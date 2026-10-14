@@ -705,6 +705,27 @@ func (e RosterSpotSlot) Valid() bool {
 	}
 }
 
+// Defines values for ScoringImportInputHost.
+const (
+	ScoringImportInputHostEspn    ScoringImportInputHost = "espn"
+	ScoringImportInputHostMfl     ScoringImportInputHost = "mfl"
+	ScoringImportInputHostSleeper ScoringImportInputHost = "sleeper"
+)
+
+// Valid indicates whether the value is a known member of the ScoringImportInputHost enum.
+func (e ScoringImportInputHost) Valid() bool {
+	switch e {
+	case ScoringImportInputHostEspn:
+		return true
+	case ScoringImportInputHostMfl:
+		return true
+	case ScoringImportInputHostSleeper:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ScoringPreset.
 const (
 	ScoringPresetHalfPpr   ScoringPreset = "half_ppr"
@@ -949,6 +970,9 @@ type Companion struct {
 
 	// PicksUntilTurn picks before the drafter's next
 	PicksUntilTurn *int `json:"picks_until_turn"`
+
+	// PlacedByName Sleeper picks placed by exact name, position and team because our players do not carry their Sleeper id yet
+	PlacedByName int `json:"placed_by_name"`
 
 	// Ranges floor, median and ceiling for each shortlist player, with range_of_outcomes only
 	Ranges *map[string]OutcomeRange `json:"ranges"`
@@ -1984,13 +2008,63 @@ type RosterSpotSlot string
 
 // Scoring exactly one of preset and custom. custom needs the custom_scoring feature.
 type Scoring struct {
-	// Custom points per stat, keyed by stat (snake_case), at most 200 stats
-	Custom *map[string]float64 `json:"custom,omitempty"`
-	Preset *ScoringPreset      `json:"preset,omitempty"`
+	Custom *ScoringRules  `json:"custom,omitempty"`
+	Preset *ScoringPreset `json:"preset,omitempty"`
 }
+
+// ScoringImport defines model for ScoringImport.
+type ScoringImport struct {
+	// Applied the rules the host states
+	Applied []string `json:"applied"`
+
+	// Defaulted the rules the host does not state, each at the standard figure
+	Defaulted []string `json:"defaulted"`
+
+	// Dropped every host rule the 21 do not carry, in the host's words with its figure, never silently lost
+	Dropped []string `json:"dropped"`
+
+	// Rules A league's exact scoring, the 21 rules research/model/domain.py ScoringRules names, every one required. An unknown key is a field error that names it. Points per yard for the yardage rules, per event for the rest.
+	Rules ScoringRules `json:"rules"`
+}
+
+// ScoringImportInput defines model for ScoringImportInput.
+type ScoringImportInput struct {
+	Host ScoringImportInputHost `json:"host"`
+
+	// Link the league link as pasted
+	Link string `json:"link"`
+}
+
+// ScoringImportInputHost defines model for ScoringImportInput.Host.
+type ScoringImportInputHost string
 
 // ScoringPreset defines model for ScoringPreset.
 type ScoringPreset string
+
+// ScoringRules A league's exact scoring, the 21 rules research/model/domain.py ScoringRules names, every one required. An unknown key is a field error that names it. Points per yard for the yardage rules, per event for the rest.
+type ScoringRules struct {
+	PointsPerDefensiveFumbleRecovery float64 `json:"points_per_defensive_fumble_recovery"`
+	PointsPerDefensiveInterception   float64 `json:"points_per_defensive_interception"`
+	PointsPerDefensiveTouchdown      float64 `json:"points_per_defensive_touchdown"`
+	PointsPerExtraPoint              float64 `json:"points_per_extra_point"`
+	PointsPerExtraPointMissed        float64 `json:"points_per_extra_point_missed"`
+	PointsPerFieldGoal               float64 `json:"points_per_field_goal"`
+	PointsPerFieldGoalMissed         float64 `json:"points_per_field_goal_missed"`
+	PointsPerFumbleLost              float64 `json:"points_per_fumble_lost"`
+	PointsPerInterception            float64 `json:"points_per_interception"`
+	PointsPerPassingTouchdown        float64 `json:"points_per_passing_touchdown"`
+	PointsPerPassingYard             float64 `json:"points_per_passing_yard"`
+	PointsPerReceivingTouchdown      float64 `json:"points_per_receiving_touchdown"`
+	PointsPerReceivingYard           float64 `json:"points_per_receiving_yard"`
+	PointsPerReception               float64 `json:"points_per_reception"`
+	PointsPerReturnTouchdown         float64 `json:"points_per_return_touchdown"`
+	PointsPerRushingTouchdown        float64 `json:"points_per_rushing_touchdown"`
+	PointsPerRushingYard             float64 `json:"points_per_rushing_yard"`
+	PointsPerSack                    float64 `json:"points_per_sack"`
+	PointsPerSafety                  float64 `json:"points_per_safety"`
+	PointsPerTwoPointConversion      float64 `json:"points_per_two_point_conversion"`
+	TeReceptionBonus                 float64 `json:"te_reception_bonus"`
+}
 
 // Sheet defines model for Sheet.
 type Sheet struct {
@@ -2327,6 +2401,9 @@ type AttachLeagueJSONRequestBody = AttachInput
 
 // PreviewAttachJSONRequestBody defines body for PreviewAttach for application/json ContentType.
 type PreviewAttachJSONRequestBody = AttachPreviewInput
+
+// ImportScoringJSONRequestBody defines body for ImportScoring for application/json ContentType.
+type ImportScoringJSONRequestBody = ScoringImportInput
 
 // ReplaceLeagueJSONRequestBody defines body for ReplaceLeague for application/json ContentType.
 type ReplaceLeagueJSONRequestBody = LeagueInput

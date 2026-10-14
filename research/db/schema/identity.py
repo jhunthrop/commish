@@ -23,8 +23,16 @@ PLAYERS: Final = Table(
     Column("last_season", Integer),
     Column("pfr_id", Text),
     Column("espn_id", Text),
+    # The fantasy hosts' own ids (revision 0005), from the fantasy id map (`pipeline host-ids`):
+    # how a host's draft or league names a player, joined on the id, never on a name.
+    Column("sleeper_id", Text),
+    Column("yahoo_id", Text),
+    Column("mfl_id", Text),
     Index("players_pfr_id_idx", "pfr_id", unique=True),
     Index("players_espn_id_idx", "espn_id", unique=True),
+    Index("players_sleeper_id_idx", "sleeper_id", unique=True),
+    Index("players_yahoo_id_idx", "yahoo_id", unique=True),
+    Index("players_mfl_id_idx", "mfl_id", unique=True),
 )
 
 PROVIDER_PLAYERS: Final = Table(

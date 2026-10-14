@@ -2,6 +2,7 @@ package entitlements_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -81,5 +82,47 @@ func TestCanAnswersFromRows(t *testing.T) {
 	}
 	if got, err := store.Can(ctx, passHolder, entitlements.LiveDraftAdvisor, bought); err != nil || got {
 		t.Errorf("refunded pass: Can = %v (err %v), want false", got, err)
+	}
+}
+
+// A seat already the claimer's answers ErrAlreadyClaimed on a repeat claim,
+// even after the claimer became a member, the no-op a repeat claim gets;
+// a member with no seat is refused as covered by the Membership.
+func TestRepeatClaimStaysAlreadyClaimedForAMember(t *testing.T) {
+	pool := dbtest.Pool(t)
+	ctx := context.Background()
+	store := &entitlements.Store{Pool: pool}
+	account := func(workosID string) uuid.UUID {
+		var id uuid.UUID
+		if err := pool.QueryRow(ctx,
+			`insert into app.accounts (workos_user_id, email) values ($1, $1 || '@example.com') returning id`,
+			workosID).Scan(&id); err != nil {
+			t.Fatal(err)
+		}
+		return id
+	}
+	buyer, claimer, member := account("user_buyer"), account("user_claimer"), account("user_member")
+	var pass uuid.UUID
+	if err := pool.QueryRow(ctx, `insert into app.group_passes (purchaser_id, league_name, season, seats, claim_code, stripe_checkout_session_id)
+		values ($1, 'Tuesday', 2027, 10, 'claim-code-0001-abcdef', 'cs_group_1') returning id`, buyer).Scan(&pass); err != nil {
+		t.Fatal(err)
+	}
+	now := time.Date(2027, time.August, 20, 12, 0, 0, 0, time.UTC)
+	if err := store.ClaimGroupPass(ctx, pass, claimer, now, "test"); err != nil {
+		t.Fatalf("first claim: %v", err)
+	}
+	for _, who := range []uuid.UUID{claimer, member} {
+		if err := store.UpsertSubscription(ctx, entitlements.SubscriptionState{
+			AccountID: who, SubscriptionID: "sub_" + who.String()[:8], Status: "active", Interval: "year",
+			CurrentPeriodEnd: now.AddDate(1, 0, 0), GrantedBy: "test",
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := store.ClaimGroupPass(ctx, pass, claimer, now, "test"); !errors.Is(err, entitlements.ErrAlreadyClaimed) {
+		t.Errorf("repeat claim as a member: %v, want ErrAlreadyClaimed", err)
+	}
+	if err := store.ClaimGroupPass(ctx, pass, member, now, "test"); !errors.Is(err, entitlements.ErrCoveredByMembership) {
+		t.Errorf("a member's first claim: %v, want ErrCoveredByMembership", err)
 	}
 }

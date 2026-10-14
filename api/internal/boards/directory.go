@@ -1,0 +1,93 @@
+package boards
+
+import (
+	"context"
+	"fmt"
+	"time"
+)
+
+// Projection is one player's season on a board the api did not read
+// from the stored table: the boards service's answer, keyed by the
+// universe id the research boards key on.
+type Projection struct {
+	Points  float64
+	Floor   float64
+	Median  float64
+	Ceiling float64
+}
+
+// maxHostIDs bounds the id map one read takes in.
+const maxHostIDs = 20000
+
+// SleeperIDs is Sleeper's player id to the provider id the boards name
+// players by: players.sleeper_id (revision 0005) through the crosswalk.
+func (s *PGSource) SleeperIDs(ctx context.Context) (map[string]string, error) {
+	rows, err := s.Pool.Query(ctx, `select p.sleeper_id, c.provider_player_id from `+s.table("players")+` p
+join `+s.table("player_crosswalk")+` c on c.player_id = p.id where p.sleeper_id is not null
+order by p.sleeper_id, c.provider_player_id limit `+fmt.Sprint(maxHostIDs+1))
+	if err != nil {
+		return nil, fmt.Errorf("boards: read sleeper ids: %w", err)
+	}
+	defer rows.Close()
+	out := map[string]string{}
+	for rows.Next() {
+		var hostID, id string
+		if err := rows.Scan(&hostID, &id); err != nil {
+			return nil, fmt.Errorf("boards: scan sleeper ids: %w", err)
+		}
+		if _, twice := out[hostID]; twice {
+			// Two provider ids for one player: the crosswalk is wrong, and a
+			// pick placed on either would be a guess.
+			return nil, fmt.Errorf("boards: sleeper id %s crosses to two provider players", hostID)
+		}
+		out[hostID] = id
+	}
+	if len(out) > maxHostIDs {
+		return nil, fmt.Errorf("boards: over %d sleeper ids; the map is not the one expected", maxHostIDs)
+	}
+	return out, rows.Err()
+}
+
+// directoryQuery is the provider's roster (the ids the product names
+// players by) in ADP order, each with the universe id the boards key on
+// through the crosswalk, empty where the crosswalk has none.
+func (s *PGSource) directoryQuery() string {
+	return `select pp.id, pp.name, pp.position, pp.team, coalesce(pp.headshot_url, ''), pp.adp, coalesce(c.player_id, '')
+from ` + s.table("provider_players") + ` pp left join ` + s.table("player_crosswalk") + ` c on c.provider_player_id = pp.id
+order by pp.adp asc nulls last, pp.id collate "C"`
+}
+
+// LoadScored is the directory with points from a board scored elsewhere
+// (the boards service), in the same pool order Load answers.
+func (s *PGSource) LoadScored(ctx context.Context, f Format, source string, asOf time.Time, points map[string]Projection) (*Raw, error) {
+	byes, err := s.byes(ctx)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := s.Pool.Query(ctx, s.directoryQuery())
+	if err != nil {
+		return nil, fmt.Errorf("boards: read the directory: %w", err)
+	}
+	defer rows.Close()
+	raw := &Raw{Format: f, Season: s.Season, Source: source, AsOf: asOf.UTC(), Custom: true}
+	for rows.Next() {
+		var p Player
+		var position, universe string
+		if err := rows.Scan(&p.ID, &p.Name, &position, &p.Team, &p.Headshot, &p.ADP, &universe); err != nil {
+			return nil, fmt.Errorf("boards: scan the directory: %w", err)
+		}
+		if !directoryPlayer(&p, position, byes) {
+			continue
+		}
+		if proj, ok := points[universe]; ok && universe != "" {
+			pts := proj.Points
+			p.Points = &pts
+			p.Range = &Range{Floor: proj.Floor, Median: proj.Median, Ceiling: proj.Ceiling}
+		}
+		raw.Players = append(raw.Players, p)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("boards: read the directory: %w", err)
+	}
+	return raw, nil
+}

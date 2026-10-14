@@ -38,7 +38,7 @@ from psycopg import IsolationLevel
 from psycopg.errors import SerializationFailure, SnapshotTooOld
 from sqlalchemy import Table
 
-from research.db.legacy import LEGACY_SCHEMA, LEGACY_TABLES, NOT_CARRIED, LegacyTable, check_complete
+from research.db.legacy import LEGACY_SCHEMA, LEGACY_TABLES, NEW_IN_RESEARCH, NOT_CARRIED, LegacyTable, check_complete
 from research.db.schema import METADATA, RESEARCH_SCHEMA
 from research.db.url import database_url_from_env
 from research.errors import ResearchError
@@ -187,7 +187,8 @@ def load(source_url: str, target_url: str, replace: bool) -> list[ManifestRow]:
         target.execute("set timezone = 'UTC'")
         try:
             for table in METADATA.sorted_tables:
-                manifest.append(_load_table(source, target, table))
+                if table.name not in NEW_IN_RESEARCH:
+                    manifest.append(_load_table(source, target, table))
         except (SerializationFailure, SnapshotTooOld) as lost:
             target.rollback()
             raise SnapshotError(f"the source snapshot could not be held ({lost}); nothing was written") from lost

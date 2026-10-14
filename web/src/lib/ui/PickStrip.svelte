@@ -18,10 +18,12 @@
 
 	/** The face's size, base.css's --strip-face, which the strip's reserved height counts. */
 	const STRIP_FACE = 36;
+	/** The text lines the strip holds: each pick's name and the most lines under one. */
+	const textLines = $derived(1 + Math.max(0, ...picks.map((p) => p.lines.length)));
 </script>
 
 <Panel padding="none">
-	<div class="strip">
+	<div class="strip strip-height" style:--strip-text-lines={textLines}>
 		<div class="lead">
 			<b>{lead}</b>
 			{#each leadLines as line, i (i)}<span>{line}</span>{/each}
@@ -51,7 +53,7 @@
 		gap: var(--s-3);
 		padding: var(--s-3) var(--fade-w) var(--s-3) var(--s-4);
 		overflow-x: auto;
-		min-block-size: var(--pick-strip-h);
+		min-block-size: var(--strip-h);
 		box-sizing: border-box;
 		/* At every width the last face fades, the cue that more of the strip scrolls in. */
 		mask-image: var(--fade-end);
@@ -103,7 +105,9 @@
 		flex-direction: column;
 		align-items: center;
 		gap: var(--strip-gap);
-		width: var(--strip-w);
+		/* At least the column's width, and as wide as its longest line: a name or a handle is shown
+		   whole, never cut, and the strip scrolls. */
+		min-inline-size: var(--strip-w);
 		font-size: var(--t-xs);
 		line-height: var(--strip-line);
 		/* A name, a league member's handle among them, keeps its direction to itself. */
@@ -116,16 +120,10 @@
 		font-weight: 600;
 		color: var(--ink);
 		white-space: nowrap;
-		max-width: var(--strip-w);
-		overflow: hidden;
-		text-overflow: ellipsis;
 		font-size: var(--t-xs);
 	}
 
 	li span {
-		max-width: var(--strip-w);
-		overflow: hidden;
-		text-overflow: ellipsis;
 		white-space: nowrap;
 	}
 

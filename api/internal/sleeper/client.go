@@ -60,7 +60,9 @@ type Client struct {
 
 // New is the client with the timeout and base URL.
 func New() *Client {
-	return &Client{HTTP: &http.Client{Timeout: Timeout}, BaseURL: BaseURL}
+	// A redirect is never followed: an answer from elsewhere is not Sleeper's.
+	refuse := func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+	return &Client{HTTP: &http.Client{Timeout: Timeout, CheckRedirect: refuse}, BaseURL: BaseURL}
 }
 
 // get reads one path into out. A JSON null body (Sleeper's answer for an

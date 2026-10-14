@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/jhunthrop/commish/api/internal/apitypes"
+	"github.com/jhunthrop/commish/api/internal/scoring"
 )
 
 // Both recorded leagues read through the same checks a live answer
@@ -29,7 +30,7 @@ func TestRecordedLeaguesRead(t *testing.T) {
 			map[string]float64{
 				"points_per_reception": 1, "te_reception_bonus": 0.5, "points_per_passing_touchdown": 5,
 				"points_per_passing_yard": 0.04, "points_per_two_point_conversion": 2, "points_per_interception": -1,
-			}, "st_td 6"},
+			}, "special teams touchdown 6"},
 		{"https://www43.myfantasyleague.com/2026/home/" + ReplayMFLLeague, apitypes.LineupStandard, 23,
 			map[string]float64{
 				"points_per_reception": 1, "points_per_passing_touchdown": 4, "points_per_passing_yard": 0.04,
@@ -61,8 +62,8 @@ func TestRecordedLeaguesRead(t *testing.T) {
 				t.Errorf("%s: a setting of 0 is named dropped: %q", c.link, d)
 			}
 		}
-		if len(snap.Scoring.Rules) != len(ruleKeys) {
-			t.Errorf("%s: %d rule keys, want the %d of ScoringRules", c.link, len(snap.Scoring.Rules), len(ruleKeys))
+		if len(snap.Scoring.Rules) != len(scoring.Rules()) {
+			t.Errorf("%s: %d rule keys, want the %d of ScoringRules", c.link, len(snap.Scoring.Rules), len(scoring.Rules()))
 		}
 		settings, reason := SettingsFor(snap)
 		if reason != "" {

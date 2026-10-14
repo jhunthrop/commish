@@ -61,3 +61,17 @@ func TestFallbackAnswersADeclinedRoom(t *testing.T) {
 		t.Fatalf("got %+v, %v; want the engine's card", got, err)
 	}
 }
+
+// The rows after the call carry the advisor's contrast as their why; the
+// call keeps its own.
+func TestHTTPRowsTakeTheirContrast(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{"ok":true,"error":null,"data":{"pickNumber":3,"nextPickNumber":6,"survival":{},"shortlist":[` +
+			`{"playerId":"a","why":"Call why.","contrast":null},{"playerId":"b","why":"Plain why.","contrast":"He is another back."}]}}`))
+	}))
+	t.Cleanup(srv.Close)
+	card, err := HTTP{BaseURL: srv.URL, Client: srv.Client()}.Card(context.Background(), request())
+	if err != nil || card.Shortlist[0].Why != "Call why." || card.Shortlist[1].Why != "He is another back." {
+		t.Fatalf("card %+v, %v", card.Shortlist, err)
+	}
+}

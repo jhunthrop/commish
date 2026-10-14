@@ -15,10 +15,26 @@ The prep site runs on three providers, provisioned on 2026-10-12 (spec §2, `doc
 - APIs: Cloud Run, Artifact Registry, IAM, IAM Credentials, STS, Secret Manager, Cloud Scheduler, Resource Manager, Logging, Monitoring.
 - Artifact Registry: `us-east1-docker.pkg.dev/trycommish/commish` (Docker). Images: `api` (one image, two Cloud Run services `api` and `room`), `research` (the Cloud Run Job `nightly` and the service `advisor`).
 - Service accounts:
-  - `deployer@trycommish.iam.gserviceaccount.com`: GitHub Actions. Roles `run.admin`, `artifactregistry.writer`, `run.jobsExecutorWithOverrides`, and `iam.serviceAccountUser` on the two runtime accounts.
+  - `deployer@trycommish.iam.gserviceaccount.com`: GitHub Actions. Roles `run.admin`, `artifactregistry.writer`, `run.jobsExecutorWithOverrides`, and `iam.serviceAccountUser` on the runtime accounts (`boards-runtime` from Lane 8 part A).
   - `api-runtime@trycommish.iam.gserviceaccount.com`: the `api` and `room` services.
   - `research-runtime@trycommish.iam.gserviceaccount.com`: the `nightly`, `nightly-publish`, `inseason` and `inseason-capture` jobs, and the caller of the research schedule.
   - `advisor-runtime@trycommish.iam.gserviceaccount.com`: the `advisor` service, no roles; `deployer` has `iam.serviceAccountUser` on it. The service runs with ingress all behind IAM; `api-runtime` holds `run.invoker` on it and the Go rooms call it with a Google identity token (`ADVISOR_URL` repository variable; unset means the engine's own odds).
+  - `boards-runtime@trycommish.iam.gserviceaccount.com` (Lane 8 part A, created by the coordinator before the merge): the `boards` service (a board for a league's exact scoring rules, `python -m research.boards`), deployed by `research.yml`. It holds `secretmanager.secretAccessor` on `RESEARCH_DATABASE_URL` alone, plus `logging.logWriter` and `monitoring.metricWriter`; `deployer` has `iam.serviceAccountUser` on it. Ingress all behind IAM (api has no VPC egress), `api-runtime` alone holds `run.invoker` (granted by the workflow); the api calls it with an identity token (`BOARDS_URL` repository variable; unset means a league's own scoring answers that its board cannot be built right now). The commands, run once by hand (the agent does not run gcloud):
+
+    ```sh
+    gcloud iam service-accounts create boards-runtime --project trycommish --display-name "boards service"
+    SA=boards-runtime@trycommish.iam.gserviceaccount.com
+    gcloud secrets add-iam-policy-binding RESEARCH_DATABASE_URL --project trycommish \
+      --member "serviceAccount:$SA" --role roles/secretmanager.secretAccessor
+    for role in roles/logging.logWriter roles/monitoring.metricWriter; do
+      gcloud projects add-iam-policy-binding trycommish --member "serviceAccount:$SA" --role "$role" --condition None
+    done
+    gcloud iam service-accounts add-iam-policy-binding "$SA" --project trycommish \
+      --member "serviceAccount:deployer@trycommish.iam.gserviceaccount.com" --role roles/iam.serviceAccountUser
+    # Check: the account reads exactly one secret.
+    gcloud secrets get-iam-policy RESEARCH_DATABASE_URL --project trycommish | grep "$SA"
+    ```
+
   - Both runtime accounts: `logging.logWriter`, `monitoring.metricWriter`. `api-runtime` holds `secretmanager.secretAccessor` on the project. `research-runtime` holds it on exactly its six secrets (`RESEARCH_DATABASE_URL`, `AI_GATEWAY_API_KEY`, `CLOUDFLARE_API_TOKEN`, `TANK01_API_KEY`, `ODDS_API_KEY`, `WEB_DISPATCH_TOKEN`) and nothing project-wide, set and checked by `infra/research-secrets.sh` (2026-10-13).
 - Cloud Run services as deployed by `api.yml`: `api` at https://api-mgq3rq4xbq-ue.a.run.app and `room` at https://room-mgq3rq4xbq-ue.a.run.app (us-east1, runtime `api-runtime`, scale to zero), the migrate job `api-migrate` run from the workflow when `APP_SCHEMA_READY` is true. The organization policy `iam.allowedPolicyMemberDomains` restricts IAM members to the derbee.ai customer, so `allUsers` cannot be granted `run.invoker`; public access comes from the invoker IAM check being disabled on the service, the same way foreversixty's API is public.
 - Custom hostnames: `api.trycommish.app` and `room.trycommish.app` map to the services with `gcloud beta run domain-mappings create` once the domain is verified for the GCP account (`gcloud domains verify trycommish.app`, a Search Console step the founder does once), then DNS-only CNAME records in Cloudflare as the mapping prints them. Until then the run.app URLs serve.

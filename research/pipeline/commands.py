@@ -23,7 +23,7 @@ from typing import Final
 from sqlalchemy import Connection
 
 from research.errors import ConfigurationError
-from research.pipeline import coaches, crosswalk, history, vegas
+from research.pipeline import coaches, crosswalk, history, host_ids, vegas
 from research.pipeline.budget import FixedBudget
 from research.pipeline.checkpoint import Checkpoint
 from research.pipeline.http import Fetcher
@@ -197,6 +197,7 @@ COMMANDS: Final = MappingProxyType({
     "tank01-adp": Command("the provider's ADP onto provider_players", lambda c, i: tank01.ingest_adp(c, tank01_provider(i), FixedBudget(TANK01_RUN_BUDGET))),
     "headshots": Command("the provider's headshot URLs onto provider_players", lambda c, i: tank01.backfill_headshots(c, tank01_provider(i))),
     "crosswalk": Command("the provider roster against the universe", lambda c, i: crosswalk.build_crosswalk(c, i.now)),
+    "host-ids": Command("the fantasy hosts' player ids onto the universe", lambda c, i: host_ids.ingest_host_ids(c, i.fetcher)),
     "capture-harvest": Command("the capture harvest's five feeds", _harvest),
     "adp-snapshot": Command("the nightly three-format ADP capture", lambda c, i: boards.ingest_adp_snapshot(c, i.fetcher, i.now)),
     "preseason": Command("week-one rosters, depth chart and the published boards per season", _preseason, atomic=False),

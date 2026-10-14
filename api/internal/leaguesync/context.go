@@ -11,32 +11,32 @@ import (
 	"github.com/jhunthrop/commish/api/internal/account"
 	"github.com/jhunthrop/commish/api/internal/apitypes"
 	"github.com/jhunthrop/commish/api/internal/boards"
+	"github.com/jhunthrop/commish/api/internal/scoring"
 )
 
 // LeagueScoring is the preset a league's scoring is or scores most like,
 // and the board it reads on. The saved league decides when there is one
-// (boards.FormatFor, superflex by its lineup); otherwise the last read's
-// rules and lineup do. A league with no rules read reads as PPR.
+// (its preset, or its own rules read by NearestPreset on the boards'
+// thresholds, scoring.PPRFrom and HalfFrom; superflex by its lineup);
+// otherwise the last read's rules and lineup do. A league with no rules
+// read reads as PPR.
 func LeagueScoring(saved *apitypes.LeagueSettings, rules map[string]float64, superFlex bool) (apitypes.ScoringPreset, apitypes.BoardFormat) {
-	ppr := apitypes.ScoringPresetPpr
-	scoring := apitypes.Scoring{Preset: &ppr}
-	if len(rules) > 0 {
-		scoring = apitypes.Scoring{Custom: &rules}
+	preset := apitypes.ScoringPresetPpr
+	switch {
+	case saved != nil && saved.Scoring.Preset != nil:
+		preset = *saved.Scoring.Preset
+	case saved != nil && saved.Scoring.Custom != nil:
+		preset = NearestPreset(scoring.ToMap(*saved.Scoring.Custom))
+	case saved == nil && len(rules) > 0:
+		preset = NearestPreset(rules)
 	}
 	if saved != nil {
-		scoring, superFlex = saved.Scoring, saved.Lineup == apitypes.LineupSuperflex
-	}
-	preset := ppr
-	switch {
-	case scoring.Preset != nil:
-		preset = *scoring.Preset
-	case scoring.Custom != nil:
-		preset = NearestPreset(*scoring.Custom)
+		superFlex = saved.Lineup == apitypes.LineupSuperflex
 	}
 	if superFlex {
 		return preset, apitypes.BoardFormatSuperflex
 	}
-	return preset, boards.FormatFor(scoring).Board()
+	return preset, boards.FormatFor(preset).Board()
 }
 
 // contextLeague is a followed league as the shell's switcher lists it.

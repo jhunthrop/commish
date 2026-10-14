@@ -75,6 +75,8 @@ type Service struct {
 	// FFPC is the FFPC host when it is set up (HOST_CREDENTIALS_KEY), nil
 	// otherwise; it is also among Hosts, which reads it on the poll.
 	FFPC *FFPC
+	// ESPN reads a public ESPN league's scoring for the import.
+	ESPN ESPNLeagues
 	// Selection keeps the site's context and Accounts answers the Account
 	// it changes (PUT /me/league).
 	Selection Selector
@@ -88,6 +90,7 @@ type Service struct {
 func (s *Service) Routes() []httpx.Route {
 	read := httpx.PerMinute(limitReadPerMinute)
 	return []httpx.Route{
+		{Method: http.MethodPost, Path: "/leagues/import-scoring", Access: httpx.SignedIn, Limit: httpx.PerMinute(limitAttachPerMinute), Handler: s.importScoring},
 		{Method: http.MethodPost, Path: "/leagues/attach/preview", Access: httpx.SignedIn, Limit: httpx.PerMinute(limitAttachPerMinute), Handler: s.preview},
 		{Method: http.MethodPost, Path: "/leagues/attach", Access: httpx.SignedIn, Limit: httpx.PerMinute(limitAttachPerMinute), Handler: s.attach},
 		{Method: http.MethodGet, Path: "/leagues/attached", Access: httpx.SignedIn, Limit: read, Handler: s.attached},

@@ -28,6 +28,7 @@ def _candidate_json(advised: AdvisedCandidate) -> dict[str, Any]:
         "survivalProbability": r.survival_probability,
         "reasons": [reason_json(reason) for reason in r.reasons],
         "why": advised.why,
+        "contrast": advised.contrast,
     }
 
 

@@ -66,11 +66,16 @@ def _cliff_of(facts: HimFacts) -> TierCliff | None:
     return next((reason for reason in facts.reasons if isinstance(reason, TierCliff)), None)
 
 
-def _tier_clause(him: _Him, cliff: TierCliff) -> str:
+def tier_clause(one: str, many: str, cliff: TierCliff) -> str:
+    """ "the last receiver before a 14.2 point drop": the tier a player closes, with its drop."""
     drop = js_to_fixed(cliff.drop_to_next_tier, 1)
     if cliff.players_left_in_tier == 1:
-        return f"the last {him.one} before a {drop} point drop"
-    return f"one of {cliff.players_left_in_tier} {him.many} left before a {drop} point drop"
+        return f"the last {one} before a {drop} point drop"
+    return f"one of {cliff.players_left_in_tier} {many} left before a {drop} point drop"
+
+
+def _tier_clause(him: _Him, cliff: TierCliff) -> str:
+    return tier_clause(him.one, him.many, cliff)
 
 
 def _cliff_one(him: _Him, cliff: TierCliff) -> str:

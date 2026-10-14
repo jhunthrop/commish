@@ -116,11 +116,13 @@ func TestPlansWithCheckoutClosed(t *testing.T) {
 		t.Error("checkout reads open with no Stripe")
 	case c.Season != 2027 || !c.PassEndsAt.Equal(time.Date(2028, 3, 1, 0, 0, 0, 0, time.UTC)):
 		t.Errorf("season %d ending %s, want 2027 ending 2028-03-01", c.Season, c.PassEndsAt)
-	case c.DraftPass == nil || c.DraftPass.AmountCents != centsDraftPass:
-		t.Errorf("draft pass %+v, want %d", c.DraftPass, centsDraftPass)
-	case len(c.Membership) != 2 || c.Membership[0].AmountCents != centsMembershipYearly:
-		t.Errorf("membership %+v, want yearly first", c.Membership)
-	case c.GroupPass == nil || c.GroupPass.PerSeat.AmountCents != centsGroupPassSeat || c.GroupPass.MinSeats != MinGroupSeats:
-		t.Errorf("group pass %+v, want %d a seat from %d", c.GroupPass, centsGroupPassSeat, MinGroupSeats)
+	// The figures themselves, as the pass page prints them, never the
+	// constants they come from: a changed constant must fail here.
+	case c.DraftPass == nil || c.DraftPass.AmountCents != 3900:
+		t.Errorf("draft pass %+v, want $39", c.DraftPass)
+	case len(c.Membership) != 2 || c.Membership[0].AmountCents != 9900 || c.Membership[1].AmountCents != 1499:
+		t.Errorf("membership %+v, want $99 a year first, then $14.99 a month", c.Membership)
+	case c.GroupPass == nil || c.GroupPass.PerSeat.AmountCents != 2900 || c.GroupPass.MinSeats != 8:
+		t.Errorf("group pass %+v, want $29 a seat from 8 seats", c.GroupPass)
 	}
 }

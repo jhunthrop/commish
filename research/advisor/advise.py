@@ -8,9 +8,10 @@ where drafters take them, each with zero value and the slot he fills as his reas
 """
 
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Final
 
+from research.advisor.contrast import contrasts
 from research.advisor.request import AdviseRequest, PoolEntry
 from research.advisor.why import HimFacts, him_sentence, survival_sentence
 from research.model.decide.draft import (
@@ -43,6 +44,8 @@ class RoomStateError(ValueError):
 class AdvisedCandidate:
     recommendation: Recommendation
     why: str
+    # The row's why as its contrast to the call (`contrast.py`), None for the call itself.
+    contrast: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -154,7 +157,11 @@ def advise(request: AdviseRequest, curve: SurvivalCurve) -> Advice:
             "the pool is missing a position the roster rules start."
         )
     card = _Card(valued, undrafted, view, restricted_positions(slots, view.filled), pick_number, next_pick)
-    shortlist = tuple(card.advised(recommendation) for recommendation in recommendations)
+    against = contrasts(recommendations, pick_number, next_pick is not None)
+    shortlist = tuple(
+        replace(card.advised(recommendation), contrast=contrast)
+        for recommendation, contrast in zip(recommendations, against, strict=True)
+    )
     return Advice(
         pick_number,
         next_pick,

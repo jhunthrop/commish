@@ -9,6 +9,7 @@ package boards
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/jhunthrop/commish/api/internal/apitypes"
@@ -28,44 +29,30 @@ const (
 // Formats is every stored board, the order a warm-up loads them in.
 func Formats() []Format { return []Format{PPR, Half, Standard} }
 
-// Reception points a custom rule must reach to read as PPR or half.
-const (
-	pprReceptionFrom  = 0.75
-	halfReceptionFrom = 0.25
-	receptionStat     = "rec"
-	receptionRule     = "points_per_reception"
-)
-
-// FormatFor is the board a league's scoring drafts from. TE premium has
-// no board of its own yet, so it reads the PPR board and the basis says
-// PPR; a custom rule reads the nearest of the three by its points per
-// reception.
-func FormatFor(s apitypes.Scoring) Format {
-	if s.Preset != nil {
-		switch *s.Preset {
-		case apitypes.ScoringPresetHalfPpr:
-			return Half
-		case apitypes.ScoringPresetStandard:
-			return Standard
-		default:
-			return PPR
-		}
-	}
-	if s.Custom != nil {
-		rec := (*s.Custom)[receptionStat]
-		// ScoringRules' name for it, as an attached league saves it.
-		if v, ok := (*s.Custom)[receptionRule]; ok {
-			rec = v
-		}
-		switch {
-		case rec >= pprReceptionFrom:
-			return PPR
-		case rec >= halfReceptionFrom:
-			return Half
-		}
+// FormatFor is the stored board a preset drafts from. TE premium has no
+// board of its own yet, so it reads the PPR board and the basis says so.
+// A league's own rules never read a stored board: CustomSource scores the
+// stored board's candidates under them exactly.
+func FormatFor(preset apitypes.ScoringPreset) Format {
+	switch preset {
+	case apitypes.ScoringPresetHalfPpr:
+		return Half
+	case apitypes.ScoringPresetStandard:
 		return Standard
+	default:
+		return PPR
 	}
-	return PPR
+}
+
+// FormatOfSource is the stored format a board source names
+// (<prefix>_<format>_12), false for one that names none.
+func FormatOfSource(source string) (Format, bool) {
+	for _, f := range Formats() {
+		if strings.Contains(source, "_"+string(f)+"_") {
+			return f, true
+		}
+	}
+	return "", false
 }
 
 // Words is how a sentence names the board's points: "PPR".
@@ -126,6 +113,9 @@ type Raw struct {
 	Source  string
 	AsOf    time.Time
 	Players []Player
+	// Custom is set when the points are a league's own rules applied to
+	// the stored board's candidates (CustomSource), not a stored board.
+	Custom bool
 }
 
 // Board is a stored board valued for one league: points over replacement
@@ -223,22 +213,24 @@ func (b Board) Byes() map[string]int {
 // Basis is the sentence that names what the numbers are: whose points,
 // over replacement for what league.
 func (b Board) Basis() string {
+	tail := fmt.Sprintf("over replacement for %d teams on this roster. Kickers and defenses carry no projection and sit where drafters take them.", b.teams)
+	if b.Raw.Custom {
+		return fmt.Sprintf("Your league's scoring. Points are our %d projections with every one of its rules applied exactly, "+
+			"built on our %s board's players and where drafters take them (the board closest to its points per catch), %s",
+			b.Raw.Season, b.Raw.Format.Words(), tail)
+	}
 	ranked := ""
 	if b.RankedFor != "" {
 		ranked = fmt.Sprintf("%s is ranked on our %s board. ", b.RankedFor, b.Raw.Format.Words())
 	}
-	return fmt.Sprintf("%sPoints are our %d %s projections, over replacement for %d teams on this roster. Kickers and defenses carry no projection and sit where drafters take them.",
-		ranked, b.Raw.Season, b.Raw.Format.Words(), b.teams)
+	return fmt.Sprintf("%sPoints are our %d %s projections, %s", ranked, b.Raw.Season, b.Raw.Format.Words(), tail)
 }
 
-// RankedFor names a league's scoring when no board of its own exists
-// yet and the room ranks it on the nearest stored board: "TE premium",
-// "Your custom scoring". Empty when the board is the scoring's own.
+// RankedFor names a preset with no board of its own, which the room
+// ranks on the nearest stored board: "TE premium". Empty when the board
+// is the scoring's own, a league's own rules included.
 func RankedFor(s apitypes.Scoring) string {
-	switch {
-	case s.Custom != nil:
-		return "Your custom scoring"
-	case s.Preset != nil && *s.Preset == apitypes.ScoringPresetTePremium:
+	if s.Preset != nil && *s.Preset == apitypes.ScoringPresetTePremium {
 		return "TE premium"
 	}
 	return ""

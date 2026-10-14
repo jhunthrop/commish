@@ -4,7 +4,7 @@ Ported from `research-ts/src/projections/preseason/persist.ts` (`buildBoard`, th
 and `market/blend.ts` (`shippedPreseasonBoardInputs`'s raw arm, `gated`).
 """
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from typing import Final
 
@@ -54,19 +54,17 @@ _SCORED: Final = ("QB", "RB", "WR", "TE")
 TEAM_COUNT: Final = 12
 
 
-def _scored_slots() -> tuple[RosterSlotConfig, ...]:
-    kept = [
-        slot
-        for slot in STANDARD_ROSTER_SLOTS
-        if slot.slot == BENCH_SLOT or all(p in _SCORED for p in slot.eligible_positions)
-    ]
+def scored_slots(slots: Sequence[RosterSlotConfig]) -> tuple[RosterSlotConfig, ...]:
+    """A roster's slots as a board values them: no kickers and no defences (they carry no
+    projection), a flex keeping only its scored positions, the bench kept."""
+    kept = [slot for slot in slots if slot.slot == BENCH_SLOT or all(p in _SCORED for p in slot.eligible_positions)]
     return tuple(
         replace(slot, eligible_positions=tuple(p for p in slot.eligible_positions if p in _SCORED)) for slot in kept
     )
 
 
 # Twelve teams, no kickers and no defences: the league every stored board is valued in.
-BOARD_SHAPE: Final = LeagueShape(TEAM_COUNT, _scored_slots())
+BOARD_SHAPE: Final = LeagueShape(TEAM_COUNT, scored_slots(STANDARD_ROSTER_SLOTS))
 
 
 @dataclass(frozen=True, slots=True)
@@ -107,6 +105,8 @@ class BuiltBoard:
     board: list[BoardEntry]
     exclusions: list[ExcludedCandidate]
     sweep: RosterSweep | None
+    # The exact set `preseason_board` was given: what `preseason_candidates` keeps (revision 0005).
+    candidates: tuple[BoardCandidate, ...] = ()
 
 
 def raw_board(
@@ -115,7 +115,7 @@ def raw_board(
     """The raw model board (v1): no market, PPR."""
     built = gated(conn, inputs, artifacts, arithmetic)
     board = preseason_board(built.candidates, PPR_SCORING, BOARD_SHAPE, artifacts.game_variance)
-    return BuiltBoard(board, built.exclusions, built.sweep)
+    return BuiltBoard(board, built.exclusions, built.sweep, tuple(built.candidates))
 
 
 @dataclass(frozen=True, slots=True)
@@ -175,5 +175,8 @@ def blended_board(  # noqa: PLR0913, PLR0917 - the oracle's parameters, and the 
     )
     blended = blend_board(market, built.candidates, context, inputs.season)
     return BuiltBoard(
-        preseason_board(blended, rules, BOARD_SHAPE, artifacts.game_variance), built.exclusions, built.sweep
+        preseason_board(blended, rules, BOARD_SHAPE, artifacts.game_variance),
+        built.exclusions,
+        built.sweep,
+        tuple(blended),
     )

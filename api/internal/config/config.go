@@ -145,6 +145,12 @@ type Board struct {
 	SourcePrefix string
 	// TTL is how long a loaded board serves before it is read again.
 	TTL time.Duration
+	// ServiceURL is BOARDS_URL, the research boards service that scores a
+	// league's own rules; empty leaves custom scoring unavailable.
+	ServiceURL string
+	// ServiceTimeout bounds one call to it (a cold board is under a
+	// second; a cached one is a read).
+	ServiceTimeout time.Duration
 }
 
 // Advisor is the research lane's advisor service. An empty URL leaves
@@ -401,6 +407,7 @@ const (
 	defaultBoardPrefix    = "commish_board_v9"
 	defaultBoardTTL       = 15 * time.Minute
 	defaultAdvisorTimeout = 300 * time.Millisecond
+	defaultBoardsTimeout  = 5 * time.Second
 	defaultDevRoomBaseURL = "ws://localhost:8081"
 )
 
@@ -424,8 +431,12 @@ func (l *loader) board() Board {
 		Season:       l.positiveInt("BOARD_SEASON", defaultBoardSeason),
 		SourcePrefix: l.optional("BOARD_SOURCE_PREFIX", defaultBoardPrefix),
 		TTL:          time.Duration(l.positiveInt("BOARD_TTL_SECONDS", int(defaultBoardTTL/time.Second))) * time.Second,
+		ServiceURL:   strings.TrimRight(l.optional("BOARDS_URL", ""), "/"),
+		ServiceTimeout: time.Duration(l.positiveInt("BOARDS_TIMEOUT_MS", int(defaultBoardsTimeout/time.Millisecond))) *
+			time.Millisecond,
 	}
 	l.postgresURL("BOARD_DATABASE_URL", b.DatabaseURL)
+	l.serviceOrigin("BOARDS_URL", b.ServiceURL)
 	return b
 }
 
@@ -434,12 +445,18 @@ func (l *loader) advisor() Advisor {
 		URL:     strings.TrimRight(l.optional("ADVISOR_URL", ""), "/"),
 		Timeout: time.Duration(l.positiveInt("ADVISOR_TIMEOUT_MS", int(defaultAdvisorTimeout/time.Millisecond))) * time.Millisecond,
 	}
-	if a.URL != "" {
-		if u, err := url.Parse(a.URL); err != nil || u.Host == "" || (u.Scheme != "http" && u.Scheme != "https") {
-			l.invalid("ADVISOR_URL", "must be an http(s) origin")
-		}
-	}
+	l.serviceOrigin("ADVISOR_URL", a.URL)
 	return a
+}
+
+// serviceOrigin checks an optional research service's origin.
+func (l *loader) serviceOrigin(name, v string) {
+	if v == "" {
+		return
+	}
+	if u, err := url.Parse(v); err != nil || u.Host == "" || (u.Scheme != "http" && u.Scheme != "https") {
+		l.invalid(name, "must be an http(s) origin")
+	}
 }
 
 func (l *loader) roomBaseURL(env Env) string {

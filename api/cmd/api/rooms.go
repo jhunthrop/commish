@@ -14,6 +14,7 @@ import (
 
 	"github.com/jhunthrop/commish/api/internal/advisor"
 	"github.com/jhunthrop/commish/api/internal/auth"
+	"github.com/jhunthrop/commish/api/internal/boards"
 	"github.com/jhunthrop/commish/api/internal/config"
 	"github.com/jhunthrop/commish/api/internal/draftroom"
 	"github.com/jhunthrop/commish/api/internal/leagues"
@@ -25,24 +26,42 @@ import (
 	"github.com/jhunthrop/commish/api/internal/solo"
 )
 
-// advisorClient is the HTTP client the card calls the advisor with. The
-// advisor runs on Cloud Run behind IAM (ingress all, run.invoker granted to
-// api-runtime), so an https advisor is called with a Google identity token
-// whose audience is its URL, minted from the service account the API runs
-// as. A plain http advisor is a local one (docker on localhost) and needs
-// none. A failed call still falls back to the engine (advisor.Fallback);
-// only a token source that cannot be built at all stops the start, since
-// that is a deploy without credentials, not a slow advisor.
-func advisorClient(ctx context.Context, cfg config.Advisor) (*http.Client, error) {
-	if !strings.HasPrefix(cfg.URL, "https://") {
-		return &http.Client{Timeout: cfg.Timeout}, nil
+// serviceClient is the HTTP client a research service (the advisor, the
+// boards service) is called with. Each runs on Cloud Run behind IAM
+// (ingress all, run.invoker granted to api-runtime), so an https service
+// is called with a Google identity token whose audience is its URL,
+// minted from the service account the API runs as. A plain http one is
+// local (docker on localhost) and needs none. Only a token source that
+// cannot be built at all stops the start, since that is a deploy without
+// credentials, not a slow service.
+func serviceClient(ctx context.Context, url string, timeout time.Duration) (*http.Client, error) {
+	if !strings.HasPrefix(url, "https://") {
+		return &http.Client{Timeout: timeout}, nil
 	}
-	client, err := idtoken.NewClient(ctx, cfg.URL)
+	client, err := idtoken.NewClient(ctx, url)
 	if err != nil {
-		return nil, fmt.Errorf("advisor: identity token client for %s: %w", cfg.URL, err)
+		return nil, fmt.Errorf("identity token client for %s: %w", url, err)
 	}
-	client.Timeout = cfg.Timeout
+	client.Timeout = timeout
 	return client, nil
+}
+
+// customBoards wires the boards service into the rooms' boards: a
+// league's own rules scored exactly. Unconfigured, custom scoring answers
+// that it cannot be built right now, never a stored board in its place.
+func customBoards(ctx context.Context, cfg config.Board, b *draftroom.Boards, now func() time.Time, log *slog.Logger) error {
+	if cfg.ServiceURL == "" {
+		log.Warn("boards service not configured", "effect", "a league's own scoring cannot be drafted")
+		return nil
+	}
+	client, err := serviceClient(ctx, cfg.ServiceURL, cfg.ServiceTimeout)
+	if err != nil {
+		return fmt.Errorf("boards: %w", err)
+	}
+	b.Custom = &boards.CustomSource{
+		BaseURL: cfg.ServiceURL, Client: client, Season: cfg.Season, Directory: b.Schedule, TTL: cfg.TTL, Now: now,
+	}
+	return nil
 }
 
 // rooms wires the solo room and the lobby's request API: the board from
@@ -55,9 +74,9 @@ func rooms(ctx context.Context, cfg config.API, pool *pgxpool.Pool, draftBoards 
 	engine := advisor.Engine{Runs: sim.RoomOddsRuns, Workers: workers}
 	card := advisor.Fallback{Secondary: engine, Timeout: cfg.Advisor.Timeout, Log: log}
 	if cfg.Advisor.URL != "" {
-		client, err := advisorClient(ctx, cfg.Advisor)
+		client, err := serviceClient(ctx, cfg.Advisor.URL, cfg.Advisor.Timeout)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, fmt.Errorf("advisor: %w", err)
 		}
 		card.Primary = advisor.HTTP{BaseURL: cfg.Advisor.URL, Client: client}
 	} else {

@@ -14,6 +14,7 @@ import (
 	"github.com/jhunthrop/commish/api/internal/auth"
 	"github.com/jhunthrop/commish/api/internal/db/dbtest"
 	"github.com/jhunthrop/commish/api/internal/entitlements"
+	"github.com/jhunthrop/commish/api/internal/scoring"
 )
 
 // The saved league decides a league's scoring and board, superflex by its
@@ -23,6 +24,9 @@ func TestLeagueScoring(t *testing.T) {
 	half := apitypes.ScoringPresetHalfPpr
 	tePremium := map[string]float64{"points_per_reception": 1, "te_reception_bonus": 0.5}
 	standard := map[string]float64{"points_per_reception": 0}
+	// A saved league's own scoring is the 21 ScoringRules (Lane 8 part A).
+	savedTE := scoring.Standard()
+	savedTE.PointsPerReception, savedTE.TeReceptionBonus = 1, 0.5
 	cases := []struct {
 		name        string
 		saved       *apitypes.LeagueSettings
@@ -32,8 +36,8 @@ func TestLeagueScoring(t *testing.T) {
 		wantFormat  apitypes.BoardFormat
 	}{
 		{"saved preset", &apitypes.LeagueSettings{Scoring: apitypes.Scoring{Preset: &half}, Lineup: apitypes.LineupStandard}, standard, false, half, apitypes.BoardFormatHalfPpr},
-		{"saved TE premium reads on PPR", &apitypes.LeagueSettings{Scoring: apitypes.Scoring{Custom: &tePremium}, Lineup: apitypes.LineupStandard}, nil, false, apitypes.ScoringPresetTePremium, apitypes.BoardFormatPpr},
-		{"saved superflex lineup", &apitypes.LeagueSettings{Scoring: apitypes.Scoring{Custom: &tePremium}, Lineup: apitypes.LineupSuperflex}, nil, false, apitypes.ScoringPresetTePremium, apitypes.BoardFormatSuperflex},
+		{"saved TE premium reads on PPR", &apitypes.LeagueSettings{Scoring: apitypes.Scoring{Custom: &savedTE}, Lineup: apitypes.LineupStandard}, nil, false, apitypes.ScoringPresetTePremium, apitypes.BoardFormatPpr},
+		{"saved superflex lineup", &apitypes.LeagueSettings{Scoring: apitypes.Scoring{Custom: &savedTE}, Lineup: apitypes.LineupSuperflex}, nil, false, apitypes.ScoringPresetTePremium, apitypes.BoardFormatSuperflex},
 		{"saved lineup over the read's", &apitypes.LeagueSettings{Scoring: apitypes.Scoring{Preset: &half}, Lineup: apitypes.LineupStandard}, nil, true, half, apitypes.BoardFormatHalfPpr},
 		{"read rules", nil, standard, false, apitypes.ScoringPresetStandard, apitypes.BoardFormatStandard},
 		{"read TE premium", nil, tePremium, false, apitypes.ScoringPresetTePremium, apitypes.BoardFormatPpr},

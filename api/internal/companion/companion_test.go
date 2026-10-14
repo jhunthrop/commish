@@ -19,7 +19,9 @@ import (
 	"github.com/jhunthrop/commish/api/internal/advisor"
 	"github.com/jhunthrop/commish/api/internal/apitypes"
 	"github.com/jhunthrop/commish/api/internal/auth"
+	"github.com/jhunthrop/commish/api/internal/boards"
 	"github.com/jhunthrop/commish/api/internal/db/dbtest"
+	"github.com/jhunthrop/commish/api/internal/draft"
 	"github.com/jhunthrop/commish/api/internal/entitlements"
 	"github.com/jhunthrop/commish/api/internal/sleeper"
 )
@@ -139,6 +141,64 @@ func TestPollerHoldsTheGap(t *testing.T) {
 	}
 }
 
+// gatedHost holds its one draft read until the gate opens, so viewers
+// arrive while it is in flight.
+type gatedHost struct {
+	reads   atomic.Int64
+	entered chan struct{}
+	gate    chan struct{}
+}
+
+func (h *gatedHost) Draft(context.Context, string) (sleeper.Draft, error) {
+	if h.reads.Add(1) == 1 {
+		close(h.entered)
+	}
+	<-h.gate
+	return sleeper.Draft{ID: "1", Teams: 12, Rounds: 15, Status: sleeper.StatusDrafting}, nil
+}
+
+func (h *gatedHost) Picks(context.Context, string, int, int) ([]sleeper.Pick, error) { return nil, nil }
+
+// Viewers who arrive while a read is in flight wait for it and share it:
+// one host read, every viewer the same draft.
+func TestPollerSharesAnInFlightRead(t *testing.T) {
+	host := &gatedHost{entered: make(chan struct{}), gate: make(chan struct{})}
+	clock := time.Date(2026, 9, 10, 20, 0, 0, 0, time.UTC)
+	p := &Poller{Host: host, Now: func() time.Time { return clock }}
+	const viewers = 10
+	var wg sync.WaitGroup
+	reads := make(chan Read, viewers+1)
+	read := func() {
+		defer wg.Done()
+		r, err := p.Read(context.Background(), "1")
+		if err != nil {
+			t.Error(err)
+		}
+		reads <- r
+	}
+	wg.Add(1)
+	go read()
+	<-host.entered
+	for range viewers {
+		wg.Add(1)
+		go read()
+	}
+	time.Sleep(20 * time.Millisecond)
+	close(host.gate)
+	wg.Wait()
+	close(reads)
+	n := 0
+	for r := range reads {
+		n++
+		if r.Draft.ID != "1" || r.Draft.Teams != 12 {
+			t.Fatalf("a viewer read %+v", r.Draft)
+		}
+	}
+	if n != viewers+1 || host.reads.Load() != 1 {
+		t.Fatalf("%d viewers, %d host reads, want %d and 1", n, host.reads.Load(), viewers+1)
+	}
+}
+
 // countingConditional counts the conditional cards it is asked for and
 // answers one for the seat it was asked about.
 type countingConditional struct {
@@ -148,12 +208,16 @@ type countingConditional struct {
 	gate    chan struct{}
 }
 
-func (c *countingConditional) Conditional(_ context.Context, req advisor.Request) (advisor.Card, error) {
+func (c *countingConditional) Conditional(ctx context.Context, req advisor.Request) (advisor.Card, error) {
 	if c.calls.Add(1) == 1 && c.entered != nil {
 		close(c.entered)
 	}
 	if c.gate != nil {
 		<-c.gate
+	}
+	// An engine honours its context, as the room odds do.
+	if err := ctx.Err(); err != nil {
+		return advisor.Card{}, err
 	}
 	next := 20
 	return advisor.Card{Call: req.TeamID, NextPick: &next, StillThere: map[string]float64{}}, nil
@@ -204,6 +268,45 @@ func TestConditionalCardIsKeptPerSeatAndPick(t *testing.T) {
 	}
 	if !card.Conditional || card.ForPick != 20 {
 		t.Fatalf("card %+v, want conditional for pick 20", card)
+	}
+}
+
+// The viewer whose request started the card leaving does not fail the
+// viewers waiting on it: each of them gets the card, made once.
+func TestConditionalCardOutlivesTheFirstViewer(t *testing.T) {
+	cond := &countingConditional{entered: make(chan struct{}), gate: make(chan struct{})}
+	s := &Service{Conditional: cond}
+	row := Row{ID: uuid.New(), HostDraftID: "1", Seat: 5, CreatedAt: time.Unix(1, 0)}
+	first, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() {
+		_, err := s.conditionalFor(first, followedAt(row, 6))
+		done <- err
+	}()
+	<-cond.entered
+	var wg sync.WaitGroup
+	errs := make(chan error, 4)
+	for range 4 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_, err := s.conditionalFor(context.Background(), followedAt(row, 6))
+			errs <- err
+		}()
+	}
+	time.Sleep(20 * time.Millisecond)
+	cancel()
+	close(cond.gate)
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		if err != nil {
+			t.Fatalf("a waiting viewer failed with the first viewer's cancel: %v", err)
+		}
+	}
+	<-done
+	if n := cond.calls.Load(); n != 1 {
+		t.Fatalf("%d cards made, want 1", n)
 	}
 }
 
@@ -344,5 +447,59 @@ func TestStoreRecentAndSeatPeople(t *testing.T) {
 	if _, err := store.Upsert(ctx, Row{AccountID: mine.ID, Host: "sleeper", HostDraftID: "556", Seat: 1,
 		HostUsername: "not a username!", Settings: apitypes.LeagueSettings{}, Status: "drafting"}); err == nil {
 		t.Fatal("the column took a username Sleeper would refuse")
+	}
+}
+
+// scriptedIDs answers its reads in order, failing on a nil entry.
+type scriptedIDs struct {
+	answers []map[string]string
+	reads   int
+}
+
+func (s *scriptedIDs) SleeperIDs(context.Context) (map[string]string, error) {
+	i := min(s.reads, len(s.answers)-1)
+	s.reads++
+	if s.answers[i] == nil {
+		return nil, errors.New("pool blip")
+	}
+	return s.answers[i], nil
+}
+
+// A failed id read is never kept as fresh: the next poll after a short
+// retry reads again, a failure with a map in hand keeps that map, and a
+// pick whose id the map lacks is placed by exact name, position and team.
+func TestIDMatcherSurvivesAFailedRead(t *testing.T) {
+	raw := &boards.Raw{Players: []boards.Player{
+		{ID: "p1", Name: "Jaxon Smith-Njigba", Position: draft.WR, Team: "SEA"},
+		{ID: "p2", Name: "Mike Washington Jr.", Position: draft.RB, Team: "LV"},
+	}}
+	jsn := sleeper.Pick{PlayerID: "9488", Name: "Jaxon Smith-Njigba", Position: "WR", Team: "SEA"}
+	rookie := sleeper.Pick{PlayerID: "13305", Name: "Mike Washington", Position: "RB", Team: "LV"}
+	ids := &scriptedIDs{answers: []map[string]string{nil, {}, {"9488": "p1"}, nil}}
+	clock := time.Date(2026, 9, 10, 20, 0, 0, 0, time.UTC)
+	m := &IDMatcher{IDs: ids, Teams: &NameMatcher{}, TTL: time.Hour, Now: func() time.Time { return clock },
+		Log: slog.New(slog.NewTextHandler(io.Discard, nil))}
+	if _, how, ok := m.Match(raw, jsn); !ok || how != MatchSleeperName {
+		t.Fatalf("with no map read a pick is placed by name, not by id: %q %v", how, ok)
+	}
+	if id, how, ok := m.Match(raw, rookie); !ok || id != "p2" || how != MatchSleeperName {
+		t.Fatalf("the rookie by name: %q %q %v", id, how, ok)
+	}
+	if ids.reads != 1 {
+		t.Fatalf("%d reads inside the retry, want 1", ids.reads)
+	}
+	clock = clock.Add(defaultIDRetry)
+	m.Match(raw, jsn)
+	if ids.reads != 2 {
+		t.Fatalf("%d reads after the retry, want 2 (an empty map is a failure too)", ids.reads)
+	}
+	clock = clock.Add(defaultIDRetry)
+	if id, how, ok := m.Match(raw, jsn); !ok || id != "p1" || how != MatchSleeperID {
+		t.Fatalf("by id after a good read: %q %q %v", id, how, ok)
+	}
+	clock = clock.Add(2 * time.Hour)
+	m.refresh()
+	if id, _, ok := m.Match(raw, jsn); !ok || id != "p1" {
+		t.Fatal("a failed refresh dropped the map in hand")
 	}
 }

@@ -74,7 +74,9 @@
 
 	.wall {
 		display: grid;
-		grid-template-columns: 24px repeat(var(--teams), minmax(0, 1fr));
+		/* Each team's column is at least its widest word, so a handle is shown whole and the wall
+		   scrolls, never cutting a name. */
+		grid-template-columns: 24px repeat(var(--teams), minmax(min-content, 1fr));
 		min-width: 860px;
 	}
 
@@ -86,10 +88,7 @@
 		border-bottom: 1px solid var(--line);
 		text-transform: uppercase;
 		letter-spacing: var(--track-label);
-		/* A name breaks only between its words; one long handle is cut with an ellipsis rather than
-		   split mid-word. */
-		overflow: hidden;
-		text-overflow: ellipsis;
+		/* A name breaks only between its words, and its column is as wide as its longest word. */
 		/* A league member's name keeps its direction to itself. */
 		unicode-bidi: isolate;
 		line-height: 1.25;

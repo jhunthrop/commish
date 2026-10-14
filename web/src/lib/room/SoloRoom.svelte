@@ -78,6 +78,11 @@
 	const FILTERS: readonly PoolFilter[] = ['All', 'QB', 'RB', 'WR', 'TE', 'K', 'DST', 'Queue'];
 	/** "Pick for me" drafts this many rounds past the one on the clock. */
 	const AUTOPICK_ROUNDS = 3;
+	/** The text lines the since strip holds (SinceStrip): a name and the pick, and "queued" under a
+	 * player from your queue, which only a drafter with a queue can see. The strip's place is held
+	 * at exactly that, never a line more. */
+	const SINCE_LINES = 2;
+	const SINCE_LINES_QUEUED = 3;
 
 	let filter = $state<PoolFilter>('All');
 	let marked = $state<string | null>(null);
@@ -255,7 +260,11 @@
 		<!-- Once the first turn has passed, the strip's place is held, so its arrival after a pick never
 		     pushes the call down: a strip's height, or one line when the next turn comes straight
 		     back. -->
-		<div class="since" class:straight>
+		<div
+			class="since strip-height"
+			class:straight
+			style:--strip-text-lines={queueAll.size > 0 ? SINCE_LINES_QUEUED : SINCE_LINES}
+		>
 			{#if room.waiting && !inFlight}
 				<SinceStrip since={prev} {went} {teams} {whose} queue={queueAll.size > 0} />
 			{/if}
@@ -353,7 +362,7 @@
 
 	/* The strip's panel: its strip and the panel's two borders. */
 	.since {
-		min-block-size: calc(var(--pick-strip-h) + 2px);
+		min-block-size: calc(var(--strip-h) + 2px);
 	}
 
 	.since.straight {

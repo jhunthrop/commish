@@ -5,6 +5,8 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/jhunthrop/commish/api/internal/apitypes"
 )
 
 func TestDecodeJSONRequiresJSONContentType(t *testing.T) {
@@ -38,5 +40,21 @@ func TestDecodeJSONRequiresJSONContentType(t *testing.T) {
 				t.Fatalf("decoded %+v", dst)
 			}
 		})
+	}
+}
+
+// A league's rules with a key the 21 do not name answer 400 at that
+// field, never as a body that is not JSON.
+func TestDecodeJSONNamesAnUnknownScoringRule(t *testing.T) {
+	body := `{"scoring":{"preset":null,"custom":{"points_per_carry":1}}}`
+	r := httptest.NewRequest(http.MethodPost, "/leagues", strings.NewReader(body))
+	r.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	var dst apitypes.LeagueSettings
+	if DecodeJSON(w, r, MaxSmallBody, &dst) {
+		t.Fatal("an unknown rule was read")
+	}
+	if w.Code != http.StatusBadRequest || !strings.Contains(w.Body.String(), `"scoring.custom.points_per_carry"`) {
+		t.Fatalf("%d %s", w.Code, w.Body.String())
 	}
 }

@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/jhunthrop/commish/api/internal/mfl"
+	"github.com/jhunthrop/commish/api/internal/scoring"
 )
 
 // MyFantasyLeague states scoring as rules: an event code (TYPE=allRules
@@ -83,7 +84,7 @@ func parseRule(r mfl.Rule) (mflRule, bool) {
 	pts := strings.TrimSpace(r.Points)
 	per := strings.HasPrefix(pts, "*")
 	v, err := strconv.ParseFloat(strings.TrimPrefix(pts, "*"), 64)
-	if err != nil || math.IsNaN(v) || math.Abs(v) > maxCustomPoints {
+	if err != nil || math.IsNaN(v) || math.Abs(v) > scoring.MaxPoints {
 		return mflRule{}, false
 	}
 	return mflRule{Rule: r, lo: lo, hi: hi, value: v, perUnit: per}, true
@@ -204,7 +205,7 @@ func carry(r mflRule, kind string, put func(string, float64), te map[string]floa
 
 // ruleWords is a dropped rule in the league's own terms: "FG 31-99 *.1 (PK)".
 func ruleWords(r mfl.Rule) string {
-	return cleanHostText(fmt.Sprintf("%s %s %s (%s)", r.Event, r.Range, r.Points, strings.ReplaceAll(r.Positions, "|", " ")))
+	return scoring.HostText(fmt.Sprintf("%s %s %s (%s)", r.Event, r.Range, r.Points, strings.ReplaceAll(r.Positions, "|", " ")))
 }
 
 // mflShape counts the league's lineup from its starter limits: each
@@ -232,7 +233,7 @@ func mflShape(l mfl.League) Shape {
 		case "Def":
 			s.DEF = p.Min
 		default:
-			if slot := cleanHostText(p.Position); p.Max > 0 && slot != "" {
+			if slot := scoring.HostText(p.Position); p.Max > 0 && slot != "" {
 				unfollowed[slot] = true
 			}
 		}

@@ -68,6 +68,8 @@ export const rooms = {
 	sharedReport: (code: string) => call<MockReport>('GET', `/shared/mocks/${code}/report`),
 	board: (format: RoomBoard['format']) => call<RoomBoard>('GET', `/boards/${format}`),
 	leagues: () => call<League[]>('GET', '/leagues'),
+	importScoring: (host: Schemas['ScoringImportInput']['host'], link: string) =>
+		call<Schemas['ScoringImport']>('POST', '/leagues/import-scoring', { host, link }),
 	saveLeague: (name: string, settings: LeagueSettings) =>
 		call<League>('POST', '/leagues', { name, settings }),
 	setHandle: (handle: string) => call<Account>('PATCH', '/me', { handle }),

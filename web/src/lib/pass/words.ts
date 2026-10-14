@@ -24,11 +24,11 @@ export const FEATURE_WORDS: Readonly<Record<Feature, FeatureWords>> = {
 	},
 	custom_scoring: {
 		lead: "Your league's exact scoring",
-		text: 'the board rebuilt from your own points per stat, imported from your league or entered by hand'
+		text: 'every player scored by your own points per stat, brought in from your Sleeper, ESPN or MyFantasyLeague league, or entered by hand for Yahoo'
 	},
 	full_reasoning: {
 		lead: 'The why on each player we would take next',
-		text: 'beside your real draft, not only on our call'
+		text: 'what taking him instead of our call gives up or gains, beside your real draft'
 	},
 	range_of_outcomes: {
 		lead: 'Floor, median and ceiling in your draft',
@@ -61,12 +61,9 @@ export const FEATURE_WORDS: Readonly<Record<Feature, FeatureWords>> = {
 };
 
 /** Features a product grants that are not built yet, kept off every screen until they ship, so
- * the page never sells what is not there: custom scoring comes back with Lane 8 part A, the why on
- * each row once the advisor writes it as the row's contrast to the call (part A), the early run with
- * the nightly's early-access build, and the three in-season tools with Lane 13. */
+ * the page never sells what is not there: the early run with the nightly's early-access build, and
+ * the three in-season tools with Lane 13. */
 const NOT_BUILT: ReadonlySet<Feature> = new Set<Feature>([
-	'custom_scoring',
-	'full_reasoning',
 	'early_run',
 	'start_sit',
 	'waiver_ranks',

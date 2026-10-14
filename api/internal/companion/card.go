@@ -106,7 +106,9 @@ func (s *Service) conditionalFor(ctx context.Context, f followed) (*apitypes.Roo
 			return card, nil
 		}
 		st := f.built.Draft.State
-		c, err := s.Conditional.Conditional(ctx, advisor.Request{
+		// The card is every viewer's: the viewer who started it leaving
+		// (its request cancelled) must not fail the ones waiting on it.
+		c, err := s.Conditional.Conditional(context.WithoutCancel(ctx), advisor.Request{
 			State: st, TeamID: f.built.Draft.HumanTeamID, Board: f.board, Teams: len(st.DraftOrder), Seed: seedOf(f.row.HostDraftID),
 		})
 		if err != nil {

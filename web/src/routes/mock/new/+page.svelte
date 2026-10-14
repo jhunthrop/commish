@@ -7,10 +7,8 @@
 	import Chip from '#lib/ui/Chip.svelte';
 	import ChipGroup from '#lib/ui/ChipGroup.svelte';
 	import DisplayTitle from '#lib/ui/DisplayTitle.svelte';
-	import Field from '#lib/ui/Field.svelte';
 	import Quiet from '#lib/ui/Quiet.svelte';
 	import Shell from '#lib/ui/Shell.svelte';
-	import Stepper from '#lib/ui/Stepper.svelte';
 	import Verb from '#lib/ui/Verb.svelte';
 	import { startMock } from '#lib/room/actions.ts';
 	import { siteContext } from '#lib/context/context.svelte.ts';
@@ -27,6 +25,9 @@
 	} from '#lib/room/api.ts';
 	import RoomLayout from '#lib/room/RoomLayout.svelte';
 	import RoomNotice from '#lib/room/RoomNotice.svelte';
+	import RosterRow from '#lib/room/setup/RosterRow.svelte';
+	import SaveLeague from '#lib/room/setup/SaveLeague.svelte';
+	import ScoringRow from '#lib/room/setup/ScoringRow.svelte';
 	import SetupRow from '#lib/room/setup/SetupRow.svelte';
 	import HandlePrompt from '#lib/room/setup/HandlePrompt.svelte';
 	import KeeperEditor from '#lib/room/setup/KeeperEditor.svelte';
@@ -40,18 +41,11 @@
 		LINEUP_CHOICES,
 		MAX_ROUNDS,
 		MIN_ROUNDS,
-		ROSTER_FIELDS,
-		SCORING_CHOICES,
 		TEAM_CHOICES,
 		defaultSettings,
 		inFormat,
-		flexCount,
-		flexMax,
-		lineupForFlex,
-		lineupForSuperflex,
 		nearestLobby,
-		roundsOf,
-		superflexCount
+		roundsOf
 	} from '#lib/room/setup/setup.ts';
 
 	/** How often the lobbies' fill is read while the page is open. */
@@ -64,8 +58,6 @@
 	let lobbies = $state<LobbyFilling[]>([]);
 	let players = $state<BoardPlayer[]>([]);
 	let keepersOpen = $state(false);
-	let naming = $state(false);
-	let leagueName = $state('');
 	let busy = $state(false);
 	let error = $state<unknown>(null);
 	let handleFor = $state<LobbyFormat | null>(null);
@@ -78,10 +70,6 @@
 	 * the form holds its settings, a draft slot aside, the verb drafts that league. Any other change
 	 * to the form lets it go. */
 	let opened = $state<League | null>(null);
-	/** The roster's steppers: the counts, then the flex spots the lineup makes, the bench last, so
-	 * they add up to the rounds line. */
-	const rosterHead = $derived(ROSTER_FIELDS.filter((f) => f.key !== 'bench'));
-	const bench = $derived(ROSTER_FIELDS.find((f) => f.key === 'bench'));
 
 	const rounds = $derived(roundsOf(settings));
 	const roundsOk = $derived(rounds >= MIN_ROUNDS && rounds <= MAX_ROUNDS);
@@ -147,15 +135,10 @@
 		}
 	}
 
-	async function saveLeague(): Promise<void> {
-		const name = leagueName.trim();
-		if (name === '') return;
+	async function saveLeague(name: string): Promise<boolean> {
 		const saved = await run(() => rooms.saveLeague(name, settings));
-		if (saved) {
-			leagues = [saved, ...leagues];
-			naming = false;
-			leagueName = '';
-		}
+		if (saved) leagues = [saved, ...leagues];
+		return saved !== undefined;
 	}
 
 	async function loadLobbies(): Promise<void> {
@@ -252,16 +235,11 @@
 			<HandlePrompt problem={handleProblem} {busy} onsave={saveHandle} />
 		{/if}
 		<div class="form">
-			<SetupRow label="Scoring">
-				<ChipGroup label="Scoring">
-					{#each SCORING_CHOICES as c (c.preset)}
-						<Chip
-							pressed={settings.scoring.preset === c.preset}
-							onclick={() => set({ scoring: { preset: c.preset, custom: null } })}>{c.label}</Chip
-						>
-					{/each}
-				</ChipGroup>
-			</SetupRow>
+			<ScoringRow
+				scoring={settings.scoring}
+				{exactRules}
+				onchange={(scoring: LeagueSettings['scoring']) => set({ scoring })}
+			/>
 			<SetupRow label="Teams">
 				<ChipGroup label="Teams">
 					{#each TEAM_CHOICES as n (n)}
@@ -280,42 +258,12 @@
 					>
 				</ChipGroup>
 			</SetupRow>
-			<SetupRow label="Roster" note="rounds follow from it: {rounds}">
-				{#each rosterHead as f (f.key)}
-					<Stepper
-						label={f.label}
-						value={settings.roster[f.key]}
-						min={0}
-						max={f.max}
-						onchange={(v: number) => set({ roster: { ...settings.roster, [f.key]: v } })}
-					/>
-				{/each}
-				<Stepper
-					label="FLEX"
-					value={flexCount(settings.lineup)}
-					min={1}
-					max={flexMax(settings.lineup)}
-					onchange={(v: number) => set({ lineup: lineupForFlex(settings.lineup, v) })}
-				/>
-				{#if superflexCount(settings.lineup) > 0}
-					<Stepper
-						label="SFLX"
-						value={superflexCount(settings.lineup)}
-						min={0}
-						max={1}
-						onchange={(v: number) => set({ lineup: lineupForSuperflex(v) })}
-					/>
-				{/if}
-				{#if bench}
-					<Stepper
-						label={bench.label}
-						value={settings.roster.bench}
-						min={0}
-						max={bench.max}
-						onchange={(v: number) => set({ roster: { ...settings.roster, bench: v } })}
-					/>
-				{/if}
-			</SetupRow>
+			<RosterRow
+				roster={settings.roster}
+				lineup={settings.lineup}
+				{rounds}
+				onchange={(patch: Partial<LeagueSettings>) => set(patch)}
+			/>
 			<SetupRow label="Lineup">
 				<ChipGroup label="Lineup">
 					{#each LINEUP_CHOICES as c (c.lineup)}
@@ -356,23 +304,7 @@
 				The roster makes {rounds} rounds. Keep it from {MIN_ROUNDS} to {MAX_ROUNDS}.
 			</p>
 		{/if}
-		<div class="save">
-			{#if signedOut}
-				<span class="later">Sign in to save this setup as a league</span>
-			{:else if naming}
-				<Field
-					hideLabel
-					bind:value={leagueName}
-					maxlength={60}
-					placeholder="Tuesday night, 12 PPR"
-					label="League name"
-					onenter={saveLeague}
-				/>
-				<Quiet disabled={busy || leagueName.trim() === ''} onclick={saveLeague}>Save</Quiet>
-			{:else}
-				<Quiet disabled={!roundsOk} onclick={() => (naming = true)}>Save as a league</Quiet>
-			{/if}
-		</div>
+		<SaveLeague {signedOut} {busy} ready={roundsOk} onsave={saveLeague} />
 		<ActionBar alert={error ? refusal : undefined} note={signedOut ? keepNote : undefined}>
 			<Verb
 				disabled={busy || !roundsOk}
@@ -440,13 +372,5 @@
 		flex-wrap: wrap;
 		align-items: center;
 		gap: var(--s-2);
-	}
-
-	.save {
-		display: flex;
-		flex-wrap: wrap;
-		gap: var(--s-2);
-		align-items: center;
-		margin-top: var(--s-3);
 	}
 </style>

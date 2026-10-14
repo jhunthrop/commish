@@ -10,6 +10,7 @@ import (
 	"github.com/jhunthrop/commish/api/internal/apitypes"
 	"github.com/jhunthrop/commish/api/internal/leagues"
 	"github.com/jhunthrop/commish/api/internal/lobby"
+	"github.com/jhunthrop/commish/api/internal/scoring"
 )
 
 // SettingsFor is the saved league a mock reruns from: the league's
@@ -33,7 +34,10 @@ func SettingsFor(snap Snapshot) (apitypes.LeagueSettings, string) {
 	if len(snap.Scoring.Rules) == 0 {
 		return apitypes.LeagueSettings{}, "A mock draft cannot rerun this league yet: the league states no scoring we can carry."
 	}
-	rules := snap.Scoring.Rules
+	rules, err := scoring.FromMap(snap.Scoring.Rules)
+	if err != nil {
+		return apitypes.LeagueSettings{}, "A mock draft cannot rerun this league yet: the league states no scoring we can carry."
+	}
 	s := apitypes.LeagueSettings{
 		Scoring: apitypes.Scoring{Custom: &rules}, Teams: sh.Teams, Lineup: lineup,
 		Roster: apitypes.RosterCounts{
