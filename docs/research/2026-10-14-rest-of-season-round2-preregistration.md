@@ -124,3 +124,13 @@ population, statistics, thresholds and judged weeks do not change.
   `model_artifacts` and pinned; preseason runs and weeks 1-6 are unchanged.
 - **Any gate fails:** nothing ships, the results report every number, and the model is not retuned
   and rerun against 2025.
+
+## Development check, as run (before the judgment)
+
+Run once on 2024 weeks 8 and 12 (fit 2023), `2026-10-14-rest-of-season-round2-dev-check.json`, tree
+`7ba60cf6`. 19 of 73 lines failed: G1 passed in all 24 cells; G2 failed for week-8 receivers in all
+three formats; G3 failed in 16 of 24 cells, on both sides of the band (week-12 running backs 0.92 to
+0.94, week-12 receivers 0.73 to 0.74, week-8 tight ends 0.72 to 0.75). A scan of individual
+projections found no defect (a capped player's points a game now come from the raw line: 2024
+Christian McCaffrey 21.4 a game over 3.8 expected games at week 8). **No amendment; nothing changed
+between the check and the judgment.**
