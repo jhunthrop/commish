@@ -19,7 +19,9 @@ import (
 	"github.com/jhunthrop/commish/api/internal/advisor"
 	"github.com/jhunthrop/commish/api/internal/apitypes"
 	"github.com/jhunthrop/commish/api/internal/auth"
+	"github.com/jhunthrop/commish/api/internal/boards"
 	"github.com/jhunthrop/commish/api/internal/db/dbtest"
+	"github.com/jhunthrop/commish/api/internal/draft"
 	"github.com/jhunthrop/commish/api/internal/entitlements"
 	"github.com/jhunthrop/commish/api/internal/sleeper"
 )
@@ -445,5 +447,59 @@ func TestStoreRecentAndSeatPeople(t *testing.T) {
 	if _, err := store.Upsert(ctx, Row{AccountID: mine.ID, Host: "sleeper", HostDraftID: "556", Seat: 1,
 		HostUsername: "not a username!", Settings: apitypes.LeagueSettings{}, Status: "drafting"}); err == nil {
 		t.Fatal("the column took a username Sleeper would refuse")
+	}
+}
+
+// scriptedIDs answers its reads in order, failing on a nil entry.
+type scriptedIDs struct {
+	answers []map[string]string
+	reads   int
+}
+
+func (s *scriptedIDs) SleeperIDs(context.Context) (map[string]string, error) {
+	i := min(s.reads, len(s.answers)-1)
+	s.reads++
+	if s.answers[i] == nil {
+		return nil, errors.New("pool blip")
+	}
+	return s.answers[i], nil
+}
+
+// A failed id read is never kept as fresh: the next poll after a short
+// retry reads again, a failure with a map in hand keeps that map, and a
+// pick whose id the map lacks is placed by exact name, position and team.
+func TestIDMatcherSurvivesAFailedRead(t *testing.T) {
+	raw := &boards.Raw{Players: []boards.Player{
+		{ID: "p1", Name: "Jaxon Smith-Njigba", Position: draft.WR, Team: "SEA"},
+		{ID: "p2", Name: "Mike Washington", Position: draft.RB, Team: "LV"},
+	}}
+	jsn := sleeper.Pick{PlayerID: "9488", Name: "Jaxon Smith-Njigba", Position: "WR", Team: "SEA"}
+	rookie := sleeper.Pick{PlayerID: "13305", Name: "Mike Washington", Position: "RB", Team: "LV"}
+	ids := &scriptedIDs{answers: []map[string]string{nil, {}, {"9488": "p1"}, nil}}
+	clock := time.Date(2026, 9, 10, 20, 0, 0, 0, time.UTC)
+	m := &IDMatcher{IDs: ids, Teams: &NameMatcher{}, TTL: time.Hour, Now: func() time.Time { return clock },
+		Log: slog.New(slog.NewTextHandler(io.Discard, nil))}
+	if _, how, ok := m.Match(raw, jsn); !ok || how != MatchSleeperName {
+		t.Fatalf("with no map read a pick is placed by name, not by id: %q %v", how, ok)
+	}
+	if id, how, ok := m.Match(raw, rookie); !ok || id != "p2" || how != MatchSleeperName {
+		t.Fatalf("the rookie by name: %q %q %v", id, how, ok)
+	}
+	if ids.reads != 1 {
+		t.Fatalf("%d reads inside the retry, want 1", ids.reads)
+	}
+	clock = clock.Add(defaultIDRetry)
+	m.Match(raw, jsn)
+	if ids.reads != 2 {
+		t.Fatalf("%d reads after the retry, want 2 (an empty map is a failure too)", ids.reads)
+	}
+	clock = clock.Add(defaultIDRetry)
+	if id, how, ok := m.Match(raw, jsn); !ok || id != "p1" || how != MatchSleeperID {
+		t.Fatalf("by id after a good read: %q %q %v", id, how, ok)
+	}
+	clock = clock.Add(2 * time.Hour)
+	m.refresh()
+	if id, _, ok := m.Match(raw, jsn); !ok || id != "p1" {
+		t.Fatal("a failed refresh dropped the map in hand")
 	}
 }

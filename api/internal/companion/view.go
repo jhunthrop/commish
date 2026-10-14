@@ -128,7 +128,7 @@ func (s *Service) view(f followed, since int) apitypes.Companion {
 		Id: f.row.ID, Host: apitypes.CompanionHost(f.row.Host), HostDraftId: f.row.HostDraftID, Replay: f.row.Replay,
 		Name: d.Name, Status: apitypes.CompanionStatus(d.Status), Teams: d.Teams, Rounds: d.Rounds, Slot: f.row.Seat,
 		Settings: f.row.Settings, Basis: basisWords(f.board), PickCount: len(f.read.Picks), TotalPicks: total,
-		Since: min(since, len(f.read.Picks)), Unplaced: f.built.Unplaced, LostAt: f.built.LostAt,
+		Since: min(since, len(f.read.Picks)), Unplaced: f.built.Unplaced, PlacedByName: f.built.PlacedByName, LostAt: f.built.LostAt,
 		Traded: traded(d, f.read.Picks), CreatedAt: f.row.CreatedAt, Picks: []apitypes.CompanionPick{},
 		SeatNames: seatNamesOrEmpty(f.row.SeatNames),
 	}

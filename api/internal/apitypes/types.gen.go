@@ -968,6 +968,9 @@ type Companion struct {
 	// PicksUntilTurn picks before the drafter's next
 	PicksUntilTurn *int `json:"picks_until_turn"`
 
+	// PlacedByName Sleeper picks placed by exact name, position and team because our players do not carry their Sleeper id yet
+	PlacedByName int `json:"placed_by_name"`
+
 	// Ranges floor, median and ceiling for each shortlist player, with range_of_outcomes only
 	Ranges *map[string]OutcomeRange `json:"ranges"`
 	Replay bool                     `json:"replay"`

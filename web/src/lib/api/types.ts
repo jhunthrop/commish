@@ -1882,6 +1882,8 @@ export interface components {
 			picks: components['schemas']['CompanionPick'][];
 			/** @description picks so far we could not place on our board; they take nobody from it */
 			unplaced: number;
+			/** @description Sleeper picks placed by exact name, position and team because our players do not carry their Sleeper id yet */
+			placed_by_name: number;
 			/** @description the pick our draft could not follow (out of order, or no roster spot takes him); no call after it */
 			lost_at: number | null;
 			/** @description picks made by a team other than the slot's own */

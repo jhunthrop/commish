@@ -2109,7 +2109,7 @@ components:
       type: object
       required:
         [id, host, host_draft_id, replay, name, status, teams, rounds, slot, seat_names, settings, basis, pick_count, total_picks,
-         on_clock, your_turn, your_next_pick, picks_until_turn, since, picks, unplaced, lost_at, traded, card, board,
+         on_clock, your_turn, your_next_pick, picks_until_turn, since, picks, unplaced, placed_by_name, lost_at, traded, card, board,
          ranges, host_stale_seconds, created_at]
       properties:
         id: { type: string, format: uuid }
@@ -2141,6 +2141,9 @@ components:
           description: every pick after since, in order
           items: { $ref: "#/components/schemas/CompanionPick" }
         unplaced: { type: integer, description: picks so far we could not place on our board; they take nobody from it }
+        placed_by_name:
+          type: integer
+          description: Sleeper picks placed by exact name, position and team because our players do not carry their Sleeper id yet
         lost_at:
           type: integer
           nullable: true
