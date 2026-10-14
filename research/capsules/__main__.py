@@ -7,6 +7,8 @@
     sweep [--budget N]                the nightly sweep: every player whose facts moved (phase D's run)
     restamp-injury-day                once, after fix round 3: restamp capsules whose sheet moved only by
                                       its injury status's dating (instant to Eastern day)
+    export --out FILE                 the board's written capsules on their current sheets, to one file
+    import --in FILE                  each into this store where its sheet hashes the same; the rest refused
 
 RESEARCH_DATABASE_URL names the store (the dev copy for every measurement; never production for a
 measurement run). `write` and `sweep` read AI_GATEWAY_API_KEY from the environment, never a file.
@@ -18,6 +20,7 @@ import os
 import sys
 from collections.abc import Sequence
 from datetime import UTC, datetime
+from pathlib import Path
 
 import httpx
 from sqlalchemy import Engine
@@ -30,6 +33,7 @@ from research.capsules.narrative import narrative_requests_for
 from research.capsules.prompt import NO_WORN_PHRASES, bundle_prompt_for
 from research.capsules.restamp import restamp_injury_day
 from research.capsules.sweep import SweepPlan, sweep_capsules
+from research.capsules.transfer import export_capsules, import_capsules
 from research.capsules.trial import Choice, gate_written, write_chosen
 from research.db.engine import make_engine
 from research.db.url import database_url_from_env
@@ -85,6 +89,21 @@ def _sweep(engine: Engine, budget: int) -> int:
     return 0
 
 
+def _transfer(engine: Engine, args: argparse.Namespace) -> int:
+    now = datetime.now(UTC)
+    if args.command == "export":
+        with engine.connect() as conn:
+            count = export_capsules(conn, now, Path(args.out))
+        _out(f"export: {count} written capsules on their current sheets, to {args.out}")
+        return 0
+    with engine.begin() as conn:
+        report = import_capsules(conn, now, Path(args.source))
+    _out(f"import: {report.imported} imported, {len(report.refused)} refused")
+    for line in report.refused:
+        _out(f"  refused {line}")
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="research.capsules", description=(__doc__ or "").splitlines()[0])
     sub = parser.add_subparsers(dest="command", required=True)
@@ -99,6 +118,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     sweep = sub.add_parser("sweep", help="the nightly sweep")
     sweep.add_argument("--budget", type=int, default=CAPSULE_CONFIG.sweep_generation_budget)
     sub.add_parser("restamp-injury-day", help="once: restamp capsules whose sheet moved only by its injury dating")
+    sub.add_parser("export", help="the board's written capsules to a file").add_argument("--out", required=True)
+    sub.add_parser("import", help="capsules from an export, where the sheet matches").add_argument(
+        "--in", dest="source", required=True
+    )
     args = parser.parse_args(argv)
     engine = make_engine(database_url_from_env())
     if args.command in ("facts", "prompt"):
@@ -106,6 +129,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.command == "write":
         players = [p for p in args.players.split(",") if p]
         return _write(engine, players, args.count, args.spread)
+    if args.command in ("export", "import"):
+        return _transfer(engine, args)
     if args.command == "restamp-injury-day":
         with engine.begin() as conn:
             restamped, stale = restamp_injury_day(conn, datetime.now(UTC))
