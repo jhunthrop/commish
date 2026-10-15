@@ -164,6 +164,13 @@ TRADING_TERMS: Final = (
     "dividend",
     "return on",
     "fetch",
+    # The live review of 2026-10-15 (H3, L5): on eight public pages.
+    "cash in",
+    "asset",
+    "investment",
+    "invest",
+    "money",
+    "paid",
 )
 DRAFTING_SENTENCES: Final = (
     ("the price is right", "he is going a round later than he should"),
@@ -200,6 +207,12 @@ TRADING_REPLACEMENTS: Final = MappingProxyType(
         "dividend": ("points over replacement",),
         "return on": ("what he gives back",),
         "fetch": ("what he would bring back in a trade",),
+        "cash in": ("draft him", "start him"),
+        "asset": ("a starter", "a pick"),
+        "investment": ("a pick", "where drafters take him"),
+        "invest": ("draft him", "take him at that pick"),
+        "money": ("a pick", "where drafters take him"),
+        "paid": ("drafted him", "took him at that pick"),
     }
 )
 _SPENT: Final = ("where he went before the season",)
@@ -213,7 +226,7 @@ IN_SEASON_REPLACEMENTS: Final = MappingProxyType(
         "bought": ("traded for him", "picked him up"),
         "sell": ("trade him away", "let him go"),
         "sold": ("traded him away", "let him go"),
-        "fade": ("bench him", "pass on him"),
+        "fade": ("sit him", "drop him"),
         "trade at": ("where he went before the season",),
         "trades at": ("where he went before the season",),
         "trading at": ("where he went before the season",),
@@ -226,6 +239,12 @@ IN_SEASON_REPLACEMENTS: Final = MappingProxyType(
         "dividend": ("points over replacement",),
         "return on": ("what he gives back",),
         "fetch": ("what he would bring back in a trade",),
+        "cash in": ("start him", "hold him"),
+        "asset": ("a starter", "a bench piece", "a roster spot"),
+        "investment": ("a roster spot", "where he went before the season"),
+        "invest": ("hold him", "add him"),
+        "money": ("where he went before the season", "a roster spot"),
+        "paid": ("where drafters took him", "drafted"),
     }
 )
 BANNED_VOCABULARY: Final = (*LAB_REPORT_TERMS, *ALL_TIME_TERMS, *TRADING_TERMS)
@@ -250,10 +269,14 @@ COMPETITOR_PRODUCT_CUES: Final = ("app", "league", "leagues", "draft", "drafts",
 
 # Trading words with a football sense too (fix round 3, R6): a player "fading" or a "fade route" is
 # decline or a route, a defense "sold out to stop the run", a coach "bought into him". Only the trading
-# sense is banned: fading him, selling, buying him.
+# sense is banned: fading him, "a fade" as a verdict (Lane 29: "a fade everyone hoped would bounce
+# back"), selling, buying him. A phrase with its inflections ("cashed in") is read the same way.
 _FOOTBALL_SENSES: Final = MappingProxyType(
     {
-        "fade": r"\bfad(?:e|es|ed|ing) (?:him|them|this|that|the)\b(?! route)",
+        "fade": r"\bfad(?:e|es|ed|ing) (?:him|them|this|that|the)\b(?! route)"
+        r"|(?<!on )(?<!caught )(?<!threw )(?<!ran )(?<!run )(?<!won )\ba fade\b"
+        r"(?! route| pattern| (?:in|to|for|down|up|from|against|over|on|near|at)\b)",
+        "cash in": r"\bcash(?:es|ed|ing)? (?:in|out)\b",
         "sold": r"\bsold\b(?! (?:out|on|the (?:dummy|defense|fake|run|play-action))\b)",
         "bought": r"\bbought\b(?! (?:in(?:to)?|time|himself time|him time)\b)",
     }

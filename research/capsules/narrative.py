@@ -127,7 +127,7 @@ def _label(item: EvidenceItem) -> str:
         return f"a new play caller at {item.team}"
     if isinstance(item, RookieEvidence):
         return "he is a rookie"
-    return "he has no ADP on file"
+    return "he has no ADP"
 
 
 def narrative_requests_for(facts: "PlayerFacts") -> list[SlotRequest]:
