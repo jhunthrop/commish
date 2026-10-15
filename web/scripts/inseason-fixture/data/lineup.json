@@ -1,0 +1,882 @@
+{
+	"week": 6,
+	"basis": "Ranked by our rest-of-season order from week 6 and this week's designations. We do not project a week's points.",
+	"order_basis": "rest_of_season",
+	"refreshed": "2026-10-14T19:05:37.917Z",
+	"read_at": "2026-10-14T19:05:38.329Z",
+	"set": false,
+	"slots": [
+		{
+			"slot": "QB",
+			"ours": {
+				"player": {
+					"host_id": "4046",
+					"board_id": "3139477",
+					"name": "Patrick Mahomes",
+					"position": "QB",
+					"team": "KC",
+					"injured_reserve": false
+				},
+				"position_rank": 3,
+				"points_over_replacement": 32.63,
+				"facts": {
+					"week": 6,
+					"opponent": "LAC",
+					"home": true,
+					"kickoff": "2026-10-18T20:25:00.000Z",
+					"bye": false,
+					"designation": null,
+					"played": false,
+					"points_this_week": null,
+					"last_games": [
+						{ "week": 2, "points": 31.98 },
+						{ "week": 3, "points": 18.94 },
+						{ "week": 4, "points": 19 }
+					],
+					"allowed_to_position": null
+				}
+			},
+			"host": {
+				"player": {
+					"host_id": "96",
+					"board_id": "8439",
+					"name": "Aaron Rodgers",
+					"position": "QB",
+					"team": "PIT",
+					"injured_reserve": false
+				},
+				"position_rank": 12,
+				"points_over_replacement": 0,
+				"facts": {
+					"week": 6,
+					"opponent": "TB",
+					"home": false,
+					"kickoff": "2026-10-18T17:00:00.000Z",
+					"bye": false,
+					"designation": null,
+					"played": false,
+					"points_this_week": null,
+					"last_games": [
+						{ "week": 3, "points": 26.68 },
+						{ "week": 4, "points": 24.96 },
+						{ "week": 5, "points": 25 }
+					],
+					"allowed_to_position": null
+				}
+			},
+			"changed": true,
+			"sentence": "Patrick Mahomes is QB3 in our rest-of-season order, Aaron Rodgers QB12. He scored 19.0 in his last game."
+		},
+		{
+			"slot": "RB",
+			"ours": {
+				"player": {
+					"host_id": "13287",
+					"board_id": "4870808",
+					"name": "Jeremiyah Love",
+					"position": "RB",
+					"team": "ARI",
+					"injured_reserve": false
+				},
+				"position_rank": 22,
+				"points_over_replacement": 6.8,
+				"facts": {
+					"week": 6,
+					"opponent": "LAR",
+					"home": false,
+					"kickoff": "2026-10-18T20:05:00.000Z",
+					"bye": false,
+					"designation": null,
+					"played": false,
+					"points_this_week": null,
+					"last_games": [
+						{ "week": 3, "points": 21.9 },
+						{ "week": 4, "points": 6.5 },
+						{ "week": 5, "points": 2.2 }
+					],
+					"allowed_to_position": null
+				}
+			},
+			"host": {
+				"player": {
+					"host_id": "13287",
+					"board_id": "4870808",
+					"name": "Jeremiyah Love",
+					"position": "RB",
+					"team": "ARI",
+					"injured_reserve": false
+				},
+				"position_rank": 22,
+				"points_over_replacement": 6.8,
+				"facts": {
+					"week": 6,
+					"opponent": "LAR",
+					"home": false,
+					"kickoff": "2026-10-18T20:05:00.000Z",
+					"bye": false,
+					"designation": null,
+					"played": false,
+					"points_this_week": null,
+					"last_games": [
+						{ "week": 3, "points": 21.9 },
+						{ "week": 4, "points": 6.5 },
+						{ "week": 5, "points": 2.2 }
+					],
+					"allowed_to_position": null
+				}
+			},
+			"changed": false,
+			"sentence": null
+		},
+		{
+			"slot": "RB",
+			"ours": {
+				"player": {
+					"host_id": "7567",
+					"board_id": "4371733",
+					"name": "Kenny Gainwell",
+					"position": "RB",
+					"team": "TB",
+					"injured_reserve": false
+				},
+				"position_rank": 33,
+				"points_over_replacement": -19.05,
+				"facts": {
+					"week": 6,
+					"opponent": "PIT",
+					"home": true,
+					"kickoff": "2026-10-18T17:00:00.000Z",
+					"bye": false,
+					"designation": null,
+					"played": false,
+					"points_this_week": null,
+					"last_games": [
+						{ "week": 3, "points": 3 },
+						{ "week": 4, "points": 10.7 },
+						{ "week": 5, "points": 5.8 }
+					],
+					"allowed_to_position": null
+				}
+			},
+			"host": {
+				"player": {
+					"host_id": "7567",
+					"board_id": "4371733",
+					"name": "Kenny Gainwell",
+					"position": "RB",
+					"team": "TB",
+					"injured_reserve": false
+				},
+				"position_rank": 33,
+				"points_over_replacement": -19.05,
+				"facts": {
+					"week": 6,
+					"opponent": "PIT",
+					"home": true,
+					"kickoff": "2026-10-18T17:00:00.000Z",
+					"bye": false,
+					"designation": null,
+					"played": false,
+					"points_this_week": null,
+					"last_games": [
+						{ "week": 3, "points": 3 },
+						{ "week": 4, "points": 10.7 },
+						{ "week": 5, "points": 5.8 }
+					],
+					"allowed_to_position": null
+				}
+			},
+			"changed": false,
+			"sentence": null
+		},
+		{
+			"slot": "WR",
+			"ours": {
+				"player": {
+					"host_id": "5947",
+					"board_id": "3916433",
+					"name": "Jakobi Meyers",
+					"position": "WR",
+					"team": "JAX",
+					"injured_reserve": false
+				},
+				"position_rank": 51,
+				"points_over_replacement": -20.2,
+				"facts": {
+					"week": 6,
+					"opponent": "HOU",
+					"home": true,
+					"kickoff": "2026-10-18T13:30:00.000Z",
+					"bye": false,
+					"designation": null,
+					"played": false,
+					"points_this_week": null,
+					"last_games": [
+						{ "week": 3, "points": 19.4 },
+						{ "week": 4, "points": 6.3 },
+						{ "week": 5, "points": 5.7 }
+					],
+					"allowed_to_position": null
+				}
+			},
+			"host": {
+				"player": {
+					"host_id": "7564",
+					"board_id": "4362628",
+					"name": "Ja'Marr Chase",
+					"position": "WR",
+					"team": "CIN",
+					"injured_reserve": false
+				},
+				"position_rank": 9,
+				"points_over_replacement": 52.78,
+				"facts": {
+					"week": 6,
+					"opponent": null,
+					"home": null,
+					"kickoff": null,
+					"bye": true,
+					"designation": null,
+					"played": false,
+					"points_this_week": null,
+					"last_games": [
+						{ "week": 3, "points": 24.8 },
+						{ "week": 4, "points": 5.7 },
+						{ "week": 5, "points": 19.7 }
+					],
+					"allowed_to_position": null
+				}
+			},
+			"changed": true,
+			"sentence": null
+		},
+		{
+			"slot": "WR",
+			"ours": {
+				"player": {
+					"host_id": "11620",
+					"board_id": "4431299",
+					"name": "Rome Odunze",
+					"position": "WR",
+					"team": "CHI",
+					"injured_reserve": false
+				},
+				"position_rank": 35,
+				"points_over_replacement": 0,
+				"facts": {
+					"week": 6,
+					"opponent": "ATL",
+					"home": false,
+					"kickoff": "2026-10-18T17:00:00.000Z",
+					"bye": false,
+					"designation": null,
+					"played": false,
+					"points_this_week": null,
+					"last_games": [
+						{ "week": 3, "points": 7.4 },
+						{ "week": 4, "points": 15.4 },
+						{ "week": 5, "points": 5 }
+					],
+					"allowed_to_position": null
+				}
+			},
+			"host": {
+				"player": {
+					"host_id": "11620",
+					"board_id": "4431299",
+					"name": "Rome Odunze",
+					"position": "WR",
+					"team": "CHI",
+					"injured_reserve": false
+				},
+				"position_rank": 35,
+				"points_over_replacement": 0,
+				"facts": {
+					"week": 6,
+					"opponent": "ATL",
+					"home": false,
+					"kickoff": "2026-10-18T17:00:00.000Z",
+					"bye": false,
+					"designation": null,
+					"played": false,
+					"points_this_week": null,
+					"last_games": [
+						{ "week": 3, "points": 7.4 },
+						{ "week": 4, "points": 15.4 },
+						{ "week": 5, "points": 5 }
+					],
+					"allowed_to_position": null
+				}
+			},
+			"changed": false,
+			"sentence": null
+		},
+		{
+			"slot": "WR",
+			"ours": {
+				"player": {
+					"host_id": "13301",
+					"board_id": "5081432",
+					"name": "Antonio Williams",
+					"position": "WR",
+					"team": "WAS",
+					"injured_reserve": false
+				},
+				"position_rank": 60,
+				"points_over_replacement": -30.39,
+				"facts": {
+					"week": 6,
+					"opponent": "SF",
+					"home": false,
+					"kickoff": "2026-10-20T00:15:00.000Z",
+					"bye": false,
+					"designation": null,
+					"played": false,
+					"points_this_week": null,
+					"last_games": [
+						{ "week": 3, "points": 3.5 },
+						{ "week": 4, "points": 5.1 },
+						{ "week": 5, "points": 6.1 }
+					],
+					"allowed_to_position": null
+				}
+			},
+			"host": {
+				"player": {
+					"host_id": "13301",
+					"board_id": "5081432",
+					"name": "Antonio Williams",
+					"position": "WR",
+					"team": "WAS",
+					"injured_reserve": false
+				},
+				"position_rank": 60,
+				"points_over_replacement": -30.39,
+				"facts": {
+					"week": 6,
+					"opponent": "SF",
+					"home": false,
+					"kickoff": "2026-10-20T00:15:00.000Z",
+					"bye": false,
+					"designation": null,
+					"played": false,
+					"points_this_week": null,
+					"last_games": [
+						{ "week": 3, "points": 3.5 },
+						{ "week": 4, "points": 5.1 },
+						{ "week": 5, "points": 6.1 }
+					],
+					"allowed_to_position": null
+				}
+			},
+			"changed": false,
+			"sentence": null
+		},
+		{
+			"slot": "TE",
+			"ours": {
+				"player": {
+					"host_id": "8210",
+					"board_id": "4360635",
+					"name": "Chig Okonkwo",
+					"position": "TE",
+					"team": "WAS",
+					"injured_reserve": false
+				},
+				"position_rank": 26,
+				"points_over_replacement": -24.36,
+				"facts": {
+					"week": 6,
+					"opponent": "SF",
+					"home": false,
+					"kickoff": "2026-10-20T00:15:00.000Z",
+					"bye": false,
+					"designation": null,
+					"played": false,
+					"points_this_week": null,
+					"last_games": [
+						{ "week": 1, "points": 3.6 },
+						{ "week": 4, "points": 2.5 },
+						{ "week": 5, "points": 10 }
+					],
+					"allowed_to_position": null
+				}
+			},
+			"host": {
+				"player": {
+					"host_id": "10859",
+					"board_id": "4430027",
+					"name": "Sam LaPorta",
+					"position": "TE",
+					"team": "DET",
+					"injured_reserve": false
+				},
+				"position_rank": 5,
+				"points_over_replacement": 25.71,
+				"facts": {
+					"week": 6,
+					"opponent": null,
+					"home": null,
+					"kickoff": null,
+					"bye": true,
+					"designation": null,
+					"played": false,
+					"points_this_week": null,
+					"last_games": [
+						{ "week": 3, "points": 7.4 },
+						{ "week": 4, "points": 22.4 },
+						{ "week": 5, "points": 19.8 }
+					],
+					"allowed_to_position": null
+				}
+			},
+			"changed": true,
+			"sentence": "Sam LaPorta is on bye this week."
+		},
+		{
+			"slot": "FLEX",
+			"ours": {
+				"player": {
+					"host_id": "11635",
+					"board_id": "4612826",
+					"name": "Ladd McConkey",
+					"position": "WR",
+					"team": "LAC",
+					"injured_reserve": false
+				},
+				"position_rank": 69,
+				"points_over_replacement": -39.12,
+				"facts": {
+					"week": 6,
+					"opponent": "KC",
+					"home": false,
+					"kickoff": "2026-10-18T20:25:00.000Z",
+					"bye": false,
+					"designation": null,
+					"played": false,
+					"points_this_week": null,
+					"last_games": [
+						{ "week": 2, "points": 6.5 },
+						{ "week": 3, "points": 10.6 },
+						{ "week": 4, "points": 0 }
+					],
+					"allowed_to_position": null
+				}
+			},
+			"host": {
+				"player": {
+					"host_id": "11635",
+					"board_id": "4612826",
+					"name": "Ladd McConkey",
+					"position": "WR",
+					"team": "LAC",
+					"injured_reserve": false
+				},
+				"position_rank": 69,
+				"points_over_replacement": -39.12,
+				"facts": {
+					"week": 6,
+					"opponent": "KC",
+					"home": false,
+					"kickoff": "2026-10-18T20:25:00.000Z",
+					"bye": false,
+					"designation": null,
+					"played": false,
+					"points_this_week": null,
+					"last_games": [
+						{ "week": 2, "points": 6.5 },
+						{ "week": 3, "points": 10.6 },
+						{ "week": 4, "points": 0 }
+					],
+					"allowed_to_position": null
+				}
+			},
+			"changed": false,
+			"sentence": null
+		},
+		{
+			"slot": "FLEX",
+			"ours": {
+				"player": {
+					"host_id": "7543",
+					"board_id": "4239996",
+					"name": "Travis Etienne",
+					"position": "RB",
+					"team": "NO",
+					"injured_reserve": false
+				},
+				"position_rank": 44,
+				"points_over_replacement": -31.43,
+				"facts": {
+					"week": 6,
+					"opponent": "NYG",
+					"home": false,
+					"kickoff": "2026-10-18T17:00:00.000Z",
+					"bye": false,
+					"designation": null,
+					"played": false,
+					"points_this_week": null,
+					"last_games": [
+						{ "week": 1, "points": 14.8 },
+						{ "week": 2, "points": 5.1 },
+						{ "week": 3, "points": 9 }
+					],
+					"allowed_to_position": null
+				}
+			},
+			"host": {
+				"player": {
+					"host_id": "5947",
+					"board_id": "3916433",
+					"name": "Jakobi Meyers",
+					"position": "WR",
+					"team": "JAX",
+					"injured_reserve": false
+				},
+				"position_rank": 51,
+				"points_over_replacement": -20.2,
+				"facts": {
+					"week": 6,
+					"opponent": "HOU",
+					"home": true,
+					"kickoff": "2026-10-18T13:30:00.000Z",
+					"bye": false,
+					"designation": null,
+					"played": false,
+					"points_this_week": null,
+					"last_games": [
+						{ "week": 3, "points": 19.4 },
+						{ "week": 4, "points": 6.3 },
+						{ "week": 5, "points": 5.7 }
+					],
+					"allowed_to_position": null
+				}
+			},
+			"changed": true,
+			"sentence": "Ja'Marr Chase is on bye this week."
+		},
+		{
+			"slot": "DEF",
+			"ours": {
+				"player": {
+					"host_id": "HOU",
+					"board_id": null,
+					"name": "Houston Texans",
+					"position": "DEF",
+					"team": "HOU",
+					"injured_reserve": false
+				},
+				"position_rank": null,
+				"points_over_replacement": null,
+				"facts": {
+					"week": 6,
+					"opponent": "JAX",
+					"home": false,
+					"kickoff": "2026-10-18T13:30:00.000Z",
+					"bye": false,
+					"designation": null,
+					"played": false,
+					"points_this_week": null,
+					"last_games": [],
+					"allowed_to_position": null
+				}
+			},
+			"host": {
+				"player": {
+					"host_id": "MIN",
+					"board_id": null,
+					"name": "Minnesota Vikings",
+					"position": "DEF",
+					"team": "MIN",
+					"injured_reserve": false
+				},
+				"position_rank": null,
+				"points_over_replacement": null,
+				"facts": {
+					"week": 6,
+					"opponent": null,
+					"home": null,
+					"kickoff": null,
+					"bye": true,
+					"designation": null,
+					"played": false,
+					"points_this_week": null,
+					"last_games": [],
+					"allowed_to_position": null
+				}
+			},
+			"changed": true,
+			"sentence": "Minnesota Vikings is on bye this week."
+		}
+	],
+	"bench": [
+		{
+			"player": {
+				"host_id": "7564",
+				"board_id": "4362628",
+				"name": "Ja'Marr Chase",
+				"position": "WR",
+				"team": "CIN",
+				"injured_reserve": false
+			},
+			"position_rank": 9,
+			"points_over_replacement": 52.78,
+			"facts": {
+				"week": 6,
+				"opponent": null,
+				"home": null,
+				"kickoff": null,
+				"bye": true,
+				"designation": null,
+				"played": false,
+				"points_this_week": null,
+				"last_games": [
+					{ "week": 3, "points": 24.8 },
+					{ "week": 4, "points": 5.7 },
+					{ "week": 5, "points": 19.7 }
+				],
+				"allowed_to_position": null
+			}
+		},
+		{
+			"player": {
+				"host_id": "10859",
+				"board_id": "4430027",
+				"name": "Sam LaPorta",
+				"position": "TE",
+				"team": "DET",
+				"injured_reserve": false
+			},
+			"position_rank": 5,
+			"points_over_replacement": 25.71,
+			"facts": {
+				"week": 6,
+				"opponent": null,
+				"home": null,
+				"kickoff": null,
+				"bye": true,
+				"designation": null,
+				"played": false,
+				"points_this_week": null,
+				"last_games": [
+					{ "week": 3, "points": 7.4 },
+					{ "week": 4, "points": 22.4 },
+					{ "week": 5, "points": 19.8 }
+				],
+				"allowed_to_position": null
+			}
+		},
+		{
+			"player": {
+				"host_id": "96",
+				"board_id": "8439",
+				"name": "Aaron Rodgers",
+				"position": "QB",
+				"team": "PIT",
+				"injured_reserve": false
+			},
+			"position_rank": 12,
+			"points_over_replacement": 0,
+			"facts": {
+				"week": 6,
+				"opponent": "TB",
+				"home": false,
+				"kickoff": "2026-10-18T17:00:00.000Z",
+				"bye": false,
+				"designation": null,
+				"played": false,
+				"points_this_week": null,
+				"last_games": [
+					{ "week": 3, "points": 26.68 },
+					{ "week": 4, "points": 24.96 },
+					{ "week": 5, "points": 25 }
+				],
+				"allowed_to_position": null
+			}
+		},
+		{
+			"player": {
+				"host_id": "MIN",
+				"board_id": null,
+				"name": "Minnesota Vikings",
+				"position": "DEF",
+				"team": "MIN",
+				"injured_reserve": false
+			},
+			"position_rank": null,
+			"points_over_replacement": null,
+			"facts": {
+				"week": 6,
+				"opponent": null,
+				"home": null,
+				"kickoff": null,
+				"bye": true,
+				"designation": null,
+				"played": false,
+				"points_this_week": null,
+				"last_games": [],
+				"allowed_to_position": null
+			}
+		},
+		{
+			"player": {
+				"host_id": "9756",
+				"board_id": "4429205",
+				"name": "Jordan Addison",
+				"position": "WR",
+				"team": "MIN",
+				"injured_reserve": false
+			},
+			"position_rank": 70,
+			"points_over_replacement": -39.4,
+			"facts": {
+				"week": 6,
+				"opponent": null,
+				"home": null,
+				"kickoff": null,
+				"bye": true,
+				"designation": null,
+				"played": false,
+				"points_this_week": null,
+				"last_games": [
+					{ "week": 2, "points": 4.1 },
+					{ "week": 3, "points": 20 },
+					{ "week": 4, "points": 9.1 }
+				],
+				"allowed_to_position": null
+			}
+		},
+		{
+			"player": {
+				"host_id": "9753",
+				"board_id": "4426385",
+				"name": "Zach Charbonnet",
+				"position": "RB",
+				"team": "SEA",
+				"injured_reserve": false
+			},
+			"position_rank": 64,
+			"points_over_replacement": -67.88,
+			"facts": {
+				"week": 6,
+				"opponent": "DEN",
+				"home": false,
+				"kickoff": "2026-10-16T00:15:00.000Z",
+				"bye": false,
+				"designation": null,
+				"played": false,
+				"points_this_week": null,
+				"last_games": [],
+				"allowed_to_position": null
+			}
+		},
+		{
+			"player": {
+				"host_id": "9225",
+				"board_id": "4429013",
+				"name": "Tank Bigsby",
+				"position": "RB",
+				"team": "PHI",
+				"injured_reserve": false
+			},
+			"position_rank": 65,
+			"points_over_replacement": -68.39,
+			"facts": {
+				"week": 6,
+				"opponent": "CAR",
+				"home": true,
+				"kickoff": "2026-10-18T17:00:00.000Z",
+				"bye": false,
+				"designation": null,
+				"played": false,
+				"points_this_week": null,
+				"last_games": [
+					{ "week": 2, "points": 11.8 },
+					{ "week": 3, "points": -0.5 },
+					{ "week": 4, "points": 5.5 }
+				],
+				"allowed_to_position": null
+			}
+		},
+		{
+			"player": {
+				"host_id": "10235",
+				"board_id": "4426386",
+				"name": "Roschon Johnson",
+				"position": "RB",
+				"team": "CHI",
+				"injured_reserve": false
+			},
+			"position_rank": 74,
+			"points_over_replacement": -74.25,
+			"facts": {
+				"week": 6,
+				"opponent": "ATL",
+				"home": false,
+				"kickoff": "2026-10-18T17:00:00.000Z",
+				"bye": false,
+				"designation": null,
+				"played": false,
+				"points_this_week": null,
+				"last_games": [
+					{ "week": 2, "points": 0 },
+					{ "week": 4, "points": 3.3 },
+					{ "week": 5, "points": 9 }
+				],
+				"allowed_to_position": null
+			}
+		},
+		{
+			"player": {
+				"host_id": "4950",
+				"board_id": "3895856",
+				"name": "Christian Kirk",
+				"position": "WR",
+				"team": "SF",
+				"injured_reserve": false
+			},
+			"position_rank": 149,
+			"points_over_replacement": -80.59,
+			"facts": {
+				"week": 6,
+				"opponent": "WSH",
+				"home": true,
+				"kickoff": "2026-10-20T00:15:00.000Z",
+				"bye": false,
+				"designation": null,
+				"played": false,
+				"points_this_week": null,
+				"last_games": [],
+				"allowed_to_position": null
+			}
+		},
+		{
+			"player": {
+				"host_id": "12508",
+				"board_id": "4689114",
+				"name": "Jaxson Dart",
+				"position": "QB",
+				"team": "NYG",
+				"injured_reserve": false
+			},
+			"position_rank": 31,
+			"points_over_replacement": -99.04,
+			"facts": {
+				"week": 6,
+				"opponent": "NO",
+				"home": true,
+				"kickoff": "2026-10-18T17:00:00.000Z",
+				"bye": false,
+				"designation": null,
+				"played": false,
+				"points_this_week": null,
+				"last_games": [
+					{ "week": 1, "points": 29.6 },
+					{ "week": 2, "points": 0.8 }
+				],
+				"allowed_to_position": null
+			}
+		}
+	],
+	"host_lineup_url": "https://sleeper.com/leagues/1382163311038038016/team"
+}
