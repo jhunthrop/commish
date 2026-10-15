@@ -27,6 +27,12 @@ const (
 	shutdownTimeout   = 10 * time.Second
 )
 
+// The probe paths: Cloud Run's own checks, open on every host.
+const (
+	livenessPath  = "/healthz"
+	readinessPath = "/readyz"
+)
+
 const (
 	limitHealthPerMinute   = 600
 	limitNotFoundPerMinute = 120
@@ -92,11 +98,11 @@ func Health(db Pinger, version string) []httpx.Route {
 		return apitypes.Health{Status: status, Version: version}
 	}
 	return []httpx.Route{
-		{Method: http.MethodGet, Path: "/healthz", Access: httpx.Anonymous, Limit: httpx.PerMinute(limitHealthPerMinute),
+		{Method: http.MethodGet, Path: livenessPath, Access: httpx.Anonymous, Limit: httpx.PerMinute(limitHealthPerMinute),
 			Handler: func(w http.ResponseWriter, r *http.Request) {
 				httpx.WriteOK(w, r, http.StatusOK, health(apitypes.HealthStatusOk))
 			}},
-		{Method: http.MethodGet, Path: "/readyz", Access: httpx.Anonymous, Limit: httpx.PerMinute(limitHealthPerMinute),
+		{Method: http.MethodGet, Path: readinessPath, Access: httpx.Anonymous, Limit: httpx.PerMinute(limitHealthPerMinute),
 			Handler: func(w http.ResponseWriter, r *http.Request) {
 				ctx, cancel := context.WithTimeout(r.Context(), pingTimeout)
 				defer cancel()
@@ -114,13 +120,19 @@ func Health(db Pinger, version string) []httpx.Route {
 }
 
 // Stack wraps the mux in the middleware every request passes through,
-// outermost first.
-func Stack(mux http.Handler, log *slog.Logger, obs httpx.Observer, origins []string) http.Handler {
+// outermost first. The host lock answers a service's routes (the api's,
+// the room's) only on hosts, and the probes on any: the service's run.app
+// URL and its address get a 404 for everything else (httpx.AllowHosts),
+// a CORS preflight included, since the lock runs before CORS. It runs
+// after the request id and the access log, so its 404 is named and
+// logged.
+func Stack(mux http.Handler, log *slog.Logger, obs httpx.Observer, origins, hosts []string) http.Handler {
 	return httpx.Chain(mux,
 		httpx.RequestID(),
 		httpx.Observe(log, obs),
 		httpx.Recover(log),
 		httpx.SecurityHeaders(),
+		httpx.AllowHosts(hosts, livenessPath, readinessPath),
 		httpx.CORS(origins),
 		httpx.Gzip(),
 	)

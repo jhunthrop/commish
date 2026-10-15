@@ -106,6 +106,6 @@ func run(ctx context.Context, log *slog.Logger) error {
 	defer background.Wait()
 	defer stopBackground()
 	registry := metrics.New()
-	public := server.Stack(mux, log, registry, cfg.HTTP.CORSOrigins)
+	public := server.Stack(mux, log, registry, cfg.HTTP.CORSOrigins, cfg.AllowedHosts)
 	return server.Run(ctx, log, cfg.HTTP.Port, public, cfg.HTTP.MetricsPort, registry.Handler())
 }
