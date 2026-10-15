@@ -17,8 +17,9 @@ code). A dispatch that failed is retried by the next
 `publish`; the run's `published.json` records each attempt.
 
 THE HOURLY BACKSTOP IS THE DELIVERY PATH; THE TOKEN IS OPTIONAL (Lane 43). The web workflow runs
-at 30 minutes past every hour from 06:30 to 12:30 UTC, compares `runs/latest.json` with the run the
-live site says it holds (`/data/run.txt`, which every build writes), and builds when they differ,
+at 30 minutes past every hour from 06:30 to 12:30 UTC, compares `runs/latest.json` and the commit
+it checked out with the run and commit the live site says it holds (`/data/run.txt`, which every
+build writes), and builds when either differs,
 so the site is on a published run within the hour of `latest` moving, with no token at all; an hour
 with nothing new stops in seconds with a named line. WEB_DISPATCH_TOKEN needs a GitHub token only
 the founder can mint, and its dispatch only makes the build start sooner. So a token that is

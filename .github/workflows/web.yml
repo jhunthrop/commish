@@ -12,8 +12,9 @@ on:
   repository_dispatch:
     types: [nightly-run]
   # The hourly backstop through the publish window, the delivery path: the nightly publishes to R2
-  # by 05:30 UTC, and each hour from 06:30 to 12:30 this builds if the live site's run
-  # (/data/run.txt) is not the latest one, and stops in seconds with a named line if it is. The
+  # by 05:30 UTC, and each hour from 06:30 to 12:30 this builds unless the live site's stamp
+  # (/data/run.txt) names both the latest run and this commit, so a scheduled run that took a
+  # pending push's place still deploys it; with nothing new it stops in seconds, named. The
   # nightly's own dispatch (WEB_DISPATCH_TOKEN) only makes it sooner and is optional.
   schedule:
     - cron: '30 6-12 * * *'
@@ -113,10 +114,15 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: lighthouse-${{ github.run_id }}
-          path: web/.lighthouseci
-          # The folder's name starts with a dot, which upload-artifact skips unless told: every deploy
+          # The board's, front door's, player's and record's reports, and the sheet's (its own run
+          # clears .lighthouseci's raw results and writes its named reports to its own folder).
+          path: |
+            web/.lighthouseci
+            web/.lighthouseci-sheet
+          # The folders' names start with a dot, which upload-artifact skips unless told: every deploy
           # before Lane 43 kept nothing ("No files were found").
           include-hidden-files: true
+          retention-days: 30
           if-no-files-found: ignore
 
       - name: Deploy to the workers.dev preview

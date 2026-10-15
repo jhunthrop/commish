@@ -1,5 +1,5 @@
 /**
- * The offline shell's rules, shared by the service worker (src/service-worker.ts) and the offline
+ * The offline shell's rules, shared by the service worker (src/service-worker/index.ts) and the offline
  * page (src/routes/offline). The worker keeps one thing: the offline page, which carries the board
  * of the run it was built from, so what it shows is the last run's board this browser saved. It
  * answers a page load that the network failed with that page, and nothing else: no API call, no

@@ -3,7 +3,9 @@
  * board of the run this deploy was built from; a page load the network fails is answered with it.
  * Nothing else is cached or answered: the API, the assets and every page a member opens go to the
  * network as if there were no worker, so no signed-in page is ever stored. SvelteKit registers this
- * with a few lines in each page's HTML, so no page's script carries it.
+ * with a few lines in each page's HTML, so no page's script carries it. Navigation preload is on,
+ * so a page load's request leaves while the worker starts rather than after: a returning visitor's
+ * page is never slower for the worker standing in front of it.
  */
 import { version } from '$app/env';
 import { self as worker } from '$app/service-worker';
@@ -22,16 +24,20 @@ async function keepShell(): Promise<void> {
 	await worker.skipWaiting();
 }
 
-async function dropStale(): Promise<void> {
+async function activate(): Promise<void> {
+	await worker.registration.navigationPreload.enable();
 	for (const name of await caches.keys()) {
 		if (isStaleCache(name, CACHE)) await caches.delete(name);
 	}
 	await worker.clients.claim();
 }
 
-async function pageOrShell(request: Request): Promise<Response> {
+/** The preloaded page, or the network's when there was no preload, or the offline shell when the
+ * network failed either way. */
+async function pageOrShell(request: Request, preload: Promise<unknown>): Promise<Response> {
 	try {
-		return await fetch(request);
+		const preloaded = (await preload) as Response | undefined;
+		return preloaded ?? (await fetch(request));
 	} catch (error) {
 		const shell = await caches.match(OFFLINE_PATH, { cacheName: CACHE });
 		if (shell) return shell;
@@ -44,11 +50,11 @@ worker.addEventListener('install', (event) => {
 });
 
 worker.addEventListener('activate', (event) => {
-	event.waitUntil(dropStale());
+	event.waitUntil(activate());
 });
 
 worker.addEventListener('fetch', (event) => {
 	if (answersOffline(event.request, worker.location.origin)) {
-		event.respondWith(pageOrShell(event.request));
+		event.respondWith(pageOrShell(event.request, event.preloadResponse));
 	}
 });

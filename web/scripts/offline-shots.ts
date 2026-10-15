@@ -1,8 +1,9 @@
 // The offline shell, proved in a browser and screenshot in both themes at 1440 and 390: open the
 // board online (the service worker installs and keeps the offline page), cut the network, open two
 // pages this browser never loaded (the record, the account) and screenshot what answers. Fails
-// unless the offline page answers both with the board's rows, and unless the worker's cache holds
-// the offline page alone. (A page the browser did load is the browser's own HTTP cache's to answer.)
+// unless the offline page answers both with the board's rows, unless the worker's cache holds the
+// offline page alone, and unless navigation preload is on. (A page the browser did load is the
+// browser's own HTTP cache's to answer.)
 //
 //   npm run build && PORT=<free port> npm run preview:static, then
 //   node scripts/offline-shots.ts http://localhost:<port> [out dir]
@@ -64,6 +65,12 @@ try {
 			if (held.length !== 1 || !held[0]?.endsWith(OFFLINE_PATH)) {
 				failures.push(`${theme} ${String(width)}: the cache holds ${held.join(', ')}`);
 			}
+			const preload = await page.evaluate(() =>
+				navigator.serviceWorker.ready.then((registration) =>
+					registration.navigationPreload.getState().then((state) => state.enabled)
+				)
+			);
+			if (!preload) failures.push(`${theme} ${String(width)}: navigation preload is off`);
 			await context.setOffline(true);
 			for (const path of ['/record', '/account']) {
 				await page.goto(`${origin}${path}`, { waitUntil: 'load' });
@@ -88,5 +95,5 @@ try {
 }
 if (failures.length > 0) throw new Error(failures.join('\n'));
 process.stdout.write(
-	`The offline shell answered every page in both themes; the cache held ${OFFLINE_PATH} alone.\n`
+	`The offline shell answered every page in both themes; the cache held ${OFFLINE_PATH} alone; navigation preload on.\n`
 );
