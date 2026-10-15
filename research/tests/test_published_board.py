@@ -115,6 +115,11 @@ def test_a_superflex_board_is_published_under_its_own_format() -> None:
         (lambda m, b: (m, _with_row(b, {"projected": "262"})), "projected"),
         (lambda m, b: (m, _with_row(b, {"id": b["ppr-12"]["rows"][1]["id"]})), "twice"),
         (lambda m, b: ({**m, "sources": []}, b), "commish_board_v9_ppr_12"),
+        (lambda m, b: ({**m, "formats": "ppr-12"}, b), "no formats list"),
+        (lambda m, b: (m, {**b, "ppr-12": {"format": "ppr-12"}}), "no rows list"),
+        (lambda m, b: (m, {**b, "ppr-12": {"format": "ppr-12", "rows": ["Gibbs"]}}), "not an object"),
+        (lambda m, b: ({**m, "sources": [_window(s, "yesterday") for s in m["sources"]]}, b), "not an instant"),
+        (lambda m, b: (_in_season(m, "soon"), b), "refreshedAt is not an instant"),
     ],
 )
 def test_a_run_whose_artifacts_do_not_read_is_refused_by_name(change: Any, message: str) -> None:
@@ -130,6 +135,15 @@ def _with_row(boards: dict[str, Json], fields: Json) -> dict[str, Json]:
     return {**boards, "ppr-12": {**ppr, "rows": [{**ppr["rows"][0], **fields}, *ppr["rows"][1:]]}}
 
 
+def _window(source: Json, to: str) -> Json:
+    return {**source, "window": {**source["window"], "to": to}}
+
+
+def _in_season(manifest: Json, refreshed: str) -> Json:
+    first = {**manifest["formats"][0], "rosFromWeek": 7, "refreshedAt": refreshed}
+    return {**manifest, "formats": [first, *manifest["formats"][1:]]}
+
+
 def test_a_missing_run_is_refused(store: LocalRunStore) -> None:
     with pytest.raises(PublishedBoardError, match="no manifest"):
         read_published_board(store, "2026-10-22T05")
@@ -141,7 +155,68 @@ def test_with_no_public_run_nothing_is_written(store: LocalRunStore) -> None:
 
 
 def _unreachable_engine() -> Engine:
-    return make_engine("postgresql+psycopg://nobody@127.0.0.1:9/none")
+    return make_engine(_UNREACHABLE)
+
+
+_UNREACHABLE = "postgresql+psycopg://nobody@127.0.0.1:9/none"
+
+
+def test_a_pointer_that_names_no_run_fails_by_name(store: LocalRunStore) -> None:
+    store.put(LATEST_KEY, encode({"run": _PRESEASON}), JSON_TYPE)
+    outcome = sync_published_board(_unreachable_engine(), store, _NOW)
+    assert not outcome.ok
+    assert outcome.line.startswith("published board: FAILED (runs/latest.json names no run); latest is unread")
+
+
+def test_a_store_that_cannot_be_reached_fails_by_name(store: LocalRunStore) -> None:
+    _point_latest(store, _PRESEASON)
+    outcome = sync_published_board(_unreachable_engine(), store, _NOW)
+    assert not outcome.ok
+    assert outcome.line.startswith("published board: FAILED (OperationalError: ")
+    assert outcome.line.endswith(
+        f"; latest is {_PRESEASON}, the table still holds what it held (the store could not be read); "
+        "retried at the next publish hour (06:00-12:00 UTC)"
+    )
+
+
+def _make_public(store: LocalRunStore, run_id: str) -> None:
+    public = {"runId": run_id, "finishedAt": "2026-10-21T12:00:00.000Z", "publicAt": "2026-10-21T13:00:00.000Z"}
+    store.put(EARLY_KEY, encode(public), JSON_TYPE)
+
+
+def _latest(store: LocalRunStore) -> object:
+    raw = store.get(LATEST_KEY)
+    return None if raw is None else json.loads(raw)["runId"]
+
+
+def _publish_command(tmp_path: Path) -> int:
+    return nightly_main(["publish", "--out", str(tmp_path), "--no-dispatch", "--at", "2026-10-21T13:30:00+00:00"])
+
+
+def test_a_failed_table_write_moves_the_pointer_and_exits_1_with_one_line(
+    store: LocalRunStore, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _make_public(store, _IN_SEASON)
+    monkeypatch.setenv("RESEARCH_DATABASE_URL", _UNREACHABLE)
+    status = _publish_command(tmp_path)
+    captured = capsys.readouterr()
+    assert status == 1
+    assert _latest(store) == _IN_SEASON
+    assert "published board: FAILED (OperationalError: " in captured.out
+    assert "Traceback" not in captured.out + captured.err
+
+
+def test_a_local_publish_without_a_store_skips_the_table_by_name(
+    store: LocalRunStore, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _make_public(store, _IN_SEASON)
+    monkeypatch.delenv("RESEARCH_DATABASE_URL", raising=False)
+    status = _publish_command(tmp_path)
+    assert status == 0
+    assert _latest(store) == _IN_SEASON
+    assert (
+        "published board: skipped, RESEARCH_DATABASE_URL is not set (a local --out publish)" in capsys.readouterr().out
+    )
 
 
 # THE TABLE, against a migrated scratch database.
@@ -218,12 +293,36 @@ def test_the_publish_command_moves_the_pointer_then_writes_the_table(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    public = {"runId": _IN_SEASON, "finishedAt": "2026-10-21T12:00:00.000Z", "publicAt": "2026-10-21T13:00:00.000Z"}
-    store.put(EARLY_KEY, encode(public), JSON_TYPE)
+    _make_public(store, _IN_SEASON)
     monkeypatch.setenv("RESEARCH_DATABASE_URL", engine.url.render_as_string(hide_password=False))
-    status = nightly_main(["publish", "--out", str(tmp_path), "--no-dispatch", "--at", "2026-10-21T13:30:00+00:00"])
+    status = _publish_command(tmp_path)
     out = capsys.readouterr().out
     assert status == 0, out
     assert f"publish: run {_IN_SEASON} is public" in out
     assert f"published board: run {_IN_SEASON}, {_SEASON}, " in out
     assert {r["run_id"] for r in _table(engine) if r["season"] == _SEASON} == {_IN_SEASON}
+
+
+def test_a_run_that_does_not_read_leaves_the_previous_run_whole_and_says_which(
+    engine: Engine,
+    store: LocalRunStore,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    _point_latest(store, _PRESEASON)
+    sync_published_board(engine, store, _NOW)
+    before = _table(engine)
+    store.put(f"runs/{_IN_SEASON}/boards/half-ppr-12.json", b'{"format": "half-ppr-12"}', JSON_TYPE)
+    _make_public(store, _IN_SEASON)
+    monkeypatch.setenv("RESEARCH_DATABASE_URL", engine.url.render_as_string(hide_password=False))
+    status = _publish_command(tmp_path)
+    out = capsys.readouterr().out
+    assert status == 1
+    assert _latest(store) == _IN_SEASON
+    held = ", ".join(sorted({str(r["run_id"]) for r in before}))
+    assert (
+        f"published board: FAILED (boards/half-ppr-12.json has no rows list); latest is {_IN_SEASON}, "
+        f"the table still holds {held}; retried at the next publish hour (06:00-12:00 UTC)"
+    ) in out
+    assert _table(engine) == before

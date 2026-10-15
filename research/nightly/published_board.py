@@ -5,7 +5,14 @@ week 7, Lane 18) reaches it through `research.published_boards`. `publish` is th
 reads the bucket for it: after the pointer step it reads the run `runs/latest.json` names, its
 manifest and every format's `boards/<format>.json`, and in one transaction deletes that season's
 rows and inserts the run's. A run already in the table is left as it is, so publishing it again
-changes nothing, and a publish whose write failed is made good by the next one (hourly).
+changes nothing.
+
+A FAILED WRITE. The pointer moves and the build is dispatched first, so a write that fails leaves
+the table holding the previous published run, whole (the swap is one transaction and the API reads
+one statement, so never a mix of two runs), while the site moves on. The failure is one named line
+and exit status 1 (the job's alert); the next publish hour retries, and publish runs only 06:00 to
+12:00 UTC, so a write that fails at 12:00 is made good at 06:00 the next day. A run whose artifacts
+never read as a board stays failed until another run is published.
 
 Every number is the run's own, so it names the run's basis: `rank` (`ourRank`), `position_rank`,
 `points` (`projected`), `points_over_replacement` (`vor`) and the range at twelve teams under the
@@ -15,13 +22,13 @@ season, and before it the stored board generation the run printed (the manifest'
 for the format's stored board, whose window is the generation's stamp).
 """
 
-import json
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Final
 
 from sqlalchemy import Connection, Engine, exists, insert, select
+from sqlalchemy.exc import SQLAlchemyError
 
 from research.db.schema import PUBLISHED_BOARDS
 from research.errors import ResearchError
@@ -42,6 +49,7 @@ _RUN_FORMATS: Final = {f.id: f for f in RUN_FORMATS}
 MANIFEST_FILE: Final = "manifest.json"
 PRESEASON: Final = "preseason"
 REST_OF_SEASON: Final = "rest_of_season"
+RETRY_WINDOW: Final = "06:00-12:00 UTC"
 
 
 class PublishedBoardError(ResearchError):
@@ -73,12 +81,23 @@ class PublishedBoard:
 @dataclass(frozen=True, slots=True)
 class SyncOutcome:
     line: str
+    ok: bool = True
 
 
 def _instant(value: object, what: str) -> datetime:
     if not isinstance(value, str):
         raise PublishedBoardError(f"{what} is not an instant: {value!r}")
-    return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError as error:
+        raise PublishedBoardError(f"{what} is not an instant: {value!r}") from error
+
+
+def _list(value: Json, key: str, what: str) -> list[Any]:
+    found = value.get(key)
+    if not isinstance(found, list):
+        raise PublishedBoardError(f"{what} has no {key} list")
+    return found
 
 
 def _number(row: Json, key: str, where: str) -> float | None:
@@ -99,17 +118,48 @@ def _rank(row: Json, key: str, where: str) -> int:
 
 def _stored_generation(manifest: Json, run_format: RunFormat) -> datetime:
     """The stamp of the stored board the run printed for this format, from its boards source."""
-    for source in manifest.get("sources", []):
-        if source.get("artifact") == "boards" and source.get("feed") == run_format.board_source:
-            return _instant(source["window"]["to"], f"the {run_format.board_source} window")
+    for source in _list(manifest, "sources", "the manifest"):
+        if (
+            isinstance(source, dict)
+            and source.get("artifact") == "boards"
+            and source.get("feed") == run_format.board_source
+        ):
+            window = source.get("window")
+            to = window.get("to") if isinstance(window, dict) else None
+            return _instant(to, f"the {run_format.board_source} window")
     raise PublishedBoardError(f"the manifest names no boards source {run_format.board_source} for {run_format.id}")
 
 
-def _format_rows(format_json: Json, manifest: Json, board: Json | None) -> list[PublishedRow]:
+def _row(row: object, format_id: str, order_basis: str, refreshed: datetime) -> PublishedRow:
+    if not isinstance(row, dict):
+        raise PublishedBoardError(f"{format_id}: a row is not an object: {row!r}")
+    where = f"{format_id} row {row.get('id')}"
+    player_id = row.get("id")
+    if not isinstance(player_id, str) or not player_id:
+        raise PublishedBoardError(f"{where}: the id is missing")
+    return PublishedRow(
+        PUBLISHED_FORMAT[format_id],
+        player_id,
+        _rank(row, "ourRank", where),
+        _rank(row, "positionRank", where),
+        _number(row, "projected", where),
+        _number(row, "vor", where),
+        _number(row, "floor", where),
+        _number(row, "median", where),
+        _number(row, "ceiling", where),
+        order_basis,
+        refreshed,
+    )
+
+
+def _format_rows(format_json: object, manifest: Json, boards: Mapping[str, Json]) -> list[PublishedRow]:
+    if not isinstance(format_json, dict):
+        raise PublishedBoardError(f"the manifest lists a format that is not an object: {format_json!r}")
     format_id = str(format_json.get("id"))
     run_format = _RUN_FORMATS.get(format_id)
     if run_format is None:
         raise PublishedBoardError(f"the manifest lists no format {format_id} the table knows")
+    board = boards.get(format_id)
     if board is None:
         raise PublishedBoardError(f"the run has no board {format_id}")
     if board.get("format") != format_id:
@@ -120,29 +170,12 @@ def _format_rows(format_json: Json, manifest: Json, board: Json | None) -> list[
         if in_season
         else _stored_generation(manifest, run_format)
     )
-    rows: list[PublishedRow] = []
-    seen: set[str] = set()
-    for row in board["rows"]:
-        where = f"{format_id} row {row.get('id')}"
-        player_id = row.get("id")
-        if not isinstance(player_id, str) or player_id in seen:
-            raise PublishedBoardError(f"{where}: the id is missing or listed twice")
-        seen.add(player_id)
-        rows.append(
-            PublishedRow(
-                PUBLISHED_FORMAT[format_id],
-                player_id,
-                _rank(row, "ourRank", where),
-                _rank(row, "positionRank", where),
-                _number(row, "projected", where),
-                _number(row, "vor", where),
-                _number(row, "floor", where),
-                _number(row, "median", where),
-                _number(row, "ceiling", where),
-                REST_OF_SEASON if in_season else PRESEASON,
-                refreshed,
-            )
-        )
+    basis = REST_OF_SEASON if in_season else PRESEASON
+    rows = [_row(row, format_id, basis, refreshed) for row in _list(board, "rows", f"boards/{format_id}.json")]
+    ids = [r.player_id for r in rows]
+    twice = sorted({i for i in ids if ids.count(i) > 1})
+    if twice:
+        raise PublishedBoardError(f"{format_id}: player {', '.join(twice)} listed twice")
     return rows
 
 
@@ -151,21 +184,32 @@ def published_board(run_id: str, manifest: Json, boards: Mapping[str, Json]) -> 
     season = manifest.get("season")
     if isinstance(season, bool) or not isinstance(season, int):
         raise PublishedBoardError(f"run {run_id}'s manifest names no season")
-    rows = [row for f in manifest["formats"] for row in _format_rows(f, manifest, boards.get(str(f.get("id"))))]
+    formats = _list(manifest, "formats", f"run {run_id}'s manifest")
+    rows = [row for f in formats for row in _format_rows(f, manifest, boards)]
     return PublishedBoard(run_id, season, tuple(rows))
+
+
+def _read(store: RunStore, key: str) -> Json | None:
+    try:
+        found = read_json(store, key)
+    except ValueError as error:  # json.JSONDecodeError
+        raise PublishedBoardError(f"{key} is not JSON: {error}") from error
+    if found is not None and not isinstance(found, dict):
+        raise PublishedBoardError(f"{key} is not an object")
+    return found
 
 
 def read_published_board(store: RunStore, run_id: str) -> PublishedBoard:
     """The run's board read back from the store (the publish job is the one reader of R2)."""
-    manifest = read_json(store, run_key(run_id, MANIFEST_FILE))
+    manifest = _read(store, run_key(run_id, MANIFEST_FILE))
     if manifest is None:
         raise PublishedBoardError(f"run {run_id} has no manifest")
     boards: dict[str, Json] = {}
-    for format_json in manifest["formats"]:
-        format_id = str(format_json.get("id"))
-        raw = store.get(run_key(run_id, f"boards/{format_id}.json"))
-        if raw is not None:
-            boards[format_id] = json.loads(raw)
+    for format_json in _list(manifest, "formats", f"run {run_id}'s manifest"):
+        format_id = str(format_json.get("id")) if isinstance(format_json, dict) else ""
+        board = _read(store, run_key(run_id, f"boards/{format_id}.json")) if format_id else None
+        if board is not None:
+            boards[format_id] = board
     return published_board(run_id, manifest, boards)
 
 
@@ -198,16 +242,21 @@ def replace_published_board(conn: Connection, board: PublishedBoard, published_a
     return len(board.rows)
 
 
-def sync_published_board(engine: Engine, store: RunStore, now: datetime) -> SyncOutcome:
-    """Make the table hold exactly the run `latest.json` names (nothing to do when it already does)."""
-    latest = read_json(store, LATEST_KEY)
+def _latest_run(store: RunStore) -> str | None:
+    latest = _read(store, LATEST_KEY)
     if latest is None:
-        return SyncOutcome("published board: no run is public yet")
-    run_id = str(latest["runId"])
+        return None
+    run_id = latest.get("runId")
+    if not isinstance(run_id, str) or not run_id:
+        raise PublishedBoardError(f"{LATEST_KEY} names no run")
+    return run_id
+
+
+def _write(engine: Engine, store: RunStore, run_id: str, now: datetime) -> str:
     with engine.connect() as conn:
         held = conn.execute(select(exists().where(PUBLISHED_BOARDS.c.run_id == run_id))).scalar_one()
     if held:
-        return SyncOutcome(f"published board: run {run_id} is already the table's")
+        return f"published board: run {run_id} is already the table's"
     board = read_published_board(store, run_id)
     with engine.begin() as conn:
         written = replace_published_board(conn, board, now)
@@ -215,4 +264,42 @@ def sync_published_board(engine: Engine, store: RunStore, now: datetime) -> Sync
         f"{fmt} {sum(1 for r in board.rows if r.format == fmt)}" for fmt in dict.fromkeys(r.format for r in board.rows)
     )
     bases = "/".join(sorted({r.order_basis for r in board.rows}))
-    return SyncOutcome(f"published board: run {run_id}, {board.season}, {written} rows ({counts}), {bases}")
+    return f"published board: run {run_id}, {board.season}, {written} rows ({counts}), {bases}"
+
+
+def held_runs(engine: Engine) -> str:
+    """The runs the table holds now, for the failure line; says so when the store cannot be read."""
+    try:
+        with engine.connect() as conn:
+            run_ids = PUBLISHED_BOARDS.c.run_id
+            runs = conn.execute(select(run_ids).distinct().order_by(run_ids)).scalars().all()
+    except SQLAlchemyError:
+        return "what it held (the store could not be read)"
+    return ", ".join(runs) or "none"
+
+
+def failed(reason: str, latest: str | None, holds: str) -> SyncOutcome:
+    return SyncOutcome(
+        f"published board: FAILED ({reason}); latest is {latest or 'unread'}, the table still holds {holds}; "
+        f"retried at the next publish hour ({RETRY_WINDOW})",
+        ok=False,
+    )
+
+
+def sync_published_board(engine: Engine, store: RunStore, now: datetime) -> SyncOutcome:
+    """Make the table hold exactly the run `latest.json` names (nothing to do when it already does).
+
+    A failure is a named line with `ok` false, never a traceback; the table is then as it was."""
+    run_id: str | None = None
+    try:
+        run_id = _latest_run(store)
+        if run_id is None:
+            return SyncOutcome("published board: no run is public yet")
+        return SyncOutcome(_write(engine, store, run_id, now))
+    except PublishedBoardError as error:
+        return failed(str(error), run_id, held_runs(engine))
+    except SQLAlchemyError as error:
+        # The driver's own first line: the server's message, never the URL or its password.
+        first = (str(getattr(error, "orig", None) or error).splitlines() or [""])[0]
+        reason = f"{type(error).__name__}: {first}"
+        return failed(reason, run_id, held_runs(engine))
