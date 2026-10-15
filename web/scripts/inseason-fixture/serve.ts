@@ -10,7 +10,7 @@
 import { readFile } from 'node:fs/promises';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import type { LeagueSync } from '../../src/lib/league/api.ts';
-import type { TradeAdvice } from '../../src/lib/league/inseason/types.ts';
+import type { TradeAdvice, WaiverAdvice } from '../../src/lib/league/inseason/api.ts';
 import type { components } from '../../src/lib/api/types.ts';
 import { FIXTURE_IDS } from './ids.ts';
 
@@ -29,7 +29,7 @@ async function load<T>(name: string): Promise<T> {
 const [sync, lineup, waivers, trades] = await Promise.all([
 	load<LeagueSync>('sync'),
 	load<object>('lineup'),
-	load<object>('waivers'),
+	load<WaiverAdvice>('waivers'),
 	load<TradeAdvice>('trades')
 ]);
 
@@ -86,6 +86,12 @@ function send(req: IncomingMessage, res: ServerResponse, status: number, body: u
 }
 
 /** The trades holding one player, by his board id, every team kept. */
+function waiversAt(position: string | null): WaiverAdvice {
+	if (position === null) return waivers;
+	const rows = waivers.rows.filter((row) => row.add.player.position === position);
+	return { ...waivers, rows, best: rows.find((row) => row.gain > 0) ?? null };
+}
+
 function tradesHolding(player: string | null): TradeAdvice {
 	if (player === null) return trades;
 	const holds = (side: { player: { board_id: string | null } }[]): boolean =>
@@ -153,7 +159,7 @@ async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> 
 		if (id === SLOW) await new Promise((resolve) => setTimeout(resolve, HOLD_MS));
 		const bodies = {
 			lineup,
-			waivers,
+			waivers: waiversAt(url.searchParams.get('position')),
 			trades: tradesHolding(url.searchParams.get('player'))
 		} as const;
 		send(req, res, HTTP.ok, { ...bodies[route as keyof typeof bodies], read_at: readAt() });

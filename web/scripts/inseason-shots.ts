@@ -102,9 +102,14 @@ for (const width of SHOT_WIDTHS) {
 	await ready(page, 'Claim on Sleeper');
 	await page.getByRole('button', { name: 'Add', exact: true }).nth(2).click();
 	await page.screenshot({ path: file(`waivers-marked-dark-${String(width)}`), fullPage: true });
+	// A position chip reads the adds at that position again (?position=).
+	await page.getByRole('button', { name: 'RB', exact: true }).click();
+	await page.locator('.rows[aria-busy="false"]').waitFor({ timeout: READY_TIMEOUT_MS });
+	await page.screenshot({ path: file(`waivers-rb-dark-${String(width)}`), fullPage: true });
 	await page.goto(`${web}/league/${id}/trades`, { waitUntil: 'networkidle' });
 	await ready(page, 'Propose on Sleeper');
 	await page.getByRole('combobox').selectOption({ label: 'Patrick Mahomes' });
+	await page.locator('.teams[aria-busy="false"]').waitFor({ timeout: READY_TIMEOUT_MS });
 	await page.screenshot({ path: file(`trades-narrowed-dark-${String(width)}`), fullPage: true });
 	await ctx.close();
 }

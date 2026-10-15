@@ -17,7 +17,6 @@ import { fileURLToPath } from 'node:url';
 import { format as prettierFormat, resolveConfig } from 'prettier';
 import { listWords } from '../../src/lib/format/list.ts';
 import { FIXTURE_IDS } from './ids.ts';
-import { slotChanges } from '../../src/lib/league/inseason/words.ts';
 import type { LeaguePlayer, LeagueSync, MatchupSide } from '../../src/lib/league/api.ts';
 import type {
 	AdviceHead,
@@ -30,7 +29,7 @@ import type {
 	WaiverAdvice,
 	WaiverRow,
 	WeekFacts
-} from '../../src/lib/league/inseason/types.ts';
+} from '../../src/lib/league/inseason/api.ts';
 
 const REPLAY = new URL('../../../api/internal/leaguesync/replay/sleeper/', import.meta.url);
 const RUNS = new URL('../../.runs/runs/', import.meta.url);
@@ -46,6 +45,19 @@ const SKILL = new Set(['QB', 'RB', 'WR', 'TE']);
 const FLEX = new Set(['RB', 'WR', 'TE']);
 const SUPER_FLEX = new Set(['QB', 'RB', 'WR', 'TE']);
 const DECIMALS = 100;
+/** The API states points over replacement a week: the season's over 17 games. */
+const SEASON_GAMES = 17;
+/** The league's slot words in the contract's: Sleeper's SUPER_FLEX is SUPERFLEX. */
+const SLOT_OF: Readonly<Record<string, LineupSlot['slot']>> = {
+	QB: 'QB',
+	RB: 'RB',
+	WR: 'WR',
+	TE: 'TE',
+	FLEX: 'FLEX',
+	SUPER_FLEX: 'SUPERFLEX',
+	K: 'K',
+	DEF: 'DEF'
+};
 
 const round = (n: number): number => Math.round(n * DECIMALS) / DECIMALS;
 
@@ -147,7 +159,6 @@ if (!format?.rosFromWeek || !format.refreshedAt) {
 }
 const rosFrom = format.rosFromWeek;
 const refreshed = format.refreshedAt;
-const weeksLeft = LAST_WEEK - rosFrom + 1;
 const week = state.week;
 
 /** "amon-ra st brown": a name as both sources can agree on it. */
@@ -207,6 +218,7 @@ async function lastGames(boardId: string | null): Promise<WeekFacts['last_games'
 	return file.season.log
 		.filter((g) => g.status === 'played')
 		.slice(-LAST_GAMES)
+		.reverse()
 		.map((g) => ({ week: g.week, points: leaguePoints(g) }));
 }
 
@@ -246,7 +258,8 @@ async function lineOf(player: LeaguePlayer): Promise<PlayerLine> {
 	return {
 		player,
 		position_rank: row?.positionRank ?? null,
-		points_over_replacement: row === null ? null : round(row.vor),
+		points_over_replacement: row === null ? null : round(row.vor / SEASON_GAMES),
+		held: false,
 		facts: await factsFor(row?.team ?? player.team, player.board_id)
 	};
 }
@@ -356,21 +369,27 @@ async function lineup(): Promise<LineupAdvice> {
 		if (j >= 0) [ours[i], ours[j]] = [ours[j] ?? null, ours[i] ?? null];
 	}
 	const started = new Set(ours.map((l) => l?.player.host_id));
-	const diffed: LineupSlot[] = slots.flatMap((slot, i) => {
+	// As the API answers: a slot changes when ours is on the host's bench, and its host player is a
+	// starter we sit (the one in that place when he sits, else the next one sat); an unchanged slot's
+	// host player is ours.
+	const hostIds = new Set(hostStarters.map((h) => h?.player.host_id));
+	const sat = hostStarters.filter(
+		(h): h is PlayerLine => h !== null && !started.has(h.player.host_id)
+	);
+	const out = slots.flatMap((slot, i): LineupSlot[] => {
 		const o = ours[i];
 		if (!o) return [];
-		const h = hostStarters[i] ?? null;
-		return [
-			{ slot, ours: o, host: h, changed: h?.player.host_id !== o.player.host_id, sentence: null }
-		];
-	});
-	// A start's sentence names the player it sits, at the end of any chain of moves.
-	const changes = slotChanges(diffed);
-	const out = diffed.map((s, i) => {
-		const change = changes[i];
-		return change?.kind === 'start'
-			? { ...s, sentence: changeSentence(change.start, change.sit) }
-			: s;
+		const kind = SLOT_OF[slot] ?? 'FLEX';
+		if (hostIds.has(o.player.host_id)) {
+			return [{ slot: kind, ours: o, host: o, changed: false, sentence: null }];
+		}
+		const here = hostStarters[i];
+		const h =
+			here && sat.includes(here)
+				? here
+				: (sat.find((l) => eligible(slot, l.player.position)) ?? sat[0] ?? null);
+		if (h) sat.splice(sat.indexOf(h), 1);
+		return [{ slot: kind, ours: o, host: h, changed: true, sentence: changeSentence(o, h) }];
 	});
 	const bench = myLines
 		.filter((l) => !started.has(l.player.host_id))
@@ -391,7 +410,7 @@ function changeSentence(ours: PlayerLine, host: PlayerLine | null): string {
 	if (host.facts.bye) return `${host.player.name} is on bye this week.`;
 	const a = `${ours.player.position}${String(ours.position_rank ?? '')}`;
 	const b = `${host.player.position}${String(host.position_rank ?? '')}`;
-	const last = ours.facts.last_games.at(-1);
+	const last = ours.facts.last_games[0];
 	const support =
 		last === undefined ? '' : ` He scored ${last.points.toFixed(1)} in his last game.`;
 	return `${ours.player.name} is ${a} in our rest-of-season order, ${host.player.name} ${b}.${support}`;
@@ -423,7 +442,7 @@ async function waivers(held: ReadonlySet<string>): Promise<WaiverAdvice> {
 		const best = options.sort((a, b) => b.after - a.after || vorOf(a.drop) - vorOf(b.drop))[0];
 		const week = best ? fill(best.roster, true) : thisWeek;
 		const at = week.findIndex((l) => l === add);
-		const gain = best ? round((best.after - base) / weeksLeft) : 0;
+		const gain = best ? round(best.after - base) : 0;
 		return {
 			add,
 			drop: best?.drop ?? null,
@@ -488,8 +507,8 @@ function tradesWith(theirs: readonly PlayerLine[]): TradeRow[] {
 			const myAfter = fill([...myLines.filter((l) => !give.includes(l)), ...get], false);
 			const theirAfter = fill([...theirs.filter((l) => !get.includes(l)), ...give], false);
 			if (!fillsEvery(myAfter) || !fillsEvery(theirAfter)) return [];
-			const myGain = round((strength(myAfter) - myBase) / weeksLeft);
-			const theirGain = round((strength(theirAfter) - theirBase) / weeksLeft);
+			const myGain = round(strength(myAfter) - myBase);
+			const theirGain = round(strength(theirAfter) - theirBase);
 			if (myGain <= 0 || theirGain <= 0) return [];
 			return [
 				{

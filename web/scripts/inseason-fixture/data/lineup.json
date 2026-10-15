@@ -18,7 +18,8 @@
 					"injured_reserve": false
 				},
 				"position_rank": 3,
-				"points_over_replacement": 32.63,
+				"points_over_replacement": 1.92,
+				"held": false,
 				"facts": {
 					"week": 6,
 					"opponent": "LAC",
@@ -29,9 +30,9 @@
 					"played": false,
 					"points_this_week": null,
 					"last_games": [
-						{ "week": 2, "points": 31.98 },
+						{ "week": 4, "points": 19 },
 						{ "week": 3, "points": 18.94 },
-						{ "week": 4, "points": 19 }
+						{ "week": 2, "points": 31.98 }
 					],
 					"allowed_to_position": null
 				}
@@ -47,6 +48,7 @@
 				},
 				"position_rank": 12,
 				"points_over_replacement": 0,
+				"held": false,
 				"facts": {
 					"week": 6,
 					"opponent": "TB",
@@ -57,9 +59,9 @@
 					"played": false,
 					"points_this_week": null,
 					"last_games": [
-						{ "week": 3, "points": 26.68 },
+						{ "week": 5, "points": 25 },
 						{ "week": 4, "points": 24.96 },
-						{ "week": 5, "points": 25 }
+						{ "week": 3, "points": 26.68 }
 					],
 					"allowed_to_position": null
 				}
@@ -79,7 +81,8 @@
 					"injured_reserve": false
 				},
 				"position_rank": 22,
-				"points_over_replacement": 6.8,
+				"points_over_replacement": 0.4,
+				"held": false,
 				"facts": {
 					"week": 6,
 					"opponent": "LAR",
@@ -90,9 +93,9 @@
 					"played": false,
 					"points_this_week": null,
 					"last_games": [
-						{ "week": 3, "points": 21.9 },
+						{ "week": 5, "points": 2.2 },
 						{ "week": 4, "points": 6.5 },
-						{ "week": 5, "points": 2.2 }
+						{ "week": 3, "points": 21.9 }
 					],
 					"allowed_to_position": null
 				}
@@ -107,7 +110,8 @@
 					"injured_reserve": false
 				},
 				"position_rank": 22,
-				"points_over_replacement": 6.8,
+				"points_over_replacement": 0.4,
+				"held": false,
 				"facts": {
 					"week": 6,
 					"opponent": "LAR",
@@ -118,9 +122,9 @@
 					"played": false,
 					"points_this_week": null,
 					"last_games": [
-						{ "week": 3, "points": 21.9 },
+						{ "week": 5, "points": 2.2 },
 						{ "week": 4, "points": 6.5 },
-						{ "week": 5, "points": 2.2 }
+						{ "week": 3, "points": 21.9 }
 					],
 					"allowed_to_position": null
 				}
@@ -140,7 +144,8 @@
 					"injured_reserve": false
 				},
 				"position_rank": 33,
-				"points_over_replacement": -19.05,
+				"points_over_replacement": -1.12,
+				"held": false,
 				"facts": {
 					"week": 6,
 					"opponent": "PIT",
@@ -151,9 +156,9 @@
 					"played": false,
 					"points_this_week": null,
 					"last_games": [
-						{ "week": 3, "points": 3 },
+						{ "week": 5, "points": 5.8 },
 						{ "week": 4, "points": 10.7 },
-						{ "week": 5, "points": 5.8 }
+						{ "week": 3, "points": 3 }
 					],
 					"allowed_to_position": null
 				}
@@ -168,7 +173,8 @@
 					"injured_reserve": false
 				},
 				"position_rank": 33,
-				"points_over_replacement": -19.05,
+				"points_over_replacement": -1.12,
+				"held": false,
 				"facts": {
 					"week": 6,
 					"opponent": "PIT",
@@ -179,9 +185,9 @@
 					"played": false,
 					"points_this_week": null,
 					"last_games": [
-						{ "week": 3, "points": 3 },
+						{ "week": 5, "points": 5.8 },
 						{ "week": 4, "points": 10.7 },
-						{ "week": 5, "points": 5.8 }
+						{ "week": 3, "points": 3 }
 					],
 					"allowed_to_position": null
 				}
@@ -201,7 +207,8 @@
 					"injured_reserve": false
 				},
 				"position_rank": 51,
-				"points_over_replacement": -20.2,
+				"points_over_replacement": -1.19,
+				"held": false,
 				"facts": {
 					"week": 6,
 					"opponent": "HOU",
@@ -212,42 +219,43 @@
 					"played": false,
 					"points_this_week": null,
 					"last_games": [
-						{ "week": 3, "points": 19.4 },
+						{ "week": 5, "points": 5.7 },
 						{ "week": 4, "points": 6.3 },
-						{ "week": 5, "points": 5.7 }
+						{ "week": 3, "points": 19.4 }
 					],
 					"allowed_to_position": null
 				}
 			},
 			"host": {
 				"player": {
-					"host_id": "7564",
-					"board_id": "4362628",
-					"name": "Ja'Marr Chase",
+					"host_id": "5947",
+					"board_id": "3916433",
+					"name": "Jakobi Meyers",
 					"position": "WR",
-					"team": "CIN",
+					"team": "JAX",
 					"injured_reserve": false
 				},
-				"position_rank": 9,
-				"points_over_replacement": 52.78,
+				"position_rank": 51,
+				"points_over_replacement": -1.19,
+				"held": false,
 				"facts": {
 					"week": 6,
-					"opponent": null,
-					"home": null,
-					"kickoff": null,
-					"bye": true,
+					"opponent": "HOU",
+					"home": true,
+					"kickoff": "2026-10-18T13:30:00.000Z",
+					"bye": false,
 					"designation": null,
 					"played": false,
 					"points_this_week": null,
 					"last_games": [
-						{ "week": 3, "points": 24.8 },
-						{ "week": 4, "points": 5.7 },
-						{ "week": 5, "points": 19.7 }
+						{ "week": 5, "points": 5.7 },
+						{ "week": 4, "points": 6.3 },
+						{ "week": 3, "points": 19.4 }
 					],
 					"allowed_to_position": null
 				}
 			},
-			"changed": true,
+			"changed": false,
 			"sentence": null
 		},
 		{
@@ -263,6 +271,7 @@
 				},
 				"position_rank": 35,
 				"points_over_replacement": 0,
+				"held": false,
 				"facts": {
 					"week": 6,
 					"opponent": "ATL",
@@ -273,9 +282,9 @@
 					"played": false,
 					"points_this_week": null,
 					"last_games": [
-						{ "week": 3, "points": 7.4 },
+						{ "week": 5, "points": 5 },
 						{ "week": 4, "points": 15.4 },
-						{ "week": 5, "points": 5 }
+						{ "week": 3, "points": 7.4 }
 					],
 					"allowed_to_position": null
 				}
@@ -291,6 +300,7 @@
 				},
 				"position_rank": 35,
 				"points_over_replacement": 0,
+				"held": false,
 				"facts": {
 					"week": 6,
 					"opponent": "ATL",
@@ -301,9 +311,9 @@
 					"played": false,
 					"points_this_week": null,
 					"last_games": [
-						{ "week": 3, "points": 7.4 },
+						{ "week": 5, "points": 5 },
 						{ "week": 4, "points": 15.4 },
-						{ "week": 5, "points": 5 }
+						{ "week": 3, "points": 7.4 }
 					],
 					"allowed_to_position": null
 				}
@@ -323,7 +333,8 @@
 					"injured_reserve": false
 				},
 				"position_rank": 60,
-				"points_over_replacement": -30.39,
+				"points_over_replacement": -1.79,
+				"held": false,
 				"facts": {
 					"week": 6,
 					"opponent": "SF",
@@ -334,9 +345,9 @@
 					"played": false,
 					"points_this_week": null,
 					"last_games": [
-						{ "week": 3, "points": 3.5 },
+						{ "week": 5, "points": 6.1 },
 						{ "week": 4, "points": 5.1 },
-						{ "week": 5, "points": 6.1 }
+						{ "week": 3, "points": 3.5 }
 					],
 					"allowed_to_position": null
 				}
@@ -351,7 +362,8 @@
 					"injured_reserve": false
 				},
 				"position_rank": 60,
-				"points_over_replacement": -30.39,
+				"points_over_replacement": -1.79,
+				"held": false,
 				"facts": {
 					"week": 6,
 					"opponent": "SF",
@@ -362,9 +374,9 @@
 					"played": false,
 					"points_this_week": null,
 					"last_games": [
-						{ "week": 3, "points": 3.5 },
+						{ "week": 5, "points": 6.1 },
 						{ "week": 4, "points": 5.1 },
-						{ "week": 5, "points": 6.1 }
+						{ "week": 3, "points": 3.5 }
 					],
 					"allowed_to_position": null
 				}
@@ -384,7 +396,8 @@
 					"injured_reserve": false
 				},
 				"position_rank": 26,
-				"points_over_replacement": -24.36,
+				"points_over_replacement": -1.43,
+				"held": false,
 				"facts": {
 					"week": 6,
 					"opponent": "SF",
@@ -395,9 +408,9 @@
 					"played": false,
 					"points_this_week": null,
 					"last_games": [
-						{ "week": 1, "points": 3.6 },
+						{ "week": 5, "points": 10 },
 						{ "week": 4, "points": 2.5 },
-						{ "week": 5, "points": 10 }
+						{ "week": 1, "points": 3.6 }
 					],
 					"allowed_to_position": null
 				}
@@ -412,7 +425,8 @@
 					"injured_reserve": false
 				},
 				"position_rank": 5,
-				"points_over_replacement": 25.71,
+				"points_over_replacement": 1.51,
+				"held": false,
 				"facts": {
 					"week": 6,
 					"opponent": null,
@@ -423,9 +437,9 @@
 					"played": false,
 					"points_this_week": null,
 					"last_games": [
-						{ "week": 3, "points": 7.4 },
+						{ "week": 5, "points": 19.8 },
 						{ "week": 4, "points": 22.4 },
-						{ "week": 5, "points": 19.8 }
+						{ "week": 3, "points": 7.4 }
 					],
 					"allowed_to_position": null
 				}
@@ -445,7 +459,8 @@
 					"injured_reserve": false
 				},
 				"position_rank": 69,
-				"points_over_replacement": -39.12,
+				"points_over_replacement": -2.3,
+				"held": false,
 				"facts": {
 					"week": 6,
 					"opponent": "KC",
@@ -456,9 +471,9 @@
 					"played": false,
 					"points_this_week": null,
 					"last_games": [
-						{ "week": 2, "points": 6.5 },
+						{ "week": 4, "points": 0 },
 						{ "week": 3, "points": 10.6 },
-						{ "week": 4, "points": 0 }
+						{ "week": 2, "points": 6.5 }
 					],
 					"allowed_to_position": null
 				}
@@ -473,7 +488,8 @@
 					"injured_reserve": false
 				},
 				"position_rank": 69,
-				"points_over_replacement": -39.12,
+				"points_over_replacement": -2.3,
+				"held": false,
 				"facts": {
 					"week": 6,
 					"opponent": "KC",
@@ -484,9 +500,9 @@
 					"played": false,
 					"points_this_week": null,
 					"last_games": [
-						{ "week": 2, "points": 6.5 },
+						{ "week": 4, "points": 0 },
 						{ "week": 3, "points": 10.6 },
-						{ "week": 4, "points": 0 }
+						{ "week": 2, "points": 6.5 }
 					],
 					"allowed_to_position": null
 				}
@@ -506,7 +522,8 @@
 					"injured_reserve": false
 				},
 				"position_rank": 44,
-				"points_over_replacement": -31.43,
+				"points_over_replacement": -1.85,
+				"held": false,
 				"facts": {
 					"week": 6,
 					"opponent": "NYG",
@@ -517,37 +534,38 @@
 					"played": false,
 					"points_this_week": null,
 					"last_games": [
-						{ "week": 1, "points": 14.8 },
+						{ "week": 3, "points": 9 },
 						{ "week": 2, "points": 5.1 },
-						{ "week": 3, "points": 9 }
+						{ "week": 1, "points": 14.8 }
 					],
 					"allowed_to_position": null
 				}
 			},
 			"host": {
 				"player": {
-					"host_id": "5947",
-					"board_id": "3916433",
-					"name": "Jakobi Meyers",
+					"host_id": "7564",
+					"board_id": "4362628",
+					"name": "Ja'Marr Chase",
 					"position": "WR",
-					"team": "JAX",
+					"team": "CIN",
 					"injured_reserve": false
 				},
-				"position_rank": 51,
-				"points_over_replacement": -20.2,
+				"position_rank": 9,
+				"points_over_replacement": 3.1,
+				"held": false,
 				"facts": {
 					"week": 6,
-					"opponent": "HOU",
-					"home": true,
-					"kickoff": "2026-10-18T13:30:00.000Z",
-					"bye": false,
+					"opponent": null,
+					"home": null,
+					"kickoff": null,
+					"bye": true,
 					"designation": null,
 					"played": false,
 					"points_this_week": null,
 					"last_games": [
-						{ "week": 3, "points": 19.4 },
-						{ "week": 4, "points": 6.3 },
-						{ "week": 5, "points": 5.7 }
+						{ "week": 5, "points": 19.7 },
+						{ "week": 4, "points": 5.7 },
+						{ "week": 3, "points": 24.8 }
 					],
 					"allowed_to_position": null
 				}
@@ -568,6 +586,7 @@
 				},
 				"position_rank": null,
 				"points_over_replacement": null,
+				"held": false,
 				"facts": {
 					"week": 6,
 					"opponent": "JAX",
@@ -592,6 +611,7 @@
 				},
 				"position_rank": null,
 				"points_over_replacement": null,
+				"held": false,
 				"facts": {
 					"week": 6,
 					"opponent": null,
@@ -620,7 +640,8 @@
 				"injured_reserve": false
 			},
 			"position_rank": 9,
-			"points_over_replacement": 52.78,
+			"points_over_replacement": 3.1,
+			"held": false,
 			"facts": {
 				"week": 6,
 				"opponent": null,
@@ -631,9 +652,9 @@
 				"played": false,
 				"points_this_week": null,
 				"last_games": [
-					{ "week": 3, "points": 24.8 },
+					{ "week": 5, "points": 19.7 },
 					{ "week": 4, "points": 5.7 },
-					{ "week": 5, "points": 19.7 }
+					{ "week": 3, "points": 24.8 }
 				],
 				"allowed_to_position": null
 			}
@@ -648,7 +669,8 @@
 				"injured_reserve": false
 			},
 			"position_rank": 5,
-			"points_over_replacement": 25.71,
+			"points_over_replacement": 1.51,
+			"held": false,
 			"facts": {
 				"week": 6,
 				"opponent": null,
@@ -659,9 +681,9 @@
 				"played": false,
 				"points_this_week": null,
 				"last_games": [
-					{ "week": 3, "points": 7.4 },
+					{ "week": 5, "points": 19.8 },
 					{ "week": 4, "points": 22.4 },
-					{ "week": 5, "points": 19.8 }
+					{ "week": 3, "points": 7.4 }
 				],
 				"allowed_to_position": null
 			}
@@ -677,6 +699,7 @@
 			},
 			"position_rank": 12,
 			"points_over_replacement": 0,
+			"held": false,
 			"facts": {
 				"week": 6,
 				"opponent": "TB",
@@ -687,9 +710,9 @@
 				"played": false,
 				"points_this_week": null,
 				"last_games": [
-					{ "week": 3, "points": 26.68 },
+					{ "week": 5, "points": 25 },
 					{ "week": 4, "points": 24.96 },
-					{ "week": 5, "points": 25 }
+					{ "week": 3, "points": 26.68 }
 				],
 				"allowed_to_position": null
 			}
@@ -705,6 +728,7 @@
 			},
 			"position_rank": null,
 			"points_over_replacement": null,
+			"held": false,
 			"facts": {
 				"week": 6,
 				"opponent": null,
@@ -728,7 +752,8 @@
 				"injured_reserve": false
 			},
 			"position_rank": 70,
-			"points_over_replacement": -39.4,
+			"points_over_replacement": -2.32,
+			"held": false,
 			"facts": {
 				"week": 6,
 				"opponent": null,
@@ -739,9 +764,9 @@
 				"played": false,
 				"points_this_week": null,
 				"last_games": [
-					{ "week": 2, "points": 4.1 },
+					{ "week": 4, "points": 9.1 },
 					{ "week": 3, "points": 20 },
-					{ "week": 4, "points": 9.1 }
+					{ "week": 2, "points": 4.1 }
 				],
 				"allowed_to_position": null
 			}
@@ -756,7 +781,8 @@
 				"injured_reserve": false
 			},
 			"position_rank": 64,
-			"points_over_replacement": -67.88,
+			"points_over_replacement": -3.99,
+			"held": false,
 			"facts": {
 				"week": 6,
 				"opponent": "DEN",
@@ -780,7 +806,8 @@
 				"injured_reserve": false
 			},
 			"position_rank": 65,
-			"points_over_replacement": -68.39,
+			"points_over_replacement": -4.02,
+			"held": false,
 			"facts": {
 				"week": 6,
 				"opponent": "CAR",
@@ -791,9 +818,9 @@
 				"played": false,
 				"points_this_week": null,
 				"last_games": [
-					{ "week": 2, "points": 11.8 },
+					{ "week": 4, "points": 5.5 },
 					{ "week": 3, "points": -0.5 },
-					{ "week": 4, "points": 5.5 }
+					{ "week": 2, "points": 11.8 }
 				],
 				"allowed_to_position": null
 			}
@@ -808,7 +835,8 @@
 				"injured_reserve": false
 			},
 			"position_rank": 74,
-			"points_over_replacement": -74.25,
+			"points_over_replacement": -4.37,
+			"held": false,
 			"facts": {
 				"week": 6,
 				"opponent": "ATL",
@@ -819,9 +847,9 @@
 				"played": false,
 				"points_this_week": null,
 				"last_games": [
-					{ "week": 2, "points": 0 },
+					{ "week": 5, "points": 9 },
 					{ "week": 4, "points": 3.3 },
-					{ "week": 5, "points": 9 }
+					{ "week": 2, "points": 0 }
 				],
 				"allowed_to_position": null
 			}
@@ -836,7 +864,8 @@
 				"injured_reserve": false
 			},
 			"position_rank": 149,
-			"points_over_replacement": -80.59,
+			"points_over_replacement": -4.74,
+			"held": false,
 			"facts": {
 				"week": 6,
 				"opponent": "WSH",
@@ -860,7 +889,8 @@
 				"injured_reserve": false
 			},
 			"position_rank": 31,
-			"points_over_replacement": -99.04,
+			"points_over_replacement": -5.83,
+			"held": false,
 			"facts": {
 				"week": 6,
 				"opponent": "NO",
@@ -871,8 +901,8 @@
 				"played": false,
 				"points_this_week": null,
 				"last_games": [
-					{ "week": 1, "points": 29.6 },
-					{ "week": 2, "points": 0.8 }
+					{ "week": 2, "points": 0.8 },
+					{ "week": 1, "points": 29.6 }
 				],
 				"allowed_to_position": null
 			}
