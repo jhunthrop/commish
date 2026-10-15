@@ -8,6 +8,7 @@
 	import { fixed, signed } from '#lib/format/number.ts';
 	import { POSITION_NAMES } from '#lib/run/derive.ts';
 	import { UNWRITTEN_READ, unwrittenLines } from '#lib/run/unwritten-words.ts';
+	import Credit from '#lib/site/Credit.svelte';
 	import SheetAdd from '#lib/site/SheetAdd.svelte';
 	import { lazySheet } from '#lib/site/lazy-sheet.svelte.ts';
 	import SiteShell from '#lib/site/SiteShell.svelte';
@@ -191,7 +192,6 @@
 					<p class="unwritten">{UNWRITTEN_READ}</p>
 					<LineList lines={unwritten} label="What our read of {page.name} will be built from" />
 				{/if}
-				<Footnote><a href={data.sources.href}>{data.sources.words}</a></Footnote>
 			</article>
 			<aside class="tier" aria-label="His tier">
 				<TierMates
@@ -231,6 +231,8 @@
 				</Table>
 			</section>
 		{/if}
+
+		<Credit />
 	</main>
 </SiteShell>
 
