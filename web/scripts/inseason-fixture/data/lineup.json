@@ -1,6 +1,7 @@
 {
 	"week": 6,
-	"basis": "Ranked by our rest-of-season order from week 6 and this week's designations. We do not project a week's points.",
+	"basis": "Ranked by our rest-of-season order and this week's designations. We do not project a week's points. Points over replacement, and every gain in them, are points above what a free pickup at his position gives you, a week: the rest of the season on our rest-of-season order, averaged over its 12 weeks, not a projection of any one week.",
+	"basis_note": "Points over replacement are for a 12-team league with 1 QB, 2 RB, 3 WR, 1 TE and two flex spots. Points so far leave out your league's points for two-point conversions, missed field goals, missed extra points, fumble recoveries and safeties: the stat lines we hold do not carry them.",
 	"order_basis": "rest_of_season",
 	"refreshed": "2026-10-14T19:05:37.917Z",
 	"read_at": "2026-10-14T19:05:38.329Z",
@@ -17,8 +18,10 @@
 					"team": "KC",
 					"injured_reserve": false
 				},
+				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/3139477.png",
+				"slug": "patrick-mahomes",
 				"position_rank": 3,
-				"points_over_replacement": 1.92,
+				"points_over_replacement": 2.7,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -46,6 +49,8 @@
 					"team": "PIT",
 					"injured_reserve": false
 				},
+				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/8439.png",
+				"slug": "aaron-rodgers",
 				"position_rank": 12,
 				"points_over_replacement": 0,
 				"held": false,
@@ -67,7 +72,7 @@
 				}
 			},
 			"changed": true,
-			"sentence": "Patrick Mahomes is QB3 in our rest-of-season order, Aaron Rodgers QB12. He scored 19.0 in his last game."
+			"sentence": "Mahomes is QB3 in our rest-of-season order, Rodgers QB12."
 		},
 		{
 			"slot": "RB",
@@ -80,8 +85,10 @@
 					"team": "ARI",
 					"injured_reserve": false
 				},
+				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4870808.png",
+				"slug": "jeremiyah-love",
 				"position_rank": 22,
-				"points_over_replacement": 0.4,
+				"points_over_replacement": 0.6,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -109,8 +116,10 @@
 					"team": "ARI",
 					"injured_reserve": false
 				},
+				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4870808.png",
+				"slug": "jeremiyah-love",
 				"position_rank": 22,
-				"points_over_replacement": 0.4,
+				"points_over_replacement": 0.6,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -143,8 +152,10 @@
 					"team": "TB",
 					"injured_reserve": false
 				},
+				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4371733.png",
+				"slug": "kenny-gainwell",
 				"position_rank": 33,
-				"points_over_replacement": -1.12,
+				"points_over_replacement": -1.6,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -172,8 +183,10 @@
 					"team": "TB",
 					"injured_reserve": false
 				},
+				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4371733.png",
+				"slug": "kenny-gainwell",
 				"position_rank": 33,
-				"points_over_replacement": -1.12,
+				"points_over_replacement": -1.6,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -206,8 +219,10 @@
 					"team": "JAX",
 					"injured_reserve": false
 				},
+				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/3916433.png",
+				"slug": "jakobi-meyers",
 				"position_rank": 51,
-				"points_over_replacement": -1.19,
+				"points_over_replacement": -1.7,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -235,8 +250,10 @@
 					"team": "JAX",
 					"injured_reserve": false
 				},
+				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/3916433.png",
+				"slug": "jakobi-meyers",
 				"position_rank": 51,
-				"points_over_replacement": -1.19,
+				"points_over_replacement": -1.7,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -269,6 +286,8 @@
 					"team": "CHI",
 					"injured_reserve": false
 				},
+				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4431299.png",
+				"slug": "rome-odunze",
 				"position_rank": 35,
 				"points_over_replacement": 0,
 				"held": false,
@@ -298,6 +317,8 @@
 					"team": "CHI",
 					"injured_reserve": false
 				},
+				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4431299.png",
+				"slug": "rome-odunze",
 				"position_rank": 35,
 				"points_over_replacement": 0,
 				"held": false,
@@ -332,8 +353,10 @@
 					"team": "WAS",
 					"injured_reserve": false
 				},
+				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/5081432.png",
+				"slug": "antonio-williams",
 				"position_rank": 60,
-				"points_over_replacement": -1.79,
+				"points_over_replacement": -2.5,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -361,8 +384,10 @@
 					"team": "WAS",
 					"injured_reserve": false
 				},
+				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/5081432.png",
+				"slug": "antonio-williams",
 				"position_rank": 60,
-				"points_over_replacement": -1.79,
+				"points_over_replacement": -2.5,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -395,8 +420,10 @@
 					"team": "WAS",
 					"injured_reserve": false
 				},
+				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4360635.png",
+				"slug": "chig-okonkwo",
 				"position_rank": 26,
-				"points_over_replacement": -1.43,
+				"points_over_replacement": -2,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -424,8 +451,10 @@
 					"team": "DET",
 					"injured_reserve": false
 				},
+				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4430027.png",
+				"slug": "sam-laporta",
 				"position_rank": 5,
-				"points_over_replacement": 1.51,
+				"points_over_replacement": 2.1,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -445,7 +474,7 @@
 				}
 			},
 			"changed": true,
-			"sentence": "Sam LaPorta is on bye this week."
+			"sentence": "Sam LaPorta is on bye this week, so Okonkwo starts."
 		},
 		{
 			"slot": "FLEX",
@@ -458,8 +487,10 @@
 					"team": "LAC",
 					"injured_reserve": false
 				},
+				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4612826.png",
+				"slug": "ladd-mcconkey",
 				"position_rank": 69,
-				"points_over_replacement": -2.3,
+				"points_over_replacement": -3.3,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -487,8 +518,10 @@
 					"team": "LAC",
 					"injured_reserve": false
 				},
+				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4612826.png",
+				"slug": "ladd-mcconkey",
 				"position_rank": 69,
-				"points_over_replacement": -2.3,
+				"points_over_replacement": -3.3,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -521,8 +554,10 @@
 					"team": "NO",
 					"injured_reserve": false
 				},
+				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4239996.png",
+				"slug": "travis-etienne-jr",
 				"position_rank": 44,
-				"points_over_replacement": -1.85,
+				"points_over_replacement": -2.6,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -550,8 +585,10 @@
 					"team": "CIN",
 					"injured_reserve": false
 				},
+				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4362628.png",
+				"slug": "ja-marr-chase",
 				"position_rank": 9,
-				"points_over_replacement": 3.1,
+				"points_over_replacement": 4.4,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -571,7 +608,7 @@
 				}
 			},
 			"changed": true,
-			"sentence": "Ja'Marr Chase is on bye this week."
+			"sentence": "Ja'Marr Chase is on bye this week, so Etienne starts."
 		},
 		{
 			"slot": "DEF",
@@ -584,6 +621,8 @@
 					"team": "HOU",
 					"injured_reserve": false
 				},
+				"headshot": null,
+				"slug": null,
 				"position_rank": null,
 				"points_over_replacement": null,
 				"held": false,
@@ -609,6 +648,8 @@
 					"team": "MIN",
 					"injured_reserve": false
 				},
+				"headshot": null,
+				"slug": null,
 				"position_rank": null,
 				"points_over_replacement": null,
 				"held": false,
@@ -626,7 +667,7 @@
 				}
 			},
 			"changed": true,
-			"sentence": "Minnesota Vikings is on bye this week."
+			"sentence": "Minnesota Vikings is on bye this week, so Texans starts."
 		}
 	],
 	"bench": [
@@ -639,8 +680,10 @@
 				"team": "CIN",
 				"injured_reserve": false
 			},
+			"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4362628.png",
+			"slug": "ja-marr-chase",
 			"position_rank": 9,
-			"points_over_replacement": 3.1,
+			"points_over_replacement": 4.4,
 			"held": false,
 			"facts": {
 				"week": 6,
@@ -668,8 +711,10 @@
 				"team": "DET",
 				"injured_reserve": false
 			},
+			"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4430027.png",
+			"slug": "sam-laporta",
 			"position_rank": 5,
-			"points_over_replacement": 1.51,
+			"points_over_replacement": 2.1,
 			"held": false,
 			"facts": {
 				"week": 6,
@@ -697,6 +742,8 @@
 				"team": "PIT",
 				"injured_reserve": false
 			},
+			"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/8439.png",
+			"slug": "aaron-rodgers",
 			"position_rank": 12,
 			"points_over_replacement": 0,
 			"held": false,
@@ -726,6 +773,8 @@
 				"team": "MIN",
 				"injured_reserve": false
 			},
+			"headshot": null,
+			"slug": null,
 			"position_rank": null,
 			"points_over_replacement": null,
 			"held": false,
@@ -751,8 +800,10 @@
 				"team": "MIN",
 				"injured_reserve": false
 			},
+			"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4429205.png",
+			"slug": "jordan-addison",
 			"position_rank": 70,
-			"points_over_replacement": -2.32,
+			"points_over_replacement": -3.3,
 			"held": false,
 			"facts": {
 				"week": 6,
@@ -773,31 +824,6 @@
 		},
 		{
 			"player": {
-				"host_id": "9753",
-				"board_id": "4426385",
-				"name": "Zach Charbonnet",
-				"position": "RB",
-				"team": "SEA",
-				"injured_reserve": false
-			},
-			"position_rank": 64,
-			"points_over_replacement": -3.99,
-			"held": false,
-			"facts": {
-				"week": 6,
-				"opponent": "DEN",
-				"home": false,
-				"kickoff": "2026-10-16T00:15:00.000Z",
-				"bye": false,
-				"designation": null,
-				"played": false,
-				"points_this_week": null,
-				"last_games": [],
-				"allowed_to_position": null
-			}
-		},
-		{
-			"player": {
 				"host_id": "9225",
 				"board_id": "4429013",
 				"name": "Tank Bigsby",
@@ -805,8 +831,10 @@
 				"team": "PHI",
 				"injured_reserve": false
 			},
+			"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4429013.png",
+			"slug": "tank-bigsby",
 			"position_rank": 65,
-			"points_over_replacement": -4.02,
+			"points_over_replacement": -5.7,
 			"held": false,
 			"facts": {
 				"week": 6,
@@ -827,6 +855,33 @@
 		},
 		{
 			"player": {
+				"host_id": "9753",
+				"board_id": "4426385",
+				"name": "Zach Charbonnet",
+				"position": "RB",
+				"team": "SEA",
+				"injured_reserve": false
+			},
+			"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4426385.png",
+			"slug": "zach-charbonnet",
+			"position_rank": 64,
+			"points_over_replacement": -5.7,
+			"held": false,
+			"facts": {
+				"week": 6,
+				"opponent": "DEN",
+				"home": false,
+				"kickoff": "2026-10-16T00:15:00.000Z",
+				"bye": false,
+				"designation": null,
+				"played": false,
+				"points_this_week": null,
+				"last_games": [],
+				"allowed_to_position": null
+			}
+		},
+		{
+			"player": {
 				"host_id": "10235",
 				"board_id": "4426386",
 				"name": "Roschon Johnson",
@@ -834,8 +889,10 @@
 				"team": "CHI",
 				"injured_reserve": false
 			},
+			"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4426386.png",
+			"slug": "roschon-johnson",
 			"position_rank": 74,
-			"points_over_replacement": -4.37,
+			"points_over_replacement": -6.2,
 			"held": false,
 			"facts": {
 				"week": 6,
@@ -863,8 +920,10 @@
 				"team": "SF",
 				"injured_reserve": false
 			},
+			"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/3895856.png",
+			"slug": "christian-kirk",
 			"position_rank": 149,
-			"points_over_replacement": -4.74,
+			"points_over_replacement": -6.7,
 			"held": true,
 			"facts": {
 				"week": 6,
@@ -888,8 +947,10 @@
 				"team": "NYG",
 				"injured_reserve": false
 			},
+			"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4689114.png",
+			"slug": "jaxson-dart",
 			"position_rank": 31,
-			"points_over_replacement": -5.83,
+			"points_over_replacement": -8.3,
 			"held": false,
 			"facts": {
 				"week": 6,
@@ -908,5 +969,6 @@
 			}
 		}
 	],
-	"host_lineup_url": "https://sleeper.com/leagues/1382163311038038016/team"
+	"host_lineup_url": "https://sleeper.com/leagues/1382163311038038016/team",
+	"host_note": null
 }

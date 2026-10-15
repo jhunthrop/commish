@@ -8,8 +8,12 @@
 //   - designation, points_this_week and allowed_to_position are not held by the run: absent (null).
 // The lineups, the drops and the trades come from a plain stand-in for the API's engine (§4.2 on the
 // run's rest-of-season order, flex by points over replacement), and a gain a week is the change in a
-// lineup's summed points over replacement divided by the weeks the rest-of-season order covers. The
-// API's own engine replaces all of it; only the shapes and the figures' sources are meant to hold.
+// lineup's summed points over replacement divided by the weeks the rest-of-season order covers (the
+// league's week through week 17, as the API divides). The API's own engine replaces all of it; only
+// the shapes and the figures' sources are meant to hold. The words are the API's own
+// (api/internal/inseason words.go and sentences.go): the basis lines, a change's reason (the order,
+// then his last two games only when they beat the player he replaces), a waiver row's sentence and a
+// team's line when every trade with it is a close call for them, so the shots read as members' do.
 //
 //   node scripts/inseason-fixture/build.ts [roster id]   (reads .runs/runs/<PUBLIC_RUN_ID or latest>)
 import { readFile, readdir, writeFile } from 'node:fs/promises';
@@ -41,12 +45,16 @@ const POOL_CANDIDATES = 60;
 const WAIVER_ROWS_UNDER_RULE = 8;
 const TRADES_PER_TEAM = 4;
 const CLOSE_FOR_THEM = 0.5;
+/** The last week the rest-of-season order covers (the API's LastWeek). */
+const LAST_FANTASY_WEEK = 17;
+/** A gain or a points over replacement figure on the wire: one decimal. */
+const TENTH = 10;
+/** The last games a change's reason names. */
+const NAMED_GAMES = 2;
 const SKILL = new Set(['QB', 'RB', 'WR', 'TE']);
 const FLEX = new Set(['RB', 'WR', 'TE']);
 const SUPER_FLEX = new Set(['QB', 'RB', 'WR', 'TE']);
 const DECIMALS = 100;
-/** The API states points over replacement a week: the season's over 17 games. */
-const SEASON_GAMES = 17;
 /** The one player the fixture's member tags Hold: a sheet tag, not a figure. */
 const HELD_ON_SHEET = 'Christian Kirk';
 /** The league's slot words in the contract's: Sleeper's SUPER_FLEX is SUPERFLEX. */
@@ -62,6 +70,7 @@ const SLOT_OF: Readonly<Record<string, LineupSlot['slot']>> = {
 };
 
 const round = (n: number): number => Math.round(n * DECIMALS) / DECIMALS;
+const tenth = (n: number): number => Math.round(n * TENTH) / TENTH;
 
 async function json<T>(url: URL): Promise<T> {
 	return JSON.parse(await readFile(url, 'utf8')) as T;
@@ -112,6 +121,8 @@ interface SleeperLeague {
 }
 interface BoardRow {
 	id: string;
+	slug: string;
+	headshot: string | null;
 	name: string;
 	position: string;
 	team: string;
@@ -159,9 +170,41 @@ const format = manifest.formats.find((f) => f.id === FORMAT);
 if (!format?.rosFromWeek || !format.refreshedAt) {
 	throw new Error(`Run ${runId} has no rest-of-season ${FORMAT} board.`);
 }
-const rosFrom = format.rosFromWeek;
 const refreshed = format.refreshedAt;
 const week = state.week;
+/** The weeks the rest-of-season order covers from the league's week: a week's figure is over them. */
+const weeksCovered = Math.max(1, LAST_FANTASY_WEEK - week + 1);
+
+/** What every basis ends with, in the API's words (words.go porWords): what points over
+ * replacement are and what a week's figure is. */
+const basisTail = `Points over replacement, and every gain in them, are points above what a free pickup at his position gives you, a week: the rest of the season on our rest-of-season order, averaged over its ${String(weeksCovered)} weeks, not a projection of any one week.`;
+
+/** The rest of the basis, under the rows, in the API's words (words.go BasisNote): the league's
+ * shape and the league's rules the stat lines leave out. */
+const basisNote = ((): string => {
+	const count = (slot: string): number => league.roster_positions.filter((s) => s === slot).length;
+	const flexes = count('FLEX');
+	const flex =
+		count('SUPER_FLEX') > 0 ? 'a flex and a superflex' : flexes > 1 ? 'two flex spots' : 'a flex';
+	const shape = `a ${String(rosters.length)}-team league with ${String(count('QB'))} QB, ${String(count('RB'))} RB, ${String(count('WR'))} WR, ${String(count('TE'))} TE and ${flex}`;
+	const s = league.scoring_settings;
+	const scores = (...keys: string[]): boolean =>
+		Object.entries(s).some(
+			([k, v]) => v !== 0 && keys.some((key) => k === key || k.startsWith(`${key}_`))
+		);
+	const left = [
+		scores('pass_2pt', 'rush_2pt', 'rec_2pt') ? 'two-point conversions' : null,
+		scores('fgmiss') ? 'missed field goals' : null,
+		scores('xpmiss') ? 'missed extra points' : null,
+		scores('kr_td', 'pr_td') ? 'return touchdowns' : null,
+		scores('fum_rec') ? 'fumble recoveries' : null,
+		scores('safe') ? 'safeties' : null
+	].filter((w): w is string => w !== null);
+	const por = `Points over replacement are for ${shape}.`;
+	return left.length === 0
+		? por
+		: `${por} Points so far leave out your league's points for ${listWords(left)}: the stat lines we hold do not carry them.`;
+})();
 
 /** "amon-ra st brown": a name as both sources can agree on it. */
 function key(name: string): string {
@@ -259,8 +302,10 @@ async function lineOf(player: LeaguePlayer): Promise<PlayerLine> {
 	const row = player.board_id === null ? null : (boardById.get(player.board_id) ?? null);
 	return {
 		player,
+		headshot: row?.headshot ?? null,
+		slug: row?.slug ?? null,
 		position_rank: row?.positionRank ?? null,
-		points_over_replacement: row === null ? null : round(row.vor / SEASON_GAMES),
+		points_over_replacement: row === null ? null : tenth(row.vor / weeksCovered),
 		held: false,
 		facts: await factsFor(row?.team ?? player.team, player.board_id)
 	};
@@ -400,28 +445,58 @@ async function lineup(): Promise<LineupAdvice> {
 		.map((l) => (l.player.name === HELD_ON_SHEET ? { ...l, held: true } : l));
 	return {
 		...head(
-			`Ranked by our rest-of-season order from week ${String(rosFrom)} and this week's designations. We do not project a week's points.`
+			`Ranked by our rest-of-season order and this week's designations. We do not project a week's points. ${basisTail}`
 		),
 		set: out.every((s) => !s.changed),
 		slots: out,
 		bench,
-		host_lineup_url: `https://sleeper.com/leagues/${league.league_id}/team`
+		host_lineup_url: `https://sleeper.com/leagues/${league.league_id}/team`,
+		host_note: null
 	};
 }
 
+/** A name's second mention, as the API's lastName: the last word, or the one before a suffix. */
+function lastName(full: string): string {
+	const words = full.trim().split(/\s+/);
+	const last = words.at(-1) ?? full;
+	return /^(jr|sr|ii|iii|iv|v)\.?$/i.test(last) && words.length > 1 ? (words.at(-2) ?? last) : last;
+}
+
+/** The mean of the last games a reason names, null with none. */
+function namedMean(line: PlayerLine): number | null {
+	const games = line.facts.last_games.slice(0, NAMED_GAMES);
+	return games.length === 0 ? null : games.reduce((sum, g) => sum + g.points, 0) / games.length;
+}
+
+/** A change's reason in the API's words (sentences.go Change): the bye that forces it, else the
+ * order, then his last games only when they beat the player he replaces. */
 function changeSentence(ours: PlayerLine, host: PlayerLine | null): string {
-	if (host === null) return `${ours.player.name} fills a slot left empty.`;
-	if (host.facts.bye) return `${host.player.name} is on bye this week.`;
-	const a = `${ours.player.position}${String(ours.position_rank ?? '')}`;
-	const b = `${host.player.position}${String(host.position_rank ?? '')}`;
-	const last = ours.facts.last_games[0];
+	if (host === null) return `Your lineup has nobody in this spot, so ${ours.player.name} starts.`;
+	if (host.facts.bye) {
+		return `${host.player.name} is on bye this week, so ${lastName(ours.player.name)} starts.`;
+	}
+	const rank = (l: PlayerLine): string => `${l.player.position}${String(l.position_rank ?? '')}`;
+	const order = `${lastName(ours.player.name)} is ${rank(ours)} in our rest-of-season order, ${lastName(host.player.name)} ${rank(host)}.`;
+	const mine = namedMean(ours);
+	const theirs = namedMean(host);
+	const games = ours.facts.last_games;
+	if (mine === null || theirs === null || mine <= theirs) return order;
 	const support =
-		last === undefined ? '' : ` He scored ${last.points.toFixed(1)} in his last game.`;
-	return `${ours.player.name} is ${a} in our rest-of-season order, ${host.player.name} ${b}.${support}`;
+		games.length >= NAMED_GAMES
+			? `He scored ${(games[0]?.points ?? 0).toFixed(1)} and ${(games[1]?.points ?? 0).toFixed(1)} in his last two games under your league's scoring.`
+			: `He scored ${(games[0]?.points ?? 0).toFixed(1)} in his last game under your league's scoring.`;
+	return `${order} ${support}`;
 }
 
 function head(basis: string): AdviceHead {
-	return { week, basis, order_basis: 'rest_of_season', refreshed, read_at: manifest.runAt };
+	return {
+		week,
+		basis,
+		basis_note: basisNote,
+		order_basis: 'rest_of_season',
+		refreshed,
+		read_at: manifest.runAt
+	};
 }
 
 // The waiver adds.
@@ -446,50 +521,82 @@ async function waivers(held: ReadonlySet<string>): Promise<WaiverAdvice> {
 		const best = options.sort((a, b) => b.after - a.after || vorOf(a.drop) - vorOf(b.drop))[0];
 		const week = best ? fill(best.roster, true) : thisWeek;
 		const at = week.findIndex((l) => l === add);
-		const gain = best ? round(best.after - base) : 0;
+		const gain = best ? tenth(best.after - base) : 0;
 		return {
 			add,
 			drop: best?.drop ?? null,
 			gain,
-			starts: at >= 0,
-			sentence: waiverSentence(add, at, thisWeek)
+			// As the API answers: he starts for you only with a gain to show.
+			starts: at >= 0 && gain > 0,
+			sentence: waiverSentence(add, best?.drop ?? null, gain, at >= 0)
 		};
 	});
 	const gaining = rows.filter((r) => r.gain > 0).sort((a, b) => b.gain - a.gain);
 	const rest = rows.filter((r) => r.gain <= 0).slice(0, WAIVER_ROWS_UNDER_RULE);
 	return {
 		...head(
-			'Ranked by the gain to your lineup on our rest-of-season order. A drop is the player it costs you least to lose.'
+			`Ranked by the gain to your lineup on our rest-of-season order. A drop is the player it costs you least to lose. ${basisTail}`
 		),
 		best: gaining[0] ?? null,
 		rows: [...gaining, ...rest],
-		host_waivers_url: `https://sleeper.com/leagues/${league.league_id}/players`
+		host_waivers_url: `https://sleeper.com/leagues/${league.league_id}/players`,
+		host_note: null
 	};
 }
 
+/** A waiver row's sentence in the API's words (sentences.go Waiver): the gain and the drop, the gain
+ * from a player who sits this week, or his place on the order behind your starters. */
 function waiverSentence(
 	add: PlayerLine,
-	at: number,
-	thisWeek: readonly (PlayerLine | null)[]
+	drop: PlayerLine | null,
+	gain: number,
+	starts: boolean
 ): string {
-	if (at >= 0) {
-		const over = thisWeek[at];
-		const slot = slots[at] ?? '';
-		const where = slot.includes('FLEX') ? 'in the flex' : `at ${slot}`;
-		return over ? `He starts ${where} over ${over.player.name}.` : `He starts ${where}.`;
+	const name = add.player.name;
+	const dropped =
+		drop === null
+			? 'Your open roster spot takes him with no drop.'
+			: `${drop.player.name} is the player it costs you least to lose.`;
+	if (gain > 0 && !starts) {
+		return `${name} does not start for you this week, and your lineup still gains ${gain.toFixed(1)} points over replacement a week with him on our rest-of-season order. ${dropped}`;
 	}
-	const ahead = thisWeek
-		.filter((l): l is PlayerLine => l?.player.position === add.player.position)
-		.map((l) => l.player.name);
-	if (ahead.length === 0) return 'He sits behind your starters this week.';
-	const verb = ahead.length === 1 ? 'starts' : 'start';
-	return `${listWords(ahead)} ${verb} ahead of him at ${add.player.position} this week.`;
+	if (gain > 0) {
+		return `${name} starts for you, and your lineup gains ${gain.toFixed(1)} points over replacement a week on our rest-of-season order. ${dropped}`;
+	}
+	if (add.position_rank !== null) {
+		return `${name} is ${add.player.position}${String(add.position_rank)} in our rest-of-season order and would not start for you.`;
+	}
+	return `${name} is not in our order and would not start for you.`;
 }
 
 // The trades.
 function pairs<T>(items: readonly T[]): T[][] {
 	return items.flatMap((a, i) => items.slice(i + 1).map((b) => [a, b]));
 }
+
+/** The member's drop for a trade that brings in more than it sends to his full roster (the API's
+ * withDrop): the last on our order among those the lineup after the trade does not start, never a
+ * player held, never his only defense. */
+function tradeDrop(
+	after: readonly PlayerLine[],
+	give: readonly PlayerLine[],
+	get: readonly PlayerLine[]
+): PlayerLine | null {
+	if (get.length <= give.length || after.length <= spots) return null;
+	const starting = new Set(fill(after, false).map((l) => l?.player.host_id));
+	const defenses = after.filter((l) => l.player.position === 'DEF').length;
+	const droppable = after.filter(
+		(l) =>
+			!get.includes(l) &&
+			!starting.has(l.player.host_id) &&
+			!l.held &&
+			(l.player.position !== 'DEF' || defenses > slots.filter((s) => s === 'DEF').length)
+	);
+	return droppable.sort((a, b) => vorOf(a) - vorOf(b) || rankOf(b) - rankOf(a))[0] ?? null;
+}
+
+/** Every spot on a roster, starters and bench. */
+const spots = league.roster_positions.length;
 
 function tradesWith(theirs: readonly PlayerLine[]): TradeRow[] {
 	const tradable = (l: PlayerLine): boolean => SKILL.has(l.player.position);
@@ -506,26 +613,39 @@ function tradesWith(theirs: readonly PlayerLine[]): TradeRow[] {
 			pairs(theirSkill).map((get): [PlayerLine[], PlayerLine[]] => [[a], get])
 		)
 	];
-	return shapes
-		.flatMap(([give, get]): TradeRow[] => {
-			const myAfter = fill([...myLines.filter((l) => !give.includes(l)), ...get], false);
-			const theirAfter = fill([...theirs.filter((l) => !get.includes(l)), ...give], false);
-			if (!fillsEvery(myAfter) || !fillsEvery(theirAfter)) return [];
-			const myGain = round(strength(myAfter) - myBase);
-			const theirGain = round(strength(theirAfter) - theirBase);
-			if (myGain <= 0 || theirGain <= 0) return [];
-			return [
-				{
-					give,
-					get,
-					my_gain: myGain,
-					their_gain: theirGain,
-					close_for_them: theirGain < CLOSE_FOR_THEM
-				}
-			];
-		})
-		.sort((a, b) => b.my_gain - a.my_gain)
-		.slice(0, TRADES_PER_TEAM);
+	return (
+		shapes
+			.flatMap(([give, get]): TradeRow[] => {
+				const myAfter = fill([...myLines.filter((l) => !give.includes(l)), ...get], false);
+				const theirAfter = fill([...theirs.filter((l) => !get.includes(l)), ...give], false);
+				if (!fillsEvery(myAfter) || !fillsEvery(theirAfter)) return [];
+				const myGain = tenth(strength(myAfter) - myBase);
+				const theirGain = tenth(strength(theirAfter) - theirBase);
+				if (myGain <= 0 || theirGain <= 0) return [];
+				const myRoster = [...myLines.filter((l) => !give.includes(l)), ...get];
+				const drop = tradeDrop(myRoster, give, get);
+				if (get.length > give.length && drop === null) return [];
+				return [
+					{
+						give,
+						get,
+						drop,
+						my_gain: myGain,
+						their_gain: theirGain,
+						close_for_them: theirGain < CLOSE_FOR_THEM
+					}
+				];
+			})
+			// As the API orders them: the trades they gain from first, then the close calls for them, each
+			// by your gain.
+			.sort(
+				(a, b) =>
+					Number(a.close_for_them) - Number(b.close_for_them) ||
+					b.my_gain - a.my_gain ||
+					b.their_gain - a.their_gain
+			)
+			.slice(0, TRADES_PER_TEAM)
+	);
 }
 
 function trades(): TradeAdvice {
@@ -537,11 +657,21 @@ function trades(): TradeAdvice {
 			owner: ownerName(r),
 			record: { wins: r.settings.wins, losses: r.settings.losses, ties: r.settings.ties },
 			trades: tradesWith(lines.get(r.roster_id) ?? [])
+		}))
+		.map((team) => ({
+			...team,
+			note:
+				team.trades.length > 0 && team.trades.every((t) => t.close_for_them)
+					? 'Every trade we found with this team is a close call for them.'
+					: null
 		}));
 	return {
-		...head('Trades where both lineups gain on our rest-of-season order. The other team decides.'),
+		...head(
+			`Trades where both lineups gain on our rest-of-season order. The other team decides. ${basisTail}`
+		),
 		teams,
-		host_trades_url: `https://sleeper.com/leagues/${league.league_id}/trade`
+		host_trades_url: `https://sleeper.com/leagues/${league.league_id}/team`,
+		host_note: null
 	};
 }
 
