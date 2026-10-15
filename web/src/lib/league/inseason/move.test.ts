@@ -2,8 +2,11 @@
 // it, the panel's steps and its words. Run with `npm test`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { ApiError } from '#lib/api/client.ts';
 import type { HostMovePlan, HostMoveResult, LineupSlot } from './api.ts';
 import {
+	failedStep,
+	lostWords,
 	MOVE_LINES,
 	hostSaid,
 	lineupMove,
@@ -135,4 +138,54 @@ void test("the host's reason is said in its own words under ours, ended once", (
 	assert.equal(openHostWords('espn'), 'Open ESPN');
 	assert.equal(readingWords('espn'), 'Reading your lineup on ESPN');
 	assert.equal(MOVE_LINES.notNow, 'Not now');
+});
+
+void test('a failed call says the API sentence, never a raw error, and a lost move sends the member to the host', () => {
+	const href = 'https://fantasy.espn.com/football/team?leagueId=1&teamId=3';
+	const expired = new ApiError(400, {
+		code: 'invalid',
+		message: 'That confirmation expired. Review the move again.',
+		fields: { confirm: 'That confirmation expired. Review the move again.' }
+	});
+	assert.deepEqual(failedStep(expired, 'espn', 'make', href), {
+		kind: 'failed',
+		sentence: 'That confirmation expired. Review the move again.',
+		href: null
+	});
+	const fieldOnly = new ApiError(400, {
+		code: 'invalid',
+		message: 'Some of that did not check out',
+		fields: { confirm: 'That confirmation is for another move. Review the move again.' }
+	});
+	assert.equal(
+		(failedStep(fieldOnly, 'espn', 'make', href) as { sentence: string }).sentence,
+		'That confirmation is for another move. Review the move again.'
+	);
+	const stale = new ApiError(422, {
+		code: 'invalid',
+		message: 'ESPN is on week 8 now. Reload your lineup to see it.'
+	});
+	assert.equal(
+		(failedStep(stale, 'espn', 'plan', href) as { sentence: string }).sentence,
+		'ESPN is on week 8 now. Reload your lineup to see it.'
+	);
+	const offline = new ApiError(0, { code: 'offline', message: 'We could not reach Commish' });
+	assert.deepEqual(failedStep(offline, 'espn', 'make', href), {
+		kind: 'failed',
+		sentence: lostWords('espn'),
+		href
+	});
+	assert.deepEqual(failedStep(new TypeError('Failed to fetch'), 'espn', 'make', href), {
+		kind: 'failed',
+		sentence: lostWords('espn'),
+		href
+	});
+	const planDrop = failedStep(new TypeError('Failed to fetch'), 'espn', 'plan', href);
+	assert.ok(
+		planDrop.kind === 'failed' && !planDrop.sentence.includes('TypeError') && planDrop.href === null
+	);
+	assert.equal(
+		lostWords('espn'),
+		'We did not hear back, so the move may have been made. Check your lineup on ESPN before you set it again.'
+	);
 });

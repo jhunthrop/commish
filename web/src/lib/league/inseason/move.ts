@@ -1,6 +1,7 @@
 /** The one move made on the host from our screen (spec §10.2): the start screen's changes as the
  * move the API plans, the steps of the confirmation panel, and its words. Pure, so every step and
  * sentence the panel shows is tested here. */
+import { ApiError } from '#lib/api/client.ts';
 import type { LeagueHost } from '../api.ts';
 import { hostWords } from '../names.ts';
 import type {
@@ -43,7 +44,7 @@ export type MoveStep =
 	| { kind: 'sending'; plan: ReadyPlan }
 	| { kind: 'answered'; result: HostMoveResult }
 	| { kind: 'unavailable'; sentence: string; href: string }
-	| { kind: 'failed'; sentence: string };
+	| { kind: 'failed'; sentence: string; href: string | null };
 
 /** The panel after a plan: the move to confirm, or the host's page when the API cannot make it. */
 export function planStep(plan: HostMovePlan): MoveStep {
@@ -59,6 +60,35 @@ export function resultStep(result: HostMoveResult): MoveStep {
 		return { kind: 'unavailable', sentence: result.sentence, href: result.host_url };
 	}
 	return { kind: 'answered', result };
+}
+
+/** When a call fails before the move could have left: nothing was sent. */
+const NOT_REACHED = 'We could not reach Commish, and nothing was sent. Try again in a moment.';
+
+/** The panel when a call fails: the API's own sentence for its refusal (an expired or spent
+ * token says so in fields), never a raw error. When the move's call fails with no answer at all,
+ * the move may have left, so the member is sent to check the host. */
+export function failedStep(
+	error: unknown,
+	host: LeagueHost,
+	stage: 'plan' | 'make',
+	href: string
+): MoveStep {
+	const answered = error instanceof ApiError && error.status !== 0;
+	if (answered) {
+		const sentence = error.fields.confirm ?? error.fields.move ?? error.message;
+		return { kind: 'failed', sentence, href: null };
+	}
+	if (stage === 'make') {
+		return { kind: 'failed', sentence: lostWords(host), href: href === '' ? null : href };
+	}
+	return { kind: 'failed', sentence: NOT_REACHED, href: null };
+}
+
+/** A move whose answer never came back: "We did not hear back, so the move may have been made.
+ * Check your lineup on ESPN before you set it again." */
+export function lostWords(host: LeagueHost): string {
+	return `We did not hear back, so the move may have been made. Check your lineup on ${hostWords(host)} before you set it again.`;
 }
 
 /** The host's reason in its own words, under ours: "ESPN said: Lineup transaction could not be

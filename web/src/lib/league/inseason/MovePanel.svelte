@@ -71,6 +71,7 @@
 			{:else}
 				<ProblemLine>{step.sentence}</ProblemLine>
 				<div class="actions">
+					{#if step.href}<Quiet href={step.href}>{openHostWords(host)}</Quiet>{/if}
 					<Quiet onclick={onclose}>{MOVE_LINES.notNow}</Quiet>
 				</div>
 			{/if}

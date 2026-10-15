@@ -3,12 +3,18 @@
 	import Panel from '#lib/ui/Panel.svelte';
 	import PanelHead from '#lib/ui/PanelHead.svelte';
 	import type { LeagueHost } from '../api.ts';
-	import { ApiError } from '#lib/api/client.ts';
 	import LineRow from './LineRow.svelte';
 	import MovePanel from './MovePanel.svelte';
 	import Screen from './Screen.svelte';
 	import type { HostMoveInput, HostMovePlan, HostMoveResult, LineupAdvice } from './api.ts';
-	import { lineupMove, planStep, resultStep, setsOnHost, type MoveStep } from './move.ts';
+	import {
+		failedStep,
+		lineupMove,
+		planStep,
+		resultStep,
+		setsOnHost,
+		type MoveStep
+	} from './move.ts';
 	import { LINES, lineupDecision, lineupTitle, satIds, slotLabels, verbWords } from './words.ts';
 
 	/** Start and sit (spec §4): this week's lineup slot by slot, ours, and where it differs from the
@@ -36,11 +42,6 @@
 
 	const onHost = $derived(setsOnHost(advice));
 
-	/** The API's sentence for a call that failed, or the client's own. */
-	function failed(error: unknown): MoveStep {
-		return { kind: 'failed', sentence: error instanceof ApiError ? error.message : String(error) };
-	}
-
 	async function open(): Promise<void> {
 		const move = lineupMove(advice);
 		planned = move;
@@ -48,7 +49,7 @@
 		try {
 			step = planStep(await plan(move));
 		} catch (error) {
-			step = failed(error);
+			step = failedStep(error, host, 'plan', advice.host_lineup_url);
 		}
 	}
 
@@ -60,7 +61,7 @@
 			step = resultStep(await make(planned, ready.confirm));
 			reread();
 		} catch (error) {
-			step = failed(error);
+			step = failedStep(error, host, 'make', advice.host_lineup_url);
 		}
 	}
 

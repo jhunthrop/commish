@@ -1,7 +1,7 @@
 // The account page's words for a connected host: run with `npm test`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { ESPN_CONSENT, statusWords } from './connection-words.ts';
+import { ESPN_CONSENT, ESPN_CONSENT_VERSION, statusWords } from './connection-words.ts';
 
 const at = '2026-10-15T12:00:00Z';
 
@@ -46,5 +46,6 @@ void test('the ESPN session sentence says what it is kept for, the moves the mem
 		'We keep an encrypted copy of your ESPN session so your league stays in sync and, when you ask, to make your moves. Disconnect deletes it at once.'
 	);
 	assert.match(ESPN_CONSENT, /when you ask, to make your moves/);
+	assert.equal(ESPN_CONSENT_VERSION, 3);
 	assert.doesNotMatch(ESPN_CONSENT, /;|—/);
 });
