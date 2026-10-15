@@ -46,9 +46,9 @@
 	>
 	{#if range}<span class="rng"><Label>Range</Label></span>{/if}
 	<Label
-		><span class="wide"
-			>Drafters{#if compare}&#32;vs us{/if}</span
-		><span class="narrow">Drafters</span></Label
+		><span class="wide">{compare ? 'Drafters vs us' : 'Drafters'}</span><span class="narrow"
+			>Drafters</span
+		></Label
 	>
 	{#if action}<span class="act-end"></span>{/if}
 </div>
