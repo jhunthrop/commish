@@ -16,7 +16,8 @@ create table app.host_write_accounts (
 
 -- Every move sent, or tried, as its proof: what the member confirmed (the
 -- plan in words and items), the body sent with no cookie in it, the
--- host's status and answer (bounded), what the answer came to and the
+-- host's answer as parsed (status, transaction id, refusal type and words,
+-- never the raw answer, which may echo the SWID), what it came to and the
 -- read-back. The confirm token's digest is unique, so one confirmation
 -- makes one move. Never a cookie, never a SWID.
 create table app.host_moves (
@@ -36,12 +37,15 @@ create table app.host_moves (
   outcome        text not null default 'sending'
                  check (outcome in ('sending', 'not_sent', 'done', 'refused', 'pending')),
   host_status    smallint,
-  host_body      text check (octet_length(host_body) <= 8192),
+  host_transaction_id text check (char_length(host_transaction_id) <= 80),
   host_reason    text check (char_length(host_reason) <= 64),
   host_words     text check (char_length(host_words) <= 300),
   -- matched: the host's state read back holds the move; not_matched: it
   -- does not; not_read: the read-back failed or was not made.
   read_back      text check (read_back in ('matched', 'not_matched', 'not_read')),
+  -- How the member ESPN names on its answer compares with the SWID sent;
+  -- mismatched is flagged in the log as well.
+  member_check   text check (member_check in ('absent', 'matched', 'mismatched')),
   created_at     timestamptz not null default now(),
   answered_at    timestamptz
 );

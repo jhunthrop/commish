@@ -64,10 +64,9 @@ func TestStore(t *testing.T) {
 	if _, err := s.Begin(ctx, record(0)); !errors.Is(err, ErrUsed) {
 		t.Fatalf("a token twice: %v", err)
 	}
-	long := []byte("x" + strings.Repeat("é", maxHostBody))
-	if err := s.Answered(ctx, acct.ID, id, Answer{Outcome: OutcomeRefused, HostStatus: 409, HostBody: long, HostReason: "TRAN_LINEUP_LOCKED",
-		HostWords: "Lineup transaction could not be completed, A is locked", ReadBack: readNotRead}, time.Now()); err != nil {
-		t.Fatalf("a long body cut mid-rune: %v", err)
+	if err := s.Answered(ctx, acct.ID, id, Answer{Outcome: OutcomeRefused, HostStatus: 409, HostReason: "TRAN_LINEUP_LOCKED",
+		HostWords: "Lineup transaction could not be completed, A is locked\x00", ReadBack: readNotRead, Member: "absent"}, time.Now()); err != nil {
+		t.Fatalf("answered: %v", err)
 	}
 	for i := 1; i <= ListMax+2; i++ {
 		if _, err := s.Begin(ctx, record(i)); err != nil {

@@ -380,7 +380,7 @@ export interface paths {
 		};
 		get?: never;
 		put?: never;
-		/** Plan a move the screen built (kind lineup: each slot's player in and the starter out, for the week) against a fresh read of the league as the member, on the member's own team only. Answers the move in words with a confirm token bound to the account, the league, the move's content and ten minutes; sends nothing. Answers unavailable, with the host's page, where the host has no write path, the host's switch is off for the account, or the account's connection is signed out or agreed to words older than the moves (a sentence asks to connect again). 20 a minute an account. */
+		/** Plan a move the screen built (kind lineup: each slot's player in and the starter out, for the week) against a fresh read of the league as the member, on the member's own team only. Answers the move in words with a confirm token bound to the account, the league, the move's content and ten minutes; sends nothing. Answers unavailable, with the host's page, where the host has no write path, the host's switch is off for the account, the account's connection is signed out or agreed to words older than the moves (a sentence asks to connect again), or the stored SWID does not own the team the attached league names as the member's in ESPN's teams read. 20 a minute an account. */
 		post: operations['planHostMove'];
 		delete?: never;
 		options?: never;
@@ -2843,6 +2843,8 @@ export interface components {
 			return_to?: string;
 		};
 		ESPNConnectInput: {
+			/** @description the version of the consent words the page showed (3 names the moves); kept never above the server's own, and taken as 2 when absent */
+			consent_version?: number;
 			/** @description ESPN's SWID cookie, a braced id: {XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX} */
 			swid: string;
 			/** @description ESPN's espn_s2 cookie, kept encrypted, never answered or logged */

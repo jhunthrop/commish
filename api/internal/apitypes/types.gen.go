@@ -1444,6 +1444,9 @@ type ESPNConnectInput struct {
 	// Consent the member agrees that we keep an encrypted copy of their ESPN session so their league stays in sync, and that disconnect deletes it; must be true
 	Consent bool `json:"consent"`
 
+	// ConsentVersion the version of the consent words the page showed (3 names the moves); kept never above the server's own, and taken as 2 when absent
+	ConsentVersion *int `json:"consent_version,omitempty"`
+
 	// EspnS2 ESPN's espn_s2 cookie, kept encrypted, never answered or logged
 	EspnS2 string `json:"espn_s2"`
 

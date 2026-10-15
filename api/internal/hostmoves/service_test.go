@@ -175,14 +175,30 @@ func (p *proofs) Begin(_ context.Context, r Record) (uuid.UUID, error) {
 	return id, nil
 }
 
-func (p *proofs) Answered(_ context.Context, _, id uuid.UUID, a Answer, _ time.Time) error {
+func (p *proofs) Answered(ctx context.Context, _, id uuid.UUID, a Answer, _ time.Time) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	p.answers[id] = a
 	return nil
 }
 
-func (p *proofs) List(context.Context, uuid.UUID, uuid.UUID) ([]Kept, error) { return nil, nil }
+func (p *proofs) List(context.Context, uuid.UUID, uuid.UUID) ([]Kept, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	out := []Kept{}
+	for i := len(p.order) - 1; i >= 0; i-- {
+		id := p.order[i]
+		outcome := OutcomeSending
+		if a, ok := p.answers[id]; ok {
+			outcome = a.Outcome
+		}
+		out = append(out, Kept{ID: id, Kind: "lineup", Week: p.records[id].Week, Outcome: outcome})
+	}
+	return out, nil
+}
 
 func (p *proofs) last(t *testing.T) (Record, Answer) {
 	t.Helper()
@@ -279,12 +295,16 @@ func (r *rig) noSecrets(t *testing.T) {
 			}
 		}
 	}
+	bare := strings.ToLower(strings.Trim(swid, "{}"))
 	for _, a := range r.proofs.answers {
-		if bytes.Contains(a.HostBody, []byte(s2)) || strings.Contains(a.HostWords, s2) {
-			t.Fatal("a cookie in the proof's answer")
+		for _, field := range []string{a.Outcome, a.TransactionID, a.HostReason, a.HostWords, a.ReadBack, a.Member} {
+			if strings.Contains(field, s2) || strings.Contains(strings.ToLower(field), bare) {
+				t.Fatalf("a cookie in the proof's answer: %+v", a)
+			}
 		}
 	}
-	if strings.Contains(r.logs.String(), s2) || strings.Contains(r.logs.String(), swid) {
+	logs := strings.ToLower(r.logs.String())
+	if strings.Contains(r.logs.String(), s2) || strings.Contains(logs, bare) {
 		t.Fatalf("a cookie in the logs: %s", r.logs.String())
 	}
 }
@@ -465,8 +485,8 @@ func (refusing) Applied(context.Context, espn.Cookies, espn.LineupSet) (bool, er
 }
 
 // The guard: a league whose seat is another manager's team (a
-// commissioner's cookies would let ESPN take it) is refused before any
-// POST.
+// commissioner's cookies would let ESPN take it) is unavailable, said as
+// not the member's team, before any POST.
 func TestAnotherTeamIsRefusedBeforeAnyPost(t *testing.T) {
 	r := newRig(t, http.StatusOK, "write-lineup-executed.json", true)
 	l := r.svc.Links.(links)
@@ -475,13 +495,12 @@ func TestAnotherTeamIsRefusedBeforeAnyPost(t *testing.T) {
 	mv := apitypes.HostMoveInput{Kind: apitypes.HostMoveInputKindLineup, Week: week, Changes: []apitypes.HostMoveChange{
 		{Slot: apitypes.HostMoveChangeSlotRB, In: "17359", Out: ptr("4047365")},
 	}}
-	code, env, _ := r.call(t, r.svc.plan, me, mv)
-	if code != http.StatusUnprocessableEntity || env.Error.Message != notYourTeamWords {
-		t.Fatalf("another team: %d %+v", code, env.Error)
+	if p := r.plan(t, mv); p.Status != apitypes.HostMovePlanStatusUnavailable || p.Sentence != notYourTeamWords || p.Confirm != nil {
+		t.Fatalf("another team: %+v", p)
 	}
 	token, _ := r.svc.Signer.Sign(me, linkID, mv, r.now.Add(ConfirmFor))
-	if code, _, _ := r.move(t, mv, token); code != http.StatusUnprocessableEntity {
-		t.Fatalf("another team, a good token: %d", code)
+	if _, _, res := r.move(t, mv, token); res.Outcome != apitypes.HostMoveResultOutcomeUnavailable || res.Sentence != notYourTeamWords {
+		t.Fatalf("another team, a good token: %+v", res)
 	}
 	if r.host.sent() != 0 || len(r.proofs.order) != 0 {
 		t.Fatal("a move on another team")
@@ -514,7 +533,7 @@ func TestPlanRefusals(t *testing.T) {
 		"stale":        {stale, staleWords},
 		"locked":       {locked, "ESPN has locked Odell Beckham Jr., whose game has started."},
 		"too many":     {tooMany, staleWords},
-		"ineligible":   {ineligible, staleWords},
+		"ineligible":   {ineligible, "ESPN does not let Alexander Mattison start in that spot."},
 	}
 	for name, tc := range cases {
 		code, env, _ := r.call(t, r.svc.plan, me, tc.mv)
@@ -612,4 +631,91 @@ func TestConsentVersionGatesTheMove(t *testing.T) {
 	if r.host.sent() != 0 {
 		t.Fatal("a move without consent")
 	}
+}
+
+// The owners check: the stored SWID must own the team the attached league
+// names as the member's, as ESPN answers the teams to these cookies. A
+// pasted SWID that owns another team (team 2 in the fixture) cannot move
+// team 1, whatever espn_s2 rides with it: unavailable, nothing sent. An
+// unproven connection is enough when the SWID owns the team.
+func TestTheStoredSWIDMustOwnTheTeam(t *testing.T) {
+	r := newRig(t, http.StatusOK, "write-lineup-executed.json", true)
+	m := r.svc.Member.(member)
+	r.svc.Member = member{client: m.client, cookies: espn.Cookies{SWID: "{0000000D-0000-4000-8000-00000000000D}", S2: s2}}
+	if p := r.plan(t, swap()); p.Status != apitypes.HostMovePlanStatusUnavailable || p.Sentence != notYourTeamWords {
+		t.Fatalf("a SWID that owns another team: %+v", p)
+	}
+	token, _ := r.svc.Signer.Sign(me, linkID, swap(), r.now.Add(ConfirmFor))
+	if _, _, res := r.move(t, swap(), token); res.Outcome != apitypes.HostMoveResultOutcomeUnavailable {
+		t.Fatalf("a good token, another member's team: %+v", res)
+	}
+	if r.host.sent() != 0 || len(r.proofs.order) != 0 {
+		t.Fatal("a move on a team the SWID does not own")
+	}
+	r.svc.Member = m
+	r.svc.Connections = conns{&hosts.Connection{Status: hosts.StatusConnected, ConsentVersion: hosts.ESPNConsentVersion, Proven: false}}
+	if p := r.plan(t, swap()); p.Status != apitypes.HostMovePlanStatusReady {
+		t.Fatalf("an unproven connection whose SWID owns the team: %+v", p)
+	}
+}
+
+// ESPN's answer may echo the member's SWID (memberId): the proof keeps
+// only the parsed fields, notes the member matched, and neither the row
+// nor any log holds the SWID or a cookie.
+func TestTheAnswerNeverKeepsTheSWID(t *testing.T) {
+	r := newRig(t, http.StatusOK, "write-lineup-executed-member.json", true)
+	mv := swap()
+	_, _, res := r.move(t, mv, *r.plan(t, mv).Confirm)
+	if res.Outcome != apitypes.HostMoveResultOutcomeDone {
+		t.Fatalf("done %+v", res)
+	}
+	_, ans := r.proofs.last(t)
+	if ans.Member != string(espn.MemberMatched) || ans.TransactionID == "" || ans.HostStatus != http.StatusOK {
+		t.Fatalf("proof %+v", ans)
+	}
+	r.noSecrets(t)
+}
+
+// A slow ESPN spends the send's budget: the member is told pending and
+// the proof's last write still lands on its own deadline, so no row is
+// left at sending. A row a crash left at sending lists as pending.
+func TestTheProofIsKeptWhenESPNIsSlow(t *testing.T) {
+	r := newRig(t, http.StatusOK, "write-lineup-executed.json", true)
+	mv := swap()
+	token := *r.plan(t, mv).Confirm
+	r.svc.Writer, r.svc.SendBudget = slow{}, 20*time.Millisecond
+	_, _, res := r.move(t, mv, token)
+	if res.Outcome != apitypes.HostMoveResultOutcomePending {
+		t.Fatalf("slow: %+v", res)
+	}
+	if _, ans := r.proofs.last(t); ans.Outcome != OutcomePending || ans.ReadBack != readNotRead {
+		t.Fatalf("proof %+v", ans)
+	}
+	if _, err := r.proofs.Begin(context.Background(), Record{Digest: []byte("a crash")}); err != nil {
+		t.Fatal(err)
+	}
+	code, _, data := r.call(t, r.svc.list, me, nil)
+	var moves []apitypes.HostMove
+	if err := json.Unmarshal(data, &moves); err != nil || code != http.StatusOK || len(moves) != 2 {
+		t.Fatalf("list %d %s %v", code, data, err)
+	}
+	for _, m := range moves {
+		if m.Outcome != apitypes.HostMoveOutcome(OutcomePending) {
+			t.Fatalf("listed %+v", m)
+		}
+	}
+}
+
+// slow is ESPN past the send's budget: the write's answer is lost and the
+// read-back never comes.
+type slow struct{}
+
+func (slow) SetLineup(ctx context.Context, _ espn.Cookies, _ espn.LineupSet) (espn.WriteAnswer, error) {
+	<-ctx.Done()
+	return espn.WriteAnswer{Outcome: espn.WriteUnknown, Member: espn.MemberAbsent}, nil
+}
+
+func (slow) Applied(ctx context.Context, _ espn.Cookies, _ espn.LineupSet) (bool, error) {
+	<-ctx.Done()
+	return false, ctx.Err()
 }

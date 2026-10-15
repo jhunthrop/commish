@@ -261,4 +261,11 @@ func TestESPNConsentVersion(t *testing.T) {
 	if got, err := store.Get(ctx, acct.ID, "espn"); err != nil || got.ConsentVersion != 2 {
 		t.Fatalf("get: version %d, %v", got.ConsentVersion, err)
 	}
+	// The words a page showed are kept, never above the server's own.
+	for shown, want := range map[int]int{2: 2, 3: 3, 9: ESPNConsentVersion, 0: 1} {
+		conn, err := store.PutConsented(ctx, acct.ID, "espn", sealed, time.Now(), false, shown)
+		if err != nil || conn.ConsentVersion != want {
+			t.Fatalf("shown %d: version %d, %v", shown, conn.ConsentVersion, err)
+		}
+	}
 }

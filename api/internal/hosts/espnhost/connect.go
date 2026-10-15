@@ -76,22 +76,34 @@ func (s *Service) connect(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, r, http.StatusBadGateway, httpx.CodeUnavailable, notAnswering, nil)
 		return
 	}
-	s.keep(w, r, cookies, v)
+	s.keep(w, r, cookies, v, shownConsent(in))
+}
+
+// unstatedConsent is the version of the ESPN words a page that does not
+// say which it showed carried: the words before the moves (version 2).
+const unstatedConsent = 2
+
+// shownConsent is the consent words' version the page says it showed.
+func shownConsent(in apitypes.ESPNConnectInput) int {
+	if in.ConsentVersion == nil {
+		return unstatedConsent
+	}
+	return *in.ConsentVersion
 }
 
 // keep seals the cookies and answers the connection and the leagues.
-func (s *Service) keep(w http.ResponseWriter, r *http.Request, cookies espn.Cookies, v verified) {
+func (s *Service) keep(w http.ResponseWriter, r *http.Request, cookies espn.Cookies, v verified, shown int) {
 	ctx, accountID, now := r.Context(), auth.AccountID(r), s.Now()
 	sealed, err := Seal(s.Vault, accountID, cookies)
 	if err != nil {
 		httpx.WriteInternal(w, r, s.Log, "espnhost: seal", err)
 		return
 	}
-	put, status := s.Store.Put, http.StatusCreated
+	status := http.StatusCreated
 	if !v.proven {
-		put, status = s.Store.PutUnproven, http.StatusOK
+		status = http.StatusOK
 	}
-	conn, err := put(ctx, accountID, Host, sealed, now)
+	conn, err := s.Store.PutConsented(ctx, accountID, Host, sealed, now, v.proven, shown)
 	if err != nil {
 		httpx.WriteInternal(w, r, s.Log, "espnhost: keep connection", err)
 		return

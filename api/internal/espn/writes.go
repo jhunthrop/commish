@@ -48,6 +48,17 @@ const (
 	SlotReserve = 21
 )
 
+// SlotID is a lineup slot's lineupSlotId by our name for it (SlotName's
+// inverse).
+func SlotID(name string) (int, bool) {
+	for id, n := range slots {
+		if n == name {
+			return id, true
+		}
+	}
+	return 0, false
+}
+
 // The ways a write is not made.
 var (
 	// ErrNotYourTeam is a move on a team the member's SWID does not own,
@@ -224,22 +235,37 @@ type Refusal struct {
 	Message string
 }
 
-// WriteAnswer is a sent write's answer: ESPN's status (0 for none), its
-// body as far as it was read, the body sent, and what it came to.
+// WriteAnswer is a sent write's answer as parsed: ESPN's status (0 for
+// none), the body sent, what it came to, the refusal, the transaction's
+// id, and whether the acting member ESPN names is the SWID the move went
+// out with. ESPN's raw answer is never kept: it may echo the member's
+// SWID (memberId).
 type WriteAnswer struct {
 	Status        int
-	Body          []byte
 	Sent          []byte
 	Outcome       WriteOutcome
 	Refusal       Refusal
 	TransactionID string
+	Member        MemberCheck
 }
+
+// MemberCheck is how ESPN's memberId on an answer compares with the SWID
+// the move was sent with.
+type MemberCheck string
+
+// The member checks.
+const (
+	MemberAbsent     MemberCheck = "absent"
+	MemberMatched    MemberCheck = "matched"
+	MemberMismatched MemberCheck = "mismatched"
+)
 
 // wireWriteAnswer is the part of ESPN's answer a write reads: a 200's
 // transaction, or a refusal's messages and details (jwulff 05 §5.1).
 type wireWriteAnswer struct {
 	ID       string   `json:"id"`
 	Status   string   `json:"status"`
+	MemberID *string  `json:"memberId"`
 	Messages []string `json:"messages"`
 	Details  []struct {
 		Type    string `json:"type"`
@@ -269,15 +295,15 @@ func (c *Client) SetLineup(ctx context.Context, cookies Cookies, set LineupSet) 
 		}
 	}
 	req.Header.Set("Cookie", cookies.header())
-	out := WriteAnswer{Sent: body, Outcome: WriteUnknown}
+	out := WriteAnswer{Sent: body, Outcome: WriteUnknown, Member: MemberAbsent}
 	resp, err := c.HTTP.Do(req)
 	if err != nil {
 		return out, nil
 	}
 	defer func() { _ = resp.Body.Close() }()
 	out.Status = resp.StatusCode
-	out.Body, _ = io.ReadAll(io.LimitReader(resp.Body, maxWriteAnswer))
-	return classify(out), nil
+	answer, _ := io.ReadAll(io.LimitReader(resp.Body, maxWriteAnswer))
+	return classify(out, answer, cookies), nil
 }
 
 // writeRequest is the POST for the move, with ESPN's headers and ours.
@@ -303,10 +329,17 @@ func (c *Client) writeRequest(ctx context.Context, set LineupSet, body []byte) (
 }
 
 // classify reads ESPN's answer: a 200 EXECUTED is executed, a 4xx is a
-// refusal in ESPN's words, anything else is not known.
-func classify(out WriteAnswer) WriteAnswer {
+// refusal in ESPN's words, anything else is not known. ESPN's words never
+// carry a cookie out: each is cut from them.
+func classify(out WriteAnswer, answer []byte, cookies Cookies) WriteAnswer {
 	var w wireWriteAnswer
-	parsed := json.Unmarshal(out.Body, &w) == nil
+	parsed := json.Unmarshal(answer, &w) == nil
+	if parsed && w.MemberID != nil && strings.TrimSpace(*w.MemberID) != "" {
+		out.Member = MemberMismatched
+		if sameSWID(*w.MemberID, cookies.SWID) {
+			out.Member = MemberMatched
+		}
+	}
 	switch {
 	case out.Status == http.StatusOK && parsed && w.Status == "EXECUTED":
 		out.Outcome, out.TransactionID = WriteExecuted, text(w.ID)
@@ -316,7 +349,34 @@ func classify(out WriteAnswer) WriteAnswer {
 			out.Refusal = refusal(w)
 		}
 	}
+	out.TransactionID = redact(out.TransactionID, cookies)
+	out.Refusal.Type = redact(out.Refusal.Type, cookies)
+	out.Refusal.Message = redact(out.Refusal.Message, cookies)
 	return out
+}
+
+// sameSWID compares two SWIDs, with or without braces, in any case.
+func sameSWID(a, b string) bool {
+	trim := func(s string) string { return strings.ToLower(strings.Trim(strings.TrimSpace(s), "{}")) }
+	return trim(a) != "" && trim(a) == trim(b)
+}
+
+// redacted stands in for a cookie in ESPN's words.
+const redacted = "[redacted]"
+
+// redact cuts the member's SWID (with or without braces, any case) and
+// espn_s2 from ESPN's words.
+func redact(s string, c Cookies) string {
+	for _, secret := range []string{c.S2, c.SWID, strings.Trim(c.SWID, "{}")} {
+		if secret == "" {
+			continue
+		}
+		lower := strings.ToLower(secret)
+		for i := strings.Index(strings.ToLower(s), lower); i >= 0; i = strings.Index(strings.ToLower(s), lower) {
+			s = s[:i] + redacted + s[i+len(secret):]
+		}
+	}
+	return s
 }
 
 // maxRefusalRunes bounds ESPN's words we keep and show.

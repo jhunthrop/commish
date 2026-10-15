@@ -1,6 +1,7 @@
 package espn
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -331,5 +332,32 @@ func TestWriteErrorsNeverPrintACookie(t *testing.T) {
 	_, err := busy.SetLineup(context.Background(), writeCookies, set)
 	if err == nil || strings.Contains(err.Error(), writeCookies.S2) || strings.Contains(err.Error(), writeCookies.SWID) {
 		t.Fatalf("error %v", err)
+	}
+}
+
+// ESPN's memberId is compared with the SWID sent, never kept; ESPN's
+// words lose any cookie they echo, braced or bare, in any case.
+func TestAnswerMemberAndRedaction(t *testing.T) {
+	c, _ := newWriteHost(t, http.StatusOK, "write-lineup-executed-member.json")
+	got, err := c.SetLineup(context.Background(), writeCookies, ownSet(t, c, rbSwap))
+	if err != nil || got.Member != MemberMatched || got.Outcome != WriteExecuted {
+		t.Fatalf("matched: %+v %v", got, err)
+	}
+	other := Cookies{SWID: "{00000099-0000-4000-8000-000000000099}", S2: writeCookies.S2}
+	answer := []byte(`{"memberId":"{00000011-0000-4000-8000-000000000011}","messages":["Member 00000011-0000-4000-8000-000000000011 is locked, ` +
+		writeCookies.S2 + `"],"details":[{"type":"TRAN_LINEUP_LOCKED"}]}`)
+	refused := classify(WriteAnswer{Status: http.StatusConflict, Member: MemberAbsent}, answer, other)
+	if refused.Member != MemberMismatched {
+		t.Fatalf("mismatched: %+v", refused)
+	}
+	mine := classify(WriteAnswer{Status: http.StatusConflict, Member: MemberAbsent}, bytes.ToUpper(answer), writeCookies)
+	for _, s := range []string{mine.Refusal.Message, mine.Refusal.Type, mine.TransactionID} {
+		low := strings.ToLower(s)
+		if strings.Contains(low, "00000011-0000-4000-8000-000000000011") || strings.Contains(low, strings.ToLower(writeCookies.S2)) {
+			t.Fatalf("a cookie in ESPN's words: %q", s)
+		}
+	}
+	if !strings.Contains(mine.Refusal.Message, "[redacted]") {
+		t.Fatalf("redaction %q", mine.Refusal.Message)
 	}
 }

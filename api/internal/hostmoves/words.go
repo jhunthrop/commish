@@ -9,7 +9,7 @@ const (
 	doneWords    = "Set on ESPN. Your lineup there now reads as ours."
 	refusedWords = "ESPN did not make the move, so nothing changed there."
 	pendingWords = "Sent to ESPN, but your lineup there did not show it when we read it back. Check your lineup on ESPN before you set it again."
-	notSentWords = "ESPN is not answering right now, and nothing was sent. Try again in a moment."
+	notSentWords = "ESPN is not answering right now, and nothing was sent. Review the move again in a moment."
 	offWords     = "Make this change on ESPN."
 
 	// Why a move is unavailable, said under the verb.
@@ -22,6 +22,7 @@ const (
 	staleWords       = "Your lineup on ESPN changed since this page read it. Reload your lineup to see it."
 	reserveWords     = "%s is on injured reserve on ESPN, so he cannot start."
 	lockedWords      = "ESPN has locked %s, whose %s started."
+	cannotFillWords  = "ESPN does not let %s start in that spot."
 	notAnsweringWord = "ESPN is not answering right now. Try again in a moment."
 
 	// The confirm token.

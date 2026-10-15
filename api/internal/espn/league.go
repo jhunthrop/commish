@@ -73,7 +73,7 @@ var proTeams = map[int]string{
 // Lineup slots by ESPN's lineupSlotId, in our names; any other is named
 // by its number to the caller.
 var slots = map[int]string{
-	0: "QB", 2: "RB", 4: "WR", 6: "TE", 16: "DEF", 17: "K", 23: "FLEX", 7: "SUPER_FLEX", 20: "BN", 21: "IR",
+	0: "QB", 2: "RB", 4: "WR", 6: "TE", 16: "DEF", 17: "K", 23: "FLEX", 7: "SUPER_FLEX", SlotBench: "BN", SlotReserve: "IR",
 	1: "TQB", 3: "RB/WR", 5: "WR/TE", 8: "DT", 9: "DE", 10: "LB", 11: "DL", 12: "CB", 13: "S", 14: "DB", 15: "DP",
 	18: "P", 19: "HC", 24: "ER",
 }

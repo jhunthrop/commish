@@ -134,10 +134,12 @@ func (s *Service) lineup(w http.ResponseWriter, r *http.Request) {
 	}
 	out, ok := a.Lineup()
 	if ok && s.Moves != nil {
+		// A failed check fails closed: the verb is the host's page, and
+		// start and sit still answers.
 		moves, err := s.Moves.LineupMove(r.Context(), auth.AccountID(r), a.Snap.Ref.Host)
 		if err != nil {
-			httpx.WriteInternal(w, r, s.Log, "inseason: moves", err)
-			return
+			s.Log.Warn("inseason: moves", "err", err)
+			moves = apitypes.LineupMoves{Lineup: apitypes.LineupMovesLineupUnavailable}
 		}
 		out.Moves = moves
 	}

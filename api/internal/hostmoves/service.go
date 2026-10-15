@@ -37,9 +37,12 @@ const (
 	maxChanges         = 10
 	maxWeek            = 25
 	maxConfirm         = 200
-	// afterSend bounds the read-back and the proof's update once a move
-	// left, cut loose from the request so a closed tab never loses them.
-	afterSend = 30 * time.Second
+	// sendBudget bounds the send and the read-back once a move leaves,
+	// cut loose from the request so a closed tab never loses them.
+	sendBudget = 30 * time.Second
+	// keepBudget bounds the proof's last write, on its own context, so a
+	// slow ESPN never leaves a row at sending.
+	keepBudget = 5 * time.Second
 )
 
 // kindLineup is the one move kind today.
@@ -94,8 +97,18 @@ type Service struct {
 	Writer      Writer
 	Proofs      Proofs
 	Signer      Signer
-	Now         func() time.Time
-	Log         *slog.Logger
+	// SendBudget and KeepBudget are sendBudget and keepBudget when zero.
+	SendBudget time.Duration
+	KeepBudget time.Duration
+	Now        func() time.Time
+	Log        *slog.Logger
+}
+
+func orDefault(d, fallback time.Duration) time.Duration {
+	if d > 0 {
+		return d
+	}
+	return fallback
 }
 
 // Routes is every route this package serves.
@@ -160,7 +173,7 @@ func checkMove(mv apitypes.HostMoveInput) bool {
 		return false
 	}
 	for _, c := range mv.Changes {
-		if _, ok := espnSlots[c.Slot]; !ok || !hostID.MatchString(c.In) || (c.Out != nil && !hostID.MatchString(*c.Out)) {
+		if _, ok := espnSlot(c.Slot); !ok || !hostID.MatchString(c.In) || (c.Out != nil && !hostID.MatchString(*c.Out)) {
 			return false
 		}
 	}
@@ -220,15 +233,21 @@ func (s *Service) prepare(w http.ResponseWriter, r *http.Request, link leaguesyn
 	case errors.Is(err, espnhost.ErrReconnect), errors.Is(err, espn.ErrSignedOut):
 		return prepared{unavailable: reconnectWords}, true
 	case errors.Is(err, espn.ErrPrivate):
-		httpx.WriteError(w, r, http.StatusUnprocessableEntity, httpx.CodeInvalid, notYourTeamWords, nil)
-		return prepared{}, false
+		return prepared{unavailable: notYourTeamWords}, true
 	case err != nil:
 		s.Log.Warn("hostmoves: read the league", "account", accountID, "err", err)
 		httpx.WriteError(w, r, http.StatusBadGateway, httpx.CodeUnavailable, notAnsweringWord, nil)
 		return prepared{}, false
 	}
+	// The read carries the teams (view=mTeam) as ESPN answers them to these
+	// cookies: the guard needs the stored SWID among the owners of the team
+	// the attached league names as the member's, or the move is unavailable.
 	plan, err := planLineup(l, cookies.SWID, link.RosterID, mv)
 	var ref *refusal
+	if errors.As(err, &ref) && ref.unavailable {
+		s.Log.Info("hostmoves: not the member's team", "account", accountID)
+		return prepared{unavailable: ref.words}, true
+	}
 	if errors.As(err, &ref) {
 		s.Log.Info("hostmoves: plan refused", "account", accountID, "why", ref.cause.Error())
 		httpx.WriteError(w, r, http.StatusUnprocessableEntity, httpx.CodeInvalid, ref.words, nil)
@@ -299,7 +318,7 @@ func (s *Service) move(w http.ResponseWriter, r *http.Request) {
 		if errors.Is(err, ErrTokenExpired) {
 			words = tokenExpiredWords
 		}
-		httpx.WriteInvalid(w, r, map[string]string{fieldConfirm: words})
+		httpx.WriteError(w, r, http.StatusBadRequest, httpx.CodeInvalid, words, map[string]string{fieldConfirm: words})
 		return
 	}
 	// A used token says so before the fresh read, which would find the
@@ -356,19 +375,22 @@ func (s *Service) send(w http.ResponseWriter, r *http.Request, link leaguesync.L
 		return
 	}
 	// From here the move may have left: nothing the request's end cancels.
-	ctx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), afterSend)
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), orDefault(s.SendBudget, sendBudget))
 	defer cancel()
 	ans, err := s.Writer.SetLineup(ctx, p.cookies, set)
 	if err != nil {
-		s.keep(ctx, accountID, id, Answer{Outcome: OutcomeNotSent})
+		s.keep(r.Context(), accountID, id, Answer{Outcome: OutcomeNotSent})
 		s.Log.Warn("hostmoves: not sent", "account", accountID, "move", id, "err", err)
 		httpx.WriteError(w, r, http.StatusBadGateway, httpx.CodeUnavailable, notSentWords, nil)
 		return
 	}
 	kept := s.settle(ctx, p.cookies, set, ans)
-	s.keep(ctx, accountID, id, kept)
+	s.keep(r.Context(), accountID, id, kept)
+	if kept.Member == string(espn.MemberMismatched) {
+		s.Log.Warn("hostmoves: ESPN named another member on the move", "account", accountID, "move", id)
+	}
 	s.Log.Info("hostmoves: move", "account", accountID, "move", id, "outcome", kept.Outcome, "status", ans.Status,
-		"reason", kept.HostReason, "read_back", kept.ReadBack)
+		"reason", kept.HostReason, "read_back", kept.ReadBack, "member", kept.Member)
 	httpx.WriteOK(w, r, http.StatusOK, result(kept, id, hostURL(link)))
 }
 
@@ -376,7 +398,7 @@ func (s *Service) send(w http.ResponseWriter, r *http.Request, link leaguesync.L
 // is read back, done when the host's lineup holds the move and pending
 // when it does not or the read fails. Never a retry.
 func (s *Service) settle(ctx context.Context, cookies espn.Cookies, set espn.LineupSet, ans espn.WriteAnswer) Answer {
-	a := Answer{HostStatus: ans.Status, HostBody: ans.Body}
+	a := Answer{HostStatus: ans.Status, TransactionID: ans.TransactionID, Member: string(ans.Member)}
 	if ans.Outcome == espn.WriteRefused {
 		a.Outcome, a.HostReason, a.HostWords, a.ReadBack = OutcomeRefused, ans.Refusal.Type, ans.Refusal.Message, readNotRead
 		return a
@@ -394,9 +416,12 @@ func (s *Service) settle(ctx context.Context, cookies espn.Cookies, set espn.Lin
 	return a
 }
 
-// keep writes what the move came to; a failure is logged, the answer
-// still goes to the member.
-func (s *Service) keep(ctx context.Context, accountID, id uuid.UUID, a Answer) {
+// keep writes what the move came to on its own short deadline, cut loose
+// from the request and from the send's budget; a failure is logged, the
+// answer still goes to the member.
+func (s *Service) keep(parent context.Context, accountID, id uuid.UUID, a Answer) {
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(parent), orDefault(s.KeepBudget, keepBudget))
+	defer cancel()
 	if err := s.Proofs.Answered(ctx, accountID, id, a, s.Now()); err != nil {
 		s.Log.Error("hostmoves: keep the answer", "account", accountID, "move", id, "err", err)
 	}
@@ -433,6 +458,10 @@ func (s *Service) list(w http.ResponseWriter, r *http.Request) {
 	}
 	out := make([]apitypes.HostMove, 0, len(kept))
 	for _, k := range kept {
+		// A row a crash left at sending is a move that may have been made.
+		if k.Outcome == OutcomeSending {
+			k.Outcome = OutcomePending
+		}
 		out = append(out, apitypes.HostMove{Id: k.ID, Kind: apitypes.HostMoveKind(k.Kind), Week: k.Week, Sentence: k.Sentence,
 			Outcome: apitypes.HostMoveOutcome(k.Outcome), HostWords: k.HostWords, CreatedAt: k.CreatedAt, AnsweredAt: k.AnsweredAt})
 	}

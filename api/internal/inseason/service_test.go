@@ -3,6 +3,7 @@ package inseason
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"log/slog"
 	"net/http"
@@ -88,10 +89,14 @@ func TestRoutesAnswerInTheEnvelope(t *testing.T) {
 type fakeMoves struct {
 	host    string
 	account uuid.UUID
+	err     error
 }
 
 func (f *fakeMoves) LineupMove(_ context.Context, accountID uuid.UUID, host string) (apitypes.LineupMoves, error) {
 	f.host, f.account = host, accountID
+	if f.err != nil {
+		return apitypes.LineupMoves{}, f.err
+	}
 	note := "To set your lineup from here, connect ESPN again on your account page and agree to moves."
 	return apitypes.LineupMoves{Lineup: apitypes.LineupMovesLineupUnavailable, Note: &note}, nil
 }
@@ -116,6 +121,14 @@ func TestLineupCarriesMoves(t *testing.T) {
 	}
 	if moves.host != f.league.Snap.Ref.Host || moves.account != uuid.MustParse("00000000-0000-0000-0000-00000000000a") {
 		t.Fatalf("asked for %q as %s", moves.host, moves.account)
+	}
+	// A failed check fails closed: start and sit still answers, the verb
+	// the host's page.
+	moves.err = errors.New("the allow list did not answer")
+	code, env := serve(t, s, leaguePath+"lineup")
+	var closed apitypes.LineupAdvice
+	if err := json.Unmarshal(env.Data, &closed); err != nil || code != http.StatusOK || closed.Moves.Lineup != apitypes.LineupMovesLineupUnavailable {
+		t.Fatalf("a failed check: %d %+v %v", code, closed.Moves, err)
 	}
 }
 

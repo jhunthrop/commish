@@ -22,12 +22,6 @@ import (
 // private one with the cookies of a connected member who follows it.
 const HostESPN = espnhost.Host
 
-// ESPN's lineup slots that hold no starter.
-const (
-	espnBench   = 20
-	espnReserve = 21
-)
-
 // ESPNMember reads ESPN with a member's cookies. *espnhost.Member
 // implements it.
 type ESPNMember interface {
@@ -159,8 +153,8 @@ func espnSnapshot(l espn.FullLeague, now time.Time) Snapshot {
 			snap.Players[p.ID] = espnPlayer(p)
 			team.Players = append(team.Players, p.ID)
 			switch p.Slot {
-			case espnBench:
-			case espnReserve:
+			case espn.SlotBench:
+			case espn.SlotReserve:
 				team.Reserve = append(team.Reserve, p.ID)
 			default:
 				team.Starters = append(team.Starters, p.ID)

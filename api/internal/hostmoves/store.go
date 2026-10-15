@@ -15,9 +15,6 @@ import (
 // ErrUsed is a confirm token that already made its move.
 var ErrUsed = errors.New("hostmoves: the confirmation was already used")
 
-// maxHostBody bounds the host's answer kept in the proof record.
-const maxHostBody = 8192
-
 // ListMax is how many moves the list answers.
 const ListMax = 20
 
@@ -51,14 +48,18 @@ type Record struct {
 	Body []byte
 }
 
-// Answer is what the host made of a move.
+// Answer is what the host made of a move, as parsed: never the host's raw
+// answer, which may echo the member's SWID.
 type Answer struct {
-	Outcome    string
-	HostStatus int
-	HostBody   []byte
-	HostReason string
-	HostWords  string
-	ReadBack   string
+	Outcome       string
+	HostStatus    int
+	TransactionID string
+	HostReason    string
+	HostWords     string
+	ReadBack      string
+	// Member is how the member ESPN names on its answer compares with the
+	// SWID sent (espn.MemberCheck), "" for a move never sent.
+	Member string
 }
 
 // Kept is one move as the member's list shows it.
@@ -120,29 +121,26 @@ func (s *Store) Begin(ctx context.Context, r Record) (uuid.UUID, error) {
 
 // Answered keeps what the host made of the move.
 func (s *Store) Answered(ctx context.Context, accountID, id uuid.UUID, a Answer, at time.Time) error {
-	body := a.HostBody
-	if len(body) > maxHostBody {
-		body = body[:maxHostBody]
-	}
 	var status *int
 	if a.HostStatus != 0 {
 		status = &a.HostStatus
 	}
-	_, err := s.Pool.Exec(ctx, `update app.host_moves set outcome = $3, host_status = $4, host_body = nullif($5, ''),
-		host_reason = nullif($6, ''), host_words = nullif($7, ''), read_back = nullif($8, ''), answered_at = $9
+	_, err := s.Pool.Exec(ctx, `update app.host_moves set outcome = $3, host_status = $4, host_transaction_id = nullif($5, ''),
+		host_reason = nullif($6, ''), host_words = nullif($7, ''), read_back = nullif($8, ''), member_check = nullif($9, ''),
+		answered_at = $10
 		where account_id = $1 and id = $2`,
-		accountID, id, a.Outcome, status, validText(body), a.HostReason, a.HostWords, a.ReadBack, at)
+		accountID, id, a.Outcome, status, validText(a.TransactionID), validText(a.HostReason), validText(a.HostWords), a.ReadBack, a.Member, at)
 	if err != nil {
 		return fmt.Errorf("hostmoves: answered: %w", err)
 	}
 	return nil
 }
 
-// validText is the host's body as text Postgres keeps: invalid UTF-8 and
-// NUL bytes dropped, since a body cut at its cap may end mid-rune.
-func validText(b []byte) string {
-	out := make([]rune, 0, len(b))
-	for _, r := range string(b) {
+// validText is the host's words as text Postgres keeps: invalid UTF-8 and
+// NUL bytes dropped.
+func validText(s string) string {
+	out := make([]rune, 0, len(s))
+	for _, r := range s {
 		if r != '�' && r != 0 {
 			out = append(out, r)
 		}

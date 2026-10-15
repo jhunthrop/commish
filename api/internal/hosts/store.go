@@ -77,6 +77,14 @@ func scanConn(row pgx.Row) (Connection, error) {
 	return c, err
 }
 
+// PutConsented stores the connection as Put or PutUnproven does, at the
+// consent version the member was shown, never above the host's current
+// one: a member who ticked older words (a page from before a deploy) is
+// kept at those words.
+func (s *Store) PutConsented(ctx context.Context, accountID uuid.UUID, host string, sealed Sealed, now time.Time, proven bool, shown int) (Connection, error) {
+	return s.putAt(ctx, accountID, host, sealed, now, proven, max(min(shown, consentVersion(host)), 1))
+}
+
 // Put stores the account's connection to the host, connected and proven,
 // replacing any earlier one, with when and to which words the member
 // consented. A sign-in on our form counts as the latest sign-in.
@@ -92,6 +100,10 @@ func (s *Store) PutUnproven(ctx context.Context, accountID uuid.UUID, host strin
 }
 
 func (s *Store) put(ctx context.Context, accountID uuid.UUID, host string, sealed Sealed, now time.Time, proven bool) (Connection, error) {
+	return s.putAt(ctx, accountID, host, sealed, now, proven, consentVersion(host))
+}
+
+func (s *Store) putAt(ctx context.Context, accountID uuid.UUID, host string, sealed Sealed, now time.Time, proven bool, version int) (Connection, error) {
 	c, err := scanConn(s.Pool.QueryRow(ctx, `insert into app.host_connections
 		(account_id, host, wrapped_key, session_ct, signin_ct, key_version, status, last_signin_at, consented_at, consent_version, proven)
 		values ($1, $2, $3, $4, $5, $6, 'connected', $7, $7, $8, $9)
@@ -100,7 +112,7 @@ func (s *Store) put(ctx context.Context, accountID uuid.UUID, host string, seale
 			last_signin_at = excluded.last_signin_at, consented_at = excluded.consented_at, consent_version = excluded.consent_version,
 			proven = excluded.proven
 		returning `+connColumns,
-		accountID, host, sealed.WrappedKey, sealed.SessionCT, sealed.SignInCT, sealed.KeyVersion, now, consentVersion(host), proven))
+		accountID, host, sealed.WrappedKey, sealed.SessionCT, sealed.SignInCT, sealed.KeyVersion, now, version, proven))
 	if err != nil {
 		return Connection{}, fmt.Errorf("hosts: put connection: %w", err)
 	}

@@ -8,12 +8,18 @@ import (
 	"github.com/jhunthrop/commish/api/internal/espn"
 )
 
-// espnSlots is a lineup row's slot as ESPN's lineupSlotId: every slot of a
-// kind is one id on ESPN, so a row's place needs no number.
-var espnSlots = map[apitypes.HostMoveChangeSlot]int{
-	apitypes.HostMoveChangeSlotQB: 0, apitypes.HostMoveChangeSlotRB: 2, apitypes.HostMoveChangeSlotWR: 4,
-	apitypes.HostMoveChangeSlotTE: 6, apitypes.HostMoveChangeSlotFLEX: 23, apitypes.HostMoveChangeSlotSUPERFLEX: 7,
-	apitypes.HostMoveChangeSlotK: 17, apitypes.HostMoveChangeSlotDEF: 16,
+// espnSlot is a lineup row's slot as ESPN's lineupSlotId (espn.SlotID):
+// every slot of a kind is one id on ESPN, so a row's place needs no
+// number. Our superflex is ESPN's SUPER_FLEX.
+func espnSlot(slot apitypes.HostMoveChangeSlot) (int, bool) {
+	if !slot.Valid() {
+		return 0, false
+	}
+	name := string(slot)
+	if slot == apitypes.HostMoveChangeSlotSUPERFLEX {
+		name = "SUPER_FLEX"
+	}
+	return espn.SlotID(name)
 }
 
 // slotPlace is where a change goes in a sentence: "at RB", "in the flex".
@@ -32,12 +38,20 @@ func slotPlace(slot apitypes.HostMoveChangeSlot) string {
 type refusal struct {
 	words string
 	cause error
+	// unavailable is a move this member cannot make here at all (the team
+	// is not theirs on ESPN): the host's page, not a refusal to fix.
+	unavailable bool
 }
 
 func (r *refusal) Error() string { return r.cause.Error() }
 func (r *refusal) Unwrap() error { return r.cause }
 
 func refuse(words string, cause error) error { return &refusal{words: words, cause: cause} }
+
+// notTheirs is the move on a team ESPN does not list as the member's.
+func notTheirs(cause error) error {
+	return &refusal{words: notYourTeamWords, cause: cause, unavailable: true}
+}
 
 // lineupPlan is a lineup move checked against a fresh read: the set ESPN
 // takes and the move in words.
@@ -58,7 +72,7 @@ func planLineup(l espn.FullLeague, swid string, me int, mv apitypes.HostMoveInpu
 	}
 	team, ok := teamOf(l, me)
 	if !ok {
-		return lineupPlan{}, refuse(notYourTeamWords, espn.ErrNotYourTeam)
+		return lineupPlan{}, notTheirs(espn.ErrNotYourTeam)
 	}
 	roster := map[string]espn.Player{}
 	for _, p := range team.Roster {
@@ -102,7 +116,7 @@ func targetsOf(changes []apitypes.HostMoveChange, roster map[string]espn.Player)
 	targets, outs := map[string]int{}, map[string]bool{}
 	var order []string
 	for _, c := range changes {
-		slot, ok := espnSlots[c.Slot]
+		slot, ok := espnSlot(c.Slot)
 		p, on := roster[c.In]
 		switch {
 		case !ok:
@@ -123,7 +137,8 @@ func targetsOf(changes []apitypes.HostMoveChange, roster map[string]espn.Player)
 			continue
 		}
 		p, on := roster[*c.Out]
-		if !on || p.Slot != espnSlots[c.Slot] || outs[*c.Out] {
+		at, _ := espnSlot(c.Slot)
+		if !on || p.Slot != at || outs[*c.Out] {
 			return nil, nil, refuse(staleWords, fmt.Errorf("player %s is not at %s", *c.Out, c.Slot))
 		}
 		outs[*c.Out] = true
@@ -157,16 +172,23 @@ func fits(roster []espn.Player, targets map[string]int, counts map[int]int) erro
 // ownRefusal is the member's sentence for a move espn.OwnLineup refused.
 func ownRefusal(err error, items []espn.LineupItem, roster map[string]espn.Player) error {
 	if errors.Is(err, espn.ErrNotYourTeam) {
-		return refuse(notYourTeamWords, err)
+		return notTheirs(err)
 	}
-	var locked []string
+	var locked, cannot []string
 	for _, it := range items {
-		if p := roster[it.PlayerID]; p.Locked {
+		p := roster[it.PlayerID]
+		if p.Locked {
 			locked = append(locked, p.Name)
 		}
+		if !espn.CanFill(p, it.To) {
+			cannot = append(cannot, p.Name)
+		}
 	}
-	if len(locked) > 0 {
+	switch {
+	case len(locked) > 0:
 		return refuse(fmt.Sprintf(lockedWords, andNames(locked), verbFor(len(locked))), err)
+	case len(cannot) > 0:
+		return refuse(fmt.Sprintf(cannotFillWords, andNames(cannot)), err)
 	}
 	return refuse(staleWords, err)
 }
