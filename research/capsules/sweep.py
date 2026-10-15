@@ -18,6 +18,7 @@ from datetime import UTC, datetime
 from types import MappingProxyType
 
 from sqlalchemy import Connection, Engine
+from sqlalchemy.exc import DBAPIError
 
 from research.capsules.config import CAPSULE_CONFIG
 from research.capsules.facts.build import PlayerFacts
@@ -117,7 +118,28 @@ class SweepReport:
     landed_carriers: list[str] = field(default_factory=list)
 
 
-def _tally(report: SweepReport, subject: Subject, result: CapsuleResult, demoted: bool, kept: bool) -> None:
+class PageCommitError(Exception):
+    """A page whose read was paid for but whose commit failed (twice: `once_more_on_disconnect`). It
+    carries the read, so the sweep still counts what the page spent before the error goes on."""
+
+    def __init__(self, subject: "Subject", result: CapsuleResult, cause: Exception) -> None:
+        super().__init__(f"{type(cause).__name__}: {cause}")
+        self.subject = subject
+        self.result = result
+
+
+class SweepInterruptedError(Exception):
+    """A sweep that raised part way: `report` holds every page that landed (and a failed commit's
+    spend), so the step adds it to the night's spend before `cause` goes on (the review's M2)."""
+
+    def __init__(self, cause: Exception, report: "SweepReport") -> None:
+        super().__init__(f"{type(cause).__name__}: {cause}")
+        self.cause = cause
+        self.report = report
+
+
+def _count_spend(report: SweepReport, subject: Subject, result: CapsuleResult) -> None:
+    """A page's calls, tokens and cost on the sweep's report."""
     usage = result.usage
     report.calls += result.calls
     report.calls_by_player[subject.universe_id] = report.calls_by_player.get(subject.universe_id, 0) + result.calls
@@ -125,6 +147,11 @@ def _tally(report: SweepReport, subject: Subject, result: CapsuleResult, demoted
         report.prompt_tokens += usage.prompt_tokens or 0
         report.completion_tokens += usage.completion_tokens or 0
         report.cost_usd += usage.cost_usd or 0.0
+
+
+def _tally(report: SweepReport, subject: Subject, result: CapsuleResult, demoted: bool, kept: bool) -> None:
+    usage = result.usage
+    _count_spend(report, subject, result)
     name = subject.facts.identity.name
     report.detail += [f"{name}: narrative slot rejected, {line}" for line in result.narrative.rejected]
     if kept:
@@ -180,7 +207,10 @@ def write_one(  # noqa: PLR0913 - one write's parts
             upsert_capsule(conn, row, datetime.now(UTC))
 
     # A dropped connection costs the commit one more try on a fresh one, never the page's paid read.
-    once_more_on_disconnect(commit)
+    try:
+        once_more_on_disconnect(commit)
+    except DBAPIError as error:
+        raise PageCommitError(subject, result, error) from error
     return result, demoted, False
 
 
@@ -359,12 +389,18 @@ def sweep_capsules(
             claim=claim_for(subject),
         )
 
-    stopped = gateway.rolling(
-        ordered[: plan.budget],
-        start,
-        lambda subject, written: _land(report, tonight, subject, written),
-        plan.deadline or (lambda: False),
-    )
+    try:
+        stopped = gateway.rolling(
+            ordered[: plan.budget],
+            start,
+            lambda subject, written: _land(report, tonight, subject, written),
+            plan.deadline or (lambda: False),
+        )
+    except Exception as error:
+        if isinstance(error, PageCommitError):
+            _count_spend(report, error.subject, error.result)
+            report.processed.append(error.subject.universe_id)
+        raise SweepInterruptedError(error, report) from error
     if stopped:
         # A half-swept board would flag sentences the rest of tonight's work is about to rewrite.
         return report

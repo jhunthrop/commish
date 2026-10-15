@@ -67,7 +67,7 @@ from research.capsules.facts.history import history_cache
 from research.capsules.gateway import GatewayClient, ModelPrice, ModelSpend, fetch_price
 from research.capsules.spans import SpanRules
 from research.capsules.store import queue_regeneration
-from research.capsules.sweep import FactsPassMemo, SweepPlan, SweepReport, sweep_capsules
+from research.capsules.sweep import FactsPassMemo, SweepInterruptedError, SweepPlan, SweepReport, sweep_capsules
 from research.db.code_digest import code_digest
 from research.db.engine import once_more_on_disconnect, pooled_like
 from research.db.read_cache import snapshot
@@ -238,7 +238,17 @@ class _Passes:
         at_ceiling = spent_out_for(self.calls_by_player, frozenset(), grace=False)
         spent = spent_out_for(self.calls_by_player, frozenset(self.graced), grace=graced_pass)
         plan = replace(plan, exclude=plan.exclude | spent, span_rules=self.rules)
-        report = sweep_capsules(self.engine, self.gateway, self.now, plan, self.facts)
+        try:
+            report = sweep_capsules(self.engine, self.gateway, self.now, plan, self.facts)
+        except SweepInterruptedError as interrupted:
+            # What the sweep spent before it raised is the night's spend too (the review's M2).
+            self._account(name, interrupted.report, at_ceiling, graced_pass=graced_pass)
+            raise interrupted.cause from interrupted
+        self._account(name, report, at_ceiling, graced_pass=graced_pass)
+        return report
+
+    def _account(self, name: str, report: SweepReport, at_ceiling: frozenset[str], *, graced_pass: bool) -> None:
+        """A sweep's report on the night: the grace taken, the calls per player, the spend, the line."""
         if graced_pass:
             # A page past the ceiling that this pass reached has taken its one extra generation.
             self.graced |= at_ceiling & set(report.processed)
@@ -246,7 +256,6 @@ class _Passes:
             self.calls_by_player[pid] = self.calls_by_player.get(pid, 0) + calls
         self.spend.add(report)
         self.log(_sweep_line(name, report))
-        return report
 
     def run(self) -> None:
         # The sentences already on two pages are quoted to the writer from the first call, so the

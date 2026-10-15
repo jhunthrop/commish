@@ -4,19 +4,31 @@ malformed setting fails it before the regenerate stamp, and a pass that raises p
 the night's spend to the run's report."""
 
 import re
+from contextlib import nullcontext
 from datetime import UTC, datetime
+from types import SimpleNamespace
 from typing import Any, cast
 
 import httpx
 import pytest
 from sqlalchemy import Engine
+from sqlalchemy.exc import OperationalError
 
+from research.capsules import sweep
 from research.capsules.config import WriterSettings
-from research.capsules.gateway import ModelPrice
+from research.capsules.gateway import GatewayClient, ModelPrice
 from research.capsules.spans import SpanRules
+from research.capsules.sweep import PageCommitError, Subject, SweepPlan
 from research.errors import ConfigurationError
 from research.nightly import capsule_step, run_parts
-from research.nightly.capsule_step import CapsuleSpend, CapsuleStepError, CapsuleStepPlan, _checked_price, _write
+from research.nightly.capsule_step import (
+    CapsuleSpend,
+    CapsuleStepError,
+    CapsuleStepPlan,
+    _checked_price,
+    _Passes,
+    _write,
+)
 from research.nightly.steps import StepRecord
 
 NOW = datetime(2026, 10, 15, 5, tzinfo=UTC)
@@ -122,3 +134,63 @@ def test_the_failed_step_carries_its_spend(monkeypatch: pytest.MonkeyPatch) -> N
     assert outcome.record.status == "failed"
     assert outcome.record.summary.startswith("RuntimeError: the proxy dropped the commit twice, 0 pages attempted")
     assert outcome.record == StepRecord("capsules", "failed", outcome.record.summary)
+
+
+def _paid_read(view: GatewayClient) -> Any:
+    """One stubbed gateway call, its usage on the read as `generate_capsule` would put it."""
+    answer = view.complete([{"role": "user", "content": "write"}], 10)
+    text = "A fresh read of its own words, nothing shared with any page."
+    read = SimpleNamespace(text=text, fallback=None)
+    return SimpleNamespace(
+        compact=read,
+        full=read,
+        narrative=SimpleNamespace(slots={}, rejected=()),
+        source="llm",
+        usage=answer.usage,
+        calls=view.calls,
+        model="m/x",
+    )
+
+
+def test_a_raising_worker_leaves_the_headline_spend_equal_to_the_ledger(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The real `_Passes.sweep` over the real sweep and rolling pool, the gateway stubbed: page b's
+    commit is lost twice, its siblings land, and the night's headline spend still equals the ledger."""
+    pages = ["a", "b", "c", "d", "e"]
+    subjects = [
+        Subject(cast("Any", SimpleNamespace(identity=SimpleNamespace(name=p.upper(), id=p), facts_hash="h")), p)
+        for p in pages
+    ]
+
+    def upsert(conn: Any, row: Any, at: Any) -> None:
+        if row.player_id == "b":
+            raise OperationalError("upsert", {}, Exception("server closed the connection unexpectedly"))
+
+    monkeypatch.setattr(sweep, "stored_capsules_for", lambda conn, ids: {})
+    monkeypatch.setattr(sweep, "queue_regeneration", lambda conn, ids: 0)
+    monkeypatch.setattr(sweep, "generate_capsule", lambda facts, view, worn: _paid_read(view))
+    monkeypatch.setattr(sweep, "upsert_capsule", upsert)
+    usage = {"prompt_tokens": 100, "completion_tokens": 50, "total_tokens": 150, "cost": 0.002}
+    body = {"choices": [{"message": {"content": " ".join(["word"] * 30)}}], "usage": usage}
+    http = httpx.Client(transport=httpx.MockTransport(lambda request: httpx.Response(200, json=body)))
+    gateway = GatewayClient.for_run("test-key", http, WriterSettings("m/x", 2, 100_000))
+    engine = cast("Engine", SimpleNamespace(connect=lambda: nullcontext(None), begin=lambda: nullcontext(None)))
+    passes = _Passes(
+        engine,
+        gateway,
+        NOW,
+        CapsuleStepPlan(),
+        lambda _: None,
+        cast("Any", lambda conn, at: subjects),
+        rules=SpanRules(frozenset()),
+    )
+    with pytest.raises(PageCommitError, match="server closed the connection"):
+        passes.sweep("capsules", SweepPlan(10))
+    ledger = gateway.ledger.by_model()["m/x"]
+    assert passes.spend.calls == ledger.calls == len(gateway.ledger.records)
+    assert passes.spend.cost_usd == pytest.approx(ledger.cost_usd)
+    assert (passes.spend.prompt_tokens, passes.spend.completion_tokens) == (
+        ledger.prompt_tokens,
+        ledger.completion_tokens,
+    )
+    assert "b" in passes.calls_by_player
+    assert passes.spend.processed == ledger.calls
