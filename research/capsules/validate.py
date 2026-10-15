@@ -38,6 +38,7 @@ from research.capsules.season_voice import (
     time_frame_hits,
 )
 from research.capsules.sentences import split_sentences
+from research.capsules.share_bases import base_violations
 from research.capsules.voice_rules import (
     BANNED_VOCABULARY,
     COMPETITOR_NAMES,
@@ -294,6 +295,7 @@ def _validate(
     violations = [*_form_violations(trimmed), *_copy_violations(trimmed, source.name_ledger, source.clock)]
     violations += _grounding_violations(trimmed, source)
     violations += claim_violations(trimmed, source.claims)
+    violations += base_violations(trimmed, source.prompt_text)
     if page_number and not names_missed_weeks(trimmed, source.clock):
         violations.append(missed_weeks_violation(source.clock))
     if tension and source.tension is not None and not _cites_tension(trimmed, source.tension):
