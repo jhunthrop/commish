@@ -143,6 +143,15 @@ class Repetition:
         "the run-up to",
         # Clerk's language, on 113 live pages; the sheet prints it nowhere.
         "on file",
+        # Lane 50: the sentence stems (first six words, a number as "#", which reads as any number) on
+        # more than 3% of the 567 written pages of the live run 2026-10-15T14-2. "weeks # through # of #"
+        # (27 pages) is held back: it is the week naming the time rules require, and the prompt names
+        # opening on a list of weeks as a shape to avoid instead.
+        "our preseason number was # points",  # 155 pages
+        "our preseason number had him at",  # 43 pages
+        "he has not missed a game",  # 31 pages
+        "our preseason number gave him #",  # 29 pages
+        "if he is on your roster",  # 27 pages
     )
 
 
