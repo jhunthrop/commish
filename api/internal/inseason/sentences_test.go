@@ -190,3 +190,24 @@ func TestBasisNamesTheRulesLeftOut(t *testing.T) {
 		t.Fatalf("%q", got)
 	}
 }
+
+// A plural club takes "have"; a change between two doubtful players is
+// the order's, never "and he is not".
+func TestSentenceGrammarAndBothDoubtful(t *testing.T) {
+	if got := allowedWords("LAC", Allowed{14.1, 4, 32, draft.RB}); got !=
+		"The Chargers have allowed the 4th fewest points to running backs this season, 14.1 a game in your scoring." {
+		t.Fatalf("%q", got)
+	}
+	doubtful := Facts{Designation: &Designation{Status: StatusDoubtful, AsOf: thursday}}
+	w := &Writer{Basis: Preseason, Now: thursday}
+	got := w.Change(Line{Name: "Rachaad White", Position: draft.RB, Rank: 14, Facts: doubtful},
+		&Line{Name: "Tank Bigsby", Position: draft.RB, Rank: 31, Facts: doubtful})
+	if strings.Contains(got, "is not") || !strings.HasPrefix(got, "White is RB14 in our preseason order, Bigsby RB31.") {
+		t.Fatalf("%q", got)
+	}
+	got = w.Change(Line{Name: "Rachaad White", Position: draft.RB, Rank: 14},
+		&Line{Name: "Tank Bigsby", Position: draft.RB, Rank: 31, Facts: doubtful})
+	if got != "Tank Bigsby is doubtful as of Thursday 4:10 pm and White is not." {
+		t.Fatalf("%q", got)
+	}
+}

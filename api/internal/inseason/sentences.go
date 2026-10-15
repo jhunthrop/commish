@@ -85,6 +85,10 @@ func (w *Writer) forced(ours Line, host *Line) string {
 	}
 	when := stampWords(d.AsOf, w.Now)
 	if d.Status == StatusDoubtful {
+		// Both doubtful (nobody better eligible): the order decided it.
+		if ours.Facts.Tier() != Available {
+			return ""
+		}
 		frames := []string{"%s is doubtful as of %s and %s is not.", "With %s doubtful as of %s, %s starts."}
 		return fmt.Sprintf(w.next(frames), host.Name, when, ours.short())
 	}
@@ -161,8 +165,13 @@ func allowedWords(opponent string, a Allowed) string {
 	if n > 1 {
 		place = "the " + ordinal(n) + " " + end
 	}
-	return fmt.Sprintf("%s has allowed %s points to %s this season, %s a game in your scoring.",
-		capitalized(placeOf(opponent)), place, positionPlural(a.Position), points(a.PointsAGame))
+	club := placeOf(opponent)
+	verb := "has"
+	if strings.HasPrefix(club, "the ") {
+		verb = "have"
+	}
+	return fmt.Sprintf("%s %s allowed %s points to %s this season, %s a game in your scoring.",
+		capitalized(club), verb, place, positionPlural(a.Position), points(a.PointsAGame))
 }
 
 // questionable flags a questionable starter: check before kickoff.
