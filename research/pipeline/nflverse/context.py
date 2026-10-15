@@ -365,8 +365,10 @@ def opponent_defence_observations(
     return rows
 
 
-def ingest_opponent_defence(conn: Connection, client: NflverseClient, seasons: Sequence[int]) -> int:
-    """`ingestOpponentDefence`: the prior season too, so week 1 carries last season's ratings."""
+def _defence_inputs(
+    conn: Connection, client: NflverseClient, seasons: Sequence[int]
+) -> tuple[list[TeamGame], list[DefenceWeek]]:
+    """The schedule's games and each game's yards allowed, from the stored play-by-play."""
     rows = schedule_client(client).get_csv(SCHEDULE_RELEASE, SCHEDULE_FILE)
     history = range(min(seasons) - 1, max(seasons) + 1)
     games = map_schedule(rows, list(history))
@@ -380,4 +382,28 @@ def ingest_opponent_defence(conn: Connection, client: NflverseClient, seasons: S
         )
         for g in games
     ]  # fmt: skip
+    return games, defence_weeks
+
+
+def ingest_opponent_defence(conn: Connection, client: NflverseClient, seasons: Sequence[int]) -> int:
+    """`ingestOpponentDefence`: the prior season too, so week 1 carries last season's ratings."""
+    games, defence_weeks = _defence_inputs(conn, client, seasons)
     return record_team_observations(conn, opponent_defence_observations(games, defence_weeks, seasons))
+
+
+def informed_weeks(defence_weeks: Sequence[DefenceWeek], season: int) -> frozenset[int]:
+    """The season's weeks whose every earlier game of the season is in the stored play-by-play: a
+    week's rating is final once written (the writer keeps the first row at a stamp), so a live
+    season writes a week only when nothing it reads is still missing."""
+    this_season = [w for w in defence_weeks if w.season == season]
+    pending = [w.week for w in this_season if w.pass_allowed is None or w.rush_allowed is None]
+    first_gap = min(pending, default=None)
+    return frozenset(w.week for w in this_season if first_gap is None or w.week <= first_gap)
+
+
+def ingest_opponent_defence_to_date(conn: Connection, client: NflverseClient, season: int) -> int:
+    """The weekly pass's step: the live season's ratings for every informed week (`informed_weeks`)."""
+    games, defence_weeks = _defence_inputs(conn, client, [season])
+    ready = informed_weeks(defence_weeks, season)
+    rows = [row for row in opponent_defence_observations(games, defence_weeks, [season]) if row.week in ready]
+    return record_team_observations(conn, rows)
