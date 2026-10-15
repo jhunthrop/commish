@@ -360,3 +360,33 @@ def test_the_run_up_label_the_sheet_no_longer_prints_is_a_worn_phrase(text: str)
     as data ("designation Q since before week 6 of 2026"), and "the run-up to" is a worn phrase."""
     assert "the run-up to" in [hit.found for hit in voice_rule_hits(text, ())]
     assert "the run-up to" not in SHEET_LABELS
+
+
+@pytest.mark.parametrize(
+    ("text", "ledger", "rule"),
+    [
+        (
+            "He is still listed first among PHI running backs, and Tank Bigsby is the man behind him, so nobody has "
+            "taken the job.",
+            JEFFERSON,
+            "a claim about drafters from a missing ADP",
+        ),
+        (
+            "The target room is crowded, worth about 0.9 a game against him, and 24.8% of his projected scoring was "
+            "touchdown points, worth another 0.9.",
+            ACHANE,
+            "unbacked scoring claim",
+        ),
+        (
+            "That is why 8.8 points a game sits well above the 46 points we gave him for the full 2026 season back "
+            "before the season opened.",
+            ACHANE,
+            "the wrong opening week",
+        ),
+    ],
+)
+def test_the_writers_own_sentences_from_the_sample_that_are_no_such_claim(
+    text: str, ledger: ClaimLedger, rule: str
+) -> None:
+    """Lane 29's 80-page sample: three sentences a first cut of the rules misread."""
+    assert rule not in _rules(text, ledger)

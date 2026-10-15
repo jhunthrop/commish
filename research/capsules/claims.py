@@ -99,6 +99,8 @@ _SCORING: Final = re.compile(
     r"\b(?:funnel\w*|feed(?:s|ing)?|fed|giv(?:es|ing)|gave|hand(?:s|ed|ing)|throw(?:s|ing|n)?|threw|get(?:s|ting)?|got|"
     r"find(?:s|ing)?|found|scor(?:es|ing|ed)|(?:pil|rack)(?:es|ed|ing|s)? up)\s+"
     r"(?:him\s+|his\s+|the\s+|a\s+|those\s+)?(?:\w+\s+)?(?:scores|touchdowns?|TDs?|end zone)\b"
+    # Touchdown points or a touchdown share are a quantity, never a claim he is scoring.
+    r"(?![\s-]+(?:points|share|rate)\b)"
     r"|\b(?:under|behind|beneath|despite|beyond|besides|on top of)\s+(?:all\s+)?(?:the|those|his)\s+(?:touchdowns|scores)\b",
     re.IGNORECASE,
 )
@@ -146,6 +148,8 @@ _OPENER: Final = re.compile(
     r"|\bto\s+open\s+(?:the\s+)?(?:\d{4}\s+)?(?:season|year)\b",
     re.IGNORECASE,
 )
+# "Before the season opened" is the preseason, never a claim about the opener.
+_BEFORE_OPENER: Final = re.compile(r"\bbefore\s+(?:the\s+|his\s+)?(?:\d{4}\s+)?$", re.IGNORECASE)
 # Two points figures this close are the same figure, rounded.
 _SAME_POINTS: Final = 0.05
 _POINTS: Final = re.compile(
@@ -157,7 +161,7 @@ def _opener_wrong(clause: str, ledger: ClaimLedger) -> bool:
     """The clause calls a week the opener that was not week 1 or his first game, or gives the opener
     points his first game did not score."""
     opener = None if ledger.first_game is None else _OPENER.search(clause)
-    if ledger.first_game is None or opener is None:
+    if ledger.first_game is None or opener is None or _BEFORE_OPENER.search(clause[: opener.start()]):
         return False
     week, points = ledger.first_game
     # The week the opener names follows it ("to open with 1.7 points in week 3"); a week before it in the
@@ -325,8 +329,8 @@ def _round_claims(sentence: str, ledger: ClaimLedger) -> list[str]:
 
 # A MISSING ADP.
 _NOBODY_DRAFTED: Final = re.compile(
-    r"\b(?:nobody|no one|no league|no drafters?|no managers?)\b[^.]{0,40}?\b(?:draft(?:ed|ing|s)?|took|taken|spent|"
-    r"spend(?:ing|s)?|picked|selected|wanted)\b"
+    r"\b(?:nobody|no one|no league|no drafters?|no managers?)\b[^.]{0,40}?\b(?:draft(?:ed|ing|s)?|spent|spend(?:ing|s)?|"
+    r"(?:took|taken|picked|selected|wanted)\s+(?:him|them|a pick|a flier))\b"
     r"|\bdrafters?\b[^.]{0,30}?\b(?:never|did not|didn't|passed|ignored|skipped|wanted no)\b"
     r"|\bundrafted in (?:fantasy|drafts|leagues|most leagues)\b",
     re.IGNORECASE,

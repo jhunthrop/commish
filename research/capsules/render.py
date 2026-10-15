@@ -48,7 +48,7 @@ def _signed_percent(fraction: float) -> str:
 def _adp_line(facts: PlayerFacts) -> str:
     adp, before = facts.market.adp, "" if facts.season is None else " before the season"
     if adp is None:
-        return f"ADP{before}: none {ON_FILE}."
+        return f"ADP{before}: none."
     by_adp = "" if facts.market.position_adp is None else f", {facts.market.position_adp} by ADP"
     if facts.season is not None:
         # In season the ADP is history, printed as on file and with no pick word (the floor refuses one).
@@ -114,7 +114,7 @@ def _evidence_line(item: EvidenceItem) -> str:
             else f"A rookie, drafted at pick {item.overall_pick}."
         )
     if isinstance(item, MarketUnlistedEvidence):
-        return f"No ADP {ON_FILE} for him."
+        return "No ADP for him."
     raise TypeError(f"no evidence line for {item!r}")
 
 

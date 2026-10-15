@@ -34,6 +34,15 @@ def _season(through: int, weeks: tuple[SeasonWeek, ...] = (), from_week: int | N
     return SeasonSoFar(2026, through, 0, None, _TOTALS, weeks, from_week)
 
 
+def test_a_missing_adp_is_printed_as_none_never_as_a_clerks_label() -> None:
+    """Lane 29 (the live review's M5): "no ADP on file" sat on 49 pages and read as filler."""
+    market = SimpleNamespace(adp=None, position_adp=None)
+    for season in (None, _season(5)):
+        stand_in = cast("PlayerFacts", SimpleNamespace(market=market, season=season))
+        line = _adp_line(stand_in)
+        assert "on file" not in line and line.endswith(": none.")
+
+
 def test_the_first_kickoff_picks_the_voice() -> None:
     assert is_in_season(KICKOFF, KICKOFF)
     assert not is_in_season(KICKOFF, KICKOFF - timedelta(seconds=1))
