@@ -137,8 +137,6 @@
 	}
 
 	const here = $derived(links.league(id));
-	/** The waiver pool's place on the page, one tap from the top on a phone. */
-	const POOL_ANCHOR = 'waiver-pool';
 	const dropped = $derived(sync ? droppedKinds(sync.scoring_dropped) : []);
 	const team = $derived(sync ? myTeam(sync) : undefined);
 	/** What every number on the page is, said once under the title: the scoring, the season's
@@ -215,7 +213,6 @@
 					</p>
 				</div>
 				<div class="reads">
-					<span class="jump"><Quiet size="sm" href={`#${POOL_ANCHOR}`}>Waiver pool</Quiet></span>
 					<Quiet size="sm" disabled={refreshing} onclick={() => void refresh()}
 						>{refreshing ? 'Reading' : `Read ${hostWords(sync.host)} now`}</Quiet
 					>
@@ -265,7 +262,6 @@
 					</footer>
 				</div>
 				<div class="col">
-					<div id={POOL_ANCHOR} class="anchor"></div>
 					<WaiverPool
 						rows={poolRows(board, sync)}
 						{tagsOf}
@@ -286,20 +282,6 @@
 		display: flex;
 		align-items: center;
 		gap: var(--s-3);
-	}
-
-	.jump {
-		display: none;
-	}
-
-	.anchor {
-		scroll-margin-top: var(--s-6);
-	}
-
-	@media (max-width: 760px) {
-		.jump {
-			display: contents;
-		}
 	}
 
 	.basis {

@@ -1,6 +1,9 @@
 /** What an account keeps and the hosts a signed-out visitor can connect, in the words the page prints. */
-/** The five hosts a league can be followed from, in the site's words and the order /league/new names them. */
-export const LEAGUE_HOSTS_LINE = 'Sleeper, MyFantasyLeague, FFPC, Yahoo or ESPN';
+import { LEAGUE_HOSTS_LINE } from '#lib/league/hosts.ts';
+
+/** The five hosts a league can be followed from, in the site's words and the order /league/new names
+ * them: built from the one list both pages read. */
+export { LEAGUE_HOSTS_LINE };
 
 /** What an account keeps, said to a reader who has none yet. */
 /** `link` names the account link a line goes to, so this file stays free of the router. */
