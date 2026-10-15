@@ -2,9 +2,11 @@ package espnhost
 
 import (
 	"context"
+	"log/slog"
 	"sync"
 	"time"
 
+	"github.com/jhunthrop/commish/api/internal/espn"
 	"github.com/jhunthrop/commish/api/internal/hosts"
 )
 
@@ -15,11 +17,89 @@ type PublicReader interface {
 }
 
 // Bounds on what Publicity keeps: an answer for the hour, and no more
-// leagues than a busy hour of connects lists.
+// leagues than a busy hour of connects lists. A list's checks stop at
+// maxPublicChecks leagues and at publicityBudget, which keeps a connect
+// well under the server's write timeout.
 const (
-	publicFor     = time.Hour
-	maxPublicKept = 4096
+	publicFor       = time.Hour
+	maxPublicKept   = 4096
+	maxPublicChecks = 10
+	publicityBudget = 15 * time.Second
 )
+
+// Why a listed league carries no public or private mark, on the wire.
+const (
+	unmarkedPastLimit = "not_checked"
+	unmarkedNoAnswer  = "no_answer"
+)
+
+// marks is what the public checks of one list found: each checked league
+// public or private by id, and the ones ESPN did not answer in time. A
+// listed league in neither was past maxPublicChecks.
+type marks struct {
+	public     map[string]bool
+	unanswered map[string]bool
+}
+
+// checkList checks the list's leagues in order, up to maxPublicChecks
+// and within publicityBudget. A check ESPN does not answer leaves its
+// league unmarked: never a guess.
+func checkList(ctx context.Context, p PublicReader, log *slog.Logger, list []espn.MyLeague, yr int) marks {
+	ctx, cancel := context.WithTimeout(ctx, publicityBudget)
+	defer cancel()
+	m := marks{public: map[string]bool{}, unanswered: map[string]bool{}}
+	for i, l := range list {
+		if i >= maxPublicChecks {
+			break
+		}
+		if ctx.Err() != nil {
+			m.unanswered[l.LeagueID] = true
+			continue
+		}
+		public, err := p.Public(ctx, l.LeagueID, yr)
+		if err != nil {
+			log.Warn("espnhost: public check", "league", l.LeagueID, "err", err)
+			m.unanswered[l.LeagueID] = true
+			continue
+		}
+		m.public[l.LeagueID] = public
+	}
+	return m
+}
+
+// first is the first listed league whose mark matches: checked private,
+// or unanswered. Empty when there is none.
+func (m marks) first(list []espn.MyLeague, private bool) string {
+	for _, l := range list {
+		public, checked := m.public[l.LeagueID]
+		if (private && checked && !public) || (!private && m.unanswered[l.LeagueID]) {
+			return l.LeagueID
+		}
+	}
+	return ""
+}
+
+// mark is a league's public flag on the wire, or why it has none.
+func (m marks) mark(id string) (*bool, string) {
+	if public, ok := m.public[id]; ok {
+		return &public, ""
+	}
+	if m.unanswered[id] {
+		return nil, unmarkedNoAnswer
+	}
+	return nil, unmarkedPastLimit
+}
+
+// countPublic is how many checked leagues the public reads.
+func (m marks) countPublic() int {
+	n := 0
+	for _, public := range m.public {
+		if public {
+			n++
+		}
+	}
+	return n
+}
 
 // Publicity is whether the public reads a league, read once with no
 // cookies and kept for the hour in this process. A check ESPN does not

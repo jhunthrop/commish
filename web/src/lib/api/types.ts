@@ -1301,7 +1301,7 @@ export interface paths {
 		};
 		get?: never;
 		put?: never;
-		/** Keep the member's two ESPN cookies, SWID and espn_s2 (handed to our page by Disney's own sign-in widget, or pasted from ESPN's site), envelope encrypted, once ESPN reads the member's league list with them. When the list holds a league the public cannot read, that league is read with them too (what proves espn_s2) and the connection is proven (201). When every listed league is public, or ESPN lists none, the session is kept anyway, not yet proven, for the day a private league or a move needs it (200, with a note saying so); the first member read of a league the public cannot read proves it later. Never a password. Answers the member's ESPN football leagues this season. Needs consent. 422 when ESPN does not accept the two values; three refusals in an hour pause connecting for the hour (423). 5 an hour an account. 503 when ESPN is not open here. */
+		/** Keep the member's two ESPN cookies, SWID and espn_s2 (handed to our page by Disney's own sign-in widget, or pasted from ESPN's site), envelope encrypted, once ESPN reads the member's league list with them. When the list holds a league the public cannot read, that league is read with them too (what proves espn_s2) and the connection is proven (201). When no listed league is checked private, a league whose check ESPN did not answer is read with them instead (a refusal refuses the connect). When every listed league is public, or ESPN lists none, the session is kept anyway, not yet proven, for the day a private league or a move needs it (200, with a note saying so); the first member read of a league the public cannot read proves it later. Never a password. Answers the member's ESPN football leagues this season. Needs consent. 422 when ESPN does not accept the two values; three refusals in an hour pause connecting for the hour (423). 502, with nothing kept, when ESPN does not answer within the connect's 40 seconds. 5 an hour an account. 503 when ESPN is not open here. */
 		post: operations['connectESPN'];
 		delete?: never;
 		options?: never;
@@ -1316,7 +1316,7 @@ export interface paths {
 			path?: never;
 			cookie?: never;
 		};
-		/** The member's ESPN football leagues this season, read from ESPN with their cookies, public and private, each with its size, whether the account follows it already, and whether the public reads it (checked with no cookies and kept for an hour). 404 when not connected; 409 when ESPN no longer accepts the cookies. */
+		/** The member's ESPN football leagues this season, read from ESPN with their cookies, public and private, each with its size, whether the account follows it already, and whether the public reads it (checked with no cookies and kept for an hour), or why it carries no mark. A session not yet proven whose list holds a league checked private reads that league with the cookies before answering: that proves the session, and a refusal signs it out. 404 when not connected; 409 when ESPN does not accept the cookies (the message says whether it ever did). */
 		get: operations['espnLeagues'];
 		put?: never;
 		post?: never;
@@ -2713,8 +2713,13 @@ export interface components {
 			scoring_type?: string;
 			/** @description whether the account follows the league already */
 			attached?: boolean;
-			/** @description whether the public reads the league with no sign-in (ESPN), as one read with no cookies answered within the hour; absent when it was not checked or ESPN did not answer */
+			/** @description whether the public reads the league with no sign-in (ESPN), as one read with no cookies answered within the hour; absent when it was not checked or ESPN did not answer, and unmarked says which */
 			public?: boolean;
+			/**
+			 * @description why an ESPN league carries no public mark: not_checked, past the first 10 leagues of the list, which are the ones checked; no_answer, ESPN did not answer the check in time
+			 * @enum {string}
+			 */
+			unmarked?: 'not_checked' | 'no_answer';
 		};
 		YahooConnectInput: {
 			/** @description a page on the site to come back to once connected, like /league/{id}; the account page when absent */

@@ -33,12 +33,15 @@ const (
 	offWords       = "ESPN leagues are not open here right now."
 	notConnected   = "Connect ESPN first."
 	reconnectWords = "ESPN no longer accepts your saved sign-in. Connect ESPN again to keep reading your leagues."
-	notAnswering   = "ESPN is not answering right now. Try again in a moment."
-	refusedWords   = "ESPN did not accept those two values. Copy them again from ESPN's site, signed in."
-	pausedWords    = "ESPN refused three tries, so connecting is paused for an hour."
-	swidWords      = "Paste your SWID, the value in braces."
-	s2Words        = "Paste your espn_s2 value."
-	consentWords   = "Agree to how we keep your ESPN session to connect ESPN."
+	// notAcceptedWords is a session kept unproven that ESPN refused: it
+	// never worked, so "no longer" would not be true.
+	notAcceptedWords = "ESPN did not accept your saved sign-in. Connect ESPN again to read your leagues."
+	notAnswering     = "ESPN is not answering right now. Try again in a moment."
+	refusedWords     = "ESPN did not accept those two values. Copy them again from ESPN's site, signed in."
+	pausedWords      = "ESPN refused three tries, so connecting is paused for an hour."
+	swidWords        = "Paste your SWID, the value in braces."
+	s2Words          = "Paste your espn_s2 value."
+	consentWords     = "Agree to how we keep your ESPN session to connect ESPN."
 )
 
 // ConnectionStore is the part of hosts.Store the routes use.
@@ -124,44 +127,23 @@ func (s *Service) leagues(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case errors.Is(err, hosts.ErrNotConnected):
 		httpx.WriteError(w, r, http.StatusNotFound, httpx.CodeNotFound, notConnected, nil)
+	case errors.Is(err, ErrNotAccepted):
+		httpx.WriteError(w, r, http.StatusConflict, httpx.CodeConflict, notAcceptedWords, nil)
 	case errors.Is(err, ErrReconnect):
 		httpx.WriteError(w, r, http.StatusConflict, httpx.CodeConflict, reconnectWords, nil)
 	case err != nil:
 		s.Log.Warn("espnhost: leagues", "err", err)
 		httpx.WriteError(w, r, http.StatusBadGateway, httpx.CodeUnavailable, notAnswering, nil)
 	default:
-		if views, ok := s.views(w, r, list, s.publicity(r.Context(), list, yr)); ok {
+		if views, ok := s.views(w, r, list, checkList(r.Context(), s.Public, s.Log, list, yr)); ok {
 			httpx.WriteOK(w, r, http.StatusOK, views)
 		}
 	}
 }
 
-// maxPublicChecks bounds the public checks one list makes; a league past
-// it carries no mark.
-const maxPublicChecks = 10
-
-// publicity is whether the public reads each listed league, by id, for
-// the leagues checked. A check ESPN does not answer leaves its league
-// unmarked: never a guess.
-func (s *Service) publicity(ctx context.Context, list []espn.MyLeague, yr int) map[string]bool {
-	out := map[string]bool{}
-	for i, l := range list {
-		if i >= maxPublicChecks {
-			break
-		}
-		public, err := s.Public.Public(ctx, l.LeagueID, yr)
-		if err != nil {
-			s.Log.Warn("espnhost: public check", "league", l.LeagueID, "err", err)
-			continue
-		}
-		out[l.LeagueID] = public
-	}
-	return out
-}
-
 // views is the leagues on the wire, each marked followed or not, and
-// public or private where it was checked.
-func (s *Service) views(w http.ResponseWriter, r *http.Request, list []espn.MyLeague, public map[string]bool) ([]apitypes.HostLeague, bool) {
+// public or private where it was checked, or why it was not.
+func (s *Service) views(w http.ResponseWriter, r *http.Request, list []espn.MyLeague, m marks) ([]apitypes.HostLeague, bool) {
 	followed, err := s.Followed.FollowedIDs(r.Context(), auth.AccountID(r), Host)
 	if err != nil {
 		httpx.WriteInternal(w, r, s.Log, "espnhost: followed", err)
@@ -170,9 +152,7 @@ func (s *Service) views(w http.ResponseWriter, r *http.Request, list []espn.MyLe
 	out := make([]apitypes.HostLeague, 0, len(list))
 	for _, l := range list {
 		line := hosts.LeagueLine{LeagueID: l.LeagueID, Season: l.Season, Name: l.Name, TeamName: l.TeamName, Teams: l.Teams}
-		if p, ok := public[l.LeagueID]; ok {
-			line.Public = &p
-		}
+		line.Public, line.Unmarked = m.mark(l.LeagueID)
 		out = append(out, hosts.LeagueView(line, followed))
 	}
 	return out, true

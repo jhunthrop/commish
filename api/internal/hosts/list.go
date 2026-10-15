@@ -101,12 +101,20 @@ type LeagueLine struct {
 	Scoring string
 	// Public is whether the public reads the league, nil when not checked.
 	Public *bool
+	// Unmarked is why a league the host could mark public carries no
+	// mark (apitypes.HostLeagueUnmarked), empty when it has one or the
+	// host marks none.
+	Unmarked string
 }
 
 // LeagueView is a list line on the wire, marked followed when followed
 // (keyed by FollowKey) holds it.
 func LeagueView(l LeagueLine, followed map[string]bool) apitypes.HostLeague {
 	v := apitypes.HostLeague{LeagueId: l.LeagueID, Name: l.Name, TeamName: l.TeamName, Public: l.Public}
+	if l.Unmarked != "" {
+		why := apitypes.HostLeagueUnmarked(l.Unmarked)
+		v.Unmarked = &why
+	}
 	attached := followed[FollowKey(l.LeagueID, l.Season)]
 	v.Attached = &attached
 	if l.Teams > 0 {

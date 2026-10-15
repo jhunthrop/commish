@@ -210,6 +210,12 @@ func setup(t *testing.T) rig {
 
 func call(t *testing.T, h http.HandlerFunc, id uuid.UUID, body any) (int, []byte) {
 	t.Helper()
+	return callIn(t, context.Background(), h, id, body)
+}
+
+// callIn is call with the request under ctx.
+func callIn(t *testing.T, ctx context.Context, h http.HandlerFunc, id uuid.UUID, body any) (int, []byte) {
+	t.Helper()
 	var r *http.Request
 	if body == nil {
 		r = httptest.NewRequest(http.MethodGet, "/", nil)
@@ -218,7 +224,7 @@ func call(t *testing.T, h http.HandlerFunc, id uuid.UUID, body any) (int, []byte
 		r = httptest.NewRequest(http.MethodPost, "/", strings.NewReader(string(raw)))
 		r.Header.Set("Content-Type", "application/json")
 	}
-	r = r.WithContext(auth.WithAccount(r.Context(), auth.Account{ID: id}))
+	r = r.WithContext(auth.WithAccount(ctx, auth.Account{ID: id}))
 	w := httptest.NewRecorder()
 	h(w, r)
 	return w.Code, w.Body.Bytes()

@@ -29,6 +29,11 @@ const Host = "espn"
 // ErrReconnect is a connection whose cookies ESPN no longer accepts.
 var ErrReconnect = errors.New("espnhost: connect again")
 
+// ErrNotAccepted is a connection kept unproven whose cookies ESPN refused:
+// ESPN never accepted them, so it is not a session that stopped working.
+// It is an ErrReconnect too.
+var ErrNotAccepted = fmt.Errorf("%w: ESPN never accepted the kept cookies", ErrReconnect)
+
 // Session keys in the vault.
 const (
 	keySWID = "swid"
@@ -89,7 +94,7 @@ func (m *Member) open(ctx context.Context, accountID uuid.UUID) (kept, error) {
 		return kept{}, err
 	}
 	if conn.Status != hosts.StatusConnected {
-		return kept{}, ErrReconnect
+		return kept{}, refused(conn.Proven)
 	}
 	wrapped := conn.Sealed.WrappedKey
 	s, err := m.Vault.OpenSession(accountID.String(), Host, conn.Sealed)
@@ -108,14 +113,45 @@ func (m *Member) open(ctx context.Context, accountID uuid.UUID) (kept, error) {
 	return kept{cookies: c, wrapped: wrapped, proven: conn.Proven}, nil
 }
 
-// Leagues is the member's football leagues in a season.
+// refused is the error for cookies ESPN refused: ErrNotAccepted when they
+// were never proven, ErrReconnect when they once worked.
+func refused(proven bool) error {
+	if proven {
+		return ErrReconnect
+	}
+	return ErrNotAccepted
+}
+
+// Leagues is the member's football leagues in a season. A session kept
+// unproven whose list holds a league checked private reads that league
+// with the cookies before the list is answered, as the connect would
+// have: the read proves the session, or ESPN's refusal signs it out. So a
+// lifted SWID with a made-up espn_s2 never keeps reading a member's list
+// through us once that list holds a private league.
 func (m *Member) Leagues(ctx context.Context, accountID uuid.UUID, season int) ([]espn.MyLeague, error) {
 	k, err := m.open(ctx, accountID)
 	if err != nil {
 		return nil, err
 	}
 	list, err := m.Client.MyLeagues(ctx, k.cookies, season)
-	return list, m.after(ctx, accountID, k.wrapped, err)
+	if err := m.after(ctx, accountID, k, err); err != nil {
+		return nil, err
+	}
+	if k.proven {
+		return list, nil
+	}
+	private := checkList(ctx, m.Public, m.Log, list, season).first(list, true)
+	if private == "" {
+		return list, nil
+	}
+	_, err = m.Client.Read(ctx, private, season, &k.cookies)
+	if err := m.after(ctx, accountID, k, err); err != nil {
+		return nil, err
+	}
+	if err := m.Store.Proved(ctx, accountID, Host, k.wrapped); err != nil {
+		m.Log.Warn("espnhost: mark proven", "account", accountID, "err", err)
+	}
+	return list, nil
 }
 
 // ReadLeague is one whole read of a league as the member. ESPN refuses a
@@ -132,7 +168,7 @@ func (m *Member) ReadLeague(ctx context.Context, accountID uuid.UUID, leagueID s
 	if errors.Is(err, espn.ErrSignedOut) && !m.inList(ctx, k.cookies, leagueID, season) {
 		return espn.FullLeague{}, fmt.Errorf("%w: not a league of this member", espn.ErrPrivate)
 	}
-	if err := m.after(ctx, accountID, k.wrapped, err); err != nil {
+	if err := m.after(ctx, accountID, k, err); err != nil {
 		return espn.FullLeague{}, err
 	}
 	if !k.proven {
@@ -175,10 +211,10 @@ func (m *Member) inList(ctx context.Context, c espn.Cookies, leagueID string, se
 }
 
 // after notes a good read, or marks a refused one for a reconnect.
-func (m *Member) after(ctx context.Context, accountID uuid.UUID, wrapped []byte, err error) error {
+func (m *Member) after(ctx context.Context, accountID uuid.UUID, k kept, err error) error {
 	if errors.Is(err, espn.ErrSignedOut) {
-		m.signedOut(ctx, accountID, wrapped, "ESPN refused the cookies")
-		return ErrReconnect
+		m.signedOut(ctx, accountID, k.wrapped, "ESPN refused the cookies")
+		return refused(k.proven)
 	}
 	if err != nil {
 		return err

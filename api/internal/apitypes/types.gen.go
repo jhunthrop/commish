@@ -306,6 +306,24 @@ func (e HostConnectionStatus) Valid() bool {
 	}
 }
 
+// Defines values for HostLeagueUnmarked.
+const (
+	HostLeagueUnmarkedNoAnswer   HostLeagueUnmarked = "no_answer"
+	HostLeagueUnmarkedNotChecked HostLeagueUnmarked = "not_checked"
+)
+
+// Valid indicates whether the value is a known member of the HostLeagueUnmarked enum.
+func (e HostLeagueUnmarked) Valid() bool {
+	switch e {
+	case HostLeagueUnmarkedNoAnswer:
+		return true
+	case HostLeagueUnmarkedNotChecked:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for InjuryDesignationStatus.
 const (
 	InjuryDesignationStatusDoubtful       InjuryDesignationStatus = "doubtful"
@@ -1452,7 +1470,7 @@ type HostLeague struct {
 	LeagueId string `json:"league_id"`
 	Name     string `json:"name"`
 
-	// Public whether the public reads the league with no sign-in (ESPN), as one read with no cookies answered within the hour; absent when it was not checked or ESPN did not answer
+	// Public whether the public reads the league with no sign-in (ESPN), as one read with no cookies answered within the hour; absent when it was not checked or ESPN did not answer, and unmarked says which
 	Public *bool `json:"public,omitempty"`
 
 	// Record the team's record as the host writes it (FFPC 2 - 3), empty when the list does not carry it
@@ -1464,7 +1482,13 @@ type HostLeague struct {
 
 	// Teams the league's team count
 	Teams *int `json:"teams,omitempty"`
+
+	// Unmarked why an ESPN league carries no public mark: not_checked, past the first 10 leagues of the list, which are the ones checked; no_answer, ESPN did not answer the check in time
+	Unmarked *HostLeagueUnmarked `json:"unmarked,omitempty"`
 }
+
+// HostLeagueUnmarked why an ESPN league carries no public mark: not_checked, past the first 10 leagues of the list, which are the ones checked; no_answer, ESPN did not answer the check in time
+type HostLeagueUnmarked string
 
 // ImportSkip defines model for ImportSkip.
 type ImportSkip struct {
