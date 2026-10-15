@@ -119,22 +119,20 @@ func Health(db Pinger, version string) []httpx.Route {
 	}
 }
 
-// LockHosts answers a service's routes (the api's, the room's) only on
-// hosts (or a loopback host), and the probes on any: the service's
-// run.app URL and its address get a 404 for everything else
-// (httpx.AllowHosts).
-func LockHosts(h http.Handler, hosts []string) http.Handler {
-	return httpx.AllowHosts(hosts, livenessPath, readinessPath)(h)
-}
-
 // Stack wraps the mux in the middleware every request passes through,
-// outermost first.
-func Stack(mux http.Handler, log *slog.Logger, obs httpx.Observer, origins []string) http.Handler {
+// outermost first. The host lock answers a service's routes (the api's,
+// the room's) only on hosts, and the probes on any: the service's run.app
+// URL and its address get a 404 for everything else (httpx.AllowHosts),
+// a CORS preflight included, since the lock runs before CORS. It runs
+// after the request id and the access log, so its 404 is named and
+// logged.
+func Stack(mux http.Handler, log *slog.Logger, obs httpx.Observer, origins, hosts []string) http.Handler {
 	return httpx.Chain(mux,
 		httpx.RequestID(),
 		httpx.Observe(log, obs),
 		httpx.Recover(log),
 		httpx.SecurityHeaders(),
+		httpx.AllowHosts(hosts, livenessPath, readinessPath),
 		httpx.CORS(origins),
 		httpx.Gzip(),
 	)

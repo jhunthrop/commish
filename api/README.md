@@ -39,7 +39,7 @@ These belong in `infra/README.md`. They are kept here until Lane 1 moves them.
 
 ## The run.app URL is locked
 
-The api answers its routes only when the request's `Host` is one of `ALLOWED_HOSTS` (default: `API_BASE_URL`'s host) or a loopback host. Its `run.app` URL, its address and any other host get a 404 in the envelope for every route but `/healthz` and `/readyz`, which stay open for Cloud Run's probes. The room is locked the same way: its socket and routes answer only on `ROOM_BASE_URL`'s host (`room.trycommish.app`) or its own `ALLOWED_HOSTS`. The check reads the request's own `Host`, never `X-Forwarded-Host`: nothing in front of the api sets one, so a caller could.
+The api answers its routes only when the request's `Host` is one of `ALLOWED_HOSTS` (default: `API_BASE_URL`'s host; development adds `localhost`, `127.0.0.1` and `::1`, production never does). Its `run.app` URL, its address and any other host get a 404 in the envelope for every route but `/healthz` and `/readyz`, which stay open for Cloud Run's probes, a CORS preflight included. The room is locked the same way: its socket and routes answer only on `ROOM_BASE_URL`'s host (`room.trycommish.app`) or its own `ALLOWED_HOSTS`. The check reads the request's own `Host`, never `X-Forwarded-Host`: nothing in front of the api sets one, so a caller could.
 
 ## Client addresses and TRUSTED_PROXY_HOPS
 

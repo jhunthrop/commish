@@ -2,6 +2,7 @@ package config
 
 import (
 	"encoding/base64"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -71,21 +72,22 @@ func TestHostsSwitchAndKeys(t *testing.T) {
 
 // ALLOWED_HOSTS defaults to API_BASE_URL's host; a set list splits on
 // spaces or commas, lower-cased, and refuses a URL, a path or a wildcard.
+// Development adds the loopback names; production never does.
 func TestAllowedHosts(t *testing.T) {
-	if got := hostLoader(nil).allowedHosts("https://api.trycommish.app"); len(got) != 1 || got[0] != "api.trycommish.app" {
-		t.Fatalf("default = %v", got)
+	if got := hostLoader(nil).allowedHosts("https://api.trycommish.app", EnvProduction); !slices.Equal(got, []string{"api.trycommish.app"}) {
+		t.Fatalf("production default = %v", got)
 	}
-	if got := hostLoader(nil).allowedHosts("http://localhost:8080"); len(got) != 1 || got[0] != "localhost" {
-		t.Fatalf("default with a port = %v", got)
+	if got := hostLoader(nil).allowedHosts("http://localhost:8080", EnvDevelopment); !slices.Equal(got, []string{"localhost", "127.0.0.1", "::1"}) {
+		t.Fatalf("development default = %v", got)
 	}
 	l := hostLoader(map[string]string{"ALLOWED_HOSTS": "api.trycommish.app API2.trycommish.app,"})
-	got := l.allowedHosts("https://api.trycommish.app")
+	got := l.allowedHosts("https://api.trycommish.app", EnvProduction)
 	if len(got) != 2 || got[0] != "api.trycommish.app" || got[1] != "api2.trycommish.app" || l.err() != nil {
 		t.Fatalf("list = %v, %v", got, l.err())
 	}
 	for _, bad := range []string{"https://api.trycommish.app", "api.trycommish.app/x", "*.trycommish.app", "*"} {
 		l := hostLoader(map[string]string{"ALLOWED_HOSTS": bad})
-		if l.allowedHosts("https://api.trycommish.app"); l.err() == nil {
+		if l.allowedHosts("https://api.trycommish.app", EnvProduction); l.err() == nil {
 			t.Fatalf("%q was accepted", bad)
 		}
 	}
@@ -102,7 +104,7 @@ func TestRoomHosts(t *testing.T) {
 	if got := l.roomHosts(EnvProduction); len(got) != 1 || got[0] != "room2.trycommish.app" {
 		t.Fatalf("set = %v", got)
 	}
-	if got := hostLoader(nil).roomHosts(EnvDevelopment); len(got) != 1 || got[0] != "localhost" {
+	if got := hostLoader(nil).roomHosts(EnvDevelopment); !slices.Equal(got, []string{"localhost", "127.0.0.1", "::1"}) {
 		t.Fatalf("development default = %v", got)
 	}
 	l = hostLoader(nil)

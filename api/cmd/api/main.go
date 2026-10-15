@@ -198,7 +198,7 @@ func build(ctx context.Context, cfg config.API, pool *pgxpool.Pool, obs httpx.Ob
 	if err := server.Mount(mux, routes, sessions, bearer, now); err != nil {
 		return nil, err
 	}
-	return server.Stack(server.LockHosts(mux, cfg.AllowedHosts), log, obs, cfg.HTTP.CORSOrigins), nil
+	return server.Stack(mux, log, obs, cfg.HTTP.CORSOrigins, cfg.AllowedHosts), nil
 }
 
 // gateway is Stripe, or nil (billing answers 503) when it has no keys.

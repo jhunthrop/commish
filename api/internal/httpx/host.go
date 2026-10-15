@@ -16,20 +16,11 @@ func HostName(host string) string {
 	return strings.ToLower(strings.Trim(host, "[]"))
 }
 
-// loopback reports whether a host name is this machine: localhost, or a
-// loopback address. Cloud Run's front end routes by the Host it is sent,
-// so no outside caller reaches the service with one of these.
-func loopback(name string) bool {
-	if name == "localhost" {
-		return true
-	}
-	ip := net.ParseIP(name)
-	return ip != nil && ip.IsLoopback()
-}
-
 // AllowHosts answers 404, in the envelope, for every request whose Host
-// is neither one of hosts nor a loopback one, except the exact paths in
-// open (the probes, which Cloud Run sends to the container on any host).
+// is not one of hosts, except the exact paths in open (the probes, which
+// Cloud Run sends to the container on any host). A loopback name passes
+// only when hosts names it, which development's list does and
+// production's never does.
 // It reads r.Host alone, never X-Forwarded-Host or Forwarded: nothing in
 // front of the API sets them, so a caller could. This is what keeps the
 // service's run.app URL and its address from answering the API's routes.
@@ -42,7 +33,7 @@ func AllowHosts(hosts []string, open ...string) Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			name := HostName(r.Host)
-			if slices.Contains(allowed, name) || loopback(name) || slices.Contains(openPaths, r.URL.Path) {
+			if slices.Contains(allowed, name) || slices.Contains(openPaths, r.URL.Path) {
 				next.ServeHTTP(w, r)
 				return
 			}

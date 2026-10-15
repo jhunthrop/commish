@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -515,18 +516,38 @@ func LoadAPI(get Getenv) (API, error) {
 	c.ShareLinkKeys = append(l.secrets("SHARE_LINK_KEYS"), c.Session.CookiePassword)
 	c.Hosts = l.hosts(c.Env)
 	c.Dev = l.dev(c.Env)
-	c.AllowedHosts = l.allowedHosts(c.HTTP.APIBaseURL)
+	c.AllowedHosts = l.allowedHosts(c.HTTP.APIBaseURL, c.Env)
 	return c, l.err()
 }
 
+// loopbackHosts are this machine's names, which a development service
+// answers on and a production one never does: no production caller needs
+// them, since the probes pass on any host.
+var loopbackHosts = []string{"localhost", "127.0.0.1", "::1"}
+
 // allowedHosts is ALLOWED_HOSTS, bare host names separated by spaces or
 // commas (gcloud's --set-env-vars takes no comma inside a value, so the
-// workflow writes spaces), or API_BASE_URL's host when it is unset. A
-// scheme, a path or a wildcard is refused: the list is exact names.
-func (l *loader) allowedHosts(apiBase string) []string {
+// workflow writes spaces), or the service's base URL's host when it is
+// unset; development adds the loopback names. A scheme, a path or a
+// wildcard is refused: the list is exact names.
+func (l *loader) allowedHosts(base string, env Env) []string {
+	hosts := l.listedHosts(base)
+	if env != EnvDevelopment {
+		return hosts
+	}
+	for _, h := range loopbackHosts {
+		if !slices.Contains(hosts, h) {
+			hosts = append(hosts, h)
+		}
+	}
+	return hosts
+}
+
+// listedHosts is ALLOWED_HOSTS as written, or base's host.
+func (l *loader) listedHosts(base string) []string {
 	raw := strings.FieldsFunc(l.get("ALLOWED_HOSTS"), func(r rune) bool { return r == ',' || r == ' ' || r == '\t' || r == '\n' })
 	if len(raw) == 0 {
-		if u, err := url.Parse(apiBase); err == nil && u.Hostname() != "" {
+		if u, err := url.Parse(base); err == nil && u.Hostname() != "" {
 			return []string{strings.ToLower(u.Hostname())}
 		}
 		return nil
@@ -575,7 +596,7 @@ func LoadRoom(get Getenv) (Room, error) {
 // roomHosts is the room's ALLOWED_HOSTS, defaulting to ROOM_BASE_URL's
 // host, which production must set.
 func (l *loader) roomHosts(env Env) []string {
-	return l.allowedHosts(l.roomBaseURL(env))
+	return l.allowedHosts(l.roomBaseURL(env), env)
 }
 
 // neonPoolerSuffix marks Neon's pooled endpoint in a host name: the
