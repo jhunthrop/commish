@@ -161,7 +161,7 @@ def games_played(
     return played
 
 
-def _latest_clubs(conn: Connection, season: int, week: int, moment: datetime) -> dict[str, str]:
+def latest_clubs(conn: Connection, season: int, week: int, moment: datetime) -> dict[str, str]:
     """Each player's club at his latest week of this season (the season-aware rule)."""
     latest: dict[str, tuple[int, str]] = {}
     for edge in player_teams_as_of(conn, season, WeekRange(1, week - 1), moment):
@@ -177,7 +177,7 @@ def week_inputs(
     """The universe at (season, week): every stale-board player and every player who has played."""
     moment = week_moment(conn, season, week)
     played = games_played(conn, ObservationQuery(season, WeekRange(1, week - 1), moment), positions) if week > 1 else {}
-    clubs = _latest_clubs(conn, season, week, moment) if week > 1 else {}
+    clubs = latest_clubs(conn, season, week, moment) if week > 1 else {}
     schedule = club_schedule(conn, season, moment)
     players: list[PlayerToDate] = []
     for player_id in sorted({*stale.players, *played}):

@@ -66,16 +66,23 @@ def points_by_format(line: StatLine, position: Position) -> dict[str, float]:
 def recent_form(data: WeeklyInput) -> dict[str, dict[str, float]]:
     """Points per game over this season's weeks before the target in which the player recorded a
     line, else over last season's; no opinion without either."""
+    return form_from_lines(data.history, data.season, data.week, data.positions)
+
+
+def form_from_lines(
+    history: Sequence[SeasonStatLine], season: int, week: int, positions: Mapping[str, Position]
+) -> dict[str, dict[str, float]]:
+    """`recent_form` on the lines alone: this season's before `week`, else the season before's."""
     this_season: dict[str, list[StatLine]] = {}
     last_season: dict[str, list[StatLine]] = {}
-    for row in data.history:
-        bucket = this_season if row.season == data.season else last_season
-        if row.season == data.season and row.line.week >= data.week:
+    for row in history:
+        bucket = this_season if row.season == season else last_season
+        if row.season == season and row.line.week >= week:
             continue
         bucket.setdefault(row.line.player_id, []).append(row.line)
     form: dict[str, dict[str, float]] = {}
     for player_id in {*this_season, *last_season}:
-        position = data.positions.get(player_id)
+        position = positions.get(player_id)
         lines = this_season.get(player_id) or last_season.get(player_id)
         if position is None or not lines:
             continue
