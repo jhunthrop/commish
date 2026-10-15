@@ -1301,7 +1301,7 @@ export interface paths {
 		};
 		get?: never;
 		put?: never;
-		/** Keep the member's two ESPN cookies, SWID and espn_s2 (handed to our page by Disney's own sign-in widget, or pasted from ESPN's site), envelope encrypted, once they prove themselves: the member's league list read with them, then one of their leagues the public cannot read, read with them (what needs espn_s2). Never a password. Answers the member's ESPN football leagues this season. Needs consent. 422 when ESPN does not accept the two values, or the member has no private league to connect; three refusals in an hour pause connecting for the hour (423). 5 an hour an account. 503 when ESPN is not open here. */
+		/** Keep the member's two ESPN cookies, SWID and espn_s2 (handed to our page by Disney's own sign-in widget, or pasted from ESPN's site), envelope encrypted, once they prove themselves: the member's league list read with them, then one of their leagues the public cannot read, read with them (what needs espn_s2). Never a password. Answers the member's ESPN football leagues this season. Needs consent. 422 when ESPN does not accept the two values, ESPN lists no football league for the member this season, or every league ESPN lists answers without cookies (each is public and follows by its link; the message names how many); three refusals in an hour pause connecting for the hour (423). 5 an hour an account. 503 when ESPN is not open here. */
 		post: operations['connectESPN'];
 		delete?: never;
 		options?: never;

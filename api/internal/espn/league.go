@@ -356,19 +356,34 @@ type MyLeague struct {
 	Teams    int
 }
 
+// wholeNumber is a JSON number or a numeric string holding a whole
+// number, as the fan API may send either. Anything else reads as 0, which
+// every caller treats as absent, so the entry is skipped and nothing is
+// invented.
+type wholeNumber int
+
+func (n *wholeNumber) UnmarshalJSON(b []byte) error {
+	*n = 0
+	raw := strings.Trim(string(b), `"`)
+	if v, err := strconv.Atoi(raw); err == nil {
+		*n = wholeNumber(v)
+	}
+	return nil
+}
+
 type wireFan struct {
 	Preferences []struct {
 		MetaData struct {
 			Entry struct {
 				Abbrev        string                    `json:"abbrev"`
-				SeasonID      int                       `json:"seasonId"`
+				SeasonID      wholeNumber               `json:"seasonId"`
 				EntryLocation string                    `json:"entryLocation"`
 				EntryNickname string                    `json:"entryNickname"`
 				EntryMetadata struct{ TeamName string } `json:"entryMetadata"`
 				Groups        []struct {
-					GroupID   int    `json:"groupId"`
-					GroupName string `json:"groupName"`
-					GroupSize int    `json:"groupSize"`
+					GroupID   wholeNumber `json:"groupId"`
+					GroupName string      `json:"groupName"`
+					GroupSize wholeNumber `json:"groupSize"`
 				} `json:"groups"`
 			} `json:"entry"`
 		} `json:"metaData"`
@@ -407,11 +422,11 @@ func ParseMyLeagues(body []byte, season int) ([]MyLeague, error) {
 	seen := map[string]bool{}
 	for _, p := range wire.Preferences {
 		e := p.MetaData.Entry
-		if e.Abbrev != "ffl" || e.SeasonID != season || len(e.Groups) == 0 || len(out) >= maxMyLeagues {
+		if !strings.EqualFold(e.Abbrev, "ffl") || int(e.SeasonID) != season || len(e.Groups) == 0 || len(out) >= maxMyLeagues {
 			continue
 		}
 		g := e.Groups[0]
-		id := strconv.Itoa(g.GroupID)
+		id := strconv.Itoa(int(g.GroupID))
 		if g.GroupID <= 0 || seen[id] {
 			continue
 		}
@@ -420,7 +435,7 @@ func ParseMyLeagues(body []byte, season int) ([]MyLeague, error) {
 		if e.EntryMetadata.TeamName != "" {
 			teamName = e.EntryMetadata.TeamName
 		}
-		out = append(out, MyLeague{LeagueID: id, Season: season, Name: text(g.GroupName), TeamName: text(teamName), Teams: min(max(g.GroupSize, 0), maxTeams)})
+		out = append(out, MyLeague{LeagueID: id, Season: season, Name: text(g.GroupName), TeamName: text(teamName), Teams: min(max(int(g.GroupSize), 0), maxTeams)})
 	}
 	return out, nil
 }
