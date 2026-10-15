@@ -54,3 +54,16 @@ def test_a_span_repair_that_falls_to_the_facts_block_keeps_the_written_read(monk
         cast("Engine", None), subject, stored, cast("Any", None), NO_WORN_PHRASES, keep_written=True
     )
     assert result.source == "facts" and not demoted and kept
+
+
+def test_the_span_pages_carrying_the_most_shared_spans_go_first() -> None:
+    gate = _gate(
+        (),
+        (
+            SharedSpan("a span on three pages here", ("a", "b", "c")),
+            SharedSpan("one span that c and e share", ("c", "e")),
+            SharedSpan("another span c and e share", ("c", "e")),
+        ),
+    )
+    # c carries three shared spans, e two, b one.
+    assert repair_order(gate, {}, ORDER).spans == ("c", "e", "b")
