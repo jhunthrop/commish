@@ -25,7 +25,7 @@ from research.capsules.facts.collect import collect_board_facts
 from research.capsules.facts_block import FACTS_SOURCE
 from research.capsules.gateway import GatewayClient
 from research.capsules.generate import CapsuleResult, describe_fallback, generate_capsule
-from research.capsules.landing import TonightWindow
+from research.capsules.landing import BoardSentences, TonightWindow
 from research.capsules.prompt import WornPhrases
 from research.capsules.repetition import (
     CapsuleRow,
@@ -98,8 +98,10 @@ class SweepReport:
     llm: int = 0
     facts: int = 0
     demoted: int = 0
-    # Span repairs whose rewrite fell short and left the page's written read as it was.
+    # Rewrites that left the page's written read as it was: a span repair that fell short, or any
+    # rewrite refused because it would land a sentence another page carries (`refused` of them).
     kept: int = 0
+    refused: int = 0
     calls: int = 0
     prompt_tokens: int = 0
     completion_tokens: int = 0
@@ -125,13 +127,17 @@ def _tally(report: SweepReport, subject: Subject, result: CapsuleResult, demoted
         report.cost_usd += usage.cost_usd or 0.0
     name = subject.facts.identity.name
     report.detail += [f"{name}: narrative slot rejected, {line}" for line in result.narrative.rejected]
+    if kept:
+        report.kept += 1
+        if result.source == "llm":
+            report.refused += 1
+            report.detail.append(f"{name}: rewrite refused, it would land a sentence another page carries")
+        else:
+            report.detail.append(f"{name}: {describe_fallback(result.compact, result.full)}, kept the written read")
+        return
     if result.source == "llm":
         report.llm += 1
         report.detail.append(f"{name}: llm, {result.calls} calls, ${(usage.cost_usd or 0.0) if usage else 0.0:.6f}")
-        return
-    if kept:
-        report.kept += 1
-        report.detail.append(f"{name}: {describe_fallback(result.compact, result.full)}, kept the written read")
         return
     report.facts += 1
     report.demoted += int(demoted)
@@ -147,13 +153,17 @@ def write_one(  # noqa: PLR0913 - one write's parts
     worn: WornPhrases,
     *,
     keep_written: bool = False,
+    claim: Callable[[CapsuleResult], bool] | None = None,
 ) -> tuple[CapsuleResult, bool, bool]:
     """One player's capsule, generated and committed on its own: the result, whether a written row was
     demoted, and whether it was kept. With `keep_written` a rewrite that falls to the facts block leaves
-    a written row as it was (a span repair's failure costs nothing)."""
+    a written row as it was (a span repair's failure costs nothing). `claim` (`landing.BoardSentences`)
+    is asked before anything lands: False keeps the page as it is, nothing written."""
     result = generate_capsule(subject.facts, gateway, worn)
     demoted = stored is not None and stored.source == "llm" and result.source == FACTS_SOURCE
     if demoted and keep_written:
+        return result, False, True
+    if claim is not None and not claim(result):
         return result, False, True
     row = CapsuleWrite(
         subject.universe_id,
@@ -279,10 +289,14 @@ def _ordered(subjects: Sequence[Subject], stored: dict[str, StoredCapsule], plan
 Written = tuple[CapsuleResult, bool, bool]
 
 
+def _reads(row: StoredCapsule) -> tuple[str, str]:
+    return row.body_compact, row.body_full
+
+
 def _land(report: SweepReport, tonight: TonightWindow, subject: Subject, written: Written) -> None:
     """One page as it lands: tallied, checked against the pages landed before it, added to the window."""
     result, demoted, kept = written
-    if result.source == "llm":
+    if result.source == "llm" and not kept:
         texts = page_texts(result.compact.text, result.full.text, result.narrative.slots)
         landing = tonight.land(texts, (result.compact.text, result.full.text))
         report.landed_sentences += landing.sentences
@@ -308,6 +322,21 @@ def sweep_capsules(
     repetition = CAPSULE_CONFIG.repetition
     tonight = TonightWindow(rules, repetition.tonight_window_pages, CAPSULE_CONFIG.shared_sentence_min_words)
     report = SweepReport(as_of, len(subjects), len(ordered))
+    board = BoardSentences(
+        {s.universe_id: _reads(row) for s in subjects if (row := stored.get(s.universe_id)) and row.source == "llm"},
+        CAPSULE_CONFIG.shared_sentence_min_words,
+    )
+    # A rewrite of chosen pages (the hard repair, the graced rewrite, the span repair) may not land a
+    # sentence another page carries; the sweep and its retries record theirs as they land.
+    exclusive = plan.only is not None
+
+    def claim_for(subject: Subject) -> Callable[[CapsuleResult], bool]:
+        def claim(result: CapsuleResult) -> bool:
+            if result.source != "llm":
+                return board.claim(subject.universe_id, (), exclusive=False)
+            return board.claim(subject.universe_id, (result.compact.text, result.full.text), exclusive=exclusive)
+
+        return claim
 
     def start(subject: Subject) -> Callable[[GatewayClient], Written]:
         # Told, as it starts, what every page landed so far already repeats.
@@ -321,7 +350,13 @@ def sweep_capsules(
             board_worn.phrases,
         )
         return lambda view: write_one(
-            engine, subject, stored.get(subject.universe_id), view, worn, keep_written=plan.keep_written
+            engine,
+            subject,
+            stored.get(subject.universe_id),
+            view,
+            worn,
+            keep_written=plan.keep_written,
+            claim=claim_for(subject),
         )
 
     stopped = gateway.rolling(

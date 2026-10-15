@@ -166,7 +166,7 @@ def _sweep_line(name: str, report: SweepReport) -> str:
     return (
         f"{name}: {report.board_players} board players, {report.eligible} eligible, "
         f"{len(report.processed)} processed ({report.llm} written, {report.facts} facts blocks), {report.calls} calls, "
-        f"${report.cost_usd:.6f}, {report.kept} written reads kept, {report.queued} queued by the repetition check, "
+        f"${report.cost_usd:.6f}, {report.kept} written reads kept ({report.refused} rewrites refused for a sentence another page carries), {report.queued} queued by the repetition check, "
         f"{report.landed_sentences} sentences and {report.landed_spans} spans shared as pages landed, "
         f"{len(report.landed_carriers)} carriers left to the repair"
     )

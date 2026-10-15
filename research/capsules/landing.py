@@ -16,12 +16,49 @@ any other shared sentence or span (the page landed first keeps it, as every page
 rewritten). The gate's judgment of each pass is unchanged.
 """
 
+import threading
 from collections import Counter, deque
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
 from research.capsules.narrative import held_sentences
 from research.capsules.spans import SpanRules, page_runs, spans_of
+
+
+class BoardSentences:
+    """THE BOARD'S HELD SENTENCES as tonight leaves them, shared by every writer thread of a sweep:
+    each written page's sentences (both reads, `min_words` long or longer), starting from the store
+    and moved as each page is committed. A span repair's rewrite claims its sentences exclusively
+    (`claim(..., exclusive=True)`): a rewrite that would land a sentence another page already carries
+    is refused and the page keeps its written read, so a span repair can never make a shared
+    sentence (the production rerun of 2026-10-15 went from 13 to 39 shared sentences while its span
+    repair rewrote 509 pages). Every other write records its sentences as it commits."""
+
+    def __init__(self, pages: Mapping[str, Sequence[str]], min_words: int) -> None:
+        self._lock = threading.Lock()
+        self._min_words = min_words
+        self._by_page: dict[str, frozenset[str]] = {}
+        self._holders: dict[str, set[str]] = {}
+        for pid, reads in pages.items():
+            self._put(pid, frozenset(held_sentences(reads, min_words)))
+
+    def _put(self, pid: str, sentences: frozenset[str]) -> None:
+        for sentence in self._by_page.get(pid, frozenset()):
+            self._holders[sentence].discard(pid)
+        self._by_page[pid] = sentences
+        for sentence in sentences:
+            self._holders.setdefault(sentence, set()).add(pid)
+
+    def claim(self, pid: str, reads: Sequence[str], *, exclusive: bool) -> bool:
+        """Records the page's new sentences (none for a facts block: pass no reads), unless
+        `exclusive` and one of them is already on another page, when nothing moves and False says
+        the write must not land."""
+        sentences = frozenset(held_sentences(reads, self._min_words))
+        with self._lock:
+            if exclusive and any(self._holders.get(s, set()) - {pid} for s in sentences):
+                return False
+            self._put(pid, sentences)
+            return True
 
 
 @dataclass(frozen=True, slots=True)
