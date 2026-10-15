@@ -166,7 +166,7 @@ def read_player_listings(payload: Any) -> dict[str, Tank01Listing]:
     return out
 
 
-def _reserve_kind(designation: str | None) -> str | None:
+def reserve_kind_of(designation: str | None) -> str | None:
     if designation is None:
         return None
     return next((kind for pattern, kind in _DESIGNATION_RULES if pattern.search(designation)), None)
@@ -185,7 +185,7 @@ def current_status_from_tank01(  # noqa: PLR0911 - one return per status rule, i
 ) -> CurrentRosterStatus | None:
     """`currentStatusFromTank01`."""
     listed = listing is not None and list_at is not None
-    reserve_kind = _reserve_kind(listing.designation) if listed and listing is not None else None
+    reserve_kind = reserve_kind_of(listing.designation) if listed and listing is not None else None
     member = None if sweep is None else sweep.members_by_espn_id.get(espn_id)
     list_wins = listed and list_at is not None and (sweep is None or list_at >= sweep.captured_at)
     if reserve_kind is not None and list_wins and listing is not None and list_at is not None:
