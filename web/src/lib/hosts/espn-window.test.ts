@@ -98,6 +98,9 @@ interface WidgetScript {
 	readonly guests: readonly unknown[];
 	readonly launchRejects?: unknown;
 	readonly initRejects?: unknown;
+	readonly logoutRejects?: unknown;
+	/** getGuest's first call rejects, as Disney's guest service can. */
+	readonly guestRejectsFirst?: boolean;
 }
 
 interface WidgetRig {
@@ -131,12 +134,19 @@ function stubWidget(script: WidgetScript): WidgetRig {
 		},
 		logout: () => {
 			calls.push('logout');
+			// eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors
+			if (script.logoutRejects !== undefined) return Promise.reject(script.logoutRejects);
 			emit('logout', 'unknown');
 			return Promise.resolve();
 		},
 		getGuest: (...args: unknown[]) => {
 			calls.push('getGuest');
 			getGuestArgs.push(args);
+			if (script.guestRejectsFirst === true && guestCall === 0) {
+				guestCall += 1;
+				// eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors
+				return Promise.reject({ errorCodes: 'UNABLE_TO_RETRIEVE_GUEST_DATA' });
+			}
 			const answer = script.guests[Math.min(guestCall, script.guests.length - 1)];
 			guestCall += 1;
 			return Promise.resolve(answer);
@@ -202,7 +212,7 @@ void test('a guest already signed in is handed over from the widget, with no sig
 	assert.equal(handed.target, SITE_ORIGIN);
 	assert.equal(handed.message.outcome, 'signed-in');
 	assert.deepEqual(handed.message.seen, ['init-signed-in']);
-	assert.deepEqual(findSession(handed.message.payload), { swid: SWID, s2: S2 });
+	assert.deepEqual(handed.message.payload, { swid: SWID, s2: S2 }, 'the pair alone, no guest');
 	assert.equal(r.closed, true);
 });
 
@@ -221,7 +231,7 @@ void test('a guest already signed in whose session the widget keeps is signed ou
 	const handed = handedOver(r);
 	assert.equal(handed.message.outcome, 'signed-in');
 	assert.deepEqual(handed.message.seen, ['init-signed-in', 'logout', 'login']);
-	assert.deepEqual(findSession(handed.message.payload), { swid: SWID, s2: S2 });
+	assert.deepEqual(handed.message.payload, { swid: SWID, s2: S2 }, 'the pair alone, no guest');
 });
 
 void test('a guest signed out gets the form, and signing in hands the session over', async () => {
@@ -233,7 +243,7 @@ void test('a guest signed out gets the form, and signing in hands the session ov
 	const handed = handedOver(r);
 	assert.equal(handed.message.outcome, 'signed-in');
 	assert.deepEqual(handed.message.seen, ['init-signed-out', 'login']);
-	assert.deepEqual(findSession(handed.message.payload), { swid: SWID, s2: S2 });
+	assert.deepEqual(handed.message.payload, { swid: SWID, s2: S2 }, 'the pair alone, no guest');
 });
 
 void test("a widget refusal is handed over as an error in the widget's own words", async () => {
@@ -250,6 +260,52 @@ void test("a widget refusal is handed over as an error in the widget's own words
 		seen: ['init-signed-out']
 	});
 	assert.equal(r.closed, true);
+});
+
+void test('a guest read that fails on the signed-in path signs the guest out and opens the form', async () => {
+	const { r, w } = await run({
+		loggedIn: true,
+		guests: [GUEST_WITH_SESSION],
+		guestRejectsFirst: true
+	});
+	assert.deepEqual(w.calls, ['init', 'getGuest', 'logout', 'launchLogin']);
+	assert.equal(r.line.textContent, ALREADY_SIGNED_IN_LINE);
+	assert.equal(finals(r).length, 0);
+});
+
+void test('a sign-out the widget refuses ends as an error in its codes', async () => {
+	const { r, w } = await run({
+		loggedIn: true,
+		guests: [GUEST_WITHOUT_S2],
+		logoutRejects: { errorCodes: ['Session not established'] }
+	});
+	assert.deepEqual(w.calls, ['init', 'getGuest', 'logout']);
+	const handed = handedOver(r);
+	assert.equal(handed.message.outcome, 'error');
+	assert.equal(handed.message.reason, 'Session not established');
+});
+
+void test("a refusal's free-text message never crosses, only its codes", async () => {
+	const { r } = await run({
+		loggedIn: false,
+		guests: [null],
+		launchRejects: new Error('typed by someone@example.com')
+	});
+	const handed = handedOver(r);
+	assert.equal(handed.message.reason, 'unknown');
+	assert.ok(!JSON.stringify(r.posted).includes('example.com'));
+});
+
+void test('a login whose guest lacks a value hands over no payload at all', async () => {
+	const { r, w } = await run({
+		loggedIn: false,
+		guests: [{ profile: { swid: SWID, email: 'm@x' } }]
+	});
+	w.emit('login', { token: {} });
+	await settle();
+	const handed = handedOver(r);
+	assert.equal(handed.message.outcome, 'signed-in');
+	assert.equal(handed.message.payload, null);
 });
 
 void test('every widget event is posted as it is seen, without its data', async () => {

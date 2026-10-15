@@ -1,9 +1,9 @@
 // Disney's sign-in hands the page a session somewhere in what it answers, and the page reads the
 // window's every message for what Disney did: run with `npm test`.
 import assert from 'node:assert/strict';
-import { test } from 'node:test';
+import { mock, test } from 'node:test';
 import { ESPN_SIGN_IN_ORIGIN, SITE_ORIGIN } from '../site/origins.ts';
-import { fromSignInWindow, readMessage } from './espn-oneid.ts';
+import { fromSignInWindow, readMessage, signInWithDisney } from './espn-oneid.ts';
 import { findSession } from './espn-session.ts';
 
 const S2 = 'AEB'.repeat(30);
@@ -103,4 +103,51 @@ void test('the account page reads a message only from its sign-in window on the 
 	}
 	assert.equal(fromSignInWindow({ origin: ESPN_SIGN_IN_ORIGIN, source: {}, data }, opened), null);
 	assert.equal(fromSignInWindow({ origin: ESPN_SIGN_IN_ORIGIN, source: null, data }, null), null);
+});
+
+void test('a window gone after progress and no last message settles as nothing, with what it saw', async () => {
+	const opened = { closed: false };
+	let listener: ((event: unknown) => void) | null = null;
+	const fakeWindow = {
+		open: () => opened,
+		addEventListener: (_type: string, handler: (event: unknown) => void) => {
+			listener = handler;
+		},
+		removeEventListener: () => {
+			listener = null;
+		}
+	};
+	const realWindow: unknown = Reflect.get(globalThis, 'window');
+	Reflect.set(globalThis, 'window', fakeWindow);
+	mock.timers.enable({ apis: ['setInterval', 'setTimeout'] });
+	try {
+		let settled = false;
+		const ending = signInWithDisney().then((end) => {
+			settled = true;
+			return end;
+		});
+		const deliver = (data: unknown): void => {
+			listener?.({
+				origin: ESPN_SIGN_IN_ORIGIN,
+				source: opened,
+				data
+			});
+		};
+		deliver({ kind: 'commish-espn', outcome: 'seen', seen: ['init-signed-in'] });
+		deliver({ kind: 'commish-espn', outcome: 'seen', seen: ['init-signed-in', 'logout'] });
+		mock.timers.tick(2000);
+		await Promise.resolve();
+		assert.equal(settled, false, 'a working window is never settled');
+		opened.closed = true;
+		mock.timers.tick(400);
+		mock.timers.tick(0);
+		assert.deepEqual(await ending, {
+			outcome: { kind: 'nothing' },
+			seen: ['init-signed-in', 'logout']
+		});
+		assert.equal(listener, null, 'the page stops listening');
+	} finally {
+		mock.timers.reset();
+		Reflect.set(globalThis, 'window', realWindow);
+	}
 });

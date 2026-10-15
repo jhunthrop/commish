@@ -84,14 +84,6 @@ export function popupMain(win: PopupWindow, setup: PopupSetup): void {
 	const seen: string[] = [];
 	let done = false;
 
-	const plain = (value: unknown): unknown => {
-		try {
-			return JSON.parse(JSON.stringify(value ?? null)) as unknown;
-		} catch {
-			return null;
-		}
-	};
-
 	const post = (message: Record<string, unknown>): void => {
 		const opener = win.opener;
 		if (opener && !opener.closed) {
@@ -107,6 +99,12 @@ export function popupMain(win: PopupWindow, setup: PopupSetup): void {
 		win.close();
 	};
 
+	/** Hands over the two ESPN values found in what the widget answered, and nothing else of the
+	 * guest: no name, email or linked account leaves this origin. Null when either is missing. */
+	const handOver = (answered: unknown): void => {
+		send({ outcome: 'signed-in', payload: setup.find(answered) });
+	};
+
 	/** Notes a widget event by name and tells the opener at once, so a window closed by hand still
 	 * leaves word of what Disney did. */
 	const saw = (event: string): void => {
@@ -114,13 +112,10 @@ export function popupMain(win: PopupWindow, setup: PopupSetup): void {
 		if (!done) post({ outcome: 'seen' });
 	};
 
-	/** The widget's own reason for a refusal: its error codes, else its message. */
+	/** The widget's own reason for a refusal: its error codes only, never free text. */
 	const reasonOf = (error: unknown): string => {
-		const fields = (error ?? {}) as { errorCodes?: unknown; message?: unknown };
-		const codes = Array.isArray(fields.errorCodes)
-			? fields.errorCodes.join(',')
-			: fields.errorCodes;
-		const reason = typeof codes === 'string' && codes !== '' ? codes : fields.message;
+		const codes = (error as { errorCodes?: unknown } | null)?.errorCodes;
+		const reason = Array.isArray(codes) ? codes.join(',') : codes;
 		return typeof reason === 'string' && reason !== '' ? reason.slice(0, MAX_REASON) : 'unknown';
 	};
 
@@ -149,7 +144,7 @@ export function popupMain(win: PopupWindow, setup: PopupSetup): void {
 		const handOverExisting = (): Promise<void> =>
 			readGuest().then((guest) => {
 				if (setup.find({ guest }) !== null) {
-					send({ outcome: 'signed-in', payload: plain({ guest }) });
+					handOver({ guest });
 					return;
 				}
 				say(setup.alreadySignedInLine);
@@ -159,7 +154,7 @@ export function popupMain(win: PopupWindow, setup: PopupSetup): void {
 		widget.on('login', (login) => {
 			saw('login');
 			void readGuest().then((guest) => {
-				send({ outcome: 'signed-in', payload: plain({ login, guest }) });
+				handOver({ login, guest });
 			});
 		});
 		widget.on('logout', () => {
