@@ -65,8 +65,9 @@ var (
 
 // LineupItem is one player's move between lineup slots, by ESPN's ids.
 type LineupItem struct {
-	PlayerID string
-	From, To int
+	PlayerID string `json:"player_id"`
+	From     int    `json:"from"`
+	To       int    `json:"to"`
 }
 
 // LineupSet is a lineup move on the member's own team. Only OwnLineup

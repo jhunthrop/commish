@@ -8,10 +8,12 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/jhunthrop/commish/api/internal/apitypes"
+	"github.com/jhunthrop/commish/api/internal/auth"
 	"github.com/jhunthrop/commish/api/internal/config"
 	"github.com/jhunthrop/commish/api/internal/draftroom"
 	"github.com/jhunthrop/commish/api/internal/entitlements"
 	"github.com/jhunthrop/commish/api/internal/espn"
+	"github.com/jhunthrop/commish/api/internal/hostmoves"
 	"github.com/jhunthrop/commish/api/internal/hosts"
 	"github.com/jhunthrop/commish/api/internal/hosts/espnhost"
 	"github.com/jhunthrop/commish/api/internal/hosts/ffpc"
@@ -141,6 +143,22 @@ func (e espnWiring) routes(pool *pgxpool.Pool, ff ffpcWiring, log *slog.Logger) 
 		Enabled: e.connect, Client: e.client, Public: e.publicity, Store: ff.store, Vault: ff.vault, Leagues: e.member,
 		Followed: &leaguesync.Store{Pool: pool}, Now: time.Now, Log: log,
 	}).Routes()
+}
+
+// hostMoves is a move on a host the member confirms on our screen: an
+// ESPN lineup set, open while ESPN is (HOST_ESPN_ENABLED with the vault's
+// key), to every member when HOST_WRITES_ESPN_LINEUP is on and to the
+// allow list's accounts alone when it is off. Its confirm tokens are
+// signed under a key derived from the session secret.
+func hostMoves(cfg config.API, pool *pgxpool.Pool, ff ffpcWiring, e espnWiring, log *slog.Logger) (*hostmoves.Service, error) {
+	key, err := auth.DeriveKey(cfg.Session.CookiePassword, hostmoves.PurposeConfirm)
+	if err != nil {
+		return nil, err
+	}
+	return &hostmoves.Service{
+		ESPNOpen: e.connect, ESPNLineup: cfg.Hosts.ESPNLineupWrites, Links: &leaguesync.Store{Pool: pool}, Connections: ff.store,
+		Member: e.member, Writer: e.client, Proofs: &hostmoves.Store{Pool: pool}, Signer: hostmoves.Signer{Key: key}, Now: time.Now, Log: log,
+	}, nil
 }
 
 // leagueHost is the ESPN league host, nil when ESPN

@@ -312,7 +312,7 @@ export interface paths {
 			};
 			cookie?: never;
 		};
-		/** Start and sit: the week's lineup for the drafter's own team, every slot filled by our order after the week's hard facts (bye, out, doubtful), each change from the lineup the host holds with its reason in one sentence. Reads the league as the sync route does. We never write the host. */
+		/** Start and sit: the week's lineup for the drafter's own team, every slot filled by our order after the week's hard facts (bye, out, doubtful), each change from the lineup the host holds with its reason in one sentence. Reads the league as the sync route does. moves says whether the lineup can be set on the host from our screen (POST /leagues/attached/{id}/moves/plan, then /moves); nothing here writes the host. */
 		get: operations['leagueLineup'];
 		put?: never;
 		post?: never;
@@ -362,6 +362,47 @@ export interface paths {
 		get: operations['leagueTrades'];
 		put?: never;
 		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/leagues/attached/{id}/moves/plan': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				/** @description the attached league's id (AttachedLeague.id) */
+				id: string;
+			};
+			cookie?: never;
+		};
+		get?: never;
+		put?: never;
+		/** Plan a move the screen built (kind lineup: each slot's player in and the starter out, for the week) against a fresh read of the league as the member, on the member's own team only. Answers the move in words with a confirm token bound to the account, the league, the move's content and ten minutes; sends nothing. Answers unavailable, with the host's page, where the host has no write path, the host's switch is off for the account, or the account's connection is signed out or agreed to words older than the moves (a sentence asks to connect again). 20 a minute an account. */
+		post: operations['planHostMove'];
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/leagues/attached/{id}/moves': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				/** @description the attached league's id (AttachedLeague.id) */
+				id: string;
+			};
+			cookie?: never;
+		};
+		/** The member's own moves on this league, newest first, the last 20. */
+		get: operations['listHostMoves'];
+		put?: never;
+		/** Make the planned move once, with its confirm token: checked again against a fresh read, sent to the host once with the member's stored session, never retried, then the host's state read back. Answers done (read back and matching), refused (the host's reason in its own words, nothing changed), pending (sent, the read-back did not confirm it: check the host) or unavailable (the host's page). Every move is kept as its proof. 409 for a token already used, 400 for a token for another account, league or move, or expired, 422 for a move the fresh read refuses (another week, a starter moved, a locked player, not the member's team). 5 a minute an account. */
+		post: operations['makeHostMove'];
 		delete?: never;
 		options?: never;
 		head?: never;
@@ -2465,6 +2506,7 @@ export interface components {
 			host_lineup_url: string;
 			/** @description one sentence under the verb when we cannot open the host's page ("Make this change on Yahoo. We cannot open that page for you yet."), null when the url opens it */
 			host_note: string | null;
+			moves: components['schemas']['LineupMoves'];
 		};
 		WaiverRow: {
 			add: components['schemas']['PlayerLine'];
@@ -2530,6 +2572,81 @@ export interface components {
 			trades: components['schemas']['TradeRow'][];
 			/** @description one sentence when every trade found with this team is a close call for them, else null */
 			note: string | null;
+		};
+		LineupMoves: {
+			/**
+			 * @description available when the lineup can be set on the host from our screen (the host has a write path, its switch is on for the account and the account's connection agreed to the moves); unavailable when the verb is the host's page
+			 * @enum {string}
+			 */
+			lineup: 'available' | 'unavailable';
+			/** @description one sentence when a move waits on the member (connect again to agree to moves), null otherwise */
+			note: string | null;
+		};
+		HostMoveChange: {
+			/** @enum {string} */
+			slot: 'QB' | 'RB' | 'WR' | 'TE' | 'FLEX' | 'SUPERFLEX' | 'K' | 'DEF';
+			/** @description the host id of the player who starts in the slot */
+			in: string;
+			/** @description the host id of the starter the change sits, null for a slot the host left empty */
+			out: string | null;
+		};
+		HostMoveInput: {
+			/** @enum {string} */
+			kind: 'lineup';
+			/** @description the week the screen read, the host's current one */
+			week: number;
+			changes: components['schemas']['HostMoveChange'][];
+		};
+		HostMoveConfirm: {
+			move: components['schemas']['HostMoveInput'];
+			/** @description the plan's token */
+			confirm: string;
+		};
+		HostMovePlan: {
+			/** @enum {string} */
+			status: 'ready' | 'unavailable';
+			/** @description the move in words, every change named ("Start Rachaad White over Tank Bigsby at RB, and Jauan Jennings over Josh Downs in the flex, on ESPN now."), or why it cannot be made here */
+			sentence: string;
+			/** @description the token that makes this move once */
+			confirm: string | null;
+			/**
+			 * Format: date-time
+			 * @description when the token stops making it
+			 */
+			expires_at: string | null;
+			/** @description the host's lineup page, empty when we know none */
+			host_url: string;
+		};
+		HostMoveResult: {
+			/** @enum {string} */
+			outcome: 'done' | 'refused' | 'pending' | 'unavailable';
+			/** @description our sentence for the outcome */
+			sentence: string;
+			/** @description the host's reason for a refusal, verbatim in its own words; null otherwise */
+			host_words: string | null;
+			/** @description the host's lineup page, empty when we know none */
+			host_url: string;
+			/**
+			 * Format: uuid
+			 * @description the move's proof record
+			 */
+			move_id: string | null;
+		};
+		HostMove: {
+			/** Format: uuid */
+			id: string;
+			/** @enum {string} */
+			kind: 'lineup';
+			week: number;
+			/** @description the move as the member confirmed it */
+			sentence: string;
+			/** @enum {string} */
+			outcome: 'sending' | 'not_sent' | 'done' | 'refused' | 'pending';
+			host_words: string | null;
+			/** Format: date-time */
+			created_at: string;
+			/** Format: date-time */
+			answered_at: string | null;
 		};
 		TradeAdvice: {
 			week: number;
@@ -2914,6 +3031,33 @@ export interface components {
 			content: {
 				'application/json': components['schemas']['Envelope'] & {
 					data?: components['schemas']['LobbyRoom'];
+				};
+			};
+		};
+		/** @description the move in words with its confirm token, or why it cannot be made here */
+		HostMovePlanResponse: {
+			headers: Record<string, unknown>;
+			content: {
+				'application/json': components['schemas']['Envelope'] & {
+					data?: components['schemas']['HostMovePlan'];
+				};
+			};
+		};
+		/** @description what the move came to */
+		HostMoveResultResponse: {
+			headers: Record<string, unknown>;
+			content: {
+				'application/json': components['schemas']['Envelope'] & {
+					data?: components['schemas']['HostMoveResult'];
+				};
+			};
+		};
+		/** @description the member's own moves on the league */
+		HostMovesResponse: {
+			headers: Record<string, unknown>;
+			content: {
+				'application/json': components['schemas']['Envelope'] & {
+					data?: components['schemas']['HostMove'][];
 				};
 			};
 		};
@@ -3375,6 +3519,72 @@ export interface operations {
 			404: components['responses']['ErrorResponse'];
 			409: components['responses']['ErrorResponse'];
 			422: components['responses']['ErrorResponse'];
+			502: components['responses']['ErrorResponse'];
+		};
+	};
+	planHostMove: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				/** @description the attached league's id (AttachedLeague.id) */
+				id: string;
+			};
+			cookie?: never;
+		};
+		requestBody: {
+			content: {
+				'application/json': components['schemas']['HostMoveInput'];
+			};
+		};
+		responses: {
+			200: components['responses']['HostMovePlanResponse'];
+			400: components['responses']['ErrorResponse'];
+			404: components['responses']['ErrorResponse'];
+			409: components['responses']['ErrorResponse'];
+			422: components['responses']['ErrorResponse'];
+			429: components['responses']['ErrorResponse'];
+			502: components['responses']['ErrorResponse'];
+		};
+	};
+	listHostMoves: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				/** @description the attached league's id (AttachedLeague.id) */
+				id: string;
+			};
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			200: components['responses']['HostMovesResponse'];
+			404: components['responses']['ErrorResponse'];
+		};
+	};
+	makeHostMove: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				/** @description the attached league's id (AttachedLeague.id) */
+				id: string;
+			};
+			cookie?: never;
+		};
+		requestBody: {
+			content: {
+				'application/json': components['schemas']['HostMoveConfirm'];
+			};
+		};
+		responses: {
+			200: components['responses']['HostMoveResultResponse'];
+			400: components['responses']['ErrorResponse'];
+			404: components['responses']['ErrorResponse'];
+			409: components['responses']['ErrorResponse'];
+			422: components['responses']['ErrorResponse'];
+			429: components['responses']['ErrorResponse'];
 			502: components['responses']['ErrorResponse'];
 		};
 	};

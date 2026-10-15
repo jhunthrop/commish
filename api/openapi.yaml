@@ -341,7 +341,8 @@ paths:
       summary: >-
         Start and sit: the week's lineup for the drafter's own team, every slot filled by our order after the week's
         hard facts (bye, out, doubtful), each change from the lineup the host holds with its reason in one sentence.
-        Reads the league as the sync route does. We never write the host.
+        Reads the league as the sync route does. moves says whether the lineup can be set on the host from our screen
+        (POST /leagues/attached/{id}/moves/plan, then /moves); nothing here writes the host.
       security: [{ session: [] }]
       responses:
         "200": { $ref: "#/components/responses/LineupAdviceResponse" }
@@ -401,6 +402,76 @@ paths:
         "404": { $ref: "#/components/responses/ErrorResponse" }
         "409": { $ref: "#/components/responses/ErrorResponse" }
         "422": { $ref: "#/components/responses/ErrorResponse" }
+        "502": { $ref: "#/components/responses/ErrorResponse" }
+  /leagues/attached/{id}/moves/plan:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: the attached league's id (AttachedLeague.id)
+        schema: { type: string, format: uuid }
+    post:
+      tags: [league-sync]
+      operationId: planHostMove
+      summary: >-
+        Plan a move the screen built (kind lineup: each slot's player in and the starter out, for the week) against a
+        fresh read of the league as the member, on the member's own team only. Answers the move in words with a confirm
+        token bound to the account, the league, the move's content and ten minutes; sends nothing. Answers unavailable,
+        with the host's page, where the host has no write path, the host's switch is off for the account, or the
+        account's connection is signed out or agreed to words older than the moves (a sentence asks to connect again).
+        20 a minute an account.
+      security: [{ session: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/HostMoveInput" }
+      responses:
+        "200": { $ref: "#/components/responses/HostMovePlanResponse" }
+        "400": { $ref: "#/components/responses/ErrorResponse" }
+        "404": { $ref: "#/components/responses/ErrorResponse" }
+        "409": { $ref: "#/components/responses/ErrorResponse" }
+        "422": { $ref: "#/components/responses/ErrorResponse" }
+        "429": { $ref: "#/components/responses/ErrorResponse" }
+        "502": { $ref: "#/components/responses/ErrorResponse" }
+  /leagues/attached/{id}/moves:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: the attached league's id (AttachedLeague.id)
+        schema: { type: string, format: uuid }
+    get:
+      tags: [league-sync]
+      operationId: listHostMoves
+      summary: The member's own moves on this league, newest first, the last 20.
+      security: [{ session: [] }]
+      responses:
+        "200": { $ref: "#/components/responses/HostMovesResponse" }
+        "404": { $ref: "#/components/responses/ErrorResponse" }
+    post:
+      tags: [league-sync]
+      operationId: makeHostMove
+      summary: >-
+        Make the planned move once, with its confirm token: checked again against a fresh read, sent to the host once
+        with the member's stored session, never retried, then the host's state read back. Answers done (read back and
+        matching), refused (the host's reason in its own words, nothing changed), pending (sent, the read-back did not
+        confirm it: check the host) or unavailable (the host's page). Every move is kept as its proof. 409 for a token
+        already used, 400 for a token for another account, league or move, or expired, 422 for a move the fresh read refuses
+        (another week, a starter moved, a locked player, not the member's team). 5 a minute an account.
+      security: [{ session: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/HostMoveConfirm" }
+      responses:
+        "200": { $ref: "#/components/responses/HostMoveResultResponse" }
+        "400": { $ref: "#/components/responses/ErrorResponse" }
+        "404": { $ref: "#/components/responses/ErrorResponse" }
+        "409": { $ref: "#/components/responses/ErrorResponse" }
+        "422": { $ref: "#/components/responses/ErrorResponse" }
+        "429": { $ref: "#/components/responses/ErrorResponse" }
         "502": { $ref: "#/components/responses/ErrorResponse" }
 
   /sheets:
@@ -1595,6 +1666,30 @@ components:
             allOf:
               - $ref: "#/components/schemas/Envelope"
               - properties: { data: { $ref: "#/components/schemas/LobbyRoom" } }
+    HostMovePlanResponse:
+      description: the move in words with its confirm token, or why it cannot be made here
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: "#/components/schemas/Envelope"
+              - properties: { data: { $ref: "#/components/schemas/HostMovePlan" } }
+    HostMoveResultResponse:
+      description: what the move came to
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: "#/components/schemas/Envelope"
+              - properties: { data: { $ref: "#/components/schemas/HostMoveResult" } }
+    HostMovesResponse:
+      description: the member's own moves on the league
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: "#/components/schemas/Envelope"
+              - properties: { data: { type: array, items: { $ref: "#/components/schemas/HostMove" } } }
 
   schemas:
     Envelope:
@@ -2819,7 +2914,7 @@ components:
         sentence: { type: string, nullable: true, description: the reason for a change, from facts; null when unchanged }
     LineupAdvice:
       type: object
-      required: [week, basis, basis_note, order_basis, refreshed, read_at, set, slots, bench, host_lineup_url, host_note]
+      required: [week, basis, basis_note, order_basis, refreshed, read_at, set, slots, bench, host_lineup_url, host_note, moves]
       properties:
         week: { type: integer }
         basis: { type: string, description: "the honesty line above the rows: the order, and what points over replacement a week are" }
@@ -2849,6 +2944,7 @@ components:
           description: >-
             one sentence under the verb when we cannot open the host's page ("Make this change on Yahoo. We cannot
             open that page for you yet."), null when the url opens it
+        moves: { $ref: "#/components/schemas/LineupMoves" }
     WaiverRow:
       type: object
       required: [add, drop, gain, starts, sentence]
@@ -2928,6 +3024,82 @@ components:
           type: string
           nullable: true
           description: one sentence when every trade found with this team is a close call for them, else null
+    LineupMoves:
+      type: object
+      required: [lineup, note]
+      properties:
+        lineup:
+          type: string
+          enum: [available, unavailable]
+          description: >-
+            available when the lineup can be set on the host from our screen (the host has a write path, its switch
+            is on for the account and the account's connection agreed to the moves); unavailable when the verb is the
+            host's page
+        note:
+          type: string
+          nullable: true
+          description: one sentence when a move waits on the member (connect again to agree to moves), null otherwise
+    HostMoveChange:
+      type: object
+      required: [slot, in, out]
+      properties:
+        slot: { type: string, enum: [QB, RB, WR, TE, FLEX, SUPERFLEX, K, DEF] }
+        in: { type: string, pattern: "^-?[0-9]{1,12}$", description: the host id of the player who starts in the slot }
+        out:
+          type: string
+          nullable: true
+          pattern: "^-?[0-9]{1,12}$"
+          description: the host id of the starter the change sits, null for a slot the host left empty
+    HostMoveInput:
+      type: object
+      required: [kind, week, changes]
+      properties:
+        kind: { type: string, enum: [lineup] }
+        week: { type: integer, minimum: 1, maximum: 25, description: "the week the screen read, the host's current one" }
+        changes: { type: array, minItems: 1, maxItems: 10, items: { $ref: "#/components/schemas/HostMoveChange" } }
+    HostMoveConfirm:
+      type: object
+      required: [move, confirm]
+      properties:
+        move: { $ref: "#/components/schemas/HostMoveInput" }
+        confirm: { type: string, minLength: 1, maxLength: 200, description: the plan's token, for this move alone }
+    HostMovePlan:
+      type: object
+      required: [status, sentence, confirm, expires_at, host_url]
+      properties:
+        status: { type: string, enum: [ready, unavailable] }
+        sentence:
+          type: string
+          description: >-
+            the move in words, every change named ("Start Rachaad White over Tank Bigsby at RB, and Jauan Jennings over
+            Josh Downs in the flex, on ESPN now."), or why it cannot be made here
+        confirm: { type: string, nullable: true, description: the token that makes this move once, null when unavailable }
+        expires_at: { type: string, format: date-time, nullable: true, description: when the token stops making it }
+        host_url: { type: string, description: "the host's lineup page, empty when we know none" }
+    HostMoveResult:
+      type: object
+      required: [outcome, sentence, host_words, host_url, move_id]
+      properties:
+        outcome: { type: string, enum: [done, refused, pending, unavailable] }
+        sentence: { type: string, description: our sentence for the outcome }
+        host_words:
+          type: string
+          nullable: true
+          description: the host's reason for a refusal, verbatim in its own words; null otherwise
+        host_url: { type: string, description: "the host's lineup page, empty when we know none" }
+        move_id: { type: string, format: uuid, nullable: true, description: the move's proof record, null when none was kept }
+    HostMove:
+      type: object
+      required: [id, kind, week, sentence, outcome, host_words, created_at, answered_at]
+      properties:
+        id: { type: string, format: uuid }
+        kind: { type: string, enum: [lineup] }
+        week: { type: integer }
+        sentence: { type: string, description: the move as the member confirmed it }
+        outcome: { type: string, enum: [sending, not_sent, done, refused, pending] }
+        host_words: { type: string, nullable: true }
+        created_at: { type: string, format: date-time }
+        answered_at: { type: string, format: date-time, nullable: true }
     TradeAdvice:
       type: object
       required: [week, basis, basis_note, order_basis, refreshed, read_at, teams, host_trades_url, host_note]

@@ -12,6 +12,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/jhunthrop/commish/api/internal/apitypes"
 	"github.com/jhunthrop/commish/api/internal/auth"
 	"github.com/jhunthrop/commish/api/internal/leaguesync"
 )
@@ -81,6 +82,40 @@ func TestRoutesAnswerInTheEnvelope(t *testing.T) {
 	}
 	if holds.account != uuid.MustParse("00000000-0000-0000-0000-00000000000a") {
 		t.Fatalf("held read for %s, not the signed-in account", holds.account)
+	}
+}
+
+type fakeMoves struct {
+	host    string
+	account uuid.UUID
+}
+
+func (f *fakeMoves) LineupMove(_ context.Context, accountID uuid.UUID, host string) (apitypes.LineupMoves, error) {
+	f.host, f.account = host, accountID
+	note := "To set your lineup from here, connect ESPN again on your account page and agree to moves."
+	return apitypes.LineupMoves{Lineup: apitypes.LineupMovesLineupUnavailable, Note: &note}, nil
+}
+
+// The lineup says whether the member may set it on the host from our
+// screen, asked for the signed-in account and the league's host; with no
+// moves wired it is the host's page.
+func TestLineupCarriesMoves(t *testing.T) {
+	f := newFixture(t)
+	s := fixtureService(t, f.league, f.data, &fakeHolds{})
+	_, env := serve(t, s, leaguePath+"lineup")
+	var plain apitypes.LineupAdvice
+	if err := json.Unmarshal(env.Data, &plain); err != nil || plain.Moves.Lineup != apitypes.LineupMovesLineupUnavailable || plain.Moves.Note != nil {
+		t.Fatalf("no moves wired: %+v %v", plain.Moves, err)
+	}
+	moves := &fakeMoves{}
+	s.Moves = moves
+	_, env = serve(t, s, leaguePath+"lineup")
+	var got apitypes.LineupAdvice
+	if err := json.Unmarshal(env.Data, &got); err != nil || got.Moves.Note == nil {
+		t.Fatalf("moves: %+v %v", got.Moves, err)
+	}
+	if moves.host != f.league.Snap.Ref.Host || moves.account != uuid.MustParse("00000000-0000-0000-0000-00000000000a") {
+		t.Fatalf("asked for %q as %s", moves.host, moves.account)
 	}
 }
 

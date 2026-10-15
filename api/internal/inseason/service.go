@@ -3,7 +3,9 @@
 // attached league. Each reads the league as the sync route does, our
 // board valued for the league, the league's saved scoring and roster,
 // and the research store's 2026 stat lines, schedule and injury
-// captures. Nothing is projected for a week, and no host is written.
+// captures. Nothing is projected for a week, and nothing here writes a
+// host: the lineup says when the member may set it from our screen
+// (package hostmoves makes the move).
 package inseason
 
 import (
@@ -14,6 +16,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/jhunthrop/commish/api/internal/apitypes"
 	"github.com/jhunthrop/commish/api/internal/auth"
 	"github.com/jhunthrop/commish/api/internal/draft"
 	"github.com/jhunthrop/commish/api/internal/httpx"
@@ -43,11 +46,19 @@ type Holds interface {
 	Held(ctx context.Context, accountID uuid.UUID) (map[string]bool, error)
 }
 
+// Moves says whether the account may set its lineup on the host from
+// our screen. *hostmoves.Service implements it; nil, the verb is always
+// the host's page.
+type Moves interface {
+	LineupMove(ctx context.Context, accountID uuid.UUID, host string) (apitypes.LineupMoves, error)
+}
+
 // Service serves the three routes.
 type Service struct {
 	Leagues Leagues
 	Facts   SeasonFacts
 	Holds   Holds
+	Moves   Moves
 	Now     func() time.Time
 	Log     *slog.Logger
 }
@@ -122,6 +133,14 @@ func (s *Service) lineup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	out, ok := a.Lineup()
+	if ok && s.Moves != nil {
+		moves, err := s.Moves.LineupMove(r.Context(), auth.AccountID(r), a.Snap.Ref.Host)
+		if err != nil {
+			httpx.WriteInternal(w, r, s.Log, "inseason: moves", err)
+			return
+		}
+		out.Moves = moves
+	}
 	s.answer(w, r, out, ok)
 }
 
