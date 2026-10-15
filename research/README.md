@@ -680,6 +680,10 @@ uv run python -m research.model.fit_inputs
 8. **promote**: a run that passed moves `runs/early.json` (early access, spec §4) and goes public an
    hour later, when `publish` moves `runs/latest.json` and dispatches `web.yml` with its id
    (`workflow_dispatch`, an Actions-only token). A step that raises is a failed step with a report.
+9. **the published board**: every `publish` then makes `research.published_boards` hold exactly the
+   board rows of the run `latest.json` names (`nightly/published_board.py`, one transaction a
+   season; a run already there is left alone), so the API reads the order the site shows, the
+   rest-of-season order from week 7, without reading R2.
 
 ### What the run reads and decides
 

@@ -15,7 +15,7 @@ created paused until cutover). Every invocation is one pass; the scheduler owns 
 | Job (Cloud Run) | Command | Schedule | Replaces |
 |---|---|---|---|
 | `nightly` | `research.nightly run`: ingest (capture harvest, ADP in four formats, pre-kickoff props, win totals), fit check, capsules, the run to R2, the gates, the headshots | 05:00 UTC | `adp-snapshot`, `props-preseason-snapshot`, `win-totals`, `capsule-sweep`, the board's nightly check |
-| `nightly-publish` | `research.nightly publish`: the passed run public an hour after it passed, and the web build dispatched | hourly 06:00-12:00 UTC | nothing (new: early access, spec §4) |
+| `nightly-publish` | `research.nightly publish`: the passed run public an hour after it passed, the web build dispatched, and `published_boards` set to the public run's boards (the API's read of the site's order) | hourly 06:00-12:00 UTC | nothing (new: early access, spec §4) |
 | `inseason` | `research.inseason --task season-week`: stats (nflverse `stats_player`), the season's play-by-play and charted feeds (FTN charting, Next Gen Stats, PFR advanced stats; `inseason/usage_steps.py`), props, grade, freeze, scoreboard | Tue 08:00, Wed 18:00, Thu 14:00 America/New_York, September through February; the season is the one the stored schedule places today, and a date none places fails the pass | `season-week` |
 | `inseason-capture` | `research.inseason --task capture-harvest` | hourly 07:00-23:00 and 02:00 America/New_York | `capture-harvest` |
 

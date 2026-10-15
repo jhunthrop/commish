@@ -5,13 +5,15 @@
     uv run python -m research.nightly publish [--out DIR] [--at ISO] [--no-dispatch]
 
 `run` writes one run under a new run id (05:00 UTC); `publish` makes the newest passed run public
-once its early-access hour is over and dispatches the web build of it (hourly from 06:00 UTC).
+once its early-access hour is over, dispatches the web build of it (hourly from 06:00 UTC), and
+keeps `research.published_boards` equal to the public run's boards, the table the API reads.
 Without `--out` both write the R2 bucket (CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID); with it, a
 local directory laid out as the bucket is, which the web build reads as PUBLIC_RUN_BASE_URL.
-RESEARCH_DATABASE_URL is the store; provider keys (TANK01_API_KEY, ODDS_API_KEY), the writer's
-(AI_GATEWAY_API_KEY) and the dispatch token (WEB_DISPATCH_TOKEN) come from the environment, and a
-part whose key is missing is skipped by name. Exit status 1 when the run failed a gate or a step, or
-the dispatch failed.
+RESEARCH_DATABASE_URL is the store (both commands); provider keys (TANK01_API_KEY, ODDS_API_KEY),
+the writer's (AI_GATEWAY_API_KEY) and the dispatch token (WEB_DISPATCH_TOKEN) come from the
+environment, and a part whose key is missing is skipped by name. Exit status 1 when the run failed a
+gate or a step, the dispatch failed, or the published board could not be written (the pointer and
+the dispatch are done first, and the next hour writes the table).
 """
 
 import argparse
@@ -31,6 +33,7 @@ from research.db.url import database_url_from_env
 from research.logging_setup import configure_logging
 from research.nightly.capsule_step import CapsuleStepPlan
 from research.nightly.publish import Dispatcher, publish
+from research.nightly.published_board import sync_published_board
 from research.nightly.r2 import run_store
 from research.nightly.run import STEPS, RunDeps, RunOptions, run_nightly
 from research.nightly.run_store import RunStore
@@ -64,10 +67,18 @@ def _run(args: argparse.Namespace) -> int:
 
 def _publish(args: argparse.Namespace) -> int:
     now = now_ms() if args.at is None else datetime.fromisoformat(args.at)
-    with httpx.Client(timeout=60.0) as http:
-        dispatcher = None if args.no_dispatch else Dispatcher.from_environ(http, os.environ)
-        outcome = publish(_store(args, http), dispatcher, now)
-    _line(outcome.line)
+    engine = make_engine(database_url_from_env())
+    try:
+        with httpx.Client(timeout=60.0) as http:
+            store = _store(args, http)
+            dispatcher = None if args.no_dispatch else Dispatcher.from_environ(http, os.environ)
+            outcome = publish(store, dispatcher, now)
+            _line(outcome.line)
+            # Whatever the pointer step did, the table follows `latest` (Lane 28): a write that
+            # failed an hour ago is made good now, and an unmoved pointer costs one row read.
+            _line(sync_published_board(engine, store, now).line)
+    finally:
+        engine.dispose()
     return 0 if outcome.ok else 1
 
 
