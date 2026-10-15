@@ -7,17 +7,25 @@ import { HTTP_STATUS, hasStatus } from '#lib/api/status.ts';
 import type { PlayerLine, TradeRow, TradeTeam, WaiverRow } from './api.ts';
 import { LINES } from './words.ts';
 
-/** What a failed read shows: the sign-in, the API's own sentence when there is no answer yet (a 404
- * for a team missing from the last read, a 409 out of season, a 422 with no saved scoring, a 400, a
- * 502), or, after an answer, a line that the page shows the last read. */
+/** What a failed read shows: the sign-in, the API's own sentence when there is no answer yet (a 409
+ * out of season, a 422 with no saved scoring, a 400, a 502; a 404 for a team missing from the last
+ * read, which the page offers to read again from the host), or, after an answer, a line that the
+ * page shows the last read. */
 export type ReadFailure =
 	| { kind: 'signed-out' }
 	| { kind: 'refused'; sentence: string }
+	| { kind: 'no-team'; sentence: string }
 	| { kind: 'stale'; sentence: string };
+
+/** The API's code for a team missing from the league's last read (api httpx CodeTeamNotRead). */
+const TEAM_NOT_READ = 'team_not_read';
 
 export function readFailure(error: unknown, answered: boolean): ReadFailure {
 	if (hasStatus(error, HTTP_STATUS.unauthorized)) return { kind: 'signed-out' };
 	if (answered) return { kind: 'stale', sentence: LINES.lastRead };
+	if (error instanceof ApiError && error.code === TEAM_NOT_READ) {
+		return { kind: 'no-team', sentence: error.message };
+	}
 	return {
 		kind: 'refused',
 		sentence: error instanceof ApiError ? error.message : LINES.unreadable
@@ -77,6 +85,35 @@ export function bestTrade(teams: readonly TradeTeam[]): { row: TradeRow; team: T
 			null
 		);
 	return best(all.filter((t) => !t.row.close_for_them)) ?? best(all);
+}
+
+/** A picker player's key: his board id, which the trades narrow by, or his host id for a player our
+ * board does not place (no trade can hold him). */
+export function pickKey(line: PlayerLine): string {
+	return line.player.board_id ?? `host:${line.player.host_id}`;
+}
+
+/** The trade picker's players: every one on your roster as the API lists it, a trade found or not,
+ * and theirs from the trades found, each once. */
+export function pickerPlayers(
+	roster: readonly PlayerLine[],
+	teams: readonly TradeTeam[]
+): { yours: readonly PlayerLine[]; theirs: readonly PlayerLine[] } {
+	const theirs = new Map<string, PlayerLine>();
+	for (const line of teams.flatMap((t) => t.trades.flatMap((r) => r.get))) {
+		if (line.player.board_id !== null && !theirs.has(line.player.board_id)) {
+			theirs.set(line.player.board_id, line);
+		}
+	}
+	return { yours: roster, theirs: [...theirs.values()] };
+}
+
+/** Whether a trade found holds the picked player (true with none picked). */
+export function tradeHolding(teams: readonly TradeTeam[], key: string | null): boolean {
+	if (key === null) return true;
+	return teams.some((t) =>
+		t.trades.some((r) => [...r.give, ...r.get].some((l) => l.player.board_id === key))
+	);
 }
 
 /** A narrowing's outcome: every row again, the narrowed answer, a sentence when it could not be

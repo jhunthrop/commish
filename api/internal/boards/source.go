@@ -113,7 +113,7 @@ func (s *PGSource) Load(ctx context.Context, f Format) (*Raw, error) {
 	if !stamp.order.Valid() {
 		return nil, fmt.Errorf("boards: %s for %d has order %q", source, s.Season, stamp.order)
 	}
-	raw.AsOf, raw.Order, raw.Run = stamp.asOf.UTC(), stamp.order, stamp.run
+	raw.AsOf, raw.Order, raw.Run, raw.FromWeek = stamp.asOf.UTC(), stamp.order, stamp.run, stamp.fromWeek
 	return raw, nil
 }
 
@@ -123,6 +123,8 @@ type boardStamp struct {
 	asOf  *time.Time
 	order Order
 	run   string
+	// fromWeek is the run's first week, 0 for none.
+	fromWeek int
 }
 
 // scanBoardRow reads one directory row with its points, and the board's
@@ -132,7 +134,7 @@ func scanBoardRow(rows pgx.Rows, stamp *boardStamp) (Player, string, error) {
 	var position string
 	var floor, median, ceiling *float64
 	if err := rows.Scan(&p.ID, &p.Name, &position, &p.Team, &p.Headshot, &p.ADP, &p.Points, &floor, &median, &ceiling,
-		&stamp.asOf, &stamp.order, &stamp.run); err != nil {
+		&stamp.asOf, &stamp.order, &stamp.run, &stamp.fromWeek); err != nil {
 		return Player{}, "", err
 	}
 	if floor != nil && median != nil && ceiling != nil {

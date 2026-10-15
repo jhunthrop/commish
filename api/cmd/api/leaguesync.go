@@ -146,9 +146,10 @@ func (e espnWiring) routes(pool *pgxpool.Pool, ff ffpcWiring, log *slog.Logger) 
 }
 
 // hostMoves is a move on a host the member confirms on our screen: an
-// ESPN lineup set, open while ESPN is (HOST_ESPN_ENABLED with the vault's
-// key), to every member when HOST_WRITES_ESPN_LINEUP is on and to the
-// allow list's accounts alone when it is off. Its confirm tokens are
+// ESPN lineup set or claim, open while ESPN is (HOST_ESPN_ENABLED with the
+// vault's key), each to every member when its switch is on
+// (HOST_WRITES_ESPN_LINEUP, HOST_WRITES_ESPN_CLAIM) and to the allow
+// list's accounts for that kind alone when it is off. Its confirm tokens are
 // signed under a key derived from the session secret.
 func hostMoves(cfg config.API, pool *pgxpool.Pool, ff ffpcWiring, e espnWiring, log *slog.Logger) (*hostmoves.Service, error) {
 	key, err := auth.DeriveKey(cfg.Session.CookiePassword, hostmoves.PurposeConfirm)
@@ -156,8 +157,8 @@ func hostMoves(cfg config.API, pool *pgxpool.Pool, ff ffpcWiring, e espnWiring, 
 		return nil, err
 	}
 	return &hostmoves.Service{
-		ESPNOpen: e.connect, ESPNLineup: cfg.Hosts.ESPNLineupWrites, Links: &leaguesync.Store{Pool: pool}, Connections: ff.store,
-		Member: e.member, Writer: e.client, Proofs: &hostmoves.Store{Pool: pool}, Signer: hostmoves.Signer{Key: key}, Now: time.Now, Log: log,
+		ESPNOpen: e.connect, ESPNLineup: cfg.Hosts.ESPNLineupWrites, ESPNClaim: cfg.Hosts.ESPNClaimWrites, Links: &leaguesync.Store{Pool: pool}, Connections: ff.store,
+		Member: e.member, Writer: e.client, Claims: e.client, Proofs: &hostmoves.Store{Pool: pool}, Signer: hostmoves.Signer{Key: key}, Now: time.Now, Log: log,
 	}, nil
 }
 

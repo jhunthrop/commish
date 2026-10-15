@@ -19,6 +19,12 @@ func TestWriteSwitchOffByDefault(t *testing.T) {
 	if h := hostLoader(map[string]string{"HOST_WRITES_ESPN_LINEUP": "true"}).hosts(EnvDevelopment); !h.ESPNLineupWrites {
 		t.Fatal("ESPN lineup writes set true and off")
 	}
+	if h := hostLoader(nil).hosts(EnvDevelopment); h.ESPNClaimWrites {
+		t.Fatal("ESPN claim writes on by default")
+	}
+	if h := hostLoader(map[string]string{"HOST_WRITES_ESPN_CLAIM": "true"}).hosts(EnvDevelopment); !h.ESPNClaimWrites || h.ESPNLineupWrites {
+		t.Fatal("the claim switch set true and off, or it opened the lineup")
+	}
 	l := hostLoader(map[string]string{"HOST_WRITES_ESPN_LINEUP": "sometimes"})
 	if l.hosts(EnvDevelopment); l.err() == nil {
 		t.Fatal("a switch neither true nor false")

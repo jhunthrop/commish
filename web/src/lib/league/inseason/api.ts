@@ -1,7 +1,7 @@
 /** The in-season reads of a followed league (spec §7), typed from the generated contract: this
  * week's lineup, the waiver adds (a position at a time when asked) and the trades (those holding
- * one player when asked), each for the drafter's own team; and the one move made on the host, a
- * lineup set planned in words and then made with its confirm token (spec §10.2). */
+ * one player when asked), each for the drafter's own team; and the moves made on the host, a lineup
+ * set or a claim planned in words and then made with its confirm token (spec §10.2). */
 import { PUBLIC_API_URL } from '$app/env/public';
 import { apiClient } from '#lib/api/client.ts';
 import type { components, operations } from '#lib/api/types.ts';
@@ -24,6 +24,8 @@ export type HostMoveInput = Schemas['HostMoveInput'];
 export type HostMoveChange = Schemas['HostMoveChange'];
 export type HostMovePlan = Schemas['HostMovePlan'];
 export type HostMoveResult = Schemas['HostMoveResult'];
+export type HostBid = Schemas['HostBid'];
+export type WaiverMoves = Schemas['WaiverMoves'];
 /** A position the waiver route narrows to. */
 export type WaiverPosition = NonNullable<
 	NonNullable<operations['leagueWaivers']['parameters']['query']>['position']

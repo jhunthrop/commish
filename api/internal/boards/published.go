@@ -43,17 +43,23 @@ func (s *PGSource) preseasonCTEs(gate string) string {
 // for a schema the 0006 migration has not reached.
 func (s *PGSource) preseasonQuery() string {
 	return `with ` + s.preseasonCTEs("") + `
-select ` + boardColumns + `, (select as_of from latest), '` + string(OrderPreseason) + `'::text, ''::text
+select ` + boardColumns + `, (select as_of from latest), '` + string(OrderPreseason) + `'::text, ''::text, 0
 from ` + s.table("provider_players") + ` pp left join proj board on board.player_id = pp.id` + boardOrder
 }
 
 // publishedQuery is the same roster with the published run's rows for
 // (season $1, format $3) when the season has any, else the stored board's
 // as preseasonQuery reads it: one statement, so a publish between two
-// reads never mixes the two boards.
-func (s *PGSource) publishedQuery() string {
+// reads never mixes the two boards. fromWeek is whether the table holds
+// from_week (research revision 0007); without it the run's first week
+// reads as 0.
+func (s *PGSource) publishedQuery(fromWeek bool) string {
+	week := "0"
+	if fromWeek {
+		week = "from_week"
+	}
 	return `with pub as (
-  select player_id, points, floor_points, median_points, ceiling_points, order_basis, refreshed, run_id
+  select player_id, points, floor_points, median_points, ceiling_points, order_basis, refreshed, run_id, ` + week + ` as from_week
   from ` + s.table("published_boards") + ` where season = $1 and format = $3
 ), ` + s.preseasonCTEs(" and not exists (select 1 from pub)") + `, board as (
   select player_id, points, floor_points, median_points, ceiling_points from pub
@@ -62,7 +68,8 @@ func (s *PGSource) publishedQuery() string {
 select ` + boardColumns + `,
   coalesce((select max(refreshed) from pub), (select as_of from latest)),
   coalesce((select min(order_basis) from pub), '` + string(OrderPreseason) + `'),
-  coalesce((select min(run_id) from pub), '')
+  coalesce((select min(run_id) from pub), ''),
+  coalesce((select min(from_week) from pub), 0)
 from ` + s.table("provider_players") + ` pp left join board on board.player_id = pp.id` + boardOrder
 }
 
@@ -76,7 +83,24 @@ func (s *PGSource) boardRead(ctx context.Context, f Format) (string, []any, erro
 	if !published {
 		return s.preseasonQuery(), []any{s.Season, s.sourceFor(f)}, nil
 	}
-	return s.publishedQuery(), []any{s.Season, s.sourceFor(f), string(f)}, nil
+	fromWeek, err := s.hasFromWeek(ctx)
+	if err != nil {
+		return "", nil, err
+	}
+	return s.publishedQuery(fromWeek), []any{s.Season, s.sourceFor(f), string(f)}, nil
+}
+
+// hasFromWeek is true when published_boards holds from_week (research
+// revision 0007): the api can deploy ahead of the migration, and then
+// reads the league's week as before.
+func (s *PGSource) hasFromWeek(ctx context.Context) (bool, error) {
+	var ok bool
+	err := s.Pool.QueryRow(ctx, `select exists (select 1 from information_schema.columns
+  where table_schema = $1 and table_name = 'published_boards' and column_name = 'from_week')`, s.Schema).Scan(&ok)
+	if err != nil {
+		return false, fmt.Errorf("boards: look for published_boards.from_week: %w", err)
+	}
+	return ok, nil
 }
 
 // hasPublished is true when the schema holds published_boards (research

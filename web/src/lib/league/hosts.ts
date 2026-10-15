@@ -25,16 +25,29 @@ function isOpen(host: LeagueHost, open: OpenHosts): boolean {
 	return host === 'sleeper' || host === 'mfl' || open[host];
 }
 
+/** The hosts open here, in the order every page names them: the one place the shared list is
+ * filtered by the switches, so the follow page and the account page always agree. */
+export function openLeagueHosts(open: OpenHosts): LeagueHost[] {
+	return LEAGUE_HOSTS.filter((host) => isOpen(host, open));
+}
+
 /** The hosts as the follow page says it: "Works with Sleeper leagues, public MyFantasyLeague
  * leagues, FFPC leagues, Yahoo leagues and ESPN leagues.", each switched host only where open. */
 export function hostsLine(open: OpenHosts): string {
-	const hosts = LEAGUE_HOSTS.filter((host) => isOpen(host, open)).map((host) =>
+	const hosts = openLeagueHosts(open).map((host) =>
 		host === 'mfl' ? `public ${hostWords(host)} leagues` : `${hostWords(host)} leagues`
 	);
 	const last = hosts.pop() ?? '';
 	return `Works with ${hosts.join(', ')} and ${last}.`;
 }
 
-/** The hosts as the signed-out account page says it: "Sleeper, MyFantasyLeague, FFPC, Yahoo or
- * ESPN". */
-export const LEAGUE_HOSTS_LINE = `${LEAGUE_HOSTS.slice(0, -1).map(hostWords).join(', ')} or ${hostWords(LEAGUE_HOSTS.at(-1) ?? 'espn')}`;
+/** The hosts as the signed-out account page says it, each switched host only where open: "Sleeper,
+ * MyFantasyLeague, FFPC, Yahoo or ESPN". */
+export function leagueHostsLine(open: OpenHosts): string {
+	const hosts = openLeagueHosts(open).map(hostWords);
+	const last = hosts.pop() ?? '';
+	return `${hosts.join(', ')} or ${last}`;
+}
+
+/** Every switched host shut: the account page's line until the hosts answer which are open. */
+export const SWITCHED_SHUT: OpenHosts = { ffpc: false, yahoo: false, espn: false };

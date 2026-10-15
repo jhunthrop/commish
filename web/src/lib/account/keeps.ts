@@ -1,41 +1,70 @@
-/** What an account keeps and the hosts a signed-out visitor can connect, in the words the page prints. */
-import { IN_SEASON_TOOLS_LINE, LEAGUE_HOSTS_LINE } from '#lib/league/hosts.ts';
+/** What an account keeps and the hosts a signed-out visitor can connect, in the words the page prints,
+ * each switched host named only where it is open (the hosts answer's `enabled`). */
+import { IN_SEASON_TOOLS_LINE, leagueHostsLine, type OpenHosts } from '#lib/league/hosts.ts';
 import { FLAGS } from '#lib/site/flags.ts';
 
-/** What following a league says on this page: the hosts and, while the in-season screens are on,
- * the tools, both read from the lists /league/new reads. */
-export const LEAGUES_KEPT_TEXT = `on ${LEAGUE_HOSTS_LINE}, kept up to date.${FLAGS.in_season_tools ? ` ${IN_SEASON_TOOLS_LINE}` : ''}`;
+/** What following a league says on this page: the hosts open here and, while the in-season screens
+ * are on, the tools, both read from the module /league/new reads. */
+export function leaguesKeptText(open: OpenHosts): string {
+	return `on ${leagueHostsLine(open)}, kept up to date.${FLAGS.in_season_tools ? ` ${IN_SEASON_TOOLS_LINE}` : ''}`;
+}
+
+/** One line of what an account keeps. `link` names the account link a line goes to, so this file
+ * stays free of the router. */
+export interface KeepLine {
+	lead: string;
+	text: string;
+	link?: 'leagueNew' | 'pass';
+}
 
 /** What an account keeps, said to a reader who has none yet. */
-/** `link` names the account link a line goes to, so this file stays free of the router. */
-export const KEEPS: readonly { lead: string; text: string; link?: 'leagueNew' | 'pass' }[] = [
-	{
-		lead: 'Your cheat sheets',
-		text: 'on every device you sign in on, with your notes and tiers'
-	},
-	{ lead: 'Your mock drafts', text: 'and the report on each one' },
-	{
-		lead: 'Your leagues',
-		text: LEAGUES_KEPT_TEXT,
-		link: 'leagueNew'
-	},
-	{
-		lead: 'Your Draft Pass or Membership',
-		text: 'and the receipts for it',
-		link: 'pass'
-	}
-];
+export function keeps(open: OpenHosts): readonly KeepLine[] {
+	return [
+		{
+			lead: 'Your cheat sheets',
+			text: 'on every device you sign in on, with your notes and tiers'
+		},
+		{ lead: 'Your mock drafts', text: 'and the report on each one' },
+		{
+			lead: 'Your leagues',
+			text: leaguesKeptText(open),
+			link: 'leagueNew'
+		},
+		{
+			lead: 'Your Draft Pass or Membership',
+			text: 'and the receipts for it',
+			link: 'pass'
+		}
+	];
+}
 
-/** The hosts read as the member: each a row whose verb signs in, then returns to the account page. */
-export const MEMBER_HOSTS = [
+/** A host read as the member: a row whose verb signs in, then returns to the account page. */
+export interface MemberHost {
+	lead: string;
+	text: string;
+	verb: string;
+}
+
+const MEMBER_HOSTS: readonly (MemberHost & { host: 'yahoo' | 'espn' })[] = [
 	{
+		host: 'yahoo',
 		lead: 'Yahoo',
 		text: 'Sign in, then connect Yahoo to follow your Yahoo leagues.',
 		verb: 'Connect Yahoo'
 	},
 	{
+		host: 'espn',
 		lead: 'ESPN',
 		text: 'Sign in, then connect ESPN to follow your ESPN leagues, public or private. We keep an encrypted copy of your ESPN session so your league stays in sync and, when you ask, to make your moves.',
 		verb: 'Connect ESPN'
 	}
-] as const;
+];
+
+/** The hosts read as the member that are open here. */
+export function memberHosts(open: OpenHosts): readonly MemberHost[] {
+	return MEMBER_HOSTS.filter((h) => open[h.host]).map(({ lead, text, verb }) => ({
+		lead,
+		text,
+		verb
+	}));
+}

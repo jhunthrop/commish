@@ -3,9 +3,17 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { ApiError } from '#lib/api/client.ts';
-import type { HostMovePlan, HostMoveResult, LineupSlot } from './api.ts';
+import type { HostMovePlan, HostMoveResult, LineupSlot, WaiverRow } from './api.ts';
 import {
+	addKey,
+	bidLabel,
+	claimable,
+	bidProblem,
+	claimMove,
+	claimsOnHost,
 	failedStep,
+	moveTitle,
+	resultWords,
 	lostWords,
 	MOVE_LINES,
 	hostSaid,
@@ -89,7 +97,8 @@ const ready: HostMovePlan = {
 		'Start Rachaad White over Tank Bigsby at RB, and Jauan Jennings in the flex, on ESPN now.',
 	confirm: 'token',
 	expires_at: '2026-10-18T15:10:00Z',
-	host_url: 'https://fantasy.espn.com/football/team?leagueId=1&teamId=3'
+	host_url: 'https://fantasy.espn.com/football/team?leagueId=1&teamId=3',
+	bid: null
 };
 
 void test('a ready plan is the move to confirm, any other is the host page with the API sentence', () => {
@@ -112,7 +121,8 @@ void test('an answer is what the move came to, an unavailable one is the host pa
 		sentence: 'ESPN did not make the move, so nothing changed there.',
 		host_words: 'Lineup transaction could not be completed, Alexander Mattison is locked',
 		host_url: ready.host_url,
-		move_id: '6f1d1c52-2626-4a26-9a26-000000000035'
+		move_id: '6f1d1c52-2626-4a26-9a26-000000000035',
+		processes_at: null
 	};
 	assert.deepEqual(resultStep(refused), { kind: 'answered', result: refused });
 	assert.deepEqual(
@@ -188,4 +198,99 @@ void test('a failed call says the API sentence, never a raw error, and a lost mo
 		lostWords('espn'),
 		'We did not hear back, so the move may have been made. Check your lineup on ESPN before you set it again.'
 	);
+});
+
+const waiverRow: WaiverRow = {
+	add: player('15818', 'Keenan Allen'),
+	drop: player('11674', 'Danny Amendola'),
+	gain: 1.2,
+	starts: true,
+	sentence: 'Allen starts for you.'
+};
+
+void test("a claim is the row's add and drop with the bid typed, for the week read, and no lineup changes", () => {
+	assert.deepEqual(claimMove(7, waiverRow, 12), {
+		kind: 'claim',
+		week: 7,
+		changes: [],
+		claim: { add: '15818', drop: '11674', bid: 12 }
+	});
+	assert.deepEqual(claimMove(7, { ...waiverRow, drop: null }, null).claim, {
+		add: '15818',
+		drop: null,
+		bid: null
+	});
+	assert.equal(claimsOnHost({ moves: { claim: 'available', note: null } }), true);
+	assert.equal(claimsOnHost({ moves: { claim: 'unavailable', note: null } }), false);
+});
+
+void test("the bid field names its basis, and a bid outside the league's bounds says them", () => {
+	const bid = { amount: 0, min: 0, max: 500, left_known: true };
+	assert.equal(bidLabel(bid), 'Your bid in waiver dollars, $0 to $500, what your team has left');
+	// When ESPN did not say what was spent, the bound is the league's budget, said as such.
+	assert.equal(
+		bidLabel({ ...bid, left_known: false }),
+		"Your bid in waiver dollars, $0 to $500, the league's budget"
+	);
+	assert.equal(bidProblem('espn', '12', bid), null);
+	assert.equal(bidProblem('espn', '0', bid), null);
+	for (const typed of ['501', '-1', '1.5', '', 'twelve']) {
+		assert.equal(
+			bidProblem('espn', typed, bid),
+			'ESPN takes bids from $0 to $500 in this league.',
+			typed
+		);
+	}
+});
+
+void test("a claim's words: the panel, its verb on the way, and a queued claim on the member's clock", () => {
+	assert.equal(moveTitle('claim'), 'Your claim');
+	assert.equal(moveTitle('lineup'), 'Your lineup move');
+	assert.equal(settingWords('espn', 'claim'), 'Claiming on ESPN');
+	assert.equal(readingWords('espn', 'claim'), 'Reading your roster on ESPN');
+	assert.equal(
+		lostWords('espn', 'claim'),
+		'We did not hear back, so the claim may have been made. Check your claims on ESPN before you claim again.'
+	);
+	const pending: HostMoveResult = {
+		outcome: 'pending',
+		sentence:
+			'Claim submitted. ESPN processes claims on Wednesday, and your lineup screen will show him once it goes through.',
+		host_words: null,
+		host_url: ready.host_url,
+		move_id: null,
+		processes_at: '2026-10-16T07:00:00.000Z'
+	};
+	assert.equal(
+		resultWords('espn', pending, 'America/New_York'),
+		'Claim submitted. ESPN processes it Fri 3:00 am, and your lineup screen will show him once it goes through.'
+	);
+	assert.equal(resultWords('espn', { ...pending, processes_at: null }), pending.sentence);
+	assert.equal(resultWords('espn', { ...pending, outcome: 'done' }), pending.sentence);
+});
+
+void test('a claim opens only for an add the host names: an add with no host id keeps the host link', () => {
+	assert.equal(claimable(waiverRow), true);
+	const unnamed: WaiverRow = {
+		...waiverRow,
+		add: { ...waiverRow.add, player: { ...waiverRow.add.player, host_id: '', board_id: '4686422' } }
+	};
+	assert.equal(claimable(unnamed), false);
+	assert.equal(
+		claimable({
+			...unnamed,
+			add: { ...unnamed.add, player: { ...unnamed.add.player, host_id: 'board-1' } }
+		}),
+		false
+	);
+	assert.equal(
+		claimable({
+			...unnamed,
+			add: { ...unnamed.add, player: { ...unnamed.add.player, host_id: '-16010' } }
+		}),
+		true
+	);
+	// A row is marked by its own key, so two adds with no host id are two rows.
+	assert.equal(addKey(unnamed), 'board:4686422');
+	assert.equal(addKey(waiverRow), '15818');
 });

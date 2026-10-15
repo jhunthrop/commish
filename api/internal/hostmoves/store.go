@@ -60,6 +60,9 @@ type Answer struct {
 	// Member is how the member ESPN names on its answer compares with the
 	// SWID sent (espn.MemberCheck), "" for a move never sent.
 	Member string
+	// ProcessAt is when the host's queue says it runs a pending claim,
+	// nil for any other move.
+	ProcessAt *time.Time
 }
 
 // Kept is one move as the member's list shows it.
@@ -127,9 +130,10 @@ func (s *Store) Answered(ctx context.Context, accountID, id uuid.UUID, a Answer,
 	}
 	_, err := s.Pool.Exec(ctx, `update app.host_moves set outcome = $3, host_status = $4, host_transaction_id = nullif($5, ''),
 		host_reason = nullif($6, ''), host_words = nullif($7, ''), read_back = nullif($8, ''), member_check = nullif($9, ''),
-		answered_at = $10
+		answered_at = $10, host_process_at = $11
 		where account_id = $1 and id = $2`,
-		accountID, id, a.Outcome, status, validText(a.TransactionID), validText(a.HostReason), validText(a.HostWords), a.ReadBack, a.Member, at)
+		accountID, id, a.Outcome, status, validText(a.TransactionID), validText(a.HostReason), validText(a.HostWords), a.ReadBack, a.Member, at,
+		a.ProcessAt)
 	if err != nil {
 		return fmt.Errorf("hostmoves: answered: %w", err)
 	}

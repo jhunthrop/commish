@@ -34,7 +34,9 @@
 		myTeam,
 		poolBasis,
 		poolRows,
+		READING_NOW,
 		readLine,
+		readNowWords,
 		recordWords,
 		seasonStarted
 	} from './model.ts';
@@ -214,7 +216,7 @@
 				</div>
 				<div class="reads">
 					<Quiet size="sm" disabled={refreshing} onclick={() => void refresh()}
-						>{refreshing ? 'Reading' : `Read ${hostWords(sync.host)} now`}</Quiet
+						>{refreshing ? READING_NOW : readNowWords(sync.host)}</Quiet
 					>
 				</div>
 			</header>

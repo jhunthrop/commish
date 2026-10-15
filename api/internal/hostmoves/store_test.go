@@ -87,4 +87,36 @@ func TestStore(t *testing.T) {
 	if err := pool.QueryRow(ctx, `select host_words from app.host_moves where id = $1`, id).Scan(&words); err != nil || !strings.HasPrefix(words, "Lineup") {
 		t.Fatalf("kept words %q: %v", words, err)
 	}
+
+	// A claim: its own allow-list row (the lineup's does not allow it), and
+	// a pending claim keeps when ESPN's queue runs it.
+	if ok, err := s.Allowed(ctx, acct.ID, "espn", "claim"); err != nil || ok {
+		t.Fatalf("an account allowed only the lineup is allowed a claim: %v %v", ok, err)
+	}
+	if _, err := pool.Exec(ctx, `insert into app.host_write_accounts (account_id, host, kind) values ($1, 'espn', 'claim')`, acct.ID); err != nil {
+		t.Fatal(err)
+	}
+	if ok, err := s.Allowed(ctx, acct.ID, "espn", "claim"); err != nil || !ok {
+		t.Fatalf("claim allowed: %v %v", ok, err)
+	}
+	claim := record(100)
+	claim.Kind, claim.Plan = "claim", []byte(`{"sentence":"Add A, drop B, bid $0.","add":"1","waiver":true}`)
+	cid, err := s.Begin(ctx, claim)
+	if err != nil {
+		t.Fatal(err)
+	}
+	runs := time.UnixMilli(1792134000000).UTC()
+	if err := s.Answered(ctx, acct.ID, cid, Answer{Outcome: OutcomePending, HostStatus: 200, TransactionID: "7c1a2f60",
+		ReadBack: readMatched, Member: "absent", ProcessAt: &runs}, time.Now()); err != nil {
+		t.Fatalf("claim answered: %v", err)
+	}
+	var kind string
+	var at time.Time
+	if err := pool.QueryRow(ctx, `select kind, host_process_at from app.host_moves where id = $1`, cid).Scan(&kind, &at); err != nil ||
+		kind != "claim" || !at.Equal(runs) {
+		t.Fatalf("kept claim %q %v: %v", kind, at, err)
+	}
+	if _, err := pool.Exec(ctx, `insert into app.host_write_accounts (account_id, host, kind) values ($1, 'espn', 'trade')`, other.ID); err == nil {
+		t.Fatal("a kind with no write path was allowed")
+	}
 }

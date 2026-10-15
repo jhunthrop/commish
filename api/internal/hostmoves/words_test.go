@@ -20,6 +20,12 @@ func TestMoveWordsPassTheCopyRules(t *testing.T) {
 		fmt.Sprintf(weekMovedWords, 7), notYourTeamWords, staleWords, fmt.Sprintf(reserveWords, "Tank Bigsby"),
 		fmt.Sprintf(lockedWords, andNames([]string{"Tank Bigsby", "Jauan Jennings"}), verbFor(2)), notAnsweringWord,
 		tokenOtherWords, tokenExpiredWords, tokenUsedWords, moveFormWords,
+		claimDoneWords, claimRefusedWords, claimNotSeenWords, claimReconsentWords, claimReconnectWords,
+		fmt.Sprintf(claimWeekMovedWords, 7), claimNotYourTeamWords, claimStaleWords, fmt.Sprintf(notAvailableWords, "Keenan Allen"),
+		fmt.Sprintf(alreadyYoursWords, "Keenan Allen"), fmt.Sprintf(notDroppableWords, "Danny Amendola"),
+		fmt.Sprintf(dropLockedWords, "Danny Amendola"), noBidsWords, fmt.Sprintf(bidBoundsWords, 0, 500), claimFormWords,
+		claimTokenUsedWords, claimPendingWords("Wednesday"), claimPendingWords(""),
+		claimNotOnRosterWords, claimNotReadWords, bidUnboundWords,
 		lineupWords([]apitypes.HostMoveChange{
 			{Slot: apitypes.HostMoveChangeSlotRB, In: "1", Out: ptr("2")},
 			{Slot: apitypes.HostMoveChangeSlotFLEX, In: "3", Out: nil},
