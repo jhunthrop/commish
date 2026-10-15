@@ -1301,7 +1301,7 @@ export interface paths {
 		};
 		get?: never;
 		put?: never;
-		/** Keep the member's two ESPN cookies, SWID and espn_s2 (handed to our page by Disney's own sign-in widget, or pasted from ESPN's site), envelope encrypted, once they prove themselves: the member's league list read with them, then one of their leagues the public cannot read, read with them (what needs espn_s2). Never a password. Answers the member's ESPN football leagues this season. Needs consent. 422 when ESPN does not accept the two values, ESPN lists no football league for the member this season, or every league ESPN lists answers without cookies (each is public and follows by its link; the message names how many); three refusals in an hour pause connecting for the hour (423). 5 an hour an account. 503 when ESPN is not open here. */
+		/** Keep the member's two ESPN cookies, SWID and espn_s2 (handed to our page by Disney's own sign-in widget, or pasted from ESPN's site), envelope encrypted, once ESPN reads the member's league list with them. When the list holds a league the public cannot read, that league is read with them too (what proves espn_s2) and the connection is proven (201). When every listed league is public, or ESPN lists none, the session is kept anyway, not yet proven, for the day a private league or a move needs it (200, with a note saying so); the first member read of a league the public cannot read proves it later. Never a password. Answers the member's ESPN football leagues this season. Needs consent. 422 when ESPN does not accept the two values; three refusals in an hour pause connecting for the hour (423). 5 an hour an account. 503 when ESPN is not open here. */
 		post: operations['connectESPN'];
 		delete?: never;
 		options?: never;
@@ -1316,7 +1316,7 @@ export interface paths {
 			path?: never;
 			cookie?: never;
 		};
-		/** The member's ESPN football leagues this season, read from ESPN with their cookies, each with its size and whether the account follows it already. 404 when not connected; 409 when ESPN no longer accepts the cookies. */
+		/** The member's ESPN football leagues this season, read from ESPN with their cookies, public and private, each with its size, whether the account follows it already, and whether the public reads it (checked with no cookies and kept for an hour). 404 when not connected; 409 when ESPN no longer accepts the cookies. */
 		get: operations['espnLeagues'];
 		put?: never;
 		post?: never;
@@ -2681,6 +2681,8 @@ export interface components {
 		HostConnection: {
 			host: components['schemas']['ConnectedHost'];
 			status: components['schemas']['HostConnectionStatus'];
+			/** @description false for an ESPN session kept before any league the public cannot read was read with it (the member's leagues were all public, or ESPN listed none); FFPC and Yahoo prove themselves on connect */
+			proven: boolean;
 			/** Format: date-time */
 			connected_at: string;
 			/** Format: date-time */
@@ -2711,6 +2713,8 @@ export interface components {
 			scoring_type?: string;
 			/** @description whether the account follows the league already */
 			attached?: boolean;
+			/** @description whether the public reads the league with no sign-in (ESPN), as one read with no cookies answered within the hour; absent when it was not checked or ESPN did not answer */
+			public?: boolean;
 		};
 		YahooConnectInput: {
 			/** @description a page on the site to come back to once connected, like /league/{id}; the account page when absent */
@@ -2721,12 +2725,14 @@ export interface components {
 			swid: string;
 			/** @description ESPN's espn_s2 cookie, kept encrypted, never answered or logged */
 			espn_s2: string;
-			/** @description the member agrees that we keep an encrypted copy of their ESPN session to keep their league in sync, never make a move, and that disconnect deletes it; must be true */
+			/** @description the member agrees that we keep an encrypted copy of their ESPN session so their league stays in sync, and that disconnect deletes it; must be true */
 			consent: boolean;
 		};
 		HostConnected: {
 			connection: components['schemas']['HostConnection'];
 			leagues: components['schemas']['HostLeague'][];
+			/** @description one sentence for a connection kept but not yet proven (ESPN): how many leagues ESPN lists and that the session is kept for the day a private league or a move needs it */
+			note?: string;
 		};
 	};
 	responses: {
@@ -4487,7 +4493,16 @@ export interface operations {
 			};
 		};
 		responses: {
-			/** @description connected */
+			/** @description connected, the session kept and not yet proven against a private league */
+			200: {
+				headers: Record<string, unknown>;
+				content: {
+					'application/json': components['schemas']['Envelope'] & {
+						data?: components['schemas']['HostConnected'];
+					};
+				};
+			};
+			/** @description connected and proven */
 			201: {
 				headers: Record<string, unknown>;
 				content: {

@@ -99,12 +99,14 @@ type LeagueLine struct {
 	Teams int
 	// Scoring is the scoring type in our words, empty when unsaid.
 	Scoring string
+	// Public is whether the public reads the league, nil when not checked.
+	Public *bool
 }
 
 // LeagueView is a list line on the wire, marked followed when followed
 // (keyed by FollowKey) holds it.
 func LeagueView(l LeagueLine, followed map[string]bool) apitypes.HostLeague {
-	v := apitypes.HostLeague{LeagueId: l.LeagueID, Name: l.Name, TeamName: l.TeamName}
+	v := apitypes.HostLeague{LeagueId: l.LeagueID, Name: l.Name, TeamName: l.TeamName, Public: l.Public}
 	attached := followed[FollowKey(l.LeagueID, l.Season)]
 	v.Attached = &attached
 	if l.Teams > 0 {
@@ -118,11 +120,11 @@ func LeagueView(l LeagueLine, followed map[string]bool) apitypes.HostLeague {
 	return v
 }
 
-// View is a connection on the wire: its host, its state and when it was
-// made and last read, never a credential.
+// View is a connection on the wire: its host, its state, whether it is
+// proven and when it was made and last read, never a credential.
 func View(c Connection) apitypes.HostConnection {
 	return apitypes.HostConnection{
 		Host: apitypes.ConnectedHost(c.Host), Status: apitypes.HostConnectionStatus(c.Status),
-		ConnectedAt: c.CreatedAt, LastReadAt: c.LastReadAt,
+		ConnectedAt: c.CreatedAt, LastReadAt: c.LastReadAt, Proven: c.Proven,
 	}
 }

@@ -25,8 +25,9 @@ const ConsentVersion = 3
 // consentVersions is each host's consent words' version: FFPC's
 // (ConsentVersion), Yahoo's own authorize page (version 1, the scope it
 // shows: Fantasy Sports, read only) and ESPN's (web/src/lib/hosts/api.ts
-// ESPN_CONSENT, version 1).
-var consentVersions = map[string]int{"ffpc": ConsentVersion, "yahoo": 1, "espn": 1}
+// ESPN_CONSENT, version 2, which drops the promise never to make a move
+// per the founder's ruling of 2026-10-15).
+var consentVersions = map[string]int{"ffpc": ConsentVersion, "yahoo": 1, "espn": 2}
 
 // consentVersion is the host's consent version, 1 for a host not listed.
 func consentVersion(host string) int {
@@ -49,39 +50,66 @@ type Connection struct {
 	LastSignInAt *time.Time
 	CreatedAt    time.Time
 	LastReadAt   *time.Time
-	Sealed       Sealed
+	// Proven is false for an ESPN session kept before a league the public
+	// cannot read was read with it; every other connection proves itself
+	// on connect.
+	Proven bool
+	Sealed Sealed
 }
 
 // Store reads and writes app.host_connections, every query scoped by
 // account and host.
 type Store struct{ Pool *pgxpool.Pool }
 
-const connColumns = `id, account_id, host, status, last_signin_at, created_at, last_read_at,
+const connColumns = `id, account_id, host, status, last_signin_at, created_at, last_read_at, proven,
 	wrapped_key, session_ct, signin_ct, key_version`
 
 func scanConn(row pgx.Row) (Connection, error) {
 	var c Connection
-	err := row.Scan(&c.ID, &c.AccountID, &c.Host, &c.Status, &c.LastSignInAt, &c.CreatedAt, &c.LastReadAt,
+	err := row.Scan(&c.ID, &c.AccountID, &c.Host, &c.Status, &c.LastSignInAt, &c.CreatedAt, &c.LastReadAt, &c.Proven,
 		&c.Sealed.WrappedKey, &c.Sealed.SessionCT, &c.Sealed.SignInCT, &c.Sealed.KeyVersion)
 	return c, err
 }
 
-// Put stores the account's connection to the host, connected, replacing
-// any earlier one, with when and to which words the member consented. A
-// sign-in on our form counts as the latest sign-in.
+// Put stores the account's connection to the host, connected and proven,
+// replacing any earlier one, with when and to which words the member
+// consented. A sign-in on our form counts as the latest sign-in.
 func (s *Store) Put(ctx context.Context, accountID uuid.UUID, host string, sealed Sealed, now time.Time) (Connection, error) {
+	return s.put(ctx, accountID, host, sealed, now, true)
+}
+
+// PutUnproven stores the connection as Put does, not yet proven: an ESPN
+// session whose leagues are all public, kept for the day a private league
+// or a move needs it.
+func (s *Store) PutUnproven(ctx context.Context, accountID uuid.UUID, host string, sealed Sealed, now time.Time) (Connection, error) {
+	return s.put(ctx, accountID, host, sealed, now, false)
+}
+
+func (s *Store) put(ctx context.Context, accountID uuid.UUID, host string, sealed Sealed, now time.Time, proven bool) (Connection, error) {
 	c, err := scanConn(s.Pool.QueryRow(ctx, `insert into app.host_connections
-		(account_id, host, wrapped_key, session_ct, signin_ct, key_version, status, last_signin_at, consented_at, consent_version)
-		values ($1, $2, $3, $4, $5, $6, 'connected', $7, $7, $8)
+		(account_id, host, wrapped_key, session_ct, signin_ct, key_version, status, last_signin_at, consented_at, consent_version, proven)
+		values ($1, $2, $3, $4, $5, $6, 'connected', $7, $7, $8, $9)
 		on conflict (account_id, host) do update set wrapped_key = excluded.wrapped_key, session_ct = excluded.session_ct,
 			signin_ct = excluded.signin_ct, key_version = excluded.key_version, status = 'connected',
-			last_signin_at = excluded.last_signin_at, consented_at = excluded.consented_at, consent_version = excluded.consent_version
+			last_signin_at = excluded.last_signin_at, consented_at = excluded.consented_at, consent_version = excluded.consent_version,
+			proven = excluded.proven
 		returning `+connColumns,
-		accountID, host, sealed.WrappedKey, sealed.SessionCT, sealed.SignInCT, sealed.KeyVersion, now, consentVersion(host)))
+		accountID, host, sealed.WrappedKey, sealed.SessionCT, sealed.SignInCT, sealed.KeyVersion, now, consentVersion(host), proven))
 	if err != nil {
 		return Connection{}, fmt.Errorf("hosts: put connection: %w", err)
 	}
 	return c, nil
+}
+
+// Proved marks the connection proven, only if it is still the one kept
+// under wrappedKey: a slow read of a connection made again since never
+// proves the new one.
+func (s *Store) Proved(ctx context.Context, accountID uuid.UUID, host string, wrappedKey []byte) error {
+	if _, err := s.Pool.Exec(ctx, `update app.host_connections set proven = true
+		where account_id = $1 and host = $2 and wrapped_key = $3`, accountID, host, wrappedKey); err != nil {
+		return fmt.Errorf("hosts: proved: %w", err)
+	}
+	return nil
 }
 
 // Get is the account's connection to the host.
@@ -100,14 +128,14 @@ func (s *Store) Get(ctx context.Context, accountID uuid.UUID, host string) (Conn
 // List is the account's connections, for the account page; the sealed
 // columns are not read.
 func (s *Store) List(ctx context.Context, accountID uuid.UUID) ([]Connection, error) {
-	rows, err := s.Pool.Query(ctx, `select id, account_id, host, status, last_signin_at, created_at, last_read_at
+	rows, err := s.Pool.Query(ctx, `select id, account_id, host, status, last_signin_at, created_at, last_read_at, proven
 		from app.host_connections where account_id = $1 order by host`, accountID)
 	if err != nil {
 		return nil, fmt.Errorf("hosts: list connections: %w", err)
 	}
 	out, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (Connection, error) {
 		var c Connection
-		err := r.Scan(&c.ID, &c.AccountID, &c.Host, &c.Status, &c.LastSignInAt, &c.CreatedAt, &c.LastReadAt)
+		err := r.Scan(&c.ID, &c.AccountID, &c.Host, &c.Status, &c.LastSignInAt, &c.CreatedAt, &c.LastReadAt, &c.Proven)
 		return c, err
 	})
 	if err != nil {

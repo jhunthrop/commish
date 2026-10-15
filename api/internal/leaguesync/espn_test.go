@@ -221,10 +221,21 @@ func TestAttachESPNPublic(t *testing.T) {
 	if status, _ := b.do(rig.svc.attach, http.MethodPost, "/", apitypes.AttachInput{Host: &eh, Link: espnLink}, ""); status != http.StatusConflict {
 		t.Fatalf("an unconnected member attach: %d", status)
 	}
-	// Alice from her list: seated by her SWID, read as her.
+	// Alice from her list: the league is public, and still read as her
+	// member (her points and her own team come from that read), seated by
+	// her SWID, with no public read made for it.
+	publicReads := rig.public.reads
 	status, body = a.do(rig.svc.attach, http.MethodPost, "/", apitypes.AttachInput{Host: &eh, Link: espnLink}, "")
 	if status != http.StatusCreated || json.Unmarshal(body, &got) != nil || got.Me != 1 || rig.member.readAs(alice) != 1 {
 		t.Fatalf("alice's member attach: %d me %d %s", status, got.Me, body)
+	}
+	if rig.public.reads != publicReads {
+		t.Fatalf("a member attach of a public league made %d public reads", rig.public.reads-publicReads)
+	}
+	// Her refresh of it reads as her again, never as the public.
+	rig.clock.now = rig.clock.now.Add(2 * MinUpstreamGap)
+	if status, _ := a.do(rig.svc.refresh, http.MethodPost, "/", nil, got.Id.String()); status != http.StatusOK || rig.member.readAs(alice) != 2 || rig.public.reads != publicReads {
+		t.Fatalf("alice's refresh: %d, %d member reads, %d public reads", status, rig.member.readAs(alice), rig.public.reads-publicReads)
 	}
 }
 

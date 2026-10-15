@@ -1290,12 +1290,13 @@ paths:
       operationId: connectESPN
       summary: >-
         Keep the member's two ESPN cookies, SWID and espn_s2 (handed to our page by Disney's own sign-in widget, or
-        pasted from ESPN's site), envelope encrypted, once they prove themselves: the member's league list read with
-        them, then one of their leagues the public cannot read, read with them (what needs espn_s2). Never a password.
-        Answers the member's ESPN football leagues this season. Needs consent. 422 when ESPN does not accept the two
-        values, ESPN lists no football league for the member this season, or every league ESPN lists answers without
-        cookies (each is public and follows by its link; the message names how many); three refusals in an hour pause
-        connecting for the hour (423). 5 an hour an account. 503 when ESPN is not open here.
+        pasted from ESPN's site), envelope encrypted, once ESPN reads the member's league list with them. When the list
+        holds a league the public cannot read, that league is read with them too (what proves espn_s2) and the
+        connection is proven (201). When every listed league is public, or ESPN lists none, the session is kept anyway,
+        not yet proven, for the day a private league or a move needs it (200, with a note saying so); the first member
+        read of a league the public cannot read proves it later. Never a password. Answers the member's ESPN football
+        leagues this season. Needs consent. 422 when ESPN does not accept the two values; three refusals in an hour
+        pause connecting for the hour (423). 5 an hour an account. 503 when ESPN is not open here.
       security: [{ session: [] }]
       requestBody:
         required: true
@@ -1303,8 +1304,16 @@ paths:
           application/json:
             schema: { $ref: "#/components/schemas/ESPNConnectInput" }
       responses:
+        "200":
+          description: connected, the session kept and not yet proven against a private league
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - properties: { data: { $ref: "#/components/schemas/HostConnected" } }
         "201":
-          description: connected
+          description: connected and proven
           content:
             application/json:
               schema:
@@ -1322,8 +1331,9 @@ paths:
       tags: [hosts]
       operationId: espnLeagues
       summary: >-
-        The member's ESPN football leagues this season, read from ESPN with their cookies, each with its size and
-        whether the account follows it already. 404 when not connected; 409 when ESPN no longer accepts the cookies.
+        The member's ESPN football leagues this season, read from ESPN with their cookies, public and private, each
+        with its size, whether the account follows it already, and whether the public reads it (checked with no
+        cookies and kept for an hour). 404 when not connected; 409 when ESPN no longer accepts the cookies.
       security: [{ session: [] }]
       responses:
         "200":
@@ -3124,10 +3134,15 @@ components:
       enum: [connected, signed_out]
     HostConnection:
       type: object
-      required: [host, status, connected_at, last_read_at]
+      required: [host, status, connected_at, last_read_at, proven]
       properties:
         host: { $ref: "#/components/schemas/ConnectedHost" }
         status: { $ref: "#/components/schemas/HostConnectionStatus" }
+        proven:
+          type: boolean
+          description: >-
+            false for an ESPN session kept before any league the public cannot read was read with it (the member's
+            leagues were all public, or ESPN listed none); FFPC and Yahoo prove themselves on connect
         connected_at: { type: string, format: date-time }
         last_read_at: { type: string, format: date-time, nullable: true }
     HostConnectInput:
@@ -3158,6 +3173,11 @@ components:
         teams: { type: integer, minimum: 1, maximum: 32, description: the league's team count, where the host's list states it }
         scoring_type: { type: string, description: "the league's scoring type in our words: points, categories, best ball" }
         attached: { type: boolean, description: whether the account follows the league already, where the host's list says }
+        public:
+          type: boolean
+          description: >-
+            whether the public reads the league with no sign-in (ESPN), as one read with no cookies answered within the
+            hour; absent when it was not checked or ESPN did not answer
     YahooConnectInput:
       type: object
       properties:
@@ -3175,11 +3195,16 @@ components:
         consent:
           type: boolean
           description: >-
-            the member agrees that we keep an encrypted copy of their ESPN session to keep their league in sync, never
-            make a move, and that disconnect deletes it; must be true
+            the member agrees that we keep an encrypted copy of their ESPN session so their league stays in sync, and
+            that disconnect deletes it; must be true
     HostConnected:
       type: object
       required: [connection, leagues]
       properties:
         connection: { $ref: "#/components/schemas/HostConnection" }
         leagues: { type: array, items: { $ref: "#/components/schemas/HostLeague" } }
+        note:
+          type: string
+          description: >-
+            one sentence for a connection kept but not yet proven (ESPN): how many leagues ESPN lists and that the
+            session is kept for the day a private league or a move needs it

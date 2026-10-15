@@ -192,3 +192,49 @@ func TestKeptSessionNeverUndoesARekey(t *testing.T) {
 		t.Fatalf("after a current keep: version %d, session %v, %v", row.Sealed.KeyVersion, s, err)
 	}
 }
+
+// An ESPN session kept before any private league proved it is unproven;
+// Proved marks it proven only while it is the session the read began
+// with, a connect again keeps what the new connect said, and the
+// account's list carries the mark. A connection put the usual way is
+// proven.
+func TestUnprovenConnections(t *testing.T) {
+	pool := dbtest.Pool(t)
+	ctx := context.Background()
+	acct, err := (&auth.Store{Pool: pool}).UpsertAccount(ctx, auth.Identity{UserID: "user_unproven", Email: "unproven@example.invalid"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	v, _ := NewVault(OneKey(key(t)))
+	store := &Store{Pool: pool}
+	first, _ := v.SealTokens(acct.ID.String(), "espn", Session{"swid": "a"}, Session{})
+	conn, err := store.PutUnproven(ctx, acct.ID, "espn", first, time.Now())
+	if err != nil || conn.Proven {
+		t.Fatalf("put unproven: %+v %v", conn.Proven, err)
+	}
+	second, _ := v.SealTokens(acct.ID.String(), "espn", Session{"swid": "b"}, Session{})
+	if _, err := store.PutUnproven(ctx, acct.ID, "espn", second, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	// A read that began on the first session proves nothing now.
+	if err := store.Proved(ctx, acct.ID, "espn", first.WrappedKey); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := store.Get(ctx, acct.ID, "espn"); got.Proven {
+		t.Fatal("a stale read proved the new session")
+	}
+	if err := store.Proved(ctx, acct.ID, "espn", second.WrappedKey); err != nil {
+		t.Fatal(err)
+	}
+	list, err := store.List(ctx, acct.ID)
+	if err != nil || len(list) != 1 || !list[0].Proven || !View(list[0]).Proven {
+		t.Fatalf("list proven %v, %v", len(list) == 1 && list[0].Proven, err)
+	}
+	if conn, _ := store.PutUnproven(ctx, acct.ID, "espn", first, time.Now()); conn.Proven {
+		t.Fatal("a connect again kept the old proof")
+	}
+	ffpc, _ := v.Seal(acct.ID.String(), "ffpc", Session{"c": "1"}, SignIn{Username: testUser, Password: testPass})
+	if conn, err := store.Put(ctx, acct.ID, "ffpc", ffpc, time.Now()); err != nil || !conn.Proven {
+		t.Fatalf("put: proven %v, %v", conn.Proven, err)
+	}
+}

@@ -192,3 +192,46 @@ func TestReadRefusesMistypedAnswers(t *testing.T) {
 		t.Fatalf("a mistyped fan answer: %v", err)
 	}
 }
+
+// Public reads a league's settings alone with no cookies: an answer is a
+// league the public reads, a refusal one it cannot, and anything else is
+// not known.
+func TestPublic(t *testing.T) {
+	var sent []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		sent = append(sent, r.Header.Get("Cookie")+"|"+r.URL.RawQuery)
+		switch r.URL.Path {
+		case "/apis/v3/games/ffl/seasons/2026/segments/0/leagues/1081607624":
+			_, _ = w.Write([]byte(`{"id":1081607624,"settings":{"name":"x"}}`))
+		case "/apis/v3/games/ffl/seasons/2026/segments/0/leagues/1":
+			http.Error(w, "{}", http.StatusUnauthorized)
+		case "/apis/v3/games/ffl/seasons/2026/segments/0/leagues/2":
+			http.Error(w, "{}", http.StatusInternalServerError)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	t.Cleanup(srv.Close)
+	c := &Client{HTTP: srv.Client(), Base: srv.URL}
+	ctx := context.Background()
+	if public, err := c.Public(ctx, "1081607624", 2026); err != nil || !public {
+		t.Fatalf("a public league: %v %v", public, err)
+	}
+	if public, err := c.Public(ctx, "1", 2026); err != nil || public {
+		t.Fatalf("a private league: %v %v", public, err)
+	}
+	if _, err := c.Public(ctx, "2", 2026); !errors.Is(err, ErrUnavailable) {
+		t.Fatalf("ESPN not answering: %v", err)
+	}
+	if _, err := c.Public(ctx, "9", 2026); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("no league: %v", err)
+	}
+	if _, err := c.Public(ctx, "1;x", 2026); !errors.Is(err, ErrNotALink) {
+		t.Fatalf("a bad id: %v", err)
+	}
+	for _, s := range sent {
+		if s != "|view=mSettings" {
+			t.Fatalf("a public check sent %q", s)
+		}
+	}
+}

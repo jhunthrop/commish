@@ -4,7 +4,10 @@
 // member hands us the two cookies their ESPN sign-in set (through
 // Disney's own sign-in widget on our page, or pasted from ESPN's site);
 // the cookies last about a year, and a read ESPN refuses marks the
-// connection for a reconnect. A public league needs none of this.
+// connection for a reconnect. A public league follows by its link with
+// none of this; connecting is one flow either way, and a session whose
+// leagues are all public is kept unproven until a member read of a league
+// the public cannot read proves it.
 package espnhost
 
 import (
@@ -36,6 +39,7 @@ const (
 type Connections interface {
 	Get(ctx context.Context, accountID uuid.UUID, host string) (hosts.Connection, error)
 	SignedOutAt(ctx context.Context, accountID uuid.UUID, host string, wrappedKey []byte) error
+	Proved(ctx context.Context, accountID uuid.UUID, host string, wrappedKey []byte) error
 	Read(ctx context.Context, accountID uuid.UUID, host string, at time.Time) error
 }
 
@@ -45,13 +49,25 @@ type Reader interface {
 	MyLeagues(ctx context.Context, cookies espn.Cookies, season int) ([]espn.MyLeague, error)
 }
 
-// Member reads ESPN with a connected member's cookies.
+// Member reads ESPN with a connected member's cookies. Public tells a
+// league the public cannot read, whose read proves a session kept
+// unproven.
 type Member struct {
 	Client Reader
+	Public PublicReader
 	Store  Connections
 	Vault  *hosts.Vault
 	Now    func() time.Time
 	Log    *slog.Logger
+}
+
+// kept is a member's open session: the cookies, the wrapped key they were
+// kept under (which guards marking them signed out or proven) and whether
+// they are proven yet.
+type kept struct {
+	cookies espn.Cookies
+	wrapped []byte
+	proven  bool
 }
 
 // Seal is a new connection's cookies, sealed for the account, with no
@@ -62,61 +78,84 @@ func Seal(v *hosts.Vault, accountID uuid.UUID, c espn.Cookies) (hosts.Sealed, er
 
 // Cookies is the member's kept cookies, for a connection that reads.
 func (m *Member) Cookies(ctx context.Context, accountID uuid.UUID) (espn.Cookies, error) {
-	c, _, err := m.open(ctx, accountID)
-	return c, err
+	k, err := m.open(ctx, accountID)
+	return k.cookies, err
 }
 
-// open is the member's kept cookies and the wrapped key they were kept
-// under, which guards marking them signed out.
-func (m *Member) open(ctx context.Context, accountID uuid.UUID) (espn.Cookies, []byte, error) {
+// open is the member's kept session, for a connection that reads.
+func (m *Member) open(ctx context.Context, accountID uuid.UUID) (kept, error) {
 	conn, err := m.Store.Get(ctx, accountID, Host)
 	if err != nil {
-		return espn.Cookies{}, nil, err
+		return kept{}, err
 	}
 	if conn.Status != hosts.StatusConnected {
-		return espn.Cookies{}, nil, ErrReconnect
+		return kept{}, ErrReconnect
 	}
 	wrapped := conn.Sealed.WrappedKey
 	s, err := m.Vault.OpenSession(accountID.String(), Host, conn.Sealed)
 	if errors.Is(err, hosts.ErrSealed) {
 		m.signedOut(ctx, accountID, wrapped, "the kept cookies no longer open")
-		return espn.Cookies{}, nil, ErrReconnect
+		return kept{}, ErrReconnect
 	}
 	if err != nil {
-		return espn.Cookies{}, nil, fmt.Errorf("espnhost: open session: %w", err)
+		return kept{}, fmt.Errorf("espnhost: open session: %w", err)
 	}
 	c := espn.Cookies{SWID: s[keySWID], S2: s[keyS2]}
 	if !c.Valid() {
 		m.signedOut(ctx, accountID, wrapped, "the kept cookies are out of shape")
-		return espn.Cookies{}, nil, ErrReconnect
+		return kept{}, ErrReconnect
 	}
-	return c, wrapped, nil
+	return kept{cookies: c, wrapped: wrapped, proven: conn.Proven}, nil
 }
 
 // Leagues is the member's football leagues in a season.
 func (m *Member) Leagues(ctx context.Context, accountID uuid.UUID, season int) ([]espn.MyLeague, error) {
-	c, wrapped, err := m.open(ctx, accountID)
+	k, err := m.open(ctx, accountID)
 	if err != nil {
 		return nil, err
 	}
-	list, err := m.Client.MyLeagues(ctx, c, season)
-	return list, m.after(ctx, accountID, wrapped, err)
+	list, err := m.Client.MyLeagues(ctx, k.cookies, season)
+	return list, m.after(ctx, accountID, k.wrapped, err)
 }
 
 // ReadLeague is one whole read of a league as the member. ESPN refuses a
 // private league to cookies that work but are not a member's of it as it
 // refuses cookies that no longer work; the member's own league list tells
-// the two apart, so a league they are not in never signs them out.
+// the two apart, so a league they are not in never signs them out. A good
+// read of a league the public cannot read proves a session kept unproven.
 func (m *Member) ReadLeague(ctx context.Context, accountID uuid.UUID, leagueID string, season int) (espn.FullLeague, error) {
-	c, wrapped, err := m.open(ctx, accountID)
+	k, err := m.open(ctx, accountID)
 	if err != nil {
 		return espn.FullLeague{}, err
 	}
-	l, err := m.Client.Read(ctx, leagueID, season, &c)
-	if errors.Is(err, espn.ErrSignedOut) && !m.inList(ctx, c, leagueID, season) {
+	l, err := m.Client.Read(ctx, leagueID, season, &k.cookies)
+	if errors.Is(err, espn.ErrSignedOut) && !m.inList(ctx, k.cookies, leagueID, season) {
 		return espn.FullLeague{}, fmt.Errorf("%w: not a league of this member", espn.ErrPrivate)
 	}
-	return l, m.after(ctx, accountID, wrapped, err)
+	if err := m.after(ctx, accountID, k.wrapped, err); err != nil {
+		return espn.FullLeague{}, err
+	}
+	if !k.proven {
+		m.prove(ctx, accountID, k.wrapped, leagueID, season)
+	}
+	return l, nil
+}
+
+// prove marks the session proven when the league just read with it is
+// one the public cannot read. A check ESPN does not answer proves
+// nothing; a later read tries again.
+func (m *Member) prove(ctx context.Context, accountID uuid.UUID, wrapped []byte, leagueID string, season int) {
+	public, err := m.Public.Public(ctx, leagueID, season)
+	if err != nil {
+		m.Log.Warn("espnhost: public check", "account", accountID, "err", err)
+		return
+	}
+	if public {
+		return
+	}
+	if err := m.Store.Proved(ctx, accountID, Host, wrapped); err != nil {
+		m.Log.Warn("espnhost: mark proven", "account", accountID, "err", err)
+	}
 }
 
 // inList reports whether the cookies still read the member's list and
