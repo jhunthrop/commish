@@ -16,7 +16,6 @@ from research.capsules.config import CAPSULE_CONFIG
 from research.capsules.narrative import SlotRequest
 from research.capsules.render import render_facts_for_model
 from research.capsules.render_words import SHEET_LABELS
-from research.capsules.sentences import NUMBER_MARK
 from research.capsules.validate import BandFailure, word_count
 from research.capsules.voice_rules import (
     BETTING_PATTERNS,
@@ -98,10 +97,8 @@ _IN_SEASON_ROUNDS: Final = (
     "A round is only history now, never advice: the round of his ADP before the season is the ADP divided by "
     f"{TEAMS} and rounded up (ADP {_EXAMPLE_ADP} was round {_EXAMPLE_ROUND})."
 )
-# A worn stem's "#" is any number: the writer reads it as N.
 _STEMS: Final = ", ".join(
-    f'"{" ".join("N" if word == NUMBER_MARK else word for word in stem.split())}"'
-    for stem in (*CAPSULE_CONFIG.repetition.refrain_stems, *CAPSULE_CONFIG.repetition.validator_only_stems)
+    f'"{stem}"' for stem in (*CAPSULE_CONFIG.repetition.refrain_stems, *CAPSULE_CONFIG.repetition.validator_only_stems)
 )
 # The opening and closing shapes the live set of 2026-10-15 wore out (its 567 written long notes):
 # shapes to stay away from, never a shape to use instead.
@@ -156,7 +153,7 @@ HOW A NOTE IS BUILT
 WORDS
 - Fantasy football words, never trading words and never betting words: {{words}}. Never these trading words: {", ".join(TRADING_TERMS)}. Never betting words either: {_BETTING_NAMES}. This is a fantasy football page, not a sportsbook, and a sportsbook's number never appears on it. "Upside" and "downside" only when tied to a fantasy outcome (a finish near the top of his position, a lost month), never as bare nouns.
 - The three sentences to catch yourself on: {{fixes}}.
-- Phrases this board has worn out, never to be written or paraphrased, where N stands for any number: {_STEMS}. Never the frame "the honest" followed by a noun (the honest worry, the honest read, the honest answer), in any form.
+- Phrases this board has worn out, never to be written or paraphrased: {_STEMS}. Never the frame "the honest" followed by a noun (the honest worry, the honest read, the honest answer), in any form.
 - Never these words either: {", ".join(LAB_REPORT_TERMS)}. Say "our number", "our projection", "the case", "costs him", "is worth", each in a sentence of your own making. "Our number" never "says".
 - Never write the word "floor". Say what the low end actually is: the weeks he missed, the weeks he scored under the bar, the season the range bottoms out at.
 - Speak for the board, never for yourself: "we", "our number", "{{we_would}}", never "I", "I'd", "I'm", "me", "my" or "mine". The page is ours, not one writer's.

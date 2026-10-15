@@ -144,13 +144,14 @@ class Repetition:
         # Clerk's language, on 113 live pages; the sheet prints it nowhere.
         "on file",
         # Lane 50: the sentence stems (first six words, a number as "#", which reads as any number) on
-        # more than 3% of the 567 written pages of the live run 2026-10-15T14-2. "weeks # through # of #"
-        # (27 pages) is held back: it is the week naming the time rules require, and the prompt names
-        # opening on a list of weeks as a shape to avoid instead.
-        "our preseason number was # points",  # 155 pages
-        "our preseason number had him at",  # 43 pages
-        "he has not missed a game",  # 31 pages
-        "our preseason number gave him #",  # 29 pages
+        # more than 3% of the 567 written pages of the live run 2026-10-15T14-2, held to the stems the
+        # sheet does not print. Held back, each with its live pages: "our preseason number was #
+        # points" (155), "our preseason number had him at" (43) and "our preseason number gave him #"
+        # (29), the sheet's own label "Our preseason number:", and "he has not missed a game" (31), the
+        # sheet's own sentence. Lane 50's 40-page sample refused them on 26 pages and they were in the
+        # last failing attempt of 6 of its 17 facts blocks: the sheet's wording has to move first.
+        # "weeks # through # of #" (27) is the week naming the time rules require. The prompt names
+        # each as a shape to avoid instead.
         "if he is on your roster",  # 27 pages
     )
 

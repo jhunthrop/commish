@@ -12,15 +12,7 @@ def split_sentences(text: str) -> list[str]:
     return [sentence for sentence in _SENTENCE_END.split(text) if sentence.strip() != ""]
 
 
-# A worn stem's stand-in for any number ("our preseason number was # points").
-NUMBER_MARK: Final = "#"
-_ANY_NUMBER: Final = r"\d+(?:[.,]\d+)*"
-
-
 def phrase_pattern(phrase: str) -> re.Pattern[str]:
-    """`phrase` found whole and case folded, a hyphen and a space read as the same ("run-up", "run up"),
-    and a word that is only `NUMBER_MARK` read as any number."""
-    words = r"[\s-]+".join(
-        _ANY_NUMBER if word == NUMBER_MARK else re.escape(word) for word in re.split(r"[\s-]+", phrase)
-    )
+    """`phrase` found whole and case folded, a hyphen and a space read as the same ("run-up", "run up")."""
+    words = r"[\s-]+".join(re.escape(word) for word in re.split(r"[\s-]+", phrase))
     return re.compile(rf"(?<![A-Za-z]){words}(?![A-Za-z])", re.IGNORECASE)
