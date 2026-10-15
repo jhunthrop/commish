@@ -55,6 +55,12 @@ def sentences_of(text: str) -> list[str]:
     return [normalize_sentence(s) for s in sentences_verbatim(text)]
 
 
+def held_sentences(bodies: Sequence[str], min_words: int) -> set[str]:
+    """A page's sentences held to uniqueness across pages: normalized, `min_words` long or longer."""
+    normalized = {normalize_sentence(s) for body in bodies for s in sentences_verbatim(body)}
+    return {s for s in normalized if len(s.split()) >= min_words}
+
+
 @dataclass(frozen=True, slots=True)
 class SlotRequest:
     key: str

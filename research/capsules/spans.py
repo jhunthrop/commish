@@ -15,13 +15,12 @@ span: a name breaks the run, so two pages that name the same teammate or club do
 for it, and so does a week with its season, the citation every page must carry. A name is a
 capitalised word of any player's name in the store or any spelling of a club.
 
-`TonightSpans` keeps the spans of the pages written tonight (the most recent `window`), so each
+`landing.TonightWindow` keeps the spans of the pages landed tonight (the most recent `window`), so each
 writer call is told the phrasing tonight's pages already repeat, and collisions are avoided as they
 are written rather than repaired after.
 """
 
 import re
-from collections import Counter, deque
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Final
@@ -132,20 +131,3 @@ def phrases_on_page(runs: Runs, shared: frozenset[str]) -> tuple[str, ...]:
         if begin is not None:
             phrases.append(" ".join(run[begin:end]))
     return tuple(dict.fromkeys(phrases))
-
-
-class TonightSpans:
-    """The spans of the most recent `window` pages written tonight; `repeated` is what two or more of
-    them already share, most widely first, for the next writer call to avoid."""
-
-    def __init__(self, rules: SpanRules, window: int) -> None:
-        self._rules = rules
-        self._pages: deque[frozenset[str]] = deque(maxlen=window)
-
-    def add(self, texts: Sequence[str]) -> None:
-        self._pages.append(spans_of(page_runs(texts, self._rules.names)) - self._rules.exempt)
-
-    def repeated(self, cap: int) -> tuple[str, ...]:
-        counts = Counter(span for page in self._pages for span in page)
-        shared = sorted((span for span, n in counts.items() if n > 1), key=lambda s: (-counts[s], s))
-        return tuple(shared[:cap])

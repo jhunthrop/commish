@@ -27,7 +27,13 @@ from research.nightly.assemble import Assembled
 from research.nightly.build.ros import RosSetup, pending_weeks
 from research.nightly.build.season import format_json
 from research.nightly.capsule_gate import CapsuleGateResult, capsule_gate, span_rules
-from research.nightly.capsule_step import CapsuleSpend, CapsuleStepPlan, night_facts, run_capsule_step
+from research.nightly.capsule_step import (
+    CapsuleSpend,
+    CapsuleStepError,
+    CapsuleStepPlan,
+    night_facts,
+    run_capsule_step,
+)
 from research.nightly.config import HELD_OUT_BASELINE_KEY, IMPLEMENTATION
 from research.nightly.headshots import Face, mirror_headshots
 from research.nightly.page_findings import page_findings
@@ -73,7 +79,11 @@ def _capsules(  # noqa: PLR0913, PLR0917 - the step's parts
     engine: Engine, clock: Callable[[], datetime], log: Log, skip: bool, plan: CapsuleStepPlan, facts: FactsPassMemo
 ) -> StepOutcome:
     if not skip:
-        result = run_capsule_step(engine, clock(), plan, log, facts)
+        try:
+            result = run_capsule_step(engine, clock(), plan, log, facts)
+        except CapsuleStepError as failed:
+            # The step failed part way; what it spent still rides on the run's report.
+            return StepOutcome(StepRecord("capsules", "failed", f"{failed}, {failed.spend.line()}"), spend=failed.spend)
         status = "ran" if result.wrote else "skipped"
         record = StepRecord("capsules", status, f"{result.spend.line()}; {result.gate.summary()}")
         return StepOutcome(record, result.gate, tuple(result.findings.reasons), result.spend)
