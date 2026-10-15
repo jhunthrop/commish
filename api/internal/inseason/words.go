@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/jhunthrop/commish/api/internal/apitypes"
+	"github.com/jhunthrop/commish/api/internal/boards"
 	"github.com/jhunthrop/commish/api/internal/draft"
 	"github.com/jhunthrop/commish/api/internal/season"
 )
@@ -107,17 +108,17 @@ func lastName(full string) string {
 	return last
 }
 
-// OrderBasis is which order ranks the players.
-type OrderBasis string
+// OrderBasis is which order ranks the players: the board's.
+type OrderBasis = boards.Order
 
 // The two orders (§3).
 const (
-	Preseason    OrderBasis = "preseason"
-	RestOfSeason OrderBasis = "rest_of_season"
+	Preseason    = boards.OrderPreseason
+	RestOfSeason = boards.OrderRestOfSeason
 )
 
 // orderWords names the order a rank is on.
-func (b OrderBasis) orderWords() string {
+func orderWords(b OrderBasis) string {
 	if b == RestOfSeason {
 		return "our rest-of-season order"
 	}
@@ -125,7 +126,7 @@ func (b OrderBasis) orderWords() string {
 }
 
 // numberWords names the number a gain is on.
-func (b OrderBasis) numberWords() string {
+func numberWords(b OrderBasis) string {
 	if b == RestOfSeason {
 		return "our rest-of-season order"
 	}
@@ -207,10 +208,10 @@ func LineupBasis(b OrderBasis, s apitypes.LeagueSettings) string {
 // WaiversBasis is the waiver page's (§5.3).
 func WaiversBasis(b OrderBasis, s apitypes.LeagueSettings) string {
 	return fmt.Sprintf("Ranked by the gain to your lineup on %s. A drop is the player it costs you least to lose. %s",
-		b.numberWords(), basisTail(s))
+		numberWords(b), basisTail(s))
 }
 
 // TradesBasis is the trade finder's (§6.3).
 func TradesBasis(b OrderBasis, s apitypes.LeagueSettings) string {
-	return fmt.Sprintf("Trades where both lineups gain on %s. The other team decides. %s", b.numberWords(), basisTail(s))
+	return fmt.Sprintf("Trades where both lineups gain on %s. The other team decides. %s", numberWords(b), basisTail(s))
 }

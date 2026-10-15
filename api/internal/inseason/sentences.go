@@ -114,7 +114,7 @@ func statusWords(status string) string {
 // order is our order between two players: their ranks at one position,
 // or the points over replacement a week between two positions.
 func (w *Writer) order(ours, host Line) string {
-	basis := w.Basis.orderWords()
+	basis := orderWords(w.Basis)
 	switch {
 	case ours.Position == host.Position && ours.Rank > 0 && host.Rank > 0:
 		frames := []string{"%s is %s in %s, %s %s.", "%s sits at %s in %s and %s at %s."}
@@ -124,7 +124,7 @@ func (w *Writer) order(ours, host Line) string {
 		frames := []string{"%s gives you %s more points over replacement a week than %s on %s.",
 			"On %[4]s, %[1]s is %[2]s points over replacement a week ahead of %[3]s."}
 		return fmt.Sprintf(w.next(frames), ours.short(), points(*ours.PerWeek-*host.PerWeek), host.short(),
-			w.Basis.numberWords())
+			numberWords(w.Basis))
 	case ours.Rank > 0 && host.Rank == 0:
 		return fmt.Sprintf("%s is %s in %s and %s is not in it.", ours.short(), rankWords(ours.Position, ours.Rank), basis, host.short())
 	}
@@ -177,7 +177,7 @@ func (w *Writer) questionable(l Line) string {
 // Waiver is a waiver row's sentence: the gain and the drop, or why he
 // does not start for you.
 func (w *Writer) Waiver(add Line, drop *Line, move Waiver) string {
-	number := w.Basis.numberWords()
+	number := numberWords(w.Basis)
 	switch {
 	case move.NoDrop:
 		return fmt.Sprintf("%s would start for you, but every player he could replace is held or starts.", add.Name)
@@ -189,7 +189,7 @@ func (w *Writer) Waiver(add Line, drop *Line, move Waiver) string {
 		return sentence(gain, w.dropWords(drop))
 	case add.Rank > 0:
 		frames := []string{"%s is %s in %s and would not start for you.", "At %[2]s in %[3]s, %[1]s sits behind your starters."}
-		return fmt.Sprintf(w.next(frames), add.Name, rankWords(add.Position, add.Rank), w.Basis.orderWords())
+		return fmt.Sprintf(w.next(frames), add.Name, rankWords(add.Position, add.Rank), orderWords(w.Basis))
 	}
 	return fmt.Sprintf("%s is not in our order and would not start for you.", add.Name)
 }

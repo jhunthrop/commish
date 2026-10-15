@@ -56,7 +56,11 @@ func newAdvisor(l League, data Data, held map[string]bool, now time.Time) (*advi
 	if err != nil {
 		return nil, fmt.Errorf("inseason: the saved league's roster: %w", err)
 	}
-	return &advisor{League: l, settings: *l.Saved, config: config, slots: Slots(config), held: held, basis: Preseason, now: now,
+	basis := l.Board.Order
+	if basis == "" {
+		basis = Preseason
+	}
+	return &advisor{League: l, settings: *l.Saved, config: config, slots: Slots(config), held: held, basis: basis, now: now,
 		season: NewSeason(data, RulesOf(rulesOf(l.Saved.Scoring)), l.Snap.Week, now)}, nil
 }
 
@@ -210,7 +214,7 @@ type header struct {
 }
 
 func (a *advisor) header() header {
-	return header{week: a.Snap.Week, basis: apitypes.OrderBasis(a.basis), refreshed: a.Board.Raw.AsOf, readAt: a.Snap.ReadAt}
+	return header{week: a.Snap.Week, basis: apitypes.OrderBasis(a.basis), refreshed: a.Board.Refreshed, readAt: a.Snap.ReadAt}
 }
 
 // Lineup is the start and sit page (§4).

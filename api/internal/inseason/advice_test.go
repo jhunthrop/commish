@@ -203,3 +203,19 @@ func BenchmarkWaiversRoute(b *testing.B) {
 		}
 	}
 }
+
+// The pages take the order and its stamp from the board: preseason with
+// the stored board's as_of today, the rest-of-season order when a source
+// sets it.
+func TestOrderComesFromTheBoard(t *testing.T) {
+	f := newFixture(t)
+	if f.league.Board.Order != boards.OrderPreseason || !f.league.Board.Refreshed.Equal(f.raw.AsOf) {
+		t.Fatalf("board order %q refreshed %v", f.league.Board.Order, f.league.Board.Refreshed)
+	}
+	at := time.Date(2026, 10, 21, 12, 0, 0, 0, time.UTC)
+	f.league.Board.Order, f.league.Board.Refreshed = boards.OrderRestOfSeason, at
+	out, _ := newFixtureAdvisor(t, f, nil).Trades("")
+	if out.OrderBasis != apitypes.OrderBasisRestOfSeason || !out.Refreshed.Equal(at) || !strings.Contains(out.Basis, "rest-of-season order") {
+		t.Fatalf("basis %q refreshed %v: %q", out.OrderBasis, out.Refreshed, out.Basis)
+	}
+}

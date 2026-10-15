@@ -118,10 +118,24 @@ type Raw struct {
 	Custom bool
 }
 
+// Order is which order ranks a board's players.
+type Order string
+
+// The two orders (in-season tools spec §3).
+const (
+	OrderPreseason    Order = "preseason"
+	OrderRestOfSeason Order = "rest_of_season"
+)
+
 // Board is a stored board valued for one league: points over replacement
 // for every projected player at a position the league starts.
 type Board struct {
 	Raw *Raw
+	// Order is which order ranks the board, preseason for the stored
+	// preseason board; Refreshed is when that order was made, the stored
+	// board's as_of. A source of the rest-of-season order sets both.
+	Order     Order
+	Refreshed time.Time
 	// Values is points over replacement, absent where the league starts
 	// nobody at his position or the board has no projection for him.
 	Values map[string]float64
@@ -141,7 +155,7 @@ func For(raw *Raw, teams int, slots []draft.SlotConfig) (Board, error) {
 	if err != nil {
 		return Board{}, err
 	}
-	b := Board{Raw: raw, Values: values, byID: make(map[string]int, len(raw.Players)), teams: teams}
+	b := Board{Raw: raw, Order: OrderPreseason, Refreshed: raw.AsOf, Values: values, byID: make(map[string]int, len(raw.Players)), teams: teams}
 	for i, p := range raw.Players {
 		b.byID[p.ID] = i
 	}
