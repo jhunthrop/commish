@@ -2368,7 +2368,7 @@ type PlayerLine struct {
 	Held   bool         `json:"held"`
 	Player LeaguePlayer `json:"player"`
 
-	// PointsOverReplacement points over replacement a week for this league, one decimal: the order's averaged over the weeks it covers (the preseason number's season over 17, the rest-of-season order's over the league's week through week 17), as the basis says; null without a projection
+	// PointsOverReplacement points over replacement a week for this league, one decimal: the order's averaged over the weeks it covers (the preseason number's season over 17, the rest-of-season order's over its own first week, the league's when the run does not say, through week 17), as the basis says; null without a projection
 	PointsOverReplacement *float64 `json:"points_over_replacement"`
 
 	// PositionRank his place at his position in our order

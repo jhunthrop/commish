@@ -2897,7 +2897,7 @@ components:
           nullable: true
           description: >-
             points over replacement a week for this league, one decimal: the order's averaged over the weeks it covers
-            (the preseason number's season over 17, the rest-of-season order's over the league's week through week
+            (the preseason number's season over 17, the rest-of-season order's over its own first week, the league's when the run does not say, through week
             17), as the basis says; null without a projection
         held: { type: boolean, description: the drafter tags him Hold on a sheet, so he is never a drop or a trade give }
         facts: { $ref: "#/components/schemas/WeekFacts" }

@@ -122,8 +122,12 @@ type Raw struct {
 	// Run is the published run the points come from
 	// (research.published_boards), empty when they come from the stored
 	// preseason board itself.
-	Run     string
-	Players []Player
+	Run string
+	// FromWeek is the first week the published run's rest-of-season
+	// points cover (research.published_boards.from_week), 0 when the run
+	// does not say or the points are the preseason board's.
+	FromWeek int
+	Players  []Player
 	// Custom is set when the points are a league's own rules applied to
 	// the stored board's candidates (CustomSource), not a stored board.
 	Custom bool
@@ -152,6 +156,9 @@ type Board struct {
 	// board's as_of.
 	Order     Order
 	Refreshed time.Time
+	// FromWeek is the Raw's: the first week a rest-of-season order covers,
+	// 0 when not known.
+	FromWeek int
 	// Values is points over replacement, absent where the league starts
 	// nobody at his position or the board has no projection for him.
 	Values map[string]float64
@@ -177,7 +184,7 @@ func For(raw *Raw, teams int, slots []draft.SlotConfig) (Board, error) {
 		// preseason board. Every source sets its own.
 		order = OrderPreseason
 	}
-	b := Board{Raw: raw, Order: order, Refreshed: raw.AsOf, Values: values, byID: make(map[string]int, len(raw.Players)), teams: teams}
+	b := Board{Raw: raw, Order: order, Refreshed: raw.AsOf, FromWeek: raw.FromWeek, Values: values, byID: make(map[string]int, len(raw.Players)), teams: teams}
 	for i, p := range raw.Players {
 		b.byID[p.ID] = i
 	}

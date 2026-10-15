@@ -63,8 +63,18 @@ func newAdvisor(l League, data Data, held map[string]bool, now time.Time) (*advi
 	if basis == "" {
 		basis = Preseason
 	}
-	return &advisor{League: l, settings: *l.Saved, config: config, slots: Slots(config), held: held, basis: basis, weeks: WeeksCovered(basis, l.Snap.Week), pages: newPages(l.Board.Raw), now: now,
+	return &advisor{League: l, settings: *l.Saved, config: config, slots: Slots(config), held: held, basis: basis, weeks: WeeksCovered(basis, firstWeek(l)), pages: newPages(l.Board.Raw), now: now,
 		season: NewSeason(data, RulesOf(rulesOf(l.Saved.Scoring)), l.Snap.Week, now)}, nil
+}
+
+// firstWeek is the first week the order's figures cover: the published
+// run's own (published_boards.from_week) on the rest-of-season order,
+// and the league's week only while the run does not say.
+func firstWeek(l League) int {
+	if l.Board.Order == boards.OrderRestOfSeason && l.Board.FromWeek > 0 {
+		return l.Board.FromWeek
+	}
+	return l.Snap.Week
 }
 
 // rulesOf is the saved league's scoring as rules: its own, else its

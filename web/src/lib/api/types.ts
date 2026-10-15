@@ -2461,7 +2461,7 @@ export interface components {
 			position_rank: number | null;
 			/**
 			 * Format: double
-			 * @description points over replacement a week for this league, one decimal: the order's averaged over the weeks it covers (the preseason number's season over 17, the rest-of-season order's over the league's week through week 17), as the basis says; null without a projection
+			 * @description points over replacement a week for this league, one decimal: the order's averaged over the weeks it covers (the preseason number's season over 17, the rest-of-season order's over its own first week, the league's when the run does not say, through week 17), as the basis says; null without a projection
 			 */
 			points_over_replacement: number | null;
 			/** @description the drafter tags him Hold on a sheet */
