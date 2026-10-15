@@ -57,7 +57,7 @@ npm run lint           # Prettier, then ESLint with typescript-eslint strictType
 npm run build          # wrangler types, then vite build into .svelte-kit/cloudflare
 npm run preview        # the built Worker under wrangler dev at http://localhost:4173
 npm run preview:static # the build as production serves it, with the headshot route, at :4173
-npm run lighthouse     # Lighthouse CI against preview:static, budgets in lighthouserc.json
+npm run lighthouse     # Lighthouse CI against preview:static, budgets in lighthouserc.cjs
 npm run screenshots -- http://localhost:4173/board/ppr-12 board   # both themes at 1440 and 390, into screenshots/
 ```
 
@@ -66,10 +66,29 @@ committed: once a build exists, wrangler adds a type import of the built worker 
 committed copy goes stale after the first build. `checkJs` is off for the same reason, so the built
 worker's JavaScript is never type-checked as if it were ours. Everything we write is TypeScript.
 
+## Running Lighthouse locally
+
+1. Build first. The audited pages come from `.svelte-kit/cloudflare`, so a stale build audits stale
+   pages: `npm run standin && npm run build`, or the build the nightly run makes.
+2. Pick a free port and use it for both the server and the configs: `PORT=4601 npm run lighthouse`
+   (the default is 4173). `lighthouserc.cjs`, `lighthouserc.sheet.cjs` and `scripts/serve-built.ts`
+   read the same `PORT`.
+3. Leave the machine quiet. The runs are timed with devtools throttling and a 4x CPU slowdown.
+
+A run that is bimodal, with first paint equal to LCP at about 0.67 s on most runs and at 1.66 s or
+2.67 s on others, script bytes unchanged, is the harness and not the page. The cause found in Lane 49
+is Chrome's paint holding. On a large document (the board's HTML is 1.4 MB) Chrome holds the first
+commit until the parse finishes, the web fonts are requested at that moment, and the text is not
+painted until they arrive, so the paint lands one or two seconds late depending on how the font
+requests queue behind the headshots. `--disable-features=PaintHolding`
+(`lighthouse-shared.cjs`) removes it. It was not `localhost` resolution, the service worker, the
+static server or machine load. If the steps return, check that the flag still reaches Chrome before
+anything else.
+
 ## Budgets
 
 `lighthouserc.json` carries the spec's budgets at the mobile profile (150 ms round trip, 1.6 Mbps,
-4x CPU), applied throttling, nine runs, asserted on the median. Applied throttling in Chrome lands an occasional run near 1.65 s whatever the page (it does so with no web fonts at all). Over three seven-run passes on 2026-10-13 the outlier showed up one to four times per page against 0.65 to 0.68 s for the rest, and twice it took a seven-run median, so the gate failed on noise. Nine runs need five outliers to move the median, so the 1.2 s budget is kept as it is and the gate holds on a real regression only. Prerendered pages are measured from `npm run preview:static` (`scripts/serve-built.ts`), a compressing static server over the build that also answers the headshot route, because in production they are Workers static assets with no Worker in the path. Prerendered pages: LCP 1.2 s, script
+4x CPU), applied throttling, nine runs, asserted on the median. Chrome's paint holding used to land a run's first paint at 0.67 s, 1.66 s or 2.67 s on some machines whatever the page (see Running Lighthouse locally), which on 2026-10-13 failed a seven-run median on noise. Both configs now turn it off, so the runs agree. Nine runs stay as margin, and the 1.2 s budget is unchanged. Prerendered pages are measured from `npm run preview:static` (`scripts/serve-built.ts`), a compressing static server over the build that also answers the headshot route, because in production they are Workers static assets with no Worker in the path. Prerendered pages: LCP 1.2 s, script
 transfer 60 KB as the target and 72 KB as the deploy gate (the Svelte and SvelteKit client runtime is a 47 KB floor before any page code; a page over 60 is a review finding, over 72 fails the deploy). User pages (sheet, mock, lobby, report, account, pass): LCP 2.0 s, script 180 KB.
 CLS 0.05 everywhere. Collected: the board, a player page and the record. The system page is a noindex documentation page, not a nightly page, and is not held to the nightly budget.
 `.github/workflows/web.yml` runs check, lint, the timed build (budget four minutes), Lighthouse and
