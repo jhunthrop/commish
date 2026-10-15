@@ -1,10 +1,14 @@
 """WHAT THE SPAN GATE JUDGES AGAINST, built at run time from the store and the night's sheets.
 
-The names that break a span (every player's name in the store, every club's spelling) and the
-exemption the coordinator ruled for Lane 17: a span the sheets' labelled stats print (the case and
-the color, `render.label_sections`) is a label or a stat name copied word for word, not stock prose.
-The sheets' framing sentences (the day, the board line, the season so far, the bye, the injury
-line) are not exempt: a read that echoes them is the stock language the gate exists for.
+The names that break a span (every player's name in the store, every club's spelling), and the
+spans the facts themselves print, which are exempt: a read that states a figure with its basis as the
+sheet renders it ("left in his tier before a", "on every report since the run-up to", "missed to
+injury or a reserve list") shares those words with every page whose sheet prints the same basis, and
+that is the fact's own phrasing, not stock prose. The coordinator's ruling of 2026-10-15 widened the
+exemption from Lane 17's (the labelled stats only, `render.label_sections`) to every span a rendered
+sheet (`render.render_facts_for_model`) or a facts block (`facts_block.render_facts_block`) prints.
+A writer's paraphrase of a basis ("he beat the position's weekly median in", against the sheet's
+"scored above the position's own weekly median in") is its own words and is still judged.
 """
 
 from collections.abc import Iterable
@@ -12,7 +16,8 @@ from typing import TYPE_CHECKING
 
 from sqlalchemy import Connection, text
 
-from research.capsules.render import label_sections
+from research.capsules.facts_block import render_facts_block
+from research.capsules.render import render_facts_for_model
 from research.capsules.spans import SpanRules, name_words, sheet_spans
 
 if TYPE_CHECKING:
@@ -24,8 +29,12 @@ def span_names(conn: Connection) -> frozenset[str]:
     return name_words(str(name) for name in conn.execute(text("select name from research.provider_players")).scalars())
 
 
+def facts_texts(facts: "PlayerFacts") -> tuple[str, str]:
+    """Everything the facts print for one player: his whole sheet, and his facts block."""
+    return render_facts_for_model(facts), render_facts_block(facts)
+
+
 def span_rules_for(conn: Connection, sheets: Iterable["PlayerFacts"]) -> SpanRules:
-    """The names, and every span the sheets' labelled stats print."""
+    """The names, and every span the night's sheets and facts blocks print."""
     names = span_names(conn)
-    labels = (section for facts in sheets for section in label_sections(facts))
-    return SpanRules(names, sheet_spans(labels, names))
+    return SpanRules(names, sheet_spans((text for facts in sheets for text in facts_texts(facts)), names))

@@ -142,6 +142,8 @@ class CapsuleStepPlan:
     # A mending night: the sweep writes only the unwritten pages, not those whose facts moved, then
     # the retries and repairs run as on any night. For a night whose spend must stay near zero.
     mend_only: bool = False
+    # The span repair's pages tonight, every attempt together (`Repetition.span_repair_pages_per_night`).
+    span_repair_pages: int = CAPSULE_CONFIG.repetition.span_repair_pages_per_night
 
 
 def night_facts(engine: Engine) -> FactsPassMemo:
@@ -176,14 +178,15 @@ def _regenerate_all(engine: Engine, now: datetime) -> str:
     return f"capsules: every board page stamped for regeneration ({queued} rows)"
 
 
-def spent_out_for(calls: Mapping[str, int], graced: frozenset[str], *, unwritten_only: bool) -> frozenset[str]:
+def spent_out_for(calls: Mapping[str, int], graced: frozenset[str], *, grace: bool) -> frozenset[str]:
     """The players a pass may not start a generation for. A player is left for the next night once
     another full generation could take him past the ceiling (review N12: at 11 calls a six-call
-    generation would reach 17); in a pass over unwritten pages each may go past it once (`graced`
-    holds those that already have)."""
+    generation would reach 17); in a graced pass (`SweepPlan.grace`: a pass over unwritten pages, or
+    the last rewrite of the pages still carrying a shared sentence) each may go past it once
+    (`graced` holds those that already have)."""
     last_start = NIGHT_CALLS_PER_PLAYER - CAPSULE_CONFIG.max_gateway_calls_per_player
     spent = frozenset(pid for pid, n in calls.items() if n > last_start)
-    return spent & graced if unwritten_only else spent
+    return spent & graced if grace else spent
 
 
 class _Passes:
@@ -213,17 +216,20 @@ class _Passes:
         self.calls_by_player: dict[str, int] = {}
         # Pages that took their one generation past the ceiling tonight.
         self.graced: set[str] = set()
+        # The span repair's pages left tonight (`CapsuleStepPlan.span_repair_pages`).
+        self.span_pages_left = plan.span_repair_pages
 
     @property
     def left(self) -> int:
         return self.budget - self.spend.processed
 
     def sweep(self, name: str, plan: SweepPlan) -> SweepReport:
-        at_ceiling = spent_out_for(self.calls_by_player, frozenset(), unwritten_only=False)
-        spent = spent_out_for(self.calls_by_player, frozenset(self.graced), unwritten_only=plan.unwritten_only)
+        graced_pass = plan.unwritten_only or plan.grace
+        at_ceiling = spent_out_for(self.calls_by_player, frozenset(), grace=False)
+        spent = spent_out_for(self.calls_by_player, frozenset(self.graced), grace=graced_pass)
         plan = replace(plan, exclude=plan.exclude | spent, span_rules=self.rules)
         report = sweep_capsules(self.engine, self.gateway, self.now, plan, self.facts)
-        if plan.unwritten_only:
+        if graced_pass:
             # A page past the ceiling that this pass reached has taken its one extra generation.
             self.graced |= at_ceiling & set(report.processed)
         for pid, calls in report.calls_by_player.items():
@@ -272,11 +278,16 @@ class _Passes:
             self._retry_unwritten(f"capsule repair {attempt}, unwritten pages first")
             gate, order, failing = self._judged()
             targets = repair_order(gate, failing, order)
-            spans = () if attempt == REPAIR_PASSES else targets.spans
+            spans = () if attempt == REPAIR_PASSES else targets.spans[: self.span_pages_left]
             if (not targets.hard and not spans) or self.left <= 0:
-                none = not targets.hard and not spans
-                self.log(f"capsule repair {attempt}: {'none needed' if none else 'no budget left'}")
-                return
+                if self.left <= 0:
+                    why = "no budget left"
+                elif targets.spans and attempt < REPAIR_PASSES:
+                    why = f"tonight's span cap is spent, {len(targets.spans)} span carriers left for later nights"
+                else:
+                    why = "none needed"
+                self.log(f"capsule repair {attempt}: {why}")
+                break
             avoid = tuple(sentence.sentence for sentence in gate.shared)
             if targets.hard:
                 name = (
@@ -286,11 +297,30 @@ class _Passes:
                 self.sweep(name, SweepPlan(self.left, only=targets.hard, avoid=avoid))
                 self._retry_unwritten(f"capsule repair {attempt}, pages the rewrite blocked")
             if spans and self.left > 0:
-                name = f"capsule span repair {attempt} ({len(gate.spans)} shared spans, {len(spans)} pages)"
+                name = (
+                    f"capsule span repair {attempt} ({len(gate.spans)} shared spans, {len(spans)} pages of "
+                    f"{len(targets.spans)} carriers, {self.span_pages_left} left in tonight's span cap)"
+                )
                 plan = SweepPlan(
                     self.left, only=spans, avoid=avoid, avoid_by_page=quoted_spans(gate, spans), keep_written=True
                 )
-                self.sweep(name, plan)
+                self.span_pages_left -= len(self.sweep(name, plan).processed)
+        self.grace_shared_sentences()
+
+    def grace_shared_sentences(self) -> None:
+        """The coordinator's ruling of 2026-10-15, Lane 17's grace extended to the hard targets: a page
+        still carrying a written sentence on two pages after the last repair attempt takes one more
+        generation, past the night's call ceiling once (`SweepPlan.grace`); the step's gate judges once
+        more after it."""
+        gate, order, _ = self._judged()
+        if not gate.shared or self.left <= 0:
+            return
+        pages = repair_order(gate, {}, order).hard
+        avoid = tuple(sentence.sentence for sentence in gate.shared)
+        name = (
+            f"capsule repair, one generation past the ceiling ({len(gate.shared)} shared sentences, {len(pages)} pages)"
+        )
+        self.sweep(name, SweepPlan(self.left, only=pages, avoid=avoid, grace=True))
 
 
 def run_capsule_step(

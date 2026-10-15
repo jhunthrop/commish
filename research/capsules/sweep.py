@@ -246,6 +246,10 @@ class SweepPlan:
     keep_written: bool = False
     # Players the night has spent its call budget on (`nightly.capsule_step`), never written again.
     exclude: frozenset[str] = frozenset()
+    # A graced pass (`nightly.capsule_step.spent_out_for`): a page at the night's call ceiling may take
+    # its one generation past it. Every pass over unwritten pages is graced; this marks the other one,
+    # the last rewrite of the pages still carrying a shared sentence.
+    grace: bool = False
 
 
 def _eligible(subject: Subject, row: StoredCapsule | None, plan: SweepPlan) -> bool:

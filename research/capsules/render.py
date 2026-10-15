@@ -172,8 +172,8 @@ def _trend_line(facts: PlayerFacts) -> str | None:
 
 def label_sections(facts: PlayerFacts) -> list[str]:
     """The sheet's labelled stats: the case (each factor's name and worth) and the color (each
-    ranked stat with its label). A read that names one of these stats copies its label, so the span
-    gate exempts these words (`capsules.span_rules`); the sheet's framing sentences are not here."""
+    ranked stat with its label). A read that names one of these stats copies its label; the span gate
+    exempts these words and every other span the whole sheet prints (`capsules.span_rules`)."""
     sections = []
     if facts.evidence:
         sections.append("The case:\n" + "\n".join(f"- {_evidence_line(item)}" for item in facts.evidence))

@@ -34,8 +34,13 @@ class Gateway:
     # drawing a token from one bucket refilled at `calls_per_minute`. The old 12 a minute, strictly
     # sequential, was a guess after one 429 in a trial and made a full in-season night take hours.
     # Each is a setting, overridden by its environment variable (`writer_settings`).
-    concurrency: int = 8
-    calls_per_minute: int = 120
+    # The defaults, ruled 2026-10-15: 16 in flight and 600 a minute. The basis: the coordinator's
+    # probe that day (96 capsule-sized calls in flight at once to zai/glm-5.3-flash, all answered, no
+    # 429, no rate-limit header) and Lane 24's 80-page measurement (four models, 3,247 calls at 8 in
+    # flight and 120 a minute, no 429 from the gateway). The gateway states no limit, so the bucket is
+    # a safety valve, not a pace.
+    concurrency: int = 16
+    calls_per_minute: int = 600
     model_variable: str = "CAPSULE_MODEL"
     concurrency_variable: str = "CAPSULE_CONCURRENCY"
     calls_per_minute_variable: str = "CAPSULE_CALLS_PER_MINUTE"
@@ -66,8 +71,15 @@ class Repetition:
     # The six-word spans shared across pages (`capsules.spans`) a prompt quotes: the board's most
     # widely shared to every writer, and a repaired page its own.
     max_quoted_spans: int = 12
-    # The pages written tonight whose spans the next writer call is checked against (`TonightSpans`).
+    # The pages landed tonight whose spans the next writer call is told about and a landing page is
+    # checked against (`landing.TonightWindow`).
     tonight_window_pages: int = 60
+    # The span repair's pages a night, every repair attempt together: the pages carrying the most
+    # shared spans first, the rest counted and left (ruled 2026-10-15: the uncapped pass rewrote about
+    # 403 of 513 carrier pages a night for $0.81 to $1.01 and never converged). Basis: a span rewrite
+    # costs about $0.002 (production 2026-10-15, $1.01 over 509 pages; Lane 24's sample, $0.168 over
+    # 83), so 90 pages keep a night's span repair near $0.18, under the ruled $0.20.
+    span_repair_pages_per_night: int = 90
     opener_words: int = 4
     max_opener_family_share: float = 0.1
     max_refrain_share: float = 0.1
