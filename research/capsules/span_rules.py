@@ -9,6 +9,12 @@ exemption from Lane 17's (the labelled stats only, `render.label_sections`) to e
 sheet (`render.render_facts_for_model`) or a facts block (`facts_block.render_facts_block`) prints.
 A writer's paraphrase of a basis ("he beat the position's weekly median in", against the sheet's
 "scored above the position's own weekly median in") is its own words and is still judged.
+
+Lane 29 narrowed it (the live review of 2026-10-15, M1: "report since the run-up to week" on 122
+pages, exempt as the sheet's words): the exemption covers a figure with its basis only. The sheet's
+section labels (`render_words.SHEET_LABELS`: "on every report", "the run-up to", "on file", ...) are
+cut from the facts before their spans are read, so a span holding a label is judged like any other,
+and a label in a read is a validator failure besides (`prose_checks.label_copies`).
 """
 
 from collections.abc import Iterable
@@ -18,7 +24,8 @@ from sqlalchemy import Connection, text
 
 from research.capsules.facts_block import render_facts_block
 from research.capsules.render import render_facts_for_model
-from research.capsules.spans import SpanRules, name_words, sheet_spans
+from research.capsules.render_words import SHEET_LABELS
+from research.capsules.spans import SpanRules, cut_phrases, name_words, sheet_spans
 
 if TYPE_CHECKING:
     from research.capsules.facts.build import PlayerFacts
@@ -35,6 +42,8 @@ def facts_texts(facts: "PlayerFacts") -> tuple[str, str]:
 
 
 def span_rules_for(conn: Connection, sheets: Iterable["PlayerFacts"]) -> SpanRules:
-    """The names, and every span the night's sheets and facts blocks print."""
+    """The names, and every span the night's sheets and facts blocks print with their labels cut out:
+    a figure with its basis is exempt, a label never is (`render_words.SHEET_LABELS`)."""
     names = span_names(conn)
-    return SpanRules(names, sheet_spans((text for facts in sheets for text in facts_texts(facts)), names))
+    texts = (cut_phrases(text, SHEET_LABELS) for facts in sheets for text in facts_texts(facts))
+    return SpanRules(names, sheet_spans(texts, names))

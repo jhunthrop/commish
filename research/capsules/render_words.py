@@ -1,6 +1,15 @@
 """THE SMALL WORDS THE FACT SHEET IS WRITTEN IN, shared by `render.py` and `render_depth.py`: a
-week with its season, a whole number, a signed one, a position's plural, and one ranked quantity
-as a clause."""
+week with its season, a whole number, a signed one, a position's plural, one ranked quantity as a
+clause, and the sheet's labels.
+
+THE LABELS are the sheet's framing words, the ones that say what a line is rather than what a figure
+is out of: "the run-up to", "on every report", "on file", "where most outcomes fall". The live review
+of 2026-10-15 found them copied into prose ("report since the run-up to week" on 122 pages, "since
+the run-up to the next game" on one), so a label in a read is a validator failure
+(`prose_checks.label_copies`) and its words are never exempt from the span gate
+(`span_rules`). A figure with its basis ("players left in his tier before a", "missed to injury or a
+reserve list") is not a label: a read may state it that way.
+"""
 
 from collections.abc import Callable
 from types import MappingProxyType
@@ -21,6 +30,35 @@ POSITION_PLURAL: Final = MappingProxyType[Position, str](
         "K": "kickers",
         "DEF": "defenses",
     }
+)
+
+
+# The sheet's labels, each printed by the renderers through these names.
+ON_FILE: Final = "on file"
+RUN_UP: Final = "the run-up to"
+EVERY_REPORT: Final = "on every report"
+ANY_REPORT: Final = "on any report"
+IN_OUR_RECORDS: Final = "in our records"
+NEXT_TO_PLAY: Final = "is the next to play"
+AS_THE_PAGE_PRINTS: Final = "as the page prints it"
+MOST_OUTCOMES: Final = "where most outcomes fall"
+LOW_TAIL: Final = "injury-shortened seasons making the low one"
+POOLED_IN: Final = "busts and injuries pooled in"
+AS_WE_SAW_IT: Final = "as we saw it before the season"
+RISK_COUNTED: Final = "with injury risk counted"
+SHEET_LABELS: Final = (
+    ON_FILE,
+    RUN_UP,
+    EVERY_REPORT,
+    ANY_REPORT,
+    IN_OUR_RECORDS,
+    NEXT_TO_PLAY,
+    AS_THE_PAGE_PRINTS,
+    MOST_OUTCOMES,
+    LOW_TAIL,
+    POOLED_IN,
+    AS_WE_SAW_IT,
+    RISK_COUNTED,
 )
 
 

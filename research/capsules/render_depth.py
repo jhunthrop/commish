@@ -9,7 +9,7 @@ from collections.abc import Sequence
 from typing import TYPE_CHECKING, Final
 
 from research.capsules.facts.depth_model import Depth, Fixture, GamesMissed
-from research.capsules.render_words import percent, ranked_clause, week_of, whole
+from research.capsules.render_words import ON_FILE, percent, ranked_clause, week_of, whole
 from research.model.jsmath import js_to_fixed
 from research.pipeline.jscompat import js_string
 
@@ -28,7 +28,7 @@ def _season_endings(depth: Depth) -> list[str]:
             injury = "" if ending.primary_injury is None else f", {ending.primary_injury.lower()}"
             cause = f"the injury report listed him {ending.report_status}{injury}"
         else:
-            cause = f"the weekly roster listed him {ending.roster_status} with no body part on file"
+            cause = f"the weekly roster listed him {ending.roster_status} with no body part {ON_FILE}"
         lines.append(
             f"His {ending.season} season ended after {week_of(ending.last_played_week, ending.season)}. From "
             f"{week_of(ending.first_missed_week, ending.season)} on, {cause}."
@@ -170,7 +170,7 @@ def _depth_chart(facts: "PlayerFacts") -> str | None:
     )
     team, position = facts.identity.team, facts.identity.position
     # In season a capture's day reads back as a month ("as of September"), which the floor refuses.
-    when = f"as of {chart.as_of}" if facts.season is None else "(the latest on file)"
+    when = f"as of {chart.as_of}" if facts.season is None else f"(the latest {ON_FILE})"
     return f"Depth chart {when}: listed {_slot_word(chart.slot)} among {team} {position}s. {around}."
 
 
@@ -264,7 +264,7 @@ def _schedule(depth: Depth, season: int) -> str | None:
         if s.week_one_opponent is None
         else f"Opens {_fixture(s.week_one_opponent, season)}."
     )
-    roof = ", with no roof reading on file" if s.indoor_games is None else f", {s.indoor_games} of them indoors"
+    roof = f", with no roof reading {ON_FILE}" if s.indoor_games is None else f", {s.indoor_games} of them indoors"
     playoffs = (
         f"The schedule holds none of weeks 15 to 17 of {season} for his team yet."
         if not s.playoff_weeks

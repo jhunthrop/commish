@@ -14,6 +14,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Final
 
+from research.capsules.prose_checks import unfinished_ending
 from research.capsules.season_voice import SeasonClock, names_missed_weeks, time_frame_hits
 from research.capsules.voice_rules import gate_hits
 from research.model.jsmath import js_round, js_to_fixed
@@ -125,6 +126,11 @@ def capsule_findings(
     findings += [f"capsule_voice_rule:{player_id}:{text}" for text in found]
     slips = dict.fromkeys(f"{hit.rule}:{hit.found}" for body in bodies for hit in time_frame_hits(body, clock))
     findings += [f"capsule_time_frame:{player_id}:{slip}" for slip in slips]
+    findings += [
+        f"capsule_unfinished:{player_id}:{size}"
+        for size, body in (("compact", body_compact), ("full", body_full))
+        if unfinished_ending(body) is not None
+    ]
     return findings + ([] if names_missed_weeks(body_full, clock) else [f"capsule_missed_weeks_unnamed:{player_id}"])
 
 
@@ -133,7 +139,9 @@ def capsule_findings(
 # figure is not a claim of where he goes now. A pick in the NFL draft ("pick 12 in the 2025 draft") is
 # not an ADP and is skipped.
 _ADP_CLAIM: Final = re.compile(
-    r"\b(?:ADP|pick)(?:\s+(?:of|is|at|around|near|about|sits at|No\.))*\s+(\d+(?:\.\d+)?)(?![\d]|[.,]\d)",
+    r"\b(?:ADP|pick)(?:\s+(?:of|is|at|around|near|about|sits at|No\.))*\s+(\d+(?:\.\d+)?)(?![\d]|[.,]\d)"
+    # The figure before the word too (Lane 29, Justin Jefferson's "The 8.8 ADP drafters actually paid").
+    r"|(?<![\d.])(\d+(?:\.\d+)?)\s+ADP\b",
     re.IGNORECASE,
 )
 _NFL_DRAFT_AFTER: Final = re.compile(r"^[^.]{0,40}\bdraft\b", re.IGNORECASE)
@@ -147,6 +155,6 @@ def adp_figures_off_page(prose: str, adp: float | None) -> list[str]:
     for match in _ADP_CLAIM.finditer(prose):
         if _NFL_DRAFT_AFTER.match(prose[match.end() :]):
             continue
-        if match.group(1) not in allowed:
+        if (match.group(1) or match.group(2)) not in allowed:
             off.append(match.group(0))
     return off

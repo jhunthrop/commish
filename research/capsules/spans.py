@@ -58,6 +58,15 @@ class SpanRules:
     exempt: frozenset[str] = frozenset()
 
 
+def cut_phrases(text: str, phrases: Iterable[str]) -> str:
+    """`text` with each of `phrases` (case folded, a hyphen read as a space) replaced by a break, so no
+    span runs through one."""
+    for phrase in phrases:
+        words = r"[\s-]+".join(re.escape(word) for word in re.split(r"[\s-]+", phrase))
+        text = re.sub(rf"(?<![A-Za-z]){words}(?![A-Za-z])", f" {_BREAK} ", text, flags=re.IGNORECASE)
+    return text
+
+
 def sheet_spans(sheets: Iterable[str], names: frozenset[str]) -> frozenset[str]:
     """Every span the rendered fact sheets print, read as a capsule's spans are read."""
     return frozenset(span for sheet in sheets for span in spans_of(runs_of(sheet, names)))

@@ -9,7 +9,16 @@ the writer never has to guess which year a week belongs to.
 from typing import TYPE_CHECKING
 
 from research.capsules.facts.model import InjuryClean, InjuryDesignated, SeasonSoFar, SeasonWeek
-from research.capsules.render_words import week_of
+from research.capsules.render_words import (
+    ANY_REPORT,
+    AS_THE_PAGE_PRINTS,
+    EVERY_REPORT,
+    IN_OUR_RECORDS,
+    NEXT_TO_PLAY,
+    ON_FILE,
+    RUN_UP,
+    week_of,
+)
 from research.model.jsmath import js_to_fixed
 from research.pipeline.jscompat import js_string
 from research.season import REGULAR_SEASON_WEEKS
@@ -36,9 +45,9 @@ def today_line(facts: "PlayerFacts") -> str:
         )
     year = season.season
     reach = (
-        "no week's games are in our records yet"
+        f"no week's games are {IN_OUR_RECORDS} yet"
         if season.through == 0
-        else f"every game through {week_of(season.through, year)} is in our records"
+        else f"every game through {week_of(season.through, year)} is {IN_OUR_RECORDS}"
     )
     return (
         f"Today is {facts.run_day}. The {year} season is under way: {reach}{_next_week(season)}. The reader "
@@ -52,7 +61,7 @@ def _next_week(season: SeasonSoFar) -> str:
     if following > REGULAR_SEASON_WEEKS:
         return ""
     played = any(w.week == following and w.status == "played" for w in season.weeks)
-    return f", and {week_of(following, season.season)} is {'under way' if played else 'the next to play'}"
+    return f", and {week_of(following, season.season)} {'is under way' if played else NEXT_TO_PLAY}"
 
 
 def _week_line(week: SeasonWeek, season: int) -> str:
@@ -61,7 +70,7 @@ def _week_line(week: SeasonWeek, season: int) -> str:
         return f"{named}, his club's bye"
     if week.status == "inactive":
         return f"{named}, did not play"
-    points = "points not on file" if week.points is None else f"{js_string(week.points)} points"
+    points = f"points not {ON_FILE}" if week.points is None else f"{js_string(week.points)} points"
     return f"{named}, played, {points}"
 
 
@@ -88,9 +97,7 @@ def season_section(facts: "PlayerFacts") -> str:
     year = season.season
     games = "game" if season.games_played == 1 else "games"
     per_game = "" if season.points_per_game is None else f", {js_to_fixed(season.points_per_game, 1)} points a game"
-    lines = [
-        f"This season so far ({year}, PPR, as the page prints it): {season.games_played} {games} played{per_game}."
-    ]
+    lines = [f"This season so far ({year}, PPR, {AS_THE_PAGE_PRINTS}): {season.games_played} {games} played{per_game}."]
     if season.weeks:
         lines.append("Week by week: " + ". ".join(_week_line(w, year) for w in season.weeks) + ".")
     missed = season.missed_weeks
@@ -121,13 +128,13 @@ def _since(facts: "PlayerFacts", since: str) -> str:
         return f"since {since}"
     if season.injury_from_week is None:
         return f"since after his last game of {season.season}"
-    return f"since the run-up to {week_of(season.injury_from_week, season.season)}"
+    return f"since {RUN_UP} {week_of(season.injury_from_week, season.season)}"
 
 
 def injury_line(facts: "PlayerFacts") -> str:
     injury = facts.injury
     if isinstance(injury, InjuryDesignated):
-        return f"Injury report: designation {injury.designation}, on every report {_since(facts, injury.since)}."
+        return f"Injury report: designation {injury.designation}, {EVERY_REPORT} {_since(facts, injury.since)}."
     if isinstance(injury, InjuryClean):
-        return f"Injury report: no designation on file on any report {_since(facts, injury.since)}."
+        return f"Injury report: no designation {ON_FILE} {ANY_REPORT} {_since(facts, injury.since)}."
     return "Injury report: no injury feed has been checked for him yet. This is not a health claim either way."
