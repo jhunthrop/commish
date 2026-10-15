@@ -20,14 +20,3 @@ export const leagueName = followedName;
 export function switchLabel(league: ContextLeague | null, format: BoardFormat | null): string {
 	return league ? leagueName(league) : FORMAT_LABELS[format ?? DEFAULT_CONTEXT_FORMAT];
 }
-
-/** The switch's label as it may be shown, longest first: the whole name, then each shorter run of
- * its first words with an ellipsis, so a name that does not fit is cut between words. */
-export function labelCuts(label: string): string[] {
-	const words = label.split(' ');
-	const cuts = [label];
-	for (let kept = words.length - 1; kept > 0; kept -= 1) {
-		cuts.push(`${words.slice(0, kept).join(' ')}…`);
-	}
-	return cuts;
-}

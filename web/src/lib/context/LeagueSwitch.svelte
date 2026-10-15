@@ -1,8 +1,8 @@
 <script lang="ts">
-	import { tick, type Component } from 'svelte';
+	import type { Component } from 'svelte';
 	import Icon from '#lib/ui/Icon.svelte';
 	import { siteContext } from './context.svelte.ts';
-	import { labelCuts, switchLabel } from './words.ts';
+	import { switchLabel } from './words.ts';
 
 	/** The shell's league switch, at the right of the top bar on every width (founder ruling
 	 * 2026-10-13): the selected league's name, or the format with none, opening the account's leagues,
@@ -27,30 +27,6 @@
 	});
 
 	const label = $derived(switchLabel(siteContext.league, siteContext.format));
-
-	/** What the bar shows of the name: the whole of it, else its first words and an ellipsis, cut
-	 * between words where the room allows. The CSS cut at the end is the fallback before this runs. */
-	let words = $state<HTMLElement | null>(null);
-	let shown = $state({ label: '', text: '' });
-	const text = $derived(shown.label === label ? shown.text : label);
-
-	async function fit(whole: string): Promise<void> {
-		for (const cut of labelCuts(whole)) {
-			shown = { label: whole, text: cut };
-			await tick();
-			if (!words || words.scrollWidth <= words.clientWidth) return;
-		}
-	}
-
-	$effect(() => {
-		if (!words) return;
-		const whole = label;
-		const watch = new ResizeObserver(() => void fit(whole));
-		watch.observe(words);
-		return () => {
-			watch.disconnect();
-		};
-	});
 </script>
 
 <span class="switch" data-opens-leagues>
@@ -65,7 +41,7 @@
 		onpointerenter={preload}
 	>
 		<span class="mark"><Icon name="league" size={18} /></span>
-		<span class="words" bind:this={words}>{text}</span>
+		<span class="words">{label}</span>
 		<Icon name="chevron" size={16} />
 	</button>
 	<div class="pop" id={MENU_ID} hidden={!siteContext.open}>
@@ -114,8 +90,8 @@
 		color: var(--accent-text);
 	}
 
-	/* A long name gives way at its end: cut between words by the script (see fit), and by the
-	   ellipsis at a letter before it runs. The button's label carries the full name. */
+	/* A long name gives way at its end, never in the middle. The button's label carries the full
+	   name. */
 	.words {
 		flex: 1;
 		min-width: 0;
