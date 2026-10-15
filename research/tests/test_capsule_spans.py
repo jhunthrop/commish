@@ -101,26 +101,30 @@ def test_the_repair_keeps_each_span_on_its_first_page() -> None:
     assert repair_targets([("c", "a"), ("d", "b", "a")], order) == ["b", "c", "d"]
 
 
-def test_a_span_any_part_of_the_facts_prints_is_exempt_and_a_paraphrase_is_not(
+def test_a_figures_basis_the_facts_print_is_exempt_and_a_label_or_a_paraphrase_is_not(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """The ruling of 2026-10-15: a figure's basis as the whole sheet or the facts block renders it."""
+    """The ruling of 2026-10-15, narrowed by Lane 29: a figure's basis as the whole sheet or the facts
+    block renders it is exempt; a section label the renderer prints ("where most outcomes fall", "in our
+    records", `render_words.SHEET_LABELS`) is not, so a label copied into prose is judged like any span."""
     monkeypatch.setattr(span_rules, "span_names", lambda conn: NAMES)
     monkeypatch.setattr(
         span_rules,
         "facts_texts",
         lambda facts: (
-            "Injury report: designation Q, on every report since the run-up to week 6 of 2026.",
-            "Middle range: 227 to 320 points",
+            "Middle range, where most outcomes fall: 227 to 320 points. ADP before the season: none.",
+            "8 players left in his tier before a 16.8-point cliff.",
         ),
     )
     rules = span_rules.span_rules_for(cast("Connection", None), [cast("Any", object())])
     rows = {
-        "a": _row("a", "Injury: on every report since the run-up to now."),
-        "b": _row("b", "Listed on every report since the run-up to Sunday."),
+        "a": _row("a", "Only 3 players left in his tier before a big drop."),
+        "b": _row("b", "Just two players left in his tier before a cliff."),
         "c": _row("c", "He beat the position's weekly median in nine weeks."),
         "d": _row("d", "Again he beat the position's weekly median in most weeks."),
+        "e": _row("e", "Range: where most outcomes fall for him."),
+        "f": _row("f", "So where most outcomes fall for him is low."),
     }
-    gate = judge_capsules(["a", "b", "c", "d"], rows, rules, LINE)
+    gate = judge_capsules(["a", "b", "c", "d", "e", "f"], rows, rules, LINE)
     assert gate.exempt_spans > 0
-    assert {s.player_ids for s in gate.spans} == {("c", "d")}
+    assert {s.player_ids for s in gate.spans} == {("c", "d"), ("e", "f")}

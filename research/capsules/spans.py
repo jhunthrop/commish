@@ -26,6 +26,7 @@ from dataclasses import dataclass
 from typing import Final
 
 from research.capsules.facts.team_names import NFL_TEAM_NAMES
+from research.capsules.sentences import phrase_pattern
 
 SPAN_WORDS: Final = 6
 _TOKEN: Final = re.compile(r"[A-Za-z0-9]+(?:\.[0-9]+)?(?:'[A-Za-z]+)?")
@@ -56,6 +57,14 @@ class SpanRules:
 
     names: frozenset[str]
     exempt: frozenset[str] = frozenset()
+
+
+def cut_phrases(text: str, phrases: Iterable[str]) -> str:
+    """`text` with each of `phrases` (case folded, a hyphen read as a space) replaced by a break, so no
+    span runs through one."""
+    for phrase in phrases:
+        text = phrase_pattern(phrase).sub(f" {_BREAK} ", text)
+    return text
 
 
 def sheet_spans(sheets: Iterable[str], names: frozenset[str]) -> frozenset[str]:

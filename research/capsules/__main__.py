@@ -5,6 +5,8 @@
     write [--players a,b] [--count 10] [--spread 50]
                                       write and gate capsules for chosen board players: paid calls
     sweep [--budget N]                the nightly sweep: every player whose facts moved (phase D's run)
+    queue --slugs a,b                 stamp these pages' capsules (by their public slug) for the next
+                                      capsule step to rewrite; every slug resolves or nothing is stamped
     restamp-injury-day                once, after fix round 3: restamp capsules whose sheet moved only by
                                       its injury status's dating (instant to Eastern day)
     export --out FILE                 the board's written capsules on their current sheets, to one file
@@ -32,6 +34,7 @@ from research.capsules.facts.model import to_js
 from research.capsules.gateway import GatewayClient
 from research.capsules.narrative import narrative_requests_for
 from research.capsules.prompt import NO_WORN_PHRASES, bundle_prompt_for
+from research.capsules.requeue import queue_slugs
 from research.capsules.restamp import restamp_injury_day
 from research.capsules.sweep import SweepPlan, sweep_capsules
 from research.capsules.transfer import export_capsules, import_capsules
@@ -92,6 +95,21 @@ def _sweep(engine: Engine, budget: int) -> int:
     return 0
 
 
+def _slugs(raw: str) -> list[str]:
+    return [slug.strip() for slug in raw.split(",") if slug.strip()]
+
+
+def _queue(engine: Engine, raw: str) -> int:
+    """Stamp the named pages; non-zero when any named page had no capsule row to stamp."""
+    with engine.begin() as conn:
+        result = queue_slugs(conn, _slugs(raw), datetime.now(UTC))
+    _out(f"queue: {result.stamped} capsules stamped for regeneration ({result.named} slugs named)")
+    if result.unstamped:
+        _out(f"queue: no capsule row to stamp for {', '.join(result.unstamped)}")
+        return 1
+    return 0
+
+
 def _transfer(engine: Engine, args: argparse.Namespace) -> int:
     now = datetime.now(UTC)
     if args.command == "export":
@@ -126,12 +144,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     write.add_argument("--spread", type=int, default=50)
     sweep = sub.add_parser("sweep", help="the nightly sweep")
     sweep.add_argument("--budget", type=int, default=CAPSULE_CONFIG.sweep_generation_budget)
+    queue = sub.add_parser("queue", help="stamp named pages' capsules for the next capsule step to rewrite")
+    queue.add_argument("--slugs", required=True, help="the pages' public slugs, comma separated")
     sub.add_parser("restamp-injury-day", help="once: restamp capsules whose sheet moved only by its injury dating")
     sub.add_parser("export", help="the board's written capsules to a file").add_argument("--out", required=True)
     imported = sub.add_parser("import", help="capsules from an export, where the sheet matches")
     imported.add_argument("--in", dest="source", required=True)
     imported.add_argument("--dry-run", action="store_true", help="print what would land and be refused, write nothing")
     args = parser.parse_args(argv)
+    if args.command == "queue" and not _slugs(args.slugs):
+        parser.error("queue --slugs names no page")
     configure_logging(logging.WARNING)
     engine = make_engine(database_url_from_env())
     if args.command in ("facts", "prompt"):
@@ -141,6 +163,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _write(engine, players, args.count, args.spread)
     if args.command in ("export", "import"):
         return _transfer(engine, args)
+    if args.command == "queue":
+        return _queue(engine, args.slugs)
     if args.command == "restamp-injury-day":
         with engine.begin() as conn:
             restamped, stale = restamp_injury_day(conn, datetime.now(UTC))

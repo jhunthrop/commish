@@ -23,7 +23,18 @@ from research.capsules.facts.model import (
 from research.capsules.render_depth import render_depth_section
 from research.capsules.render_season import bye_line, injury_line, season_section, today_line
 from research.capsules.render_usage import season_usage_section
-from research.capsules.render_words import percent, ranked_clause, signed, week_of, whole
+from research.capsules.render_words import (
+    AS_WE_SAW_IT,
+    LOW_TAIL,
+    MOST_OUTCOMES,
+    POOLED_IN,
+    RISK_COUNTED,
+    percent,
+    ranked_clause,
+    signed,
+    week_of,
+    whole,
+)
 from research.capsules.voice_rules import in_fantasy_words
 from research.model.jsmath import js_round, js_to_fixed
 from research.pipeline.jscompat import js_string
@@ -36,10 +47,10 @@ def _signed_percent(fraction: float) -> str:
 def _adp_line(facts: PlayerFacts) -> str:
     adp, before = facts.market.adp, "" if facts.season is None else " before the season"
     if adp is None:
-        return f"ADP{before}: none on file."
+        return f"ADP{before}: none."
     by_adp = "" if facts.market.position_adp is None else f", {facts.market.position_adp} by ADP"
     if facts.season is not None:
-        # In season the ADP is history, printed as on file and with no pick word (the floor refuses one).
+        # In season the ADP is history, printed as history and with no pick word (the floor refuses one).
         return f"ADP{before} {js_string(adp)} (where drafters took him{by_adp})."
     return f"ADP {js_string(adp)} (drafters take him around pick {whole(adp)}{by_adp})."
 
@@ -50,8 +61,8 @@ def _board_line(facts: PlayerFacts) -> str:
     if m.position_rank is not None:
         ranks.append(f"position rank {position}{m.position_rank} by our own board")
     ranges = (
-        f"Middle range, where most outcomes fall: {whole(p.typical_low)} to {whole(p.typical_high)} points. "
-        f"Full tails: {whole(p.floor_points)} to {whole(p.ceiling_points)}, injury-shortened seasons making the low one."
+        f"Middle range, {MOST_OUTCOMES}: {whole(p.typical_low)} to {whole(p.typical_high)} points. "
+        f"Full tails: {whole(p.floor_points)} to {whole(p.ceiling_points)}, {LOW_TAIL}."
     )
     rank_text = f" {', '.join(ranks)}." if ranks else ""
     number = (
@@ -62,8 +73,8 @@ def _board_line(facts: PlayerFacts) -> str:
     parts = [f"{number} {ranges}{rank_text}", _adp_line(facts)]
     if m.market_anchor_points is not None:
         parts.append(
-            f"Past seasons of {position}s drafted around his ADP: about {js_string(m.market_anchor_points)} points, busts and "
-            f"injuries pooled in. Our number is {signed(m.market_anchor_delta or 0.0)} points from that."
+            f"Past seasons of {position}s drafted around his ADP: about {js_string(m.market_anchor_points)} points, "
+            f"{POOLED_IN}. Our number is {signed(m.market_anchor_delta or 0.0)} points from that."
         )
     if m.players_left_in_tier is not None and m.drop_to_next_tier is not None:
         parts.append(
@@ -76,10 +87,10 @@ def _availability_line(facts: PlayerFacts) -> str | None:
     a = facts.availability
     if a is None:
         return None
-    when = "Availability" if facts.season is None else "Availability as we saw it before the season"
+    when = "Availability" if facts.season is None else f"Availability {AS_WE_SAW_IT}"
     return (
         f"{when}: expected games {whole(a.expected_games)}, from {whole(a.floor_games)} to "
-        f"{whole(a.ceiling_games)} with injury risk counted."
+        f"{whole(a.ceiling_games)} {RISK_COUNTED}."
     )
 
 
@@ -102,13 +113,13 @@ def _evidence_line(item: EvidenceItem) -> str:
             else f"A rookie, drafted at pick {item.overall_pick}."
         )
     if isinstance(item, MarketUnlistedEvidence):
-        return "No ADP on file for him."
+        return "No ADP for him."
     raise TypeError(f"no evidence line for {item!r}")
 
 
 def _news_lines(facts: PlayerFacts) -> list[str]:
     if not facts.news:
-        return ["No recent headlines on file."]
+        return ["No recent headlines."]
     return [f'"{s.title}"' + ("" if s.published_at is None else f" ({s.published_at[:10]})") for s in facts.news]
 
 

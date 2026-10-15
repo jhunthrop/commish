@@ -4,13 +4,16 @@ Split from `validate.py` (which raises the violations) so each file holds one jo
 is handed back as a sentence-level fix ("rewrite this sentence ..."); one this module has no
 correction for costs the read a full rewrite. The time frame rules (`season_voice`) each carry the
 advice their slip calls for: a week's season, a week still to play, a month, a draft already behind
-the reader, the weeks he has missed.
+the reader, the weeks he has missed. The page's own facts (`claims`), a label of the facts copied into
+prose and a read that stops mid-sentence (`prose_checks`) each name the sentence and what to say.
 """
 
 import re
 from collections.abc import Sequence
 from typing import Final
 
+from research.capsules.claims import CLAIM_RULES
+from research.capsules.prose_checks import LABEL_VIOLATION, UNFINISHED_VIOLATION
 from research.capsules.season_voice import MISSED_WEEKS_UNNAMED
 from research.capsules.validate import ADP_FIGURE_VIOLATION, NO_PAGE_NUMBER_VIOLATION, UNFRAMED_FLOOR_VIOLATION
 
@@ -76,6 +79,11 @@ def _page_correction(violation: str) -> str | None:
         )
     if violation.startswith(MISSED_WEEKS_UNNAMED):
         return f"{violation.removeprefix(MISSED_WEEKS_UNNAMED + ': ')} Leave everything else as it is."
+    if violation.startswith((UNFINISHED_VIOLATION, LABEL_VIOLATION)):
+        return f"{violation} Leave everything else as it is."
+    rule = next((rule for rule in CLAIM_RULES if violation.startswith(f"{rule}: ")), None)
+    if rule is not None:
+        return f"{violation.removeprefix(f'{rule}: ')} Rewrite only that sentence and leave everything else as it is."
     return None
 
 

@@ -25,6 +25,7 @@ from types import MappingProxyType
 from typing import Final
 
 from research.capsules.config import CAPSULE_CONFIG
+from research.capsules.sentences import phrase_pattern
 
 EM_DASH: Final = chr(0x2014)
 # Curly apostrophes read as straight ones before a phrase is matched.
@@ -164,6 +165,13 @@ TRADING_TERMS: Final = (
     "dividend",
     "return on",
     "fetch",
+    # The live review of 2026-10-15 (H3, L5): on eight public pages.
+    "cash in",
+    "asset",
+    "investment",
+    "invest",
+    "money",
+    "paid",
 )
 DRAFTING_SENTENCES: Final = (
     ("the price is right", "he is going a round later than he should"),
@@ -200,6 +208,12 @@ TRADING_REPLACEMENTS: Final = MappingProxyType(
         "dividend": ("points over replacement",),
         "return on": ("what he gives back",),
         "fetch": ("what he would bring back in a trade",),
+        "cash in": ("draft him", "start him"),
+        "asset": ("a starter", "a pick"),
+        "investment": ("a pick", "where drafters take him"),
+        "invest": ("draft him", "take him at that pick"),
+        "money": ("a pick", "where drafters take him"),
+        "paid": ("drafted him", "took him at that pick"),
     }
 )
 _SPENT: Final = ("where he went before the season",)
@@ -213,7 +227,7 @@ IN_SEASON_REPLACEMENTS: Final = MappingProxyType(
         "bought": ("traded for him", "picked him up"),
         "sell": ("trade him away", "let him go"),
         "sold": ("traded him away", "let him go"),
-        "fade": ("bench him", "pass on him"),
+        "fade": ("sit him", "drop him"),
         "trade at": ("where he went before the season",),
         "trades at": ("where he went before the season",),
         "trading at": ("where he went before the season",),
@@ -226,6 +240,12 @@ IN_SEASON_REPLACEMENTS: Final = MappingProxyType(
         "dividend": ("points over replacement",),
         "return on": ("what he gives back",),
         "fetch": ("what he would bring back in a trade",),
+        "cash in": ("start him", "hold him"),
+        "asset": ("a starter", "a bench piece", "a roster spot"),
+        "investment": ("a roster spot", "where he went before the season"),
+        "invest": ("hold him", "add him"),
+        "money": ("where he went before the season", "a roster spot"),
+        "paid": ("where drafters took him", "drafted"),
     }
 )
 BANNED_VOCABULARY: Final = (*LAB_REPORT_TERMS, *ALL_TIME_TERMS, *TRADING_TERMS)
@@ -250,10 +270,16 @@ COMPETITOR_PRODUCT_CUES: Final = ("app", "league", "leagues", "draft", "drafts",
 
 # Trading words with a football sense too (fix round 3, R6): a player "fading" or a "fade route" is
 # decline or a route, a defense "sold out to stop the run", a coach "bought into him". Only the trading
-# sense is banned: fading him, selling, buying him.
+# sense is banned: fading him, "a fade" as a verdict (Lane 29: "a fade everyone hoped would bounce
+# back"), selling, buying him. A phrase with its inflections ("cashed in") is read the same way.
 _FOOTBALL_SENSES: Final = MappingProxyType(
     {
-        "fade": r"\bfad(?:e|es|ed|ing) (?:him|them|this|that|the)\b(?! route)",
+        "fade": r"\bfad(?:e|es|ed|ing) (?:him|them|this|that|the)\b(?! route)"
+        r"|(?<!on )(?<!caught )(?<!threw )(?<!ran )(?<!run )(?<!won )\ba fade\b"
+        # Only a football place makes it a route ("a fade to the corner", "a fade in the end zone");
+        # "a fade for me" and "a fade in every league" are the verdict.
+        r"(?! route| pattern| (?:in|into|to|toward|down|up|along|near|at) the (?:end zone|corner|sideline|back|pylon)\b)",
+        "cash in": r"\bcash(?:es|ed|ing)? (?:in|out)\b",
         "sold": r"\bsold\b(?! (?:out|on|the (?:dummy|defense|fake|run|play-action))\b)",
         "bought": r"\bbought\b(?! (?:in(?:to)?|time|himself time|him time)\b)",
     }
@@ -327,6 +353,18 @@ def voice_rule_hits(text: str, names: Sequence[str]) -> list[VoiceRuleHit]:
     # Read on the text as written: a masked name ("Him") beside another would read as one doubled.
     hits += [VoiceRuleHit("doubled word", doubled) for doubled in dict.fromkeys(doubled_words(text))]
     return hits
+
+
+_WRITER_ONLY_PATTERNS: Final = tuple(
+    NamedPattern(phrase, phrase_pattern(phrase)) for phrase in CAPSULE_CONFIG.repetition.validator_only_stems
+)
+
+
+def writer_only_hits(text: str, names: Sequence[str]) -> list[VoiceRuleHit]:
+    """The worn phrases that bind new writes only (`Repetition.validator_only_stems`): the validator
+    refuses them as set phrases; the page gate (`gate_hits`) never reads them on a stored page."""
+    normalised = _normalise_apostrophes(mask_names(text, names))
+    return [VoiceRuleHit("set phrase", p.name) for p in _WRITER_ONLY_PATTERNS if p.pattern.search(normalised)]
 
 
 def gate_hits(text: str, names: Sequence[str]) -> list[VoiceRuleHit]:

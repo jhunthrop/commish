@@ -34,6 +34,15 @@ def _season(through: int, weeks: tuple[SeasonWeek, ...] = (), from_week: int | N
     return SeasonSoFar(2026, through, 0, None, _TOTALS, weeks, from_week)
 
 
+def test_a_missing_adp_is_printed_as_none_never_as_a_clerks_label() -> None:
+    """Lane 29 (the live review's M5): "no ADP on file" sat on 49 pages and read as filler."""
+    market = SimpleNamespace(adp=None, position_adp=None)
+    for season in (None, _season(5)):
+        stand_in = cast("PlayerFacts", SimpleNamespace(market=market, season=season))
+        line = _adp_line(stand_in)
+        assert "on file" not in line and line.endswith(": none.")
+
+
 def test_the_first_kickoff_picks_the_voice() -> None:
     assert is_in_season(KICKOFF, KICKOFF)
     assert not is_in_season(KICKOFF, KICKOFF - timedelta(seconds=1))
@@ -51,7 +60,7 @@ def test_preseason_sheet_and_rules_speak_to_a_drafter() -> None:
     )
     assert season_section(facts) == "No games played yet: the 2026 season has not kicked off."
     assert bye_line(facts) == "Bye: week 11 of 2026."
-    assert injury_line(facts) == "Injury report: no designation on file on any report since 2026-08-01."
+    assert injury_line(facts) == "Injury report: no designation since 2026-08-01."
 
 
 def test_in_season_rules_and_lines() -> None:
@@ -59,7 +68,7 @@ def test_in_season_rules_and_lines() -> None:
     assert writer_rules_for(facts) is IN_SEASON_RULES
     assert "week 6 of 2026 is the next to play" in today_line(facts)
     assert bye_line(facts) == "Bye: week 11 of 2026, still to come."
-    assert injury_line(facts) == "Injury report: designation Q, on every report since the run-up to week 6 of 2026."
+    assert injury_line(facts) == "Injury report: designation Q since before week 6 of 2026."
     assert "Weeks he has missed this season: week 4 of 2026 (1 in all)." in season_section(facts)
 
 

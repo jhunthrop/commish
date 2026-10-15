@@ -16,7 +16,8 @@ from sqlalchemy.exc import OperationalError
 
 from research.capsules import sweep
 from research.capsules.config import WriterSettings
-from research.capsules.gateway import GatewayClient, ModelPrice
+from research.capsules.gateway import GatewayClient
+from research.capsules.gateway_ledger import ModelPrice
 from research.capsules.spans import SpanRules
 from research.capsules.sweep import PageCommitError, Subject, SweepPlan
 from research.errors import ConfigurationError

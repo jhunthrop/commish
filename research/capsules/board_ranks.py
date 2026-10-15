@@ -17,7 +17,8 @@ ours.
 import re
 from typing import Final
 
-_SENTENCE: Final = re.compile(r"(?<=[.!?])\s+")
+from research.capsules.sentences import split_sentences
+
 _BOARD_TALK: Final = re.compile(
     r"\b(?:our (?:own )?board|our number|our projection|our rank(?:ing)?s?|we have him|we rank|we'd rank|"
     r"we would rank|puts him at|has him at|for us|on the board|our \d+(?:\.\d+)? points)\b",
@@ -55,7 +56,7 @@ def _position_claims(sentence: str, position: str, position_rank: int | None) ->
 def rank_claims_off_page(prose: str, position: str, position_rank: int | None, overall_rank: int | None) -> list[str]:
     """Every board rank `prose` states that is not the page's (every one, when the page has none)."""
     off = []
-    for sentence in _SENTENCE.split(prose):
+    for sentence in split_sentences(prose):
         if not _BOARD_TALK.search(sentence):
             continue
         off += _position_claims(sentence, position, position_rank)

@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Final
 
 from research.capsules.board_ranks import rank_claims_off_page
+from research.capsules.claims import ClaimLedger, claim_violations, claims_of
 from research.capsules.config import CAPSULE_CONFIG
 from research.capsules.facts.model import LawEvidence
 from research.capsules.grounding import (
@@ -26,16 +27,17 @@ from research.capsules.grounding import (
     proper_name_phrases,
     round_half_up,
 )
+from research.capsules.prose_checks import label_copies, label_violation, unfinished_ending, unfinished_violation
 from research.capsules.pull_figures import adp_figures_off_page, facts_page_numbers, pull_figures_of, renderings_of
 from research.capsules.rank_basis import rank_basis_violation, ranks_without_basis
 from research.capsules.render import render_facts_for_model
 from research.capsules.season_voice import (
     SeasonClock,
-    clock_of,
     missed_weeks_violation,
     names_missed_weeks,
     time_frame_hits,
 )
+from research.capsules.sentences import split_sentences
 from research.capsules.voice_rules import (
     BANNED_VOCABULARY,
     COMPETITOR_NAMES,
@@ -49,6 +51,7 @@ from research.capsules.voice_rules import (
     banned_term_pattern,
     mask_names,
     voice_rule_hits,
+    writer_only_hits,
 )
 from research.pipeline.jscompat import js_string
 
@@ -79,7 +82,6 @@ _AVAILABILITY: Final = re.compile(
     re.IGNORECASE,
 )
 _COST_CUE: Final = re.compile(r"\b(costs?|minus|down|shaves?)\b", re.IGNORECASE | re.ASCII)
-_SENTENCE_SPLIT: Final = re.compile(r"(?<=[.!?])\s+")
 _PRODUCT_CUE_AFTER: Final = re.compile(rf"^(?:['\u2019]s)?\s+(?:{'|'.join(COMPETITOR_PRODUCT_CUES)})\b", re.IGNORECASE)
 _ON_BEFORE: Final = re.compile(r"\bon\s+$", re.IGNORECASE)
 _SENTENCE_OPENERS: Final = re.compile(r"[\s\"'\u201c\u2018(]+$")
@@ -116,14 +118,17 @@ class Grounding:
     board_rank: int | None
     # The run's day: in season or not, how far the season has gone, the weeks he played and missed.
     clock: SeasonClock
+    # This season's touchdowns and his first game (week, points), for the claims a read makes (`claims`).
+    touchdowns: float | None = None
+    first_game: tuple[int, float | None] | None = None
+
+    @property
+    def claims(self) -> ClaimLedger:
+        return ClaimLedger(self.clock, self.touchdowns, self.first_game, self.adp, self.board_rank)
 
 
 def word_count(text: str) -> int:
     return len(text.split())
-
-
-def split_sentences(text: str) -> list[str]:
-    return [sentence for sentence in _SENTENCE_SPLIT.split(text) if sentence.strip() != ""]
 
 
 def banned_term_in(text: str) -> str | None:
@@ -204,6 +209,7 @@ def _cites_tension(text: str, tension: float) -> bool:
 
 
 def grounding_of(facts: "PlayerFacts") -> Grounding:
+    claims = claims_of(facts)
     return Grounding(
         facts.number_ledger,
         facts.name_ledger,
@@ -214,7 +220,9 @@ def grounding_of(facts: "PlayerFacts") -> Grounding:
         facts.identity.position,
         facts.market.position_rank,
         facts.market.board_rank,
-        clock_of(facts),
+        claims.clock,
+        claims.touchdowns,
+        claims.first_game,
     )
 
 
@@ -244,11 +252,17 @@ def _copy_violations(text: str, names: Sequence[str], clock: SeasonClock) -> lis
         violations.append(f'The text names a competitor product ("{competitor}"). Remove it.')
     # The time frame rules read the text as written: they hold no name-sized words, and the sentence a
     # hit names goes back to the writer as he wrote it.
-    hits = [*voice_rule_hits(text, names), *time_frame_hits(text, clock)]
+    hits = [*voice_rule_hits(text, names), *writer_only_hits(text, names), *time_frame_hits(text, clock)]
     violations += [_voice_violation(hit, text) for hit in hits]
     if _unframed_floor(text):
         violations.append(UNFRAMED_FLOOR_VIOLATION)
     return violations
+
+
+def _form_violations(text: str) -> list[str]:
+    """A read that stops mid-sentence, and every label of the facts it copies (`prose_checks`)."""
+    violations = [] if unfinished_ending(text) is None else [unfinished_violation(text)]
+    return violations + [label_violation(label, text) for label in label_copies(text)]
 
 
 def _grounding_violations(text: str, source: Grounding) -> list[str]:
@@ -277,7 +291,9 @@ def _validate(
     if not band[0] <= words <= band[1]:
         message = f"Word count {words} is outside the required {band[0]}-{band[1]} word band."
         return ValidationResult(False, (message,), BandFailure(words, band[0], band[1]))
-    violations = [*_copy_violations(trimmed, source.name_ledger, source.clock), *_grounding_violations(trimmed, source)]
+    violations = [*_form_violations(trimmed), *_copy_violations(trimmed, source.name_ledger, source.clock)]
+    violations += _grounding_violations(trimmed, source)
+    violations += claim_violations(trimmed, source.claims)
     if page_number and not names_missed_weeks(trimmed, source.clock):
         violations.append(missed_weeks_violation(source.clock))
     if tension and source.tension is not None and not _cites_tension(trimmed, source.tension):

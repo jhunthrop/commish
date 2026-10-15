@@ -64,7 +64,8 @@ from sqlalchemy import Engine
 
 from research.capsules.config import CAPSULE_CONFIG, WriterSettings, writer_settings
 from research.capsules.facts.history import history_cache
-from research.capsules.gateway import GatewayClient, ModelPrice, ModelSpend, fetch_price
+from research.capsules.gateway import GatewayClient
+from research.capsules.gateway_ledger import ModelPrice, ModelSpend, fetch_price
 from research.capsules.spans import SpanRules
 from research.capsules.store import queue_regeneration
 from research.capsules.sweep import FactsPassMemo, SweepInterruptedError, SweepPlan, SweepReport, sweep_capsules

@@ -18,7 +18,8 @@ from sqlalchemy.exc import OperationalError
 
 from research.capsules import sweep
 from research.capsules.config import CAPSULE_CONFIG, CAPSULE_MODEL, WriterSettings, writer_settings
-from research.capsules.gateway import GatewayClient, GenerationError, fetch_price
+from research.capsules.gateway import GatewayClient, GenerationError
+from research.capsules.gateway_ledger import fetch_price
 from research.capsules.landing import BoardSentences, TonightWindow
 from research.capsules.pace import TokenBucket
 from research.capsules.prompt import WornPhrases
