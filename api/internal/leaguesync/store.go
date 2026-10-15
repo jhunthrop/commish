@@ -306,24 +306,22 @@ func (s *Store) PutHostPlayers(ctx context.Context, host string, players []HostP
 	})
 }
 
-// FFPCReader is a connected member who has an FFPC league attached, to
-// read it as: the one whose connection read most recently, so one member
-// signed out never stops the league for the rest.
-func (s *Store) FFPCReader(ctx context.Context, ref Ref) (uuid.UUID, string, error) {
-	var accountID uuid.UUID
+// FFPCTeamKey is the league-team id on the FFPC attachment of the account
+// the league is read as (ref.As): that account's own, never another's.
+// An account with no live member attachment of the league has none.
+func (s *Store) FFPCTeamKey(ctx context.Context, ref Ref) (string, error) {
 	var ltuid string
-	err := s.Pool.QueryRow(ctx, `select l.account_id, l.host_team_key from app.league_links l
-		join app.host_connections c on c.account_id = l.account_id and c.host = l.host and c.status = 'connected'
-		where l.host = 'ffpc' and l.host_league_id = $1 and l.host_season = $2 and l.detached_at is null
-			and l.host_team_key is not null
-		order by c.last_read_at desc nulls last, l.attached_at limit 1`, ref.LeagueID, ref.Season).Scan(&accountID, &ltuid)
+	err := s.Pool.QueryRow(ctx, `select host_team_key from app.league_links
+		where account_id = $1 and host = 'ffpc' and host_league_id = $2 and host_season = $3
+			and read_as_member and detached_at is null and host_team_key is not null`,
+		ref.As, ref.LeagueID, ref.Season).Scan(&ltuid)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return uuid.Nil, "", ErrNotConnected
+		return "", fmt.Errorf("%w: no FFPC attachment of %s for the account", ErrNotConnected, ref.Shared().Key())
 	}
 	if err != nil {
-		return uuid.Nil, "", fmt.Errorf("leaguesync: ffpc reader %s: %w", ref.Key(), err)
+		return "", fmt.Errorf("leaguesync: ffpc team key %s: %w", ref.Shared().Key(), err)
 	}
-	return accountID, ltuid, nil
+	return ltuid, nil
 }
 
 // FollowedIDs is the account's live leagues on a host, keyed "id/season"
@@ -345,18 +343,20 @@ func (s *Store) FollowedIDs(ctx context.Context, accountID uuid.UUID, host strin
 	return out, nil
 }
 
-// FFPCLeagues is every attached FFPC league with a connected member, for
-// the background read.
+// FFPCLeagues is every live FFPC attachment whose member is connected,
+// each as the ref read as that member, for the background read: one read
+// per attachment, with its own member's sign-in.
 func (s *Store) FFPCLeagues(ctx context.Context) ([]Ref, error) {
-	rows, err := s.Pool.Query(ctx, `select distinct l.host_league_id, l.host_season from app.league_links l
+	rows, err := s.Pool.Query(ctx, `select l.host_league_id, l.host_season, l.account_id from app.league_links l
 		join app.host_connections c on c.account_id = l.account_id and c.host = l.host and c.status = 'connected'
-		where l.host = 'ffpc' and l.detached_at is null order by 1, 2`)
+		where l.host = 'ffpc' and l.read_as_member and l.detached_at is null and l.host_team_key is not null
+		order by 1, 2, 3`)
 	if err != nil {
 		return nil, fmt.Errorf("leaguesync: ffpc leagues: %w", err)
 	}
 	out, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (Ref, error) {
 		ref := Ref{Host: HostFFPC}
-		err := r.Scan(&ref.LeagueID, &ref.Season)
+		err := r.Scan(&ref.LeagueID, &ref.Season, &ref.As)
 		return ref, err
 	})
 	if err != nil {

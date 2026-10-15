@@ -70,7 +70,7 @@ func (f ffpcWiring) host(store *leaguesync.Store, weeks leaguesync.WeekSource, l
 	if !f.on {
 		return nil
 	}
-	return &leaguesync.FFPC{Member: f.member, Readers: store, Weeks: weeks, Now: time.Now, Log: log}
+	return &leaguesync.FFPC{Member: f.member, TeamKeys: store, Weeks: weeks, Now: time.Now, Log: log}
 }
 
 // yahooWiring is Yahoo read as connected members: the app's OAuth

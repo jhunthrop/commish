@@ -41,8 +41,8 @@ type SnapshotStore interface {
 
 // Read is a snapshot and how stale it is (poll.Read's rule). Failed is a
 // stale read whose last try failed, never a kept read waiting on the next;
-// SignedOut is one that failed because no member of the league is signed
-// in to the host, so a sign-in mends it.
+// SignedOut is one that failed because the account it is read as is not
+// signed in to the host, so their own sign-in mends it.
 type Read struct {
 	Snapshot
 	Stale     time.Duration

@@ -12,8 +12,8 @@ import (
 	"github.com/jhunthrop/commish/api/internal/leaguesync"
 )
 
-// runFFPCRefresh reads every attached FFPC league with a connected
-// member once, as that member, and keeps the read: the background
+// runFFPCRefresh reads every FFPC attachment whose member is connected
+// once, as that member alone, and keeps the read under them: the background
 // cadence beside the one-a-minute read while someone views. Cloud
 // Scheduler runs it hourly and in bursts around FFPC's own clock
 // (Wednesday 6 am and Tuesday 6 am Eastern after the waiver runs, Sunday
@@ -53,6 +53,6 @@ func runFFPCRefresh(ctx context.Context, log *slog.Logger, cfg config.API, pool 
 		}
 		read++
 	}
-	log.Info("ffpc refresh", "leagues", len(refs), "read", read, "failed", failed)
+	log.Info("ffpc refresh", "attachments", len(refs), "read", read, "failed", failed)
 	return nil
 }
