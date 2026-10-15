@@ -5,11 +5,10 @@
 	import Quiet from '#lib/ui/Quiet.svelte';
 	import ToneChip from '#lib/ui/ToneChip.svelte';
 	import type { LeagueHost } from '../api.ts';
-	import type { LeagueBoard } from '../board.ts';
 	import LineRow from './LineRow.svelte';
 	import Screen from './Screen.svelte';
 	import type { PlayerLine, TradeAdvice, TradeRow, TradeTeam } from './api.ts';
-	import { Narrowing, markedTrade, tradeKey } from './state.ts';
+	import { Narrowing, bestTrade, markedTrade, tradeKey } from './state.ts';
 	import {
 		CLOSE_FOR_THEM,
 		EVERY_TRADE,
@@ -23,19 +22,20 @@
 	} from './words.ts';
 
 	/** The trade finder (spec §6): for each other team, its name, owner and record and the trades
-	 * that help both lineups, each a give and a get with both gains, best for you first. A player
+	 * that help both lineups, each a give and a get (and the drop a full roster makes for two in)
+	 * with both gains: those the other team gains from first, best for you first, then the close
+	 * calls for them, as the API orders them; a team with only close calls says so. A player
 	 * picked reads the trades holding him again, so no team's list is cut to its first trades.
 	 * Propose marks a trade as the decision, by who is in it, so the minute's re-read never moves the
 	 * mark to another trade; the one verb opens the host's trade page. We never send an offer. */
 	interface Props {
 		advice: TradeAdvice;
-		board: LeagueBoard;
 		host: LeagueHost;
 		/** Reads the trades holding one player, by his board id. */
 		narrow: (player: string) => Promise<TradeAdvice>;
 	}
 
-	let { advice, board, host, narrow }: Props = $props();
+	let { advice, host, narrow }: Props = $props();
 
 	/** Trades a team shows before its Show more. */
 	const FIRST_TRADES = 2;
@@ -84,15 +84,13 @@
 			.filter(({ trades }) => player === null || trades.length > 0)
 	);
 
-	/** The marked trade while the answer still holds it, else the best trade shown. */
-	const chosen = $derived.by((): { row: TradeRow; team: TradeTeam } | null => {
-		const kept = markedTrade(shown.teams, marked);
-		if (kept) return kept;
-		const best = teams
-			.flatMap(({ team, trades }) => trades.map((row) => ({ row, team })))
-			.sort((a, b) => b.row.my_gain - a.row.my_gain)[0];
-		return best ?? null;
-	});
+	/** The marked trade while the answer still holds it, else the best trade shown that the other
+	 * team gains from (a close call for them only when there is no other). */
+	const chosen = $derived.by(
+		(): { row: TradeRow; team: TradeTeam } | null =>
+			markedTrade(shown.teams, marked) ??
+			bestTrade(teams.map(({ team, trades }) => ({ ...team, trades })))
+	);
 
 	async function pick(next: string | null): Promise<void> {
 		player = next;
@@ -116,12 +114,9 @@
 	{@const key = tradeKey(team.roster_id, row)}
 	{@const on = marked === key}
 	<div class="trade" class:on>
-		{#each row.give as line (line.player.host_id)}<LineRow
-				{line}
-				{board}
-				slot={LINES.give}
-			/>{/each}
-		{#each row.get as line (line.player.host_id)}<LineRow {line} {board} slot={LINES.get} />{/each}
+		{#each row.give as line (line.player.host_id)}<LineRow {line} slot={LINES.give} />{/each}
+		{#each row.get as line (line.player.host_id)}<LineRow {line} slot={LINES.get} />{/each}
+		{#if row.drop}<LineRow line={row.drop} slot={LINES.drop} />{/if}
 		<div class="gains">
 			<p>{tradeGains(row)}</p>
 			{#if row.close_for_them}<ToneChip tone="even">{CLOSE_FOR_THEM}</ToneChip>{/if}
@@ -137,7 +132,9 @@
 	reason={chosen?.row.close_for_them ? `${CLOSE_FOR_THEM}.` : null}
 	verb={verbWords('trades', host)}
 	href={shown.host_trades_url}
+	hostNote={shown.host_note}
 	basis={shown.basis}
+	basisNote={shown.basis_note}
 >
 	<div class="tools">
 		<label class="pick">
@@ -170,6 +167,7 @@
 					<h2>{team.name}</h2>
 					<p>{teamAside(team)}</p>
 				</header>
+				{#if team.note && trades.length > 0}<p class="none">{team.note}</p>{/if}
 				{#each first as row (tradeKey(team.roster_id, row))}{@render trade(team, row)}{/each}
 				{#if trades.length === 0}<p class="none">{NO_TRADES_WITH_TEAM}</p>{/if}
 				{#if trades.length > first.length}

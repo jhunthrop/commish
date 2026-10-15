@@ -12,12 +12,15 @@ import {
 	TAB_LABELS,
 	addsTitle,
 	lineupTitle,
-	porWords,
 	showMore,
 	startingCount,
 	NO_START_RULE,
+	LATER_RULE,
 	NO_TRADES_WITH_TEAM,
-	POINTS_OVER_REPLACEMENT,
+	hisPorWords,
+	porFigure,
+	signInTitle,
+	sharedDropWords,
 	designationWords,
 	dropWords,
 	gainFigure,
@@ -59,6 +62,8 @@ const line = (name: string, position = 'RB', rank: number | null = 14): PlayerLi
 		team: 'TB',
 		injured_reserve: false
 	},
+	headshot: null,
+	slug: null,
 	position_rank: rank,
 	points_over_replacement: 0.7,
 	held: false,
@@ -90,6 +95,7 @@ const waiver = (over: Partial<WaiverRow> = {}): WaiverRow => ({
 const trade: TradeRow = {
 	give: [line('Kyren Williams'), line('Jordan Mason')],
 	get: [line('Nico Collins', 'WR', 9)],
+	drop: null,
 	my_gain: 4.06,
 	their_gain: 0.31,
 	close_for_them: true
@@ -137,6 +143,19 @@ void test('the lineup decision names each change and its slot, or says the lineu
 	assert.equal(lineupDecision({ set: true, slots: [] }), 'Your lineup is set.');
 });
 
+void test('above two changes the decision leads with the count and the first, and the rows carry the rest', () => {
+	const slots = [
+		slot('QB', 'Patrick Mahomes', 'Aaron Rodgers', true),
+		slot('TE', 'Chig Okonkwo', 'Sam LaPorta', true),
+		slot('FLEX', 'Travis Etienne', "Ja'Marr Chase", true),
+		slot('DEF', 'Minnesota Vikings', 'Buffalo Bills', true)
+	];
+	assert.equal(
+		lineupDecision({ set: false, slots }),
+		'Four changes, starting with Patrick Mahomes over Aaron Rodgers at QB.'
+	);
+});
+
 void test("the bench marks the starters a change sits, the host's player in each changed slot", () => {
 	const slots = [
 		slot('WR', 'Rome Odunze', 'Rome Odunze', false),
@@ -148,16 +167,27 @@ void test("the bench marks the starters a change sits, the host's player in each
 void test('the waiver decision names the add, the drop and the gain a week', () => {
 	assert.equal(
 		waiverDecision(waiver()),
-		'Add Bhayshul Tuten for Jaylen Wright. Your lineup gains 1.2 points over replacement a week.'
+		'Add Bhayshul Tuten, drop Jaylen Wright. Your lineup gains 1.2 points over replacement a week.'
 	);
 	assert.equal(
 		waiverDecision(waiver({ drop: null, gain: 0, starts: false })),
 		'Add Bhayshul Tuten. He would not start for you this week.'
 	);
 	assert.equal(waiverDecision(null), 'Nobody on waivers starts for you this week.');
-	assert.equal(dropWords(waiver()), 'for Jaylen Wright, RB14');
+	assert.equal(dropWords(waiver()), 'drop Jaylen Wright, RB14');
 	assert.equal(dropWords({ drop: null }), 'into an open spot');
+	assert.equal(sharedDropWords(line('Jaxson Dart', 'QB', 31)), 'Each add drops Jaxson Dart, QB31');
 	assert.equal(gainFigure(1.24), '+1.2');
+});
+
+void test("a row's own points over replacement is his, and zero carries no sign", () => {
+	assert.equal(hisPorWords(-0.5), 'his −0.5 over repl a week');
+	assert.equal(hisPorWords(0.04), 'his 0.0 over repl a week');
+	assert.equal(porFigure(0), '0.0');
+	assert.equal(porFigure(-0.02), '0.0');
+	assert.equal(porFigure(0.4), '+0.4');
+	assert.equal(LINES.overRepl, 'over repl a week');
+	assert.equal(LINES.toYourLineup, 'a week to your lineup');
 });
 
 void test('a trade says who gets whom and both gains plainly', () => {
@@ -166,6 +196,18 @@ void test('a trade says who gets whom and both gains plainly', () => {
 		'Trade Kyren Williams and Jordan Mason to Muttdogs for Nico Collins. Your lineup gains 4.1 points over replacement a week, theirs 0.3.'
 	);
 	assert.equal(tradeDecision(null), 'No trade we found helps both lineups.');
+	assert.equal(
+		tradeDecision({
+			row: {
+				...trade,
+				give: [line('Aaron Rodgers', 'QB', 12)],
+				get: [line('Bhayshul Tuten'), line('Emeka Egbuka', 'WR', 20)],
+				drop: line('Jaxson Dart', 'QB', 31)
+			},
+			team: 'Max_Jensen10'
+		}),
+		'Trade Aaron Rodgers to Max_Jensen10 for Bhayshul Tuten and Emeka Egbuka, and drop Jaxson Dart to make room. Your lineup gains 4.1 points over replacement a week, theirs 0.3.'
+	);
 	assert.equal(
 		tradeGains({ my_gain: 5.93, their_gain: 0.03 }),
 		'Your lineup gains 5.9 points over replacement a week, theirs under 0.1.'
@@ -212,12 +254,17 @@ void test("a row's facts: the game on the Eastern clock, the designation with it
 			{ week: 4, points: 11.24 },
 			{ week: 5, points: 9 }
 		]),
-		'18.4, 11.2 and 9.0 in his last three'
+		'Last 3: 18.4, 11.2, 9.0'
 	);
-	assert.equal(lastGamesWords([{ week: 5, points: 18.4 }]), '18.4 in his last game');
+	assert.equal(lastGamesWords([{ week: 5, points: 18.4 }]), 'Last game: 18.4');
 	assert.equal(lastGamesWords([]), null);
 	assert.equal(rankWords(line('Rachaad White')), 'RB14');
 	assert.equal(rankWords(line('Rachaad White', 'RB', null)), null);
+});
+
+void test('the signed-out panel names the screen it is for', () => {
+	assert.equal(signInTitle('start'), 'Sign in to see start and sit for your league');
+	assert.equal(signInTitle('trades'), 'Sign in to see trades for your league');
 });
 
 void test('the refreshed stamp names the order and its day', () => {
@@ -266,7 +313,21 @@ void test('copy guard: every in-season line is fantasy words, with no dash, semi
 		EVERY_TRADE,
 		teamAside({ name: 'Muttdogs', owner: 'muttdog', record: { wins: 5, losses: 0, ties: 0 } }),
 		NO_START_RULE,
-		POINTS_OVER_REPLACEMENT,
+		LATER_RULE,
+		hisPorWords(-0.5),
+		sharedDropWords(line('Jaxson Dart', 'QB', 31)),
+		signInTitle('start'),
+		signInTitle('waivers'),
+		signInTitle('trades'),
+		lineupDecision({
+			set: false,
+			slots: [
+				slot('QB', 'Patrick Mahomes', 'Aaron Rodgers', true),
+				slot('TE', 'Chig Okonkwo', 'Sam LaPorta', true),
+				slot('FLEX', 'Travis Etienne', "Ja'Marr Chase", true)
+			]
+		}),
+		tradeDecision({ row: { ...trade, drop: line('Jaxson Dart', 'QB', 31) }, team: 'Muttdogs' }),
 		HELD,
 		refreshedWords('rest_of_season', '2026-10-14T19:05:37.917Z'),
 		refreshedWords('preseason', '2026-09-09T02:20:29.697Z'),
@@ -274,7 +335,7 @@ void test('copy guard: every in-season line is fantasy words, with no dash, semi
 		gameWords(facts({ bye: true, opponent: null })),
 		designationWords({ status: 'pup', as_of: '2026-10-15T20:10:00.000Z' }),
 		lastGamesWords([{ week: 5, points: 18.4 }]),
-		porWords(0.4),
+		hisPorWords(0.4),
 		lineupTitle(6),
 		addsTitle(6),
 		startingCount(0),
@@ -299,7 +360,12 @@ function sentencesIn(value: unknown): string[] {
 	if (Array.isArray(value)) return value.flatMap(sentencesIn);
 	if (typeof value !== 'object' || value === null) return [];
 	return Object.entries(value).flatMap(([key, field]) =>
-		(key === 'basis' || key === 'sentence') && typeof field === 'string'
+		(key === 'basis' ||
+			key === 'basis_note' ||
+			key === 'sentence' ||
+			key === 'note' ||
+			key === 'host_note') &&
+		typeof field === 'string'
 			? [field]
 			: sentencesIn(field)
 	);

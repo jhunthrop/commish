@@ -1,6 +1,7 @@
 {
 	"week": 6,
-	"basis": "Ranked by the gain to your lineup on our rest-of-season order. A drop is the player it costs you least to lose.",
+	"basis": "Ranked by the gain to your lineup on our rest-of-season order. A drop is the player it costs you least to lose. Points over replacement, and every gain in them, are points above what a free pickup at his position gives you, a week: the rest of the season on our rest-of-season order, averaged over its 12 weeks, not a projection of any one week.",
+	"basis_note": "Points over replacement are for a 12-team league with 1 QB, 2 RB, 3 WR, 1 TE and two flex spots. Points so far leave out your league's points for two-point conversions, missed field goals, missed extra points, fumble recoveries and safeties: the stat lines we hold do not carry them.",
 	"order_basis": "rest_of_season",
 	"refreshed": "2026-10-14T19:05:37.917Z",
 	"read_at": "2026-10-14T19:05:38.329Z",
@@ -14,8 +15,10 @@
 				"team": "HOU",
 				"injured_reserve": false
 			},
+			"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4686422.png",
+			"slug": "xavier-hutchinson",
 			"position_rank": 42,
-			"points_over_replacement": -0.5,
+			"points_over_replacement": -0.7,
 			"held": false,
 			"facts": {
 				"week": 6,
@@ -43,8 +46,10 @@
 				"team": "NYG",
 				"injured_reserve": false
 			},
+			"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4689114.png",
+			"slug": "jaxson-dart",
 			"position_rank": 31,
-			"points_over_replacement": -5.83,
+			"points_over_replacement": -8.3,
 			"held": false,
 			"facts": {
 				"week": 6,
@@ -62,9 +67,9 @@
 				"allowed_to_position": null
 			}
 		},
-		"gain": 1.29,
+		"gain": 1.8,
 		"starts": true,
-		"sentence": "He starts at WR over Jakobi Meyers."
+		"sentence": "Xavier Hutchinson starts for you, and your lineup gains 1.8 points over replacement a week on our rest-of-season order. Jaxson Dart is the player it costs you least to lose."
 	},
 	"rows": [
 		{
@@ -77,8 +82,10 @@
 					"team": "HOU",
 					"injured_reserve": false
 				},
+				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4686422.png",
+				"slug": "xavier-hutchinson",
 				"position_rank": 42,
-				"points_over_replacement": -0.5,
+				"points_over_replacement": -0.7,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -106,8 +113,10 @@
 					"team": "NYG",
 					"injured_reserve": false
 				},
+				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4689114.png",
+				"slug": "jaxson-dart",
 				"position_rank": 31,
-				"points_over_replacement": -5.83,
+				"points_over_replacement": -8.3,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -125,9 +134,9 @@
 					"allowed_to_position": null
 				}
 			},
-			"gain": 1.29,
+			"gain": 1.8,
 			"starts": true,
-			"sentence": "He starts at WR over Jakobi Meyers."
+			"sentence": "Xavier Hutchinson starts for you, and your lineup gains 1.8 points over replacement a week on our rest-of-season order. Jaxson Dart is the player it costs you least to lose."
 		},
 		{
 			"add": {
@@ -139,8 +148,10 @@
 					"team": "MIA",
 					"injured_reserve": false
 				},
+				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4429160.png",
+				"slug": "de-von-achane",
 				"position_rank": 38,
-				"points_over_replacement": -1.32,
+				"points_over_replacement": -1.9,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -168,8 +179,10 @@
 					"team": "NYG",
 					"injured_reserve": false
 				},
+				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4689114.png",
+				"slug": "jaxson-dart",
 				"position_rank": 31,
-				"points_over_replacement": -5.83,
+				"points_over_replacement": -8.3,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -187,9 +200,9 @@
 					"allowed_to_position": null
 				}
 			},
-			"gain": 0.47,
+			"gain": 0.6,
 			"starts": false,
-			"sentence": "Jeremiyah Love, Kenny Gainwell and Travis Etienne start ahead of him at RB this week."
+			"sentence": "De'Von Achane does not start for you this week, and your lineup still gains 0.6 points over replacement a week with him on our rest-of-season order. Jaxson Dart is the player it costs you least to lose."
 		},
 		{
 			"add": {
@@ -201,8 +214,10 @@
 					"team": "CAR",
 					"injured_reserve": false
 				},
+				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4372780.png",
+				"slug": "tommy-tremble",
 				"position_rank": 24,
-				"points_over_replacement": -1.35,
+				"points_over_replacement": -1.9,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -230,8 +245,10 @@
 					"team": "NYG",
 					"injured_reserve": false
 				},
+				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4689114.png",
+				"slug": "jaxson-dart",
 				"position_rank": 31,
-				"points_over_replacement": -5.83,
+				"points_over_replacement": -8.3,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -249,9 +266,9 @@
 					"allowed_to_position": null
 				}
 			},
-			"gain": 0.44,
+			"gain": 0.6,
 			"starts": true,
-			"sentence": "He starts at TE over Chig Okonkwo."
+			"sentence": "Tommy Tremble starts for you, and your lineup gains 0.6 points over replacement a week on our rest-of-season order. Jaxson Dart is the player it costs you least to lose."
 		},
 		{
 			"add": {
@@ -263,8 +280,10 @@
 					"team": "KC",
 					"injured_reserve": false
 				},
+				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4362921.png",
+				"slug": "tyquan-thornton",
 				"position_rank": 52,
-				"points_over_replacement": -1.38,
+				"points_over_replacement": -2,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -292,8 +311,10 @@
 					"team": "NYG",
 					"injured_reserve": false
 				},
+				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4689114.png",
+				"slug": "jaxson-dart",
 				"position_rank": 31,
-				"points_over_replacement": -5.83,
+				"points_over_replacement": -8.3,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -311,9 +332,9 @@
 					"allowed_to_position": null
 				}
 			},
-			"gain": 0.41,
+			"gain": 0.5,
 			"starts": true,
-			"sentence": "He starts at WR over Antonio Williams."
+			"sentence": "Tyquan Thornton starts for you, and your lineup gains 0.5 points over replacement a week on our rest-of-season order. Jaxson Dart is the player it costs you least to lose."
 		},
 		{
 			"add": {
@@ -325,8 +346,10 @@
 					"team": "LAR",
 					"injured_reserve": false
 				},
+				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/2573401.png",
+				"slug": "tyler-higbee",
 				"position_rank": 27,
-				"points_over_replacement": -1.62,
+				"points_over_replacement": -2.3,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -354,8 +377,10 @@
 					"team": "NYG",
 					"injured_reserve": false
 				},
+				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4689114.png",
+				"slug": "jaxson-dart",
 				"position_rank": 31,
-				"points_over_replacement": -5.83,
+				"points_over_replacement": -8.3,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -373,9 +398,9 @@
 					"allowed_to_position": null
 				}
 			},
-			"gain": 0.17,
+			"gain": 0.2,
 			"starts": true,
-			"sentence": "He starts in the flex over Travis Etienne."
+			"sentence": "Tyler Higbee starts for you, and your lineup gains 0.2 points over replacement a week on our rest-of-season order. Jaxson Dart is the player it costs you least to lose."
 		},
 		{
 			"add": {
@@ -387,8 +412,10 @@
 					"team": "NYJ",
 					"injured_reserve": false
 				},
+				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/15864.png",
+				"slug": "geno-smith",
 				"position_rank": 18,
-				"points_over_replacement": -0.6,
+				"points_over_replacement": -0.9,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -416,8 +443,10 @@
 					"team": "NYG",
 					"injured_reserve": false
 				},
+				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4689114.png",
+				"slug": "jaxson-dart",
 				"position_rank": 31,
-				"points_over_replacement": -5.83,
+				"points_over_replacement": -8.3,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -437,7 +466,7 @@
 			},
 			"gain": 0,
 			"starts": false,
-			"sentence": "Patrick Mahomes starts ahead of him at QB this week."
+			"sentence": "Geno Smith is QB18 in our rest-of-season order and would not start for you."
 		},
 		{
 			"add": {
@@ -449,8 +478,10 @@
 					"team": "TEN",
 					"injured_reserve": false
 				},
+				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4688380.png",
+				"slug": "cam-ward",
 				"position_rank": 19,
-				"points_over_replacement": -0.63,
+				"points_over_replacement": -0.9,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -478,8 +509,10 @@
 					"team": "NYG",
 					"injured_reserve": false
 				},
+				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4689114.png",
+				"slug": "jaxson-dart",
 				"position_rank": 31,
-				"points_over_replacement": -5.83,
+				"points_over_replacement": -8.3,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -499,7 +532,7 @@
 			},
 			"gain": 0,
 			"starts": false,
-			"sentence": "Patrick Mahomes starts ahead of him at QB this week."
+			"sentence": "Cam Ward is QB19 in our rest-of-season order and would not start for you."
 		},
 		{
 			"add": {
@@ -511,8 +544,10 @@
 					"team": "IND",
 					"injured_reserve": false
 				},
+				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/3917792.png",
+				"slug": "daniel-jones",
 				"position_rank": 24,
-				"points_over_replacement": -1.5,
+				"points_over_replacement": -2.1,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -540,8 +575,10 @@
 					"team": "NYG",
 					"injured_reserve": false
 				},
+				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4689114.png",
+				"slug": "jaxson-dart",
 				"position_rank": 31,
-				"points_over_replacement": -5.83,
+				"points_over_replacement": -8.3,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -561,7 +598,7 @@
 			},
 			"gain": 0,
 			"starts": false,
-			"sentence": "Patrick Mahomes starts ahead of him at QB this week."
+			"sentence": "Daniel Jones is QB24 in our rest-of-season order and would not start for you."
 		},
 		{
 			"add": {
@@ -573,8 +610,10 @@
 					"team": "NE",
 					"injured_reserve": false
 				},
+				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4427095.png",
+				"slug": "demario-douglas",
 				"position_rank": 61,
-				"points_over_replacement": -1.86,
+				"points_over_replacement": -2.6,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -602,8 +641,10 @@
 					"team": "NYG",
 					"injured_reserve": false
 				},
+				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4689114.png",
+				"slug": "jaxson-dart",
 				"position_rank": 31,
-				"points_over_replacement": -5.83,
+				"points_over_replacement": -8.3,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -622,8 +663,8 @@
 				}
 			},
 			"gain": 0,
-			"starts": true,
-			"sentence": "He starts in the flex over Ladd McConkey."
+			"starts": false,
+			"sentence": "DeMario Douglas is WR61 in our rest-of-season order and would not start for you."
 		},
 		{
 			"add": {
@@ -635,8 +676,10 @@
 					"team": "PIT",
 					"injured_reserve": false
 				},
+				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4430802.png",
+				"slug": "darnell-washington",
 				"position_rank": 31,
-				"points_over_replacement": -2.01,
+				"points_over_replacement": -2.8,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -664,8 +707,10 @@
 					"team": "NYG",
 					"injured_reserve": false
 				},
+				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4689114.png",
+				"slug": "jaxson-dart",
 				"position_rank": 31,
-				"points_over_replacement": -5.83,
+				"points_over_replacement": -8.3,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -684,8 +729,8 @@
 				}
 			},
 			"gain": 0,
-			"starts": true,
-			"sentence": "He starts in the flex over Ladd McConkey."
+			"starts": false,
+			"sentence": "Darnell Washington is TE31 in our rest-of-season order and would not start for you."
 		},
 		{
 			"add": {
@@ -697,8 +742,10 @@
 					"team": "ATL",
 					"injured_reserve": false
 				},
+				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4361409.png",
+				"slug": "jahan-dotson",
 				"position_rank": 67,
-				"points_over_replacement": -2.15,
+				"points_over_replacement": -3,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -726,8 +773,10 @@
 					"team": "NYG",
 					"injured_reserve": false
 				},
+				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4689114.png",
+				"slug": "jaxson-dart",
 				"position_rank": 31,
-				"points_over_replacement": -5.83,
+				"points_over_replacement": -8.3,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -746,8 +795,8 @@
 				}
 			},
 			"gain": 0,
-			"starts": true,
-			"sentence": "He starts in the flex over Ladd McConkey."
+			"starts": false,
+			"sentence": "Jahan Dotson is WR67 in our rest-of-season order and would not start for you."
 		},
 		{
 			"add": {
@@ -759,8 +808,10 @@
 					"team": "NYJ",
 					"injured_reserve": false
 				},
+				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4808766.png",
+				"slug": "mason-taylor",
 				"position_rank": 32,
-				"points_over_replacement": -2.17,
+				"points_over_replacement": -3.1,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -788,8 +839,10 @@
 					"team": "NYG",
 					"injured_reserve": false
 				},
+				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4689114.png",
+				"slug": "jaxson-dart",
 				"position_rank": 31,
-				"points_over_replacement": -5.83,
+				"points_over_replacement": -8.3,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -808,8 +861,8 @@
 				}
 			},
 			"gain": 0,
-			"starts": true,
-			"sentence": "He starts in the flex over Ladd McConkey."
+			"starts": false,
+			"sentence": "Mason Taylor is TE32 in our rest-of-season order and would not start for you."
 		},
 		{
 			"add": {
@@ -821,8 +874,10 @@
 					"team": "NYG",
 					"injured_reserve": false
 				},
+				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4429148.png",
+				"slug": "theo-johnson",
 				"position_rank": 34,
-				"points_over_replacement": -2.39,
+				"points_over_replacement": -3.4,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -850,8 +905,10 @@
 					"team": "NYG",
 					"injured_reserve": false
 				},
+				"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4689114.png",
+				"slug": "jaxson-dart",
 				"position_rank": 31,
-				"points_over_replacement": -5.83,
+				"points_over_replacement": -8.3,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -871,8 +928,9 @@
 			},
 			"gain": 0,
 			"starts": false,
-			"sentence": "Chig Okonkwo starts ahead of him at TE this week."
+			"sentence": "Theo Johnson is TE34 in our rest-of-season order and would not start for you."
 		}
 	],
-	"host_waivers_url": "https://sleeper.com/leagues/1382163311038038016/players"
+	"host_waivers_url": "https://sleeper.com/leagues/1382163311038038016/players",
+	"host_note": null
 }

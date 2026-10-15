@@ -42,7 +42,10 @@ type advisor struct {
 	season   *Season
 	held     map[string]bool
 	basis    OrderBasis
-	now      time.Time
+	// weeks is how many weeks the order covers (WeeksCovered).
+	pages pages
+	weeks int
+	now   time.Time
 }
 
 // newAdvisor reads the league's roster shape and scoring from the saved
@@ -60,7 +63,7 @@ func newAdvisor(l League, data Data, held map[string]bool, now time.Time) (*advi
 	if basis == "" {
 		basis = Preseason
 	}
-	return &advisor{League: l, settings: *l.Saved, config: config, slots: Slots(config), held: held, basis: basis, now: now,
+	return &advisor{League: l, settings: *l.Saved, config: config, slots: Slots(config), held: held, basis: basis, weeks: WeeksCovered(basis, l.Snap.Week), pages: newPages(l.Board.Raw), now: now,
 		season: NewSeason(data, RulesOf(rulesOf(l.Saved.Scoring)), l.Snap.Week, now)}, nil
 }
 
@@ -94,7 +97,8 @@ func (a *advisor) build(id string, lp apitypes.LeaguePlayer, side *leaguesync.Si
 		boardID = *lp.BoardId
 	}
 	position, team := draft.Position(lp.Position), lp.Team
-	if bp, ok := a.Board.Player(boardID); ok {
+	bp, placed := a.Board.Player(boardID)
+	if placed {
 		position, team = bp.Position, bp.Team
 	}
 	facts := a.season.For(Player{BoardID: boardID, Team: team, Position: position, HostIR: lp.InjuredReserve, ReadAt: a.Snap.ReadAt})
@@ -106,9 +110,13 @@ func (a *advisor) build(id string, lp apitypes.LeaguePlayer, side *leaguesync.Si
 		rank := c.Rank
 		line.PositionRank = &rank
 	}
+	line.Headshot = faceOf(bp, placed)
+	if placed {
+		line.Slug = a.pages.of(bp.Name, c.Rank > 0)
+	}
 	if v, ok := a.Board.Values[boardID]; ok {
 		c.Value, c.HasValue = v, true
-		perWeek := roundTenth(PerWeek(v))
+		perWeek := roundTenth(PerWeek(v, a.weeks))
 		line.PointsOverReplacement, words.PerWeek = &perWeek, &perWeek
 	}
 	if facts.PerGame != nil {
@@ -217,6 +225,13 @@ func (a *advisor) header() header {
 	return header{week: a.Snap.Week, basis: apitypes.OrderBasis(a.basis), refreshed: a.Board.Refreshed, readAt: a.Snap.ReadAt}
 }
 
+// host is the host's page for a verb on the member's team, and the note
+// a page prints when we cannot open it.
+func (a *advisor) host(page Page) (string, *string) {
+	href := HostURL(a.Snap.Ref, a.Me, page)
+	return href, HostNote(a.Snap.Ref, href)
+}
+
 // Lineup is the start and sit page (§4).
 func (a *advisor) Lineup() (apitypes.LineupAdvice, bool) {
 	team, ok := a.Snap.TeamByRoster(a.Me)
@@ -230,9 +245,10 @@ func (a *advisor) Lineup() (apitypes.LineupAdvice, bool) {
 	}
 	rows := Lineup(a.config, cands, team.Starters)
 	h := a.header()
-	out := apitypes.LineupAdvice{Week: h.week, Basis: LineupBasis(a.basis, a.settings), OrderBasis: h.basis, Refreshed: h.refreshed,
+	out := apitypes.LineupAdvice{Week: h.week, Basis: LineupBasis(a.basis, a.weeks), BasisNote: BasisNote(a.settings), OrderBasis: h.basis, Refreshed: h.refreshed,
 		ReadAt: h.readAt, Set: true, Slots: []apitypes.LineupSlot{}, Bench: []apitypes.PlayerLine{},
-		HostLineupUrl: HostURL(a.Snap.Ref, LineupPage)}
+	}
+	out.HostLineupUrl, out.HostNote = a.host(LineupPage)
 	w := &Writer{Basis: a.basis, Now: a.now}
 	starting := map[int]bool{}
 	for _, r := range rows {
@@ -305,10 +321,11 @@ func (a *advisor) Waivers(position draft.Position) (apitypes.WaiverAdvice, bool)
 		cands[i] = p.cand
 	}
 	h := a.header()
-	out := apitypes.WaiverAdvice{Week: h.week, Basis: WaiversBasis(a.basis, a.settings), OrderBasis: h.basis, Refreshed: h.refreshed,
-		ReadAt: h.readAt, Rows: []apitypes.WaiverRow{}, HostWaiversUrl: HostURL(a.Snap.Ref, WaiversPage)}
+	out := apitypes.WaiverAdvice{Week: h.week, Basis: WaiversBasis(a.basis, a.weeks), BasisNote: BasisNote(a.settings), OrderBasis: h.basis, Refreshed: h.refreshed,
+		ReadAt: h.readAt, Rows: []apitypes.WaiverRow{}}
+	out.HostWaiversUrl, out.HostNote = a.host(WaiversPage)
 	w := &Writer{Basis: a.basis, Now: a.now}
-	for _, move := range Waivers(a.config, squad, cands) {
+	for _, move := range Waivers(a.config, a.weeks, squad, cands) {
 		if len(out.Rows) == MaxWaiverRows {
 			break
 		}
@@ -320,6 +337,8 @@ func (a *advisor) Waivers(position draft.Position) (apitypes.WaiverAdvice, bool)
 			line := mine[move.Drop].line
 			row.Drop, drop = &line, &mine[move.Drop].words
 		}
+		// The sentence says he starts only when he starts this week.
+		move.Starts = row.Starts
 		row.Sentence = w.Waiver(add.words, drop, move)
 		out.Rows = append(out.Rows, row)
 	}
@@ -339,8 +358,9 @@ func (a *advisor) Trades(focus string) (apitypes.TradeAdvice, bool) {
 	mine := a.active(team)
 	squad := a.squad(mine, true)
 	h := a.header()
-	out := apitypes.TradeAdvice{Week: h.week, Basis: TradesBasis(a.basis, a.settings), OrderBasis: h.basis, Refreshed: h.refreshed,
-		ReadAt: h.readAt, Teams: []apitypes.TradeTeam{}, HostTradesUrl: HostURL(a.Snap.Ref, TradesPage)}
+	out := apitypes.TradeAdvice{Week: h.week, Basis: TradesBasis(a.basis, a.weeks), BasisNote: BasisNote(a.settings), OrderBasis: h.basis, Refreshed: h.refreshed,
+		ReadAt: h.readAt, Teams: []apitypes.TradeTeam{}}
+	out.HostTradesUrl, out.HostNote = a.host(TradesPage)
 	for _, t := range leaguesync.Standings(a.Snap.Teams) {
 		if t.RosterID == a.Me {
 			continue
@@ -348,9 +368,22 @@ func (a *advisor) Trades(focus string) (apitypes.TradeAdvice, bool) {
 		theirs := a.active(t)
 		row := apitypes.TradeTeam{RosterId: t.RosterID, Name: t.Name, Owner: t.Owner,
 			Record: apitypes.TradeRecord{Wins: t.Wins, Losses: t.Losses, Ties: t.Ties}, Trades: []apitypes.TradeRow{}}
-		for _, tr := range Trades(a.config, squad, a.squad(theirs, false), focus, TradesPerTeam) {
-			row.Trades = append(row.Trades, apitypes.TradeRow{Give: lines(mine, tr.Give), Get: lines(theirs, tr.Get),
-				MyGain: roundTenth(tr.MyGain), TheirGain: roundTenth(tr.TheirGain), CloseForThem: roundTenth(tr.TheirGain) < CloseCall})
+		close := 0
+		for _, tr := range Trades(a.config, a.weeks, squad, a.squad(theirs, false), focus, TradesPerTeam) {
+			wire := apitypes.TradeRow{Give: lines(mine, tr.Give), Get: lines(theirs, tr.Get),
+				MyGain: roundTenth(tr.MyGain), TheirGain: roundTenth(tr.TheirGain), CloseForThem: tr.CloseForThem()}
+			if tr.Drop >= 0 {
+				drop := mine[tr.Drop].line
+				wire.Drop = &drop
+			}
+			row.Trades = append(row.Trades, wire)
+			if tr.CloseForThem() {
+				close++
+			}
+		}
+		if close > 0 && close == len(row.Trades) {
+			note := OnlyCloseCalls
+			row.Note = &note
 		}
 		out.Teams = append(out.Teams, row)
 	}

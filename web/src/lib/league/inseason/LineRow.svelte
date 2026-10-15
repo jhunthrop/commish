@@ -6,9 +6,7 @@
 	import ToneChip from '#lib/ui/ToneChip.svelte';
 	import ValueCell from '#lib/ui/ValueCell.svelte';
 	import Label from '#lib/ui/Label.svelte';
-	import type { LeagueBoard } from '../board.ts';
 	import LeagueRow from '../LeagueRow.svelte';
-	import { rowOf } from '../model.ts';
 	import type { PlayerLine } from './api.ts';
 	import {
 		GAIN_DECIMALS,
@@ -17,31 +15,29 @@
 		designationSitsHim,
 		designationWords,
 		gameWords,
+		hisPorWords,
 		lastGamesWords,
-		porWords
+		porFigure
 	} from './words.ts';
 
 	/** One player of an in-season screen as a league row: his face and name (which opens his game
-	 * log), his rank at his position on our order, his game this week, his designation with its
-	 * stamp, his last games, and at the end his points over replacement a week (the panel's head says
-	 * a week). A screen that ends the row on its own number (a waiver's gain) keeps his points over
-	 * replacement on his line. On a phone the cell drops its label, as the league page's rows do,
-	 * and the facts wrap under his name rather than run under the cell. */
+	 * log, when he has a page), his rank at his position on our order, his game this week, his
+	 * designation with its stamp, his last games, and at the end his points over replacement a week.
+	 * A screen that ends the row on its own number (a waiver's gain to your lineup) keeps his points
+	 * over replacement on his line, said as his. Everything comes from the API's line: no board is
+	 * read. On a phone the cell drops its label, as the league page's rows do, and the facts wrap
+	 * under his name rather than run under the cell. */
 	interface Props {
 		line: PlayerLine;
-		board: LeagueBoard;
 		tags?: readonly string[];
 		/** A slot label before the row: "RB2", "Bench". */
 		slot?: string;
-		/** A last fact on the row's line, the screen's own: "for Jaylen Wright, RB58". */
+		/** A last fact on the row's line, the screen's own: "drop Jaylen Wright, RB58". */
 		note?: string;
-		/** On a phone, leave his last games off the line: a row that already carries its own facts
-		 * (a waiver's drop and his points over replacement) keeps to a few lines. */
-		brief?: boolean;
 		trailing?: Snippet;
 	}
 
-	let { line, board, tags = [], slot, note, brief = false, trailing }: Props = $props();
+	let { line, tags = [], slot, note, trailing }: Props = $props();
 
 	const facts = $derived(line.facts);
 	const game = $derived(gameWords(facts));
@@ -49,6 +45,8 @@
 	const position = $derived(
 		POSITIONS.includes(line.player.position as Position) ? (line.player.position as Position) : null
 	);
+	const por = $derived(line.points_over_replacement);
+	const none = $derived(por !== null && porFigure(por) === porFigure(0));
 </script>
 
 {#snippet meta()}
@@ -64,9 +62,9 @@
 			>{designationWords(facts.designation)}</ToneChip
 		>
 	{/if}
-	{#if last}<span class="fact" class:brief>{last}</span>{/if}
-	{#if trailing && line.points_over_replacement !== null}
-		<span class="fact">{porWords(line.points_over_replacement)}</span>
+	{#if last}<span class="fact">{last}</span>{/if}
+	{#if trailing && por !== null}
+		<span class="fact his">{hisPorWords(por)}</span>
 	{/if}
 	{#if line.held}<TagChip label={HELD} />{/if}
 	{#if note}<span class="note">{note}</span>{/if}
@@ -75,12 +73,13 @@
 {#snippet value()}
 	{#if trailing}
 		{@render trailing()}
-	{:else if line.points_over_replacement !== null}
+	{:else if por !== null}
+		<!-- A figure that rounds to nothing prints "0.0", with no sign. -->
 		<ValueCell
-			value={line.points_over_replacement}
+			value={none ? 0 : por}
 			label={LINES.overRepl}
 			phoneLabel={false}
-			signed
+			signed={!none}
 			decimals={GAIN_DECIMALS}
 		/>
 	{:else}
@@ -89,8 +88,9 @@
 {/snippet}
 
 <LeagueRow
-	player={rowOf(board, line.player)}
+	player={null}
 	host={line.player}
+	face={{ headshot: line.headshot, slug: line.slug }}
 	{tags}
 	{slot}
 	status={line.player.injured_reserve ? 'ir' : null}
@@ -109,12 +109,10 @@
 		font-variant-numeric: tabular-nums;
 	}
 
+	/* On a phone a row that ends on its own number keeps to its game and last games: his own figure
+	   is at a desk's width, beside the gain it is told apart from. */
 	@media (max-width: 760px) {
-		.fact {
-			white-space: normal;
-		}
-
-		.brief {
+		.his {
 			display: none;
 		}
 	}

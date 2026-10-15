@@ -2766,17 +2766,25 @@ components:
         allowed_to_position: { allOf: [{ $ref: "#/components/schemas/PointsAllowed" }], nullable: true }
     PlayerLine:
       type: object
-      required: [player, position_rank, points_over_replacement, held, facts]
+      required: [player, headshot, slug, position_rank, points_over_replacement, held, facts]
       properties:
         player: { $ref: "#/components/schemas/LeaguePlayer" }
+        headshot: { type: string, nullable: true, description: "his face from our player directory, null without one" }
+        slug:
+          type: string
+          nullable: true
+          description: >-
+            his page on the site (/players/{slug}): set for a player our order ranks whose name no other player in our
+            directory shares, null otherwise (a shared name's page is named by the run, which the API does not read)
         position_rank: { type: integer, nullable: true, description: his place at his position in our order, null when unranked }
         points_over_replacement:
           type: number
           format: double
           nullable: true
           description: >-
-            points over replacement a week (the season's over 17 games) for this league, one decimal; null without a
-            projection
+            points over replacement a week for this league, one decimal: the order's averaged over the weeks it covers
+            (the preseason number's season over 17, the rest-of-season order's over the league's week through week
+            17), as the basis says; null without a projection
         held: { type: boolean, description: the drafter tags him Hold on a sheet, so he is never a drop or a trade give }
         facts: { $ref: "#/components/schemas/WeekFacts" }
     LineupSlot:
@@ -2795,10 +2803,15 @@ components:
         sentence: { type: string, nullable: true, description: the reason for a change, from facts; null when unchanged }
     LineupAdvice:
       type: object
-      required: [week, basis, order_basis, refreshed, read_at, set, slots, bench, host_lineup_url]
+      required: [week, basis, basis_note, order_basis, refreshed, read_at, set, slots, bench, host_lineup_url, host_note]
       properties:
         week: { type: integer }
-        basis: { type: string, description: the honesty line and the basis of points over replacement }
+        basis: { type: string, description: "the honesty line above the rows: the order, and what points over replacement a week are" }
+        basis_note:
+          type: string
+          description: >-
+            the rest of the basis, said once under the rows: the league the points over replacement are for and the
+            league's rules points so far leave out
         order_basis: { $ref: "#/components/schemas/OrderBasis" }
         refreshed: { type: string, format: date-time, description: when the order was made }
         read_at: { type: string, format: date-time, description: the league's last host read }
@@ -2814,6 +2827,12 @@ components:
           description: everyone else on the active roster, by the same keys (injured reserve and taxi spots left out)
           items: { $ref: "#/components/schemas/PlayerLine" }
         host_lineup_url: { type: string, description: "the host's lineup page, empty when we know none" }
+        host_note:
+          type: string
+          nullable: true
+          description: >-
+            one sentence under the verb when we cannot open the host's page ("Make this change on Yahoo. We cannot
+            open that page for you yet."), null when the url opens it
     WaiverRow:
       type: object
       required: [add, drop, gain, starts, sentence]
@@ -2828,10 +2847,15 @@ components:
         sentence: { type: string }
     WaiverAdvice:
       type: object
-      required: [week, basis, order_basis, refreshed, read_at, best, rows, host_waivers_url]
+      required: [week, basis, basis_note, order_basis, refreshed, read_at, best, rows, host_waivers_url, host_note]
       properties:
         week: { type: integer }
         basis: { type: string }
+        basis_note:
+          type: string
+          description: >-
+            the rest of the basis, said once under the rows: the league the points over replacement are for and the
+            league's rules points so far leave out
         order_basis: { $ref: "#/components/schemas/OrderBasis" }
         refreshed: { type: string, format: date-time }
         read_at: { type: string, format: date-time }
@@ -2841,6 +2865,12 @@ components:
           description: positive gains first by gain, then the rest by points over replacement, at most 60
           items: { $ref: "#/components/schemas/WaiverRow" }
         host_waivers_url: { type: string, description: "the host's waiver page, empty when we know none" }
+        host_note:
+          type: string
+          nullable: true
+          description: >-
+            one sentence under the verb when we cannot open the host's page ("Make this change on Yahoo. We cannot
+            open that page for you yet."), null when the url opens it
     TradeRecord:
       type: object
       required: [wins, losses, ties]
@@ -2850,16 +2880,23 @@ components:
         ties: { type: integer }
     TradeRow:
       type: object
-      required: [give, get, my_gain, their_gain, close_for_them]
+      required: [give, get, drop, my_gain, their_gain, close_for_them]
       properties:
         give: { type: array, items: { $ref: "#/components/schemas/PlayerLine" } }
         get: { type: array, items: { $ref: "#/components/schemas/PlayerLine" } }
+        drop:
+          allOf: [{ $ref: "#/components/schemas/PlayerLine" }]
+          nullable: true
+          description: >-
+            who the drafter drops to make room when the trade brings in more players than it sends and the roster has
+            no open spot (the player it costs least to lose, never held, never a starter after the trade); the gain
+            is after him; null otherwise
         my_gain: { type: number, format: double, description: points over replacement a week to the drafter's lineup, one decimal }
         their_gain: { type: number, format: double, description: the same to theirs }
         close_for_them: { type: boolean, description: their gain is under 0.5 a week }
     TradeTeam:
       type: object
-      required: [roster_id, name, owner, record, trades]
+      required: [roster_id, name, owner, record, trades, note]
       properties:
         roster_id: { type: integer }
         name: { type: string }
@@ -2867,19 +2904,36 @@ components:
         record: { $ref: "#/components/schemas/TradeRecord" }
         trades:
           type: array
-          description: at most 10, best for the drafter first
+          description: >-
+            at most 10: the trades their lineup gains 0.5 a week or more from first, then the close calls for them,
+            each group best for the drafter first
           items: { $ref: "#/components/schemas/TradeRow" }
+        note:
+          type: string
+          nullable: true
+          description: one sentence when every trade found with this team is a close call for them, else null
     TradeAdvice:
       type: object
-      required: [week, basis, order_basis, refreshed, read_at, teams, host_trades_url]
+      required: [week, basis, basis_note, order_basis, refreshed, read_at, teams, host_trades_url, host_note]
       properties:
         week: { type: integer }
         basis: { type: string }
+        basis_note:
+          type: string
+          description: >-
+            the rest of the basis, said once under the rows: the league the points over replacement are for and the
+            league's rules points so far leave out
         order_basis: { $ref: "#/components/schemas/OrderBasis" }
         refreshed: { type: string, format: date-time }
         read_at: { type: string, format: date-time }
         teams: { type: array, description: every other team, in standings order, items: { $ref: "#/components/schemas/TradeTeam" } }
         host_trades_url: { type: string, description: "the host's trade page, empty when we know none" }
+        host_note:
+          type: string
+          nullable: true
+          description: >-
+            one sentence under the verb when we cannot open the host's page ("Make this change on Yahoo. We cannot
+            open that page for you yet."), null when the url opens it
     LeagueMove:
       type: object
       required: [kind, at, roster_ids, adds, drops]

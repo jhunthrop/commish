@@ -1663,14 +1663,20 @@ type Lineup string
 
 // LineupAdvice defines model for LineupAdvice.
 type LineupAdvice struct {
-	// Basis the honesty line and the basis of points over replacement
+	// Basis the honesty line above the rows: the order, and what points over replacement a week are
 	Basis string `json:"basis"`
+
+	// BasisNote the rest of the basis, said once under the rows: the league the points over replacement are for and the league's rules points so far leave out
+	BasisNote string `json:"basis_note"`
 
 	// Bench everyone else on the active roster, by the same keys (injured reserve and taxi spots left out)
 	Bench []PlayerLine `json:"bench"`
 
 	// HostLineupUrl the host's lineup page, empty when we know none
 	HostLineupUrl string `json:"host_lineup_url"`
+
+	// HostNote one sentence under the verb when we cannot open the host's page ("Make this change on Yahoo. We cannot open that page for you yet."), null when the url opens it
+	HostNote *string `json:"host_note"`
 
 	// OrderBasis which order ranks the players: our preseason board, or the rest-of-season order (from week 7, once the API reads it)
 	OrderBasis OrderBasis `json:"order_basis"`
@@ -2005,15 +2011,21 @@ type PlayerLine struct {
 	// Facts one player's week; a fact we do not hold is null, never zero
 	Facts WeekFacts `json:"facts"`
 
+	// Headshot his face from our player directory, null without one
+	Headshot *string `json:"headshot"`
+
 	// Held the drafter tags him Hold on a sheet
 	Held   bool         `json:"held"`
 	Player LeaguePlayer `json:"player"`
 
-	// PointsOverReplacement points over replacement a week (the season's over 17 games) for this league, one decimal; null without a projection
+	// PointsOverReplacement points over replacement a week for this league, one decimal: the order's averaged over the weeks it covers (the preseason number's season over 17, the rest-of-season order's over the league's week through week 17), as the basis says; null without a projection
 	PointsOverReplacement *float64 `json:"points_over_replacement"`
 
 	// PositionRank his place at his position in our order
 	PositionRank *int `json:"position_rank"`
+
+	// Slug his page on the site (/players/{slug}): set for a player our order ranks whose name no other player in our directory shares, null otherwise (a shared name's page is named by the run, which the API does not read)
+	Slug *string `json:"slug"`
 }
 
 // PlayerPosition defines model for PlayerPosition.
@@ -2431,6 +2443,12 @@ type SheetUpdate struct {
 type TradeAdvice struct {
 	Basis string `json:"basis"`
 
+	// BasisNote the rest of the basis, said once under the rows: the league the points over replacement are for and the league's rules points so far leave out
+	BasisNote string `json:"basis_note"`
+
+	// HostNote one sentence under the verb when we cannot open the host's page ("Make this change on Yahoo. We cannot open that page for you yet."), null when the url opens it
+	HostNote *string `json:"host_note"`
+
 	// HostTradesUrl the host's trade page, empty when we know none
 	HostTradesUrl string `json:"host_trades_url"`
 
@@ -2454,9 +2472,12 @@ type TradeRecord struct {
 // TradeRow defines model for TradeRow.
 type TradeRow struct {
 	// CloseForThem their gain is under 0.5 a week
-	CloseForThem bool         `json:"close_for_them"`
-	Get          []PlayerLine `json:"get"`
-	Give         []PlayerLine `json:"give"`
+	CloseForThem bool `json:"close_for_them"`
+
+	// Drop who the drafter drops to make room when the trade brings in more players than it sends and the roster has no open spot (the player it costs least to lose, never held, never a starter after the trade); the gain is after him; null otherwise
+	Drop *PlayerLine  `json:"drop"`
+	Get  []PlayerLine `json:"get"`
+	Give []PlayerLine `json:"give"`
 
 	// MyGain points over replacement a week to the drafter's lineup
 	MyGain float64 `json:"my_gain"`
@@ -2467,12 +2488,15 @@ type TradeRow struct {
 
 // TradeTeam defines model for TradeTeam.
 type TradeTeam struct {
-	Name     string      `json:"name"`
+	Name string `json:"name"`
+
+	// Note one sentence when every trade found with this team is a close call for them, else null
+	Note     *string     `json:"note"`
 	Owner    string      `json:"owner"`
 	Record   TradeRecord `json:"record"`
 	RosterId int         `json:"roster_id"`
 
-	// Trades at most 10, best for the drafter first
+	// Trades at most 10: the trades their lineup gains 0.5 a week or more from first, then the close calls for them, each group best for the drafter first
 	Trades []TradeRow `json:"trades"`
 }
 
@@ -2480,8 +2504,14 @@ type TradeTeam struct {
 type WaiverAdvice struct {
 	Basis string `json:"basis"`
 
+	// BasisNote the rest of the basis, said once under the rows: the league the points over replacement are for and the league's rules points so far leave out
+	BasisNote string `json:"basis_note"`
+
 	// Best the add that gains most
 	Best *WaiverRow `json:"best"`
+
+	// HostNote one sentence under the verb when we cannot open the host's page ("Make this change on Yahoo. We cannot open that page for you yet."), null when the url opens it
+	HostNote *string `json:"host_note"`
 
 	// HostWaiversUrl the host's waiver page, empty when we know none
 	HostWaiversUrl string `json:"host_waivers_url"`

@@ -4,7 +4,7 @@
  * in it. */
 import { ApiError } from '#lib/api/client.ts';
 import { HTTP_STATUS, hasStatus } from '#lib/api/status.ts';
-import type { TradeRow, TradeTeam } from './api.ts';
+import type { PlayerLine, TradeRow, TradeTeam, WaiverRow } from './api.ts';
 import { LINES } from './words.ts';
 
 /** What a failed read shows: the sign-in, the API's own sentence when there is no answer yet (a 404
@@ -24,27 +24,59 @@ export function readFailure(error: unknown, answered: boolean): ReadFailure {
 	};
 }
 
-/** Where one of the page's own reads is: the account's leagues, or the run's board. */
+/** Where the page's own read of the account's leagues is. */
 export type ReadState = 'pending' | 'done' | 'failed';
 
-/** What the page shows once no read has refused it: the league not on the account, a sentence for
- * a read that failed (each tried again with the next minute's read), the screen, or the rows held
- * while the reads land. */
-export type ScreenView = 'missing' | 'leagues-failed' | 'board-failed' | 'ready' | 'loading';
+/** What the page shows once no read has refused it: the league not on the account, a sentence when
+ * the account's leagues could not be read (tried again with the next minute's read), the screen, or
+ * the rows held while the reads land. The answer carries every face and page, so no board is read. */
+export type ScreenView = 'missing' | 'leagues-failed' | 'ready' | 'loading';
 
 export function screenView(reads: {
 	/** The account's leagues, read to name and place this one. */
 	leagues: ReadState;
 	/** This league is among them. */
 	known: boolean;
-	board: ReadState;
 	answered: boolean;
 }): ScreenView {
 	if (reads.leagues === 'failed') return 'leagues-failed';
 	if (reads.leagues === 'done' && !reads.known) return 'missing';
-	if (reads.board === 'failed') return 'board-failed';
-	if (reads.leagues === 'done' && reads.board === 'done' && reads.answered) return 'ready';
+	if (reads.leagues === 'done' && reads.answered) return 'ready';
 	return 'loading';
+}
+
+/** The waiver rows in their three groups: the adds that start for you this week (the panel's count),
+ * those that gain your lineup but sit this week (a bye, a designation), and the rest under the rule.
+ * Split on the API's starts, never on the sign of the gain. */
+export function waiverGroups(rows: readonly WaiverRow[]): {
+	starting: WaiverRow[];
+	later: WaiverRow[];
+	rest: WaiverRow[];
+} {
+	return {
+		starting: rows.filter((r) => r.starts),
+		later: rows.filter((r) => !r.starts && r.gain > 0),
+		rest: rows.filter((r) => !r.starts && r.gain <= 0)
+	};
+}
+
+/** The drop every waiver row shares, said once over them; null when any row drops another or none. */
+export function sharedDrop(rows: readonly WaiverRow[]): PlayerLine | null {
+	const first = rows[0]?.drop ?? null;
+	if (first === null) return null;
+	return rows.every((r) => r.drop?.player.host_id === first.player.host_id) ? first : null;
+}
+
+/** The trade screen's decision when none is marked: the best trade for you among those the other
+ * team gains from, a close call for them only when no other trade is found. */
+export function bestTrade(teams: readonly TradeTeam[]): { row: TradeRow; team: TradeTeam } | null {
+	const all = teams.flatMap((team) => team.trades.map((row) => ({ row, team })));
+	const best = (rows: typeof all): (typeof all)[number] | null =>
+		rows.reduce<(typeof all)[number] | null>(
+			(top, t) => (top === null || t.row.my_gain > top.row.my_gain ? t : top),
+			null
+		);
+	return best(all.filter((t) => !t.row.close_for_them)) ?? best(all);
 }
 
 /** A narrowing's outcome: every row again, the narrowed answer, a sentence when it could not be

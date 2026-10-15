@@ -29,10 +29,11 @@ type Waiver struct {
 	NoDrop bool
 }
 
-// Waivers is §5.2's gain for every pool candidate, positive gains first
-// by gain, then the rest by points over replacement.
-func Waivers(config []draft.SlotConfig, squad Squad, pool []Candidate) []Waiver {
-	w := waiverSearch{f: newFiller(Slots(config)), squad: squad, mine: pointers(squad.Players),
+// Waivers is §5.2's gain for every pool candidate, a week's over the
+// weeks the order covers, positive gains first by gain, then the rest by
+// points over replacement.
+func Waivers(config []draft.SlotConfig, weeks int, squad Squad, pool []Candidate) []Waiver {
+	w := waiverSearch{f: newFiller(Slots(config), weeks), squad: squad, mine: pointers(squad.Players),
 		dedicated: dedicatedCounts(config), counts: positionCounts(squad.Players)}
 	w.base, _ = w.f.strength(w.mine)
 	w.baseStarts = make([]bool, len(w.mine))

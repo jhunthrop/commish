@@ -35,7 +35,7 @@ type memberWords struct {
 }
 
 func wordsFor(host string) memberWords {
-	name := hostWords(host)
+	name := HostWords(host)
 	w := memberWords{
 		off:         name + " leagues are not open here right now.",
 		pick:        "Pick your league from your " + name + " list.",

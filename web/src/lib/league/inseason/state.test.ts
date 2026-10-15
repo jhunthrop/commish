@@ -4,9 +4,18 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { ApiError } from '#lib/api/client.ts';
-import type { PlayerLine, TradeRow, TradeTeam } from './api.ts';
+import type { PlayerLine, TradeRow, TradeTeam, WaiverRow } from './api.ts';
 import { screenOf } from './screens.ts';
-import { Narrowing, markedTrade, readFailure, screenView, tradeKey } from './state.ts';
+import {
+	Narrowing,
+	bestTrade,
+	markedTrade,
+	readFailure,
+	screenView,
+	sharedDrop,
+	tradeKey,
+	waiverGroups
+} from './state.ts';
 import { LINES } from './words.ts';
 
 const ON = { in_season_tools: true };
@@ -49,12 +58,10 @@ void test('a signed-out read asks for the sign-in, and a later failure keeps the
 });
 
 void test('the page holds its rows while reads land and says which of its own reads failed', () => {
-	const base = { leagues: 'done', known: true, board: 'done', answered: true } as const;
+	const base = { leagues: 'done', known: true, answered: true } as const;
 	assert.equal(screenView(base), 'ready');
 	assert.equal(screenView({ ...base, answered: false }), 'loading');
-	assert.equal(screenView({ ...base, board: 'pending' }), 'loading');
 	assert.equal(screenView({ ...base, leagues: 'pending', known: false }), 'loading');
-	assert.equal(screenView({ ...base, board: 'failed' }), 'board-failed');
 	assert.equal(screenView({ ...base, leagues: 'failed', known: false }), 'leagues-failed');
 	// Not on the account is said only once the account's leagues were read.
 	assert.equal(screenView({ ...base, known: false }), 'missing');
@@ -93,6 +100,8 @@ const line = (id: string): PlayerLine => ({
 		team: 'KC',
 		injured_reserve: false
 	},
+	headshot: null,
+	slug: null,
 	position_rank: 10,
 	points_over_replacement: 0.5,
 	held: false,
@@ -110,20 +119,70 @@ const line = (id: string): PlayerLine => ({
 	}
 });
 
-const row = (give: string[], get: string[], mine: number): TradeRow => ({
+const row = (give: string[], get: string[], mine: number, close = false): TradeRow => ({
 	give: give.map(line),
 	get: get.map(line),
+	drop: null,
 	my_gain: mine,
-	their_gain: 0.6,
-	close_for_them: false
+	their_gain: close ? 0.1 : 0.6,
+	close_for_them: close
 });
 
-const team = (trades: TradeRow[]): TradeTeam => ({
-	roster_id: 4,
-	name: 'Muttdogs',
+const team = (trades: TradeRow[], roster = 4): TradeTeam => ({
+	roster_id: roster,
+	name: `Team ${String(roster)}`,
 	owner: 'muttdog',
 	record: { wins: 5, losses: 0, ties: 0 },
-	trades
+	trades,
+	note: null
+});
+
+void test('the trade decision is the best one the other team gains from, a close call only when none is', () => {
+	const lopsided = row(['p1'], ['q1', 'q2'], 4.5, true);
+	const fair = row(['p2'], ['q3'], 1.5);
+	const fairer = row(['p3'], ['q4'], 1.1);
+	const teams = [team([lopsided], 4), team([fair, fairer], 5)];
+	assert.equal(bestTrade(teams)?.row, fair);
+	assert.equal(bestTrade(teams)?.team.roster_id, 5);
+	assert.equal(bestTrade([team([lopsided])])?.row, lopsided);
+	assert.equal(bestTrade([team([])]), null);
+});
+
+const add = (id: string, gain: number, starts: boolean): WaiverRow => ({
+	add: line(id),
+	drop: null,
+	gain,
+	starts,
+	sentence: id
+});
+
+void test('a drop every add shares is said once', () => {
+	const dart = line('Jaxson Dart');
+	const rows = [
+		{ ...add('a', 1.3, true), drop: dart },
+		{ ...add('b', 0.5, false), drop: dart }
+	];
+	assert.equal(sharedDrop(rows), dart);
+	assert.equal(sharedDrop([...rows, { ...add('c', 0, false), drop: line('Other') }]), null);
+	assert.equal(sharedDrop([...rows, add('d', 0, false)]), null);
+	assert.equal(sharedDrop([]), null);
+});
+
+void test('the waiver rows split on who starts this week, never on the sign of the gain', () => {
+	const rows = [add('a', 1.3, true), add('b', 0.5, false), add('c', 0.2, true), add('d', 0, false)];
+	const groups = waiverGroups(rows);
+	assert.deepEqual(
+		groups.starting.map((r) => r.add.player.host_id),
+		['a', 'c']
+	);
+	assert.deepEqual(
+		groups.later.map((r) => r.add.player.host_id),
+		['b']
+	);
+	assert.deepEqual(
+		groups.rest.map((r) => r.add.player.host_id),
+		['d']
+	);
 });
 
 void test('a marked trade is the same trade after a re-read reorders the team, and gone when it is', () => {

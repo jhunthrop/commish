@@ -18,7 +18,8 @@ func pw(v float64) *float64 { return &v }
 func TestChangeSentences(t *testing.T) {
 	white := Line{Name: "Rachaad White", Position: draft.RB, Rank: 14, PerWeek: pw(3.1),
 		Facts: Facts{LastGames: []GamePoints{{5, 18.4}, {4, 11.2}}}}
-	bigsby := Line{Name: "Tank Bigsby", Position: draft.RB, Rank: 31, PerWeek: pw(0.4)}
+	bigsby := Line{Name: "Tank Bigsby", Position: draft.RB, Rank: 31, PerWeek: pw(0.4),
+		Facts: Facts{LastGames: []GamePoints{{5, 6.0}, {4, 3.1}}}}
 	cases := []struct {
 		name string
 		host *Line
@@ -45,6 +46,16 @@ func TestChangeSentences(t *testing.T) {
 			Facts: Facts{Designation: &Designation{Status: StatusQuestionable, AsOf: thursday}}},
 			"White is RB14 in our preseason order, Bigsby RB31. White is questionable as of Thursday 4:10 pm, so check before kickoff."},
 		{"an empty spot", nil, Line{Name: "Rachaad White"}, "Your lineup has nobody in this spot, so Rachaad White starts."},
+		// M1: the fact under a change never argues against it.
+		{"his last games trail the player he replaces: the order alone",
+			&Line{Name: "Aaron Rodgers", Position: draft.QB, Rank: 12, Facts: Facts{LastGames: []GamePoints{{5, 25.0}, {4, 25.0}, {3, 26.7}}}},
+			Line{Name: "Patrick Mahomes", Position: draft.QB, Rank: 3, Facts: Facts{LastGames: []GamePoints{{5, 19.0}, {4, 18.9}, {3, 32.0}}}},
+			"Mahomes is QB3 in our preseason order, Rodgers QB12."},
+		{"a defense that allows few points is never the reason to start against it", &bigsby, Line{Name: "Rachaad White", Position: draft.RB, Rank: 14,
+			Facts: Facts{Opponent: "BUF", Allowed: &Allowed{PointsAGame: 14.1, Rank: 4, Of: 32, Position: draft.RB}}},
+			"White is RB14 in our preseason order, Bigsby RB31."},
+		{"no last games for the player he replaces: nothing to beat", &Line{Name: "Tank Bigsby", Position: draft.RB, Rank: 31}, white,
+			"White is RB14 in our preseason order, Bigsby RB31."},
 	}
 	for _, c := range cases {
 		w := &Writer{Basis: Preseason, Now: thursday.Add(2 * time.Hour)}
@@ -111,6 +122,14 @@ func TestWaiverSentences(t *testing.T) {
 	if got := w.Waiver(Line{Name: "X Y"}, nil, Waiver{Gain: 2, Starts: true}); !strings.Contains(got, "open roster spot") {
 		t.Fatalf("%q", got)
 	}
+	// H1: a gain from a player who does not start this week (a bye, a
+	// designation) never says he starts.
+	got = w.Waiver(Line{Name: "De'Von Achane", Position: draft.RB, Rank: 38}, &wright, Waiver{Gain: 0.5})
+	want = "De'Von Achane does not start for you this week, and your lineup still gains 0.5 points over replacement a week " +
+		"with him on our preseason number. Drop Jaylen Wright, the player it costs you least to lose."
+	if got != want {
+		t.Fatalf("got %q\nwant %q", got, want)
+	}
 }
 
 // The copy guard: every sentence and basis line the routes write, over
@@ -138,8 +157,8 @@ func TestCopyGuard(t *testing.T) {
 	plain := settings
 	plain.Scoring = apitypes.Scoring{Custom: &none}
 	for _, b := range []OrderBasis{Preseason, RestOfSeason} {
-		for _, s := range []string{LineupBasis(b, settings), WaiversBasis(b, settings), TradesBasis(b, settings),
-			LineupBasis(b, plain), WaiversBasis(b, plain), TradesBasis(b, plain)} {
+		for _, s := range []string{LineupBasis(b, SeasonGames), WaiversBasis(b, SeasonGames), TradesBasis(b, SeasonGames),
+			BasisNote(settings), BasisNote(plain), OnlyCloseCalls} {
 			guard(t, s)
 		}
 		w := &Writer{Basis: b, Now: thursday}
@@ -164,7 +183,7 @@ func TestCopyGuard(t *testing.T) {
 					guard(t, w.Change(o, h))
 				}
 			}
-			for _, move := range []Waiver{{Gain: 2, Starts: true}, {Gain: 0}, {NoDrop: true}} {
+			for _, move := range []Waiver{{Gain: 2, Starts: true}, {Gain: 2}, {Gain: 0}, {NoDrop: true}} {
 				for _, add := range ours {
 					guard(t, w.Waiver(add, hosts[1], move))
 					guard(t, w.Waiver(add, nil, move))
@@ -182,11 +201,11 @@ func TestBasisNamesTheRulesLeftOut(t *testing.T) {
 	settings := apitypes.LeagueSettings{Teams: 12, Lineup: apitypes.LineupStandard, Scoring: apitypes.Scoring{Custom: &rules},
 		Roster: apitypes.RosterCounts{Qb: 1, Rb: 2, Wr: 3, Te: 1}}
 	want := "Points so far leave out your league's points for two-point conversions and safeties: the stat lines we hold do not carry them."
-	if got := LineupBasis(Preseason, settings); !strings.HasSuffix(got, want) {
+	if got := BasisNote(settings); !strings.HasSuffix(got, want) {
 		t.Fatalf("%q", got)
 	}
 	rules.PointsPerTwoPointConversion, rules.PointsPerSafety = 0, 0
-	if got := TradesBasis(Preseason, settings); strings.Contains(got, "leave out") {
+	if got := BasisNote(settings); strings.Contains(got, "leave out") {
 		t.Fatalf("%q", got)
 	}
 }

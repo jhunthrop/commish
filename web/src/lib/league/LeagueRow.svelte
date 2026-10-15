@@ -38,6 +38,8 @@
 		meta?: Snippet;
 		/** End on his value over replacement, the order of a list ranked by it (the waiver pool). */
 		endsOnValue?: boolean;
+		/** His face and his page when no board row is given: an in-season row carries both. */
+		face?: { headshot: string | null; slug: string | null };
 	}
 
 	let {
@@ -48,10 +50,13 @@
 		status = null,
 		trailing,
 		meta,
-		endsOnValue = false
+		endsOnValue = false,
+		face
 	}: Props = $props();
 
 	const name = $derived(player?.name ?? host.name);
+	const headshot = $derived(player?.headshot ?? face?.headshot ?? null);
+	const slug = $derived(player?.slug ?? face?.slug ?? null);
 	/** His value cell when the row ends on it, null otherwise or without a value. */
 	const valueEnd = $derived.by(() => {
 		if (!endsOnValue || player === null) return null;
@@ -64,10 +69,10 @@
 
 <div class="row" class:slotted={slot !== undefined}>
 	{#if slot !== undefined}<span class="slot"><Label size="cell">{slot}</Label></span>{/if}
-	<Face src={player?.headshot ?? null} {name} size={32} {status} />
+	<Face src={headshot} {name} size={32} {status} />
 	<span class="who">
-		{#if player}
-			<a href={links.playerSeason(player.slug)}><b><NameWords {name} /></b></a>
+		{#if slug !== null}
+			<a href={links.playerSeason(slug)}><b><NameWords {name} /></b></a>
 		{:else}
 			<b><NameWords {name} /></b>
 		{/if}

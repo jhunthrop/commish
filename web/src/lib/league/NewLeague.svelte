@@ -37,7 +37,14 @@
 		missedWords,
 		roomToFollow
 	} from './follow-many.ts';
-	import { followedLine, followedName, hostWords, hostsLine } from './model.ts';
+	import {
+		IN_SEASON_TOOLS_LINE,
+		followedLine,
+		followedName,
+		hostWords,
+		hostsLine
+	} from './model.ts';
+	import { FLAGS } from '#lib/site/flags.ts';
 	import OneLeagueFree from './OneLeagueFree.svelte';
 
 	/** Attach a league: paste its link, say which team is yours (a tap on it, or a Sleeper username),
@@ -335,6 +342,7 @@
 		{#if withField}Paste your league's link.{/if}
 		We keep your roster, this week's matchup and every player nobody in your league holds up to date,
 		on our board. Free.
+		{#if FLAGS.in_season_tools}{IN_SEASON_TOOLS_LINE}{/if}
 	</p>
 	<p class="hosts">{hostsLine({ ffpc: ffpcOn, yahoo: yahooOn, espn: espnOn })}</p>
 {/snippet}

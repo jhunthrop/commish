@@ -47,7 +47,7 @@ func TestWaiverGainAndDrop(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			got := Waivers(twelveTeamPPR(t), c.squad, []Candidate{c.add})[0]
+			got := Waivers(twelveTeamPPR(t), SeasonGames, c.squad, []Candidate{c.add})[0]
 			if dropID(got, c.squad) != c.drop || !near(got.Gain, c.gain) || got.Starts != c.starts || got.NoDrop != c.noDrop ||
 				positive(got.Gain) != c.positive {
 				t.Fatalf("got drop %s gain %v starts %v no drop %v, want %s %v %v %v",
@@ -61,7 +61,7 @@ func TestWaiverGainAndDrop(t *testing.T) {
 // drop: the move has nobody to drop.
 func TestWaiverKeepsTheOnlyDefense(t *testing.T) {
 	squad := Squad{Players: pprRoster(), Held: map[string]bool{"qb2": true, "rb4": true, "wr4": true, "te2": true, "wr5": true}}
-	got := Waivers(twelveTeamPPR(t), squad, []Candidate{player("fa-rb", draft.RB, 15, 60)})[0]
+	got := Waivers(twelveTeamPPR(t), SeasonGames, squad, []Candidate{player("fa-rb", draft.RB, 15, 60)})[0]
 	if dropID(got, squad) == "def1" || dropID(got, squad) == "k1" {
 		t.Fatalf("dropped the only %s", dropID(got, squad))
 	}
@@ -74,7 +74,7 @@ func TestWaiverOrder(t *testing.T) {
 		player("small", draft.WR, 50, 3), player("big", draft.RB, 10, 90), player("mid", draft.RB, 18, 40),
 		player("none", draft.TE, 30, 1),
 	}
-	got := Waivers(twelveTeamPPR(t), Squad{Players: pprRoster()}, pool)
+	got := Waivers(twelveTeamPPR(t), SeasonGames, Squad{Players: pprRoster()}, pool)
 	var order []string
 	for _, w := range got {
 		order = append(order, pool[w.Add].ID)
@@ -91,10 +91,10 @@ func TestWaiverOrder(t *testing.T) {
 // costs what he costs any week, so he is never the cheapest drop.
 func TestWaiverNeverDropsAStarOutThisWeek(t *testing.T) {
 	back := player("fa-rb", draft.RB, 15, 60)
-	healthy := Waivers(twelveTeamPPR(t), Squad{Players: pprRoster()}, []Candidate{back})[0]
+	healthy := Waivers(twelveTeamPPR(t), SeasonGames, Squad{Players: pprRoster()}, []Candidate{back})[0]
 	for _, tier := range []Tier{Out, Doubtful} {
 		squad := Squad{Players: set(pprRoster(), "rb1", func(c Candidate) Candidate { return withTier(c, tier) })}
-		got := Waivers(twelveTeamPPR(t), squad, []Candidate{back})[0]
+		got := Waivers(twelveTeamPPR(t), SeasonGames, squad, []Candidate{back})[0]
 		if dropID(got, squad) != dropID(healthy, squad) || !near(got.Gain, healthy.Gain) {
 			t.Fatalf("tier %d: drop %s gain %v, want %s %v as when healthy", tier, dropID(got, squad), got.Gain, dropID(healthy, squad), healthy.Gain)
 		}

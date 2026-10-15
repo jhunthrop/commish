@@ -16,12 +16,26 @@
 		verb: string;
 		/** The host's page; empty when the API knows none, and the verb stands disabled. */
 		href: string;
-		/** The API's line on how the rows are ranked. */
+		/** The API's sentence under a verb it cannot open: where the member makes the change. */
+		hostNote?: string | null;
+		/** The API's line on how the rows are ranked, above them. */
 		basis: string;
+		/** The rest of the API's basis, under the rows: the league the figures are for and the rules
+		 * points so far leave out. */
+		basisNote: string;
 		children: Snippet;
 	}
 
-	let { decision, reason = null, verb, href, basis, children }: Props = $props();
+	let {
+		decision,
+		reason = null,
+		verb,
+		href,
+		hostNote = null,
+		basis,
+		basisNote,
+		children
+	}: Props = $props();
 
 	/** The verb's link opens the host in a new tab with no hold on this page. Set here rather than
 	 * on the shared verb, so no other page carries it; made again for each host page, so a link that
@@ -43,14 +57,17 @@
 			{#if reason}<p class="reason">{reason}</p>{/if}
 		</div>
 		<span class="verb desk" {@attach toHost(href)}
-			><Verb {href} disabled={href === ''}>{verb}</Verb></span
+			><Verb {href} disabled={href === ''}>{verb}</Verb>
+			{#if hostNote}<span class="note">{hostNote}</span>{/if}</span
 		>
 	</div>
 </Panel>
 <Basis {basis} />
 {@render children()}
+<p class="foot">{basisNote}</p>
 <div class="pin" {@attach toHost(href)}>
 	<Verb {href} fill disabled={href === ''}>{verb}</Verb>
+	{#if hostNote}<p class="note">{hostNote}</p>{/if}
 </div>
 
 <style>
@@ -84,6 +101,25 @@
 
 	.verb {
 		flex: none;
+		display: flex;
+		flex-direction: column;
+		align-items: flex-end;
+		gap: var(--s-1);
+		max-width: 22em;
+	}
+
+	.note {
+		margin: 0;
+		color: var(--ink-2);
+		font-size: var(--t-sm);
+		text-align: right;
+	}
+
+	.foot {
+		margin: 0;
+		max-width: 90ch;
+		font-size: var(--t-sm);
+		color: var(--ink-3);
 	}
 
 	.pin {
@@ -108,6 +144,11 @@
 			padding: var(--s-3) var(--s-4);
 			background: var(--surface);
 			border-top: 1px solid var(--line-strong);
+		}
+
+		.pin .note {
+			margin-top: var(--s-1);
+			text-align: center;
 		}
 	}
 </style>

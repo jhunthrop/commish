@@ -102,8 +102,8 @@ func (s *Service) Routes() []httpx.Route {
 	}
 }
 
-// hostWords is a host's name as a sentence says it.
-func hostWords(host string) string {
+// HostWords is a host's name as a sentence says it.
+func HostWords(host string) string {
 	switch host {
 	case HostMFL:
 		return "MyFantasyLeague"
@@ -148,22 +148,22 @@ func (s *Service) writeHostError(w http.ResponseWriter, r *http.Request, host st
 	case errors.Is(err, ErrNotALink):
 		httpx.WriteInvalid(w, r, map[string]string{fieldLink: s.linkWords()})
 	case errors.Is(err, ErrNotFound):
-		httpx.WriteError(w, r, http.StatusNotFound, httpx.CodeNotFound, hostWords(host)+" has no league at that link", nil)
+		httpx.WriteError(w, r, http.StatusNotFound, httpx.CodeNotFound, HostWords(host)+" has no league at that link", nil)
 	case errors.Is(err, ErrPrivate) && host == HostESPN:
 		httpx.WriteError(w, r, http.StatusUnprocessableEntity, httpx.CodeInvalid, espnPrivateFollowWords, nil)
 	case errors.Is(err, ErrPrivate):
 		httpx.WriteError(w, r, http.StatusUnprocessableEntity, httpx.CodeInvalid,
-			"This league is private on "+hostWords(host)+". We follow public leagues today", nil)
+			"This league is private on "+HostWords(host)+". We follow public leagues today", nil)
 	case errors.Is(err, ErrTooManyNew):
 		httpx.WriteError(w, r, http.StatusTooManyRequests, httpx.CodeRateLimited,
 			fmt.Sprintf("You have looked up %d new leagues this hour. Attach one of them, or try again later", NewLeaguesPerHour), nil)
 	case errors.Is(err, ErrBusy):
 		httpx.WriteError(w, r, http.StatusServiceUnavailable, httpx.CodeUnavailable,
-			hostWords(host)+" is busy with other leagues right now. Try again in a minute", nil)
+			HostWords(host)+" is busy with other leagues right now. Try again in a minute", nil)
 	case errors.Is(err, ErrUnavailable):
 		s.Log.Warn("leaguesync: host", "host", host, "err", err)
 		httpx.WriteError(w, r, http.StatusBadGateway, httpx.CodeUnavailable,
-			hostWords(host)+" is not answering right now. Try again in a moment", nil)
+			HostWords(host)+" is not answering right now. Try again in a moment", nil)
 	default:
 		httpx.WriteInternal(w, r, s.Log, "leaguesync", err)
 	}

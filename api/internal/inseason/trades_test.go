@@ -45,7 +45,7 @@ func tradeWords(tr Trade, mine, theirs []Candidate) string {
 
 func TestTradesHelpBothLineups(t *testing.T) {
 	mine, theirs := deepAtBack(), deepAtReceiver()
-	got := Trades(twelveTeamPPR(t), Squad{Players: mine}, Squad{Players: theirs}, "", 1000)
+	got := Trades(twelveTeamPPR(t), SeasonGames, Squad{Players: mine}, Squad{Players: theirs}, "", 1000)
 	if len(got) == 0 {
 		t.Fatal("no trade found between a team deep at back and one deep at receiver")
 	}
@@ -68,8 +68,11 @@ func TestTradesHelpBothLineups(t *testing.T) {
 		t.Fatalf("trades %v miss m-rb3 for t-wr4", seen)
 	}
 	for i := 1; i < len(got); i++ {
-		if got[i].MyGain > got[i-1].MyGain {
+		if got[i].CloseForThem() == got[i-1].CloseForThem() && got[i].MyGain > got[i-1].MyGain {
 			t.Fatalf("not ordered by the member's gain at %d", i)
+		}
+		if got[i-1].CloseForThem() && !got[i].CloseForThem() {
+			t.Fatalf("a close call for them leads a trade they gain from at %d", i)
 		}
 	}
 }
@@ -77,7 +80,7 @@ func TestTradesHelpBothLineups(t *testing.T) {
 func TestTradesKeepHeldInjuredAndKickers(t *testing.T) {
 	mine := deepAtBack()
 	theirs := set(deepAtReceiver(), "t-wr4", func(c Candidate) Candidate { c.InjuredReserve = true; return c })
-	got := Trades(twelveTeamPPR(t), Squad{Players: mine, Held: map[string]bool{"m-rb3": true}}, Squad{Players: theirs}, "", 1000)
+	got := Trades(twelveTeamPPR(t), SeasonGames, Squad{Players: mine, Held: map[string]bool{"m-rb3": true}}, Squad{Players: theirs}, "", 1000)
 	for _, tr := range got {
 		words := tradeWords(tr, mine, theirs)
 		if strings.Contains(words, "m-rb3") || strings.Contains(words, "t-wr4") || strings.Contains(words, "-k") || strings.Contains(words, "-def") {
@@ -88,7 +91,7 @@ func TestTradesKeepHeldInjuredAndKickers(t *testing.T) {
 
 func TestTradesNarrowToOnePlayer(t *testing.T) {
 	mine, theirs := deepAtBack(), deepAtReceiver()
-	got := Trades(twelveTeamPPR(t), Squad{Players: mine}, Squad{Players: theirs}, "t-wr5", 1000)
+	got := Trades(twelveTeamPPR(t), SeasonGames, Squad{Players: mine}, Squad{Players: theirs}, "t-wr5", 1000)
 	if len(got) == 0 {
 		t.Fatal("no trade holds t-wr5")
 	}
@@ -107,12 +110,63 @@ func TestTradesNarrowToOnePlayer(t *testing.T) {
 	}
 }
 
+// A two-for-one that grows a full roster names who the member drops to
+// make room (§5.2's drop: the player it costs least to lose, never held,
+// never a starter, never one of the two he gets), and the gain is after
+// the drop. An open spot takes the extra player with no drop.
+func TestTwoForOneNamesTheDrop(t *testing.T) {
+	mine, theirs := deepAtBack(), deepAtReceiver()
+	held := map[string]bool{"m-wr4": true}
+	full := Trades(twelveTeamPPR(t), SeasonGames, Squad{Players: mine, Held: held}, Squad{Players: theirs}, "", 1000)
+	grows := 0
+	for _, tr := range full {
+		words := tradeWords(tr, mine, theirs)
+		if len(tr.Get) <= len(tr.Give) {
+			if tr.Drop >= 0 {
+				t.Fatalf("%s drops %s with no room needed", words, mine[tr.Drop].ID)
+			}
+			continue
+		}
+		grows++
+		if tr.Drop < 0 {
+			t.Fatalf("%s grows a full roster with no drop", words)
+		}
+		drop := mine[tr.Drop]
+		if held[drop.ID] || contains(tr.Give, tr.Drop) || drop.Position == draft.K || drop.Position == draft.DEF {
+			t.Fatalf("%s drops %s", words, drop.ID)
+		}
+		f := newFiller(Slots(twelveTeamPPR(t)), SeasonGames)
+		base, _ := f.strength(pointers(mine))
+		var after []*Candidate
+		for i := range mine {
+			if !contains(tr.Give, i) && i != tr.Drop {
+				after = append(after, &mine[i])
+			}
+		}
+		for _, h := range tr.Get {
+			after = append(after, &theirs[h])
+		}
+		strength, _ := f.strength(after)
+		if !near(tr.MyGain, strength-base) {
+			t.Fatalf("%s gain %v, after the drop %v", words, tr.MyGain, strength-base)
+		}
+	}
+	if grows == 0 {
+		t.Fatal("no two-for-one the member gets two in")
+	}
+	for _, tr := range Trades(twelveTeamPPR(t), SeasonGames, Squad{Players: mine, Open: true}, Squad{Players: theirs}, "", 1000) {
+		if tr.Drop >= 0 {
+			t.Fatalf("%s drops with an open spot", tradeWords(tr, mine, theirs))
+		}
+	}
+}
+
 // A trade that leaves a side unable to fill a slot is never offered:
 // the member's only tight end stays.
 func TestTradesFillEverySlot(t *testing.T) {
 	mine := without(deepAtBack(), []int{12})
 	theirs := deepAtReceiver()
-	for _, tr := range Trades(twelveTeamPPR(t), Squad{Players: mine}, Squad{Players: theirs}, "", 1000) {
+	for _, tr := range Trades(twelveTeamPPR(t), SeasonGames, Squad{Players: mine}, Squad{Players: theirs}, "", 1000) {
 		for _, g := range tr.Give {
 			if mine[g].ID == "m-te" {
 				gotTE := false
@@ -151,7 +205,7 @@ func BenchmarkTradesFifteenAgainstFifteen(b *testing.B) {
 	teams := league(2)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		Trades(config, teams[0], teams[1], "", TradesPerTeam)
+		Trades(config, SeasonGames, teams[0], teams[1], "", TradesPerTeam)
 	}
 }
 
@@ -163,7 +217,7 @@ func BenchmarkTradesTwelveTeams(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		for _, other := range teams[1:] {
-			Trades(config, teams[0], other, "", TradesPerTeam)
+			Trades(config, SeasonGames, teams[0], other, "", TradesPerTeam)
 		}
 	}
 }
@@ -172,9 +226,9 @@ func BenchmarkTradesTwelveTeams(b *testing.B) {
 // week changes nothing.
 func TestTradeGainsIgnoreThisWeek(t *testing.T) {
 	theirs := deepAtReceiver()
-	healthy := Trades(twelveTeamPPR(t), Squad{Players: deepAtBack()}, Squad{Players: theirs}, "m-rb1", 1000)
+	healthy := Trades(twelveTeamPPR(t), SeasonGames, Squad{Players: deepAtBack()}, Squad{Players: theirs}, "m-rb1", 1000)
 	bye := set(deepAtBack(), "m-rb1", func(c Candidate) Candidate { return withTier(c, Out) })
-	got := Trades(twelveTeamPPR(t), Squad{Players: bye}, Squad{Players: theirs}, "m-rb1", 1000)
+	got := Trades(twelveTeamPPR(t), SeasonGames, Squad{Players: bye}, Squad{Players: theirs}, "m-rb1", 1000)
 	if len(got) != len(healthy) {
 		t.Fatalf("%d trades with him on bye, %d healthy", len(got), len(healthy))
 	}
@@ -184,5 +238,24 @@ func TestTradeGainsIgnoreThisWeek(t *testing.T) {
 			t.Fatalf("trade %d: %s %v, healthy %s %v", i, tradeWords(got[i], bye, theirs), got[i].MyGain,
 				tradeWords(healthy[i], bye, theirs), healthy[i].MyGain)
 		}
+	}
+}
+
+// The trades the other team gains from lead, by the member's gain; the
+// close calls for them follow, by the member's gain too (H3).
+func TestTradesLeadWithOnesTheyGainFrom(t *testing.T) {
+	trades := []Trade{{MyGain: 4.5, TheirGain: 0.04}, {MyGain: 1.5, TheirGain: 0.6}, {MyGain: 2, TheirGain: 1},
+		{MyGain: 3, TheirGain: 0.44}, {MyGain: 1, TheirGain: 0.46}}
+	orderTrades(trades)
+	var got []string
+	for _, tr := range trades {
+		got = append(got, fmt.Sprintf("%.1f/%.2f", tr.MyGain, tr.TheirGain))
+	}
+	want := "2.0/1.00 1.5/0.60 1.0/0.46 4.5/0.04 3.0/0.44"
+	if strings.Join(got, " ") != want {
+		t.Fatalf("order %v, want %s", got, want)
+	}
+	if (Trade{TheirGain: 0.46}).CloseForThem() || !(Trade{TheirGain: 0.44}).CloseForThem() {
+		t.Fatal("a close call is judged on the gain a page prints")
 	}
 }

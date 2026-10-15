@@ -7,17 +7,19 @@
 	import Quiet from '#lib/ui/Quiet.svelte';
 	import ValueCell from '#lib/ui/ValueCell.svelte';
 	import type { LeagueHost } from '../api.ts';
-	import type { LeagueBoard } from '../board.ts';
 	import LineRow from './LineRow.svelte';
 	import Screen from './Screen.svelte';
 	import type { WaiverAdvice, WaiverPosition, WaiverRow } from './api.ts';
-	import { Narrowing } from './state.ts';
+	import Label from '#lib/ui/Label.svelte';
+	import { Narrowing, sharedDrop, waiverGroups } from './state.ts';
 	import {
 		GAIN_DECIMALS,
+		LATER_RULE,
 		LINES,
 		NO_START_RULE,
 		addsTitle,
 		dropWords,
+		sharedDropWords,
 		startingCount,
 		verbWords,
 		waiverDecision
@@ -29,13 +31,12 @@
 	 * the decision, and the one verb opens the host's waiver page to claim it. */
 	interface Props {
 		advice: WaiverAdvice;
-		board: LeagueBoard;
 		host: LeagueHost;
 		/** Reads the adds at one position. */
 		narrow: (position: WaiverPosition) => Promise<WaiverAdvice>;
 	}
 
-	let { advice, board, host, narrow }: Props = $props();
+	let { advice, host, narrow }: Props = $props();
 
 	/** The positions the route narrows to, in the board's order. */
 	const POSITIONS: readonly WaiverPosition[] = ['QB', 'RB', 'WR', 'TE', 'K', 'DEF'];
@@ -59,8 +60,10 @@
 			? shown.rows
 			: advice.rows.filter((r) => r.add.player.position === position)
 	);
-	const gaining = $derived(visible.filter((r) => r.gain > 0));
-	const rest = $derived(visible.filter((r) => r.gain <= 0));
+	/** Who starts this week (the count), who helps but sits this week, and the rest. */
+	const groups = $derived(waiverGroups(visible));
+	/** The drop every add shares, said once over the rows rather than on each. */
+	const shared = $derived(sharedDrop(visible));
 	const chosen = $derived(visible.find((r) => idOf(r) === marked) ?? shown.best);
 
 	// The route's reader is fixed for the page's life.
@@ -83,11 +86,17 @@
 {#snippet row(r: WaiverRow)}
 	{@const on = marked === idOf(r)}
 	<div class="pick" class:on>
-		<LineRow line={r.add} {board} note={dropWords(r)} brief>
+		<LineRow line={r.add} note={shared === null ? dropWords(r) : undefined}>
 			{#snippet trailing()}
 				<span class="end">
 					{#if r.gain > 0}
-						<ValueCell value={r.gain} label={LINES.aWeek} signed decimals={GAIN_DECIMALS} />
+						<ValueCell
+							value={r.gain}
+							label={LINES.toYourLineup}
+							phoneLabel={false}
+							signed
+							decimals={GAIN_DECIMALS}
+						/>
 					{/if}
 					<span class="mark">
 						<Quiet size="sm" onclick={() => (marked = on ? null : idOf(r))}
@@ -102,14 +111,20 @@
 
 <Screen
 	decision={waiverDecision(chosen)}
-	reason={chosen?.sentence}
+	reason={chosen && !chosen.starts ? chosen.sentence : null}
 	verb={verbWords('waivers', host)}
 	href={shown.host_waivers_url}
+	hostNote={shown.host_note}
 	basis={shown.basis}
+	basisNote={shown.basis_note}
 >
 	<Panel as="section" label={LINES.waiverAdds} padding="none">
 		<div class="head">
-			<PanelHead title={addsTitle(advice.week)} aside={startingCount(gaining.length)} level={2} />
+			<PanelHead
+				title={addsTitle(advice.week)}
+				aside={startingCount(groups.starting.length)}
+				level={2}
+			/>
 			<ChipGroup label={LINES.position}>
 				<Chip size="sm" pressed={position === null} onclick={() => void choose(null)}
 					>{LINES.all}</Chip
@@ -119,12 +134,24 @@
 				{/each}
 			</ChipGroup>
 			{#if problem}<ProblemLine>{problem}</ProblemLine>{/if}
+			{#if shared !== null || groups.starting.length + groups.later.length > 0}
+				<div class="under">
+					<span
+						>{#if shared}{sharedDropWords(shared)}{/if}</span
+					>
+					<span class="phone"><Label>{LINES.gainHead}</Label></span>
+				</div>
+			{/if}
 		</div>
 		<div class="rows" class:reading aria-busy={reading}>
-			{#each gaining as r (idOf(r))}{@render row(r)}{/each}
-			{#if rest.length > 0}
+			{#each groups.starting as r (idOf(r))}{@render row(r)}{/each}
+			{#if groups.later.length > 0}
+				<p class="rule">{LATER_RULE}</p>
+				{#each groups.later as r (idOf(r))}{@render row(r)}{/each}
+			{/if}
+			{#if groups.rest.length > 0}
 				<p class="rule">{NO_START_RULE}</p>
-				{#each rest as r (idOf(r))}{@render row(r)}{/each}
+				{#each groups.rest as r (idOf(r))}{@render row(r)}{/each}
 			{/if}
 		</div>
 	</Panel>
@@ -157,6 +184,28 @@
 	.mark {
 		position: relative;
 		z-index: 1;
+	}
+
+	/* Over the rows: the drop they share, and on a phone what the rows' number is, since the cell
+	   prints it alone there. */
+	.under {
+		display: flex;
+		align-items: baseline;
+		justify-content: space-between;
+		gap: var(--s-3);
+		font-size: var(--t-sm);
+		font-weight: 600;
+		color: var(--ink);
+	}
+
+	.phone {
+		display: none;
+	}
+
+	@media (max-width: 760px) {
+		.phone {
+			display: inline;
+		}
 	}
 
 	.rule {

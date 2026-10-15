@@ -8,6 +8,7 @@ import (
 	"github.com/jhunthrop/commish/api/internal/apitypes"
 	"github.com/jhunthrop/commish/api/internal/boards"
 	"github.com/jhunthrop/commish/api/internal/draft"
+	"github.com/jhunthrop/commish/api/internal/leaguesync"
 )
 
 func boardID(l apitypes.PlayerLine) string {
@@ -29,6 +30,13 @@ func TestLineupAdvice(t *testing.T) {
 			out.OrderBasis, out.Refreshed, out.HostLineupUrl)
 	}
 	guard(t, out.Basis)
+	if out.HostNote != nil {
+		t.Fatalf("a Sleeper page carries a note: %q", *out.HostNote)
+	}
+	f.league.Snap.Ref = leaguesync.Ref{Host: leaguesync.HostMFL, LeagueID: "12345"}
+	if mfl, _ := newFixtureAdvisor(t, f, nil).Lineup(); mfl.HostLineupUrl != "" || mfl.HostNote == nil {
+		t.Fatalf("a league with no page: url %q note %v", mfl.HostLineupUrl, mfl.HostNote)
+	}
 	seen := map[string]bool{}
 	for _, s := range out.Slots {
 		if seen[boardID(s.Ours)] {
@@ -105,6 +113,9 @@ func TestWaiverAdvice(t *testing.T) {
 			t.Fatalf("row %d gains %v below the rule", i, r.Gain)
 		}
 		above = above && r.Gain > 0
+		if !r.Starts && (strings.Contains(r.Sentence, "starts for you,") || strings.Contains(r.Sentence, "would start,")) {
+			t.Fatalf("row %d does not start and says he does: %q", i, r.Sentence)
+		}
 		if i > 0 && r.Gain > 0 && r.Gain > out.Rows[i-1].Gain {
 			t.Fatalf("row %d not by gain", i)
 		}
@@ -140,6 +151,13 @@ func TestTradeAdvice(t *testing.T) {
 			if tr.MyGain <= 0 || tr.TheirGain <= 0 || tr.CloseForThem != (tr.TheirGain < CloseCall) {
 				t.Fatalf("gains %v %v close %v", tr.MyGain, tr.TheirGain, tr.CloseForThem)
 			}
+			// The fixture's rosters are full: two in for one out names the drop.
+			if (len(tr.Get) > len(tr.Give)) != (tr.Drop != nil) {
+				t.Fatalf("%d in, %d out, drop %v", len(tr.Get), len(tr.Give), tr.Drop)
+			}
+			if tr.Drop != nil && (tr.Drop.Held || boardID(*tr.Drop) == boardID(tr.Give[0])) {
+				t.Fatalf("drop %s", boardID(*tr.Drop))
+			}
 			for _, g := range tr.Give {
 				if g.Held || held[boardID(g)] {
 					t.Fatal("a held player is given")
@@ -152,6 +170,24 @@ func TestTradeAdvice(t *testing.T) {
 	}
 	if any == 0 {
 		t.Fatal("no trade in a twelve-team league")
+	}
+	for _, team := range out.Teams {
+		close := 0
+		for _, tr := range team.Trades {
+			if tr.CloseForThem {
+				close++
+			}
+		}
+		only := close > 0 && close == len(team.Trades)
+		if (team.Note != nil) != only {
+			t.Fatalf("team %d: %d of %d close, note %v", team.RosterId, close, len(team.Trades), team.Note)
+		}
+		if team.Note != nil && *team.Note != OnlyCloseCalls {
+			t.Fatalf("note %q", *team.Note)
+		}
+		if len(team.Trades) > 0 && team.Trades[0].CloseForThem && !only {
+			t.Fatalf("team %d leads with a close call", team.RosterId)
+		}
 	}
 	focus := *f.league.Player(mine[3]).BoardId
 	narrowed, _ := a.Trades(a.hostIDOf(focus))

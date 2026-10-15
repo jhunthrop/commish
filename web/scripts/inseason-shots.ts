@@ -2,7 +2,9 @@
 // tabs, against the fixture API (scripts/inseason-fixture/serve.ts) and the built site, in both themes
 // at 1440 and 390. At 1440, 1024, 800, 768 and 390 it asserts the page never scrolls sideways, and it
 // prints the tallest player row, the taps from the page to its verb, and the shots of the loading
-// rows, the API's refusals and the site's not-found for an unknown screen. Exits non-zero when a page scrolls sideways.
+// rows, the API's refusals and the site's not-found for an unknown screen. On a phone (390 by 844) it
+// asserts the first player row sits whole above the pinned verb. Exits non-zero when a page scrolls
+// sideways or a phone's first row is under the pin.
 //
 //   node scripts/inseason-shots.ts [web origin] [out dir]
 // with the site built against PUBLIC_API_URL=http://localhost:8799 and the fixture API running there.
@@ -15,6 +17,8 @@ const THEMES = ['light', 'dark'] as const;
 const SHOT_WIDTHS = new Set([1440, 390]);
 const WIDTHS = [1440, 1024, 800, 768, 390] as const;
 const VIEWPORT_HEIGHT = 900;
+/** A phone's screen: the first row must clear the pinned verb in it. */
+const PHONE = { width: 390, height: 844 } as const;
 const READY_TIMEOUT_MS = 30_000;
 /** The CSRF cookie the site reads as signed in; the fixture API asks for nothing more. */
 const SIGNED_IN = { name: 'commish_csrf', value: 'fixture' };
@@ -62,6 +66,8 @@ function file(name: string): string {
 
 const scrolls: string[] = [];
 const rows = new Map<string, number>();
+const under: string[] = [];
+const firstRows = new Map<string, string>();
 for (const { name, path, ready: text } of PAGES) {
 	for (const theme of THEMES) {
 		for (const width of WIDTHS) {
@@ -85,6 +91,21 @@ for (const { name, path, ready: text } of PAGES) {
 				);
 			}
 			rows.set(`${name} ${String(width)}`, wide.tallest);
+			if (width === PHONE.width && name !== 'league') {
+				await page.setViewportSize(PHONE);
+				const fold = await page.evaluate(() => {
+					const row = document.querySelector('main .row')?.getBoundingClientRect();
+					const pin = document.querySelector('.pin')?.getBoundingClientRect();
+					return { rowBottom: row?.bottom ?? Infinity, pinTop: pin?.top ?? 0 };
+				});
+				firstRows.set(
+					`${name} ${theme}`,
+					`first row ends ${fold.rowBottom.toFixed(0)}px, pin starts ${fold.pinTop.toFixed(0)}px`
+				);
+				if (fold.rowBottom > fold.pinTop) under.push(`${name} ${theme}`);
+				await page.screenshot({ path: file(`${name}-phone-${theme}`) });
+				await page.setViewportSize({ width, height: VIEWPORT_HEIGHT });
+			}
 			if (SHOT_WIDTHS.has(width)) {
 				await page.screenshot({ path: file(`${name}-${theme}-${String(width)}`), fullPage: true });
 				await page.screenshot({ path: file(`${name}-first-${theme}-${String(width)}`) });
@@ -138,6 +159,9 @@ for (const width of SHOT_WIDTHS) {
 await browser.close();
 for (const [where, height] of rows)
 	process.stdout.write(`tallest row ${where}: ${height.toFixed(1)}px\n`);
+for (const [where, fold] of firstRows) process.stdout.write(`phone ${where}: ${fold}\n`);
 process.stdout.write(`shots in ${out.pathname}\n`);
 if (scrolls.length > 0) throw new Error(`Pages scroll sideways:\n${scrolls.join('\n')}`);
+if (under.length > 0)
+	throw new Error(`A phone's first row is under the pinned verb:\n${under.join('\n')}`);
 process.stdout.write('No page scrolls sideways at 1440, 1024, 800, 768 or 390.\n');

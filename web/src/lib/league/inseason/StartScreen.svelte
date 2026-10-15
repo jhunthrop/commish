@@ -3,7 +3,6 @@
 	import Panel from '#lib/ui/Panel.svelte';
 	import PanelHead from '#lib/ui/PanelHead.svelte';
 	import type { LeagueHost } from '../api.ts';
-	import type { LeagueBoard } from '../board.ts';
 	import LineRow from './LineRow.svelte';
 	import Screen from './Screen.svelte';
 	import type { LineupAdvice } from './api.ts';
@@ -14,11 +13,10 @@
 	 * players a change sits marked. One column at every width, as §4.1 lays it out. */
 	interface Props {
 		advice: LineupAdvice;
-		board: LeagueBoard;
 		host: LeagueHost;
 	}
 
-	let { advice, board, host }: Props = $props();
+	let { advice, host }: Props = $props();
 
 	const labels = $derived(slotLabels(advice.slots.map((s) => s.slot)));
 	/** The host's starters our lineup sits, marked on the bench. */
@@ -29,7 +27,9 @@
 	decision={lineupDecision(advice)}
 	verb={verbWords('start', host)}
 	href={advice.host_lineup_url}
+	hostNote={advice.host_note}
 	basis={advice.basis}
+	basisNote={advice.basis_note}
 >
 	<Panel as="section" label={lineupTitle(advice.week)} padding="none">
 		<div class="head">
@@ -38,12 +38,12 @@
 		{#each advice.slots as slot, i (`${slot.slot}-${String(i)}`)}
 			{#if slot.changed}
 				<div class="change">
-					<LineRow line={slot.ours} {board} slot={labels[i]} />
-					{#if slot.host}<LineRow line={slot.host} {board} slot={LINES.sit} />{/if}
+					<LineRow line={slot.ours} slot={labels[i]} />
+					{#if slot.host}<LineRow line={slot.host} slot={LINES.sit} />{/if}
 					{#if slot.sentence}<p class="why">{slot.sentence}</p>{/if}
 				</div>
 			{:else}
-				<LineRow line={slot.ours} {board} slot={labels[i]} />
+				<LineRow line={slot.ours} slot={labels[i]} />
 			{/if}
 		{/each}
 	</Panel>
@@ -52,7 +52,11 @@
 			<PanelHead title={LINES.bench} aside={LINES.perWeek} level={2} />
 		</div>
 		{#each advice.bench as line (line.player.host_id)}
-			<LineRow {line} {board} slot={sat.has(line.player.host_id) ? LINES.sit : LINES.bench} />
+			{@const sits = sat.has(line.player.host_id)}
+			<!-- A starter a change sits is on the change's wash here too, so the two read as one move. -->
+			<div class:change={sits}>
+				<LineRow {line} slot={sits ? LINES.sit : LINES.bench} />
+			</div>
 		{:else}
 			<p class="none"><Label>{LINES.noBench}</Label></p>
 		{/each}

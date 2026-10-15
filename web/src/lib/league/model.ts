@@ -29,20 +29,12 @@ type ScoringPreset = components['schemas']['ScoringPreset'];
  * minute whatever the number of viewers, so a faster page would only see the same read. */
 export const POLL_MS = 60_000;
 
-/** The hosts a league may come from here, as the attach page says it: FFPC, Yahoo and ESPN only where
- * each is open (HOST_FFPC_ENABLED, HOST_YAHOO_ENABLED, HOST_ESPN_ENABLED). */
-export function hostsLine(open: {
-	readonly ffpc: boolean;
-	readonly yahoo: boolean;
-	readonly espn: boolean;
-}): string {
-	const hosts = ['Sleeper leagues', 'public MyFantasyLeague leagues'];
-	if (open.ffpc) hosts.push('FFPC leagues');
-	if (open.yahoo) hosts.push('Yahoo leagues');
-	if (open.espn) hosts.push('ESPN leagues');
-	const last = hosts.pop() ?? '';
-	return `Works with ${hosts.join(', ')} and ${last}.`;
-}
+export { LEAGUE_HOSTS, hostsLine } from './hosts.ts';
+
+/** What following a league gives in season, in one sentence for a first-timer on the follow page:
+ * the three in-season screens, by what each decides. */
+export const IN_SEASON_TOOLS_LINE =
+	'Each week we show the lineup to start, your best add on waivers and the trades that help both teams.';
 
 const SECOND = 1;
 const MINUTE = 60;
@@ -169,7 +161,8 @@ export function seasonWords(season: IndexSeason): string {
 	return `${plural(season.games, 'game')}, ${figure} a game`;
 }
 
-/** His preseason numbers with their basis: "proj 288, over repl +61", or for a player at his
+/** His preseason numbers with their basis: "proj 288, over repl +61 a season" (a season, apart from
+ * the in-season screens' figures a week), or for a player at his
  * position's depth floor, "below our board's depth". */
 export function projectionWords(player: {
 	points: number | null;
@@ -179,7 +172,7 @@ export function projectionWords(player: {
 	if (player.belowDepth === true) return "below our board's depth";
 	const parts = [
 		player.points === null ? null : `proj ${fixed(player.points, 0)}`,
-		player.vor === null ? null : `over repl ${signed(player.vor, 0)}`
+		player.vor === null ? null : `over repl ${signed(player.vor, 0)} a season`
 	];
 	return parts.filter((part) => part !== null).join(', ');
 }

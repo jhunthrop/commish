@@ -2412,11 +2412,15 @@ export interface components {
 		};
 		PlayerLine: {
 			player: components['schemas']['LeaguePlayer'];
+			/** @description his face from our player directory, null without one */
+			headshot: string | null;
+			/** @description his page on the site (/players/{slug}): set for a player our order ranks whose name no other player in our directory shares, null otherwise (a shared name's page is named by the run, which the API does not read) */
+			slug: string | null;
 			/** @description his place at his position in our order */
 			position_rank: number | null;
 			/**
 			 * Format: double
-			 * @description points over replacement a week (the season's over 17 games) for this league, one decimal; null without a projection
+			 * @description points over replacement a week for this league, one decimal: the order's averaged over the weeks it covers (the preseason number's season over 17, the rest-of-season order's over the league's week through week 17), as the basis says; null without a projection
 			 */
 			points_over_replacement: number | null;
 			/** @description the drafter tags him Hold on a sheet */
@@ -2436,8 +2440,10 @@ export interface components {
 		};
 		LineupAdvice: {
 			week: number;
-			/** @description the honesty line and the basis of points over replacement */
+			/** @description the honesty line above the rows: the order, and what points over replacement a week are */
 			basis: string;
+			/** @description the rest of the basis, said once under the rows: the league the points over replacement are for and the league's rules points so far leave out */
+			basis_note: string;
 			order_basis: components['schemas']['OrderBasis'];
 			/**
 			 * Format: date-time
@@ -2457,6 +2463,8 @@ export interface components {
 			bench: components['schemas']['PlayerLine'][];
 			/** @description the host's lineup page, empty when we know none */
 			host_lineup_url: string;
+			/** @description one sentence under the verb when we cannot open the host's page ("Make this change on Yahoo. We cannot open that page for you yet."), null when the url opens it */
+			host_note: string | null;
 		};
 		WaiverRow: {
 			add: components['schemas']['PlayerLine'];
@@ -2474,6 +2482,8 @@ export interface components {
 		WaiverAdvice: {
 			week: number;
 			basis: string;
+			/** @description the rest of the basis, said once under the rows: the league the points over replacement are for and the league's rules points so far leave out */
+			basis_note: string;
 			order_basis: components['schemas']['OrderBasis'];
 			/** Format: date-time */
 			refreshed: string;
@@ -2485,6 +2495,8 @@ export interface components {
 			rows: components['schemas']['WaiverRow'][];
 			/** @description the host's waiver page, empty when we know none */
 			host_waivers_url: string;
+			/** @description one sentence under the verb when we cannot open the host's page ("Make this change on Yahoo. We cannot open that page for you yet."), null when the url opens it */
+			host_note: string | null;
 		};
 		TradeRecord: {
 			wins: number;
@@ -2494,6 +2506,8 @@ export interface components {
 		TradeRow: {
 			give: components['schemas']['PlayerLine'][];
 			get: components['schemas']['PlayerLine'][];
+			/** @description who the drafter drops to make room when the trade brings in more players than it sends and the roster has no open spot (the player it costs least to lose, never held, never a starter after the trade); the gain is after him; null otherwise */
+			drop: components['schemas']['PlayerLine'] | null;
 			/**
 			 * Format: double
 			 * @description points over replacement a week to the drafter's lineup
@@ -2512,12 +2526,16 @@ export interface components {
 			name: string;
 			owner: string;
 			record: components['schemas']['TradeRecord'];
-			/** @description at most 10, best for the drafter first */
+			/** @description at most 10: the trades their lineup gains 0.5 a week or more from first, then the close calls for them, each group best for the drafter first */
 			trades: components['schemas']['TradeRow'][];
+			/** @description one sentence when every trade found with this team is a close call for them, else null */
+			note: string | null;
 		};
 		TradeAdvice: {
 			week: number;
 			basis: string;
+			/** @description the rest of the basis, said once under the rows: the league the points over replacement are for and the league's rules points so far leave out */
+			basis_note: string;
 			order_basis: components['schemas']['OrderBasis'];
 			/** Format: date-time */
 			refreshed: string;
@@ -2527,6 +2545,8 @@ export interface components {
 			teams: components['schemas']['TradeTeam'][];
 			/** @description the host's trade page, empty when we know none */
 			host_trades_url: string;
+			/** @description one sentence under the verb when we cannot open the host's page ("Make this change on Yahoo. We cannot open that page for you yet."), null when the url opens it */
+			host_note: string | null;
 		};
 		LeagueMove: {
 			/** @enum {string} */

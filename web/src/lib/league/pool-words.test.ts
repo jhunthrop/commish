@@ -16,5 +16,5 @@ void test('a depth-floor projection is said in words, not as a measured number',
 		projectionWords({ points: 86, vor: -54.5, belowDepth: true }),
 		"below our board's depth"
 	);
-	assert.equal(projectionWords({ points: 288, vor: 61 }), 'proj 288, over repl +61');
+	assert.equal(projectionWords({ points: 288, vor: 61 }), 'proj 288, over repl +61 a season');
 });

@@ -176,7 +176,7 @@ func (s *Service) saveSettings(ctx context.Context, accountID uuid.UUID, snap Sn
 func savedName(snap Snapshot) string {
 	name := strings.TrimSpace(snap.Name)
 	if name == "" {
-		name = "My " + hostWords(snap.Ref.Host) + " league"
+		name = "My " + HostWords(snap.Ref.Host) + " league"
 	}
 	if utf8.RuneCountInString(name) > maxSavedLeagueNameLen {
 		name = string([]rune(name)[:maxSavedLeagueNameLen])
