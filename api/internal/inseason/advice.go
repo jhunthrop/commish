@@ -337,6 +337,8 @@ func (a *advisor) Waivers(position draft.Position) (apitypes.WaiverAdvice, bool)
 			line := mine[move.Drop].line
 			row.Drop, drop = &line, &mine[move.Drop].words
 		}
+		// The sentence says he starts only when he starts this week.
+		move.Starts = row.Starts
 		row.Sentence = w.Waiver(add.words, drop, move)
 		out.Rows = append(out.Rows, row)
 	}

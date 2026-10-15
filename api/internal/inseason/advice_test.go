@@ -113,6 +113,9 @@ func TestWaiverAdvice(t *testing.T) {
 			t.Fatalf("row %d gains %v below the rule", i, r.Gain)
 		}
 		above = above && r.Gain > 0
+		if !r.Starts && (strings.Contains(r.Sentence, "starts for you,") || strings.Contains(r.Sentence, "would start,")) {
+			t.Fatalf("row %d does not start and says he does: %q", i, r.Sentence)
+		}
 		if i > 0 && r.Gain > 0 && r.Gain > out.Rows[i-1].Gain {
 			t.Fatalf("row %d not by gain", i)
 		}

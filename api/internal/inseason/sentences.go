@@ -22,8 +22,9 @@ type Line struct {
 
 func (l Line) short() string { return lastName(l.Name) }
 
-// extremeRanks is how near either end of the 32 a defense's points
-// allowed must sit to be named (§4.3: the top or bottom six).
+// extremeRanks is how near the end of the 32 a defense's points allowed
+// must sit to be named: the six that allow the most (§4.3's bottom six;
+// its top six would argue against the start).
 const extremeRanks = 6
 
 // Writer writes one page's sentences from facts (§4.3, §5.1). Template
@@ -59,13 +60,14 @@ func sentence(parts ...string) string {
 
 // Change is the reason ours starts over host (nil when the host's spot
 // is empty): the bye or designation that forces it, else our order;
-// then one supporting fact at most; then a questionable flag.
+// then one supporting fact at most, only one that points the same way;
+// then a questionable flag.
 func (w *Writer) Change(ours Line, host *Line) string {
 	reason := w.forced(ours, host)
 	if reason == "" {
 		reason = w.order(ours, *host)
 	}
-	return sentence(reason, w.support(ours), w.questionable(ours))
+	return sentence(reason, w.support(ours, host), w.questionable(ours))
 }
 
 // forced is the fact that keeps host out of the lineup, "" when none.
@@ -135,12 +137,17 @@ func (w *Writer) order(ours, host Line) string {
 	return fmt.Sprintf("%s is ahead of %s in %s.", ours.short(), host.short(), basis)
 }
 
-// support is one fact for ours: his opponent's points allowed when it
-// sits in the top or bottom six, else his last games under the league's
-// scoring.
-func (w *Writer) support(l Line) string {
-	if a := l.Facts.Allowed; a != nil && l.Facts.Opponent != "" && (a.Rank <= extremeRanks || a.Rank > a.Of-extremeRanks) {
+// support is one fact for ours over host, and only one that favours
+// him, so the reason never argues against the change (M1): his
+// opponent's points allowed when it sits among the six most, else his
+// last games when they beat the last games of the player he replaces.
+// Otherwise the order stands alone.
+func (w *Writer) support(l Line, host *Line) string {
+	if a := l.Facts.Allowed; a != nil && l.Facts.Opponent != "" && a.Rank > a.Of-extremeRanks {
 		return allowedWords(l.Facts.Opponent, *a)
+	}
+	if host == nil || !beats(l.Facts.LastGames, host.Facts.LastGames) {
+		return ""
 	}
 	games := l.Facts.LastGames
 	switch {
@@ -152,6 +159,29 @@ func (w *Writer) support(l Line) string {
 		return fmt.Sprintf("He scored %s in his last game under your league's scoring.", points(games[0].Points))
 	}
 	return ""
+}
+
+// namedGames is how many of a player's last games a sentence names.
+const namedGames = 2
+
+// beats reports whether the games a sentence names (his last two, or
+// one) average more than the other player's same games; false when
+// either has none.
+func beats(ours, theirs []GamePoints) bool {
+	mean := func(games []GamePoints) (float64, bool) {
+		n := min(len(games), namedGames)
+		if n == 0 {
+			return 0, false
+		}
+		sum := 0.0
+		for _, g := range games[:n] {
+			sum += g.Points
+		}
+		return sum / float64(n), true
+	}
+	a, okA := mean(ours)
+	b, okB := mean(theirs)
+	return okA && okB && a > b
 }
 
 // allowedWords is "Buffalo has allowed the 4th fewest points to running
@@ -190,6 +220,10 @@ func (w *Writer) Waiver(add Line, drop *Line, move Waiver) string {
 	switch {
 	case move.NoDrop:
 		return fmt.Sprintf("%s would start for you, but every player he could replace is held or starts.", add.Name)
+	case positive(move.Gain) && !move.Starts:
+		gain := fmt.Sprintf("%s does not start for you this week, and your lineup still gains %s points over replacement a week with him on %s.",
+			add.Name, points(move.Gain), number)
+		return sentence(gain, w.dropWords(drop))
 	case positive(move.Gain):
 		frames := []string{"%s starts for you, and your lineup gains %s points over replacement a week on %s.",
 			"Adding %s raises your lineup by %s points over replacement a week on %s.",
