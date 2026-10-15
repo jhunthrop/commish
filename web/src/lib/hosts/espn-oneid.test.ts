@@ -2,7 +2,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { ESPN_SIGN_IN_ORIGIN, SITE_ORIGIN } from '../site/origins.ts';
-import { findSession, fromSignInWindow, outcomeOf } from './espn-oneid.ts';
+import { fromSignInWindow, outcomeOf } from './espn-oneid.ts';
+import { findSession } from './espn-session.ts';
 
 const S2 = 'AEB'.repeat(30);
 
