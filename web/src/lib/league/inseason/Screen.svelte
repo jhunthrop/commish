@@ -3,6 +3,7 @@
 	import Panel from '#lib/ui/Panel.svelte';
 	import Verb from '#lib/ui/Verb.svelte';
 	import Basis from './Basis.svelte';
+	import { LINES } from './words.ts';
 
 	/** An in-season screen's body: its decision in one sentence first, with the one verb at the
 	 * right (the host's page where the member acts, in a new tab: we never write a host), what the
@@ -35,7 +36,7 @@
 	}
 </script>
 
-<Panel as="section" label="Our call" edge="accent">
+<Panel as="section" label={LINES.ourCall} edge="accent">
 	<div class="decision">
 		<div class="words" role="status">
 			<p class="line">{decision}</p>

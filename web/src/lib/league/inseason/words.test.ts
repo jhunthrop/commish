@@ -2,11 +2,19 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { readFileSync } from 'node:fs';
+import { isScreen } from './screens.ts';
 import type { LineupSlot, PlayerLine, TradeRow, WaiverRow, WeekFacts } from './api.ts';
 import {
 	CLOSE_FOR_THEM,
 	EVERY_TRADE,
 	HELD,
+	LINES,
+	TAB_LABELS,
+	addsTitle,
+	lineupTitle,
+	porWords,
+	showMore,
+	startingCount,
 	NO_START_RULE,
 	NO_TRADES_WITH_TEAM,
 	POINTS_OVER_REPLACEMENT,
@@ -14,7 +22,6 @@ import {
 	dropWords,
 	gainFigure,
 	gameWords,
-	isScreen,
 	lastGamesWords,
 	lineupDecision,
 	rankWords,
@@ -164,10 +171,29 @@ void test('a trade says who gets whom and both gains plainly', () => {
 		'Your lineup gains 5.9 points over replacement a week, theirs under 0.1.'
 	);
 	assert.equal(
-		teamAside({ owner: 'muttdog', record: { wins: 5, losses: 0, ties: 0 } }),
+		teamAside({ name: 'Muttdogs', owner: 'muttdog', record: { wins: 5, losses: 0, ties: 0 } }),
 		'muttdog, 5-0'
 	);
-	assert.equal(teamAside({ owner: '', record: { wins: 2, losses: 2, ties: 1 } }), '2-2-1');
+	assert.equal(
+		teamAside({ name: 'Muttdogs', owner: '', record: { wins: 2, losses: 2, ties: 1 } }),
+		'2-2-1'
+	);
+	assert.equal(
+		teamAside({
+			name: 'Max_Jensen10',
+			owner: 'Max_Jensen10',
+			record: { wins: 1, losses: 4, ties: 0 }
+		}),
+		'1-4'
+	);
+	assert.equal(
+		teamAside({
+			name: 'Nacua Matata',
+			owner: 'Rad_Thad1',
+			record: { wins: 3, losses: 2, ties: 0 }
+		}),
+		'Rad_Thad1, 3-2'
+	);
 });
 
 void test("a row's facts: the game on the Eastern clock, the designation with its stamp, the last games", () => {
@@ -238,7 +264,7 @@ void test('copy guard: every in-season line is fantasy words, with no dash, semi
 		NO_TRADES_WITH_TEAM,
 		CLOSE_FOR_THEM,
 		EVERY_TRADE,
-		teamAside({ owner: 'muttdog', record: { wins: 5, losses: 0, ties: 0 } }),
+		teamAside({ name: 'Muttdogs', owner: 'muttdog', record: { wins: 5, losses: 0, ties: 0 } }),
 		NO_START_RULE,
 		POINTS_OVER_REPLACEMENT,
 		HELD,
@@ -247,7 +273,15 @@ void test('copy guard: every in-season line is fantasy words, with no dash, semi
 		gameWords(facts()),
 		gameWords(facts({ bye: true, opponent: null })),
 		designationWords({ status: 'pup', as_of: '2026-10-15T20:10:00.000Z' }),
-		lastGamesWords([{ week: 5, points: 18.4 }])
+		lastGamesWords([{ week: 5, points: 18.4 }]),
+		porWords(0.4),
+		lineupTitle(6),
+		addsTitle(6),
+		startingCount(0),
+		startingCount(2),
+		showMore(2),
+		...Object.values(TAB_LABELS),
+		...Object.values(LINES)
 	];
 	for (const text of lines) {
 		assert.ok(text, 'every composed line is said');
@@ -260,12 +294,27 @@ void test('copy guard: every in-season line is fantasy words, with no dash, semi
 	assert.match('a clause — another', DASH);
 });
 
-void test("copy guard: the API's honesty lines, as the fixture carries them, pass the same rules", () => {
+/** Every basis and sentence in an answer, however deep. */
+function sentencesIn(value: unknown): string[] {
+	if (Array.isArray(value)) return value.flatMap(sentencesIn);
+	if (typeof value !== 'object' || value === null) return [];
+	return Object.entries(value).flatMap(([key, field]) =>
+		(key === 'basis' || key === 'sentence') && typeof field === 'string'
+			? [field]
+			: sentencesIn(field)
+	);
+}
+
+void test("copy guard: the API's honesty lines and row sentences, as the fixture carries them, pass the same rules", () => {
 	for (const name of ['lineup', 'waivers', 'trades']) {
 		const url = new URL(`../../../../scripts/inseason-fixture/data/${name}.json`, import.meta.url);
-		const { basis } = JSON.parse(readFileSync(url, 'utf8')) as { basis: string };
-		assert.doesNotMatch(basis, BANNED, basis);
-		assert.doesNotMatch(basis, DASH, basis);
-		assert.doesNotMatch(basis, /;/, basis);
+		const said = sentencesIn(JSON.parse(readFileSync(url, 'utf8')) as unknown);
+		assert.ok(said.length > 0, name);
+		for (const text of said) {
+			assert.doesNotMatch(text, BANNED, text);
+			assert.doesNotMatch(text, DASH, text);
+			assert.doesNotMatch(text, /;/, text);
+			assert.doesNotMatch(text, DOUBLED_WORD, text);
+		}
 	}
 });

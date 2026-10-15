@@ -20,14 +20,9 @@ import type {
 	WeekFacts
 } from './api.ts';
 
-/** The three screens, by the decision each makes, as their route's segment names them. */
-const SCREENS = ['start', 'waivers', 'trades'] as const;
-export type InSeasonScreen = (typeof SCREENS)[number];
+import type { InSeasonScreen } from './screens.ts';
 
-/** Whether a route's segment names an in-season screen. */
-export function isScreen(segment: string): segment is InSeasonScreen {
-	return (SCREENS as readonly string[]).includes(segment);
-}
+export type { InSeasonScreen } from './screens.ts';
 
 /** How a gain and a points-over-replacement figure print: one decimal. */
 export const GAIN_DECIMALS = 1;
@@ -167,10 +162,13 @@ export const CLOSE_FOR_THEM = 'A close call for them';
 /** The trade picker's first choice, every trade. */
 export const EVERY_TRADE = 'Every trade';
 
-/** A team's head beside its name: its owner and record, "muttdog, 5-0". */
-export function teamAside(team: Pick<TradeTeam, 'owner' | 'record'>): string {
+/** A team's line under its name: its owner, in the case the host gives, and its record, "muttdog,
+ * 5-0". A team named for its owner, or with none, says only its record. */
+export function teamAside(team: Pick<TradeTeam, 'name' | 'owner' | 'record'>): string {
 	const record = recordWords(team.record);
-	return team.owner === '' ? record : `${team.owner}, ${record}`;
+	const owner = team.owner.trim();
+	const named = owner === '' || owner.toLowerCase() === team.name.trim().toLowerCase();
+	return named ? record : `${owner}, ${record}`;
 }
 
 /** What a team's trades are when the finder holds none for it. */
@@ -254,4 +252,76 @@ export function rankWords(line: Pick<PlayerLine, 'position_rank' | 'player'>): s
 	return line.position_rank === null
 		? null
 		: `${line.player.position}${String(line.position_rank)}`;
+}
+
+/** Points over replacement a week on a row's line, where the row ends on another number: "+0.4 over
+ * repl". */
+export function porWords(points: number): string {
+	return `${signed(points, GAIN_DECIMALS)} ${LINES.overRepl}`;
+}
+
+/** The tabs under a followed league's title. */
+export const TAB_LABELS: Readonly<Record<'league' | InSeasonScreen, string>> = {
+	league: 'League',
+	start: 'Start and sit',
+	waivers: 'Waivers',
+	trades: 'Trades'
+};
+
+/** Every other line the in-season pages print, in one place for the copy guard. */
+export const LINES = {
+	/** A row's number cell, a week said once in its panel's head. */
+	overRepl: 'over repl',
+	unranked: 'Unranked',
+	aWeek: 'a week',
+	all: 'All',
+	position: 'Position',
+	waiverAdds: 'Waiver adds',
+	leaguePages: "Your league's pages",
+	orderRecord: 'How the order has done',
+	perWeek: 'Over repl a week',
+	add: 'Add',
+	propose: 'Propose',
+	chosen: 'Chosen',
+	sit: 'Sit',
+	bench: 'Bench',
+	give: 'Give',
+	get: 'Get',
+	ourCall: 'Our call',
+	reading: 'Reading your league',
+	noBench: 'Nobody on your bench',
+	tradesHolding: 'Trades holding',
+	yourPlayers: 'Your players',
+	theirPlayers: 'Their players',
+	signInTitle: 'Sign in to see your league',
+	signInLine: 'A league lives on your account. Following one is free.',
+	signIn: 'Sign in',
+	missingTitle: 'This league is not on your account',
+	missingLine: 'Paste its link again to follow it.',
+	follow: 'Follow a league',
+	lastRead: 'Your league could not be read just now. The page shows the last read.',
+	unreadable: 'Your league could not be read just now.',
+	leaguesUnread: 'Your leagues could not be read just now. We try again in a minute.',
+	boardUnread: "Our board can't be read right now. We try again in a minute.",
+	narrowingUnread: 'These could not be read just now. The last read stands.'
+} as const;
+
+/** "Your lineup for week 6". */
+export function lineupTitle(week: number): string {
+	return `Your lineup for week ${String(week)}`;
+}
+
+/** "Adds for week 6". */
+export function addsTitle(week: number): string {
+	return `Adds for week ${String(week)}`;
+}
+
+/** The waiver panel's count: "2 would start for you", "None would start for you". */
+export function startingCount(n: number): string {
+	return `${n === 0 ? 'None' : String(n)} would start for you`;
+}
+
+/** A team's Show more: "Show 2 more". */
+export function showMore(n: number): string {
+	return `Show ${String(n)} more`;
 }
