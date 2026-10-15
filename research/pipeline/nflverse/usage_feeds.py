@@ -18,6 +18,7 @@ from sqlalchemy import Connection, text
 from research.errors import SchemaDriftError
 from research.pipeline.nflverse.client import NflverseClient, NflverseError
 from research.pipeline.nflverse.config import FTN_PUBLICATION_LAG_HOURS, ByteCaps, Releases
+from research.pipeline.nflverse.context import play_by_play_file
 from research.pipeline.nflverse.ftn import (
     FTN_COLUMNS,
     PBP_JOIN_COLUMNS,
@@ -78,15 +79,17 @@ def ingest_ftn_charting(conn: Connection, client: NflverseClient, season: int) -
     charted = _capped(client, ByteCaps.FTN_CHARTING).stream_csv(Releases.FTN_CHARTING, ftn, FTN_COLUMNS, index.add)
     _refuse_empty(charted, f"{Releases.FTN_CHARTING}/{ftn}")
     players = ChartedPlayers(index)
-    pbp = f"play_by_play_{season}.csv.gz"
+    pbp = play_by_play_file(season, compressed=True)
     _capped(client, ByteCaps.PLAY_BY_PLAY).stream_csv(Releases.PBP, pbp, PBP_JOIN_COLUMNS, players.add)
     tallies = players.tallies()
     known = frozenset(all_positions(conn))
     built = ftn_observations(tallies, lambda day: kickoff_as_of(day, FTN_PUBLICATION_LAG_HOURS), known)
     written = record_observations(conn, built.observations)
+    held = players.held_back()
     detail = (
         f"{charted} charted plays, {players.joined} dropbacks and targets joined to play-by-play, "
         f"{players.uncharted} with no charting row",
+        f"{len(held)} games held back until FTN charts them whole ({', '.join(held) or 'none'})",
     )
     weeks = len({(t.week, t.player_id) for t in tallies if t.player_id in known})
     return FeedReport("ftn-charting", season, charted, written, weeks, tuple(built.unknown_players), detail)

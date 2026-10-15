@@ -134,6 +134,14 @@ def test_a_failing_feed_is_its_own_line_and_the_pass_carries_on(monkeypatch: pyt
     assert all(statuses[s] == "skipped" for s in skip)
 
 
+def test_the_weekly_pass_reads_the_gzipped_play_by_play(written: list[PlayerWeekObservation]) -> None:
+    fetcher = FixtureFetcher()
+    result = usage_steps.play_by_play(cast(Engine, _FakeEngine()), fetcher, _SEASON)
+    assert fetcher.requested == ["play_by_play_2026.csv.gz"]
+    assert result.status == "ok"
+    assert any(r.source == PBP_PASSER_SOURCE for r in written)
+
+
 def test_a_landed_week_is_skipped_with_nothing_new(monkeypatch: pytest.MonkeyPatch) -> None:
     report = usage_feeds.FeedReport("pfr-advstats", _SEASON, 40, 0, 12, (), ("pass: 40 rows",))
     monkeypatch.setattr(usage_feeds, "ingest_pfr_advstats", lambda conn, client, season: report)

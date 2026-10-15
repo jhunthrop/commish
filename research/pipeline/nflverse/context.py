@@ -78,15 +78,27 @@ class ContextIngestReport:
     passer_weeks: int = 0
 
 
+def play_by_play_file(season: int, *, compressed: bool) -> str:
+    """The season's play-by-play asset, plain or gzipped."""
+    return f"play_by_play_{season}.csv{'.gz' if compressed else ''}"
+
+
 def _game_day_stamp(game_date: str) -> datetime:
     return kickoff_as_of(game_date, PUBLICATION_LAG_HOURS)
 
 
 def ingest_play_by_play(
-    conn: Connection, client: NflverseClient, season: int, *, passers: PasserDropbacks | None = None
+    conn: Connection,
+    client: NflverseClient,
+    season: int,
+    *,
+    passers: PasserDropbacks | None = None,
+    compressed: bool = False,
 ) -> ContextIngestReport:
     """`ingestPlayByPlay`: one stream, two accumulators, team-week and player-week facts; with
-    `passers`, the same stream also counts each passer's dropbacks (the weekly pass's addition)."""
+    `passers`, the same stream also counts each passer's dropbacks (the weekly pass's addition).
+    `compressed` reads the gzipped asset, a fifth of the bytes (the weekly pass, which reads it for the
+    FTN join too); the history pass and its recordings read the plain CSV."""
     teams = PlayByPlayAggregator()
     players = PlayerPlayAggregator()
     extra = () if passers is None else PASSER_COLUMNS
@@ -98,7 +110,8 @@ def ingest_play_by_play(
         if passers is not None:
             passers.add(row)
 
-    plays = client.stream_csv(Releases.PBP, f"play_by_play_{season}.csv", columns, on_row)
+    file = play_by_play_file(season, compressed=compressed)
+    plays = client.stream_csv(Releases.PBP, file, columns, on_row)
     profiles = teams.profiles()
     observations = play_profile_observations(profiles, lambda p: _game_day_stamp(p.game_date))
     projected = frozenset(all_positions(conn))

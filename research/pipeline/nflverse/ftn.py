@@ -114,6 +114,7 @@ class _Tally:
     season: int
     week: int
     player_id: str
+    game_id: str
     game_date: str
     counts: dict[str, int] = field(default_factory=dict)
 
@@ -141,18 +142,28 @@ _THROW_COUNTS: Final = (
 
 @dataclass(slots=True)
 class ChartedPlayers:
-    """Fed the season's play-by-play one row at a time; counts each charted play's passer and target."""
+    """Fed the season's play-by-play one row at a time; counts each charted play's passer and target.
+
+    A game is written only once FTN has charted every dropback and target of it (`tallies`): its rows
+    carry a fixed stamp and the writer keeps the first statement of a fact at a stamp, so a game
+    stored half charted would keep its partial counts for good. A game with an uncharted play is held
+    back (`held_back`) and the next pass, reading the season again, writes it whole."""
 
     index: ChartIndex
     joined: int = 0
-    uncharted: int = 0
-    _tallies: dict[tuple[int, int, str], _Tally] = field(default_factory=dict)
+    uncharted_by_game: dict[str, int] = field(default_factory=dict)
+    _tallies: dict[tuple[int, int, str, str], _Tally] = field(default_factory=dict)
 
-    def _tally(self, season: int, week: int, player_id: str, game_date: str) -> _Tally:
-        key = (season, week, player_id)
+    @property
+    def uncharted(self) -> int:
+        return sum(self.uncharted_by_game.values())
+
+    def _tally(self, season: int, week: int, player_id: str, row: CsvRow) -> _Tally:
+        game_id = row.get("game_id") or ""
+        key = (season, week, player_id, game_id)
         held = self._tallies.get(key)
         if held is None:
-            held = _Tally(season, week, player_id, game_date)
+            held = _Tally(season, week, player_id, game_id, row.get("game_date") or "")
             self._tallies[key] = held
         return held
 
@@ -165,16 +176,16 @@ class ChartedPlayers:
         target = flag(row, "pass_attempt") and not flag(row, "sack") and receiver is not None
         if season is None or week is None or not (dropback or target):
             return
-        charted = self.index.plays.get(play_key(row.get("game_id") or "", row.get("play_id") or ""))
+        game_id = row.get("game_id") or ""
+        charted = self.index.plays.get(play_key(game_id, row.get("play_id") or ""))
         if charted is None:
-            self.uncharted += 1
+            self.uncharted_by_game[game_id] = self.uncharted_by_game.get(game_id, 0) + 1
             return
         self.joined += 1
-        game_date = row.get("game_date") or ""
         if dropback and passer is not None:
-            self._dropback(self._tally(int(season), int(week), passer, game_date), charted, row)
+            self._dropback(self._tally(int(season), int(week), passer, row), charted, row)
         if target and receiver is not None:
-            self._target(self._tally(int(season), int(week), receiver, game_date), charted, row)
+            self._target(self._tally(int(season), int(week), receiver, row), charted, row)
 
     @staticmethod
     def _dropback(tally: _Tally, play: ChartedPlay, row: CsvRow) -> None:
@@ -194,11 +205,19 @@ class ChartedPlayers:
         for metric, name in _RECEIVER_COUNTS:
             tally.bump(metric, play.has(name))
 
+    def held_back(self) -> list[str]:
+        """The games with a dropback or target FTN has not charted yet, by game id."""
+        return sorted(game for game, count in self.uncharted_by_game.items() if count > 0)
+
     def tallies(self) -> list[_Tally]:
+        """Every player-week of a fully charted game."""
+
         def order(a: _Tally, b: _Tally) -> int:
             return (a.season - b.season) or (a.week - b.week) or js_locale_compare(a.player_id, b.player_id)
 
-        return sorted(self._tallies.values(), key=functools.cmp_to_key(order))
+        held = set(self.held_back())
+        whole = (t for t in self._tallies.values() if t.game_id not in held)
+        return sorted(whole, key=functools.cmp_to_key(order))
 
 
 @dataclass(frozen=True, slots=True)

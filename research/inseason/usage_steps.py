@@ -49,9 +49,10 @@ def play_by_play(engine: Engine, fetcher: Fetcher, season: int) -> StepResult:
     client = NflverseClient(fetcher, max_bytes=ByteCaps.PLAY_BY_PLAY)
     try:
         with engine.connect() as conn:
-            report = context.ingest_play_by_play(conn, client, season, passers=PasserDropbacks())
+            report = context.ingest_play_by_play(conn, client, season, passers=PasserDropbacks(), compressed=True)
             if report.plays_read == 0:
-                raise NflverseError("malformed", f"play_by_play_{season}.csv", "play-by-play has a header and no rows")
+                asset = context.play_by_play_file(season, compressed=True)
+                raise NflverseError("malformed", asset, "play-by-play has a header and no rows")
             conn.commit()
     except NflverseError as error:
         if error.kind != "not_found":

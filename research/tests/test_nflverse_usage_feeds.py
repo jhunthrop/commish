@@ -219,3 +219,22 @@ def test_the_client_refuses_an_asset_past_its_byte_cap() -> None:
     with pytest.raises(NflverseError, match="more than 1000 bytes"):
         client.get_csv("ftn_charting", "ftn_charting_2026.csv")
     assert NflverseClient(FixtureFetcher(), max_bytes=10_000_000).get_csv("ftn_charting", "ftn_charting_2026.csv")
+
+
+def test_a_game_ftn_has_only_partly_charted_is_held_back_whole(written: list[PlayerWeekObservation]) -> None:
+    pairs = _joined()
+    partial = "2026_01_ATL_PIT"
+    dropped = next(p for p, _ in pairs if p["game_id"] == partial and p["qb_dropback"] == "1")
+    charted = [
+        r
+        for r in fixture_rows("ftn_charting_2026.csv")
+        if not (r["nflverse_game_id"] == partial and int(r["nflverse_play_id"]) == int(dropped["play_id"]))
+    ]
+    fetcher = FixtureFetcher({"ftn_charting_2026.csv": _csv(charted)})
+    report = usage_feeds.ingest_ftn_charting(_CONN, NflverseClient(fetcher), _SEASON)
+    in_partial = {p[c] for p, _ in pairs if p["game_id"] == partial for c in ("passer_id", "receiver_player_id")}
+    in_whole = {p["passer_id"] for p, _ in pairs if p["game_id"] != partial and p["passer_id"]}
+    stored = {r.player_id for r in written}
+    assert not stored & (in_partial - {""}), "no player of the partly charted game is written"
+    assert in_whole <= stored
+    assert report.detail[1] == f"1 games held back until FTN charts them whole ({partial})"
