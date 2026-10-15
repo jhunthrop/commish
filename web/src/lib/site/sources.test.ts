@@ -1,7 +1,13 @@
 // Where the numbers come from: each feed's credit and the copy guard. Run with `npm test`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { SOURCES, SOURCES_LEAD, SOURCES_TITLE, sourceSentence } from './sources.ts';
+import {
+	DATA_PAGE_TITLE,
+	SOURCES,
+	SOURCES_LEAD,
+	SOURCES_TITLE,
+	sourceSentence
+} from './sources.ts';
 
 const SENTENCES = SOURCES.map(sourceSentence);
 
@@ -36,7 +42,7 @@ void test("every credit links to its publisher's page over https, each once", ()
 });
 
 void test('copy guard: one sentence each, with no dash, semicolon, doubled word, trading word or tip', () => {
-	for (const words of [SOURCES_TITLE, SOURCES_LEAD, ...SENTENCES]) {
+	for (const words of [DATA_PAGE_TITLE, SOURCES_TITLE, SOURCES_LEAD, ...SENTENCES]) {
 		assert.doesNotMatch(words, /[–—;]/, words);
 		assert.doesNotMatch(words, /\b([a-z]+)\s+\1\b/i, words);
 		assert.doesNotMatch(words, TRADING, words);

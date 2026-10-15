@@ -2,7 +2,11 @@
  * words, with the credit each publisher asks for (`docs/research/data-sources.md`). The `/data` page
  * prints them, and every page that prints a charted figure links there. */
 
-/** The page's title, and the words of every link to it. */
+/** The `/data` page's own title: short, so the display face never breaks it a line longer than the
+ * fallback face does when it arrives. */
+export const DATA_PAGE_TITLE = 'Our data';
+
+/** The credits' section, and the words of every link to it. */
 export const SOURCES_TITLE = 'Where the numbers come from';
 
 /** One feed's sentence: the words before its credit, the credit linked to the publisher's page,
@@ -29,22 +33,22 @@ export const SOURCES: readonly Source[] = [
 		credit: 'FTN Data via nflverse',
 		href: 'https://ftndata.com',
 		after:
-			', the contested catches, blitzes and interception-worthy throws in our reads, shared under the CC BY-SA 4.0 licence.'
+			', the contested catches, blitzes and interception-worthy throws, shared under the CC BY-SA 4.0 licence.'
 	},
 	{
 		before: 'Next Gen Stats from ',
 		credit: 'the NFL via nflverse',
 		href: 'https://nextgenstats.nfl.com',
-		after: ', the separation, time to throw and yards over expected in our reads.'
+		after: ', the separation, time to throw and yards over expected.'
 	},
 	{
 		before: 'Advanced stats from ',
 		credit: 'Pro Football Reference via nflverse',
 		href: 'https://www.pro-football-reference.com',
-		after: ', the drops, pressures and yards after contact in our reads.'
+		after: ', the drops, pressures and yards after contact.'
 	},
 	{
-		before: 'Average draft position from ',
+		before: 'ADP from ',
 		credit: 'Fantasy Football Calculator',
 		href: 'https://fantasyfootballcalculator.com/adp',
 		after: ', its PPR, half PPR, standard and two-quarterback drafts.'
