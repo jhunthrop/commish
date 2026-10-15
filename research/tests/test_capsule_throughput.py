@@ -19,7 +19,7 @@ from sqlalchemy.exc import OperationalError
 from research.capsules import sweep
 from research.capsules.config import CAPSULE_CONFIG, CAPSULE_MODEL, WriterSettings, writer_settings
 from research.capsules.gateway import GatewayClient, GenerationError, fetch_price
-from research.capsules.landing import TonightWindow
+from research.capsules.landing import BoardSentences, TonightWindow
 from research.capsules.pace import TokenBucket
 from research.capsules.prompt import WornPhrases
 from research.capsules.spans import SpanRules
@@ -432,3 +432,57 @@ def test_the_writers_share_one_pool_sized_to_the_concurrency() -> None:
     assert (held.size(), held._max_overflow, held._pre_ping) == (16, POOL_HEADROOM, True)
     assert writers.url.password == "secret"
     writers.dispose()
+
+
+# No rewrite lands a sentence another page carries.
+
+_CLOSER = "Drop him and spend the roster spot on a live body."
+
+
+def test_an_exclusive_claim_is_refused_when_another_page_carries_the_sentence() -> None:
+    board = BoardSentences({"x": (_CLOSER, "Something of its own.")}, 4)
+    assert not board.claim("a", (f"He is done. {_CLOSER}",), exclusive=True)
+    # The page's own sentence never blocks it, and a fresh sentence lands.
+    assert board.claim("x", (_CLOSER,), exclusive=True)
+    assert board.claim("a", ("A new and unshared closing line here.",), exclusive=True)
+    # The sweep's own write records without asking; a facts block releases the page's sentences.
+    assert board.claim("b", (_CLOSER,), exclusive=False)
+    assert board.claim("b", (), exclusive=False)
+    assert board.claim("x", (), exclusive=False)
+    assert board.claim("a", (_CLOSER,), exclusive=True)
+
+
+def _stored(pid: str, full: str) -> Any:
+    return SimpleNamespace(
+        player_id=pid, source="llm", body_compact="Short note.", body_full=full, facts_hash="h", narrative=None
+    )
+
+
+@pytest.mark.parametrize(
+    ("plan", "lands"),
+    [
+        (SweepPlan(10, span_rules=SpanRules(frozenset())), True),
+        (SweepPlan(10, span_rules=SpanRules(frozenset()), only=("a",)), False),
+        (SweepPlan(10, span_rules=SpanRules(frozenset()), only=("a",), keep_written=True), False),
+        (SweepPlan(10, span_rules=SpanRules(frozenset()), only=("a",), grace=True), False),
+    ],
+    ids=["the sweep", "the shared-sentence repair", "the span repair", "the graced rewrite"],
+)
+def test_a_rewrite_that_would_land_another_pages_sentence_is_refused_and_keeps_the_written_read(
+    monkeypatch: pytest.MonkeyPatch, plan: SweepPlan, lands: bool
+) -> None:
+    subjects = [_subject(pid) for pid in ("a", "x")]
+    stored = {"a": _stored("a", "His own old read, nothing shared."), "x": _stored("x", _CLOSER)}
+    committed: list[str] = []
+    monkeypatch.setattr(sweep, "stored_capsules_for", lambda conn, ids: {k: v for k, v in stored.items() if k in ids})
+    monkeypatch.setattr(sweep, "queue_regeneration", lambda conn, ids: 0)
+    monkeypatch.setattr(sweep, "worn_phrases", lambda subjects, stored: WornPhrases((), ()))
+    monkeypatch.setattr(sweep, "generate_capsule", lambda facts, gateway, worn: _result(f"Fresh words. {_CLOSER}"))
+    monkeypatch.setattr(sweep, "upsert_capsule", lambda conn, row, at: committed.append(row.player_id))
+    monkeypatch.setattr(sweep, "_needs_generation", lambda subject, row: subject.universe_id == "a")
+    engine = cast("Engine", SimpleNamespace(connect=lambda: nullcontext(None), begin=lambda: nullcontext(None)))
+    gateway = _client(lambda r: _ok(), FakeClock(), WriterSettings("m/x", 1, 60))
+    report = sweep_capsules(engine, gateway, NOW, plan, lambda c, a: subjects)
+    assert report.processed == ["a"]
+    assert committed == (["a"] if lands else [])
+    assert (report.llm, report.kept, report.refused) == ((1, 0, 0) if lands else (0, 1, 1))
