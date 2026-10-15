@@ -238,3 +238,27 @@ func TestUnprovenConnections(t *testing.T) {
 		t.Fatalf("put: proven %v, %v", conn.Proven, err)
 	}
 }
+
+// An ESPN connection keeps the words the member agreed to: version 3,
+// which names the moves; an older row keeps its own version.
+func TestESPNConsentVersion(t *testing.T) {
+	pool := dbtest.Pool(t)
+	ctx := context.Background()
+	acct, err := (&auth.Store{Pool: pool}).UpsertAccount(ctx, auth.Identity{UserID: "user_consent", Email: "consent@example.invalid"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	v, _ := NewVault(OneKey(key(t)))
+	store := &Store{Pool: pool}
+	sealed, _ := v.SealTokens(acct.ID.String(), "espn", Session{"swid": "a"}, Session{})
+	conn, err := store.Put(ctx, acct.ID, "espn", sealed, time.Now())
+	if err != nil || conn.ConsentVersion != ESPNConsentVersion || ESPNConsentVersion != 3 {
+		t.Fatalf("put: version %d, %v", conn.ConsentVersion, err)
+	}
+	if _, err := pool.Exec(ctx, `update app.host_connections set consent_version = 2 where account_id = $1`, acct.ID); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := store.Get(ctx, acct.ID, "espn"); err != nil || got.ConsentVersion != 2 {
+		t.Fatalf("get: version %d, %v", got.ConsentVersion, err)
+	}
+}

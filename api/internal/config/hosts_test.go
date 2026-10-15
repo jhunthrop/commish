@@ -10,6 +10,20 @@ func hostLoader(vars map[string]string) *loader {
 	return &loader{get: func(name string) string { return vars[name] }}
 }
 
+// A host write's switch is off unless set true.
+func TestWriteSwitchOffByDefault(t *testing.T) {
+	if h := hostLoader(nil).hosts(EnvDevelopment); h.ESPNLineupWrites {
+		t.Fatal("ESPN lineup writes on by default")
+	}
+	if h := hostLoader(map[string]string{"HOST_WRITES_ESPN_LINEUP": "true"}).hosts(EnvDevelopment); !h.ESPNLineupWrites {
+		t.Fatal("ESPN lineup writes set true and off")
+	}
+	l := hostLoader(map[string]string{"HOST_WRITES_ESPN_LINEUP": "sometimes"})
+	if l.hosts(EnvDevelopment); l.err() == nil {
+		t.Fatal("a switch neither true nor false")
+	}
+}
+
 // FFPC is on unless set false; production needs the key only when FFPC is
 // on; the previous key needs a version to sit below.
 func TestHostsSwitchAndKeys(t *testing.T) {
