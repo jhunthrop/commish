@@ -1,11 +1,15 @@
 """The paid trial's call budget (`capsules.trial.within_calls`, `write --budget`): a hard stop that never
 starts a player whose worst case would cross it."""
 
+import pytest
+
 from research.capsules.__main__ import main
 from research.capsules.config import CAPSULE_CONFIG
 from research.capsules.trial import within_calls
 
 WORST = CAPSULE_CONFIG.max_gateway_calls_per_player
+# argparse's exit status for a malformed argument.
+ARGPARSE_USAGE_ERROR = 2
 
 
 def _run(calls: list[int], budget: int | None) -> tuple[list[int], list[int]]:
@@ -31,9 +35,6 @@ def test_a_budget_below_one_worst_case_starts_nobody() -> None:
 
 
 def test_the_write_command_takes_a_budget() -> None:
-    try:
+    with pytest.raises(SystemExit) as exit_:
         main(["write", "--budget", "not-a-number"])
-    except SystemExit as exit_:
-        assert exit_.code == 2
-    else:
-        raise AssertionError("a malformed --budget should fail argument parsing")
+    assert exit_.value.code == ARGPARSE_USAGE_ERROR
