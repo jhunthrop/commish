@@ -21,7 +21,8 @@ from research.capsules.bundle import CapsuleBundle, parse_bundle
 from research.capsules.config import CAPSULE_CONFIG
 from research.capsules.corrections import banned_phrases_in, soft_correction_for
 from research.capsules.facts_block import FACTS_SOURCE, render_facts_block
-from research.capsules.gateway import GatewayClient, GenerationError, Usage, add_usage
+from research.capsules.gateway import GatewayClient, GenerationError
+from research.capsules.gateway_ledger import Usage, add_usage
 from research.capsules.narrative import (
     NarrativeResult,
     RefusedSlot,
