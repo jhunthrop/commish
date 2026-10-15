@@ -1,0 +1,43 @@
+# .github/workflows/ops.yml
+# One-shot operations from CI with the deployer's federated identity: execute a Cloud Run job by name
+# and wait for it. For the nights a laptop's gcloud login has lapsed and a run must still happen.
+# It changes nothing and holds no secret; the job's own identity and secrets apply as deployed.
+name: ops
+on:
+  workflow_dispatch:
+    inputs:
+      job:
+        description: the Cloud Run job to execute
+        required: true
+        type: choice
+        options: [nightly, nightly-publish, inseason, inseason-capture]
+permissions: { contents: read }
+concurrency: { group: ops-${{ inputs.job }}, cancel-in-progress: false }
+jobs:
+  execute:
+    runs-on: ubuntu-latest
+    timeout-minutes: 480
+    permissions: { contents: read, id-token: write }
+    env:
+      REGION: ${{ vars.GCP_REGION }}
+      JOB: ${{ inputs.job }}
+    steps:
+      - uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed # v2.1.13
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOYER_SA }}
+      - uses: google-github-actions/setup-gcloud@e427ad8a34f8676edf47cf7d7925499adf3eb74f # v2.2.1
+        with: { project_id: '${{ vars.GCP_PROJECT }}' }
+      - name: execute the job and wait
+        run: |
+          set -euo pipefail
+          gcloud run jobs execute "$JOB" --region "$REGION" --wait --format='value(metadata.name)' | tee execution.txt
+      - name: the execution's log lines
+        if: always()
+        run: |
+          set -uo pipefail
+          EX=$(grep -oE "$JOB-[a-z0-9]+" execution.txt | head -1 || true)
+          [ -n "$EX" ] || exit 0
+          sleep 20
+          gcloud logging read "resource.type=\"cloud_run_job\" AND labels.\"run.googleapis.com/execution_name\"=\"$EX\"" \
+            --limit 60 --format='value(textPayload)' --freshness=12h | grep -E '^[0-9T:.+-]+ (ingest|fit|capsules|gate|run |publish|freeze|grade|scoreboard|stats-ingest|play-by-play|ftn|next-gen|pfr)' | cut -c1-400 || true
