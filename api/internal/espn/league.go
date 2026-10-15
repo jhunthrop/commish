@@ -70,6 +70,22 @@ var proTeams = map[int]string{
 	33: "BAL", 34: "HOU",
 }
 
+// defenseBase is the base of ESPN's D/ST player ids: a club's D/ST is
+// -(defenseBase + its proTeamId), as every defense in the recorded league
+// 48153503 carries it (Ravens D/ST -16033, Lions D/ST -16008).
+const defenseBase = 16000
+
+// DefenseID is ESPN's player id for the club's D/ST, by our team code;
+// false for a club ESPN does not name.
+func DefenseID(team string) (string, bool) {
+	for id, code := range proTeams {
+		if code == team {
+			return strconv.Itoa(-(defenseBase + id)), true
+		}
+	}
+	return "", false
+}
+
 // Lineup slots by ESPN's lineupSlotId, in our names; any other is named
 // by its number to the caller.
 var slots = map[int]string{

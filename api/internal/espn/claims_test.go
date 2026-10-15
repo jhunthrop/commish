@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -293,6 +294,14 @@ func TestClaimPendingAndTheQueue(t *testing.T) {
 	if err != nil || q.Found {
 		t.Fatalf("another id %+v %v", q, err)
 	}
+	// An answer lost: the claim is found by the team and its players.
+	if q, err := c.PendingClaim(context.Background(), writeCookies, set, ""); err != nil || !q.Found || q.ProcessAt == nil {
+		t.Fatalf("by its players %+v %v", q, err)
+	}
+	other := ownClaim(t, c, ClaimInput{Add: claimAdd, Drop: "3050487", Bid: bid(0)}, Availability{Status: StatusWaivers})
+	if q, err := c.PendingClaim(context.Background(), writeCookies, other, ""); err != nil || q.Found {
+		t.Fatalf("another drop %+v %v", q, err)
+	}
 	h.pending = []byte(`{"id":48153503}`)
 	if _, err := c.PendingClaim(context.Background(), writeCookies, set, ans.TransactionID); !errors.Is(err, ErrMalformed) {
 		t.Fatalf("a queue without its key is drift, never an empty queue: %v", err)
@@ -355,6 +364,48 @@ func TestClaimNotSentWithoutCookies(t *testing.T) {
 	set := ownClaim(t, c, ClaimInput{Add: claimAdd, Bid: bid(0)}, Availability{Status: StatusWaivers})
 	if _, err := c.Claim(context.Background(), Cookies{}, set); !errors.Is(err, ErrNotSent) || len(h.bodies) != 0 {
 		t.Fatalf("%v %d", err, len(h.bodies))
+	}
+}
+
+// A club's D/ST id is ESPN's own: every defense in the recorded league
+// (fourteen teams' rosters) carries -(16000 + its proTeamId).
+func TestDefenseIDMatchesTheRecordedLeague(t *testing.T) {
+	var doc struct {
+		Teams []struct {
+			Roster struct {
+				Entries []struct {
+					PlayerID        int `json:"playerId"`
+					PlayerPoolEntry struct {
+						Player struct {
+							DefaultPositionID int `json:"defaultPositionId"`
+							ProTeamID         int `json:"proTeamId"`
+						} `json:"player"`
+					} `json:"playerPoolEntry"`
+				} `json:"entries"`
+			} `json:"roster"`
+		} `json:"teams"`
+	}
+	if err := json.Unmarshal(readFixture(t, "testdata/league-48153503-2019-full.json"), &doc); err != nil {
+		t.Fatal(err)
+	}
+	seen := 0
+	for _, team := range doc.Teams {
+		for _, e := range team.Roster.Entries {
+			p := e.PlayerPoolEntry.Player
+			if p.DefaultPositionID != 16 {
+				continue
+			}
+			seen++
+			if got, ok := DefenseID(proTeams[p.ProTeamID]); !ok || got != strconv.Itoa(e.PlayerID) {
+				t.Errorf("proTeam %d: %q, ESPN says %d", p.ProTeamID, got, e.PlayerID)
+			}
+		}
+	}
+	if seen == 0 {
+		t.Fatal("no defense in the recorded league")
+	}
+	if _, ok := DefenseID("XYZ"); ok {
+		t.Fatal("a club ESPN does not name has a D/ST id")
 	}
 }
 

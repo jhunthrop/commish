@@ -2,12 +2,14 @@ package inseason
 
 import (
 	"fmt"
+	"regexp"
 	"sort"
 	"time"
 
 	"github.com/jhunthrop/commish/api/internal/apitypes"
 	"github.com/jhunthrop/commish/api/internal/boards"
 	"github.com/jhunthrop/commish/api/internal/draft"
+	"github.com/jhunthrop/commish/api/internal/espn"
 	"github.com/jhunthrop/commish/api/internal/leaguesync"
 	"github.com/jhunthrop/commish/api/internal/mock"
 	"github.com/jhunthrop/commish/api/internal/scoring"
@@ -312,10 +314,33 @@ func (a *advisor) pool(position draft.Position) []person {
 			continue
 		}
 		id := p.ID
-		lp := apitypes.LeaguePlayer{BoardId: &id, Name: p.Name, Position: string(p.Position), Team: p.Team}
+		lp := apitypes.LeaguePlayer{HostId: a.hostIDOfAdd(p), BoardId: &id, Name: p.Name, Position: string(p.Position), Team: p.Team}
 		out = append(out, a.build(p.ID, lp, nil))
 	}
 	return out
+}
+
+// espnPlayerID is the shape of an ESPN player id: the board's ids are
+// ESPN's own (leaguesync places a rostered player by it), a D/ST's is
+// negative.
+var espnPlayerID = regexp.MustCompile(`^-?[0-9]{1,12}$`)
+
+// hostIDOfAdd is an unrostered player's id on the league's host, the one
+// a claim names: on ESPN his board id, a defense ESPN's D/ST id for its
+// club. Empty on any other host, and for a player whose id is not
+// ESPN's shape: his Add stays the host's page.
+func (a *advisor) hostIDOfAdd(p boards.Player) string {
+	if a.Snap.Ref.Host != leaguesync.HostESPN {
+		return ""
+	}
+	if p.Position == draft.DEF {
+		id, _ := espn.DefenseID(p.Team)
+		return id
+	}
+	if !espnPlayerID.MatchString(p.ID) {
+		return ""
+	}
+	return p.ID
 }
 
 // Waivers is the waiver page (§5).
