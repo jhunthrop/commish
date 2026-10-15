@@ -103,7 +103,8 @@ def season_usage_by_player(
     team_totals = _team_totals(facts, team_of)
     weeks: dict[str, list[Week]] = {}
     for (player, week), own in sorted(_played(facts).items()):
-        if player in positions:
+        # A week of special teams alone (no offensive snap, no other fact) is not a week of his.
+        if player in positions and (own.keys() != {_SNAPS} or own[_SNAPS] > 0):
             team = team_totals.get((team_of.get((player, week)) or "", week), {})
             weeks.setdefault(player, []).append(Week(week, own, team))
     inputs = SeasonInputs(season, min(pbp_weeks), max(pbp_weeks), weeks, positions, names_for(conn, list(weeks)))
