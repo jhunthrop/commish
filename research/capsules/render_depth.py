@@ -9,8 +9,8 @@ from collections.abc import Sequence
 from typing import TYPE_CHECKING, Final
 
 from research.capsules.facts.depth_model import Depth, Fixture, GamesMissed
-from research.capsules.render_words import ranked_clause, week_of, whole
-from research.model.jsmath import js_round, js_to_fixed
+from research.capsules.render_words import percent, ranked_clause, week_of, whole
+from research.model.jsmath import js_to_fixed
 from research.pipeline.jscompat import js_string
 
 if TYPE_CHECKING:
@@ -174,10 +174,6 @@ def _depth_chart(facts: "PlayerFacts") -> str | None:
     return f"Depth chart {when}: listed {_slot_word(chart.slot)} among {team} {position}s. {around}."
 
 
-def _pct(fraction: float) -> str:
-    return f"{js_string(js_round(fraction * 100))}%"
-
-
 def _span(weeks: Sequence[int], season: int) -> str:
     if not weeks:
         return "no weeks"
@@ -191,10 +187,12 @@ def _role_trend(depth: Depth) -> str | None:
     clauses = [
         clause
         for clause in (
-            None if t.snap_share is None else f"snap share {_pct(t.snap_share.early)} to {_pct(t.snap_share.late)}",
+            None
+            if t.snap_share is None
+            else f"snap share {percent(t.snap_share.early)} to {percent(t.snap_share.late)}",
             None
             if t.target_share is None
-            else f"target share {_pct(t.target_share.early)} to {_pct(t.target_share.late)}",
+            else f"target share {percent(t.target_share.early)} to {percent(t.target_share.late)}",
         )
         if clause is not None
     ]
@@ -209,8 +207,8 @@ def _target_competition(depth: Depth) -> str | None:
     c = depth.target_competition
     if c is None:
         return None
-    named = " and ".join(f"{leader.name} took {_pct(leader.share)}" for leader in c.leaders)
-    return f"Target competition on {c.team} in {c.season}: {named}, {_pct(c.combined_share)} between them."
+    named = " and ".join(f"{leader.name} took {percent(leader.share)}" for leader in c.leaders)
+    return f"Target competition on {c.team} in {c.season}: {named}, {percent(c.combined_share)} between them."
 
 
 def _scoring_usage(facts: "PlayerFacts") -> str | None:
@@ -245,7 +243,7 @@ def _team_context(facts: "PlayerFacts") -> str | None:
         part
         for part in (
             None if c.pace_seconds_per_play is None else f"{js_to_fixed(c.pace_seconds_per_play, 1)} seconds a play",
-            None if c.pass_rate is None else f"{_pct(c.pass_rate)} of situation-neutral plays passes",
+            None if c.pass_rate is None else f"{percent(c.pass_rate)} of situation-neutral plays passes",
             None if c.wins is None else f"{js_string(c.wins)} wins",
         )
         if part is not None

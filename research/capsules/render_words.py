@@ -40,11 +40,29 @@ def signed(value: float, digits: int = 1) -> str:
     return f"+{js_string(rounded)}" if rounded >= 0 else js_string(rounded)
 
 
-def ranked_clause(position: Position, label: str, rank: RankedStat, fmt: Callable[[float], str]) -> str:
-    """One ranked quantity as a clause with its honest qualifier count, no period."""
-    where = f"{position}{rank.position_rank} among {rank.qualifier_count} qualifying {POSITION_PLURAL[position]}"
+def percent(fraction: float, digits: int = 0) -> str:
+    """A fraction as a percent: whole by default (`Math.round`), else to `digits` places (`toFixed`)."""
+    if digits == 0:
+        return f"{js_string(js_round(fraction * 100))}%"
+    return f"{js_to_fixed(fraction * 100, digits)}%"
+
+
+def rank_where(position: Position, rank: RankedStat, among: str | None = None, *, neutral: bool = False) -> str:
+    """Where a rank stands and who it is among (`among`, the position's qualifying peers when None),
+    with "best at the position" or the neighbour ahead unless the quantity is a role (`neutral`)."""
+    who = f"qualifying {POSITION_PLURAL[position]}" if among is None else among
+    where = f"{position}{rank.position_rank} among {rank.qualifier_count} {who}"
+    if neutral:
+        return where
     if rank.position_rank == 1:
-        return f"{label} {fmt(rank.value)}, {where}, best at the position"
+        return f"{where}, best at the position"
     if rank.named_neighbor is not None:
-        return f"{label} {fmt(rank.value)}, {where}, one spot behind {rank.named_neighbor}"
-    return f"{label} {fmt(rank.value)}, {where}"
+        return f"{where}, one spot behind {rank.named_neighbor}"
+    return where
+
+
+def ranked_clause(
+    position: Position, label: str, rank: RankedStat, fmt: Callable[[float], str], among: str | None = None
+) -> str:
+    """One ranked quantity as a clause with its honest qualifier count, no period."""
+    return f"{label} {fmt(rank.value)}, {rank_where(position, rank, among)}"

@@ -1,0 +1,28 @@
+game_id,pfr_game_id,season,week,game_type,team,opponent,pfr_player_name,pfr_player_id,rushing_broken_tackles,receiving_broken_tackles,passing_drops,passing_drop_pct,receiving_drop,receiving_drop_pct,receiving_int,receiving_rat
+2026_01_NE_SEA,202609090sea,2026,1,REG,SEA,NE,Jaxon Smith-Njigba,SmitJa06,,0,,,0,0,0,139.2
+2026_01_NE_SEA,202609090sea,2026,1,REG,SEA,NE,AJ Barner,BarnAJ00,,0,,,0,0,0,93.7
+2026_01_NE_SEA,202609090sea,2026,1,REG,SEA,NE,Cooper Kupp,KuppCo00,,0,,,0,0,0,106.2
+2026_01_NE_SEA,202609090sea,2026,1,REG,SEA,NE,Jadarian Price,PricJa02,,0,,,0,0,0,79.2
+2026_01_NE_SEA,202609090sea,2026,1,REG,SEA,NE,Brady Russell,RussBr00,,0,,,0,0,0,108.3
+2026_01_NE_SEA,202609090sea,2026,1,REG,SEA,NE,Rashid Shaheed,ShahRa00,,0,,,0,0,0,42.4
+2026_01_NE_SEA,202609090sea,2026,1,REG,SEA,NE,George Holani,HolaGe00,,0,,,0,0,0,39.6
+2026_01_NE_SEA,202609090sea,2026,1,REG,NE,SEA,DeMario Douglas,DougDe00,,0,,,0,0,1,34.5
+2026_01_NE_SEA,202609090sea,2026,1,REG,NE,SEA,Rhamondre Stevenson,StevRh00,,0,,,0,0,0,97.2
+2026_01_NE_SEA,202609090sea,2026,1,REG,NE,SEA,Mack Hollins,HollMa00,,0,,,0,0,1,69.6
+2026_01_NE_SEA,202609090sea,2026,1,REG,NE,SEA,A.J. Brown,BrowAJ00,,0,,,0,0,0,91.7
+2026_01_NE_SEA,202609090sea,2026,1,REG,NE,SEA,Hunter Henry,HenrHu00,,1,,,0,0,0,102.8
+2026_01_NE_SEA,202609090sea,2026,1,REG,NE,SEA,Lan Larison,LariLa00,,0,,,0,0,0,85.4
+2026_01_NE_SEA,202609090sea,2026,1,REG,NE,SEA,Eli Raridon,RariEl00,,0,,,0,0,0,118.7
+2026_01_NE_SEA,202609090sea,2026,1,REG,NE,SEA,Romeo Doubs,DoubRo00,,0,,,1,0.333,1,0
+2026_01_ATL_PIT,202609130pit,2026,1,REG,PIT,ATL,Pat Freiermuth,FreiPa00,,1,,,0,0,0,144.6
+2026_01_ATL_PIT,202609130pit,2026,1,REG,PIT,ATL,Jaylen Warren,WarrJa01,,2,,,0,0,0,85.4
+2026_01_ATL_PIT,202609130pit,2026,1,REG,PIT,ATL,D.K. Metcalf,MetcDK00,,0,,,1,0.1,0,52.1
+2026_01_ATL_PIT,202609130pit,2026,1,REG,PIT,ATL,Michael Pittman Jr.,PittMi01,,1,,,0,0,0,118.7
+2026_01_ATL_PIT,202609130pit,2026,1,REG,PIT,ATL,Roman Wilson,WilsRo02,,0,,,0,0,0,61.8
+2026_01_ATL_PIT,202609130pit,2026,1,REG,PIT,ATL,Rico Dowdle,DowdRi01,,0,,,1,0.2,0,47.9
+2026_01_ATL_PIT,202609130pit,2026,1,REG,PIT,ATL,Darnell Washington,WashDa03,,1,,,0,0,0,104.2
+2026_01_ATL_PIT,202609130pit,2026,1,REG,ATL,PIT,Bijan Robinson,RobiBi01,,3,,,0,0,1,97.9
+2026_01_ATL_PIT,202609130pit,2026,1,REG,ATL,PIT,Drake London,LondDr00,,0,,,0,0,0,74
+2026_01_ATL_PIT,202609130pit,2026,1,REG,ATL,PIT,Jahan Dotson,DotsJa00,,0,,,0,0,1,16.7
+2026_01_ATL_PIT,202609130pit,2026,1,REG,ATL,PIT,Olamide Zaccheaus,ZaccOl01,,0,,,0,0,0,87.5
+2026_01_ATL_PIT,202609130pit,2026,1,REG,ATL,PIT,Kyle Pitts,PittKy00,,0,,,0,0,0,39.6

@@ -11,9 +11,14 @@ from dataclasses import dataclass
 from typing import Final
 
 from research.errors import ConfigurationError
+from research.pipeline.nflverse.ngs import NGS_SOURCE
+from research.pipeline.nflverse.participation import NflverseSource
+from research.pipeline.nflverse.pbp import PBP_PLAYER_SOURCE
+from research.pipeline.nflverse.pbp_passers import PBP_PASSER_SOURCE
+from research.pipeline.nflverse.pfr_advstats import PFR_SOURCE
 
 # The writer's model, the gateway's slug. A setting: `CAPSULE_MODEL` in the environment overrides it
-# (`writer_settings`); Lane 24 measured the candidates and the coordinator picks the default at merge.
+# (`writer_settings`); Lane 24 measured the candidates and the coordinator ruled it stays (2026-10-15).
 CAPSULE_MODEL: Final = "zai/glm-5.3-flash"
 
 
@@ -177,6 +182,22 @@ class CapsuleConfig:
     # and the span repairs rewrite two-page carriers every night, so steady nights spend real budget too,
     # up to the same ceiling. The board-scale measurement is in the Lane 17 report.
     sweep_generation_budget: int = 1000
+    # The licence gate, one per source: the stores whose figures may reach the writer's sheet (this
+    # season's usage and play, `facts.season_usage`). A counsel ruling on any one is a flip here.
+    # - On: nflverse's own play-by-play and weekly stats (CC-BY 4.0), and Next Gen Stats (the NFL's
+    #   data) and PFR advanced stats (Pro Football Reference's), whose nflverse releases state no
+    #   licence: flagged for counsel in the Lane 23 report and `docs/research/data-sources.md`.
+    # - Off: FTN Data's charting (contested catches, blitz rate, interception-worthy throws), CC-BY-SA
+    #   4.0 with attribution "must be made to FTN Data via nflverse"; the page carries no such credit,
+    #   and the share-alike term is unruled for a paid page. The ingest stores every source either way.
+    sources_on_pages: frozenset[str] = frozenset({
+        PBP_PLAYER_SOURCE,
+        PBP_PASSER_SOURCE,
+        NflverseSource.PLAYER_WEEK,
+        NflverseSource.SNAP_COUNTS,
+        NGS_SOURCE,
+        PFR_SOURCE,
+    })  # fmt: skip
 
     def unwritten_line(self, *, in_season: bool) -> UnwrittenLine:
         """The line in use for a run: in season from the season's first kickoff on, preseason before."""

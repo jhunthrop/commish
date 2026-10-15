@@ -22,7 +22,8 @@ from research.capsules.facts.model import (
 )
 from research.capsules.render_depth import render_depth_section
 from research.capsules.render_season import bye_line, injury_line, season_section, today_line
-from research.capsules.render_words import ranked_clause, signed, week_of, whole
+from research.capsules.render_usage import season_usage_section
+from research.capsules.render_words import percent, ranked_clause, signed, week_of, whole
 from research.capsules.voice_rules import in_fantasy_words
 from research.model.jsmath import js_round, js_to_fixed
 from research.pipeline.jscompat import js_string
@@ -112,7 +113,7 @@ def _news_lines(facts: PlayerFacts) -> list[str]:
 
 
 def _percent(value: float) -> str:
-    return f"{js_to_fixed(value * 100, 1)}%"
+    return percent(value, 1)
 
 
 def _story_line(facts: PlayerFacts) -> str | None:
@@ -171,15 +172,19 @@ def _trend_line(facts: PlayerFacts) -> str | None:
 
 
 def label_sections(facts: PlayerFacts) -> list[str]:
-    """The sheet's labelled stats: the case (each factor's name and worth) and the color (each
-    ranked stat with its label). A read that names one of these stats copies its label; the span gate
-    exempts these words and every other span the whole sheet prints (`capsules.span_rules`)."""
+    """The sheet's labelled stats: the case (each factor's name and worth), the color (each ranked
+    stat with its label) and this season's usage and play (each figure with its basis). A read that
+    names one of these stats copies its label; the span gate exempts these words with every other
+    span the whole sheet prints (`capsules.span_rules`, which renders the whole sheet)."""
     sections = []
     if facts.evidence:
         sections.append("The case:\n" + "\n".join(f"- {_evidence_line(item)}" for item in facts.evidence))
     color = [line for line in (_story_line(facts), _usage_line(facts), _trend_line(facts)) if line is not None]
     if color:
         sections.append("The color:\n" + "\n".join(f"- {line}" for line in color))
+    usage = season_usage_section(facts)
+    if usage is not None:
+        sections.append(usage)
     return sections
 
 

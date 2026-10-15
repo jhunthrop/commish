@@ -1,10 +1,12 @@
 """THE REGISTER'S WEEKLY PASS (`season-week`), ported from `research-ts/src/projections/season-week/steps.ts`.
 
-Five steps, each isolated: a step that raises is reported as failed and the pass carries on to the
+Nine steps, each isolated: a step that raises is reported as failed and the pass carries on to the
 next, because a dead odds key must never stop the freeze that runs after it. The exit status is
 non-zero when any step failed.
 
 1. **stats-ingest**: the nflverse universe and the season's published weekly stats (idempotent).
+1a. **play-by-play**, **ftn-charting**, **next-gen-stats**, **pfr-advstats**: the season's
+   play-by-play and the three charted feeds (`usage_steps`), each skipped until nflverse publishes it.
 2. **props-snapshot**: the odds provider's player props for the coming fourteen days.
 3. **grade**: every frozen week not yet graded, whose games are complete (below), against the
    stats now held. Each grade row is stamped `implementation = 'python'`.
@@ -25,12 +27,14 @@ import logging
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Final, Literal
+from typing import Final
 
 from sqlalchemy import Connection, Engine, text
 
 from research.errors import ConfigurationError
+from research.inseason import usage_steps
 from research.inseason.scoreboard import scoreboard_lines
+from research.inseason.step_result import Status, StepResult
 from research.model.instants import js_iso, ms_instant
 from research.model.reads.teams import kickoff_instants_by_week
 from research.model.register.freeze import SERVED_SOURCE, take_freeze
@@ -47,17 +51,7 @@ GRADE_AFTER: Final = timedelta(hours=36)
 # two days, so a refusal past this is an outage an operator must see, not a wait.
 GRADE_OVERDUE: Final = timedelta(days=4)
 LAST_POSSIBLE_WEEK: Final = 22
-STEPS: Final = ("stats-ingest", "props-snapshot", "grade", "freeze", "scoreboard")
-
-Status = Literal["ok", "skipped", "failed"]
-
-
-@dataclass(frozen=True, slots=True)
-class StepResult:
-    step: str
-    status: Status
-    summary: str
-    detail: tuple[str, ...] = ()
+STEPS: Final = ("stats-ingest", *usage_steps.USAGE_STEPS, "props-snapshot", "grade", "freeze", "scoreboard")
 
 
 @dataclass(frozen=True, slots=True)
@@ -250,13 +244,29 @@ def scoreboard(context: SeasonWeekContext) -> StepResult:
     return StepResult("scoreboard", "ok", f"season {context.season} running scoreboard", tuple(lines))
 
 
-def run_season_week(context: SeasonWeekContext) -> list[StepResult]:
-    """The five steps in order, each isolated."""
-    bodies: dict[str, Callable[[], StepResult]] = {
+def _usage_body(name: str, context: SeasonWeekContext) -> Callable[[], StepResult]:
+    body = usage_steps.BODIES[name]
+    return lambda: body(context.engine, context.fetcher, context.season)
+
+
+def _bodies(context: SeasonWeekContext) -> dict[str, Callable[[], StepResult]]:
+    return {
         "stats-ingest": lambda: stats_ingest(context),
+        **{name: _usage_body(name, context) for name in usage_steps.USAGE_STEPS},
         "props-snapshot": lambda: props_snapshot(context),
         "grade": lambda: grade(context),
         "freeze": lambda: freeze(context),
         "scoreboard": lambda: scoreboard(context),
     }
+
+
+def run_season_week(context: SeasonWeekContext) -> list[StepResult]:
+    """Every step in order, each isolated."""
+    bodies = _bodies(context)
     return [_safely(name, bodies[name], context) for name in STEPS]
+
+
+def run_usage_backfill(context: SeasonWeekContext) -> list[StepResult]:
+    """The usage steps alone, each isolated: the operator's one-shot for weeks already played."""
+    bodies = _bodies(context)
+    return [_safely(name, bodies[name], context) for name in usage_steps.USAGE_STEPS]

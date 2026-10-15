@@ -82,7 +82,7 @@ def number_or_null(row: CsvRow, column: str) -> float | None:
     return value if js_is_finite(value) else None
 
 
-def _identifier(row: CsvRow, column: str) -> str | None:
+def identifier(row: CsvRow, column: str) -> str | None:
     raw = row.get(column)
     if raw is None or js_trim(raw) == "" or raw == "NA":
         return None
@@ -312,7 +312,7 @@ class PlayerPlayAggregator:
         yardline = number_or_null(row, "yardline_100")
         red_zone = yardline is not None and yardline <= _RED_ZONE
         inside_ten = yardline is not None and yardline <= _INSIDE_TEN
-        rusher = _identifier(row, "rusher_player_id")
+        rusher = identifier(row, "rusher_player_id")
         if (
             rusher is not None
             and flag(row, "rush_attempt")
@@ -323,7 +323,7 @@ class PlayerPlayAggregator:
             tally.carries += 1
             tally.red_zone_carries += 1 if red_zone else 0
             tally.inside_ten_carries += 1 if inside_ten else 0
-        receiver = _identifier(row, "receiver_player_id")
+        receiver = identifier(row, "receiver_player_id")
         if receiver is not None and row.get("play_type") == "pass":
             tally = self._tally(season, week, receiver, game_date)
             tally.targets += 1
