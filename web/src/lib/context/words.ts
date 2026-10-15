@@ -21,14 +21,13 @@ export function switchLabel(league: ContextLeague | null, format: BoardFormat | 
 	return league ? leagueName(league) : FORMAT_LABELS[format ?? DEFAULT_CONTEXT_FORMAT];
 }
 
-/** The longest last word the switch keeps whole, its space included. */
-const TAIL_MAX = 12;
-
-/** The switch's label split for a cut in the middle: the last word, which tells one entry of a
- * contest from the next ("#104870"), always shows, and only the head gives way. */
-export function labelEnds(label: string): [head: string, tail: string] {
-	const cut = label.lastIndexOf(' ');
-	return cut > 0 && label.length - cut <= TAIL_MAX
-		? [label.slice(0, cut), label.slice(cut)]
-		: [label, ''];
+/** The switch's label as it may be shown, longest first: the whole name, then each shorter run of
+ * its first words with an ellipsis, so a name that does not fit is cut between words. */
+export function labelCuts(label: string): string[] {
+	const words = label.split(' ');
+	const cuts = [label];
+	for (let kept = words.length - 1; kept > 0; kept -= 1) {
+		cuts.push(`${words.slice(0, kept).join(' ')}…`);
+	}
+	return cuts;
 }
