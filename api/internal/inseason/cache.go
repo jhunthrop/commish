@@ -26,11 +26,17 @@ const (
 	CaptureTTL = 5 * time.Minute
 )
 
+// ReadTimeout bounds one shared read: the pool sets no statement
+// timeout, and every request waiting on the read waits on it.
+const ReadTimeout = 5 * time.Second
+
 // Cache keeps the reads for their TTLs, each read once however many
 // requests ask for it at the same time, as the board cache does.
 type Cache struct {
 	Reads Reads
 	Now   func() time.Time
+	// Timeout bounds each read, ReadTimeout when zero.
+	Timeout time.Duration
 
 	group   singleflight.Group
 	mu      sync.Mutex
@@ -75,8 +81,11 @@ func cached[V any](c *Cache, ctx context.Context, key string, ttl time.Duration,
 		if v, ok := c.fresh(key, ttl); ok {
 			return v, nil
 		}
-		// The read is shared: one viewer leaving must not fail the rest.
-		value, err := read(context.WithoutCancel(ctx))
+		// The read is shared: one viewer leaving must not fail the rest,
+		// and the read still ends within its timeout.
+		readCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), c.timeout())
+		defer cancel()
+		value, err := read(readCtx)
 		if err != nil {
 			return nil, err
 		}
@@ -104,4 +113,11 @@ func (c *Cache) fresh(key string, ttl time.Duration) (any, bool) {
 		return nil, false
 	}
 	return e.value, true
+}
+
+func (c *Cache) timeout() time.Duration {
+	if c.Timeout > 0 {
+		return c.Timeout
+	}
+	return ReadTimeout
 }

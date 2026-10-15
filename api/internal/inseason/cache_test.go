@@ -82,3 +82,27 @@ func TestCacheKeepsNoFailure(t *testing.T) {
 		t.Fatalf("a failure was kept: %d reads", reads.lines.Load())
 	}
 }
+
+type blockingReads struct{ countingReads }
+
+func (*blockingReads) StatLines(ctx context.Context, _ int) ([]boards.StatLine, error) {
+	<-ctx.Done()
+	return nil, ctx.Err()
+}
+
+// A read that never answers errors within the timeout, even for a
+// caller whose own context never ends.
+func TestCacheReadTimesOut(t *testing.T) {
+	c := &Cache{Reads: &blockingReads{}, Now: time.Now, Timeout: 50 * time.Millisecond}
+	start := time.Now()
+	_, err := c.Data(context.Background(), 2026)
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("err %v, want the deadline", err)
+	}
+	if took := time.Since(start); took > time.Second {
+		t.Fatalf("took %v", took)
+	}
+	if (&Cache{}).timeout() != ReadTimeout {
+		t.Fatal("no default timeout")
+	}
+}
