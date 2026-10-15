@@ -2,7 +2,7 @@
 
 **Preregistration:** `docs/research/2026-10-15-weekly-projection-round3-preregistration.md`, committed as `e58ae444` before any code or fit of the round.
 **Code:** `research/model/weekly3/` (Lane 48), with `model_version` and `implementation = 'python'` stamped on every row. Commits `754164e0` (shared reads and round 2's pieces opened to the caller, behaviour unchanged), `fe03cade` (the round and its tests), `dc39efce` (the judged weeks' stage-1 error read over the rows with a number, a reported number only, fixed before the recorded run).
-**Run:** `python -m research.model.weekly3.round develop` on a scratch copy of the development store (`lane48_weekly`, local port 5433, restored from a dump of the dev copy's `research` schema), fit on 2021 and 2022, checked on 2023 weeks 6 to 17, once, on 2026-10-15, from a clean tree at `research@dc39efce`. It took 183 s: the rate refit 38.7 s (equal to the rest-of-season round 3 development record), the reads 88.4 s, the fit 0.4 s. The fit population held 4,560 rows, 4,557 of them with a number and 4,556 with stage-1 inputs. The check scored 2,444 population rows, 2,443 with a number. Every number is in `2026-10-15-weekly-projection-round3-dev-check.json`.
+**Run:** `python -m research.model.weekly3.round develop` on a scratch copy of the development store (`lane48_weekly`, local port 5433, restored from a dump of the dev copy's `research` schema), fit on 2021 and 2022, checked on 2023 weeks 6 to 17, once, on 2026-10-15, from a clean tree at `research@dc39efce`. It took 183 s: the rate refit 38.7 s (equal to the rest-of-season round 3 development record), the reads 88.4 s, the fit 0.4 s. The fit population held 4,560 rows, 4,557 of them with a number and 4,556 with stage-1 inputs. The check scored 2,444 population rows, 2,443 with a number. Every number is in `2026-10-15-weekly-projection-round3-dev-check.json`. One earlier `develop` run, on the code at `fe03cade` before the reported-only fix in `dc39efce`, printed the same 26 gate lines, and its output was not kept. The preconditions were checked and passed, since the run refuses otherwise, but this run's record does not hold their counts. The code now writes them into the record for any later run.
 
 ## Result
 
@@ -21,7 +21,7 @@
 | G4, WR cells | pass | below floor 0.074, 0.076, 0.070 and above ceiling 0.076, 0.073, 0.078, n = 1,600 |
 | G4, TE cells | pass | below floor 0.080, 0.083, 0.099 and above ceiling 0.101, 0.110, 0.094, n = 775 |
 | G4, the chance | pass | five bins gated, each within 0.05: [0.5, 0.6) 0.549 against 0.553 observed, [0.6, 0.7) 0.649 against 0.653, [0.7, 0.8) 0.748 against 0.767, [0.8, 0.9) 0.847 against 0.862, [0.9, 1.0) 0.932 against 0.930 |
-| G5, isolation | pass | the fit read outcomes for 2021 and 2022 only, the check for 2023 only, the five tables unchanged, and the per-game clause held: 1,058 games, 531 recorded reads, every row from a week before W (week W for filings) and stamped before its game's instant, the closest 0.1 h before |
+| G5, isolation | pass | the fit read outcomes for 2021 and 2022 only, the check for 2023 only, the five tables unchanged, and the per-game clause held for every read that computes x and the rate: 1,058 games, 531 recorded reads, every row from a week before W (week W for filings) and stamped before its game's instant, the closest 0.1 h before. Round 2's week board, read at the week's first kickoff for the benchmarks and the reported factor ablation, sits outside the clause: it read clubs, filings and the stored week-W opponent ratings, none of them feeding the number and none stamped after the instant |
 
 ## The ruling
 
@@ -30,7 +30,7 @@ The stop rule applies. The preregistration (section 4) says a development check 
 What the check established, for the record:
 
 - **Against ADP** the model leads by +0.0802 pooled (lower bound +0.0611) and at every position.
-- **Against recent form** it is ahead at every position (QB +0.0005, RB +0.0172, WR +0.0225, TE +0.0021) but under the margin pooled. Round 2 measured +0.0033 (lower bound -0.0237) on the same check. Round 3 added +0.0073 and did not clear +0.0200.
+- **Against recent form** it is ahead at every position (QB +0.0005, RB +0.0172, WR +0.0225, TE +0.0021) but under the margin pooled. Round 2 measured +0.0033 (lower bound -0.0237) on the same check. Round 3 added +0.0072 and did not clear +0.0200.
 - **Places off** fell to 11.870, against round 2's 12.116. The lead over recent form doubled, from 0.258 to 0.505.
 - **Calibration** held in all 12 cells and all five chance bins.
 - **The per-game instant.** The preregistration counted 754 of 780 Out or Doubtful filings for 2021 to 2023 weeks 6 to 17 in reach at each game's own kickoff under the model's club rule, against 119 at the week's first kickoff. In the check the filter withheld 1 population row in 2023 and 0 in the fit seasons, and flagged 148 and 303 Questionable. At Thursday's instant it withheld none. The filings reached the number mostly through vacated volume. A withheld teammate counted in 343 club-games of the fit seasons and 164 of 2023.
@@ -91,7 +91,7 @@ Stage 1 beats the season-to-date mean on every line but 2023's tight-end carries
 | Every number at Thursday's instant | +0.0105 (-0.0143) | +0.0801 (+0.0626) | 11.916 |
 | m times round 2's opponent factor, elasticities refit on 2021 and 2022 (QB pass 0.6, RB rush 0.5, WR pass 0.3, TE pass 0.9) | +0.0034 (-0.0236) | +0.0731 (+0.0561) | 12.115 |
 
-The last row is a reported number only. Nothing that computes x reads it, and its week-W read of the stored opponent ratings happened outside the recording wrapper. It reproduces round 2's development check (+0.0033 and +0.0729), which checks the pieces the two rounds share. The rate m alone measured +0.0045 against recent form (lower bound -0.0234) and +0.0741 against ADP (lower bound +0.0596). Of round 3's +0.0061 over the rate against recent form, removing the allowances takes away 0.0034 and removing vacated volume 0.0006.
+The last row is a reported number only. Nothing that computes x reads it, and its week-W read of the stored opponent ratings happened outside the recording wrapper. It comes within 0.0002 of round 2's development check (+0.0033, +0.0729, 12.116), the difference being the rows the per-game filter treats differently. The rate m alone measured +0.0045 against recent form (lower bound -0.0234) and +0.0741 against ADP (lower bound +0.0596). Of round 3's +0.0061 over the rate against recent form, removing the allowances takes away 0.0034 and removing vacated volume 0.0005.
 
 ## Two things the replay showed about the data
 
