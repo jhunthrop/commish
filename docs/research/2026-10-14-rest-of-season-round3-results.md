@@ -95,3 +95,21 @@ Quoted from the coordinator of this session, 2026-10-14, after round 2 failed:
 > "round 3 gates ordering only (G1 +0.04, G2, G4), the in-season board ships with no interval (null
 > floor/ceiling, basis says so), fit 2021-2023 after ingesting 2021-22 week-one rosters into the
 > scratch copy, judged once on 2024 at weeks 8 and 12; 2025 closed, 2026 pristine; S=6."
+
+## Switch week moved to 6, 2026-10-15
+
+The preregistration named week 7: the preseason board through week 6, the model from week 7. The
+founder ruled on 2026-10-15:
+
+> "We said be ready for week 6 (this week)."
+
+What changes on the board: `FIRST_MODEL_WEEK` in `research/model/ros/live.py` is 6, so the nightly
+serves the rest-of-season board from the first week with a game still to kick off when that week is 6
+or later. The board is the model's from week 6, one week before the preregistered switch, with the
+model's inputs through week 5 (the last week whose games are all in the records). The basis the
+formats print and the record page reads ("the rest of the 2026 season from week N") derives from the
+run's window, so it says week 6 on the first in-season run. No fit, gate or judged number changes.
+
+The honest statement: the ordering was judged on held-out seasons at weeks 8 and 12, and nothing
+earlier was measured. Weeks 6 and 7 sit before the judged weeks; the board served at those weeks
+rests on the evidence of weeks 8 and 12, not on a measurement of its own.

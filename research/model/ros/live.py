@@ -37,9 +37,11 @@ from research.model.ros.payload import ARTIFACT_NAME, priors_from
 from research.model.weekly.round.scoring import SKILL_POSITIONS
 
 ARTIFACT_VERSION: Final = 1
-# The first week the model's board is served: round 3's preregistration, the preseason board through
-# the switch week (6) and the model from week 7 (the coordinator's ruling of 2026-10-14: "the record wins").
-FIRST_MODEL_WEEK: Final = 7
+# The first week the model's board is served. The preregistration named week 7 (the preseason board
+# through week 6). The founder ruled on 2026-10-15 that the board be ready for week 6, so the model is
+# served from week 6: one week before the preregistered switch, with the model's inputs through week 5.
+# The ordering was judged at weeks 8 and 12; nothing earlier was measured.
+FIRST_MODEL_WEEK: Final = 6
 _STAT_FIELDS: Final = (
     "passing_yards", "passing_touchdowns", "interceptions", "rushing_yards", "rushing_touchdowns",
     "receiving_yards", "receiving_touchdowns", "receptions", "fumbles_lost", "field_goals_made",

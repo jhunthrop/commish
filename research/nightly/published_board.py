@@ -1,7 +1,7 @@
 """THE PUBLISHED RUN'S BOARD AS A TABLE, for the readers that never read R2 (Lane 28).
 
 The API reads no file at request time, so the order the site shows (the rest-of-season order from
-week 7, Lane 18) reaches it through `research.published_boards`. `publish` is the one place that
+the first model week, Lane 18) reaches it through `research.published_boards`. `publish` is the one place that
 reads the bucket for it: after the pointer step it reads the run `runs/latest.json` names, its
 manifest and every format's `boards/<format>.json`, and in one transaction deletes that season's
 rows and inserts the run's. A run already in the table is left as it is, so publishing it again

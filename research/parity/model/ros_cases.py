@@ -2,7 +2,7 @@
 
 Each case assembles the run at one instant without the model's inputs (today's board) and with them,
 as the nightly reads them (`run_parts.ros_setup`). Before the switch week the two runs are equal file
-for file. From week 7 every board re-ranks the judged universe with no range: each preseason board
+for file. From the first model week every board re-ranks the judged universe with no range: each preseason board
 player keeps his preseason rank and points, each player with a line who was off the preseason board
 is ranked with a null preseason rank, and the depth, basis and ADP gates pass. With the artifact or
 the raw line missing the run is today's board again and says why. And the in-season boards from the
@@ -26,7 +26,7 @@ from sqlalchemy import Connection, Engine
 
 from research.model.arithmetic import ARM64_BOARDS
 from research.model.priors import load_model_artifacts
-from research.model.ros.live import load_ros_priors
+from research.model.ros.live import FIRST_MODEL_WEEK, load_ros_priors
 from research.model.ros.raw_line import raw_generation, rebuild_raw_line
 from research.nightly import gates
 from research.nightly.assemble import Assembled, assemble
@@ -38,9 +38,10 @@ from research.parity.model.compare import Diff
 from research.parity.model.outcome import CaseResult, Claim
 from research.season import PRODUCT_SEASON
 
-# The day the code shipped (week 6 to play, before the switch) and a week later (week 7 to play).
-BEFORE_SWITCH: Final = datetime.fromisoformat("2026-10-14T12:00:00+00:00")
-IN_SEASON: Final = datetime.fromisoformat("2026-10-21T12:00:00+00:00")
+# The Wednesday before the last preseason week (week 5 to play) and the Wednesday after (week 6 to play,
+# the first model week). The claims below read the weeks from `FIRST_MODEL_WEEK`, never a literal.
+BEFORE_SWITCH: Final = datetime.fromisoformat("2026-10-07T12:00:00+00:00")
+IN_SEASON: Final = datetime.fromisoformat("2026-10-14T12:00:00+00:00")
 _RANGE: Final = ("floor", "median", "ceiling")
 Json = dict[str, Any]
 Case = Callable[[Connection, RosSetup], CaseResult]
@@ -92,12 +93,12 @@ def _before_switch(conn: Connection, _: RosSetup) -> CaseResult:
     return CaseResult(
         "ros-before-switch",
         [
-            _files_diff("every file, a run dated in week 6", today.files, switched.files),
+            _files_diff("every file, a run dated before the switch week", today.files, switched.files),
             _files_diff("every format in the manifest", _manifest_formats(today), _manifest_formats(switched)),
         ],
         [f"status: {switched.rest_status}"],
         claims=[
-            Claim("the run says week 6 is before the switch", "week 6 is before the switch week (7)" in switched.rest_status),
+            Claim("the run says the week is before the switch", f"before the switch week ({FIRST_MODEL_WEEK})" in switched.rest_status),
             Claim("the run reads no season players before the switch", setup.season_players == ()),
         ],
     )  # fmt: skip
@@ -110,8 +111,9 @@ def _in_season(conn: Connection, setup: RosSetup) -> CaseResult:
     on = [r for p, rows in after.items() for r in rows if r["id"] in ranks[p]]
     off = [r for p, rows in after.items() for r in rows if r["id"] not in ranks[p]]
     claims = [
-        Claim("the rest of the season starts at week 7, lines through week 5",
-              switched.rest is not None and (switched.rest.from_week, switched.rest.through) == (7, 5)),
+        Claim(f"the rest of the season starts at week {FIRST_MODEL_WEEK}, lines through week {FIRST_MODEL_WEEK - 1}",
+              switched.rest is not None
+              and (switched.rest.from_week, switched.rest.through) == (FIRST_MODEL_WEEK, FIRST_MODEL_WEEK - 1)),
         Claim("every board re-ranks", all([r["id"] for r in after[p]][: len(before[p])] != [r["id"] for r in before[p]] for p in before)),
         Claim("every in-season row has no range", all(r[k] is None for rows in after.values() for r in rows for k in _RANGE)),
         Claim("every preseason board player keeps his preseason rank",
@@ -120,8 +122,8 @@ def _in_season(conn: Connection, setup: RosSetup) -> CaseResult:
               bool(off) and all(r["preseasonRank"] is None and r["preseasonPoints"] is None for r in off)),
         Claim("each board is in its order of points over replacement",
               all(all(a["vor"] >= b["vor"] for a, b in itertools.pairwise(rows)) for rows in after.values())),
-        Claim("every format names the rest of the season from week 7",
-              all("rest of the 2026 season from week 7" in f["basis"][0] for f in _manifest_formats(switched).values())),
+        Claim(f"every format names the rest of the season from week {FIRST_MODEL_WEEK}",
+              all(f"rest of the 2026 season from week {FIRST_MODEL_WEEK}" in f["basis"][0] for f in _manifest_formats(switched).values())),
         Claim("the index is in the board's order",
               [e["id"] for e in switched.files["index.json"]][:10] == [r["id"] for r in after["boards/ppr-12.json"]][:10]),
         *_gates_pass(switched),
