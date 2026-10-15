@@ -105,13 +105,36 @@ type Range struct {
 	Ceiling float64
 }
 
+// OrderBasis is what a board's points rank: the preseason board's season,
+// or from week 7 the rest of the season (the published run's order).
+type OrderBasis string
+
+// The orders a board can carry, as research.published_boards names them.
+const (
+	OrderPreseason    OrderBasis = "preseason"
+	OrderRestOfSeason OrderBasis = "rest_of_season"
+)
+
+// Valid is true for an order the board knows how to say.
+func (o OrderBasis) Valid() bool { return o == OrderPreseason || o == OrderRestOfSeason }
+
 // Raw is one scoring board as stored, players in pool order: ADP
 // ascending, unpriced last, ties by id.
 type Raw struct {
-	Format  Format
-	Season  int
-	Source  string
-	AsOf    time.Time
+	Format Format
+	Season int
+	// Source is the stored preseason board the format names
+	// (<prefix>_<format>_12), the boards service's source for a custom one.
+	Source string
+	// AsOf is when the points were made: the published run's refresh in
+	// season, else the stored board generation.
+	AsOf time.Time
+	// OrderBasis is what the points rank.
+	OrderBasis OrderBasis
+	// Run is the published run the points come from
+	// (research.published_boards), empty when they come from the stored
+	// preseason board itself.
+	Run     string
 	Players []Player
 	// Custom is set when the points are a league's own rules applied to
 	// the stored board's candidates (CustomSource), not a stored board.
@@ -210,6 +233,13 @@ func (b Board) Byes() map[string]int {
 	return out
 }
 
+// OrderBasis is what the board's points rank: preseason, or the rest of
+// the season once the published run ranks it.
+func (b Board) OrderBasis() OrderBasis { return b.Raw.OrderBasis }
+
+// Refreshed is when the board's points were made (Raw.AsOf).
+func (b Board) Refreshed() time.Time { return b.Raw.AsOf }
+
 // CustomBasis says what a board for a league's own rules is built on, and
 // no more: the 21 rules we score (a rule the import left out is named as
 // left out on the setup page), the stored board whose players and draft
@@ -230,6 +260,10 @@ func (b Board) Basis() string {
 	ranked := ""
 	if b.RankedFor != "" {
 		ranked = fmt.Sprintf("%s is ranked on our %s board. ", b.RankedFor, b.Raw.Format.Words())
+	}
+	if b.Raw.OrderBasis == OrderRestOfSeason {
+		return fmt.Sprintf("%sPoints are our %d %s projections for the rest of the season, refreshed %s, %s",
+			ranked, b.Raw.Season, b.Raw.Format.Words(), b.Raw.AsOf.UTC().Format("January 2"), tail)
 	}
 	return fmt.Sprintf("%sPoints are our %d %s projections, %s", ranked, b.Raw.Season, b.Raw.Format.Words(), tail)
 }
