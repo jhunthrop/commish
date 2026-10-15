@@ -25,7 +25,11 @@ async function keepShell(): Promise<void> {
 }
 
 async function activate(): Promise<void> {
-	await worker.registration.navigationPreload.enable();
+	// The type says every browser has it; Safari before 15.4 does not, and a throw here would skip the
+	// cleanup and the claim below.
+	const preload = (worker.registration as { navigationPreload?: NavigationPreloadManager })
+		.navigationPreload;
+	await preload?.enable();
 	for (const name of await caches.keys()) {
 		if (isStaleCache(name, CACHE)) await caches.delete(name);
 	}
