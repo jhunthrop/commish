@@ -2766,9 +2766,16 @@ components:
         allowed_to_position: { allOf: [{ $ref: "#/components/schemas/PointsAllowed" }], nullable: true }
     PlayerLine:
       type: object
-      required: [player, position_rank, points_over_replacement, held, facts]
+      required: [player, headshot, slug, position_rank, points_over_replacement, held, facts]
       properties:
         player: { $ref: "#/components/schemas/LeaguePlayer" }
+        headshot: { type: string, nullable: true, description: "his face from our player directory, null without one" }
+        slug:
+          type: string
+          nullable: true
+          description: >-
+            his page on the site (/players/{slug}): set for a player our order ranks whose name no other player in our
+            directory shares, null otherwise (a shared name's page is named by the run, which the API does not read)
         position_rank: { type: integer, nullable: true, description: his place at his position in our order, null when unranked }
         points_over_replacement:
           type: number

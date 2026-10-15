@@ -2412,6 +2412,10 @@ export interface components {
 		};
 		PlayerLine: {
 			player: components['schemas']['LeaguePlayer'];
+			/** @description his face from our player directory, null without one */
+			headshot: string | null;
+			/** @description his page on the site (/players/{slug}): set for a player our order ranks whose name no other player in our directory shares, null otherwise (a shared name's page is named by the run, which the API does not read) */
+			slug: string | null;
 			/** @description his place at his position in our order */
 			position_rank: number | null;
 			/**

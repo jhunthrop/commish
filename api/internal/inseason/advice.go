@@ -43,6 +43,7 @@ type advisor struct {
 	held     map[string]bool
 	basis    OrderBasis
 	// weeks is how many weeks the order covers (WeeksCovered).
+	pages pages
 	weeks int
 	now   time.Time
 }
@@ -62,7 +63,7 @@ func newAdvisor(l League, data Data, held map[string]bool, now time.Time) (*advi
 	if basis == "" {
 		basis = Preseason
 	}
-	return &advisor{League: l, settings: *l.Saved, config: config, slots: Slots(config), held: held, basis: basis, weeks: WeeksCovered(basis, l.Snap.Week), now: now,
+	return &advisor{League: l, settings: *l.Saved, config: config, slots: Slots(config), held: held, basis: basis, weeks: WeeksCovered(basis, l.Snap.Week), pages: newPages(l.Board.Raw), now: now,
 		season: NewSeason(data, RulesOf(rulesOf(l.Saved.Scoring)), l.Snap.Week, now)}, nil
 }
 
@@ -96,7 +97,8 @@ func (a *advisor) build(id string, lp apitypes.LeaguePlayer, side *leaguesync.Si
 		boardID = *lp.BoardId
 	}
 	position, team := draft.Position(lp.Position), lp.Team
-	if bp, ok := a.Board.Player(boardID); ok {
+	bp, placed := a.Board.Player(boardID)
+	if placed {
 		position, team = bp.Position, bp.Team
 	}
 	facts := a.season.For(Player{BoardID: boardID, Team: team, Position: position, HostIR: lp.InjuredReserve, ReadAt: a.Snap.ReadAt})
@@ -107,6 +109,10 @@ func (a *advisor) build(id string, lp apitypes.LeaguePlayer, side *leaguesync.Si
 	if c.Rank > 0 {
 		rank := c.Rank
 		line.PositionRank = &rank
+	}
+	line.Headshot = faceOf(bp, placed)
+	if placed {
+		line.Slug = a.pages.of(bp.Name, c.Rank > 0)
 	}
 	if v, ok := a.Board.Values[boardID]; ok {
 		c.Value, c.HasValue = v, true

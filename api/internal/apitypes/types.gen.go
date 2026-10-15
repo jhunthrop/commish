@@ -2008,6 +2008,9 @@ type PlayerLine struct {
 	// Facts one player's week; a fact we do not hold is null, never zero
 	Facts WeekFacts `json:"facts"`
 
+	// Headshot his face from our player directory, null without one
+	Headshot *string `json:"headshot"`
+
 	// Held the drafter tags him Hold on a sheet
 	Held   bool         `json:"held"`
 	Player LeaguePlayer `json:"player"`
@@ -2017,6 +2020,9 @@ type PlayerLine struct {
 
 	// PositionRank his place at his position in our order
 	PositionRank *int `json:"position_rank"`
+
+	// Slug his page on the site (/players/{slug}): set for a player our order ranks whose name no other player in our directory shares, null otherwise (a shared name's page is named by the run, which the API does not read)
+	Slug *string `json:"slug"`
 }
 
 // PlayerPosition defines model for PlayerPosition.
