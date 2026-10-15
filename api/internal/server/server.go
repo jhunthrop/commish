@@ -27,6 +27,12 @@ const (
 	shutdownTimeout   = 10 * time.Second
 )
 
+// The probe paths: Cloud Run's own checks, open on every host.
+const (
+	livenessPath  = "/healthz"
+	readinessPath = "/readyz"
+)
+
 const (
 	limitHealthPerMinute   = 600
 	limitNotFoundPerMinute = 120
@@ -92,11 +98,11 @@ func Health(db Pinger, version string) []httpx.Route {
 		return apitypes.Health{Status: status, Version: version}
 	}
 	return []httpx.Route{
-		{Method: http.MethodGet, Path: "/healthz", Access: httpx.Anonymous, Limit: httpx.PerMinute(limitHealthPerMinute),
+		{Method: http.MethodGet, Path: livenessPath, Access: httpx.Anonymous, Limit: httpx.PerMinute(limitHealthPerMinute),
 			Handler: func(w http.ResponseWriter, r *http.Request) {
 				httpx.WriteOK(w, r, http.StatusOK, health(apitypes.HealthStatusOk))
 			}},
-		{Method: http.MethodGet, Path: "/readyz", Access: httpx.Anonymous, Limit: httpx.PerMinute(limitHealthPerMinute),
+		{Method: http.MethodGet, Path: readinessPath, Access: httpx.Anonymous, Limit: httpx.PerMinute(limitHealthPerMinute),
 			Handler: func(w http.ResponseWriter, r *http.Request) {
 				ctx, cancel := context.WithTimeout(r.Context(), pingTimeout)
 				defer cancel()
@@ -111,6 +117,13 @@ func Health(db Pinger, version string) []httpx.Route {
 				httpx.WriteError(w, r, http.StatusNotFound, httpx.CodeNotFound, "No route here", nil)
 			}},
 	}
+}
+
+// LockHosts answers the API's routes only on hosts (or a loopback host),
+// and the probes on any: the service's run.app URL and its address get
+// a 404 for everything else (httpx.AllowHosts).
+func LockHosts(h http.Handler, hosts []string) http.Handler {
+	return httpx.AllowHosts(hosts, livenessPath, readinessPath)(h)
 }
 
 // Stack wraps the mux in the middleware every request passes through,

@@ -187,6 +187,10 @@ type API struct {
 	Hosts Hosts
 	// Dev is what only a development API may do.
 	Dev Dev
+	// AllowedHosts are ALLOWED_HOSTS, the Host names the API answers its
+	// routes on (API_BASE_URL's host by default). Any other host, its
+	// run.app URL above all, gets a 404 but for the probes.
+	AllowedHosts []string
 }
 
 // Room is cmd/room's whole configuration.
@@ -507,7 +511,31 @@ func LoadAPI(get Getenv) (API, error) {
 	c.ShareLinkKeys = append(l.secrets("SHARE_LINK_KEYS"), c.Session.CookiePassword)
 	c.Hosts = l.hosts(c.Env)
 	c.Dev = l.dev(c.Env)
+	c.AllowedHosts = l.allowedHosts(c.HTTP.APIBaseURL)
 	return c, l.err()
+}
+
+// allowedHosts is ALLOWED_HOSTS, bare host names separated by spaces or
+// commas (gcloud's --set-env-vars takes no comma inside a value, so the
+// workflow writes spaces), or API_BASE_URL's host when it is unset. A
+// scheme, a path or a wildcard is refused: the list is exact names.
+func (l *loader) allowedHosts(apiBase string) []string {
+	raw := strings.FieldsFunc(l.get("ALLOWED_HOSTS"), func(r rune) bool { return r == ',' || r == ' ' || r == '\t' || r == '\n' })
+	if len(raw) == 0 {
+		if u, err := url.Parse(apiBase); err == nil && u.Hostname() != "" {
+			return []string{strings.ToLower(u.Hostname())}
+		}
+		return nil
+	}
+	out := make([]string, 0, len(raw))
+	for _, h := range raw {
+		if strings.ContainsAny(h, "/:*") {
+			l.invalid("ALLOWED_HOSTS", "every entry must be a bare host name like api.trycommish.app")
+			continue
+		}
+		out = append(out, strings.ToLower(h))
+	}
+	return out
 }
 
 // secrets is a list of signing secrets separated by spaces or commas, each

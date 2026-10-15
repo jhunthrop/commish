@@ -35,6 +35,11 @@ These belong in `infra/README.md`. They are kept here until Lane 1 moves them.
   - `STRIPE_ENVIRONMENT`: `test` or `live`.
   - `STRIPE_AUTOMATIC_TAX`: `true` once Stripe Tax is set up.
   - `TRUSTED_PROXY_HOPS`: see below.
+  - `ALLOWED_HOSTS`: the host names the api answers its routes on, separated by spaces; unset, `api.trycommish.app`. See below.
+
+## The run.app URL is locked
+
+The api answers its routes only when the request's `Host` is one of `ALLOWED_HOSTS` (default: `API_BASE_URL`'s host) or a loopback host. Its `run.app` URL, its address and any other host get a 404 in the envelope for every route but `/healthz` and `/readyz`, which stay open for Cloud Run's probes. The check reads the request's own `Host`, never `X-Forwarded-Host`: nothing in front of the api sets one, so a caller could.
 
 ## Client addresses and TRUSTED_PROXY_HOPS
 

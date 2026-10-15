@@ -68,3 +68,25 @@ func TestHostsSwitchAndKeys(t *testing.T) {
 		t.Fatalf("the Yahoo app: %v", l.err())
 	}
 }
+
+// ALLOWED_HOSTS defaults to API_BASE_URL's host; a set list splits on
+// spaces or commas, lower-cased, and refuses a URL, a path or a wildcard.
+func TestAllowedHosts(t *testing.T) {
+	if got := hostLoader(nil).allowedHosts("https://api.trycommish.app"); len(got) != 1 || got[0] != "api.trycommish.app" {
+		t.Fatalf("default = %v", got)
+	}
+	if got := hostLoader(nil).allowedHosts("http://localhost:8080"); len(got) != 1 || got[0] != "localhost" {
+		t.Fatalf("default with a port = %v", got)
+	}
+	l := hostLoader(map[string]string{"ALLOWED_HOSTS": "api.trycommish.app API2.trycommish.app,"})
+	got := l.allowedHosts("https://api.trycommish.app")
+	if len(got) != 2 || got[0] != "api.trycommish.app" || got[1] != "api2.trycommish.app" || l.err() != nil {
+		t.Fatalf("list = %v, %v", got, l.err())
+	}
+	for _, bad := range []string{"https://api.trycommish.app", "api.trycommish.app/x", "*.trycommish.app", "*"} {
+		l := hostLoader(map[string]string{"ALLOWED_HOSTS": bad})
+		if l.allowedHosts("https://api.trycommish.app"); l.err() == nil {
+			t.Fatalf("%q was accepted", bad)
+		}
+	}
+}
