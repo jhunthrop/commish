@@ -86,8 +86,9 @@ func orderTrades(trades []Trade) {
 // skill positions, a trade kept when both lineups gain and both still
 // fill every slot. focus, when set, keeps only trades holding that
 // player (either side's id). The best limit trades in orderTrades' order.
-func Trades(config []draft.SlotConfig, mine, theirs Squad, focus string, limit int) []Trade {
-	f := newFiller(Slots(config))
+// Gains are a week's over the weeks the order covers.
+func Trades(config []draft.SlotConfig, weeks int, mine, theirs Squad, focus string, limit int) []Trade {
+	f := newFiller(Slots(config), weeks)
 	me, them := newSide(f, mine, true), newSide(f, theirs, false)
 	var out []Trade
 	var in []*Candidate

@@ -2,12 +2,28 @@ package inseason
 
 import "github.com/jhunthrop/commish/api/internal/draft"
 
-// SeasonGames turns a season's points over replacement into a week's:
-// the regular season's seventeen games.
+// SeasonGames is the weeks the preseason number covers: the regular
+// season's seventeen games.
 const SeasonGames = 17
 
-// PerWeek is a season's points over replacement a week.
-func PerWeek(season float64) float64 { return season / SeasonGames }
+// LastWeek is the last week the rest-of-season order covers, the last
+// fantasy week (research.model.ros.outcomes' LAST_FANTASY_WEEK).
+const LastWeek = 17
+
+// WeeksCovered is how many weeks the order's points over replacement
+// cover: the season's on the preseason number; on the rest-of-season
+// order, the league's week through the last, never fewer than one. A
+// league with no week reads as the whole season.
+func WeeksCovered(basis OrderBasis, week int) int {
+	if basis != RestOfSeason || week < 1 {
+		return SeasonGames
+	}
+	return max(1, LastWeek-week+1)
+}
+
+// PerWeek is the order's points over replacement a week: averaged over
+// the weeks it covers.
+func PerWeek(total float64, weeks int) float64 { return total / float64(max(1, weeks)) }
 
 // skill is a position the trade finder trades and a kicker or defense
 // is never dropped for without a spare.

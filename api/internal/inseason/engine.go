@@ -149,7 +149,10 @@ func valueThenForm(a, b *Candidate) bool {
 type filler struct {
 	// week orders by this week's tiers (the lineup); without it the fill
 	// is the rest-of-season lineup strength's, nobody's week counted.
-	week   bool
+	week bool
+	// weeks is how many weeks the order's points over replacement cover:
+	// strength is a week's over them.
+	weeks  int
 	slots  []Slot
 	shared []int
 	open   []bool
@@ -159,8 +162,8 @@ type filler struct {
 	pool   []*Candidate
 }
 
-func newFiller(slots []Slot) *filler {
-	f := &filler{slots: slots, shared: sharedOrder(slots), open: make([]bool, len(slots)), out: make([]int, len(slots))}
+func newFiller(slots []Slot, weeks int) *filler {
+	f := &filler{weeks: weeks, slots: slots, shared: sharedOrder(slots), open: make([]bool, len(slots)), out: make([]int, len(slots))}
 	for i := range f.open {
 		f.open[i] = true
 	}
@@ -220,7 +223,7 @@ func (f *filler) fill(open []bool, pool []*Candidate, taken []bool) []int {
 }
 
 // strength is §5.2's lineup strength: the points over replacement a week
-// summed over the slots the engine fills from pool (§4.2's fill on our
+// (over the filler's weeks) summed over the slots the engine fills from pool (§4.2's fill on our
 // order with no week tiers: a bye or this week's designation counts for
 // nothing; the filler must not be a week filler), and how many slots it filled. A player
 // on injured reserve fills nothing; a player with no points over
@@ -240,7 +243,7 @@ func (f *filler) strength(pool []*Candidate) (float64, int) {
 			total += pool[p].Value
 		}
 	}
-	return PerWeek(total), filled
+	return PerWeek(total, f.weeks), filled
 }
 
 // started reports whether the last fill started pool[at].
@@ -344,7 +347,7 @@ func Lineup(config []draft.SlotConfig, roster []Candidate, hostStarters []string
 			taken[p] = true
 		}
 	}
-	week := newFiller(slots)
+	week := newFiller(slots, SeasonGames)
 	week.week = true
 	for i, p := range week.fill(open, pointers(roster), taken) {
 		if open[i] {

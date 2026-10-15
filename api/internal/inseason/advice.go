@@ -42,7 +42,9 @@ type advisor struct {
 	season   *Season
 	held     map[string]bool
 	basis    OrderBasis
-	now      time.Time
+	// weeks is how many weeks the order covers (WeeksCovered).
+	weeks int
+	now   time.Time
 }
 
 // newAdvisor reads the league's roster shape and scoring from the saved
@@ -60,7 +62,7 @@ func newAdvisor(l League, data Data, held map[string]bool, now time.Time) (*advi
 	if basis == "" {
 		basis = Preseason
 	}
-	return &advisor{League: l, settings: *l.Saved, config: config, slots: Slots(config), held: held, basis: basis, now: now,
+	return &advisor{League: l, settings: *l.Saved, config: config, slots: Slots(config), held: held, basis: basis, weeks: WeeksCovered(basis, l.Snap.Week), now: now,
 		season: NewSeason(data, RulesOf(rulesOf(l.Saved.Scoring)), l.Snap.Week, now)}, nil
 }
 
@@ -108,7 +110,7 @@ func (a *advisor) build(id string, lp apitypes.LeaguePlayer, side *leaguesync.Si
 	}
 	if v, ok := a.Board.Values[boardID]; ok {
 		c.Value, c.HasValue = v, true
-		perWeek := roundTenth(PerWeek(v))
+		perWeek := roundTenth(PerWeek(v, a.weeks))
 		line.PointsOverReplacement, words.PerWeek = &perWeek, &perWeek
 	}
 	if facts.PerGame != nil {
@@ -237,7 +239,7 @@ func (a *advisor) Lineup() (apitypes.LineupAdvice, bool) {
 	}
 	rows := Lineup(a.config, cands, team.Starters)
 	h := a.header()
-	out := apitypes.LineupAdvice{Week: h.week, Basis: LineupBasis(a.basis, a.settings), OrderBasis: h.basis, Refreshed: h.refreshed,
+	out := apitypes.LineupAdvice{Week: h.week, Basis: LineupBasis(a.basis, a.weeks, a.settings), OrderBasis: h.basis, Refreshed: h.refreshed,
 		ReadAt: h.readAt, Set: true, Slots: []apitypes.LineupSlot{}, Bench: []apitypes.PlayerLine{},
 	}
 	out.HostLineupUrl, out.HostNote = a.host(LineupPage)
@@ -313,11 +315,11 @@ func (a *advisor) Waivers(position draft.Position) (apitypes.WaiverAdvice, bool)
 		cands[i] = p.cand
 	}
 	h := a.header()
-	out := apitypes.WaiverAdvice{Week: h.week, Basis: WaiversBasis(a.basis, a.settings), OrderBasis: h.basis, Refreshed: h.refreshed,
+	out := apitypes.WaiverAdvice{Week: h.week, Basis: WaiversBasis(a.basis, a.weeks, a.settings), OrderBasis: h.basis, Refreshed: h.refreshed,
 		ReadAt: h.readAt, Rows: []apitypes.WaiverRow{}}
 	out.HostWaiversUrl, out.HostNote = a.host(WaiversPage)
 	w := &Writer{Basis: a.basis, Now: a.now}
-	for _, move := range Waivers(a.config, squad, cands) {
+	for _, move := range Waivers(a.config, a.weeks, squad, cands) {
 		if len(out.Rows) == MaxWaiverRows {
 			break
 		}
@@ -348,7 +350,7 @@ func (a *advisor) Trades(focus string) (apitypes.TradeAdvice, bool) {
 	mine := a.active(team)
 	squad := a.squad(mine, true)
 	h := a.header()
-	out := apitypes.TradeAdvice{Week: h.week, Basis: TradesBasis(a.basis, a.settings), OrderBasis: h.basis, Refreshed: h.refreshed,
+	out := apitypes.TradeAdvice{Week: h.week, Basis: TradesBasis(a.basis, a.weeks, a.settings), OrderBasis: h.basis, Refreshed: h.refreshed,
 		ReadAt: h.readAt, Teams: []apitypes.TradeTeam{}}
 	out.HostTradesUrl, out.HostNote = a.host(TradesPage)
 	for _, t := range leaguesync.Standings(a.Snap.Teams) {
@@ -359,7 +361,7 @@ func (a *advisor) Trades(focus string) (apitypes.TradeAdvice, bool) {
 		row := apitypes.TradeTeam{RosterId: t.RosterID, Name: t.Name, Owner: t.Owner,
 			Record: apitypes.TradeRecord{Wins: t.Wins, Losses: t.Losses, Ties: t.Ties}, Trades: []apitypes.TradeRow{}}
 		close := 0
-		for _, tr := range Trades(a.config, squad, a.squad(theirs, false), focus, TradesPerTeam) {
+		for _, tr := range Trades(a.config, a.weeks, squad, a.squad(theirs, false), focus, TradesPerTeam) {
 			row.Trades = append(row.Trades, apitypes.TradeRow{Give: lines(mine, tr.Give), Get: lines(theirs, tr.Get),
 				MyGain: roundTenth(tr.MyGain), TheirGain: roundTenth(tr.TheirGain), CloseForThem: tr.CloseForThem()})
 			if tr.CloseForThem() {

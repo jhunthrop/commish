@@ -45,7 +45,7 @@ func tradeWords(tr Trade, mine, theirs []Candidate) string {
 
 func TestTradesHelpBothLineups(t *testing.T) {
 	mine, theirs := deepAtBack(), deepAtReceiver()
-	got := Trades(twelveTeamPPR(t), Squad{Players: mine}, Squad{Players: theirs}, "", 1000)
+	got := Trades(twelveTeamPPR(t), SeasonGames, Squad{Players: mine}, Squad{Players: theirs}, "", 1000)
 	if len(got) == 0 {
 		t.Fatal("no trade found between a team deep at back and one deep at receiver")
 	}
@@ -80,7 +80,7 @@ func TestTradesHelpBothLineups(t *testing.T) {
 func TestTradesKeepHeldInjuredAndKickers(t *testing.T) {
 	mine := deepAtBack()
 	theirs := set(deepAtReceiver(), "t-wr4", func(c Candidate) Candidate { c.InjuredReserve = true; return c })
-	got := Trades(twelveTeamPPR(t), Squad{Players: mine, Held: map[string]bool{"m-rb3": true}}, Squad{Players: theirs}, "", 1000)
+	got := Trades(twelveTeamPPR(t), SeasonGames, Squad{Players: mine, Held: map[string]bool{"m-rb3": true}}, Squad{Players: theirs}, "", 1000)
 	for _, tr := range got {
 		words := tradeWords(tr, mine, theirs)
 		if strings.Contains(words, "m-rb3") || strings.Contains(words, "t-wr4") || strings.Contains(words, "-k") || strings.Contains(words, "-def") {
@@ -91,7 +91,7 @@ func TestTradesKeepHeldInjuredAndKickers(t *testing.T) {
 
 func TestTradesNarrowToOnePlayer(t *testing.T) {
 	mine, theirs := deepAtBack(), deepAtReceiver()
-	got := Trades(twelveTeamPPR(t), Squad{Players: mine}, Squad{Players: theirs}, "t-wr5", 1000)
+	got := Trades(twelveTeamPPR(t), SeasonGames, Squad{Players: mine}, Squad{Players: theirs}, "t-wr5", 1000)
 	if len(got) == 0 {
 		t.Fatal("no trade holds t-wr5")
 	}
@@ -115,7 +115,7 @@ func TestTradesNarrowToOnePlayer(t *testing.T) {
 func TestTradesFillEverySlot(t *testing.T) {
 	mine := without(deepAtBack(), []int{12})
 	theirs := deepAtReceiver()
-	for _, tr := range Trades(twelveTeamPPR(t), Squad{Players: mine}, Squad{Players: theirs}, "", 1000) {
+	for _, tr := range Trades(twelveTeamPPR(t), SeasonGames, Squad{Players: mine}, Squad{Players: theirs}, "", 1000) {
 		for _, g := range tr.Give {
 			if mine[g].ID == "m-te" {
 				gotTE := false
@@ -154,7 +154,7 @@ func BenchmarkTradesFifteenAgainstFifteen(b *testing.B) {
 	teams := league(2)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		Trades(config, teams[0], teams[1], "", TradesPerTeam)
+		Trades(config, SeasonGames, teams[0], teams[1], "", TradesPerTeam)
 	}
 }
 
@@ -166,7 +166,7 @@ func BenchmarkTradesTwelveTeams(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		for _, other := range teams[1:] {
-			Trades(config, teams[0], other, "", TradesPerTeam)
+			Trades(config, SeasonGames, teams[0], other, "", TradesPerTeam)
 		}
 	}
 }
@@ -175,9 +175,9 @@ func BenchmarkTradesTwelveTeams(b *testing.B) {
 // week changes nothing.
 func TestTradeGainsIgnoreThisWeek(t *testing.T) {
 	theirs := deepAtReceiver()
-	healthy := Trades(twelveTeamPPR(t), Squad{Players: deepAtBack()}, Squad{Players: theirs}, "m-rb1", 1000)
+	healthy := Trades(twelveTeamPPR(t), SeasonGames, Squad{Players: deepAtBack()}, Squad{Players: theirs}, "m-rb1", 1000)
 	bye := set(deepAtBack(), "m-rb1", func(c Candidate) Candidate { return withTier(c, Out) })
-	got := Trades(twelveTeamPPR(t), Squad{Players: bye}, Squad{Players: theirs}, "m-rb1", 1000)
+	got := Trades(twelveTeamPPR(t), SeasonGames, Squad{Players: bye}, Squad{Players: theirs}, "m-rb1", 1000)
 	if len(got) != len(healthy) {
 		t.Fatalf("%d trades with him on bye, %d healthy", len(got), len(healthy))
 	}
