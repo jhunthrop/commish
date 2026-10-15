@@ -9,8 +9,9 @@ import numpy as np
 import pytest
 
 from research.errors import SchemaDriftError
+from research.model.weekly.round.interval import EDGE_PERCENTILES, IntervalFitError
 from research.model.weekly.scheme import CONTEXT_MULTIPLIER_MAX, CONTEXT_MULTIPLIER_MIN
-from research.model.weekly2.band import RangeFitError, chance, fit_ranges
+from research.model.weekly2.band import chance, fit_ranges
 from research.model.weekly2.designation import status_of_filing, status_of_tank01
 from research.model.weekly2.factor import Elasticity, FactorRow, fit_elasticities, opponent_factor
 from research.model.weekly2.gates import ROUND_TWO
@@ -125,6 +126,10 @@ def _cell_pairs(count: int) -> list[tuple[float, float]]:
     return [(float(i), float(i) + (i % 10) - 4.5) for i in range(count)]
 
 
+def test_the_range_cuts_at_round_ones_preregistered_quintile_edges() -> None:
+    assert EDGE_PERCENTILES == (20.0, 40.0, 60.0, 80.0)
+
+
 def test_the_range_cuts_quintiles_of_x_and_keeps_99_percentiles() -> None:
     pairs = {f"{p}|{f}": _cell_pairs(500) for p in _POSITIONS for f in ("ppr", "half", "std")}
     ranges = fit_ranges(pairs, ROUND_TWO)
@@ -150,7 +155,7 @@ def test_the_range_floors_at_zero() -> None:
 def test_a_thin_quintile_is_refused() -> None:
     pairs = {f"{p}|{f}": _cell_pairs(500) for p in _POSITIONS for f in ("ppr", "half", "std")}
     pairs["TE|std"] = _cell_pairs(40)
-    with pytest.raises(RangeFitError, match=r"TE\|std"):
+    with pytest.raises(IntervalFitError, match=r"TE\|std"):
         fit_ranges(pairs, ROUND_TWO)
 
 

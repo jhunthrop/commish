@@ -7,23 +7,21 @@ the fit population's x) and each quintile keeps its 1st to 99th percentiles (num
 max(0, x + q10), median max(0, x + q50), ceiling max(0, x + q90). The chance A outscores B is the
 share of the 99 x 99 pairs of their buckets' percentiles in which max(0, x_A + a) exceeds
 max(0, x_B + b), ties counted half; the residuals are taken as independent and both as playing.
+
+The cut itself is round 1's (`weekly.round.interval.quintile_cut`: its edges, its minimum quintile
+and its refusal of a thin one); round 2 keeps 99 percentiles where round 1 kept three.
 """
 
 import bisect
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Any, Final
+from typing import Any
 
 import numpy as np
 
+from research.model.weekly.round.interval import quintile_cut
 from research.model.weekly2.gates import Thresholds
-
-MIN_BUCKET: Final = 30  # round 1's: a quintile must hold this many player-weeks
-
-
-class RangeFitError(ValueError):
-    """A position and format whose fit population is too thin to cut into quintiles."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -58,16 +56,7 @@ class Ranges:
 
 
 def _cell(key: str, pairs: Sequence[tuple[float, float]], t: Thresholds) -> Bucketed:
-    numbers = np.array([number for number, _ in pairs])
-    edges = tuple(float(e) for e in np.percentile(numbers, t.quintile_edges))
-    buckets: list[list[float]] = [[] for _ in range(len(edges) + 1)]
-    for number, actual in pairs:
-        buckets[bisect.bisect_right(edges, number)].append(actual - number)
-    if min(len(bucket) for bucket in buckets) < MIN_BUCKET:
-        raise RangeFitError(f"{key}: a quintile holds fewer than {MIN_BUCKET} weeks: {[len(b) for b in buckets]}")
-    percentiles = tuple(
-        tuple(float(v) for v in np.percentile(np.array(bucket), t.residual_percentiles)) for bucket in buckets
-    )
+    edges, percentiles = quintile_cut(pairs, t.residual_percentiles, key)
     return Bucketed(edges, percentiles)
 
 

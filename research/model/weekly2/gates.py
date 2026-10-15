@@ -32,9 +32,8 @@ class Thresholds:
     factor_low: float
     factor_high: float
     elasticity_grid: tuple[float, ...]
-    # Section 2 item 5: quintile edges of x and the 1st to 99th residual percentiles; floor q10,
-    # median q50, ceiling q90.
-    quintile_edges: tuple[float, ...]
+    # Section 2 item 5: round 1's quintile cut of x (`interval.EDGE_PERCENTILES`), the 1st to 99th
+    # residual percentiles kept; floor q10, median q50, ceiling q90.
     residual_percentiles: tuple[float, ...]
     band_percentiles: tuple[float, float, float]
     # Section 4, population and statistics.
@@ -71,7 +70,6 @@ ROUND_TWO: Final = Thresholds(
     factor_low=0.8,
     factor_high=1.25,
     elasticity_grid=tuple(round(0.1 * i, 1) for i in range(11)),
-    quintile_edges=(20.0, 40.0, 60.0, 80.0),
     residual_percentiles=tuple(float(p) for p in range(1, 100)),
     band_percentiles=(10.0, 50.0, 90.0),
     population=FROZEN({"QB": 36, "RB": 72, "WR": 108, "TE": 36}),
