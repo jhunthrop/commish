@@ -123,6 +123,11 @@ type Player struct {
 	Slot     int
 	// Injured is ESPN's injured reserve mark on him.
 	Injured bool
+	// Eligible is the lineup slots ESPN lets him fill (eligibleSlots).
+	Eligible []int
+	// Locked is ESPN's lineupLocked: his game has started, and no lineup
+	// move may hold him.
+	Locked bool
 }
 
 // Game is one matchup in the current matchup period.
@@ -137,6 +142,7 @@ type wirePlayer struct {
 	DefaultPositionID int    `json:"defaultPositionId"`
 	ProTeamID         int    `json:"proTeamId"`
 	InjuryStatus      string `json:"injuryStatus"`
+	EligibleSlots     []int  `json:"eligibleSlots"`
 }
 
 type wireEntry struct {
@@ -144,7 +150,8 @@ type wireEntry struct {
 	LineupSlotID    int    `json:"lineupSlotId"`
 	InjuryStatus    string `json:"injuryStatus"`
 	PlayerPoolEntry struct {
-		Player wirePlayer `json:"player"`
+		LineupLocked bool       `json:"lineupLocked"`
+		Player       wirePlayer `json:"player"`
 	} `json:"playerPoolEntry"`
 }
 
@@ -342,9 +349,21 @@ func rosterOf(entries []wireEntry) []Player {
 		out = append(out, Player{
 			ID: strconv.Itoa(id), Name: text(p.FullName), Position: positions[p.DefaultPositionID], Team: proTeams[p.ProTeamID],
 			Slot: e.LineupSlotID, Injured: e.InjuryStatus == "INJURY_RESERVE" || p.InjuryStatus == "INJURY_RESERVE",
+			Eligible: eligible(p.EligibleSlots), Locked: e.PlayerPoolEntry.LineupLocked,
 		})
 	}
 	return out
+}
+
+// maxEligible bounds one player's eligible slots: ESPN has 25 slot ids.
+const maxEligible = 32
+
+// eligible is a player's eligible slots, bounded.
+func eligible(in []int) []int {
+	if len(in) > maxEligible {
+		in = in[:maxEligible]
+	}
+	return append([]int(nil), in...)
 }
 
 func text(s string) string {
