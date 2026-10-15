@@ -272,7 +272,6 @@ def test_no_adp_said_plainly_passes(text: str) -> None:
 @pytest.mark.parametrize(
     "text",
     [
-        "There is no ADP on file for him at all.",
         "Every game through week 5 of 2026 is in our records.",
     ],
 )
@@ -283,7 +282,7 @@ def test_a_facts_label_copied_into_prose_fails(text: str) -> None:
 
 
 def test_the_label_list_is_the_renderers_and_plain_prose_passes() -> None:
-    assert "on file" in SHEET_LABELS and "where most outcomes fall" in SHEET_LABELS
+    assert "where most outcomes fall" in SHEET_LABELS and "on file" not in SHEET_LABELS
     assert label_copies("He has been listed questionable since before week 6 of 2026, so sit him.") == []
     assert label_copies("He has no ADP.") == []
 

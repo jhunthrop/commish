@@ -105,14 +105,14 @@ def test_a_figures_basis_the_facts_print_is_exempt_and_a_label_or_a_paraphrase_i
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """The ruling of 2026-10-15, narrowed by Lane 29: a figure's basis as the whole sheet or the facts
-    block renders it is exempt; a section label the renderer prints ("on file", "where most outcomes
-    fall", `render_words.SHEET_LABELS`) is not, so a label copied into prose is judged like any span."""
+    block renders it is exempt; a section label the renderer prints ("where most outcomes fall", "in our
+    records", `render_words.SHEET_LABELS`) is not, so a label copied into prose is judged like any span."""
     monkeypatch.setattr(span_rules, "span_names", lambda conn: NAMES)
     monkeypatch.setattr(
         span_rules,
         "facts_texts",
         lambda facts: (
-            "Middle range, where most outcomes fall: 227 to 320 points. ADP before the season: none on file.",
+            "Middle range, where most outcomes fall: 227 to 320 points. ADP before the season: none.",
             "8 players left in his tier before a 16.8-point cliff.",
         ),
     )

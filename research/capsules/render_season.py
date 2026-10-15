@@ -13,7 +13,6 @@ from research.capsules.render_words import (
     AS_THE_PAGE_PRINTS,
     IN_OUR_RECORDS,
     NEXT_TO_PLAY,
-    ON_FILE,
     week_of,
 )
 from research.model.jsmath import js_to_fixed
@@ -67,7 +66,7 @@ def _week_line(week: SeasonWeek, season: int) -> str:
         return f"{named}, his club's bye"
     if week.status == "inactive":
         return f"{named}, did not play"
-    points = f"points not {ON_FILE}" if week.points is None else f"{js_string(week.points)} points"
+    points = "points not recorded" if week.points is None else f"{js_string(week.points)} points"
     return f"{named}, played, {points}"
 
 

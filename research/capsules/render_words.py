@@ -3,10 +3,11 @@ week with its season, a whole number, a signed one, a position's plural, one ran
 clause, and the sheet's labels.
 
 THE LABELS are the sheet's framing words, the ones that say what a line is rather than what a figure
-is out of: "on file", "in our records", "where most outcomes fall". The live review of 2026-10-15
+is out of: "in our records", "where most outcomes fall", "as the page prints it". The live review of 2026-10-15
 found the injury line's labels copied into prose ("report since the run-up to week" on 122 pages,
 "since the run-up to the next game" on one); that line now prints the status as data (`render_season`)
-and "the run-up to" is a worn phrase (`Repetition.refrain_stems`). A label in a read is a validator
+and "the run-up to" is a worn phrase (`Repetition.refrain_stems`). "On file", clerk's language on 113
+live pages, is printed nowhere on the sheet and is a worn phrase too (the coordinator's ruling). A label in a read is a validator
 failure
 (`prose_checks.label_copies`) and its words are never exempt from the span gate
 (`span_rules`). A figure with its basis ("players left in his tier before a", "missed to injury or a
@@ -36,7 +37,6 @@ POSITION_PLURAL: Final = MappingProxyType[Position, str](
 
 
 # The sheet's labels, each printed by the renderers through these names.
-ON_FILE: Final = "on file"
 IN_OUR_RECORDS: Final = "in our records"
 NEXT_TO_PLAY: Final = "is the next to play"
 AS_THE_PAGE_PRINTS: Final = "as the page prints it"
@@ -46,7 +46,6 @@ POOLED_IN: Final = "busts and injuries pooled in"
 AS_WE_SAW_IT: Final = "as we saw it before the season"
 RISK_COUNTED: Final = "with injury risk counted"
 SHEET_LABELS: Final = (
-    ON_FILE,
     IN_OUR_RECORDS,
     NEXT_TO_PLAY,
     AS_THE_PAGE_PRINTS,

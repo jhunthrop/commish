@@ -7,8 +7,8 @@
   hands an unfinished read back like any other failure; the page gate refuses a stored one
   (`pull_figures.capsule_findings`). The cause, a completion cut at its token limit and read as
   whole, is closed in `gateway.GatewayClient.complete`.
-- **No facts label in prose** (H2). The sheet's framing words (`render_words.SHEET_LABELS`: "on
-  file", "in our records", "where most outcomes fall", ...) copied into a sentence read as a template
+- **No facts label in prose** (H2). The sheet's framing words (`render_words.SHEET_LABELS`: "in
+  our records", "where most outcomes fall", ...) copied into a sentence read as a template
   that failed to fill ("since the run-up to the next game", the old injury label) or as stock across
   the board ("report since the run-up to week" on 122 pages). A label in a read is a validator
   failure; the injury line now prints its status as data, and "the run-up to" is a worn phrase.

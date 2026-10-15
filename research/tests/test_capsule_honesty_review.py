@@ -1,12 +1,15 @@
 """Lane 29 fix round 1: the task review's findings, each on the sentences the reviewer ran. True
 sentences pass, the missed claims fail."""
 
+import inspect
 from typing import Any
 
 import pytest
 
 from research.capsules import __main__ as cli
+from research.capsules import render, render_depth, render_season, render_words
 from research.capsules.claims import ClaimLedger, claim_violations
+from research.capsules.config import CAPSULE_CONFIG
 from research.capsules.prompt import IN_SEASON_RULES, PRESEASON_RULES
 from research.capsules.prose_checks import unfinished_ending
 from research.capsules.pull_figures import adp_figures_off_page
@@ -14,6 +17,7 @@ from research.capsules.requeue import QueueResult
 from research.capsules.season_voice import SeasonClock
 from research.capsules.sentences import phrase_pattern, split_sentences
 from research.capsules.validate import banned_term_in
+from research.capsules.voice_rules import voice_rule_hits
 from research.nightly.config import TEAMS
 
 OCTOBER = SeasonClock(2026, 5, (1, 2, 3, 5), (4,))
@@ -140,6 +144,15 @@ def test_the_round_line_is_built_from_the_boards_teams_and_is_history_in_season(
         assert f"divided by {TEAMS}" in rules
     assert "only history" in IN_SEASON_RULES
     assert "only history" not in PRESEASON_RULES
+
+
+# The coordinator's ruling: the sheet prints "on file" nowhere, and "on file" is a worn phrase.
+def test_the_sheet_prints_on_file_nowhere_and_on_file_is_a_worn_phrase() -> None:
+    for module in (render, render_depth, render_season, render_words):
+        assert "on file" not in inspect.getsource(module).split('"""', 2)[-1], module.__name__
+    assert "on file" in CAPSULE_CONFIG.repetition.refrain_stems
+    found = [hit.found for hit in voice_rule_hits("There is no ADP on file for him at all.", ())]
+    assert "on file" in found
 
 
 # L5: the queue command refuses an empty list and fails when it stamps fewer rows than it named.

@@ -27,7 +27,6 @@ from research.capsules.render_words import (
     AS_WE_SAW_IT,
     LOW_TAIL,
     MOST_OUTCOMES,
-    ON_FILE,
     POOLED_IN,
     RISK_COUNTED,
     percent,
@@ -51,7 +50,7 @@ def _adp_line(facts: PlayerFacts) -> str:
         return f"ADP{before}: none."
     by_adp = "" if facts.market.position_adp is None else f", {facts.market.position_adp} by ADP"
     if facts.season is not None:
-        # In season the ADP is history, printed as on file and with no pick word (the floor refuses one).
+        # In season the ADP is history, printed as history and with no pick word (the floor refuses one).
         return f"ADP{before} {js_string(adp)} (where drafters took him{by_adp})."
     return f"ADP {js_string(adp)} (drafters take him around pick {whole(adp)}{by_adp})."
 
@@ -120,7 +119,7 @@ def _evidence_line(item: EvidenceItem) -> str:
 
 def _news_lines(facts: PlayerFacts) -> list[str]:
     if not facts.news:
-        return [f"No recent headlines {ON_FILE}."]
+        return ["No recent headlines."]
     return [f'"{s.title}"' + ("" if s.published_at is None else f" ({s.published_at[:10]})") for s in facts.news]
 
 

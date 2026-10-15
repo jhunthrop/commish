@@ -132,6 +132,8 @@ class Repetition:
         "once injury risk is in",
         # The live review of 2026-10-15 (M1): the old injury label, on 206 live pages.
         "the run-up to",
+        # Clerk's language, on 113 live pages; the sheet prints it nowhere (the coordinator's ruling).
+        "on file",
     )
 
 
