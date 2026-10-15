@@ -4,7 +4,8 @@ The failure KIND is typed because each means a different operator action: `not_f
 ordinary case of a season nflverse has not published, `upstream` wants a retry, `malformed` wants
 a human. `getCsv` parses a whole asset; `streamCsv` projects named columns out of an asset too
 large to hold (play-by-play), decompressing a `.gz` asset explicitly because GitHub serves it as
-opaque bytes.
+opaque bytes. A client built with `max_bytes` refuses any asset that sends more than that many bytes
+(as sent, before decompression), counted as it arrives, so an oversized asset is never held whole.
 """
 
 import codecs
@@ -42,6 +43,17 @@ def _assert_ok(status: int, asset: str) -> None:
         raise NflverseError("upstream", asset, f"nflverse returned HTTP {status} for {asset}.")
 
 
+def _capped(chunks: Iterator[bytes], max_bytes: int | None, asset: str) -> Iterator[bytes]:
+    received = 0
+    for chunk in chunks:
+        received += len(chunk)
+        if max_bytes is not None and received > max_bytes:
+            raise NflverseError(
+                "malformed", asset, f"nflverse asset {asset} sent more than {max_bytes} bytes; refused."
+            )
+        yield chunk
+
+
 def _decoded(chunks: Iterator[bytes], gzipped: bool) -> Iterator[str]:
     inflater = zlib.decompressobj(16 + zlib.MAX_WBITS) if gzipped else None
     decoder = codecs.getincrementaldecoder("utf-8-sig")(errors="replace")
@@ -60,11 +72,16 @@ def _decoded(chunks: Iterator[bytes], gzipped: bool) -> Iterator[str]:
 class NflverseClient:
     fetcher: Fetcher
     base_url: str = NFLVERSE_BASE_URL
+    max_bytes: int | None = None
 
     def get_csv(self, release: str, file: str) -> list[dict[str, str]]:
         asset = f"{release}/{file}"
         response = self.fetcher.get(_asset_url(self.base_url, release, file))
         _assert_ok(response.status, asset)
+        if self.max_bytes is not None and len(response.body) > self.max_bytes:
+            raise NflverseError(
+                "malformed", asset, f"nflverse asset {asset} sent more than {self.max_bytes} bytes; refused."
+            )
         body = response.text()
         if js_trim(body) == "":
             raise NflverseError("malformed", asset, f"nflverse returned an empty body for {asset}.")
@@ -80,7 +97,7 @@ class NflverseClient:
         splitter = CsvSplitter()
 
         def records() -> Iterator[list[str]]:
-            for text in _decoded(chunks, file.endswith(".gz")):
+            for text in _decoded(_capped(chunks, self.max_bytes, asset), file.endswith(".gz")):
                 yield from splitter.feed(text)
             yield from splitter.end()
 
