@@ -22,6 +22,20 @@ const (
 // Version 3 names what is kept, the password, inside the ticked words.
 const ConsentVersion = 3
 
+// consentVersions is each host's consent words' version: FFPC's
+// (ConsentVersion), Yahoo's own authorize page (version 1, the scope it
+// shows: Fantasy Sports, read only) and ESPN's (web/src/lib/hosts/api.ts
+// ESPN_CONSENT, version 1).
+var consentVersions = map[string]int{"ffpc": ConsentVersion, "yahoo": 1, "espn": 1}
+
+// consentVersion is the host's consent version, 1 for a host not listed.
+func consentVersion(host string) int {
+	if v, ok := consentVersions[host]; ok {
+		return v
+	}
+	return 1
+}
+
 // ErrNotConnected is an account with no connection to the host.
 var ErrNotConnected = errors.New("hosts: not connected")
 
@@ -63,7 +77,7 @@ func (s *Store) Put(ctx context.Context, accountID uuid.UUID, host string, seale
 			signin_ct = excluded.signin_ct, key_version = excluded.key_version, status = 'connected',
 			last_signin_at = excluded.last_signin_at, consented_at = excluded.consented_at, consent_version = excluded.consent_version
 		returning `+connColumns,
-		accountID, host, sealed.WrappedKey, sealed.SessionCT, sealed.SignInCT, sealed.KeyVersion, now, ConsentVersion))
+		accountID, host, sealed.WrappedKey, sealed.SessionCT, sealed.SignInCT, sealed.KeyVersion, now, consentVersion(host)))
 	if err != nil {
 		return Connection{}, fmt.Errorf("hosts: put connection: %w", err)
 	}
@@ -135,6 +149,20 @@ func (s *Store) SessionKept(ctx context.Context, accountID uuid.UUID, host strin
 	return nil
 }
 
+// TokensKept keeps a refreshed session and renewal, both under the row's
+// own data key, guarded by the wrapped key the refresh began with as
+// SessionKept is: after a reconnect a stale refresh keeps nothing. Kept
+// tokens are working ones, so the connection is connected again.
+func (s *Store) TokensKept(ctx context.Context, accountID uuid.UUID, host string, wrappedKey, sessionCT, renewalCT []byte) error {
+	_, err := s.Pool.Exec(ctx, `update app.host_connections set session_ct = $3, signin_ct = $4, status = 'connected'
+		where account_id = $1 and host = $2 and wrapped_key = $5`,
+		accountID, host, sessionCT, renewalCT, wrappedKey)
+	if err != nil {
+		return fmt.Errorf("hosts: keep tokens: %w", err)
+	}
+	return nil
+}
+
 // ClaimSignIn claims the member's one kept sign-in for the window: it
 // writes last_signin_at only when none was tried in the window, in one
 // statement, so of every process that finds the same expired session
@@ -155,6 +183,31 @@ func (s *Store) ClaimSignIn(ctx context.Context, accountID uuid.UUID, host strin
 func (s *Store) SignedOut(ctx context.Context, accountID uuid.UUID, host string) error {
 	if _, err := s.Pool.Exec(ctx, `update app.host_connections set status = 'signed_out' where account_id = $1 and host = $2`,
 		accountID, host); err != nil {
+		return fmt.Errorf("hosts: signed out: %w", err)
+	}
+	return nil
+}
+
+// Locked runs fn holding the account's lock for the host across every
+// process (a transaction-scoped advisory lock), so two instances never
+// refresh one member's tokens at once. fn reads and writes through the
+// store as usual; the lock is released when it returns.
+func (s *Store) Locked(ctx context.Context, accountID uuid.UUID, host string, fn func(context.Context) error) error {
+	return pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error {
+		if _, err := tx.Exec(ctx, `select pg_advisory_xact_lock(hashtext('host_refresh:' || $1::text || ':' || $2))`,
+			accountID, host); err != nil {
+			return fmt.Errorf("hosts: lock %s: %w", host, err)
+		}
+		return fn(ctx)
+	})
+}
+
+// SignedOutAt stops reading as the member until they connect again, only
+// if the connection is still the one kept under wrappedKey: a slow read
+// of a connection made again since never marks the new one.
+func (s *Store) SignedOutAt(ctx context.Context, accountID uuid.UUID, host string, wrappedKey []byte) error {
+	if _, err := s.Pool.Exec(ctx, `update app.host_connections set status = 'signed_out'
+		where account_id = $1 and host = $2 and wrapped_key = $3`, accountID, host, wrappedKey); err != nil {
 		return fmt.Errorf("hosts: signed out: %w", err)
 	}
 	return nil

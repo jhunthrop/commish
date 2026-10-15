@@ -26,16 +26,25 @@ const UserAgent = "Commish/1.0 (+https://trycommish.app; hello@trycommish.app)"
 // DefaultBase is ESPN's league read host.
 const DefaultBase = "https://lm-api-reads.fantasy.espn.com"
 
+// Pacing of league and fan reads across every process: one a quarter
+// second, a read waiting at most ten seconds for its turn.
+const (
+	Gap      = 250 * time.Millisecond
+	MaxQueue = 10 * time.Second
+)
+
 // Bounds on what one read takes in.
 const (
-	maxBody      = 2 << 20
-	maxItems     = 400
-	maxStatID    = 1000
-	maxPoints    = 100
-	readTimeout  = 5 * time.Second
-	minSeason    = 2000
-	maxSeason    = 2100
-	maxNameRunes = 80
+	maxBody     = 2 << 20
+	maxItems    = 400
+	maxStatID   = 1000
+	maxPoints   = 100
+	readTimeout = 5 * time.Second
+	// leagueTimeout bounds a whole league read, up to 8 MB.
+	leagueTimeout = 15 * time.Second
+	minSeason     = 2000
+	maxSeason     = 2100
+	maxNameRunes  = 80
 )
 
 // The ways a read fails, each a different sentence to the drafter.
@@ -113,17 +122,26 @@ type wireLeague struct {
 type Client struct {
 	HTTP *http.Client
 	Base string
+	// FanBase is the fan API, FanBase when empty.
+	FanBase string
+	// Pace, when set, waits for each league or fan read's turn (*hosts.Gate
+	// paces every process).
+	Pace interface {
+		Wait(ctx context.Context) error
+	}
 }
 
 // New is a client on ESPN with the read timeout. A redirect is never
 // followed: an answer from anywhere but the read host is not ESPN's.
 func New() *Client {
 	refuse := func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
-	return &Client{HTTP: &http.Client{Timeout: readTimeout, CheckRedirect: refuse}, Base: DefaultBase}
+	return &Client{HTTP: &http.Client{Timeout: leagueTimeout, CheckRedirect: refuse}, Base: DefaultBase}
 }
 
 // League is a public league's scoring settings for a season.
 func (c *Client) League(ctx context.Context, ref Ref, season int) (League, error) {
+	ctx, cancel := context.WithTimeout(ctx, readTimeout)
+	defer cancel()
 	if !leagueID.MatchString(ref.LeagueID) || season < minSeason || season > maxSeason {
 		return League{}, ErrNotALink
 	}
@@ -151,11 +169,11 @@ func (c *Client) League(ctx context.Context, ref Ref, season int) (League, error
 	if err := json.NewDecoder(io.LimitReader(resp.Body, maxBody)).Decode(&wire); err != nil {
 		return League{}, fmt.Errorf("%w: %w", ErrMalformed, err)
 	}
-	return check(wire)
+	return checkScoring(wire.Settings.Name, wire.Settings.ScoringSettings.ScoringItems)
 }
 
-func check(wire wireLeague) (League, error) {
-	items := wire.Settings.ScoringSettings.ScoringItems
+// checkScoring bounds a league's name and scoring items.
+func checkScoring(rawName string, items []Item) (League, error) {
 	if len(items) == 0 || len(items) > maxItems {
 		return League{}, fmt.Errorf("%w: %d scoring items", ErrMalformed, len(items))
 	}
@@ -169,7 +187,7 @@ func check(wire wireLeague) (League, error) {
 			}
 		}
 	}
-	name := []rune(strings.TrimSpace(wire.Settings.Name))
+	name := []rune(strings.TrimSpace(rawName))
 	if len(name) > maxNameRunes {
 		name = name[:maxNameRunes]
 	}

@@ -1140,8 +1140,9 @@ paths:
       tags: [hosts]
       operationId: listHostConnections
       summary: >-
-        The hosts connecting is open for here (HOST_FFPC_ENABLED), and the hosts the account is connected to, each with
-        its state and when it was last read. No credential is ever answered. Signed out it answers the switches with no
+        The hosts connecting is open for here (HOST_FFPC_ENABLED, HOST_YAHOO_ENABLED, HOST_ESPN_ENABLED, each with the
+        credentials key present), and the hosts the account is connected to, each with its state and when it was last
+        read. No credential is ever answered. Signed out it answers the switches with no
         connections: a switch is not account data.
       security: [{ session: [] }, {}]
       responses:
@@ -1207,6 +1208,140 @@ paths:
       tags: [hosts]
       operationId: disconnectFFPC
       summary: Disconnect FFPC. The kept sign-in and session are deleted at once; leagues read from FFPC stop updating.
+      security: [{ session: [] }]
+      responses:
+        "200": { $ref: "#/components/responses/EmptyResponse" }
+        "404": { $ref: "#/components/responses/ErrorResponse" }
+  /hosts/yahoo/connect:
+    post:
+      tags: [hosts]
+      operationId: connectYahoo
+      summary: >-
+        Start connecting Yahoo: answers Yahoo's authorize address for the member to open, carrying a state bound to the
+        account that expires in ten minutes, one use, and a PKCE S256 challenge. The permission Yahoo shows is Fantasy
+        Sports, read only. The page the member started from may ride along (return_to), a path on the site the callback
+        sends them back to once connected. 5 an hour an account. 503 when Yahoo is not open here.
+      security: [{ session: [] }]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/YahooConnectInput" }
+      responses:
+        "200":
+          description: the authorize address
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - properties: { data: { $ref: "#/components/schemas/Redirect" } }
+        "429": { $ref: "#/components/responses/ErrorResponse" }
+        "503": { $ref: "#/components/responses/ErrorResponse" }
+  /hosts/yahoo/callback:
+    get:
+      tags: [hosts]
+      operationId: yahooCallback
+      summary: >-
+        Yahoo returns here. The state must be one this account started in the last ten minutes, and the browser must be
+        signed in as that account. The code is exchanged for Yahoo's tokens, which are kept envelope encrypted. Always
+        redirects to the site: the page the sign-in started from (return_to) or the account page with yahoo=connected,
+        or the account page with yahoo=refused and why (denied, expired, signed_out, failed, off), never anywhere else.
+      parameters:
+        - { name: code, in: query, required: false, schema: { type: string, maxLength: 512 } }
+        - { name: state, in: query, required: false, schema: { type: string, maxLength: 128 } }
+        - { name: error, in: query, required: false, schema: { type: string, maxLength: 128 } }
+      responses:
+        "302": { description: to the site's account page with the outcome }
+  /hosts/yahoo/leagues:
+    get:
+      tags: [hosts]
+      operationId: yahooLeagues
+      summary: >-
+        The member's Yahoo football leagues for the current season, read from Yahoo as them, each with its size, its
+        scoring type and whether the account follows it already. 404 when not connected; 409 when Yahoo refused the kept
+        token and the member connects again.
+      security: [{ session: [] }]
+      responses:
+        "200":
+          description: the leagues
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - properties: { data: { type: array, items: { $ref: "#/components/schemas/HostLeague" } } }
+        "404": { $ref: "#/components/responses/ErrorResponse" }
+        "409": { $ref: "#/components/responses/ErrorResponse" }
+        "502": { $ref: "#/components/responses/ErrorResponse" }
+        "503": { $ref: "#/components/responses/ErrorResponse" }
+  /hosts/yahoo:
+    delete:
+      tags: [hosts]
+      operationId: disconnectYahoo
+      summary: Disconnect Yahoo. The kept tokens are deleted at once; leagues read from Yahoo keep their last read, shown as stale.
+      security: [{ session: [] }]
+      responses:
+        "200": { $ref: "#/components/responses/EmptyResponse" }
+        "404": { $ref: "#/components/responses/ErrorResponse" }
+  /hosts/espn/connect:
+    post:
+      tags: [hosts]
+      operationId: connectESPN
+      summary: >-
+        Keep the member's two ESPN cookies, SWID and espn_s2 (handed to our page by Disney's own sign-in widget, or
+        pasted from ESPN's site), envelope encrypted, once they prove themselves: the member's league list read with
+        them, then one of their leagues the public cannot read, read with them (what needs espn_s2). Never a password.
+        Answers the member's ESPN football leagues this season. Needs consent. 422 when ESPN does not accept the two
+        values, or the member has no private league to connect; three refusals in an hour pause connecting for the hour
+        (423). 5 an hour an account. 503 when ESPN is not open here.
+      security: [{ session: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ESPNConnectInput" }
+      responses:
+        "201":
+          description: connected
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - properties: { data: { $ref: "#/components/schemas/HostConnected" } }
+        "400": { $ref: "#/components/responses/ErrorResponse" }
+        "422": { $ref: "#/components/responses/ErrorResponse" }
+        "423": { $ref: "#/components/responses/ErrorResponse" }
+        "429": { $ref: "#/components/responses/ErrorResponse" }
+        "502": { $ref: "#/components/responses/ErrorResponse" }
+        "503": { $ref: "#/components/responses/ErrorResponse" }
+  /hosts/espn/leagues:
+    get:
+      tags: [hosts]
+      operationId: espnLeagues
+      summary: >-
+        The member's ESPN football leagues this season, read from ESPN with their cookies, each with its size and
+        whether the account follows it already. 404 when not connected; 409 when ESPN no longer accepts the cookies.
+      security: [{ session: [] }]
+      responses:
+        "200":
+          description: the leagues
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - properties: { data: { type: array, items: { $ref: "#/components/schemas/HostLeague" } } }
+        "404": { $ref: "#/components/responses/ErrorResponse" }
+        "409": { $ref: "#/components/responses/ErrorResponse" }
+        "502": { $ref: "#/components/responses/ErrorResponse" }
+        "503": { $ref: "#/components/responses/ErrorResponse" }
+  /hosts/espn:
+    delete:
+      tags: [hosts]
+      operationId: disconnectESPN
+      summary: Disconnect ESPN. The kept cookies are deleted at once; private leagues read from ESPN keep their last read, shown as stale.
       security: [{ session: [] }]
       responses:
         "200": { $ref: "#/components/responses/EmptyResponse" }
@@ -2464,7 +2599,7 @@ components:
     LeagueHost:
       type: string
       description: the host a league runs on, named as a mechanism
-      enum: [sleeper, mfl, ffpc]
+      enum: [sleeper, mfl, ffpc, yahoo, espn]
     AttachPreviewInput:
       type: object
       required: [link]
@@ -2924,12 +3059,13 @@ components:
     ConnectedHost:
       type: string
       description: a host the member connects their own account on, named as a mechanism
-      enum: [ffpc]
+      enum: [ffpc, yahoo, espn]
     HostConnectionStatus:
       type: string
       description: >-
-        connected reads. signed_out: FFPC no longer honors the session and the one kept sign-in allowed in six hours did
-        not mend it; the member signs in again on our form
+        connected reads. signed_out: the host no longer honors what we keep (FFPC's session past the one kept sign-in
+        allowed in six hours, a Yahoo refresh Yahoo refused, ESPN cookies ESPN no longer accepts); the member connects
+        again
       enum: [connected, signed_out]
     HostConnection:
       type: object
@@ -2963,7 +3099,29 @@ components:
         league_id: { type: string }
         name: { type: string }
         team_name: { type: string }
-        record: { type: string, description: "the team's record as FFPC writes it, 2 - 3" }
+        record: { type: string, description: "the team's record as the host writes it (FFPC 2 - 3), empty when the list does not carry it" }
+        teams: { type: integer, minimum: 1, maximum: 32, description: the league's team count, where the host's list states it }
+        scoring_type: { type: string, description: "the league's scoring type in our words: points, categories, best ball" }
+        attached: { type: boolean, description: whether the account follows the league already, where the host's list says }
+    YahooConnectInput:
+      type: object
+      properties:
+        return_to:
+          type: string
+          maxLength: 200
+          pattern: "^/[A-Za-z0-9_-][A-Za-z0-9/_-]{0,199}$"
+          description: a page on the site to come back to once connected, like /league/{id}; the account page when absent
+    ESPNConnectInput:
+      type: object
+      required: [swid, espn_s2, consent]
+      properties:
+        swid: { type: string, minLength: 38, maxLength: 40, description: "ESPN's SWID cookie, a braced id: {XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX}" }
+        espn_s2: { type: string, minLength: 40, maxLength: 600, description: "ESPN's espn_s2 cookie, kept encrypted, never answered or logged" }
+        consent:
+          type: boolean
+          description: >-
+            the member agrees that we keep an encrypted copy of their ESPN session to keep their league in sync, never
+            make a move, and that disconnect deletes it; must be true
     HostConnected:
       type: object
       required: [connection, leagues]

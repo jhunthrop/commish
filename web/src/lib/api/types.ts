@@ -1163,7 +1163,7 @@ export interface paths {
 			path?: never;
 			cookie?: never;
 		};
-		/** The hosts connecting is open for here (HOST_FFPC_ENABLED), and the hosts the account is connected to, each with its state and when it was last read. No credential is ever answered. Signed out it answers the switches with no connections: a switch is not account data. */
+		/** The hosts connecting is open for here (HOST_FFPC_ENABLED, HOST_YAHOO_ENABLED, HOST_ESPN_ENABLED, each with the credentials key present), and the hosts the account is connected to, each with its state and when it was last read. No credential is ever answered. Signed out it answers the switches with no connections: a switch is not account data. */
 		get: operations['listHostConnections'];
 		put?: never;
 		post?: never;
@@ -1219,6 +1219,125 @@ export interface paths {
 		post?: never;
 		/** Disconnect FFPC. The kept sign-in and session are deleted at once; leagues read from FFPC stop updating. */
 		delete: operations['disconnectFFPC'];
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/hosts/yahoo/connect': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		get?: never;
+		put?: never;
+		/** Start connecting Yahoo: answers Yahoo's authorize address for the member to open, carrying a state bound to the account that expires in ten minutes, one use, and a PKCE S256 challenge. The permission Yahoo shows is Fantasy Sports, read only. The page the member started from may ride along (return_to), a path on the site the callback sends them back to once connected. 5 an hour an account. 503 when Yahoo is not open here. */
+		post: operations['connectYahoo'];
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/hosts/yahoo/callback': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		/** Yahoo returns here. The state must be one this account started in the last ten minutes, and the browser must be signed in as that account. The code is exchanged for Yahoo's tokens, which are kept envelope encrypted. Always redirects to the site: the page the sign-in started from (return_to) or the account page with yahoo=connected, or the account page with yahoo=refused and why (denied, expired, signed_out, failed, off), never anywhere else. */
+		get: operations['yahooCallback'];
+		put?: never;
+		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/hosts/yahoo/leagues': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		/** The member's Yahoo football leagues for the current season, read from Yahoo as them, each with its size, its scoring type and whether the account follows it already. 404 when not connected; 409 when Yahoo refused the kept token and the member connects again. */
+		get: operations['yahooLeagues'];
+		put?: never;
+		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/hosts/yahoo': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		get?: never;
+		put?: never;
+		post?: never;
+		/** Disconnect Yahoo. The kept tokens are deleted at once; leagues read from Yahoo keep their last read, shown as stale. */
+		delete: operations['disconnectYahoo'];
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/hosts/espn/connect': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		get?: never;
+		put?: never;
+		/** Keep the member's two ESPN cookies, SWID and espn_s2 (handed to our page by Disney's own sign-in widget, or pasted from ESPN's site), envelope encrypted, once they prove themselves: the member's league list read with them, then one of their leagues the public cannot read, read with them (what needs espn_s2). Never a password. Answers the member's ESPN football leagues this season. Needs consent. 422 when ESPN does not accept the two values, or the member has no private league to connect; three refusals in an hour pause connecting for the hour (423). 5 an hour an account. 503 when ESPN is not open here. */
+		post: operations['connectESPN'];
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/hosts/espn/leagues': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		/** The member's ESPN football leagues this season, read from ESPN with their cookies, each with its size and whether the account follows it already. 404 when not connected; 409 when ESPN no longer accepts the cookies. */
+		get: operations['espnLeagues'];
+		put?: never;
+		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/hosts/espn': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		get?: never;
+		put?: never;
+		post?: never;
+		/** Disconnect ESPN. The kept cookies are deleted at once; private leagues read from ESPN keep their last read, shown as stale. */
+		delete: operations['disconnectESPN'];
 		options?: never;
 		head?: never;
 		patch?: never;
@@ -2137,7 +2256,7 @@ export interface components {
 		 * @description the host a league runs on, named as a mechanism
 		 * @enum {string}
 		 */
-		LeagueHost: 'sleeper' | 'mfl' | 'ffpc';
+		LeagueHost: 'sleeper' | 'mfl' | 'ffpc' | 'yahoo' | 'espn';
 		AttachPreviewInput: {
 			host?: components['schemas']['LeagueHost'];
 			/** @description the league link as pasted */
@@ -2533,9 +2652,9 @@ export interface components {
 		 * @description a host the member connects their own account on, named as a mechanism
 		 * @enum {string}
 		 */
-		ConnectedHost: 'ffpc';
+		ConnectedHost: 'ffpc' | 'yahoo' | 'espn';
 		/**
-		 * @description connected reads. signed_out: FFPC no longer honors the session and the one kept sign-in allowed in six hours did not mend it; the member signs in again on our form
+		 * @description connected reads. signed_out: the host no longer honors what we keep (FFPC's session past the one kept sign-in allowed in six hours, a Yahoo refresh Yahoo refused, ESPN cookies ESPN no longer accepts); the member connects again
 		 * @enum {string}
 		 */
 		HostConnectionStatus: 'connected' | 'signed_out';
@@ -2564,8 +2683,26 @@ export interface components {
 			league_id: string;
 			name: string;
 			team_name: string;
-			/** @description the team's record as FFPC writes it, 2 - 3 */
+			/** @description the team's record as the host writes it (FFPC 2 - 3), empty when the list does not carry it */
 			record: string;
+			/** @description the league's team count */
+			teams?: number;
+			/** @description the league's scoring type in our words: points, categories, best ball */
+			scoring_type?: string;
+			/** @description whether the account follows the league already */
+			attached?: boolean;
+		};
+		YahooConnectInput: {
+			/** @description a page on the site to come back to once connected, like /league/{id}; the account page when absent */
+			return_to?: string;
+		};
+		ESPNConnectInput: {
+			/** @description ESPN's SWID cookie, a braced id: {XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX} */
+			swid: string;
+			/** @description ESPN's espn_s2 cookie, kept encrypted, never answered or logged */
+			espn_s2: string;
+			/** @description the member agrees that we keep an encrypted copy of their ESPN session to keep their league in sync, never make a move, and that disconnect deletes it; must be true */
+			consent: boolean;
 		};
 		HostConnected: {
 			connection: components['schemas']['HostConnection'];
@@ -4222,6 +4359,156 @@ export interface operations {
 		};
 	};
 	disconnectFFPC: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			200: components['responses']['EmptyResponse'];
+			404: components['responses']['ErrorResponse'];
+		};
+	};
+	connectYahoo: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody?: {
+			content: {
+				'application/json': components['schemas']['YahooConnectInput'];
+			};
+		};
+		responses: {
+			/** @description the authorize address */
+			200: {
+				headers: Record<string, unknown>;
+				content: {
+					'application/json': components['schemas']['Envelope'] & {
+						data?: components['schemas']['Redirect'];
+					};
+				};
+			};
+			429: components['responses']['ErrorResponse'];
+			503: components['responses']['ErrorResponse'];
+		};
+	};
+	yahooCallback: {
+		parameters: {
+			query?: {
+				code?: string;
+				state?: string;
+				error?: string;
+			};
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description to the site's account page with the outcome */
+			302: {
+				headers: Record<string, unknown>;
+				content?: never;
+			};
+		};
+	};
+	yahooLeagues: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description the leagues */
+			200: {
+				headers: Record<string, unknown>;
+				content: {
+					'application/json': components['schemas']['Envelope'] & {
+						data?: components['schemas']['HostLeague'][];
+					};
+				};
+			};
+			404: components['responses']['ErrorResponse'];
+			409: components['responses']['ErrorResponse'];
+			502: components['responses']['ErrorResponse'];
+			503: components['responses']['ErrorResponse'];
+		};
+	};
+	disconnectYahoo: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			200: components['responses']['EmptyResponse'];
+			404: components['responses']['ErrorResponse'];
+		};
+	};
+	connectESPN: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody: {
+			content: {
+				'application/json': components['schemas']['ESPNConnectInput'];
+			};
+		};
+		responses: {
+			/** @description connected */
+			201: {
+				headers: Record<string, unknown>;
+				content: {
+					'application/json': components['schemas']['Envelope'] & {
+						data?: components['schemas']['HostConnected'];
+					};
+				};
+			};
+			400: components['responses']['ErrorResponse'];
+			422: components['responses']['ErrorResponse'];
+			423: components['responses']['ErrorResponse'];
+			429: components['responses']['ErrorResponse'];
+			502: components['responses']['ErrorResponse'];
+			503: components['responses']['ErrorResponse'];
+		};
+	};
+	espnLeagues: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description the leagues */
+			200: {
+				headers: Record<string, unknown>;
+				content: {
+					'application/json': components['schemas']['Envelope'] & {
+						data?: components['schemas']['HostLeague'][];
+					};
+				};
+			};
+			404: components['responses']['ErrorResponse'];
+			409: components['responses']['ErrorResponse'];
+			502: components['responses']['ErrorResponse'];
+			503: components['responses']['ErrorResponse'];
+		};
+	};
+	disconnectESPN: {
 		parameters: {
 			query?: never;
 			header?: never;

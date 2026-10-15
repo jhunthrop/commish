@@ -11,7 +11,11 @@
 		"directory": ".svelte-kit/cloudflare"
 	},
 	// Cutover 2026-10-13 (founder: rip and replace): the apex and www are custom domains on this
-	// Worker; wrangler keeps their DNS records. The workers.dev preview stays for checks.
+	// Worker; wrangler keeps their DNS records. The workers.dev address stays, and it is load-bearing:
+	// Disney's ESPN sign-in runs there, the one origin that carries no Commish cookie
+	// (src/lib/site/origins.ts ESPN_SIGN_IN_ORIGIN, Lane 21). Turning workers_dev off breaks
+	// Connect ESPN silently: the window shows Cloudflare's error page, which posts nothing, and the
+	// member waits until they close it. Renaming the Worker moves the origin: change the constant too.
 	"routes": [
 		{ "pattern": "trycommish.app", "custom_domain": true },
 		{ "pattern": "www.trycommish.app", "custom_domain": true }

@@ -24,7 +24,6 @@ import (
 const (
 	limitConnectPerHour  = 5
 	limitLeaguesPerMin   = 20
-	limitListPerMin      = 120
 	limitDisconnectPerMn = 30
 	refusalWindow        = time.Hour
 	maxRefusals          = 3
@@ -40,7 +39,6 @@ type Signer interface {
 // ConnectionStore is the part of hosts.Store the routes use.
 type ConnectionStore interface {
 	Put(ctx context.Context, accountID uuid.UUID, host string, sealed hosts.Sealed, now time.Time) (hosts.Connection, error)
-	List(ctx context.Context, accountID uuid.UUID) ([]hosts.Connection, error)
 	Delete(ctx context.Context, accountID uuid.UUID, host string) error
 	Refused(ctx context.Context, accountID uuid.UUID, host string, at time.Time) error
 	Refusals(ctx context.Context, accountID uuid.UUID, host string, since time.Time) (int, error)
@@ -51,10 +49,10 @@ type LeagueReader interface {
 	Leagues(ctx context.Context, accountID uuid.UUID) ([]MyLeague, error)
 }
 
-// Service serves connecting, listing and disconnecting FFPC.
+// Service serves connecting and disconnecting FFPC and reading its leagues.
 type Service struct {
-	// Enabled is HOST_FFPC_ENABLED with the vault's key present: off, the
-	// list says no host is enabled and connecting answers 503.
+	// Enabled is HOST_FFPC_ENABLED with the vault's key present: off,
+	// GET /hosts leaves FFPC out and connecting answers 503.
 	Enabled bool
 	Signer  Signer
 	Store   ConnectionStore
@@ -71,7 +69,6 @@ type Service struct {
 // Routes is every route this package serves.
 func (s *Service) Routes() []httpx.Route {
 	return []httpx.Route{
-		{Method: http.MethodGet, Path: "/hosts", Access: httpx.Public, Limit: httpx.PerMinute(limitListPerMin), Handler: s.list},
 		{Method: http.MethodPost, Path: "/hosts/ffpc/connect", Access: httpx.SignedIn, Limit: httpx.PerHour(limitConnectPerHour), Handler: s.connect},
 		{Method: http.MethodGet, Path: "/hosts/ffpc/leagues", Access: httpx.SignedIn, Limit: httpx.PerMinute(limitLeaguesPerMin), Handler: s.leagues},
 		{Method: http.MethodDelete, Path: "/hosts/ffpc", Access: httpx.SignedIn, Limit: httpx.PerMinute(limitDisconnectPerMn), Handler: s.disconnect},
@@ -158,7 +155,7 @@ func (s *Service) connect(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteInternal(w, r, s.Log, "ffpc: keep connection", err)
 		return
 	}
-	httpx.WriteOK(w, r, http.StatusCreated, apitypes.HostConnected{Connection: connectionView(conn), Leagues: leagueViews(leagues)})
+	httpx.WriteOK(w, r, http.StatusCreated, apitypes.HostConnected{Connection: hosts.View(conn), Leagues: leagueViews(leagues)})
 }
 
 // answerSignIn answers a sign-in that did not go through, and reports
@@ -210,29 +207,6 @@ func (s *Service) leagues(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// list answers the switches to anyone, since a switch is not account
-// data, and the account's own connections when signed in.
-func (s *Service) list(w http.ResponseWriter, r *http.Request) {
-	out := apitypes.HostConnections{Enabled: []apitypes.ConnectedHost{}, Connections: []apitypes.HostConnection{}}
-	if s.Enabled {
-		out.Enabled = append(out.Enabled, apitypes.ConnectedHostFfpc)
-	}
-	account, signedIn := auth.AccountFrom(r.Context())
-	if !signedIn {
-		httpx.WriteOK(w, r, http.StatusOK, out)
-		return
-	}
-	list, err := s.Store.List(r.Context(), account.ID)
-	if err != nil {
-		httpx.WriteInternal(w, r, s.Log, "hosts: list", err)
-		return
-	}
-	for _, c := range list {
-		out.Connections = append(out.Connections, connectionView(c))
-	}
-	httpx.WriteOK(w, r, http.StatusOK, out)
-}
-
 func (s *Service) disconnect(w http.ResponseWriter, r *http.Request) {
 	err := s.Store.Delete(r.Context(), auth.AccountID(r), Host)
 	if errors.Is(err, hosts.ErrNotConnected) {
@@ -244,13 +218,6 @@ func (s *Service) disconnect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.WriteOK(w, r, http.StatusOK, nil)
-}
-
-func connectionView(c hosts.Connection) apitypes.HostConnection {
-	return apitypes.HostConnection{
-		Host: apitypes.ConnectedHost(c.Host), Status: apitypes.HostConnectionStatus(c.Status),
-		ConnectedAt: c.CreatedAt, LastReadAt: c.LastReadAt,
-	}
 }
 
 func leagueViews(list []MyLeague) []apitypes.HostLeague {

@@ -31,8 +31,16 @@ var ErrSealed = errors.New("hosts: credential does not open")
 // that it is not set up here.
 var ErrNoKey = errors.New("hosts: no credentials key")
 
-// Session is what every read opens: the host's cookies by name.
+// Session is what every read opens: the host's cookies by name, or the
+// access token and its expiry. Like a sign-in it never reaches a log: it
+// prints as redacted.
 type Session map[string]string
+
+func (Session) String() string   { return redacted }
+func (Session) GoString() string { return redacted }
+
+// LogValue keeps slog from printing it.
+func (Session) LogValue() slog.Value { return slog.StringValue(redacted) }
 
 // SignIn is what only a renewal opens: the member's own sign-in. It never
 // reaches a log or a response: String, GoString, LogValue and MarshalJSON
@@ -150,10 +158,33 @@ const (
 	partKey     = "key"
 	partSession = "session"
 	partSignIn  = "signin"
+	// partRenewal is a token-based host's renewal (Yahoo's refresh token),
+	// kept where a sign-in would be and never opened as one.
+	partRenewal = "renewal"
 )
 
 // Seal encrypts a connection's session and sign-in under a new data key.
 func (v *Vault) Seal(accountID, host string, session Session, in SignIn) (Sealed, error) {
+	signInPlain, err := json.Marshal(signInWire(in))
+	if err != nil {
+		return Sealed{}, fmt.Errorf("hosts: encode sign-in: %w", err)
+	}
+	return v.seal(accountID, host, session, signInPlain, partSignIn)
+}
+
+// SealTokens encrypts a token-based connection under a new data key: the
+// session every read opens (an access token and its expiry, or cookies)
+// and the renewal only a refresh opens (a refresh token), empty for a
+// host with none.
+func (v *Vault) SealTokens(accountID, host string, session, renewal Session) (Sealed, error) {
+	plain, err := json.Marshal(map[string]string(renewal))
+	if err != nil {
+		return Sealed{}, fmt.Errorf("hosts: encode renewal: %w", err)
+	}
+	return v.seal(accountID, host, session, plain, partRenewal)
+}
+
+func (v *Vault) seal(accountID, host string, session Session, secondPlain []byte, secondPart string) (Sealed, error) {
 	if !v.Ready() {
 		return Sealed{}, ErrNoKey
 	}
@@ -169,14 +200,10 @@ func (v *Vault) Seal(accountID, host string, session Session, in SignIn) (Sealed
 	if err != nil {
 		return Sealed{}, fmt.Errorf("hosts: encode session: %w", err)
 	}
-	signInPlain, err := json.Marshal(signInWire(in))
-	if err != nil {
-		return Sealed{}, fmt.Errorf("hosts: encode sign-in: %w", err)
-	}
 	return Sealed{
 		WrappedKey: seal(v.ring[v.current], dek, associated(accountID, host, partKey+strconv.Itoa(v.current))),
 		SessionCT:  seal(data, sessionPlain, associated(accountID, host, partSession)),
-		SignInCT:   seal(data, signInPlain, associated(accountID, host, partSignIn)),
+		SignInCT:   seal(data, secondPlain, associated(accountID, host, secondPart)),
 		KeyVersion: v.current,
 	}, nil
 }
@@ -213,6 +240,44 @@ func (v *Vault) dataKey(accountID, host string, s Sealed) (cipher.AEAD, error) {
 		return nil, ErrSealed
 	}
 	return data, nil
+}
+
+// ResealTokens keeps a new session and renewal under the row's own data
+// key, for a refresh that handed back both.
+func (v *Vault) ResealTokens(accountID, host string, s Sealed, session, renewal Session) (Sealed, error) {
+	data, err := v.dataKey(accountID, host, s)
+	if err != nil {
+		return Sealed{}, err
+	}
+	sessionPlain, err := json.Marshal(map[string]string(session))
+	if err != nil {
+		return Sealed{}, fmt.Errorf("hosts: encode session: %w", err)
+	}
+	renewalPlain, err := json.Marshal(map[string]string(renewal))
+	if err != nil {
+		return Sealed{}, fmt.Errorf("hosts: encode renewal: %w", err)
+	}
+	s.SessionCT = seal(data, sessionPlain, associated(accountID, host, partSession))
+	s.SignInCT = seal(data, renewalPlain, associated(accountID, host, partRenewal))
+	return s, nil
+}
+
+// OpenRenewal decrypts a token-based connection's renewal. Only a refresh
+// calls it.
+func (v *Vault) OpenRenewal(accountID, host string, s Sealed) (Session, error) {
+	data, err := v.dataKey(accountID, host, s)
+	if err != nil {
+		return nil, err
+	}
+	plain, err := open(data, s.SignInCT, associated(accountID, host, partRenewal))
+	if err != nil {
+		return nil, err
+	}
+	var out map[string]string
+	if err := json.Unmarshal(plain, &out); err != nil {
+		return nil, ErrSealed
+	}
+	return out, nil
 }
 
 // OpenSession decrypts a connection's session, for a read.

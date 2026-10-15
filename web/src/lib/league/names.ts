@@ -9,7 +9,9 @@ type ScoringPreset = Schemas['ScoringPreset'];
 const HOST_WORDS: Readonly<Record<LeagueHost, string>> = {
 	sleeper: 'Sleeper',
 	mfl: 'MyFantasyLeague',
-	ffpc: 'FFPC'
+	ffpc: 'FFPC',
+	yahoo: 'Yahoo',
+	espn: 'ESPN'
 };
 
 /** The host as a sentence names it. */
