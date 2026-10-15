@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -74,6 +75,16 @@ var proTeams = map[int]string{
 // -(defenseBase + its proTeamId), as every defense in the recorded league
 // 48153503 carries it (Ravens D/ST -16033, Lions D/ST -16008).
 const defenseBase = 16000
+
+// TeamCodes is every club code ESPN's proTeamId table names, sorted.
+func TeamCodes() []string {
+	out := make([]string, 0, len(proTeams))
+	for _, code := range proTeams {
+		out = append(out, code)
+	}
+	sort.Strings(out)
+	return out
+}
 
 // DefenseID is ESPN's player id for the club's D/ST, by our team code;
 // false for a club ESPN does not name.

@@ -7,6 +7,7 @@ import (
 
 	"github.com/jhunthrop/commish/api/internal/boards"
 	"github.com/jhunthrop/commish/api/internal/draft"
+	"github.com/jhunthrop/commish/api/internal/espn"
 	"github.com/jhunthrop/commish/api/internal/leaguesync"
 	"github.com/jhunthrop/commish/api/internal/mock"
 )
@@ -36,6 +37,28 @@ func espnFixture(t *testing.T) fixture {
 	f.league.Board = board
 	f.league.Snap.Ref.Host = leaguesync.HostESPN
 	return f
+}
+
+// ESPN's club table and the board's club codes (the 32 the screens name,
+// placeNames) are the same codes, so a defense never loses its host id to
+// a club spelled two ways. A code on one side only is named.
+func TestESPNClubCodesAreTheBoards(t *testing.T) {
+	board := placeNames()
+	espnCodes := map[string]bool{}
+	for _, code := range espn.TeamCodes() {
+		espnCodes[code] = true
+		if _, ok := board[code]; !ok {
+			t.Errorf("ESPN's club %q is not a code the board uses", code)
+		}
+	}
+	for code := range board {
+		if _, ok := espn.DefenseID(code); !ok || !espnCodes[code] {
+			t.Errorf("the board's club %q has no ESPN D/ST id", code)
+		}
+	}
+	if len(espnCodes) != len(board) {
+		t.Errorf("ESPN names %d clubs, the board %d", len(espnCodes), len(board))
+	}
 }
 
 func mustConfig(t *testing.T) []draft.SlotConfig {
