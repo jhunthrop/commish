@@ -37,6 +37,7 @@ from research.capsules.season_voice import (
     names_missed_weeks,
     time_frame_hits,
 )
+from research.capsules.sentences import split_sentences
 from research.capsules.voice_rules import (
     BANNED_VOCABULARY,
     COMPETITOR_NAMES,
@@ -80,7 +81,6 @@ _AVAILABILITY: Final = re.compile(
     re.IGNORECASE,
 )
 _COST_CUE: Final = re.compile(r"\b(costs?|minus|down|shaves?)\b", re.IGNORECASE | re.ASCII)
-_SENTENCE_SPLIT: Final = re.compile(r"(?<=[.!?])\s+")
 _PRODUCT_CUE_AFTER: Final = re.compile(rf"^(?:['\u2019]s)?\s+(?:{'|'.join(COMPETITOR_PRODUCT_CUES)})\b", re.IGNORECASE)
 _ON_BEFORE: Final = re.compile(r"\bon\s+$", re.IGNORECASE)
 _SENTENCE_OPENERS: Final = re.compile(r"[\s\"'\u201c\u2018(]+$")
@@ -128,10 +128,6 @@ class Grounding:
 
 def word_count(text: str) -> int:
     return len(text.split())
-
-
-def split_sentences(text: str) -> list[str]:
-    return [sentence for sentence in _SENTENCE_SPLIT.split(text) if sentence.strip() != ""]
 
 
 def banned_term_in(text: str) -> str | None:

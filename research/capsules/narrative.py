@@ -21,6 +21,7 @@ from research.capsules.facts.model import (
     RookieEvidence,
     ShareEvidence,
 )
+from research.capsules.sentences import split_sentences
 from research.capsules.validate import grounding_of, validate_narrative_slot
 from research.capsules.voice_rules import in_fantasy_words
 
@@ -29,7 +30,6 @@ if TYPE_CHECKING:
 
 CALL_WORDS: Final = 30
 MODULE_WORDS: Final = 40
-_SENTENCES: Final = re.compile(r"(?<=[.!?])\s+")
 
 
 def why_group_slot_key(group_key: str) -> str:
@@ -48,7 +48,7 @@ def normalize_sentence(text: str) -> str:
 
 
 def sentences_verbatim(text: str) -> list[str]:
-    return [s.strip() for s in _SENTENCES.split(text) if normalize_sentence(s.strip()) != ""]
+    return [s.strip() for s in split_sentences(text) if normalize_sentence(s.strip()) != ""]
 
 
 def sentences_of(text: str) -> list[str]:

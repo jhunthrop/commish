@@ -18,16 +18,16 @@ import re
 from typing import Final
 
 from research.capsules.render_words import SHEET_LABELS
+from research.capsules.sentences import phrase_pattern, split_sentences
 
-_SENTENCE: Final = re.compile(r"(?<=[.!?])\s+")
 # What may follow the full stop: a closing quote (straight or curly) or bracket.
 _CLOSERS: Final = "\"'" + chr(0x201D) + chr(0x2019) + ")\\]"
 _TERMINAL: Final = re.compile(rf"[.!?][{_CLOSERS}]*$")
-# Words a sentence never ends on: an article, a conjunction, "of", "than", "our" and "your", and a
-# hedge waiting for its number ("by about", "at around"). Not a copula or "his": "no matter how thin
-# your bench is" and "the job is his" end where they should (read on the live board, 2026-10-15).
+# Words a sentence never ends on: an article, a conjunction, "than", "our" and "your", and a hedge
+# waiting for its number ("by about", "at around"). Not a copula, "his" or a bare "of": "no matter how
+# thin your bench is", "the job is his" and "the role he is capable of" end where they should.
 _DANGLING: Final = re.compile(
-    r"(?:\b(?:a|an|the|and|or|but|nor|of|than|our|your)"
+    r"(?:\b(?:a|an|the|and|or|but|nor|than|our|your)"
     r"|\b(?:by|at|to|from|of|near|for)\s+(?:about|around|roughly|nearly|almost|some))"
     rf"\s*[.!?][{_CLOSERS}]*$",
     re.IGNORECASE,
@@ -36,16 +36,11 @@ UNFINISHED_VIOLATION: Final = "The text does not end as a sentence ends"
 LABEL_VIOLATION: Final = "The text copies a label of the facts word for word"
 
 
-def _label_pattern(label: str) -> re.Pattern[str]:
-    words = r"[\s-]+".join(re.escape(word) for word in re.split(r"[\s-]+", label))
-    return re.compile(rf"(?<![A-Za-z]){words}(?![A-Za-z])", re.IGNORECASE)
-
-
-_LABELS: Final = tuple((label, _label_pattern(label)) for label in SHEET_LABELS)
+_LABELS: Final = tuple((label, phrase_pattern(label)) for label in SHEET_LABELS)
 
 
 def last_sentence(text: str) -> str:
-    sentences = [s for s in _SENTENCE.split(text.strip()) if s.strip()]
+    sentences = split_sentences(text.strip())
     return sentences[-1] if sentences else ""
 
 
@@ -73,8 +68,8 @@ def label_copies(text: str) -> list[str]:
 
 
 def label_violation(label: str, text: str) -> str:
-    pattern = _label_pattern(label)
-    sentence = next((s for s in _SENTENCE.split(text) if pattern.search(s)), text)
+    pattern = phrase_pattern(label)
+    sentence = next((s for s in split_sentences(text) if pattern.search(s)), text)
     return (
         f'{LABEL_VIOLATION}, "{label}", in the sentence "{sentence}". Say the fact itself in your own words, with '
         "its week and season where it has one, and never the label."

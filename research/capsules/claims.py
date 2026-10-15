@@ -29,6 +29,7 @@ from typing import TYPE_CHECKING, Final
 
 from research.capsules.pull_figures import renderings_of
 from research.capsules.season_voice import SeasonClock, clock_of, week_references
+from research.capsules.sentences import split_sentences
 from research.nightly.config import TEAMS
 
 if TYPE_CHECKING:
@@ -69,7 +70,6 @@ def claims_of(facts: "PlayerFacts") -> ClaimLedger:
     )
 
 
-_SENTENCE: Final = re.compile(r"(?<=[.!?])\s+")
 _YEAR: Final = re.compile(r"\b((?:19|20)\d\d)\b")
 _EARLIER_SEASON: Final = re.compile(
     r"\blast (?:season|year)\b|\ba year ago\b|\bin his career\b|\bcareer\b|\bas a rookie\b|\bin college\b",
@@ -101,44 +101,74 @@ _SCORING: Final = re.compile(
     r"(?:him\s+|his\s+|the\s+|a\s+|those\s+)?(?:\w+\s+)?(?:scores|touchdowns?|TDs?|end zone)\b"
     # Touchdown points or a touchdown share are a quantity, never a claim he is scoring.
     r"(?![\s-]+(?:points|share|rate)\b)"
-    r"|\b(?:under|behind|beneath|despite|beyond|besides|on top of)\s+(?:all\s+)?(?:the|those|his)\s+(?:touchdowns|scores)\b",
+    r"|\b(?:under|behind|beneath|despite|beyond|besides|on top of)\s+(?:all\s+)?(?:the|those|his)\s+(?:touchdowns|scores)\b"
+    # Touchdowns as the subject of a verb that has them happen ("his touchdowns carried him", "the
+    # touchdowns came in bunches"); "the touchdowns have not come" names none.
+    r"|\b(?:the|those|his)\s+(?:touchdowns|scores)\s+(?:carr(?:y|ies|ied)|came|come|kept|keep|keeps|piled|made|"
+    r"make|makes|saved|propped|drove|drive|drives|are coming|kept coming|keep coming)\b",
     re.IGNORECASE,
 )
-# A statement of none, or one still to come: "has not found the end zone", "not that anyone is throwing
-# him scores", "until he scores his first touchdown".
+# A statement of none, or one still to come, read in the verb phrase only: "has not found the end
+# zone", "anyone is throwing him scores", "can find the end zone". "There is no doubt Slowik is feeding
+# him scores" is a claim: its "no" is four words before the verb.
 _NONE_BEFORE: Final = re.compile(
-    r"(?:\b(?:zero|no|0|none|without|not|never|nobody|no one|yet to|lacks?|lacking|missing|needs?|would|could|"
-    r"might|may|can)|n't)\b(?:\W+\w+){0,5}\W*$",
+    r"(?:\b(?:zero|no|0|none|without|not|never|nobody|no one|anyone|yet to|lacks?|lacking|missing|needs?|would|"
+    r"could|might|may|can|to)|n't)\b(?:\W+\w+){0,2}\W*$",
     re.IGNORECASE,
 )
-# A wait anywhere earlier in the clause makes it a condition, not a claim ("bench him until he is back at
-# full practice and scores his first touchdown").
+# A wait earlier in the clause makes it a condition ("bench him until he is back at full practice and
+# scores his first touchdown"), unless a new subject takes over after it ("when it gets close and Slowik
+# keeps feeding him touchdowns").
 _CONDITION: Final = re.compile(r"\b(?:until|once|unless|if|when|before|wait(?:ing)? for)\b", re.IGNORECASE)
+_NEW_SUBJECT: Final = re.compile(r"\band\s+(?:[A-Z][a-z]+|he|she|it|they|we)\b")
 _NONE_AFTER: Final = re.compile(
     r"^\W*(?:\w+\W+){0,3}?(?:have not|haven't|has not|hasn't|never|are missing|is missing|yet to|at zero)\b",
     re.IGNORECASE,
 )
 
 
-def _scoring_claims(sentence: str, ledger: ClaimLedger) -> list[str]:
-    if (ledger.touchdowns or 0) > 0:
-        return []
+def _a_condition(before: str) -> bool:
+    conditions = list(_CONDITION.finditer(before))
+    return bool(conditions) and _NEW_SUBJECT.search(before[conditions[-1].end() :]) is None
+
+
+def _asserted(clause: str) -> list[str]:
+    """The scoring claims a clause asserts: never negated, never a condition."""
     found = []
-    for clause in _clauses(sentence):
-        if _about_earlier_season(clause, ledger.clock.season):
+    for match in _SCORING.finditer(clause):
+        before = clause[: match.start()]
+        if _NONE_BEFORE.search(before) or _a_condition(before) or _NONE_AFTER.match(clause[match.end() :]):
             continue
-        for match in _SCORING.finditer(clause):
-            before = clause[: match.start()]
-            if _NONE_BEFORE.search(before) or _CONDITION.search(before) or _NONE_AFTER.match(clause[match.end() :]):
-                continue
-            found.append(match.group(0))
-    if not found:
-        return []
-    held = "no touchdown" if ledger.touchdowns == 0 else "no touchdown figure"
-    return [
-        f'{SCORING_CLAIM}: "{found[0]}" in the sentence "{sentence}", and this season\'s totals show {held} for '
-        "him. Say what he has scored as the totals print it, or leave scoring out."
-    ]
+        found.append(match.group(0))
+    return found
+
+
+def _names_a_week_this_season(clause: str, season: int) -> bool:
+    return any(r.season in (None, season) for r in week_references(clause))
+
+
+def _scoring_claims(sentence: str, ledger: ClaimLedger) -> list[str]:
+    """A claim he is scoring needs this season's touchdowns; a claim tied to a named week cannot be
+    backed at all, because the sheet prints touchdowns for the season, never by week."""
+    season = ledger.clock.season
+    for clause in _clauses(sentence):
+        if _about_earlier_season(clause, season):
+            continue
+        claims = _asserted(clause)
+        if not claims:
+            continue
+        if _names_a_week_this_season(clause, season):
+            return [
+                f'{SCORING_CLAIM}: "{claims[0]}" in the sentence "{sentence}" is tied to a week, and our numbers '
+                "carry his touchdowns for the season only. Say the season's total, or leave scoring out."
+            ]
+        if (ledger.touchdowns or 0) <= 0:
+            held = "no touchdown" if ledger.touchdowns == 0 else "no touchdown figure"
+            return [
+                f'{SCORING_CLAIM}: "{claims[0]}" in the sentence "{sentence}", and this season\'s totals show {held} '
+                "for him. Say what he has scored as the totals print it, or leave scoring out."
+            ]
+    return []
 
 
 # THE OPENER.
@@ -182,7 +212,7 @@ def _opener_claims(sentence: str, ledger: ClaimLedger) -> list[str]:
     if ledger.first_game is None or not any(_opener_wrong(clause, ledger) for clause in _clauses(sentence)):
         return []
     week, points = ledger.first_game
-    first = "no points on file" if points is None else f"{points:g} points"
+    first = "with no points figure" if points is None else f"{points:g} points"
     return [
         f'{OPENER_CLAIM}: the sentence "{sentence}" says the season opened with a week that was not his first. '
         f"His first game was week {week} of {ledger.clock.season}, {first}. Say that, or do not call it the opener."
@@ -191,8 +221,9 @@ def _opener_claims(sentence: str, ledger: ClaimLedger) -> list[str]:
 
 # ADP AGAINST OUR NUMBER.
 _FIGURE: Final = r"(\d+(?:\.\d+)?)"
+# A four-digit year before "ADP" is its season ("his 2026 ADP of 11.7"), never the figure.
 _ADP_FIGURE: Final = re.compile(
-    rf"\b{_FIGURE}\s+ADP\b|\bADP(?:\s+(?:of|is|at|was|sits at|before the season))*\s+{_FIGURE}"
+    rf"(?<![\d.])(?!(?:19|20)\d\d\b){_FIGURE}\s+ADP\b|\bADP(?:\s+(?:of|is|at|was|sits at|before the season))*\s+{_FIGURE}"
 )
 _NOT_A_PICK: Final = r"(?!\s*(?:points?|pts|a game|per game|%|-point|games?)\b)(?!\d|\.\d)"
 _OUR_FIGURE: Final = re.compile(
@@ -200,8 +231,15 @@ _OUR_FIGURE: Final = re.compile(
     rf"|\bwe (?:have|had|rank|ranked|put|slot) him (?:at\s+)?(?:pick\s+|No\.\s*)?{_FIGURE}{_NOT_A_PICK}",
     re.IGNORECASE,
 )
-_EARLIER: Final = re.compile(r"\b(?:above|ahead of|earlier than|before|higher than|sooner than)\b", re.IGNORECASE)
-_LATER: Final = re.compile(r"\b(?:below|behind|later than|after|lower than)\b", re.IGNORECASE)
+# A comparison counts only beside the second figure ("is above our 11", "ahead of his 11.7 ADP"): at
+# most two words between the word and the figure. "Before" and "after" in their time sense ("ADP 11.7
+# before the season, and we have him at pick 11") are not pick order.
+_COMPARISON: Final = re.compile(
+    r"\b(?:(?P<earlier>above|ahead of|earlier than|before|higher than|sooner than)"
+    r"|(?P<later>below|behind|later than|after|lower than))"
+    r"(?!\s+(?:the\s+)?(?:season|week\s+\d|opener|camp|draft)\b)(?P<gap>(?:\s+\w+){0,2}?)\s*$",
+    re.IGNORECASE,
+)
 
 
 def _first(match: re.Match[str]) -> float:
@@ -223,13 +261,10 @@ def _adp_comparison_claims(sentence: str, ledger: ClaimLedger) -> list[str]:
     if adp_match is None or ledger.adp is None or ledger.board_rank is None or ledger.adp == ledger.board_rank:
         return found
     between = sentence[min(adp_match.end(), our_match.end()) : max(adp_match.start(), our_match.start())]
-    # The comparison is the word nearest the second figure ("after moving up 2.8 picks, is above our").
-    words = sorted(
-        [(m.start(), True) for m in _EARLIER.finditer(between)] + [(m.start(), False) for m in _LATER.finditer(between)]
-    )
-    if not words:
+    comparison = _COMPARISON.search(between)
+    if comparison is None:
         return found
-    says_earlier = words[-1][1]
+    says_earlier = comparison.group("earlier") is not None
     adp_first = adp_match.start() < our_match.start()
     first, second = (ledger.adp, ledger.board_rank) if adp_first else (ledger.board_rank, ledger.adp)
     if (first < second) != says_earlier:
@@ -339,20 +374,22 @@ _NFL_CONTEXT: Final = re.compile(r"\bcollege\b|\bNFL\b|\bout of\b|\bfree agent\b
 
 
 def _missing_adp_claims(sentence: str, ledger: ClaimLedger) -> list[str]:
+    """Only a page with no ADP: with one, "where drafters took him" is the in-season ADP sentence itself."""
+    if ledger.adp is not None:
+        return []
     match = _NOBODY_DRAFTED.search(sentence)
     if match is None or _NFL_CONTEXT.search(sentence):
         return []
-    held = "no ADP for him, which means only that our sources have none" if ledger.adp is None else "an ADP for him"
     return [
-        f'{NO_ADP_CLAIM}: the sentence "{sentence}" says "{match.group(0)}". The page has {held}, and that says '
-        "nothing about who drafted him. Leave drafters out of it."
+        f'{NO_ADP_CLAIM}: the sentence "{sentence}" says "{match.group(0)}". The page has no ADP for him, which '
+        "means only that our sources have none, and that says nothing about who drafted him. Leave drafters out of it."
     ]
 
 
 def claim_violations(text: str, ledger: ClaimLedger) -> list[str]:
     """Every claim in `text` its page's facts contradict, sentence by sentence, each named by its rule."""
     found: list[str] = []
-    for sentence in (s for s in _SENTENCE.split(text) if s.strip()):
+    for sentence in split_sentences(text):
         found += _adp_comparison_claims(sentence, ledger)
         found += _round_claims(sentence, ledger)
         found += _missing_adp_claims(sentence, ledger)

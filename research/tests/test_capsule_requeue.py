@@ -38,7 +38,15 @@ def test_the_stamp_is_the_regeneration_queues(monkeypatch: pytest.MonkeyPatch) -
 
     monkeypatch.setattr(requeue, "served_identities", lambda conn, at: SERVED)
     monkeypatch.setattr(requeue, "universe_ids_for", lambda conn, ids: {pid: f"u-{pid}" for pid in ids})
+    # Achane's page has a capsule row; Puka's has none, so he is named as not stamped.
+    monkeypatch.setattr(requeue, "stored_capsules_for", lambda conn, ids: {"u-p2": object()})
     named = ["de-von-achane", "puka-nacua"]
-    count = requeue.queue_slugs(cast("Connection", _Conn()), named, cast("Any", None))
-    assert count == len(named)
+    result = requeue.queue_slugs(cast("Connection", _Conn()), named, cast("Any", None))
+    assert result.named == len(named)
+    assert result.unstamped == ("puka-nacua",)
     assert stamped == [(REGENERATE_FACTS_HASH, ["u-p2", "u-p1"])]
+
+
+def test_an_empty_list_stamps_nothing() -> None:
+    with pytest.raises(ConfigurationError, match="no slug"):
+        requeue.queue_slugs(cast("Connection", None), [], cast("Any", None))

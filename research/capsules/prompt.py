@@ -7,6 +7,7 @@ sportsbook number), the betting words are named beside the trading words as neve
 and the "the honest ..." frame is named whatever its noun. Everything else is the oracle's.
 """
 
+import math
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Final
@@ -24,6 +25,7 @@ from research.capsules.voice_rules import (
     TRADING_TERMS,
 )
 from research.model.jsmath import js_round
+from research.nightly.config import TEAMS
 
 if TYPE_CHECKING:
     from research.capsules.facts.build import PlayerFacts
@@ -84,6 +86,17 @@ def _kind(prior: PriorAttempt) -> str:
 
 _BETTING_NAMES: Final = ", ".join(rule.name for rule in BETTING_PATTERNS)
 _LABELS: Final = ", ".join(f'"{label}"' for label in SHEET_LABELS)
+# A round from an ADP is the ADP over the board's teams, rounded up; in season only as history.
+_EXAMPLE_ADP: Final = 177.1
+_EXAMPLE_ROUND: Final = math.ceil(_EXAMPLE_ADP / TEAMS)
+_PRESEASON_ROUNDS: Final = (
+    f"A round you name from his ADP is the ADP divided by {TEAMS} and rounded up "
+    f"(ADP {_EXAMPLE_ADP} is round {_EXAMPLE_ROUND})."
+)
+_IN_SEASON_ROUNDS: Final = (
+    "A round is only history now, never advice: the round of his ADP before the season is the ADP divided by "
+    f"{TEAMS} and rounded up (ADP {_EXAMPLE_ADP} was round {_EXAMPLE_ROUND})."
+)
 _STEMS: Final = ", ".join(f'"{stem}"' for stem in CAPSULE_CONFIG.repetition.refrain_stems)
 _PRESEASON_FIXES: Final = ", ".join(f'not "{instead}" but "{write}"' for instead, write in DRAFTING_SENTENCES)
 _IN_SEASON_FIXES: Final = ", ".join(f'not "{instead}" but "{write}"' for instead, write in IN_SEASON_SENTENCES)
@@ -144,7 +157,7 @@ HONESTY, NO EXCEPTIONS
 - Never make an all-time or historical-record claim. This engine holds no such data.
 - If the sheet carries a real downside (a factor that costs him points a game, or a year-over-year number that fell), name it with its own number before your call. Never a one-sided rave on mixed facts.
 - The sheet gives two ranges: the middle range most outcomes fall in, and the full tails. Reason from the middle range. If you mention the low tail, say in your own words, in the same sentence, that injuries are what pull it down. Never present the full tails as what he is expected to score.
-- Our pick for him (his overall rank) and his ADP are two different numbers: never swap them, and the smaller number is the earlier pick. A round you name from his ADP is the ADP divided by 12 and rounded up (ADP 177.1 is round 15).
+- Our pick for him (his overall rank) and his ADP are two different numbers: never swap them, and the smaller number is the earlier pick. {{rounds}}
 - No ADP means only that we have no ADP for him: it says nothing about whether anyone drafted him. If it matters at all, one short clause says it.
 - Every other note on this board is written from a sheet like this one. Never copy the sheet's wording, never its labels ({_LABELS}), and never write a phrase of six words or more that would fit a note about another player.
 - The long note always states our projected points for him (or his ADP) as the sheet prints it, rounding to the whole point if you like."""
@@ -155,6 +168,7 @@ PRESEASON_RULES: Final = (
     .replace("{fixes}", _PRESEASON_FIXES)
     .replace("{words}", _PRESEASON_WORDS)
     .replace("{picks}", _PRESEASON_PICKS)
+    .replace("{rounds}", _PRESEASON_ROUNDS)
     .replace("{we_would}", "we would take him")
     + "\n\n"
     + _PRESEASON_TIME
@@ -165,6 +179,7 @@ IN_SEASON_RULES: Final = (
     .replace("{fixes}", _IN_SEASON_FIXES)
     .replace("{words}", _IN_SEASON_WORDS)
     .replace("{picks}", _IN_SEASON_PICKS)
+    .replace("{rounds}", _IN_SEASON_ROUNDS)
     .replace("{we_would}", "we would hold him")
     + "\n\n"
     + _IN_SEASON_TIME

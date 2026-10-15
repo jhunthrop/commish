@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, Final
 
 from research.capsules.prose_checks import unfinished_ending
 from research.capsules.season_voice import SeasonClock, names_missed_weeks, time_frame_hits
+from research.capsules.sentences import split_sentences
 from research.capsules.voice_rules import gate_hits
 from research.model.jsmath import js_round, js_to_fixed
 from research.pipeline.jscompat import js_number, js_string
@@ -25,7 +26,6 @@ if TYPE_CHECKING:
 
 PULL_FIGURES_PER_CAPSULE: Final = 3
 _WHOLE_NUMBER_FLOOR: Final = 10
-_SENTENCES: Final = re.compile(r"(?<=[.!?])\s+")
 
 PageNumber = tuple[str, float]
 
@@ -89,7 +89,7 @@ def pull_figures_of(
     prose: str, numbers: Sequence[PageNumber], count: int = PULL_FIGURES_PER_CAPSULE
 ) -> list[PullFigure]:
     """`pullFiguresOf`: the page's numbers the prose prints, one figure per printed number."""
-    sentences = [s.strip() for s in _SENTENCES.split(prose) if s.strip()]
+    sentences = [s.strip() for s in split_sentences(prose)]
     figures: list[PullFigure] = []
     for label, value in numbers:
         for text in renderings_of(value):
@@ -140,8 +140,9 @@ def capsule_findings(
 # not an ADP and is skipped.
 _ADP_CLAIM: Final = re.compile(
     r"\b(?:ADP|pick)(?:\s+(?:of|is|at|around|near|about|sits at|No\.))*\s+(\d+(?:\.\d+)?)(?![\d]|[.,]\d)"
-    # The figure before the word too (Lane 29, Justin Jefferson's "The 8.8 ADP drafters actually paid").
-    r"|(?<![\d.])(\d+(?:\.\d+)?)\s+ADP\b",
+    # The figure before the word too (Lane 29, Justin Jefferson's "The 8.8 ADP drafters actually paid"),
+    # never a four-digit year, which is the ADP's season ("his 2026 ADP of 11.7").
+    r"|(?<![\d.])(?!(?:19|20)\d\d\b)(\d+(?:\.\d+)?)\s+ADP\b",
     re.IGNORECASE,
 )
 _NFL_DRAFT_AFTER: Final = re.compile(r"^[^.]{0,40}\bdraft\b", re.IGNORECASE)

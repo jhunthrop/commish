@@ -24,6 +24,7 @@ from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING, Final
 
 from research.capsules.render_season import week_list
+from research.capsules.sentences import split_sentences
 from research.capsules.voice_rules import NamedPattern, VoiceRuleHit, named_rule
 
 if TYPE_CHECKING:
@@ -73,7 +74,6 @@ _PAST_AFTER: Final = re.compile(
     r"put up|managed|logged|dropped)\b",
     re.IGNORECASE,
 )
-_SENTENCE: Final = re.compile(r"(?<=[.!?])\s+")
 _MISSED_WORDS: Final = re.compile(
     r"\b(?:miss(?:ed|ing)?|sat(?: out)?|did not play|didn't play|inactive|out for|without him|sidelined)\b",
     re.IGNORECASE,
@@ -216,7 +216,7 @@ def _sentence_hits(sentence: str, clock: SeasonClock) -> list[VoiceRuleHit]:
 def time_frame_hits(text: str, clock: SeasonClock) -> list[VoiceRuleHit]:
     """Every time frame slip in `text` for a page on the clock's day, sentence by sentence, each hit
     carrying the sentence it stands in."""
-    return [hit for sentence in _SENTENCE.split(text) if sentence.strip() for hit in _sentence_hits(sentence, clock)]
+    return [hit for sentence in split_sentences(text) for hit in _sentence_hits(sentence, clock)]
 
 
 # In season, points a game set against our full-season number compare two different things (the
@@ -245,7 +245,7 @@ def _honest_rate(season_points: float, rate: float, sentence: str) -> bool:
 
 def _per_game_against_season(text: str) -> list[re.Match[str]]:
     found = []
-    for sentence in re.split(r"(?<=[.!?])\s+", text):
+    for sentence in split_sentences(text):
         match = PER_GAME_AGAINST_SEASON.pattern.search(sentence)
         rate = _PER_GAME.search(sentence)
         if match is None or rate is None:
@@ -278,7 +278,7 @@ def _month_is_history(sentence: str, month: re.Match[str], season: int) -> bool:
 def _month_hits(text: str, clock: SeasonClock) -> list[VoiceRuleHit]:
     """Every month that places something on this season's calendar."""
     hits = []
-    for sentence in re.split(r"(?<=[.!?])\s+", text):
+    for sentence in split_sentences(text):
         hits += [
             VoiceRuleHit(MONTHS.name, month.group(0))
             for month in MONTHS.pattern.finditer(sentence)
@@ -304,7 +304,7 @@ def names_missed_weeks(text: str, clock: SeasonClock) -> bool:
     return any(
         _MISSED_WORDS.search(sentence)
         and any(re.search(rf"\b{word}\b", sentence, re.IGNORECASE) for word in count_words)
-        for sentence in re.split(r"(?<=[.!?])\s+", text)
+        for sentence in split_sentences(text)
     )
 
 

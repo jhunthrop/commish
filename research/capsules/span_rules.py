@@ -2,8 +2,7 @@
 
 The names that break a span (every player's name in the store, every club's spelling), and the
 spans the facts themselves print, which are exempt: a read that states a figure with its basis as the
-sheet renders it ("left in his tier before a", "on every report since the run-up to", "missed to
-injury or a reserve list") shares those words with every page whose sheet prints the same basis, and
+sheet renders it ("left in his tier before a", "missed to injury or a reserve list") shares those words with every page whose sheet prints the same basis, and
 that is the fact's own phrasing, not stock prose. The coordinator's ruling of 2026-10-15 widened the
 exemption from Lane 17's (the labelled stats only, `render.label_sections`) to every span a rendered
 sheet (`render.render_facts_for_model`) or a facts block (`facts_block.render_facts_block`) prints.

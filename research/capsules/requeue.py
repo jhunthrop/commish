@@ -8,12 +8,13 @@ the stamp is the regeneration queue's (`store.queue_regeneration`), which the sw
 """
 
 from collections.abc import Sequence
+from dataclasses import dataclass
 from datetime import datetime
 
 from sqlalchemy import Connection
 
 from research.capsules.facts.collect import universe_ids_for
-from research.capsules.store import queue_regeneration
+from research.capsules.store import queue_regeneration, stored_capsules_for
 from research.errors import ConfigurationError
 from research.nightly.build.pages import Identity, identities
 from research.nightly.config import PAGE_FORMAT
@@ -36,11 +37,26 @@ def provider_ids_for(served: Sequence[Identity], slugs: Sequence[str]) -> list[s
     return [by_slug[slug] for slug in dict.fromkeys(slugs)]
 
 
-def queue_slugs(conn: Connection, slugs: Sequence[str], as_of: datetime) -> int:
-    """Stamp the named pages' capsules for regeneration; the rows stamped."""
-    provider_ids = provider_ids_for(served_identities(conn, as_of), slugs)
+@dataclass(frozen=True, slots=True)
+class QueueResult:
+    """What a queue stamped: the rows, the slugs named, and the named pages with no capsule row to stamp."""
+
+    stamped: int
+    named: int
+    unstamped: tuple[str, ...]
+
+
+def queue_slugs(conn: Connection, slugs: Sequence[str], as_of: datetime) -> QueueResult:
+    """Stamp the named pages' capsules for regeneration. A slug with no capsule row is named, not hidden."""
+    named = list(dict.fromkeys(slugs))
+    if not named:
+        raise ConfigurationError("no slug was named: nothing was stamped")
+    provider_ids = provider_ids_for(served_identities(conn, as_of), named)
     universe = universe_ids_for(conn, provider_ids)
     missing = [pid for pid in provider_ids if pid not in universe]
     if missing:
         raise ConfigurationError(f"no universe id for provider ids {', '.join(missing)}: nothing was stamped")
-    return queue_regeneration(conn, [universe[pid] for pid in provider_ids])
+    ids = [universe[pid] for pid in provider_ids]
+    rows = set(stored_capsules_for(conn, ids))
+    unstamped = tuple(slug for slug, uid in zip(named, ids, strict=True) if uid not in rows)
+    return QueueResult(queue_regeneration(conn, ids), len(named), unstamped)

@@ -95,6 +95,21 @@ def _sweep(engine: Engine, budget: int) -> int:
     return 0
 
 
+def _slugs(raw: str) -> list[str]:
+    return [slug.strip() for slug in raw.split(",") if slug.strip()]
+
+
+def _queue(engine: Engine, raw: str) -> int:
+    """Stamp the named pages; non-zero when any named page had no capsule row to stamp."""
+    with engine.begin() as conn:
+        result = queue_slugs(conn, _slugs(raw), datetime.now(UTC))
+    _out(f"queue: {result.stamped} capsules stamped for regeneration ({result.named} slugs named)")
+    if result.unstamped:
+        _out(f"queue: no capsule row to stamp for {', '.join(result.unstamped)}")
+        return 1
+    return 0
+
+
 def _transfer(engine: Engine, args: argparse.Namespace) -> int:
     now = datetime.now(UTC)
     if args.command == "export":
@@ -137,6 +152,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     imported.add_argument("--in", dest="source", required=True)
     imported.add_argument("--dry-run", action="store_true", help="print what would land and be refused, write nothing")
     args = parser.parse_args(argv)
+    if args.command == "queue" and not _slugs(args.slugs):
+        parser.error("queue --slugs names no page")
     configure_logging(logging.WARNING)
     engine = make_engine(database_url_from_env())
     if args.command in ("facts", "prompt"):
@@ -147,11 +164,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.command in ("export", "import"):
         return _transfer(engine, args)
     if args.command == "queue":
-        slugs = [slug.strip() for slug in args.slugs.split(",") if slug.strip()]
-        with engine.begin() as conn:
-            stamped = queue_slugs(conn, slugs, datetime.now(UTC))
-        _out(f"queue: {stamped} capsules stamped for regeneration ({len(slugs)} slugs named)")
-        return 0
+        return _queue(engine, args.slugs)
     if args.command == "restamp-injury-day":
         with engine.begin() as conn:
             restamped, stale = restamp_injury_day(conn, datetime.now(UTC))

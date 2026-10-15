@@ -275,7 +275,9 @@ _FOOTBALL_SENSES: Final = MappingProxyType(
     {
         "fade": r"\bfad(?:e|es|ed|ing) (?:him|them|this|that|the)\b(?! route)"
         r"|(?<!on )(?<!caught )(?<!threw )(?<!ran )(?<!run )(?<!won )\ba fade\b"
-        r"(?! route| pattern| (?:in|to|for|down|up|from|against|over|on|near|at)\b)",
+        # Only a football place makes it a route ("a fade to the corner", "a fade in the end zone");
+        # "a fade for me" and "a fade in every league" are the verdict.
+        r"(?! route| pattern| (?:in|into|to|toward|down|up|along|near|at) the (?:end zone|corner|sideline|back|pylon)\b)",
         "cash in": r"\bcash(?:es|ed|ing)? (?:in|out)\b",
         "sold": r"\bsold\b(?! (?:out|on|the (?:dummy|defense|fake|run|play-action))\b)",
         "bought": r"\bbought\b(?! (?:in(?:to)?|time|himself time|him time)\b)",

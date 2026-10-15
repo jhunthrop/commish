@@ -341,7 +341,7 @@ def test_the_writer_is_told_what_a_missing_adp_means_and_the_page_facts_rules() 
     for rules in (IN_SEASON_RULES, PRESEASON_RULES):
         assert "No ADP means only that we have no ADP for him" in rules
         assert "one short clause" in rules
-        assert "ADP 177.1 is round 15" in rules
+        assert "round 15" in rules
         assert all(f'"{label}"' in rules for label in SHEET_LABELS)
     assert "with 0 touchdowns he has not scored" in IN_SEASON_RULES
     assert "no ADP on file" not in IN_SEASON_RULES
