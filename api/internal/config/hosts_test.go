@@ -90,3 +90,23 @@ func TestAllowedHosts(t *testing.T) {
 		}
 	}
 }
+
+// The room answers on ROOM_BASE_URL's host unless ALLOWED_HOSTS names
+// others; production refuses a room with no base URL.
+func TestRoomHosts(t *testing.T) {
+	l := hostLoader(map[string]string{"ROOM_BASE_URL": "wss://room.trycommish.app"})
+	if got := l.roomHosts(EnvProduction); len(got) != 1 || got[0] != "room.trycommish.app" || l.err() != nil {
+		t.Fatalf("from the base URL = %v, %v", got, l.err())
+	}
+	l = hostLoader(map[string]string{"ROOM_BASE_URL": "wss://room.trycommish.app", "ALLOWED_HOSTS": "room2.trycommish.app"})
+	if got := l.roomHosts(EnvProduction); len(got) != 1 || got[0] != "room2.trycommish.app" {
+		t.Fatalf("set = %v", got)
+	}
+	if got := hostLoader(nil).roomHosts(EnvDevelopment); len(got) != 1 || got[0] != "localhost" {
+		t.Fatalf("development default = %v", got)
+	}
+	l = hostLoader(nil)
+	if l.roomHosts(EnvProduction); l.err() == nil {
+		t.Fatal("a production room with no ROOM_BASE_URL was accepted")
+	}
+}

@@ -205,6 +205,10 @@ type Room struct {
 	ListenURL string
 	// Instance names this process in a room's lease.
 	Instance string
+	// AllowedHosts are the Host names the room answers its routes on:
+	// ALLOWED_HOSTS, or ROOM_BASE_URL's host. Its run.app URL gets a 404
+	// but for the probes.
+	AllowedHosts []string
 }
 
 // Getenv is os.Getenv's shape, injected so tests never touch the
@@ -564,7 +568,14 @@ func LoadRoom(get Getenv) (Room, error) {
 	l.postgresURL("ROOM_LISTEN_DATABASE_URL", c.ListenURL)
 	// Empty names the instance by its host and a random suffix.
 	c.Instance = l.optional("ROOM_INSTANCE", "")
+	c.AllowedHosts = l.roomHosts(c.Env)
 	return c, l.err()
+}
+
+// roomHosts is the room's ALLOWED_HOSTS, defaulting to ROOM_BASE_URL's
+// host, which production must set.
+func (l *loader) roomHosts(env Env) []string {
+	return l.allowedHosts(l.roomBaseURL(env))
 }
 
 // neonPoolerSuffix marks Neon's pooled endpoint in a host name: the
