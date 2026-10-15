@@ -28,9 +28,10 @@ The order, and why each pass exists:
    The first page keeps a shared sentence or span, so each attempt strictly shrinks the set.
 5. **The capsule gate** (`capsule_gate`), judged once more after the last attempt: the step's verdict.
 
-Every pass writes its pages concurrently, in waves of the writer's pool (`capsules.waves`: each page is told the
-spans of every page landed before its wave, and what a wave's own pages share is counted and left to the
-repair attempts), each call paced by the run's token bucket (`capsules.pace`). The passes themselves run in
+Every pass keeps the writer's pool full (`gateway.GatewayClient.rolling`: a slot refilled the moment its page
+lands, each page told the spans of every page landed before it started, and checked as it lands against the
+pages landed before it, a carrier left to the repair attempts, `capsules.landing`), each call paced by the run's
+token bucket (`capsules.pace`), the commits on one small pool of connections. The passes themselves run in
 order, since each reads what the last one stored.
 
 Every pass shares one ceiling per player for the night, `NIGHT_CALLS_PER_PLAYER` (12, two of phase C's
@@ -59,6 +60,7 @@ from research.capsules.spans import SpanRules
 from research.capsules.store import queue_regeneration
 from research.capsules.sweep import FactsPassMemo, SweepPlan, SweepReport, sweep_capsules
 from research.db.code_digest import code_digest
+from research.db.engine import once_more_on_disconnect, pooled_like
 from research.db.read_cache import snapshot
 from research.nightly.capsule_gate import (
     CapsuleGateResult,
@@ -92,9 +94,10 @@ class CapsuleSpend:
     written: int = 0
     facts_blocks: int = 0
     processed: int = 0
-    # The wave gate (`capsules.waves`): sentences and spans two pages of one wave shared, every pass.
-    wave_sentences: int = 0
-    wave_spans: int = 0
+    # The landing gate (`capsules.landing`): sentences and spans a page shared, as it landed, with the pages
+    # landed before it, every pass.
+    landed_sentences: int = 0
+    landed_spans: int = 0
     # The run's writer (`config.WriterSettings.line`), its model's list price read once this run, and
     # the ledger's calls by model (the cost each call's usage response stated) with the 429s met.
     writer: str | None = None
@@ -111,8 +114,8 @@ class CapsuleSpend:
         self.written += report.llm
         self.facts_blocks += report.facts
         self.processed += len(report.processed)
-        self.wave_sentences += report.wave_sentences
-        self.wave_spans += report.wave_spans
+        self.landed_sentences += report.landed_sentences
+        self.landed_spans += report.landed_spans
 
     def close(self, gateway: GatewayClient, writer: str, price: ModelPrice) -> None:
         """The run's ledger and price, kept on the spend the run's report carries."""
@@ -128,7 +131,7 @@ class CapsuleSpend:
             f"{self.processed} pages attempted ({self.written} written, {self.facts_blocks} facts blocks), "
             f"{self.calls} calls, {self.prompt_tokens} prompt and {self.completion_tokens} completion tokens, "
             f"${self.cost_usd:.6f}; {self.rate_limited} calls met a 429 (the gateway's limit: {limits}); "
-            f"{self.wave_sentences} sentences and {self.wave_spans} spans shared inside a wave, left to the repair"
+            f"{self.landed_sentences} sentences and {self.landed_spans} spans shared as pages landed, left to the repair"
         )
 
 
@@ -162,8 +165,8 @@ def _sweep_line(name: str, report: SweepReport) -> str:
         f"{name}: {report.board_players} board players, {report.eligible} eligible, "
         f"{len(report.processed)} processed ({report.llm} written, {report.facts} facts blocks), {report.calls} calls, "
         f"${report.cost_usd:.6f}, {report.kept} written reads kept, {report.queued} queued by the repetition check, "
-        f"{report.waves} waves ({report.wave_sentences} sentences and {report.wave_spans} spans shared inside one, "
-        f"{len(report.wave_carriers)} carriers left to the repair)"
+        f"{report.landed_sentences} sentences and {report.landed_spans} spans shared as pages landed, "
+        f"{len(report.landed_carriers)} carriers left to the repair"
     )
 
 
@@ -232,8 +235,7 @@ class _Passes:
     def run(self) -> None:
         # The sentences already on two pages are quoted to the writer from the first call, so the
         # sweep does not write them again and the repair pass is left the few it still does.
-        with self.engine.connect() as conn:
-            gate = capsule_gate(conn, self.now, self.rules)
+        gate, _, _ = self._judged()
         cap = CAPSULE_CONFIG.repetition.max_quoted_spans
         shared = (*(s.sentence for s in gate.shared), *(s.span for s in gate.spans[:cap]))
         name = "capsules (mend only: pages whose facts moved wait for a full night)" if self.mend_only else "capsules"
@@ -249,6 +251,9 @@ class _Passes:
             unwritten = retry.facts
 
     def _judged(self) -> tuple[CapsuleGateResult, list[str], dict[str, tuple[str, ...]]]:
+        return once_more_on_disconnect(self._read_judgment)
+
+    def _read_judgment(self) -> tuple[CapsuleGateResult, list[str], dict[str, tuple[str, ...]]]:
         with self.engine.connect() as conn:
             gate = capsule_gate(conn, self.now, self.rules)
             order = board_universe_ids(conn, self.now)
@@ -307,16 +312,25 @@ def run_capsule_step(
             log(_regenerate_all(engine, now))
         settings = writer_settings(os.environ)
         log(f"capsules: {settings.line()}")
-        with httpx.Client() as http:
-            gateway = GatewayClient.for_run(key, http, settings)
-            price = fetch_price(http, key, settings.model)
-            passes = _Passes(engine, gateway, now, plan, log, facts, rules=rules)
-            passes.run()
-            spend = passes.spend
-            spend.close(gateway, settings.line(), price)
+        writers = pooled_like(engine, settings.concurrency)
+        try:
+            with httpx.Client() as http:
+                gateway = GatewayClient.for_run(key, http, settings)
+                price = fetch_price(http, key, settings.model)
+                passes = _Passes(writers, gateway, now, plan, log, facts, rules=rules)
+                passes.run()
+                spend = passes.spend
+                spend.close(gateway, settings.line(), price)
+        finally:
+            writers.dispose()
         log(f"capsules spent: {spend.line()}")
-    with engine.connect() as conn:
-        gate = capsule_gate(conn, now, rules)
-        findings = page_findings(conn, now, facts)
+    gate, findings = once_more_on_disconnect(lambda: _final_judgment(engine, now, rules, facts))
     log(f"{gate.summary()}; {len(findings.by_page)} written pages fail the page gate")
     return CapsuleStepResult(gate, findings, spend, bool(key))
+
+
+def _final_judgment(
+    engine: Engine, now: datetime, rules: SpanRules, facts: FactsPassMemo
+) -> tuple[CapsuleGateResult, PageFindings]:
+    with engine.connect() as conn:
+        return capsule_gate(conn, now, rules), page_findings(conn, now, facts)

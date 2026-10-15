@@ -8,7 +8,7 @@ spent for everyone does the whole line pause until their reset. A 5xx, a network
 completion gets one retry, and usage the gateway billed before a failure is kept on the error, so a
 player's cost is counted whether or not his read survived.
 
-Pages are written `concurrency` at a time (`GatewayClient.in_parallel`): each page holds its own
+Pages are written `concurrency` at a time (`GatewayClient.rolling`): each page holds its own
 scoped view of the run's client (its own call count over the shared line, bucket and ledger). The
 ledger records every call's model, its serving provider and the cost the gateway's usage response
 states; the gateway's price list is read once a run (`fetch_price`) for the run's report. The pacing
@@ -22,11 +22,11 @@ import threading
 import time
 from collections import Counter
 from collections.abc import Callable, Mapping, Sequence
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
-from typing import Any, Final
+from typing import Any, Final, cast
 
 import httpx
 
@@ -46,6 +46,8 @@ _RESET_HEADERS: Final = ("x-ratelimit-reset", "ratelimit-reset")
 # A reset this large is an epoch second, not a count of seconds to wait.
 _EPOCH_RESET_FLOOR: Final = 1_000_000_000
 _PER_MILLION: Final = 1_000_000
+# The end of a rolling pool's items.
+_DONE: Final = object()
 
 
 @dataclass(frozen=True, slots=True)
@@ -303,13 +305,37 @@ class GatewayClient:
         """A view for one page: the same line, bucket and ledger, its own call count from zero."""
         return replace(self, calls=0)
 
-    def in_parallel[T, R](self, work: Callable[["GatewayClient", T], R], items: Sequence[T]) -> list[R]:
-        """Each item's work on its own scoped view, at most `concurrency` at once, the results in the
-        items' order; one at a time when the pool is one wide."""
-        if self.concurrency <= 1 or len(items) <= 1:
-            return [work(self.scoped(), item) for item in items]
-        with ThreadPoolExecutor(max_workers=min(self.concurrency, len(items))) as pool:
-            return list(pool.map(lambda item: work(self.scoped(), item), items))
+    def rolling[T, R](
+        self,
+        items: Sequence[T],
+        start: Callable[[T], Callable[["GatewayClient"], R]],
+        land: Callable[[T, R], None],
+        stop: Callable[[], bool] = lambda: False,
+    ) -> bool:
+        """THE ROLLING POOL: at most `concurrency` items in flight, a slot refilled the moment its item
+        lands. `start(item)` runs on the caller's thread as the item starts (so it reads the state
+        every landed item left) and returns the work, run on a scoped view in a worker; `land(item,
+        result)` runs on the caller's thread as each lands, in landing order. `stop` is asked before
+        each start; True ends the run once the items in flight land. Returns whether it stopped."""
+        queue = iter(items)
+        with ThreadPoolExecutor(max_workers=max(1, self.concurrency)) as pool:
+            flight: dict[Future[R], T] = {}
+            stopped = False
+            while True:
+                while not stopped and len(flight) < max(1, self.concurrency):
+                    item = next(queue, _DONE)
+                    if item is _DONE:
+                        break
+                    if stop():
+                        stopped = True
+                        break
+                    work = start(cast("T", item))
+                    flight[pool.submit(work, self.scoped())] = cast("T", item)
+                if not flight:
+                    return stopped
+                done, _ = wait(flight, return_when=FIRST_COMPLETED)
+                for future in done:
+                    land(flight.pop(future), future.result())
 
     def _retry_after(self, response: httpx.Response) -> float | None:
         raw = response.headers.get("retry-after")
