@@ -2803,10 +2803,15 @@ components:
         sentence: { type: string, nullable: true, description: the reason for a change, from facts; null when unchanged }
     LineupAdvice:
       type: object
-      required: [week, basis, order_basis, refreshed, read_at, set, slots, bench, host_lineup_url, host_note]
+      required: [week, basis, basis_note, order_basis, refreshed, read_at, set, slots, bench, host_lineup_url, host_note]
       properties:
         week: { type: integer }
-        basis: { type: string, description: the honesty line and the basis of points over replacement }
+        basis: { type: string, description: "the honesty line above the rows: the order, and what points over replacement a week are" }
+        basis_note:
+          type: string
+          description: >-
+            the rest of the basis, said once under the rows: the league the points over replacement are for and the
+            league's rules points so far leave out
         order_basis: { $ref: "#/components/schemas/OrderBasis" }
         refreshed: { type: string, format: date-time, description: when the order was made }
         read_at: { type: string, format: date-time, description: the league's last host read }
@@ -2842,10 +2847,15 @@ components:
         sentence: { type: string }
     WaiverAdvice:
       type: object
-      required: [week, basis, order_basis, refreshed, read_at, best, rows, host_waivers_url, host_note]
+      required: [week, basis, basis_note, order_basis, refreshed, read_at, best, rows, host_waivers_url, host_note]
       properties:
         week: { type: integer }
         basis: { type: string }
+        basis_note:
+          type: string
+          description: >-
+            the rest of the basis, said once under the rows: the league the points over replacement are for and the
+            league's rules points so far leave out
         order_basis: { $ref: "#/components/schemas/OrderBasis" }
         refreshed: { type: string, format: date-time }
         read_at: { type: string, format: date-time }
@@ -2904,10 +2914,15 @@ components:
           description: one sentence when every trade found with this team is a close call for them, else null
     TradeAdvice:
       type: object
-      required: [week, basis, order_basis, refreshed, read_at, teams, host_trades_url, host_note]
+      required: [week, basis, basis_note, order_basis, refreshed, read_at, teams, host_trades_url, host_note]
       properties:
         week: { type: integer }
         basis: { type: string }
+        basis_note:
+          type: string
+          description: >-
+            the rest of the basis, said once under the rows: the league the points over replacement are for and the
+            league's rules points so far leave out
         order_basis: { $ref: "#/components/schemas/OrderBasis" }
         refreshed: { type: string, format: date-time }
         read_at: { type: string, format: date-time }

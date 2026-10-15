@@ -245,7 +245,7 @@ func (a *advisor) Lineup() (apitypes.LineupAdvice, bool) {
 	}
 	rows := Lineup(a.config, cands, team.Starters)
 	h := a.header()
-	out := apitypes.LineupAdvice{Week: h.week, Basis: LineupBasis(a.basis, a.weeks, a.settings), OrderBasis: h.basis, Refreshed: h.refreshed,
+	out := apitypes.LineupAdvice{Week: h.week, Basis: LineupBasis(a.basis, a.weeks), BasisNote: BasisNote(a.settings), OrderBasis: h.basis, Refreshed: h.refreshed,
 		ReadAt: h.readAt, Set: true, Slots: []apitypes.LineupSlot{}, Bench: []apitypes.PlayerLine{},
 	}
 	out.HostLineupUrl, out.HostNote = a.host(LineupPage)
@@ -321,7 +321,7 @@ func (a *advisor) Waivers(position draft.Position) (apitypes.WaiverAdvice, bool)
 		cands[i] = p.cand
 	}
 	h := a.header()
-	out := apitypes.WaiverAdvice{Week: h.week, Basis: WaiversBasis(a.basis, a.weeks, a.settings), OrderBasis: h.basis, Refreshed: h.refreshed,
+	out := apitypes.WaiverAdvice{Week: h.week, Basis: WaiversBasis(a.basis, a.weeks), BasisNote: BasisNote(a.settings), OrderBasis: h.basis, Refreshed: h.refreshed,
 		ReadAt: h.readAt, Rows: []apitypes.WaiverRow{}}
 	out.HostWaiversUrl, out.HostNote = a.host(WaiversPage)
 	w := &Writer{Basis: a.basis, Now: a.now}
@@ -358,7 +358,7 @@ func (a *advisor) Trades(focus string) (apitypes.TradeAdvice, bool) {
 	mine := a.active(team)
 	squad := a.squad(mine, true)
 	h := a.header()
-	out := apitypes.TradeAdvice{Week: h.week, Basis: TradesBasis(a.basis, a.weeks, a.settings), OrderBasis: h.basis, Refreshed: h.refreshed,
+	out := apitypes.TradeAdvice{Week: h.week, Basis: TradesBasis(a.basis, a.weeks), BasisNote: BasisNote(a.settings), OrderBasis: h.basis, Refreshed: h.refreshed,
 		ReadAt: h.readAt, Teams: []apitypes.TradeTeam{}}
 	out.HostTradesUrl, out.HostNote = a.host(TradesPage)
 	for _, t := range leaguesync.Standings(a.Snap.Teams) {

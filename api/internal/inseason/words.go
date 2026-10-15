@@ -147,17 +147,15 @@ func shapeWords(s apitypes.LeagueSettings) string {
 	return fmt.Sprintf("a %d-team league with %d QB, %d RB, %d WR, %d TE and %s", s.Teams, r.Qb, r.Rb, r.Wr, r.Te, flex)
 }
 
-// porWords is the basis of every points over replacement on a page:
-// what they are, for which league, and what "a week" is, so a week's
-// figure never reads as a week's projection.
-func porWords(b OrderBasis, weeks int, s apitypes.LeagueSettings) string {
+// porWords is what points over replacement are and what "a week" is,
+// so a week's figure never reads as a week's projection.
+func porWords(b OrderBasis, weeks int) string {
 	span := "the season on our preseason number"
 	if b == RestOfSeason {
 		span = "the rest of the season on our rest-of-season order"
 	}
-	return fmt.Sprintf("Points over replacement are points above what a free pickup at his position gives you, for %s. "+
-		"Every figure and gain here is points over replacement a week: %s, averaged over its %s, not a projection of any one week.",
-		shapeWords(s), span, weekCount(weeks))
+	return fmt.Sprintf("Points over replacement, and every gain in them, are points above what a free pickup at his "+
+		"position gives you, a week: %s, averaged over its %s, not a projection of any one week.", span, weekCount(weeks))
 }
 
 // weekCount is "11 weeks", "one week".
@@ -203,30 +201,32 @@ func uncountedWords(s apitypes.LeagueSettings) string {
 	return "Points so far leave out your league's points for " + list + ": the stat lines we hold do not carry them."
 }
 
-// basisTail is what every page's basis ends with: the points over
-// replacement's basis and the rules points so far leave out.
-func basisTail(b OrderBasis, weeks int, s apitypes.LeagueSettings) string {
+// BasisNote is the rest of every page's basis, said once under the rows:
+// the league the points over replacement are for, and the league's rules
+// points so far leave out.
+func BasisNote(s apitypes.LeagueSettings) string {
+	shape := "Points over replacement are for " + shapeWords(s) + "."
 	if u := uncountedWords(s); u != "" {
-		return porWords(b, weeks, s) + " " + u
+		return shape + " " + u
 	}
-	return porWords(b, weeks, s)
+	return shape
 }
 
 // LineupBasis is the start and sit page's honesty line (§4.4), on either
 // order: neither projects a week, and the stamp dates the order.
-func LineupBasis(b OrderBasis, weeks int, s apitypes.LeagueSettings) string {
+func LineupBasis(b OrderBasis, weeks int) string {
 	order := "our preseason number"
 	if b == RestOfSeason {
 		order = "our rest-of-season order"
 	}
 	return fmt.Sprintf("Ranked by %s and this week's designations. We do not project a week's points. %s",
-		order, basisTail(b, weeks, s))
+		order, porWords(b, weeks))
 }
 
 // WaiversBasis is the waiver page's (§5.3).
-func WaiversBasis(b OrderBasis, weeks int, s apitypes.LeagueSettings) string {
+func WaiversBasis(b OrderBasis, weeks int) string {
 	return fmt.Sprintf("Ranked by the gain to your lineup on %s. A drop is the player it costs you least to lose. %s",
-		numberWords(b), basisTail(b, weeks, s))
+		numberWords(b), porWords(b, weeks))
 }
 
 // OnlyCloseCalls is a team's line when every trade found with it is a
@@ -234,6 +234,6 @@ func WaiversBasis(b OrderBasis, weeks int, s apitypes.LeagueSettings) string {
 const OnlyCloseCalls = "Every trade we found with this team is a close call for them."
 
 // TradesBasis is the trade finder's (§6.3).
-func TradesBasis(b OrderBasis, weeks int, s apitypes.LeagueSettings) string {
-	return fmt.Sprintf("Trades where both lineups gain on %s. The other team decides. %s", numberWords(b), basisTail(b, weeks, s))
+func TradesBasis(b OrderBasis, weeks int) string {
+	return fmt.Sprintf("Trades where both lineups gain on %s. The other team decides. %s", numberWords(b), porWords(b, weeks))
 }

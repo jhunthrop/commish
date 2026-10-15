@@ -1663,8 +1663,11 @@ type Lineup string
 
 // LineupAdvice defines model for LineupAdvice.
 type LineupAdvice struct {
-	// Basis the honesty line and the basis of points over replacement
+	// Basis the honesty line above the rows: the order, and what points over replacement a week are
 	Basis string `json:"basis"`
+
+	// BasisNote the rest of the basis, said once under the rows: the league the points over replacement are for and the league's rules points so far leave out
+	BasisNote string `json:"basis_note"`
 
 	// Bench everyone else on the active roster, by the same keys (injured reserve and taxi spots left out)
 	Bench []PlayerLine `json:"bench"`
@@ -2440,6 +2443,9 @@ type SheetUpdate struct {
 type TradeAdvice struct {
 	Basis string `json:"basis"`
 
+	// BasisNote the rest of the basis, said once under the rows: the league the points over replacement are for and the league's rules points so far leave out
+	BasisNote string `json:"basis_note"`
+
 	// HostNote one sentence under the verb when we cannot open the host's page ("Make this change on Yahoo. We cannot open that page for you yet."), null when the url opens it
 	HostNote *string `json:"host_note"`
 
@@ -2497,6 +2503,9 @@ type TradeTeam struct {
 // WaiverAdvice defines model for WaiverAdvice.
 type WaiverAdvice struct {
 	Basis string `json:"basis"`
+
+	// BasisNote the rest of the basis, said once under the rows: the league the points over replacement are for and the league's rules points so far leave out
+	BasisNote string `json:"basis_note"`
 
 	// Best the add that gains most
 	Best *WaiverRow `json:"best"`

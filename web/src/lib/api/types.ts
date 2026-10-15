@@ -2440,8 +2440,10 @@ export interface components {
 		};
 		LineupAdvice: {
 			week: number;
-			/** @description the honesty line and the basis of points over replacement */
+			/** @description the honesty line above the rows: the order, and what points over replacement a week are */
 			basis: string;
+			/** @description the rest of the basis, said once under the rows: the league the points over replacement are for and the league's rules points so far leave out */
+			basis_note: string;
 			order_basis: components['schemas']['OrderBasis'];
 			/**
 			 * Format: date-time
@@ -2480,6 +2482,8 @@ export interface components {
 		WaiverAdvice: {
 			week: number;
 			basis: string;
+			/** @description the rest of the basis, said once under the rows: the league the points over replacement are for and the league's rules points so far leave out */
+			basis_note: string;
 			order_basis: components['schemas']['OrderBasis'];
 			/** Format: date-time */
 			refreshed: string;
@@ -2530,6 +2534,8 @@ export interface components {
 		TradeAdvice: {
 			week: number;
 			basis: string;
+			/** @description the rest of the basis, said once under the rows: the league the points over replacement are for and the league's rules points so far leave out */
+			basis_note: string;
 			order_basis: components['schemas']['OrderBasis'];
 			/** Format: date-time */
 			refreshed: string;

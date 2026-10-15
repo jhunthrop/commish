@@ -157,8 +157,8 @@ func TestCopyGuard(t *testing.T) {
 	plain := settings
 	plain.Scoring = apitypes.Scoring{Custom: &none}
 	for _, b := range []OrderBasis{Preseason, RestOfSeason} {
-		for _, s := range []string{LineupBasis(b, SeasonGames, settings), WaiversBasis(b, SeasonGames, settings), TradesBasis(b, SeasonGames, settings),
-			LineupBasis(b, SeasonGames, plain), WaiversBasis(b, SeasonGames, plain), TradesBasis(b, SeasonGames, plain), OnlyCloseCalls} {
+		for _, s := range []string{LineupBasis(b, SeasonGames), WaiversBasis(b, SeasonGames), TradesBasis(b, SeasonGames),
+			BasisNote(settings), BasisNote(plain), OnlyCloseCalls} {
 			guard(t, s)
 		}
 		w := &Writer{Basis: b, Now: thursday}
@@ -201,11 +201,11 @@ func TestBasisNamesTheRulesLeftOut(t *testing.T) {
 	settings := apitypes.LeagueSettings{Teams: 12, Lineup: apitypes.LineupStandard, Scoring: apitypes.Scoring{Custom: &rules},
 		Roster: apitypes.RosterCounts{Qb: 1, Rb: 2, Wr: 3, Te: 1}}
 	want := "Points so far leave out your league's points for two-point conversions and safeties: the stat lines we hold do not carry them."
-	if got := LineupBasis(Preseason, SeasonGames, settings); !strings.HasSuffix(got, want) {
+	if got := BasisNote(settings); !strings.HasSuffix(got, want) {
 		t.Fatalf("%q", got)
 	}
 	rules.PointsPerTwoPointConversion, rules.PointsPerSafety = 0, 0
-	if got := TradesBasis(Preseason, SeasonGames, settings); strings.Contains(got, "leave out") {
+	if got := BasisNote(settings); strings.Contains(got, "leave out") {
 		t.Fatalf("%q", got)
 	}
 }
