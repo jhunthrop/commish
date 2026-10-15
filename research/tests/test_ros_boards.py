@@ -16,7 +16,7 @@ from research.model.domain import Position
 from research.model.ros import ship
 from research.model.ros.__main__ import JUDGMENT_RECORDS
 from research.model.ros.judge import RoundFit
-from research.model.ros.live import SeasonPlayer
+from research.model.ros.live import FIRST_MODEL_WEEK, SeasonPlayer
 from research.model.ros.payload import ARTIFACT_NAME, priors_from
 from research.model.ros.raw_line import RawLine
 from research.model.ros.ship import SHIPPED_ROUND, fit_and_publish
@@ -87,20 +87,24 @@ def _raw(scorings: tuple[str, ...] = ("ppr", "half", "std")) -> RawLine:
 
 OFF = SeasonPlayer("u-p9", "p9", "P9", "WR", "KC", None, None)
 SETUP = RosSetup(PRIORS, _raw(), (OFF,))
-WEEK_7 = KICKOFF + timedelta(weeks=6) - timedelta(hours=1)  # before week 7's games, week 6 played
+LINES_THROUGH = FIRST_MODEL_WEEK - 1  # the last week played when the first model week is still to play
+FIRST_WEEK_INSTANT = (
+    KICKOFF + timedelta(weeks=LINES_THROUGH) - timedelta(hours=1)
+)  # before the first model week's games
+LAST_PRESEASON_INSTANT = KICKOFF + timedelta(weeks=LINES_THROUGH - 1) - timedelta(hours=1)
 
 
 def test_before_the_switch_week_every_board_stays_preseason() -> None:
     boards = _boards()
-    result = ros_boards(boards, _context(5), KICKOFF + timedelta(weeks=5) - timedelta(hours=1), SETUP)
+    result = ros_boards(boards, _context(LINES_THROUGH - 1), LAST_PRESEASON_INSTANT, SETUP)
     assert result.boards == boards
-    assert result.status == "preseason: week 6 is before the switch week (7)"
+    assert result.status == f"preseason: week {FIRST_MODEL_WEEK - 1} is before the switch week ({FIRST_MODEL_WEEK})"
 
 
-def test_from_week_7_every_board_ranks_the_rest_of_the_season() -> None:
-    result = ros_boards(_boards(), _context(6), WEEK_7, SETUP)
+def test_from_the_first_model_week_every_board_ranks_the_rest_of_the_season() -> None:
+    result = ros_boards(_boards(), _context(LINES_THROUGH), FIRST_WEEK_INSTANT, SETUP)
     assert result.basis is not None
-    assert (result.basis.from_week, result.basis.through) == (7, 6)
+    assert (result.basis.from_week, result.basis.through) == (FIRST_MODEL_WEEK, LINES_THROUGH)
     assert result.in_season == {"ppr-12", "half-ppr-12", "standard-12"}
     for board in result.boards:
         assert {e.row.player_id for e in board.entries} == {"p1", "p2", "p3", "p9"}
@@ -123,7 +127,7 @@ def test_from_week_7_every_board_ranks_the_rest_of_the_season() -> None:
 )  # fmt: skip
 def test_a_missing_or_unread_input_keeps_every_board_preseason_and_says_which(setup: RosSetup, reason: str) -> None:
     boards = _boards()
-    result = ros_boards(boards, _context(6), WEEK_7, setup)
+    result = ros_boards(boards, _context(LINES_THROUGH), FIRST_WEEK_INSTANT, setup)
     assert (result.boards, result.basis, result.status) == (boards, None, reason)
 
 
@@ -136,7 +140,7 @@ def test_after_the_last_ranked_week_the_board_reverts_to_preseason() -> None:
 
 def test_a_raw_line_without_a_scoring_keeps_that_format_preseason_alone() -> None:
     boards = _boards()
-    result = ros_boards(boards, _context(6), WEEK_7, replace(SETUP, raw=_raw(("ppr", "half"))))
+    result = ros_boards(boards, _context(LINES_THROUGH), FIRST_WEEK_INSTANT, replace(SETUP, raw=_raw(("ppr", "half"))))
     assert result.in_season == {"ppr-12", "half-ppr-12"}
     assert result.boards[2] == boards[2]
     assert "preseason for standard-12: the raw line holds no std points" in result.status
@@ -144,7 +148,7 @@ def test_a_raw_line_without_a_scoring_keeps_that_format_preseason_alone() -> Non
 
 def test_a_player_the_ppr_board_lacks_keeps_that_format_preseason_alone() -> None:
     boards = _boards(half_extra=True)
-    result = ros_boards(boards, _context(6), WEEK_7, SETUP)
+    result = ros_boards(boards, _context(LINES_THROUGH), FIRST_WEEK_INSTANT, SETUP)
     assert result.in_season == {"ppr-12", "standard-12"}
     assert result.boards[1] == boards[1]
     assert "preseason for half-ppr-12: it ranks 1 players the PPR board does not" in result.status
@@ -153,16 +157,16 @@ def test_a_player_the_ppr_board_lacks_keeps_that_format_preseason_alone() -> Non
 def test_a_player_off_the_ppr_board_with_a_line_is_ranked_once_on_a_board_that_has_him() -> None:
     """The reviewer's case: p7 on the half board, not on PPR, with a line this season."""
     boards = _boards(half_extra=True)
-    context = _context(6)
-    lines = {**context.store.lines, "p7": {w: _line(12.0) for w in range(1, 7)}}
+    context = _context(LINES_THROUGH)
+    lines = {**context.store.lines, "p7": {w: _line(12.0) for w in range(1, LINES_THROUGH + 1)}}
     snaps = {
         **context.store.snaps,
-        "p7": {w: {"offensive_snaps": 30.0, "team_offensive_snaps": 60.0} for w in range(1, 7)},
+        "p7": {w: {"offensive_snaps": 30.0, "team_offensive_snaps": 60.0} for w in range(1, LINES_THROUGH + 1)},
     }
-    teams = {**context.store.teams, "p7": dict.fromkeys(range(1, 7), "KC")}
+    teams = {**context.store.teams, "p7": dict.fromkeys(range(1, LINES_THROUGH + 1), "KC")}
     context = replace(context, store=replace(context.store, lines=lines, snaps=snaps, teams=teams))
     p7 = SeasonPlayer("u-p7", "p7", "P7", "WR", "KC", None, None)
-    result = ros_boards(boards, context, WEEK_7, replace(SETUP, season_players=(OFF, p7)))
+    result = ros_boards(boards, context, FIRST_WEEK_INSTANT, replace(SETUP, season_players=(OFF, p7)))
     assert result.in_season == {"ppr-12", "half-ppr-12", "standard-12"}
     for board in result.boards:
         ids = [e.row.player_id for e in board.entries]

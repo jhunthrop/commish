@@ -30,13 +30,13 @@ _SERVED = {"ppr": 200.0, "half": 170.0, "std": 140.0}
 
 
 def test_the_switch_reads_the_first_week_still_to_play() -> None:
-    assert FIRST_MODEL_WEEK == 7  # the preregistration's: the preseason board through week 6
-    assert window_of([7, 8, 18], through=6) == Window(7, 6)
+    assert FIRST_MODEL_WEEK == 6  # the founder's ruling of 2026-10-15; the preregistration named week 7
+    assert window_of([6, 7, 18], through=5) == Window(6, 5)
     assert window_of([7, 8], through=5) == Window(7, 5)  # week 6's lines not yet in: the window still starts at 7
-    assert window_of([6, 7], through=5) == "week 6 is before the switch week (7)"
+    assert window_of([5, 6], through=4) == "week 5 is before the switch week (6)"
     assert window_of([18], through=17) == "week 18 is past week 17, the last the model ranks"
     assert window_of([], through=17) == "the season's schedule has no game left to play"
-    assert window_of([7], through=0) == "the store holds no week of this season's lines"
+    assert window_of([6], through=0) == "the store holds no week of this season's lines"
 
 
 def test_a_week_is_played_with_a_stat_line_or_snaps() -> None:

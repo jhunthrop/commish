@@ -3,7 +3,7 @@
 The nightly writes its boards to R2 and `publish` moves `latest`; the API never reads the bucket (no
 file-sourced data at runtime), so `publish` also keeps this table equal to the published run's
 boards (`research.nightly.published_board`): one transaction deletes the season's rows and inserts
-the run's. From week 7 those rows rank the rest of the season (`order_basis`), with points and no
+the run's. From the first model week (week 6) those rows rank the rest of the season (`order_basis`), with points and no
 range; before it they are the preseason board.
 
 `player_id` is the provider id the product names players by (`provider_players.id`), the id the

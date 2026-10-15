@@ -231,7 +231,7 @@ def ros_boards(boards: Sequence[FormatBoard], context: SeasonContext, instant: d
     if not ranked:
         return RosResult(preseason, None, f"preseason: {kept}")
     status = (
-        f"rest of season from week {window.from_week} (switch week {FIRST_MODEL_WEEK - 1}), lines through week "
+        f"rest of season from week {window.from_week} (switch week {FIRST_MODEL_WEEK}), lines through week "
         f"{window.through}, model {MODEL_NAME}, {len(extra)} players off the preseason board ranked"
         + (f"; {kept}" if kept else "")
     )
