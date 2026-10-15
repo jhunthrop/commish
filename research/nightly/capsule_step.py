@@ -28,6 +28,11 @@ The order, and why each pass exists:
    The first page keeps a shared sentence or span, so each attempt strictly shrinks the set.
 5. **The capsule gate** (`capsule_gate`), judged once more after the last attempt: the step's verdict.
 
+Every pass writes its pages concurrently, in waves of the writer's pool (`capsules.waves`: each page is told the
+spans of every page landed before its wave, and what a wave's own pages share is counted and left to the
+repair attempts), each call paced by the run's token bucket (`capsules.pace`). The passes themselves run in
+order, since each reads what the last one stored.
+
 Every pass shares one ceiling per player for the night, `NIGHT_CALLS_PER_PLAYER` (12, two of phase C's
 six-call generations): a player who reached it is left to the next night rather than written again,
 with one exception (the coordinator's Lane 17 ruling): a page still unwritten at the ceiling may start
@@ -40,16 +45,16 @@ demote written reads to facts blocks) and the gate still judges what is stored.
 
 import os
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from datetime import datetime
 from typing import Final
 
 import httpx
 from sqlalchemy import Engine
 
-from research.capsules.config import CAPSULE_CONFIG
+from research.capsules.config import CAPSULE_CONFIG, writer_settings
 from research.capsules.facts.history import history_cache
-from research.capsules.gateway import GatewayClient
+from research.capsules.gateway import GatewayClient, ModelPrice, ModelSpend, fetch_price
 from research.capsules.spans import SpanRules
 from research.capsules.store import queue_regeneration
 from research.capsules.sweep import FactsPassMemo, SweepPlan, SweepReport, sweep_capsules
@@ -87,6 +92,16 @@ class CapsuleSpend:
     written: int = 0
     facts_blocks: int = 0
     processed: int = 0
+    # The wave gate (`capsules.waves`): sentences and spans two pages of one wave shared, every pass.
+    wave_sentences: int = 0
+    wave_spans: int = 0
+    # The run's writer (`config.WriterSettings.line`), its model's list price read once this run, and
+    # the ledger's calls by model (the cost each call's usage response stated) with the 429s met.
+    writer: str | None = None
+    price: ModelPrice | None = None
+    by_model: dict[str, ModelSpend] = field(default_factory=dict)
+    rate_limited: int = 0
+    stated_limits: tuple[str, ...] = ()
 
     def add(self, report: SweepReport) -> None:
         self.calls += report.calls
@@ -96,12 +111,24 @@ class CapsuleSpend:
         self.written += report.llm
         self.facts_blocks += report.facts
         self.processed += len(report.processed)
+        self.wave_sentences += report.wave_sentences
+        self.wave_spans += report.wave_spans
+
+    def close(self, gateway: GatewayClient, writer: str, price: ModelPrice) -> None:
+        """The run's ledger and price, kept on the spend the run's report carries."""
+        self.writer = writer
+        self.price = price
+        self.by_model = gateway.ledger.by_model()
+        self.rate_limited = gateway.ledger.rate_limited
+        self.stated_limits = gateway.ledger.stated_limits
 
     def line(self) -> str:
+        limits = ", ".join(self.stated_limits) or "none stated"
         return (
             f"{self.processed} pages attempted ({self.written} written, {self.facts_blocks} facts blocks), "
             f"{self.calls} calls, {self.prompt_tokens} prompt and {self.completion_tokens} completion tokens, "
-            f"${self.cost_usd:.6f}"
+            f"${self.cost_usd:.6f}; {self.rate_limited} calls met a 429 (the gateway's limit: {limits}); "
+            f"{self.wave_sentences} sentences and {self.wave_spans} spans shared inside a wave, left to the repair"
         )
 
 
@@ -134,7 +161,9 @@ def _sweep_line(name: str, report: SweepReport) -> str:
     return (
         f"{name}: {report.board_players} board players, {report.eligible} eligible, "
         f"{len(report.processed)} processed ({report.llm} written, {report.facts} facts blocks), {report.calls} calls, "
-        f"${report.cost_usd:.6f}, {report.kept} written reads kept, {report.queued} queued by the repetition check"
+        f"${report.cost_usd:.6f}, {report.kept} written reads kept, {report.queued} queued by the repetition check, "
+        f"{report.waves} waves ({report.wave_sentences} sentences and {report.wave_spans} spans shared inside one, "
+        f"{len(report.wave_carriers)} carriers left to the repair)"
     )
 
 
@@ -276,10 +305,15 @@ def run_capsule_step(
     else:
         if plan.regenerate_all:
             log(_regenerate_all(engine, now))
+        settings = writer_settings(os.environ)
+        log(f"capsules: {settings.line()}")
         with httpx.Client() as http:
-            passes = _Passes(engine, GatewayClient(key, http), now, plan, log, facts, rules=rules)
+            gateway = GatewayClient.for_run(key, http, settings)
+            price = fetch_price(http, key, settings.model)
+            passes = _Passes(engine, gateway, now, plan, log, facts, rules=rules)
             passes.run()
             spend = passes.spend
+            spend.close(gateway, settings.line(), price)
         log(f"capsules spent: {spend.line()}")
     with engine.connect() as conn:
         gate = capsule_gate(conn, now, rules)

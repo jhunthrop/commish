@@ -34,7 +34,7 @@ from research.capsules.facts.board import board_rows
 from research.capsules.facts.collect import universe_ids_for
 from research.capsules.facts.season_so_far import in_season
 from research.capsules.facts_block import FACTS_SOURCE
-from research.capsules.narrative import normalize_sentence, sentences_verbatim
+from research.capsules.narrative import held_sentences
 from research.capsules.span_rules import span_rules_for
 from research.capsules.spans import (
     Runs,
@@ -111,8 +111,7 @@ class CapsuleGateResult:
 
 def _sentences(row: StoredCapsule) -> set[str]:
     """The read's sentences held to uniqueness: normalized, and of at least the minimum length."""
-    normalized = {normalize_sentence(s) for body in (row.body_compact, row.body_full) for s in sentences_verbatim(body)}
-    return {s for s in normalized if len(s.split()) >= CAPSULE_CONFIG.shared_sentence_min_words}
+    return held_sentences((row.body_compact, row.body_full), CAPSULE_CONFIG.shared_sentence_min_words)
 
 
 def shared_written_sentences(rows: Mapping[str, StoredCapsule]) -> tuple[SharedSentence, ...]:

@@ -5,12 +5,12 @@ Ported from `research-ts/src/capsules/sweep.ts`. A player is written when his ro
 facts hash moved, or his row is not written (a facts block, or the oracle's template: a throttled or
 refused read keeps retrying);
 players demoted from a written read go first. Each player is committed as he is written, so a run
-stopped part way loses at most the one in hand. The worn language the board already carries is
+stopped part way loses at most the wave in hand. Pages are written concurrently in waves of the
+writer's pool (`capsules.waves`). The worn language the board already carries is
 quoted into every prompt; the check runs again at the end and queues anyone over a line. Capsules
 key on the universe id (`research.players.id`), through the crosswalk.
 """
 
-import time
 from collections.abc import Callable, Mapping, Sequence
 from contextlib import AbstractContextManager
 from dataclasses import dataclass, field
@@ -43,6 +43,7 @@ from research.capsules.store import (
     stored_capsules_for,
     upsert_capsule,
 )
+from research.capsules.waves import wave_collisions, waves
 from research.db.read_cache import UNCACHED, ReadThrough
 
 
@@ -106,6 +107,12 @@ class SweepReport:
     detail: list[str] = field(default_factory=list)
     # Universe id to the gateway calls his capsule took in this sweep.
     calls_by_player: dict[str, int] = field(default_factory=dict)
+    # The wave gate (`capsules.waves`): the waves written, and what each wave's own pages shared with
+    # each other (sentences and spans), their carriers left to the repair pass.
+    waves: int = 0
+    wave_sentences: int = 0
+    wave_spans: int = 0
+    wave_carriers: list[str] = field(default_factory=list)
 
 
 def _tally(report: SweepReport, subject: Subject, result: CapsuleResult, demoted: bool, kept: bool) -> None:
@@ -260,6 +267,31 @@ def _ordered(subjects: Sequence[Subject], stored: dict[str, StoredCapsule], plan
     return [*demoted, *unwritten, *(s for s in eligible if s not in demoted and s not in unwritten)]
 
 
+def _land(
+    report: SweepReport,
+    tonight: TonightSpans,
+    rules: SpanRules,
+    wave: Sequence[Subject],
+    landed: Sequence[tuple[CapsuleResult, bool, bool]],
+) -> None:
+    """A wave's pages in order: tallied, added to tonight's spans, and checked against each other."""
+    pages: dict[str, tuple[str, ...]] = {}
+    reads: dict[str, tuple[str, ...]] = {}
+    for subject, (result, demoted, kept) in zip(wave, landed, strict=True):
+        if result.source == "llm":
+            texts = page_texts(result.compact.text, result.full.text, result.narrative.slots)
+            tonight.add(texts)
+            pages[subject.universe_id] = texts
+            reads[subject.universe_id] = (result.compact.text, result.full.text)
+        _tally(report, subject, result, demoted, kept)
+        report.processed.append(subject.universe_id)
+    report.waves += 1
+    collisions = wave_collisions(pages, reads, rules, CAPSULE_CONFIG.shared_sentence_min_words)
+    report.wave_sentences += collisions.sentences
+    report.wave_spans += collisions.spans
+    report.wave_carriers.extend(collisions.carriers)
+
+
 def sweep_capsules(
     engine: Engine, gateway: GatewayClient, as_of: datetime, plan: SweepPlan, subjects_at: Subjects = subjects_of
 ) -> SweepReport:
@@ -276,22 +308,30 @@ def sweep_capsules(
     tonight = TonightSpans(rules, repetition.tonight_window_pages)
     report = SweepReport(as_of, len(subjects), len(ordered))
     stopped = False
-    for subject in ordered[: plan.budget]:
+    for wave in waves(ordered[: plan.budget], gateway.concurrency):
         if plan.deadline is not None and plan.deadline():
             stopped = True
             break
-        if report.processed and CAPSULE_CONFIG.sweep_pacing_ms > 0:
-            time.sleep(CAPSULE_CONFIG.sweep_pacing_ms / 1000)
-        own = plan.avoid_by_page.get(subject.universe_id, ())
+        # Every page of the wave is told what every page landed before the wave already repeats.
         repeated = tonight.repeated(repetition.max_quoted_spans)
-        worn = WornPhrases((*plan.avoid, *own, *repeated, *board_worn.sentences), board_worn.phrases)
-        result, demoted, kept = write_one(
-            engine, subject, stored.get(subject.universe_id), gateway, worn, keep_written=plan.keep_written
-        )
-        if result.source == "llm":
-            tonight.add(page_texts(result.compact.text, result.full.text, result.narrative.slots))
-        _tally(report, subject, result, demoted, kept)
-        report.processed.append(subject.universe_id)
+        jobs = [
+            (
+                subject,
+                WornPhrases(
+                    (*plan.avoid, *plan.avoid_by_page.get(subject.universe_id, ()), *repeated, *board_worn.sentences),
+                    board_worn.phrases,
+                ),
+            )
+            for subject in wave
+        ]
+
+        def write(view: GatewayClient, job: tuple[Subject, WornPhrases]) -> tuple[CapsuleResult, bool, bool]:
+            subject, worn = job
+            return write_one(
+                engine, subject, stored.get(subject.universe_id), view, worn, keep_written=plan.keep_written
+            )
+
+        _land(report, tonight, rules, wave, gateway.in_parallel(write, jobs))
     if stopped:
         # A half-swept board would flag sentences the rest of tonight's work is about to rewrite.
         return report
