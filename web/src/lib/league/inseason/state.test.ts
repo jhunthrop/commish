@@ -39,7 +39,15 @@ void test('the three screens are pages only while the flag is on, and nothing el
 void test("a failed read with no answer yet prints the API's own sentence, whatever its status", () => {
 	const noTeam = "We could not find your team in this league's last read.";
 	// A team missing from the last read can be read again from the host: the page offers it.
-	assert.deepEqual(readFailure(api(404, noTeam), false), { kind: 'no-team', sentence: noTeam });
+	assert.deepEqual(
+		readFailure(new ApiError(404, { code: 'team_not_read', message: noTeam }), false),
+		{ kind: 'no-team', sentence: noTeam }
+	);
+	// Any other 404 (a league gone from the account) is the API's sentence alone.
+	assert.deepEqual(readFailure(api(404, 'Not found.'), false), {
+		kind: 'refused',
+		sentence: 'Not found.'
+	});
 	for (const status of [400, 409, 422, 502]) {
 		assert.deepEqual(readFailure(api(status, `Sentence ${String(status)}.`), false), {
 			kind: 'refused',

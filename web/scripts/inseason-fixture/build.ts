@@ -313,7 +313,8 @@ async function lineOf(player: LeaguePlayer): Promise<PlayerLine> {
 
 async function boardLine(row: BoardRow): Promise<PlayerLine> {
 	return lineOf({
-		host_id: `board-${row.id}`,
+		// As the API answers an add on Sleeper: no host id (an ESPN league's is its board id, serve.ts).
+		host_id: '',
 		board_id: row.id,
 		name: row.name,
 		position: row.position,

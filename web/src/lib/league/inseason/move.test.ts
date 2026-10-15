@@ -5,7 +5,9 @@ import { test } from 'node:test';
 import { ApiError } from '#lib/api/client.ts';
 import type { HostMovePlan, HostMoveResult, LineupSlot, WaiverRow } from './api.ts';
 import {
+	addKey,
 	bidLabel,
+	claimable,
 	bidProblem,
 	claimMove,
 	claimsOnHost,
@@ -223,8 +225,13 @@ void test("a claim is the row's add and drop with the bid typed, for the week re
 });
 
 void test("the bid field names its basis, and a bid outside the league's bounds says them", () => {
-	const bid = { amount: 0, min: 0, max: 500 };
+	const bid = { amount: 0, min: 0, max: 500, left_known: true };
 	assert.equal(bidLabel(bid), 'Your bid in waiver dollars, $0 to $500, what your team has left');
+	// When ESPN did not say what was spent, the bound is the league's budget, said as such.
+	assert.equal(
+		bidLabel({ ...bid, left_known: false }),
+		"Your bid in waiver dollars, $0 to $500, the league's budget"
+	);
 	assert.equal(bidProblem('espn', '12', bid), null);
 	assert.equal(bidProblem('espn', '0', bid), null);
 	for (const typed of ['501', '-1', '1.5', '', 'twelve']) {
@@ -260,4 +267,30 @@ void test("a claim's words: the panel, its verb on the way, and a queued claim o
 	);
 	assert.equal(resultWords('espn', { ...pending, processes_at: null }), pending.sentence);
 	assert.equal(resultWords('espn', { ...pending, outcome: 'done' }), pending.sentence);
+});
+
+void test('a claim opens only for an add the host names: an add with no host id keeps the host link', () => {
+	assert.equal(claimable(waiverRow), true);
+	const unnamed: WaiverRow = {
+		...waiverRow,
+		add: { ...waiverRow.add, player: { ...waiverRow.add.player, host_id: '', board_id: '4686422' } }
+	};
+	assert.equal(claimable(unnamed), false);
+	assert.equal(
+		claimable({
+			...unnamed,
+			add: { ...unnamed.add, player: { ...unnamed.add.player, host_id: 'board-1' } }
+		}),
+		false
+	);
+	assert.equal(
+		claimable({
+			...unnamed,
+			add: { ...unnamed.add, player: { ...unnamed.add.player, host_id: '-16010' } }
+		}),
+		true
+	);
+	// A row is marked by its own key, so two adds with no host id are two rows.
+	assert.equal(addKey(unnamed), 'board:4686422');
+	assert.equal(addKey(waiverRow), '15818');
 });

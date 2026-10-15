@@ -20,7 +20,9 @@
 	} from './api.ts';
 	import {
 		bidProblem,
+		addKey,
 		claimMove,
+		claimable,
 		claimsOnHost,
 		failedStep,
 		planStep,
@@ -64,8 +66,9 @@
 	let { advice, host, narrow, plan, make, reread }: Props = $props();
 
 	const MOVE_ID = 'claim-move';
-	/** How long a typed bid rests before the claim is planned again for it. */
-	const BID_PAUSE_MS = 400;
+	/** How long a typed bid rests before the claim is planned again for it: long enough that a
+	 * member still typing costs no plan (each plan reads ESPN twice). */
+	const BID_PAUSE_MS = 600;
 	let step = $state<MoveStep>({ kind: 'closed' });
 	/** The claim as last planned: the one the token makes, whatever is typed meanwhile. */
 	let planned: HostMoveInput | null = null;
@@ -87,7 +90,7 @@
 	/** The add the member marked, by his host id; null keeps the best add as the decision. */
 	let marked = $state<string | null>(null);
 
-	const idOf = (row: WaiverRow): string => row.add.player.host_id;
+	const idOf = addKey;
 	const positions = $derived(
 		POSITIONS.filter((p) => advice.rows.some((r) => r.add.player.position === p))
 	);
@@ -121,7 +124,12 @@
 			const answer = await plan(move);
 			if (planned !== move) return;
 			step = planStep(answer);
-			if (bid === null && answer.bid) typed = String(answer.bid.amount);
+			// The first plan says the league's least bid: planned again as that number, so the token
+			// makes the bid the member sees, never one the API derives again at send time.
+			if (bid === null && answer.bid) {
+				typed = String(answer.bid.amount);
+				void planFor(row, answer.bid.amount);
+			}
 		} catch (error) {
 			if (planned === move) {
 				step = failedStep(error, host, 'plan', shown.host_waivers_url, 'claim');
@@ -133,6 +141,8 @@
 
 	/** Add on a row: marks it and opens the claim for it. */
 	function openClaim(row: WaiverRow): void {
+		// One claim at a time: while one is on its way, its answer stays on screen.
+		if (step.kind === 'sending' || !claimable(row)) return;
 		marked = idOf(row);
 		claiming = row;
 		typed = '';
@@ -197,8 +207,10 @@
 						/>
 					{/if}
 					<span class="mark">
-						{#if onHost}
-							<Quiet size="sm" onclick={() => openClaim(r)}>{LINES.add}</Quiet>
+						{#if onHost && claimable(r)}
+							<Quiet size="sm" onclick={() => openClaim(r)} disabled={step.kind === 'sending'}
+								>{LINES.add}</Quiet
+							>
 						{:else}
 							<Quiet size="sm" onclick={() => (marked = on ? null : idOf(r))}
 								>{on ? LINES.chosen : LINES.add}</Quiet
@@ -219,7 +231,7 @@
 	hostNote={shown.host_note ?? shown.moves.note}
 	basis={shown.basis}
 	basisNote={shown.basis_note}
-	onverb={onHost && chosen ? () => openClaim(chosen) : null}
+	onverb={onHost && chosen && claimable(chosen) ? () => openClaim(chosen) : null}
 	controls={onHost ? MOVE_ID : undefined}
 	expanded={onHost ? step.kind !== 'closed' : undefined}
 >

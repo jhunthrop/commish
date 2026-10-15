@@ -17,10 +17,13 @@ export type ReadFailure =
 	| { kind: 'no-team'; sentence: string }
 	| { kind: 'stale'; sentence: string };
 
+/** The API's code for a team missing from the league's last read (api httpx CodeTeamNotRead). */
+const TEAM_NOT_READ = 'team_not_read';
+
 export function readFailure(error: unknown, answered: boolean): ReadFailure {
 	if (hasStatus(error, HTTP_STATUS.unauthorized)) return { kind: 'signed-out' };
 	if (answered) return { kind: 'stale', sentence: LINES.lastRead };
-	if (error instanceof ApiError && error.status === HTTP_STATUS.notFound) {
+	if (error instanceof ApiError && error.code === TEAM_NOT_READ) {
 		return { kind: 'no-team', sentence: error.message };
 	}
 	return {

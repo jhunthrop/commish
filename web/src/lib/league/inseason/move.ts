@@ -52,6 +52,23 @@ export function setsOnHost(advice: Pick<LineupAdvice, 'set' | 'slots' | 'moves'>
 	);
 }
 
+/** The shape of a host id the claim route takes (api hostmoves checkClaim): ESPN's player ids, a
+ * D/ST's negative. */
+const HOST_ID = /^-?[0-9]{1,12}$/;
+
+/** Whether a row's add can be claimed from here: the API names him by his host id. An add with none
+ * (a defense ESPN does not name, any add on a host with no write path) keeps the host's page. */
+export function claimable(row: WaiverRow): boolean {
+	return HOST_ID.test(row.add.player.host_id);
+}
+
+/** A waiver row's own key, for marking it: the add's host id, else his board id. */
+export function addKey(row: WaiverRow): string {
+	return row.add.player.host_id === ''
+		? `board:${row.add.player.board_id ?? row.add.player.name}`
+		: row.add.player.host_id;
+}
+
 /** Whether the waiver screen's Add opens a claim on the host from here: the API says it is open. */
 export function claimsOnHost(advice: Pick<WaiverAdvice, 'moves'>): boolean {
 	return advice.moves.claim === 'available';
@@ -169,9 +186,11 @@ export function openHostWords(host: LeagueHost): string {
 }
 
 /** The bid field's label, its number's basis named: "Your bid in waiver dollars, $0 to $500, what
- * your team has left". We never suggest a bid. */
+ * your team has left", or the league's budget when the host did not say what was spent. We never
+ * suggest a bid. */
 export function bidLabel(bid: HostBid): string {
-	return `Your bid in waiver dollars, $${String(bid.min)} to $${String(bid.max)}, what your team has left`;
+	const basis = bid.left_known ? 'what your team has left' : "the league's budget";
+	return `Your bid in waiver dollars, $${String(bid.min)} to $${String(bid.max)}, ${basis}`;
 }
 
 /** A typed bid the league does not take, in the host's terms; null for a whole number in bounds. */

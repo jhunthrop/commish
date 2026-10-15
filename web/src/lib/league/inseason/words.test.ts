@@ -386,8 +386,9 @@ void test('copy guard: every in-season line is fantasy words, with no dash, semi
 		readingWords('espn', 'claim'),
 		lostWords('espn', 'claim'),
 		moveTitle('claim'),
-		bidLabel({ amount: 0, min: 0, max: 87 }),
-		bidProblem('espn', '88', { amount: 0, min: 0, max: 87 }) ?? '',
+		bidLabel({ amount: 0, min: 0, max: 87, left_known: true }),
+		bidLabel({ amount: 0, min: 0, max: 500, left_known: false }),
+		bidProblem('espn', '88', { amount: 0, min: 0, max: 87, left_known: true }) ?? '',
 		resultWords(
 			'espn',
 			{

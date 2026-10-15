@@ -8,7 +8,7 @@
 	"best": {
 		"add": {
 			"player": {
-				"host_id": "board-4686422",
+				"host_id": "",
 				"board_id": "4686422",
 				"name": "Xavier Hutchinson",
 				"position": "WR",
@@ -75,7 +75,7 @@
 		{
 			"add": {
 				"player": {
-					"host_id": "board-4686422",
+					"host_id": "",
 					"board_id": "4686422",
 					"name": "Xavier Hutchinson",
 					"position": "WR",
@@ -141,7 +141,7 @@
 		{
 			"add": {
 				"player": {
-					"host_id": "board-4429160",
+					"host_id": "",
 					"board_id": "4429160",
 					"name": "De'Von Achane",
 					"position": "RB",
@@ -207,7 +207,7 @@
 		{
 			"add": {
 				"player": {
-					"host_id": "board-4372780",
+					"host_id": "",
 					"board_id": "4372780",
 					"name": "Tommy Tremble",
 					"position": "TE",
@@ -273,7 +273,7 @@
 		{
 			"add": {
 				"player": {
-					"host_id": "board-4362921",
+					"host_id": "",
 					"board_id": "4362921",
 					"name": "Tyquan Thornton",
 					"position": "WR",
@@ -339,7 +339,7 @@
 		{
 			"add": {
 				"player": {
-					"host_id": "board-2573401",
+					"host_id": "",
 					"board_id": "2573401",
 					"name": "Tyler Higbee",
 					"position": "TE",
@@ -405,7 +405,7 @@
 		{
 			"add": {
 				"player": {
-					"host_id": "board-15864",
+					"host_id": "",
 					"board_id": "15864",
 					"name": "Geno Smith",
 					"position": "QB",
@@ -471,7 +471,7 @@
 		{
 			"add": {
 				"player": {
-					"host_id": "board-4688380",
+					"host_id": "",
 					"board_id": "4688380",
 					"name": "Cam Ward",
 					"position": "QB",
@@ -537,7 +537,7 @@
 		{
 			"add": {
 				"player": {
-					"host_id": "board-3917792",
+					"host_id": "",
 					"board_id": "3917792",
 					"name": "Daniel Jones",
 					"position": "QB",
@@ -603,7 +603,7 @@
 		{
 			"add": {
 				"player": {
-					"host_id": "board-4427095",
+					"host_id": "",
 					"board_id": "4427095",
 					"name": "DeMario Douglas",
 					"position": "WR",
@@ -669,7 +669,7 @@
 		{
 			"add": {
 				"player": {
-					"host_id": "board-4430802",
+					"host_id": "",
 					"board_id": "4430802",
 					"name": "Darnell Washington",
 					"position": "TE",
@@ -735,7 +735,7 @@
 		{
 			"add": {
 				"player": {
-					"host_id": "board-4361409",
+					"host_id": "",
 					"board_id": "4361409",
 					"name": "Jahan Dotson",
 					"position": "WR",
@@ -801,7 +801,7 @@
 		{
 			"add": {
 				"player": {
-					"host_id": "board-4808766",
+					"host_id": "",
 					"board_id": "4808766",
 					"name": "Mason Taylor",
 					"position": "TE",
@@ -867,7 +867,7 @@
 		{
 			"add": {
 				"player": {
-					"host_id": "board-4429148",
+					"host_id": "",
 					"board_id": "4429148",
 					"name": "Theo Johnson",
 					"position": "TE",

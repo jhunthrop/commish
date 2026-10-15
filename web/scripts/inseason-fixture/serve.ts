@@ -69,7 +69,7 @@ const NO_TEAM_WORDS = "We could not find your team in this league's last read.";
 const READ_MINUTES_AGO = 4;
 const MINUTE_MS = 60_000;
 const HOLD_MS = 10 * MINUTE_MS;
-const HTTP = { ok: 200, noContent: 204, notFound: 404, conflict: 409 } as const;
+const HTTP = { ok: 200, noContent: 204, badRequest: 400, notFound: 404, conflict: 409 } as const;
 
 async function load<T>(name: string): Promise<T> {
 	return JSON.parse(await readFile(new URL(`${name}.json`, DATA), 'utf8')) as T;
@@ -118,7 +118,13 @@ const account: components['schemas']['Account'] = {
 
 const readAt = (): string => new Date(Date.now() - READ_MINUTES_AGO * MINUTE_MS).toISOString();
 
-function send(req: IncomingMessage, res: ServerResponse, status: number, body: unknown): void {
+function send(
+	req: IncomingMessage,
+	res: ServerResponse,
+	status: number,
+	body: unknown,
+	code = 'fixture'
+): void {
 	res.writeHead(status, {
 		'Content-Type': 'application/json',
 		'Access-Control-Allow-Origin': req.headers.origin ?? '*',
@@ -129,7 +135,7 @@ function send(req: IncomingMessage, res: ServerResponse, status: number, body: u
 		JSON.stringify({
 			ok,
 			data: ok ? body : null,
-			error: ok ? null : { code: 'fixture', message: String(body) }
+			error: ok ? null : { code, message: String(body) }
 		})
 	);
 }
@@ -188,10 +194,25 @@ function espnLineup(): LineupAdvice {
 	};
 }
 
-/** The ESPN league's waivers: the claim open, the verb ESPN's league page. */
+/** The shape of a host id the claim route takes (api hostmoves checkClaim). */
+const HOST_ID = /^-?[0-9]{1,12}$/;
+/** The API's words for a claim whose add it cannot name (hostmoves claimFormWords). */
+const CLAIM_FORM_WORDS = 'Send the claim from the waivers screen.';
+
+/** The ESPN league's waivers, as the API answers an ESPN league: each add named by his board id
+ * (ESPN's own), the claim open, the verb ESPN's league page. A defense needs ESPN's D/ST id, which
+ * the fixture does not carry, so it keeps no host id and its Add stays the host's page. */
 function espnWaivers(position: string | null): WaiverAdvice {
+	const named = waiversAt(position);
+	const withId = (row: WaiverAdvice['rows'][number]): WaiverAdvice['rows'][number] => {
+		const board = row.add.player.board_id ?? '';
+		const hostId = row.add.player.position !== 'DEF' && HOST_ID.test(board) ? board : '';
+		return { ...row, add: { ...row.add, player: { ...row.add.player, host_id: hostId } } };
+	};
 	return {
-		...waiversAt(position),
+		...named,
+		rows: named.rows.map(withId),
+		best: named.best ? withId(named.best) : null,
 		host_waivers_url: ESPN_LEAGUE_URL,
 		moves: { claim: 'available', note: null }
 	};
@@ -227,7 +248,7 @@ function claimAnswer(
 			confirm: 'fixture-token',
 			expires_at: new Date(Date.now() + HOLD_MS).toISOString(),
 			host_url: ESPN_LEAGUE_URL,
-			bid: bids ? { amount, ...CLAIM_BUDGET } : null
+			bid: bids ? { amount, ...CLAIM_BUDGET, left_known: true } : null
 		};
 	}
 	return {
@@ -330,6 +351,13 @@ async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> 
 	const moved = MOVES.exec(url.pathname);
 	if (moved && req.method === 'POST') {
 		const body = await bodyOf(req);
+		const move = (moved[2] !== undefined ? body : (body as { move?: unknown } | null)?.move) as
+			HostMoveInput | undefined;
+		// The API's own form check: an add it cannot name is refused before anything is read.
+		if (move?.kind === 'claim' && !HOST_ID.test(move.claim?.add ?? '')) {
+			send(req, res, HTTP.badRequest, CLAIM_FORM_WORDS, 'invalid');
+			return;
+		}
 		send(req, res, HTTP.ok, moveAnswer(moved[1] ?? '', moved[2] !== undefined, body));
 		return;
 	}
@@ -341,7 +369,7 @@ async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> 
 			return;
 		}
 		if (id === NO_TEAM) {
-			send(req, res, HTTP.notFound, NO_TEAM_WORDS);
+			send(req, res, HTTP.notFound, NO_TEAM_WORDS, 'team_not_read');
 			return;
 		}
 		if (id === SLOW) await new Promise((resolve) => setTimeout(resolve, HOLD_MS));
