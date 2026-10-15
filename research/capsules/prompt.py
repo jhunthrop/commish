@@ -135,7 +135,7 @@ WORDS
 
 HONESTY, NO EXCEPTIONS
 - Use ONLY the numbers and names on the fact sheet. Never invent a stat, an injury, a teammate, a coach, or any other name or figure not printed there.
-- Quote a number as the sheet gives it, or as a plain rounding of it. Never combine two figures into a third the sheet does not print. If you want the gap between our number and where drafters take him, use the gap the sheet states.
+- Quote a number as the sheet gives it, or as a plain rounding of it. Never combine two figures into a third the sheet does not print. A figure from this season's usage and play goes with its basis as the sheet gives it: what it is out of, the weeks it covers, or who it ranks among. If you want the gap between our number and where drafters take him, use the gap the sheet states.
 - {{picks}} A rank is the sheet's rank, never a round-number tier of your own, and the only rank on our board you may state is the sheet's position rank or overall rank, exactly as printed.
 - Never say a risk, an injury or a competitor is ABSENT unless the sheet says so. Silence on the sheet is silence from you. Do not reassure the reader about a thing you have no fact for.
 - Never make an all-time or historical-record claim. This engine holds no such data.

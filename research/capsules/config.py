@@ -9,6 +9,12 @@ is the oracle's and is not restated; the voice rules live in `voice_rules.py`.
 from dataclasses import dataclass
 from typing import Final
 
+from research.pipeline.nflverse.ngs import NGS_SOURCE
+from research.pipeline.nflverse.participation import NflverseSource
+from research.pipeline.nflverse.pbp import PBP_PLAYER_SOURCE
+from research.pipeline.nflverse.pbp_passers import PBP_PASSER_SOURCE
+from research.pipeline.nflverse.pfr_advstats import PFR_SOURCE
+
 CAPSULE_MODEL: Final = "zai/glm-5.3-flash"
 _GATEWAY_CALLS_PER_MINUTE: Final = 12
 
@@ -153,6 +159,22 @@ class CapsuleConfig:
     sweep_generation_budget: int = 1000
     # Zero: every gateway call is spaced at `gateway.min_call_spacing_ms`, which paces the sweep.
     sweep_pacing_ms: int = 0
+    # The licence gate, one per source: the stores whose figures may reach the writer's sheet (this
+    # season's usage and play, `facts.season_usage`). A counsel ruling on any one is a flip here.
+    # - On: nflverse's own play-by-play and weekly stats (CC-BY 4.0), and Next Gen Stats (the NFL's
+    #   data) and PFR advanced stats (Pro Football Reference's), whose nflverse releases state no
+    #   licence: flagged for counsel in the Lane 23 report and `docs/research/data-sources.md`.
+    # - Off: FTN Data's charting (contested catches, blitz rate, interception-worthy throws), CC-BY-SA
+    #   4.0 with attribution "must be made to FTN Data via nflverse"; the page carries no such credit,
+    #   and the share-alike term is unruled for a paid page. The ingest stores every source either way.
+    sources_on_pages: frozenset[str] = frozenset({
+        PBP_PLAYER_SOURCE,
+        PBP_PASSER_SOURCE,
+        NflverseSource.PLAYER_WEEK,
+        NflverseSource.SNAP_COUNTS,
+        NGS_SOURCE,
+        PFR_SOURCE,
+    })  # fmt: skip
 
     def unwritten_line(self, *, in_season: bool) -> UnwrittenLine:
         """The line in use for a run: in season from the season's first kickoff on, preseason before."""

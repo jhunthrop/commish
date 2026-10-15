@@ -21,7 +21,7 @@ from research.pipeline.jscompat import js_locale_compare, js_string
 from research.pipeline.nflverse.client import NflverseClient
 from research.pipeline.nflverse.config import PUBLICATION_LAG_HOURS, Releases
 from research.pipeline.nflverse.csv import CsvRow
-from research.pipeline.nflverse.pbp import _identifier, _sign, flag, number_or_null
+from research.pipeline.nflverse.pbp import _sign, flag, identifier, number_or_null
 from research.pipeline.nflverse.schedule import kickoff_as_of
 from research.pipeline.nflverse.stat_lines import STAT_FIELDS, SeasonStatLine, stat_line_observations
 from research.pipeline.nflverse.universe_reads import all_positions
@@ -83,25 +83,25 @@ class DerivedStatLineAggregator:
         if season is None or week is None or flag(row, "two_point_attempt"):
             return
         game_date = row.get("game_date") or ""
-        passer = _identifier(row, "passer_player_id")
+        passer = identifier(row, "passer_player_id")
         if passer is not None:
             totals = self._tally(season, week, passer, game_date).totals
             totals["passingYards"] += _or_zero(number_or_null(row, "passing_yards"))
             totals["passingTouchdowns"] += 1 if flag(row, "pass_touchdown") else 0
             totals["interceptions"] += 1 if flag(row, "interception") else 0
-        rusher = _identifier(row, "rusher_player_id")
+        rusher = identifier(row, "rusher_player_id")
         if rusher is not None and flag(row, "rush_attempt") and not flag(row, "qb_kneel"):
             totals = self._tally(season, week, rusher, game_date).totals
             totals["rushingYards"] += _or_zero(number_or_null(row, "rushing_yards"))
             totals["rushingTouchdowns"] += 1 if flag(row, "rush_touchdown") else 0
-        receiver = _identifier(row, "receiver_player_id")
+        receiver = identifier(row, "receiver_player_id")
         if receiver is not None and row.get("play_type") == "pass":
             totals = self._tally(season, week, receiver, game_date).totals
             totals["receivingYards"] += _or_zero(number_or_null(row, "receiving_yards"))
             totals["receptions"] += 1 if flag(row, "complete_pass") else 0
             totals["receivingTouchdowns"] += 1 if flag(row, "pass_touchdown") else 0
         if flag(row, "fumble_lost"):
-            fumbler = _identifier(row, "fumbled_1_player_id")
+            fumbler = identifier(row, "fumbled_1_player_id")
             if fumbler is not None:
                 self._tally(season, week, fumbler, game_date).totals["fumblesLost"] += 1
 
