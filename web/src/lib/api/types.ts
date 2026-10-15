@@ -2512,8 +2512,10 @@ export interface components {
 			name: string;
 			owner: string;
 			record: components['schemas']['TradeRecord'];
-			/** @description at most 10, best for the drafter first */
+			/** @description at most 10: the trades their lineup gains 0.5 a week or more from first, then the close calls for them, each group best for the drafter first */
 			trades: components['schemas']['TradeRow'][];
+			/** @description one sentence when every trade found with this team is a close call for them, else null */
+			note: string | null;
 		};
 		TradeAdvice: {
 			week: number;

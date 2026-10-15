@@ -2467,12 +2467,15 @@ type TradeRow struct {
 
 // TradeTeam defines model for TradeTeam.
 type TradeTeam struct {
-	Name     string      `json:"name"`
+	Name string `json:"name"`
+
+	// Note one sentence when every trade found with this team is a close call for them, else null
+	Note     *string     `json:"note"`
 	Owner    string      `json:"owner"`
 	Record   TradeRecord `json:"record"`
 	RosterId int         `json:"roster_id"`
 
-	// Trades at most 10, best for the drafter first
+	// Trades at most 10: the trades their lineup gains 0.5 a week or more from first, then the close calls for them, each group best for the drafter first
 	Trades []TradeRow `json:"trades"`
 }
 

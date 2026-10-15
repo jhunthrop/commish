@@ -211,6 +211,10 @@ func WaiversBasis(b OrderBasis, s apitypes.LeagueSettings) string {
 		numberWords(b), basisTail(s))
 }
 
+// OnlyCloseCalls is a team's line when every trade found with it is a
+// close call for them.
+const OnlyCloseCalls = "Every trade we found with this team is a close call for them."
+
 // TradesBasis is the trade finder's (§6.3).
 func TradesBasis(b OrderBasis, s apitypes.LeagueSettings) string {
 	return fmt.Sprintf("Trades where both lineups gain on %s. The other team decides. %s", numberWords(b), basisTail(s))

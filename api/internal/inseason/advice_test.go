@@ -153,6 +153,24 @@ func TestTradeAdvice(t *testing.T) {
 	if any == 0 {
 		t.Fatal("no trade in a twelve-team league")
 	}
+	for _, team := range out.Teams {
+		close := 0
+		for _, tr := range team.Trades {
+			if tr.CloseForThem {
+				close++
+			}
+		}
+		only := close > 0 && close == len(team.Trades)
+		if (team.Note != nil) != only {
+			t.Fatalf("team %d: %d of %d close, note %v", team.RosterId, close, len(team.Trades), team.Note)
+		}
+		if team.Note != nil && *team.Note != OnlyCloseCalls {
+			t.Fatalf("note %q", *team.Note)
+		}
+		if len(team.Trades) > 0 && team.Trades[0].CloseForThem && !only {
+			t.Fatalf("team %d leads with a close call", team.RosterId)
+		}
+	}
 	focus := *f.league.Player(mine[3]).BoardId
 	narrowed, _ := a.Trades(a.hostIDOf(focus))
 	for _, team := range narrowed.Teams {

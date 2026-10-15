@@ -348,9 +348,17 @@ func (a *advisor) Trades(focus string) (apitypes.TradeAdvice, bool) {
 		theirs := a.active(t)
 		row := apitypes.TradeTeam{RosterId: t.RosterID, Name: t.Name, Owner: t.Owner,
 			Record: apitypes.TradeRecord{Wins: t.Wins, Losses: t.Losses, Ties: t.Ties}, Trades: []apitypes.TradeRow{}}
+		close := 0
 		for _, tr := range Trades(a.config, squad, a.squad(theirs, false), focus, TradesPerTeam) {
 			row.Trades = append(row.Trades, apitypes.TradeRow{Give: lines(mine, tr.Give), Get: lines(theirs, tr.Get),
-				MyGain: roundTenth(tr.MyGain), TheirGain: roundTenth(tr.TheirGain), CloseForThem: roundTenth(tr.TheirGain) < CloseCall})
+				MyGain: roundTenth(tr.MyGain), TheirGain: roundTenth(tr.TheirGain), CloseForThem: tr.CloseForThem()})
+			if tr.CloseForThem() {
+				close++
+			}
+		}
+		if close > 0 && close == len(row.Trades) {
+			note := OnlyCloseCalls
+			row.Note = &note
 		}
 		out.Teams = append(out.Teams, row)
 	}

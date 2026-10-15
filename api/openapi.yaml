@@ -2859,7 +2859,7 @@ components:
         close_for_them: { type: boolean, description: their gain is under 0.5 a week }
     TradeTeam:
       type: object
-      required: [roster_id, name, owner, record, trades]
+      required: [roster_id, name, owner, record, trades, note]
       properties:
         roster_id: { type: integer }
         name: { type: string }
@@ -2867,8 +2867,14 @@ components:
         record: { $ref: "#/components/schemas/TradeRecord" }
         trades:
           type: array
-          description: at most 10, best for the drafter first
+          description: >-
+            at most 10: the trades their lineup gains 0.5 a week or more from first, then the close calls for them,
+            each group best for the drafter first
           items: { $ref: "#/components/schemas/TradeRow" }
+        note:
+          type: string
+          nullable: true
+          description: one sentence when every trade found with this team is a close call for them, else null
     TradeAdvice:
       type: object
       required: [week, basis, order_basis, refreshed, read_at, teams, host_trades_url]

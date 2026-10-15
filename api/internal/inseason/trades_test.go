@@ -68,8 +68,11 @@ func TestTradesHelpBothLineups(t *testing.T) {
 		t.Fatalf("trades %v miss m-rb3 for t-wr4", seen)
 	}
 	for i := 1; i < len(got); i++ {
-		if got[i].MyGain > got[i-1].MyGain {
+		if got[i].CloseForThem() == got[i-1].CloseForThem() && got[i].MyGain > got[i-1].MyGain {
 			t.Fatalf("not ordered by the member's gain at %d", i)
+		}
+		if got[i-1].CloseForThem() && !got[i].CloseForThem() {
+			t.Fatalf("a close call for them leads a trade they gain from at %d", i)
 		}
 	}
 }
@@ -184,5 +187,24 @@ func TestTradeGainsIgnoreThisWeek(t *testing.T) {
 			t.Fatalf("trade %d: %s %v, healthy %s %v", i, tradeWords(got[i], bye, theirs), got[i].MyGain,
 				tradeWords(healthy[i], bye, theirs), healthy[i].MyGain)
 		}
+	}
+}
+
+// The trades the other team gains from lead, by the member's gain; the
+// close calls for them follow, by the member's gain too (H3).
+func TestTradesLeadWithOnesTheyGainFrom(t *testing.T) {
+	trades := []Trade{{MyGain: 4.5, TheirGain: 0.04}, {MyGain: 1.5, TheirGain: 0.6}, {MyGain: 2, TheirGain: 1},
+		{MyGain: 3, TheirGain: 0.44}, {MyGain: 1, TheirGain: 0.46}}
+	orderTrades(trades)
+	var got []string
+	for _, tr := range trades {
+		got = append(got, fmt.Sprintf("%.1f/%.2f", tr.MyGain, tr.TheirGain))
+	}
+	want := "2.0/1.00 1.5/0.60 1.0/0.46 4.5/0.04 3.0/0.44"
+	if strings.Join(got, " ") != want {
+		t.Fatalf("order %v, want %s", got, want)
+	}
+	if (Trade{TheirGain: 0.46}).CloseForThem() || !(Trade{TheirGain: 0.44}).CloseForThem() {
+		t.Fatal("a close call is judged on the gain a page prints")
 	}
 }

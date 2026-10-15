@@ -61,11 +61,31 @@ func (s tradeSide) at(list []int, buf []*Candidate) []*Candidate {
 	return buf
 }
 
+// CloseForThem is a trade whose gain to the other side, as a page prints
+// it, is under CloseCall.
+func (t Trade) CloseForThem() bool { return roundTenth(t.TheirGain) < CloseCall }
+
+// orderTrades puts the trades the other side gains from first and the
+// close calls for them after, each group by the member's gain, then by
+// theirs: the first trade a page shows is one the other team can accept.
+func orderTrades(trades []Trade) {
+	sort.SliceStable(trades, func(i, j int) bool {
+		a, b := trades[i], trades[j]
+		if a.CloseForThem() != b.CloseForThem() {
+			return !a.CloseForThem()
+		}
+		if a.MyGain != b.MyGain {
+			return a.MyGain > b.MyGain
+		}
+		return a.TheirGain > b.TheirGain
+	})
+}
+
 // Trades is §6.2's search between the member's squad and one other team's:
 // exact over every one-for-one and two-for-one pair both ways at the
 // skill positions, a trade kept when both lineups gain and both still
 // fill every slot. focus, when set, keeps only trades holding that
-// player (either side's id). The best limit trades by the member's gain.
+// player (either side's id). The best limit trades in orderTrades' order.
 func Trades(config []draft.SlotConfig, mine, theirs Squad, focus string, limit int) []Trade {
 	f := newFiller(Slots(config))
 	me, them := newSide(f, mine, true), newSide(f, theirs, false)
@@ -102,12 +122,7 @@ func Trades(config []draft.SlotConfig, mine, theirs Squad, focus string, limit i
 			try([]int{g}, pair)
 		}
 	}
-	sort.SliceStable(out, func(i, j int) bool {
-		if out[i].MyGain != out[j].MyGain {
-			return out[i].MyGain > out[j].MyGain
-		}
-		return out[i].TheirGain > out[j].TheirGain
-	})
+	orderTrades(out)
 	if len(out) > limit {
 		out = out[:limit]
 	}
