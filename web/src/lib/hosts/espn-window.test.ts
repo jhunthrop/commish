@@ -1,25 +1,60 @@
-// The ESPN sign-in window hands Disney's answer to the site's origin alone, and runs nowhere else
-// but the workers.dev origin: run with `npm test`.
+// The ESPN sign-in window hands Disney's answer to the site's origin alone, runs nowhere else but
+// the workers.dev origin, and hands over an existing Disney session the way it hands over a fresh
+// sign-in: run with `npm test`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { Script } from 'node:vm';
 import { ESPN_SIGN_IN_ORIGIN, SITE_ORIGIN } from '../site/origins.ts';
-import { MESSAGE_KIND, popupMain, popupSource, type PopupWindow } from './espn-window.ts';
+import { findSession } from './espn-session.ts';
+import {
+	ALREADY_SIGNED_IN_LINE,
+	MESSAGE_KIND,
+	popupMain,
+	popupSource,
+	type PopupWidget,
+	type PopupWindow
+} from './espn-window.ts';
+
+const SWID = '{00000001-0000-4000-8000-000000000001}';
+const S2 = 'AEB'.repeat(30);
+const GUEST_WITH_SESSION = { profile: { swid: SWID }, s2: S2 };
+const GUEST_WITHOUT_S2 = { profile: { swid: SWID } };
+const SETUP = {
+	siteOrigin: SITE_ORIGIN,
+	signInOrigin: ESPN_SIGN_IN_ORIGIN,
+	find: findSession,
+	alreadySignedInLine: ALREADY_SIGNED_IN_LINE
+};
+
+interface Posted {
+	readonly message: Record<string, unknown>;
+	readonly target: string;
+}
+
+interface ScriptTag {
+	src: string;
+	onload: (() => void) | null;
+	onerror: (() => void) | null;
+}
 
 interface Rig {
 	readonly win: PopupWindow;
-	readonly posted: { message: unknown; target: string }[];
-	readonly appended: unknown[];
+	readonly posted: Posted[];
+	readonly appended: ScriptTag[];
+	readonly line: { textContent: string | null };
 	click: () => void;
 	closed: boolean;
 }
 
 function rig(origin: string): Rig {
-	const posted: { message: unknown; target: string }[] = [];
-	const appended: unknown[] = [];
+	const posted: Posted[] = [];
+	const appended: ScriptTag[] = [];
+	const line = { textContent: '' as string | null };
 	let onClick: () => void = () => undefined;
 	const state: Rig = {
 		posted,
 		appended,
+		line,
 		closed: false,
 		click: () => {
 			onClick();
@@ -27,34 +62,126 @@ function rig(origin: string): Rig {
 		win: {
 			opener: {
 				closed: false,
-				postMessage: (message, target) => posted.push({ message, target })
+				postMessage: (message, target) => {
+					posted.push({ message: message as Record<string, unknown>, target });
+				}
 			},
 			location: { origin },
 			close: () => {
 				state.closed = true;
 			},
 			document: {
-				getElementById: (id) => ({
-					textContent: '',
-					addEventListener: (_event, handler) => {
-						if (id === 'close') onClick = handler;
-					}
-				}),
-				createElement: () => ({ src: '', onload: null, onerror: null }),
-				head: { appendChild: (node) => appended.push(node) }
+				getElementById: (id) =>
+					id === 'line'
+						? Object.assign(line, { addEventListener: () => undefined })
+						: {
+								textContent: '',
+								addEventListener: (_event, handler) => {
+									if (id === 'close') onClick = handler;
+								}
+							},
+				createElement: () => {
+					const script: ScriptTag = { src: '', onload: null, onerror: null };
+					appended.push(script);
+					return script;
+				},
+				head: { appendChild: () => undefined }
 			}
 		}
 	};
 	return state;
 }
 
+interface WidgetScript {
+	readonly loggedIn: boolean;
+	/** What getGuest answers, call by call; the last answer repeats. */
+	readonly guests: readonly unknown[];
+	readonly launchRejects?: unknown;
+	readonly initRejects?: unknown;
+}
+
+interface WidgetRig {
+	readonly widget: PopupWidget;
+	readonly calls: string[];
+	readonly getGuestArgs: unknown[][];
+	emit: (event: string, data?: unknown) => void;
+}
+
+function stubWidget(script: WidgetScript): WidgetRig {
+	const calls: string[] = [];
+	const getGuestArgs: unknown[][] = [];
+	const handlers = new Map<string, ((data: unknown) => void)[]>();
+	const emit = (event: string, data?: unknown): void => {
+		for (const handler of handlers.get(event) ?? []) handler(data);
+	};
+	let guestCall = 0;
+	const widget: PopupWidget = {
+		init: () => {
+			calls.push('init');
+			// Disney's widget rejects with plain objects ({ errorCategory, errorCodes }), never an Error.
+			// eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors
+			if (script.initRejects !== undefined) return Promise.reject(script.initRejects);
+			return Promise.resolve({ loggedIn: script.loggedIn, guest: null });
+		},
+		launchLogin: () => {
+			calls.push('launchLogin');
+			// eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors
+			if (script.launchRejects !== undefined) return Promise.reject(script.launchRejects);
+			return Promise.resolve();
+		},
+		logout: () => {
+			calls.push('logout');
+			emit('logout', 'unknown');
+			return Promise.resolve();
+		},
+		getGuest: (...args: unknown[]) => {
+			calls.push('getGuest');
+			getGuestArgs.push(args);
+			const answer = script.guests[Math.min(guestCall, script.guests.length - 1)];
+			guestCall += 1;
+			return Promise.resolve(answer);
+		},
+		on: (event, handler) => {
+			handlers.set(event, [...(handlers.get(event) ?? []), handler]);
+		}
+	};
+	return { widget, calls, getGuestArgs, emit };
+}
+
+/** Runs the window with a stubbed Disney widget and lets its promises settle. */
+async function run(script: WidgetScript): Promise<{ r: Rig; w: WidgetRig }> {
+	const r = rig(ESPN_SIGN_IN_ORIGIN);
+	const w = stubWidget(script);
+	popupMain(r.win, SETUP);
+	r.win.OneID = { get: () => w.widget };
+	r.appended[0]?.onload?.();
+	await settle();
+	return { r, w };
+}
+
+async function settle(): Promise<void> {
+	for (let i = 0; i < 20; i += 1) await Promise.resolve();
+}
+
+function finals(r: Rig): Posted[] {
+	return r.posted.filter((p) => p.message.outcome !== 'seen');
+}
+
+/** The window's one last message. */
+function handedOver(r: Rig): Posted {
+	const [last, ...more] = finals(r);
+	assert.ok(last, 'the window sent its last message');
+	assert.equal(more.length, 0, 'the window sent one last message');
+	return last;
+}
+
 void test('on the sign-in origin the window loads Disney and hands its outcome to the site alone', () => {
 	const r = rig(ESPN_SIGN_IN_ORIGIN);
-	popupMain(r.win, SITE_ORIGIN, ESPN_SIGN_IN_ORIGIN);
+	popupMain(r.win, SETUP);
 	assert.equal(r.appended.length, 1);
 	r.click();
 	assert.deepEqual(r.posted, [
-		{ message: { kind: MESSAGE_KIND, outcome: 'closed' }, target: SITE_ORIGIN }
+		{ message: { kind: MESSAGE_KIND, outcome: 'closed', seen: [] }, target: SITE_ORIGIN }
 	]);
 	assert.equal(r.closed, true);
 });
@@ -62,13 +189,83 @@ void test('on the sign-in origin the window loads Disney and hands its outcome t
 void test('on any other origin, the site among them, the window loads nothing', () => {
 	for (const origin of [SITE_ORIGIN, 'https://evil.example']) {
 		const r = rig(origin);
-		popupMain(r.win, SITE_ORIGIN, ESPN_SIGN_IN_ORIGIN);
+		popupMain(r.win, SETUP);
 		assert.equal(r.appended.length, 0, origin);
 	}
 });
 
-void test('the served script names both origins and never a wildcard target', () => {
+void test('a guest already signed in is handed over from the widget, with no sign-in form', async () => {
+	const { r, w } = await run({ loggedIn: true, guests: [GUEST_WITH_SESSION] });
+	assert.deepEqual(w.calls, ['init', 'getGuest']);
+	assert.deepEqual(w.getGuestArgs[0], [true, { forceRefresh: true }]);
+	const handed = handedOver(r);
+	assert.equal(handed.target, SITE_ORIGIN);
+	assert.equal(handed.message.outcome, 'signed-in');
+	assert.deepEqual(handed.message.seen, ['init-signed-in']);
+	assert.deepEqual(findSession(handed.message.payload), { swid: SWID, s2: S2 });
+	assert.equal(r.closed, true);
+});
+
+void test('a guest already signed in whose session the widget keeps is signed out and asked to sign in', async () => {
+	const { r, w } = await run({
+		loggedIn: true,
+		guests: [GUEST_WITHOUT_S2, GUEST_WITH_SESSION]
+	});
+	assert.deepEqual(w.calls, ['init', 'getGuest', 'logout', 'launchLogin']);
+	assert.equal(r.line.textContent, ALREADY_SIGNED_IN_LINE);
+	assert.equal(finals(r).length, 0, 'nothing final while the form is up');
+	assert.equal(r.closed, false);
+
+	w.emit('login', { token: {} });
+	await settle();
+	const handed = handedOver(r);
+	assert.equal(handed.message.outcome, 'signed-in');
+	assert.deepEqual(handed.message.seen, ['init-signed-in', 'logout', 'login']);
+	assert.deepEqual(findSession(handed.message.payload), { swid: SWID, s2: S2 });
+});
+
+void test('a guest signed out gets the form, and signing in hands the session over', async () => {
+	const { r, w } = await run({ loggedIn: false, guests: [GUEST_WITH_SESSION] });
+	assert.deepEqual(w.calls, ['init', 'launchLogin']);
+	assert.equal(finals(r).length, 0);
+	w.emit('login', { token: {} });
+	await settle();
+	const handed = handedOver(r);
+	assert.equal(handed.message.outcome, 'signed-in');
+	assert.deepEqual(handed.message.seen, ['init-signed-out', 'login']);
+	assert.deepEqual(findSession(handed.message.payload), { swid: SWID, s2: S2 });
+});
+
+void test("a widget refusal is handed over as an error in the widget's own words", async () => {
+	const { r } = await run({
+		loggedIn: false,
+		guests: [null],
+		launchRejects: { errorCategory: 'FAILURE_BY_DESIGN', errorCodes: 'Session already established' }
+	});
+	const handed = handedOver(r);
+	assert.deepEqual(handed.message, {
+		kind: MESSAGE_KIND,
+		outcome: 'error',
+		reason: 'Session already established',
+		seen: ['init-signed-out']
+	});
+	assert.equal(r.closed, true);
+});
+
+void test('every widget event is posted as it is seen, without its data', async () => {
+	const { r, w } = await run({ loggedIn: false, guests: [null] });
+	w.emit('error', { secret: 'never posted' });
+	const progress = r.posted.filter((p) => p.message.outcome === 'seen');
+	assert.deepEqual(
+		progress.map((p) => p.message.seen),
+		[['init-signed-out'], ['init-signed-out', 'error']]
+	);
+	assert.ok(!JSON.stringify(r.posted).includes('never posted'));
+});
+
+void test('the served script runs, names both origins and never a wildcard target', () => {
 	const source = popupSource();
+	assert.doesNotThrow(() => new Script(source));
 	assert.ok(source.includes(JSON.stringify(SITE_ORIGIN)));
 	assert.ok(source.includes(JSON.stringify(ESPN_SIGN_IN_ORIGIN)));
 	assert.ok(!source.includes("'*'") && !source.includes('"*"'));
