@@ -28,9 +28,10 @@ from research.capsules.spans import SpanRules, page_runs, spans_of
 class BoardSentences:
     """THE BOARD'S HELD SENTENCES as tonight leaves them, shared by every writer thread of a sweep:
     each written page's sentences (both reads, `min_words` long or longer), starting from the store
-    and moved as each page is committed. A span repair's rewrite claims its sentences exclusively
+    and moved as each page is committed. Every rewrite of chosen pages (any `SweepPlan.only` pass: the
+    shared-sentence repair, the graced rewrite and the span repair) claims its sentences exclusively
     (`claim(..., exclusive=True)`): a rewrite that would land a sentence another page already carries
-    is refused and the page keeps its written read, so a span repair can never make a shared
+    is refused and the page keeps its written read, so no rewrite can ever make a shared
     sentence (the production rerun of 2026-10-15 went from 13 to 39 shared sentences while its span
     repair rewrote 509 pages). Every other write records its sentences as it commits."""
 

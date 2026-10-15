@@ -27,6 +27,9 @@ class Retry:
     max_attempts: int = 2
     base_delay_ms: int = 1_500
     rate_limit_backoff_ms: tuple[int, ...] = (20_000, 40_000, 80_000)
+    # The longest `retry-after` a call waits out (the review's M1): honoured however long up to here,
+    # past it the call fails with the reason rather than tying up a writer slot for longer.
+    retry_after_cap_ms: int = 300_000
 
 
 @dataclass(frozen=True, slots=True)
@@ -46,6 +49,8 @@ class Gateway:
     # a safety valve, not a pace.
     concurrency: int = 16
     calls_per_minute: int = 600
+    # The widest pool a run may ask for: each slot holds a database connection (`db.engine.pooled_like`).
+    max_concurrency: int = 64
     model_variable: str = "CAPSULE_MODEL"
     concurrency_variable: str = "CAPSULE_CONCURRENCY"
     calls_per_minute_variable: str = "CAPSULE_CALLS_PER_MINUTE"
@@ -232,7 +237,7 @@ class WriterSettings:
         )
 
 
-def _positive(environ: Mapping[str, str], variable: str, default: int) -> int:
+def _positive(environ: Mapping[str, str], variable: str, default: int, maximum: int | None = None) -> int:
     raw = environ.get(variable, "").strip()
     if not raw:
         return default
@@ -242,6 +247,8 @@ def _positive(environ: Mapping[str, str], variable: str, default: int) -> int:
         raise ConfigurationError(f"{variable} must be a whole number, got {raw!r}.") from None
     if value < 1:
         raise ConfigurationError(f"{variable} must be at least 1, got {value}.")
+    if maximum is not None and value > maximum:
+        raise ConfigurationError(f"{variable} must be at most {maximum}, got {value}.")
     return value
 
 
@@ -252,7 +259,7 @@ def writer_settings(environ: Mapping[str, str], gateway: Gateway = CAPSULE_CONFI
     providers = tuple(p.strip() for p in environ.get(gateway.providers_variable, "").split(",") if p.strip())
     return WriterSettings(
         model,
-        _positive(environ, gateway.concurrency_variable, gateway.concurrency),
+        _positive(environ, gateway.concurrency_variable, gateway.concurrency, gateway.max_concurrency),
         _positive(environ, gateway.calls_per_minute_variable, gateway.calls_per_minute),
         providers,
     )

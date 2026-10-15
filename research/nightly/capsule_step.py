@@ -7,7 +7,7 @@ The order, and why each pass exists:
    to replace the oracle-era rows (their prose template and their repeated verdict sentences).
 2. **The sweep** (`capsules.sweep`): every page whose facts moved, whose row is missing or whose row
    the writer did not write, within the night's budget. Each writer call in every pass is told the
-   six-word spans the pass's latest pages already share (`spans.TonightSpans`), so tonight's
+   six-word spans the pass's latest pages already share (`landing.TonightWindow`), so tonight's
    collisions are avoided as they are written; the span rules are built once for the night.
 3. **The retry passes** (up to `RETRY_PASSES`): another attempt at the pages still unwritten (facts blocks), from the budget
    left, because a throttled or refused read often succeeds on a second try.
@@ -21,12 +21,16 @@ The order, and why each pass exists:
    b. the hard targets: every page but the first in board order of each shared sentence, and every
       page failing its page gate;
    c. the retry of any page a hard rewrite left blocked;
-   d. on every attempt but the last, the span targets, widest span first, a rewrite that cannot pass
+   d. on every attempt but the last, the span targets, the pages carrying the most shared spans
+      first, within the night's span cap (`span_repair_pages_per_night`), a rewrite that cannot pass
       its validator keeping the page's written read. The last attempt never rewrites for spans, so
       nothing after it can make a failure, and a page a span rewrite left unwritten is retried at the
       next attempt's (a) before any further span rewrite.
-   The first page keeps a shared sentence or span, so each attempt strictly shrinks the set.
-5. **The capsule gate** (`capsule_gate`), judged once more after the last attempt: the step's verdict.
+   The first page keeps a shared sentence or span, so each attempt strictly shrinks the set. No
+   rewrite of chosen pages may land a sentence another page carries (`landing.BoardSentences`).
+5. **The graced rewrite**: a page still carrying a shared sentence after the last attempt takes one
+   more generation, past the night's call ceiling once (the coordinator's ruling of 2026-10-15).
+6. **The capsule gate** (`capsule_gate`), judged once more after the graced rewrite: the step's verdict.
 
 Every pass keeps the writer's pool full (`gateway.GatewayClient.rolling`: a slot refilled the moment its page
 lands, each page told the spans of every page landed before it started, and checked as it lands against the
@@ -36,9 +40,14 @@ order, since each reads what the last one stored.
 
 Every pass shares one ceiling per player for the night, `NIGHT_CALLS_PER_PLAYER` (12, two of phase C's
 six-call generations): a player who reached it is left to the next night rather than written again,
-with one exception (the coordinator's Lane 17 ruling): a page still unwritten at the ceiling may start
-one more generation that night, once, in a pass over unwritten pages (`spent_out_for`). The night's
-page budget stays the hard ceiling.
+with one exception (the coordinator's Lane 17 ruling, extended 2026-10-15): a page at the ceiling may
+start one more generation that night, once, in a graced pass: a pass over unwritten pages, or the
+graced rewrite of the pages still carrying a shared sentence (`spent_out_for`). The night's page
+budget stays the hard ceiling.
+
+The writer's settings and the model are checked before anything is written: a malformed setting, or
+a model the gateway's list (read before the first call) does not carry, fails the step there. A
+pass that raises part way still reports what the night spent (`CapsuleStepError`).
 
 Without AI_GATEWAY_API_KEY the writing passes are skipped by name (a sweep without the key would
 demote written reads to facts blocks) and the gate still judges what is stored.
@@ -53,7 +62,7 @@ from typing import Final
 import httpx
 from sqlalchemy import Engine
 
-from research.capsules.config import CAPSULE_CONFIG, writer_settings
+from research.capsules.config import CAPSULE_CONFIG, WriterSettings, writer_settings
 from research.capsules.facts.history import history_cache
 from research.capsules.gateway import GatewayClient, ModelPrice, ModelSpend, fetch_price
 from research.capsules.spans import SpanRules
@@ -62,6 +71,7 @@ from research.capsules.sweep import FactsPassMemo, SweepPlan, SweepReport, sweep
 from research.db.code_digest import code_digest
 from research.db.engine import once_more_on_disconnect, pooled_like
 from research.db.read_cache import snapshot
+from research.errors import ConfigurationError
 from research.nightly.capsule_gate import (
     CapsuleGateResult,
     board_universe_ids,
@@ -130,7 +140,7 @@ class CapsuleSpend:
         return (
             f"{self.processed} pages attempted ({self.written} written, {self.facts_blocks} facts blocks), "
             f"{self.calls} calls, {self.prompt_tokens} prompt and {self.completion_tokens} completion tokens, "
-            f"${self.cost_usd:.6f}; {self.rate_limited} calls met a 429 (the gateway's limit: {limits}); "
+            f"${self.cost_usd:.6f}, {self.rate_limited} calls met a 429 (the gateway's limit: {limits}), "
             f"{self.landed_sentences} sentences and {self.landed_spans} spans shared as pages landed, left to the repair"
         )
 
@@ -279,14 +289,15 @@ class _Passes:
             gate, order, failing = self._judged()
             targets = repair_order(gate, failing, order)
             spans = () if attempt == REPAIR_PASSES else targets.spans[: self.span_pages_left]
+            if targets.spans and not spans and attempt < REPAIR_PASSES:
+                self.log(
+                    f"capsule span repair {attempt}: tonight's span cap is spent, "
+                    f"{len(targets.spans)} span carriers left for later nights"
+                )
             if (not targets.hard and not spans) or self.left <= 0:
-                if self.left <= 0:
-                    why = "no budget left"
-                elif targets.spans and attempt < REPAIR_PASSES:
-                    why = f"tonight's span cap is spent, {len(targets.spans)} span carriers left for later nights"
-                else:
-                    why = "none needed"
-                self.log(f"capsule repair {attempt}: {why}")
+                self.log(
+                    f"capsule repair {attempt}: {'no budget left' if self.left <= 0 else 'nothing more to repair'}"
+                )
                 break
             avoid = tuple(sentence.sentence for sentence in gate.shared)
             if targets.hard:
@@ -299,7 +310,7 @@ class _Passes:
             if spans and self.left > 0:
                 name = (
                     f"capsule span repair {attempt} ({len(gate.spans)} shared spans, {len(spans)} pages of "
-                    f"{len(targets.spans)} carriers, {self.span_pages_left} left in tonight's span cap)"
+                    f"{len(targets.spans)} carriers, the span cap at {self.span_pages_left} before this pass)"
                 )
                 plan = SweepPlan(
                     self.left, only=spans, avoid=avoid, avoid_by_page=quoted_spans(gate, spans), keep_written=True
@@ -338,25 +349,59 @@ def run_capsule_step(
             "(a sweep without it would demote written reads)"
         )
     else:
-        if plan.regenerate_all:
-            log(_regenerate_all(engine, now))
-        settings = writer_settings(os.environ)
-        log(f"capsules: {settings.line()}")
-        writers = pooled_like(engine, settings.concurrency)
-        try:
-            with httpx.Client() as http:
-                gateway = GatewayClient.for_run(key, http, settings)
-                price = fetch_price(http, key, settings.model)
-                passes = _Passes(writers, gateway, now, plan, log, facts, rules=rules)
-                passes.run()
-                spend = passes.spend
-                spend.close(gateway, settings.line(), price)
-        finally:
-            writers.dispose()
+        spend = _write(engine, key, now, plan, log, facts, rules)
         log(f"capsules spent: {spend.line()}")
     gate, findings = once_more_on_disconnect(lambda: _final_judgment(engine, now, rules, facts))
     log(f"{gate.summary()}; {len(findings.by_page)} written pages fail the page gate")
     return CapsuleStepResult(gate, findings, spend, bool(key))
+
+
+class CapsuleStepError(Exception):
+    """A writing pass raised part way; `spend` is what the night spent before it (the ledger, the
+    price, the calls), so the run's report carries it with the failed step."""
+
+    def __init__(self, cause: Exception, spend: CapsuleSpend) -> None:
+        super().__init__(f"{type(cause).__name__}: {cause}")
+        self.spend = spend
+
+
+def _checked_price(http: httpx.Client, key: str, settings: WriterSettings) -> ModelPrice:
+    """The model's price from the gateway's list; a list that was read and does not carry the model
+    fails the step before any call (a typo in CAPSULE_MODEL would demote written reads board-wide).
+    A list that could not be read does not block."""
+    price = fetch_price(http, key, settings.model)
+    if price.listed is False:
+        raise ConfigurationError(
+            f"capsules: {CAPSULE_CONFIG.gateway.model_variable} names {settings.model}, which the gateway's "
+            "model list does not carry, so no call was made"
+        )
+    return price
+
+
+def _write(  # noqa: PLR0913, PLR0917 - the step's parts
+    engine: Engine, key: str, now: datetime, plan: CapsuleStepPlan, log: Log, facts: FactsPassMemo, rules: SpanRules
+) -> CapsuleSpend:
+    """The writing passes: the settings and the model checked before anything is written, then the
+    night on one pool of writers' connections; the spend closed whether the passes finish or raise."""
+    settings = writer_settings(os.environ)
+    log(f"capsules: {settings.line()}")
+    with httpx.Client() as http:
+        price = _checked_price(http, key, settings)
+        if plan.regenerate_all:
+            log(_regenerate_all(engine, now))
+        gateway = GatewayClient.for_run(key, http, settings)
+        writers = pooled_like(engine, settings.concurrency)
+        passes = _Passes(writers, gateway, now, plan, log, facts, rules=rules)
+        try:
+            passes.run()
+        except Exception as error:
+            passes.spend.close(gateway, settings.line(), price)
+            log(f"capsules spent before the failure: {passes.spend.line()}")
+            raise CapsuleStepError(error, passes.spend) from error
+        finally:
+            writers.dispose()
+        passes.spend.close(gateway, settings.line(), price)
+        return passes.spend
 
 
 def _final_judgment(

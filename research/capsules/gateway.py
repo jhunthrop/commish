@@ -2,8 +2,9 @@
 
 Ported from `research-ts/src/capsules/write.ts` (`postChatCompletion`). Every call draws a token from
 the run's bucket (`pace.TokenBucket`, `calls_per_minute`). A 429 gets its own longer backoff for the
-one call that met it (a `retry-after` the gateway sends is honoured up to that ceiling, and an
-`x-should-retry: false` ends the call); only when the gateway's rate-limit headers say the limit is
+one call that met it (a `retry-after` the gateway sends is honoured however long, up to
+`retry_after_cap_ms`, past which the call fails with the reason, and an `x-should-retry: false` ends
+the call); only when the gateway's rate-limit headers say the limit is
 spent for everyone does the whole line pause until their reset. A 5xx, a network error or an empty
 completion gets one retry, and usage the gateway billed before a failure is kept on the error, so a
 player's cost is counted whether or not his read survived.
@@ -212,6 +213,8 @@ class ModelPrice:
     input_usd_per_million: float | None
     output_usd_per_million: float | None
     basis: str
+    # Whether the list carries the model: None when the list could not be read (`fetch_price`).
+    listed: bool | None = None
 
 
 def _per_million(value: object) -> float | None:
@@ -236,13 +239,13 @@ def fetch_price(http: httpx.Client, api_key: str, model: str, config: Gateway = 
         response.raise_for_status()
         listed = _dict(response.json()).get("data")
     except (httpx.HTTPError, ValueError) as error:
-        return ModelPrice(model, None, None, f"{basis}: not read ({type(error).__name__})")
+        return ModelPrice(model, None, None, f"{basis}: not read ({type(error).__name__})", None)
     entries = [_dict(m) for m in listed] if isinstance(listed, list) else []
     entry = next((m for m in entries if m.get("id") == model), None)
     if entry is None:
-        return ModelPrice(model, None, None, f"{basis}: the list does not carry {model}")
+        return ModelPrice(model, None, None, f"{basis}: the list does not carry {model}", False)
     pricing = _dict(entry.get("pricing"))
-    return ModelPrice(model, _per_million(pricing.get("input")), _per_million(pricing.get("output")), basis)
+    return ModelPrice(model, _per_million(pricing.get("input")), _per_million(pricing.get("output")), basis, True)
 
 
 def _header(headers: Mapping[str, str], names: Sequence[str]) -> str | None:
@@ -316,13 +319,16 @@ class GatewayClient:
         lands. `start(item)` runs on the caller's thread as the item starts (so it reads the state
         every landed item left) and returns the work, run on a scoped view in a worker; `land(item,
         result)` runs on the caller's thread as each lands, in landing order. `stop` is asked before
-        each start; True ends the run once the items in flight land. Returns whether it stopped."""
+        each start; True ends the run once the items in flight land. Returns whether it stopped.
+        A worker that raises starts nothing more: every item still in flight finishes and lands
+        (its spend is tallied), then the first error is raised."""
         queue = iter(items)
+        failure: Exception | None = None
         with ThreadPoolExecutor(max_workers=max(1, self.concurrency)) as pool:
             flight: dict[Future[R], T] = {}
             stopped = False
             while True:
-                while not stopped and len(flight) < max(1, self.concurrency):
+                while failure is None and not stopped and len(flight) < max(1, self.concurrency):
                     item = next(queue, _DONE)
                     if item is _DONE:
                         break
@@ -332,23 +338,33 @@ class GatewayClient:
                     work = start(cast("T", item))
                     flight[pool.submit(work, self.scoped())] = cast("T", item)
                 if not flight:
-                    return stopped
+                    break
                 done, _ = wait(flight, return_when=FIRST_COMPLETED)
                 for future in done:
-                    land(flight.pop(future), future.result())
+                    item = flight.pop(future)
+                    try:
+                        result = future.result()
+                    except Exception as error:  # kept, and raised once the flight has landed
+                        failure = failure or error
+                        continue
+                    land(item, result)
+        if failure is not None:
+            raise failure
+        return stopped
 
     def _retry_after(self, response: httpx.Response) -> float | None:
+        """The seconds the gateway's `retry-after` asks for (a count or a date); None when absent,
+        unreadable or not in the future."""
         raw = response.headers.get("retry-after")
         if raw is None:
             return None
-        ceiling = max(self.config.retry.rate_limit_backoff_ms) / 1000
         seconds = _float(raw)
         if seconds is None:
             try:
                 seconds = parsedate_to_datetime(raw).timestamp() - time.time()
             except (TypeError, ValueError):
                 return None
-        return None if not math.isfinite(seconds) or seconds <= 0 or seconds > ceiling else seconds
+        return None if not math.isfinite(seconds) or seconds <= 0 else seconds
 
     def _line_spent_for(self, response: httpx.Response) -> float | None:
         """Seconds until the gateway's limit resets for everyone, when its rate-limit headers say the
@@ -381,19 +397,30 @@ class GatewayClient:
             self.ledger.record(CallRecord(self.model, None))
             raise
 
-    def _back_off_rate_limit(self, response: httpx.Response, attempt: int) -> bool:
-        """A 429: whether this call may try again, after its wait. The wait is this call's own
-        (`retry-after`, else the configured backoff) unless the headers say the line is spent, when
-        the bucket holds every caller until the reset."""
-        backoffs = self.config.retry.rate_limit_backoff_ms
-        if response.headers.get("x-should-retry", "").strip().lower() == "false" or attempt > len(backoffs):
-            return False
+    def _back_off_rate_limit(self, response: httpx.Response, attempt: int, billed: Usage | None) -> None:
+        """A 429: waits before this call tries again, or raises why it will not. The wait is this
+        call's own: the `retry-after` the gateway asks for, however long, up to `retry_after_cap_ms`
+        (past it the call fails with the reason), else the configured backoff. When the rate-limit
+        headers say the line is spent, the bucket holds every caller until the reset instead."""
+        retry = self.config.retry
+        backoffs = retry.rate_limit_backoff_ms
+        if response.headers.get("x-should-retry", "").strip().lower() == "false":
+            raise GenerationError("Gateway returned HTTP 429 with x-should-retry false, not retried.", True, billed)
+        if attempt > len(backoffs):
+            raise GenerationError(f"Gateway returned HTTP 429 on attempt {attempt}, not retried.", True, billed)
         line_wait = self._line_spent_for(response)
         if line_wait is not None and line_wait > 0:
             self.bucket.pause_for(line_wait)
-        else:
-            self.sleep(self._retry_after(response) or backoffs[attempt - 1] / 1000)
-        return True
+            return
+        asked = self._retry_after(response)
+        cap = retry.retry_after_cap_ms / 1000
+        if asked is not None and asked > cap:
+            raise GenerationError(
+                f"Gateway returned HTTP 429 asking to retry after {asked:.0f} s, past the {cap:.0f} s cap, not retried.",
+                True,
+                billed,
+            )
+        self.sleep(asked if asked is not None else backoffs[attempt - 1] / 1000)
 
     def complete(
         self, messages: Sequence[dict[str, str]], max_tokens: int, min_words: int = DEGENERATE_COMPLETION_WORDS
@@ -412,9 +439,8 @@ class GatewayClient:
                 raise GenerationError(f"Gateway request failed after its retry: {error}", True, billed) from None
             if response.status_code == _RATE_LIMITED:
                 self.ledger.record(CallRecord(self.model, _RATE_LIMITED))
-                if self._back_off_rate_limit(response, attempt):
-                    continue
-                raise GenerationError(f"Gateway returned HTTP 429 on attempt {attempt}, not retried.", True, billed)
+                self._back_off_rate_limit(response, attempt, billed)
+                continue
             if not response.is_success:
                 self.ledger.record(CallRecord(self.model, response.status_code))
                 if response.status_code < _SERVER_ERROR:
