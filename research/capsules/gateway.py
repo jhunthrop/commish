@@ -5,9 +5,10 @@ the run's bucket (`pace.TokenBucket`, `calls_per_minute`). A 429 gets its own lo
 one call that met it (a `retry-after` the gateway sends is honoured however long, up to
 `retry_after_cap_ms`, past which the call fails with the reason, and an `x-should-retry: false` ends
 the call); only when the gateway's rate-limit headers say the limit is
-spent for everyone does the whole line pause until their reset. A 5xx, a network error or an empty
-completion gets one retry, and usage the gateway billed before a failure is kept on the error, so a
-player's cost is counted whether or not his read survived.
+spent for everyone does the whole line pause until their reset. A 5xx, a network error, an empty
+completion or one the gateway says was cut at its token limit (`finish_reason: length`, never read
+as a whole answer: Lane 29) gets one retry, and usage the gateway billed before a failure is kept on
+the error, so a player's cost is counted whether or not his read survived.
 
 Pages are written `concurrency` at a time (`GatewayClient.rolling`): each page holds its own
 scoped view of the run's client (its own call count over the shared line, bucket and ledger). The
@@ -39,6 +40,7 @@ _THINKING_DISABLED: Final = {"thinking": {"type": "disabled"}, "reasoning_effort
 _CONTROL: Final = dict.fromkeys((*range(0, 9), 11, 12, *range(14, 32)))
 _RATE_LIMITED: Final = 429
 _SERVER_ERROR: Final = 500
+_CUT_OFF: Final = "length"
 # The rate-limit headers a gateway may answer with, in either spelling (the IETF draft's or the
 # common `x-` one). The Vercel AI Gateway sent none on Lane 24's probes; they are read when sent.
 _LIMIT_HEADERS: Final = ("x-ratelimit-limit", "ratelimit-limit")
@@ -95,6 +97,13 @@ class Completion:
     usage: Usage | None
     # The provider the gateway routed the call to (`provider_metadata.gateway.routing.finalProvider`).
     provider: str | None = None
+    # Why the completion ended (`choices[0].finish_reason`): "length" is a completion cut at its token
+    # limit, never a whole answer (Lane 29: the cause of Puka Nacua's read ending "by about").
+    finish_reason: str | None = None
+
+    @property
+    def cut_off(self) -> bool:
+        return self.finish_reason == _CUT_OFF
 
 
 def _int_or_none(value: object) -> int | None:
@@ -129,7 +138,13 @@ def _parse(raw: str) -> Completion:
         _int_or_none(raw_usage.get("total_tokens")),
         float(cost) if isinstance(cost, int | float) and not isinstance(cost, bool) else None,
     )
-    return Completion(str(content), usage, provider if isinstance(provider, str) else None)
+    finish = first.get("finish_reason")
+    return Completion(
+        str(content),
+        usage,
+        provider if isinstance(provider, str) else None,
+        finish if isinstance(finish, str) else None,
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -457,5 +472,15 @@ class GatewayClient:
                     self.sleep(retry.base_delay_ms * attempt / 1000)
                     continue
                 raise GenerationError("Gateway returned an empty completion after its retry.", True, billed)
+            if completion.cut_off:
+                billed = add_usage(billed, completion.usage)
+                if attempt < retry.max_attempts:
+                    self.sleep(retry.base_delay_ms * attempt / 1000)
+                    continue
+                raise GenerationError(
+                    f"Gateway returned a completion cut off at its token limit ({max_tokens}) after its retry.",
+                    True,
+                    billed,
+                )
             return Completion(completion.content, add_usage(billed, completion.usage), completion.provider)
         raise GenerationError("Gateway request failed.", True, billed)
