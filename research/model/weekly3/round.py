@@ -19,7 +19,7 @@ import json
 import logging
 import sys
 import time
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any, Final
@@ -48,7 +48,7 @@ from research.model.weekly3.judgment import Judgment, judge_round
 from research.model.weekly3.ledger import per_game_clause
 from research.model.weekly3.number import Fitted
 from research.model.weekly3.outcomes import fit_reader, judgment_reader
-from research.model.weekly3.preconditions import missing_preconditions, read_counts
+from research.model.weekly3.preconditions import missing_preconditions, preconditions_payload, read_counts
 
 PREREGISTRATION_COMMIT: Final = "e58ae444"
 PREREGISTRATION: Final = "docs/research/2026-10-15-weekly-projection-round3-preregistration.md"
@@ -74,19 +74,44 @@ EXPOSURE_CAVEAT: Final = (
 )
 
 
+def development_record(path: Path = DEVELOPMENT_RECORD) -> dict[str, Any] | None:
+    """The committed development check's record, or None when it is not in this tree."""
+    if not path.exists():
+        return None
+    found: dict[str, Any] = json.loads(path.read_text())
+    return found
+
+
+def stop_rule_refusal(record: Mapping[str, Any] | None) -> str | None:
+    """Why the judgment may not run under section 4's stop rule, or None when the check passed G2
+    pooled against recent form."""
+    if record is None:
+        return f"no development check record ({DEVELOPMENT_RECORD.name}); the judgment runs only after the check"
+    for line in record.get("gates", []):
+        if (line.get("gate"), line.get("subject")) == DECIDING:
+            if line.get("passed") is True:
+                return None
+            return "the stop rule (section 4): the development check failed G2 pooled against recent form; the round ended, 2024 is not judged"
+    return f"the development check record names no {DECIDING[0]} {DECIDING[1]} line"
+
+
 def thresholds_for(
     command: str,
     committed: Callable[[], bool] = lambda: preregistration_committed(PREREGISTRATION_COMMIT),
     exists: Callable[[Path], bool] = Path.exists,
+    record: Callable[[], Mapping[str, Any] | None] = development_record,
 ) -> Thresholds:
-    """The constant a command runs under, or the refusal: the judgment needs the lock in its history
-    and is taken once."""
+    """The constant a command runs under, or the refusal: the judgment needs the lock in its history,
+    a development check that passed G2 pooled (the stop rule), and is taken once."""
     if command != "judge":
         return DEVELOPMENT_CHECK
     if not committed():
         raise ConfigurationError(
             f"the preregistration's commit {PREREGISTRATION_COMMIT} is not in this tree's history; no judgment without the lock"
         )
+    refused = stop_rule_refusal(record())
+    if refused is not None:
+        raise ConfigurationError(refused)
     for taken in (JUDGMENT_CLAIM, JUDGMENT_RECORD):
         if exists(taken):
             raise ConfigurationError(f"the 2024 judgment was taken once ({taken.name}); it is never rerun")
@@ -172,16 +197,17 @@ def _run(command: str, url: str, t: Thresholds, out: Path) -> int:
     status = tree_status()
     check_round_scratch(command, url)
     version = model_version()
-    if command == "judge":
-        claim_judgment(out, version, JUDGMENT_CLAIM)
     engine = make_engine(sqlalchemy_url(url))
     try:
         with engine.connect() as conn:
             conn.execute(text("set transaction read only"))
             guard_queries(conn, closed_seasons(t))
-            missing = missing_preconditions(read_counts(conn, t), t)
+            counts = read_counts(conn, t)
+            missing = missing_preconditions(counts, t)
             if missing:
                 raise ConfigurationError("the round's preconditions are not met: " + "; ".join(missing))
+            if command == "judge":  # claimed after the preconditions, before any outcome is read
+                claim_judgment(out, version, JUDGMENT_CLAIM)
             before = table_digests(conn)
             artifacts = load_model_artifacts(conn)
             positions = all_positions(conn)
@@ -197,6 +223,7 @@ def _run(command: str, url: str, t: Thresholds, out: Path) -> int:
         log_line(line)
     extra = {
         "model_version": version,
+        "preconditions": preconditions_payload(counts, t),
         "digests": {"before": before, "after": after},
         "seconds": {**dict(fitted.seconds), "total": time.monotonic() - started},
         "report": report,

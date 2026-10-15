@@ -1,3 +1,4 @@
+# ruff: noqa: PLR2004 - the expected values are the fixture's own counts
 """Weekly round 3's preconditions (preregistration section 6): each refusal names what is missing,
 the pairing one to one with the kickoff club-weeks and symmetric, and the development check asks
 nothing of 2024."""
@@ -14,6 +15,7 @@ from research.model.weekly3.preconditions import (
     StoreCounts,
     input_seasons,
     missing_preconditions,
+    preconditions_payload,
 )
 
 _K = datetime(2023, 10, 22, tzinfo=UTC)
@@ -92,3 +94,18 @@ def test_missing_filings_and_adp_are_named() -> None:
     filings = {k: v for k, v in counts.filings.items() if k != (2024, 9)}
     found = missing_preconditions(StoreCounts(counts.inputs, filings, {2023: 188}, counts.schedules), ROUND_THREE)
     assert found == ["stamped injury filings (injury_report_status) for 2024 week 9", "ADP (ffc_adp_ppr_12) for 2024"]
+
+
+def test_the_preconditions_counts_are_written_for_the_record() -> None:
+    counts = _full(input_seasons(DEVELOPMENT_CHECK), (2021, 2022, 2023))
+    found = preconditions_payload(counts, DEVELOPMENT_CHECK)
+    assert found["missing"] == []
+    assert found["schedules"]["2023"] == {
+        "kickoff_club_weeks": 24,
+        "paired_club_weeks": 24,
+        "home_field_club_weeks": 24,
+        "asymmetric_pairings": 0,
+    }
+    assert found["inputs"]["nflverse_pbp_player|red_zone_targets|2020"] == 10
+    assert found["filings"]["2021|6"] == 5
+    assert found["adp"] == {"2023": 188, "2024": 189}

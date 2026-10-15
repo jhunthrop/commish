@@ -187,8 +187,9 @@ def test_the_judgment_is_taken_once() -> None:
             return path == found
 
         with pytest.raises(ConfigurationError, match="once"):
-            round3.thresholds_for("judge", committed=lambda: True, exists=exists)
-    assert round3.thresholds_for("judge", committed=lambda: True, exists=lambda _: False) == ROUND_THREE
+            round3.thresholds_for("judge", committed=lambda: True, exists=exists, record=_passed)
+    found = round3.thresholds_for("judge", committed=lambda: True, exists=lambda _: False, record=_passed)
+    assert found == ROUND_THREE
 
 
 def test_the_development_check_runs_the_check_constant() -> None:
@@ -256,3 +257,38 @@ def test_the_judgment_prints_the_2024_caveat_item_six_first() -> None:
 
 def test_the_lock_is_in_this_trees_history() -> None:
     assert preregistration_committed(round3.PREREGISTRATION_COMMIT)
+
+
+def _record(passed: bool) -> dict[str, object]:
+    return {
+        "gates": [
+            {"gate": "G1", "subject": "pooled vs ADP", "passed": True},
+            {"gate": "G2", "subject": "pooled vs recent form", "passed": passed},
+        ]
+    }
+
+
+def _passed() -> dict[str, object]:
+    return _record(True)
+
+
+def test_the_judgment_is_refused_when_the_check_failed_g2_pooled() -> None:
+    with pytest.raises(ConfigurationError, match="stop rule"):
+        round3.thresholds_for("judge", committed=lambda: True, exists=lambda _: False, record=lambda: _record(False))
+
+
+def test_the_judgment_is_refused_without_a_development_record() -> None:
+    with pytest.raises(ConfigurationError, match="no development check record"):
+        round3.thresholds_for("judge", committed=lambda: True, exists=lambda _: False, record=lambda: None)
+    with pytest.raises(ConfigurationError, match="names no G2"):
+        round3.thresholds_for("judge", committed=lambda: True, exists=lambda _: False, record=lambda: {"gates": []})
+
+
+def test_the_committed_round_three_check_stops_the_judgment() -> None:
+    record = round3.development_record()
+    assert record is not None
+    found = round3.stop_rule_refusal(record)
+    assert found is not None
+    assert "stop rule" in found
+    with pytest.raises(ConfigurationError, match="stop rule"):
+        round3.thresholds_for("judge", committed=lambda: True, exists=lambda _: False)

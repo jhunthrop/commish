@@ -30,17 +30,56 @@ from research.model.weekly2.factor import Elasticity, FactorRow, fit_elasticitie
 from research.model.weekly2.gates import Thresholds
 from research.model.weekly2.judge import rate_priors
 from research.model.weekly2.statistics import population
+from research.model.weekly3.allowance import NO_EXPECTATION, NO_GAME
+from research.model.weekly3.features import (
+    CLUB_GAME_WITHOUT_PACE,
+    FEWER_THAN_THREE,
+    NO_FILING,
+    NO_PRIOR_SEASON,
+    TEAMMATE_NOT_IN_LAST_THREE,
+)
 from research.model.weekly3.ledger import Game, Stamp
 from research.model.weekly3.number import Fitted, view_number
-from research.model.weekly3.outcomes import GameOutcomeReader, Outcome
-from research.model.weekly3.season import Placed, SeasonRead, WeekRead, read_season
+from research.model.weekly3.outcomes import LINE_WITHOUT_EDGE, GameOutcomeReader, Outcome
+from research.model.weekly3.season import (
+    NO_CLUB,
+    NO_GAME_THIS_SEASON,
+    NO_GAME_THIS_WEEK,
+    Placed,
+    SeasonRead,
+    WeekRead,
+    read_season,
+)
 from research.model.weekly3.stage import StageOne, club_means, fit_red_zone, fit_stage_one
-from research.model.weekly3.work import KINDS_BY_POSITION
+from research.model.weekly3.work import KINDS_BY_POSITION, NO_RED_ZONE_ROW, NO_SNAP_ROW
 
 FROZEN: Final = MappingProxyType
 OUTSIDE_UNIVERSE: Final = "outside_the_universe"  # the missing-input table's last row: no m, no number
 NO_PACE_AT_ALL: Final = "club_without_pace_takes_the_fit_mean"
 FIRST_GAME_AFTER_A_TRADE: Final = "first_game_after_a_trade"
+# Every row of the missing-input table, written into the counts at 0 when no row took it (section 2:
+# "The results report the count of rows under each default").
+DEFAULTS: Final = (
+    NO_GAME_THIS_SEASON,
+    NO_CLUB,
+    NO_GAME_THIS_WEEK,
+    FEWER_THAN_THREE,
+    NO_PRIOR_SEASON,
+    NO_RED_ZONE_ROW,
+    NO_SNAP_ROW,
+    CLUB_GAME_WITHOUT_PACE,
+    NO_PACE_AT_ALL,
+    NO_GAME,
+    NO_EXPECTATION,
+    TEAMMATE_NOT_IN_LAST_THREE,
+    NO_FILING,
+    OUTSIDE_UNIVERSE,
+    LINE_WITHOUT_EDGE,
+    FIRST_GAME_AFTER_A_TRADE,
+    "withheld",
+    "questionable",
+    "withheld_at_thursday",
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -76,7 +115,7 @@ def is_numbered(placed: Placed | None) -> bool:
 def default_counts(rows: Iterable[Member]) -> dict[str, int]:
     """The rows under each missing-input default, the withheld and flagged rows, and the first games
     after a trade (section 5, "Reported, not gated")."""
-    counts: Counter[str] = Counter()
+    counts: Counter[str] = Counter(dict.fromkeys(DEFAULTS, 0))
     for m in rows:
         counts["rows"] += 1
         counts.update(m.outcome.defaults)

@@ -10,7 +10,7 @@ refit equal to their record is checked by the run as it refits them: `weekly2.ju
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Final
+from typing import Any, Final
 
 from sqlalchemy import Connection, text
 
@@ -94,6 +94,27 @@ def missing_preconditions(counts: StoreCounts, t: Thresholds) -> list[str]:
         ]
     missing += [f"ADP ({t.adp_source}) for {s}" for s in t.adp_seasons if counts.adp.get(s, 0) <= 0]
     return missing
+
+
+def preconditions_payload(counts: StoreCounts, t: Thresholds) -> dict[str, Any]:
+    """The counts the preconditions read, for the run's record (section 6: "recorded in the results")."""
+    weeks = set(t.weeks)
+    schedules = {
+        str(season): {
+            "kickoff_club_weeks": sum(1 for w, _ in s.kickoffs if w in weeks),
+            "paired_club_weeks": sum(1 for w, _ in s.pairing if w in weeks),
+            "home_field_club_weeks": sum(1 for w, _ in s.home_field if w in weeks),
+            "asymmetric_pairings": sum(1 for (w, c), d in s.pairing.items() if s.pairing.get((w, d)) != c),
+        }
+        for season, s in sorted(counts.schedules.items())
+    }
+    return {
+        "inputs": {f"{source}|{metric}|{season}": n for ((source, metric), season), n in sorted(counts.inputs.items())},
+        "filings": {f"{season}|{week}": n for (season, week), n in sorted(counts.filings.items())},
+        "adp": {str(season): n for season, n in sorted(counts.adp.items())},
+        "schedules": schedules,
+        "missing": missing_preconditions(counts, t),
+    }
 
 
 _PLAYER_COUNTS: Final = text(
