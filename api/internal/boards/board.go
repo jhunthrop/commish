@@ -108,17 +108,29 @@ type Range struct {
 // Raw is one scoring board as stored, players in pool order: ADP
 // ascending, unpriced last, ties by id.
 type Raw struct {
-	Format  Format
-	Season  int
-	Source  string
-	AsOf    time.Time
+	Format Format
+	Season int
+	// Source is the stored preseason board the format names
+	// (<prefix>_<format>_12), the boards service's source for a custom one.
+	Source string
+	// AsOf is when the points were made: the published run's refresh in
+	// season, else the stored board generation.
+	AsOf time.Time
+	// Order is what the points rank: the published run's order, preseason
+	// for the stored preseason board and a custom board.
+	Order Order
+	// Run is the published run the points come from
+	// (research.published_boards), empty when they come from the stored
+	// preseason board itself.
+	Run     string
 	Players []Player
 	// Custom is set when the points are a league's own rules applied to
 	// the stored board's candidates (CustomSource), not a stored board.
 	Custom bool
 }
 
-// Order is which order ranks a board's players.
+// Order is which order ranks a board's players, as
+// research.published_boards names it.
 type Order string
 
 // The two orders (in-season tools spec §3).
@@ -127,13 +139,17 @@ const (
 	OrderRestOfSeason Order = "rest_of_season"
 )
 
+// Valid is true for an order the board knows how to say.
+func (o Order) Valid() bool { return o == OrderPreseason || o == OrderRestOfSeason }
+
 // Board is a stored board valued for one league: points over replacement
 // for every projected player at a position the league starts.
 type Board struct {
 	Raw *Raw
-	// Order is which order ranks the board, preseason for the stored
-	// preseason board; Refreshed is when that order was made, the stored
-	// board's as_of. A source of the rest-of-season order sets both.
+	// Order is which order ranks the board and Refreshed when that order
+	// was made, both the Raw's: from week 7 the published run's
+	// rest-of-season order and refresh, else preseason and the stored
+	// board's as_of.
 	Order     Order
 	Refreshed time.Time
 	// Values is points over replacement, absent where the league starts
@@ -155,7 +171,13 @@ func For(raw *Raw, teams int, slots []draft.SlotConfig) (Board, error) {
 	if err != nil {
 		return Board{}, err
 	}
-	b := Board{Raw: raw, Order: OrderPreseason, Refreshed: raw.AsOf, Values: values, byID: make(map[string]int, len(raw.Players)), teams: teams}
+	order := raw.Order
+	if order == "" {
+		// A Raw built by hand (tests, the sim) names no order: it is a
+		// preseason board. Every source sets its own.
+		order = OrderPreseason
+	}
+	b := Board{Raw: raw, Order: order, Refreshed: raw.AsOf, Values: values, byID: make(map[string]int, len(raw.Players)), teams: teams}
 	for i, p := range raw.Players {
 		b.byID[p.ID] = i
 	}
@@ -244,6 +266,10 @@ func (b Board) Basis() string {
 	ranked := ""
 	if b.RankedFor != "" {
 		ranked = fmt.Sprintf("%s is ranked on our %s board. ", b.RankedFor, b.Raw.Format.Words())
+	}
+	if b.Order == OrderRestOfSeason {
+		return fmt.Sprintf("%sPoints are our %d %s projections for the rest of the season, refreshed %s, %s",
+			ranked, b.Raw.Season, b.Raw.Format.Words(), b.Refreshed.UTC().Format("January 2"), tail)
 	}
 	return fmt.Sprintf("%sPoints are our %d %s projections, %s", ranked, b.Raw.Season, b.Raw.Format.Words(), tail)
 }

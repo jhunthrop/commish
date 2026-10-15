@@ -410,13 +410,15 @@ func (l *loader) r2() R2 {
 }
 
 // Board and advisor defaults: the 2026 board under the v9 source names,
-// read again every fifteen minutes; the advisor's answer awaited 300 ms
-// (its measured p90 is 35 to 63 ms) before the engine answers instead.
+// checked again every five minutes (a version read, the board itself only
+// once it moved, so an hourly publish shows within five minutes); the
+// advisor's answer awaited 300 ms (its measured p90 is 35 to 63 ms)
+// before the engine answers instead.
 const (
 	defaultBoardSchema    = "research"
 	defaultBoardSeason    = 2026
 	defaultBoardPrefix    = "commish_board_v9"
-	defaultBoardTTL       = 15 * time.Minute
+	defaultBoardTTL       = 5 * time.Minute
 	defaultAdvisorTimeout = 300 * time.Millisecond
 	defaultBoardsTimeout  = 5 * time.Second
 	defaultDevRoomBaseURL = "ws://localhost:8081"

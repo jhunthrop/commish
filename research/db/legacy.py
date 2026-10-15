@@ -366,6 +366,7 @@ NEW_IN_RESEARCH: Final[Mapping[str, str]] = MappingProxyType(
     {
         "preseason_candidates": "each board's candidate set, kept from revision 0005 so a custom board can be built",
         "custom_boards": "the custom-scoring board cache (revision 0005), rebuilt on demand from the candidates",
+        "published_boards": "the published run's board rows (revision 0006), rewritten by every publish",
     }
 )
 

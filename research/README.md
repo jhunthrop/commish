@@ -680,6 +680,14 @@ uv run python -m research.model.fit_inputs
 8. **promote**: a run that passed moves `runs/early.json` (early access, spec §4) and goes public an
    hour later, when `publish` moves `runs/latest.json` and dispatches `web.yml` with its id
    (`workflow_dispatch`, an Actions-only token). A step that raises is a failed step with a report.
+9. **the published board**: every `publish` then makes `research.published_boards` hold exactly the
+   board rows of the run `latest.json` names (`nightly/published_board.py`, one transaction a
+   season; a run already there is left alone), so the API reads the order the site shows, the
+   rest-of-season order from week 7, without reading R2. The pointer and the dispatch come first:
+   a write that fails prints one `published board: FAILED (...)` line naming the run `latest` names
+   and the run the table still holds (whole, never a mix), exits 1, and is retried at the next
+   publish hour. Publish runs 06:00-12:00 UTC, so a failure at 12:00 is made good at 06:00 the next
+   day; a run whose artifacts never read as a board stays failed until another run is published.
 
 ### What the run reads and decides
 
