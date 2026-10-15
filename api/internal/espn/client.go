@@ -124,6 +124,8 @@ type Client struct {
 	Base string
 	// FanBase is the fan API, FanBase when empty.
 	FanBase string
+	// WriteBase is the league write host, DefaultWriteBase when empty.
+	WriteBase string
 	// Pace, when set, waits for each league or fan read's turn (*hosts.Gate
 	// paces every process).
 	Pace interface {

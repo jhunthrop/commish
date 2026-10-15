@@ -247,6 +247,7 @@ func (a *advisor) Lineup() (apitypes.LineupAdvice, bool) {
 	h := a.header()
 	out := apitypes.LineupAdvice{Week: h.week, Basis: LineupBasis(a.basis, a.weeks), BasisNote: BasisNote(a.settings), OrderBasis: h.basis, Refreshed: h.refreshed,
 		ReadAt: h.readAt, Set: true, Slots: []apitypes.LineupSlot{}, Bench: []apitypes.PlayerLine{},
+		Moves: apitypes.LineupMoves{Lineup: apitypes.LineupMovesLineupUnavailable},
 	}
 	out.HostLineupUrl, out.HostNote = a.host(LineupPage)
 	w := &Writer{Basis: a.basis, Now: a.now}

@@ -46,8 +46,7 @@ const (
 
 // ConnectionStore is the part of hosts.Store the routes use.
 type ConnectionStore interface {
-	Put(ctx context.Context, accountID uuid.UUID, host string, sealed hosts.Sealed, now time.Time) (hosts.Connection, error)
-	PutUnproven(ctx context.Context, accountID uuid.UUID, host string, sealed hosts.Sealed, now time.Time) (hosts.Connection, error)
+	PutConsented(ctx context.Context, accountID uuid.UUID, host string, sealed hosts.Sealed, now time.Time, proven bool, shown int) (hosts.Connection, error)
 	Delete(ctx context.Context, accountID uuid.UUID, host string) error
 	Refused(ctx context.Context, accountID uuid.UUID, host string, at time.Time) error
 	Refusals(ctx context.Context, accountID uuid.UUID, host string, since time.Time) (int, error)

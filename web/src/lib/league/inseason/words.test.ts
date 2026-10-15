@@ -3,6 +3,15 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { readFileSync } from 'node:fs';
 import { isScreen } from './screens.ts';
+import {
+	MOVE_LINES,
+	failedStep,
+	hostSaid,
+	lostWords,
+	openHostWords,
+	readingWords,
+	settingWords
+} from './move.ts';
 import type { LineupSlot, PlayerLine, TradeRow, WaiverRow, WeekFacts } from './api.ts';
 import {
 	CLOSE_FOR_THEM,
@@ -342,7 +351,15 @@ void test('copy guard: every in-season line is fantasy words, with no dash, semi
 		startingCount(2),
 		showMore(2),
 		...Object.values(TAB_LABELS),
-		...Object.values(LINES)
+		...Object.values(LINES),
+		verbWords('start', 'espn'),
+		settingWords('espn'),
+		openHostWords('espn'),
+		readingWords('espn'),
+		lostWords('espn'),
+		(failedStep(new TypeError('x'), 'espn', 'plan', '') as { sentence: string }).sentence,
+		hostSaid('espn', 'Lineup transaction could not be completed, Alexander Mattison is locked'),
+		...Object.values(MOVE_LINES)
 	];
 	for (const text of lines) {
 		assert.ok(text, 'every composed line is said');

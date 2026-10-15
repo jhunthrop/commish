@@ -4,6 +4,7 @@
 import { PUBLIC_API_URL } from '$app/env/public';
 import { ApiError, apiClient } from '#lib/api/client.ts';
 import type { components } from '#lib/api/types.ts';
+import { ESPN_CONSENT_VERSION } from './connection-words.ts';
 
 type Schemas = components['schemas'];
 export type HostConnection = Schemas['HostConnection'];
@@ -47,7 +48,7 @@ export const hostsApi = {
 	connectESPN: (swid: string, s2: string) =>
 		client.call<HostConnected>('/hosts/espn/connect', {
 			method: 'POST',
-			body: { swid, espn_s2: s2, consent: true }
+			body: { swid, espn_s2: s2, consent: true, consent_version: ESPN_CONSENT_VERSION }
 		}),
 	espnLeagues: () => client.call<HostLeague[]>('/hosts/espn/leagues'),
 	disconnectESPN: () => client.call<null>('/hosts/espn', { method: 'DELETE' }),

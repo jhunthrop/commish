@@ -115,12 +115,10 @@ func (m *memStore) put(accountID uuid.UUID, host string, sealed hosts.Sealed, no
 	return *m.conn
 }
 
-func (m *memStore) Put(_ context.Context, accountID uuid.UUID, host string, sealed hosts.Sealed, now time.Time) (hosts.Connection, error) {
-	return m.put(accountID, host, sealed, now, true), nil
-}
-
-func (m *memStore) PutUnproven(_ context.Context, accountID uuid.UUID, host string, sealed hosts.Sealed, now time.Time) (hosts.Connection, error) {
-	return m.put(accountID, host, sealed, now, false), nil
+func (m *memStore) PutConsented(_ context.Context, accountID uuid.UUID, host string, sealed hosts.Sealed, now time.Time, proven bool, shown int) (hosts.Connection, error) {
+	c := m.put(accountID, host, sealed, now, proven)
+	m.conn.ConsentVersion, c.ConsentVersion = shown, shown
+	return c, nil
 }
 
 func (m *memStore) Get(context.Context, uuid.UUID, string) (hosts.Connection, error) {
@@ -311,6 +309,24 @@ func TestConnectKeepsAnEmptyListUnproven(t *testing.T) {
 		t.Fatalf("empty: %d %s", status, body)
 	}
 }
+
+// A connect keeps the consent words the page says it showed: version 3
+// when it says 3, 2 when it says nothing (a page from before the moves).
+func TestConnectKeepsTheShownConsent(t *testing.T) {
+	for _, tc := range []struct {
+		shown *int
+		want  int
+	}{{nil, 2}, {ptrInt(3), 3}} {
+		r := setup(t)
+		in := goodPair
+		in.ConsentVersion = tc.shown
+		if status, body := call(t, r.s.connect, r.me, in); status >= 300 || r.store.conn == nil || r.store.conn.ConsentVersion != tc.want {
+			t.Fatalf("shown %v: %d %s", tc.shown, status, body)
+		}
+	}
+}
+
+func ptrInt(n int) *int { return &n }
 
 // A league whose public check ESPN does not answer is never guessed: it
 // carries no public mark, and the sentence counts only what was checked.

@@ -324,6 +324,141 @@ func (e HostLeagueUnmarked) Valid() bool {
 	}
 }
 
+// Defines values for HostMoveKind.
+const (
+	HostMoveKindLineup HostMoveKind = "lineup"
+)
+
+// Valid indicates whether the value is a known member of the HostMoveKind enum.
+func (e HostMoveKind) Valid() bool {
+	switch e {
+	case HostMoveKindLineup:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for HostMoveOutcome.
+const (
+	HostMoveOutcomeDone    HostMoveOutcome = "done"
+	HostMoveOutcomeNotSent HostMoveOutcome = "not_sent"
+	HostMoveOutcomePending HostMoveOutcome = "pending"
+	HostMoveOutcomeRefused HostMoveOutcome = "refused"
+	HostMoveOutcomeSending HostMoveOutcome = "sending"
+)
+
+// Valid indicates whether the value is a known member of the HostMoveOutcome enum.
+func (e HostMoveOutcome) Valid() bool {
+	switch e {
+	case HostMoveOutcomeDone:
+		return true
+	case HostMoveOutcomeNotSent:
+		return true
+	case HostMoveOutcomePending:
+		return true
+	case HostMoveOutcomeRefused:
+		return true
+	case HostMoveOutcomeSending:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for HostMoveChangeSlot.
+const (
+	HostMoveChangeSlotDEF       HostMoveChangeSlot = "DEF"
+	HostMoveChangeSlotFLEX      HostMoveChangeSlot = "FLEX"
+	HostMoveChangeSlotK         HostMoveChangeSlot = "K"
+	HostMoveChangeSlotQB        HostMoveChangeSlot = "QB"
+	HostMoveChangeSlotRB        HostMoveChangeSlot = "RB"
+	HostMoveChangeSlotSUPERFLEX HostMoveChangeSlot = "SUPERFLEX"
+	HostMoveChangeSlotTE        HostMoveChangeSlot = "TE"
+	HostMoveChangeSlotWR        HostMoveChangeSlot = "WR"
+)
+
+// Valid indicates whether the value is a known member of the HostMoveChangeSlot enum.
+func (e HostMoveChangeSlot) Valid() bool {
+	switch e {
+	case HostMoveChangeSlotDEF:
+		return true
+	case HostMoveChangeSlotFLEX:
+		return true
+	case HostMoveChangeSlotK:
+		return true
+	case HostMoveChangeSlotQB:
+		return true
+	case HostMoveChangeSlotRB:
+		return true
+	case HostMoveChangeSlotSUPERFLEX:
+		return true
+	case HostMoveChangeSlotTE:
+		return true
+	case HostMoveChangeSlotWR:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for HostMoveInputKind.
+const (
+	HostMoveInputKindLineup HostMoveInputKind = "lineup"
+)
+
+// Valid indicates whether the value is a known member of the HostMoveInputKind enum.
+func (e HostMoveInputKind) Valid() bool {
+	switch e {
+	case HostMoveInputKindLineup:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for HostMovePlanStatus.
+const (
+	HostMovePlanStatusReady       HostMovePlanStatus = "ready"
+	HostMovePlanStatusUnavailable HostMovePlanStatus = "unavailable"
+)
+
+// Valid indicates whether the value is a known member of the HostMovePlanStatus enum.
+func (e HostMovePlanStatus) Valid() bool {
+	switch e {
+	case HostMovePlanStatusReady:
+		return true
+	case HostMovePlanStatusUnavailable:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for HostMoveResultOutcome.
+const (
+	HostMoveResultOutcomeDone        HostMoveResultOutcome = "done"
+	HostMoveResultOutcomePending     HostMoveResultOutcome = "pending"
+	HostMoveResultOutcomeRefused     HostMoveResultOutcome = "refused"
+	HostMoveResultOutcomeUnavailable HostMoveResultOutcome = "unavailable"
+)
+
+// Valid indicates whether the value is a known member of the HostMoveResultOutcome enum.
+func (e HostMoveResultOutcome) Valid() bool {
+	switch e {
+	case HostMoveResultOutcomeDone:
+		return true
+	case HostMoveResultOutcomePending:
+		return true
+	case HostMoveResultOutcomeRefused:
+		return true
+	case HostMoveResultOutcomeUnavailable:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for InjuryDesignationStatus.
 const (
 	InjuryDesignationStatusDoubtful       InjuryDesignationStatus = "doubtful"
@@ -438,6 +573,24 @@ func (e Lineup) Valid() bool {
 	case LineupSuperflex:
 		return true
 	case LineupTwoFlex:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for LineupMovesLineup.
+const (
+	LineupMovesLineupAvailable   LineupMovesLineup = "available"
+	LineupMovesLineupUnavailable LineupMovesLineup = "unavailable"
+)
+
+// Valid indicates whether the value is a known member of the LineupMovesLineup enum.
+func (e LineupMovesLineup) Valid() bool {
+	switch e {
+	case LineupMovesLineupAvailable:
+		return true
+	case LineupMovesLineupUnavailable:
 		return true
 	default:
 		return false
@@ -1291,6 +1444,9 @@ type ESPNConnectInput struct {
 	// Consent the member agrees that we keep an encrypted copy of their ESPN session so their league stays in sync, and that disconnect deletes it; must be true
 	Consent bool `json:"consent"`
 
+	// ConsentVersion the version of the consent words the page showed (3 names the moves); kept never above the server's own, and taken as 2 when absent
+	ConsentVersion *int `json:"consent_version,omitempty"`
+
 	// EspnS2 ESPN's espn_s2 cookie, kept encrypted, never answered or logged
 	EspnS2 string `json:"espn_s2"`
 
@@ -1489,6 +1645,96 @@ type HostLeague struct {
 
 // HostLeagueUnmarked why an ESPN league carries no public mark: not_checked, past the first 10 leagues of the list, which are the ones checked; no_answer, ESPN did not answer the check in time
 type HostLeagueUnmarked string
+
+// HostMove defines model for HostMove.
+type HostMove struct {
+	AnsweredAt *time.Time         `json:"answered_at"`
+	CreatedAt  time.Time          `json:"created_at"`
+	HostWords  *string            `json:"host_words"`
+	Id         openapi_types.UUID `json:"id"`
+	Kind       HostMoveKind       `json:"kind"`
+	Outcome    HostMoveOutcome    `json:"outcome"`
+
+	// Sentence the move as the member confirmed it
+	Sentence string `json:"sentence"`
+	Week     int    `json:"week"`
+}
+
+// HostMoveKind defines model for HostMove.Kind.
+type HostMoveKind string
+
+// HostMoveOutcome defines model for HostMove.Outcome.
+type HostMoveOutcome string
+
+// HostMoveChange defines model for HostMoveChange.
+type HostMoveChange struct {
+	// In the host id of the player who starts in the slot
+	In string `json:"in"`
+
+	// Out the host id of the starter the change sits, null for a slot the host left empty
+	Out  *string            `json:"out"`
+	Slot HostMoveChangeSlot `json:"slot"`
+}
+
+// HostMoveChangeSlot defines model for HostMoveChange.Slot.
+type HostMoveChangeSlot string
+
+// HostMoveConfirm defines model for HostMoveConfirm.
+type HostMoveConfirm struct {
+	// Confirm the plan's token
+	Confirm string        `json:"confirm"`
+	Move    HostMoveInput `json:"move"`
+}
+
+// HostMoveInput defines model for HostMoveInput.
+type HostMoveInput struct {
+	Changes []HostMoveChange  `json:"changes"`
+	Kind    HostMoveInputKind `json:"kind"`
+
+	// Week the week the screen read, the host's current one
+	Week int `json:"week"`
+}
+
+// HostMoveInputKind defines model for HostMoveInput.Kind.
+type HostMoveInputKind string
+
+// HostMovePlan defines model for HostMovePlan.
+type HostMovePlan struct {
+	// Confirm the token that makes this move once
+	Confirm *string `json:"confirm"`
+
+	// ExpiresAt when the token stops making it
+	ExpiresAt *time.Time `json:"expires_at"`
+
+	// HostUrl the host's lineup page, empty when we know none
+	HostUrl string `json:"host_url"`
+
+	// Sentence the move in words, every change named ("Start Rachaad White over Tank Bigsby at RB, and Jauan Jennings over Josh Downs in the flex, on ESPN now."), or why it cannot be made here
+	Sentence string             `json:"sentence"`
+	Status   HostMovePlanStatus `json:"status"`
+}
+
+// HostMovePlanStatus defines model for HostMovePlan.Status.
+type HostMovePlanStatus string
+
+// HostMoveResult defines model for HostMoveResult.
+type HostMoveResult struct {
+	// HostUrl the host's lineup page, empty when we know none
+	HostUrl string `json:"host_url"`
+
+	// HostWords the host's reason for a refusal, verbatim in its own words; null otherwise
+	HostWords *string `json:"host_words"`
+
+	// MoveId the move's proof record
+	MoveId  *openapi_types.UUID   `json:"move_id"`
+	Outcome HostMoveResultOutcome `json:"outcome"`
+
+	// Sentence our sentence for the outcome
+	Sentence string `json:"sentence"`
+}
+
+// HostMoveResultOutcome defines model for HostMoveResult.Outcome.
+type HostMoveResultOutcome string
 
 // ImportSkip defines model for ImportSkip.
 type ImportSkip struct {
@@ -1709,7 +1955,8 @@ type LineupAdvice struct {
 	HostLineupUrl string `json:"host_lineup_url"`
 
 	// HostNote one sentence under the verb when we cannot open the host's page ("Make this change on Yahoo. We cannot open that page for you yet."), null when the url opens it
-	HostNote *string `json:"host_note"`
+	HostNote *string     `json:"host_note"`
+	Moves    LineupMoves `json:"moves"`
 
 	// OrderBasis which order ranks the players: our preseason board, or the rest-of-season order (from week 7, once the API reads it)
 	OrderBasis OrderBasis `json:"order_basis"`
@@ -1727,6 +1974,18 @@ type LineupAdvice struct {
 	Slots []LineupSlot `json:"slots"`
 	Week  int          `json:"week"`
 }
+
+// LineupMoves defines model for LineupMoves.
+type LineupMoves struct {
+	// Lineup available when the lineup can be set on the host from our screen (the host has a write path, its switch is on for the account and the account's connection agreed to the moves); unavailable when the verb is the host's page
+	Lineup LineupMovesLineup `json:"lineup"`
+
+	// Note one sentence when a move waits on the member (connect again to agree to moves), null otherwise
+	Note *string `json:"note"`
+}
+
+// LineupMovesLineup available when the lineup can be set on the host from our screen (the host has a write path, its switch is on for the account and the account's connection agreed to the moves); unavailable when the verb is the host's page
+type LineupMovesLineup string
 
 // LineupSlot defines model for LineupSlot.
 type LineupSlot struct {
@@ -2668,6 +2927,33 @@ type HealthResponse struct {
 	RequestId string     `json:"request_id"`
 }
 
+// HostMovePlanResponse defines model for HostMovePlanResponse.
+type HostMovePlanResponse struct {
+	Data      HostMovePlan `json:"data"`
+	Error     *ErrorBody   `json:"error"`
+	Meta      *PageMeta    `json:"meta,omitempty"`
+	Ok        bool         `json:"ok"`
+	RequestId string       `json:"request_id"`
+}
+
+// HostMoveResultResponse defines model for HostMoveResultResponse.
+type HostMoveResultResponse struct {
+	Data      HostMoveResult `json:"data"`
+	Error     *ErrorBody     `json:"error"`
+	Meta      *PageMeta      `json:"meta,omitempty"`
+	Ok        bool           `json:"ok"`
+	RequestId string         `json:"request_id"`
+}
+
+// HostMovesResponse defines model for HostMovesResponse.
+type HostMovesResponse struct {
+	Data      []HostMove `json:"data"`
+	Error     *ErrorBody `json:"error"`
+	Meta      *PageMeta  `json:"meta,omitempty"`
+	Ok        bool       `json:"ok"`
+	RequestId string     `json:"request_id"`
+}
+
 // LeagueResponse defines model for LeagueResponse.
 type LeagueResponse struct {
 	Data      League     `json:"data"`
@@ -2891,6 +3177,12 @@ type AttachLeagueJSONRequestBody = AttachInput
 
 // PreviewAttachJSONRequestBody defines body for PreviewAttach for application/json ContentType.
 type PreviewAttachJSONRequestBody = AttachPreviewInput
+
+// MakeHostMoveJSONRequestBody defines body for MakeHostMove for application/json ContentType.
+type MakeHostMoveJSONRequestBody = HostMoveConfirm
+
+// PlanHostMoveJSONRequestBody defines body for PlanHostMove for application/json ContentType.
+type PlanHostMoveJSONRequestBody = HostMoveInput
 
 // ImportScoringJSONRequestBody defines body for ImportScoring for application/json ContentType.
 type ImportScoringJSONRequestBody = ScoringImportInput

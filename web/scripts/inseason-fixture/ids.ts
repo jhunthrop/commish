@@ -7,5 +7,12 @@ export const FIXTURE_IDS = {
 	/** The same league held, so a page shows its loading rows. */
 	slow: '6f1d1c52-2626-4a26-9a26-000000000028',
 	/** The same league whose last read lacks the drafter's team: the in-season routes answer 404. */
-	noTeam: '6f1d1c52-2626-4a26-9a26-000000000029'
+	noTeam: '6f1d1c52-2626-4a26-9a26-000000000029',
+	/** The same league as an ESPN league whose lineup the member may set from our screen: the move is
+	 * done. */
+	espnDone: '6f1d1c52-2626-4a26-9a26-000000000035',
+	/** The ESPN league whose move ESPN refuses, in its own words. */
+	espnRefused: '6f1d1c52-2626-4a26-9a26-000000000036',
+	/** The ESPN league whose move ESPN took but the read-back did not show. */
+	espnPending: '6f1d1c52-2626-4a26-9a26-000000000037'
 } as const;

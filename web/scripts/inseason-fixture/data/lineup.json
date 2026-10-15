@@ -970,5 +970,6 @@
 		}
 	],
 	"host_lineup_url": "https://sleeper.com/leagues/1382163311038038016/team",
-	"host_note": null
+	"host_note": null,
+	"moves": { "lineup": "unavailable", "note": null }
 }

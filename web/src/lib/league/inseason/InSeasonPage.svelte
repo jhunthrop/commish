@@ -32,8 +32,8 @@
 		read: () => Promise<T>;
 		/** How many rows to hold while the answer is read, so nothing moves when it lands. */
 		reserve: number;
-		/** The screen, from its answer and the league's host. */
-		children: Snippet<[T, LeagueHost]>;
+		/** The screen, from its answer, the league's host, and a way to read the answer again. */
+		children: Snippet<[T, LeagueHost, () => void]>;
 	}
 
 	let { id, screen, title, read, reserve, children }: Props = $props();
@@ -152,7 +152,7 @@
 				{#if problem}
 					<Panel edge="loss" padding="sm"><ProblemLine>{problem}</ProblemLine></Panel>
 				{/if}
-				{@render children(advice, head.host)}
+				{@render children(advice, head.host, () => void readAnswer())}
 			{:else}
 				<div class="reserve" aria-busy="true" aria-label={LINES.reading}>
 					<div class="call"></div>

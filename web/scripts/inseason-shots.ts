@@ -156,6 +156,42 @@ for (const width of SHOT_WIDTHS) {
 	await ctx.close();
 }
 
+/** The lineup move on an ESPN league (Lane 35), in both themes at both widths: the confirmation
+ * naming the exact changes, then each answer (done, refused in ESPN's words, pending). On a phone the
+ * pinned verb opens it. Each must not scroll sideways. */
+const MOVES = [
+	{ name: 'done', id: FIXTURE_IDS.espnDone, ready: 'Set on ESPN.' },
+	{ name: 'refused', id: FIXTURE_IDS.espnRefused, ready: 'ESPN said:' },
+	{ name: 'pending', id: FIXTURE_IDS.espnPending, ready: 'Check your lineup on ESPN' }
+] as const;
+for (const theme of THEMES) {
+	for (const width of SHOT_WIDTHS) {
+		for (const move of MOVES) {
+			const ctx = await context(theme, width);
+			const page = await ctx.newPage();
+			await page.goto(`${web}/league/${move.id}/start`, { waitUntil: 'networkidle' });
+			await ready(page, 'Set it on ESPN');
+			await page
+				.getByRole('button', { name: 'Set it on ESPN' })
+				.filter({ visible: true })
+				.first()
+				.click();
+			await ready(page, 'on ESPN now.');
+			if (move.name === 'done') {
+				await page.screenshot({ path: file(`start-move-confirm-${theme}-${String(width)}`) });
+			}
+			await page.locator('#lineup-move').getByRole('button', { name: 'Set it on ESPN' }).click();
+			await ready(page, move.ready);
+			const wide = await page.evaluate(
+				() => document.documentElement.scrollWidth > window.innerWidth
+			);
+			if (wide) scrolls.push(`start move ${move.name} ${theme} ${String(width)}`);
+			await page.screenshot({ path: file(`start-move-${move.name}-${theme}-${String(width)}`) });
+			await ctx.close();
+		}
+	}
+}
+
 await browser.close();
 for (const [where, height] of rows)
 	process.stdout.write(`tallest row ${where}: ${height.toFixed(1)}px\n`);

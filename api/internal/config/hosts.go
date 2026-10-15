@@ -27,6 +27,10 @@ type Hosts struct {
 	// league poller's ESPN host (public leagues too) and the web's ESPN
 	// choice read it. On unless set false.
 	ESPNEnabled bool
+	// ESPNLineupWrites is HOST_WRITES_ESPN_LINEUP, the switch for setting
+	// an ESPN lineup from our screen (Lane 35): off unless set true, and
+	// while off only the accounts on app.host_write_accounts may.
+	ESPNLineupWrites bool
 	// Keys wrap each connected account's own data key: KeyVersion is the
 	// current key's version (HOST_CREDENTIALS_KEY_VERSION, 1 unless set),
 	// Key is HOST_CREDENTIALS_KEY, and Previous is
@@ -42,7 +46,7 @@ const hostKeyLen = 32
 
 func (l *loader) hosts(env Env) Hosts {
 	h := Hosts{FFPCEnabled: l.hostSwitch("HOST_FFPC_ENABLED"), YahooEnabled: l.hostSwitch("HOST_YAHOO_ENABLED"),
-		ESPNEnabled: l.hostSwitch("HOST_ESPN_ENABLED"), KeyVersion: 1}
+		ESPNEnabled: l.hostSwitch("HOST_ESPN_ENABLED"), ESPNLineupWrites: l.writeSwitch("HOST_WRITES_ESPN_LINEUP"), KeyVersion: 1}
 	h.YahooClientID = strings.TrimSpace(l.get("YAHOO_CLIENT_ID"))
 	h.YahooClientSecret = strings.TrimSpace(l.get("YAHOO_CLIENT_SECRET"))
 	if (h.YahooClientID == "") != (h.YahooClientSecret == "") {
@@ -72,6 +76,19 @@ func (l *loader) hostSwitch(name string) bool {
 	v := strings.TrimSpace(l.get(name))
 	if v == "" {
 		return true
+	}
+	on, err := strconv.ParseBool(v)
+	if err != nil {
+		l.invalid(name, "must be true or false")
+	}
+	return on
+}
+
+// writeSwitch is one host write's switch: off unless set true.
+func (l *loader) writeSwitch(name string) bool {
+	v := strings.TrimSpace(l.get(name))
+	if v == "" {
+		return false
 	}
 	on, err := strconv.ParseBool(v)
 	if err != nil {

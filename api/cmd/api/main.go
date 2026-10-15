@@ -164,9 +164,13 @@ func build(ctx context.Context, cfg config.API, pool *pgxpool.Pool, obs httpx.Ob
 	}
 
 	leagueSync := leagueSyncService(cfg, pool, draftBoards, leagueStore, ents, viewer, ff, yh, es, log)
+	moves, err := hostMoves(cfg, pool, ff, es, log)
+	if err != nil {
+		return nil, err
+	}
 	inSeason := &inseason.Service{
 		Leagues: inseason.SyncLeagues{Sync: leagueSync}, Facts: &inseason.Cache{Reads: draftBoards.Schedule, Now: now},
-		Holds: sheetStore, Now: now, Log: log,
+		Holds: sheetStore, Moves: moves, Now: now, Log: log,
 	}
 
 	routes := slices.Concat(
@@ -183,6 +187,7 @@ func build(ctx context.Context, cfg config.API, pool *pgxpool.Pool, obs httpx.Ob
 		(&devices.Service{Store: deviceStore, Tokens: bearer, CodeKey: codeKey, Now: now, Log: log}).Routes(),
 		leagueSync.Routes(),
 		inSeason.Routes(),
+		moves.Routes(),
 		hostList(ff, yh, es, log),
 		ff.routes(log),
 		yh.routes(cfg, pool, ff, log),

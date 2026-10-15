@@ -1,6 +1,8 @@
 // A stand-in for the request API's league reads, answering from the fixture build.ts writes, so the
 // in-season screens can be built and shot before the API's routes land (Lane 25). Signed in as one
-// account that follows the recorded Sleeper league. Three attachment ids:
+// account that follows the recorded Sleeper league, and three ESPN stand-ins of it whose lineup the
+// member may set from our screen (Lane 35): the move done, refused in ESPN's captured words, and
+// pending. Attachment ids:
 // FIXTURE_IDS (ids.ts) names them: the league, the league out of season (409 on the in-season
 // routes) and the league held (a page shows its loading rows).
 // Every answer is the API's envelope, with the league's read stamped a few minutes before the call.
@@ -10,13 +12,42 @@
 import { readFile } from 'node:fs/promises';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import type { LeagueSync } from '../../src/lib/league/api.ts';
-import type { TradeAdvice, WaiverAdvice } from '../../src/lib/league/inseason/api.ts';
+import type {
+	HostMovePlan,
+	HostMoveResult,
+	LineupAdvice,
+	TradeAdvice,
+	WaiverAdvice
+} from '../../src/lib/league/inseason/api.ts';
 import type { components } from '../../src/lib/api/types.ts';
 import { FIXTURE_IDS } from './ids.ts';
 
 const PORT = Number(process.env.PORT ?? 8799);
 const DATA = new URL('./data/', import.meta.url);
-const { league: LEAGUE, outOfSeason: OUT_OF_SEASON, slow: SLOW, noTeam: NO_TEAM } = FIXTURE_IDS;
+const {
+	league: LEAGUE,
+	outOfSeason: OUT_OF_SEASON,
+	slow: SLOW,
+	noTeam: NO_TEAM,
+	espnDone: ESPN_DONE,
+	espnRefused: ESPN_REFUSED,
+	espnPending: ESPN_PENDING
+} = FIXTURE_IDS;
+/** The leagues the fixture answers as ESPN's, each with what its move comes to. */
+const ESPN_MOVES = new Map<string, 'done' | 'refused' | 'pending'>([
+	[ESPN_DONE, 'done'],
+	[ESPN_REFUSED, 'refused'],
+	[ESPN_PENDING, 'pending']
+]);
+/** The API's own sentences for a move (api/internal/hostmoves words.go). */
+const MOVE_SENTENCES = {
+	done: 'Set on ESPN. Your lineup there now reads as ours.',
+	refused: 'ESPN did not make the move, so nothing changed there.',
+	pending:
+		'Sent to ESPN, but your lineup there did not show it when we read it back. Check your lineup on ESPN before you set it again.'
+} as const;
+const ESPN_LINEUP_URL =
+	'https://fantasy.espn.com/football/team?leagueId=1081607624&seasonId=2026&teamId=3';
 /** The API's own sentences (api/internal/inseason): leaguesync.NoGamesWords and noTeamWords. */
 const NO_GAMES = 'Your league has no games this week.';
 const NO_TEAM_WORDS = "We could not find your team in this league's last read.";
@@ -31,7 +62,7 @@ async function load<T>(name: string): Promise<T> {
 
 const [sync, lineup, waivers, trades] = await Promise.all([
 	load<LeagueSync>('sync'),
-	load<object>('lineup'),
+	load<LineupAdvice>('lineup'),
 	load<WaiverAdvice>('waivers'),
 	load<TradeAdvice>('trades')
 ]);
@@ -109,6 +140,64 @@ function tradesHolding(player: string | null): TradeAdvice {
 }
 
 const IN_SEASON = /^\/leagues\/attached\/([^/]+)\/(lineup|waivers|trades)$/;
+const MOVES = /^\/leagues\/attached\/([^/]+)\/moves(\/plan)?$/;
+
+/** A changed slot's place in the API's words: "at RB", "in the flex". */
+function slotPlace(slot: string): string {
+	if (slot === 'FLEX') return 'in the flex';
+	if (slot === 'SUPERFLEX') return 'in the superflex';
+	return `at ${slot}`;
+}
+
+/** The plan's sentence as the API words it (hostmoves lineupWords): every change, then the host. */
+function planSentence(): string {
+	const clauses = lineup.slots
+		.filter((slot) => slot.changed)
+		.map(
+			(slot) =>
+				`${slot.ours.player.name}${slot.host ? ` over ${slot.host.player.name}` : ''} ${slotPlace(slot.slot)}`
+		);
+	const joined =
+		clauses.length < 2
+			? (clauses[0] ?? '')
+			: `${clauses.slice(0, -1).join(', ')}, and ${clauses.at(-1) ?? ''}`;
+	return `Start ${joined}, on ESPN now.`;
+}
+
+/** The ESPN league's lineup: the move open, the verb ESPN's lineup page. */
+function espnLineup(): LineupAdvice {
+	return {
+		...lineup,
+		host_lineup_url: ESPN_LINEUP_URL,
+		moves: { lineup: 'available', note: null }
+	};
+}
+
+/** A move on an ESPN fixture league: the plan in words with a token, or what the move came to. */
+function moveAnswer(id: string, plan: boolean): HostMovePlan | HostMoveResult {
+	if (plan) {
+		return {
+			status: 'ready',
+			sentence: planSentence(),
+			confirm: 'fixture-token',
+			expires_at: new Date(Date.now() + HOLD_MS).toISOString(),
+			host_url: ESPN_LINEUP_URL
+		};
+	}
+	const outcome = ESPN_MOVES.get(id) ?? 'done';
+	const first = lineup.slots.find((slot) => slot.changed)?.ours.player.name ?? '';
+	return {
+		outcome,
+		sentence: MOVE_SENTENCES[outcome],
+		// ESPN's refusal as captured live (jwulff 05-espn-write-surface.md 5.1, TRAN_LINEUP_LOCKED).
+		host_words:
+			outcome === 'refused'
+				? `Lineup transaction could not be completed, ${first} is locked`
+				: null,
+		host_url: ESPN_LINEUP_URL,
+		move_id: '6f1d1c52-2626-4a26-9a26-0000000000f1'
+	};
+}
 const SYNC = /^\/leagues\/attached\/([^/]+)\/(sync|refresh)$/;
 
 async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> {
@@ -140,7 +229,7 @@ async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> 
 			HTTP.ok,
 			Object.values(FIXTURE_IDS).map((id) => ({
 				id,
-				host: sync.host,
+				host: ESPN_MOVES.has(id) ? 'espn' : sync.host,
 				host_league_id: sync.host_league_id,
 				season: sync.season,
 				name: sync.name,
@@ -157,6 +246,11 @@ async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> 
 		send(req, res, HTTP.ok, { ...sync, id: synced[1], read_at: readAt() });
 		return;
 	}
+	const moved = MOVES.exec(url.pathname);
+	if (moved && req.method === 'POST') {
+		send(req, res, HTTP.ok, moveAnswer(moved[1] ?? '', moved[2] !== undefined));
+		return;
+	}
 	const inSeason = IN_SEASON.exec(url.pathname);
 	if (inSeason) {
 		const [, id, route] = inSeason;
@@ -170,7 +264,7 @@ async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> 
 		}
 		if (id === SLOW) await new Promise((resolve) => setTimeout(resolve, HOLD_MS));
 		const bodies = {
-			lineup,
+			lineup: ESPN_MOVES.has(id ?? '') ? espnLineup() : lineup,
 			waivers: waiversAt(url.searchParams.get('position')),
 			trades: tradesHolding(url.searchParams.get('player'))
 		} as const;
