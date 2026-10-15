@@ -3,6 +3,7 @@ package boards
 import (
 	"context"
 	"fmt"
+	"log/slog"
 )
 
 // The board the site shows reaches the api through a table: the nightly
@@ -78,20 +79,24 @@ func (s *PGSource) boardRead(ctx context.Context, f Format) (string, []any, erro
 	return s.publishedQuery(), []any{s.Season, s.sourceFor(f), string(f)}, nil
 }
 
-// hasPublished is true once the schema holds published_boards (research
-// revision 0006). The api can deploy ahead of the migration, so until the
-// table exists the board reads the stored board alone; once seen it is
-// never looked for again.
+// hasPublished is true when the schema holds published_boards (research
+// revision 0006) and this role may read it. Asked on every read (one
+// catalog lookup, every TTL a format), never latched: the api can deploy
+// ahead of the migration, and a migration run by a role whose default
+// privileges do not reach the api's role creates a table the api cannot
+// select from. Either way the board reads the stored preseason board, as
+// before the table, rather than failing every room; an unreadable table is
+// logged once a process.
 func (s *PGSource) hasPublished(ctx context.Context) (bool, error) {
-	if s.published.Load() {
-		return true, nil
-	}
-	var found bool
-	if err := s.Pool.QueryRow(ctx, `select to_regclass($1) is not null`, s.table("published_boards")).Scan(&found); err != nil {
+	var exists, readable bool
+	err := s.Pool.QueryRow(ctx, `select to_regclass($1) is not null,
+  coalesce(has_table_privilege(to_regclass($1), 'select'), false)`, s.table("published_boards")).Scan(&exists, &readable)
+	if err != nil {
 		return false, fmt.Errorf("boards: look for published_boards: %w", err)
 	}
-	if found {
-		s.published.Store(true)
+	if exists && !readable && s.unreadable.CompareAndSwap(false, true) {
+		slog.Warn("boards: published_boards exists but this role cannot select from it; reading the preseason board",
+			"table", s.table("published_boards"))
 	}
-	return found, nil
+	return readable, nil
 }

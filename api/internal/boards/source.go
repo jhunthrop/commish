@@ -47,8 +47,9 @@ type PGSource struct {
 	// SourcePrefix names the stored boards: <prefix>_<format>_12.
 	SourcePrefix string
 
-	// published is set once the schema is seen to hold published_boards.
-	published atomic.Bool
+	// unreadable is set once published_boards was found and not readable,
+	// so the warning is logged once a process.
+	unreadable atomic.Bool
 }
 
 // NewPGSource checks the schema name once.
@@ -93,9 +94,9 @@ func (s *PGSource) Load(ctx context.Context, f Format) (*Raw, error) {
 	}
 	defer rows.Close()
 	raw := &Raw{Format: f, Season: s.Season, Source: source}
-	var asOf *time.Time
+	var stamp boardStamp
 	for rows.Next() {
-		p, position, err := scanBoardRow(rows, &asOf, raw)
+		p, position, err := scanBoardRow(rows, &stamp)
 		if err != nil {
 			return nil, fmt.Errorf("boards: scan %s: %w", source, err)
 		}
@@ -106,27 +107,34 @@ func (s *PGSource) Load(ctx context.Context, f Format) (*Raw, error) {
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("boards: read %s: %w", source, err)
 	}
-	if asOf == nil {
+	if stamp.asOf == nil {
 		return nil, fmt.Errorf("boards: no stored board %s for %d", source, s.Season)
 	}
-	if !raw.OrderBasis.Valid() {
-		return nil, fmt.Errorf("boards: %s for %d has order %q", source, s.Season, raw.OrderBasis)
+	if !stamp.order.Valid() {
+		return nil, fmt.Errorf("boards: %s for %d has order %q", source, s.Season, stamp.order)
 	}
-	raw.AsOf = asOf.UTC()
+	raw.AsOf, raw.Order, raw.Run = stamp.asOf.UTC(), stamp.order, stamp.run
 	return raw, nil
 }
 
+// boardStamp is the board's own columns, which every row repeats: when
+// its points were made, the order they rank, the published run.
+type boardStamp struct {
+	asOf  *time.Time
+	order Order
+	run   string
+}
+
 // scanBoardRow reads one directory row with its points, and the board's
-// stamp, order and run, which every row repeats.
-func scanBoardRow(rows pgx.Rows, asOf **time.Time, raw *Raw) (Player, string, error) {
+// stamp into stamp.
+func scanBoardRow(rows pgx.Rows, stamp *boardStamp) (Player, string, error) {
 	var p Player
-	var position, order string
+	var position string
 	var floor, median, ceiling *float64
 	if err := rows.Scan(&p.ID, &p.Name, &position, &p.Team, &p.Headshot, &p.ADP, &p.Points, &floor, &median, &ceiling,
-		asOf, &order, &raw.Run); err != nil {
+		&stamp.asOf, &stamp.order, &stamp.run); err != nil {
 		return Player{}, "", err
 	}
-	raw.OrderBasis = OrderBasis(order)
 	if floor != nil && median != nil && ceiling != nil {
 		p.Range = &Range{Floor: *floor, Median: *median, Ceiling: *ceiling}
 	}

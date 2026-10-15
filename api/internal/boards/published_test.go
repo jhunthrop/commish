@@ -122,8 +122,8 @@ func TestPublishedBoardBeatsThePreseasonBoard(t *testing.T) {
 	pool, src := publishedFixture(t, true)
 	publishRun(t, pool, "2026-10-21T12", "rest_of_season", "ppr,p1,242.5,null", "ppr,p2,195.3,null")
 	raw := load(t, src, PPR)
-	if raw.OrderBasis != OrderRestOfSeason || !raw.AsOf.Equal(refreshedAt) || raw.Run != "2026-10-21T12" {
-		t.Fatalf("basis %q as of %s run %q", raw.OrderBasis, raw.AsOf, raw.Run)
+	if raw.Order != OrderRestOfSeason || !raw.AsOf.Equal(refreshedAt) || raw.Run != "2026-10-21T12" {
+		t.Fatalf("basis %q as of %s run %q", raw.Order, raw.AsOf, raw.Run)
 	}
 	ids := make([]string, len(raw.Players))
 	for i, p := range raw.Players {
@@ -143,8 +143,8 @@ func TestPublishedBoardBeatsThePreseasonBoard(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if b.OrderBasis() != OrderRestOfSeason || !b.Refreshed().Equal(refreshedAt) {
-		t.Fatalf("board basis %q refreshed %s", b.OrderBasis(), b.Refreshed())
+	if b.Order != OrderRestOfSeason || !b.Refreshed.Equal(refreshedAt) {
+		t.Fatalf("board basis %q refreshed %s", b.Order, b.Refreshed)
 	}
 	if basis := b.Basis(); !strings.Contains(basis, "rest of the season, refreshed October 21") {
 		t.Fatalf("basis %q", basis)
@@ -157,12 +157,76 @@ func TestPublishedPreseasonRunKeepsItsRange(t *testing.T) {
 	pool, src := publishedFixture(t, true)
 	publishRun(t, pool, "2026-10-13T05", "preseason", "ppr,p1,262.1,177.6", "ppr,p2,307.3,207.6")
 	raw := load(t, src, PPR)
-	if raw.OrderBasis != OrderPreseason || raw.Players[0].Range == nil || raw.Players[0].Range.Floor != 177.6 {
-		t.Fatalf("basis %q first %+v", raw.OrderBasis, raw.Players[0])
+	if raw.Order != OrderPreseason || raw.Players[0].Range == nil || raw.Players[0].Range.Floor != 177.6 {
+		t.Fatalf("basis %q first %+v", raw.Order, raw.Players[0])
 	}
-	b := Board{Raw: raw, teams: 12}
+	b, err := For(raw, 12, []draft.SlotConfig{{Slot: draft.SlotQB, Count: 1}, {Slot: draft.SlotRB, Count: 2}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if b.Order != OrderPreseason || !b.Refreshed.Equal(refreshedAt) {
+		t.Fatalf("board order %q refreshed %s", b.Order, b.Refreshed)
+	}
 	if basis := b.Basis(); strings.Contains(basis, "rest of the season") {
 		t.Fatalf("basis %q", basis)
+	}
+}
+
+// readerRole stands in for the api's production role when the migration
+// ran as a role whose default privileges do not reach it: it reads the
+// research tables but not published_boards.
+const readerRole = "boards_published_reader"
+
+// A published_boards this role cannot select from reads the preseason
+// board, never a permission error in every room; once the grant lands the
+// next read takes the published rows (nothing is latched).
+func TestUnreadablePublishedTableFallsBackToThePreseasonBoard(t *testing.T) {
+	pool, admin := publishedFixture(t, true)
+	publishRun(t, pool, "2026-10-21T12", "rest_of_season", "ppr,p1,242.5,null", "ppr,p2,195.3,null")
+	ctx := context.Background()
+	s := publishedSchema
+	for _, stmt := range []string{
+		"drop role if exists " + readerRole,
+		"create role " + readerRole,
+		"grant usage on schema " + s + " to " + readerRole,
+		"grant select on " + s + ".preseason_projections, " + s + ".player_crosswalk, " + s + ".provider_players, " +
+			s + ".provider_games to " + readerRole,
+	} {
+		if _, err := pool.Exec(ctx, stmt); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Cleanup(func() {
+		_, _ = pool.Exec(ctx, "drop schema if exists "+s+" cascade")
+		_, _ = pool.Exec(ctx, "drop role if exists "+readerRole)
+	})
+	cfg, err := pgxpool.ParseConfig(dbtest.URL(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg.ConnConfig.RuntimeParams["role"] = readerRole
+	reader, err := pgxpool.NewWithConfig(ctx, cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(reader.Close)
+	src, err := NewPGSource(reader, s, 2026, admin.SourcePrefix)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw := load(t, src, PPR)
+	if raw.Order != OrderPreseason || *pointsOf(raw)["p1"] != 262.1 {
+		t.Fatalf("unreadable table: order %q p1 %v", raw.Order, *pointsOf(raw)["p1"])
+	}
+	if _, err := src.Version(ctx, PPR); err != nil {
+		t.Fatalf("version with an unreadable table: %v", err)
+	}
+	if _, err := pool.Exec(ctx, "grant select on "+s+".published_boards to "+readerRole); err != nil {
+		t.Fatal(err)
+	}
+	raw = load(t, src, PPR)
+	if raw.Order != OrderRestOfSeason || *pointsOf(raw)["p1"] != 242.5 {
+		t.Fatalf("after the grant: order %q p1 %v", raw.Order, *pointsOf(raw)["p1"])
 	}
 }
 
@@ -187,8 +251,8 @@ func TestEmptyPublishedTableFallsBackToThePreseasonBoard(t *testing.T) {
 				}
 			}
 			raw := load(t, src, PPR)
-			if raw.OrderBasis != OrderPreseason || !raw.AsOf.Equal(preseasonAsOf) || raw.Run != "" {
-				t.Fatalf("basis %q as of %s run %q", raw.OrderBasis, raw.AsOf, raw.Run)
+			if raw.Order != OrderPreseason || !raw.AsOf.Equal(preseasonAsOf) || raw.Run != "" {
+				t.Fatalf("basis %q as of %s run %q", raw.Order, raw.AsOf, raw.Run)
 			}
 			if p := pointsOf(raw)["p1"]; p == nil || *p != 262.1 || raw.Players[0].Range == nil {
 				t.Fatalf("preseason row %+v", raw.Players[0])
