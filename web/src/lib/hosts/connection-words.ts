@@ -20,9 +20,12 @@ const STATUS: Readonly<Record<ConnectedHost, Record<HostConnection['status'], st
  * with it proved it. */
 const NOT_YET_CHECKED = 'Connected, not yet checked against a private league';
 
+/** An ESPN session kept unproven that ESPN then refused: it never worked, so not "no longer". */
+const NEVER_ACCEPTED = 'ESPN did not accept your saved sign-in';
+
 /** A connection's state: "Signed in", "Connected", "Connected, not yet checked against a private
  * league", "Signed out by FFPC". */
 export function statusWords(c: HostConnection): string {
-	if (c.status === 'connected' && !c.proven) return NOT_YET_CHECKED;
+	if (!c.proven) return c.status === 'connected' ? NOT_YET_CHECKED : NEVER_ACCEPTED;
 	return STATUS[c.host][c.status];
 }

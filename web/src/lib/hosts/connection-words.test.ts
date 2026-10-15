@@ -27,16 +27,17 @@ void test('an ESPN session kept with only public leagues says it is not yet chec
 	assert.equal(statusWords(c), 'Connected, not yet checked against a private league');
 });
 
-void test('a signed out session says so whether or not it was proven', () => {
+void test('a signed out session says whether ESPN ever accepted it', () => {
 	const c = {
 		host: 'espn',
 		status: 'signed_out',
-		proven: false,
+		proven: true,
 		connected_at: at,
 		last_read_at: null
 	} as const;
 	assert.equal(statusWords(c), 'ESPN no longer accepts your saved sign-in');
-	assert.equal(statusWords({ ...c, host: 'ffpc', proven: true }), 'Signed out by FFPC');
+	assert.equal(statusWords({ ...c, proven: false }), 'ESPN did not accept your saved sign-in');
+	assert.equal(statusWords({ ...c, host: 'ffpc' }), 'Signed out by FFPC');
 });
 
 void test('the ESPN session sentence says what it is kept for and makes no promise about moves', () => {

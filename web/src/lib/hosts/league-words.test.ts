@@ -34,6 +34,14 @@ void test('an ESPN league says whether it is public or private where it was chec
 	assert.equal(chipWords({ ...league, public: true }), 'Sunday Crew, 10 teams, public');
 	assert.equal(chipLabel({ ...league, public: false }), 'Sunday Crew, as Hunt, 10 teams, private');
 	assert.equal(chipWords(league), 'Sunday Crew, 10 teams');
+	assert.equal(
+		chipWords({ ...league, unmarked: 'not_checked' }),
+		'Sunday Crew, 10 teams, public or private not checked'
+	);
+	assert.equal(
+		chipWords({ ...league, unmarked: 'no_answer' }),
+		'Sunday Crew, 10 teams, ESPN did not say public or private'
+	);
 });
 
 void test('a league with nothing to part it is its name', () => {
