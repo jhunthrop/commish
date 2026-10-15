@@ -51,6 +51,7 @@ from research.capsules.voice_rules import (
     banned_term_pattern,
     mask_names,
     voice_rule_hits,
+    writer_only_hits,
 )
 from research.pipeline.jscompat import js_string
 
@@ -251,7 +252,7 @@ def _copy_violations(text: str, names: Sequence[str], clock: SeasonClock) -> lis
         violations.append(f'The text names a competitor product ("{competitor}"). Remove it.')
     # The time frame rules read the text as written: they hold no name-sized words, and the sentence a
     # hit names goes back to the writer as he wrote it.
-    hits = [*voice_rule_hits(text, names), *time_frame_hits(text, clock)]
+    hits = [*voice_rule_hits(text, names), *writer_only_hits(text, names), *time_frame_hits(text, clock)]
     violations += [_voice_violation(hit, text) for hit in hits]
     if _unframed_floor(text):
         violations.append(UNFRAMED_FLOOR_VIOLATION)

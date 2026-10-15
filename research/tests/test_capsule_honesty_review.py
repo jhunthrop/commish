@@ -12,12 +12,12 @@ from research.capsules.claims import ClaimLedger, claim_violations
 from research.capsules.config import CAPSULE_CONFIG
 from research.capsules.prompt import IN_SEASON_RULES, PRESEASON_RULES
 from research.capsules.prose_checks import unfinished_ending
-from research.capsules.pull_figures import adp_figures_off_page
+from research.capsules.pull_figures import adp_figures_off_page, capsule_findings
 from research.capsules.requeue import QueueResult
 from research.capsules.season_voice import SeasonClock
 from research.capsules.sentences import phrase_pattern, split_sentences
-from research.capsules.validate import banned_term_in
-from research.capsules.voice_rules import voice_rule_hits
+from research.capsules.validate import Grounding, banned_term_in, validate_narrative_slot
+from research.capsules.voice_rules import gate_hits, writer_only_hits
 from research.nightly.config import TEAMS
 
 OCTOBER = SeasonClock(2026, 5, (1, 2, 3, 5), (4,))
@@ -150,9 +150,27 @@ def test_the_round_line_is_built_from_the_boards_teams_and_is_history_in_season(
 def test_the_sheet_prints_on_file_nowhere_and_on_file_is_a_worn_phrase() -> None:
     for module in (render, render_depth, render_season, render_words):
         assert "on file" not in inspect.getsource(module).split('"""', 2)[-1], module.__name__
-    assert "on file" in CAPSULE_CONFIG.repetition.refrain_stems
-    found = [hit.found for hit in voice_rule_hits("There is no ADP on file for him at all.", ())]
+    assert "on file" in CAPSULE_CONFIG.repetition.validator_only_stems
+    found = [hit.found for hit in writer_only_hits("There is no ADP on file for him at all.", ())]
     assert "on file" in found
+
+
+# The coordinator's ruling (Option B): a worn phrase added from now on binds new writes only.
+STORED = "He has no ADP on file, and he has been on every report since the run-up to week 6 of 2026. Sit him."
+GROUNDING = Grounding((6.0, 2026.0), (), "", None, (), None, "WR", None, None, OCTOBER)
+
+
+def test_a_stored_page_with_a_validator_only_phrase_passes_the_page_gate() -> None:
+    findings = capsule_findings("p", (STORED, STORED), (), (), OCTOBER)
+    assert not [f for f in findings if f.startswith("capsule_voice_rule")], findings
+    assert not gate_hits(STORED, ())
+    assert set(CAPSULE_CONFIG.repetition.validator_only_stems).isdisjoint(CAPSULE_CONFIG.repetition.refrain_stems)
+
+
+def test_a_new_write_with_a_validator_only_phrase_fails_the_validator() -> None:
+    violations = validate_narrative_slot(STORED, GROUNDING, 40).violations
+    assert any('"on file"' in v for v in violations)
+    assert any('"the run-up to"' in v for v in violations)
 
 
 # L5: the queue command refuses an empty list and fails when it stamps fewer rows than it named.

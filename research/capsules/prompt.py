@@ -97,7 +97,9 @@ _IN_SEASON_ROUNDS: Final = (
     "A round is only history now, never advice: the round of his ADP before the season is the ADP divided by "
     f"{TEAMS} and rounded up (ADP {_EXAMPLE_ADP} was round {_EXAMPLE_ROUND})."
 )
-_STEMS: Final = ", ".join(f'"{stem}"' for stem in CAPSULE_CONFIG.repetition.refrain_stems)
+_STEMS: Final = ", ".join(
+    f'"{stem}"' for stem in (*CAPSULE_CONFIG.repetition.refrain_stems, *CAPSULE_CONFIG.repetition.validator_only_stems)
+)
 _PRESEASON_FIXES: Final = ", ".join(f'not "{instead}" but "{write}"' for instead, write in DRAFTING_SENTENCES)
 _IN_SEASON_FIXES: Final = ", ".join(f'not "{instead}" but "{write}"' for instead, write in IN_SEASON_SENTENCES)
 

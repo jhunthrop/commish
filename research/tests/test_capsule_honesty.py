@@ -17,7 +17,7 @@ from research.capsules.pull_figures import adp_figures_off_page, capsule_finding
 from research.capsules.render_words import SHEET_LABELS
 from research.capsules.season_voice import SeasonClock
 from research.capsules.validate import banned_term_in
-from research.capsules.voice_rules import gate_hits, voice_rule_hits
+from research.capsules.voice_rules import gate_hits, writer_only_hits
 
 # The pages as the review read them on 2026-10-15 (through week 5 of 2026).
 OCTOBER = SeasonClock(2026, 5, (1, 4, 5), (2, 3))
@@ -357,7 +357,7 @@ def test_the_writer_is_told_what_a_missing_adp_means_and_the_page_facts_rules() 
 def test_the_run_up_label_the_sheet_no_longer_prints_is_a_worn_phrase(text: str) -> None:
     """Harris's unfilled template and the stock line on 122 pages: the sheet now prints an injury status
     as data ("designation Q since before week 6 of 2026"), and "the run-up to" is a worn phrase."""
-    assert "the run-up to" in [hit.found for hit in voice_rule_hits(text, ())]
+    assert "the run-up to" in [hit.found for hit in writer_only_hits(text, ())]
     assert "the run-up to" not in SHEET_LABELS
 
 

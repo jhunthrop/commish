@@ -130,9 +130,17 @@ class Repetition:
         "cut short by injury",
         "our number puts him at",
         "once injury risk is in",
+    )
+    # WORN PHRASES FOR NEW WRITES ONLY (the coordinator's ruling of 2026-10-15, Option B). The stems above
+    # are set phrases the page gate also refuses on every stored page. A worn phrase added from now on
+    # goes here unless a ruling says otherwise: the writer is told it and the validator refuses it on
+    # every new write, but a stored page carrying it is not a page-gate repair target, so a new phrase
+    # never turns the whole stored board into repair targets on its first night. The week a full
+    # rewrite lands (every page's facts move) applies it to every page.
+    validator_only_stems: tuple[str, ...] = (
         # The live review of 2026-10-15 (M1): the old injury label, on 206 live pages.
         "the run-up to",
-        # Clerk's language, on 113 live pages; the sheet prints it nowhere (the coordinator's ruling).
+        # Clerk's language, on 113 live pages; the sheet prints it nowhere.
         "on file",
     )
 

@@ -25,6 +25,7 @@ from types import MappingProxyType
 from typing import Final
 
 from research.capsules.config import CAPSULE_CONFIG
+from research.capsules.sentences import phrase_pattern
 
 EM_DASH: Final = chr(0x2014)
 # Curly apostrophes read as straight ones before a phrase is matched.
@@ -352,6 +353,18 @@ def voice_rule_hits(text: str, names: Sequence[str]) -> list[VoiceRuleHit]:
     # Read on the text as written: a masked name ("Him") beside another would read as one doubled.
     hits += [VoiceRuleHit("doubled word", doubled) for doubled in dict.fromkeys(doubled_words(text))]
     return hits
+
+
+_WRITER_ONLY_PATTERNS: Final = tuple(
+    NamedPattern(phrase, phrase_pattern(phrase)) for phrase in CAPSULE_CONFIG.repetition.validator_only_stems
+)
+
+
+def writer_only_hits(text: str, names: Sequence[str]) -> list[VoiceRuleHit]:
+    """The worn phrases that bind new writes only (`Repetition.validator_only_stems`): the validator
+    refuses them as set phrases; the page gate (`gate_hits`) never reads them on a stored page."""
+    normalised = _normalise_apostrophes(mask_names(text, names))
+    return [VoiceRuleHit("set phrase", p.name) for p in _WRITER_ONLY_PATTERNS if p.pattern.search(normalised)]
 
 
 def gate_hits(text: str, names: Sequence[str]) -> list[VoiceRuleHit]:
