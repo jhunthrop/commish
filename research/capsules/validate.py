@@ -27,6 +27,7 @@ from research.capsules.grounding import (
     round_half_up,
 )
 from research.capsules.pull_figures import adp_figures_off_page, facts_page_numbers, pull_figures_of, renderings_of
+from research.capsules.rank_basis import rank_basis_violation, ranks_without_basis
 from research.capsules.render import render_facts_for_model
 from research.capsules.season_voice import (
     SeasonClock,
@@ -290,6 +291,9 @@ def _validate(
     violations += [
         rank_violation(claim, source)
         for claim in rank_claims_off_page(trimmed, source.position, source.position_rank, source.board_rank)
+    ]
+    violations += [
+        rank_basis_violation(claim) for claim in ranks_without_basis(trimmed, source.position, source.position_rank)
     ]
     return ValidationResult(not violations, tuple(violations))
 

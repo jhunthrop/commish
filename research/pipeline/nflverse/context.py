@@ -29,6 +29,7 @@ from research.pipeline.nflverse.pbp import (
     play_profile_observations,
     player_touch_observations,
 )
+from research.pipeline.nflverse.pbp_passers import PASSER_COLUMNS, PasserDropbacks, passer_observations
 from research.pipeline.nflverse.schedule import (
     SCHEDULE_FILE,
     SCHEDULE_RELEASE,
@@ -73,28 +74,58 @@ class ContextIngestReport:
     player_weeks: int
     observations_written: int
     unknown_players: int
+    # Passer-weeks counted when the stream also counted dropbacks (the weekly pass), else 0.
+    passer_weeks: int = 0
 
 
-def ingest_play_by_play(conn: Connection, client: NflverseClient, season: int) -> ContextIngestReport:
-    """`ingestPlayByPlay`: one stream, two accumulators, team-week and player-week facts."""
+def play_by_play_file(season: int, *, compressed: bool) -> str:
+    """The season's play-by-play asset, plain or gzipped."""
+    return f"play_by_play_{season}.csv{'.gz' if compressed else ''}"
+
+
+def _game_day_stamp(game_date: str) -> datetime:
+    return kickoff_as_of(game_date, PUBLICATION_LAG_HOURS)
+
+
+def ingest_play_by_play(
+    conn: Connection,
+    client: NflverseClient,
+    season: int,
+    *,
+    passers: PasserDropbacks | None = None,
+    compressed: bool = False,
+) -> ContextIngestReport:
+    """`ingestPlayByPlay`: one stream, two accumulators, team-week and player-week facts; with
+    `passers`, the same stream also counts each passer's dropbacks (the weekly pass's addition).
+    `compressed` reads the gzipped asset, a fifth of the bytes (the weekly pass, which reads it for the
+    FTN join too); the history pass and its recordings read the plain CSV."""
     teams = PlayByPlayAggregator()
     players = PlayerPlayAggregator()
-    columns = tuple(dict.fromkeys((*PBP_COLUMNS, *PBP_PLAYER_COLUMNS)))
+    extra = () if passers is None else PASSER_COLUMNS
+    columns = tuple(dict.fromkeys((*PBP_COLUMNS, *PBP_PLAYER_COLUMNS, *extra)))
 
     def on_row(row: Mapping[str, str]) -> None:
         teams.add(row)
         players.add(row)
+        if passers is not None:
+            passers.add(row)
 
-    plays = client.stream_csv(Releases.PBP, f"play_by_play_{season}.csv", columns, on_row)
+    file = play_by_play_file(season, compressed=compressed)
+    plays = client.stream_csv(Releases.PBP, file, columns, on_row)
     profiles = teams.profiles()
-    observations = play_profile_observations(profiles, lambda p: kickoff_as_of(p.game_date, PUBLICATION_LAG_HOURS))
+    observations = play_profile_observations(profiles, lambda p: _game_day_stamp(p.game_date))
     projected = frozenset(all_positions(conn))
-    touches = player_touch_observations(
-        players.touches(), lambda game_date: kickoff_as_of(game_date, PUBLICATION_LAG_HOURS), projected
-    )
+    touches = player_touch_observations(players.touches(), _game_day_stamp, projected)
     player_weeks = len({f"{o.week}|{o.player_id}" for o in touches.observations})
     written = record_team_observations(conn, observations) + record_observations(conn, touches.observations)
-    return ContextIngestReport(season, plays, len(profiles), player_weeks, written, len(touches.unknown_players))
+    passer_weeks = 0
+    if passers is not None:
+        dropbacks = passer_observations(passers.weeks(), _game_day_stamp, projected)
+        written += record_observations(conn, dropbacks.observations)
+        passer_weeks = len(dropbacks.observations)
+    return ContextIngestReport(
+        season, plays, len(profiles), player_weeks, written, len(touches.unknown_players), passer_weeks
+    )
 
 
 # --- reading the team store back ----------------------------------------------------------------

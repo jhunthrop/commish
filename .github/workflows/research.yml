@@ -65,8 +65,8 @@ env:
   BOARDS_SA: boards-runtime@trycommish.iam.gserviceaccount.com
   # Cloud SQL for Postgres (infra/README.md). What reads RESEARCH_DATABASE_URL mounts the instance's
   # socket at /cloudsql/<instance>, which that URL names in its host parameter: the boards service and
-  # the nightly, inseason and inseason-capture jobs. The advisor and nightly-publish read no database,
-  # so they get no connection.
+  # the nightly, nightly-publish (it writes the published board, Lane 28), inseason and
+  # inseason-capture jobs. The advisor reads no database, so it gets no connection.
   CLOUDSQL_INSTANCE: trycommish:us-east1:commish-pg
 jobs:
   research:
@@ -275,9 +275,9 @@ jobs:
           db="RESEARCH_DATABASE_URL=RESEARCH_DATABASE_URL:latest"
           nightly="$db,AI_GATEWAY_API_KEY=AI_GATEWAY_API_KEY:latest,CLOUDFLARE_API_TOKEN=CLOUDFLARE_API_TOKEN:latest"
           nightly="$nightly,TANK01_API_KEY=TANK01_API_KEY:latest,ODDS_API_KEY=ODDS_API_KEY:latest"
-          publish="CLOUDFLARE_API_TOKEN=CLOUDFLARE_API_TOKEN:latest,WEB_DISPATCH_TOKEN=WEB_DISPATCH_TOKEN:latest"
+          publish="$db,CLOUDFLARE_API_TOKEN=CLOUDFLARE_API_TOKEN:latest,WEB_DISPATCH_TOKEN=WEB_DISPATCH_TOKEN:latest"
           deploy() { # name, args, secrets, cpu, memory, task timeout
-            # A job that reads the database gets its socket; one that does not (publish) gets none.
+            # A job that reads the database gets its socket; one that does not gets none.
             sql=()
             case "$3" in *RESEARCH_DATABASE_URL=*) sql=(--set-cloudsql-instances "$CLOUDSQL_INSTANCE") ;; esac
             gcloud run jobs deploy "$1" --image "$IMAGE" --region "$REGION" --service-account "$RUNTIME_SA" \

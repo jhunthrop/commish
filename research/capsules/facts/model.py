@@ -272,3 +272,35 @@ class NewsItem:
     title: str
     link: str
     published_at: str | None
+
+
+# --- this season's usage and play (`facts.season_usage`) ---------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class SeasonFigure:
+    """One figure of this season with its basis: `value` is the rate or average, `count` and `out_of`
+    what it was taken from (9 of 29, 3 drops on 41 targets), `weeks` the weeks it was taken over,
+    `floor` the sample every ranked peer cleared, `rank` his place among them (None where the figure
+    is not ranked)."""
+
+    key: str
+    value: float
+    count: float | None
+    out_of: float
+    weeks: tuple[int, ...]
+    floor: float
+    rank: RankedStat | None
+
+
+@dataclass(frozen=True, slots=True)
+class SeasonUsage:
+    """This season's usage and play from the play-by-play and the charted feeds, weeks `first_week`
+    to `last_week`: only the figures whose sample cleared its floor, never a zero for a missing one."""
+
+    season: int
+    first_week: int
+    last_week: int
+    # The weeks he has any of these facts in: a figure taken over fewer names its own.
+    weeks: tuple[int, ...]
+    figures: tuple[SeasonFigure, ...]

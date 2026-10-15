@@ -28,10 +28,12 @@ from research.capsules.facts.model import (
     NewsItem,
     Projection,
     SeasonSoFar,
+    SeasonUsage,
     Trend,
     Usage,
     to_js,
 )
+from research.capsules.facts.season_usage_ledger import usage_names, usage_numbers
 from research.model.domain import snake_to_camel
 from research.model.laws.registry import Law
 from research.pipeline.jscompat import js_json_stringify
@@ -80,6 +82,8 @@ class FactsInput:
     # The page's overall and position rank (`market_adp`), which replace the oracle's board rank and
     # the scarcity reason's position rank; None keeps the oracle's (the parity cases).
     page_ranks: PageRanks | None = None  # None only where a sheet is built without a run (none today)
+    # This season's usage and play (`facts.season_usage`): None before any week's facts are stored.
+    season_usage: SeasonUsage | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -102,6 +106,8 @@ class PlayerFacts:
     usage: Usage | None
     trend: Trend | None
     depth: Depth
+    # This season's usage and play from the play-by-play and the charted feeds, None until it has a figure.
+    season_usage: SeasonUsage | None = None
     run_day: str = ""
     number_ledger: tuple[float, ...] = ()
     name_ledger: tuple[str, ...] = ()
@@ -124,6 +130,7 @@ _CONTENT_FIELDS: Final = (
     "usage",
     "trend",
     "depth",
+    "season_usage",
 )
 
 
@@ -163,9 +170,11 @@ def build_player_facts(given: FactsInput) -> PlayerFacts:
         given.usage,
         given.trend,
         given.depth,
-        given.run_day,
+        season_usage=given.season_usage,
+        run_day=given.run_day,
     )
     depth = content.depth
-    numbers = tuple(number_ledger(content, depth_numbers(depth)))
-    names = tuple(name_ledger(content, depth_names(depth), depth_team_codes(depth)))
+    usage = content.season_usage
+    numbers = tuple(number_ledger(content, [*depth_numbers(depth), *usage_numbers(usage)]))
+    names = tuple(name_ledger(content, [*depth_names(depth), *usage_names(usage)], depth_team_codes(depth)))
     return replace(content, number_ledger=numbers, name_ledger=names, facts_hash=facts_hash(content))

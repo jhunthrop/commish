@@ -302,6 +302,72 @@ export interface paths {
 		patch?: never;
 		trace?: never;
 	};
+	'/leagues/attached/{id}/lineup': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				/** @description the attached league's id (AttachedLeague.id) */
+				id: string;
+			};
+			cookie?: never;
+		};
+		/** Start and sit: the week's lineup for the drafter's own team, every slot filled by our order after the week's hard facts (bye, out, doubtful), each change from the lineup the host holds with its reason in one sentence. Reads the league as the sync route does. We never write the host. */
+		get: operations['leagueLineup'];
+		put?: never;
+		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/leagues/attached/{id}/waivers': {
+		parameters: {
+			query?: {
+				/** @description only candidates at this position */
+				position?: 'QB' | 'RB' | 'WR' | 'TE' | 'K' | 'DEF';
+			};
+			header?: never;
+			path: {
+				/** @description the attached league's id (AttachedLeague.id) */
+				id: string;
+			};
+			cookie?: never;
+		};
+		/** Waivers: the unrostered players on our board ranked by the gain to the drafter's lineup, each with the drop it costs least to lose. A player tagged Hold on the drafter's sheets is never the drop. We submit nothing. */
+		get: operations['leagueWaivers'];
+		put?: never;
+		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/leagues/attached/{id}/trades': {
+		parameters: {
+			query?: {
+				/** @description a board id; only trades holding this player, on either side */
+				player?: string;
+			};
+			header?: never;
+			path: {
+				/** @description the attached league's id (AttachedLeague.id) */
+				id: string;
+			};
+			cookie?: never;
+		};
+		/** The trade finder: for each other team, the one-for-one and two-for-one trades (both ways) after which both lineups gain on our order and both still fill every slot, best for the drafter first. A player tagged Hold on the drafter's sheets is never given. We never send an offer. */
+		get: operations['leagueTrades'];
+		put?: never;
+		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
 	'/sheets': {
 		parameters: {
 			query?: never;
@@ -2170,6 +2236,179 @@ export interface components {
 			mine: components['schemas']['MatchupSide'];
 			opponent: components['schemas']['MatchupSide'] | null;
 		};
+		/**
+		 * @description which order ranks the players: our preseason board, or the rest-of-season order (from week 7, once the API reads it)
+		 * @enum {string}
+		 */
+		OrderBasis: 'preseason' | 'rest_of_season';
+		InjuryDesignation: {
+			/** @enum {string} */
+			status: 'questionable' | 'doubtful' | 'out' | 'injured_reserve' | 'suspended' | 'pup' | 'nfi';
+			/**
+			 * Format: date-time
+			 * @description the stamp of the injury read that lists it, or of the host read for the host's own IR mark
+			 */
+			as_of: string;
+		};
+		GamePoints: {
+			week: number;
+			/**
+			 * Format: double
+			 * @description his points that game under the league's scoring
+			 */
+			points: number;
+		};
+		PointsAllowed: {
+			/**
+			 * Format: double
+			 * @description the opponent's defense to this position, season to date, under the league's scoring, one decimal
+			 */
+			points_a_game: number;
+			/** @description 1 allowed the fewest */
+			rank: number;
+			/** @description the defenses ranked */
+			of: number;
+			position: string;
+		};
+		/** @description one player's week; a fact we do not hold is null, never zero */
+		WeekFacts: {
+			week: number;
+			/** @description the opponent's team code, null on bye or when his team is unknown */
+			opponent: string | null;
+			home: boolean | null;
+			/** Format: date-time */
+			kickoff: string | null;
+			bye: boolean;
+			designation: components['schemas']['InjuryDesignation'] | null;
+			/** @description his game this week is final */
+			played: boolean;
+			/**
+			 * Format: double
+			 * @description the host's score for him so far, from the matchup, when he starts there and his game has kicked off
+			 */
+			points_this_week: number | null;
+			/** @description up to three completed games under the league's scoring, newest first */
+			last_games: components['schemas']['GamePoints'][];
+			allowed_to_position: components['schemas']['PointsAllowed'] | null;
+		};
+		PlayerLine: {
+			player: components['schemas']['LeaguePlayer'];
+			/** @description his place at his position in our order */
+			position_rank: number | null;
+			/**
+			 * Format: double
+			 * @description points over replacement a week (the season's over 17 games) for this league, one decimal; null without a projection
+			 */
+			points_over_replacement: number | null;
+			/** @description the drafter tags him Hold on a sheet */
+			held: boolean;
+			facts: components['schemas']['WeekFacts'];
+		};
+		LineupSlot: {
+			/** @enum {string} */
+			slot: 'QB' | 'RB' | 'WR' | 'TE' | 'FLEX' | 'SUPERFLEX' | 'K' | 'DEF';
+			ours: components['schemas']['PlayerLine'];
+			/** @description the host lineup's player in this place: the same player when unchanged, the starter we sit for a change, null for a spot the host left empty */
+			host: components['schemas']['PlayerLine'] | null;
+			/** @description we start a player the host has on the bench */
+			changed: boolean;
+			/** @description the reason for a change */
+			sentence: string | null;
+		};
+		LineupAdvice: {
+			week: number;
+			/** @description the honesty line and the basis of points over replacement */
+			basis: string;
+			order_basis: components['schemas']['OrderBasis'];
+			/**
+			 * Format: date-time
+			 * @description when the order was made
+			 */
+			refreshed: string;
+			/**
+			 * Format: date-time
+			 * @description the league's last host read
+			 */
+			read_at: string;
+			/** @description true when the host's lineup is already ours */
+			set: boolean;
+			/** @description every starting spot in the league's order (QB, RB, WR, TE, the flex spots, K, DEF); a spot no rostered player can fill is left out */
+			slots: components['schemas']['LineupSlot'][];
+			/** @description everyone else on the active roster, by the same keys (injured reserve and taxi spots left out) */
+			bench: components['schemas']['PlayerLine'][];
+			/** @description the host's lineup page, empty when we know none */
+			host_lineup_url: string;
+		};
+		WaiverRow: {
+			add: components['schemas']['PlayerLine'];
+			/** @description null when a roster spot is open or there is no move to make */
+			drop: components['schemas']['PlayerLine'] | null;
+			/**
+			 * Format: double
+			 * @description points over replacement a week to the lineup, one decimal; above 0 sits above the rule
+			 */
+			gain: number;
+			/** @description he starts for you this week */
+			starts: boolean;
+			sentence: string;
+		};
+		WaiverAdvice: {
+			week: number;
+			basis: string;
+			order_basis: components['schemas']['OrderBasis'];
+			/** Format: date-time */
+			refreshed: string;
+			/** Format: date-time */
+			read_at: string;
+			/** @description the add that gains most */
+			best: components['schemas']['WaiverRow'] | null;
+			/** @description positive gains first by gain, then the rest by points over replacement, at most 60 */
+			rows: components['schemas']['WaiverRow'][];
+			/** @description the host's waiver page, empty when we know none */
+			host_waivers_url: string;
+		};
+		TradeRecord: {
+			wins: number;
+			losses: number;
+			ties: number;
+		};
+		TradeRow: {
+			give: components['schemas']['PlayerLine'][];
+			get: components['schemas']['PlayerLine'][];
+			/**
+			 * Format: double
+			 * @description points over replacement a week to the drafter's lineup
+			 */
+			my_gain: number;
+			/**
+			 * Format: double
+			 * @description the same to theirs
+			 */
+			their_gain: number;
+			/** @description their gain is under 0.5 a week */
+			close_for_them: boolean;
+		};
+		TradeTeam: {
+			roster_id: number;
+			name: string;
+			owner: string;
+			record: components['schemas']['TradeRecord'];
+			/** @description at most 10, best for the drafter first */
+			trades: components['schemas']['TradeRow'][];
+		};
+		TradeAdvice: {
+			week: number;
+			basis: string;
+			order_basis: components['schemas']['OrderBasis'];
+			/** Format: date-time */
+			refreshed: string;
+			/** Format: date-time */
+			read_at: string;
+			/** @description every other team */
+			teams: components['schemas']['TradeTeam'][];
+			/** @description the host's trade page, empty when we know none */
+			host_trades_url: string;
+		};
 		LeagueMove: {
 			/** @enum {string} */
 			kind: 'add' | 'waiver' | 'trade';
@@ -2453,6 +2692,33 @@ export interface components {
 			content: {
 				'application/json': components['schemas']['Envelope'] & {
 					data?: components['schemas']['LeagueSync'];
+				};
+			};
+		};
+		/** @description the week's lineup advice for the drafter's team */
+		LineupAdviceResponse: {
+			headers: Record<string, unknown>;
+			content: {
+				'application/json': components['schemas']['Envelope'] & {
+					data?: components['schemas']['LineupAdvice'];
+				};
+			};
+		};
+		/** @description the waiver pool ranked by the gain to the drafter's lineup */
+		WaiverAdviceResponse: {
+			headers: Record<string, unknown>;
+			content: {
+				'application/json': components['schemas']['Envelope'] & {
+					data?: components['schemas']['WaiverAdvice'];
+				};
+			};
+		};
+		/** @description the trades that help both lineups, by team */
+		TradeAdviceResponse: {
+			headers: Record<string, unknown>;
+			content: {
+				'application/json': components['schemas']['Envelope'] & {
+					data?: components['schemas']['TradeAdvice'];
 				};
 			};
 		};
@@ -2876,6 +3142,71 @@ export interface operations {
 			200: components['responses']['LeagueSyncResponse'];
 			404: components['responses']['ErrorResponse'];
 			429: components['responses']['ErrorResponse'];
+			502: components['responses']['ErrorResponse'];
+		};
+	};
+	leagueLineup: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				/** @description the attached league's id (AttachedLeague.id) */
+				id: string;
+			};
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			200: components['responses']['LineupAdviceResponse'];
+			404: components['responses']['ErrorResponse'];
+			409: components['responses']['ErrorResponse'];
+			422: components['responses']['ErrorResponse'];
+			502: components['responses']['ErrorResponse'];
+		};
+	};
+	leagueWaivers: {
+		parameters: {
+			query?: {
+				/** @description only candidates at this position */
+				position?: 'QB' | 'RB' | 'WR' | 'TE' | 'K' | 'DEF';
+			};
+			header?: never;
+			path: {
+				/** @description the attached league's id (AttachedLeague.id) */
+				id: string;
+			};
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			200: components['responses']['WaiverAdviceResponse'];
+			400: components['responses']['ErrorResponse'];
+			404: components['responses']['ErrorResponse'];
+			409: components['responses']['ErrorResponse'];
+			422: components['responses']['ErrorResponse'];
+			502: components['responses']['ErrorResponse'];
+		};
+	};
+	leagueTrades: {
+		parameters: {
+			query?: {
+				/** @description a board id; only trades holding this player, on either side */
+				player?: string;
+			};
+			header?: never;
+			path: {
+				/** @description the attached league's id (AttachedLeague.id) */
+				id: string;
+			};
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			200: components['responses']['TradeAdviceResponse'];
+			400: components['responses']['ErrorResponse'];
+			404: components['responses']['ErrorResponse'];
+			409: components['responses']['ErrorResponse'];
+			422: components['responses']['ErrorResponse'];
 			502: components['responses']['ErrorResponse'];
 		};
 	};

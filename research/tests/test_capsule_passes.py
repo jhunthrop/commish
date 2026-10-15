@@ -64,6 +64,8 @@ def _passes(script: _Script, monkeypatch: pytest.MonkeyPatch) -> _Passes:
 def _kind(plan: SweepPlan) -> str:
     if plan.unwritten_only:
         return "retry"
+    if plan.grace:
+        return "graced"
     return "spans" if plan.keep_written else "hard"
 
 
@@ -76,7 +78,8 @@ def test_each_attempt_retries_then_rewrites_hard_then_retries_then_spans_and_the
     # The scripted retry pass writes its page, so each retry is one sweep.
     one_attempt = ["retry", "hard", "retry", "spans"]
     last_attempt = ["retry", "hard", "retry"]
-    assert kinds == one_attempt * (REPAIR_PASSES - 1) + last_attempt
+    # A sentence still on two pages after the last attempt gets the graced rewrite (ruled 2026-10-15).
+    assert kinds == [*one_attempt * (REPAIR_PASSES - 1), *last_attempt, "graced"]
     # Every span rewrite is preceded, within its attempt, by a retry of the pages still unwritten.
     for index, kind in enumerate(kinds):
         if kind == "spans":
@@ -164,3 +167,55 @@ def test_the_failure_path_reads_the_pass_the_step_already_holds(monkeypatch: pyt
     )
     assert steps[-1].record == StepRecord("capsules", "failed", "RuntimeError: the gateway went away")
     assert len(reads) == 1
+
+
+def test_a_shared_sentence_at_the_ceiling_takes_one_generation_past_it_after_the_last_attempt(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The graced rewrite reaches a page at the ceiling that the hard passes had to leave, once."""
+    passes = _passes(_Script(), monkeypatch)
+    monkeypatch.undo()
+    seen: list[frozenset[str]] = []
+
+    def sweep_capsules(*args: Any) -> SweepReport:
+        plan = cast("SweepPlan", args[3])
+        seen.append(plan.exclude)
+        processed = [] if "b" in plan.exclude else ["b"]
+        return SweepReport(NOW, 4, 1, processed, 1, 0, calls_by_player=dict.fromkeys(processed, 6))
+
+    monkeypatch.setattr(capsule_step, "sweep_capsules", sweep_capsules)
+    monkeypatch.setattr(passes, "_judged", lambda: (_gate(0, True, False), ORDER, {}))
+    passes.calls_by_player["b"] = NIGHT_CALLS_PER_PLAYER
+    passes.sweep("hard", SweepPlan(10, only=("b",)))
+    passes.grace_shared_sentences()
+    passes.grace_shared_sentences()
+    assert seen == [frozenset({"b"}), frozenset(), frozenset({"b"})]
+
+
+def test_no_graced_rewrite_when_no_sentence_is_shared(monkeypatch: pytest.MonkeyPatch) -> None:
+    script = _Script()
+    passes = _passes(script, monkeypatch)
+    monkeypatch.setattr(passes, "_judged", lambda: (_gate(0, False, True), ORDER, {}))
+    passes.grace_shared_sentences()
+    assert script.plans == []
+
+
+def test_the_span_repair_rewrites_at_most_the_nights_cap(monkeypatch: pytest.MonkeyPatch) -> None:
+    script = _Script()
+    passes = _passes(script, monkeypatch)
+    passes.span_pages_left = 1
+    many = (SharedSpan("six words that two pages share", ("a", "b", "c", "d")),)
+
+    def judged() -> tuple[CapsuleGateResult, list[str], dict[str, tuple[str, ...]]]:
+        return CapsuleGateResult(4, 4, 0, 0, 0, (), _LINE, many), ORDER, {}
+
+    def sweep(name: str, plan: SweepPlan) -> SweepReport:
+        script.plans.append((name, plan))
+        return SweepReport(NOW, 4, 1, list(plan.only or ()), 1, 0)
+
+    monkeypatch.setattr(passes, "_judged", judged)
+    monkeypatch.setattr(passes, "sweep", sweep)
+    passes.repair()
+    span_plans = [plan for _, plan in script.plans if plan.keep_written]
+    assert [plan.only for plan in span_plans] == [("b",)]
+    assert passes.span_pages_left == 0

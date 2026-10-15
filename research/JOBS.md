@@ -15,8 +15,8 @@ created paused until cutover). Every invocation is one pass; the scheduler owns 
 | Job (Cloud Run) | Command | Schedule | Replaces |
 |---|---|---|---|
 | `nightly` | `research.nightly run`: ingest (capture harvest, ADP in four formats, pre-kickoff props, win totals), fit check, capsules, the run to R2, the gates, the headshots | 05:00 UTC | `adp-snapshot`, `props-preseason-snapshot`, `win-totals`, `capsule-sweep`, the board's nightly check |
-| `nightly-publish` | `research.nightly publish`: the passed run public an hour after it passed, and the web build dispatched | hourly 06:00-12:00 UTC | nothing (new: early access, spec §4) |
-| `inseason` | `research.inseason --task season-week`: stats (nflverse `stats_player`), props, grade, freeze, scoreboard | Tue 08:00, Wed 18:00, Thu 14:00 America/New_York, September through February; the season is the one the stored schedule places today, and a date none places fails the pass | `season-week` |
+| `nightly-publish` | `research.nightly publish`: the passed run public an hour after it passed, the web build dispatched, and `published_boards` set to the public run's boards (the API's read of the site's order) | hourly 06:00-12:00 UTC | nothing (new: early access, spec §4) |
+| `inseason` | `research.inseason --task season-week`: stats (nflverse `stats_player`), the season's play-by-play and charted feeds (FTN charting, Next Gen Stats, PFR advanced stats; `inseason/usage_steps.py`), props, grade, freeze, scoreboard | Tue 08:00, Wed 18:00, Thu 14:00 America/New_York, September through February; the season is the one the stored schedule places today, and a date none places fails the pass | `season-week` |
 | `inseason-capture` | `research.inseason --task capture-harvest` | hourly 07:00-23:00 and 02:00 America/New_York | `capture-harvest` |
 
 `research.pipeline history` re-creates the seasons the store lost (an operator command, run once
@@ -49,6 +49,7 @@ write of a new season starts it clean.
 | Job | Schedule today | What it ingests or does | Python destination |
 |---|---|---|---|
 | `season-week` step `stats-ingest` | Tue 08:00, Wed 18:00, Thu 14:00 ET | nflverse universe, snap counts, weekly stats into `players`, `player_week_observations`, `player_week_teams`, `team_week_observations` | `pipeline.nflverse.ingest.ingest_player_universe` + `schedule_week_as_of` + `ingest_season` (phase A, parity `nflverse-season-*`) |
+| `season-week` steps `play-by-play`, `ftn-charting`, `next-gen-stats`, `pfr-advstats` | same | the season's play-by-play (team and player facts, passer dropbacks) and the three charted feeds into `player_week_observations` and `team_week_observations` | new in Python (Lane 23): `inseason.usage_steps`; `--task usage-backfill` runs them alone |
 | `season-week` step `props-snapshot` | same | The Odds API props into `player_prop_observations` | `pipeline.odds.ingest.run_odds_snapshot` (phase A, parity `odds-snapshot-and-resolve`) |
 | `season-week` steps `grade`, `freeze`, `scoreboard` | same | the register (`register_freeze_rows`, `register_grade_rows`) | `research.model` (phase B, register parity) |
 | `season-week` steps `peek-facts`, `peek-documents` | same | the old app's peek tables | not carried: the research schema has no peek tables (README) |

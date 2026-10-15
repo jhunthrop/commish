@@ -4,7 +4,12 @@ fails the run, a whole sentence on two pages does, a span a fact sheet prints is
 span, overlapping windows are quoted as one phrase, and the repair keeps each span on its first page."""
 
 from datetime import UTC, datetime
+from typing import Any, cast
 
+import pytest
+from sqlalchemy import Connection
+
+from research.capsules import span_rules
 from research.capsules.config import CAPSULE_CONFIG
 from research.capsules.spans import SpanRules, name_words, page_runs, phrases_on_page, shared_spans, sheet_spans
 from research.capsules.store import WRITTEN_SOURCE, StoredCapsule
@@ -94,3 +99,28 @@ def test_overlapping_windows_are_quoted_as_one_phrase() -> None:
 def test_the_repair_keeps_each_span_on_its_first_page() -> None:
     order = ["a", "b", "c", "d"]
     assert repair_targets([("c", "a"), ("d", "b", "a")], order) == ["b", "c", "d"]
+
+
+def test_a_span_any_part_of_the_facts_prints_is_exempt_and_a_paraphrase_is_not(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The ruling of 2026-10-15: a figure's basis as the whole sheet or the facts block renders it."""
+    monkeypatch.setattr(span_rules, "span_names", lambda conn: NAMES)
+    monkeypatch.setattr(
+        span_rules,
+        "facts_texts",
+        lambda facts: (
+            "Injury report: designation Q, on every report since the run-up to week 6 of 2026.",
+            "Middle range: 227 to 320 points",
+        ),
+    )
+    rules = span_rules.span_rules_for(cast("Connection", None), [cast("Any", object())])
+    rows = {
+        "a": _row("a", "Injury: on every report since the run-up to now."),
+        "b": _row("b", "Listed on every report since the run-up to Sunday."),
+        "c": _row("c", "He beat the position's weekly median in nine weeks."),
+        "d": _row("d", "Again he beat the position's weekly median in most weeks."),
+    }
+    gate = judge_capsules(["a", "b", "c", "d"], rows, rules, LINE)
+    assert gate.exempt_spans > 0
+    assert {s.player_ids for s in gate.spans} == {("c", "d")}

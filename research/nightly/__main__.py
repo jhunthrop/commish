@@ -5,13 +5,17 @@
     uv run python -m research.nightly publish [--out DIR] [--at ISO] [--no-dispatch]
 
 `run` writes one run under a new run id (05:00 UTC); `publish` makes the newest passed run public
-once its early-access hour is over and dispatches the web build of it (hourly from 06:00 UTC).
+once its early-access hour is over, dispatches the web build of it (hourly from 06:00 UTC), and
+keeps `research.published_boards` equal to the public run's boards, the table the API reads.
 Without `--out` both write the R2 bucket (CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID); with it, a
 local directory laid out as the bucket is, which the web build reads as PUBLIC_RUN_BASE_URL.
-RESEARCH_DATABASE_URL is the store; provider keys (TANK01_API_KEY, ODDS_API_KEY), the writer's
-(AI_GATEWAY_API_KEY) and the dispatch token (WEB_DISPATCH_TOKEN) come from the environment, and a
-part whose key is missing is skipped by name. Exit status 1 when the run failed a gate or a step, or
-the dispatch failed.
+RESEARCH_DATABASE_URL is the store (both commands; a local `--out` publish without it skips the
+table by name); provider keys (TANK01_API_KEY, ODDS_API_KEY), the writer's (AI_GATEWAY_API_KEY) and
+the dispatch token (WEB_DISPATCH_TOKEN) come from the environment, and a part whose key is missing is
+skipped by name. Exit status 1 when the run failed a gate or a step, the dispatch failed, or the
+published board could not be written: one `published board: FAILED (...)` line, the pointer and the
+dispatch already done, the table still the previous run whole, retried at the next publish hour
+(06:00-12:00 UTC; `nightly/published_board.py`).
 """
 
 import argparse
@@ -21,6 +25,7 @@ import sys
 from collections.abc import Sequence
 from datetime import datetime
 from pathlib import Path
+from typing import Final
 
 import httpx
 
@@ -31,12 +36,15 @@ from research.db.url import database_url_from_env
 from research.logging_setup import configure_logging
 from research.nightly.capsule_step import CapsuleStepPlan
 from research.nightly.publish import Dispatcher, publish
+from research.nightly.published_board import SyncOutcome, failed, sync_published_board
 from research.nightly.r2 import run_store
 from research.nightly.run import STEPS, RunDeps, RunOptions, run_nightly
 from research.nightly.run_store import RunStore
 from research.nightly.schema_gate import contract_dir, schema_gate
 from research.pipeline.commands import now_ms
 from research.pipeline.http import LiveFetcher
+
+DATABASE_VARIABLE: Final = "RESEARCH_DATABASE_URL"
 
 
 def _store(args: argparse.Namespace, http: httpx.Client) -> RunStore:
@@ -65,10 +73,29 @@ def _run(args: argparse.Namespace) -> int:
 def _publish(args: argparse.Namespace) -> int:
     now = now_ms() if args.at is None else datetime.fromisoformat(args.at)
     with httpx.Client(timeout=60.0) as http:
+        store = _store(args, http)
         dispatcher = None if args.no_dispatch else Dispatcher.from_environ(http, os.environ)
-        outcome = publish(_store(args, http), dispatcher, now)
-    _line(outcome.line)
-    return 0 if outcome.ok else 1
+        outcome = publish(store, dispatcher, now)
+        _line(outcome.line)
+        # Whatever the pointer step did, the table follows `latest` (Lane 28): a write that failed
+        # an earlier hour is made good now, and an unmoved pointer costs one row read.
+        synced = _sync_table(args, store, now)
+    _line(synced.line)
+    return 0 if outcome.ok and synced.ok else 1
+
+
+def _sync_table(args: argparse.Namespace, store: RunStore, now: datetime) -> SyncOutcome:
+    """The published board written after the pointer step; a local `--out` publish with no store
+    URL skips it by name, the bucket's publish without one fails by name."""
+    if not os.environ.get(DATABASE_VARIABLE, "").strip():
+        if args.out is not None:
+            return SyncOutcome(f"published board: skipped, {DATABASE_VARIABLE} is not set (a local --out publish)")
+        return failed(f"{DATABASE_VARIABLE} is not set", None, "what it held")
+    engine = make_engine(database_url_from_env(DATABASE_VARIABLE))
+    try:
+        return sync_published_board(engine, store, now)
+    finally:
+        engine.dispose()
 
 
 def _contract(args: argparse.Namespace) -> int:
