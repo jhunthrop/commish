@@ -38,7 +38,15 @@ from research.model.weekly2.statistics import (
     rho_deltas,
 )
 from research.model.weekly3.features import without_allowances, without_vacated
-from research.model.weekly3.judge import Member, RoundFit, default_counts, members, stage_one_error, vacated_club_games
+from research.model.weekly3.judge import (
+    Member,
+    RoundFit,
+    default_counts,
+    is_numbered,
+    members,
+    stage_one_error,
+    vacated_club_games,
+)
 from research.model.weekly3.ledger import Game, Stamp
 from research.model.weekly3.number import Points, WeekNumber, view_number, week_number
 from research.model.weekly3.outcomes import GameOutcomeReader
@@ -178,7 +186,7 @@ def judge_round(  # noqa: PLR0913, PLR0917 - the judgment's every input, named
     scored = score_season(read, fitted, positions, t, version)
     lines, numbers = assess(scored, fitted.ranges.band, t)
     judged = members(read, positions, t)
-    staged = [m for m in judged if m.placed is not None and m.placed.own.features is not None]
+    staged = [m for m in judged if is_numbered(m.placed) and m.placed is not None and m.placed.own.features is not None]
     numbers = {
         **numbers,
         "board_moment": read.board_moment,
