@@ -1,10 +1,12 @@
 // The in-season screens' words, and the copy guard over every line they compose: run with `npm test`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import type { LineupSlot, PlayerLine, TradeRow, WaiverRow, WeekFacts } from './types.ts';
+import { readFileSync } from 'node:fs';
+import type { LineupSlot, PlayerLine, TradeRow, WaiverRow, WeekFacts } from './api.ts';
 import {
 	CLOSE_FOR_THEM,
 	EVERY_TRADE,
+	HELD,
 	NO_START_RULE,
 	NO_TRADES_WITH_TEAM,
 	POINTS_OVER_REPLACEMENT,
@@ -15,10 +17,8 @@ import {
 	isScreen,
 	lastGamesWords,
 	lineupDecision,
-	moveWords,
 	rankWords,
 	satIds,
-	slotChanges,
 	refreshedWords,
 	slotLabels,
 	teamAside,
@@ -53,11 +53,17 @@ const line = (name: string, position = 'RB', rank: number | null = 14): PlayerLi
 		injured_reserve: false
 	},
 	position_rank: rank,
-	points_over_replacement: 12.5,
+	points_over_replacement: 0.7,
+	held: false,
 	facts: facts()
 });
 
-const slot = (name: string, ours: string, host: string | null, changed: boolean): LineupSlot => ({
+const slot = (
+	name: LineupSlot['slot'],
+	ours: string,
+	host: string | null,
+	changed: boolean
+): LineupSlot => ({
 	slot: name,
 	ours: line(ours),
 	host: host === null ? null : line(host),
@@ -94,10 +100,17 @@ void test('the verb names the host as the place it happens', () => {
 });
 
 void test('slots alike are numbered, a lone slot is not, and a flex reads as a word', () => {
-	assert.deepEqual(
-		slotLabels(['QB', 'RB', 'RB', 'WR', 'TE', 'FLEX', 'FLEX', 'SUPER_FLEX', 'DEF']),
-		['QB', 'RB1', 'RB2', 'WR', 'TE', 'Flex 1', 'Flex 2', 'Superflex', 'DEF']
-	);
+	assert.deepEqual(slotLabels(['QB', 'RB', 'RB', 'WR', 'TE', 'FLEX', 'FLEX', 'SUPERFLEX', 'DEF']), [
+		'QB',
+		'RB1',
+		'RB2',
+		'WR',
+		'TE',
+		'Flex 1',
+		'Flex 2',
+		'Superflex',
+		'DEF'
+	]);
 });
 
 void test('the lineup decision names each change and its slot, or says the lineup is set', () => {
@@ -117,23 +130,12 @@ void test('the lineup decision names each change and its slot, or says the lineu
 	assert.equal(lineupDecision({ set: true, slots: [] }), 'Your lineup is set.');
 });
 
-void test('a starter moved to make room is not a change, and the start sits the player at the end of the chain', () => {
+void test("the bench marks the starters a change sits, the host's player in each changed slot", () => {
 	const slots = [
-		slot('WR', 'Jakobi Meyers', "Ja'Marr Chase", true),
 		slot('WR', 'Rome Odunze', 'Rome Odunze', false),
-		slot('FLEX', 'Travis Etienne', 'Jakobi Meyers', true)
+		slot('FLEX', 'Travis Etienne', "Ja'Marr Chase", true)
 	];
-	assert.deepEqual(
-		slotChanges(slots).map((c) => (c?.kind === 'start' ? c.sit?.player.name : c?.kind)),
-		['move', undefined, "Ja'Marr Chase"]
-	);
-	assert.equal(
-		lineupDecision({ set: false, slots }),
-		"One change: start Travis Etienne over Ja'Marr Chase in the flex."
-	);
 	assert.deepEqual([...satIds(slots)], ["Ja'Marr Chase"]);
-	assert.equal(moveWords('Flex 1'), 'Moves from the flex');
-	assert.equal(moveWords('WR2'), 'Moves from WR2');
 });
 
 void test('the waiver decision names the add, the drop and the gain a week', () => {
@@ -239,7 +241,7 @@ void test('copy guard: every in-season line is fantasy words, with no dash, semi
 		teamAside({ owner: 'muttdog', record: { wins: 5, losses: 0, ties: 0 } }),
 		NO_START_RULE,
 		POINTS_OVER_REPLACEMENT,
-		moveWords('Flex 1'),
+		HELD,
 		refreshedWords('rest_of_season', '2026-10-14T19:05:37.917Z'),
 		refreshedWords('preseason', '2026-09-09T02:20:29.697Z'),
 		gameWords(facts()),
@@ -256,4 +258,14 @@ void test('copy guard: every in-season line is fantasy words, with no dash, semi
 	}
 	assert.match('a steal at his price', BANNED);
 	assert.match('a clause — another', DASH);
+});
+
+void test("copy guard: the API's honesty lines, as the fixture carries them, pass the same rules", () => {
+	for (const name of ['lineup', 'waivers', 'trades']) {
+		const url = new URL(`../../../../scripts/inseason-fixture/data/${name}.json`, import.meta.url);
+		const { basis } = JSON.parse(readFileSync(url, 'utf8')) as { basis: string };
+		assert.doesNotMatch(basis, BANNED, basis);
+		assert.doesNotMatch(basis, DASH, basis);
+		assert.doesNotMatch(basis, /;/, basis);
+	}
 });

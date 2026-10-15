@@ -6,15 +6,8 @@
 	import type { LeagueBoard } from '../board.ts';
 	import LineRow from './LineRow.svelte';
 	import Screen from './Screen.svelte';
-	import type { LineupAdvice } from './types.ts';
-	import {
-		lineupDecision,
-		moveWords,
-		satIds,
-		slotChanges,
-		slotLabels,
-		verbWords
-	} from './words.ts';
+	import type { LineupAdvice } from './api.ts';
+	import { lineupDecision, satIds, slotLabels, verbWords } from './words.ts';
 
 	/** Start and sit (spec §4): this week's lineup slot by slot, ours, and where it differs from the
 	 * lineup the host holds, the player it sits with the fact that tipped it; then the bench, the
@@ -28,10 +21,9 @@
 	let { advice, board, host }: Props = $props();
 
 	const labels = $derived(slotLabels(advice.slots.map((s) => s.slot)));
-	const changes = $derived(slotChanges(advice.slots));
 	/** The host's starters our lineup sits, marked on the bench. */
 	const sat = $derived(satIds(advice.slots));
-	const starts = $derived(changes.filter((c) => c?.kind === 'start').length);
+	const starts = $derived(advice.slots.filter((s) => s.changed).length);
 </script>
 
 <Screen
@@ -50,20 +42,12 @@
 				/>
 			</div>
 			{#each advice.slots as slot, i (`${slot.slot}-${String(i)}`)}
-				{@const change = changes[i]}
-				{#if change?.kind === 'start'}
+				{#if slot.changed}
 					<div class="change">
-						<LineRow line={change.start} {board} slot={labels[i]} />
-						{#if change.sit}<LineRow line={change.sit} {board} slot="Sit" />{/if}
+						<LineRow line={slot.ours} {board} slot={labels[i]} />
+						{#if slot.host}<LineRow line={slot.host} {board} slot="Sit" />{/if}
 						{#if slot.sentence}<p class="why">{slot.sentence}</p>{/if}
 					</div>
-				{:else if change?.kind === 'move'}
-					<LineRow
-						line={slot.ours}
-						{board}
-						slot={labels[i]}
-						note={moveWords(labels[change.from] ?? '')}
-					/>
 				{:else}
 					<LineRow line={slot.ours} {board} slot={labels[i]} />
 				{/if}
@@ -71,7 +55,7 @@
 		</Panel>
 		<Panel as="section" label="Your bench" padding="none">
 			<div class="head">
-				<PanelHead title="Bench" aside="Over repl, rest of season" level={2} />
+				<PanelHead title="Bench" aside="Over repl a week" level={2} />
 			</div>
 			{#each advice.bench as line (line.player.host_id)}
 				<LineRow {line} {board} slot={sat.has(line.player.host_id) ? 'Sit' : 'Bench'} />

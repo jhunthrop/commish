@@ -13,6 +13,7 @@
 		/** The fact that tipped it, under the decision. */
 		reason?: string | null;
 		verb: string;
+		/** The host's page; empty when the API knows none, and the verb stands disabled. */
 		href: string;
 		/** The API's line on how the rows are ranked. */
 		basis: string;
@@ -22,11 +23,15 @@
 	let { decision, reason = null, verb, href, basis, children }: Props = $props();
 
 	/** The verb's link opens the host in a new tab with no hold on this page. Set here rather than
-	 * on the shared verb, so no other page carries it. */
-	function toHost(holder: HTMLElement): void {
-		const link = holder.querySelector('a');
-		link?.setAttribute('target', '_blank');
-		link?.setAttribute('rel', 'noopener');
+	 * on the shared verb, so no other page carries it; made again for each host page, so a link that
+	 * replaces the disabled verb takes it too. */
+	function toHost(page: string): (holder: HTMLElement) => void {
+		return (holder) => {
+			if (page === '') return;
+			const link = holder.querySelector('a');
+			link?.setAttribute('target', '_blank');
+			link?.setAttribute('rel', 'noopener');
+		};
 	}
 </script>
 
@@ -36,13 +41,15 @@
 			<p class="line">{decision}</p>
 			{#if reason}<p class="reason">{reason}</p>{/if}
 		</div>
-		<span class="verb desk" {@attach toHost}><Verb {href}>{verb}</Verb></span>
+		<span class="verb desk" {@attach toHost(href)}
+			><Verb {href} disabled={href === ''}>{verb}</Verb></span
+		>
 	</div>
 </Panel>
 <Basis {basis} />
 {@render children()}
-<div class="pin" {@attach toHost}>
-	<Verb {href} fill>{verb}</Verb>
+<div class="pin" {@attach toHost(href)}>
+	<Verb {href} fill disabled={href === ''}>{verb}</Verb>
 </div>
 
 <style>

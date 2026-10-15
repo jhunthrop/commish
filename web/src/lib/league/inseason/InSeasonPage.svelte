@@ -16,7 +16,7 @@
 	import { POLL_MS, followedName, readAgoLine, standingWords } from '../model.ts';
 	import LeagueTabs from './LeagueTabs.svelte';
 	import { tabHref } from './tabs.ts';
-	import type { AdviceHead } from './types.ts';
+	import type { AdviceHead } from './api.ts';
 	import { refreshedWords, type InSeasonScreen } from './words.ts';
 
 	/** One in-season screen of a followed league: the league's title with its read and order stamps,

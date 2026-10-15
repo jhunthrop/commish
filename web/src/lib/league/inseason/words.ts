@@ -8,8 +8,8 @@ import type { LeagueHost } from '../api.ts';
 import { recordWords } from '../model.ts';
 import { hostWords } from '../names.ts';
 import type {
-	Designation,
-	LastGame,
+	GamePoints,
+	InjuryDesignation,
 	LineupAdvice,
 	LineupSlot,
 	OrderBasis,
@@ -18,7 +18,7 @@ import type {
 	TradeTeam,
 	WaiverRow,
 	WeekFacts
-} from './types.ts';
+} from './api.ts';
 
 /** The three screens, by the decision each makes, as their route's segment names them. */
 const SCREENS = ['start', 'waivers', 'trades'] as const;
@@ -45,26 +45,27 @@ export function verbWords(screen: InSeasonScreen, host: LeagueHost): string {
 	return verbs[screen];
 }
 
-/** A host's lineup slot as a row labels it. The host's own word stands for a slot not named here. */
-const SLOT_NAMES: Readonly<Record<string, string>> = {
+/** A lineup slot as a row labels it. */
+const SLOT_NAMES: Readonly<Record<LineupSlot['slot'], string>> = {
+	QB: 'QB',
+	RB: 'RB',
+	WR: 'WR',
+	TE: 'TE',
 	FLEX: 'Flex',
-	SUPER_FLEX: 'Superflex',
-	REC_FLEX: 'Flex',
-	WRRB_FLEX: 'Flex',
-	DEF: 'DEF',
-	DST: 'DEF',
-	IDP_FLEX: 'IDP flex'
+	SUPERFLEX: 'Superflex',
+	K: 'K',
+	DEF: 'DEF'
 };
 
 /** Every slot's label, numbered where the lineup has more than one alike: "QB", "RB1", "RB2",
  * "Flex 1". */
-export function slotLabels(slots: readonly string[]): string[] {
+export function slotLabels(slots: readonly LineupSlot['slot'][]): string[] {
 	const counts = Map.groupBy(slots, (slot) => slot);
 	const seen = new Map<string, number>();
 	return slots.map((slot) => {
 		const n = (seen.get(slot) ?? 0) + 1;
 		seen.set(slot, n);
-		const name = SLOT_NAMES[slot] ?? slot;
+		const name = SLOT_NAMES[slot];
 		if ((counts.get(slot)?.length ?? 0) < 2) return name;
 		return name.length > 3 ? `${name} ${String(n)}` : `${name}${String(n)}`;
 	});
@@ -83,66 +84,24 @@ function changeCount(n: number): string {
 	return `${word} ${n === 1 ? 'change' : 'changes'}`;
 }
 
-/** What a changed slot is. A start puts in a player the host has not starting and sits one the
- * host has starting; a move takes a player the host already starts into another slot, to make
- * room for a start. */
-export type SlotChange =
-	{ kind: 'start'; start: PlayerLine; sit: PlayerLine | null } | { kind: 'move'; from: number };
-
-/** Each slot's change, null where the slot stands. The player a start sits is the one the host
- * starts that ours does not: when the host's player in the slot moves to another slot, it is the
- * one he displaces there, and so on down the chain. */
-export function slotChanges(slots: readonly LineupSlot[]): (SlotChange | null)[] {
-	const ourSlot = new Map(slots.map((s, i) => [s.ours.player.host_id, i] as const));
-	const hostSlot = new Map(
-		slots.flatMap((s, i) => (s.host ? [[s.host.player.host_id, i] as const] : []))
-	);
-	return slots.map((slot, i): SlotChange | null => {
-		if (!slot.changed) return null;
-		const from = hostSlot.get(slot.ours.player.host_id);
-		if (from !== undefined) return { kind: 'move', from };
-		let sit = slot.host;
-		const seen = new Set([i]);
-		for (let at = ourSlot.get(sit?.player.host_id ?? ''); at !== undefined && !seen.has(at);) {
-			seen.add(at);
-			sit = slots[at]?.host ?? null;
-			at = ourSlot.get(sit?.player.host_id ?? '');
-		}
-		return {
-			kind: 'start',
-			start: slot.ours,
-			sit: sit && ourSlot.has(sit.player.host_id) ? null : sit
-		};
-	});
-}
-
-/** The host's starters our lineup sits, by host id: the bench marks them. */
+/** The host's starters our lineup sits, by host id: the bench marks them. A changed slot's host
+ * player is the starter we sit for it. */
 export function satIds(slots: readonly LineupSlot[]): ReadonlySet<string> {
-	return new Set(
-		slotChanges(slots).flatMap((c) => (c?.kind === 'start' && c.sit ? [c.sit.player.host_id] : []))
-	);
+	return new Set(slots.flatMap((s) => (s.changed && s.host ? [s.host.player.host_id] : [])));
 }
 
 /** One start as its clause: "start Rachaad White over Tank Bigsby at RB2". */
-function startClause(start: PlayerLine, sit: PlayerLine | null, label: string): string {
-	const over = sit ? ` over ${sit.player.name}` : '';
-	return `start ${start.player.name}${over} ${slotPlace(label)}`;
-}
-
-/** "Moves from the flex", "Moves from WR2": a starter the host has elsewhere, moved to make room. */
-export function moveWords(fromLabel: string): string {
-	return `Moves from ${/flex/i.test(fromLabel) ? 'the flex' : fromLabel}`;
+function startClause(slot: LineupSlot, label: string): string {
+	const over = slot.host ? ` over ${slot.host.player.name}` : '';
+	return `start ${slot.ours.player.name}${over} ${slotPlace(label)}`;
 }
 
 /** The start screen's decision: "Two changes: start Rachaad White over Tank Bigsby at RB2, start
- * Jauan Jennings over Josh Downs in the flex." or "Your lineup is set." A move is not a change of
- * its own: it is how a start fits. */
+ * Jauan Jennings over Josh Downs in the flex." or "Your lineup is set." */
 export function lineupDecision(advice: Pick<LineupAdvice, 'set' | 'slots'>): string {
 	const labels = slotLabels(advice.slots.map((s) => s.slot));
-	const changes = slotChanges(advice.slots).flatMap((change, i) =>
-		change?.kind === 'start'
-			? [startClause(change.start, change.sit, labels[i] ?? advice.slots[i]?.slot ?? '')]
-			: []
+	const changes = advice.slots.flatMap((slot, i) =>
+		slot.changed ? [startClause(slot, labels[i] ?? slot.slot)] : []
 	);
 	if (advice.set || changes.length === 0) return 'Your lineup is set.';
 	return `${changeCount(changes.length)}: ${changes.join(', ')}.`;
@@ -217,6 +176,9 @@ export function teamAside(team: Pick<TradeTeam, 'owner' | 'record'>): string {
 /** What a team's trades are when the finder holds none for it. */
 export const NO_TRADES_WITH_TEAM = 'No trade with this team helps both lineups.';
 
+/** A player the drafter tags Hold on a sheet: never a drop, never given in a trade. */
+export const HELD = 'Held';
+
 /** The line over the waiver adds that would not start (spec §5.2). */
 export const NO_START_RULE = 'Nobody here starts for you this week';
 
@@ -256,7 +218,7 @@ export function gameWords(facts: WeekFacts): string | null {
 	return facts.kickoff === null ? game : `${game} ${weekdayTime(facts.kickoff)}`;
 }
 
-const DESIGNATION_WORDS: Readonly<Record<Designation['status'], string>> = {
+const DESIGNATION_WORDS: Readonly<Record<InjuryDesignation['status'], string>> = {
 	questionable: 'Questionable',
 	doubtful: 'Doubtful',
 	out: 'Out',
@@ -267,20 +229,20 @@ const DESIGNATION_WORDS: Readonly<Record<Designation['status'], string>> = {
 };
 
 /** "Questionable as of Thu 4:10 pm ET": the designation with when the report said so. */
-export function designationWords(designation: Designation): string {
+export function designationWords(designation: InjuryDesignation): string {
 	return `${DESIGNATION_WORDS[designation.status]} as of ${weekdayTime(designation.as_of)}`;
 }
 
 /** Whether a designation keeps him out (out, injured reserve, suspended, PUP, NFI): drawn as a loss. */
-export function designationSitsHim(designation: Designation): boolean {
+export function designationSitsHim(designation: InjuryDesignation): boolean {
 	return !['questionable', 'doubtful'].includes(designation.status);
 }
 
 const GAME_COUNT_WORDS = ['', 'game', 'two', 'three'];
 
-/** His last games, newest last: "18.4, 11.2 and 9.0 in his last three", "18.4 in his last game",
- * null with none. */
-export function lastGamesWords(games: readonly LastGame[]): string | null {
+/** His last games as the API lists them, newest first: "9.0, 11.2 and 18.4 in his last three",
+ * "18.4 in his last game", null with none. */
+export function lastGamesWords(games: readonly GamePoints[]): string | null {
 	if (games.length === 0) return null;
 	const points = listWords(games.map((game) => fixed(game.points, GAME_DECIMALS)));
 	const reach = GAME_COUNT_WORDS[games.length] ?? String(games.length);

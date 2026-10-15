@@ -1,31 +1,41 @@
 <script lang="ts">
 	import { count } from '#lib/format/number.ts';
-	import { POSITIONS, type Position } from '#lib/types/player.ts';
 	import Chip from '#lib/ui/Chip.svelte';
 	import ChipGroup from '#lib/ui/ChipGroup.svelte';
 	import Panel from '#lib/ui/Panel.svelte';
 	import PanelHead from '#lib/ui/PanelHead.svelte';
+	import ProblemLine from '#lib/ui/ProblemLine.svelte';
 	import Quiet from '#lib/ui/Quiet.svelte';
 	import ValueCell from '#lib/ui/ValueCell.svelte';
 	import type { LeagueHost } from '../api.ts';
 	import type { LeagueBoard } from '../board.ts';
 	import LineRow from './LineRow.svelte';
 	import Screen from './Screen.svelte';
-	import type { WaiverAdvice, WaiverRow } from './types.ts';
+	import type { WaiverAdvice, WaiverPosition, WaiverRow } from './api.ts';
 	import { GAIN_DECIMALS, NO_START_RULE, dropWords, verbWords, waiverDecision } from './words.ts';
 
 	/** Waivers (spec §5): the unrostered players ranked by what they add to this lineup, each with
-	 * the player it costs least to drop for him, a position at a time if you like. Add marks the
-	 * pair as the decision, and the one verb opens the host's waiver page to claim it. */
+	 * the player it costs least to drop for him, a position at a time if you like (read again for
+	 * that position, so it is never cut to the first rows of every position). Add marks the pair as
+	 * the decision, and the one verb opens the host's waiver page to claim it. */
 	interface Props {
 		advice: WaiverAdvice;
 		board: LeagueBoard;
 		host: LeagueHost;
+		/** Reads the adds at one position. */
+		narrow: (position: WaiverPosition) => Promise<WaiverAdvice>;
 	}
 
-	let { advice, board, host }: Props = $props();
+	let { advice, board, host, narrow }: Props = $props();
 
-	let position = $state<Position | null>(null);
+	/** The positions the route narrows to, in the board's order. */
+	const POSITIONS: readonly WaiverPosition[] = ['QB', 'RB', 'WR', 'TE', 'K', 'DEF'];
+
+	let position = $state<WaiverPosition | null>(null);
+	/** The answer for the chosen position, null for every position or until it is read. */
+	let narrowed = $state<WaiverAdvice | null>(null);
+	let reading = $state(false);
+	let problem = $state<string | null>(null);
 	/** The add the member marked, by his host id; null keeps the best add as the decision. */
 	let marked = $state<string | null>(null);
 
@@ -33,12 +43,33 @@
 	const positions = $derived(
 		POSITIONS.filter((p) => advice.rows.some((r) => r.add.player.position === p))
 	);
+	const shown = $derived(narrowed ?? advice);
+	/** The rows of the chosen position: the narrowed answer's, or this answer's own while it is read. */
 	const visible = $derived(
-		position === null ? advice.rows : advice.rows.filter((r) => r.add.player.position === position)
+		position === null || narrowed !== null
+			? shown.rows
+			: advice.rows.filter((r) => r.add.player.position === position)
 	);
 	const gaining = $derived(visible.filter((r) => r.gain > 0));
 	const rest = $derived(visible.filter((r) => r.gain <= 0));
-	const chosen = $derived(advice.rows.find((r) => idOf(r) === marked) ?? advice.best);
+	const chosen = $derived(visible.find((r) => idOf(r) === marked) ?? shown.best);
+
+	async function choose(next: WaiverPosition | null): Promise<void> {
+		position = next;
+		narrowed = null;
+		problem = null;
+		if (next === null) return;
+		reading = true;
+		try {
+			const answer = await narrow(next);
+			if (position === next) narrowed = answer;
+		} catch {
+			if (position === next)
+				problem = 'These adds could not be read just now. They show from the last read.';
+		} finally {
+			if (position === next) reading = false;
+		}
+	}
 </script>
 
 {#snippet row(r: WaiverRow)}
@@ -65,8 +96,8 @@
 	decision={waiverDecision(chosen)}
 	reason={chosen?.sentence}
 	verb={verbWords('waivers', host)}
-	href={advice.host_waivers_url}
-	basis={advice.basis}
+	href={shown.host_waivers_url}
+	basis={shown.basis}
 >
 	<Panel as="section" label="Waiver adds" padding="none">
 		<div class="head">
@@ -76,17 +107,20 @@
 				level={2}
 			/>
 			<ChipGroup label="Position">
-				<Chip size="sm" pressed={position === null} onclick={() => (position = null)}>All</Chip>
+				<Chip size="sm" pressed={position === null} onclick={() => void choose(null)}>All</Chip>
 				{#each positions as p (p)}
-					<Chip size="sm" pressed={position === p} onclick={() => (position = p)}>{p}</Chip>
+					<Chip size="sm" pressed={position === p} onclick={() => void choose(p)}>{p}</Chip>
 				{/each}
 			</ChipGroup>
+			{#if problem}<ProblemLine>{problem}</ProblemLine>{/if}
 		</div>
-		{#each gaining as r (idOf(r))}{@render row(r)}{/each}
-		{#if rest.length > 0}
-			<p class="rule">{NO_START_RULE}</p>
-			{#each rest as r (idOf(r))}{@render row(r)}{/each}
-		{/if}
+		<div class="rows" class:reading aria-busy={reading}>
+			{#each gaining as r (idOf(r))}{@render row(r)}{/each}
+			{#if rest.length > 0}
+				<p class="rule">{NO_START_RULE}</p>
+				{#each rest as r (idOf(r))}{@render row(r)}{/each}
+			{/if}
+		</div>
 	</Panel>
 </Screen>
 
@@ -96,6 +130,11 @@
 		flex-direction: column;
 		gap: var(--s-2);
 		padding: var(--s-3);
+	}
+
+	/* While a position is read, its rows from the last answer stay, quieter. */
+	.reading {
+		opacity: 0.6;
 	}
 
 	.pick.on {

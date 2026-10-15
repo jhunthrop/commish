@@ -2,15 +2,17 @@
 	import type { Snippet } from 'svelte';
 	import { POSITIONS, type Position } from '#lib/types/player.ts';
 	import PositionPill from '#lib/ui/PositionPill.svelte';
+	import TagChip from '#lib/ui/TagChip.svelte';
 	import ToneChip from '#lib/ui/ToneChip.svelte';
 	import ValueCell from '#lib/ui/ValueCell.svelte';
 	import Label from '#lib/ui/Label.svelte';
 	import type { LeagueBoard } from '../board.ts';
 	import LeagueRow from '../LeagueRow.svelte';
 	import { rowOf } from '../model.ts';
-	import type { PlayerLine } from './types.ts';
+	import type { PlayerLine } from './api.ts';
 	import {
 		GAIN_DECIMALS,
+		HELD,
 		designationSitsHim,
 		designationWords,
 		gameWords,
@@ -56,6 +58,7 @@
 		>
 	{/if}
 	{#if last}<span class="fact">{last}</span>{/if}
+	{#if line.held}<TagChip label={HELD} />{/if}
 	{#if note}<span class="note">{note}</span>{/if}
 {/snippet}
 
@@ -65,7 +68,7 @@
 	{:else if line.points_over_replacement !== null}
 		<ValueCell
 			value={line.points_over_replacement}
-			label="over repl"
+			label="over repl a week"
 			signed
 			decimals={GAIN_DECIMALS}
 		/>

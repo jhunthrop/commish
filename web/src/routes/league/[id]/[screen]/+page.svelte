@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { inSeasonApi } from '#lib/league/inseason/api.ts';
+	import { inSeasonApi, type WaiverPosition } from '#lib/league/inseason/api.ts';
 	import InSeasonPage from '#lib/league/inseason/InSeasonPage.svelte';
 	import StartScreen from '#lib/league/inseason/StartScreen.svelte';
 	import TradeScreen from '#lib/league/inseason/TradeScreen.svelte';
@@ -38,7 +38,14 @@
 			read={() => inSeasonApi.waivers(id)}
 			reserve={RESERVE_ROWS.waivers}
 		>
-			{#snippet children(advice, board, host)}<WaiverScreen {advice} {board} {host} />{/snippet}
+			{#snippet children(advice, board, host)}
+				<WaiverScreen
+					{advice}
+					{board}
+					{host}
+					narrow={(position: WaiverPosition) => inSeasonApi.waivers(id, position)}
+				/>
+			{/snippet}
 		</InSeasonPage>
 	{:else if data.screen === 'trades'}
 		<InSeasonPage
@@ -48,7 +55,14 @@
 			read={() => inSeasonApi.trades(id)}
 			reserve={RESERVE_ROWS.trades}
 		>
-			{#snippet children(advice, board, host)}<TradeScreen {advice} {board} {host} />{/snippet}
+			{#snippet children(advice, board, host)}
+				<TradeScreen
+					{advice}
+					{board}
+					{host}
+					narrow={(player: string) => inSeasonApi.trades(id, player)}
+				/>
+			{/snippet}
 		</InSeasonPage>
 	{:else}
 		<Shell title="League" active="league">
