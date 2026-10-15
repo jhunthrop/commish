@@ -152,21 +152,65 @@ func porWords(s apitypes.LeagueSettings) string {
 		shapeWords(s) + "."
 }
 
+// uncountedRules are the rules the season's stat lines hold no metric
+// for (score.go), as a sentence names them.
+func uncountedRules(r apitypes.ScoringRules) []struct {
+	points float64
+	words  string
+} {
+	return []struct {
+		points float64
+		words  string
+	}{
+		{r.PointsPerTwoPointConversion, "two-point conversions"}, {r.PointsPerFieldGoalMissed, "missed field goals"},
+		{r.PointsPerExtraPointMissed, "missed extra points"}, {r.PointsPerReturnTouchdown, "return touchdowns"},
+		{r.PointsPerDefensiveFumbleRecovery, "fumble recoveries"}, {r.PointsPerSafety, "safeties"},
+	}
+}
+
+// uncountedWords says which of the league's rules points so far leave
+// out, "" when the league scores none of them.
+func uncountedWords(s apitypes.LeagueSettings) string {
+	var named []string
+	for _, u := range uncountedRules(rulesOf(s.Scoring)) {
+		if u.points != 0 {
+			named = append(named, u.words)
+		}
+	}
+	if len(named) == 0 {
+		return ""
+	}
+	list := named[0]
+	if len(named) > 1 {
+		list = strings.Join(named[:len(named)-1], ", ") + " and " + named[len(named)-1]
+	}
+	return "Points so far leave out your league's points for " + list + ": the stat lines we hold do not carry them."
+}
+
+// basisTail is what every page's basis ends with: the points over
+// replacement's basis and the rules points so far leave out.
+func basisTail(s apitypes.LeagueSettings) string {
+	if u := uncountedWords(s); u != "" {
+		return porWords(s) + " " + u
+	}
+	return porWords(s)
+}
+
 // LineupBasis is the start and sit page's honesty line (§4.4).
 func LineupBasis(b OrderBasis, s apitypes.LeagueSettings) string {
 	if b == RestOfSeason {
-		return "Ranked by our rest-of-season order from week 7 and this week's designations. We do not project a week's points. " + porWords(s)
+		return "Ranked by our rest-of-season order from week 7 and this week's designations. We do not project a week's points. " + basisTail(s)
 	}
-	return "Ranked by our preseason number and this week's designations. " + porWords(s)
+	return "Ranked by our preseason number and this week's designations. " + basisTail(s)
 }
 
 // WaiversBasis is the waiver page's (§5.3).
 func WaiversBasis(b OrderBasis, s apitypes.LeagueSettings) string {
 	return fmt.Sprintf("Ranked by the gain to your lineup on %s. A drop is the player it costs you least to lose. %s",
-		b.numberWords(), porWords(s))
+		b.numberWords(), basisTail(s))
 }
 
 // TradesBasis is the trade finder's (§6.3).
 func TradesBasis(b OrderBasis, s apitypes.LeagueSettings) string {
-	return fmt.Sprintf("Trades where both lineups gain on %s. The other team decides. %s", b.numberWords(), porWords(s))
+	return fmt.Sprintf("Trades where both lineups gain on %s. The other team decides. %s", b.numberWords(), basisTail(s))
 }

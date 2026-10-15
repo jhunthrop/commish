@@ -8,6 +8,7 @@ import (
 
 	"github.com/jhunthrop/commish/api/internal/apitypes"
 	"github.com/jhunthrop/commish/api/internal/draft"
+	"github.com/jhunthrop/commish/api/internal/scoring"
 )
 
 var thursday = time.Date(2026, 10, 15, 16, 10, 0, 0, east)
@@ -131,8 +132,14 @@ func guard(t *testing.T, s string) {
 
 func TestCopyGuard(t *testing.T) {
 	settings := apitypes.LeagueSettings{Teams: 12, Lineup: apitypes.LineupSuperflex, Roster: apitypes.RosterCounts{Qb: 1, Rb: 2, Wr: 3, Te: 1}}
+	none := scoring.PresetRules(apitypes.ScoringPresetPpr)
+	none.PointsPerTwoPointConversion, none.PointsPerFieldGoalMissed, none.PointsPerReturnTouchdown = 0, 0, 0
+	none.PointsPerDefensiveFumbleRecovery, none.PointsPerSafety = 0, 0
+	plain := settings
+	plain.Scoring = apitypes.Scoring{Custom: &none}
 	for _, b := range []OrderBasis{Preseason, RestOfSeason} {
-		for _, s := range []string{LineupBasis(b, settings), WaiversBasis(b, settings), TradesBasis(b, settings)} {
+		for _, s := range []string{LineupBasis(b, settings), WaiversBasis(b, settings), TradesBasis(b, settings),
+			LineupBasis(b, plain), WaiversBasis(b, plain), TradesBasis(b, plain)} {
 			guard(t, s)
 		}
 		w := &Writer{Basis: b, Now: thursday}
@@ -164,5 +171,22 @@ func TestCopyGuard(t *testing.T) {
 				}
 			}
 		}
+	}
+}
+
+// The basis names the league's rules that points so far leave out, and
+// says nothing when the league scores none of them.
+func TestBasisNamesTheRulesLeftOut(t *testing.T) {
+	rules := scoring.PresetRules(apitypes.ScoringPresetPpr)
+	rules.PointsPerFieldGoalMissed, rules.PointsPerReturnTouchdown, rules.PointsPerDefensiveFumbleRecovery = 0, 0, 0
+	settings := apitypes.LeagueSettings{Teams: 12, Lineup: apitypes.LineupStandard, Scoring: apitypes.Scoring{Custom: &rules},
+		Roster: apitypes.RosterCounts{Qb: 1, Rb: 2, Wr: 3, Te: 1}}
+	want := "Points so far leave out your league's points for two-point conversions and safeties: the stat lines we hold do not carry them."
+	if got := LineupBasis(Preseason, settings); !strings.HasSuffix(got, want) {
+		t.Fatalf("%q", got)
+	}
+	rules.PointsPerTwoPointConversion, rules.PointsPerSafety = 0, 0
+	if got := TradesBasis(Preseason, settings); strings.Contains(got, "leave out") {
+		t.Fatalf("%q", got)
 	}
 }
