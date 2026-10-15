@@ -173,6 +173,7 @@
 				<article class="read">
 					<h3><Label>Our read</Label></h3>
 					<Capsule body={page.capsule.body} pulls={page.capsule.pulls} />
+					<Footnote><a href={data.sources.href}>{data.sources.words}</a></Footnote>
 				</article>
 			{/if}
 			<aside class="tier" aria-label="His tier">
