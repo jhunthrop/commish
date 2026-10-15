@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from typing import Final
 
 from research.errors import ConfigurationError
+from research.pipeline.nflverse.ftn import FTN_SOURCE
 from research.pipeline.nflverse.ngs import NGS_SOURCE
 from research.pipeline.nflverse.participation import NflverseSource
 from research.pipeline.nflverse.pbp import PBP_PLAYER_SOURCE
@@ -201,12 +202,15 @@ class CapsuleConfig:
     sweep_generation_budget: int = 1000
     # The licence gate, one per source: the stores whose figures may reach the writer's sheet (this
     # season's usage and play, `facts.season_usage`). A counsel ruling on any one is a flip here.
-    # - On: nflverse's own play-by-play and weekly stats (CC-BY 4.0), and Next Gen Stats (the NFL's
-    #   data) and PFR advanced stats (Pro Football Reference's), whose nflverse releases state no
-    #   licence: flagged for counsel in the Lane 23 report and `docs/research/data-sources.md`.
-    # - Off: FTN Data's charting (contested catches, blitz rate, interception-worthy throws), CC-BY-SA
-    #   4.0 with attribution "must be made to FTN Data via nflverse"; the page carries no such credit,
-    #   and the share-alike term is unruled for a paid page. The ingest stores every source either way.
+    # - nflverse's own play-by-play and weekly stats (CC-BY 4.0), and Next Gen Stats (the NFL's data)
+    #   and PFR advanced stats (Pro Football Reference's), whose nflverse releases state no licence:
+    #   flagged for counsel in the Lane 23 report and `docs/research/data-sources.md`.
+    # - FTN Data's charting (contested catches, blitz rate, interception-worthy throws), CC-BY-SA 4.0
+    #   with attribution "must be made to FTN Data via nflverse": on from Lane 41 (ruled 2026-10-15),
+    #   once the site's `/data` page printed the credit and every player page linked it. Its figures
+    #   sit inside the four-figure cap's priority order (`season_usage.FIGURE_PRIORITY`), never a
+    #   fifth. The share-alike question for a paid page stays with counsel.
+    # The ingest stores every source whether or not it is on pages.
     sources_on_pages: frozenset[str] = frozenset({
         PBP_PLAYER_SOURCE,
         PBP_PASSER_SOURCE,
@@ -214,6 +218,7 @@ class CapsuleConfig:
         NflverseSource.SNAP_COUNTS,
         NGS_SOURCE,
         PFR_SOURCE,
+        FTN_SOURCE,
     })  # fmt: skip
 
     def unwritten_line(self, *, in_season: bool) -> UnwrittenLine:
