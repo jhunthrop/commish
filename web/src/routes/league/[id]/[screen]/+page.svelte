@@ -5,8 +5,11 @@
 	import StartScreen from '#lib/league/inseason/StartScreen.svelte';
 	import TradeScreen from '#lib/league/inseason/TradeScreen.svelte';
 	import WaiverScreen from '#lib/league/inseason/WaiverScreen.svelte';
-	import { TAB_LABELS } from '#lib/league/inseason/words.ts';
-	import ErrorView from '#lib/site/ErrorView.svelte';
+	import { LINES, TAB_LABELS } from '#lib/league/inseason/words.ts';
+	import { sectionHref } from '#lib/ui/nav.ts';
+	import EmptyState from '#lib/ui/EmptyState.svelte';
+	import Shell from '#lib/ui/Shell.svelte';
+	import Verb from '#lib/ui/Verb.svelte';
 	import type { PageProps } from './$types';
 
 	/** The rows each screen holds while its answer is read: a lineup with its bench, the first adds,
@@ -63,6 +66,26 @@
 			{/snippet}
 		</InSeasonPage>
 	{:else}
-		<ErrorView missing />
+		<!-- The site's not-found in its own words. Drawn here, not by importing the root error page,
+		     which would split that page into another file every page loads. -->
+		<Shell title={LINES.notFoundBar} active={null}>
+			<div class="pad">
+				<EmptyState title={LINES.notFound} line={LINES.notFoundLine}>
+					{#snippet actions()}<Verb href={sectionHref('board')}>{LINES.toBoard}</Verb>{/snippet}
+				</EmptyState>
+			</div>
+		</Shell>
 	{/if}
 {/key}
+
+<style>
+	.pad {
+		padding: var(--s-6) var(--s-5);
+	}
+
+	@media (max-width: 760px) {
+		.pad {
+			padding: var(--s-5) var(--s-4);
+		}
+	}
+</style>

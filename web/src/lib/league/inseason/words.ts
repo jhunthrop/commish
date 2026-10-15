@@ -279,6 +279,11 @@ export const LINES = {
 	waiverAdds: 'Waiver adds',
 	leaguePages: "Your league's pages",
 	orderRecord: 'How the order has done',
+	/** The site's not-found, as the root error page says it (routes/+error.svelte). */
+	notFoundBar: 'Page not found',
+	notFound: 'Not found',
+	notFoundLine: 'Nothing lives at this address.',
+	toBoard: 'Go to the board',
 	perWeek: 'Over repl a week',
 	add: 'Add',
 	propose: 'Propose',
