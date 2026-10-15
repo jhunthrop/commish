@@ -2,8 +2,8 @@
 // the one sentence that names the in-season tools to a first-timer. Run with `npm test`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { LEAGUE_HOSTS_LINE } from '#lib/account/keeps.ts';
-import { IN_SEASON_TOOLS_LINE, LEAGUE_HOSTS, hostsLine } from './model.ts';
+import { LEAGUES_KEPT_TEXT } from '#lib/account/keeps.ts';
+import { IN_SEASON_TOOLS_LINE, LEAGUE_HOSTS, LEAGUE_HOSTS_LINE, hostsLine } from './hosts.ts';
 import { hostWords } from './names.ts';
 
 const ALL_OPEN = { ffpc: true, yahoo: true, espn: true };
@@ -39,4 +39,11 @@ void test('the follow page names the three in-season tools in one sentence, in f
 		'Each week we show the lineup to start, your best add on waivers and the trades that help both teams.'
 	);
 	assert.doesNotMatch(IN_SEASON_TOOLS_LINE, /[—–;]|\b(market|price|buy|sell|value)\b/i);
+});
+
+void test('the account page reads the hosts and the tools from the same two lines', () => {
+	assert.equal(
+		LEAGUES_KEPT_TEXT,
+		`on ${LEAGUE_HOSTS_LINE}, kept up to date. ${IN_SEASON_TOOLS_LINE}`
+	);
 });

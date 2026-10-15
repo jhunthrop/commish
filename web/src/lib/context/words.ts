@@ -20,15 +20,3 @@ export const leagueName = followedName;
 export function switchLabel(league: ContextLeague | null, format: BoardFormat | null): string {
 	return league ? leagueName(league) : FORMAT_LABELS[format ?? DEFAULT_CONTEXT_FORMAT];
 }
-
-/** The longest last word the switch keeps whole, its space included. */
-const TAIL_MAX = 12;
-
-/** The switch's label split for a cut in the middle: the last word, which tells one entry of a
- * contest from the next ("#104870"), always shows, and only the head gives way. */
-export function labelEnds(label: string): [head: string, tail: string] {
-	const cut = label.lastIndexOf(' ');
-	return cut > 0 && label.length - cut <= TAIL_MAX
-		? [label.slice(0, cut), label.slice(cut)]
-		: [label, ''];
-}

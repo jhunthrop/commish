@@ -1,7 +1,7 @@
 // The context's words: the switch, a league's line, the basis line and the held mark. Run with `npm test`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { labelEnds, switchLabel, type ContextLeague } from './words.ts';
+import { switchLabel, type ContextLeague } from './words.ts';
 import { heldMark, holderWords } from './held-marks.ts';
 import type { Held } from './held-words.ts';
 import { contextNote, scoresSentence } from './note-words.ts';
@@ -40,15 +40,6 @@ void test('the switch names the league, else the format, else the default board'
 	assert.equal(switchLabel(league({ name: '' }), 'ppr'), 'Your FFPC league');
 	assert.equal(switchLabel(null, 'half_ppr'), 'Half PPR');
 	assert.equal(switchLabel(null, null), 'PPR');
-});
-
-void test("the switch keeps a league name's last word whole and cuts the head", () => {
-	assert.deepEqual(labelEnds('Big Gorilla Tourney (Aug 15) #104870'), [
-		'Big Gorilla Tourney (Aug 15)',
-		' #104870'
-	]);
-	assert.deepEqual(labelEnds('PPR'), ['PPR', '']);
-	assert.deepEqual(labelEnds('Severely Underappreciated'), ['Severely Underappreciated', '']);
 });
 
 void test("a league's line is its host and scoring, and superflex when it reads on that board", () => {

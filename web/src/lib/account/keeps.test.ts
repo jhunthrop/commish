@@ -1,7 +1,8 @@
 // The signed-out account page's words: five hosts named, the connect verbs, the copy guard. Run with `npm test`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { KEEPS, LEAGUE_HOSTS_LINE, MEMBER_HOSTS } from './keeps.ts';
+import { LEAGUE_HOSTS_LINE } from '#lib/league/hosts.ts';
+import { KEEPS, MEMBER_HOSTS } from './keeps.ts';
 
 const WORDS = [
 	...KEEPS.flatMap((k) => [k.lead, k.text]),
