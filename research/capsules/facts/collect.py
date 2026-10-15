@@ -3,8 +3,8 @@
 Ported from `research-ts/src/capsules/collect.ts` (`collectBoardFacts`, `factsInputFor`,
 `propsLinesByPlayer`, `vegasWinTotalsByTeam`) and `capsules/peers.ts` (`activePeersFor`). The pass
 reads the board, the injury and news captures, this season's lines, the active peers at the board's
-positions and the crosswalk, then the color and depth facts for the prior season, and builds each
-projected player's sheet. Identity ids are the board's (the provider's); the universe id the
+positions and the crosswalk, then the color and depth facts for the prior season and this season's
+usage and play (`facts.season_usage`), and builds each projected player's sheet. Identity ids are the board's (the provider's); the universe id the
 capsule row keys on rides on the pass (`universe_ids`).
 """
 
@@ -14,6 +14,7 @@ from datetime import datetime
 
 from sqlalchemy import Connection, text
 
+from research.capsules.config import CAPSULE_CONFIG
 from research.capsules.facts import history as cached
 from research.capsules.facts.board import BOARD_SOURCE, BoardRow, board_rows, market_order_positions_on_board
 from research.capsules.facts.build import FactsInput, PlayerFacts, build_player_facts
@@ -21,9 +22,10 @@ from research.capsules.facts.color import StoryWithoutTouches, UsageTouchesAndTr
 from research.capsules.facts.depth_collect import DepthOptions, collect_depth_facts, depth_prior_seasons
 from research.capsules.facts.depth_model import EMPTY_DEPTH, Depth
 from research.capsules.facts.market_adp import MarketAdp, run_market_adp
-from research.capsules.facts.model import BooksNumbers, Identity, NewsItem, PropsLine, SeasonSoFar
+from research.capsules.facts.model import BooksNumbers, Identity, NewsItem, PropsLine, SeasonSoFar, SeasonUsage
 from research.capsules.facts.reference import InjurySnapshot, capture_day, injury_snapshot, news_for_players
 from research.capsules.facts.season_so_far import SeasonSubject, seasons_so_far
+from research.capsules.facts.season_usage_reads import season_usage_by_player
 from research.db.read_cache import UNCACHED, ReadThrough
 from research.model.domain import Position
 from research.model.laws.registry import Law, chip_eligible_laws
@@ -83,6 +85,8 @@ class ColorFacts:
     win_totals: Mapping[str, float]
     universe_ids: Mapping[str, str]
     depth: Mapping[str, Depth]
+    # This season's usage and play by universe id (`facts.season_usage`), empty before week 1 lands.
+    season_usage: Mapping[str, SeasonUsage]
 
 
 @dataclass(frozen=True, slots=True)
@@ -142,6 +146,7 @@ def facts_input_for(row: BoardRow, shared: SharedReads) -> FactsInput:
         shared.run_day,
         EMPTY_DEPTH if gsis is None else color.depth.get(gsis, EMPTY_DEPTH),
         shared.market.page_ranks(row.player_id),
+        None if gsis is None else color.season_usage.get(gsis),
     )
 
 
@@ -180,6 +185,7 @@ def collect_color(
         vegas_win_totals_by_team(conn, PRODUCT_SEASON, as_of),
         population.universe_ids,
         collect_depth_facts(conn, depth_options, history, played),
+        season_usage_by_player(conn, PRODUCT_SEASON, positions, as_of, ftn_on=CAPSULE_CONFIG.ftn_charting_on_pages),
     )
 
 

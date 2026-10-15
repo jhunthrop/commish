@@ -153,6 +153,12 @@ class CapsuleConfig:
     sweep_generation_budget: int = 1000
     # Zero: every gateway call is spaced at `gateway.min_call_spacing_ms`, which paces the sweep.
     sweep_pacing_ms: int = 0
+    # FTN Data's charting (contested catches, blitz rate, interception-worthy throws) on the writer's
+    # sheet. Off: nflverse releases it under CC-BY-SA 4.0 with attribution "must be made to FTN Data via
+    # nflverse" (nflreadr `load_ftn_charting`), and the page carries no such credit yet, nor has the
+    # share-alike term been ruled on for a paid page. The ingest stores it either way; the Lane 23 report
+    # holds the licence finding.
+    ftn_charting_on_pages: bool = False
 
     def unwritten_line(self, *, in_season: bool) -> UnwrittenLine:
         """The line in use for a run: in season from the season's first kickoff on, preseason before."""
