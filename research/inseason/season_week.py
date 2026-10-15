@@ -123,9 +123,9 @@ def opponent_ratings(context: SeasonWeekContext) -> StepResult:
     with context.engine.connect() as conn:
         written = ingest_opponent_defence_to_date(conn, NflverseClient(context.fetcher), context.season)
         conn.commit()
-    status: Status = "ok" if written > 0 else "skipped"
-    summary = f"{written} new opponent-rating rows for {context.season}"
-    return StepResult(OPPONENT_RATINGS, status, summary if written else f"nothing new, {summary}")
+    return usage_steps.written_result(
+        OPPONENT_RATINGS, written, f"{written} new opponent-rating rows for {context.season}"
+    )
 
 
 def props_snapshot(context: SeasonWeekContext) -> StepResult:
