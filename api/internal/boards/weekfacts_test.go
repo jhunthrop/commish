@@ -148,3 +148,47 @@ func TestNoCaptureIsNoDesignations(t *testing.T) {
 		t.Fatalf("designations %v (%v), want none", d, err)
 	}
 }
+
+// The by-date list is read before a newer roster sweep; a newest capture
+// that does not parse gives way to the next with its own stamp; the
+// sweep stands in when no by-date capture exists.
+func TestDesignationSources(t *testing.T) {
+	pool := dbtest.Pool(t)
+	ctx := context.Background()
+	const schema = "weekfacts_sources_test"
+	for _, q := range []string{
+		`drop schema if exists ` + schema + ` cascade`, `create schema ` + schema,
+		`create table ` + schema + `.capture_snapshots (source text, payload jsonb, captured_at timestamptz)`,
+		`insert into ` + schema + `.capture_snapshots values
+			('tank01_injuries', '[{"roster": [{"playerID": "p9", "injury": {"designation": "IR"}}]}]', '2026-09-08 10:00:00+00'),
+			('tank01_injuries_by_date', '{"injList": [{"playerID": "p1", "designation": "Q"}]}', '2026-09-12 10:00:00+00'),
+			('tank01_injuries_by_date', '[1, 2]', '2026-09-13 10:00:00+00'),
+			('tank01_injuries', '[{"roster": [{"playerID": "p2", "injury": {"designation": "O"}}]}]', '2026-09-14 10:00:00+00')`,
+	} {
+		if _, err := pool.Exec(ctx, q); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Cleanup(func() { _, _ = pool.Exec(context.Background(), `drop schema if exists `+schema+` cascade`) })
+	src, _ := NewPGSource(pool, schema, 2026, "")
+	d, err := src.Designations(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(d) != 1 || d["p1"].Code != "Q" || !d["p1"].AsOf.Equal(time.Date(2026, 9, 12, 10, 0, 0, 0, time.UTC)) {
+		t.Fatalf("designations %+v: the newest by-date capture that reads, with its stamp", d)
+	}
+	if _, err := pool.Exec(ctx, `delete from `+schema+`.capture_snapshots where source = 'tank01_injuries_by_date'`); err != nil {
+		t.Fatal(err)
+	}
+	d, err = src.Designations(ctx)
+	if err != nil || len(d) != 1 || d["p2"].Code != "O" {
+		t.Fatalf("designations %+v (%v): the sweep with no by-date capture", d, err)
+	}
+	if _, err := pool.Exec(ctx, `update `+schema+`.capture_snapshots set payload = '{"x": 1}'`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := src.Designations(ctx); err == nil {
+		t.Fatal("no capture reads, and no error")
+	}
+}
