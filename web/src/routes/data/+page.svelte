@@ -1,6 +1,15 @@
 <script lang="ts">
+	import '#lib/ui/fonts/steady.css';
 	import SiteShell from '#lib/site/SiteShell.svelte';
-	import { DATA_PAGE_TITLE, SOURCES, SOURCES_LEAD, SOURCES_TITLE } from '#lib/site/sources.ts';
+	import {
+		DATA_PAGE_TITLE,
+		LICENCE_WORD,
+		SHARED_UNDER,
+		SOURCES,
+		SOURCES_LEAD,
+		SOURCES_TITLE,
+		sourceEnd
+	} from '#lib/site/sources.ts';
 	import PageHead from '#lib/ui/PageHead.svelte';
 	import PanelHead from '#lib/ui/PanelHead.svelte';
 	import type { PageProps } from './$types';
@@ -16,7 +25,11 @@
 			<ul>
 				{#each SOURCES as source (source.href)}
 					<li>
-						{source.before}<a href={source.href} rel="external">{source.credit}</a>{source.after}
+						{source.before}<a href={source.href} rel="external">{source.credit}</a
+						>{source.after}{#if source.licence}{SHARED_UNDER}<a
+								href={source.licence.href}
+								rel="external license">{source.licence.name}</a
+							>{LICENCE_WORD}{/if}{sourceEnd(source)}
 					</li>
 				{/each}
 			</ul>
@@ -25,25 +38,17 @@
 </SiteShell>
 
 <style>
-	/* The credits are long sentences in the viewport's first screen, and wherever Outfit breaks a line
-	   where its fallback did not, its arrival moves words across the list (measured at 412 wide: a CLS
-	   of 0.08 to 0.15 with the shared swap face). This face is the same core file with `optional`: the
-	   list keeps whichever face it painted in, Outfit once the file is cached, and never swaps. */
-	@font-face {
-		font-family: 'Outfit Steady';
-		font-style: normal;
-		font-display: optional;
-		font-weight: 100 900;
-		src: url('../../lib/ui/fonts/core/outfit-core.woff2') format('woff2-variations');
-		unicode-range: U+0020-007E, U+00A0-017F, U+2018-2019, U+201C-201D, U+2026, U+2190-2193, U+2212;
-	}
-
+	/* The credits are long sentences in the first screen: set in the steady face (fonts/steady.css,
+	   font-display optional), the lead and the list keep the face they painted in, so Outfit's arrival
+	   moves no word (measured at 412 wide: a CLS of 0.08 to 0.15 with the swap face). The title is
+	   the display face, short enough to break the same in both. */
 	.sources {
 		padding: var(--s-5);
 		display: flex;
 		flex-direction: column;
 		gap: var(--s-5);
 		max-width: 900px;
+		font-family: var(--font-ui-steady);
 	}
 
 	ul {
@@ -52,7 +57,6 @@
 		padding: 0;
 		max-width: 68ch;
 		border-top: 1px solid var(--line);
-		font-family: 'Outfit Steady', 'Outfit Fallback', var(--font-ui);
 	}
 
 	li {

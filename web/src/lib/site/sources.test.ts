@@ -3,12 +3,15 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import {
+	CC_BY_4,
+	CC_BY_SA_4,
 	DATA_PAGE_TITLE,
 	RECURRING_FEEDS,
 	SOURCES,
 	SOURCES_LEAD,
 	SOURCES_TITLE,
-	sourceSentence
+	sourceSentence,
+	type Source
 } from './sources.ts';
 
 const SENTENCES = SOURCES.map(sourceSentence);
@@ -67,20 +70,34 @@ void test("the board's season win expectations and player expectations are credi
 	assert.doesNotMatch('from The Odds API.', BETTING);
 });
 
-void test('a licence is named where the feed has one', () => {
-	const sentence = (credit: string): string => {
+void test('a licence is named and linked where the feed has one, with the note that we changed it', () => {
+	const find = (credit: string): Source => {
 		const source = SOURCES.find((each) => each.credit === credit);
 		assert.ok(source, credit);
-		return sourceSentence(source);
+		return source;
 	};
-	assert.match(sentence('nflverse'), /CC BY 4\.0 licence/);
-	assert.match(sentence('FTN Data via nflverse'), /CC BY-SA 4\.0 licence/);
-	assert.doesNotMatch(sentence('the NFL via nflverse'), /licence/);
+	const nflverse = find('nflverse');
+	const ftn = find('FTN Data via nflverse');
+	assert.deepEqual(nflverse.licence, CC_BY_4);
+	assert.deepEqual(ftn.licence, CC_BY_SA_4);
+	assert.equal(CC_BY_4.href, 'https://creativecommons.org/licenses/by/4.0/');
+	assert.equal(CC_BY_SA_4.href, 'https://creativecommons.org/licenses/by-sa/4.0/');
+	const changed = /licence, and our rates are worked out from their counts\.$/;
+	assert.match(sourceSentence(nflverse), /shared under the CC BY 4\.0 licence/);
+	assert.match(sourceSentence(nflverse), changed);
+	assert.match(sourceSentence(ftn), /shared under the CC BY-SA 4\.0 licence/);
+	assert.match(sourceSentence(ftn), changed);
+	// A licensed feed always says it was changed, and a feed with no licence names none.
+	for (const source of SOURCES) {
+		assert.equal(source.modified === true, source.licence !== undefined, source.credit);
+	}
+	assert.doesNotMatch(sourceSentence(find('the NFL via nflverse')), /licence/);
 });
 
-void test("every credit links to its publisher's page over https, each once", () => {
-	for (const { href } of SOURCES) assert.match(href, /^https:\/\/[a-z0-9.-]+\.[a-z]+/, href);
-	assert.equal(new Set(SOURCES.map((source) => source.href)).size, SOURCES.length);
+void test("every credit links to its publisher's page over https, each publisher once", () => {
+	const hrefs = SOURCES.map((source) => source.href);
+	for (const href of hrefs) assert.match(href, /^https:\/\/[a-z0-9.-]+\.[a-z]+/, href);
+	assert.equal(new Set(hrefs).size, hrefs.length);
 });
 
 void test('copy guard: one sentence each, with no dash, semicolon, doubled word, trading word or tip', () => {

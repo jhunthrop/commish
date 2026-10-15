@@ -28,19 +28,40 @@ export const RECURRING_FEEDS = [
 ] as const;
 export type RecurringFeed = (typeof RECURRING_FEEDS)[number];
 
-/** One credit's sentence: the words before its credit, the credit linked to the publisher's page,
- * and the rest of the sentence, the licence named where one exists. `feeds` are the registry's feeds
- * it credits. */
+/** A Creative Commons licence, named and linked as its attribution terms ask (section 3(a)(1)(C)). */
+export interface Licence {
+	name: string;
+	href: string;
+}
+
+export const CC_BY_4: Licence = {
+	name: 'CC BY 4.0',
+	href: 'https://creativecommons.org/licenses/by/4.0/'
+};
+
+export const CC_BY_SA_4: Licence = {
+	name: 'CC BY-SA 4.0',
+	href: 'https://creativecommons.org/licenses/by-sa/4.0/'
+};
+
+/** The note the licences ask for when the material is changed (section 3(a)(1)(B)). */
+export const MODIFIED_NOTE = 'our rates are worked out from their counts';
+
+/** One credit's sentence: the words before its credit, the credit linked to the publisher's page, the
+ * rest of the clause, then the licence linked where one exists and the modification note where the
+ * site prints rates made from the feed's counts. `feeds` are the registry's feeds it credits. */
 export interface Source {
 	feeds: readonly RecurringFeed[];
 	before: string;
 	credit: string;
 	href: string;
 	after: string;
+	licence?: Licence;
+	modified?: boolean;
 }
 
 export const SOURCES_LEAD =
-	'Every figure on Commish starts in one of these feeds, credited the way its publisher asks.';
+	'Every figure in our board and our reads starts in one of these feeds, credited the way its publisher asks.';
 
 export const SOURCES: readonly Source[] = [
 	{
@@ -55,68 +76,83 @@ export const SOURCES: readonly Source[] = [
 			'Play-by-play, weekly stat lines, snap counts, depth charts, the player list and the schedule from ',
 		credit: 'nflverse',
 		href: 'https://github.com/nflverse/nflverse-data',
-		after: ', shared under the CC BY 4.0 licence.'
+		after: '',
+		licence: CC_BY_4,
+		modified: true
 	},
 	{
 		feeds: ['FTN charting'],
 		before: 'Charting from ',
 		credit: 'FTN Data via nflverse',
 		href: 'https://ftndata.com',
-		after:
-			', the contested catches, blitzes and interception-worthy throws, shared under the CC BY-SA 4.0 licence.'
+		after: ', the contested catches, blitzes and interception-worthy throws',
+		licence: CC_BY_SA_4,
+		modified: true
 	},
 	{
 		feeds: ['Next Gen Stats'],
 		before: 'Next Gen Stats from ',
 		credit: 'the NFL via nflverse',
 		href: 'https://nextgenstats.nfl.com',
-		after: ', the separation, time to throw and yards over expected.'
+		after: ', the separation, time to throw and yards over expected'
 	},
 	{
 		feeds: ['PFR advanced stats'],
 		before: 'Advanced stats from ',
 		credit: 'Pro Football Reference via nflverse',
 		href: 'https://www.pro-football-reference.com',
-		after: ', the drops, pressures and yards after contact.'
+		after: ', the drops, pressures and yards after contact'
 	},
 	{
 		feeds: ['ADP'],
 		before: 'ADP from ',
 		credit: 'Fantasy Football Calculator',
 		href: 'https://fantasyfootballcalculator.com/adp',
-		after: ', its PPR, half PPR, standard and two-quarterback drafts.'
+		after: ', its PPR, half PPR, standard and two-quarterback drafts'
 	},
 	{
 		feeds: ['Tank01 captures'],
 		before: 'Injury reports, inactives, depth charts and news through the week from ',
 		credit: 'the Tank01 NFL API on RapidAPI',
 		href: 'https://rapidapi.com/tank01/api/tank01-nfl-live-in-game-real-time-statistics-nfl',
-		after: '.'
+		after: ''
 	},
 	{
 		feeds: ['Player props'],
 		before: 'The consensus expectations for each player that the board reads, from ',
 		credit: 'The Odds API',
 		href: 'https://the-odds-api.com',
-		after: '.'
+		after: ''
 	},
 	{
 		feeds: ['Season win totals'],
 		before: "Each team's season win expectation that the board reads, from ",
 		credit: 'nfelo',
 		href: 'https://github.com/greerreNFL/nfelosrs',
-		after: '.'
+		after: ''
 	},
 	{
 		feeds: ['Host player ids'],
 		before: "The ids that match each host's players to ours, from ",
 		credit: 'DynastyProcess',
 		href: 'https://github.com/dynastyprocess/data',
-		after: '.'
+		after: ''
 	}
 ];
 
+/** What follows a source's own clause: the licence's words before and after its linked name, and the
+ * modification note, as the page sets them. */
+export const SHARED_UNDER = ', shared under the ';
+export const LICENCE_WORD = ' licence';
+
+/** The tail of a source's sentence after its licence, ending the sentence. */
+export function sourceEnd({ modified }: Source): string {
+	return modified === true ? `, and ${MODIFIED_NOTE}.` : '.';
+}
+
 /** A source's whole sentence, as a reader hears it. */
-export function sourceSentence({ before, credit, after }: Source): string {
-	return `${before}${credit}${after}`;
+export function sourceSentence(source: Source): string {
+	const { before, credit, after, licence } = source;
+	const shared = licence === undefined ? '' : `${SHARED_UNDER}${licence.name}${LICENCE_WORD}`;
+	return `${before}${credit}${after}${shared}${sourceEnd(source)}`;
 }
