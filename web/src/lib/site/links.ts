@@ -13,6 +13,10 @@ import {
 /** The attach page's search parameter naming the way in it starts from: `?host=ffpc`. */
 export const LEAGUE_HOST_PARAM = 'host';
 
+/** The hosts whose leagues are followed from the member's own list, the attach page's other ways in. */
+export const MEMBER_WAYS = ['ffpc', 'yahoo', 'espn'] as const;
+export type MemberWay = (typeof MEMBER_WAYS)[number];
+
 export { FOLLOWED_PARAM, LEAGUES_ANCHOR };
 
 /** The anchor of a player page's This season block. */
@@ -55,8 +59,8 @@ export const links = {
 	companionNew: (): string => resolve(COMPANION_START),
 	companion: (id: string): string => resolve('/companion/[id]', { id }),
 	claim: (code: string): string => resolve('/claim/[code]', { code }),
-	/** Where a league on another host is attached, opened on FFPC's way in when asked. */
-	leagueNew: (host?: 'ffpc'): string =>
+	/** Where a league on another host is attached, opened on a member host's way in when asked. */
+	leagueNew: (host?: MemberWay): string =>
 		host === undefined
 			? resolve(LEAGUE_START)
 			: `${resolve(LEAGUE_START)}?${new URLSearchParams({ [LEAGUE_HOST_PARAM]: host }).toString()}`,

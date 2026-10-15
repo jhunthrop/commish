@@ -41,12 +41,28 @@ func (s *Service) attach(w http.ResponseWriter, r *http.Request) {
 		s.attachFFPC(w, r, in)
 		return
 	}
+	if in.Host != nil && *in.Host == apitypes.LeagueHostYahoo {
+		s.attachMember(w, r, in, HostYahoo)
+		return
+	}
+	if in.Host != nil && *in.Host == apitypes.LeagueHostEspn && in.Me.RosterId == nil && in.Me.Username == nil {
+		// An ESPN league from the member's own list: read with their
+		// cookies, seated at the team their ESPN account owns.
+		s.attachMember(w, r, in, HostESPN)
+		return
+	}
 	if errs := checkSeat(in.Me); errs != nil {
 		httpx.WriteInvalid(w, r, errs)
 		return
 	}
 	h, ref, ok := s.resolve(w, r, in.Host, in.Link)
 	if !ok {
+		return
+	}
+	if pickedFromList(h.Key()) {
+		// A league read only as a member is attached from that member's
+		// own list (attachMember), never by a link and a team picked.
+		httpx.WriteInvalid(w, r, map[string]string{fieldLink: wordsFor(h.Key()).pick})
 		return
 	}
 	many, ok := s.admitLeague(w, r, ref)

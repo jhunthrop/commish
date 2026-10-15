@@ -4,7 +4,7 @@
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { isSignedOut } from '#lib/api/status.ts';
-	import { LEAGUE_HOST_PARAM, links } from '#lib/site/links.ts';
+	import { LEAGUE_HOST_PARAM, MEMBER_WAYS, links, type MemberWay } from '#lib/site/links.ts';
 	import ActionBar from '#lib/ui/ActionBar.svelte';
 	import Chip from '#lib/ui/Chip.svelte';
 	import ChipGroup from '#lib/ui/ChipGroup.svelte';
@@ -19,10 +19,13 @@
 	import { siteContext } from '#lib/context/context.svelte.ts';
 	import { hasFeature } from '#lib/account/features.ts';
 	import FFPCLeagues from '#lib/hosts/FFPCLeagues.svelte';
+	import MemberLeagues from '#lib/hosts/MemberLeagues.svelte';
 	import {
 		ffpcOpen,
 		hostsApi,
+		espnOpen,
 		needsSignIn,
+		yahooOpen,
 		type HostLeague,
 		type PickAnswer
 	} from '#lib/hosts/api.ts';
@@ -46,13 +49,19 @@
 	type View = 'loading' | 'signed-out' | 'form' | 'unreachable';
 
 	let view = $state<View>('loading');
-	/** How the league comes in: a pasted link (Sleeper, MyFantasyLeague), or FFPC read as you. A
-	 * `?host=ffpc` starts on FFPC, and rides the sign-in's return path with the rest of the search. */
-	let way = $state<'link' | 'ffpc'>(
-		page.url.searchParams.get(LEAGUE_HOST_PARAM) === 'ffpc' ? 'ffpc' : 'link'
-	);
-	/** FFPC is offered only where it is open (HOST_FFPC_ENABLED). */
+	/** How the league comes in: a pasted link (Sleeper, MyFantasyLeague, a public ESPN league), or a
+	 * host read as you (FFPC, Yahoo, ESPN). A `?host=ffpc` starts on FFPC, and rides the sign-in's return path with the rest of the
+	 * search. */
+	let way = $state<'link' | MemberWay>(startWay(page.url.searchParams.get(LEAGUE_HOST_PARAM)));
+	/** FFPC, Yahoo and ESPN are offered only where each is open (HOST_FFPC_ENABLED,
+	 * HOST_YAHOO_ENABLED, HOST_ESPN_ENABLED). */
 	let ffpcOn = $state(false);
+	let yahooOn = $state(false);
+	let espnOn = $state(false);
+
+	function startWay(asked: string | null): 'link' | MemberWay {
+		return MEMBER_WAYS.find((w) => w === asked) ?? 'link';
+	}
 	let link = $state('');
 	let preview = $state<AttachPreview | null>(null);
 	let reading = $state(false);
@@ -69,8 +78,16 @@
 	onMount(() => {
 		hostsApi
 			.connections()
-			.then((hosts) => (ffpcOn = ffpcOpen(hosts)))
-			.catch(() => (ffpcOn = false));
+			.then((hosts) => {
+				ffpcOn = ffpcOpen(hosts);
+				yahooOn = yahooOpen(hosts);
+				espnOn = espnOpen(hosts);
+			})
+			.catch(() => {
+				ffpcOn = false;
+				yahooOn = false;
+				espnOn = false;
+			});
 		leagueApi
 			.attached()
 			.then((list) => {
@@ -144,24 +161,24 @@
 	const many = $derived(hasFeature(siteContext.features, 'many_leagues'));
 	/** How many more leagues this account can follow now. */
 	const room = $derived(roomToFollow(many, attached.length));
-	/** The FFPC leagues already followed, by FFPC league id, to their page here. */
-	const followedFFPC = $derived(
-		new Map(
-			attached.filter((a) => a.host === 'ffpc').map((a) => [a.host_league_id, links.league(a.id)])
-		)
-	);
+	/** The leagues already followed on a member host, by the host's league id, to their page here. */
+	function followedOn(host: MemberWay): Map<string, string> {
+		return new Map(
+			attached.filter((a) => a.host === host).map((a) => [a.host_league_id, links.league(a.id)])
+		);
+	}
 
 	async function reread(): Promise<void> {
 		attached = await leagueApi.attached();
 		void siteContext.refresh();
 	}
 
-	/** Each chosen FFPC league through the one attach, in order. All followed: one league opens its
-	 * page, more open the account's list with the summary. A miss stays here, named. */
-	async function followFFPC(leagues: HostLeague[]): Promise<PickAnswer | null> {
+	/** Each chosen league on a member host through the one attach, in order. All followed: one league
+	 * opens its page, more open the account's list with the summary. A miss stays here, named. */
+	async function followOn(host: MemberWay, leagues: HostLeague[]): Promise<PickAnswer | null> {
 		const outcome = await followInOrder(
 			leagues.map((l) => ({ key: l.league_id, name: l.name })),
-			async (l) => (await leagueApi.attach({ host: 'ffpc', link: l.key, me: {} })).id,
+			async (l) => (await leagueApi.attach({ host, link: l.key, me: {} })).id,
 			failure,
 			needsSignIn
 		).finally(() => void reread().catch(() => undefined));
@@ -209,22 +226,42 @@
 		{:else}
 			<DisplayTitle size="page">Follow your league</DisplayTitle>
 			{@render gives(way === 'link')}
-			{#if ffpcOn}
+			{#if ffpcOn || yahooOn || espnOn}
 				<ChipGroup label="Your league is on" fit>
 					<Chip pressed={way === 'link'} onclick={() => (way = 'link')}
 						>Sleeper or MyFantasyLeague</Chip
 					>
-					<Chip pressed={way === 'ffpc'} onclick={() => (way = 'ffpc')}>FFPC</Chip>
+					{#if ffpcOn}
+						<Chip pressed={way === 'ffpc'} onclick={() => (way = 'ffpc')}>FFPC</Chip>
+					{/if}
+					{#if yahooOn}
+						<Chip pressed={way === 'yahoo'} onclick={() => (way = 'yahoo')}>Yahoo</Chip>
+					{/if}
+					{#if espnOn}
+						<Chip pressed={way === 'espn'} onclick={() => (way = 'espn')}>ESPN</Chip>
+					{/if}
 				</ChipGroup>
 			{/if}
 			{#if ffpcOn && way === 'ffpc'}
 				<FFPCLeagues
 					verb={(count: number) => followVerb(count, room)}
-					onpick={followFFPC}
+					onpick={(leagues: HostLeague[]) => followOn('ffpc', leagues)}
 					most={room}
-					followed={followedFFPC}
+					followed={followedOn('ffpc')}
 					limit={many ? undefined : oneLeagueFree}
 				/>
+			{:else if (yahooOn && way === 'yahoo') || (espnOn && way === 'espn')}
+				{@const host = way === 'yahoo' ? 'yahoo' : 'espn'}
+				{#key host}
+					<MemberLeagues
+						{host}
+						verb={(count: number) => followVerb(count, room)}
+						onpick={(leagues: HostLeague[]) => followOn(host, leagues)}
+						most={room}
+						followed={followedOn(host)}
+						limit={many ? undefined : oneLeagueFree}
+					/>
+				{/key}
 			{:else}
 				<div class="form">
 					<Field
@@ -299,7 +336,7 @@
 		We keep your roster, this week's matchup and every player nobody in your league holds up to date,
 		on our board. Free.
 	</p>
-	<p class="hosts">{hostsLine(ffpcOn)}</p>
+	<p class="hosts">{hostsLine({ ffpc: ffpcOn, yahoo: yahooOn, espn: espnOn })}</p>
 {/snippet}
 
 {#snippet oneLeagueFree()}

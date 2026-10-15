@@ -1,0 +1,47 @@
+body {
+	margin: 0;
+	font: 16px/1.5 system-ui, sans-serif;
+	color: #1a1714;
+	background: #fbfaf8;
+}
+
+main {
+	max-width: 32rem;
+	margin: 0 auto;
+	padding: 24px;
+}
+
+h1 {
+	font-size: 20px;
+	margin: 0 0 8px;
+}
+
+p {
+	margin: 0 0 16px;
+	color: #57514b;
+}
+
+button {
+	font: inherit;
+	padding: 8px 14px;
+	border: 1px solid #c9c2ba;
+	border-radius: 8px;
+	background: transparent;
+	cursor: pointer;
+}
+
+@media (prefers-color-scheme: dark) {
+	body {
+		color: #f2eee9;
+		background: #12100e;
+	}
+
+	p {
+		color: #b5ada5;
+	}
+
+	button {
+		color: inherit;
+		border-color: #4a443e;
+	}
+}

@@ -45,6 +45,7 @@ func (s *Store) Attached(ctx context.Context, accountID uuid.UUID) ([]Attached, 
 		from app.league_links l
 		left join app.league_snapshots sn
 			on sn.host = l.host and sn.host_league_id = l.host_league_id and sn.host_season = l.host_season
+			and sn.read_as = case when l.read_as_member then l.account_id else '00000000-0000-0000-0000-000000000000'::uuid end
 		left join app.leagues saved on saved.id = l.league_id and saved.account_id = l.account_id
 		where l.account_id = $1 and l.detached_at is null order by l.attached_at desc, l.id limit $2`, accountID, MaxLinksPerAccount)
 	if err != nil {

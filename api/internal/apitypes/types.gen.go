@@ -107,13 +107,19 @@ func (e CompanionStatus) Valid() bool {
 
 // Defines values for ConnectedHost.
 const (
-	ConnectedHostFfpc ConnectedHost = "ffpc"
+	ConnectedHostEspn  ConnectedHost = "espn"
+	ConnectedHostFfpc  ConnectedHost = "ffpc"
+	ConnectedHostYahoo ConnectedHost = "yahoo"
 )
 
 // Valid indicates whether the value is a known member of the ConnectedHost enum.
 func (e ConnectedHost) Valid() bool {
 	switch e {
+	case ConnectedHostEspn:
+		return true
 	case ConnectedHostFfpc:
+		return true
+	case ConnectedHostYahoo:
 		return true
 	default:
 		return false
@@ -353,19 +359,25 @@ func (e Interval) Valid() bool {
 
 // Defines values for LeagueHost.
 const (
+	LeagueHostEspn    LeagueHost = "espn"
 	LeagueHostFfpc    LeagueHost = "ffpc"
 	LeagueHostMfl     LeagueHost = "mfl"
 	LeagueHostSleeper LeagueHost = "sleeper"
+	LeagueHostYahoo   LeagueHost = "yahoo"
 )
 
 // Valid indicates whether the value is a known member of the LeagueHost enum.
 func (e LeagueHost) Valid() bool {
 	switch e {
+	case LeagueHostEspn:
+		return true
 	case LeagueHostFfpc:
 		return true
 	case LeagueHostMfl:
 		return true
 	case LeagueHostSleeper:
+		return true
+	case LeagueHostYahoo:
 		return true
 	default:
 		return false
@@ -1256,6 +1268,18 @@ type DroppedRule struct {
 // DroppedRuleGroup defines model for DroppedRule.Group.
 type DroppedRuleGroup string
 
+// ESPNConnectInput defines model for ESPNConnectInput.
+type ESPNConnectInput struct {
+	// Consent the member agrees that we keep an encrypted copy of their ESPN session to keep their league in sync, never make a move, and that disconnect deletes it; must be true
+	Consent bool `json:"consent"`
+
+	// EspnS2 ESPN's espn_s2 cookie, kept encrypted, never answered or logged
+	EspnS2 string `json:"espn_s2"`
+
+	// Swid ESPN's SWID cookie, a braced id: {XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX}
+	Swid string `json:"swid"`
+}
+
 // Envelope defines model for Envelope.
 type Envelope struct {
 	// Data the payload
@@ -1400,11 +1424,11 @@ type HostConnection struct {
 	Host       ConnectedHost `json:"host"`
 	LastReadAt *time.Time    `json:"last_read_at"`
 
-	// Status connected reads. signed_out: FFPC no longer honors the session and the one kept sign-in allowed in six hours did not mend it; the member signs in again on our form
+	// Status connected reads. signed_out: the host no longer honors what we keep (FFPC's session past the one kept sign-in allowed in six hours, a Yahoo refresh Yahoo refused, ESPN cookies ESPN no longer accepts); the member connects again
 	Status HostConnectionStatus `json:"status"`
 }
 
-// HostConnectionStatus connected reads. signed_out: FFPC no longer honors the session and the one kept sign-in allowed in six hours did not mend it; the member signs in again on our form
+// HostConnectionStatus connected reads. signed_out: the host no longer honors what we keep (FFPC's session past the one kept sign-in allowed in six hours, a Yahoo refresh Yahoo refused, ESPN cookies ESPN no longer accepts); the member connects again
 type HostConnectionStatus string
 
 // HostConnections defines model for HostConnections.
@@ -1417,12 +1441,20 @@ type HostConnections struct {
 
 // HostLeague defines model for HostLeague.
 type HostLeague struct {
+	// Attached whether the account follows the league already
+	Attached *bool  `json:"attached,omitempty"`
 	LeagueId string `json:"league_id"`
 	Name     string `json:"name"`
 
-	// Record the team's record as FFPC writes it, 2 - 3
-	Record   string `json:"record"`
-	TeamName string `json:"team_name"`
+	// Record the team's record as the host writes it (FFPC 2 - 3), empty when the list does not carry it
+	Record string `json:"record"`
+
+	// ScoringType the league's scoring type in our words: points, categories, best ball
+	ScoringType *string `json:"scoring_type,omitempty"`
+	TeamName    string  `json:"team_name"`
+
+	// Teams the league's team count
+	Teams *int `json:"teams,omitempty"`
 }
 
 // ImportSkip defines model for ImportSkip.
@@ -2501,6 +2533,12 @@ type WeekFacts struct {
 	Week           int      `json:"week"`
 }
 
+// YahooConnectInput defines model for YahooConnectInput.
+type YahooConnectInput struct {
+	// ReturnTo a page on the site to come back to once connected, like /league/{id}; the account page when absent
+	ReturnTo *string `json:"return_to,omitempty"`
+}
+
 // ClaimCode defines model for ClaimCode.
 type ClaimCode = string
 
@@ -2719,6 +2757,13 @@ type ListExportsParams struct {
 	PerPage *PerPage `form:"per_page,omitempty" json:"per_page,omitempty"`
 }
 
+// YahooCallbackParams defines parameters for YahooCallback.
+type YahooCallbackParams struct {
+	Code  *string `form:"code,omitempty" json:"code,omitempty"`
+	State *string `form:"state,omitempty" json:"state,omitempty"`
+	Error *string `form:"error,omitempty" json:"error,omitempty"`
+}
+
 // ListLeaguesParams defines parameters for ListLeagues.
 type ListLeaguesParams struct {
 	Page    *Page    `form:"page,omitempty" json:"page,omitempty"`
@@ -2766,8 +2811,14 @@ type CreateCompanionJSONRequestBody = CompanionCreate
 // PairDeviceJSONRequestBody defines body for PairDevice for application/json ContentType.
 type PairDeviceJSONRequestBody = PairInput
 
+// ConnectESPNJSONRequestBody defines body for ConnectESPN for application/json ContentType.
+type ConnectESPNJSONRequestBody = ESPNConnectInput
+
 // ConnectFFPCJSONRequestBody defines body for ConnectFFPC for application/json ContentType.
 type ConnectFFPCJSONRequestBody = HostConnectInput
+
+// ConnectYahooJSONRequestBody defines body for ConnectYahoo for application/json ContentType.
+type ConnectYahooJSONRequestBody = YahooConnectInput
 
 // CreateLeagueJSONRequestBody defines body for CreateLeague for application/json ContentType.
 type CreateLeagueJSONRequestBody = LeagueInput

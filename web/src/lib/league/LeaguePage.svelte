@@ -16,7 +16,7 @@
 	import { listWords } from '#lib/format/list.ts';
 	import { plural } from '#lib/format/number.ts';
 	import { droppedKinds } from './scoring-words.ts';
-	import FFPCSignIn from '#lib/hosts/FFPCSignIn.svelte';
+	import HostReconnect from '#lib/hosts/HostReconnect.svelte';
 	import { ApiError, leagueApi, type LeagueSync } from './api.ts';
 	import { loadBoard, type LeagueBoard } from './board.ts';
 	import { followSwitch } from './follow-switch.svelte.ts';
@@ -52,8 +52,10 @@
 	let sync = $state<LeagueSync | null>(null);
 	let board = $state<LeagueBoard | null>(null);
 	let failure = $state<'signed-out' | 'missing' | 'unreachable' | 'host-sign-in' | null>(null);
-	/** The league's saved name, for the sign-in an FFPC league with no member signed in asks for. */
+	/** The league's saved name and host, for the way back in a league read as a member asks for when
+	 * no member is connected. */
 	let savedName = $state('');
+	let savedHost = $state<LeagueSync['host']>('ffpc');
 	let problem = $state<string | null>(null);
 	/** The run's board file could not be read; cleared when one loads. */
 	let boardFailed = $state(false);
@@ -88,15 +90,19 @@
 		} catch (error) {
 			if (isSignedOut(error)) failure = 'signed-out';
 			else if (hasStatus(error, HTTP_STATUS.conflict)) {
-				// An FFPC league with no member signed in to read it as: sign in right here, under the
-				// league's saved name.
+				// A league read as a member with no member connected to read it as: the way back in right
+				// here, under the league's saved name.
 				failure = 'host-sign-in';
 				// The name is a nicety: a failed list read leaves the generic title, and the form works
 				// without it, so the failure is shown as that floor and not as an error.
 				if (savedName === '') {
 					void leagueApi
 						.attached()
-						.then((list) => (savedName = list.find((a) => a.id === id)?.name ?? ''))
+						.then((list) => {
+							const mine = list.find((a) => a.id === id);
+							savedName = mine?.name ?? '';
+							savedHost = mine?.host ?? 'ffpc';
+						})
 						.catch(() => (savedName = ''));
 				}
 			} else if (hasStatus(error, HTTP_STATUS.notFound)) failure = 'missing';
@@ -170,9 +176,15 @@
 		</div>
 	{:else if failure === 'host-sign-in'}
 		<main class="league">
-			<DisplayTitle size="page">{savedName || `Your ${hostWords('ffpc')} league`}</DisplayTitle>
-			<p class="sub">Read from FFPC as a member. Sign in to FFPC to read it now.</p>
-			<FFPCSignIn
+			<DisplayTitle size="page">{savedName || `Your ${hostWords(savedHost)} league`}</DisplayTitle>
+			<p class="sub">
+				Read from {hostWords(savedHost)} as a member. {savedHost === 'ffpc'
+					? 'Sign in to FFPC'
+					: `Connect ${hostWords(savedHost)}`} to read it now.
+			</p>
+			<HostReconnect
+				host={savedHost}
+				returnTo={here}
 				onconnected={() => {
 					failure = null;
 					void read();
@@ -216,7 +228,7 @@
 			{/if}
 			{#if sync.host_signed_out}
 				<!-- The read line says no one is signed in: the sign-in that mends it sits under it. -->
-				<FFPCSignIn onconnected={() => void refresh()} />
+				<HostReconnect host={sync.host} returnTo={here} onconnected={() => void refresh()} />
 			{/if}
 			<StandingsStrip teams={sync.teams} me={sync.me} host={sync.host} />
 			<div class="grid">

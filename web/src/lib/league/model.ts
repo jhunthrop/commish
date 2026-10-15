@@ -29,12 +29,19 @@ type ScoringPreset = components['schemas']['ScoringPreset'];
  * minute whatever the number of viewers, so a faster page would only see the same read. */
 export const POLL_MS = 60_000;
 
-/** The hosts a league may come from here, as the attach page says it: FFPC only where it is open
- * (HOST_FFPC_ENABLED). */
-export function hostsLine(ffpcOn: boolean): string {
-	return ffpcOn
-		? 'Works with Sleeper leagues, public MyFantasyLeague leagues and FFPC leagues.'
-		: 'Works with Sleeper leagues and public MyFantasyLeague leagues.';
+/** The hosts a league may come from here, as the attach page says it: FFPC, Yahoo and ESPN only where
+ * each is open (HOST_FFPC_ENABLED, HOST_YAHOO_ENABLED, HOST_ESPN_ENABLED). */
+export function hostsLine(open: {
+	readonly ffpc: boolean;
+	readonly yahoo: boolean;
+	readonly espn: boolean;
+}): string {
+	const hosts = ['Sleeper leagues', 'public MyFantasyLeague leagues'];
+	if (open.ffpc) hosts.push('FFPC leagues');
+	if (open.yahoo) hosts.push('Yahoo leagues');
+	if (open.espn) hosts.push('ESPN leagues');
+	const last = hosts.pop() ?? '';
+	return `Works with ${hosts.join(', ')} and ${last}.`;
 }
 
 const SECOND = 1;
@@ -58,6 +65,11 @@ export function readAgoLine(host: LeagueHost, readAt: string, now: Date): string
 	return `Read from ${hostWords(host)} ${agoWords(readAge(readAt, now))}.`;
 }
 
+/** How a league read as a member is reached: FFPC is signed in to, every other host connected to. */
+function memberWords(host: LeagueSync['host']): string {
+	return host === 'ffpc' ? 'signed in to' : 'connected to';
+}
+
 /** The read's line: when the host was last read, and, when the last read failed, why, and that this
  * is the last read we have. A kept read waiting on the next one names no failure. */
 export function readLine(sync: LeagueSync, now: Date): string {
@@ -65,7 +77,9 @@ export function readLine(sync: LeagueSync, now: Date): string {
 	const host = hostWords(sync.host);
 	const read = readAgoLine(sync.host, sync.read_at, now);
 	const last = `This is our last read, ${agoWords(age)}.`;
-	if (sync.host_signed_out) return `No one in this league is signed in to ${host}. ${last}`;
+	if (sync.host_signed_out) {
+		return `No one in this league is ${memberWords(sync.host)} ${host}. ${last}`;
+	}
 	if (sync.host_failed) return `${host} is not answering. ${last}`;
 	if (sync.host_stale_seconds > 0) return `${read} Reading again.`;
 	return read;
