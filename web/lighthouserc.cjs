@@ -3,8 +3,8 @@
 // format), the first player in the run's index (our top-ranked player), and the record. Read after
 // the build.
 const { readFileSync } = require('node:fs');
+const { ORIGIN, PAINT_HOLDING_OFF } = require('./lighthouse-shared.cjs');
 
-const ORIGIN = 'http://localhost:4173';
 const INDEX = '.svelte-kit/cloudflare/data/index.json';
 
 /** The first player in the built index, the run's top-ranked player. */
@@ -22,11 +22,12 @@ module.exports = {
 			startServerCommand: 'npm run preview:static',
 			startServerReadyPattern: 'Accepting connections',
 			url: [`${ORIGIN}/`, `${ORIGIN}/board`, `${ORIGIN}${firstPlayerPath()}`, `${ORIGIN}/record`],
-			// Nine runs, asserted on the median (the fifth). Devtools throttling lands an occasional run
-			// near 1.65 s whatever the page; in seven runs one to four such runs were seen, so the
-			// median could flip on noise. In nine it takes five. The budgets themselves are unchanged.
+			// Nine runs, asserted on the median (the fifth). Chrome's paint holding used to land runs
+			// near 1.65 s or 2.67 s on some machines (lighthouse-shared.cjs); nine runs are kept
+			// as margin. The budgets themselves are unchanged.
 			numberOfRuns: 9,
 			settings: {
+				chromeFlags: PAINT_HOLDING_OFF,
 				preset: 'perf',
 				formFactor: 'mobile',
 				throttlingMethod: 'devtools'
