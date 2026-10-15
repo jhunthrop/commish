@@ -88,8 +88,11 @@ func TestStore(t *testing.T) {
 		t.Fatalf("kept words %q: %v", words, err)
 	}
 
-	// A claim: its own allow-list row, and a pending claim keeps when
-	// ESPN's queue runs it.
+	// A claim: its own allow-list row (the lineup's does not allow it), and
+	// a pending claim keeps when ESPN's queue runs it.
+	if ok, err := s.Allowed(ctx, acct.ID, "espn", "claim"); err != nil || ok {
+		t.Fatalf("an account allowed only the lineup is allowed a claim: %v %v", ok, err)
+	}
 	if _, err := pool.Exec(ctx, `insert into app.host_write_accounts (account_id, host, kind) values ($1, 'espn', 'claim')`, acct.ID); err != nil {
 		t.Fatal(err)
 	}

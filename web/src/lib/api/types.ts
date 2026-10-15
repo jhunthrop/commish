@@ -1416,7 +1416,7 @@ export interface components {
 			request_id: string;
 		};
 		ErrorBody: {
-			/** @description invalid, unauthorized, forbidden, not_found, conflict, rate_limited, csrf, payload_too_large, unsupported_media_type, billing_unavailable, storage_unavailable, unavailable, internal */
+			/** @description invalid, unauthorized, forbidden, not_found, conflict, rate_limited, csrf, payload_too_large, unsupported_media_type, billing_unavailable, storage_unavailable, unavailable, internal, team_not_read (a 404 from an in-season route: the drafter's team is missing from the league's last read, so reading the host again may find it) */
 			code: string;
 			message: string;
 			fields?: Record<string, string>;
@@ -2623,8 +2623,10 @@ export interface components {
 			amount: number;
 			/** @description the league's least bid */
 			min: number;
-			/** @description what the team has left to bid */
+			/** @description what the team has left to bid, the league's budget less what it has spent; the whole budget when the host did not say what was spent (left_known false) */
 			max: number;
+			/** @description the host said what the team has spent */
+			left_known: boolean;
 		};
 		HostMoveConfirm: {
 			move: components['schemas']['HostMoveInput'];

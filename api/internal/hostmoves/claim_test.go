@@ -39,7 +39,9 @@ type claimServer struct {
 	status  int
 	answer  []byte
 	written bool
-	writes  [][]byte
+	// drop closes the connection after a write is taken: the answer lost.
+	drop   bool
+	writes [][]byte
 }
 
 func (h *claimServer) sent() int {
@@ -92,6 +94,13 @@ func newClaimRig(t *testing.T, status int, answer string, patch func(map[string]
 			body, _ := io.ReadAll(req.Body)
 			h.writes = append(h.writes, body)
 			h.written = true
+			if h.drop {
+				conn, _, err := w.(http.Hijacker).Hijack()
+				if err == nil {
+					_ = conn.Close()
+				}
+				return
+			}
 			w.WriteHeader(h.status)
 			_, _ = w.Write(h.answer)
 			return
@@ -140,6 +149,13 @@ func TestClaimPlanThenPending(t *testing.T) {
 	if h.sent() != 0 {
 		t.Fatal("a plan sent a claim")
 	}
+	// The plan's token binds no bid: the move needs the bid the member saw,
+	// planned again as a number (the screen does so before its verb opens).
+	if code, env, _ := r.move(t, mv, *p.Confirm); code != http.StatusUnprocessableEntity || env.Error.Message != bidUnboundWords || h.sent() != 0 {
+		t.Fatalf("a move with no bid where the league bids: %d %+v", code, env.Error)
+	}
+	mv = claimMove(ptr(claimDrop), intPtr(0))
+	p = r.plan(t, mv)
 	code, env, res := r.move(t, mv, *p.Confirm)
 	if code != http.StatusOK || res.Outcome != apitypes.HostMoveResultOutcomePending || res.Sentence != claimPendingWords(claimDays) ||
 		res.ProcessesAt == nil || !res.ProcessesAt.Equal(time.UnixMilli(1792134000000)) || res.MoveId == nil {
@@ -200,7 +216,7 @@ func TestClaimRefusedInESPNsWords(t *testing.T) {
 func TestClaimNotSeenInTheQueue(t *testing.T) {
 	r, h := newClaimRig(t, http.StatusOK, "write-claim-pending.json", nil)
 	h.pending = []byte(`{"id":48153503,"pendingTransactions":[]}`)
-	mv := claimMove(ptr(claimDrop), nil)
+	mv := claimMove(ptr(claimDrop), intPtr(0))
 	_, _, res := r.move(t, mv, *r.plan(t, mv).Confirm)
 	if res.Outcome != apitypes.HostMoveResultOutcomePending || res.Sentence != claimNotSeenWords || res.ProcessesAt != nil || h.sent() != 1 {
 		t.Fatalf("not seen %+v", res)
@@ -350,5 +366,61 @@ func TestClaimSwitchAndGuards(t *testing.T) {
 	}
 	if h.sent() != 0 || len(r.proofs.order) != 0 {
 		t.Fatal("a claim past the guards")
+	}
+}
+
+// A waiver claim whose answer was lost (a 502, or the connection dropped
+// after the request left) is read back in ESPN's queue by the member's
+// team and the claim's players, never on the roster: queued is pending
+// with when ESPN runs it. Never sent twice.
+func TestALostWaiverClaimIsFoundInTheQueue(t *testing.T) {
+	for _, lost := range []string{"502", "dropped"} {
+		t.Run(lost, func(t *testing.T) {
+			r, h := newClaimRig(t, http.StatusBadGateway, "", nil)
+			h.drop = lost == "dropped"
+			mv := claimMove(ptr(claimDrop), intPtr(0))
+			_, _, res := r.move(t, mv, *r.plan(t, mv).Confirm)
+			if res.Outcome != apitypes.HostMoveResultOutcomePending || res.Sentence != claimPendingWords(claimDays) ||
+				res.ProcessesAt == nil || !res.ProcessesAt.Equal(time.UnixMilli(1792134000000)) || h.sent() != 1 {
+				t.Fatalf("lost %+v, %d sent", res, h.sent())
+			}
+			if _, ans := r.proofs.last(t); ans.ReadBack != readMatched || ans.ProcessAt == nil {
+				t.Fatalf("proof %+v", ans)
+			}
+			// Not in the queue: pending, the claims named as what was read.
+			h.pending = []byte(`{"id":48153503,"pendingTransactions":[]}`)
+			mv = claimMove(ptr(claimDrop), intPtr(1))
+			_, _, res = r.move(t, mv, *r.plan(t, mv).Confirm)
+			if res.Outcome != apitypes.HostMoveResultOutcomePending || res.Sentence != claimNotSeenWords || h.sent() != 2 {
+				t.Fatalf("lost, not queued %+v", res)
+			}
+		})
+	}
+}
+
+// A free agent's add whose answer was lost is read back on the roster,
+// and the sentence names the roster.
+func TestALostFreeAgentAddIsReadOnTheRoster(t *testing.T) {
+	r, h := newClaimRig(t, http.StatusBadGateway, "", func(doc map[string]any) {
+		noBudget(doc)
+		entryOf(doc, 0, 10)["playerPoolEntry"].(map[string]any)["rosterLocked"] = false
+	})
+	h.players = bytes.Replace(h.players, []byte(`"WAIVERS"`), []byte(`"FREEAGENT"`), 1)
+	mv := claimMove(ptr(claimDrop), nil)
+	_, _, res := r.move(t, mv, *r.plan(t, mv).Confirm)
+	if res.Outcome != apitypes.HostMoveResultOutcomePending || res.Sentence != claimNotOnRosterWords || h.sent() != 1 {
+		t.Fatalf("lost free agent %+v", res)
+	}
+}
+
+// The claim route takes ESPN's ids as the waivers answer carries them: a
+// player's board id and a defense's negative D/ST id.
+func TestClaimFormTakesESPNIds(t *testing.T) {
+	for _, add := range []string{"4429795", "-16010"} {
+		mv := apitypes.HostMoveInput{Kind: apitypes.HostMoveInputKindClaim, Week: week, Changes: []apitypes.HostMoveChange{},
+			Claim: &apitypes.HostClaim{Add: add}}
+		if !checkMove(mv) {
+			t.Fatalf("%s refused", add)
+		}
 	}
 }

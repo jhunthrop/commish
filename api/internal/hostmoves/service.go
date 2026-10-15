@@ -287,7 +287,7 @@ var errSilent = errors.New("hostmoves: the host did not answer")
 // prepare checks the move is open to the account, reads the league as
 // the member and plans the move on their own team. It answers a refusal
 // itself and reports false.
-func (s *Service) prepare(w http.ResponseWriter, r *http.Request, link leaguesync.Link, mv apitypes.HostMoveInput) (prepared, bool) {
+func (s *Service) prepare(w http.ResponseWriter, r *http.Request, link leaguesync.Link, mv apitypes.HostMoveInput, making bool) (prepared, bool) {
 	ctx, accountID := r.Context(), auth.AccountID(r)
 	words := wordsFor(mv.Kind)
 	open, note, err := s.open(ctx, accountID, link.Ref.Host, mv.Kind)
@@ -318,7 +318,7 @@ func (s *Service) prepare(w http.ResponseWriter, r *http.Request, link leaguesyn
 		plan, err = planClaim(l, cookies.SWID, link.RosterID, mv, func(id string) (espn.Availability, error) {
 			a, err := s.Claims.Availability(ctx, cookies, link.Ref.LeagueID, link.Ref.Season, l.ScoringPeriod, id)
 			return a, availabilityRefusal(err, words)
-		})
+		}, making)
 		out.claim = &plan
 	} else {
 		var plan lineupPlan
@@ -416,7 +416,7 @@ func (s *Service) plan(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	p, ok := s.prepare(w, r, link, mv)
+	p, ok := s.prepare(w, r, link, mv, false)
 	if !ok {
 		return
 	}
@@ -474,7 +474,7 @@ func (s *Service) move(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, r, http.StatusConflict, httpx.CodeConflict, words.used, nil)
 		return
 	}
-	p, ok := s.prepare(w, r, link, in.Move)
+	p, ok := s.prepare(w, r, link, in.Move, true)
 	if !ok {
 		return
 	}

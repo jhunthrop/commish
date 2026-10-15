@@ -307,19 +307,50 @@ type PendingClaim struct {
 	ProcessAt *time.Time
 }
 
+type wirePendingRow struct {
+	ID          string `json:"id"`
+	TeamID      int    `json:"teamId"`
+	ProcessDate int64  `json:"processDate"`
+	Items       []struct {
+		PlayerID int    `json:"playerId"`
+		Type     string `json:"type"`
+	} `json:"items"`
+}
+
 type wirePending struct {
-	Pending *[]struct {
-		ID          string `json:"id"`
-		TeamID      int    `json:"teamId"`
-		ProcessDate int64  `json:"processDate"`
-	} `json:"pendingTransactions"`
+	Pending *[]wirePendingRow `json:"pendingTransactions"`
+}
+
+// holds reports whether a queued row is the claim: ESPN's id when the
+// answer gave one, else (an answer lost) the member's team with the
+// claim's ADD and, when there is one, its DROP. The queue holds live
+// claims only, so a match is a claim ESPN will run.
+func (row wirePendingRow) holds(set ClaimSet, transactionID string) bool {
+	if row.TeamID != set.team {
+		return false
+	}
+	if transactionID != "" {
+		return row.ID == transactionID
+	}
+	added, dropped := false, set.drop == ""
+	for _, it := range row.Items {
+		id := strconv.Itoa(it.PlayerID)
+		switch {
+		case it.Type == "ADD" && id == set.add:
+			added = true
+		case it.Type == "DROP" && id == set.drop:
+			dropped = true
+		}
+	}
+	return added && dropped
 }
 
 // PendingClaim reads the league's queue (view=mPendingTransactions, the
 // queue a cancelled claim leaves at once: jwulff docs/memory
 // a-cancelled-claim-still-reads-pending.md) and finds the claim by the
-// transaction id ESPN answered. A body without the queue's key is drift,
-// ErrMalformed, never an empty queue.
+// transaction id ESPN answered, or, with none (an answer lost), by the
+// member's team and the claim's players. A body without the queue's key
+// is drift, ErrMalformed, never an empty queue.
 func (c *Client) PendingClaim(ctx context.Context, cookies Cookies, set ClaimSet, transactionID string) (PendingClaim, error) {
 	if !leagueID.MatchString(set.leagueID) {
 		return PendingClaim{}, ErrNotALink
@@ -338,7 +369,7 @@ func (c *Client) PendingClaim(ctx context.Context, cookies Cookies, set ClaimSet
 		return PendingClaim{}, fmt.Errorf("%w: no pending transactions", ErrMalformed)
 	}
 	for _, p := range *w.Pending {
-		if transactionID == "" || p.ID != transactionID || p.TeamID != set.team {
+		if !p.holds(set, transactionID) {
 			continue
 		}
 		out := PendingClaim{Found: true}

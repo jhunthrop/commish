@@ -1490,7 +1490,7 @@ type Envelope struct {
 
 // ErrorBody defines model for ErrorBody.
 type ErrorBody struct {
-	// Code invalid, unauthorized, forbidden, not_found, conflict, rate_limited, csrf, payload_too_large, unsupported_media_type, billing_unavailable, storage_unavailable, unavailable, internal
+	// Code invalid, unauthorized, forbidden, not_found, conflict, rate_limited, csrf, payload_too_large, unsupported_media_type, billing_unavailable, storage_unavailable, unavailable, internal, team_not_read (a 404 from an in-season route: the drafter's team is missing from the league's last read, so reading the host again may find it)
 	Code    string             `json:"code"`
 	Feature *Feature           `json:"feature,omitempty"`
 	Fields  *map[string]string `json:"fields,omitempty"`
@@ -1601,7 +1601,10 @@ type HostBid struct {
 	// Amount the bid the plan sends
 	Amount int `json:"amount"`
 
-	// Max what the team has left to bid
+	// LeftKnown the host said what the team has spent
+	LeftKnown bool `json:"left_known"`
+
+	// Max what the team has left to bid, the league's budget less what it has spent; the whole budget when the host did not say what was spent (left_known false)
 	Max int `json:"max"`
 
 	// Min the league's least bid

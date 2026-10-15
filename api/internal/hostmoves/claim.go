@@ -36,9 +36,10 @@ type availability func(playerID string) (espn.Availability, error)
 // planClaim turns the screen's claim into ESPN's on the member's own
 // team: the week must be ESPN's current one, the add a player no team
 // holds, the drop one of the member's ESPN lets go, and the bid the
-// member typed (the league's least when none is typed yet) inside the
+// member typed (the league's least when none is typed yet, which only a
+// plan accepts: a move needs the number the member saw) inside the
 // league's bounds. espn.OwnClaim checks the team and the rest.
-func planClaim(l espn.FullLeague, swid string, me int, mv apitypes.HostMoveInput, read availability) (claimPlan, error) {
+func planClaim(l espn.FullLeague, swid string, me int, mv apitypes.HostMoveInput, read availability, making bool) (claimPlan, error) {
 	c := *mv.Claim
 	if mv.Week != l.ScoringPeriod {
 		return claimPlan{}, refuse(fmt.Sprintf(claimWeekMovedWords, l.ScoringPeriod), fmt.Errorf("week %d is not ESPN's %d", mv.Week, l.ScoringPeriod))
@@ -52,12 +53,13 @@ func planClaim(l espn.FullLeague, swid string, me int, mv apitypes.HostMoveInput
 		in.Drop = *c.Drop
 	}
 	var bid *apitypes.HostBid
+	unbound := in.Bid == nil && l.Acquisition.Budget
 	if l.Acquisition.Budget {
 		low, high := espn.BidBounds(l.Acquisition, team.BudgetSpent)
 		if in.Bid == nil {
 			in.Bid = &low
 		}
-		bid = &apitypes.HostBid{Amount: *in.Bid, Min: low, Max: high}
+		bid = &apitypes.HostBid{Amount: *in.Bid, Min: low, Max: high, LeftKnown: team.BudgetSpent != nil}
 	}
 	avail, err := read(c.Add)
 	if err != nil {
@@ -66,6 +68,11 @@ func planClaim(l espn.FullLeague, swid string, me int, mv apitypes.HostMoveInput
 	set, err := espn.OwnClaim(l, swid, me, in, avail)
 	if err != nil {
 		return claimPlan{}, claimRefusal(err, in, avail, team, l.Acquisition, bid)
+	}
+	if unbound && making {
+		// The token makes the number the member saw, never one derived again
+		// at send time.
+		return claimPlan{}, refuse(bidUnboundWords, espn.ErrBid)
 	}
 	days := espn.ProcessDays(l.Acquisition)
 	return claimPlan{set: set, sentence: claimSentence(avail.Name, dropName(team, in.Drop), set, days), bid: bid, days: days}, nil
@@ -148,44 +155,55 @@ func (p claimPlan) record() claimRecord {
 		Bid: p.set.Bid(), Waiver: p.set.Waiver()}
 }
 
-// settleClaim is what a sent claim came to: a refusal is ESPN's; a claim
-// ESPN queued is read back in the league's queue by its id, pending with
-// when ESPN runs it; an add made at once, or an answer lost, is read back
-// on the roster, done when he is there. Never a retry.
+// settleClaim is what a sent claim came to: a refusal is ESPN's. A waiver
+// claim, queued or with its answer lost, is read back in the league's
+// queue (by ESPN's id, or by the team and the claim's players when the
+// answer gave none), pending with when ESPN runs it; never on the roster,
+// where a queued claim is not. A free agent's add, made at once, is read
+// back on the roster, done when he is there. Each sentence names what was
+// read. Never a retry.
 func (s *Service) settleClaim(ctx context.Context, cookies espn.Cookies, p claimPlan, ans espn.WriteAnswer) (Answer, string) {
 	a := Answer{HostStatus: ans.Status, TransactionID: ans.TransactionID, Member: string(ans.Member)}
-	switch ans.Outcome {
-	case espn.WriteRefused:
+	switch {
+	case ans.Outcome == espn.WriteRefused:
 		a.Outcome, a.HostReason, a.HostWords, a.ReadBack = OutcomeRefused, ans.Refusal.Type, ans.Refusal.Message, readNotRead
 		return a, claimRefusedWords
-	case espn.WritePending:
-		q, err := s.Claims.PendingClaim(ctx, cookies, p.set, ans.TransactionID)
-		if err != nil {
-			s.Log.Warn("hostmoves: read the claims back", "err", err)
+	case ans.Outcome == espn.WritePending, p.set.Waiver() && ans.Outcome != espn.WriteExecuted:
+		id := ""
+		if ans.Outcome == espn.WritePending {
+			id = ans.TransactionID
 		}
-		a.Outcome, a.ReadBack = OutcomePending, readNotMatched
-		switch {
-		case err != nil:
-			a.ReadBack = readNotRead
-			return a, claimNotSeenWords
-		case !q.Found:
-			return a, claimNotSeenWords
-		}
-		a.ReadBack, a.ProcessAt = readMatched, q.ProcessAt
-		return a, claimPendingWords(p.days)
+		return s.settleQueued(ctx, cookies, p, id, a)
 	}
 	added, err := s.Claims.Claimed(ctx, cookies, p.set)
 	switch {
 	case err != nil:
 		s.Log.Warn("hostmoves: read the roster back", "err", err)
 		a.Outcome, a.ReadBack = OutcomePending, readNotRead
+		return a, claimNotReadWords
 	case added:
 		a.Outcome, a.ReadBack = OutcomeDone, readMatched
 		return a, claimDoneWords
-	default:
-		a.Outcome, a.ReadBack = OutcomePending, readNotMatched
 	}
-	return a, claimNotSeenWords
+	a.Outcome, a.ReadBack = OutcomePending, readNotMatched
+	return a, claimNotOnRosterWords
+}
+
+// settleQueued reads a waiver claim back in the league's queue.
+func (s *Service) settleQueued(ctx context.Context, cookies espn.Cookies, p claimPlan, id string, a Answer) (Answer, string) {
+	a.Outcome = OutcomePending
+	q, err := s.Claims.PendingClaim(ctx, cookies, p.set, id)
+	switch {
+	case err != nil:
+		s.Log.Warn("hostmoves: read the claims back", "err", err)
+		a.ReadBack = readNotRead
+		return a, claimNotReadWords
+	case !q.Found:
+		a.ReadBack = readNotMatched
+		return a, claimNotSeenWords
+	}
+	a.ReadBack, a.ProcessAt = readMatched, q.ProcessAt
+	return a, claimPendingWords(p.days)
 }
 
 // claimPendingWords is a queued claim's answer, with the league's days.

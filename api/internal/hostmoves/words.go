@@ -43,6 +43,12 @@ const (
 	claimDoneWords    = "Done on ESPN. He is on your roster there now."
 	claimRefusedWords = "ESPN did not take the claim, so nothing changed there."
 	claimNotSeenWords = "Sent to ESPN, but your claims there did not show it when we read them back. Check your claims on ESPN before you claim again."
+	// A free agent's add the roster read back does not show.
+	claimNotOnRosterWords = "Sent to ESPN, but your roster there did not show him when we read it back. Check your roster on ESPN before you claim again."
+	// The read-back itself failed: nothing was checked, and the sentence says so.
+	claimNotReadWords = "Sent to ESPN, but we could not read it back. Check your claims on ESPN before you claim again."
+	// A move with no bid where the league bids: the screen plans the bid it shows.
+	bidUnboundWords = "Review the claim again with your bid."
 
 	// Why a claim is unavailable, said under the verb.
 	claimReconsentWords = "To claim from here, connect ESPN again on your account page and agree to moves."
