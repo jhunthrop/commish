@@ -5,7 +5,7 @@
     uv run python -m research.nightly publish [--out DIR] [--at ISO] [--no-dispatch]
 
 `run` writes one run under a new run id (05:00 UTC); `publish` makes the newest passed run public
-once its early-access hour is over, dispatches the web build of it (hourly from 06:00 UTC), and
+once its early-access hour is over, dispatches the web build of it (every hour), and
 keeps `research.published_boards` equal to the public run's boards, the table the API reads.
 Without `--out` both write the R2 bucket (CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID); with it, a
 local directory laid out as the bucket is, which the web build reads as PUBLIC_RUN_BASE_URL.
@@ -15,7 +15,7 @@ the dispatch token (WEB_DISPATCH_TOKEN) come from the environment, and a part wh
 skipped by name. Exit status 1 when the run failed a gate or a step, the dispatch failed, or the
 published board could not be written: one `published board: FAILED (...)` line, the pointer and the
 dispatch already done, the table still the previous run whole, retried at the next publish hour
-(06:00-12:00 UTC; `nightly/published_board.py`).
+(every hour; `nightly/published_board.py`).
 """
 
 import argparse

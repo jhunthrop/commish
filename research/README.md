@@ -686,8 +686,7 @@ uv run python -m research.model.fit_inputs
    rest-of-season order from week 6, without reading R2. The pointer and the dispatch come first:
    a write that fails prints one `published board: FAILED (...)` line naming the run `latest` names
    and the run the table still holds (whole, never a mix), exits 1, and is retried at the next
-   publish hour. Publish runs 06:00-12:00 UTC, so a failure at 12:00 is made good at 06:00 the next
-   day; a run whose artifacts never read as a board stays failed until another run is published.
+   publish hour. Publish runs every hour, so a failure is made good within the hour; a run whose artifacts never read as a board stays failed until another run is published.
 
 ### What the run reads and decides
 

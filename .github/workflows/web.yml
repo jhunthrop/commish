@@ -11,13 +11,13 @@ on:
     paths: ['web/**', '.github/workflows/web.yml']
   repository_dispatch:
     types: [nightly-run]
-  # The hourly backstop through the publish window, the delivery path: the nightly publishes to R2
-  # by 05:30 UTC, and each hour from 06:30 to 12:30 this builds unless the live site's stamp
+  # The hourly backstop at any hour, the delivery path: `publish` moves runs/latest.json every hour
+  # (an in-season run goes public after noon UTC), and at 30 past every hour this builds unless the live site's stamp
   # (/data/run.txt) names both the latest run and this commit, so a scheduled run that took a
   # pending push's place still deploys it; with nothing new it stops in seconds, named. The
   # nightly's own dispatch (WEB_DISPATCH_TOKEN) only makes it sooner and is optional.
   schedule:
-    - cron: '30 6-12 * * *'
+    - cron: '30 * * * *'
   workflow_dispatch:
     inputs:
       runId:
@@ -67,7 +67,7 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: node scripts/r2-env.ts
 
-      - name: Is the live site already on the latest run
+      - name: Is the live site already on the latest run (the hourly backstop)
         # Only the schedule asks: a push or a dispatch always builds.
         id: fresh
         if: github.event_name == 'schedule'
