@@ -194,7 +194,7 @@ func (s *Service) trades(w http.ResponseWriter, r *http.Request) {
 // answer writes a page, or says the drafter's team is not in the read.
 func (s *Service) answer(w http.ResponseWriter, r *http.Request, out any, ok bool) {
 	if !ok {
-		httpx.WriteError(w, r, http.StatusNotFound, httpx.CodeNotFound, noTeamWords, nil)
+		httpx.WriteError(w, r, http.StatusNotFound, httpx.CodeTeamNotRead, noTeamWords, nil)
 		return
 	}
 	httpx.WriteOK(w, r, http.StatusOK, out)

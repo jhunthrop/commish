@@ -15,6 +15,7 @@ import (
 
 	"github.com/jhunthrop/commish/api/internal/apitypes"
 	"github.com/jhunthrop/commish/api/internal/auth"
+	"github.com/jhunthrop/commish/api/internal/httpx"
 	"github.com/jhunthrop/commish/api/internal/leaguesync"
 )
 
@@ -166,6 +167,19 @@ func TestLineupCarriesMoves(t *testing.T) {
 	var closed apitypes.LineupAdvice
 	if err := json.Unmarshal(env.Data, &closed); err != nil || code != http.StatusOK || closed.Moves.Lineup != apitypes.LineupMovesLineupUnavailable {
 		t.Fatalf("a failed check: %d %+v %v", code, closed.Moves, err)
+	}
+}
+
+// A team missing from the last read is its own code, so the page offers to
+// read the host again for it and for no other 404.
+func TestMissingTeamHasItsOwnCode(t *testing.T) {
+	f := newFixture(t)
+	f.league.Me = 99
+	for _, route := range []string{"lineup", "waivers", "trades"} {
+		code, env := serve(t, fixtureService(t, f.league, f.data, &fakeHolds{}), leaguePath+route)
+		if code != http.StatusNotFound || env.Error == nil || env.Error.Code != httpx.CodeTeamNotRead {
+			t.Fatalf("%s: %d %+v", route, code, env.Error)
+		}
 	}
 }
 

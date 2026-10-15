@@ -28,6 +28,9 @@ const (
 	CodeStorageUnavailable = "storage_unavailable"
 	CodeUnavailable        = "unavailable"
 	CodeInternal           = "internal"
+	// CodeTeamNotRead is an in-season route's 404 for a team missing from
+	// the league's last read: reading the host again may find it.
+	CodeTeamNotRead = "team_not_read"
 )
 
 type ctxKey int
