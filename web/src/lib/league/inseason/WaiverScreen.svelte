@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { count } from '#lib/format/number.ts';
 	import Chip from '#lib/ui/Chip.svelte';
 	import ChipGroup from '#lib/ui/ChipGroup.svelte';
 	import Panel from '#lib/ui/Panel.svelte';
@@ -12,7 +11,17 @@
 	import LineRow from './LineRow.svelte';
 	import Screen from './Screen.svelte';
 	import type { WaiverAdvice, WaiverPosition, WaiverRow } from './api.ts';
-	import { GAIN_DECIMALS, NO_START_RULE, dropWords, verbWords, waiverDecision } from './words.ts';
+	import { Narrowing } from './state.ts';
+	import {
+		GAIN_DECIMALS,
+		LINES,
+		NO_START_RULE,
+		addsTitle,
+		dropWords,
+		startingCount,
+		verbWords,
+		waiverDecision
+	} from './words.ts';
 
 	/** Waivers (spec §5): the unrostered players ranked by what they add to this lineup, each with
 	 * the player it costs least to drop for him, a position at a time if you like (read again for
@@ -54,36 +63,35 @@
 	const rest = $derived(visible.filter((r) => r.gain <= 0));
 	const chosen = $derived(visible.find((r) => idOf(r) === marked) ?? shown.best);
 
+	// The route's reader is fixed for the page's life.
+	// svelte-ignore state_referenced_locally
+	const narrowing = new Narrowing(narrow);
+
 	async function choose(next: WaiverPosition | null): Promise<void> {
 		position = next;
 		narrowed = null;
 		problem = null;
-		if (next === null) return;
-		reading = true;
-		try {
-			const answer = await narrow(next);
-			if (position === next) narrowed = answer;
-		} catch {
-			if (position === next)
-				problem = 'These adds could not be read just now. They show from the last read.';
-		} finally {
-			if (position === next) reading = false;
-		}
+		reading = next !== null;
+		const outcome = await narrowing.choose(next);
+		if (outcome.kind === 'overtaken') return;
+		reading = false;
+		if (outcome.kind === 'answer') narrowed = outcome.answer;
+		if (outcome.kind === 'failed') problem = outcome.sentence;
 	}
 </script>
 
 {#snippet row(r: WaiverRow)}
 	{@const on = marked === idOf(r)}
 	<div class="pick" class:on>
-		<LineRow line={r.add} {board} note={dropWords(r)}>
+		<LineRow line={r.add} {board} note={dropWords(r)} brief>
 			{#snippet trailing()}
 				<span class="end">
 					{#if r.gain > 0}
-						<ValueCell value={r.gain} label="a week" signed decimals={GAIN_DECIMALS} />
+						<ValueCell value={r.gain} label={LINES.aWeek} signed decimals={GAIN_DECIMALS} />
 					{/if}
 					<span class="mark">
 						<Quiet size="sm" onclick={() => (marked = on ? null : idOf(r))}
-							>{on ? 'Chosen' : 'Add'}</Quiet
+							>{on ? LINES.chosen : LINES.add}</Quiet
 						>
 					</span>
 				</span>
@@ -99,15 +107,13 @@
 	href={shown.host_waivers_url}
 	basis={shown.basis}
 >
-	<Panel as="section" label="Waiver adds" padding="none">
+	<Panel as="section" label={LINES.waiverAdds} padding="none">
 		<div class="head">
-			<PanelHead
-				title={`Adds for week ${String(advice.week)}`}
-				aside={`${count(gaining.length)} start for you`}
-				level={2}
-			/>
-			<ChipGroup label="Position">
-				<Chip size="sm" pressed={position === null} onclick={() => void choose(null)}>All</Chip>
+			<PanelHead title={addsTitle(advice.week)} aside={startingCount(gaining.length)} level={2} />
+			<ChipGroup label={LINES.position}>
+				<Chip size="sm" pressed={position === null} onclick={() => void choose(null)}
+					>{LINES.all}</Chip
+				>
 				{#each positions as p (p)}
 					<Chip size="sm" pressed={position === p} onclick={() => void choose(p)}>{p}</Chip>
 				{/each}

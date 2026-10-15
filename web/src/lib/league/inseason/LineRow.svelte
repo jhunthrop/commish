@@ -13,16 +13,20 @@
 	import {
 		GAIN_DECIMALS,
 		HELD,
+		LINES,
 		designationSitsHim,
 		designationWords,
 		gameWords,
-		lastGamesWords
+		lastGamesWords,
+		porWords
 	} from './words.ts';
 
 	/** One player of an in-season screen as a league row: his face and name (which opens his game
 	 * log), his rank at his position on our order, his game this week, his designation with its
-	 * stamp, his last games, and at the end his points over replacement, unless the screen ends the
-	 * row on its own number. */
+	 * stamp, his last games, and at the end his points over replacement a week (the panel's head says
+	 * a week). A screen that ends the row on its own number (a waiver's gain) keeps his points over
+	 * replacement on his line. On a phone the cell drops its label, as the league page's rows do,
+	 * and the facts wrap under his name rather than run under the cell. */
 	interface Props {
 		line: PlayerLine;
 		board: LeagueBoard;
@@ -31,10 +35,13 @@
 		slot?: string;
 		/** A last fact on the row's line, the screen's own: "for Jaylen Wright, RB58". */
 		note?: string;
+		/** On a phone, leave his last games off the line: a row that already carries its own facts
+		 * (a waiver's drop and his points over replacement) keeps to a few lines. */
+		brief?: boolean;
 		trailing?: Snippet;
 	}
 
-	let { line, board, tags = [], slot, note, trailing }: Props = $props();
+	let { line, board, tags = [], slot, note, brief = false, trailing }: Props = $props();
 
 	const facts = $derived(line.facts);
 	const game = $derived(gameWords(facts));
@@ -57,7 +64,10 @@
 			>{designationWords(facts.designation)}</ToneChip
 		>
 	{/if}
-	{#if last}<span class="fact">{last}</span>{/if}
+	{#if last}<span class="fact" class:brief>{last}</span>{/if}
+	{#if trailing && line.points_over_replacement !== null}
+		<span class="fact">{porWords(line.points_over_replacement)}</span>
+	{/if}
 	{#if line.held}<TagChip label={HELD} />{/if}
 	{#if note}<span class="note">{note}</span>{/if}
 {/snippet}
@@ -68,12 +78,13 @@
 	{:else if line.points_over_replacement !== null}
 		<ValueCell
 			value={line.points_over_replacement}
-			label="over repl a week"
+			label={LINES.overRepl}
+			phoneLabel={false}
 			signed
 			decimals={GAIN_DECIMALS}
 		/>
 	{:else}
-		<Label size="cell">Unranked</Label>
+		<Label size="cell">{LINES.unranked}</Label>
 	{/if}
 {/snippet}
 
@@ -96,5 +107,15 @@
 	.fact {
 		white-space: nowrap;
 		font-variant-numeric: tabular-nums;
+	}
+
+	@media (max-width: 760px) {
+		.fact {
+			white-space: normal;
+		}
+
+		.brief {
+			display: none;
+		}
 	}
 </style>

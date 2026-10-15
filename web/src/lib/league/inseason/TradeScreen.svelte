@@ -1,6 +1,6 @@
 <script lang="ts">
+	import Label from '#lib/ui/Label.svelte';
 	import Panel from '#lib/ui/Panel.svelte';
-	import PanelHead from '#lib/ui/PanelHead.svelte';
 	import ProblemLine from '#lib/ui/ProblemLine.svelte';
 	import Quiet from '#lib/ui/Quiet.svelte';
 	import ToneChip from '#lib/ui/ToneChip.svelte';
@@ -9,20 +9,24 @@
 	import LineRow from './LineRow.svelte';
 	import Screen from './Screen.svelte';
 	import type { PlayerLine, TradeAdvice, TradeRow, TradeTeam } from './api.ts';
+	import { Narrowing, markedTrade, tradeKey } from './state.ts';
 	import {
 		CLOSE_FOR_THEM,
 		EVERY_TRADE,
+		LINES,
 		NO_TRADES_WITH_TEAM,
+		showMore,
 		teamAside,
 		tradeDecision,
 		tradeGains,
 		verbWords
 	} from './words.ts';
 
-	/** The trade finder (spec §6): for each other team, the trades that help both lineups, each a
-	 * give and a get with both gains, best for you first. A player picked reads the trades holding
-	 * him again, so no team's list is cut to its first trades. Propose marks a trade as the decision, and the one verb opens the host's
-	 * trade page. We never send an offer. */
+	/** The trade finder (spec §6): for each other team, its name, owner and record and the trades
+	 * that help both lineups, each a give and a get with both gains, best for you first. A player
+	 * picked reads the trades holding him again, so no team's list is cut to its first trades.
+	 * Propose marks a trade as the decision, by who is in it, so the minute's re-read never moves the
+	 * mark to another trade; the one verb opens the host's trade page. We never send an offer. */
 	interface Props {
 		advice: TradeAdvice;
 		board: LeagueBoard;
@@ -36,14 +40,18 @@
 	/** Trades a team shows before its Show more. */
 	const FIRST_TRADES = 2;
 
+	// The route's reader is fixed for the page's life.
+	// svelte-ignore state_referenced_locally
+	const narrowing = new Narrowing(narrow);
+
 	/** The player the trades are narrowed to, by board id; null for every trade. */
 	let player = $state<string | null>(null);
 	/** The answer for the chosen player, null for every trade or until it is read. */
 	let narrowed = $state<TradeAdvice | null>(null);
 	let reading = $state(false);
 	let problem = $state<string | null>(null);
-	/** The trade the member marked; null keeps the best one as the decision. */
-	let marked = $state<{ team: number; index: number } | null>(null);
+	/** The trade the member marked (tradeKey); null keeps the best one as the decision. */
+	let marked = $state<string | null>(null);
 	/** The teams opened past their first trades. */
 	let opened = $state<ReadonlySet<number>>(new Set());
 
@@ -71,23 +79,17 @@
 		shown.teams
 			.map((team) => ({
 				team,
-				trades: team.trades
-					.map((row, index) => ({ row, index }))
-					.filter(({ row }) => player === null || holds(row, player))
+				trades: team.trades.filter((row) => player === null || holds(row, player))
 			}))
 			.filter(({ trades }) => player === null || trades.length > 0)
 	);
 
-	/** The best trade for you across the league, or the one marked. */
+	/** The marked trade while the answer still holds it, else the best trade shown. */
 	const chosen = $derived.by((): { row: TradeRow; team: TradeTeam } | null => {
-		if (marked !== null) {
-			const team = shown.teams.find((t) => t.roster_id === marked?.team);
-			const row = team?.trades[marked.index];
-			if (team && row) return { row, team };
-		}
-		// The best of the trades shown: narrowed to a player, the decision holds him too.
+		const kept = markedTrade(shown.teams, marked);
+		if (kept) return kept;
 		const best = teams
-			.flatMap(({ team, trades }) => trades.map(({ row }) => ({ row, team })))
+			.flatMap(({ team, trades }) => trades.map((row) => ({ row, team })))
 			.sort((a, b) => b.row.my_gain - a.row.my_gain)[0];
 		return best ?? null;
 	});
@@ -97,17 +99,12 @@
 		narrowed = null;
 		marked = null;
 		problem = null;
-		if (next === null) return;
-		reading = true;
-		try {
-			const answer = await narrow(next);
-			if (player === next) narrowed = answer;
-		} catch {
-			if (player === next)
-				problem = 'These trades could not be read just now. They show from the last read.';
-		} finally {
-			if (player === next) reading = false;
-		}
+		reading = next !== null;
+		const outcome = await narrowing.choose(next);
+		if (outcome.kind === 'overtaken') return;
+		reading = false;
+		if (outcome.kind === 'answer') narrowed = outcome.answer;
+		if (outcome.kind === 'failed') problem = outcome.sentence;
 	}
 
 	function open(team: number): void {
@@ -115,22 +112,21 @@
 	}
 </script>
 
-{#snippet trade(team: TradeTeam, row: TradeRow, index: number)}
-	{@const on = marked?.team === team.roster_id && marked.index === index}
+{#snippet trade(team: TradeTeam, row: TradeRow)}
+	{@const key = tradeKey(team.roster_id, row)}
+	{@const on = marked === key}
 	<div class="trade" class:on>
-		<div class="sides">
-			<div class="side">
-				{#each row.give as line (line.player.host_id)}<LineRow {line} {board} slot="Give" />{/each}
-			</div>
-			<div class="side">
-				{#each row.get as line (line.player.host_id)}<LineRow {line} {board} slot="Get" />{/each}
-			</div>
-		</div>
+		{#each row.give as line (line.player.host_id)}<LineRow
+				{line}
+				{board}
+				slot={LINES.give}
+			/>{/each}
+		{#each row.get as line (line.player.host_id)}<LineRow {line} {board} slot={LINES.get} />{/each}
 		<div class="gains">
 			<p>{tradeGains(row)}</p>
 			{#if row.close_for_them}<ToneChip tone="even">{CLOSE_FOR_THEM}</ToneChip>{/if}
-			<Quiet size="sm" onclick={() => (marked = on ? null : { team: team.roster_id, index })}
-				>{on ? 'Chosen' : 'Propose'}</Quiet
+			<Quiet size="sm" onclick={() => (marked = on ? null : key)}
+				>{on ? LINES.chosen : LINES.propose}</Quiet
 			>
 		</div>
 	</div>
@@ -143,34 +139,43 @@
 	href={shown.host_trades_url}
 	basis={shown.basis}
 >
-	<label class="pick">
-		<span>Trades holding</span>
-		<select value={player ?? ''} onchange={(event) => void pick(event.currentTarget.value || null)}>
-			<option value="">{EVERY_TRADE}</option>
-			<optgroup label="Your players">
-				{#each players.yours as line (line.player.host_id)}
-					<option value={line.player.board_id}>{line.player.name}</option>
-				{/each}
-			</optgroup>
-			<optgroup label="Their players">
-				{#each players.theirs as line (line.player.host_id)}
-					<option value={line.player.board_id}>{line.player.name}</option>
-				{/each}
-			</optgroup>
-		</select>
-	</label>
+	<div class="tools">
+		<label class="pick">
+			<span>{LINES.tradesHolding}</span>
+			<select
+				value={player ?? ''}
+				onchange={(event) => void pick(event.currentTarget.value || null)}
+			>
+				<option value="">{EVERY_TRADE}</option>
+				<optgroup label={LINES.yourPlayers}>
+					{#each players.yours as line (line.player.host_id)}
+						<option value={line.player.board_id}>{line.player.name}</option>
+					{/each}
+				</optgroup>
+				<optgroup label={LINES.theirPlayers}>
+					{#each players.theirs as line (line.player.host_id)}
+						<option value={line.player.board_id}>{line.player.name}</option>
+					{/each}
+				</optgroup>
+			</select>
+		</label>
+		<Label>{LINES.perWeek}</Label>
+	</div>
 	{#if problem}<ProblemLine>{problem}</ProblemLine>{/if}
 	<div class="teams" class:reading aria-busy={reading}>
 		{#each teams as { team, trades } (team.roster_id)}
 			{@const first = opened.has(team.roster_id) ? trades : trades.slice(0, FIRST_TRADES)}
 			<Panel as="section" label={team.name} padding="none">
-				<div class="head"><PanelHead title={team.name} aside={teamAside(team)} level={2} /></div>
-				{#each first as { row, index } (index)}{@render trade(team, row, index)}{/each}
+				<header class="head">
+					<h2>{team.name}</h2>
+					<p>{teamAside(team)}</p>
+				</header>
+				{#each first as row (tradeKey(team.roster_id, row))}{@render trade(team, row)}{/each}
 				{#if trades.length === 0}<p class="none">{NO_TRADES_WITH_TEAM}</p>{/if}
 				{#if trades.length > first.length}
 					<div class="more">
 						<Quiet size="sm" onclick={() => open(team.roster_id)}
-							>Show {trades.length - first.length} more</Quiet
+							>{showMore(trades.length - first.length)}</Quiet
 						>
 					</div>
 				{/if}
@@ -180,10 +185,19 @@
 </Screen>
 
 <style>
+	.tools {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		flex-wrap: wrap;
+		gap: var(--s-2) var(--s-4);
+	}
+
 	.pick {
 		display: flex;
 		align-items: center;
 		gap: var(--s-2);
+		min-width: 0;
 		font-size: var(--t-sm);
 		color: var(--ink-2);
 	}
@@ -205,15 +219,35 @@
 		opacity: 0.6;
 	}
 
+	/* One team a row, so every player row keeps its one line at a desk's width. */
 	.teams {
-		display: grid;
-		grid-template-columns: repeat(2, minmax(0, 1fr));
+		display: flex;
+		flex-direction: column;
 		gap: var(--s-4);
-		align-items: start;
 	}
 
 	.head {
+		display: flex;
+		align-items: baseline;
+		justify-content: space-between;
+		flex-wrap: wrap;
+		gap: var(--s-1) var(--s-3);
 		padding: var(--s-3) var(--s-3) var(--s-2);
+	}
+
+	/* The team as the host names it, and its owner in the case the host gives, never upper-cased. */
+	.head h2 {
+		margin: 0;
+		font-size: var(--t-md);
+		font-weight: 700;
+		overflow-wrap: anywhere;
+	}
+
+	.head p {
+		margin: 0;
+		font-size: var(--t-sm);
+		color: var(--ink-2);
+		overflow-wrap: anywhere;
 	}
 
 	.trade {
@@ -222,11 +256,6 @@
 
 	.trade.on {
 		background: var(--accent-wash);
-	}
-
-	.sides {
-		display: grid;
-		grid-template-columns: minmax(0, 1fr);
 	}
 
 	.gains {
@@ -253,16 +282,5 @@
 
 	.more {
 		padding: var(--s-3);
-	}
-
-	@media (max-width: 1100px) {
-		/* While a player's trades are read, the last answer's stay, quieter. */
-		.reading {
-			opacity: 0.6;
-		}
-
-		.teams {
-			grid-template-columns: minmax(0, 1fr);
-		}
 	}
 </style>

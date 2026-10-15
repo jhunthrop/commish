@@ -1,7 +1,5 @@
 <script lang="ts" generics="T extends AdviceHead">
 	import { onMount, type Snippet } from 'svelte';
-	import { ApiError } from '#lib/api/client.ts';
-	import { HTTP_STATUS, hasStatus, isSignedOut } from '#lib/api/status.ts';
 	import { siteContext } from '#lib/context/context.svelte.ts';
 	import DisplayTitle from '#lib/ui/DisplayTitle.svelte';
 	import EmptyState from '#lib/ui/EmptyState.svelte';
@@ -10,20 +8,22 @@
 	import Shell from '#lib/ui/Shell.svelte';
 	import Verb from '#lib/ui/Verb.svelte';
 	import { links } from '#lib/site/links.ts';
-	import { leagueApi, type LeagueHost } from '../api.ts';
+	import { leagueApi, type AttachedLeague, type LeagueHost } from '../api.ts';
 	import { loadBoard, type LeagueBoard } from '../board.ts';
 	import { followSwitch } from '../follow-switch.svelte.ts';
 	import { POLL_MS, followedName, readAgoLine, standingWords } from '../model.ts';
 	import LeagueTabs from './LeagueTabs.svelte';
 	import { tabHref } from './tabs.ts';
 	import type { AdviceHead } from './api.ts';
-	import { refreshedWords, type InSeasonScreen } from './words.ts';
+	import { readFailure, screenView, type ReadState } from './state.ts';
+	import { LINES, refreshedWords, type InSeasonScreen } from './words.ts';
 
 	/** One in-season screen of a followed league: the league's title with its read and order stamps,
 	 * the league's tabs, and the screen's answer once read (reserved rows until then, the API's own
-	 * sentence when it has no answer). Read on open and once a minute while open, as the league page
-	 * is. Opening it selects its league in the shell's switch; switching there opens this screen of
-	 * the league switched to. */
+	 * sentence when it has no answer, a sentence for each of the page's own reads that fails). Read
+	 * on open and once a minute while open, as the league page is; a failed read of the account's
+	 * leagues or of the board is tried again with it. Opening it selects its league in the shell's
+	 * switch; switching there opens this screen of the league switched to. */
 	interface Props {
 		id: string;
 		screen: InSeasonScreen;
@@ -39,10 +39,17 @@
 
 	let { id, screen, title, read, reserve, children }: Props = $props();
 
+	/** The league as the page names it: from the switch's list, else from the account's leagues. */
+	type Head = Pick<AttachedLeague, 'host' | 'name' | 'team_name' | 'standing'>;
+
 	let advice = $state<T | null>(null);
 	let board = $state<LeagueBoard | null>(null);
-	let failure = $state<'signed-out' | 'missing' | null>(null);
-	/** The API's sentence when it has no answer for this league (not in season, no saved scoring). */
+	let boardRead = $state<ReadState>('pending');
+	let leaguesRead = $state<ReadState>('pending');
+	/** The league from the account's list when the switch's list lacks it. */
+	let listed = $state<Head | null>(null);
+	let signedOut = $state(false);
+	/** The API's sentence when it has no answer for this league. */
 	let refusal = $state<string | null>(null);
 	/** A later read failed: the page keeps the last answer and says so. */
 	let problem = $state<string | null>(null);
@@ -52,38 +59,69 @@
 	// svelte-ignore state_referenced_locally
 	followSwitch(id, (league) => tabHref(screen, league));
 
-	const league = $derived(siteContext.leagues.find((l) => l.id === id) ?? null);
+	const switchLeague = $derived(siteContext.leagues.find((l) => l.id === id) ?? null);
+	const head = $derived<Head | null>(switchLeague ?? listed);
 
-	async function load(): Promise<void> {
+	async function readAnswer(): Promise<void> {
 		try {
 			advice = await read();
 			now = new Date();
 			problem = null;
 			refusal = null;
 		} catch (error) {
-			if (isSignedOut(error)) failure = 'signed-out';
-			else if (hasStatus(error, HTTP_STATUS.notFound)) failure = 'missing';
-			else if (advice !== null)
-				problem = 'Your league could not be read just now. The page shows the last read.';
-			else
-				refusal =
-					error instanceof ApiError ? error.message : 'Your league could not be read just now.';
+			const failure = readFailure(error, advice !== null);
+			if (failure.kind === 'signed-out') signedOut = true;
+			else if (failure.kind === 'stale') problem = failure.sentence;
+			else refusal = failure.sentence;
 		}
 	}
 
+	/** Names the league: the switch's list first, the account's leagues when it lacks it. */
+	async function readLeagues(): Promise<void> {
+		try {
+			await siteContext.load();
+			if (!siteContext.leagues.some((l) => l.id === id)) {
+				listed = (await leagueApi.attached()).find((l) => l.id === id) ?? null;
+			}
+			leaguesRead = 'done';
+		} catch {
+			leaguesRead = 'failed';
+		}
+	}
+
+	async function readBoard(): Promise<void> {
+		try {
+			board = await loadBoard(switchLeague?.format ?? 'ppr', {});
+			boardRead = 'done';
+		} catch {
+			boardRead = 'failed';
+		}
+	}
+
+	/** The answer every minute; the league's name and the board until each has been read. */
+	function readAll(): void {
+		void readAnswer();
+		if (leaguesRead === 'done' && boardRead === 'done') return;
+		const leagues = leaguesRead === 'done' ? Promise.resolve() : readLeagues();
+		void leagues.then(() => (boardRead === 'done' ? undefined : readBoard()));
+	}
+
 	onMount(() => {
-		void siteContext
-			.load()
-			.then(() => loadBoard(league?.format ?? 'ppr', {}).then((loaded) => (board = loaded)));
-		void load();
-		const timer = setInterval(() => void load(), POLL_MS);
+		readAll();
+		const timer = setInterval(readAll, POLL_MS);
 		return () => clearInterval(timer);
 	});
 
-	const name = $derived(league ? followedName(league) : 'Your league');
-	const standing = $derived(
-		league?.standing ? `${league.team_name}, ${standingWords(league)}.` : ''
+	const view = $derived(
+		screenView({
+			leagues: leaguesRead,
+			known: head !== null,
+			board: boardRead,
+			answered: advice !== null
+		})
 	);
+	const name = $derived(head ? followedName(head) : 'Your league');
+	const standing = $derived(head?.standing ? `${head.team_name}, ${standingWords(head)}.` : '');
 </script>
 
 <svelte:head>
@@ -92,23 +130,18 @@
 </svelte:head>
 
 <Shell title="League" active="league">
-	{#if failure === 'signed-out'}
+	{#if signedOut}
 		<div class="pad">
-			<EmptyState
-				title="Sign in to see your league"
-				line="A league lives on your account. Following one is free."
-			>
-				{#snippet actions()}<Verb href={leagueApi.signInUrl(tabHref(screen, id))}>Sign in</Verb
+			<EmptyState title={LINES.signInTitle} line={LINES.signInLine}>
+				{#snippet actions()}<Verb href={leagueApi.signInUrl(tabHref(screen, id))}
+						>{LINES.signIn}</Verb
 					>{/snippet}
 			</EmptyState>
 		</div>
-	{:else if failure === 'missing'}
+	{:else if view === 'missing'}
 		<div class="pad">
-			<EmptyState
-				title="This league is not on your account"
-				line="Paste its link again to follow it."
-			>
-				{#snippet actions()}<Verb href={links.leagueNew()}>Follow a league</Verb>{/snippet}
+			<EmptyState title={LINES.missingTitle} line={LINES.missingLine}>
+				{#snippet actions()}<Verb href={links.leagueNew()}>{LINES.follow}</Verb>{/snippet}
 			</EmptyState>
 		</div>
 	{:else}
@@ -119,7 +152,7 @@
 					{standing}
 					{#if advice}
 						<span class="read" role="status"
-							>{league ? readAgoLine(league.host, advice.read_at, now) : ''}
+							>{head ? readAgoLine(head.host, advice.read_at, now) : ''}
 							{refreshedWords(advice.order_basis, advice.refreshed)}</span
 						>
 					{/if}
@@ -128,13 +161,17 @@
 			<LeagueTabs {id} current={screen} />
 			{#if refusal}
 				<Panel edge="loss" padding="sm"><ProblemLine>{refusal}</ProblemLine></Panel>
-			{:else if advice && board && league}
+			{:else if view === 'leagues-failed'}
+				<Panel edge="loss" padding="sm"><ProblemLine>{LINES.leaguesUnread}</ProblemLine></Panel>
+			{:else if view === 'board-failed'}
+				<Panel edge="loss" padding="sm"><ProblemLine>{LINES.boardUnread}</ProblemLine></Panel>
+			{:else if view === 'ready' && advice && board && head}
 				{#if problem}
 					<Panel edge="loss" padding="sm"><ProblemLine>{problem}</ProblemLine></Panel>
 				{/if}
-				{@render children(advice, board, league.host)}
+				{@render children(advice, board, head.host)}
 			{:else}
-				<div class="reserve" aria-busy="true" aria-label="Reading your league">
+				<div class="reserve" aria-busy="true" aria-label={LINES.reading}>
 					<div class="call"></div>
 					{#each { length: reserve }, i (i)}<div class="row"></div>{/each}
 				</div>

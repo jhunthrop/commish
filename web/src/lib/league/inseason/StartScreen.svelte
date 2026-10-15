@@ -7,11 +7,11 @@
 	import LineRow from './LineRow.svelte';
 	import Screen from './Screen.svelte';
 	import type { LineupAdvice } from './api.ts';
-	import { lineupDecision, satIds, slotLabels, verbWords } from './words.ts';
+	import { LINES, lineupDecision, lineupTitle, satIds, slotLabels, verbWords } from './words.ts';
 
 	/** Start and sit (spec §4): this week's lineup slot by slot, ours, and where it differs from the
-	 * lineup the host holds, the player it sits with the fact that tipped it; then the bench, the
-	 * players a change sits marked. */
+	 * lineup the host holds, the player it sits with the fact that tipped it; below it the bench, the
+	 * players a change sits marked. One column at every width, as §4.1 lays it out. */
 	interface Props {
 		advice: LineupAdvice;
 		board: LeagueBoard;
@@ -23,7 +23,6 @@
 	const labels = $derived(slotLabels(advice.slots.map((s) => s.slot)));
 	/** The host's starters our lineup sits, marked on the bench. */
 	const sat = $derived(satIds(advice.slots));
-	const starts = $derived(advice.slots.filter((s) => s.changed).length);
 </script>
 
 <Screen
@@ -32,50 +31,37 @@
 	href={advice.host_lineup_url}
 	basis={advice.basis}
 >
-	<div class="grid">
-		<Panel as="section" label="Your lineup" padding="none">
-			<div class="head">
-				<PanelHead
-					title={`Your lineup for week ${String(advice.week)}`}
-					aside={starts > 0 ? `${String(starts)} to change` : 'Set'}
-					level={2}
-				/>
-			</div>
-			{#each advice.slots as slot, i (`${slot.slot}-${String(i)}`)}
-				{#if slot.changed}
-					<div class="change">
-						<LineRow line={slot.ours} {board} slot={labels[i]} />
-						{#if slot.host}<LineRow line={slot.host} {board} slot="Sit" />{/if}
-						{#if slot.sentence}<p class="why">{slot.sentence}</p>{/if}
-					</div>
-				{:else}
+	<Panel as="section" label={lineupTitle(advice.week)} padding="none">
+		<div class="head">
+			<PanelHead title={lineupTitle(advice.week)} aside={LINES.perWeek} level={2} />
+		</div>
+		{#each advice.slots as slot, i (`${slot.slot}-${String(i)}`)}
+			{#if slot.changed}
+				<div class="change">
 					<LineRow line={slot.ours} {board} slot={labels[i]} />
-				{/if}
-			{/each}
-		</Panel>
-		<Panel as="section" label="Your bench" padding="none">
-			<div class="head">
-				<PanelHead title="Bench" aside="Over repl a week" level={2} />
-			</div>
-			{#each advice.bench as line (line.player.host_id)}
-				<LineRow {line} {board} slot={sat.has(line.player.host_id) ? 'Sit' : 'Bench'} />
+					{#if slot.host}<LineRow line={slot.host} {board} slot={LINES.sit} />{/if}
+					{#if slot.sentence}<p class="why">{slot.sentence}</p>{/if}
+				</div>
 			{:else}
-				<p class="none"><Label>Nobody on your bench</Label></p>
-			{/each}
-		</Panel>
-	</div>
+				<LineRow line={slot.ours} {board} slot={labels[i]} />
+			{/if}
+		{/each}
+	</Panel>
+	<Panel as="section" label={LINES.bench} padding="none">
+		<div class="head">
+			<PanelHead title={LINES.bench} aside={LINES.perWeek} level={2} />
+		</div>
+		{#each advice.bench as line (line.player.host_id)}
+			<LineRow {line} {board} slot={sat.has(line.player.host_id) ? LINES.sit : LINES.bench} />
+		{:else}
+			<p class="none"><Label>{LINES.noBench}</Label></p>
+		{/each}
+	</Panel>
 </Screen>
 
 <style>
 	.head {
 		padding: var(--s-3) var(--s-3) var(--s-2);
-	}
-
-	.grid {
-		display: grid;
-		grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
-		gap: var(--s-4);
-		align-items: start;
 	}
 
 	/* A change is ours over the host's, on our wash, with the fact that tipped it. */
@@ -97,11 +83,5 @@
 		padding: var(--s-3);
 		color: var(--ink-3);
 		font-size: var(--t-sm);
-	}
-
-	@media (max-width: 1100px) {
-		.grid {
-			grid-template-columns: minmax(0, 1fr);
-		}
 	}
 </style>
