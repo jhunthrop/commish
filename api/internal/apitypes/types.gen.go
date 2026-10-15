@@ -1672,6 +1672,9 @@ type LineupAdvice struct {
 	// HostLineupUrl the host's lineup page, empty when we know none
 	HostLineupUrl string `json:"host_lineup_url"`
 
+	// HostNote one sentence under the verb when we cannot open the host's page ("Make this change on Yahoo. We cannot open that page for you yet."), null when the url opens it
+	HostNote *string `json:"host_note"`
+
 	// OrderBasis which order ranks the players: our preseason board, or the rest-of-season order (from week 7, once the API reads it)
 	OrderBasis OrderBasis `json:"order_basis"`
 
@@ -2431,6 +2434,9 @@ type SheetUpdate struct {
 type TradeAdvice struct {
 	Basis string `json:"basis"`
 
+	// HostNote one sentence under the verb when we cannot open the host's page ("Make this change on Yahoo. We cannot open that page for you yet."), null when the url opens it
+	HostNote *string `json:"host_note"`
+
 	// HostTradesUrl the host's trade page, empty when we know none
 	HostTradesUrl string `json:"host_trades_url"`
 
@@ -2485,6 +2491,9 @@ type WaiverAdvice struct {
 
 	// Best the add that gains most
 	Best *WaiverRow `json:"best"`
+
+	// HostNote one sentence under the verb when we cannot open the host's page ("Make this change on Yahoo. We cannot open that page for you yet."), null when the url opens it
+	HostNote *string `json:"host_note"`
 
 	// HostWaiversUrl the host's waiver page, empty when we know none
 	HostWaiversUrl string `json:"host_waivers_url"`

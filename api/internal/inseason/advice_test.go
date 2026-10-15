@@ -8,6 +8,7 @@ import (
 	"github.com/jhunthrop/commish/api/internal/apitypes"
 	"github.com/jhunthrop/commish/api/internal/boards"
 	"github.com/jhunthrop/commish/api/internal/draft"
+	"github.com/jhunthrop/commish/api/internal/leaguesync"
 )
 
 func boardID(l apitypes.PlayerLine) string {
@@ -29,6 +30,13 @@ func TestLineupAdvice(t *testing.T) {
 			out.OrderBasis, out.Refreshed, out.HostLineupUrl)
 	}
 	guard(t, out.Basis)
+	if out.HostNote != nil {
+		t.Fatalf("a Sleeper page carries a note: %q", *out.HostNote)
+	}
+	f.league.Snap.Ref = leaguesync.Ref{Host: leaguesync.HostMFL, LeagueID: "12345"}
+	if mfl, _ := newFixtureAdvisor(t, f, nil).Lineup(); mfl.HostLineupUrl != "" || mfl.HostNote == nil {
+		t.Fatalf("a league with no page: url %q note %v", mfl.HostLineupUrl, mfl.HostNote)
+	}
 	seen := map[string]bool{}
 	for _, s := range out.Slots {
 		if seen[boardID(s.Ours)] {

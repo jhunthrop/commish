@@ -2457,6 +2457,8 @@ export interface components {
 			bench: components['schemas']['PlayerLine'][];
 			/** @description the host's lineup page, empty when we know none */
 			host_lineup_url: string;
+			/** @description one sentence under the verb when we cannot open the host's page ("Make this change on Yahoo. We cannot open that page for you yet."), null when the url opens it */
+			host_note: string | null;
 		};
 		WaiverRow: {
 			add: components['schemas']['PlayerLine'];
@@ -2485,6 +2487,8 @@ export interface components {
 			rows: components['schemas']['WaiverRow'][];
 			/** @description the host's waiver page, empty when we know none */
 			host_waivers_url: string;
+			/** @description one sentence under the verb when we cannot open the host's page ("Make this change on Yahoo. We cannot open that page for you yet."), null when the url opens it */
+			host_note: string | null;
 		};
 		TradeRecord: {
 			wins: number;
@@ -2529,6 +2533,8 @@ export interface components {
 			teams: components['schemas']['TradeTeam'][];
 			/** @description the host's trade page, empty when we know none */
 			host_trades_url: string;
+			/** @description one sentence under the verb when we cannot open the host's page ("Make this change on Yahoo. We cannot open that page for you yet."), null when the url opens it */
+			host_note: string | null;
 		};
 		LeagueMove: {
 			/** @enum {string} */

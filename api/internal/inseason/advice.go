@@ -217,6 +217,13 @@ func (a *advisor) header() header {
 	return header{week: a.Snap.Week, basis: apitypes.OrderBasis(a.basis), refreshed: a.Board.Refreshed, readAt: a.Snap.ReadAt}
 }
 
+// host is the host's page for a verb on the member's team, and the note
+// a page prints when we cannot open it.
+func (a *advisor) host(page Page) (string, *string) {
+	href := HostURL(a.Snap.Ref, a.Me, page)
+	return href, HostNote(a.Snap.Ref, href)
+}
+
 // Lineup is the start and sit page (§4).
 func (a *advisor) Lineup() (apitypes.LineupAdvice, bool) {
 	team, ok := a.Snap.TeamByRoster(a.Me)
@@ -232,7 +239,8 @@ func (a *advisor) Lineup() (apitypes.LineupAdvice, bool) {
 	h := a.header()
 	out := apitypes.LineupAdvice{Week: h.week, Basis: LineupBasis(a.basis, a.settings), OrderBasis: h.basis, Refreshed: h.refreshed,
 		ReadAt: h.readAt, Set: true, Slots: []apitypes.LineupSlot{}, Bench: []apitypes.PlayerLine{},
-		HostLineupUrl: HostURL(a.Snap.Ref, LineupPage)}
+	}
+	out.HostLineupUrl, out.HostNote = a.host(LineupPage)
 	w := &Writer{Basis: a.basis, Now: a.now}
 	starting := map[int]bool{}
 	for _, r := range rows {
@@ -306,7 +314,8 @@ func (a *advisor) Waivers(position draft.Position) (apitypes.WaiverAdvice, bool)
 	}
 	h := a.header()
 	out := apitypes.WaiverAdvice{Week: h.week, Basis: WaiversBasis(a.basis, a.settings), OrderBasis: h.basis, Refreshed: h.refreshed,
-		ReadAt: h.readAt, Rows: []apitypes.WaiverRow{}, HostWaiversUrl: HostURL(a.Snap.Ref, WaiversPage)}
+		ReadAt: h.readAt, Rows: []apitypes.WaiverRow{}}
+	out.HostWaiversUrl, out.HostNote = a.host(WaiversPage)
 	w := &Writer{Basis: a.basis, Now: a.now}
 	for _, move := range Waivers(a.config, squad, cands) {
 		if len(out.Rows) == MaxWaiverRows {
@@ -340,7 +349,8 @@ func (a *advisor) Trades(focus string) (apitypes.TradeAdvice, bool) {
 	squad := a.squad(mine, true)
 	h := a.header()
 	out := apitypes.TradeAdvice{Week: h.week, Basis: TradesBasis(a.basis, a.settings), OrderBasis: h.basis, Refreshed: h.refreshed,
-		ReadAt: h.readAt, Teams: []apitypes.TradeTeam{}, HostTradesUrl: HostURL(a.Snap.Ref, TradesPage)}
+		ReadAt: h.readAt, Teams: []apitypes.TradeTeam{}}
+	out.HostTradesUrl, out.HostNote = a.host(TradesPage)
 	for _, t := range leaguesync.Standings(a.Snap.Teams) {
 		if t.RosterID == a.Me {
 			continue

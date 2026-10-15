@@ -2795,7 +2795,7 @@ components:
         sentence: { type: string, nullable: true, description: the reason for a change, from facts; null when unchanged }
     LineupAdvice:
       type: object
-      required: [week, basis, order_basis, refreshed, read_at, set, slots, bench, host_lineup_url]
+      required: [week, basis, order_basis, refreshed, read_at, set, slots, bench, host_lineup_url, host_note]
       properties:
         week: { type: integer }
         basis: { type: string, description: the honesty line and the basis of points over replacement }
@@ -2814,6 +2814,12 @@ components:
           description: everyone else on the active roster, by the same keys (injured reserve and taxi spots left out)
           items: { $ref: "#/components/schemas/PlayerLine" }
         host_lineup_url: { type: string, description: "the host's lineup page, empty when we know none" }
+        host_note:
+          type: string
+          nullable: true
+          description: >-
+            one sentence under the verb when we cannot open the host's page ("Make this change on Yahoo. We cannot
+            open that page for you yet."), null when the url opens it
     WaiverRow:
       type: object
       required: [add, drop, gain, starts, sentence]
@@ -2828,7 +2834,7 @@ components:
         sentence: { type: string }
     WaiverAdvice:
       type: object
-      required: [week, basis, order_basis, refreshed, read_at, best, rows, host_waivers_url]
+      required: [week, basis, order_basis, refreshed, read_at, best, rows, host_waivers_url, host_note]
       properties:
         week: { type: integer }
         basis: { type: string }
@@ -2841,6 +2847,12 @@ components:
           description: positive gains first by gain, then the rest by points over replacement, at most 60
           items: { $ref: "#/components/schemas/WaiverRow" }
         host_waivers_url: { type: string, description: "the host's waiver page, empty when we know none" }
+        host_note:
+          type: string
+          nullable: true
+          description: >-
+            one sentence under the verb when we cannot open the host's page ("Make this change on Yahoo. We cannot
+            open that page for you yet."), null when the url opens it
     TradeRecord:
       type: object
       required: [wins, losses, ties]
@@ -2877,7 +2889,7 @@ components:
           description: one sentence when every trade found with this team is a close call for them, else null
     TradeAdvice:
       type: object
-      required: [week, basis, order_basis, refreshed, read_at, teams, host_trades_url]
+      required: [week, basis, order_basis, refreshed, read_at, teams, host_trades_url, host_note]
       properties:
         week: { type: integer }
         basis: { type: string }
@@ -2886,6 +2898,12 @@ components:
         read_at: { type: string, format: date-time }
         teams: { type: array, description: every other team, in standings order, items: { $ref: "#/components/schemas/TradeTeam" } }
         host_trades_url: { type: string, description: "the host's trade page, empty when we know none" }
+        host_note:
+          type: string
+          nullable: true
+          description: >-
+            one sentence under the verb when we cannot open the host's page ("Make this change on Yahoo. We cannot
+            open that page for you yet."), null when the url opens it
     LeagueMove:
       type: object
       required: [kind, at, roster_ids, adds, drops]
