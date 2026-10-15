@@ -30,6 +30,13 @@ export function hostsLine(open: OpenHosts): string {
 	return `Works with ${hosts.join(', ')} and ${last}.`;
 }
 
-/** The hosts as the signed-out account page says it: "Sleeper, MyFantasyLeague, FFPC, Yahoo or
- * ESPN". */
-export const LEAGUE_HOSTS_LINE = `${LEAGUE_HOSTS.slice(0, -1).map(hostWords).join(', ')} or ${hostWords(LEAGUE_HOSTS.at(-1) ?? 'espn')}`;
+/** The hosts as the signed-out account page says it, each switched host only where open: "Sleeper,
+ * MyFantasyLeague, FFPC, Yahoo or ESPN". */
+export function leagueHostsLine(open: OpenHosts): string {
+	const hosts = LEAGUE_HOSTS.filter((host) => isOpen(host, open)).map(hostWords);
+	const last = hosts.pop() ?? '';
+	return `${hosts.join(', ')} or ${last}`;
+}
+
+/** Every switched host shut: the account page's line until the hosts answer which are open. */
+export const SWITCHED_SHUT: OpenHosts = { ffpc: false, yahoo: false, espn: false };

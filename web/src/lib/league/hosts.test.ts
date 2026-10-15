@@ -2,8 +2,8 @@
 // the one sentence that names the in-season tools to a first-timer. Run with `npm test`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { LEAGUE_HOSTS_LINE } from '#lib/account/keeps.ts';
 import { IN_SEASON_TOOLS_LINE, LEAGUE_HOSTS, hostsLine } from './model.ts';
+import { leagueHostsLine } from './hosts.ts';
 import { hostWords } from './names.ts';
 
 const ALL_OPEN = { ffpc: true, yahoo: true, espn: true };
@@ -11,10 +11,10 @@ const ALL_OPEN = { ffpc: true, yahoo: true, espn: true };
 void test('both pages name the same hosts in the same order, from one list', () => {
 	const named = (line: string): string[] =>
 		LEAGUE_HOSTS.map(hostWords).filter((host) => line.includes(host));
-	assert.deepEqual(named(LEAGUE_HOSTS_LINE), LEAGUE_HOSTS.map(hostWords));
+	assert.deepEqual(named(leagueHostsLine(ALL_OPEN)), LEAGUE_HOSTS.map(hostWords));
 	assert.deepEqual(named(hostsLine(ALL_OPEN)), LEAGUE_HOSTS.map(hostWords));
 	const order = (line: string): number[] => LEAGUE_HOSTS.map((h) => line.indexOf(hostWords(h)));
-	for (const line of [LEAGUE_HOSTS_LINE, hostsLine(ALL_OPEN)]) {
+	for (const line of [leagueHostsLine(ALL_OPEN), hostsLine(ALL_OPEN)]) {
 		const at = order(line);
 		assert.deepEqual(
 			at,
@@ -26,7 +26,11 @@ void test('both pages name the same hosts in the same order, from one list', () 
 		hostsLine(ALL_OPEN),
 		'Works with Sleeper leagues, public MyFantasyLeague leagues, FFPC leagues, Yahoo leagues and ESPN leagues.'
 	);
-	assert.equal(LEAGUE_HOSTS_LINE, 'Sleeper, MyFantasyLeague, FFPC, Yahoo or ESPN');
+	assert.equal(leagueHostsLine(ALL_OPEN), 'Sleeper, MyFantasyLeague, FFPC, Yahoo or ESPN');
+	assert.equal(
+		leagueHostsLine({ ffpc: false, yahoo: false, espn: true }),
+		'Sleeper, MyFantasyLeague or ESPN'
+	);
 	assert.equal(
 		hostsLine({ ffpc: false, yahoo: false, espn: true }),
 		'Works with Sleeper leagues, public MyFantasyLeague leagues and ESPN leagues.'
