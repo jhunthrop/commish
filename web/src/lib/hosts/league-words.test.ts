@@ -23,6 +23,27 @@ void test('a Yahoo league carries its size and, read aloud, its scoring', () => 
 	assert.equal(chipLabel(league), 'The Commish Classic, as Gridiron Gurus, 10 teams, head to head');
 });
 
+void test('an ESPN league says whether it is public or private where it was checked', () => {
+	const league = {
+		league_id: '1081607624',
+		name: 'Sunday Crew',
+		team_name: 'Hunt',
+		record: '',
+		teams: 10
+	};
+	assert.equal(chipWords({ ...league, public: true }), 'Sunday Crew, 10 teams, public');
+	assert.equal(chipLabel({ ...league, public: false }), 'Sunday Crew, as Hunt, 10 teams, private');
+	assert.equal(chipWords(league), 'Sunday Crew, 10 teams');
+	assert.equal(
+		chipWords({ ...league, unmarked: 'not_checked' }),
+		'Sunday Crew, 10 teams, public or private not checked'
+	);
+	assert.equal(
+		chipWords({ ...league, unmarked: 'no_answer' }),
+		'Sunday Crew, 10 teams, ESPN did not say public or private'
+	);
+});
+
 void test('a league with nothing to part it is its name', () => {
 	assert.equal(chipWords({ league_id: '1', name: 'Solo', team_name: '', record: '' }), 'Solo');
 });

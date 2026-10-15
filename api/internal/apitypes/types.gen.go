@@ -306,6 +306,24 @@ func (e HostConnectionStatus) Valid() bool {
 	}
 }
 
+// Defines values for HostLeagueUnmarked.
+const (
+	HostLeagueUnmarkedNoAnswer   HostLeagueUnmarked = "no_answer"
+	HostLeagueUnmarkedNotChecked HostLeagueUnmarked = "not_checked"
+)
+
+// Valid indicates whether the value is a known member of the HostLeagueUnmarked enum.
+func (e HostLeagueUnmarked) Valid() bool {
+	switch e {
+	case HostLeagueUnmarkedNoAnswer:
+		return true
+	case HostLeagueUnmarkedNotChecked:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for InjuryDesignationStatus.
 const (
 	InjuryDesignationStatusDoubtful       InjuryDesignationStatus = "doubtful"
@@ -1270,7 +1288,7 @@ type DroppedRuleGroup string
 
 // ESPNConnectInput defines model for ESPNConnectInput.
 type ESPNConnectInput struct {
-	// Consent the member agrees that we keep an encrypted copy of their ESPN session to keep their league in sync, never make a move, and that disconnect deletes it; must be true
+	// Consent the member agrees that we keep an encrypted copy of their ESPN session so their league stays in sync, and that disconnect deletes it; must be true
 	Consent bool `json:"consent"`
 
 	// EspnS2 ESPN's espn_s2 cookie, kept encrypted, never answered or logged
@@ -1414,6 +1432,9 @@ type HostConnectInput struct {
 type HostConnected struct {
 	Connection HostConnection `json:"connection"`
 	Leagues    []HostLeague   `json:"leagues"`
+
+	// Note one sentence for a connection kept but not yet proven (ESPN): how many leagues ESPN lists and that the session is kept for the day a private league or a move needs it
+	Note *string `json:"note,omitempty"`
 }
 
 // HostConnection defines model for HostConnection.
@@ -1423,6 +1444,9 @@ type HostConnection struct {
 	// Host a host the member connects their own account on, named as a mechanism
 	Host       ConnectedHost `json:"host"`
 	LastReadAt *time.Time    `json:"last_read_at"`
+
+	// Proven false for an ESPN session kept before any league the public cannot read was read with it (the member's leagues were all public, or ESPN listed none); FFPC and Yahoo prove themselves on connect
+	Proven bool `json:"proven"`
 
 	// Status connected reads. signed_out: the host no longer honors what we keep (FFPC's session past the one kept sign-in allowed in six hours, a Yahoo refresh Yahoo refused, ESPN cookies ESPN no longer accepts); the member connects again
 	Status HostConnectionStatus `json:"status"`
@@ -1446,6 +1470,9 @@ type HostLeague struct {
 	LeagueId string `json:"league_id"`
 	Name     string `json:"name"`
 
+	// Public whether the public reads the league with no sign-in (ESPN), as one read with no cookies answered within the hour; absent when it was not checked or ESPN did not answer, and unmarked says which
+	Public *bool `json:"public,omitempty"`
+
 	// Record the team's record as the host writes it (FFPC 2 - 3), empty when the list does not carry it
 	Record string `json:"record"`
 
@@ -1455,7 +1482,13 @@ type HostLeague struct {
 
 	// Teams the league's team count
 	Teams *int `json:"teams,omitempty"`
+
+	// Unmarked why an ESPN league carries no public mark: not_checked, past the first 10 leagues of the list, which are the ones checked; no_answer, ESPN did not answer the check in time
+	Unmarked *HostLeagueUnmarked `json:"unmarked,omitempty"`
 }
+
+// HostLeagueUnmarked why an ESPN league carries no public mark: not_checked, past the first 10 leagues of the list, which are the ones checked; no_answer, ESPN did not answer the check in time
+type HostLeagueUnmarked string
 
 // ImportSkip defines model for ImportSkip.
 type ImportSkip struct {

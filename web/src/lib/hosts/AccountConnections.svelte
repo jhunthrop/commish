@@ -25,8 +25,10 @@
 		hostsApi,
 		yahooOpen,
 		type ConnectedHost,
+		type HostConnected,
 		type HostConnection
 	} from './api.ts';
+	import { ESPN_CONSENT, statusWords } from './connection-words.ts';
 	import { yahooOutcome } from './yahoo.ts';
 
 	/** The hosts the account reads as the member (FFPC, Yahoo, ESPN), each with its state, a one-tap
@@ -67,12 +69,6 @@
 
 	onMount(load);
 
-	const STATUS: Readonly<Record<ConnectedHost, Record<HostConnection['status'], string>>> = {
-		ffpc: { connected: 'Signed in', signed_out: 'Signed out by FFPC' },
-		yahoo: { connected: 'Connected', signed_out: 'Yahoo asks you to connect again' },
-		espn: { connected: 'Connected', signed_out: 'ESPN no longer accepts your saved sign-in' }
-	};
-
 	/** What disconnecting deleted, said once it went through. */
 	const GONE: Readonly<Record<ConnectedHost, string>> = {
 		ffpc: 'FFPC disconnected. Your password and session are deleted. Your FFPC league keeps its last read.',
@@ -89,11 +85,11 @@
 	}
 
 	/** "Signed in. Reads your 2 FFPC leagues, last read 1 minute ago." "Signed out by FFPC. Last
-	 * read on Oct 12." */
+	 * read on Oct 12." "Connected, not yet checked against a private league." */
 	function line(c: HostConnection): string {
 		const when = c.last_read_at ? readWhen(c.last_read_at) : null;
 		const count = followed?.[c.host] ?? 0;
-		const status = STATUS[c.host][c.status];
+		const status = statusWords(c);
 		const reads =
 			c.status === 'connected' && count > 0
 				? `Reads your ${plural(count, `${hostWords(c.host)} league`)}`
@@ -126,6 +122,15 @@
 	const espnAgain = $derived(open.espn && connectionOf('espn')?.status === 'signed_out');
 	/** ESPN's connect form, opened from its row. */
 	let espnForm = $state(false);
+	/** Said once ESPN connected with a session kept not yet proven, in the API's words. */
+	let espnNote = $state<string | null>(null);
+
+	/** ESPN connected here: the form closes, the note shows, and the list reads again. */
+	function espnConnected(answer: HostConnected): void {
+		espnForm = false;
+		espnNote = answer.note ?? null;
+		load();
+	}
 
 	/** Open Yahoo's own sign-in from its row. */
 	async function connectYahoo(): Promise<void> {
@@ -195,8 +200,11 @@
 				{/if}
 				{#if espnAgain}
 					<div class="again">
-						<ESPNConnect label="Connect ESPN again" onconnected={load} />
+						<ESPNConnect label="Connect ESPN again" onconnected={espnConnected} />
 					</div>
+				{:else if connectionOf('espn')}
+					{#if espnNote}<p class="done" role="status">{espnNote}</p>{/if}
+					<p class="note">{ESPN_CONSENT}</p>
 				{/if}
 			{:else if anyOpen && !yahooNew && !espnNew}
 				<EmptyState level={3} title="No connected accounts">
@@ -215,7 +223,7 @@
 					{#if espnNew}
 						<ActionRow
 							lead="ESPN"
-							text="Not connected. Connect to follow a private ESPN league. A public one needs only its link."
+							text="Not connected. Connect to follow your ESPN leagues, public or private."
 						>
 							{#snippet action()}
 								<Quiet size="sm" onclick={() => (espnForm = !espnForm)}>Connect</Quiet>
@@ -224,7 +232,7 @@
 					{/if}
 				</ActionRows>
 				{#if espnNew && espnForm}
-					<div class="again"><ESPNConnect onconnected={load} /></div>
+					<div class="again"><ESPNConnect onconnected={espnConnected} /></div>
 				{/if}
 			{/if}
 			{#if problem}<ProblemLine>{problem}</ProblemLine>{/if}

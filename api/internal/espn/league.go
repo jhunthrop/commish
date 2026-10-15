@@ -219,6 +219,22 @@ func (c *Client) Read(ctx context.Context, id string, season int, cookies *Cooki
 	return checkFull(wire)
 }
 
+// Public reports whether the public reads a league in a season: its
+// settings alone, read with no cookies. A refusal is a private league;
+// any other failure is not known and is answered as an error, never a
+// guess.
+func (c *Client) Public(ctx context.Context, id string, season int) (bool, error) {
+	if !leagueID.MatchString(id) || season < minSeason || season > maxSeason {
+		return false, ErrNotALink
+	}
+	path := fmt.Sprintf("%s/apis/v3/games/ffl/seasons/%d/segments/0/leagues/%s?view=mSettings", c.Base, season, id)
+	_, err := c.get(ctx, path, nil, maxBody)
+	if errors.Is(err, ErrPrivate) {
+		return false, nil
+	}
+	return err == nil, err
+}
+
 // get reads one address with the cookies when given. A refusal with
 // cookies is ErrSignedOut, without them ErrPrivate. Its errors name a
 // status, never a cookie.

@@ -114,10 +114,11 @@ func (y yahooWiring) host(ids leaguesync.HostIDs, log *slog.Logger) *leaguesync.
 // connected member's private leagues read with their kept cookies. The
 // host is HOST_ESPN_ENABLED; connecting needs the vault's key as well.
 type espnWiring struct {
-	host    bool
-	connect bool
-	client  *espn.Client
-	member  *espnhost.Member
+	host      bool
+	connect   bool
+	client    *espn.Client
+	publicity *espnhost.Publicity
+	member    *espnhost.Member
 }
 
 func newESPNWiring(cfg config.API, pool *pgxpool.Pool, ff ffpcWiring, log *slog.Logger) espnWiring {
@@ -127,14 +128,17 @@ func newESPNWiring(cfg config.API, pool *pgxpool.Pool, ff ffpcWiring, log *slog.
 	}
 	client := espn.New()
 	client.Pace = &hosts.Gate{Pool: pool, Host: espnhost.Host, Gap: espn.Gap, MaxWait: espn.MaxQueue}
-	member := &espnhost.Member{Client: client, Store: ff.store, Vault: ff.vault, Now: time.Now, Log: log}
-	return espnWiring{host: cfg.Hosts.ESPNEnabled, connect: connect, client: client, member: member}
+	// One process-wide answer to "does the public read this league", kept
+	// for the hour, shared by the connect, the list and the member reads.
+	publicity := &espnhost.Publicity{Client: client, Now: time.Now}
+	member := &espnhost.Member{Client: client, Public: publicity, Store: ff.store, Vault: ff.vault, Now: time.Now, Log: log}
+	return espnWiring{host: cfg.Hosts.ESPNEnabled, connect: connect, client: client, publicity: publicity, member: member}
 }
 
 // routes are connecting, listing and disconnecting ESPN.
 func (e espnWiring) routes(pool *pgxpool.Pool, ff ffpcWiring, log *slog.Logger) []httpx.Route {
 	return (&espnhost.Service{
-		Enabled: e.connect, Client: e.client, Store: ff.store, Vault: ff.vault, Leagues: e.member,
+		Enabled: e.connect, Client: e.client, Public: e.publicity, Store: ff.store, Vault: ff.vault, Leagues: e.member,
 		Followed: &leaguesync.Store{Pool: pool}, Now: time.Now, Log: log,
 	}).Routes()
 }

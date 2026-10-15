@@ -5,13 +5,15 @@
 	import ProblemLine from '#lib/ui/ProblemLine.svelte';
 	import Quiet from '#lib/ui/Quiet.svelte';
 	import Verb from '#lib/ui/Verb.svelte';
-	import { ApiError, ESPN_CONSENT, hostsApi, type HostLeague } from './api.ts';
+	import { ApiError, ESPN_CONSENT, hostsApi, type HostConnected } from './api.ts';
 	import { signInWithDisney } from './espn-oneid.ts';
 
 	/** Connect ESPN: one verb opens Disney's own sign-in in a window of its own on the workers.dev
 	 * origin (espn-oneid.ts), which hands the session back to this page, and this page sends it to
 	 * the API, which keeps it encrypted. The two values can be pasted from ESPN's site instead, the
-	 * way in when Disney's sign-in does not hand them over. */
+	 * way in when Disney's sign-in does not hand them over. One flow whatever the member's leagues
+	 * are: a member whose leagues are all public is connected too, with a note saying why the
+	 * session is kept. */
 	interface Props {
 		/** A line above the verb: why a connection is asked for again. */
 		reason?: string;
@@ -20,7 +22,8 @@
 		/** The verb sits in the page's action bar: true where connecting is the page's one verb (the
 		 * attach page), false where it sits among other rows (the account page). */
 		bar?: boolean;
-		onconnected: (leagues: HostLeague[]) => void;
+		/** Connected: the leagues ESPN lists, and the note for a session kept not yet proven. */
+		onconnected: (answer: HostConnected) => void;
 	}
 
 	let { reason, label = 'Connect ESPN', bar = false, onconnected }: Props = $props();
@@ -40,8 +43,7 @@
 	}
 
 	async function keep(session: { swid: string; s2: string }): Promise<void> {
-		const answer = await hostsApi.connectESPN(session.swid, session.s2);
-		onconnected(answer.leagues);
+		onconnected(await hostsApi.connectESPN(session.swid, session.s2));
 	}
 
 	/** Disney's sign-in in its own window. Closing it makes the verb ready again at once; a sign-in

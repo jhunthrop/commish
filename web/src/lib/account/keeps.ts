@@ -34,7 +34,7 @@ export const MEMBER_HOSTS = [
 	},
 	{
 		lead: 'ESPN',
-		text: 'Sign in, then connect ESPN to follow a private ESPN league.',
+		text: 'Sign in, then connect ESPN to follow your ESPN leagues, public or private. We keep an encrypted copy of your ESPN session so your league stays in sync.',
 		verb: 'Connect ESPN'
 	}
 ] as const;
