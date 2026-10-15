@@ -20,6 +20,14 @@
 	}
 
 	let { decision, reason = null, verb, href, basis, children }: Props = $props();
+
+	/** The verb's link opens the host in a new tab with no hold on this page. Set here rather than
+	 * on the shared verb, so no other page carries it. */
+	function toHost(holder: HTMLElement): void {
+		const link = holder.querySelector('a');
+		link?.setAttribute('target', '_blank');
+		link?.setAttribute('rel', 'noopener');
+	}
 </script>
 
 <Panel as="section" label="Our call" edge="accent">
@@ -28,13 +36,13 @@
 			<p class="line">{decision}</p>
 			{#if reason}<p class="reason">{reason}</p>{/if}
 		</div>
-		<span class="verb desk"><Verb {href} external>{verb}</Verb></span>
+		<span class="verb desk" {@attach toHost}><Verb {href}>{verb}</Verb></span>
 	</div>
 </Panel>
 <Basis {basis} />
 {@render children()}
-<div class="pin">
-	<Verb {href} external fill>{verb}</Verb>
+<div class="pin" {@attach toHost}>
+	<Verb {href} fill>{verb}</Verb>
 </div>
 
 <style>

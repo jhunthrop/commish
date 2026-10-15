@@ -8,7 +8,6 @@
 	let {
 		variant,
 		href,
-		external = false,
 		onclick,
 		key,
 		size = 'md',
@@ -27,15 +26,7 @@
 {/snippet}
 
 {#if href && !disabled}
-	<a
-		class="action {variant} {size}"
-		class:fill
-		{href}
-		target={external ? '_blank' : undefined}
-		rel={external ? 'noopener' : undefined}
-		aria-keyshortcuts={key}
-		{onclick}
-	>
+	<a class="action {variant} {size}" class:fill {href} aria-keyshortcuts={key} {onclick}>
 		{@render body()}
 	</a>
 {:else}

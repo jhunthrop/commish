@@ -4,8 +4,6 @@ import type { Snippet } from 'svelte';
 export interface ActionProps {
 	/** A link to another page. Without it the action is a button. */
 	href?: string;
-	/** The link opens another site (a league's host) in a new tab, with no hold on this one. */
-	external?: boolean;
 	onclick?: (event: MouseEvent) => void;
 	/** The key that does the same thing, printed after the words: Enter, U. */
 	key?: string;
