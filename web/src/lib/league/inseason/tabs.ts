@@ -1,6 +1,6 @@
 /** A followed league's pages, as the tabs under its title list them: the league page (standings,
  * roster, matchup, moves, pool) and the three in-season screens, which share one route
- * (/league/[id]/[screen=inseason]). Kept with the league's parts, not with the site's links, so no other
+ * (/league/[id]/[screen]). Kept with the league's parts, not with the site's links, so no other
  * page carries them. */
 import { resolve } from '$app/paths';
 import { TAB_LABELS, type InSeasonScreen } from './words.ts';
@@ -23,5 +23,5 @@ export const LEAGUE_TABS: readonly LeagueTabLink[] = ORDER.map((tab) => ({
 export function tabHref(tab: LeagueTab, id: string): string {
 	return tab === 'league'
 		? resolve('/league/[id]', { id })
-		: resolve('/league/[id]/[screen=inseason]', { id, screen: tab });
+		: resolve('/league/[id]/[screen]', { id, screen: tab });
 }

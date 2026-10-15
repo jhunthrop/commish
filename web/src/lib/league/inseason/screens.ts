@@ -1,6 +1,5 @@
 /** The three in-season screens as their route's segment names them, and which of them are pages
- * under the flag. Alone and import-free on purpose: the route's matcher ships with the app's entry,
- * which every page loads. */
+ * under the flag. Alone and free of run-time imports, so the route's load carries only this. */
 import type { Flag } from '#lib/site/flags.ts';
 
 const SCREENS = ['start', 'waivers', 'trades'] as const;
