@@ -10,6 +10,7 @@ import type { FaceStatus } from '#lib/ui/face-status.ts';
 import type {
 	AttachedLeague,
 	LeagueMatchup,
+	LeagueHost,
 	LeagueMove,
 	LeaguePlayer,
 	LeagueSync,
@@ -54,6 +55,16 @@ export function agoWords(seconds: number): string {
 	return `${plural(Math.floor(seconds / HOUR), 'hour')} ago`;
 }
 
+/** Seconds since a read, never below 0. */
+function readAge(readAt: string, now: Date): number {
+	return Math.max(0, (now.getTime() - Date.parse(readAt)) / 1000);
+}
+
+/** "Read from Sleeper 4 minutes ago.": when the host was last read for the league. */
+export function readAgoLine(host: LeagueHost, readAt: string, now: Date): string {
+	return `Read from ${hostWords(host)} ${agoWords(readAge(readAt, now))}.`;
+}
+
 /** How a league read as a member is reached: FFPC is signed in to, every other host connected to. */
 function memberWords(host: LeagueSync['host']): string {
 	return host === 'ffpc' ? 'signed in to' : 'connected to';
@@ -62,9 +73,9 @@ function memberWords(host: LeagueSync['host']): string {
 /** The read's line: when the host was last read, and, when the last read failed, why, and that this
  * is the last read we have. A kept read waiting on the next one names no failure. */
 export function readLine(sync: LeagueSync, now: Date): string {
-	const age = Math.max(0, (now.getTime() - Date.parse(sync.read_at)) / 1000);
+	const age = readAge(sync.read_at, now);
 	const host = hostWords(sync.host);
-	const read = `Read from ${host} ${agoWords(age)}.`;
+	const read = readAgoLine(sync.host, sync.read_at, now);
 	const last = `This is our last read, ${agoWords(age)}.`;
 	if (sync.host_signed_out) {
 		return `No one in this league is ${memberWords(sync.host)} ${host}. ${last}`;
@@ -111,7 +122,7 @@ export function recordWords(team: Pick<LeagueTeam, 'wins' | 'losses' | 'ties'>):
 }
 
 /** Where the drafter stands in a followed league: "2-3, 9 of 12", empty before a read. */
-export function standingWords(league: AttachedLeague): string {
+export function standingWords(league: Pick<AttachedLeague, 'standing'>): string {
 	const s = league.standing;
 	return s ? `${recordWords(s)}, ${String(s.place)} of ${String(s.teams)}` : '';
 }

@@ -33,6 +33,9 @@
 		status?: FaceStatus | null;
 		/** The row's number, at its end. Left out, the row ends on his points a game this season. */
 		trailing?: Snippet;
+		/** The line under his name, in place of his board place, bye and projection: an in-season
+		 * screen's facts for this week. */
+		meta?: Snippet;
 		/** End on his value over replacement, the order of a list ranked by it (the waiver pool). */
 		endsOnValue?: boolean;
 	}
@@ -44,6 +47,7 @@
 		slot,
 		status = null,
 		trailing,
+		meta,
 		endsOnValue = false
 	}: Props = $props();
 
@@ -68,7 +72,9 @@
 			<b><NameWords {name} /></b>
 		{/if}
 		<span class="meta">
-			{#if player}
+			{#if meta}
+				{@render meta()}
+			{:else if player}
 				<PositionPill position={player.position} rank={player.positionRank} />
 				<span>{player.team}</span>
 				{#if player.bye !== null}<span>bye {player.bye}</span>{/if}

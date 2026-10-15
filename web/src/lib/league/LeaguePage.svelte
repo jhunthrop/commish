@@ -1,10 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { goto } from '$app/navigation';
 	import { HTTP_STATUS, hasStatus, isSignedOut } from '#lib/api/status.ts';
-	import { choose } from '#lib/context/choose.svelte.ts';
 	import { takeHeld } from '#lib/context/held.ts';
-	import { siteContext } from '#lib/context/context.svelte.ts';
 	import { scoresSentence } from '#lib/context/note-words.ts';
 	import { lazySheet } from '#lib/site/lazy-sheet.svelte.ts';
 	import { links } from '#lib/site/links.ts';
@@ -22,6 +19,8 @@
 	import HostReconnect from '#lib/hosts/HostReconnect.svelte';
 	import { ApiError, leagueApi, type LeagueSync } from './api.ts';
 	import { loadBoard, type LeagueBoard } from './board.ts';
+	import { followSwitch } from './follow-switch.svelte.ts';
+	import LeagueTabs from './inseason/LeagueTabs.svelte';
 	import MatchupPanel from './MatchupPanel.svelte';
 	import MovesPanel from './MovesPanel.svelte';
 	import RosterPanel from './RosterPanel.svelte';
@@ -62,25 +61,10 @@
 	let boardFailed = $state(false);
 	let refreshing = $state(false);
 	let now = $state(new Date());
-	/** The switch's choices once this page made its league the context (when /me first answers),
-	 * null before. Only a later choice made in the switch opens another league's page: a refused
-	 * selection stays here, its sentence in the switch. */
-	let adoptedAt = $state<number | null>(null);
 
-	onMount(() => {
-		void siteContext.load().then(async () => {
-			if (siteContext.league?.id !== id && siteContext.leagues.some((l) => l.id === id)) {
-				await choose({ league: id });
-			}
-			adoptedAt = siteContext.choices;
-		});
-	});
-
-	$effect(() => {
-		const selected = siteContext.league?.id ?? null;
-		const switched = adoptedAt !== null && siteContext.choices !== adoptedAt;
-		if (switched && selected !== null && selected !== id) void goto(links.league(selected));
-	});
+	// The page is created per league ({#key} in the route), so its id is fixed for its life.
+	// svelte-ignore state_referenced_locally
+	followSwitch(id, links.league);
 
 	function take(answer: LeagueSync): void {
 		sync = answer;
@@ -237,6 +221,7 @@
 					>
 				</div>
 			</header>
+			<LeagueTabs {id} current="league" />
 			{#if basis}<p class="basis">{basis}</p>{/if}
 			{#if problem}
 				<Panel edge="loss" padding="sm"><ProblemLine>{problem}</ProblemLine></Panel>
