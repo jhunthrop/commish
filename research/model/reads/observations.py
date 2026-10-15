@@ -42,6 +42,8 @@ class ObservationQuery:
     source: str | None = None
     # `ObservationQuery.playerIds`: only these players' rows, the order unchanged.
     player_ids: tuple[str, ...] | None = None
+    # Only these metrics' rows, the order unchanged (a read that needs a few metrics of a wide source).
+    metrics: tuple[str, ...] | None = None
 
 
 def _week_bounds(week: Weeks) -> tuple[int, int]:
@@ -51,7 +53,7 @@ def _week_bounds(week: Weeks) -> tuple[int, int]:
 _OBSERVATIONS_AS_OF: Final = """
 select distinct on (week, player_id, source, metric) season, week, player_id, source, metric, value, as_of
 from research.player_week_observations
-where season = :season and week >= :first and week <= :last and as_of <= :as_of {source} {players}
+where season = :season and week >= :first and week <= :last and as_of <= :as_of {source} {players} {metrics}
 order by week asc, player_id asc, source asc, metric asc, as_of desc
 """
 
@@ -68,7 +70,11 @@ def observations_as_of(conn: Connection, query: ObservationQuery) -> list[Player
     if query.player_ids is not None:
         players = "and player_id = any(:player_ids)"
         params["player_ids"] = list(query.player_ids)
-    rows = conn.execute(text(_OBSERVATIONS_AS_OF.format(source=clause, players=players)), params)
+    metrics = ""
+    if query.metrics is not None:
+        metrics = "and metric = any(:metrics)"
+        params["metrics"] = list(query.metrics)
+    rows = conn.execute(text(_OBSERVATIONS_AS_OF.format(source=clause, players=players, metrics=metrics)), params)
     return [
         PlayerWeekObservation(
             row.season, row.week, row.player_id, row.source, row.metric, row.value, ms_instant(row.as_of)
