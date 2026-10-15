@@ -2,6 +2,7 @@
 // script writes them into localStorage before each run, and storage is kept between the seed and
 // the audit. Same profile, method and user-page budgets as lighthouserc.json.
 const { Launcher } = require('chrome-launcher');
+const { ORIGIN, PAINT_HOLDING_OFF } = require('./lighthouse-shared.cjs');
 
 const RUNS = 7;
 const [chromePath] = Launcher.getInstallations();
@@ -16,13 +17,12 @@ module.exports = {
 			startServerReadyPattern: 'Accepting connections',
 			// LHCI runs the seed script once per listed URL, not once per run, so the URL is listed
 			// once per run: every run is seeded and cold. LH_SHEET_URL points at a build already served.
-			url: Array.from(
-				{ length: RUNS },
-				() => process.env.LH_SHEET_URL ?? 'http://localhost:4173/sheet'
-			),
+			url: Array.from({ length: RUNS }, () => process.env.LH_SHEET_URL ?? `${ORIGIN}/sheet`),
 			numberOfRuns: 1,
 			chromePath: process.env.CHROME_PATH ?? chromePath,
 			puppeteerScript: './scripts/lighthouse-seed-sheet.cjs',
+			// A puppeteer run launches Chrome itself, so the switch goes in as a launch argument.
+			puppeteerLaunchOptions: { args: [PAINT_HOLDING_OFF] },
 			settings: {
 				preset: 'perf',
 				formFactor: 'mobile',
