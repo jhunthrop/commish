@@ -12,7 +12,7 @@ import (
 
 // twelveTeamPPR is the first fixture league: 12 teams, PPR, QB, 2 RB,
 // 3 WR, TE, one flex, K, DEF, six on the bench, no superflex.
-func twelveTeamPPR(t *testing.T) []draft.SlotConfig {
+func twelveTeamPPR(t testing.TB) []draft.SlotConfig {
 	t.Helper()
 	return slotsOf(t, apitypes.LeagueSettings{Teams: 12, Lineup: apitypes.LineupStandard,
 		Roster: apitypes.RosterCounts{Qb: 1, Rb: 2, Wr: 3, Te: 1, K: 1, Dst: 1, Bench: 6}})
@@ -20,13 +20,13 @@ func twelveTeamPPR(t *testing.T) []draft.SlotConfig {
 
 // tenTeamHalfSuperflex is the second: 10 teams, half PPR, QB, 2 RB,
 // 2 WR, TE, a flex and a superflex, K, DEF, six on the bench.
-func tenTeamHalfSuperflex(t *testing.T) []draft.SlotConfig {
+func tenTeamHalfSuperflex(t testing.TB) []draft.SlotConfig {
 	t.Helper()
 	return slotsOf(t, apitypes.LeagueSettings{Teams: 10, Lineup: apitypes.LineupSuperflex,
 		Roster: apitypes.RosterCounts{Qb: 1, Rb: 2, Wr: 2, Te: 1, K: 1, Dst: 1, Bench: 6}})
 }
 
-func slotsOf(t *testing.T, s apitypes.LeagueSettings) []draft.SlotConfig {
+func slotsOf(t testing.TB, s apitypes.LeagueSettings) []draft.SlotConfig {
 	t.Helper()
 	config, err := mock.SlotConfig(s)
 	if err != nil {
@@ -119,7 +119,7 @@ func equal(a, b []string) bool {
 func TestLineupKeys(t *testing.T) {
 	cases := []struct {
 		name   string
-		config func(*testing.T) []draft.SlotConfig
+		config func(testing.TB) []draft.SlotConfig
 		roster []Candidate
 		host   []string
 		want   []string
@@ -199,4 +199,15 @@ func TestLineupOutOnlyWithNoAlternative(t *testing.T) {
 	if c := changes(rows, roster); c != nil {
 		t.Fatalf("changes %v, want the out kicker kept with no other kicker", c)
 	}
+}
+
+// without is roster less the players at drop.
+func without(roster []Candidate, drop []int) []Candidate {
+	var out []Candidate
+	for i, c := range roster {
+		if !contains(drop, i) {
+			out = append(out, c)
+		}
+	}
+	return out
 }

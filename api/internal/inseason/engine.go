@@ -36,6 +36,9 @@ type Candidate struct {
 	// Locked is a player whose game has kicked off: he cannot be moved
 	// into or out of the lineup.
 	Locked bool
+	// InjuredReserve is a player listed on injured reserve: he counts in
+	// no lineup strength and is never traded.
+	InjuredReserve bool
 }
 
 // Slot is one starting spot: its type, the positions it takes and its
@@ -133,54 +136,157 @@ func valueThenForm(a, b *Candidate) bool {
 	return a.ID < b.ID
 }
 
+// filler fills one league's slots, its buffers kept between calls: the
+// trade search fills thousands of rosters a request.
+type filler struct {
+	slots  []Slot
+	shared []int
+	open   []bool
+	out    []int
+	order  []int
+	taken  []bool
+	pool   []*Candidate
+}
+
+func newFiller(slots []Slot) *filler {
+	f := &filler{slots: slots, shared: sharedOrder(slots), open: make([]bool, len(slots)), out: make([]int, len(slots))}
+	for i := range f.open {
+		f.open[i] = true
+	}
+	return f
+}
+
 // fill puts the best of pool in every open slot: each position's own
 // slots first, in config order, by the order inside the position; then
 // the shared slots, narrowest first, by the order across positions.
-// taken marks players already placed; the answer is a pool index per
-// slot, -1 where nobody eligible is left.
-func fill(slots []Slot, open []bool, pool []Candidate, taken []bool) []int {
-	out := make([]int, len(slots))
-	for i := range out {
-		out[i] = -1
+// taken marks players already placed and is marked as players are; the
+// answer is a pool index per slot, -1 where nobody eligible is left,
+// good until the next call.
+func (f *filler) fill(open []bool, pool []*Candidate, taken []bool) []int {
+	for i := range f.out {
+		f.out[i] = -1
 	}
-	order := make([]int, len(pool))
-	for i := range order {
-		order[i] = i
+	f.order = f.order[:0]
+	for i := range pool {
+		f.order = append(f.order, i)
 	}
-	sort.SliceStable(order, func(i, j int) bool { return withinBetter(&pool[order[i]], &pool[order[j]]) })
-	for i, s := range slots {
+	// An insertion sort: a roster is a few dozen players at most.
+	order := f.order
+	for i := 1; i < len(order); i++ {
+		for j := i; j > 0 && withinBetter(pool[order[j]], pool[order[j-1]]); j-- {
+			order[j], order[j-1] = order[j-1], order[j]
+		}
+	}
+	for i, s := range f.slots {
 		if !open[i] || s.shared() {
 			continue
 		}
 		for _, p := range order {
 			if !taken[p] && s.accepts(pool[p].Position) {
-				out[i], taken[p] = p, true
+				f.out[i], taken[p] = p, true
 				break
 			}
 		}
 	}
-	shared := make([]int, 0, len(slots))
-	for i, s := range slots {
-		if open[i] && s.shared() {
-			shared = append(shared, i)
+	for _, i := range f.shared {
+		if !open[i] {
+			continue
 		}
-	}
-	sort.SliceStable(shared, func(i, j int) bool { return len(slots[shared[i]].Eligible) < len(slots[shared[j]].Eligible) })
-	for _, i := range shared {
 		best := -1
 		for p := range pool {
-			if taken[p] || !slots[i].accepts(pool[p].Position) {
+			if taken[p] || !f.slots[i].accepts(pool[p].Position) {
 				continue
 			}
-			if best < 0 || acrossBetter(&pool[p], &pool[best]) {
+			if best < 0 || acrossBetter(pool[p], pool[best]) {
 				best = p
 			}
 		}
 		if best >= 0 {
-			out[i], taken[best] = best, true
+			f.out[i], taken[best] = best, true
+		}
+	}
+	return f.out
+}
+
+// strength is §5.2's lineup strength: the points over replacement a week
+// summed over the slots the engine fills from pool (§4.2's fill on our
+// order, nobody's week counted), and how many slots it filled. A player
+// on injured reserve fills nothing; a player with no points over
+// replacement fills a slot and adds none.
+func (f *filler) strength(pool []*Candidate) (float64, int) {
+	f.taken = f.taken[:0]
+	for _, c := range pool {
+		f.taken = append(f.taken, c.InjuredReserve)
+	}
+	total, filled := 0.0, 0
+	for _, p := range f.fill(f.open, pool, f.taken) {
+		if p < 0 {
+			continue
+		}
+		filled++
+		if pool[p].HasValue {
+			total += pool[p].Value
+		}
+	}
+	return PerWeek(total), filled
+}
+
+// started reports whether the last fill started pool[at].
+func (f *filler) started(at int) bool { return contains(f.out, at) }
+
+// swap is base less the players at out, with in appended, in the
+// filler's buffer: good until the next swap.
+func (f *filler) swap(base []*Candidate, out []int, in ...*Candidate) []*Candidate {
+	f.pool = f.pool[:0]
+	for i, c := range base {
+		if !contains(out, i) {
+			f.pool = append(f.pool, c)
+		}
+	}
+	f.pool = append(f.pool, in...)
+	return f.pool
+}
+
+func contains(list []int, v int) bool {
+	for _, x := range list {
+		if x == v {
+			return true
+		}
+	}
+	return false
+}
+
+// pointers is the roster as the filler reads it.
+func pointers(roster []Candidate) []*Candidate {
+	out := make([]*Candidate, len(roster))
+	for i := range roster {
+		out[i] = &roster[i]
+	}
+	return out
+}
+
+// sharedOrder is the shared slots, narrowest first, in config order
+// among equals.
+func sharedOrder(slots []Slot) []int {
+	var out []int
+	for width := 2; len(out) < countShared(slots); width++ {
+		for i, s := range slots {
+			if s.shared() && len(s.Eligible) == width {
+				out = append(out, i)
+			}
 		}
 	}
 	return out
+}
+
+func countShared(slots []Slot) int {
+	n := 0
+	for _, s := range slots {
+		if s.shared() {
+			n++
+		}
+	}
+	return n
 }
 
 // Row is one starting spot of the advised lineup: who we start, and who
@@ -226,7 +332,7 @@ func Lineup(config []draft.SlotConfig, roster []Candidate, hostStarters []string
 			taken[p] = true
 		}
 	}
-	for i, p := range fill(slots, open, roster, taken) {
+	for i, p := range newFiller(slots).fill(open, pointers(roster), taken) {
 		if open[i] {
 			ours[i] = p
 		}
