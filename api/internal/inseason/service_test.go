@@ -101,6 +101,43 @@ func (f *fakeMoves) LineupMove(_ context.Context, accountID uuid.UUID, host stri
 	return apitypes.LineupMoves{Lineup: apitypes.LineupMovesLineupUnavailable, Note: &note}, nil
 }
 
+func (f *fakeMoves) ClaimMove(_ context.Context, accountID uuid.UUID, host string) (apitypes.WaiverMoves, error) {
+	f.host, f.account = host, accountID
+	if f.err != nil {
+		return apitypes.WaiverMoves{}, f.err
+	}
+	return apitypes.WaiverMoves{Claim: apitypes.WaiverMovesClaimAvailable}, nil
+}
+
+// The waivers say whether the member may claim on the host from our
+// screen, asked for the signed-in account and the league's host; with no
+// moves wired, or a failed check, it is the host's page.
+func TestWaiversCarryMoves(t *testing.T) {
+	f := newFixture(t)
+	s := fixtureService(t, f.league, f.data, &fakeHolds{})
+	_, env := serve(t, s, leaguePath+"waivers")
+	var plain apitypes.WaiverAdvice
+	if err := json.Unmarshal(env.Data, &plain); err != nil || plain.Moves.Claim != apitypes.WaiverMovesClaimUnavailable || plain.Moves.Note != nil {
+		t.Fatalf("no moves wired: %+v %v", plain.Moves, err)
+	}
+	moves := &fakeMoves{}
+	s.Moves = moves
+	_, env = serve(t, s, leaguePath+"waivers?position=RB")
+	var got apitypes.WaiverAdvice
+	if err := json.Unmarshal(env.Data, &got); err != nil || got.Moves.Claim != apitypes.WaiverMovesClaimAvailable {
+		t.Fatalf("moves: %+v %v", got.Moves, err)
+	}
+	if moves.host != f.league.Snap.Ref.Host || moves.account != uuid.MustParse("00000000-0000-0000-0000-00000000000a") {
+		t.Fatalf("asked for %q as %s", moves.host, moves.account)
+	}
+	moves.err = errors.New("the allow list did not answer")
+	code, env := serve(t, s, leaguePath+"waivers")
+	var closed apitypes.WaiverAdvice
+	if err := json.Unmarshal(env.Data, &closed); err != nil || code != http.StatusOK || closed.Moves.Claim != apitypes.WaiverMovesClaimUnavailable {
+		t.Fatalf("a failed check: %d %+v %v", code, closed.Moves, err)
+	}
+}
+
 // The lineup says whether the member may set it on the host from our
 // screen, asked for the signed-in account and the league's host; with no
 // moves wired it is the host's page.

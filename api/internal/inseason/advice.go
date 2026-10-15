@@ -323,7 +323,7 @@ func (a *advisor) Waivers(position draft.Position) (apitypes.WaiverAdvice, bool)
 	}
 	h := a.header()
 	out := apitypes.WaiverAdvice{Week: h.week, Basis: WaiversBasis(a.basis, a.weeks), BasisNote: BasisNote(a.settings), OrderBasis: h.basis, Refreshed: h.refreshed,
-		ReadAt: h.readAt, Rows: []apitypes.WaiverRow{}}
+		ReadAt: h.readAt, Rows: []apitypes.WaiverRow{}, Moves: apitypes.WaiverMoves{Claim: apitypes.WaiverMovesClaimUnavailable}}
 	out.HostWaiversUrl, out.HostNote = a.host(WaiversPage)
 	w := &Writer{Basis: a.basis, Now: a.now}
 	for _, move := range Waivers(a.config, a.weeks, squad, cands) {
@@ -360,7 +360,7 @@ func (a *advisor) Trades(focus string) (apitypes.TradeAdvice, bool) {
 	squad := a.squad(mine, true)
 	h := a.header()
 	out := apitypes.TradeAdvice{Week: h.week, Basis: TradesBasis(a.basis, a.weeks), BasisNote: BasisNote(a.settings), OrderBasis: h.basis, Refreshed: h.refreshed,
-		ReadAt: h.readAt, Teams: []apitypes.TradeTeam{}}
+		ReadAt: h.readAt, Teams: []apitypes.TradeTeam{}, Roster: rosterLines(mine)}
 	out.HostTradesUrl, out.HostNote = a.host(TradesPage)
 	for _, t := range leaguesync.Standings(a.Snap.Teams) {
 		if t.RosterID == a.Me {
@@ -389,6 +389,30 @@ func (a *advisor) Trades(focus string) (apitypes.TradeAdvice, bool) {
 		out.Teams = append(out.Teams, row)
 	}
 	return out, true
+}
+
+// positionOrder is the order the trade picker lists a roster in.
+var positionOrder = map[draft.Position]int{draft.QB: 0, draft.RB: 1, draft.WR: 2, draft.TE: 3, draft.K: 4, draft.DEF: 5}
+
+// rosterLines is every active player on the roster, by position then name.
+func rosterLines(people []person) []apitypes.PlayerLine {
+	out := make([]apitypes.PlayerLine, len(people))
+	for i, p := range people {
+		out[i] = p.line
+	}
+	rank := func(l apitypes.PlayerLine) int {
+		if r, ok := positionOrder[draft.Position(l.Player.Position)]; ok {
+			return r
+		}
+		return len(positionOrder)
+	}
+	sort.SliceStable(out, func(i, j int) bool {
+		if ri, rj := rank(out[i]), rank(out[j]); ri != rj {
+			return ri < rj
+		}
+		return out[i].Player.Name < out[j].Player.Name
+	})
+	return out
 }
 
 func lines(people []person, at []int) []apitypes.PlayerLine {
