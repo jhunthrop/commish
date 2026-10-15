@@ -47,6 +47,8 @@ const SUPER_FLEX = new Set(['QB', 'RB', 'WR', 'TE']);
 const DECIMALS = 100;
 /** The API states points over replacement a week: the season's over 17 games. */
 const SEASON_GAMES = 17;
+/** The one player the fixture's member tags Hold: a sheet tag, not a figure. */
+const HELD_ON_SHEET = 'Christian Kirk';
 /** The league's slot words in the contract's: Sleeper's SUPER_FLEX is SUPERFLEX. */
 const SLOT_OF: Readonly<Record<string, LineupSlot['slot']>> = {
 	QB: 'QB',
@@ -393,7 +395,9 @@ async function lineup(): Promise<LineupAdvice> {
 	});
 	const bench = myLines
 		.filter((l) => !started.has(l.player.host_id))
-		.sort((a, b) => vorOf(b) - vorOf(a));
+		.sort((a, b) => vorOf(b) - vorOf(a))
+		// One bench player tagged Hold, as a member would on a sheet, so the screen draws a held row.
+		.map((l) => (l.player.name === HELD_ON_SHEET ? { ...l, held: true } : l));
 	return {
 		...head(
 			`Ranked by our rest-of-season order from week ${String(rosFrom)} and this week's designations. We do not project a week's points.`

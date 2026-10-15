@@ -2,7 +2,7 @@
 // tabs, against the fixture API (scripts/inseason-fixture/serve.ts) and the built site, in both themes
 // at 1440 and 390. At 1440, 1024, 800, 768 and 390 it asserts the page never scrolls sideways, and it
 // prints the tallest player row, the taps from the page to its verb, and the shots of the loading
-// rows and the API's refusal. Exits non-zero when a page scrolls sideways.
+// rows, the API's refusals and the site's not-found for an unknown screen. Exits non-zero when a page scrolls sideways.
 //
 //   node scripts/inseason-shots.ts [web origin] [out dir]
 // with the site built against PUBLIC_API_URL=http://localhost:8799 and the fixture API running there.
@@ -122,8 +122,16 @@ for (const width of SHOT_WIDTHS) {
 	await page.locator('.reserve').waitFor({ timeout: READY_TIMEOUT_MS });
 	await page.screenshot({ path: file(`start-loading-light-${String(width)}`) });
 	await page.goto(`${web}/league/${FIXTURE_IDS.outOfSeason}/waivers`, { waitUntil: 'networkidle' });
-	await ready(page, 'not in season');
+	await ready(page, 'no games this week');
 	await page.screenshot({ path: file(`waivers-refused-light-${String(width)}`) });
+	// A 404 for a team missing from the league's last read prints the API's sentence.
+	await page.goto(`${web}/league/${FIXTURE_IDS.noTeam}/start`, { waitUntil: 'networkidle' });
+	await ready(page, 'could not find your team');
+	await page.screenshot({ path: file(`start-no-team-light-${String(width)}`) });
+	// Any other segment under a league is the site's own not-found.
+	await page.goto(`${web}/league/${id}/pool`, { waitUntil: 'networkidle' });
+	await ready(page, 'Nothing lives at this address');
+	await page.screenshot({ path: file(`unknown-screen-light-${String(width)}`) });
 	await ctx.close();
 }
 

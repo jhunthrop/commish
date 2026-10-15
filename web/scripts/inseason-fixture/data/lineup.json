@@ -865,7 +865,7 @@
 			},
 			"position_rank": 149,
 			"points_over_replacement": -4.74,
-			"held": false,
+			"held": true,
 			"facts": {
 				"week": 6,
 				"opponent": "WSH",

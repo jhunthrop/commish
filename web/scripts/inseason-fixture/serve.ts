@@ -16,7 +16,10 @@ import { FIXTURE_IDS } from './ids.ts';
 
 const PORT = Number(process.env.PORT ?? 8799);
 const DATA = new URL('./data/', import.meta.url);
-const { league: LEAGUE, outOfSeason: OUT_OF_SEASON, slow: SLOW } = FIXTURE_IDS;
+const { league: LEAGUE, outOfSeason: OUT_OF_SEASON, slow: SLOW, noTeam: NO_TEAM } = FIXTURE_IDS;
+/** The API's own sentences (api/internal/inseason): leaguesync.NoGamesWords and noTeamWords. */
+const NO_GAMES = 'Your league has no games this week.';
+const NO_TEAM_WORDS = "We could not find your team in this league's last read.";
 const READ_MINUTES_AGO = 4;
 const MINUTE_MS = 60_000;
 const HOLD_MS = 10 * MINUTE_MS;
@@ -129,9 +132,14 @@ async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> 
 		return;
 	}
 	if (url.pathname === '/leagues/attached') {
-		send(req, res, HTTP.ok, [
-			{
-				id: LEAGUE,
+		// Every fixture league is on the account; only the first is in the switch's list (/me), so
+		// the page names the others from this list.
+		send(
+			req,
+			res,
+			HTTP.ok,
+			Object.values(FIXTURE_IDS).map((id) => ({
+				id,
 				host: sync.host,
 				host_league_id: sync.host_league_id,
 				season: sync.season,
@@ -140,8 +148,8 @@ async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> 
 				team_name: contextLeague.team_name,
 				standing: contextLeague.standing,
 				attached_at: '2026-09-01T12:00:00.000Z'
-			}
-		]);
+			}))
+		);
 		return;
 	}
 	const synced = SYNC.exec(url.pathname);
@@ -153,7 +161,11 @@ async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> 
 	if (inSeason) {
 		const [, id, route] = inSeason;
 		if (id === OUT_OF_SEASON) {
-			send(req, res, HTTP.conflict, 'Your league is not in season, so there is nothing to set.');
+			send(req, res, HTTP.conflict, NO_GAMES);
+			return;
+		}
+		if (id === NO_TEAM) {
+			send(req, res, HTTP.notFound, NO_TEAM_WORDS);
 			return;
 		}
 		if (id === SLOW) await new Promise((resolve) => setTimeout(resolve, HOLD_MS));
