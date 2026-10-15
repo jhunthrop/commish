@@ -932,5 +932,6 @@
 		}
 	],
 	"host_waivers_url": "https://sleeper.com/leagues/1382163311038038016/players",
-	"host_note": null
+	"host_note": null,
+	"moves": { "claim": "unavailable", "note": null }
 }

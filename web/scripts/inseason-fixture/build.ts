@@ -542,7 +542,9 @@ async function waivers(held: ReadonlySet<string>): Promise<WaiverAdvice> {
 		best: gaining[0] ?? null,
 		rows: [...gaining, ...rest],
 		host_waivers_url: `https://sleeper.com/leagues/${league.league_id}/players`,
-		host_note: null
+		host_note: null,
+		// Sleeper has no write path: the verb is the host's page.
+		moves: { claim: 'unavailable', note: null }
 	};
 }
 
@@ -650,6 +652,21 @@ function tradesWith(theirs: readonly PlayerLine[]): TradeRow[] {
 	);
 }
 
+/** The order the API lists a roster in (advice.go positionOrder): by position, then name. */
+const POSITION_ORDER = ['QB', 'RB', 'WR', 'TE', 'K', 'DEF'];
+
+function rosterByPosition(roster: readonly PlayerLine[]): PlayerLine[] {
+	const rank = (l: PlayerLine): number => {
+		const at = POSITION_ORDER.indexOf(l.player.position);
+		return at < 0 ? POSITION_ORDER.length : at;
+	};
+	return [...roster].sort(
+		(a, b) =>
+			rank(a) - rank(b) ||
+			(a.player.name < b.player.name ? -1 : a.player.name > b.player.name ? 1 : 0)
+	);
+}
+
 function trades(): TradeAdvice {
 	const teams: TradeTeam[] = rosters
 		.filter((r) => r.roster_id !== me)
@@ -672,6 +689,7 @@ function trades(): TradeAdvice {
 			`Trades where both lineups gain on our rest-of-season order. The other team decides. ${basisTail}`
 		),
 		teams,
+		roster: rosterByPosition(myLines),
 		host_trades_url: `https://sleeper.com/leagues/${league.league_id}/team`,
 		host_note: null
 	};

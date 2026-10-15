@@ -8,8 +8,25 @@
 	import ValueCell from '#lib/ui/ValueCell.svelte';
 	import type { LeagueHost } from '../api.ts';
 	import LineRow from './LineRow.svelte';
+	import MovePanel from './MovePanel.svelte';
 	import Screen from './Screen.svelte';
-	import type { WaiverAdvice, WaiverPosition, WaiverRow } from './api.ts';
+	import type {
+		HostMoveInput,
+		HostMovePlan,
+		HostMoveResult,
+		WaiverAdvice,
+		WaiverPosition,
+		WaiverRow
+	} from './api.ts';
+	import {
+		bidProblem,
+		claimMove,
+		claimsOnHost,
+		failedStep,
+		planStep,
+		resultStep,
+		type MoveStep
+	} from './move.ts';
 	import Label from '#lib/ui/Label.svelte';
 	import { Narrowing, sharedDrop, waiverGroups } from './state.ts';
 	import {
@@ -28,15 +45,36 @@
 	/** Waivers (spec §5): the unrostered players ranked by what they add to this lineup, each with
 	 * the player it costs least to drop for him, a position at a time if you like (read again for
 	 * that position, so it is never cut to the first rows of every position). Add marks the pair as
-	 * the decision, and the one verb opens the host's waiver page to claim it. */
+	 * the decision, and the one verb opens the host's waiver page to claim it. Where the API opens
+	 * the claim (spec §10.2), Add opens a confirmation on this screen naming the add, the drop and,
+	 * where the league bids, the bid the member types; its one verb claims on the host. */
 	interface Props {
 		advice: WaiverAdvice;
 		host: LeagueHost;
 		/** Reads the adds at one position. */
 		narrow: (position: WaiverPosition) => Promise<WaiverAdvice>;
+		/** Plans the claim in words with its confirm token; nothing is sent. */
+		plan: (move: HostMoveInput) => Promise<HostMovePlan>;
+		/** Makes the planned claim once with its token. */
+		make: (move: HostMoveInput, confirm: string) => Promise<HostMoveResult>;
+		/** Reads the adds again, once a claim has been made. */
+		reread: () => void;
 	}
 
-	let { advice, host, narrow }: Props = $props();
+	let { advice, host, narrow, plan, make, reread }: Props = $props();
+
+	const MOVE_ID = 'claim-move';
+	/** How long a typed bid rests before the claim is planned again for it. */
+	const BID_PAUSE_MS = 400;
+	let step = $state<MoveStep>({ kind: 'closed' });
+	/** The claim as last planned: the one the token makes, whatever is typed meanwhile. */
+	let planned: HostMoveInput | null = null;
+	/** The row the confirmation is for. */
+	let claiming = $state<WaiverRow | null>(null);
+	/** The bid as typed; the plan's own bid until the member types one. */
+	let typed = $state('');
+	let replanning = $state(false);
+	let pause: ReturnType<typeof setTimeout> | undefined;
 
 	/** The positions the route narrows to, in the board's order. */
 	const POSITIONS: readonly WaiverPosition[] = ['QB', 'RB', 'WR', 'TE', 'K', 'DEF'];
@@ -70,6 +108,66 @@
 	// svelte-ignore state_referenced_locally
 	const narrowing = new Narrowing(narrow);
 
+	const onHost = $derived(claimsOnHost(shown));
+
+	/** Plans the claim for the row with the bid (null: none typed yet, the plan says the league's
+	 * least where it bids). Only the latest plan is kept. */
+	async function planFor(row: WaiverRow, bid: number | null): Promise<void> {
+		const move = claimMove(shown.week, row, bid);
+		planned = move;
+		if (bid === null) step = { kind: 'planning' };
+		else replanning = true;
+		try {
+			const answer = await plan(move);
+			if (planned !== move) return;
+			step = planStep(answer);
+			if (bid === null && answer.bid) typed = String(answer.bid.amount);
+		} catch (error) {
+			if (planned === move) {
+				step = failedStep(error, host, 'plan', shown.host_waivers_url, 'claim');
+			}
+		} finally {
+			if (planned === move) replanning = false;
+		}
+	}
+
+	/** Add on a row: marks it and opens the claim for it. */
+	function openClaim(row: WaiverRow): void {
+		marked = idOf(row);
+		claiming = row;
+		typed = '';
+		void planFor(row, null);
+	}
+
+	/** A typed bid: planned again once it rests, when the league takes it. */
+	function onbid(value: string): void {
+		typed = value;
+		clearTimeout(pause);
+		const row = claiming;
+		if (row === null || step.kind !== 'confirm' || step.plan.bid === null) return;
+		if (bidProblem(host, value, step.plan.bid) !== null) return;
+		pause = setTimeout(() => void planFor(row, Number(value)), BID_PAUSE_MS);
+	}
+
+	async function confirm(): Promise<void> {
+		if (step.kind !== 'confirm' || planned === null) return;
+		const { plan: ready } = step;
+		step = { kind: 'sending', plan: ready };
+		try {
+			step = resultStep(await make(planned, ready.confirm));
+			reread();
+		} catch (error) {
+			step = failedStep(error, host, 'make', shown.host_waivers_url, 'claim');
+		}
+	}
+
+	function close(): void {
+		clearTimeout(pause);
+		step = { kind: 'closed' };
+		planned = null;
+		claiming = null;
+	}
+
 	async function choose(next: WaiverPosition | null): Promise<void> {
 		position = next;
 		narrowed = null;
@@ -99,9 +197,13 @@
 						/>
 					{/if}
 					<span class="mark">
-						<Quiet size="sm" onclick={() => (marked = on ? null : idOf(r))}
-							>{on ? LINES.chosen : LINES.add}</Quiet
-						>
+						{#if onHost}
+							<Quiet size="sm" onclick={() => openClaim(r)}>{LINES.add}</Quiet>
+						{:else}
+							<Quiet size="sm" onclick={() => (marked = on ? null : idOf(r))}
+								>{on ? LINES.chosen : LINES.add}</Quiet
+							>
+						{/if}
 					</span>
 				</span>
 			{/snippet}
@@ -114,10 +216,28 @@
 	reason={chosen && !chosen.starts ? chosen.sentence : null}
 	verb={verbWords('waivers', host)}
 	href={shown.host_waivers_url}
-	hostNote={shown.host_note}
+	hostNote={shown.host_note ?? shown.moves.note}
 	basis={shown.basis}
 	basisNote={shown.basis_note}
+	onverb={onHost && chosen ? () => openClaim(chosen) : null}
+	controls={onHost ? MOVE_ID : undefined}
+	expanded={onHost ? step.kind !== 'closed' : undefined}
 >
+	{#snippet move()}
+		{#if step.kind !== 'closed'}
+			<MovePanel
+				id={MOVE_ID}
+				kind="claim"
+				{step}
+				{host}
+				{typed}
+				{onbid}
+				{replanning}
+				onconfirm={() => void confirm()}
+				onclose={close}
+			/>
+		{/if}
+	{/snippet}
 	<Panel as="section" label={LINES.waiverAdds} padding="none">
 		<div class="head">
 			<PanelHead

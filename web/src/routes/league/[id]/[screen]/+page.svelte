@@ -51,11 +51,14 @@
 			read={() => inSeasonApi.waivers(id)}
 			reserve={RESERVE_ROWS.waivers}
 		>
-			{#snippet children(advice, host)}
+			{#snippet children(advice, host, reread)}
 				<WaiverScreen
 					{advice}
 					{host}
 					narrow={(position: WaiverPosition) => inSeasonApi.waivers(id, position)}
+					plan={(move: HostMoveInput) => inSeasonApi.planMove(id, move)}
+					make={(move: HostMoveInput, confirm: string) => inSeasonApi.makeMove(id, move, confirm)}
+					{reread}
 				/>
 			{/snippet}
 		</InSeasonPage>

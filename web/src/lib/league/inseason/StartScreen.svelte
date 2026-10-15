@@ -88,7 +88,14 @@
 >
 	{#snippet move()}
 		{#if step.kind !== 'closed'}
-			<MovePanel id={MOVE_ID} {step} {host} onconfirm={() => void confirm()} onclose={close} />
+			<MovePanel
+				id={MOVE_ID}
+				kind="lineup"
+				{step}
+				{host}
+				onconfirm={() => void confirm()}
+				onclose={close}
+			/>
 		{/if}
 	{/snippet}
 	<Panel as="section" label={lineupTitle(advice.week)} padding="none">

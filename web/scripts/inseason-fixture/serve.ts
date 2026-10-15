@@ -1,8 +1,8 @@
 // A stand-in for the request API's league reads, answering from the fixture build.ts writes, so the
 // in-season screens can be built and shot before the API's routes land (Lane 25). Signed in as one
 // account that follows the recorded Sleeper league, and three ESPN stand-ins of it whose lineup the
-// member may set from our screen (Lane 35): the move done, refused in ESPN's captured words, and
-// pending. Attachment ids:
+// member may set, and whose adds the member may claim, from our screen (Lanes 35 and 39): the move
+// done, refused in ESPN's captured words, and pending. Attachment ids:
 // FIXTURE_IDS (ids.ts) names them: the league, the league out of season (409 on the in-season
 // routes) and the league held (a page shows its loading rows).
 // Every answer is the API's envelope, with the league's read stamped a few minutes before the call.
@@ -13,6 +13,7 @@ import { readFile } from 'node:fs/promises';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import type { LeagueSync } from '../../src/lib/league/api.ts';
 import type {
+	HostMoveInput,
 	HostMovePlan,
 	HostMoveResult,
 	LineupAdvice,
@@ -46,6 +47,20 @@ const MOVE_SENTENCES = {
 	pending:
 		'Sent to ESPN, but your lineup there did not show it when we read it back. Check your lineup on ESPN before you set it again.'
 } as const;
+/** The API's own sentences for a claim (api/internal/hostmoves words.go and claim.go). */
+const CLAIM_SENTENCES = {
+	done: 'Done on ESPN. He is on your roster there now.',
+	refused: 'ESPN did not take the claim, so nothing changed there.',
+	pending:
+		'Claim submitted. ESPN processes claims on Wednesday, and your lineup screen will show him once it goes through.'
+} as const;
+/** The stand-in leagues' waiver settings: the pending one bids (a budget of 100, 13 spent), the
+ * done one adds a free agent at once, the refused one does not bid. */
+const CLAIM_BUDGET = { min: 0, max: 87 } as const;
+/** When the pending league's claims run: ESPN's processDate, a Wednesday's 07:00 UTC. */
+const CLAIM_RUNS_AT = '2026-10-21T07:00:00.000Z';
+const ESPN_LEAGUE_URL =
+	'https://fantasy.espn.com/football/league?leagueId=1081607624&seasonId=2026';
 const ESPN_LINEUP_URL =
 	'https://fantasy.espn.com/football/team?leagueId=1081607624&seasonId=2026&teamId=3';
 /** The API's own sentences (api/internal/inseason): leaguesync.NoGamesWords and noTeamWords. */
@@ -173,15 +188,72 @@ function espnLineup(): LineupAdvice {
 	};
 }
 
+/** The ESPN league's waivers: the claim open, the verb ESPN's league page. */
+function espnWaivers(position: string | null): WaiverAdvice {
+	return {
+		...waiversAt(position),
+		host_waivers_url: ESPN_LEAGUE_URL,
+		moves: { claim: 'available', note: null }
+	};
+}
+
+/** A player in the waiver answer by his host id, for the plan's words. */
+function nameOf(hostId: string | null): string {
+	const lines = waivers.rows.flatMap((row) => (row.drop ? [row.add, row.drop] : [row.add]));
+	return lines.find((line) => line.player.host_id === hostId)?.player.name ?? '';
+}
+
+/** A claim on an ESPN fixture league: the plan in the API's words with a token (and the bid where
+ * the league bids), or what the claim came to. */
+function claimAnswer(
+	id: string,
+	plan: boolean,
+	move: HostMoveInput
+): HostMovePlan | HostMoveResult {
+	const outcome = ESPN_MOVES.get(id) ?? 'done';
+	const claim = move.claim ?? { add: '', drop: null, bid: null };
+	if (plan) {
+		const bids = outcome === 'pending';
+		const amount = claim.bid ?? CLAIM_BUDGET.min;
+		const named = `Add ${nameOf(claim.add)}${claim.drop ? `, drop ${nameOf(claim.drop)}` : ''}`;
+		const bidWords = bids ? `, bid $${String(amount)}` : '';
+		const sentence =
+			outcome === 'done'
+				? `${named}, on ESPN now. He is a free agent, so the add is made at once.`
+				: `${named}${bidWords}. He is on waivers, so ESPN runs the claim on Wednesday.`;
+		return {
+			status: 'ready',
+			sentence,
+			confirm: 'fixture-token',
+			expires_at: new Date(Date.now() + HOLD_MS).toISOString(),
+			host_url: ESPN_LEAGUE_URL,
+			bid: bids ? { amount, ...CLAIM_BUDGET } : null
+		};
+	}
+	return {
+		outcome,
+		sentence: CLAIM_SENTENCES[outcome],
+		// ESPN's refusal as captured live (jwulff 06-espn-add-drop-surface p1, TRAN_PLAYER_NOT_FREEAGENT).
+		host_words: outcome === 'refused' ? `Player ${claim.add} is not a free agent` : null,
+		host_url: ESPN_LEAGUE_URL,
+		move_id: '6f1d1c52-2626-4a26-9a26-0000000000f2',
+		processes_at: outcome === 'pending' ? CLAIM_RUNS_AT : null
+	};
+}
+
 /** A move on an ESPN fixture league: the plan in words with a token, or what the move came to. */
-function moveAnswer(id: string, plan: boolean): HostMovePlan | HostMoveResult {
+function moveAnswer(id: string, plan: boolean, body: unknown): HostMovePlan | HostMoveResult {
+	const move = (plan ? body : (body as { move?: unknown } | null)?.move) as
+		HostMoveInput | undefined;
+	if (move?.kind === 'claim') return claimAnswer(id, plan, move);
 	if (plan) {
 		return {
 			status: 'ready',
 			sentence: planSentence(),
 			confirm: 'fixture-token',
 			expires_at: new Date(Date.now() + HOLD_MS).toISOString(),
-			host_url: ESPN_LINEUP_URL
+			host_url: ESPN_LINEUP_URL,
+			bid: null
 		};
 	}
 	const outcome = ESPN_MOVES.get(id) ?? 'done';
@@ -195,8 +267,17 @@ function moveAnswer(id: string, plan: boolean): HostMovePlan | HostMoveResult {
 				? `Lineup transaction could not be completed, ${first} is locked`
 				: null,
 		host_url: ESPN_LINEUP_URL,
-		move_id: '6f1d1c52-2626-4a26-9a26-0000000000f1'
+		move_id: '6f1d1c52-2626-4a26-9a26-0000000000f1',
+		processes_at: null
 	};
+}
+
+/** A request's JSON body, or null when it has none. */
+async function bodyOf(req: IncomingMessage): Promise<unknown> {
+	const chunks: Buffer[] = [];
+	for await (const chunk of req) chunks.push(chunk as Buffer);
+	const text = Buffer.concat(chunks).toString('utf8');
+	return text === '' ? null : (JSON.parse(text) as unknown);
 }
 const SYNC = /^\/leagues\/attached\/([^/]+)\/(sync|refresh)$/;
 
@@ -248,7 +329,8 @@ async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> 
 	}
 	const moved = MOVES.exec(url.pathname);
 	if (moved && req.method === 'POST') {
-		send(req, res, HTTP.ok, moveAnswer(moved[1] ?? '', moved[2] !== undefined));
+		const body = await bodyOf(req);
+		send(req, res, HTTP.ok, moveAnswer(moved[1] ?? '', moved[2] !== undefined, body));
 		return;
 	}
 	const inSeason = IN_SEASON.exec(url.pathname);
@@ -265,7 +347,9 @@ async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> 
 		if (id === SLOW) await new Promise((resolve) => setTimeout(resolve, HOLD_MS));
 		const bodies = {
 			lineup: ESPN_MOVES.has(id ?? '') ? espnLineup() : lineup,
-			waivers: waiversAt(url.searchParams.get('position')),
+			waivers: ESPN_MOVES.has(id ?? '')
+				? espnWaivers(url.searchParams.get('position'))
+				: waiversAt(url.searchParams.get('position')),
 			trades: tradesHolding(url.searchParams.get('player'))
 		} as const;
 		send(req, res, HTTP.ok, { ...bodies[route as keyof typeof bodies], read_at: readAt() });
