@@ -361,3 +361,30 @@ func TestAnswerMemberAndRedaction(t *testing.T) {
 		t.Fatalf("redaction %q", mine.Refusal.Message)
 	}
 }
+
+// A character whose lower case changes its length ("İ" lowers to two
+// runes) ahead of an echoed SWID never shifts the cut: the SWID goes whole,
+// and the 300-rune cut never splits one that sits across it.
+func TestRedactionSurvivesCaseAndTheCut(t *testing.T) {
+	bare := strings.Trim(writeCookies.SWID, "{}")
+	ahead := strings.Repeat("İ", 40) + " member " + strings.ToUpper(writeCookies.SWID) + " and " + bare + " and " + writeCookies.S2
+	across := strings.Repeat("x", maxRefusalRunes-10) + writeCookies.SWID
+	for name, message := range map[string]string{"after İ": ahead, "across the cut": across} {
+		body, _ := json.Marshal(map[string]any{"messages": []string{message}, "details": []map[string]string{{"type": "TRAN_X " + bare}}})
+		got := classify(WriteAnswer{Status: http.StatusConflict, Member: MemberAbsent}, body, writeCookies)
+		for _, s := range []string{got.Refusal.Message, got.Refusal.Type} {
+			low := strings.ToLower(s)
+			for _, part := range strings.Split(strings.ToLower(bare), "-") {
+				if len(part) >= 8 && strings.Contains(low, part) {
+					t.Fatalf("%s: a piece of the SWID survives in %q", name, s)
+				}
+			}
+			if strings.Contains(s, writeCookies.S2) {
+				t.Fatalf("%s: espn_s2 survives", name)
+			}
+		}
+		if !strings.Contains(got.Refusal.Message, "[redacted]") || len([]rune(got.Refusal.Message)) > maxRefusalRunes {
+			t.Fatalf("%s: %q", name, got.Refusal.Message)
+		}
+	}
+}

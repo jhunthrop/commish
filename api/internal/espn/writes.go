@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 )
@@ -340,18 +341,16 @@ func classify(out WriteAnswer, answer []byte, cookies Cookies) WriteAnswer {
 			out.Member = MemberMatched
 		}
 	}
+	secrets := secretsOf(cookies)
 	switch {
 	case out.Status == http.StatusOK && parsed && w.Status == "EXECUTED":
-		out.Outcome, out.TransactionID = WriteExecuted, text(w.ID)
+		out.Outcome, out.TransactionID = WriteExecuted, text(secrets.redact(w.ID))
 	case out.Status >= 400 && out.Status < 500:
 		out.Outcome = WriteRefused
 		if parsed {
-			out.Refusal = refusal(w)
+			out.Refusal = refusal(w, secrets)
 		}
 	}
-	out.TransactionID = redact(out.TransactionID, cookies)
-	out.Refusal.Type = redact(out.Refusal.Type, cookies)
-	out.Refusal.Message = redact(out.Refusal.Message, cookies)
 	return out
 }
 
@@ -364,25 +363,38 @@ func sameSWID(a, b string) bool {
 // redacted stands in for a cookie in ESPN's words.
 const redacted = "[redacted]"
 
-// redact cuts the member's SWID (with or without braces, any case) and
-// espn_s2 from ESPN's words.
-func redact(s string, c Cookies) string {
+// secrets matches the member's cookies in ESPN's words: espn_s2, and the
+// SWID braced or bare, in any case. Nil when there is nothing to match.
+type secrets struct{ pattern *regexp.Regexp }
+
+func secretsOf(c Cookies) secrets {
+	var quoted []string
+	// Longest first, so a braced SWID is cut whole rather than its bare
+	// middle alone.
 	for _, secret := range []string{c.S2, c.SWID, strings.Trim(c.SWID, "{}")} {
-		if secret == "" {
-			continue
-		}
-		lower := strings.ToLower(secret)
-		for i := strings.Index(strings.ToLower(s), lower); i >= 0; i = strings.Index(strings.ToLower(s), lower) {
-			s = s[:i] + redacted + s[i+len(secret):]
+		if secret != "" {
+			quoted = append(quoted, regexp.QuoteMeta(secret))
 		}
 	}
-	return s
+	if len(quoted) == 0 {
+		return secrets{}
+	}
+	return secrets{pattern: regexp.MustCompile(`(?i)(?:` + strings.Join(quoted, "|") + `)`)}
+}
+
+// redact cuts every cookie from ESPN's words. It runs on the words whole,
+// before any length cut, so a cut never splits an echoed SWID.
+func (s secrets) redact(words string) string {
+	if s.pattern == nil {
+		return words
+	}
+	return s.pattern.ReplaceAllLiteralString(words, redacted)
 }
 
 // maxRefusalRunes bounds ESPN's words we keep and show.
 const maxRefusalRunes = 300
 
-func refusal(w wireWriteAnswer) Refusal {
+func refusal(w wireWriteAnswer, secrets secrets) Refusal {
 	r := Refusal{}
 	if len(w.Details) > 0 {
 		r.Type, r.Message = w.Details[0].Type, w.Details[0].Message
@@ -390,6 +402,7 @@ func refusal(w wireWriteAnswer) Refusal {
 	if len(w.Messages) > 0 && strings.TrimSpace(w.Messages[0]) != "" {
 		r.Message = w.Messages[0]
 	}
+	r.Type, r.Message = secrets.redact(r.Type), secrets.redact(r.Message)
 	r.Type = bounded64(r.Type)
 	m := []rune(strings.TrimSpace(r.Message))
 	if len(m) > maxRefusalRunes {
