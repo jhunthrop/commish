@@ -32,7 +32,7 @@ const (
 // 0 on Sleeper, where a league has a new id each season.
 //
 // As is the account a league attached as a member is read for (every
-// Yahoo league, a private ESPN league), uuid.Nil for a read anyone may
+// FFPC and Yahoo league, a private ESPN league), uuid.Nil for a read anyone may
 // share: a host credential reads only for the account that stored it, so
 // such a league is read, kept and answered apart for each such account.
 type Ref struct {

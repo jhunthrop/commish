@@ -20,7 +20,7 @@ const (
 // attachFFPC attaches one of the member's FFPC leagues, read as them: the
 // league id from their list opens their own team (My Teams' own link,
 // never a pasted team address), the league is read once as them, and the
-// link keeps their league-team id so later reads use it.
+// link keeps their league-team id so every later read is theirs alone.
 func (s *Service) attachFFPC(w http.ResponseWriter, r *http.Request, in apitypes.AttachInput) {
 	if s.FFPC == nil {
 		httpx.WriteError(w, r, http.StatusServiceUnavailable, httpx.CodeUnavailable, ffpcNotConfigured, nil)
@@ -56,6 +56,9 @@ func (s *Service) attachFFPC(w http.ResponseWriter, r *http.Request, in apitypes
 		httpx.WriteInvalid(w, r, map[string]string{fieldLink: ffpcNotInListWords})
 		return
 	}
+	// Read with this account's own sign-in, the league is kept and
+	// answered for this account alone.
+	snap.Ref.As = accountID
 	link, err := s.save(ctx, accountID, snap, teamID, ltuid, many)
 	if writeCapError(w, r, err) {
 		return
