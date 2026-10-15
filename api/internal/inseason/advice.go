@@ -362,8 +362,13 @@ func (a *advisor) Trades(focus string) (apitypes.TradeAdvice, bool) {
 			Record: apitypes.TradeRecord{Wins: t.Wins, Losses: t.Losses, Ties: t.Ties}, Trades: []apitypes.TradeRow{}}
 		close := 0
 		for _, tr := range Trades(a.config, a.weeks, squad, a.squad(theirs, false), focus, TradesPerTeam) {
-			row.Trades = append(row.Trades, apitypes.TradeRow{Give: lines(mine, tr.Give), Get: lines(theirs, tr.Get),
-				MyGain: roundTenth(tr.MyGain), TheirGain: roundTenth(tr.TheirGain), CloseForThem: tr.CloseForThem()})
+			wire := apitypes.TradeRow{Give: lines(mine, tr.Give), Get: lines(theirs, tr.Get),
+				MyGain: roundTenth(tr.MyGain), TheirGain: roundTenth(tr.TheirGain), CloseForThem: tr.CloseForThem()}
+			if tr.Drop >= 0 {
+				drop := mine[tr.Drop].line
+				wire.Drop = &drop
+			}
+			row.Trades = append(row.Trades, wire)
 			if tr.CloseForThem() {
 				close++
 			}

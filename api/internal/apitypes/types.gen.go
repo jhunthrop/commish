@@ -2460,9 +2460,12 @@ type TradeRecord struct {
 // TradeRow defines model for TradeRow.
 type TradeRow struct {
 	// CloseForThem their gain is under 0.5 a week
-	CloseForThem bool         `json:"close_for_them"`
-	Get          []PlayerLine `json:"get"`
-	Give         []PlayerLine `json:"give"`
+	CloseForThem bool `json:"close_for_them"`
+
+	// Drop who the drafter drops to make room when the trade brings in more players than it sends and the roster has no open spot (the player it costs least to lose, never held, never a starter after the trade); the gain is after him; null otherwise
+	Drop *PlayerLine  `json:"drop"`
+	Get  []PlayerLine `json:"get"`
+	Give []PlayerLine `json:"give"`
 
 	// MyGain points over replacement a week to the drafter's lineup
 	MyGain float64 `json:"my_gain"`

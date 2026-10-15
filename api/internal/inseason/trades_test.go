@@ -110,6 +110,57 @@ func TestTradesNarrowToOnePlayer(t *testing.T) {
 	}
 }
 
+// A two-for-one that grows a full roster names who the member drops to
+// make room (§5.2's drop: the player it costs least to lose, never held,
+// never a starter, never one of the two he gets), and the gain is after
+// the drop. An open spot takes the extra player with no drop.
+func TestTwoForOneNamesTheDrop(t *testing.T) {
+	mine, theirs := deepAtBack(), deepAtReceiver()
+	held := map[string]bool{"m-wr4": true}
+	full := Trades(twelveTeamPPR(t), SeasonGames, Squad{Players: mine, Held: held}, Squad{Players: theirs}, "", 1000)
+	grows := 0
+	for _, tr := range full {
+		words := tradeWords(tr, mine, theirs)
+		if len(tr.Get) <= len(tr.Give) {
+			if tr.Drop >= 0 {
+				t.Fatalf("%s drops %s with no room needed", words, mine[tr.Drop].ID)
+			}
+			continue
+		}
+		grows++
+		if tr.Drop < 0 {
+			t.Fatalf("%s grows a full roster with no drop", words)
+		}
+		drop := mine[tr.Drop]
+		if held[drop.ID] || contains(tr.Give, tr.Drop) || drop.Position == draft.K || drop.Position == draft.DEF {
+			t.Fatalf("%s drops %s", words, drop.ID)
+		}
+		f := newFiller(Slots(twelveTeamPPR(t)), SeasonGames)
+		base, _ := f.strength(pointers(mine))
+		var after []*Candidate
+		for i := range mine {
+			if !contains(tr.Give, i) && i != tr.Drop {
+				after = append(after, &mine[i])
+			}
+		}
+		for _, h := range tr.Get {
+			after = append(after, &theirs[h])
+		}
+		strength, _ := f.strength(after)
+		if !near(tr.MyGain, strength-base) {
+			t.Fatalf("%s gain %v, after the drop %v", words, tr.MyGain, strength-base)
+		}
+	}
+	if grows == 0 {
+		t.Fatal("no two-for-one the member gets two in")
+	}
+	for _, tr := range Trades(twelveTeamPPR(t), SeasonGames, Squad{Players: mine, Open: true}, Squad{Players: theirs}, "", 1000) {
+		if tr.Drop >= 0 {
+			t.Fatalf("%s drops with an open spot", tradeWords(tr, mine, theirs))
+		}
+	}
+}
+
 // A trade that leaves a side unable to fill a slot is never offered:
 // the member's only tight end stays.
 func TestTradesFillEverySlot(t *testing.T) {

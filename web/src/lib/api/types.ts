@@ -2498,6 +2498,8 @@ export interface components {
 		TradeRow: {
 			give: components['schemas']['PlayerLine'][];
 			get: components['schemas']['PlayerLine'][];
+			/** @description who the drafter drops to make room when the trade brings in more players than it sends and the roster has no open spot (the player it costs least to lose, never held, never a starter after the trade); the gain is after him; null otherwise */
+			drop: components['schemas']['PlayerLine'] | null;
 			/**
 			 * Format: double
 			 * @description points over replacement a week to the drafter's lineup

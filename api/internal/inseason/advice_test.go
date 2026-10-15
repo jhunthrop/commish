@@ -148,6 +148,13 @@ func TestTradeAdvice(t *testing.T) {
 			if tr.MyGain <= 0 || tr.TheirGain <= 0 || tr.CloseForThem != (tr.TheirGain < CloseCall) {
 				t.Fatalf("gains %v %v close %v", tr.MyGain, tr.TheirGain, tr.CloseForThem)
 			}
+			// The fixture's rosters are full: two in for one out names the drop.
+			if (len(tr.Get) > len(tr.Give)) != (tr.Drop != nil) {
+				t.Fatalf("%d in, %d out, drop %v", len(tr.Get), len(tr.Give), tr.Drop)
+			}
+			if tr.Drop != nil && (tr.Drop.Held || boardID(*tr.Drop) == boardID(tr.Give[0])) {
+				t.Fatalf("drop %s", boardID(*tr.Drop))
+			}
 			for _, g := range tr.Give {
 				if g.Held || held[boardID(g)] {
 					t.Fatal("a held player is given")
