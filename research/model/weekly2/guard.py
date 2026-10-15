@@ -7,6 +7,10 @@ season after it, the judgment's refuses every season after the judgment season, 
 pristine 2026 (`ros.outcomes.PRISTINE_SEASON`). Beneath the readers, `guard_queries` makes the
 connection itself refuse any statement whose parameters name a closed season, inputs included, so
 no 2025 or 2026 row (and in the development check no 2024 row) can reach any fit, check or gate.
+
+Its limit, stated: it reads bind parameters by name (`s`, any `season*` or `*seasons`). A statement
+that writes a closed season into its SQL text, or binds it under another name (`year`), passes it.
+Every read this round makes binds its season under one of those names.
 """
 
 from collections.abc import Mapping

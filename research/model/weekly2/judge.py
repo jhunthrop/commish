@@ -48,8 +48,11 @@ FROZEN: Final = MappingProxyType
 
 def rate_priors(conn: Connection, t: Thresholds, artifacts: ModelArtifacts, record: Path | None = None) -> RateFit:
     """Round 3's rate refit on its own seasons, refused unless every number equals its record."""
+    path = record or DOCS / t.rate_record
+    if not path.exists():
+        raise ConfigurationError(f"round 3's record {path.name} is not in this tree; the rate cannot be checked")
     fitted = fit_rate(conn, t.rate_round, artifacts, ARM64_BOARDS)
-    judged = json.loads((record or DOCS / t.rate_record).read_text())["priors"]
+    judged = json.loads(path.read_text())["priors"]
     differs = first_difference(priors_payload(fitted.priors), judged)
     if differs is not None:
         raise ConfigurationError(

@@ -9,6 +9,13 @@ copy), in one read-only transaction whose every statement is refused if it names
 (`guard`). Both check the preconditions first and refuse, naming what is missing. The judgment also
 refuses unless the preregistration's commit is in this tree's history, and once its record exists.
 `develop` fits on 2021-2022 and checks on 2023: every gate reported, nothing shipped, nothing decided.
+
+A READING OF THE LOCK, written down (review M1; nothing in the fit changed for it): a fit-population
+player whose latest filing at the moment lists him Out or Doubtful has no x, and is left out of BOTH
+fits. Section 2 allows that for the range ("residuals (actual minus x)"); for the elasticity fit its
+loss uses m and c, which a withheld player has, so the wording is unclear there. This round keeps
+one fit population for both (`judge.fit_round`, `numbered`); a later round decides. Players outside
+round 3's universe have no m and are excluded from both by necessity.
 """
 
 import argparse
@@ -19,6 +26,7 @@ import sys
 import time
 from collections.abc import Callable, Sequence
 from dataclasses import asdict, fields
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Final
 
@@ -46,6 +54,9 @@ _ROOT: Final = Path(__file__).resolve().parents[3]
 PREREGISTRATION_COMMIT: Final = "86ca79d6"
 PREREGISTRATION: Final = "docs/research/2026-10-15-weekly-projection-round2-preregistration.md"
 JUDGMENT_RECORD: Final = DOCS / "2026-10-15-weekly-projection-round2-results.json"
+# The judgment's claim, in one fixed place whatever `--out` names: created exclusively before any
+# 2024 row is read, so neither another output path nor a run that dies part way can judge twice.
+JUDGMENT_CLAIM: Final = DOCS / "2026-10-15-weekly-projection-round2-judgment-taken.json"
 DEVELOPMENT_RECORD: Final = DOCS / "2026-10-15-weekly-projection-round2-dev-check.json"
 JUDGMENT_PREFIXES: Final = ("lane42_",)  # section 5: "admits only a `lane42_` database on 5433"
 DEVELOPMENT_PREFIXES: Final = ("lane42_", "lane44_")  # and the implementer's development copy
@@ -76,9 +87,20 @@ def thresholds_for(
         raise ConfigurationError(
             f"the preregistration's commit {PREREGISTRATION_COMMIT} is not in this tree's history; no judgment without the lock"
         )
-    if exists(JUDGMENT_RECORD):
-        raise ConfigurationError(f"the 2024 judgment was taken once ({JUDGMENT_RECORD.name}); it is never rerun")
+    for taken in (JUDGMENT_CLAIM, JUDGMENT_RECORD):
+        if exists(taken):
+            raise ConfigurationError(f"the 2024 judgment was taken once ({taken.name}); it is never rerun")
     return ROUND_TWO
+
+
+def claim_judgment(out: Path, version: str, claim: Path = JUDGMENT_CLAIM) -> None:
+    """Claim the one judgment before it reads anything: the file is created exclusively, so a
+    second claim is refused even if the first run wrote its output elsewhere or never finished."""
+    try:
+        with claim.open("x") as file:
+            json.dump({"output": str(out), "claimed_at": datetime.now(UTC).isoformat(), "model_version": version}, file)
+    except FileExistsError as error:
+        raise ConfigurationError(f"the 2024 judgment was taken once ({claim.name}); it is never rerun") from error
 
 
 def check_round_scratch(command: str, url: str) -> None:
@@ -119,6 +141,8 @@ def _run(command: str, url: str, t: Thresholds, out: Path) -> int:
     started = time.monotonic()
     status = tree_status()
     check_round_scratch(command, url)
+    if command == "judge":
+        claim_judgment(out, model_version())
     engine = make_engine(sqlalchemy_url(url))
     try:
         with engine.connect() as conn:
