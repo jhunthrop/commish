@@ -22,7 +22,7 @@ from research.model.reads.preseason import preseason_rankings_as_of
 from research.model.reads.teams import team_observations_as_of
 from research.model.register.freeze import IMPLEMENTATION
 from research.model.ros.model import FORMATS, RosPriors, per_game
-from research.model.ros.reads import StaleBoard, latest_clubs, week_inputs
+from research.model.ros.reads import StaleBoard, WeekInputs, latest_clubs, week_inputs
 from research.model.weekly.inputs import ROUND_READER
 from research.model.weekly.round.scoring import SKILL_POSITIONS, form_from_lines
 from research.model.weekly2.designation import QUESTIONABLE, WITHHELD, WeekStatus, filed_statuses
@@ -93,7 +93,20 @@ def read_week(  # noqa: PLR0913, PLR0917 - the reads one week needs
 ) -> WeekBoard:
     """Every universe player's inputs at (season, week), with the benchmarks beside them."""
     inputs = week_inputs(conn, season, week, stale, positions)
-    moment = inputs.moment
+    return week_board(conn, inputs, stale, positions, priors, adp_source)
+
+
+def week_board(  # noqa: PLR0913, PLR0917 - the week's reads, once its universe is read
+    conn: Connection,
+    inputs: WeekInputs,
+    stale: StaleBoard,
+    positions: Mapping[str, Position],
+    priors: RosPriors,
+    adp_source: str,
+) -> WeekBoard:
+    """The week's board from its universe (`week_inputs`): the rate, the clubs, the ratings, the
+    filings at the week's moment, and the benchmarks."""
+    season, week, moment = inputs.season, inputs.week, inputs.moment
     clubs = latest_clubs(conn, season, week, moment) if week > 1 else {}
     ratings = _ratings(conn, season, week, moment)
     statuses = filed_statuses(conn, season, week, moment)

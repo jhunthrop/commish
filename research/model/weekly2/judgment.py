@@ -22,6 +22,7 @@ from research.model.weekly2.judge import RoundFit, Scored, read_season, score_se
 from research.model.weekly2.statistics import (
     BENCHMARKS,
     SOURCES,
+    Band,
     BoardRow,
     JudgedRow,
     WeekOrdering,
@@ -138,14 +139,15 @@ def _reported(
     }
 
 
-def assess(scored: Scored, fitted: RoundFit, t: Thresholds) -> tuple[list[gates.GateLine], dict[str, Any]]:
-    """G1 to G4 on the scored season, and every gated and reported number."""
+def assess(scored: Scored, band: Band, t: Thresholds) -> tuple[list[gates.GateLine], dict[str, Any]]:
+    """G1 to G4 on the scored season, and every gated and reported number, the range read through
+    `band` (the fitted range's floor, median and ceiling of a number)."""
     weeks = list(t.weeks)
     found = {name: orderings(scored.rows, weeks, name, t) for name in FORMATS}
     draws = bootstrap_draws(len(weeks), t)
     against = {bench: ordering_difference(rho_deltas(found["ppr"], bench, weeks), draws, t) for bench in BENCHMARKS}
     places = {source: places_mean(found["ppr"], source) for source in ("model", *BENCHMARKS)}
-    calibrated = calibration(scored.board, fitted.ranges.band, FORMATS)
+    calibrated = calibration(scored.board, band, FORMATS)
     bins = chance_bins(_pairs(scored, "ppr"), t)
     lines = [
         *gates.ordering_lines("G1", "ADP", against["adp"], t.adp_margin, t),
@@ -179,6 +181,6 @@ def judge_round(  # noqa: PLR0913, PLR0917 - the judgment's every input, named
     """The judgment season read once through its reader, scored and assessed."""
     read, reader = read_season(conn, t.judgment_season, t, fitted.rate, artifacts, positions, reader)
     scored = score_season(read, fitted, positions, t, version)
-    lines, numbers = assess(scored, fitted, t)
+    lines, numbers = assess(scored, fitted.ranges.band, t)
     numbers = {**numbers, "board_moment": read.board_moment}
     return Judgment(tuple(lines), MappingProxyType(numbers), reader.served, len(scored.rows))

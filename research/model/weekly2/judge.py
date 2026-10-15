@@ -14,7 +14,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any, Final
+from typing import Any, Final, Protocol
 
 from sqlalchemy import Connection
 
@@ -171,6 +171,13 @@ def fit_round(  # noqa: PLR0913, PLR0917 - the fit's every input, named
     )
 
 
+class Numbered(Protocol):
+    """Any round's weekly number as the counts read it: None when withheld."""
+
+    @property
+    def number(self) -> Mapping[str, float] | None: ...
+
+
 @dataclass(frozen=True, slots=True)
 class Scored:
     """The judgment season scored: the population rows, the whole board's rows, and the contenders
@@ -179,7 +186,7 @@ class Scored:
     rows: tuple[JudgedRow, ...]
     board: tuple[BoardRow, ...]
     contenders: Mapping[tuple[int, str, str], tuple[Contender, ...]]
-    numbers: tuple[WeekNumber, ...]
+    numbers: tuple[Numbered, ...]
 
 
 def _judged_row(member: Member, number: WeekNumber | None) -> JudgedRow:

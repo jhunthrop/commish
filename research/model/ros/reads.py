@@ -19,7 +19,15 @@ from research.model.domain import Position, compute_fantasy_points
 from research.model.preseason.board import BoardEntry
 from research.model.preseason.persist import build_season
 from research.model.priors import ModelArtifacts
-from research.model.reads.observations import ObservationQuery, WeekRange, stat_lines_as_of, usage_as_of
+from research.model.reads.observations import (
+    ObservationQuery,
+    PlayerWeekUsage,
+    SeasonStatLine,
+    WeekRange,
+    stat_lines_as_of,
+    usage_as_of,
+)
+from research.model.reads.stamps import Newest, newest_of
 from research.model.reads.teams import player_teams_as_of, team_observations_as_of
 from research.model.ros.model import (
     FORMATS,
@@ -35,6 +43,7 @@ from research.model.weekly.inputs import week_moment
 from research.model.weekly.round.scoring import FORMATS as FORMAT_RULES
 from research.model.weekly.round.scoring import SKILL_POSITIONS
 from research.pipeline.nflverse.schedule import ScheduleMetric, ScheduleSource
+from research.pipeline.observations import PlayerWeekTeam
 
 SERVED_SOURCE: Final = "commish_board_v9_ppr_12"
 RAW_SOURCE: Final = "commish_board_v1_ppr_12"
@@ -130,13 +139,22 @@ class WeekInputs:
     week: int
     moment: datetime
     players: tuple[PlayerToDate, ...]
+    # The newest line, usage and club row the week's reads returned (None before week 2's games).
+    newest: Newest | None = None
 
 
 def games_played(
     conn: Connection, query: ObservationQuery, positions: Mapping[str, Position]
 ) -> dict[str, list[GamePlayed]]:
-    lines = {(r.line.week, r.line.player_id): r.line for r in stat_lines_as_of(conn, query)}
-    usage = {(u.week, u.player_id): u for u in usage_as_of(conn, query)}
+    return games_from(stat_lines_as_of(conn, query), usage_as_of(conn, query), positions)
+
+
+def games_from(
+    line_rows: Sequence[SeasonStatLine], usage_rows: Sequence[PlayerWeekUsage], positions: Mapping[str, Position]
+) -> dict[str, list[GamePlayed]]:
+    """Each skill player's games from the lines and usage a read returned."""
+    lines = {(r.line.week, r.line.player_id): r.line for r in line_rows}
+    usage = {(u.week, u.player_id): u for u in usage_rows}
     played: dict[str, list[GamePlayed]] = {}
     for key in sorted({*lines, *(k for k, u in usage.items() if (u.snap_share or 0.0) > 0)}):
         week, player_id = key
@@ -163,8 +181,13 @@ def games_played(
 
 def latest_clubs(conn: Connection, season: int, week: int, moment: datetime) -> dict[str, str]:
     """Each player's club at his latest week of this season (the season-aware rule)."""
+    return clubs_from(player_teams_as_of(conn, season, WeekRange(1, week - 1), moment))
+
+
+def clubs_from(edges: Sequence[PlayerWeekTeam]) -> dict[str, str]:
+    """Each player's club at his latest week among `edges` (one season's, read before a week)."""
     latest: dict[str, tuple[int, str]] = {}
-    for edge in player_teams_as_of(conn, season, WeekRange(1, week - 1), moment):
+    for edge in edges:
         held = latest.get(edge.player_id)
         if held is None or edge.week >= held[0]:
             latest[edge.player_id] = (edge.week, edge.team)
@@ -176,8 +199,15 @@ def week_inputs(
 ) -> WeekInputs:
     """The universe at (season, week): every stale-board player and every player who has played."""
     moment = week_moment(conn, season, week)
-    played = games_played(conn, ObservationQuery(season, WeekRange(1, week - 1), moment), positions) if week > 1 else {}
-    clubs = latest_clubs(conn, season, week, moment) if week > 1 else {}
+    line_rows: list[SeasonStatLine] = []
+    usage_rows: list[PlayerWeekUsage] = []
+    edges: list[PlayerWeekTeam] = []
+    if week > 1:
+        query = ObservationQuery(season, WeekRange(1, week - 1), moment)
+        line_rows, usage_rows = stat_lines_as_of(conn, query), usage_as_of(conn, query)
+        edges = player_teams_as_of(conn, season, WeekRange(1, week - 1), moment)
+    played = games_from(line_rows, usage_rows, positions)
+    clubs = clubs_from(edges)
     schedule = club_schedule(conn, season, moment)
     players: list[PlayerToDate] = []
     for player_id in sorted({*stale.players, *played}):
@@ -195,7 +225,14 @@ def week_inputs(
                 None if board is None else board.entry,
             )
         )
-    return WeekInputs(season, week, moment, tuple(players))
+    newest = newest_of(
+        [
+            *((r.season, r.line.week, r.as_of) for r in line_rows),
+            *((u.season, u.week, u.as_of) for u in usage_rows),
+            *((e.season, e.week, e.as_of) for e in edges),
+        ]
+    )
+    return WeekInputs(season, week, moment, tuple(players), newest)
 
 
 def to_date_points(players: Sequence[PlayerToDate], format_name: str) -> dict[str, float]:

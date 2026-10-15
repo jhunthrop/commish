@@ -63,10 +63,10 @@ DEVELOPMENT_PREFIXES: Final = ("lane42_", "lane44_")  # and the implementer's de
 COMMANDS: Final = ("develop", "judge")
 
 
-def preregistration_committed() -> bool:
+def preregistration_committed(commit: str = PREREGISTRATION_COMMIT) -> bool:
     """The preregistration's commit is an ancestor of the tree's HEAD."""
     found = subprocess.run(
-        ["git", "merge-base", "--is-ancestor", PREREGISTRATION_COMMIT, "HEAD"],
+        ["git", "merge-base", "--is-ancestor", commit, "HEAD"],
         cwd=_ROOT,
         capture_output=True,
         check=False,
