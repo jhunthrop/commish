@@ -11,6 +11,11 @@ on:
         required: true
         type: choice
         options: [nightly, nightly-publish, inseason, inseason-capture]
+      args:
+        description: "optional: the container's arguments for this execution only, comma-separated (the image's entrypoint is python -m, so for example research.capsules,queue,--slugs,a,b)"
+        required: false
+        type: string
+        default: ""
 permissions: { contents: read }
 concurrency:
   group: "ops-${{ inputs.job }}"
@@ -23,6 +28,7 @@ jobs:
     env:
       REGION: ${{ vars.GCP_REGION }}
       JOB: ${{ inputs.job }}
+      ARGS: ${{ inputs.args }}
     steps:
       - uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed # v2.1.13
         with:
@@ -33,7 +39,11 @@ jobs:
       - name: execute the job and wait
         run: |
           set -euo pipefail
-          gcloud run jobs execute "$JOB" --region "$REGION" --wait --format='value(metadata.name)' | tee execution.txt
+          if [ -n "$ARGS" ]; then
+            gcloud run jobs execute "$JOB" --region "$REGION" --wait --args="$ARGS" --format='value(metadata.name)' | tee execution.txt
+          else
+            gcloud run jobs execute "$JOB" --region "$REGION" --wait --format='value(metadata.name)' | tee execution.txt
+          fi
       - name: the execution's log lines
         if: always()
         run: |
