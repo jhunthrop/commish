@@ -11,10 +11,12 @@ on:
     paths: ['web/**', '.github/workflows/web.yml']
   repository_dispatch:
     types: [nightly-run]
-  # The daily backstop: the nightly publishes to R2 by 05:30 UTC and asks for this build; if that
-  # dispatch ever fails, the site is never more than a day behind the run.
+  # The hourly backstop through the publish window, the delivery path: the nightly publishes to R2
+  # by 05:30 UTC, and each hour from 06:30 to 12:30 this builds if the live site's run
+  # (/data/run.txt) is not the latest one, and stops in seconds with a named line if it is. The
+  # nightly's own dispatch (WEB_DISPATCH_TOKEN) only makes it sooner and is optional.
   schedule:
-    - cron: '30 6 * * *'
+    - cron: '30 6-12 * * *'
   workflow_dispatch:
     inputs:
       runId:
@@ -64,16 +66,28 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: node scripts/r2-env.ts
 
+      - name: Is the live site already on the latest run
+        # Only the schedule asks: a push or a dispatch always builds.
+        id: fresh
+        if: github.event_name == 'schedule'
+        env:
+          SITE_URL: https://trycommish.app
+        run: node scripts/run-fresh.ts
+
       - name: svelte-check
+        if: steps.fresh.outputs.build != 'false'
         run: npm run check
 
       - name: Lint
+        if: steps.fresh.outputs.build != 'false'
         run: npm run lint
 
       - name: Unit tests
+        if: steps.fresh.outputs.build != 'false'
         run: npm test
 
       - name: Build every nightly page, timed
+        if: steps.fresh.outputs.build != 'false'
         # The request API the account page and the sheet's sync call, fixed at build (src/env.ts).
         env:
           PUBLIC_API_URL: ${{ vars.PUBLIC_API_URL }}
@@ -89,12 +103,13 @@ jobs:
           fi
 
       - name: Lighthouse budgets on the front door, the board, the run's top-ranked player and the record
+        if: steps.fresh.outputs.build != 'false'
         # Real (devtools) throttling at the mobile profile, nine runs, asserted on the median, from
         # a static server of the build. A failed budget stops the deploy.
         run: npm run lighthouse
 
       - name: Keep the Lighthouse reports
-        if: always()
+        if: always() && steps.fresh.outputs.build != 'false'
         uses: actions/upload-artifact@v4
         with:
           name: lighthouse-${{ github.run_id }}
@@ -102,6 +117,7 @@ jobs:
           if-no-files-found: ignore
 
       - name: Deploy to the workers.dev preview
+        if: steps.fresh.outputs.build != 'false'
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: npx wrangler deploy
