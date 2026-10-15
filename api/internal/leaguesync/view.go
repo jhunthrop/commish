@@ -15,29 +15,50 @@ import (
 // list yet (a signing since its last read).
 const unlistedName = "A player not yet listed"
 
-// view is the league as the link's drafter sees it.
-func (s *Service) view(ctx context.Context, link Link, read Read) (apitypes.LeagueSync, error) {
+// prepared is a read made ready for a page: the snapshot as the link's
+// drafter may see it, the saved league, the board valued for the league,
+// and every named player placed on it.
+type prepared struct {
+	snap    Snapshot
+	saved   *apitypes.LeagueSettings
+	board   boards.Board
+	ids     []string
+	placed  map[string]Placement
+	players players
+}
+
+// prepare is what the league page and the in-season tools both read.
+func (s *Service) prepare(ctx context.Context, link Link, read Read) (prepared, error) {
 	snap := read.Snapshot
 	if snap.Ref.Host == HostFFPC {
 		snap = ownLineupOnly(snap, link.RosterID)
 	}
 	saved, err := s.savedSettings(ctx, link)
 	if err != nil {
-		return apitypes.LeagueSync{}, err
+		return prepared{}, err
 	}
 	board, err := s.Boards.For(ctx, ValuationSettings(snap, saved))
 	if err != nil {
-		return apitypes.LeagueSync{}, fmt.Errorf("leaguesync: board: %w", err)
+		return prepared{}, fmt.Errorf("leaguesync: board: %w", err)
 	}
 	ids := namedPlayers(snap)
 	dir := snap.Players
 	if dir == nil {
 		if dir, err = s.Players.For(ctx, snap.Ref.Host, directorySeason(snap, s.Now()), ids); err != nil {
-			return apitypes.LeagueSync{}, fmt.Errorf("leaguesync: directory: %w", err)
+			return prepared{}, fmt.Errorf("leaguesync: directory: %w", err)
 		}
 	}
 	placed := Place(board.Raw, dir, ids)
-	p := players{dir: dir, placed: placed}
+	return prepared{snap: snap, saved: saved, board: board, ids: ids, placed: placed, players: players{dir: dir, placed: placed}}, nil
+}
+
+// view is the league as the link's drafter sees it.
+func (s *Service) view(ctx context.Context, link Link, read Read) (apitypes.LeagueSync, error) {
+	pr, err := s.prepare(ctx, link, read)
+	if err != nil {
+		return apitypes.LeagueSync{}, err
+	}
+	snap, saved, board, placed, p := pr.snap, pr.saved, pr.board, pr.placed, pr.players
 	scoringLike, format := LeagueScoring(saved, snap.Scoring.Rules, snap.Shape.SuperFlex > 0)
 	held, twice := heldOnBoard(snap, placed)
 	if twice > 0 {
@@ -193,9 +214,9 @@ func standingOf(teams []Team, roster int) *apitypes.LeagueStanding {
 	return nil
 }
 
-// standings is every team, most wins first, then fewest losses, then
-// points for.
-func standings(teams []Team) []apitypes.LeagueTeam {
+// Standings is every team, most wins first, then fewest losses, then
+// points for: the league page's order.
+func Standings(teams []Team) []Team {
 	sorted := append([]Team(nil), teams...)
 	sort.SliceStable(sorted, func(i, j int) bool {
 		a, b := sorted[i], sorted[j]
@@ -207,6 +228,12 @@ func standings(teams []Team) []apitypes.LeagueTeam {
 		}
 		return a.PointsFor > b.PointsFor
 	})
+	return sorted
+}
+
+// standings is every team on the wire, in Standings' order.
+func standings(teams []Team) []apitypes.LeagueTeam {
+	sorted := Standings(teams)
 	out := make([]apitypes.LeagueTeam, 0, len(sorted))
 	for _, t := range sorted {
 		out = append(out, apitypes.LeagueTeam{
