@@ -1,7 +1,12 @@
 """`python -m research.inseason --task <task>`: one pass of an in-season job (the Cloud Run Job `inseason`).
 
     uv run python -m research.inseason --task season-week [--season 2026] [--skip props-snapshot]
+    uv run python -m research.inseason --task usage-backfill [--season 2026]
     uv run python -m research.inseason --task capture-harvest
+
+`usage-backfill` runs the weekly pass's usage steps alone (play-by-play and the three charted feeds)
+for every week nflverse has published: the operator's one-shot for weeks played before the steps
+existed. Idempotent (a re-run writes nothing new), no register trail, each feed's counts printed.
 
 Exit status 1 when any step failed (or the capture was refused), 0 otherwise. Provider keys come
 from the environment: TANK01_API_KEY for the capture, ODDS_API_KEY for the props snapshot.
@@ -29,7 +34,8 @@ from research.inseason.season_of import (
     stored_span,
     unplaced_reason,
 )
-from research.inseason.season_week import STEPS, SeasonWeekContext, StepResult, run_season_week
+from research.inseason.season_week import STEPS, SeasonWeekContext, run_season_week, run_usage_backfill
+from research.inseason.step_result import StepResult
 from research.logging_setup import configure_logging
 from research.nightly.publish import take_run_id
 from research.nightly.r2 import run_store
@@ -39,7 +45,7 @@ from research.pipeline.http import LiveFetcher
 from research.pipeline.tank01.capture import run_capture_harvest
 from research.pipeline.tank01.client import API_KEY_ENV, DEFAULT_SEASON, SEASON_ENV, Tank01Client
 
-TASKS: Final = ("season-week", "capture-harvest")
+TASKS: Final = ("season-week", "usage-backfill", "capture-harvest")
 LOG: Final = logging.getLogger(__name__)
 
 
@@ -67,6 +73,27 @@ def _season_week(args: argparse.Namespace, now: datetime) -> bool:
     # own failed line (fix round 2, N2): an R2 outage or a bad token never costs a freeze.
     results.append(_trail(args.out, now, None if isinstance(season, StepResult) else season, freezes, results))
     _line(f"season-week pass, season {season if isinstance(season, int) else 'unplaced'}")
+    for result in results:
+        _line(f"{result.step}: {result.status}, {result.summary}")
+        for detail in result.detail:
+            _line(f"  {detail}")
+    return all(result.status != "failed" for result in results)
+
+
+def _usage_backfill(args: argparse.Namespace, now: datetime) -> bool:
+    engine = make_engine(database_url_from_env())
+    fetcher = LiveFetcher()
+    try:
+        season = _season(engine, args.season, now)
+        results = (
+            [season]
+            if isinstance(season, StepResult)
+            else run_usage_backfill(SeasonWeekContext(engine, fetcher, now, season, os.environ))
+        )
+    finally:
+        fetcher.close()
+        engine.dispose()
+    _line(f"usage-backfill, season {season if isinstance(season, int) else 'unplaced'}")
     for result in results:
         _line(f"{result.step}: {result.status}, {result.summary}")
         for detail in result.detail:
@@ -147,14 +174,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         "--season",
         type=int,
         default=None,
-        help="season-week: the season (default: the one the stored schedule places today)",
+        help="season-week, usage-backfill: the season (default: the one the stored schedule places today)",
     )
     parser.add_argument("--skip", default="", help=f"season-week: steps to skip, of {', '.join(STEPS)}")
     parser.add_argument("--out", default=None, help="season-week: a local directory for the register's trail, not R2")
     args = parser.parse_args(argv)
     configure_logging(logging.INFO)
     now = now_ms()
-    ok = _season_week(args, now) if args.task == "season-week" else _capture_harvest(now)
+    tasks = {"season-week": _season_week, "usage-backfill": _usage_backfill}
+    ok = tasks[args.task](args, now) if args.task in tasks else _capture_harvest(now)
     return 0 if ok else 1
 
 
