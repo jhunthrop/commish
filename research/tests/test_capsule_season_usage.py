@@ -16,6 +16,7 @@ from research.capsules.voice_rules import EM_DASH, SEMICOLON
 from research.model.domain import Position
 from research.pipeline.nflverse.ftn import FTN_SOURCE, FtnMetric
 from research.pipeline.nflverse.ngs import NGS_SOURCE
+from research.pipeline.nflverse.participation import NflverseSource, ParticipationMetric
 from research.pipeline.nflverse.pbp import PBP_PLAYER_SOURCE, PbpPlayerMetric
 from research.pipeline.nflverse.pbp_passers import PBP_PASSER_SOURCE, PasserMetric
 from research.pipeline.nflverse.pfr_advstats import PFR_SOURCE
@@ -218,3 +219,25 @@ def test_ftn_figures_sit_inside_the_four_figure_cap_never_a_fifth() -> None:
     assert [f.key for f in usage.figures] == [
         Figure.PRESSURE_RATE, Figure.COMPLETION_OVER_EXPECTED, Figure.TIME_TO_THROW, Figure.BLITZ_RATE,
     ]  # fmt: skip
+
+
+def test_turning_ftn_on_never_takes_a_figure_off_a_full_sheet() -> None:
+    """A receiver with three higher figures, drops and contested catches keeps drops: FTN's figures are
+    last in the order, so they only fill room the others leave (the Lane 41 review's H1)."""
+    stat_targets = metric_key(NflverseSource.PLAYER_WEEK, ParticipationMetric.TARGETS)
+    own = {
+        _SEPARATION: 3.0, _NGS_TARGETS: 10.0,
+        metric_key(NGS_SOURCE, "rec_avg_yac_above_expectation"): 1.2,
+        metric_key(NGS_SOURCE, "rec_receptions"): 7.0,
+        _AIR: 90.0, metric_key(PBP_PLAYER_SOURCE, PbpPlayerMetric.AIR_YARD_TARGETS): 10.0,
+        metric_key(PFR_SOURCE, "receiving_drops"): 1.0, stat_targets: 10.0,
+        metric_key(FTN_SOURCE, FtnMetric.CONTESTED_CATCHES): 2.0,
+        metric_key(FTN_SOURCE, FtnMetric.CONTESTED_TARGETS): 4.0,
+    }  # fmt: skip
+    weeks = {"wr": [Week(1, own, {}), Week(2, own, {})]}
+
+    def chosen(on: frozenset[str]) -> list[str]:
+        return [f.key for f in season_usage_for(_inputs(weeks, {"wr": "WR"}), on_pages=on)["wr"].figures]
+
+    expected = [Figure.SEPARATION, Figure.YAC_OVER_EXPECTED, Figure.TARGET_DEPTH, Figure.DROPS]
+    assert chosen(_ON - {FTN_SOURCE}) == chosen(_ON) == expected

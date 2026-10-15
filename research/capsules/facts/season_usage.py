@@ -296,10 +296,12 @@ FIGURE_PRIORITY: Final = (
     Figure.TIME_TO_THROW,
     Figure.INSIDE_TEN_SHARE,
     Figure.TARGET_DEPTH,
+    Figure.DROPS,
+    # FTN's charting last (Lane 41): it fills the cap only where every other figure leaves room, so
+    # turning it on never takes a figure off a sheet that already carried four.
     Figure.CONTESTED_CATCH_RATE,
     Figure.BLITZ_RATE,
     Figure.INTERCEPTION_WORTHY,
-    Figure.DROPS,
 )
 
 
