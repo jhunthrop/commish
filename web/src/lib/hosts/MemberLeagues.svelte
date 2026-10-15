@@ -12,6 +12,7 @@
 		needsSignIn,
 		notConnected,
 		yahooOpen,
+		type HostConnected,
 		type HostConnections,
 		type HostLeague,
 		type PickAnswer
@@ -42,6 +43,8 @@
 	let leagues = $state<HostLeague[]>([]);
 	/** Why a connection is asked for again, in the API's own words. */
 	let reason = $state<string | undefined>(undefined);
+	/** Said once just connected with a session kept not yet proven (ESPN), in the API's words. */
+	let note = $state<string | undefined>(undefined);
 
 	/** A 409 asks to connect again with the API's sentence as the reason; true when it did. */
 	function connectAgain(error: unknown): boolean {
@@ -58,6 +61,11 @@
 	function connected(list: HostLeague[]): void {
 		leagues = list;
 		view = 'leagues';
+	}
+
+	function connectedNow(answer: HostConnected): void {
+		note = answer.note;
+		connected(answer.leagues);
 	}
 
 	onMount(() => {
@@ -97,7 +105,7 @@
 			{reason}
 			bar
 			label={again ? 'Connect ESPN again' : 'Connect ESPN'}
-			onconnected={connected}
+			onconnected={connectedNow}
 		/>
 	{/if}
 {:else if view === 'off'}
@@ -105,8 +113,11 @@
 {:else if view === 'unreachable'}
 	<p class="line">{name} can't be read right now. Try again in a moment.</p>
 {:else if leagues.length === 0}
-	<p class="line">Your {name} account has no football league this season.</p>
+	<p class="line" role={note ? 'status' : undefined}>
+		{note ?? `Your ${name} account has no football league this season.`}
+	</p>
 {:else}
+	{#if note}<p class="line note" role="status">{note}</p>{/if}
 	<LeagueChoice
 		host={name}
 		{leagues}
@@ -123,5 +134,11 @@
 	.line {
 		margin: 0;
 		color: var(--ink-2);
+	}
+
+	.note {
+		margin-bottom: var(--s-3);
+		max-width: 60ch;
+		font-size: var(--t-sm);
 	}
 </style>

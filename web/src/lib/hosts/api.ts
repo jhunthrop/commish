@@ -42,7 +42,8 @@ export const hostsApi = {
 		}),
 	yahooLeagues: () => client.call<HostLeague[]>('/hosts/yahoo/leagues'),
 	disconnectYahoo: () => client.call<null>('/hosts/yahoo', { method: 'DELETE' }),
-	/** The member's two ESPN cookies, kept encrypted once one read of their leagues shows they work. */
+	/** The member's two ESPN cookies, kept encrypted once one read of their leagues shows they work:
+	 * proven when a private league reads with them too, else kept with a note saying why. */
 	connectESPN: (swid: string, s2: string) =>
 		client.call<HostConnected>('/hosts/espn/connect', {
 			method: 'POST',
@@ -92,10 +93,7 @@ export function disconnect(host: ConnectedHost): Promise<null> {
 	}
 }
 
-/** The words that keep an ESPN session, said beside the verb that connects: consent version 1
- * (api/internal/hosts consentVersions). Change the words, raise the version. */
-export const ESPN_CONSENT =
-	'We keep an encrypted copy of your ESPN session so your league stays in sync, and never make a move. Disconnect deletes it at once.';
+export { ESPN_CONSENT } from './connection-words.ts';
 
 /** The account's connection to one host, if any. */
 export function connectionTo(

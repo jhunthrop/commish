@@ -8,11 +8,13 @@ export function recordWords(record: string): string {
 }
 
 /** What parts two leagues of one name: the member's record where the host's list carries it (FFPC),
- * else the league's size (Yahoo). */
+ * else the league's size (Yahoo), and whether the public reads it where that was checked (ESPN). */
 function aside(league: HostLeague): string | null {
-	if (league.record) return recordWords(league.record);
-	if (league.teams) return plural(league.teams, 'team');
-	return null;
+	const parts: string[] = [];
+	if (league.record) parts.push(recordWords(league.record));
+	else if (league.teams) parts.push(plural(league.teams, 'team'));
+	if (league.public !== undefined) parts.push(league.public ? 'public' : 'private');
+	return parts.length > 0 ? parts.join(', ') : null;
 }
 
 /** A league's chip: "Big Gorilla, 2-3", "The Commish Classic, 10 teams". */
