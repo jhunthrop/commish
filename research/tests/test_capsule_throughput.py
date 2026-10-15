@@ -1,6 +1,6 @@
 """The writer's throughput (Lane 24), with the gateway stubbed (`httpx.MockTransport`) and a fake
 clock: the token bucket, the bounded pool and its scoped views, the 429 handling per call and per
-line, the ledger and the price list, the settings from the environment, and the wave gate."""
+line, the ledger and the price list, the settings from the environment, the landing gate and the sentence claim."""
 
 import json
 import threading
@@ -24,7 +24,7 @@ from research.capsules.pace import TokenBucket
 from research.capsules.prompt import WornPhrases
 from research.capsules.spans import SpanRules
 from research.capsules.sweep import Subject, SweepPlan, sweep_capsules
-from research.db.engine import POOL_HEADROOM, make_engine, once_more_on_disconnect, pooled_like
+from research.db.engine import POOL_HEADROOM, connection_lost, make_engine, once_more_on_disconnect, pooled_like
 from research.errors import ConfigurationError
 
 NOW = datetime(2026, 10, 15, 5, tzinfo=UTC)
@@ -32,6 +32,8 @@ _WORDS = " ".join(["word"] * 30)
 WIDTH = 3
 SIZES = (1, 2, 3, 1, 2, 3, 1)
 RETRY_AFTER = 3.0
+# Twelve tokens at ten a second with a burst of four: at least 0.8 s, read with a little slack.
+CONTENDED_FLOOR_S = 0.75
 
 
 class FakeClock:
@@ -313,7 +315,7 @@ def test_a_malformed_setting_fails_before_any_call(raw: str) -> None:
         writer_settings({"CAPSULE_CONCURRENCY": raw})
 
 
-# The wave gate.
+# The landing gate.
 
 
 _SHARED = "the volume is real and the role is growing every single week"
@@ -486,3 +488,106 @@ def test_a_rewrite_that_would_land_another_pages_sentence_is_refused_and_keeps_t
     assert report.processed == ["a"]
     assert committed == (["a"] if lands else [])
     assert (report.llm, report.kept, report.refused) == ((1, 0, 0) if lands else (0, 1, 1))
+
+
+def test_two_pages_in_flight_with_the_same_new_sentence_land_it_once(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Width 2, an exclusive pass: both rewrites return the same fresh sentence; exactly one lands."""
+    subjects = [_subject(pid) for pid in ("a", "b")]
+    stored = {pid: _stored(pid, f"The old read of {pid}, its own words.") for pid in ("a", "b")}
+    both_started = threading.Barrier(2)
+    committed: list[str] = []
+
+    def generate(facts: Any, gateway: Any, worn: Any) -> Any:
+        both_started.wait(5)
+        return _result(f"Fresh words. {_CLOSER}")
+
+    monkeypatch.setattr(sweep, "stored_capsules_for", lambda conn, ids: {k: v for k, v in stored.items() if k in ids})
+    monkeypatch.setattr(sweep, "queue_regeneration", lambda conn, ids: 0)
+    monkeypatch.setattr(sweep, "worn_phrases", lambda subjects, stored: WornPhrases((), ()))
+    monkeypatch.setattr(sweep, "generate_capsule", generate)
+    monkeypatch.setattr(sweep, "upsert_capsule", lambda conn, row, at: committed.append(row.player_id))
+    engine = cast("Engine", SimpleNamespace(connect=lambda: nullcontext(None), begin=lambda: nullcontext(None)))
+    gateway = _client(lambda r: _ok(), FakeClock(), WriterSettings("m/x", 2, 60))
+    plan = SweepPlan(10, span_rules=SpanRules(frozenset()), only=("a", "b"), keep_written=True)
+    report = sweep_capsules(engine, gateway, NOW, plan, lambda c, a: subjects)
+    assert len(committed) == 1
+    assert (report.llm, report.refused) == (1, 1)
+
+
+# The review's M1, M2 and L5: a long retry-after, a raising worker, the bucket under contention.
+
+
+def test_a_retry_after_past_the_backoff_ceiling_is_waited_out() -> None:
+    clock = FakeClock()
+    gateway = _client(_scripted(httpx.Response(429, headers={"retry-after": "120"}), _ok()), clock)
+    gateway.complete([{"role": "user", "content": "hi"}], 10)
+    assert clock.slept == [pytest.approx(120.0)]
+
+
+def test_a_retry_after_past_the_cap_fails_the_call_with_the_reason() -> None:
+    clock = FakeClock()
+    gateway = _client(_scripted(httpx.Response(429, headers={"retry-after": "900"})), clock)
+    with pytest.raises(GenerationError, match="900 s, past the 300 s cap"):
+        gateway.complete([{"role": "user", "content": "hi"}], 10)
+    assert gateway.calls == 1
+    assert clock.slept == []
+
+
+def test_a_raising_worker_lets_its_siblings_land_then_raises() -> None:
+    gateway = _client(lambda r: _ok(), FakeClock(), WriterSettings("m/x", 3, 60))
+    raised = threading.Event()
+    started: list[int] = []
+    landed: list[int] = []
+
+    def start(item: int) -> Callable[[GatewayClient], int]:
+        started.append(item)
+
+        def work(view: GatewayClient) -> int:
+            if item == 0:
+                raised.set()
+                raise RuntimeError("the proxy dropped the commit twice")
+            assert raised.wait(5)
+            time.sleep(0.05)
+            return item
+
+        return work
+
+    with pytest.raises(RuntimeError, match="dropped the commit"):
+        gateway.rolling([0, 1, 2, 3, 4, 5], start, lambda item, result: landed.append(result))
+    assert started == [0, 1, 2]
+    assert sorted(landed) == [1, 2]
+
+
+def test_the_bucket_holds_its_rate_under_contention() -> None:
+    bucket = TokenBucket(600, 4)  # 10 a second, a burst of 4
+    began = time.monotonic()
+    threads = [threading.Thread(target=lambda: [bucket.acquire() for _ in range(3)]) for _ in range(4)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+    # Twelve tokens: four from the burst, eight more at ten a second.
+    assert time.monotonic() - began >= CONTENDED_FLOOR_S
+
+
+# The review's L1 and L2.
+
+
+class _DriverError(Exception):
+    def __init__(self, sqlstate: str | None) -> None:
+        super().__init__("driver error")
+        self.sqlstate = sqlstate
+
+
+@pytest.mark.parametrize(
+    ("sqlstate", "lost"),
+    [(None, True), ("08006", True), ("57014", False), ("40P01", False), ("55P03", False)],
+    ids=["closed unexpectedly", "connection failure", "statement timeout", "deadlock", "lock not available"],
+)
+def test_only_a_lost_connection_is_retried(sqlstate: str | None, lost: bool) -> None:
+    assert connection_lost(OperationalError("select 1", {}, _DriverError(sqlstate))) is lost
+
+
+def test_the_concurrency_has_a_ceiling() -> None:
+    with pytest.raises(ConfigurationError, match="at most 64"):
+        writer_settings({"CAPSULE_CONCURRENCY": "500"})
