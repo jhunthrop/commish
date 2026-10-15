@@ -37,6 +37,9 @@ var (
 	// ErrNotAvailable is an add another team holds, or the member's
 	// own team already does.
 	ErrNotAvailable = errors.New("espn: the player is not available")
+	// ErrDropGone is a drop no longer on the member's team: the screen
+	// was read before a change on ESPN.
+	ErrDropGone = errors.New("espn: the drop is not on the team")
 	// ErrNotDroppable is a drop ESPN does not let the team make.
 	ErrNotDroppable = errors.New("espn: the drop cannot be dropped")
 	// ErrBid is a bid in a league without a budget, none where the league
@@ -206,7 +209,7 @@ func checkDrop(t Team, drop string, waiver bool) error {
 		}
 		return nil
 	}
-	return fmt.Errorf("%w: player %s is not on team %d", ErrNotYourTeam, drop, t.ID)
+	return fmt.Errorf("%w: player %s is not on team %d", ErrDropGone, drop, t.ID)
 }
 
 // checkBid is a bid the league takes: none without a budget (ESPN refuses

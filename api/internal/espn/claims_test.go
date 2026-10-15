@@ -189,7 +189,7 @@ func TestOwnClaimGuards(t *testing.T) {
 	}{
 		{"another team", nil, writeCookies.SWID, 2, ClaimInput{Add: claimAdd}, waivers, ErrNotYourTeam},
 		{"another SWID", nil, "{0000000D-0000-4000-8000-00000000000D}", 1, ClaimInput{Add: claimAdd}, waivers, ErrNotYourTeam},
-		{"a drop not his", nil, writeCookies.SWID, 1, ClaimInput{Add: claimAdd, Drop: "15795"}, waivers, ErrNotYourTeam},
+		{"a drop not his", nil, writeCookies.SWID, 1, ClaimInput{Add: claimAdd, Drop: "15795"}, waivers, ErrDropGone},
 		{"on a team", nil, writeCookies.SWID, 1, ClaimInput{Add: claimAdd}, Availability{Status: StatusOnTeam, OnTeam: 3}, ErrNotAvailable},
 		{"already his", nil, writeCookies.SWID, 1, ClaimInput{Add: claimDrop}, Availability{Status: StatusOnTeam, OnTeam: 1}, ErrNotAvailable},
 		{"undroppable", func(doc map[string]any) {

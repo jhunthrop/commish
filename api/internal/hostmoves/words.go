@@ -1,6 +1,10 @@
 package hostmoves
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/jhunthrop/commish/api/internal/apitypes"
+)
 
 // The member's words for a move. No em-dash, no semicolon, the host named
 // as where the move happens.
@@ -34,7 +38,45 @@ const (
 	fieldMove     = "move"
 	fieldConfirm  = "confirm"
 	moveFormWords = "Send the lineup changes from the start screen."
+
+	// A claim's answers.
+	claimDoneWords    = "Done on ESPN. He is on your roster there now."
+	claimRefusedWords = "ESPN did not take the claim, so nothing changed there."
+	claimNotSeenWords = "Sent to ESPN, but your claims there did not show it when we read them back. Check your claims on ESPN before you claim again."
+
+	// Why a claim is unavailable, said under the verb.
+	claimReconsentWords = "To claim from here, connect ESPN again on your account page and agree to moves."
+	claimReconnectWords = "ESPN no longer accepts your saved sign-in. Connect ESPN again on your account page to claim from here."
+
+	// Why a claim is refused before anything is sent.
+	claimWeekMovedWords   = "ESPN is on week %d now. Reload the waivers to see it."
+	claimNotYourTeamWords = "ESPN does not list this team as yours, so we cannot claim for it."
+	claimStaleWords       = "Your roster on ESPN changed since this page read it. Reload the waivers to see it."
+	notAvailableWords     = "%s is on another team in this league now."
+	alreadyYoursWords     = "%s is already on your team."
+	notDroppableWords     = "ESPN does not let you drop %s."
+	dropLockedWords       = "ESPN has locked %s on your roster until his game ends, so he cannot be dropped for a free agent now."
+	noBidsWords           = "This league on ESPN does not take bids."
+	bidBoundsWords        = "ESPN takes bids from $%d to $%d in this league."
+	claimFormWords        = "Send the claim from the waivers screen."
+	claimTokenUsedWords   = "That claim was already sent. Check your claims on ESPN."
 )
+
+// kindWords is a move kind's own sentences where a lineup and a claim
+// differ.
+type kindWords struct {
+	reconsent, reconnect, notYourTeam, form, used string
+}
+
+// wordsFor is the kind's sentences; anything but a claim is a lineup's.
+func wordsFor(kind apitypes.HostMoveInputKind) kindWords {
+	if kind == apitypes.HostMoveInputKindClaim {
+		return kindWords{reconsent: claimReconsentWords, reconnect: claimReconnectWords, notYourTeam: claimNotYourTeamWords,
+			form: claimFormWords, used: claimTokenUsedWords}
+	}
+	return kindWords{reconsent: reconsentWords, reconnect: reconnectWords, notYourTeam: notYourTeamWords, form: moveFormWords,
+		used: tokenUsedWords}
+}
 
 // andNames joins names: "A", "A and B", "A, B and C".
 func andNames(names []string) string {
