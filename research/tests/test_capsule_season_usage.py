@@ -177,3 +177,20 @@ def test_the_section_is_a_labelled_stat_the_span_gate_exempts() -> None:
     usage = season_usage_for(_inputs(weeks, {"starter": "RB"}), on_pages=_ON)["starter"]
     assert any(section.startswith("This season's usage and play") for section in label_sections(_sheet(usage)))
     assert label_sections(_sheet(None)) == []
+
+
+def test_a_sheet_carries_at_most_four_figures_the_most_telling_first() -> None:
+    own = {
+        _CARRIES: 10.0, _TARGETS: 10.0, _RZ_CARRIES: 1.0, _RZ_TARGETS: 2.0, _AIR: 120.0,
+        metric_key(PBP_PLAYER_SOURCE, PbpPlayerMetric.AIR_YARD_TARGETS): 10.0,
+        metric_key(PBP_PLAYER_SOURCE, PbpPlayerMetric.INSIDE_TEN_CARRIES): 1.0,
+        metric_key(PBP_PLAYER_SOURCE, PbpPlayerMetric.INSIDE_TEN_TARGETS): 2.0,
+        _SEPARATION: 3.0, _NGS_TARGETS: 10.0,
+    }  # fmt: skip
+    team = {_RZ_CARRIES: 6.0, _RZ_TARGETS: 6.0, _AIR: 300.0}
+    team |= {k: 4.0 for k in own if "inside_ten" in k}
+    weeks = {"wr": [Week(1, own, team), Week(2, own, team)]}
+    usage = season_usage_for(_inputs(weeks, {"wr": "WR"}), on_pages=_ON)["wr"]
+    assert [f.key for f in usage.figures] == [
+        Figure.RED_ZONE_SHARE, Figure.AIR_YARDS_SHARE, Figure.SEPARATION, Figure.INSIDE_TEN_SHARE,
+    ]  # fmt: skip

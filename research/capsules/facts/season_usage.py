@@ -278,6 +278,35 @@ def _ranks(rule: Rule, sums: Mapping[str, _Sum], inputs: SeasonInputs) -> dict[s
     return rank_within_groups(groups)
 
 
+# At most this many figures on one sheet, the most telling first: a longer sheet crowded the long note
+# in the Lane 23 trial (first-write blocks 11 of 40 with the full section against 6 of 40 without).
+MAX_FIGURES_PER_SHEET: Final = 4
+# The order an analyst reaches for them: the scoring role and the target earning, then how well he
+# plays it, then the rest.
+FIGURE_PRIORITY: Final = (
+    Figure.RED_ZONE_SHARE,
+    Figure.AIR_YARDS_SHARE,
+    Figure.RUSH_YARDS_OVER_EXPECTED,
+    Figure.PRESSURE_RATE,
+    Figure.SEPARATION,
+    Figure.YAC_OVER_EXPECTED,
+    Figure.YARDS_AFTER_CONTACT,
+    Figure.COMPLETION_OVER_EXPECTED,
+    Figure.TIME_TO_THROW,
+    Figure.INSIDE_TEN_SHARE,
+    Figure.TARGET_DEPTH,
+    Figure.CONTESTED_CATCH_RATE,
+    Figure.BLITZ_RATE,
+    Figure.INTERCEPTION_WORTHY,
+    Figure.DROPS,
+)
+
+
+def _most_telling(found: Sequence[SeasonFigure]) -> tuple[SeasonFigure, ...]:
+    ordered = sorted(found, key=lambda figure: FIGURE_PRIORITY.index(figure.key))
+    return tuple(ordered[:MAX_FIGURES_PER_SHEET])
+
+
 def season_usage_for(inputs: SeasonInputs, *, on_pages: frozenset[str]) -> dict[str, SeasonUsage]:
     """Every player's figures that cleared their floors and read only sources cleared for the page
     (`on_pages`), by universe id; a player with none is absent."""
@@ -311,7 +340,7 @@ def season_usage_for(inputs: SeasonInputs, *, on_pages: frozenset[str]) -> dict[
             inputs.first_week,
             inputs.last_week,
             tuple(sorted({week.week for week in inputs.weeks[player_id]})),
-            tuple(found),
+            _most_telling(found),
         )
         for player_id, found in figures.items()
     }
