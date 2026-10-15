@@ -6,9 +6,10 @@
 	import { LINES } from './words.ts';
 
 	/** An in-season screen's body: its decision in one sentence first, with the one verb at the
-	 * right (the host's page where the member acts, in a new tab: we never write a host), what the
-	 * rows are ranked by, then the rows. On a phone the verb is pinned above the tab bar, so it is
-	 * never a scroll away from the row that set it. */
+	 * right (the host's page where the member acts, in a new tab; or, where the API opens the move,
+	 * a button that opens the confirmation on this screen), what the rows are ranked by, then the
+	 * rows. On a phone the verb is pinned above the tab bar, so it is never a scroll away from the
+	 * row that set it. */
 	interface Props {
 		decision: string;
 		/** The fact that tipped it, under the decision. */
@@ -23,6 +24,15 @@
 		/** The rest of the API's basis, under the rows: the league the figures are for and the rules
 		 * points so far leave out. */
 		basisNote: string;
+		/** When set, the verb is a button that does this (opens the move's confirmation) rather than
+		 * the host's page. */
+		onverb?: (() => void) | null;
+		/** The confirmation the verb opens: its id, and whether it is open (the screen's verb steps
+		 * aside while it is, so one verb shows). */
+		controls?: string;
+		expanded?: boolean;
+		/** The confirmation, under the decision. */
+		move?: Snippet;
 		children: Snippet;
 	}
 
@@ -34,8 +44,15 @@
 		hostNote = null,
 		basis,
 		basisNote,
+		onverb = null,
+		controls,
+		expanded,
+		move,
 		children
 	}: Props = $props();
+
+	/** While the confirmation is open its own verb is the one on screen. */
+	const asideForMove = $derived(onverb !== null && expanded === true);
 
 	/** The verb's link opens the host in a new tab with no hold on this page. Set here rather than
 	 * on the shared verb, so no other page carries it; made again for each host page, so a link that
@@ -50,25 +67,38 @@
 	}
 </script>
 
+{#snippet action(fill: boolean)}
+	{#if onverb}
+		<Verb onclick={onverb} {fill} {controls} {expanded}>{verb}</Verb>
+	{:else}
+		<Verb {href} {fill} disabled={href === ''}>{verb}</Verb>
+	{/if}
+{/snippet}
+
 <Panel as="section" label={LINES.ourCall} edge="accent">
 	<div class="decision">
 		<div class="words" role="status">
 			<p class="line">{decision}</p>
 			{#if reason}<p class="reason">{reason}</p>{/if}
 		</div>
-		<span class="verb desk" {@attach toHost(href)}
-			><Verb {href} disabled={href === ''}>{verb}</Verb>
-			{#if hostNote}<span class="note">{hostNote}</span>{/if}</span
-		>
+		{#if !asideForMove}
+			<span class="verb desk" {@attach toHost(href)}
+				>{@render action(false)}
+				{#if hostNote}<span class="note">{hostNote}</span>{/if}</span
+			>
+		{/if}
 	</div>
 </Panel>
+{@render move?.()}
 <Basis {basis} />
 {@render children()}
 <p class="foot">{basisNote}</p>
-<div class="pin" {@attach toHost(href)}>
-	<Verb {href} fill disabled={href === ''}>{verb}</Verb>
-	{#if hostNote}<p class="note">{hostNote}</p>{/if}
-</div>
+{#if !asideForMove}
+	<div class="pin" {@attach toHost(href)}>
+		{@render action(true)}
+		{#if hostNote}<p class="note">{hostNote}</p>{/if}
+	</div>
+{/if}
 
 <style>
 	.decision {

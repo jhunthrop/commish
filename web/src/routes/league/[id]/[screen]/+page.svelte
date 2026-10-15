@@ -1,6 +1,10 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { inSeasonApi, type WaiverPosition } from '#lib/league/inseason/api.ts';
+	import {
+		inSeasonApi,
+		type HostMoveInput,
+		type WaiverPosition
+	} from '#lib/league/inseason/api.ts';
 	import InSeasonPage from '#lib/league/inseason/InSeasonPage.svelte';
 	import StartScreen from '#lib/league/inseason/StartScreen.svelte';
 	import TradeScreen from '#lib/league/inseason/TradeScreen.svelte';
@@ -29,7 +33,15 @@
 			read={() => inSeasonApi.lineup(id)}
 			reserve={RESERVE_ROWS.start}
 		>
-			{#snippet children(advice, host)}<StartScreen {advice} {host} />{/snippet}
+			{#snippet children(advice, host, reread)}
+				<StartScreen
+					{advice}
+					{host}
+					plan={(move: HostMoveInput) => inSeasonApi.planMove(id, move)}
+					make={(move: HostMoveInput, confirm: string) => inSeasonApi.makeMove(id, move, confirm)}
+					{reread}
+				/>
+			{/snippet}
 		</InSeasonPage>
 	{:else if data.screen === 'waivers'}
 		<InSeasonPage

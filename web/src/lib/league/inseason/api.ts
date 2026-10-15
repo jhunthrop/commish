@@ -1,6 +1,7 @@
 /** The in-season reads of a followed league (spec §7), typed from the generated contract: this
  * week's lineup, the waiver adds (a position at a time when asked) and the trades (those holding
- * one player when asked), each for the drafter's own team. */
+ * one player when asked), each for the drafter's own team; and the one move made on the host, a
+ * lineup set planned in words and then made with its confirm token (spec §10.2). */
 import { PUBLIC_API_URL } from '$app/env/public';
 import { apiClient } from '#lib/api/client.ts';
 import type { components, operations } from '#lib/api/types.ts';
@@ -18,6 +19,11 @@ export type WeekFacts = Schemas['WeekFacts'];
 export type InjuryDesignation = Schemas['InjuryDesignation'];
 export type GamePoints = Schemas['GamePoints'];
 export type OrderBasis = Schemas['OrderBasis'];
+export type LineupMoves = Schemas['LineupMoves'];
+export type HostMoveInput = Schemas['HostMoveInput'];
+export type HostMoveChange = Schemas['HostMoveChange'];
+export type HostMovePlan = Schemas['HostMovePlan'];
+export type HostMoveResult = Schemas['HostMoveResult'];
 /** A position the waiver route narrows to. */
 export type WaiverPosition = NonNullable<
 	NonNullable<operations['leagueWaivers']['parameters']['query']>['position']
@@ -45,5 +51,11 @@ export const inSeasonApi = {
 		client.call<WaiverAdvice>(path(id, 'waivers', { position })),
 	/** The trades, narrowed to those holding one player when given (his board id). */
 	trades: (id: string, player: string | null = null) =>
-		client.call<TradeAdvice>(path(id, 'trades', { player }))
+		client.call<TradeAdvice>(path(id, 'trades', { player })),
+	/** The move in words with its confirm token; nothing is sent to the host. */
+	planMove: (id: string, move: HostMoveInput) =>
+		client.call<HostMovePlan>(path(id, 'moves/plan'), { method: 'POST', body: move }),
+	/** The planned move, made once with its token. */
+	makeMove: (id: string, move: HostMoveInput, confirm: string) =>
+		client.call<HostMoveResult>(path(id, 'moves'), { method: 'POST', body: { move, confirm } })
 };
