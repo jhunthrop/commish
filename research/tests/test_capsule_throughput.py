@@ -14,15 +14,17 @@ from typing import Any, cast
 import httpx
 import pytest
 from sqlalchemy import Engine
+from sqlalchemy.exc import OperationalError
 
 from research.capsules import sweep
 from research.capsules.config import CAPSULE_CONFIG, CAPSULE_MODEL, WriterSettings, writer_settings
 from research.capsules.gateway import GatewayClient, GenerationError, fetch_price
+from research.capsules.landing import TonightWindow
 from research.capsules.pace import TokenBucket
 from research.capsules.prompt import WornPhrases
 from research.capsules.spans import SpanRules
 from research.capsules.sweep import Subject, SweepPlan, sweep_capsules
-from research.capsules.waves import wave_collisions, waves
+from research.db.engine import POOL_HEADROOM, make_engine, once_more_on_disconnect, pooled_like
 from research.errors import ConfigurationError
 
 NOW = datetime(2026, 10, 15, 5, tzinfo=UTC)
@@ -114,7 +116,7 @@ def test_the_bucket_refuses_a_zero_rate() -> None:
 # The pool.
 
 
-def test_the_pool_holds_at_most_its_width_in_flight_and_keeps_the_order() -> None:
+def test_the_rolling_pool_holds_at_most_its_width_in_flight_and_counts_each_page_on_its_own_view() -> None:
     clock = FakeClock()
     in_flight = 0
     peak = 0
@@ -131,25 +133,57 @@ def test_the_pool_holds_at_most_its_width_in_flight_and_keeps_the_order() -> Non
         return _ok()
 
     gateway = _client(answer, clock, WriterSettings("m/x", WIDTH, 100_000))
+    landed: list[tuple[int, int]] = []
 
-    def work(view: GatewayClient, n: int) -> tuple[int, int]:
-        for _ in range(n):
-            view.complete([{"role": "user", "content": "hi"}], 10)
-        return n, view.calls
+    def start(n: int) -> Callable[[GatewayClient], tuple[int, int]]:
+        def work(view: GatewayClient) -> tuple[int, int]:
+            for _ in range(n):
+                view.complete([{"role": "user", "content": "hi"}], 10)
+            return n, view.calls
 
-    results = gateway.in_parallel(work, list(SIZES))
-    assert results == [(n, n) for n in SIZES]
+        return work
+
+    stopped = gateway.rolling(list(SIZES), start, lambda n, result: landed.append(result))
+    assert not stopped
+    assert sorted(landed) == sorted((n, n) for n in SIZES)
     assert peak <= WIDTH
     assert gateway.calls == 0  # each page counted on its own view
     assert len(gateway.ledger.records) == sum(SIZES)
 
 
-def test_a_pool_one_wide_runs_in_line() -> None:
-    clock = FakeClock()
-    gateway = _client(lambda r: _ok(), clock, WriterSettings("m/x", 1, 60))
-    seen: list[str] = []
-    gateway.in_parallel(lambda view, item: seen.append(threading.current_thread().name), ["a", "b"])
-    assert len(set(seen)) == 1
+def test_a_slot_is_refilled_the_moment_its_page_lands_and_the_next_start_sees_it() -> None:
+    """Width 2: a slow page and a quick one start; the quick one lands, and the third page starts
+    (seeing it landed) while the slow one is still in flight."""
+    gateway = _client(lambda r: _ok(), FakeClock(), WriterSettings("m/x", 2, 60))
+    slow_may_finish = threading.Event()
+    landed: list[str] = []
+    seen_at_start: dict[str, tuple[str, ...]] = {}
+
+    def start(item: str) -> Callable[[GatewayClient], str]:
+        seen_at_start[item] = tuple(landed)
+
+        def work(view: GatewayClient) -> str:
+            if item == "slow":
+                assert slow_may_finish.wait(5)
+            if item == "third":
+                slow_may_finish.set()
+            return item
+
+        return work
+
+    gateway.rolling(["slow", "quick", "third"], start, lambda item, result: landed.append(result))
+    assert seen_at_start["third"] == ("quick",)
+    assert landed.index("quick") < landed.index("slow")
+
+
+def test_the_rolling_pool_stops_starting_when_asked_and_lands_what_is_in_flight() -> None:
+    gateway = _client(lambda r: _ok(), FakeClock(), WriterSettings("m/x", 2, 60))
+    landed: list[int] = []
+    stopped = gateway.rolling(
+        [1, 2, 3, 4], lambda n: lambda view: n, lambda n, result: landed.append(result), lambda: len(landed) >= 1
+    )
+    assert stopped
+    assert 1 <= len(landed) < len([1, 2, 3, 4])
 
 
 # The 429s.
@@ -282,27 +316,25 @@ def test_a_malformed_setting_fails_before_any_call(raw: str) -> None:
 # The wave gate.
 
 
-def test_waves_cut_in_order() -> None:
-    assert waves([1, 2, 3, 4, 5], 2) == [[1, 2], [3, 4], [5]]
-    with pytest.raises(ValueError, match="one page wide"):
-        waves([1], 0)
-
-
 _SHARED = "the volume is real and the role is growing every single week"
 
 
-def test_wave_collisions_count_what_a_waves_own_pages_share() -> None:
-    rules = SpanRules(frozenset())
-    pages = {
-        "a": (f"{_SHARED}.",),
-        "b": (f"Draft him because {_SHARED}.",),
-        "c": ("nothing alike here at all today friend",),
-    }
-    reads = {"a": (f"{_SHARED}.",), "b": (f"{_SHARED}.",), "c": ("Something else entirely here.",)}
-    found = wave_collisions(pages, reads, rules, 4)
-    assert found.sentences == 1
-    assert found.spans > 0
-    assert found.carriers == ("a", "b")
+def test_a_landing_page_counts_what_it_shares_with_the_pages_landed_before_it() -> None:
+    window = TonightWindow(SpanRules(frozenset()), 60, 4)
+    assert not window.land((f"{_SHARED}.",), (f"{_SHARED}.",)).carrier
+    second = window.land((f"Draft him because {_SHARED}.",), (f"{_SHARED}.",))
+    assert second.sentences == 1
+    assert second.spans > 0
+    assert not window.land(("nothing alike here at all today friend",), ("Something else entirely.",)).carrier
+    first_span = " ".join(_SHARED.split()[:6])
+    assert first_span in window.repeated(12)
+
+
+def test_the_window_forgets_pages_past_its_width() -> None:
+    window = TonightWindow(SpanRules(frozenset()), 1, 4)
+    window.land((f"{_SHARED}.",), (f"{_SHARED}.",))
+    window.land(("nothing alike here at all today friend",), ("Something else entirely.",))
+    assert not window.land((f"{_SHARED}.",), (f"{_SHARED}.",)).carrier
 
 
 def _subject(pid: str) -> Subject:
@@ -313,16 +345,22 @@ def _subject(pid: str) -> Subject:
 def _result(text: str) -> Any:
     read = SimpleNamespace(text=text, fallback=None)
     narrative = SimpleNamespace(slots={}, rejected=())
-    return SimpleNamespace(compact=read, full=read, narrative=narrative, source="llm", usage=None, calls=1)
+    return SimpleNamespace(compact=read, full=read, narrative=narrative, source="llm", usage=None, calls=1, model="m/x")
 
 
-def test_a_wave_sees_every_page_landed_before_it_and_its_own_collisions_are_counted(
+def _stub_store(monkeypatch: pytest.MonkeyPatch) -> Engine:
+    monkeypatch.setattr(sweep, "stored_capsules_for", lambda conn, ids: {})
+    monkeypatch.setattr(sweep, "queue_regeneration", lambda conn, ids: 0)
+    return cast("Engine", SimpleNamespace(connect=lambda: nullcontext(None), begin=lambda: nullcontext(None)))
+
+
+def test_each_page_is_told_what_the_pages_landed_before_it_started_repeat_and_carriers_are_counted(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Width 2: a and b share a span inside the first wave (neither could see the other); c and d,
-    the next wave, are told it; the wave's collision is counted for the repair."""
-    subjects = [_subject(pid) for pid in "abcd"]
-    texts = {"a": _SHARED, "b": f"Yes {_SHARED}", "c": "a page of its own words entirely", "d": "and another one alone"}
+    """Width 1 makes the landing order the board order: a and b share a span (b, landing second, is
+    the carrier); c starts after both landed and is told it."""
+    subjects = [_subject(pid) for pid in "abc"]
+    texts = {"a": _SHARED, "b": f"Yes {_SHARED}", "c": "a page of its own words entirely"}
     told: dict[str, tuple[str, ...]] = {}
 
     def write_one(engine: Any, subject: Subject, stored: Any, view: GatewayClient, worn: WornPhrases, **_: Any) -> Any:
@@ -330,17 +368,67 @@ def test_a_wave_sees_every_page_landed_before_it_and_its_own_collisions_are_coun
         return _result(texts[subject.universe_id]), False, False
 
     monkeypatch.setattr(sweep, "write_one", write_one)
-    monkeypatch.setattr(sweep, "stored_capsules_for", lambda conn, ids: {})
-    monkeypatch.setattr(sweep, "queue_regeneration", lambda conn, ids: 0)
-    engine = cast("Engine", SimpleNamespace(connect=lambda: nullcontext(None), begin=lambda: nullcontext(None)))
-    gateway = _client(lambda r: _ok(), FakeClock(), WriterSettings("m/x", 2, 60))
-    plan = SweepPlan(10, span_rules=SpanRules(frozenset()))
-    report = sweep_capsules(engine, gateway, NOW, plan, lambda conn, at: subjects)
+    engine = _stub_store(monkeypatch)
+    gateway = _client(lambda r: _ok(), FakeClock(), WriterSettings("m/x", 1, 60))
+    report = sweep_capsules(
+        engine, gateway, NOW, SweepPlan(10, span_rules=SpanRules(frozenset())), lambda c, a: subjects
+    )
     first_span = " ".join(_SHARED.split()[:6])
     assert not any(first_span in s for s in told["a"] + told["b"])
     assert first_span in told["c"]
-    assert first_span in told["d"]
-    assert report.processed == ["a", "b", "c", "d"]
-    assert report.waves == len(subjects) // 2
-    assert report.wave_spans > 0
-    assert report.wave_carriers == ["a", "b"]
+    assert report.processed == ["a", "b", "c"]
+    assert report.landed_spans > 0
+    assert report.landed_carriers == ["b"]
+
+
+# A dropped connection.
+
+
+class _FlakyEngine:
+    """`begin` loses its connection on the first `failures` calls, then commits."""
+
+    def __init__(self, failures: int) -> None:
+        self.failures = failures
+        self.begun = 0
+
+    def begin(self) -> Any:
+        self.begun += 1
+        if self.begun <= self.failures:
+            raise OperationalError("upsert", {}, Exception("server closed the connection unexpectedly"))
+        return nullcontext(None)
+
+
+def test_a_commit_that_loses_its_connection_is_tried_once_more_on_a_fresh_one(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(sweep, "generate_capsule", lambda facts, gateway, worn: _result(_SHARED))
+    monkeypatch.setattr(sweep, "upsert_capsule", lambda conn, row, at: None)
+    monkeypatch.setattr(sweep, "CapsuleWrite", lambda *args: args)
+    engine = _FlakyEngine(1)
+    gateway = _client(lambda r: _ok(), FakeClock())
+    result, _, _ = sweep.write_one(cast("Engine", engine), _subject("a"), None, gateway, WornPhrases((), ()))
+    assert result.source == "llm"
+    assert engine.begun == 1 + 1
+
+
+def test_a_second_loss_or_another_error_is_raised() -> None:
+    engine = _FlakyEngine(2)
+    with pytest.raises(OperationalError):
+        once_more_on_disconnect(engine.begin)
+    calls: list[int] = []
+
+    def refused() -> None:
+        calls.append(1)
+        raise ValueError("not a connection")
+
+    with pytest.raises(ValueError, match="not a connection"):
+        once_more_on_disconnect(refused)
+    assert calls == [1]
+
+
+def test_the_writers_share_one_pool_sized_to_the_concurrency() -> None:
+    writers = pooled_like(make_engine("postgresql+psycopg://user:secret@db.invalid/commish"), 16)
+    held = cast("Any", writers.pool)
+    assert (held.size(), held._max_overflow, held._pre_ping) == (16, POOL_HEADROOM, True)
+    assert writers.url.password == "secret"
+    writers.dispose()
