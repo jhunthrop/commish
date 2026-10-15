@@ -16,9 +16,10 @@ import (
 	"github.com/jhunthrop/commish/api/internal/hosts/ffpc"
 )
 
-// HostFFPC is FFPC, read server side as a connected member (founder
-// ruling 2026-10-13): no public API, so the league's pages are read with
-// the member's own FFPC session through internal/hosts/ffpc.
+// HostFFPC is FFPC, read server side as the member who attached the
+// league (ruling 2026-10-15): no public API, so the league's pages are
+// read with that member's own FFPC session through internal/hosts/ffpc,
+// for their attachment alone.
 const HostFFPC = ffpc.Host
 
 // rulesTTL is how long a league's rules read lasts: its scoring and
@@ -31,17 +32,18 @@ type FFPCMember interface {
 	OpenLeague(ctx context.Context, accountID uuid.UUID, leagueID string) (string, error)
 }
 
-// FFPCReaders finds a connected member who has attached a league, to
-// read it as. *Store implements it.
-type FFPCReaders interface {
-	FFPCReader(ctx context.Context, ref Ref) (accountID uuid.UUID, ltuid string, err error)
+// FFPCTeamKeys finds the league-team id of the account a league is read
+// as (ref.As), from that account's own attachment. *Store implements it.
+type FFPCTeamKeys interface {
+	FFPCTeamKey(ctx context.Context, ref Ref) (ltuid string, err error)
 }
 
-// FFPC is the FFPC host. One read per league per interval, as any host,
-// read as whichever connected member last read it.
+// FFPC is the FFPC host: one read per attachment per interval, each read
+// with the sign-in of the account that attached it, for that account
+// alone (a host credential reads only for the account that stored it).
 type FFPC struct {
-	Member  FFPCMember
-	Readers FFPCReaders
+	Member   FFPCMember
+	TeamKeys FFPCTeamKeys
 	// Weeks is the run's schedule, the source of the current week; nil
 	// falls back to FFPC's own week.
 	Weeks WeekSource
@@ -81,25 +83,24 @@ func (f *FFPC) Parse(pasted string) (Ref, error) {
 	return Ref{Host: HostFFPC, LeagueID: id}, nil
 }
 
-// Read reads the league as a connected member who attached it.
-//
-// The read is shared by every member viewing the league, so one member's
-// signed-out connection is not the viewer's news: the next connected
-// member is tried once (the signed-out one is no longer a reader). Only
-// when no connected member is left does the answer ask for a sign-in,
-// which is then the viewer's own to give.
+// Read reads the league as the account it is attached for, with that
+// account's own league-team id. An FFPC league is never read for anyone
+// else: a ref with no account, or an account with no attachment of its
+// own, has no reader, and a lapsed sign-in is that member's alone to mend.
 func (f *FFPC) Read(ctx context.Context, ref Ref) (Snapshot, error) {
-	for range 2 {
-		accountID, ltuid, err := f.Readers.FFPCReader(ctx, ref)
-		if err != nil {
-			return Snapshot{}, err
-		}
-		snap, _, err := f.ReadAs(ctx, accountID, ltuid)
-		if !errors.Is(err, ErrSignInAgain) && !errors.Is(err, ErrNotConnected) {
-			return snap, err
-		}
+	if ref.As == uuid.Nil {
+		return Snapshot{}, fmt.Errorf("%w: an FFPC league is read only as the account that attached it", ErrNotConnected)
 	}
-	return Snapshot{}, fmt.Errorf("%w: two members signed out in one read", ErrSignInAgain)
+	ltuid, err := f.TeamKeys.FFPCTeamKey(ctx, ref)
+	if err != nil {
+		return Snapshot{}, err
+	}
+	snap, _, err := f.ReadAs(ctx, ref.As, ltuid)
+	if err != nil {
+		return Snapshot{}, err
+	}
+	snap.Ref.As = ref.As
+	return snap, nil
 }
 
 // ReadAs reads the league as one member, answering it and the member's

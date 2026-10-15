@@ -41,12 +41,11 @@ func wordsFor(host string) memberWords {
 		pick:        "Pick your league from your " + name + " list.",
 		notInList:   "That league is not in your " + name + " list. Pick your league from your " + name + " list.",
 		attachFirst: "Connect " + name + " first.",
-		noReader:    "No one in this league is connected to " + name + " on Commish right now. Connect " + name + " to read it.",
+		noReader:    "Connect " + name + " to keep this league in sync.",
 		again:       name + " asks you to connect again. Connect " + name + " to keep reading your league.",
 	}
 	if host == HostFFPC {
 		w.attachFirst = "Connect FFPC first. Sign in to FFPC above."
-		w.noReader = "No one in this league is signed in to FFPC on Commish right now. Sign in to read it."
 		w.again = "FFPC signed you out. Sign in to FFPC again to keep reading your league."
 	}
 	return w

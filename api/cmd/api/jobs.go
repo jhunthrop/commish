@@ -45,8 +45,8 @@ func jobTable() map[string]job {
 		"sweep": runSweep,
 		// stripe-setup runs by hand once per Stripe mode.
 		"stripe-setup": runStripeSetup,
-		// ffpc-refresh runs hourly and in bursts: every FFPC league read as
-		// a connected member (ffpcjob.go).
+		// ffpc-refresh runs hourly and in bursts: every FFPC attachment read
+		// as its own connected member (ffpcjob.go).
 		"ffpc-refresh": runFFPCRefresh,
 		// re-encrypt-host-connections runs by hand during a key rotation:
 		// every connection's data key re-wrapped under the current key.

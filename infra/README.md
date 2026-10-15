@@ -82,12 +82,13 @@ The prep site runs on three providers, provisioned on 2026-10-12 (spec §2, `doc
   4. Deploy without the previous key. Only then disable the old version.
   A row that no longer opens marks its connection signed out, and the member signs in again.
 - Rotating `WORKOS_COOKIE_PASSWORD` also unpairs every paired device: the device token key and the pairing code key derive from it. Tell members to pair again.
-- Cloud Scheduler runs the `api-ffpc-refresh` job (one read of every attached FFPC league with a connected member, at one FFPC request a second) on these schedules, all `America/New_York`:
+- Cloud Scheduler runs the `api-ffpc-refresh` job (one read of every FFPC attachment whose member is connected, as that member alone, at one FFPC request a second) on these schedules, all `America/New_York`:
   - hourly: `0 * * * *`
   - after Wednesday's waiver run: `0 6 * * 3`
   - after Tuesday's waiver run: `0 6 * * 2`
   - at Sunday's first kickoffs: `0 13 * * 0`, `15 13 * * 0`, `30 13 * * 0`
   Each is `gcloud scheduler jobs create http ffpc-refresh-<name> --schedule "<cron>" --time-zone America/New_York --uri https://us-east1-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/trycommish/jobs/api-ffpc-refresh:run --http-method POST --oauth-service-account-email deployer@trycommish.iam.gserviceaccount.com`, the same way the other api jobs are scheduled.
+- After the deploy that applies migration 00023 (Lane 38, every FFPC attachment read as its own member), run `infra/checks/2026-10-15-ffpc-member-reads.sql` once with psql: the FFPC attachments by state, and the shared FFPC reads left, which should be 0. It only reads.
 
 ## Cloud SQL (the data)
 

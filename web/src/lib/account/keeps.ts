@@ -1,6 +1,13 @@
 /** What an account keeps and the hosts a signed-out visitor can connect, in the words the page prints,
  * each switched host named only where it is open (the hosts answer's `enabled`). */
-import { leagueHostsLine, type OpenHosts } from '#lib/league/hosts.ts';
+import { IN_SEASON_TOOLS_LINE, leagueHostsLine, type OpenHosts } from '#lib/league/hosts.ts';
+import { FLAGS } from '#lib/site/flags.ts';
+
+/** What following a league says on this page: the hosts open here and, while the in-season screens
+ * are on, the tools, both read from the module /league/new reads. */
+export function leaguesKeptText(open: OpenHosts): string {
+	return `on ${leagueHostsLine(open)}, kept up to date.${FLAGS.in_season_tools ? ` ${IN_SEASON_TOOLS_LINE}` : ''}`;
+}
 
 /** One line of what an account keeps. `link` names the account link a line goes to, so this file
  * stays free of the router. */
@@ -20,7 +27,7 @@ export function keeps(open: OpenHosts): readonly KeepLine[] {
 		{ lead: 'Your mock drafts', text: 'and the report on each one' },
 		{
 			lead: 'Your leagues',
-			text: `on ${leagueHostsLine(open)}, kept up to date`,
+			text: leaguesKeptText(open),
 			link: 'leagueNew'
 		},
 		{
