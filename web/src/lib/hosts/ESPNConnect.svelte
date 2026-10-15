@@ -7,6 +7,7 @@
 	import Verb from '#lib/ui/Verb.svelte';
 	import { ApiError, ESPN_CONSENT, hostsApi, type HostConnected } from './api.ts';
 	import { signInWithDisney } from './espn-oneid.ts';
+	import { problemOf, seenWords } from './espn-signin-words.ts';
 
 	/** Connect ESPN: one verb opens Disney's own sign-in in a window of its own on the workers.dev
 	 * origin (espn-oneid.ts), which hands the session back to this page, and this page sends it to
@@ -33,6 +34,8 @@
 	let s2 = $state('');
 	let busy = $state(false);
 	let problem = $state<string | null>(null);
+	/** What Disney did, under the problem: the widget events the window saw, in words. */
+	let detail = $state<string | null>(null);
 
 	function failure(error: unknown): string {
 		const fields = error instanceof ApiError ? Object.values(error.fields) : [];
@@ -46,30 +49,25 @@
 		onconnected(await hostsApi.connectESPN(session.swid, session.s2));
 	}
 
-	/** Disney's sign-in in its own window. Closing it makes the verb ready again at once; a sign-in
-	 * that hands back no session, or a window that cannot open, says so and opens the paste form. */
+	/** Disney's sign-in in its own window. The member closing it with its own button makes the verb
+	 * ready again at once. Any other end that hands back no session says how it ended and what
+	 * Disney did, and opens the paste form. */
 	async function viaDisney(): Promise<void> {
 		// The window opens first, inside the tap, before anything is awaited.
 		const signingIn = signInWithDisney();
 		busy = true;
 		problem = null;
+		detail = null;
 		try {
-			const outcome = await signingIn;
-			switch (outcome.kind) {
-				case 'session':
-					await keep(outcome.session);
-					break;
-				case 'no-session':
-					problem =
-						'ESPN signed you in but did not hand us your session. Paste the two values below instead.';
-					pasting = true;
-					break;
-				case 'failed':
-					problem = "ESPN's sign-in did not open here. Paste the two values below instead.";
-					pasting = true;
-					break;
-				case 'closed':
-					break;
+			const { outcome, seen } = await signingIn;
+			if (outcome.kind === 'session') {
+				await keep(outcome.session);
+				return;
+			}
+			problem = problemOf(outcome);
+			if (problem !== null) {
+				detail = seenWords(seen);
+				pasting = true;
 			}
 		} catch (error) {
 			problem = failure(error);
@@ -82,6 +80,7 @@
 		if (busy || swid.trim() === '' || s2.trim() === '') return;
 		busy = true;
 		problem = null;
+		detail = null;
 		const typed = s2.trim();
 		s2 = '';
 		try {
@@ -136,6 +135,7 @@
 
 {#snippet alert()}
 	<ProblemLine>{problem}</ProblemLine>
+	{#if detail}<p class="detail">{detail}</p>{/if}
 {/snippet}
 
 <style>
@@ -147,13 +147,15 @@
 
 	.reason,
 	.note,
-	.steps {
+	.steps,
+	.detail {
 		margin: 0;
 		max-width: 60ch;
 	}
 
 	.note,
-	.steps {
+	.steps,
+	.detail {
 		font-size: var(--t-sm);
 		color: var(--ink-2);
 	}
