@@ -57,20 +57,22 @@ export function readAgoLine(host: LeagueHost, readAt: string, now: Date): string
 	return `Read from ${hostWords(host)} ${agoWords(readAge(readAt, now))}.`;
 }
 
-/** How a league read as a member is reached: FFPC is signed in to, every other host connected to. */
-function memberWords(host: LeagueSync['host']): string {
-	return host === 'ffpc' ? 'signed in to' : 'connected to';
-}
+/** What the read's line reads off a sync. */
+type ReadState = Pick<
+	LeagueSync,
+	'host' | 'read_at' | 'host_signed_out' | 'host_failed' | 'host_stale_seconds'
+>;
 
 /** The read's line: when the host was last read, and, when the last read failed, why, and that this
- * is the last read we have. A kept read waiting on the next one names no failure. */
-export function readLine(sync: LeagueSync, now: Date): string {
+ * is the last read we have. A kept read waiting on the next one names no failure. A league read as a
+ * member is read with the drafter's own sign-in alone, so a lapsed one is theirs to connect again. */
+export function readLine(sync: ReadState, now: Date): string {
 	const age = readAge(sync.read_at, now);
 	const host = hostWords(sync.host);
 	const read = readAgoLine(sync.host, sync.read_at, now);
 	const last = `This is our last read, ${agoWords(age)}.`;
 	if (sync.host_signed_out) {
-		return `No one in this league is ${memberWords(sync.host)} ${host}. ${last}`;
+		return `Connect ${host} to keep this league in sync. ${last}`;
 	}
 	if (sync.host_failed) return `${host} is not answering. ${last}`;
 	if (sync.host_stale_seconds > 0) return `${read} Reading again.`;

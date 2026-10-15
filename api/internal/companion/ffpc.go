@@ -36,8 +36,9 @@ type FFPCMember interface {
 	OpenLeague(ctx context.Context, accountID uuid.UUID, leagueID string) (string, error)
 }
 
-// FFPCDrafts shares one read of an FFPC draft board per two seconds
-// between its viewers, read as the companion's own member.
+// FFPCDrafts shares one read of an FFPC draft board per interval between
+// the viewers of one member's connection, read as that member. Two
+// members of one league never share a read.
 type FFPCDrafts struct {
 	Member FFPCMember
 	Now    func() time.Time
@@ -65,12 +66,17 @@ const ffpcReadTimeout = 20 * time.Second
 // one-request-a-second pace than Sleeper's two.
 const FFPCGap = 5 * time.Second
 
-// Read is the draft as of at most FFPCGap ago: one read per league,
-// shared by every member following it, read as whichever member asked
-// first. The board's own marks (whose picks are whose) are the reader's,
-// so a member's seat comes from their companion row, never from a read.
+// readKey is one member's read of one league: league@account.
+func readKey(leagueID string, accountID uuid.UUID) string {
+	return HostFFPC + "/" + leagueID + "@" + accountID.String()
+}
+
+// Read is the draft as of at most FFPCGap ago, read with the asking
+// member's own sign-in: one read per league per interval per account,
+// shared only by that account's own viewers. A member with no connection
+// gets hosts.ErrNotConnected, never another member's read.
 func (f *FFPCDrafts) Read(ctx context.Context, accountID uuid.UUID, leagueID, ltuid string) (Read, error) {
-	r, err := f.shared().Read(ctx, HostFFPC+"/"+leagueID, FFPCGap, poll.Wait, func(ctx context.Context) (Snapshot, error) {
+	r, err := f.shared().Read(ctx, readKey(leagueID, accountID), FFPCGap, poll.Wait, func(ctx context.Context) (Snapshot, error) {
 		d, err := f.Member.ReadDraft(ctx, accountID, ltuid)
 		if err != nil {
 			return Snapshot{}, err
@@ -154,7 +160,7 @@ func (s *Service) createFFPC(w http.ResponseWriter, r *http.Request, in apitypes
 		return
 	}
 	// The seat is read once, as the member, from their own view of the
-	// board; the shared reads that follow never decide it.
+	// board; later reads are theirs too.
 	board, err := s.FFPC.Member.ReadDraft(ctx, accountID, ltuid)
 	if err != nil {
 		s.writeHostError(w, r, err)

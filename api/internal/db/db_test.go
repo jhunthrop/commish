@@ -102,6 +102,75 @@ func TestMigrationsApplyCleanly(t *testing.T) {
 		t.Error("app.companions.draft_name has no length check")
 	}
 	scoringRulesMigration(ctx, t, url, pool)
+	ffpcMemberReadsMigration(ctx, t, url, pool)
+}
+
+// gooseProvider runs the app's migrations one by one on the test database.
+func gooseProvider(t *testing.T, url string) *goose.Provider {
+	t.Helper()
+	cfg, err := pgx.ParseConfig(url)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sqlDB := stdlib.OpenDB(*cfg)
+	t.Cleanup(func() { _ = sqlDB.Close() })
+	provider, err := goose.NewProvider(goose.DialectPostgres, sqlDB, migrations.FS,
+		goose.WithTableName("app.goose_db_version"), goose.WithDisableGlobalRegistry(true))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return provider
+}
+
+// 00023: every FFPC attachment is read as the member who attached it
+// (each was attached with that member's own sign-in), whether or not they
+// hold an FFPC connection today, and the shared FFPC reads, each made as
+// whichever member read last, are dropped.
+func ffpcMemberReadsMigration(ctx context.Context, t *testing.T, url string, pool *pgxpool.Pool) {
+	t.Helper()
+	provider := gooseProvider(t, url)
+	if _, err := provider.DownTo(ctx, 22); err != nil {
+		t.Fatalf("down to 22: %v", err)
+	}
+	var connected, unconnected string
+	for _, who := range []struct {
+		name string
+		into *string
+	}{{"connected", &connected}, {"unconnected", &unconnected}} {
+		if err := pool.QueryRow(ctx, `insert into app.accounts (workos_user_id, email) values ($1, $1 || '@example.invalid') returning id`,
+			"user_00023_"+who.name).Scan(who.into); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := pool.Exec(ctx, `insert into app.host_connections
+		(account_id, host, wrapped_key, session_ct, signin_ct, key_version, consented_at, consent_version)
+		values ($1, 'ffpc', decode(repeat('00', 40), 'hex'), decode(repeat('00', 16), 'hex'), decode(repeat('00', 16), 'hex'), 1, now(), 3)`,
+		connected); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, `insert into app.league_links (account_id, host, host_league_id, host_season, roster_id, host_team_key)
+		values ($1, 'ffpc', '104870', 2026, 11, 'F3C-781497793F8E'), ($2, 'ffpc', '104870', 2026, 3, 'F3C-0000000000B0'),
+			($1, 'sleeper', '1180000000000000000', 0, 2, null)`, connected, unconnected); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, `insert into app.league_snapshots (host, host_league_id, host_season, snapshot, read_at)
+		values ('ffpc', '104870', 2026, '{}', now()), ('sleeper', '1180000000000000000', 0, '{}', now())`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := provider.Up(ctx); err != nil {
+		t.Fatalf("up again: %v", err)
+	}
+	var ffpcMember, ffpcShared, sleeperMember, sleeperShared int
+	if err := pool.QueryRow(ctx, `select
+		(select count(*) from app.league_links where host = 'ffpc' and read_as_member),
+		(select count(*) from app.league_snapshots where host = 'ffpc'),
+		(select count(*) from app.league_links where host = 'sleeper' and read_as_member),
+		(select count(*) from app.league_snapshots where host = 'sleeper')`).Scan(&ffpcMember, &ffpcShared, &sleeperMember, &sleeperShared); err != nil {
+		t.Fatal(err)
+	}
+	if ffpcMember != 2 || ffpcShared != 0 || sleeperMember != 0 || sleeperShared != 1 {
+		t.Fatalf("ffpc: %d member links, %d shared reads; sleeper: %d member links, %d reads", ffpcMember, ffpcShared, sleeperMember, sleeperShared)
+	}
 }
 
 // 00019: a custom scoring saved as the old free map becomes the 21
@@ -109,17 +178,7 @@ func TestMigrationsApplyCleanly(t *testing.T) {
 // standard figure, and a saved league's settings move to version 2.
 func scoringRulesMigration(ctx context.Context, t *testing.T, url string, pool *pgxpool.Pool) {
 	t.Helper()
-	cfg, err := pgx.ParseConfig(url)
-	if err != nil {
-		t.Fatal(err)
-	}
-	sqlDB := stdlib.OpenDB(*cfg)
-	defer func() { _ = sqlDB.Close() }()
-	provider, err := goose.NewProvider(goose.DialectPostgres, sqlDB, migrations.FS,
-		goose.WithTableName("app.goose_db_version"), goose.WithDisableGlobalRegistry(true))
-	if err != nil {
-		t.Fatal(err)
-	}
+	provider := gooseProvider(t, url)
 	if _, err := provider.DownTo(ctx, 18); err != nil {
 		t.Fatalf("down to 18: %v", err)
 	}

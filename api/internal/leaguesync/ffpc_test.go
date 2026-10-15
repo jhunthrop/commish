@@ -3,6 +3,7 @@ package leaguesync
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -140,7 +141,7 @@ func (f *fakeMember) OpenLeague(_ context.Context, accountID uuid.UUID, leagueID
 
 // An FFPC league attaches from the member's own list and reads as them;
 // an account with no connection is told to connect; a league outside the
-// list is refused; the league reads again through the connected member.
+// list is refused; the league reads again as the member alone.
 func TestAttachFFPC(t *testing.T) {
 	pool := dbtest.Pool(t)
 	ctx := context.Background()
@@ -166,7 +167,7 @@ func TestAttachFFPC(t *testing.T) {
 	}
 	store := &Store{Pool: pool}
 	member := &fakeMember{t: t, owner: alice.ID, league: fixtureLeagueRead(t)}
-	host := &FFPC{Member: member, Readers: store, Now: clock.Now}
+	host := &FFPC{Member: member, TeamKeys: store, Now: clock.Now}
 	hostList := Hosts{host}
 	svc := &Service{
 		Hosts: hostList, Poller: &Poller{Hosts: hostList, Store: store, Now: clock.Now, Log: quietLog()},
@@ -195,10 +196,10 @@ func TestAttachFFPC(t *testing.T) {
 	if got.Me != 11 || got.Host != apitypes.LeagueHostFfpc || len(got.Teams) != 12 || len(got.Roster) != 20 || got.SettingsLeagueId == nil {
 		t.Fatalf("the league: me %d, %d teams, %d on my roster, settings %v", got.Me, len(got.Teams), len(got.Roster), got.SettingsLeagueId)
 	}
-	ref := Ref{Host: HostFFPC, LeagueID: fixtureLeague, Season: 2026}
-	reader, ltuid, err := store.FFPCReader(ctx, ref)
-	if err != nil || reader != alice.ID || ltuid != fixtureLTUID {
-		t.Fatalf("reader %s %q %v", reader, ltuid, err)
+	ref := Ref{Host: HostFFPC, LeagueID: fixtureLeague, Season: 2026, As: alice.ID}
+	ltuid, err := store.FFPCTeamKey(ctx, ref)
+	if err != nil || ltuid != fixtureLTUID {
+		t.Fatalf("alice's league-team %q %v", ltuid, err)
 	}
 	clock.now = clock.now.Add(2 * MinUpstreamGap)
 	if status, _ := a.do(svc.refresh, http.MethodPost, "/", nil, got.Id.String()); status != http.StatusOK {
@@ -222,10 +223,12 @@ func TestAttachFFPC(t *testing.T) {
 		}
 	}
 
-	if err := (&hosts.Store{Pool: pool}).Delete(ctx, alice.ID, ffpc.Host); err != nil {
-		t.Fatal(err)
+	// Bob, who attached nothing, has no league-team of his own to read as.
+	ref.As = bob.ID
+	if _, err := host.Read(ctx, ref); !errors.Is(err, ErrNotConnected) {
+		t.Fatalf("a read as bob: %v", err)
 	}
-	if _, _, err := store.FFPCReader(ctx, ref); err == nil {
-		t.Fatal("a disconnected member still reads the league")
+	if member.reads != 2 {
+		t.Fatalf("%d member reads, want no read for bob", member.reads)
 	}
 }
