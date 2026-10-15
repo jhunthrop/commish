@@ -46,11 +46,12 @@ type Holds interface {
 	Held(ctx context.Context, accountID uuid.UUID) (map[string]bool, error)
 }
 
-// Moves says whether the account may set its lineup on the host from
-// our screen. *hostmoves.Service implements it; nil, the verb is always
-// the host's page.
+// Moves says whether the account may set its lineup, or claim, on the
+// host from our screen. *hostmoves.Service implements it; nil, the verb
+// is always the host's page.
 type Moves interface {
 	LineupMove(ctx context.Context, accountID uuid.UUID, host string) (apitypes.LineupMoves, error)
+	ClaimMove(ctx context.Context, accountID uuid.UUID, host string) (apitypes.WaiverMoves, error)
 }
 
 // Service serves the three routes.
@@ -157,6 +158,15 @@ func (s *Service) waivers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	out, ok := a.Waivers(position)
+	if ok && s.Moves != nil {
+		// A failed check fails closed, as the lineup's does.
+		moves, err := s.Moves.ClaimMove(r.Context(), auth.AccountID(r), a.Snap.Ref.Host)
+		if err != nil {
+			s.Log.Warn("inseason: claim moves", "err", err)
+			moves = apitypes.WaiverMoves{Claim: apitypes.WaiverMovesClaimUnavailable}
+		}
+		out.Moves = moves
+	}
 	s.answer(w, r, out, ok)
 }
 
@@ -184,7 +194,7 @@ func (s *Service) trades(w http.ResponseWriter, r *http.Request) {
 // answer writes a page, or says the drafter's team is not in the read.
 func (s *Service) answer(w http.ResponseWriter, r *http.Request, out any, ok bool) {
 	if !ok {
-		httpx.WriteError(w, r, http.StatusNotFound, httpx.CodeNotFound, noTeamWords, nil)
+		httpx.WriteError(w, r, http.StatusNotFound, httpx.CodeTeamNotRead, noTeamWords, nil)
 		return
 	}
 	httpx.WriteOK(w, r, http.StatusOK, out)

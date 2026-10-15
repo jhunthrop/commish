@@ -41,7 +41,9 @@
 	import AccountConnections from '#lib/hosts/AccountConnections.svelte';
 	import AccountDevices from '#lib/hosts/AccountDevices.svelte';
 	import GroupPasses from './GroupPasses.svelte';
-	import { KEEPS, MEMBER_HOSTS } from './keeps.ts';
+	import { hostsApi, espnOpen, ffpcOpen, yahooOpen } from '#lib/hosts/api.ts';
+	import { SWITCHED_SHUT, type OpenHosts } from '#lib/league/hosts.ts';
+	import { keeps, memberHosts } from './keeps.ts';
 	import { accountLinks } from './links.ts';
 	import { hasFeature } from './features.ts';
 	import { boughtMembership, displayName, mockLine, planWords, sheetLine } from './words.ts';
@@ -57,6 +59,19 @@
 	let busy = $state(false);
 	/** Back from checkout: what was bought, and whether it shows on the account yet. */
 	let arrival = $state<Arrival>({ kind: 'none' });
+	/** The switched hosts open here (the hosts answer's enabled): shut until it is read, so a host
+	 * switched off is never promised. */
+	let openHosts = $state<OpenHosts>(SWITCHED_SHUT);
+
+	/** Reads which switched hosts are open, for the signed-out page's lines. */
+	async function readOpenHosts(): Promise<void> {
+		try {
+			const hosts = await hostsApi.connections();
+			openHosts = { ffpc: ffpcOpen(hosts), yahoo: yahooOpen(hosts), espn: espnOpen(hosts) };
+		} catch {
+			openHosts = SWITCHED_SHUT;
+		}
+	}
 
 	async function load(): Promise<void> {
 		try {
@@ -94,7 +109,10 @@
 			arrival = { kind: 'waiting', bought };
 			void goto(resolve('/account'), { replace: true, shallow: true });
 		}
-		void load().then(awaitArrival);
+		void load().then(() => {
+			if (view?.kind === 'signed-out') void readOpenHosts();
+			return awaitArrival();
+		});
 		const again = (): void => void load();
 		window.addEventListener('online', again);
 		return () => window.removeEventListener('online', again);
@@ -188,24 +206,26 @@
 				<PanelHead title="What your account keeps" level={2} />
 				<LineList
 					label="What an account keeps"
-					lines={KEEPS.map(({ link, ...line }) => ({
+					lines={keeps(openHosts).map(({ link, ...line }) => ({
 						...line,
 						href: link ? accountLinks[link]() : undefined
 					}))}
 				/>
 			</section>
-			<section aria-label="Hosts to connect">
-				<PanelHead title="Connect a host" level={2} />
-				<ActionRows label="Hosts to connect">
-					{#each MEMBER_HOSTS as host (host.lead)}
-						<ActionRow lead={host.lead} text={host.text}>
-							{#snippet action()}
-								<Quiet size="sm" href={api.signInUrl(accountLinks.account())}>{host.verb}</Quiet>
-							{/snippet}
-						</ActionRow>
-					{/each}
-				</ActionRows>
-			</section>
+			{#if memberHosts(openHosts).length > 0}
+				<section aria-label="Hosts to connect">
+					<PanelHead title="Connect a host" level={2} />
+					<ActionRows label="Hosts to connect">
+						{#each memberHosts(openHosts) as host (host.lead)}
+							<ActionRow lead={host.lead} text={host.text}>
+								{#snippet action()}
+									<Quiet size="sm" href={api.signInUrl(accountLinks.account())}>{host.verb}</Quiet>
+								{/snippet}
+							</ActionRow>
+						{/each}
+					</ActionRows>
+				</section>
+			{/if}
 		{:else if view.kind === 'offline'}
 			<EmptyState title="You're offline" line="Your account loads as soon as you're back online." />
 		{:else if view.kind === 'unreachable'}

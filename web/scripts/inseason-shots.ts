@@ -192,6 +192,65 @@ for (const theme of THEMES) {
 	}
 }
 
+/** The claim on an ESPN league (Lane 39), in both themes at both widths: the row's Add opens the
+ * confirmation naming the add and the drop (with the bid field where the league bids), then each
+ * answer (done, refused in ESPN's words, pending with when ESPN runs it). Each must not scroll
+ * sideways. */
+const CLAIMS = [
+	{ name: 'done', id: FIXTURE_IDS.espnDone, plan: 'a free agent', ready: 'Done on ESPN.' },
+	{ name: 'refused', id: FIXTURE_IDS.espnRefused, plan: 'on waivers', ready: 'ESPN said:' },
+	{
+		name: 'pending',
+		id: FIXTURE_IDS.espnPending,
+		plan: 'Your bid in waiver dollars',
+		ready: 'Claim submitted.'
+	}
+] as const;
+for (const theme of THEMES) {
+	for (const width of SHOT_WIDTHS) {
+		for (const claim of CLAIMS) {
+			const ctx = await context(theme, width);
+			const page = await ctx.newPage();
+			await page.goto(`${web}/league/${claim.id}/waivers`, { waitUntil: 'networkidle' });
+			await ready(page, 'Claim on ESPN');
+			await page.getByRole('button', { name: 'Add', exact: true }).first().click();
+			await ready(page, claim.plan);
+			await page.screenshot({
+				path: file(`waivers-claim-confirm-${claim.name}-${theme}-${String(width)}`)
+			});
+			await page.locator('#claim-move').getByRole('button', { name: 'Claim on ESPN' }).click();
+			await ready(page, claim.ready);
+			const wide = await page.evaluate(
+				() => document.documentElement.scrollWidth > window.innerWidth
+			);
+			if (wide) scrolls.push(`waivers claim ${claim.name} ${theme} ${String(width)}`);
+			await page.screenshot({
+				path: file(`waivers-claim-${claim.name}-${theme}-${String(width)}`)
+			});
+			await ctx.close();
+		}
+	}
+}
+
+/** The trade picker with a player of yours no trade holds, and the no-team state with its verb that
+ * reads the host again, in both themes at both widths. */
+for (const theme of THEMES) {
+	for (const width of SHOT_WIDTHS) {
+		const ctx = await context(theme, width);
+		const page = await ctx.newPage();
+		await page.goto(`${web}/league/${id}/trades`, { waitUntil: 'networkidle' });
+		await ready(page, 'Propose on Sleeper');
+		const kicker = await page.locator('optgroup[label="Your players"] option').last().textContent();
+		await page.getByRole('combobox').selectOption({ label: kicker ?? '' });
+		await ready(page, 'No trade we found includes');
+		await page.screenshot({ path: file(`trades-no-trade-${theme}-${String(width)}`) });
+		await page.goto(`${web}/league/${FIXTURE_IDS.noTeam}/waivers`, { waitUntil: 'networkidle' });
+		await ready(page, 'Read Sleeper now');
+		await page.screenshot({ path: file(`waivers-no-team-${theme}-${String(width)}`) });
+		await ctx.close();
+	}
+}
+
 await browser.close();
 for (const [where, height] of rows)
 	process.stdout.write(`tallest row ${where}: ${height.toFixed(1)}px\n`);

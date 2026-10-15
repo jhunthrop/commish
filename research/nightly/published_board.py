@@ -17,7 +17,8 @@ never read as a board stays failed until another run is published.
 Every number is the run's own, so it names the run's basis: `rank` (`ourRank`), `position_rank`,
 `points` (`projected`), `points_over_replacement` (`vor`) and the range at twelve teams under the
 format's roster shape. `order_basis` is `rest_of_season` for a format the manifest gives the
-in-season window (`rosFromWeek`), else `preseason`; `refreshed` is that format's `refreshedAt` in
+in-season window (`rosFromWeek`), else `preseason`, and `from_week` is that `rosFromWeek` (NULL before
+it), the first week the figures cover; `refreshed` is that format's `refreshedAt` in
 season, and before it the stored board generation the run printed (the manifest's boards source
 for the format's stored board, whose window is the generation's stamp).
 """
@@ -50,6 +51,9 @@ MANIFEST_FILE: Final = "manifest.json"
 PRESEASON: Final = "preseason"
 REST_OF_SEASON: Final = "rest_of_season"
 RETRY_WINDOW: Final = "06:00-12:00 UTC"
+# The weeks a rest-of-season window may start at (the table's published_boards_from_week_ck).
+FIRST_WEEK: Final = 1
+LAST_WEEK: Final = 18
 
 
 class PublishedBoardError(ResearchError):
@@ -69,6 +73,7 @@ class PublishedRow:
     ceiling: float | None
     order_basis: str
     refreshed: datetime
+    from_week: int | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -130,7 +135,15 @@ def _stored_generation(manifest: Json, run_format: RunFormat) -> datetime:
     raise PublishedBoardError(f"the manifest names no boards source {run_format.board_source} for {run_format.id}")
 
 
-def _row(row: object, format_id: str, order_basis: str, refreshed: datetime) -> PublishedRow:
+def _from_week(format_json: Json, format_id: str) -> int:
+    """The run's first in-season week for the format: the weeks its figures cover start there."""
+    week = format_json.get("rosFromWeek")
+    if isinstance(week, bool) or not isinstance(week, int) or not FIRST_WEEK <= week <= LAST_WEEK:
+        raise PublishedBoardError(f"{format_id} rosFromWeek is not a week: {week!r}")
+    return week
+
+
+def _row(row: object, format_id: str, order_basis: str, refreshed: datetime, from_week: int | None) -> PublishedRow:
     if not isinstance(row, dict):
         raise PublishedBoardError(f"{format_id}: a row is not an object: {row!r}")
     where = f"{format_id} row {row.get('id')}"
@@ -149,6 +162,7 @@ def _row(row: object, format_id: str, order_basis: str, refreshed: datetime) -> 
         _number(row, "ceiling", where),
         order_basis,
         refreshed,
+        from_week,
     )
 
 
@@ -171,7 +185,10 @@ def _format_rows(format_json: object, manifest: Json, boards: Mapping[str, Json]
         else _stored_generation(manifest, run_format)
     )
     basis = REST_OF_SEASON if in_season else PRESEASON
-    rows = [_row(row, format_id, basis, refreshed) for row in _list(board, "rows", f"boards/{format_id}.json")]
+    from_week = _from_week(format_json, format_id) if in_season else None
+    rows = [
+        _row(row, format_id, basis, refreshed, from_week) for row in _list(board, "rows", f"boards/{format_id}.json")
+    ]
     ids = [r.player_id for r in rows]
     twice = sorted({i for i in ids if ids.count(i) > 1})
     if twice:
@@ -235,6 +252,7 @@ def replace_published_board(conn: Connection, board: PublishedBoard, published_a
                     "order_basis": r.order_basis,
                     "refreshed": r.refreshed,
                     "published_at": published_at,
+                    "from_week": r.from_week,
                 }
                 for r in board.rows
             ],

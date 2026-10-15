@@ -380,7 +380,7 @@ export interface paths {
 		};
 		get?: never;
 		put?: never;
-		/** Plan a move the screen built (kind lineup: each slot's player in and the starter out, for the week) against a fresh read of the league as the member, on the member's own team only. Answers the move in words with a confirm token bound to the account, the league, the move's content and ten minutes; sends nothing. Answers unavailable, with the host's page, where the host has no write path, the host's switch is off for the account, the account's connection is signed out or agreed to words older than the moves (a sentence asks to connect again), or the stored SWID does not own the team the attached league names as the member's in ESPN's teams read. 20 a minute an account. */
+		/** Plan a move the screen built (kind lineup: each slot's player in and the starter out, for the week; kind claim: the add, the drop and the bid the member typed, where the league bids, with the bid's bounds in the answer) against a fresh read of the league as the member, on the member's own team only. Answers the move in words with a confirm token bound to the account, the league, the move's content and ten minutes; sends nothing. Answers unavailable, with the host's page, where the host has no write path, the host's switch is off for the account, the account's connection is signed out or agreed to words older than the moves (a sentence asks to connect again), or the stored SWID does not own the team the attached league names as the member's in ESPN's teams read. 20 a minute an account. */
 		post: operations['planHostMove'];
 		delete?: never;
 		options?: never;
@@ -401,7 +401,7 @@ export interface paths {
 		/** The member's own moves on this league, newest first, the last 20. */
 		get: operations['listHostMoves'];
 		put?: never;
-		/** Make the planned move once, with its confirm token: checked again against a fresh read, sent to the host once with the member's stored session, never retried, then the host's state read back. Answers done (read back and matching), refused (the host's reason in its own words, nothing changed), pending (sent, the read-back did not confirm it: check the host) or unavailable (the host's page). Every move is kept as its proof. 409 for a token already used, 400 for a token for another account, league or move, or expired, 422 for a move the fresh read refuses (another week, a starter moved, a locked player, not the member's team). 5 a minute an account. */
+		/** Make the planned move once, with its confirm token: checked again against a fresh read, sent to the host once with the member's stored session, never retried, then the host's state read back. Answers done (read back and matching), refused (the host's reason in its own words, nothing changed), pending (a claim in the host's queue, with when it runs; or sent and the read-back did not confirm it: check the host) or unavailable (the host's page). Every move is kept as its proof. 409 for a token already used, 400 for a token for another account, league or move, or expired, 422 for a move the fresh read refuses (another week, a starter moved, a locked player, not the member's team). 5 a minute an account. */
 		post: operations['makeHostMove'];
 		delete?: never;
 		options?: never;
@@ -1416,7 +1416,7 @@ export interface components {
 			request_id: string;
 		};
 		ErrorBody: {
-			/** @description invalid, unauthorized, forbidden, not_found, conflict, rate_limited, csrf, payload_too_large, unsupported_media_type, billing_unavailable, storage_unavailable, unavailable, internal */
+			/** @description invalid, unauthorized, forbidden, not_found, conflict, rate_limited, csrf, payload_too_large, unsupported_media_type, billing_unavailable, storage_unavailable, unavailable, internal, team_not_read (a 404 from an in-season route: the drafter's team is missing from the league's last read, so reading the host again may find it) */
 			code: string;
 			message: string;
 			fields?: Record<string, string>;
@@ -2461,7 +2461,7 @@ export interface components {
 			position_rank: number | null;
 			/**
 			 * Format: double
-			 * @description points over replacement a week for this league, one decimal: the order's averaged over the weeks it covers (the preseason number's season over 17, the rest-of-season order's over the league's week through week 17), as the basis says; null without a projection
+			 * @description points over replacement a week for this league, one decimal: the order's averaged over the weeks it covers (the preseason number's season over 17, the rest-of-season order's over its own first week, the league's when the run does not say, through week 17), as the basis says; null without a projection
 			 */
 			points_over_replacement: number | null;
 			/** @description the drafter tags him Hold on a sheet */
@@ -2539,6 +2539,16 @@ export interface components {
 			host_waivers_url: string;
 			/** @description one sentence under the verb when we cannot open the host's page ("Make this change on Yahoo. We cannot open that page for you yet."), null when the url opens it */
 			host_note: string | null;
+			moves: components['schemas']['WaiverMoves'];
+		};
+		WaiverMoves: {
+			/**
+			 * @description available when a claim can be made on the host from our screen (the host has a write path, its claim switch is on for the account and the account's connection agreed to the moves); unavailable when the verb is the host's page
+			 * @enum {string}
+			 */
+			claim: 'available' | 'unavailable';
+			/** @description one sentence when a claim waits on the member (connect again to agree to moves), null otherwise */
+			note: string | null;
 		};
 		TradeRecord: {
 			wins: number;
@@ -2590,12 +2600,33 @@ export interface components {
 			/** @description the host id of the starter the change sits, null for a slot the host left empty */
 			out: string | null;
 		};
+		HostClaim: {
+			/** @description the host id of the player claimed */
+			add: string;
+			/** @description the host id of the player dropped for him, null for an open roster spot */
+			drop: string | null;
+			/** @description the bid the member typed, in the league's waiver dollars; null where the league does not bid. We never suggest one. */
+			bid: number | null;
+		};
 		HostMoveInput: {
 			/** @enum {string} */
-			kind: 'lineup';
+			kind: 'lineup' | 'claim';
 			/** @description the week the screen read, the host's current one */
 			week: number;
+			/** @description a lineup's changes, at least one; empty for a claim */
 			changes: components['schemas']['HostMoveChange'][];
+			/** @description a claim's add, drop and bid; absent for a lineup */
+			claim?: components['schemas']['HostClaim'] | null;
+		};
+		HostBid: {
+			/** @description the bid the plan sends */
+			amount: number;
+			/** @description the league's least bid */
+			min: number;
+			/** @description what the team has left to bid, the league's budget less what it has spent; the whole budget when the host did not say what was spent (left_known false) */
+			max: number;
+			/** @description the host said what the team has spent */
+			left_known: boolean;
 		};
 		HostMoveConfirm: {
 			move: components['schemas']['HostMoveInput'];
@@ -2605,7 +2636,7 @@ export interface components {
 		HostMovePlan: {
 			/** @enum {string} */
 			status: 'ready' | 'unavailable';
-			/** @description the move in words, every change named ("Start Rachaad White over Tank Bigsby at RB, and Jauan Jennings over Josh Downs in the flex, on ESPN now."), or why it cannot be made here */
+			/** @description the move in words, every change named ("Start Rachaad White over Tank Bigsby at RB, and Jauan Jennings over Josh Downs in the flex, on ESPN now.", "Add Keenan Allen, drop Danny Amendola, bid $12. He is on waivers, so ESPN runs the claim on Wednesday."), or why it cannot be made here */
 			sentence: string;
 			/** @description the token that makes this move once */
 			confirm: string | null;
@@ -2614,8 +2645,10 @@ export interface components {
 			 * @description when the token stops making it
 			 */
 			expires_at: string | null;
-			/** @description the host's lineup page, empty when we know none */
+			/** @description the host's page for the move (lineup or waivers), empty when we know none */
 			host_url: string;
+			/** @description a claim in a league that bids: the bid the plan sends (the one typed, else the league's least) and the bounds the league allows; null otherwise */
+			bid: components['schemas']['HostBid'] | null;
 		};
 		HostMoveResult: {
 			/** @enum {string} */
@@ -2624,19 +2657,24 @@ export interface components {
 			sentence: string;
 			/** @description the host's reason for a refusal, verbatim in its own words; null otherwise */
 			host_words: string | null;
-			/** @description the host's lineup page, empty when we know none */
+			/** @description the host's page for the move (lineup or waivers), empty when we know none */
 			host_url: string;
 			/**
 			 * Format: uuid
 			 * @description the move's proof record
 			 */
 			move_id: string | null;
+			/**
+			 * Format: date-time
+			 * @description a pending claim: when the host's queue says it runs the claim (ESPN's processDate), null when it did not say or for any other move
+			 */
+			processes_at: string | null;
 		};
 		HostMove: {
 			/** Format: uuid */
 			id: string;
 			/** @enum {string} */
-			kind: 'lineup';
+			kind: 'lineup' | 'claim';
 			week: number;
 			/** @description the move as the member confirmed it */
 			sentence: string;
@@ -2650,6 +2688,8 @@ export interface components {
 		};
 		TradeAdvice: {
 			week: number;
+			/** @description every player on the drafter's active roster (injured reserve and taxi spots left out), by position then name: the picker's own players, a trade found or not */
+			roster: components['schemas']['PlayerLine'][];
 			basis: string;
 			/** @description the rest of the basis, said once under the rows: the league the points over replacement are for and the league's rules points so far leave out */
 			basis_note: string;

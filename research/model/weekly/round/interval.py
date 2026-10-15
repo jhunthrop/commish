@@ -8,7 +8,7 @@ The numbers describe a week the player plays.
 """
 
 import bisect
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Final
 
@@ -51,18 +51,27 @@ class WeeklyInterval:
         }
 
 
-def _cell(pairs: list[tuple[float, float]]) -> Bucketed:
+def quintile_cut(
+    pairs: Sequence[tuple[float, float]], percentiles: Sequence[float], label: str = ""
+) -> tuple[tuple[float, ...], tuple[tuple[float, ...], ...]]:
+    """The one residual cut both weekly rounds use: the quintile edges of the projections and, per
+    quintile, the `percentiles` of (actual minus projected), numpy linear. A quintile thinner than
+    `MIN_BUCKET` is refused. Round 1 keeps the 10th, 50th and 90th; round 2 the 1st to 99th."""
     projected = np.array([p for p, _ in pairs])
     edges = tuple(float(e) for e in np.percentile(projected, EDGE_PERCENTILES))
     buckets: list[list[float]] = [[] for _ in range(len(edges) + 1)]
     for predicted, actual in pairs:
         buckets[bisect.bisect_right(edges, predicted)].append(actual - predicted)
     if min(len(bucket) for bucket in buckets) < MIN_BUCKET:
-        raise IntervalFitError(f"a quintile holds fewer than {MIN_BUCKET} weeks: {[len(b) for b in buckets]}")
-    offsets = tuple(
-        (float(q[0]), float(q[1]), float(q[2])) for q in (np.percentile(np.array(b), BAND_PERCENTILES) for b in buckets)
-    )
-    return Bucketed(edges, offsets)
+        prefix = f"{label}: " if label else ""
+        raise IntervalFitError(f"{prefix}a quintile holds fewer than {MIN_BUCKET} weeks: {[len(b) for b in buckets]}")
+    kept = tuple(tuple(float(v) for v in np.percentile(np.array(b), list(percentiles))) for b in buckets)
+    return edges, kept
+
+
+def _cell(pairs: list[tuple[float, float]]) -> Bucketed:
+    edges, kept = quintile_cut(pairs, BAND_PERCENTILES)
+    return Bucketed(edges, tuple((q[0], q[1], q[2]) for q in kept))
 
 
 def fit_interval(rows: Iterable[ScoredRow]) -> WeeklyInterval:

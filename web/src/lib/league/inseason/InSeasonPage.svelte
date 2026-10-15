@@ -8,14 +8,28 @@
 	import Shell from '#lib/ui/Shell.svelte';
 	import Verb from '#lib/ui/Verb.svelte';
 	import { links } from '#lib/site/links.ts';
-	import { leagueApi, type AttachedLeague, type LeagueHost } from '../api.ts';
+	import { ApiError, leagueApi, type AttachedLeague, type LeagueHost } from '../api.ts';
 	import { followSwitch } from '../follow-switch.svelte.ts';
-	import { POLL_MS, followedName, readAgoLine, standingWords } from '../model.ts';
+	import {
+		POLL_MS,
+		READING_NOW,
+		followedName,
+		readAgoLine,
+		readNowWords,
+		standingWords
+	} from '../model.ts';
 	import LeagueTabs from './LeagueTabs.svelte';
 	import { tabHref } from './tabs.ts';
 	import type { AdviceHead } from './api.ts';
 	import { readFailure, screenView, type ReadState } from './state.ts';
-	import { LINES, TAB_LABELS, refreshedWords, signInTitle, type InSeasonScreen } from './words.ts';
+	import {
+		LINES,
+		TAB_LABELS,
+		refreshedWords,
+		signInTitle,
+		zoneLine,
+		type InSeasonScreen
+	} from './words.ts';
 
 	/** One in-season screen of a followed league: the league's title with its read and order stamps,
 	 * the league's tabs, and the screen's answer once read (reserved rows until then, the API's own
@@ -50,7 +64,12 @@
 	let refusal = $state<string | null>(null);
 	/** A later read failed: the page keeps the last answer and says so. */
 	let problem = $state<string | null>(null);
+	/** The refusal is a team missing from the last read: the host can be read again from here. */
+	let noTeam = $state(false);
+	let rereading = $state(false);
 	let now = $state(new Date());
+	/** The member's zone, named once beside the stamps when it is not Eastern. */
+	const zone = zoneLine();
 
 	// The page is created per league ({#key} in the route), so its id is fixed for its life.
 	// svelte-ignore state_referenced_locally
@@ -65,11 +84,28 @@
 			now = new Date();
 			problem = null;
 			refusal = null;
+			noTeam = false;
 		} catch (error) {
 			const failure = readFailure(error, advice !== null);
 			if (failure.kind === 'signed-out') signedOut = true;
 			else if (failure.kind === 'stale') problem = failure.sentence;
-			else refusal = failure.sentence;
+			else {
+				refusal = failure.sentence;
+				noTeam = failure.kind === 'no-team';
+			}
+		}
+	}
+
+	/** Reads the league from its host again (the league page's refresh), then this screen. */
+	async function readHost(): Promise<void> {
+		rereading = true;
+		try {
+			await leagueApi.refresh(id);
+			await readAnswer();
+		} catch (error) {
+			refusal = error instanceof ApiError ? error.message : LINES.unreadable;
+		} finally {
+			rereading = false;
 		}
 	}
 
@@ -138,14 +174,24 @@
 					{#if advice}
 						<span class="read" role="status"
 							>{head ? readAgoLine(head.host, advice.read_at, now) : ''}
-							{refreshedWords(advice.order_basis, advice.refreshed)}</span
+							{refreshedWords(advice.order_basis, advice.refreshed)}
+							{zone ?? ''}</span
 						>
 					{/if}
 				</p>
 			</header>
 			<LeagueTabs {id} current={screen} />
 			{#if refusal}
-				<Panel edge="loss" padding="sm"><ProblemLine>{refusal}</ProblemLine></Panel>
+				<Panel edge="loss" padding="sm">
+					<div class="refused">
+						<ProblemLine>{refusal}</ProblemLine>
+						{#if noTeam && head}
+							<Verb onclick={() => void readHost()} disabled={rereading}
+								>{rereading ? READING_NOW : readNowWords(head.host)}</Verb
+							>
+						{/if}
+					</div>
+				</Panel>
 			{:else if view === 'leagues-failed'}
 				<Panel edge="loss" padding="sm"><ProblemLine>{LINES.leaguesUnread}</ProblemLine></Panel>
 			{:else if view === 'ready' && advice && head}
@@ -187,6 +233,14 @@
 	.read {
 		color: var(--ink-3);
 		font-size: var(--t-sm);
+	}
+
+	.refused {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		justify-content: space-between;
+		gap: var(--s-3);
 	}
 
 	/* The rows to come, at their own height, so the answer lands without moving the page. */

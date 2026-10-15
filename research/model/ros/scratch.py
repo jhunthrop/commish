@@ -29,18 +29,19 @@ SCRATCH_PREFIX: Final = "lane18_"
 REFUSED_DATABASES: Final = frozenset({"commish", "commish_test"})  # dev's name, and the parity database
 
 
-def check_scratch_url(url: str) -> None:
-    """Refuse anything but a `lane18_` database on the local test server: a remote host, another
-    port (dev's 5432 above all), or the dev and parity database names."""
+def check_scratch_url(url: str, prefixes: tuple[str, ...] = (SCRATCH_PREFIX,)) -> None:
+    """Refuse anything but a database named with one of `prefixes` (the rest-of-season round's
+    `lane18_`) on the local test server: a remote host, another port (dev's 5432 above all), or the
+    dev and parity database names."""
     parsed = urlparse(url)
     host = parsed.hostname or ""
     if host not in LOCAL_HOSTS:
-        raise ConfigurationError(f"the rest-of-season round runs on a local scratch copy, never on {host!r}")
+        raise ConfigurationError(f"the round runs on a local scratch copy, never on {host!r}")
     if parsed.port != SCRATCH_PORT:
         raise ConfigurationError(f"the scratch copy lives on port {SCRATCH_PORT}, not {parsed.port}")
     database = parsed.path.lstrip("/")
-    if database in REFUSED_DATABASES or not database.startswith(SCRATCH_PREFIX):
-        raise ConfigurationError(f"{database!r} is not a scratch copy: its name must start {SCRATCH_PREFIX!r}")
+    if database in REFUSED_DATABASES or not database.startswith(prefixes):
+        raise ConfigurationError(f"{database!r} is not a scratch copy: its name must start with one of {prefixes}")
 
 
 def scratch_engine(url: str) -> Engine:

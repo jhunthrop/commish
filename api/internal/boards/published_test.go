@@ -151,6 +151,43 @@ func TestPublishedBoardBeatsThePreseasonBoard(t *testing.T) {
 	}
 }
 
+// The run's first week (from_week, revision 0007) reaches the board, so a
+// week's figure divides by the weeks the run covers; a table before the
+// column, or a row without it, reads as 0 and the caller falls back to
+// the league's week.
+func TestPublishedBoardCarriesItsFromWeek(t *testing.T) {
+	pool, src := publishedFixture(t, true)
+	publishRun(t, pool, "2026-10-21T12", "rest_of_season", "ppr,p1,242.5,null", "ppr,p2,195.3,null")
+	if raw := load(t, src, PPR); raw.FromWeek != 0 {
+		t.Fatalf("a table before the column: from week %d", raw.FromWeek)
+	}
+	ctx := context.Background()
+	if _, err := pool.Exec(ctx, "alter table "+publishedSchema+".published_boards add column from_week int"); err != nil {
+		t.Fatal(err)
+	}
+	if raw := load(t, src, PPR); raw.FromWeek != 0 || raw.Order != OrderRestOfSeason {
+		t.Fatalf("a null column: from week %d", raw.FromWeek)
+	}
+	if _, err := pool.Exec(ctx, "update "+publishedSchema+".published_boards set from_week = 7"); err != nil {
+		t.Fatal(err)
+	}
+	raw := load(t, src, PPR)
+	if raw.FromWeek != 7 {
+		t.Fatalf("from week %d", raw.FromWeek)
+	}
+	b, err := For(raw, 12, []draft.SlotConfig{{Slot: draft.SlotQB, Count: 1}, {Slot: draft.SlotRB, Count: 2}})
+	if err != nil || b.FromWeek != 7 {
+		t.Fatalf("board from week %d: %v", b.FromWeek, err)
+	}
+	// With no published rows the stored preseason board covers no window.
+	if _, err := pool.Exec(ctx, "delete from "+publishedSchema+".published_boards"); err != nil {
+		t.Fatal(err)
+	}
+	if raw := load(t, src, PPR); raw.FromWeek != 0 || raw.Order != OrderPreseason {
+		t.Fatalf("preseason: from week %d order %q", raw.FromWeek, raw.Order)
+	}
+}
+
 // Before week 7 the published run is the preseason board: its rows keep
 // their range, and the basis is the preseason sentence.
 func TestPublishedPreseasonRunKeepsItsRange(t *testing.T) {

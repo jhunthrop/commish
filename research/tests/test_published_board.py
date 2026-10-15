@@ -71,6 +71,8 @@ def test_a_preseason_run_publishes_its_boards_with_the_stored_generation_as_refr
     assert gibbs.points_over_replacement == pytest.approx(113.94)
     assert (gibbs.floor, gibbs.median, gibbs.ceiling) == pytest.approx((177.6178, 262.1017, 346.5856), abs=1e-4)
     assert {r.order_basis for r in board.rows} == {"preseason"}
+    # A preseason board covers no window of weeks: the season's seventeen are the API's.
+    assert {r.from_week for r in board.rows} == {None}
     # The stored board generation the run printed (the manifest's boards source window).
     assert {r.refreshed for r in board.rows} == {datetime(2026, 9, 9, 2, 20, 29, 697000, tzinfo=UTC)}
     assert {r.format for r in board.rows} == {"ppr", "half", "std"}
@@ -89,6 +91,8 @@ def test_a_rest_of_season_run_publishes_its_order_with_no_range(store: LocalRunS
     assert (gibbs.floor, gibbs.median, gibbs.ceiling) == (None, None, None)
     assert {r.order_basis for r in board.rows} == {"rest_of_season"}
     assert {r.refreshed for r in board.rows} == {datetime(2026, 10, 21, 12, 0, tzinfo=UTC)}
+    # The week the run's window starts at, so a week's figure divides by the weeks the run covers.
+    assert {r.from_week for r in board.rows} == {_artifact(_IN_SEASON, "manifest.json")["formats"][0]["rosFromWeek"]}
 
 
 def test_a_superflex_board_is_published_under_its_own_format() -> None:
@@ -120,6 +124,9 @@ def test_a_superflex_board_is_published_under_its_own_format() -> None:
         (lambda m, b: (m, {**b, "ppr-12": {"format": "ppr-12", "rows": ["Gibbs"]}}), "not an object"),
         (lambda m, b: ({**m, "sources": [_window(s, "yesterday") for s in m["sources"]]}, b), "not an instant"),
         (lambda m, b: (_in_season(m, "soon"), b), "refreshedAt is not an instant"),
+        (lambda m, b: (_from_week(_in_season(m, "2026-10-21T12:00:00Z"), "7"), b), "rosFromWeek is not a week"),
+        (lambda m, b: (_from_week(_in_season(m, "2026-10-21T12:00:00Z"), 0), b), "rosFromWeek is not a week"),
+        (lambda m, b: (_from_week(_in_season(m, "2026-10-21T12:00:00Z"), 19), b), "rosFromWeek is not a week"),
     ],
 )
 def test_a_run_whose_artifacts_do_not_read_is_refused_by_name(change: Any, message: str) -> None:
@@ -141,6 +148,11 @@ def _window(source: Json, to: str) -> Json:
 
 def _in_season(manifest: Json, refreshed: str) -> Json:
     first = {**manifest["formats"][0], "rosFromWeek": 7, "refreshedAt": refreshed}
+    return {**manifest, "formats": [first, *manifest["formats"][1:]]}
+
+
+def _from_week(manifest: Json, week: object) -> Json:
+    first = {**manifest["formats"][0], "rosFromWeek": week}
     return {**manifest, "formats": [first, *manifest["formats"][1:]]}
 
 
@@ -268,6 +280,10 @@ def test_the_table_holds_exactly_the_published_run_and_a_second_publish_changes_
     this_season = [r for r in rows if r["season"] == _SEASON]
     assert {r["run_id"] for r in this_season} == {_IN_SEASON}
     assert {r["order_basis"] for r in this_season} == {"rest_of_season"}
+    assert {r["from_week"] for r in this_season} == {
+        _artifact(_IN_SEASON, "manifest.json")["formats"][0]["rosFromWeek"]
+    }
+    assert {r["from_week"] for r in preseason} == {None}
     expected = sum(
         len(_artifact(_IN_SEASON, f"boards/{f}.json")["rows"]) for f in ("ppr-12", "half-ppr-12", "standard-12")
     )

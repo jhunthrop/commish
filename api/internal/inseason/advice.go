@@ -2,12 +2,14 @@ package inseason
 
 import (
 	"fmt"
+	"regexp"
 	"sort"
 	"time"
 
 	"github.com/jhunthrop/commish/api/internal/apitypes"
 	"github.com/jhunthrop/commish/api/internal/boards"
 	"github.com/jhunthrop/commish/api/internal/draft"
+	"github.com/jhunthrop/commish/api/internal/espn"
 	"github.com/jhunthrop/commish/api/internal/leaguesync"
 	"github.com/jhunthrop/commish/api/internal/mock"
 	"github.com/jhunthrop/commish/api/internal/scoring"
@@ -63,8 +65,18 @@ func newAdvisor(l League, data Data, held map[string]bool, now time.Time) (*advi
 	if basis == "" {
 		basis = Preseason
 	}
-	return &advisor{League: l, settings: *l.Saved, config: config, slots: Slots(config), held: held, basis: basis, weeks: WeeksCovered(basis, l.Snap.Week), pages: newPages(l.Board.Raw), now: now,
+	return &advisor{League: l, settings: *l.Saved, config: config, slots: Slots(config), held: held, basis: basis, weeks: WeeksCovered(basis, firstWeek(l)), pages: newPages(l.Board.Raw), now: now,
 		season: NewSeason(data, RulesOf(rulesOf(l.Saved.Scoring)), l.Snap.Week, now)}, nil
+}
+
+// firstWeek is the first week the order's figures cover: the published
+// run's own (published_boards.from_week) on the rest-of-season order,
+// and the league's week only while the run does not say.
+func firstWeek(l League) int {
+	if l.Board.Order == boards.OrderRestOfSeason && l.Board.FromWeek > 0 {
+		return l.Board.FromWeek
+	}
+	return l.Snap.Week
 }
 
 // rulesOf is the saved league's scoring as rules: its own, else its
@@ -302,10 +314,33 @@ func (a *advisor) pool(position draft.Position) []person {
 			continue
 		}
 		id := p.ID
-		lp := apitypes.LeaguePlayer{BoardId: &id, Name: p.Name, Position: string(p.Position), Team: p.Team}
+		lp := apitypes.LeaguePlayer{HostId: a.hostIDOfAdd(p), BoardId: &id, Name: p.Name, Position: string(p.Position), Team: p.Team}
 		out = append(out, a.build(p.ID, lp, nil))
 	}
 	return out
+}
+
+// espnPlayerID is the shape of an ESPN player id: the board's ids are
+// ESPN's own (leaguesync places a rostered player by it), a D/ST's is
+// negative.
+var espnPlayerID = regexp.MustCompile(`^-?[0-9]{1,12}$`)
+
+// hostIDOfAdd is an unrostered player's id on the league's host, the one
+// a claim names: on ESPN his board id, a defense ESPN's D/ST id for its
+// club. Empty on any other host, and for a player whose id is not
+// ESPN's shape: his Add stays the host's page.
+func (a *advisor) hostIDOfAdd(p boards.Player) string {
+	if a.Snap.Ref.Host != leaguesync.HostESPN {
+		return ""
+	}
+	if p.Position == draft.DEF {
+		id, _ := espn.DefenseID(p.Team)
+		return id
+	}
+	if !espnPlayerID.MatchString(p.ID) {
+		return ""
+	}
+	return p.ID
 }
 
 // Waivers is the waiver page (§5).
@@ -323,7 +358,7 @@ func (a *advisor) Waivers(position draft.Position) (apitypes.WaiverAdvice, bool)
 	}
 	h := a.header()
 	out := apitypes.WaiverAdvice{Week: h.week, Basis: WaiversBasis(a.basis, a.weeks), BasisNote: BasisNote(a.settings), OrderBasis: h.basis, Refreshed: h.refreshed,
-		ReadAt: h.readAt, Rows: []apitypes.WaiverRow{}}
+		ReadAt: h.readAt, Rows: []apitypes.WaiverRow{}, Moves: apitypes.WaiverMoves{Claim: apitypes.WaiverMovesClaimUnavailable}}
 	out.HostWaiversUrl, out.HostNote = a.host(WaiversPage)
 	w := &Writer{Basis: a.basis, Now: a.now}
 	for _, move := range Waivers(a.config, a.weeks, squad, cands) {
@@ -360,7 +395,7 @@ func (a *advisor) Trades(focus string) (apitypes.TradeAdvice, bool) {
 	squad := a.squad(mine, true)
 	h := a.header()
 	out := apitypes.TradeAdvice{Week: h.week, Basis: TradesBasis(a.basis, a.weeks), BasisNote: BasisNote(a.settings), OrderBasis: h.basis, Refreshed: h.refreshed,
-		ReadAt: h.readAt, Teams: []apitypes.TradeTeam{}}
+		ReadAt: h.readAt, Teams: []apitypes.TradeTeam{}, Roster: rosterLines(mine)}
 	out.HostTradesUrl, out.HostNote = a.host(TradesPage)
 	for _, t := range leaguesync.Standings(a.Snap.Teams) {
 		if t.RosterID == a.Me {
@@ -389,6 +424,30 @@ func (a *advisor) Trades(focus string) (apitypes.TradeAdvice, bool) {
 		out.Teams = append(out.Teams, row)
 	}
 	return out, true
+}
+
+// positionOrder is the order the trade picker lists a roster in.
+var positionOrder = map[draft.Position]int{draft.QB: 0, draft.RB: 1, draft.WR: 2, draft.TE: 3, draft.K: 4, draft.DEF: 5}
+
+// rosterLines is every active player on the roster, by position then name.
+func rosterLines(people []person) []apitypes.PlayerLine {
+	out := make([]apitypes.PlayerLine, len(people))
+	for i, p := range people {
+		out[i] = p.line
+	}
+	rank := func(l apitypes.PlayerLine) int {
+		if r, ok := positionOrder[draft.Position(l.Player.Position)]; ok {
+			return r
+		}
+		return len(positionOrder)
+	}
+	sort.SliceStable(out, func(i, j int) bool {
+		if ri, rj := rank(out[i]), rank(out[j]); ri != rj {
+			return ri < rj
+		}
+		return out[i].Player.Name < out[j].Player.Name
+	})
+	return out
 }
 
 func lines(people []person, at []int) []apitypes.PlayerLine {

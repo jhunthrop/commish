@@ -153,7 +153,7 @@ func newProofs() *proofs {
 }
 
 func (p *proofs) Allowed(_ context.Context, accountID uuid.UUID, host, kind string) (bool, error) {
-	return p.allowed[accountID] && host == "espn" && kind == "lineup", nil
+	return p.allowed[accountID] && host == "espn" && (kind == kindLineup || kind == kindClaim), nil
 }
 
 func (p *proofs) Used(_ context.Context, _ uuid.UUID, digest []byte) (bool, error) {

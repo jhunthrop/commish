@@ -7,6 +7,7 @@
 	import { draftersGap } from '#lib/format/draft.ts';
 	import { fixed, signed } from '#lib/format/number.ts';
 	import { POSITION_NAMES } from '#lib/run/derive.ts';
+	import { UNWRITTEN_READ, unwrittenLines } from '#lib/run/unwritten-words.ts';
 	import SheetAdd from '#lib/site/SheetAdd.svelte';
 	import { lazySheet } from '#lib/site/lazy-sheet.svelte.ts';
 	import SiteShell from '#lib/site/SiteShell.svelte';
@@ -20,6 +21,7 @@
 	import GameLog from '#lib/ui/GameLog.svelte';
 	import GapChip from '#lib/ui/GapChip.svelte';
 	import HeroCard from '#lib/ui/HeroCard.svelte';
+	import LineList from '#lib/ui/LineList.svelte';
 	import Label from '#lib/ui/Label.svelte';
 	import OutcomeBar from '#lib/ui/OutcomeBar.svelte';
 	import PanelHead from '#lib/ui/PanelHead.svelte';
@@ -54,6 +56,18 @@
 	const rostered = $derived.by(() => {
 		return siteContext.held?.holder(page.id) ?? null;
 	});
+	/** What the read will be built from, on a page whose written read is not ready. */
+	const unwritten = $derived(
+		unwrittenLines({
+			position: page.position,
+			numbers: n,
+			boardSize: lead.boardSize,
+			label: scoring,
+			unit,
+			year: season,
+			restOfSeason: lead.rest !== null
+		})
+	);
 	const mates = $derived(
 		page.tier.mates.map((mate) => ({ ...mate, href: links.player(mate.slug) }))
 	);
@@ -168,14 +182,17 @@
 
 		{#if !page.underway}{@render thisSeason()}{/if}
 
-		<div class="split" class:alone={!page.capsule}>
-			{#if page.capsule}
-				<article class="read">
-					<h3><Label>Our read</Label></h3>
+		<div class="split">
+			<article class="read">
+				<h3><Label>Our read</Label></h3>
+				{#if page.capsule}
 					<Capsule body={page.capsule.body} pulls={page.capsule.pulls} />
-					<Footnote><a href={data.sources.href}>{data.sources.words}</a></Footnote>
-				</article>
-			{/if}
+				{:else}
+					<p class="unwritten">{UNWRITTEN_READ}</p>
+					<LineList lines={unwritten} label="What our read of {page.name} will be built from" />
+				{/if}
+				<Footnote><a href={data.sources.href}>{data.sources.words}</a></Footnote>
+			</article>
 			<aside class="tier" aria-label="His tier">
 				<TierMates
 					tier={page.tier.tier}
@@ -289,14 +306,10 @@
 		grid-column: 2;
 	}
 
-	/* With no read of ours, the tier card takes the left column rather than sitting alone at the
-	   right. */
-	.alone {
-		grid-template-columns: minmax(0, 480px);
-	}
-
-	.alone .tier {
-		grid-column: 1;
+	.unwritten {
+		margin: 0 0 var(--s-3);
+		color: var(--ink-2);
+		font-size: var(--t-md);
 	}
 
 	@media (max-width: 1080px) {

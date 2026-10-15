@@ -12,7 +12,7 @@ const LastWeek = 17
 
 // WeeksCovered is how many weeks the order's points over replacement
 // cover: the season's on the preseason number; on the rest-of-season
-// order, the league's week through the last, never fewer than one. A
+// order, the first week it covers through the last, never fewer than one. A
 // league with no week reads as the whole season.
 func WeeksCovered(basis OrderBasis, week int) int {
 	if basis != RestOfSeason || week < 1 {

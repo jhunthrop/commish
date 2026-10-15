@@ -225,6 +225,9 @@ const (
 	// WriteRefused is ESPN's refusal (a 4xx): nothing applied, the
 	// transaction is atomic.
 	WriteRefused WriteOutcome = "refused"
+	// WritePending is ESPN's 200 with status PENDING: a waiver claim
+	// taken into the league's queue, run when the league runs claims.
+	WritePending WriteOutcome = "pending"
 	// WriteUnknown is a write sent whose answer is lost or not one ESPN
 	// documents as done or refused: read back, never retried.
 	WriteUnknown WriteOutcome = "unknown"
@@ -279,14 +282,26 @@ type wireWriteAnswer struct {
 // WriteAnswer, never an error, so the caller always keeps what was sent.
 // It never retries.
 func (c *Client) SetLineup(ctx context.Context, cookies Cookies, set LineupSet) (WriteAnswer, error) {
-	if !cookies.Valid() {
-		return WriteAnswer{}, fmt.Errorf("%w: no session", ErrNotSent)
-	}
 	body, err := set.Body()
 	if err != nil {
 		return WriteAnswer{}, fmt.Errorf("%w: %w", ErrNotSent, err)
 	}
-	req, err := c.writeRequest(ctx, set, body)
+	ans, err := c.send(ctx, cookies, set.leagueID, set.season, body)
+	// A lineup set is executed or refused; PENDING is not an answer ESPN
+	// documents for one, so it is read back like any other unknown.
+	if ans.Outcome == WritePending {
+		ans.Outcome = WriteUnknown
+	}
+	return ans, err
+}
+
+// send POSTs one transaction once with the member's cookies: ErrNotSent
+// when nothing left, else what the answer came to. Never a retry.
+func (c *Client) send(ctx context.Context, cookies Cookies, league string, season int, body []byte) (WriteAnswer, error) {
+	if !cookies.Valid() {
+		return WriteAnswer{}, fmt.Errorf("%w: no session", ErrNotSent)
+	}
+	req, err := c.writeRequest(ctx, league, season, body)
 	if err != nil {
 		return WriteAnswer{}, err
 	}
@@ -308,15 +323,15 @@ func (c *Client) SetLineup(ctx context.Context, cookies Cookies, set LineupSet) 
 }
 
 // writeRequest is the POST for the move, with ESPN's headers and ours.
-func (c *Client) writeRequest(ctx context.Context, set LineupSet, body []byte) (*http.Request, error) {
+func (c *Client) writeRequest(ctx context.Context, league string, season int, body []byte) (*http.Request, error) {
 	base := c.WriteBase
 	if base == "" {
 		base = DefaultWriteBase
 	}
-	if !leagueID.MatchString(set.leagueID) || set.season < minSeason || set.season > maxSeason {
-		return nil, fmt.Errorf("%w: league %q", ErrNotSent, set.leagueID)
+	if !leagueID.MatchString(league) || season < minSeason || season > maxSeason {
+		return nil, fmt.Errorf("%w: league %q", ErrNotSent, league)
 	}
-	path := fmt.Sprintf("%s/apis/v3/games/ffl/seasons/%d/segments/0/leagues/%s/transactions/", base, set.season, set.leagueID)
+	path := fmt.Sprintf("%s/apis/v3/games/ffl/seasons/%d/segments/0/leagues/%s/transactions/", base, season, league)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, path, bytes.NewReader(body))
 	if err != nil {
 		return nil, fmt.Errorf("%w: request: %w", ErrNotSent, err)
@@ -345,6 +360,8 @@ func classify(out WriteAnswer, answer []byte, cookies Cookies) WriteAnswer {
 	switch {
 	case out.Status == http.StatusOK && parsed && w.Status == "EXECUTED":
 		out.Outcome, out.TransactionID = WriteExecuted, text(secrets.redact(w.ID))
+	case out.Status == http.StatusOK && parsed && w.Status == "PENDING":
+		out.Outcome, out.TransactionID = WritePending, text(secrets.redact(w.ID))
 	case out.Status >= 400 && out.Status < 500:
 		out.Outcome = WriteRefused
 		if parsed {
@@ -432,32 +449,43 @@ type wireRosters struct {
 // cookies and reports whether every player of the move is where it put
 // him.
 func (c *Client) Applied(ctx context.Context, cookies Cookies, set LineupSet) (bool, error) {
-	if !leagueID.MatchString(set.leagueID) {
-		return false, ErrNotALink
+	slots, ok, err := c.rosterIDs(ctx, cookies, set.leagueID, set.season, set.team)
+	if err != nil || !ok {
+		return false, err
 	}
-	path := fmt.Sprintf("%s/apis/v3/games/ffl/seasons/%d/segments/0/leagues/%s?view=mRoster", c.Base, set.season, set.leagueID)
+	for _, it := range set.items {
+		if at, on := slots[it.PlayerID]; !on || at != it.To {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
+// rosterIDs reads the team's roster (view=mRoster) with the member's
+// cookies: each player's slot by his id, and whether the team was in the
+// answer.
+func (c *Client) rosterIDs(ctx context.Context, cookies Cookies, league string, season, team int) (map[string]int, bool, error) {
+	if !leagueID.MatchString(league) {
+		return nil, false, ErrNotALink
+	}
+	path := fmt.Sprintf("%s/apis/v3/games/ffl/seasons/%d/segments/0/leagues/%s?view=mRoster", c.Base, season, league)
 	body, err := c.get(ctx, path, &cookies, rosterBody)
 	if err != nil {
-		return false, err
+		return nil, false, err
 	}
 	var w wireRosters
 	if err := json.Unmarshal(body, &w); err != nil {
-		return false, fmt.Errorf("%w: %w", ErrMalformed, err)
+		return nil, false, fmt.Errorf("%w: %w", ErrMalformed, err)
 	}
 	for _, t := range w.Teams {
-		if t.ID != set.team {
+		if t.ID != team {
 			continue
 		}
 		slots := map[string]int{}
 		for _, p := range rosterOf(t.Roster.Entries) {
 			slots[p.ID] = p.Slot
 		}
-		for _, it := range set.items {
-			if at, ok := slots[it.PlayerID]; !ok || at != it.To {
-				return false, nil
-			}
-		}
-		return true, nil
+		return slots, true, nil
 	}
-	return false, nil
+	return nil, false, nil
 }

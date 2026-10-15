@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -70,6 +71,32 @@ var proTeams = map[int]string{
 	33: "BAL", 34: "HOU",
 }
 
+// defenseBase is the base of ESPN's D/ST player ids: a club's D/ST is
+// -(defenseBase + its proTeamId), as every defense in the recorded league
+// 48153503 carries it (Ravens D/ST -16033, Lions D/ST -16008).
+const defenseBase = 16000
+
+// TeamCodes is every club code ESPN's proTeamId table names, sorted.
+func TeamCodes() []string {
+	out := make([]string, 0, len(proTeams))
+	for _, code := range proTeams {
+		out = append(out, code)
+	}
+	sort.Strings(out)
+	return out
+}
+
+// DefenseID is ESPN's player id for the club's D/ST, by our team code;
+// false for a club ESPN does not name.
+func DefenseID(team string) (string, bool) {
+	for id, code := range proTeams {
+		if code == team {
+			return strconv.Itoa(-(defenseBase + id)), true
+		}
+	}
+	return "", false
+}
+
 // Lineup slots by ESPN's lineupSlotId, in our names; any other is named
 // by its number to the caller.
 var slots = map[int]string{
@@ -100,6 +127,26 @@ type FullLeague struct {
 	Games           []Game
 	Items           []Item
 	LineupSlotCount map[int]int
+	// Acquisition is how the league takes adds: its waiver budget and
+	// when its claims run (settings.acquisitionSettings).
+	Acquisition Acquisition
+}
+
+// Acquisition is a league's waiver settings as ESPN's mSettings answers
+// them (settings.acquisitionSettings; the names espn-api's
+// base_settings.py reads).
+type Acquisition struct {
+	// Budget is isUsingAcquisitionBudget: claims carry a bid.
+	Budget bool
+	// Total is acquisitionBudget, each team's budget for the season.
+	Total int
+	// MinimumBid is the least bid a claim may carry.
+	MinimumBid int
+	// Type is acquisitionType, WAIVERS_TRADITIONAL and the like.
+	Type string
+	// ProcessDays is waiverProcessDays, the days ESPN runs claims, as
+	// ESPN names them (MONDAY ...).
+	ProcessDays []string
 }
 
 // Team is one team, its record, owners and roster.
@@ -112,6 +159,9 @@ type Team struct {
 	Ties      int
 	PointsFor float64
 	Roster    []Player
+	// BudgetSpent is transactionCounter.acquisitionBudgetSpent, nil when
+	// the read does not carry it.
+	BudgetSpent *int
 }
 
 // Player is one rostered player and the slot he fills.
@@ -128,7 +178,15 @@ type Player struct {
 	// Locked is ESPN's lineupLocked: his game has started, and no lineup
 	// move may hold him.
 	Locked bool
+	// RosterLocked is ESPN's rosterLocked: he cannot leave the roster now.
+	RosterLocked bool
+	// droppable is ESPN's droppable, nil when the read does not carry it.
+	droppable *bool
 }
+
+// Droppable reports whether ESPN lets the team drop him: false only when
+// ESPN says so.
+func (p Player) Droppable() bool { return p.droppable == nil || *p.droppable }
 
 // Game is one matchup in the current matchup period.
 type Game struct {
@@ -143,6 +201,7 @@ type wirePlayer struct {
 	ProTeamID         int    `json:"proTeamId"`
 	InjuryStatus      string `json:"injuryStatus"`
 	EligibleSlots     []int  `json:"eligibleSlots"`
+	Droppable         *bool  `json:"droppable"`
 }
 
 type wireEntry struct {
@@ -151,6 +210,7 @@ type wireEntry struct {
 	InjuryStatus    string `json:"injuryStatus"`
 	PlayerPoolEntry struct {
 		LineupLocked bool       `json:"lineupLocked"`
+		RosterLocked bool       `json:"rosterLocked"`
 		Player       wirePlayer `json:"player"`
 	} `json:"playerPoolEntry"`
 }
@@ -168,7 +228,8 @@ type wireFull struct {
 		RosterSettings struct {
 			LineupSlotCounts map[string]int `json:"lineupSlotCounts"`
 		} `json:"rosterSettings"`
-		ScoringSettings struct {
+		AcquisitionSettings wireAcquisition `json:"acquisitionSettings"`
+		ScoringSettings     struct {
 			ScoringItems []Item `json:"scoringItems"`
 		} `json:"scoringSettings"`
 	} `json:"settings"`
@@ -182,7 +243,10 @@ type wireFull struct {
 		Location string   `json:"location"`
 		Nickname string   `json:"nickname"`
 		Owners   []string `json:"owners"`
-		Record   struct {
+		Counter  *struct {
+			BudgetSpent *int `json:"acquisitionBudgetSpent"`
+		} `json:"transactionCounter"`
+		Record struct {
 			Overall struct {
 				Wins      int     `json:"wins"`
 				Losses    int     `json:"losses"`
@@ -246,6 +310,12 @@ func (c *Client) Public(ctx context.Context, id string, season int) (bool, error
 // cookies is ErrSignedOut, without them ErrPrivate. Its errors name a
 // status, never a cookie.
 func (c *Client) get(ctx context.Context, path string, cookies *Cookies, limit int64) ([]byte, error) {
+	return c.getFiltered(ctx, path, cookies, limit, "")
+}
+
+// getFiltered is get with ESPN's X-Fantasy-Filter header when filter is
+// set: the players read narrows by it.
+func (c *Client) getFiltered(ctx context.Context, path string, cookies *Cookies, limit int64, filter string) ([]byte, error) {
 	if c.Pace != nil {
 		if err := c.Pace.Wait(ctx); err != nil {
 			return nil, fmt.Errorf("%w: %w", ErrUnavailable, err)
@@ -259,6 +329,9 @@ func (c *Client) get(ctx context.Context, path string, cookies *Cookies, limit i
 	}
 	req.Header.Set("User-Agent", UserAgent)
 	req.Header.Set("Accept", "application/json")
+	if filter != "" {
+		req.Header.Set("X-Fantasy-Filter", filter)
+	}
 	if cookies != nil {
 		req.Header.Set("Cookie", cookies.header())
 	}
@@ -301,7 +374,7 @@ func checkFull(w wireFull) (FullLeague, error) {
 	l := FullLeague{
 		ID: strconv.Itoa(w.ID), Name: scoring.Name, Season: w.SeasonID, ScoringPeriod: w.ScoringPeriodID,
 		MatchupPeriod: w.Status.CurrentMatchupPeriod, Size: w.Settings.Size, Items: scoring.Items,
-		Members: map[string]string{}, LineupSlotCount: map[int]int{},
+		Members: map[string]string{}, LineupSlotCount: map[int]int{}, Acquisition: acquisitionOf(w.Settings.AcquisitionSettings),
 	}
 	for k, n := range w.Settings.RosterSettings.LineupSlotCounts {
 		id, err := strconv.Atoi(k)
@@ -316,8 +389,13 @@ func checkFull(w wireFull) (FullLeague, error) {
 		l.Members[m.ID] = text(m.DisplayName)
 	}
 	for _, t := range w.Teams {
-		l.Teams = append(l.Teams, team(t.ID, t.Name, t.Location, t.Nickname, t.Owners, t.Record.Overall.Wins, t.Record.Overall.Losses,
-			t.Record.Overall.Ties, t.Record.Overall.PointsFor, rosterOf(t.Roster.Entries)))
+		tm := team(t.ID, t.Name, t.Location, t.Nickname, t.Owners, t.Record.Overall.Wins, t.Record.Overall.Losses,
+			t.Record.Overall.Ties, t.Record.Overall.PointsFor, rosterOf(t.Roster.Entries))
+		if t.Counter != nil && t.Counter.BudgetSpent != nil && *t.Counter.BudgetSpent >= 0 && *t.Counter.BudgetSpent <= maxBudget {
+			spent := *t.Counter.BudgetSpent
+			tm.BudgetSpent = &spent
+		}
+		l.Teams = append(l.Teams, tm)
 	}
 	for _, g := range w.Schedule {
 		if g.MatchupPeriodID != l.MatchupPeriod || g.Away == nil {
@@ -350,6 +428,7 @@ func rosterOf(entries []wireEntry) []Player {
 			ID: strconv.Itoa(id), Name: text(p.FullName), Position: positions[p.DefaultPositionID], Team: proTeams[p.ProTeamID],
 			Slot: e.LineupSlotID, Injured: e.InjuryStatus == "INJURY_RESERVE" || p.InjuryStatus == "INJURY_RESERVE",
 			Eligible: eligible(p.EligibleSlots), Locked: e.PlayerPoolEntry.LineupLocked,
+			RosterLocked: e.PlayerPoolEntry.RosterLocked, droppable: p.Droppable,
 		})
 	}
 	return out

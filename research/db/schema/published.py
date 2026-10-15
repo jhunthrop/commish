@@ -41,8 +41,12 @@ PUBLISHED_BOARDS: Final = Table(
     # In season the run's refresh; before it the stored board generation the run printed.
     Column("refreshed", DateTime(True), nullable=False),
     Column("published_at", DateTime(True), nullable=False),
+    # The run's rosFromWeek in season (revision 0007): the weeks a figure covers run from it to week 17;
+    # NULL for a preseason row.
+    Column("from_week", Integer),
     one_of("format", PUBLISHED_FORMATS, "published_boards_format_ck"),
     one_of("order_basis", ORDER_BASES, "published_boards_order_basis_ck"),
     CheckConstraint("rank >= 1 AND position_rank >= 1", name="published_boards_rank_ck"),
+    CheckConstraint("from_week BETWEEN 1 AND 18", name="published_boards_from_week_ck"),
     Index("published_boards_run_idx", "run_id"),
 )

@@ -66,6 +66,32 @@ func TestBasisSaysWhatAWeekIs(t *testing.T) {
 	}
 }
 
+// The weeks come from the run's own first week when the table says it,
+// not the league's: a run that rolled to week 8 while the host still
+// says 7 divides by 10, and the basis names 10. Without the run's week
+// the league's stands.
+func TestTheRunsFirstWeekSetsTheDivisor(t *testing.T) {
+	f := newFixture(t)
+	f.league.Board.Order = boards.OrderRestOfSeason
+	f.league.Board.FromWeek = 8
+	f.league.Snap.Week = 7
+	out, _ := newFixtureAdvisor(t, f, nil).Lineup()
+	line := out.Slots[0].Ours
+	season := f.league.Board.Values[boardID(line)]
+	if *line.PointsOverReplacement != roundTenth(season/10) || !strings.Contains(out.Basis, "its 10 weeks") {
+		t.Fatalf("%v %q", *line.PointsOverReplacement, out.Basis)
+	}
+	f.league.Board.FromWeek = 0
+	if out, _ := newFixtureAdvisor(t, f, nil).Lineup(); !strings.Contains(out.Basis, "its 11 weeks") {
+		t.Fatalf("the league's week: %q", out.Basis)
+	}
+	// A preseason board's from week is never read.
+	f.league.Board.Order, f.league.Board.FromWeek = boards.OrderPreseason, 8
+	if out, _ := newFixtureAdvisor(t, f, nil).Lineup(); !strings.Contains(out.Basis, "its 17 weeks") {
+		t.Fatalf("preseason: %q", out.Basis)
+	}
+}
+
 // A row's points over replacement is a week's on the order's weeks.
 func TestPlayerLineOverTheOrdersWeeks(t *testing.T) {
 	f := newFixture(t)

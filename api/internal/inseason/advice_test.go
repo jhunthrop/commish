@@ -171,6 +171,18 @@ func TestTradeAdvice(t *testing.T) {
 	if any == 0 {
 		t.Fatal("no trade in a twelve-team league")
 	}
+	// The picker's own players: every active player on the roster, a
+	// trade found or not, by position then name.
+	if len(out.Roster) != len(mine) {
+		t.Fatalf("roster %d of %d", len(out.Roster), len(mine))
+	}
+	order := map[string]int{"QB": 0, "RB": 1, "WR": 2, "TE": 3, "K": 4, "DEF": 5}
+	for i := 1; i < len(out.Roster); i++ {
+		a, b := out.Roster[i-1].Player, out.Roster[i].Player
+		if order[a.Position] > order[b.Position] || (a.Position == b.Position && a.Name > b.Name) {
+			t.Fatalf("roster order %s %s before %s %s", a.Position, a.Name, b.Position, b.Name)
+		}
+	}
 	for _, team := range out.Teams {
 		close := 0
 		for _, tr := range team.Trades {

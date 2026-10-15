@@ -326,12 +326,15 @@ func (e HostLeagueUnmarked) Valid() bool {
 
 // Defines values for HostMoveKind.
 const (
+	HostMoveKindClaim  HostMoveKind = "claim"
 	HostMoveKindLineup HostMoveKind = "lineup"
 )
 
 // Valid indicates whether the value is a known member of the HostMoveKind enum.
 func (e HostMoveKind) Valid() bool {
 	switch e {
+	case HostMoveKindClaim:
+		return true
 	case HostMoveKindLineup:
 		return true
 	default:
@@ -404,12 +407,15 @@ func (e HostMoveChangeSlot) Valid() bool {
 
 // Defines values for HostMoveInputKind.
 const (
+	HostMoveInputKindClaim  HostMoveInputKind = "claim"
 	HostMoveInputKindLineup HostMoveInputKind = "lineup"
 )
 
 // Valid indicates whether the value is a known member of the HostMoveInputKind enum.
 func (e HostMoveInputKind) Valid() bool {
 	switch e {
+	case HostMoveInputKindClaim:
+		return true
 	case HostMoveInputKindLineup:
 		return true
 	default:
@@ -1077,6 +1083,24 @@ func (e SheetTag) Valid() bool {
 	}
 }
 
+// Defines values for WaiverMovesClaim.
+const (
+	WaiverMovesClaimAvailable   WaiverMovesClaim = "available"
+	WaiverMovesClaimUnavailable WaiverMovesClaim = "unavailable"
+)
+
+// Valid indicates whether the value is a known member of the WaiverMovesClaim enum.
+func (e WaiverMovesClaim) Valid() bool {
+	switch e {
+	case WaiverMovesClaimAvailable:
+		return true
+	case WaiverMovesClaimUnavailable:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for LoginParamsScreen.
 const (
 	LoginParamsScreenSignIn LoginParamsScreen = "sign-in"
@@ -1466,7 +1490,7 @@ type Envelope struct {
 
 // ErrorBody defines model for ErrorBody.
 type ErrorBody struct {
-	// Code invalid, unauthorized, forbidden, not_found, conflict, rate_limited, csrf, payload_too_large, unsupported_media_type, billing_unavailable, storage_unavailable, unavailable, internal
+	// Code invalid, unauthorized, forbidden, not_found, conflict, rate_limited, csrf, payload_too_large, unsupported_media_type, billing_unavailable, storage_unavailable, unavailable, internal, team_not_read (a 404 from an in-season route: the drafter's team is missing from the league's last read, so reading the host again may find it)
 	Code    string             `json:"code"`
 	Feature *Feature           `json:"feature,omitempty"`
 	Fields  *map[string]string `json:"fields,omitempty"`
@@ -1571,6 +1595,33 @@ type Health struct {
 
 // HealthStatus defines model for Health.Status.
 type HealthStatus string
+
+// HostBid defines model for HostBid.
+type HostBid struct {
+	// Amount the bid the plan sends
+	Amount int `json:"amount"`
+
+	// LeftKnown the host said what the team has spent
+	LeftKnown bool `json:"left_known"`
+
+	// Max what the team has left to bid, the league's budget less what it has spent; the whole budget when the host did not say what was spent (left_known false)
+	Max int `json:"max"`
+
+	// Min the league's least bid
+	Min int `json:"min"`
+}
+
+// HostClaim defines model for HostClaim.
+type HostClaim struct {
+	// Add the host id of the player claimed
+	Add string `json:"add"`
+
+	// Bid the bid the member typed, in the league's waiver dollars; null where the league does not bid. We never suggest one.
+	Bid *int `json:"bid"`
+
+	// Drop the host id of the player dropped for him, null for an open roster spot
+	Drop *string `json:"drop"`
+}
 
 // HostConnectInput defines model for HostConnectInput.
 type HostConnectInput struct {
@@ -1688,8 +1739,12 @@ type HostMoveConfirm struct {
 
 // HostMoveInput defines model for HostMoveInput.
 type HostMoveInput struct {
-	Changes []HostMoveChange  `json:"changes"`
-	Kind    HostMoveInputKind `json:"kind"`
+	// Changes a lineup's changes, at least one; empty for a claim
+	Changes []HostMoveChange `json:"changes"`
+
+	// Claim a claim's add, drop and bid; absent for a lineup
+	Claim *HostClaim        `json:"claim,omitempty"`
+	Kind  HostMoveInputKind `json:"kind"`
 
 	// Week the week the screen read, the host's current one
 	Week int `json:"week"`
@@ -1700,16 +1755,19 @@ type HostMoveInputKind string
 
 // HostMovePlan defines model for HostMovePlan.
 type HostMovePlan struct {
+	// Bid a claim in a league that bids: the bid the plan sends (the one typed, else the league's least) and the bounds the league allows; null otherwise
+	Bid *HostBid `json:"bid"`
+
 	// Confirm the token that makes this move once
 	Confirm *string `json:"confirm"`
 
 	// ExpiresAt when the token stops making it
 	ExpiresAt *time.Time `json:"expires_at"`
 
-	// HostUrl the host's lineup page, empty when we know none
+	// HostUrl the host's page for the move (lineup or waivers), empty when we know none
 	HostUrl string `json:"host_url"`
 
-	// Sentence the move in words, every change named ("Start Rachaad White over Tank Bigsby at RB, and Jauan Jennings over Josh Downs in the flex, on ESPN now."), or why it cannot be made here
+	// Sentence the move in words, every change named ("Start Rachaad White over Tank Bigsby at RB, and Jauan Jennings over Josh Downs in the flex, on ESPN now.", "Add Keenan Allen, drop Danny Amendola, bid $12. He is on waivers, so ESPN runs the claim on Wednesday."), or why it cannot be made here
 	Sentence string             `json:"sentence"`
 	Status   HostMovePlanStatus `json:"status"`
 }
@@ -1719,7 +1777,7 @@ type HostMovePlanStatus string
 
 // HostMoveResult defines model for HostMoveResult.
 type HostMoveResult struct {
-	// HostUrl the host's lineup page, empty when we know none
+	// HostUrl the host's page for the move (lineup or waivers), empty when we know none
 	HostUrl string `json:"host_url"`
 
 	// HostWords the host's reason for a refusal, verbatim in its own words; null otherwise
@@ -1728,6 +1786,9 @@ type HostMoveResult struct {
 	// MoveId the move's proof record
 	MoveId  *openapi_types.UUID   `json:"move_id"`
 	Outcome HostMoveResultOutcome `json:"outcome"`
+
+	// ProcessesAt a pending claim: when the host's queue says it runs the claim (ESPN's processDate), null when it did not say or for any other move
+	ProcessesAt *time.Time `json:"processes_at"`
 
 	// Sentence our sentence for the outcome
 	Sentence string `json:"sentence"`
@@ -2310,7 +2371,7 @@ type PlayerLine struct {
 	Held   bool         `json:"held"`
 	Player LeaguePlayer `json:"player"`
 
-	// PointsOverReplacement points over replacement a week for this league, one decimal: the order's averaged over the weeks it covers (the preseason number's season over 17, the rest-of-season order's over the league's week through week 17), as the basis says; null without a projection
+	// PointsOverReplacement points over replacement a week for this league, one decimal: the order's averaged over the weeks it covers (the preseason number's season over 17, the rest-of-season order's over its own first week, the league's when the run does not say, through week 17), as the basis says; null without a projection
 	PointsOverReplacement *float64 `json:"points_over_replacement"`
 
 	// PositionRank his place at his position in our order
@@ -2749,6 +2810,9 @@ type TradeAdvice struct {
 	ReadAt     time.Time  `json:"read_at"`
 	Refreshed  time.Time  `json:"refreshed"`
 
+	// Roster every player on the drafter's active roster (injured reserve and taxi spots left out), by position then name: the picker's own players, a trade found or not
+	Roster []PlayerLine `json:"roster"`
+
 	// Teams every other team
 	Teams []TradeTeam `json:"teams"`
 	Week  int         `json:"week"`
@@ -2806,7 +2870,8 @@ type WaiverAdvice struct {
 	HostNote *string `json:"host_note"`
 
 	// HostWaiversUrl the host's waiver page, empty when we know none
-	HostWaiversUrl string `json:"host_waivers_url"`
+	HostWaiversUrl string      `json:"host_waivers_url"`
+	Moves          WaiverMoves `json:"moves"`
 
 	// OrderBasis which order ranks the players: our preseason board, or the rest-of-season order (from week 7, once the API reads it)
 	OrderBasis OrderBasis `json:"order_basis"`
@@ -2817,6 +2882,18 @@ type WaiverAdvice struct {
 	Rows []WaiverRow `json:"rows"`
 	Week int         `json:"week"`
 }
+
+// WaiverMoves defines model for WaiverMoves.
+type WaiverMoves struct {
+	// Claim available when a claim can be made on the host from our screen (the host has a write path, its claim switch is on for the account and the account's connection agreed to the moves); unavailable when the verb is the host's page
+	Claim WaiverMovesClaim `json:"claim"`
+
+	// Note one sentence when a claim waits on the member (connect again to agree to moves), null otherwise
+	Note *string `json:"note"`
+}
+
+// WaiverMovesClaim available when a claim can be made on the host from our screen (the host has a write path, its claim switch is on for the account and the account's connection agreed to the moves); unavailable when the verb is the host's page
+type WaiverMovesClaim string
 
 // WaiverRow defines model for WaiverRow.
 type WaiverRow struct {

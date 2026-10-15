@@ -34,7 +34,8 @@ USAGE_STEPS: Final = (PLAY_BY_PLAY, FTN_CHARTING, NEXT_GEN_STATS, PFR_ADVSTATS)
 UsageStep = Callable[[Engine, Fetcher, int], StepResult]
 
 
-def _written(step: str, written: int, summary: str, detail: tuple[str, ...] = ()) -> StepResult:
+def written_result(step: str, written: int, summary: str, detail: tuple[str, ...] = ()) -> StepResult:
+    """A step's verdict from what it wrote: `ok` when it wrote, `skipped` with "nothing new" otherwise."""
     status: Status = "ok" if written > 0 else "skipped"
     return StepResult(step, status, summary if written > 0 else f"nothing new, {summary}", detail)
 
@@ -63,7 +64,7 @@ def play_by_play(engine: Engine, fetcher: Fetcher, season: int) -> StepResult:
         f"{report.team_weeks} team-weeks, {report.player_weeks} player-weeks, {report.passer_weeks} passer-weeks, "
         f"{report.unknown_players} ids outside the projected universe)"
     )
-    return _written(PLAY_BY_PLAY, report.observations_written, summary)
+    return written_result(PLAY_BY_PLAY, report.observations_written, summary)
 
 
 def _feed(step: str, what: str, season: int, run: Callable[[], FeedReport]) -> StepResult:
@@ -75,7 +76,7 @@ def _feed(step: str, what: str, season: int, run: Callable[[], FeedReport]) -> S
         return _unpublished(step, what, season, error)
     if not report.published:
         return StepResult(step, "skipped", f"nflverse has not published {what} for {season} yet", report.detail)
-    return _written(step, report.observations_written, report.summary(), report.detail)
+    return written_result(step, report.observations_written, report.summary(), report.detail)
 
 
 def ftn_charting(engine: Engine, fetcher: Fetcher, season: int) -> StepResult:

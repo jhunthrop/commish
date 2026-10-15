@@ -2,6 +2,7 @@ package config
 
 import (
 	"encoding/base64"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -17,6 +18,12 @@ func TestWriteSwitchOffByDefault(t *testing.T) {
 	}
 	if h := hostLoader(map[string]string{"HOST_WRITES_ESPN_LINEUP": "true"}).hosts(EnvDevelopment); !h.ESPNLineupWrites {
 		t.Fatal("ESPN lineup writes set true and off")
+	}
+	if h := hostLoader(nil).hosts(EnvDevelopment); h.ESPNClaimWrites {
+		t.Fatal("ESPN claim writes on by default")
+	}
+	if h := hostLoader(map[string]string{"HOST_WRITES_ESPN_CLAIM": "true"}).hosts(EnvDevelopment); !h.ESPNClaimWrites || h.ESPNLineupWrites {
+		t.Fatal("the claim switch set true and off, or it opened the lineup")
 	}
 	l := hostLoader(map[string]string{"HOST_WRITES_ESPN_LINEUP": "sometimes"})
 	if l.hosts(EnvDevelopment); l.err() == nil {
@@ -66,5 +73,48 @@ func TestHostsSwitchAndKeys(t *testing.T) {
 	l = hostLoader(map[string]string{"YAHOO_CLIENT_ID": "id", "YAHOO_CLIENT_SECRET": "secret"})
 	if h := l.hosts(EnvDevelopment); !h.YahooConfigured() || l.err() != nil {
 		t.Fatalf("the Yahoo app: %v", l.err())
+	}
+}
+
+// ALLOWED_HOSTS defaults to API_BASE_URL's host; a set list splits on
+// spaces or commas, lower-cased, and refuses a URL, a path or a wildcard.
+// Development adds the loopback names; production never does.
+func TestAllowedHosts(t *testing.T) {
+	if got := hostLoader(nil).allowedHosts("https://api.trycommish.app", EnvProduction); !slices.Equal(got, []string{"api.trycommish.app"}) {
+		t.Fatalf("production default = %v", got)
+	}
+	if got := hostLoader(nil).allowedHosts("http://localhost:8080", EnvDevelopment); !slices.Equal(got, []string{"localhost", "127.0.0.1", "::1"}) {
+		t.Fatalf("development default = %v", got)
+	}
+	l := hostLoader(map[string]string{"ALLOWED_HOSTS": "api.trycommish.app API2.trycommish.app,"})
+	got := l.allowedHosts("https://api.trycommish.app", EnvProduction)
+	if len(got) != 2 || got[0] != "api.trycommish.app" || got[1] != "api2.trycommish.app" || l.err() != nil {
+		t.Fatalf("list = %v, %v", got, l.err())
+	}
+	for _, bad := range []string{"https://api.trycommish.app", "api.trycommish.app/x", "*.trycommish.app", "*"} {
+		l := hostLoader(map[string]string{"ALLOWED_HOSTS": bad})
+		if l.allowedHosts("https://api.trycommish.app", EnvProduction); l.err() == nil {
+			t.Fatalf("%q was accepted", bad)
+		}
+	}
+}
+
+// The room answers on ROOM_BASE_URL's host unless ALLOWED_HOSTS names
+// others; production refuses a room with no base URL.
+func TestRoomHosts(t *testing.T) {
+	l := hostLoader(map[string]string{"ROOM_BASE_URL": "wss://room.trycommish.app"})
+	if got := l.roomHosts(EnvProduction); len(got) != 1 || got[0] != "room.trycommish.app" || l.err() != nil {
+		t.Fatalf("from the base URL = %v, %v", got, l.err())
+	}
+	l = hostLoader(map[string]string{"ROOM_BASE_URL": "wss://room.trycommish.app", "ALLOWED_HOSTS": "room2.trycommish.app"})
+	if got := l.roomHosts(EnvProduction); len(got) != 1 || got[0] != "room2.trycommish.app" {
+		t.Fatalf("set = %v", got)
+	}
+	if got := hostLoader(nil).roomHosts(EnvDevelopment); !slices.Equal(got, []string{"localhost", "127.0.0.1", "::1"}) {
+		t.Fatalf("development default = %v", got)
+	}
+	l = hostLoader(nil)
+	if l.roomHosts(EnvProduction); l.err() == nil {
+		t.Fatal("a production room with no ROOM_BASE_URL was accepted")
 	}
 }
