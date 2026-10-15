@@ -98,23 +98,29 @@ func Standard() apitypes.ScoringRules {
 	return out
 }
 
+// PresetRules is a preset's figures: the standard ones with 1, 0.5 or 0
+// a catch. TE premium names no tight end bonus of its own and ranks on
+// the PPR board (boards.FormatFor), so it scores as PPR.
+func PresetRules(p apitypes.ScoringPreset) apitypes.ScoringRules {
+	r := Standard()
+	switch p {
+	case apitypes.ScoringPresetPpr, apitypes.ScoringPresetTePremium:
+		r.PointsPerReception = 1
+	case apitypes.ScoringPresetHalfPpr:
+		r.PointsPerReception = 0.5
+	}
+	return r
+}
+
 // StoredPreset is the preset whose stored board a league's rules score
 // exactly the same as (domain.py's PPR_SCORING, HALF_PPR_SCORING,
 // STANDARD_SCORING: the standard figures with 1, 0.5 or 0 a catch), false
 // for any other rules. research.parity proves those three boards are what
 // the boards service builds for those rules, bit for bit.
 func StoredPreset(r apitypes.ScoringRules) (apitypes.ScoringPreset, bool) {
-	presets := []struct {
-		preset    apitypes.ScoringPreset
-		reception float64
-	}{
-		{apitypes.ScoringPresetPpr, 1}, {apitypes.ScoringPresetHalfPpr, 0.5}, {apitypes.ScoringPresetStandard, 0},
-	}
-	for _, p := range presets {
-		want := Standard()
-		want.PointsPerReception = p.reception
-		if r == want {
-			return p.preset, true
+	for _, p := range []apitypes.ScoringPreset{apitypes.ScoringPresetPpr, apitypes.ScoringPresetHalfPpr, apitypes.ScoringPresetStandard} {
+		if r == PresetRules(p) {
+			return p, true
 		}
 	}
 	return "", false
