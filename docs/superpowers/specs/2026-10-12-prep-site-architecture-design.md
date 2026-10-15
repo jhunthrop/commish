@@ -107,6 +107,20 @@ The nightly job is the product's heartbeat. It runs at 05:00 UTC, writes every a
 
 Measured, not asserted. Each lane carries a budget and a measurement in CI, and the ledger records the number with its basis. The board's first paint under 1.2 s on throttled mobile from a cold cache, the mock room usable under 2 s, the sheet's drag at 60 fps on a mid phone, the API's p90 under 100 ms for every read, the room's pick broadcast under 150 ms p90 from pick to every client. Edge-prerendered pages are the first lever, the Go API the second, and the client bundle budget the third.
 
+### Measured at cutover, 2026-10-15
+
+The cutover record (runbook Phase 2 step 8), each number with where it was read. Nothing here is estimated.
+
+| What | Number | Budget | Source |
+|---|---|---|---|
+| The board's LCP (`/board`), throttled mobile, cold cache | 714 ms median of 9 runs (692 to 2,674 ms) | 1,200 ms | Local Lighthouse CI run, Lane 43, 2026-10-15T16:26Z, `npm run lighthouse` (devtools throttling, mobile) against the static build on the stand-in run `2026-10-12T00-standin`. The deploys kept no Lighthouse reports before Lane 43: `upload-artifact` skipped the `.lighthouseci` folder for its leading dot ("No files were found", web run 38757416894), fixed in the same lane, so the next deploy keeps them. |
+| The board's script bytes on load | 72,985 B in 12 scripts, every run | 73,728 B | The same run, `resource-summary` script transfer size. |
+| The front door's LCP and script bytes (`/`) | 684 ms median of 9; 69,156 B | 1,200 ms; 73,728 B | The same run. |
+| The advisor's p95 | Not measured. The nearest: server time p90 9.1 ms and p99 11.7 ms, round trip p90 10.7 ms, one room at once in the committed image at 2 CPUs | p90 under 50 ms (§2.3) | `lane-2p-c-report.md`, "The advisor's p90" (`python -m research.advisor.bench`, 360 calls). |
+| The advisor's and the boards service's cold start | Advisor 6.3 s cold, 0.13 s warm; boards 6.4 s cold, 0.11 s warm | none | Ledger 2026-10-15T16:05Z (`/readyz` with an identity token from the laptop). Kept warm in August and September by the `warm-advisor` and `warm-boards` scheduler jobs (`infra/README.md`). |
+| The nightly's capsule spend, the last three runs | `2026-10-15T09-2` (passed) $0.278 for 464 calls; `2026-10-15T14` (failed, one shared sentence) $0.254 for 394 calls; `2026-10-15T14-2` (passed) $0.234 for 398 calls | none | Each run's `report.json` `capsuleSpend.cost_usd` (writer `zai/glm-5.3-flash` at $0.15 in and $0.50 out per million tokens, priced from the gateway's model list at the run). Wall time 10 min 15 s, 9 min 1 s, 7 min 56 s (`startedAt` to `finishedAt`). The Cloud Run compute is not in the report. |
+| The capsule gate, the last passed run (`2026-10-15T14-2`) | 536 board pages: 535 written, 1 facts block, 0 on the oracle's template, 0 missing (0.2% unwritten against the in-season 3% line), 0 written sentences on two pages; 7,198 six-word spans on two pages or more (never a failure), 191 exempt as facts the page prints | 3% unwritten, 0 shared sentences | `runs/2026-10-15T14-2/report.json`, gate `capsules`. The run's other gates: held-out rho 0.7649 (2023, n 533) and 0.7848 (2024, n 537); schema 0 refusals, 1,854 board rows, 618 of 618 player pages; board depth, ADP and basis passed. |
+
 ## 6. What does not change
 
 The research core's science and its held-out discipline, `launch-2027-data-year-2026`, Tank01 as the only stats source with no mock data, nflverse as the only recurring charted source, the capsule writer and its rules, WorkOS, the honest-data rules, the persona panel on every surface, measurement before fixing. The league platform stays reachable at the tag `league-platform-final`.

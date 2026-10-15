@@ -28,9 +28,10 @@ env:
   # DATABASE_URL names in its host parameter; set, not add, so the list
   # each deploy leaves is exactly this one.
   CLOUDSQL_INSTANCE: trycommish:us-east1:commish-pg
-  # The plain settings every api process gets (internal/config).
+  # The plain settings every api process gets (internal/config). ALLOWED_HOSTS locks the run.app URL:
+  # the api answers its routes only on these hosts (space-separated), the probes on any.
   API_ENV_VARS: >-
-    APP_ENV=production,PUBLIC_BASE_URL=https://trycommish.app,API_BASE_URL=https://api.trycommish.app,SESSION_COOKIE_DOMAIN=.trycommish.app,CORS_ORIGINS=${{ vars.CORS_ORIGINS || 'https://trycommish.app' }},TRUSTED_PROXY_HOPS=${{ vars.TRUSTED_PROXY_HOPS || '1' }},STRIPE_ENVIRONMENT=${{ vars.STRIPE_ENVIRONMENT || 'test' }},STRIPE_AUTOMATIC_TAX=${{ vars.STRIPE_AUTOMATIC_TAX || 'false' }},R2_ACCOUNT_ID=${{ vars.CLOUDFLARE_ACCOUNT_ID }},R2_EXPORTS_BUCKET=commish-exports,ROOM_BASE_URL=wss://room.trycommish.app,ADVISOR_URL=${{ vars.ADVISOR_URL }},BOARDS_URL=${{ vars.BOARDS_URL }},BOARD_SCHEMA=${{ vars.BOARD_SCHEMA || 'research' }},HOST_FFPC_ENABLED=${{ vars.HOST_FFPC_ENABLED || 'true' }},HOST_YAHOO_ENABLED=${{ vars.HOST_YAHOO_ENABLED || 'true' }},HOST_ESPN_ENABLED=${{ vars.HOST_ESPN_ENABLED || 'true' }},HOST_WRITES_ESPN_LINEUP=${{ vars.HOST_WRITES_ESPN_LINEUP || 'false' }},HOST_CREDENTIALS_KEY_VERSION=1
+    APP_ENV=production,PUBLIC_BASE_URL=https://trycommish.app,API_BASE_URL=https://api.trycommish.app,SESSION_COOKIE_DOMAIN=.trycommish.app,CORS_ORIGINS=${{ vars.CORS_ORIGINS || 'https://trycommish.app' }},TRUSTED_PROXY_HOPS=${{ vars.TRUSTED_PROXY_HOPS || '1' }},STRIPE_ENVIRONMENT=${{ vars.STRIPE_ENVIRONMENT || 'test' }},STRIPE_AUTOMATIC_TAX=${{ vars.STRIPE_AUTOMATIC_TAX || 'false' }},R2_ACCOUNT_ID=${{ vars.CLOUDFLARE_ACCOUNT_ID }},R2_EXPORTS_BUCKET=commish-exports,ROOM_BASE_URL=wss://room.trycommish.app,ADVISOR_URL=${{ vars.ADVISOR_URL }},BOARDS_URL=${{ vars.BOARDS_URL }},BOARD_SCHEMA=${{ vars.BOARD_SCHEMA || 'research' }},HOST_FFPC_ENABLED=${{ vars.HOST_FFPC_ENABLED || 'true' }},HOST_YAHOO_ENABLED=${{ vars.HOST_YAHOO_ENABLED || 'true' }},HOST_ESPN_ENABLED=${{ vars.HOST_ESPN_ENABLED || 'true' }},HOST_WRITES_ESPN_LINEUP=${{ vars.HOST_WRITES_ESPN_LINEUP || 'false' }},HOST_CREDENTIALS_KEY_VERSION=1,ALLOWED_HOSTS=${{ vars.ALLOWED_HOSTS || 'api.trycommish.app' }}
   # Secret Manager references, NAME=secret:version.
   API_SECRETS: >-
     DATABASE_URL=DATABASE_URL:latest,WORKOS_CLIENT_ID=WORKOS_CLIENT_ID:latest,WORKOS_API_KEY=WORKOS_API_KEY:latest,WORKOS_COOKIE_PASSWORD=WORKOS_COOKIE_PASSWORD:latest,STRIPE_SECRET_KEY=STRIPE_SECRET_KEY:latest,STRIPE_WEBHOOK_SECRET=STRIPE_WEBHOOK_SECRET:latest,R2_ACCESS_KEY_ID=R2_ACCESS_KEY_ID:latest,R2_SECRET_ACCESS_KEY=R2_SECRET_ACCESS_KEY:latest,SHARE_LINK_KEYS=SHARE_LINK_KEYS:latest,HOST_CREDENTIALS_KEY=HOST_CREDENTIALS_KEY:1,YAHOO_CLIENT_ID=YAHOO_CLIENT_ID:latest,YAHOO_CLIENT_SECRET=YAHOO_CLIENT_SECRET:latest
@@ -39,9 +40,10 @@ env:
     RESEND_API_KEY=RESEND_API_KEY:latest
   # The room reads the database, the session cookie and the board (the
   # research tables, BOARD_SCHEMA). Its LISTEN connection is the direct
-  # endpoint derived from DATABASE_URL (config.DirectURL).
+  # endpoint derived from DATABASE_URL (config.DirectURL). ROOM_BASE_URL's host is the one the room
+  # answers on (ALLOWED_HOSTS unset): its run.app URL gets a 404 but for the probes.
   ROOM_ENV_VARS: >-
-    APP_ENV=production,PUBLIC_BASE_URL=https://trycommish.app,API_BASE_URL=https://api.trycommish.app,SESSION_COOKIE_DOMAIN=.trycommish.app,TRUSTED_PROXY_HOPS=${{ vars.TRUSTED_PROXY_HOPS || '1' }},BOARD_SCHEMA=${{ vars.BOARD_SCHEMA || 'research' }}
+    APP_ENV=production,PUBLIC_BASE_URL=https://trycommish.app,API_BASE_URL=https://api.trycommish.app,ROOM_BASE_URL=wss://room.trycommish.app,SESSION_COOKIE_DOMAIN=.trycommish.app,TRUSTED_PROXY_HOPS=${{ vars.TRUSTED_PROXY_HOPS || '1' }},BOARD_SCHEMA=${{ vars.BOARD_SCHEMA || 'research' }}
   ROOM_SECRETS: >-
     DATABASE_URL=DATABASE_URL:latest,WORKOS_COOKIE_PASSWORD=WORKOS_COOKIE_PASSWORD:latest
 
