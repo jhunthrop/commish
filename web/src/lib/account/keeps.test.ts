@@ -25,8 +25,8 @@ void test('a connect verb for Yahoo and for ESPN', () => {
 void test('connecting ESPN is for any ESPN league and says what the session is kept for', () => {
 	const espn = MEMBER_HOSTS.find((h) => h.lead === 'ESPN')?.text ?? '';
 	assert.match(espn, /public or private/);
-	assert.match(espn, /so your league stays in sync/);
-	assert.doesNotMatch(espn, /a private ESPN league|move/);
+	assert.match(espn, /so your league stays in sync and, when you ask, to make your moves\./);
+	assert.doesNotMatch(espn, /a private ESPN league/);
 });
 
 void test('the copy has no em-dash, no semicolon, no doubled word and no trading words', () => {

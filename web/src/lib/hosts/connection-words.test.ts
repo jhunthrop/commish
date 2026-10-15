@@ -40,10 +40,11 @@ void test('a signed out session says whether ESPN ever accepted it', () => {
 	assert.equal(statusWords({ ...c, host: 'ffpc' }), 'Signed out by FFPC');
 });
 
-void test('the ESPN session sentence says what it is kept for and makes no promise about moves', () => {
+void test('the ESPN session sentence says what it is kept for, the moves the member asks for included', () => {
 	assert.equal(
 		ESPN_CONSENT,
-		'We keep an encrypted copy of your ESPN session so your league stays in sync. Disconnect deletes it at once.'
+		'We keep an encrypted copy of your ESPN session so your league stays in sync and, when you ask, to make your moves. Disconnect deletes it at once.'
 	);
-	assert.doesNotMatch(ESPN_CONSENT, /move|;|—/);
+	assert.match(ESPN_CONSENT, /when you ask, to make your moves/);
+	assert.doesNotMatch(ESPN_CONSENT, /;|—/);
 });

@@ -6,9 +6,10 @@ type HostConnection = components['schemas']['HostConnection'];
 type ConnectedHost = components['schemas']['ConnectedHost'];
 
 /** The words that keep an ESPN session, said beside the verb that connects and on the account page:
- * consent version 2 (api/internal/hosts consentVersions). Change the words, raise the version. */
+ * consent version 3 (api/internal/hosts ESPNConsentVersion), which names the moves a member asks
+ * for; a move needs a connection made at 3. Change the words, raise the version. */
 export const ESPN_CONSENT =
-	'We keep an encrypted copy of your ESPN session so your league stays in sync. Disconnect deletes it at once.';
+	'We keep an encrypted copy of your ESPN session so your league stays in sync and, when you ask, to make your moves. Disconnect deletes it at once.';
 
 const STATUS: Readonly<Record<ConnectedHost, Record<HostConnection['status'], string>>> = {
 	ffpc: { connected: 'Signed in', signed_out: 'Signed out by FFPC' },
