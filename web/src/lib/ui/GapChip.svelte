@@ -11,7 +11,7 @@
 
 	const tone = $derived(gap === null || gap === 0 ? 'even' : gap > 0 ? 'gain' : 'loss');
 	const text = $derived.by(() => {
-		if (gap === null) return 'No ADP yet';
+		if (gap === null) return 'No ADP';
 		if (gap === 0) return 'Same spot';
 		return `${plural(Math.abs(gap), 'pick')} ${gap > 0 ? 'later' : 'earlier'}`;
 	});
