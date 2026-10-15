@@ -74,6 +74,11 @@ transfer 60 KB as the target and 72 KB as the deploy gate (the Svelte and Svelte
 CLS 0.05 everywhere. Collected: the board, a player page and the record. The system page is a noindex documentation page, not a nightly page, and is not held to the nightly budget.
 `.github/workflows/web.yml` runs check, lint, the timed build (budget four minutes), Lighthouse and
 the deploy to the workers.dev preview, on a push to main touching `web/` and on `nightly-run`.
+The workers.dev address is also where Disney's ESPN sign-in runs (`src/lib/site/origins.ts`), so it
+must stay on. Local dev (`npm run dev`, `npm run preview`) and preview-version URLs cannot finish
+Disney's sign-in: the window opens on the production workers.dev address and hands the two ESPN
+values to `https://trycommish.app` only, so another origin never receives them. Connect ESPN there
+falls to the paste form, which works anywhere.
 
 The client loads the Svelte runtime and the components four or more routes share as two files
 (`vite.config.ts`), which keeps a nightly page's script requests near ten and under the budget. Only

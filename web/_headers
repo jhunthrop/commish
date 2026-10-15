@@ -12,10 +12,10 @@
   Referrer-Policy: no-referrer
   X-Content-Type-Options: nosniff
 /espn-responder
-  Content-Security-Policy: default-src 'none'; script-src https://cdn.registerdisney.go.com; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'
+  Content-Security-Policy: default-src 'none'; script-src 'self' https://cdn.registerdisney.go.com; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'
   Referrer-Policy: no-referrer
   X-Content-Type-Options: nosniff
 /espn-responder.html
-  Content-Security-Policy: default-src 'none'; script-src https://cdn.registerdisney.go.com; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'
+  Content-Security-Policy: default-src 'none'; script-src 'self' https://cdn.registerdisney.go.com; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'
   Referrer-Policy: no-referrer
   X-Content-Type-Options: nosniff

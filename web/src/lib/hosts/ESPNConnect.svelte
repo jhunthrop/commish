@@ -8,9 +8,10 @@
 	import { ApiError, ESPN_CONSENT, hostsApi, type HostLeague } from './api.ts';
 	import { signInWithDisney } from './espn-oneid.ts';
 
-	/** Connect ESPN: one verb opens Disney's own sign-in on this page, and the session it hands back is
-	 * kept encrypted. The two values can be pasted from ESPN's site instead, the way in when Disney's
-	 * sign-in does not hand them over. */
+	/** Connect ESPN: one verb opens Disney's own sign-in in a window of its own on the workers.dev
+	 * origin (espn-oneid.ts), which hands the session back to this page, and this page sends it to
+	 * the API, which keeps it encrypted. The two values can be pasted from ESPN's site instead, the
+	 * way in when Disney's sign-in does not hand them over. */
 	interface Props {
 		/** A line above the verb: why a connection is asked for again. */
 		reason?: string;
