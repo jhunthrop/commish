@@ -12,6 +12,7 @@ import {
 	dropWords,
 	gainFigure,
 	gameWords,
+	isScreen,
 	lastGamesWords,
 	lineupDecision,
 	moveWords,
@@ -80,6 +81,11 @@ const trade: TradeRow = {
 	their_gain: 0.31,
 	close_for_them: true
 };
+
+void test('only the three screens are pages under a league', () => {
+	assert.ok(isScreen('start') && isScreen('waivers') && isScreen('trades'));
+	assert.equal(isScreen('pool'), false);
+});
 
 void test('the verb names the host as the place it happens', () => {
 	assert.equal(verbWords('start', 'sleeper'), 'Set it on Sleeper');

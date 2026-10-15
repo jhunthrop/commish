@@ -24,18 +24,14 @@ const BOARD_PARTS =
  * call the API. */
 const USER_PAGE_PARTS =
 	/[\\/]src[\\/]lib[\\/](room|account|api|sheet|pass|companion)[\\/]|[\\/]src[\\/]lib[\\/]ui[\\/](CallPanel|TeamPanel|PickStrip|OddsCell|ToneChip|Stepper|TextInput|ScoreBug|SinceStrip|Keys)\./;
-/** A followed league's own parts that its page and its three in-season screens all draw: the row,
- * the board read, the tabs and the switch's follow. One file for those four pages. */
-const LEAGUE_PARTS =
-	/[\\/]src[\\/]lib[\\/]league[\\/](LeagueRow|board|follow-switch\.svelte|inseason[\\/](LeagueTabs|tabs))\./;
-/** The in-season screens' own parts (start and sit, waivers, trades): one file for the three, none
- * of it on the league page or anywhere else. */
-const IN_SEASON_PARTS = /[\\/]src[\\/]lib[\\/]league[\\/]inseason[\\/]/;
-/** What only a followed league's pages, the account's leagues and the attach page run: the league
- * page's words (league/model.ts), the league calls (league/api.ts) and the switch's choice made on
- * opening a league (context/choose). No nightly page loads them with the page, so each stays its
- * own file however many league pages share it. */
-const LEAGUE_ALONE = /[\\/]src[\\/]lib[\\/](league[\\/](model|api)\.|context[\\/]choose\.svelte\.)/;
+/** What only a followed league's pages (the league page and its three in-season screens), the
+ * account's leagues and the attach page run: the league row, the board read, the league's words and
+ * calls, the in-season screens and the switch's choice made on opening a league. Four league pages
+ * share them, so they are kept out of the shared chunk by name, and the bundler splits them among
+ * the pages that load them. (A group of their own would pull in everything they import, the API
+ * client too, and land it on every page that reads the API.) */
+const LEAGUE_PAGE_PARTS =
+	/[\\/]src[\\/]lib[\\/](league[\\/](LeagueRow|board|model|api|follow-switch\.svelte)\.|league[\\/]inseason[\\/]|context[\\/]choose\.svelte\.)/;
 /** A component joins the shared chunk once this many routes use it. Fewer, and every page would
  * carry code only a couple of pages run. */
 const SHARED_BY_ROUTES = 4;
@@ -82,9 +78,7 @@ export default defineConfig({
 								!USER_PAGE_PARTS.test(id) &&
 								!ROW_PARTS.test(id) &&
 								!BOARD_PARTS.test(id) &&
-								!LEAGUE_PARTS.test(id) &&
-								!IN_SEASON_PARTS.test(id) &&
-								!LEAGUE_ALONE.test(id),
+								!LEAGUE_PAGE_PARTS.test(id),
 							minShareCount: SHARED_BY_ROUTES,
 							priority: 1
 						},

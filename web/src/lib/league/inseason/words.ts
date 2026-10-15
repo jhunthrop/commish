@@ -20,8 +20,14 @@ import type {
 	WeekFacts
 } from './types.ts';
 
-/** The three screens, by the decision each makes. */
-export type InSeasonScreen = 'start' | 'waivers' | 'trades';
+/** The three screens, by the decision each makes, as their route's segment names them. */
+const SCREENS = ['start', 'waivers', 'trades'] as const;
+export type InSeasonScreen = (typeof SCREENS)[number];
+
+/** Whether a route's segment names an in-season screen. */
+export function isScreen(segment: string): segment is InSeasonScreen {
+	return (SCREENS as readonly string[]).includes(segment);
+}
 
 /** How a gain and a points-over-replacement figure print: one decimal. */
 export const GAIN_DECIMALS = 1;

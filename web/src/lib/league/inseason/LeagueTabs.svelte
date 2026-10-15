@@ -1,7 +1,7 @@
 <script lang="ts">
 	import Chip from '#lib/ui/Chip.svelte';
 	import ChipGroup from '#lib/ui/ChipGroup.svelte';
-	import { LEAGUE_TABS, type LeagueTab } from './tabs.ts';
+	import { LEAGUE_TABS, tabHref, type LeagueTab } from './tabs.ts';
 
 	/** A followed league's pages under its title: the league itself, then start and sit, waivers and
 	 * trades. Each a link, the page you are on pressed. */
@@ -16,7 +16,7 @@
 <nav class="tabs" aria-label="Your league's pages">
 	<ChipGroup label="Your league's pages">
 		{#each LEAGUE_TABS as tab (tab.tab)}
-			<Chip href={tab.href(id)} pressed={tab.tab === current}>{tab.label}</Chip>
+			<Chip href={tabHref(tab.tab, id)} pressed={tab.tab === current}>{tab.label}</Chip>
 		{/each}
 	</ChipGroup>
 </nav>
