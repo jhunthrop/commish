@@ -8,11 +8,13 @@ from typing import Any, cast
 
 from sqlalchemy import Connection
 
+from research.capsules.config import CAPSULE_CONFIG
 from research.capsules.facts.season_usage import Figure
 from research.capsules.facts.season_usage_reads import season_usage_by_player
 from research.pipeline.nflverse.participation import NflverseSource, ParticipationMetric
 from research.pipeline.nflverse.pbp import PBP_PLAYER_SOURCE, PbpPlayerMetric
 
+_ON = CAPSULE_CONFIG.sources_on_pages
 _AS_OF = datetime(2026, 10, 15, tzinfo=UTC)
 _SNAPS = (NflverseSource.SNAP_COUNTS, ParticipationMetric.OFFENSIVE_SNAPS)
 
@@ -59,14 +61,14 @@ def test_club_totals_count_everyone_and_a_quiet_played_week_counts_at_zero() -> 
     ]
     teams = {(p, w): "ATL" for p in ("back", "teammate") for w in (1, 2, 3, 4)}
     store = cast(Connection, _Store(facts, teams))
-    usage = season_usage_by_player(store, 2026, {"back": "RB"}, _AS_OF, ftn_on=False)["back"]
+    usage = season_usage_by_player(store, 2026, {"back": "RB"}, _AS_OF, on_pages=_ON)["back"]
     share = next(f for f in usage.figures if f.key == Figure.RED_ZONE_SHARE)
     assert (share.count, share.out_of, share.weeks) == (11, 24, (1, 2, 3))
     assert usage.weeks == (1, 2, 3), "a week of special teams alone is not his"
     assert (usage.first_week, usage.last_week) == (1, 3)
-    assert set(season_usage_by_player(store, 2026, {"back": "RB"}, _AS_OF, ftn_on=False)) == {"back"}
+    assert set(season_usage_by_player(store, 2026, {"back": "RB"}, _AS_OF, on_pages=_ON)) == {"back"}
 
 
 def test_nothing_before_the_season_has_a_play_by_play_week() -> None:
     store = cast(Connection, _Store([(1, "back", *_SNAPS, 30.0)], {("back", 1): "ATL"}))
-    assert season_usage_by_player(store, 2026, {"back": "RB"}, _AS_OF, ftn_on=False) == {}
+    assert season_usage_by_player(store, 2026, {"back": "RB"}, _AS_OF, on_pages=_ON) == {}

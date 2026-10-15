@@ -7,7 +7,7 @@ other than the page's is a validator violation and a page finding, so a stray is
 
 A BOARD RANK CLAIM is his own position code and a number ("RB101", "QB4") in a sentence that speaks
 of our board ("our board", "our number", "we have him", "puts him at", ...), unless the code is a
-season finish or a usage rank the sheet states with its own basis (followed by "among", "finish",
+season finish or a usage rank the sheet states with its own basis (followed by "among", "of <n>", "finish",
 "season", "in", "last", "two seasons ago"), or a roster slot ("your QB1", "a usable RB3"). An overall
 claim is "rank 422 overall", "overall rank 12" or "422nd overall" in a sentence about our board (fix
 round 3, R3); elsewhere "136th overall" is an NFL draft slot and "ranked 3 overall by scouts" is not
@@ -24,7 +24,8 @@ _BOARD_TALK: Final = re.compile(
     re.IGNORECASE,
 )
 _NOT_BOARD_AFTER: Final = re.compile(
-    r"^\s*(?:among|finish|season|in\b|last\b|usage|points?\b|(?:\w+ )?(?:seasons?|years?) ago)", re.IGNORECASE
+    r"^\s*(?:among|of\s+(?:the\s+)?\d|finish|season|in\b|last\b|usage|points?\b|(?:\w+ )?(?:seasons?|years?) ago)",
+    re.IGNORECASE,
 )
 _SLOT_BEFORE: Final = re.compile(
     r"(?:\byour|\ba|\ban|locked-in|true|weekly|usable|solid|reliable|startable|instead of)\s+$", re.IGNORECASE

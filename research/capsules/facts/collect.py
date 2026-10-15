@@ -185,7 +185,7 @@ def collect_color(
         vegas_win_totals_by_team(conn, PRODUCT_SEASON, as_of),
         population.universe_ids,
         collect_depth_facts(conn, depth_options, history, played),
-        season_usage_by_player(conn, PRODUCT_SEASON, positions, as_of, ftn_on=CAPSULE_CONFIG.ftn_charting_on_pages),
+        season_usage_by_player(conn, PRODUCT_SEASON, positions, as_of, on_pages=CAPSULE_CONFIG.sources_on_pages),
     )
 
 

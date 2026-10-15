@@ -12,19 +12,14 @@ from types import MappingProxyType
 from typing import TYPE_CHECKING, Final
 
 from research.capsules.facts.model import SeasonFigure, SeasonUsage
-from research.capsules.facts.season_usage import Figure
+from research.capsules.facts.season_usage import NEUTRAL_FIGURES, Figure
 from research.capsules.render_season import week_list
-from research.capsules.render_words import POSITION_PLURAL, signed, week_of, whole
+from research.capsules.render_words import POSITION_PLURAL, percent, rank_where, signed, week_of, whole
 from research.model.domain import Position
-from research.model.jsmath import js_round, js_to_fixed
-from research.pipeline.jscompat import js_string
+from research.model.jsmath import js_to_fixed
 
 if TYPE_CHECKING:
     from research.capsules.facts.build import PlayerFacts
-
-
-def percent(fraction: float) -> str:
-    return f"{js_string(js_round(fraction * 100))}%"
 
 
 def tenths(value: float) -> str:
@@ -91,7 +86,7 @@ FIGURE_WORDS: Final = MappingProxyType({
         "tracked attempts",
     ),
     Figure.COMPLETION_OVER_EXPECTED: FigureWords(
-        lambda f: f"Completion rate over expectation: {signed(f.value)} points over {whole(f.out_of)} tracked attempts",
+        lambda f: f"Completion rate over expectation: {signed(f.value)} percentage points over {whole(f.out_of)} tracked attempts",
         "tracked attempts",
     ),
     Figure.BLITZ_RATE: FigureWords(
@@ -105,18 +100,10 @@ FIGURE_WORDS: Final = MappingProxyType({
 
 
 def _rank_clause(figure: SeasonFigure, position: Position) -> str:
-    rank = figure.rank
-    if rank is None:
+    if figure.rank is None:
         return ""
-    among = (
-        f"{position}{rank.position_rank} among {rank.qualifier_count} {POSITION_PLURAL[position]} with "
-        f"{whole(figure.floor)} or more {FIGURE_WORDS[figure.key].floor_unit}"
-    )
-    if rank.position_rank == 1:
-        return f", {among}, best at the position"
-    if rank.named_neighbor is not None:
-        return f", {among}, one spot behind {rank.named_neighbor}"
-    return f", {among}"
+    among = f"{POSITION_PLURAL[position]} with {whole(figure.floor)} or more {FIGURE_WORDS[figure.key].floor_unit}"
+    return f", {rank_where(position, figure.rank, among, neutral=figure.key in NEUTRAL_FIGURES)}"
 
 
 def week_span(usage: SeasonUsage) -> str:

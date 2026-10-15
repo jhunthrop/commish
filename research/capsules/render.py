@@ -23,7 +23,7 @@ from research.capsules.facts.model import (
 from research.capsules.render_depth import render_depth_section
 from research.capsules.render_season import bye_line, injury_line, season_section, today_line
 from research.capsules.render_usage import season_usage_section
-from research.capsules.render_words import ranked_clause, signed, week_of, whole
+from research.capsules.render_words import percent, ranked_clause, signed, week_of, whole
 from research.capsules.voice_rules import in_fantasy_words
 from research.model.jsmath import js_round, js_to_fixed
 from research.pipeline.jscompat import js_string
@@ -113,7 +113,7 @@ def _news_lines(facts: PlayerFacts) -> list[str]:
 
 
 def _percent(value: float) -> str:
-    return f"{js_to_fixed(value * 100, 1)}%"
+    return percent(value, 1)
 
 
 def _story_line(facts: PlayerFacts) -> str | None:

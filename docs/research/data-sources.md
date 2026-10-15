@@ -52,7 +52,7 @@ nflverse injuries, weekly rosters, depth charts, draft picks, team weekly stats,
 - The site carries no FTN credit today, and whether a paid page's prose built on FTN figures is an
   adaptation the share-alike term reaches is a question for counsel, not for this lane.
 - So the ingest stores FTN's charting (storage is not sharing), and the capsule writer's sheet carries
-  no FTN-derived figure while `CapsuleConfig.ftn_charting_on_pages` is False (`research/capsules/config.py`).
+  no FTN-derived figure while `nflverse_ftn_charting` is out of `CapsuleConfig.sources_on_pages`, the one licence gate per source (NGS and PFR are in it, flagged for counsel above; a ruling on any source is a flip there) (`research/capsules/config.py`).
   Turning it on wants the credit on the page and the share-alike ruling first.
 
 ## Not tracked, and why

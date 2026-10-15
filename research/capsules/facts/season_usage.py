@@ -6,13 +6,17 @@ carries what it was taken from. A figure is on the sheet only when its sample cl
 floor (`Rule.floor`, in the denominator's own unit): a two-route week never produces a rate. A player
 the feeds hold nothing for has no figure, never a zero. Ranked figures are ranked among his
 position's peers who cleared the same floor; figures whose better end is a matter of taste (a
-pressure rate, a time to throw, drops) are stated, not ranked.
+pressure rate, a time to throw, drops) are stated, not ranked, and a figure that describes a role
+rather than a quality (`Rule.neutral`, the depth of target) is ranked without "best".
 
 The team shares are taken over the weeks he played (an offensive snap, or a carry or target in the
 play-by-play), against his club's own totals in those weeks, his club that week being the one the
-store places him on. FTN's charted figures are on the sheet only when `ftn_on` (`CapsuleConfig.
-ftn_charting_on_pages`): FTN releases its charting under CC-BY-SA 4.0 with attribution to FTN Data
-via nflverse, which the page does not yet carry.
+store places him on. A team share needs a real role of his own to appear at all (`Pool`), and a
+negative share (air yards lost to screens) is left off.
+
+A figure reaches the sheet only when every source it reads is cleared for the page
+(`CapsuleConfig.sources_on_pages`, one licence gate per source): FTN's charting is off until the page
+carries its credit and its share-alike term is ruled on; a ruling on any source is a config flip.
 """
 
 from collections.abc import Mapping, Sequence
@@ -118,8 +122,13 @@ class Rule:
     floor: float
     ranked: bool
     count_is_numerator: bool = True
-    ftn: bool = False
     pool: Pool | None = None
+    neutral: bool = False
+
+    @property
+    def sources(self) -> frozenset[str]:
+        """Every store source the figure reads."""
+        return frozenset(name.split(":", 1)[0] for part in _parts(self) for name in part.names)
 
 
 _RECEIVERS: Final = frozenset[Position]({"WR", "TE"})
@@ -147,12 +156,12 @@ RULES: Final = (
     Rule(Figure.AIR_YARDS_SHARE, _RECEIVERS, _own(_AIR_YARDS), _team(_AIR_YARDS), 300, True, pool=_ROLE),
     Rule(
         Figure.TARGET_DEPTH, _RECEIVERS, _own(_AIR_YARDS), _own(_pbp(PbpPlayerMetric.AIR_YARD_TARGETS)), 15, True,
-        count_is_numerator=False,
+        count_is_numerator=False, neutral=True,
     ),
     Rule(Figure.DROPS, _PASS_CATCHERS, _own(metric_key(PFR_SOURCE, "receiving_drops")), _own(_TARGETS), 15, False),
     Rule(
         Figure.CONTESTED_CATCH_RATE, _RECEIVERS, _own(metric_key(FTN_SOURCE, FtnMetric.CONTESTED_CATCHES)),
-        _own(metric_key(FTN_SOURCE, FtnMetric.CONTESTED_TARGETS)), 5, True, ftn=True,
+        _own(metric_key(FTN_SOURCE, FtnMetric.CONTESTED_TARGETS)), 5, True,
     ),
     Rule(
         Figure.SEPARATION, _RECEIVERS,
@@ -188,17 +197,20 @@ RULES: Final = (
     ),
     Rule(
         Figure.BLITZ_RATE, _PASSERS, _own(metric_key(FTN_SOURCE, FtnMetric.BLITZED_DROPBACKS)),
-        _own(metric_key(FTN_SOURCE, FtnMetric.DROPBACKS)), 50, False, ftn=True,
+        _own(metric_key(FTN_SOURCE, FtnMetric.DROPBACKS)), 50, False,
     ),
     Rule(
         Figure.INTERCEPTION_WORTHY, _PASSERS, _own(metric_key(FTN_SOURCE, FtnMetric.INTERCEPTION_WORTHY_THROWS)),
-        _own(metric_key(FTN_SOURCE, FtnMetric.PASS_ATTEMPTS)), 50, False, ftn=True,
+        _own(metric_key(FTN_SOURCE, FtnMetric.PASS_ATTEMPTS)), 50, False,
     ),
 )  # fmt: skip
 
 
-def _parts(rule: Rule) -> tuple[Part, ...]:
+def _parts(rule: "Rule") -> tuple[Part, ...]:
     return (rule.numerator, rule.denominator, *(() if rule.pool is None else (rule.pool.part,)))
+
+
+NEUTRAL_FIGURES: Final = frozenset(rule.key for rule in RULES if rule.neutral)
 
 
 def needed_metrics() -> frozenset[str]:
@@ -225,7 +237,6 @@ class _Sum:
     numerator: float
     denominator: float
     weeks: tuple[int, ...]
-    pooled: bool
 
 
 def _summed(rule: Rule, weeks: Sequence[Week]) -> _Sum | None:
@@ -240,7 +251,9 @@ def _summed(rule: Rule, weeks: Sequence[Week]) -> _Sum | None:
         read.append(week.week)
     if not read or denominator < rule.floor or denominator <= 0:
         return None
-    return _Sum(numerator, denominator, tuple(read), rule.pool is None or role >= rule.pool.floor)
+    if rule.pool is not None and (role < rule.pool.floor or numerator < 0):
+        return None
+    return _Sum(numerator, denominator, tuple(read))
 
 
 @dataclass(frozen=True, slots=True)
@@ -259,19 +272,18 @@ class SeasonInputs:
 def _ranks(rule: Rule, sums: Mapping[str, _Sum], inputs: SeasonInputs) -> dict[str, RankedStat]:
     groups: dict[Position, list[RankableStat]] = {}
     for player_id, total in sums.items():
-        if not total.pooled:
-            continue
         position = inputs.positions[player_id]
         name = inputs.names.get(player_id, player_id)
         groups.setdefault(position, []).append(RankableStat(player_id, name, total.numerator / total.denominator))
     return rank_within_groups(groups)
 
 
-def season_usage_for(inputs: SeasonInputs, *, ftn_on: bool) -> dict[str, SeasonUsage]:
-    """Every player's figures that cleared their floors, by universe id; a player with none is absent."""
+def season_usage_for(inputs: SeasonInputs, *, on_pages: frozenset[str]) -> dict[str, SeasonUsage]:
+    """Every player's figures that cleared their floors and read only sources cleared for the page
+    (`on_pages`), by universe id; a player with none is absent."""
     figures: dict[str, list[SeasonFigure]] = {}
     for rule in RULES:
-        if rule.ftn and not ftn_on:
+        if not rule.sources <= on_pages:
             continue
         sums: dict[str, _Sum] = {}
         for player_id, weeks in inputs.weeks.items():

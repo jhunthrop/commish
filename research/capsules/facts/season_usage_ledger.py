@@ -10,7 +10,7 @@ from typing import Final
 
 from research.capsules.facts.ledger import share_numbers
 from research.capsules.facts.model import SeasonUsage
-from research.capsules.facts.season_usage import Figure
+from research.capsules.facts.season_usage import NEUTRAL_FIGURES, Figure
 from research.model.jsmath import js_round
 
 PERCENT_FIGURES: Final = frozenset({
@@ -44,4 +44,8 @@ def usage_numbers(usage: SeasonUsage | None) -> list[float]:
 def usage_names(usage: SeasonUsage | None) -> list[str]:
     if usage is None:
         return []
-    return [f.rank.named_neighbor for f in usage.figures if f.rank is not None and f.rank.named_neighbor is not None]
+    return [
+        f.rank.named_neighbor
+        for f in usage.figures
+        if f.rank is not None and f.rank.named_neighbor is not None and f.key not in NEUTRAL_FIGURES
+    ]

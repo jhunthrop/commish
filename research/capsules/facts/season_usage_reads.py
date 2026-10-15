@@ -89,7 +89,12 @@ def _team_totals(
 
 
 def season_usage_by_player(
-    conn: Connection, season: int, positions: Mapping[str, Position], as_of: datetime, *, ftn_on: bool
+    conn: Connection,
+    season: int,
+    positions: Mapping[str, Position],
+    as_of: datetime,
+    *,
+    on_pages: frozenset[str],
 ) -> dict[str, SeasonUsage]:
     """This season's figures for every player in `positions`, by universe id; empty before any
     week's facts are stored."""
@@ -108,4 +113,4 @@ def season_usage_by_player(
             team = team_totals.get((team_of.get((player, week)) or "", week), {})
             weeks.setdefault(player, []).append(Week(week, own, team))
     inputs = SeasonInputs(season, min(pbp_weeks), max(pbp_weeks), weeks, positions, names_for(conn, list(weeks)))
-    return season_usage_for(inputs, ftn_on=ftn_on)
+    return season_usage_for(inputs, on_pages=on_pages)
