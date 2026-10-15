@@ -15,8 +15,9 @@ store places him on. A team share needs a real role of his own to appear at all 
 negative share (air yards lost to screens) is left off.
 
 A figure reaches the sheet only when every source it reads is cleared for the page
-(`CapsuleConfig.sources_on_pages`, one licence gate per source): FTN's charting is off until the page
-carries its credit and its share-alike term is ruled on; a ruling on any source is a config flip.
+(`CapsuleConfig.sources_on_pages`, one licence gate per source); a ruling on any source is a config
+flip. FTN's charting is on from Lane 41, its credit on the site's `/data` page, and its figures sit at
+the tail of `FIGURE_PRIORITY`, so they fill the four-figure cap only where the others leave room.
 """
 
 from collections.abc import Mapping, Sequence
@@ -295,10 +296,12 @@ FIGURE_PRIORITY: Final = (
     Figure.TIME_TO_THROW,
     Figure.INSIDE_TEN_SHARE,
     Figure.TARGET_DEPTH,
+    Figure.DROPS,
+    # FTN's charting last (Lane 41): it fills the cap only where every other figure leaves room, so
+    # turning it on never takes a figure off a sheet that already carried four.
     Figure.CONTESTED_CATCH_RATE,
     Figure.BLITZ_RATE,
     Figure.INTERCEPTION_WORTHY,
-    Figure.DROPS,
 )
 
 

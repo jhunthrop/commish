@@ -8,7 +8,7 @@ capsule gate (the unwritten share and no written sentence on two pages), and rep
 cost in calls and tokens.
 """
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -55,6 +55,35 @@ class Choice:
     players: tuple[str, ...] = ()
     count: int = 10
     spread: int = 50
+    # The run's gateway calls at most (None: no cap): a player starts only if his worst case fits.
+    call_budget: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class Trial:
+    """What a trial wrote, and the chosen players it never started because the call budget could not
+    cover a page's worst case."""
+
+    written: tuple[Written, ...]
+    unstarted: tuple[str, ...]
+
+
+def within_calls[S, R](
+    subjects: Sequence[S], write: Callable[[S], R], calls_of: Callable[[R], int], call_budget: int | None
+) -> tuple[list[R], list[S]]:
+    """Writes subjects in order, refusing to start one whose worst case (the per-player call ceiling,
+    `max_gateway_calls_per_player`) would take the run past `call_budget`, so the budget is a hard stop;
+    the subjects left are returned unstarted."""
+    worst = CAPSULE_CONFIG.max_gateway_calls_per_player
+    done: list[R] = []
+    spent = 0
+    for index, subject in enumerate(subjects):
+        if call_budget is not None and spent + worst > call_budget:
+            return done, list(subjects[index:])
+        result = write(subject)
+        spent += calls_of(result)
+        done.append(result)
+    return done, []
 
 
 def _chosen(subjects: Sequence[Subject], choice: Choice) -> list[Subject]:
@@ -68,27 +97,28 @@ def _chosen(subjects: Sequence[Subject], choice: Choice) -> list[Subject]:
     return list(subjects[:: max(1, spread)][:count])
 
 
-def write_chosen(engine: Engine, gateway: GatewayClient, as_of: datetime, choice: Choice) -> list[Written]:
-    """Writes the chosen players' capsules and gates each stored one."""
+def write_chosen(engine: Engine, gateway: GatewayClient, as_of: datetime, choice: Choice) -> Trial:
+    """Writes the chosen players' capsules, inside the choice's call budget, and gates each stored one."""
     with engine.connect() as conn:
         subjects = subjects_of(conn, as_of)
         rows = {row.player_id: row for row in board_rows(conn, PRODUCT_SEASON, as_of)}
         stored = stored_capsules_for(conn, [s.universe_id for s in subjects])
     worn = worn_phrases(subjects, stored)
-    written: list[Written] = []
-    for subject in _chosen(subjects, choice):
+
+    def write(subject: Subject) -> Written:
         result, _, _ = write_one(engine, subject, stored.get(subject.universe_id), gateway, worn)
         row = rows[subject.facts.identity.id]
-        numbers = page_numbers(page_values_of(row))
         findings = capsule_findings(
             subject.facts.identity.id,
             (result.compact.text, result.full.text),
-            numbers,
+            page_numbers(page_values_of(row)),
             subject.facts.name_ledger,
             clock_of(subject.facts),
         )
-        written.append(Written(subject, row, result, tuple(findings)))
-    return written
+        return Written(subject, row, result, tuple(findings))
+
+    written, unstarted = within_calls(_chosen(subjects, choice), write, lambda w: w.result.calls, choice.call_budget)
+    return Trial(tuple(written), tuple(s.facts.identity.name for s in unstarted))
 
 
 def gate_written(engine: Engine, written: Sequence[Written], as_of: datetime) -> list[str]:

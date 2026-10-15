@@ -2,8 +2,9 @@
 
     facts <provider id>               one player's fact sheet (the narrow read), as JSON
     prompt <provider id>              the user message the writer would be sent for him
-    write [--players a,b] [--count 10] [--spread 50]
-                                      write and gate capsules for chosen board players: paid calls
+    write [--players a,b] [--count 10] [--spread 50] [--budget CALLS]
+                                      write and gate capsules for chosen board players: paid calls,
+                                      never starting a player whose worst case would pass --budget
     sweep [--budget N]                the nightly sweep: every player whose facts moved (phase D's run)
     queue --slugs a,b                 stamp these pages' capsules (by their public slug) for the next
                                       capsule step to rewrite; every slug resolves or nothing is stamped
@@ -70,15 +71,19 @@ def _facts(engine: Engine, player_id: str, prompt: bool) -> int:
     return 0
 
 
-def _write(engine: Engine, players: Sequence[str], count: int, spread: int) -> int:
+def _write(engine: Engine, choice: Choice) -> int:
     with httpx.Client() as http:
         gateway = _gateway(http)
         now = datetime.now(UTC)
-        written = write_chosen(engine, gateway, now, Choice(tuple(players), count, spread))
-    report = gate_written(engine, written, now)
-    for line in report:
+        trial = write_chosen(engine, gateway, now, choice)
+    for line in gate_written(engine, trial.written, now):
         _out(line)
-    return 0 if all(not w.findings for w in written) else 1
+    if trial.unstarted:
+        _out(
+            f"budget: {len(trial.unstarted)} chosen players not started, their worst case would pass "
+            f"{choice.call_budget} calls: {', '.join(trial.unstarted)}"
+        )
+    return 0 if all(not w.findings for w in trial.written) and not trial.unstarted else 1
 
 
 def _sweep(engine: Engine, budget: int) -> int:
@@ -142,6 +147,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     write.add_argument("--count", type=int, default=10)
     write.add_argument("--spread", type=int, default=50)
+    write.add_argument(
+        "--budget",
+        type=int,
+        default=None,
+        help="the run's gateway calls at most; a player starts only if his worst case fits",
+    )
     sweep = sub.add_parser("sweep", help="the nightly sweep")
     sweep.add_argument("--budget", type=int, default=CAPSULE_CONFIG.sweep_generation_budget)
     queue = sub.add_parser("queue", help="stamp named pages' capsules for the next capsule step to rewrite")
@@ -159,8 +170,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.command in ("facts", "prompt"):
         return _facts(engine, args.player_id, args.command == "prompt")
     if args.command == "write":
-        players = [p for p in args.players.split(",") if p]
-        return _write(engine, players, args.count, args.spread)
+        players = tuple(p for p in args.players.split(",") if p)
+        return _write(engine, Choice(players, args.count, args.spread, args.budget))
     if args.command in ("export", "import"):
         return _transfer(engine, args)
     if args.command == "queue":

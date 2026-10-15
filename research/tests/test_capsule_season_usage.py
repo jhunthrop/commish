@@ -16,7 +16,10 @@ from research.capsules.voice_rules import EM_DASH, SEMICOLON
 from research.model.domain import Position
 from research.pipeline.nflverse.ftn import FTN_SOURCE, FtnMetric
 from research.pipeline.nflverse.ngs import NGS_SOURCE
+from research.pipeline.nflverse.participation import NflverseSource, ParticipationMetric
 from research.pipeline.nflverse.pbp import PBP_PLAYER_SOURCE, PbpPlayerMetric
+from research.pipeline.nflverse.pbp_passers import PBP_PASSER_SOURCE, PasserMetric
+from research.pipeline.nflverse.pfr_advstats import PFR_SOURCE
 
 _ON = CAPSULE_CONFIG.sources_on_pages
 
@@ -121,7 +124,8 @@ def test_each_source_is_its_own_licence_gate() -> None:
     weeks = {"wr": [week(1), week(2)]}
     assert season_usage_for(_inputs(weeks, {"wr": "WR"}), on_pages=_ON - {NGS_SOURCE}) == {}
     assert _figure(season_usage_for(_inputs(weeks, {"wr": "WR"}), on_pages=_ON), "wr", Figure.SEPARATION)
-    assert FTN_SOURCE not in CAPSULE_CONFIG.sources_on_pages
+    # FTN's charting is on pages from Lane 41, its credit on the site's `/data` page.
+    assert FTN_SOURCE in CAPSULE_CONFIG.sources_on_pages
 
 
 def test_ftn_charting_reaches_the_sheet_only_when_switched_on() -> None:
@@ -133,8 +137,8 @@ def test_ftn_charting_reaches_the_sheet_only_when_switched_on() -> None:
         return Week(n, own, {})
 
     weeks = {"wr": [week(1), week(2)]}
-    assert season_usage_for(_inputs(weeks, {"wr": "WR"}), on_pages=_ON) == {}
-    on = season_usage_for(_inputs(weeks, {"wr": "WR"}), on_pages=_ON | {FTN_SOURCE})
+    assert season_usage_for(_inputs(weeks, {"wr": "WR"}), on_pages=_ON - {FTN_SOURCE}) == {}
+    on = season_usage_for(_inputs(weeks, {"wr": "WR"}), on_pages=_ON)
     contested = _figure(on, "wr", Figure.CONTESTED_CATCH_RATE)
     assert contested is not None
     assert (contested.value, contested.count, contested.out_of) == (0.5, 4, 8)
@@ -194,3 +198,46 @@ def test_a_sheet_carries_at_most_four_figures_the_most_telling_first() -> None:
     assert [f.key for f in usage.figures] == [
         Figure.RED_ZONE_SHARE, Figure.AIR_YARDS_SHARE, Figure.SEPARATION, Figure.INSIDE_TEN_SHARE,
     ]  # fmt: skip
+
+
+def test_ftn_figures_sit_inside_the_four_figure_cap_never_a_fifth() -> None:
+    """A passer with every figure: the cap keeps the NFL's and PFR's three, then FTN's blitz rate, and
+    leaves interception-worthy throws off (Lane 41: FTN joins inside the priority order)."""
+    own = {
+        metric_key(PFR_SOURCE, "times_pressured"): 12.0,
+        metric_key(PBP_PASSER_SOURCE, PasserMetric.DROPBACKS): 40.0,
+        metric_key(NGS_SOURCE, "pass_avg_time_to_throw"): 2.8,
+        metric_key(NGS_SOURCE, "pass_completion_pct_above_expectation"): 1.5,
+        metric_key(NGS_SOURCE, "pass_attempts"): 35.0,
+        metric_key(FTN_SOURCE, FtnMetric.BLITZED_DROPBACKS): 12.0,
+        metric_key(FTN_SOURCE, FtnMetric.DROPBACKS): 40.0,
+        metric_key(FTN_SOURCE, FtnMetric.INTERCEPTION_WORTHY_THROWS): 1.0,
+        metric_key(FTN_SOURCE, FtnMetric.PASS_ATTEMPTS): 35.0,
+    }
+    weeks = {"qb": [Week(1, own, {}), Week(2, own, {})]}
+    usage = season_usage_for(_inputs(weeks, {"qb": "QB"}), on_pages=_ON)["qb"]
+    assert [f.key for f in usage.figures] == [
+        Figure.PRESSURE_RATE, Figure.COMPLETION_OVER_EXPECTED, Figure.TIME_TO_THROW, Figure.BLITZ_RATE,
+    ]  # fmt: skip
+
+
+def test_turning_ftn_on_never_takes_a_figure_off_a_full_sheet() -> None:
+    """A receiver with three higher figures, drops and contested catches keeps drops: FTN's figures are
+    last in the order, so they only fill room the others leave (the Lane 41 review's H1)."""
+    stat_targets = metric_key(NflverseSource.PLAYER_WEEK, ParticipationMetric.TARGETS)
+    own = {
+        _SEPARATION: 3.0, _NGS_TARGETS: 10.0,
+        metric_key(NGS_SOURCE, "rec_avg_yac_above_expectation"): 1.2,
+        metric_key(NGS_SOURCE, "rec_receptions"): 7.0,
+        _AIR: 90.0, metric_key(PBP_PLAYER_SOURCE, PbpPlayerMetric.AIR_YARD_TARGETS): 10.0,
+        metric_key(PFR_SOURCE, "receiving_drops"): 1.0, stat_targets: 10.0,
+        metric_key(FTN_SOURCE, FtnMetric.CONTESTED_CATCHES): 2.0,
+        metric_key(FTN_SOURCE, FtnMetric.CONTESTED_TARGETS): 4.0,
+    }  # fmt: skip
+    weeks = {"wr": [Week(1, own, {}), Week(2, own, {})]}
+
+    def chosen(on: frozenset[str]) -> list[str]:
+        return [f.key for f in season_usage_for(_inputs(weeks, {"wr": "WR"}), on_pages=on)["wr"].figures]
+
+    expected = [Figure.SEPARATION, Figure.YAC_OVER_EXPECTED, Figure.TARGET_DEPTH, Figure.DROPS]
+    assert chosen(_ON - {FTN_SOURCE}) == chosen(_ON) == expected
