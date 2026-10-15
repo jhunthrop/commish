@@ -12,7 +12,9 @@ on:
         type: choice
         options: [nightly, nightly-publish, inseason, inseason-capture]
 permissions: { contents: read }
-concurrency: { group: ops-${{ inputs.job }}, cancel-in-progress: false }
+concurrency:
+  group: "ops-${{ inputs.job }}"
+  cancel-in-progress: false
 jobs:
   execute:
     runs-on: ubuntu-latest
