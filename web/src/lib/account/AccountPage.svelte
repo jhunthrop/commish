@@ -10,6 +10,8 @@
 	import { ApiError, apiClient } from '#lib/api/client.ts';
 	import { dayLabel } from '#lib/format/date.ts';
 	import { lazySheet } from '#lib/site/lazy-sheet.svelte.ts';
+	import ActionRow from '#lib/ui/ActionRow.svelte';
+	import ActionRows from '#lib/ui/ActionRows.svelte';
 	import EmptyState from '#lib/ui/EmptyState.svelte';
 	import Fact from '#lib/ui/Fact.svelte';
 	import Panel from '#lib/ui/Panel.svelte';
@@ -39,6 +41,7 @@
 	import AccountConnections from '#lib/hosts/AccountConnections.svelte';
 	import AccountDevices from '#lib/hosts/AccountDevices.svelte';
 	import GroupPasses from './GroupPasses.svelte';
+	import { KEEPS, MEMBER_HOSTS } from './keeps.ts';
 	import { accountLinks } from './links.ts';
 	import { hasFeature } from './features.ts';
 	import { boughtMembership, displayName, mockLine, planWords, sheetLine } from './words.ts';
@@ -47,25 +50,6 @@
 	 * cancel, and sign out. Signed out, the sign-in verb and what an account keeps. The shell is
 	 * prerendered and everything inside it is read from the API in the browser. */
 	const api = accountApi(apiClient(PUBLIC_API_URL), () => navigator.onLine);
-
-	/** What an account keeps, said to a reader who has none yet. */
-	const KEEPS = [
-		{
-			lead: 'Your cheat sheets',
-			text: 'on every device you sign in on, with your notes and tiers'
-		},
-		{ lead: 'Your mock drafts', text: 'and the report on each one' },
-		{
-			lead: 'Your leagues',
-			text: 'on Sleeper or MyFantasyLeague, kept up to date',
-			href: accountLinks.leagueNew()
-		},
-		{
-			lead: 'Your Draft Pass or Membership',
-			text: 'and the receipts for it',
-			href: accountLinks.pass()
-		}
-	];
 
 	let view = $state<AccountState | null>(null);
 	/** The API's sentence for an action that failed, shown beside the action. */
@@ -202,7 +186,25 @@
 			</HeroCard>
 			<section aria-label="What an account keeps">
 				<PanelHead title="What your account keeps" level={2} />
-				<LineList label="What an account keeps" lines={KEEPS} />
+				<LineList
+					label="What an account keeps"
+					lines={KEEPS.map(({ link, ...line }) => ({
+						...line,
+						href: link ? accountLinks[link]() : undefined
+					}))}
+				/>
+			</section>
+			<section aria-label="Hosts to connect">
+				<PanelHead title="Connect a host" level={2} />
+				<ActionRows label="Hosts to connect">
+					{#each MEMBER_HOSTS as host (host.lead)}
+						<ActionRow lead={host.lead} text={host.text}>
+							{#snippet action()}
+								<Quiet size="sm" href={api.signInUrl(accountLinks.account())}>{host.verb}</Quiet>
+							{/snippet}
+						</ActionRow>
+					{/each}
+				</ActionRows>
 			</section>
 		{:else if view.kind === 'offline'}
 			<EmptyState title="You're offline" line="Your account loads as soon as you're back online." />
