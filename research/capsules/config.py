@@ -6,11 +6,20 @@ correction, the repetition measures and the sweep's budget. The measured history
 is the oracle's and is not restated; the voice rules live in `voice_rules.py`.
 """
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Final
 
+from research.errors import ConfigurationError
+from research.pipeline.nflverse.ngs import NGS_SOURCE
+from research.pipeline.nflverse.participation import NflverseSource
+from research.pipeline.nflverse.pbp import PBP_PLAYER_SOURCE
+from research.pipeline.nflverse.pbp_passers import PBP_PASSER_SOURCE
+from research.pipeline.nflverse.pfr_advstats import PFR_SOURCE
+
+# The writer's model, the gateway's slug. A setting: `CAPSULE_MODEL` in the environment overrides it
+# (`writer_settings`); Lane 24 measured the candidates and the coordinator ruled it stays (2026-10-15).
 CAPSULE_MODEL: Final = "zai/glm-5.3-flash"
-_GATEWAY_CALLS_PER_MINUTE: Final = 12
 
 
 @dataclass(frozen=True, slots=True)
@@ -18,6 +27,9 @@ class Retry:
     max_attempts: int = 2
     base_delay_ms: int = 1_500
     rate_limit_backoff_ms: tuple[int, ...] = (20_000, 40_000, 80_000)
+    # The longest `retry-after` a call waits out (the review's M1): honoured however long up to here,
+    # past it the call fails with the reason rather than tying up a writer slot for longer.
+    retry_after_cap_ms: int = 300_000
 
 
 @dataclass(frozen=True, slots=True)
@@ -26,8 +38,25 @@ class Gateway:
     api_key_variable: str = "AI_GATEWAY_API_KEY"
     timeout_ms: int = 20_000
     retry: Retry = Retry()
-    calls_per_minute: int = _GATEWAY_CALLS_PER_MINUTE
-    min_call_spacing_ms: int = round(60_000 / _GATEWAY_CALLS_PER_MINUTE)
+    # The writer's throughput (Lane 24): at most `concurrency` pages in flight at once, every call
+    # drawing a token from one bucket refilled at `calls_per_minute`. The old 12 a minute, strictly
+    # sequential, was a guess after one 429 in a trial and made a full in-season night take hours.
+    # Each is a setting, overridden by its environment variable (`writer_settings`).
+    # The defaults, ruled 2026-10-15: 16 in flight and 600 a minute. The basis: the coordinator's
+    # probe that day (96 capsule-sized calls in flight at once to zai/glm-5.3-flash, all answered, no
+    # 429, no rate-limit header) and Lane 24's 80-page measurement (four models, 3,247 calls at 8 in
+    # flight and 120 a minute, no 429 from the gateway). The gateway states no limit, so the bucket is
+    # a safety valve, not a pace.
+    concurrency: int = 16
+    calls_per_minute: int = 600
+    # The widest pool a run may ask for: each slot holds a database connection (`db.engine.pooled_like`).
+    max_concurrency: int = 64
+    model_variable: str = "CAPSULE_MODEL"
+    concurrency_variable: str = "CAPSULE_CONCURRENCY"
+    calls_per_minute_variable: str = "CAPSULE_CALLS_PER_MINUTE"
+    # The gateway's providers a call may be served by, comma separated (`providerOptions.gateway.only`);
+    # unset lets the gateway route. Lane 24 pinned a rapid host with it for the measurement.
+    providers_variable: str = "CAPSULE_PROVIDERS"
     # The writer does not think before it writes (measured: more written, none throttled, cheaper).
     thinking: bool = False
 
@@ -52,8 +81,15 @@ class Repetition:
     # The six-word spans shared across pages (`capsules.spans`) a prompt quotes: the board's most
     # widely shared to every writer, and a repaired page its own.
     max_quoted_spans: int = 12
-    # The pages written tonight whose spans the next writer call is checked against (`TonightSpans`).
+    # The pages landed tonight whose spans the next writer call is told about and a landing page is
+    # checked against (`landing.TonightWindow`).
     tonight_window_pages: int = 60
+    # The span repair's pages a night, every repair attempt together: the pages carrying the most
+    # shared spans first, the rest counted and left (ruled 2026-10-15: the uncapped pass rewrote about
+    # 403 of 513 carrier pages a night for $0.81 to $1.01 and never converged). Basis: a span rewrite
+    # costs about $0.002 (production 2026-10-15, $1.01 over 509 pages; Lane 24's sample, $0.168 over
+    # 83), so 90 pages keep a night's span repair near $0.18, under the ruled $0.20.
+    span_repair_pages_per_night: int = 90
     opener_words: int = 4
     max_opener_family_share: float = 0.1
     max_refrain_share: float = 0.1
@@ -151,8 +187,22 @@ class CapsuleConfig:
     # and the span repairs rewrite two-page carriers every night, so steady nights spend real budget too,
     # up to the same ceiling. The board-scale measurement is in the Lane 17 report.
     sweep_generation_budget: int = 1000
-    # Zero: every gateway call is spaced at `gateway.min_call_spacing_ms`, which paces the sweep.
-    sweep_pacing_ms: int = 0
+    # The licence gate, one per source: the stores whose figures may reach the writer's sheet (this
+    # season's usage and play, `facts.season_usage`). A counsel ruling on any one is a flip here.
+    # - On: nflverse's own play-by-play and weekly stats (CC-BY 4.0), and Next Gen Stats (the NFL's
+    #   data) and PFR advanced stats (Pro Football Reference's), whose nflverse releases state no
+    #   licence: flagged for counsel in the Lane 23 report and `docs/research/data-sources.md`.
+    # - Off: FTN Data's charting (contested catches, blitz rate, interception-worthy throws), CC-BY-SA
+    #   4.0 with attribution "must be made to FTN Data via nflverse"; the page carries no such credit,
+    #   and the share-alike term is unruled for a paid page. The ingest stores every source either way.
+    sources_on_pages: frozenset[str] = frozenset({
+        PBP_PLAYER_SOURCE,
+        PBP_PASSER_SOURCE,
+        NflverseSource.PLAYER_WEEK,
+        NflverseSource.SNAP_COUNTS,
+        NGS_SOURCE,
+        PFR_SOURCE,
+    })  # fmt: skip
 
     def unwritten_line(self, *, in_season: bool) -> UnwrittenLine:
         """The line in use for a run: in season from the season's first kickoff on, preseason before."""
@@ -167,3 +217,49 @@ class CapsuleConfig:
 
 
 CAPSULE_CONFIG: Final = CapsuleConfig()
+
+
+@dataclass(frozen=True, slots=True)
+class WriterSettings:
+    """The writer's model and throughput for one run, the config's defaults with the environment's
+    overrides applied (`writer_settings`)."""
+
+    model: str
+    concurrency: int
+    calls_per_minute: int
+    providers: tuple[str, ...] = ()
+
+    def line(self) -> str:
+        routed = ", ".join(self.providers) if self.providers else "the gateway's routing"
+        return (
+            f"writer {self.model} via {routed}, {self.concurrency} pages at once, "
+            f"at most {self.calls_per_minute} calls a minute"
+        )
+
+
+def _positive(environ: Mapping[str, str], variable: str, default: int, maximum: int | None = None) -> int:
+    raw = environ.get(variable, "").strip()
+    if not raw:
+        return default
+    try:
+        value = int(raw)
+    except ValueError:
+        raise ConfigurationError(f"{variable} must be a whole number, got {raw!r}.") from None
+    if value < 1:
+        raise ConfigurationError(f"{variable} must be at least 1, got {value}.")
+    if maximum is not None and value > maximum:
+        raise ConfigurationError(f"{variable} must be at most {maximum}, got {value}.")
+    return value
+
+
+def writer_settings(environ: Mapping[str, str], gateway: Gateway = CAPSULE_CONFIG.gateway) -> WriterSettings:
+    """The run's writer settings: each environment variable that is set overrides its default, and a
+    malformed one fails the run before any call is made."""
+    model = environ.get(gateway.model_variable, "").strip() or CAPSULE_MODEL
+    providers = tuple(p.strip() for p in environ.get(gateway.providers_variable, "").split(",") if p.strip())
+    return WriterSettings(
+        model,
+        _positive(environ, gateway.concurrency_variable, gateway.concurrency, gateway.max_concurrency),
+        _positive(environ, gateway.calls_per_minute_variable, gateway.calls_per_minute),
+        providers,
+    )

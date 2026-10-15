@@ -12,9 +12,9 @@ across players is a defect. The run fails when
   product's vocabulary, not stock prose; or
 - never for six words in a row (`capsules.spans`, case folded, punctuation stripped, player and club
   names breaking the run) on two or more pages (the live review's M1, as the coordinator ruled it):
-  those are counted, named and repaired within the budget, never a failure. A span the sheets'
-  labelled stats print (a label or a stat name copied word for word, `capsules.span_rules`) is
-  exempt. Spans read the narrative sentences too; the whole-sentence rule reads the two reads only.
+  those are counted, named and repaired within the budget, never a failure. A span the facts
+  print (a rendered sheet or a facts block: a figure's basis or a stat's label copied word for word,
+  `capsules.span_rules`) is exempt. Spans read the narrative sentences too; the whole-sentence rule reads the two reads only.
   Each page's shared spans are kept, joined where they overlap, for the repair's prompt.
 
 Phase D extends this gate (the page findings of `capsules.pull_figures`, the run's other gates);
@@ -34,7 +34,7 @@ from research.capsules.facts.board import board_rows
 from research.capsules.facts.collect import universe_ids_for
 from research.capsules.facts.season_so_far import in_season
 from research.capsules.facts_block import FACTS_SOURCE
-from research.capsules.narrative import normalize_sentence, sentences_verbatim
+from research.capsules.narrative import held_sentences
 from research.capsules.span_rules import span_rules_for
 from research.capsules.spans import (
     Runs,
@@ -98,7 +98,7 @@ class CapsuleGateResult:
             f"{len(self.shared)} written sentences on two pages, {len(self.spans)} six-word spans on two pages or "
             f"more, never a failure ({len(self.span_phrases)} pages carry one, {self.queued} eligible for a span "
             "rewrite: every carrier but the first, as the budget reaches them), "
-            f"{self.exempt_spans} sheet-label spans exempt"
+            f"{self.exempt_spans} spans the facts print exempt"
         )
         examples = "; ".join(
             [
@@ -111,8 +111,7 @@ class CapsuleGateResult:
 
 def _sentences(row: StoredCapsule) -> set[str]:
     """The read's sentences held to uniqueness: normalized, and of at least the minimum length."""
-    normalized = {normalize_sentence(s) for body in (row.body_compact, row.body_full) for s in sentences_verbatim(body)}
-    return {s for s in normalized if len(s.split()) >= CAPSULE_CONFIG.shared_sentence_min_words}
+    return held_sentences((row.body_compact, row.body_full), CAPSULE_CONFIG.shared_sentence_min_words)
 
 
 def shared_written_sentences(rows: Mapping[str, StoredCapsule]) -> tuple[SharedSentence, ...]:

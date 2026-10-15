@@ -91,7 +91,7 @@ func (s *PGSource) LoadScored(ctx context.Context, f Format, source string, asOf
 		return nil, fmt.Errorf("boards: read the directory: %w", err)
 	}
 	defer rows.Close()
-	raw := &Raw{Format: f, Season: s.Season, Source: source, AsOf: asOf.UTC(), Custom: true}
+	raw := &Raw{Format: f, Season: s.Season, Source: source, AsOf: asOf.UTC(), Order: OrderPreseason, Custom: true}
 	for rows.Next() {
 		var p Player
 		var position, universe string

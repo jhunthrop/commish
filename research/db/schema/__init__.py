@@ -9,6 +9,7 @@ Every table lives in the `research` Postgres schema and is defined once here, by
     market        preseason_rosters, preseason_rankings, adp_snapshots
     boards        model_artifacts, the boards and reasons, the register, player_capsules
     custom        preseason_candidates (each board's candidate set), custom_boards (revision 0005)
+    published     published_boards, the published run's board rows (revision 0006)
 
 `alembic/versions/0001_research_schema.py` creates exactly this, and the schema gate checks the
 two agree. What changed from the legacy `public` tables, and why, is in the README; the column
@@ -43,6 +44,7 @@ from research.db.schema.provider import (
     PROVIDER_STAT_LINES,
     PROVIDER_WEEKS,
 )
+from research.db.schema.published import PUBLISHED_BOARDS
 
 __all__ = [
     "ADP_SNAPSHOTS",
@@ -72,6 +74,7 @@ __all__ = [
     "PROVIDER_PLAYERS",
     "PROVIDER_STAT_LINES",
     "PROVIDER_WEEKS",
+    "PUBLISHED_BOARDS",
     "REGISTER_FREEZE_ROWS",
     "REGISTER_GRADE_ROWS",
     "RESEARCH_SCHEMA",

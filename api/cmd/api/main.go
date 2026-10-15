@@ -26,6 +26,7 @@ import (
 	"github.com/jhunthrop/commish/api/internal/entitlements"
 	"github.com/jhunthrop/commish/api/internal/exports"
 	"github.com/jhunthrop/commish/api/internal/httpx"
+	"github.com/jhunthrop/commish/api/internal/inseason"
 	"github.com/jhunthrop/commish/api/internal/leagues"
 	"github.com/jhunthrop/commish/api/internal/leaguesync"
 	"github.com/jhunthrop/commish/api/internal/metrics"
@@ -162,6 +163,12 @@ func build(ctx context.Context, cfg config.API, pool *pgxpool.Pool, obs httpx.Ob
 		return nil, err
 	}
 
+	leagueSync := leagueSyncService(cfg, pool, draftBoards, leagueStore, ents, viewer, ff, yh, es, log)
+	inSeason := &inseason.Service{
+		Leagues: inseason.SyncLeagues{Sync: leagueSync}, Facts: &inseason.Cache{Reads: draftBoards.Schedule, Now: now},
+		Holds: sheetStore, Now: now, Log: log,
+	}
+
 	routes := slices.Concat(
 		server.Health(pool, version),
 		authHandler.Routes(),
@@ -174,7 +181,8 @@ func build(ctx context.Context, cfg config.API, pool *pgxpool.Pool, obs httpx.Ob
 		lobbies.Routes(),
 		companions.Routes(),
 		(&devices.Service{Store: deviceStore, Tokens: bearer, CodeKey: codeKey, Now: now, Log: log}).Routes(),
-		leagueSyncService(cfg, pool, draftBoards, leagueStore, ents, viewer, ff, yh, es, log).Routes(),
+		leagueSync.Routes(),
+		inSeason.Routes(),
 		hostList(ff, yh, es, log),
 		ff.routes(log),
 		yh.routes(cfg, pool, ff, log),

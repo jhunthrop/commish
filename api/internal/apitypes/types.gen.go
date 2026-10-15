@@ -306,6 +306,39 @@ func (e HostConnectionStatus) Valid() bool {
 	}
 }
 
+// Defines values for InjuryDesignationStatus.
+const (
+	InjuryDesignationStatusDoubtful       InjuryDesignationStatus = "doubtful"
+	InjuryDesignationStatusInjuredReserve InjuryDesignationStatus = "injured_reserve"
+	InjuryDesignationStatusNfi            InjuryDesignationStatus = "nfi"
+	InjuryDesignationStatusOut            InjuryDesignationStatus = "out"
+	InjuryDesignationStatusPup            InjuryDesignationStatus = "pup"
+	InjuryDesignationStatusQuestionable   InjuryDesignationStatus = "questionable"
+	InjuryDesignationStatusSuspended      InjuryDesignationStatus = "suspended"
+)
+
+// Valid indicates whether the value is a known member of the InjuryDesignationStatus enum.
+func (e InjuryDesignationStatus) Valid() bool {
+	switch e {
+	case InjuryDesignationStatusDoubtful:
+		return true
+	case InjuryDesignationStatusInjuredReserve:
+		return true
+	case InjuryDesignationStatusNfi:
+		return true
+	case InjuryDesignationStatusOut:
+		return true
+	case InjuryDesignationStatusPup:
+		return true
+	case InjuryDesignationStatusQuestionable:
+		return true
+	case InjuryDesignationStatusSuspended:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for Interval.
 const (
 	IntervalMonth Interval = "month"
@@ -387,6 +420,42 @@ func (e Lineup) Valid() bool {
 	case LineupSuperflex:
 		return true
 	case LineupTwoFlex:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for LineupSlotSlot.
+const (
+	LineupSlotSlotDEF       LineupSlotSlot = "DEF"
+	LineupSlotSlotFLEX      LineupSlotSlot = "FLEX"
+	LineupSlotSlotK         LineupSlotSlot = "K"
+	LineupSlotSlotQB        LineupSlotSlot = "QB"
+	LineupSlotSlotRB        LineupSlotSlot = "RB"
+	LineupSlotSlotSUPERFLEX LineupSlotSlot = "SUPERFLEX"
+	LineupSlotSlotTE        LineupSlotSlot = "TE"
+	LineupSlotSlotWR        LineupSlotSlot = "WR"
+)
+
+// Valid indicates whether the value is a known member of the LineupSlotSlot enum.
+func (e LineupSlotSlot) Valid() bool {
+	switch e {
+	case LineupSlotSlotDEF:
+		return true
+	case LineupSlotSlotFLEX:
+		return true
+	case LineupSlotSlotK:
+		return true
+	case LineupSlotSlotQB:
+		return true
+	case LineupSlotSlotRB:
+		return true
+	case LineupSlotSlotSUPERFLEX:
+		return true
+	case LineupSlotSlotTE:
+		return true
+	case LineupSlotSlotWR:
 		return true
 	default:
 		return false
@@ -492,6 +561,24 @@ func (e MockStatus) Valid() bool {
 	case MockStatusActive:
 		return true
 	case MockStatusComplete:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for OrderBasis.
+const (
+	OrderBasisPreseason    OrderBasis = "preseason"
+	OrderBasisRestOfSeason OrderBasis = "rest_of_season"
+)
+
+// Valid indicates whether the value is a known member of the OrderBasis enum.
+func (e OrderBasis) Valid() bool {
+	switch e {
+	case OrderBasisPreseason:
+		return true
+	case OrderBasisRestOfSeason:
 		return true
 	default:
 		return false
@@ -1247,6 +1334,13 @@ type ExportLink struct {
 // Feature defines model for Feature.
 type Feature string
 
+// GamePoints defines model for GamePoints.
+type GamePoints struct {
+	// Points his points that game under the league's scoring
+	Points float64 `json:"points"`
+	Week   int     `json:"week"`
+}
+
 // GroupPass defines model for GroupPass.
 type GroupPass struct {
 	// ClaimCode the code in the claim link
@@ -1368,6 +1462,16 @@ type ImportSkip struct {
 	Line   int    `json:"line"`
 	Reason string `json:"reason"`
 }
+
+// InjuryDesignation defines model for InjuryDesignation.
+type InjuryDesignation struct {
+	// AsOf the stamp of the injury read that lists it, or of the host read for the host's own IR mark
+	AsOf   time.Time               `json:"as_of"`
+	Status InjuryDesignationStatus `json:"status"`
+}
+
+// InjuryDesignationStatus defines model for InjuryDesignation.Status.
+type InjuryDesignationStatus string
 
 // Interval defines model for Interval.
 type Interval string
@@ -1556,6 +1660,51 @@ type LeagueTeam struct {
 
 // Lineup defines model for Lineup.
 type Lineup string
+
+// LineupAdvice defines model for LineupAdvice.
+type LineupAdvice struct {
+	// Basis the honesty line and the basis of points over replacement
+	Basis string `json:"basis"`
+
+	// Bench everyone else on the active roster, by the same keys (injured reserve and taxi spots left out)
+	Bench []PlayerLine `json:"bench"`
+
+	// HostLineupUrl the host's lineup page, empty when we know none
+	HostLineupUrl string `json:"host_lineup_url"`
+
+	// OrderBasis which order ranks the players: our preseason board, or the rest-of-season order (from week 7, once the API reads it)
+	OrderBasis OrderBasis `json:"order_basis"`
+
+	// ReadAt the league's last host read
+	ReadAt time.Time `json:"read_at"`
+
+	// Refreshed when the order was made
+	Refreshed time.Time `json:"refreshed"`
+
+	// Set true when the host's lineup is already ours
+	Set bool `json:"set"`
+
+	// Slots every starting spot in the league's order (QB, RB, WR, TE, the flex spots, K, DEF); a spot no rostered player can fill is left out
+	Slots []LineupSlot `json:"slots"`
+	Week  int          `json:"week"`
+}
+
+// LineupSlot defines model for LineupSlot.
+type LineupSlot struct {
+	// Changed we start a player the host has on the bench
+	Changed bool `json:"changed"`
+
+	// Host the host lineup's player in this place: the same player when unchanged, the starter we sit for a change, null for a spot the host left empty
+	Host *PlayerLine `json:"host"`
+	Ours PlayerLine  `json:"ours"`
+
+	// Sentence the reason for a change
+	Sentence *string        `json:"sentence"`
+	Slot     LineupSlotSlot `json:"slot"`
+}
+
+// LineupSlotSlot defines model for LineupSlot.Slot.
+type LineupSlotSlot string
 
 // LobbyFilling defines model for LobbyFilling.
 type LobbyFilling struct {
@@ -1776,6 +1925,9 @@ type NamedPick struct {
 	HostName string `json:"host_name"`
 }
 
+// OrderBasis which order ranks the players: our preseason board, or the rest-of-season order (from week 7, once the API reads it)
+type OrderBasis string
+
 // OutcomeRange defines model for OutcomeRange.
 type OutcomeRange struct {
 	Ceiling float64 `json:"ceiling"`
@@ -1848,8 +2000,37 @@ type PlanFeatures struct {
 	Membership []Feature `json:"membership"`
 }
 
+// PlayerLine defines model for PlayerLine.
+type PlayerLine struct {
+	// Facts one player's week; a fact we do not hold is null, never zero
+	Facts WeekFacts `json:"facts"`
+
+	// Held the drafter tags him Hold on a sheet
+	Held   bool         `json:"held"`
+	Player LeaguePlayer `json:"player"`
+
+	// PointsOverReplacement points over replacement a week (the season's over 17 games) for this league, one decimal; null without a projection
+	PointsOverReplacement *float64 `json:"points_over_replacement"`
+
+	// PositionRank his place at his position in our order
+	PositionRank *int `json:"position_rank"`
+}
+
 // PlayerPosition defines model for PlayerPosition.
 type PlayerPosition string
+
+// PointsAllowed defines model for PointsAllowed.
+type PointsAllowed struct {
+	// Of the defenses ranked
+	Of int `json:"of"`
+
+	// PointsAGame the opponent's defense to this position, season to date, under the league's scoring, one decimal
+	PointsAGame float64 `json:"points_a_game"`
+	Position    string  `json:"position"`
+
+	// Rank 1 allowed the fewest
+	Rank int `json:"rank"`
+}
 
 // Price defines model for Price.
 type Price struct {
@@ -2246,6 +2427,112 @@ type SheetUpdate struct {
 	Name string `json:"name"`
 }
 
+// TradeAdvice defines model for TradeAdvice.
+type TradeAdvice struct {
+	Basis string `json:"basis"`
+
+	// HostTradesUrl the host's trade page, empty when we know none
+	HostTradesUrl string `json:"host_trades_url"`
+
+	// OrderBasis which order ranks the players: our preseason board, or the rest-of-season order (from week 7, once the API reads it)
+	OrderBasis OrderBasis `json:"order_basis"`
+	ReadAt     time.Time  `json:"read_at"`
+	Refreshed  time.Time  `json:"refreshed"`
+
+	// Teams every other team
+	Teams []TradeTeam `json:"teams"`
+	Week  int         `json:"week"`
+}
+
+// TradeRecord defines model for TradeRecord.
+type TradeRecord struct {
+	Losses int `json:"losses"`
+	Ties   int `json:"ties"`
+	Wins   int `json:"wins"`
+}
+
+// TradeRow defines model for TradeRow.
+type TradeRow struct {
+	// CloseForThem their gain is under 0.5 a week
+	CloseForThem bool         `json:"close_for_them"`
+	Get          []PlayerLine `json:"get"`
+	Give         []PlayerLine `json:"give"`
+
+	// MyGain points over replacement a week to the drafter's lineup
+	MyGain float64 `json:"my_gain"`
+
+	// TheirGain the same to theirs
+	TheirGain float64 `json:"their_gain"`
+}
+
+// TradeTeam defines model for TradeTeam.
+type TradeTeam struct {
+	Name     string      `json:"name"`
+	Owner    string      `json:"owner"`
+	Record   TradeRecord `json:"record"`
+	RosterId int         `json:"roster_id"`
+
+	// Trades at most 10, best for the drafter first
+	Trades []TradeRow `json:"trades"`
+}
+
+// WaiverAdvice defines model for WaiverAdvice.
+type WaiverAdvice struct {
+	Basis string `json:"basis"`
+
+	// Best the add that gains most
+	Best *WaiverRow `json:"best"`
+
+	// HostWaiversUrl the host's waiver page, empty when we know none
+	HostWaiversUrl string `json:"host_waivers_url"`
+
+	// OrderBasis which order ranks the players: our preseason board, or the rest-of-season order (from week 7, once the API reads it)
+	OrderBasis OrderBasis `json:"order_basis"`
+	ReadAt     time.Time  `json:"read_at"`
+	Refreshed  time.Time  `json:"refreshed"`
+
+	// Rows positive gains first by gain, then the rest by points over replacement, at most 60
+	Rows []WaiverRow `json:"rows"`
+	Week int         `json:"week"`
+}
+
+// WaiverRow defines model for WaiverRow.
+type WaiverRow struct {
+	Add PlayerLine `json:"add"`
+
+	// Drop null when a roster spot is open or there is no move to make
+	Drop *PlayerLine `json:"drop"`
+
+	// Gain points over replacement a week to the lineup, one decimal; above 0 sits above the rule
+	Gain     float64 `json:"gain"`
+	Sentence string  `json:"sentence"`
+
+	// Starts he starts for you this week
+	Starts bool `json:"starts"`
+}
+
+// WeekFacts one player's week; a fact we do not hold is null, never zero
+type WeekFacts struct {
+	AllowedToPosition *PointsAllowed     `json:"allowed_to_position"`
+	Bye               bool               `json:"bye"`
+	Designation       *InjuryDesignation `json:"designation"`
+	Home              *bool              `json:"home"`
+	Kickoff           *time.Time         `json:"kickoff"`
+
+	// LastGames up to three completed games under the league's scoring, newest first
+	LastGames []GamePoints `json:"last_games"`
+
+	// Opponent the opponent's team code, null on bye or when his team is unknown
+	Opponent *string `json:"opponent"`
+
+	// Played his game this week is final
+	Played bool `json:"played"`
+
+	// PointsThisWeek the host's score for him so far, from the matchup, when he starts there and his game has kicked off
+	PointsThisWeek *float64 `json:"points_this_week"`
+	Week           int      `json:"week"`
+}
+
 // YahooConnectInput defines model for YahooConnectInput.
 type YahooConnectInput struct {
 	// ReturnTo a page on the site to come back to once connected, like /league/{id}; the account page when absent
@@ -2336,6 +2623,15 @@ type LeagueSyncResponse struct {
 	RequestId string     `json:"request_id"`
 }
 
+// LineupAdviceResponse defines model for LineupAdviceResponse.
+type LineupAdviceResponse struct {
+	Data      LineupAdvice `json:"data"`
+	Error     *ErrorBody   `json:"error"`
+	Meta      *PageMeta    `json:"meta,omitempty"`
+	Ok        bool         `json:"ok"`
+	RequestId string       `json:"request_id"`
+}
+
 // LobbyRoomResponse defines model for LobbyRoomResponse.
 type LobbyRoomResponse struct {
 	Data      LobbyRoom  `json:"data"`
@@ -2408,6 +2704,24 @@ type SheetResponse struct {
 	RequestId string     `json:"request_id"`
 }
 
+// TradeAdviceResponse defines model for TradeAdviceResponse.
+type TradeAdviceResponse struct {
+	Data      TradeAdvice `json:"data"`
+	Error     *ErrorBody  `json:"error"`
+	Meta      *PageMeta   `json:"meta,omitempty"`
+	Ok        bool        `json:"ok"`
+	RequestId string      `json:"request_id"`
+}
+
+// WaiverAdviceResponse defines model for WaiverAdviceResponse.
+type WaiverAdviceResponse struct {
+	Data      WaiverAdvice `json:"data"`
+	Error     *ErrorBody   `json:"error"`
+	Meta      *PageMeta    `json:"meta,omitempty"`
+	Ok        bool         `json:"ok"`
+	RequestId string       `json:"request_id"`
+}
+
 // CallbackParams defines parameters for Callback.
 type CallbackParams struct {
 	Code  string `form:"code" json:"code"`
@@ -2454,6 +2768,18 @@ type YahooCallbackParams struct {
 type ListLeaguesParams struct {
 	Page    *Page    `form:"page,omitempty" json:"page,omitempty"`
 	PerPage *PerPage `form:"per_page,omitempty" json:"per_page,omitempty"`
+}
+
+// LeagueTradesParams defines parameters for LeagueTrades.
+type LeagueTradesParams struct {
+	// Player a board id; only trades holding this player, on either side
+	Player *string `form:"player,omitempty" json:"player,omitempty"`
+}
+
+// LeagueWaiversParams defines parameters for LeagueWaivers.
+type LeagueWaiversParams struct {
+	// Position only candidates at this position
+	Position *string `form:"position,omitempty" json:"position,omitempty"`
 }
 
 // ListMocksParams defines parameters for ListMocks.

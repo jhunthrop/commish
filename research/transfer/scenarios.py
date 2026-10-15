@@ -52,6 +52,10 @@ BOARDS_STEPS: Final = {
 }
 INSEASON_STEPS: Final = {
     "stats_ingest": "stats-ingest",
+    "play_by_play": "play-by-play",
+    "ftn_charting": "ftn-charting",
+    "next_gen_stats": "next-gen-stats",
+    "pfr_advstats": "pfr-advstats",
     "grade": "grade",
     "freeze": "freeze",
     "scoreboard": "scoreboard",
@@ -73,6 +77,7 @@ FACTS_STEPS: Final = {
     "news_for_players": "facts: news",
     "current_season_summaries": "facts: current season",
     "run_market_adp": "facts: market ADP",
+    "season_usage_by_player": "facts: this season's usage",
 }
 API_STEPS: Final = {"_api_board": "api board read"}
 
@@ -121,7 +126,8 @@ def boards(engine: Engine, skip: frozenset[str]) -> str:
 def inseason(engine: Engine, skip: frozenset[str]) -> str:
     """The season-week pass on the season the stored schedule places today."""
     from research.inseason.__main__ import _season  # noqa: PLC0415 - the job's own placement
-    from research.inseason.season_week import SeasonWeekContext, StepResult, run_season_week  # noqa: PLC0415
+    from research.inseason.season_week import SeasonWeekContext, run_season_week  # noqa: PLC0415
+    from research.inseason.step_result import StepResult  # noqa: PLC0415
 
     fetcher = LiveFetcher()
     try:

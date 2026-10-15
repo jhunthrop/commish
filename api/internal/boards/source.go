@@ -36,7 +36,8 @@ var schemaName = regexp.MustCompile(`^[a-z_][a-z0-9_]{0,62}$`)
 // provider's roster (provider_players, the ids rooms and sheets name
 // players by), the stored board (preseason_projections, one source per
 // scoring format, keyed on the universe id), the crosswalk between them,
-// and the provider's schedule for byes.
+// the provider's schedule for byes, and the published run's board
+// (published_boards, which in season holds the rest-of-season order).
 type PGSource struct {
 	Pool *pgxpool.Pool
 	// Schema holds the research tables, "research".
@@ -45,6 +46,10 @@ type PGSource struct {
 	Season int
 	// SourcePrefix names the stored boards: <prefix>_<format>_12.
 	SourcePrefix string
+
+	// unreadable is set once published_boards was found and not readable,
+	// so the warning is logged once a process.
+	unreadable atomic.Bool
 }
 
 // NewPGSource checks the schema name once.
@@ -56,26 +61,6 @@ func NewPGSource(pool *pgxpool.Pool, schema string, season int, sourcePrefix str
 }
 
 func (s *PGSource) table(name string) string { return pgx.Identifier{s.Schema, name}.Sanitize() }
-
-// boardQuery is the provider's roster (the ids the product names
-// players by) in ADP order, each with the stored board's points through
-// the crosswalk to the universe id the board keys on.
-func (s *PGSource) boardQuery() string {
-	return `with latest as (
-  select max(as_of) as as_of from ` + s.table("preseason_projections") + ` where season = $1 and source = $2
-), proj as (
-  select c.provider_player_id, p.projected_points, p.floor_points, p.median_points, p.ceiling_points
-  from ` + s.table("preseason_projections") + ` p
-  join latest l on p.as_of = l.as_of
-  join ` + s.table("player_crosswalk") + ` c on c.player_id = p.player_id
-  where p.season = $1 and p.source = $2
-)
-select pp.id, pp.name, pp.position, pp.team, coalesce(pp.headshot_url, ''), pp.adp, proj.projected_points,
-  proj.floor_points, proj.median_points, proj.ceiling_points,
-  (select as_of from latest)
-from ` + s.table("provider_players") + ` pp left join proj on proj.provider_player_id = pp.id
-order by pp.adp asc nulls last, pp.id collate "C"`
-}
 
 // byeQuery is each team's bye: the first week of the season's schedule
 // it plays no game.
@@ -91,54 +76,85 @@ where not exists (select 1 from played p where p.team = t.team and p.week = w.we
 group by t.team`
 }
 
-// Load reads the format's newest stored board joined to the directory.
+// Load reads the format's board joined to the directory: the published
+// run's rows when the season has them, else the newest stored board.
 func (s *PGSource) Load(ctx context.Context, f Format) (*Raw, error) {
 	byes, err := s.byes(ctx)
 	if err != nil {
 		return nil, err
 	}
+	query, args, err := s.boardRead(ctx, f)
+	if err != nil {
+		return nil, err
+	}
 	source := s.sourceFor(f)
-	rows, err := s.Pool.Query(ctx, s.boardQuery(), s.Season, source)
+	rows, err := s.Pool.Query(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("boards: read %s: %w", source, err)
 	}
+	defer rows.Close()
 	raw := &Raw{Format: f, Season: s.Season, Source: source}
-	var asOf *time.Time
+	var stamp boardStamp
 	for rows.Next() {
-		var p Player
-		var position string
-		var floor, median, ceiling *float64
-		if err := rows.Scan(&p.ID, &p.Name, &position, &p.Team, &p.Headshot, &p.ADP, &p.Points, &floor, &median, &ceiling, &asOf); err != nil {
-			rows.Close()
+		p, position, err := scanBoardRow(rows, &stamp)
+		if err != nil {
 			return nil, fmt.Errorf("boards: scan %s: %w", source, err)
 		}
-		if !directoryPlayer(&p, position, byes) {
-			continue
+		if directoryPlayer(&p, position, byes) {
+			raw.Players = append(raw.Players, p)
 		}
-		if floor != nil && median != nil && ceiling != nil {
-			p.Range = &Range{Floor: *floor, Median: *median, Ceiling: *ceiling}
-		}
-		raw.Players = append(raw.Players, p)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("boards: read %s: %w", source, err)
 	}
-	if asOf == nil {
+	if stamp.asOf == nil {
 		return nil, fmt.Errorf("boards: no stored board %s for %d", source, s.Season)
 	}
-	raw.AsOf = asOf.UTC()
+	if !stamp.order.Valid() {
+		return nil, fmt.Errorf("boards: %s for %d has order %q", source, s.Season, stamp.order)
+	}
+	raw.AsOf, raw.Order, raw.Run = stamp.asOf.UTC(), stamp.order, stamp.run
 	return raw, nil
+}
+
+// boardStamp is the board's own columns, which every row repeats: when
+// its points were made, the order they rank, the published run.
+type boardStamp struct {
+	asOf  *time.Time
+	order Order
+	run   string
+}
+
+// scanBoardRow reads one directory row with its points, and the board's
+// stamp into stamp.
+func scanBoardRow(rows pgx.Rows, stamp *boardStamp) (Player, string, error) {
+	var p Player
+	var position string
+	var floor, median, ceiling *float64
+	if err := rows.Scan(&p.ID, &p.Name, &position, &p.Team, &p.Headshot, &p.ADP, &p.Points, &floor, &median, &ceiling,
+		&stamp.asOf, &stamp.order, &stamp.run); err != nil {
+		return Player{}, "", err
+	}
+	if floor != nil && median != nil && ceiling != nil {
+		p.Range = &Range{Floor: *floor, Median: *median, Ceiling: *ceiling}
+	}
+	return p, position, nil
 }
 
 // Version is a digest, computed on the server, of every row Load would
 // read for f (the board query's rows and the byes), each set in a fixed
-// order: 65 bytes over the wire where Load moves about 260 KB.
+// order: 65 bytes over the wire where Load moves about 260 KB. A publish
+// moves it: the rows carry the published run, its points and its refresh.
 func (s *PGSource) Version(ctx context.Context, f Format) (string, error) {
+	board, args, err := s.boardRead(ctx, f)
+	if err != nil {
+		return "", err
+	}
 	query := `select md5(coalesce(string_agg(b::text, '|' order by b::text), '')) || ':' ||
   (select md5(coalesce(string_agg(y::text, '|' order by y::text), '')) from (` + s.byeQuery() + `) y)
-from (` + s.boardQuery() + `) b`
+from (` + board + `) b`
 	var version string
-	if err := s.Pool.QueryRow(ctx, query, s.Season, s.sourceFor(f)).Scan(&version); err != nil {
+	if err := s.Pool.QueryRow(ctx, query, args...).Scan(&version); err != nil {
 		return "", fmt.Errorf("boards: version of %s: %w", s.sourceFor(f), err)
 	}
 	return version, nil

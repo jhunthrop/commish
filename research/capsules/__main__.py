@@ -26,7 +26,7 @@ from pathlib import Path
 import httpx
 from sqlalchemy import Engine
 
-from research.capsules.config import CAPSULE_CONFIG
+from research.capsules.config import CAPSULE_CONFIG, writer_settings
 from research.capsules.facts.collect_one import ServedBoardCache, collect_player_facts
 from research.capsules.facts.model import to_js
 from research.capsules.gateway import GatewayClient
@@ -50,7 +50,7 @@ def _gateway(http: httpx.Client) -> GatewayClient:
     key = os.environ.get(CAPSULE_CONFIG.gateway.api_key_variable, "").strip()
     if not key:
         raise ConfigurationError(f"{CAPSULE_CONFIG.gateway.api_key_variable} is not set.")
-    return GatewayClient(key, http)
+    return GatewayClient.for_run(key, http, writer_settings(os.environ))
 
 
 def _facts(engine: Engine, player_id: str, prompt: bool) -> int:

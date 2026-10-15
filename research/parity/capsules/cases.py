@@ -24,6 +24,10 @@ prints it (`facts.season_so_far`, the in-season voice of the live review's H2) i
 provider's season lines, so every facts hash moved by design; and the season block reads the store
 as of `AS_OF` like every other read here.
 
+Lane 23 re-recorded them again: a sheet now carries this season's usage and play
+(`facts.season_usage`), a new content field, so every facts hash moved by design; the dev copy holds
+no 2026 play-by-play or charted feed at `AS_OF`, so every recorded sheet's figure set is empty.
+
 There is no pre-kickoff case: `AS_OF` is in season, and the 2026 preseason is no longer the store's
 as-of view of anything the cases hold (an as-of before 2026-09-10 would read a board, captures and
 ADP the dev copy was not recorded against). The preseason voice is held by the unit tests instead

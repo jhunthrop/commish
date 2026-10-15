@@ -10,7 +10,8 @@ import pytest
 from sqlalchemy import Connection, Engine
 
 from research.inseason import season_week
-from research.inseason.season_week import SeasonWeekContext, StepResult, run_season_week
+from research.inseason.season_week import STEPS, SeasonWeekContext, run_season_week
+from research.inseason.step_result import StepResult
 from research.pipeline.http import Fetcher
 
 _SEASON = 2026
@@ -22,7 +23,7 @@ _KICKOFFS = {
     6: datetime(2026, 10, 16, 0, 15, tzinfo=UTC),
 }
 _FROZEN_AT = datetime(2026, 10, 13, 12, 0, 17, 450000, tzinfo=UTC)
-_ONLY_FREEZE = frozenset({"stats-ingest", "props-snapshot", "grade", "scoreboard"})
+_ONLY_FREEZE = frozenset(STEPS) - {"freeze"}
 
 
 class _FakeEngine:

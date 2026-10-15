@@ -328,6 +328,80 @@ paths:
         "404": { $ref: "#/components/responses/ErrorResponse" }
         "429": { $ref: "#/components/responses/ErrorResponse" }
         "502": { $ref: "#/components/responses/ErrorResponse" }
+  /leagues/attached/{id}/lineup:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: the attached league's id (AttachedLeague.id)
+        schema: { type: string, format: uuid }
+    get:
+      tags: [league-sync]
+      operationId: leagueLineup
+      summary: >-
+        Start and sit: the week's lineup for the drafter's own team, every slot filled by our order after the week's
+        hard facts (bye, out, doubtful), each change from the lineup the host holds with its reason in one sentence.
+        Reads the league as the sync route does. We never write the host.
+      security: [{ session: [] }]
+      responses:
+        "200": { $ref: "#/components/responses/LineupAdviceResponse" }
+        "404": { $ref: "#/components/responses/ErrorResponse" }
+        "409": { $ref: "#/components/responses/ErrorResponse" }
+        "422": { $ref: "#/components/responses/ErrorResponse" }
+        "502": { $ref: "#/components/responses/ErrorResponse" }
+  /leagues/attached/{id}/waivers:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: the attached league's id (AttachedLeague.id)
+        schema: { type: string, format: uuid }
+      - name: position
+        in: query
+        required: false
+        description: only candidates at this position
+        schema: { type: string, enum: [QB, RB, WR, TE, K, DEF] }
+    get:
+      tags: [league-sync]
+      operationId: leagueWaivers
+      summary: >-
+        Waivers: the unrostered players on our board ranked by the gain to the drafter's lineup, each with the drop it
+        costs least to lose. A player tagged Hold on the drafter's sheets is never the drop. We submit nothing.
+      security: [{ session: [] }]
+      responses:
+        "200": { $ref: "#/components/responses/WaiverAdviceResponse" }
+        "400": { $ref: "#/components/responses/ErrorResponse" }
+        "404": { $ref: "#/components/responses/ErrorResponse" }
+        "409": { $ref: "#/components/responses/ErrorResponse" }
+        "422": { $ref: "#/components/responses/ErrorResponse" }
+        "502": { $ref: "#/components/responses/ErrorResponse" }
+  /leagues/attached/{id}/trades:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: the attached league's id (AttachedLeague.id)
+        schema: { type: string, format: uuid }
+      - name: player
+        in: query
+        required: false
+        description: a board id; only trades holding this player, on either side
+        schema: { type: string, minLength: 1, maxLength: 64 }
+    get:
+      tags: [league-sync]
+      operationId: leagueTrades
+      summary: >-
+        The trade finder: for each other team, the one-for-one and two-for-one trades (both ways) after which both
+        lineups gain on our order and both still fill every slot, best for the drafter first. A player tagged Hold on
+        the drafter's sheets is never given. We never send an offer.
+      security: [{ session: [] }]
+      responses:
+        "200": { $ref: "#/components/responses/TradeAdviceResponse" }
+        "400": { $ref: "#/components/responses/ErrorResponse" }
+        "404": { $ref: "#/components/responses/ErrorResponse" }
+        "409": { $ref: "#/components/responses/ErrorResponse" }
+        "422": { $ref: "#/components/responses/ErrorResponse" }
+        "502": { $ref: "#/components/responses/ErrorResponse" }
 
   /sheets:
     get:
@@ -1457,6 +1531,30 @@ components:
             allOf:
               - $ref: "#/components/schemas/Envelope"
               - properties: { data: { $ref: "#/components/schemas/LeagueSync" } }
+    LineupAdviceResponse:
+      description: the week's lineup advice for the drafter's team
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: "#/components/schemas/Envelope"
+              - properties: { data: { $ref: "#/components/schemas/LineupAdvice" } }
+    WaiverAdviceResponse:
+      description: the waiver pool ranked by the gain to the drafter's lineup
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: "#/components/schemas/Envelope"
+              - properties: { data: { $ref: "#/components/schemas/WaiverAdvice" } }
+    TradeAdviceResponse:
+      description: the trades that help both lineups, by team
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: "#/components/schemas/Envelope"
+              - properties: { data: { $ref: "#/components/schemas/TradeAdvice" } }
     AttachPreviewResponse:
       description: a league's name and teams, before it is attached
       content:
@@ -2612,6 +2710,176 @@ components:
         week: { type: integer }
         mine: { $ref: "#/components/schemas/MatchupSide" }
         opponent: { allOf: [{ $ref: "#/components/schemas/MatchupSide" }], nullable: true }
+    OrderBasis:
+      type: string
+      enum: [preseason, rest_of_season]
+      description: >-
+        which order ranks the players: our preseason board, or the rest-of-season order (from week 7, once the API
+        reads it)
+    InjuryDesignation:
+      type: object
+      required: [status, as_of]
+      properties:
+        status: { type: string, enum: [questionable, doubtful, out, injured_reserve, suspended, pup, nfi] }
+        as_of:
+          type: string
+          format: date-time
+          description: the stamp of the injury read that lists it, or of the host read for the host's own IR mark
+    GamePoints:
+      type: object
+      required: [week, points]
+      properties:
+        week: { type: integer }
+        points: { type: number, format: double, description: his points that game under the league's scoring }
+    PointsAllowed:
+      type: object
+      required: [points_a_game, rank, of, position]
+      properties:
+        points_a_game:
+          type: number
+          format: double
+          description: the opponent's defense to this position, season to date, under the league's scoring, one decimal
+        rank: { type: integer, description: 1 allowed the fewest }
+        of: { type: integer, description: the defenses ranked, those with a final game }
+        position: { type: string }
+    WeekFacts:
+      type: object
+      description: one player's week; a fact we do not hold is null, never zero
+      required: [week, opponent, home, kickoff, bye, designation, played, points_this_week, last_games, allowed_to_position]
+      properties:
+        week: { type: integer }
+        opponent: { type: string, nullable: true, description: "the opponent's team code, null on bye or when his team is unknown" }
+        home: { type: boolean, nullable: true }
+        kickoff: { type: string, format: date-time, nullable: true }
+        bye: { type: boolean }
+        designation: { allOf: [{ $ref: "#/components/schemas/InjuryDesignation" }], nullable: true }
+        played: { type: boolean, description: his game this week is final }
+        points_this_week:
+          type: number
+          format: double
+          nullable: true
+          description: the host's score for him so far, from the matchup, when he starts there and his game has kicked off
+        last_games:
+          type: array
+          description: up to three completed games under the league's scoring, newest first
+          items: { $ref: "#/components/schemas/GamePoints" }
+        allowed_to_position: { allOf: [{ $ref: "#/components/schemas/PointsAllowed" }], nullable: true }
+    PlayerLine:
+      type: object
+      required: [player, position_rank, points_over_replacement, held, facts]
+      properties:
+        player: { $ref: "#/components/schemas/LeaguePlayer" }
+        position_rank: { type: integer, nullable: true, description: his place at his position in our order, null when unranked }
+        points_over_replacement:
+          type: number
+          format: double
+          nullable: true
+          description: >-
+            points over replacement a week (the season's over 17 games) for this league, one decimal; null without a
+            projection
+        held: { type: boolean, description: the drafter tags him Hold on a sheet, so he is never a drop or a trade give }
+        facts: { $ref: "#/components/schemas/WeekFacts" }
+    LineupSlot:
+      type: object
+      required: [slot, ours, host, changed, sentence]
+      properties:
+        slot: { type: string, enum: [QB, RB, WR, TE, FLEX, SUPERFLEX, K, DEF] }
+        ours: { $ref: "#/components/schemas/PlayerLine" }
+        host:
+          allOf: [{ $ref: "#/components/schemas/PlayerLine" }]
+          nullable: true
+          description: >-
+            the host lineup's player in this place: the same player when unchanged, the starter we sit for a change,
+            null for a spot the host left empty
+        changed: { type: boolean, description: we start a player the host has on the bench }
+        sentence: { type: string, nullable: true, description: the reason for a change, from facts; null when unchanged }
+    LineupAdvice:
+      type: object
+      required: [week, basis, order_basis, refreshed, read_at, set, slots, bench, host_lineup_url]
+      properties:
+        week: { type: integer }
+        basis: { type: string, description: the honesty line and the basis of points over replacement }
+        order_basis: { $ref: "#/components/schemas/OrderBasis" }
+        refreshed: { type: string, format: date-time, description: when the order was made }
+        read_at: { type: string, format: date-time, description: the league's last host read }
+        set: { type: boolean, description: true when the host's lineup is already ours }
+        slots:
+          type: array
+          description: >-
+            every starting spot in the league's order (QB, RB, WR, TE, the flex spots, K, DEF); a spot no rostered player
+            can fill is left out
+          items: { $ref: "#/components/schemas/LineupSlot" }
+        bench:
+          type: array
+          description: everyone else on the active roster, by the same keys (injured reserve and taxi spots left out)
+          items: { $ref: "#/components/schemas/PlayerLine" }
+        host_lineup_url: { type: string, description: "the host's lineup page, empty when we know none" }
+    WaiverRow:
+      type: object
+      required: [add, drop, gain, starts, sentence]
+      properties:
+        add: { $ref: "#/components/schemas/PlayerLine" }
+        drop:
+          allOf: [{ $ref: "#/components/schemas/PlayerLine" }]
+          nullable: true
+          description: null when a roster spot is open or there is no move to make
+        gain: { type: number, format: double, description: "points over replacement a week to the lineup, one decimal; above 0 sits above the rule" }
+        starts: { type: boolean, description: he starts for you this week }
+        sentence: { type: string }
+    WaiverAdvice:
+      type: object
+      required: [week, basis, order_basis, refreshed, read_at, best, rows, host_waivers_url]
+      properties:
+        week: { type: integer }
+        basis: { type: string }
+        order_basis: { $ref: "#/components/schemas/OrderBasis" }
+        refreshed: { type: string, format: date-time }
+        read_at: { type: string, format: date-time }
+        best: { allOf: [{ $ref: "#/components/schemas/WaiverRow" }], nullable: true, description: the add that gains most, null when none gains }
+        rows:
+          type: array
+          description: positive gains first by gain, then the rest by points over replacement, at most 60
+          items: { $ref: "#/components/schemas/WaiverRow" }
+        host_waivers_url: { type: string, description: "the host's waiver page, empty when we know none" }
+    TradeRecord:
+      type: object
+      required: [wins, losses, ties]
+      properties:
+        wins: { type: integer }
+        losses: { type: integer }
+        ties: { type: integer }
+    TradeRow:
+      type: object
+      required: [give, get, my_gain, their_gain, close_for_them]
+      properties:
+        give: { type: array, items: { $ref: "#/components/schemas/PlayerLine" } }
+        get: { type: array, items: { $ref: "#/components/schemas/PlayerLine" } }
+        my_gain: { type: number, format: double, description: points over replacement a week to the drafter's lineup, one decimal }
+        their_gain: { type: number, format: double, description: the same to theirs }
+        close_for_them: { type: boolean, description: their gain is under 0.5 a week }
+    TradeTeam:
+      type: object
+      required: [roster_id, name, owner, record, trades]
+      properties:
+        roster_id: { type: integer }
+        name: { type: string }
+        owner: { type: string }
+        record: { $ref: "#/components/schemas/TradeRecord" }
+        trades:
+          type: array
+          description: at most 10, best for the drafter first
+          items: { $ref: "#/components/schemas/TradeRow" }
+    TradeAdvice:
+      type: object
+      required: [week, basis, order_basis, refreshed, read_at, teams, host_trades_url]
+      properties:
+        week: { type: integer }
+        basis: { type: string }
+        order_basis: { $ref: "#/components/schemas/OrderBasis" }
+        refreshed: { type: string, format: date-time }
+        read_at: { type: string, format: date-time }
+        teams: { type: array, description: every other team, in standings order, items: { $ref: "#/components/schemas/TradeTeam" } }
+        host_trades_url: { type: string, description: "the host's trade page, empty when we know none" }
     LeagueMove:
       type: object
       required: [kind, at, roster_ids, adds, drops]
