@@ -7,13 +7,22 @@
 	import type { LeagueHost } from '../api.ts';
 	import LineRow from './LineRow.svelte';
 	import Screen from './Screen.svelte';
-	import type { PlayerLine, TradeAdvice, TradeRow, TradeTeam } from './api.ts';
-	import { Narrowing, bestTrade, markedTrade, tradeKey } from './state.ts';
+	import type { TradeAdvice, TradeRow, TradeTeam } from './api.ts';
+	import {
+		Narrowing,
+		bestTrade,
+		markedTrade,
+		pickKey,
+		pickerPlayers,
+		tradeHolding,
+		tradeKey
+	} from './state.ts';
 	import {
 		CLOSE_FOR_THEM,
 		EVERY_TRADE,
 		LINES,
 		NO_TRADES_WITH_TEAM,
+		noTradeWith,
 		showMore,
 		teamAside,
 		tradeDecision,
@@ -58,19 +67,12 @@
 	const holds = (row: TradeRow, id: string): boolean =>
 		[...row.give, ...row.get].some((line) => line.player.board_id === id);
 
-	/** Every player on our board the trades hold, yours first, each once. */
-	const players = $derived.by(() => {
-		const all = advice.teams.flatMap((t) => t.trades);
-		const once = (lines: PlayerLine[]): PlayerLine[] => [
-			...new Map(
-				lines.flatMap((l) => (l.player.board_id === null ? [] : [[l.player.board_id, l] as const]))
-			).values()
-		];
-		return {
-			yours: once(all.flatMap((r) => r.give)),
-			theirs: once(all.flatMap((r) => r.get))
-		};
-	});
+	/** Every player on your roster (a trade found or not), then theirs from the trades, each once. */
+	const players = $derived(pickerPlayers(advice.roster, advice.teams));
+	/** The picked player's name, for the sentence when no trade holds him. */
+	const pickedName = $derived(
+		[...players.yours, ...players.theirs].find((l) => pickKey(l) === player)?.player.name ?? ''
+	);
 
 	const shown = $derived(narrowed ?? advice);
 	/** Every team, or narrowed to a player, only the teams with a trade holding him: the narrowed
@@ -83,6 +85,9 @@
 			}))
 			.filter(({ trades }) => player === null || trades.length > 0)
 	);
+
+	/** A picked player no trade found holds, once his trades are read: the screen says so. */
+	const none = $derived(!reading && !tradeHolding(shown.teams, player));
 
 	/** The marked trade while the answer still holds it, else the best trade shown that the other
 	 * team gains from (a close call for them only when there is no other). */
@@ -98,7 +103,8 @@
 		marked = null;
 		problem = null;
 		reading = next !== null;
-		const outcome = await narrowing.choose(next);
+		// A player our board does not place is in no trade: nothing to read.
+		const outcome = await narrowing.choose(next?.startsWith('host:') ? null : next);
 		if (outcome.kind === 'overtaken') return;
 		reading = false;
 		if (outcome.kind === 'answer') narrowed = outcome.answer;
@@ -128,7 +134,9 @@
 {/snippet}
 
 <Screen
-	decision={tradeDecision(chosen ? { row: chosen.row, team: chosen.team.name } : null)}
+	decision={none
+		? noTradeWith(pickedName)
+		: tradeDecision(chosen ? { row: chosen.row, team: chosen.team.name } : null)}
 	reason={chosen?.row.close_for_them ? `${CLOSE_FOR_THEM}.` : null}
 	verb={verbWords('trades', host)}
 	href={shown.host_trades_url}
@@ -146,12 +154,12 @@
 				<option value="">{EVERY_TRADE}</option>
 				<optgroup label={LINES.yourPlayers}>
 					{#each players.yours as line (line.player.host_id)}
-						<option value={line.player.board_id}>{line.player.name}</option>
+						<option value={pickKey(line)}>{line.player.name}</option>
 					{/each}
 				</optgroup>
 				<optgroup label={LINES.theirPlayers}>
 					{#each players.theirs as line (line.player.host_id)}
-						<option value={line.player.board_id}>{line.player.name}</option>
+						<option value={pickKey(line)}>{line.player.name}</option>
 					{/each}
 				</optgroup>
 			</select>

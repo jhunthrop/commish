@@ -188,6 +188,11 @@ export function teamAside(team: Pick<TradeTeam, 'name' | 'owner' | 'record'>): s
 	return named ? record : `${owner}, ${record}`;
 }
 
+/** A player picked whom no trade found holds: "No trade we found includes Josh Downs." */
+export function noTradeWith(name: string): string {
+	return `No trade we found includes ${name}.`;
+}
+
 /** What a team's trades are when the finder holds none for it. */
 export const NO_TRADES_WITH_TEAM = 'No trade with this team helps both lineups.';
 
@@ -211,30 +216,61 @@ export function refreshedWords(basis: OrderBasis, refreshed: string): string {
 	return `${order}, refreshed ${monthDayLabel(refreshed)}.`;
 }
 
-const ZONE = 'America/New_York';
-const WEEKDAY_TIME = new Intl.DateTimeFormat('en-US', {
-	weekday: 'short',
-	hour: 'numeric',
-	minute: '2-digit',
-	timeZone: ZONE
-});
-
-/** "Sun 1:00 pm ET": a kickoff or a stamp on the Eastern clock, the one the NFL keeps. */
-export function weekdayTime(iso: string): string {
-	const parts = WEEKDAY_TIME.formatToParts(new Date(iso));
-	const part = (type: Intl.DateTimeFormatPartTypes): string =>
-		parts.find((p) => p.type === type)?.value ?? '';
-	return `${part('weekday')} ${part('hour')}:${part('minute')} ${part('dayPeriod').toLowerCase()} ET`;
+/** The member's own time zone, from the browser: the API keeps instants, the screen says them on the
+ * member's clock. */
+export function memberZone(): string {
+	return Intl.DateTimeFormat().resolvedOptions().timeZone;
 }
 
-/** His game this week: "at BUF Sun 1:00 pm ET", "vs BUF ...", "Bye this week", "Played". */
-export function gameWords(facts: WeekFacts): string | null {
+/** The weekday-and-time format for a zone, made once per zone. */
+const weekdayFormats = new Map<string, Intl.DateTimeFormat>();
+
+function weekdayFormat(zone: string): Intl.DateTimeFormat {
+	const known = weekdayFormats.get(zone);
+	if (known) return known;
+	const made = new Intl.DateTimeFormat('en-US', {
+		weekday: 'short',
+		hour: 'numeric',
+		minute: '2-digit',
+		timeZone: zone
+	});
+	weekdayFormats.set(zone, made);
+	return made;
+}
+
+/** "Sun 1:00 pm": a kickoff or a stamp on the member's clock (zoneLine names the zone once). */
+export function weekdayTime(iso: string, zone: string = memberZone()): string {
+	const parts = weekdayFormat(zone).formatToParts(new Date(iso));
+	const part = (type: Intl.DateTimeFormatPartTypes): string =>
+		parts.find((p) => p.type === type)?.value ?? '';
+	return `${part('weekday')} ${part('hour')}:${part('minute')} ${part('dayPeriod').toLowerCase()}`;
+}
+
+/** The zone's own name, "Central Time", as the browser names it. */
+function zoneName(zone: string): string {
+	const named = new Intl.DateTimeFormat('en-US', { timeZone: zone, timeZoneName: 'longGeneric' })
+		.formatToParts(new Date())
+		.find((p) => p.type === 'timeZoneName')?.value;
+	return named ?? zone;
+}
+
+/** The NFL's clock, which a screen's times need not name. */
+const EASTERN = 'Eastern Time';
+
+/** The member's zone said once on a screen, "Times are in Central Time.", null on the Eastern clock. */
+export function zoneLine(zone: string = memberZone()): string | null {
+	const name = zoneName(zone);
+	return name === EASTERN ? null : `Times are in ${name}.`;
+}
+
+/** His game this week: "at BUF Sun 1:00 pm", "vs BUF ...", "Bye this week", "Played". */
+export function gameWords(facts: WeekFacts, zone: string = memberZone()): string | null {
 	if (facts.bye) return 'Bye this week';
 	if (facts.opponent === null) return null;
 	const side = facts.home === false ? 'at' : 'vs';
 	const game = `${side} ${facts.opponent}`;
 	if (facts.played) return `${game}, played`;
-	return facts.kickoff === null ? game : `${game} ${weekdayTime(facts.kickoff)}`;
+	return facts.kickoff === null ? game : `${game} ${weekdayTime(facts.kickoff, zone)}`;
 }
 
 const DESIGNATION_WORDS: Readonly<Record<InjuryDesignation['status'], string>> = {
@@ -247,9 +283,12 @@ const DESIGNATION_WORDS: Readonly<Record<InjuryDesignation['status'], string>> =
 	nfi: 'On the NFI list'
 };
 
-/** "Questionable as of Thu 4:10 pm ET": the designation with when the report said so. */
-export function designationWords(designation: InjuryDesignation): string {
-	return `${DESIGNATION_WORDS[designation.status]} as of ${weekdayTime(designation.as_of)}`;
+/** "Questionable as of Thu 4:10 pm": the designation with when the report said so. */
+export function designationWords(
+	designation: InjuryDesignation,
+	zone: string = memberZone()
+): string {
+	return `${DESIGNATION_WORDS[designation.status]} as of ${weekdayTime(designation.as_of, zone)}`;
 }
 
 /** Whether a designation keeps him out (out, injured reserve, suspended, PUP, NFI): drawn as a loss. */

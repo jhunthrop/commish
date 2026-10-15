@@ -5,13 +5,18 @@ import { readFileSync } from 'node:fs';
 import { isScreen } from './screens.ts';
 import {
 	MOVE_LINES,
+	bidLabel,
+	bidProblem,
 	failedStep,
 	hostSaid,
 	lostWords,
+	moveTitle,
 	openHostWords,
 	readingWords,
+	resultWords,
 	settingWords
 } from './move.ts';
+import { READING_NOW, readNowWords } from '../model.ts';
 import type { LineupSlot, PlayerLine, TradeRow, WaiverRow, WeekFacts } from './api.ts';
 import {
 	CLOSE_FOR_THEM,
@@ -31,6 +36,9 @@ import {
 	signInTitle,
 	sharedDropWords,
 	designationWords,
+	memberZone,
+	noTradeWith,
+	zoneLine,
 	dropWords,
 	gainFigure,
 	gameWords,
@@ -247,16 +255,27 @@ void test('a trade says who gets whom and both gains plainly', () => {
 	);
 });
 
-void test("a row's facts: the game on the Eastern clock, the designation with its stamp, the last games", () => {
-	assert.equal(weekdayTime('2026-10-18T17:00:00.000Z'), 'Sun 1:00 pm ET');
-	assert.equal(gameWords(facts()), 'at BUF Sun 1:00 pm ET');
+void test("a row's facts: the game on the member's own clock, the designation with its stamp, the last games", () => {
+	const eastern = 'America/New_York';
+	assert.equal(weekdayTime('2026-10-18T17:00:00.000Z', eastern), 'Sun 1:00 pm');
+	assert.equal(weekdayTime('2026-10-18T17:00:00.000Z', 'America/Los_Angeles'), 'Sun 10:00 am');
+	assert.equal(weekdayTime('2026-10-18T17:00:00.000Z', 'Europe/London'), 'Sun 6:00 pm');
+	assert.equal(gameWords(facts(), eastern), 'at BUF Sun 1:00 pm');
+	assert.equal(gameWords(facts(), 'America/Chicago'), 'at BUF Sun 12:00 pm');
 	assert.equal(gameWords(facts({ home: true, kickoff: null })), 'vs BUF');
 	assert.equal(gameWords(facts({ played: true })), 'at BUF, played');
 	assert.equal(gameWords(facts({ bye: true, opponent: null })), 'Bye this week');
 	assert.equal(
-		designationWords({ status: 'questionable', as_of: '2026-10-15T20:10:00.000Z' }),
-		'Questionable as of Thu 4:10 pm ET'
+		designationWords({ status: 'questionable', as_of: '2026-10-15T20:10:00.000Z' }, eastern),
+		'Questionable as of Thu 4:10 pm'
 	);
+	// The zone is named once on the screen, and only when it is not Eastern.
+	assert.equal(zoneLine(eastern), null);
+	assert.equal(zoneLine('America/Detroit'), null);
+	assert.equal(zoneLine('America/Chicago'), 'Times are in Central Time.');
+	assert.equal(zoneLine('America/Los_Angeles'), 'Times are in Pacific Time.');
+	assert.equal(typeof memberZone(), 'string');
+	assert.equal(noTradeWith('Josh Downs'), 'No trade we found includes Josh Downs.');
 	assert.equal(
 		lastGamesWords([
 			{ week: 3, points: 18.4 },
@@ -359,7 +378,30 @@ void test('copy guard: every in-season line is fantasy words, with no dash, semi
 		lostWords('espn'),
 		(failedStep(new TypeError('x'), 'espn', 'plan', '') as { sentence: string }).sentence,
 		hostSaid('espn', 'Lineup transaction could not be completed, Alexander Mattison is locked'),
-		...Object.values(MOVE_LINES)
+		...Object.values(MOVE_LINES),
+		zoneLine('America/Chicago') ?? '',
+		noTradeWith('Josh Downs'),
+		verbWords('waivers', 'espn'),
+		settingWords('espn', 'claim'),
+		readingWords('espn', 'claim'),
+		lostWords('espn', 'claim'),
+		moveTitle('claim'),
+		bidLabel({ amount: 0, min: 0, max: 87 }),
+		bidProblem('espn', '88', { amount: 0, min: 0, max: 87 }) ?? '',
+		resultWords(
+			'espn',
+			{
+				outcome: 'pending',
+				sentence: 'Claim submitted.',
+				host_words: null,
+				host_url: '',
+				move_id: null,
+				processes_at: '2026-10-21T07:00:00.000Z'
+			},
+			'America/Chicago'
+		),
+		readNowWords('sleeper'),
+		READING_NOW
 	];
 	for (const text of lines) {
 		assert.ok(text, 'every composed line is said');

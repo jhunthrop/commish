@@ -10,6 +10,9 @@ import {
 	Narrowing,
 	bestTrade,
 	markedTrade,
+	pickKey,
+	pickerPlayers,
+	tradeHolding,
 	readFailure,
 	screenView,
 	sharedDrop,
@@ -35,7 +38,8 @@ void test('the three screens are pages only while the flag is on, and nothing el
 
 void test("a failed read with no answer yet prints the API's own sentence, whatever its status", () => {
 	const noTeam = "We could not find your team in this league's last read.";
-	assert.deepEqual(readFailure(api(404, noTeam), false), { kind: 'refused', sentence: noTeam });
+	// A team missing from the last read can be read again from the host: the page offers it.
+	assert.deepEqual(readFailure(api(404, noTeam), false), { kind: 'no-team', sentence: noTeam });
 	for (const status of [400, 409, 422, 502]) {
 		assert.deepEqual(readFailure(api(status, `Sentence ${String(status)}.`), false), {
 			kind: 'refused',
@@ -195,4 +199,26 @@ void test('a marked trade is the same trade after a re-read reorders the team, a
 	assert.equal(markedTrade(reread, key)?.row.my_gain, 2.5);
 	assert.equal(markedTrade([team([a])], key), null);
 	assert.equal(markedTrade(reread, null), null);
+});
+
+void test('the picker lists every player on your roster, a trade found or not, and theirs from the trades', () => {
+	const unboarded: PlayerLine = { ...line('k1'), player: { ...line('k1').player, board_id: null } };
+	const roster = [line('p1'), line('p2'), unboarded];
+	const teams = [team([row(['p1'], ['q1'], 1.2), row(['p1'], ['q2'], 0.8)])];
+	const players = pickerPlayers(roster, teams);
+	assert.deepEqual(
+		players.yours.map((l) => l.player.host_id),
+		['p1', 'p2', 'k1']
+	);
+	assert.deepEqual(
+		players.theirs.map((l) => l.player.host_id),
+		['q1', 'q2']
+	);
+	assert.equal(pickKey(line('p2')), 'p2');
+	assert.equal(pickKey(unboarded), 'host:k1');
+	// A player no trade holds: the picker says so rather than leaving the screen empty.
+	assert.equal(tradeHolding(teams, 'p1'), true);
+	assert.equal(tradeHolding(teams, 'p2'), false);
+	assert.equal(tradeHolding(teams, 'host:k1'), false);
+	assert.equal(tradeHolding(teams, null), true);
 });

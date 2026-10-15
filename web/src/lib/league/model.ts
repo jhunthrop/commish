@@ -52,6 +52,14 @@ function readAge(readAt: string, now: Date): number {
 	return Math.max(0, (now.getTime() - Date.parse(readAt)) / 1000);
 }
 
+/** The verb that reads the league from its host again: "Read Sleeper now". */
+export function readNowWords(host: LeagueHost): string {
+	return `Read ${hostWords(host)} now`;
+}
+
+/** The read-again verb while the host is read. */
+export const READING_NOW = 'Reading';
+
 /** "Read from Sleeper 4 minutes ago.": when the host was last read for the league. */
 export function readAgoLine(host: LeagueHost, readAt: string, now: Date): string {
 	return `Read from ${hostWords(host)} ${agoWords(readAge(readAt, now))}.`;
