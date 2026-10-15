@@ -9,15 +9,15 @@ Every JSON artifact is written compact, as the web reads it, and recorded in the
 its bytes and SHA-256. The manifest is written last.
 
 PUBLIC AFTER AN HOUR (spec §4, early access). A run that passed every gate moves `runs/early.json`
-at once, the run a member may read, with the instant it goes public. `publish` (hourly from 06:00
-UTC) moves `runs/latest.json` to it once that instant has passed and dispatches the web build with
+at once, the run a member may read, with the instant it goes public. `publish` (every hour, all
+day) moves `runs/latest.json` to it once that instant has passed and dispatches the web build with
 its id: a `workflow_dispatch` of `web.yml` on main with the input `runId`, which needs a token with
 Actions write and nothing else (a `repository_dispatch` token needs Contents write, which can push
 code). A dispatch that failed is retried by the next
 `publish`; the run's `published.json` records each attempt.
 
 THE HOURLY BACKSTOP IS THE DELIVERY PATH; THE TOKEN IS OPTIONAL (Lane 43). The web workflow runs
-at 30 minutes past every hour from 06:30 to 12:30 UTC, compares `runs/latest.json` and the commit
+at 30 minutes past every hour, at any hour (an in-season run goes public after noon UTC), compares `runs/latest.json` and the commit
 it checked out with the run and commit the live site says it holds (`/data/run.txt`, which every
 build writes), and builds when either differs,
 so the site is on a published run within the hour of `latest` moving, with no token at all; an hour
@@ -116,9 +116,7 @@ class Dispatcher:
         token = environ.get(DISPATCH_TOKEN_VARIABLE, "").strip()
         if token in PLACEHOLDER_TOKENS:
             state = "is not set" if token == "" else "is the placeholder"
-            return (
-                f"{DISPATCH_TOKEN_VARIABLE} {state}; the web's daily 06:30 UTC rebuild builds runs/latest.json instead"
-            )
+            return f"{DISPATCH_TOKEN_VARIABLE} {state}; the web's hourly rebuild builds runs/latest.json instead"
         return cls(http, token, environ.get(DISPATCH_REPOSITORY_VARIABLE, DEFAULT_REPOSITORY).strip())
 
     def dispatch(self, run_id: str) -> str | None:

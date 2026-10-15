@@ -10,8 +10,8 @@ changes nothing.
 A FAILED WRITE. The pointer moves and the build is dispatched first, so a write that fails leaves
 the table holding the previous published run, whole (the swap is one transaction and the API reads
 one statement, so never a mix of two runs), while the site moves on. The failure is one named line
-and exit status 1 (the job's alert); the next publish hour retries, and publish runs only 06:00 to
-12:00 UTC, so a write that fails at 12:00 is made good at 06:00 the next day. A run whose artifacts
+and exit status 1 (the job's alert); the next publish hour retries, and publish runs every hour, so a
+write that fails is made good within the hour. A run whose artifacts
 never read as a board stays failed until another run is published.
 
 Every number is the run's own, so it names the run's basis: `rank` (`ourRank`), `position_rank`,
@@ -50,7 +50,6 @@ _RUN_FORMATS: Final = {f.id: f for f in RUN_FORMATS}
 MANIFEST_FILE: Final = "manifest.json"
 PRESEASON: Final = "preseason"
 REST_OF_SEASON: Final = "rest_of_season"
-RETRY_WINDOW: Final = "06:00-12:00 UTC"
 # The weeks a rest-of-season window may start at (the table's published_boards_from_week_ck).
 FIRST_WEEK: Final = 1
 LAST_WEEK: Final = 18
@@ -299,7 +298,7 @@ def held_runs(engine: Engine) -> str:
 def failed(reason: str, latest: str | None, holds: str) -> SyncOutcome:
     return SyncOutcome(
         f"published board: FAILED ({reason}); latest is {latest or 'unread'}, the table still holds {holds}; "
-        f"retried at the next publish hour ({RETRY_WINDOW})",
+        f"retried at the next publish hour (hourly)",
         ok=False,
     )
 

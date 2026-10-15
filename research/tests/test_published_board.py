@@ -187,7 +187,7 @@ def test_a_store_that_cannot_be_reached_fails_by_name(store: LocalRunStore) -> N
     assert outcome.line.startswith("published board: FAILED (OperationalError: ")
     assert outcome.line.endswith(
         f"; latest is {_PRESEASON}, the table still holds what it held (the store could not be read); "
-        "retried at the next publish hour (06:00-12:00 UTC)"
+        "retried at the next publish hour (hourly)"
     )
 
 
@@ -339,6 +339,6 @@ def test_a_run_that_does_not_read_leaves_the_previous_run_whole_and_says_which(
     held = ", ".join(sorted({str(r["run_id"]) for r in before}))
     assert (
         f"published board: FAILED (boards/half-ppr-12.json has no rows list); latest is {_IN_SEASON}, "
-        f"the table still holds {held}; retried at the next publish hour (06:00-12:00 UTC)"
+        f"the table still holds {held}; retried at the next publish hour (hourly)"
     ) in out
     assert _table(engine) == before
