@@ -3,6 +3,7 @@ package espnhost
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -39,7 +40,7 @@ const (
 	swidWords      = "Paste your SWID, the value in braces."
 	s2Words        = "Paste your espn_s2 value."
 	consentWords   = "Agree to how we keep your ESPN session to connect ESPN."
-	nothingWords   = "ESPN shows no private league on your account this season, so there is nothing to connect. A public league follows by its link."
+	noLeaguesWords = "ESPN lists no football league for your account this season. If you are in one, tell us and we will look at what ESPN answered."
 )
 
 // ConnectionStore is the part of hosts.Store the routes use.
@@ -144,8 +145,9 @@ func (s *Service) connect(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, r, http.StatusUnprocessableEntity, httpx.CodeInvalid, refusedWords, nil)
 		return
 	}
-	if errors.Is(err, errNothingPrivate) {
-		httpx.WriteError(w, r, http.StatusUnprocessableEntity, httpx.CodeInvalid, nothingWords, nil)
+	var nothing *nothingToConnectError
+	if errors.As(err, &nothing) {
+		httpx.WriteError(w, r, http.StatusUnprocessableEntity, httpx.CodeInvalid, nothing.words(), nil)
 		return
 	}
 	if err != nil {
@@ -174,36 +176,60 @@ func (s *Service) connect(w http.ResponseWriter, r *http.Request) {
 // league that proves the cookies.
 const maxProbes = 5
 
-// errNothingPrivate is a member with no private league to prove the
-// cookies by: there is nothing to connect.
-var errNothingPrivate = errors.New("espnhost: no private league to read")
+// nothingToConnectError is a member with no private league to prove the
+// cookies by: there is nothing to connect. It keeps apart ESPN listing no
+// league at all and every probed league answering without cookies.
+type nothingToConnectError struct {
+	listed, probed int
+}
+
+func (*nothingToConnectError) Error() string { return "espnhost: no private league to read" }
+
+// words is the sentence for the member, in the situation's own terms.
+func (e *nothingToConnectError) words() string {
+	switch {
+	case e.listed == 0:
+		return noLeaguesWords
+	case e.probed < e.listed:
+		return fmt.Sprintf("ESPN lists %d leagues for you this season and the first %d we checked are public, so those follow by their link. Connect ESPN is only for a private league.", e.listed, e.probed)
+	case e.listed == 1:
+		return "ESPN lists 1 league for you this season and it is public, so it follows by its link. Connect ESPN is only for a private league."
+	}
+	return fmt.Sprintf("ESPN lists %d leagues for you this season and each is public, so each follows by its link. Connect ESPN is only for a private league.", e.listed)
+}
 
 // verify proves both cookies: the member's league list read with them,
 // then a league the public cannot read (ESPN refuses it with no cookies)
 // read with them, which is what needs espn_s2. A SWID alone is no proof:
-// any public league answers its members' SWIDs.
+// any public league answers its members' SWIDs. It logs counts, never a
+// cookie or the SWID.
 func (s *Service) verify(ctx context.Context, c espn.Cookies, yr int) ([]espn.MyLeague, error) {
 	list, err := s.Client.MyLeagues(ctx, c, yr)
 	if err != nil {
 		return nil, err
 	}
+	probed, public := 0, 0
 	for i, l := range list {
 		if i >= maxProbes {
 			break
 		}
+		probed++
 		_, err := s.Client.Read(ctx, l.LeagueID, yr, nil)
 		if err == nil {
+			public++
 			continue
 		}
 		if !errors.Is(err, espn.ErrPrivate) {
 			return nil, err
 		}
+		s.Log.Info("espnhost: connect probes", "listed", len(list), "probed", probed, "public", public)
 		if _, err := s.Client.Read(ctx, l.LeagueID, yr, &c); err != nil {
 			return nil, err
 		}
 		return list, nil
 	}
-	return nil, errNothingPrivate
+	s.Log.Info("espnhost: connect probes", "listed", len(list), "probed", probed, "public", public)
+	return nil, &nothingToConnectError{listed: len(list), probed: probed}
 }
 
 func (s *Service) leagues(w http.ResponseWriter, r *http.Request) {

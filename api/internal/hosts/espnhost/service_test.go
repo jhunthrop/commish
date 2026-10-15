@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -34,6 +35,10 @@ var goodS2 = strings.Repeat("AEB", 30) + "%2B"
 type fakeESPN struct {
 	reads, lists, publicReads int
 	public                    bool
+	// listed is how many leagues the list answers: 1 when zero, and
+	// empty answers none.
+	listed int
+	empty  bool
 }
 
 func (f *fakeESPN) MyLeagues(_ context.Context, c espn.Cookies, season int) ([]espn.MyLeague, error) {
@@ -41,13 +46,20 @@ func (f *fakeESPN) MyLeagues(_ context.Context, c espn.Cookies, season int) ([]e
 	if c.SWID != goodSWID {
 		return nil, espn.ErrSignedOut
 	}
-	return []espn.MyLeague{{LeagueID: "48153503", Season: season, Name: "Agbo Superhero League", TeamName: "TEAM BERRY", Teams: 14}}, nil
+	if f.empty {
+		return []espn.MyLeague{}, nil
+	}
+	out := []espn.MyLeague{{LeagueID: "48153503", Season: season, Name: "Agbo Superhero League", TeamName: "TEAM BERRY", Teams: 14}}
+	for i := 1; i < f.listed; i++ {
+		out = append(out, espn.MyLeague{LeagueID: strconv.Itoa(1000 + i), Season: season, Name: "Other", TeamName: "T", Teams: 10})
+	}
+	return out, nil
 }
 
 func (f *fakeESPN) Read(_ context.Context, id string, _ int, c *espn.Cookies) (espn.FullLeague, error) {
 	if c == nil {
 		f.publicReads++
-		if f.public && id == "48153503" {
+		if f.public && (id == "48153503" || id >= "1000") {
 			return espn.FullLeague{ID: id}, nil
 		}
 		return espn.FullLeague{}, espn.ErrPrivate
@@ -247,6 +259,63 @@ func TestConnectNeedsAPrivateLeagueToProveTheCookies(t *testing.T) {
 	}
 	if store.refusals != 0 {
 		t.Fatal("nothing to connect counted as a refusal")
+	}
+}
+
+func logged(t *testing.T, s *Service) *strings.Builder {
+	t.Helper()
+	var buf strings.Builder
+	s.Log = slog.New(slog.NewTextHandler(&buf, nil))
+	return &buf
+}
+
+func errorOf(t *testing.T, body []byte) string {
+	t.Helper()
+	var e struct {
+		Error struct{ Message string } `json:"error"`
+	}
+	if err := json.Unmarshal(body, &e); err != nil {
+		t.Fatalf("body %s: %v", body, err)
+	}
+	return e.Error.Message
+}
+
+// An empty list and an all-public list are different situations with
+// their own sentences, and the all-public one counts the leagues.
+func TestConnectSaysWhichNothingItIs(t *testing.T) {
+	s, _, client, me := setup(t)
+	client.empty = true
+	status, body := call(t, s.connect, me, apitypes.ESPNConnectInput{Swid: goodSWID, EspnS2: goodS2, Consent: true})
+	if status != http.StatusUnprocessableEntity || errorOf(t, body) != noLeaguesWords {
+		t.Fatalf("empty: %d %s", status, body)
+	}
+	client.empty, client.public, client.listed = false, true, 3
+	status, body = call(t, s.connect, me, apitypes.ESPNConnectInput{Swid: goodSWID, EspnS2: goodS2, Consent: true})
+	want := "ESPN lists 3 leagues for you this season and each is public, so each follows by its link. Connect ESPN is only for a private league."
+	if status != http.StatusUnprocessableEntity || errorOf(t, body) != want {
+		t.Fatalf("all public: %d %s", status, body)
+	}
+	client.listed = 1
+	_, body = call(t, s.connect, me, apitypes.ESPNConnectInput{Swid: goodSWID, EspnS2: goodS2, Consent: true})
+	if !strings.Contains(errorOf(t, body), "ESPN lists 1 league for you this season and it is public, so it follows by its link.") {
+		t.Fatalf("one public: %s", body)
+	}
+}
+
+// The connect path logs the list's size and the probes, never a cookie.
+func TestConnectLogsCountsNotCookies(t *testing.T) {
+	s, _, client, me := setup(t)
+	buf := logged(t, s)
+	client.public, client.listed = true, 3
+	call(t, s.connect, me, apitypes.ESPNConnectInput{Swid: goodSWID, EspnS2: goodS2, Consent: true})
+	out := buf.String()
+	for _, want := range []string{"level=INFO", "listed=3", "probed=3", "public=3"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("log lacks %q: %s", want, out)
+		}
+	}
+	if strings.Contains(out, goodSWID) || strings.Contains(out, "00000001-0000") || strings.Contains(out, goodS2) {
+		t.Fatalf("log carries a cookie: %s", out)
 	}
 }
 
