@@ -1,9 +1,10 @@
 <script lang="ts">
 	import { links } from '#lib/site/links.ts';
-	import { LINES, POINTS_OVER_REPLACEMENT } from './words.ts';
+	import { LINES } from './words.ts';
 
-	/** What a screen's rows are ranked by, said once above them: the API's own line, what points over
-	 * replacement are, and where the order's record is kept. */
+	/** What a screen's rows are ranked by, said once above them: the API's own line, as the API says
+	 * it (what the order is, what points over replacement are and what a week is), and where the
+	 * order's record is kept. The page adds no sentence of its own. */
 	interface Props {
 		basis: string;
 	}
@@ -13,7 +14,6 @@
 
 <p class="basis">
 	{basis}
-	{POINTS_OVER_REPLACEMENT}
 	<a href={links.record()}>{LINES.orderRecord}</a>
 </p>
 

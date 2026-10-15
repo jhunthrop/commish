@@ -29,7 +29,7 @@
 			read={() => inSeasonApi.lineup(id)}
 			reserve={RESERVE_ROWS.start}
 		>
-			{#snippet children(advice, board, host)}<StartScreen {advice} {board} {host} />{/snippet}
+			{#snippet children(advice, host)}<StartScreen {advice} {host} />{/snippet}
 		</InSeasonPage>
 	{:else if data.screen === 'waivers'}
 		<InSeasonPage
@@ -39,10 +39,9 @@
 			read={() => inSeasonApi.waivers(id)}
 			reserve={RESERVE_ROWS.waivers}
 		>
-			{#snippet children(advice, board, host)}
+			{#snippet children(advice, host)}
 				<WaiverScreen
 					{advice}
-					{board}
 					{host}
 					narrow={(position: WaiverPosition) => inSeasonApi.waivers(id, position)}
 				/>
@@ -56,13 +55,8 @@
 			read={() => inSeasonApi.trades(id)}
 			reserve={RESERVE_ROWS.trades}
 		>
-			{#snippet children(advice, board, host)}
-				<TradeScreen
-					{advice}
-					{board}
-					{host}
-					narrow={(player: string) => inSeasonApi.trades(id, player)}
-				/>
+			{#snippet children(advice, host)}
+				<TradeScreen {advice} {host} narrow={(player: string) => inSeasonApi.trades(id, player)} />
 			{/snippet}
 		</InSeasonPage>
 	{:else}

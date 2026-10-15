@@ -92,15 +92,24 @@ function startClause(slot: LineupSlot, label: string): string {
 }
 
 /** The start screen's decision: "Two changes: start Rachaad White over Tank Bigsby at RB2, start
- * Jauan Jennings over Josh Downs in the flex." or "Your lineup is set." */
+ * Jauan Jennings over Josh Downs in the flex.", "Four changes, starting with Patrick Mahomes over
+ * Aaron Rodgers at QB." or "Your lineup is set." */
 export function lineupDecision(advice: Pick<LineupAdvice, 'set' | 'slots'>): string {
 	const labels = slotLabels(advice.slots.map((s) => s.slot));
 	const changes = advice.slots.flatMap((slot, i) =>
 		slot.changed ? [startClause(slot, labels[i] ?? slot.slot)] : []
 	);
 	if (advice.set || changes.length === 0) return 'Your lineup is set.';
+	if (changes.length > NAMED_CHANGES) {
+		const first = changes[0]?.replace(/^start /, '') ?? '';
+		return `${changeCount(changes.length)}, starting with ${first}.`;
+	}
 	return `${changeCount(changes.length)}: ${changes.join(', ')}.`;
 }
+
+/** How many changes the decision names one by one; above it, it names the count and the first, and
+ * the rows carry the rest. */
+const NAMED_CHANGES = 2;
 
 /** The smallest gain one decimal can show: a smaller one is said as under it, never as 0.0. */
 const LEAST_SHOWN = 0.1;
@@ -118,11 +127,11 @@ export function gainFigure(gain: number): string {
 	return signed(gain, GAIN_DECIMALS);
 }
 
-/** The waiver screen's decision, for the best add or the one the member marked: "Add Bhayshul Tuten
- * for Jaylen Wright. Your lineup gains 1.2 points over replacement a week." */
+/** The waiver screen's decision, for the best add or the one the member marked: "Add Bhayshul
+ * Tuten, drop Jaylen Wright. Your lineup gains 1.2 points over replacement a week." */
 export function waiverDecision(row: WaiverRow | null): string {
 	if (row === null) return 'Nobody on waivers starts for you this week.';
-	const drop = row.drop ? ` for ${row.drop.player.name}` : '';
+	const drop = row.drop ? `, drop ${row.drop.player.name}` : '';
 	const gain =
 		row.gain > 0
 			? ` Your lineup gains ${gainAmount(row.gain)} points over replacement a week.`
@@ -130,12 +139,18 @@ export function waiverDecision(row: WaiverRow | null): string {
 	return `Add ${row.add.player.name}${drop}.${gain}`;
 }
 
-/** Who a row's add replaces on the roster, with his rank: "for Jaylen Wright, RB58", "into an open
- * spot". */
+/** Who a row's add replaces on the roster, with his rank: "drop Jaylen Wright, RB58", "into an
+ * open spot". */
 export function dropWords(row: Pick<WaiverRow, 'drop'>): string {
 	if (row.drop === null) return 'into an open spot';
 	const rank = rankWords(row.drop);
-	return `for ${row.drop.player.name}${rank === null ? '' : `, ${rank}`}`;
+	return `drop ${row.drop.player.name}${rank === null ? '' : `, ${rank}`}`;
+}
+
+/** The drop every add shares, said once over the rows: "Each add drops Jaxson Dart, QB31". */
+export function sharedDropWords(drop: PlayerLine): string {
+	const rank = rankWords(drop);
+	return `Each add drops ${drop.player.name}${rank === null ? '' : `, ${rank}`}`;
 }
 
 /** A trade's two gains: "Your lineup gains 4.1 points over replacement a week, theirs 2.3." */
@@ -149,11 +164,13 @@ export function sideNames(side: readonly PlayerLine[]): string {
 }
 
 /** The trade screen's decision, for the best trade or the one the member marked: "Trade Kyren
- * Williams to Muttdogs for Nico Collins. Your lineup gains ...". */
+ * Williams to Muttdogs for Nico Collins. Your lineup gains ...", naming the drop a trade that grows
+ * a full roster makes: "..., and drop Jaxson Dart to make room." */
 export function tradeDecision(trade: { row: TradeRow; team: string } | null): string {
 	if (trade === null) return 'No trade we found helps both lineups.';
 	const { row, team } = trade;
-	return `Trade ${sideNames(row.give)} to ${team} for ${sideNames(row.get)}. ${tradeGains(row)}`;
+	const drop = row.drop ? `, and drop ${row.drop.player.name} to make room` : '';
+	return `Trade ${sideNames(row.give)} to ${team} for ${sideNames(row.get)}${drop}. ${tradeGains(row)}`;
 }
 
 /** A trade where their lineup gains under half a point a week (spec §6.2). */
@@ -180,15 +197,19 @@ export const HELD = 'Held';
 /** The line over the waiver adds that would not start (spec §5.2). */
 export const NO_START_RULE = 'Nobody here starts for you this week';
 
+/** The line over the adds that gain your lineup but sit this week (a bye, a designation). */
+export const LATER_RULE = 'These help your lineup but do not start this week';
+
+/** The signed-out panel's title, naming the screen it is for. */
+export function signInTitle(screen: InSeasonScreen): string {
+	return `Sign in to see ${TAB_LABELS[screen].toLowerCase()} for your league`;
+}
+
 /** What the order is, in the refreshed stamp: "Our rest-of-season order, refreshed October 14." */
 export function refreshedWords(basis: OrderBasis, refreshed: string): string {
 	const order = basis === 'rest_of_season' ? 'Our rest-of-season order' : 'Our preseason number';
 	return `${order}, refreshed ${monthDayLabel(refreshed)}.`;
 }
-
-/** What "points over replacement" is, the first time a first-timer meets it. */
-export const POINTS_OVER_REPLACEMENT =
-	'Points over replacement are points above what a free pickup at his position gives you.';
 
 const ZONE = 'America/New_York';
 const WEEKDAY_TIME = new Intl.DateTimeFormat('en-US', {
@@ -236,15 +257,12 @@ export function designationSitsHim(designation: InjuryDesignation): boolean {
 	return !['questionable', 'doubtful'].includes(designation.status);
 }
 
-const GAME_COUNT_WORDS = ['', 'game', 'two', 'three'];
-
-/** His last games as the API lists them, newest first: "9.0, 11.2 and 18.4 in his last three",
- * "18.4 in his last game", null with none. */
+/** His last games as the API lists them, newest first, in the few characters a row has: "Last 3:
+ * 9.0, 11.2, 18.4", "Last game: 18.4", null with none. */
 export function lastGamesWords(games: readonly GamePoints[]): string | null {
 	if (games.length === 0) return null;
-	const points = listWords(games.map((game) => fixed(game.points, GAME_DECIMALS)));
-	const reach = GAME_COUNT_WORDS[games.length] ?? String(games.length);
-	return `${points} in his last ${reach}`;
+	const points = games.map((game) => fixed(game.points, GAME_DECIMALS)).join(', ');
+	return games.length === 1 ? `Last game: ${points}` : `Last ${String(games.length)}: ${points}`;
 }
 
 /** His rest-of-season or preseason rank at his position: "RB14", null when unranked. */
@@ -254,10 +272,18 @@ export function rankWords(line: Pick<PlayerLine, 'position_rank' | 'player'>): s
 		: `${line.player.position}${String(line.position_rank)}`;
 }
 
-/** Points over replacement a week on a row's line, where the row ends on another number: "+0.4 over
- * repl". */
-export function porWords(points: number): string {
-	return `${signed(points, GAIN_DECIMALS)} ${LINES.overRepl}`;
+/** A points over replacement figure: signed, "+0.4", "−0.5", and "0.0" with no sign when it rounds
+ * to nothing. */
+export function porFigure(points: number): string {
+	return fixed(Math.abs(points), GAIN_DECIMALS) === fixed(0, GAIN_DECIMALS)
+		? fixed(0, GAIN_DECIMALS)
+		: signed(points, GAIN_DECIMALS);
+}
+
+/** A row's own points over replacement a week, where the row ends on another number (a waiver's
+ * gain to your lineup), said as his: "his −0.5 over repl a week". */
+export function hisPorWords(points: number): string {
+	return `his ${porFigure(points)} ${LINES.overRepl}`;
 }
 
 /** The tabs under a followed league's title. */
@@ -270,8 +296,13 @@ export const TAB_LABELS: Readonly<Record<'league' | InSeasonScreen, string>> = {
 
 /** Every other line the in-season pages print, in one place for the copy guard. */
 export const LINES = {
-	/** A row's number cell, a week said once in its panel's head. */
-	overRepl: 'over repl',
+	/** A row's number cell: a week, apart from the league page's season figure. */
+	overRepl: 'over repl a week',
+	/** A waiver row's number: the gain to your lineup, not his own. */
+	toYourLineup: 'a week to your lineup',
+	/** The waiver rows' number named once over them on a phone, where the cell prints it alone. */
+	gainHead: 'Your gain a week',
+	drop: 'Drop',
 	unranked: 'Unranked',
 	aWeek: 'a week',
 	all: 'All',
@@ -287,7 +318,7 @@ export const LINES = {
 	perWeek: 'Over repl a week',
 	add: 'Add',
 	propose: 'Propose',
-	chosen: 'Chosen',
+	chosen: 'Up top',
 	sit: 'Sit',
 	bench: 'Bench',
 	give: 'Give',
@@ -298,7 +329,6 @@ export const LINES = {
 	tradesHolding: 'Trades holding',
 	yourPlayers: 'Your players',
 	theirPlayers: 'Their players',
-	signInTitle: 'Sign in to see your league',
 	signInLine: 'A league lives on your account. Following one is free.',
 	signIn: 'Sign in',
 	missingTitle: 'This league is not on your account',
@@ -307,7 +337,6 @@ export const LINES = {
 	lastRead: 'Your league could not be read just now. The page shows the last read.',
 	unreadable: 'Your league could not be read just now.',
 	leaguesUnread: 'Your leagues could not be read just now. We try again in a minute.',
-	boardUnread: "Our board can't be read right now. We try again in a minute.",
 	narrowingUnread: 'These could not be read just now. The last read stands.'
 } as const;
 
