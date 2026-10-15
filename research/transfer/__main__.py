@@ -12,6 +12,7 @@ transfer incidents), and RESEARCH_DATABASE_URL is deliberately not read.
 
 import argparse
 import json
+import logging
 import sys
 from collections.abc import Sequence
 from dataclasses import asdict
@@ -19,6 +20,7 @@ from dataclasses import asdict
 from research.db.engine import make_engine
 from research.db.meter import TransferMeter
 from research.db.url import database_url_from_env
+from research.logging_setup import configure_logging
 from research.transfer.proxy import CountingRelay
 from research.transfer.report import render
 from research.transfer.scenarios import SCENARIOS
@@ -34,6 +36,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--json", default=None, help="write every statement's read to this file")
     parser.add_argument("--top", type=int, default=10)
     args = parser.parse_args(argv)
+    configure_logging(logging.WARNING)
     url = database_url_from_env(URL_VARIABLE)
     try:
         target = checked_target(url)

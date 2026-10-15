@@ -23,9 +23,10 @@ export interface BoardPlayer extends PlayerRef {
 	/** Projected points over the replacement level at his position. */
 	vor: number;
 	expectedGames: number;
-	floor: number;
-	median: number;
-	ceiling: number;
+	/** Null in season: the rest-of-season board gives no range. */
+	floor: number | null;
+	median: number | null;
+	ceiling: number | null;
 	/** Tier within his position, 1 is the top. */
 	tier: number;
 }

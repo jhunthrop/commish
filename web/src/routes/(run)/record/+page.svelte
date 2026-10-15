@@ -74,7 +74,7 @@
 	<main class="record">
 		<PageHead
 			title="Our record"
-			lead="Our {scoring} board against {record.season}'s games, week by week, beside ADP"
+			lead="Our preseason {scoring} board against {record.season}'s games, week by week, beside ADP"
 		/>
 		<ContextNote {note} />
 

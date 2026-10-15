@@ -9,6 +9,7 @@ environment URL, and anything but a local host is refused (`scratch_engine`).
 
 import argparse
 import json
+import logging
 import subprocess
 import sys
 from collections.abc import Callable, Mapping, Sequence
@@ -21,12 +22,14 @@ from sqlalchemy import text
 
 from research.cli import log_line
 from research.errors import ConfigurationError
+from research.logging_setup import configure_logging
 from research.model.arithmetic import ARM64_BOARDS, model_version
 from research.model.priors import load_model_artifacts
 from research.model.ros import gates
 from research.model.ros.judge import Judgment, RoundFit, fit_round, judge_round
 from research.model.ros.payload import priors_payload
 from research.model.ros.scratch import ingest_judgment_season, ingest_week_one_rosters, scratch_engine
+from research.model.ros.ship import SHIPPED_ROUND, fit_and_publish
 
 # Each round's one judgment record. Its existence closes that judgment for good: `judge` refuses a
 # round whose record exists, and `dev-check` refuses a check that would judge a closed season.
@@ -134,14 +137,21 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     rosters.add_argument("--database", required=True)
     rosters.add_argument("--season", type=int, action="append", required=True)
+    fit = sub.add_parser("fit", help="fit the judged model on the named store and publish its artifact")
+    fit.add_argument("--database", required=True)
     for name in ("dev-check", "judge"):
         run = sub.add_parser(name)
         run.add_argument("--database", required=True)
         run.add_argument("--out", type=Path, required=True)
         run.add_argument("--round", type=int, choices=sorted(ROUNDS), required=True)
     args = parser.parse_args(argv)
+    configure_logging(logging.WARNING)
     if args.command == "ingest-week-one-rosters":
         ingest_week_one_rosters(args.database, args.season, datetime.now(UTC))
+        return 0
+    if args.command == "fit":
+        for line in fit_and_publish(args.database, JUDGMENT_RECORDS[SHIPPED_ROUND], datetime.now(UTC)):
+            log_line(line)
         return 0
     if args.command == "ingest-judgment-season":
         ingest_judgment_season(args.database, args.season, datetime.now(UTC))

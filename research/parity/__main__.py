@@ -8,6 +8,7 @@
     uv run python -m research.parity decide record       re-record the advisor's room states (reads the dev copy)
     uv run python -m research.parity capsules <case>|all the capsule facts on the dev copy, against their recording
     uv run python -m research.parity capsules record     re-record the capsule facts (reads the dev copy)
+    uv run python -m research.parity ros --database URL  the rest-of-season switch on the lane18_ scratch copy
     uv run python -m research.parity list                every case and fixture set
 
 `ingest` and `schema` need PARITY_DATABASE_URL (a Postgres where the harness may create its own
@@ -25,6 +26,8 @@ import sys
 from collections.abc import Callable, Sequence
 from pathlib import Path
 
+from research.logging_setup import configure_logging
+from research.model.ros.scratch import scratch_engine
 from research.parity import databases
 from research.parity.capsules.cases import CAPSULE_CASES
 from research.parity.capsules.cases import record as capsule_record
@@ -33,6 +36,7 @@ from research.parity.decide.cases import DECIDE_CASES
 from research.parity.decide.rooms import record as record_rooms
 from research.parity.model.cases import MODEL_CASES, MODEL_CASES_BY_NAME
 from research.parity.model.report import report_model
+from research.parity.model.ros_cases import run_ros_cases
 from research.parity.record import record_case
 from research.parity.report import report
 from research.parity.runner import close_harness, open_harness, run_case
@@ -90,6 +94,16 @@ def _capsules(names: Sequence[str]) -> int:
     by_name = {case.name: case for case in CAPSULE_CASES}
     cases = CAPSULE_CASES if names == ["all"] else tuple(by_name[name] for name in names)
     results = [case.run() for case in cases]
+    report_model(results)
+    return 0 if all(result.matches for result in results) else 1
+
+
+def _ros(url: str) -> int:
+    engine = scratch_engine(url)
+    try:
+        results = run_ros_cases(engine)
+    finally:
+        engine.dispose()
     report_model(results)
     return 0 if all(result.matches for result in results) else 1
 
@@ -175,9 +189,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     decide.add_argument("names", nargs="+", help="decide case names, all, or record")
     capsules = sub.add_parser("capsules", help="the capsule facts on the dev copy, against their recording")
     capsules.add_argument("names", nargs="+", help="capsule case names, all, or record")
+    ros = sub.add_parser("ros", help="the rest-of-season switch on the round's scratch copy")
+    ros.add_argument("--database", required=True, help="a lane18_ database on the local test server, port 5433")
     sub.add_parser("list", help="every case and fixture set")
     args = parser.parse_args(argv)
-    logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s: %(message)s")
+    configure_logging(logging.WARNING)
     commands: dict[str, Callable[[], int]] = {
         "ingest": lambda: _ingest(args.names),
         "model": lambda: _model(args.names, not args.no_store),
@@ -185,6 +201,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "capsules": lambda: _capsules(args.names),
         "schema": lambda: _schema(args.against),
         "record": lambda: _record(args.names, args.env_file),
+        "ros": lambda: _ros(args.database),
     }
     return commands.get(args.command, _list)()
 

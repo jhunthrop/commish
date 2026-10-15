@@ -21,6 +21,7 @@ from research.boards.server import create_app, service_engine
 from research.boards.sets import from_store, point_in_time, rebuilt_in
 from research.db.engine import make_engine
 from research.db.url import database_url_from_env, sqlalchemy_url
+from research.logging_setup import configure_logging
 from research.model.arithmetic import ARM64_BOARDS, model_version
 from research.model.priors import load_model_artifacts
 from research.season import PRODUCT_SEASON
@@ -85,7 +86,7 @@ def _keep(argv: Sequence[str]) -> int:
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = list(sys.argv[1:] if argv is None else argv)
-    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+    configure_logging(logging.INFO)
     if args and args[0] == "keep-candidates":
         return _keep(args[1:])
     if args:

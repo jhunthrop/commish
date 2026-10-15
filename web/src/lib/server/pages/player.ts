@@ -15,8 +15,16 @@ import {
 	manifest,
 	player,
 	schedule,
+	seasonReach,
 	seasonUnderway
 } from '../run.ts';
+import {
+	formatTable,
+	lineWords,
+	restFigures,
+	type LineWords,
+	type RestFigures
+} from '#lib/run/player-words.ts';
 
 export interface TierMate {
 	id: string;
@@ -32,6 +40,11 @@ export interface TierMate {
 export interface FormatLine {
 	format: Format;
 	numbers: PlayerFormat;
+	/** His format's name in the every-format table: with its basis when the table mixes the two. */
+	tableLabel: string;
+	words: LineWords;
+	/** Null on a preseason board. */
+	rest: RestFigures | null;
 	/** The drafts behind this format's ADP and their window: "PPR drafts, Sep 5 to Sep 9". */
 	adpSources: string[];
 	/** How many players this format's board ranks. */
@@ -52,6 +65,14 @@ export interface PlayerPage {
 	 * leads with the context's when the run carries it. */
 	lines: FormatLine[];
 	tier: { tier: number; cliff: TierCliff | null; mates: TierMate[] };
+	/** The every-format table's points heading: "Projected", or in season "Rest of season from week 7". */
+	pointsHead: string;
+	/** The tier list's caption: what its points are. */
+	tierBasis: string;
+	/** The default format's sentences, as its line carries them. */
+	words: LineWords;
+	/** The default format's rest-of-season figures, as its line carries them. */
+	rest: RestFigures | null;
 	/** The default format's ADP drafts and board size, as its line carries them. */
 	adpSources: string[];
 	boardSize: number;
@@ -70,21 +91,27 @@ export async function playerEntries(): Promise<{ slug: string }[]> {
 async function linesFor(
 	formats: readonly Format[],
 	numbers: Readonly<Record<string, PlayerFormat>>,
-	sources: readonly AdpSource[]
+	sources: readonly AdpSource[],
+	season: { year: number; underway: boolean }
 ): Promise<FormatLine[]> {
+	const reach = await seasonReach();
 	const ranked = formats.flatMap((format) => {
 		const found = numbers[format.id];
 		return found ? [{ format, numbers: found }] : [];
 	});
-	return Promise.all(
-		ranked.map(async (line) => ({
-			...line,
-			adpSources: sources
+	const lines = await Promise.all(
+		ranked.map(async (line) => {
+			const rest = restFigures(line.format, line.numbers, reach, season.year);
+			const adpSources = sources
 				.filter((source) => source.formats.includes(line.format.id))
-				.map((source) => `${source.drafts}, ${windowLabel(source.window)}`),
-			boardSize: (await board(line.format.id)).rows.length
-		}))
+				.map((source) => `${source.drafts}, ${windowLabel(source.window)}`);
+			const boardSize = (await board(line.format.id)).rows.length;
+			const words = lineWords({ ...line, rest }, adpSources, boardSize, season);
+			return { ...line, rest, words, adpSources, boardSize };
+		})
 	);
+	const { labels } = formatTable(lines);
+	return lines.map((line, i) => ({ ...line, tableLabel: labels[i] ?? line.format.label }));
 }
 
 async function mates(format: Format, entry: IndexEntry): Promise<PlayerPage['tier']> {
@@ -127,7 +154,10 @@ export async function playerPage(slug: string): Promise<PlayerPage> {
 		kickoffsOf(entry.team),
 		seasonUnderway()
 	]);
-	const lines = await linesFor(run.formats, loaded.formats, sources.sources);
+	const lines = await linesFor(run.formats, loaded.formats, sources.sources, {
+		year: run.season,
+		underway
+	});
 	const [lead] = lines;
 	if (!lead) throw new Error(`${loaded.name} has a page but no format ranks him.`);
 	return {
@@ -141,6 +171,13 @@ export async function playerPage(slug: string): Promise<PlayerPage> {
 		numbers: lead.numbers,
 		lines,
 		tier: await mates(lead.format, entry),
+		pointsHead: formatTable(lines).head,
+		tierBasis:
+			lead.format.rosFromWeek === undefined
+				? `Projected ${lead.format.label} points, ${String(run.season)}`
+				: `Projected ${lead.format.label} points for the rest of ${String(run.season)} from week ${String(lead.format.rosFromWeek)}`,
+		words: lead.words,
+		rest: lead.rest,
 		adpSources: lead.adpSources,
 		boardSize: lead.boardSize,
 		capsule: loaded.capsule,

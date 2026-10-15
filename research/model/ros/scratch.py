@@ -49,9 +49,32 @@ def scratch_engine(url: str) -> Engine:
     return make_engine(sqlalchemy_url(url))
 
 
+DEV_PORT: Final = 5432
+DEV_DATABASE: Final = "commish"
+PARITY_DATABASE: Final = "commish_test"
+
+
+def check_target_url(url: str) -> None:
+    """The one-shot commands (the ingests and the fit) take any explicit URL, the production store
+    through its proxy included, but never dev (read only) nor the parity database."""
+    parsed = urlparse(url)
+    database = parsed.path.lstrip("/")
+    if database == PARITY_DATABASE:
+        raise ConfigurationError("the parity database is the harness's, never a target")
+    # No port is libpq's default, 5432: dev's.
+    if (parsed.hostname or "") in LOCAL_HOSTS and parsed.port in (None, DEV_PORT) and database == DEV_DATABASE:
+        raise ConfigurationError("dev on 5432 is only read")
+
+
+def target_engine(url: str) -> Engine:
+    """An engine on a one-shot command's named store (`check_target_url`)."""
+    check_target_url(url)
+    return make_engine(sqlalchemy_url(url))
+
+
 def _ingest(url: str, body: Callable[[Connection, NflverseClient], list[str]]) -> list[str]:
-    """One transaction on the scratch copy; the engine is disposed whether or not the body raises."""
-    engine = scratch_engine(url)
+    """One transaction on the named store; the engine is disposed whether or not the body raises."""
+    engine = target_engine(url)
     try:
         with engine.begin() as conn:
             lines = body(conn, NflverseClient(LiveFetcher()))

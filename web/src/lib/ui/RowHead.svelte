@@ -11,9 +11,17 @@
 		order?: 'board' | 'adp';
 		/** The rows under it carry this season's figures: a Games column on a desk. */
 		games?: boolean;
+		/** The Drafters column compares drafters with our rank ("vs us"). Off in season. */
+		compare?: boolean;
 	}
 
-	let { range = true, action = false, order = 'board', games = false }: Props = $props();
+	let {
+		range = true,
+		action = false,
+		order = 'board',
+		games = false,
+		compare = true
+	}: Props = $props();
 </script>
 
 <div
@@ -37,7 +45,12 @@
 		></span
 	>
 	{#if range}<span class="rng"><Label>Range</Label></span>{/if}
-	<Label><span class="wide">Drafters vs us</span><span class="narrow">Drafters</span></Label>
+	<Label
+		><span class="wide"
+			>Drafters{#if compare}
+				vs us{/if}</span
+		><span class="narrow">Drafters</span></Label
+	>
 	{#if action}<span class="act-end"></span>{/if}
 </div>
 

@@ -35,6 +35,7 @@ from research.nightly.run_parts import (
     held_out,
     manifest_of,
     mirror_faces,
+    ros_setup,
     run_steps,
 )
 from research.nightly.run_store import LocalRunStore, RunStore
@@ -131,11 +132,13 @@ def run_nightly(deps: RunDeps, options: RunOptions) -> RunOutcome:
             frozen_by = carry_forward(
                 read_frozen_by(deps.store), PRODUCT_SEASON, frozen_weeks(conn, PRODUCT_SEASON), run_id
             )
-            assembled = assemble(conn, deps.clock(), frozen_by)
+            instant = deps.clock()
+            assembled = assemble(conn, instant, frozen_by, ros_setup(deps.engine, instant, deps.log))
     except Exception as error:
         return _failed(deps, run_id, steps, error)
     for line in assembled.dropped:
         deps.log(f"format not carried tonight, {line}")
+    deps.log(f"boards: {assembled.rest_status}")
     try:
         with tempfile.TemporaryDirectory(prefix="nightly-") as root:
             return _finish(deps, options, run_id, started, steps, assembled, frozen_by, Path(root))
@@ -182,6 +185,7 @@ def _finish(  # noqa: PLR0913, PLR0917 - the run's parts, handed on from `run_ni
         "capsuleSpend": next((asdict(s.spend) for s in steps if isinstance(s.spend, CapsuleSpend)), None),
         "headshots": headshot_line,
         "formatsNotCarried": list(assembled.dropped),
+        "restOfSeason": assembled.rest_status,
         "artifacts": writer.records,
     }  # fmt: skip
     writer.write("report.json", report)

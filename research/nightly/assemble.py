@@ -18,6 +18,8 @@ from research.errors import ResearchError
 from research.model.reads.teams import first_kickoff_for
 from research.nightly.build import pages, season
 from research.nightly.build.player_season import season_context
+from research.nightly.build.ros import MODEL_NAME as ROS_MODEL
+from research.nightly.build.ros import RosBasis, RosSetup, ros_boards
 from research.nightly.config import PAGE_FORMAT, RUN_FORMATS, RunFormat
 from research.nightly.reads import record as record_read
 from research.nightly.reads import schedule as schedule_read
@@ -29,6 +31,8 @@ from research.season import PRODUCT_SEASON
 Json = dict[str, Any]
 WIN_TOTALS_VENDOR: Final = "Published preseason season win totals, the nfelo win_totals.csv (greerreNFL/nfelosrs)"
 FIXTURES_VENDOR: Final = "Tank01 NFL fixtures (the stats provider)"
+ROS_FEED: Final = "model_artifacts: model/ros-priors v1"
+NO_REST_INPUTS: Final = "preseason: the run read no rest-of-season inputs"
 REGISTER_VENDOR: Final = "The Commish register: frozen before each kickoff, graded on nflverse weekly stats"
 
 
@@ -46,6 +50,12 @@ class Assembled:
     formats: tuple[RunFormat, ...]
     # The formats the run does not carry tonight, each with why (a format without ADP is not shipped).
     dropped: tuple[str, ...]
+    # In season, what the rest-of-season boards rank; None on a preseason board.
+    rest: RosBasis | None = None
+    # Why the boards are preseason or rest of season tonight, for the run's report.
+    rest_status: str = NO_REST_INPUTS
+    # The format ids whose board ranks the rest of the season tonight.
+    rest_formats: frozenset[str] = frozenset()
 
 
 def _boards(conn: Connection, as_of: datetime, formats: Sequence[RunFormat]) -> tuple[FormatBoard, ...]:
@@ -144,17 +154,26 @@ def _feed_sources(
     return [*board_sources.values(), *adp_sources, *capsule_sources]
 
 
-def assemble(conn: Connection, as_of: datetime, frozen_by: FrozenBy) -> Assembled:
+def assemble(conn: Connection, as_of: datetime, frozen_by: FrozenBy, ros: RosSetup | None = None) -> Assembled:
+    """Every artifact at `as_of`; with the model's inputs (`ros`), the in-season boards once the switch
+    week is reached (`nightly.build.ros`), else the preseason boards."""
     captures, formats, dropped = _captures(conn, as_of)
     boards = _boards(conn, as_of, formats)
     adp_by_format = {f.id: season.format_adp(f, captures) for f in formats}
+    # The season so far for every board player, and in season for every player with a line this
+    # season (the judged universe ranks him whether or not the preseason board did).
+    extra = () if ros is None else tuple(p.provider_id for p in ros.season_players)
+    on_boards = {e.row.player_id for b in boards for e in b.entries}
+    context = season_context(conn, PRODUCT_SEASON, sorted({*on_boards, *extra}), as_of)
+    rest = None if ros is None else ros_boards(boards, context, as_of, ros)
+    if rest is not None:
+        boards = rest.boards
+    # The pages and the search index in the order of the boards the run prints.
     people = tuple(pages.identities(boards))
     by_slug = {p.id: p for p in people}
     universe_ids = sorted({e.row.universe_id for b in boards for e in b.entries})
     capsules = stored_capsules_for(conn, universe_ids)
-    inputs = pages.page_inputs(
-        boards, adp_by_format, capsules, season_context(conn, PRODUCT_SEASON, sorted(by_slug), as_of)
-    )
+    inputs = pages.page_inputs(boards, adp_by_format, capsules, context)
     players = [pages.player_json(who, inputs) for who in people]
     schedule, clubs, schedule_source, clubs_source = _schedule(conn, as_of)
     record, record_source = _record(conn, as_of, frozen_by)
@@ -170,6 +189,8 @@ def assemble(conn: Connection, as_of: datetime, frozen_by: FrozenBy) -> Assemble
         "schedule.json": schedule,
     }
     feeds = _feed_sources(boards, captures, capsules)
+    if rest is not None and rest.basis is not None:
+        feeds.insert(0, _rest_source(rest.basis))
     # The sources block's order: boards, ADP, schedule, clubs, the record, capsules.
     capsule_feeds = [f for f in feeds if f["artifact"] == "capsules"]
     sources = (
@@ -180,4 +201,27 @@ def assemble(conn: Connection, as_of: datetime, frozen_by: FrozenBy) -> Assemble
         *capsule_feeds,
     )
     model_versions = tuple(sorted({b.stored.model_version or "unrecorded" for b in boards}))
-    return Assembled(files, boards, people, sources, model_versions, formats, dropped)
+    if rest is not None and rest.basis is not None:
+        model_versions = (*model_versions, ROS_MODEL)
+    return Assembled(
+        files,
+        boards,
+        people,
+        sources,
+        model_versions,
+        formats,
+        dropped,
+        None if rest is None else rest.basis,
+        NO_REST_INPUTS if rest is None else rest.status,
+        frozenset() if rest is None else rest.in_season,
+    )
+
+
+def _rest_source(basis: RosBasis) -> Json:
+    """The in-season boards' feed: the judged model's artifact, applied at the run's instant."""
+    return {
+        "artifact": "boards",
+        "vendor": f"Commish rest-of-season model {ROS_MODEL}, from week {basis.from_week}",
+        "feed": ROS_FEED,
+        "window": season.window(basis.refreshed_at, basis.refreshed_at),
+    }

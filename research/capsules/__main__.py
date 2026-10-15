@@ -16,6 +16,7 @@ measurement run). `write` and `sweep` read AI_GATEWAY_API_KEY from the environme
 
 import argparse
 import json
+import logging
 import os
 import sys
 from collections.abc import Sequence
@@ -38,6 +39,7 @@ from research.capsules.trial import Choice, gate_written, write_chosen
 from research.db.engine import make_engine
 from research.db.url import database_url_from_env
 from research.errors import ConfigurationError
+from research.logging_setup import configure_logging
 
 
 def _out(line: str = "") -> None:
@@ -130,6 +132,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     imported.add_argument("--in", dest="source", required=True)
     imported.add_argument("--dry-run", action="store_true", help="print what would land and be refused, write nothing")
     args = parser.parse_args(argv)
+    configure_logging(logging.WARNING)
     engine = make_engine(database_url_from_env())
     if args.command in ("facts", "prompt"):
         return _facts(engine, args.player_id, args.command == "prompt")
