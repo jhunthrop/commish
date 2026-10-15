@@ -8,6 +8,11 @@ type LeagueHost = components['schemas']['LeagueHost'];
 
 export const LEAGUE_HOSTS: readonly LeagueHost[] = ['sleeper', 'mfl', 'ffpc', 'yahoo', 'espn'];
 
+/** What following a league gives in season, in one sentence for a first-timer: the three in-season
+ * screens, by what each decides. Said on the follow page and on the signed-out account page. */
+export const IN_SEASON_TOOLS_LINE =
+	'Each week we show the lineup to start, your best add on waivers and the trades that help both teams.';
+
 /** Which of the hosts that open by switch are open (HOST_FFPC_ENABLED, HOST_YAHOO_ENABLED,
  * HOST_ESPN_ENABLED); Sleeper and MyFantasyLeague always are. */
 export interface OpenHosts {

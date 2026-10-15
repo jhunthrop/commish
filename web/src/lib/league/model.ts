@@ -29,12 +29,7 @@ type ScoringPreset = components['schemas']['ScoringPreset'];
  * minute whatever the number of viewers, so a faster page would only see the same read. */
 export const POLL_MS = 60_000;
 
-export { LEAGUE_HOSTS, hostsLine } from './hosts.ts';
-
-/** What following a league gives in season, in one sentence for a first-timer on the follow page:
- * the three in-season screens, by what each decides. */
-export const IN_SEASON_TOOLS_LINE =
-	'Each week we show the lineup to start, your best add on waivers and the trades that help both teams.';
+export { IN_SEASON_TOOLS_LINE, LEAGUE_HOSTS, hostsLine } from './hosts.ts';
 
 const SECOND = 1;
 const MINUTE = 60;
