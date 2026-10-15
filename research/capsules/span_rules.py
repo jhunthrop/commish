@@ -12,7 +12,7 @@ A writer's paraphrase of a basis ("he beat the position's weekly median in", aga
 
 Lane 29 narrowed it (the live review of 2026-10-15, M1: "report since the run-up to week" on 122
 pages, exempt as the sheet's words): the exemption covers a figure with its basis only. The sheet's
-section labels (`render_words.SHEET_LABELS`: "on every report", "the run-up to", "on file", ...) are
+section labels (`render_words.SHEET_LABELS`: "on file", "in our records", ...) are
 cut from the facts before their spans are read, so a span holding a label is judged like any other,
 and a label in a read is a validator failure besides (`prose_checks.label_copies`).
 """

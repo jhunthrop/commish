@@ -105,14 +105,14 @@ def test_a_figures_basis_the_facts_print_is_exempt_and_a_label_or_a_paraphrase_i
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """The ruling of 2026-10-15, narrowed by Lane 29: a figure's basis as the whole sheet or the facts
-    block renders it is exempt; a section label the renderer prints ("on every report", "the run-up
-    to", `render_words.SHEET_LABELS`) is not, so a label copied into prose is judged like any span."""
+    block renders it is exempt; a section label the renderer prints ("on file", "where most outcomes
+    fall", `render_words.SHEET_LABELS`) is not, so a label copied into prose is judged like any span."""
     monkeypatch.setattr(span_rules, "span_names", lambda conn: NAMES)
     monkeypatch.setattr(
         span_rules,
         "facts_texts",
         lambda facts: (
-            "Injury report: designation Q, on every report since the run-up to week 6 of 2026.",
+            "Middle range, where most outcomes fall: 227 to 320 points. ADP before the season: none on file.",
             "8 players left in his tier before a 16.8-point cliff.",
         ),
     )
@@ -122,8 +122,8 @@ def test_a_figures_basis_the_facts_print_is_exempt_and_a_label_or_a_paraphrase_i
         "b": _row("b", "Just two players left in his tier before a cliff."),
         "c": _row("c", "He beat the position's weekly median in nine weeks."),
         "d": _row("d", "Again he beat the position's weekly median in most weeks."),
-        "e": _row("e", "Injury: on every report since the run-up to now."),
-        "f": _row("f", "Listed on every report since the run-up to the bye."),
+        "e": _row("e", "Range: where most outcomes fall for him."),
+        "f": _row("f", "So where most outcomes fall for him is low."),
     }
     gate = judge_capsules(["a", "b", "c", "d", "e", "f"], rows, rules, LINE)
     assert gate.exempt_spans > 0

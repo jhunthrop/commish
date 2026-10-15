@@ -10,13 +10,10 @@ from typing import TYPE_CHECKING
 
 from research.capsules.facts.model import InjuryClean, InjuryDesignated, SeasonSoFar, SeasonWeek
 from research.capsules.render_words import (
-    ANY_REPORT,
     AS_THE_PAGE_PRINTS,
-    EVERY_REPORT,
     IN_OUR_RECORDS,
     NEXT_TO_PLAY,
     ON_FILE,
-    RUN_UP,
     week_of,
 )
 from research.model.jsmath import js_to_fixed
@@ -122,19 +119,21 @@ def bye_line(facts: "PlayerFacts") -> str:
 
 def _since(facts: "PlayerFacts", since: str) -> str:
     """When his status began: its day before the season; in season the week it reaches, never a
-    date (a date reads back as a month, which the in-season floor refuses)."""
+    date (a date reads back as a month, which the in-season floor refuses). Printed as data, never
+    as a sentence to copy (Lane 29: "on every report since the run-up to week 6" was the label the
+    writer copied onto 122 pages, and "since the run-up to the next game" the template it failed to fill)."""
     season = facts.season
     if season is None:
         return f"since {since}"
     if season.injury_from_week is None:
         return f"since after his last game of {season.season}"
-    return f"since {RUN_UP} {week_of(season.injury_from_week, season.season)}"
+    return f"since before {week_of(season.injury_from_week, season.season)}"
 
 
 def injury_line(facts: "PlayerFacts") -> str:
     injury = facts.injury
     if isinstance(injury, InjuryDesignated):
-        return f"Injury report: designation {injury.designation}, {EVERY_REPORT} {_since(facts, injury.since)}."
+        return f"Injury report: designation {injury.designation} {_since(facts, injury.since)}."
     if isinstance(injury, InjuryClean):
-        return f"Injury report: no designation {ON_FILE} {ANY_REPORT} {_since(facts, injury.since)}."
+        return f"Injury report: no designation {_since(facts, injury.since)}."
     return "Injury report: no injury feed has been checked for him yet. This is not a health claim either way."

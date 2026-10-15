@@ -130,6 +130,8 @@ class Repetition:
         "cut short by injury",
         "our number puts him at",
         "once injury risk is in",
+        # The live review of 2026-10-15 (M1): the old injury label, on 206 live pages.
+        "the run-up to",
     )
 
 

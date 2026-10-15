@@ -17,7 +17,7 @@ from research.capsules.pull_figures import adp_figures_off_page, capsule_finding
 from research.capsules.render_words import SHEET_LABELS
 from research.capsules.season_voice import SeasonClock
 from research.capsules.validate import banned_term_in
-from research.capsules.voice_rules import gate_hits
+from research.capsules.voice_rules import gate_hits, voice_rule_hits
 
 # The pages as the review read them on 2026-10-15 (through week 5 of 2026).
 OCTOBER = SeasonClock(2026, 5, (1, 4, 5), (2, 3))
@@ -272,9 +272,6 @@ def test_no_adp_said_plainly_passes(text: str) -> None:
 @pytest.mark.parametrize(
     "text",
     [
-        "He has been on every injury report since the run-up to the next game, and Wednesday was a non-participant, "
-        "so even before you get to the role, he may not help you this week or in week 7 of 2026, his bye.",
-        "He has been on every report since the run-up to week 6 of 2026.",
         "There is no ADP on file for him at all.",
         "Every game through week 5 of 2026 is in our records.",
     ],
@@ -286,7 +283,7 @@ def test_a_facts_label_copied_into_prose_fails(text: str) -> None:
 
 
 def test_the_label_list_is_the_renderers_and_plain_prose_passes() -> None:
-    assert "the run-up to" in SHEET_LABELS and "on file" in SHEET_LABELS
+    assert "on file" in SHEET_LABELS and "where most outcomes fall" in SHEET_LABELS
     assert label_copies("He has been listed questionable since before week 6 of 2026, so sit him.") == []
     assert label_copies("He has no ADP.") == []
 
@@ -348,3 +345,18 @@ def test_the_writer_is_told_what_a_missing_adp_means_and_the_page_facts_rules() 
         assert all(f'"{label}"' in rules for label in SHEET_LABELS)
     assert "with 0 touchdowns he has not scored" in IN_SEASON_RULES
     assert "no ADP on file" not in IN_SEASON_RULES
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "He has been on every injury report since the run-up to the next game, and Wednesday was a non-participant, "
+        "so even before you get to the role, he may not help you this week or in week 7 of 2026, his bye.",
+        "He has been on every report since the run-up to week 6 of 2026.",
+    ],
+)
+def test_the_run_up_label_the_sheet_no_longer_prints_is_a_worn_phrase(text: str) -> None:
+    """Harris's unfilled template and the stock line on 122 pages: the sheet now prints an injury status
+    as data ("designation Q since before week 6 of 2026"), and "the run-up to" is a worn phrase."""
+    assert "the run-up to" in [hit.found for hit in voice_rule_hits(text, ())]
+    assert "the run-up to" not in SHEET_LABELS

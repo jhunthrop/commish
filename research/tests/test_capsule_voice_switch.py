@@ -51,7 +51,7 @@ def test_preseason_sheet_and_rules_speak_to_a_drafter() -> None:
     )
     assert season_section(facts) == "No games played yet: the 2026 season has not kicked off."
     assert bye_line(facts) == "Bye: week 11 of 2026."
-    assert injury_line(facts) == "Injury report: no designation on file on any report since 2026-08-01."
+    assert injury_line(facts) == "Injury report: no designation since 2026-08-01."
 
 
 def test_in_season_rules_and_lines() -> None:
@@ -59,7 +59,7 @@ def test_in_season_rules_and_lines() -> None:
     assert writer_rules_for(facts) is IN_SEASON_RULES
     assert "week 6 of 2026 is the next to play" in today_line(facts)
     assert bye_line(facts) == "Bye: week 11 of 2026, still to come."
-    assert injury_line(facts) == "Injury report: designation Q, on every report since the run-up to week 6 of 2026."
+    assert injury_line(facts) == "Injury report: designation Q since before week 6 of 2026."
     assert "Weeks he has missed this season: week 4 of 2026 (1 in all)." in season_section(facts)
 
 
