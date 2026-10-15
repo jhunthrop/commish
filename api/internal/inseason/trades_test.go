@@ -167,3 +167,22 @@ func BenchmarkTradesTwelveTeams(b *testing.B) {
 		}
 	}
 }
+
+// A trade's gains are on the rest of the season: a player on bye this
+// week changes nothing.
+func TestTradeGainsIgnoreThisWeek(t *testing.T) {
+	theirs := deepAtReceiver()
+	healthy := Trades(twelveTeamPPR(t), Squad{Players: deepAtBack()}, Squad{Players: theirs}, "m-rb1", 1000)
+	bye := set(deepAtBack(), "m-rb1", func(c Candidate) Candidate { return withTier(c, Out) })
+	got := Trades(twelveTeamPPR(t), Squad{Players: bye}, Squad{Players: theirs}, "m-rb1", 1000)
+	if len(got) != len(healthy) {
+		t.Fatalf("%d trades with him on bye, %d healthy", len(got), len(healthy))
+	}
+	for i := range got {
+		if tradeWords(got[i], bye, theirs) != tradeWords(healthy[i], bye, theirs) || !near(got[i].MyGain, healthy[i].MyGain) ||
+			!near(got[i].TheirGain, healthy[i].TheirGain) {
+			t.Fatalf("trade %d: %s %v, healthy %s %v", i, tradeWords(got[i], bye, theirs), got[i].MyGain,
+				tradeWords(healthy[i], bye, theirs), healthy[i].MyGain)
+		}
+	}
+}

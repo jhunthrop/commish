@@ -51,7 +51,7 @@ func Waivers(config []draft.SlotConfig, squad Squad, pool []Candidate) []Waiver 
 		if gi && out[i].Gain != out[j].Gain {
 			return out[i].Gain > out[j].Gain
 		}
-		return acrossBetter(&pool[out[i].Add], &pool[out[j].Add])
+		return across(&pool[out[i].Add], &pool[out[j].Add], false)
 	})
 	return out
 }
@@ -89,7 +89,7 @@ func (w *waiverSearch) bestDrop(a int, c *Candidate) Waiver {
 			continue
 		}
 		gain := strength - w.base
-		if best.NoDrop || gain > best.Gain || (gain == best.Gain && acrossBetter(w.mine[best.Drop], p)) {
+		if best.NoDrop || gain > best.Gain || (gain == best.Gain && across(w.mine[best.Drop], p, false)) {
 			best = Waiver{Add: a, Drop: d, Gain: gain, Starts: starts}
 		}
 	}

@@ -86,10 +86,21 @@ func startingConfig(config []draft.SlotConfig) []draft.SlotConfig {
 	return out
 }
 
-// withinBetter is §4.2's order inside one position: tier, then our
-// position order, then points over replacement, then points a game.
-func withinBetter(a, b *Candidate) bool {
-	if a.Tier != b.Tier {
+// withinBetter is §4.2's order inside one position for this week: tier,
+// then our position order, then points over replacement, then points a
+// game.
+func withinBetter(a, b *Candidate) bool { return within(a, b, true) }
+
+// acrossBetter orders players of different positions for a shared slot
+// this week: a position rank says nothing about another position, so
+// after the tier the points over replacement decide, then the rank,
+// then the form.
+func acrossBetter(a, b *Candidate) bool { return across(a, b, true) }
+
+// within and across are the two orders, with this week's tiers or, for
+// the rest-of-season lineup strength, without them.
+func within(a, b *Candidate, week bool) bool {
+	if week && a.Tier != b.Tier {
 		return a.Tier < b.Tier
 	}
 	if (a.Rank == 0) != (b.Rank == 0) {
@@ -101,11 +112,8 @@ func withinBetter(a, b *Candidate) bool {
 	return valueThenForm(a, b)
 }
 
-// acrossBetter orders players of different positions for a shared slot:
-// a position rank says nothing about another position, so after the
-// tier the points over replacement decide, then the rank, then the form.
-func acrossBetter(a, b *Candidate) bool {
-	if a.Tier != b.Tier {
+func across(a, b *Candidate, week bool) bool {
+	if week && a.Tier != b.Tier {
 		return a.Tier < b.Tier
 	}
 	if a.HasValue != b.HasValue {
@@ -115,7 +123,7 @@ func acrossBetter(a, b *Candidate) bool {
 		return a.Value > b.Value
 	}
 	if a.Position == b.Position {
-		return withinBetter(a, b)
+		return within(a, b, week)
 	}
 	return valueThenForm(a, b)
 }
@@ -139,6 +147,9 @@ func valueThenForm(a, b *Candidate) bool {
 // filler fills one league's slots, its buffers kept between calls: the
 // trade search fills thousands of rosters a request.
 type filler struct {
+	// week orders by this week's tiers (the lineup); without it the fill
+	// is the rest-of-season lineup strength's, nobody's week counted.
+	week   bool
 	slots  []Slot
 	shared []int
 	open   []bool
@@ -173,7 +184,7 @@ func (f *filler) fill(open []bool, pool []*Candidate, taken []bool) []int {
 	// An insertion sort: a roster is a few dozen players at most.
 	order := f.order
 	for i := 1; i < len(order); i++ {
-		for j := i; j > 0 && withinBetter(pool[order[j]], pool[order[j-1]]); j-- {
+		for j := i; j > 0 && within(pool[order[j]], pool[order[j-1]], f.week); j-- {
 			order[j], order[j-1] = order[j-1], order[j]
 		}
 	}
@@ -197,7 +208,7 @@ func (f *filler) fill(open []bool, pool []*Candidate, taken []bool) []int {
 			if taken[p] || !f.slots[i].accepts(pool[p].Position) {
 				continue
 			}
-			if best < 0 || acrossBetter(pool[p], pool[best]) {
+			if best < 0 || across(pool[p], pool[best], f.week) {
 				best = p
 			}
 		}
@@ -210,7 +221,8 @@ func (f *filler) fill(open []bool, pool []*Candidate, taken []bool) []int {
 
 // strength is §5.2's lineup strength: the points over replacement a week
 // summed over the slots the engine fills from pool (§4.2's fill on our
-// order, nobody's week counted), and how many slots it filled. A player
+// order with no week tiers: a bye or this week's designation counts for
+// nothing; the filler must not be a week filler), and how many slots it filled. A player
 // on injured reserve fills nothing; a player with no points over
 // replacement fills a slot and adds none.
 func (f *filler) strength(pool []*Candidate) (float64, int) {
@@ -332,7 +344,9 @@ func Lineup(config []draft.SlotConfig, roster []Candidate, hostStarters []string
 			taken[p] = true
 		}
 	}
-	for i, p := range newFiller(slots).fill(open, pointers(roster), taken) {
+	week := newFiller(slots)
+	week.week = true
+	for i, p := range week.fill(open, pointers(roster), taken) {
 		if open[i] {
 			ours[i] = p
 		}

@@ -86,3 +86,17 @@ func TestWaiverOrder(t *testing.T) {
 		t.Fatalf("gains %v %v, want none for players who do not start", got[2].Gain, got[3].Gain)
 	}
 }
+
+// The gain is on the rest of the season: a star on bye or out this week
+// costs what he costs any week, so he is never the cheapest drop.
+func TestWaiverNeverDropsAStarOutThisWeek(t *testing.T) {
+	back := player("fa-rb", draft.RB, 15, 60)
+	healthy := Waivers(twelveTeamPPR(t), Squad{Players: pprRoster()}, []Candidate{back})[0]
+	for _, tier := range []Tier{Out, Doubtful} {
+		squad := Squad{Players: set(pprRoster(), "rb1", func(c Candidate) Candidate { return withTier(c, tier) })}
+		got := Waivers(twelveTeamPPR(t), squad, []Candidate{back})[0]
+		if dropID(got, squad) != dropID(healthy, squad) || !near(got.Gain, healthy.Gain) {
+			t.Fatalf("tier %d: drop %s gain %v, want %s %v as when healthy", tier, dropID(got, squad), got.Gain, dropID(healthy, squad), healthy.Gain)
+		}
+	}
+}
