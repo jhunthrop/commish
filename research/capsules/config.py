@@ -177,6 +177,15 @@ class CapsuleConfig:
     # A player's gateway calls: the bundle, its retry, and the corrections, never more (the oracle
     # had four; ruled up to six in phase C's fix round 3).
     max_gateway_calls_per_player: int = 6
+    # A THROTTLE IS NOT A BLOCK (Lane 52): an ask the gateway fails on a rate limit or a transport failure
+    # (`GenerationError.transport`, after the client's own retry and 429 backoffs) is asked again with
+    # the same prompt after each of these waits, and never counts against the six above. Every re-ask
+    # is an HTTP call on the page's bill and the run's budget (`run_budget`), and the night's per-player
+    # ceiling counts it. Lane 50's 40-page samples ended 4 of 38 blocks "throttled" on the last ask.
+    throttle_waits_ms: tuple[int, ...] = (15_000, 45_000, 90_000)
+    # The heaviest prompt a trial page's start rule assumes (`run_budget.room_for_page`): Lane 50
+    # measured 4,517 prompt tokens at most; the dollar reservation itself reads each call's real prompt.
+    trial_worst_prompt_tokens: int = 8_000
     # How far over its word cap a read may run once it has been asked for a shorter read: accepted,
     # not failed (ruled in phase C's fix round 3). A first draft is held to the cap itself.
     overrun_percent_after_length_correction: int = 10

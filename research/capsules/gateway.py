@@ -25,7 +25,7 @@ from collections.abc import Callable, Mapping, Sequence
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
 from dataclasses import dataclass, field, replace
 from email.utils import parsedate_to_datetime
-from typing import Any, Final, cast
+from typing import TYPE_CHECKING, Any, Final, cast
 
 import httpx
 
@@ -39,6 +39,9 @@ from research.capsules.gateway_ledger import (
     as_dict,
 )
 from research.capsules.pace import TokenBucket
+
+if TYPE_CHECKING:
+    from research.capsules.run_budget import RunBudget
 
 DEGENERATE_COMPLETION_WORDS: Final = 20
 _THINKING_DISABLED: Final = {"thinking": {"type": "disabled"}, "reasoning_effort": "none"}
@@ -57,12 +60,15 @@ _DONE: Final = object()
 
 
 class GenerationError(Exception):
-    """A call that did not produce a usable completion; `billed` is what the gateway charged anyway."""
+    """A call that did not produce a usable completion; `billed` is what the gateway charged anyway.
+    `transport` marks a rate limit or a transport failure (a network error, a 5xx, a response that was
+    not JSON): the line failed, not the writer, so the page waits and asks again (`generate`)."""
 
-    def __init__(self, message: str, retryable: bool, billed: Usage | None = None) -> None:
+    def __init__(self, message: str, retryable: bool, billed: Usage | None = None, *, transport: bool = False) -> None:
         super().__init__(message)
         self.retryable = retryable
         self.billed = billed
+        self.transport = transport
 
 
 @dataclass(frozen=True, slots=True)
@@ -91,9 +97,9 @@ def _parse(raw: str) -> Completion:
         try:
             body = json.loads(raw.translate(_CONTROL))
         except ValueError as error:
-            raise GenerationError(f"Gateway response was not parseable JSON: {error}", True) from None
+            raise GenerationError(f"Gateway response was not parseable JSON: {error}", True, transport=True) from None
     if not isinstance(body, dict):
-        raise GenerationError("Gateway response was not a JSON object.", True)
+        raise GenerationError("Gateway response was not a JSON object.", True, transport=True)
     choices = body.get("choices")
     first = as_dict(choices[0]) if isinstance(choices, list) and choices else {}
     message = as_dict(first.get("message"))
@@ -151,6 +157,8 @@ class GatewayClient:
     clock: Callable[[], float] = time.monotonic
     sleep: Callable[[float], None] = time.sleep
     calls: int = 0
+    # The run's budget (`run_budget`), shared by every scoped view: None for a run with no cap.
+    budget: "RunBudget | None" = None
 
     @classmethod
     def for_run(
@@ -172,6 +180,10 @@ class GatewayClient:
             clock=clock,
             sleep=sleep,
         )
+
+    def with_budget(self, budget: "RunBudget") -> "GatewayClient":
+        """This client drawing every call it makes from `budget`, a hard stop."""
+        return replace(self, budget=budget)
 
     def scoped(self) -> "GatewayClient":
         """A view for one page: the same line, bucket and ledger, its own call count from zero."""
@@ -274,9 +286,13 @@ class GatewayClient:
         retry = self.config.retry
         backoffs = retry.rate_limit_backoff_ms
         if response.headers.get("x-should-retry", "").strip().lower() == "false":
-            raise GenerationError("Gateway returned HTTP 429 with x-should-retry false, not retried.", True, billed)
+            raise GenerationError(
+                "Gateway returned HTTP 429 with x-should-retry false, not retried.", True, billed, transport=True
+            )
         if attempt > len(backoffs):
-            raise GenerationError(f"Gateway returned HTTP 429 on attempt {attempt}, not retried.", True, billed)
+            raise GenerationError(
+                f"Gateway returned HTTP 429 on attempt {attempt}, not retried.", True, billed, transport=True
+            )
         line_wait = self._line_spent_for(response)
         if line_wait is not None and line_wait > 0:
             self.bucket.pause_for(line_wait)
@@ -288,15 +304,16 @@ class GatewayClient:
                 f"Gateway returned HTTP 429 asking to retry after {asked:.0f} s, past the {cap:.0f} s cap, not retried.",
                 True,
                 billed,
+                transport=True,
             )
         self.sleep(asked if asked is not None else backoffs[attempt - 1] / 1000)
 
-    def _retry_or_fail(self, attempt: int, failure: str, billed: Usage | None) -> None:
+    def _retry_or_fail(self, attempt: int, failure: str, billed: Usage | None, *, transport: bool) -> None:
         """One retry for a failed attempt (a network error, a 5xx, an empty or a cut completion): wait and
         go again while attempts are left, else raise the failure with the usage billed so far."""
         retry = self.config.retry
         if attempt >= retry.max_attempts:
-            raise GenerationError(f"{failure} after its retry.", True, billed)
+            raise GenerationError(f"{failure} after its retry.", True, billed, transport=transport)
         self.sleep(retry.base_delay_ms * attempt / 1000)
 
     def complete(
@@ -307,29 +324,48 @@ class GatewayClient:
         billed: Usage | None = None
         attempts = max(retry.max_attempts, len(retry.rate_limit_backoff_ms) + 1)
         for attempt in range(1, attempts + 1):
+            reserved = self._reserve(messages, max_tokens)
             try:
                 response = self._post(messages, max_tokens)
             except httpx.HTTPError as error:
-                self._retry_or_fail(attempt, f"Gateway request failed ({error})", billed)
+                self._settle(reserved, None, billed=True)
+                self._retry_or_fail(attempt, f"Gateway request failed ({error})", billed, transport=True)
                 continue
             if response.status_code == RATE_LIMITED:
+                self._settle(reserved, None, billed=False)
                 self.ledger.record(CallRecord(self.model, RATE_LIMITED))
                 self._back_off_rate_limit(response, attempt, billed)
                 continue
             if not response.is_success:
+                self._settle(reserved, None, billed=False)
                 self.ledger.record(CallRecord(self.model, response.status_code))
                 if response.status_code < _SERVER_ERROR:
                     raise GenerationError(f"Gateway refused the request: HTTP {response.status_code}.", False)
-                self._retry_or_fail(attempt, f"Gateway returned HTTP {response.status_code}", billed)
+                self._retry_or_fail(attempt, f"Gateway returned HTTP {response.status_code}", billed, transport=True)
                 continue
-            completion = _parse(response.text)
+            try:
+                completion = _parse(response.text)
+            except GenerationError:
+                self._settle(reserved, None, billed=True)
+                raise
+            self._settle(reserved, completion.usage, billed=True)
             self.ledger.record(CallRecord(self.model, response.status_code, completion.provider, completion.usage))
             failure = self._unusable(completion, min_words, max_tokens)
             if failure is None:
                 return replace(completion, usage=add_usage(billed, completion.usage))
             billed = add_usage(billed, completion.usage)
-            self._retry_or_fail(attempt, failure, billed)
-        raise GenerationError("Gateway request failed.", True, billed)
+            self._retry_or_fail(attempt, failure, billed, transport=False)
+        raise GenerationError("Gateway request failed.", True, billed, transport=True)
+
+    def _reserve(self, messages: Sequence[dict[str, str]], max_tokens: int) -> float:
+        """The run's budget takes this call before it is made (`run_budget`); nothing with no budget."""
+        if self.budget is None:
+            return 0.0
+        return self.budget.reserve(sum(len(m.get("content", "")) for m in messages), max_tokens)
+
+    def _settle(self, reserved: float, usage: Usage | None, *, billed: bool) -> None:
+        if self.budget is not None:
+            self.budget.settle(reserved, usage, billed=billed)
 
     @staticmethod
     def _unusable(completion: Completion, min_words: int, max_tokens: int) -> str | None:

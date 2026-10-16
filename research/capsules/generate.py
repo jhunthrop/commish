@@ -11,6 +11,10 @@ been caught with on any attempt. A read that still fails is the facts block (`fa
 numbers as labelled facts, no prose.
 Narrative slots refused only for their voice get one rewrite each from what calls are left. Nothing
 here raises for a gateway failure: the facts block is the answer, and the usage billed is kept.
+A throttle is not a block (Lane 52): an ask the gateway fails on a rate limit or a transport failure
+waits and is asked again with the same prompt (`_ask`, `throttle_waits_ms`), and never counts against
+the six; only a line still down after every wait ends in the facts block, named "throttled". A call
+the run's budget refuses (`run_budget`) ends the page at once, named for the budget.
 """
 
 from collections.abc import Sequence
@@ -21,7 +25,7 @@ from research.capsules.bundle import CapsuleBundle, parse_bundle
 from research.capsules.config import CAPSULE_CONFIG
 from research.capsules.corrections import banned_phrases_in, soft_correction_for
 from research.capsules.facts_block import FACTS_SOURCE, render_facts_block
-from research.capsules.gateway import GatewayClient, GenerationError
+from research.capsules.gateway import DEGENERATE_COMPLETION_WORDS, Completion, GatewayClient, GenerationError
 from research.capsules.gateway_ledger import Usage, add_usage
 from research.capsules.narrative import (
     NarrativeResult,
@@ -43,6 +47,7 @@ from research.capsules.prompt import (
     correction_prompt_for,
     writer_rules_for,
 )
+from research.capsules.run_budget import BudgetSpentError
 from research.capsules.validate import (
     NARRATIVE_MIN_WORDS,
     ValidationResult,
@@ -57,6 +62,11 @@ if TYPE_CHECKING:
 
 NOT_AN_OBJECT: Final = "The answer was not a single JSON object."
 _NOT_WRITTEN: Final = "The answer carried no such read."
+# Why a page's gateway failed it: a line still down after every wait, the run's budget, or an answer
+# the gateway refused or that came back empty or cut (an ask like any other, `GenerationError.transport`).
+THROTTLED: Final = "throttled"
+BUDGET_SPENT: Final = "budget"
+UNUSABLE: Final = "unusable"
 
 
 @dataclass(frozen=True, slots=True)
@@ -100,6 +110,38 @@ def _msgs(facts: "PlayerFacts", user: str) -> list[dict[str, str]]:
     return [{"role": "system", "content": writer_rules_for(facts)}, {"role": "user", "content": user}]
 
 
+def _ask(
+    gateway: GatewayClient,
+    messages: list[dict[str, str]],
+    max_tokens: int,
+    min_words: int = DEGENERATE_COMPLETION_WORDS,
+) -> Completion:
+    """One of the page's asks. A rate limit or a transport failure waits (`throttle_waits_ms`) and asks
+    again with the same messages, as the same ask; what the failed tries billed rides on the answer, or
+    on the error raised once the waits are spent. Any other failure is raised at once."""
+    billed: Usage | None = None
+    waits = CAPSULE_CONFIG.throttle_waits_ms
+    for wait in (*waits, None):
+        try:
+            answer = gateway.complete(messages, max_tokens, min_words)
+        except GenerationError as error:
+            billed = add_usage(billed, error.billed)
+            if not error.transport or wait is None:
+                error.billed = billed
+                raise
+            gateway.sleep(wait / 1000)
+            continue
+        return replace(answer, usage=add_usage(billed, answer.usage))
+    raise AssertionError("unreachable: the last try raises or returns")
+
+
+def _gateway_failure(error: GenerationError) -> "Fallback":
+    """The fallback a gateway failure leaves: the run's budget, or a line that never answered."""
+    if isinstance(error, BudgetSpentError):
+        return Fallback(BUDGET_SPENT, str(error))
+    return Fallback(THROTTLED if error.transport else UNUSABLE, str(error))
+
+
 @dataclass(frozen=True, slots=True)
 class _BundleOutcome:
     bundle: CapsuleBundle | None
@@ -113,11 +155,11 @@ def _bundle_once(
 ) -> _BundleOutcome:
     prompt = bundle_prompt_for(facts, requests, worn)
     try:
-        answer = gateway.complete(
-            _msgs(facts, prompt if note is None else f"{prompt}\n\n{note}"), CAPSULE_CONFIG.bundle_max_tokens
+        answer = _ask(
+            gateway, _msgs(facts, prompt if note is None else f"{prompt}\n\n{note}"), CAPSULE_CONFIG.bundle_max_tokens
         )
     except GenerationError as error:
-        return _BundleOutcome(None, error.billed, Fallback("throttled"), 1)
+        return _BundleOutcome(None, error.billed, _gateway_failure(error), 1)
     bundle = parse_bundle(answer.content)
     failure = None if bundle is not None else Fallback("failed_validation", NOT_AN_OBJECT)
     return _BundleOutcome(bundle, answer.usage, failure, 1)
@@ -127,12 +169,13 @@ def _bundle(
     facts: "PlayerFacts", requests: Sequence[SlotRequest], gateway: GatewayClient, worn: WornPhrases
 ) -> _BundleOutcome:
     first = _bundle_once(facts, requests, gateway, worn, None)
-    if first.bundle is not None:
+    failure = first.failure
+    if first.bundle is not None or (failure is not None and failure.kind in (THROTTLED, BUDGET_SPENT)):
         return first
     note = (
-        "Your previous attempt did not complete. Answer again in full."
-        if first.failure is not None and first.failure.kind == "throttled"
-        else "Your previous answer was not a single JSON object. Return exactly one JSON object with the three keys and nothing around it."
+        "Your previous answer was not a single JSON object. Return exactly one JSON object with the three keys and nothing around it."
+        if failure is not None and failure.first_violation == NOT_AN_OBJECT
+        else "Your previous attempt did not complete. Answer again in full."
     )
     second = _bundle_once(facts, requests, gateway, worn, note)
     return replace(second, usage=add_usage(first.usage, second.usage), calls=first.calls + second.calls)
@@ -217,12 +260,12 @@ def _settle(
             first = _NOT_WRITTEN if read.result is None or not read.result.violations else read.result.violations[0]
             return _facts_block(facts, read, Fallback("failed_validation", first)), read.calls
         try:
-            answer = gateway.complete(
-                _msgs(facts, correction_prompt_for(facts, size, prior)), CAPSULE_CONFIG.size(size).max_tokens
+            answer = _ask(
+                gateway, _msgs(facts, correction_prompt_for(facts, size, prior)), CAPSULE_CONFIG.size(size).max_tokens
             )
         except GenerationError as error:
             spent = replace(read, usage=add_usage(read.usage, error.billed))
-            return _facts_block(facts, spent, Fallback("throttled")), read.calls + 1
+            return _facts_block(facts, spent, _gateway_failure(error)), read.calls + 1
         text = answer.content.strip()
         result = validate_capsule(text, facts, size, asked_shorter=_asked_shorter(read, size))
         read = read.graded(prior.kind, text, result, answer.usage, 1)
@@ -246,7 +289,8 @@ def _rewrite_voice_slots(
             attempt += 1
             calls += 1
             try:
-                answer = gateway.complete(
+                answer = _ask(
+                    gateway,
                     _msgs(facts, slot_rewrite_prompt(request, current)),
                     CAPSULE_CONFIG.bundle_max_tokens,
                     NARRATIVE_MIN_WORDS,
@@ -291,7 +335,9 @@ def describe_fallback(compact: ReadResult, full: ReadResult) -> str:
     reasons = [r for r in (compact.fallback, full.fallback) if r is not None]
     if not reasons:
         return "llm"
-    if any(r.kind == "throttled" for r in reasons):
+    if any(r.kind == BUDGET_SPENT for r in reasons):
+        return "facts (the run's budget is spent)"
+    if any(r.kind in (THROTTLED, UNUSABLE) for r in reasons):
         return "facts (throttled)"
     failed = next((r for r in reasons if r.kind == "failed_validation"), None)
     return "facts (fell back)" if failed is None else f"facts (failed validation: {failed.first_violation})"
@@ -305,8 +351,10 @@ def generate_capsule(
     requests = narrative_requests_for(facts)
     outcome = _bundle(facts, requests, gateway, worn)
     if outcome.bundle is None:
-        failure = outcome.failure or Fallback("throttled")
-        reason = "the gateway never returned a usable answer" if failure.kind == "throttled" else NOT_AN_OBJECT
+        failure = outcome.failure or Fallback(THROTTLED)
+        reason = (
+            NOT_AN_OBJECT if failure.first_violation == NOT_AN_OBJECT else "the gateway never returned a usable answer"
+        )
         floor = _facts_block(facts, _Read(), failure)
         return _assemble((floor, floor), failed_narrative(reason), outcome.usage, gateway.model, gateway.calls - before)
     remaining = CAPSULE_CONFIG.max_gateway_calls_per_player - outcome.calls
