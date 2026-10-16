@@ -21,6 +21,9 @@ from zoneinfo import ZoneInfo
 from research.pipeline.kickoffs import TeamKickoff
 
 LEAD: Final = timedelta(hours=2)
+# How far an event's own start may sit from the stored kickoffs and still belong to a slot: the odds
+# provider's instant and nflverse's can differ by minutes, and a late flex can move a game by hours.
+EVENT_TOLERANCE: Final = timedelta(hours=3)
 _NEW_YORK: Final = ZoneInfo("America/New_York")
 _SUNDAY: Final = 6
 _LATE_FROM_HOUR: Final = 15
@@ -62,6 +65,18 @@ def kickoff_slots(kickoffs: Sequence[TeamKickoff]) -> list[Slot]:
         grouped[(k.season, k.week, local_day, slot_name(k.at))].append(k.at)
     slots = [Slot(season, week, name, min(times), max(times)) for (season, week, _day, name), times in grouped.items()]
     return sorted(slots, key=lambda s: s.first_kickoff)
+
+
+def _gap(slot: Slot, instant: datetime) -> timedelta:
+    if slot.holds(instant):
+        return timedelta(0)
+    return slot.first_kickoff - instant if instant < slot.first_kickoff else instant - slot.last_kickoff
+
+
+def slot_of(slots: Sequence[Slot], instant: datetime) -> Slot | None:
+    """The slot an event's start belongs to: the nearest, within `EVENT_TOLERANCE`."""
+    nearest = min(slots, key=lambda s: _gap(s, instant), default=None)
+    return nearest if nearest is not None and _gap(nearest, instant) <= EVENT_TOLERANCE else None
 
 
 def due_slot(slots: Sequence[Slot], now: datetime) -> Slot | None:

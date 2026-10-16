@@ -1,6 +1,10 @@
 """THE STORED KICKOFFS, per club and week: the instants the schedule ingest wrote (`nflverse_kickoff`,
 `kickoff_instant`, stamped at the kickoff itself). The depth chart stamps and the kickoff slots of the
-benchmark captures read them, so both agree with the store on when every game starts."""
+benchmark captures read them, so both agree with the store on when every game starts.
+
+A rescheduled game (a flexed Sunday) gets a second row at its new instant, so each club-week's kickoff
+is the row recorded last, never the earliest. Lane 66a's `nflverse_games` takes this read's place once
+it is on main."""
 
 from dataclasses import dataclass
 from datetime import datetime
@@ -21,9 +25,10 @@ class TeamKickoff:
 
 
 _KICKOFFS: Final = text(
-    f"select season, week, team, min(as_of) as at from {TEAM_WEEK_OBSERVATIONS.fullname} "
-    "where season = :season and source = :source and metric = :metric group by season, week, team "
-    "order by at, team"
+    "select season, week, team, at from ("
+    "select distinct on (season, week, team) season, week, team, as_of as at "
+    f"from {TEAM_WEEK_OBSERVATIONS.fullname} where season = :season and source = :source and metric = :metric "
+    "order by season, week, team, ingested_at desc, as_of desc) latest order by at, team"
 )
 
 

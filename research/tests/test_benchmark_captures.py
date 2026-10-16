@@ -25,8 +25,8 @@ from research.db.url import sqlalchemy_url
 from research.errors import SchemaDriftError
 from research.parity import databases
 from research.pipeline.http import HttpResponse
-from research.pipeline.kickoff_slots import LEAD, due_slot, kickoff_slots, slot_name
-from research.pipeline.kickoffs import TeamKickoff
+from research.pipeline.kickoff_slots import LEAD, due_slot, kickoff_slots, slot_name, slot_of
+from research.pipeline.kickoffs import TeamKickoff, stored_kickoffs
 from research.pipeline.odds import touchdowns
 from research.pipeline.tank01 import projections
 
@@ -204,3 +204,51 @@ def test_the_harvest_window_captures_the_slots_projection_and_every_snapshot_is_
         rows = conn.execute(select(func.count()).select_from(TANK01_PROJECTION_ROWS)).scalar_one()
     assert (parsed.snapshots, parsed.rows, rows) == (1, 8, 8)
     assert (again.snapshots, again.rows) == (0, 0)
+
+
+def test_an_event_belongs_to_its_nearest_slot_within_three_hours() -> None:
+    slots = kickoff_slots(KICKOFFS)
+    monday = slot_of(slots, _at(20, 0, 25))  # the provider's start ten minutes off nflverse's
+    assert monday is not None and monday.name == "monday"
+    late = slot_of(slots, _at(18, 20, 25))
+    assert late is not None and late.name == "sunday-late"
+    assert slot_of(slots, _at(21, 12)) is None
+
+
+def test_a_refused_snapshot_is_its_own_line_and_the_capture_stands(engine: Engine) -> None:
+    broken = _projections()
+    assert isinstance(broken, dict)
+    broken["playerProjections"]["8439"]["team"] = ""
+    insert_snapshot = text(
+        f"insert into {CAPTURE_SNAPSHOTS.fullname} (source, captured_at, digest, payload) "
+        "values (:source, :at, 'd', cast(:payload as jsonb))"
+    )
+    with engine.begin() as conn:
+        conn.execute(insert_snapshot, {"source": "tank01_news", "at": _at(16, 20), "payload": "[]"})
+        conn.execute(
+            insert_snapshot,
+            {"source": projections.PROJECTIONS_SOURCE, "at": _at(16, 20), "payload": json.dumps(broken)},
+        )
+        report = projections.parse_stored_projections(conn)
+        news = conn.execute(
+            select(func.count()).select_from(CAPTURE_SNAPSHOTS).where(CAPTURE_SNAPSHOTS.c.source == "tank01_news")
+        ).scalar_one()
+    assert len(report.refused) == 1 and "playerProjections.8439.team" in report.refused[0]
+    assert "FAILED" in report.line()
+    assert news == 1
+
+
+def test_a_rescheduled_game_takes_its_latest_recorded_kickoff(engine: Engine) -> None:
+    with engine.begin() as conn:
+        conn.execute(
+            insert(TEAM_WEEK_OBSERVATIONS).values(
+                season=2026, week=6, team="CHI", source="nflverse_kickoff", metric="kickoff_instant", value=1.0,
+                as_of=_at(18, 20, 25), ingested_at=datetime(2026, 10, 30, tzinfo=UTC),
+            )
+        )  # fmt: skip
+        chicago = [k.at for k in stored_kickoffs(conn, 2026) if k.team == "CHI"]
+        conn.execute(
+            text("delete from research.team_week_observations where team = 'CHI' and as_of = :at"),
+            {"at": _at(18, 20, 25)},
+        )
+    assert chicago == [_at(18, 20, 25)]

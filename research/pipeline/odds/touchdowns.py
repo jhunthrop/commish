@@ -1,10 +1,14 @@
 """THE ANYTIME-TOUCHDOWN MARKET, CAPTURED PER KICKOFF SLOT (`player_td_prop_observations`).
 
 The weekly round 4's market benchmark for touchdowns (preregistration §2.9): The Odds API's
-`player_anytime_td` (the key checked against a live answer on 2026-10-16: every book quotes a Yes
+`player_anytime_td` (the key checked against a live answer on 2026-10-16: every US book quotes a Yes
 price per player, none a No), captured in each kickoff slot's window (`kickoff_slots`) for that
-slot's events. One event's call with one market and one region spends one credit, and the answer's
-`x-requests-remaining` is the plan's balance, printed every pass. Never an input, never on the site.
+slot's events, from the US, second US and European regions (`TD_REGIONS`) so books that quote a No
+are read too. One event's call spends one credit per region, three in all, and the answer's
+`x-requests-remaining` is the plan's balance, printed every pass. Two extra calls are bounded per
+slot: a refused answer rolls back the slot's rows (credits spent) and the next hour's pass takes it
+again, and an event with no market yet is taken again in the same window. Never an input, never on
+the site.
 
 Parsed strictly, as the props snapshot is (`props.py`): an unknown market, an outcome other than
 Yes or No, or an unreadable price is a changed API; a player with a No and no Yes is skipped and
@@ -19,15 +23,17 @@ from typing import Final
 from sqlalchemy import Connection, insert, text
 
 from research.db.schema import PLAYER_TD_PROP_OBSERVATIONS
-from research.errors import SchemaDriftError
 from research.pipeline.http import Fetcher
 from research.pipeline.jscompat import js_date_parse
-from research.pipeline.kickoff_slots import Slot, due_slot, kickoff_slots
+from research.pipeline.kickoff_slots import EVENT_TOLERANCE, Slot, due_slot, kickoff_slots, slot_of
 from research.pipeline.kickoffs import stored_kickoffs
-from research.pipeline.odds.props import SPORT_KEY, CreditStatus, get_json, odds_url, parse_odds_event
+from research.pipeline.odds.props import SPORT_KEY, CreditStatus, StrictJson, get_json, odds_url, parse_odds_event
 
 TD_MARKET: Final = "player_anytime_td"
-TD_PARAMS: Final = (("regions", "us"), ("markets", TD_MARKET), ("oddsFormat", "american"))
+# The regions whose books quote a No beside the Yes (the coordinator's ruling on the review's H2), so
+# §3.3 can take the margin out of an anytime offer: one credit per region per event, three an event.
+TD_REGIONS: Final = ("us", "us2", "eu")
+TD_PARAMS: Final = (("regions", ",".join(TD_REGIONS)), ("markets", TD_MARKET), ("oddsFormat", "american"))
 _SIDES: Final = ("Yes", "No")
 
 
@@ -48,32 +54,14 @@ class ParsedTd:
     skipped: int
 
 
-def _fail(path: str, reason: str) -> SchemaDriftError:
-    return SchemaDriftError(f"anytime-touchdown snapshot: {path}: {reason}")
-
-
-def _list(value: object, path: str) -> list[object]:
-    if not isinstance(value, list):
-        raise _fail(path, "expected an array")
-    return value
-
-
-def _dict(value: object, path: str) -> dict[str, object]:
-    if not isinstance(value, dict):
-        raise _fail(path, "expected an object")
-    return value
-
-
-def _string(value: object, path: str) -> str:
-    if not isinstance(value, str) or value.strip() == "":
-        raise _fail(path, "expected a non-empty string")
-    return value
+_JSON: Final = StrictJson("anytime-touchdown snapshot")
 
 
 def _price(value: object, path: str) -> int:
-    if isinstance(value, bool) or not isinstance(value, int | float) or float(value) != int(value):
-        raise _fail(path, f"expected a whole American price, got {value!r}")
-    return int(value)
+    price = _JSON.number(value, path)
+    if price != int(price):
+        raise _JSON.fail(path, f"expected a whole American price, got {value!r}")
+    return int(price)
 
 
 def _book_prices(outcomes: list[object], path: str) -> tuple[dict[str, dict[str, int]], int]:
@@ -81,11 +69,11 @@ def _book_prices(outcomes: list[object], path: str) -> tuple[dict[str, dict[str,
     ambiguous: set[str] = set()
     for index, raw in enumerate(outcomes):
         where = f"{path}[{index}]"
-        outcome = _dict(raw, where)
-        side = _string(outcome.get("name"), f"{where}.name")
+        outcome = _JSON.mapping(raw, where)
+        side = _JSON.text(outcome.get("name"), f"{where}.name")
         if side not in _SIDES:
-            raise _fail(f"{where}.name", f'expected "Yes" or "No", got "{side}"')
-        player = _string(outcome.get("description"), f"{where}.description")
+            raise _JSON.fail(f"{where}.name", f'expected "Yes" or "No", got "{side}"')
+        player = _JSON.text(outcome.get("description"), f"{where}.description")
         quoted = prices.setdefault(player, {})
         if side in quoted:
             ambiguous.add(player)
@@ -96,23 +84,25 @@ def _book_prices(outcomes: list[object], path: str) -> tuple[dict[str, dict[str,
 
 
 def parse_td_response(payload: object, fetched_at: datetime) -> ParsedTd:
-    root = _dict(payload, "response")
-    event_id = _string(root.get("id"), "response.id")
-    commence = js_date_parse(_string(root.get("commence_time"), "response.commence_time"))
+    root = _JSON.mapping(payload, "response")
+    event_id = _JSON.text(root.get("id"), "response.id")
+    commence = js_date_parse(_JSON.text(root.get("commence_time"), "response.commence_time"))
     if commence is None:
-        raise _fail("response.commence_time", "unparseable date")
+        raise _JSON.fail("response.commence_time", "unparseable date")
     observations: list[TdObservation] = []
     skipped = 0
-    for b_index, raw_book in enumerate(_list(root.get("bookmakers", []), "response.bookmakers")):
+    for b_index, raw_book in enumerate(_JSON.array(root.get("bookmakers", []), "response.bookmakers")):
         b_path = f"response.bookmakers[{b_index}]"
-        book = _dict(raw_book, b_path)
-        key = _string(book.get("key"), f"{b_path}.key")
-        for m_index, raw_market in enumerate(_list(book.get("markets"), f"{b_path}.markets")):
+        book = _JSON.mapping(raw_book, b_path)
+        key = _JSON.text(book.get("key"), f"{b_path}.key")
+        for m_index, raw_market in enumerate(_JSON.array(book.get("markets"), f"{b_path}.markets")):
             m_path = f"{b_path}.markets[{m_index}]"
-            market = _dict(raw_market, m_path)
+            market = _JSON.mapping(raw_market, m_path)
             if market.get("key") != TD_MARKET:
-                raise _fail(f"{m_path}.key", f'unknown market "{market.get("key")}", expected {TD_MARKET}')
-            prices, ambiguous = _book_prices(_list(market.get("outcomes"), f"{m_path}.outcomes"), f"{m_path}.outcomes")
+                raise _JSON.fail(f"{m_path}.key", f'unknown market "{market.get("key")}", expected {TD_MARKET}')
+            prices, ambiguous = _book_prices(
+                _JSON.array(market.get("outcomes"), f"{m_path}.outcomes"), f"{m_path}.outcomes"
+            )
             skipped += ambiguous
             for player, sides in prices.items():
                 if "Yes" not in sides:
@@ -143,13 +133,19 @@ _CAPTURED_SINCE: Final = text(
 )
 
 
-def td_slot_due(conn: Connection, season: int, now: datetime) -> Slot | None:
-    """The kickoff slot whose window holds `now`, unless its events' market is already stored in it."""
-    slot = due_slot(kickoff_slots(stored_kickoffs(conn, season)), now)
+def td_slot_due(conn: Connection, season: int, now: datetime) -> tuple[Slot, list[Slot]] | None:
+    """The kickoff slot whose window holds `now` (with the season's slots, to place each event), unless
+    its events' market is already stored in the window."""
+    slots = kickoff_slots(stored_kickoffs(conn, season))
+    slot = due_slot(slots, now)
     if slot is None:
         return None
-    params = {"since": slot.opens, "first": slot.first_kickoff, "last": slot.last_kickoff}
-    return None if conn.execute(_CAPTURED_SINCE, params).scalar_one() else slot
+    params = {
+        "since": slot.opens,
+        "first": slot.first_kickoff - EVENT_TOLERANCE,
+        "last": slot.last_kickoff + EVENT_TOLERANCE,
+    }
+    return None if conn.execute(_CAPTURED_SINCE, params).scalar_one() else (slot, slots)
 
 
 @dataclass(frozen=True, slots=True)
@@ -171,13 +167,17 @@ class TdSnapshot:
 
 
 def run_td_snapshot(conn: Connection, fetcher: Fetcher, api_key: str, season: int, now: datetime) -> TdSnapshot:
-    """The due slot's events, one credit each; nothing at all when no slot is due."""
-    slot = td_slot_due(conn, season, now)
-    if slot is None:
+    """The due slot's events (each placed in its nearest slot, `kickoff_slots.slot_of`), three credits
+    each; nothing at all when no slot is due."""
+    due = td_slot_due(conn, season, now)
+    if due is None:
         return TdSnapshot(None, 0, 0, 0, None)
+    slot, slots = due
     listed, credits = get_json(fetcher, odds_url(f"/sports/{SPORT_KEY}/events", api_key), "/events")
-    events = [parse_odds_event(raw, f"td snapshot: /events[{i}]") for i, raw in enumerate(_list(listed, "/events"))]
-    chosen = [e for e in events if slot.holds(e.commence_time)]
+    events = [
+        parse_odds_event(raw, f"td snapshot: /events[{i}]") for i, raw in enumerate(_JSON.array(listed, "/events"))
+    ]
+    chosen = [e for e in events if slot_of(slots, e.commence_time) == slot]
     written = skipped = 0
     for event in chosen:
         path = f"/sports/{SPORT_KEY}/events/{event.id}/odds"
