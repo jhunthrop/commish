@@ -115,7 +115,9 @@ def season_report(build: SeasonBuild, conn: Connection, digests: Mapping[str, st
         },
         "clause": {
             "team": clause(build.team_games, build.stamps, (*TEAM_KINDS, *figures), prior=False),
-            "player": clause(build.player_games, build.stamps, player_kinds, prior=True),
+            "player": clause(build.player_games, build.stamps, player_kinds, prior=True)
+            if build.spec.player_weeks
+            else None,
         },
         "weather_stamp_window": weather_window(conn, build.spec.season),
         "seconds": round(build.seconds, 1),
