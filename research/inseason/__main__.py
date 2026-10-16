@@ -50,6 +50,7 @@ from research.pipeline.http import LiveFetcher
 from research.pipeline.odds.touchdowns import run_td_snapshot
 from research.pipeline.tank01.capture import run_capture_harvest
 from research.pipeline.tank01.client import API_KEY_ENV, DEFAULT_SEASON, SEASON_ENV, Tank01Client
+from research.pipeline.tank01.projections import parse_stored_projections
 
 TASKS: Final = ("season-week", "usage-backfill", "capture-harvest")
 LOG: Final = logging.getLogger(__name__)
@@ -168,12 +169,25 @@ def _capture_harvest(now: datetime) -> bool:
     if result.reason is not None:
         _line(f"capture-harvest: REFUSED, {result.reason}")
         return False
-    _line(f"  projections parsed: {result.projection_snapshots} snapshots, {result.projection_rows} player rows")
     failed = [feed.source for feed in result.feeds if feed.status == "failed"]
     _line(f"capture-harvest: {len(result.feeds)} feeds, {len(failed)} failed")
+    parsed = _parse_projections()
     # The market is its own provider and its own line: a failed Tank01 feed never skips it.
     market = _touchdown_market(now, season)
-    return not failed and market
+    return not failed and parsed and market
+
+
+def _parse_projections() -> bool:
+    """The stored projections parsed in a transaction after the capture's, so a refused snapshot is its
+    own failed line and the capture stands."""
+    engine = make_engine(database_url_from_env())
+    try:
+        with engine.begin() as conn:
+            report = parse_stored_projections(conn)
+    finally:
+        engine.dispose()
+    _line(report.line())
+    return not report.refused
 
 
 def _touchdown_market(now: datetime, season: int) -> bool:

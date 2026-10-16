@@ -13,7 +13,7 @@ whose designation or headlines moved) is a capsule concern and lands with the ca
 
 import hashlib
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Final, Literal
 
@@ -25,7 +25,7 @@ from research.pipeline.jscompat import js_iso, js_json_stringify, js_object_keys
 from research.pipeline.nflverse.team_codes import NFL_TEAM_ABBREVIATIONS
 from research.pipeline.tank01.client import Paths, Tank01Client
 from research.pipeline.tank01.mapping import ADP_TYPE
-from research.pipeline.tank01.projections import PROJECTIONS_SOURCE, parse_stored_projections, projection_slot_due
+from research.pipeline.tank01.projections import PROJECTIONS_SOURCE, projection_slot_due
 from research.pipeline.tolerated import TOLERATED_FAILURES
 
 Cadence = Literal["daily", "game-day", "weekly"]
@@ -126,9 +126,6 @@ class FeedOutcome:
 class CaptureResult:
     feeds: list[FeedOutcome]
     reason: str | None = None
-    # Projection snapshots parsed into `tank01_projection_rows` by this pass, and the rows they gave.
-    projection_snapshots: int = 0
-    projection_rows: int = 0
 
 
 _INSERT = text(
@@ -227,11 +224,10 @@ def slot_projection_feed(week: int) -> CaptureFeed:
 
 def run_capture_harvest(conn: Connection, client: Tank01Client, fired_at: datetime, season: int) -> CaptureResult:
     """The capture-harvest job's capture: five feeds, a ten-request ceiling, no freshness keys; in a
-    kickoff slot's window not yet captured, the slot week's projection as a sixth, and every stored
-    projection snapshot not yet parsed is parsed after."""
+    kickoff slot's window not yet captured, the slot week's projection as a sixth. Parsing the stored
+    projections is the caller's next transaction (`projections.parse_stored_projections`), so a refused
+    snapshot never rolls back what this pass captured."""
     slot = projection_slot_due(conn, season, fired_at)
     feeds = [*harvest_feeds(), *([] if slot is None else [slot_projection_feed(slot.week)])]
     capture = CapturePass(fired_at, season, current_nfl_week(conn, season), feeds=feeds)
-    result = capture_once(conn, client, capture, FixedBudget(CAPTURE_HARVEST_REQUEST_BUDGET))
-    parsed = parse_stored_projections(conn)
-    return replace(result, projection_snapshots=parsed.snapshots, projection_rows=parsed.rows)
+    return capture_once(conn, client, capture, FixedBudget(CAPTURE_HARVEST_REQUEST_BUDGET))

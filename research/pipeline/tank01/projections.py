@@ -108,16 +108,28 @@ _UNPARSED: Final = text(
 class ParseReport:
     snapshots: int
     rows: int
+    # Each refused snapshot's id and why: left unparsed, its line failed, the rest still parsed.
+    refused: tuple[str, ...] = ()
+
+    def line(self) -> str:
+        head = f"projections-parse: {self.snapshots} snapshots, {self.rows} player rows"
+        return head if not self.refused else f"{head}; FAILED, refused {'; '.join(self.refused)}"
 
 
 def parse_stored_projections(conn: Connection) -> ParseReport:
-    """Every stored projections snapshot with no rows yet, parsed and written."""
+    """Every stored projections snapshot with no rows yet, each in its own savepoint: a refused one is
+    named and left unparsed, and never undoes another."""
     snapshots = rows = 0
+    refused: list[str] = []
     for stored in conn.execute(_UNPARSED, {"source": PROJECTIONS_SOURCE}).all():
-        parsed = parse_projection_snapshot(stored.payload, int(stored.id), stored.captured_at)
-        rows += insert_ignoring_conflicts(conn, TANK01_PROJECTION_ROWS, parsed)
-        snapshots += 1
-    return ParseReport(snapshots, rows)
+        try:
+            with conn.begin_nested():
+                parsed = parse_projection_snapshot(stored.payload, int(stored.id), stored.captured_at)
+                rows += insert_ignoring_conflicts(conn, TANK01_PROJECTION_ROWS, parsed)
+            snapshots += 1
+        except SchemaDriftError as error:
+            refused.append(f"snapshot {stored.id}: {error}")
+    return ParseReport(snapshots, rows, tuple(refused))
 
 
 _CAPTURED_SINCE: Final = text(
