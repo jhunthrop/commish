@@ -29,6 +29,8 @@ from research.pipeline.checkpoint import Checkpoint
 from research.pipeline.http import Fetcher
 from research.pipeline.nflverse import (
     context,
+    depth_chart_check,
+    depth_chart_weeks,
     derived_stat_lines,
     draft_picks,
     ingest,
@@ -177,6 +179,16 @@ def _pbp_plays(conn: Connection, inv: Invocation) -> object:
     return lines
 
 
+def _depth_chart_weeks(conn: Connection, inv: Invocation) -> object:
+    """Each season's weekly depth charts, durable after each season."""
+    client = NflverseClient(inv.fetcher)
+    lines = []
+    for season in seasons_of(inv.args):
+        lines.append(depth_chart_weeks.ingest_depth_chart_weeks(conn, client, season).summary())
+        inv.checkpoint()
+    return lines
+
+
 def _win_totals(conn: Connection, inv: Invocation) -> object:
     return vegas.run_win_totals(conn, inv.fetcher, inv.args.last, inv.now, first_kickoff_for(conn, inv.args.last))
 
@@ -220,5 +232,7 @@ COMMANDS: Final = MappingProxyType({
     "win-totals-seed": Command("the committed win-totals CSV", lambda c, i: vegas.ingest_win_totals_csv(c, RESEARCH_ROOT / vegas.WIN_TOTALS_CSV_PATH, i.now)),
     "win-totals": Command("the publisher's win totals before kickoff", _win_totals),
     "pbp-plays": Command("the play-level play-by-play per season into nflverse_pbp_plays", _pbp_plays, atomic=False),
+    "depth-chart-weeks": Command("nflverse's weekly depth charts per season into nflverse_depth_chart_weeks", _depth_chart_weeks, atomic=False),
+    "depth-chart-check": Command("the round 4 depth chart stamp check (reads charts and filings, writes nothing; the coordinator's recorded run)", lambda c, i: depth_chart_check.run_stamp_check(c).lines()),
     "history": Command("the seasons the store lost, re-created from nflverse (pipeline/history.py); --first/--last narrow it", _history, atomic=False),
 })  # fmt: skip

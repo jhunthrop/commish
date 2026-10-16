@@ -1,0 +1,223 @@
+season,club_code,week,game_type,depth_team,last_name,first_name,football_name,formation,gsis_id,jersey_number,position,elias_id,depth_position,full_name
+2016,ATL,1,REG,1,Ishmael,Kemal,Kemal,Defense,00-0030427,36,SS,ISH415291,S,Kemal Ishmael
+2016,ATL,1,REG,3,Toilolo,Levine,Levine,Offense,00-0030443,85,TE,TOI581408,TE,Levine Toilolo
+2016,ATL,1,REG,1,Alford,Robert,Robert,Defense,00-0030528,23,CB,ALF657259,CB,Robert Alford
+2016,ATL,1,REG,1,Trufant,Desmond,Desmond,Defense,00-0030562,10,CB,TRU381665,CB,Desmond Trufant
+2016,ATL,1,REG,1,Allen,Ricardo,Ricardo,Defense,00-0031181,37,SS,ALL641418,S,Ricardo Allen
+2016,ATL,1,REG,3,Gabriel,Taylor,Taylor,Offense,00-0031228,18,WR,GAB627060,WR,Taylor Gabriel
+2016,ATL,1,REG,1,Matthews,Jacob,Jake,Offense,00-0031279,70,T,MAT565555,LT,Jake Matthews
+2016,ATL,1,REG,2,Hageman,Ra'Shede,Ra'Shede,Defense,00-0031281,90,DT,HAG152196,DE,Ra'Shede Hageman
+2016,ATL,1,REG,1,Freeman,Devonta,Devonta,Offense,00-0031285,33,RB,FRE174508,RB,Devonta Freeman
+2016,ATL,1,REG,2,Goodwin,Charaun,C.J.,Defense,00-0031357,29,CB,GOO627559,CB,C.J. Goodwin
+2016,ATL,1,REG,2,Hardy,Justin,Justin,Special Teams,00-0031570,6,WR,HAR111877,PR,Justin Hardy
+2016,ATL,1,REG,2,Therezie,Robenson,Robenson,Defense,00-0031680,40,SS,THE622937,S,Robenson Therezie
+2016,ATL,1,REG,3,Ward,Terron,Terron,Offense,00-0031682,28,RB,WAR275043,RB,Terron Ward
+2016,ATL,1,REG,1,Coleman,Tevin,Tevin,Special Teams,00-0032058,28,RB,COL359050,KR,Tevin Coleman
+2016,ATL,1,REG,2,Coleman,Tevin,Tevin,Offense,00-0032058,28,RB,COL359050,RB,Tevin Coleman
+2016,ATL,1,REG,3,Neal,Keanu,Keanu,Defense,00-0032382,31,FS,NEA222964,S,Keanu Neal
+2016,ATL,1,REG,2,Hooper,Austin,Austin,Offense,00-0032392,81,TE,HOO570770,TE,Austin Hooper
+2016,ATL,1,REG,1,Campbell,De'Vondre,De'Vondre,Defense,00-0032401,59,ILB,CAM227922,LB,De'Vondre Campbell
+2016,ATL,1,REG,2,Schweitzer,Weston,Wes,Offense,00-0032432,71,G,SCH821050,RG,Wes Schweitzer
+2016,ATL,1,REG,2,Poole,Brian,Brian,Defense,00-0032596,33,CB,POO231564,CB,Brian Poole
+2016,ATL,1,REG,3,Perkins,Joshua,Joshua,Offense,00-0032599,47,TE,PER222525,"
+    ",Joshua Perkins
+2016,ATL,1,REG,2,Worrilow,Paul,Paul,Defense,00-0029792,40,OLB,WOR678863,LB,Paul Worrilow
+2016,ATL,1,REG,3,Reynolds,LaRoy,LaRoy,Defense,00-0029955,49,OLB,REY431570,LB,LaRoy Reynolds
+2016,ATL,1,REG,2,Hardy,Justin,Justin,Offense,00-0031570,6,WR,HAR111877,WR,Justin Hardy
+2016,ATL,1,REG,1,Jarrett,Grady,Grady,Defense,00-0031583,97,DT,JAR254349,DT,Grady Jarrett
+2016,ATL,1,REG,1,Beasley,Victor,Vic,Defense,00-0032240,51,OLB,BEA528276,LB,Vic Beasley
+2016,ATL,1,REG,1,Jones,Deion,Deion,Defense,00-0032388,45,ILB,JON233279,LB,Deion Jones
+2016,ATL,1,REG,1,Bosher,Matt,Matt,Special Teams,00-0028130,5,P,BOS219856,H,Matt Bosher
+2016,ATL,1,REG,2,Upshaw,Courtney,Courtney,Defense,00-0029252,91,DE,UPS271236,DT,Courtney Upshaw
+2016,ATL,1,REG,1,Jones,Quintorris,Julio,Offense,00-0027944,80,WR,JON640315,WR,Julio Jones
+2016,ATL,1,REG,2,Clayborn,Adrian,Adrian,Defense,00-0027958,94,DE,CLA770145,DE,Adrian Clayborn
+2016,ATL,1,REG,1,Reed,Brooks,Brooks,Defense,00-0027980,42,OLB,REE154467,DE,Brooks Reed
+2016,ATL,1,REG,1,Bosher,Matt,Matt,Special Teams,00-0028130,5,P,BOS219856,KO,Matt Bosher
+2016,ATL,1,REG,2,Garland,Ben,Ben,Offense,00-0027282,63,C,GAR218169,C,Ben Garland
+2016,ATL,1,REG,2,Weatherspoon,Franklin,Sean,Defense,00-0027871,56,OLB,WEA447811,LB,Sean Weatherspoon
+2016,ATL,1,REG,2,Robinson,Aldrick,Aldrick,Offense,00-0028116,8,WR,ROB365875,WR,Aldrick Robinson
+2016,ATL,1,REG,1,Bosher,Matt,Matt,Special Teams,00-0028130,5,P,BOS219856,P,Matt Bosher
+2016,ATL,1,REG,1,DiMarco,Patrick,Patrick,Offense,00-0028581,42,FB,DIM110572,FB,Patrick DiMarco
+2016,ATL,1,REG,1,Harris,Josh,Josh,Special Teams,00-0028845,47,LS,HAR000002,LS,Josh Harris
+2016,ATL,1,REG,2,Shelby,Derrick,Derrick,Defense,00-0029111,90,DE,SHE238558,DT,Derrick Shelby
+2016,ATL,1,REG,2,Compton,Thomas,Tom,Offense,00-0029144,69,T,COM663097,RT,Tom Compton
+2016,ATL,1,REG,2,Compton,Thomas,Tom,Offense,00-0029144,69,T,COM663097,LT,Tom Compton
+2016,ATL,1,REG,1,Sanu,Mohamed,Mohamed,Offense,00-0029632,16,WR,SAN808447,WR,Mohamed Sanu
+2016,ATL,1,REG,1,Schraeder,Ryan,Ryan,Offense,00-0029786,73,T,SCH492299,RT,Ryan Schraeder
+2016,ATL,1,REG,2,Goldson,Dashon,Dashon,Defense,00-0025513,38,FS,GOL350563,S,Dashon Goldson
+2016,ATL,1,REG,1,Ryan,Matthew,Matt,Offense,00-0026143,2,QB,RYA238179,QB,Matt Ryan
+2016,ATL,1,REG,1,Tamme,Jacob,Jacob,Offense,00-0026267,83,TE,TAM511848,TE,Jacob Tamme
+2016,ATL,1,REG,1,Jackson,Tyson,Tyson,Defense,00-0026980,94,DE,JAC610518,DE,Tyson Jackson
+2016,ATL,1,REG,1,Chester,Chris,Chris,Offense,00-0024271,65,G,CHE592085,RG,Chris Chester
+2016,ATL,1,REG,1,Weems,Eric,Eric,Special Teams,00-0024535,14,WR,WEE551877,PR,Eric Weems
+2016,ATL,1,REG,2,Weems,Eric,Eric,Special Teams,00-0024535,14,WR,WEE551877,KR,Eric Weems
+2016,ATL,1,REG,1,Bryant,Steven,Matt,Special Teams,00-0020578,3,K,BRY500226,K,Matt Bryant
+2016,ATL,1,REG,2,Schaub,Matt,Matt,Offense,00-0022787,8,QB,SCH085186,QB,Matt Schaub
+2016,ATL,1,REG,1,Babineaux,Jonathan,Jonathan,Defense,00-0023494,95,DT,BAB717191,DT,Jonathan Babineaux
+2016,ATL,1,REG,3,Freeney,Dwight,Dwight,Defense,00-0021146,93,DE,FRE417537,DE,Dwight Freeney
+2016,ATL,1,REG,3,Weems,Eric,Eric,Offense,00-0024535,14,WR,WEE551877,WR,Eric Weems
+2016,ATL,1,REG,2,Wheeler,Philip,Philip,Defense,00-0026233,57,OLB,WHE450744,LB,Philip Wheeler
+2016,ATL,1,REG,1,Mack,Alex,Alex,Offense,00-0026997,50,C,MAC273212,C,Alex Mack
+2016,ATL,1,REG,1,Levitre,Andrew,Andy,Offense,00-0027027,67,G,LEV605031,LG,Andy Levitre
+2016,ATL,2,REG,1,Bryant,Steven,Matt,Special Teams,00-0020578,3,K,BRY500226,K,Matt Bryant
+2016,ATL,2,REG,2,Schaub,Matt,Matt,Offense,00-0022787,8,QB,SCH085186,QB,Matt Schaub
+2016,ATL,2,REG,1,Babineaux,Jonathan,Jonathan,Defense,00-0023494,95,DT,BAB717191,DT,Jonathan Babineaux
+2016,ATL,2,REG,1,Chester,Chris,Chris,Offense,00-0024271,65,G,CHE592085,RG,Chris Chester
+2016,ATL,2,REG,1,Weems,Eric,Eric,Special Teams,00-0024535,14,WR,WEE551877,PR,Eric Weems
+2016,ATL,2,REG,2,Weems,Eric,Eric,Special Teams,00-0024535,14,WR,WEE551877,KR,Eric Weems
+2016,ATL,2,REG,2,Goldson,Dashon,Dashon,Defense,00-0025513,38,FS,GOL350563,S,Dashon Goldson
+2016,ATL,2,REG,1,Ryan,Matthew,Matt,Offense,00-0026143,2,QB,RYA238179,QB,Matt Ryan
+2016,ATL,2,REG,1,Tamme,Jacob,Jacob,Offense,00-0026267,83,TE,TAM511848,TE,Jacob Tamme
+2016,ATL,2,REG,1,Jackson,Tyson,Tyson,Defense,00-0026980,94,DE,JAC610518,DE,Tyson Jackson
+2016,ATL,2,REG,2,Weatherspoon,Franklin,Sean,Defense,00-0027871,56,OLB,WEA447811,LB,Sean Weatherspoon
+2016,ATL,2,REG,2,Robinson,Aldrick,Aldrick,Offense,00-0028116,8,WR,ROB365875,WR,Aldrick Robinson
+2016,ATL,2,REG,1,Bosher,Matt,Matt,Special Teams,00-0028130,5,P,BOS219856,P,Matt Bosher
+2016,ATL,2,REG,1,DiMarco,Patrick,Patrick,Offense,00-0028581,42,FB,DIM110572,FB,Patrick DiMarco
+2016,ATL,2,REG,1,Harris,Josh,Josh,Special Teams,00-0028845,47,LS,HAR000002,LS,Josh Harris
+2016,ATL,2,REG,2,Shelby,Derrick,Derrick,Defense,00-0029111,90,DE,SHE238558,DT,Derrick Shelby
+2016,ATL,2,REG,2,Compton,Thomas,Tom,Offense,00-0029144,69,T,COM663097,RT,Tom Compton
+2016,ATL,2,REG,2,Compton,Thomas,Tom,Offense,00-0029144,69,T,COM663097,LT,Tom Compton
+2016,ATL,2,REG,1,Sanu,Mohamed,Mohamed,Offense,00-0029632,16,WR,SAN808447,WR,Mohamed Sanu
+2016,ATL,2,REG,1,Schraeder,Ryan,Ryan,Offense,00-0029786,73,T,SCH492299,RT,Ryan Schraeder
+2016,ATL,2,REG,1,Ishmael,Kemal,Kemal,Defense,00-0030427,36,SS,ISH415291,S,Kemal Ishmael
+2016,ATL,2,REG,3,Toilolo,Levine,Levine,Offense,00-0030443,85,TE,TOI581408,TE,Levine Toilolo
+2016,ATL,2,REG,1,Alford,Robert,Robert,Defense,00-0030528,23,CB,ALF657259,CB,Robert Alford
+2016,ATL,2,REG,1,Trufant,Desmond,Desmond,Defense,00-0030562,10,CB,TRU381665,CB,Desmond Trufant
+2016,ATL,2,REG,1,Allen,Ricardo,Ricardo,Defense,00-0031181,37,SS,ALL641418,S,Ricardo Allen
+2016,ATL,2,REG,3,Gabriel,Taylor,Taylor,Offense,00-0031228,18,WR,GAB627060,WR,Taylor Gabriel
+2016,ATL,2,REG,1,Matthews,Jacob,Jake,Offense,00-0031279,70,T,MAT565555,LT,Jake Matthews
+2016,ATL,2,REG,2,Hageman,Ra'Shede,Ra'Shede,Defense,00-0031281,90,DT,HAG152196,DE,Ra'Shede Hageman
+2016,ATL,2,REG,1,Freeman,Devonta,Devonta,Offense,00-0031285,33,RB,FRE174508,RB,Devonta Freeman
+2016,ATL,2,REG,2,Goodwin,Charaun,C.J.,Defense,00-0031357,29,CB,GOO627559,CB,C.J. Goodwin
+2016,ATL,2,REG,2,Hardy,Justin,Justin,Special Teams,00-0031570,6,WR,HAR111877,PR,Justin Hardy
+2016,ATL,2,REG,2,Therezie,Robenson,Robenson,Defense,00-0031680,40,SS,THE622937,S,Robenson Therezie
+2016,ATL,2,REG,3,Ward,Terron,Terron,Offense,00-0031682,28,RB,WAR275043,RB,Terron Ward
+2016,ATL,2,REG,1,Coleman,Tevin,Tevin,Special Teams,00-0032058,28,RB,COL359050,KR,Tevin Coleman
+2016,ATL,2,REG,2,Coleman,Tevin,Tevin,Offense,00-0032058,28,RB,COL359050,RB,Tevin Coleman
+2016,ATL,2,REG,3,Neal,Keanu,Keanu,Defense,00-0032382,31,FS,NEA222964,S,Keanu Neal
+2016,ATL,2,REG,2,Hooper,Austin,Austin,Offense,00-0032392,81,TE,HOO570770,TE,Austin Hooper
+2016,ATL,2,REG,1,Campbell,De'Vondre,De'Vondre,Defense,00-0032401,59,ILB,CAM227922,LB,De'Vondre Campbell
+2016,ATL,2,REG,2,Schweitzer,Weston,Wes,Offense,00-0032432,71,G,SCH821050,RG,Wes Schweitzer
+2016,ATL,2,REG,2,Poole,Brian,Brian,Defense,00-0032596,33,CB,POO231564,CB,Brian Poole
+2016,ATL,2,REG,3,Perkins,Joshua,Joshua,Offense,00-0032599,47,TE,PER222525,"
+    ",Joshua Perkins
+2016,ATL,2,REG,3,Freeney,Dwight,Dwight,Defense,00-0021146,93,DE,FRE417537,DE,Dwight Freeney
+2016,ATL,2,REG,3,Weems,Eric,Eric,Offense,00-0024535,14,WR,WEE551877,WR,Eric Weems
+2016,ATL,2,REG,2,Wheeler,Philip,Philip,Defense,00-0026233,57,OLB,WHE450744,LB,Philip Wheeler
+2016,ATL,2,REG,1,Mack,Alex,Alex,Offense,00-0026997,50,C,MAC273212,C,Alex Mack
+2016,ATL,2,REG,1,Levitre,Andrew,Andy,Offense,00-0027027,67,G,LEV605031,LG,Andy Levitre
+2016,ATL,2,REG,2,Garland,Ben,Ben,Offense,00-0027282,63,C,GAR218169,C,Ben Garland
+2016,ATL,2,REG,1,Jones,Quintorris,Julio,Offense,00-0027944,80,WR,JON640315,WR,Julio Jones
+2016,ATL,2,REG,2,Clayborn,Adrian,Adrian,Defense,00-0027958,94,DE,CLA770145,DE,Adrian Clayborn
+2016,ATL,2,REG,1,Reed,Brooks,Brooks,Defense,00-0027980,42,OLB,REE154467,DE,Brooks Reed
+2016,ATL,2,REG,1,Bosher,Matt,Matt,Special Teams,00-0028130,5,P,BOS219856,KO,Matt Bosher
+2016,ATL,2,REG,1,Bosher,Matt,Matt,Special Teams,00-0028130,5,P,BOS219856,H,Matt Bosher
+2016,ATL,2,REG,2,Upshaw,Courtney,Courtney,Defense,00-0029252,91,DE,UPS271236,DT,Courtney Upshaw
+2016,ATL,2,REG,2,Worrilow,Paul,Paul,Defense,00-0029792,40,OLB,WOR678863,LB,Paul Worrilow
+2016,ATL,2,REG,3,Reynolds,LaRoy,LaRoy,Defense,00-0029955,49,OLB,REY431570,LB,LaRoy Reynolds
+2016,ATL,2,REG,2,Hardy,Justin,Justin,Offense,00-0031570,6,WR,HAR111877,WR,Justin Hardy
+2016,ATL,2,REG,1,Jarrett,Grady,Grady,Defense,00-0031583,97,DT,JAR254349,DT,Grady Jarrett
+2016,ATL,2,REG,1,Beasley,Victor,Vic,Defense,00-0032240,51,OLB,BEA528276,LB,Vic Beasley
+2016,ATL,2,REG,1,Jones,Deion,Deion,Defense,00-0032388,45,ILB,JON233279,LB,Deion Jones
+2016,TB,2,REG,1,Grimes,Brent,Brent,Defense,00-0024183,24,CB,GRI674817,CB,Brent Grimes
+2016,TB,2,REG,2,Smith,Evan,Evan,Offense,00-0026784,62,G,DIE682921,C,Evan Smith
+2016,TB,2,REG,2,Smith,Evan,Evan,Offense,00-0026784,62,G,DIE682921,LG,Evan Smith
+2016,TB,2,REG,1,Verner,Alterraun,Alterraun,Defense,00-0027705,42,CB,VER599864,CB,Alterraun Verner
+2016,TB,2,REG,1,Hawley,Joseph,Joe,Offense,00-0027717,68,C,HAW653722,C,Joe Hawley
+2016,TB,2,REG,1,McCoy,Gerald,Gerald,Defense,00-0027856,93,DT,MCC604879,DT,Gerald McCoy
+2016,TB,2,REG,1,Conte,Christopher,Chris,Defense,00-0028031,23,FS,CON690403,S,Chris Conte
+2016,TB,2,REG,2,Tandy,Keith,Keith,Defense,00-0029422,35,FS,TAN126893,S,Keith Tandy
+2016,TB,2,REG,1,David,Lavonte,Lavonte,Defense,00-0029562,54,ILB,DAV026654,WLB,Lavonte David
+2016,TB,2,REG,3,Robinson,Joshua,Josh,Defense,00-0029691,29,CB,ROB590205,CB,Josh Robinson
+2016,TB,2,REG,2,Anger,Bryan,Bryan,Special Teams,00-0029692,5,P,ANG280911,KO,Bryan Anger
+2016,TB,2,REG,3,Banks,Johnthan,Johnthan,Defense,00-0030469,33,CB,BAN557808,CB,Johnthan Banks
+2016,TB,2,REG,2,Taylor,Adarius,Adarius,Defense,00-0031120,57,MLB,GLA303597,WLB,Adarius Taylor
+2016,TB,2,REG,1,Pamphile,Kevin,Kevin,Offense,00-0031182,66,G,PAM490782,LG,Kevin Pamphile
+2016,TB,2,REG,1,Brate,Cameron,Cameron,Offense,00-0031273,84,TE,BRA663798,TE,Cameron Brate
+2016,TB,2,REG,2,Seferian-Jenkins,Austin,Austin,Offense,00-0031418,88,TE,SEF177981,TE,Austin Seferian-Jenkins
+2016,TB,2,REG,2,Humphries,Adam,Adam,Offense,00-0032009,27,WR,HUM721507,WR,Adam Humphries
+2016,TB,2,REG,1,Smith,Donovan,Donovan,Offense,00-0032217,79,T,SMI221725,LT,Donovan Smith
+2016,TB,2,REG,1,Marpet,Alexander,Ali,Offense,00-0032243,74,G,MAR291946,RG,Ali Marpet
+2016,TB,2,REG,2,Adjei-Barimah,Jude,Jude,Defense,00-0032273,38,CB,ADJ177981,CB,Jude Adjei-Barimah
+2016,TB,2,REG,2,Hargreaves,Vernon,Vernon,Defense,00-0032758,29,CB,HAR143957,CB,Vernon Hargreaves
+2016,TB,2,REG,1,Aguayo,Roberto,Roberto,Special Teams,00-0033102,9,K,AGU080357,PK,Roberto Aguayo
+2016,TB,2,REG,1,Aguayo,Roberto,Roberto,Special Teams,00-0033102,9,K,AGU080357,KO,Roberto Aguayo
+2016,TB,1,REG,2,Shepard,Russell,Russell,Offense,00-0030147,81,WR,SHE495616,WR,Russell Shepard
+2016,TB,1,REG,1,McDougald,Bradley,Bradley,Defense,00-0030161,22,SS,MCD722675,S,Bradley McDougald
+2016,TB,1,REG,1,Gholston,William,William,Defense,00-0030386,92,DE,GHO405127,DE,William Gholston
+2016,TB,1,REG,2,Spence,Akeem,Akeem,Defense,00-0030402,55,DT,SPE410844,DT,Akeem Spence
+2016,TB,1,REG,2,Glennon,Michael,Mike,Special Teams,00-0030520,16,QB,GLE711694,H,Mike Glennon
+2016,TB,1,REG,2,Glennon,Michael,Mike,Offense,00-0030520,16,QB,GLE711694,QB,Mike Glennon
+2016,TB,1,REG,3,Jones,Howard,Howard,Defense,00-0030881,57,OLB,JON402377,DE,Howard Jones
+2016,TB,1,REG,2,Sims,Charles,Charles,Offense,00-0031390,34,RB,SIM669037,RB,Charles Sims
+2016,TB,1,REG,1,Evans,Mike,Mike,Offense,00-0031408,13,WR,EVA534309,WR,Mike Evans
+2016,TB,1,REG,1,Winston,Jameis,Jameis,Offense,00-0031503,5,QB,WIN623708,QB,Jameis Winston
+2016,TB,1,REG,1,Humphries,Adam,Adam,Special Teams,00-0032009,27,WR,HUM721507,PR,Adam Humphries
+2016,TB,1,REG,2,Humphries,Adam,Adam,Special Teams,00-0032009,27,WR,HUM721507,KR,Adam Humphries
+2016,TB,1,REG,1,Alexander,Shanderious,Kwon,Defense,00-0032109,54,OLB,ALE492854,MLB,Kwon Alexander
+2016,TB,1,REG,1,Smith,Ryan,Ryan,Special Teams,00-0032772,33,CB,SMI697570,KR,Ryan Smith
+2016,TB,1,REG,2,Spence,Noah,Noah,Defense,00-0032952,52,DE,SPE433467,DE,Noah Spence
+2016,TB,1,REG,1,David,Lavonte,Lavonte,Defense,00-0029562,54,ILB,DAV026654,WLB,Lavonte David
+2016,TB,1,REG,3,Robinson,Joshua,Josh,Defense,00-0029691,29,CB,ROB590205,CB,Josh Robinson
+2016,TB,1,REG,2,Anger,Bryan,Bryan,Special Teams,00-0029692,5,P,ANG280911,KO,Bryan Anger
+2016,TB,1,REG,3,Banks,Johnthan,Johnthan,Defense,00-0030469,33,CB,BAN557808,CB,Johnthan Banks
+2016,TB,1,REG,2,Taylor,Adarius,Adarius,Defense,00-0031120,57,MLB,GLA303597,WLB,Adarius Taylor
+2016,TB,1,REG,1,Pamphile,Kevin,Kevin,Offense,00-0031182,66,G,PAM490782,LG,Kevin Pamphile
+2016,TB,1,REG,1,Brate,Cameron,Cameron,Offense,00-0031273,84,TE,BRA663798,TE,Cameron Brate
+2016,TB,1,REG,2,Seferian-Jenkins,Austin,Austin,Offense,00-0031418,88,TE,SEF177981,TE,Austin Seferian-Jenkins
+2016,TB,1,REG,2,Humphries,Adam,Adam,Offense,00-0032009,27,WR,HUM721507,WR,Adam Humphries
+2016,TB,1,REG,1,Smith,Donovan,Donovan,Offense,00-0032217,79,T,SMI221725,LT,Donovan Smith
+2016,TB,1,REG,1,Marpet,Alexander,Ali,Offense,00-0032243,74,G,MAR291946,RG,Ali Marpet
+2016,TB,1,REG,2,Adjei-Barimah,Jude,Jude,Defense,00-0032273,38,CB,ADJ177981,CB,Jude Adjei-Barimah
+2016,TB,1,REG,2,Hargreaves,Vernon,Vernon,Defense,00-0032758,29,CB,HAR143957,CB,Vernon Hargreaves
+2016,TB,1,REG,1,Aguayo,Roberto,Roberto,Special Teams,00-0033102,9,K,AGU080357,PK,Roberto Aguayo
+2016,TB,1,REG,1,Aguayo,Roberto,Roberto,Special Teams,00-0033102,9,K,AGU080357,KO,Roberto Aguayo
+2016,TB,1,REG,2,Tandy,Keith,Keith,Defense,00-0029422,35,FS,TAN126893,S,Keith Tandy
+2016,TB,1,REG,1,Conte,Christopher,Chris,Defense,00-0028031,23,FS,CON690403,S,Chris Conte
+2016,TB,1,REG,1,Verner,Alterraun,Alterraun,Defense,00-0027705,42,CB,VER599864,CB,Alterraun Verner
+2016,TB,1,REG,1,Hawley,Joseph,Joe,Offense,00-0027717,68,C,HAW653722,C,Joe Hawley
+2016,TB,1,REG,1,McCoy,Gerald,Gerald,Defense,00-0027856,93,DT,MCC604879,DT,Gerald McCoy
+2016,TB,1,REG,2,Myers,Brandon,Brandon,Offense,00-0027135,82,TE,MYE123904,TE,Brandon Myers
+2016,TB,1,REG,1,Stocker,Lucas,Luke,Offense,00-0028042,35,TE,STO088140,TE,Luke Stocker
+2016,TB,1,REG,2,Smith,Jacquies,Jacquies,Defense,00-0029112,93,DE,SMI344730,DE,Jacquies Smith
+2016,TB,1,REG,1,Martin,Douglas,Doug,Offense,00-0029613,22,RB,MAR578568,RB,Doug Martin
+2016,TB,1,REG,1,Anger,Bryan,Bryan,Special Teams,00-0029692,5,P,ANG280911,P,Bryan Anger
+2016,TB,1,REG,1,Anger,Bryan,Bryan,Special Teams,00-0029692,5,P,ANG280911,H,Bryan Anger
+2016,TB,1,REG,1,DePaola,Andrew,Andrew,Special Teams,00-0029714,42,LS,DEP118180,LS,Andrew DePaola
+2016,TB,1,REG,2,Cherilus,Gosder,Gosder,Offense,00-0026157,78,T,CHE253467,RT,Gosder Cherilus
+2016,TB,1,REG,1,Dotson,Demar,Demar,Offense,00-0026814,78,T,DOT277798,RT,Demar Dotson
+2016,TB,1,REG,1,McDonald,Clinton,Clinton,Defense,00-0026964,93,DE,MCD242013,DT,Clinton McDonald
+2016,TB,1,REG,1,Ayers,Robert,Robert,Defense,00-0026994,91,DE,AYE577722,DE,Robert Ayers
+2016,TB,1,REG,1,Smith,Daryl,Daryl,Defense,00-0022839,51,OLB,SMI164720,SLB,Daryl Smith
+2016,TB,1,REG,1,Jackson,Vincent,Vincent,Offense,00-0023496,83,WR,JAC627460,WR,Vincent Jackson
+2016,TB,1,REG,1,Grimes,Brent,Brent,Defense,00-0024183,24,CB,GRI674817,CB,Brent Grimes
+2016,TB,1,REG,2,Smith,Evan,Evan,Offense,00-0026784,62,G,DIE682921,C,Evan Smith
+2016,TB,1,REG,2,Smith,Evan,Evan,Offense,00-0026784,62,G,DIE682921,LG,Evan Smith
+2016,TB,2,REG,2,Cherilus,Gosder,Gosder,Offense,00-0026157,78,T,CHE253467,RT,Gosder Cherilus
+2016,TB,2,REG,1,Dotson,Demar,Demar,Offense,00-0026814,78,T,DOT277798,RT,Demar Dotson
+2016,TB,2,REG,1,McDonald,Clinton,Clinton,Defense,00-0026964,93,DE,MCD242013,DT,Clinton McDonald
+2016,TB,2,REG,1,Ayers,Robert,Robert,Defense,00-0026994,91,DE,AYE577722,DE,Robert Ayers
+2016,TB,2,REG,2,Myers,Brandon,Brandon,Offense,00-0027135,82,TE,MYE123904,TE,Brandon Myers
+2016,TB,2,REG,1,Stocker,Lucas,Luke,Offense,00-0028042,35,TE,STO088140,TE,Luke Stocker
+2016,TB,2,REG,2,Smith,Jacquies,Jacquies,Defense,00-0029112,93,DE,SMI344730,DE,Jacquies Smith
+2016,TB,2,REG,1,Martin,Douglas,Doug,Offense,00-0029613,22,RB,MAR578568,RB,Doug Martin
+2016,TB,2,REG,1,Anger,Bryan,Bryan,Special Teams,00-0029692,5,P,ANG280911,P,Bryan Anger
+2016,TB,2,REG,1,Anger,Bryan,Bryan,Special Teams,00-0029692,5,P,ANG280911,H,Bryan Anger
+2016,TB,2,REG,1,DePaola,Andrew,Andrew,Special Teams,00-0029714,42,LS,DEP118180,LS,Andrew DePaola
+2016,TB,2,REG,2,Shepard,Russell,Russell,Offense,00-0030147,81,WR,SHE495616,WR,Russell Shepard
+2016,TB,2,REG,1,McDougald,Bradley,Bradley,Defense,00-0030161,22,SS,MCD722675,S,Bradley McDougald
+2016,TB,2,REG,1,Gholston,William,William,Defense,00-0030386,92,DE,GHO405127,DE,William Gholston
+2016,TB,2,REG,2,Spence,Akeem,Akeem,Defense,00-0030402,55,DT,SPE410844,DT,Akeem Spence
+2016,TB,2,REG,2,Glennon,Michael,Mike,Special Teams,00-0030520,16,QB,GLE711694,H,Mike Glennon
+2016,TB,2,REG,2,Glennon,Michael,Mike,Offense,00-0030520,16,QB,GLE711694,QB,Mike Glennon
+2016,TB,2,REG,3,Jones,Howard,Howard,Defense,00-0030881,57,OLB,JON402377,DE,Howard Jones
+2016,TB,2,REG,2,Sims,Charles,Charles,Offense,00-0031390,34,RB,SIM669037,RB,Charles Sims
+2016,TB,2,REG,1,Evans,Mike,Mike,Offense,00-0031408,13,WR,EVA534309,WR,Mike Evans
+2016,TB,2,REG,1,Winston,Jameis,Jameis,Offense,00-0031503,5,QB,WIN623708,QB,Jameis Winston
+2016,TB,2,REG,1,Humphries,Adam,Adam,Special Teams,00-0032009,27,WR,HUM721507,PR,Adam Humphries
+2016,TB,2,REG,2,Humphries,Adam,Adam,Special Teams,00-0032009,27,WR,HUM721507,KR,Adam Humphries
+2016,TB,2,REG,1,Alexander,Shanderious,Kwon,Defense,00-0032109,54,OLB,ALE492854,MLB,Kwon Alexander
+2016,TB,2,REG,1,Smith,Ryan,Ryan,Special Teams,00-0032772,33,CB,SMI697570,KR,Ryan Smith
+2016,TB,2,REG,2,Spence,Noah,Noah,Defense,00-0032952,52,DE,SPE433467,DE,Noah Spence
+2016,TB,2,REG,1,Smith,Daryl,Daryl,Defense,00-0022839,51,OLB,SMI164720,SLB,Daryl Smith
+2016,TB,2,REG,1,Jackson,Vincent,Vincent,Offense,00-0023496,83,WR,JAC627460,WR,Vincent Jackson
