@@ -1,6 +1,7 @@
 /** Magnitude. Points over replacement is tinted by the round it ranks in on the board,
- * rounds 1 to 4, then no tint. Below replacement takes the rose wash. The label always
- * prints the round or the minus, so color is never the only channel. */
+ * rounds 1 to 4, then no tint. Below replacement takes the rose wash. The label prints the round or
+ * the minus where the row names the round (run/row-framing.ts), so color is never the only channel;
+ * once the board ranks the rest of the season the signed figure itself carries it. */
 
 export const TINTED_ROUNDS = 4;
 export const HEATS = ['heat-1', 'heat-2', 'heat-3', 'heat-4', 'heat-neg', 'none'] as const;
@@ -14,10 +15,12 @@ export function heatFor(vor: number, round: number): Heat {
 	return 'none';
 }
 
-/** "over repl · rd 1" while tinted, "over repl" otherwise. */
-export function vorLabel(vor: number, round: number): string {
+/** "over repl · rd 1" while tinted and the row names the round, "over repl" otherwise. */
+export function vorLabel(vor: number, round: number, withRound = true): string {
 	const heat = heatFor(vor, round);
-	return heat === 'heat-neg' || heat === 'none' ? VOR_LABEL : `${VOR_LABEL} · rd ${round}`;
+	return !withRound || heat === 'heat-neg' || heat === 'none'
+		? VOR_LABEL
+		: `${VOR_LABEL} · rd ${round}`;
 }
 
 export interface VorCellProps {
@@ -27,7 +30,13 @@ export interface VorCellProps {
 	signed: true;
 }
 
-/** Everything a ValueCell needs to print points over replacement: <ValueCell {...vorCell(vor, round)} />. */
-export function vorCell(vor: number, round: number): VorCellProps {
-	return { value: vor, label: vorLabel(vor, round), heat: heatFor(vor, round), signed: true };
+/** Everything a ValueCell needs to print points over replacement: <ValueCell {...vorCell(vor, round)} />.
+ * `withRound` off, the label names no round (a rest-of-season board, run/row-framing.ts). */
+export function vorCell(vor: number, round: number, withRound = true): VorCellProps {
+	return {
+		value: vor,
+		label: vorLabel(vor, round, withRound),
+		heat: heatFor(vor, round),
+		signed: true
+	};
 }

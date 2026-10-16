@@ -8,7 +8,7 @@
 </script>
 
 {#if data.view.kind === 'board'}
-	<BoardPageView page={data.view.page} run={data.run} />
+	<BoardPageView page={data.view.page} run={data.run} siteRail={data.siteRail} />
 {:else}
 	<AbsentFormatView page={data.view.page} run={data.run} noun="Board" href={links.board} />
 {/if}

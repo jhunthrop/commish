@@ -12,7 +12,6 @@ import {
 	SEE_MATCHUP,
 	SHEET_LINK,
 	NEXT_DRAFT_ROWS,
-	railInSeason,
 	TURNS_AFTER_DRAFT,
 	draftLine,
 	finalStanding,
@@ -128,10 +127,6 @@ void test("the league page's one matchup line names both teams and the score so 
 });
 
 void test('the account keeps the next draft a tap away in season', () => {
-	assert.equal(railInSeason('in_season'), true);
-	assert.equal(railInSeason('playoffs_waivers'), true);
-	assert.equal(railInSeason('pre_draft'), false);
-	assert.equal(railInSeason('offseason'), false);
 	assert.deepEqual(
 		NEXT_DRAFT_ROWS.map((row) => row.lead),
 		['Mock draft', 'Cheat sheet']

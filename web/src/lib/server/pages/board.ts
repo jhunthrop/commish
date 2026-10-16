@@ -8,6 +8,8 @@ import {
 	rangeScale,
 	rowsAt
 } from '#lib/run/derive.ts';
+import { boardBasisTerms, type BasisTerm } from '#lib/run/board-basis.ts';
+import { rowFraming, type RowFraming } from '#lib/run/row-framing.ts';
 import type { BoardRowView, Format } from '#lib/run/schema.ts';
 import type { Position, RangeScale } from '#lib/types/player.ts';
 import { scoringBasis } from '#lib/run/catalog.ts';
@@ -27,12 +29,6 @@ import {
 } from './format-route.ts';
 
 const NOT_FOUND = 404;
-
-/** One row of the board's Basis panel: a colour or column, and what it stands for. */
-export interface BasisTerm {
-	term: string;
-	means: string;
-}
 
 export interface BoardPage {
 	format: Format;
@@ -54,34 +50,8 @@ export interface BoardPage {
 	adpBasis: string[];
 	/** The Basis panel's rows, in order. */
 	basisTerms: BasisTerm[];
-}
-
-/** The Basis panel: the scoring; in season the order and the tiers (the lead names the sort and the
- * season); the round tint against the whole board; below replacement; the drafters' ADP; and last
- * the range, when the rows carry one, so the band that hides its column hides its line. */
-function basisTerms(
-	format: Format,
-	seasonLead: string | null,
-	boardSize: number,
-	adpBasis: readonly string[],
-	range: boolean
-): BasisTerm[] {
-	return [
-		{ term: 'Scoring', means: scoringBasis(format) },
-		...(seasonLead === null ? [] : [{ term: 'Order', means: format.basis.slice(1).join(', ') }]),
-		{
-			term: 'Green',
-			means: `The round his points over replacement rank in, among ${String(boardSize)}`
-		},
-		{ term: 'Rose', means: 'Below replacement' },
-		{
-			term: 'Drafters',
-			// In season the ADP is the drafts' preseason order, never compared with the rest of the season.
-			means: `Their ADP from ${adpBasis.join(' and ')}${format.rosFromWeek === undefined ? ', against our rank' : ''}`
-		},
-		// Last, so the band that hides the range column hides its line too (BoardView's style).
-		...(range ? [{ term: 'Range', means: 'Floor to ceiling' }] : [])
-	];
+	/** How every row frames his rank against the drafts (run/row-framing.ts). */
+	framing: RowFraming;
 }
 
 /** A format's board, or the page saying the run lacks it. */
@@ -111,7 +81,15 @@ export async function boardPage(formatId: string, segment: string | null): Promi
 		range,
 		boardSize: loaded.rows.length,
 		adpBasis,
-		basisTerms: basisTerms(format, lead, loaded.rows.length, adpBasis, range)
+		basisTerms: boardBasisTerms({
+			format,
+			scoring: scoringBasis(format),
+			underway: lead !== null,
+			boardSize: loaded.rows.length,
+			adpBasis,
+			range
+		}),
+		framing: rowFraming(format)
 	};
 }
 

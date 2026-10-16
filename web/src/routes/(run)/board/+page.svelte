@@ -5,4 +5,4 @@
 	let { data }: PageProps = $props();
 </script>
 
-<BoardPageView page={data.page} run={data.run} />
+<BoardPageView page={data.page} run={data.run} siteRail={data.siteRail} />

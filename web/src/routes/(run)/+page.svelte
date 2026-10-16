@@ -5,6 +5,9 @@
 	import SiteShell from '#lib/site/SiteShell.svelte';
 	import { lazySheet } from '#lib/site/lazy-sheet.svelte.ts';
 	import { links } from '#lib/site/links.ts';
+	import { PAGE_VERBS, frontWords } from '#lib/site/season-words.ts';
+	import { verbHref } from '#lib/site/verb-links.ts';
+	import { shownRail } from '#lib/site/shown-rail.svelte.ts';
 	import Figure from '#lib/ui/Figure.svelte';
 	import Footnote from '#lib/ui/Footnote.svelte';
 	import HeroCard from '#lib/ui/HeroCard.svelte';
@@ -14,7 +17,6 @@
 	import Row from '#lib/ui/Row.svelte';
 	import RowHead from '#lib/ui/RowHead.svelte';
 	import Verb from '#lib/ui/Verb.svelte';
-	import { sectionHref } from '#lib/ui/nav.ts';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
@@ -31,6 +33,11 @@
 	/** A member who follows a league is sent back to the one selected in the shell; anyone
 	 * else to follow one. */
 	const leagueId = $derived(siteContext.league?.id ?? null);
+	/** The words follow the season the rail shows: in season the followed league is the verb. */
+	const rail = shownRail(() => data.siteRail);
+	const words = $derived(
+		frontWords(rail(), { ...format, season: data.run.season }, leagueId !== null)
+	);
 </script>
 
 <svelte:head>
@@ -41,20 +48,17 @@
 	/>
 </svelte:head>
 
-<SiteShell title="Draft prep" run={data.run}>
+<SiteShell title={words.title} run={data.run}>
 	<main class="front">
-		<HeroCard title="Our {data.run.season} board, for your draft and your league">
+		<HeroCard title={words.heading}>
 			{#snippet meta()}
 				<span>{format.basis.join(' · ')}</span>
 			{/snippet}
 			{#snippet aside()}
-				<Verb href={sectionHref('mock')} size="lg" fill>Start a mock draft</Verb>
-				{#if leagueId}
-					<Quiet href={links.league(leagueId)} size="lg" fill>Open your league</Quiet>
-				{:else}
-					<Quiet href={links.leagueNew()} size="lg" fill>Follow your league</Quiet>
-				{/if}
-				<Quiet href={sectionHref('sheet')} size="lg" fill>Build your cheat sheet</Quiet>
+				<Verb href={verbHref(words.verb, leagueId)} size="lg" fill>{PAGE_VERBS[words.verb]}</Verb>
+				{#each words.quiet as verb (verb)}
+					<Quiet href={verbHref(verb, leagueId)} size="lg" fill>{PAGE_VERBS[verb]}</Quiet>
+				{/each}
 			{/snippet}
 		</HeroCard>
 
@@ -67,7 +71,7 @@
 				/>
 				{#if page.seasonLead !== null}<Footnote>{page.seasonLead}</Footnote>{/if}
 				<div class="rows">
-					<RowHead range={false} action games={page.seasonLead !== null} />
+					<RowHead range={false} action games={page.seasonLead !== null} framing={page.framing} />
 					{#each page.rows as player, i (player.id)}
 						<Row
 							{player}
@@ -78,6 +82,7 @@
 							range={false}
 							eager={i < EAGER_ROWS}
 							season={player.season}
+							framing={page.framing}
 						>
 							{#snippet action()}<RowSheetMark {player} />{/snippet}
 						</Row>

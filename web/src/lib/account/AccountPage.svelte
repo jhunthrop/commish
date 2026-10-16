@@ -23,7 +23,8 @@
 	import Shell from '#lib/ui/Shell.svelte';
 	import Verb from '#lib/ui/Verb.svelte';
 	import { sectionHref } from '#lib/ui/nav.ts';
-	import { NEXT_DRAFT, NEXT_DRAFT_ROWS, railInSeason } from '#lib/league/phase-words.ts';
+	import { NEXT_DRAFT, NEXT_DRAFT_ROWS } from '#lib/league/phase-words.ts';
+	import { railInSeason } from '#lib/site/season-words.ts';
 	import {
 		accountApi,
 		type AccountMock,
