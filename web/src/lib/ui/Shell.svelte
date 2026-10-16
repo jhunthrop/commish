@@ -276,10 +276,20 @@
 			display: none;
 		}
 
+		/* A label of two words or more ("Rest of season", "Cheat sheet") takes two lines in a cell a
+		   fifth of a phone wide: the padding and the gap give it the room inside the bar's height. */
 		.item {
-			padding: 6px 2px;
+			gap: 2px;
+			padding: 3px 1px 2px;
 			border-left: 0;
 			border-top: 3px solid transparent;
+			overflow: hidden;
+		}
+
+		.item span {
+			display: block;
+			line-height: 1.05;
+			text-wrap: balance;
 		}
 
 		.item[aria-current='page'] {
