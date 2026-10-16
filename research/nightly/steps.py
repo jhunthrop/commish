@@ -78,7 +78,7 @@ def _capture(context: IngestContext) -> str:
         result = run_capture_harvest(conn, Tank01Client(context.fetcher, key), context.now, season)
     if result.reason is not None:
         return f"refused, {result.reason}"
-    failed = [feed.source for feed in result.feeds if feed.status == "failed"]
+    failed = [f"{feed.source} ({feed.reason})" for feed in result.feeds if feed.status == "failed"]
     return f"{len(result.feeds)} feeds, {sum(f.requests for f in result.feeds)} requests" + (
         f", failed: {', '.join(failed)}" if failed else ""
     )
