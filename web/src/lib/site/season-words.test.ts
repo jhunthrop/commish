@@ -3,9 +3,9 @@
 // your league; before the draft and after the season the draft words stay. Run with `npm test`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { RAIL_KEYS, type RailKey } from '#lib/ui/nav.ts';
+import { RAIL_KEYS, railInSeason, type RailKey } from '#lib/ui/nav.ts';
 import { railOfKey } from '#lib/ui/rail-order.ts';
-import { PAGE_VERBS, boardWords, frontWords, railInSeason } from './season-words.ts';
+import { PAGE_VERBS, boardWords, frontWords } from './season-words.ts';
 
 const IN_SEASON: readonly RailKey[] = ['in_season', 'playoffs', 'playoffs_waivers'];
 const BEFORE_OR_AFTER: readonly RailKey[] = ['pre_draft', 'draft_day', 'offseason'];

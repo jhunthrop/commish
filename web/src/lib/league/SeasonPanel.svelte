@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { MOCK_VERB } from '#lib/site/season-words.ts';
 	import { zoneLine } from '#lib/format/clock.ts';
 	import { links } from '#lib/site/links.ts';
 	import Label from '#lib/ui/Label.svelte';
@@ -8,7 +9,6 @@
 	import type { LeagueStanding } from './api.ts';
 	import {
 		ADVISOR_VERB,
-		MOCK_VERB,
 		NEXT_DRAFT,
 		SHEET_LINK,
 		TURNS_AFTER_DRAFT,

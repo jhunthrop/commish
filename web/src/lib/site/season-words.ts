@@ -3,13 +3,10 @@
  * is the trust loop, so it is the verb, and the board is the rest of the season under the rail's
  * own word; before the draft and after the season the draft words stay. A heading names the rest of
  * the season only where the run's board ranks it. Pure, so every sentence is tested. */
-import { MOCK_VERB } from '#lib/league/phase-words.ts';
-import { RAIL_ITEMS, type RailKey } from '#lib/ui/nav.ts';
+import { RAIL_ITEMS, railInSeason, type RailKey } from '#lib/ui/nav.ts';
 
-/** Whether a rail is the season's: the rails that hold the in-season screens. */
-export function railInSeason(rail: RailKey): boolean {
-	return rail === 'in_season' || rail === 'playoffs' || rail === 'playoffs_waivers';
-}
+/** The verb to a mock draft, wherever the draft prep offers one. */
+export const MOCK_VERB = 'Start a mock draft';
 
 /** A page's verbs, each by what it does: the page maps each to its link. */
 export type PageVerb = 'follow' | 'open_league' | 'mock' | 'sheet';

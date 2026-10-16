@@ -2,7 +2,7 @@
 	import { fixed } from '#lib/format/number.ts';
 	import type { Snippet } from 'svelte';
 	import type { ShownMark } from '#lib/context/held-words.ts';
-	import type { RowFraming } from '#lib/run/row-framing.ts';
+	import { framedVorCell, type RowFraming } from '#lib/run/row-framing.ts';
 	import type { IndexSeason } from '#lib/run/schema.ts';
 	import type { BoardPlayer, RangeScale } from '#lib/types/player.ts';
 	import AdpCell from './AdpCell.svelte';
@@ -12,7 +12,6 @@
 	import RangeBar from './RangeBar.svelte';
 	import TierChip from './TierChip.svelte';
 	import ValueCell from './ValueCell.svelte';
-	import { vorCell } from './heat.ts';
 	import { seasonFigures } from './season-figures.ts';
 
 	interface Props {
@@ -100,7 +99,7 @@
 	</span>
 	<span class="gp">{season?.games}</span>
 	<span class="proj"><ValueCell value={player.projected} label={unit} /></span>
-	<ValueCell {...vorCell(player.vor, player.vorRound, framing.round)} phoneLabel={false} />
+	<ValueCell {...framedVorCell(player.vor, player.vorRound, framing)} phoneLabel={false} />
 	{#if range}
 		<span class="rng">
 			<RangeBar

@@ -4,9 +4,8 @@
 // alone as a fact and the round goes (Lane 59, H2 and M6). Run with `npm test`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { vorCell } from '#lib/ui/heat.ts';
 import { boardBasisTerms } from './board-basis.ts';
-import { PRESEASON_FRAMING, rowFraming } from './row-framing.ts';
+import { PRESEASON_FRAMING, framedVorCell, rowFraming } from './row-framing.ts';
 
 void test('a preseason board compares drafters with our rank and names the round', () => {
 	assert.deepEqual(rowFraming({}), { compare: true, round: true });
@@ -18,11 +17,11 @@ void test('a rest-of-season board gives the ADP alone and no round', () => {
 });
 
 void test('the over replacement cell names the round only where the framing does', () => {
-	assert.equal(vorCell(164.1, 1, true).label, 'over repl · rd 1');
-	assert.equal(vorCell(164.1, 1, false).label, 'over repl');
+	assert.equal(framedVorCell(164.1, 1, PRESEASON_FRAMING).label, 'over repl · rd 1');
+	assert.equal(framedVorCell(164.1, 1, rowFraming({ rosFromWeek: 6 })).label, 'over repl');
 	// The tint stays: the figure keeps its colour, the framing goes.
-	assert.equal(vorCell(164.1, 1, false).heat, 'heat-1');
-	assert.equal(vorCell(-3, 9, true).label, 'over repl');
+	assert.equal(framedVorCell(164.1, 1, rowFraming({ rosFromWeek: 6 })).heat, 'heat-1');
+	assert.equal(framedVorCell(-3, 9, PRESEASON_FRAMING).label, 'over repl');
 });
 
 const ADP = ['PPR drafts, Sep 5 to Sep 9'];

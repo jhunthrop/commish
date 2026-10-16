@@ -2,12 +2,12 @@
 // line for the screen a rail item led there from, the switch's one word beside a league, the league
 // page's draft line and final standing, and the matchup's one line. Run with `npm test`.
 import assert from 'node:assert/strict';
+import { MOCK_VERB } from '#lib/site/season-words.ts';
 import { test } from 'node:test';
 import type { LeagueSync, MatchupSide } from './api.ts';
 import {
 	ADVISOR_VERB,
 	FOLLOW_FOR,
-	MOCK_VERB,
 	NEXT_DRAFT,
 	SEE_MATCHUP,
 	SHEET_LINK,

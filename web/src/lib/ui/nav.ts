@@ -193,6 +193,11 @@ export function isRailKey(word: unknown): word is RailKey {
 	return (RAIL_KEYS as readonly unknown[]).includes(word);
 }
 
+/** Whether a rail is the season's: the rails that hold the in-season screens. */
+export function railInSeason(rail: RailKey): boolean {
+	return rail === 'in_season' || rail.startsWith('playoffs');
+}
+
 /** The rail the shell shows before any context is read: the site before its draft. */
 export const DEFAULT_RAIL: RailKey = 'pre_draft';
 
