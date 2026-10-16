@@ -203,6 +203,21 @@ export function railInSeason(rail: RailKey): boolean {
 /** The rail the shell shows before any context is read: the site before its draft. */
 export const DEFAULT_RAIL: RailKey = 'pre_draft';
 
+/** The two sets of words a page that follows the season draws, each shown by the root's rail: the
+ * draft's (before the draft and after the season) and the season's (rail-css.ts). */
+export const WORD_SETS = ['draft', 'season'] as const;
+export type WordSet = (typeof WORD_SETS)[number];
+
+export function wordSetOf(rail: RailKey): WordSet {
+	return railInSeason(rail) ? 'season' : 'draft';
+}
+
+/** A rail that stands for each set: the words of every rail in a set are the same. */
+export const RAIL_OF_WORD_SET: Readonly<Record<WordSet, RailKey>> = {
+	draft: DEFAULT_RAIL,
+	season: 'in_season'
+};
+
 /** Where an item goes: a league's screen for the selected league, the follow page naming it with
  * none, every other item its own page. */
 export function railHref(item: RailItem, leagueId: string | null): string {

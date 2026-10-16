@@ -10,5 +10,11 @@
 {#if data.view.kind === 'adp'}
 	<AdpView page={data.view.page} run={data.run} />
 {:else}
-	<AbsentFormatView page={data.view.page} run={data.run} noun="ADP" href={links.adp} />
+	<AbsentFormatView
+		page={data.view.page}
+		run={data.run}
+		heading="{data.run.season} ADP"
+		name={(label: string) => `${label} ADP`}
+		href={links.adp}
+	/>
 {/if}
