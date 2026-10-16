@@ -171,10 +171,16 @@ def _season_runs(conn: Connection, newest: datetime) -> dict[tuple[str, str], da
     return {(r.player_id, r.status): ms_instant(r.since) for r in rows if r.bounded}
 
 
+# The capture job's last check (revision 0008): to_regclass keeps a store that predates it readable,
+# as the API's lastChecked does.
+# The capture job's last check (revision 0008), read only where the store has the table, as the API does.
+_HAS_CHECKS: Final = text("select to_regclass('research.capture_checks') is not null")
 _CHECKED: Final = text("select checked_at from research.capture_checks where source = :source")
 
 
 def _checked(conn: Connection, source: str) -> datetime | None:
+    if not conn.execute(_HAS_CHECKS).scalar_one():
+        return None
     found = conn.execute(_CHECKED, {"source": source}).scalar_one_or_none()
     return None if found is None else ms_instant(found)
 
