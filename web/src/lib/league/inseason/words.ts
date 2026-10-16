@@ -21,9 +21,9 @@ import type {
 	WeekFacts
 } from './api.ts';
 
-import type { InSeasonScreen } from './screens.ts';
+import type { InSeasonScreen, LeagueScreen } from './screens.ts';
 
-export type { InSeasonScreen } from './screens.ts';
+export type { InSeasonScreen, LeagueScreen } from './screens.ts';
 
 /** How a gain and a points-over-replacement figure print: one decimal. */
 export const GAIN_DECIMALS = 1;
@@ -207,7 +207,7 @@ export const NO_START_RULE = 'Nobody here starts for you this week';
 export const LATER_RULE = 'These help your lineup but do not start this week';
 
 /** The signed-out panel's title, naming the screen it is for. */
-export function signInTitle(screen: InSeasonScreen): string {
+export function signInTitle(screen: LeagueScreen): string {
 	return `Sign in to see ${TAB_LABELS[screen].toLowerCase()} for your league`;
 }
 
@@ -279,10 +279,11 @@ export function hisPorWords(points: number): string {
 	return `his ${porFigure(points)} ${LINES.overRepl}`;
 }
 
-/** The tabs under a followed league's title. */
-export const TAB_LABELS: Readonly<Record<'league' | InSeasonScreen, string>> = {
+/** The tabs under a followed league's title, each screen by its rail word (spec 2026-10-16 §3). */
+export const TAB_LABELS: Readonly<Record<'league' | LeagueScreen, string>> = {
 	league: 'League',
-	start: 'Start and sit',
+	start: 'Lineup',
+	matchup: 'Matchup',
 	waivers: 'Waivers',
 	trades: 'Trades'
 };

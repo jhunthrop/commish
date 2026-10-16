@@ -1,14 +1,23 @@
-/** The three in-season screens as their route's segment names them, and which of them are pages
- * under the flag. Alone and free of run-time imports, so the route's load carries only this. */
+/** A followed league's screens as their route's segment names them: the three that advise (start
+ * and sit, waivers, trades) and the week's matchup, and which of them are pages under the flag.
+ * Alone and free of run-time imports, so the route's load carries only this. */
 import type { Flag } from '#lib/site/flags.ts';
+import type { LeagueScreen } from '#lib/ui/nav.ts';
 
-const SCREENS = ['start', 'waivers', 'trades'] as const;
+const SCREENS = [
+	'start',
+	'matchup',
+	'waivers',
+	'trades'
+] as const satisfies readonly LeagueScreen[];
 
-/** A screen, by the decision it makes. */
-export type InSeasonScreen = (typeof SCREENS)[number];
+/** A screen that answers with our advice, by the decision it makes. */
+export type InSeasonScreen = Exclude<LeagueScreen, 'matchup'>;
 
-/** Whether a route's segment names an in-season screen. */
-export function isScreen(segment: string): segment is InSeasonScreen {
+export type { LeagueScreen };
+
+/** Whether a route's segment names a league screen. */
+export function isScreen(segment: string): segment is LeagueScreen {
 	return (SCREENS as readonly string[]).includes(segment);
 }
 
@@ -17,6 +26,6 @@ export function isScreen(segment: string): segment is InSeasonScreen {
 export function screenOf(
 	segment: string,
 	flags: Readonly<Record<Flag, boolean>>
-): InSeasonScreen | null {
+): LeagueScreen | null {
 	return flags.in_season_tools && isScreen(segment) ? segment : null;
 }

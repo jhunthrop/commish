@@ -1,4 +1,4 @@
-<script lang="ts" generics="T extends AdviceHead">
+<script lang="ts" generics="T extends { read_at: string }">
 	import { onMount, type Snippet } from 'svelte';
 	import { siteContext } from '#lib/context/context.svelte.ts';
 	import DisplayTitle from '#lib/ui/DisplayTitle.svelte';
@@ -22,9 +22,9 @@
 	import { screenSection } from '#lib/ui/nav.ts';
 	import LeagueTabs from './LeagueTabs.svelte';
 	import { tabHref } from './tabs.ts';
-	import type { AdviceHead } from './api.ts';
 	import { readFailure, screenView, type ReadState } from './state.ts';
-	import { LINES, TAB_LABELS, refreshedWords, signInTitle, type InSeasonScreen } from './words.ts';
+	import { leagueScreens } from './tab-list.ts';
+	import { LINES, TAB_LABELS, signInTitle, type LeagueScreen } from './words.ts';
 
 	/** One in-season screen of a followed league: the league's title with its read and order stamps,
 	 * the league's tabs, and the screen's answer once read (reserved rows until then, the API's own
@@ -34,9 +34,11 @@
 	 * switch; switching there opens this screen of the league switched to. */
 	interface Props {
 		id: string;
-		screen: InSeasonScreen;
+		screen: LeagueScreen;
 		/** The page's title in the browser's tab. */
 		title: string;
+		/** What the answer was read from, beside the read's age: the order and when it was refreshed. */
+		stamp: (answer: T) => string;
 		/** Reads the screen's answer. */
 		read: () => Promise<T>;
 		/** How many rows to hold while the answer is read, so nothing moves when it lands. */
@@ -45,7 +47,7 @@
 		children: Snippet<[T, LeagueHost, () => void]>;
 	}
 
-	let { id, screen, title, read, reserve, children }: Props = $props();
+	let { id, screen, title, stamp, read, reserve, children }: Props = $props();
 
 	/** The league as the page names it: from the switch's list, else from the account's leagues. */
 	type Head = Pick<AttachedLeague, 'host' | 'name' | 'team_name' | 'standing'>;
@@ -68,7 +70,14 @@
 
 	// The page is created per league ({#key} in the route), so its id is fixed for its life.
 	// svelte-ignore state_referenced_locally
-	followSwitch(id, (league) => tabHref(screen, league));
+	// A league switched to whose phase has no such screen (before its draft, after its season) opens
+	// on its league page.
+	followSwitch(id, (league) => {
+		const to = siteContext.leagues.find((l) => l.id === league);
+		return to && !leagueScreens(to).includes(screen)
+			? tabHref('league', league)
+			: tabHref(screen, league);
+	});
 
 	const switchLeague = $derived(siteContext.leagues.find((l) => l.id === id) ?? null);
 	const head = $derived<Head | null>(switchLeague ?? listed);
@@ -169,7 +178,7 @@
 					{#if advice}
 						<span class="read" role="status"
 							>{head ? readAgoLine(head.host, advice.read_at, now) : ''}
-							{refreshedWords(advice.order_basis, advice.refreshed)}
+							{stamp(advice)}
 							{zone ?? ''}</span
 						>
 					{/if}

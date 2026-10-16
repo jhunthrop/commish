@@ -28,12 +28,13 @@ const USER_PAGE_PARTS =
 	/[\\/]src[\\/]lib[\\/](room|account|api|sheet|pass|companion|hosts)[\\/]|[\\/]src[\\/]lib[\\/]ui[\\/](CallPanel|TeamPanel|PickStrip|OddsCell|ToneChip|Stepper|TextInput|ScoreBug|SinceStrip|Keys)\./;
 /** What only a followed league's pages (the league page and its three in-season screens), the
  * account's leagues and the attach page run: the league row, the board read, the league's words and
- * calls, the in-season screens and the switch's choice made on opening a league. Four league pages
+ * calls, the in-season screens, the season's words, the member's clock and the rail's order a
+ * league's tabs read, and the switch's choice made on opening a league. Four league pages
  * share them, so they are kept out of the shared chunk by name, and the bundler splits them among
  * the pages that load them. (A group of their own would pull in everything they import, the API
  * client too, and land it on every page that reads the API.) */
 const LEAGUE_PAGE_PARTS =
-	/[\\/]src[\\/]lib[\\/](league[\\/](LeagueRow|board|model|api|follow-switch\.svelte)\.|league[\\/]inseason[\\/]|context[\\/]choose\.svelte\.)/;
+	/[\\/]src[\\/]lib[\\/](league[\\/](LeagueRow|board|model|api|follow-switch\.svelte|phase-words|sheet-tags)\.|league[\\/]inseason[\\/]|context[\\/]choose\.svelte\.|format[\\/]clock\.|ui[\\/]rail-order\.)/;
 /** A component joins the shared chunk once this many routes use it. Fewer, and every page would
  * carry code only a couple of pages run. */
 const SHARED_BY_ROUTES = 4;

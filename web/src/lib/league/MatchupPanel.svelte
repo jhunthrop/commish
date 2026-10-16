@@ -6,6 +6,7 @@
 	import PanelHead from '#lib/ui/PanelHead.svelte';
 	import type { LeagueSync, MatchupSide } from './api.ts';
 	import LeagueRow from './LeagueRow.svelte';
+	import PositionPill from '#lib/ui/PositionPill.svelte';
 	import {
 		hostWords,
 		matchupAside,
@@ -17,17 +18,20 @@
 		teamName
 	} from './model.ts';
 
-	/** This week's game: both lineups as the host has them set, each starter's points so far, and
-	 * each side's total. Side by side on a desk, one above the other in a hand. */
+	/** This week's game: both lineups as the host has them set, each starter's points so far and his
+	 * game with its kickoff on the member's clock, and each side's total. Side by side on a desk, one
+	 * above the other in a hand. The Matchup screen (spec 2026-10-16 §3). */
 	interface Props {
 		sync: LeagueSync;
 		board: LeagueBoard;
 		tagsOf: (boardId: string | null) => readonly string[];
 		/** The clock the page's read line uses, for a week we could not read. */
 		now: Date;
+		/** A starter's game this week, "at BUF Sun 1:00 pm", null when the run does not say. */
+		gameOf: (team: string, week: number) => string | null;
 	}
 
-	let { sync, board, tagsOf, now }: Props = $props();
+	let { sync, board, tagsOf, now, gameOf }: Props = $props();
 
 	const matchup = $derived(sync.matchup);
 
@@ -67,12 +71,21 @@
 			<p class="none">{hostWords(sync.host)} shows us your lineup only.</p>
 		{/if}
 		{#each s.starters as starter (starter.player.host_id)}
+			{@const row = rowOf(board, starter.player)}
+			{@const game = matchup ? gameOf(starter.player.team, matchup.week) : null}
 			<LeagueRow
-				player={rowOf(board, starter.player)}
+				player={row}
 				host={starter.player}
 				tags={mine ? tagsOf(starter.player.board_id) : []}
 				status={statusOn(mine ? sync.roster : [], starter.player)}
 			>
+				{#snippet meta()}
+					{#if row}<PositionPill position={row.position} rank={row.positionRank} />{:else}<span
+							>{starter.player.position}</span
+						>{/if}
+					<span>{starter.player.team}</span>
+					{#if game}<span>{game}</span>{/if}
+				{/snippet}
 				{#snippet trailing()}
 					{#if scored}<span class="pts">{fixed(starter.points)}</span>{/if}
 				{/snippet}
