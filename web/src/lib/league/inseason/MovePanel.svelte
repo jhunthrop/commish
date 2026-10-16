@@ -18,6 +18,7 @@
 		type MoveStep
 	} from './move.ts';
 	import { verbWords } from './words.ts';
+	import { focusOnOpen } from './attach.ts';
 
 	/** The confirmation of a move on our screen (spec §10.2): the exact move in the API's words (a
 	 * claim with its bid field where the league bids) with the one verb that makes it and a way out;
@@ -57,12 +58,6 @@
 	const waits = $derived(
 		replanning || (bid !== null && (problem !== null || Number(typed) !== bid.amount))
 	);
-
-	/** The panel takes the focus when it opens, so a keyboard or a phone lands on the move. */
-	function focusOnOpen(node: HTMLElement): void {
-		node.focus({ preventScroll: true });
-		node.scrollIntoView({ block: 'nearest' });
-	}
 </script>
 
 <div {id} class="move" tabindex="-1" {@attach focusOnOpen}>

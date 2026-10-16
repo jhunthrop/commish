@@ -97,18 +97,23 @@ function changeWords(row: Pick<TradeRow, 'my_gain' | 'their_gain'>): string {
 	return `Your lineup ${mine} ${amount(row.my_gain)} ${PER_WEEK}, theirs ${theirs} ${amount(row.their_gain)}.`;
 }
 
-/** The answer line: a roster the trade leaves short first ("Your roster would not fill RB2."), else
- * each lineup's change, with the drop a full roster makes for two in. */
+/** The answer line: a roster the trade leaves short first ("Your roster would not fill RB2."), then
+ * a roster with no one it could drop to take two in, else each lineup's change, with the drop a full
+ * roster makes for two in. */
 export function checkWords(check: Pick<TradeCheck, 'trade' | 'fills'>): string {
 	const { fills, trade } = check;
 	if (!fills.yours) return `Your roster would not fill ${slotPlace(fills.yours_open)}.`;
 	if (!fills.theirs) return `Their roster would not fill ${slotPlace(fills.theirs_open)}.`;
+	if (!fills.yours_room) return 'Your roster has no one to drop to make room.';
+	if (!fills.theirs_room) return 'Their roster has no one to drop to make room.';
 	const drop = trade.drop ? ` You drop ${trade.drop.player.name} to make room.` : '';
 	return `${changeWords(trade)}${drop}`;
 }
 
-/** What the answer line asks for before both sides hold a player. */
+/** The answer line before an answer: what is still to pick, or, once both sides hold a player, that
+ * the trade is being checked. */
 export function pickPrompt(picks: Picks): string {
+	if (picks.give.length > 0 && picks.get.length > 0) return BUILDER_LINES.checking;
 	if (picks.give.length === 0 && picks.get.length === 0) return BUILDER_LINES.pickBoth;
 	return picks.give.length === 0 ? BUILDER_LINES.pickYours : BUILDER_LINES.pickTheirs;
 }
@@ -127,6 +132,6 @@ export const BUILDER_LINES = {
 	pickTheirs: 'Now pick one or two of theirs to get.',
 	checking: 'Checking the trade',
 	notNow: 'Not now',
-	/** A side already holding two: the row says why it does not take a third. */
-	full: 'Two picked. Tap one to put him back.'
+	/** A side already holding two: said over its rows, which wait for one put back. */
+	full: 'Two picked, tap one to swap'
 } as const;

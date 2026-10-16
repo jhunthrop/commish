@@ -8,6 +8,7 @@ import {
 	builtFrom,
 	checkInput,
 	checkWords,
+	pickPrompt,
 	pickable,
 	teamChoice,
 	toggle
@@ -67,9 +68,41 @@ const check = (
 	refreshed: '2026-10-14T19:05:37.917Z',
 	read_at: '2026-10-15T19:05:37.917Z',
 	trade: row(over),
-	fills: { yours: true, theirs: true, yours_open: null, theirs_open: null, ...fills },
+	fills: {
+		yours: true,
+		theirs: true,
+		yours_open: null,
+		theirs_open: null,
+		yours_room: true,
+		theirs_room: true,
+		...fills
+	},
 	host_trades_url: 'https://sleeper.com/leagues/1/team',
 	host_note: null
+});
+
+void test('a roster with no one to drop says so before any gain, and one with room names the drop', () => {
+	assert.equal(
+		checkWords(check({}, { yours_room: false })),
+		'Your roster has no one to drop to make room.'
+	);
+	assert.equal(
+		checkWords(check({}, { theirs_room: false })),
+		'Their roster has no one to drop to make room.'
+	);
+	assert.match(
+		checkWords(check({ drop: line('Jaxson Dart', 'QB') })),
+		/You drop Jaxson Dart to make room\.$/
+	);
+});
+
+void test('the answer line asks for what is missing, and says it is checking once both sides hold a player', () => {
+	assert.equal(pickPrompt({ team: 3, give: [], get: [] }), BUILDER_LINES.pickBoth);
+	assert.equal(pickPrompt({ team: 3, give: [], get: ['b'] }), BUILDER_LINES.pickYours);
+	assert.equal(pickPrompt({ team: 3, give: ['a'], get: [] }), BUILDER_LINES.pickTheirs);
+	assert.equal(pickPrompt({ team: 3, give: ['a'], get: ['b'] }), BUILDER_LINES.checking);
+	assert.equal(BUILDER_LINES.checking, 'Checking the trade');
+	assert.equal(BUILDER_LINES.full, 'Two picked, tap one to swap');
 });
 
 void test('the answer line says what each lineup gains or loses, in points over replacement a week', () => {

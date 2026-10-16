@@ -7,6 +7,7 @@
 	import type { LeagueHost } from '../api.ts';
 	import LineRow from './LineRow.svelte';
 	import Screen from './Screen.svelte';
+	import PickSelect from './PickSelect.svelte';
 	import TradeBuilder from './TradeBuilder.svelte';
 	import type { TradeAdvice, TradeCheck, TradeCheckInput, TradeRow, TradeTeam } from './api.ts';
 	import { BUILDER_LINES, builtFrom, type Picks } from './builder.ts';
@@ -185,7 +186,7 @@
 					roster={advice.roster}
 					{host}
 					start={building.picks}
-					basis={advice.basis}
+					basis={advice.check_basis}
 					href={advice.host_trades_url}
 					hostNote={advice.host_note}
 					{check}
@@ -196,25 +197,23 @@
 	{/snippet}
 	<div class="tools">
 		<div class="lead">
-			<label class="pick">
-				<span>{LINES.tradesHolding}</span>
-				<select
-					value={player ?? ''}
-					onchange={(event) => void pick(event.currentTarget.value || null)}
-				>
-					<option value="">{EVERY_TRADE}</option>
-					<optgroup label={LINES.yourPlayers}>
-						{#each players.yours as line (line.player.host_id)}
-							<option value={pickKey(line)}>{line.player.name}</option>
-						{/each}
-					</optgroup>
-					<optgroup label={LINES.theirPlayers}>
-						{#each players.theirs as line (line.player.host_id)}
-							<option value={pickKey(line)}>{line.player.name}</option>
-						{/each}
-					</optgroup>
-				</select>
-			</label>
+			<PickSelect
+				label={LINES.tradesHolding}
+				value={player ?? ''}
+				onchange={(value: string) => void pick(value === '' ? null : value)}
+			>
+				<option value="">{EVERY_TRADE}</option>
+				<optgroup label={LINES.yourPlayers}>
+					{#each players.yours as line (line.player.host_id)}
+						<option value={pickKey(line)}>{line.player.name}</option>
+					{/each}
+				</optgroup>
+				<optgroup label={LINES.theirPlayers}>
+					{#each players.theirs as line (line.player.host_id)}
+						<option value={pickKey(line)}>{line.player.name}</option>
+					{/each}
+				</optgroup>
+			</PickSelect>
 			<Quiet size="sm" controls={BUILDER_ID} expanded={building !== null} onclick={buildNew}
 				>{BUILDER_LINES.open}</Quiet
 			>
@@ -265,28 +264,6 @@
 
 	.lead > :global(*:last-child) {
 		flex: none;
-	}
-
-	.pick {
-		display: flex;
-		align-items: center;
-		gap: var(--s-2);
-		min-width: 0;
-		white-space: nowrap;
-		font-size: var(--t-sm);
-		color: var(--ink-2);
-	}
-
-	select {
-		height: 36px;
-		max-width: 100%;
-		min-width: 0;
-		border: 1px solid var(--line-strong);
-		border-radius: var(--r-md);
-		background: var(--surface);
-		color: var(--ink);
-		padding: 0 var(--s-2);
-		font: inherit;
 	}
 
 	/* While a player's trades are read, the last answer's stay, quieter. */

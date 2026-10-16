@@ -3,6 +3,7 @@
 	import Panel from '#lib/ui/Panel.svelte';
 	import Verb from '#lib/ui/Verb.svelte';
 	import Basis from './Basis.svelte';
+	import { hostTab } from './attach.ts';
 	import { LINES } from './words.ts';
 
 	/** An in-season screen's body: its decision in one sentence first, with the one verb at the
@@ -57,18 +58,6 @@
 
 	/** While the confirmation (or a panel with the verb) is open its own verb is the one on screen. */
 	const asideForMove = $derived((onverb !== null && expanded === true) || panelVerb);
-
-	/** The verb's link opens the host in a new tab with no hold on this page. Set here rather than
-	 * on the shared verb, so no other page carries it; made again for each host page, so a link that
-	 * replaces the disabled verb takes it too. */
-	function toHost(page: string): (holder: HTMLElement) => void {
-		return (holder) => {
-			if (page === '') return;
-			const link = holder.querySelector('a');
-			link?.setAttribute('target', '_blank');
-			link?.setAttribute('rel', 'noopener');
-		};
-	}
 </script>
 
 {#snippet action(fill: boolean)}
@@ -86,7 +75,7 @@
 			{#if reason}<p class="reason">{reason}</p>{/if}
 		</div>
 		{#if !asideForMove}
-			<span class="verb desk" {@attach toHost(href)}
+			<span class="verb desk" {@attach hostTab(href)}
 				>{@render action(false)}
 				{#if hostNote}<span class="note">{hostNote}</span>{/if}</span
 			>
@@ -98,7 +87,7 @@
 {@render children()}
 <p class="foot">{basisNote}</p>
 {#if !asideForMove}
-	<div class="pin" {@attach toHost(href)}>
+	<div class="pin" {@attach hostTab(href)}>
 		{@render action(true)}
 		{#if hostNote}<p class="note">{hostNote}</p>{/if}
 	</div>

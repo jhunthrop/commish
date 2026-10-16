@@ -20,6 +20,8 @@
 		toggle,
 		type Picks
 	} from './builder.ts';
+	import PickSelect from './PickSelect.svelte';
+	import { focusOnOpen, hostTab } from './attach.ts';
 	import { Narrowing } from './state.ts';
 	import { CLOSE_FOR_THEM, verbWords } from './words.ts';
 
@@ -36,7 +38,7 @@
 		host: LeagueHost;
 		/** The picks it opens with: a finder row's trade, or a team alone. */
 		start: Picks;
-		/** The finder's honesty line, until the first answer brings the builder's own. */
+		/** The builder's honesty line, from the finder's answer, until the first check says it. */
 		basis: string;
 		/** The host's trade page and the API's note when it has none. */
 		href: string;
@@ -62,7 +64,12 @@
 	const theirs = $derived((team?.roster ?? []).filter(pickable));
 	const sentence = $derived(answer === null ? pickPrompt(picks) : checkWords(answer));
 	const close = $derived(
-		answer !== null && answer.fills.yours && answer.fills.theirs && answer.trade.my_gain > 0
+		answer !== null &&
+			answer.fills.yours &&
+			answer.fills.theirs &&
+			answer.fills.yours_room &&
+			answer.fills.theirs_room &&
+			answer.trade.my_gain > 0
 			? answer.trade.close_for_them && answer.trade.their_gain > 0
 			: false
 	);
@@ -104,25 +111,15 @@
 	onMount(() => {
 		if (checkInput(picks) !== null) void ask();
 	});
-
-	/** The panel takes the focus when it opens, so a keyboard or a phone lands on it. */
-	function focusOnOpen(node: HTMLElement): void {
-		node.focus({ preventScroll: true });
-		node.scrollIntoView({ block: 'nearest' });
-	}
-
-	/** The host's page opens in a new tab with no hold on this one, as the screen's verb does. */
-	function toHost(holder: HTMLElement): void {
-		const link = holder.querySelector('a');
-		link?.setAttribute('target', '_blank');
-		link?.setAttribute('rel', 'noopener');
-	}
 </script>
 
 {#snippet side(name: 'give' | 'get', label: string, lines: readonly PlayerLine[])}
 	{@const picked = picks[name]}
+	{@const full = picked.length >= MAX_A_SIDE}
 	<section class="side" aria-label={label}>
-		<h3>{label}</h3>
+		<h3>
+			{label}{#if full}<span class="full">{BUILDER_LINES.full}</span>{/if}
+		</h3>
 		{#each lines as line (line.player.host_id)}
 			{@const hostId = line.player.host_id}
 			{@const on = picked.includes(hostId)}
@@ -131,8 +128,7 @@
 				class="pick"
 				class:on
 				aria-pressed={on}
-				disabled={!on && picked.length >= MAX_A_SIDE}
-				title={!on && picked.length >= MAX_A_SIDE ? BUILDER_LINES.full : undefined}
+				disabled={!on && full}
 				onclick={() => tap(name, hostId)}
 			>
 				<LineRow line={{ ...line, slug: null }} />
@@ -144,17 +140,15 @@
 <div {id} class="builder" tabindex="-1" {@attach focusOnOpen}>
 	<Panel as="section" label={BUILDER_LINES.open} edge="accent">
 		<div class="body">
-			<label class="team">
-				<span>{BUILDER_LINES.team}</span>
-				<select
-					value={picks.team ?? ''}
-					onchange={(event) => choose(Number(event.currentTarget.value))}
-				>
-					{#each teams as t (t.roster_id)}
-						<option value={t.roster_id}>{teamChoice(t)}</option>
-					{/each}
-				</select>
-			</label>
+			<PickSelect
+				label={BUILDER_LINES.team}
+				value={picks.team ?? ''}
+				onchange={(value: string) => choose(Number(value))}
+			>
+				{#each teams as t (t.roster_id)}
+					<option value={t.roster_id}>{teamChoice(t)}</option>
+				{/each}
+			</PickSelect>
 			<div class="answer">
 				<div class="words" aria-live="polite" aria-busy={reading}>
 					{#if problem}
@@ -164,7 +158,7 @@
 					{/if}
 					{#if close}<ToneChip tone="even">{CLOSE_FOR_THEM}</ToneChip>{/if}
 				</div>
-				<div class="actions" {@attach toHost}>
+				<div class="actions" {@attach hostTab(page)}>
 					<Verb href={page} disabled={page === ''}>{verb}</Verb>
 					<Quiet onclick={onclose}>{BUILDER_LINES.notNow}</Quiet>
 				</div>
@@ -189,27 +183,6 @@
 		display: flex;
 		flex-direction: column;
 		gap: var(--s-3);
-	}
-
-	.team {
-		display: flex;
-		align-items: center;
-		flex-wrap: wrap;
-		gap: var(--s-2);
-		font-size: var(--t-sm);
-		color: var(--ink-2);
-	}
-
-	select {
-		height: 36px;
-		max-width: 100%;
-		min-width: 0;
-		border: 1px solid var(--line-strong);
-		border-radius: var(--r-md);
-		background: var(--surface);
-		color: var(--ink);
-		padding: 0 var(--s-2);
-		font: inherit;
 	}
 
 	.answer {
@@ -275,6 +248,17 @@
 		font-weight: 700;
 		color: var(--ink-2);
 		border-bottom: 1px solid var(--line-strong);
+		display: flex;
+		flex-wrap: wrap;
+		align-items: baseline;
+		justify-content: space-between;
+		gap: var(--s-1) var(--s-3);
+	}
+
+	/* A side holding two says why its other rows wait, in words a phone shows. */
+	.full {
+		font-weight: 400;
+		color: var(--ink-2);
 	}
 
 	.pick {
