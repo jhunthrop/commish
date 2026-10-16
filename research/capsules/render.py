@@ -88,9 +88,28 @@ def _availability_line(facts: PlayerFacts) -> str | None:
     if a is None:
         return None
     when = "Availability" if facts.season is None else f"Availability {AS_WE_SAW_IT}"
-    return (
+    line = (
         f"{when}: expected games {whole(a.expected_games)}, from {whole(a.floor_games)} to "
         f"{whole(a.ceiling_games)} {RISK_COUNTED}."
+    )
+    pace = preseason_pace_line(facts)
+    return line if pace is None else f"{line} {pace}"
+
+
+def preseason_pace_line(facts: PlayerFacts) -> str | None:
+    """In season, our preseason number as points a game over the games we expected, from the whole
+    numbers the sheet prints (Lane 52). The writer set his pace against the season total on 39
+    attempts of Lane 50's samples, which the time rule refuses; with a pace printed, a pace goes
+    against a pace."""
+    a = facts.availability
+    if facts.season is None or a is None:
+        return None
+    points, games = js_round(facts.projection.projected_points), js_round(a.expected_games)
+    if games < 1:
+        return None
+    return (
+        f"Our preseason pace: {js_to_fixed(points / games, 1)} points a game, our {js_string(points)} points over "
+        f"the {js_string(games)} games we expected."
     )
 
 

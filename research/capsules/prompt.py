@@ -161,13 +161,18 @@ _IN_SEASON_WORDS: Final = (
 # The pick numbers a note may write, per voice: in season the draft is history, so no round or pick advice.
 _PRESEASON_PICKS: Final = "The only pick numbers you may write are the sheet's own: his ADP and the rounded pick beside it. Your call goes against that number in words (a round earlier than that, a few picks after his ADP, wait on him), never a pick you chose and never a threshold you made up for games or points."
 _IN_SEASON_PICKS: Final = "His ADP is history: where drafters took him before the season, written as the sheet prints it, and no other pick number at all, and never a threshold you made up for games or points."
-_PRESEASON_TIME: Final = """TIME
+# The bare week's commonest shapes in Lane 50's samples (115 attempts): a bye, and a stretch of weeks.
+_BYE_AND_STRETCH: Final = (
+    'A bye and a stretch of weeks take the season too: "his bye in week 13 of 2026", never "the week 13 bye", '
+    'and "through week 5 of 2026", never "through week 5".'
+)
+_PRESEASON_TIME: Final = f"""TIME
 - The top of the sheet says what day it is: the season has not kicked off and the reader is getting ready to draft.
-- Name every week with its season, always: "week 7 of 2025", "weeks 2 to 5 of 2024". Never a bare "week 7"."""
-_IN_SEASON_TIME: Final = """TIME
+- Name every week with its season, always: "week 7 of 2025", "weeks 2 to 5 of 2024". Never a bare "week 7". {_BYE_AND_STRETCH}"""
+_IN_SEASON_TIME: Final = f"""TIME
 - The top of the sheet says what day it is and how far the season has gone. Write to a reader on that day. His draft is behind him: never write as if it is still ahead. No "draft him", no "take him at his ADP", no round or pick advice, no draft day. His ADP is history now, where drafters took him before the season.
-- Name every week with its season, always: "week 7 of 2025", "weeks 2 and 3 of 2026". Never a bare "week 7". Only a numbered week takes a year: never tack one onto anything else ("this week", his bye, the next game).
-- Our preseason number is points for the full season. Never set his points so far against it as if he were behind it: compare points a game with points a game.
+- Name every week with its season, always: "week 7 of 2025", "weeks 2 and 3 of 2026". Never a bare "week 7". {_BYE_AND_STRETCH} Only a numbered week takes a year: never tack one onto anything else ("this week", the next game).
+- Our preseason number is points for the full season, so it never shares a sentence with a points-a-game figure, and neither does "our number" or "our projection". To set his pace against what we expected, use our preseason pace, the points a game the sheet prints beside his expected games, in a sentence of your own.
 - A week of this season that is still to play can only be looked ahead to, never told as if it happened.
 - Place things by week and season, never by a date or the name of a month.
 - His ADP is the sheet's number, written exactly as the sheet prints it (7.4, never "pick 7"). With no ADP, no pick at all.
