@@ -6,9 +6,13 @@ moved from one season to the next, summed over the group's laws (`facts.evidence
 difference-in-differences of `research-ts/src/projections/laws/harness.ts`). Written as "costs him
 13.7 points a game" on a back scoring 8.9, a reader takes it as his own points. So a per-game figure
 the prose puts on him with a cost or gain word ("costs him", "docks him", "adds", "gains", the cost
-words) is refused when it is larger than his own points a game: the largest per-game figure the sheet
-prints for him (this season's, last season's, or our preseason number over the games we expected).
-The average written as an average ("among players in his spot, points a game fell 13.7") passes.
+words) is refused when it is larger than his own points a game. His own points a game (ruled for the
+re-review's N4) is this season's when the sheet prints it, else the largest per-game figure the sheet
+prints for him (last season's, or our preseason number over the games we expected). The rule reads
+the verbs that put a figure on him (the cost words, "loses", "sets him back", "subtracts", "adds",
+"gains", "takes"), a word or two before the figure ("a full", "a hefty"), and the units "a game",
+"per game", "every game", "each game", "pts/game" and "ppg" (the re-review's N3). The average written
+as an average ("among players in his spot, points a game fell 13.7") passes.
 """
 
 import re
@@ -22,26 +26,24 @@ if TYPE_CHECKING:
 
 OWN_RATE_VIOLATION: Final = "The text puts a per-game figure on him that is larger than his own points a game"
 _VERBS: Final = (
-    r"costs?|costing|docks?|docked|docking|shaves?|shaving|minus|down|adds?|adding|gains?|gaining|takes?|taking"
+    r"costs?|costing|docks?|docked|docking|shaves?|shaved|shaving|minus|down|adds?|added|adding|gains?|gained|"
+    r"gaining|takes?|taking|loses?|losing|lost|subtracts?|subtracted|subtracting|sets?\s+(?:him\s+)?back"
 )
-_HEDGES: Final = r"(?:about|another|roughly|nearly|around|almost|close to|an extra|a further|over|more than)"
+# A word or two between the verb (and "him") and the figure, never the people an average is among.
+_FILLER: Final = r"(?:\s+(?!players\b|backs\b|receivers\b|ends\b|quarterbacks\b|others\b|those\b)[a-z'-]+){0,2}?"
+_UNIT: Final = r"(?:fantasy\s+)?(?:points?|pts)?\s*(?:(?:a|per|every|each)\s+game\b|/\s*game\b)|ppg\b"
 _ATTRIBUTED: Final = re.compile(
-    rf"\b(?:{_VERBS})\b(?:\s+(?:him|his\s+\w+|you))?(?:\s+{_HEDGES})?\s+"
-    r"(?P<figure>\d+(?:\.\d+)?)\s*(?:fantasy\s+)?(?:points?\s+)?(?:a|per)\s+game\b",
+    rf"\b(?:{_VERBS})\b(?:\s+(?:him|his\s+\w+|you))?{_FILLER}\s+(?P<figure>\d+(?:\.\d+)?)\s*(?:{_UNIT})",
     re.IGNORECASE,
 )
 
 
 def own_points_per_game(facts: "PlayerFacts") -> float | None:
-    """His own points a game: the largest per-game figure the sheet prints for him, or None with none."""
-    rates = [
-        rate
-        for rate in (
-            None if facts.season is None else facts.season.points_per_game,
-            None if facts.last_season_story is None else facts.last_season_story.points_per_game,
-        )
-        if rate is not None
-    ]
+    """His own points a game: this season's when the sheet prints it, else the largest per-game figure it
+    prints for him, or None with none."""
+    if facts.season is not None and facts.season.points_per_game is not None:
+        return facts.season.points_per_game
+    rates = [] if facts.last_season_story is None else [facts.last_season_story.points_per_game]
     availability = facts.availability
     if availability is not None and round(availability.expected_games) >= 1:
         rates.append(round(facts.projection.projected_points) / round(availability.expected_games))

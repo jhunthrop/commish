@@ -12,6 +12,7 @@ from research.capsules.facts.model import LawEvidence
 from research.capsules.own_rate import OWN_RATE_VIOLATION, own_points_per_game, own_rate_violations
 from research.capsules.render import law_line
 from research.capsules.rule_notes import notes_of
+from research.capsules.validate import COST_WORDS
 
 if TYPE_CHECKING:
     from research.capsules.facts.build import PlayerFacts
@@ -43,8 +44,10 @@ def _facts(season: float | None, last: float | None, points: float, games: float
     )
 
 
-def test_his_own_points_a_game_is_the_largest_per_game_figure_the_sheet_prints_for_him() -> None:
+def test_his_own_points_a_game_is_this_seasons_else_the_largest_per_game_figure_on_the_sheet() -> None:
+    """The re-review's N4, ruled: this season's points a game when the sheet has it."""
     assert own_points_per_game(_facts(8.9, 6.4, 62, 12)) == pytest.approx(8.9)
+    assert own_points_per_game(_facts(5.0, 16.4, 212, 15)) == pytest.approx(5.0)
     assert own_points_per_game(_facts(None, 16.4, 212, 15)) == pytest.approx(16.4)
     assert own_points_per_game(_facts(None, None, 212, 15)) == pytest.approx(212 / 15)
     assert own_points_per_game(_facts(None, None, 212, None)) is None
@@ -58,6 +61,19 @@ def test_his_own_points_a_game_is_the_largest_per_game_figure_the_sheet_prints_f
         "His target share adds about 10.1 points a game.",
         "The volume gains him 12 points per game.",
         "That shaves another 9.5 a game off him.",
+        # The re-review's N3: other verbs, a word or two before the figure, other units.
+        "He loses 13.7 points a game on that profile.",
+        "That sets him back 13.7 points a game.",
+        "The profile costs him a full 13.7 points a game.",
+        "The profile costs him a hefty 13.7 points a game.",
+        "It costs him 13.7 points every game.",
+        "It costs him 13.7 points each game.",
+        "It costs him 13.7 pts/game.",
+        "It costs him 13.7 ppg.",
+        "It subtracts 13.7 points a game.",
+        "That is minus 13.7 points a game for him.",
+        "He is down 13.7 points per game.",
+        "The red-zone role docked him 13.7 a game.",
     ],
 )
 def test_a_per_game_figure_larger_than_his_own_scoring_put_on_him_is_refused(sentence: str) -> None:
@@ -90,3 +106,8 @@ def test_the_correction_and_the_note_name_the_sentence() -> None:
     assert correction is not None and sentence in correction
     (note,) = notes_of([(sentence, (violation,))])
     assert note.sentence == sentence
+
+
+def test_every_cost_word_the_validator_reads_is_a_cost_put_on_him() -> None:
+    for word in COST_WORDS:
+        assert own_rate_violations(f"That {word} him 13.7 points a game.", OWN), word
