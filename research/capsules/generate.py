@@ -121,19 +121,20 @@ def _ask(
     min_words: int = DEGENERATE_COMPLETION_WORDS,
 ) -> Completion:
     """One of the page's asks. A rate limit or a transport failure waits (`throttle_waits_ms`) and asks
-    again with the same messages, as the same ask; what the failed tries billed rides on the answer, or
-    on the error raised once the waits are spent. Any other failure is raised at once."""
+    again with the same messages, as the same ask; every wait, the gateway's own included, draws on the
+    ask's one allowance (`throttle_waits`), and a wait it cannot cover ends the ask. What the failed
+    tries billed rides on the answer, or on the error raised. Any other failure is raised at once."""
     billed: Usage | None = None
-    waits = CAPSULE_CONFIG.throttle_waits_ms
-    for wait in (*waits, None):
+    allowance = gateway.ask_waits()
+    for wait_ms in (*CAPSULE_CONFIG.throttle_waits_ms, None):
         try:
-            answer = gateway.complete(messages, max_tokens, min_words)
+            answer = gateway.complete(messages, max_tokens, min_words, allowance)
         except GenerationError as error:
             billed = add_usage(billed, error.billed)
-            if not error.transport or wait is None:
+            if not error.transport or wait_ms is None or not allowance.take(wait_ms / 1000):
                 error.billed = billed
                 raise
-            gateway.sleep(wait / 1000)
+            gateway.sleep(wait_ms / 1000)
             continue
         return replace(answer, usage=add_usage(billed, answer.usage))
     raise AssertionError("unreachable: the last try raises or returns")

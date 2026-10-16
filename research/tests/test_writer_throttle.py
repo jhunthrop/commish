@@ -17,6 +17,7 @@ from research.capsules.gateway_ledger import ModelPrice, Usage
 from research.capsules.generate import CapsuleResult, describe_fallback, generate_capsule
 from research.capsules.narrative import NarrativeResult
 from research.capsules.run_budget import BudgetSpentError, RunBudget, parse_budget
+from research.capsules.throttle_waits import AskWaits, RunWaits
 from research.capsules.validate import ValidationResult
 
 WAITS = CAPSULE_CONFIG.throttle_waits_ms
@@ -44,8 +45,14 @@ class _StubGateway:
         self.calls = 0
         self.slept: list[float] = []
         self.asked: list[str] = []
+        self.waits = RunWaits()
 
-    def complete(self, messages: list[dict[str, str]], max_tokens: int, min_words: int = 20) -> Completion:
+    def ask_waits(self) -> AskWaits:
+        return self.waits.ask()
+
+    def complete(
+        self, messages: list[dict[str, str]], max_tokens: int, min_words: int = 20, ask: AskWaits | None = None
+    ) -> Completion:
         self.calls += 1
         self.asked.append(messages[-1]["content"])
         item = next(self.script)
@@ -254,3 +261,47 @@ def test_a_page_starts_only_when_its_worst_case_fits_the_budget() -> None:
     dollars.spent_usd = 0.20 - dollars.worst_page_usd() + 1e-9
     assert not dollars.room_for_page()
     assert RunBudget.of().room_for_page()
+
+
+# One allowance for every throttle wait (the review's M1).
+
+_LONG_RETRY_AFTER_S = 200  # under the gateway's 300 s retry-after cap, over an ask's 150 s
+
+
+def _sleeps(client: GatewayClient) -> list[float]:
+    slept: list[float] = []
+    client.sleep = slept.append
+    return slept
+
+
+@pytest.mark.usefixtures("quiet_page")
+def test_a_long_retry_after_never_holds_an_ask_past_its_cap_and_the_page_says_throttled() -> None:
+    client = _client(lambda r: httpx.Response(429, headers={"retry-after": str(_LONG_RETRY_AFTER_S)}))
+    slept = _sleeps(client)
+    result = generate_capsule(cast("Any", None), client)
+    assert result.source == "facts"
+    assert describe_fallback(result.compact, result.full) == "facts (throttled)"
+    assert result.compact.fallback is not None
+    assert "throttle wait cap" in str(result.compact.fallback.first_violation)
+    assert sum(slept) <= CAPSULE_CONFIG.throttle_ask_wait_cap_ms / 1000
+    assert _LONG_RETRY_AFTER_S not in slept
+
+
+def test_the_gateways_own_429_backoffs_draw_on_the_asks_allowance() -> None:
+    client = _client(lambda r: httpx.Response(429))
+    slept = _sleeps(client)
+    ask = client.ask_waits()
+    with pytest.raises(GenerationError):
+        client.complete([{"role": "user", "content": "hi"}], 10, ask=ask)
+    backoffs = sum(CAPSULE_CONFIG.gateway.retry.rate_limit_backoff_ms) / 1000
+    assert sum(slept) == pytest.approx(backoffs)
+    assert ask.left_s == pytest.approx(CAPSULE_CONFIG.throttle_ask_wait_cap_ms / 1000 - backoffs)
+
+
+def test_a_runs_throttle_waits_are_bounded_across_its_asks() -> None:
+    pool = RunWaits(cap_s=20)
+    first, second = pool.ask(), pool.ask()
+    assert first.take(15)
+    assert not second.take(15)
+    assert second.take(5)
+    assert not first.take(1)

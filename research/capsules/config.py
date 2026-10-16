@@ -183,6 +183,12 @@ class CapsuleConfig:
     # is an HTTP call on the page's bill and the run's budget (`run_budget`), and the night's per-player
     # ceiling counts it. Lane 50's 40-page samples ended 4 of 38 blocks "throttled" on the last ask.
     throttle_waits_ms: tuple[int, ...] = (15_000, 45_000, 90_000)
+    # The most one ask waits on throttles, every wait together: the gateway's own 429 backoffs and
+    # `retry-after` included (`throttle_waits.AskWaits`, the review's M1). The waits above sum to it.
+    throttle_ask_wait_cap_ms: int = 150_000
+    # The most a whole run waits on throttles, every page together (`throttle_waits.RunWaits`): 20 minutes
+    # summed over the pages in flight, so a gateway down for the night costs the run minutes, not hours.
+    throttle_run_wait_cap_ms: int = 1_200_000
     # The heaviest prompt a trial page's start rule assumes (`run_budget.room_for_page`): Lane 50
     # measured 4,517 prompt tokens at most; the dollar reservation itself reads each call's real prompt.
     trial_worst_prompt_tokens: int = 8_000
