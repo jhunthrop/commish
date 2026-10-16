@@ -85,7 +85,8 @@
 	class:act-flat={action !== undefined && !range}
 	class:games={season !== undefined}
 >
-	<span class="rk">{status?.rank ?? lead}</span>
+	<!-- A held player's rank shows as the word; in ADP order the lead is the drafters' ADP, kept. -->
+	<span class="rk">{order === 'board' ? (status?.rank ?? lead) : lead}</span>
 	<span class="face"
 		><Face src={player.headshot} size={40} loading={eager ? 'eager' : 'lazy'} />{#if held}<held.Mark
 				words={held.words}

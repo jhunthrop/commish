@@ -152,6 +152,58 @@ async function recordPage(page: Page, tag: string): Promise<void> {
 	await page.screenshot({ path: file(`record-method-${tag}`) });
 }
 
+function width(tag: string): number {
+	return Number(tag.split('-').at(-1));
+}
+
+/** The other surfaces that place a player by rank or tier (Lane 63, round 3): none places him. */
+async function otherSurfaces(page: Page, tag: string): Promise<void> {
+	const placed = /\bRB \d|Our rank \d|Tier \d|picks? (later|earlier)|rd \d/i;
+	await page.goto(`${web}/clubs/mia`, { waitUntil: 'networkidle' });
+	const clubRow = await row(page, HELD.name).innerText();
+	check(
+		clubRow.includes('RB IR') && !placed.test(clubRow),
+		`${tag}: his club page's row: ${clubRow}`
+	);
+	await row(page, HELD.name).scrollIntoViewIfNeeded();
+	await page.screenshot({ path: file(`club-ir-row-${tag}`) });
+	await page.goto(`${web}/clubs`, { waitUntil: 'networkidle' });
+	check(
+		!(await page.locator('main').innerText()).includes("De'Von Achane"),
+		`${tag}: no club leads with him`
+	);
+	await page.goto(`${web}/players`, { waitUntil: 'networkidle' });
+	const indexLine = await page.locator('li', { hasText: "De'Von Achane" }).first().innerText();
+	check(
+		indexLine.includes('RB IR') && !/\b\d+\b/.test(indexLine.replace("De'Von Achane", '')),
+		`${tag}: the players index: ${indexLine}`
+	);
+	await page.goto(`${web}/adp/ppr-12`, { waitUntil: 'networkidle' });
+	const adpRow = await row(page, HELD.name).innerText();
+	check(
+		!placed.test(adpRow) && (width(tag) < 760 || /our rank ir/i.test(adpRow)),
+		`${tag}: the ADP row: ${adpRow}`
+	);
+	await page.goto(`${web}/players/christian-mccaffrey`, { waitUntil: 'networkidle' });
+	const mates = await page.locator('aside.tier').innerText();
+	check(!mates.includes(HELD.name), `${tag}: a tier mate's page leaves him out`);
+	await page.goto(`${web}/compare?a=${HELD.slug}&b=christian-mccaffrey`, {
+		waitUntil: 'networkidle'
+	});
+	await page.getByText('is on injured reserve').first().waitFor({ timeout: 15_000 });
+	const compare = await page.locator('main').innerText();
+	const heldCard = compare.split('Christian McCaffrey')[0] ?? '';
+	check(
+		compare.includes(
+			'McCaffrey: Achane is on injured reserve, so he sits below the available players'
+		) &&
+			!/places? higher/.test(compare) &&
+			!/\bRB \d|Tier \d/.test(heldCard.split("De'Von Achane").slice(1).join('')),
+		`${tag}: the compare page`
+	);
+	await page.screenshot({ path: file(`compare-ir-${tag}`) });
+}
+
 for (const theme of THEMES) {
 	for (const width of WIDTHS) {
 		const tag = `${theme}-${String(width)}`;
@@ -161,6 +213,7 @@ for (const theme of THEMES) {
 		await positionView(page, tag);
 		await playerPages(page, tag);
 		await recordPage(page, tag);
+		await otherSurfaces(page, tag);
 		const sideways = await page.evaluate(
 			() => document.documentElement.scrollWidth > window.innerWidth
 		);
