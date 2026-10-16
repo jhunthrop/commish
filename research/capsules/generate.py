@@ -6,8 +6,10 @@ validated; a read that fails gets the correction its failure calls for (a length
 fresh draft after a second length miss, the soft points, or a rewrite), each a call, up to
 `corrections_per_read` of them (the oracle stopped at one) and all within the player's ceiling
 (`max_gateway_calls_per_player`, six; the oracle had four). Once a read has been asked for a shorter
-version it may run 10% over its cap. Every correction quotes the exact banned phrases the read has
-been caught with on any attempt. A read that still fails is the facts block (`facts_block`): his
+version it may run 10% over its cap. Every correction carries each rule the read has broken on any
+attempt so far, with the sentence it broke it in and the rule in one line (`rule_notes`, Lane 52),
+and a read out of its band is still read for every other rule, so its length correction asks for
+all of it at once. A read that still fails is the facts block (`facts_block`): his
 numbers as labelled facts, no prose.
 Narrative slots refused only for their voice get one rewrite each from what calls are left. Nothing
 here raises for a gateway failure: the facts block is the answer, and the usage billed is kept.
@@ -23,7 +25,7 @@ from typing import TYPE_CHECKING, Final
 
 from research.capsules.bundle import CapsuleBundle, parse_bundle
 from research.capsules.config import CAPSULE_CONFIG
-from research.capsules.corrections import banned_phrases_in, soft_correction_for
+from research.capsules.corrections import soft_correction_for
 from research.capsules.facts_block import FACTS_SOURCE, render_facts_block
 from research.capsules.gateway import DEGENERATE_COMPLETION_WORDS, Completion, GatewayClient, GenerationError
 from research.capsules.gateway_ledger import Usage, add_usage
@@ -47,6 +49,7 @@ from research.capsules.prompt import (
     correction_prompt_for,
     writer_rules_for,
 )
+from research.capsules.rule_notes import notes_of
 from research.capsules.run_budget import BudgetSpentError
 from research.capsules.validate import (
     NARRATIVE_MIN_WORDS,
@@ -225,24 +228,24 @@ def _asked_shorter(read: _Read, size: str) -> bool:
 def _next_correction(read: _Read) -> PriorAttempt | None:
     if read.text is None or read.result is None:
         return PriorAttempt("", missing=True)
-    banned = banned_phrases_in([v for attempt in read.attempts for v in attempt.violations])
+    ledger = notes_of([(attempt.body, attempt.violations) for attempt in read.attempts])
     failure = read.result.band_failure
     if failure is not None:
         if len(read.band_misses) == 1:
-            return PriorAttempt(read.text, read.result.violations, length_correction=failure, banned_phrases=banned)
+            return PriorAttempt(read.text, read.result.violations, length_correction=failure, ledger=ledger)
         if len(read.band_misses) == 2:  # noqa: PLR2004 - a second miss is answered by a fresh draft
             return PriorAttempt(
                 read.text,
                 read.result.violations,
                 fresh_draft=FreshDraft(read.band_misses, failure.min_words, failure.max_words),
-                banned_phrases=banned,
+                ledger=ledger,
             )
         return None
     if read.corrections >= CAPSULE_CONFIG.corrections_per_read:
         return None
     soft = [soft_correction_for(v) for v in read.result.violations]
     corrections = tuple(c for c in soft if c is not None) if all(c is not None for c in soft) else None
-    return PriorAttempt(read.text, read.result.violations, soft_corrections=corrections, banned_phrases=banned)
+    return PriorAttempt(read.text, read.result.violations, soft_corrections=corrections, ledger=ledger)
 
 
 def _facts_block(facts: "PlayerFacts", read: _Read, fallback: Fallback) -> ReadResult:

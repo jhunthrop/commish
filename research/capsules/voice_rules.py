@@ -57,67 +57,107 @@ SET_PHRASES: Final = tuple(dict.fromkeys((*_SET_PHRASES_FIXED, *CAPSULE_CONFIG.r
 class NamedPattern:
     name: str
     pattern: re.Pattern[str]
+    # The words the rule refuses as the writer's prompt lists them (`prompt.NEVER_ON_THE_PAGE`); a test
+    # holds each to the rule's own pattern, so the list and the rule cannot drift (Lane 52).
+    shown: tuple[str, ...] = ()
 
 
-def named_rule(name: str, pattern: str, flags: int = re.IGNORECASE) -> NamedPattern:
+def named_rule(name: str, pattern: str, flags: int = re.IGNORECASE, shown: tuple[str, ...] = ()) -> NamedPattern:
     """A rule named for the violation it raises, matched ASCII-only (case-insensitive unless `flags` says)."""
-    return NamedPattern(name, re.compile(pattern, flags | re.ASCII))
+    return NamedPattern(name, re.compile(pattern, flags | re.ASCII), shown)
 
 
 # The "the honest <noun>" frame, whatever the noun.
-_HONEST_FRAME: Final = named_rule("the honest ... frame", r"\bthe honest [a-z]+\b")
+HONEST_FRAME: Final = named_rule(
+    "the honest ... frame", r"\bthe honest [a-z]+\b", shown=('"the honest" followed by any noun',)
+)
 
 # The model talking to itself or its editor. Narrow: "wait" and "actually" are drafting words.
 ASIDE_PATTERNS: Final = (
-    named_rule("let me", r"\blet me (?:say|put|try|rephrase|start|be (?:clear|plain|honest))\b"),
-    named_rule("not that word", r"\bnot that word\b"),
-    named_rule("the wrong word", r"\b(?:that'?s|that is) (?:the wrong|not the right) word\b"),
-    named_rule("scratch that", r"\b(?:scratch|strike) that\b"),
-    named_rule("or rather", r"\bor rather\b"),
-    named_rule("put plainly", r"\b(?:to )?put (?:it )?(?:plainly|simply|another way)\b"),
-    named_rule("in other words", r"\bin other words\b"),
-    named_rule("I mean", r"\bI mean\b", 0),
-    named_rule("a rewrite note", r"\bhere'?s (?:my|the|a) (?:rewrite|revision|draft|version)\b"),
-    named_rule("an editorial bracket", r"\[[^\]]*\]"),
-    named_rule("the model naming itself", r"\bas an? (?:AI|language model|assistant)\b"),
+    named_rule(
+        "let me",
+        r"\blet me (?:say|put|try|rephrase|start|be (?:clear|plain|honest))\b",
+        shown=("let me say", "let me be clear"),
+    ),
+    named_rule("not that word", r"\bnot that word\b", shown=("not that word",)),
+    named_rule(
+        "the wrong word",
+        r"\b(?:that'?s|that is) (?:the wrong|not the right) word\b",
+        shown=("that is the wrong word",),
+    ),
+    named_rule("scratch that", r"\b(?:scratch|strike) that\b", shown=("scratch that",)),
+    named_rule("or rather", r"\bor rather\b", shown=("or rather",)),
+    named_rule(
+        "put plainly",
+        r"\b(?:to )?put (?:it )?(?:plainly|simply|another way)\b",
+        shown=("put simply", "to put it plainly"),
+    ),
+    named_rule("in other words", r"\bin other words\b", shown=("in other words",)),
+    named_rule("I mean", r"\bI mean\b", 0, shown=("I mean",)),
+    named_rule(
+        "a rewrite note",
+        r"\bhere'?s (?:my|the|a) (?:rewrite|revision|draft|version)\b",
+        shown=("here's my rewrite",),
+    ),
+    named_rule("an editorial bracket", r"\[[^\]]*\]", shown=("[a note in brackets]",)),
+    named_rule("the model naming itself", r"\bas an? (?:AI|language model|assistant)\b", shown=("as an AI",)),
     # The capsule speaks as "we" (our board, our projection); a single writer's "I" is an aside
     # (phase D review L10: "I would still spend it elsewhere"). Case-sensitive, so "Week I" and a
     # name's "III" never match a lone "I".
-    named_rule("the first person singular", r"(?<![\w'])I(?:'d|'m|'ll|'ve)?(?![\w'])", 0),
+    named_rule("the first person singular", r"(?<![\w'])I(?:'d|'m|'ll|'ve)?(?![\w'])", 0, shown=("I", "I'd", "I'm")),
     # And its other cases (fix round 2, N8: "gives me pause", "in my mind"); a name is masked first.
-    named_rule("the first person singular", r"\b(?:[Mm]e|[Mm]y|[Mm]ine|[Mm]yself)\b", 0),
+    named_rule(
+        "the first person singular", r"\b(?:[Mm]e|[Mm]y|[Mm]ine|[Mm]yself)\b", 0, shown=("me", "my", "mine", "myself")
+    ),
     # The writer's fact sheet is its own input, never the reader's (fix round 2, N13: "nothing on the
     # sheet says that changes"). The page shows numbers, not a sheet.
-    named_rule("the writer's sheet", r"\b(?:the|this|his|our) (?:fact |facts )?sheet\b|\bfacts? sheet\b"),
+    named_rule(
+        "the writer's sheet",
+        r"\b(?:the|this|his|our) (?:fact |facts )?sheet\b|\bfacts? sheet\b",
+        shown=("the sheet", "the fact sheet"),
+    ),
 )
 
 # Betting words, named. Football's own senses (the offensive line, the line of scrimmage, the Las
 # Vegas Raiders, spreading the ball) are not bets and pass.
 BETTING_PATTERNS: Final = (
-    named_rule("the books", r"\bthe books\b"),
-    named_rule("a sportsbook", r"\bsports ?books?\b|\b(?:book|odds)makers?\b"),
-    named_rule("odds", r"\bodds\b"),
+    named_rule("the books", r"\bthe books\b", shown=("the books",)),
     named_rule(
-        "a posted line", r"\bposted (?:him at|a line|his line|their line)\b|\b(?:prop|betting|player|season) lines?\b"
+        "a sportsbook", r"\bsports ?books?\b|\b(?:book|odds)makers?\b", shown=("sportsbook", "bookmaker", "oddsmaker")
+    ),
+    named_rule("odds", r"\bodds\b", shown=("odds",)),
+    named_rule(
+        "a posted line",
+        r"\bposted (?:him at|a line|his line|their line)\b|\b(?:prop|betting|player|season) lines?\b",
+        shown=("posted a line", "a betting line", "a season line", "a player line"),
     ),
     named_rule(
         "the line as a bet",
         r"\bthe (?:posted |opening |closing )?line (?:on|for|at|sits|is set|was set|moved|opened|closed)\b",
+        shown=("the line on him", "the line opened"),
     ),
     named_rule(
         "a line as a number",
         r"(?<!stat )(?<!offensive )(?<!defensive )\bline (?:is|was|of|at|sits at|sat at|set at|opened at|closed at)"
         r" (?:about |around |roughly )?[0-9]",
+        shown=("a line of 8.5",),
     ),
     named_rule(
-        "over or under as a bet", r"\bthe (?:over|under)\b(?!-)|\bover/under\b|\bo/u\b|\b(?:over|under) [0-9]+\.5\b"
+        "over or under as a bet",
+        r"\bthe (?:over|under)\b(?!-)|\bover/under\b|\bo/u\b|\b(?:over|under) [0-9]+\.5\b",
+        shown=("the over", "the under", "over/under", "over 8.5"),
     ),
-    named_rule("a win total", r"\bwin totals?\b"),
-    named_rule("a prop", r"\bprops?\b"),
-    named_rule("a spread", r"\bpoint spread\b|\bthe spread\b"),
-    named_rule("Vegas as a bettor", r"(?<!las )\bvegas\b"),
-    named_rule("a bet", r"\bbet(?:s|ting|tor|tors)?\b|\bwagers?\b|\bparlays?\b|\bmoneylines?\b|\bvig\b"),
-    named_rule("an implied total", r"\bimplied (?:team )?totals?\b"),
+    named_rule("a win total", r"\bwin totals?\b", shown=("win total",)),
+    named_rule("a prop", r"\bprops?\b", shown=("prop",)),
+    named_rule("a spread", r"\bpoint spread\b|\bthe spread\b", shown=("the spread", "point spread")),
+    named_rule("Vegas as a bettor", r"(?<!las )\bvegas\b", shown=("Vegas",)),
+    named_rule(
+        "a bet",
+        r"\bbet(?:s|ting|tor|tors)?\b|\bwagers?\b|\bparlays?\b|\bmoneylines?\b|\bvig\b",
+        # "A safe bet" and "a better bet" (Lane 50's samples) are the word itself.
+        shown=("bet", "a safe bet", "betting", "bettor", "wager", "parlay", "moneyline", "vig"),
+    ),
+    named_rule("an implied total", r"\bimplied (?:team )?totals?\b", shown=("implied total",)),
 )
 
 LAB_REPORT_TERMS: Final = (
@@ -342,7 +382,7 @@ def voice_rule_hits(text: str, names: Sequence[str]) -> list[VoiceRuleHit]:
     drafting phrase to use (`validate.py`)."""
     normalised = _normalise_apostrophes(mask_names(text, names))
     hits = [VoiceRuleHit("set phrase", p.name) for p in _SET_PHRASE_PATTERNS if p.pattern.search(normalised)]
-    honest = _HONEST_FRAME.pattern.search(normalised)
+    honest = HONEST_FRAME.pattern.search(normalised)
     if honest is not None and not any(hit.found == honest.group(0).lower() for hit in hits):
         hits.append(VoiceRuleHit("set phrase", honest.group(0)))
     for rules, kind in ((ASIDE_PATTERNS, "aside"), (BETTING_PATTERNS, "betting word")):

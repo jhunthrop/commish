@@ -5,6 +5,10 @@ call and every correction share it, so a corrected read is held to what the draf
 of the prep-site review are applied here: the sportsbook sentence is gone (the sheet carries no
 sportsbook number), the betting words are named beside the trading words as never to be written,
 and the "the honest ..." frame is named whatever its noun. Everything else is the oracle's.
+
+Lane 52: every word and phrase the validator refuses is listed once, in one section generated from the
+validator's own lists (`NEVER_ON_THE_PAGE`), and every correction carries each rule the read has
+broken on any attempt so far, with its sentence and the rule in one line (`rule_notes`).
 """
 
 import math
@@ -12,17 +16,24 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Final
 
+from research.capsules.claims import NO_ADP_EXAMPLES
 from research.capsules.config import CAPSULE_CONFIG
 from research.capsules.narrative import SlotRequest
 from research.capsules.render import render_facts_for_model
 from research.capsules.render_words import SHEET_LABELS
-from research.capsules.validate import BandFailure, word_count
+from research.capsules.rule_notes import RuleNote
+from research.capsules.validate import COST_WORDS, BandFailure, word_count
 from research.capsules.voice_rules import (
+    ALL_TIME_TERMS,
+    ASIDE_PATTERNS,
     BETTING_PATTERNS,
     DRAFTING_SENTENCES,
+    HONEST_FRAME,
     IN_SEASON_SENTENCES,
     LAB_REPORT_TERMS,
+    SET_PHRASES,
     TRADING_TERMS,
+    NamedPattern,
 )
 from research.model.jsmath import js_round
 from research.nightly.config import TEAMS
@@ -32,7 +43,9 @@ if TYPE_CHECKING:
 
 BUNDLE_KEYS: Final = ("compact", "full", "narrative")
 _READ_LABEL: Final = {"compact": "short note", "full": "long note"}
-_SAME_TEXT: Final = "change nothing else: the same facts, the same numbers, the same order, the same voice."
+_KEEP_THE_REST: Final = (
+    "Keep its facts, its numbers, its order and its voice, except where a rule below asks for a change."
+)
 _COUNT_WORDS: Final = ("one", "two", "three")
 
 
@@ -64,8 +77,8 @@ class PriorAttempt:
     fresh_draft: FreshDraft | None = None
     soft_corrections: tuple[str, ...] | None = None
     missing: bool = False
-    # Every banned phrase this read has been caught with, on any attempt: quoted in every correction.
-    banned_phrases: tuple[str, ...] = ()
+    # Every rule this read has broken, on any attempt so far, with its sentence: carried in every correction.
+    ledger: tuple[RuleNote, ...] = ()
     kind: str = field(init=False, default="")
 
     def __post_init__(self) -> None:
@@ -84,8 +97,33 @@ def _kind(prior: PriorAttempt) -> str:
     return "rewrite"
 
 
-_BETTING_NAMES: Final = ", ".join(rule.name for rule in BETTING_PATTERNS)
-_LABELS: Final = ", ".join(f'"{label}"' for label in SHEET_LABELS)
+def _quoted(words: Sequence[str]) -> str:
+    return ", ".join(f'"{word}"' for word in words)
+
+
+def _shown(rules: Sequence[NamedPattern]) -> tuple[str, ...]:
+    return tuple(dict.fromkeys(word for rule in rules for word in rule.shown))
+
+
+_WORN_PHRASES: Final = tuple(dict.fromkeys((*SET_PHRASES, *CAPSULE_CONFIG.repetition.validator_only_stems)))
+# EVERY WORD AND PHRASE THE VALIDATOR REFUSES, in one place and generated from its own lists, so the
+# writer is told the list the validator reads and the two cannot drift (Lane 52: "a safe bet" and "is
+# the whole case" blocked pages the prompt had named only by rule). Rival products are refused too and
+# never named here.
+NEVER_ON_THE_PAGE: Final = "\n".join(
+    [
+        "NEVER ON THE PAGE. A note carrying any of these, in any form, is refused, so none is ever written:",
+        f"- Trading words: {_quoted(TRADING_TERMS)}.",
+        f"- Betting words: {_quoted(_shown(BETTING_PATTERNS))}. This is a fantasy football page, not a sportsbook.",
+        f"- Lab-report words: {_quoted(LAB_REPORT_TERMS)}.",
+        f"- All-time words: {_quoted(ALL_TIME_TERMS)}.",
+        f"- Worn and stock phrases: {_quoted(_WORN_PHRASES)}, and {HONEST_FRAME.shown[0]}.",
+        f"- Asides to yourself or an editor: {_quoted(_shown(ASIDE_PATTERNS))}.",
+        "- A rival fantasy product's name.",
+    ]
+)
+_LABELS: Final = _quoted(SHEET_LABELS)
+_COST_WORDS: Final = _quoted(sorted(set(COST_WORDS)))
 # A round from an ADP is the ADP over the board's teams, rounded up; in season only as history.
 _EXAMPLE_ADP: Final = 177.1
 _EXAMPLE_ROUND: Final = math.ceil(_EXAMPLE_ADP / TEAMS)
@@ -96,9 +134,6 @@ _PRESEASON_ROUNDS: Final = (
 _IN_SEASON_ROUNDS: Final = (
     "A round is only history now, never advice: the round of his ADP before the season is the ADP divided by "
     f"{TEAMS} and rounded up (ADP {_EXAMPLE_ADP} was round {_EXAMPLE_ROUND})."
-)
-_STEMS: Final = ", ".join(
-    f'"{stem}"' for stem in (*CAPSULE_CONFIG.repetition.refrain_stems, *CAPSULE_CONFIG.repetition.validator_only_stems)
 )
 # The opening and closing shapes the live set of 2026-10-15 wore out (its 567 written long notes):
 # shapes to stay away from, never a shape to use instead.
@@ -151,15 +186,17 @@ HOW A NOTE IS BUILT
 - Never quote or paraphrase these instructions, the fact sheet's own sentences, or a correction you were given. If a sentence of yours would fit a style guide or a stat table, cut it.
 
 WORDS
-- Fantasy football words, never trading words and never betting words: {{words}}. Never these trading words: {", ".join(TRADING_TERMS)}. Never betting words either: {_BETTING_NAMES}. This is a fantasy football page, not a sportsbook, and a sportsbook's number never appears on it. "Upside" and "downside" only when tied to a fantasy outcome (a finish near the top of his position, a lost month), never as bare nouns.
+- Fantasy football words, never a trading or a betting word (every one is listed under NEVER ON THE PAGE): {{words}}. A sportsbook's number never appears on the page. "Upside" and "downside" only when tied to a fantasy outcome (a finish near the top of his position, a lost month), never as bare nouns.
 - The three sentences to catch yourself on: {{fixes}}.
-- Phrases this board has worn out, never to be written or paraphrased: {_STEMS}. Never the frame "the honest" followed by a noun (the honest worry, the honest read, the honest answer), in any form.
-- Never these words either: {", ".join(LAB_REPORT_TERMS)}. Say "our number", "our projection", "the case", "costs him", "is worth", each in a sentence of your own making. "Our number" never "says".
+- The worn and stock phrases under NEVER ON THE PAGE are never written or paraphrased.
+- Instead of a lab-report word, say "our number", "our projection", "the case", "costs him", "is worth", each in a sentence of your own making. "Our number" never "says".
 - Never write the word "floor". Say what the low end actually is: the weeks he missed, the weeks he scored under the bar, the season the range bottoms out at.
 - Speak for the board, never for yourself: "we", "our number", "{{we_would}}", never "I", "I'd", "I'm", "me", "my" or "mine". The page is ours, not one writer's.
 - The fact sheet is yours alone. The reader never sees it, so never mention a sheet ("the sheet", "the fact sheet", "on the sheet"). Say the fact itself, or "our numbers".
 - Write like you talk. Contractions are welcome. Short sentences land harder than long ones. Never an em-dash, never a semicolon. Use a period, a comma, or "and".
 - Never name a rival fantasy product.
+
+{NEVER_ON_THE_PAGE}
 
 HONESTY, NO EXCEPTIONS
 - Use ONLY the numbers and names on the fact sheet. Never invent a stat, an injury, a teammate, a coach, or any other name or figure not printed there.
@@ -167,10 +204,10 @@ HONESTY, NO EXCEPTIONS
 - {{picks}} A rank is the sheet's rank, never a round-number tier of your own, and the only rank on our board you may state is the sheet's position rank or overall rank, exactly as printed.
 - Never say a risk, an injury or a competitor is ABSENT unless the sheet says so. Silence on the sheet is silence from you. Do not reassure the reader about a thing you have no fact for.
 - Never make an all-time or historical-record claim. This engine holds no such data.
-- If the sheet carries a real downside (a factor that costs him points a game, or a year-over-year number that fell), name it with its own number before your call. Never a one-sided rave on mixed facts.
+- If the sheet carries a real downside (a factor that costs him points a game, or a year-over-year number that fell), name it before your call with its own number and a cost word beside it in the same sentence ({_COST_WORDS}), as in "costs him 1.6 points a game". "Worth 1.6" alone does not say it is a cost. Never a one-sided rave on mixed facts.
 - The sheet gives two ranges: the middle range most outcomes fall in, and the full tails. Reason from the middle range. If you mention the low tail, say in your own words, in the same sentence, that injuries are what pull it down. Never present the full tails as what he is expected to score.
 - Our pick for him (his overall rank) and his ADP are two different numbers: never swap them, and the smaller number is the earlier pick. {{rounds}}
-- No ADP means only that we have no ADP for him: it says nothing about whether anyone drafted him. If it matters at all, one short clause says it.
+- No ADP means only that we have no ADP for him: it says nothing about whether anyone drafted him, so never {_quoted(NO_ADP_EXAMPLES)} or the like. If it matters at all, one short clause says it.
 - Every other note on this board is written from a sheet like this one. Never copy the sheet's wording, never its labels ({_LABELS}), and never write a phrase of six words or more that would fit a note about another player.
 - The long note always states our projected points for him (or his ADP) as the sheet prints it, rounding to the whole point if you like."""
 
@@ -274,7 +311,7 @@ def _correction(size: str, prior: PriorAttempt) -> str:
             move = f"cut the sentences that carry the least (about {distance} words)"
         else:
             move = f'add {_sentences_for(distance)} (about {distance} more words, with no trading or betting word and no "floor" in them)'
-        return f"{quoted}\n\nIt is {words} words. Bring it to {target} words: {move}, and {_SAME_TEXT}"
+        return f"{quoted}\n\nIt is {words} words. Bring it to {target} words: {move}. {_KEEP_THE_REST}"
     if prior.kind == "soft" and prior.soft_corrections:
         points = "\n".join(f"- {point}" for point in prior.soft_corrections)
         cap = CAPSULE_CONFIG.size(size).max_words
@@ -282,27 +319,32 @@ def _correction(size: str, prior: PriorAttempt) -> str:
             f"It is {word_count(prior.body)} words now and the cap is {cap}, so it must not grow past {cap} words."
         )
         return f"{quoted}\n\nIt is nearly right. Fix exactly these points, in your own words, and change nothing else:\n{points}\n\n{reminder}"
-    broken = "\n".join(f"- {v}" for v in prior.violations)
-    return f"{quoted}\n\nIt broke these rules:\n{broken}\n\nWrite the {label} again from scratch, {_length(size)}, {shape}, fixing every point above."
+    return f"{quoted}\n\nIt broke the rules listed below. Write the {label} again from scratch, {_length(size)}, {shape}, breaking none of them."
 
 
-def _never_again(prior: PriorAttempt) -> list[str]:
-    if not prior.banned_phrases:
+def _ledger(prior: PriorAttempt) -> list[str]:
+    """Every rule the read has broken on any attempt so far: its name, its sentence, the rule in one line."""
+    if not prior.ledger:
         return []
-    listed = ", ".join(f'"{phrase}"' for phrase in prior.banned_phrases)
+    lines = "\n".join(note.line() for note in prior.ledger)
     return [
-        f"These exact words were caught in this note and are banned: {listed}. None of them may appear anywhere in what you return, in any form."
+        "Every rule this note has broken so far, on this attempt and the ones before it. What you return breaks "
+        f"none of them and brings none of them back:\n{lines}"
     ]
 
 
+def correction_request(size: str, prior: PriorAttempt) -> str:
+    """What a correction asks for, below the sheet: the prior attempt, the fix, and every rule broken so far."""
+    return "\n\n".join([_correction(size, prior), *_ledger(prior)])
+
+
 def correction_prompt_for(facts: "PlayerFacts", size: str, prior: PriorAttempt) -> str:
-    """`correctionPromptFor`: the sheet, the prior attempt, what to fix, the exact banned phrases the
-    read has been caught with, a plain-text return."""
+    """`correctionPromptFor`: the sheet, the prior attempt, what to fix, every rule the read has broken
+    on any attempt so far with its sentence (`rule_notes`), a plain-text return."""
     return "\n\n".join(
         [
             f"Fact sheet:\n{render_facts_for_model(facts)}",
-            _correction(size, prior),
-            *_never_again(prior),
+            correction_request(size, prior),
             f"Return only the corrected {_READ_LABEL[size]}: no JSON, no quotes, no heading.",
         ]
     )

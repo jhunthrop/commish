@@ -82,7 +82,10 @@ _AVAILABILITY: Final = re.compile(
     r"sidelin|out for|stay(?:s|ing)? on the field|on the field for all",
     re.IGNORECASE,
 )
-_COST_CUE: Final = re.compile(r"\b(costs?|minus|down|shaves?)\b", re.IGNORECASE | re.ASCII)
+# The words that make a cited downside read as a cost ("costs him 6.2 a game"): the validator's own
+# list, quoted to the writer by the prompt and the correction (`prompt`, `corrections`).
+COST_WORDS: Final = ("cost", "costs", "minus", "down", "shave", "shaves")
+_COST_CUE: Final = re.compile(rf"\b(?:{'|'.join(COST_WORDS)})\b", re.IGNORECASE | re.ASCII)
 _PRODUCT_CUE_AFTER: Final = re.compile(rf"^(?:['\u2019]s)?\s+(?:{'|'.join(COMPETITOR_PRODUCT_CUES)})\b", re.IGNORECASE)
 _ON_BEFORE: Final = re.compile(r"\bon\s+$", re.IGNORECASE)
 _SENTENCE_OPENERS: Final = re.compile(r"[\s\"'\u201c\u2018(]+$")
@@ -199,7 +202,7 @@ def strongest_negative_law_effect(facts: "PlayerFacts") -> float | None:
     return strongest
 
 
-def _cites_tension(text: str, tension: float) -> bool:
+def cites_tension(text: str, tension: float) -> bool:
     if any(is_derived_from_ledger(value, [tension], False) for _, value in extract_numbers(text)):
         return True
     magnitude = abs(tension)
@@ -289,16 +292,19 @@ def _validate(
     if trimmed == "":
         return ValidationResult(False, ("The completion was empty.",))
     words = word_count(trimmed)
-    if not band[0] <= words <= band[1]:
-        message = f"Word count {words} is outside the required {band[0]}-{band[1]} word band."
-        return ValidationResult(False, (message,), BandFailure(words, band[0], band[1]))
-    violations = [*_form_violations(trimmed), *_copy_violations(trimmed, source.name_ledger, source.clock)]
+    # A read out of its band is still read for every other rule, so its length correction asks for
+    # everything at once (Lane 52); the band failure leads its violations.
+    band_failure = None if band[0] <= words <= band[1] else BandFailure(words, band[0], band[1])
+    violations = (
+        [] if band_failure is None else [f"Word count {words} is outside the required {band[0]}-{band[1]} word band."]
+    )
+    violations += [*_form_violations(trimmed), *_copy_violations(trimmed, source.name_ledger, source.clock)]
     violations += _grounding_violations(trimmed, source)
     violations += claim_violations(trimmed, source.claims)
     violations += base_violations(trimmed, source.prompt_text)
     if page_number and not names_missed_weeks(trimmed, source.clock):
         violations.append(missed_weeks_violation(source.clock))
-    if tension and source.tension is not None and not _cites_tension(trimmed, source.tension):
+    if tension and source.tension is not None and not cites_tension(trimmed, source.tension):
         figure = js_string(round_half_up(source.tension, 1))
         violations.append(
             f"Mixed evidence: the strongest downside ({figure} pts/game) is never cited. It has to appear, with that number, before the call."
@@ -313,7 +319,7 @@ def _validate(
     violations += [
         rank_basis_violation(claim) for claim in ranks_without_basis(trimmed, source.position, source.position_rank)
     ]
-    return ValidationResult(not violations, tuple(violations))
+    return ValidationResult(not violations, tuple(violations), band_failure)
 
 
 RANK_VIOLATION: Final = "The text states a board rank that is not his rank on the page"
