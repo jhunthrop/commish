@@ -17,7 +17,7 @@ const ZONE = 'America/Chicago';
 const HELD = { slug: 'de-von-achane', name: 'Achane', position: 'RB' };
 const DOUBTFUL = { slug: 'david-montgomery', name: 'Montgomery' };
 const CAPTURE =
-	/(Injury status from the hourly capture|These injury statuses are from the hourly capture), (read|as the list stood) \w{3} \w{3} \d{1,2}, \d{1,2}:\d{2} [ap]m Central\./;
+	/(Injury status from the hourly capture|These injury statuses are from the hourly capture), (read|as the list stood) \w{3} \w{3} \d{1,2}, \d{1,2}:\d{2} [ap]m Central(\.|, over a day and a half before now\.)/;
 
 const web = process.argv[2] ?? 'http://localhost:4681';
 const out = new URL(process.argv[3] ?? '../screenshots/injury-status/', import.meta.url);
