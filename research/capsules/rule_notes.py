@@ -24,6 +24,7 @@ from research.capsules.claims import (
     SCORING_CLAIM,
 )
 from research.capsules.corrections import BANNED_TERM_VIOLATION, TENSION_NUMBER, VOICE_RULE_VIOLATION
+from research.capsules.multiples import MULTIPLE_VIOLATION
 from research.capsules.prose_checks import LABEL_VIOLATION, UNFINISHED_VIOLATION
 from research.capsules.season_voice import MISSED_WEEKS_UNNAMED
 from research.capsules.sentences import split_sentences
@@ -208,6 +209,12 @@ def _page_note(violation: str, _body: str) -> RuleNote | None:
     rule = next((rule for rule in _CLAIM_STATEMENTS if violation.startswith(f"{rule}: ")), None)
     if rule is not None:
         return RuleNote(rule, _named_sentence(violation), _CLAIM_STATEMENTS[rule])
+    if violation.startswith(MULTIPLE_VIOLATION):
+        return RuleNote(
+            "a multiple the figures do not make",
+            _named_sentence(violation),
+            "Call one figure double, twice, half or triple another only when the two stand within a tenth of it.",
+        )
     if _SHARE_BASE.match(violation):
         return RuleNote(
             "a share without its own base",

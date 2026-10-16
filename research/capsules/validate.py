@@ -27,6 +27,7 @@ from research.capsules.grounding import (
     proper_name_phrases,
     round_half_up,
 )
+from research.capsules.multiples import multiple_violations
 from research.capsules.prose_checks import label_copies, label_violation, unfinished_ending, unfinished_violation
 from research.capsules.pull_figures import adp_figures_off_page, facts_page_numbers, pull_figures_of, renderings_of
 from research.capsules.rank_basis import rank_basis_violation, ranks_without_basis
@@ -304,6 +305,7 @@ def _validate(
     violations += _grounding_violations(trimmed, source)
     violations += claim_violations(trimmed, source.claims)
     violations += base_violations(trimmed, source.prompt_text)
+    violations += multiple_violations(trimmed)
     if page_number and not names_missed_weeks(trimmed, source.clock):
         violations.append(missed_weeks_violation(source.clock))
     if tension and source.tension is not None and not cites_tension(trimmed, source.tension):

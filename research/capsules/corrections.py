@@ -14,6 +14,7 @@ import re
 from typing import Final
 
 from research.capsules.claims import CLAIM_RULES
+from research.capsules.multiples import MULTIPLE_VIOLATION
 from research.capsules.prose_checks import LABEL_VIOLATION, UNFINISHED_VIOLATION
 from research.capsules.season_voice import MISSED_WEEKS_UNNAMED
 from research.capsules.validate import (
@@ -85,7 +86,7 @@ def _page_correction(violation: str) -> str | None:
         )
     if violation.startswith(MISSED_WEEKS_UNNAMED):
         return f"{violation.removeprefix(MISSED_WEEKS_UNNAMED + ': ')} Leave everything else as it is."
-    if violation.startswith((UNFINISHED_VIOLATION, LABEL_VIOLATION)):
+    if violation.startswith((UNFINISHED_VIOLATION, LABEL_VIOLATION, MULTIPLE_VIOLATION)):
         return f"{violation} Leave everything else as it is."
     rule = next((rule for rule in CLAIM_RULES if violation.startswith(f"{rule}: ")), None)
     if rule is not None:
