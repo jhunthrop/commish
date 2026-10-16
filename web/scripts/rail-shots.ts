@@ -14,13 +14,14 @@ import { RAIL_KEYS, type RailKey } from '../src/lib/ui/nav.ts';
 import { railFor } from '../src/lib/ui/rail-order.ts';
 import {
 	FIXTURE_PHASES,
+	MANY_COOKIE,
 	ONE_COOKIE,
 	PHASE_COOKIE,
 	type FixturePhase
 } from './inseason-fixture/phases.ts';
 
 const THEMES = ['light', 'dark'] as const;
-const WIDTHS = [1440, 390] as const;
+const WIDTHS = [1440, 390, 360] as const;
 const PHONE_MAX = 760;
 const VIEWPORT_HEIGHT = 900;
 const READY_TIMEOUT_MS = 30_000;
@@ -86,6 +87,21 @@ async function check(page: Page, where: string, key: RailKey, width: number): Pr
 	}
 	const wide = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
 	if (wide) failures.push(`${where}: scrolls sideways`);
+	// Every shown label sits whole in its item and inside the bar: nothing clipped.
+	const clipped = await page.evaluate(() => {
+		const rail = document.querySelector('nav.rail')?.getBoundingClientRect();
+		return [...document.querySelectorAll<HTMLElement>('nav.rail .item')]
+			.filter((item) => item.getBoundingClientRect().width > 0)
+			.filter((item) => {
+				const label = item.querySelector('span')?.getBoundingClientRect();
+				return (
+					item.scrollHeight > item.clientHeight + 1 ||
+					(label !== undefined && rail !== undefined && label.bottom > rail.bottom + 0.5)
+				);
+			})
+			.map((item) => item.innerText.trim());
+	});
+	if (clipped.length > 0) failures.push(`${where}: clipped labels ${clipped.join(', ')}`);
 }
 
 function file(name: string): string {
@@ -139,24 +155,78 @@ for (const theme of THEMES) {
 	}
 }
 
-/** The switch's menu: leagues in every phase say theirs, one league says none. */
+/** The switch's menu: leagues in every phase say theirs, one league says none. Its last row follows
+ * another league for an account that may follow more, and is what more leagues come with for one
+ * that may not. */
 for (const theme of THEMES) {
-	for (const width of WIDTHS) {
+	for (const width of [1440, 390] as const) {
 		for (const one of [false, true]) {
-			const cookies = [SIGNED_IN, { name: PHASE_COOKIE, value: 'in_season' }];
-			if (one) cookies.push({ name: ONE_COOKIE, value: '1' });
-			const ctx = await context(theme, width, cookies);
-			const page = await ctx.newPage();
-			await page.goto(`${web}/board`, { waitUntil: 'networkidle' });
-			await settle(page, 'in_season');
-			await page.locator('.switch .face').click();
-			await page.locator('#league-menu .foot').waitFor({ timeout: READY_TIMEOUT_MS });
-			await page.waitForLoadState('networkidle');
-			const name = one ? 'menu-one' : 'menu-phases';
-			await page.screenshot({ path: file(`${name}-${theme}-${String(width)}`) });
-			await ctx.close();
+			for (const many of [false, true]) {
+				const cookies = [SIGNED_IN, { name: PHASE_COOKIE, value: 'in_season' }];
+				if (one) cookies.push({ name: ONE_COOKIE, value: '1' });
+				if (many) cookies.push({ name: MANY_COOKIE, value: '1' });
+				const ctx = await context(theme, width, cookies);
+				const page = await ctx.newPage();
+				await page.goto(`${web}/board`, { waitUntil: 'networkidle' });
+				await settle(page, 'in_season');
+				await page.locator('.switch .face').click();
+				await page.locator('#league-menu .foot').waitFor({ timeout: READY_TIMEOUT_MS });
+				await page.waitForLoadState('networkidle');
+				const last = await page.evaluate(() => {
+					const foot = document.querySelector('#league-menu .foot');
+					const end = foot?.lastElementChild;
+					return {
+						text: (end as HTMLElement | null)?.innerText.trim() ?? '',
+						href: end?.getAttribute('href') ?? null
+					};
+				});
+				const where = `menu ${many ? 'many' : 'free'} ${theme} ${String(width)}`;
+				if (many && (last.text !== 'Follow another league' || last.href !== '/league/new')) {
+					failures.push(`${where}: the last row is ${last.text} to ${String(last.href)}`);
+				}
+				if (
+					!many &&
+					(last.text.includes('Follow another league') || !last.text.includes('Draft Pass'))
+				) {
+					failures.push(`${where}: the last row is ${last.text}`);
+				}
+				const name = `menu-${one ? 'one' : 'phases'}${many ? '-many' : ''}`;
+				await page.screenshot({ path: file(`${name}-${theme}-${String(width)}`) });
+				await ctx.close();
+			}
 		}
 	}
+}
+
+/** Signed out in season: Lineup opens the follow page naming the lineup, then Trades on that page
+ * names the trades and lights Trades. */
+for (const theme of THEMES) {
+	const ctx = await context(theme, 390, []);
+	const page = await ctx.newPage();
+	await page.goto(`${web}/board`, { waitUntil: 'networkidle' });
+	const taps = [
+		{ label: 'Lineup', line: 'to see your lineup each week' },
+		{ label: 'Trades', line: 'to see the trades that help both teams' }
+	] as const;
+	for (const tap of taps) {
+		await page.locator('nav.rail .item', { hasText: tap.label }).filter({ visible: true }).click();
+		await page
+			.getByText(tap.line)
+			.filter({ visible: true })
+			.waitFor({ timeout: READY_TIMEOUT_MS })
+			.catch(() =>
+				failures.push(`follow ${tap.label} ${theme}: the page does not say "${tap.line}"`)
+			);
+		const lit = await page.evaluate(
+			() =>
+				[...document.querySelectorAll<HTMLElement>('nav.rail .item[aria-current="page"]')]
+					.filter((item) => item.getBoundingClientRect().width > 0)
+					.map((item) => item.innerText.trim())[0] ?? ''
+		);
+		if (lit !== tap.label) failures.push(`follow ${tap.label} ${theme}: ${lit} is lit`);
+		await page.screenshot({ path: file(`follow-tap-${tap.label.toLowerCase()}-${theme}-390`) });
+	}
+	await ctx.close();
 }
 
 await browser.close();

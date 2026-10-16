@@ -322,11 +322,14 @@ async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> 
 		return;
 	}
 	if (url.pathname === '/me' || url.pathname === '/me/league') {
-		const { phase, one } = askedPhase(req.headers.cookie);
+		const { phase, one, many } = askedPhase(req.headers.cookie);
 		const leagues = leaguesNow();
 		const asked = url.pathname === '/me/league' ? await bodyOf(req) : null;
 		const chosen = (asked as { league_id?: string } | null)?.league_id;
-		const answer = phaseAccount(account, leagues, phase, one);
+		const answer = {
+			...phaseAccount(account, leagues, phase, one),
+			features: many ? (['many_leagues'] as const) : []
+		};
 		const picked = leagues.find((league) => league.id === chosen);
 		send(req, res, HTTP.ok, picked ? { ...answer, league: picked } : answer);
 		return;

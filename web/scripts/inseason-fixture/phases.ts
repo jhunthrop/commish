@@ -24,6 +24,8 @@ export type FixturePhase = (typeof FIXTURE_PHASES)[number];
 
 export const PHASE_COOKIE = 'fixture_phase';
 export const ONE_COOKIE = 'fixture_one';
+/** The account may follow many leagues (the many_leagues feature). */
+export const MANY_COOKIE = 'fixture_many';
 
 const HOUR_MS = 3_600_000;
 const DAY_MS = 24 * HOUR_MS;
@@ -185,7 +187,11 @@ export function phaseSync(sync: LeagueSync, id: string): LeagueSync {
 }
 
 /** The phase a shot asked for, from the request's cookies: the in-season league by default. */
-export function askedPhase(cookie: string | undefined): { phase: FixturePhase; one: boolean } {
+export function askedPhase(cookie: string | undefined): {
+	phase: FixturePhase;
+	one: boolean;
+	many: boolean;
+} {
 	const pairs = new Map(
 		(cookie ?? '').split('; ').map((pair) => {
 			const at = pair.indexOf('=');
@@ -193,7 +199,11 @@ export function askedPhase(cookie: string | undefined): { phase: FixturePhase; o
 		})
 	);
 	const asked = pairs.get(PHASE_COOKIE);
-	return { phase: isFixturePhase(asked) ? asked : 'in_season', one: pairs.get(ONE_COOKIE) === '1' };
+	return {
+		phase: isFixturePhase(asked) ? asked : 'in_season',
+		one: pairs.get(ONE_COOKIE) === '1',
+		many: pairs.get(MANY_COOKIE) === '1'
+	};
 }
 
 /** The site's season the fixture answers on /me: week 6 of the regular season. */
