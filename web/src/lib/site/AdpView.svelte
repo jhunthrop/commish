@@ -6,6 +6,7 @@
 	import { plural } from '#lib/format/number.ts';
 	import { rangeScale } from '#lib/run/derive.ts';
 	import { rowFraming } from '#lib/run/row-framing.ts';
+	import { liveStatusClock, sayBoard, type LiveStatus } from '#lib/run/live-status.ts';
 	import type { AdpPage } from '#lib/server/pages/adp.ts';
 	import type { RunStamp } from '#lib/run/stamp.ts';
 	import BasisList from '#lib/ui/BasisList.svelte';
@@ -38,6 +39,18 @@
 		lazySheet.armOnFirstIntent(window);
 		siteContext.wantHeld();
 	});
+	/** The rows' status words as built, said again on the member's clock once the page is live. */
+	let live = $state<LiveStatus | null>(null);
+	onMount(() => {
+		liveStatusClock(
+			page.capture !== null,
+			() => import('#lib/run/status-view.ts'),
+			(said) => {
+				live = said;
+			}
+		);
+	});
+	const words = $derived(sayBoard(page, live));
 	// ADP opens in the context's format and turns with the switch.
 	followFormat(
 		() => page.format.id,
@@ -85,6 +98,7 @@
 						{framing}
 						eager={i < EAGER_ROWS}
 						held={siteContext.held?.mark(player.id) ?? null}
+						status={words?.rows[player.id] ?? null}
 					>
 						{#snippet action()}
 							<RowSheetMark {player} />

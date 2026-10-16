@@ -9,6 +9,7 @@ import type { DirectoryPlayer } from '#lib/sheet/directory.ts';
 import type { LeagueBoardFile } from '#lib/run/league-board.ts';
 import type { BoardFormat } from '#lib/sheet/model.ts';
 import { withStatuses } from '#lib/run/board-status.ts';
+import { heldWord } from '#lib/run/held-places.ts';
 import { withSeasons } from './board-season.ts';
 import { board, designations, manifest, seasonReach } from './run.ts';
 import { captureStamp } from './statuses.ts';
@@ -62,7 +63,10 @@ export async function runBoardFor(format: BoardFormat): Promise<LeagueBoardFile 
 export async function sheetBoard(format: BoardFormat): Promise<readonly DirectoryPlayer[] | null> {
 	const id = (await sheetFormats()).get(format);
 	if (id === undefined) return null;
-	return (await board(id)).rows.map((row) => ({
+	// The board's order beside the capture: a player on a season-long list follows the available ones
+	// at his position, his ranks shown as the word (Lane 63).
+	const [loaded, capture] = await Promise.all([board(id), designations()]);
+	return withStatuses(loaded.rows, capture).map((row) => ({
 		id: row.id,
 		name: row.name,
 		position: row.position,
@@ -70,6 +74,7 @@ export async function sheetBoard(format: BoardFormat): Promise<readonly Director
 		headshot: row.headshot,
 		rank: row.ourRank,
 		positionRank: row.positionRank,
-		adp: row.adp
+		adp: row.adp,
+		held: heldWord(row)
 	}));
 }

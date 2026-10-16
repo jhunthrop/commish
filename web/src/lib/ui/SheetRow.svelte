@@ -7,6 +7,8 @@
 		positionRank: number;
 		/** Where drafters take him on average, or null when he is not in our ADP window. */
 		adp: number | null;
+		/** The word his ranks show as when he is on a season-long list ("IR", Lane 63). */
+		held?: string | null;
 	}
 </script>
 
@@ -142,20 +144,35 @@
 			{/if}
 		</span>
 		<span class="meta">
-			<PositionPill {position} rank={board?.positionRank} />
+			<PositionPill {position} rank={board?.held ?? board?.positionRank} />
 			{#if tier !== null}<TierChip {tier} />{/if}
 			{#if team && !compact}<span class="team">{team}</span>{/if}
-			{#if board && compact}<AdpCell adp={board.adp} ourRank={board.rank} figure={false} />{/if}
+			{#if board && compact}<AdpCell
+					adp={board.adp}
+					ourRank={board.rank}
+					figure={false}
+					compare={!board.held}
+					rankWord={board.held ?? null}
+				/>{/if}
 		</span>
 	</span>
 	<span class="place"><Place {place} /></span>
 	{#if !compact}
 		<span class="adp">
-			{#if board}<AdpCell adp={board.adp} ourRank={board.rank} />{/if}
+			{#if board}<AdpCell
+					adp={board.adp}
+					ourRank={board.rank}
+					compare={!board.held}
+					rankWord={board.held ?? null}
+				/>{/if}
 		</span>
 		<span class="ours">
 			{#if board !== undefined}
-				<Label>{board === null ? 'We do not rank him' : `Our rank ${String(board.rank)}`}</Label>
+				<Label
+					>{board === null
+						? 'We do not rank him'
+						: `Our rank ${board.held ?? String(board.rank)}`}</Label
+				>
 			{/if}
 		</span>
 		<span class="said">

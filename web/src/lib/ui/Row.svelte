@@ -132,6 +132,7 @@
 		ourRank={player.ourRank}
 		under={order === 'adp' ? 'rank' : 'adp'}
 		compare={shownFraming.compare}
+		rankWord={status?.rank ?? null}
 	/>
 	{#if action}<span class="action">{@render action()}</span>{/if}
 </div>

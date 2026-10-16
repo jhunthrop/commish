@@ -83,7 +83,10 @@
 				<span class="who">
 					<span class="name">{row.name}</span>
 					<span class="meta"
-						><PositionPill position={row.position} rank={board?.get(row.id)?.positionRank} />
+						><PositionPill
+							position={row.position}
+							rank={board?.get(row.id)?.held ?? board?.get(row.id)?.positionRank}
+						/>
 						{#if row.tags[0]}<TagChip
 								label={tagLabel(row.tags[0])}
 								tone={tagTone(row.tags[0])}
