@@ -3,6 +3,7 @@ package season
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"strings"
 	"testing"
 	"time"
@@ -19,11 +20,11 @@ func TestSiteSeasonSaysWhenTheBoardLagsTheWeek(t *testing.T) {
 		basis     string
 	}{
 		{"week 7 begun, board still week 6", "2026-10-20 00:00", 6,
-			"Week 7 has begun. Our board is still the week 6 board until Tuesday's refresh."},
+			"Week 7 has begun. Our board is still the week 6 board until the next refresh."},
 		{"the week 7 board is out", "2026-10-20 12:00", 7, "Week 7 of the 2026 NFL season is under way."},
 		{"the last minute of week 6", "2026-10-19 23:59", 6, "Week 6 of the 2026 NFL season is under way."},
 		{"a board two weeks behind", "2026-10-27 00:00", 6,
-			"Week 8 has begun. Our board is still the week 6 board until Tuesday's refresh."},
+			"Week 8 has begun. Our board is still the week 6 board until the next refresh."},
 		{"the preseason board is up", "2026-10-20 00:00", 0, "Week 7 of the 2026 NFL season is under way."},
 	}
 	for _, c := range cases {
@@ -70,12 +71,22 @@ func TestSiteSeasonBoardReadFailureStillAnswersTheSeason(t *testing.T) {
 	if err != nil || got.Phase != SiteInSeason || got.Week != 7 || got.BoardWeek != 0 || got.Basis != want {
 		t.Fatalf("%+v (%v)", got, err)
 	}
-	site := &Site{Facts: facts, Now: func() time.Time { return now }}
+	var logged strings.Builder
+	site := &Site{Facts: facts, Now: func() time.Time { return now }, Log: slog.New(slog.NewTextHandler(&logged, nil))}
 	if first := site.Phase(context.Background()); first.Unread || first.Basis != want {
 		t.Fatalf("through Site: %+v", first)
 	}
+	if !strings.Contains(logged.String(), "board's week could not be read") || !strings.Contains(logged.String(), "board week 2026") {
+		t.Fatalf("log %q", logged.String())
+	}
+	now = now.Add(59 * time.Second)
 	if again := site.Phase(context.Background()); again.Basis != want || facts.reads != 2 {
-		t.Fatalf("not kept: %+v after %d reads", again, facts.reads)
+		t.Fatalf("within a minute: %+v after %d reads", again, facts.reads)
+	}
+	now = now.Add(2 * time.Second)
+	site.Phase(context.Background())
+	if facts.reads != 3 {
+		t.Fatalf("a minute on: %d reads, want 3 (kept a minute, not the hour)", facts.reads)
 	}
 }
 

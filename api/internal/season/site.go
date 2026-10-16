@@ -62,6 +62,9 @@ type SitePhase struct {
 	// BoardWeek is the first week the published board covers, 0 when the
 	// site shows the preseason board or the phase is not in season.
 	BoardWeek int
+	// BoardErr is why the board's week could not be read, nil when it
+	// was. The phase is whole without it, but Site keeps it for a minute.
+	BoardErr error
 	// Opener is the coming season's first kickoff in the preseason, zero
 	// when its schedule is not loaded or the season is under way.
 	Opener time.Time
@@ -135,15 +138,16 @@ func inSeason(ctx context.Context, facts SiteFacts, y int, now time.Time) (SiteP
 	basis := fmt.Sprintf("Week %d of the %d NFL season is under way.", week, y)
 	boardWeek, shown, err := facts.BoardWeek(ctx, y)
 	if err != nil {
-		// The season does not depend on the board: answer it, and say the
-		// board's week is unknown.
-		return SitePhase{Phase: SiteInSeason, Week: week, Basis: basis + " " + boardUnread}, nil
+		// The season does not depend on the board: answer it, say the
+		// board's week is unknown, and hand the error to Site to log.
+		return SitePhase{Phase: SiteInSeason, Week: week, Basis: basis + " " + boardUnread,
+			BoardErr: fmt.Errorf("season: board week %d: %w", y, err)}, nil
 	}
 	if !shown {
 		return SitePhase{Phase: SiteInSeason, Week: week, Basis: basis}, nil
 	}
 	if boardWeek < week {
-		basis = fmt.Sprintf("Week %d has begun. Our board is still the week %d board until Tuesday's refresh.", week, boardWeek)
+		basis = fmt.Sprintf("Week %d has begun. Our board is still the week %d board until the next refresh.", week, boardWeek)
 	}
 	return SitePhase{Phase: SiteInSeason, Week: week, BoardWeek: boardWeek, Basis: basis}, nil
 }
@@ -259,6 +263,13 @@ func (s *Site) Phase(ctx context.Context) SitePhase {
 		return lastGood(s.kept, s.at)
 	}
 	s.kept, s.at = got, now
+	if got.BoardErr != nil {
+		if s.Log != nil {
+			s.Log.Warn("season: the board's week could not be read", "err", got.BoardErr)
+		}
+		// Expire as a failed read does, a minute on, not the hour.
+		s.at = now.Add(siteRetry - siteTTL)
+	}
 	return got
 }
 

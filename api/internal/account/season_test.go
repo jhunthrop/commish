@@ -41,7 +41,7 @@ func TestSeasonRoute(t *testing.T) {
 // names it board_week.
 func TestSeasonRouteCarriesTheBoardWeek(t *testing.T) {
 	src := fixedSeason{season.SitePhase{Phase: season.SiteInSeason, Week: 7, BoardWeek: 6,
-		Basis: "Week 7 has begun. Our board is still the week 6 board until Tuesday's refresh."}}
+		Basis: "Week 7 has begun. Our board is still the week 6 board until the next refresh."}}
 	w := httptest.NewRecorder()
 	(&account.SeasonHandler{Season: src}).Routes()[0].Handler(w, httptest.NewRequest(http.MethodGet, "/season", nil))
 	var env struct {

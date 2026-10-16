@@ -2884,7 +2884,7 @@ type SiteSeason struct {
 	// Basis one sentence naming the fact the phase came from
 	Basis string `json:"basis"`
 
-	// BoardWeek the first week the published board covers, read from the published run the board routes read. Null when the site shows the preseason board or the phase is not in season. When it is behind week, basis says why.
+	// BoardWeek the first week the published board covers, read from the published run the board routes read. Absent (never null) before the first in-season board, outside the regular season, and when the board's week could not be read, which basis then says. When it is behind week, basis says why.
 	BoardWeek *int            `json:"board_week,omitempty"`
 	Phase     SiteSeasonPhase `json:"phase"`
 
