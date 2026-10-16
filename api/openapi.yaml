@@ -3284,9 +3284,12 @@ components:
         answered_at: { type: string, format: date-time, nullable: true }
     TradeAdvice:
       type: object
-      required: [week, basis, basis_note, order_basis, refreshed, read_at, teams, roster, host_trades_url, host_note]
+      required: [week, basis, basis_note, order_basis, refreshed, read_at, teams, roster, host_trades_url, host_note, check_basis]
       properties:
         week: { type: integer }
+        check_basis:
+          type: string
+          description: the trade builder's honesty line, shown before its first answer (TradeCheck.basis says the same)
         roster:
           type: array
           description: >-
@@ -3329,7 +3332,7 @@ components:
           items: { type: string, minLength: 1, maxLength: 64 }
     TradeFills:
       type: object
-      required: [yours, theirs, yours_open, theirs_open]
+      required: [yours, theirs, yours_open, theirs_open, yours_room, theirs_room]
       properties:
         yours: { type: boolean, description: "the drafter's roster still fills every slot it filled before the trade" }
         theirs: { type: boolean, description: the same for theirs }
@@ -3340,6 +3343,13 @@ components:
             the first slot the drafter's lineup would leave empty, as a lineup row labels it ("RB2", "TE", "Flex"),
             null when it fills every slot
         theirs_open: { type: string, nullable: true, description: the same for theirs }
+        yours_room:
+          type: boolean
+          description: >-
+            the drafter's roster has room for what it takes in: an open spot, or a player to drop (trade.drop) when it
+            takes in more than it gives; false when every player it could drop is a starter after the trade, held, or
+            its only kicker or defense
+        theirs_room: { type: boolean, description: "the same for theirs (their drop is theirs to choose, so it is not named)" }
     TradeCheck:
       type: object
       required: [week, basis, basis_note, order_basis, refreshed, read_at, trade, fills, host_trades_url, host_note]

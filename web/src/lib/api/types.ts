@@ -2768,6 +2768,8 @@ export interface components {
 		};
 		TradeAdvice: {
 			week: number;
+			/** @description the trade builder's honesty line, shown before its first answer (TradeCheck.basis says the same) */
+			check_basis: string;
 			/** @description every player on the drafter's active roster (injured reserve and taxi spots left out), by position then name: the picker's own players, a trade found or not */
 			roster: components['schemas']['PlayerLine'][];
 			basis: string;
@@ -2802,6 +2804,10 @@ export interface components {
 			yours_open: string | null;
 			/** @description the same for theirs */
 			theirs_open: string | null;
+			/** @description the drafter's roster has room for what it takes in: an open spot, or a player to drop (trade.drop) when it takes in more than it gives; false when every player it could drop is a starter after the trade, held, or its only kicker or defense */
+			yours_room: boolean;
+			/** @description the same for theirs (their drop is theirs to choose, so it is not named) */
+			theirs_room: boolean;
 		};
 		TradeCheck: {
 			week: number;

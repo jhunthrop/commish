@@ -2,6 +2,7 @@ package inseason
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -157,6 +158,38 @@ func TestTradeCheckRefusals(t *testing.T) {
 		if c.words != "" && !strings.HasPrefix(env.Error.Message, c.words) {
 			t.Fatalf("%s: %q", c.name, env.Error.Message)
 		}
+	}
+}
+
+// The answer says when the member's roster has no room for two in: every
+// player he could drop is held. With one free it has room and names him.
+// The finder's answer carries the builder's honesty line, the one the
+// check answers with.
+func TestTradeCheckSaysWhenThereIsNoRoom(t *testing.T) {
+	f := newFixture(t)
+	held := map[string]bool{}
+	for n := 0; n < 15; n++ {
+		held[fmt.Sprintf("p%03d", n)] = true
+	}
+	body := checkBody(t, 2, []string{"h001"}, []string{"h016", "h017"})
+	code, env := post(t, fixtureService(t, f.league, f.data, &fakeHolds{held: held}), leaguePath+"trades/check", body)
+	var got apitypes.TradeCheck
+	if code != http.StatusOK || json.Unmarshal(env.Data, &got) != nil {
+		t.Fatalf("%d %+v", code, env.Error)
+	}
+	if got.Fills.YoursRoom || got.Trade.Drop != nil || !got.Fills.TheirsRoom {
+		t.Fatalf("all held: %+v drop %v", got.Fills, got.Trade.Drop)
+	}
+	s := fixtureService(t, f.league, f.data, &fakeHolds{})
+	_, env = post(t, s, leaguePath+"trades/check", body)
+	got = apitypes.TradeCheck{}
+	if json.Unmarshal(env.Data, &got) != nil || !got.Fills.YoursRoom || got.Trade.Drop == nil {
+		t.Fatalf("none held: %+v drop %v", got.Fills, got.Trade.Drop)
+	}
+	_, env = serve(t, s, leaguePath+"trades")
+	var advice apitypes.TradeAdvice
+	if json.Unmarshal(env.Data, &advice) != nil || advice.CheckBasis == "" || advice.CheckBasis != got.Basis {
+		t.Fatalf("check basis %q, the check's %q", advice.CheckBasis, got.Basis)
 	}
 }
 

@@ -30,7 +30,7 @@ const (
 type refusal struct{ field, sentence string }
 
 // checkFields is what is wrong with a trade check's body before the
-// league is read, by field: each side one or two board ids, each once.
+// league is read, by field: each side one or two host ids, each once.
 func checkFields(in apitypes.TradeCheckInput) map[string]string {
 	fields := map[string]string{}
 	if !validSide(in.Give) {
@@ -83,7 +83,8 @@ func (a *advisor) CheckTrade(in apitypes.TradeCheckInput) (apitypes.TradeCheck, 
 	out := apitypes.TradeCheck{Week: h.week, Basis: TradeCheckBasis(a.basis, a.weeks), BasisNote: BasisNote(a.settings),
 		OrderBasis: h.basis, Refreshed: h.refreshed, ReadAt: h.readAt, Trade: tradeRow(mine, theirs, checked.Trade),
 		Fills: apitypes.TradeFills{Yours: checked.Mine.Fills, Theirs: checked.Theirs.Fills,
-			YoursOpen: a.openLabel(checked.Mine), TheirsOpen: a.openLabel(checked.Theirs)}}
+			YoursOpen: a.openLabel(checked.Mine), TheirsOpen: a.openLabel(checked.Theirs),
+			YoursRoom: checked.Mine.Room, TheirsRoom: checked.Theirs.Room}}
 	out.HostTradesUrl, out.HostNote = a.host(TradesPage)
 	return out, nil, true
 }

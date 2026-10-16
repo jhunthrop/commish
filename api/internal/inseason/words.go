@@ -263,7 +263,7 @@ const OnlyCloseCalls = "Every trade we found with this team is a close call for 
 // TradeCheckBasis is the trade builder's: the finder's line for a trade
 // the member built, which either lineup may gain or lose by.
 func TradeCheckBasis(b OrderBasis, weeks int) string {
-	return fmt.Sprintf("What each lineup gains or loses with this trade on %s. The other team decides. %s", numberWords(b), porWords(b, weeks))
+	return fmt.Sprintf("What each lineup gains or loses on %s. The other team decides. %s", numberWords(b), porWords(b, weeks))
 }
 
 // TradesBasis is the trade finder's (§6.3).

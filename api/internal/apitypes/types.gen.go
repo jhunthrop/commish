@@ -2902,6 +2902,9 @@ type TradeAdvice struct {
 	// BasisNote the rest of the basis, said once under the rows: the league the points over replacement are for and the league's rules points so far leave out
 	BasisNote string `json:"basis_note"`
 
+	// CheckBasis the trade builder's honesty line, shown before its first answer (TradeCheck.basis says the same)
+	CheckBasis string `json:"check_basis"`
+
 	// HostNote one sentence under the verb when we cannot open the host's page ("Make this change on Yahoo. We cannot open that page for you yet."), null when the url opens it
 	HostNote *string `json:"host_note"`
 
@@ -2964,11 +2967,17 @@ type TradeFills struct {
 	// TheirsOpen the same for theirs
 	TheirsOpen *string `json:"theirs_open"`
 
+	// TheirsRoom the same for theirs (their drop is theirs to choose, so it is not named)
+	TheirsRoom bool `json:"theirs_room"`
+
 	// Yours the drafter's roster still fills every slot it filled before the trade
 	Yours bool `json:"yours"`
 
 	// YoursOpen the first slot the drafter's lineup would leave empty, as a lineup row labels it ("RB2", "TE", "Flex"), null when it fills every slot
 	YoursOpen *string `json:"yours_open"`
+
+	// YoursRoom the drafter's roster has room for what it takes in: an open spot, or a player to drop (trade.drop) when it takes in more than it gives; false when every player it could drop is a starter after the trade, held, or its only kicker or defense
+	YoursRoom bool `json:"yours_room"`
 }
 
 // TradeRecord defines model for TradeRecord.

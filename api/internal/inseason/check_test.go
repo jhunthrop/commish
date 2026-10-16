@@ -91,3 +91,27 @@ func TestSlotLabels(t *testing.T) {
 		}
 	}
 }
+
+// A two-for-one into a full roster where every player it could drop is
+// held has no room: no drop named, Room false. With a player free to
+// drop it has room and names him. Their side is reckoned the same way.
+func TestCheckSaysWhenARosterHasNoRoom(t *testing.T) {
+	config := twelveTeamPPR(t)
+	mine, theirs := deepAtBack(), deepAtReceiver()
+	held := map[string]bool{}
+	for _, c := range mine {
+		held[c.ID] = true
+	}
+	got := Check(config, SeasonGames, Squad{Players: mine, Held: held}, Squad{Players: theirs}, []int{1}, []int{2, 11})
+	if got.Mine.Room || got.Drop >= 0 || !got.Mine.Fills {
+		t.Fatalf("all held: %+v drop %d", got.Mine, got.Drop)
+	}
+	free := Check(config, SeasonGames, Squad{Players: mine}, Squad{Players: theirs}, []int{1}, []int{2, 11})
+	if !free.Mine.Room || free.Drop < 0 {
+		t.Fatalf("none held: %+v drop %d", free.Mine, free.Drop)
+	}
+	back := Check(config, SeasonGames, Squad{Players: mine}, Squad{Players: theirs}, []int{3, 4}, []int{6})
+	if !back.Theirs.Room || !back.Mine.Room {
+		t.Fatalf("two for one of theirs: %+v %+v", back.Mine, back.Theirs)
+	}
+}

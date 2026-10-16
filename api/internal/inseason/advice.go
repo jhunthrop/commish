@@ -395,7 +395,7 @@ func (a *advisor) Trades(focus string) (apitypes.TradeAdvice, bool) {
 	squad := a.squad(mine, true)
 	h := a.header()
 	out := apitypes.TradeAdvice{Week: h.week, Basis: TradesBasis(a.basis, a.weeks), BasisNote: BasisNote(a.settings), OrderBasis: h.basis, Refreshed: h.refreshed,
-		ReadAt: h.readAt, Teams: []apitypes.TradeTeam{}, Roster: rosterLines(mine)}
+		ReadAt: h.readAt, Teams: []apitypes.TradeTeam{}, Roster: rosterLines(mine), CheckBasis: TradeCheckBasis(a.basis, a.weeks)}
 	out.HostTradesUrl, out.HostNote = a.host(TradesPage)
 	for _, t := range leaguesync.Standings(a.Snap.Teams) {
 		if t.RosterID == a.Me {
