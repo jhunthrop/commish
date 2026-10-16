@@ -21,6 +21,9 @@ export interface RunReader {
 	/** The run being read, resolved from the latest pointer when the config asked for it. */
 	runId: string;
 	read<T>(path: string, schema: z.ZodType<T>): Promise<T>;
+	/** An artifact a run may leave out (designations.json): null when the store has no such object,
+	 * parsed with its schema when it has. Any other failure is the read's. */
+	readOptional<T>(path: string, schema: z.ZodType<T>): Promise<T | null>;
 }
 
 type Fetcher = (url: string) => Promise<Response>;
@@ -52,6 +55,7 @@ function pause(ms: number): Promise<void> {
 }
 
 const SERVER_ERROR = 500;
+const NOT_FOUND = 404;
 
 /** The bucket's answer to a read, kept with its status so the caller decides by the number. */
 export class RunReadError extends Error {
@@ -114,6 +118,12 @@ function parse<T>(text: string, key: string, schema: z.ZodType<T>): T {
 	return result.data;
 }
 
+/** The store has no such object: a 404 from the bucket, or no such file in a directory. */
+function absent(error: unknown): boolean {
+	if (error instanceof RunReadError) return error.status === NOT_FOUND;
+	return error instanceof Error && 'code' in error && error.code === 'ENOENT';
+}
+
 /** A reader for the configured run. Resolves "latest" through the pointer the run's writer moves. */
 export async function openRun(config: RunConfig): Promise<RunReader> {
 	const readText = textReader(config.location);
@@ -125,11 +135,19 @@ export async function openRun(config: RunConfig): Promise<RunReader> {
 					latestPointerSchema
 				).runId
 			: config.runId;
+	const keyOf = (path: string): string => `${RUNS_PREFIX}/${runId}/${path}`;
 	return {
 		runId,
-		read: async (path, schema) => {
-			const key = `${RUNS_PREFIX}/${runId}/${path}`;
-			return parse(await readText(key), key, schema);
+		read: async (path, schema) => parse(await readText(keyOf(path)), keyOf(path), schema),
+		readOptional: async (path, schema) => {
+			let text: string;
+			try {
+				text = await readText(keyOf(path));
+			} catch (error) {
+				if (absent(error)) return null;
+				throw error;
+			}
+			return parse(text, keyOf(path), schema);
 		}
 	};
 }

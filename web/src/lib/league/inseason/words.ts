@@ -5,6 +5,7 @@ import { fixed, signed } from '#lib/format/number.ts';
 import { listWords } from '#lib/format/list.ts';
 import { monthDayLabel } from '#lib/format/date.ts';
 import { memberZone, weekdayTime } from '#lib/format/clock.ts';
+import { designationMark, sitsHim } from '#lib/format/designation.ts';
 import type { LeagueHost } from '../api.ts';
 import { recordWords } from '../model.ts';
 import { hostWords } from '../names.ts';
@@ -227,27 +228,17 @@ export function gameWords(facts: WeekFacts, zone: string = memberZone()): string
 	return facts.kickoff === null ? game : `${game} ${weekdayTime(facts.kickoff, zone)}`;
 }
 
-const DESIGNATION_WORDS: Readonly<Record<InjuryDesignation['status'], string>> = {
-	questionable: 'Questionable',
-	doubtful: 'Doubtful',
-	out: 'Out',
-	injured_reserve: 'On injured reserve',
-	suspended: 'Suspended',
-	pup: 'On the PUP list',
-	nfi: 'On the NFI list'
-};
-
 /** "Questionable as of Thu 4:10 pm": the designation with when the report said so. */
 export function designationWords(
 	designation: InjuryDesignation,
 	zone: string = memberZone()
 ): string {
-	return `${DESIGNATION_WORDS[designation.status]} as of ${weekdayTime(designation.as_of, zone)}`;
+	return designationMark(designation.status, designation.as_of, zone);
 }
 
 /** Whether a designation keeps him out (out, injured reserve, suspended, PUP, NFI): drawn as a loss. */
 export function designationSitsHim(designation: InjuryDesignation): boolean {
-	return !['questionable', 'doubtful'].includes(designation.status);
+	return sitsHim(designation.status);
 }
 
 /** His last games as the API lists them, newest first, in the few characters a row has: "Last 3:

@@ -14,10 +14,14 @@
  *   index.json               the search index: id, slug, name, team, position
  *   clubs.json               the 32 clubs with their names and bye weeks
  *   schedule.json            every club's slate and the strength of it, with its basis
+ *   designations.json        each ranked player the newest hourly injury capture lists, written
+ *                            beside the run every publish hour (optional: a run without it renders
+ *                            no status)
  *
  * Types are inferred from the schemas, so client code imports them as types only and never ships zod.
  */
 import { z } from 'zod';
+import type { components } from '#lib/api/types.ts';
 import { POSITIONS } from '#lib/types/player.ts';
 import { club, formatId } from './primitives.ts';
 import { seasonSchema } from './season.ts';
@@ -347,6 +351,49 @@ export const scheduleSchema = z
 		}
 	});
 
+/** The API's designation statuses (DesignationStatus), the words designations.json keys by. */
+export const DESIGNATION_STATUSES = [
+	'questionable',
+	'doubtful',
+	'out',
+	'injured_reserve',
+	'suspended',
+	'pup',
+	'nfi'
+] as const satisfies readonly components['schemas']['DesignationStatus'][];
+
+/** Every status the API can send is listed: a status added to the contract fails the check here. */
+type Unlisted = Exclude<
+	components['schemas']['DesignationStatus'],
+	(typeof DESIGNATION_STATUSES)[number]
+>;
+export const EVERY_STATUS_LISTED: Unlisted extends never ? true : never = true;
+
+/** One ranked player's designation on the capture. A season-long one (injured reserve, PUP, NFI,
+ * suspended, or out for the season) puts him below every available player at his position; a week's
+ * out, doubtful or questionable moves nothing. */
+export const playerStatusSchema = z
+	.object({
+		status: z.enum(DESIGNATION_STATUSES),
+		seasonLong: z.boolean(),
+		/** The first capture of his unbroken run under a season-long status; null for a week's
+		 * designation and for a run older than the captures read, whose start we do not know. */
+		since: isoTime.nullable()
+	})
+	.refine(
+		(status) => status.seasonLong || status.since === null,
+		'Only a season-long status has a since.'
+	);
+
+export const designationsSchema = z.object({
+	/** The capture's stamp: when the hourly capture read the provider's list. */
+	readAt: isoTime,
+	/** The capture's feed in our store. Provenance, never printed on a screen. */
+	source: phrase,
+	/** By player id, every ranked player the capture lists. A player it does not list is not keyed. */
+	players: z.record(playerId, playerStatusSchema)
+});
+
 export type Format = z.infer<typeof formatSchema>;
 export type Manifest = z.infer<typeof manifestSchema>;
 export type Source = z.infer<typeof sourceSchema>;
@@ -368,12 +415,15 @@ export type IndexEntry = z.infer<typeof indexEntrySchema>;
 export type IndexSeason = z.infer<typeof indexSeasonSchema>;
 /** A board row with his games and points a game this season, from index.json. */
 export type SeasonedRow = BoardRow & { season: IndexSeason };
-/** A board row as a page prints it: his season figures only once the season is underway. */
-export type BoardRowView = BoardRow & { season?: IndexSeason };
+/** A board row as a page prints it: his season figures only once the season is underway, his status
+ * when the run's injury capture lists him. */
+export type BoardRowView = BoardRow & { season?: IndexSeason; status?: PlayerStatus };
 export type Club = z.infer<typeof clubSchema>;
 export type Game = z.infer<typeof gameSchema>;
 export type Slate = z.infer<typeof slateSchema>;
 export type Schedule = z.infer<typeof scheduleSchema>;
+export type PlayerStatus = z.infer<typeof playerStatusSchema>;
+export type Designations = z.infer<typeof designationsSchema>;
 
 /** Where each artifact sits inside a run's folder. */
 export const RUN_PATHS = {
@@ -387,7 +437,8 @@ export const RUN_PATHS = {
 	record: 'record.json',
 	index: 'index.json',
 	clubs: 'clubs.json',
-	schedule: 'schedule.json'
+	schedule: 'schedule.json',
+	designations: 'designations.json'
 } as const;
 
 /** The object a run's writer moves to point the site at its newest valid run. */
