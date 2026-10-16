@@ -19,3 +19,13 @@
   Content-Security-Policy: default-src 'none'; script-src 'self' https://cdn.registerdisney.go.com; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'
   Referrer-Policy: no-referrer
   X-Content-Type-Options: nosniff
+
+# Every page revalidates at the edge, and the deploy's stamp is never stored: Cloudflare's edge kept
+# serving a removed page and the previous stamp after a deploy (ledger 2026-10-15), and the workflow
+# now purges the zone after each deploy as well. adapter-cloudflare appends the rules that keep
+# /_app/immutable/* cached for a year.
+/*
+  Cache-Control: no-cache
+/data/run.txt
+  ! Cache-Control
+  Cache-Control: no-store
