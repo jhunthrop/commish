@@ -2,7 +2,7 @@
 // (spec 2026-10-16 §2). Run with `npm test`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { FOLLOW_ANOTHER, phaseWords } from './menu-words.ts';
+import { FOLLOW_ANOTHER, menuLast, phaseWords } from './menu-words.ts';
 import type { ContextLeague } from './words.ts';
 
 const EASTERN = 'America/New_York';
@@ -46,6 +46,10 @@ void test('leagues in different phases each say theirs', () => {
 	assert.equal(words.get('c'), 'Playoffs');
 });
 
-void test("the menu's last row follows another league", () => {
+void test("the menu's last row follows another league only for an account that may", () => {
 	assert.equal(FOLLOW_ANOTHER, 'Follow another league');
+	assert.equal(menuLast(0, false), 'follow-first');
+	assert.equal(menuLast(2, true), 'follow-another');
+	// A free account with its one league reads what more leagues come with, last.
+	assert.equal(menuLast(1, false), 'one-league-free');
 });
