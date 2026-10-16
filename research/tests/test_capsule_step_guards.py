@@ -69,9 +69,10 @@ def _no_write(stamped: list[str], monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def _run_write(plan: CapsuleStepPlan) -> CapsuleSpend:
-    return _write(
+    spend, _ = _write(
         cast("Engine", None), "test-key", NOW, plan, lambda _: None, cast("Any", None), SpanRules(frozenset())
     )
+    return spend
 
 
 def test_a_malformed_setting_fails_before_the_regenerate_stamp(monkeypatch: pytest.MonkeyPatch) -> None:

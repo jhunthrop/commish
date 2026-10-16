@@ -58,6 +58,8 @@ def _passes(script: _Script, monkeypatch: pytest.MonkeyPatch) -> _Passes:
 
     monkeypatch.setattr(passes, "_judged", judged)
     monkeypatch.setattr(passes, "sweep", sweep)
+    # The demotion after the graced rewrite writes no sweep (`test_capsule_demotion`).
+    monkeypatch.setattr(passes, "_demote", lambda targets: ())
     return passes
 
 

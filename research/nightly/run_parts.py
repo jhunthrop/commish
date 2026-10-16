@@ -26,6 +26,7 @@ from research.model.ros.raw_line import RawLine, latest_raw_line, raw_generation
 from research.nightly.assemble import Assembled
 from research.nightly.build.ros import RosSetup, pending_weeks
 from research.nightly.build.season import format_json
+from research.nightly.capsule_demotion import Demotion, demotion_line
 from research.nightly.capsule_gate import CapsuleGateResult, capsule_gate, span_rules
 from research.nightly.capsule_step import (
     CapsuleSpend,
@@ -64,6 +65,7 @@ class StepOutcome:
     capsule_gate: CapsuleGateResult | None = None
     page_reasons: tuple[str, ...] = ()
     spend: CapsuleSpend | None = None
+    demoted: tuple[Demotion, ...] = ()
 
 
 def _isolated(name: str, body: Callable[[], StepOutcome], log: Log) -> StepOutcome:
@@ -85,8 +87,10 @@ def _capsules(  # noqa: PLR0913, PLR0917 - the step's parts
             # The step failed part way; what it spent still rides on the run's report.
             return StepOutcome(StepRecord("capsules", "failed", f"{failed}, {failed.spend.line()}"), spend=failed.spend)
         status = "ran" if result.wrote else "skipped"
-        record = StepRecord("capsules", status, f"{result.spend.line()}; {result.gate.summary()}")
-        return StepOutcome(record, result.gate, tuple(result.findings.reasons), result.spend)
+        demoted = "" if not result.demoted else f"; {demotion_line(result.demoted)}"
+        summary = f"{result.spend.line()}{demoted}; {result.gate.summary()}"
+        record = StepRecord("capsules", status, summary, tuple(d.json() for d in result.demoted))
+        return StepOutcome(record, result.gate, tuple(result.findings.reasons), result.spend, result.demoted)
     at = clock()  # one instant for the gate, the span rules and the page findings: one facts pass
     with engine.connect() as conn:
         gate = capsule_gate(conn, at, span_rules(conn, at, facts))

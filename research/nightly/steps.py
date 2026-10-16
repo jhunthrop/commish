@@ -45,9 +45,12 @@ class StepRecord:
     name: str
     status: str  # "ran", "skipped", "failed"
     summary: str
+    # The capsule step's demoted pages (`capsule_demotion.Demotion.json`), carried beside its summary.
+    demoted: tuple[Mapping[str, str], ...] | None = None
 
-    def json(self) -> dict[str, str]:
-        return {"name": self.name, "status": self.status, "summary": self.summary}
+    def json(self) -> dict[str, object]:
+        record: dict[str, object] = {"name": self.name, "status": self.status, "summary": self.summary}
+        return record if self.demoted is None else {**record, "demoted": [dict(d) for d in self.demoted]}
 
 
 @dataclass(frozen=True, slots=True)

@@ -80,6 +80,9 @@ class CapsuleGateResult:
     # The writer's one loud line when the run's throttle pool ran dry (`throttle_waits`), carried here so
     # the publish gate's summary says why pages fell to facts.
     throttle_alarm: str | None = None
+    # The pages the capsule step demoted tonight to their facts blocks for a sentence still on two pages
+    # after the graced rewrite (`capsule_demotion`), counted among the facts blocks and so unwritten.
+    demoted: int = 0
 
     @property
     def unwritten_share(self) -> float:
@@ -91,11 +94,15 @@ class CapsuleGateResult:
         # Spans are counted and repaired, never a failure (the coordinator's Lane 17 ruling 1).
         return self.unwritten_share <= self.line.share_max and not self.shared
 
+    def _demoted_note(self) -> str:
+        return "" if not self.demoted else f" ({self.demoted} demoted tonight for a sentence on two pages)"
+
     def summary(self) -> str:
         verdict = "passed" if self.ok else "failed"
         line = (
             f"capsule gate: {verdict}, {self.board_players} board pages, {self.written} written, "
-            f"{self.facts_blocks} facts blocks, {self.template} on the oracle's template, {self.missing} missing "
+            f"{self.facts_blocks} facts blocks{self._demoted_note()}, {self.template} on the oracle's template, "
+            f"{self.missing} missing "
             f"({self.unwritten_share:.1%} unwritten, the {self.line.voice} line {self.line.share_max:.0%}: "
             f"{self.line.basis}), "
             f"{len(self.shared)} written sentences on two pages, {len(self.spans)} six-word spans on two pages or "
