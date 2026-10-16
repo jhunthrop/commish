@@ -21,11 +21,12 @@ const BOARD_PARTS =
 	/[\\/]src[\\/]lib[\\/](ui[\\/](TierStrip|TierJump|Toggle|Chip|ChipGroup|chips|FilterBar)\.|site[\\/](BoardView|BoardPageView|AdpView|AbsentFormatView|absent)\.|context[\\/]follow\.)/;
 /** What only the user pages run: the mock room and its parts, the account, the pass and the live
  * draft companion, the connected hosts (FFPC, Yahoo, ESPN), the request API client and the sheet's
- * store. A nightly page never loads any of
- * it with the page; the sheet arrives on a reader's first intent, the rest only on the pages that
+ * store, and the forms' parts (menu, field, tag chip, action bar, problem line, consent, the theme
+ * switch, the held height, the sentence joiner), which only those pages draw. A nightly page never
+ * loads any of it with the page; the sheet arrives on a reader's first intent, the rest only on the pages that
  * call the API. */
 const USER_PAGE_PARTS =
-	/[\\/]src[\\/]lib[\\/](room|account|api|sheet|pass|companion|hosts)[\\/]|[\\/]src[\\/]lib[\\/]ui[\\/](CallPanel|TeamPanel|PickStrip|OddsCell|ToneChip|Stepper|TextInput|ScoreBug|SinceStrip|Keys)\./;
+	/[\\/]src[\\/]lib[\\/](room|account|api|sheet|pass|companion|hosts)[\\/]|[\\/]src[\\/]lib[\\/]ui[\\/](CallPanel|TeamPanel|PickStrip|OddsCell|ToneChip|Stepper|TextInput|ScoreBug|SinceStrip|Keys|Menu|Field|TagChip|ActionBar|ProblemLine|Consent|LiveRegion|theme|hold-height)\.|[\\/]src[\\/]lib[\\/]format[\\/]sentence\./;
 /** What only a followed league's pages (the league page and its three in-season screens), the
  * account's leagues and the attach page run: the league row, the board read, the league's words and
  * calls, the in-season screens, the season's words, the member's clock and the rail's order a
