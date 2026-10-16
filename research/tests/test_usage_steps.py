@@ -19,6 +19,7 @@ from research.pipeline.nflverse import context, usage_feeds
 from research.pipeline.nflverse import ingest as nflverse_ingest
 from research.pipeline.nflverse.client import NflverseClient, NflverseError
 from research.pipeline.nflverse.pbp_passers import PBP_PASSER_SOURCE, PasserDropbacks, PasserMetric
+from research.pipeline.nflverse.pbp_plays import PlayRows
 from research.pipeline.observations import PlayerWeekObservation, TeamWeekObservation
 from research.tests.nflverse_fixtures import TESTDATA, FixtureFetcher, fixture_rows
 
@@ -60,6 +61,7 @@ def written(monkeypatch: pytest.MonkeyPatch) -> list[PlayerWeekObservation]:
         monkeypatch.setattr(module, "all_positions", lambda conn: universe)
         monkeypatch.setattr(module, "record_observations", record)
     monkeypatch.setattr(context, "record_team_observations", record_team)
+    monkeypatch.setattr(context, "record_plays", lambda conn, plays: len(plays))
     monkeypatch.setattr(usage_feeds, "pfr_players", lambda conn: {})
     return rows
 
@@ -140,6 +142,18 @@ def test_the_weekly_pass_reads_the_gzipped_play_by_play(written: list[PlayerWeek
     assert fetcher.requested == ["play_by_play_2026.csv.gz"]
     assert result.status == "ok"
     assert any(r.source == PBP_PASSER_SOURCE for r in written)
+
+
+def test_the_weekly_pass_keeps_the_plays_for_the_play_table(written: list[PlayerWeekObservation]) -> None:
+    plays = PlayRows()
+    report = context.ingest_play_by_play(
+        cast(Connection, None), NflverseClient(FixtureFetcher()), _SEASON, play_rows=plays, compressed=True
+    )
+    expected = [r for r in fixture_rows("play_by_play_2026.csv.gz") if r["season_type"] == "REG" and r["play_type"]]
+    assert report.plays_written == len(plays.rows) == len(expected)
+    assert {(r["game_id"], r["play_id"]) for r in plays.rows} == {(r["game_id"], int(r["play_id"])) for r in expected}
+    result = usage_steps.play_by_play(cast(Engine, _FakeEngine()), FixtureFetcher(), _SEASON)
+    assert f"{len(expected)} new plays in the play table" in result.summary
 
 
 def test_a_landed_week_is_skipped_with_nothing_new(monkeypatch: pytest.MonkeyPatch) -> None:

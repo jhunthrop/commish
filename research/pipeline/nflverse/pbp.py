@@ -70,6 +70,11 @@ _LOSS_WEIGHT = 1.2
 _RED_ZONE, _INSIDE_TEN = 20, 10
 
 
+def play_by_play_file(season: int, *, compressed: bool) -> str:
+    """The season's play-by-play asset, plain or gzipped."""
+    return f"play_by_play_{season}.csv{'.gz' if compressed else ''}"
+
+
 def flag(row: CsvRow, column: str) -> bool:
     return row.get(column) == "1"
 

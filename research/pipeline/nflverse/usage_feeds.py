@@ -18,7 +18,6 @@ from sqlalchemy import Connection, text
 from research.errors import SchemaDriftError
 from research.pipeline.nflverse.client import NflverseClient, NflverseError
 from research.pipeline.nflverse.config import FTN_PUBLICATION_LAG_HOURS, ByteCaps, Releases
-from research.pipeline.nflverse.context import play_by_play_file
 from research.pipeline.nflverse.ftn import (
     FTN_COLUMNS,
     PBP_JOIN_COLUMNS,
@@ -27,6 +26,7 @@ from research.pipeline.nflverse.ftn import (
     ftn_observations,
 )
 from research.pipeline.nflverse.ngs import NGS_KINDS, NgsWeeks
+from research.pipeline.nflverse.pbp import play_by_play_file
 from research.pipeline.nflverse.pfr_advstats import PFR_KINDS, PfrPlayer, PfrWeeks
 from research.pipeline.nflverse.players import projected_position
 from research.pipeline.nflverse.schedule import kickoff_as_of

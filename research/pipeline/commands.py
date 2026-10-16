@@ -36,6 +36,7 @@ from research.pipeline.nflverse import (
     injury_archive,
     injury_reports,
     kicking_weeks,
+    pbp_plays,
     roster_weeks,
     team_defense_weeks,
 )
@@ -166,6 +167,16 @@ def _props_backfill(conn: Connection, inv: Invocation) -> object:
     return backfill.backfill_props(conn, inv.fetcher, request, inv.checkpoint)
 
 
+def _pbp_plays(conn: Connection, inv: Invocation) -> object:
+    """Each season's plays into the play table, durable after each season."""
+    client = NflverseClient(inv.fetcher)
+    lines = []
+    for season in seasons_of(inv.args):
+        lines.append(pbp_plays.ingest_pbp_plays(conn, client, season).summary())
+        inv.checkpoint()
+    return lines
+
+
 def _win_totals(conn: Connection, inv: Invocation) -> object:
     return vegas.run_win_totals(conn, inv.fetcher, inv.args.last, inv.now, first_kickoff_for(conn, inv.args.last))
 
@@ -208,5 +219,6 @@ COMMANDS: Final = MappingProxyType({
     "props-backfill": Command("the historical props archive, budgeted", _props_backfill, atomic=False),
     "win-totals-seed": Command("the committed win-totals CSV", lambda c, i: vegas.ingest_win_totals_csv(c, RESEARCH_ROOT / vegas.WIN_TOTALS_CSV_PATH, i.now)),
     "win-totals": Command("the publisher's win totals before kickoff", _win_totals),
+    "pbp-plays": Command("the play-level play-by-play per season into nflverse_pbp_plays", _pbp_plays, atomic=False),
     "history": Command("the seasons the store lost, re-created from nflverse (pipeline/history.py); --first/--last narrow it", _history, atomic=False),
 })  # fmt: skip

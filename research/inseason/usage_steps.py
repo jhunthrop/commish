@@ -19,10 +19,11 @@ from sqlalchemy import Engine
 
 from research.inseason.step_result import Status, StepResult
 from research.pipeline.http import Fetcher
-from research.pipeline.nflverse import context, ingest, usage_feeds
+from research.pipeline.nflverse import context, ingest, pbp, usage_feeds
 from research.pipeline.nflverse.client import NflverseClient, NflverseError
 from research.pipeline.nflverse.config import ByteCaps
 from research.pipeline.nflverse.pbp_passers import PasserDropbacks
+from research.pipeline.nflverse.pbp_plays import PlayRows
 from research.pipeline.nflverse.usage_feeds import FeedReport
 
 PLAY_BY_PLAY: Final = "play-by-play"
@@ -45,14 +46,16 @@ def _unpublished(step: str, what: str, season: int, error: NflverseError) -> Ste
 
 
 def play_by_play(engine: Engine, fetcher: Fetcher, season: int) -> StepResult:
-    """The season's play-by-play: the team and player facts the history pass writes, and each
-    passer's dropbacks, from one stream."""
+    """The season's play-by-play: the team and player facts the history pass writes, each passer's
+    dropbacks, and the plays themselves for the play table (`pbp_plays`), from one stream."""
     client = NflverseClient(fetcher, max_bytes=ByteCaps.PLAY_BY_PLAY)
     try:
         with engine.connect() as conn:
-            report = context.ingest_play_by_play(conn, client, season, passers=PasserDropbacks(), compressed=True)
+            report = context.ingest_play_by_play(
+                conn, client, season, passers=PasserDropbacks(), play_rows=PlayRows(), compressed=True
+            )
             if report.plays_read == 0:
-                asset = context.play_by_play_file(season, compressed=True)
+                asset = pbp.play_by_play_file(season, compressed=True)
                 raise NflverseError("malformed", asset, "play-by-play has a header and no rows")
             conn.commit()
     except NflverseError as error:
@@ -62,9 +65,9 @@ def play_by_play(engine: Engine, fetcher: Fetcher, season: int) -> StepResult:
     summary = (
         f"{report.observations_written} new observations for {season} ({report.plays_read} plays, "
         f"{report.team_weeks} team-weeks, {report.player_weeks} player-weeks, {report.passer_weeks} passer-weeks, "
-        f"{report.unknown_players} ids outside the projected universe)"
+        f"{report.unknown_players} ids outside the projected universe), {report.plays_written} new plays in the play table"
     )
-    return written_result(PLAY_BY_PLAY, report.observations_written, summary)
+    return written_result(PLAY_BY_PLAY, report.observations_written + report.plays_written, summary)
 
 
 def _feed(step: str, what: str, season: int, run: Callable[[], FeedReport]) -> StepResult:
