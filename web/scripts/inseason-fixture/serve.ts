@@ -4,7 +4,8 @@
 // member may set, and whose adds the member may claim, from our screen (Lanes 35 and 39): the move
 // done, refused in ESPN's captured words, and pending. Attachment ids:
 // FIXTURE_IDS (ids.ts) names them: the league, the league out of season (409 on the in-season
-// routes) and the league held (a page shows its loading rows).
+// routes) and the league held (a page shows its loading rows). The trade builder's check answers a
+// trade the finder lists with its own row, and any other with a plain stand-in (tradeCheck).
 // Every answer is the API's envelope, with the league's read stamped a few minutes before the call.
 //
 //   PORT=8799 node scripts/inseason-fixture/serve.ts
@@ -17,7 +18,10 @@ import type {
 	HostMovePlan,
 	HostMoveResult,
 	LineupAdvice,
+	PlayerLine,
 	TradeAdvice,
+	TradeCheck,
+	TradeCheckInput,
 	WaiverAdvice
 } from '../../src/lib/league/inseason/api.ts';
 import type { components } from '../../src/lib/api/types.ts';
@@ -70,7 +74,14 @@ const NO_TEAM_WORDS = "We could not find your team in this league's last read.";
 const READ_MINUTES_AGO = 4;
 const MINUTE_MS = 60_000;
 const HOLD_MS = 10 * MINUTE_MS;
-const HTTP = { ok: 200, noContent: 204, badRequest: 400, notFound: 404, conflict: 409 } as const;
+const HTTP = {
+	ok: 200,
+	noContent: 204,
+	badRequest: 400,
+	notFound: 404,
+	conflict: 409,
+	unprocessable: 422
+} as const;
 
 async function load<T>(name: string): Promise<T> {
 	return JSON.parse(await readFile(new URL(`${name}.json`, DATA), 'utf8')) as T;
@@ -167,6 +178,90 @@ function tradesHolding(player: string | null): TradeAdvice {
 	};
 }
 
+/** The trade builder's honesty line in the API's words (inseason words.go TradeCheckBasis): the
+ * finder's, said of one trade. */
+const checkBasis = trades.basis.replace(
+	/^Trades where both lineups gain on (.+?)\. /,
+	'What each lineup gains or loses with this trade on $1. '
+);
+/** The API's sentence for a team the read does not hold (inseason check.go otherTeamWords). */
+const OTHER_TEAM_WORDS = "Pick another team in this league's last read.";
+/** A gain on the wire: one decimal. */
+const tenth = (n: number): number => Math.round(n * 10) / 10;
+/** The finder's close call for them (inseason trades.go CloseCall). */
+const CLOSE_CALL = 0.5;
+
+/** The slots each position fills alone, from the lineup's own slots: QB, RB, WR and TE. */
+const dedicated = new Map<string, number>();
+for (const { slot } of lineup.slots) {
+	if (['QB', 'RB', 'WR', 'TE'].includes(slot)) dedicated.set(slot, (dedicated.get(slot) ?? 0) + 1);
+}
+
+/** The first dedicated slot a roster no longer fills, as a lineup row labels it ("RB2", "TE"); null
+ * when it fills every one. The fixture's rosters of other teams are only the players its trades name,
+ * so only the member's is counted. */
+function openSlot(roster: readonly PlayerLine[]): string | null {
+	for (const [position, need] of dedicated) {
+		const have = roster.filter((line) => line.player.position === position).length;
+		if (have < need) return need > 1 ? `${position}${String(have + 1)}` : position;
+	}
+	return null;
+}
+
+/** One trade the member built. A trade the finder lists answers the finder's own row, as the API's
+ * shared reckoning does; any other is a plain stand-in for the engine, each lineup's change the swap
+ * of the players' points over replacement a week. A player not on the named roster is refused with
+ * the API's sentence. */
+function tradeCheck(input: TradeCheckInput): TradeCheck | string {
+	const team = trades.teams.find((t) => t.roster_id === input.team);
+	if (!team) return OTHER_TEAM_WORDS;
+	const pick = (roster: readonly PlayerLine[], ids: readonly string[], whose: string) =>
+		ids.map(
+			(id) =>
+				roster.find((line) => line.player.host_id === id) ??
+				`That player is not on ${whose} roster in the league's last read.`
+		);
+	const give = pick(trades.roster, input.give, 'your');
+	const get = pick(team.roster, input.get, `${team.name}'s`);
+	const refused = [...give, ...get].find((line) => typeof line === 'string');
+	if (typeof refused === 'string') return refused;
+	const gives = give as PlayerLine[];
+	const gets = get as PlayerLine[];
+	const ids = (side: readonly PlayerLine[]): string =>
+		side
+			.map((line) => line.player.host_id)
+			.sort()
+			.join('+');
+	const listed = team.trades.find(
+		(row) => ids(row.give) === ids(gives) && ids(row.get) === ids(gets)
+	);
+	const por = (side: readonly PlayerLine[]): number =>
+		side.reduce((sum, line) => sum + (line.points_over_replacement ?? 0), 0);
+	const swing = tenth(por(gets) - por(gives));
+	const trade = listed ?? {
+		give: gives,
+		get: gets,
+		drop: null,
+		my_gain: swing,
+		their_gain: -swing,
+		close_for_them: -swing < CLOSE_CALL
+	};
+	const yoursOpen = openSlot([...trades.roster.filter((line) => !gives.includes(line)), ...gets]);
+	return {
+		week: trades.week,
+		basis: checkBasis,
+		basis_note: trades.basis_note,
+		order_basis: trades.order_basis,
+		refreshed: trades.refreshed,
+		read_at: readAt(),
+		trade,
+		fills: { yours: yoursOpen === null, theirs: true, yours_open: yoursOpen, theirs_open: null },
+		host_trades_url: trades.host_trades_url,
+		host_note: trades.host_note
+	};
+}
+
+const CHECK = /^\/leagues\/attached\/([^/]+)\/trades\/check$/;
 const IN_SEASON = /^\/leagues\/attached\/([^/]+)\/(lineup|waivers|trades)$/;
 const MOVES = /^\/leagues\/attached\/([^/]+)\/moves(\/plan)?$/;
 
@@ -397,6 +492,12 @@ async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> 
 			return;
 		}
 		send(req, res, HTTP.ok, moveAnswer(moved[1] ?? '', moved[2] !== undefined, body));
+		return;
+	}
+	if (CHECK.test(url.pathname) && req.method === 'POST') {
+		const checked = tradeCheck((await bodyOf(req)) as TradeCheckInput);
+		if (typeof checked === 'string') send(req, res, HTTP.unprocessable, checked, 'invalid');
+		else send(req, res, HTTP.ok, checked);
 		return;
 	}
 	const inSeason = IN_SEASON.exec(url.pathname);

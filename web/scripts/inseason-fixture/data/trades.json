@@ -11,6 +11,128 @@
 			"name": "Carried by QJs",
 			"owner": "PeakedInHighSkool",
 			"record": { "wins": 3, "losses": 2, "ties": 0 },
+			"roster": [
+				{
+					"player": {
+						"host_id": "12489",
+						"board_id": "4568490",
+						"name": "RJ Harvey",
+						"position": "RB",
+						"team": "DEN",
+						"injured_reserve": false
+					},
+					"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4568490.png",
+					"slug": "rj-harvey",
+					"position_rank": 27,
+					"points_over_replacement": -0.6,
+					"held": false,
+					"facts": {
+						"week": 6,
+						"opponent": "SEA",
+						"home": true,
+						"kickoff": "2026-10-16T00:15:00.000Z",
+						"bye": false,
+						"designation": null,
+						"played": false,
+						"points_this_week": null,
+						"last_games": [
+							{ "week": 5, "points": 0.7 },
+							{ "week": 4, "points": 19.3 },
+							{ "week": 3, "points": 10.7 }
+						],
+						"allowed_to_position": null
+					}
+				},
+				{
+					"player": {
+						"host_id": "3321",
+						"board_id": null,
+						"name": "Tyreek Hill",
+						"position": "WR",
+						"team": "",
+						"injured_reserve": false
+					},
+					"headshot": null,
+					"slug": null,
+					"position_rank": null,
+					"points_over_replacement": null,
+					"held": false,
+					"facts": {
+						"week": 6,
+						"opponent": null,
+						"home": null,
+						"kickoff": null,
+						"bye": true,
+						"designation": null,
+						"played": false,
+						"points_this_week": null,
+						"last_games": [],
+						"allowed_to_position": null
+					}
+				},
+				{
+					"player": {
+						"host_id": "9480",
+						"board_id": "4430539",
+						"name": "Brenton Strange",
+						"position": "TE",
+						"team": "JAX",
+						"injured_reserve": false
+					},
+					"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4430539.png",
+					"slug": "brenton-strange",
+					"position_rank": 13,
+					"points_over_replacement": -0.2,
+					"held": false,
+					"facts": {
+						"week": 6,
+						"opponent": "HOU",
+						"home": true,
+						"kickoff": "2026-10-18T13:30:00.000Z",
+						"bye": false,
+						"designation": null,
+						"played": false,
+						"points_this_week": null,
+						"last_games": [
+							{ "week": 5, "points": 13.8 },
+							{ "week": 4, "points": 16.5 },
+							{ "week": 3, "points": 6.2 }
+						],
+						"allowed_to_position": null
+					}
+				},
+				{
+					"player": {
+						"host_id": "9484",
+						"board_id": "4572680",
+						"name": "Tucker Kraft",
+						"position": "TE",
+						"team": "GB",
+						"injured_reserve": false
+					},
+					"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4572680.png",
+					"slug": "tucker-kraft",
+					"position_rank": 8,
+					"points_over_replacement": 0.3,
+					"held": false,
+					"facts": {
+						"week": 6,
+						"opponent": "DAL",
+						"home": true,
+						"kickoff": "2026-10-19T00:20:00.000Z",
+						"bye": false,
+						"designation": null,
+						"played": false,
+						"points_this_week": null,
+						"last_games": [
+							{ "week": 5, "points": 11.6 },
+							{ "week": 4, "points": 16.5 },
+							{ "week": 3, "points": 6.6 }
+						],
+						"allowed_to_position": null
+					}
+				}
+			],
 			"trades": [
 				{
 					"give": [
@@ -540,6 +662,163 @@
 			"name": "Keeper? I Hardly Know Her",
 			"owner": "JeffHaseleyFBG",
 			"record": { "wins": 4, "losses": 1, "ties": 0 },
+			"roster": [
+				{
+					"player": {
+						"host_id": "6806",
+						"board_id": "4241985",
+						"name": "J.K. Dobbins",
+						"position": "RB",
+						"team": "DEN",
+						"injured_reserve": false
+					},
+					"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4241985.png",
+					"slug": "j-k-dobbins",
+					"position_rank": 28,
+					"points_over_replacement": -0.7,
+					"held": false,
+					"facts": {
+						"week": 6,
+						"opponent": "SEA",
+						"home": true,
+						"kickoff": "2026-10-16T00:15:00.000Z",
+						"bye": false,
+						"designation": null,
+						"played": false,
+						"points_this_week": null,
+						"last_games": [
+							{ "week": 5, "points": 15.4 },
+							{ "week": 4, "points": 7.2 },
+							{ "week": 3, "points": 6.3 }
+						],
+						"allowed_to_position": null
+					}
+				},
+				{
+					"player": {
+						"host_id": "7571",
+						"board_id": "4360939",
+						"name": "Rashod Bateman",
+						"position": "WR",
+						"team": "BAL",
+						"injured_reserve": false
+					},
+					"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4360939.png",
+					"slug": "rashod-bateman",
+					"position_rank": 46,
+					"points_over_replacement": -1.3,
+					"held": false,
+					"facts": {
+						"week": 6,
+						"opponent": "CLE",
+						"home": false,
+						"kickoff": "2026-10-18T17:00:00.000Z",
+						"bye": false,
+						"designation": null,
+						"played": false,
+						"points_this_week": null,
+						"last_games": [
+							{ "week": 5, "points": 11.2 },
+							{ "week": 4, "points": 6.6 },
+							{ "week": 3, "points": 5.7 }
+						],
+						"allowed_to_position": null
+					}
+				},
+				{
+					"player": {
+						"host_id": "8121",
+						"board_id": "4361432",
+						"name": "Romeo Doubs",
+						"position": "WR",
+						"team": "NE",
+						"injured_reserve": false
+					},
+					"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4361432.png",
+					"slug": "romeo-doubs",
+					"position_rank": 40,
+					"points_over_replacement": -0.6,
+					"held": false,
+					"facts": {
+						"week": 6,
+						"opponent": "NYJ",
+						"home": true,
+						"kickoff": "2026-10-18T17:00:00.000Z",
+						"bye": false,
+						"designation": null,
+						"played": false,
+						"points_this_week": null,
+						"last_games": [
+							{ "week": 5, "points": 2.6 },
+							{ "week": 4, "points": 23.8 },
+							{ "week": 3, "points": 7.9 }
+						],
+						"allowed_to_position": null
+					}
+				},
+				{
+					"player": {
+						"host_id": "8131",
+						"board_id": "4361050",
+						"name": "Isaiah Likely",
+						"position": "TE",
+						"team": "NYG",
+						"injured_reserve": false
+					},
+					"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4361050.png",
+					"slug": "isaiah-likely",
+					"position_rank": 3,
+					"points_over_replacement": 3,
+					"held": false,
+					"facts": {
+						"week": 6,
+						"opponent": "NO",
+						"home": true,
+						"kickoff": "2026-10-18T17:00:00.000Z",
+						"bye": false,
+						"designation": null,
+						"played": false,
+						"points_this_week": null,
+						"last_games": [
+							{ "week": 5, "points": 32.4 },
+							{ "week": 4, "points": 13.6 },
+							{ "week": 3, "points": 3.3 }
+						],
+						"allowed_to_position": null
+					}
+				},
+				{
+					"player": {
+						"host_id": "1466",
+						"board_id": "15847",
+						"name": "Travis Kelce",
+						"position": "TE",
+						"team": "KC",
+						"injured_reserve": false
+					},
+					"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/15847.png",
+					"slug": "travis-kelce",
+					"position_rank": 6,
+					"points_over_replacement": 0.9,
+					"held": false,
+					"facts": {
+						"week": 6,
+						"opponent": "LAC",
+						"home": true,
+						"kickoff": "2026-10-18T20:25:00.000Z",
+						"bye": false,
+						"designation": null,
+						"played": false,
+						"points_this_week": null,
+						"last_games": [
+							{ "week": 4, "points": 3.5 },
+							{ "week": 3, "points": 13.9 },
+							{ "week": 2, "points": 25.1 }
+						],
+						"allowed_to_position": null
+					}
+				}
+			],
 			"trades": [
 				{
 					"give": [
@@ -1077,6 +1356,132 @@
 			"name": "Dad Runners",
 			"owner": "jjzachariason",
 			"record": { "wins": 2, "losses": 3, "ties": 0 },
+			"roster": [
+				{
+					"player": {
+						"host_id": "7611",
+						"board_id": "4569173",
+						"name": "Rhamondre Stevenson",
+						"position": "RB",
+						"team": "NE",
+						"injured_reserve": false
+					},
+					"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4569173.png",
+					"slug": "rhamondre-stevenson",
+					"position_rank": 17,
+					"points_over_replacement": 2.3,
+					"held": false,
+					"facts": {
+						"week": 6,
+						"opponent": "NYJ",
+						"home": true,
+						"kickoff": "2026-10-18T17:00:00.000Z",
+						"bye": false,
+						"designation": null,
+						"played": false,
+						"points_this_week": null,
+						"last_games": [
+							{ "week": 5, "points": 17.5 },
+							{ "week": 4, "points": 16.4 },
+							{ "week": 3, "points": 6.8 }
+						],
+						"allowed_to_position": null
+					}
+				},
+				{
+					"player": {
+						"host_id": "9500",
+						"board_id": "4688813",
+						"name": "Josh Downs",
+						"position": "WR",
+						"team": "IND",
+						"injured_reserve": false
+					},
+					"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4688813.png",
+					"slug": "josh-downs",
+					"position_rank": 33,
+					"points_over_replacement": 0,
+					"held": false,
+					"facts": {
+						"week": 6,
+						"opponent": "TEN",
+						"home": true,
+						"kickoff": "2026-10-18T17:00:00.000Z",
+						"bye": false,
+						"designation": null,
+						"played": false,
+						"points_this_week": null,
+						"last_games": [
+							{ "week": 5, "points": 7.7 },
+							{ "week": 4, "points": 4.6 },
+							{ "week": 3, "points": 12.7 }
+						],
+						"allowed_to_position": null
+					}
+				},
+				{
+					"player": {
+						"host_id": "12519",
+						"board_id": "4685278",
+						"name": "Luther Burden",
+						"position": "WR",
+						"team": "CHI",
+						"injured_reserve": false
+					},
+					"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4685278.png",
+					"slug": "luther-burden-iii",
+					"position_rank": 32,
+					"points_over_replacement": 0.5,
+					"held": false,
+					"facts": {
+						"week": 6,
+						"opponent": "ATL",
+						"home": false,
+						"kickoff": "2026-10-18T17:00:00.000Z",
+						"bye": false,
+						"designation": null,
+						"played": false,
+						"points_this_week": null,
+						"last_games": [
+							{ "week": 5, "points": 8.9 },
+							{ "week": 4, "points": 11.4 },
+							{ "week": 3, "points": 19.8 }
+						],
+						"allowed_to_position": null
+					}
+				},
+				{
+					"player": {
+						"host_id": "9487",
+						"board_id": "4432620",
+						"name": "Parker Washington",
+						"position": "WR",
+						"team": "JAX",
+						"injured_reserve": false
+					},
+					"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4432620.png",
+					"slug": "parker-washington",
+					"position_rank": 18,
+					"points_over_replacement": 2.3,
+					"held": false,
+					"facts": {
+						"week": 6,
+						"opponent": "HOU",
+						"home": true,
+						"kickoff": "2026-10-18T13:30:00.000Z",
+						"bye": false,
+						"designation": null,
+						"played": false,
+						"points_this_week": null,
+						"last_games": [
+							{ "week": 5, "points": 30.4 },
+							{ "week": 4, "points": 2 },
+							{ "week": 3, "points": 13 }
+						],
+						"allowed_to_position": null
+					}
+				}
+			],
 			"trades": [
 				{
 					"give": [
@@ -1614,6 +2019,128 @@
 			"name": "Ball Snatchers",
 			"owner": "Quinnifer",
 			"record": { "wins": 3, "losses": 2, "ties": 0 },
+			"roster": [
+				{
+					"player": {
+						"host_id": "6790",
+						"board_id": "4259545",
+						"name": "D'Andre Swift",
+						"position": "RB",
+						"team": "CHI",
+						"injured_reserve": false
+					},
+					"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4259545.png",
+					"slug": "d-andre-swift",
+					"position_rank": 14,
+					"points_over_replacement": 4.4,
+					"held": false,
+					"facts": {
+						"week": 6,
+						"opponent": "ATL",
+						"home": false,
+						"kickoff": "2026-10-18T17:00:00.000Z",
+						"bye": false,
+						"designation": null,
+						"played": false,
+						"points_this_week": null,
+						"last_games": [
+							{ "week": 5, "points": 17.3 },
+							{ "week": 4, "points": 7.4 },
+							{ "week": 3, "points": 10.8 }
+						],
+						"allowed_to_position": null
+					}
+				},
+				{
+					"player": {
+						"host_id": "5892",
+						"board_id": "4035538",
+						"name": "David Montgomery",
+						"position": "RB",
+						"team": "HOU",
+						"injured_reserve": false
+					},
+					"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4035538.png",
+					"slug": "david-montgomery",
+					"position_rank": 31,
+					"points_over_replacement": -0.9,
+					"held": false,
+					"facts": {
+						"week": 6,
+						"opponent": "JAX",
+						"home": false,
+						"kickoff": "2026-10-18T13:30:00.000Z",
+						"bye": false,
+						"designation": null,
+						"played": false,
+						"points_this_week": null,
+						"last_games": [
+							{ "week": 5, "points": 1.1 },
+							{ "week": 4, "points": 4.3 },
+							{ "week": 3, "points": 6.8 }
+						],
+						"allowed_to_position": null
+					}
+				},
+				{
+					"player": {
+						"host_id": "11435",
+						"board_id": "4887558",
+						"name": "Emanuel Wilson",
+						"position": "RB",
+						"team": "SEA",
+						"injured_reserve": false
+					},
+					"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4887558.png",
+					"slug": "emanuel-wilson",
+					"position_rank": 29,
+					"points_over_replacement": -0.7,
+					"held": false,
+					"facts": {
+						"week": 6,
+						"opponent": "DEN",
+						"home": false,
+						"kickoff": "2026-10-16T00:15:00.000Z",
+						"bye": false,
+						"designation": null,
+						"played": false,
+						"points_this_week": null,
+						"last_games": [
+							{ "week": 5, "points": 13.2 },
+							{ "week": 4, "points": 27 },
+							{ "week": 3, "points": 1.4 }
+						],
+						"allowed_to_position": null
+					}
+				},
+				{
+					"player": {
+						"host_id": "9502",
+						"board_id": null,
+						"name": "Tank Dell",
+						"position": "WR",
+						"team": "HOU",
+						"injured_reserve": false
+					},
+					"headshot": null,
+					"slug": null,
+					"position_rank": null,
+					"points_over_replacement": null,
+					"held": false,
+					"facts": {
+						"week": 6,
+						"opponent": "JAX",
+						"home": false,
+						"kickoff": "2026-10-18T13:30:00.000Z",
+						"bye": false,
+						"designation": null,
+						"played": false,
+						"points_this_week": null,
+						"last_games": [],
+						"allowed_to_position": null
+					}
+				}
+			],
 			"trades": [
 				{
 					"give": [
@@ -2031,6 +2558,155 @@
 			"name": "Bower Rangers",
 			"owner": "pricej07",
 			"record": { "wins": 3, "losses": 2, "ties": 0 },
+			"roster": [
+				{
+					"player": {
+						"host_id": "11583",
+						"board_id": null,
+						"name": "Jonathon Brooks",
+						"position": "RB",
+						"team": "CAR",
+						"injured_reserve": false
+					},
+					"headshot": null,
+					"slug": null,
+					"position_rank": null,
+					"points_over_replacement": null,
+					"held": false,
+					"facts": {
+						"week": 6,
+						"opponent": "PHI",
+						"home": false,
+						"kickoff": "2026-10-18T17:00:00.000Z",
+						"bye": false,
+						"designation": null,
+						"played": false,
+						"points_this_week": null,
+						"last_games": [],
+						"allowed_to_position": null
+					}
+				},
+				{
+					"player": {
+						"host_id": "11581",
+						"board_id": null,
+						"name": "MarShawn Lloyd",
+						"position": "RB",
+						"team": "GB",
+						"injured_reserve": false
+					},
+					"headshot": null,
+					"slug": null,
+					"position_rank": null,
+					"points_over_replacement": null,
+					"held": false,
+					"facts": {
+						"week": 6,
+						"opponent": "DAL",
+						"home": true,
+						"kickoff": "2026-10-19T00:20:00.000Z",
+						"bye": false,
+						"designation": null,
+						"played": false,
+						"points_this_week": null,
+						"last_games": [],
+						"allowed_to_position": null
+					}
+				},
+				{
+					"player": {
+						"host_id": "13346",
+						"board_id": "4832800",
+						"name": "Denzel Boston",
+						"position": "WR",
+						"team": "CLE",
+						"injured_reserve": false
+					},
+					"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4832800.png",
+					"slug": "denzel-boston",
+					"position_rank": 30,
+					"points_over_replacement": 0.5,
+					"held": false,
+					"facts": {
+						"week": 6,
+						"opponent": "BAL",
+						"home": true,
+						"kickoff": "2026-10-18T17:00:00.000Z",
+						"bye": false,
+						"designation": null,
+						"played": false,
+						"points_this_week": null,
+						"last_games": [
+							{ "week": 5, "points": 13.6 },
+							{ "week": 4, "points": 12.9 },
+							{ "week": 3, "points": 6.1 }
+						],
+						"allowed_to_position": null
+					}
+				},
+				{
+					"player": {
+						"host_id": "5927",
+						"board_id": "3121422",
+						"name": "Terry McLaurin",
+						"position": "WR",
+						"team": "WAS",
+						"injured_reserve": false
+					},
+					"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/3121422.png",
+					"slug": "terry-mclaurin",
+					"position_rank": 39,
+					"points_over_replacement": -0.4,
+					"held": false,
+					"facts": {
+						"week": 6,
+						"opponent": "SF",
+						"home": false,
+						"kickoff": "2026-10-20T00:15:00.000Z",
+						"bye": false,
+						"designation": null,
+						"played": false,
+						"points_this_week": null,
+						"last_games": [
+							{ "week": 5, "points": 10.2 },
+							{ "week": 3, "points": 19.7 },
+							{ "week": 2, "points": 7 }
+						],
+						"allowed_to_position": null
+					}
+				},
+				{
+					"player": {
+						"host_id": "10213",
+						"board_id": "4428718",
+						"name": "Tre Tucker",
+						"position": "WR",
+						"team": "LV",
+						"injured_reserve": false
+					},
+					"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4428718.png",
+					"slug": "tre-tucker",
+					"position_rank": 25,
+					"points_over_replacement": 1.4,
+					"held": false,
+					"facts": {
+						"week": 6,
+						"opponent": "BUF",
+						"home": true,
+						"kickoff": "2026-10-18T20:25:00.000Z",
+						"bye": false,
+						"designation": null,
+						"played": false,
+						"points_this_week": null,
+						"last_games": [
+							{ "week": 5, "points": 7.5 },
+							{ "week": 4, "points": 8.4 },
+							{ "week": 3, "points": 8.3 }
+						],
+						"allowed_to_position": null
+					}
+				}
+			],
 			"trades": [
 				{
 					"give": [
@@ -2556,6 +3232,159 @@
 			"name": "thatmattkelley",
 			"owner": "thatmattkelley",
 			"record": { "wins": 1, "losses": 4, "ties": 0 },
+			"roster": [
+				{
+					"player": {
+						"host_id": "4035",
+						"board_id": "3054850",
+						"name": "Alvin Kamara",
+						"position": "RB",
+						"team": "NO",
+						"injured_reserve": false
+					},
+					"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/3054850.png",
+					"slug": "alvin-kamara",
+					"position_rank": 24,
+					"points_over_replacement": 0.2,
+					"held": false,
+					"facts": {
+						"week": 6,
+						"opponent": "NYG",
+						"home": false,
+						"kickoff": "2026-10-18T17:00:00.000Z",
+						"bye": false,
+						"designation": null,
+						"played": false,
+						"points_this_week": null,
+						"last_games": [
+							{ "week": 5, "points": 2.6 },
+							{ "week": 4, "points": 22.8 },
+							{ "week": 3, "points": 5.1 }
+						],
+						"allowed_to_position": null
+					}
+				},
+				{
+					"player": {
+						"host_id": "8129",
+						"board_id": null,
+						"name": "Dameon Pierce",
+						"position": "RB",
+						"team": "PHI",
+						"injured_reserve": false
+					},
+					"headshot": null,
+					"slug": null,
+					"position_rank": null,
+					"points_over_replacement": null,
+					"held": false,
+					"facts": {
+						"week": 6,
+						"opponent": "CAR",
+						"home": true,
+						"kickoff": "2026-10-18T17:00:00.000Z",
+						"bye": false,
+						"designation": null,
+						"played": false,
+						"points_this_week": null,
+						"last_games": [],
+						"allowed_to_position": null
+					}
+				},
+				{
+					"player": {
+						"host_id": "12533",
+						"board_id": "4575131",
+						"name": "Jacory Croskey-Merritt",
+						"position": "RB",
+						"team": "WAS",
+						"injured_reserve": false
+					},
+					"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4575131.png",
+					"slug": "jacory-croskey-merritt",
+					"position_rank": 25,
+					"points_over_replacement": 0,
+					"held": false,
+					"facts": {
+						"week": 6,
+						"opponent": "SF",
+						"home": false,
+						"kickoff": "2026-10-20T00:15:00.000Z",
+						"bye": false,
+						"designation": null,
+						"played": false,
+						"points_this_week": null,
+						"last_games": [
+							{ "week": 5, "points": 14.2 },
+							{ "week": 4, "points": 7 },
+							{ "week": 3, "points": 5.3 }
+						],
+						"allowed_to_position": null
+					}
+				},
+				{
+					"player": {
+						"host_id": "8111",
+						"board_id": "4243331",
+						"name": "Cade Otton",
+						"position": "TE",
+						"team": "TB",
+						"injured_reserve": false
+					},
+					"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4243331.png",
+					"slug": "cade-otton",
+					"position_rank": 11,
+					"points_over_replacement": 0.1,
+					"held": false,
+					"facts": {
+						"week": 6,
+						"opponent": "PIT",
+						"home": true,
+						"kickoff": "2026-10-18T17:00:00.000Z",
+						"bye": false,
+						"designation": null,
+						"played": false,
+						"points_this_week": null,
+						"last_games": [
+							{ "week": 5, "points": 5.5 },
+							{ "week": 4, "points": 7.7 },
+							{ "week": 3, "points": 8.6 }
+						],
+						"allowed_to_position": null
+					}
+				},
+				{
+					"player": {
+						"host_id": "12518",
+						"board_id": "4431459",
+						"name": "Tyler Warren",
+						"position": "TE",
+						"team": "IND",
+						"injured_reserve": false
+					},
+					"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4431459.png",
+					"slug": "tyler-warren",
+					"position_rank": 4,
+					"points_over_replacement": 2.5,
+					"held": false,
+					"facts": {
+						"week": 6,
+						"opponent": "TEN",
+						"home": true,
+						"kickoff": "2026-10-18T17:00:00.000Z",
+						"bye": false,
+						"designation": null,
+						"played": false,
+						"points_this_week": null,
+						"last_games": [
+							{ "week": 5, "points": 21.4 },
+							{ "week": 4, "points": 9.1 },
+							{ "week": 3, "points": 14.7 }
+						],
+						"allowed_to_position": null
+					}
+				}
+			],
 			"trades": [
 				{
 					"give": [
@@ -3085,6 +3914,159 @@
 			"name": "Max_Jensen10",
 			"owner": "Max_Jensen10",
 			"record": { "wins": 1, "losses": 4, "ties": 0 },
+			"roster": [
+				{
+					"player": {
+						"host_id": "12490",
+						"board_id": "4882093",
+						"name": "Bhayshul Tuten",
+						"position": "RB",
+						"team": "JAX",
+						"injured_reserve": false
+					},
+					"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4882093.png",
+					"slug": "bhayshul-tuten",
+					"position_rank": 23,
+					"points_over_replacement": 0.4,
+					"held": false,
+					"facts": {
+						"week": 6,
+						"opponent": "HOU",
+						"home": true,
+						"kickoff": "2026-10-18T13:30:00.000Z",
+						"bye": false,
+						"designation": null,
+						"played": false,
+						"points_this_week": null,
+						"last_games": [
+							{ "week": 5, "points": 11.6 },
+							{ "week": 4, "points": 11.1 },
+							{ "week": 3, "points": 17 }
+						],
+						"allowed_to_position": null
+					}
+				},
+				{
+					"player": {
+						"host_id": "12481",
+						"board_id": "4696981",
+						"name": "Cam Skattebo",
+						"position": "RB",
+						"team": "NYG",
+						"injured_reserve": false
+					},
+					"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4696981.png",
+					"slug": "cam-skattebo",
+					"position_rank": 20,
+					"points_over_replacement": 1.2,
+					"held": false,
+					"facts": {
+						"week": 6,
+						"opponent": "NO",
+						"home": true,
+						"kickoff": "2026-10-18T17:00:00.000Z",
+						"bye": false,
+						"designation": null,
+						"played": false,
+						"points_this_week": null,
+						"last_games": [
+							{ "week": 5, "points": 7.1 },
+							{ "week": 4, "points": 7.6 },
+							{ "week": 3, "points": 13 }
+						],
+						"allowed_to_position": null
+					}
+				},
+				{
+					"player": {
+						"host_id": "12507",
+						"board_id": "4685382",
+						"name": "Omarion Hampton",
+						"position": "RB",
+						"team": "LAC",
+						"injured_reserve": false
+					},
+					"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4685382.png",
+					"slug": "omarion-hampton",
+					"position_rank": 21,
+					"points_over_replacement": 1.1,
+					"held": false,
+					"facts": {
+						"week": 6,
+						"opponent": "KC",
+						"home": false,
+						"kickoff": "2026-10-18T20:25:00.000Z",
+						"bye": false,
+						"designation": null,
+						"played": false,
+						"points_this_week": null,
+						"last_games": [
+							{ "week": 5, "points": 4.9 },
+							{ "week": 4, "points": 13.3 },
+							{ "week": 3, "points": 5.6 }
+						],
+						"allowed_to_position": null
+					}
+				},
+				{
+					"player": {
+						"host_id": "8116",
+						"board_id": null,
+						"name": "Pierre Strong",
+						"position": "RB",
+						"team": "GB",
+						"injured_reserve": false
+					},
+					"headshot": null,
+					"slug": null,
+					"position_rank": null,
+					"points_over_replacement": null,
+					"held": false,
+					"facts": {
+						"week": 6,
+						"opponent": "DAL",
+						"home": true,
+						"kickoff": "2026-10-19T00:20:00.000Z",
+						"bye": false,
+						"designation": null,
+						"played": false,
+						"points_this_week": null,
+						"last_games": [],
+						"allowed_to_position": null
+					}
+				},
+				{
+					"player": {
+						"host_id": "7526",
+						"board_id": "4372016",
+						"name": "Jaylen Waddle",
+						"position": "WR",
+						"team": "DEN",
+						"injured_reserve": false
+					},
+					"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4372016.png",
+					"slug": "jaylen-waddle",
+					"position_rank": 29,
+					"points_over_replacement": 0.8,
+					"held": false,
+					"facts": {
+						"week": 6,
+						"opponent": "SEA",
+						"home": true,
+						"kickoff": "2026-10-16T00:15:00.000Z",
+						"bye": false,
+						"designation": null,
+						"played": false,
+						"points_this_week": null,
+						"last_games": [
+							{ "week": 5, "points": 4.8 },
+							{ "week": 4, "points": 14.5 },
+							{ "week": 3, "points": 4.4 }
+						],
+						"allowed_to_position": null
+					}
+				}
+			],
 			"trades": [
 				{
 					"give": [
@@ -3610,6 +4592,163 @@
 			"name": "Aaron Donald Dependent",
 			"owner": "Nowlan",
 			"record": { "wins": 2, "losses": 3, "ties": 0 },
+			"roster": [
+				{
+					"player": {
+						"host_id": "2133",
+						"board_id": "16800",
+						"name": "Davante Adams",
+						"position": "WR",
+						"team": "LAR",
+						"injured_reserve": false
+					},
+					"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/16800.png",
+					"slug": "davante-adams",
+					"position_rank": 10,
+					"points_over_replacement": 4.2,
+					"held": false,
+					"facts": {
+						"week": 6,
+						"opponent": "ARI",
+						"home": true,
+						"kickoff": "2026-10-18T20:05:00.000Z",
+						"bye": false,
+						"designation": null,
+						"played": false,
+						"points_this_week": null,
+						"last_games": [
+							{ "week": 5, "points": 22.1 },
+							{ "week": 4, "points": 7.2 },
+							{ "week": 3, "points": 20.7 }
+						],
+						"allowed_to_position": null
+					}
+				},
+				{
+					"player": {
+						"host_id": "11646",
+						"board_id": "4695883",
+						"name": "Jalen Coker",
+						"position": "WR",
+						"team": "CAR",
+						"injured_reserve": false
+					},
+					"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4695883.png",
+					"slug": "jalen-coker",
+					"position_rank": 41,
+					"points_over_replacement": -0.6,
+					"held": false,
+					"facts": {
+						"week": 6,
+						"opponent": "PHI",
+						"home": false,
+						"kickoff": "2026-10-18T17:00:00.000Z",
+						"bye": false,
+						"designation": null,
+						"played": false,
+						"points_this_week": null,
+						"last_games": [
+							{ "week": 3, "points": 3.8 },
+							{ "week": 2, "points": 14.6 },
+							{ "week": 1, "points": 33.8 }
+						],
+						"allowed_to_position": null
+					}
+				},
+				{
+					"player": {
+						"host_id": "13294",
+						"board_id": "4870795",
+						"name": "Makai Lemon",
+						"position": "WR",
+						"team": "PHI",
+						"injured_reserve": false
+					},
+					"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4870795.png",
+					"slug": "makai-lemon",
+					"position_rank": 49,
+					"points_over_replacement": -1.6,
+					"held": false,
+					"facts": {
+						"week": 6,
+						"opponent": "CAR",
+						"home": true,
+						"kickoff": "2026-10-18T17:00:00.000Z",
+						"bye": false,
+						"designation": null,
+						"played": false,
+						"points_this_week": null,
+						"last_games": [
+							{ "week": 5, "points": 9.3 },
+							{ "week": 4, "points": 5.7 },
+							{ "week": 3, "points": 5.9 }
+						],
+						"allowed_to_position": null
+					}
+				},
+				{
+					"player": {
+						"host_id": "11632",
+						"board_id": "4595348",
+						"name": "Malik Nabers",
+						"position": "WR",
+						"team": "NYG",
+						"injured_reserve": false
+					},
+					"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4595348.png",
+					"slug": "malik-nabers",
+					"position_rank": 16,
+					"points_over_replacement": 2.9,
+					"held": false,
+					"facts": {
+						"week": 6,
+						"opponent": "NO",
+						"home": true,
+						"kickoff": "2026-10-18T17:00:00.000Z",
+						"bye": false,
+						"designation": null,
+						"played": false,
+						"points_this_week": null,
+						"last_games": [
+							{ "week": 5, "points": 29.1 },
+							{ "week": 4, "points": 23.2 },
+							{ "week": 3, "points": 7.6 }
+						],
+						"allowed_to_position": null
+					}
+				},
+				{
+					"player": {
+						"host_id": "8110",
+						"board_id": "4242355",
+						"name": "Jake Ferguson",
+						"position": "TE",
+						"team": "DAL",
+						"injured_reserve": false
+					},
+					"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4242355.png",
+					"slug": "jake-ferguson",
+					"position_rank": 19,
+					"points_over_replacement": -1.2,
+					"held": false,
+					"facts": {
+						"week": 6,
+						"opponent": "GB",
+						"home": false,
+						"kickoff": "2026-10-19T00:20:00.000Z",
+						"bye": false,
+						"designation": null,
+						"played": false,
+						"points_this_week": null,
+						"last_games": [
+							{ "week": 5, "points": 4.9 },
+							{ "week": 4, "points": 4.1 },
+							{ "week": 3, "points": 9.3 }
+						],
+						"allowed_to_position": null
+					}
+				}
+			],
 			"trades": [
 				{
 					"give": [
@@ -4147,6 +5286,190 @@
 			"name": "Muttdogs",
 			"owner": "muttdog",
 			"record": { "wins": 5, "losses": 0, "ties": 0 },
+			"roster": [
+				{
+					"player": {
+						"host_id": "6770",
+						"board_id": "3915511",
+						"name": "Joe Burrow",
+						"position": "QB",
+						"team": "CIN",
+						"injured_reserve": false
+					},
+					"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/3915511.png",
+					"slug": "joe-burrow",
+					"position_rank": 5,
+					"points_over_replacement": 1.5,
+					"held": false,
+					"facts": {
+						"week": 6,
+						"opponent": null,
+						"home": null,
+						"kickoff": null,
+						"bye": true,
+						"designation": null,
+						"played": false,
+						"points_this_week": null,
+						"last_games": [
+							{ "week": 5, "points": 28.6 },
+							{ "week": 4, "points": 26.72 },
+							{ "week": 3, "points": 25.58 }
+						],
+						"allowed_to_position": null
+					}
+				},
+				{
+					"player": {
+						"host_id": "11584",
+						"board_id": "4596448",
+						"name": "Bucky Irving",
+						"position": "RB",
+						"team": "TB",
+						"injured_reserve": false
+					},
+					"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4596448.png",
+					"slug": "bucky-irving",
+					"position_rank": 16,
+					"points_over_replacement": 3.8,
+					"held": false,
+					"facts": {
+						"week": 6,
+						"opponent": "PIT",
+						"home": true,
+						"kickoff": "2026-10-18T17:00:00.000Z",
+						"bye": false,
+						"designation": null,
+						"played": false,
+						"points_this_week": null,
+						"last_games": [
+							{ "week": 5, "points": 31.5 },
+							{ "week": 4, "points": 6.1 },
+							{ "week": 3, "points": 7.8 }
+						],
+						"allowed_to_position": null
+					}
+				},
+				{
+					"player": {
+						"host_id": "13305",
+						"board_id": null,
+						"name": "Mike Washington",
+						"position": "RB",
+						"team": "LV",
+						"injured_reserve": false
+					},
+					"headshot": null,
+					"slug": null,
+					"position_rank": null,
+					"points_over_replacement": null,
+					"held": false,
+					"facts": {
+						"week": 6,
+						"opponent": "BUF",
+						"home": true,
+						"kickoff": "2026-10-18T20:25:00.000Z",
+						"bye": false,
+						"designation": null,
+						"played": false,
+						"points_this_week": null,
+						"last_games": [],
+						"allowed_to_position": null
+					}
+				},
+				{
+					"player": {
+						"host_id": "11624",
+						"board_id": "4683062",
+						"name": "Xavier Worthy",
+						"position": "WR",
+						"team": "KC",
+						"injured_reserve": false
+					},
+					"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4683062.png",
+					"slug": "xavier-worthy",
+					"position_rank": 37,
+					"points_over_replacement": -0.2,
+					"held": false,
+					"facts": {
+						"week": 6,
+						"opponent": "LAC",
+						"home": true,
+						"kickoff": "2026-10-18T20:25:00.000Z",
+						"bye": false,
+						"designation": null,
+						"played": false,
+						"points_this_week": null,
+						"last_games": [
+							{ "week": 4, "points": 11 },
+							{ "week": 3, "points": 4 },
+							{ "week": 2, "points": 13.5 }
+						],
+						"allowed_to_position": null
+					}
+				},
+				{
+					"player": {
+						"host_id": "5001",
+						"board_id": "3117256",
+						"name": "Dalton Schultz",
+						"position": "TE",
+						"team": "HOU",
+						"injured_reserve": false
+					},
+					"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/3117256.png",
+					"slug": "dalton-schultz",
+					"position_rank": 12,
+					"points_over_replacement": 0,
+					"held": false,
+					"facts": {
+						"week": 6,
+						"opponent": "JAX",
+						"home": false,
+						"kickoff": "2026-10-18T13:30:00.000Z",
+						"bye": false,
+						"designation": null,
+						"played": false,
+						"points_this_week": null,
+						"last_games": [
+							{ "week": 5, "points": 6 },
+							{ "week": 4, "points": 2.9 },
+							{ "week": 3, "points": 6 }
+						],
+						"allowed_to_position": null
+					}
+				},
+				{
+					"player": {
+						"host_id": "4217",
+						"board_id": "3040151",
+						"name": "George Kittle",
+						"position": "TE",
+						"team": "SF",
+						"injured_reserve": false
+					},
+					"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/3040151.png",
+					"slug": "george-kittle",
+					"position_rank": 9,
+					"points_over_replacement": 0.2,
+					"held": false,
+					"facts": {
+						"week": 6,
+						"opponent": "WSH",
+						"home": true,
+						"kickoff": "2026-10-20T00:15:00.000Z",
+						"bye": false,
+						"designation": null,
+						"played": false,
+						"points_this_week": null,
+						"last_games": [
+							{ "week": 5, "points": 7.4 },
+							{ "week": 4, "points": 17 },
+							{ "week": 3, "points": 26.2 }
+						],
+						"allowed_to_position": null
+					}
+				}
+			],
 			"trades": [
 				{
 					"give": [
@@ -4676,6 +5999,194 @@
 			"name": "OnlyFannins",
 			"owner": "jordanp2323",
 			"record": { "wins": 2, "losses": 3, "ties": 0 },
+			"roster": [
+				{
+					"player": {
+						"host_id": "9758",
+						"board_id": "4432577",
+						"name": "C.J. Stroud",
+						"position": "QB",
+						"team": "HOU",
+						"injured_reserve": false
+					},
+					"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4432577.png",
+					"slug": "c-j-stroud",
+					"position_rank": 7,
+					"points_over_replacement": 1.1,
+					"held": false,
+					"facts": {
+						"week": 6,
+						"opponent": "JAX",
+						"home": false,
+						"kickoff": "2026-10-18T13:30:00.000Z",
+						"bye": false,
+						"designation": null,
+						"played": false,
+						"points_this_week": null,
+						"last_games": [
+							{ "week": 5, "points": 21.94 },
+							{ "week": 4, "points": 25.08 },
+							{ "week": 3, "points": 12.68 }
+						],
+						"allowed_to_position": null
+					}
+				},
+				{
+					"player": {
+						"host_id": "8136",
+						"board_id": "4697815",
+						"name": "Rachaad White",
+						"position": "RB",
+						"team": "WAS",
+						"injured_reserve": false
+					},
+					"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4697815.png",
+					"slug": "rachaad-white",
+					"position_rank": 30,
+					"points_over_replacement": -0.8,
+					"held": false,
+					"facts": {
+						"week": 6,
+						"opponent": "SF",
+						"home": false,
+						"kickoff": "2026-10-20T00:15:00.000Z",
+						"bye": false,
+						"designation": null,
+						"played": false,
+						"points_this_week": null,
+						"last_games": [
+							{ "week": 5, "points": 3 },
+							{ "week": 3, "points": 11.1 },
+							{ "week": 2, "points": 14.3 }
+						],
+						"allowed_to_position": null
+					}
+				},
+				{
+					"player": {
+						"host_id": "11834",
+						"board_id": "4569559",
+						"name": "Devaughn Vele",
+						"position": "WR",
+						"team": "NO",
+						"injured_reserve": false
+					},
+					"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4569559.png",
+					"slug": "devaughn-vele",
+					"position_rank": 31,
+					"points_over_replacement": 0.5,
+					"held": false,
+					"facts": {
+						"week": 6,
+						"opponent": "NYG",
+						"home": false,
+						"kickoff": "2026-10-18T17:00:00.000Z",
+						"bye": false,
+						"designation": null,
+						"played": false,
+						"points_this_week": null,
+						"last_games": [
+							{ "week": 5, "points": 6.6 },
+							{ "week": 4, "points": 17.4 },
+							{ "week": 3, "points": 6.9 }
+						],
+						"allowed_to_position": null
+					}
+				},
+				{
+					"player": {
+						"host_id": "6794",
+						"board_id": "4262921",
+						"name": "Justin Jefferson",
+						"position": "WR",
+						"team": "MIN",
+						"injured_reserve": false
+					},
+					"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4262921.png",
+					"slug": "justin-jefferson",
+					"position_rank": 19,
+					"points_over_replacement": 2.1,
+					"held": false,
+					"facts": {
+						"week": 6,
+						"opponent": null,
+						"home": null,
+						"kickoff": null,
+						"bye": true,
+						"designation": null,
+						"played": false,
+						"points_this_week": null,
+						"last_games": [
+							{ "week": 5, "points": 18.8 },
+							{ "week": 3, "points": 5.2 },
+							{ "week": 2, "points": 8.5 }
+						],
+						"allowed_to_position": null
+					}
+				},
+				{
+					"player": {
+						"host_id": "10229",
+						"board_id": "4428331",
+						"name": "Rashee Rice",
+						"position": "WR",
+						"team": "KC",
+						"injured_reserve": false
+					},
+					"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4428331.png",
+					"slug": "rashee-rice",
+					"position_rank": 36,
+					"points_over_replacement": -0.1,
+					"held": false,
+					"facts": {
+						"week": 6,
+						"opponent": "LAC",
+						"home": true,
+						"kickoff": "2026-10-18T20:25:00.000Z",
+						"bye": false,
+						"designation": null,
+						"played": false,
+						"points_this_week": null,
+						"last_games": [
+							{ "week": 4, "points": 0 },
+							{ "week": 3, "points": 15.8 },
+							{ "week": 2, "points": 12.3 }
+						],
+						"allowed_to_position": null
+					}
+				},
+				{
+					"player": {
+						"host_id": "12506",
+						"board_id": "5083076",
+						"name": "Harold Fannin",
+						"position": "TE",
+						"team": "CLE",
+						"injured_reserve": false
+					},
+					"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/5083076.png",
+					"slug": "harold-fannin-jr",
+					"position_rank": 10,
+					"points_over_replacement": 0.2,
+					"held": false,
+					"facts": {
+						"week": 6,
+						"opponent": "BAL",
+						"home": true,
+						"kickoff": "2026-10-18T17:00:00.000Z",
+						"bye": false,
+						"designation": null,
+						"played": false,
+						"points_this_week": null,
+						"last_games": [
+							{ "week": 5, "points": 1.4 },
+							{ "week": 4, "points": 11.7 },
+							{ "week": 3, "points": 24.1 }
+						],
+						"allowed_to_position": null
+					}
+				}
+			],
 			"trades": [
 				{
 					"give": [
@@ -5213,6 +6724,163 @@
 			"name": "Nacua Matata",
 			"owner": "Rad_Thad1",
 			"record": { "wins": 3, "losses": 2, "ties": 0 },
+			"roster": [
+				{
+					"player": {
+						"host_id": "11576",
+						"board_id": "4685247",
+						"name": "Braelon Allen",
+						"position": "RB",
+						"team": "NYJ",
+						"injured_reserve": false
+					},
+					"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4685247.png",
+					"slug": "braelon-allen",
+					"position_rank": 34,
+					"points_over_replacement": -1.7,
+					"held": false,
+					"facts": {
+						"week": 6,
+						"opponent": "NE",
+						"home": false,
+						"kickoff": "2026-10-18T17:00:00.000Z",
+						"bye": false,
+						"designation": null,
+						"played": false,
+						"points_this_week": null,
+						"last_games": [
+							{ "week": 5, "points": 18.6 },
+							{ "week": 4, "points": 8.7 },
+							{ "week": 3, "points": 4.7 }
+						],
+						"allowed_to_position": null
+					}
+				},
+				{
+					"player": {
+						"host_id": "8155",
+						"board_id": "4427366",
+						"name": "Breece Hall",
+						"position": "RB",
+						"team": "NYJ",
+						"injured_reserve": false
+					},
+					"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4427366.png",
+					"slug": "breece-hall",
+					"position_rank": 32,
+					"points_over_replacement": -1.4,
+					"held": false,
+					"facts": {
+						"week": 6,
+						"opponent": "NE",
+						"home": false,
+						"kickoff": "2026-10-18T17:00:00.000Z",
+						"bye": false,
+						"designation": null,
+						"played": false,
+						"points_this_week": null,
+						"last_games": [
+							{ "week": 3, "points": 8.5 },
+							{ "week": 2, "points": 14.2 },
+							{ "week": 1, "points": 19.8 }
+						],
+						"allowed_to_position": null
+					}
+				},
+				{
+					"player": {
+						"host_id": "5872",
+						"board_id": "3126486",
+						"name": "Deebo Samuel",
+						"position": "WR",
+						"team": "SF",
+						"injured_reserve": false
+					},
+					"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/3126486.png",
+					"slug": "deebo-samuel-sr",
+					"position_rank": 34,
+					"points_over_replacement": 0,
+					"held": false,
+					"facts": {
+						"week": 6,
+						"opponent": "WSH",
+						"home": true,
+						"kickoff": "2026-10-20T00:15:00.000Z",
+						"bye": false,
+						"designation": null,
+						"played": false,
+						"points_this_week": null,
+						"last_games": [
+							{ "week": 5, "points": 2.5 },
+							{ "week": 4, "points": 18 },
+							{ "week": 3, "points": 15.4 }
+						],
+						"allowed_to_position": null
+					}
+				},
+				{
+					"player": {
+						"host_id": "11610",
+						"board_id": "4569603",
+						"name": "Malik Washington",
+						"position": "WR",
+						"team": "MIA",
+						"injured_reserve": false
+					},
+					"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4569603.png",
+					"slug": "malik-washington",
+					"position_rank": 26,
+					"points_over_replacement": 1.3,
+					"held": false,
+					"facts": {
+						"week": 6,
+						"opponent": null,
+						"home": null,
+						"kickoff": null,
+						"bye": true,
+						"designation": null,
+						"played": false,
+						"points_this_week": null,
+						"last_games": [
+							{ "week": 5, "points": 12.1 },
+							{ "week": 4, "points": 12 },
+							{ "week": 3, "points": 11.1 }
+						],
+						"allowed_to_position": null
+					}
+				},
+				{
+					"player": {
+						"host_id": "3214",
+						"board_id": "3046439",
+						"name": "Hunter Henry",
+						"position": "TE",
+						"team": "NE",
+						"injured_reserve": false
+					},
+					"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/3046439.png",
+					"slug": "hunter-henry",
+					"position_rank": 22,
+					"points_over_replacement": -1.6,
+					"held": false,
+					"facts": {
+						"week": 6,
+						"opponent": "NYJ",
+						"home": true,
+						"kickoff": "2026-10-18T17:00:00.000Z",
+						"bye": false,
+						"designation": null,
+						"played": false,
+						"points_this_week": null,
+						"last_games": [
+							{ "week": 5, "points": 13.4 },
+							{ "week": 4, "points": 11.2 },
+							{ "week": 3, "points": 1.5 }
+						],
+						"allowed_to_position": null
+					}
+				}
+			],
 			"trades": [
 				{
 					"give": [

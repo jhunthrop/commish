@@ -6,7 +6,7 @@
 // asserts the first player row sits whole above the pinned verb. Exits non-zero when a page scrolls
 // sideways or a phone's first row is under the pin.
 //
-//   node scripts/inseason-shots.ts [web origin] [out dir]
+//   node scripts/inseason-shots.ts [web origin] [out dir, from scripts/]
 // with the site built against PUBLIC_API_URL=http://localhost:8799 and the fixture API running there.
 import { mkdir } from 'node:fs/promises';
 import { chromium, type BrowserContext, type Page } from 'playwright';
@@ -252,6 +252,91 @@ for (const theme of THEMES) {
 	}
 }
 
+/** The trade builder (Lane 61), in both themes at both widths: Build a trade opens it empty, a tap
+ * a side reads the answer, a finder row's Build from this opens it with that trade and answers the
+ * row's own two gains, one player changed reads it again, and giving both tight ends says the TE
+ * would not be filled. Each must not scroll sideways. */
+const builder = '#trade-builder';
+const gainsOf = (text: string): string[] => [...text.matchAll(/\d+\.\d/g)].map((m) => m[0]);
+async function answered(page: Page): Promise<string> {
+	const line = page.locator(`${builder} .words[aria-busy="false"] .line`);
+	await line.waitFor({ timeout: READY_TIMEOUT_MS });
+	return (await line.textContent()) ?? '';
+}
+async function tapSide(page: Page, side: 'You give' | 'You get', name: string): Promise<void> {
+	await page
+		.locator(`${builder} section[aria-label="${side}"] button.pick`)
+		.filter({ hasText: name })
+		.first()
+		.click();
+}
+const builderLines = new Map<string, string>();
+for (const theme of THEMES) {
+	for (const width of SHOT_WIDTHS) {
+		const ctx = await context(theme, width);
+		const page = await ctx.newPage();
+		const shot = async (name: string): Promise<void> => {
+			const wide = await page.evaluate(
+				() => document.documentElement.scrollWidth > window.innerWidth
+			);
+			if (wide) scrolls.push(`trades builder ${name} ${theme} ${String(width)}`);
+			await page.screenshot({
+				path: file(`trades-builder-${name}-${theme}-${String(width)}`),
+				fullPage: name !== 'pinned'
+			});
+		};
+		await page.goto(`${web}/league/${id}/trades`, { waitUntil: 'networkidle' });
+		await ready(page, 'Propose on Sleeper');
+		await page.getByRole('button', { name: 'Build a trade' }).click();
+		await ready(page, 'Pick one or two of your players and one or two of theirs.');
+		await shot('open');
+		const yours = page.locator(`${builder} section[aria-label="You give"] button.pick`);
+		const theirs = page.locator(`${builder} section[aria-label="You get"] button.pick`);
+		await yours.nth(1).click();
+		await theirs.first().click();
+		builderLines.set(`picked ${theme} ${String(width)}`, await answered(page));
+		await shot('picked');
+		if (width === PHONE.width) {
+			// The answer and its verb stay pinned while the member scrolls the rosters.
+			await page.setViewportSize(PHONE);
+			await theirs.last().scrollIntoViewIfNeeded();
+			await shot('pinned');
+			await page.setViewportSize({ width, height: VIEWPORT_HEIGHT });
+		}
+		// A finder row opens the builder with its trade, and answers the row's own gains.
+		await page.getByRole('button', { name: 'Not now' }).click();
+		const row = page.locator('.trade').first();
+		const rowGains = gainsOf((await row.locator('.gains p').textContent()) ?? '');
+		await row.getByRole('button', { name: 'Build from this' }).click();
+		const fromRow = await answered(page);
+		builderLines.set(`from a row ${theme} ${String(width)}`, fromRow);
+		if (gainsOf(fromRow).join(' ') !== rowGains.join(' ')) {
+			throw new Error(`The builder answered ${fromRow} for a finder row of ${rowGains.join(', ')}`);
+		}
+		await shot('from-row');
+		// One player changed reads the trade again.
+		const firstTheirs = page.locator(`${builder} section[aria-label="You get"] button.pick`);
+		const pickedTheirs = firstTheirs.and(page.locator('[aria-pressed="true"]')).first();
+		await pickedTheirs.click();
+		await firstTheirs.and(page.locator('[aria-pressed="false"]')).first().click();
+		builderLines.set(`changed ${theme} ${String(width)}`, await answered(page));
+		await shot('changed');
+		// Both tight ends given: the member's TE would not be filled.
+		await page.getByRole('button', { name: 'Not now' }).click();
+		await page.getByRole('button', { name: 'Build a trade' }).click();
+		await tapSide(page, 'You give', 'Chig Okonkwo');
+		await tapSide(page, 'You give', 'Sam LaPorta');
+		await theirs.first().click();
+		const short = await answered(page);
+		builderLines.set(`short ${theme} ${String(width)}`, short);
+		if (short !== 'Your roster would not fill TE.') {
+			throw new Error(`Giving both tight ends answered ${short}`);
+		}
+		await shot('short');
+		await ctx.close();
+	}
+}
+
 /** The league page in each season phase (spec 2026-10-16 §3), the follow page a rail item opens
  * with no league, and the account's Next draft rows in season, in both themes at both widths. */
 const STATES = [
@@ -294,6 +379,7 @@ await browser.close();
 for (const [where, height] of rows)
 	process.stdout.write(`tallest row ${where}: ${height.toFixed(1)}px\n`);
 for (const [where, fold] of firstRows) process.stdout.write(`phone ${where}: ${fold}\n`);
+for (const [where, said] of builderLines) process.stdout.write(`builder ${where}: ${said}\n`);
 process.stdout.write(`shots in ${out.pathname}\n`);
 if (scrolls.length > 0) throw new Error(`Pages scroll sideways:\n${scrolls.join('\n')}`);
 if (under.length > 0)

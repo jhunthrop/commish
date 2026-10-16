@@ -676,6 +676,7 @@ function trades(): TradeAdvice {
 			name: teamName(r),
 			owner: ownerName(r),
 			record: { wins: r.settings.wins, losses: r.settings.losses, ties: r.settings.ties },
+			roster: rosterByPosition(lines.get(r.roster_id) ?? []),
 			trades: tradesWith(lines.get(r.roster_id) ?? [])
 		}))
 		.map((team) => ({
