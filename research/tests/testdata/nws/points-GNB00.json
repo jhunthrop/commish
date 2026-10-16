@@ -1,0 +1,12 @@
+{
+ "properties": {
+  "@id": "https://api.weather.gov/points/44.5013,-88.0622",
+  "forecastGridData": "https://api.weather.gov/gridpoints/GRB/78,31",
+  "forecastHourly": "https://api.weather.gov/gridpoints/GRB/78,31/forecast/hourly",
+  "gridId": "GRB",
+  "gridX": 78,
+  "gridY": 31,
+  "timeZone": "America/Chicago"
+ },
+ "type": "Feature"
+}
