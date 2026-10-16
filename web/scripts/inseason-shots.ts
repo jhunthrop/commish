@@ -3,8 +3,10 @@
 // at 1440 and 390. At 1440, 1024, 800, 768 and 390 it asserts the page never scrolls sideways, and it
 // prints the tallest player row, the taps from the page to its verb, and the shots of the loading
 // rows, the API's refusals and the site's not-found for an unknown screen. On a phone (390 by 844) it
-// asserts the first player row sits whole above the pinned verb. Exits non-zero when a page scrolls
-// sideways or a phone's first row is under the pin.
+// asserts the first player row sits whole above the pinned verb. On the three screens it asserts the
+// rows carry the rest-of-season points a game and the basis line says what they are (Lane 64), and
+// the builder's answer names its players with them. Exits non-zero when a page scrolls sideways, a
+// phone's first row is under the pin, or a figure or its sentence is missing.
 //
 //   node scripts/inseason-shots.ts [web origin] [out dir, from scripts/]
 // with the site built against PUBLIC_API_URL=http://localhost:8799 and the fixture API running there.
@@ -66,6 +68,12 @@ function file(name: string): string {
 }
 
 const scrolls: string[] = [];
+/** The screens whose rows carry his rest-of-season points a game, and the basis sentence saying so. */
+const PER_GAME_SCREENS = new Set(['start', 'waivers', 'trades']);
+const PER_GAME_BASIS =
+	/Points a game are our rest-of-season projection from week \d+ over the games his club has left, byes out\./;
+const PER_GAME = /\d+\.\d a game/;
+const missing: string[] = [];
 const rows = new Map<string, number>();
 const under: string[] = [];
 const firstRows = new Map<string, string>();
@@ -92,6 +100,15 @@ for (const { name, path, ready: text } of PAGES) {
 				);
 			}
 			rows.set(`${name} ${String(width)}`, wide.tallest);
+			if (PER_GAME_SCREENS.has(name)) {
+				const said = await page.evaluate(() => ({
+					basis: document.querySelector('main p.basis')?.textContent ?? '',
+					row: document.querySelector('main .row')?.textContent ?? ''
+				}));
+				if (!PER_GAME_BASIS.test(said.basis))
+					missing.push(`${name} ${theme} ${String(width)} basis`);
+				if (!PER_GAME.test(said.row)) missing.push(`${name} ${theme} ${String(width)} first row`);
+			}
 			if (width === PHONE.width && name !== 'league' && name !== 'matchup') {
 				await page.setViewportSize(PHONE);
 				const fold = await page.evaluate(() => {
@@ -257,7 +274,9 @@ for (const theme of THEMES) {
  * row's own two gains, one player changed reads it again, and giving both tight ends says the TE
  * would not be filled. Each must not scroll sideways. */
 const builder = '#trade-builder';
-const gainsOf = (text: string): string[] => [...text.matchAll(/\d+\.\d/g)].map((m) => m[0]);
+/** The gains in an answer line: its figures before the players it names with their points a game. */
+const gainsOf = (text: string): string[] =>
+	[...(text.split(' You give ')[0] ?? '').matchAll(/\d+\.\d/g)].map((m) => m[0]);
 async function answered(page: Page): Promise<string> {
 	const line = page.locator(`${builder} .words[aria-busy="false"] .line`);
 	await line.waitFor({ timeout: READY_TIMEOUT_MS });
@@ -294,7 +313,11 @@ for (const theme of THEMES) {
 		const theirs = page.locator(`${builder} section[aria-label="You get"] button.pick`);
 		await yours.nth(1).click();
 		await theirs.first().click();
-		builderLines.set(`picked ${theme} ${String(width)}`, await answered(page));
+		const picked = await answered(page);
+		builderLines.set(`picked ${theme} ${String(width)}`, picked);
+		if (!/You give .+ for .+\(\d+\.\d a game\)\./.test(picked)) {
+			missing.push(`builder answer ${theme} ${String(width)}: ${picked}`);
+		}
 		await shot('picked');
 		if (width === PHONE.width) {
 			// The answer and its verb stay pinned while the member scrolls the rosters.
@@ -392,6 +415,8 @@ for (const [where, fold] of firstRows) process.stdout.write(`phone ${where}: ${f
 for (const [where, said] of builderLines) process.stdout.write(`builder ${where}: ${said}\n`);
 process.stdout.write(`shots in ${out.pathname}\n`);
 if (scrolls.length > 0) throw new Error(`Pages scroll sideways:\n${scrolls.join('\n')}`);
+if (missing.length > 0)
+	throw new Error(`The rest-of-season points a game are missing:\n${missing.join('\n')}`);
 if (under.length > 0)
 	throw new Error(`A phone's first row is under the pinned verb:\n${under.join('\n')}`);
 process.stdout.write('No page scrolls sideways at 1440, 1024, 800, 768 or 390.\n');
