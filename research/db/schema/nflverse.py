@@ -141,10 +141,13 @@ NFL_DRAFT_PICKS: Final = Table(
     Index("nfl_draft_picks_player_idx", "player_id"),
 )
 
-# nflverse's game table (`games.csv`), one row per game (revision 0009, Lane 66a). A future game's
-# figures and its venue move until kickoff and its result lands after, so the ingest updates a row
-# whose values changed and `read_at` is the pass that last changed it. `kickoff_at` is the file's
-# Eastern `gameday` and `gametime` as an instant, NULL while the time is unset.
+# nflverse's game table (`games.csv`), one row per game (revision 0010, Lane 66a): THE CURRENT STATE
+# ONLY, NEVER AN AS-OF SOURCE. A future game's figures and venue move until kickoff and its result
+# lands after, so the ingest rewrites a row whose values changed and `read_at` is the pass that last
+# changed it; an earlier state is gone. What a pass read is kept append-only beside it:
+# `nflverse_game_reads` (the venue and kickoff) and the `nflverse_game_figures` team-week source
+# (the figures from each club's side). `kickoff_at` is the file's Eastern `gameday` and `gametime`
+# as an instant, NULL while the time is unset.
 NFLVERSE_GAMES: Final = Table(
     "nflverse_games",
     METADATA,
@@ -173,6 +176,26 @@ NFLVERSE_GAMES: Final = Table(
     recorded_at(),
     Index("nflverse_games_week_idx", "season", "week"),
     Index("nflverse_games_kickoff_idx", "kickoff_at"),
+)
+
+# Each pass's read of every game it ingests (revision 0010): the venue and kickoff as the file stood,
+# append-only (a re-run at the same instant writes nothing), so a replay reads the newest at or
+# before its instant.
+NFLVERSE_GAME_READS: Final = Table(
+    "nflverse_game_reads",
+    METADATA,
+    Column("game_id", Text, primary_key=True),
+    Column("read_at", DateTime(True), primary_key=True),
+    Column("season", Integer, nullable=False),
+    Column("week", Integer, nullable=False),
+    Column("home_team", Text, nullable=False),
+    Column("away_team", Text, nullable=False),
+    Column("kickoff_at", DateTime(True)),
+    Column("stadium_id", Text, nullable=False),
+    Column("stadium", Text, nullable=False),
+    Column("roof", Text),
+    recorded_at(),
+    Index("nflverse_game_reads_week_idx", "season", "week", "read_at"),
 )
 
 COACHES: Final = Table(

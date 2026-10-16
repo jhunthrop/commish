@@ -3,14 +3,14 @@
 Every table lives in the `research` Postgres schema and is defined once here, by group:
 
     identity      players (the one universe), provider_players, player_crosswalk, props_player_map
-    nflverse      the weekly archives, nflverse_games (revision 0009), nfl_draft_picks, coaches
+    nflverse      the weekly archives, nflverse_games and nflverse_game_reads (revision 0010), nfl_draft_picks, coaches
     observations  player_week_observations, team_week_observations, player_week_teams
     provider      the Tank01 current-season store, the capture and odds archives
     market        preseason_rosters, preseason_rankings, adp_snapshots
     boards        model_artifacts, the boards and reasons, the register, player_capsules
     custom        preseason_candidates (each board's candidate set), custom_boards (revision 0005)
     published     published_boards, the published run's board rows (revision 0006)
-    venues        stadiums and nws_grid_points, the game's place and its forecast grid (revision 0009)
+    venues        stadiums and nws_grid_points, the game's place and its forecast grid (revision 0010)
 
 `alembic/versions/0001_research_schema.py` creates exactly this, and the schema gate checks the
 two agree. What changed from the legacy `public` tables, and why, is in the README; the column
@@ -32,6 +32,7 @@ from research.db.schema.market import ADP_SNAPSHOTS, PRESEASON_RANKINGS, PRESEAS
 from research.db.schema.nflverse import (
     COACHES,
     NFL_DRAFT_PICKS,
+    NFLVERSE_GAME_READS,
     NFLVERSE_GAMES,
     NFLVERSE_INJURIES,
     NFLVERSE_KICKING_WEEKS,
@@ -57,6 +58,7 @@ __all__ = [
     "METADATA",
     "MODEL_ARTIFACTS",
     "NFLVERSE_GAMES",
+    "NFLVERSE_GAME_READS",
     "NFLVERSE_INJURIES",
     "NFLVERSE_KICKING_WEEKS",
     "NFLVERSE_ROSTER_WEEKS",

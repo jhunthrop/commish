@@ -1,17 +1,17 @@
 """The game's facts for the live week: nflverse's game table, the stadiums and the forecast grid.
 
-Revision ID: 0009
-Revises: 0007
+Revision ID: 0010
+Revises: 0009
 Create Date: 2026-10-16
 
 Lane 66a (the round 4 preregistration, sections 2.5 and 2.9): `nflverse_games` holds games.csv
-one row per game for 2016 on, `stadiums` the venues from the reviewed Wikidata seed, and
-`nws_grid_points` the weather service's grid cell per stadium and season. The game figures and
-the forecasts themselves are team-week observations (`tank01_lines`, `nws_forecast`), so they
-need no table of their own.
+one row per game for 2016 on, the current state only; `nflverse_game_reads` keeps each pass's
+read of every game's venue and kickoff, append-only, the as-of source; `stadiums` the venues from
+the reviewed Wikidata seed; and `nws_grid_points` the weather service's grid cell per stadium and
+season. The game figures and the forecasts themselves are team-week observations (`tank01_lines`,
+`nflverse_game_figures`, `nws_forecast`), so they need no table of their own.
 
-It revises 0007 because this branch was cut before Lane 63's 0008; whichever merges second sets
-`down_revision` to the other's revision so the chain has one head.
+The chain is 0007, Lane 63's 0008, Lane 66b's 0009, this.
 """
 
 from collections.abc import Sequence
@@ -21,8 +21,8 @@ from typing import Final
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "0009"
-down_revision: str | None = "0007"
+revision: str = "0010"
+down_revision: str | None = "0009"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
@@ -64,6 +64,25 @@ def _games() -> None:
     )
     op.create_index("nflverse_games_week_idx", "nflverse_games", ["season", "week"], schema=_SCHEMA)
     op.create_index("nflverse_games_kickoff_idx", "nflverse_games", ["kickoff_at"], schema=_SCHEMA)
+    op.create_table(
+        "nflverse_game_reads",
+        sa.Column("game_id", sa.Text(), nullable=False),
+        sa.Column("read_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("season", sa.Integer(), nullable=False),
+        sa.Column("week", sa.Integer(), nullable=False),
+        sa.Column("home_team", sa.Text(), nullable=False),
+        sa.Column("away_team", sa.Text(), nullable=False),
+        sa.Column("kickoff_at", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("stadium_id", sa.Text(), nullable=False),
+        sa.Column("stadium", sa.Text(), nullable=False),
+        sa.Column("roof", sa.Text(), nullable=True),
+        _now(),
+        sa.PrimaryKeyConstraint("game_id", "read_at"),
+        schema=_SCHEMA,
+    )
+    op.create_index(
+        "nflverse_game_reads_week_idx", "nflverse_game_reads", ["season", "week", "read_at"], schema=_SCHEMA
+    )
 
 
 def _stadiums() -> None:
@@ -116,6 +135,8 @@ def upgrade() -> None:
 def downgrade() -> None:
     op.drop_table("nws_grid_points", schema=_SCHEMA)
     op.drop_table("stadiums", schema=_SCHEMA)
+    op.drop_index("nflverse_game_reads_week_idx", "nflverse_game_reads", schema=_SCHEMA)
+    op.drop_table("nflverse_game_reads", schema=_SCHEMA)
     op.drop_index("nflverse_games_kickoff_idx", "nflverse_games", schema=_SCHEMA)
     op.drop_index("nflverse_games_week_idx", "nflverse_games", schema=_SCHEMA)
     op.drop_table("nflverse_games", schema=_SCHEMA)

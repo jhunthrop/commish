@@ -1,4 +1,4 @@
-"""THE GAME'S PLACE AND ITS FORECAST GRID (revision 0009, Lane 66a): `stadiums` and `nws_grid_points`.
+"""THE GAME'S PLACE AND ITS FORECAST GRID (revision 0010, Lane 66a): `stadiums` and `nws_grid_points`.
 
 `stadiums` is loaded from the reviewed seed `data/stadiums/stadiums.csv` (Wikidata's coordinates,
 CC0, keyed to nflverse's `stadium_id`) by a validating ingest; nothing reads the file at runtime.

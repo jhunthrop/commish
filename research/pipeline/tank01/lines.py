@@ -30,7 +30,7 @@ from sqlalchemy import Connection, select
 
 from research.db.schema import CAPTURE_SNAPSHOTS, PROVIDER_GAMES
 from research.errors import SchemaDriftError
-from research.pipeline.game_figures import implied_points
+from research.pipeline.game_figures import FigureMetric, club_figures
 from research.pipeline.nflverse.team_codes import source_team_code
 from research.pipeline.observations import TeamWeekObservation, record_team_observations
 from research.pipeline.tank01.capture import BETTING_ODDS_SOURCE, CaptureResult
@@ -44,11 +44,8 @@ _LEVEL_GAME: Final = "PK"
 _GAME_FIELDS: Final = ("gameID", "homeTeam", "awayTeam")
 
 
-class LinesMetric:
-    POINT_SPREAD = "point_spread"
-    GAME_TOTAL = "game_total"
-    IMPLIED_TEAM_TOTAL = "implied_team_total"
-    BOOKS = "books"
+class LinesMetric(FigureMetric):
+    BOOKS: Final = "books"
 
 
 @dataclass(frozen=True)
@@ -150,12 +147,7 @@ def _club_rows(place: GamePlace, line: GameLine, home: bool, at: datetime) -> li
     """One club's four rows: its own side of the spread, the game's total and its implied points."""
     club = source_team_code(line.home if home else line.away)
     spread = line.home_spread if home else -line.home_spread
-    values = (
-        (LinesMetric.POINT_SPREAD, spread),
-        (LinesMetric.GAME_TOTAL, line.total),
-        (LinesMetric.IMPLIED_TEAM_TOTAL, implied_points(line.total, spread)),
-        (LinesMetric.BOOKS, float(line.books)),
-    )
+    values = (*club_figures(line.total, spread), (LinesMetric.BOOKS, float(line.books)))
     return [TeamWeekObservation(place.season, place.week, club, LINES_SOURCE, m, v, at) for m, v in values]
 
 
