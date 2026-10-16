@@ -126,6 +126,39 @@ func (e ConnectedHost) Valid() bool {
 	}
 }
 
+// Defines values for DesignationStatus.
+const (
+	DesignationStatusDoubtful       DesignationStatus = "doubtful"
+	DesignationStatusInjuredReserve DesignationStatus = "injured_reserve"
+	DesignationStatusNfi            DesignationStatus = "nfi"
+	DesignationStatusOut            DesignationStatus = "out"
+	DesignationStatusPup            DesignationStatus = "pup"
+	DesignationStatusQuestionable   DesignationStatus = "questionable"
+	DesignationStatusSuspended      DesignationStatus = "suspended"
+)
+
+// Valid indicates whether the value is a known member of the DesignationStatus enum.
+func (e DesignationStatus) Valid() bool {
+	switch e {
+	case DesignationStatusDoubtful:
+		return true
+	case DesignationStatusInjuredReserve:
+		return true
+	case DesignationStatusNfi:
+		return true
+	case DesignationStatusOut:
+		return true
+	case DesignationStatusPup:
+		return true
+	case DesignationStatusQuestionable:
+		return true
+	case DesignationStatusSuspended:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for DeviceScope.
 const (
 	DeviceScopeDraftWrite  DeviceScope = "draft:write"
@@ -459,39 +492,6 @@ func (e HostMoveResultOutcome) Valid() bool {
 	case HostMoveResultOutcomeRefused:
 		return true
 	case HostMoveResultOutcomeUnavailable:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for InjuryDesignationStatus.
-const (
-	InjuryDesignationStatusDoubtful       InjuryDesignationStatus = "doubtful"
-	InjuryDesignationStatusInjuredReserve InjuryDesignationStatus = "injured_reserve"
-	InjuryDesignationStatusNfi            InjuryDesignationStatus = "nfi"
-	InjuryDesignationStatusOut            InjuryDesignationStatus = "out"
-	InjuryDesignationStatusPup            InjuryDesignationStatus = "pup"
-	InjuryDesignationStatusQuestionable   InjuryDesignationStatus = "questionable"
-	InjuryDesignationStatusSuspended      InjuryDesignationStatus = "suspended"
-)
-
-// Valid indicates whether the value is a known member of the InjuryDesignationStatus enum.
-func (e InjuryDesignationStatus) Valid() bool {
-	switch e {
-	case InjuryDesignationStatusDoubtful:
-		return true
-	case InjuryDesignationStatusInjuredReserve:
-		return true
-	case InjuryDesignationStatusNfi:
-		return true
-	case InjuryDesignationStatusOut:
-		return true
-	case InjuryDesignationStatusPup:
-		return true
-	case InjuryDesignationStatusQuestionable:
-		return true
-	case InjuryDesignationStatusSuspended:
 		return true
 	default:
 		return false
@@ -1296,10 +1296,29 @@ type BoardPlayer struct {
 	Points       *float64       `json:"points"`
 	Position     PlayerPosition `json:"position"`
 	PositionRank int            `json:"position_rank"`
-	Team         string         `json:"team"`
+
+	// Status his injury designation on the newest hourly capture (GET /boards/{format} only), absent when the capture does not list him
+	Status *BoardStatus `json:"status,omitempty"`
+	Team   string       `json:"team"`
 
 	// Vor points over replacement for this league
 	Vor *float64 `json:"vor"`
+}
+
+// BoardStatus his injury designation on the newest hourly capture (GET /boards/{format} only), absent when the capture does not list him
+type BoardStatus struct {
+	// AsOf the stamp of the capture that lists him
+	AsOf time.Time `json:"as_of"`
+
+	// SeasonLong injured reserve, suspended, PUP, NFI, or out with the capture's note saying out for the season: his rest-of-season figure assumes he plays, so he is placed below every available player at his position. A week's out, doubtful or questionable moves nothing
+	SeasonLong bool `json:"season_long"`
+
+	// Since the first capture of his unbroken run under a season-long status; null for a week's designation and for a run older than the captures read, whose start we do not know
+	Since *time.Time `json:"since"`
+
+	// Source the capture's feed in the research store: tank01_injuries_by_date
+	Source string            `json:"source"`
+	Status DesignationStatus `json:"status"`
 }
 
 // BotStyle defines model for BotStyle.
@@ -1498,6 +1517,9 @@ type ContextLeague struct {
 	// WaiversOpen the host still runs waivers this week: false in and after the playoffs where the host closes them, and once the season is over, else true
 	WaiversOpen bool `json:"waivers_open"`
 }
+
+// DesignationStatus defines model for DesignationStatus.
+type DesignationStatus string
 
 // Device defines model for Device.
 type Device struct {
@@ -1890,12 +1912,9 @@ type ImportSkip struct {
 // InjuryDesignation defines model for InjuryDesignation.
 type InjuryDesignation struct {
 	// AsOf the stamp of the injury read that lists it, or of the host read for the host's own IR mark
-	AsOf   time.Time               `json:"as_of"`
-	Status InjuryDesignationStatus `json:"status"`
+	AsOf   time.Time         `json:"as_of"`
+	Status DesignationStatus `json:"status"`
 }
-
-// InjuryDesignationStatus defines model for InjuryDesignation.Status.
-type InjuryDesignationStatus string
 
 // Interval defines model for Interval.
 type Interval string
@@ -2591,9 +2610,12 @@ type RoomBoard struct {
 	Basis  string          `json:"basis"`
 	Format RoomBoardFormat `json:"format"`
 
-	// Players every player in the order drafters take them
+	// Players every player in the order drafters take them; on GET /boards/{format}, each player on a season-long list follows the last available player at his position
 	Players []BoardPlayer `json:"players"`
 	Season  int           `json:"season"`
+
+	// StatusRead the injury capture a board's statuses come from, absent when none was read
+	StatusRead *StatusRead `json:"status_read,omitempty"`
 }
 
 // RoomBoardFormat defines model for RoomBoard.Format.
@@ -2894,6 +2916,18 @@ type SiteSeason struct {
 
 // SiteSeasonPhase defines model for SiteSeason.Phase.
 type SiteSeasonPhase string
+
+// StatusRead the injury capture a board's statuses come from, absent when none was read
+type StatusRead struct {
+	// AsOf the capture's stamp, when the list last changed (an unchanged list is not stored again)
+	AsOf time.Time `json:"as_of"`
+
+	// CheckedAt the capture job's last successful check of the list, null when the store records none: say "read" at this time, and "as the list stood" at as_of without it
+	CheckedAt *time.Time `json:"checked_at"`
+
+	// Source the capture's feed in the research store
+	Source string `json:"source"`
+}
 
 // TradeAdvice defines model for TradeAdvice.
 type TradeAdvice struct {

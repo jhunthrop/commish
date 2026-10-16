@@ -6,7 +6,7 @@ day, and give this season week by week as the player page prints it, every week 
 the writer never has to guess which year a week belongs to.
 """
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Final
 
 from research.capsules.facts.model import InjuryClean, InjuryDesignated, SeasonSoFar, SeasonWeek
 from research.capsules.render_words import (
@@ -15,6 +15,7 @@ from research.capsules.render_words import (
     NEXT_TO_PLAY,
     week_of,
 )
+from research.model.designations import season_long, status_of
 from research.model.jsmath import js_to_fixed
 from research.pipeline.jscompat import js_string
 from research.season import REGULAR_SEASON_WEEKS
@@ -116,6 +117,14 @@ def bye_line(facts: "PlayerFacts") -> str:
     return f"Bye: {named}, {'already behind him' if bye <= season.through else 'still to come'}."
 
 
+# A season-long designation, as the board treats it (Lane 63): the page's read must not contradict the
+# row, which shows him below the available players at his position.
+SEASON_LONG_FACT: Final = (
+    "That is a season-long list: the board ranks him below every available player at his position, "
+    "and he plays no game while he is on it."
+)
+
+
 def _since(facts: "PlayerFacts", since: str) -> str:
     """When his status began: its day before the season; in season the week it reaches, never a
     date (a date reads back as a month, which the in-season floor refuses). Printed as data, never
@@ -132,7 +141,10 @@ def _since(facts: "PlayerFacts", since: str) -> str:
 def injury_line(facts: "PlayerFacts") -> str:
     injury = facts.injury
     if isinstance(injury, InjuryDesignated):
-        return f"Injury report: designation {injury.designation} {_since(facts, injury.since)}."
+        line = f"Injury report: designation {injury.designation} {_since(facts, injury.since)}."
+        status = status_of(injury.designation)
+        # The capsule's sheet carries no capture note, so only the codes that are season-long alone.
+        return f"{line} {SEASON_LONG_FACT}" if status is not None and season_long(status, None) else line
     if isinstance(injury, InjuryClean):
         return f"Injury report: no designation {_since(facts, injury.since)}."
     return "Injury report: no injury feed has been checked for him yet. This is not a health claim either way."

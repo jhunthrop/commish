@@ -7,6 +7,8 @@ import type { RoomPlayer } from '#lib/room/model.ts';
 import type { LeagueBoardFile } from '#lib/run/league-board.ts';
 import type { IndexSeason } from '#lib/run/schema.ts';
 import type { BoardFormat } from '#lib/sheet/model.ts';
+import { memberZone } from '#lib/format/clock.ts';
+import { statusView, type Saying, type StatusView } from '#lib/run/status-view.ts';
 
 /** A board player as a league row reads him: the room's player, his page and his season so far. */
 export interface LeagueBoardPlayer extends RoomPlayer {
@@ -15,6 +17,9 @@ export interface LeagueBoardPlayer extends RoomPlayer {
 	/** His projection is the board's depth floor at his position: a fill value several players share
 	 * below the last one we project, said in words, never as a measured number. */
 	belowDepth: boolean;
+	/** His injury status as the row prints it (Lane 63): a season-long one shows as his rank, a
+	 * week's carries its mark. Null when the capture does not list him. */
+	status: StatusView | null;
 }
 
 /** How many players at a position must share its lowest projection for it to read as a fill value. */
@@ -56,7 +61,8 @@ async function fetchBoard(format: BoardFormat): Promise<LeagueBoardFile | null> 
 function playerOf(
 	row: LeagueBoardFile['rows'][number],
 	byes: Readonly<Record<string, number>>,
-	floor: ReadonlySet<string>
+	floor: ReadonlySet<string>,
+	saying: Saying | null
 ): LeagueBoardPlayer {
 	return {
 		id: row.id,
@@ -72,7 +78,8 @@ function playerOf(
 		vorRound: row.vorRound,
 		bye: byes[row.team] ?? null,
 		season: row.season,
-		belowDepth: floor.has(row.id)
+		belowDepth: floor.has(row.id),
+		status: row.status === undefined || saying === null ? null : statusView(row.status, saying)
 	};
 }
 
@@ -85,7 +92,17 @@ export async function loadBoard(
 	const run = own ?? (await fetchBoard(FALLBACK));
 	if (run === null) throw new Error('The run carries no board for a league.');
 	const floor = depthFloor(run.rows);
-	const players = run.rows.map((row) => playerOf(row, byes, floor));
+	// The league page is drawn in the browser: its words are on the member's clock at once.
+	const saying: Saying | null =
+		run.capture === null
+			? null
+			: {
+					capture: run.capture,
+					restOfSeason: run.format.rosFromWeek !== undefined,
+					zone: memberZone(),
+					now: Date.now()
+				};
+	const players = run.rows.map((row) => playerOf(row, byes, floor, saying));
 	return {
 		players,
 		byId: new Map(players.map((p) => [p.id, p] as const)),

@@ -316,7 +316,10 @@ def sync_published_board(engine: Engine, store: RunStore, now: datetime) -> Sync
     except PublishedBoardError as error:
         return failed(str(error), run_id, held_runs(engine))
     except SQLAlchemyError as error:
-        # The driver's own first line: the server's message, never the URL or its password.
-        first = (str(getattr(error, "orig", None) or error).splitlines() or [""])[0]
-        reason = f"{type(error).__name__}: {first}"
-        return failed(reason, run_id, held_runs(engine))
+        return failed(driver_line(error), run_id, held_runs(engine))
+
+
+def driver_line(error: SQLAlchemyError) -> str:
+    """The driver's own first line: the server's message, never the URL or its password."""
+    first = (str(getattr(error, "orig", None) or error).splitlines() or [""])[0]
+    return f"{type(error).__name__}: {first}"

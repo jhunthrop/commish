@@ -1,0 +1,20 @@
+{
+	"codes": {
+		"Q": "questionable",
+		"QUESTIONABLE": "questionable",
+		"D": "doubtful",
+		"DOUBTFUL": "doubtful",
+		"O": "out",
+		"OUT": "out",
+		"IR": "injured_reserve",
+		"IR-R": "injured_reserve",
+		"INJURED RESERVE": "injured_reserve",
+		"SUSP": "suspended",
+		"SUS": "suspended",
+		"SUSPENDED": "suspended",
+		"PUP": "pup",
+		"NFI": "nfi"
+	},
+	"season_long": ["injured_reserve", "suspended", "pup", "nfi"],
+	"out_for_the_season": "out for the season"
+}

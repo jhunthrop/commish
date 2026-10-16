@@ -14,6 +14,7 @@
 	import PageHead from '#lib/ui/PageHead.svelte';
 	import Panel from '#lib/ui/Panel.svelte';
 	import PanelHead from '#lib/ui/PanelHead.svelte';
+	import Label from '#lib/ui/Label.svelte';
 	import Quiet from '#lib/ui/Quiet.svelte';
 	import Row from '#lib/ui/Row.svelte';
 	import RowHead from '#lib/ui/RowHead.svelte';
@@ -21,7 +22,10 @@
 	import TierStrip from '#lib/ui/TierStrip.svelte';
 	import Toggle from '#lib/ui/Toggle.svelte';
 	import { apiFormatOf } from '#lib/run/format-ids.ts';
+	import { heldOut } from '#lib/run/board-status.ts';
 	import type { BoardRowView } from '#lib/run/schema.ts';
+	import type { StatusView } from '#lib/run/status-view.ts';
+	import { liveStatusClock, sayBoard, type LiveStatus } from '#lib/run/live-status.ts';
 	import { links, tierAnchor } from './links.ts';
 
 	interface Props {
@@ -70,7 +74,39 @@
 		return !onlySheet || lazySheet.has(row.id);
 	}
 
-	const groups = $derived(page.position === null ? [] : tierGroups(page.rows, page.position));
+	/** The status words as built, said again on the member's clock once the page is live. */
+	let live = $state<LiveStatus | null>(null);
+	onMount(() => {
+		liveStatusClock(
+			page.capture !== null,
+			() => import('#lib/run/status-view.ts'),
+			(said) => {
+				live = said;
+			}
+		);
+	});
+	const words = $derived(sayBoard(page, live));
+	/** A listed player's status as his row prints it. */
+	function status(player: BoardRowView): StatusView | null {
+		return words?.rows[player.id] ?? null;
+	}
+	/** The basis line, and the capture's sentence when the run carries one. */
+	const lead = $derived.by(() => {
+		const basis = page.seasonLead ?? page.format.basis.join(' · ');
+		return words === null ? basis : `${basis} ${words.capture}`;
+	});
+
+	/** A position view draws its tiers from the available players: a player on a season-long list
+	 * follows them, under a strip of his own. */
+	const groups = $derived(
+		page.position === null
+			? []
+			: tierGroups(
+					page.rows.filter((row) => !heldOut(row)),
+					page.position
+				)
+	);
+	const heldRows = $derived(page.position === null ? [] : page.rows.filter(heldOut).filter(shown));
 	const visible = $derived(page.rows.filter(shown));
 	const group = $derived(POSITION_NAMES[page.position ?? 'WR']);
 	const unit = $derived(page.format.unit);
@@ -91,6 +127,7 @@
 		eager={i < EAGER_ROWS}
 		season={player.season}
 		held={siteContext.held?.mark(player.id) ?? null}
+		status={status(player)}
 	>
 		{#snippet action()}
 			<RowSheetMark {player} />
@@ -106,7 +143,7 @@
 	</div>
 	<div class="content">
 		<div class="lead">
-			<PageHead title={heading} lead={page.seasonLead ?? page.format.basis.join(' · ')}>
+			<PageHead title={heading} {lead}>
 				{#snippet actions()}
 					<Quiet href={links.adp(page.format.id)} size="sm">ADP</Quiet>
 					<Quiet href={links.schedule()} size="sm">Schedule strength</Quiet>
@@ -153,6 +190,14 @@
 						</div>
 					{/if}
 				{/each}
+				{#if heldRows.length > 0}
+					<div class="tier">
+						<p class="held-head"><Label>On a season-long list</Label></p>
+						{#each heldRows as player (player.id)}
+							{@render row(player, page.rows.length)}
+						{/each}
+					</div>
+				{/if}
 			{/if}
 		</section>
 	</div>
@@ -248,6 +293,12 @@
 
 	.tier {
 		margin-top: var(--s-4);
+	}
+
+	.held-head {
+		margin: 0;
+		padding: var(--s-2) var(--s-3);
+		border-bottom: 1px solid var(--line);
 	}
 
 	.side {

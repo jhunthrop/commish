@@ -78,7 +78,7 @@ func TestWeekFacts(t *testing.T) {
 	if !buf.Bye || buf.Opponent != "" || buf.Allowed != nil || buf.Kickoff != nil || buf.Tier() != Out {
 		t.Fatalf("Buffalo's back is on bye: %v", buf)
 	}
-	if buf.Designation == nil || buf.Designation.Status != StatusDoubtful {
+	if buf.Designation == nil || buf.Designation.Status != boards.StatusDoubtful {
 		t.Fatalf("designation %+v", buf.Designation)
 	}
 
@@ -89,7 +89,7 @@ func TestWeekFacts(t *testing.T) {
 
 	read := time.Date(2026, 9, 26, 9, 0, 0, 0, time.UTC)
 	ir := s.For(Player{BoardID: "nobody", Team: "NE", Position: draft.WR, HostIR: true, ReadAt: read})
-	if ir.Designation == nil || ir.Designation.Status != StatusInjuredReserve || !ir.Designation.AsOf.Equal(read) || !ir.InjuredReserve() {
+	if ir.Designation == nil || ir.Designation.Status != boards.StatusInjuredReserve || !ir.Designation.AsOf.Equal(read) || !ir.InjuredReserve() {
 		t.Fatalf("the host's IR mark: %+v", ir.Designation)
 	}
 	if ir.PerGame != nil || ir.LastGames != nil {

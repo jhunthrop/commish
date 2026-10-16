@@ -73,3 +73,10 @@ void test('the copy has no em-dash, no semicolon and no trading words', () => {
 		}
 	}
 });
+
+void test('a held player’s list places him by no rank or tier (Lane 63, round 3)', () => {
+	const lines = unwrittenLines({ ...INPUT, held: 'IR' });
+	const words = lines.map((line) => `${line.figure} ${line.text}`).join(' ');
+	assert.doesNotMatch(words, /rank \d|\b(QB|RB|WR|TE) ?\d|Tier \d|pick \d/u, words);
+	assert.equal(lines[0]?.figure, 'WR IR');
+});

@@ -2,14 +2,27 @@
  * him and from which sources, his season so far, his capsule, and his numbers in every other format
  * the run carries. */
 import { windowLabel } from '#lib/format/date.ts';
-import { tierOf } from '#lib/run/derive.ts';
-import type { AdpSource, Capsule, Format, IndexEntry, PlayerFormat } from '#lib/run/schema.ts';
+import { withStatuses } from '#lib/run/board-status.ts';
+import { availableTierOf } from '#lib/run/held-places.ts';
+import type {
+	AdpSource,
+	Capsule,
+	Designations,
+	Format,
+	IndexEntry,
+	PlayerFormat,
+	PlayerStatus
+} from '#lib/run/schema.ts';
 import type { Position } from '#lib/types/player.ts';
 import type { TierCliff } from '#lib/ui/tier.ts';
+import type { CaptureStamp } from '#lib/format/designation.ts';
+import { playerStatusWords, type PlayerStatusWords } from '#lib/run/status-view.ts';
+import { builtSaying, captureStamp } from '../statuses.ts';
 import { seasonView, type KickoffOf, type SeasonView } from './player-season.ts';
 import {
 	adp,
 	board,
+	designations,
 	entryBySlug,
 	index,
 	manifest,
@@ -19,6 +32,7 @@ import {
 	seasonUnderway
 } from '../run.ts';
 import {
+	HELD_TIER_WORDS,
 	formatTable,
 	lineWords,
 	restFigures,
@@ -80,6 +94,11 @@ export interface PlayerPage {
 	season: SeasonView;
 	/** The run was written after the season's first kickoff: his season leads the draft facts. */
 	underway: boolean;
+	/** His designation on the run's injury capture, null when it does not list him or the run
+	 * carries no capture; with when the capture was read. */
+	status: { status: PlayerStatus; capture: CaptureStamp; words: PlayerStatusWords } | null;
+	/** In place of his tier mates for a player on a season-long list, null otherwise. */
+	heldTier: string | null;
 }
 
 export async function playerEntries(): Promise<{ slug: string }[]> {
@@ -92,7 +111,7 @@ async function linesFor(
 	formats: readonly Format[],
 	numbers: Readonly<Record<string, PlayerFormat>>,
 	sources: readonly AdpSource[],
-	season: { year: number; underway: boolean }
+	season: { year: number; underway: boolean; heldOut: boolean }
 ): Promise<FormatLine[]> {
 	const reach = await seasonReach();
 	const ranked = formats.flatMap((format) => {
@@ -114,12 +133,20 @@ async function linesFor(
 	return lines.map((line, i) => ({ ...line, tableLabel: labels[i] ?? line.format.label }));
 }
 
-async function mates(format: Format, entry: IndexEntry): Promise<PlayerPage['tier']> {
-	const rows = (await board(format.id)).rows;
+/** His tier among the available players at his position (run/held-places.ts): a player on a
+ * season-long list is no one's tier mate and counts toward no cliff, and has none of his own (his page
+ * says so in its place). */
+async function mates(
+	format: Format,
+	entry: IndexEntry,
+	capture: Designations | null
+): Promise<PlayerPage['tier']> {
+	const rows = withStatuses((await board(format.id)).rows, capture);
 	const row = rows.find((candidate) => candidate.id === entry.id);
 	if (!row)
 		throw new Error(`${entry.name} is not on the ${format.id} board his page says he is on.`);
-	const group = tierOf(rows, row);
+	const group = availableTierOf(rows, row);
+	if (group === null) return { tier: row.tier, cliff: null, mates: [] };
 	return {
 		tier: group.tier,
 		cliff: group.cliff,
@@ -147,19 +174,30 @@ async function kickoffsOf(team: string): Promise<KickoffOf> {
 
 export async function playerPage(slug: string): Promise<PlayerPage> {
 	const entry = await entryBySlug(slug);
-	const [loaded, run, sources, kickoffOf, underway] = await Promise.all([
+	const [loaded, run, sources, kickoffOf, underway, capture] = await Promise.all([
 		player(entry.id),
 		manifest(),
 		adp(),
 		kickoffsOf(entry.team),
-		seasonUnderway()
+		seasonUnderway(),
+		designations()
 	]);
+	const listed = capture?.players[entry.id];
 	const lines = await linesFor(run.formats, loaded.formats, sources.sources, {
 		year: run.season,
-		underway
+		underway,
+		heldOut: listed?.seasonLong === true
 	});
 	const [lead] = lines;
 	if (!lead) throw new Error(`${loaded.name} has a page but no format ranks him.`);
+	const status =
+		capture && listed
+			? {
+					status: listed,
+					capture: captureStamp(capture),
+					words: playerStatusWords(listed, builtSaying(capture, lead.format))
+				}
+			: null;
 	return {
 		id: loaded.id,
 		slug: loaded.slug,
@@ -170,7 +208,7 @@ export async function playerPage(slug: string): Promise<PlayerPage> {
 		format: lead.format,
 		numbers: lead.numbers,
 		lines,
-		tier: await mates(lead.format, entry),
+		tier: await mates(lead.format, entry, capture),
 		pointsHead: formatTable(lines).head,
 		tierBasis:
 			lead.format.rosFromWeek === undefined
@@ -182,6 +220,8 @@ export async function playerPage(slug: string): Promise<PlayerPage> {
 		boardSize: lead.boardSize,
 		capsule: loaded.capsule,
 		season: seasonView(loaded.season, loaded.position, run.formats, kickoffOf),
-		underway
+		underway,
+		status,
+		heldTier: listed?.seasonLong === true ? HELD_TIER_WORDS : null
 	};
 }

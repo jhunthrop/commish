@@ -2,7 +2,10 @@
  * where our board has him. */
 import type { AdpSource, BoardRow, Format } from '#lib/run/schema.ts';
 import { links } from '#lib/site/links.ts';
-import { adp, board } from '../run.ts';
+import { withStatuses } from '#lib/run/board-status.ts';
+import type { PlayerStatus } from '#lib/run/schema.ts';
+import { adp, board, designations } from '../run.ts';
+import { boardStatuses, type BoardStatuses } from '../statuses.ts';
 import {
 	absentFormatPage,
 	formatChips,
@@ -13,12 +16,12 @@ import {
 	type FormatChip
 } from './format-route.ts';
 
-export interface AdpPage {
+export interface AdpPage extends BoardStatuses {
 	format: Format;
 	formats: FormatChip[];
 	sources: AdpSource[];
 	/** Board rows with an ADP, earliest first. */
-	rows: (BoardRow & { adp: number })[];
+	rows: (BoardRow & { adp: number; status?: PlayerStatus })[];
 	/** Players our board ranks that no source has yet. */
 	unpriced: number;
 }
@@ -40,8 +43,14 @@ export async function adpEntries(): Promise<{ format: string }[]> {
 
 export async function adpPage(formatId: string): Promise<AdpPage> {
 	const format = await formatForRoute(formatId, (id) => links.adp(id));
-	const [loaded, all, formats] = await Promise.all([board(format.id), adp(), formatChips()]);
-	const rows = loaded.rows
+	const [loaded, all, formats, capture] = await Promise.all([
+		board(format.id),
+		adp(),
+		formatChips(),
+		designations()
+	]);
+	// The drafters' order stays theirs: a held player keeps his place in it, marked (Lane 63).
+	const rows = withStatuses(loaded.rows, capture)
 		.flatMap((row) => (row.adp === null ? [] : [{ ...row, adp: row.adp }]))
 		.sort((a, b) => a.adp - b.adp || a.ourRank - b.ourRank);
 	return {
@@ -49,6 +58,7 @@ export async function adpPage(formatId: string): Promise<AdpPage> {
 		formats,
 		sources: all.sources.filter((source) => source.formats.includes(format.id)),
 		rows,
-		unpriced: loaded.rows.length - rows.length
+		unpriced: loaded.rows.length - rows.length,
+		...boardStatuses(rows, capture, format)
 	};
 }
