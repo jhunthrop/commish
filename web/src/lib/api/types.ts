@@ -1582,6 +1582,8 @@ export interface components {
 			week: number;
 			/** @description one sentence naming the fact the phase came from */
 			basis: string;
+			/** @description the first week the published board covers, read from the published run the board routes read. Null when the site shows the preseason board or the phase is not in season. When it is behind week, basis says why. */
+			board_week?: number | null;
 		};
 		/** @description exactly one of league_id (a followed league) and format (no league: any board format, the web offering the ones the run carries) */
 		LeagueChoice: {

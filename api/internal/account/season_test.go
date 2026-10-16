@@ -32,4 +32,22 @@ func TestSeasonRoute(t *testing.T) {
 	if env.Data.Phase != apitypes.SiteSeasonPhasePlayoffs || env.Data.Week != 20 || env.Data.Basis != src.p.Basis {
 		t.Fatalf("season %+v", env.Data)
 	}
+	if env.Data.BoardWeek != nil {
+		t.Fatalf("board week %d with the preseason board up", *env.Data.BoardWeek)
+	}
+}
+
+// The board's week rides with the season when the published board has one, and the contract
+// names it board_week.
+func TestSeasonRouteCarriesTheBoardWeek(t *testing.T) {
+	src := fixedSeason{season.SitePhase{Phase: season.SiteInSeason, Week: 7, BoardWeek: 6,
+		Basis: "Week 7 has begun. Our board is still the week 6 board until Tuesday's refresh."}}
+	w := httptest.NewRecorder()
+	(&account.SeasonHandler{Season: src}).Routes()[0].Handler(w, httptest.NewRequest(http.MethodGet, "/season", nil))
+	var env struct {
+		Data map[string]any `json:"data"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &env); err != nil || env.Data["board_week"] != float64(6) {
+		t.Fatalf("%d %s (%v)", w.Code, w.Body.String(), err)
+	}
 }
