@@ -56,6 +56,9 @@ type SitePhase struct {
 	// Opener is the coming season's first kickoff in the preseason, zero
 	// when its schedule is not loaded or the season is under way.
 	Opener time.Time
+	// Unread says no read of the schedule has succeeded: the phase is a
+	// stand-in, not a fact.
+	Unread bool
 }
 
 // OpenerDay is a kickoff's day as a sentence names it, Eastern:
@@ -149,7 +152,7 @@ type Site struct {
 }
 
 // unread is the answer before any read has succeeded.
-var unread = SitePhase{Phase: SitePreseason, Basis: "We could not read the NFL schedule, so the site reads as before the season."}
+var unread = SitePhase{Phase: SitePreseason, Unread: true, Basis: "We could not read the NFL schedule, so the site reads as before the season."}
 
 // Phase is the site's season now.
 func (s *Site) Phase(ctx context.Context) SitePhase {

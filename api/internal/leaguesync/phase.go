@@ -184,6 +184,9 @@ func drafted(f PhaseFacts, host string) (apitypes.LeaguePhase, string) {
 // before the NFL season starts (the member manages the roster from the
 // draft on), the offseason once the NFL regular season is over.
 func noWeek(f PhaseFacts, draft string) (apitypes.LeaguePhase, string) {
+	if f.Site.Unread {
+		return apitypes.LeaguePhaseInSeason, draft + " and we could not read the NFL schedule."
+	}
 	switch f.Site.Phase {
 	case season.SitePreseason:
 		if !f.Site.Opener.IsZero() {

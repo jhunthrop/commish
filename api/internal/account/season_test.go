@@ -12,12 +12,12 @@ import (
 	"github.com/jhunthrop/commish/api/internal/season"
 )
 
-// GET /season answers anyone the site's season, the same object /me
+// GET /season answers anyone, with no session read, the site's season, the same object /me
 // carries, from the same source.
 func TestSeasonRoute(t *testing.T) {
 	src := fixedSeason{season.SitePhase{Phase: season.SitePlayoffs, Week: 20, Basis: "The 2026 regular season is over and the NFL playoffs are on."}}
 	routes := (&account.SeasonHandler{Season: src}).Routes()
-	if len(routes) != 1 || routes[0].Method != http.MethodGet || routes[0].Path != "/season" || routes[0].Access != httpx.Public {
+	if len(routes) != 1 || routes[0].Method != http.MethodGet || routes[0].Path != "/season" || routes[0].Access != httpx.Anonymous || routes[0].Access.ResolvesSession() {
 		t.Fatalf("routes %+v", routes)
 	}
 	w := httptest.NewRecorder()

@@ -35,7 +35,7 @@ type SeasonHandler struct {
 // Routes is GET /season.
 func (h *SeasonHandler) Routes() []httpx.Route {
 	return []httpx.Route{
-		{Method: http.MethodGet, Path: "/season", Access: httpx.Public, Limit: httpx.PerMinute(limitSeasonPerMinute), Handler: h.get},
+		{Method: http.MethodGet, Path: "/season", Access: httpx.Anonymous, Limit: httpx.PerMinute(limitSeasonPerMinute), Handler: h.get},
 	}
 }
 
