@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
-	import { gameFactsLine } from '#lib/format/game-facts.ts';
+	import { gameFactsLine, toBePlayed } from '#lib/format/game-facts.ts';
 	import { POSITIONS, type Position } from '#lib/types/player.ts';
 	import PositionPill from '#lib/ui/PositionPill.svelte';
 	import TagChip from '#lib/ui/TagChip.svelte';
@@ -48,7 +48,7 @@
 	const facts = $derived(line.facts);
 	const game = $derived(gameWords(facts));
 	const last = $derived(lastGamesWords(facts.last_games));
-	const conditions = $derived(facts.played || facts.bye ? null : gameFactsLine(facts));
+	const conditions = $derived(facts.bye || !toBePlayed(facts) ? null : gameFactsLine(facts));
 	const position = $derived(
 		POSITIONS.includes(line.player.position as Position) ? (line.player.position as Position) : null
 	);

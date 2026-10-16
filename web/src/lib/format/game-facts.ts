@@ -1,7 +1,7 @@
 /** A game's facts as the screens say them (Lane 66a): the expected score and margin from the hourly
  * capture, the roof, and the kickoff forecast, each a fact with its read time, never a projection.
- * "Expected to win by 3, 47.5 points in the game. 52°F and 14 mph wind at kickoff, outdoors. Read Sun
- * 9:05 am." The lineup, waivers and trades rows read them from WeekFacts, the Matchup screen and the
+ * "Expected to score 25 and to win by 3, 47.5 points in the game. 52°F and 14 mph wind at kickoff,
+ * outdoors. Read Sun 9:05 am." The lineup, waivers and trades rows read them from WeekFacts, the Matchup screen and the
  * player pages from GET /games/week. Pure, so every sentence is tested. */
 import type { components } from '#lib/api/types.ts';
 import { memberZone, weekdayTime } from './clock.ts';
@@ -19,10 +19,11 @@ export type GameWeek = Schemas['GameWeek'];
 /** A chance of precipitation below this is not named: a few percent is a dry forecast. */
 export const PRECIPITATION_NAMED_FROM = 20;
 
+/** The kind is named only when the forecast names it: a chance with no kind is precipitation. */
 const KIND_WORDS: Readonly<
 	Record<NonNullable<NonNullable<GameConditions['weather']>['precipitation_kind']>, string>
 > = {
-	none: 'rain or snow',
+	none: 'precipitation',
 	rain: 'rain',
 	thunderstorms: 'storms',
 	snow: 'snow',
@@ -34,26 +35,26 @@ function halves(points: number): string {
 	return Number.isInteger(points) ? String(points) : fixed(points, 1);
 }
 
-/** How the margin is said from his club's side (the round 4 lock's copy rule, its L5): never the
- * spread's own idiom. */
-const MARGIN_WORDS: Readonly<Record<NonNullable<GameConditions['spread']>['side'], string>> = {
-	favoured: 'Expected to win by',
-	underdog: 'Expected to lose by',
-	even: 'Expected to be even'
-};
-
-/** "Expected to win by 3, 47.5 points in the game.", "47.5 points expected in the game." without a
- * margin, null without the figures. */
+/** "Expected to score 25 and to win by 3, 47.5 points in the game.", his club's own points and the
+ * margin from its side (the round 4 lock's copy form, its L5, never the spread's own idiom); "Expected
+ * to be a close game, 47.5 points in the game."; "47.5 points expected in the game." without a margin;
+ * null without the figures. */
 export function figuresWords(c: GameConditions): string | null {
 	if (c.game_total === null) return null;
 	const points = halves(c.game_total.points);
 	const spread = c.spread;
 	if (spread === null) return `${points} points expected in the game.`;
-	const margin =
-		spread.side === 'even'
-			? MARGIN_WORDS.even
-			: `${MARGIN_WORDS[spread.side]} ${halves(spread.points)}`;
-	return `${margin}, ${points} points in the game.`;
+	if (spread.side === 'even') return `Expected to be a close game, ${points} points in the game.`;
+	const team = halves(c.game_total.team_points);
+	return `Expected to score ${team} and to ${spread.side} by ${halves(spread.points)}, ${points} points in the game.`;
+}
+
+/** Whether the game is still to be played: not final and not yet kicked off. */
+export function toBePlayed(
+	game: { played: boolean; kickoff: string | null },
+	now: number = Date.now()
+): boolean {
+	return !game.played && (game.kickoff === null || Date.parse(game.kickoff) > now);
 }
 
 /** Where the game is played, as the end of the weather sentence or alone. */
@@ -110,14 +111,14 @@ export function clubGame(week: GameWeek, team: string): ClubGame | null {
 	return week.games.find((g) => g.team === team) ?? null;
 }
 
-/** A player page's week line: "Week 7: at SEA Sun 7:20 pm. Expected to lose by 3, 47.5 points in
- * the game. 49°F and 14 mph wind at kickoff, outdoors. Read Sun 9:05 am.", null once his game is played. */
+/** A player page's week line: "Week 7: at SEA Sun 7:20 pm. Expected to score 22 and to lose by 3, 47.5 points in
+ * the game. 49°F and 14 mph wind at kickoff, outdoors. Read Sun 9:05 am.", null from his game's kickoff. */
 export function clubGameLine(
 	week: GameWeek,
 	game: ClubGame,
 	zone: string = memberZone()
 ): string | null {
-	if (game.played) return null;
+	if (!toBePlayed(game)) return null;
 	const side = game.home ? 'vs' : 'at';
 	const head = `Week ${String(week.week)}: ${side} ${game.opponent} ${weekdayTime(game.kickoff, zone)}.`;
 	const facts = gameFactsLine(game, zone);

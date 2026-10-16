@@ -3,7 +3,7 @@
 	import { resolve } from '$app/paths';
 	import { siteContext } from '#lib/context/context.svelte.ts';
 	import { gameWeek } from '#lib/api/games.ts';
-	import { clubGame, gameFactsLine, type GameWeek } from '#lib/format/game-facts.ts';
+	import { clubGame, gameFactsLine, toBePlayed, type GameWeek } from '#lib/format/game-facts.ts';
 	import { gameLine, runClub, type Kickoffs } from '#lib/run/kickoffs.ts';
 	import { lazySheet } from '#lib/site/lazy-sheet.svelte.ts';
 	import { leagueApi, type LeagueSync } from './api.ts';
@@ -74,10 +74,10 @@
 		return { sync, board: await board, kickoffs: await kickoffs, games, read_at: sync.read_at };
 	}
 
-	/** A starter's game facts this week, null when the game is played or nothing is held. */
+	/** A starter's game facts this week, null from kickoff or when nothing is held. */
 	function factsOf(games: GameWeek | null, team: string): string | null {
 		const game = games === null ? null : clubGame(games, runClub(team));
-		return game === null || game.played ? null : gameFactsLine(game);
+		return game === null || !toBePlayed(game) ? null : gameFactsLine(game);
 	}
 
 	onMount(() => void lazySheet.load());

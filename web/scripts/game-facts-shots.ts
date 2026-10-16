@@ -21,7 +21,7 @@ const READY_TIMEOUT_MS = 30_000;
 const SIGNED_IN = { name: 'commish_csrf', value: 'fixture' };
 /** A game facts sentence as a row says it. */
 const FACTS =
-	/(Expected to (win|lose) by \d+(\.5)?|Expected to be even), \d+(\.5)? points in the game\./;
+	/(Expected to score \d+(\.5)? and to (win|lose) by \d+(\.5)?|Expected to be a close game), \d+(\.5)? points in the game\./;
 const READ = /Read \w{3} \d{1,2}:\d{2} [ap]m\./;
 const WEATHER =
 	/\d+°F and \d+ mph wind at kickoff, (outdoors|under a retractable roof)\.|Indoors\.|Played abroad, so no forecast\./;
