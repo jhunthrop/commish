@@ -226,3 +226,16 @@ When a weekly projection round passes its gates (§10), its rows join `PlayerLin
 | 27 Review | ux-design-architect review of the merged screens live; the record page link | 25 and 26 merged |
 
 Gates as every lane: api `gofmt -l`, `go vet`, `go build`, `make check-gen`, the race tests; web `npm run check`, `npm run lint`, `npm test`, Lighthouse as web.yml runs it; copy guard tests on every new sentence.
+
+## 12. A player who is out is never ranked as if he plays (Lane 63)
+
+Founder, 2026-10-16: a player on injured reserve still ranked high makes people question the board.
+
+**The rule.** A season-long designation (injured reserve, PUP, NFI, suspended, or out with the capture's note saying out for the season) puts him below every available player at his position in the rest-of-season order. His points and points over replacement stay the figures they are, his rank shows as the designation's word ("IR"), and his row says so: "On injured reserve since October 14. Our rest-of-season figure assumes he plays, so he sits below the available players." We do not model return dates. A week's designation (out, doubtful, questionable) moves nothing: the row carries the league screens' mark ("Doubtful as of Thu 4:10 pm") and the player page says "Doubtful this week, which does not move his place on our board." The host's own IR mark counts as season-long on that league's screens (already so in the engine). The public board uses the capture alone.
+
+**Since.** The first capture of his unbroken run under the status, over the last sixty days of by-date captures. A run that reaches the oldest capture read has no date, and the row says "as of" the capture's day. A capture whose list does not read breaks no run.
+
+**The source and the cadence.** The hourly injury capture, the same read the in-season screens use. The API's `GET /boards/{format}` overlays it at read time from that cache (`status` per player, `status_read` for the board), ordering only: ranks stay the store's. Every publish hour writes `runs/<id>/designations.json` beside the public run and the run waiting on its early-access hour, writes `status`, `status_since` and `status_source` into `research.published_boards` (revision 0008), and dispatches the site build when the run's set of season-long ranked players differs from the set its last build was made with. A run without the file renders as before. The provider's codes and the rule are one table for both lanes, pinned in `api/testdata/designation-codes.json`.
+
+**Basis.** The board's basis line adds "Injury status from the hourly capture, read 9:05 am Central.", on the member's own clock once the page is live (built on the Eastern clock), and the record's method words say the same and that the frozen boards it grades moved no one. The capsule sheet tells the writer that a season-long designation puts him below every available player at his position, so a read never contradicts its row.
+
