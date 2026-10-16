@@ -166,5 +166,4 @@ The paper tokens (`--paper`, `--paper-ink`, `--paper-line`, `--paper-muted`) are
 addition to `tokens.css`: the print view's colors in both themes, and the page ground under print
 media.
 
-
 Lighthouse is off as a gate until there is a product to tune (founder, 2026-10-16): the deploy skips it unless the repository variable `LIGHTHOUSE` is `on`, and a merge does not run it locally. The configs and budgets stay as they are for when it returns.
