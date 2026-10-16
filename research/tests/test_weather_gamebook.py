@@ -40,11 +40,44 @@ def test_temperature_and_wind(text: str, temperature: float | None, wind: float 
         ("Clear, no rain Temp: 60° F, Wind: S 5 mph", Precipitation(0, None)),
         ("Cloudy, forecast: rain later Temp: 60° F, Wind: S 5 mph", Precipitation(0, None)),
         ("Sunny Temp: 74° F, Humidity: 53%, Wind: E 6 mph", Precipitation(0, None)),
-        # Outside the preregistered list, so not counted (the results name such words).
-        ("Rainy Temp: 50° F, Wind: E 6 mph", Precipitation(0, None)),
-        # The preregistered rule read literally: the word precedes "forecast", so it is present.
-        ("Mostly Cloudy with Light Rain Forecasted Temp: 66° F, Wind: S 8 mph", Precipitation(1, "rain")),
+        # The stems of the amended list (Amendment 1, item 1).
+        ("Rainy Temp: 50° F, Wind: E 6 mph", Precipitation(1, "rain")),
+        ("Raining Temp: 50° F, Wind: E 6 mph", Precipitation(1, "rain")),
+        ("Shower Temp: 50° F, Wind: E 6 mph", Precipitation(1, "rain")),
+        ("Drizzling Temp: 50° F, Wind: E 6 mph", Precipitation(1, "rain")),
+        ("Snowing Temp: 28° F, Wind: E 6 mph", Precipitation(1, "snow")),
+        ("Snowy Temp: 28° F, Wind: E 6 mph", Precipitation(1, "snow")),
+        # A hedge or a percentage anywhere in the line, before or after the word, is not a present condition.
+        ("Mostly Cloudy with Light Rain Forecasted Temp: 66° F, Wind: S 8 mph", Precipitation(0, None)),
+        ("Rain Chance 40% Temp: 66° F, Wind: S 8 mph", Precipitation(0, None)),
+        ("Rain Chances Temp: 66° F, Wind: S 8 mph", Precipitation(0, None)),
+        ("Rain possible Temp: 66° F, Wind: S 8 mph", Precipitation(0, None)),
+        ("Rain, possibly heavy Temp: 66° F, Wind: S 8 mph", Precipitation(0, None)),
+        ("Rain 40% Temp: 66° F, Wind: S 8 mph", Precipitation(0, None)),
+        ("40 % showers Temp: 66° F, Wind: S 8 mph", Precipitation(0, None)),
+        ("Forecast cloudy, rain Temp: 66° F, Wind: S 8 mph", Precipitation(0, None)),
+        # The humidity figure is a measurement, not a probability.
+        ("Rain Temp: 66° F, Humidity: 87 %, Wind: S 8 mph", Precipitation(1, "rain")),
+        ("No rain, snow Temp: 30° F, Wind: S 8 mph", Precipitation(1, "snow")),
     ],
 )
 def test_the_preregistered_precipitation_word(text: str, expected: Precipitation) -> None:
     assert precipitation(text) == expected
+
+
+@pytest.mark.parametrize(
+    ("text", "flag"),
+    [
+        ("Rain Chance 40%", 0),
+        ("Light Rain Forecasted", 0),
+        ("rainy", 1),
+        ("Raining", 1),
+    ],
+)
+def test_the_four_lines_the_literal_rule_misread(text: str, flag: int) -> None:
+    assert precipitation(text).flag == flag
+
+
+def test_the_empty_gamebook_line_has_no_reading() -> None:
+    line = "Temp: ° F, Wind: mph"
+    assert (temperature_f(line), wind_mph(line)) == (None, None)
