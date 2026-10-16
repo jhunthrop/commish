@@ -29,6 +29,8 @@ from research.pipeline.checkpoint import Checkpoint
 from research.pipeline.http import Fetcher
 from research.pipeline.nflverse import (
     context,
+    depth_chart_check,
+    depth_chart_weeks,
     derived_stat_lines,
     draft_picks,
     ingest,
@@ -36,8 +38,10 @@ from research.pipeline.nflverse import (
     injury_archive,
     injury_reports,
     kicking_weeks,
+    pbp_plays,
     roster_weeks,
     team_defense_weeks,
+    usage_feeds,
 )
 from research.pipeline.nflverse.client import NflverseClient
 from research.pipeline.odds import backfill
@@ -50,6 +54,7 @@ from research.pipeline.tank01.client import API_KEY_ENV as TANK01_KEY_ENV
 from research.pipeline.tank01.client import DEFAULT_SEASON, SEASON_ENV, Tank01Client
 from research.pipeline.tank01.mapping import WEEKS_LAST
 from research.pipeline.tank01.provider import Tank01Provider
+from research.pipeline.weather import game_weather, isd
 
 RESEARCH_ROOT: Final = Path(__file__).resolve().parents[1]
 ODDS_KEY_ENV: Final = "ODDS_API_KEY"
@@ -166,6 +171,59 @@ def _props_backfill(conn: Connection, inv: Invocation) -> object:
     return backfill.backfill_props(conn, inv.fetcher, request, inv.checkpoint)
 
 
+def _pbp_plays(conn: Connection, inv: Invocation) -> object:
+    """Each season's plays into the play table, durable after each season."""
+    client = NflverseClient(inv.fetcher)
+    lines = []
+    for season in seasons_of(inv.args):
+        lines.append(pbp_plays.ingest_pbp_plays(conn, client, season).summary())
+        inv.checkpoint()
+    return lines
+
+
+def _depth_chart_weeks(conn: Connection, inv: Invocation) -> object:
+    """Each season's weekly depth charts, durable after each season."""
+    client = NflverseClient(inv.fetcher)
+    lines = []
+    for season in seasons_of(inv.args):
+        lines.append(depth_chart_weeks.ingest_depth_chart_weeks(conn, client, season).summary())
+        inv.checkpoint()
+    return lines
+
+
+# The charted feeds' first published seasons upstream (the data-sources doc): Next Gen Stats weekly
+# from 2016, PFR's advanced stats through nflverse from 2018. FTN charting starts in 2022 and is kept
+# out of the round 4 fit (no 2021 season), so its history is not ingested here.
+NGS_FIRST_SEASON: Final = 2016
+PFR_FIRST_SEASON: Final = 2018
+
+
+def _charted_history(conn: Connection, inv: Invocation) -> object:
+    """Next Gen Stats and PFR advanced stats per season through the weekly pass's own ingests
+    (`usage_feeds`, Lane 23), durable after each feed."""
+    client = NflverseClient(inv.fetcher)
+    seasons = seasons_of(inv.args)
+    week_as_of = ingest.schedule_week_as_of(client, seasons)
+    lines = []
+    for season in seasons:
+        if season >= NGS_FIRST_SEASON:
+            ngs = usage_feeds.ingest_next_gen_stats(conn, client, season, week_as_of.get(season, {}))
+            lines.append(f"next-gen-stats {season}: {ngs.summary()}")
+            inv.checkpoint()
+        if season >= PFR_FIRST_SEASON:
+            pfr = usage_feeds.ingest_pfr_advstats(conn, client, season)
+            lines.append(f"pfr-advstats {season}: {pfr.summary()}")
+            inv.checkpoint()
+    return lines
+
+
+def _game_weather(conn: Connection, inv: Invocation) -> object:
+    """The kickoff weather of every regular-season game of the seasons, filled from its three sources."""
+    reader = isd.IsdReader(inv.fetcher)
+    reports = game_weather.ingest_game_weather(conn, NflverseClient(inv.fetcher), reader, seasons_of(inv.args))
+    return [line for report in reports for line in report.lines()] + [f"NCEI reads: {len(reader.requests)}"]
+
+
 def _win_totals(conn: Connection, inv: Invocation) -> object:
     return vegas.run_win_totals(conn, inv.fetcher, inv.args.last, inv.now, first_kickoff_for(conn, inv.args.last))
 
@@ -208,5 +266,10 @@ COMMANDS: Final = MappingProxyType({
     "props-backfill": Command("the historical props archive, budgeted", _props_backfill, atomic=False),
     "win-totals-seed": Command("the committed win-totals CSV", lambda c, i: vegas.ingest_win_totals_csv(c, RESEARCH_ROOT / vegas.WIN_TOTALS_CSV_PATH, i.now)),
     "win-totals": Command("the publisher's win totals before kickoff", _win_totals),
+    "pbp-plays": Command("the play-level play-by-play per season into nflverse_pbp_plays", _pbp_plays, atomic=False),
+    "depth-chart-weeks": Command("nflverse's weekly depth charts per season into nflverse_depth_chart_weeks", _depth_chart_weeks, atomic=False),
+    "depth-chart-check": Command("the round 4 depth chart stamp check (reads charts and filings, writes nothing; the coordinator's recorded run)", lambda c, i: depth_chart_check.run_stamp_check(c).lines()),
+    "charted-history": Command("Next Gen Stats (2016 on) and PFR advanced stats (2018 on) per season through the weekly pass's ingests", _charted_history, atomic=False),
+    "game-weather": Command("the recorded kickoff weather per game into game_weather (games.csv, the gamebook line, NOAA ISD)", _game_weather),
     "history": Command("the seasons the store lost, re-created from nflverse (pipeline/history.py); --first/--last narrow it", _history, atomic=False),
 })  # fmt: skip

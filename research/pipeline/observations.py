@@ -19,8 +19,10 @@ from research.db.schema import PLAYER_WEEK_OBSERVATIONS, PLAYER_WEEK_TEAMS, TEAM
 from research.errors import CoherenceError
 from research.pipeline.jscompat import js_epoch_ms, js_iso, js_string
 
-# Postgres caps a statement at 65,535 bound parameters; the TypeScript writers chunk at 2,000 rows.
+# Postgres caps a statement at 65,535 bound parameters; the TypeScript writers chunk at 2,000 rows,
+# and a row wider than the cap allows at that count (the play table's) takes fewer per statement.
 INSERT_CHUNK_ROWS = 2_000
+MAX_BIND_PARAMETERS = 65_535
 
 # Eighteen regular-season weeks plus four rounds of playoffs: above every real week.
 LAST_POSSIBLE_WEEK = 22
@@ -98,11 +100,17 @@ def _assert_team_coherent(rows: Sequence[TeamWeekObservation]) -> None:
 def insert_ignoring_conflicts(conn: Connection, table: Table, rows: Sequence[dict[str, object]]) -> int:
     """Chunked `INSERT ... ON CONFLICT DO NOTHING RETURNING`, counting the rows actually written."""
     written = 0
-    for start in range(0, len(rows), INSERT_CHUNK_ROWS):
-        chunk = rows[start : start + INSERT_CHUNK_ROWS]
+    per_statement = rows_per_statement(max((len(row) for row in rows), default=1))
+    for start in range(0, len(rows), per_statement):
+        chunk = rows[start : start + per_statement]
         statement = insert(table).values(list(chunk)).on_conflict_do_nothing().returning(table.c[_first_key(table)])
         written += len(conn.execute(statement).all())
     return written
+
+
+def rows_per_statement(width: int) -> int:
+    """How many rows of `width` columns one INSERT may carry under the bound-parameter cap."""
+    return min(INSERT_CHUNK_ROWS, MAX_BIND_PARAMETERS // width)
 
 
 def _first_key(table: Table) -> str:

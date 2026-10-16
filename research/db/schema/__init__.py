@@ -10,6 +10,7 @@ Every table lives in the `research` Postgres schema and is defined once here, by
     boards        model_artifacts, the boards and reasons, the register, player_capsules
     custom        preseason_candidates (each board's candidate set), custom_boards (revision 0005)
     published     published_boards, the published run's board rows (revision 0006)
+    game_history  nflverse_pbp_plays, nflverse_depth_chart_weeks, game_weather (revision 0009)
 
 `alembic/versions/0001_research_schema.py` creates exactly this, and the schema gate checks the
 two agree. What changed from the legacy `public` tables, and why, is in the README; the column
@@ -26,6 +27,7 @@ from research.db.schema.boards import (
     REGISTER_GRADE_ROWS,
 )
 from research.db.schema.custom import CUSTOM_BOARDS, PRESEASON_CANDIDATES
+from research.db.schema.game_history import GAME_WEATHER, NFLVERSE_DEPTH_CHART_WEEKS, NFLVERSE_PBP_PLAYS
 from research.db.schema.identity import PLAYER_CROSSWALK, PLAYERS, PROPS_PLAYER_MAP, PROVIDER_PLAYERS
 from research.db.schema.market import ADP_SNAPSHOTS, PRESEASON_RANKINGS, PRESEASON_ROSTERS
 from research.db.schema.nflverse import (
@@ -41,9 +43,11 @@ from research.db.schema.provider import (
     CAPTURE_CHECKS,
     CAPTURE_SNAPSHOTS,
     PLAYER_PROP_OBSERVATIONS,
+    PLAYER_TD_PROP_OBSERVATIONS,
     PROVIDER_GAMES,
     PROVIDER_STAT_LINES,
     PROVIDER_WEEKS,
+    TANK01_PROJECTION_ROWS,
 )
 from research.db.schema.published import PUBLISHED_BOARDS
 
@@ -53,10 +57,13 @@ __all__ = [
     "CAPTURE_SNAPSHOTS",
     "COACHES",
     "CUSTOM_BOARDS",
+    "GAME_WEATHER",
     "METADATA",
     "MODEL_ARTIFACTS",
+    "NFLVERSE_DEPTH_CHART_WEEKS",
     "NFLVERSE_INJURIES",
     "NFLVERSE_KICKING_WEEKS",
+    "NFLVERSE_PBP_PLAYS",
     "NFLVERSE_ROSTER_WEEKS",
     "NFLVERSE_TEAM_DEFENSE_WEEKS",
     "NFL_DRAFT_PICKS",
@@ -64,6 +71,7 @@ __all__ = [
     "PLAYER_CAPSULES",
     "PLAYER_CROSSWALK",
     "PLAYER_PROP_OBSERVATIONS",
+    "PLAYER_TD_PROP_OBSERVATIONS",
     "PLAYER_WEEK_OBSERVATIONS",
     "PLAYER_WEEK_TEAMS",
     "PRESEASON_BOARD_REASONS",
@@ -80,5 +88,6 @@ __all__ = [
     "REGISTER_FREEZE_ROWS",
     "REGISTER_GRADE_ROWS",
     "RESEARCH_SCHEMA",
+    "TANK01_PROJECTION_ROWS",
     "TEAM_WEEK_OBSERVATIONS",
 ]

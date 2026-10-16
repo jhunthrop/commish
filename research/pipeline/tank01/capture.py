@@ -25,6 +25,7 @@ from research.pipeline.jscompat import js_iso, js_json_stringify, js_object_keys
 from research.pipeline.nflverse.team_codes import NFL_TEAM_ABBREVIATIONS
 from research.pipeline.tank01.client import Paths, Tank01Client
 from research.pipeline.tank01.mapping import ADP_TYPE
+from research.pipeline.tank01.projections import PROJECTIONS_SOURCE, projection_slot_due
 from research.pipeline.tolerated import TOLERATED_FAILURES
 
 Cadence = Literal["daily", "game-day", "weekly"]
@@ -67,7 +68,7 @@ CAPTURE_FEEDS: tuple[CaptureFeed, ...] = (
     CaptureFeed("tank01_betting_odds", "game-day", lambda c: [CaptureRequest(Paths.BETTING_ODDS, {"gameDate": c.day})]),
     CaptureFeed("tank01_dfs_salaries", "game-day", lambda c: [CaptureRequest(Paths.DFS, {"date": c.day})]),
     CaptureFeed("tank01_adp", "weekly", lambda _c: [CaptureRequest(Paths.ADP, {"adpType": ADP_TYPE})]),
-    CaptureFeed("tank01_projections", "daily", lambda c: [CaptureRequest(Paths.PROJECTIONS, {"week": str(c.week)})]),
+    CaptureFeed(PROJECTIONS_SOURCE, "daily", lambda c: [CaptureRequest(Paths.PROJECTIONS, {"week": str(c.week)})]),
     CaptureFeed("tank01_injuries_by_date", "daily", lambda _c: [CaptureRequest(Paths.INJURIES_BY_DATE, {})]),
     CaptureFeed("tank01_inactives", "game-day", lambda c: [CaptureRequest(Paths.INACTIVES, {"week": str(c.week)})]),
     CaptureFeed("tank01_player_list", "weekly", lambda _c: [CaptureRequest(Paths.PLAYER_LIST, {})]),
@@ -233,7 +234,17 @@ def current_nfl_week(conn: Connection, season: int) -> int:
     return 1 if week is None else int(week)
 
 
+def slot_projection_feed(week: int) -> CaptureFeed:
+    """The weekly projection of the kickoff slot's own week (`projections`)."""
+    return CaptureFeed(PROJECTIONS_SOURCE, "daily", lambda _c: [CaptureRequest(Paths.PROJECTIONS, {"week": str(week)})])
+
+
 def run_capture_harvest(conn: Connection, client: Tank01Client, fired_at: datetime, season: int) -> CaptureResult:
-    """The capture-harvest job's capture: five feeds, a ten-request ceiling, no freshness keys."""
-    capture = CapturePass(fired_at, season, current_nfl_week(conn, season), feeds=harvest_feeds())
+    """The capture-harvest job's capture: five feeds, a ten-request ceiling, no freshness keys; in a
+    kickoff slot's window not yet captured, the slot week's projection as a sixth. Parsing the stored
+    projections is the caller's next transaction (`projections.parse_stored_projections`), so a refused
+    snapshot never rolls back what this pass captured."""
+    slot = projection_slot_due(conn, season, fired_at)
+    feeds = [*harvest_feeds(), *([] if slot is None else [slot_projection_feed(slot.week)])]
+    capture = CapturePass(fired_at, season, current_nfl_week(conn, season), feeds=feeds)
     return capture_once(conn, client, capture, FixedBudget(CAPTURE_HARVEST_REQUEST_BUDGET))
