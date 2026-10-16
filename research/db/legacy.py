@@ -372,6 +372,7 @@ NEW_IN_RESEARCH: Final[Mapping[str, str]] = MappingProxyType(
         "game_weather": "the recorded kickoff weather with each value's source (revision 0009)",
         "tank01_projection_rows": "Tank01's weekly projection parsed per player (revision 0009), a benchmark",
         "player_td_prop_observations": "the anytime-touchdown market (revision 0009), a benchmark",
+        "capture_checks": "each capture feed's last successful check (revision 0008), rewritten by every capture pass",
     }
 )
 

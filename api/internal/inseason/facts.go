@@ -3,45 +3,11 @@ package inseason
 import (
 	"fmt"
 	"sort"
-	"strings"
 	"time"
 
 	"github.com/jhunthrop/commish/api/internal/boards"
 	"github.com/jhunthrop/commish/api/internal/draft"
 )
-
-// Designation statuses, the contract's words (WeekFacts.designation).
-const (
-	StatusQuestionable   = "questionable"
-	StatusDoubtful       = "doubtful"
-	StatusOut            = "out"
-	StatusInjuredReserve = "injured_reserve"
-	StatusSuspended      = "suspended"
-	StatusPUP            = "pup"
-	StatusNFI            = "nfi"
-)
-
-// statusOf is the provider's designation code in the contract's words,
-// "" for a code we do not know (then no designation is shown).
-func statusOf(code string) string {
-	switch strings.ToUpper(strings.TrimSpace(code)) {
-	case "Q", "QUESTIONABLE":
-		return StatusQuestionable
-	case "D", "DOUBTFUL":
-		return StatusDoubtful
-	case "O", "OUT":
-		return StatusOut
-	case "IR", "IR-R", "INJURED RESERVE":
-		return StatusInjuredReserve
-	case "SUSP", "SUS", "SUSPENDED":
-		return StatusSuspended
-	case "PUP":
-		return StatusPUP
-	case "NFI":
-		return StatusNFI
-	}
-	return ""
-}
 
 // lastGamesShown is how many completed games a row carries.
 const lastGamesShown = 3
@@ -110,9 +76,9 @@ func (f Facts) Tier() Tier {
 		return Available
 	}
 	switch f.Designation.Status {
-	case StatusDoubtful:
+	case boards.StatusDoubtful:
 		return Doubtful
-	case StatusQuestionable:
+	case boards.StatusQuestionable:
 		return Available
 	}
 	return Out
@@ -120,7 +86,7 @@ func (f Facts) Tier() Tier {
 
 // InjuredReserve is a player listed on injured reserve.
 func (f Facts) InjuredReserve() bool {
-	return f.Designation != nil && f.Designation.Status == StatusInjuredReserve
+	return f.Designation != nil && f.Designation.Status == boards.StatusInjuredReserve
 }
 
 type teamWeek struct {
@@ -260,12 +226,12 @@ func (s *Season) For(p Player) Facts {
 // host's IR mark at the read.
 func (s *Season) designation(p Player) *Designation {
 	if d, ok := s.designations[p.BoardID]; ok && p.BoardID != "" {
-		if status := statusOf(d.Code); status != "" {
+		if status := boards.StatusOf(d.Code); status != "" {
 			return &Designation{Status: status, AsOf: d.AsOf}
 		}
 	}
 	if p.HostIR {
-		return &Designation{Status: StatusInjuredReserve, AsOf: p.ReadAt}
+		return &Designation{Status: boards.StatusInjuredReserve, AsOf: p.ReadAt}
 	}
 	return nil
 }

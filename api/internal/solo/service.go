@@ -80,7 +80,10 @@ type Service struct {
 	Gate    SettingsGate
 	Sheets  SheetOrder
 	Boards  BoardSource
-	Advisor advisor.Advisor
+	// Designations is the hourly injury capture GET /boards/{format}
+	// overlays; nil leaves the board as the store has it.
+	Designations DesignationSource
+	Advisor      advisor.Advisor
 	// Hindsight answers a report's pick that recorded no odds.
 	Hindsight mock.Odds
 	// Anon is the signed-out owner's cookies.

@@ -76,6 +76,7 @@ await check('adp.json', () => web.adp());
 await check('record.json', () => web.record());
 await check('clubs.json', () => web.clubs());
 await check('schedule.json', () => web.schedule());
+await check('designations.json', () => web.designations());
 // The run-wide loaders the build's pages call (fix round 3, R5): each holds the run to a rule no single
 // file carries (the season blocks' reach and format, the first kickoff, the default format).
 for (const name of ['firstKickoff', 'seasonUnderway', 'seasonReach', 'defaultFormat'] as const) {
@@ -89,6 +90,6 @@ for (const name of ['firstKickoff', 'seasonUnderway', 'seasonReach', 'defaultFor
 for (const line of refusals.values()) process.stdout.write(`${line}\n`);
 process.stdout.write(
 	`run ${runId}: ${refusals.size} refusals; ${manifest?.formats.length ?? 0} formats (${rows} board rows), ` +
-		`${pages} of ${index?.length ?? 0} player pages parsed, adp, record, clubs, schedule\n`
+		`${pages} of ${index?.length ?? 0} player pages parsed, adp, record, clubs, schedule, designations\n`
 );
 process.exit(refusals.size === 0 ? 0 : 1);

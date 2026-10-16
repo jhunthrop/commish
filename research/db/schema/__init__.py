@@ -40,6 +40,7 @@ from research.db.schema.nflverse import (
 )
 from research.db.schema.observations import PLAYER_WEEK_OBSERVATIONS, PLAYER_WEEK_TEAMS, TEAM_WEEK_OBSERVATIONS
 from research.db.schema.provider import (
+    CAPTURE_CHECKS,
     CAPTURE_SNAPSHOTS,
     PLAYER_PROP_OBSERVATIONS,
     PLAYER_TD_PROP_OBSERVATIONS,
@@ -52,6 +53,7 @@ from research.db.schema.published import PUBLISHED_BOARDS
 
 __all__ = [
     "ADP_SNAPSHOTS",
+    "CAPTURE_CHECKS",
     "CAPTURE_SNAPSHOTS",
     "COACHES",
     "CUSTOM_BOARDS",

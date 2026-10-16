@@ -25,24 +25,37 @@ export interface UnwrittenInput {
 	year: number;
 	/** The figures are the rest of the season's, not the whole season's. */
 	restOfSeason: boolean;
+	/** The word his ranks show as when he is on a season-long list ("IR", Lane 63): no rank or tier
+	 * places him by the figure that assumes he plays. */
+	held?: string | null;
 }
 
 /** The facts the written read draws on that the page does not already print as its own numbers. */
 export function unwrittenLines(input: UnwrittenInput): UnwrittenLine[] {
 	const { numbers, position, boardSize, label, unit, year, restOfSeason } = input;
 	const span = restOfSeason ? `the rest of ${String(year)}` : String(year);
-	const lines: UnwrittenLine[] = [
-		{
-			lead: 'Our rank',
-			figure: `${position}${String(numbers.positionRank)}`,
-			text: `${position} ${String(numbers.positionRank)} and pick ${String(numbers.ourRank)} overall among the ${String(boardSize)} on our ${label} board.`
-		},
-		{
-			lead: 'His tier',
-			figure: `Tier ${String(numbers.tier)}`,
-			text: `Tier ${String(numbers.tier)} among ${position}s on our ${label} board.`
-		}
-	];
+	const held = input.held ?? null;
+	const lines: UnwrittenLine[] =
+		held === null
+			? [
+					{
+						lead: 'Our rank',
+						figure: `${position}${String(numbers.positionRank)}`,
+						text: `${position} ${String(numbers.positionRank)} and pick ${String(numbers.ourRank)} overall among the ${String(boardSize)} on our ${label} board.`
+					},
+					{
+						lead: 'His tier',
+						figure: `Tier ${String(numbers.tier)}`,
+						text: `Tier ${String(numbers.tier)} among ${position}s on our ${label} board.`
+					}
+				]
+			: [
+					{
+						lead: 'His place',
+						figure: `${position} ${held}`,
+						text: `On a season-long list, so he sits below every available ${position} on our ${label} board, in no tier.`
+					}
+				];
 	if (numbers.floor !== null && numbers.median !== null && numbers.ceiling !== null) {
 		lines.push({
 			lead: 'His range',

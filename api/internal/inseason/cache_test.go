@@ -12,8 +12,8 @@ import (
 )
 
 type countingReads struct {
-	lines, games, designations atomic.Int32
-	fail                       bool
+	lines, games, designations, runs atomic.Int32
+	fail, failRuns                   bool
 }
 
 func (r *countingReads) StatLines(context.Context, int) ([]boards.StatLine, error) {
@@ -32,7 +32,17 @@ func (r *countingReads) Schedule(context.Context, int) ([]boards.TeamWeek, error
 func (r *countingReads) Designations(context.Context) (map[string]boards.Designation, error) {
 	r.designations.Add(1)
 	time.Sleep(5 * time.Millisecond)
-	return map[string]boards.Designation{"p1": {Code: "Q"}}, nil
+	return map[string]boards.Designation{"p1": {Code: "Q"}, "p2": {Code: "IR", AsOf: captureAt}}, nil
+}
+
+var captureAt = time.Date(2026, 10, 15, 11, 0, 0, 0, time.UTC)
+
+func (r *countingReads) SeasonRuns(_ context.Context, newest time.Time) (map[boards.RunKey]time.Time, error) {
+	r.runs.Add(1)
+	if r.failRuns {
+		return nil, errors.New("runs down")
+	}
+	return map[boards.RunKey]time.Time{{PlayerID: "p2", Status: boards.StatusInjuredReserve}: newest.Add(-time.Hour)}, nil
 }
 
 func TestCacheReadsOncePerTTL(t *testing.T) {
@@ -46,7 +56,7 @@ func TestCacheReadsOncePerTTL(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			if d, err := c.Data(ctx, 2026); err != nil || len(d.Lines) != 1 || len(d.Games) != 1 || len(d.Designations) != 1 {
+			if d, err := c.Data(ctx, 2026); err != nil || len(d.Lines) != 1 || len(d.Games) != 1 || len(d.Designations) != 2 {
 				t.Errorf("data %+v %v", d, err)
 			}
 		}()
@@ -69,6 +79,42 @@ func TestCacheReadsOncePerTTL(t *testing.T) {
 	mu.Unlock()
 	if _, err := c.Data(ctx, 2026); err != nil || reads.lines.Load() != 2 || reads.games.Load() != 2 {
 		t.Fatalf("past the season TTL: lines %d games %d (%v)", reads.lines.Load(), reads.games.Load(), err)
+	}
+}
+
+// The board route's designations are the in-season screens' read: one
+// capture read serves both within the TTL, and the screens never pay for
+// the dating read.
+func TestCacheSharesTheCaptureRead(t *testing.T) {
+	reads := &countingReads{}
+	c := &Cache{Reads: reads, Now: time.Now}
+	ctx := context.Background()
+	if _, err := c.Data(ctx, 2026); err != nil {
+		t.Fatal(err)
+	}
+	if reads.runs.Load() != 0 {
+		t.Fatal("the in-season screens read the season-long runs")
+	}
+	d, err := c.DatedDesignations(ctx)
+	if err != nil || d["p2"].Since == nil || !d["p2"].Since.Equal(captureAt.Add(-time.Hour)) || d["p1"].Since != nil {
+		t.Fatalf("dated designations %+v %v", d, err)
+	}
+	if reads.designations.Load() != 1 {
+		t.Fatalf("the board and the screens read the capture %d times, want once", reads.designations.Load())
+	}
+}
+
+// A dating read that fails answers the designations undated, never an
+// error, and the screens' read is untouched.
+func TestCacheDatingFailureAnswersUndated(t *testing.T) {
+	reads := &countingReads{failRuns: true}
+	c := &Cache{Reads: reads, Now: time.Now}
+	d, err := c.DatedDesignations(context.Background())
+	if err != nil || len(d) != 2 || d["p2"].Since != nil {
+		t.Fatalf("designations %+v %v, want them undated", d, err)
+	}
+	if _, err := c.Data(context.Background(), 2026); err != nil {
+		t.Fatal(err)
 	}
 }
 

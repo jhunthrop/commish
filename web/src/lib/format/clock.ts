@@ -40,6 +40,27 @@ function zoneName(zone: string): string {
 	return named ?? zone;
 }
 
+/** The zone in a word after a time, "9:05 am Central": a name of one word and "Time" drops the
+ * "Time", any other name is said whole. */
+export function zoneWord(zone: string = memberZone()): string {
+	const name = zoneName(zone);
+	const word = /^(\S+) Time$/.exec(name)?.[1];
+	return word ?? name;
+}
+
+/** The long month-and-day format for a zone, made once per zone. */
+const monthDayFormats = new Map<string, Intl.DateTimeFormat>();
+
+/** "October 14": an instant's day on the member's clock, as a sentence names it. */
+export function monthDay(iso: string, zone: string = memberZone()): string {
+	let made = monthDayFormats.get(zone);
+	if (!made) {
+		made = new Intl.DateTimeFormat('en-US', { month: 'long', day: 'numeric', timeZone: zone });
+		monthDayFormats.set(zone, made);
+	}
+	return made.format(new Date(iso));
+}
+
 /** The NFL's clock, which a screen's times need not name. */
 const EASTERN = 'Eastern Time';
 

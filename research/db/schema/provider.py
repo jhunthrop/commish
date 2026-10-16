@@ -147,6 +147,15 @@ CAPTURE_SNAPSHOTS: Final = Table(
     Index("capture_snapshots_source_captured_idx", "source", "captured_at"),
 )
 
+# The capture job's last successful check of each feed (revision 0008, Lane 63): a feed whose list
+# has not changed writes no snapshot, so this says when the list was last read, whatever it held.
+CAPTURE_CHECKS: Final = Table(
+    "capture_checks",
+    METADATA,
+    Column("source", Text, primary_key=True),
+    Column("checked_at", DateTime(True), nullable=False),
+)
+
 # A plain insert: one event's props fetched twice hold identical rows, and both are kept.
 PLAYER_PROP_OBSERVATIONS: Final = Table(
     "player_prop_observations",

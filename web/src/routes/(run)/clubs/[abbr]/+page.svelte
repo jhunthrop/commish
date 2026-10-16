@@ -1,5 +1,7 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { fixed } from '#lib/format/number.ts';
+	import { liveStatusClock, sayBoard, type LiveStatus } from '#lib/run/live-status.ts';
 	import { rowFraming } from '#lib/run/row-framing.ts';
 	import { clubCaption, playedWords } from '#lib/run/strength-words.ts';
 	import SiteShell from '#lib/site/SiteShell.svelte';
@@ -24,6 +26,18 @@
 	const name = $derived(`${club.city} ${club.nickname}`);
 	const names = $derived(new Map(page.clubs.map((other) => [other.abbr, other])));
 	const caption = $derived(clubCaption(page.slate, page.clubs.length));
+	/** The rows' status words as built, said again on the member's clock once the page is live. */
+	let live = $state<LiveStatus | null>(null);
+	onMount(() => {
+		liveStatusClock(
+			page.capture !== null,
+			() => import('#lib/run/status-view.ts'),
+			(said) => {
+				live = said;
+			}
+		);
+	});
+	const words = $derived(sayBoard(page, live));
 </script>
 
 <SiteShell title={name} run={data.run}>
@@ -56,6 +70,7 @@
 							unit={page.format.unit}
 							season={player.season}
 							{framing}
+							status={words?.rows[player.id] ?? null}
 						/>
 					{/each}
 				</Panel>

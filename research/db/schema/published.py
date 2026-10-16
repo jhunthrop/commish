@@ -21,6 +21,8 @@ from research.db.schema._base import METADATA, one_of
 
 PUBLISHED_FORMATS: Final = ("ppr", "half", "std", "superflex")
 ORDER_BASES: Final = ("preseason", "rest_of_season")
+# The contract's designation words (api/openapi.yaml DesignationStatus).
+PUBLISHED_STATUSES: Final = ("questionable", "doubtful", "out", "injured_reserve", "suspended", "pup", "nfi")
 
 PUBLISHED_BOARDS: Final = Table(
     "published_boards",
@@ -44,9 +46,16 @@ PUBLISHED_BOARDS: Final = Table(
     # The run's rosFromWeek in season (revision 0007): the weeks a figure covers run from it to week 17;
     # NULL for a preseason row.
     Column("from_week", Integer),
+    # His designation on the newest hourly capture (revision 0008, Lane 63), NULL when it does not list
+    # him; the first capture of his unbroken run under a season-long status, NULL for a week's
+    # designation and for a run older than the captures read; the capture's feed.
+    Column("status", Text),
+    Column("status_since", DateTime(True)),
+    Column("status_source", Text),
     one_of("format", PUBLISHED_FORMATS, "published_boards_format_ck"),
     one_of("order_basis", ORDER_BASES, "published_boards_order_basis_ck"),
     CheckConstraint("rank >= 1 AND position_rank >= 1", name="published_boards_rank_ck"),
     CheckConstraint("from_week BETWEEN 1 AND 18", name="published_boards_from_week_ck"),
+    one_of("status", PUBLISHED_STATUSES, "published_boards_status_ck"),
     Index("published_boards_run_idx", "run_id"),
 )

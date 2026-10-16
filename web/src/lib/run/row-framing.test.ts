@@ -5,7 +5,14 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { boardBasisTerms } from './board-basis.ts';
-import { PRESEASON_FRAMING, framedVorCell, rowFraming } from './row-framing.ts';
+import {
+	HELD_FRAMING,
+	PRESEASON_FRAMING,
+	framedVorCell,
+	roundlessVorCell,
+	rowFraming
+} from './row-framing.ts';
+import { VOR_LABEL, vorCell } from '#lib/ui/heat.ts';
 
 void test('a preseason board compares drafters with our rank and names the round', () => {
 	assert.deepEqual(rowFraming({}), { compare: true, round: true });
@@ -65,4 +72,17 @@ void test('the rest-of-season basis names no round and gives the ADP as a fact',
 	assert.doesNotMatch(green, /round/i);
 	assert.equal(green, 'Above replacement, deeper the higher he ranks among 618');
 	assert.equal(terms[4]?.means, 'Their ADP from PPR drafts, Sep 5 to Sep 9');
+});
+
+void test('a held player’s row frames no rank on any board: the ADP alone, no round (Lane 63)', () => {
+	assert.deepEqual(HELD_FRAMING, { compare: false, round: false });
+	assert.equal(framedVorCell(97.3, 1, HELD_FRAMING).label, VOR_LABEL);
+	assert.notEqual(framedVorCell(97.3, 1, PRESEASON_FRAMING).label, VOR_LABEL);
+});
+
+void test('a league row’s value cell drops the round only for a held player (Lane 63, N1)', () => {
+	// LeagueRow draws roundlessVorCell for a held player and vorCell otherwise.
+	assert.equal(roundlessVorCell(97.3, 1).label, VOR_LABEL);
+	assert.deepEqual(roundlessVorCell(97.3, 1), framedVorCell(97.3, 1, HELD_FRAMING));
+	assert.deepEqual(vorCell(97.3, 1), framedVorCell(97.3, 1, PRESEASON_FRAMING));
 });

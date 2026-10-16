@@ -117,7 +117,7 @@ def week_scores_for(
     return out
 
 
-def _designations(source: str, payload: Any) -> dict[str, CapturedDesignation]:
+def designations_in(source: str, payload: Any) -> dict[str, CapturedDesignation]:
     """`parseInjuryCapture`: the roster sweep's nested injury, or the by-date list's designation."""
     out: dict[str, CapturedDesignation] = {}
     if source == ROSTER_SWEEP_SOURCE:
@@ -154,7 +154,9 @@ def injury_captures_for(conn: Connection, since: datetime, limit: int) -> list[I
         ),
         {"sources": list(DESIGNATION_SOURCES), "since": since, "limit": limit},
     )
-    return [InjuryCapture(ms_instant(r.captured_at), _designations(r.source, r.payload)) for r in reversed(list(rows))]
+    return [
+        InjuryCapture(ms_instant(r.captured_at), designations_in(r.source, r.payload)) for r in reversed(list(rows))
+    ]
 
 
 def latest_roster_colleges(conn: Connection) -> dict[str, str | None]:

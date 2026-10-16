@@ -1,11 +1,13 @@
-/** The front door: the top of the default board, and the record's headline, from the run. */
+/** The front door: the top of the default board in the board's order, and the record's headline,
+ * from the run. */
+import { withStatuses } from '#lib/run/board-status.ts';
 import { rangeScale } from '#lib/run/derive.ts';
 import { recordHeadline, type RecordHeadline } from '#lib/run/record.ts';
 import { rowFraming, type RowFraming } from '#lib/run/row-framing.ts';
 import type { BoardRowView, Format } from '#lib/run/schema.ts';
 import type { RangeScale } from '#lib/types/player.ts';
 import { boardSeason } from '../board-season.ts';
-import { board, defaultFormat, record } from '../run.ts';
+import { board, defaultFormat, designations, record } from '../run.ts';
 
 /** How many of the board's top rows the front door shows. */
 const TOP_ROWS = 10;
@@ -27,8 +29,11 @@ export interface FrontPage {
 
 export async function frontPage(): Promise<FrontPage> {
 	const format = await defaultFormat();
-	const [loaded, kept] = await Promise.all([board(format.id), record()]);
-	const { rows, lead } = await boardSeason(format, loaded.rows.slice(0, TOP_ROWS));
+	const [loaded, kept, capture] = await Promise.all([board(format.id), record(), designations()]);
+	// A player on a season-long list is never in the top as if he plays (Lane 63): the strip is the
+	// board's own order, which puts him below the available players at his position.
+	const top = withStatuses(loaded.rows, capture).slice(0, TOP_ROWS);
+	const { rows, lead } = await boardSeason(format, top);
 	return {
 		format,
 		rows,

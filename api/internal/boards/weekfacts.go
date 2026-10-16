@@ -2,9 +2,7 @@ package boards
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"strings"
 	"time"
 )
 
@@ -29,17 +27,13 @@ func StatMetrics() []string {
 }
 
 // Read caps: a whole season is about 600 lined players a week for 18
-// weeks and 272 games; the newest injury capture is a few hundred KB.
+// weeks and 272 games.
 const (
-	maxStatLines       = 20000
-	maxTeamWeeks       = 1200
-	maxCaptureBytes    = 4 << 20
-	maxCaptureEntries  = 5000
-	scheduleSource     = "nflverse_kickoff"
-	kickoffMetric      = "kickoff_instant"
-	gameResultMetric   = "game_result"
-	injuriesByDate     = "tank01_injuries_by_date"
-	injuriesRosterWide = "tank01_injuries"
+	maxStatLines     = 20000
+	maxTeamWeeks     = 1200
+	scheduleSource   = "nflverse_kickoff"
+	kickoffMetric    = "kickoff_instant"
+	gameResultMetric = "game_result"
 )
 
 // nflverseTeams folds nflverse's spellings onto the provider's codes the
@@ -232,131 +226,4 @@ func (s *PGSource) teamWeekFacts(ctx context.Context, season int) (map[string]ti
 		return nil, nil, fmt.Errorf("boards: over %d team-week facts for %d", 2*maxTeamWeeks, season)
 	}
 	return kickoffs, finals, nil
-}
-
-// Designation is one player's injury designation as the provider's
-// capture lists it ("Q", "D", "O", "IR" and the like), and the capture's
-// stamp.
-type Designation struct {
-	Code string
-	AsOf time.Time
-}
-
-// Designations is the newest injury capture, by the board's player id.
-// Each capture is the provider's whole current list, so the newest stamp
-// wins outright: a player it does not name has no designation, whatever
-// an older capture said. The by-date list is the source (research's
-// current-status read); the roster sweep stands in only when no by-date
-// capture exists. A newest capture over the byte cap or that does not
-// parse gives way to the newest one that does, with its own stamp. The
-// sources and payload shapes are research/capsules/facts/depth_reads.py's.
-func (s *PGSource) Designations(ctx context.Context) (map[string]Designation, error) {
-	for _, source := range []string{injuriesByDate, injuriesRosterWide} {
-		out, found, err := s.newestCapture(ctx, source)
-		if err != nil || found {
-			return out, err
-		}
-	}
-	return map[string]Designation{}, nil
-}
-
-// capturesTried is how many of a source's newest captures are tried
-// before the read gives up on them.
-const capturesTried = 5
-
-// newestCapture is the source's newest capture that parses, found false
-// when the source has none at all.
-func (s *PGSource) newestCapture(ctx context.Context, source string) (map[string]Designation, bool, error) {
-	rows, err := s.Pool.Query(ctx, `select case when octet_length(payload::text) <= $2 then payload end, captured_at
-		from `+s.table("capture_snapshots")+` where source = $1 order by captured_at desc limit $3`,
-		source, maxCaptureBytes, capturesTried)
-	if err != nil {
-		return nil, false, fmt.Errorf("boards: read injury capture %s: %w", source, err)
-	}
-	type capture struct {
-		payload []byte
-		at      time.Time
-	}
-	var captures []capture
-	for rows.Next() {
-		var c capture
-		if err := rows.Scan(&c.payload, &c.at); err != nil {
-			rows.Close()
-			return nil, false, fmt.Errorf("boards: scan injury capture %s: %w", source, err)
-		}
-		captures = append(captures, c)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, false, fmt.Errorf("boards: read injury capture %s: %w", source, err)
-	}
-	var lastErr error
-	for _, c := range captures {
-		if c.payload == nil {
-			lastErr = fmt.Errorf("boards: an injury capture %s of %v is over %d bytes", source, c.at, maxCaptureBytes)
-			continue
-		}
-		codes, err := parseCapture(source, c.payload)
-		if err != nil {
-			lastErr = err
-			continue
-		}
-		out := make(map[string]Designation, len(codes))
-		for id, code := range codes {
-			out[id] = Designation{Code: code, AsOf: c.at.UTC()}
-		}
-		return out, true, nil
-	}
-	if len(captures) == 0 {
-		return nil, false, nil
-	}
-	return nil, true, fmt.Errorf("boards: none of the %d newest injury captures %s reads: %w", len(captures), source, lastErr)
-}
-
-type captureEntry struct {
-	PlayerID    string `json:"playerID"`
-	Designation string `json:"designation"`
-	Injury      *struct {
-		Designation string `json:"designation"`
-	} `json:"injury"`
-}
-
-// parseCapture is a capture's designation by player: the by-date list's
-// injList, or the roster sweep's nested injury per rostered player.
-func parseCapture(source string, payload []byte) (map[string]string, error) {
-	var entries []captureEntry
-	if source == injuriesRosterWide {
-		var teams []struct {
-			Roster []captureEntry `json:"roster"`
-		}
-		if err := json.Unmarshal(payload, &teams); err != nil {
-			return nil, fmt.Errorf("boards: injury capture %s: %w", source, err)
-		}
-		for _, t := range teams {
-			for _, e := range t.Roster {
-				if e.Injury != nil {
-					e.Designation = e.Injury.Designation
-					entries = append(entries, e)
-				}
-			}
-		}
-	} else {
-		var list struct {
-			InjList []captureEntry `json:"injList"`
-		}
-		if err := json.Unmarshal(payload, &list); err != nil {
-			return nil, fmt.Errorf("boards: injury capture %s: %w", source, err)
-		}
-		entries = list.InjList
-	}
-	if len(entries) > maxCaptureEntries {
-		return nil, fmt.Errorf("boards: injury capture %s lists over %d players", source, maxCaptureEntries)
-	}
-	out := make(map[string]string, len(entries))
-	for _, e := range entries {
-		id, code := strings.TrimSpace(e.PlayerID), strings.TrimSpace(e.Designation)
-		if id != "" && code != "" {
-			out[id] = code
-		}
-	}
-	return out, nil
 }

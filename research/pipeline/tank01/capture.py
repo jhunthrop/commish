@@ -19,7 +19,7 @@ from typing import Final, Literal
 
 from sqlalchemy import Connection, select, text
 
-from research.db.schema import CAPTURE_SNAPSHOTS, PROVIDER_WEEKS
+from research.db.schema import CAPTURE_CHECKS, CAPTURE_SNAPSHOTS, PROVIDER_WEEKS
 from research.pipeline.budget import FixedBudget, RequestBudget
 from research.pipeline.jscompat import js_iso, js_json_stringify, js_object_keys
 from research.pipeline.nflverse.team_codes import NFL_TEAM_ABBREVIATIONS
@@ -128,6 +128,14 @@ class CaptureResult:
     reason: str | None = None
 
 
+# The feed's last successful check (Lane 63): an unchanged list writes no snapshot, so the check says
+# when the list was last read. Never moved back by an older pass.
+_CHECKED = text(
+    f"insert into {CAPTURE_CHECKS.fullname} (source, checked_at) values (:source, :checked_at) "
+    "on conflict (source) do update set checked_at = greatest(excluded.checked_at, "
+    f"{CAPTURE_CHECKS.name}.checked_at)"
+)
+
 _INSERT = text(
     f"insert into {CAPTURE_SNAPSHOTS.fullname} (source, captured_at, digest, payload) "
     "values (:source, :captured_at, :digest, cast(:payload as jsonb))"
@@ -202,7 +210,16 @@ def capture_once(
             [*skipped, *(FeedOutcome(feed.source, "budget-refused", 0) for feed in due)],
             f"The upstream request budget refused the capture pass ({reservation.denial or 'denied'}).",
         )
-    return CaptureResult([*skipped, *(_capture_feed(conn, client, feed, context, capture.captured_at) for feed in due)])
+    outcomes = [_capture_feed(conn, client, feed, context, capture.captured_at) for feed in due]
+    record_checks(conn, outcomes, capture.captured_at)
+    return CaptureResult([*skipped, *outcomes])
+
+
+def record_checks(conn: Connection, outcomes: Sequence[FeedOutcome], at: datetime) -> None:
+    """Each feed read this pass, captured or unchanged, marked checked at the pass's instant."""
+    checked = [{"source": o.source, "checked_at": at} for o in outcomes if o.status in ("captured", "unchanged")]
+    if checked:
+        conn.execute(_CHECKED, checked)
 
 
 def current_nfl_week(conn: Connection, season: int) -> int:

@@ -8,6 +8,7 @@
 	import { fixed, signed } from '#lib/format/number.ts';
 	import { POSITION_NAMES } from '#lib/run/derive.ts';
 	import { readFigures } from '#lib/run/read-figures.ts';
+	import { liveStatusClock, type LiveStatus } from '#lib/run/live-status.ts';
 	import { UNWRITTEN_READ, unwrittenLines } from '#lib/run/unwritten-words.ts';
 	import Credit from '#lib/site/Credit.svelte';
 	import SheetAdd from '#lib/site/SheetAdd.svelte';
@@ -32,6 +33,7 @@
 	import Table from '#lib/ui/Table.svelte';
 	import TierChip from '#lib/ui/TierChip.svelte';
 	import TierMates from '#lib/ui/TierMates.svelte';
+	import ToneChip from '#lib/ui/ToneChip.svelte';
 	import { heatFor } from '#lib/ui/heat.ts';
 	import type { PageProps } from './$types';
 
@@ -67,7 +69,8 @@
 			label: scoring,
 			unit,
 			year: season,
-			restOfSeason: lead.rest !== null
+			restOfSeason: lead.rest !== null,
+			held: page.status?.words.view.rank ?? null
 		})
 	);
 	/** The figures beside our read, each naming its basis: in season the rest of it leads, in the
@@ -84,6 +87,33 @@
 					: { points: n.projected, fromWeek: lead.format.rosFromWeek }
 		})
 	);
+	/** His status words as built, said again on the member's clock once the page is live. */
+	let live = $state<LiveStatus | null>(null);
+	onMount(() => {
+		liveStatusClock(
+			page.status !== null,
+			() => import('#lib/run/status-view.ts'),
+			(said) => {
+				live = said;
+			}
+		);
+	});
+	const statusWords = $derived.by(() => {
+		const clock = live;
+		const status = page.status;
+		if (status === null || clock === null) return status?.words ?? null;
+		return clock.words.playerStatusWords(status.status, {
+			capture: status.capture,
+			restOfSeason: page.format.rosFromWeek !== undefined,
+			zone: clock.zone,
+			now: clock.now
+		});
+	});
+	/** A season-long status shows as his rank. */
+	const listed = $derived(statusWords?.view ?? null);
+	const statusNote = $derived(statusWords?.note ?? null);
+	/** On a season-long list: no tier and no gap frame the rank his figure would earn. */
+	const heldOut = $derived(page.status?.status.seasonLong === true);
 	const mates = $derived(
 		page.tier.mates.map((mate) => ({ ...mate, href: links.player(mate.slug) }))
 	);
@@ -126,9 +156,10 @@
 					loading="eager"
 				/>{/snippet}
 			{#snippet meta()}
-				<PositionPill position={page.position} rank={n.positionRank} />
-				<TierChip tier={n.tier} long />
+				<PositionPill position={page.position} rank={listed?.rank ?? n.positionRank} />
+				{#if !heldOut}<TierChip tier={n.tier} long />{/if}
 				<a href={links.club(page.team)}>{page.team}</a>
+				{#if listed}<ToneChip tone={listed.sits ? 'loss' : 'even'}>{listed.mark}</ToneChip>{/if}
 				<span class="holder" class:filled={rostered !== null}>{rostered ?? ''}</span>
 			{/snippet}
 			{#snippet aside()}
@@ -161,6 +192,7 @@
 			{/snippet}
 		</HeroCard>
 		{#if lead.rest}<Footnote>{lead.rest.lead}</Footnote>{/if}
+		{#if statusNote}<Footnote>{statusNote}</Footnote>{/if}
 		<div class="league-lines">
 			<ContextNote note={note?.text ?? null} link={note?.link ?? null} />
 		</div>
@@ -171,7 +203,7 @@
 			<Fact label={lead.words.draftersLabel}>
 				{#snippet value()}
 					<Figure value={lead.words.draftersFigure} />
-					{#if !lead.rest}<GapChip {gap} />{/if}
+					{#if !lead.rest && !heldOut}<GapChip {gap} />{/if}
 				{/snippet}
 				{lead.words.drafters}
 			</Fact>
@@ -209,15 +241,20 @@
 				{/if}
 			</article>
 			<aside class="tier" aria-label="His tier">
-				<TierMates
-					tier={page.tier.tier}
-					group={POSITION_NAMES[page.position]}
-					{mates}
-					currentId={page.id}
-					cliff={page.tier.cliff}
-					unit={page.format.unit}
-					basis={page.tierBasis}
-				/>
+				{#if page.heldTier !== null}
+					<PanelHead title="Tier" />
+					<Footnote>{page.heldTier}</Footnote>
+				{:else}
+					<TierMates
+						tier={page.tier.tier}
+						group={POSITION_NAMES[page.position]}
+						{mates}
+						currentId={page.id}
+						cliff={page.tier.cliff}
+						unit={page.format.unit}
+						basis={page.tierBasis}
+					/>
+				{/if}
 			</aside>
 		</div>
 
@@ -237,10 +274,10 @@
 					{#each page.lines as line (line.format.id)}
 						<tr>
 							<td><a href={links.board(line.format.id, page.position)}>{line.tableLabel}</a></td>
-							<td class="num">{line.numbers.ourRank}</td>
+							<td class="num">{listed?.rank ?? line.numbers.ourRank}</td>
 							<td class="num">{fixed(line.numbers.projected)}</td>
 							<td class="num">{signed(line.numbers.vor)}</td>
-							<td class="num">{line.numbers.tier}</td>
+							<td class="num">{listed?.rank ?? line.numbers.tier}</td>
 						</tr>
 					{/each}
 				</Table>
