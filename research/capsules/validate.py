@@ -84,7 +84,9 @@ _AVAILABILITY: Final = re.compile(
 )
 # The words that make a cited downside read as a cost ("costs him 6.2 a game"): the validator's own
 # list, quoted to the writer by the prompt and the correction (`prompt`, `corrections`).
-COST_WORDS: Final = ("cost", "costs", "minus", "down", "shave", "shaves")
+# "Dock" joined by the coordinator's ruling for Lane 52 ("our numbers dock him 6.2 a game" was 17 of 55
+# refusals in Lane 50's samples); the sentence still has to cite the downside's figure.
+COST_WORDS: Final = ("cost", "costs", "minus", "down", "shave", "shaves", "dock", "docks", "docked")
 _COST_CUE: Final = re.compile(rf"\b(?:{'|'.join(COST_WORDS)})\b", re.IGNORECASE | re.ASCII)
 _PRODUCT_CUE_AFTER: Final = re.compile(rf"^(?:['\u2019]s)?\s+(?:{'|'.join(COMPETITOR_PRODUCT_CUES)})\b", re.IGNORECASE)
 _ON_BEFORE: Final = re.compile(r"\bon\s+$", re.IGNORECASE)

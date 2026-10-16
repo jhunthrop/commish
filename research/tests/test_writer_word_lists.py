@@ -92,6 +92,15 @@ def test_the_cost_form_passes_and_worth_alone_does_not() -> None:
     assert not cites_tension("A 34.3% touchdown share worth 6.2 points a week in regression risk.", -6.2)
 
 
+def test_dock_cites_the_downside_as_a_cost_and_still_needs_its_number() -> None:
+    """The coordinator's ruling (Lane 52): "dock", "docks" and "docked" are cost words."""
+    assert cites_tension("Our numbers dock him 6.2 a game for it.", -6.2)
+    assert cites_tension("The touchdown reliance docks him 6.2 points a game.", -6.2)
+    assert cites_tension("He was docked 6.2 points a game before the season.", -6.2)
+    assert not cites_tension("Our numbers dock him for how top-heavy his scoring is.", -6.2)
+    assert not cites_tension("Our numbers dock him 1.4 a game for the inside-ten work.", -6.2)
+
+
 @pytest.mark.parametrize("example", NO_ADP_EXAMPLES)
 def test_each_missing_adp_claim_the_prompt_names_is_one_the_rule_refuses(example: str) -> None:
     ledger = ClaimLedger(SeasonClock(2026, 5), None, None, None, None)
