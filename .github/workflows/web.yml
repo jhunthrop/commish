@@ -104,13 +104,16 @@ jobs:
           fi
 
       - name: Lighthouse budgets on the front door, the board, the run's top-ranked player and the record
-        if: steps.fresh.outputs.build != 'false'
+        # Off until there is a product to tune (founder, 2026-10-16): the nine-run audit added about
+        # twenty minutes to every deploy. Set the repository variable LIGHTHOUSE to "on" to run it
+        # again; the configs and budgets stay in web/ unchanged.
+        if: steps.fresh.outputs.build != 'false' && vars.LIGHTHOUSE == 'on'
         # Real (devtools) throttling at the mobile profile, nine runs, asserted on the median, from
         # a static server of the build. A failed budget stops the deploy.
         run: npm run lighthouse
 
       - name: Keep the Lighthouse reports
-        if: always() && steps.fresh.outputs.build != 'false'
+        if: always() && steps.fresh.outputs.build != 'false' && vars.LIGHTHOUSE == 'on'
         uses: actions/upload-artifact@v4
         with:
           name: lighthouse-${{ github.run_id }}
