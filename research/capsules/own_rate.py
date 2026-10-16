@@ -27,11 +27,20 @@ if TYPE_CHECKING:
 OWN_RATE_VIOLATION: Final = "The text puts a per-game figure on him that is larger than his own points a game"
 _VERBS: Final = (
     r"costs?|costing|docks?|docked|docking|shaves?|shaved|shaving|minus|down|adds?|added|adding|gains?|gained|"
-    r"gaining|takes?|taking|loses?|losing|lost|subtracts?|subtracted|subtracting|sets?\s+(?:him\s+)?back"
+    r"gaining|takes?|taking|loses?|losing|lost|subtracts?|subtracted|subtracting|sets?\s+(?:him\s+)?back|"
+    r"gives?\s+up|giving\s+up|gave\s+up|drops?|dropped|dropping"
 )
 # A word or two between the verb (and "him") and the figure, never the people an average is among.
-_FILLER: Final = r"(?:\s+(?!players\b|backs\b|receivers\b|ends\b|quarterbacks\b|others\b|those\b)[a-z'-]+){0,2}?"
-_UNIT: Final = r"(?:fantasy\s+)?(?:points?|pts)?\s*(?:(?:a|per|every|each)\s+game\b|/\s*game\b)|ppg\b"
+_FILLER: Final = r"(?:\s+(?!players\b|backs\b|receivers\b|ends\b|quarterbacks\b|others\b|those\b|them\b)[a-z'-]+){0,3}?"
+_UNIT: Final = (
+    r"(?:fantasy\s+)?(?:points?|pts)?\s*(?:off\s+him\s+)?(?:(?:a|per|every|each|over\s+each)\s+game\b|/\s*game\b)"
+    r"|ppg\b"
+)
+# "A 13.7 points per game hit" puts the figure on him without a verb (the re-review's R2-L3).
+_HIT: Final = re.compile(
+    r"\ban?\s+(?P<figure>\d+(?:\.\d+)?)[\s-]*(?:fantasy\s+)?(?:points?|pts)?[\s-]*(?:a|per)[\s-]+game\s+hit\b",
+    re.IGNORECASE,
+)
 _ATTRIBUTED: Final = re.compile(
     rf"\b(?:{_VERBS})\b(?:\s+(?:him|his\s+\w+|you))?{_FILLER}\s+(?P<figure>\d+(?:\.\d+)?)\s*(?:{_UNIT})",
     re.IGNORECASE,
@@ -56,7 +65,8 @@ def own_rate_violations(text: str, own: float | None) -> list[str]:
         return []
     violations = []
     for sentence in split_sentences(text):
-        match = next((m for m in _ATTRIBUTED.finditer(sentence) if float(m.group("figure")) > own), None)
+        found = [*_ATTRIBUTED.finditer(sentence), *_HIT.finditer(sentence)]
+        match = next((m for m in found if float(m.group("figure")) > own), None)
         if match is not None:
             violations.append(
                 f'{OWN_RATE_VIOLATION}: "{match.group(0)}" in the sentence "{sentence}". He scores '

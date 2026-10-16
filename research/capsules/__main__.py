@@ -95,6 +95,7 @@ def _write(engine: Engine, choice: Choice) -> int:
         _out(line)
     if budget is not None:
         _out(budget.line())
+    _throttle_alarm(gateway)
     if trial.unstarted:
         _out(
             f"budget: {len(trial.unstarted)} chosen players not started, their worst case would pass what was "
@@ -103,9 +104,17 @@ def _write(engine: Engine, choice: Choice) -> int:
     return 0 if all(not w.findings for w in trial.written) and not trial.unstarted else 1
 
 
+def _throttle_alarm(gateway: GatewayClient) -> None:
+    """The run's one loud line when its throttle pool ran dry (`throttle_waits`), as the nightly prints it."""
+    alarm = gateway.waits.line()
+    if alarm is not None:
+        _out(alarm)
+
+
 def _sweep(engine: Engine, budget: int) -> int:
     with httpx.Client() as http:
-        report = sweep_capsules(engine, _gateway(http), datetime.now(UTC), SweepPlan(budget))
+        gateway = _gateway(http)
+        report = sweep_capsules(engine, gateway, datetime.now(UTC), SweepPlan(budget))
     _out(
         f"capsule-sweep: {report.board_players} board players, {report.eligible} needed a fresh generation, "
         f"{len(report.processed)} processed ({report.llm} llm, {report.facts} facts blocks), {report.calls} calls, "
@@ -114,6 +123,7 @@ def _sweep(engine: Engine, budget: int) -> int:
     )
     for line in report.detail:
         _out(f"  {line}")
+    _throttle_alarm(gateway)
     return 0
 
 

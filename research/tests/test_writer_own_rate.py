@@ -74,6 +74,14 @@ def test_his_own_points_a_game_is_this_seasons_else_the_largest_per_game_figure_
         "That is minus 13.7 points a game for him.",
         "He is down 13.7 points per game.",
         "The red-zone role docked him 13.7 a game.",
+        # Round 3 (the re-review's R2-L3).
+        "He gives up 13.7 points a game on that profile.",
+        "The profile drops him 13.7 points a game.",
+        "That drops 13.7 a game off him.",
+        "That is a 13.7 points per game hit.",
+        "That takes 13.7 off him per game.",
+        "That costs him 13.7 points over each game.",
+        "That costs him a very large 13.7 points a game.",
     ],
 )
 def test_a_per_game_figure_larger_than_his_own_scoring_put_on_him_is_refused(sentence: str) -> None:
@@ -88,6 +96,8 @@ def test_a_per_game_figure_larger_than_his_own_scoring_put_on_him_is_refused(sen
         "That profile costs him 1.6 points a game.",
         "Among players in his spot, points a game fell 13.7 on average from one season to the next.",
         "That touchdown profile has cost players in his spot 13.7 points a game on average.",
+        # Round 3 (the re-review's R2-L2).
+        "Among players in his spot, that profile has cost them 13.7 points a game on average.",
         "He has scored 22 points a game.",
     ],
 )
