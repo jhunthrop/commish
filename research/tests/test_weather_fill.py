@@ -3,6 +3,8 @@ wild-card round), the play-by-play fixture's gamebook lines, NCEI's station list
 Detroit and New York airports, and the data service's answer for Chicago Midway on 2022-09-11 from
 16:00 to 21:00 UTC (SF at CHI kicked off at 17:00 UTC in rain)."""
 
+import csv
+import io
 import os
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field, replace
@@ -24,7 +26,8 @@ from research.pipeline.weather import game_weather as gw
 from research.pipeline.weather import isd
 from research.tests.nflverse_fixtures import TESTDATA, FixtureFetcher, fixture_rows
 
-NOAA: Final = TESTDATA.parent / "noaa"
+NOAA: Final = TESTDATA.parent / "weather"
+GAMES: Final = {"games.csv": (NOAA / "games.csv").read_bytes()}
 SOLDIER_FIELD: Final = (41.8623, -87.6167)
 _DATABASE = "parity_test_game_weather"
 
@@ -51,7 +54,8 @@ class NcciFetcher:
 
 
 def _games() -> dict[str, gw.GameRecord]:
-    return {g.game_id: g for g in gw.game_records(fixture_rows("games.csv"), [2022])}
+    rows = list(csv.DictReader(io.StringIO(GAMES["games.csv"].decode())))
+    return {g.game_id: g for g in gw.game_records(rows, [2022])}
 
 
 def _texts() -> dict[str, str]:
@@ -148,7 +152,7 @@ def engine() -> Any:
 
 
 def test_without_a_stadiums_table_no_station_is_read_and_a_rerun_writes_nothing(engine: Engine) -> None:
-    client = NflverseClient(FixtureFetcher())
+    client = NflverseClient(FixtureFetcher(bodies=GAMES))
     fetcher = NcciFetcher()
     with engine.begin() as conn:
         assert gw.stadium_coordinates(conn) is None
@@ -162,7 +166,7 @@ def test_without_a_stadiums_table_no_station_is_read_and_a_rerun_writes_nothing(
 
 
 def test_a_value_that_moved_is_rewritten(engine: Engine) -> None:
-    client = NflverseClient(FixtureFetcher())
+    client = NflverseClient(FixtureFetcher(bodies=GAMES))
     with engine.begin() as conn:
         conn.execute(
             text("create table research.stadiums (stadium_id text primary key, latitude float8, longitude float8)")

@@ -57,8 +57,10 @@ development the `research` schema sits beside the legacy `public` tables in the 
 | `pipeline/http.py` | the HTTP boundary: a `Fetcher` protocol, httpx live; every ingest reaches a provider only through it |
 | `pipeline/jscompat.py` | JavaScript's semantics where a port must reproduce them: `Number()`, `trim`, `localeCompare` (printable ASCII, anything else refused), `Date` parsing, `JSON.stringify`, a left-fold sum |
 | `pipeline/nflverse/` | the nflverse client and strict CSV reader, the universe, seasons, schedule, play-by-play, coaches observations, opponent adjustment, injuries, rosters, draft picks, kicking and defense weeks, derived stat lines |
-| `pipeline/tank01/` | the stats provider's client, mappers, provider, roster and box scores, fixtures, ADP, headshots, the capture archive |
-| `pipeline/odds/` | player props: the strict parser, snapshot, name resolution, historical backfill |
+| `pipeline/tank01/` | the stats provider's client, mappers, provider, roster and box scores, fixtures, ADP, headshots, the capture archive, the weekly projection parsed per player (`projections.py`) |
+| `pipeline/odds/` | player props: the strict parser, snapshot, name resolution, historical backfill, the anytime-touchdown market (`touchdowns.py`) |
+| `pipeline/weather/` | the kickoff weather fill: the gamebook line's parser, NOAA ISD's nearest station, `game_weather` |
+| `pipeline/kickoffs.py`, `pipeline/kickoff_slots.py` | the stored kickoffs per club, and the kickoff slots the two round 4 benchmarks are captured in |
 | `pipeline/preseason/` | week-one rosters and depth charts, the published boards and their thin-run gate, the nightly ADP capture |
 | `pipeline/commands.py`, `pipeline/__main__.py` | the command line: every ingest, its transaction, its exit status |
 | `parity/` | the harness: scratch databases, replay, recording, the passes, the row diff, the cases, the TypeScript driver in `parity/ts/` |

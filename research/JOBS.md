@@ -19,6 +19,16 @@ created paused until cutover). Every invocation is one pass; the scheduler owns 
 | `inseason` | `research.inseason --task season-week`: stats (nflverse `stats_player`), the season's play-by-play and charted feeds (FTN charting, Next Gen Stats, PFR advanced stats; `inseason/usage_steps.py`), opponent ratings, props, grade, freeze, scoreboard | Tue 08:00, Wed 18:00, Thu 14:00 America/New_York, September through February; the season is the one the stored schedule places today, and a date none places fails the pass | `season-week` |
 | `inseason-capture` | `research.inseason --task capture-harvest` | hourly 07:00-23:00 and 02:00 America/New_York | `capture-harvest` |
 
+The round 4 history (Lane 66b) is four operator commands, each idempotent and run once per store for
+2016 on: `pbp-plays` (nflverse's plays into `nflverse_pbp_plays`), `depth-chart-weeks` (the weekly
+charts into `nflverse_depth_chart_weeks`), `charted-history` (Next Gen Stats from 2016 and PFR
+advanced stats from 2018 through the weekly pass's own ingests) and `game-weather` (`game_weather`,
+from the game table, the gamebook line and NOAA ISD; it reads `research.stadiums` for the stations).
+The live season keeps them current through the weekly pass (`play-by-play` writes the play table) and
+the hourly `inseason-capture`, which in each kickoff slot's two hours takes Tank01's projection for the
+slot's week and the anytime-touchdown market (`pipeline/kickoff_slots.py`). `depth-chart-check` is the
+round 4 stamp check (it writes nothing; its recorded run is the coordinator's).
+
 `research.pipeline history` re-creates the seasons the store lost (an operator command, run once
 per store; `pipeline/history.py`).
 
