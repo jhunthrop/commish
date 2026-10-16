@@ -2,19 +2,20 @@
 	import { siteContext } from '#lib/context/context.svelte.ts';
 	import type { BoardPage } from '#lib/server/pages/board.ts';
 	import type { RunStamp } from '#lib/run/stamp.ts';
+	import Phased from '#lib/ui/Phased.svelte';
 	import Verb from '#lib/ui/Verb.svelte';
-	import type { RailKey } from '#lib/ui/nav.ts';
+	import { RAIL_OF_WORD_SET, type RailKey, type WordSet } from '#lib/ui/nav.ts';
 	import BoardView from './BoardView.svelte';
 	import SiteShell from './SiteShell.svelte';
 	import { links } from './links.ts';
-	import { PAGE_VERBS, boardWords } from './season-words.ts';
+	import { PAGE_VERBS, boardWords, type BoardWords } from './season-words.ts';
 	import { shownRail } from './shown-rail.svelte.ts';
 	import { verbHref } from './verb-links.ts';
 
 	interface Props {
 		page: BoardPage;
 		run: RunStamp;
-		/** The site's rail at build: the words follow it until the context says otherwise. */
+		/** The site's rail at build: the document's title follows it until the context says otherwise. */
 		siteRail: RailKey;
 	}
 
@@ -22,23 +23,40 @@
 
 	const leagueId = $derived(siteContext.league?.id ?? null);
 	/** The bar takes the rail's word for the board and leaves the format to the league switch beside
-	 * it; the document names it. In season the one verb follows your league (season-words.ts). */
-	const rail = shownRail(() => siteRail);
-	const words = $derived(
+	 * it; the document names it. In season the one verb follows your league (season-words.ts). Both
+	 * sets of words are in the HTML and the root's rail shows one (Phased.svelte), so the bar is right
+	 * on the first frame; the document's title follows the rail once the script runs. */
+	const wordsAt = (rail: RailKey): BoardWords =>
 		boardWords(
-			rail(),
+			rail,
 			{ ...page.format, season: run.season, position: page.position },
 			leagueId !== null
-		)
-	);
+		);
+	const wordsOf = (set: WordSet): BoardWords => wordsAt(RAIL_OF_WORD_SET[set]);
+	const rail = shownRail(() => siteRail);
+	const documentTitle = $derived(wordsAt(rail()).title);
 </script>
 
 <svelte:head>
 	<link rel="canonical" href={links.board(page.format.id, page.position)} />
 </svelte:head>
 
-<SiteShell title={words.title} heading={words.bar} {run}>
-	{#snippet tail()}<Verb href={verbHref(words.verb, leagueId)}>{PAGE_VERBS[words.verb]}</Verb
-		>{/snippet}
-	<BoardView {page} heading={words.heading} />
+{#snippet barTitle()}
+	<Phased>{#snippet children(set: WordSet)}{wordsOf(set).bar}{/snippet}</Phased>
+{/snippet}
+
+{#snippet heading()}
+	<Phased>{#snippet children(set: WordSet)}{wordsOf(set).heading}{/snippet}</Phased>
+{/snippet}
+
+<SiteShell title={documentTitle} heading={barTitle} {run}>
+	{#snippet tail()}
+		<Phased>
+			{#snippet children(set: WordSet)}
+				{@const verb = wordsOf(set).verb}
+				<Verb href={verbHref(verb, leagueId)}>{PAGE_VERBS[verb]}</Verb>
+			{/snippet}
+		</Phased>
+	{/snippet}
+	<BoardView {page} {heading} />
 </SiteShell>

@@ -2,7 +2,7 @@
 // along the bottom (spec 2026-10-16 §2). Run with `npm test`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { RAIL_ITEMS, RAIL_KEYS } from './nav.ts';
+import { RAIL_ITEMS, RAIL_KEYS, WORD_SETS, wordSetOf } from './nav.ts';
 import { railOfKey } from './rail-order.ts';
 import { PHONE_MAX_PX, railCss } from './rail-css.ts';
 
@@ -52,4 +52,31 @@ void test('with no rail named, the site before its draft shows', () => {
 		shown(':root:not([data-rail])', false),
 		railOfKey('pre_draft').map((entry) => entry.key)
 	);
+});
+
+/** The word sets a root shows: the rules that turn a set's wrapper back on (display:contents). */
+function wordSetsShown(root: string): string[] {
+	return WORD_SETS.filter((set) =>
+		wideRules.split('}').some((rule) => {
+			const [selectors = '', body = ''] = rule.split('{');
+			return (
+				body.includes('display:contents') &&
+				selectors.split(',').includes(`${root} [data-words=${set}]`)
+			);
+		})
+	);
+}
+
+void test('the page words are hidden until a rail shows their set', () => {
+	assert.ok(css.includes('[data-words]{display:none}'));
+});
+
+for (const key of RAIL_KEYS) {
+	void test(`the ${key} rail shows exactly one set of page words, the one its season has`, () => {
+		assert.deepEqual(wordSetsShown(`:root[data-rail=${key}]`), [wordSetOf(key)]);
+	});
+}
+
+void test('with no rail named, the draft words show', () => {
+	assert.deepEqual(wordSetsShown(':root:not([data-rail])'), ['draft']);
 });

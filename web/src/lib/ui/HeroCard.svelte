@@ -3,7 +3,7 @@
 
 	interface Props {
 		/** Who or what the page is about: "Chris Olave", "New Orleans Saints". */
-		title: string;
+		title: string | Snippet;
 		/** A face before the name, when the page is a person's. */
 		media?: Snippet;
 		/** The line under the name: pills, chips, labels. */
@@ -18,7 +18,9 @@
 <section class="hero" class:with-media={media !== undefined}>
 	{#if media}<div class="media">{@render media()}</div>{/if}
 	<div class="ident">
-		<h2>{title}</h2>
+		<h2>
+			{#if typeof title === 'string'}{title}{:else}{@render title()}{/if}
+		</h2>
 		{#if meta}<div class="meta">{@render meta()}</div>{/if}
 	</div>
 	{#if aside}<div class="aside">{@render aside()}</div>{/if}

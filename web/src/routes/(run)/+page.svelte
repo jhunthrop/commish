@@ -5,18 +5,20 @@
 	import SiteShell from '#lib/site/SiteShell.svelte';
 	import { lazySheet } from '#lib/site/lazy-sheet.svelte.ts';
 	import { links } from '#lib/site/links.ts';
-	import { PAGE_VERBS, frontWords } from '#lib/site/season-words.ts';
+	import { PAGE_VERBS, frontWords, type FrontWords } from '#lib/site/season-words.ts';
 	import { verbHref } from '#lib/site/verb-links.ts';
 	import { shownRail } from '#lib/site/shown-rail.svelte.ts';
 	import Figure from '#lib/ui/Figure.svelte';
 	import Footnote from '#lib/ui/Footnote.svelte';
 	import HeroCard from '#lib/ui/HeroCard.svelte';
 	import Panel from '#lib/ui/Panel.svelte';
+	import Phased from '#lib/ui/Phased.svelte';
 	import PanelHead from '#lib/ui/PanelHead.svelte';
 	import Quiet from '#lib/ui/Quiet.svelte';
 	import Row from '#lib/ui/Row.svelte';
 	import RowHead from '#lib/ui/RowHead.svelte';
 	import Verb from '#lib/ui/Verb.svelte';
+	import { RAIL_OF_WORD_SET, type WordSet } from '#lib/ui/nav.ts';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
@@ -33,10 +35,14 @@
 	/** A member who follows a league is sent back to the one selected in the shell; anyone
 	 * else to follow one. */
 	const leagueId = $derived(siteContext.league?.id ?? null);
-	/** The words follow the season the rail shows: in season the followed league is the verb. */
+	/** The words follow the season the rail shows: in season the followed league is the verb. Both
+	 * sets are in the HTML and the root's rail shows one (Phased.svelte), so the hero is right on the
+	 * first frame; the document's title follows the rail once the script runs. */
+	const wordsOf = (set: WordSet): FrontWords =>
+		frontWords(RAIL_OF_WORD_SET[set], { ...format, season: data.run.season }, leagueId !== null);
 	const rail = shownRail(() => data.siteRail);
-	const words = $derived(
-		frontWords(rail(), { ...format, season: data.run.season }, leagueId !== null)
+	const documentTitle = $derived(
+		frontWords(rail(), { ...format, season: data.run.season }, leagueId !== null).title
 	);
 </script>
 
@@ -48,17 +54,32 @@
 	/>
 </svelte:head>
 
-<SiteShell title={words.title} run={data.run}>
+{#snippet barTitle()}
+	<Phased>{#snippet children(set: WordSet)}{wordsOf(set).title}{/snippet}</Phased>
+{/snippet}
+
+{#snippet heading()}
+	<Phased>{#snippet children(set: WordSet)}{wordsOf(set).heading}{/snippet}</Phased>
+{/snippet}
+
+<SiteShell title={documentTitle} heading={barTitle} run={data.run}>
 	<main class="front">
-		<HeroCard title={words.heading}>
+		<HeroCard title={heading}>
 			{#snippet meta()}
 				<span>{format.basis.join(' · ')}</span>
 			{/snippet}
 			{#snippet aside()}
-				<Verb href={verbHref(words.verb, leagueId)} size="lg" fill>{PAGE_VERBS[words.verb]}</Verb>
-				{#each words.quiet as verb (verb)}
-					<Quiet href={verbHref(verb, leagueId)} size="lg" fill>{PAGE_VERBS[verb]}</Quiet>
-				{/each}
+				<Phased>
+					{#snippet children(set: WordSet)}
+						{@const words = wordsOf(set)}
+						<Verb href={verbHref(words.verb, leagueId)} size="lg" fill
+							>{PAGE_VERBS[words.verb]}</Verb
+						>
+						{#each words.quiet as verb (verb)}
+							<Quiet href={verbHref(verb, leagueId)} size="lg" fill>{PAGE_VERBS[verb]}</Quiet>
+						{/each}
+					{/snippet}
+				</Phased>
 			{/snippet}
 		</HeroCard>
 

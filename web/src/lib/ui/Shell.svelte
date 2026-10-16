@@ -18,7 +18,7 @@
 
 	interface Props {
 		/** The page's name in the top bar. Hidden on the phone, where the rail names the section. */
-		title: string;
+		title: string | Snippet;
 		/** What the page's numbers are as of, beside the title: the nightly run's date. Kept on the phone. */
 		stamp?: string;
 		/** The rail item for this page, or null for a page outside the sections. Left out, the page's
@@ -71,7 +71,9 @@
 	</nav>
 	<div class="main">
 		<header class="top">
-			<h1>{title}</h1>
+			<h1>
+				{#if typeof title === 'string'}{title}{:else}{@render title()}{/if}
+			</h1>
 			{#if stamp}<span class="stamp"><Stamp text={stamp} /></span>{/if}
 			{#if search}
 				<div class="find">{@render search()}</div>
