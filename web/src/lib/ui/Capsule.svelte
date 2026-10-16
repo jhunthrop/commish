@@ -1,13 +1,15 @@
 <script lang="ts">
 	import './fonts/read.css';
-	import type { PullFigure } from '#lib/run/schema.ts';
+	import type { ReadFigure } from '#lib/run/read-figures.ts';
+	import Label from './Label.svelte';
 
 	interface Props {
 		/** The capsule as the grounded writer wrote it, paragraphs split by a blank line. */
 		body: string;
-		/** Numbers the prose itself states, set beside it after the first paragraph. The run checks
-		 * each appears in the prose word for word. */
-		pulls: readonly PullFigure[];
+		/** Numbers set beside the prose after the first paragraph, each naming its basis where it has
+		 * one (run/read-figures.ts): the prose's own, which the run checks appear in it word for word,
+		 * and in season the rest of it from the run. */
+		pulls: readonly ReadFigure[];
 	}
 
 	let { body, pulls }: Props = $props();
@@ -26,8 +28,12 @@
 	{#if lead}<p class="lead">{lead}</p>{/if}
 	{#if pulls.length > 0}
 		<figure class="pulls">
-			{#each pulls as pull (pull.figure)}
-				<div><b>{pull.figure}</b><span>{pull.caption}</span></div>
+			{#each pulls as pull, i (i)}
+				<div>
+					{#if pull.label}<Label>{pull.label}</Label>{/if}<b>{pull.figure}</b><span
+						>{pull.caption}</span
+					>
+				</div>
 			{/each}
 		</figure>
 	{/if}
@@ -99,8 +105,15 @@
 
 		.pulls div {
 			flex-direction: row;
+			flex-wrap: wrap;
 			align-items: baseline;
-			gap: var(--s-3);
+			column-gap: var(--s-3);
+			row-gap: 2px;
+		}
+
+		/* A figure's basis takes its own line above it. */
+		.pulls div > :global(.label) {
+			flex-basis: 100%;
 		}
 
 		.pulls b {

@@ -3,7 +3,13 @@
 // compare caption. Run with `npm test`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { draftersWords, formatTable, restFigures, type RestFigures } from './player-words.ts';
+import {
+	draftersWords,
+	formatTable,
+	lineWords,
+	restFigures,
+	type RestFigures
+} from './player-words.ts';
 import { restCaption } from './rest-words.ts';
 import type { Format, PlayerFormat } from './schema.ts';
 
@@ -62,10 +68,10 @@ void test('an in-season row without its preseason fields is refused, and a prese
 	assert.equal(restFigures(PPR, BARE, REACH, 2026), null);
 });
 
-void test('in season the drafters sentence gives the ADP alone', () => {
+void test('in season the drafters sentence gives the ADP alone, as a fact of the drafts before the season', () => {
 	assert.equal(
 		draftersWords(NUMBERS, ['PPR drafts, Sep 9'], true),
-		'ADP 15.0 from PPR drafts, Sep 9.'
+		'His ADP in PPR drafts, Sep 9, before the season.'
 	);
 	assert.equal(
 		draftersWords({ ...NUMBERS, adp: null }, [], true),
@@ -112,4 +118,41 @@ void test('/compare captions the in-season figure with the rest of the season an
 		'PPR points for the rest of the 2026 season from week 7, refreshed October 21'
 	);
 	assert.equal(restCaption(PPR, 2026), null);
+});
+
+const SOURCES = ['PPR drafts, Sep 5 to Sep 9'];
+const SEASON = { year: 2026, underway: true };
+
+void test('before the run ranks the rest of the season the facts frame him by pick and round', () => {
+	const words = lineWords({ format: PPR, numbers: BARE, rest: null }, SOURCES, 618, SEASON);
+	assert.equal(words.draftersLabel, 'Where drafters take him');
+	assert.equal(words.draftersFigure, 'Pick 15');
+	assert.equal(words.value, 'Round 1 value among the 618 on our board');
+});
+
+void test('in season the ADP is a fact and the rest-of-season rank takes the round and the pick', () => {
+	const rest = restFigures(REST, NUMBERS, REACH, 2026);
+	const words = lineWords({ format: REST, numbers: NUMBERS, rest }, SOURCES, 618, SEASON);
+	assert.equal(words.draftersLabel, 'ADP');
+	assert.equal(words.draftersFigure, '15.0');
+	assert.equal(words.drafters, 'His ADP in PPR drafts, Sep 5 to Sep 9, before the season.');
+	assert.equal(words.value, 'Our rank 12 of the 618 on our board for the rest of the season');
+	assert.doesNotMatch(`${words.value} ${words.drafters} ${words.draftersLabel}`, /round|pick/i);
+	const below = lineWords(
+		{ format: REST, numbers: { ...NUMBERS, vor: -4 }, rest },
+		SOURCES,
+		618,
+		SEASON
+	);
+	assert.equal(
+		below.value,
+		'Below replacement for the rest of the season, among the 618 on our board'
+	);
+	const none = lineWords(
+		{ format: REST, numbers: { ...NUMBERS, adp: null }, rest },
+		[],
+		618,
+		SEASON
+	);
+	assert.equal(none.draftersFigure, 'No ADP');
 });

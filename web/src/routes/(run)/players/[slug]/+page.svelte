@@ -7,6 +7,7 @@
 	import { draftersGap } from '#lib/format/draft.ts';
 	import { fixed, signed } from '#lib/format/number.ts';
 	import { POSITION_NAMES } from '#lib/run/derive.ts';
+	import { readFigures } from '#lib/run/read-figures.ts';
 	import { UNWRITTEN_READ, unwrittenLines } from '#lib/run/unwritten-words.ts';
 	import Credit from '#lib/site/Credit.svelte';
 	import SheetAdd from '#lib/site/SheetAdd.svelte';
@@ -67,6 +68,17 @@
 			unit,
 			year: season,
 			restOfSeason: lead.rest !== null
+		})
+	);
+	/** The figures beside our read, each naming its basis: in season the rest of it leads. */
+	const readPulls = $derived(
+		readFigures(page.capsule?.pulls ?? [], {
+			label: scoring,
+			preseason: lead.rest === null ? n.projected : (lead.rest.preseason?.points ?? null),
+			rest:
+				lead.rest === null || lead.format.rosFromWeek === undefined
+					? null
+					: { points: n.projected, fromWeek: lead.format.rosFromWeek }
 		})
 	);
 	const mates = $derived(
@@ -153,9 +165,9 @@
 		{#if page.underway}{@render thisSeason()}{/if}
 
 		<section class="facts" aria-label="His numbers">
-			<Fact label="Where drafters take him">
+			<Fact label={lead.words.draftersLabel}>
 				{#snippet value()}
-					<Figure value={n.adp === null ? 'No ADP' : `Pick ${fixed(n.adp, 0)}`} />
+					<Figure value={lead.words.draftersFigure} />
 					{#if !lead.rest}<GapChip {gap} />{/if}
 				{/snippet}
 				{lead.words.drafters}
@@ -187,7 +199,7 @@
 			<article class="read">
 				<h3><Label>Our read</Label></h3>
 				{#if page.capsule}
-					<Capsule body={page.capsule.body} pulls={page.capsule.pulls} />
+					<Capsule body={page.capsule.body} pulls={readPulls} />
 				{:else}
 					<p class="unwritten">{UNWRITTEN_READ}</p>
 					<LineList lines={unwritten} label="What our read of {page.name} will be built from" />
