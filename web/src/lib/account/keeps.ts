@@ -17,25 +17,31 @@ export interface KeepLine {
 	link?: 'leagueNew' | 'pass';
 }
 
-/** What an account keeps, said to a reader who has none yet. */
-export function keeps(open: OpenHosts): readonly KeepLine[] {
-	return [
+/** The signed-out page's heading: in season the leagues are why to sign in, before the draft the prep. */
+export function signedOutTitle(inSeason: boolean): string {
+	return inSeason ? 'Sign in to keep your leagues and your prep' : 'Sign in to keep your prep';
+}
+
+/** What an account keeps, said to a reader who has none yet: in season your leagues first. */
+export function keeps(open: OpenHosts, inSeason: boolean): readonly KeepLine[] {
+	const leagues: KeepLine = {
+		lead: 'Your leagues',
+		text: leaguesKeptText(open),
+		link: 'leagueNew'
+	};
+	const prep: readonly KeepLine[] = [
 		{
 			lead: 'Your cheat sheets',
 			text: 'on every device you sign in on, with your notes and tiers'
 		},
-		{ lead: 'Your mock drafts', text: 'and the report on each one' },
-		{
-			lead: 'Your leagues',
-			text: leaguesKeptText(open),
-			link: 'leagueNew'
-		},
-		{
-			lead: 'Your Draft Pass or Membership',
-			text: 'and the receipts for it',
-			link: 'pass'
-		}
+		{ lead: 'Your mock drafts', text: 'and the report on each one' }
 	];
+	const pass: KeepLine = {
+		lead: 'Your Draft Pass or Membership',
+		text: 'and the receipts for it',
+		link: 'pass'
+	};
+	return inSeason ? [leagues, ...prep, pass] : [...prep, leagues, pass];
 }
 
 /** A host read as the member: a row whose verb signs in, then returns to the account page. */
@@ -55,7 +61,7 @@ const MEMBER_HOSTS: readonly (MemberHost & { host: 'yahoo' | 'espn' })[] = [
 	{
 		host: 'espn',
 		lead: 'ESPN',
-		text: 'Sign in, then connect ESPN to follow your ESPN leagues, public or private. We keep an encrypted copy of your ESPN session so your league stays in sync and, when you ask, to make your moves.',
+		text: 'Sign in, then connect ESPN to follow your ESPN leagues, public or private. We keep an encrypted copy of your ESPN session so your league stays in sync and we can make your moves when you ask.',
 		verb: 'Connect ESPN'
 	}
 ];

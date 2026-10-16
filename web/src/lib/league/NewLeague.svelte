@@ -347,8 +347,7 @@
 	{#if forScreen}<p class="for">{FOLLOW_FOR[forScreen]}</p>{/if}
 	<p class="lede">
 		{#if withField}Paste your league's link.{/if}
-		We keep your roster, this week's matchup and every player nobody in your league holds up to date,
-		on our board. Free.
+		We keep your roster, this week's matchup and your league's free agents up to date, on our board. Free.
 		{#if FLAGS.in_season_tools}{IN_SEASON_TOOLS_LINE}{/if}
 	</p>
 	<p class="hosts">{hostsLine({ ffpc: ffpcOn, yahoo: yahooOn, espn: espnOn })}</p>

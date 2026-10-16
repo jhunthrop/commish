@@ -45,7 +45,7 @@
 	import GroupPasses from './GroupPasses.svelte';
 	import { hostsApi, espnOpen, ffpcOpen, yahooOpen } from '#lib/hosts/api.ts';
 	import { SWITCHED_SHUT, type OpenHosts } from '#lib/league/hosts.ts';
-	import { keeps, memberHosts } from './keeps.ts';
+	import { keeps, memberHosts, signedOutTitle } from './keeps.ts';
 	import { accountLinks } from './links.ts';
 	import { hasFeature } from './features.ts';
 	import { boughtMembership, displayName, mockLine, planWords, sheetLine } from './words.ts';
@@ -198,7 +198,7 @@
 			<!-- The shell is drawn; the account arrives in a moment and takes this place. -->
 			<div class="reserve"></div>
 		{:else if view.kind === 'signed-out'}
-			<HeroCard title="Sign in to keep your prep">
+			<HeroCard title={signedOutTitle(railInSeason(siteContext.rail))}>
 				{#snippet meta()}<span>One account for the site, on any device.</span>{/snippet}
 				{#snippet aside()}
 					<Verb href={api.signInUrl(accountLinks.account())} size="lg" fill>Sign in</Verb>
@@ -208,7 +208,7 @@
 				<PanelHead title="What your account keeps" level={2} />
 				<LineList
 					label="What an account keeps"
-					lines={keeps(openHosts).map(({ link, ...line }) => ({
+					lines={keeps(openHosts, railInSeason(siteContext.rail)).map(({ link, ...line }) => ({
 						...line,
 						href: link ? accountLinks[link]() : undefined
 					}))}
