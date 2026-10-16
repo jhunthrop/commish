@@ -27,6 +27,30 @@ export function kickoffsOf(schedule: Pick<Schedule, 'slates'>): Kickoffs {
 
 const EASTERN = 'America/New_York';
 
+/** The hosts' club codes that differ from the run's, one map for every host: MyFantasyLeague's
+ * three-letter forms, Sleeper's and Yahoo's WAS and JAC, and the older and nflverse spellings (the
+ * API keeps the same folds, leaguesync teamCodes and boards nflverseTeams). */
+const HOST_CLUBS: Readonly<Record<string, string>> = {
+	KCC: 'KC',
+	GBP: 'GB',
+	NEP: 'NE',
+	NOS: 'NO',
+	SFO: 'SF',
+	TBB: 'TB',
+	LVR: 'LV',
+	JAC: 'JAX',
+	WAS: 'WSH',
+	LA: 'LAR',
+	STL: 'LAR',
+	SD: 'LAC',
+	OAK: 'LV'
+};
+
+/** A host's club code in the run's codes. */
+export function runClub(code: string): string {
+	return HOST_CLUBS[code] ?? code;
+}
+
 /** Whether a kickoff is a day the league has not timed yet: midnight on the Eastern clock. */
 function untimed(kickoff: string): boolean {
 	const time = new Intl.DateTimeFormat('en-US', {
@@ -38,7 +62,7 @@ function untimed(kickoff: string): boolean {
 	return time === '00:00';
 }
 
-/** A club's game in a week, as a row's line says it: "at BUF Sun 1:00 pm", "vs BUF Sun" for a day
+/** A club's game in a week, by the run's code or a host's, as a row's line says it: "at BUF Sun 1:00 pm", "vs BUF Sun" for a day
  * not yet timed, "Bye this week", or null for a club the run does not schedule. */
 export function gameLine(
 	kickoffs: Kickoffs,
@@ -46,7 +70,7 @@ export function gameLine(
 	week: number,
 	zone: string = memberZone()
 ): string | null {
-	const games = kickoffs[team];
+	const games = kickoffs[runClub(team)];
 	if (games === undefined) return null;
 	const game = games.find((candidate) => candidate.week === week);
 	if (game === undefined) return 'Bye this week';

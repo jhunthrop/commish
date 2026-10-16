@@ -72,7 +72,7 @@
 		{/if}
 		{#each s.starters as starter (starter.player.host_id)}
 			{@const row = rowOf(board, starter.player)}
-			{@const game = matchup ? gameOf(starter.player.team, matchup.week) : null}
+			{@const game = matchup ? gameOf(row?.team ?? starter.player.team, matchup.week) : null}
 			<LeagueRow
 				player={row}
 				host={starter.player}
