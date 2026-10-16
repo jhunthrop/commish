@@ -131,6 +131,20 @@ def test_each_dated_club_game_takes_its_latest_snapshot_since_the_previous_kicko
     }  # week 3: no snapshot in the fixture after week 2's kickoffs, so no chart
 
 
+def test_a_later_pass_adds_only_the_newer_snapshot_of_the_coming_game() -> None:
+    clubs = frozenset(k.team for k in KICKOFFS_2026)
+    early, late = charts.DatedCharts(2026, clubs), charts.DatedCharts(2026, clubs)
+    for row in fixture_rows("depth_charts_2026.csv"):
+        late.add(row)
+        if row["dt"] != "2026-09-16T12:34:22Z":
+            early.add(row)
+    first = {(r.week, r.team, r.as_of) for r in early.assigned(KICKOFFS_2026)}
+    second = {(r.week, r.team, r.as_of) for r in late.assigned(KICKOFFS_2026)}
+    # Week 1's charts stand; week 2 gains the 16 September statement beside the 14 September one.
+    assert second - first == {(2, t, _at(2026, 9, 16, 12, 34, 22)) for t in ("NE", "SEA")}
+    assert {(1, t, _at(2026, 9, 9, 12, 6, 21)) for t in ("NE", "SEA")} <= first & second
+
+
 def test_a_dated_row_is_its_snapshots_skill_row_with_its_slot() -> None:
     snapshot = [
         r for r in fixture_rows("depth_charts_2026.csv")

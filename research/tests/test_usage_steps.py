@@ -15,7 +15,8 @@ from research.inseason import usage_steps
 from research.inseason.season_week import STEPS, SeasonWeekContext, run_season_week, run_usage_backfill
 from research.inseason.step_result import StepResult
 from research.pipeline.http import Fetcher
-from research.pipeline.nflverse import context, usage_feeds
+from research.pipeline.kickoffs import TeamKickoff
+from research.pipeline.nflverse import context, depth_chart_weeks, usage_feeds
 from research.pipeline.nflverse import ingest as nflverse_ingest
 from research.pipeline.nflverse.client import NflverseClient, NflverseError
 from research.pipeline.nflverse.pbp_passers import PBP_PASSER_SOURCE, PasserDropbacks, PasserMetric
@@ -62,6 +63,8 @@ def written(monkeypatch: pytest.MonkeyPatch) -> list[PlayerWeekObservation]:
         monkeypatch.setattr(module, "record_observations", record)
     monkeypatch.setattr(context, "record_team_observations", record_team)
     monkeypatch.setattr(context, "record_plays", lambda conn, plays: len(plays))
+    kickoff = TeamKickoff(2027, 1, "KC", datetime(2027, 9, 10, tzinfo=UTC))
+    monkeypatch.setattr(depth_chart_weeks, "stored_kickoffs", lambda conn, season: [kickoff])
     monkeypatch.setattr(usage_feeds, "pfr_players", lambda conn: {})
     return rows
 
@@ -132,7 +135,7 @@ def test_a_failing_feed_is_its_own_line_and_the_pass_carries_on(monkeypatch: pyt
     results = run_season_week(_context(cast(Fetcher, None), skip))
     statuses = {r.step: r.status for r in results}
     assert statuses["ftn-charting"] == "failed"
-    assert ran == ["play-by-play", "next-gen-stats", "pfr-advstats"]
+    assert ran == ["play-by-play", "next-gen-stats", "pfr-advstats", "depth-charts"]
     assert all(statuses[s] == "skipped" for s in skip)
 
 

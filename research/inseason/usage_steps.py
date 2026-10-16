@@ -1,4 +1,4 @@
-"""THE WEEKLY PASS'S USAGE STEPS: the season's play-by-play and the three charted feeds.
+"""THE WEEKLY PASS'S USAGE STEPS: the season's play-by-play, the three charted feeds and the depth charts.
 
 Each runs after `stats-ingest` (the universe the feeds' players are checked against is refreshed
 there) and is its own step: a failure is that step's line, never the pass's. A season nflverse has
@@ -22,6 +22,7 @@ from research.pipeline.http import Fetcher
 from research.pipeline.nflverse import context, ingest, pbp, usage_feeds
 from research.pipeline.nflverse.client import NflverseClient, NflverseError
 from research.pipeline.nflverse.config import ByteCaps
+from research.pipeline.nflverse.depth_chart_weeks import ingest_depth_chart_weeks
 from research.pipeline.nflverse.pbp_passers import PasserDropbacks
 from research.pipeline.nflverse.pbp_plays import PlayRows
 from research.pipeline.nflverse.usage_feeds import FeedReport
@@ -30,7 +31,8 @@ PLAY_BY_PLAY: Final = "play-by-play"
 FTN_CHARTING: Final = "ftn-charting"
 NEXT_GEN_STATS: Final = "next-gen-stats"
 PFR_ADVSTATS: Final = "pfr-advstats"
-USAGE_STEPS: Final = (PLAY_BY_PLAY, FTN_CHARTING, NEXT_GEN_STATS, PFR_ADVSTATS)
+DEPTH_CHARTS: Final = "depth-charts"
+USAGE_STEPS: Final = (PLAY_BY_PLAY, FTN_CHARTING, NEXT_GEN_STATS, PFR_ADVSTATS, DEPTH_CHARTS)
 
 UsageStep = Callable[[Engine, Fetcher, int], StepResult]
 
@@ -118,9 +120,25 @@ def pfr_advstats(engine: Engine, fetcher: Fetcher, season: int) -> StepResult:
     return _feed(PFR_ADVSTATS, "PFR advanced stats", season, run)
 
 
+def depth_charts(engine: Engine, fetcher: Fetcher, season: int) -> StepResult:
+    """The season's depth charts (`depth_chart_weeks`): from 2025 nflverse's dated snapshots, so a rerun
+    adds only the snapshots loaded since, each club-game's latest before its kickoff (§5 item 6, live).
+    The hourly capture runs it again in each kickoff slot's window."""
+    try:
+        with engine.connect() as conn:
+            report = ingest_depth_chart_weeks(conn, NflverseClient(fetcher), season)
+            conn.commit()
+    except NflverseError as error:
+        if error.kind != "not_found":
+            raise
+        return _unpublished(DEPTH_CHARTS, "depth charts", season, error)
+    return written_result(DEPTH_CHARTS, report.written, report.summary())
+
+
 BODIES: Final[dict[str, UsageStep]] = {
     PLAY_BY_PLAY: play_by_play,
     FTN_CHARTING: ftn_charting,
     NEXT_GEN_STATS: next_gen_stats,
     PFR_ADVSTATS: pfr_advstats,
+    DEPTH_CHARTS: depth_charts,
 }

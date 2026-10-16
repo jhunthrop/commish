@@ -8,8 +8,9 @@
 for every week nflverse has published: the operator's one-shot for weeks played before the steps
 existed. Idempotent (a re-run writes nothing new), no register trail, each feed's counts printed.
 
-`capture-harvest` also takes, in a kickoff slot's window, the slot week's Tank01 projection and the
-anytime-touchdown market (the weekly round 4's two benchmarks, `pipeline/kickoff_slots.py`).
+`capture-harvest` also takes, in a kickoff slot's window, the slot week's Tank01 projection, the
+anytime-touchdown market (the weekly round 4's two benchmarks, `pipeline/kickoff_slots.py`) and the
+season's dated depth charts again.
 
 Exit status 1 when any step failed (or the capture was refused), 0 otherwise. Provider keys come
 from the environment: TANK01_API_KEY for the capture, ODDS_API_KEY for the props snapshot and the
@@ -31,6 +32,7 @@ from research.cli import log_line as _line
 from research.db.engine import make_engine
 from research.db.url import database_url_from_env
 from research.errors import ResearchError
+from research.inseason import usage_steps
 from research.inseason.season_of import (
     calendar_season,
     out_of_window_reason,
@@ -47,6 +49,8 @@ from research.nightly.r2 import run_store
 from research.nightly.register_log import WEEKLY_SUFFIX, record_freeze, record_pass
 from research.pipeline.commands import ODDS_KEY_ENV, now_ms
 from research.pipeline.http import LiveFetcher
+from research.pipeline.kickoff_slots import due_slot, kickoff_slots
+from research.pipeline.kickoffs import stored_kickoffs
 from research.pipeline.odds.touchdowns import run_td_snapshot
 from research.pipeline.tank01.capture import run_capture_harvest
 from research.pipeline.tank01.client import API_KEY_ENV, DEFAULT_SEASON, SEASON_ENV, Tank01Client
@@ -174,7 +178,30 @@ def _capture_harvest(now: datetime) -> bool:
     parsed = _parse_projections()
     # The market is its own provider and its own line: a failed Tank01 feed never skips it.
     market = _touchdown_market(now, season)
-    return not failed and parsed and market
+    charts = _slot_depth_charts(now, season)
+    return not failed and parsed and market and charts
+
+
+def _slot_depth_charts(now: datetime, season: int) -> bool:
+    """In a kickoff slot's window, the season's dated depth charts again (`usage_steps.depth_charts`),
+    so the slot's games read a snapshot loaded that day; its own line."""
+    engine = make_engine(database_url_from_env())
+    fetcher = LiveFetcher()
+    try:
+        with engine.connect() as conn:
+            slot = due_slot(kickoff_slots(stored_kickoffs(conn, season)), now)
+        if slot is None:
+            _line("depth-charts: no kickoff slot due")
+            return True
+        result = usage_steps.depth_charts(engine, fetcher, season)
+    except (ResearchError, httpx.HTTPError) as error:
+        _line(f"depth-charts: FAILED, {error}")
+        return False
+    finally:
+        fetcher.close()
+        engine.dispose()
+    _line(f"depth-charts, week {slot.week} {slot.name}: {result.status}, {result.summary}")
+    return result.status != "failed"
 
 
 def _parse_projections() -> bool:
