@@ -208,7 +208,7 @@ export const LATER_RULE = 'These help your lineup but do not start this week';
 
 /** The signed-out panel's title, naming the screen it is for. */
 export function signInTitle(screen: LeagueScreen): string {
-	return `Sign in to see ${TAB_LABELS[screen].toLowerCase()} for your league`;
+	return `Sign in to see your ${TAB_LABELS[screen].toLowerCase()}`;
 }
 
 /** What the order is, in the refreshed stamp: "Our rest-of-season order, refreshed October 14." */

@@ -289,8 +289,9 @@ void test("a row's facts: the game on the member's own clock, the designation wi
 });
 
 void test('the signed-out panel names the screen it is for', () => {
-	assert.equal(signInTitle('start'), 'Sign in to see start and sit for your league');
-	assert.equal(signInTitle('trades'), 'Sign in to see trades for your league');
+	assert.equal(signInTitle('start'), 'Sign in to see your lineup');
+	assert.equal(signInTitle('matchup'), 'Sign in to see your matchup');
+	assert.equal(signInTitle('trades'), 'Sign in to see your trades');
 });
 
 void test('the refreshed stamp names the order and its day', () => {
