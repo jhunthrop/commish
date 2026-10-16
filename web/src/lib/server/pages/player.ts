@@ -2,10 +2,12 @@
  * him and from which sources, his season so far, his capsule, and his numbers in every other format
  * the run carries. */
 import { windowLabel } from '#lib/format/date.ts';
-import { tierOf } from '#lib/run/derive.ts';
+import { withStatuses } from '#lib/run/board-status.ts';
+import { availableTierOf } from '#lib/run/held-places.ts';
 import type {
 	AdpSource,
 	Capsule,
+	Designations,
 	Format,
 	IndexEntry,
 	PlayerFormat,
@@ -131,12 +133,20 @@ async function linesFor(
 	return lines.map((line, i) => ({ ...line, tableLabel: labels[i] ?? line.format.label }));
 }
 
-async function mates(format: Format, entry: IndexEntry): Promise<PlayerPage['tier']> {
-	const rows = (await board(format.id)).rows;
+/** His tier among the available players at his position (run/held-places.ts): a player on a
+ * season-long list is no one's tier mate and counts toward no cliff, and has none of his own (his page
+ * says so in its place). */
+async function mates(
+	format: Format,
+	entry: IndexEntry,
+	capture: Designations | null
+): Promise<PlayerPage['tier']> {
+	const rows = withStatuses((await board(format.id)).rows, capture);
 	const row = rows.find((candidate) => candidate.id === entry.id);
 	if (!row)
 		throw new Error(`${entry.name} is not on the ${format.id} board his page says he is on.`);
-	const group = tierOf(rows, row);
+	const group = availableTierOf(rows, row);
+	if (group === null) return { tier: row.tier, cliff: null, mates: [] };
 	return {
 		tier: group.tier,
 		cliff: group.cliff,
@@ -198,7 +208,7 @@ export async function playerPage(slug: string): Promise<PlayerPage> {
 		format: lead.format,
 		numbers: lead.numbers,
 		lines,
-		tier: await mates(lead.format, entry),
+		tier: await mates(lead.format, entry, capture),
 		pointsHead: formatTable(lines).head,
 		tierBasis:
 			lead.format.rosFromWeek === undefined

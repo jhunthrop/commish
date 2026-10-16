@@ -17,8 +17,8 @@ import { links } from '#lib/site/links.ts';
 import { windowLabel } from '#lib/format/date.ts';
 import { withStatuses } from '#lib/run/board-status.ts';
 import type { CaptureStamp } from '#lib/format/designation.ts';
-import { boardStatusWords, type BoardStatusWords } from '#lib/run/status-view.ts';
-import { builtSaying, captureStamp } from '../statuses.ts';
+import type { BoardStatusWords } from '#lib/run/status-view.ts';
+import { boardStatuses } from '../statuses.ts';
 import { boardSeason } from '../board-season.ts';
 import { adp, board, designations, manifest } from '../run.ts';
 import {
@@ -107,8 +107,7 @@ export async function boardPage(formatId: string, segment: string | null): Promi
 			range
 		}),
 		framing: rowFraming(format),
-		capture: capture === null ? null : captureStamp(capture),
-		statusWords: capture === null ? null : boardStatusWords(rows, builtSaying(capture, format))
+		...boardStatuses(rows, capture, format)
 	};
 }
 

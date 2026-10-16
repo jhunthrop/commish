@@ -10,7 +10,10 @@
  *   let live = $state<LiveStatus | null>(null);
  *   onMount(() => liveStatusClock(hasCapture, () => import('#lib/run/status-view.ts'), (said) => (live = said)));
  */
+import type { CaptureStamp } from '#lib/format/designation.ts';
+import type { PlayerStatus } from './schema.ts';
 import type * as StatusWords from './status-view.ts';
+import type { BoardStatusWords } from './status-view.ts';
 
 export interface LiveStatus {
 	zone: string;
@@ -28,5 +31,25 @@ export function liveStatusClock(
 	if (!wanted) return;
 	void load().then((words) => {
 		said({ zone: Intl.DateTimeFormat().resolvedOptions().timeZone, now: Date.now(), words });
+	});
+}
+
+/** A board's rows' words: as built until the live clock answers, then said again on it. The board,
+ * the ADP page and a club page draw their rows' statuses through it. */
+export function sayBoard(
+	page: {
+		rows: readonly { id: string; status?: PlayerStatus }[];
+		capture: CaptureStamp | null;
+		statusWords: BoardStatusWords | null;
+		format: { rosFromWeek?: number };
+	},
+	live: LiveStatus | null
+): BoardStatusWords | null {
+	if (live === null || page.capture === null) return page.statusWords;
+	return live.words.boardStatusWords(page.rows, {
+		capture: page.capture,
+		restOfSeason: page.format.rosFromWeek !== undefined,
+		zone: live.zone,
+		now: live.now
 	});
 }

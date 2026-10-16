@@ -7,8 +7,9 @@
 	interface Props {
 		name: string;
 		position: Position;
-		/** Rank at the position, printed after it: "WR 6". */
-		positionRank?: number;
+		/** Rank at the position, printed after it: "WR 6", or the word for a player on a season-long
+		 * list: "RB IR". */
+		positionRank?: number | string;
 		/** His team, or null when he has none to print. */
 		team: string | null;
 		/** The headshot. Omitted where a list has no faces, the search menu. */

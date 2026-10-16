@@ -25,7 +25,7 @@
 	import { heldOut } from '#lib/run/board-status.ts';
 	import type { BoardRowView } from '#lib/run/schema.ts';
 	import type { StatusView } from '#lib/run/status-view.ts';
-	import { liveStatusClock, type LiveStatus } from '#lib/run/live-status.ts';
+	import { liveStatusClock, sayBoard, type LiveStatus } from '#lib/run/live-status.ts';
 	import { links, tierAnchor } from './links.ts';
 
 	interface Props {
@@ -85,16 +85,7 @@
 			}
 		);
 	});
-	const words = $derived.by(() => {
-		const clock = live;
-		if (clock === null || page.capture === null) return page.statusWords;
-		return clock.words.boardStatusWords(page.rows, {
-			capture: page.capture,
-			restOfSeason: page.format.rosFromWeek !== undefined,
-			zone: clock.zone,
-			now: clock.now
-		});
-	});
+	const words = $derived(sayBoard(page, live));
 	/** A listed player's status as his row prints it. */
 	function status(player: BoardRowView): StatusView | null {
 		return words?.rows[player.id] ?? null;
