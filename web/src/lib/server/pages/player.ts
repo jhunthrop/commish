@@ -3,13 +3,21 @@
  * the run carries. */
 import { windowLabel } from '#lib/format/date.ts';
 import { tierOf } from '#lib/run/derive.ts';
-import type { AdpSource, Capsule, Format, IndexEntry, PlayerFormat } from '#lib/run/schema.ts';
+import type {
+	AdpSource,
+	Capsule,
+	Format,
+	IndexEntry,
+	PlayerFormat,
+	PlayerStatus
+} from '#lib/run/schema.ts';
 import type { Position } from '#lib/types/player.ts';
 import type { TierCliff } from '#lib/ui/tier.ts';
 import { seasonView, type KickoffOf, type SeasonView } from './player-season.ts';
 import {
 	adp,
 	board,
+	designations,
 	entryBySlug,
 	index,
 	manifest,
@@ -80,6 +88,9 @@ export interface PlayerPage {
 	season: SeasonView;
 	/** The run was written after the season's first kickoff: his season leads the draft facts. */
 	underway: boolean;
+	/** His designation on the run's injury capture, null when it does not list him or the run
+	 * carries no capture; with when the capture was read. */
+	status: { status: PlayerStatus; readAt: string } | null;
 }
 
 export async function playerEntries(): Promise<{ slug: string }[]> {
@@ -92,7 +103,7 @@ async function linesFor(
 	formats: readonly Format[],
 	numbers: Readonly<Record<string, PlayerFormat>>,
 	sources: readonly AdpSource[],
-	season: { year: number; underway: boolean }
+	season: { year: number; underway: boolean; heldOut: boolean }
 ): Promise<FormatLine[]> {
 	const reach = await seasonReach();
 	const ranked = formats.flatMap((format) => {
@@ -147,16 +158,20 @@ async function kickoffsOf(team: string): Promise<KickoffOf> {
 
 export async function playerPage(slug: string): Promise<PlayerPage> {
 	const entry = await entryBySlug(slug);
-	const [loaded, run, sources, kickoffOf, underway] = await Promise.all([
+	const [loaded, run, sources, kickoffOf, underway, capture] = await Promise.all([
 		player(entry.id),
 		manifest(),
 		adp(),
 		kickoffsOf(entry.team),
-		seasonUnderway()
+		seasonUnderway(),
+		designations()
 	]);
+	const listed = capture?.players[entry.id];
+	const status = capture && listed ? { status: listed, readAt: capture.readAt } : null;
 	const lines = await linesFor(run.formats, loaded.formats, sources.sources, {
 		year: run.season,
-		underway
+		underway,
+		heldOut: listed?.seasonLong === true
 	});
 	const [lead] = lines;
 	if (!lead) throw new Error(`${loaded.name} has a page but no format ranks him.`);
@@ -182,6 +197,7 @@ export async function playerPage(slug: string): Promise<PlayerPage> {
 		boardSize: lead.boardSize,
 		capsule: loaded.capsule,
 		season: seasonView(loaded.season, loaded.position, run.formats, kickoffOf),
-		underway
+		underway,
+		status
 	};
 }

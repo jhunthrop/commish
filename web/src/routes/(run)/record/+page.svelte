@@ -1,6 +1,9 @@
 <script lang="ts">
 	import { siteContext } from '#lib/context/context.svelte.ts';
 	import ContextNote from '#lib/context/ContextNote.svelte';
+	import { captureLine } from '#lib/format/designation.ts';
+	import { HELD_OUT_METHOD } from '#lib/run/status-view.ts';
+	import { memberClock } from '#lib/format/member-clock.svelte.ts';
 	import { fixed, plural } from '#lib/format/number.ts';
 	import {
 		allLine,
@@ -56,6 +59,15 @@
 	}
 
 	const lines = $derived(weekLines(record.weeks, data.page.unplayed).map(withFigure));
+
+	/** The capture's read on the member's clock once the page is live (Eastern as built). */
+	const zone = memberClock();
+	/** How the board treats a player on a season-long list, and that the record grades it as frozen. */
+	const statusWords = $derived(
+		data.page.statusRead === null
+			? null
+			: `${captureLine(data.page.statusRead, zone())} ${HELD_OUT_METHOD}`
+	);
 
 	const positionColumns: Column[] = [
 		{ label: 'Position' },
@@ -116,6 +128,7 @@
 		<Footnote>
 			{record.method}
 			Each week's board is the nightly run taken just before it froze.
+			{#if statusWords}{statusWords}{/if}
 		</Footnote>
 	</main>
 </SiteShell>

@@ -3,8 +3,9 @@
 
 	interface Props {
 		position: Position;
-		/** Rank at the position on this board. Omitted where only the position is known. */
-		rank?: number;
+		/** Rank at the position on this board, or the word it shows as (IR for a player on a
+		 * season-long list). Omitted where only the position is known. */
+		rank?: number | string;
 	}
 
 	let { position, rank }: Props = $props();

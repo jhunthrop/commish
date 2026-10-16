@@ -51,18 +51,26 @@ export function draftersWords(
 	return `We have him at pick ${String(numbers.ourRank)}, so ${where}. ADP ${fixed(numbers.adp)} from ${sources.join(' and ')}.`;
 }
 
+/** A player on a season-long list sits below the available players (Lane 63): his figure assumes he
+ * plays, so no sentence gives him the rank it would earn. */
+const BELOW_THE_AVAILABLE = 'He sits below the available players.';
+
 export function lineWords(
 	line: { format: Format; numbers: PlayerFormat; rest: RestFigures | null },
 	sources: readonly string[],
 	boardSize: number,
-	season: { year: number; underway: boolean }
+	season: { year: number; underway: boolean; heldOut?: boolean }
 ): LineWords {
 	const { numbers, format, rest } = line;
 	const year = String(season.year);
 	const games = fixed(numbers.expectedGames);
+	const held = season.heldOut === true;
+	const rank = held
+		? ' if he plays, below the available players'
+		: `, our rank ${String(numbers.ourRank)}`;
 	const caption =
 		rest !== null
-			? `${format.label} points for the rest of ${year}, our rank ${String(numbers.ourRank)}`
+			? `${format.label} points for the rest of ${year}${rank}`
 			: season.underway
 				? `${format.label} points in ${year}, projected preseason over ${games} games`
 				: `projected ${format.label} points in ${year}, over ${games} expected games`;
@@ -71,7 +79,9 @@ export function lineWords(
 		caption,
 		...draftersFact(numbers, inSeason),
 		drafters: draftersWords(numbers, sources, inSeason),
-		value: valueWords(numbers, String(boardSize), inSeason)
+		value: held
+			? heldValueWords(String(boardSize), inSeason)
+			: valueWords(numbers, String(boardSize), inSeason)
 	};
 }
 
@@ -90,6 +100,11 @@ function draftersFact(
 	return inSeason
 		? { draftersLabel: 'ADP', draftersFigure: fixed(numbers.adp) }
 		: { draftersLabel: 'Where drafters take him', draftersFigure: `Pick ${fixed(numbers.adp, 0)}` };
+}
+
+function heldValueWords(boardSize: string, inSeason: boolean): string {
+	const among = `If he plays, among the ${boardSize} on our board${inSeason ? ' for the rest of the season' : ''}.`;
+	return `${among} ${BELOW_THE_AVAILABLE}`;
 }
 
 function valueWords(numbers: PlayerFormat, boardSize: string, inSeason: boolean): string {

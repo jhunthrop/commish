@@ -15,8 +15,9 @@ import type { Position, RangeScale } from '#lib/types/player.ts';
 import { scoringBasis } from '#lib/run/catalog.ts';
 import { links } from '#lib/site/links.ts';
 import { windowLabel } from '#lib/format/date.ts';
+import { withStatuses } from '#lib/run/board-status.ts';
 import { boardSeason } from '../board-season.ts';
-import { adp, board, manifest } from '../run.ts';
+import { adp, board, designations, manifest } from '../run.ts';
 import {
 	absentFormatPage,
 	formatChips,
@@ -52,6 +53,9 @@ export interface BoardPage {
 	basisTerms: BasisTerm[];
 	/** How every row frames his rank against the drafts (run/row-framing.ts). */
 	framing: RowFraming;
+	/** When the run's injury capture was read, null when the run carries none: the basis line names
+	 * it, on the member's clock. */
+	statusRead: string | null;
 }
 
 /** A format's board, or the page saying the run lacks it. */
@@ -62,8 +66,16 @@ export async function boardPage(formatId: string, segment: string | null): Promi
 	const position = segment === null ? null : positionFromSegment(segment);
 	if (segment !== null && position === null) error(NOT_FOUND, 'No such position.');
 	const format = await formatForRoute(formatId, (id) => links.board(id, position));
-	const [loaded, formats, sources] = await Promise.all([board(format.id), formatChips(), adp()]);
-	const ranked = position === null ? loaded.rows : rowsAt(loaded.rows, position);
+	const [loaded, formats, sources, capture] = await Promise.all([
+		board(format.id),
+		formatChips(),
+		adp(),
+		designations()
+	]);
+	const ranked = withStatuses(
+		position === null ? loaded.rows : rowsAt(loaded.rows, position),
+		capture
+	);
 	if (ranked.length === 0) error(NOT_FOUND, 'This board ranks nobody at that position.');
 	const { rows, lead } = await boardSeason(format, ranked);
 	const range = carriesRange(rows);
@@ -89,7 +101,8 @@ export async function boardPage(formatId: string, segment: string | null): Promi
 			adpBasis,
 			range
 		}),
-		framing: rowFraming(format)
+		framing: rowFraming(format),
+		statusRead: capture?.readAt ?? null
 	};
 }
 

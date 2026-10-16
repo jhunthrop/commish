@@ -156,3 +156,25 @@ void test('in season the ADP is a fact and the rest-of-season rank takes the rou
 	);
 	assert.equal(none.draftersFigure, 'No ADP');
 });
+
+void test('a player on a season-long list is never given a rank as if he plays (Lane 63)', () => {
+	const rest = restFigures(REST, NUMBERS, REACH, 2026);
+	const held = { ...SEASON, heldOut: true };
+	const words = lineWords({ format: REST, numbers: NUMBERS, rest }, SOURCES, 618, held);
+	assert.equal(
+		words.caption,
+		'PPR points for the rest of 2026 if he plays, below the available players'
+	);
+	assert.equal(
+		words.value,
+		'If he plays, among the 618 on our board for the rest of the season. He sits below the available players.'
+	);
+	const preseason = lineWords({ format: PPR, numbers: BARE, rest: null }, SOURCES, 618, held);
+	assert.equal(
+		preseason.value,
+		'If he plays, among the 618 on our board. He sits below the available players.'
+	);
+	for (const line of [words.caption, words.value, preseason.value]) {
+		assert.doesNotMatch(line, /rank \d|Round \d|[—;]/u, line);
+	}
+});

@@ -8,6 +8,9 @@
 	import { fixed, signed } from '#lib/format/number.ts';
 	import { POSITION_NAMES } from '#lib/run/derive.ts';
 	import { readFigures } from '#lib/run/read-figures.ts';
+	import { statusView, weekNote } from '#lib/run/status-view.ts';
+	import { captureLine } from '#lib/format/designation.ts';
+	import { memberClock } from '#lib/format/member-clock.svelte.ts';
 	import { UNWRITTEN_READ, unwrittenLines } from '#lib/run/unwritten-words.ts';
 	import Credit from '#lib/site/Credit.svelte';
 	import SheetAdd from '#lib/site/SheetAdd.svelte';
@@ -32,6 +35,7 @@
 	import Table from '#lib/ui/Table.svelte';
 	import TierChip from '#lib/ui/TierChip.svelte';
 	import TierMates from '#lib/ui/TierMates.svelte';
+	import ToneChip from '#lib/ui/ToneChip.svelte';
 	import { heatFor } from '#lib/ui/heat.ts';
 	import type { PageProps } from './$types';
 
@@ -84,6 +88,25 @@
 					: { points: n.projected, fromWeek: lead.format.rosFromWeek }
 		})
 	);
+	/** The capture's times on the member's clock once the page is live (Eastern as built). */
+	const zone = memberClock();
+	/** His designation on the run's injury capture: a season-long one shows as his rank. */
+	const listed = $derived(
+		page.status === null
+			? null
+			: statusView(
+					page.status.status,
+					page.status.readAt,
+					lead.format.rosFromWeek !== undefined,
+					zone()
+				)
+	);
+	/** The status's sentence and where it comes from, under his figures. */
+	const statusNote = $derived(
+		page.status === null || listed === null
+			? null
+			: `${listed.line ?? weekNote(page.status.status.status)} ${captureLine(page.status.readAt, zone())}`
+	);
 	const mates = $derived(
 		page.tier.mates.map((mate) => ({ ...mate, href: links.player(mate.slug) }))
 	);
@@ -126,9 +149,10 @@
 					loading="eager"
 				/>{/snippet}
 			{#snippet meta()}
-				<PositionPill position={page.position} rank={n.positionRank} />
+				<PositionPill position={page.position} rank={listed?.rank ?? n.positionRank} />
 				<TierChip tier={n.tier} long />
 				<a href={links.club(page.team)}>{page.team}</a>
+				{#if listed}<ToneChip tone={listed.sits ? 'loss' : 'even'}>{listed.mark}</ToneChip>{/if}
 				<span class="holder" class:filled={rostered !== null}>{rostered ?? ''}</span>
 			{/snippet}
 			{#snippet aside()}
@@ -161,6 +185,7 @@
 			{/snippet}
 		</HeroCard>
 		{#if lead.rest}<Footnote>{lead.rest.lead}</Footnote>{/if}
+		{#if statusNote}<Footnote>{statusNote}</Footnote>{/if}
 		<div class="league-lines">
 			<ContextNote note={note?.text ?? null} link={note?.link ?? null} />
 		</div>
@@ -237,7 +262,7 @@
 					{#each page.lines as line (line.format.id)}
 						<tr>
 							<td><a href={links.board(line.format.id, page.position)}>{line.tableLabel}</a></td>
-							<td class="num">{line.numbers.ourRank}</td>
+							<td class="num">{listed?.rank ?? line.numbers.ourRank}</td>
 							<td class="num">{fixed(line.numbers.projected)}</td>
 							<td class="num">{signed(line.numbers.vor)}</td>
 							<td class="num">{line.numbers.tier}</td>
