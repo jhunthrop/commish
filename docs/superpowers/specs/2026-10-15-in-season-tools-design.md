@@ -153,6 +153,7 @@ PlayerLine:
   player: LeaguePlayer          # existing
   position_rank: int|null       # rest-of-season from week 7, preseason before; null when unranked
   points_over_replacement: number|null
+  rest_of_season_per_game: number|null   # Lane 64, §13
   facts: WeekFacts
 
 LineupAdvice:
@@ -256,3 +257,11 @@ Founder, 2026-10-16: a player on injured reserve still ranked high makes people 
 
 **Basis.** The board's basis line adds "Injury status from the hourly capture, read Fri Oct 16, 9:05 am Central.", on the member's own clock once the page is live (built on the Eastern clock), and the record's method words say the same and that the frozen boards it grades moved no one. The capsule sheet tells the writer that a season-long designation puts him below every available player at his position, so a read never contradicts its row.
 
+## 13. The number beside each row is one we stand behind (Lane 64)
+
+No weekly point projection ships from a round that failed its own check, so no row carries a week's figure. Each `PlayerLine` carries `rest_of_season_per_game`: the published board's rest-of-season points over the games his club has left from the board's first week (`published_boards.from_week`) through week 17, byes out, to one decimal. One function (`inseason.RestOfSeasonPerGame`, the clubs' games from `GamesLeft` over the schedule the facts read) serves the lineup, the waivers, the trade finder and the trade check. It is the player page's "Rest of season" total per game, and the order the screens rank by.
+
+- It is null on the preseason number, on a run that does not say its first week, for a player with no projection (kickers and defenses), and for a club with no games left.
+- A player who is out, on a season-long list included, keeps it with his row's status: the figure assumes he plays (§12).
+- When the rows carry it, every screen's basis, and the builder's, ends on "Points a game are our rest-of-season projection from week N over the games his club has left, byes out."
+- The web ends each row on it ("18.4 a game") where a week's number would sit, with the head "Points a game", and his points over replacement a week move to his line at a desk's width. A waiver row, which ends on its gain, says it beside his club. The trade builder's answer names its players with it: "You give Kyren Williams (14.2 a game) for Nico Collins (17.8 a game)." Before the rest-of-season order every row reads as before.
