@@ -15,8 +15,9 @@ Narrative slots refused only for their voice get one rewrite each from what call
 here raises for a gateway failure: the facts block is the answer, and the usage billed is kept.
 A throttle is not a block (Lane 52): an ask the gateway fails on a rate limit or a transport failure
 waits and is asked again with the same prompt (`_ask`, `throttle_waits_ms`), and never counts against
-the six; only a line still down after every wait ends in the facts block, named "throttled". A call
-the run's budget refuses (`run_budget`) ends the page at once, named for the budget.
+the six; only a line still down after every wait ends in the facts block, named "throttled". An empty
+or cut answer to a correction is an ask spent, and the read asks again while asks remain. A call the
+run's budget refuses (`run_budget`) ends the page at once, named for the budget.
 """
 
 from collections.abc import Sequence
@@ -267,8 +268,14 @@ def _settle(
                 gateway, _msgs(facts, correction_prompt_for(facts, size, prior)), CAPSULE_CONFIG.size(size).max_tokens
             )
         except GenerationError as error:
-            spent = replace(read, usage=add_usage(read.usage, error.billed))
-            return _facts_block(facts, spent, _gateway_failure(error)), read.calls + 1
+            spent = replace(read, usage=add_usage(read.usage, error.billed), calls=read.calls + 1)
+            failure = _gateway_failure(error)
+            if failure.kind != UNUSABLE or not error.retryable:
+                return _facts_block(facts, spent, failure), spent.calls
+            # An empty or cut answer is an ask spent, never the read's end: ask again while asks remain
+            # (a refused request, not retryable, would be refused again).
+            read = spent
+            continue
         text = answer.content.strip()
         result = validate_capsule(text, facts, size, asked_shorter=_asked_shorter(read, size))
         read = read.graded(prior.kind, text, result, answer.usage, 1)

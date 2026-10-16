@@ -130,6 +130,27 @@ def test_a_refused_request_or_a_degenerate_completion_is_not_waited_out() -> Non
 
 
 @pytest.mark.usefixtures("quiet_page")
+def test_an_empty_correction_is_an_ask_spent_and_the_read_asks_again(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Lane 52's sample: Hockenson's short note fell to the facts block on one empty answer with asks
+    left. The empty answer spends its ask, and the read asks again while asks remain."""
+    verdicts = iter([True, False, True])  # the full draft passes, the short draft fails, its correction passes
+    monkeypatch.setattr(
+        generate,
+        "validate_capsule",
+        lambda body, facts, size, asked_shorter=False: (
+            ValidationResult(True, ()) if next(verdicts) else ValidationResult(False, ("The completion was empty.",))
+        ),
+    )
+    empty = GenerationError("Gateway returned an empty completion after its retry.", True)
+    answer = Completion(_WORDS, Usage(cost_usd=_CALL_COST))
+    gateway = _StubGateway([Completion(_BUNDLE, None), empty, answer])
+    result = _write(gateway)
+    assert result.source == "llm"
+    assert gateway.slept == []
+    assert len(result.compact.attempts) == _THROTTLES  # the draft and the correction that passed
+
+
+@pytest.mark.usefixtures("quiet_page")
 def test_a_spent_run_budget_stops_the_page_and_says_so() -> None:
     gateway = _StubGateway([BudgetSpentError("the run's budget is spent")])
     result = _write(gateway)

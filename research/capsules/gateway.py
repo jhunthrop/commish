@@ -8,7 +8,10 @@ the call); only when the gateway's rate-limit headers say the limit is
 spent for everyone does the whole line pause until their reset. A 5xx, a network error, an empty
 completion or one the gateway says was cut at its token limit (`finish_reason: length`, never read
 as a whole answer: Lane 29) gets one retry, and usage the gateway billed before a failure is kept on
-the error, so a player's cost is counted whether or not his read survived.
+the error, so a player's cost is counted whether or not his read survived. A failure the line caused
+(a rate limit, a network error, a 5xx, a response that was not JSON) is marked `transport`, which the
+writer waits out (`generate._ask`, Lane 52). A run with a budget (`run_budget`) draws on it before
+every HTTP call, so the budget is a hard stop at the gateway.
 
 Pages are written `concurrency` at a time (`GatewayClient.rolling`): each page holds its own
 scoped view of the run's client (its own call count over the shared line, bucket and ledger). The
