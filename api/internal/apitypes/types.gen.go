@@ -1293,11 +1293,9 @@ type BoardPlayer struct {
 	Name     string   `json:"name"`
 
 	// Points projected season points
-	Points   *float64       `json:"points"`
-	Position PlayerPosition `json:"position"`
-
-	// PositionRank his place at his position; on GET /boards/{format}, a player on a season-long list is placed after every available player at it
-	PositionRank int `json:"position_rank"`
+	Points       *float64       `json:"points"`
+	Position     PlayerPosition `json:"position"`
+	PositionRank int            `json:"position_rank"`
 
 	// Status his injury designation on the newest hourly capture (GET /boards/{format} only), absent when the capture does not list him
 	Status *BoardStatus `json:"status,omitempty"`

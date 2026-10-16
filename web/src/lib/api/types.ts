@@ -1960,7 +1960,6 @@ export interface components {
 			 * @description points over replacement for this league
 			 */
 			vor: number | null;
-			/** @description his place at his position; on GET /boards/{format}, a player on a season-long list is placed after every available player at it */
 			position_rank: number;
 			bye: number | null;
 			status?: components['schemas']['BoardStatus'];

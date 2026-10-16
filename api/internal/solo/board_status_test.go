@@ -23,7 +23,7 @@ func ids(players []apitypes.BoardPlayer) []string {
 }
 
 // A player on a season-long list follows the last available player at
-// his position and takes the places after theirs; a week's designation
+// his position, his rank the store's; a week's designation
 // keeps his place and carries its mark; a position with nobody available
 // keeps its order.
 func TestBoardStatuses(t *testing.T) {
@@ -51,8 +51,8 @@ func TestBoardStatuses(t *testing.T) {
 	for _, p := range got.Players {
 		ranks[p.Id], byID[p.Id] = p.PositionRank, p
 	}
-	if want := map[string]int{"c-wr": 1, "d-wr": 2, "a-wr": 3, "b-rb": 1, "e-rb": 2, "f-te": 1, "g-qb": 1}; !maps.Equal(ranks, want) {
-		t.Fatalf("position ranks %v, want %v", ranks, want)
+	if want := map[string]int{"a-wr": 1, "b-rb": 1, "c-wr": 2, "d-wr": 3, "e-rb": 2, "f-te": 1, "g-qb": 1}; !maps.Equal(ranks, want) {
+		t.Fatalf("position ranks %v, want the store's %v", ranks, want)
 	}
 	a := byID["a-wr"].Status
 	if a == nil || a.Status != apitypes.DesignationStatusInjuredReserve || !a.SeasonLong || a.Since == nil || !a.Since.Equal(since) ||

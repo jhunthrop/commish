@@ -2371,11 +2371,7 @@ components:
         adp: { type: number, format: double, nullable: true, description: where drafters take him, null with no source }
         points: { type: number, format: double, nullable: true, description: projected season points, null for kickers and defenses }
         vor: { type: number, format: double, nullable: true, description: points over replacement for this league, null when it has none }
-        position_rank:
-          type: integer
-          description: >-
-            his place at his position; on GET /boards/{format}, a player on a season-long list is placed after every
-            available player at it
+        position_rank: { type: integer }
         bye: { type: integer, nullable: true }
         status:
           $ref: "#/components/schemas/BoardStatus"

@@ -66,7 +66,7 @@ func TestTheBoardRouteCarriesTheCapture(t *testing.T) {
 	got := routeBoard(t, fixedDesignations{d: map[string]boards.Designation{
 		"wr-1": {Code: "IR", AsOf: read, Source: "tank01_injuries_by_date"},
 	}})
-	if ids(got.Players)[0] != "wr-2" || got.Players[1].Id != "wr-1" || got.Players[1].PositionRank != 2 || got.Players[0].PositionRank != 1 {
+	if ids(got.Players)[0] != "wr-2" || got.Players[1].Id != "wr-1" || got.Players[1].PositionRank != 1 || got.Players[0].PositionRank != 2 {
 		t.Fatalf("players %+v: the receiver on injured reserve follows the available one", got.Players)
 	}
 	if got.Players[1].Status == nil || !got.Players[1].Status.SeasonLong || got.Players[1].Points == nil || *got.Players[1].Points != 250 {

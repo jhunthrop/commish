@@ -2,7 +2,6 @@ package solo
 
 import (
 	"context"
-	"sort"
 
 	"github.com/jhunthrop/commish/api/internal/apitypes"
 	"github.com/jhunthrop/commish/api/internal/boards"
@@ -17,10 +16,10 @@ type DesignationSource interface {
 
 // withStatuses is the board with each listed player's designation, and
 // the rows ordered by the lane 63 rule: a player on a season-long list
-// (boards.SeasonLong) follows the last available player at his position
-// and takes the places after theirs, his figures as they are. A week's
-// designation moves nothing. A position with nobody available keeps its
-// order. The view handed in is not changed.
+// (boards.SeasonLong) follows the last available player at his position,
+// his figures and rank as they are. A week's designation moves nothing.
+// A position with nobody available keeps its order. The view handed in is
+// not changed.
 func withStatuses(view apitypes.RoomBoard, designations map[string]boards.Designation) apitypes.RoomBoard {
 	out := view
 	out.Players = make([]apitypes.BoardPlayer, len(view.Players))
@@ -58,9 +57,9 @@ func statusRead(designations map[string]boards.Designation) *apitypes.StatusRead
 }
 
 // belowTheAvailable moves each held player (on a season-long list) to
-// just after the last available player at his position, in their order,
-// and renumbers each position's ranks: the available first in their
-// order, then the held.
+// just after the last available player at his position, in their order.
+// Ranks stay the store's: a held player's rank is his figure's, which
+// assumes he plays, and his status says why he follows.
 func belowTheAvailable(players []apitypes.BoardPlayer, held map[string]bool) []apitypes.BoardPlayer {
 	lastAvailable := map[apitypes.PlayerPosition]int{}
 	waiting := map[apitypes.PlayerPosition][]apitypes.BoardPlayer{}
@@ -81,29 +80,5 @@ func belowTheAvailable(players []apitypes.BoardPlayer, held map[string]bool) []a
 			ordered = append(ordered, waiting[p.Position]...)
 		}
 	}
-	renumber(ordered, held)
 	return ordered
-}
-
-// renumber gives each position's ranked players 1, 2, ... by their
-// place at it, the available before the held.
-func renumber(players []apitypes.BoardPlayer, held map[string]bool) {
-	byPosition := map[apitypes.PlayerPosition][]int{}
-	for i, p := range players {
-		if p.PositionRank > 0 {
-			byPosition[p.Position] = append(byPosition[p.Position], i)
-		}
-	}
-	for _, at := range byPosition {
-		sort.SliceStable(at, func(a, b int) bool {
-			pa, pb := players[at[a]], players[at[b]]
-			if held[pa.Id] != held[pb.Id] {
-				return !held[pa.Id]
-			}
-			return pa.PositionRank < pb.PositionRank
-		})
-		for rank, i := range at {
-			players[i].PositionRank = rank + 1
-		}
-	}
 }
