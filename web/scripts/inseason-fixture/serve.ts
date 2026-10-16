@@ -325,7 +325,7 @@ async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> 
 		const { phase, one } = askedPhase(req.headers.cookie);
 		const leagues = leaguesNow();
 		const asked = url.pathname === '/me/league' ? await bodyOf(req) : null;
-		const chosen = (asked as { league?: string } | null)?.league;
+		const chosen = (asked as { league_id?: string } | null)?.league_id;
 		const answer = phaseAccount(account, leagues, phase, one);
 		const picked = leagues.find((league) => league.id === chosen);
 		send(req, res, HTTP.ok, picked ? { ...answer, league: picked } : answer);
@@ -333,6 +333,11 @@ async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> 
 	}
 	if (url.pathname === '/season') {
 		send(req, res, HTTP.ok, FIXTURE_SEASON);
+		return;
+	}
+	// The account page's other lists, empty for the fixture account.
+	if (url.pathname === '/mocks' || url.pathname === '/billing/group-passes') {
+		send(req, res, HTTP.ok, []);
 		return;
 	}
 	if (url.pathname === '/sheets') {

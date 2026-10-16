@@ -30,6 +30,7 @@ const id = FIXTURE_IDS.league;
 const PAGES = [
 	{ name: 'league', path: `/league/${id}`, ready: 'Waiver pool' },
 	{ name: 'start', path: `/league/${id}/start`, ready: 'Set it on Sleeper' },
+	{ name: 'matchup', path: `/league/${id}/matchup`, ready: 'Week 6' },
 	{ name: 'waivers', path: `/league/${id}/waivers`, ready: 'Claim on Sleeper' },
 	{ name: 'trades', path: `/league/${id}/trades`, ready: 'Propose on Sleeper' }
 ] as const;
@@ -91,7 +92,7 @@ for (const { name, path, ready: text } of PAGES) {
 				);
 			}
 			rows.set(`${name} ${String(width)}`, wide.tallest);
-			if (width === PHONE.width && name !== 'league') {
+			if (width === PHONE.width && name !== 'league' && name !== 'matchup') {
 				await page.setViewportSize(PHONE);
 				const fold = await page.evaluate(() => {
 					const row = document.querySelector('main .row')?.getBoundingClientRect();
@@ -248,6 +249,44 @@ for (const theme of THEMES) {
 		await ready(page, 'Read Sleeper now');
 		await page.screenshot({ path: file(`waivers-no-team-${theme}-${String(width)}`) });
 		await ctx.close();
+	}
+}
+
+/** The league page in each season phase (spec 2026-10-16 §3), the follow page a rail item opens
+ * with no league, and the account's Next draft rows in season, in both themes at both widths. */
+const STATES = [
+	{
+		name: 'league-pre-draft',
+		path: `/league/${FIXTURE_IDS.preDraft}`,
+		ready: 'The site turns to your season'
+	},
+	{ name: 'league-draft-day', path: `/league/${FIXTURE_IDS.draftDay}`, ready: 'Open the Advisor' },
+	{ name: 'league-playoffs', path: `/league/${FIXTURE_IDS.playoffs}`, ready: 'See the matchup' },
+	{ name: 'league-offseason', path: `/league/${FIXTURE_IDS.offseason}`, ready: 'finished' },
+	{
+		name: 'follow-for-lineup',
+		path: '/league/new?screen=start',
+		ready: 'to see your lineup each week'
+	},
+	{ name: 'account-next-draft', path: '/account', ready: 'Next draft' }
+] as const;
+for (const theme of THEMES) {
+	for (const width of SHOT_WIDTHS) {
+		for (const state of STATES) {
+			const ctx = await context(theme, width);
+			const page = await ctx.newPage();
+			await page.goto(`${web}${state.path}`, { waitUntil: 'networkidle' });
+			await ready(page, state.ready);
+			const wide = await page.evaluate(
+				() => document.documentElement.scrollWidth > window.innerWidth
+			);
+			if (wide) scrolls.push(`${state.name} ${theme} ${String(width)}`);
+			await page.screenshot({
+				path: file(`${state.name}-${theme}-${String(width)}`),
+				fullPage: true
+			});
+			await ctx.close();
+		}
 	}
 }
 
