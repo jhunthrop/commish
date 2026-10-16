@@ -130,6 +130,13 @@ def test_precipitation_comes_from_the_next_station_when_the_nearest_has_no_depth
     assert (found.precipitation, found.precipitation_station) == (1, "72530094846")
 
 
+def test_an_answer_without_temperature_or_wind_columns_reads_as_no_value() -> None:
+    body = _recut({"TMP": "TMP_GONE", "WND": "WND_GONE"}).decode()
+    reports = isd.parse_reports(body)
+    assert reports and all(r.temperature_f is None and r.wind_mph is None for r in reports)
+    assert any(r.hour_depth_mm is not None for r in reports)
+
+
 def test_an_unreadable_report_field_is_refused() -> None:
     body = (NOAA / "global-hourly-72534014819-2022.csv").read_text().replace('"+0206,5"', '"+0206"')
     with pytest.raises(SchemaDriftError, match="TMP"):

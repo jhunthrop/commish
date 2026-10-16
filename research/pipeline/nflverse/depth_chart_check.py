@@ -54,6 +54,9 @@ class StampCheck:
     # Depth-1 player-weeks outside the players the filing ingest covers (a fullback, a player the
     # universe does not project): they can never be filed, so they are in neither group.
     excluded: int = 0
+    # Of the comparison group, the player-weeks of a covered player with no filing anywhere in the
+    # season: covered means the universe projects him, not that he was ever filed. Printed, not removed.
+    never_filed: int = 0
 
     @property
     def passed(self) -> bool:
@@ -73,6 +76,7 @@ class StampCheck:
             f"injured group: {shown(self.injured)}",
             f"comparison group: {shown(self.comparison)}",
             f"excluded: {self.excluded} depth-1 player-weeks the filing ingest does not cover",
+            f"never filed: {self.never_filed} comparison player-weeks of a covered player with no filing all season",
             f"margin {RETENTION_MARGIN}: {verdict}",
         ]
 
@@ -94,7 +98,10 @@ class CheckInputs:
 def stamp_check(inputs: CheckInputs, weeks: Set[WeekKey]) -> StampCheck:
     injured = [0, 0, 0]
     comparison = [0, 0, 0]
-    excluded = 0
+    excluded = never_filed = 0
+    filed_in: dict[int, set[str]] = {}
+    for (season, _week), filed in inputs.filings.items():
+        filed_in.setdefault(season, set()).update(filed)
     for season, week in sorted(weeks):
         before = inputs.starters.get((season, week - 1), {})
         now = inputs.starters.get((season, week), {})
@@ -111,7 +118,8 @@ def stamp_check(inputs: CheckInputs, weeks: Set[WeekKey]) -> StampCheck:
                 group[0] += 1
                 group[1] += 1 if player in now else 0
                 group[2] += 0 if (season, week, club) in inputs.games else 1
-    return StampCheck(Group(*injured), Group(*comparison), excluded)
+                never_filed += 1 if player not in filed_in.get(season, set()) else 0
+    return StampCheck(Group(*injured), Group(*comparison), excluded, never_filed)
 
 
 _STARTERS: Final = text(

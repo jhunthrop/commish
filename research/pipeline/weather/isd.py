@@ -239,7 +239,14 @@ def parse_reports(text: str) -> list[Report]:
             raise SchemaDriftError(f'ISD report date "{at}" is not ISO 8601.') from error
         depth, trace = _first_hour_depth(row, at)
         reports.append(
-            Report(instant, _temperature(row["TMP"], at), _wind(row["WND"], at), depth, trace, _weather_code(row, at))
+            Report(
+                instant,
+                _temperature(row.get("TMP", ""), at),
+                _wind(row.get("WND", ""), at),
+                depth,
+                trace,
+                _weather_code(row, at),
+            )
         )
     return reports
 

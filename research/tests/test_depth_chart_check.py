@@ -26,6 +26,8 @@ def test_each_covered_starter_falls_in_one_group_by_his_filings() -> None:
     # fine (kept), fine_dropped (dropped) and on_bye (kept, his club had no week-8 game).
     assert check.comparison == Group(players=3, retained=2, byes=1)
     assert check.excluded == 1  # the fullback the filing ingest never covers
+    # fine, fine_dropped and on_bye have no filing in 2022 at all.
+    assert check.never_filed == 3  # noqa: PLR2004 - three comparison player-weeks
     assert not check.passed  # 0.50 retained against 0.67, more than 0.05 below
 
 
