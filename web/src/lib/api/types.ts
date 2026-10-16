@@ -385,6 +385,26 @@ export interface paths {
 		patch?: never;
 		trace?: never;
 	};
+	'/leagues/attached/{id}/trades/check': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				/** @description the attached league's id (AttachedLeague.id) */
+				id: string;
+			};
+			cookie?: never;
+		};
+		get?: never;
+		put?: never;
+		/** The trade builder: one trade the drafter built with one other team, one or two players a side at QB, RB, WR or TE from the two rosters as the league's last read holds them, answered with the finder's own figures (the same engine, so a trade the finder lists answers its numbers): each lineup's gain or loss on our order, the drop a full roster makes for two in, and whether each roster still fills every slot. A player not on the named roster, a kicker, a defense, or a player on injured reserve or the taxi squad answers 422 with the sentence naming him. We never send an offer. */
+		post: operations['checkLeagueTrade'];
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
 	'/leagues/attached/{id}/moves/plan': {
 		parameters: {
 			query?: never;
@@ -2636,6 +2656,8 @@ export interface components {
 			name: string;
 			owner: string;
 			record: components['schemas']['TradeRecord'];
+			/** @description every player on their active roster (injured reserve and taxi spots left out), by position then name: the builder's players on their side */
+			roster: components['schemas']['PlayerLine'][];
 			/** @description at most 10: the trades their lineup gains 0.5 a week or more from first, then the close calls for them, each group best for the drafter first */
 			trades: components['schemas']['TradeRow'][];
 			/** @description one sentence when every trade found with this team is a close call for them, else null */
@@ -2761,6 +2783,42 @@ export interface components {
 			/** @description the host's trade page, empty when we know none */
 			host_trades_url: string;
 			/** @description one sentence under the verb when we cannot open the host's page ("Make this change on Yahoo. We cannot open that page for you yet."), null when the url opens it */
+			host_note: string | null;
+		};
+		TradeCheckInput: {
+			/** @description the other team's roster_id (TradeTeam.roster_id) */
+			team: number;
+			/** @description board ids of one or two of the drafter's players */
+			give: string[];
+			/** @description board ids of one or two of theirs */
+			get: string[];
+		};
+		TradeFills: {
+			/** @description the drafter's roster still fills every slot it filled before the trade */
+			yours: boolean;
+			/** @description the same for theirs */
+			theirs: boolean;
+			/** @description the first slot the drafter's lineup would leave empty, as a lineup row labels it ("RB2", "TE", "Flex"), null when it fills every slot */
+			yours_open: string | null;
+			/** @description the same for theirs */
+			theirs_open: string | null;
+		};
+		TradeCheck: {
+			week: number;
+			/** @description the honesty line beside the answer */
+			basis: string;
+			basis_note: string;
+			order_basis: components['schemas']['OrderBasis'];
+			/** Format: date-time */
+			refreshed: string;
+			/** Format: date-time */
+			read_at: string;
+			/** @description the trade as the finder reckons one: my_gain and their_gain fall below zero for a lineup that loses, close_for_them as the finder marks it */
+			trade: components['schemas']['TradeRow'];
+			fills: components['schemas']['TradeFills'];
+			/** @description the host's trade page, the finder's, empty when we know none */
+			host_trades_url: string;
+			/** @description as TradeAdvice's */
 			host_note: string | null;
 		};
 		LeagueMove: {
@@ -3104,6 +3162,15 @@ export interface components {
 			content: {
 				'application/json': components['schemas']['Envelope'] & {
 					data?: components['schemas']['TradeAdvice'];
+				};
+			};
+		};
+		/** @description one trade the drafter built, with each lineup's change */
+		TradeCheckResponse: {
+			headers: Record<string, unknown>;
+			content: {
+				'application/json': components['schemas']['Envelope'] & {
+					data?: components['schemas']['TradeCheck'];
 				};
 			};
 		};
@@ -3639,6 +3706,32 @@ export interface operations {
 			404: components['responses']['ErrorResponse'];
 			409: components['responses']['ErrorResponse'];
 			422: components['responses']['ErrorResponse'];
+			502: components['responses']['ErrorResponse'];
+		};
+	};
+	checkLeagueTrade: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				/** @description the attached league's id (AttachedLeague.id) */
+				id: string;
+			};
+			cookie?: never;
+		};
+		requestBody: {
+			content: {
+				'application/json': components['schemas']['TradeCheckInput'];
+			};
+		};
+		responses: {
+			200: components['responses']['TradeCheckResponse'];
+			400: components['responses']['ErrorResponse'];
+			404: components['responses']['ErrorResponse'];
+			409: components['responses']['ErrorResponse'];
+			415: components['responses']['ErrorResponse'];
+			422: components['responses']['ErrorResponse'];
+			429: components['responses']['ErrorResponse'];
 			502: components['responses']['ErrorResponse'];
 		};
 	};

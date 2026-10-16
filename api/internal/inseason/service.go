@@ -54,7 +54,7 @@ type Moves interface {
 	ClaimMove(ctx context.Context, accountID uuid.UUID, host string) (apitypes.WaiverMoves, error)
 }
 
-// Service serves the three routes.
+// Service serves the three pages and the trade check.
 type Service struct {
 	Leagues Leagues
 	Facts   SeasonFacts
@@ -71,6 +71,7 @@ func (s *Service) Routes() []httpx.Route {
 		{Method: http.MethodGet, Path: "/leagues/attached/{id}/lineup", Access: httpx.SignedIn, Limit: limit, Handler: s.lineup},
 		{Method: http.MethodGet, Path: "/leagues/attached/{id}/waivers", Access: httpx.SignedIn, Limit: limit, Handler: s.waivers},
 		{Method: http.MethodGet, Path: "/leagues/attached/{id}/trades", Access: httpx.SignedIn, Limit: limit, Handler: s.trades},
+		{Method: http.MethodPost, Path: "/leagues/attached/{id}/trades/check", Access: httpx.SignedIn, Limit: limit, Handler: s.checkTrade},
 	}
 }
 
@@ -188,6 +189,31 @@ func (s *Service) trades(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	out, ok := a.Trades(focus)
+	s.answer(w, r, out, ok)
+}
+
+// checkTrade answers one trade the drafter built (the trade builder):
+// the body checked before the league is read, a team or player the read
+// does not hold as asked refused in a sentence naming him.
+func (s *Service) checkTrade(w http.ResponseWriter, r *http.Request) {
+	var in apitypes.TradeCheckInput
+	if !httpx.DecodeJSON(w, r, httpx.MaxSmallBody, &in) {
+		return
+	}
+	if fields := checkFields(in); len(fields) > 0 {
+		httpx.WriteInvalid(w, r, fields)
+		return
+	}
+	a, ok := s.advisorFor(w, r)
+	if !ok {
+		return
+	}
+	out, refused, ok := a.CheckTrade(in)
+	if refused != nil {
+		httpx.WriteError(w, r, http.StatusUnprocessableEntity, httpx.CodeInvalid, refused.sentence,
+			map[string]string{refused.field: refused.sentence})
+		return
+	}
 	s.answer(w, r, out, ok)
 }
 
