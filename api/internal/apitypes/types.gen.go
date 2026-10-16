@@ -2946,10 +2946,10 @@ type TradeCheck struct {
 
 // TradeCheckInput defines model for TradeCheckInput.
 type TradeCheckInput struct {
-	// Get board ids of one or two of theirs
+	// Get host ids of one or two of theirs
 	Get []string `json:"get"`
 
-	// Give board ids of one or two of the drafter's players
+	// Give host ids (LeaguePlayer.host_id) of one or two of the drafter's players: every rostered player has one, placed on our board or not
 	Give []string `json:"give"`
 
 	// Team the other team's roster_id (TradeTeam.roster_id)

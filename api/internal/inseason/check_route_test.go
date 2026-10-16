@@ -41,10 +41,10 @@ func checkBody(t *testing.T, team int, give, get []string) string {
 	return string(b)
 }
 
-func boardIDs(lines []apitypes.PlayerLine) []string {
+func hostIDs(lines []apitypes.PlayerLine) []string {
 	out := make([]string, len(lines))
 	for i, l := range lines {
-		out[i] = *l.Player.BoardId
+		out[i] = l.Player.HostId
 	}
 	return out
 }
@@ -66,7 +66,7 @@ func TestTradeCheckAgreesWithTheFinder(t *testing.T) {
 			t.Fatalf("%s carries no roster", team.Name)
 		}
 		for _, row := range team.Trades {
-			code, env := post(t, s, leaguePath+"trades/check", checkBody(t, team.RosterId, boardIDs(row.Give), boardIDs(row.Get)))
+			code, env := post(t, s, leaguePath+"trades/check", checkBody(t, team.RosterId, hostIDs(row.Give), hostIDs(row.Get)))
 			if code != http.StatusOK {
 				t.Fatalf("%d %+v", code, env.Error)
 			}
@@ -96,13 +96,13 @@ func TestTradeCheckAnswersAnyTrade(t *testing.T) {
 	s := fixtureService(t, f.league, f.data, &fakeHolds{})
 	// The member's quarterback (p000) for team 2's backup (p025): one
 	// quarterback each way, every slot still filled.
-	code, env := post(t, s, leaguePath+"trades/check", checkBody(t, 2, []string{"p000"}, []string{"p025"}))
+	code, env := post(t, s, leaguePath+"trades/check", checkBody(t, 2, []string{"h000"}, []string{"h025"}))
 	var got apitypes.TradeCheck
 	if code != http.StatusOK || json.Unmarshal(env.Data, &got) != nil || !got.Fills.Yours || !got.Fills.Theirs {
 		t.Fatalf("%d %+v %+v", code, env.Error, got.Fills)
 	}
 	// Both his tight ends (p006, p013) for a receiver leave his TE open.
-	code, env = post(t, s, leaguePath+"trades/check", checkBody(t, 2, []string{"p006", "p013"}, []string{"p018"}))
+	code, env = post(t, s, leaguePath+"trades/check", checkBody(t, 2, []string{"h006", "h013"}, []string{"h018"}))
 	got = apitypes.TradeCheck{}
 	if code != http.StatusOK || json.Unmarshal(env.Data, &got) != nil {
 		t.Fatalf("%d %+v", code, env.Error)
@@ -134,18 +134,19 @@ func TestTradeCheckRefusals(t *testing.T) {
 		code  int
 		words string
 	}{
-		{"his player on another roster", checkBody(t, 2, []string{"p020"}, []string{"p018"}), http.StatusUnprocessableEntity, "Player 020 is not on your roster"},
-		{"their player not on theirs", checkBody(t, 2, []string{"p001"}, []string{"p031"}), http.StatusUnprocessableEntity, "Player 031 is not on Team 2's roster"},
-		{"a kicker", checkBody(t, 2, []string{"p008"}, []string{"p018"}), http.StatusUnprocessableEntity, "Player 008 is a kicker"},
-		{"a defense", checkBody(t, 2, []string{"p001"}, []string{"p024"}), http.StatusUnprocessableEntity, "Player 024 is a defense"},
-		{"an injured reserve spot", checkBody(t, 2, []string{"p001"}, []string{"p019"}), http.StatusUnprocessableEntity, "Player 019 is on injured reserve"},
-		{"the host's injured reserve mark", checkBody(t, 2, []string{"p001"}, []string{"p016"}), http.StatusUnprocessableEntity, "Player 016 is on injured reserve"},
-		{"his own team", checkBody(t, 1, []string{"p001"}, []string{"p002"}), http.StatusUnprocessableEntity, "Pick another team"},
-		{"a team not in the read", checkBody(t, 40, []string{"p001"}, []string{"p018"}), http.StatusUnprocessableEntity, "Pick another team"},
-		{"three a side", checkBody(t, 2, []string{"p001", "p002", "p003"}, []string{"p018"}), http.StatusBadRequest, ""},
-		{"nobody a side", checkBody(t, 2, nil, []string{"p018"}), http.StatusBadRequest, ""},
-		{"a player twice", checkBody(t, 2, []string{"p001", "p001"}, []string{"p018"}), http.StatusBadRequest, ""},
-		{"an id too long", checkBody(t, 2, []string{strings.Repeat("9", 65)}, []string{"p018"}), http.StatusBadRequest, ""},
+		{"his player on another roster", checkBody(t, 2, []string{"h020"}, []string{"h018"}), http.StatusUnprocessableEntity, "Player 020 is not on your roster"},
+		{"their player not on theirs", checkBody(t, 2, []string{"h001"}, []string{"h031"}), http.StatusUnprocessableEntity, "Player 031 is not on Team 2's roster"},
+		{"a player on no roster", checkBody(t, 2, []string{"h999"}, []string{"h018"}), http.StatusUnprocessableEntity, "That player is not on your roster"},
+		{"a kicker", checkBody(t, 2, []string{"h008"}, []string{"h018"}), http.StatusUnprocessableEntity, "Player 008 is a kicker"},
+		{"a defense", checkBody(t, 2, []string{"h001"}, []string{"h024"}), http.StatusUnprocessableEntity, "Player 024 is a defense"},
+		{"an injured reserve spot", checkBody(t, 2, []string{"h001"}, []string{"h019"}), http.StatusUnprocessableEntity, "Player 019 is on injured reserve"},
+		{"the host's injured reserve mark", checkBody(t, 2, []string{"h001"}, []string{"h016"}), http.StatusUnprocessableEntity, "Player 016 is on injured reserve"},
+		{"his own team", checkBody(t, 1, []string{"h001"}, []string{"h002"}), http.StatusUnprocessableEntity, "Pick another team"},
+		{"a team not in the read", checkBody(t, 40, []string{"h001"}, []string{"h018"}), http.StatusUnprocessableEntity, "Pick another team"},
+		{"three a side", checkBody(t, 2, []string{"h001", "h002", "h003"}, []string{"h018"}), http.StatusBadRequest, ""},
+		{"nobody a side", checkBody(t, 2, nil, []string{"h018"}), http.StatusBadRequest, ""},
+		{"a player twice", checkBody(t, 2, []string{"h001", "h001"}, []string{"h018"}), http.StatusBadRequest, ""},
+		{"an id too long", checkBody(t, 2, []string{strings.Repeat("9", 65)}, []string{"h018"}), http.StatusBadRequest, ""},
 		{"a body that is not one", `{"team": 2`, http.StatusBadRequest, ""},
 	}
 	for _, c := range cases {
@@ -167,7 +168,7 @@ func TestTradeCheckLeagueErrors(t *testing.T) {
 	unsaved.Saved, unsaved.SettingsNote = nil, "A mock draft cannot rerun this league yet: its lineup has IDP."
 	noTeam := f.league
 	noTeam.Me = 99
-	body := checkBody(t, 2, []string{"p001"}, []string{"p018"})
+	body := checkBody(t, 2, []string{"h001"}, []string{"h018"})
 	if code, env := post(t, fixtureService(t, unsaved, f.data, &fakeHolds{}), leaguePath+"trades/check", body); code != http.StatusUnprocessableEntity || env.Error.Message != unsaved.SettingsNote {
 		t.Fatalf("unsaved: %d %+v", code, env.Error)
 	}

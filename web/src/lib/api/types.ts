@@ -2788,9 +2788,9 @@ export interface components {
 		TradeCheckInput: {
 			/** @description the other team's roster_id (TradeTeam.roster_id) */
 			team: number;
-			/** @description board ids of one or two of the drafter's players */
+			/** @description host ids (LeaguePlayer.host_id) of one or two of the drafter's players: every rostered player has one, placed on our board or not */
 			give: string[];
-			/** @description board ids of one or two of theirs */
+			/** @description host ids of one or two of theirs */
 			get: string[];
 		};
 		TradeFills: {

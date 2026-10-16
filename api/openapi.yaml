@@ -3319,13 +3319,13 @@ components:
           type: array
           minItems: 1
           maxItems: 2
-          description: board ids of one or two of the drafter's players
+          description: "host ids (LeaguePlayer.host_id) of one or two of the drafter's players: every rostered player has one, placed on our board or not"
           items: { type: string, minLength: 1, maxLength: 64 }
         get:
           type: array
           minItems: 1
           maxItems: 2
-          description: board ids of one or two of theirs
+          description: host ids of one or two of theirs
           items: { type: string, minLength: 1, maxLength: 64 }
     TradeFills:
       type: object

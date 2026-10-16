@@ -2,6 +2,7 @@ package inseason
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/jhunthrop/commish/api/internal/apitypes"
@@ -97,7 +98,7 @@ func (a *advisor) openLabel(c Change) *string {
 	return &label
 }
 
-// pick is the players a side names, as indexes into its active people,
+// pick is the players a side names by host id, as indexes into its active people,
 // or the refusal naming the first the read does not hold as asked: not
 // on the roster, in its injured reserve or taxi spot, on injured reserve,
 // or a kicker or defense. whose is the roster's owner as a sentence says
@@ -107,7 +108,7 @@ func (a *advisor) pick(t leaguesync.Team, people []person, ids []string, field, 
 	for _, id := range ids {
 		at := -1
 		for i, p := range people {
-			if p.line.Player.BoardId != nil && *p.line.Player.BoardId == id {
+			if p.cand.ID == id {
 				at = i
 				break
 			}
@@ -132,24 +133,32 @@ func (a *advisor) pick(t leaguesync.Team, people []person, ids []string, field, 
 	return out, nil
 }
 
-// absentWords says why a board id is not among a roster's active
+// absentWords says why a host id is not among a roster's active
 // players: in its injured reserve or taxi spot, or not on it at all.
-func (a *advisor) absentWords(t leaguesync.Team, boardID, whose string) string {
+func (a *advisor) absentWords(t leaguesync.Team, hostID, whose string) string {
 	for _, spot := range []struct {
 		ids   []string
 		words string
 	}{{t.Reserve, "on injured reserve"}, {t.Taxi, "on the taxi squad"}} {
-		for _, hostID := range spot.ids {
-			if lp := a.Player(hostID); lp.BoardId != nil && *lp.BoardId == boardID {
-				return fmt.Sprintf("%s is %s, so we leave him out of trades.", lp.Name, spot.words)
-			}
+		if slices.Contains(spot.ids, hostID) {
+			return fmt.Sprintf("%s is %s, so we leave him out of trades.", a.Player(hostID).Name, spot.words)
 		}
 	}
 	name := "That player"
-	if bp, ok := a.Board.Player(boardID); ok {
-		name = bp.Name
+	if a.rostered(hostID) {
+		name = a.Player(hostID).Name
 	}
 	return fmt.Sprintf("%s is not on %s roster in the league's last read.", name, whose)
+}
+
+// rostered reports whether any roster in the read holds the host id.
+func (a *advisor) rostered(hostID string) bool {
+	for _, t := range a.Snap.Teams {
+		if slices.Contains(t.Players, hostID) {
+			return true
+		}
+	}
+	return false
 }
 
 // possessive is a team's name as its owner: "Team 2's", "Muttdogs'".
