@@ -13,20 +13,30 @@ const PRERENDER_CONCURRENCY = 8;
  * club and the front door draw them, a player page never does, so they load as one file with the
  * pages that draw rows. */
 const ROW_PARTS =
-	/[\\/]src[\\/]lib[\\/](ui[\\/](Row|RowHead|RangeBar|AdpCell|SheetMark|season-figures)\.|site[\\/]RowSheetMark\.)/;
+	/[\\/]src[\\/]lib[\\/](ui[\\/](Row|RowHead|RangeBar|AdpCell|SheetMark|season-figures|ValueCell|NameWords|Place)\.|site[\\/]RowSheetMark\.)/;
 /** The board and ADP pages' own parts: the views, the tier strip, the rail's jump list and toggles,
  * the follow of the switch's format, the chips, and a missing format's page. One file for those
  * pages. */
 const BOARD_PARTS =
-	/[\\/]src[\\/]lib[\\/](ui[\\/](TierStrip|TierJump|Toggle|Chip|ChipGroup|chips|FilterBar)\.|site[\\/](BoardView|BoardPageView|AdpView|AbsentFormatView|absent)\.|context[\\/]follow\.)/;
+	/[\\/]src[\\/]lib[\\/](ui[\\/](TierStrip|TierJump|Toggle|Chip|ChipGroup|chips|FilterBar|BasisList)\.|site[\\/](BoardView|BoardPageView|AdpView|AbsentFormatView|absent)\.|context[\\/]follow\.)/;
 /** What only the user pages run: the mock room and its parts, the account, the pass and the live
  * draft companion, the connected hosts (FFPC, Yahoo, ESPN), the request API client and the sheet's
- * store, and the forms' parts (menu, field, tag chip, action bar, problem line, consent, the theme
- * switch, the held height, the sentence joiner), which only those pages draw. A nightly page never
- * loads any of it with the page; the sheet arrives on a reader's first intent, the rest only on the pages that
+ * store. A nightly page never loads any of it with the page; the sheet arrives on a reader's first intent, the rest only on the pages that
  * call the API. */
 const USER_PAGE_PARTS =
-	/[\\/]src[\\/]lib[\\/](room|account|api|sheet|pass|companion|hosts)[\\/]|[\\/]src[\\/]lib[\\/]ui[\\/](CallPanel|TeamPanel|PickStrip|OddsCell|ToneChip|Stepper|TextInput|ScoreBug|SinceStrip|Keys|Menu|Field|TagChip|ActionBar|ProblemLine|Consent|LiveRegion|theme|hold-height)\.|[\\/]src[\\/]lib[\\/]format[\\/]sentence\./;
+	/[\\/]src[\\/]lib[\\/](room|account|api|sheet|pass|companion|hosts)[\\/]|[\\/]src[\\/]lib[\\/]ui[\\/](CallPanel|TeamPanel|PickStrip|OddsCell|ToneChip|Stepper|TextInput|ScoreBug|SinceStrip|Keys)\./;
+/** What the player, club and compare pages draw and the others never do: a player's line, the
+ * crumb, the outcome bar, the tier mates, the capsule and a fact. One file for those pages. */
+const PLAYER_PARTS =
+	/[\\/]src[\\/]lib[\\/]ui[\\/](PlayerLine|EmptyState|Crumb|OutcomeBar|TierMates|Capsule|Fact)\./;
+/** What the front door, the club, player and record pages draw and the board and ADP pages never do:
+ * the table and its line list, the hero card and the footnote. One file for those pages. */
+const FIGURE_PARTS = /[\\/]src[\\/]lib[\\/]ui[\\/](Table|LineList|HeroCard|Footnote)\./;
+/** The forms' parts, which only the user pages draw: the menu, the field, the tag chip, the action
+ * bar, the problem line, the consent, the live region, the theme switch, the held height, the
+ * sentence joiner, the list joiner and the site's flags. One file for the pages that draw them. */
+const FORM_PARTS =
+	/[\\/]src[\\/]lib[\\/](ui[\\/](Menu|Field|TagChip|ActionBar|ProblemLine|Consent|LiveRegion|theme|hold-height)\.|format[\\/](sentence|list)\.|site[\\/]flags\.)/;
 /** What only a followed league's pages (the league page and its three in-season screens), the
  * account's leagues and the attach page run: the league row, the board read, the league's words and
  * calls, the in-season screens, the season's words, the member's clock and the rail's order a
@@ -80,14 +90,20 @@ export default defineConfig({
 								/[\\/]src[\\/]lib[\\/]/.test(id) &&
 								!/[\\/]ui[\\/]system[\\/]/.test(id) &&
 								!USER_PAGE_PARTS.test(id) &&
+								!FORM_PARTS.test(id) &&
 								!ROW_PARTS.test(id) &&
 								!BOARD_PARTS.test(id) &&
+								!PLAYER_PARTS.test(id) &&
+								!FIGURE_PARTS.test(id) &&
 								!LEAGUE_PAGE_PARTS.test(id),
 							minShareCount: SHARED_BY_ROUTES,
 							priority: 1
 						},
 						{ name: 'rows', test: ROW_PARTS, minShareCount: 2, priority: 1 },
-						{ name: 'board', test: BOARD_PARTS, minShareCount: 2, priority: 1 }
+						{ name: 'board', test: BOARD_PARTS, minShareCount: 2, priority: 1 },
+						{ name: 'player', test: PLAYER_PARTS, minShareCount: 2, priority: 1 },
+						{ name: 'figure', test: FIGURE_PARTS, minShareCount: 2, priority: 1 },
+						{ name: 'forms', test: FORM_PARTS, minShareCount: 2, priority: 1 }
 					]
 				}
 			}

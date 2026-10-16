@@ -59,7 +59,9 @@ const map = JSON.parse(readFileSync(`${file}.map`, 'utf8')) as SourceMap;
 const gzipTotal = gzipSync(code).length;
 const totals = charactersBySource(code, map);
 const mapped = [...totals.values()].reduce((sum, value) => sum + value, 0);
-process.stdout.write(`${basename(file)}: ${String(code.length)} B raw, ${String(gzipTotal)} B gz\n`);
+process.stdout.write(
+	`${basename(file)}: ${String(code.length)} B raw, ${String(gzipTotal)} B gz\n`
+);
 const ranked = [...totals].sort((a, b) => b[1] - a[1]).slice(0, top);
 for (const [source, characters] of ranked) {
 	const share = Math.round((characters / mapped) * gzipTotal);
