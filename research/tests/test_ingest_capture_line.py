@@ -22,3 +22,11 @@ def test_a_failed_feed_is_named_with_its_reason(monkeypatch: pytest.MonkeyPatch)
     engine = cast("Any", type("E", (), {"begin": lambda self: nullcontext(object())})())
     context = IngestContext(engine, cast("Any", None), datetime(2026, 10, 16, 5, tzinfo=UTC), {"TANK01_API_KEY": "k"})
     assert steps._capture(context) == f"2 feeds, 2 requests, failed: tank01_betting_odds ({REFUSAL})"
+
+
+def test_a_long_reason_keeps_its_first_line_within_the_cap() -> None:
+    database = "(psycopg.errors.Unknown) " + "x" * 400 + "\n[SQL: insert into capture_snapshots ...]"
+    short = steps._short_reason(database)
+    assert len(short) == steps.CAPTURE_REASON_CHARS
+    assert "\n" not in short and "SQL" not in short
+    assert steps._short_reason(None) == "no reason given"

@@ -8,6 +8,10 @@ in board order and demotes every other to the facts block, the honest fallback a
 has (`capsules.facts_block`), with no model call. The gate then counts those pages as unwritten, and
 the night passes while the unwritten share stays under its line.
 
+Two refinements (the Lane 62 review): a carrier that cannot be demoted (no sheet tonight) is the
+keeper before any other, and a page demoted when none of its shared sentences is left on a page still
+standing is restored, in board order, so the result never hangs on the sentences' alphabetical order.
+
 A demoted row is stamped `RETRY_FIRST_FACTS_HASH` as a page the writer demoted is, and the run keeps
 the demotions (`DEMOTED_KEY`, beside the report's `demoted` list), so the next night writes them first
 (`SweepPlan.first`) and tells each the sentence it was demoted for (`SweepPlan.avoid_by_page`): a page
@@ -30,33 +34,58 @@ from research.nightly.config import RUNS_PREFIX
 
 # The last capsule step's demotions, which the next night reads before it writes.
 DEMOTED_KEY = f"{RUNS_PREFIX}/capsule-demotions.json"
-# One page and the sentence on two pages it was demoted for.
-Target = tuple[str, str]
+# One page and the shared sentence it is demoted for.
+Target = tuple[str, SharedSentence]
 
 
 @dataclass(frozen=True, slots=True)
 class Demotion:
-    """A page demoted to its facts block: its universe id, its public slug, the sentence it shared."""
+    """A page demoted to its facts block: its universe id, its public slug, the sentence it shared and
+    how many pages carried that sentence before the demotion."""
 
     player_id: str
     slug: str
     sentence: str
+    carriers: int
 
-    def json(self) -> dict[str, str]:
-        return {"slug": self.slug, "sentence": self.sentence, "playerId": self.player_id}
+    def json(self) -> dict[str, str | int]:
+        return {"slug": self.slug, "sentence": self.sentence, "playerId": self.player_id, "carriers": self.carriers}
 
 
-def demotion_targets(shared: Sequence[SharedSentence], board_order: Sequence[str]) -> tuple[Target, ...]:
-    """Every carrier but the first in board order of each shared sentence, each page once. A page
-    already demoted for one sentence never keeps another, so the next carrier keeps that one."""
-    place = {pid: index for index, pid in enumerate(board_order)}
-    demoted: dict[str, str] = {}
+def _greedy(
+    shared: Sequence[SharedSentence], place: Mapping[str, int], undemotable: frozenset[str]
+) -> dict[str, SharedSentence]:
+    """Every carrier but the keeper of each sentence: a carrier that cannot be demoted first, then the
+    first in board order; a page already demoted never keeps another sentence."""
+    demoted: dict[str, SharedSentence] = {}
     for sentence in shared:
-        carriers = sorted(sentence.player_ids, key=lambda p: place.get(p, len(place)))
+        carriers = sorted(sentence.player_ids, key=lambda p: (p not in undemotable, place.get(p, len(place))))
         standing = [pid for pid in carriers if pid not in demoted]
         for pid in standing[1:]:
-            demoted[pid] = sentence.sentence
-    return tuple(demoted.items())
+            demoted[pid] = sentence
+    return demoted
+
+
+def _restored(
+    demoted: dict[str, SharedSentence], shared: Sequence[SharedSentence], place: Mapping[str, int]
+) -> dict[str, SharedSentence]:
+    """The greedy pass's demotions less, in board order, every page none of whose shared sentences is
+    still on another page left standing (a restored page stands for the pages after it)."""
+    kept = dict(demoted)
+    for pid in sorted(demoted, key=lambda p: place.get(p, len(place))):
+        sentences = [s for s in shared if pid in s.player_ids]
+        if not any(other != pid and other not in kept for s in sentences for other in s.player_ids):
+            del kept[pid]
+    return kept
+
+
+def demotion_targets(
+    shared: Sequence[SharedSentence], board_order: Sequence[str], undemotable: frozenset[str] = frozenset()
+) -> tuple[Target, ...]:
+    """The pages to demote, each once with the sentence it is demoted for, in board order."""
+    place = {pid: index for index, pid in enumerate(board_order)}
+    demoted = _restored(_greedy(shared, place, undemotable), shared, place)
+    return tuple(sorted(demoted.items(), key=lambda item: place.get(item[0], len(place))))
 
 
 def demotion_writes(
@@ -75,7 +104,8 @@ def demotion_writes(
         block = render_facts_block(subject.facts)
         writes.append(CapsuleWrite(pid, RETRY_FIRST_FACTS_HASH, block, block, FACTS_SOURCE, {}, None))
         identity = subject.facts.identity
-        demoted.append(Demotion(pid, slugs.get(identity.id) or slug_of(identity.name), sentence))
+        slug = slugs.get(identity.id) or slug_of(identity.name)
+        demoted.append(Demotion(pid, slug, sentence.sentence, len(sentence.player_ids)))
     unserved = tuple(pid for pid, _ in targets if pid not in by_id)
     return tuple(writes), tuple(demoted), unserved
 
@@ -85,27 +115,41 @@ def write_demotions(conn: Connection, writes: Sequence[CapsuleWrite], at: dateti
         upsert_capsule(conn, write, at)
 
 
+def _plural(count: int, word: str) -> str:
+    return f"{count} {word}" if count == 1 else f"{count} {word}s"
+
+
 def demotion_line(demoted: Sequence[Demotion]) -> str:
-    """'2 pages demoted for a shared sentence: <slug>, <slug>'."""
-    pages = "page" if len(demoted) == 1 else "pages"
-    return f"{len(demoted)} {pages} demoted for a shared sentence: {', '.join(d.slug for d in demoted)}"
+    """'16 pages demoted for 1 shared sentence ("..." on 17 pages): <slug>, ...', each distinct
+    sentence quoted with its carriers, so one stock sentence on many pages reads as what it is."""
+    carriers = {d.sentence: d.carriers for d in demoted}
+    quoted = ", ".join(f'"{sentence}" on {_plural(count, "page")}' for sentence, count in carriers.items())
+    return (
+        f"{_plural(len(demoted), 'page')} demoted for {_plural(len(carriers), 'shared sentence')} ({quoted}): "
+        f"{', '.join(d.slug for d in demoted)}"
+    )
 
 
-def carried_demotions(previous: Mapping[str, Any] | None) -> tuple[Demotion, ...]:
+def _demotion(entry: object) -> Demotion:
+    texts = [entry.get(key) if isinstance(entry, dict) else None for key in ("playerId", "slug", "sentence")]
+    carriers = entry.get("carriers") if isinstance(entry, dict) else None
+    if not all(isinstance(value, str) and value for value in texts) or not isinstance(carriers, int):
+        raise ValueError(f"{DEMOTED_KEY}: a demoted entry lacks its playerId, slug, sentence or carriers: {entry!r}")
+    player_id, slug, sentence = (str(value) for value in texts)
+    return Demotion(player_id, slug, sentence, carriers)
+
+
+def carried_demotions(previous: object) -> tuple[Demotion, ...]:
     """The last night's demotions as the run store keeps them (`DEMOTED_KEY`); none when it holds none.
-    A malformed entry raises, naming the key."""
+    Anything malformed raises ValueError, naming the key."""
     if previous is None:
         return ()
-    entries = previous.get("demoted")
+    if not isinstance(previous, dict):
+        raise ValueError(f"{DEMOTED_KEY}: not an object")
+    entries: Any = previous.get("demoted")
     if not isinstance(entries, list):
         raise ValueError(f"{DEMOTED_KEY}: 'demoted' is not a list")
-    carried: list[Demotion] = []
-    for entry in entries:
-        fields = [entry.get(key) if isinstance(entry, dict) else None for key in ("playerId", "slug", "sentence")]
-        if not all(isinstance(value, str) and value for value in fields):
-            raise ValueError(f"{DEMOTED_KEY}: a demoted entry lacks its playerId, slug or sentence: {entry!r}")
-        carried.append(Demotion(*(str(value) for value in fields)))
-    return tuple(carried)
+    return tuple(_demotion(entry) for entry in entries)
 
 
 def carried_avoid(carried: Sequence[Demotion]) -> dict[str, tuple[str, ...]]:

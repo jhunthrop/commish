@@ -80,7 +80,6 @@ from research.db.read_cache import snapshot
 from research.errors import ConfigurationError
 from research.nightly.capsule_demotion import (
     Demotion,
-    Target,
     carried_avoid,
     demotion_line,
     demotion_targets,
@@ -89,6 +88,7 @@ from research.nightly.capsule_demotion import (
 )
 from research.nightly.capsule_gate import (
     CapsuleGateResult,
+    SharedSentence,
     board_universe_ids,
     capsule_gate,
     span_rules,
@@ -380,19 +380,24 @@ class _Passes:
         keeps its first carrier in board order, and every other carrier is demoted to its facts block
         (`capsule_demotion`), no model call made; the step's gate then counts them unwritten."""
         gate, order, _ = self._judged()
-        targets = demotion_targets(gate.shared, order)
-        if not targets:
+        if not gate.shared:
             return
-        self.demoted = list(self._demote(targets))
-        self.log(f"capsules: {demotion_line(self.demoted)}")
+        self.demoted = list(self._demote(gate.shared, order))
+        if self.demoted:
+            self.log(f"capsules: {demotion_line(self.demoted)}")
 
-    def _demote(self, targets: tuple[Target, ...]) -> tuple[Demotion, ...]:
-        """The targets' facts blocks, committed together; a carrier with no sheet tonight is named."""
+    def _demote(self, shared: tuple[SharedSentence, ...], order: list[str]) -> tuple[Demotion, ...]:
+        """The demotions' facts blocks, committed together. A carrier with no sheet tonight cannot be
+        demoted, so it is the keeper before any other; one that still must go is named."""
 
         def demote() -> tuple[tuple[Demotion, ...], tuple[str, ...]]:
             with self.engine.begin() as conn:
+                subjects = self.facts(conn, self.now)
+                sheets = {subject.universe_id for subject in subjects}
+                undemotable = frozenset(pid for s in shared for pid in s.player_ids if pid not in sheets)
+                targets = demotion_targets(shared, order, undemotable)
                 slugs = {identity.id: identity.slug for identity in served_identities(conn, self.now)}
-                writes, demoted, unserved = demotion_writes(self.facts(conn, self.now), targets, slugs)
+                writes, demoted, unserved = demotion_writes(subjects, targets, slugs)
                 write_demotions(conn, writes, datetime.now(UTC))
             return demoted, unserved
 

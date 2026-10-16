@@ -87,7 +87,8 @@ def carry_demotions(store: RunStore, plan: CapsuleStepPlan, log: Callable[[str],
     list that cannot be read is named and carries nothing: it is an aid to the writer, never the night."""
     try:
         carried = carried_demotions(read_json(store, DEMOTED_KEY))
-    except ValueError as error:
+    except Exception as error:
+        # A malformed list (ValueError) or a store read that failed: named, and the night goes on.
         log(f"capsules: the last night's demotions were not read ({error})")
         return plan
     if carried:

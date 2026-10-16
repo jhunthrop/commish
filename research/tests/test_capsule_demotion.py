@@ -3,6 +3,7 @@ pages keeps its first carrier in board order and demotes the others to the facts
 call; the gate counts them unwritten and the night passes under its line; the run report names them;
 and the next night writes them first, each told the sentence it was demoted for."""
 
+from contextlib import nullcontext
 from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
@@ -18,10 +19,12 @@ from research.capsules.facts_block import FACTS_SOURCE
 from research.capsules.spans import SpanRules
 from research.capsules.store import RETRY_FIRST_FACTS_HASH, WRITTEN_SOURCE, StoredCapsule
 from research.capsules.sweep import FactsPassMemo, Subject, SweepPlan, SweepReport
-from research.nightly import capsule_step, gates, run_parts
+from research.nightly import capsule_demotion, capsule_step, gates, run_parts
+from research.nightly.build.pages import Identity
 from research.nightly.capsule_demotion import (
     DEMOTED_KEY,
     Demotion,
+    Target,
     carried_demotions,
     demotion_line,
     demotion_targets,
@@ -59,20 +62,42 @@ def _subject(pid: str, name: str) -> Subject:
     return Subject(cast("Any", _facts(pid, name)), pid)
 
 
+def _named(targets: tuple[Target, ...]) -> tuple[tuple[str, str], ...]:
+    return tuple((pid, sentence.sentence) for pid, sentence in targets)
+
+
 def test_every_carrier_but_the_first_in_board_order_is_demoted() -> None:
     shared = (SharedSentence(SENTENCE, ("a", "c", "d")),)
-    assert demotion_targets(shared, ["d", "c", "b", "a"]) == (("c", SENTENCE), ("a", SENTENCE))
+    assert _named(demotion_targets(shared, ["d", "c", "b", "a"])) == (("c", SENTENCE), ("a", SENTENCE))
 
 
 def test_a_page_demoted_for_one_sentence_is_never_the_keeper_of_another() -> None:
     shared = (SharedSentence(SENTENCE, ("a", "b")), SharedSentence(OTHER, ("b", "c")))
     # b goes for the first sentence; the second is then on c alone, which keeps it.
-    assert demotion_targets(shared, ORDER) == (("b", SENTENCE),)
+    assert _named(demotion_targets(shared, ORDER)) == (("b", SENTENCE),)
+
+
+@pytest.mark.parametrize("swapped", [False, True])
+def test_the_overlap_demotes_the_one_page_whatever_the_sentences_order(swapped: bool) -> None:
+    """The review's M1: A on p2 and p3, B on p1 and p2, board order p1, p2, p3. Taken A first, the
+    greedy pass demotes p3 then p2, and A is left on no page: p3 is restored."""
+    first = SharedSentence("aaa is the first sentence here", ("p2", "p3"))
+    second = SharedSentence("bbb is the second sentence here", ("p1", "p2"))
+    shared = (second, first) if swapped else (first, second)
+    targets = demotion_targets(shared, ["p1", "p2", "p3"])
+    assert [pid for pid, _ in targets] == ["p2"]
+
+
+def test_a_carrier_that_cannot_be_demoted_keeps_the_sentence() -> None:
+    """The review's L3: a carrier with no sheet tonight is the keeper, so the sentence is still cured."""
+    shared = (SharedSentence(SENTENCE, ("a", "b")),)
+    assert _named(demotion_targets(shared, ORDER, frozenset({"b"}))) == (("a", SENTENCE),)
 
 
 def test_a_demotion_is_the_facts_block_stamped_to_be_written_first() -> None:
     subjects = [_subject("a", "Ja'Marr Chase"), _subject("c", "Puka Nacua")]
-    writes, demoted, unserved = demotion_writes(subjects, (("c", SENTENCE), ("x", SENTENCE)), {"provider-c": "puka"})
+    held = SharedSentence(SENTENCE, ("a", "c", "x"))
+    writes, demoted, unserved = demotion_writes(subjects, (("c", held), ("x", held)), {"provider-c": "puka"})
     (write,) = writes
     assert write.player_id == "c"
     assert write.source == FACTS_SOURCE
@@ -81,13 +106,14 @@ def test_a_demotion_is_the_facts_block_stamped_to_be_written_first() -> None:
     assert write.body_full.startswith("Projected points: 181 in 16.4 expected games")
     assert write.model is None
     assert not write.narrative
-    assert demoted == (Demotion("c", "puka", SENTENCE),)
+    assert demoted == (Demotion("c", "puka", SENTENCE, 3),)
     # A carrier with no sheet tonight cannot be given a facts block, so it is named rather than hidden.
     assert unserved == ("x",)
 
 
 def test_a_page_with_no_served_slug_is_named_by_the_web_slug_rule() -> None:
-    _, demoted, _ = demotion_writes([_subject("c", "Amon-Ra St. Brown")], (("c", SENTENCE),), {})
+    held = SharedSentence(SENTENCE, ("a", "c"))
+    _, demoted, _ = demotion_writes([_subject("c", "Amon-Ra St. Brown")], (("c", held),), {})
     assert demoted[0].slug == "amon-ra-st-brown"
 
 
@@ -110,7 +136,7 @@ def test_the_failed_night_passes_once_its_one_shared_sentence_is_demoted() -> No
     assert not before.ok
     assert [s.player_ids for s in before.shared] == [("p0", "p1")]
     targets = demotion_targets(before.shared, ids)
-    assert targets == (("p1", SENTENCE),)
+    assert _named(targets) == (("p1", SENTENCE),)
     demoted_row = replace(rows["p1"], source=FACTS_SOURCE, facts_hash=RETRY_FIRST_FACTS_HASH)
     after = replace(judge_capsules(ids, {**rows, "p1": demoted_row}, rules, _LINE), demoted=1)
     assert after.shared == ()
@@ -121,6 +147,61 @@ def test_the_failed_night_passes_once_its_one_shared_sentence_is_demoted() -> No
     record = gates.capsule_gate(after, ())
     assert record.passed
     assert "1 demoted tonight for a sentence on two pages" in record.summary
+
+
+class _Conn:
+    """A writers' connection that keeps every capsule row upserted, for the fake engine below."""
+
+    def __init__(self, rows: dict[str, StoredCapsule]) -> None:
+        self.rows = rows
+
+
+class _Engine:
+    def __init__(self, rows: dict[str, StoredCapsule]) -> None:
+        self.conn = _Conn(rows)
+
+    def begin(self) -> Any:
+        return nullcontext(self.conn)
+
+
+def test_the_demotion_commits_facts_blocks_and_the_final_gate_reads_no_shared_sentence(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The review's L5: `_demote` over a fake engine, its rows judged as the final gate judges them."""
+    ids = ["p0", "p1", "p2", "p3"]
+    rows = _rows(4)
+    engine = _Engine(rows)
+
+    def upsert(conn: _Conn, write: Any, at: datetime) -> None:
+        conn.rows[write.player_id] = StoredCapsule(
+            write.player_id, write.facts_hash, write.body_compact, write.body_full, write.source, None, write.model, at
+        )
+
+    monkeypatch.setattr(capsule_demotion, "upsert_capsule", upsert)
+    served = [Identity("provider-p1", "player-one", "Player One", "WR", "KC", None)]
+    monkeypatch.setattr(capsule_step, "served_identities", lambda conn, at: served)
+    subjects = tuple(_subject(pid, f"Player {pid}") for pid in ids)
+    log: list[str] = []
+    passes = _Passes(
+        cast("Engine", engine),
+        cast("Any", None),
+        NOW,
+        CapsuleStepPlan(),
+        log.append,
+        cast("FactsPassMemo", lambda conn, at: subjects),
+        rules=SpanRules(frozenset()),
+    )
+    rules = SpanRules(frozenset())
+    monkeypatch.setattr(passes, "_judged", lambda: (judge_capsules(ids, rows, rules, _LINE), ids, {}))
+    passes.demote_shared_sentences()
+    assert rows["p1"].source == FACTS_SOURCE
+    assert rows["p1"].facts_hash == RETRY_FIRST_FACTS_HASH
+    assert rows["p0"].source == WRITTEN_SOURCE
+    final = judge_capsules(ids, rows, rules, _LINE)
+    assert final.shared == ()
+    assert final.facts_blocks == 1
+    assert passes.demoted == [Demotion("p1", "player-one", SENTENCE, 2)]
+    assert log == [f'capsules: 1 page demoted for 1 shared sentence ("{SENTENCE}" on 2 pages): player-one']
 
 
 def _passes(plan: CapsuleStepPlan, log: list[str]) -> _Passes:
@@ -138,13 +219,15 @@ def _passes(plan: CapsuleStepPlan, log: list[str]) -> _Passes:
 def test_the_step_demotes_after_the_graced_rewrite_with_no_model_call(monkeypatch: pytest.MonkeyPatch) -> None:
     log: list[str] = []
     passes = _passes(CapsuleStepPlan(), log)
-    gate = CapsuleGateResult(4, 4, 0, 0, 0, (SharedSentence(SENTENCE, ("a", "c", "d")),), _LINE)
+    held = SharedSentence(SENTENCE, ("a", "c", "d"))
+    gate = CapsuleGateResult(4, 4, 0, 0, 0, (held,), _LINE)
     swept: list[str] = []
-    asked: list[tuple[tuple[str, str], ...]] = []
+    asked: list[tuple[SharedSentence, ...]] = []
 
-    def demote(targets: tuple[tuple[str, str], ...]) -> tuple[Demotion, ...]:
-        asked.append(targets)
-        return tuple(Demotion(pid, f"slug-{pid}", sentence) for pid, sentence in targets)
+    def demote(shared: tuple[SharedSentence, ...], order: list[str]) -> tuple[Demotion, ...]:
+        asked.append(shared)
+        targets = demotion_targets(shared, order)
+        return tuple(Demotion(pid, f"slug-{pid}", s.sentence, len(s.player_ids)) for pid, s in targets)
 
     def sweep(name: str, plan: SweepPlan) -> SweepReport:
         del plan
@@ -157,51 +240,59 @@ def test_the_step_demotes_after_the_graced_rewrite_with_no_model_call(monkeypatc
     passes.repair()
     # The graced rewrite ran, then the demotion, of every carrier but the first.
     assert swept[-1].startswith("capsule repair, one generation past the ceiling")
-    assert asked == [(("c", SENTENCE), ("d", SENTENCE))]
-    assert passes.demoted == [Demotion("c", "slug-c", SENTENCE), Demotion("d", "slug-d", SENTENCE)]
-    assert log[-1] == "capsules: 2 pages demoted for a shared sentence: slug-c, slug-d"
+    assert asked == [(held,)]
+    assert passes.demoted == [Demotion("c", "slug-c", SENTENCE, 3), Demotion("d", "slug-d", SENTENCE, 3)]
+    assert log[-1] == f'capsules: 2 pages demoted for 1 shared sentence ("{SENTENCE}" on 3 pages): slug-c, slug-d'
 
 
 def test_nothing_is_demoted_when_no_sentence_is_shared(monkeypatch: pytest.MonkeyPatch) -> None:
     passes = _passes(CapsuleStepPlan(), [])
     monkeypatch.setattr(passes, "_judged", lambda: (CapsuleGateResult(4, 4, 0, 0, 0, (), _LINE), ORDER, {}))
-    monkeypatch.setattr(passes, "_demote", lambda targets: pytest.fail("nothing to demote"))
+    monkeypatch.setattr(passes, "_demote", lambda shared, order: pytest.fail("nothing to demote"))
     passes.demote_shared_sentences()
     assert passes.demoted == []
 
 
-def test_the_line_names_one_page_in_the_singular() -> None:
-    assert demotion_line([Demotion("c", "puka-nacua", SENTENCE)]) == (
-        "1 page demoted for a shared sentence: puka-nacua"
+def test_the_line_counts_the_sentences_and_quotes_each_with_its_carriers() -> None:
+    """The review's L1: one stock sentence on 17 pages reads as one sentence, not 16 pairs."""
+    stock = [Demotion(f"p{i}", f"s{i}", SENTENCE, 17) for i in range(16)]
+    assert demotion_line(stock).startswith(f'16 pages demoted for 1 shared sentence ("{SENTENCE}" on 17 pages): s0, ')
+    two = [Demotion("c", "puka-nacua", SENTENCE, 2), Demotion("d", "nico-collins", OTHER, 2)]
+    assert demotion_line(two) == (
+        f'2 pages demoted for 2 shared sentences ("{SENTENCE}" on 2 pages, "{OTHER}" on 2 pages): '
+        "puka-nacua, nico-collins"
     )
 
 
 def test_the_run_report_carries_the_demoted_list_beside_the_summary(monkeypatch: pytest.MonkeyPatch) -> None:
     gate = CapsuleGateResult(4, 3, 1, 0, 0, (), _LINE, demoted=1)
-    demoted = (Demotion("c", "puka-nacua", SENTENCE),)
+    demoted = (Demotion("c", "puka-nacua", SENTENCE, 2),)
     result = CapsuleStepResult(gate, PageFindings({}), CapsuleSpend(), True, demoted)
     monkeypatch.setattr(run_parts, "run_capsule_step", lambda *args: result)
     outcome = run_parts._capsules(
         cast("Engine", None), lambda: NOW, lambda _: None, False, CapsuleStepPlan(), cast("Any", None)
     )
     step = outcome.record.json()
-    assert step["demoted"] == [{"slug": "puka-nacua", "sentence": SENTENCE, "playerId": "c"}]
-    assert "1 page demoted for a shared sentence: puka-nacua" in str(step["summary"])
+    assert step["demoted"] == [{"slug": "puka-nacua", "sentence": SENTENCE, "playerId": "c", "carriers": 2}]
+    assert f'1 page demoted for 1 shared sentence ("{SENTENCE}" on 2 pages): puka-nacua' in str(step["summary"])
     assert outcome.demoted == demoted
 
 
 # The previous night's report as the run store keeps it (`nightly.run`, `DEMOTED_KEY`).
 _PREVIOUS = {
     "runId": "2026-10-16T05",
-    "demoted": [{"slug": "puka-nacua", "sentence": SENTENCE, "playerId": "c"}],
+    "demoted": [{"slug": "puka-nacua", "sentence": SENTENCE, "playerId": "c", "carriers": 2}],
 }
 
 
 def test_last_nights_report_carries_its_demotions() -> None:
-    assert carried_demotions(_PREVIOUS) == (Demotion("c", "puka-nacua", SENTENCE),)
+    assert carried_demotions(_PREVIOUS) == (Demotion("c", "puka-nacua", SENTENCE, 2),)
     assert carried_demotions(None) == ()
     with pytest.raises(ValueError, match="demoted"):
         carried_demotions({"runId": "x", "demoted": [{"slug": "puka-nacua"}]})
+    # The review's L2: a list where the object belongs is a ValueError, not an AttributeError.
+    with pytest.raises(ValueError, match="not an object"):
+        carried_demotions([])
 
 
 def test_last_nights_demoted_pages_are_written_first_and_told_their_sentence(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -235,7 +326,7 @@ def _capsule_outcome(status: str, demoted: tuple[Demotion, ...]) -> run_parts.St
 
 def test_the_run_keeps_its_demotions_for_the_next_night(tmp_path: Path) -> None:
     store = LocalRunStore(tmp_path)
-    demoted = (Demotion("c", "puka-nacua", SENTENCE),)
+    demoted = (Demotion("c", "puka-nacua", SENTENCE, 2),)
     keep_demotions(store, "2026-10-16T05", [_capsule_outcome("ran", demoted)])
     log: list[str] = []
     plan = carry_demotions(store, CapsuleStepPlan(), log.append)
@@ -248,9 +339,29 @@ def test_the_run_keeps_its_demotions_for_the_next_night(tmp_path: Path) -> None:
     assert carry_demotions(store, CapsuleStepPlan(), log.append).carried == ()
 
 
-def test_a_malformed_demotion_list_is_named_and_carries_nothing(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    ("body", "reason"),
+    [
+        (b'{"runId": "x", "demoted": "c"}', f"{DEMOTED_KEY}: 'demoted' is not a list"),
+        (b"[]", f"{DEMOTED_KEY}: not an object"),
+    ],
+)
+def test_a_malformed_demotion_list_is_named_and_carries_nothing(tmp_path: Path, body: bytes, reason: str) -> None:
     store = LocalRunStore(tmp_path)
-    store.put(DEMOTED_KEY, b'{"runId": "x", "demoted": "c"}', "application/json")
+    store.put(DEMOTED_KEY, body, "application/json")
     log: list[str] = []
     assert carry_demotions(store, CapsuleStepPlan(), log.append).carried == ()
-    assert log == [f"capsules: the last night's demotions were not read ({DEMOTED_KEY}: 'demoted' is not a list)"]
+    assert log == [f"capsules: the last night's demotions were not read ({reason})"]
+
+
+class _UnreadableStore(LocalRunStore):
+    def get(self, key: str) -> bytes | None:
+        raise OSError(f"the bucket refused {key}")
+
+
+def test_a_store_read_that_fails_never_fails_the_night(tmp_path: Path) -> None:
+    """The review's L2: a transient read error is named and the night carries nothing."""
+    log: list[str] = []
+    plan = CapsuleStepPlan()
+    assert carry_demotions(_UnreadableStore(tmp_path), plan, log.append) is plan
+    assert log == [f"capsules: the last night's demotions were not read (the bucket refused {DEMOTED_KEY})"]
