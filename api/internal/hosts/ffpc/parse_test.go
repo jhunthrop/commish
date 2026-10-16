@@ -228,6 +228,20 @@ func TestRulesAndScoring(t *testing.T) {
 		r.Lineup.Starters() != want.Starters() || r.Lineup.QB != 1 || r.Lineup.Flex != 2 || r.Lineup.DEF != 1 || len(r.Lineup.Other) != 0 {
 		t.Fatalf("rules %+v", r)
 	}
+	if r.PlayoffStartWeek != 13 {
+		t.Fatalf("the Duration row says League Playoffs Weeks 13-14, read %d", r.PlayoffStartWeek)
+	}
+	for value, want := range map[string]int{
+		"Regular season Weeks 1-14. Playoffs Weeks 15-17": 15,
+		"Regular season Weeks 1-13":                       14,
+		"Weeks 1-17":                                      0,
+	} {
+		var other Rules
+		ruleRow(&other, "duration:", value)
+		if other.PlayoffStartWeek != want {
+			t.Errorf("duration %q: playoffs from %d, want %d", value, other.PlayoffStartWeek, want)
+		}
+	}
 	if r.OfficialRules != "https://myffpc.com/cms/public/play/big-gorilla-official-rules" {
 		t.Fatalf("official rules %q", r.OfficialRules)
 	}

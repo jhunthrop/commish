@@ -65,6 +65,16 @@ func (m *ffpcMembers) ReadLeague(_ context.Context, accountID uuid.UUID, ltuid s
 	return seat.league, nil
 }
 
+// ReadDraft answers each connected member's draft as done.
+func (m *ffpcMembers) ReadDraft(_ context.Context, accountID uuid.UUID, _ string) (ffpc.Draft, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if _, ok := m.seats[accountID]; !ok {
+		return ffpc.Draft{}, hosts.ErrNotConnected
+	}
+	return ffpc.Draft{Complete: true}, nil
+}
+
 func (m *ffpcMembers) OpenLeague(_ context.Context, accountID uuid.UUID, leagueID string) (string, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
