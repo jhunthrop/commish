@@ -243,7 +243,16 @@ Founder, 2026-10-16: a player on injured reserve still ranked high makes people 
 
 **Read, as the list stood, and behind.** The capture stores a list only when it changed, so its stamp is when the list last changed. Every capture pass records each feed it read, changed or not, in `research.capture_checks`. A page says "read Fri Oct 16, 9:05 am Central" at that check, and "as the list stood Tue Oct 13, 9:03 pm Central" at the list's stamp when no check is recorded. Stamps name the month and day, since a static page can outlive a week. Past 36 hours since that check (or the list, with none), the basis line says how old the statuses are: "These injury statuses are from the hourly capture, read ..., over a day and a half before now. Players keep them until a newer list is read." It never says the capture is behind, because a static page judges against the file it was built from, which may be older than the capture. The last known statuses stay applied, because a player on injured reserve ranked as if he plays would be worse than a stale notice. A static page judges the 36 hours at its build, and again in the browser once it is live. The check names a list only when that list is the feed's newest stored one: a check that returned a list the floor refused leaves the older list shown "as the list stood". The floor counts a list's unique, non-blank players the same way in the reads and in the run dating.
 
-**A held player's row.** A held player's row and page frame no rank: the drafters cell and sentence give the ADP alone, with no round and no tier chip. His page's tier aside says "No tier while he is on a season-long list." in place of his tier mates, the every-format table prints the word in its tier cell, and a league row's value cell names no round. A week's designation is said "on the latest report". The league page's board carries the same statuses through its rows.
+**A held player's row.** A held player's row and page frame no rank: the drafters cell and sentence give the ADP alone, with no round and no tier chip. His page's tier aside says "No tier while he is on a season-long list." in place of his tier mates, the every-format table prints the word in its tier cell, and a league row's value cell names no round.
+
+**Every surface that places a player.** The rule reaches every page that prints our rank, a position rank, a tier or a round from the run's board (`web/src/lib/run/held-places.ts`):
+- another player's tier mates, built from the available players only, so a held player is no one's mate and counts toward no cliff;
+- a club's page, whose rows carry their statuses;
+- the clubs index, which leads with a club's first available player;
+- the players index;
+- the ADP page, which keeps the drafters' order with the ranks as the word;
+- the offline board and the sheet's board;
+- the compare page, whose verdict never sets a held player's places against another's and says why. A week's designation is said "on the latest report". The league page's board carries the same statuses through its rows.
 
 **Basis.** The board's basis line adds "Injury status from the hourly capture, read Fri Oct 16, 9:05 am Central.", on the member's own clock once the page is live (built on the Eastern clock), and the record's method words say the same and that the frozen boards it grades moved no one. The capsule sheet tells the writer that a season-long designation puts him below every available player at his position, so a read never contradicts its row.
 
