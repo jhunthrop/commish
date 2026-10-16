@@ -3055,11 +3055,16 @@ components:
       description: >-
         the weather service's forecast for the kickoff hour at the stadium, the newest read before kickoff; null for a
         dome, a venue abroad, or before the forecast reaches the game
-      required: [temperature_f, wind_mph, precipitation_chance, read_at]
+      required: [temperature_f, wind_mph, precipitation_chance, precipitation_kind, read_at]
       properties:
         temperature_f: { type: number, format: double, nullable: true }
         wind_mph: { type: number, format: double, nullable: true }
         precipitation_chance: { type: number, format: double, nullable: true, description: "percent, 0 to 100" }
+        precipitation_kind:
+          type: string
+          nullable: true
+          enum: [none, rain, thunderstorms, snow, ice]
+          description: the most severe kind of precipitation the kickoff hour names
         read_at: { type: string, format: date-time, description: when the forecast was read }
     GameWeek:
       type: object

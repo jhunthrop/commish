@@ -54,6 +54,10 @@ func conditionsOf(g boards.GameFact) conditions {
 	if w := g.Forecast; w != nil && (c.roof == nil || (c.roof.Kind != apitypes.GameRoofKindDome && !c.roof.Abroad)) {
 		c.weather = &apitypes.KickoffWeather{TemperatureF: w.TemperatureF, WindMph: w.WindMph,
 			PrecipitationChance: w.PrecipitationChance, ReadAt: w.ReadAt}
+		if w.PrecipitationKind != nil {
+			kind := apitypes.KickoffWeatherPrecipitationKind(*w.PrecipitationKind)
+			c.weather.PrecipitationKind = &kind
+		}
 	}
 	return c
 }

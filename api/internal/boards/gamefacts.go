@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"math"
 	"time"
 )
 
@@ -24,7 +25,26 @@ const (
 	metricTemperature = "temperature_f"
 	metricWind        = "wind_mph"
 	metricChance      = "precipitation_probability"
+	metricKind        = "precipitation_kind"
 )
+
+// PrecipitationKinds are the forecast's precipitation_kind codes, by
+// index (research/pipeline/nws/grid.py PRECIPITATION_KINDS; both test
+// against api/testdata/precipitation-kinds.json).
+func PrecipitationKinds() []string {
+	return []string{"none", "rain", "thunderstorms", "snow", "ice"}
+}
+
+// kindOf is a stored code's word, nil for a code outside the list.
+func kindOf(values map[string]float64) *string {
+	code, ok := values[metricKind]
+	kinds := PrecipitationKinds()
+	if !ok || code != math.Trunc(code) || code < 0 || int(code) >= len(kinds) {
+		return nil
+	}
+	kind := kinds[int(code)]
+	return &kind
+}
 
 // Roof kinds, the stadium table's words (research/db/schema/venues.py).
 const (
@@ -51,7 +71,10 @@ type Forecast struct {
 	TemperatureF        *float64
 	WindMph             *float64
 	PrecipitationChance *float64
-	ReadAt              time.Time
+	// PrecipitationKind is the most severe kind the hour names, one of
+	// PrecipitationKinds.
+	PrecipitationKind *string
+	ReadAt            time.Time
 }
 
 // Venue is where the game is played, as the stadium table confirms it.
@@ -108,7 +131,7 @@ where o.season = $1 and o.metric = any($5)
 order by o.week, o.team collate "C", o.source, o.metric limit $6`
 	rows, err := s.Pool.Query(ctx, query, season, scheduleSource, kickoffMetric,
 		[]string{LinesSource, ForecastSource},
-		[]string{metricSpread, metricTotal, metricTemperature, metricWind, metricChance}, maxGameFactRows+1)
+		[]string{metricSpread, metricTotal, metricTemperature, metricWind, metricChance, metricKind}, maxGameFactRows+1)
 	if err != nil {
 		return fmt.Errorf("boards: read game facts %d: %w", season, err)
 	}
@@ -154,7 +177,7 @@ order by o.week, o.team collate "C", o.source, o.metric limit $6`
 		}
 		if w := sources[ForecastSource]; w != nil {
 			f.Forecast = &Forecast{TemperatureF: valueOf(w.values, metricTemperature), WindMph: valueOf(w.values, metricWind),
-				PrecipitationChance: valueOf(w.values, metricChance), ReadAt: w.at}
+				PrecipitationChance: valueOf(w.values, metricChance), PrecipitationKind: kindOf(w.values), ReadAt: w.at}
 		}
 		out[key] = f
 	}

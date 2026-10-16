@@ -1,0 +1,4 @@
+{
+  "note": "The nws_forecast precipitation_kind codes, by index: research/pipeline/nws/grid.py PRECIPITATION_KINDS and api/internal/boards/gamefacts.go PrecipitationKinds both test against this list.",
+  "kinds": ["none", "rain", "thunderstorms", "snow", "ice"]
+}

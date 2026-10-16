@@ -558,6 +558,33 @@ func (e Interval) Valid() bool {
 	}
 }
 
+// Defines values for KickoffWeatherPrecipitationKind.
+const (
+	KickoffWeatherPrecipitationKindIce           KickoffWeatherPrecipitationKind = "ice"
+	KickoffWeatherPrecipitationKindNone          KickoffWeatherPrecipitationKind = "none"
+	KickoffWeatherPrecipitationKindRain          KickoffWeatherPrecipitationKind = "rain"
+	KickoffWeatherPrecipitationKindSnow          KickoffWeatherPrecipitationKind = "snow"
+	KickoffWeatherPrecipitationKindThunderstorms KickoffWeatherPrecipitationKind = "thunderstorms"
+)
+
+// Valid indicates whether the value is a known member of the KickoffWeatherPrecipitationKind enum.
+func (e KickoffWeatherPrecipitationKind) Valid() bool {
+	switch e {
+	case KickoffWeatherPrecipitationKindIce:
+		return true
+	case KickoffWeatherPrecipitationKindNone:
+		return true
+	case KickoffWeatherPrecipitationKindRain:
+		return true
+	case KickoffWeatherPrecipitationKindSnow:
+		return true
+	case KickoffWeatherPrecipitationKindThunderstorms:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for LeagueHost.
 const (
 	LeagueHostEspn    LeagueHost = "espn"
@@ -2007,11 +2034,17 @@ type KickoffWeather struct {
 	// PrecipitationChance percent, 0 to 100
 	PrecipitationChance *float64 `json:"precipitation_chance"`
 
+	// PrecipitationKind the most severe kind of precipitation the kickoff hour names
+	PrecipitationKind *KickoffWeatherPrecipitationKind `json:"precipitation_kind"`
+
 	// ReadAt when the forecast was read
 	ReadAt       time.Time `json:"read_at"`
 	TemperatureF *float64  `json:"temperature_f"`
 	WindMph      *float64  `json:"wind_mph"`
 }
+
+// KickoffWeatherPrecipitationKind the most severe kind of precipitation the kickoff hour names
+type KickoffWeatherPrecipitationKind string
 
 // League defines model for League.
 type League struct {

@@ -30,6 +30,11 @@ def _recorded(name: str) -> dict[str, Any]:
     return loaded
 
 
+def test_the_kind_codes_are_the_list_the_api_reads() -> None:
+    shared = Path(__file__).resolve().parents[2] / "api" / "testdata" / "precipitation-kinds.json"
+    assert list(PRECIPITATION_KINDS) == json.loads(shared.read_text(encoding="utf-8"))["kinds"]
+
+
 def test_an_iso_duration_reads_days_and_hours() -> None:
     assert [parse_duration(d).total_seconds() / 3600 for d in ("PT1H", "PT6H", "P1D", "P4DT17H", "P7D")] == [
         1.0, 6.0, 24.0, 113.0, 168.0,

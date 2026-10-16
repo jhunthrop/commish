@@ -2593,6 +2593,11 @@ export interface components {
 			 */
 			precipitation_chance: number | null;
 			/**
+			 * @description the most severe kind of precipitation the kickoff hour names
+			 * @enum {string|null}
+			 */
+			precipitation_kind: 'none' | 'rain' | 'thunderstorms' | 'snow' | 'ice' | null;
+			/**
 			 * Format: date-time
 			 * @description when the forecast was read
 			 */

@@ -38,6 +38,7 @@ func gameFactsSchema(t *testing.T, pool *pgxpool.Pool, schema string, venues boo
 			(2026, 7, 'SEA', 'nws_forecast', 'temperature_f', '2026-10-25 14:05:00+00', 49),
 			(2026, 7, 'SEA', 'nws_forecast', 'wind_mph', '2026-10-25 14:05:00+00', 14.1),
 			(2026, 7, 'SEA', 'nws_forecast', 'sky_cover_pct', '2026-10-25 14:05:00+00', 90),
+			(2026, 7, 'SEA', 'nws_forecast', 'precipitation_kind', '2026-10-25 14:05:00+00', 3),
 			(2026, 7, 'WAS', 'tank01_lines', 'point_spread', '2026-10-25 14:05:00+00', 1)`,
 	}
 	if venues {
@@ -83,7 +84,7 @@ func TestGameFactsReadTheNewestBeforeKickoffWithTheVenue(t *testing.T) {
 		t.Fatalf("Las Vegas's figures %+v", f)
 	}
 	sea := facts[ClubWeek{7, "SEA"}]
-	if w := sea.Forecast; w == nil || *w.TemperatureF != 49 || *w.WindMph != 14.1 || w.PrecipitationChance != nil || !w.ReadAt.Equal(read) {
+	if w := sea.Forecast; w == nil || *w.TemperatureF != 49 || *w.WindMph != 14.1 || w.PrecipitationChance != nil || w.PrecipitationKind == nil || *w.PrecipitationKind != "snow" || !w.ReadAt.Equal(read) {
 		t.Fatalf("Seattle's forecast %+v: one read's values, a chance it did not hold left nil", sea.Forecast)
 	}
 	if sea.Figures != nil || sea.Venue == nil || sea.Venue.Roof != RoofOutdoors {
