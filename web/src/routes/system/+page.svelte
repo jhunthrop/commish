@@ -47,6 +47,8 @@
 	import { TINTED_ROUNDS, heatFor, vorCell } from '#lib/ui/heat.ts';
 	import type { BoardPlayer } from '#lib/types/player.ts';
 	import { ICON_NAMES } from '#lib/ui/icons.ts';
+	import { railIconNames } from '#lib/ui/rail-icons.ts';
+	import RailIcon from '#lib/ui/RailIcon.svelte';
 	import { sectionHref } from '#lib/ui/nav.ts';
 	import DocPage from '#lib/ui/system/DocPage.svelte';
 	import DocSection from '#lib/ui/system/DocSection.svelte';
@@ -518,6 +520,16 @@
 		<RoundParts nightly={data.nightly} run={data.run} />
 
 		<DocSection title="Rail icons" sub="A 24 grid, a 1.8 stroke, in the color of the text.">
+			<Parts>
+				{#each railIconNames() as name (name)}
+					<Part {name}>
+						{#snippet show()}<RailIcon {name} />{/snippet}
+					</Part>
+				{/each}
+			</Parts>
+		</DocSection>
+
+		<DocSection title="Icons" sub="The same grid and stroke, for the controls on a page.">
 			<Parts>
 				{#each ICON_NAMES as name (name)}
 					<Part {name}>

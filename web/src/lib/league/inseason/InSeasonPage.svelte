@@ -18,18 +18,13 @@
 		readNowWords,
 		standingWords
 	} from '../model.ts';
+	import { zoneLine } from '#lib/format/clock.ts';
+	import { screenSection } from '#lib/ui/nav.ts';
 	import LeagueTabs from './LeagueTabs.svelte';
 	import { tabHref } from './tabs.ts';
 	import type { AdviceHead } from './api.ts';
 	import { readFailure, screenView, type ReadState } from './state.ts';
-	import {
-		LINES,
-		TAB_LABELS,
-		refreshedWords,
-		signInTitle,
-		zoneLine,
-		type InSeasonScreen
-	} from './words.ts';
+	import { LINES, TAB_LABELS, refreshedWords, signInTitle, type InSeasonScreen } from './words.ts';
 
 	/** One in-season screen of a followed league: the league's title with its read and order stamps,
 	 * the league's tabs, and the screen's answer once read (reserved rows until then, the API's own
@@ -150,7 +145,7 @@
 	<meta name="robots" content="noindex" />
 </svelte:head>
 
-<Shell title={TAB_LABELS[screen]} active="league">
+<Shell title={TAB_LABELS[screen]} active={screenSection(screen)}>
 	{#if signedOut}
 		<div class="pad">
 			<EmptyState title={signInTitle(screen)} line={LINES.signInLine}>

@@ -155,7 +155,7 @@
 	<meta name="robots" content="noindex" />
 </svelte:head>
 
-<Shell title="League" active="league">
+<Shell title="League" active={null}>
 	{#if failure === 'signed-out'}
 		<div class="pad">
 			<EmptyState

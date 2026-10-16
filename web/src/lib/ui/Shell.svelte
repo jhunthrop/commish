@@ -3,13 +3,14 @@
 	import { page } from '$app/state';
 	import { siteContext } from '#lib/context/context.svelte.ts';
 	import LeagueSwitch from '#lib/context/LeagueSwitch.svelte';
-	import Icon from './Icon.svelte';
+	import RailIcon from './RailIcon.svelte';
 	import Stamp from './Stamp.svelte';
 	import {
 		HOME_HREF,
-		RAIL,
+		PHONE_RAIL_ITEMS,
 		RAIL_FOOT,
-		phoneRailCount,
+		RAIL_ITEMS,
+		railHref,
 		sectionOf,
 		type RailItem,
 		type Section
@@ -38,38 +39,35 @@
 	// The site's context: the session's copy at once, then /me. The rail's Board (/board, which
 	// names no format) opens in the context's format by itself (follow.svelte.ts).
 	onMount(() => void siteContext.load());
-
-	/** Leagues opens the switch's menu in place of its page, which stays the way without script. */
-	function openLeagues(event: MouseEvent): void {
-		event.preventDefault();
-		siteContext.open = !siteContext.open;
-	}
+	const leagueId = $derived(siteContext.league?.id ?? null);
 </script>
 
-{#snippet railLink(item: RailItem)}
+{#snippet railLink(item: RailItem, foot: boolean)}
 	<a
 		class="item"
-		class:wide-only={item.wideOnly}
-		href={item.href}
+		class:foot
+		data-k={foot ? undefined : item.key}
+		href={railHref(item, leagueId)}
 		aria-current={item.section === current ? 'page' : undefined}
-		data-opens-leagues={item.opensLeagues ? '' : undefined}
-		role={item.opensLeagues ? 'button' : undefined}
-		aria-expanded={item.opensLeagues ? siteContext.open : undefined}
-		onclick={item.opensLeagues ? openLeagues : undefined}
 	>
-		<Icon name={item.icon} />
+		<RailIcon name={item.icon} />
 		<span>{item.label}</span>
 	</a>
 {/snippet}
 
 <div class="app">
-	<nav class="rail" aria-label="Sections" style="--phone-items: {phoneRailCount(RAIL)}">
+	<!-- The rail follows the season (spec 2026-10-16 §2): every item is drawn in one order every
+	     rail follows, and the rail styles (rail-css.ts, in the head) show the rail the root's
+	     data-rail names, set by
+	     the boot script before the first paint and by the context after. So a prerendered page never
+	     paints the wrong rail and then swaps it. -->
+	<nav class="rail" aria-label="Sections" style="--phone-items: {PHONE_RAIL_ITEMS}">
 		<a class="mark" href={HOME_HREF} aria-label="Commish"><b>C</b></a>
-		{#each RAIL as item (item.section)}
-			{@render railLink(item)}
+		{#each RAIL_ITEMS as item (item.key)}
+			{@render railLink(item, false)}
 		{/each}
 		<span class="spacer"></span>
-		{@render railLink(RAIL_FOOT)}
+		{@render railLink(RAIL_FOOT, true)}
 	</nav>
 	<div class="main">
 		<header class="top">
@@ -83,7 +81,7 @@
 				href={RAIL_FOOT.href}
 				aria-label={RAIL_FOOT.label}
 				aria-current={current === RAIL_FOOT.section ? 'page' : undefined}
-				><Icon name={RAIL_FOOT.icon} /></a
+				><RailIcon name={RAIL_FOOT.icon} /></a
 			>
 			<div class="tail">
 				{@render tail?.()}
@@ -274,7 +272,7 @@
 
 		.mark,
 		.spacer,
-		.wide-only {
+		.foot {
 			display: none;
 		}
 

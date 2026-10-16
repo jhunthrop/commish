@@ -6,7 +6,8 @@
 
 	/** The shell's league switch, at the right of the top bar on every width (founder ruling
 	 * 2026-10-13): the selected league's name, or the format with none, opening the account's leagues,
-	 * the formats and the way to follow another. The rail's Leagues opens the same menu. The menu's
+	 * the formats and the way to follow another, its last row. The switch is the one place a league
+	 * is chosen (spec 2026-10-16 §2: the rail's Leagues is gone). The menu's
 	 * code arrives on the first intent to open it, closing included (LeagueMenu), so every page
 	 * carries only this button. */
 
@@ -21,11 +22,6 @@
 		});
 	}
 
-	// Opened from the rail before any intent here: fetch the menu then.
-	$effect(() => {
-		if (siteContext.open) preload();
-	});
-
 	const label = $derived(switchLabel(siteContext.league, siteContext.format));
 </script>
 
@@ -37,7 +33,10 @@
 		aria-controls={MENU_ID}
 		aria-label="{label}, your league and scoring"
 		title={label}
-		onclick={() => (siteContext.open = !siteContext.open)}
+		onclick={() => {
+			preload();
+			siteContext.open = !siteContext.open;
+		}}
 		onpointerenter={preload}
 	>
 		<span class="mark"><Icon name="league" size={18} /></span>

@@ -1,9 +1,10 @@
 import adapter from '@sveltejs/adapter-cloudflare';
 import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
-import { SHELL_HREFS } from './src/lib/ui/nav.ts';
+import { shellHrefs } from './src/lib/ui/nav.ts';
 
 const NOT_FOUND = 404;
+const SHELL_HREFS = shellHrefs();
 /** A route's stylesheets under this many characters ride in the HTML, so a prerendered page paints
  * on its first response. The design system's CSS for a whole page sits well under it. */
 const INLINE_STYLE_LIMIT = 32_768;

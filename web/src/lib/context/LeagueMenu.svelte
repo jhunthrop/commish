@@ -22,8 +22,7 @@
 	 * formats and the way to sign in. Loaded on the first intent to open the switch, with how it
 	 * closes: a tap outside every control that opens it, Escape, or a page it opens. */
 
-	/** What marks a control that opens the menu (the switch, the rail's Leagues, a page's scoring
-	 * chip): its own tap opens and closes it. */
+	/** What marks a control that opens the menu (the switch): its own tap opens and closes it. */
 	const OPENER = '[data-opens-leagues]';
 
 	afterNavigate(() => {
