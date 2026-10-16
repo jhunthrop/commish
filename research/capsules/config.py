@@ -138,11 +138,23 @@ class Repetition:
     # every new write, but a stored page carrying it is not a page-gate repair target, so a new phrase
     # never turns the whole stored board into repair targets on its first night. The week a full
     # rewrite lands (every page's facts move) applies it to every page.
+    # The list targets non-stat phrases only ("the run-up to", "on file", "if he is on your roster"). A
+    # sentence that restates a number the sheet prints ("our preseason number was 180 points", "we had
+    # him down for 180") is a stat sentence, not stock prose, and never goes here (the coordinator's
+    # ruling for Lane 50, 2026-10-15).
     validator_only_stems: tuple[str, ...] = (
         # The live review of 2026-10-15 (M1): the old injury label, on 206 live pages.
         "the run-up to",
         # Clerk's language, on 113 live pages; the sheet prints it nowhere.
         "on file",
+        # Lane 50: the sentence stems (first six words, numbers as "#") on more than 3% of the 567
+        # written pages of the live run 2026-10-15T14-2, less the stat sentences. Held back, each with
+        # its live pages: "our preseason number was # points" (155), "our preseason number had him at"
+        # (43) and "our preseason number gave him #" (29), which restate the sheet's "Our preseason
+        # number:", and "he has not missed a game" (31), the sheet's own sentence. Lane 50's 40-page
+        # sample refused them on 26 pages, in the last failing attempt of 6 of its 17 facts blocks.
+        # "weeks # through # of #" (27) is the week naming the time rules require.
+        "if he is on your roster",  # 27 pages
     )
 
 

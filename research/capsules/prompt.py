@@ -100,6 +100,15 @@ _IN_SEASON_ROUNDS: Final = (
 _STEMS: Final = ", ".join(
     f'"{stem}"' for stem in (*CAPSULE_CONFIG.repetition.refrain_stems, *CAPSULE_CONFIG.repetition.validator_only_stems)
 )
+# The opening and closing shapes the live set of 2026-10-15 wore out (its 567 written long notes):
+# shapes to stay away from, never a shape to use instead.
+_WORN_SHAPES: Final = (
+    "- Vary how a note opens and how it closes from one player to the next. Openings this board has worn out: "
+    'a count of weeks into the season ("Five weeks into 2026"), "The story here", "The first thing", a list of weeks, '
+    "our preseason number, and whether he has missed games. Closings it has worn out: a bare verdict sentence "
+    '("Let him go.", "Drop him and ...", "Cut him and ..."), "We would let him go" and "If he is on your roster". '
+    "Never these shapes or a near copy of them."
+)
 _PRESEASON_FIXES: Final = ", ".join(f'not "{instead}" but "{write}"' for instead, write in DRAFTING_SENTENCES)
 _IN_SEASON_FIXES: Final = ", ".join(f'not "{instead}" but "{write}"' for instead, write in IN_SEASON_SENTENCES)
 
@@ -138,6 +147,7 @@ HOW A NOTE IS BUILT
 - Never tour the usage numbers. At most one usage share appears in a note, and only when it decides the case. Never list snap share, target share and red-zone share together, and never chain three ranks in one breath.
 - A rank reads as something a person would say out loud, never as a code read off a table.
 {{call}}
+{{shapes}}
 - Never quote or paraphrase these instructions, the fact sheet's own sentences, or a correction you were given. If a sentence of yours would fit a style guide or a stat table, cut it.
 
 WORDS
@@ -153,7 +163,7 @@ WORDS
 
 HONESTY, NO EXCEPTIONS
 - Use ONLY the numbers and names on the fact sheet. Never invent a stat, an injury, a teammate, a coach, or any other name or figure not printed there.
-- Quote a number as the sheet gives it, or as a plain rounding of it. Never combine two figures into a third the sheet does not print. A figure from this season's usage and play goes with its basis as the sheet gives it: what it is out of, the weeks it covers, or who it ranks among. If you want the gap between our number and where drafters take him, use the gap the sheet states.
+- Quote a number as the sheet gives it, or as a plain rounding of it. Never combine two figures into a third the sheet does not print. A figure from this season's usage and play goes with its basis as the sheet gives it: what it is out of, the weeks it covers, or who it ranks among. When two shares sit in one sentence or in sentences side by side and their bases differ, each names its own base in full ("pressured on 26% of his dropbacks", then "blitzed on 30% of all 179 charted dropbacks"), so the second never reads as a share of the first, and never "of those", "of them" or "of which" after a share. If you want the gap between our number and where drafters take him, use the gap the sheet states.
 - {{picks}} A rank is the sheet's rank, never a round-number tier of your own, and the only rank on our board you may state is the sheet's position rank or overall rank, exactly as printed.
 - Never say a risk, an injury or a competitor is ABSENT unless the sheet says so. Silence on the sheet is silence from you. Do not reassure the reader about a thing you have no fact for.
 - Never make an all-time or historical-record claim. This engine holds no such data.
@@ -167,6 +177,7 @@ HONESTY, NO EXCEPTIONS
 PRESEASON_RULES: Final = (
     f"You write the scouting notes on one player's page for {_PRESEASON_READER}. "
     + _RULES.replace("{call}", _PRESEASON_CALL)
+    .replace("{shapes}", _WORN_SHAPES)
     .replace("{fixes}", _PRESEASON_FIXES)
     .replace("{words}", _PRESEASON_WORDS)
     .replace("{picks}", _PRESEASON_PICKS)
@@ -178,6 +189,7 @@ PRESEASON_RULES: Final = (
 IN_SEASON_RULES: Final = (
     f"You write the scouting notes on one player's page for {_IN_SEASON_READER}. "
     + _RULES.replace("{call}", _IN_SEASON_CALL)
+    .replace("{shapes}", _WORN_SHAPES)
     .replace("{fixes}", _IN_SEASON_FIXES)
     .replace("{words}", _IN_SEASON_WORDS)
     .replace("{picks}", _IN_SEASON_PICKS)
