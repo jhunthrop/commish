@@ -178,12 +178,9 @@ function tradesHolding(player: string | null): TradeAdvice {
 	};
 }
 
-/** The trade builder's honesty line in the API's words (inseason words.go TradeCheckBasis): the
- * finder's, said of one trade. */
-const checkBasis = trades.basis.replace(
-	/^Trades where both lineups gain on (.+?)\. /,
-	'What each lineup gains or loses with this trade on $1. '
-);
+/** The trade builder's honesty line, as the finder's answer carries it (inseason words.go
+ * TradeCheckBasis). */
+const checkBasis = trades.check_basis;
 /** The API's sentence for a team the read does not hold (inseason check.go otherTeamWords). */
 const OTHER_TEAM_WORDS = "Pick another team in this league's last read.";
 /** A gain on the wire: one decimal. */
@@ -255,7 +252,15 @@ function tradeCheck(input: TradeCheckInput): TradeCheck | string {
 		refreshed: trades.refreshed,
 		read_at: readAt(),
 		trade,
-		fills: { yours: yoursOpen === null, theirs: true, yours_open: yoursOpen, theirs_open: null },
+		// The stand-in names no drop off the finder's rows, so it never refuses a trade for room.
+		fills: {
+			yours: yoursOpen === null,
+			theirs: true,
+			yours_open: yoursOpen,
+			theirs_open: null,
+			yours_room: true,
+			theirs_room: true
+		},
 		host_trades_url: trades.host_trades_url,
 		host_note: trades.host_note
 	};

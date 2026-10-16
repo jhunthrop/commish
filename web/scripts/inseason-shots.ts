@@ -308,6 +308,11 @@ for (const theme of THEMES) {
 		const row = page.locator('.trade').first();
 		const rowGains = gainsOf((await row.locator('.gains p').textContent()) ?? '');
 		await row.getByRole('button', { name: 'Build from this' }).click();
+		// Opened with both sides held, the line says it is checking, never to pick a player.
+		const first = (await page.locator(`${builder} .words .line`).textContent()) ?? '';
+		if (/pick one or two/i.test(first)) {
+			throw new Error(`A filled builder asked to pick: ${first}`);
+		}
 		const fromRow = await answered(page);
 		builderLines.set(`from a row ${theme} ${String(width)}`, fromRow);
 		if (gainsOf(fromRow).join(' ') !== rowGains.join(' ')) {
@@ -332,6 +337,11 @@ for (const theme of THEMES) {
 		if (short !== 'Your roster would not fill TE.') {
 			throw new Error(`Giving both tight ends answered ${short}`);
 		}
+		// Two given: the side says why its other rows wait, in words, not a tooltip.
+		await page
+			.locator(`${builder} section[aria-label="You give"] .full`)
+			.getByText('Two picked, tap one to swap')
+			.waitFor({ timeout: READY_TIMEOUT_MS });
 		await shot('short');
 		await ctx.close();
 	}
