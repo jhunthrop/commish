@@ -132,7 +132,7 @@ export function followedLine(league: AttachedLeague): string {
 }
 
 /** A team's name for a sentence, by roster id. */
-export function teamName(sync: LeagueSync, rosterId: number): string {
+export function teamName(sync: Pick<LeagueSync, 'teams'>, rosterId: number): string {
 	const name = sync.teams.find((t) => t.roster_id === rosterId)?.name ?? '';
 	return name !== '' ? name : `Team ${String(rosterId)}`;
 }
