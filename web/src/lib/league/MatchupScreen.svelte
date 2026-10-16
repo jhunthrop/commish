@@ -2,7 +2,9 @@
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
 	import { siteContext } from '#lib/context/context.svelte.ts';
-	import { gameLine, type Kickoffs } from '#lib/run/kickoffs.ts';
+	import { gameWeek } from '#lib/api/games.ts';
+	import { clubGame, gameFactsLine, type GameWeek } from '#lib/format/game-facts.ts';
+	import { gameLine, runClub, type Kickoffs } from '#lib/run/kickoffs.ts';
 	import { lazySheet } from '#lib/site/lazy-sheet.svelte.ts';
 	import { leagueApi, type LeagueSync } from './api.ts';
 	import { loadBoard, type LeagueBoard } from './board.ts';
@@ -12,9 +14,10 @@
 	import { sheetTags } from './sheet-tags.ts';
 
 	/** A followed league's Matchup screen (spec 2026-10-16 §3): this week's game with both teams
-	 * named, the score so far, each starter's game with its kickoff on the member's clock, and the
-	 * panel's honesty lines. The league's read, our board for the faces and places, and the run's
-	 * kickoffs; read on open and once a minute, as the other screens are. */
+	 * named, the score so far, each starter's game with its kickoff on the member's clock and its
+	 * facts (the expected score, the margin, the roof and the kickoff weather, Lane 66a), and the
+	 * panel's honesty lines. The league's read, our board for the faces and places, the run's
+	 * kickoffs and the week's games; read on open and once a minute, as the other screens are. */
 	interface Props {
 		id: string;
 	}
@@ -28,6 +31,8 @@
 		sync: LeagueSync;
 		board: LeagueBoard;
 		kickoffs: Kickoffs;
+		/** The week's games with their facts, null when the read failed: the rows stand without them. */
+		games: GameWeek | null;
 		read_at: string;
 	}
 
@@ -57,7 +62,22 @@
 			console.warn('Matchup: kickoffs', error);
 			return {};
 		});
-		return { sync, board: await board, kickoffs: await kickoffs, read_at: sync.read_at };
+		const week = sync.matchup?.week;
+		const games =
+			week === undefined
+				? null
+				: await gameWeek(week).catch((error: unknown) => {
+						// eslint-disable-next-line no-console -- no user-facing text: the rows stand without their facts
+						console.warn('Matchup: game facts', error);
+						return null;
+					});
+		return { sync, board: await board, kickoffs: await kickoffs, games, read_at: sync.read_at };
+	}
+
+	/** A starter's game facts this week, null when the game is played or nothing is held. */
+	function factsOf(games: GameWeek | null, team: string): string | null {
+		const game = games === null ? null : clubGame(games, runClub(team));
+		return game === null || game.played ? null : gameFactsLine(game);
 	}
 
 	onMount(() => void lazySheet.load());
@@ -82,6 +102,7 @@
 			tagsOf={sheetTags}
 			now={new Date(week.read_at)}
 			gameOf={(team: string, number: number) => gameLine(week.kickoffs, team, number)}
+			factsOf={(team: string) => factsOf(week.games, team)}
 		/>
 		{#if week.sync.matchup === null && basis !== ''}<p class="basis">{basis}</p>{/if}
 	{/snippet}

@@ -65,6 +65,10 @@ const facts = (over: Partial<WeekFacts> = {}): WeekFacts => ({
 	points_this_week: null,
 	last_games: [],
 	allowed_to_position: null,
+	game_total: null,
+	spread: null,
+	roof: null,
+	weather: null,
 	...over
 });
 
