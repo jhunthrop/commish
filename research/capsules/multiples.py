@@ -13,7 +13,8 @@ What counts as a multiple (the re-reviews' N5, N6 and R2-H1, ruled):
   to half") or followed by an object ("double it", "twice the 14.1", "half of his 14.1", "twice as many"),
   whatever comes after.
 Exempt, by name only, the non-comparisons: "half" of a named counted thing with no figure after it
-("half of his targets", "half the season", "half our guys"; the list is `_COUNTED`), "half a chance",
+("half of his targets", "half of his 12 catches", "half the season"; the list is `_COUNTED`, and a week
+or season marker after it is a date, not a figure), "half a chance",
 "twice a week", a "double-digit" week, a "double team", "double coverage", the "second half", and "he
 scored twice" (no object, no hedge).
 """
@@ -56,10 +57,15 @@ _MULTIPLE: Final = re.compile(
 )
 # The counted things "half" may be half of without comparing two figures (the re-review's R3-H1,
 # ruled): exempt by name, and only when no figure follows in the sentence.
-_COUNTED: Final = r"targets|snaps|carries|touches|routes|games|season|field|team|guys|drives"
-_HALF_OF_A_COUNT: Final = re.compile(
-    rf"half\s+(?:of\s+)?(?:his|her|their|the|our|its)\s+(?:{_COUNTED})\b", re.IGNORECASE
+_COUNTED: Final = (
+    r"targets|snaps|carries|touches|routes|games|season|field|team|guys|drives|"
+    r"catches|receptions|yards|attempts|passes|completions|looks"
 )
+_HALF_OF_A_COUNT: Final = re.compile(
+    rf"half\s+(?:of\s+)?(?:his|her|their|the|our|its)\s+(?:\d+\s+)?(?:{_COUNTED})\b", re.IGNORECASE
+)
+# A week or season marker is a date, never a figure that follows the counted noun ("in week 2 of 2026").
+_WEEK_MARKER: Final = re.compile(r"\bweeks?\s+\d+(?:\s*(?:,|and|or|to|through|-)\s*\d+)*", re.IGNORECASE)
 # The other non-comparisons, read from the comparison word on, each exempt by name.
 _NOT_A_COMPARISON: Final = re.compile(
     r"half\s+an?\s+(?!\d)[a-z]"
@@ -101,7 +107,7 @@ def _is_claim(match: re.Match[str], sentence: str) -> bool:
     if _NOT_A_COMPARISON.match(sentence, match.start("word")) is not None:
         return False
     count = _HALF_OF_A_COUNT.match(sentence, match.start("word"))
-    return count is None or bool(_figures(sentence[count.end() :]))
+    return count is None or bool(_figures(_WEEK_MARKER.sub(" ", sentence[count.end() :])))
 
 
 def _claims(sentence: str) -> list[tuple[str, float]]:

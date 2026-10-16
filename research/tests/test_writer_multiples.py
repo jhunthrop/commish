@@ -53,6 +53,9 @@ def test_a_multiple_the_figures_do_not_make_is_refused(text: str) -> None:
         "He has half a chance to start in week 7 of 2026.",
         "He missed half the season in 2025.",
         "Half of his carries came late in 2025.",
+        "Half of his 12 catches came in week 2 of 2026.",
+        "Half of his yards came in weeks 2 and 3 of 2026.",
+        "Half of his receptions came last season.",
     ],
 )
 def test_a_multiple_the_figures_make_or_another_sense_passes(text: str) -> None:
