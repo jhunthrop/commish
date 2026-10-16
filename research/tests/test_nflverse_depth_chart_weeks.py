@@ -59,6 +59,12 @@ def test_a_wednesday_game_takes_the_tuesday_pass() -> None:
     assert charts.latest_pass_before(week17_first, week16_last) == _at(2024, 12, 24, 13)
 
 
+def test_a_pass_while_the_last_game_is_played_is_not_taken() -> None:
+    # 2020 week 12 ended on Wednesday 2 December, PIT at BAL at 15:40 New York; week 13 began Sunday.
+    week12_last, week13_first = _at(2020, 12, 2, 20, 40), _at(2020, 12, 6, 18)
+    assert charts.latest_pass_before(week13_first, week12_last) == _at(2020, 12, 3, 19)  # Thursday 14:00
+
+
 def test_no_pass_between_two_weeks_is_refused() -> None:
     with pytest.raises(SchemaDriftError, match="no in-season pass"):
         charts.latest_pass_before(_at(2024, 12, 25, 18), _at(2024, 12, 25, 12))
@@ -89,8 +95,21 @@ def test_a_week_inside_the_season_the_schedule_does_not_hold_is_refused() -> Non
         charts.chart_rows_for(NflverseClient(FixtureFetcher()), 2016, [k for k in KICKOFFS_2016 if k.week == 2])  # noqa: PLR2004 - week 2
 
 
+def test_a_club_no_stored_kickoff_names_is_refused() -> None:
+    kickoffs = [k for k in KICKOFFS_2016 if k.team != "TB"]
+    with pytest.raises(NflverseError, match='club "TB"'):
+        charts.chart_rows_for(NflverseClient(FixtureFetcher()), 2016, kickoffs)
+    with pytest.raises(SchemaDriftError, match=r"clubs \['NE'\]"):
+        charts.chart_rows_for(
+            NflverseClient(FixtureFetcher()),
+            2026,
+            [k for k in KICKOFFS_2026 if k.team != "NE"] + [TeamKickoff(2026, 1, "TB", _at(2026, 9, 10, 0, 20))],
+        )
+
+
 def test_the_chart_after_the_final_week_is_passed_over() -> None:
-    weekly = charts.WeeklyCharts(2016, charts.weekly_stamps([k for k in KICKOFFS_2016 if k.week == 1]))
+    week1 = [k for k in KICKOFFS_2016 if k.week == 1]
+    weekly = charts.WeeklyCharts(2016, charts.weekly_stamps(week1), frozenset(k.team for k in KICKOFFS_2016))
     for row in fixture_rows("depth_charts_2016.csv"):
         weekly.add(row)
     assert {r.week for r in weekly.rows} == {1}

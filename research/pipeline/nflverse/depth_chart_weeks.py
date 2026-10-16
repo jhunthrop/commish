@@ -10,8 +10,9 @@ TWO SCHEMAS, AS IN `preseason/rosters.py`.
   carries no publication time (its columns, and the data dictionary checked 2026-10-16, which
   documents only the 2025 schema's `dt`), so a week's chart is stamped at the in-season pass of its
   week (§5 item 6): the latest Wednesday 18:00 New York before the week's first kickoff, provided it
-  falls after the previous week's last kickoff; else (a Wednesday game, Christmas 2024) the latest
-  Tuesday 08:00 before it on the same condition; else the week is refused.
+  falls at least `GAME_LENGTH` after the previous week's last kickoff (that game is over); else (a
+  Wednesday game, Christmas 2024) the latest Tuesday 08:00 on the same condition; else (a Wednesday
+  afternoon game the week before, PIT at BAL in 2020) the Thursday 14:00 pass; else the week is refused.
 - **From 2025, dated snapshots** (`dt`, "the timestamp ... when the data record was loaded", the
   dictionary's words). Each club-game takes the club's latest snapshot loaded at or before one
   millisecond before its kickoff, and only a snapshot loaded after the club's previous kickoff: a
@@ -55,9 +56,11 @@ WEEKLY_COLUMNS: Final = (
 DATED_COLUMNS: Final = ("dt", "team", "gsis_id", "pos_grp", "pos_abb", "pos_slot", "pos_rank")
 _DATED_OFFENSE: Final = "3WR 1TE"
 _NEW_YORK: Final = ZoneInfo("America/New_York")
-_WEDNESDAY, _TUESDAY = 2, 1
-# The in-season passes a week's chart is stamped at (JOBS.md `inseason`): Wednesday's, else Tuesday's.
-PASSES: Final = ((_WEDNESDAY, time(18, 0)), (_TUESDAY, time(8, 0)))
+_TUESDAY, _WEDNESDAY, _THURSDAY = 1, 2, 3
+# The in-season passes a week's chart is stamped at (JOBS.md `inseason`), in the order they are tried.
+PASSES: Final = ((_WEDNESDAY, time(18, 0)), (_TUESDAY, time(8, 0)), (_THURSDAY, time(14, 0)))
+# A pass is taken only once the previous week's last game is over: its kickoff plus this.
+GAME_LENGTH: Final = timedelta(hours=4)
 _ONE_MS: Final = timedelta(milliseconds=1)
 
 
@@ -81,15 +84,15 @@ def _whole(raw: str, what: str, file: str) -> int:
 
 
 def latest_pass_before(first_kickoff: datetime, after: datetime | None) -> datetime:
-    """The in-season pass a week's chart is stamped at: the latest Wednesday 18:00 New York strictly
-    before the week's first kickoff and after the previous week's last, else Tuesday 08:00 so."""
+    """The in-season pass a week's chart is stamped at: the first of `PASSES` whose latest occurrence
+    strictly before the week's first kickoff falls after the previous week's last game."""
     local = first_kickoff.astimezone(_NEW_YORK)
     for weekday, at in PASSES:
         days_back = (local.weekday() - weekday) % 7
         candidate = datetime.combine(local.date() - timedelta(days=days_back), at, _NEW_YORK)
         if candidate >= first_kickoff:
             candidate -= timedelta(days=7)
-        if after is None or candidate > after:
+        if after is None or candidate >= after + GAME_LENGTH:
             return candidate.astimezone(UTC)
     raise SchemaDriftError(f"no in-season pass falls between {after} and the kickoff at {first_kickoff}.")
 
@@ -110,6 +113,8 @@ class WeeklyCharts:
 
     season: int
     stamps: Mapping[int, datetime]
+    # The clubs of the stored kickoffs: a chart under any other code is a changed release, refused.
+    clubs: frozenset[str]
     rows: list[ChartRow] = field(default_factory=list)
     read: int = 0
     no_id: int = 0
@@ -142,6 +147,8 @@ class WeeklyCharts:
         slot = js_trim(row.get("depth_position") or "") or position
         depth = _whole(row.get("depth_team") or "", "depth_team", self.file)
         team = js_trim(row.get("club_code") or "")
+        if team not in self.clubs:
+            raise SchemaDriftError(f'{self.file} has club "{team}", which no stored {self.season} kickoff names.')
         self.rows.append(ChartRow(self.season, week, team, slot, depth, player, stamp, position))
 
 
@@ -150,6 +157,7 @@ class DatedCharts:
     """The schema from 2025: offensive skill rows by club and snapshot, assigned to club-games."""
 
     season: int
+    clubs: frozenset[str]
     snapshots: dict[str, dict[datetime, list[tuple[str, int, str, str]]]] = field(
         default_factory=lambda: defaultdict(lambda: defaultdict(list))
     )
@@ -182,6 +190,9 @@ class DatedCharts:
 
     def assigned(self, kickoffs: Sequence[TeamKickoff]) -> list[ChartRow]:
         """Each club-game's latest snapshot before its kickoff and after the club's previous one."""
+        unknown = sorted(set(self.snapshots) - self.clubs)
+        if unknown:
+            raise SchemaDriftError(f"{self.file} has clubs {unknown}, which no stored {self.season} kickoff names.")
         rows: list[ChartRow] = []
         by_team: dict[str, list[TeamKickoff]] = defaultdict(list)
         for k in kickoffs:
@@ -236,11 +247,12 @@ def chart_rows_for(
 ) -> tuple[list[ChartRow], int, int]:
     """The season's chart rows, the file rows read, and the skill rows that carried no id."""
     file = f"depth_charts_{season}.csv"
+    clubs = frozenset(k.team for k in kickoffs)
     if season >= DATED_FROM_SEASON:
-        dated = DatedCharts(season)
+        dated = DatedCharts(season, clubs)
         client.stream_csv(Releases.DEPTH_CHARTS, file, DATED_COLUMNS, dated.add)
         return dated.assigned(kickoffs), dated.read, dated.no_id
-    weekly = WeeklyCharts(season, weekly_stamps(kickoffs))
+    weekly = WeeklyCharts(season, weekly_stamps(kickoffs), clubs)
     client.stream_csv(Releases.DEPTH_CHARTS, file, WEEKLY_COLUMNS, weekly.add)
     return weekly.rows, weekly.read, weekly.no_id
 

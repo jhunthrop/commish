@@ -22,7 +22,9 @@ from typing import Final
 from sqlalchemy import Connection, text
 
 from research.db.schema import NFLVERSE_DEPTH_CHART_WEEKS, PLAYER_WEEK_OBSERVATIONS
+from research.pipeline.kickoffs import stored_kickoffs
 from research.pipeline.nflverse.injury_reports import INJURY_SOURCE, InjuryMetric
+from research.pipeline.nflverse.universe_reads import all_positions
 
 CHECK_SEASONS: Final = (2021, 2022, 2023)
 CHECK_WEEKS: Final = range(6, 18)
@@ -36,6 +38,9 @@ WeekKey = tuple[int, int]
 class Group:
     players: int
     retained: int
+    # Of `players`, those whose club had no game in week W: no report is filed on a bye, so the literal
+    # rule puts a bye club's starters in "no week-W filing". Printed beside the verdict, never removed.
+    byes: int = 0
 
     @property
     def retention(self) -> float | None:
@@ -46,6 +51,9 @@ class Group:
 class StampCheck:
     injured: Group
     comparison: Group
+    # Depth-1 player-weeks outside the players the filing ingest covers (a fullback, a player the
+    # universe does not project): they can never be filed, so they are in neither group.
+    excluded: int = 0
 
     @property
     def passed(self) -> bool:
@@ -56,7 +64,7 @@ class StampCheck:
     def lines(self) -> list[str]:
         def shown(group: Group) -> str:
             rate = "none" if group.retention is None else f"{group.retention:.4f}"
-            return f"{group.retained} of {group.players} retained at depth 1 ({rate})"
+            return f"{group.retained} of {group.players} retained at depth 1 ({rate}), {group.byes} on a bye week"
 
         verdict = (
             "PASS: the replay reads the week-W chart" if self.passed else "FAIL: the replay reads week W-1's chart"
@@ -64,33 +72,50 @@ class StampCheck:
         return [
             f"injured group: {shown(self.injured)}",
             f"comparison group: {shown(self.comparison)}",
+            f"excluded: {self.excluded} depth-1 player-weeks the filing ingest does not cover",
             f"margin {RETENTION_MARGIN}: {verdict}",
         ]
 
 
-def stamp_check(
-    starters: Mapping[WeekKey, Set[str]], filings: Mapping[WeekKey, Mapping[str, float]], weeks: Set[WeekKey]
-) -> StampCheck:
-    """`starters`: each week's depth-1 players; `filings`: each week's latest status per filed player."""
-    injured = [0, 0]
-    comparison = [0, 0]
+ClubWeek = tuple[int, int, str]
+
+
+@dataclass(frozen=True, slots=True)
+class CheckInputs:
+    """`starters`: each week's depth-1 players with their club; `filings`: each week's latest status per
+    filed player; `covered`: the players the filing ingest writes; `games`: every club-week with a game."""
+
+    starters: Mapping[WeekKey, Mapping[str, str]]
+    filings: Mapping[WeekKey, Mapping[str, float]]
+    covered: Set[str]
+    games: Set[ClubWeek]
+
+
+def stamp_check(inputs: CheckInputs, weeks: Set[WeekKey]) -> StampCheck:
+    injured = [0, 0, 0]
+    comparison = [0, 0, 0]
+    excluded = 0
     for season, week in sorted(weeks):
-        before = starters.get((season, week - 1), frozenset())
-        now = starters.get((season, week), frozenset())
-        this_week = filings.get((season, week), {})
-        next_week = filings.get((season, week + 1), {})
-        for player in before:
+        before = inputs.starters.get((season, week - 1), {})
+        now = inputs.starters.get((season, week), {})
+        this_week = inputs.filings.get((season, week), {})
+        next_week = inputs.filings.get((season, week + 1), {})
+        for player, club in before.items():
+            if player not in inputs.covered:
+                excluded += 1
+                continue
             if player in this_week:
                 continue
             group = injured if next_week.get(player) == OUT else comparison if player not in next_week else None
             if group is not None:
                 group[0] += 1
                 group[1] += 1 if player in now else 0
-    return StampCheck(Group(*injured), Group(*comparison))
+                group[2] += 0 if (season, week, club) in inputs.games else 1
+    return StampCheck(Group(*injured), Group(*comparison), excluded)
 
 
 _STARTERS: Final = text(
-    f"select season, week, player_id from {NFLVERSE_DEPTH_CHART_WEEKS.fullname} "
+    f"select season, week, player_id, team from {NFLVERSE_DEPTH_CHART_WEEKS.fullname} "
     "where season = any(:seasons) and depth_order = 1"
 )
 _FILINGS: Final = text(
@@ -103,12 +128,14 @@ _FILINGS: Final = text(
 def run_stamp_check(conn: Connection) -> StampCheck:
     """The check over its preregistered seasons and weeks, read from the store."""
     seasons = list(CHECK_SEASONS)
-    starters: dict[WeekKey, set[str]] = defaultdict(set)
+    starters: dict[WeekKey, dict[str, str]] = defaultdict(dict)
     for row in conn.execute(_STARTERS, {"seasons": seasons}):
-        starters[(int(row.season), int(row.week))].add(str(row.player_id))
+        starters[(int(row.season), int(row.week))][str(row.player_id)] = str(row.team)
     filings: dict[WeekKey, dict[str, float]] = defaultdict(dict)
     params = {"seasons": seasons, "source": INJURY_SOURCE, "metric": InjuryMetric.REPORT_STATUS}
     for row in conn.execute(_FILINGS, params):
         filings[(int(row.season), int(row.week))][str(row.player_id)] = float(row.value)
+    games = {(k.season, k.week, k.team) for season in seasons for k in stored_kickoffs(conn, season)}
+    inputs = CheckInputs(starters, filings, frozenset(all_positions(conn)), games)
     weeks = {(season, week) for season in CHECK_SEASONS for week in CHECK_WEEKS}
-    return stamp_check(starters, filings, weeks)
+    return stamp_check(inputs, weeks)
