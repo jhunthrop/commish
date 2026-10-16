@@ -50,6 +50,8 @@ export const HOME_HREF = '/';
 
 /** Where a mock draft starts: the room's setup. */
 const MOCK_SETUP = '/mock/new';
+/** The verb to a mock draft, wherever a page offers one: the season's pages and the league's. */
+export const MOCK_VERB = 'Start a mock draft';
 /** The advisor's own page: our call beside your real draft (the live draft companion). */
 export const COMPANION_START = '/companion/new' as const;
 /** Where a league on another host is attached. */

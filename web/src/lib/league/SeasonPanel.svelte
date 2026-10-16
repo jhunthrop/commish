@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { MOCK_VERB } from '#lib/site/season-words.ts';
+	import { MOCK_VERB } from '#lib/ui/nav.ts';
 	import { zoneLine } from '#lib/format/clock.ts';
 	import { links } from '#lib/site/links.ts';
 	import Label from '#lib/ui/Label.svelte';

@@ -12,8 +12,7 @@ import {
 } from '#lib/format/clock.ts';
 import { fixed, ordinal } from '#lib/format/number.ts';
 import type { ContextLeague } from '#lib/context/words.ts';
-import { MOCK_VERB } from '#lib/site/season-words.ts';
-import type { LeagueScreen } from '#lib/ui/nav.ts';
+import { MOCK_VERB, type LeagueScreen } from '#lib/ui/nav.ts';
 import type { LeagueStanding, LeagueSync, MatchupSide } from './api.ts';
 import { recordWords, scoreUnread, teamName } from './model.ts';
 
