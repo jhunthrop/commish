@@ -994,7 +994,9 @@ paths:
       operationId: roomBoard
       summary: >-
         The board a room drafts from in a scoring format, valued for 12 teams on the standard roster: the setup
-        page's player list for keepers. A room values its own league.
+        page's player list for keepers. A room values its own league. Each player carries his designation on the
+        newest hourly injury capture, and a player on a season-long list follows the available players at his
+        position.
       responses:
         "200":
           description: the board
@@ -2369,8 +2371,44 @@ components:
         adp: { type: number, format: double, nullable: true, description: where drafters take him, null with no source }
         points: { type: number, format: double, nullable: true, description: projected season points, null for kickers and defenses }
         vor: { type: number, format: double, nullable: true, description: points over replacement for this league, null when it has none }
-        position_rank: { type: integer }
+        position_rank:
+          type: integer
+          description: >-
+            his place at his position; on GET /boards/{format}, a player on a season-long list is placed after every
+            available player at it
         bye: { type: integer, nullable: true }
+        status:
+          $ref: "#/components/schemas/BoardStatus"
+    BoardStatus:
+      type: object
+      description: >-
+        his injury designation on the newest hourly capture (GET /boards/{format} only), absent when the capture does
+        not list him
+      required: [status, season_long, since, as_of, source]
+      properties:
+        status: { $ref: "#/components/schemas/DesignationStatus" }
+        season_long:
+          type: boolean
+          description: >-
+            injured reserve, suspended, PUP, NFI, or out with the capture's note saying out for the season: his
+            rest-of-season figure assumes he plays, so he is placed below every available player at his position. A
+            week's out, doubtful or questionable moves nothing
+        since:
+          type: string
+          format: date-time
+          nullable: true
+          description: >-
+            the first capture of his unbroken run under a season-long status; null for a week's designation and for a
+            run older than the captures read, whose start we do not know
+        as_of: { type: string, format: date-time, description: the stamp of the capture that lists him }
+        source: { type: string, description: "the capture's feed in the research store: tank01_injuries_by_date" }
+    StatusRead:
+      type: object
+      description: the injury capture a board's statuses come from, absent when none was read
+      required: [as_of, source]
+      properties:
+        as_of: { type: string, format: date-time, description: the capture's stamp }
+        source: { type: string, description: the capture's feed in the research store }
     RoomBoard:
       type: object
       required: [format, season, as_of, basis, players]
@@ -2379,9 +2417,13 @@ components:
         season: { type: integer }
         as_of: { type: string, format: date-time }
         basis: { type: string, description: the sentence naming what the numbers are }
+        status_read:
+          $ref: "#/components/schemas/StatusRead"
         players:
           type: array
-          description: every player in the order drafters take them
+          description: >-
+            every player in the order drafters take them; on GET /boards/{format}, each player on a season-long list
+            follows the last available player at his position
           items: { $ref: "#/components/schemas/BoardPlayer" }
     RoomPick:
       type: object
@@ -2935,11 +2977,14 @@ components:
       description: >-
         which order ranks the players: our preseason board, or the rest-of-season order (from week 7, once the API
         reads it)
+    DesignationStatus:
+      type: string
+      enum: [questionable, doubtful, out, injured_reserve, suspended, pup, nfi]
     InjuryDesignation:
       type: object
       required: [status, as_of]
       properties:
-        status: { type: string, enum: [questionable, doubtful, out, injured_reserve, suspended, pup, nfi] }
+        status: { $ref: "#/components/schemas/DesignationStatus" }
         as_of:
           type: string
           format: date-time

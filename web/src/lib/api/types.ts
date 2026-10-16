@@ -928,7 +928,7 @@ export interface paths {
 			};
 			cookie?: never;
 		};
-		/** The board a room drafts from in a scoring format, valued for 12 teams on the standard roster: the setup page's player list for keepers. A room values its own league. */
+		/** The board a room drafts from in a scoring format, valued for 12 teams on the standard roster: the setup page's player list for keepers. A room values its own league. Each player carries his designation on the newest hourly injury capture, and a player on a season-long list follows the available players at his position. */
 		get: operations['roomBoard'];
 		put?: never;
 		post?: never;
@@ -1960,8 +1960,38 @@ export interface components {
 			 * @description points over replacement for this league
 			 */
 			vor: number | null;
+			/** @description his place at his position; on GET /boards/{format}, a player on a season-long list is placed after every available player at it */
 			position_rank: number;
 			bye: number | null;
+			status?: components['schemas']['BoardStatus'];
+		};
+		/** @description his injury designation on the newest hourly capture (GET /boards/{format} only), absent when the capture does not list him */
+		BoardStatus: {
+			status: components['schemas']['DesignationStatus'];
+			/** @description injured reserve, suspended, PUP, NFI, or out with the capture's note saying out for the season: his rest-of-season figure assumes he plays, so he is placed below every available player at his position. A week's out, doubtful or questionable moves nothing */
+			season_long: boolean;
+			/**
+			 * Format: date-time
+			 * @description the first capture of his unbroken run under a season-long status; null for a week's designation and for a run older than the captures read, whose start we do not know
+			 */
+			since: string | null;
+			/**
+			 * Format: date-time
+			 * @description the stamp of the capture that lists him
+			 */
+			as_of: string;
+			/** @description the capture's feed in the research store: tank01_injuries_by_date */
+			source: string;
+		};
+		/** @description the injury capture a board's statuses come from, absent when none was read */
+		StatusRead: {
+			/**
+			 * Format: date-time
+			 * @description the capture's stamp
+			 */
+			as_of: string;
+			/** @description the capture's feed in the research store */
+			source: string;
 		};
 		RoomBoard: {
 			/** @enum {string} */
@@ -1971,7 +2001,8 @@ export interface components {
 			as_of: string;
 			/** @description the sentence naming what the numbers are */
 			basis: string;
-			/** @description every player in the order drafters take them */
+			status_read?: components['schemas']['StatusRead'];
+			/** @description every player in the order drafters take them; on GET /boards/{format}, each player on a season-long list follows the last available player at his position */
 			players: components['schemas']['BoardPlayer'][];
 		};
 		RoomPick: {
@@ -2479,9 +2510,11 @@ export interface components {
 		 * @enum {string}
 		 */
 		OrderBasis: 'preseason' | 'rest_of_season';
+		/** @enum {string} */
+		DesignationStatus:
+			'questionable' | 'doubtful' | 'out' | 'injured_reserve' | 'suspended' | 'pup' | 'nfi';
 		InjuryDesignation: {
-			/** @enum {string} */
-			status: 'questionable' | 'doubtful' | 'out' | 'injured_reserve' | 'suspended' | 'pup' | 'nfi';
+			status: components['schemas']['DesignationStatus'];
 			/**
 			 * Format: date-time
 			 * @description the stamp of the injury read that lists it, or of the host read for the host's own IR mark

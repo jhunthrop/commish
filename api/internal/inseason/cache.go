@@ -62,11 +62,17 @@ func (c *Cache) Data(ctx context.Context, season int) (Data, error) {
 	if err != nil {
 		return Data{}, err
 	}
-	designations, err := cached(c, ctx, "designations", CaptureTTL, c.Reads.Designations)
+	designations, err := c.Designations(ctx)
 	if err != nil {
 		return Data{}, err
 	}
 	return Data{Lines: lines, Games: games, Designations: designations}, nil
+}
+
+// Designations is the newest injury capture, kept for CaptureTTL: the
+// in-season screens' read and the board route's (solo.DesignationSource).
+func (c *Cache) Designations(ctx context.Context) (map[string]boards.Designation, error) {
+	return cached(c, ctx, "designations", CaptureTTL, c.Reads.Designations)
 }
 
 // cached is the value kept for key while younger than ttl, else read

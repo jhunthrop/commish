@@ -354,7 +354,22 @@ func (s *Service) handleBoard(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, "solo: board", err)
 		return
 	}
-	httpx.WriteOK(w, r, http.StatusOK, draftroom.BoardView(b, nil))
+	httpx.WriteOK(w, r, http.StatusOK, s.withDesignations(r, draftroom.BoardView(b, nil)))
+}
+
+// withDesignations is the board with the newest capture's statuses. A
+// capture that cannot be read leaves the board as the store has it, with
+// no status claimed and no read named.
+func (s *Service) withDesignations(r *http.Request, view apitypes.RoomBoard) apitypes.RoomBoard {
+	if s.Designations == nil {
+		return view
+	}
+	designations, err := s.Designations.Designations(r.Context())
+	if err != nil {
+		s.Log.Warn("solo: the board answers without injury statuses", "err", err)
+		return view
+	}
+	return withStatuses(view, designations)
 }
 
 func (s *Service) handleShared(w http.ResponseWriter, r *http.Request) {

@@ -72,6 +72,23 @@ func TestCacheReadsOncePerTTL(t *testing.T) {
 	}
 }
 
+// The board route's designations are the in-season screens' read: one
+// capture read serves both within the TTL.
+func TestCacheSharesTheCaptureRead(t *testing.T) {
+	reads := &countingReads{}
+	c := &Cache{Reads: reads, Now: time.Now}
+	ctx := context.Background()
+	if d, err := c.Designations(ctx); err != nil || d["p1"].Code != "Q" {
+		t.Fatalf("designations %v %v", d, err)
+	}
+	if _, err := c.Data(ctx, 2026); err != nil {
+		t.Fatal(err)
+	}
+	if reads.designations.Load() != 1 {
+		t.Fatalf("the board and the screens read the capture %d times, want once", reads.designations.Load())
+	}
+}
+
 func TestCacheKeepsNoFailure(t *testing.T) {
 	reads := &countingReads{fail: true}
 	c := &Cache{Reads: reads, Now: time.Now}
