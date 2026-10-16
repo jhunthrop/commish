@@ -19,17 +19,18 @@ void test('before week 1 kicks off the site is in its preseason', () => {
 	assert.equal(at('2026-09-10T00:19:59.000Z'), 'preseason');
 });
 
-void test('from the first kickoff through the last regular-season game the site is in season', () => {
+void test('from the first kickoff to the end of the last game day, Eastern, the site is in season', () => {
 	assert.equal(at('2026-09-10T00:20:00.000Z'), 'in_season');
 	assert.equal(at('2026-10-15T12:00:00.000Z'), 'in_season');
-	// The last game is still on the night it kicks off.
-	assert.equal(at('2027-01-11T04:00:00.000Z'), 'in_season');
+	// The last game day is Sunday January 10 on the Eastern clock: in season to its last second.
+	assert.equal(at('2027-01-11T04:59:59.000Z'), 'in_season');
+	assert.equal(at('2027-01-11T05:00:00.000Z'), 'playoffs');
 });
 
-void test('the NFL playoffs follow, then the offseason until the next season', () => {
-	assert.equal(at('2027-01-12T12:00:00.000Z'), 'playoffs');
-	assert.equal(at('2027-02-14T12:00:00.000Z'), 'playoffs');
-	assert.equal(at('2027-02-20T12:00:00.000Z'), 'offseason');
+void test('the playoffs run to the end of Super Bowl day, five weeks on, then the offseason', () => {
+	assert.equal(at('2027-02-14T23:30:00.000Z'), 'playoffs');
+	assert.equal(at('2027-02-15T04:59:59.000Z'), 'playoffs');
+	assert.equal(at('2027-02-15T05:00:00.000Z'), 'offseason');
 	assert.equal(at('2027-06-01T12:00:00.000Z'), 'offseason');
 });
 
