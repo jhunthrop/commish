@@ -12,12 +12,24 @@ dropbacks", where the sheet takes the blitz share from all of his charted dropba
 A base phrase is "of ..." after the percentage, a base noun next to it ("a 96% snap share", "54%
 situation-neutral passes", "his snap share is 96%", "a slice of the air yards at 22.5%"), a count
 ("(54 of 179)"), or the previous share's own base carried by "from", "to", "up", "down" or "between"
-("fell from 97% to 89%").
+("fell from 97% to 89%"). A pair joined by "and", "or" or "to" alone shares the base that trails it
+("between 97% and 89% of the snaps", "from 20% to 14% of the targets").
+
+A base a carrier passes along stands as named, whatever the sheet says: "His red-zone share is 22% this
+season, up from 13.3% last year" names its base once for one metric on two time bases, even when the
+sheet takes the two from different counts. Refusing a passed-along base would flag honest sentences
+(ruled for Lane 50's review, M2, not taken).
+
+A bare "share" or "rate" ("a 30% share") still counts as naming a base, though the sheet's metric word
+is missing (the review's L2, noted and not taken). Reading it as no base hands 8 live sentences of the
+run 2026-10-15T14-2 to the sheet check, among them "a 10.6% share inside the ten" beside a
+touchdown-points share, which names its metric after the noun. That is a likely new flag on an honest
+sentence, against the ruling's bar of no flag beyond the three known.
 """
 
 import re
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Final
 
 from research.capsules.grounding import round_half_up
@@ -30,12 +42,16 @@ _BASE_NOUN: Final = (
 )
 # A base runs to the clause's end, the next joined clause or the time it covers ("of his charted
 # dropbacks and pressured on ...", "of the targets in 2024 to ...").
+# A word between a percentage and its base noun ("54% situation-neutral passes", "a 35% slice of"),
+# never a joining word or a determiner, which starts a new clause ("49.2% and his target share").
+_MODIFIER: Final = r"(?:(?!(?:and|or|but|nor|his|her|their|its|the|to|from|with|on|in|while|as|than)\b)[a-z'-]+\s+)"
 _TRAILING_OF: Final = re.compile(
-    r"^\s+(?:[a-z'-]+\s+){0,2}?(?:of|among)\s+((?:(?!\b(?:and|but|while|with|which|as|than|to|from|in|by|over|across|during|"
+    rf"^\s+{_MODIFIER}{{0,2}}?(?:of|among)\s+((?:(?!\b(?:and|but|while|with|which|as|than|to|from|in|by|over|across|during|"
     r"through|since|up|down|this|last|early|late)\b)[^,;:.()%])+)",
     re.IGNORECASE,
 )
-_TRAILING_NOUN: Final = re.compile(rf"^\s+((?:[a-z'-]+\s+){{0,2}}?{_BASE_NOUN})\b", re.IGNORECASE)
+# The noun with its "share" or "rate" ("snap share", not "snap" with "share" left for the next share).
+_TRAILING_NOUN: Final = re.compile(rf"^\s+({_MODIFIER}{{0,2}}?{_BASE_NOUN}(?:\s+(?:share|rate))?)\b", re.IGNORECASE)
 _TRAILING_COUNT: Final = re.compile(r"^\s*,?\s*\(?\s*\d+(?:\.\d+)? of \d+")
 # A base named before the percentage: a word or two, the noun, and what it is of ("red-zone share of
 # his own touches").
@@ -57,6 +73,8 @@ _BASE_QUALIFIERS: Final = frozenset({"charted", "tracked", "contested"})
 _STOP_TAIL: Final = re.compile(r"\s+(?:in|over|across)\s+(?:his|the)\s+games?$")
 _ANAPHORS: Final = '"of those", "of them" or "of which"'
 _COUNT_BASE: Final = "(count)"
+# The words that join a pair of shares sharing the base that trails the second ("97% and 89% of the snaps").
+_PAIR_JOINS: Final = frozenset({"and", "or", "to"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -66,6 +84,7 @@ class Share:
     raw: str
     value: float
     decimals: int
+    start: int
     end: int
     # The words of its own base phrase, normalized; None when it names none.
     base: str | None
@@ -73,6 +92,10 @@ class Share:
     base_end: int
     # Hung on "of those", "of them", "of which" or "of these".
     anaphoric: bool
+    # Its base is the phrase right after it ("of the snaps", "snap share").
+    trailing: bool = False
+    # Its base is borrowed from the next share in a pair ("97% and 89% of the snaps").
+    paired: bool = False
 
 
 def _singular(word: str) -> str:
@@ -96,12 +119,19 @@ def _normalized(words: str) -> str:
 
 def _trailing_base(after: str) -> tuple[str | None, int]:
     """The base phrase right after a percentage, and how far it runs."""
+    bare: tuple[str | None, int] | None = None
     for pattern in (_TRAILING_NOUN, _TRAILING_OF):
         match = pattern.match(after)
         if match is not None:
-            return _normalized(match.group(1)), match.end()
+            base = _normalized(match.group(1))
+            if base:
+                return base, match.end()
+            # A bare "share" or "rate": read on for "of ..." after it, else it stands as named (L2, not taken).
+            bare = bare or (base, match.end())
     count = _TRAILING_COUNT.match(after)
-    return (_COUNT_BASE, count.end()) if count is not None else (None, 0)
+    if count is not None:
+        return _COUNT_BASE, count.end()
+    return bare or (None, 0)
 
 
 def _leading_base(window: str, previous: Share | None) -> str | None:
@@ -137,8 +167,33 @@ def shares_in(sentence: str) -> list[Share]:
             base_end = match.end() + length
         raw = match.group(1)
         decimals = len(raw.split(".")[1]) if "." in raw else 0
-        shares.append(Share(match.group(0), float(raw), decimals, match.end(), base, base_end, anaphor is not None))
-    return shares
+        trailed = anaphor is None and base_end > match.end() and base is not None
+        shares.append(
+            Share(
+                match.group(0),
+                float(raw),
+                decimals,
+                match.start(),
+                match.end(),
+                base,
+                base_end,
+                anaphor is not None,
+                trailed,
+            )
+        )
+    return _paired(sentence, shares)
+
+
+def _paired(sentence: str, shares: list[Share]) -> list[Share]:
+    """A share naming no base takes the trailing base of the next share when only "and", "or" or "to"
+    stand between them, read right to left so a run of three shares down to one base reads whole."""
+    out = list(shares)
+    for index in range(len(out) - 2, -1, -1):
+        share, after = out[index], out[index + 1]
+        words = re.findall(r"[a-z]+", sentence[share.end : after.start].lower())
+        if share.base is None and not share.anaphoric and after.trailing and words and set(words) <= _PAIR_JOINS:
+            out[index] = replace(share, base=after.base, trailing=True, paired=True)
+    return out
 
 
 def sheet_bases(sheet: str) -> dict[float, set[str]]:
@@ -182,6 +237,18 @@ def _unnamed_base_violation(sentence: str, share: Share, earlier: Share, bases: 
     )
 
 
+def _borrowed_base_violation(sentence: str, share: Share, bases: dict[float, set[str]]) -> str | None:
+    """A paired share whose borrowed base is not the one the sheet takes it from ("pressured on 26% and
+    30% of his charted dropbacks", where the sheet takes the 26% from all his dropbacks)."""
+    mine = _bases_of(share, bases)
+    if not share.paired or not mine or share.base in mine:
+        return None
+    return (
+        f'The share "{share.raw}" borrows the base of the share after it, which is not its own, in the sentence '
+        f'"{sentence}". Name each share\'s own base in full, as in "30% of all 179 charted dropbacks".'
+    )
+
+
 def _sentence_violation(
     sentence: str, shares: Sequence[Share], previous: Share | None, bases: dict[float, set[str]]
 ) -> str | None:
@@ -189,7 +256,9 @@ def _sentence_violation(
         if share.anaphoric:
             return _anaphor_violation(sentence, share)
         earlier = shares[index - 1] if index > 0 else previous
-        violation = None if earlier is None else _unnamed_base_violation(sentence, share, earlier, bases)
+        violation = _borrowed_base_violation(sentence, share, bases)
+        if violation is None and earlier is not None:
+            violation = _unnamed_base_violation(sentence, share, earlier, bases)
         if violation is not None:
             return violation
     return None

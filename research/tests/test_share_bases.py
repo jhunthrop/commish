@@ -5,7 +5,7 @@ import pytest
 
 from research.capsules.prompt import IN_SEASON_RULES, PRESEASON_RULES
 from research.capsules.season_voice import SeasonClock
-from research.capsules.share_bases import base_violations, sheet_bases
+from research.capsules.share_bases import base_violations, shares_in, sheet_bases
 from research.capsules.validate import Grounding, validate_narrative_slot
 
 SHEET = """Fact sheet:
@@ -14,6 +14,7 @@ SHEET = """Fact sheet:
 - 41.0% air-yards share: worth +2.7 a game (net of 2 factors).
 - Air yards share: 34% of his team's air yards in his games (350 of 1349).
 - 30.8% red-zone touch share: worth -10.2 a game. 15.4% inside-ten touch share: worth -4.8 a game.
+- Inside 2024: target share 20% to 14%. His 2023 target share: 24.0%.
 - Inside 2025, weeks 1 to 4 of 2025 against weeks 15 to 18 of 2025: snap share 97% to 89%.
 - NE in 2025: 34.6 seconds a play, 54% of situation-neutral plays passes, 14 wins.
 This season's usage and play (weeks 1 to 5 of 2026):
@@ -120,6 +121,47 @@ def test_a_second_share_on_another_base_without_its_own_is_refused(text: str, se
 )
 def test_shares_that_name_their_base_or_share_one_pass(text: str) -> None:
     assert base_violations(text, SHEET) == []
+
+
+# The review's M1: a base named once after a pair joined by "and", "or" or "to" covers both shares.
+@pytest.mark.parametrize(
+    "text",
+    [
+        "His air yards share is 34%, and he played between 97% and 89% of the snaps across 2025.",
+        "His air yards share is 34%, and he went from 20% to 14% of the targets across 2024.",
+        "His target share was 24% in 2023. He played 97% and 89% of the snaps in the two halves of 2025.",
+        # A pair with a base on each.
+        "He played 97% of the snaps and 34% of the team's air yards in 2025.",
+    ],
+)
+def test_a_pair_shares_the_base_that_trails_it(text: str) -> None:
+    assert base_violations(text, SHEET) == []
+
+
+def test_a_pair_never_lends_a_share_a_base_the_sheet_does_not_give_it() -> None:
+    text = "He is pressured on 26% and 30% of his charted dropbacks."
+    violations = base_violations(text, SHEET)
+    assert len(violations) == 1, violations
+    assert "borrows the base" in violations[0]
+    assert f'"{text}"' in violations[0]
+
+
+# The review's M2, ruled not taken: a base passed along by a carrier stands as named.
+def test_a_base_passed_along_by_a_carrier_stands() -> None:
+    assert base_violations("His red-zone share is 22% this season, up from 13.3% last year.", SHEET) == []
+
+
+# The review's L2, noted and not taken: a bare "share" stands as named, and "of ..." after it is read on.
+def test_a_bare_share_stands_as_named_and_reads_on_to_its_of() -> None:
+    assert base_violations("He is pressured on 26% of his dropbacks and sees a 30% share.", SHEET) == []
+    shares = shares_in("A 9.0% share of targets and a 96% snap share.")
+    assert [share.base for share in shares] == ["target", "snap"]
+
+
+# A joining word or a determiner starts a new clause, never a base ("49.2% and his target share").
+def test_a_base_never_reaches_across_a_joining_word() -> None:
+    shares = shares_in("His snap share was 96.0% and his target share 0.3%.")
+    assert [share.base for share in shares] == ["snap", "target"]
 
 
 OCTOBER = SeasonClock(2026, 5, (1, 2, 3, 4, 5), ())
