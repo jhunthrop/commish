@@ -4,7 +4,8 @@ The weekly round 4's market benchmark for touchdowns (preregistration §2.9): Th
 `player_anytime_td` (the key checked against a live answer on 2026-10-16: every US book quotes a Yes
 price per player, none a No), captured in each kickoff slot's window (`kickoff_slots`) for that
 slot's events, from the US, second US and European regions (`TD_REGIONS`) so books that quote a No
-are read too. One event's call spends one credit per region, three in all, and the answer's
+are read too. The recorded three-region answer (2026-10-16, HOU at JAX) held 14 books, all US, and
+not one No price: until a book quotes one, `no_price` stays NULL and §3.3's benchmark is partial. One event's call spends one credit per region, three in all, and the answer's
 `x-requests-remaining` is the plan's balance, printed every pass. Two extra calls are bounded per
 slot: a refused answer rolls back the slot's rows (credits spent) and the next hour's pass takes it
 again, and an event with no market yet is taken again in the same window. Never an input, never on

@@ -117,6 +117,14 @@ def test_every_book_quotes_a_yes_price_per_player() -> None:
     assert first.commence_time == datetime(2026, 10, 18, 13, 30, tzinfo=UTC)
 
 
+def test_the_three_region_answer_quotes_no_no_price() -> None:
+    """Recorded 2026-10-16 for HOU at JAX across us, us2 and eu: 14 books, all US, Yes prices only."""
+    payload = json.loads((TESTDATA / f"odds/event-{_EVENT}-player_anytime_td-us-us2-eu.json").read_text())
+    parsed = touchdowns.parse_td_response(payload, datetime(2026, 10, 16, 21, 30, tzinfo=UTC))
+    assert len({o.bookmaker for o in parsed.observations}) == 14  # noqa: PLR2004 - the recorded books
+    assert all(o.no_price is None for o in parsed.observations)
+
+
 def test_an_unknown_market_or_side_is_refused() -> None:
     payload = _td()
     assert isinstance(payload, dict)
