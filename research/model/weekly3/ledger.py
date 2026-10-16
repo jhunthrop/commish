@@ -23,15 +23,41 @@ at the season's first instant; its stamp's week is 0, the whole season).
 
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Final, Literal, Protocol
 
 from research.errors import ResearchError
 from research.model.reads.stamps import Newest, newest_of
 
-ReadKind = Literal["box", "filings", "rate", "prior"]
+ReadKind = Literal[
+    "box",
+    "filings",
+    "rate",
+    "prior",
+    # Round 4's kinds (its preregistration, section 5 and amendment 1 item 3), on the same wrapper.
+    "plays",
+    "charted",
+    "figures",
+    "live_figures",
+    "weather",
+    "depth",
+    "depth_prior",
+    "forecast",
+    "schedule",
+]
 KINDS: Final[tuple[ReadKind, ...]] = ("box", "filings", "rate", "prior")
 SEASON_WIDE: Final = 0  # the week a `prior` stamp carries: the whole of the season before
+ONE_MS: Final = timedelta(milliseconds=1)
+# Week W's own rows: the filings (round 4 item 1), the game's figures (item 2, replay at the kickoff,
+# live at or before t_g), the recorded weather (item 3), the depth chart (item 6), the live forecast
+# and the schedule knowledge (item 4). Every other kind but `prior` reads weeks before W only.
+_WEEK_W: Final[frozenset[ReadKind]] = frozenset(
+    {"filings", "figures", "live_figures", "weather", "depth", "forecast", "schedule"}
+)
+# Item 6's fallback when the depth chart stamp check fails: week W-1's chart.
+_WEEK_BEFORE: Final[frozenset[ReadKind]] = frozenset({"depth_prior"})
+# Admitted at t_g by name whatever their stamp (item 3: "the window is no part of the rule"; item 4).
+_UNSTAMPED: Final[frozenset[ReadKind]] = frozenset({"weather", "schedule"})
 
 
 class InputRuleError(ResearchError):
@@ -59,17 +85,43 @@ class Stamp:
     rows: int
 
 
-def _row_breaks(kind: ReadKind, season: int, week: int, moment: datetime, row: Stamped) -> str | None:
-    if row.as_of > moment:
-        return f"a row stamped {row.as_of.isoformat()}, after the instant {moment.isoformat()}"
+def _wanted_week(kind: ReadKind, week: int) -> int | None:
+    """The one week a week-W kind reads, or None for a kind that reads weeks before W."""
+    if kind in _WEEK_W:
+        return week
+    return week - 1 if kind in _WEEK_BEFORE else None
+
+
+def _stamp_breaks(kind: ReadKind, moment: datetime, as_of: datetime) -> str | None:
+    """Round 3's stamp rule with round 4's two exceptions: the closing figure is the figure at the
+    kickoff, one millisecond after t_g, and the recorded weather and the schedule are admitted by name."""
+    if kind in _UNSTAMPED:
+        return None
+    if kind == "figures":
+        kickoff = moment + ONE_MS
+        return (
+            None if as_of <= kickoff else f"a row stamped {as_of.isoformat()}, after the kickoff {kickoff.isoformat()}"
+        )
+    return None if as_of <= moment else f"a row stamped {as_of.isoformat()}, after the instant {moment.isoformat()}"
+
+
+def _week_breaks(kind: ReadKind, season: int, week: int, row_season: int, row_week: int) -> str | None:
     if kind == "prior":
-        return None if row.season < season else f"a {row.season} row in the read of the season before {season}"
+        return None if row_season < season else f"a {row_season} row in the read of the season before {season}"
     if kind == "filings":
-        same = row.season == season and row.week == week
-        return None if same else f"a {row.season} week {row.week} filing in the read of {season} week {week}'s"
-    if row.season != season or row.week >= week:
-        return f"a {row.season} week {row.week} row in a read for {season} week {week}"
+        same = row_season == season and row_week == week
+        return None if same else f"a {row_season} week {row_week} filing in the read of {season} week {week}'s"
+    wanted = _wanted_week(kind, week)
+    if wanted is not None:
+        same = row_season == season and row_week == wanted
+        return None if same else f"a {row_season} week {row_week} row in the {kind} read of {season} week {week}"
+    if row_season != season or row_week >= week:
+        return f"a {row_season} week {row_week} row in a read for {season} week {week}"
     return None
+
+
+def _row_breaks(kind: ReadKind, season: int, week: int, moment: datetime, row: Stamped) -> str | None:
+    return _stamp_breaks(kind, moment, row.as_of) or _week_breaks(kind, season, week, row.season, row.week)
 
 
 def admit(rows: Sequence[Stamped], season: int, week: int, moment: datetime, kind: ReadKind) -> Stamp:
@@ -87,13 +139,14 @@ def violation(stamp: Stamp) -> str | None:
     found = stamp.newest
     if found is None:
         return None
-    if found.as_of > stamp.moment:
+    if _stamp_breaks(stamp.kind, stamp.moment, found.as_of) is not None:
         return f"{stamp.kind} read for {stamp.season} week {stamp.week} saw a row stamped after its instant"
     if stamp.kind == "prior":
         return None if found.season < stamp.season else f"prior read for {stamp.season} saw its own season"
-    if stamp.kind == "filings":
-        same = (found.season, found.week) == (stamp.season, stamp.week)
-        return None if same else f"filings read for {stamp.season} week {stamp.week} saw another week"
+    wanted = _wanted_week(stamp.kind, stamp.week)
+    if wanted is not None:
+        same = (found.season, found.week) == (stamp.season, wanted)
+        return None if same else f"{stamp.kind} read for {stamp.season} week {stamp.week} saw another week"
     if (found.season, found.week) >= (stamp.season, stamp.week):
         return f"{stamp.kind} read for {stamp.season} week {stamp.week} saw week {found.week}"
     return None
