@@ -66,16 +66,21 @@ func (d Designation) SeasonLong() bool { return SeasonLong(d.Status(), d.Note) }
 // reads the same.
 func (s *PGSource) Designations(ctx context.Context) (map[string]Designation, error) {
 	for _, source := range []string{injuriesByDate, injuriesRosterWide} {
-		out, found, err := s.newestCapture(ctx, source)
+		out, storedNewest, found, err := s.newestCapture(ctx, source)
 		if err != nil {
 			return nil, err
 		}
 		if !found {
 			continue
 		}
-		checked, err := s.lastChecked(ctx, source)
-		if err != nil {
-			return nil, err
+		// The feed's last check is this list's only when it is the newest
+		// stored: a check that returned a list the floor refused never
+		// vouches for the older list shown.
+		var checked *time.Time
+		if storedNewest {
+			if checked, err = s.lastChecked(ctx, source); err != nil {
+				return nil, err
+			}
 		}
 		for id, d := range out {
 			d.CheckedAt = checked
@@ -100,15 +105,16 @@ type capture struct {
 	err     error
 }
 
-// newestCapture is the source's newest capture that reads, found false
-// when the source has none at all.
-func (s *PGSource) newestCapture(ctx context.Context, source string) (map[string]Designation, bool, error) {
+// newestCapture is the source's newest capture that reads, storedNewest
+// when it is the newest the source stores, found false when the source
+// has none at all.
+func (s *PGSource) newestCapture(ctx context.Context, source string) (out map[string]Designation, storedNewest, found bool, err error) {
 	captures, err := s.captures(ctx, source, capturesTried+1, time.Time{})
 	if err != nil {
-		return nil, false, err
+		return nil, false, false, err
 	}
 	if len(captures) == 0 {
-		return nil, false, nil
+		return nil, false, false, nil
 	}
 	var lastErr error
 	for i := 0; i < len(captures) && i < capturesTried; i++ {
@@ -117,14 +123,14 @@ func (s *PGSource) newestCapture(ctx context.Context, source string) (map[string
 			lastErr = err
 			continue
 		}
-		out := make(map[string]Designation, len(c.entries))
+		out = make(map[string]Designation, len(c.entries))
 		for id, e := range c.entries {
 			out[id] = Designation{Code: e.code, Note: e.note, AsOf: c.at.UTC(), Source: source}
 		}
-		return out, true, nil
+		return out, i == 0, true, nil
 	}
 	tried := min(len(captures), capturesTried)
-	return nil, true, fmt.Errorf("boards: none of the %d newest injury captures %s reads: %w", tried, source, lastErr)
+	return nil, false, true, fmt.Errorf("boards: none of the %d newest injury captures %s reads: %w", tried, source, lastErr)
 }
 
 // captures is the source's newest n captures, newest first, each parsed,
@@ -271,7 +277,10 @@ type RunKey struct {
 func (s *PGSource) SeasonRuns(ctx context.Context, newest time.Time) (map[RunKey]time.Time, error) {
 	codes, statuses := seasonLongCodes()
 	query := `with listed_caps as (
-  select payload, captured_at, jsonb_array_length(payload->'injList') as n_listed
+  select payload, captured_at, (
+    select count(distinct btrim(e->>'playerID')) from jsonb_array_elements(payload->'injList') as e
+    where btrim(coalesce(e->>'playerID', '')) <> '' and btrim(coalesce(e->>'designation', '')) <> ''
+  ) as n_listed
   from ` + s.table("capture_snapshots") + `
   where source = $1 and captured_at <= $2 and captured_at > $3 and jsonb_typeof(payload->'injList') = 'array'
 ), floored as (

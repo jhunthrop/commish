@@ -239,6 +239,20 @@ func TestDesignationFloorChecksAndNotes(t *testing.T) {
 	if _, listed := d["p1"]; listed {
 		t.Fatal("a lapsed injured reserve still shows")
 	}
+	// The 16:00 pass returns an empty list, which the floor refuses: the
+	// 13:00 list shows, and the 16:00 check never vouches for it.
+	for _, q := range []string{
+		`insert into ` + schema + `.capture_snapshots values ('tank01_injuries_by_date', '{"injList": []}', '2026-10-13 16:00:00+00')`,
+		`update ` + schema + `.capture_checks set checked_at = '2026-10-13 16:00:00+00'`,
+	} {
+		if _, err := pool.Exec(ctx, q); err != nil {
+			t.Fatal(err)
+		}
+	}
+	d, err = src.Designations(ctx)
+	if err != nil || d["p3"].Code != "D" || d["p3"].CheckedAt != nil {
+		t.Fatalf("designations %+v (%v): the older list shown, with no check named", d, err)
+	}
 }
 
 func TestNoCaptureIsNoDesignations(t *testing.T) {
