@@ -5,7 +5,12 @@
 //   - position_rank and points_over_replacement are the run's PPR board row, as served;
 //   - last_games are the run's game logs scored with the league's own rules (its scoring settings);
 //   - opponent, home, kickoff and bye are the run's schedule;
-//   - designation, points_this_week and allowed_to_position are not held by the run: absent (null).
+//   - designation, points_this_week and allowed_to_position are not held by the run: absent (null);
+//   - game_total, spread, roof and weather are each club's facts in data/games.json, which is GET
+//     /games/week's answer for the week recorded from the research store (Lane 66a, read from the
+//     lane66a_scratch copy of dev on 2026-10-16: the figures from nflverse's game table, since the
+//     store held no hourly figures for week 6, the weather service's forecasts of that day, the venues
+//     of the stadium table, with the API's rounding and sides). serve.ts answers that route from it.
 // The lineups, the drops and the trades come from a plain stand-in for the API's engine (§4.2 on the
 // run's rest-of-season order, flex by points over replacement), and a gain a week is the change in a
 // lineup's summed points over replacement divided by the weeks the rest-of-season order covers (the
@@ -34,6 +39,8 @@ import type {
 	WaiverRow,
 	WeekFacts
 } from '../../src/lib/league/inseason/api.ts';
+
+import type { GameWeek } from '../../src/lib/format/game-facts.ts';
 
 const REPLAY = new URL('../../../api/internal/leaguesync/replay/sleeper/', import.meta.url);
 const RUNS = new URL('../../.runs/runs/', import.meta.url);
@@ -267,8 +274,15 @@ async function lastGames(boardId: string | null): Promise<WeekFacts['last_games'
 		.map((g) => ({ week: g.week, points: leaguePoints(g) }));
 }
 
+/** The week's game facts by club, GET /games/week's recorded answer. */
+const gameFacts = new Map(
+	(await json<GameWeek>(new URL('games.json', OUT))).games.map((g) => [g.team, g] as const)
+);
+const NO_FACTS = { game_total: null, spread: null, roof: null, weather: null } as const;
+
 async function factsFor(team: string, boardId: string | null): Promise<WeekFacts> {
 	const game = games.get(team)?.find((g) => g.week === week) ?? null;
+	const held = game === null ? undefined : gameFacts.get(team);
 	return {
 		week,
 		opponent: game?.opponent ?? null,
@@ -279,7 +293,15 @@ async function factsFor(team: string, boardId: string | null): Promise<WeekFacts
 		played: false,
 		points_this_week: null,
 		last_games: await lastGames(boardId),
-		allowed_to_position: null
+		allowed_to_position: null,
+		...(held === undefined
+			? NO_FACTS
+			: {
+					game_total: held.game_total,
+					spread: held.spread,
+					roof: held.roof,
+					weather: held.weather
+				})
 	};
 }
 
