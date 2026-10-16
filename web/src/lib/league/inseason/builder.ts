@@ -133,5 +133,5 @@ export const BUILDER_LINES = {
 	checking: 'Checking the trade',
 	notNow: 'Not now',
 	/** A side already holding two: said over its rows, which wait for one put back. */
-	full: 'Two picked, tap one to swap'
+	full: 'Two picked, tap one to put him back'
 } as const;

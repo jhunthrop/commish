@@ -102,7 +102,7 @@ void test('the answer line asks for what is missing, and says it is checking onc
 	assert.equal(pickPrompt({ team: 3, give: ['a'], get: [] }), BUILDER_LINES.pickTheirs);
 	assert.equal(pickPrompt({ team: 3, give: ['a'], get: ['b'] }), BUILDER_LINES.checking);
 	assert.equal(BUILDER_LINES.checking, 'Checking the trade');
-	assert.equal(BUILDER_LINES.full, 'Two picked, tap one to swap');
+	assert.equal(BUILDER_LINES.full, 'Two picked, tap one to put him back');
 });
 
 void test('the answer line says what each lineup gains or loses, in points over replacement a week', () => {

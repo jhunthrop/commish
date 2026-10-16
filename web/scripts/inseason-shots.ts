@@ -340,7 +340,7 @@ for (const theme of THEMES) {
 		// Two given: the side says why its other rows wait, in words, not a tooltip.
 		await page
 			.locator(`${builder} section[aria-label="You give"] .full`)
-			.getByText('Two picked, tap one to swap')
+			.getByText('Two picked, tap one to put him back')
 			.waitFor({ timeout: READY_TIMEOUT_MS });
 		await shot('short');
 		await ctx.close();
