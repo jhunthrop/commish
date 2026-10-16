@@ -1,9 +1,7 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { siteContext } from '#lib/context/context.svelte.ts';
 	import ContextNote from '#lib/context/ContextNote.svelte';
-	import { captureLine } from '#lib/format/designation.ts';
-	import { HELD_OUT_METHOD } from '#lib/run/status-view.ts';
-	import { memberClock } from '#lib/format/member-clock.svelte.ts';
 	import { fixed, plural } from '#lib/format/number.ts';
 	import {
 		allLine,
@@ -60,14 +58,23 @@
 
 	const lines = $derived(weekLines(record.weeks, data.page.unplayed).map(withFigure));
 
-	/** The capture's read on the member's clock once the page is live (Eastern as built). */
-	const zone = memberClock();
-	/** How the board treats a player on a season-long list, and that the record grades it as frozen. */
-	const statusWords = $derived(
-		data.page.statusRead === null
-			? null
-			: `${captureLine(data.page.statusRead, zone())} ${HELD_OUT_METHOD}`
-	);
+	/** The capture's read as built, said again on the member's clock once the page is live. */
+	// Said again on the member's clock once the page is live, from words loaded after the first paint,
+	// so the page's first script carries neither the clock nor the words (run/status-view.ts).
+	let live = $state<{ zone: string; words: typeof import('#lib/run/status-view.ts') } | null>(null);
+	onMount(() => {
+		if (data.page.statusRead === null) return;
+		void import('#lib/run/status-view.ts').then((words) => {
+			live = { zone: Intl.DateTimeFormat().resolvedOptions().timeZone, words };
+		});
+	});
+	const statusWords = $derived.by(() => {
+		const clock = live;
+		const read = data.page.statusRead;
+		return clock === null || read === null
+			? data.page.statusWords
+			: clock.words.recordStatusWords(read, clock.zone);
+	});
 
 	const positionColumns: Column[] = [
 		{ label: 'Position' },

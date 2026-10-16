@@ -24,9 +24,7 @@
 	import { apiFormatOf } from '#lib/run/format-ids.ts';
 	import { heldOut } from '#lib/run/board-status.ts';
 	import type { BoardRowView } from '#lib/run/schema.ts';
-	import { statusView, type StatusView } from '#lib/run/status-view.ts';
-	import { captureLine } from '#lib/format/designation.ts';
-	import { memberClock } from '#lib/format/member-clock.svelte.ts';
+	import type { StatusView } from '#lib/run/status-view.ts';
 	import { links, tierAnchor } from './links.ts';
 
 	interface Props {
@@ -75,22 +73,34 @@
 		return !onlySheet || lazySheet.has(row.id);
 	}
 
-	/** The capture's times on the member's clock once the page is live (Eastern as built). */
-	const zone = memberClock();
-	/** A listed player's status as his row prints it. */
-	function status(player: BoardRowView): StatusView | null {
-		if (player.status === undefined || page.statusRead === null) return null;
-		return statusView(
-			player.status,
+	/** The status words as built, said again on the member's clock once the page is live. */
+	// Said again on the member's clock once the page is live, from words loaded after the first paint,
+	// so the page's first script carries neither the clock nor the words (run/status-view.ts).
+	let live = $state<{ zone: string; words: typeof import('#lib/run/status-view.ts') } | null>(null);
+	onMount(() => {
+		if (page.statusRead === null) return;
+		void import('#lib/run/status-view.ts').then((words) => {
+			live = { zone: Intl.DateTimeFormat().resolvedOptions().timeZone, words };
+		});
+	});
+	const words = $derived.by(() => {
+		const clock = live;
+		if (clock === null || page.statusRead === null) return page.statusWords;
+		return clock.words.boardStatusWords(
+			page.rows,
 			page.statusRead,
 			page.format.rosFromWeek !== undefined,
-			zone()
+			clock.zone
 		);
+	});
+	/** A listed player's status as his row prints it. */
+	function status(player: BoardRowView): StatusView | null {
+		return words?.rows[player.id] ?? null;
 	}
 	/** The basis line, and the capture's sentence when the run carries one. */
 	const lead = $derived.by(() => {
 		const basis = page.seasonLead ?? page.format.basis.join(' · ');
-		return page.statusRead === null ? basis : `${basis} ${captureLine(page.statusRead, zone())}`;
+		return words === null ? basis : `${basis} ${words.capture}`;
 	});
 
 	/** A position view draws its tiers from the available players: a player on a season-long list

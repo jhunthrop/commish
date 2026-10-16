@@ -46,6 +46,10 @@ const FORM_PARTS =
  * client too, and land it on every page that reads the API.) */
 const LEAGUE_PAGE_PARTS =
 	/[\\/]src[\\/]lib[\\/](league[\\/](LeagueRow|board|model|api|follow-switch\.svelte|phase-words|sheet-tags)\.|league[\\/]inseason[\\/]|context[\\/]choose\.svelte\.|format[\\/]clock\.|ui[\\/]rail-order\.)/;
+/** A player's injury status in words on the member's clock (Lane 63): the designation's words, which
+ * the league's screens import and the board, player and record pages load after their first paint.
+ * Kept out of the shared chunk by name, as the league's parts are. */
+const STATUS_PARTS = /[\\/]src[\\/]lib[\\/](format[\\/]designation\.|run[\\/]status-view\.)/;
 /** A component joins the shared chunk once this many routes use it. Fewer, and every page would
  * carry code only a couple of pages run. */
 const SHARED_BY_ROUTES = 4;
@@ -95,6 +99,7 @@ export default defineConfig({
 								!BOARD_PARTS.test(id) &&
 								!PLAYER_PARTS.test(id) &&
 								!FIGURE_PARTS.test(id) &&
+								!STATUS_PARTS.test(id) &&
 								!LEAGUE_PAGE_PARTS.test(id),
 							minShareCount: SHARED_BY_ROUTES,
 							priority: 1

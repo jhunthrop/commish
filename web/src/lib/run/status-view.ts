@@ -1,5 +1,6 @@
 /** What a board row or a player page prints for a player the injury capture lists (Lane 63). */
 import {
+	captureLine,
 	designationMark,
 	designationWord,
 	rankWord,
@@ -51,3 +52,47 @@ export function weekNote(status: PlayerStatus['status']): string {
 /** The record's method words beside the capture's: the frozen boards it grades never moved anyone. */
 export const HELD_OUT_METHOD =
 	"The board puts a player on a season-long list below the available players at his position. The record grades each week's board as it froze, before that move.";
+
+/** The clock a page is built on: the NFL's, until the member's own is known in the browser. */
+export const BUILT_ZONE = 'America/New_York';
+
+/** One board view's status words: the capture's sentence for the basis line, and each listed row's. */
+export interface BoardStatusWords {
+	capture: string;
+	rows: Readonly<Record<string, StatusView>>;
+}
+
+export function boardStatusWords(
+	rows: readonly { id: string; status?: PlayerStatus }[],
+	readAt: string,
+	restOfSeason: boolean,
+	zone: string
+): BoardStatusWords {
+	const listed = rows.flatMap((row) =>
+		row.status === undefined
+			? []
+			: [[row.id, statusView(row.status, readAt, restOfSeason, zone)] as const]
+	);
+	return { capture: captureLine(readAt, zone), rows: Object.fromEntries(listed) };
+}
+
+/** A player page's status words: the mark and rank word, and the note under his figures. */
+export interface PlayerStatusWords {
+	view: StatusView;
+	note: string;
+}
+
+export function playerStatusWords(
+	status: PlayerStatus,
+	readAt: string,
+	restOfSeason: boolean,
+	zone: string
+): PlayerStatusWords {
+	const view = statusView(status, readAt, restOfSeason, zone);
+	return { view, note: `${view.line ?? weekNote(status.status)} ${captureLine(readAt, zone)}` };
+}
+
+/** The record's method words beside the capture's read. */
+export function recordStatusWords(readAt: string, zone: string): string {
+	return `${captureLine(readAt, zone)} ${HELD_OUT_METHOD}`;
+}

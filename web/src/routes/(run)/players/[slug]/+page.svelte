@@ -8,9 +8,6 @@
 	import { fixed, signed } from '#lib/format/number.ts';
 	import { POSITION_NAMES } from '#lib/run/derive.ts';
 	import { readFigures } from '#lib/run/read-figures.ts';
-	import { statusView, weekNote } from '#lib/run/status-view.ts';
-	import { captureLine } from '#lib/format/designation.ts';
-	import { memberClock } from '#lib/format/member-clock.svelte.ts';
 	import { UNWRITTEN_READ, unwrittenLines } from '#lib/run/unwritten-words.ts';
 	import Credit from '#lib/site/Credit.svelte';
 	import SheetAdd from '#lib/site/SheetAdd.svelte';
@@ -88,25 +85,30 @@
 					: { points: n.projected, fromWeek: lead.format.rosFromWeek }
 		})
 	);
-	/** The capture's times on the member's clock once the page is live (Eastern as built). */
-	const zone = memberClock();
-	/** His designation on the run's injury capture: a season-long one shows as his rank. */
-	const listed = $derived(
-		page.status === null
-			? null
-			: statusView(
-					page.status.status,
-					page.status.readAt,
-					lead.format.rosFromWeek !== undefined,
-					zone()
-				)
-	);
-	/** The status's sentence and where it comes from, under his figures. */
-	const statusNote = $derived(
-		page.status === null || listed === null
-			? null
-			: `${listed.line ?? weekNote(page.status.status.status)} ${captureLine(page.status.readAt, zone())}`
-	);
+	/** His status words as built, said again on the member's clock once the page is live. */
+	// Said again on the member's clock once the page is live, from words loaded after the first paint,
+	// so the page's first script carries neither the clock nor the words (run/status-view.ts).
+	let live = $state<{ zone: string; words: typeof import('#lib/run/status-view.ts') } | null>(null);
+	onMount(() => {
+		if (page.status === null) return;
+		void import('#lib/run/status-view.ts').then((words) => {
+			live = { zone: Intl.DateTimeFormat().resolvedOptions().timeZone, words };
+		});
+	});
+	const statusWords = $derived.by(() => {
+		const clock = live;
+		const status = page.status;
+		if (status === null || clock === null) return status?.words ?? null;
+		return clock.words.playerStatusWords(
+			status.status,
+			status.readAt,
+			page.format.rosFromWeek !== undefined,
+			clock.zone
+		);
+	});
+	/** A season-long status shows as his rank. */
+	const listed = $derived(statusWords?.view ?? null);
+	const statusNote = $derived(statusWords?.note ?? null);
 	const mates = $derived(
 		page.tier.mates.map((mate) => ({ ...mate, href: links.player(mate.slug) }))
 	);

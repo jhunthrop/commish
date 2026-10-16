@@ -13,6 +13,7 @@ import type {
 } from '#lib/run/schema.ts';
 import type { Position } from '#lib/types/player.ts';
 import type { TierCliff } from '#lib/ui/tier.ts';
+import { BUILT_ZONE, playerStatusWords, type PlayerStatusWords } from '#lib/run/status-view.ts';
 import { seasonView, type KickoffOf, type SeasonView } from './player-season.ts';
 import {
 	adp,
@@ -90,7 +91,7 @@ export interface PlayerPage {
 	underway: boolean;
 	/** His designation on the run's injury capture, null when it does not list him or the run
 	 * carries no capture; with when the capture was read. */
-	status: { status: PlayerStatus; readAt: string } | null;
+	status: { status: PlayerStatus; readAt: string; words: PlayerStatusWords } | null;
 }
 
 export async function playerEntries(): Promise<{ slug: string }[]> {
@@ -167,7 +168,6 @@ export async function playerPage(slug: string): Promise<PlayerPage> {
 		designations()
 	]);
 	const listed = capture?.players[entry.id];
-	const status = capture && listed ? { status: listed, readAt: capture.readAt } : null;
 	const lines = await linesFor(run.formats, loaded.formats, sources.sources, {
 		year: run.season,
 		underway,
@@ -175,6 +175,15 @@ export async function playerPage(slug: string): Promise<PlayerPage> {
 	});
 	const [lead] = lines;
 	if (!lead) throw new Error(`${loaded.name} has a page but no format ranks him.`);
+	const restOfSeason = lead.format.rosFromWeek !== undefined;
+	const status =
+		capture && listed
+			? {
+					status: listed,
+					readAt: capture.readAt,
+					words: playerStatusWords(listed, capture.readAt, restOfSeason, BUILT_ZONE)
+				}
+			: null;
 	return {
 		id: loaded.id,
 		slug: loaded.slug,
