@@ -155,5 +155,11 @@
 		.desk {
 			display: none;
 		}
+
+		/* The game's facts set tighter on a phone, so with points a game at the row's end the first row
+		   still clears the pinned verb. Every sentence stays. */
+		.conditions {
+			line-height: 1.25;
+		}
 	}
 </style>

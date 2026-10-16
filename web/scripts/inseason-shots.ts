@@ -73,6 +73,27 @@ const PER_GAME_SCREENS = new Set(['start', 'waivers', 'trades']);
 const PER_GAME_BASIS =
 	/Points a game are our rest-of-season projection from week \d+ over the games his club has left, byes out\./;
 const PER_GAME = /\d+\.\d a game/;
+/** The screens whose rows end on their own figure, not on a gain: every row's end names its basis. */
+const OWN_END_SCREENS = new Set(['start', 'trades']);
+/** A row's end on those screens: points a game, or words saying why it has none. */
+const NAMED_END = /a game|No projection|Unranked/i;
+
+/** Every row under root whose end is a bare number or names no basis we expect, by player name. */
+async function unnamedEnds(page: Page, root: string): Promise<string[]> {
+	return page.evaluate(
+		([scope, pattern]) =>
+			[...document.querySelectorAll(`${scope} .row`)].flatMap((row) => {
+				const end = row.querySelector('.end');
+				if (!end) return [];
+				const bare = end.querySelector('.bare') !== null;
+				const text = (end as HTMLElement).innerText;
+				return bare || !new RegExp(pattern, 'i').test(text)
+					? [row.querySelector('b')?.textContent ?? '?']
+					: [];
+			}),
+		[root, NAMED_END.source] as const
+	);
+}
 const missing: string[] = [];
 const rows = new Map<string, number>();
 const under: string[] = [];
@@ -108,6 +129,11 @@ for (const { name, path, ready: text } of PAGES) {
 				if (!PER_GAME_BASIS.test(said.basis))
 					missing.push(`${name} ${theme} ${String(width)} basis`);
 				if (!PER_GAME.test(said.row)) missing.push(`${name} ${theme} ${String(width)} first row`);
+				if (OWN_END_SCREENS.has(name)) {
+					for (const who of await unnamedEnds(page, 'main')) {
+						missing.push(`${name} ${theme} ${String(width)} row end unnamed: ${who}`);
+					}
+				}
 			}
 			if (width === PHONE.width && name !== 'league' && name !== 'matchup') {
 				await page.setViewportSize(PHONE);
@@ -313,6 +339,9 @@ for (const theme of THEMES) {
 		const theirs = page.locator(`${builder} section[aria-label="You get"] button.pick`);
 		await yours.nth(1).click();
 		await theirs.first().click();
+		for (const who of await unnamedEnds(page, builder)) {
+			missing.push(`builder ${theme} ${String(width)} row end unnamed: ${who}`);
+		}
 		const picked = await answered(page);
 		builderLines.set(`picked ${theme} ${String(width)}`, picked);
 		if (!/You give .+ for .+\(\d+\.\d a game\)\./.test(picked)) {
