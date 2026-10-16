@@ -231,7 +231,11 @@ PER_GAME_AGAINST_SEASON: Final = named_rule(
 )
 # A points-a-game figure ("12.4 a game", "13 points per game"); "has not missed a game" is not one.
 _PER_GAME: Final = re.compile(r"\b(?P<rate>\d+(?:\.\d+)?)\s*(?:points?\s+)?(?:a|per)\s+game\b", re.IGNORECASE)
-_GAMES: Final = re.compile(r"\b(\d{1,2})\s+(?:expected\s+)?games\b", re.IGNORECASE)
+# The games a sentence states: "15 games", "15 expected games", and (the coordinator's ruling for Lane 52)
+# "over the 15 we expected" without the word; `_honest_rate` still holds the rate to them.
+_GAMES: Final = re.compile(
+    r"\b(\d{1,2})\s+(?:expected\s+)?games\b|\bover the (\d{1,2}) (?:games )?we expected\b", re.IGNORECASE
+)
 _FULL_SEASON_GAMES: Final = 17
 _RATE_TOLERANCE: Final = 0.1
 
@@ -239,7 +243,7 @@ _RATE_TOLERANCE: Final = 0.1
 def _honest_rate(season_points: float, rate: float, sentence: str) -> bool:
     """The season number read as points a game over the games the sentence states (or a full
     season): the per-game reading the TIME rule asks for, not a comparison of unlike things."""
-    games = [int(g) for g in _GAMES.findall(sentence)] + [_FULL_SEASON_GAMES]
+    games = [int(m.group(1) or m.group(2)) for m in _GAMES.finditer(sentence)] + [_FULL_SEASON_GAMES]
     return any(g > 0 and abs(season_points / g - rate) <= _RATE_TOLERANCE for g in games)
 
 

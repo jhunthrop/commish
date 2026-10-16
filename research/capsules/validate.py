@@ -27,6 +27,8 @@ from research.capsules.grounding import (
     proper_name_phrases,
     round_half_up,
 )
+from research.capsules.multiples import multiple_violations
+from research.capsules.own_rate import own_points_per_game, own_rate_violations
 from research.capsules.prose_checks import label_copies, label_violation, unfinished_ending, unfinished_violation
 from research.capsules.pull_figures import adp_figures_off_page, facts_page_numbers, pull_figures_of, renderings_of
 from research.capsules.rank_basis import rank_basis_violation, ranks_without_basis
@@ -82,7 +84,14 @@ _AVAILABILITY: Final = re.compile(
     r"sidelin|out for|stay(?:s|ing)? on the field|on the field for all",
     re.IGNORECASE,
 )
-_COST_CUE: Final = re.compile(r"\b(costs?|minus|down|shaves?)\b", re.IGNORECASE | re.ASCII)
+# The words that make a cited downside read as a cost ("costs him 6.2 a game"): the validator's own
+# list, quoted to the writer by the prompt and the correction (`prompt`, `corrections`).
+# "Dock" joined by the coordinator's ruling for Lane 52 ("our numbers dock him 6.2 a game" was 17 of 55
+# refusals in Lane 50's samples); the sentence still has to cite the downside's figure.
+COST_WORDS: Final = ("cost", "costs", "minus", "down", "shave", "shaves", "dock", "docks", "docked")
+# The cost words as the writer is shown them, quoted, in one place (the prompt, the correction, the note).
+COST_WORDS_SHOWN: Final = ", ".join(f'"{word}"' for word in COST_WORDS)
+_COST_CUE: Final = re.compile(rf"\b(?:{'|'.join(COST_WORDS)})\b", re.IGNORECASE | re.ASCII)
 _PRODUCT_CUE_AFTER: Final = re.compile(rf"^(?:['\u2019]s)?\s+(?:{'|'.join(COMPETITOR_PRODUCT_CUES)})\b", re.IGNORECASE)
 _ON_BEFORE: Final = re.compile(r"\bon\s+$", re.IGNORECASE)
 _SENTENCE_OPENERS: Final = re.compile(r"[\s\"'\u201c\u2018(]+$")
@@ -122,6 +131,8 @@ class Grounding:
     # This season's touchdowns and his first game (week, points), for the claims a read makes (`claims`).
     touchdowns: float | None = None
     first_game: tuple[int, float | None] | None = None
+    # His own points a game, the most a per-game cost or gain put on him may be (`own_rate`).
+    own_points_per_game: float | None = None
 
     @property
     def claims(self) -> ClaimLedger:
@@ -199,7 +210,7 @@ def strongest_negative_law_effect(facts: "PlayerFacts") -> float | None:
     return strongest
 
 
-def _cites_tension(text: str, tension: float) -> bool:
+def cites_tension(text: str, tension: float) -> bool:
     if any(is_derived_from_ledger(value, [tension], False) for _, value in extract_numbers(text)):
         return True
     magnitude = abs(tension)
@@ -224,6 +235,7 @@ def grounding_of(facts: "PlayerFacts") -> Grounding:
         claims.clock,
         claims.touchdowns,
         claims.first_game,
+        own_points_per_game(facts),
     )
 
 
@@ -289,16 +301,21 @@ def _validate(
     if trimmed == "":
         return ValidationResult(False, ("The completion was empty.",))
     words = word_count(trimmed)
-    if not band[0] <= words <= band[1]:
-        message = f"Word count {words} is outside the required {band[0]}-{band[1]} word band."
-        return ValidationResult(False, (message,), BandFailure(words, band[0], band[1]))
-    violations = [*_form_violations(trimmed), *_copy_violations(trimmed, source.name_ledger, source.clock)]
+    # A read out of its band is still read for every other rule, so its length correction asks for
+    # everything at once (Lane 52); the band failure leads its violations.
+    band_failure = None if band[0] <= words <= band[1] else BandFailure(words, band[0], band[1])
+    violations = (
+        [] if band_failure is None else [f"Word count {words} is outside the required {band[0]}-{band[1]} word band."]
+    )
+    violations += [*_form_violations(trimmed), *_copy_violations(trimmed, source.name_ledger, source.clock)]
     violations += _grounding_violations(trimmed, source)
     violations += claim_violations(trimmed, source.claims)
     violations += base_violations(trimmed, source.prompt_text)
+    violations += multiple_violations(trimmed)
+    violations += own_rate_violations(trimmed, source.own_points_per_game)
     if page_number and not names_missed_weeks(trimmed, source.clock):
         violations.append(missed_weeks_violation(source.clock))
-    if tension and source.tension is not None and not _cites_tension(trimmed, source.tension):
+    if tension and source.tension is not None and not cites_tension(trimmed, source.tension):
         figure = js_string(round_half_up(source.tension, 1))
         violations.append(
             f"Mixed evidence: the strongest downside ({figure} pts/game) is never cited. It has to appear, with that number, before the call."
@@ -313,7 +330,7 @@ def _validate(
     violations += [
         rank_basis_violation(claim) for claim in ranks_without_basis(trimmed, source.position, source.position_rank)
     ]
-    return ValidationResult(not violations, tuple(violations))
+    return ValidationResult(not violations, tuple(violations), band_failure)
 
 
 RANK_VIOLATION: Final = "The text states a board rank that is not his rank on the page"

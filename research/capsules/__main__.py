@@ -2,9 +2,10 @@
 
     facts <provider id>               one player's fact sheet (the narrow read), as JSON
     prompt <provider id>              the user message the writer would be sent for him
-    write [--players a,b] [--count 10] [--spread 50] [--budget CALLS]
+    write [--players a,b] [--count 10] [--spread 50] [--budget CALLS | --budget '$DOLLARS']
                                       write and gate capsules for chosen board players: paid calls,
-                                      never starting a player whose worst case would pass --budget
+                                      never starting a player whose worst case would pass --budget,
+                                      and never making a call past it (a hard stop at the gateway)
     sweep [--budget N]                the nightly sweep: every player whose facts moved (phase D's run)
     queue --slugs a,b                 stamp these pages' capsules (by their public slug) for the next
                                       capsule step to rewrite; every slug resolves or nothing is stamped
@@ -23,6 +24,7 @@ import logging
 import os
 import sys
 from collections.abc import Sequence
+from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -33,10 +35,12 @@ from research.capsules.config import CAPSULE_CONFIG, writer_settings
 from research.capsules.facts.collect_one import ServedBoardCache, collect_player_facts
 from research.capsules.facts.model import to_js
 from research.capsules.gateway import GatewayClient
+from research.capsules.gateway_ledger import fetch_price
 from research.capsules.narrative import narrative_requests_for
 from research.capsules.prompt import NO_WORN_PHRASES, bundle_prompt_for
 from research.capsules.requeue import queue_slugs
 from research.capsules.restamp import restamp_injury_day
+from research.capsules.run_budget import RunBudget, parse_budget
 from research.capsules.sweep import SweepPlan, sweep_capsules
 from research.capsules.transfer import export_capsules, import_capsules
 from research.capsules.trial import Choice, gate_written, write_chosen
@@ -71,24 +75,46 @@ def _facts(engine: Engine, player_id: str, prompt: bool) -> int:
     return 0
 
 
+def _priced(http: httpx.Client, gateway: GatewayClient, budget: RunBudget | None) -> RunBudget | None:
+    """A dollar budget with the model's list price read now; it fails the run before any call without one."""
+    if budget is None or budget.max_usd is None:
+        return budget
+    price = fetch_price(http, gateway.api_key, gateway.model)
+    if price.input_usd_per_million is None or price.output_usd_per_million is None:
+        raise ConfigurationError(f"a dollar budget needs {gateway.model}'s list price: {price.basis}")
+    return budget.priced(price)
+
+
 def _write(engine: Engine, choice: Choice) -> int:
     with httpx.Client() as http:
         gateway = _gateway(http)
+        budget = _priced(http, gateway, choice.budget)
         now = datetime.now(UTC)
-        trial = write_chosen(engine, gateway, now, choice)
+        trial = write_chosen(engine, gateway, now, replace(choice, budget=budget))
     for line in gate_written(engine, trial.written, now):
         _out(line)
+    if budget is not None:
+        _out(budget.line())
+    _throttle_alarm(gateway)
     if trial.unstarted:
         _out(
-            f"budget: {len(trial.unstarted)} chosen players not started, their worst case would pass "
-            f"{choice.call_budget} calls: {', '.join(trial.unstarted)}"
+            f"budget: {len(trial.unstarted)} chosen players not started, their worst case would pass what was "
+            f"left: {', '.join(trial.unstarted)}"
         )
     return 0 if all(not w.findings for w in trial.written) and not trial.unstarted else 1
 
 
+def _throttle_alarm(gateway: GatewayClient) -> None:
+    """The run's one loud line when its throttle pool ran dry (`throttle_waits`), as the nightly prints it."""
+    alarm = gateway.waits.line()
+    if alarm is not None:
+        _out(alarm)
+
+
 def _sweep(engine: Engine, budget: int) -> int:
     with httpx.Client() as http:
-        report = sweep_capsules(engine, _gateway(http), datetime.now(UTC), SweepPlan(budget))
+        gateway = _gateway(http)
+        report = sweep_capsules(engine, gateway, datetime.now(UTC), SweepPlan(budget))
     _out(
         f"capsule-sweep: {report.board_players} board players, {report.eligible} needed a fresh generation, "
         f"{len(report.processed)} processed ({report.llm} llm, {report.facts} facts blocks), {report.calls} calls, "
@@ -97,6 +123,7 @@ def _sweep(engine: Engine, budget: int) -> int:
     )
     for line in report.detail:
         _out(f"  {line}")
+    _throttle_alarm(gateway)
     return 0
 
 
@@ -149,9 +176,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     write.add_argument("--spread", type=int, default=50)
     write.add_argument(
         "--budget",
-        type=int,
+        type=parse_budget,
         default=None,
-        help="the run's gateway calls at most; a player starts only if his worst case fits",
+        help="the run's gateway calls at most (120) or its dollars ('$0.20'); a player starts only if his worst case fits",
     )
     sweep = sub.add_parser("sweep", help="the nightly sweep")
     sweep.add_argument("--budget", type=int, default=CAPSULE_CONFIG.sweep_generation_budget)

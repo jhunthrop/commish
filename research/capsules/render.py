@@ -37,7 +37,7 @@ from research.capsules.render_words import (
 )
 from research.capsules.voice_rules import in_fantasy_words
 from research.model.jsmath import js_round, js_to_fixed
-from research.pipeline.jscompat import js_string
+from research.pipeline.jscompat import js_number, js_string
 
 
 def _signed_percent(fraction: float) -> str:
@@ -88,16 +88,47 @@ def _availability_line(facts: PlayerFacts) -> str | None:
     if a is None:
         return None
     when = "Availability" if facts.season is None else f"Availability {AS_WE_SAW_IT}"
-    return (
+    line = (
         f"{when}: expected games {whole(a.expected_games)}, from {whole(a.floor_games)} to "
         f"{whole(a.ceiling_games)} {RISK_COUNTED}."
+    )
+    pace = preseason_pace_line(facts)
+    return line if pace is None else f"{line} {pace}"
+
+
+def preseason_pace_line(facts: PlayerFacts) -> str | None:
+    """In season, our preseason number as points a game over the games we expected, from the whole
+    numbers the sheet prints (Lane 52). The writer set his pace against the season total on 39
+    attempts of Lane 50's samples, which the time rule refuses; with a pace printed, a pace goes
+    against a pace."""
+    a = facts.availability
+    if facts.season is None or a is None:
+        return None
+    points, games = js_round(facts.projection.projected_points), js_round(a.expected_games)
+    if games < 1:
+        return None
+    return (
+        f"Our preseason pace: {js_to_fixed(points / games, 1)} points a game, our {js_string(points)} points over "
+        f"the {js_string(games)} games we expected."
+    )
+
+
+def law_line(item: LawEvidence) -> str:
+    """A law's figure with its basis, the coordinator's M3 ruling (Lane 52): the figure is the average
+    change in points a game among players in his spot from one season to the next (the law harness's
+    matched difference-in-differences), summed over the group's laws, never his own points."""
+    moved = "fell" if item.net_effect_points < 0 else "rose"
+    size = js_string(abs(js_number(js_to_fixed(item.net_effect_points, 1))))
+    net = f", net of {item.law_count} factors" if item.law_count > 1 else ""
+    return (
+        f"{in_fantasy_words(item.headline)}: among players in his spot, points a game {moved} {size} on average "
+        f"from one season to the next{net}."
     )
 
 
 def _evidence_line(item: EvidenceItem) -> str:
     if isinstance(item, LawEvidence):
-        net = f" (net of {item.law_count} factors)" if item.law_count > 1 else ""
-        return f"{in_fantasy_words(item.headline)}: worth {signed(item.net_effect_points)} a game{net}."
+        return law_line(item)
     if isinstance(item, ShareEvidence):
         verb = "grew" if item.kind == "offseason_share_gained" else "shrank"
         target, carry = _signed_percent(item.target_share_change), _signed_percent(item.carry_share_change)
