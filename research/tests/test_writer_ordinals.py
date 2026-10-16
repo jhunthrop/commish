@@ -19,6 +19,7 @@ LEDGER = [469.0, 4.9, 186.0]
         ("he sat 469th overall, WR186", [469.0]),
         ("We had him 443rd overall before the year.", [443.0]),
         ("he was the 2nd back and the 31st pick", [2.0, 31.0]),
+        ("his 1,000th yard, 12,345th play and 10000th snap", [1000.0, 12345.0, 10000.0]),
         ("1.1x touchdown share", [1.1]),
         ("He piled up 340yds and a 10x day", [340.0, 10.0]),
         ("the 49ers backfield", []),
@@ -48,6 +49,9 @@ def _grounding() -> Grounding:
         ("He piled up 34yds in week 5 of 2026.", "34"),
         ("That is a 300yd pace.", "300"),
         ("He is a 10x better runner in week 5 of 2026.", "10"),
+        # The re-review's N1: a comma-grouped or long ordinal is its whole number.
+        ("He reached his 1,000th yard in week 5 of 2026.", "1,000th"),
+        ("He played his 10000th snap in week 5 of 2026.", "10000th"),
     ],
 )
 def test_a_number_with_letters_after_it_is_still_traced(sentence: str, untraced: str) -> None:

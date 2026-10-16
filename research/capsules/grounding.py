@@ -40,7 +40,11 @@ _TENS: Final = {
 _UNITS: Final = ("one", "two", "three", "four", "five", "six", "seven", "eight", "nine")
 _CARDINAL_WORD: Final = re.compile(rf"\b({'|'.join(_CARDINALS)})\b", re.IGNORECASE | re.ASCII)
 _COMPOUND: Final = re.compile(rf"\b({'|'.join(_TENS)})(?:[-\s]({'|'.join(_UNITS)}))?\b", re.IGNORECASE | re.ASCII)
-_ORDINAL: Final = re.compile(r"\b([1-9][0-9]{0,3})(st|nd|rd|th)\b", re.IGNORECASE | re.ASCII)
+# An ordinal of any size, comma-grouped or not ("469th", "1,000th", "10000th"), read as its whole number
+# (the re-review's N1); the digit-run reader leaves every ordinal ending to this one.
+_ORDINAL: Final = re.compile(
+    r"(?<![A-Za-z0-9,])([1-9][0-9]{0,2}(?:,[0-9]{3})+|[1-9][0-9]*)(st|nd|rd|th)\b", re.IGNORECASE | re.ASCII
+)
 _LOOSE_UNITS: Final = ((100, 10), (1000, 100))
 _EPSILON: Final = 2.220446049250313e-16
 
@@ -60,7 +64,7 @@ def extract_numbers(text: str) -> list[tuple[str, float]]:
         )
     without_compounds = _COMPOUND.sub(" ", text)
     numbers += [(m.group(0), _CARDINALS[m.group(1).lower()]) for m in _CARDINAL_WORD.finditer(without_compounds)]
-    numbers += [(m.group(0), js_number(m.group(1))) for m in _ORDINAL.finditer(text)]
+    numbers += [(m.group(0), js_number(m.group(1).replace(",", ""))) for m in _ORDINAL.finditer(text)]
     return numbers
 
 
