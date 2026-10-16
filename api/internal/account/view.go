@@ -14,6 +14,7 @@ import (
 	"github.com/jhunthrop/commish/api/internal/apitypes"
 	"github.com/jhunthrop/commish/api/internal/auth"
 	"github.com/jhunthrop/commish/api/internal/entitlements"
+	"github.com/jhunthrop/commish/api/internal/season"
 )
 
 // Entitlements is the part of entitlements.Store the view reads.
@@ -30,7 +31,26 @@ type Viewer struct {
 	// every league followed, and the format pages open in. Nil answers
 	// none.
 	Leagues Leagues
-	Now     func() time.Time
+	// Season answers the site's season (*season.Site). Nil answers
+	// unwired, saying so.
+	Season Season
+	Now    func() time.Time
+}
+
+// Season is the site's season source. *season.Site implements it.
+type Season interface {
+	Phase(ctx context.Context) season.SitePhase
+}
+
+// unwired is the site's season with no source: the preseason, saying so.
+var unwired = season.SitePhase{Phase: season.SitePreseason, Basis: "The site's season is not read here."}
+
+func (v *Viewer) season(ctx context.Context) apitypes.SiteSeason {
+	p := unwired
+	if v.Season != nil {
+		p = v.Season.Phase(ctx)
+	}
+	return apitypes.SiteSeason{Phase: apitypes.SiteSeasonPhase(p.Phase), Week: p.Week, Basis: p.Basis}
 }
 
 // Leagues is the part of the league sync store the account answer reads.
@@ -74,7 +94,7 @@ func (v *Viewer) View(ctx context.Context, a auth.Account) (apitypes.Account, er
 	return apitypes.Account{
 		Id: a.ID, Email: a.Email, FirstName: a.FirstName, LastName: a.LastName, Handle: a.Handle,
 		Features: features, DraftPass: passView(pass), Membership: membershipView(membership),
-		League: leagues.League, Leagues: leagues.Leagues, Format: leagues.Format, CreatedAt: a.CreatedAt,
+		League: leagues.League, Leagues: leagues.Leagues, Format: leagues.Format, Season: v.season(ctx), CreatedAt: a.CreatedAt,
 	}, nil
 }
 

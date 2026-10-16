@@ -115,7 +115,19 @@ func build(ctx context.Context, cfg config.API, pool *pgxpool.Pool, obs httpx.Ob
 	if err != nil {
 		return nil, err
 	}
-	viewer := &account.Viewer{Entitlements: ents, Leagues: &leaguesync.Store{Pool: pool}, Now: now}
+	// The board's pool lives as long as the process.
+	draftBoards, _, err := draftroom.OpenBoards(pool, cfg.Board, now)
+	if err != nil {
+		return nil, err
+	}
+	if err := customBoards(ctx, cfg.Board, draftBoards, now, log); err != nil {
+		return nil, err
+	}
+	viewer := &account.Viewer{
+		Entitlements: ents, Leagues: &leaguesync.Store{Pool: pool, Now: now},
+		// The site's season reads the board's schedule, kept an hour.
+		Season: &season.Site{Facts: draftBoards.Schedule, Now: now, Log: log}, Now: now,
+	}
 	gate := &leagues.Gate{Entitlements: ents, Now: now, Log: log}
 	leagueStore := &leagues.Store{Pool: pool}
 	sheetStore := &sheets.Store{Pool: pool}
@@ -125,14 +137,6 @@ func build(ctx context.Context, cfg config.API, pool *pgxpool.Pool, obs httpx.Ob
 		IdP:           auth.NewWorkOS(cfg.WorkOS.APIKey, cfg.WorkOS.ClientID, cfg.WorkOS.RedirectURI),
 		PublicBaseURL: cfg.HTTP.PublicBaseURL, TrustedHops: cfg.HTTP.TrustedProxyHops, Now: now, Log: log,
 		Anon: anon, Claimer: mockStore,
-	}
-	// The board's pool lives as long as the process.
-	draftBoards, _, err := draftroom.OpenBoards(pool, cfg.Board, now)
-	if err != nil {
-		return nil, err
-	}
-	if err := customBoards(ctx, cfg.Board, draftBoards, now, log); err != nil {
-		return nil, err
 	}
 	sale := &season.Sale{Schedule: draftBoards.Schedule, Log: log}
 	billingService := &billing.Service{

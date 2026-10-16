@@ -10,6 +10,7 @@ import (
 	"github.com/jhunthrop/commish/api/internal/auth"
 	"github.com/jhunthrop/commish/api/internal/db/dbtest"
 	"github.com/jhunthrop/commish/api/internal/entitlements"
+	"github.com/jhunthrop/commish/api/internal/season"
 )
 
 var viewNow = time.Date(2026, time.October, 13, 15, 0, 0, 0, time.UTC)
@@ -103,5 +104,30 @@ func TestViewSubscriptionMembership(t *testing.T) {
 	wantEnd := periodEnd.Add(entitlements.SubscriptionGrace)
 	if m.EndsAt == nil || !m.EndsAt.Equal(wantEnd) {
 		t.Errorf("ends_at = %v, want %v", m.EndsAt, wantEnd)
+	}
+}
+
+type fixedSeason struct{ p season.SitePhase }
+
+func (f fixedSeason) Phase(context.Context) season.SitePhase { return f.p }
+
+// The Account answer carries the site's season as the season source
+// reads it, and says so when none is wired.
+func TestViewCarriesTheSiteSeason(t *testing.T) {
+	ctx := context.Background()
+	store := &entitlements.Store{Pool: dbtest.Pool(t)}
+	a := newAccount(t, ctx, store, "user_season")
+	v := &account.Viewer{Entitlements: store, Now: func() time.Time { return viewNow },
+		Season: fixedSeason{season.SitePhase{Phase: season.SiteInSeason, Week: 6, Basis: "Week 6 of the 2026 NFL season is under way."}}}
+	got, err := v.View(ctx, a)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Season.Phase != apitypes.SiteSeasonPhaseInSeason || got.Season.Week != 6 || got.Season.Basis == "" {
+		t.Fatalf("season %+v", got.Season)
+	}
+	v.Season = nil
+	if got, err = v.View(ctx, a); err != nil || !got.Season.Phase.Valid() || got.Season.Basis == "" {
+		t.Fatalf("with no season source: %+v (%v)", got.Season, err)
 	}
 }

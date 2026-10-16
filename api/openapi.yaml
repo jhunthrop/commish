@@ -1754,7 +1754,7 @@ components:
 
     Account:
       type: object
-      required: [id, email, first_name, last_name, handle, features, draft_pass, membership, league, leagues, format, created_at]
+      required: [id, email, first_name, last_name, handle, features, draft_pass, membership, league, leagues, format, season, created_at]
       properties:
         id: { type: string, format: uuid }
         email: { type: string }
@@ -1774,6 +1774,7 @@ components:
           description: >-
             the context's format, the board every page opens in: the selected league's, else the format chosen with
             no league, null when neither
+        season: { $ref: "#/components/schemas/SiteSeason" }
         first_name: { type: string, nullable: true }
         last_name: { type: string, nullable: true }
         handle:
@@ -1835,7 +1836,7 @@ components:
     ContextLeague:
       type: object
       description: a followed league as the site's context reads it
-      required: [id, name, host, team_name, standing, scoring, format, settings_league_id]
+      required: [id, name, host, team_name, standing, scoring, format, settings_league_id, phase, phase_basis, draft_at, playoff_start_week, waivers_open]
       properties:
         id: { type: string, format: uuid, description: the attachment (AttachedLeague.id) }
         name: { type: string, description: "the league's name at its last read, else its saved league's" }
@@ -1858,6 +1859,34 @@ components:
           format: uuid
           nullable: true
           description: the saved league a mock reruns from, null when a mock room cannot draft this league
+        phase: { $ref: "#/components/schemas/LeaguePhase" }
+        phase_basis: { type: string, description: "one sentence naming the fact the phase came from, in the site's words" }
+        draft_at: { type: string, format: date-time, nullable: true, description: "the host's draft time, null when the host does not say" }
+        playoff_start_week:
+          type: integer
+          nullable: true
+          description: the league's first playoff week as the host states it, null when the host does not say
+        waivers_open:
+          type: boolean
+          description: >-
+            the host still runs waivers this week: false in and after the playoffs where the host closes them, and once
+            the season is over, else true
+    LeaguePhase:
+      type: string
+      enum: [pre_draft, draft_day, in_season, playoffs, offseason]
+      description: >-
+        where a followed league is in its season, computed at read time from the host's facts: pre_draft before its
+        draft, draft_day when the draft starts within 24 hours or is under way, in_season from the draft to the playoffs,
+        playoffs from the league's playoff start week until the host says the season is over, offseason after it (or a
+        drafted league the host gives no current week)
+    SiteSeason:
+      type: object
+      description: the NFL season the site is in, for a visitor with no league, from the kickoffs the API reads
+      required: [phase, week, basis]
+      properties:
+        phase: { type: string, enum: [preseason, in_season, playoffs, offseason] }
+        week: { type: integer, description: "the NFL week in play, 0 before week 1 and after the season" }
+        basis: { type: string, description: one sentence naming the fact the phase came from, in the site's words }
     LeagueChoice:
       type: object
       description: >-
@@ -2746,7 +2775,7 @@ components:
         seat_by_username: { type: boolean, description: whether the host finds a seat by username (Sleeper does) }
     AttachedLeague:
       type: object
-      required: [id, host, host_league_id, season, name, roster_id, team_name, standing, attached_at]
+      required: [id, host, host_league_id, season, name, roster_id, team_name, standing, attached_at, phase, phase_basis, draft_at, playoff_start_week, waivers_open]
       properties:
         id: { type: string, format: uuid }
         host: { $ref: "#/components/schemas/LeagueHost" }
@@ -2760,6 +2789,18 @@ components:
           nullable: true
           description: the drafter's record and place at the last read, null when unread
         attached_at: { type: string, format: date-time }
+        phase: { $ref: "#/components/schemas/LeaguePhase" }
+        phase_basis: { type: string, description: "one sentence naming the fact the phase came from, in the site's words" }
+        draft_at: { type: string, format: date-time, nullable: true, description: "the host's draft time, null when the host does not say" }
+        playoff_start_week:
+          type: integer
+          nullable: true
+          description: the league's first playoff week as the host states it, null when the host does not say
+        waivers_open:
+          type: boolean
+          description: >-
+            the host still runs waivers this week: false in and after the playoffs where the host closes them, and once
+            the season is over, else true
     LeagueStanding:
       type: object
       required: [wins, losses, ties, place, teams]

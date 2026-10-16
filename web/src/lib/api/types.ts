@@ -1462,6 +1462,7 @@ export interface components {
 			leagues: components['schemas']['ContextLeague'][];
 			/** @description the context's format, the board every page opens in: the selected league's, else the format chosen with no league, null when neither */
 			format: components['schemas']['BoardFormat'] | null;
+			season: components['schemas']['SiteSeason'];
 			first_name: string | null;
 			last_name: string | null;
 			/** @description the name shown in lobbies, 3 to 20 letters, digits or underscores, not starting with a digit */
@@ -1538,6 +1539,32 @@ export interface components {
 			 * @description the saved league a mock reruns from, null when a mock room cannot draft this league
 			 */
 			settings_league_id: string | null;
+			phase: components['schemas']['LeaguePhase'];
+			/** @description one sentence naming the fact the phase came from, in the site's words */
+			phase_basis: string;
+			/**
+			 * Format: date-time
+			 * @description the host's draft time, null when the host does not say
+			 */
+			draft_at: string | null;
+			/** @description the league's first playoff week as the host states it, null when the host does not say */
+			playoff_start_week: number | null;
+			/** @description the host still runs waivers this week: false in and after the playoffs where the host closes them, and once the season is over, else true */
+			waivers_open: boolean;
+		};
+		/**
+		 * @description where a followed league is in its season, computed at read time from the host's facts: pre_draft before its draft, draft_day when the draft starts within 24 hours or is under way, in_season from the draft to the playoffs, playoffs from the league's playoff start week until the host says the season is over, offseason after it (or a drafted league the host gives no current week)
+		 * @enum {string}
+		 */
+		LeaguePhase: 'pre_draft' | 'draft_day' | 'in_season' | 'playoffs' | 'offseason';
+		/** @description the NFL season the site is in, for a visitor with no league, from the kickoffs the API reads */
+		SiteSeason: {
+			/** @enum {string} */
+			phase: 'preseason' | 'in_season' | 'playoffs' | 'offseason';
+			/** @description the NFL week in play, 0 before week 1 and after the season */
+			week: number;
+			/** @description one sentence naming the fact the phase came from */
+			basis: string;
 		};
 		/** @description exactly one of league_id (a followed league) and format (no league: any board format, the web offering the ones the run carries) */
 		LeagueChoice: {
@@ -2339,6 +2366,18 @@ export interface components {
 			standing: components['schemas']['LeagueStanding'] | null;
 			/** Format: date-time */
 			attached_at: string;
+			phase: components['schemas']['LeaguePhase'];
+			/** @description one sentence naming the fact the phase came from, in the site's words */
+			phase_basis: string;
+			/**
+			 * Format: date-time
+			 * @description the host's draft time, null when the host does not say
+			 */
+			draft_at: string | null;
+			/** @description the league's first playoff week as the host states it, null when the host does not say */
+			playoff_start_week: number | null;
+			/** @description the host still runs waivers this week: false in and after the playoffs where the host closes them, and once the season is over, else true */
+			waivers_open: boolean;
 		};
 		LeagueStanding: {
 			wins: number;

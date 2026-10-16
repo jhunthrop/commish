@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -29,6 +30,17 @@ type Attached struct {
 	Rules map[string]float64
 	// SuperFlex is the superflex spots the last read's lineup starts.
 	SuperFlex int
+	// Read says a read of the league is kept; Status, Week and Calendar
+	// are that read's, what its phase is computed from.
+	Read     bool
+	Status   string
+	Week     int
+	Calendar Calendar
+}
+
+// Phase is the league's phase at now, from its last kept read.
+func (a Attached) Phase(now time.Time) LeaguePhase {
+	return PhaseOf(PhaseFacts{Host: a.Ref.Host, Read: a.Read, Status: a.Status, Season: a.Season, Week: a.Week, Calendar: a.Calendar}, now)
 }
 
 // Attached is the account's links, newest first, each with its league's
@@ -41,7 +53,9 @@ func (s *Store) Attached(ctx context.Context, accountID uuid.UUID) ([]Attached, 
 		coalesce((select t->>'name' from jsonb_array_elements(sn.snapshot->'teams') t
 			where (t->>'roster_id')::int = l.roster_id limit 1), ''),
 		sn.snapshot->'teams', saved.settings, sn.snapshot->'scoring'->'rules',
-		coalesce((sn.snapshot->'shape'->>'super_flex')::int, 0)
+		coalesce((sn.snapshot->'shape'->>'super_flex')::int, 0),
+		sn.snapshot is not null, coalesce(sn.snapshot->>'status', ''), coalesce((sn.snapshot->>'week')::int, 0),
+		sn.snapshot->'calendar'
 		from app.league_links l
 		left join app.league_snapshots sn
 			on sn.host = l.host and sn.host_league_id = l.host_league_id and sn.host_season = l.host_season
@@ -60,16 +74,17 @@ func (s *Store) Attached(ctx context.Context, accountID uuid.UUID) ([]Attached, 
 
 func scanAttached(r pgx.CollectableRow) (Attached, error) {
 	var a Attached
-	var teams, saved, rules []byte
+	var teams, saved, rules, calendar []byte
 	err := r.Scan(&a.ID, &a.AccountID, &a.LeagueID, &a.Ref.Host, &a.Ref.LeagueID, &a.Ref.Season, &a.RosterID,
-		&a.AttachedAt, &a.LastReadAt, &a.Season, &a.Name, &a.TeamName, &teams, &saved, &rules, &a.SuperFlex)
+		&a.AttachedAt, &a.LastReadAt, &a.Season, &a.Name, &a.TeamName, &teams, &saved, &rules, &a.SuperFlex,
+		&a.Read, &a.Status, &a.Week, &calendar)
 	if err != nil {
 		return a, err
 	}
 	for _, field := range []struct {
 		raw  []byte
 		into any
-	}{{teams, &a.Teams}, {saved, &a.Saved}, {rules, &a.Rules}} {
+	}{{teams, &a.Teams}, {saved, &a.Saved}, {rules, &a.Rules}, {calendar, &a.Calendar}} {
 		if len(field.raw) == 0 {
 			continue
 		}
