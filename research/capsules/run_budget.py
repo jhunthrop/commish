@@ -6,8 +6,10 @@ retries and the throttle's re-asks included, so no call can carry the run past i
 counting calls a page at a time let transport retries pass the cap by a few). In dollars a call is
 reserved at its worst case before it starts, its prompt's characters (never fewer than its tokens)
 at the input price plus its whole completion allowance at the output price, and settles at the cost
-the gateway states once it answers. A page starts only while its worst case fits what is left
-(`room_for_page`), so a started page can finish; a call the budget refuses raises `BudgetSpentError`
+the gateway states once it answers. A page starts only while its worst case (six asks at the
+heaviest prompt measured, `room_for_page`) fits what is left; a page that runs past that, on a long
+prompt, a retry or a throttle's re-ask, can still meet the stop part way. A call the budget refuses
+raises `BudgetSpentError`
 and the page falls to its facts block with that reason, never counted as the writer's failure.
 """
 

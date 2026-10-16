@@ -60,6 +60,27 @@ def test_each_violation_names_its_rule_its_sentence_and_the_rule_in_one_line(
     assert "\n" not in note.statement
 
 
+@pytest.mark.parametrize(
+    ("violation", "statement"),
+    [
+        (
+            'The text states an ADP or a pick that is not his ADP on the page: "pick 43", and the page has no ADP '
+            "for him. Say no ADP or pick at all.",
+            "The page has no ADP for him. Say no ADP or pick at all.",
+        ),
+        (
+            'The text states an ADP or a pick that is not his ADP on the page: "ADP 98.2". His ADP is 104.7 or 105. '
+            "Say exactly that, or say no ADP.",
+            "His ADP is 104.7 or 105. Say exactly that, or say no ADP.",
+        ),
+    ],
+)
+def test_an_adp_note_states_the_remedy_alone(violation: str, statement: str) -> None:
+    """The review's L3: the no-ADP shape carried its whole violation as its statement."""
+    (note,) = notes_of([("He went at pick 43. ADP 98.2 then.", (violation,))])
+    assert note.statement == statement
+
+
 def test_every_statement_keeps_the_copy_rules() -> None:
     violations = [
         _BYE_VIOLATION,

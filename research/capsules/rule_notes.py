@@ -30,7 +30,7 @@ from research.capsules.season_voice import MISSED_WEEKS_UNNAMED
 from research.capsules.sentences import split_sentences
 from research.capsules.validate import (
     ADP_FIGURE_VIOLATION,
-    COST_WORDS,
+    COST_WORDS_SHOWN,
     NO_PAGE_NUMBER_VIOLATION,
     RANK_VIOLATION,
     UNFRAMED_FLOOR_VIOLATION,
@@ -132,12 +132,11 @@ def _mixed_note(violation: str, _body: str) -> RuleNote | None:
         return None
     number = TENSION_NUMBER.search(violation)
     figure = "his downside" if number is None else number.group(1).lstrip("-")
-    words = ", ".join(sorted(set(COST_WORDS)))
     return RuleNote(
         "mixed evidence uncited",
         None,
         f"The strongest downside appears before the call with its own number and a cost word beside it "
-        f'({words}), as in "costs him {figure} points a game".',
+        f'({COST_WORDS_SHOWN}), as in "costs him {figure} points a game".',
     )
 
 
@@ -175,6 +174,13 @@ def _prose_note(violation: str, _body: str) -> RuleNote | None:
     return None
 
 
+def _remedy_after(violation: str, quoted: str) -> str:
+    """What a figure rule asks for, after the figure it quotes: 'His ADP is 104.7 or 105. Say exactly that'
+    and 'the page has no ADP for him. Say no ADP or pick at all' alike (the review's L3)."""
+    rest = violation.split(f'"{quoted}"', 1)[-1].lstrip(".,").strip().removeprefix("and ").strip()
+    return rest[:1].upper() + rest[1:] if rest else violation
+
+
 def _figure_note(violation: str, body: str) -> RuleNote | None:
     """The rules that quote a figure or a name: untraced ones, a rank without its basis, an ADP or a
     board rank that is not his."""
@@ -199,7 +205,7 @@ def _figure_note(violation: str, body: str) -> RuleNote | None:
         if violation.startswith(prefix):
             claim = _QUOTED.search(violation)
             quoted = "" if claim is None else claim.group("q")
-            remedy = violation.split('". ', 1)[-1] if '". ' in violation else violation
+            remedy = _remedy_after(violation, quoted)
             return RuleNote(f'{name}, "{quoted}"', _sentence_holding(body, quoted) if quoted else None, remedy)
     return None
 

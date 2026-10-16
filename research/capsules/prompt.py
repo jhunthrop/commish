@@ -22,7 +22,7 @@ from research.capsules.narrative import SlotRequest
 from research.capsules.render import render_facts_for_model
 from research.capsules.render_words import SHEET_LABELS
 from research.capsules.rule_notes import RuleNote
-from research.capsules.validate import COST_WORDS, BandFailure, word_count
+from research.capsules.validate import COST_WORDS_SHOWN, BandFailure, word_count
 from research.capsules.voice_rules import (
     ALL_TIME_TERMS,
     ASIDE_PATTERNS,
@@ -123,7 +123,6 @@ NEVER_ON_THE_PAGE: Final = "\n".join(
     ]
 )
 _LABELS: Final = _quoted(SHEET_LABELS)
-_COST_WORDS: Final = _quoted(sorted(set(COST_WORDS)))
 # A round from an ADP is the ADP over the board's teams, rounded up; in season only as history.
 _EXAMPLE_ADP: Final = 177.1
 _EXAMPLE_ROUND: Final = math.ceil(_EXAMPLE_ADP / TEAMS)
@@ -209,7 +208,7 @@ HONESTY, NO EXCEPTIONS
 - {{picks}} A rank is the sheet's rank, never a round-number tier of your own, and the only rank on our board you may state is the sheet's position rank or overall rank, exactly as printed.
 - Never say a risk, an injury or a competitor is ABSENT unless the sheet says so. Silence on the sheet is silence from you. Do not reassure the reader about a thing you have no fact for.
 - Never make an all-time or historical-record claim. This engine holds no such data.
-- If the sheet carries a real downside (a factor that costs him points a game, or a year-over-year number that fell), name it before your call with its own number and a cost word beside it in the same sentence ({_COST_WORDS}), as in "costs him 1.6 points a game". "Worth 1.6" alone does not say it is a cost. Never a one-sided rave on mixed facts.
+- If the sheet carries a real downside (a factor that costs him points a game, or a year-over-year number that fell), name it before your call with its own number and a cost word beside it in the same sentence ({COST_WORDS_SHOWN}), as in "costs him 1.6 points a game". "Worth 1.6" alone does not say it is a cost. Never a one-sided rave on mixed facts.
 - The sheet gives two ranges: the middle range most outcomes fall in, and the full tails. Reason from the middle range. If you mention the low tail, say in your own words, in the same sentence, that injuries are what pull it down. Never present the full tails as what he is expected to score.
 - Our pick for him (his overall rank) and his ADP are two different numbers: never swap them, and the smaller number is the earlier pick. {{rounds}}
 - No ADP means only that we have no ADP for him: it says nothing about whether anyone drafted him, so never {_quoted(NO_ADP_EXAMPLES)} or the like. If it matters at all, one short clause says it.

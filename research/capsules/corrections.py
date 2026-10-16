@@ -19,7 +19,7 @@ from research.capsules.prose_checks import LABEL_VIOLATION, UNFINISHED_VIOLATION
 from research.capsules.season_voice import MISSED_WEEKS_UNNAMED
 from research.capsules.validate import (
     ADP_FIGURE_VIOLATION,
-    COST_WORDS,
+    COST_WORDS_SHOWN,
     NO_PAGE_NUMBER_VIOLATION,
     UNFRAMED_FLOOR_VIOLATION,
 )
@@ -119,9 +119,8 @@ def _downside_correction(violation: str) -> str:
     number = TENSION_NUMBER.search(violation)
     downside = "the strongest downside on the sheet" if number is None else f"the {number.group(1)} pts/game downside"
     figure = "its number" if number is None else number.group(1).lstrip("-")
-    words = ", ".join(f'"{word}"' for word in sorted(set(COST_WORDS)))
     return (
         f"Your text never cites {downside} as a cost. Work it in before your last sentence, in your own words, with "
-        f'the number and a cost word beside it in the same sentence ({words}), as in "costs him {figure} points a '
+        f'the number and a cost word beside it in the same sentence ({COST_WORDS_SHOWN}), as in "costs him {figure} points a '
         f'game". "Worth {figure}" alone does not say it is a cost. Leave everything else as it is.'
     )

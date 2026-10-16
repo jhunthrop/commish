@@ -88,6 +88,8 @@ _AVAILABILITY: Final = re.compile(
 # "Dock" joined by the coordinator's ruling for Lane 52 ("our numbers dock him 6.2 a game" was 17 of 55
 # refusals in Lane 50's samples); the sentence still has to cite the downside's figure.
 COST_WORDS: Final = ("cost", "costs", "minus", "down", "shave", "shaves", "dock", "docks", "docked")
+# The cost words as the writer is shown them, quoted, in one place (the prompt, the correction, the note).
+COST_WORDS_SHOWN: Final = ", ".join(f'"{word}"' for word in COST_WORDS)
 _COST_CUE: Final = re.compile(rf"\b(?:{'|'.join(COST_WORDS)})\b", re.IGNORECASE | re.ASCII)
 _PRODUCT_CUE_AFTER: Final = re.compile(rf"^(?:['\u2019]s)?\s+(?:{'|'.join(COMPETITOR_PRODUCT_CUES)})\b", re.IGNORECASE)
 _ON_BEFORE: Final = re.compile(r"\bon\s+$", re.IGNORECASE)
