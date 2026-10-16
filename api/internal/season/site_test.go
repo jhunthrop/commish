@@ -86,6 +86,8 @@ func TestSiteSeasonBoundaries(t *testing.T) {
 		{"the conference games", "2027-01-31 15:00", false, SitePlayoffs, 21},
 		{"Super Bowl Sunday", "2027-02-14 18:30", false, SitePlayoffs, 22},
 		{"the day after the Super Bowl", "2027-02-15 00:00", false, SiteOffseason, 0},
+		{"February with the 2027 board out", "2027-02-20 12:00", true, SitePreseason, 0},
+		{"February with no 2027 board", "2027-02-20 12:00", false, SiteOffseason, 0},
 		{"March with no 2027 board", "2027-03-20 12:00", false, SiteOffseason, 0},
 		{"March with the 2027 board out", "2027-03-20 12:00", true, SitePreseason, 0},
 	}
@@ -100,6 +102,26 @@ func TestSiteSeasonBoundaries(t *testing.T) {
 		if got.Basis == "" || strings.ContainsAny(got.Basis, ";—–") {
 			t.Errorf("%s: basis %q", c.name, got.Basis)
 		}
+	}
+}
+
+// The preseason names the opener's day once the schedule is loaded, and
+// carries the kickoff for the league phases to name.
+func TestSiteSeasonNamesTheOpener(t *testing.T) {
+	got, err := SiteAt(context.Background(), facts2026(t, false), eastern(t, "2026-08-20 12:00"))
+	if err != nil || got.Phase != SitePreseason || !got.Opener.Equal(eastern(t, "2026-09-09 20:20")) ||
+		got.Basis != "The 2026 boards are out and week 1 kicks off Wednesday, September 9." {
+		t.Fatalf("%+v (%v)", got, err)
+	}
+}
+
+// A moment the in-season schedule has no week for is an error, never
+// "week 0 is under way".
+func TestSiteSeasonWithNoWeekIsAnError(t *testing.T) {
+	facts := facts2026(t, false)
+	facts.weekEnds = map[int][]time.Time{}
+	if got, err := SiteAt(context.Background(), facts, eastern(t, "2026-10-15 12:00")); err == nil {
+		t.Fatalf("answered %+v", got)
 	}
 }
 
@@ -133,5 +155,15 @@ func TestSiteSeasonIsKeptForAnHour(t *testing.T) {
 	now = now.Add(2 * time.Hour)
 	if kept := site.Phase(context.Background()); kept != first {
 		t.Fatalf("a failed read answered %+v, want the last good %+v", kept, first)
+	}
+	reads := facts.reads
+	now = now.Add(30 * time.Second)
+	if kept := site.Phase(context.Background()); kept != first || facts.reads != reads {
+		t.Fatalf("within a minute of a failure: %+v after %d more reads", kept, facts.reads-reads)
+	}
+	now = now.Add(time.Minute)
+	site.Phase(context.Background())
+	if facts.reads != reads+1 {
+		t.Fatalf("a minute after a failure: %d more reads, want 1", facts.reads-reads)
 	}
 }

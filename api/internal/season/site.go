@@ -53,7 +53,14 @@ type SitePhase struct {
 	Phase string
 	Week  int
 	Basis string
+	// Opener is the coming season's first kickoff in the preseason, zero
+	// when its schedule is not loaded or the season is under way.
+	Opener time.Time
 }
+
+// OpenerDay is a kickoff's day as a sentence names it, Eastern:
+// "Wednesday, September 9".
+func OpenerDay(t time.Time) string { return t.In(Eastern()).Format("Monday, January 2") }
 
 // SiteAt is the site's season at now: from week 1's first kickoff to the
 // end of the last regular-season game day is in season, then the NFL
@@ -67,7 +74,7 @@ func SiteAt(ctx context.Context, facts SiteFacts, now time.Time) (SitePhase, err
 		return SitePhase{}, fmt.Errorf("season: site at %s: %w", now, err)
 	}
 	if !loaded || now.Before(first) {
-		return beforeKickoff(ctx, facts, y, loaded)
+		return beforeKickoff(ctx, facts, y, first, loaded)
 	}
 	last, ok, err := facts.LastGameDay(ctx, y)
 	if err != nil {
@@ -81,9 +88,12 @@ func SiteAt(ctx context.Context, facts SiteFacts, now time.Time) (SitePhase, err
 	superBowlEnd := time.Date(last.Year(), last.Month(), last.Day()+superBowlAfterLastGame+1, 0, 0, 0, 0, east)
 	switch {
 	case now.Before(regularEnd):
-		week, _, err := facts.WeekAt(ctx, y, now)
+		week, ok, err := facts.WeekAt(ctx, y, now)
 		if err != nil {
 			return SitePhase{}, fmt.Errorf("season: site at %s: %w", now, err)
+		}
+		if !ok {
+			return SitePhase{}, fmt.Errorf("season: site at %s: the %d schedule has no week for it", now, y)
 		}
 		return SitePhase{Phase: SiteInSeason, Week: week, Basis: fmt.Sprintf("Week %d of the %d NFL season is under way.", week, y)}, nil
 	case now.Before(superBowlEnd):
@@ -91,37 +101,51 @@ func SiteAt(ctx context.Context, facts SiteFacts, now time.Time) (SitePhase, err
 		week := min(firstPlayoffWeek+max(days-1, 0)/daysPerWeek, lastPlayoffWeek)
 		return SitePhase{Phase: SitePlayoffs, Week: week, Basis: fmt.Sprintf("The %d regular season is over and the NFL playoffs are on.", y)}, nil
 	}
-	return SitePhase{Phase: SiteOffseason, Basis: fmt.Sprintf("The %d season ended with the Super Bowl and the %d boards are not out yet.", y, y+1)}, nil
+	// After the Super Bowl and before March 1 the next season's board may
+	// already be out.
+	next, scheduled, err := facts.FirstKickoff(ctx, y+1)
+	if err != nil {
+		return SitePhase{}, fmt.Errorf("season: site at %s: %w", now, err)
+	}
+	return beforeKickoff(ctx, facts, y+1, next, scheduled)
 }
 
 // beforeKickoff is the site's season before season y's opener: the
 // preseason once y's first preseason board is out, else the offseason
-// after season y-1. scheduled says y's schedule is loaded.
-func beforeKickoff(ctx context.Context, facts SiteFacts, y int, scheduled bool) (SitePhase, error) {
+// after season y-1. first is y's first kickoff, when scheduled says y's
+// schedule is loaded.
+func beforeKickoff(ctx context.Context, facts SiteFacts, y int, first time.Time, scheduled bool) (SitePhase, error) {
 	board, err := facts.PreseasonBoard(ctx, y)
 	if err != nil {
 		return SitePhase{}, fmt.Errorf("season: preseason board %d: %w", y, err)
 	}
 	switch {
 	case board && scheduled:
-		return SitePhase{Phase: SitePreseason, Basis: fmt.Sprintf("The %d boards are out and week 1 has not kicked off.", y)}, nil
+		return SitePhase{Phase: SitePreseason, Opener: first,
+			Basis: fmt.Sprintf("The %d boards are out and week 1 kicks off %s.", y, OpenerDay(first))}, nil
 	case board:
 		return SitePhase{Phase: SitePreseason, Basis: fmt.Sprintf("The %d boards are out and the %d schedule is not loaded yet.", y, y)}, nil
 	}
 	return SitePhase{Phase: SiteOffseason, Basis: fmt.Sprintf("The %d season is over and the %d boards are not out yet.", y-1, y)}, nil
 }
 
+// siteRetry is how long a failed read stands before the facts are read
+// again, so an outage costs one read a minute, not one a request.
+const siteRetry = time.Minute
+
 // Site keeps the site's season in process for an hour. A failed read is
-// logged and answers the last good one; with none yet, the preseason,
-// saying the schedule could not be read.
+// logged and answers the last good one (with none yet, the preseason,
+// saying the schedule could not be read) for a minute before the next
+// try. The lock is never held across a read.
 type Site struct {
 	Facts SiteFacts
 	Now   func() time.Time
 	Log   *slog.Logger
 
-	mu   sync.Mutex
-	kept SitePhase
-	at   time.Time
+	mu      sync.Mutex
+	kept    SitePhase
+	at      time.Time
+	retryAt time.Time
 }
 
 // unread is the answer before any read has succeeded.
@@ -131,20 +155,32 @@ var unread = SitePhase{Phase: SitePreseason, Basis: "We could not read the NFL s
 func (s *Site) Phase(ctx context.Context) SitePhase {
 	now := s.Now()
 	s.mu.Lock()
-	defer s.mu.Unlock()
-	if !s.at.IsZero() && now.Sub(s.at) < siteTTL {
-		return s.kept
+	kept, at, retryAt := s.kept, s.at, s.retryAt
+	s.mu.Unlock()
+	if !at.IsZero() && now.Sub(at) < siteTTL {
+		return kept
+	}
+	if now.Before(retryAt) {
+		return lastGood(kept, at)
 	}
 	got, err := SiteAt(ctx, s.Facts, now)
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if err != nil {
 		if s.Log != nil {
 			s.Log.Warn("season: the site's season could not be read", "err", err)
 		}
-		if s.at.IsZero() {
-			return unread
-		}
-		return s.kept
+		s.retryAt = now.Add(siteRetry)
+		return lastGood(s.kept, s.at)
 	}
 	s.kept, s.at = got, now
 	return got
+}
+
+// lastGood is the last good answer, or unread when there is none.
+func lastGood(kept SitePhase, at time.Time) SitePhase {
+	if at.IsZero() {
+		return unread
+	}
+	return kept
 }
