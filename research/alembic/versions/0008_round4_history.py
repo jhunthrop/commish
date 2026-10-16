@@ -169,6 +169,7 @@ def _game_weather() -> None:
         sa.Column("precipitation_source", sa.Text(), nullable=True),
         sa.Column("precipitation_kind", sa.Text(), nullable=True),
         sa.Column("precipitation_mm", sa.Double(precision=53), nullable=True),
+        sa.Column("isd_precipitation", sa.Integer(), nullable=True),
         sa.Column("isd_station", sa.Text(), nullable=True),
         sa.Column("isd_distance_km", sa.Double(precision=53), nullable=True),
         sa.Column("as_of", sa.DateTime(timezone=True), nullable=False),
@@ -187,6 +188,7 @@ def _game_weather() -> None:
             name="game_weather_temperature_source_ck",
         ),
         sa.CheckConstraint("precipitation IN (0, 1)", name="game_weather_precipitation_ck"),
+        sa.CheckConstraint("isd_precipitation IN (0, 1)", name="game_weather_isd_precipitation_ck"),
         sa.CheckConstraint(
             "(precipitation IS NULL) = (precipitation_source IS NULL)", name="game_weather_precipitation_pair_ck"
         ),

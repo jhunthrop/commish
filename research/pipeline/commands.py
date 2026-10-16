@@ -54,6 +54,7 @@ from research.pipeline.tank01.client import API_KEY_ENV as TANK01_KEY_ENV
 from research.pipeline.tank01.client import DEFAULT_SEASON, SEASON_ENV, Tank01Client
 from research.pipeline.tank01.mapping import WEEKS_LAST
 from research.pipeline.tank01.provider import Tank01Provider
+from research.pipeline.weather import game_weather, isd
 
 RESEARCH_ROOT: Final = Path(__file__).resolve().parents[1]
 ODDS_KEY_ENV: Final = "ODDS_API_KEY"
@@ -216,6 +217,13 @@ def _charted_history(conn: Connection, inv: Invocation) -> object:
     return lines
 
 
+def _game_weather(conn: Connection, inv: Invocation) -> object:
+    """The kickoff weather of every regular-season game of the seasons, filled from its three sources."""
+    reader = isd.IsdReader(inv.fetcher)
+    reports = game_weather.ingest_game_weather(conn, NflverseClient(inv.fetcher), reader, seasons_of(inv.args))
+    return [line for report in reports for line in report.lines()] + [f"NCEI reads: {len(reader.requests)}"]
+
+
 def _win_totals(conn: Connection, inv: Invocation) -> object:
     return vegas.run_win_totals(conn, inv.fetcher, inv.args.last, inv.now, first_kickoff_for(conn, inv.args.last))
 
@@ -262,5 +270,6 @@ COMMANDS: Final = MappingProxyType({
     "depth-chart-weeks": Command("nflverse's weekly depth charts per season into nflverse_depth_chart_weeks", _depth_chart_weeks, atomic=False),
     "depth-chart-check": Command("the round 4 depth chart stamp check (reads charts and filings, writes nothing; the coordinator's recorded run)", lambda c, i: depth_chart_check.run_stamp_check(c).lines()),
     "charted-history": Command("Next Gen Stats (2016 on) and PFR advanced stats (2018 on) per season through the weekly pass's ingests", _charted_history, atomic=False),
+    "game-weather": Command("the recorded kickoff weather per game into game_weather (games.csv, the gamebook line, NOAA ISD)", _game_weather),
     "history": Command("the seasons the store lost, re-created from nflverse (pipeline/history.py); --first/--last narrow it", _history, atomic=False),
 })  # fmt: skip

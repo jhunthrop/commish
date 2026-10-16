@@ -155,8 +155,10 @@ GAME_WEATHER: Final = Table(
     Column("precipitation_source", Text),
     # The present condition's word class (rain, snow, sleet, mix) where a source names one.
     Column("precipitation_kind", Text),
-    # ISD's liquid-equivalent depth over the observation's period at the kickoff hour, millimetres.
+    # ISD's one-hour liquid depth in the hour after kickoff, millimetres, and ISD's own 0 or 1 for it,
+    # kept beside the chosen flag so the gamebook's word can be checked against the gauge.
     Column("precipitation_mm", Double(53)),
+    Column("isd_precipitation", Integer),
     Column("isd_station", Text),
     Column("isd_distance_km", Double(53)),
     # The recorded weather's stamp: the game's day plus the publication lag, as `nflverse_kickoff`'s.
@@ -167,6 +169,7 @@ GAME_WEATHER: Final = Table(
     one_of("wind_source", WEATHER_SOURCES, "game_weather_wind_source_ck"),
     one_of("precipitation_source", WEATHER_SOURCES, "game_weather_precipitation_source_ck"),
     CheckConstraint("precipitation IN (0, 1)", name="game_weather_precipitation_ck"),
+    CheckConstraint("isd_precipitation IN (0, 1)", name="game_weather_isd_precipitation_ck"),
     CheckConstraint("(temperature_f IS NULL) = (temperature_source IS NULL)", name="game_weather_temperature_pair_ck"),
     CheckConstraint("(wind_mph IS NULL) = (wind_source IS NULL)", name="game_weather_wind_pair_ck"),
     CheckConstraint(
