@@ -70,11 +70,14 @@
 			restOfSeason: lead.rest !== null
 		})
 	);
-	/** The figures beside our read, each naming its basis: in season the rest of it leads. */
+	/** The figures beside our read, each naming its basis: in season the rest of it leads, in the
+	 * context's format. The writer's pulls are matched against the format the capsule was written
+	 * for, the page's default line. */
 	const readPulls = $derived(
 		readFigures(page.capsule?.pulls ?? [], {
 			label: scoring,
-			preseason: lead.rest === null ? n.projected : (lead.rest.preseason?.points ?? null),
+			preseason:
+				page.rest === null ? page.numbers.projected : (page.rest.preseason?.points ?? null),
 			rest:
 				lead.rest === null || lead.format.rosFromWeek === undefined
 					? null

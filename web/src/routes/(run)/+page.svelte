@@ -44,7 +44,7 @@
 	<meta
 		name="description"
 		content="Our {data.run
-			.season} {format.label} board from our own projections, every player's page, mock drafts and a cheat sheet."
+			.season} {format.label} board from our own projections, every player's page, your league's lineup, waivers and trades, mock drafts and a cheat sheet."
 	/>
 </svelte:head>
 

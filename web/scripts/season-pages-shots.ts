@@ -6,7 +6,7 @@
 // lit. Against the built site and the fixture API (scripts/inseason-fixture/serve.ts), which
 // answers GET /season with week 6.
 //
-//   node scripts/season-pages-shots.ts [web origin] [out dir]
+//   [ROS_FROM_WEEK=6] node scripts/season-pages-shots.ts [web origin] [out dir]
 // with the site built against PUBLIC_API_URL=http://localhost:8799 and the fixture API running there.
 import { mkdir } from 'node:fs/promises';
 import { chromium, type BrowserContext, type Page } from 'playwright';
@@ -22,7 +22,16 @@ const PHONE_MAX = 760;
 const VIEWPORT_HEIGHT = 900;
 const READY_TIMEOUT_MS = 30_000;
 const SEASON = 2026;
+/** What the built run's board covers: the stand-in ranks the full season; a run that ranks the rest
+ * of it from a week is shot with ROS_FROM_WEEK set to that week. */
+const ROS_FROM_WEEK = process.env.ROS_FROM_WEEK;
+const COVER = {
+	season: SEASON,
+	...(ROS_FROM_WEEK === undefined ? {} : { rosFromWeek: Number(ROS_FROM_WEEK) })
+};
 const PLAYER = 'puka-nacua';
+/** The read's figures fill one row (run/read-figures.ts). */
+const READ_FIGURES = 3;
 /** The API reads that answer 401 with no session. */
 const SESSION_READS = ['/me', '/leagues/attached'];
 const PAGES = [
@@ -70,8 +79,7 @@ function expect(where: string, what: string, got: string, want: string): void {
 	}
 }
 
-/** The words the page shows, checked against the rail its root names. The stand-in run ranks the
- * full season, so the headings name no week. */
+/** The words the page shows, checked against the rail its root names. */
 async function checkWords(page: Page, name: string, where: string): Promise<void> {
 	const rail = await rootRail(page);
 	if (rail === null) {
@@ -80,13 +88,13 @@ async function checkWords(page: Page, name: string, where: string): Promise<void
 	}
 	const bar = await text(page, 'header.top h1');
 	if (name === 'home') {
-		const words = frontWords(rail, { season: SEASON }, false);
+		const words = frontWords(rail, COVER, false);
 		expect(where, 'bar', bar, words.title);
 		expect(where, 'heading', await text(page, 'main h2'), words.heading);
 		expect(where, 'verb', await text(page, 'main a.action.verb'), PAGE_VERBS[words.verb]);
 	}
 	if (name === 'board') {
-		const words = boardWords(rail, { season: SEASON, label: 'PPR', position: null }, false);
+		const words = boardWords(rail, { ...COVER, label: 'PPR', position: null }, false);
 		expect(where, 'bar', bar, words.bar);
 		expect(where, 'verb', await text(page, 'header.top .tail a.action'), PAGE_VERBS[words.verb]);
 	}
@@ -112,6 +120,22 @@ for (const theme of THEMES) {
 			await page.evaluate(() => document.fonts.ready);
 			await checkWords(page, name, where);
 			await page.screenshot({ path: file(`${name}-${theme}-${String(width)}`) });
+			if (name === 'player' && (await page.locator('.pulls').count()) > 0) {
+				// The read's figures: one row of at most three, every number on one baseline.
+				const figures = page.locator('.pulls');
+				await figures.scrollIntoViewIfNeeded();
+				const tops = await figures
+					.locator('b')
+					.evaluateAll((all) => all.map((b) => Math.round(b.getBoundingClientRect().top)));
+				if (tops.length > READ_FIGURES)
+					failures.push(`${where}: the read has ${String(tops.length)} figures`);
+				if (width > PHONE_MAX && new Set(tops).size > 1) {
+					failures.push(
+						`${where}: the read's figures sit on ${String(new Set(tops).size)} baselines`
+					);
+				}
+				await figures.screenshot({ path: file(`player-figures-${theme}-${String(width)}`) });
+			}
 			if (name === 'player') {
 				await page.screenshot({
 					path: file(`${name}-full-${theme}-${String(width)}`),

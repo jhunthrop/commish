@@ -1,6 +1,8 @@
 /** Magnitude. Points over replacement is tinted by the round it ranks in on the board,
- * rounds 1 to 4, then no tint. Below replacement takes the rose wash. The label always
- * prints the round or the minus, so color is never the only channel. */
+ * rounds 1 to 4, then no tint. Below replacement takes the rose wash. Where the row names the round
+ * (a preseason board, run/row-framing.ts) the label prints it or the minus, so color is never the
+ * only channel; on a rest-of-season board the label names no round, the signed figure carries the
+ * magnitude, and the Basis panel says the tint deepens the higher he ranks. */
 
 export const TINTED_ROUNDS = 4;
 export const HEATS = ['heat-1', 'heat-2', 'heat-3', 'heat-4', 'heat-neg', 'none'] as const;

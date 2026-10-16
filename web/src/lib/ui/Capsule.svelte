@@ -21,6 +21,9 @@
 			.filter((paragraph) => paragraph !== '')
 	);
 	const [lead, ...rest] = $derived(paragraphs);
+	/** When any figure names its basis, every figure keeps the label's line, so the numbers share
+	 * one baseline. */
+	const labelled = $derived(pulls.some((pull) => pull.label !== undefined));
 </script>
 
 <!-- Borrowed from Scout, player page only: the capsule is writing, so it is set in a reading serif. -->
@@ -30,9 +33,9 @@
 		<figure class="pulls">
 			{#each pulls as pull, i (i)}
 				<div>
-					{#if pull.label}<Label>{pull.label}</Label>{/if}<b>{pull.figure}</b><span
-						>{pull.caption}</span
-					>
+					{#if labelled}<span class="slot" class:empty={pull.label === undefined}
+							><Label>{pull.label ?? '\u00a0'}</Label></span
+						>{/if}<b>{pull.figure}</b><span class="caption">{pull.caption}</span>
 				</div>
 			{/each}
 		</figure>
@@ -85,7 +88,7 @@
 		font-variant-numeric: lining-nums tabular-nums;
 	}
 
-	.pulls span {
+	.pulls .caption {
 		font-style: italic;
 		font-size: var(--t-md);
 		line-height: 1.35;
@@ -111,9 +114,14 @@
 			row-gap: 2px;
 		}
 
-		/* A figure's basis takes its own line above it. */
-		.pulls div > :global(.label) {
+		/* A figure's basis takes its own line above it; one with none takes no line here, where each
+		   figure is its own row. */
+		.slot {
 			flex-basis: 100%;
+		}
+
+		.slot.empty {
+			display: none;
 		}
 
 		.pulls b {
