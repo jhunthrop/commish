@@ -99,7 +99,12 @@ const contextLeague: components['schemas']['ContextLeague'] = {
 		: null,
 	scoring: sync.scoring_like,
 	format: sync.board_format,
-	settings_league_id: null
+	settings_league_id: null,
+	phase: 'in_season',
+	phase_basis: `${sync.host === 'ffpc' ? 'FFPC' : 'The host'} says the draft is done and week ${sync.week} is under way.`,
+	draft_at: null,
+	playoff_start_week: null,
+	waivers_open: true
 };
 const account: components['schemas']['Account'] = {
 	id: '6f1d1c52-2626-4a26-9a26-0000000000a1',
@@ -113,6 +118,11 @@ const account: components['schemas']['Account'] = {
 	features: [],
 	draft_pass: null,
 	membership: null,
+	season: {
+		phase: 'in_season',
+		week: sync.week,
+		basis: `Week ${sync.week} of the 2026 NFL season is under way.`
+	},
 	created_at: '2026-09-01T12:00:00.000Z'
 };
 
