@@ -77,6 +77,9 @@ class CapsuleGateResult:
     queued: int = 0
     # Spans two pages or more share that the sheets' labelled stats print, so not judged.
     exempt_spans: int = 0
+    # The writer's one loud line when the run's throttle pool ran dry (`throttle_waits`), carried here so
+    # the publish gate's summary says why pages fell to facts.
+    throttle_alarm: str | None = None
 
     @property
     def unwritten_share(self) -> float:
@@ -106,7 +109,8 @@ class CapsuleGateResult:
                 *(f'span "{s.span}" on {len(s.player_ids)} pages' for s in self.spans[:_EXAMPLES]),
             ]
         )
-        return line if not examples else f"{line}: {examples}"
+        line = line if not examples else f"{line}: {examples}"
+        return line if self.throttle_alarm is None else f"{self.throttle_alarm}; {line}"
 
 
 def _sentences(row: StoredCapsule) -> set[str]:

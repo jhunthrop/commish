@@ -27,7 +27,10 @@ CAPSULE_MODEL: Final = "zai/glm-5.3-flash"
 class Retry:
     max_attempts: int = 2
     base_delay_ms: int = 1_500
-    rate_limit_backoff_ms: tuple[int, ...] = (20_000, 40_000, 80_000)
+    # A 429's backoffs within one call: 30 s in all, so the four calls of one ask (the first and its
+    # three re-asks, `throttle_waits_ms`) fit inside an ask's 150 s cap with the re-ask waits (the
+    # re-review's N2: at 20, 40 and 80 s the gateway's own backoffs used the cap before any re-ask).
+    rate_limit_backoff_ms: tuple[int, ...] = (5_000, 10_000, 15_000)
     # The longest `retry-after` a call waits out (the review's M1): honoured however long up to here,
     # past it the call fails with the reason rather than tying up a writer slot for longer.
     retry_after_cap_ms: int = 300_000
@@ -182,13 +185,14 @@ class CapsuleConfig:
     # the same prompt after each of these waits, and never counts against the six above. Every re-ask
     # is an HTTP call on the page's bill and the run's budget (`run_budget`), and the night's per-player
     # ceiling counts it. Lane 50's 40-page samples ended 4 of 38 blocks "throttled" on the last ask.
-    throttle_waits_ms: tuple[int, ...] = (15_000, 45_000, 90_000)
+    # Four calls of 30 s of 429 backoffs and these 30 s of re-ask waits make the 150 s cap exactly.
+    throttle_waits_ms: tuple[int, ...] = (5_000, 10_000, 15_000)
     # The most one ask waits on throttles, every wait together: the gateway's own 429 backoffs and
-    # `retry-after` included (`throttle_waits.AskWaits`, the review's M1). The waits above sum to it.
+    # `retry-after` included (`throttle_waits.AskWaits`, the review's M1).
     throttle_ask_wait_cap_ms: int = 150_000
-    # The most a whole run waits on throttles, every page together (`throttle_waits.RunWaits`): 20 minutes
-    # summed over the pages in flight, so a gateway down for the night costs the run minutes, not hours.
-    throttle_run_wait_cap_ms: int = 1_200_000
+    # The run's throttle pool, every page together (`throttle_waits.run_wait_cap_s`, ruled for the
+    # re-review's N2): an ask's cap for every writer slot, this many times over (4,800 s at 16 slots).
+    throttle_run_asks_per_slot: int = 2
     # The heaviest prompt a trial page's start rule assumes (`run_budget.room_for_page`): Lane 50
     # measured 4,517 prompt tokens at most; the dollar reservation itself reads each call's real prompt.
     trial_worst_prompt_tokens: int = 8_000

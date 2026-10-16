@@ -14,11 +14,13 @@ from research.capsules import generate
 from research.capsules.config import CAPSULE_CONFIG, WriterSettings
 from research.capsules.gateway import Completion, GatewayClient, GenerationError
 from research.capsules.gateway_ledger import ModelPrice, Usage
-from research.capsules.generate import CapsuleResult, describe_fallback, generate_capsule
+from research.capsules.generate import CapsuleResult, _ask, describe_fallback, generate_capsule
 from research.capsules.narrative import NarrativeResult
 from research.capsules.run_budget import BudgetSpentError, RunBudget, parse_budget
-from research.capsules.throttle_waits import AskWaits, RunWaits
+from research.capsules.throttle_waits import AskWaits, RunWaits, run_wait_cap_s
 from research.capsules.validate import ValidationResult
+from research.nightly.capsule_gate import CapsuleGateResult
+from research.nightly.capsule_step import CapsuleSpend
 
 WAITS = CAPSULE_CONFIG.throttle_waits_ms
 _WORDS = " ".join(["word"] * 30)
@@ -305,3 +307,61 @@ def test_a_runs_throttle_waits_are_bounded_across_its_asks() -> None:
     assert not second.take(15)
     assert second.take(5)
     assert not first.take(1)
+
+
+# The re-review's N2: the run's pool sized to the run, said loudly when dry, and re-asks that fit.
+
+_ASK_CAP_S = CAPSULE_CONFIG.throttle_ask_wait_cap_ms / 1000
+_SLOTS = 16
+_POOL_AT_16_S = 4_800
+
+
+def _answers(*responses: httpx.Response) -> Callable[[httpx.Request], httpx.Response]:
+    queue = iter(responses)
+    return lambda request: next(queue)
+
+
+def test_the_runs_pool_is_an_asks_cap_per_slot_twice_over() -> None:
+    assert run_wait_cap_s(_SLOTS) == _POOL_AT_16_S
+    http = httpx.Client(transport=httpx.MockTransport(lambda r: _ok()))
+    client = GatewayClient.for_run("k", http, WriterSettings("m/x", _SLOTS, 600))
+    assert client.waits.cap_s == _POOL_AT_16_S
+
+
+def test_an_ask_that_meets_429s_on_every_call_still_makes_all_its_re_asks_inside_the_cap() -> None:
+    client = _client(lambda r: httpx.Response(429))
+    slept = _sleeps(client)
+    with pytest.raises(GenerationError, match="429"):
+        _ask(client, [{"role": "user", "content": "hi"}], 10)
+    posts_per_call = len(CAPSULE_CONFIG.gateway.retry.rate_limit_backoff_ms) + 1
+    assert client.calls == posts_per_call * (len(WAITS) + 1)  # the first call and every re-ask were made
+    assert sum(slept) <= _ASK_CAP_S
+
+
+def test_an_ask_with_two_429s_on_its_re_ask_completes_inside_the_cap() -> None:
+    posts_per_call = len(CAPSULE_CONFIG.gateway.retry.rate_limit_backoff_ms) + 1
+    client = _client(_answers(*[httpx.Response(429)] * (posts_per_call + 2), _ok()))
+    slept = _sleeps(client)
+    answer = _ask(client, [{"role": "user", "content": "hi"}], 10)
+    assert answer.content == _WORDS
+    assert sum(slept) <= _ASK_CAP_S
+
+
+@pytest.mark.usefixtures("quiet_page")
+def test_a_dry_pool_is_one_loud_line_naming_the_asks_and_the_pages_it_cost() -> None:
+    client = _client(lambda r: httpx.Response(429))
+    client.waits = RunWaits(cap_s=1)
+    _sleeps(client)
+    result = generate_capsule(cast("Any", None), client)
+    assert result.source == "facts"
+    line = client.waits.line()
+    assert line is not None
+    assert line.startswith("THROTTLE ALLOWANCE SPENT after 1 asks, 1 page fell to facts")
+    assert RunWaits().line() is None
+
+
+def test_the_publish_gate_summary_and_the_spend_line_carry_the_alarm() -> None:
+    alarm = "THROTTLE ALLOWANCE SPENT after 40 asks, 12 pages fell to facts (the run's 4800 s of throttle waits)"
+    gate = CapsuleGateResult(40, 28, 12, 0, 0, (), CAPSULE_CONFIG.unwritten_line(in_season=True), throttle_alarm=alarm)
+    assert gate.summary().startswith(alarm)
+    assert CapsuleSpend(throttle_alarm=alarm).line().endswith(alarm)

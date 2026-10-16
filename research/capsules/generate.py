@@ -341,6 +341,12 @@ def _assemble(
     )
 
 
+def _note_dry_pool(gateway: GatewayClient, compact: ReadResult, full: ReadResult) -> None:
+    """A page that fell to its facts block on a throttle once the run's pool ran dry is counted on it."""
+    if gateway.waits.dry and any(r.fallback is not None and r.fallback.kind == THROTTLED for r in (compact, full)):
+        gateway.waits.page_fell()
+
+
 def describe_fallback(compact: ReadResult, full: ReadResult) -> str:
     """`describeCapsuleFallback`: one player's outcome in words an operator scans."""
     reasons = [r for r in (compact.fallback, full.fallback) if r is not None]
@@ -369,6 +375,7 @@ def generate_capsule(
             NOT_AN_OBJECT if failure.first_violation == NOT_AN_OBJECT else "the gateway never returned a usable answer"
         )
         floor = _facts_block(facts, _Read(), failure)
+        _note_dry_pool(gateway, floor, floor)
         return _assemble((floor, floor), failed_narrative(reason), outcome.usage, gateway.model, gateway.calls - before)
     remaining = CAPSULE_CONFIG.max_gateway_calls_per_player - outcome.calls
     full_start = _start(facts, "full", outcome.bundle.full)
@@ -383,6 +390,7 @@ def generate_capsule(
     settled = settle_narrative(outcome.bundle.narrative, facts, requests, gateway.model)
     left = CAPSULE_CONFIG.max_gateway_calls_per_player - outcome.calls - compact_calls - full_calls
     narrative, voice_usage = _rewrite_voice_slots(settled, facts, requests, gateway, left)
+    _note_dry_pool(gateway, compact, full)
     return _assemble(
         _one_kind(facts, (compact, full)),
         narrative,

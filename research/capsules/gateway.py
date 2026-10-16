@@ -43,7 +43,7 @@ from research.capsules.gateway_ledger import (
     as_dict,
 )
 from research.capsules.pace import TokenBucket
-from research.capsules.throttle_waits import AskWaits, RunWaits
+from research.capsules.throttle_waits import AskWaits, RunWaits, run_wait_cap_s
 
 if TYPE_CHECKING:
     from research.capsules.run_budget import RunBudget
@@ -186,6 +186,7 @@ class GatewayClient:
             bucket=TokenBucket(settings.calls_per_minute, settings.concurrency, clock, sleep),
             clock=clock,
             sleep=sleep,
+            waits=RunWaits(run_wait_cap_s(settings.concurrency)),
         )
 
     def with_budget(self, budget: "RunBudget") -> "GatewayClient":
