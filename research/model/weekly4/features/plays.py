@@ -269,6 +269,22 @@ def _dropback(b: _Builder, play: Play) -> None:
         )
 
 
+def merge(parts: Iterable[Tallies]) -> Tallies:
+    """The tallies of several games (their keys are disjoint: a club plays once a week)."""
+    players: dict[PlayerWeek, PlayerTally] = {}
+    clubs: dict[ClubWeek, Counts] = {}
+    defences: dict[ClubWeek, Pressure] = {}
+    groups: dict[ClubWeek, Mapping[str, GroupTargets]] = {}
+    for part in parts:
+        players.update(part.players)
+        clubs.update(part.clubs)
+        defences.update(part.defences)
+        groups.update(part.groups)
+    return Tallies(
+        MappingProxyType(players), MappingProxyType(clubs), MappingProxyType(defences), MappingProxyType(groups)
+    )
+
+
 def tally(plays: Iterable[Play], positions: Mapping[str, str]) -> Tallies:
     """Every game's tallies among `plays`, by (player, week) and (club, week)."""
     b = _Builder()

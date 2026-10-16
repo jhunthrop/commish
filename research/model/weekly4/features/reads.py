@@ -16,7 +16,7 @@ from typing import Any, Final
 
 from sqlalchemy import Connection, text
 
-from research.model.instants import ms_instant
+from research.model.instants import FAR_FUTURE, ms_instant
 from research.model.weekly3.ledger import ReadKind, Stamped
 from research.model.weekly4.features.admitted import (
     BOX_TEAM_METRICS,
@@ -45,6 +45,8 @@ from research.pipeline.nflverse.schedule import ScheduleSource
 from research.pipeline.nws.forecast import FORECAST_SOURCE
 from research.pipeline.observations import PlayerWeekObservation, TeamWeekObservation
 
+# Schedule knowledge is read whole, as round 3 reads its kickoffs and home field (item 4).
+SCHEDULE_UNTIL: Final = FAR_FUTURE
 WEATHER_SELECTED: Final = (*WEATHER_KEY_COLUMNS, *WEATHER_COLUMNS, *WEATHER_SOURCE_COLUMNS)
 CHARTED_SOURCES: Final = ((NGS_SOURCE, NGS_METRICS), (PFR_SOURCE, PFR_METRICS))
 # Each club-row read's sources and metrics, by kind: the guard test compares their product with the list.
