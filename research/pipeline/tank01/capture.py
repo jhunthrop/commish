@@ -7,19 +7,23 @@ of its canonical form; a feed whose digest equals its latest stored one writes n
 feed's failure is an outcome, never a fabricated row and never the whole pass's failure.
 
 THE HARVEST (`capture-harvest-job.ts`) runs five cheap, daily-value feeds against a fixed per-run
-budget of ten requests. Its follow-on event (enqueuing peek-document rebuilds for the players
+budget of ten requests. The game lines feed asks for every game day still ahead in the week the
+provider schedule places next (Lane 66a, `week_game_dates`), one request a day, so a Tuesday pass
+already holds Sunday's figures; with no stored schedule it asks for the capture's own day, as the
+TypeScript did. Its follow-on event (enqueuing peek-document rebuilds for the players
 whose designation or headlines moved) is a capsule concern and lands with the capsules in phase C.
 """
 
 import hashlib
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from typing import Final, Literal
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import Connection, select, text
 
-from research.db.schema import CAPTURE_SNAPSHOTS, PROVIDER_WEEKS
+from research.db.schema import CAPTURE_SNAPSHOTS, PROVIDER_GAMES, PROVIDER_WEEKS
 from research.pipeline.budget import FixedBudget, RequestBudget
 from research.pipeline.jscompat import js_iso, js_json_stringify, js_object_keys
 from research.pipeline.nflverse.team_codes import NFL_TEAM_ABBREVIATIONS
@@ -27,11 +31,13 @@ from research.pipeline.tank01.client import Paths, Tank01Client
 from research.pipeline.tank01.mapping import ADP_TYPE
 from research.pipeline.tolerated import TOLERATED_FAILURES
 
-Cadence = Literal["daily", "game-day", "weekly"]
+Cadence = Literal["daily", "game-day", "game-week", "weekly"]
 Status = Literal["captured", "unchanged", "fresh", "off-cadence", "budget-refused", "failed"]
 
 _GAME_DAYS_UTC: Final = (0, 1, 4, 5, 6)  # JavaScript's getUTCDay: Sunday 0, Monday 1, Thursday to Saturday.
 CAPTURE_HARVEST_REQUEST_BUDGET: Final = 10
+# The provider dates a game by its Eastern day.
+_EASTERN: Final = ZoneInfo("America/New_York")
 
 
 @dataclass(frozen=True)
@@ -40,6 +46,8 @@ class CaptureContext:
     week: int
     day: str
     teams: tuple[str, ...]
+    # The game days still ahead in the coming week (YYYYMMDD, Eastern), empty without a schedule.
+    game_dates: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -64,7 +72,11 @@ CAPTURE_FEEDS: tuple[CaptureFeed, ...] = (
     CaptureFeed("tank01_depth_charts", "daily", lambda _c: [CaptureRequest(Paths.DEPTH_CHARTS, {})]),
     CaptureFeed("tank01_changelog", "daily", lambda _c: [CaptureRequest(Paths.CHANGELOG, {})]),
     CaptureFeed("tank01_news", "daily", lambda _c: [CaptureRequest(Paths.NEWS, {"fantasyNews": "true"})]),
-    CaptureFeed("tank01_betting_odds", "game-day", lambda c: [CaptureRequest(Paths.BETTING_ODDS, {"gameDate": c.day})]),
+    CaptureFeed(
+        "tank01_betting_odds",
+        "game-week",
+        lambda c: [CaptureRequest(Paths.BETTING_ODDS, {"gameDate": d}) for d in (c.game_dates or (c.day,))],
+    ),
     CaptureFeed("tank01_dfs_salaries", "game-day", lambda c: [CaptureRequest(Paths.DFS, {"date": c.day})]),
     CaptureFeed("tank01_adp", "weekly", lambda _c: [CaptureRequest(Paths.ADP, {"adpType": ADP_TYPE})]),
     CaptureFeed("tank01_projections", "daily", lambda c: [CaptureRequest(Paths.PROJECTIONS, {"week": str(c.week)})]),
@@ -83,10 +95,31 @@ def harvest_feeds(feeds: Sequence[CaptureFeed] = CAPTURE_FEEDS) -> list[CaptureF
     return [feed for feed in feeds if feed.source in HARVEST_FEED_SOURCES]
 
 
-def cadence_allows(cadence: Cadence, at: datetime) -> bool:
-    if cadence != "game-day":
+def cadence_allows(cadence: Cadence, at: datetime, context: CaptureContext | None = None) -> bool:
+    """A game-week feed is due whenever a game is ahead in the week, else on game days as a game-day
+    feed is."""
+    if cadence == "game-week" and context is not None and context.game_dates:
+        return True
+    if cadence not in ("game-day", "game-week"):
         return True
     return (at.isoweekday() % 7) in _GAME_DAYS_UTC
+
+
+def week_game_dates(games: Sequence[tuple[int, date]], at: datetime) -> tuple[str, ...]:
+    """The game days of the earliest week with a game on or after today (Eastern), from today on."""
+    today = at.astimezone(_EASTERN).date()
+    ahead = [(week, day) for week, day in games if day >= today]
+    if not ahead:
+        return ()
+    week = min(w for w, _ in ahead)
+    return tuple(sorted({day.strftime("%Y%m%d") for w, day in ahead if w == week}))
+
+
+def stored_week_game_dates(conn: Connection, season: int, at: datetime) -> tuple[str, ...]:
+    """`week_game_dates` over the provider schedule's dated games of the season."""
+    table = PROVIDER_GAMES
+    query = select(table.c.week, table.c.game_date).where(table.c.season == season, table.c.game_date.is_not(None))
+    return week_game_dates([(int(r.week), r.game_date) for r in conn.execute(query)], at)
 
 
 def _canonical(value: object) -> object:
@@ -144,15 +177,16 @@ class CapturePass:
     teams: tuple[str, ...] = NFL_TEAM_ABBREVIATIONS
     feeds: Sequence[CaptureFeed] = CAPTURE_FEEDS
     is_fresh: Callable[[str], bool] = lambda _key: False
+    game_dates: tuple[str, ...] = ()
 
 
 def _due(
-    feeds: Sequence[CaptureFeed], at: datetime, is_fresh: Callable[[str], bool]
+    feeds: Sequence[CaptureFeed], at: datetime, is_fresh: Callable[[str], bool], context: CaptureContext
 ) -> tuple[list[CaptureFeed], list[FeedOutcome]]:
     due: list[CaptureFeed] = []
     skipped: list[FeedOutcome] = []
     for feed in feeds:
-        if not cadence_allows(feed.cadence, at):
+        if not cadence_allows(feed.cadence, at, context):
             skipped.append(FeedOutcome(feed.source, "off-cadence", 0))
         elif is_fresh(f"commish:capture:attempted:{feed.source}"):
             skipped.append(FeedOutcome(feed.source, "fresh", 0))
@@ -189,10 +223,9 @@ def capture_once(
     budget: RequestBudget,
 ) -> CaptureResult:
     """`captureOnce`: due feeds, one budget reservation, each feed captured, unchanged or failed."""
-    context = CaptureContext(
-        capture.season, capture.week, js_iso(capture.captured_at)[:10].replace("-", ""), capture.teams
-    )
-    due, skipped = _due(capture.feeds, capture.captured_at, capture.is_fresh)
+    day = js_iso(capture.captured_at)[:10].replace("-", "")
+    context = CaptureContext(capture.season, capture.week, day, capture.teams, capture.game_dates)
+    due, skipped = _due(capture.feeds, capture.captured_at, capture.is_fresh, context)
     if not due:
         return CaptureResult(skipped)
     reservation = budget.reserve(sum(len(feed.requests(context)) for feed in due))
@@ -217,6 +250,13 @@ def current_nfl_week(conn: Connection, season: int) -> int:
 
 
 def run_capture_harvest(conn: Connection, client: Tank01Client, fired_at: datetime, season: int) -> CaptureResult:
-    """The capture-harvest job's capture: five feeds, a ten-request ceiling, no freshness keys."""
-    capture = CapturePass(fired_at, season, current_nfl_week(conn, season), feeds=harvest_feeds())
+    """The capture-harvest job's capture: five feeds, a ten-request ceiling, no freshness keys. The
+    lines feed takes one request per game day left in the week (at most five, a holiday week)."""
+    capture = CapturePass(
+        fired_at,
+        season,
+        current_nfl_week(conn, season),
+        feeds=harvest_feeds(),
+        game_dates=stored_week_game_dates(conn, season, fired_at),
+    )
     return capture_once(conn, client, capture, FixedBudget(CAPTURE_HARVEST_REQUEST_BUDGET))
