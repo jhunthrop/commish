@@ -15,8 +15,27 @@ type siteFacts struct {
 	// weekEnds are each week's last game day, by season.
 	weekEnds map[int][]time.Time
 	boards   map[int]bool
-	reads    int
-	fail     error
+	// postseason is each season's last postseason week and game day.
+	postseason map[int]postseasonEnd
+	// boardWeeks is the first week of the published board, by season.
+	boardWeeks map[int]int
+	reads      int
+	fail       error
+}
+
+type postseasonEnd struct {
+	week int
+	day  time.Time
+}
+
+func (f *siteFacts) PostseasonEnd(_ context.Context, y int) (int, time.Time, bool, error) {
+	p, ok := f.postseason[y]
+	return p.week, p.day, ok, f.fail
+}
+
+func (f *siteFacts) BoardWeek(_ context.Context, y int) (int, bool, error) {
+	w, ok := f.boardWeeks[y]
+	return w, ok, f.fail
 }
 
 func (f *siteFacts) FirstKickoff(_ context.Context, y int) (time.Time, bool, error) {

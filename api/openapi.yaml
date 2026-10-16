@@ -1904,6 +1904,12 @@ components:
         phase: { type: string, enum: [preseason, in_season, playoffs, offseason] }
         week: { type: integer, description: "the NFL week in play, 0 before week 1 and after the season" }
         basis: { type: string, description: one sentence naming the fact the phase came from, in the site's words }
+        board_week:
+          type: integer
+          description: >-
+            the first week the published board covers, read from the published run the board routes read. Absent
+            (never null) before the first in-season board, outside the regular season, and when the board's week
+            could not be read, which basis then says. When it is behind week, basis says why.
     LeagueChoice:
       type: object
       description: >-

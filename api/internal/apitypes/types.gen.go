@@ -2882,8 +2882,11 @@ type SheetUpdate struct {
 // SiteSeason the NFL season the site is in, for a visitor with no league, from the kickoffs the API reads
 type SiteSeason struct {
 	// Basis one sentence naming the fact the phase came from
-	Basis string          `json:"basis"`
-	Phase SiteSeasonPhase `json:"phase"`
+	Basis string `json:"basis"`
+
+	// BoardWeek the first week the published board covers, read from the published run the board routes read. Absent (never null) before the first in-season board, outside the regular season, and when the board's week could not be read, which basis then says. When it is behind week, basis says why.
+	BoardWeek *int            `json:"board_week,omitempty"`
+	Phase     SiteSeasonPhase `json:"phase"`
 
 	// Week the NFL week in play, 0 before week 1 and after the season
 	Week int `json:"week"`

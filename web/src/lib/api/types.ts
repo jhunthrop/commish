@@ -1582,6 +1582,8 @@ export interface components {
 			week: number;
 			/** @description one sentence naming the fact the phase came from */
 			basis: string;
+			/** @description the first week the published board covers, read from the published run the board routes read. Absent (never null) before the first in-season board, outside the regular season, and when the board's week could not be read, which basis then says. When it is behind week, basis says why. */
+			board_week?: number;
 		};
 		/** @description exactly one of league_id (a followed league) and format (no league: any board format, the web offering the ones the run carries) */
 		LeagueChoice: {

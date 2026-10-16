@@ -22,7 +22,11 @@ func siteSeason(ctx context.Context, src Season) apitypes.SiteSeason {
 	if src != nil {
 		p = src.Phase(ctx)
 	}
-	return apitypes.SiteSeason{Phase: apitypes.SiteSeasonPhase(p.Phase), Week: p.Week, Basis: p.Basis}
+	out := apitypes.SiteSeason{Phase: apitypes.SiteSeasonPhase(p.Phase), Week: p.Week, Basis: p.Basis}
+	if p.BoardWeek > 0 {
+		out.BoardWeek = &p.BoardWeek
+	}
+	return out
 }
 
 // SeasonHandler serves the site's season to anyone (GET /season), so a
