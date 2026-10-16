@@ -4,12 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"math"
 	"sort"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/jhunthrop/commish/api/internal/season"
 	"github.com/jhunthrop/commish/api/internal/sleeper"
 )
 
@@ -24,6 +26,7 @@ type SleeperAPI interface {
 	NFLState(ctx context.Context) (sleeper.State, error)
 	UserID(ctx context.Context, username string) (string, error)
 	Players(ctx context.Context) ([]sleeper.Player, error)
+	Draft(ctx context.Context, id string) (sleeper.Draft, error)
 }
 
 // stateTTL is how long the NFL's week is kept: it is one read for every
@@ -34,6 +37,11 @@ const stateTTL = time.Minute
 type Sleeper struct {
 	API SleeperAPI
 	Now func() time.Time
+	// Log is where a failed draft read is said, nil for none.
+	Log *slog.Logger
+	// Season is the site's season: the NFL state's week counts only
+	// once the season is past the preseason. Nil takes the week as is.
+	Season SiteSeason
 
 	mu      sync.Mutex
 	state   sleeper.State
@@ -102,8 +110,10 @@ func (s *Sleeper) Read(ctx context.Context, ref Ref) (Snapshot, error) {
 		Ref: ref, Name: league.Name, Status: league.Status, Season: league.Season,
 		Teams: sleeperTeams(rosters, users), Scoring: sleeperScoring(league.Scoring),
 		Shape: sleeperShape(league), ReadAt: s.Now(),
+		Calendar: Calendar{PlayoffStartWeek: league.PlayoffWeekStart, WaiversClosed: league.AddsDisabled},
 	}
-	if league.Season == state.Season && league.Status != sleeper.LeaguePreDraft && state.Week >= 1 {
+	snap.Calendar.DraftAt = s.draftTime(ctx, league)
+	if league.Season == state.Season && league.Status != sleeper.LeaguePreDraft && state.Week >= 1 && !s.preseason(ctx) {
 		snap.Week = state.Week
 	}
 	if snap.Week == 0 {
@@ -230,4 +240,28 @@ func (s *Sleeper) Players(ctx context.Context, _ int) ([]HostPlayer, error) {
 		out = append(out, HostPlayer{ID: p.ID, Name: p.Name, Position: p.Position, Team: cleanTeam(p.Team), ESPNID: p.ESPNID})
 	}
 	return out, nil
+}
+
+// preseason says the site's season has not reached week 1: the NFL
+// state may count preseason weeks, which are no league's week.
+func (s *Sleeper) preseason(ctx context.Context) bool {
+	return s.Season != nil && s.Season.Phase(ctx).Phase == season.SitePreseason
+}
+
+// draftTime is the start time of a league's draft not yet done, from the
+// draft itself; nil for a drafted league, a draft with no time set, or a
+// draft read that failed (said in the log: the time is a fact the league
+// reads without).
+func (s *Sleeper) draftTime(ctx context.Context, league sleeper.League) *time.Time {
+	if league.DraftID == "" || (league.Status != sleeper.LeaguePreDraft && league.Status != sleeper.LeagueDrafting) {
+		return nil
+	}
+	d, err := s.API.Draft(ctx, league.DraftID)
+	if err != nil {
+		if s.Log != nil {
+			s.Log.Warn("leaguesync: sleeper draft time", "league", league.ID, "draft", league.DraftID, "err", err)
+		}
+		return nil
+	}
+	return d.StartTime
 }

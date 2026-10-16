@@ -564,6 +564,33 @@ func (e LeagueMoveKind) Valid() bool {
 	}
 }
 
+// Defines values for LeaguePhase.
+const (
+	LeaguePhaseDraftDay  LeaguePhase = "draft_day"
+	LeaguePhaseInSeason  LeaguePhase = "in_season"
+	LeaguePhaseOffseason LeaguePhase = "offseason"
+	LeaguePhasePlayoffs  LeaguePhase = "playoffs"
+	LeaguePhasePreDraft  LeaguePhase = "pre_draft"
+)
+
+// Valid indicates whether the value is a known member of the LeaguePhase enum.
+func (e LeaguePhase) Valid() bool {
+	switch e {
+	case LeaguePhaseDraftDay:
+		return true
+	case LeaguePhaseInSeason:
+		return true
+	case LeaguePhaseOffseason:
+		return true
+	case LeaguePhasePlayoffs:
+		return true
+	case LeaguePhasePreDraft:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for Lineup.
 const (
 	LineupStandard  Lineup = "standard"
@@ -1083,6 +1110,30 @@ func (e SheetTag) Valid() bool {
 	}
 }
 
+// Defines values for SiteSeasonPhase.
+const (
+	SiteSeasonPhaseInSeason  SiteSeasonPhase = "in_season"
+	SiteSeasonPhaseOffseason SiteSeasonPhase = "offseason"
+	SiteSeasonPhasePlayoffs  SiteSeasonPhase = "playoffs"
+	SiteSeasonPhasePreseason SiteSeasonPhase = "preseason"
+)
+
+// Valid indicates whether the value is a known member of the SiteSeasonPhase enum.
+func (e SiteSeasonPhase) Valid() bool {
+	switch e {
+	case SiteSeasonPhaseInSeason:
+		return true
+	case SiteSeasonPhaseOffseason:
+		return true
+	case SiteSeasonPhasePlayoffs:
+		return true
+	case SiteSeasonPhasePreseason:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for WaiverMovesClaim.
 const (
 	WaiverMovesClaimAvailable   WaiverMovesClaim = "available"
@@ -1141,6 +1192,9 @@ type Account struct {
 	// Leagues every league the account follows, newest first, as the shell's switcher lists them
 	Leagues    []ContextLeague  `json:"leagues"`
 	Membership *MembershipState `json:"membership"`
+
+	// Season the NFL season the site is in, for a visitor with no league, from the kickoffs the API reads
+	Season SiteSeason `json:"season"`
 }
 
 // AccountUpdate defines model for AccountUpdate.
@@ -1194,21 +1248,36 @@ type AttachSeat struct {
 type AttachedLeague struct {
 	AttachedAt time.Time `json:"attached_at"`
 
+	// DraftAt the host's draft time, null when the host does not say
+	DraftAt *time.Time `json:"draft_at"`
+
 	// Host the host a league runs on, named as a mechanism
 	Host         LeagueHost         `json:"host"`
 	HostLeagueId string             `json:"host_league_id"`
 	Id           openapi_types.UUID `json:"id"`
 
 	// Name the league's name at its last read
-	Name     string `json:"name"`
-	RosterId int    `json:"roster_id"`
-	Season   int    `json:"season"`
+	Name string `json:"name"`
+
+	// Phase where a followed league is in its season, computed at read time from the host's facts: pre_draft before its draft, draft_day when the draft starts within 24 hours or is under way, in_season from the draft to the playoffs (a drafted league the host gives no current week is in_season while the site season is preseason), playoffs from the league's playoff start week until the host says the season is over, offseason after it (or a drafted league with no current week once the NFL regular season has ended)
+	Phase LeaguePhase `json:"phase"`
+
+	// PhaseBasis one sentence naming the fact the phase came from, in the site's words
+	PhaseBasis string `json:"phase_basis"`
+
+	// PlayoffStartWeek the league's first playoff week as the host states it, null when the host does not say
+	PlayoffStartWeek *int `json:"playoff_start_week"`
+	RosterId         int  `json:"roster_id"`
+	Season           int  `json:"season"`
 
 	// Standing the drafter's record and place at the last read, null when unread
 	Standing *LeagueStanding `json:"standing"`
 
 	// TeamName the drafter's team at the last read, empty when unread
 	TeamName string `json:"team_name"`
+
+	// WaiversOpen the host still runs waivers this week: false in and after the playoffs where the host closes them, and once the season is over, else true
+	WaiversOpen bool `json:"waivers_open"`
 }
 
 // BoardFormat defines model for BoardFormat.
@@ -1390,6 +1459,9 @@ type ConnectedHost string
 
 // ContextLeague a followed league as the site's context reads it
 type ContextLeague struct {
+	// DraftAt the host's draft time, null when the host does not say
+	DraftAt *time.Time `json:"draft_at"`
+
 	// Format the board the league reads on: superflex for a superflex lineup, otherwise ppr, half_ppr or standard by the league's points per reception (TE premium reads on ppr until its exact rules have a board)
 	Format BoardFormat `json:"format"`
 
@@ -1402,6 +1474,15 @@ type ContextLeague struct {
 	// Name the league's name at its last read, else its saved league's
 	Name string `json:"name"`
 
+	// Phase where a followed league is in its season, computed at read time from the host's facts: pre_draft before its draft, draft_day when the draft starts within 24 hours or is under way, in_season from the draft to the playoffs (a drafted league the host gives no current week is in_season while the site season is preseason), playoffs from the league's playoff start week until the host says the season is over, offseason after it (or a drafted league with no current week once the NFL regular season has ended)
+	Phase LeaguePhase `json:"phase"`
+
+	// PhaseBasis one sentence naming the fact the phase came from, in the site's words
+	PhaseBasis string `json:"phase_basis"`
+
+	// PlayoffStartWeek the league's first playoff week as the host states it, null when the host does not say
+	PlayoffStartWeek *int `json:"playoff_start_week"`
+
 	// Scoring the preset the league's scoring is, or scores most like (its saved league's, else its last read's)
 	Scoring ScoringPreset `json:"scoring"`
 
@@ -1413,6 +1494,9 @@ type ContextLeague struct {
 
 	// TeamName the drafter's team at the last read, empty when unread
 	TeamName string `json:"team_name"`
+
+	// WaiversOpen the host still runs waivers this week: false in and after the playoffs where the host closes them, and once the season is over, else true
+	WaiversOpen bool `json:"waivers_open"`
 }
 
 // Device defines model for Device.
@@ -1868,6 +1952,9 @@ type LeagueMove struct {
 
 // LeagueMoveKind defines model for LeagueMove.Kind.
 type LeagueMoveKind string
+
+// LeaguePhase where a followed league is in its season, computed at read time from the host's facts: pre_draft before its draft, draft_day when the draft starts within 24 hours or is under way, in_season from the draft to the playoffs (a drafted league the host gives no current week is in_season while the site season is preseason), playoffs from the league's playoff start week until the host says the season is over, offseason after it (or a drafted league with no current week once the NFL regular season has ended)
+type LeaguePhase string
 
 // LeaguePlayer defines model for LeaguePlayer.
 type LeaguePlayer struct {
@@ -2791,6 +2878,19 @@ type SheetTags = []string
 type SheetUpdate struct {
 	Name string `json:"name"`
 }
+
+// SiteSeason the NFL season the site is in, for a visitor with no league, from the kickoffs the API reads
+type SiteSeason struct {
+	// Basis one sentence naming the fact the phase came from
+	Basis string          `json:"basis"`
+	Phase SiteSeasonPhase `json:"phase"`
+
+	// Week the NFL week in play, 0 before week 1 and after the season
+	Week int `json:"week"`
+}
+
+// SiteSeasonPhase defines model for SiteSeason.Phase.
+type SiteSeasonPhase string
 
 // TradeAdvice defines model for TradeAdvice.
 type TradeAdvice struct {

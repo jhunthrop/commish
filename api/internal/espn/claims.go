@@ -401,6 +401,7 @@ type wireAcquisition struct {
 	MinimumBid               int      `json:"minimumBid"`
 	AcquisitionType          string   `json:"acquisitionType"`
 	WaiverProcessDays        []string `json:"waiverProcessDays"`
+	AcquisitionLimit         *int     `json:"acquisitionLimit"`
 }
 
 // acquisitionOf is the league's waiver settings, bounded: a budget or a
@@ -408,7 +409,7 @@ type wireAcquisition struct {
 // sent on a number we cannot trust.
 func acquisitionOf(w wireAcquisition) Acquisition {
 	a := Acquisition{Budget: w.IsUsingAcquisitionBudget, Total: w.AcquisitionBudget, MinimumBid: w.MinimumBid,
-		Type: bounded64(text(w.AcquisitionType))}
+		Type: bounded64(text(w.AcquisitionType)), Closed: w.AcquisitionLimit != nil && *w.AcquisitionLimit == 0}
 	if a.Total < 0 || a.Total > maxBudget || a.MinimumBid < 0 || a.MinimumBid > a.Total {
 		a.Budget, a.Total, a.MinimumBid = false, 0, 0
 	}

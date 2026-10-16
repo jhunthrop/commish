@@ -25,6 +25,7 @@ func yahooSnapshot(l yahoo.League, ids map[string]string, now time.Time) Snapsho
 		Ref:  Ref{Host: HostYahoo, LeagueID: l.LeagueID, Season: l.Season},
 		Name: scoring.HostText(l.Name), Status: yahooStatus(l), Season: l.Season, Week: l.Scoreboard.Week,
 		Players: map[string]HostPlayer{}, ReadAt: now,
+		Calendar: Calendar{DraftAt: l.DraftAt, PlayoffStartWeek: l.PlayoffStartWeek},
 	}
 	if snap.Week == 0 {
 		snap.Week = l.CurrentWeek
@@ -69,13 +70,13 @@ func yahooSnapshot(l yahoo.League, ids map[string]string, now time.Time) Snapsho
 func yahooStatus(l yahoo.League) string {
 	switch {
 	case l.Finished:
-		return "complete"
+		return StatusComplete
 	case l.DraftStatus == "predraft":
-		return "pre_draft"
+		return StatusPreDraft
 	case l.DraftStatus == "draft":
-		return "drafting"
+		return StatusDrafting
 	}
-	return "in_season"
+	return StatusInSeason
 }
 
 // addYahooPlayer keeps a player in the snapshot's directory, with our

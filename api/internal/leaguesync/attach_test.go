@@ -45,6 +45,9 @@ func (offline) Transactions(context.Context, string, int) ([]sleeper.Transaction
 func (offline) NFLState(context.Context) (sleeper.State, error)   { return sleeper.State{}, errOffline }
 func (offline) UserID(context.Context, string) (string, error)    { return "", sleeper.ErrNotFound }
 func (offline) Players(context.Context) ([]sleeper.Player, error) { return nil, errOffline }
+func (offline) Draft(context.Context, string) (sleeper.Draft, error) {
+	return sleeper.Draft{}, errOffline
+}
 
 type offlineMFL struct{}
 
@@ -66,6 +69,9 @@ func (offlineMFL) SeasonStatus(context.Context, int) (mfl.Status, error) {
 	return mfl.Status{}, errOffline
 }
 func (offlineMFL) Players(context.Context, int) ([]mfl.Player, error) { return nil, errOffline }
+func (offlineMFL) DraftResults(context.Context, int, string) (mfl.DraftResults, error) {
+	return mfl.DraftResults{}, errOffline
+}
 
 func replayHosts(now func() time.Time) Hosts {
 	return Hosts{
@@ -213,6 +219,9 @@ func TestAttachIsScopedToTheAccount(t *testing.T) {
 	if err := json.Unmarshal(body, &list); err != nil || len(list) != 1 || list[0].Id != aliceSync.Id || list[0].TeamName == "" ||
 		list[0].Standing == nil || list[0].Standing.Teams != 12 || list[0].Standing.Place < 1 {
 		t.Fatalf("alice's list %s", body)
+	}
+	if l := list[0]; l.Phase != apitypes.LeaguePhaseInSeason || l.PhaseBasis == "" || l.PlayoffStartWeek == nil || *l.PlayoffStartWeek != 15 || !l.WaiversOpen {
+		t.Fatalf("alice's league's phase in the list: %s", body)
 	}
 
 	// A second league needs many_leagues, so alice holds a Draft Pass for it.

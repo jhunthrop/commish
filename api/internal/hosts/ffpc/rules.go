@@ -25,6 +25,36 @@ type Rules struct {
 	// OfficialRules is the official rules page the league's rules page
 	// links to, where FFPC states the scoring in full; empty when none.
 	OfficialRules string `json:"official_rules"`
+	// PlayoffStartWeek is the league's first playoff week from the rules'
+	// Duration row ("League Playoffs Weeks 13-14", else the week after
+	// "Regular season Weeks 1-12"), 0 when the row does not say.
+	PlayoffStartWeek int `json:"playoff_start_week,omitempty"`
+}
+
+var (
+	playoffWeeks = regexp.MustCompile(`(?i)playoffs? weeks? ([0-9]{1,2})`)
+	regularWeeks = regexp.MustCompile(`(?i)regular season weeks? [0-9]{1,2}-([0-9]{1,2})`)
+)
+
+// playoffStart reads the Duration row's first playoff week.
+func playoffStart(duration string) int {
+	if m := playoffWeeks.FindStringSubmatch(duration); m != nil {
+		n, _ := strconv.Atoi(m[1])
+		return boundedWeek(n)
+	}
+	if m := regularWeeks.FindStringSubmatch(duration); m != nil {
+		n, _ := strconv.Atoi(m[1])
+		return boundedWeek(n + 1)
+	}
+	return 0
+}
+
+// boundedWeek is a week within a season's schedule, else 0.
+func boundedWeek(n int) int {
+	if n < 1 || n > MaxWeeks {
+		return 0
+	}
+	return n
 }
 
 // LineupCounts is a starting lineup by slot.
@@ -103,6 +133,8 @@ func ruleRow(r *Rules, label, value string) bool {
 		r.Snake = strings.Contains(strings.ToLower(value), "snake") || strings.Contains(strings.ToLower(value), "serpentine")
 	case strings.HasPrefix(label, "starting lineup"):
 		r.Lineup, r.HasLineup = lineupOf(value), true
+	case strings.HasPrefix(label, "duration"):
+		r.PlayoffStartWeek = playoffStart(value)
 	default:
 		return false
 	}

@@ -140,8 +140,13 @@ func espnErr(err error) error {
 func espnSnapshot(l espn.FullLeague, now time.Time) Snapshot {
 	snap := Snapshot{
 		Ref:  Ref{Host: HostESPN, LeagueID: l.ID, Season: l.Season},
-		Name: scoring.HostText(l.Name), Status: "in_season", Season: l.Season, Week: l.ScoringPeriod,
+		Name: scoring.HostText(l.Name), Season: l.Season, Week: l.ScoringPeriod,
 		Players: map[string]HostPlayer{}, Moves: []Move{}, ReadAt: now,
+		Calendar: Calendar{DraftAt: l.DraftAt, DraftUnstated: l.Draft == nil, PlayoffStartWeek: l.PlayoffStartWeek, WaiversClosed: l.Acquisition.Closed},
+	}
+	snap.Status = espnStatus(l)
+	if l.Draft == nil {
+		snap.Calendar.DraftReadBy = ReadByRosters
 	}
 	byID := map[int]Team{}
 	for _, t := range l.Teams {
@@ -178,6 +183,36 @@ func espnSnapshot(l espn.FullLeague, now time.Time) Snapshot {
 	snap.Scoring = Scoring{Rules: im.Rules, Dropped: scoring.DroppedWords(im.Dropped), DroppedRules: im.Dropped, Defaulted: im.Defaulted}
 	snap.Shape = espnShape(l.LineupSlotCount, len(snap.Teams))
 	return snap
+}
+
+// espnStatus is the league's state in ESPN's own flags: the scoring
+// period past the season's final one is the season over; then
+// draftDetail's inProgress and drafted. A read that carries no
+// draftDetail is read by its rosters (anyone rostered has drafted), and
+// the snapshot's calendar says the draft was unstated.
+func espnStatus(l espn.FullLeague) string {
+	switch {
+	case l.FinalScoringPeriod > 0 && l.ScoringPeriod > l.FinalScoringPeriod:
+		return StatusComplete
+	case l.Draft == nil && anyRostered(l.Teams):
+		return StatusInSeason
+	case l.Draft == nil:
+		return StatusPreDraft
+	case l.Draft.InProgress:
+		return StatusDrafting
+	case !l.Draft.Drafted:
+		return StatusPreDraft
+	}
+	return StatusInSeason
+}
+
+func anyRostered(teams []espn.Team) bool {
+	for _, t := range teams {
+		if len(t.Roster) > 0 {
+			return true
+		}
+	}
+	return false
 }
 
 // espnPlayer is one ESPN player in the snapshot's directory: ESPN's own

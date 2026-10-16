@@ -101,3 +101,34 @@ func (s *PGSource) WeekAt(ctx context.Context, seasonYear int, at time.Time) (in
 	}
 	return 0, false, nil
 }
+
+// regularSeasonWeeks is the NFL's regular season: a later week in the
+// schedule is a postseason game.
+const regularSeasonWeeks = 18
+
+// LastGameDay is the season's last regular-season game day, midnight
+// Eastern, false while the season's schedule is not loaded.
+func (s *PGSource) LastGameDay(ctx context.Context, seasonYear int) (time.Time, bool, error) {
+	var last *time.Time
+	err := s.Pool.QueryRow(ctx, `select max(game_date) from `+s.table("provider_games")+`
+		where season = $1 and week <= $2`, seasonYear, regularSeasonWeeks).Scan(&last)
+	if err != nil {
+		return time.Time{}, false, fmt.Errorf("boards: last game day %d: %w", seasonYear, err)
+	}
+	if last == nil {
+		return time.Time{}, false, nil
+	}
+	return time.Date(last.Year(), last.Month(), last.Day(), 0, 0, 0, 0, season.Eastern()), true, nil
+}
+
+// PreseasonBoard is whether a preseason board is stored for the season:
+// the first one marks the end of the offseason before it.
+func (s *PGSource) PreseasonBoard(ctx context.Context, seasonYear int) (bool, error) {
+	var ok bool
+	err := s.Pool.QueryRow(ctx, `select exists (select 1 from `+s.table("preseason_projections")+` where season = $1)`,
+		seasonYear).Scan(&ok)
+	if err != nil {
+		return false, fmt.Errorf("boards: preseason board %d: %w", seasonYear, err)
+	}
+	return ok, nil
+}

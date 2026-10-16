@@ -44,10 +44,16 @@ type League struct {
 	ScoringType string
 	DraftStatus string
 	Finished    bool
-	Teams       []Team
-	Settings    Settings
-	Scoreboard  Scoreboard
-	Moves       []Move
+	// DraftAt is the league's draft time (settings draft_time), nil when
+	// Yahoo does not say.
+	DraftAt *time.Time
+	// PlayoffStartWeek is the league's first playoff week (settings
+	// playoff_start_week), 0 for a league with no playoffs.
+	PlayoffStartWeek int
+	Teams            []Team
+	Settings         Settings
+	Scoreboard       Scoreboard
+	Moves            []Move
 	// Waivers is every unrostered player on waivers; every other
 	// unrostered player is a free agent.
 	Waivers []Waiver
@@ -202,7 +208,10 @@ type xmlLeague struct {
 	Teams       []xmlTeam `xml:"teams>team"`
 	Standings   []xmlTeam `xml:"standings>teams>team"`
 	Settings    struct {
-		Slots []struct {
+		DraftTime        int64  `xml:"draft_time"`
+		UsesPlayoff      string `xml:"uses_playoff"`
+		PlayoffStartWeek int    `xml:"playoff_start_week"`
+		Slots            []struct {
 			Position string `xml:"position"`
 			Count    int    `xml:"count"`
 			Starting string `xml:"is_starting_position"`
@@ -360,9 +369,12 @@ func ParseLeague(headBody, rostersBody []byte) (League, error) {
 		return League{}, fmt.Errorf("%w: no league id", ErrMalformed)
 	}
 	l := League{
-		LeagueID: h.LeagueID, Name: clean(h.Name), Season: h.Season, CurrentWeek: bounded(h.CurrentWeek, 0, 25),
+		LeagueID: h.LeagueID, Name: clean(h.Name), Season: h.Season, CurrentWeek: bounded(h.CurrentWeek, 0, maxWeek),
 		ScoringType: h.ScoringType, DraftStatus: h.DraftStatus, Finished: h.IsFinished == "1",
-		Settings: settings(h), Scoreboard: scoreboard(h), Moves: moves(h),
+		Settings: settings(h), Scoreboard: scoreboard(h), Moves: moves(h), DraftAt: draftTime(h.Settings.DraftTime),
+	}
+	if h.Settings.UsesPlayoff == "1" {
+		l.PlayoffStartWeek = bounded(h.Settings.PlayoffStartWeek, 0, maxWeek)
 	}
 	teams, err := leagueTeams(h.Standings, rosters.League.Teams)
 	if err != nil {
@@ -615,4 +627,23 @@ func boundedScore(v float64) float64 {
 		return 0
 	}
 	return math.Round(v*100) / 100
+}
+
+// maxWeek bounds a week Yahoo names.
+const maxWeek = 25
+
+// Bounds on a draft time Yahoo states: 2000 to 2100, in Unix seconds.
+const (
+	minDraftTime = 946684800
+	maxDraftTime = 4102444800
+)
+
+// draftTime is the league's draft time from Yahoo's Unix seconds, nil
+// when Yahoo states none or one out of bounds.
+func draftTime(unix int64) *time.Time {
+	if unix < minDraftTime || unix > maxDraftTime {
+		return nil
+	}
+	t := time.Unix(unix, 0).UTC()
+	return &t
 }

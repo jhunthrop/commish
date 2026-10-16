@@ -74,7 +74,7 @@ func TestTheLeagueIsTheContext(t *testing.T) {
 	pool := dbtest.Pool(t)
 	ctx := context.Background()
 	svc := replayService(pool)
-	store := &Store{Pool: pool}
+	store := &Store{Pool: pool, Now: svc.Now}
 	ents := &entitlements.Store{Pool: pool}
 	svc.Selection = store
 	svc.Accounts = &account.Viewer{Entitlements: ents, Leagues: store, Now: time.Now}
@@ -95,6 +95,18 @@ func TestTheLeagueIsTheContext(t *testing.T) {
 	if sleeper.Id != sleeperID || sleeper.Scoring != apitypes.ScoringPresetTePremium ||
 		sleeper.Format != apitypes.BoardFormatPpr || sleeper.SettingsLeagueId == nil || sleeper.Name == "" {
 		t.Fatalf("the Sleeper league reads %+v, want TE premium on the PPR board with its saved league", sleeper)
+	}
+	// Each league's phase, read from its kept snapshot at the store's
+	// clock: the recorded Sleeper league is drafted and in week 6 with
+	// its playoffs from week 15, the recorded MyFantasyLeague one states
+	// no draft and is in week 6 with its playoffs from week 15.
+	if sleeper.Phase != apitypes.LeaguePhaseInSeason || sleeper.PhaseBasis != "Sleeper says the draft is done and week 6 is under way." ||
+		sleeper.PlayoffStartWeek == nil || *sleeper.PlayoffStartWeek != 15 || !sleeper.WaiversOpen || sleeper.DraftAt != nil {
+		t.Fatalf("the Sleeper league's phase: %s %q, playoffs %v, waivers %v", sleeper.Phase, sleeper.PhaseBasis, sleeper.PlayoffStartWeek, sleeper.WaiversOpen)
+	}
+	if m := got.Leagues[0]; m.Phase != apitypes.LeaguePhaseInSeason || m.PlayoffStartWeek == nil || *m.PlayoffStartWeek != 15 ||
+		m.PhaseBasis != "MyFantasyLeague did not state the draft and week 6 is under way." {
+		t.Fatalf("the MyFantasyLeague league's phase: %s %q, playoffs %v", m.Phase, m.PhaseBasis, m.PlayoffStartWeek)
 	}
 
 	status, me := selectAs(t, svc, carol, apitypes.LeagueChoice{LeagueId: &sleeperID})

@@ -39,16 +39,19 @@ func LeagueScoring(saved *apitypes.LeagueSettings, rules map[string]float64, sup
 	return preset, boards.FormatFor(preset).Board()
 }
 
-// contextLeague is a followed league as the shell's switcher lists it.
+// contextLeague is a followed league as the shell's switcher lists it,
+// with its phase as listed.
 func contextLeague(a Attached) apitypes.ContextLeague {
 	scoring, format := LeagueScoring(a.Saved, a.Rules, a.SuperFlex > 0)
 	settings := a.LeagueID
 	if a.Saved == nil {
 		settings = nil
 	}
+	p := a.Phase
 	return apitypes.ContextLeague{
 		Id: a.ID, Name: a.Name, Host: apitypes.LeagueHost(a.Ref.Host), TeamName: a.TeamName,
 		Standing: standingOf(a.Teams, a.RosterID), Scoring: scoring, Format: format, SettingsLeagueId: settings,
+		Phase: p.Phase, PhaseBasis: p.Basis, DraftAt: p.DraftAt, PlayoffStartWeek: p.PlayoffStartWeek, WaiversOpen: p.WaiversOpen,
 	}
 }
 

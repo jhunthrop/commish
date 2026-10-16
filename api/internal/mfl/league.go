@@ -17,6 +17,11 @@ type League struct {
 	RosterSize     int
 	InjuredReserve int
 	TaxiSquad      int
+	// LastRegularSeasonWeek and EndWeek are the league's last regular
+	// season week and its last week (lastRegularSeasonWeek, endWeek), 0
+	// when it does not say.
+	LastRegularSeasonWeek int
+	EndWeek               int
 }
 
 // Franchise is one team in a league.
@@ -33,13 +38,15 @@ type PositionLimit struct {
 
 type wireLeague struct {
 	League struct {
-		ID         string `json:"id"`
-		Name       string `json:"name"`
-		BaseURL    string `json:"baseURL"`
-		RosterSize string `json:"rosterSize"`
-		IR         string `json:"injuredReserve"`
-		Taxi       string `json:"taxiSquad"`
-		Franchises struct {
+		ID          string `json:"id"`
+		Name        string `json:"name"`
+		BaseURL     string `json:"baseURL"`
+		RosterSize  string `json:"rosterSize"`
+		IR          string `json:"injuredReserve"`
+		Taxi        string `json:"taxiSquad"`
+		LastRegular string `json:"lastRegularSeasonWeek"`
+		EndWeek     string `json:"endWeek"`
+		Franchises  struct {
 			Franchise list[struct {
 				ID   string `json:"id"`
 				Name string `json:"name"`
@@ -88,6 +95,14 @@ func (w wireLeague) validate(season int, id string) (League, error) {
 	out.InjuredReserve, ok2 = count(l.IR, maxRoster)
 	out.TaxiSquad, ok3 = count(l.Taxi, maxRoster)
 	out.Starters, ok4 = count(l.Starters.Count, maxRoster)
+	// The weeks are the calendar's, read without: one out of bounds
+	// reads as unsaid.
+	if n, ok := count(l.LastRegular, maxWeek); ok {
+		out.LastRegularSeasonWeek = n
+	}
+	if n, ok := count(l.EndWeek, maxWeek); ok {
+		out.EndWeek = n
+	}
 	if !ok1 || !ok2 || !ok3 || !ok4 || len(l.Franchises.Franchise) > maxTeams || len(l.Starters.Position) > maxShortText {
 		return League{}, malformed("league %s setup", id)
 	}

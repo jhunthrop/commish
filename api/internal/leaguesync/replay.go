@@ -3,6 +3,7 @@ package leaguesync
 import (
 	"context"
 	"embed"
+	"errors"
 	"fmt"
 
 	"github.com/jhunthrop/commish/api/internal/mfl"
@@ -105,6 +106,12 @@ func (r SleeperReplay) NFLState(ctx context.Context) (sleeper.State, error) {
 	return sleeper.DecodeState(replayFile("sleeper/state.json"))
 }
 
+// Draft is live: the recorded league is past its draft, so its draft is
+// never read.
+func (r SleeperReplay) Draft(ctx context.Context, id string) (sleeper.Draft, error) {
+	return r.Live.Draft(ctx, id)
+}
+
 // UserID is live: a username is the drafter's own.
 func (r SleeperReplay) UserID(ctx context.Context, username string) (string, error) {
 	return r.Live.UserID(ctx, username)
@@ -180,6 +187,18 @@ func (r MFLReplay) Transactions(ctx context.Context, season int, id string, week
 		return nil, err
 	}
 	return mfl.DecodeTransactions(replayFile("mfl/transactions.json"))
+}
+
+// errNotRecorded is a part of the recorded league its recording lacks.
+var errNotRecorded = errors.New("leaguesync: replay: not recorded")
+
+// DraftResults: the recording has none for the recorded league, so its
+// draft reads as unstated, as a league whose results do not answer.
+func (r MFLReplay) DraftResults(ctx context.Context, season int, id string) (mfl.DraftResults, error) {
+	if r.recorded(season, id) {
+		return mfl.DraftResults{}, errNotRecorded
+	}
+	return r.Live.DraftResults(ctx, season, id)
 }
 
 // SeasonStatus is the recording's for the recorded season.
