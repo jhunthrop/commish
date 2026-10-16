@@ -1259,7 +1259,7 @@ type AttachedLeague struct {
 	// Name the league's name at its last read
 	Name string `json:"name"`
 
-	// Phase where a followed league is in its season, computed at read time from the host's facts: pre_draft before its draft, draft_day when the draft starts within 24 hours or is under way, in_season from the draft to the playoffs, playoffs from the league's playoff start week until the host says the season is over, offseason after it (or a drafted league the host gives no current week)
+	// Phase where a followed league is in its season, computed at read time from the host's facts: pre_draft before its draft, draft_day when the draft starts within 24 hours or is under way, in_season from the draft to the playoffs (a drafted league the host gives no current week is in_season while the site season is preseason), playoffs from the league's playoff start week until the host says the season is over, offseason after it (or a drafted league with no current week once the NFL regular season has ended)
 	Phase LeaguePhase `json:"phase"`
 
 	// PhaseBasis one sentence naming the fact the phase came from, in the site's words
@@ -1474,7 +1474,7 @@ type ContextLeague struct {
 	// Name the league's name at its last read, else its saved league's
 	Name string `json:"name"`
 
-	// Phase where a followed league is in its season, computed at read time from the host's facts: pre_draft before its draft, draft_day when the draft starts within 24 hours or is under way, in_season from the draft to the playoffs, playoffs from the league's playoff start week until the host says the season is over, offseason after it (or a drafted league the host gives no current week)
+	// Phase where a followed league is in its season, computed at read time from the host's facts: pre_draft before its draft, draft_day when the draft starts within 24 hours or is under way, in_season from the draft to the playoffs (a drafted league the host gives no current week is in_season while the site season is preseason), playoffs from the league's playoff start week until the host says the season is over, offseason after it (or a drafted league with no current week once the NFL regular season has ended)
 	Phase LeaguePhase `json:"phase"`
 
 	// PhaseBasis one sentence naming the fact the phase came from, in the site's words
@@ -1953,7 +1953,7 @@ type LeagueMove struct {
 // LeagueMoveKind defines model for LeagueMove.Kind.
 type LeagueMoveKind string
 
-// LeaguePhase where a followed league is in its season, computed at read time from the host's facts: pre_draft before its draft, draft_day when the draft starts within 24 hours or is under way, in_season from the draft to the playoffs, playoffs from the league's playoff start week until the host says the season is over, offseason after it (or a drafted league the host gives no current week)
+// LeaguePhase where a followed league is in its season, computed at read time from the host's facts: pre_draft before its draft, draft_day when the draft starts within 24 hours or is under way, in_season from the draft to the playoffs (a drafted league the host gives no current week is in_season while the site season is preseason), playoffs from the league's playoff start week until the host says the season is over, offseason after it (or a drafted league with no current week once the NFL regular season has ended)
 type LeaguePhase string
 
 // LeaguePlayer defines model for LeaguePlayer.

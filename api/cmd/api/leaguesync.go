@@ -190,7 +190,7 @@ func hostList(ff ffpcWiring, y yahooWiring, e espnWiring, log *slog.Logger) []ht
 // second, FFPC third, Yahoo fourth and ESPN fifth behind one poller, the rooms' board, and the
 // recorded leagues when COMPANION_REPLAY is on (development only). The
 // host directories are read at start, so the first view finds them.
-func leagueSyncService(cfg config.API, pool *pgxpool.Pool, board *draftroom.Boards, saved *leagues.Store, ents *entitlements.Store, accounts leaguesync.AccountViewer, ff ffpcWiring, y yahooWiring, e espnWiring, log *slog.Logger) *leaguesync.Service {
+func leagueSyncService(cfg config.API, pool *pgxpool.Pool, board *draftroom.Boards, saved *leagues.Store, ents *entitlements.Store, accounts leaguesync.AccountViewer, site leaguesync.SiteSeason, ff ffpcWiring, y yahooWiring, e espnWiring, log *slog.Logger) *leaguesync.Service {
 	now := time.Now
 	var sleeperAPI leaguesync.SleeperAPI = sleeper.New()
 	var mflAPI leaguesync.MFLAPI = mfl.New()
@@ -199,9 +199,9 @@ func leagueSyncService(cfg config.API, pool *pgxpool.Pool, board *draftroom.Boar
 		mflAPI = leaguesync.MFLReplay{Live: mflAPI}
 		log.Warn("league sync replay is on", "sleeper", leaguesync.ReplaySleeperLeague, "mfl", leaguesync.ReplayMFLLeague)
 	}
-	store := &leaguesync.Store{Pool: pool, Now: now}
+	store := &leaguesync.Store{Pool: pool, Now: now, Season: site}
 	hostList := leaguesync.Hosts{
-		&leaguesync.Sleeper{API: sleeperAPI, Now: now, Log: log},
+		&leaguesync.Sleeper{API: sleeperAPI, Now: now, Log: log, Season: site},
 		&leaguesync.MFL{API: mflAPI, Now: now, Log: log},
 	}
 	ffpcHost := ff.host(store, board.Schedule, log)

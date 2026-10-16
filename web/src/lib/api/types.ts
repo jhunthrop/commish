@@ -105,6 +105,23 @@ export interface paths {
 		patch: operations['updateMe'];
 		trace?: never;
 	};
+	'/season': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		/** The NFL season the site is in, the same object /me carries, for anyone signed in or not, so a signed-out shell can correct its rail at boot. Kept an hour on the API, the same answer as /me's. */
+		get: operations['getSeason'];
+		put?: never;
+		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
 	'/me/league': {
 		parameters: {
 			query?: never;
@@ -1553,7 +1570,7 @@ export interface components {
 			waivers_open: boolean;
 		};
 		/**
-		 * @description where a followed league is in its season, computed at read time from the host's facts: pre_draft before its draft, draft_day when the draft starts within 24 hours or is under way, in_season from the draft to the playoffs, playoffs from the league's playoff start week until the host says the season is over, offseason after it (or a drafted league the host gives no current week)
+		 * @description where a followed league is in its season, computed at read time from the host's facts: pre_draft before its draft, draft_day when the draft starts within 24 hours or is under way, in_season from the draft to the playoffs (a drafted league the host gives no current week is in_season while the site season is preseason), playoffs from the league's playoff start week until the host says the season is over, offseason after it (or a drafted league with no current week once the NFL regular season has ended)
 		 * @enum {string}
 		 */
 		LeaguePhase: 'pre_draft' | 'draft_day' | 'in_season' | 'playoffs' | 'offseason';
@@ -3269,6 +3286,26 @@ export interface operations {
 			200: components['responses']['AccountResponse'];
 			400: components['responses']['ErrorResponse'];
 			409: components['responses']['ErrorResponse'];
+		};
+	};
+	getSeason: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description the site's season */
+			200: {
+				headers: Record<string, unknown>;
+				content: {
+					'application/json': components['schemas']['Envelope'] & {
+						data?: components['schemas']['SiteSeason'];
+					};
+				};
+			};
 		};
 	};
 	selectLeague: {

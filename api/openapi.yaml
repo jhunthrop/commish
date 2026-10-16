@@ -102,6 +102,22 @@ paths:
         "200": { $ref: "#/components/responses/AccountResponse" }
         "400": { $ref: "#/components/responses/ErrorResponse" }
         "409": { $ref: "#/components/responses/ErrorResponse" }
+  /season:
+    get:
+      tags: [auth]
+      operationId: getSeason
+      summary: >-
+        The NFL season the site is in, the same object /me carries, for anyone signed in or not, so a signed-out shell
+        can correct its rail at boot. Kept an hour on the API, the same answer as /me's.
+      responses:
+        "200":
+          description: the site's season
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - properties: { data: { $ref: "#/components/schemas/SiteSeason" } }
   /me/league:
     put:
       tags: [league-sync]
@@ -1876,9 +1892,10 @@ components:
       enum: [pre_draft, draft_day, in_season, playoffs, offseason]
       description: >-
         where a followed league is in its season, computed at read time from the host's facts: pre_draft before its
-        draft, draft_day when the draft starts within 24 hours or is under way, in_season from the draft to the playoffs,
-        playoffs from the league's playoff start week until the host says the season is over, offseason after it (or a
-        drafted league the host gives no current week)
+        draft, draft_day when the draft starts within 24 hours or is under way, in_season from the draft to the playoffs
+        (a drafted league the host gives no current week is in_season while the site season is preseason), playoffs
+        from the league's playoff start week until the host says the season is over, offseason after it (or a drafted
+        league with no current week once the NFL regular season has ended)
     SiteSeason:
       type: object
       description: the NFL season the site is in, for a visitor with no league, from the kickoffs the API reads

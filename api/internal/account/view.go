@@ -42,17 +42,6 @@ type Season interface {
 	Phase(ctx context.Context) season.SitePhase
 }
 
-// unwired is the site's season with no source: the preseason, saying so.
-var unwired = season.SitePhase{Phase: season.SitePreseason, Basis: "The site's season is not read here."}
-
-func (v *Viewer) season(ctx context.Context) apitypes.SiteSeason {
-	p := unwired
-	if v.Season != nil {
-		p = v.Season.Phase(ctx)
-	}
-	return apitypes.SiteSeason{Phase: apitypes.SiteSeasonPhase(p.Phase), Week: p.Week, Basis: p.Basis}
-}
-
 // Leagues is the part of the league sync store the account answer reads.
 type Leagues interface {
 	Context(ctx context.Context, accountID uuid.UUID) (LeagueContext, error)
@@ -94,7 +83,7 @@ func (v *Viewer) View(ctx context.Context, a auth.Account) (apitypes.Account, er
 	return apitypes.Account{
 		Id: a.ID, Email: a.Email, FirstName: a.FirstName, LastName: a.LastName, Handle: a.Handle,
 		Features: features, DraftPass: passView(pass), Membership: membershipView(membership),
-		League: leagues.League, Leagues: leagues.Leagues, Format: leagues.Format, Season: v.season(ctx), CreatedAt: a.CreatedAt,
+		League: leagues.League, Leagues: leagues.Leagues, Format: leagues.Format, Season: siteSeason(ctx, v.Season), CreatedAt: a.CreatedAt,
 	}, nil
 }
 
