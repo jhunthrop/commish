@@ -13,7 +13,12 @@ const league: AttachedLeague = {
 	roster_id: 11,
 	team_name: 'My Ball Zach Ertz',
 	standing: { wins: 2, losses: 3, ties: 0, place: 11, teams: 12 },
-	attached_at: '2026-10-13T12:00:00Z'
+	attached_at: '2026-10-13T12:00:00Z',
+	phase: 'in_season',
+	phase_basis: 'FFPC says the draft is done.',
+	draft_at: null,
+	playoff_start_week: 15,
+	waivers_open: true
 };
 
 void test('a read league says the team, its record and place, and the host', () => {

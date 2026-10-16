@@ -1469,6 +1469,13 @@ export interface components {
 			features: components['schemas']['Feature'][];
 			draft_pass: components['schemas']['DraftPassState'] | null;
 			membership: components['schemas']['MembershipState'] | null;
+			season: {
+				/** @enum {string} */
+				phase: 'preseason' | 'in_season' | 'playoffs' | 'offseason';
+				/** @description the NFL week in play, 0 before week 1 and after the season */
+				week: number;
+				basis: string;
+			};
 			/** Format: date-time */
 			created_at: string;
 		};
@@ -1538,6 +1545,18 @@ export interface components {
 			 * @description the saved league a mock reruns from, null when a mock room cannot draft this league
 			 */
 			settings_league_id: string | null;
+			/** @enum {string} */
+			phase: 'pre_draft' | 'draft_day' | 'in_season' | 'playoffs' | 'offseason';
+			/** @description one sentence naming the fact the phase came from, in the site's words */
+			phase_basis: string;
+			/**
+			 * Format: date-time
+			 * @description the host's draft time, null when the host does not say
+			 */
+			draft_at: string | null;
+			playoff_start_week: number | null;
+			/** @description the host still runs waivers this week, false in and after the playoffs where the host closes them, else true */
+			waivers_open: boolean;
 		};
 		/** @description exactly one of league_id (a followed league) and format (no league: any board format, the web offering the ones the run carries) */
 		LeagueChoice: {
@@ -2339,6 +2358,18 @@ export interface components {
 			standing: components['schemas']['LeagueStanding'] | null;
 			/** Format: date-time */
 			attached_at: string;
+			/** @enum {string} */
+			phase: 'pre_draft' | 'draft_day' | 'in_season' | 'playoffs' | 'offseason';
+			/** @description one sentence naming the fact the phase came from, in the site's words */
+			phase_basis: string;
+			/**
+			 * Format: date-time
+			 * @description the host's draft time, null when the host does not say
+			 */
+			draft_at: string | null;
+			playoff_start_week: number | null;
+			/** @description the host still runs waivers this week, false in and after the playoffs where the host closes them, else true */
+			waivers_open: boolean;
 		};
 		LeagueStanding: {
 			wins: number;

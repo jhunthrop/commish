@@ -32,6 +32,11 @@ const league = (over: Partial<ContextLeague> = {}): ContextLeague => ({
 	scoring: 'ppr',
 	format: 'ppr',
 	settings_league_id: null,
+	phase: 'in_season',
+	phase_basis: 'FFPC says the draft is done.',
+	draft_at: null,
+	playoff_start_week: 15,
+	waivers_open: true,
 	...over
 });
 
