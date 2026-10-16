@@ -2,7 +2,12 @@
 // commit being built. Run with `npm test`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { backstopChoice, deployedStamp, parseDeployedStamp } from './deployed.ts';
+import {
+	backstopChoice,
+	deployedStamp,
+	fetchDeployedStamp,
+	parseDeployedStamp
+} from './deployed.ts';
 
 const SHA = '0c1a7591aa0bb1c2d3e4f5a6b7c8d9e0f1a2b3c4';
 const OTHER_SHA = '86584c40aa0bb1c2d3e4f5a6b7c8d9e0f1a2b3c4';
@@ -51,4 +56,41 @@ void test('a stamp without a run id or a full commit reads as nothing', () => {
 
 void test('a build with no commit to name writes a stamp that never matches', () => {
 	assert.equal(parseDeployedStamp(deployedStamp('2026-10-15T05', undefined)), null);
+});
+
+interface Seen {
+	url: string;
+	cacheControl: string | null;
+}
+
+function recordingFetch(seen: Seen[], body: string, status = 200): typeof fetch {
+	return (input, init) => {
+		seen.push({
+			url: input instanceof Request ? input.url : input.toString(),
+			cacheControl: new Headers(init?.headers).get('Cache-Control')
+		});
+		return Promise.resolve(new Response(body, { status }));
+	};
+}
+
+void test('the stamp is read with a query no cached copy has and a request for a fresh copy', async () => {
+	const seen: Seen[] = [];
+	const stamp = await fetchDeployedStamp(
+		'https://trycommish.app/',
+		recordingFetch(seen, deployedStamp('2026-10-15T05', SHA)),
+		1_760_000_000_000
+	);
+	assert.deepEqual(stamp, { runId: '2026-10-15T05', commit: SHA });
+	assert.deepEqual(seen, [
+		{ url: 'https://trycommish.app/data/run.txt?at=1760000000000', cacheControl: 'no-cache' }
+	]);
+});
+
+void test('a site that answers with an error or not at all has no stamp', async () => {
+	assert.equal(
+		await fetchDeployedStamp('https://x.test', recordingFetch([], 'gone', 404), 1),
+		null
+	);
+	const failing: typeof fetch = () => Promise.reject(new Error('offline'));
+	assert.equal(await fetchDeployedStamp('https://x.test', failing, 1), null);
 });

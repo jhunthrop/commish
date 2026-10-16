@@ -10,9 +10,9 @@ Every followed league carries a phase, computed on the API from facts the league
 |---|---|---|
 | `pre_draft` | The league has not drafted | the snapshot status `pre_draft` (Yahoo and Sleeper state it, ESPN's `draftDetail.drafted` is false, FFPC's draft `complete` is false, MFL's draft results are empty), or a draft time in the future |
 | `draft_day` | The draft starts within 24 hours or is in progress | a draft time within the next 24 hours, or status `drafting` |
-| `in_season` | Drafted and the league's regular season is on | status `in_season` (or `complete` draft with the host's current week between 1 and the week before the playoffs start) |
+| `in_season` | Drafted and the league's regular season is on, or drafted before the NFL season has begun (the member manages a roster from the draft on: waivers and trades open on most hosts the same night) | status `in_season`, or a drafted league with the host's current week between 1 and the week before the playoffs start, or a drafted league with no current week while the site season is `preseason` (the basis names the day the season starts) |
 | `playoffs` | The league's playoff weeks | the host's current week at or past the league's playoff start week, until the host says the season is complete |
-| `offseason` | The season is over, or no current week and the draft is done | status `complete`, or a past season, or a drafted league whose host reports no current week |
+| `offseason` | The season is over | status `complete`, or a past season, or a drafted league whose host reports no current week after the NFL regular season has ended |
 
 The API answers, on every `ContextLeague` (the shell's switcher list and the selected league) and on `AttachedLeague`:
 
@@ -24,7 +24,7 @@ playoff_start_week: { type: integer, nullable: true }
 waivers_open: { type: boolean, description: the host still runs waivers this week, false in and after the playoffs where the host closes them, else true }
 ```
 
-And on `/me`, for the site itself:
+And on `/me` for the site itself, and the same object on a public `GET /season` (anonymous, cached an hour) so a signed-out visitor's shell can correct its rail at boot:
 
 ```yaml
 season:
