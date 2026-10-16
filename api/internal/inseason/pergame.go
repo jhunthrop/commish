@@ -49,11 +49,19 @@ func carriesPerGame(b boards.Board) bool {
 	return b.Order == boards.OrderRestOfSeason && b.FromWeek >= 1
 }
 
-// withPerGame is a page's basis with the figure's sentence when the
-// board's rows carry it.
-func withPerGame(b boards.Board, basis string) string {
+// withPerGame is a page's basis with the figure's sentence when any of
+// the page's players carries it: a board that could carry it but whose
+// rows do not (no game read from its first week) says nothing about it.
+func withPerGame(b boards.Board, basis string, people ...[]person) string {
 	if !carriesPerGame(b) {
 		return basis
 	}
-	return basis + " " + PerGameBasis(b.FromWeek)
+	for _, side := range people {
+		for _, p := range side {
+			if p.line.RestOfSeasonPerGame != nil {
+				return basis + " " + PerGameBasis(b.FromWeek)
+			}
+		}
+	}
+	return basis
 }

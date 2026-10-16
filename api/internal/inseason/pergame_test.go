@@ -63,6 +63,14 @@ func TestRestOfSeasonPerGame(t *testing.T) {
 	if got := RestOfSeasonPerGame(b, rb, left); got == nil || *got != 11 {
 		t.Fatalf("per game %v, want 11", got)
 	}
+	// An inexact figure rounds to a tenth: 110 over three games is 36.7.
+	three := GamesLeft(restSchedule(), 15)
+	if three["MIA"] != 3 {
+		t.Fatalf("weeks 15 to 17: %d games", three["MIA"])
+	}
+	if got := RestOfSeasonPerGame(b, rb, three); got == nil || *got != 36.7 {
+		t.Fatalf("per game %v, want 36.7", got)
+	}
 	k, _ := b.Player("k")
 	fa, _ := b.Player("fa")
 	if got := RestOfSeasonPerGame(b, k, left); got != nil {
@@ -211,4 +219,24 @@ func TestAnInjuredPlayerKeepsHisFigure(t *testing.T) {
 		return
 	}
 	t.Fatalf("%s is not on the bench", boardID(target))
+}
+
+// A rest-of-season board whose rows carry no figure (the schedule read
+// holds no game from its first week) says no sentence about one.
+func TestNoSentenceWithoutAFigure(t *testing.T) {
+	f := newFixture(t)
+	f.league.Board.Order, f.league.Board.FromWeek = boards.OrderRestOfSeason, 7
+	f.league.Snap.Week = 7
+	a := newFixtureAdvisor(t, f, nil)
+	lineup, _ := a.Lineup()
+	waivers, _ := a.Waivers("")
+	trades, _ := a.Trades("")
+	team := trades.Teams[0]
+	check, _, _ := a.CheckTrade(apitypes.TradeCheckInput{Team: team.RosterId,
+		Give: []string{lineup.Slots[1].Ours.Player.HostId}, Get: []string{team.Roster[1].Player.HostId}})
+	for _, basis := range []string{lineup.Basis, waivers.Basis, trades.Basis, trades.CheckBasis, check.Basis} {
+		if strings.Contains(basis, "Points a game") {
+			t.Errorf("no row carries the figure, yet %q", basis)
+		}
+	}
 }
