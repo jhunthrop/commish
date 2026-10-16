@@ -25,6 +25,7 @@ from research.capsules.claims import (
 )
 from research.capsules.corrections import BANNED_TERM_VIOLATION, TENSION_NUMBER, VOICE_RULE_VIOLATION
 from research.capsules.multiples import MULTIPLE_VIOLATION
+from research.capsules.own_rate import OWN_RATE_VIOLATION
 from research.capsules.prose_checks import LABEL_VIOLATION, UNFINISHED_VIOLATION
 from research.capsules.season_voice import MISSED_WEEKS_UNNAMED
 from research.capsules.sentences import split_sentences
@@ -136,7 +137,7 @@ def _mixed_note(violation: str, _body: str) -> RuleNote | None:
         "mixed evidence uncited",
         None,
         f"The strongest downside appears before the call with its own number and a cost word beside it "
-        f'({COST_WORDS_SHOWN}), as in "costs him {figure} points a game".',
+        f'({COST_WORDS_SHOWN}), as in "that profile has cost players in his spot {figure} points a game on average".',
     )
 
 
@@ -215,6 +216,13 @@ def _page_note(violation: str, _body: str) -> RuleNote | None:
     rule = next((rule for rule in _CLAIM_STATEMENTS if violation.startswith(f"{rule}: ")), None)
     if rule is not None:
         return RuleNote(rule, _named_sentence(violation), _CLAIM_STATEMENTS[rule])
+    if violation.startswith(OWN_RATE_VIOLATION):
+        return RuleNote(
+            "a per-game figure larger than his own scoring",
+            _named_sentence(violation),
+            "He cannot lose or gain more than he scores: a law's figure is an average change among players in "
+            "his spot, said that way.",
+        )
     if violation.startswith(MULTIPLE_VIOLATION):
         return RuleNote(
             "a multiple the figures do not make",

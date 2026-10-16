@@ -28,6 +28,7 @@ from research.capsules.grounding import (
     round_half_up,
 )
 from research.capsules.multiples import multiple_violations
+from research.capsules.own_rate import own_points_per_game, own_rate_violations
 from research.capsules.prose_checks import label_copies, label_violation, unfinished_ending, unfinished_violation
 from research.capsules.pull_figures import adp_figures_off_page, facts_page_numbers, pull_figures_of, renderings_of
 from research.capsules.rank_basis import rank_basis_violation, ranks_without_basis
@@ -130,6 +131,8 @@ class Grounding:
     # This season's touchdowns and his first game (week, points), for the claims a read makes (`claims`).
     touchdowns: float | None = None
     first_game: tuple[int, float | None] | None = None
+    # His own points a game, the most a per-game cost or gain put on him may be (`own_rate`).
+    own_points_per_game: float | None = None
 
     @property
     def claims(self) -> ClaimLedger:
@@ -232,6 +235,7 @@ def grounding_of(facts: "PlayerFacts") -> Grounding:
         claims.clock,
         claims.touchdowns,
         claims.first_game,
+        own_points_per_game(facts),
     )
 
 
@@ -308,6 +312,7 @@ def _validate(
     violations += claim_violations(trimmed, source.claims)
     violations += base_violations(trimmed, source.prompt_text)
     violations += multiple_violations(trimmed)
+    violations += own_rate_violations(trimmed, source.own_points_per_game)
     if page_number and not names_missed_weeks(trimmed, source.clock):
         violations.append(missed_weeks_violation(source.clock))
     if tension and source.tension is not None and not cites_tension(trimmed, source.tension):

@@ -80,7 +80,7 @@ def test_the_writer_is_told_the_cost_words_the_validator_reads() -> None:
         "Mixed evidence: the strongest downside (-6.2 pts/game) is never cited. It has to appear, with that number, before the call."
     )
     assert correction is not None
-    assert "costs him 6.2 points a game" in correction
+    assert "has cost players in his spot 6.2 points a game on average" in correction
     assert all(f'"{word}"' in correction for word in COST_WORDS)
 
 

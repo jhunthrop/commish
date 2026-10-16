@@ -37,7 +37,7 @@ from research.capsules.render_words import (
 )
 from research.capsules.voice_rules import in_fantasy_words
 from research.model.jsmath import js_round, js_to_fixed
-from research.pipeline.jscompat import js_string
+from research.pipeline.jscompat import js_number, js_string
 
 
 def _signed_percent(fraction: float) -> str:
@@ -113,10 +113,22 @@ def preseason_pace_line(facts: PlayerFacts) -> str | None:
     )
 
 
+def law_line(item: LawEvidence) -> str:
+    """A law's figure with its basis, the coordinator's M3 ruling (Lane 52): the figure is the average
+    change in points a game among players in his spot from one season to the next (the law harness's
+    matched difference-in-differences), summed over the group's laws, never his own points."""
+    moved = "fell" if item.net_effect_points < 0 else "rose"
+    size = js_string(abs(js_number(js_to_fixed(item.net_effect_points, 1))))
+    net = f", net of {item.law_count} factors" if item.law_count > 1 else ""
+    return (
+        f"{in_fantasy_words(item.headline)}: among players in his spot, points a game {moved} {size} on average "
+        f"from one season to the next{net}."
+    )
+
+
 def _evidence_line(item: EvidenceItem) -> str:
     if isinstance(item, LawEvidence):
-        net = f" (net of {item.law_count} factors)" if item.law_count > 1 else ""
-        return f"{in_fantasy_words(item.headline)}: worth {signed(item.net_effect_points)} a game{net}."
+        return law_line(item)
     if isinstance(item, ShareEvidence):
         verb = "grew" if item.kind == "offseason_share_gained" else "shrank"
         target, carry = _signed_percent(item.target_share_change), _signed_percent(item.carry_share_change)

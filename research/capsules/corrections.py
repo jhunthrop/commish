@@ -15,6 +15,7 @@ from typing import Final
 
 from research.capsules.claims import CLAIM_RULES
 from research.capsules.multiples import MULTIPLE_VIOLATION
+from research.capsules.own_rate import OWN_RATE_VIOLATION
 from research.capsules.prose_checks import LABEL_VIOLATION, UNFINISHED_VIOLATION
 from research.capsules.season_voice import MISSED_WEEKS_UNNAMED
 from research.capsules.validate import (
@@ -86,7 +87,7 @@ def _page_correction(violation: str) -> str | None:
         )
     if violation.startswith(MISSED_WEEKS_UNNAMED):
         return f"{violation.removeprefix(MISSED_WEEKS_UNNAMED + ': ')} Leave everything else as it is."
-    if violation.startswith((UNFINISHED_VIOLATION, LABEL_VIOLATION, MULTIPLE_VIOLATION)):
+    if violation.startswith((UNFINISHED_VIOLATION, LABEL_VIOLATION, MULTIPLE_VIOLATION, OWN_RATE_VIOLATION)):
         return f"{violation} Leave everything else as it is."
     rule = next((rule for rule in CLAIM_RULES if violation.startswith(f"{rule}: ")), None)
     if rule is not None:
@@ -121,6 +122,8 @@ def _downside_correction(violation: str) -> str:
     figure = "its number" if number is None else number.group(1).lstrip("-")
     return (
         f"Your text never cites {downside} as a cost. Work it in before your last sentence, in your own words, with "
-        f'the number and a cost word beside it in the same sentence ({COST_WORDS_SHOWN}), as in "costs him {figure} points a '
-        f'game". "Worth {figure}" alone does not say it is a cost. Leave everything else as it is.'
+        f"the number and a cost word beside it in the same sentence ({COST_WORDS_SHOWN}), as in "
+        f'"that profile has cost players in his spot {figure} points a game on average". The figure is an average '
+        f'among players in his spot, never his own points. "Worth {figure}" alone does not say it is a cost. Leave '
+        "everything else as it is."
     )
