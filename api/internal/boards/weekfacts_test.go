@@ -115,17 +115,63 @@ func TestWeekFactReads(t *testing.T) {
 
 func TestDesignationsFromTheRosterSweep(t *testing.T) {
 	codes, err := parseCapture(injuriesRosterWide, []byte(`[{"roster": [
-		{"playerID": "p1", "injury": {"designation": "IR"}},
+		{"playerID": "p1", "injury": {"designation": "O", "description": "Out for the season (knee)"}},
 		{"playerID": "p2", "injury": {"designation": ""}},
 		{"playerID": "p3"}]}]`))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(codes) != 1 || codes["p1"] != "IR" {
-		t.Fatalf("codes %v", codes)
+	if len(codes) != 1 || codes["p1"] != (captured{code: "O", note: "Out for the season (knee)"}) {
+		t.Fatalf("codes %v: the sweep's designation with its note", codes)
 	}
 	if _, err := parseCapture(injuriesByDate, []byte(`[1, 2]`)); err == nil {
 		t.Fatal("a by-date capture that is not an object reads")
+	}
+}
+
+// A season-long designation is dated by the first capture of his
+// unbroken run under that status (IR and IR-R are one status); a run that
+// reaches the oldest capture in the window has no date, and a week's
+// designation never carries one. A capture that does not read breaks no
+// run.
+func TestDesignationSince(t *testing.T) {
+	pool := dbtest.Pool(t)
+	ctx := context.Background()
+	const schema = "weekfacts_since_test"
+	for _, q := range []string{
+		`drop schema if exists ` + schema + ` cascade`, `create schema ` + schema,
+		`create table ` + schema + `.capture_snapshots (source text, payload jsonb, captured_at timestamptz)`,
+		`insert into ` + schema + `.capture_snapshots values
+			('tank01_injuries_by_date', '{"injList": [{"playerID": "p5", "designation": "Q"}]}', '2026-07-01 10:00:00+00'),
+			('tank01_injuries_by_date', '{"injList": [{"playerID": "p1", "designation": "Q"}, {"playerID": "p5", "designation": "IR"}]}', '2026-10-13 10:00:00+00'),
+			('tank01_injuries_by_date', '{"injList": [{"playerID": "p1", "designation": "IR"}, {"playerID": "p2", "designation": "IR"}, {"playerID": "p5", "designation": "IR"}]}', '2026-10-13 11:00:00+00'),
+			('tank01_injuries_by_date', '{"injList": [{"playerID": "p1", "designation": "IR"}, {"playerID": "p2", "designation": "IR"}, {"playerID": "p3", "designation": "PUP"}, {"playerID": "p5", "designation": "IR"}]}', '2026-10-13 12:00:00+00'),
+			('tank01_injuries_by_date', '[1, 2]', '2026-10-13 13:00:00+00'),
+			('tank01_injuries_by_date', '{"injList": [{"playerID": "p1", "designation": "IR-R"}, {"playerID": "p2", "designation": "ir"}, {"playerID": "p3", "designation": "PUP"}, {"playerID": "p4", "designation": "O"}, {"playerID": "p5", "designation": "IR"}]}', '2026-10-13 14:00:00+00')`,
+	} {
+		if _, err := pool.Exec(ctx, q); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Cleanup(func() { _, _ = pool.Exec(context.Background(), `drop schema if exists `+schema+` cascade`) })
+	src, _ := NewPGSource(pool, schema, 2026, "")
+	d, err := src.Designations(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	at := func(hour int) *time.Time {
+		v := time.Date(2026, 10, 13, hour, 0, 0, 0, time.UTC)
+		return &v
+	}
+	// p5's run reaches July's capture, outside the window: no date.
+	for id, want := range map[string]*time.Time{"p1": at(11), "p2": at(11), "p3": at(12), "p4": nil, "p5": nil} {
+		got := d[id]
+		if got.Source != injuriesByDate || !got.AsOf.Equal(*at(14)) {
+			t.Errorf("%s: %+v, want the newest by-date capture's stamp and source", id, got)
+		}
+		if (got.Since == nil) != (want == nil) || (want != nil && !got.Since.Equal(*want)) {
+			t.Errorf("%s since %v, want %v", id, got.Since, want)
+		}
 	}
 }
 

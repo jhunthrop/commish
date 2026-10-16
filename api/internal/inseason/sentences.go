@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jhunthrop/commish/api/internal/boards"
 	"github.com/jhunthrop/commish/api/internal/draft"
 )
 
@@ -82,11 +83,11 @@ func (w *Writer) forced(ours Line, host *Line) string {
 		return fmt.Sprintf(w.next(frames), host.Name, ours.short())
 	}
 	d := f.Designation
-	if d == nil || d.Status == StatusQuestionable {
+	if d == nil || d.Status == boards.StatusQuestionable {
 		return ""
 	}
 	when := stampWords(d.AsOf, w.Now)
-	if d.Status == StatusDoubtful {
+	if d.Status == boards.StatusDoubtful {
 		// Both doubtful (nobody better eligible): the order decided it.
 		if ours.Facts.Tier() != Available {
 			return ""
@@ -101,17 +102,17 @@ func (w *Writer) forced(ours Line, host *Line) string {
 // statusWords is a designation as a sentence says it.
 func statusWords(status string) string {
 	switch status {
-	case StatusInjuredReserve:
+	case boards.StatusInjuredReserve:
 		return "on injured reserve"
-	case StatusSuspended:
+	case boards.StatusSuspended:
 		return "suspended"
-	case StatusPUP:
+	case boards.StatusPUP:
 		return "on the PUP list"
-	case StatusNFI:
+	case boards.StatusNFI:
 		return "on the NFI list"
-	case StatusDoubtful:
+	case boards.StatusDoubtful:
 		return "doubtful"
-	case StatusQuestionable:
+	case boards.StatusQuestionable:
 		return "questionable"
 	}
 	return "listed out"
@@ -207,7 +208,7 @@ func allowedWords(opponent string, a Allowed) string {
 // questionable flags a questionable starter: check before kickoff.
 func (w *Writer) questionable(l Line) string {
 	d := l.Facts.Designation
-	if d == nil || d.Status != StatusQuestionable {
+	if d == nil || d.Status != boards.StatusQuestionable {
 		return ""
 	}
 	return fmt.Sprintf("%s is questionable as of %s, so check before kickoff.", l.short(), stampWords(d.AsOf, w.Now))
