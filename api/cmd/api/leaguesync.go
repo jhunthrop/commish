@@ -199,9 +199,9 @@ func leagueSyncService(cfg config.API, pool *pgxpool.Pool, board *draftroom.Boar
 		mflAPI = leaguesync.MFLReplay{Live: mflAPI}
 		log.Warn("league sync replay is on", "sleeper", leaguesync.ReplaySleeperLeague, "mfl", leaguesync.ReplayMFLLeague)
 	}
-	store := &leaguesync.Store{Pool: pool}
+	store := &leaguesync.Store{Pool: pool, Now: now}
 	hostList := leaguesync.Hosts{
-		&leaguesync.Sleeper{API: sleeperAPI, Now: now},
+		&leaguesync.Sleeper{API: sleeperAPI, Now: now, Log: log},
 		&leaguesync.MFL{API: mflAPI, Now: now},
 	}
 	ffpcHost := ff.host(store, board.Schedule, log)

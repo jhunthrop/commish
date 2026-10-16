@@ -11,6 +11,9 @@ nesting are Yahoo's; the values are ours.
 - `yahoo-my-teams.xml`: `users;use_login=1/games;game_keys=nfl/teams`
 - `yahoo-games-2026.xml`: `games;game_codes=nfl;seasons=2026`
 - `yahoo-league-head.xml`: `league/{key};out=settings,standings,scoreboard,transactions`
+- `yahoo-league-head-predraft.xml`: the same head as a league before its draft
+  (Lane 53, constructed): `draft_status` predraft, `current_week` and the
+  scoreboard's weeks 1, and `draft_time` a week after the drafted league's
 - `yahoo-league-rosters.xml`: `league/{key}/teams;out=roster`
 - `yahoo-league-waivers.xml`: `league/{key}/players;status=W;out=ownership;start=0;count=25`
 - `yahoo-token.json`: the token endpoint's answer, with fixture tokens

@@ -45,6 +45,9 @@ func (offline) Transactions(context.Context, string, int) ([]sleeper.Transaction
 func (offline) NFLState(context.Context) (sleeper.State, error)   { return sleeper.State{}, errOffline }
 func (offline) UserID(context.Context, string) (string, error)    { return "", sleeper.ErrNotFound }
 func (offline) Players(context.Context) ([]sleeper.Player, error) { return nil, errOffline }
+func (offline) Draft(context.Context, string) (sleeper.Draft, error) {
+	return sleeper.Draft{}, errOffline
+}
 
 type offlineMFL struct{}
 

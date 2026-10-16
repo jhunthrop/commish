@@ -105,6 +105,12 @@ func (r SleeperReplay) NFLState(ctx context.Context) (sleeper.State, error) {
 	return sleeper.DecodeState(replayFile("sleeper/state.json"))
 }
 
+// Draft is live: the recorded league is past its draft, so its draft is
+// never read.
+func (r SleeperReplay) Draft(ctx context.Context, id string) (sleeper.Draft, error) {
+	return r.Live.Draft(ctx, id)
+}
+
 // UserID is live: a username is the drafter's own.
 func (r SleeperReplay) UserID(ctx context.Context, username string) (string, error) {
 	return r.Live.UserID(ctx, username)
