@@ -190,15 +190,20 @@ func readableAt(captures []capture, i int) error {
 // nil when the store records none (research.capture_checks, revision
 // 0008; the api can deploy ahead of it).
 func (s *PGSource) lastChecked(ctx context.Context, source string) (*time.Time, error) {
-	var exists bool
-	if err := s.Pool.QueryRow(ctx, `select to_regclass($1) is not null`, s.table("capture_checks")).Scan(&exists); err != nil {
+	// Readable, not only present: a migration whose grants have not reached
+	// the api's role leaves the check unknown ("as the list stood"), never
+	// the screens without their statuses.
+	var readable bool
+	err := s.Pool.QueryRow(ctx, `select coalesce(has_table_privilege(to_regclass($1), 'select'), false)`,
+		s.table("capture_checks")).Scan(&readable)
+	if err != nil {
 		return nil, fmt.Errorf("boards: look for capture_checks: %w", err)
 	}
-	if !exists {
+	if !readable {
 		return nil, nil
 	}
 	var at time.Time
-	err := s.Pool.QueryRow(ctx, `select checked_at from `+s.table("capture_checks")+` where source = $1`, source).Scan(&at)
+	err = s.Pool.QueryRow(ctx, `select checked_at from `+s.table("capture_checks")+` where source = $1`, source).Scan(&at)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
