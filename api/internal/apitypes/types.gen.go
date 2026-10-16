@@ -2919,8 +2919,11 @@ type SiteSeasonPhase string
 
 // StatusRead the injury capture a board's statuses come from, absent when none was read
 type StatusRead struct {
-	// AsOf the capture's stamp
+	// AsOf the capture's stamp, when the list last changed (an unchanged list is not stored again)
 	AsOf time.Time `json:"as_of"`
+
+	// CheckedAt the capture job's last successful check of the list, null when the store records none: say "read" at this time, and "as the list stood" at as_of without it
+	CheckedAt *time.Time `json:"checked_at"`
 
 	// Source the capture's feed in the research store
 	Source string `json:"source"`

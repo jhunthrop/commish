@@ -364,7 +364,7 @@ func (s *Service) withDesignations(r *http.Request, view apitypes.RoomBoard) api
 	if s.Designations == nil {
 		return view
 	}
-	designations, err := s.Designations.Designations(r.Context())
+	designations, err := s.Designations.DatedDesignations(r.Context())
 	if err != nil {
 		s.Log.Warn("solo: the board answers without injury statuses", "err", err)
 		return view

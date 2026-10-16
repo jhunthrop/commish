@@ -147,6 +147,7 @@ func TestDesignationSince(t *testing.T) {
 			('tank01_injuries_by_date', '{"injList": [{"playerID": "p1", "designation": "IR"}, {"playerID": "p2", "designation": "IR"}, {"playerID": "p5", "designation": "IR"}]}', '2026-10-13 11:00:00+00'),
 			('tank01_injuries_by_date', '{"injList": [{"playerID": "p1", "designation": "IR"}, {"playerID": "p2", "designation": "IR"}, {"playerID": "p3", "designation": "PUP"}, {"playerID": "p5", "designation": "IR"}]}', '2026-10-13 12:00:00+00'),
 			('tank01_injuries_by_date', '[1, 2]', '2026-10-13 13:00:00+00'),
+			('tank01_injuries_by_date', '{"injList": [{"playerID": "p9", "designation": "Q"}]}', '2026-10-13 13:30:00+00'),
 			('tank01_injuries_by_date', '{"injList": [{"playerID": "p1", "designation": "IR-R"}, {"playerID": "p2", "designation": "ir"}, {"playerID": "p3", "designation": "PUP"}, {"playerID": "p4", "designation": "O"}, {"playerID": "p5", "designation": "IR"}]}', '2026-10-13 14:00:00+00')`,
 	} {
 		if _, err := pool.Exec(ctx, q); err != nil {
@@ -155,10 +156,18 @@ func TestDesignationSince(t *testing.T) {
 	}
 	t.Cleanup(func() { _, _ = pool.Exec(context.Background(), `drop schema if exists `+schema+` cascade`) })
 	src, _ := NewPGSource(pool, schema, 2026, "")
-	d, err := src.Designations(ctx)
+	undated, err := src.Designations(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
+	if undated["p1"].Since != nil {
+		t.Fatal("the in-season screens' read dates a run")
+	}
+	runs, err := src.SeasonRuns(ctx, Newest(undated))
+	if err != nil {
+		t.Fatal(err)
+	}
+	d := WithSince(undated, runs)
 	at := func(hour int) *time.Time {
 		v := time.Date(2026, 10, 13, hour, 0, 0, 0, time.UTC)
 		return &v
@@ -172,6 +181,63 @@ func TestDesignationSince(t *testing.T) {
 		if (got.Since == nil) != (want == nil) || (want != nil && !got.Since.Equal(*want)) {
 			t.Errorf("%s since %v, want %v", id, got.Since, want)
 		}
+	}
+}
+
+// A list that is empty or under half the one before it is a glitch: the
+// read takes the newest list that is not, and a real drop reads once a
+// second short list follows it. A designation the newest list no longer
+// names is gone. The capture job's last check rides on every designation,
+// and a by-date out takes a nearby roster sweep's note.
+func TestDesignationFloorChecksAndNotes(t *testing.T) {
+	pool := dbtest.Pool(t)
+	ctx := context.Background()
+	const schema = "weekfacts_floor_test"
+	full := `{"injList": [{"playerID": "p1", "designation": "IR"}, {"playerID": "p2", "designation": "O"}, {"playerID": "p3", "designation": "Q"}, {"playerID": "p4", "designation": "Q"}]}`
+	for _, q := range []string{
+		`drop schema if exists ` + schema + ` cascade`, `create schema ` + schema,
+		`create table ` + schema + `.capture_snapshots (source text, payload jsonb, captured_at timestamptz)`,
+		`insert into ` + schema + `.capture_snapshots values
+			('tank01_injuries_by_date', '` + full + `', '2026-10-13 10:00:00+00'),
+			('tank01_injuries_by_date', '{"injList": []}', '2026-10-13 11:00:00+00'),
+			('tank01_injuries_by_date', '{"injList": [{"playerID": "p3", "designation": "Q"}]}', '2026-10-13 12:00:00+00'),
+			('tank01_injuries', '[{"roster": [{"playerID": "p2", "injury": {"designation": "O", "description": "Out for the season (knee)"}}]}]', '2026-10-12 20:00:00+00')`,
+	} {
+		if _, err := pool.Exec(ctx, q); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Cleanup(func() { _, _ = pool.Exec(context.Background(), `drop schema if exists `+schema+` cascade`) })
+	src, _ := NewPGSource(pool, schema, 2026, "")
+	d, err := src.Designations(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(d) != 4 || !d["p1"].AsOf.Equal(time.Date(2026, 10, 13, 10, 0, 0, 0, time.UTC)) || d["p1"].CheckedAt != nil {
+		t.Fatalf("designations %+v: the empty 11:00 list and the cut-short 12:00 one give way to 10:00's, with no check recorded", d)
+	}
+	if !d["p2"].SeasonLong() || d["p2"].Note != "Out for the season (knee)" {
+		t.Fatalf("p2 %+v: the sweep's note makes his out season-long", d["p2"])
+	}
+	// The list really drops to one: a second short list reads, and p1's
+	// injured reserve is gone.
+	for _, q := range []string{
+		`insert into ` + schema + `.capture_snapshots values
+			('tank01_injuries_by_date', '{"injList": [{"playerID": "p3", "designation": "D"}]}', '2026-10-13 13:00:00+00')`,
+		`create table ` + schema + `.capture_checks (source text primary key, checked_at timestamptz)`,
+		`insert into ` + schema + `.capture_checks values ('tank01_injuries_by_date', '2026-10-13 15:00:00+00')`,
+	} {
+		if _, err := pool.Exec(ctx, q); err != nil {
+			t.Fatal(err)
+		}
+	}
+	d, err = src.Designations(ctx)
+	checked := time.Date(2026, 10, 13, 15, 0, 0, 0, time.UTC)
+	if err != nil || len(d) != 1 || d["p3"].Code != "D" || d["p3"].CheckedAt == nil || !d["p3"].CheckedAt.Equal(checked) {
+		t.Fatalf("designations %+v (%v): the second short list, with the last check", d, err)
+	}
+	if _, listed := d["p1"]; listed {
+		t.Fatal("a lapsed injured reserve still shows")
 	}
 }
 

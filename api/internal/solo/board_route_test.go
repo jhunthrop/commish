@@ -32,7 +32,7 @@ type fixedDesignations struct {
 	err error
 }
 
-func (f fixedDesignations) Designations(context.Context) (map[string]boards.Designation, error) {
+func (f fixedDesignations) DatedDesignations(context.Context) (map[string]boards.Designation, error) {
 	return f.d, f.err
 }
 

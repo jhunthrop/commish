@@ -5,6 +5,8 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/jhunthrop/commish/api/internal/apitypes"
 )
 
 // designationCodes is the table both lanes read the provider's codes by:
@@ -85,5 +87,25 @@ func TestSeasonLongCodes(t *testing.T) {
 		if StatusOf(code) != statuses[i] || !SeasonLong(statuses[i], "") {
 			t.Errorf("%q lists %q", code, statuses[i])
 		}
+	}
+}
+
+// Statuses is the contract's DesignationStatus enum and the shared
+// table's statuses, no more and no fewer.
+func TestStatusesAreTheContractsAndTheTables(t *testing.T) {
+	table := map[string]bool{}
+	for _, status := range readDesignationCodes(t).Codes {
+		table[status] = true
+	}
+	if len(Statuses()) != len(table) {
+		t.Fatalf("Statuses() has %d, the shared table %d", len(Statuses()), len(table))
+	}
+	for _, status := range Statuses() {
+		if !table[status] || !apitypes.DesignationStatus(status).Valid() {
+			t.Errorf("%q is not in both the shared table and the contract's enum", status)
+		}
+	}
+	if apitypes.DesignationStatus("ir").Valid() {
+		t.Error("the contract's enum takes a status the table does not")
 	}
 }

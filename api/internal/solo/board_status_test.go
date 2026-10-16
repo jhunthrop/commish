@@ -1,7 +1,9 @@
 package solo
 
 import (
+	"encoding/json"
 	"maps"
+	"os"
 	"slices"
 	"testing"
 	"time"
@@ -29,6 +31,7 @@ func ids(players []apitypes.BoardPlayer) []string {
 func TestBoardStatuses(t *testing.T) {
 	read := time.Date(2026, 10, 16, 14, 5, 0, 0, time.UTC)
 	since := time.Date(2026, 10, 14, 15, 0, 0, 0, time.UTC)
+	checked := time.Date(2026, 10, 16, 15, 5, 0, 0, time.UTC)
 	view := apitypes.RoomBoard{Players: []apitypes.BoardPlayer{
 		boardRow("a-wr", apitypes.PlayerPositionWR, 1), boardRow("b-rb", apitypes.PlayerPositionRB, 1), boardRow("c-wr", apitypes.PlayerPositionWR, 2),
 		boardRow("d-wr", apitypes.PlayerPositionWR, 3), boardRow("e-rb", apitypes.PlayerPositionRB, 2), boardRow("f-te", apitypes.PlayerPositionTE, 1),
@@ -36,7 +39,7 @@ func TestBoardStatuses(t *testing.T) {
 	}}
 	source := "tank01_injuries_by_date"
 	got := withStatuses(view, map[string]boards.Designation{
-		"a-wr": {Code: "IR", AsOf: read, Source: source, Since: &since},
+		"a-wr": {Code: "IR", AsOf: read, Source: source, Since: &since, CheckedAt: &checked},
 		"d-wr": {Code: "D", AsOf: read, Source: source},
 		"e-rb": {Code: "PUP", AsOf: read, Source: source},
 		"f-te": {Code: "IR", AsOf: read, Source: source},
@@ -65,7 +68,8 @@ func TestBoardStatuses(t *testing.T) {
 	if byID["g-qb"].Status != nil || byID["b-rb"].Status != nil {
 		t.Fatal("a code we do not know, or no listing, shows no status")
 	}
-	if got.StatusRead == nil || !got.StatusRead.AsOf.Equal(read) || got.StatusRead.Source != source {
+	if got.StatusRead == nil || !got.StatusRead.AsOf.Equal(read) || got.StatusRead.Source != source ||
+		got.StatusRead.CheckedAt == nil || !got.StatusRead.CheckedAt.Equal(checked) {
 		t.Fatalf("status read %+v", got.StatusRead)
 	}
 	if view.Players[0].Id != "a-wr" || view.Players[0].Status != nil {
@@ -78,5 +82,49 @@ func TestNoCaptureLeavesTheBoard(t *testing.T) {
 	got := withStatuses(view, map[string]boards.Designation{})
 	if got.StatusRead != nil || !slices.Equal(ids(got.Players), []string{"a", "b"}) {
 		t.Fatalf("board %+v", got)
+	}
+}
+
+// orderCases is api/testdata/board-order-cases.json, the cases the site's
+// order (web/src/lib/run/board-status.ts) is held to as well.
+type orderCases struct {
+	Cases []struct {
+		Name   string
+		Rows   [][2]string
+		Listed map[string]struct {
+			Code       string
+			Status     string
+			SeasonLong bool `json:"season_long"`
+		}
+		Want []string
+	}
+}
+
+func TestTheSharedOrderCases(t *testing.T) {
+	raw, err := os.ReadFile("../../testdata/board-order-cases.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var file orderCases
+	if err := json.Unmarshal(raw, &file); err != nil {
+		t.Fatal(err)
+	}
+	read := time.Date(2026, 10, 16, 14, 5, 0, 0, time.UTC)
+	for _, c := range file.Cases {
+		view := apitypes.RoomBoard{}
+		for i, r := range c.Rows {
+			view.Players = append(view.Players, boardRow(r[0], apitypes.PlayerPosition(r[1]), i+1))
+		}
+		designations := map[string]boards.Designation{}
+		for id, l := range c.Listed {
+			d := boards.Designation{Code: l.Code, AsOf: read, Source: "tank01_injuries_by_date"}
+			if d.Status() != l.Status || d.SeasonLong() != l.SeasonLong {
+				t.Fatalf("%s: %s reads as %s (season-long %v), the case says %s", c.Name, l.Code, d.Status(), d.SeasonLong(), l.Status)
+			}
+			designations[id] = d
+		}
+		if got := ids(withStatuses(view, designations).Players); !slices.Equal(got, c.Want) {
+			t.Errorf("%s: %v, want %v", c.Name, got, c.Want)
+		}
 	}
 }

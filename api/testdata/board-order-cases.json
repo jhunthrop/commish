@@ -1,0 +1,49 @@
+{
+	"about": "The board's order beside the injury capture (Lane 63): a player on a season-long list follows the last available player at his position; a week's designation moves nothing; a position with nobody available keeps its order. api/internal/solo/board_status_test.go and web/src/lib/run/board-status.test.ts both read these cases.",
+	"cases": [
+		{
+			"name": "a held receiver and a held back follow their positions, a doubtful receiver stays",
+			"rows": [
+				["a-wr", "WR"],
+				["b-rb", "RB"],
+				["c-wr", "WR"],
+				["d-wr", "WR"],
+				["e-rb", "RB"],
+				["f-te", "TE"],
+				["g-qb", "QB"]
+			],
+			"listed": {
+				"a-wr": { "code": "IR", "status": "injured_reserve", "season_long": true },
+				"d-wr": { "code": "D", "status": "doubtful", "season_long": false },
+				"e-rb": { "code": "PUP", "status": "pup", "season_long": true },
+				"f-te": { "code": "IR", "status": "injured_reserve", "season_long": true }
+			},
+			"want": ["b-rb", "e-rb", "c-wr", "d-wr", "a-wr", "f-te", "g-qb"]
+		},
+		{
+			"name": "two held at one position keep their own order after the last available",
+			"rows": [
+				["a-rb", "RB"],
+				["b-rb", "RB"],
+				["c-wr", "WR"],
+				["d-rb", "RB"],
+				["e-wr", "WR"]
+			],
+			"listed": {
+				"a-rb": { "code": "SUSP", "status": "suspended", "season_long": true },
+				"b-rb": { "code": "NFI", "status": "nfi", "season_long": true },
+				"e-wr": { "code": "O", "status": "out", "season_long": false }
+			},
+			"want": ["c-wr", "d-rb", "a-rb", "b-rb", "e-wr"]
+		},
+		{
+			"name": "nobody listed leaves the board",
+			"rows": [
+				["a-wr", "WR"],
+				["b-wr", "WR"]
+			],
+			"listed": {},
+			"want": ["a-wr", "b-wr"]
+		}
+	]
+}

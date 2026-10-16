@@ -8,10 +8,10 @@ import (
 )
 
 // DesignationSource is the newest injury capture, by the board's player
-// id, from the hourly cache the in-season screens read.
-// *inseason.Cache implements it.
+// id, each season-long designation dated, from the hourly cache the
+// in-season screens read. *inseason.Cache implements it.
 type DesignationSource interface {
-	Designations(ctx context.Context) (map[string]boards.Designation, error)
+	DatedDesignations(ctx context.Context) (map[string]boards.Designation, error)
 }
 
 // withStatuses is the board with each listed player's designation, and
@@ -47,10 +47,15 @@ func withStatuses(view apitypes.RoomBoard, designations map[string]boards.Design
 
 // statusRead is the capture the designations come from, nil with none.
 func statusRead(designations map[string]boards.Designation) *apitypes.StatusRead {
-	var read *apitypes.StatusRead
+	if len(designations) == 0 {
+		return nil
+	}
+	read := &apitypes.StatusRead{AsOf: boards.Newest(designations)}
 	for _, d := range designations {
-		if read == nil || d.AsOf.After(read.AsOf) {
-			read = &apitypes.StatusRead{AsOf: d.AsOf, Source: d.Source}
+		// One capture: every designation carries its source and its check.
+		read.Source = d.Source
+		if d.CheckedAt != nil && (read.CheckedAt == nil || d.CheckedAt.After(*read.CheckedAt)) {
+			read.CheckedAt = d.CheckedAt
 		}
 	}
 	return read

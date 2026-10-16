@@ -155,7 +155,7 @@ func build(ctx context.Context, cfg config.API, pool *pgxpool.Pool, obs httpx.Ob
 	exportHandler := &exports.Handler{Store: &exports.Store{Pool: pool}, Sheets: sheetStore, Objects: objects(cfg, log), Now: now, Log: log}
 	// One hourly capture read, kept for its TTL, serves the in-season
 	// screens and the board route's designations alike.
-	facts := &inseason.Cache{Reads: draftBoards.Schedule, Now: now}
+	facts := &inseason.Cache{Reads: draftBoards.Schedule, Now: now, Log: log}
 	solo, lobbies, err := rooms(ctx, cfg, pool, draftBoards, mockStore, anon, gate, leagueStore, sheetStore, authStore, facts, log)
 	if err != nil {
 		return nil, err

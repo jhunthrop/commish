@@ -2401,9 +2401,19 @@ components:
     StatusRead:
       type: object
       description: the injury capture a board's statuses come from, absent when none was read
-      required: [as_of, source]
+      required: [as_of, checked_at, source]
       properties:
-        as_of: { type: string, format: date-time, description: the capture's stamp }
+        as_of:
+          type: string
+          format: date-time
+          description: the capture's stamp, when the list last changed (an unchanged list is not stored again)
+        checked_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: >-
+            the capture job's last successful check of the list, null when the store records none: say "read" at
+            this time, and "as the list stood" at as_of without it
         source: { type: string, description: the capture's feed in the research store }
     RoomBoard:
       type: object

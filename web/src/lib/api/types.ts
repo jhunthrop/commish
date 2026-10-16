@@ -1986,9 +1986,14 @@ export interface components {
 		StatusRead: {
 			/**
 			 * Format: date-time
-			 * @description the capture's stamp
+			 * @description the capture's stamp, when the list last changed (an unchanged list is not stored again)
 			 */
 			as_of: string;
+			/**
+			 * Format: date-time
+			 * @description the capture job's last successful check of the list, null when the store records none: say "read" at this time, and "as the list stood" at as_of without it
+			 */
+			checked_at: string | null;
 			/** @description the capture's feed in the research store */
 			source: string;
 		};
