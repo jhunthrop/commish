@@ -21,8 +21,8 @@ const BOARD_PARTS =
 	/[\\/]src[\\/]lib[\\/](ui[\\/](TierStrip|TierJump|Toggle|Chip|ChipGroup|chips|FilterBar|BasisList)\.|site[\\/](BoardView|BoardPageView|AdpView|AbsentFormatView|absent)\.|context[\\/]follow\.)/;
 /** What only the user pages run: the mock room and its parts, the account, the pass and the live
  * draft companion, the connected hosts (FFPC, Yahoo, ESPN), the request API client and the sheet's
- * store. A nightly page never loads any of it with the page; the sheet arrives on a reader's first intent, the rest only on the pages that
- * call the API. */
+ * store. A nightly page never loads any of it with the page; the sheet arrives on a reader's first
+ * intent, the rest only on the pages that call the API. */
 const USER_PAGE_PARTS =
 	/[\\/]src[\\/]lib[\\/](room|account|api|sheet|pass|companion|hosts)[\\/]|[\\/]src[\\/]lib[\\/]ui[\\/](CallPanel|TeamPanel|PickStrip|OddsCell|ToneChip|Stepper|TextInput|ScoreBug|SinceStrip|Keys)\./;
 /** What the player, club and compare pages draw and the others never do: a player's line, the

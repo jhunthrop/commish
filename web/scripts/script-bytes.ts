@@ -1,7 +1,9 @@
 // The script a page loads on first paint, gzipped, computed from the build output with no browser:
 // the page's start and app entries, the route nodes its boot call names, and every chunk those import
 // statically. Dynamic imports (the sheet, the mock room) are not counted, the way the budget does not
-// count what waits for a reader's first intent. Run after `npm run build`:
+// count what waits for a reader's first intent. It leaves out the scripts inline in the HTML and is
+// not Lighthouse's transfer size (which adds headers), so compare it only with itself. Run after
+// `npm run build`:
 //   node scripts/script-bytes.ts [slug]       the five pages, with the slug for the player page
 //   VERBOSE=1 node scripts/script-bytes.ts    also each file by weight, and the chunks by weight
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
