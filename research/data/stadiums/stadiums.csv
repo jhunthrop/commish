@@ -1,0 +1,48 @@
+stadium_id,name,clubs,aliases,latitude,longitude,roof_type,surface,country,region,time_zone,wikidata_id
+ATL00,Georgia Dome,ATL,Georgia Dome,33.7575,-84.400833333333,dome,fieldturf,US,GA,America/New_York,Q1058931
+ATL97,Mercedes-Benz Stadium,ATL,Mercedes-Benz Stadium,33.75527777777778,-84.40083333333334,retractable,fieldturf,US,GA,America/New_York,Q7007552
+BAL00,M&T Bank Stadium,BAL,M&T Bank Stadium,39.278055555556,-76.622777777778,outdoors,grass,US,MD,America/New_York,Q1141336
+BOS00,Gillette Stadium,NE,Gillette Stadium,42.090944444444,-71.264344444444,outdoors,fieldturf,US,MA,America/New_York,Q373355
+BUF00,Highmark Stadium,BUF,Highmark Stadium|New Era Field,42.77297222222222,-78.79219444444445,outdoors,a_turf,US,NY,America/New_York,Q16251517
+CAR00,Bank of America Stadium,CAR,Bank of America Stadium,35.225833333333,-80.852777777778,outdoors,grass,US,NC,America/New_York,Q806673
+CHI98,Soldier Field,CHI,Soldier Field,41.8625,-87.616666666667,outdoors,grass,US,IL,America/Chicago,Q1132413
+CIN00,Paycor Stadium,CIN,Paul Brown Stadium|Paycor Stadium,39.095444444444,-84.516038888889,outdoors,fieldturf,US,OH,America/New_York,Q1632294
+CLE00,Huntington Bank Field,CLE,FirstEnergy Stadium|Huntington Bank Field,41.506111111111,-81.699444444444,outdoors,grass,US,OH,America/New_York,Q1100756
+DAL00,AT&T Stadium,DAL,AT&T Stadium,32.74769,-97.09288,retractable,matrixturf,US,TX,America/Chicago,Q838284
+DEN00,Empower Field at Mile High,DEN,Empower Field at Mile High|Sports Authority Field at Mile High,39.743888888889,-105.02,outdoors,grass,US,CO,America/Denver,Q1046135
+DET00,Ford Field,DET,Ford Field,42.34,-83.045555555556,dome,fieldturf,US,MI,America/Detroit,Q1142586
+FRA00,Deutsche Bank Park,,Deutsche Bank Park,50.068611,8.645278,retractable,grass,DE,,Europe/Berlin,Q157273
+GER00,Allianz Arena,,Allianz Arena,48.218775,11.624752777778,outdoors,,DE,,Europe/Berlin,Q127429
+GNB00,Lambeau Field,GB,Lambeau Field,44.501388888889,-88.062222222222,outdoors,grass,US,WI,America/Chicago,Q860790
+HOU00,NRG Stadium,HOU,NRG Stadium|Reliant Stadium,29.684722222222,-95.410833333333,retractable,astroturf,US,TX,America/Chicago,Q1058864
+IND00,Lucas Oil Stadium,IND,Lucas Oil Stadium,39.760056,-86.163806,retractable,fieldturf,US,IN,America/Indiana/Indianapolis,Q867160
+JAX00,EverBank Stadium,JAX,EverBank Field|EverBank Stadium|TIAA Bank Stadium,30.323889,-81.6375,outdoors,grass,US,FL,America/New_York,Q635117
+KAN00,GEHA Field at Arrowhead Stadium,KC,Arrowhead Stadium|GEHA Field at Arrowhead Stadium,39.048888888889,-94.483888888889,outdoors,grass,US,MO,America/Chicago,Q544553
+LAX01,SoFi Stadium,LA|LAC,SoFi Stadium,33.9504,-118.338,dome,matrixturf,US,CA,America/Los_Angeles,Q19520501
+LAX97,StubHub Center,LAC,StubHub Center,33.864444444444,-118.26111111111,outdoors,grass,US,CA,America/Los_Angeles,Q200684
+LAX99,Los Angeles Memorial Coliseum,LA,Los Angeles Memorial Coliseum,34.014167,-118.287778,outdoors,grass,US,CA,America/Los_Angeles,Q849784
+LON00,Wembley Stadium,,Wembley Stadium,51.55555555555556,-0.27944444444444444,outdoors,grass,GB,,Europe/London,Q128468
+LON01,Twickenham Stadium,,Twickenham Stadium,51.456111111111,-0.34166666666667,outdoors,grass,GB,,Europe/London,Q209725
+LON02,Tottenham Hotspur Stadium,,Tottenham Hotspur Stadium|Tottenham Stadium,51.604444444444,-0.066388888888889,outdoors,grass,GB,,Europe/London,Q55074091
+MAD01,Bernabeu,,Bernabeu,40.45306,-3.68835,retractable,fieldturf,ES,,Europe/Madrid,Q164027
+MEL00,Melbourne Cricket Ground,,Melbourne Cricket Ground,-37.819943,144.983447,outdoors,grass,AU,,Australia/Melbourne,Q330136
+MEX00,Estadio Banorte,,Azteca Stadium|Estadio Banorte,19.303055555555556,-99.15055555555556,outdoors,grass,MX,,America/Mexico_City,Q320454
+MIA00,Hard Rock Stadium,MIA,Hard Rock Stadium,25.958055555556,-80.238888888889,outdoors,grass,US,FL,America/New_York,Q864339
+MIN01,U.S. Bank Stadium,MIN,U.S. Bank Stadium,44.973889,-93.258056,dome,sportturf,US,MN,America/Chicago,Q7929512
+MUN01,FC Bayern Munich Stadium,,FC Bayern Munich Stadium,48.218775,11.624752777778,outdoors,fieldturf,DE,,Europe/Berlin,Q127429
+NAS00,Nissan Stadium,TEN,Nissan Stadium,36.166388888889,-86.771388888889,outdoors,grass,US,TN,America/Chicago,Q1142992
+NOR00,Caesars Superdome,NO,Caesars Superdome|Mercedes-Benz Superdome,29.950833333333,-90.081111111111,dome,sportturf,US,LA,America/Chicago,Q756452
+NYC01,MetLife Stadium,NYG|NYJ,MetLife Stadium,40.81361111111111,-74.07444444444444,outdoors,fieldturf,US,NJ,America/New_York,Q10862290
+OAK00,Ring Central Coliseum,OAK,Oakland-Alameda County Coliseum|Ring Central Coliseum,37.751666666667,-122.20055555556,outdoors,grass,US,CA,America/Los_Angeles,Q1147732
+PAR00,Stade de France,,Stade de France,48.92444444444445,2.36,outdoors,sportturf,FR,,Europe/Paris,Q13205
+PHI00,Lincoln Financial Field,PHI,Lincoln Financial Field,39.90089,-75.16776,outdoors,grass,US,PA,America/New_York,Q1052370
+PHO00,State Farm Stadium,ARI,State Farm Stadium|University of Phoenix Stadium,33.5275,-112.2625,retractable,grass,US,AZ,America/Phoenix,Q756433
+PIT00,Acrisure Stadium,PIT,Acrisure Stadium|Heinz Field,40.446666666667,-80.015833333333,outdoors,grass,US,PA,America/New_York,Q1067148
+RIO00,Maracana Stadium,,Maracana Stadium,-22.912222222222223,-43.23027777777778,outdoors,grass,BR,,America/Sao_Paulo,Q155174
+SAO00,Arena Corinthians,,Arena Corinthians,-23.545555555556,-46.474,outdoors,,BR,,America/Sao_Paulo,Q1362236
+SDG00,Qualcomm Stadium,SD,Qualcomm Stadium,32.783055555556,-117.11944444444,outdoors,grass,US,CA,America/Los_Angeles,Q956072
+SEA00,Lumen Field,SEA,CenturyLink Field|Lumen Field,47.595277777778,-122.33166666667,outdoors,fieldturf,US,WA,America/Los_Angeles,Q612736
+SFO01,Levi's Stadium,SF,Levi's Stadium,37.4034,-121.97,outdoors,grass,US,CA,America/Los_Angeles,Q7419343
+TAM00,Raymond James Stadium,TB,Raymond James Stadium,27.975833333333,-82.503333333333,outdoors,grass,US,FL,America/New_York,Q1141343
+VEG00,Allegiant Stadium,LV,Allegiant Stadium,36.090777777778,-115.183,dome,grass,US,NV,America/Los_Angeles,Q27768421
+WAS00,Northwest Stadium,WAS,FedExField|Northwest Stadium,38.907777777778,-76.864444444444,outdoors,grass,US,MD,America/New_York,Q583085

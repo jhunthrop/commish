@@ -194,7 +194,7 @@
 {#snippet row(r: WaiverRow)}
 	{@const on = marked === idOf(r)}
 	<div class="pick" class:on>
-		<LineRow line={r.add} note={shared === null ? dropWords(r) : undefined}>
+		<LineRow line={r.add} note={shared === null ? dropWords(r) : undefined} factsOnPhone={false}>
 			{#snippet trailing()}
 				<span class="end">
 					{#if r.gain > 0}

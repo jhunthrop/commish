@@ -6,7 +6,18 @@ no row repeats it in a `source` column.
 
 from typing import Final
 
-from sqlalchemy import CheckConstraint, Column, DateTime, Double, ForeignKeyConstraint, Index, Integer, Table, Text
+from sqlalchemy import (
+    CheckConstraint,
+    Column,
+    Date,
+    DateTime,
+    Double,
+    ForeignKeyConstraint,
+    Index,
+    Integer,
+    Table,
+    Text,
+)
 
 from research.db.schema._base import METADATA, RESEARCH_SCHEMA, one_of, recorded_at
 
@@ -128,6 +139,63 @@ NFL_DRAFT_PICKS: Final = Table(
     recorded_at(),
     _player_fk("nfl_draft_picks"),
     Index("nfl_draft_picks_player_idx", "player_id"),
+)
+
+# nflverse's game table (`games.csv`), one row per game (revision 0010, Lane 66a): THE CURRENT STATE
+# ONLY, NEVER AN AS-OF SOURCE. A future game's figures and venue move until kickoff and its result
+# lands after, so the ingest rewrites a row whose values changed and `read_at` is the pass that last
+# changed it; an earlier state is gone. What a pass read is kept append-only beside it:
+# `nflverse_game_reads` (the venue and kickoff) and the `nflverse_game_figures` team-week source
+# (the figures from each club's side). `kickoff_at` is the file's Eastern `gameday` and `gametime`
+# as an instant, NULL while the time is unset.
+NFLVERSE_GAMES: Final = Table(
+    "nflverse_games",
+    METADATA,
+    Column("game_id", Text, primary_key=True),
+    Column("season", Integer, nullable=False),
+    Column("game_type", Text, nullable=False),
+    Column("week", Integer, nullable=False),
+    Column("gameday", Date, nullable=False),
+    Column("gametime", Text),
+    Column("kickoff_at", DateTime(True)),
+    Column("home_team", Text, nullable=False),
+    Column("away_team", Text, nullable=False),
+    Column("location", Text, nullable=False),
+    Column("home_score", Integer),
+    Column("away_score", Integer),
+    Column("result", Integer),
+    Column("spread_line", Double(53)),
+    Column("total_line", Double(53)),
+    Column("roof", Text),
+    Column("surface", Text),
+    Column("temp", Double(53)),
+    Column("wind", Double(53)),
+    Column("stadium_id", Text, nullable=False),
+    Column("stadium", Text, nullable=False),
+    Column("read_at", DateTime(True), nullable=False),
+    recorded_at(),
+    Index("nflverse_games_week_idx", "season", "week"),
+    Index("nflverse_games_kickoff_idx", "kickoff_at"),
+)
+
+# Each pass's read of every game it ingests (revision 0010): the venue and kickoff as the file stood,
+# append-only (a re-run at the same instant writes nothing), so a replay reads the newest at or
+# before its instant.
+NFLVERSE_GAME_READS: Final = Table(
+    "nflverse_game_reads",
+    METADATA,
+    Column("game_id", Text, primary_key=True),
+    Column("read_at", DateTime(True), primary_key=True),
+    Column("season", Integer, nullable=False),
+    Column("week", Integer, nullable=False),
+    Column("home_team", Text, nullable=False),
+    Column("away_team", Text, nullable=False),
+    Column("kickoff_at", DateTime(True)),
+    Column("stadium_id", Text, nullable=False),
+    Column("stadium", Text, nullable=False),
+    Column("roof", Text),
+    recorded_at(),
+    Index("nflverse_game_reads_week_idx", "season", "week", "read_at"),
 )
 
 COACHES: Final = Table(

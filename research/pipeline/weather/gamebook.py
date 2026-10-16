@@ -10,25 +10,34 @@ indoor games' empty line) says nothing. WIND is read from the text between "Wind
 "mph": "Calm" is 0, otherwise the first whole number there (a range "11-17" or a gust "6G15" gives
 its first figure, the sustained or lower wind); no number says nothing.
 
-PRECIPITATION, preregistered word for word (§2.5, "Parsing the precipitation word"): the flag is 1
-when the text names one of rain, showers, drizzle, snow, sleet, flurries or "wintry mix" as a
-present condition, and 0 otherwise. A word preceded by "chance of", "no", "slight chance" or
-"possible", or appearing only after "forecast", is not a present condition. The list is the
-preregistered one: a word outside it ("rainy", "snowing") does not count, and the results name such
-words rather than this parser widening the list.
+PRECIPITATION, as amended before any fit (preregistration §7, Amendment 1, item 1): the words match as
+stems, rain (rainy, raining), showers (shower), drizzle (drizzling), snow (snowing, snowy), sleet,
+flurries and "wintry mix". A word is not a present condition when "no" precedes it, or when any form of
+"chance", "possible" or "forecast", or a percentage, appears anywhere in the same line; otherwise it is
+a present condition and the flag is 1, and 0 when none is. The gamebook's own "Humidity: 87%" figure is a
+measurement, not a probability, so it is not read as a percentage. An empty line ("Temp: ° F, Wind: mph")
+is not read here at all: the fill (`game_weather.fill`) gives it no flag and goes to ISD (item 2).
 """
 
 import re
 from dataclasses import dataclass
 from typing import Final
 
-PRECIPITATION_WORDS: Final = ("rain", "showers", "drizzle", "snow", "sleet", "flurries", "wintry mix")
-NEGATING_PREFIXES: Final = ("chance of", "no", "slight chance", "possible")
-FORECAST_WORD: Final = "forecast"
-KIND_OF_WORD: Final = {
+PRECIPITATION_WORDS: Final = (
+    r"rain(?:y|ing)?",
+    r"showers?",
+    r"drizzl(?:e|ing)",
+    r"snow(?:ing|y)?",
+    "sleet",
+    "flurries",
+    "wintry mix",
+)
+NEGATING_PREFIXES: Final = ("no",)
+HEDGE_STEMS: Final = ("chance", "possib", "forecast")
+KIND_OF_STEM: Final = {
     "rain": "rain",
-    "showers": "rain",
-    "drizzle": "rain",
+    "shower": "rain",
+    "drizzl": "rain",
     "snow": "snow",
     "flurries": "snow",
     "sleet": "sleet",
@@ -40,8 +49,10 @@ _TEMPERATURE: Final = re.compile(r"temp:\s*(-?\d+)", re.IGNORECASE)
 _WIND_SEGMENT: Final = re.compile(r"wind:(.*?)mph", re.IGNORECASE | re.DOTALL)
 _FIRST_NUMBER: Final = re.compile(r"\d+")
 _CALM: Final = re.compile(r"\bcalm\b", re.IGNORECASE)
-_WORD: Final = re.compile(r"\b(" + "|".join(re.escape(w) for w in PRECIPITATION_WORDS) + r")\b", re.IGNORECASE)
+_WORD: Final = re.compile(r"\b(" + "|".join(PRECIPITATION_WORDS) + r")\b", re.IGNORECASE)
 _NEGATED: Final = re.compile(r"\b(" + "|".join(re.escape(p) for p in NEGATING_PREFIXES) + r")\s*$", re.IGNORECASE)
+_HEDGE: Final = re.compile("|".join(HEDGE_STEMS), re.IGNORECASE)
+_HUMIDITY: Final = re.compile(r"humidity:\s*\d+\s*%", re.IGNORECASE)
 
 
 @dataclass(frozen=True, slots=True)
@@ -65,22 +76,24 @@ def wind_mph(text: str) -> float | None:
     return None if number is None else float(number.group(0))
 
 
+def _kind(word: str) -> str:
+    return next(kind for stem, kind in KIND_OF_STEM.items() if word.startswith(stem))
+
+
+def _is_hedged(text: str) -> bool:
+    return _HEDGE.search(text) is not None or "%" in _HUMIDITY.sub("", text)
+
+
 def _present_words(text: str) -> list[str]:
+    if _is_hedged(text):
+        return []
     lowered = text.lower()
-    forecast_at = lowered.find(FORECAST_WORD)
-    present: list[str] = []
-    for match in _WORD.finditer(lowered):
-        if forecast_at != -1 and match.start() > forecast_at:
-            continue
-        if _NEGATED.search(lowered[: match.start()]):
-            continue
-        present.append(match.group(1))
-    return present
+    return [m.group(1) for m in _WORD.finditer(lowered) if not _NEGATED.search(lowered[: m.start()])]
 
 
 def precipitation(text: str) -> Precipitation:
     """The preregistered flag, and the present condition's kind (several kinds are a mix)."""
-    kinds = {KIND_OF_WORD[word] for word in _present_words(text)}
+    kinds = {_kind(word) for word in _present_words(text)}
     if not kinds:
         return Precipitation(0, None)
     return Precipitation(1, kinds.pop() if len(kinds) == 1 else MIXED_KIND)

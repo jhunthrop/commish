@@ -172,6 +172,8 @@ func wireFacts(f Facts, pointsThisWeek *float64) apitypes.WeekFacts {
 	if al := f.Allowed; al != nil {
 		out.AllowedToPosition = &apitypes.PointsAllowed{PointsAGame: al.PointsAGame, Rank: al.Rank, Of: al.Of, Position: string(al.Position)}
 	}
+	c := conditionsOf(f.Game)
+	out.GameTotal, out.Spread, out.Roof, out.Weather = c.total, c.spread, c.roof, c.weather
 	return out
 }
 

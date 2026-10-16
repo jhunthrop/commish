@@ -1,6 +1,6 @@
 """THE REGISTER'S WEEKLY PASS (`season-week`), ported from `research-ts/src/projections/season-week/steps.ts`.
 
-Ten steps, each isolated: a step that raises is reported as failed and the pass carries on to the
+Eleven steps, each isolated: a step that raises is reported as failed and the pass carries on to the
 next, because a dead odds key must never stop the freeze that runs after it. The exit status is
 non-zero when any step failed.
 
@@ -11,6 +11,8 @@ non-zero when any step failed.
    (`commish_opponent_adjustment`), from the play-by-play just stored, for every week whose earlier
    games are all in it (`ingest_opponent_defence_to_date`): the weekly number's opponent factor
    (`docs/research/2026-10-15-weekly-projection-round2-preregistration.md`, section 4's build items).
+1c. **game-table**: nflverse's game table for the season into `nflverse_games` (Lane 66a): the
+   kickoffs and venues the hourly forecast reads, and the figures the live default falls back to.
 2. **props-snapshot**: the odds provider's player props for the coming fourteen days.
 3. **grade**: every frozen week not yet graded, whose games are complete (below), against the
    stats now held. Each grade row is stamped `implementation = 'python'`.
@@ -47,6 +49,7 @@ from research.pipeline.http import Fetcher
 from research.pipeline.nflverse import ingest, ingest_schedule
 from research.pipeline.nflverse.client import NflverseClient
 from research.pipeline.nflverse.context import ingest_opponent_defence_to_date
+from research.pipeline.nflverse.games import ingest_games
 from research.pipeline.nflverse.schedule import ScheduleMetric, ScheduleSource
 from research.pipeline.odds.ingest import run_odds_snapshot
 
@@ -57,10 +60,12 @@ GRADE_AFTER: Final = timedelta(hours=36)
 GRADE_OVERDUE: Final = timedelta(days=4)
 LAST_POSSIBLE_WEEK: Final = 22
 OPPONENT_RATINGS: Final = "opponent-ratings"
+GAME_TABLE: Final = "game-table"
 STEPS: Final = (
     "stats-ingest",
     *usage_steps.USAGE_STEPS,
     OPPONENT_RATINGS,
+    GAME_TABLE,
     "props-snapshot",
     "grade",
     "freeze",
@@ -125,6 +130,15 @@ def opponent_ratings(context: SeasonWeekContext) -> StepResult:
         conn.commit()
     return usage_steps.written_result(
         OPPONENT_RATINGS, written, f"{written} new opponent-rating rows for {context.season}"
+    )
+
+
+def game_table(context: SeasonWeekContext) -> StepResult:
+    """The season's games as nflverse lists them now; a re-run over an unchanged file writes nothing."""
+    with context.engine.begin() as conn:
+        report = ingest_games(conn, NflverseClient(context.fetcher), [context.season], context.now)
+    return usage_steps.written_result(
+        GAME_TABLE, report.written, f"{report.written} games of {context.season} written or updated"
     )
 
 
@@ -278,6 +292,7 @@ def _bodies(context: SeasonWeekContext) -> dict[str, Callable[[], StepResult]]:
         "stats-ingest": lambda: stats_ingest(context),
         **{name: _usage_body(name, context) for name in usage_steps.USAGE_STEPS},
         OPPONENT_RATINGS: lambda: opponent_ratings(context),
+        GAME_TABLE: lambda: game_table(context),
         "props-snapshot": lambda: props_snapshot(context),
         "grade": lambda: grade(context),
         "freeze": lambda: freeze(context),

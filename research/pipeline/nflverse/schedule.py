@@ -15,6 +15,7 @@ from typing import Final
 from zoneinfo import ZoneInfo
 
 from research.errors import SchemaDriftError
+from research.pipeline.game_figures import implied_points
 from research.pipeline.jscompat import js_is_finite, js_number, js_trim
 from research.pipeline.nflverse.config import PUBLICATION_LAG_HOURS, SEASON_TYPE
 from research.pipeline.nflverse.csv import CsvRow
@@ -246,7 +247,7 @@ def schedule_observations(games: Sequence[TeamGame]) -> list[TeamWeekObservation
         if game.point_spread is not None:
             rows.append(obs(kickoff, at_kickoff, ScheduleMetric.POINT_SPREAD, game.point_spread))
             if game.total_line is not None:
-                implied = game.total_line / 2 + game.point_spread / 2
+                implied = implied_points(game.total_line, game.point_spread)
                 rows.append(obs(kickoff, at_kickoff, ScheduleMetric.IMPLIED_TEAM_TOTAL, implied))
         if game.temperature is not None:
             rows.append(obs(kickoff, after, ScheduleMetric.TEMPERATURE, game.temperature))

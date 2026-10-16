@@ -128,7 +128,11 @@ const line = (id: string): PlayerLine => ({
 		played: false,
 		points_this_week: null,
 		last_games: [],
-		allowed_to_position: null
+		allowed_to_position: null,
+		game_total: null,
+		spread: null,
+		roof: null,
+		weather: null
 	}
 });
 

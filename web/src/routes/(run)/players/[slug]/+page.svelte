@@ -39,9 +39,15 @@
 
 	let { data }: PageProps = $props();
 
+	/** His club's game this week with its facts, read from the API after the first paint. */
+	let thisWeek = $state<string | null>(null);
+
 	onMount(() => {
 		lazySheet.armOnFirstIntent(window);
 		siteContext.wantHeld();
+		void import('#lib/run/week-line.ts')
+			.then(({ weekLine }) => weekLine(data.page.team))
+			.then((line) => (thisWeek = line));
 	});
 
 	const page = $derived(data.page);
@@ -193,6 +199,7 @@
 		</HeroCard>
 		{#if lead.rest}<Footnote>{lead.rest.lead}</Footnote>{/if}
 		{#if statusNote}<Footnote>{statusNote}</Footnote>{/if}
+		{#if thisWeek}<p class="this-week">{thisWeek}</p>{/if}
 		<div class="league-lines">
 			<ContextNote note={note?.text ?? null} link={note?.link ?? null} />
 		</div>
@@ -289,6 +296,14 @@
 </SiteShell>
 
 <style>
+	/* His club's game this week with its facts, the row's facts style: a sentence in the second ink. */
+	.this-week {
+		margin: 0;
+		color: var(--ink-2);
+		font-size: var(--t-sm);
+		font-variant-numeric: tabular-nums;
+	}
+
 	/* The league's line; with no league selected it takes no place. */
 	.league-lines {
 		display: flex;

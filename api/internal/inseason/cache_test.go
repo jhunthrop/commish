@@ -12,8 +12,8 @@ import (
 )
 
 type countingReads struct {
-	lines, games, designations, runs atomic.Int32
-	fail, failRuns                   bool
+	lines, games, designations, runs, gameFacts atomic.Int32
+	fail, failRuns                              bool
 }
 
 func (r *countingReads) StatLines(context.Context, int) ([]boards.StatLine, error) {
@@ -45,6 +45,11 @@ func (r *countingReads) SeasonRuns(_ context.Context, newest time.Time) (map[boa
 	return map[boards.RunKey]time.Time{{PlayerID: "p2", Status: boards.StatusInjuredReserve}: newest.Add(-time.Hour)}, nil
 }
 
+func (r *countingReads) GameFacts(context.Context, int) (map[boards.ClubWeek]boards.GameFact, error) {
+	r.gameFacts.Add(1)
+	return map[boards.ClubWeek]boards.GameFact{{Week: 7, Team: "BUF"}: {Venue: &boards.Venue{Roof: boards.RoofOutdoors}}}, nil
+}
+
 func TestCacheReadsOncePerTTL(t *testing.T) {
 	reads := &countingReads{}
 	now := time.Date(2026, 10, 15, 12, 0, 0, 0, time.UTC)
@@ -56,7 +61,7 @@ func TestCacheReadsOncePerTTL(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			if d, err := c.Data(ctx, 2026); err != nil || len(d.Lines) != 1 || len(d.Games) != 1 || len(d.Designations) != 2 {
+			if d, err := c.Data(ctx, 2026); err != nil || len(d.Lines) != 1 || len(d.Games) != 1 || len(d.Designations) != 2 || len(d.GameFacts) != 1 {
 				t.Errorf("data %+v %v", d, err)
 			}
 		}()
@@ -71,8 +76,9 @@ func TestCacheReadsOncePerTTL(t *testing.T) {
 	if _, err := c.Data(ctx, 2026); err != nil {
 		t.Fatal(err)
 	}
-	if reads.lines.Load() != 1 || reads.designations.Load() != 2 {
-		t.Fatalf("past the capture TTL: lines %d captures %d, want 1 and 2", reads.lines.Load(), reads.designations.Load())
+	if reads.lines.Load() != 1 || reads.designations.Load() != 2 || reads.gameFacts.Load() != 2 {
+		t.Fatalf("past the capture TTL: lines %d captures %d game facts %d, want 1, 2 and 2",
+			reads.lines.Load(), reads.designations.Load(), reads.gameFacts.Load())
 	}
 	mu.Lock()
 	now = now.Add(SeasonTTL)

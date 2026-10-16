@@ -170,9 +170,17 @@
 	{@const on = marked === key}
 	{@const filled = builtFrom(team, row)}
 	<div class="trade" class:on>
-		{#each row.give as line (line.player.host_id)}<LineRow {line} slot={LINES.give} />{/each}
-		{#each row.get as line (line.player.host_id)}<LineRow {line} slot={LINES.get} />{/each}
-		{#if row.drop}<LineRow line={row.drop} slot={LINES.drop} />{/if}
+		{#each row.give as line (line.player.host_id)}<LineRow
+				{line}
+				slot={LINES.give}
+				factsOnPhone={false}
+			/>{/each}
+		{#each row.get as line (line.player.host_id)}<LineRow
+				{line}
+				slot={LINES.get}
+				factsOnPhone={false}
+			/>{/each}
+		{#if row.drop}<LineRow line={row.drop} slot={LINES.drop} factsOnPhone={false} />{/if}
 		<div class="gains">
 			<p>{tradeGains(row)}</p>
 			{#if row.close_for_them}<ToneChip tone="even">{CLOSE_FOR_THEM}</ToneChip>{/if}

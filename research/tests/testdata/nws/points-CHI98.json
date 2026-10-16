@@ -1,0 +1,12 @@
+{
+ "properties": {
+  "@id": "https://api.weather.gov/points/41.8625,-87.6167",
+  "forecastGridData": "https://api.weather.gov/gridpoints/LOT/76,72",
+  "forecastHourly": "https://api.weather.gov/gridpoints/LOT/76,72/forecast/hourly",
+  "gridId": "LOT",
+  "gridX": 76,
+  "gridY": 72,
+  "timeZone": "America/Chicago"
+ },
+ "type": "Feature"
+}

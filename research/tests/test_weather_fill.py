@@ -175,6 +175,16 @@ def test_an_empty_gamebook_line_says_nothing_about_precipitation() -> None:
     assert (row.temperature_f, row.wind_mph, row.precipitation) == (None, None, None)
 
 
+def test_an_empty_gamebook_line_proceeds_to_the_gauge_for_all_three_values() -> None:
+    station = isd.KickoffWeather("72534014819", 12.0, 61.0, 9.0, 1, 1.5, "rain", "72534014819")
+    row = gw.fill(_games()["2022_03_CIN_NYJ"], "Temp: ° F, Wind: mph", lambda _game: station)
+    assert (row.temperature_f, row.wind_mph, row.precipitation) == (61.0, 9.0, 1)
+    assert (row.temperature_source, row.wind_source, row.precipitation_source) == (gw.ISD,) * 3
+    dry = replace(station, precipitation=None)
+    unknown = gw.fill(_games()["2022_03_CIN_NYJ"], "Temp: ° F, Wind: mph", lambda _game: dry)
+    assert (unknown.precipitation, unknown.precipitation_source) == (None, None)
+
+
 def test_a_missing_season_answer_is_a_failure() -> None:
     reader = isd.IsdReader(NcciFetcher())
     with pytest.raises(isd.IsdError, match="HTTP 404"):
@@ -185,7 +195,8 @@ def test_a_missing_season_answer_is_a_failure() -> None:
 def engine() -> Any:
     if "PARITY_DATABASE_URL" not in os.environ:
         pytest.skip("needs a Postgres for scratch databases")
-    url = databases.build_with_alembic(_DATABASE)
+    # Revision 0009, before 0010 creates the real stadiums table: these cases build their own stand-in.
+    url = databases.build_with_alembic(_DATABASE, revision="0009")
     built = make_engine(sqlalchemy_url(url))
     try:
         yield built

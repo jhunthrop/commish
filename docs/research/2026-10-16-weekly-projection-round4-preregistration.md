@@ -998,3 +998,65 @@ development check and its record, any defect amendment, the stop rule applied, (
 claimed by an exclusive file, (6) the results, (7) on a pass, the served refit, pinned, before the
 first counted freeze. The judgment refuses to run unless the lock is an ancestor of HEAD (round 2's
 `preregistration_committed` rule).
+
+## 7. Amendments
+
+Each amendment is committed before the step it governs, as 6.4 requires, and names what the document
+said, what was found, and the rule as it now reads.
+
+### Amendment 1, 2026-10-16, before any fit
+
+Recorded by the coordinator after lanes 66a and 66b landed their tables and before any feature row,
+fit or development check. No model choice, input, default, population, statistic, threshold, seed or
+judged week changes. Items 1 and 2 are parsing rules for the weather fill, settled on the gamebook text
+and the ISD gauge, which are weather records and never an outcome. Item 3 names the tables the reads
+use. Item 4 is the benchmark's margin method. Items 5 and 6 are notes.
+
+1. **The precipitation word rule (2.5).** Lane 66b's agreement check against ISD found exactly four
+   gamebook lines in 2016 to 2024 that pair a precipitation word with a hedge or an inflection the rule
+   as written does not name, and the literal rule misreads all four: 2018 week 2 NE at JAX "Rain Chance
+   40%" (word 1, gauge 0), 2022 week 3 CIN at NYJ "Light Rain Forecasted" (word 1, gauge 0), 2021 week
+   7 IND at SF "rainy" (word 0, gauge 1), 2023 week 14 HOU at NYJ "Raining" (word 0, gauge 1). The rule
+   now reads: the words match as stems, rain (rainy, raining), showers (shower), drizzle (drizzling),
+   snow (snowing, snowy), sleet, flurries and "wintry mix"; a word is not a present condition when
+   "no" precedes it, or when any form of "chance", "possible" or "forecast", or a percentage, appears
+   anywhere in the same line (the gamebook's own humidity figure, "Humidity: 87%", is a measurement,
+   not a chance, and is not read as a percentage); otherwise it is a present condition. The amended rule reads the four
+   lines as 0, 0, 1, 1, agreeing with the gauge. `research/pipeline/weather/gamebook.py` carries the
+   amended lists as one tested list, and the results report the flag's agreement with ISD as before.
+2. **The empty gamebook line.** A gamebook weather text with no temperature figure and no wind figure
+   ("Temp: ° F, Wind: mph") is an empty entry. It yields no temperature, no wind and no precipitation
+   flag, and the fill proceeds to ISD for all three. It is never read as flag 0. The document's "0
+   otherwise" clause applies to a line that carries a weather reading, not to an empty one.
+3. **The weather tables (2.9 and section 5, item 3).** The recorded game-day weather and roof are read
+   from the tables lanes 66a and 66b landed, not from new `nflverse_kickoff` metrics. The allow-list's
+   item 3 now admits, for week W at t_g: (`game_weather`, `temperature_f`), (`game_weather`,
+   `wind_mph`), (`game_weather`, `precipitation`) and (`game_weather`, `roof`), one row per game with
+   `as_of` the game day plus 24 hours, inside the stamp window item 3 states, with the row's source
+   columns (`temperature_source`, `wind_source`, `precipitation_source`, `precipitation_kind`,
+   `precipitation_mm` and the ISD station columns) read beside them as the `weather_source` the
+   document named. `game_weather.roof` is the four-valued roof state, sourced from
+   `nflverse_games.roof`. The (`nflverse_kickoff`, `temperature_f`) and (`nflverse_kickoff`, `wind_mph`)
+   pairs are no longer selected, since `game_weather` carries those values with their source where the
+   store had them and the fill elsewhere. Item 5 stands: no other `nflverse_kickoff` pair of week W is
+   admitted, the guard test asserts the selected list, and the week-W `game_result` refusal test is
+   unchanged. The default table's weather rows (2.10) read the `game_weather` row's nulls: no
+   temperature or wind after the fill, no flag after the fill, and no roof value, each as written.
+   The weekly depth chart of item 6 is read from `nflverse_depth_chart_weeks`, the weekly table lane
+   66b landed, keyed by season, week, club, position, depth order and player id. Nothing else in
+   section 5 changes.
+4. **The touchdown benchmark's margin (3.1).** Lane 66b's capture of the anytime-touchdown market found
+   that no book quotes a No side: every offer is Yes-only, so the rule as written would mark the
+   touchdown term absent every week and the benchmark partial throughout. For a Yes-only offer, p is
+   now the raw Yes probability divided by that book's median overround (the over plus the under implied
+   probabilities) over its two-sided player props (passing yards, receiving yards, receptions, rushing
+   yards) in the same kickoff slot and week, else the median over all books' two-sided props in that
+   slot, and the benchmark row is marked "margin estimated" with the overround used. With no two-sided
+   prop in the slot anywhere, the term is absent and the week's benchmark is partial, as before. The
+   two-sided anytime rule stays for any book that later quotes a No. The margin is removed from a
+   benchmark, never from an input, so the model is untouched.
+5. **Note, the NGS and PFR stamps (section 5, item 8).** The stored stamps are lane 23's (the week's
+   last game plus 24 hours for NGS, the game day plus 24 hours for PFR), earlier than item 8's
+   Wednesday 18:00 ET pass. Lane 68 admits those rows at the Wednesday pass regardless of the stored
+   stamp, as item 8 says. The two differ only for Wednesday games (Christmas 2024).
+6. **Note, FTN.** No FTN history was ingested and FTN stays out of the fit, as 2.9 states.
