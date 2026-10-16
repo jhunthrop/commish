@@ -118,6 +118,10 @@ func SiteAt(ctx context.Context, facts SiteFacts, now time.Time) (SitePhase, err
 	return beforeKickoff(ctx, facts, y+1, next, scheduled)
 }
 
+// boardUnread is the sentence added when the published board's week
+// could not be read.
+const boardUnread = "Our board's week could not be read just now."
+
 // inSeason is the site's season in a regular-season week, and when the
 // published board starts from another week, the sentence saying so.
 func inSeason(ctx context.Context, facts SiteFacts, y int, now time.Time) (SitePhase, error) {
@@ -128,11 +132,13 @@ func inSeason(ctx context.Context, facts SiteFacts, y int, now time.Time) (SiteP
 	if !ok {
 		return SitePhase{}, fmt.Errorf("season: site at %s: the %d schedule has no week for it", now, y)
 	}
+	basis := fmt.Sprintf("Week %d of the %d NFL season is under way.", week, y)
 	boardWeek, shown, err := facts.BoardWeek(ctx, y)
 	if err != nil {
-		return SitePhase{}, fmt.Errorf("season: site at %s: %w", now, err)
+		// The season does not depend on the board: answer it, and say the
+		// board's week is unknown.
+		return SitePhase{Phase: SiteInSeason, Week: week, Basis: basis + " " + boardUnread}, nil
 	}
-	basis := fmt.Sprintf("Week %d of the %d NFL season is under way.", week, y)
 	if !shown {
 		return SitePhase{Phase: SiteInSeason, Week: week, Basis: basis}, nil
 	}

@@ -60,12 +60,22 @@ func (boardFails) BoardWeek(context.Context, int) (int, bool, error) {
 	return 0, false, errors.New("down")
 }
 
-// A failed board read fails the season read, so the last good answer is
-// served, never a basis that hides the gap.
-func TestSiteSeasonBoardReadFailureIsAnError(t *testing.T) {
+// A failed board read leaves board_week out and says so in the basis, with
+// the season itself answered and kept for the hour.
+func TestSiteSeasonBoardReadFailureStillAnswersTheSeason(t *testing.T) {
 	facts := boardFails{facts2026(t, false)}
-	if got, err := SiteAt(context.Background(), facts, eastern(t, "2026-10-20 00:00")); err == nil {
-		t.Fatalf("answered %+v", got)
+	now := eastern(t, "2026-10-20 00:00")
+	got, err := SiteAt(context.Background(), facts, now)
+	want := "Week 7 of the 2026 NFL season is under way. Our board's week could not be read just now."
+	if err != nil || got.Phase != SiteInSeason || got.Week != 7 || got.BoardWeek != 0 || got.Basis != want {
+		t.Fatalf("%+v (%v)", got, err)
+	}
+	site := &Site{Facts: facts, Now: func() time.Time { return now }}
+	if first := site.Phase(context.Background()); first.Unread || first.Basis != want {
+		t.Fatalf("through Site: %+v", first)
+	}
+	if again := site.Phase(context.Background()); again.Basis != want || facts.reads != 2 {
+		t.Fatalf("not kept: %+v after %d reads", again, facts.reads)
 	}
 }
 
@@ -141,5 +151,3 @@ func TestSiteSeasonOffseasonBasisInMarch(t *testing.T) {
 		t.Fatalf("no schedule: %+v (%v)", got, err)
 	}
 }
-
-var _ = time.Second
