@@ -32,6 +32,16 @@ def nfl_teams_by_season(season: int) -> list[str]:
     return sorted(teams)
 
 
+def season_code(season: int, code: str) -> str:
+    """The club's abbreviation in `season`'s own spelling: nflverse's play-by-play (and the stores
+    built from it: the play table, its club rows, the pairing) spells a relocated club by its current
+    code in every season, the schedule by the code of the season (OAK in 2016, LV in 2020)."""
+    for current, historical, first in _RELOCATIONS:
+        if code == current and season < first:
+            return historical
+    return code
+
+
 def final_week_of(season: int) -> int:
     """18 from 2021, 17 before."""
     return 18 if season >= _SEVENTEEN_GAME_SEASON else 17

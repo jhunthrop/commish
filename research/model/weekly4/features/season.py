@@ -13,8 +13,9 @@ the live sources, and builds no outcome.
 import time
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime
+from types import MappingProxyType
 from typing import Final
 
 from sqlalchemy import Connection, text
@@ -35,6 +36,7 @@ from research.model.weekly4.features.plays import Play, Tallies, tally
 from research.model.weekly4.features.rows import Row, game_row
 from research.model.weekly4.features.shares import GameShare, prior_shares
 from research.model.weekly4.features.view import PLAY_PAIRS, SeasonInputs, read_instant, read_week
+from research.pipeline.nflverse.team_eras import season_code
 
 _PRIOR_PLAYS_BETWEEN: Final = text(
     "select count(*) from research.nflverse_pbp_plays where season = :prior_season and as_of > :after and as_of <= :until"
@@ -111,6 +113,19 @@ def _inputs(  # noqa: PLR0913, PLR0917 - the season's reads, named
     )
 
 
+def season_schedule(conn: Connection, season: int) -> tuple[Schedule, int]:
+    """Round 3's schedule knowledge, its pairing (play-by-play spelled) in the season's own codes, and
+    for a club-week with a kickoff and no pairing row (a game still to be played, whose play-by-play
+    does not exist yet) the game rows' pairing."""
+    found = read_schedule(conn, season)
+    pairing = {(w, season_code(season, c)): season_code(season, d) for (w, c), d in found.pairing.items()}
+    games = reads.game_pairing(conn, season)
+    filled = [key for key in found.kickoffs if key not in pairing and key in games]
+    for key in filled:
+        pairing[key] = games[key]
+    return replace(found, pairing=MappingProxyType(pairing)), len(filled)
+
+
 def _moments(spec: SeasonSpec, weeks: Sequence[int], schedule: Schedule) -> dict[int, list[datetime]]:
     after = spec.live_after
     return {w: [m for m in schedule.moments(w) if after is None or m > after] for w in weeks}
@@ -122,7 +137,7 @@ def build_season(
     """The season's rows; `reader` is None for a live build, which reads no outcome."""
     started = time.monotonic()
     weeks = sorted(set(spec.player_weeks) | set(spec.team_weeks))
-    schedule = read_schedule(conn, spec.season)
+    schedule, paired_from_games = season_schedule(conn, spec.season)
     moments = _moments(spec, weeks, schedule)
     every = sorted(m for found in moments.values() for m in found)
     if not every:
@@ -142,6 +157,7 @@ def build_season(
     placed: list[Game] = []
     weather: dict[str, Weather] = {}
     counts: dict[str, int] = defaultdict(int)
+    counts["club_weeks_paired_from_game_rows"] = paired_from_games
     for week in weeks:
         w = read_week(conn, spec.season, week)
         for moment in moments[week]:

@@ -8,6 +8,7 @@ from datetime import UTC, datetime, timedelta
 from research.model.weekly3.ledger import ReadKind
 from research.model.weekly4.features import reads
 from research.model.weekly4.features.admitted import ADMITTED, DEPTH_CHARTS, GAME_WEATHER, PLAYS, STADIUMS
+from research.pipeline.nflverse.team_eras import season_code
 from research.pipeline.observations import PlayerWeekObservation
 
 _SELECT = re.compile(r"^select (.+?) from research\.(\w+)")
@@ -25,6 +26,9 @@ def test_each_table_read_selects_its_kinds_pairs_and_nothing_else() -> None:
     assert _selected(reads.DEPTH_QUERY) == ADMITTED["depth"] == ADMITTED["depth_prior"]
     assert _selected(reads.STADIUM_QUERY) == {p for p in ADMITTED["schedule"] if p[0] == STADIUMS}
     assert {t for t, _ in _selected(reads.WEATHER_QUERY)} == {GAME_WEATHER}
+    pairing = {p for p in ADMITTED["schedule"] if p[0] == GAME_WEATHER}
+    assert _selected(reads.GAME_PAIRING_QUERY) == pairing
+    assert {c for _, c in pairing} == {"season", "week", "home_team", "away_team"}
     assert {t for t, _ in _selected(reads.DEPTH_QUERY)} == {DEPTH_CHARTS}
 
 
@@ -40,6 +44,12 @@ def test_each_observation_read_selects_its_kinds_metric_list() -> None:
     assert selected("schedule") == {p for p in ADMITTED["schedule"] if p[0] == "nflverse_schedule"}
     assert selected("box") == {p for p in ADMITTED["box"] if p[0] == "nflverse_pbp"}
     assert selected("figures") == {("nflverse_kickoff", "implied_team_total"), ("nflverse_kickoff", "point_spread")}
+
+
+def test_play_by_play_codes_are_spelled_as_their_season_spelled_them() -> None:
+    assert [season_code(2016, c) for c in ("LV", "LAC", "LA", "KC")] == ["OAK", "SD", "LA", "KC"]
+    assert [season_code(2019, c) for c in ("LV", "LAC")] == ["OAK", "LAC"]
+    assert [season_code(2020, c) for c in ("LV", "OAK")] == ["LV", "OAK"]
 
 
 def test_the_instant_view_is_the_as_of_predicate() -> None:

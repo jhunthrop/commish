@@ -111,6 +111,14 @@ def _figures(
     return figures, [admit_observations("figures", figures, s.season, week, moment)]
 
 
+def _game_opponent(row: WeatherRow | None, club: str) -> str | None:
+    """A game still to be played has no pairing row (the pairing is built from its play-by-play);
+    its opponent is the other club of its schedule row (`game_weather`, week W's, admitted)."""
+    if row is None:
+        return None
+    return row.away_team if row.home_team == club else row.home_team
+
+
 def _club_game(  # noqa: PLR0913, PLR0917 - one club-game's every read, named
     s: SeasonInputs,
     w: WeekInputs,
@@ -122,11 +130,11 @@ def _club_game(  # noqa: PLR0913, PLR0917 - one club-game's every read, named
     team_rows: TeamRows,
     pressured: Pressured,
 ) -> tuple[ClubGame, str]:
-    opponent = s.schedule.opponent(week, club)
+    row = w.weather.get(club)
+    opponent = s.schedule.opponent(week, club) or _game_opponent(row, club)
     home = s.schedule.home(week, club)
     if opponent is None or home is None:
         raise ValueError(f"{s.season} week {week} {club}: no pairing or home-field row")
-    row = w.weather.get(club)
     sched = w.schedule.get(club, {})
     if s.live:
         figures: Figures = live_figures(view_rows, club, opponent, moment)

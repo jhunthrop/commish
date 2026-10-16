@@ -6,6 +6,10 @@ the build needs, and each instant then takes its rows with the same predicate as
 (`week < W` and the stamp at or before t_g; `as_of_rows`), so the per-instant view equals the
 per-instant read and goes through the recording wrapper as one. The week-W reads (figures, weather,
 the forecast, the schedule rows) are read per week or per instant.
+
+Clubs are spelled as the season spelled them (`team_eras.season_code`): the play table and the
+play-by-play club rows carry a relocated club's current code in every season (LV in 2016), the
+schedule, the weather, the edges and the depth charts the code of the season (OAK in 2016).
 """
 
 from collections.abc import Mapping, Sequence
@@ -24,6 +28,7 @@ from research.model.weekly4.features.admitted import (
     DEPTH_COLUMNS,
     FIGURE_METRICS,
     FORECAST_METRICS,
+    GAME_PAIRING_COLUMNS,
     GAME_WEATHER,
     LIVE_FIGURE_METRICS,
     LIVE_FIGURE_SOURCES,
@@ -42,6 +47,7 @@ from research.pipeline.nflverse.ngs import NGS_SOURCE
 from research.pipeline.nflverse.pbp import PBP_SOURCE
 from research.pipeline.nflverse.pfr_advstats import PFR_SOURCE
 from research.pipeline.nflverse.schedule import ScheduleSource
+from research.pipeline.nflverse.team_eras import season_code
 from research.pipeline.nws.forecast import FORECAST_SOURCE
 from research.pipeline.observations import PlayerWeekObservation, TeamWeekObservation
 
@@ -73,6 +79,10 @@ DEPTH_QUERY: Final = (
     "where season = :season and week <= :last_week and as_of <= :until "
     "order by week, team, player_id, depth_order, slot, as_of"
 )
+GAME_PAIRING_QUERY: Final = (
+    f"select {', '.join(GAME_PAIRING_COLUMNS)} from research.{GAME_WEATHER} "
+    "where season = :season order by week, home_team"
+)
 STADIUM_QUERY: Final = f"select {', '.join(STADIUM_COLUMNS)} from research.{STADIUMS} order by stadium_id"
 _TEAM_WEEK: Final = (
     "select distinct on (week, team, source, metric) season, week, team, source, metric, value, as_of "
@@ -95,6 +105,9 @@ def plays(conn: Connection, season: int, last_week: int, until: datetime) -> lis
     for row in rows.mappings():
         values: dict[str, Any] = dict(row)
         values["as_of"] = ms_instant(values["as_of"])
+        for side in ("posteam", "defteam"):
+            if values[side] is not None:
+                values[side] = season_code(season, values[side])
         found.append(Play(**values))
     return found
 
@@ -170,6 +183,14 @@ class Stadium:
     international: bool
 
 
+def game_pairing(conn: Connection, season: int) -> dict[tuple[int, str], str]:
+    """Who plays whom each week of the season, from the game rows (schedule knowledge, item 4)."""
+    found: dict[tuple[int, str], str] = {}
+    for _, week, home, away in conn.execute(text(GAME_PAIRING_QUERY), {"season": season}):
+        found[(int(week), str(home))], found[(int(week), str(away))] = str(away), str(home)
+    return found
+
+
 def stadiums(conn: Connection) -> dict[str, Stadium]:
     """The venues (schedule knowledge, section 5 item 4)."""
     return {str(r[0]): Stadium(str(r[0]), str(r[1]), bool(r[2])) for r in conn.execute(text(STADIUM_QUERY))}
@@ -192,7 +213,9 @@ def team_rows(  # noqa: PLR0913, PLR0917 - the as-of read's every bound, named
         "metrics": list(metrics),
     }
     return [
-        TeamWeekObservation(r.season, r.week, r.team, r.source, r.metric, r.value, ms_instant(r.as_of))
+        TeamWeekObservation(
+            r.season, r.week, season_code(season, r.team), r.source, r.metric, r.value, ms_instant(r.as_of)
+        )
         for r in conn.execute(text(_TEAM_WEEK), params)
     ]
 

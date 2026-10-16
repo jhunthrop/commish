@@ -18,7 +18,8 @@ Item by item:
    `roof`) and the row's source columns, week W, admitted at t_g by name (`weather`). Live
    (`forecast`): `nws_forecast` at or before t_g;
 4. schedule knowledge (`schedule`): the kickoff, home field, rest days, division game and indoors
-   rows of week W and the `stadiums` row. (`nflverse_schedule`, `surface`) is named by item 4 but
+   rows of week W, the `stadiums` row, and the game rows' pairing columns where the play-by-play
+   pairing has none (a game still to be played). (`nflverse_schedule`, `surface`) is named by item 4 but
    the store holds no such metric (section 2.10 has no default for it): the surface feature stops;
 5. no other (`nflverse_kickoff`, metric) pair of week W: `game_result` and `points_allowed` are in
    no list;
@@ -89,6 +90,9 @@ FORECAST_METRICS: Final = (
 )
 SCHEDULE_METRICS: Final = (ScheduleMetric.REST_DAYS, ScheduleMetric.DIVISION_GAME, ScheduleMetric.INDOORS)
 STADIUM_COLUMNS: Final = ("stadium_id", "roof_type", "international")
+# The game rows' pairing columns: who plays whom each week, the pairing's own four columns (item 4),
+# read where the play-by-play pairing has no row yet (a game still to be played).
+GAME_PAIRING_COLUMNS: Final = ("season", "week", "home_team", "away_team")
 DEPTH_COLUMNS: Final = ("season", "week", "team", "slot", "depth_order", "player_id", "as_of", "position")
 NGS_METRICS: Final = (
     "rush_attempts",
@@ -121,6 +125,7 @@ ADMITTED: Final[Mapping[ReadKind, frozenset[Pair]]] = MappingProxyType(
         "forecast": _pairs(FORECAST_SOURCE, FORECAST_METRICS),
         "schedule": _pairs(ScheduleSource.SCHEDULE, SCHEDULE_METRICS)
         | _pairs(STADIUMS, STADIUM_COLUMNS)
+        | _pairs(GAME_WEATHER, GAME_PAIRING_COLUMNS)
         | {(ScheduleSource.KICKOFF, ScheduleMetric.KICKOFF_INSTANT)},
         "depth": _pairs(DEPTH_CHARTS, DEPTH_COLUMNS),
         "depth_prior": _pairs(DEPTH_CHARTS, DEPTH_COLUMNS),
