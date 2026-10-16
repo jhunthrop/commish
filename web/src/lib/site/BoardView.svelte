@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, type Snippet } from 'svelte';
 	import { siteContext } from '#lib/context/context.svelte.ts';
 	import ContextNote from '#lib/context/ContextNote.svelte';
 	import { followFormat } from '#lib/context/follow.svelte.ts';
@@ -27,7 +27,7 @@
 	interface Props {
 		page: BoardPage;
 		/** The board's own heading, which follows the season (season-words.ts). */
-		heading: string;
+		heading: string | Snippet;
 	}
 
 	let { page, heading }: Props = $props();

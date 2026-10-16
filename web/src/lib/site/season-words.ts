@@ -82,16 +82,18 @@ export function boardWords(
 	following: boolean
 ): BoardWords {
 	const inSeason = railInSeason(rail);
-	const noun = inSeason ? REST_WORD : BOARD_WORD;
-	const lower = inSeason ? noun.toLowerCase() : noun;
+	// The rest of the season is the board's name only where the run's board ranks it; a board of the
+	// full season keeps its own name in season, with the verb still following the league.
+	const ranksRest = inSeason && board.rosFromWeek !== undefined;
+	const noun = ranksRest ? REST_WORD : BOARD_WORD;
+	const lower = ranksRest ? noun.toLowerCase() : noun;
 	const named = (prefix: string): string => `${prefix} ${lower}`;
 	const position = board.position;
 	const season = String(board.season);
 	return {
 		bar: position === null ? noun : named(position),
 		title: named(position === null ? board.label : `${position} ${board.label}`),
-		heading:
-			inSeason && board.rosFromWeek !== undefined ? `Rest of ${season}` : `${season} ${BOARD_WORD}`,
+		heading: ranksRest ? `Rest of ${season}` : `${season} ${BOARD_WORD}`,
 		verb: inSeason ? leagueVerb(following) : 'mock'
 	};
 }

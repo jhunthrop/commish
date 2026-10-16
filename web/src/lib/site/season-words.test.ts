@@ -3,7 +3,14 @@
 // your league; before the draft and after the season the draft words stay. Run with `npm test`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { RAIL_KEYS, railInSeason, type RailKey } from '#lib/ui/nav.ts';
+import {
+	RAIL_KEYS,
+	RAIL_OF_WORD_SET,
+	WORD_SETS,
+	wordSetOf,
+	railInSeason,
+	type RailKey
+} from '#lib/ui/nav.ts';
 import { railOfKey } from '#lib/ui/rail-order.ts';
 import { PAGE_VERBS, boardWords, frontWords } from './season-words.ts';
 
@@ -89,11 +96,31 @@ void test('the board before the draft and after the season keeps its name and th
 	assert.equal(boardWords('pre_draft', { ...PRESEASON, position: 'RB' }, false).bar, 'RB Board');
 });
 
-void test('in season on a board that still ranks the full season, the heading stays the season board', () => {
-	assert.equal(
-		boardWords('in_season', { ...PRESEASON, position: null }, false).heading,
-		'2026 Board'
-	);
+void test('in season on a board that still ranks the full season, the heading and the bar stay the season board', () => {
+	const words = boardWords('in_season', { ...PRESEASON, position: null }, false);
+	assert.equal(words.heading, '2026 Board');
+	assert.equal(words.bar, 'Board');
+	assert.equal(words.title, 'PPR Board');
+	assert.equal(words.verb, 'follow');
+	assert.equal(boardWords('in_season', { ...PRESEASON, position: 'WR' }, false).bar, 'WR Board');
+});
+
+void test('the absent-format page takes the board heading and the chip word from the same words', () => {
+	const rest = boardWords('in_season', { ...REST, label: 'Half PPR', position: null }, false);
+	assert.equal(rest.heading, 'Rest of 2026');
+	assert.equal(rest.title, 'Half PPR rest of season');
+	assert.doesNotMatch(rest.heading, /2026 Rest/);
+	const full = boardWords('in_season', { ...PRESEASON, label: 'Half PPR', position: null }, false);
+	assert.equal(full.heading, '2026 Board');
+	assert.equal(full.title, 'Half PPR Board');
+});
+
+void test('the draft words and the season words are the two sets a page draws, each one a rail', () => {
+	assert.deepEqual([...WORD_SETS], ['draft', 'season']);
+	for (const set of WORD_SETS) assert.equal(wordSetOf(RAIL_OF_WORD_SET[set]), set);
+	for (const rail of RAIL_KEYS) {
+		assert.equal(wordSetOf(rail), railInSeason(rail) ? 'season' : 'draft', rail);
+	}
 });
 
 void test('every word keeps the copy rules', () => {

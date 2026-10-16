@@ -92,8 +92,17 @@ export async function runFormatSlugs(): Promise<string[]> {
 export interface AbsentFormatPage {
 	format: CatalogFormat;
 	formats: FormatChip[];
+	/** The first week the run's default board ranks the rest of the season, absent preseason: what
+	 * the page's words need to name the board the way the run's own boards do. */
+	rosFromWeek?: number;
 }
 
 export async function absentFormatPage(format: CatalogFormat): Promise<AbsentFormatPage> {
-	return { format, formats: await formatChips() };
+	const { formats } = await manifest();
+	const rosFromWeek = formats[0]?.rosFromWeek;
+	return {
+		format,
+		formats: await formatChips(),
+		...(rosFromWeek === undefined ? {} : { rosFromWeek })
+	};
 }

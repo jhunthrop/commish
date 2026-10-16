@@ -15,13 +15,15 @@
 	interface Props {
 		page: AbsentFormatPage;
 		run: RunStamp;
-		/** The page's kind, as its title names it: "Board", "ADP". */
-		noun: string;
+		/** The page's heading: "2026 Board", "Rest of 2026", "2026 ADP". */
+		heading: string;
+		/** A format's name for this kind of page, for the title and each way to a carried format. */
+		name: (formatLabel: string) => string;
 		/** A format's page of this kind. */
 		href: (formatId: string) => string;
 	}
 
-	let { page, run, noun, href }: Props = $props();
+	let { page, run, heading, name, href }: Props = $props();
 
 	const carried = $derived(page.formats.filter((chip) => chip.onRun));
 	// A context in a format the run carries opens that format's page.
@@ -43,14 +45,14 @@
 	<meta name="robots" content="noindex" />
 </svelte:head>
 
-<SiteShell title="{page.format.label} {noun}" {run}>
+<SiteShell title={name(page.format.label)} {run}>
 	{#snippet tail()}<Verb href={sectionHref('mock')}>Start a mock draft</Verb>{/snippet}
 	<main class="absent">
-		<PageHead title="{run.season} {noun}" />
+		<PageHead title={heading} />
 		<EmptyState title={words.title} line={words.line}>
 			{#snippet actions()}
 				{#each carried as chip (chip.id)}
-					<Quiet href={href(chip.id)}>{chip.label} {noun}</Quiet>
+					<Quiet href={href(chip.id)}>{name(chip.label)}</Quiet>
 				{/each}
 			{/snippet}
 		</EmptyState>

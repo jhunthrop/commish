@@ -9,7 +9,7 @@
 		title: string;
 		/** The bar's title when it differs from the document's: a format page's bar leaves the format
 		 * to the league switch beside it ("Board", where the document says "PPR Board"). */
-		heading?: string;
+		heading?: string | Snippet;
 		/** The run every number on the page comes from. */
 		run: RunStamp;
 		tail?: Snippet;

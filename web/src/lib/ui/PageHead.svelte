@@ -4,7 +4,7 @@
 
 	interface Props {
 		/** The page's display title, set in the number face in capitals: "2026 Board". */
-		title: string;
+		title: string | Snippet;
 		/** One line under the title naming the basis of everything on the page. */
 		lead?: string;
 		/** Quiet links or chips at the title's right end. */
@@ -16,7 +16,9 @@
 
 <div class="head">
 	<div>
-		<DisplayTitle size="hero">{title}</DisplayTitle>
+		<DisplayTitle size="hero"
+			>{#if typeof title === 'string'}{title}{:else}{@render title()}{/if}</DisplayTitle
+		>
 		{#if lead}<p>{lead}</p>{/if}
 	</div>
 	{#if actions}<div class="actions">{@render actions()}</div>{/if}

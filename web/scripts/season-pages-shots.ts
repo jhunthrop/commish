@@ -2,8 +2,10 @@
 // page and the account page, signed out, in both themes at 1440 and 390, and the front door with
 // script blocked (the prerendered rail). Each asserts the page's words follow the rail its root
 // names (site/season-words.ts), that the front door with no script names the build's rail and
-// shows its items, and that the front door's "All on the board" lands on a page with its rail item
-// lit. Against the built site and the fixture API (scripts/inseason-fixture/serve.ts), which
+// shows its items, that the front door's "All on the board" lands on a page with its rail item
+// lit, and that the front door under a league whose phase differs from the site's (a pre-draft
+// league in season) holds the same words and the same hero shape before its script runs as after
+// (Lane 60: the words are drawn for both phases and the root's rail shows one). Against the built site and the fixture API (scripts/inseason-fixture/serve.ts), which
 // answers GET /season with week 6.
 //
 //   [ROS_FROM_WEEK=6] node scripts/season-pages-shots.ts [web origin] [out dir]
@@ -12,6 +14,7 @@ import { mkdir } from 'node:fs/promises';
 import { chromium, type BrowserContext, type Page } from 'playwright';
 import { signedOutTitle } from '../src/lib/account/keeps.ts';
 import { PAGE_VERBS, boardWords, frontWords } from '../src/lib/site/season-words.ts';
+import { PHASE_COOKIE } from './inseason-fixture/phases.ts';
 import { RAIL_KEYS, railInSeason, type RailKey } from '../src/lib/ui/nav.ts';
 import { railOfKey } from '../src/lib/ui/rail-order.ts';
 import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
@@ -30,6 +33,11 @@ const COVER = {
 	...(ROS_FROM_WEEK === undefined ? {} : { rosFromWeek: Number(ROS_FROM_WEEK) })
 };
 const PLAYER = 'puka-nacua';
+/** The league whose phase differs from the site's season (the fixture's pre-draft league). */
+const DIFFERING_PHASE = 'pre_draft';
+const SIGNED_IN = { name: 'commish_csrf', value: 'fixture' };
+/** The page's script, which a held load never fetches (the inline boot script still runs). */
+const PAGE_SCRIPT = '**/_app/immutable/**';
 /** The read's figures fill one row (run/read-figures.ts). */
 const READ_FIGURES = 3;
 /** The API reads that answer 401 with no session. */
@@ -70,8 +78,26 @@ async function rootRail(page: Page): Promise<RailKey | null> {
 	return RAIL_KEYS.find((key) => key === rail) ?? null;
 }
 
-const text = (page: Page, selector: string): Promise<string> =>
-	page.locator(selector).first().innerText({ timeout: READY_TIMEOUT_MS });
+/** The words as drawn: the first match not inside a set of words the root's rail hides (a page
+ * holds both sets), its text without the sets inside it that are hidden. A match is read whether or
+ * not its own box is shown, as the phone hides the bar's title. */
+async function text(page: Page, selector: string): Promise<string> {
+	await page.waitForSelector(selector, { state: 'attached', timeout: READY_TIMEOUT_MS });
+	return page.evaluate((sel) => {
+		const hidden = (node: Element | null): boolean => {
+			const set = node?.closest('[data-words]') ?? null;
+			return set !== null && getComputedStyle(set).display === 'none';
+		};
+		const match = [...document.querySelectorAll(sel)].find((node) => !hidden(node));
+		if (!match) return '';
+		const walker = document.createTreeWalker(match, NodeFilter.SHOW_TEXT);
+		let out = '';
+		for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+			if (!hidden(node.parentElement)) out += node.textContent ?? '';
+		}
+		return out.replace(/\s+/g, ' ');
+	}, selector);
+}
 
 function expect(where: string, what: string, got: string, want: string): void {
 	if (got.trim().toLowerCase() !== want.toLowerCase()) {
@@ -80,7 +106,12 @@ function expect(where: string, what: string, got: string, want: string): void {
 }
 
 /** The words the page shows, checked against the rail its root names. */
-async function checkWords(page: Page, name: string, where: string): Promise<void> {
+async function checkWords(
+	page: Page,
+	name: string,
+	where: string,
+	following = false
+): Promise<void> {
 	const rail = await rootRail(page);
 	if (rail === null) {
 		failures.push(`${where}: the root names no rail`);
@@ -88,19 +119,75 @@ async function checkWords(page: Page, name: string, where: string): Promise<void
 	}
 	const bar = await text(page, 'header.top h1');
 	if (name === 'home') {
-		const words = frontWords(rail, COVER, false);
+		const words = frontWords(rail, COVER, following);
 		expect(where, 'bar', bar, words.title);
 		expect(where, 'heading', await text(page, 'main h2'), words.heading);
 		expect(where, 'verb', await text(page, 'main a.action.verb'), PAGE_VERBS[words.verb]);
 	}
 	if (name === 'board') {
-		const words = boardWords(rail, { ...COVER, label: 'PPR', position: null }, false);
+		const words = boardWords(rail, { ...COVER, label: 'PPR', position: null }, following);
 		expect(where, 'bar', bar, words.bar);
 		expect(where, 'verb', await text(page, 'header.top .tail a.action'), PAGE_VERBS[words.verb]);
 	}
 	if (name === 'account') {
 		expect(where, 'heading', await text(page, 'main h2'), signedOutTitle(railInSeason(rail)));
 	}
+}
+
+/** The hero as it is drawn: its words and its height. */
+async function hero(page: Page): Promise<{ bar: string; heading: string; height: number }> {
+	return {
+		bar: (await text(page, 'header.top h1')).trim(),
+		heading: (await text(page, 'main h2')).trim(),
+		height: await page
+			.locator('section.hero')
+			.evaluate((el) => Math.round(el.getBoundingClientRect().height))
+	};
+}
+
+/** A member whose league is in another phase than the site's: the front door holds that phase's
+ * words before its script runs, and the hero keeps its words and its shape when it has. */
+async function checkDifferingPhase(theme: string, width: number): Promise<void> {
+	const where = `home ${DIFFERING_PHASE} league ${theme} ${String(width)}`;
+	const ctx = await context(theme, width);
+	await ctx.addCookies(
+		[SIGNED_IN, { name: PHASE_COOKIE, value: DIFFERING_PHASE }].map((cookie) => ({
+			...cookie,
+			domain: 'localhost',
+			path: '/'
+		}))
+	);
+	const page = await ctx.newPage();
+	// The first visit lets the page learn the league's phase, as a member's last visit did.
+	await page.goto(`${web}/`, { waitUntil: 'networkidle' });
+	await page.waitForFunction(
+		(want) => document.documentElement.getAttribute('data-rail') === want,
+		DIFFERING_PHASE,
+		{ timeout: READY_TIMEOUT_MS }
+	);
+	// Then the page is drawn with its script held: the boot script has set the rail, nothing else ran.
+	await ctx.route(PAGE_SCRIPT, (route) => route.abort());
+	await page.goto(`${web}/`, { waitUntil: 'load' });
+	const held = await hero(page);
+	const want = frontWords(DIFFERING_PHASE, COVER, false);
+	expect(where, 'held bar', held.bar, want.title);
+	expect(where, 'held heading', held.heading, want.heading);
+	await page.screenshot({ path: file(`home-${DIFFERING_PHASE}-held-${theme}-${String(width)}`) });
+	await ctx.unroute(PAGE_SCRIPT);
+	await page.goto(`${web}/`, { waitUntil: 'networkidle' });
+	await page.evaluate(() => document.fonts.ready);
+	const ready = await hero(page);
+	if (ready.bar !== held.bar || ready.heading !== held.heading) {
+		failures.push(`${where}: the words changed when the script ran`);
+	}
+	if (ready.height !== held.height) {
+		failures.push(
+			`${where}: the hero went from ${String(held.height)} to ${String(ready.height)}px`
+		);
+	}
+	await checkWords(page, 'home', where, true);
+	await page.screenshot({ path: file(`home-${DIFFERING_PHASE}-${theme}-${String(width)}`) });
+	await ctx.close();
 }
 
 for (const theme of THEMES) {
@@ -192,8 +279,10 @@ for (const theme of THEMES) {
 		);
 		if (rowDisplay !== 'grid')
 			failures.push(`${where}: the rows are drawn ${rowDisplay}, not grid`);
+		await checkWords(still, 'home', where);
 		await still.screenshot({ path: file(`home-nojs-${theme}-${String(width)}`) });
 		await blocked.close();
+		await checkDifferingPhase(theme, width);
 	}
 }
 
