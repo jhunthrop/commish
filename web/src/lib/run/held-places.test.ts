@@ -5,7 +5,14 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { verdict, type Contender } from '#lib/site/verdict.ts';
 import { withStatuses } from './board-status.ts';
-import { availableTierOf, heldWord, leadOf, positionRankShown, rankShown } from './held-places.ts';
+import {
+	availableTierOf,
+	heldWord,
+	leadOf,
+	pillRank,
+	positionRankShown,
+	rankShown
+} from './held-places.ts';
 import type { BoardRow, Designations } from './schema.ts';
 import { BUILT_ZONE, boardStatusWords } from './status-view.ts';
 
@@ -109,4 +116,12 @@ void test('a club page, the ADP page and the offline board draw a held row by th
 	assert.ok(held);
 	const offline = `${rankShown(held)} ${held.position} ${String(positionRankShown(held))}`;
 	assert.doesNotMatch(offline, PLACED, offline);
+});
+
+void test('a league row and the matchup panel draw a held starter’s pill by the word', () => {
+	const pill = (rank: number | string): string => `RB ${String(rank)}`;
+	assert.equal(pill(pillRank({ rank: 'IR' }, 7)), 'RB IR');
+	assert.doesNotMatch(pill(pillRank({ rank: 'IR' }, 7)), PLACED);
+	assert.equal(pill(pillRank({ rank: null }, 7)), 'RB 7');
+	assert.equal(pill(pillRank(null, 7)), 'RB 7');
 });

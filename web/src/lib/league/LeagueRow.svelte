@@ -7,13 +7,12 @@
 	import type { FaceStatus } from '#lib/ui/face-status.ts';
 	import Label from '#lib/ui/Label.svelte';
 	import NameWords from '#lib/ui/NameWords.svelte';
-	import PositionPill from '#lib/ui/PositionPill.svelte';
 	import TagChip from '#lib/ui/TagChip.svelte';
-	import ToneChip from '#lib/ui/ToneChip.svelte';
 	import ValueCell from '#lib/ui/ValueCell.svelte';
 	import { roundlessVorCell } from '#lib/run/row-framing.ts';
 	import { vorCell } from '#lib/ui/heat.ts';
 	import type { LeaguePlayer } from './api.ts';
+	import StatusPill from './StatusPill.svelte';
 	import type { LeagueBoardPlayer } from './board.ts';
 	import { projectionWords, seasonWords } from './model.ts';
 
@@ -85,13 +84,11 @@
 			{#if meta}
 				{@render meta()}
 			{:else if player}
-				<PositionPill
+				<StatusPill
 					position={player.position}
-					rank={player.status?.rank ?? player.positionRank}
+					positionRank={player.positionRank}
+					status={player.status}
 				/>
-				{#if player.status}<ToneChip tone={player.status.sits ? 'loss' : 'even'}
-						>{player.status.mark}</ToneChip
-					>{/if}
 				<span>{player.team}</span>
 				{#if player.bye !== null}<span>bye {player.bye}</span>{/if}
 				{#if seasonInMeta}<span class="figures">{seasonWords(player.season)}</span>{/if}

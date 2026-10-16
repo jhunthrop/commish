@@ -46,3 +46,12 @@ export function availableTierOf<R extends BoardRow & Listed>(
 	if (!group) throw new Error(`${player.name} is in no tier of his position.`);
 	return group;
 }
+
+/** A league row's pill rank from his said status (run/status-view.ts): the word for a season-long
+ * status, his position rank otherwise. */
+export function pillRank(
+	status: { rank: string | null } | null,
+	positionRank: number
+): number | string {
+	return status?.rank ?? positionRank;
+}
