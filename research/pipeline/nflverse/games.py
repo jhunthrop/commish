@@ -9,6 +9,13 @@ A PASS IS STAMPED AND IDEMPOTENT. A game's row is written when it is new or when
 moved (a future game's figures and venue move until kickoff, its result lands after), and `read_at`
 is the pass that wrote it. A re-run over the same file writes nothing. A row missing a column the
 table cannot do without (the clubs, the day, the venue) is refused, never written half.
+
+THE TABLE IS THE CURRENT STATE ONLY, never an as-of source: a moved row loses its earlier state. What
+each pass read is kept append-only beside it, stamped at the pass (insert ignoring conflicts, so a
+re-run at the same instant writes nothing): each game's venue and kickoff in `nflverse_game_reads`,
+and each club's figures (its spread, the game's total and its implied points, `game_figures`) as the
+`nflverse_game_figures` team-week source. A replay, and the screens' stale-figure fallback, read
+those at or before their instant.
 """
 
 import re
@@ -21,15 +28,19 @@ from typing import Final
 from sqlalchemy import Connection, tuple_
 from sqlalchemy.dialects.postgresql import insert
 
-from research.db.schema import NFLVERSE_GAMES
+from research.db.schema import NFLVERSE_GAME_READS, NFLVERSE_GAMES
 from research.errors import SchemaDriftError
+from research.pipeline.game_figures import club_figures
 from research.pipeline.nflverse.client import NflverseClient
 from research.pipeline.nflverse.config import SEASON_TYPE
 from research.pipeline.nflverse.csv import CsvRow
 from research.pipeline.nflverse.ingest import schedule_client
 from research.pipeline.nflverse.schedule import SCHEDULE_FILE, SCHEDULE_RELEASE, kickoff_instant
+from research.pipeline.observations import TeamWeekObservation, insert_ignoring_conflicts, record_team_observations
 
 GAMES_FIRST_SEASON: Final = 2016
+# The game table's figures from each club's side, one stamped read per pass.
+GAME_FIGURES_SOURCE: Final = "nflverse_game_figures"
 # A roof that keeps the weather out: the schedule ingest's `indoors` (`schedule._INDOOR_ROOFS`).
 INDOOR_ROOFS: Final = ("dome", "closed")
 
@@ -148,16 +159,54 @@ def missing_weather(games: Sequence[GameRow]) -> dict[int, tuple[int, int]]:
     return {season: (2 * missing[season], 2 * total[season]) for season in sorted(total)}
 
 
+def figure_observations(games: Iterable[GameRow], read_at: datetime) -> list[TeamWeekObservation]:
+    """Both clubs' figures for every game the file gives a spread and a total, stamped at the read."""
+    rows: list[TeamWeekObservation] = []
+    for g in games:
+        if g.spread_line is None or g.total_line is None:
+            continue
+        for team, spread in ((g.home_team, g.spread_line), (g.away_team, -g.spread_line)):
+            rows.extend(
+                TeamWeekObservation(g.season, g.week, team, GAME_FIGURES_SOURCE, metric, value, read_at)
+                for metric, value in club_figures(g.total_line, spread)
+            )
+    return rows
+
+
+def game_reads(games: Iterable[GameRow], read_at: datetime) -> list[dict[str, object]]:
+    """Each game's venue and kickoff as this pass read them."""
+    return [
+        {
+            "game_id": g.game_id,
+            "read_at": read_at,
+            "season": g.season,
+            "week": g.week,
+            "home_team": g.home_team,
+            "away_team": g.away_team,
+            "kickoff_at": g.kickoff_at,
+            "stadium_id": g.stadium_id,
+            "stadium": g.stadium,
+            "roof": g.roof,
+        }
+        for g in games
+    ]
+
+
 @dataclass(frozen=True)
 class GamesReport:
     games_per_season: dict[int, int]
     written: int
     missing_weather: dict[int, tuple[int, int]]
+    reads_written: int = 0
+    figures_written: int = 0
 
     def line(self) -> str:
         seasons = ", ".join(f"{s} {n}" for s, n in sorted(self.games_per_season.items()))
         weather = ", ".join(f"{s} {m} of {t}" for s, (m, t) in self.missing_weather.items())
-        return f"{self.written} games written or updated; games per season: {seasons}; outdoor club-games with no recorded weather: {weather}"
+        return (
+            f"{self.written} games written or updated, {self.reads_written} game reads and {self.figures_written} "
+            f"figure rows stamped; games per season: {seasons}; outdoor club-games with no recorded weather: {weather}"
+        )
 
 
 _CHUNK: Final = 500
@@ -188,5 +237,7 @@ def ingest_games(conn: Connection, client: NflverseClient, seasons: Iterable[int
     rows = schedule_client(client).get_csv(SCHEDULE_RELEASE, SCHEDULE_FILE)
     games = map_games(rows, seasons)
     written = _upsert(conn, games, read_at)
+    reads = insert_ignoring_conflicts(conn, NFLVERSE_GAME_READS, game_reads(games, read_at))
+    figures = record_team_observations(conn, figure_observations(games, read_at))
     per_season = dict(sorted(Counter(g.season for g in games).items()))
-    return GamesReport(per_season, written, missing_weather(games))
+    return GamesReport(per_season, written, missing_weather(games), reads, figures)

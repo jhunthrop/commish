@@ -12,14 +12,16 @@ import pytest
 from sqlalchemy import Engine, func, select, update
 
 from research.db.engine import make_engine
-from research.db.schema import NFLVERSE_GAMES
+from research.db.schema import NFLVERSE_GAME_READS, NFLVERSE_GAMES, TEAM_WEEK_OBSERVATIONS
 from research.db.url import sqlalchemy_url
 from research.errors import SchemaDriftError
 from research.parity import databases
 from research.parity.replay import ReplayFetcher
+from research.pipeline.game_figures import implied_points
 from research.pipeline.nflverse.client import NflverseClient
 from research.pipeline.nflverse.csv import CsvRow
 from research.pipeline.nflverse.games import (
+    GAME_FIGURES_SOURCE,
     GAMES_FIRST_SEASON,
     ingest_games,
     map_games,
@@ -34,6 +36,10 @@ _DATABASE = "parity_test_nflverse_games"
 _READ = datetime(2026, 10, 16, 21, 0, tzinfo=UTC)
 # Every game of 2016 to 2026 in the recorded file, every game type.
 _GAMES_2016_TO_2026 = 3033
+SEASON = 2026
+WEEK_SIX = 6
+# The passes the tests before the moved-facts one took: the first, the later one, and this.
+PASSES_SO_FAR = 3
 
 
 def _client() -> NflverseClient:
@@ -102,6 +108,42 @@ def test_the_ingest_writes_each_game_once_stamped_and_a_rerun_writes_nothing(eng
         assert again.written == 0
         assert conn.execute(select(func.count()).select_from(NFLVERSE_GAMES)).scalar_one() == _GAMES_2016_TO_2026
         assert set(conn.execute(select(NFLVERSE_GAMES.c.read_at).distinct()).scalars()) == {_READ}
+        # The current state did not move, but the pass's read of every game is kept, stamped then.
+        assert again.reads_written == _GAMES_2016_TO_2026
+        assert again.figures_written == first.figures_written > 0
+    with engine.begin() as conn:
+        same = ingest_games(conn, _client(), _SEASONS, _READ)
+    assert (same.written, same.reads_written, same.figures_written) == (0, 0, 0)
+
+
+def test_each_pass_keeps_its_figures_from_each_clubs_side_and_its_venue_read(engine: Engine) -> None:
+    table = TEAM_WEEK_OBSERVATIONS
+    with engine.begin() as conn:
+        figures = {
+            (r.team, r.metric): r.value
+            for r in conn.execute(
+                select(table.c.team, table.c.metric, table.c.value).where(
+                    table.c.source == GAME_FIGURES_SOURCE,
+                    table.c.season == SEASON,
+                    table.c.week == WEEK_SIX,
+                    table.c.team.in_(("GB", "DAL")),
+                    table.c.as_of == _READ,
+                )
+            )
+        }
+        reads = conn.execute(
+            select(NFLVERSE_GAME_READS.c.stadium).where(NFLVERSE_GAME_READS.c.game_id == "2026_06_DAL_GB")
+        ).scalars()
+        assert set(reads) == {"Lambeau Field"}
+    # nflverse's spread_line is the home club's, positive when it is favoured: Green Bay by 1.5.
+    assert figures == {
+        ("GB", "point_spread"): 1.5,
+        ("GB", "game_total"): 52.5,
+        ("GB", "implied_team_total"): implied_points(52.5, 1.5),
+        ("DAL", "point_spread"): -1.5,
+        ("DAL", "game_total"): 52.5,
+        ("DAL", "implied_team_total"): implied_points(52.5, -1.5),
+    }
 
 
 def test_a_game_whose_facts_moved_is_updated_and_restamped(engine: Engine) -> None:
@@ -113,3 +155,11 @@ def test_a_game_whose_facts_moved_is_updated_and_restamped(engine: Engine) -> No
         assert report.written == 1
         row = conn.execute(select(table).where(table.c.game_id == "2026_07_PIT_NO")).one()
         assert row.stadium == "Stade de France" and row.read_at == later
+        reads = conn.execute(
+            select(NFLVERSE_GAME_READS.c.read_at, NFLVERSE_GAME_READS.c.stadium)
+            .where(NFLVERSE_GAME_READS.c.game_id == "2026_07_PIT_NO")
+            .order_by(NFLVERSE_GAME_READS.c.read_at)
+        ).all()
+    # Every pass's read stays: the current row is rewritten, the reads are not.
+    assert [r.stadium for r in reads] == ["Stade de France"] * len(reads)
+    assert reads[-1].read_at == later and len(reads) == PASSES_SO_FAR
