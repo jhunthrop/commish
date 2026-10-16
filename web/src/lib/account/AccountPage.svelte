@@ -23,6 +23,7 @@
 	import Shell from '#lib/ui/Shell.svelte';
 	import Verb from '#lib/ui/Verb.svelte';
 	import { sectionHref } from '#lib/ui/nav.ts';
+	import { NEXT_DRAFT, NEXT_DRAFT_ROWS, railInSeason } from '#lib/league/phase-words.ts';
 	import {
 		accountApi,
 		type AccountMock,
@@ -275,6 +276,23 @@
 					</section>
 
 					<AccountLeagues features={account.features} />
+					{#if railInSeason(siteContext.rail)}
+						<!-- In season the draft prep leaves the rail, never the site (spec 2026-10-16 §2). -->
+						<section aria-label={NEXT_DRAFT}>
+							<PanelHead title={NEXT_DRAFT} level={2} />
+							<ActionRows label={NEXT_DRAFT}>
+								{#each NEXT_DRAFT_ROWS as row, i (row.lead)}
+									<ActionRow lead={row.lead} text={row.text}>
+										{#snippet action()}
+											<Quiet size="sm" href={i === 0 ? sectionHref('mock') : accountLinks.sheet()}
+												>{row.verb}</Quiet
+											>
+										{/snippet}
+									</ActionRow>
+								{/each}
+							</ActionRows>
+						</section>
+					{/if}
 					<AccountConnections />
 					<AccountDevices />
 

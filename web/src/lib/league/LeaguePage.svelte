@@ -19,9 +19,14 @@
 	import HostReconnect from '#lib/hosts/HostReconnect.svelte';
 	import { ApiError, leagueApi, type LeagueSync } from './api.ts';
 	import { loadBoard, type LeagueBoard } from './board.ts';
+	import { sheetTags } from './sheet-tags.ts';
 	import { followSwitch } from './follow-switch.svelte.ts';
 	import LeagueTabs from './inseason/LeagueTabs.svelte';
-	import MatchupPanel from './MatchupPanel.svelte';
+	import SeasonPanel from './SeasonPanel.svelte';
+	import { MOCK_VERB, SEE_MATCHUP, matchupSummary } from './phase-words.ts';
+	import { tabHref } from './inseason/tabs.ts';
+	import { siteContext } from '#lib/context/context.svelte.ts';
+	import { sectionHref } from '#lib/ui/nav.ts';
 	import MovesPanel from './MovesPanel.svelte';
 	import RosterPanel from './RosterPanel.svelte';
 	import StandingsStrip from './StandingsStrip.svelte';
@@ -132,13 +137,18 @@
 		return () => clearInterval(timer);
 	});
 
-	/** Your sheet's tags on a board player, none before the sheet is in. */
-	function tagsOf(boardId: string | null): readonly string[] {
-		if (boardId === null) return [];
-		return lazySheet.parts?.store.sheet.rows.find((row) => row.id === boardId)?.tags ?? [];
-	}
+	const tagsOf = sheetTags;
 
 	const here = $derived(links.league(id));
+	/** The league as the switch lists it, for its phase; a league it lacks yet, or an API from before
+	 * the phase, reads as in season, the page this always was. */
+	const listed = $derived(siteContext.leagues.find((l) => l.id === id));
+	const phase = $derived(
+		listed && (listed as Partial<typeof listed>).phase !== undefined ? listed.phase : 'in_season'
+	);
+	const drafted = $derived(phase !== 'pre_draft' && phase !== 'draft_day');
+	const playing = $derived(phase === 'in_season' || phase === 'playoffs');
+	const summary = $derived(sync && playing ? matchupSummary(sync) : null);
 	const dropped = $derived(sync ? droppedKinds(sync.scoring_dropped) : []);
 	const team = $derived(sync ? myTeam(sync) : undefined);
 	/** What every number on the page is, said once under the title: the scoring, the season's
@@ -229,11 +239,28 @@
 				<!-- The read line asks the drafter to connect: the sign-in that mends it sits under it. -->
 				<HostReconnect host={sync.host} returnTo={here} onconnected={() => void refresh()} />
 			{/if}
+			<SeasonPanel
+				{phase}
+				draftAt={listed?.draft_at ?? null}
+				team={team?.name ?? ''}
+				standing={listed?.standing ?? null}
+				mockHref={sync.settings_league_id
+					? links.mockLeague(sync.settings_league_id)
+					: sectionHref('mock')}
+				{now}
+			/>
 			<StandingsStrip teams={sync.teams} me={sync.me} host={sync.host} />
+			{#if summary}
+				<p class="summary">
+					<span>{summary}</span>
+					<Quiet size="sm" href={tabHref('matchup', id)}>{SEE_MATCHUP}</Quiet>
+				</p>
+			{/if}
 			<div class="grid">
 				<div class="col">
-					<MatchupPanel {sync} {board} {tagsOf} {now} />
-					<RosterPanel roster={sync.roster} {board} {tagsOf} host={sync.host} />
+					{#if drafted}
+						<RosterPanel roster={sync.roster} {board} {tagsOf} host={sync.host} />
+					{/if}
 					<footer class="foot">
 						{#if sync.settings_league_id}
 							<Footnote>
@@ -247,14 +274,16 @@
 									use our standard points.
 								{/if}
 							</Footnote>
-							<Quiet href={links.mockLeague(sync.settings_league_id)} size="sm"
-								>Start a mock draft</Quiet
-							>
+							{#if playing}
+								<!-- Before the draft and after the season the season panel carries the verb. -->
+								<Quiet href={links.mockLeague(sync.settings_league_id)} size="sm">{MOCK_VERB}</Quiet
+								>
+							{/if}
 						{:else if sync.settings_note}
 							<Footnote>{sync.settings_note}</Footnote>
 						{/if}
 
-						{#if sync.placement.unplaced > 0}
+						{#if drafted && sync.placement.unplaced > 0}
 							<Footnote>
 								{sync.placement.unplaced} rostered
 								{sync.placement.unplaced === 1 ? 'player is' : 'players are'} not on our board, so the
@@ -264,13 +293,17 @@
 					</footer>
 				</div>
 				<div class="col">
-					<WaiverPool
-						rows={poolRows(board, sync)}
-						{tagsOf}
-						basis={poolBasis(board)}
-						inSeason={seasonStarted(board)}
-					/>
-					<MovesPanel {sync} />
+					{#if playing}
+						<WaiverPool
+							rows={poolRows(board, sync)}
+							{tagsOf}
+							basis={poolBasis(board)}
+							inSeason={seasonStarted(board)}
+						/>
+					{/if}
+					{#if drafted}
+						<MovesPanel {sync} />
+					{/if}
 				</div>
 			</div>
 		</main>
@@ -284,6 +317,16 @@
 		display: flex;
 		align-items: center;
 		gap: var(--s-3);
+	}
+
+	/* The week's game in one line, its screen a tap away. */
+	.summary {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: var(--s-2) var(--s-3);
+		margin: 0;
+		font-weight: 600;
 	}
 
 	.basis {

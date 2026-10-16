@@ -5,8 +5,14 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { LeagueSync, MatchupSide } from './api.ts';
 import {
+	ADVISOR_VERB,
 	FOLLOW_FOR,
+	MOCK_VERB,
 	NEXT_DRAFT,
+	SEE_MATCHUP,
+	SHEET_LINK,
+	NEXT_DRAFT_ROWS,
+	railInSeason,
 	TURNS_AFTER_DRAFT,
 	draftLine,
 	finalStanding,
@@ -42,6 +48,7 @@ void test("the switch's word for a league's phase", () => {
 	assert.equal(at('pre_draft', null), 'Not drafted');
 	assert.equal(at('draft_day', later(7)), 'Draft today 7:00 pm');
 	assert.equal(at('draft_day', later(-1)), 'Drafting');
+	assert.equal(at('draft_day', later(14)), 'Draft tomorrow 2:00 am');
 	assert.equal(at('draft_day', null), 'Drafting');
 	assert.equal(at('in_season', null), 'Drafted');
 	assert.equal(at('playoffs', null), 'Playoffs');
@@ -60,6 +67,7 @@ void test("the league page's draft line, on the member's clock", () => {
 	);
 	assert.equal(draftLine(later(7), NOW, EASTERN), 'Your draft is today at 7:00 pm.');
 	assert.equal(draftLine(later(-1), NOW, EASTERN), 'Your draft is on now.');
+	assert.equal(draftLine(later(14), NOW, EASTERN), 'Your draft is tomorrow at 2:00 am.');
 	assert.equal(draftLine(null, NOW, EASTERN), 'Your league has not set its draft time.');
 	assert.equal(TURNS_AFTER_DRAFT, 'The site turns to your season after your draft.');
 	for (const line of [draftLine(later(7), NOW, EASTERN), TURNS_AFTER_DRAFT]) clean(line);
@@ -72,6 +80,7 @@ void test('the offseason names where the team finished, and the next draft', () 
 	);
 	assert.equal(finalStanding('', null), 'Your season is over.');
 	assert.equal(NEXT_DRAFT, 'Next draft');
+	for (const line of [ADVISOR_VERB, MOCK_VERB, SHEET_LINK, SEE_MATCHUP]) clean(line);
 });
 
 const side = (roster: number, points: number): MatchupSide => ({
@@ -116,4 +125,16 @@ void test("the league page's one matchup line names both teams and the score so 
 	);
 	assert.equal(matchupSummary(sync({ matchup: null })), null);
 	clean(matchupSummary(sync({})) ?? '');
+});
+
+void test('the account keeps the next draft a tap away in season', () => {
+	assert.equal(railInSeason('in_season'), true);
+	assert.equal(railInSeason('playoffs_waivers'), true);
+	assert.equal(railInSeason('pre_draft'), false);
+	assert.equal(railInSeason('offseason'), false);
+	assert.deepEqual(
+		NEXT_DRAFT_ROWS.map((row) => row.lead),
+		['Mock draft', 'Cheat sheet']
+	);
+	for (const row of NEXT_DRAFT_ROWS) for (const line of Object.values(row)) clean(line);
 });

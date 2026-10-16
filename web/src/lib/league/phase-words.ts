@@ -12,7 +12,7 @@ import {
 } from '#lib/format/clock.ts';
 import { fixed, ordinal } from '#lib/format/number.ts';
 import type { ContextLeague } from '#lib/context/words.ts';
-import type { LeagueScreen } from '#lib/ui/nav.ts';
+import type { LeagueScreen, RailKey } from '#lib/ui/nav.ts';
 import type { LeagueStanding, LeagueSync, MatchupSide } from './api.ts';
 import { recordWords, scoreUnread, teamName } from './model.ts';
 
@@ -28,12 +28,49 @@ export const FOLLOW_FOR: Readonly<Record<LeagueScreen, string>> = {
 /** The league page's line before the draft. */
 export const TURNS_AFTER_DRAFT = 'The site turns to your season after your draft.';
 
-/** The account page's rows for the draft prep that leaves the rail in season. */
+/** The account page's rows, and the league page's after the season, for the draft prep that
+ * leaves the rail in season. */
 export const NEXT_DRAFT = 'Next draft';
 
-const HOUR_MS = 3_600_000;
+/** The league page's one verb on draft day: our call beside the real draft. */
+export const ADVISOR_VERB = 'Open the Advisor';
+/** The league page's verb before the draft and after the season. */
+export const MOCK_VERB = 'Start a mock draft';
+/** The cheat sheet's way in beside it. */
+export const SHEET_LINK = 'Cheat sheet';
+/** The account page's Next draft rows in season, where the draft prep has left the rail: each
+ * page by its rail word, a line, and its verb. */
+export const NEXT_DRAFT_ROWS = [
+	{
+		lead: 'Mock draft',
+		text: 'Practice your next draft any time, against a room on our board.',
+		verb: MOCK_VERB
+	},
+	{
+		lead: SHEET_LINK,
+		text: 'Your ranks and tags, kept for your next draft.',
+		verb: 'Open your sheet'
+	}
+] as const;
+
+/** Whether a rail is the season's, where the account page shows the Next draft rows. */
+export function railInSeason(rail: RailKey): boolean {
+	return rail === 'in_season' || rail === 'playoffs' || rail === 'playoffs_waivers';
+}
+
+/** The league page's matchup line's way to the Matchup screen. */
+export const SEE_MATCHUP = 'See the matchup';
+
+const DAY_MS = 86_400_000;
 /** A draft this many days off is named by its weekday, further off by its date. */
-const WEEK_AHEAD_MS = 6 * 24 * HOUR_MS;
+const WEEK_AHEAD_MS = 6 * DAY_MS;
+
+/** "today" or "tomorrow" for an instant on those days of the member's clock, else null. */
+function nearDay(iso: string, now: Date, zone: string): string | null {
+	const at = new Date(iso);
+	if (sameDay(at, now, zone)) return 'today';
+	return sameDay(at, new Date(now.getTime() + DAY_MS), zone) ? 'tomorrow' : null;
+}
 
 type Phased = Pick<ContextLeague, 'phase' | 'draft_at'>;
 
@@ -58,17 +95,19 @@ function draftWord(league: Phased, now: Date, zone: string): string {
 	if (at === null) return league.phase === 'draft_day' ? 'Drafting' : 'Not drafted';
 	const ahead = Date.parse(at) - now.getTime();
 	if (ahead <= 0) return 'Drafting';
-	if (sameDay(new Date(at), now, zone)) return `Draft today ${timeOfDay(at, zone)}`;
+	const near = nearDay(at, now, zone);
+	if (near !== null) return `Draft ${near} ${timeOfDay(at, zone)}`;
 	return ahead <= WEEK_AHEAD_MS ? `Draft ${weekdayTime(at, zone)}` : `Draft ${shortDay(at, zone)}`;
 }
 
 /** The league page's draft line before the draft: "Your draft is Sunday, October 25 at 7:00 pm.",
- * "Your draft is today at 7:00 pm.", "Your draft is on now.", or that the host has no time. */
+ * "Your draft is today at 7:00 pm.", "... tomorrow at ...", "Your draft is on now.", or that the host
+ * has no time. */
 export function draftLine(draftAt: string | null, now: Date, zone: string = memberZone()): string {
 	if (draftAt === null) return 'Your league has not set its draft time.';
 	if (Date.parse(draftAt) <= now.getTime()) return 'Your draft is on now.';
-	if (sameDay(new Date(draftAt), now, zone))
-		return `Your draft is today at ${timeOfDay(draftAt, zone)}.`;
+	const near = nearDay(draftAt, now, zone);
+	if (near !== null) return `Your draft is ${near} at ${timeOfDay(draftAt, zone)}.`;
 	return `Your draft is ${dayAndTime(draftAt, zone)}.`;
 }
 
