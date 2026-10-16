@@ -2,7 +2,7 @@
  * screens' week mark, and the board and player pages' status. The statuses are the API's
  * (`DesignationStatus`) and the run's (`designations.json`). */
 import type { components } from '#lib/api/types.ts';
-import { memberZone, monthDay, weekdayTime, zoneWord } from './clock.ts';
+import { memberZone, monthDay, shortDay, weekdayTime, zoneWord } from './clock.ts';
 
 export type DesignationStatus = components['schemas']['DesignationStatus'];
 
@@ -68,8 +68,50 @@ export function seasonLongLine(
 	return `${DESIGNATION_WORDS[status.status]} ${when}. ${figure} assumes he plays, so he sits below the available players.`;
 }
 
-/** The basis line's sentence naming where the statuses come from and when they were read:
- * "Injury status from the hourly capture, read Thu 9:05 am Central." */
-export function captureLine(readAt: string, zone: string = memberZone()): string {
-	return `Injury status from the hourly capture, read ${weekdayTime(readAt, zone)} ${zoneWord(zone)}.`;
+/** The capture a page's statuses come from: when its list last changed, and the capture job's last
+ * successful check of it (null when the store records none). */
+export interface CaptureStamp {
+	readAt: string;
+	checkedAt: string | null;
+}
+
+/** Past this long without a check the capture is behind, and the basis says so. Its statuses stay
+ * applied: a player on injured reserve ranked as if he plays would be worse than a stale notice. */
+export const CAPTURE_BEHIND_MS = 36 * 60 * 60 * 1000;
+
+/** "Tue Oct 13, 9:03 pm Central": a stamp a static page may print a week or more later, so it names
+ * the month and the day. */
+export function stampWords(iso: string, zone: string = memberZone()): string {
+	const [weekday = '', ...time] = weekdayTime(iso, zone).split(' ');
+	return `${weekday} ${shortDay(iso, zone)}, ${time.join(' ')} ${zoneWord(zone)}`;
+}
+
+/** The basis line's sentence naming the capture and when it was read, "read" only for a real check:
+ * "Injury status from the hourly capture, read Fri Oct 16, 9:05 am Central.", else "as the list
+ * stood" at its last change. Past CAPTURE_BEHIND_MS since the last check (or the list, with none) it
+ * says the capture is behind and that the statuses are the last it read. */
+export function captureLine(
+	capture: CaptureStamp,
+	now: number,
+	zone: string = memberZone()
+): string {
+	const last = capture.checkedAt ?? capture.readAt;
+	const when =
+		capture.checkedAt === null
+			? `as the list stood ${stampWords(capture.readAt, zone)}`
+			: `read ${stampWords(capture.checkedAt, zone)}`;
+	if (now - Date.parse(last) > CAPTURE_BEHIND_MS) {
+		return `The hourly injury capture is behind, ${when}. Players keep the statuses it read then.`;
+	}
+	return `Injury status from the hourly capture, ${when}.`;
+}
+
+/** "Doubtful as of Oct 13": a static page's mark, dated by the list's day, since the page can outlive
+ * the week. */
+export function listedMark(
+	status: DesignationStatus,
+	readAt: string,
+	zone: string = memberZone()
+): string {
+	return `${DESIGNATION_WORDS[status]} as of ${shortDay(readAt, zone)}`;
 }

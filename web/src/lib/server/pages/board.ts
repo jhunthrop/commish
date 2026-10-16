@@ -16,7 +16,9 @@ import { scoringBasis } from '#lib/run/catalog.ts';
 import { links } from '#lib/site/links.ts';
 import { windowLabel } from '#lib/format/date.ts';
 import { withStatuses } from '#lib/run/board-status.ts';
-import { BUILT_ZONE, boardStatusWords, type BoardStatusWords } from '#lib/run/status-view.ts';
+import type { CaptureStamp } from '#lib/format/designation.ts';
+import { boardStatusWords, type BoardStatusWords } from '#lib/run/status-view.ts';
+import { builtSaying, captureStamp } from '../statuses.ts';
 import { boardSeason } from '../board-season.ts';
 import { adp, board, designations, manifest } from '../run.ts';
 import {
@@ -54,9 +56,9 @@ export interface BoardPage {
 	basisTerms: BasisTerm[];
 	/** How every row frames his rank against the drafts (run/row-framing.ts). */
 	framing: RowFraming;
-	/** When the run's injury capture was read, null when the run carries none: the basis line names
-	 * it, on the member's clock. */
-	statusRead: string | null;
+	/** The run's injury capture, null when the run carries none: the basis line names it, said again
+	 * on the member's clock once the page is live. */
+	capture: CaptureStamp | null;
 	/** The status words as built, on the Eastern clock (the page says them again on the member's). */
 	statusWords: BoardStatusWords | null;
 }
@@ -105,11 +107,8 @@ export async function boardPage(formatId: string, segment: string | null): Promi
 			range
 		}),
 		framing: rowFraming(format),
-		statusRead: capture?.readAt ?? null,
-		statusWords:
-			capture === null
-				? null
-				: boardStatusWords(rows, capture.readAt, format.rosFromWeek !== undefined, BUILT_ZONE)
+		capture: capture === null ? null : captureStamp(capture),
+		statusWords: capture === null ? null : boardStatusWords(rows, builtSaying(capture, format))
 	};
 }
 

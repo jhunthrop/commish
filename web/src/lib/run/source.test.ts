@@ -25,6 +25,7 @@ void test('an artifact the run left out reads as null, one it carries is parsed'
 	assert.equal(await empty.readOptional('designations.json', designationsSchema), null);
 	const file = {
 		readAt: '2026-10-21T11:00:00.000Z',
+		checkedAt: null,
 		source: 'tank01_injuries_by_date',
 		players: {
 			'4429795': { status: 'injured_reserve', seasonLong: true, since: '2026-10-14T15:00:00.000Z' }
@@ -43,6 +44,7 @@ void test('an artifact the run left out reads as null, one it carries is parsed'
 void test('a file that is there but wrong fails the build by name', async () => {
 	const bad = {
 		readAt: '2026-10-21T11:00:00.000Z',
+		checkedAt: null,
 		source: 'x',
 		players: { p1: { status: 'doubtful', seasonLong: false, since: '2026-10-14T15:00:00.000Z' } }
 	};

@@ -49,6 +49,10 @@ const LEAGUE_PAGE_PARTS =
 /** A player's injury status in words on the member's clock (Lane 63): the designation's words, which
  * the league's screens import and the board, player and record pages load after their first paint.
  * Kept out of the shared chunk by name, as the league's parts are. */
+/** The live clock the board, player and record pages call to say their status words again on the
+ * member's clock: a few lines with no import but the words' own lazy one, in a file of its own, so
+ * neither the shared chunk nor a page's group carries it for the others. */
+const LIVE_STATUS = /[\\/]src[\\/]lib[\\/]run[\\/]live-status\./;
 const STATUS_PARTS = /[\\/]src[\\/]lib[\\/](format[\\/]designation\.|run[\\/]status-view\.)/;
 /** A component joins the shared chunk once this many routes use it. Fewer, and every page would
  * carry code only a couple of pages run. */
@@ -100,6 +104,7 @@ export default defineConfig({
 								!PLAYER_PARTS.test(id) &&
 								!FIGURE_PARTS.test(id) &&
 								!STATUS_PARTS.test(id) &&
+								!LIVE_STATUS.test(id) &&
 								!LEAGUE_PAGE_PARTS.test(id),
 							minShareCount: SHARED_BY_ROUTES,
 							priority: 1
@@ -108,7 +113,8 @@ export default defineConfig({
 						{ name: 'board', test: BOARD_PARTS, minShareCount: 2, priority: 1 },
 						{ name: 'player', test: PLAYER_PARTS, minShareCount: 2, priority: 1 },
 						{ name: 'figure', test: FIGURE_PARTS, minShareCount: 2, priority: 1 },
-						{ name: 'forms', test: FORM_PARTS, minShareCount: 2, priority: 1 }
+						{ name: 'forms', test: FORM_PARTS, minShareCount: 2, priority: 1 },
+						{ name: 'live', test: LIVE_STATUS, minShareCount: 2, priority: 2 }
 					]
 				}
 			}

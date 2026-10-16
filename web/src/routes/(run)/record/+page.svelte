@@ -3,6 +3,7 @@
 	import { siteContext } from '#lib/context/context.svelte.ts';
 	import ContextNote from '#lib/context/ContextNote.svelte';
 	import { fixed, plural } from '#lib/format/number.ts';
+	import { liveStatusClock, type LiveStatus } from '#lib/run/live-status.ts';
 	import {
 		allLine,
 		rankAgreement,
@@ -59,21 +60,27 @@
 	const lines = $derived(weekLines(record.weeks, data.page.unplayed).map(withFigure));
 
 	/** The capture's read as built, said again on the member's clock once the page is live. */
-	// Said again on the member's clock once the page is live, from words loaded after the first paint,
-	// so the page's first script carries neither the clock nor the words (run/status-view.ts).
-	let live = $state<{ zone: string; words: typeof import('#lib/run/status-view.ts') } | null>(null);
+	let live = $state<LiveStatus | null>(null);
 	onMount(() => {
-		if (data.page.statusRead === null) return;
-		void import('#lib/run/status-view.ts').then((words) => {
-			live = { zone: Intl.DateTimeFormat().resolvedOptions().timeZone, words };
-		});
+		liveStatusClock(
+			data.page.capture !== null,
+			() => import('#lib/run/status-view.ts'),
+			(said) => {
+				live = said;
+			}
+		);
 	});
 	const statusWords = $derived.by(() => {
 		const clock = live;
-		const read = data.page.statusRead;
-		return clock === null || read === null
+		const capture = data.page.capture;
+		return clock === null || capture === null
 			? data.page.statusWords
-			: clock.words.recordStatusWords(read, clock.zone);
+			: clock.words.recordStatusWords({
+					capture,
+					restOfSeason: false,
+					zone: clock.zone,
+					now: clock.now
+				});
 	});
 
 	const positionColumns: Column[] = [

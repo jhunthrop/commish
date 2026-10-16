@@ -1,32 +1,37 @@
 // A designation's words on every screen (Lane 63): run with `npm test`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { monthDay, zoneWord } from './clock.ts';
 import { DESIGNATION_STATUSES } from '#lib/run/schema.ts';
+import { monthDay, zoneWord } from './clock.ts';
 import {
+	CAPTURE_BEHIND_MS,
 	captureLine,
 	designationMark,
 	designationWord,
+	listedMark,
 	rankWord,
 	seasonLongLine,
-	sitsHim
+	sitsHim,
+	stampWords
 } from './designation.ts';
 
 const CENTRAL = 'America/Chicago';
-const READ = '2026-10-16T14:05:00.000Z';
+const LISTED = '2026-10-13T02:03:00.000Z';
+const CHECKED = '2026-10-16T14:05:00.000Z';
+const SOON = Date.parse(CHECKED) + 60 * 60 * 1000;
 
 void test('a season-long status says since when and what the order does with him', () => {
 	assert.equal(
 		seasonLongLine(
 			{ status: 'injured_reserve', since: '2026-10-14T15:00:00.000Z' },
-			READ,
+			CHECKED,
 			true,
 			CENTRAL
 		),
 		'On injured reserve since October 14. Our rest-of-season figure assumes he plays, so he sits below the available players.'
 	);
 	assert.equal(
-		seasonLongLine({ status: 'pup', since: null }, READ, false, CENTRAL),
+		seasonLongLine({ status: 'pup', since: null }, CHECKED, false, CENTRAL),
 		'On the PUP list as of October 16. Our projection assumes he plays, so he sits below the available players.'
 	);
 });
@@ -35,19 +40,49 @@ void test('the day is the member’s own', () => {
 	// 03:30 UTC on October 15 is still October 14 in Chicago.
 	assert.equal(monthDay('2026-10-15T03:30:00.000Z', CENTRAL), 'October 14');
 	assert.equal(monthDay('2026-10-15T03:30:00.000Z', 'UTC'), 'October 15');
-});
-
-void test('the basis sentence names the capture and its read on the member’s clock', () => {
-	assert.equal(
-		captureLine(READ, CENTRAL),
-		'Injury status from the hourly capture, read Fri 9:05 am Central.'
-	);
 	assert.equal(zoneWord('America/New_York'), 'Eastern');
 	assert.equal(zoneWord('America/Los_Angeles'), 'Pacific');
 });
 
+void test('"read" is said only for a real check, and a stamp names its month and day', () => {
+	assert.equal(stampWords(CHECKED, CENTRAL), 'Fri Oct 16, 9:05 am Central');
+	assert.equal(
+		captureLine({ readAt: LISTED, checkedAt: CHECKED }, SOON, CENTRAL),
+		'Injury status from the hourly capture, read Fri Oct 16, 9:05 am Central.'
+	);
+	assert.equal(
+		captureLine({ readAt: LISTED, checkedAt: null }, Date.parse(LISTED) + 1000, CENTRAL),
+		'Injury status from the hourly capture, as the list stood Mon Oct 12, 9:03 pm Central.'
+	);
+});
+
+void test('past 36 hours without a check the capture is said to be behind, its statuses kept', () => {
+	const late = Date.parse(CHECKED) + CAPTURE_BEHIND_MS + 1;
+	assert.equal(
+		captureLine({ readAt: LISTED, checkedAt: CHECKED }, late, CENTRAL),
+		'The hourly injury capture is behind, read Fri Oct 16, 9:05 am Central. Players keep the statuses it read then.'
+	);
+	assert.match(
+		captureLine(
+			{ readAt: LISTED, checkedAt: null },
+			Date.parse(LISTED) + CAPTURE_BEHIND_MS + 1,
+			CENTRAL
+		),
+		/^The hourly injury capture is behind, as the list stood Mon Oct 12, 9:03 pm Central\./
+	);
+	assert.match(
+		captureLine(
+			{ readAt: LISTED, checkedAt: CHECKED },
+			Date.parse(CHECKED) + CAPTURE_BEHIND_MS,
+			CENTRAL
+		),
+		/^Injury status from/
+	);
+});
+
 void test('the marks', () => {
-	assert.equal(designationMark('doubtful', READ, CENTRAL), 'Doubtful as of Fri 9:05 am');
+	assert.equal(designationMark('doubtful', CHECKED, CENTRAL), 'Doubtful as of Fri 9:05 am');
+	assert.equal(listedMark('doubtful', LISTED, CENTRAL), 'Doubtful as of Oct 12');
 	assert.equal(rankWord('injured_reserve'), 'IR');
 	assert.equal(designationWord('nfi'), 'On the NFI list');
 	assert.deepEqual(
@@ -59,10 +94,11 @@ void test('the marks', () => {
 void test('no line carries an em-dash or a semicolon', () => {
 	const lines = [
 		...DESIGNATION_STATUSES.map((status) =>
-			seasonLongLine({ status, since: null }, READ, true, CENTRAL)
+			seasonLongLine({ status, since: null }, CHECKED, true, CENTRAL)
 		),
-		...DESIGNATION_STATUSES.map((status) => designationMark(status, READ, CENTRAL)),
-		captureLine(READ, CENTRAL)
+		...DESIGNATION_STATUSES.map((status) => listedMark(status, CHECKED, CENTRAL)),
+		captureLine({ readAt: LISTED, checkedAt: CHECKED }, SOON, CENTRAL),
+		captureLine({ readAt: LISTED, checkedAt: null }, SOON + CAPTURE_BEHIND_MS, CENTRAL)
 	];
 	for (const line of lines) assert.doesNotMatch(line, /[—;]/u, line);
 });

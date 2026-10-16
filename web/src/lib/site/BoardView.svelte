@@ -25,6 +25,7 @@
 	import { heldOut } from '#lib/run/board-status.ts';
 	import type { BoardRowView } from '#lib/run/schema.ts';
 	import type { StatusView } from '#lib/run/status-view.ts';
+	import { liveStatusClock, type LiveStatus } from '#lib/run/live-status.ts';
 	import { links, tierAnchor } from './links.ts';
 
 	interface Props {
@@ -74,24 +75,25 @@
 	}
 
 	/** The status words as built, said again on the member's clock once the page is live. */
-	// Said again on the member's clock once the page is live, from words loaded after the first paint,
-	// so the page's first script carries neither the clock nor the words (run/status-view.ts).
-	let live = $state<{ zone: string; words: typeof import('#lib/run/status-view.ts') } | null>(null);
+	let live = $state<LiveStatus | null>(null);
 	onMount(() => {
-		if (page.statusRead === null) return;
-		void import('#lib/run/status-view.ts').then((words) => {
-			live = { zone: Intl.DateTimeFormat().resolvedOptions().timeZone, words };
-		});
+		liveStatusClock(
+			page.capture !== null,
+			() => import('#lib/run/status-view.ts'),
+			(said) => {
+				live = said;
+			}
+		);
 	});
 	const words = $derived.by(() => {
 		const clock = live;
-		if (clock === null || page.statusRead === null) return page.statusWords;
-		return clock.words.boardStatusWords(
-			page.rows,
-			page.statusRead,
-			page.format.rosFromWeek !== undefined,
-			clock.zone
-		);
+		if (clock === null || page.capture === null) return page.statusWords;
+		return clock.words.boardStatusWords(page.rows, {
+			capture: page.capture,
+			restOfSeason: page.format.rosFromWeek !== undefined,
+			zone: clock.zone,
+			now: clock.now
+		});
 	});
 	/** A listed player's status as his row prints it. */
 	function status(player: BoardRowView): StatusView | null {

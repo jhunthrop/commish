@@ -386,8 +386,11 @@ export const playerStatusSchema = z
 	);
 
 export const designationsSchema = z.object({
-	/** The capture's stamp: when the hourly capture read the provider's list. */
+	/** The capture's stamp: when the provider's list last changed (an unchanged list is not stored). */
 	readAt: isoTime,
+	/** The capture job's last successful check of the list, null when the store records none: a page
+	 * says "read" at it, and "as the list stood" at readAt without it. */
+	checkedAt: isoTime.nullable(),
 	/** The capture's feed in our store. Provenance, never printed on a screen. */
 	source: phrase,
 	/** By player id, every ranked player the capture lists. A player it does not list is not keyed. */
