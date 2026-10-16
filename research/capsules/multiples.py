@@ -12,9 +12,10 @@ What counts as a multiple (the re-reviews' N5, N6 and R2-H1, ruled):
 - "double", "twice", "triple", "half", "two times" or "three times" when hedged ("almost double", "close
   to half") or followed by an object ("double it", "twice the 14.1", "half of his 14.1", "twice as many"),
   whatever comes after.
-Exempt, by name only, the non-comparisons: "half of his targets" (half of a counted thing), "half a
-chance", "half the season", "half our guys", "twice a week", a "double-digit" week, a "double team",
-"double coverage", the "second half", and "he scored twice" (no object, no hedge).
+Exempt, by name only, the non-comparisons: "half" of a named counted thing with no figure after it
+("half of his targets", "half the season", "half our guys"; the list is `_COUNTED`), "half a chance",
+"twice a week", a "double-digit" week, a "double team", "double coverage", the "second half", and "he
+scored twice" (no object, no hedge).
 """
 
 import re
@@ -53,16 +54,15 @@ _MULTIPLE: Final = re.compile(
     rf"\b(?P<hedge>{_HEDGE}\s+)?(?P<word>{'|'.join(_WORD_RATIOS)})\b(?P<object>{_OBJECT})?",
     re.IGNORECASE,
 )
-# The names of figures a multiple compares: never the counted thing "half of his ..." is half of.
-_FIGURE_NAMES: Final = (
-    r"number|numbers|pace|projection|projected|expectation|expectations|average|rate|mark|total|output|"
-    r"figure|scoring|production|preseason|points?|we|you|they|he|she|a|an|per"
+# The counted things "half" may be half of without comparing two figures (the re-review's R3-H1,
+# ruled): exempt by name, and only when no figure follows in the sentence.
+_COUNTED: Final = r"targets|snaps|carries|touches|routes|games|season|field|team|guys|drives"
+_HALF_OF_A_COUNT: Final = re.compile(
+    rf"half\s+(?:of\s+)?(?:his|her|their|the|our|its)\s+(?:{_COUNTED})\b", re.IGNORECASE
 )
-# The non-comparisons, read from the comparison word on, each exempt by name.
+# The other non-comparisons, read from the comparison word on, each exempt by name.
 _NOT_A_COMPARISON: Final = re.compile(
-    r"half\s+(?:of\s+)?(?:his|her|their|the|our|its)\s+(?:\d+(?:\.\d+)?\s+)?"
-    rf"(?!(?:{_FIGURE_NAMES})\b)[a-z][a-z'-]*"
-    r"|half\s+an?\s+(?!\d)[a-z]"
+    r"half\s+an?\s+(?!\d)[a-z]"
     r"|twice\s+an?\s+(?:week|game|day|month|season|year|quarter|half|night)\b"
     r"|double[\s-](?:digits?|teams?|teamed|coverage)\b",
     re.IGNORECASE,
@@ -98,7 +98,10 @@ def _is_claim(match: re.Match[str], sentence: str) -> bool:
         return True
     if match.group("hedge") is None and match.group("object") is None:
         return False
-    return _NOT_A_COMPARISON.match(sentence, match.start("word")) is None
+    if _NOT_A_COMPARISON.match(sentence, match.start("word")) is not None:
+        return False
+    count = _HALF_OF_A_COUNT.match(sentence, match.start("word"))
+    return count is None or bool(_figures(sentence[count.end() :]))
 
 
 def _claims(sentence: str) -> list[tuple[str, float]]:

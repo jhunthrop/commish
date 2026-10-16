@@ -52,7 +52,7 @@ def test_a_multiple_the_figures_do_not_make_is_refused(text: str) -> None:
         "Half of his targets came late in 2025.",
         "He has half a chance to start in week 7 of 2026.",
         "He missed half the season in 2025.",
-        "Half of his 12 catches came in week 2 of 2026.",
+        "Half of his carries came late in 2025.",
     ],
 )
 def test_a_multiple_the_figures_make_or_another_sense_passes(text: str) -> None:
@@ -113,3 +113,19 @@ def test_every_hedged_or_object_bearing_multiple_is_a_claim(text: str) -> None:
 )
 def test_the_named_non_comparisons_pass(text: str) -> None:
     assert multiple_violations(text) == []
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        # Round 4 (the re-review's R3-H1): only a named counted noun is exempt, and only with no figure after it.
+        "He is at 9, half of his last season pace of 14.1.",
+        "He is at 9, half of his expected 14.1.",
+        "He is at 9, half of his old number of 14.1.",
+        "He is at 9, half of his career-best 14.1.",
+        "He is at 9, half of his targets from 14.1 a game.",
+    ],
+)
+def test_half_of_his_anything_but_a_named_count_is_a_claim(text: str) -> None:
+    (violation,) = multiple_violations(text)
+    assert violation.startswith(MULTIPLE_VIOLATION)
