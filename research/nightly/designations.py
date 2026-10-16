@@ -130,7 +130,10 @@ def _captures(conn: Connection, source: str, n: int, before: datetime | None = N
 # captures that pass the floor.
 _RUNS: Final = text(
     """with listed_caps as (
-  select payload, captured_at, jsonb_array_length(payload->'injList') as n_listed
+  select payload, captured_at, (
+    select count(distinct btrim(e->>'playerID')) from jsonb_array_elements(payload->'injList') as e
+    where btrim(coalesce(e->>'playerID', '')) <> '' and btrim(coalesce(e->>'designation', '')) <> ''
+  ) as n_listed
   from research.capture_snapshots
   where source = :source and captured_at <= :newest and captured_at > :oldest
     and jsonb_typeof(payload->'injList') = 'array'
@@ -173,7 +176,6 @@ def _season_runs(conn: Connection, newest: datetime) -> dict[tuple[str, str], da
 
 # The capture job's last check (revision 0008): to_regclass keeps a store that predates it readable,
 # as the API's lastChecked does.
-# The capture job's last check (revision 0008), read only where the store has the table, as the API does.
 _HAS_CHECKS: Final = text("select to_regclass('research.capture_checks') is not null")
 _CHECKED: Final = text("select checked_at from research.capture_checks where source = :source")
 
@@ -193,7 +195,7 @@ def _sweep_notes(conn: Connection, at: datetime) -> Mapping[str, str]:
     return {i: e.description for i, e in sweeps[0].entries.items() if e.description}
 
 
-def _statuses(conn: Connection, source: str, newest: _Capture) -> StatusRead:
+def _statuses(conn: Connection, source: str, newest: _Capture, stored_newest: bool) -> StatusRead:
     entries = newest.entries or {}
     by_date = source == BY_DATE_SOURCE
     runs = _season_runs(conn, newest.at) if by_date else {}
@@ -207,7 +209,10 @@ def _statuses(conn: Connection, source: str, newest: _Capture) -> StatusRead:
         note = captured.description if not by_date else notes.get(player_id) if status == "out" else None
         long = season_long(status, note)
         players[player_id] = PlayerStatus(status, long, runs.get((player_id, status)) if long else None)
-    return StatusRead(ms_instant(newest.at), _checked(conn, source), source, players)
+    # The feed's last check is this list's only when it is the newest stored: a check that returned a
+    # list the floor refused never vouches for the older list shown.
+    checked = _checked(conn, source) if stored_newest else None
+    return StatusRead(ms_instant(newest.at), checked, source, players)
 
 
 def read_statuses(conn: Connection) -> StatusRead | None:
@@ -220,7 +225,7 @@ def read_statuses(conn: Connection) -> StatusRead | None:
         captures = _captures(conn, source, CAPTURES_TRIED + 1)
         for i in range(min(len(captures), CAPTURES_TRIED)):
             if readable_at(captures, i):
-                return _statuses(conn, source, captures[i])
+                return _statuses(conn, source, captures[i], stored_newest=i == 0)
         if captures:
             raise DesignationsError(
                 f"none of the {min(len(captures), CAPTURES_TRIED)} newest injury captures {source} reads"

@@ -290,10 +290,14 @@ def test_an_empty_or_cut_short_list_gives_way_and_a_real_drop_reads_on_the_next(
         (_BY_DATE, {"injList": []}, "2026-10-13T11:00:00+00:00"),
         (_BY_DATE, _listed(("p3", "Q")), "2026-10-13T12:00:00+00:00"),
     )
+    with engine.begin() as conn:
+        record_checks(conn, [FeedOutcome(_BY_DATE, "captured", 1)], datetime(2026, 10, 13, 12, tzinfo=UTC))
     with engine.connect() as conn:
         read = read_statuses(conn)
     assert read is not None and read.read_at == datetime(2026, 10, 13, 10, tzinfo=UTC)
     assert read.players["p1"] == PlayerStatus("injured_reserve", True, None)
+    # The 12:00 check returned the refused list, so it never vouches for the 10:00 one shown.
+    assert read.checked_at is None
     # A second short list: the drop is real, and the lapsed injured reserve is gone.
     with engine.begin() as conn:
         conn.execute(
@@ -307,9 +311,12 @@ def test_an_empty_or_cut_short_list_gives_way_and_a_real_drop_reads_on_the_next(
                 }
             ],
         )
+    with engine.begin() as conn:
+        record_checks(conn, [FeedOutcome(_BY_DATE, "captured", 1)], datetime(2026, 10, 13, 13, tzinfo=UTC))
     with engine.connect() as conn:
         read = read_statuses(conn)
     assert read is not None and dict(read.players) == {"p3": PlayerStatus("doubtful", False, None)}
+    assert read.checked_at == datetime(2026, 10, 13, 13, tzinfo=UTC)
 
 
 def test_the_checks_ride_on_the_read_and_an_out_takes_a_nearby_sweeps_note(engine: Engine) -> None:
