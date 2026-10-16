@@ -69,7 +69,8 @@
 			label: scoring,
 			unit,
 			year: season,
-			restOfSeason: lead.rest !== null
+			restOfSeason: lead.rest !== null,
+			held: page.status?.words.view.rank ?? null
 		})
 	);
 	/** The figures beside our read, each naming its basis: in season the rest of it leads, in the
