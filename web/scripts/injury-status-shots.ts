@@ -78,13 +78,13 @@ async function board(page: Page, tag: string): Promise<void> {
 		(rows, position) =>
 			rows.map((r) => ({
 				text: (r as HTMLElement).innerText,
-				at: r.textContent?.includes(position)
+				at: r.textContent.includes(position)
 			})),
 		HELD.position
 	);
 	const heldAt = order.findIndex((r) => r.text.includes(HELD.name));
 	const lastAvailable = order.findLastIndex(
-		(r, i) => i !== heldAt && r.at === true && !/\bIR\b|PUP|NFI|Susp/.test(r.text)
+		(r, i) => i !== heldAt && r.at && !/\bIR\b|PUP|NFI|Susp/.test(r.text)
 	);
 	check(
 		heldAt > lastAvailable,

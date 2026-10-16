@@ -22,7 +22,7 @@ const capture: Designations = {
 	}
 };
 
-test('a season-long player follows the last available player at his position, as the API orders him', () => {
+void test('a season-long player follows the last available player at his position, as the API orders him', () => {
 	const rows = [
 		row('a-wr', 'WR'),
 		row('b-rb', 'RB'),
@@ -47,7 +47,7 @@ test('a season-long player follows the last available player at his position, as
 	);
 });
 
-test('no capture leaves the board as the run has it', () => {
+void test('no capture leaves the board as the run has it', () => {
 	const rows = [row('a-wr', 'WR'), row('c-wr', 'WR')];
 	assert.deepEqual(withStatuses(rows, null), rows);
 });

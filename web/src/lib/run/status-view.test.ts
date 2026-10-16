@@ -14,7 +14,7 @@ import {
 const READ = '2026-10-16T14:05:00.000Z';
 const CENTRAL = 'America/Chicago';
 
-test('a season-long status shows as his rank and says why he sits below', () => {
+void test('a season-long status shows as his rank and says why he sits below', () => {
 	assert.deepEqual(
 		statusView(
 			{ status: 'injured_reserve', seasonLong: true, since: '2026-10-14T15:00:00.000Z' },
@@ -31,7 +31,7 @@ test('a season-long status shows as his rank and says why he sits below', () => 
 	);
 });
 
-test('a week’s designation keeps his rank and carries the league screens’ mark', () => {
+void test('a week’s designation keeps his rank and carries the league screens’ mark', () => {
 	assert.deepEqual(
 		statusView({ status: 'doubtful', seasonLong: false, since: null }, READ, true, CENTRAL),
 		{
@@ -51,12 +51,12 @@ test('a week’s designation keeps his rank and carries the league screens’ ma
 	);
 });
 
-test('the record says the frozen boards it grades moved no one', () => {
+void test('the record says the frozen boards it grades moved no one', () => {
 	assert.match(HELD_OUT_METHOD, /as it froze, before that move\.$/u);
 	assert.doesNotMatch(HELD_OUT_METHOD, /[—;]/u);
 });
 
-test('a board, a page and the record built on the Eastern clock and said again on the member’s', () => {
+void test('a board, a page and the record built on the Eastern clock and said again on the member’s', () => {
 	const rows = [
 		{ id: 'ir', status: { status: 'injured_reserve', seasonLong: true, since: null } as const },
 		{ id: 'free' }

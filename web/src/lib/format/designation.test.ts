@@ -15,7 +15,7 @@ import {
 const CENTRAL = 'America/Chicago';
 const READ = '2026-10-16T14:05:00.000Z';
 
-test('a season-long status says since when and what the order does with him', () => {
+void test('a season-long status says since when and what the order does with him', () => {
 	assert.equal(
 		seasonLongLine(
 			{ status: 'injured_reserve', since: '2026-10-14T15:00:00.000Z' },
@@ -31,13 +31,13 @@ test('a season-long status says since when and what the order does with him', ()
 	);
 });
 
-test('the day is the member’s own', () => {
+void test('the day is the member’s own', () => {
 	// 03:30 UTC on October 15 is still October 14 in Chicago.
 	assert.equal(monthDay('2026-10-15T03:30:00.000Z', CENTRAL), 'October 14');
 	assert.equal(monthDay('2026-10-15T03:30:00.000Z', 'UTC'), 'October 15');
 });
 
-test('the basis sentence names the capture and its read on the member’s clock', () => {
+void test('the basis sentence names the capture and its read on the member’s clock', () => {
 	assert.equal(
 		captureLine(READ, CENTRAL),
 		'Injury status from the hourly capture, read Fri 9:05 am Central.'
@@ -46,7 +46,7 @@ test('the basis sentence names the capture and its read on the member’s clock'
 	assert.equal(zoneWord('America/Los_Angeles'), 'Pacific');
 });
 
-test('the marks', () => {
+void test('the marks', () => {
 	assert.equal(designationMark('doubtful', READ, CENTRAL), 'Doubtful as of Fri 9:05 am');
 	assert.equal(rankWord('injured_reserve'), 'IR');
 	assert.equal(designationWord('nfi'), 'On the NFI list');
@@ -56,7 +56,7 @@ test('the marks', () => {
 	);
 });
 
-test('no line carries an em-dash or a semicolon', () => {
+void test('no line carries an em-dash or a semicolon', () => {
 	const lines = [
 		...DESIGNATION_STATUSES.map((status) =>
 			seasonLongLine({ status, since: null }, READ, true, CENTRAL)

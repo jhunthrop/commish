@@ -17,7 +17,7 @@ async function runDir(files: Record<string, string>): Promise<string> {
 	return root;
 }
 
-test('an artifact the run left out reads as null, one it carries is parsed', async () => {
+void test('an artifact the run left out reads as null, one it carries is parsed', async () => {
 	const empty = await openRun({
 		runId: RUN,
 		location: { kind: 'directory', path: await runDir({}) }
@@ -40,7 +40,7 @@ test('an artifact the run left out reads as null, one it carries is parsed', asy
 	assert.deepEqual(await carried.readOptional('designations.json', designationsSchema), file);
 });
 
-test('a file that is there but wrong fails the build by name', async () => {
+void test('a file that is there but wrong fails the build by name', async () => {
 	const bad = {
 		readAt: '2026-10-21T11:00:00.000Z',
 		source: 'x',
