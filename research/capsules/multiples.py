@@ -6,15 +6,15 @@ words, so the number rules could not see it. A multiple is refused unless two fi
 or the sentence before it ("he is running at barely half of that"), stand within a tenth of the ratio
 it names (a hedge, "almost double", gets no wider room).
 
-What counts as a multiple (the re-review's N5 and N6, ruled):
+What counts as a multiple (the re-reviews' N5, N6 and R2-H1, ruled):
 - a verb that names one: "doubled", "doubles", "tripled", "triples", "halved", "halves";
 - "2x" or "3x", and "one and a half times";
-- "double", "twice", "triple", "half", "two times" or "three times" comparing two figures: before "as"
-  ("twice as many"), before what was expected or "that" standing alone ("half of what we expected",
-  "half of that"), before a figure's name ("double our number", "twice his pace", "triple the
-  projection"), or before a per-game figure ("triple the 4.1 a game we expected").
-Never "half of his targets", "half a chance", "half the season", a "double-digit" week, a "double
-team", "he scored twice".
+- "double", "twice", "triple", "half", "two times" or "three times" when hedged ("almost double", "close
+  to half") or followed by an object ("double it", "twice the 14.1", "half of his 14.1", "twice as many"),
+  whatever comes after.
+Exempt, by name only, the non-comparisons: "half of his targets" (half of a counted thing), "half a
+chance", "half the season", "half our guys", "twice a week", a "double-digit" week, a "double team",
+"double coverage", the "second half", and "he scored twice" (no object, no hedge).
 """
 
 import re
@@ -43,23 +43,28 @@ _WORD_RATIOS: Final = {
     "triple": 3.0,
     "three times": 3.0,
 }
-# The names of figures a multiple compares: a pace, a number, a projection, an average.
-_FIGURE_NAMES: Final = (
-    r"number|numbers|pace|projection|expectation|expectations|average|rate|mark|total|output|figure|"
-    r"scoring|production|preseason\s+number|preseason\s+pace"
-)
-_COMPARED: Final = (
-    r"\s+(?:as\b"
-    r"|(?:of\s+)?what\b"
-    r"|(?:of\s+)?(?:that|those)(?=\s*(?:[,.;:!?]|$|\s+(?:a|per)\s+game))"
-    rf"|(?:of\s+)?(?:our|his|her|their|the|its|that)\s+(?:[a-z0-9'-]+\s+){{0,2}}?(?:{_FIGURE_NAMES})\b"
-    r"|(?:of\s+)?(?:our|his|her|their|the|its)\s+\d+(?:\.\d+)?\s*(?:points?\s+)?(?:a|per)\s+game\b)"
-)
+_HEDGE: Final = r"(?:almost|nearly|about|roughly|barely|just|more than|less than|over|under|close to)"
+_OBJECT: Final = r"\s+(?:of\s+)?(?:as|the|his|her|that|what|our|its|their|him|it|this|those|a|an)\b"
 _MULTIPLE: Final = re.compile(
     rf"\b(?P<verb>{'|'.join(_VERB_RATIOS)})\b"
     r"|\b(?P<times>[23])x\b"
     r"|\b(?P<one_half>one and a half times)\b"
-    rf"|\b(?P<word>{'|'.join(_WORD_RATIOS)})\b(?={_COMPARED})",
+    r"|(?<!first )(?<!second )(?<!back )(?<!front )(?<!other )(?<!later )(?<!early )"
+    rf"\b(?P<hedge>{_HEDGE}\s+)?(?P<word>{'|'.join(_WORD_RATIOS)})\b(?P<object>{_OBJECT})?",
+    re.IGNORECASE,
+)
+# The names of figures a multiple compares: never the counted thing "half of his ..." is half of.
+_FIGURE_NAMES: Final = (
+    r"number|numbers|pace|projection|projected|expectation|expectations|average|rate|mark|total|output|"
+    r"figure|scoring|production|preseason|points?|we|you|they|he|she|a|an|per"
+)
+# The non-comparisons, read from the comparison word on, each exempt by name.
+_NOT_A_COMPARISON: Final = re.compile(
+    r"half\s+(?:of\s+)?(?:his|her|their|the|our|its)\s+(?:\d+(?:\.\d+)?\s+)?"
+    rf"(?!(?:{_FIGURE_NAMES})\b)[a-z][a-z'-]*"
+    r"|half\s+an?\s+(?!\d)[a-z]"
+    r"|twice\s+an?\s+(?:week|game|day|month|season|year|quarter|half|night)\b"
+    r"|double[\s-](?:digits?|teams?|teamed|coverage)\b",
     re.IGNORECASE,
 )
 # A season or a year is a date, never one side of a multiple.
@@ -88,8 +93,18 @@ def _ratio(match: re.Match[str]) -> float:
     return _WORD_RATIOS[re.sub(r"\s+", " ", match.group("word").lower())]
 
 
+def _is_claim(match: re.Match[str], sentence: str) -> bool:
+    if match.group("word") is None:
+        return True
+    if match.group("hedge") is None and match.group("object") is None:
+        return False
+    return _NOT_A_COMPARISON.match(sentence, match.start("word")) is None
+
+
 def _claims(sentence: str) -> list[tuple[str, float]]:
-    return [(match.group(0), _ratio(match)) for match in _MULTIPLE.finditer(sentence)]
+    return [
+        (match.group(0).strip(), _ratio(match)) for match in _MULTIPLE.finditer(sentence) if _is_claim(match, sentence)
+    ]
 
 
 def multiple_violations(text: str) -> list[str]:
