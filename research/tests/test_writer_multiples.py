@@ -19,6 +19,11 @@ from research.capsules.rule_notes import notes_of
         "Our preseason pace was 5.7 a game. He is running at barely half of that, 3.8 a game.",
         "He is scoring triple the 4.1 a game we expected, at 9.0.",
         "That is twice as many targets, 18 against 12.",
+        # The re-review's N6: the other forms of the claim.
+        "His targets halved, from 30 to 20.",
+        "That doubles his 7.0 a game, at 12.0.",
+        "It was a 2x jump, 9.0 against 6.0.",
+        "He is at one and a half times his 8.0 a game, at 16.0.",
     ],
 )
 def test_a_multiple_the_figures_do_not_make_is_refused(text: str) -> None:
@@ -39,6 +44,15 @@ def test_a_multiple_the_figures_do_not_make_is_refused(text: str) -> None:
         "He scored twice in week 5 of 2026.",
         "The second half of 2025 was his best stretch.",
         "He drew a double team in week 2 of 2026.",
+        "His targets halved, from 30 to 15.",
+        "That doubles his 7.0 a game, at 14.0.",
+        "It was a 2x jump, 9.0 against 4.5.",
+        "He is at one and a half times his 8.0 a game, at 12.0.",
+        # The re-review's N5: "half" that compares no two figures.
+        "Half of his targets came late in 2025.",
+        "He has half a chance to start in week 7 of 2026.",
+        "He missed half the season in 2025.",
+        "Half of his 12 catches came in week 2 of 2026.",
     ],
 )
 def test_a_multiple_the_figures_make_or_another_sense_passes(text: str) -> None:
@@ -46,7 +60,7 @@ def test_a_multiple_the_figures_make_or_another_sense_passes(text: str) -> None:
 
 
 def test_a_season_is_never_one_side_of_a_multiple() -> None:
-    assert multiple_violations("In 2026 he is scoring double his 1013 yards.") != []
+    assert multiple_violations("In 2026 he is scoring double his 2025 output, 1013 yards.") != []
 
 
 def test_the_writer_is_told_and_the_correction_and_note_name_the_sentence() -> None:
