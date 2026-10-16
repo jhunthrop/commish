@@ -39,8 +39,11 @@
 
 	async function readKickoffs(): Promise<Kickoffs> {
 		const response = await fetch(resolve('/data/kickoffs.json'));
-		if (!response.ok) throw new Error('The run carries no kickoffs.');
-		return response.json<Kickoffs>();
+		if (response.ok) return response.json<Kickoffs>();
+		// The rows go without their games: the one record of why, for whoever has the console open.
+		// eslint-disable-next-line no-console -- no user-facing text: the screen stands without kickoffs
+		console.warn('Matchup: kickoffs', response.status);
+		return {};
 	}
 
 	async function read(): Promise<Week> {
@@ -49,7 +52,11 @@
 			boardFormat = sync.board_format;
 			board = loadBoard(sync.board_format, sync.byes);
 		}
-		kickoffs ??= readKickoffs().catch(() => ({}));
+		kickoffs ??= readKickoffs().catch((error: unknown) => {
+			// eslint-disable-next-line no-console -- no user-facing text: the screen stands without kickoffs
+			console.warn('Matchup: kickoffs', error);
+			return {};
+		});
 		return { sync, board: await board, kickoffs: await kickoffs, read_at: sync.read_at };
 	}
 
