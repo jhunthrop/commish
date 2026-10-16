@@ -347,8 +347,10 @@ def describe_fallback(compact: ReadResult, full: ReadResult) -> str:
         return "llm"
     if any(r.kind == BUDGET_SPENT for r in reasons):
         return "facts (the run's budget is spent)"
-    if any(r.kind in (THROTTLED, UNUSABLE) for r in reasons):
+    if any(r.kind == THROTTLED for r in reasons):
         return "facts (throttled)"
+    if any(r.kind == UNUSABLE for r in reasons):
+        return "facts (the gateway's answer was refused, empty or cut)"
     failed = next((r for r in reasons if r.kind == "failed_validation"), None)
     return "facts (fell back)" if failed is None else f"facts (failed validation: {failed.first_violation})"
 

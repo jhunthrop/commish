@@ -127,6 +127,9 @@ def test_a_refused_request_or_a_degenerate_completion_is_not_waited_out() -> Non
         result = _write(gateway)
         assert result.source == "facts"
         assert gateway.slept == []
+        assert (
+            describe_fallback(result.compact, result.full) == "facts (the gateway's answer was refused, empty or cut)"
+        )
 
 
 @pytest.mark.usefixtures("quiet_page")
