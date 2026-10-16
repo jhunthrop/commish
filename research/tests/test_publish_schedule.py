@@ -20,7 +20,7 @@ def test_the_publish_scheduler_job_fires_every_hour() -> None:
 
 def test_the_web_backstop_fires_every_hour() -> None:
     workflow = (REPO_ROOT / ".github" / "workflows" / "web.yml").read_text()
-    assert "- cron: '30 * * * *'" in workflow
+    assert "- cron: '30 * * * *'" in workflow or '- cron: "30 * * * *"' in workflow
 
 
 def test_a_missing_dispatch_token_names_the_hourly_rebuild() -> None:
