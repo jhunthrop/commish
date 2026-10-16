@@ -13,8 +13,9 @@ What counts as a multiple (the re-reviews' N5, N6 and R2-H1, ruled):
   to half") or followed by an object ("double it", "twice the 14.1", "half of his 14.1", "twice as many"),
   whatever comes after.
 Exempt, by name only, the non-comparisons: "half" of a named counted thing with no figure after it
-("half of his targets", "half of his 12 catches", "half the season"; the list is `_COUNTED`, and a week
-or season marker after it is a date, not a figure), "half a chance",
+("half of his targets", "half of his 12 catches", "half the season"; the list is `_COUNTED`) in a
+sentence, and the one before it, that holds no other figure: a week or season marker is a date, not a
+figure, and the count inside the phrase is its own), "half a chance",
 "twice a week", a "double-digit" week, a "double team", "double coverage", the "second half", and "he
 scored twice" (no object, no hedge).
 """
@@ -99,7 +100,7 @@ def _ratio(match: re.Match[str]) -> float:
     return _WORD_RATIOS[re.sub(r"\s+", " ", match.group("word").lower())]
 
 
-def _is_claim(match: re.Match[str], sentence: str) -> bool:
+def _is_claim(match: re.Match[str], sentence: str, before: str) -> bool:
     if match.group("word") is None:
         return True
     if match.group("hedge") is None and match.group("object") is None:
@@ -107,12 +108,19 @@ def _is_claim(match: re.Match[str], sentence: str) -> bool:
     if _NOT_A_COMPARISON.match(sentence, match.start("word")) is not None:
         return False
     count = _HALF_OF_A_COUNT.match(sentence, match.start("word"))
-    return count is None or bool(_figures(_WEEK_MARKER.sub(" ", sentence[count.end() :])))
+    if count is None:
+        return True
+    # A counted noun exempts only a sentence (and the one before it, as `_made_by` reads) that holds no
+    # figure but the count inside the match, a week marker or a year (the re-review's R4-H1).
+    rest = f"{before} {sentence[: count.start()]} {sentence[count.end() :]}"
+    return bool(_figures(_WEEK_MARKER.sub(" ", rest)))
 
 
-def _claims(sentence: str) -> list[tuple[str, float]]:
+def _claims(sentence: str, before: str = "") -> list[tuple[str, float]]:
     return [
-        (match.group(0).strip(), _ratio(match)) for match in _MULTIPLE.finditer(sentence) if _is_claim(match, sentence)
+        (match.group(0).strip(), _ratio(match))
+        for match in _MULTIPLE.finditer(sentence)
+        if _is_claim(match, sentence, before)
     ]
 
 
@@ -127,7 +135,7 @@ def multiple_violations(text: str) -> list[str]:
         violations += [
             f'{MULTIPLE_VIOLATION}, "{phrase}", in the sentence "{sentence}". No two figures there stand in '
             f"that ratio: give the two figures and leave the multiple out."
-            for phrase, ratio in _claims(sentence)
+            for phrase, ratio in _claims(sentence, sentences[index - 1] if index else "")
             if not _made_by(ratio, figures)
         ]
     return violations

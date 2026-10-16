@@ -127,6 +127,11 @@ def test_the_named_non_comparisons_pass(text: str) -> None:
         "He is at 9, half of his old number of 14.1.",
         "He is at 9, half of his career-best 14.1.",
         "He is at 9, half of his targets from 14.1 a game.",
+        # Round 5 (the re-review's R4-H1): a figure anywhere in the sentence, the text before the noun included.
+        "Our 14.1 pace has him at 9, half of his season rate.",
+        "Our 14.1 a game has him at 9, half of his yards per game.",
+        "He had 14.1 last year and is at 9, half of his team's output.",
+        "He is at 9 against 14.1, half of his games played.",
     ],
 )
 def test_half_of_his_anything_but_a_named_count_is_a_claim(text: str) -> None:
