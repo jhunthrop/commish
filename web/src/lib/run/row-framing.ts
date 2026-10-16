@@ -4,7 +4,7 @@
  * the value names the round it ranks in. Once it does, the ADP is the drafts' September order and
  * our rank the rest of the season's: the two are never compared, the ADP stands alone as a fact,
  * and the round goes (the figure and its tint stay). */
-import { roundlessVorCell, vorCell, type VorCellProps } from '#lib/ui/heat.ts';
+import { VOR_LABEL, vorCell, type VorCellProps } from '#lib/ui/heat.ts';
 import type { Format } from './schema.ts';
 
 export interface RowFraming {
@@ -28,6 +28,12 @@ export function rowFraming(format: Pick<Format, 'rosFromWeek'>): RowFraming {
 
 /** The over replacement cell as the framing prints it: its round named only where the row names it,
  * the tint kept either way. */
+/** The value cell with no round named, its tint kept: a row that frames no rank (an in-season board,
+ * a player on a season-long list, a league row for him). */
+export function roundlessVorCell(vor: number, round: number): VorCellProps {
+	return { ...vorCell(vor, round), label: VOR_LABEL };
+}
+
 export function framedVorCell(vor: number, round: number, framing: RowFraming): VorCellProps {
 	return framing.round ? vorCell(vor, round) : roundlessVorCell(vor, round);
 }

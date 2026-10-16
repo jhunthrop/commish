@@ -5,8 +5,14 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { boardBasisTerms } from './board-basis.ts';
-import { HELD_FRAMING, PRESEASON_FRAMING, framedVorCell, rowFraming } from './row-framing.ts';
-import { VOR_LABEL, roundlessVorCell, vorCell } from '#lib/ui/heat.ts';
+import {
+	HELD_FRAMING,
+	PRESEASON_FRAMING,
+	framedVorCell,
+	roundlessVorCell,
+	rowFraming
+} from './row-framing.ts';
+import { VOR_LABEL, vorCell } from '#lib/ui/heat.ts';
 
 void test('a preseason board compares drafters with our rank and names the round', () => {
 	assert.deepEqual(rowFraming({}), { compare: true, round: true });

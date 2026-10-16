@@ -33,9 +33,3 @@ export interface VorCellProps {
 export function vorCell(vor: number, round: number): VorCellProps {
 	return { value: vor, label: vorLabel(vor, round), heat: heatFor(vor, round), signed: true };
 }
-
-/** The value cell with no round named, its tint kept: a row that frames no rank (an in-season board,
- * a player on a season-long list). */
-export function roundlessVorCell(vor: number, round: number): VorCellProps {
-	return { ...vorCell(vor, round), label: VOR_LABEL };
-}

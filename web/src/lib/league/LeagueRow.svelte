@@ -11,7 +11,8 @@
 	import TagChip from '#lib/ui/TagChip.svelte';
 	import ToneChip from '#lib/ui/ToneChip.svelte';
 	import ValueCell from '#lib/ui/ValueCell.svelte';
-	import { roundlessVorCell, vorCell } from '#lib/ui/heat.ts';
+	import { roundlessVorCell } from '#lib/run/row-framing.ts';
+	import { vorCell } from '#lib/ui/heat.ts';
 	import type { LeaguePlayer } from './api.ts';
 	import type { LeagueBoardPlayer } from './board.ts';
 	import { projectionWords, seasonWords } from './model.ts';
