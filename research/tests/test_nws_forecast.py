@@ -78,7 +78,7 @@ def test_a_kickoff_past_the_whole_answer_has_no_values() -> None:
     assert forecast.temperature_f is None and forecast.wind_mph is None and forecast.is_empty
 
 
-def test_an_unknown_unit_or_weather_word_or_a_missing_layer_is_refused() -> None:
+def test_an_unknown_unit_or_weather_word_a_missing_layer_or_a_loose_value_is_refused() -> None:
     recorded = _recorded("grid-GRB-78-31.json")
     unit = copy.deepcopy(recorded)
     unit["properties"]["windSpeed"]["uom"] = "wmoUnit:m_s-1"
@@ -86,7 +86,9 @@ def test_an_unknown_unit_or_weather_word_or_a_missing_layer_is_refused() -> None
     word["properties"]["weather"]["values"][0]["value"][0]["weather"] = "meteor_shower"
     missing = copy.deepcopy(recorded)
     del missing["properties"]["windGust"]
-    for broken in (unit, word, missing):
+    loose = copy.deepcopy(recorded)
+    loose["properties"]["temperature"]["values"].insert(0, "12.5")
+    for broken in (unit, word, missing, loose):
         with pytest.raises(SchemaDriftError):
             kickoff_forecast(broken, DAL_AT_GB)
 

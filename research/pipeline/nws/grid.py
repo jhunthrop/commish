@@ -103,12 +103,17 @@ def _interval(valid_time: object) -> tuple[datetime, timedelta]:
     return datetime.fromisoformat(start), parse_duration(duration)
 
 
+def _entries(layer: Mapping[str, Any]) -> list[Mapping[str, Any]]:
+    """A layer's values, each an object, or the answer is refused."""
+    values = layer.get("values")
+    if not isinstance(values, list) or not all(isinstance(entry, dict) for entry in values):
+        raise SchemaDriftError("A weather service layer's values are not a list of objects.")
+    return values
+
+
 def _at(layer: Mapping[str, Any], kickoff: datetime) -> tuple[object, timedelta] | None:
     """The layer's value for the interval holding the kickoff, and that interval's length."""
-    values = layer.get("values")
-    if not isinstance(values, list):
-        raise SchemaDriftError("A weather service layer has no list of values.")
-    for entry in values:
+    for entry in _entries(layer):
         start, length = _interval(entry.get("validTime"))
         if start <= kickoff < start + length:
             return entry.get("value"), length
@@ -154,7 +159,7 @@ def _kind(properties: Mapping[str, Any], kickoff: datetime) -> int | None:
     """The most severe kind the kickoff interval names. Every interval's words are checked, so a
     word the service adds is refused the hour it first appears, wherever it falls."""
     layer = _layer(properties, "weather")
-    for entry in layer.get("values") or []:
+    for entry in _entries(layer):
         _kinds(entry.get("value"))
     found = _at(layer, kickoff)
     if found is None:

@@ -5,12 +5,12 @@ not confirm takes none rather than another place's weather."""
 
 import os
 from collections.abc import Iterator, Mapping
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
 import pytest
-from sqlalchemy import Connection, Engine, delete, select, update
+from sqlalchemy import Connection, Engine, delete, func, select, update
 
 from research.db.engine import make_engine
 from research.db.schema import NFLVERSE_GAMES, NWS_GRID_POINTS, TEAM_WEEK_OBSERVATIONS
@@ -28,6 +28,8 @@ _RESEARCH = Path(__file__).resolve().parents[1]
 _DATA = Path(__file__).resolve().parent / "testdata" / "nws"
 _DATABASE = "parity_test_nws_forecast"
 SEASON = 2026
+WEEK_SIX = 6
+HTTP_SERVER_ERROR = 503
 FRIDAY = datetime(2026, 10, 16, 21, 5, tzinfo=UTC)
 NEXT_TUESDAY = datetime(2026, 10, 20, 14, 5, tzinfo=UTC)
 # The games the recorded grids cover, a dome and a game abroad; the rest of weeks 6 and 7 are removed.
@@ -121,6 +123,38 @@ def test_a_second_pass_in_the_same_hour_asks_nothing(engine: Engine) -> None:
         result = run_forecast_pass(conn, NwsClient(fetcher, sleep=lambda _s: None), FRIDAY.replace(minute=40))
     assert fetcher.asked == []
     assert {o.game_id: o.status for o in result.outcomes}["2026_06_DAL_GB"] == "fresh"
+
+
+class _Down:
+    """The weather service answering every request with a server error."""
+
+    def __init__(self) -> None:
+        self.asked: list[str] = []
+
+    def get(self, url: str, headers: Mapping[str, str] | None = None) -> HttpResponse:
+        self.asked.append(url)
+        return HttpResponse(HTTP_SERVER_ERROR, b"")
+
+    def stream(self, url: str, headers: Mapping[str, str] | None = None) -> Any:
+        raise NotImplementedError
+
+
+def test_a_failed_grid_read_writes_nothing_and_the_earlier_forecast_stays_newest(engine: Engine) -> None:
+    an_hour_on = FRIDAY + timedelta(hours=1)
+    fetcher = _Down()
+    with engine.begin() as conn:
+        result = run_forecast_pass(conn, NwsClient(fetcher, sleep=lambda _s: None), an_hour_on)
+        table = TEAM_WEEK_OBSERVATIONS
+        newest = conn.execute(
+            select(func.max(table.c.as_of)).where(
+                table.c.source == FORECAST_SOURCE, table.c.season == SEASON, table.c.week == WEEK_SIX
+            )
+        ).scalar_one()
+    (failed,) = result.failed
+    assert (failed.game_id, result.written) == ("2026_06_DAL_GB", 0)
+    # The stored cell is read first: the grid alone was asked, and asked again once after the pause.
+    assert fetcher.asked == ["https://api.weather.gov/gridpoints/GRB/78,31"] * 2
+    assert newest == FRIDAY
 
 
 def test_next_tuesday_opens_week_seven_and_reads_its_thursday_game(engine: Engine) -> None:

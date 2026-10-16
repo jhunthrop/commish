@@ -131,7 +131,6 @@ class GameVenue:
     roof: str | None
     surface: str | None
     played: bool
-    neutral: bool
 
 
 def _list(raw: str) -> tuple[str, ...]:
@@ -173,10 +172,7 @@ def parse_stadiums_csv(text: str) -> list[StadiumRow]:
 
 def game_venues(games: Iterable[GameRow]) -> list[GameVenue]:
     return [
-        GameVenue(
-            g.season, g.gameday, g.stadium_id, g.stadium, g.roof, g.surface, g.result is not None, g.location != "Home"
-        )
-        for g in games
+        GameVenue(g.season, g.gameday, g.stadium_id, g.stadium, g.roof, g.surface, g.result is not None) for g in games
     ]
 
 
@@ -286,7 +282,6 @@ def stored_game_venues(conn: Connection) -> list[GameVenue]:
         table.c.roof,
         table.c.surface,
         table.c.result.is_not(None).label("played"),
-        (table.c.location != "Home").label("neutral"),
     )
     return [GameVenue(*r) for r in conn.execute(query)]
 
