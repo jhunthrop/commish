@@ -158,6 +158,33 @@ func porWords(b OrderBasis, weeks int) string {
 		"position gives you, a week: %s, averaged over its %s, not a projection of any one week.", span, weekCount(weeks))
 }
 
+// slotNames is a slot type as a lineup row labels it (the web's
+// slotLabels).
+var slotNames = map[draft.SlotType]string{draft.SlotFlex: "Flex", draft.SlotSuperflex: "Superflex"}
+
+// SlotLabel is slots[i] as a lineup row labels it, numbered where the
+// lineup has more than one alike: "QB", "RB2", "Flex", "Flex 2".
+func SlotLabel(slots []Slot, i int) string {
+	s := slots[i]
+	name, long := slotNames[s.Type]
+	if !long {
+		name = string(s.Type)
+	}
+	alike := 0
+	for _, o := range slots {
+		if o.Type == s.Type {
+			alike++
+		}
+	}
+	switch {
+	case alike < 2:
+		return name
+	case long:
+		return fmt.Sprintf("%s %d", name, s.Index+1)
+	}
+	return fmt.Sprintf("%s%d", name, s.Index+1)
+}
+
 // weekCount is "11 weeks", "one week".
 func weekCount(n int) string {
 	if n == 1 {
@@ -232,6 +259,12 @@ func WaiversBasis(b OrderBasis, weeks int) string {
 // OnlyCloseCalls is a team's line when every trade found with it is a
 // close call for them.
 const OnlyCloseCalls = "Every trade we found with this team is a close call for them."
+
+// TradeCheckBasis is the trade builder's: the finder's line for a trade
+// the member built, which either lineup may gain or lose by.
+func TradeCheckBasis(b OrderBasis, weeks int) string {
+	return fmt.Sprintf("What each lineup gains or loses on %s. The other team decides. %s", numberWords(b), porWords(b, weeks))
+}
 
 // TradesBasis is the trade finder's (§6.3).
 func TradesBasis(b OrderBasis, weeks int) string {

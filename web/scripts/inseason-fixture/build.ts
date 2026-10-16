@@ -676,6 +676,7 @@ function trades(): TradeAdvice {
 			name: teamName(r),
 			owner: ownerName(r),
 			record: { wins: r.settings.wins, losses: r.settings.losses, ties: r.settings.ties },
+			roster: rosterByPosition(lines.get(r.roster_id) ?? []),
 			trades: tradesWith(lines.get(r.roster_id) ?? [])
 		}))
 		.map((team) => ({
@@ -689,6 +690,7 @@ function trades(): TradeAdvice {
 		...head(
 			`Trades where both lineups gain on our rest-of-season order. The other team decides. ${basisTail}`
 		),
+		check_basis: `What each lineup gains or loses on our rest-of-season order. The other team decides. ${basisTail}`,
 		teams,
 		roster: rosterByPosition(myLines),
 		host_trades_url: `https://sleeper.com/leagues/${league.league_id}/team`,

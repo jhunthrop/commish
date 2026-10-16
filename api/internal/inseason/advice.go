@@ -395,7 +395,7 @@ func (a *advisor) Trades(focus string) (apitypes.TradeAdvice, bool) {
 	squad := a.squad(mine, true)
 	h := a.header()
 	out := apitypes.TradeAdvice{Week: h.week, Basis: TradesBasis(a.basis, a.weeks), BasisNote: BasisNote(a.settings), OrderBasis: h.basis, Refreshed: h.refreshed,
-		ReadAt: h.readAt, Teams: []apitypes.TradeTeam{}, Roster: rosterLines(mine)}
+		ReadAt: h.readAt, Teams: []apitypes.TradeTeam{}, Roster: rosterLines(mine), CheckBasis: TradeCheckBasis(a.basis, a.weeks)}
 	out.HostTradesUrl, out.HostNote = a.host(TradesPage)
 	for _, t := range leaguesync.Standings(a.Snap.Teams) {
 		if t.RosterID == a.Me {
@@ -403,16 +403,10 @@ func (a *advisor) Trades(focus string) (apitypes.TradeAdvice, bool) {
 		}
 		theirs := a.active(t)
 		row := apitypes.TradeTeam{RosterId: t.RosterID, Name: t.Name, Owner: t.Owner,
-			Record: apitypes.TradeRecord{Wins: t.Wins, Losses: t.Losses, Ties: t.Ties}, Trades: []apitypes.TradeRow{}}
+			Record: apitypes.TradeRecord{Wins: t.Wins, Losses: t.Losses, Ties: t.Ties}, Roster: rosterLines(theirs), Trades: []apitypes.TradeRow{}}
 		close := 0
 		for _, tr := range Trades(a.config, a.weeks, squad, a.squad(theirs, false), focus, TradesPerTeam) {
-			wire := apitypes.TradeRow{Give: lines(mine, tr.Give), Get: lines(theirs, tr.Get),
-				MyGain: roundTenth(tr.MyGain), TheirGain: roundTenth(tr.TheirGain), CloseForThem: tr.CloseForThem()}
-			if tr.Drop >= 0 {
-				drop := mine[tr.Drop].line
-				wire.Drop = &drop
-			}
-			row.Trades = append(row.Trades, wire)
+			row.Trades = append(row.Trades, tradeRow(mine, theirs, tr))
 			if tr.CloseForThem() {
 				close++
 			}

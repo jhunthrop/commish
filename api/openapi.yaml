@@ -419,6 +419,38 @@ paths:
         "409": { $ref: "#/components/responses/ErrorResponse" }
         "422": { $ref: "#/components/responses/ErrorResponse" }
         "502": { $ref: "#/components/responses/ErrorResponse" }
+  /leagues/attached/{id}/trades/check:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: the attached league's id (AttachedLeague.id)
+        schema: { type: string, format: uuid }
+    post:
+      tags: [league-sync]
+      operationId: checkLeagueTrade
+      summary: >-
+        The trade builder: one trade the drafter built with one other team, one or two players a side at QB, RB, WR
+        or TE from the two rosters as the league's last read holds them, answered with the finder's own figures (the
+        same engine, so a trade the finder lists answers its numbers): each lineup's gain or loss on our order, the
+        drop a full roster makes for two in, and whether each roster still fills every slot. A player not on the
+        named roster, a kicker, a defense, or a player on injured reserve or the taxi squad answers 422 with the
+        sentence naming him. We never send an offer.
+      security: [{ session: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/TradeCheckInput" }
+      responses:
+        "200": { $ref: "#/components/responses/TradeCheckResponse" }
+        "400": { $ref: "#/components/responses/ErrorResponse" }
+        "404": { $ref: "#/components/responses/ErrorResponse" }
+        "409": { $ref: "#/components/responses/ErrorResponse" }
+        "415": { $ref: "#/components/responses/ErrorResponse" }
+        "422": { $ref: "#/components/responses/ErrorResponse" }
+        "429": { $ref: "#/components/responses/ErrorResponse" }
+        "502": { $ref: "#/components/responses/ErrorResponse" }
   /leagues/attached/{id}/moves/plan:
     parameters:
       - name: id
@@ -1661,6 +1693,14 @@ components:
             allOf:
               - $ref: "#/components/schemas/Envelope"
               - properties: { data: { $ref: "#/components/schemas/TradeAdvice" } }
+    TradeCheckResponse:
+      description: one trade the drafter built, with each lineup's change
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: "#/components/schemas/Envelope"
+              - properties: { data: { $ref: "#/components/schemas/TradeCheck" } }
     AttachPreviewResponse:
       description: a league's name and teams, before it is attached
       content:
@@ -3092,12 +3132,18 @@ components:
         close_for_them: { type: boolean, description: their gain is under 0.5 a week }
     TradeTeam:
       type: object
-      required: [roster_id, name, owner, record, trades, note]
+      required: [roster_id, name, owner, record, roster, trades, note]
       properties:
         roster_id: { type: integer }
         name: { type: string }
         owner: { type: string }
         record: { $ref: "#/components/schemas/TradeRecord" }
+        roster:
+          type: array
+          description: >-
+            every player on their active roster (injured reserve and taxi spots left out), by position then name: the
+            builder's players on their side
+          items: { $ref: "#/components/schemas/PlayerLine" }
         trades:
           type: array
           description: >-
@@ -3238,9 +3284,12 @@ components:
         answered_at: { type: string, format: date-time, nullable: true }
     TradeAdvice:
       type: object
-      required: [week, basis, basis_note, order_basis, refreshed, read_at, teams, roster, host_trades_url, host_note]
+      required: [week, basis, basis_note, order_basis, refreshed, read_at, teams, roster, host_trades_url, host_note, check_basis]
       properties:
         week: { type: integer }
+        check_basis:
+          type: string
+          description: the trade builder's honesty line, shown before its first answer (TradeCheck.basis says the same)
         roster:
           type: array
           description: >-
@@ -3264,6 +3313,61 @@ components:
           description: >-
             one sentence under the verb when we cannot open the host's page ("Make this change on Yahoo. We cannot
             open that page for you yet."), null when the url opens it
+    TradeCheckInput:
+      type: object
+      required: [team, give, get]
+      properties:
+        team: { type: integer, description: "the other team's roster_id (TradeTeam.roster_id)" }
+        give:
+          type: array
+          minItems: 1
+          maxItems: 2
+          description: "host ids (LeaguePlayer.host_id) of one or two of the drafter's players: every rostered player has one, placed on our board or not"
+          items: { type: string, minLength: 1, maxLength: 64 }
+        get:
+          type: array
+          minItems: 1
+          maxItems: 2
+          description: host ids of one or two of theirs
+          items: { type: string, minLength: 1, maxLength: 64 }
+    TradeFills:
+      type: object
+      required: [yours, theirs, yours_open, theirs_open, yours_room, theirs_room]
+      properties:
+        yours: { type: boolean, description: "the drafter's roster still fills every slot it filled before the trade" }
+        theirs: { type: boolean, description: the same for theirs }
+        yours_open:
+          type: string
+          nullable: true
+          description: >-
+            the first slot the drafter's lineup would leave empty, as a lineup row labels it ("RB2", "TE", "Flex"),
+            null when it fills every slot
+        theirs_open: { type: string, nullable: true, description: the same for theirs }
+        yours_room:
+          type: boolean
+          description: >-
+            the drafter's roster has room for what it takes in: an open spot, or a player to drop (trade.drop) when it
+            takes in more than it gives; false when every player it could drop is a starter after the trade, held, or
+            its only kicker or defense
+        theirs_room: { type: boolean, description: "the same for theirs (their drop is theirs to choose, so it is not named)" }
+    TradeCheck:
+      type: object
+      required: [week, basis, basis_note, order_basis, refreshed, read_at, trade, fills, host_trades_url, host_note]
+      properties:
+        week: { type: integer }
+        basis: { type: string, description: the honesty line beside the answer }
+        basis_note: { type: string }
+        order_basis: { $ref: "#/components/schemas/OrderBasis" }
+        refreshed: { type: string, format: date-time }
+        read_at: { type: string, format: date-time }
+        trade:
+          allOf: [{ $ref: "#/components/schemas/TradeRow" }]
+          description: >-
+            the trade as the finder reckons one: my_gain and their_gain fall below zero for a lineup that loses,
+            close_for_them as the finder marks it
+        fills: { $ref: "#/components/schemas/TradeFills" }
+        host_trades_url: { type: string, description: "the host's trade page, the finder's, empty when we know none" }
+        host_note: { type: string, nullable: true, description: "as TradeAdvice's" }
     LeagueMove:
       type: object
       required: [kind, at, roster_ids, adds, drops]

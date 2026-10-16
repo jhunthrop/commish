@@ -7,7 +7,17 @@
 	import type { LeagueHost } from '../api.ts';
 	import LineRow from './LineRow.svelte';
 	import Screen from './Screen.svelte';
-	import type { TradeAdvice, TradeRow, TradeTeam } from './api.ts';
+	import PickSelect, { type PickGroup, type PickOption } from './PickSelect.svelte';
+	import TradeBuilder from './TradeBuilder.svelte';
+	import type {
+		PlayerLine,
+		TradeAdvice,
+		TradeCheck,
+		TradeCheckInput,
+		TradeRow,
+		TradeTeam
+	} from './api.ts';
+	import { BUILDER_LINES, builtFrom, type Picks } from './builder.ts';
 	import {
 		Narrowing,
 		bestTrade,
@@ -36,15 +46,38 @@
 	 * calls for them, as the API orders them; a team with only close calls says so. A player
 	 * picked reads the trades holding him again, so no team's list is cut to its first trades.
 	 * Propose marks a trade as the decision, by who is in it, so the minute's re-read never moves the
-	 * mark to another trade; the one verb opens the host's trade page. We never send an offer. */
+	 * mark to another trade; the one verb opens the host's trade page. We never send an offer.
+	 * Build a trade, over the rows, opens the builder for a trade the member has in mind; a row's
+	 * Build from this opens it with that trade filled. While it is open its verb is the screen's. */
 	interface Props {
 		advice: TradeAdvice;
 		host: LeagueHost;
 		/** Reads the trades holding one player, by his board id. */
 		narrow: (player: string) => Promise<TradeAdvice>;
+		/** Checks one trade the member built. */
+		check: (trade: TradeCheckInput) => Promise<TradeCheck>;
 	}
 
-	let { advice, host, narrow }: Props = $props();
+	let { advice, host, narrow, check }: Props = $props();
+
+	/** The builder's id, for the verb that opens it. */
+	const BUILDER_ID = 'trade-builder';
+
+	/** The trade the builder opened with, and a count that makes it again for each opening; null
+	 * while it is closed. */
+	let building = $state<{ picks: Picks; opening: number } | null>(null);
+	let openings = 0;
+
+	function build(picks: Picks): void {
+		openings += 1;
+		building = { picks, opening: openings };
+	}
+
+	/** Build a trade with the first team that has a trade found, else the first team. */
+	function buildNew(): void {
+		const first = shown.teams.find((t) => t.trades.length > 0) ?? shown.teams[0];
+		build({ team: first?.roster_id ?? null, give: [], get: [] });
+	}
 
 	/** Trades a team shows before its Show more. */
 	const FIRST_TRADES = 2;
@@ -64,11 +97,22 @@
 	/** The teams opened past their first trades. */
 	let opened = $state<ReadonlySet<number>>(new Set());
 
+	const pickOption = (line: PlayerLine): PickOption => ({
+		value: pickKey(line),
+		label: line.player.name
+	});
+
 	const holds = (row: TradeRow, id: string): boolean =>
 		[...row.give, ...row.get].some((line) => line.player.board_id === id);
 
 	/** Every player on your roster (a trade found or not), then theirs from the trades, each once. */
 	const players = $derived(pickerPlayers(advice.roster, advice.teams));
+	/** The picker's choices: every trade, then your players and theirs. */
+	const pickGroups = $derived<PickGroup[]>([
+		{ label: null, options: [{ value: '', label: EVERY_TRADE }] },
+		{ label: LINES.yourPlayers, options: players.yours.map(pickOption) },
+		{ label: LINES.theirPlayers, options: players.theirs.map(pickOption) }
+	]);
 	/** The picked player's name, for the sentence when no trade holds him. */
 	const pickedName = $derived(
 		[...players.yours, ...players.theirs].find((l) => pickKey(l) === player)?.player.name ?? ''
@@ -119,6 +163,7 @@
 {#snippet trade(team: TradeTeam, row: TradeRow)}
 	{@const key = tradeKey(team.roster_id, row)}
 	{@const on = marked === key}
+	{@const filled = builtFrom(team, row)}
 	<div class="trade" class:on>
 		{#each row.give as line (line.player.host_id)}<LineRow {line} slot={LINES.give} />{/each}
 		{#each row.get as line (line.player.host_id)}<LineRow {line} slot={LINES.get} />{/each}
@@ -126,6 +171,11 @@
 		<div class="gains">
 			<p>{tradeGains(row)}</p>
 			{#if row.close_for_them}<ToneChip tone="even">{CLOSE_FOR_THEM}</ToneChip>{/if}
+			{#if filled}
+				<Quiet size="sm" controls={BUILDER_ID} onclick={() => build(filled)}
+					>{BUILDER_LINES.fromThis}</Quiet
+				>
+			{/if}
 			<Quiet size="sm" onclick={() => (marked = on ? null : key)}
 				>{on ? LINES.chosen : LINES.propose}</Quiet
 			>
@@ -143,27 +193,38 @@
 	hostNote={shown.host_note}
 	basis={shown.basis}
 	basisNote={shown.basis_note}
+	panelVerb={building !== null}
 >
+	{#snippet move()}
+		{#if building}
+			{#key building.opening}
+				<TradeBuilder
+					id={BUILDER_ID}
+					teams={advice.teams}
+					roster={advice.roster}
+					{host}
+					start={building.picks}
+					basis={advice.check_basis}
+					href={advice.host_trades_url}
+					hostNote={advice.host_note}
+					{check}
+					onclose={() => (building = null)}
+				/>
+			{/key}
+		{/if}
+	{/snippet}
 	<div class="tools">
-		<label class="pick">
-			<span>{LINES.tradesHolding}</span>
-			<select
+		<div class="lead">
+			<PickSelect
+				label={LINES.tradesHolding}
 				value={player ?? ''}
-				onchange={(event) => void pick(event.currentTarget.value || null)}
+				groups={pickGroups}
+				onchange={(value: string) => void pick(value === '' ? null : value)}
+			/>
+			<Quiet size="sm" controls={BUILDER_ID} expanded={building !== null} onclick={buildNew}
+				>{BUILDER_LINES.open}</Quiet
 			>
-				<option value="">{EVERY_TRADE}</option>
-				<optgroup label={LINES.yourPlayers}>
-					{#each players.yours as line (line.player.host_id)}
-						<option value={pickKey(line)}>{line.player.name}</option>
-					{/each}
-				</optgroup>
-				<optgroup label={LINES.theirPlayers}>
-					{#each players.theirs as line (line.player.host_id)}
-						<option value={pickKey(line)}>{line.player.name}</option>
-					{/each}
-				</optgroup>
-			</select>
-		</label>
+		</div>
 		<Label>{LINES.perWeek}</Label>
 	</div>
 	{#if problem}<ProblemLine>{problem}</ProblemLine>{/if}
@@ -199,25 +260,17 @@
 		gap: var(--s-2) var(--s-4);
 	}
 
-	.pick {
+	/* The picker and Build a trade share one line down to a phone's width: the picker gives way. */
+	.lead {
 		display: flex;
 		align-items: center;
-		gap: var(--s-2);
+		gap: var(--s-3);
 		min-width: 0;
-		font-size: var(--t-sm);
-		color: var(--ink-2);
+		max-width: 100%;
 	}
 
-	select {
-		height: 36px;
-		max-width: 100%;
-		min-width: 0;
-		border: 1px solid var(--line-strong);
-		border-radius: var(--r-md);
-		background: var(--surface);
-		color: var(--ink);
-		padding: 0 var(--s-2);
-		font: inherit;
+	.lead > :global(*:last-child) {
+		flex: none;
 	}
 
 	/* While a player's trades are read, the last answer's stay, quieter. */

@@ -3,6 +3,7 @@
 	import {
 		inSeasonApi,
 		type HostMoveInput,
+		type TradeCheckInput,
 		type WaiverPosition
 	} from '#lib/league/inseason/api.ts';
 	import InSeasonPage from '#lib/league/inseason/InSeasonPage.svelte';
@@ -80,7 +81,12 @@
 			reserve={RESERVE_ROWS.trades}
 		>
 			{#snippet children(advice, host)}
-				<TradeScreen {advice} {host} narrow={(player: string) => inSeasonApi.trades(id, player)} />
+				<TradeScreen
+					{advice}
+					{host}
+					narrow={(player: string) => inSeasonApi.trades(id, player)}
+					check={(trade: TradeCheckInput) => inSeasonApi.checkTrade(id, trade)}
+				/>
 			{/snippet}
 		</InSeasonPage>
 	{:else if data.screen === 'matchup'}

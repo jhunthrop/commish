@@ -2902,6 +2902,9 @@ type TradeAdvice struct {
 	// BasisNote the rest of the basis, said once under the rows: the league the points over replacement are for and the league's rules points so far leave out
 	BasisNote string `json:"basis_note"`
 
+	// CheckBasis the trade builder's honesty line, shown before its first answer (TradeCheck.basis says the same)
+	CheckBasis string `json:"check_basis"`
+
 	// HostNote one sentence under the verb when we cannot open the host's page ("Make this change on Yahoo. We cannot open that page for you yet."), null when the url opens it
 	HostNote *string `json:"host_note"`
 
@@ -2919,6 +2922,62 @@ type TradeAdvice struct {
 	// Teams every other team
 	Teams []TradeTeam `json:"teams"`
 	Week  int         `json:"week"`
+}
+
+// TradeCheck defines model for TradeCheck.
+type TradeCheck struct {
+	// Basis the honesty line beside the answer
+	Basis     string     `json:"basis"`
+	BasisNote string     `json:"basis_note"`
+	Fills     TradeFills `json:"fills"`
+
+	// HostNote as TradeAdvice's
+	HostNote *string `json:"host_note"`
+
+	// HostTradesUrl the host's trade page, the finder's, empty when we know none
+	HostTradesUrl string `json:"host_trades_url"`
+
+	// OrderBasis which order ranks the players: our preseason board, or the rest-of-season order (from week 7, once the API reads it)
+	OrderBasis OrderBasis `json:"order_basis"`
+	ReadAt     time.Time  `json:"read_at"`
+	Refreshed  time.Time  `json:"refreshed"`
+
+	// Trade the trade as the finder reckons one: my_gain and their_gain fall below zero for a lineup that loses, close_for_them as the finder marks it
+	Trade TradeRow `json:"trade"`
+	Week  int      `json:"week"`
+}
+
+// TradeCheckInput defines model for TradeCheckInput.
+type TradeCheckInput struct {
+	// Get host ids of one or two of theirs
+	Get []string `json:"get"`
+
+	// Give host ids (LeaguePlayer.host_id) of one or two of the drafter's players: every rostered player has one, placed on our board or not
+	Give []string `json:"give"`
+
+	// Team the other team's roster_id (TradeTeam.roster_id)
+	Team int `json:"team"`
+}
+
+// TradeFills defines model for TradeFills.
+type TradeFills struct {
+	// Theirs the same for theirs
+	Theirs bool `json:"theirs"`
+
+	// TheirsOpen the same for theirs
+	TheirsOpen *string `json:"theirs_open"`
+
+	// TheirsRoom the same for theirs (their drop is theirs to choose, so it is not named)
+	TheirsRoom bool `json:"theirs_room"`
+
+	// Yours the drafter's roster still fills every slot it filled before the trade
+	Yours bool `json:"yours"`
+
+	// YoursOpen the first slot the drafter's lineup would leave empty, as a lineup row labels it ("RB2", "TE", "Flex"), null when it fills every slot
+	YoursOpen *string `json:"yours_open"`
+
+	// YoursRoom the drafter's roster has room for what it takes in: an open spot, or a player to drop (trade.drop) when it takes in more than it gives; false when every player it could drop is a starter after the trade, held, or its only kicker or defense
+	YoursRoom bool `json:"yours_room"`
 }
 
 // TradeRecord defines model for TradeRecord.
@@ -2950,10 +3009,13 @@ type TradeTeam struct {
 	Name string `json:"name"`
 
 	// Note one sentence when every trade found with this team is a close call for them, else null
-	Note     *string     `json:"note"`
-	Owner    string      `json:"owner"`
-	Record   TradeRecord `json:"record"`
-	RosterId int         `json:"roster_id"`
+	Note   *string     `json:"note"`
+	Owner  string      `json:"owner"`
+	Record TradeRecord `json:"record"`
+
+	// Roster every player on their active roster (injured reserve and taxi spots left out), by position then name: the builder's players on their side
+	Roster   []PlayerLine `json:"roster"`
+	RosterId int          `json:"roster_id"`
 
 	// Trades at most 10: the trades their lineup gains 0.5 a week or more from first, then the close calls for them, each group best for the drafter first
 	Trades []TradeRow `json:"trades"`
@@ -3242,6 +3304,15 @@ type TradeAdviceResponse struct {
 	RequestId string      `json:"request_id"`
 }
 
+// TradeCheckResponse defines model for TradeCheckResponse.
+type TradeCheckResponse struct {
+	Data      TradeCheck `json:"data"`
+	Error     *ErrorBody `json:"error"`
+	Meta      *PageMeta  `json:"meta,omitempty"`
+	Ok        bool       `json:"ok"`
+	RequestId string     `json:"request_id"`
+}
+
 // WaiverAdviceResponse defines model for WaiverAdviceResponse.
 type WaiverAdviceResponse struct {
 	Data      WaiverAdvice `json:"data"`
@@ -3363,6 +3434,9 @@ type MakeHostMoveJSONRequestBody = HostMoveConfirm
 
 // PlanHostMoveJSONRequestBody defines body for PlanHostMove for application/json ContentType.
 type PlanHostMoveJSONRequestBody = HostMoveInput
+
+// CheckLeagueTradeJSONRequestBody defines body for CheckLeagueTrade for application/json ContentType.
+type CheckLeagueTradeJSONRequestBody = TradeCheckInput
 
 // ImportScoringJSONRequestBody defines body for ImportScoring for application/json ContentType.
 type ImportScoringJSONRequestBody = ScoringImportInput

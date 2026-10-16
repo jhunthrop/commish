@@ -122,6 +122,8 @@ Ties and near-ties are shown, not hidden: a trade where their gain is under 0.5 
 
 "Trades where both lineups gain on our rest-of-season order. Nothing here is a price. The other team decides."
 
+Note (Lane 61): as served, this line and the trade builder's ("What each lineup gains or loses on our rest-of-season order. The other team decides.") leave out the price sentence, under the copy rule that "price" never appears on a screen.
+
 ## 7. The API
 
 All under the attached league, signed in, the drafter's own league only (the league's `me` roster). Rate limited as the sync routes. Every response in the envelope. Reads: the LeagueSync view (one upstream read per league per minute as today), the served board for the league's format and shape (`boards.For`), the research schema's 2026 stat lines, schedule and injury captures through the existing Postgres source pattern (`boards.PGSource`), the league's saved `ScoringRules` to score stat lines.

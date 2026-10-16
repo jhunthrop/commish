@@ -145,6 +145,7 @@ const team = (trades: TradeRow[], roster = 4): TradeTeam => ({
 	name: `Team ${String(roster)}`,
 	owner: 'muttdog',
 	record: { wins: 5, losses: 0, ties: 0 },
+	roster: [],
 	trades,
 	note: null
 });
