@@ -11,6 +11,7 @@
 	import Quiet from '#lib/ui/Quiet.svelte';
 	import { choose, switchProblem } from './choose.svelte.ts';
 	import { signInReturn } from './sign-in.ts';
+	import { followThen } from './then-path.ts';
 	import { siteContext } from './context.svelte.ts';
 	import { FOLLOW_ANOTHER, FOLLOW_FIRST, leagueLine, menuLast, phaseWords } from './menu-words.ts';
 	import { FALLBACK_BOARDS, runBoards, type RunBoard } from './run-boards.ts';
@@ -67,8 +68,12 @@
 		if (siteContext.open) readBoards();
 	});
 
+	/** Signed out, the last row signs in to follow a league: back to the follow page, or the league
+	 * screen the visitor was on, never the page they opened the menu from (then-path.ts). */
 	const signInHref = $derived(
-		apiClient(PUBLIC_API_URL).signInUrl(signInReturn(page.url.pathname + page.url.search))
+		apiClient(PUBLIC_API_URL).signInUrl(
+			signInReturn(followThen(page.url.pathname + page.url.search))
+		)
 	);
 	const many = $derived(hasFeature(siteContext.features, 'many_leagues'));
 	const last = $derived(menuLast(siteContext.leagues.length, many));

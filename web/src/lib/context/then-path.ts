@@ -1,5 +1,6 @@
-/** Where the account page may go on to after a sign-in: a path on this site and nothing else. Pure,
- * so the tests read the same rule the page runs. */
+/** Where the account page may go on to after a sign-in: a path on this site and nothing else; and
+ * where a sign-in to follow a league goes on to. Pure, so the tests read the same rule the page runs. */
+import { LEAGUE_START } from '#lib/ui/nav.ts';
 
 /** The account page's parameter naming where to go on after it. */
 export const THEN_PARAM = 'then';
@@ -23,4 +24,14 @@ export function safeThen(value: string | null, origin: string): string | null {
 	// "//evil.example"), and a navigation reads a leading "//" or "/\\" as another host: the path must
 	// start with one "/" and no second slash of either kind.
 	return /^\/(?![/\\])/.test(path) ? path : null;
+}
+
+/** The first path segment of every league page: the follow page and each league's screens. */
+const LEAGUE_SEGMENT = '/league/';
+
+/** Where a sign-in to follow a league goes on to from the page at `path` (its path and query): that
+ * page when it is the follow page (keeping the screen a rail item named) or a league's own, else the
+ * follow page. */
+export function followThen(path: string): string {
+	return path.startsWith(LEAGUE_SEGMENT) ? path : LEAGUE_START;
 }
