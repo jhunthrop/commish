@@ -297,13 +297,16 @@ type Status struct {
 	CurrentWeek int
 	// LiveScoringWeek is the week whose games last scored.
 	LiveScoringWeek int
+	// CompletedWeek is the last week whose games are all final.
+	CompletedWeek int
 }
 
 type wireStatus struct {
 	Status struct {
 		Weeks struct {
-			Current string `json:"CurrentWeek"`
-			Live    string `json:"LiveScoringWeek"`
+			Current   string `json:"CurrentWeek"`
+			Live      string `json:"LiveScoringWeek"`
+			Completed string `json:"CompletedWeek"`
 		} `json:"weeks"`
 		Year string `json:"year"`
 	} `json:"mfl_status"`
@@ -343,8 +346,9 @@ func (w wireStatus) validate() (Status, error) {
 	year, err := strconv.Atoi(w.Status.Year)
 	current, ok1 := count(w.Status.Weeks.Current, maxWeek)
 	live, ok2 := count(w.Status.Weeks.Live, maxWeek)
-	if err != nil || !ValidSeason(year) || !ok1 || !ok2 {
+	completed, ok3 := count(w.Status.Weeks.Completed, maxWeek)
+	if err != nil || !ValidSeason(year) || !ok1 || !ok2 || !ok3 {
 		return Status{}, malformed("status %q", w.Status.Year)
 	}
-	return Status{Season: year, CurrentWeek: current, LiveScoringWeek: live}, nil
+	return Status{Season: year, CurrentWeek: current, LiveScoringWeek: live, CompletedWeek: completed}, nil
 }

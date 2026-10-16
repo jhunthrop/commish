@@ -202,7 +202,7 @@ func leagueSyncService(cfg config.API, pool *pgxpool.Pool, board *draftroom.Boar
 	store := &leaguesync.Store{Pool: pool, Now: now}
 	hostList := leaguesync.Hosts{
 		&leaguesync.Sleeper{API: sleeperAPI, Now: now, Log: log},
-		&leaguesync.MFL{API: mflAPI, Now: now},
+		&leaguesync.MFL{API: mflAPI, Now: now, Log: log},
 	}
 	ffpcHost := ff.host(store, board.Schedule, log)
 	if ffpcHost != nil {

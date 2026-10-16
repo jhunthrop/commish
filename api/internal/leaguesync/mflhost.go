@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"sort"
 	"sync"
 	"time"
@@ -22,16 +23,33 @@ type MFLAPI interface {
 	Transactions(ctx context.Context, season int, id string, week int) ([]mfl.Transaction, error)
 	SeasonStatus(ctx context.Context, season int) (mfl.Status, error)
 	Players(ctx context.Context, season int) ([]mfl.Player, error)
+	DraftResults(ctx context.Context, season int, id string) (mfl.DraftResults, error)
 }
+
+// mflDraftTTL is how long a league's draft results answer is kept while
+// its draft is not done: one more export a league each read would double
+// the reads a league that never drafts on the host (a dynasty league)
+// costs. A done draft is kept for good.
+const mflDraftTTL = time.Hour
 
 // MFL is the MyFantasyLeague host.
 type MFL struct {
 	API MFLAPI
 	Now func() time.Time
+	// Log is where a draft results read that failed is said, nil for none.
+	Log *slog.Logger
 
 	mu       sync.Mutex
 	status   map[int]mfl.Status
 	statusAt map[int]time.Time
+	drafts   map[string]mflDraft
+}
+
+// mflDraft is a league's draft as its results last said, and when.
+type mflDraft struct {
+	status   string
+	unstated bool
+	at       time.Time
 }
 
 // Key is the host's contract name.
@@ -112,6 +130,11 @@ func (m *MFL) Read(ctx context.Context, ref Ref) (Snapshot, error) {
 	if status.Season == ref.Season && status.CurrentWeek >= 1 {
 		snap.Week = status.CurrentWeek
 	}
+	snap.Calendar.PlayoffStartWeek = mflPlayoffStart(league)
+	snap.Status, snap.Calendar.DraftUnstated = m.draftStatus(ctx, ref, snap.Week)
+	if league.EndWeek > 0 && status.Season == ref.Season && status.CompletedWeek >= league.EndWeek {
+		snap.Status = StatusComplete
+	}
 	if snap.Week == 0 {
 		return snap, nil
 	}
@@ -134,6 +157,63 @@ func (m *MFL) Read(ctx context.Context, ref Ref) (Snapshot, error) {
 	snap.Matchups, snap.Moves = mflSides(live), mflMoves(txs)
 	snap.Teams = withStarters(snap.Teams, snap.Matchups)
 	return snap, nil
+}
+
+// mflPlayoffStart is the week after the league's last regular-season
+// week, 0 when it states none or its regular season is its whole season.
+func mflPlayoffStart(l mfl.League) int {
+	if l.LastRegularSeasonWeek < 1 || (l.EndWeek > 0 && l.LastRegularSeasonWeek >= l.EndWeek) {
+		return 0
+	}
+	return l.LastRegularSeasonWeek + 1
+}
+
+// draftStatus is the league's state from its draft results: every pick
+// made is past the draft, some is a draft under way, none is before it.
+// Results with no picks, or none answered (logged), leave the draft
+// unstated: a week under way reads as in season, else before the draft.
+func (m *MFL) draftStatus(ctx context.Context, ref Ref, week int) (string, bool) {
+	key, now := ref.Key(), m.Now()
+	m.mu.Lock()
+	kept, ok := m.drafts[key]
+	m.mu.Unlock()
+	done := kept.status == StatusInSeason && !kept.unstated
+	if ok && (done || now.Sub(kept.at) < mflDraftTTL) {
+		return m.byWeek(kept, week)
+	}
+	d, err := m.API.DraftResults(ctx, ref.Season, ref.LeagueID)
+	got := mflDraft{unstated: true, at: now}
+	switch {
+	case err != nil:
+		if m.Log != nil {
+			m.Log.Warn("leaguesync: mfl draft results", "league", key, "err", err)
+		}
+	case d.Picks > 0 && d.Made == d.Picks:
+		got = mflDraft{status: StatusInSeason, at: now}
+	case d.Made > 0:
+		got = mflDraft{status: StatusDrafting, at: now}
+	case d.Picks > 0:
+		got = mflDraft{status: StatusPreDraft, at: now}
+	}
+	m.mu.Lock()
+	if m.drafts == nil {
+		m.drafts = map[string]mflDraft{}
+	}
+	m.drafts[key] = got
+	m.mu.Unlock()
+	return m.byWeek(got, week)
+}
+
+// byWeek is a kept draft answer as a status: an unstated draft goes by
+// the host's week.
+func (m *MFL) byWeek(d mflDraft, week int) (string, bool) {
+	switch {
+	case !d.unstated:
+		return d.status, false
+	case week >= 1:
+		return StatusInSeason, true
+	}
+	return StatusPreDraft, true
 }
 
 // privateAfterSetup reads a refusal after the setup answered as the

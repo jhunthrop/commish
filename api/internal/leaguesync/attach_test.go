@@ -69,6 +69,9 @@ func (offlineMFL) SeasonStatus(context.Context, int) (mfl.Status, error) {
 	return mfl.Status{}, errOffline
 }
 func (offlineMFL) Players(context.Context, int) ([]mfl.Player, error) { return nil, errOffline }
+func (offlineMFL) DraftResults(context.Context, int, string) (mfl.DraftResults, error) {
+	return mfl.DraftResults{}, errOffline
+}
 
 func replayHosts(now func() time.Time) Hosts {
 	return Hosts{
