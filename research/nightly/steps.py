@@ -32,9 +32,10 @@ from research.pipeline.host_ids import ingest_host_ids
 from research.pipeline.http import Fetcher
 from research.pipeline.odds.ingest import KickoffGate, run_props_preseason_snapshot
 from research.pipeline.preseason.boards import ingest_adp_snapshot, ingest_superflex_adp_snapshot
-from research.pipeline.tank01.capture import run_capture_harvest
+from research.pipeline.tank01.capture import CaptureResult, run_capture_harvest
 from research.pipeline.tank01.client import API_KEY_ENV as TANK01_KEY
 from research.pipeline.tank01.client import DEFAULT_SEASON, SEASON_ENV, Tank01Client
+from research.pipeline.tank01.lines import lines_after_harvest
 from research.season import PRODUCT_SEASON
 
 ODDS_KEY: Final = "ODDS_API_KEY"
@@ -87,9 +88,21 @@ def _capture(context: IngestContext) -> str:
     if result.reason is not None:
         return f"refused, {result.reason}"
     failed = [f"{feed.source} ({_short_reason(feed.reason)})" for feed in result.feeds if feed.status == "failed"]
-    return f"{len(result.feeds)} feeds, {sum(f.requests for f in result.feeds)} requests" + (
-        f", failed: {', '.join(failed)}" if failed else ""
+    return (
+        f"{len(result.feeds)} feeds, {sum(f.requests for f in result.feeds)} requests"
+        + (f", failed: {', '.join(failed)}" if failed else "")
+        + _lines(context, result)
     )
+
+
+def _lines(context: IngestContext, harvest: CaptureResult) -> str:
+    """The capture's game figures (Lane 66a), in their own transaction so a refused parse keeps it."""
+    try:
+        with context.engine.begin() as conn:
+            lines = lines_after_harvest(conn, harvest, context.now)
+    except Exception as error:
+        return f"; game figures FAILED, {_short_reason(str(error))}"
+    return "" if lines is None else f"; game figures: {lines.line()}"
 
 
 def _adp(context: IngestContext) -> str:

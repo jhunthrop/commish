@@ -23,6 +23,8 @@ type Data struct {
 	Lines        []boards.StatLine
 	Games        []boards.TeamWeek
 	Designations map[string]boards.Designation
+	// GameFacts is each club-week's figures, forecast and venue.
+	GameFacts map[boards.ClubWeek]boards.GameFact
 }
 
 // GamePoints is one completed game's points under the league's scoring.
@@ -65,6 +67,8 @@ type Facts struct {
 	// PerGame is his points a game over every completed game this season.
 	PerGame *float64
 	Allowed *Allowed
+	// Game is his club's game facts this week, empty without a game.
+	Game boards.GameFact
 }
 
 // Tier is §4.2's first two keys for the facts.
@@ -110,12 +114,13 @@ type Season struct {
 	points       map[string][]GamePoints
 	allowed      map[teamPosition]Allowed
 	designations map[string]boards.Designation
+	gameFacts    map[boards.ClubWeek]boards.GameFact
 }
 
 // NewSeason indexes the data for the league's rules, the week and now.
 func NewSeason(d Data, rules Rules, week int, now time.Time) *Season {
 	s := &Season{week: week, now: now, games: map[teamWeek]boards.TeamWeek{}, scheduled: map[string]bool{},
-		points: map[string][]GamePoints{}, designations: d.Designations}
+		points: map[string][]GamePoints{}, designations: d.Designations, gameFacts: d.GameFacts}
 	for _, g := range d.Games {
 		s.games[teamWeek{g.Week, g.Team}] = g
 		s.scheduled[g.Team] = true
@@ -200,6 +205,7 @@ func (s *Season) For(p Player) Facts {
 			home, kickoff := g.Home, g.Kickoff
 			f.Opponent, f.Home, f.Kickoff, f.Played = g.Opponent, &home, &kickoff, g.Final
 			f.Locked = g.Final || !s.now.Before(g.Kickoff)
+			f.Game = figuresAt(s.gameFacts[boards.ClubWeek{Week: s.week, Team: p.Team}], s.now, g.Kickoff)
 			if a, ok := s.allowed[teamPosition{g.Opponent, p.Position}]; ok {
 				f.Allowed = &a
 			}

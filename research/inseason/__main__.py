@@ -4,6 +4,9 @@
     uv run python -m research.inseason --task usage-backfill [--season 2026]
     uv run python -m research.inseason --task capture-harvest
 
+`capture-harvest` takes the hourly provider capture, then reads the hour's game figures from it into
+`tank01_lines` and the weather service's kickoff forecasts into `nws_forecast` (Lane 66a).
+
 `usage-backfill` runs the weekly pass's usage steps alone (play-by-play and the three charted feeds)
 for every week nflverse has published: the operator's one-shot for weeks played before the steps
 existed. Idempotent (a re-run writes nothing new), no register trail, each feed's counts printed.
@@ -51,9 +54,12 @@ from research.pipeline.commands import ODDS_KEY_ENV, now_ms
 from research.pipeline.http import LiveFetcher
 from research.pipeline.kickoff_slots import due_slot, kickoff_slots
 from research.pipeline.kickoffs import stored_kickoffs
+from research.pipeline.nws.client import NwsClient
+from research.pipeline.nws.forecast import FORECAST_SOURCE, run_forecast_pass
 from research.pipeline.odds.touchdowns import run_td_snapshot
-from research.pipeline.tank01.capture import run_capture_harvest
+from research.pipeline.tank01.capture import CaptureResult, run_capture_harvest
 from research.pipeline.tank01.client import API_KEY_ENV, DEFAULT_SEASON, SEASON_ENV, Tank01Client
+from research.pipeline.tank01.lines import LINES_SOURCE, lines_after_harvest
 from research.pipeline.tank01.projections import parse_stored_projections
 
 TASKS: Final = ("season-week", "usage-backfill", "capture-harvest")
@@ -153,6 +159,30 @@ def _trail(
     return StepResult("trail", "ok", f"pass {run_id}, {len(freezes)} freezes recorded")
 
 
+def _game_facts(engine: Engine, fetcher: LiveFetcher, harvest: CaptureResult, now: datetime) -> bool:
+    """The hour's game figures from the capture just taken, then the forecasts, each in its own
+    transaction so one failing keeps the other and the capture (Lane 66a)."""
+    ok = True
+    try:
+        with engine.begin() as conn:
+            lines = lines_after_harvest(conn, harvest, now)
+        _line(f"  {LINES_SOURCE}: " + ("the odds feed was not read" if lines is None else lines.line()))
+    except Exception as error:
+        LOG.exception("the lines parse failed")
+        _line(f"  {LINES_SOURCE}: FAILED, {error}")
+        ok = False
+    try:
+        with engine.begin() as conn:
+            forecast = run_forecast_pass(conn, NwsClient(fetcher), now)
+        _line(f"  {FORECAST_SOURCE}: {forecast.line()}")
+        ok = ok and not forecast.failed
+    except Exception as error:
+        LOG.exception("the forecast pass failed")
+        _line(f"  {FORECAST_SOURCE}: FAILED, {error}")
+        ok = False
+    return ok
+
+
 def _capture_harvest(now: datetime) -> bool:
     key = os.environ.get(API_KEY_ENV, "").strip()
     if not key:
@@ -164,6 +194,7 @@ def _capture_harvest(now: datetime) -> bool:
     try:
         with engine.begin() as conn:
             result = run_capture_harvest(conn, Tank01Client(fetcher, key), now, season)
+        facts_ok = _game_facts(engine, fetcher, result, now)
     finally:
         fetcher.close()
         engine.dispose()
@@ -179,7 +210,7 @@ def _capture_harvest(now: datetime) -> bool:
     # The market is its own provider and its own line: a failed Tank01 feed never skips it.
     market = _touchdown_market(now, season)
     charts = _slot_depth_charts(now, season)
-    return not failed and parsed and market and charts
+    return not failed and facts_ok and parsed and market and charts
 
 
 def _slot_depth_charts(now: datetime, season: int) -> bool:

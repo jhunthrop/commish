@@ -23,7 +23,7 @@ from typing import Final
 from sqlalchemy import Connection
 
 from research.errors import ConfigurationError
-from research.pipeline import coaches, crosswalk, history, host_ids, vegas
+from research.pipeline import coaches, crosswalk, history, host_ids, stadiums, vegas
 from research.pipeline.budget import FixedBudget
 from research.pipeline.checkpoint import Checkpoint
 from research.pipeline.http import Fetcher
@@ -33,6 +33,7 @@ from research.pipeline.nflverse import (
     depth_chart_weeks,
     derived_stat_lines,
     draft_picks,
+    games,
     ingest,
     ingest_schedule,
     injury_archive,
@@ -44,11 +45,13 @@ from research.pipeline.nflverse import (
     usage_feeds,
 )
 from research.pipeline.nflverse.client import NflverseClient
+from research.pipeline.nws.client import NwsClient
+from research.pipeline.nws.forecast import run_forecast_pass
 from research.pipeline.odds import backfill
 from research.pipeline.odds import ingest as odds
 from research.pipeline.preseason import boards
 from research.pipeline.preseason.ingest import first_kickoff_for
-from research.pipeline.tank01 import capture
+from research.pipeline.tank01 import capture, lines
 from research.pipeline.tank01 import ingest as tank01
 from research.pipeline.tank01.client import API_KEY_ENV as TANK01_KEY_ENV
 from research.pipeline.tank01.client import DEFAULT_SEASON, SEASON_ENV, Tank01Client
@@ -245,6 +248,10 @@ COMMANDS: Final = MappingProxyType({
     "season": Command("participation, stat lines and team edges per season (the season-week stats step)", _season, atomic=False),
     "context": Command("schedule, play-by-play, coaches, opponent adjustment, injuries, rosters", _context, atomic=False),
     "schedule": Command("games.csv into team_week_observations", lambda c, i: ingest_schedule.ingest_schedule(c, NflverseClient(i.fetcher), seasons_of(i.args))),
+    "games": Command("games.csv into nflverse_games, one stamped row per game", lambda c, i: games.ingest_games(c, NflverseClient(i.fetcher), seasons_of(i.args), i.now).line()),
+    "stadiums": Command("the reviewed stadium seed into stadiums, validated against nflverse_games", lambda c, i: stadiums.ingest_stadiums(c, RESEARCH_ROOT / stadiums.STADIUMS_CSV_PATH, i.now).line()),
+    "lines-backfill": Command("every stored odds capture into the tank01_lines team-week source", lambda c, i: lines.backfill_lines(c).line()),
+    "forecast": Command("one pass of the weather service's kickoff forecasts into nws_forecast", lambda c, i: run_forecast_pass(c, NwsClient(i.fetcher), i.now).line()),
     "derived-stat-lines": Command("a gap season's stat lines from play-by-play", _derived, atomic=False),
     "roster-weeks": Command("the weekly roster release archived per season", lambda c, i: roster_weeks.ingest_roster_weeks(c, NflverseClient(i.fetcher), seasons_of(i.args))),
     "draft-picks": Command("every NFL draft pick", lambda c, i: draft_picks.ingest_draft_picks(c, NflverseClient(i.fetcher))),

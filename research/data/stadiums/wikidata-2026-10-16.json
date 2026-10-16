@@ -1,0 +1,891 @@
+{
+ "entities": {
+  "Q1046135": {
+   "P131": [
+    "Q1261",
+    "Q16554"
+   ],
+   "P17": [
+    "Q30"
+   ],
+   "P625": [
+    {
+     "altitude": null,
+     "globe": "http://www.wikidata.org/entity/Q2",
+     "latitude": 39.743888888889,
+     "longitude": -105.02,
+     "precision": null
+    }
+   ],
+   "label": "Empower Field at Mile High"
+  },
+  "Q1052370": {
+   "P131": [
+    "Q1345"
+   ],
+   "P17": [
+    "Q30"
+   ],
+   "P625": [
+    {
+     "altitude": null,
+     "globe": "http://www.wikidata.org/entity/Q2",
+     "latitude": 39.90089,
+     "longitude": -75.16776,
+     "precision": -1e-06
+    }
+   ],
+   "label": "Lincoln Financial Field"
+  },
+  "Q1058864": {
+   "P131": [
+    "Q1439"
+   ],
+   "P17": [
+    "Q30"
+   ],
+   "P625": [
+    {
+     "altitude": null,
+     "globe": "http://www.wikidata.org/entity/Q2",
+     "latitude": 29.684722222222,
+     "longitude": -95.410833333333,
+     "precision": null
+    }
+   ],
+   "label": "Reliant Stadium"
+  },
+  "Q1058931": {
+   "P131": [
+    "Q23556"
+   ],
+   "P17": [
+    "Q30"
+   ],
+   "P625": [
+    {
+     "altitude": null,
+     "globe": "http://www.wikidata.org/entity/Q2",
+     "latitude": 33.7575,
+     "longitude": -84.400833333333,
+     "precision": null
+    }
+   ],
+   "label": "Georgia Dome"
+  },
+  "Q1067148": {
+   "P131": [
+    "Q1342"
+   ],
+   "P17": [
+    "Q30"
+   ],
+   "P625": [
+    {
+     "altitude": null,
+     "globe": "http://www.wikidata.org/entity/Q2",
+     "latitude": 40.446666666667,
+     "longitude": -80.015833333333,
+     "precision": null
+    }
+   ],
+   "label": "Acrisure Stadium"
+  },
+  "Q10862290": {
+   "P131": [
+    "Q746830"
+   ],
+   "P17": [
+    "Q30"
+   ],
+   "P625": [
+    {
+     "altitude": null,
+     "globe": "http://www.wikidata.org/entity/Q2",
+     "latitude": 40.81361111111111,
+     "longitude": -74.07444444444444,
+     "precision": 0.0002777777777777778
+    }
+   ],
+   "label": "MetLife Stadium"
+  },
+  "Q1100756": {
+   "P131": [
+    "Q1397",
+    "Q37320"
+   ],
+   "P17": [
+    "Q30"
+   ],
+   "P625": [
+    {
+     "altitude": null,
+     "globe": "http://www.wikidata.org/entity/Q2",
+     "latitude": 41.506111111111,
+     "longitude": -81.699444444444,
+     "precision": null
+    }
+   ],
+   "label": "Huntington Bank Field"
+  },
+  "Q1132413": {
+   "P131": [
+    "Q1297"
+   ],
+   "P17": [
+    "Q30"
+   ],
+   "P625": [
+    {
+     "altitude": null,
+     "globe": "http://www.wikidata.org/entity/Q2",
+     "latitude": 41.8625,
+     "longitude": -87.616666666667,
+     "precision": null
+    }
+   ],
+   "label": "Soldier Field"
+  },
+  "Q1141336": {
+   "P131": [
+    "Q5092"
+   ],
+   "P17": [
+    "Q30"
+   ],
+   "P625": [
+    {
+     "altitude": null,
+     "globe": "http://www.wikidata.org/entity/Q2",
+     "latitude": 39.278055555556,
+     "longitude": -76.622777777778,
+     "precision": null
+    }
+   ],
+   "label": "M&T Bank Stadium"
+  },
+  "Q1141343": {
+   "P131": [
+    "Q49255"
+   ],
+   "P17": [
+    "Q30"
+   ],
+   "P625": [
+    {
+     "altitude": null,
+     "globe": "http://www.wikidata.org/entity/Q2",
+     "latitude": 27.975833333333,
+     "longitude": -82.503333333333,
+     "precision": null
+    }
+   ],
+   "label": "Raymond James Stadium"
+  },
+  "Q1142586": {
+   "P131": [
+    "Q12439"
+   ],
+   "P17": [
+    "Q30"
+   ],
+   "P625": [
+    {
+     "altitude": null,
+     "globe": "http://www.wikidata.org/entity/Q2",
+     "latitude": 42.34,
+     "longitude": -83.045555555556,
+     "precision": null
+    }
+   ],
+   "label": "Ford Field"
+  },
+  "Q1142992": {
+   "P131": [
+    "Q23197"
+   ],
+   "P17": [
+    "Q30"
+   ],
+   "P625": [
+    {
+     "altitude": null,
+     "globe": "http://www.wikidata.org/entity/Q2",
+     "latitude": 36.166388888889,
+     "longitude": -86.771388888889,
+     "precision": null
+    }
+   ],
+   "label": "Nissan Stadium"
+  },
+  "Q1147732": {
+   "P131": [
+    "Q17042"
+   ],
+   "P17": [
+    "Q30"
+   ],
+   "P625": [
+    {
+     "altitude": null,
+     "globe": "http://www.wikidata.org/entity/Q2",
+     "latitude": 37.751666666667,
+     "longitude": -122.20055555556,
+     "precision": null
+    }
+   ],
+   "label": "Oakland Coliseum"
+  },
+  "Q127429": {
+   "P131": [
+    "Q252679"
+   ],
+   "P17": [
+    "Q183"
+   ],
+   "P625": [
+    {
+     "altitude": null,
+     "globe": "http://www.wikidata.org/entity/Q2",
+     "latitude": 48.218775,
+     "longitude": 11.624752777778,
+     "precision": null
+    }
+   ],
+   "label": "Allianz Arena"
+  },
+  "Q128468": {
+   "P131": [
+    "Q207201",
+    "Q146858"
+   ],
+   "P17": [
+    "Q145"
+   ],
+   "P625": [
+    {
+     "altitude": null,
+     "globe": "http://www.wikidata.org/entity/Q2",
+     "latitude": 51.55555555555556,
+     "longitude": -0.27944444444444444,
+     "precision": 0.0002777777777777778
+    }
+   ],
+   "label": "Wembley Stadium"
+  },
+  "Q13205": {
+   "P131": [
+    "Q160506",
+    "Q131575588"
+   ],
+   "P17": [
+    "Q142"
+   ],
+   "P625": [
+    {
+     "altitude": null,
+     "globe": "http://www.wikidata.org/entity/Q2",
+     "latitude": 48.92444444444445,
+     "longitude": 2.36,
+     "precision": 0.0002777777777777778
+    }
+   ],
+   "label": "Stade de France"
+  },
+  "Q1362236": {
+   "P131": [
+    "Q6094072"
+   ],
+   "P17": [
+    "Q155"
+   ],
+   "P625": [
+    {
+     "altitude": null,
+     "globe": "http://www.wikidata.org/entity/Q2",
+     "latitude": -23.545555555556,
+     "longitude": -46.474,
+     "precision": 2.7777777777778e-05
+    }
+   ],
+   "label": "Neo Qu\u00edmica Arena"
+  },
+  "Q155174": {
+   "P131": [
+    "Q8678",
+    "Q2712903"
+   ],
+   "P17": [
+    "Q155"
+   ],
+   "P625": [
+    {
+     "altitude": null,
+     "globe": "http://www.wikidata.org/entity/Q2",
+     "latitude": -22.912222222222223,
+     "longitude": -43.23027777777778,
+     "precision": 0.0002777777777777778
+    }
+   ],
+   "label": "Maracan\u00e3 Stadium"
+  },
+  "Q157273": {
+   "P131": [
+    "Q1444863"
+   ],
+   "P17": [
+    "Q183"
+   ],
+   "P625": [
+    {
+     "altitude": null,
+     "globe": "http://www.wikidata.org/entity/Q2",
+     "latitude": 50.068611,
+     "longitude": 8.645278,
+     "precision": 1e-05
+    }
+   ],
+   "label": "Waldstadion"
+  },
+  "Q16251517": {
+   "P131": [
+    "Q40435"
+   ],
+   "P17": [
+    "Q30"
+   ],
+   "P625": [
+    {
+     "altitude": null,
+     "globe": "http://www.wikidata.org/entity/Q2",
+     "latitude": 42.77297222222222,
+     "longitude": -78.79219444444445,
+     "precision": 2.777777777777778e-05
+    }
+   ],
+   "label": "Highmark Stadium"
+  },
+  "Q1632294": {
+   "P131": [
+    "Q43196"
+   ],
+   "P17": [
+    "Q30"
+   ],
+   "P625": [
+    {
+     "altitude": null,
+     "globe": "http://www.wikidata.org/entity/Q2",
+     "latitude": 39.095444444444,
+     "longitude": -84.516038888889,
+     "precision": null
+    }
+   ],
+   "label": "Paycor Stadium"
+  },
+  "Q164027": {
+   "P131": [
+    "Q2807",
+    "Q1766348"
+   ],
+   "P17": [
+    "Q29"
+   ],
+   "P625": [
+    {
+     "altitude": null,
+     "globe": "http://www.wikidata.org/entity/Q2",
+     "latitude": 40.45306,
+     "longitude": -3.68835,
+     "precision": null
+    }
+   ],
+   "label": "Bernab\u00e9u"
+  },
+  "Q19520501": {
+   "P131": [
+    "Q621549"
+   ],
+   "P17": [
+    "Q30"
+   ],
+   "P625": [
+    {
+     "altitude": null,
+     "globe": "http://www.wikidata.org/entity/Q2",
+     "latitude": 33.9504,
+     "longitude": -118.338,
+     "precision": 0.010829320892736
+    }
+   ],
+   "label": "SoFi Stadium"
+  },
+  "Q200684": {
+   "P131": [
+    "Q494690"
+   ],
+   "P17": [
+    "Q30"
+   ],
+   "P625": [
+    {
+     "altitude": null,
+     "globe": "http://www.wikidata.org/entity/Q2",
+     "latitude": 33.864444444444,
+     "longitude": -118.26111111111,
+     "precision": null
+    }
+   ],
+   "label": "Dignity Health Sports Park"
+  },
+  "Q209725": {
+   "P131": [
+    "Q32515"
+   ],
+   "P17": [
+    "Q145"
+   ],
+   "P625": [
+    {
+     "altitude": null,
+     "globe": "http://www.wikidata.org/entity/Q2",
+     "latitude": 51.456111111111,
+     "longitude": -0.34166666666667,
+     "precision": null
+    }
+   ],
+   "label": "Twickenham Stadium"
+  },
+  "Q27768421": {
+   "P131": [
+    "Q108403"
+   ],
+   "P17": [
+    "Q30"
+   ],
+   "P625": [
+    {
+     "altitude": null,
+     "globe": "http://www.wikidata.org/entity/Q2",
+     "latitude": 36.090777777778,
+     "longitude": -115.183,
+     "precision": 2.7777777777778e-05
+    }
+   ],
+   "label": "Allegiant Stadium"
+  },
+  "Q320454": {
+   "P131": [
+    "Q661315",
+    "Q1489"
+   ],
+   "P17": [
+    "Q96"
+   ],
+   "P625": [
+    {
+     "altitude": null,
+     "globe": "http://www.wikidata.org/entity/Q2",
+     "latitude": 19.303055555555556,
+     "longitude": -99.15055555555556,
+     "precision": 0.0002777777777777778
+    }
+   ],
+   "label": "Estadio Azteca"
+  },
+  "Q330136": {
+   "P131": [
+    "Q1919098"
+   ],
+   "P17": [
+    "Q408"
+   ],
+   "P625": [
+    {
+     "altitude": null,
+     "globe": "http://www.wikidata.org/entity/Q2",
+     "latitude": -37.819943,
+     "longitude": 144.983447,
+     "precision": 0.0001
+    }
+   ],
+   "label": "Melbourne Cricket Ground"
+  },
+  "Q373355": {
+   "P131": [
+    "Q830669"
+   ],
+   "P17": [
+    "Q30"
+   ],
+   "P625": [
+    {
+     "altitude": null,
+     "globe": "http://www.wikidata.org/entity/Q2",
+     "latitude": 42.090944444444,
+     "longitude": -71.264344444444,
+     "precision": null
+    }
+   ],
+   "label": "Gillette Stadium"
+  },
+  "Q544553": {
+   "P131": [
+    "Q41819"
+   ],
+   "P17": [
+    "Q30"
+   ],
+   "P625": [
+    {
+     "altitude": null,
+     "globe": "http://www.wikidata.org/entity/Q2",
+     "latitude": 39.048888888889,
+     "longitude": -94.483888888889,
+     "precision": null
+    }
+   ],
+   "label": "Arrowhead Stadium"
+  },
+  "Q55074091": {
+   "P131": [
+    "Q503375"
+   ],
+   "P17": [
+    "Q145"
+   ],
+   "P625": [
+    {
+     "altitude": null,
+     "globe": "http://www.wikidata.org/entity/Q2",
+     "latitude": 51.604444444444,
+     "longitude": -0.066388888888889,
+     "precision": 0.00027777777777778
+    }
+   ],
+   "label": "Tottenham Hotspur Stadium"
+  },
+  "Q583085": {
+   "P131": [
+    "Q26807"
+   ],
+   "P17": [
+    "Q30"
+   ],
+   "P625": [
+    {
+     "altitude": null,
+     "globe": "http://www.wikidata.org/entity/Q2",
+     "latitude": 38.907777777778,
+     "longitude": -76.864444444444,
+     "precision": null
+    }
+   ],
+   "label": "Northwest Stadium"
+  },
+  "Q612736": {
+   "P131": [
+    "Q5083"
+   ],
+   "P17": [
+    "Q30"
+   ],
+   "P625": [
+    {
+     "altitude": null,
+     "globe": "http://www.wikidata.org/entity/Q2",
+     "latitude": 47.595277777778,
+     "longitude": -122.33166666667,
+     "precision": null
+    }
+   ],
+   "label": "Lumen Field"
+  },
+  "Q635117": {
+   "P131": [
+    "Q16568"
+   ],
+   "P17": [
+    "Q30"
+   ],
+   "P625": [
+    {
+     "altitude": null,
+     "globe": "http://www.wikidata.org/entity/Q2",
+     "latitude": 30.323889,
+     "longitude": -81.6375,
+     "precision": 0.0001
+    }
+   ],
+   "label": "EverBank Field"
+  },
+  "Q7007552": {
+   "P131": [
+    "Q23556",
+    "Q1428"
+   ],
+   "P17": [
+    "Q30"
+   ],
+   "P625": [
+    {
+     "altitude": null,
+     "globe": "http://www.wikidata.org/entity/Q2",
+     "latitude": 33.75527777777778,
+     "longitude": -84.40083333333334,
+     "precision": 0.000277778
+    }
+   ],
+   "label": "Mercedes-Benz Stadium"
+  },
+  "Q7419343": {
+   "P131": [
+    "Q159260"
+   ],
+   "P17": [
+    "Q30"
+   ],
+   "P625": [
+    {
+     "altitude": null,
+     "globe": "http://www.wikidata.org/entity/Q2",
+     "latitude": 37.4034,
+     "longitude": -121.97,
+     "precision": 0.0001
+    }
+   ],
+   "label": "Levi's Stadium"
+  },
+  "Q756433": {
+   "P131": [
+    "Q51682"
+   ],
+   "P17": [
+    "Q30"
+   ],
+   "P625": [
+    {
+     "altitude": null,
+     "globe": "http://www.wikidata.org/entity/Q2",
+     "latitude": 33.5275,
+     "longitude": -112.2625,
+     "precision": 0.0001
+    }
+   ],
+   "label": "State Farm Stadium"
+  },
+  "Q756452": {
+   "P131": [
+    "Q34404"
+   ],
+   "P17": [
+    "Q30"
+   ],
+   "P625": [
+    {
+     "altitude": null,
+     "globe": "http://www.wikidata.org/entity/Q2",
+     "latitude": 29.950833333333,
+     "longitude": -90.081111111111,
+     "precision": null
+    }
+   ],
+   "label": "Caesars Superdome"
+  },
+  "Q7929512": {
+   "P131": [
+    "Q36091"
+   ],
+   "P17": [
+    "Q30"
+   ],
+   "P625": [
+    {
+     "altitude": null,
+     "globe": "http://www.wikidata.org/entity/Q2",
+     "latitude": 44.973889,
+     "longitude": -93.258056,
+     "precision": 0.0001
+    }
+   ],
+   "label": "U.S. Bank Stadium"
+  },
+  "Q806673": {
+   "P131": [
+    "Q16565"
+   ],
+   "P17": [
+    "Q30"
+   ],
+   "P625": [
+    {
+     "altitude": null,
+     "globe": "http://www.wikidata.org/entity/Q2",
+     "latitude": 35.225833333333,
+     "longitude": -80.852777777778,
+     "precision": null
+    }
+   ],
+   "label": "Bank of America Stadium"
+  },
+  "Q838284": {
+   "P131": [
+    "Q17943"
+   ],
+   "P17": [
+    "Q30"
+   ],
+   "P625": [
+    {
+     "altitude": null,
+     "globe": "http://www.wikidata.org/entity/Q2",
+     "latitude": 32.74769,
+     "longitude": -97.09288,
+     "precision": -1e-06
+    }
+   ],
+   "label": "AT&T Stadium"
+  },
+  "Q849784": {
+   "P131": [
+    "Q65"
+   ],
+   "P17": [
+    "Q30"
+   ],
+   "P625": [
+    {
+     "altitude": null,
+     "globe": "http://www.wikidata.org/entity/Q2",
+     "latitude": 34.014167,
+     "longitude": -118.287778,
+     "precision": 1e-05
+    }
+   ],
+   "label": "Los Angeles Memorial Coliseum"
+  },
+  "Q860790": {
+   "P131": [
+    "Q47430"
+   ],
+   "P17": [
+    "Q30"
+   ],
+   "P625": [
+    {
+     "altitude": null,
+     "globe": "http://www.wikidata.org/entity/Q2",
+     "latitude": 44.501388888889,
+     "longitude": -88.062222222222,
+     "precision": null
+    }
+   ],
+   "label": "Lambeau Field"
+  },
+  "Q864339": {
+   "P131": [
+    "Q721455"
+   ],
+   "P17": [
+    "Q30"
+   ],
+   "P625": [
+    {
+     "altitude": null,
+     "globe": "http://www.wikidata.org/entity/Q2",
+     "latitude": 25.958055555556,
+     "longitude": -80.238888888889,
+     "precision": null
+    }
+   ],
+   "label": "Hard Rock Stadium"
+  },
+  "Q867160": {
+   "P131": [
+    "Q6346"
+   ],
+   "P17": [
+    "Q30"
+   ],
+   "P625": [
+    {
+     "altitude": null,
+     "globe": "http://www.wikidata.org/entity/Q2",
+     "latitude": 39.760056,
+     "longitude": -86.163806,
+     "precision": 0.0001
+    }
+   ],
+   "label": "Lucas Oil Stadium"
+  },
+  "Q956072": {
+   "P131": [
+    "Q16552"
+   ],
+   "P17": [
+    "Q30"
+   ],
+   "P625": [
+    {
+     "altitude": null,
+     "globe": "http://www.wikidata.org/entity/Q2",
+     "latitude": 32.783055555556,
+     "longitude": -117.11944444444,
+     "precision": null
+    }
+   ],
+   "label": "San Diego Stadium"
+  }
+ },
+ "fetched": "2026-10-16",
+ "query": "wbgetentities props=labels|claims languages=en",
+ "stadium_ids": {
+  "ATL00": "Q1058931",
+  "ATL97": "Q7007552",
+  "BAL00": "Q1141336",
+  "BOS00": "Q373355",
+  "BUF00": "Q16251517",
+  "CAR00": "Q806673",
+  "CHI98": "Q1132413",
+  "CIN00": "Q1632294",
+  "CLE00": "Q1100756",
+  "DAL00": "Q838284",
+  "DEN00": "Q1046135",
+  "DET00": "Q1142586",
+  "FRA00": "Q157273",
+  "GER00": "Q127429",
+  "GNB00": "Q860790",
+  "HOU00": "Q1058864",
+  "IND00": "Q867160",
+  "JAX00": "Q635117",
+  "KAN00": "Q544553",
+  "LAX01": "Q19520501",
+  "LAX97": "Q200684",
+  "LAX99": "Q849784",
+  "LON00": "Q128468",
+  "LON01": "Q209725",
+  "LON02": "Q55074091",
+  "MAD01": "Q164027",
+  "MEL00": "Q330136",
+  "MEX00": "Q320454",
+  "MIA00": "Q864339",
+  "MIN01": "Q7929512",
+  "MUN01": "Q127429",
+  "NAS00": "Q1142992",
+  "NOR00": "Q756452",
+  "NYC01": "Q10862290",
+  "OAK00": "Q1147732",
+  "PAR00": "Q13205",
+  "PHI00": "Q1052370",
+  "PHO00": "Q756433",
+  "PIT00": "Q1067148",
+  "RIO00": "Q155174",
+  "SAO00": "Q1362236",
+  "SDG00": "Q956072",
+  "SEA00": "Q612736",
+  "SFO01": "Q7419343",
+  "TAM00": "Q1141343",
+  "VEG00": "Q27768421",
+  "WAS00": "Q583085"
+ }
+}

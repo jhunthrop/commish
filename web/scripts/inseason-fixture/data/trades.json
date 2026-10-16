@@ -41,7 +41,15 @@
 							{ "week": 4, "points": 19.3 },
 							{ "week": 3, "points": 10.7 }
 						],
-						"allowed_to_position": null
+						"allowed_to_position": null,
+						"game_total": {
+							"points": 40.5,
+							"team_points": 19,
+							"read_at": "2026-10-16T21:01:26.774Z"
+						},
+						"spread": { "side": "lose", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
+						"roof": { "kind": "outdoors", "abroad": false },
+						"weather": null
 					}
 				},
 				{
@@ -68,7 +76,11 @@
 						"played": false,
 						"points_this_week": null,
 						"last_games": [],
-						"allowed_to_position": null
+						"allowed_to_position": null,
+						"game_total": null,
+						"spread": null,
+						"roof": null,
+						"weather": null
 					}
 				},
 				{
@@ -99,7 +111,15 @@
 							{ "week": 4, "points": 16.5 },
 							{ "week": 3, "points": 6.2 }
 						],
-						"allowed_to_position": null
+						"allowed_to_position": null,
+						"game_total": {
+							"points": 42.5,
+							"team_points": 23,
+							"read_at": "2026-10-16T21:01:26.774Z"
+						},
+						"spread": { "side": "win", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
+						"roof": { "kind": "outdoors", "abroad": true },
+						"weather": null
 					}
 				},
 				{
@@ -130,7 +150,21 @@
 							{ "week": 4, "points": 16.5 },
 							{ "week": 3, "points": 6.6 }
 						],
-						"allowed_to_position": null
+						"allowed_to_position": null,
+						"game_total": {
+							"points": 52.5,
+							"team_points": 27,
+							"read_at": "2026-10-16T21:01:26.774Z"
+						},
+						"spread": { "side": "win", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+						"roof": { "kind": "outdoors", "abroad": false },
+						"weather": {
+							"temperature_f": 55,
+							"wind_mph": 9.2,
+							"precipitation_chance": 0,
+							"precipitation_kind": "none",
+							"read_at": "2026-10-16T21:01:34.611Z"
+						}
 					}
 				}
 			],
@@ -165,7 +199,21 @@
 									{ "week": 3, "points": 18.94 },
 									{ "week": 2, "points": 31.98 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 42.5,
+									"team_points": 25.5,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "win", "points": 8.5, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": false },
+								"weather": {
+									"temperature_f": 66,
+									"wind_mph": 10.4,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						}
 					],
@@ -194,7 +242,11 @@
 								"played": false,
 								"points_this_week": null,
 								"last_games": [],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": null,
+								"spread": null,
+								"roof": null,
+								"weather": null
 							}
 						},
 						{
@@ -225,7 +277,21 @@
 									{ "week": 4, "points": 16.5 },
 									{ "week": 3, "points": 6.6 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 52.5,
+									"team_points": 27,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "win", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": false },
+								"weather": {
+									"temperature_f": 55,
+									"wind_mph": 9.2,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						}
 					],
@@ -256,7 +322,21 @@
 								{ "week": 2, "points": 0.8 },
 								{ "week": 1, "points": 29.6 }
 							],
-							"allowed_to_position": null
+							"allowed_to_position": null,
+							"game_total": {
+								"points": 45.5,
+								"team_points": 23.5,
+								"read_at": "2026-10-16T21:01:26.774Z"
+							},
+							"spread": { "side": "win", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+							"roof": { "kind": "outdoors", "abroad": false },
+							"weather": {
+								"temperature_f": 54,
+								"wind_mph": 6.9,
+								"precipitation_chance": 0,
+								"precipitation_kind": "none",
+								"read_at": "2026-10-16T21:01:34.611Z"
+							}
 						}
 					},
 					"my_gain": 2.1,
@@ -293,7 +373,21 @@
 									{ "week": 3, "points": 18.94 },
 									{ "week": 2, "points": 31.98 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 42.5,
+									"team_points": 25.5,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "win", "points": 8.5, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": false },
+								"weather": {
+									"temperature_f": 66,
+									"wind_mph": 10.4,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						}
 					],
@@ -326,7 +420,15 @@
 									{ "week": 4, "points": 16.5 },
 									{ "week": 3, "points": 6.2 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 42.5,
+									"team_points": 23,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "win", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": true },
+								"weather": null
 							}
 						},
 						{
@@ -357,7 +459,21 @@
 									{ "week": 4, "points": 16.5 },
 									{ "week": 3, "points": 6.6 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 52.5,
+									"team_points": 27,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "win", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": false },
+								"weather": {
+									"temperature_f": 55,
+									"wind_mph": 9.2,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						}
 					],
@@ -388,7 +504,21 @@
 								{ "week": 2, "points": 0.8 },
 								{ "week": 1, "points": 29.6 }
 							],
-							"allowed_to_position": null
+							"allowed_to_position": null,
+							"game_total": {
+								"points": 45.5,
+								"team_points": 23.5,
+								"read_at": "2026-10-16T21:01:26.774Z"
+							},
+							"spread": { "side": "win", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+							"roof": { "kind": "outdoors", "abroad": false },
+							"weather": {
+								"temperature_f": 54,
+								"wind_mph": 6.9,
+								"precipitation_chance": 0,
+								"precipitation_kind": "none",
+								"read_at": "2026-10-16T21:01:34.611Z"
+							}
 						}
 					},
 					"my_gain": 1.9,
@@ -425,7 +555,21 @@
 									{ "week": 3, "points": 18.94 },
 									{ "week": 2, "points": 31.98 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 42.5,
+									"team_points": 25.5,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "win", "points": 8.5, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": false },
+								"weather": {
+									"temperature_f": 66,
+									"wind_mph": 10.4,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						}
 					],
@@ -454,7 +598,11 @@
 								"played": false,
 								"points_this_week": null,
 								"last_games": [],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": null,
+								"spread": null,
+								"roof": null,
+								"weather": null
 							}
 						},
 						{
@@ -485,7 +633,15 @@
 									{ "week": 4, "points": 16.5 },
 									{ "week": 3, "points": 6.2 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 42.5,
+									"team_points": 23,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "win", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": true },
+								"weather": null
 							}
 						}
 					],
@@ -516,7 +672,21 @@
 								{ "week": 2, "points": 0.8 },
 								{ "week": 1, "points": 29.6 }
 							],
-							"allowed_to_position": null
+							"allowed_to_position": null,
+							"game_total": {
+								"points": 45.5,
+								"team_points": 23.5,
+								"read_at": "2026-10-16T21:01:26.774Z"
+							},
+							"spread": { "side": "win", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+							"roof": { "kind": "outdoors", "abroad": false },
+							"weather": {
+								"temperature_f": 54,
+								"wind_mph": 6.9,
+								"precipitation_chance": 0,
+								"precipitation_kind": "none",
+								"read_at": "2026-10-16T21:01:34.611Z"
+							}
 						}
 					},
 					"my_gain": 1.6,
@@ -553,7 +723,21 @@
 									{ "week": 3, "points": 18.94 },
 									{ "week": 2, "points": 31.98 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 42.5,
+									"team_points": 25.5,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "win", "points": 8.5, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": false },
+								"weather": {
+									"temperature_f": 66,
+									"wind_mph": 10.4,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						}
 					],
@@ -586,7 +770,15 @@
 									{ "week": 4, "points": 19.3 },
 									{ "week": 3, "points": 10.7 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 40.5,
+									"team_points": 19,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "lose", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": false },
+								"weather": null
 							}
 						},
 						{
@@ -617,7 +809,21 @@
 									{ "week": 4, "points": 16.5 },
 									{ "week": 3, "points": 6.6 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 52.5,
+									"team_points": 27,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "win", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": false },
+								"weather": {
+									"temperature_f": 55,
+									"wind_mph": 9.2,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						}
 					],
@@ -648,7 +854,21 @@
 								{ "week": 2, "points": 0.8 },
 								{ "week": 1, "points": 29.6 }
 							],
-							"allowed_to_position": null
+							"allowed_to_position": null,
+							"game_total": {
+								"points": 45.5,
+								"team_points": 23.5,
+								"read_at": "2026-10-16T21:01:26.774Z"
+							},
+							"spread": { "side": "win", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+							"roof": { "kind": "outdoors", "abroad": false },
+							"weather": {
+								"temperature_f": 54,
+								"wind_mph": 6.9,
+								"precipitation_chance": 0,
+								"precipitation_kind": "none",
+								"read_at": "2026-10-16T21:01:34.611Z"
+							}
 						}
 					},
 					"my_gain": 1.5,
@@ -692,7 +912,15 @@
 							{ "week": 4, "points": 7.2 },
 							{ "week": 3, "points": 6.3 }
 						],
-						"allowed_to_position": null
+						"allowed_to_position": null,
+						"game_total": {
+							"points": 40.5,
+							"team_points": 19,
+							"read_at": "2026-10-16T21:01:26.774Z"
+						},
+						"spread": { "side": "lose", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
+						"roof": { "kind": "outdoors", "abroad": false },
+						"weather": null
 					}
 				},
 				{
@@ -723,7 +951,21 @@
 							{ "week": 4, "points": 6.6 },
 							{ "week": 3, "points": 5.7 }
 						],
-						"allowed_to_position": null
+						"allowed_to_position": null,
+						"game_total": {
+							"points": 40.5,
+							"team_points": 22.5,
+							"read_at": "2026-10-16T21:01:26.774Z"
+						},
+						"spread": { "side": "win", "points": 4.5, "read_at": "2026-10-16T21:01:26.774Z" },
+						"roof": { "kind": "outdoors", "abroad": false },
+						"weather": {
+							"temperature_f": 57,
+							"wind_mph": 6.9,
+							"precipitation_chance": 0,
+							"precipitation_kind": "none",
+							"read_at": "2026-10-16T21:01:34.611Z"
+						}
 					}
 				},
 				{
@@ -754,7 +996,21 @@
 							{ "week": 4, "points": 23.8 },
 							{ "week": 3, "points": 7.9 }
 						],
-						"allowed_to_position": null
+						"allowed_to_position": null,
+						"game_total": {
+							"points": 43.5,
+							"team_points": 25.5,
+							"read_at": "2026-10-16T21:01:26.774Z"
+						},
+						"spread": { "side": "win", "points": 7, "read_at": "2026-10-16T21:01:26.774Z" },
+						"roof": { "kind": "outdoors", "abroad": false },
+						"weather": {
+							"temperature_f": 48,
+							"wind_mph": 4.6,
+							"precipitation_chance": 0,
+							"precipitation_kind": "none",
+							"read_at": "2026-10-16T21:01:34.611Z"
+						}
 					}
 				},
 				{
@@ -785,7 +1041,21 @@
 							{ "week": 4, "points": 13.6 },
 							{ "week": 3, "points": 3.3 }
 						],
-						"allowed_to_position": null
+						"allowed_to_position": null,
+						"game_total": {
+							"points": 45.5,
+							"team_points": 23.5,
+							"read_at": "2026-10-16T21:01:26.774Z"
+						},
+						"spread": { "side": "win", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+						"roof": { "kind": "outdoors", "abroad": false },
+						"weather": {
+							"temperature_f": 54,
+							"wind_mph": 6.9,
+							"precipitation_chance": 0,
+							"precipitation_kind": "none",
+							"read_at": "2026-10-16T21:01:34.611Z"
+						}
 					}
 				},
 				{
@@ -816,7 +1086,21 @@
 							{ "week": 3, "points": 13.9 },
 							{ "week": 2, "points": 25.1 }
 						],
-						"allowed_to_position": null
+						"allowed_to_position": null,
+						"game_total": {
+							"points": 42.5,
+							"team_points": 25.5,
+							"read_at": "2026-10-16T21:01:26.774Z"
+						},
+						"spread": { "side": "win", "points": 8.5, "read_at": "2026-10-16T21:01:26.774Z" },
+						"roof": { "kind": "outdoors", "abroad": false },
+						"weather": {
+							"temperature_f": 66,
+							"wind_mph": 10.4,
+							"precipitation_chance": 0,
+							"precipitation_kind": "none",
+							"read_at": "2026-10-16T21:01:34.611Z"
+						}
 					}
 				}
 			],
@@ -851,7 +1135,11 @@
 									{ "week": 4, "points": 22.4 },
 									{ "week": 3, "points": 7.4 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": null,
+								"spread": null,
+								"roof": null,
+								"weather": null
 							}
 						}
 					],
@@ -884,7 +1172,21 @@
 									{ "week": 3, "points": 13.9 },
 									{ "week": 2, "points": 25.1 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 42.5,
+									"team_points": 25.5,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "win", "points": 8.5, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": false },
+								"weather": {
+									"temperature_f": 66,
+									"wind_mph": 10.4,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						},
 						{
@@ -915,7 +1217,21 @@
 									{ "week": 4, "points": 23.8 },
 									{ "week": 3, "points": 7.9 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 43.5,
+									"team_points": 25.5,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "win", "points": 7, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": false },
+								"weather": {
+									"temperature_f": 48,
+									"wind_mph": 4.6,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						}
 					],
@@ -946,7 +1262,21 @@
 								{ "week": 2, "points": 0.8 },
 								{ "week": 1, "points": 29.6 }
 							],
-							"allowed_to_position": null
+							"allowed_to_position": null,
+							"game_total": {
+								"points": 45.5,
+								"team_points": 23.5,
+								"read_at": "2026-10-16T21:01:26.774Z"
+							},
+							"spread": { "side": "win", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+							"roof": { "kind": "outdoors", "abroad": false },
+							"weather": {
+								"temperature_f": 54,
+								"wind_mph": 6.9,
+								"precipitation_chance": 0,
+								"precipitation_kind": "none",
+								"read_at": "2026-10-16T21:01:34.611Z"
+							}
 						}
 					},
 					"my_gain": 0.7,
@@ -983,7 +1313,21 @@
 									{ "week": 4, "points": 15.4 },
 									{ "week": 3, "points": 7.4 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 49.5,
+									"team_points": 26.5,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "win", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "retractable", "abroad": false },
+								"weather": {
+									"temperature_f": 59,
+									"wind_mph": 12.7,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						}
 					],
@@ -1016,7 +1360,21 @@
 									{ "week": 4, "points": 6.6 },
 									{ "week": 3, "points": 5.7 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 40.5,
+									"team_points": 22.5,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "win", "points": 4.5, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": false },
+								"weather": {
+									"temperature_f": 57,
+									"wind_mph": 6.9,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						},
 						{
@@ -1047,7 +1405,21 @@
 									{ "week": 4, "points": 23.8 },
 									{ "week": 3, "points": 7.9 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 43.5,
+									"team_points": 25.5,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "win", "points": 7, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": false },
+								"weather": {
+									"temperature_f": 48,
+									"wind_mph": 4.6,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						}
 					],
@@ -1078,7 +1450,21 @@
 								{ "week": 2, "points": 0.8 },
 								{ "week": 1, "points": 29.6 }
 							],
-							"allowed_to_position": null
+							"allowed_to_position": null,
+							"game_total": {
+								"points": 45.5,
+								"team_points": 23.5,
+								"read_at": "2026-10-16T21:01:26.774Z"
+							},
+							"spread": { "side": "win", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+							"roof": { "kind": "outdoors", "abroad": false },
+							"weather": {
+								"temperature_f": 54,
+								"wind_mph": 6.9,
+								"precipitation_chance": 0,
+								"precipitation_kind": "none",
+								"read_at": "2026-10-16T21:01:34.611Z"
+							}
 						}
 					},
 					"my_gain": 0.6,
@@ -1115,7 +1501,15 @@
 									{ "week": 4, "points": 6.5 },
 									{ "week": 3, "points": 21.9 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 52.5,
+									"team_points": 20,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "lose", "points": 12.5, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "dome", "abroad": false },
+								"weather": null
 							}
 						}
 					],
@@ -1148,7 +1542,15 @@
 									{ "week": 4, "points": 7.2 },
 									{ "week": 3, "points": 6.3 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 40.5,
+									"team_points": 19,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "lose", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": false },
+								"weather": null
 							}
 						},
 						{
@@ -1179,7 +1581,21 @@
 									{ "week": 4, "points": 23.8 },
 									{ "week": 3, "points": 7.9 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 43.5,
+									"team_points": 25.5,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "win", "points": 7, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": false },
+								"weather": {
+									"temperature_f": 48,
+									"wind_mph": 4.6,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						}
 					],
@@ -1210,7 +1626,21 @@
 								{ "week": 2, "points": 0.8 },
 								{ "week": 1, "points": 29.6 }
 							],
-							"allowed_to_position": null
+							"allowed_to_position": null,
+							"game_total": {
+								"points": 45.5,
+								"team_points": 23.5,
+								"read_at": "2026-10-16T21:01:26.774Z"
+							},
+							"spread": { "side": "win", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+							"roof": { "kind": "outdoors", "abroad": false },
+							"weather": {
+								"temperature_f": 54,
+								"wind_mph": 6.9,
+								"precipitation_chance": 0,
+								"precipitation_kind": "none",
+								"read_at": "2026-10-16T21:01:34.611Z"
+							}
 						}
 					},
 					"my_gain": 0.6,
@@ -1247,7 +1677,11 @@
 									{ "week": 4, "points": 5.7 },
 									{ "week": 3, "points": 24.8 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": null,
+								"spread": null,
+								"roof": null,
+								"weather": null
 							}
 						}
 					],
@@ -1280,7 +1714,21 @@
 									{ "week": 4, "points": 23.8 },
 									{ "week": 3, "points": 7.9 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 43.5,
+									"team_points": 25.5,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "win", "points": 7, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": false },
+								"weather": {
+									"temperature_f": 48,
+									"wind_mph": 4.6,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						},
 						{
@@ -1311,7 +1759,21 @@
 									{ "week": 4, "points": 13.6 },
 									{ "week": 3, "points": 3.3 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 45.5,
+									"team_points": 23.5,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "win", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": false },
+								"weather": {
+									"temperature_f": 54,
+									"wind_mph": 6.9,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						}
 					],
@@ -1342,7 +1804,21 @@
 								{ "week": 2, "points": 0.8 },
 								{ "week": 1, "points": 29.6 }
 							],
-							"allowed_to_position": null
+							"allowed_to_position": null,
+							"game_total": {
+								"points": 45.5,
+								"team_points": 23.5,
+								"read_at": "2026-10-16T21:01:26.774Z"
+							},
+							"spread": { "side": "win", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+							"roof": { "kind": "outdoors", "abroad": false },
+							"weather": {
+								"temperature_f": 54,
+								"wind_mph": 6.9,
+								"precipitation_chance": 0,
+								"precipitation_kind": "none",
+								"read_at": "2026-10-16T21:01:34.611Z"
+							}
 						}
 					},
 					"my_gain": 0.5,
@@ -1386,7 +1862,21 @@
 							{ "week": 4, "points": 16.4 },
 							{ "week": 3, "points": 6.8 }
 						],
-						"allowed_to_position": null
+						"allowed_to_position": null,
+						"game_total": {
+							"points": 43.5,
+							"team_points": 25.5,
+							"read_at": "2026-10-16T21:01:26.774Z"
+						},
+						"spread": { "side": "win", "points": 7, "read_at": "2026-10-16T21:01:26.774Z" },
+						"roof": { "kind": "outdoors", "abroad": false },
+						"weather": {
+							"temperature_f": 48,
+							"wind_mph": 4.6,
+							"precipitation_chance": 0,
+							"precipitation_kind": "none",
+							"read_at": "2026-10-16T21:01:34.611Z"
+						}
 					}
 				},
 				{
@@ -1417,7 +1907,21 @@
 							{ "week": 4, "points": 4.6 },
 							{ "week": 3, "points": 12.7 }
 						],
-						"allowed_to_position": null
+						"allowed_to_position": null,
+						"game_total": {
+							"points": 44.5,
+							"team_points": 26,
+							"read_at": "2026-10-16T21:01:26.774Z"
+						},
+						"spread": { "side": "win", "points": 7, "read_at": "2026-10-16T21:01:26.774Z" },
+						"roof": { "kind": "retractable", "abroad": false },
+						"weather": {
+							"temperature_f": 58,
+							"wind_mph": 5.8,
+							"precipitation_chance": 0,
+							"precipitation_kind": "none",
+							"read_at": "2026-10-16T21:01:34.611Z"
+						}
 					}
 				},
 				{
@@ -1448,7 +1952,21 @@
 							{ "week": 4, "points": 11.4 },
 							{ "week": 3, "points": 19.8 }
 						],
-						"allowed_to_position": null
+						"allowed_to_position": null,
+						"game_total": {
+							"points": 49.5,
+							"team_points": 26.5,
+							"read_at": "2026-10-16T21:01:26.774Z"
+						},
+						"spread": { "side": "win", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
+						"roof": { "kind": "retractable", "abroad": false },
+						"weather": {
+							"temperature_f": 59,
+							"wind_mph": 12.7,
+							"precipitation_chance": 0,
+							"precipitation_kind": "none",
+							"read_at": "2026-10-16T21:01:34.611Z"
+						}
 					}
 				},
 				{
@@ -1479,7 +1997,15 @@
 							{ "week": 4, "points": 2 },
 							{ "week": 3, "points": 13 }
 						],
-						"allowed_to_position": null
+						"allowed_to_position": null,
+						"game_total": {
+							"points": 42.5,
+							"team_points": 23,
+							"read_at": "2026-10-16T21:01:26.774Z"
+						},
+						"spread": { "side": "win", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
+						"roof": { "kind": "outdoors", "abroad": true },
+						"weather": null
 					}
 				}
 			],
@@ -1514,7 +2040,21 @@
 									{ "week": 3, "points": 18.94 },
 									{ "week": 2, "points": 31.98 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 42.5,
+									"team_points": 25.5,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "win", "points": 8.5, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": false },
+								"weather": {
+									"temperature_f": 66,
+									"wind_mph": 10.4,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						}
 					],
@@ -1547,7 +2087,21 @@
 									{ "week": 4, "points": 11.4 },
 									{ "week": 3, "points": 19.8 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 49.5,
+									"team_points": 26.5,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "win", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "retractable", "abroad": false },
+								"weather": {
+									"temperature_f": 59,
+									"wind_mph": 12.7,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						},
 						{
@@ -1578,7 +2132,21 @@
 									{ "week": 4, "points": 16.4 },
 									{ "week": 3, "points": 6.8 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 43.5,
+									"team_points": 25.5,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "win", "points": 7, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": false },
+								"weather": {
+									"temperature_f": 48,
+									"wind_mph": 4.6,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						}
 					],
@@ -1609,7 +2177,21 @@
 								{ "week": 2, "points": 0.8 },
 								{ "week": 1, "points": 29.6 }
 							],
-							"allowed_to_position": null
+							"allowed_to_position": null,
+							"game_total": {
+								"points": 45.5,
+								"team_points": 23.5,
+								"read_at": "2026-10-16T21:01:26.774Z"
+							},
+							"spread": { "side": "win", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+							"roof": { "kind": "outdoors", "abroad": false },
+							"weather": {
+								"temperature_f": 54,
+								"wind_mph": 6.9,
+								"precipitation_chance": 0,
+								"precipitation_kind": "none",
+								"read_at": "2026-10-16T21:01:34.611Z"
+							}
 						}
 					},
 					"my_gain": 4.6,
@@ -1646,7 +2228,21 @@
 									{ "week": 3, "points": 18.94 },
 									{ "week": 2, "points": 31.98 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 42.5,
+									"team_points": 25.5,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "win", "points": 8.5, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": false },
+								"weather": {
+									"temperature_f": 66,
+									"wind_mph": 10.4,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						}
 					],
@@ -1679,7 +2275,21 @@
 									{ "week": 4, "points": 11.4 },
 									{ "week": 3, "points": 19.8 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 49.5,
+									"team_points": 26.5,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "win", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "retractable", "abroad": false },
+								"weather": {
+									"temperature_f": 59,
+									"wind_mph": 12.7,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						},
 						{
@@ -1710,7 +2320,15 @@
 									{ "week": 4, "points": 2 },
 									{ "week": 3, "points": 13 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 42.5,
+									"team_points": 23,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "win", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": true },
+								"weather": null
 							}
 						}
 					],
@@ -1741,7 +2359,21 @@
 								{ "week": 2, "points": 0.8 },
 								{ "week": 1, "points": 29.6 }
 							],
-							"allowed_to_position": null
+							"allowed_to_position": null,
+							"game_total": {
+								"points": 45.5,
+								"team_points": 23.5,
+								"read_at": "2026-10-16T21:01:26.774Z"
+							},
+							"spread": { "side": "win", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+							"roof": { "kind": "outdoors", "abroad": false },
+							"weather": {
+								"temperature_f": 54,
+								"wind_mph": 6.9,
+								"precipitation_chance": 0,
+								"precipitation_kind": "none",
+								"read_at": "2026-10-16T21:01:34.611Z"
+							}
 						}
 					},
 					"my_gain": 4.6,
@@ -1778,7 +2410,21 @@
 									{ "week": 3, "points": 18.94 },
 									{ "week": 2, "points": 31.98 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 42.5,
+									"team_points": 25.5,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "win", "points": 8.5, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": false },
+								"weather": {
+									"temperature_f": 66,
+									"wind_mph": 10.4,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						}
 					],
@@ -1811,7 +2457,21 @@
 									{ "week": 4, "points": 16.4 },
 									{ "week": 3, "points": 6.8 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 43.5,
+									"team_points": 25.5,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "win", "points": 7, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": false },
+								"weather": {
+									"temperature_f": 48,
+									"wind_mph": 4.6,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						},
 						{
@@ -1842,7 +2502,21 @@
 									{ "week": 4, "points": 4.6 },
 									{ "week": 3, "points": 12.7 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 44.5,
+									"team_points": 26,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "win", "points": 7, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "retractable", "abroad": false },
+								"weather": {
+									"temperature_f": 58,
+									"wind_mph": 5.8,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						}
 					],
@@ -1873,7 +2547,21 @@
 								{ "week": 2, "points": 0.8 },
 								{ "week": 1, "points": 29.6 }
 							],
-							"allowed_to_position": null
+							"allowed_to_position": null,
+							"game_total": {
+								"points": 45.5,
+								"team_points": 23.5,
+								"read_at": "2026-10-16T21:01:26.774Z"
+							},
+							"spread": { "side": "win", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+							"roof": { "kind": "outdoors", "abroad": false },
+							"weather": {
+								"temperature_f": 54,
+								"wind_mph": 6.9,
+								"precipitation_chance": 0,
+								"precipitation_kind": "none",
+								"read_at": "2026-10-16T21:01:34.611Z"
+							}
 						}
 					},
 					"my_gain": 4.1,
@@ -1910,7 +2598,21 @@
 									{ "week": 3, "points": 18.94 },
 									{ "week": 2, "points": 31.98 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 42.5,
+									"team_points": 25.5,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "win", "points": 8.5, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": false },
+								"weather": {
+									"temperature_f": 66,
+									"wind_mph": 10.4,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						}
 					],
@@ -1943,7 +2645,15 @@
 									{ "week": 4, "points": 2 },
 									{ "week": 3, "points": 13 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 42.5,
+									"team_points": 23,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "win", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": true },
+								"weather": null
 							}
 						},
 						{
@@ -1974,7 +2684,21 @@
 									{ "week": 4, "points": 4.6 },
 									{ "week": 3, "points": 12.7 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 44.5,
+									"team_points": 26,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "win", "points": 7, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "retractable", "abroad": false },
+								"weather": {
+									"temperature_f": 58,
+									"wind_mph": 5.8,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						}
 					],
@@ -2005,7 +2729,21 @@
 								{ "week": 2, "points": 0.8 },
 								{ "week": 1, "points": 29.6 }
 							],
-							"allowed_to_position": null
+							"allowed_to_position": null,
+							"game_total": {
+								"points": 45.5,
+								"team_points": 23.5,
+								"read_at": "2026-10-16T21:01:26.774Z"
+							},
+							"spread": { "side": "win", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+							"roof": { "kind": "outdoors", "abroad": false },
+							"weather": {
+								"temperature_f": 54,
+								"wind_mph": 6.9,
+								"precipitation_chance": 0,
+								"precipitation_kind": "none",
+								"read_at": "2026-10-16T21:01:34.611Z"
+							}
 						}
 					},
 					"my_gain": 4.1,
@@ -2049,7 +2787,21 @@
 							{ "week": 4, "points": 7.4 },
 							{ "week": 3, "points": 10.8 }
 						],
-						"allowed_to_position": null
+						"allowed_to_position": null,
+						"game_total": {
+							"points": 49.5,
+							"team_points": 26.5,
+							"read_at": "2026-10-16T21:01:26.774Z"
+						},
+						"spread": { "side": "win", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
+						"roof": { "kind": "retractable", "abroad": false },
+						"weather": {
+							"temperature_f": 59,
+							"wind_mph": 12.7,
+							"precipitation_chance": 0,
+							"precipitation_kind": "none",
+							"read_at": "2026-10-16T21:01:34.611Z"
+						}
 					}
 				},
 				{
@@ -2080,7 +2832,15 @@
 							{ "week": 4, "points": 4.3 },
 							{ "week": 3, "points": 6.8 }
 						],
-						"allowed_to_position": null
+						"allowed_to_position": null,
+						"game_total": {
+							"points": 42.5,
+							"team_points": 20,
+							"read_at": "2026-10-16T21:01:26.774Z"
+						},
+						"spread": { "side": "lose", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
+						"roof": { "kind": "outdoors", "abroad": true },
+						"weather": null
 					}
 				},
 				{
@@ -2111,7 +2871,15 @@
 							{ "week": 4, "points": 27 },
 							{ "week": 3, "points": 1.4 }
 						],
-						"allowed_to_position": null
+						"allowed_to_position": null,
+						"game_total": {
+							"points": 40.5,
+							"team_points": 22,
+							"read_at": "2026-10-16T21:01:26.774Z"
+						},
+						"spread": { "side": "win", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
+						"roof": { "kind": "outdoors", "abroad": false },
+						"weather": null
 					}
 				},
 				{
@@ -2138,7 +2906,15 @@
 						"played": false,
 						"points_this_week": null,
 						"last_games": [],
-						"allowed_to_position": null
+						"allowed_to_position": null,
+						"game_total": {
+							"points": 42.5,
+							"team_points": 20,
+							"read_at": "2026-10-16T21:01:26.774Z"
+						},
+						"spread": { "side": "lose", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
+						"roof": { "kind": "outdoors", "abroad": true },
+						"weather": null
 					}
 				}
 			],
@@ -2173,7 +2949,21 @@
 									{ "week": 4, "points": 5.1 },
 									{ "week": 3, "points": 3.5 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 50.5,
+									"team_points": 21.5,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "lose", "points": 7.5, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": false },
+								"weather": {
+									"temperature_f": 63,
+									"wind_mph": 12.7,
+									"precipitation_chance": 2,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						},
 						{
@@ -2204,7 +2994,21 @@
 									{ "week": 4, "points": 24.96 },
 									{ "week": 3, "points": 26.68 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 40.5,
+									"team_points": 22,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "win", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": false },
+								"weather": {
+									"temperature_f": 74,
+									"wind_mph": 15,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						}
 					],
@@ -2237,7 +3041,15 @@
 									{ "week": 4, "points": 27 },
 									{ "week": 3, "points": 1.4 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 40.5,
+									"team_points": 22,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "win", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": false },
+								"weather": null
 							}
 						}
 					],
@@ -2276,7 +3088,21 @@
 									{ "week": 4, "points": 15.4 },
 									{ "week": 3, "points": 7.4 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 49.5,
+									"team_points": 26.5,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "win", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "retractable", "abroad": false },
+								"weather": {
+									"temperature_f": 59,
+									"wind_mph": 12.7,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						},
 						{
@@ -2307,7 +3133,21 @@
 									{ "week": 3, "points": 18.94 },
 									{ "week": 2, "points": 31.98 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 42.5,
+									"team_points": 25.5,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "win", "points": 8.5, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": false },
+								"weather": {
+									"temperature_f": 66,
+									"wind_mph": 10.4,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						}
 					],
@@ -2340,7 +3180,21 @@
 									{ "week": 4, "points": 7.4 },
 									{ "week": 3, "points": 10.8 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 49.5,
+									"team_points": 26.5,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "win", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "retractable", "abroad": false },
+								"weather": {
+									"temperature_f": 59,
+									"wind_mph": 12.7,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						}
 					],
@@ -2379,7 +3233,15 @@
 									{ "week": 4, "points": 6.3 },
 									{ "week": 3, "points": 19.4 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 42.5,
+									"team_points": 23,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "win", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": true },
+								"weather": null
 							}
 						},
 						{
@@ -2410,7 +3272,21 @@
 									{ "week": 4, "points": 24.96 },
 									{ "week": 3, "points": 26.68 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 40.5,
+									"team_points": 22,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "win", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": false },
+								"weather": {
+									"temperature_f": 74,
+									"wind_mph": 15,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						}
 					],
@@ -2439,7 +3315,15 @@
 								"played": false,
 								"points_this_week": null,
 								"last_games": [],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 42.5,
+									"team_points": 20,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "lose", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": true },
+								"weather": null
 							}
 						}
 					],
@@ -2478,7 +3362,21 @@
 									{ "week": 4, "points": 5.1 },
 									{ "week": 3, "points": 3.5 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 50.5,
+									"team_points": 21.5,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "lose", "points": 7.5, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": false },
+								"weather": {
+									"temperature_f": 63,
+									"wind_mph": 12.7,
+									"precipitation_chance": 2,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						},
 						{
@@ -2509,7 +3407,21 @@
 									{ "week": 4, "points": 24.96 },
 									{ "week": 3, "points": 26.68 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 40.5,
+									"team_points": 22,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "win", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": false },
+								"weather": {
+									"temperature_f": 74,
+									"wind_mph": 15,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						}
 					],
@@ -2542,7 +3454,15 @@
 									{ "week": 4, "points": 4.3 },
 									{ "week": 3, "points": 6.8 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 42.5,
+									"team_points": 20,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "lose", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": true },
+								"weather": null
 							}
 						}
 					],
@@ -2584,7 +3504,21 @@
 						"played": false,
 						"points_this_week": null,
 						"last_games": [],
-						"allowed_to_position": null
+						"allowed_to_position": null,
+						"game_total": {
+							"points": 41.5,
+							"team_points": 20,
+							"read_at": "2026-10-16T21:01:26.774Z"
+						},
+						"spread": { "side": "lose", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+						"roof": { "kind": "outdoors", "abroad": false },
+						"weather": {
+							"temperature_f": 52,
+							"wind_mph": 6.9,
+							"precipitation_chance": 0,
+							"precipitation_kind": "none",
+							"read_at": "2026-10-16T21:01:34.611Z"
+						}
 					}
 				},
 				{
@@ -2611,7 +3545,21 @@
 						"played": false,
 						"points_this_week": null,
 						"last_games": [],
-						"allowed_to_position": null
+						"allowed_to_position": null,
+						"game_total": {
+							"points": 52.5,
+							"team_points": 27,
+							"read_at": "2026-10-16T21:01:26.774Z"
+						},
+						"spread": { "side": "win", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+						"roof": { "kind": "outdoors", "abroad": false },
+						"weather": {
+							"temperature_f": 55,
+							"wind_mph": 9.2,
+							"precipitation_chance": 0,
+							"precipitation_kind": "none",
+							"read_at": "2026-10-16T21:01:34.611Z"
+						}
 					}
 				},
 				{
@@ -2642,7 +3590,21 @@
 							{ "week": 4, "points": 12.9 },
 							{ "week": 3, "points": 6.1 }
 						],
-						"allowed_to_position": null
+						"allowed_to_position": null,
+						"game_total": {
+							"points": 40.5,
+							"team_points": 18,
+							"read_at": "2026-10-16T21:01:26.774Z"
+						},
+						"spread": { "side": "lose", "points": 4.5, "read_at": "2026-10-16T21:01:26.774Z" },
+						"roof": { "kind": "outdoors", "abroad": false },
+						"weather": {
+							"temperature_f": 57,
+							"wind_mph": 6.9,
+							"precipitation_chance": 0,
+							"precipitation_kind": "none",
+							"read_at": "2026-10-16T21:01:34.611Z"
+						}
 					}
 				},
 				{
@@ -2673,7 +3635,21 @@
 							{ "week": 3, "points": 19.7 },
 							{ "week": 2, "points": 7 }
 						],
-						"allowed_to_position": null
+						"allowed_to_position": null,
+						"game_total": {
+							"points": 50.5,
+							"team_points": 21.5,
+							"read_at": "2026-10-16T21:01:26.774Z"
+						},
+						"spread": { "side": "lose", "points": 7.5, "read_at": "2026-10-16T21:01:26.774Z" },
+						"roof": { "kind": "outdoors", "abroad": false },
+						"weather": {
+							"temperature_f": 63,
+							"wind_mph": 12.7,
+							"precipitation_chance": 2,
+							"precipitation_kind": "none",
+							"read_at": "2026-10-16T21:01:34.611Z"
+						}
 					}
 				},
 				{
@@ -2704,7 +3680,15 @@
 							{ "week": 4, "points": 8.4 },
 							{ "week": 3, "points": 8.3 }
 						],
-						"allowed_to_position": null
+						"allowed_to_position": null,
+						"game_total": {
+							"points": 52.5,
+							"team_points": 23.5,
+							"read_at": "2026-10-16T21:01:26.774Z"
+						},
+						"spread": { "side": "lose", "points": 6, "read_at": "2026-10-16T21:01:26.774Z" },
+						"roof": { "kind": "dome", "abroad": false },
+						"weather": null
 					}
 				}
 			],
@@ -2739,7 +3723,15 @@
 									{ "week": 4, "points": 6.5 },
 									{ "week": 3, "points": 21.9 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 52.5,
+									"team_points": 20,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "lose", "points": 12.5, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "dome", "abroad": false },
+								"weather": null
 							}
 						}
 					],
@@ -2772,7 +3764,15 @@
 									{ "week": 4, "points": 8.4 },
 									{ "week": 3, "points": 8.3 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 52.5,
+									"team_points": 23.5,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "lose", "points": 6, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "dome", "abroad": false },
+								"weather": null
 							}
 						},
 						{
@@ -2799,7 +3799,21 @@
 								"played": false,
 								"points_this_week": null,
 								"last_games": [],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 52.5,
+									"team_points": 27,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "win", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": false },
+								"weather": {
+									"temperature_f": 55,
+									"wind_mph": 9.2,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						}
 					],
@@ -2830,7 +3844,21 @@
 								{ "week": 2, "points": 0.8 },
 								{ "week": 1, "points": 29.6 }
 							],
-							"allowed_to_position": null
+							"allowed_to_position": null,
+							"game_total": {
+								"points": 45.5,
+								"team_points": 23.5,
+								"read_at": "2026-10-16T21:01:26.774Z"
+							},
+							"spread": { "side": "win", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+							"roof": { "kind": "outdoors", "abroad": false },
+							"weather": {
+								"temperature_f": 54,
+								"wind_mph": 6.9,
+								"precipitation_chance": 0,
+								"precipitation_kind": "none",
+								"read_at": "2026-10-16T21:01:34.611Z"
+							}
 						}
 					},
 					"my_gain": 2.7,
@@ -2867,7 +3895,15 @@
 									{ "week": 4, "points": 6.5 },
 									{ "week": 3, "points": 21.9 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 52.5,
+									"team_points": 20,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "lose", "points": 12.5, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "dome", "abroad": false },
+								"weather": null
 							}
 						}
 					],
@@ -2900,7 +3936,15 @@
 									{ "week": 4, "points": 8.4 },
 									{ "week": 3, "points": 8.3 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 52.5,
+									"team_points": 23.5,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "lose", "points": 6, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "dome", "abroad": false },
+								"weather": null
 							}
 						},
 						{
@@ -2927,7 +3971,21 @@
 								"played": false,
 								"points_this_week": null,
 								"last_games": [],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 41.5,
+									"team_points": 20,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "lose", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": false },
+								"weather": {
+									"temperature_f": 52,
+									"wind_mph": 6.9,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						}
 					],
@@ -2958,7 +4016,21 @@
 								{ "week": 2, "points": 0.8 },
 								{ "week": 1, "points": 29.6 }
 							],
-							"allowed_to_position": null
+							"allowed_to_position": null,
+							"game_total": {
+								"points": 45.5,
+								"team_points": 23.5,
+								"read_at": "2026-10-16T21:01:26.774Z"
+							},
+							"spread": { "side": "win", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+							"roof": { "kind": "outdoors", "abroad": false },
+							"weather": {
+								"temperature_f": 54,
+								"wind_mph": 6.9,
+								"precipitation_chance": 0,
+								"precipitation_kind": "none",
+								"read_at": "2026-10-16T21:01:34.611Z"
+							}
 						}
 					},
 					"my_gain": 2.7,
@@ -2995,7 +4067,15 @@
 									{ "week": 4, "points": 6.5 },
 									{ "week": 3, "points": 21.9 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 52.5,
+									"team_points": 20,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "lose", "points": 12.5, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "dome", "abroad": false },
+								"weather": null
 							}
 						}
 					],
@@ -3028,7 +4108,15 @@
 									{ "week": 4, "points": 8.4 },
 									{ "week": 3, "points": 8.3 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 52.5,
+									"team_points": 23.5,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "lose", "points": 6, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "dome", "abroad": false },
+								"weather": null
 							}
 						},
 						{
@@ -3059,7 +4147,21 @@
 									{ "week": 3, "points": 19.7 },
 									{ "week": 2, "points": 7 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 50.5,
+									"team_points": 21.5,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "lose", "points": 7.5, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": false },
+								"weather": {
+									"temperature_f": 63,
+									"wind_mph": 12.7,
+									"precipitation_chance": 2,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						}
 					],
@@ -3090,7 +4192,21 @@
 								{ "week": 2, "points": 0.8 },
 								{ "week": 1, "points": 29.6 }
 							],
-							"allowed_to_position": null
+							"allowed_to_position": null,
+							"game_total": {
+								"points": 45.5,
+								"team_points": 23.5,
+								"read_at": "2026-10-16T21:01:26.774Z"
+							},
+							"spread": { "side": "win", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+							"roof": { "kind": "outdoors", "abroad": false },
+							"weather": {
+								"temperature_f": 54,
+								"wind_mph": 6.9,
+								"precipitation_chance": 0,
+								"precipitation_kind": "none",
+								"read_at": "2026-10-16T21:01:34.611Z"
+							}
 						}
 					},
 					"my_gain": 2.3,
@@ -3127,7 +4243,15 @@
 									{ "week": 4, "points": 6.5 },
 									{ "week": 3, "points": 21.9 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 52.5,
+									"team_points": 20,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "lose", "points": 12.5, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "dome", "abroad": false },
+								"weather": null
 							}
 						}
 					],
@@ -3156,7 +4280,21 @@
 								"played": false,
 								"points_this_week": null,
 								"last_games": [],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 52.5,
+									"team_points": 27,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "win", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": false },
+								"weather": {
+									"temperature_f": 55,
+									"wind_mph": 9.2,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						},
 						{
@@ -3187,7 +4325,21 @@
 									{ "week": 4, "points": 12.9 },
 									{ "week": 3, "points": 6.1 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 40.5,
+									"team_points": 18,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "lose", "points": 4.5, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": false },
+								"weather": {
+									"temperature_f": 57,
+									"wind_mph": 6.9,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						}
 					],
@@ -3218,7 +4370,21 @@
 								{ "week": 2, "points": 0.8 },
 								{ "week": 1, "points": 29.6 }
 							],
-							"allowed_to_position": null
+							"allowed_to_position": null,
+							"game_total": {
+								"points": 45.5,
+								"team_points": 23.5,
+								"read_at": "2026-10-16T21:01:26.774Z"
+							},
+							"spread": { "side": "win", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+							"roof": { "kind": "outdoors", "abroad": false },
+							"weather": {
+								"temperature_f": 54,
+								"wind_mph": 6.9,
+								"precipitation_chance": 0,
+								"precipitation_kind": "none",
+								"read_at": "2026-10-16T21:01:34.611Z"
+							}
 						}
 					},
 					"my_gain": 1.8,
@@ -3262,7 +4428,21 @@
 							{ "week": 4, "points": 22.8 },
 							{ "week": 3, "points": 5.1 }
 						],
-						"allowed_to_position": null
+						"allowed_to_position": null,
+						"game_total": {
+							"points": 45.5,
+							"team_points": 22,
+							"read_at": "2026-10-16T21:01:26.774Z"
+						},
+						"spread": { "side": "lose", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+						"roof": { "kind": "outdoors", "abroad": false },
+						"weather": {
+							"temperature_f": 54,
+							"wind_mph": 6.9,
+							"precipitation_chance": 0,
+							"precipitation_kind": "none",
+							"read_at": "2026-10-16T21:01:34.611Z"
+						}
 					}
 				},
 				{
@@ -3289,7 +4469,21 @@
 						"played": false,
 						"points_this_week": null,
 						"last_games": [],
-						"allowed_to_position": null
+						"allowed_to_position": null,
+						"game_total": {
+							"points": 41.5,
+							"team_points": 21.5,
+							"read_at": "2026-10-16T21:01:26.774Z"
+						},
+						"spread": { "side": "win", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+						"roof": { "kind": "outdoors", "abroad": false },
+						"weather": {
+							"temperature_f": 52,
+							"wind_mph": 6.9,
+							"precipitation_chance": 0,
+							"precipitation_kind": "none",
+							"read_at": "2026-10-16T21:01:34.611Z"
+						}
 					}
 				},
 				{
@@ -3320,7 +4514,21 @@
 							{ "week": 4, "points": 7 },
 							{ "week": 3, "points": 5.3 }
 						],
-						"allowed_to_position": null
+						"allowed_to_position": null,
+						"game_total": {
+							"points": 50.5,
+							"team_points": 21.5,
+							"read_at": "2026-10-16T21:01:26.774Z"
+						},
+						"spread": { "side": "lose", "points": 7.5, "read_at": "2026-10-16T21:01:26.774Z" },
+						"roof": { "kind": "outdoors", "abroad": false },
+						"weather": {
+							"temperature_f": 63,
+							"wind_mph": 12.7,
+							"precipitation_chance": 2,
+							"precipitation_kind": "none",
+							"read_at": "2026-10-16T21:01:34.611Z"
+						}
 					}
 				},
 				{
@@ -3351,7 +4559,21 @@
 							{ "week": 4, "points": 7.7 },
 							{ "week": 3, "points": 8.6 }
 						],
-						"allowed_to_position": null
+						"allowed_to_position": null,
+						"game_total": {
+							"points": 40.5,
+							"team_points": 19,
+							"read_at": "2026-10-16T21:01:26.774Z"
+						},
+						"spread": { "side": "lose", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
+						"roof": { "kind": "outdoors", "abroad": false },
+						"weather": {
+							"temperature_f": 74,
+							"wind_mph": 15,
+							"precipitation_chance": 0,
+							"precipitation_kind": "none",
+							"read_at": "2026-10-16T21:01:34.611Z"
+						}
 					}
 				},
 				{
@@ -3382,7 +4604,21 @@
 							{ "week": 4, "points": 9.1 },
 							{ "week": 3, "points": 14.7 }
 						],
-						"allowed_to_position": null
+						"allowed_to_position": null,
+						"game_total": {
+							"points": 44.5,
+							"team_points": 26,
+							"read_at": "2026-10-16T21:01:26.774Z"
+						},
+						"spread": { "side": "win", "points": 7, "read_at": "2026-10-16T21:01:26.774Z" },
+						"roof": { "kind": "retractable", "abroad": false },
+						"weather": {
+							"temperature_f": 58,
+							"wind_mph": 5.8,
+							"precipitation_chance": 0,
+							"precipitation_kind": "none",
+							"read_at": "2026-10-16T21:01:34.611Z"
+						}
 					}
 				}
 			],
@@ -3417,7 +4653,21 @@
 									{ "week": 4, "points": 24.96 },
 									{ "week": 3, "points": 26.68 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 40.5,
+									"team_points": 22,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "win", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": false },
+								"weather": {
+									"temperature_f": 74,
+									"wind_mph": 15,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						}
 					],
@@ -3450,7 +4700,21 @@
 									{ "week": 4, "points": 7 },
 									{ "week": 3, "points": 5.3 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 50.5,
+									"team_points": 21.5,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "lose", "points": 7.5, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": false },
+								"weather": {
+									"temperature_f": 63,
+									"wind_mph": 12.7,
+									"precipitation_chance": 2,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						},
 						{
@@ -3481,7 +4745,21 @@
 									{ "week": 4, "points": 7.7 },
 									{ "week": 3, "points": 8.6 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 40.5,
+									"team_points": 19,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "lose", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": false },
+								"weather": {
+									"temperature_f": 74,
+									"wind_mph": 15,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						}
 					],
@@ -3512,7 +4790,21 @@
 								{ "week": 2, "points": 0.8 },
 								{ "week": 1, "points": 29.6 }
 							],
-							"allowed_to_position": null
+							"allowed_to_position": null,
+							"game_total": {
+								"points": 45.5,
+								"team_points": 23.5,
+								"read_at": "2026-10-16T21:01:26.774Z"
+							},
+							"spread": { "side": "win", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+							"roof": { "kind": "outdoors", "abroad": false },
+							"weather": {
+								"temperature_f": 54,
+								"wind_mph": 6.9,
+								"precipitation_chance": 0,
+								"precipitation_kind": "none",
+								"read_at": "2026-10-16T21:01:34.611Z"
+							}
 						}
 					},
 					"my_gain": 4.6,
@@ -3549,7 +4841,21 @@
 									{ "week": 4, "points": 24.96 },
 									{ "week": 3, "points": 26.68 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 40.5,
+									"team_points": 22,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "win", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": false },
+								"weather": {
+									"temperature_f": 74,
+									"wind_mph": 15,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						}
 					],
@@ -3582,7 +4888,21 @@
 									{ "week": 4, "points": 7.7 },
 									{ "week": 3, "points": 8.6 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 40.5,
+									"team_points": 19,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "lose", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": false },
+								"weather": {
+									"temperature_f": 74,
+									"wind_mph": 15,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						},
 						{
@@ -3609,7 +4929,21 @@
 								"played": false,
 								"points_this_week": null,
 								"last_games": [],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 41.5,
+									"team_points": 21.5,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "win", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": false },
+								"weather": {
+									"temperature_f": 52,
+									"wind_mph": 6.9,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						}
 					],
@@ -3640,7 +4974,21 @@
 								{ "week": 2, "points": 0.8 },
 								{ "week": 1, "points": 29.6 }
 							],
-							"allowed_to_position": null
+							"allowed_to_position": null,
+							"game_total": {
+								"points": 45.5,
+								"team_points": 23.5,
+								"read_at": "2026-10-16T21:01:26.774Z"
+							},
+							"spread": { "side": "win", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+							"roof": { "kind": "outdoors", "abroad": false },
+							"weather": {
+								"temperature_f": 54,
+								"wind_mph": 6.9,
+								"precipitation_chance": 0,
+								"precipitation_kind": "none",
+								"read_at": "2026-10-16T21:01:34.611Z"
+							}
 						}
 					},
 					"my_gain": 4.6,
@@ -3677,7 +5025,21 @@
 									{ "week": 3, "points": 18.94 },
 									{ "week": 2, "points": 31.98 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 42.5,
+									"team_points": 25.5,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "win", "points": 8.5, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": false },
+								"weather": {
+									"temperature_f": 66,
+									"wind_mph": 10.4,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						}
 					],
@@ -3710,7 +5072,21 @@
 									{ "week": 4, "points": 9.1 },
 									{ "week": 3, "points": 14.7 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 44.5,
+									"team_points": 26,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "win", "points": 7, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "retractable", "abroad": false },
+								"weather": {
+									"temperature_f": 58,
+									"wind_mph": 5.8,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						},
 						{
@@ -3741,7 +5117,21 @@
 									{ "week": 4, "points": 22.8 },
 									{ "week": 3, "points": 5.1 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 45.5,
+									"team_points": 22,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "lose", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": false },
+								"weather": {
+									"temperature_f": 54,
+									"wind_mph": 6.9,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						}
 					],
@@ -3772,7 +5162,21 @@
 								{ "week": 2, "points": 0.8 },
 								{ "week": 1, "points": 29.6 }
 							],
-							"allowed_to_position": null
+							"allowed_to_position": null,
+							"game_total": {
+								"points": 45.5,
+								"team_points": 23.5,
+								"read_at": "2026-10-16T21:01:26.774Z"
+							},
+							"spread": { "side": "win", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+							"roof": { "kind": "outdoors", "abroad": false },
+							"weather": {
+								"temperature_f": 54,
+								"wind_mph": 6.9,
+								"precipitation_chance": 0,
+								"precipitation_kind": "none",
+								"read_at": "2026-10-16T21:01:34.611Z"
+							}
 						}
 					},
 					"my_gain": 4.5,
@@ -3809,7 +5213,21 @@
 									{ "week": 4, "points": 24.96 },
 									{ "week": 3, "points": 26.68 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 40.5,
+									"team_points": 22,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "win", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": false },
+								"weather": {
+									"temperature_f": 74,
+									"wind_mph": 15,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						}
 					],
@@ -3842,7 +5260,21 @@
 									{ "week": 4, "points": 7 },
 									{ "week": 3, "points": 5.3 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 50.5,
+									"team_points": 21.5,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "lose", "points": 7.5, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": false },
+								"weather": {
+									"temperature_f": 63,
+									"wind_mph": 12.7,
+									"precipitation_chance": 2,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						},
 						{
@@ -3869,7 +5301,21 @@
 								"played": false,
 								"points_this_week": null,
 								"last_games": [],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 41.5,
+									"team_points": 21.5,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "win", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": false },
+								"weather": {
+									"temperature_f": 52,
+									"wind_mph": 6.9,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						}
 					],
@@ -3900,7 +5346,21 @@
 								{ "week": 2, "points": 0.8 },
 								{ "week": 1, "points": 29.6 }
 							],
-							"allowed_to_position": null
+							"allowed_to_position": null,
+							"game_total": {
+								"points": 45.5,
+								"team_points": 23.5,
+								"read_at": "2026-10-16T21:01:26.774Z"
+							},
+							"spread": { "side": "win", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+							"roof": { "kind": "outdoors", "abroad": false },
+							"weather": {
+								"temperature_f": 54,
+								"wind_mph": 6.9,
+								"precipitation_chance": 0,
+								"precipitation_kind": "none",
+								"read_at": "2026-10-16T21:01:34.611Z"
+							}
 						}
 					},
 					"my_gain": 4.5,
@@ -3944,7 +5404,15 @@
 							{ "week": 4, "points": 11.1 },
 							{ "week": 3, "points": 17 }
 						],
-						"allowed_to_position": null
+						"allowed_to_position": null,
+						"game_total": {
+							"points": 42.5,
+							"team_points": 23,
+							"read_at": "2026-10-16T21:01:26.774Z"
+						},
+						"spread": { "side": "win", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
+						"roof": { "kind": "outdoors", "abroad": true },
+						"weather": null
 					}
 				},
 				{
@@ -3975,7 +5443,21 @@
 							{ "week": 4, "points": 7.6 },
 							{ "week": 3, "points": 13 }
 						],
-						"allowed_to_position": null
+						"allowed_to_position": null,
+						"game_total": {
+							"points": 45.5,
+							"team_points": 23.5,
+							"read_at": "2026-10-16T21:01:26.774Z"
+						},
+						"spread": { "side": "win", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+						"roof": { "kind": "outdoors", "abroad": false },
+						"weather": {
+							"temperature_f": 54,
+							"wind_mph": 6.9,
+							"precipitation_chance": 0,
+							"precipitation_kind": "none",
+							"read_at": "2026-10-16T21:01:34.611Z"
+						}
 					}
 				},
 				{
@@ -4006,7 +5488,21 @@
 							{ "week": 4, "points": 13.3 },
 							{ "week": 3, "points": 5.6 }
 						],
-						"allowed_to_position": null
+						"allowed_to_position": null,
+						"game_total": {
+							"points": 42.5,
+							"team_points": 17,
+							"read_at": "2026-10-16T21:01:26.774Z"
+						},
+						"spread": { "side": "lose", "points": 8.5, "read_at": "2026-10-16T21:01:26.774Z" },
+						"roof": { "kind": "outdoors", "abroad": false },
+						"weather": {
+							"temperature_f": 66,
+							"wind_mph": 10.4,
+							"precipitation_chance": 0,
+							"precipitation_kind": "none",
+							"read_at": "2026-10-16T21:01:34.611Z"
+						}
 					}
 				},
 				{
@@ -4033,7 +5529,21 @@
 						"played": false,
 						"points_this_week": null,
 						"last_games": [],
-						"allowed_to_position": null
+						"allowed_to_position": null,
+						"game_total": {
+							"points": 52.5,
+							"team_points": 27,
+							"read_at": "2026-10-16T21:01:26.774Z"
+						},
+						"spread": { "side": "win", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+						"roof": { "kind": "outdoors", "abroad": false },
+						"weather": {
+							"temperature_f": 55,
+							"wind_mph": 9.2,
+							"precipitation_chance": 0,
+							"precipitation_kind": "none",
+							"read_at": "2026-10-16T21:01:34.611Z"
+						}
 					}
 				},
 				{
@@ -4064,7 +5574,15 @@
 							{ "week": 4, "points": 14.5 },
 							{ "week": 3, "points": 4.4 }
 						],
-						"allowed_to_position": null
+						"allowed_to_position": null,
+						"game_total": {
+							"points": 40.5,
+							"team_points": 19,
+							"read_at": "2026-10-16T21:01:26.774Z"
+						},
+						"spread": { "side": "lose", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
+						"roof": { "kind": "outdoors", "abroad": false },
+						"weather": null
 					}
 				}
 			],
@@ -4099,7 +5617,21 @@
 									{ "week": 4, "points": 24.96 },
 									{ "week": 3, "points": 26.68 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 40.5,
+									"team_points": 22,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "win", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": false },
+								"weather": {
+									"temperature_f": 74,
+									"wind_mph": 15,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						}
 					],
@@ -4132,7 +5664,21 @@
 									{ "week": 4, "points": 7.6 },
 									{ "week": 3, "points": 13 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 45.5,
+									"team_points": 23.5,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "win", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": false },
+								"weather": {
+									"temperature_f": 54,
+									"wind_mph": 6.9,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						},
 						{
@@ -4159,7 +5705,21 @@
 								"played": false,
 								"points_this_week": null,
 								"last_games": [],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 52.5,
+									"team_points": 27,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "win", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": false },
+								"weather": {
+									"temperature_f": 55,
+									"wind_mph": 9.2,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						}
 					],
@@ -4190,7 +5750,21 @@
 								{ "week": 2, "points": 0.8 },
 								{ "week": 1, "points": 29.6 }
 							],
-							"allowed_to_position": null
+							"allowed_to_position": null,
+							"game_total": {
+								"points": 45.5,
+								"team_points": 23.5,
+								"read_at": "2026-10-16T21:01:26.774Z"
+							},
+							"spread": { "side": "win", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+							"roof": { "kind": "outdoors", "abroad": false },
+							"weather": {
+								"temperature_f": 54,
+								"wind_mph": 6.9,
+								"precipitation_chance": 0,
+								"precipitation_kind": "none",
+								"read_at": "2026-10-16T21:01:34.611Z"
+							}
 						}
 					},
 					"my_gain": 5.7,
@@ -4227,7 +5801,21 @@
 									{ "week": 4, "points": 24.96 },
 									{ "week": 3, "points": 26.68 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 40.5,
+									"team_points": 22,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "win", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": false },
+								"weather": {
+									"temperature_f": 74,
+									"wind_mph": 15,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						}
 					],
@@ -4260,7 +5848,15 @@
 									{ "week": 4, "points": 11.1 },
 									{ "week": 3, "points": 17 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 42.5,
+									"team_points": 23,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "win", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": true },
+								"weather": null
 							}
 						},
 						{
@@ -4291,7 +5887,15 @@
 									{ "week": 4, "points": 14.5 },
 									{ "week": 3, "points": 4.4 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 40.5,
+									"team_points": 19,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "lose", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": false },
+								"weather": null
 							}
 						}
 					],
@@ -4322,7 +5926,21 @@
 								{ "week": 2, "points": 0.8 },
 								{ "week": 1, "points": 29.6 }
 							],
-							"allowed_to_position": null
+							"allowed_to_position": null,
+							"game_total": {
+								"points": 45.5,
+								"team_points": 23.5,
+								"read_at": "2026-10-16T21:01:26.774Z"
+							},
+							"spread": { "side": "win", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+							"roof": { "kind": "outdoors", "abroad": false },
+							"weather": {
+								"temperature_f": 54,
+								"wind_mph": 6.9,
+								"precipitation_chance": 0,
+								"precipitation_kind": "none",
+								"read_at": "2026-10-16T21:01:34.611Z"
+							}
 						}
 					},
 					"my_gain": 5.7,
@@ -4359,7 +5977,21 @@
 									{ "week": 4, "points": 24.96 },
 									{ "week": 3, "points": 26.68 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 40.5,
+									"team_points": 22,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "win", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": false },
+								"weather": {
+									"temperature_f": 74,
+									"wind_mph": 15,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						}
 					],
@@ -4392,7 +6024,21 @@
 									{ "week": 4, "points": 13.3 },
 									{ "week": 3, "points": 5.6 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 42.5,
+									"team_points": 17,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "lose", "points": 8.5, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": false },
+								"weather": {
+									"temperature_f": 66,
+									"wind_mph": 10.4,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						},
 						{
@@ -4419,7 +6065,21 @@
 								"played": false,
 								"points_this_week": null,
 								"last_games": [],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 52.5,
+									"team_points": 27,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "win", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": false },
+								"weather": {
+									"temperature_f": 55,
+									"wind_mph": 9.2,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						}
 					],
@@ -4450,7 +6110,21 @@
 								{ "week": 2, "points": 0.8 },
 								{ "week": 1, "points": 29.6 }
 							],
-							"allowed_to_position": null
+							"allowed_to_position": null,
+							"game_total": {
+								"points": 45.5,
+								"team_points": 23.5,
+								"read_at": "2026-10-16T21:01:26.774Z"
+							},
+							"spread": { "side": "win", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+							"roof": { "kind": "outdoors", "abroad": false },
+							"weather": {
+								"temperature_f": 54,
+								"wind_mph": 6.9,
+								"precipitation_chance": 0,
+								"precipitation_kind": "none",
+								"read_at": "2026-10-16T21:01:34.611Z"
+							}
 						}
 					},
 					"my_gain": 5.6,
@@ -4487,7 +6161,21 @@
 									{ "week": 4, "points": 24.96 },
 									{ "week": 3, "points": 26.68 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 40.5,
+									"team_points": 22,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "win", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": false },
+								"weather": {
+									"temperature_f": 74,
+									"wind_mph": 15,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						}
 					],
@@ -4520,7 +6208,15 @@
 									{ "week": 4, "points": 14.5 },
 									{ "week": 3, "points": 4.4 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 40.5,
+									"team_points": 19,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "lose", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": false },
+								"weather": null
 							}
 						},
 						{
@@ -4547,7 +6243,21 @@
 								"played": false,
 								"points_this_week": null,
 								"last_games": [],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 52.5,
+									"team_points": 27,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "win", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": false },
+								"weather": {
+									"temperature_f": 55,
+									"wind_mph": 9.2,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						}
 					],
@@ -4578,7 +6288,21 @@
 								{ "week": 2, "points": 0.8 },
 								{ "week": 1, "points": 29.6 }
 							],
-							"allowed_to_position": null
+							"allowed_to_position": null,
+							"game_total": {
+								"points": 45.5,
+								"team_points": 23.5,
+								"read_at": "2026-10-16T21:01:26.774Z"
+							},
+							"spread": { "side": "win", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+							"roof": { "kind": "outdoors", "abroad": false },
+							"weather": {
+								"temperature_f": 54,
+								"wind_mph": 6.9,
+								"precipitation_chance": 0,
+								"precipitation_kind": "none",
+								"read_at": "2026-10-16T21:01:34.611Z"
+							}
 						}
 					},
 					"my_gain": 5.3,
@@ -4622,7 +6346,15 @@
 							{ "week": 4, "points": 7.2 },
 							{ "week": 3, "points": 20.7 }
 						],
-						"allowed_to_position": null
+						"allowed_to_position": null,
+						"game_total": {
+							"points": 52.5,
+							"team_points": 32.5,
+							"read_at": "2026-10-16T21:01:26.774Z"
+						},
+						"spread": { "side": "win", "points": 12.5, "read_at": "2026-10-16T21:01:26.774Z" },
+						"roof": { "kind": "dome", "abroad": false },
+						"weather": null
 					}
 				},
 				{
@@ -4653,7 +6385,21 @@
 							{ "week": 2, "points": 14.6 },
 							{ "week": 1, "points": 33.8 }
 						],
-						"allowed_to_position": null
+						"allowed_to_position": null,
+						"game_total": {
+							"points": 41.5,
+							"team_points": 20,
+							"read_at": "2026-10-16T21:01:26.774Z"
+						},
+						"spread": { "side": "lose", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+						"roof": { "kind": "outdoors", "abroad": false },
+						"weather": {
+							"temperature_f": 52,
+							"wind_mph": 6.9,
+							"precipitation_chance": 0,
+							"precipitation_kind": "none",
+							"read_at": "2026-10-16T21:01:34.611Z"
+						}
 					}
 				},
 				{
@@ -4684,7 +6430,21 @@
 							{ "week": 4, "points": 5.7 },
 							{ "week": 3, "points": 5.9 }
 						],
-						"allowed_to_position": null
+						"allowed_to_position": null,
+						"game_total": {
+							"points": 41.5,
+							"team_points": 21.5,
+							"read_at": "2026-10-16T21:01:26.774Z"
+						},
+						"spread": { "side": "win", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+						"roof": { "kind": "outdoors", "abroad": false },
+						"weather": {
+							"temperature_f": 52,
+							"wind_mph": 6.9,
+							"precipitation_chance": 0,
+							"precipitation_kind": "none",
+							"read_at": "2026-10-16T21:01:34.611Z"
+						}
 					}
 				},
 				{
@@ -4715,7 +6475,21 @@
 							{ "week": 4, "points": 23.2 },
 							{ "week": 3, "points": 7.6 }
 						],
-						"allowed_to_position": null
+						"allowed_to_position": null,
+						"game_total": {
+							"points": 45.5,
+							"team_points": 23.5,
+							"read_at": "2026-10-16T21:01:26.774Z"
+						},
+						"spread": { "side": "win", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+						"roof": { "kind": "outdoors", "abroad": false },
+						"weather": {
+							"temperature_f": 54,
+							"wind_mph": 6.9,
+							"precipitation_chance": 0,
+							"precipitation_kind": "none",
+							"read_at": "2026-10-16T21:01:34.611Z"
+						}
 					}
 				},
 				{
@@ -4746,7 +6520,21 @@
 							{ "week": 4, "points": 4.1 },
 							{ "week": 3, "points": 9.3 }
 						],
-						"allowed_to_position": null
+						"allowed_to_position": null,
+						"game_total": {
+							"points": 52.5,
+							"team_points": 25.5,
+							"read_at": "2026-10-16T21:01:26.774Z"
+						},
+						"spread": { "side": "lose", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+						"roof": { "kind": "outdoors", "abroad": false },
+						"weather": {
+							"temperature_f": 55,
+							"wind_mph": 9.2,
+							"precipitation_chance": 0,
+							"precipitation_kind": "none",
+							"read_at": "2026-10-16T21:01:34.611Z"
+						}
 					}
 				}
 			],
@@ -4781,7 +6569,11 @@
 									{ "week": 4, "points": 5.7 },
 									{ "week": 3, "points": 24.8 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": null,
+								"spread": null,
+								"roof": null,
+								"weather": null
 							}
 						}
 					],
@@ -4814,7 +6606,21 @@
 									{ "week": 4, "points": 23.2 },
 									{ "week": 3, "points": 7.6 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 45.5,
+									"team_points": 23.5,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "win", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": false },
+								"weather": {
+									"temperature_f": 54,
+									"wind_mph": 6.9,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						},
 						{
@@ -4845,7 +6651,21 @@
 									{ "week": 2, "points": 14.6 },
 									{ "week": 1, "points": 33.8 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 41.5,
+									"team_points": 20,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "lose", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": false },
+								"weather": {
+									"temperature_f": 52,
+									"wind_mph": 6.9,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						}
 					],
@@ -4876,7 +6696,21 @@
 								{ "week": 2, "points": 0.8 },
 								{ "week": 1, "points": 29.6 }
 							],
-							"allowed_to_position": null
+							"allowed_to_position": null,
+							"game_total": {
+								"points": 45.5,
+								"team_points": 23.5,
+								"read_at": "2026-10-16T21:01:26.774Z"
+							},
+							"spread": { "side": "win", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+							"roof": { "kind": "outdoors", "abroad": false },
+							"weather": {
+								"temperature_f": 54,
+								"wind_mph": 6.9,
+								"precipitation_chance": 0,
+								"precipitation_kind": "none",
+								"read_at": "2026-10-16T21:01:34.611Z"
+							}
 						}
 					},
 					"my_gain": 0.4,
@@ -4913,7 +6747,21 @@
 									{ "week": 4, "points": 15.4 },
 									{ "week": 3, "points": 7.4 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 49.5,
+									"team_points": 26.5,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "win", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "retractable", "abroad": false },
+								"weather": {
+									"temperature_f": 59,
+									"wind_mph": 12.7,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						}
 					],
@@ -4946,7 +6794,21 @@
 									{ "week": 2, "points": 14.6 },
 									{ "week": 1, "points": 33.8 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 41.5,
+									"team_points": 20,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "lose", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": false },
+								"weather": {
+									"temperature_f": 52,
+									"wind_mph": 6.9,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						},
 						{
@@ -4977,7 +6839,21 @@
 									{ "week": 4, "points": 5.7 },
 									{ "week": 3, "points": 5.9 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 41.5,
+									"team_points": 21.5,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "win", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": false },
+								"weather": {
+									"temperature_f": 52,
+									"wind_mph": 6.9,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						}
 					],
@@ -5008,7 +6884,21 @@
 								{ "week": 2, "points": 0.8 },
 								{ "week": 1, "points": 29.6 }
 							],
-							"allowed_to_position": null
+							"allowed_to_position": null,
+							"game_total": {
+								"points": 45.5,
+								"team_points": 23.5,
+								"read_at": "2026-10-16T21:01:26.774Z"
+							},
+							"spread": { "side": "win", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+							"roof": { "kind": "outdoors", "abroad": false },
+							"weather": {
+								"temperature_f": 54,
+								"wind_mph": 6.9,
+								"precipitation_chance": 0,
+								"precipitation_kind": "none",
+								"read_at": "2026-10-16T21:01:34.611Z"
+							}
 						}
 					},
 					"my_gain": 0.3,
@@ -5045,7 +6935,21 @@
 									{ "week": 4, "points": 15.4 },
 									{ "week": 3, "points": 7.4 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 49.5,
+									"team_points": 26.5,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "win", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "retractable", "abroad": false },
+								"weather": {
+									"temperature_f": 59,
+									"wind_mph": 12.7,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						}
 					],
@@ -5078,7 +6982,21 @@
 									{ "week": 2, "points": 14.6 },
 									{ "week": 1, "points": 33.8 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 41.5,
+									"team_points": 20,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "lose", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": false },
+								"weather": {
+									"temperature_f": 52,
+									"wind_mph": 6.9,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						},
 						{
@@ -5109,7 +7027,21 @@
 									{ "week": 4, "points": 4.1 },
 									{ "week": 3, "points": 9.3 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 52.5,
+									"team_points": 25.5,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "lose", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": false },
+								"weather": {
+									"temperature_f": 55,
+									"wind_mph": 9.2,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						}
 					],
@@ -5140,7 +7072,21 @@
 								{ "week": 2, "points": 0.8 },
 								{ "week": 1, "points": 29.6 }
 							],
-							"allowed_to_position": null
+							"allowed_to_position": null,
+							"game_total": {
+								"points": 45.5,
+								"team_points": 23.5,
+								"read_at": "2026-10-16T21:01:26.774Z"
+							},
+							"spread": { "side": "win", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+							"roof": { "kind": "outdoors", "abroad": false },
+							"weather": {
+								"temperature_f": 54,
+								"wind_mph": 6.9,
+								"precipitation_chance": 0,
+								"precipitation_kind": "none",
+								"read_at": "2026-10-16T21:01:34.611Z"
+							}
 						}
 					},
 					"my_gain": 0.7,
@@ -5177,7 +7123,11 @@
 									{ "week": 4, "points": 5.7 },
 									{ "week": 3, "points": 24.8 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": null,
+								"spread": null,
+								"roof": null,
+								"weather": null
 							}
 						}
 					],
@@ -5210,7 +7160,21 @@
 									{ "week": 4, "points": 5.7 },
 									{ "week": 3, "points": 5.9 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 41.5,
+									"team_points": 21.5,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "win", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": false },
+								"weather": {
+									"temperature_f": 52,
+									"wind_mph": 6.9,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						},
 						{
@@ -5241,7 +7205,15 @@
 									{ "week": 4, "points": 7.2 },
 									{ "week": 3, "points": 20.7 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 52.5,
+									"team_points": 32.5,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "win", "points": 12.5, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "dome", "abroad": false },
+								"weather": null
 							}
 						}
 					],
@@ -5272,7 +7244,21 @@
 								{ "week": 2, "points": 0.8 },
 								{ "week": 1, "points": 29.6 }
 							],
-							"allowed_to_position": null
+							"allowed_to_position": null,
+							"game_total": {
+								"points": 45.5,
+								"team_points": 23.5,
+								"read_at": "2026-10-16T21:01:26.774Z"
+							},
+							"spread": { "side": "win", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+							"roof": { "kind": "outdoors", "abroad": false },
+							"weather": {
+								"temperature_f": 54,
+								"wind_mph": 6.9,
+								"precipitation_chance": 0,
+								"precipitation_kind": "none",
+								"read_at": "2026-10-16T21:01:34.611Z"
+							}
 						}
 					},
 					"my_gain": 0.7,
@@ -5316,7 +7302,11 @@
 							{ "week": 4, "points": 26.72 },
 							{ "week": 3, "points": 25.58 }
 						],
-						"allowed_to_position": null
+						"allowed_to_position": null,
+						"game_total": null,
+						"spread": null,
+						"roof": null,
+						"weather": null
 					}
 				},
 				{
@@ -5347,7 +7337,21 @@
 							{ "week": 4, "points": 6.1 },
 							{ "week": 3, "points": 7.8 }
 						],
-						"allowed_to_position": null
+						"allowed_to_position": null,
+						"game_total": {
+							"points": 40.5,
+							"team_points": 19,
+							"read_at": "2026-10-16T21:01:26.774Z"
+						},
+						"spread": { "side": "lose", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
+						"roof": { "kind": "outdoors", "abroad": false },
+						"weather": {
+							"temperature_f": 74,
+							"wind_mph": 15,
+							"precipitation_chance": 0,
+							"precipitation_kind": "none",
+							"read_at": "2026-10-16T21:01:34.611Z"
+						}
 					}
 				},
 				{
@@ -5374,7 +7378,15 @@
 						"played": false,
 						"points_this_week": null,
 						"last_games": [],
-						"allowed_to_position": null
+						"allowed_to_position": null,
+						"game_total": {
+							"points": 52.5,
+							"team_points": 23.5,
+							"read_at": "2026-10-16T21:01:26.774Z"
+						},
+						"spread": { "side": "lose", "points": 6, "read_at": "2026-10-16T21:01:26.774Z" },
+						"roof": { "kind": "dome", "abroad": false },
+						"weather": null
 					}
 				},
 				{
@@ -5405,7 +7417,21 @@
 							{ "week": 3, "points": 4 },
 							{ "week": 2, "points": 13.5 }
 						],
-						"allowed_to_position": null
+						"allowed_to_position": null,
+						"game_total": {
+							"points": 42.5,
+							"team_points": 25.5,
+							"read_at": "2026-10-16T21:01:26.774Z"
+						},
+						"spread": { "side": "win", "points": 8.5, "read_at": "2026-10-16T21:01:26.774Z" },
+						"roof": { "kind": "outdoors", "abroad": false },
+						"weather": {
+							"temperature_f": 66,
+							"wind_mph": 10.4,
+							"precipitation_chance": 0,
+							"precipitation_kind": "none",
+							"read_at": "2026-10-16T21:01:34.611Z"
+						}
 					}
 				},
 				{
@@ -5436,7 +7462,15 @@
 							{ "week": 4, "points": 2.9 },
 							{ "week": 3, "points": 6 }
 						],
-						"allowed_to_position": null
+						"allowed_to_position": null,
+						"game_total": {
+							"points": 42.5,
+							"team_points": 20,
+							"read_at": "2026-10-16T21:01:26.774Z"
+						},
+						"spread": { "side": "lose", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
+						"roof": { "kind": "outdoors", "abroad": true },
+						"weather": null
 					}
 				},
 				{
@@ -5467,7 +7501,21 @@
 							{ "week": 4, "points": 17 },
 							{ "week": 3, "points": 26.2 }
 						],
-						"allowed_to_position": null
+						"allowed_to_position": null,
+						"game_total": {
+							"points": 50.5,
+							"team_points": 29,
+							"read_at": "2026-10-16T21:01:26.774Z"
+						},
+						"spread": { "side": "win", "points": 7.5, "read_at": "2026-10-16T21:01:26.774Z" },
+						"roof": { "kind": "outdoors", "abroad": false },
+						"weather": {
+							"temperature_f": 63,
+							"wind_mph": 12.7,
+							"precipitation_chance": 2,
+							"precipitation_kind": "none",
+							"read_at": "2026-10-16T21:01:34.611Z"
+						}
 					}
 				}
 			],
@@ -5502,7 +7550,21 @@
 									{ "week": 3, "points": 18.94 },
 									{ "week": 2, "points": 31.98 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 42.5,
+									"team_points": 25.5,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "win", "points": 8.5, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": false },
+								"weather": {
+									"temperature_f": 66,
+									"wind_mph": 10.4,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						}
 					],
@@ -5531,7 +7593,15 @@
 								"played": false,
 								"points_this_week": null,
 								"last_games": [],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 52.5,
+									"team_points": 23.5,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "lose", "points": 6, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "dome", "abroad": false },
+								"weather": null
 							}
 						},
 						{
@@ -5562,7 +7632,15 @@
 									{ "week": 4, "points": 2.9 },
 									{ "week": 3, "points": 6 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 42.5,
+									"team_points": 20,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "lose", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": true },
+								"weather": null
 							}
 						}
 					],
@@ -5593,7 +7671,21 @@
 								{ "week": 2, "points": 0.8 },
 								{ "week": 1, "points": 29.6 }
 							],
-							"allowed_to_position": null
+							"allowed_to_position": null,
+							"game_total": {
+								"points": 45.5,
+								"team_points": 23.5,
+								"read_at": "2026-10-16T21:01:26.774Z"
+							},
+							"spread": { "side": "win", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+							"roof": { "kind": "outdoors", "abroad": false },
+							"weather": {
+								"temperature_f": 54,
+								"wind_mph": 6.9,
+								"precipitation_chance": 0,
+								"precipitation_kind": "none",
+								"read_at": "2026-10-16T21:01:34.611Z"
+							}
 						}
 					},
 					"my_gain": 1.8,
@@ -5630,7 +7722,11 @@
 									{ "week": 4, "points": 5.7 },
 									{ "week": 3, "points": 24.8 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": null,
+								"spread": null,
+								"roof": null,
+								"weather": null
 							}
 						}
 					],
@@ -5663,7 +7759,21 @@
 									{ "week": 4, "points": 6.1 },
 									{ "week": 3, "points": 7.8 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 40.5,
+									"team_points": 19,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "lose", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": false },
+								"weather": {
+									"temperature_f": 74,
+									"wind_mph": 15,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						},
 						{
@@ -5694,7 +7804,21 @@
 									{ "week": 3, "points": 4 },
 									{ "week": 2, "points": 13.5 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 42.5,
+									"team_points": 25.5,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "win", "points": 8.5, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": false },
+								"weather": {
+									"temperature_f": 66,
+									"wind_mph": 10.4,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						}
 					],
@@ -5725,7 +7849,21 @@
 								{ "week": 2, "points": 0.8 },
 								{ "week": 1, "points": 29.6 }
 							],
-							"allowed_to_position": null
+							"allowed_to_position": null,
+							"game_total": {
+								"points": 45.5,
+								"team_points": 23.5,
+								"read_at": "2026-10-16T21:01:26.774Z"
+							},
+							"spread": { "side": "win", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+							"roof": { "kind": "outdoors", "abroad": false },
+							"weather": {
+								"temperature_f": 54,
+								"wind_mph": 6.9,
+								"precipitation_chance": 0,
+								"precipitation_kind": "none",
+								"read_at": "2026-10-16T21:01:34.611Z"
+							}
 						}
 					},
 					"my_gain": 1.7,
@@ -5762,7 +7900,21 @@
 									{ "week": 3, "points": 18.94 },
 									{ "week": 2, "points": 31.98 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 42.5,
+									"team_points": 25.5,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "win", "points": 8.5, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": false },
+								"weather": {
+									"temperature_f": 66,
+									"wind_mph": 10.4,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						}
 					],
@@ -5795,7 +7947,21 @@
 									{ "week": 4, "points": 17 },
 									{ "week": 3, "points": 26.2 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 50.5,
+									"team_points": 29,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "win", "points": 7.5, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": false },
+								"weather": {
+									"temperature_f": 63,
+									"wind_mph": 12.7,
+									"precipitation_chance": 2,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						},
 						{
@@ -5826,7 +7992,11 @@
 									{ "week": 4, "points": 26.72 },
 									{ "week": 3, "points": 25.58 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": null,
+								"spread": null,
+								"roof": null,
+								"weather": null
 							}
 						}
 					],
@@ -5857,7 +8027,21 @@
 								{ "week": 2, "points": 0.8 },
 								{ "week": 1, "points": 29.6 }
 							],
-							"allowed_to_position": null
+							"allowed_to_position": null,
+							"game_total": {
+								"points": 45.5,
+								"team_points": 23.5,
+								"read_at": "2026-10-16T21:01:26.774Z"
+							},
+							"spread": { "side": "win", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+							"roof": { "kind": "outdoors", "abroad": false },
+							"weather": {
+								"temperature_f": 54,
+								"wind_mph": 6.9,
+								"precipitation_chance": 0,
+								"precipitation_kind": "none",
+								"read_at": "2026-10-16T21:01:34.611Z"
+							}
 						}
 					},
 					"my_gain": 1.5,
@@ -5894,7 +8078,11 @@
 									{ "week": 4, "points": 5.7 },
 									{ "week": 3, "points": 24.8 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": null,
+								"spread": null,
+								"roof": null,
+								"weather": null
 							}
 						}
 					],
@@ -5927,7 +8115,21 @@
 									{ "week": 4, "points": 6.1 },
 									{ "week": 3, "points": 7.8 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 40.5,
+									"team_points": 19,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "lose", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": false },
+								"weather": {
+									"temperature_f": 74,
+									"wind_mph": 15,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						},
 						{
@@ -5954,7 +8156,15 @@
 								"played": false,
 								"points_this_week": null,
 								"last_games": [],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 52.5,
+									"team_points": 23.5,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "lose", "points": 6, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "dome", "abroad": false },
+								"weather": null
 							}
 						}
 					],
@@ -5985,7 +8195,21 @@
 								{ "week": 2, "points": 0.8 },
 								{ "week": 1, "points": 29.6 }
 							],
-							"allowed_to_position": null
+							"allowed_to_position": null,
+							"game_total": {
+								"points": 45.5,
+								"team_points": 23.5,
+								"read_at": "2026-10-16T21:01:26.774Z"
+							},
+							"spread": { "side": "win", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+							"roof": { "kind": "outdoors", "abroad": false },
+							"weather": {
+								"temperature_f": 54,
+								"wind_mph": 6.9,
+								"precipitation_chance": 0,
+								"precipitation_kind": "none",
+								"read_at": "2026-10-16T21:01:34.611Z"
+							}
 						}
 					},
 					"my_gain": 1.4,
@@ -6029,7 +8253,15 @@
 							{ "week": 4, "points": 25.08 },
 							{ "week": 3, "points": 12.68 }
 						],
-						"allowed_to_position": null
+						"allowed_to_position": null,
+						"game_total": {
+							"points": 42.5,
+							"team_points": 20,
+							"read_at": "2026-10-16T21:01:26.774Z"
+						},
+						"spread": { "side": "lose", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
+						"roof": { "kind": "outdoors", "abroad": true },
+						"weather": null
 					}
 				},
 				{
@@ -6060,7 +8292,21 @@
 							{ "week": 3, "points": 11.1 },
 							{ "week": 2, "points": 14.3 }
 						],
-						"allowed_to_position": null
+						"allowed_to_position": null,
+						"game_total": {
+							"points": 50.5,
+							"team_points": 21.5,
+							"read_at": "2026-10-16T21:01:26.774Z"
+						},
+						"spread": { "side": "lose", "points": 7.5, "read_at": "2026-10-16T21:01:26.774Z" },
+						"roof": { "kind": "outdoors", "abroad": false },
+						"weather": {
+							"temperature_f": 63,
+							"wind_mph": 12.7,
+							"precipitation_chance": 2,
+							"precipitation_kind": "none",
+							"read_at": "2026-10-16T21:01:34.611Z"
+						}
 					}
 				},
 				{
@@ -6091,7 +8337,21 @@
 							{ "week": 4, "points": 17.4 },
 							{ "week": 3, "points": 6.9 }
 						],
-						"allowed_to_position": null
+						"allowed_to_position": null,
+						"game_total": {
+							"points": 45.5,
+							"team_points": 22,
+							"read_at": "2026-10-16T21:01:26.774Z"
+						},
+						"spread": { "side": "lose", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+						"roof": { "kind": "outdoors", "abroad": false },
+						"weather": {
+							"temperature_f": 54,
+							"wind_mph": 6.9,
+							"precipitation_chance": 0,
+							"precipitation_kind": "none",
+							"read_at": "2026-10-16T21:01:34.611Z"
+						}
 					}
 				},
 				{
@@ -6122,7 +8382,11 @@
 							{ "week": 3, "points": 5.2 },
 							{ "week": 2, "points": 8.5 }
 						],
-						"allowed_to_position": null
+						"allowed_to_position": null,
+						"game_total": null,
+						"spread": null,
+						"roof": null,
+						"weather": null
 					}
 				},
 				{
@@ -6153,7 +8417,21 @@
 							{ "week": 3, "points": 15.8 },
 							{ "week": 2, "points": 12.3 }
 						],
-						"allowed_to_position": null
+						"allowed_to_position": null,
+						"game_total": {
+							"points": 42.5,
+							"team_points": 25.5,
+							"read_at": "2026-10-16T21:01:26.774Z"
+						},
+						"spread": { "side": "win", "points": 8.5, "read_at": "2026-10-16T21:01:26.774Z" },
+						"roof": { "kind": "outdoors", "abroad": false },
+						"weather": {
+							"temperature_f": 66,
+							"wind_mph": 10.4,
+							"precipitation_chance": 0,
+							"precipitation_kind": "none",
+							"read_at": "2026-10-16T21:01:34.611Z"
+						}
 					}
 				},
 				{
@@ -6184,7 +8462,21 @@
 							{ "week": 4, "points": 11.7 },
 							{ "week": 3, "points": 24.1 }
 						],
-						"allowed_to_position": null
+						"allowed_to_position": null,
+						"game_total": {
+							"points": 40.5,
+							"team_points": 18,
+							"read_at": "2026-10-16T21:01:26.774Z"
+						},
+						"spread": { "side": "lose", "points": 4.5, "read_at": "2026-10-16T21:01:26.774Z" },
+						"roof": { "kind": "outdoors", "abroad": false },
+						"weather": {
+							"temperature_f": 57,
+							"wind_mph": 6.9,
+							"precipitation_chance": 0,
+							"precipitation_kind": "none",
+							"read_at": "2026-10-16T21:01:34.611Z"
+						}
 					}
 				}
 			],
@@ -6219,7 +8511,11 @@
 									{ "week": 4, "points": 22.4 },
 									{ "week": 3, "points": 7.4 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": null,
+								"spread": null,
+								"roof": null,
+								"weather": null
 							}
 						}
 					],
@@ -6252,7 +8548,21 @@
 									{ "week": 4, "points": 17.4 },
 									{ "week": 3, "points": 6.9 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 45.5,
+									"team_points": 22,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "lose", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": false },
+								"weather": {
+									"temperature_f": 54,
+									"wind_mph": 6.9,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						},
 						{
@@ -6283,7 +8593,21 @@
 									{ "week": 3, "points": 11.1 },
 									{ "week": 2, "points": 14.3 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 50.5,
+									"team_points": 21.5,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "lose", "points": 7.5, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": false },
+								"weather": {
+									"temperature_f": 63,
+									"wind_mph": 12.7,
+									"precipitation_chance": 2,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						}
 					],
@@ -6314,7 +8638,21 @@
 								{ "week": 2, "points": 0.8 },
 								{ "week": 1, "points": 29.6 }
 							],
-							"allowed_to_position": null
+							"allowed_to_position": null,
+							"game_total": {
+								"points": 45.5,
+								"team_points": 23.5,
+								"read_at": "2026-10-16T21:01:26.774Z"
+							},
+							"spread": { "side": "win", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+							"roof": { "kind": "outdoors", "abroad": false },
+							"weather": {
+								"temperature_f": 54,
+								"wind_mph": 6.9,
+								"precipitation_chance": 0,
+								"precipitation_kind": "none",
+								"read_at": "2026-10-16T21:01:34.611Z"
+							}
 						}
 					},
 					"my_gain": 0.1,
@@ -6351,7 +8689,21 @@
 									{ "week": 3, "points": 18.94 },
 									{ "week": 2, "points": 31.98 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 42.5,
+									"team_points": 25.5,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "win", "points": 8.5, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": false },
+								"weather": {
+									"temperature_f": 66,
+									"wind_mph": 10.4,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						}
 					],
@@ -6384,7 +8736,21 @@
 									{ "week": 3, "points": 11.1 },
 									{ "week": 2, "points": 14.3 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 50.5,
+									"team_points": 21.5,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "lose", "points": 7.5, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": false },
+								"weather": {
+									"temperature_f": 63,
+									"wind_mph": 12.7,
+									"precipitation_chance": 2,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						},
 						{
@@ -6415,7 +8781,15 @@
 									{ "week": 4, "points": 25.08 },
 									{ "week": 3, "points": 12.68 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 42.5,
+									"team_points": 20,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "lose", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": true },
+								"weather": null
 							}
 						}
 					],
@@ -6446,7 +8820,21 @@
 								{ "week": 2, "points": 0.8 },
 								{ "week": 1, "points": 29.6 }
 							],
-							"allowed_to_position": null
+							"allowed_to_position": null,
+							"game_total": {
+								"points": 45.5,
+								"team_points": 23.5,
+								"read_at": "2026-10-16T21:01:26.774Z"
+							},
+							"spread": { "side": "win", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+							"roof": { "kind": "outdoors", "abroad": false },
+							"weather": {
+								"temperature_f": 54,
+								"wind_mph": 6.9,
+								"precipitation_chance": 0,
+								"precipitation_kind": "none",
+								"read_at": "2026-10-16T21:01:34.611Z"
+							}
 						}
 					},
 					"my_gain": 0.1,
@@ -6483,7 +8871,11 @@
 									{ "week": 4, "points": 5.7 },
 									{ "week": 3, "points": 24.8 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": null,
+								"spread": null,
+								"roof": null,
+								"weather": null
 							}
 						}
 					],
@@ -6516,7 +8908,21 @@
 									{ "week": 3, "points": 15.8 },
 									{ "week": 2, "points": 12.3 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 42.5,
+									"team_points": 25.5,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "win", "points": 8.5, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": false },
+								"weather": {
+									"temperature_f": 66,
+									"wind_mph": 10.4,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						},
 						{
@@ -6547,7 +8953,11 @@
 									{ "week": 3, "points": 5.2 },
 									{ "week": 2, "points": 8.5 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": null,
+								"spread": null,
+								"roof": null,
+								"weather": null
 							}
 						}
 					],
@@ -6578,7 +8988,21 @@
 								{ "week": 2, "points": 0.8 },
 								{ "week": 1, "points": 29.6 }
 							],
-							"allowed_to_position": null
+							"allowed_to_position": null,
+							"game_total": {
+								"points": 45.5,
+								"team_points": 23.5,
+								"read_at": "2026-10-16T21:01:26.774Z"
+							},
+							"spread": { "side": "win", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+							"roof": { "kind": "outdoors", "abroad": false },
+							"weather": {
+								"temperature_f": 54,
+								"wind_mph": 6.9,
+								"precipitation_chance": 0,
+								"precipitation_kind": "none",
+								"read_at": "2026-10-16T21:01:34.611Z"
+							}
 						}
 					},
 					"my_gain": 0.1,
@@ -6615,7 +9039,11 @@
 									{ "week": 4, "points": 22.4 },
 									{ "week": 3, "points": 7.4 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": null,
+								"spread": null,
+								"roof": null,
+								"weather": null
 							}
 						}
 					],
@@ -6648,7 +9076,21 @@
 									{ "week": 3, "points": 15.8 },
 									{ "week": 2, "points": 12.3 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 42.5,
+									"team_points": 25.5,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "win", "points": 8.5, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": false },
+								"weather": {
+									"temperature_f": 66,
+									"wind_mph": 10.4,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						},
 						{
@@ -6679,7 +9121,21 @@
 									{ "week": 4, "points": 11.7 },
 									{ "week": 3, "points": 24.1 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 40.5,
+									"team_points": 18,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "lose", "points": 4.5, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": false },
+								"weather": {
+									"temperature_f": 57,
+									"wind_mph": 6.9,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						}
 					],
@@ -6710,7 +9166,21 @@
 								{ "week": 2, "points": 0.8 },
 								{ "week": 1, "points": 29.6 }
 							],
-							"allowed_to_position": null
+							"allowed_to_position": null,
+							"game_total": {
+								"points": 45.5,
+								"team_points": 23.5,
+								"read_at": "2026-10-16T21:01:26.774Z"
+							},
+							"spread": { "side": "win", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+							"roof": { "kind": "outdoors", "abroad": false },
+							"weather": {
+								"temperature_f": 54,
+								"wind_mph": 6.9,
+								"precipitation_chance": 0,
+								"precipitation_kind": "none",
+								"read_at": "2026-10-16T21:01:34.611Z"
+							}
 						}
 					},
 					"my_gain": 0.5,
@@ -6754,7 +9224,21 @@
 							{ "week": 4, "points": 8.7 },
 							{ "week": 3, "points": 4.7 }
 						],
-						"allowed_to_position": null
+						"allowed_to_position": null,
+						"game_total": {
+							"points": 43.5,
+							"team_points": 18.5,
+							"read_at": "2026-10-16T21:01:26.774Z"
+						},
+						"spread": { "side": "lose", "points": 7, "read_at": "2026-10-16T21:01:26.774Z" },
+						"roof": { "kind": "outdoors", "abroad": false },
+						"weather": {
+							"temperature_f": 48,
+							"wind_mph": 4.6,
+							"precipitation_chance": 0,
+							"precipitation_kind": "none",
+							"read_at": "2026-10-16T21:01:34.611Z"
+						}
 					}
 				},
 				{
@@ -6785,7 +9269,21 @@
 							{ "week": 2, "points": 14.2 },
 							{ "week": 1, "points": 19.8 }
 						],
-						"allowed_to_position": null
+						"allowed_to_position": null,
+						"game_total": {
+							"points": 43.5,
+							"team_points": 18.5,
+							"read_at": "2026-10-16T21:01:26.774Z"
+						},
+						"spread": { "side": "lose", "points": 7, "read_at": "2026-10-16T21:01:26.774Z" },
+						"roof": { "kind": "outdoors", "abroad": false },
+						"weather": {
+							"temperature_f": 48,
+							"wind_mph": 4.6,
+							"precipitation_chance": 0,
+							"precipitation_kind": "none",
+							"read_at": "2026-10-16T21:01:34.611Z"
+						}
 					}
 				},
 				{
@@ -6816,7 +9314,21 @@
 							{ "week": 4, "points": 18 },
 							{ "week": 3, "points": 15.4 }
 						],
-						"allowed_to_position": null
+						"allowed_to_position": null,
+						"game_total": {
+							"points": 50.5,
+							"team_points": 29,
+							"read_at": "2026-10-16T21:01:26.774Z"
+						},
+						"spread": { "side": "win", "points": 7.5, "read_at": "2026-10-16T21:01:26.774Z" },
+						"roof": { "kind": "outdoors", "abroad": false },
+						"weather": {
+							"temperature_f": 63,
+							"wind_mph": 12.7,
+							"precipitation_chance": 2,
+							"precipitation_kind": "none",
+							"read_at": "2026-10-16T21:01:34.611Z"
+						}
 					}
 				},
 				{
@@ -6847,7 +9359,11 @@
 							{ "week": 4, "points": 12 },
 							{ "week": 3, "points": 11.1 }
 						],
-						"allowed_to_position": null
+						"allowed_to_position": null,
+						"game_total": null,
+						"spread": null,
+						"roof": null,
+						"weather": null
 					}
 				},
 				{
@@ -6878,7 +9394,21 @@
 							{ "week": 4, "points": 11.2 },
 							{ "week": 3, "points": 1.5 }
 						],
-						"allowed_to_position": null
+						"allowed_to_position": null,
+						"game_total": {
+							"points": 43.5,
+							"team_points": 25.5,
+							"read_at": "2026-10-16T21:01:26.774Z"
+						},
+						"spread": { "side": "win", "points": 7, "read_at": "2026-10-16T21:01:26.774Z" },
+						"roof": { "kind": "outdoors", "abroad": false },
+						"weather": {
+							"temperature_f": 48,
+							"wind_mph": 4.6,
+							"precipitation_chance": 0,
+							"precipitation_kind": "none",
+							"read_at": "2026-10-16T21:01:34.611Z"
+						}
 					}
 				}
 			],
@@ -6913,7 +9443,11 @@
 									{ "week": 4, "points": 22.4 },
 									{ "week": 3, "points": 7.4 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": null,
+								"spread": null,
+								"roof": null,
+								"weather": null
 							}
 						}
 					],
@@ -6946,7 +9480,11 @@
 									{ "week": 4, "points": 12 },
 									{ "week": 3, "points": 11.1 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": null,
+								"spread": null,
+								"roof": null,
+								"weather": null
 							}
 						},
 						{
@@ -6977,7 +9515,21 @@
 									{ "week": 2, "points": 14.2 },
 									{ "week": 1, "points": 19.8 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 43.5,
+									"team_points": 18.5,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "lose", "points": 7, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": false },
+								"weather": {
+									"temperature_f": 48,
+									"wind_mph": 4.6,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						}
 					],
@@ -7008,7 +9560,21 @@
 								{ "week": 2, "points": 0.8 },
 								{ "week": 1, "points": 29.6 }
 							],
-							"allowed_to_position": null
+							"allowed_to_position": null,
+							"game_total": {
+								"points": 45.5,
+								"team_points": 23.5,
+								"read_at": "2026-10-16T21:01:26.774Z"
+							},
+							"spread": { "side": "win", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+							"roof": { "kind": "outdoors", "abroad": false },
+							"weather": {
+								"temperature_f": 54,
+								"wind_mph": 6.9,
+								"precipitation_chance": 0,
+								"precipitation_kind": "none",
+								"read_at": "2026-10-16T21:01:34.611Z"
+							}
 						}
 					},
 					"my_gain": 0.3,
@@ -7045,7 +9611,11 @@
 									{ "week": 4, "points": 22.4 },
 									{ "week": 3, "points": 7.4 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": null,
+								"spread": null,
+								"roof": null,
+								"weather": null
 							}
 						}
 					],
@@ -7078,7 +9648,11 @@
 									{ "week": 4, "points": 12 },
 									{ "week": 3, "points": 11.1 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": null,
+								"spread": null,
+								"roof": null,
+								"weather": null
 							}
 						},
 						{
@@ -7109,7 +9683,21 @@
 									{ "week": 4, "points": 11.2 },
 									{ "week": 3, "points": 1.5 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 43.5,
+									"team_points": 25.5,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "win", "points": 7, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": false },
+								"weather": {
+									"temperature_f": 48,
+									"wind_mph": 4.6,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						}
 					],
@@ -7140,7 +9728,21 @@
 								{ "week": 2, "points": 0.8 },
 								{ "week": 1, "points": 29.6 }
 							],
-							"allowed_to_position": null
+							"allowed_to_position": null,
+							"game_total": {
+								"points": 45.5,
+								"team_points": 23.5,
+								"read_at": "2026-10-16T21:01:26.774Z"
+							},
+							"spread": { "side": "win", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+							"roof": { "kind": "outdoors", "abroad": false },
+							"weather": {
+								"temperature_f": 54,
+								"wind_mph": 6.9,
+								"precipitation_chance": 0,
+								"precipitation_kind": "none",
+								"read_at": "2026-10-16T21:01:34.611Z"
+							}
 						}
 					},
 					"my_gain": 0.1,
@@ -7177,7 +9779,15 @@
 									{ "week": 4, "points": 6.5 },
 									{ "week": 3, "points": 21.9 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 52.5,
+									"team_points": 20,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "lose", "points": 12.5, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "dome", "abroad": false },
+								"weather": null
 							}
 						}
 					],
@@ -7210,7 +9820,21 @@
 									{ "week": 4, "points": 18 },
 									{ "week": 3, "points": 15.4 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 50.5,
+									"team_points": 29,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "win", "points": 7.5, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": false },
+								"weather": {
+									"temperature_f": 63,
+									"wind_mph": 12.7,
+									"precipitation_chance": 2,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						},
 						{
@@ -7241,7 +9865,21 @@
 									{ "week": 2, "points": 14.2 },
 									{ "week": 1, "points": 19.8 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 43.5,
+									"team_points": 18.5,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "lose", "points": 7, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": false },
+								"weather": {
+									"temperature_f": 48,
+									"wind_mph": 4.6,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						}
 					],
@@ -7272,7 +9910,21 @@
 								{ "week": 2, "points": 0.8 },
 								{ "week": 1, "points": 29.6 }
 							],
-							"allowed_to_position": null
+							"allowed_to_position": null,
+							"game_total": {
+								"points": 45.5,
+								"team_points": 23.5,
+								"read_at": "2026-10-16T21:01:26.774Z"
+							},
+							"spread": { "side": "win", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+							"roof": { "kind": "outdoors", "abroad": false },
+							"weather": {
+								"temperature_f": 54,
+								"wind_mph": 6.9,
+								"precipitation_chance": 0,
+								"precipitation_kind": "none",
+								"read_at": "2026-10-16T21:01:34.611Z"
+							}
 						}
 					},
 					"my_gain": 0.5,
@@ -7309,7 +9961,15 @@
 									{ "week": 4, "points": 6.5 },
 									{ "week": 3, "points": 21.9 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 52.5,
+									"team_points": 20,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "lose", "points": 12.5, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "dome", "abroad": false },
+								"weather": null
 							}
 						}
 					],
@@ -7342,7 +10002,21 @@
 									{ "week": 4, "points": 8.7 },
 									{ "week": 3, "points": 4.7 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 43.5,
+									"team_points": 18.5,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "lose", "points": 7, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": false },
+								"weather": {
+									"temperature_f": 48,
+									"wind_mph": 4.6,
+									"precipitation_chance": 0,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						},
 						{
@@ -7373,7 +10047,21 @@
 									{ "week": 4, "points": 18 },
 									{ "week": 3, "points": 15.4 }
 								],
-								"allowed_to_position": null
+								"allowed_to_position": null,
+								"game_total": {
+									"points": 50.5,
+									"team_points": 29,
+									"read_at": "2026-10-16T21:01:26.774Z"
+								},
+								"spread": { "side": "win", "points": 7.5, "read_at": "2026-10-16T21:01:26.774Z" },
+								"roof": { "kind": "outdoors", "abroad": false },
+								"weather": {
+									"temperature_f": 63,
+									"wind_mph": 12.7,
+									"precipitation_chance": 2,
+									"precipitation_kind": "none",
+									"read_at": "2026-10-16T21:01:34.611Z"
+								}
 							}
 						}
 					],
@@ -7404,7 +10092,21 @@
 								{ "week": 2, "points": 0.8 },
 								{ "week": 1, "points": 29.6 }
 							],
-							"allowed_to_position": null
+							"allowed_to_position": null,
+							"game_total": {
+								"points": 45.5,
+								"team_points": 23.5,
+								"read_at": "2026-10-16T21:01:26.774Z"
+							},
+							"spread": { "side": "win", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+							"roof": { "kind": "outdoors", "abroad": false },
+							"weather": {
+								"temperature_f": 54,
+								"wind_mph": 6.9,
+								"precipitation_chance": 0,
+								"precipitation_kind": "none",
+								"read_at": "2026-10-16T21:01:34.611Z"
+							}
 						}
 					},
 					"my_gain": 0.2,
@@ -7444,7 +10146,17 @@
 					{ "week": 4, "points": 24.96 },
 					{ "week": 3, "points": 26.68 }
 				],
-				"allowed_to_position": null
+				"allowed_to_position": null,
+				"game_total": { "points": 40.5, "team_points": 22, "read_at": "2026-10-16T21:01:26.774Z" },
+				"spread": { "side": "win", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
+				"roof": { "kind": "outdoors", "abroad": false },
+				"weather": {
+					"temperature_f": 74,
+					"wind_mph": 15,
+					"precipitation_chance": 0,
+					"precipitation_kind": "none",
+					"read_at": "2026-10-16T21:01:34.611Z"
+				}
 			}
 		},
 		{
@@ -7474,7 +10186,21 @@
 					{ "week": 2, "points": 0.8 },
 					{ "week": 1, "points": 29.6 }
 				],
-				"allowed_to_position": null
+				"allowed_to_position": null,
+				"game_total": {
+					"points": 45.5,
+					"team_points": 23.5,
+					"read_at": "2026-10-16T21:01:26.774Z"
+				},
+				"spread": { "side": "win", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+				"roof": { "kind": "outdoors", "abroad": false },
+				"weather": {
+					"temperature_f": 54,
+					"wind_mph": 6.9,
+					"precipitation_chance": 0,
+					"precipitation_kind": "none",
+					"read_at": "2026-10-16T21:01:34.611Z"
+				}
 			}
 		},
 		{
@@ -7505,7 +10231,21 @@
 					{ "week": 3, "points": 18.94 },
 					{ "week": 2, "points": 31.98 }
 				],
-				"allowed_to_position": null
+				"allowed_to_position": null,
+				"game_total": {
+					"points": 42.5,
+					"team_points": 25.5,
+					"read_at": "2026-10-16T21:01:26.774Z"
+				},
+				"spread": { "side": "win", "points": 8.5, "read_at": "2026-10-16T21:01:26.774Z" },
+				"roof": { "kind": "outdoors", "abroad": false },
+				"weather": {
+					"temperature_f": 66,
+					"wind_mph": 10.4,
+					"precipitation_chance": 0,
+					"precipitation_kind": "none",
+					"read_at": "2026-10-16T21:01:34.611Z"
+				}
 			}
 		},
 		{
@@ -7536,7 +10276,11 @@
 					{ "week": 4, "points": 6.5 },
 					{ "week": 3, "points": 21.9 }
 				],
-				"allowed_to_position": null
+				"allowed_to_position": null,
+				"game_total": { "points": 52.5, "team_points": 20, "read_at": "2026-10-16T21:01:26.774Z" },
+				"spread": { "side": "lose", "points": 12.5, "read_at": "2026-10-16T21:01:26.774Z" },
+				"roof": { "kind": "dome", "abroad": false },
+				"weather": null
 			}
 		},
 		{
@@ -7567,7 +10311,17 @@
 					{ "week": 4, "points": 10.7 },
 					{ "week": 3, "points": 3 }
 				],
-				"allowed_to_position": null
+				"allowed_to_position": null,
+				"game_total": { "points": 40.5, "team_points": 19, "read_at": "2026-10-16T21:01:26.774Z" },
+				"spread": { "side": "lose", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
+				"roof": { "kind": "outdoors", "abroad": false },
+				"weather": {
+					"temperature_f": 74,
+					"wind_mph": 15,
+					"precipitation_chance": 0,
+					"precipitation_kind": "none",
+					"read_at": "2026-10-16T21:01:34.611Z"
+				}
 			}
 		},
 		{
@@ -7598,7 +10352,21 @@
 					{ "week": 4, "points": 3.3 },
 					{ "week": 2, "points": 0 }
 				],
-				"allowed_to_position": null
+				"allowed_to_position": null,
+				"game_total": {
+					"points": 49.5,
+					"team_points": 26.5,
+					"read_at": "2026-10-16T21:01:26.774Z"
+				},
+				"spread": { "side": "win", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
+				"roof": { "kind": "retractable", "abroad": false },
+				"weather": {
+					"temperature_f": 59,
+					"wind_mph": 12.7,
+					"precipitation_chance": 0,
+					"precipitation_kind": "none",
+					"read_at": "2026-10-16T21:01:34.611Z"
+				}
 			}
 		},
 		{
@@ -7629,7 +10397,21 @@
 					{ "week": 3, "points": -0.5 },
 					{ "week": 2, "points": 11.8 }
 				],
-				"allowed_to_position": null
+				"allowed_to_position": null,
+				"game_total": {
+					"points": 41.5,
+					"team_points": 21.5,
+					"read_at": "2026-10-16T21:01:26.774Z"
+				},
+				"spread": { "side": "win", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+				"roof": { "kind": "outdoors", "abroad": false },
+				"weather": {
+					"temperature_f": 52,
+					"wind_mph": 6.9,
+					"precipitation_chance": 0,
+					"precipitation_kind": "none",
+					"read_at": "2026-10-16T21:01:34.611Z"
+				}
 			}
 		},
 		{
@@ -7660,7 +10442,17 @@
 					{ "week": 2, "points": 5.1 },
 					{ "week": 1, "points": 14.8 }
 				],
-				"allowed_to_position": null
+				"allowed_to_position": null,
+				"game_total": { "points": 45.5, "team_points": 22, "read_at": "2026-10-16T21:01:26.774Z" },
+				"spread": { "side": "lose", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+				"roof": { "kind": "outdoors", "abroad": false },
+				"weather": {
+					"temperature_f": 54,
+					"wind_mph": 6.9,
+					"precipitation_chance": 0,
+					"precipitation_kind": "none",
+					"read_at": "2026-10-16T21:01:34.611Z"
+				}
 			}
 		},
 		{
@@ -7687,7 +10479,11 @@
 				"played": false,
 				"points_this_week": null,
 				"last_games": [],
-				"allowed_to_position": null
+				"allowed_to_position": null,
+				"game_total": { "points": 40.5, "team_points": 22, "read_at": "2026-10-16T21:01:26.774Z" },
+				"spread": { "side": "win", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
+				"roof": { "kind": "outdoors", "abroad": false },
+				"weather": null
 			}
 		},
 		{
@@ -7718,7 +10514,21 @@
 					{ "week": 4, "points": 5.1 },
 					{ "week": 3, "points": 3.5 }
 				],
-				"allowed_to_position": null
+				"allowed_to_position": null,
+				"game_total": {
+					"points": 50.5,
+					"team_points": 21.5,
+					"read_at": "2026-10-16T21:01:26.774Z"
+				},
+				"spread": { "side": "lose", "points": 7.5, "read_at": "2026-10-16T21:01:26.774Z" },
+				"roof": { "kind": "outdoors", "abroad": false },
+				"weather": {
+					"temperature_f": 63,
+					"wind_mph": 12.7,
+					"precipitation_chance": 2,
+					"precipitation_kind": "none",
+					"read_at": "2026-10-16T21:01:34.611Z"
+				}
 			}
 		},
 		{
@@ -7745,7 +10555,17 @@
 				"played": false,
 				"points_this_week": null,
 				"last_games": [],
-				"allowed_to_position": null
+				"allowed_to_position": null,
+				"game_total": { "points": 50.5, "team_points": 29, "read_at": "2026-10-16T21:01:26.774Z" },
+				"spread": { "side": "win", "points": 7.5, "read_at": "2026-10-16T21:01:26.774Z" },
+				"roof": { "kind": "outdoors", "abroad": false },
+				"weather": {
+					"temperature_f": 63,
+					"wind_mph": 12.7,
+					"precipitation_chance": 2,
+					"precipitation_kind": "none",
+					"read_at": "2026-10-16T21:01:34.611Z"
+				}
 			}
 		},
 		{
@@ -7776,7 +10596,11 @@
 					{ "week": 4, "points": 5.7 },
 					{ "week": 3, "points": 24.8 }
 				],
-				"allowed_to_position": null
+				"allowed_to_position": null,
+				"game_total": null,
+				"spread": null,
+				"roof": null,
+				"weather": null
 			}
 		},
 		{
@@ -7807,7 +10631,11 @@
 					{ "week": 4, "points": 6.3 },
 					{ "week": 3, "points": 19.4 }
 				],
-				"allowed_to_position": null
+				"allowed_to_position": null,
+				"game_total": { "points": 42.5, "team_points": 23, "read_at": "2026-10-16T21:01:26.774Z" },
+				"spread": { "side": "win", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
+				"roof": { "kind": "outdoors", "abroad": true },
+				"weather": null
 			}
 		},
 		{
@@ -7838,7 +10666,11 @@
 					{ "week": 3, "points": 20 },
 					{ "week": 2, "points": 4.1 }
 				],
-				"allowed_to_position": null
+				"allowed_to_position": null,
+				"game_total": null,
+				"spread": null,
+				"roof": null,
+				"weather": null
 			}
 		},
 		{
@@ -7869,7 +10701,17 @@
 					{ "week": 3, "points": 10.6 },
 					{ "week": 2, "points": 6.5 }
 				],
-				"allowed_to_position": null
+				"allowed_to_position": null,
+				"game_total": { "points": 42.5, "team_points": 17, "read_at": "2026-10-16T21:01:26.774Z" },
+				"spread": { "side": "lose", "points": 8.5, "read_at": "2026-10-16T21:01:26.774Z" },
+				"roof": { "kind": "outdoors", "abroad": false },
+				"weather": {
+					"temperature_f": 66,
+					"wind_mph": 10.4,
+					"precipitation_chance": 0,
+					"precipitation_kind": "none",
+					"read_at": "2026-10-16T21:01:34.611Z"
+				}
 			}
 		},
 		{
@@ -7900,7 +10742,21 @@
 					{ "week": 4, "points": 15.4 },
 					{ "week": 3, "points": 7.4 }
 				],
-				"allowed_to_position": null
+				"allowed_to_position": null,
+				"game_total": {
+					"points": 49.5,
+					"team_points": 26.5,
+					"read_at": "2026-10-16T21:01:26.774Z"
+				},
+				"spread": { "side": "win", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
+				"roof": { "kind": "retractable", "abroad": false },
+				"weather": {
+					"temperature_f": 59,
+					"wind_mph": 12.7,
+					"precipitation_chance": 0,
+					"precipitation_kind": "none",
+					"read_at": "2026-10-16T21:01:34.611Z"
+				}
 			}
 		},
 		{
@@ -7931,7 +10787,21 @@
 					{ "week": 4, "points": 2.5 },
 					{ "week": 1, "points": 3.6 }
 				],
-				"allowed_to_position": null
+				"allowed_to_position": null,
+				"game_total": {
+					"points": 50.5,
+					"team_points": 21.5,
+					"read_at": "2026-10-16T21:01:26.774Z"
+				},
+				"spread": { "side": "lose", "points": 7.5, "read_at": "2026-10-16T21:01:26.774Z" },
+				"roof": { "kind": "outdoors", "abroad": false },
+				"weather": {
+					"temperature_f": 63,
+					"wind_mph": 12.7,
+					"precipitation_chance": 2,
+					"precipitation_kind": "none",
+					"read_at": "2026-10-16T21:01:34.611Z"
+				}
 			}
 		},
 		{
@@ -7962,7 +10832,11 @@
 					{ "week": 4, "points": 22.4 },
 					{ "week": 3, "points": 7.4 }
 				],
-				"allowed_to_position": null
+				"allowed_to_position": null,
+				"game_total": null,
+				"spread": null,
+				"roof": null,
+				"weather": null
 			}
 		},
 		{
@@ -7989,7 +10863,11 @@
 				"played": false,
 				"points_this_week": null,
 				"last_games": [],
-				"allowed_to_position": null
+				"allowed_to_position": null,
+				"game_total": { "points": 42.5, "team_points": 20, "read_at": "2026-10-16T21:01:26.774Z" },
+				"spread": { "side": "lose", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
+				"roof": { "kind": "outdoors", "abroad": true },
+				"weather": null
 			}
 		},
 		{
@@ -8016,7 +10894,11 @@
 				"played": false,
 				"points_this_week": null,
 				"last_games": [],
-				"allowed_to_position": null
+				"allowed_to_position": null,
+				"game_total": null,
+				"spread": null,
+				"roof": null,
+				"weather": null
 			}
 		}
 	],

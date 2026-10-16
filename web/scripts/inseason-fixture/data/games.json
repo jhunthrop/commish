@@ -1,0 +1,434 @@
+{
+	"season": 2026,
+	"week": 6,
+	"games": [
+		{
+			"team": "DEN",
+			"opponent": "SEA",
+			"home": true,
+			"kickoff": "2026-10-16T00:15:00.000Z",
+			"played": false,
+			"game_total": { "points": 40.5, "team_points": 19, "read_at": "2026-10-16T21:01:26.774Z" },
+			"spread": { "side": "lose", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
+			"roof": { "kind": "outdoors", "abroad": false },
+			"weather": null
+		},
+		{
+			"team": "SEA",
+			"opponent": "DEN",
+			"home": false,
+			"kickoff": "2026-10-16T00:15:00.000Z",
+			"played": false,
+			"game_total": { "points": 40.5, "team_points": 22, "read_at": "2026-10-16T21:01:26.774Z" },
+			"spread": { "side": "win", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
+			"roof": { "kind": "outdoors", "abroad": false },
+			"weather": null
+		},
+		{
+			"team": "HOU",
+			"opponent": "JAX",
+			"home": false,
+			"kickoff": "2026-10-18T13:30:00.000Z",
+			"played": false,
+			"game_total": { "points": 42.5, "team_points": 20, "read_at": "2026-10-16T21:01:26.774Z" },
+			"spread": { "side": "lose", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
+			"roof": { "kind": "outdoors", "abroad": true },
+			"weather": null
+		},
+		{
+			"team": "JAX",
+			"opponent": "HOU",
+			"home": true,
+			"kickoff": "2026-10-18T13:30:00.000Z",
+			"played": false,
+			"game_total": { "points": 42.5, "team_points": 23, "read_at": "2026-10-16T21:01:26.774Z" },
+			"spread": { "side": "win", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
+			"roof": { "kind": "outdoors", "abroad": true },
+			"weather": null
+		},
+		{
+			"team": "ATL",
+			"opponent": "CHI",
+			"home": true,
+			"kickoff": "2026-10-18T17:00:00.000Z",
+			"played": false,
+			"game_total": { "points": 49.5, "team_points": 23.5, "read_at": "2026-10-16T21:01:26.774Z" },
+			"spread": { "side": "lose", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
+			"roof": { "kind": "retractable", "abroad": false },
+			"weather": {
+				"temperature_f": 59,
+				"wind_mph": 12.7,
+				"precipitation_chance": 0,
+				"precipitation_kind": "none",
+				"read_at": "2026-10-16T21:01:34.611Z"
+			}
+		},
+		{
+			"team": "BAL",
+			"opponent": "CLE",
+			"home": false,
+			"kickoff": "2026-10-18T17:00:00.000Z",
+			"played": false,
+			"game_total": { "points": 40.5, "team_points": 22.5, "read_at": "2026-10-16T21:01:26.774Z" },
+			"spread": { "side": "win", "points": 4.5, "read_at": "2026-10-16T21:01:26.774Z" },
+			"roof": { "kind": "outdoors", "abroad": false },
+			"weather": {
+				"temperature_f": 57,
+				"wind_mph": 6.9,
+				"precipitation_chance": 0,
+				"precipitation_kind": "none",
+				"read_at": "2026-10-16T21:01:34.611Z"
+			}
+		},
+		{
+			"team": "CAR",
+			"opponent": "PHI",
+			"home": false,
+			"kickoff": "2026-10-18T17:00:00.000Z",
+			"played": false,
+			"game_total": { "points": 41.5, "team_points": 20, "read_at": "2026-10-16T21:01:26.774Z" },
+			"spread": { "side": "lose", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+			"roof": { "kind": "outdoors", "abroad": false },
+			"weather": {
+				"temperature_f": 52,
+				"wind_mph": 6.9,
+				"precipitation_chance": 0,
+				"precipitation_kind": "none",
+				"read_at": "2026-10-16T21:01:34.611Z"
+			}
+		},
+		{
+			"team": "CHI",
+			"opponent": "ATL",
+			"home": false,
+			"kickoff": "2026-10-18T17:00:00.000Z",
+			"played": false,
+			"game_total": { "points": 49.5, "team_points": 26.5, "read_at": "2026-10-16T21:01:26.774Z" },
+			"spread": { "side": "win", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
+			"roof": { "kind": "retractable", "abroad": false },
+			"weather": {
+				"temperature_f": 59,
+				"wind_mph": 12.7,
+				"precipitation_chance": 0,
+				"precipitation_kind": "none",
+				"read_at": "2026-10-16T21:01:34.611Z"
+			}
+		},
+		{
+			"team": "CLE",
+			"opponent": "BAL",
+			"home": true,
+			"kickoff": "2026-10-18T17:00:00.000Z",
+			"played": false,
+			"game_total": { "points": 40.5, "team_points": 18, "read_at": "2026-10-16T21:01:26.774Z" },
+			"spread": { "side": "lose", "points": 4.5, "read_at": "2026-10-16T21:01:26.774Z" },
+			"roof": { "kind": "outdoors", "abroad": false },
+			"weather": {
+				"temperature_f": 57,
+				"wind_mph": 6.9,
+				"precipitation_chance": 0,
+				"precipitation_kind": "none",
+				"read_at": "2026-10-16T21:01:34.611Z"
+			}
+		},
+		{
+			"team": "IND",
+			"opponent": "TEN",
+			"home": true,
+			"kickoff": "2026-10-18T17:00:00.000Z",
+			"played": false,
+			"game_total": { "points": 44.5, "team_points": 26, "read_at": "2026-10-16T21:01:26.774Z" },
+			"spread": { "side": "win", "points": 7, "read_at": "2026-10-16T21:01:26.774Z" },
+			"roof": { "kind": "retractable", "abroad": false },
+			"weather": {
+				"temperature_f": 58,
+				"wind_mph": 5.8,
+				"precipitation_chance": 0,
+				"precipitation_kind": "none",
+				"read_at": "2026-10-16T21:01:34.611Z"
+			}
+		},
+		{
+			"team": "NE",
+			"opponent": "NYJ",
+			"home": true,
+			"kickoff": "2026-10-18T17:00:00.000Z",
+			"played": false,
+			"game_total": { "points": 43.5, "team_points": 25.5, "read_at": "2026-10-16T21:01:26.774Z" },
+			"spread": { "side": "win", "points": 7, "read_at": "2026-10-16T21:01:26.774Z" },
+			"roof": { "kind": "outdoors", "abroad": false },
+			"weather": {
+				"temperature_f": 48,
+				"wind_mph": 4.6,
+				"precipitation_chance": 0,
+				"precipitation_kind": "none",
+				"read_at": "2026-10-16T21:01:34.611Z"
+			}
+		},
+		{
+			"team": "NO",
+			"opponent": "NYG",
+			"home": false,
+			"kickoff": "2026-10-18T17:00:00.000Z",
+			"played": false,
+			"game_total": { "points": 45.5, "team_points": 22, "read_at": "2026-10-16T21:01:26.774Z" },
+			"spread": { "side": "lose", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+			"roof": { "kind": "outdoors", "abroad": false },
+			"weather": {
+				"temperature_f": 54,
+				"wind_mph": 6.9,
+				"precipitation_chance": 0,
+				"precipitation_kind": "none",
+				"read_at": "2026-10-16T21:01:34.611Z"
+			}
+		},
+		{
+			"team": "NYG",
+			"opponent": "NO",
+			"home": true,
+			"kickoff": "2026-10-18T17:00:00.000Z",
+			"played": false,
+			"game_total": { "points": 45.5, "team_points": 23.5, "read_at": "2026-10-16T21:01:26.774Z" },
+			"spread": { "side": "win", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+			"roof": { "kind": "outdoors", "abroad": false },
+			"weather": {
+				"temperature_f": 54,
+				"wind_mph": 6.9,
+				"precipitation_chance": 0,
+				"precipitation_kind": "none",
+				"read_at": "2026-10-16T21:01:34.611Z"
+			}
+		},
+		{
+			"team": "NYJ",
+			"opponent": "NE",
+			"home": false,
+			"kickoff": "2026-10-18T17:00:00.000Z",
+			"played": false,
+			"game_total": { "points": 43.5, "team_points": 18.5, "read_at": "2026-10-16T21:01:26.774Z" },
+			"spread": { "side": "lose", "points": 7, "read_at": "2026-10-16T21:01:26.774Z" },
+			"roof": { "kind": "outdoors", "abroad": false },
+			"weather": {
+				"temperature_f": 48,
+				"wind_mph": 4.6,
+				"precipitation_chance": 0,
+				"precipitation_kind": "none",
+				"read_at": "2026-10-16T21:01:34.611Z"
+			}
+		},
+		{
+			"team": "PHI",
+			"opponent": "CAR",
+			"home": true,
+			"kickoff": "2026-10-18T17:00:00.000Z",
+			"played": false,
+			"game_total": { "points": 41.5, "team_points": 21.5, "read_at": "2026-10-16T21:01:26.774Z" },
+			"spread": { "side": "win", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+			"roof": { "kind": "outdoors", "abroad": false },
+			"weather": {
+				"temperature_f": 52,
+				"wind_mph": 6.9,
+				"precipitation_chance": 0,
+				"precipitation_kind": "none",
+				"read_at": "2026-10-16T21:01:34.611Z"
+			}
+		},
+		{
+			"team": "PIT",
+			"opponent": "TB",
+			"home": false,
+			"kickoff": "2026-10-18T17:00:00.000Z",
+			"played": false,
+			"game_total": { "points": 40.5, "team_points": 22, "read_at": "2026-10-16T21:01:26.774Z" },
+			"spread": { "side": "win", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
+			"roof": { "kind": "outdoors", "abroad": false },
+			"weather": {
+				"temperature_f": 74,
+				"wind_mph": 15,
+				"precipitation_chance": 0,
+				"precipitation_kind": "none",
+				"read_at": "2026-10-16T21:01:34.611Z"
+			}
+		},
+		{
+			"team": "TB",
+			"opponent": "PIT",
+			"home": true,
+			"kickoff": "2026-10-18T17:00:00.000Z",
+			"played": false,
+			"game_total": { "points": 40.5, "team_points": 19, "read_at": "2026-10-16T21:01:26.774Z" },
+			"spread": { "side": "lose", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
+			"roof": { "kind": "outdoors", "abroad": false },
+			"weather": {
+				"temperature_f": 74,
+				"wind_mph": 15,
+				"precipitation_chance": 0,
+				"precipitation_kind": "none",
+				"read_at": "2026-10-16T21:01:34.611Z"
+			}
+		},
+		{
+			"team": "TEN",
+			"opponent": "IND",
+			"home": false,
+			"kickoff": "2026-10-18T17:00:00.000Z",
+			"played": false,
+			"game_total": { "points": 44.5, "team_points": 19, "read_at": "2026-10-16T21:01:26.774Z" },
+			"spread": { "side": "lose", "points": 7, "read_at": "2026-10-16T21:01:26.774Z" },
+			"roof": { "kind": "retractable", "abroad": false },
+			"weather": {
+				"temperature_f": 58,
+				"wind_mph": 5.8,
+				"precipitation_chance": 0,
+				"precipitation_kind": "none",
+				"read_at": "2026-10-16T21:01:34.611Z"
+			}
+		},
+		{
+			"team": "ARI",
+			"opponent": "LAR",
+			"home": false,
+			"kickoff": "2026-10-18T20:05:00.000Z",
+			"played": false,
+			"game_total": { "points": 52.5, "team_points": 20, "read_at": "2026-10-16T21:01:26.774Z" },
+			"spread": { "side": "lose", "points": 12.5, "read_at": "2026-10-16T21:01:26.774Z" },
+			"roof": { "kind": "dome", "abroad": false },
+			"weather": null
+		},
+		{
+			"team": "LAR",
+			"opponent": "ARI",
+			"home": true,
+			"kickoff": "2026-10-18T20:05:00.000Z",
+			"played": false,
+			"game_total": { "points": 52.5, "team_points": 32.5, "read_at": "2026-10-16T21:01:26.774Z" },
+			"spread": { "side": "win", "points": 12.5, "read_at": "2026-10-16T21:01:26.774Z" },
+			"roof": { "kind": "dome", "abroad": false },
+			"weather": null
+		},
+		{
+			"team": "BUF",
+			"opponent": "LV",
+			"home": false,
+			"kickoff": "2026-10-18T20:25:00.000Z",
+			"played": false,
+			"game_total": { "points": 52.5, "team_points": 29.5, "read_at": "2026-10-16T21:01:26.774Z" },
+			"spread": { "side": "win", "points": 6, "read_at": "2026-10-16T21:01:26.774Z" },
+			"roof": { "kind": "dome", "abroad": false },
+			"weather": null
+		},
+		{
+			"team": "KC",
+			"opponent": "LAC",
+			"home": true,
+			"kickoff": "2026-10-18T20:25:00.000Z",
+			"played": false,
+			"game_total": { "points": 42.5, "team_points": 25.5, "read_at": "2026-10-16T21:01:26.774Z" },
+			"spread": { "side": "win", "points": 8.5, "read_at": "2026-10-16T21:01:26.774Z" },
+			"roof": { "kind": "outdoors", "abroad": false },
+			"weather": {
+				"temperature_f": 66,
+				"wind_mph": 10.4,
+				"precipitation_chance": 0,
+				"precipitation_kind": "none",
+				"read_at": "2026-10-16T21:01:34.611Z"
+			}
+		},
+		{
+			"team": "LAC",
+			"opponent": "KC",
+			"home": false,
+			"kickoff": "2026-10-18T20:25:00.000Z",
+			"played": false,
+			"game_total": { "points": 42.5, "team_points": 17, "read_at": "2026-10-16T21:01:26.774Z" },
+			"spread": { "side": "lose", "points": 8.5, "read_at": "2026-10-16T21:01:26.774Z" },
+			"roof": { "kind": "outdoors", "abroad": false },
+			"weather": {
+				"temperature_f": 66,
+				"wind_mph": 10.4,
+				"precipitation_chance": 0,
+				"precipitation_kind": "none",
+				"read_at": "2026-10-16T21:01:34.611Z"
+			}
+		},
+		{
+			"team": "LV",
+			"opponent": "BUF",
+			"home": true,
+			"kickoff": "2026-10-18T20:25:00.000Z",
+			"played": false,
+			"game_total": { "points": 52.5, "team_points": 23.5, "read_at": "2026-10-16T21:01:26.774Z" },
+			"spread": { "side": "lose", "points": 6, "read_at": "2026-10-16T21:01:26.774Z" },
+			"roof": { "kind": "dome", "abroad": false },
+			"weather": null
+		},
+		{
+			"team": "DAL",
+			"opponent": "GB",
+			"home": false,
+			"kickoff": "2026-10-19T00:20:00.000Z",
+			"played": false,
+			"game_total": { "points": 52.5, "team_points": 25.5, "read_at": "2026-10-16T21:01:26.774Z" },
+			"spread": { "side": "lose", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+			"roof": { "kind": "outdoors", "abroad": false },
+			"weather": {
+				"temperature_f": 55,
+				"wind_mph": 9.2,
+				"precipitation_chance": 0,
+				"precipitation_kind": "none",
+				"read_at": "2026-10-16T21:01:34.611Z"
+			}
+		},
+		{
+			"team": "GB",
+			"opponent": "DAL",
+			"home": true,
+			"kickoff": "2026-10-19T00:20:00.000Z",
+			"played": false,
+			"game_total": { "points": 52.5, "team_points": 27, "read_at": "2026-10-16T21:01:26.774Z" },
+			"spread": { "side": "win", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
+			"roof": { "kind": "outdoors", "abroad": false },
+			"weather": {
+				"temperature_f": 55,
+				"wind_mph": 9.2,
+				"precipitation_chance": 0,
+				"precipitation_kind": "none",
+				"read_at": "2026-10-16T21:01:34.611Z"
+			}
+		},
+		{
+			"team": "SF",
+			"opponent": "WSH",
+			"home": true,
+			"kickoff": "2026-10-20T00:15:00.000Z",
+			"played": false,
+			"game_total": { "points": 50.5, "team_points": 29, "read_at": "2026-10-16T21:01:26.774Z" },
+			"spread": { "side": "win", "points": 7.5, "read_at": "2026-10-16T21:01:26.774Z" },
+			"roof": { "kind": "outdoors", "abroad": false },
+			"weather": {
+				"temperature_f": 63,
+				"wind_mph": 12.7,
+				"precipitation_chance": 2,
+				"precipitation_kind": "none",
+				"read_at": "2026-10-16T21:01:34.611Z"
+			}
+		},
+		{
+			"team": "WSH",
+			"opponent": "SF",
+			"home": false,
+			"kickoff": "2026-10-20T00:15:00.000Z",
+			"played": false,
+			"game_total": { "points": 50.5, "team_points": 21.5, "read_at": "2026-10-16T21:01:26.774Z" },
+			"spread": { "side": "lose", "points": 7.5, "read_at": "2026-10-16T21:01:26.774Z" },
+			"roof": { "kind": "outdoors", "abroad": false },
+			"weather": {
+				"temperature_f": 63,
+				"wind_mph": 12.7,
+				"precipitation_chance": 2,
+				"precipitation_kind": "none",
+				"read_at": "2026-10-16T21:01:34.611Z"
+			}
+		}
+	]
+}

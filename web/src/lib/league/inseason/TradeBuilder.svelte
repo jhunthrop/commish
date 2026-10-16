@@ -138,7 +138,7 @@
 				disabled={!on && full}
 				onclick={() => tap(name, hostId)}
 			>
-				<LineRow line={{ ...line, slug: null }} />
+				<LineRow line={{ ...line, slug: null }} factsOnPhone={false} />
 			</button>
 		{/each}
 	</section>

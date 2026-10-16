@@ -195,7 +195,8 @@ def test_a_missing_season_answer_is_a_failure() -> None:
 def engine() -> Any:
     if "PARITY_DATABASE_URL" not in os.environ:
         pytest.skip("needs a Postgres for scratch databases")
-    url = databases.build_with_alembic(_DATABASE)
+    # Revision 0009, before 0010 creates the real stadiums table: these cases build their own stand-in.
+    url = databases.build_with_alembic(_DATABASE, revision="0009")
     built = make_engine(sqlalchemy_url(url))
     try:
         yield built

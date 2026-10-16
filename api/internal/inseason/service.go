@@ -60,8 +60,10 @@ type Service struct {
 	Facts   SeasonFacts
 	Holds   Holds
 	Moves   Moves
-	Now     func() time.Time
-	Log     *slog.Logger
+	// Season is the season GET /games/week reads, the board's.
+	Season int
+	Now    func() time.Time
+	Log    *slog.Logger
 }
 
 // Routes is every route this package serves.
@@ -72,6 +74,7 @@ func (s *Service) Routes() []httpx.Route {
 		{Method: http.MethodGet, Path: "/leagues/attached/{id}/waivers", Access: httpx.SignedIn, Limit: limit, Handler: s.waivers},
 		{Method: http.MethodGet, Path: "/leagues/attached/{id}/trades", Access: httpx.SignedIn, Limit: limit, Handler: s.trades},
 		{Method: http.MethodPost, Path: "/leagues/attached/{id}/trades/check", Access: httpx.SignedIn, Limit: limit, Handler: s.checkTrade},
+		{Method: http.MethodGet, Path: "/games/week", Access: httpx.Public, Limit: limit, Handler: s.weekGames},
 	}
 }
 

@@ -29,9 +29,11 @@
 		now: Date;
 		/** A starter's game this week, "at BUF Sun 1:00 pm", null when the run does not say. */
 		gameOf: (team: string, week: number) => string | null;
+		/** His game's facts, "Expected to score 25 and to win by 3, 47.5 points in the game. ...", null when none are held. */
+		factsOf?: (team: string) => string | null;
 	}
 
-	let { sync, board, tagsOf, now, gameOf }: Props = $props();
+	let { sync, board, tagsOf, now, gameOf, factsOf = () => null }: Props = $props();
 
 	const matchup = $derived(sync.matchup);
 
@@ -73,6 +75,7 @@
 		{#each s.starters as starter (starter.player.host_id)}
 			{@const row = rowOf(board, starter.player)}
 			{@const game = matchup ? gameOf(row?.team ?? starter.player.team, matchup.week) : null}
+			{@const facts = factsOf(row?.team ?? starter.player.team)}
 			<LeagueRow
 				player={row}
 				host={starter.player}
@@ -87,6 +90,7 @@
 						/>{:else}<span>{starter.player.position}</span>{/if}
 					<span>{starter.player.team}</span>
 					{#if game}<span>{game}</span>{/if}
+					{#if facts}<span class="conditions">{facts}</span>{/if}
 				{/snippet}
 				{#snippet trailing()}
 					{#if scored}<span class="pts">{fixed(starter.points)}</span>{/if}
@@ -171,6 +175,12 @@
 	.pts {
 		font-family: var(--font-num);
 		font-weight: 600;
+	}
+
+	/* A starter's game facts are a sentence: a line of their own under his short facts. */
+	.conditions {
+		flex-basis: 100%;
+		font-variant-numeric: tabular-nums;
 	}
 
 	.none {

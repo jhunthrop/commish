@@ -25,6 +25,7 @@ import type {
 	WaiverAdvice
 } from '../../src/lib/league/inseason/api.ts';
 import type { components } from '../../src/lib/api/types.ts';
+import type { GameWeek } from '../../src/lib/format/game-facts.ts';
 import { FIXTURE_IDS } from './ids.ts';
 import { FIXTURE_SEASON, askedPhase, phaseAccount, phaseLeagues, phaseSync } from './phases.ts';
 
@@ -87,11 +88,12 @@ async function load<T>(name: string): Promise<T> {
 	return JSON.parse(await readFile(new URL(`${name}.json`, DATA), 'utf8')) as T;
 }
 
-const [sync, lineup, waivers, trades] = await Promise.all([
+const [sync, lineup, waivers, trades, gameWeek] = await Promise.all([
 	load<LeagueSync>('sync'),
 	load<LineupAdvice>('lineup'),
 	load<WaiverAdvice>('waivers'),
-	load<TradeAdvice>('trades')
+	load<TradeAdvice>('trades'),
+	load<GameWeek>('games')
 ]);
 
 const myTeam = sync.teams.find((t) => t.roster_id === sync.me);
@@ -432,6 +434,11 @@ async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> 
 		};
 		const picked = leagues.find((league) => league.id === chosen);
 		send(req, res, HTTP.ok, picked ? { ...answer, league: picked } : answer);
+		return;
+	}
+	// The week's games with their facts (Lane 66a), the recorded week whatever week is asked.
+	if (url.pathname === '/games/week') {
+		send(req, res, HTTP.ok, gameWeek);
 		return;
 	}
 	if (url.pathname === '/season') {
