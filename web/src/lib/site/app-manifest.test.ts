@@ -55,3 +55,12 @@ void test('every page links the manifest and colours the chrome for each theme',
 	);
 	assert.match(head, /<link rel="apple-touch-icon" href="\/icons\/apple-touch-icon\.png">/);
 });
+
+void test('the installed app describes the whole season, the league screens as well as the draft prep', () => {
+	const { description } = webManifest();
+	assert.equal(
+		description,
+		'Fantasy football all season: your lineup, matchup, waivers and trades, our board, every player, mock drafts and your sheet.'
+	);
+	assert.doesNotMatch(description, /[\u2013\u2014;]/);
+});

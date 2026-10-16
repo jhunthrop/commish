@@ -3,6 +3,7 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
+	import { hasSessionCookie } from '#lib/api/session.ts';
 	import { isSignedOut } from '#lib/api/status.ts';
 	import { LEAGUE_HOST_PARAM, MEMBER_WAYS, links, type MemberWay } from '#lib/site/links.ts';
 	import ActionBar from '#lib/ui/ActionBar.svelte';
@@ -101,15 +102,18 @@
 				yahooOn = false;
 				espnOn = false;
 			});
-		leagueApi
-			.attached()
-			.then((list) => {
-				attached = list;
-				view = 'form';
-				const pasted = page.url.searchParams.get('link');
-				if (pasted) typed(pasted);
-			})
-			.catch((error: unknown) => (view = isSignedOut(error) ? 'signed-out' : 'unreachable'));
+		// With no session the answer is a 401: the page is the signed-out one without asking.
+		if (!hasSessionCookie()) view = 'signed-out';
+		else
+			leagueApi
+				.attached()
+				.then((list) => {
+					attached = list;
+					view = 'form';
+					const pasted = page.url.searchParams.get('link');
+					if (pasted) typed(pasted);
+				})
+				.catch((error: unknown) => (view = isSignedOut(error) ? 'signed-out' : 'unreachable'));
 		return () => {
 			if (timer !== null) clearTimeout(timer);
 		};

@@ -58,7 +58,7 @@ export function webManifest(): WebManifest {
 		name: APP_NAME,
 		short_name: APP_NAME,
 		description:
-			'Fantasy football draft prep: the board, every player, mock drafts and your sheet.',
+			'Fantasy football all season: your lineup, matchup, waivers and trades, our board, every player, mock drafts and your sheet.',
 		id: START_PATH,
 		start_url: START_PATH,
 		scope: '/',
