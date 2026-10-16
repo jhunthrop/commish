@@ -31,6 +31,9 @@
 		 * aside while it is, so one verb shows). */
 		controls?: string;
 		expanded?: boolean;
+		/** A panel under the decision that carries the screen's verb itself (the trade builder): the
+		 * screen's verb steps aside while it is open, so one verb shows. */
+		panelVerb?: boolean;
 		/** The confirmation, under the decision. */
 		move?: Snippet;
 		children: Snippet;
@@ -47,12 +50,13 @@
 		onverb = null,
 		controls,
 		expanded,
+		panelVerb = false,
 		move,
 		children
 	}: Props = $props();
 
-	/** While the confirmation is open its own verb is the one on screen. */
-	const asideForMove = $derived(onverb !== null && expanded === true);
+	/** While the confirmation (or a panel with the verb) is open its own verb is the one on screen. */
+	const asideForMove = $derived((onverb !== null && expanded === true) || panelVerb);
 
 	/** The verb's link opens the host in a new tab with no hold on this page. Set here rather than
 	 * on the shared verb, so no other page carries it; made again for each host page, so a link that

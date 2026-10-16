@@ -14,6 +14,8 @@ export type WaiverRow = Schemas['WaiverRow'];
 export type TradeAdvice = Schemas['TradeAdvice'];
 export type TradeTeam = Schemas['TradeTeam'];
 export type TradeRow = Schemas['TradeRow'];
+export type TradeCheck = Schemas['TradeCheck'];
+export type TradeCheckInput = Schemas['TradeCheckInput'];
 export type PlayerLine = Schemas['PlayerLine'];
 export type WeekFacts = Schemas['WeekFacts'];
 export type InjuryDesignation = Schemas['InjuryDesignation'];
@@ -54,6 +56,9 @@ export const inSeasonApi = {
 	/** The trades, narrowed to those holding one player when given (his board id). */
 	trades: (id: string, player: string | null = null) =>
 		client.call<TradeAdvice>(path(id, 'trades', { player })),
+	/** One trade the member built, on the finder's reckoning; nothing is sent to the host. */
+	checkTrade: (id: string, trade: TradeCheckInput) =>
+		client.call<TradeCheck>(path(id, 'trades/check'), { method: 'POST', body: trade }),
 	/** The move in words with its confirm token; nothing is sent to the host. */
 	planMove: (id: string, move: HostMoveInput) =>
 		client.call<HostMovePlan>(path(id, 'moves/plan'), { method: 'POST', body: move }),
