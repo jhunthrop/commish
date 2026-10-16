@@ -3,7 +3,8 @@
  * (`data-rail`, set by the boot script before the first paint), the phone's five along the bottom. Built from
  * railFor on the server and put in every page's head by hooks.server.ts, so the phase table never
  * ships in a page's script and the rail is right on the first frame. */
-import { DEFAULT_RAIL, RAIL_KEYS, railOfKey } from './nav.ts';
+import { DEFAULT_RAIL, RAIL_KEYS } from './nav.ts';
+import { railOfKey } from './rail-order.ts';
 
 /** The shell's phone width, where the rail becomes the bottom bar: Shell.svelte's media query. */
 export const PHONE_MAX_PX = 760;

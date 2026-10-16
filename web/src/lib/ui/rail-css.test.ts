@@ -2,7 +2,8 @@
 // along the bottom (spec 2026-10-16 §2). Run with `npm test`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { RAIL_ITEMS, RAIL_KEYS, railOfKey } from './nav.ts';
+import { RAIL_ITEMS, RAIL_KEYS } from './nav.ts';
+import { railOfKey } from './rail-order.ts';
 import { PHONE_MAX_PX, railCss } from './rail-css.ts';
 
 const css = railCss();

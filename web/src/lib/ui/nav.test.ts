@@ -10,7 +10,6 @@ import {
 	RAIL_ITEMS,
 	SCREEN_PARAM,
 	shellHrefs,
-	railFor,
 	railHref,
 	railKey,
 	railPhase,
@@ -18,9 +17,9 @@ import {
 	sectionOf,
 	screenSection,
 	leagueScreenOf,
-	type LeaguePhase,
-	type RailEntry
+	type LeaguePhase
 } from './nav.ts';
+import { railFor, type RailEntry } from './rail-order.ts';
 
 const labels = (items: readonly RailEntry[]): string[] => items.map((item) => item.label);
 const phone = (items: readonly RailEntry[]): string[] =>

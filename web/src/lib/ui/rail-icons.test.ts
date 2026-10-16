@@ -3,7 +3,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { ICONS } from './icons.ts';
-import { LEAGUE_PHASES, RAIL_FOOT, RAIL_ITEMS, railFor, railIconId } from './nav.ts';
+import { LEAGUE_PHASES, RAIL_FOOT, RAIL_ITEMS, railIconId } from './nav.ts';
+import { railFor } from './rail-order.ts';
 import { RAIL_ICONS, railIconNames, railSprite } from './rail-icons.ts';
 
 const sprite = railSprite();
