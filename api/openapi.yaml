@@ -3036,7 +3036,7 @@ components:
         allowed_to_position: { allOf: [{ $ref: "#/components/schemas/PointsAllowed" }], nullable: true }
     PlayerLine:
       type: object
-      required: [player, headshot, slug, position_rank, points_over_replacement, held, facts]
+      required: [player, headshot, slug, position_rank, points_over_replacement, rest_of_season_per_game, held, facts]
       properties:
         player: { $ref: "#/components/schemas/LeaguePlayer" }
         headshot: { type: string, nullable: true, description: "his face from our player directory, null without one" }
@@ -3055,6 +3055,15 @@ components:
             points over replacement a week for this league, one decimal: the order's averaged over the weeks it covers
             (the preseason number's season over 17, the rest-of-season order's over its own first week, the league's when the run does not say, through week
             17), as the basis says; null without a projection
+        rest_of_season_per_game:
+          type: number
+          format: double
+          nullable: true
+          description: >-
+            his rest-of-season points a game, one decimal: the published board's rest-of-season points over the games his
+            club has left from the board's first week through week 17, byes out, as the basis says; null on the preseason
+            number, on a run that does not say its first week, without a projection or with no games left. A player who is
+            out keeps it: it assumes he plays
         held: { type: boolean, description: the drafter tags him Hold on a sheet, so he is never a drop or a trade give }
         facts: { $ref: "#/components/schemas/WeekFacts" }
     LineupSlot:

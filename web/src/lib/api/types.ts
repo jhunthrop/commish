@@ -2579,6 +2579,11 @@ export interface components {
 			 * @description points over replacement a week for this league, one decimal: the order's averaged over the weeks it covers (the preseason number's season over 17, the rest-of-season order's over its own first week, the league's when the run does not say, through week 17), as the basis says; null without a projection
 			 */
 			points_over_replacement: number | null;
+			/**
+			 * Format: double
+			 * @description his rest-of-season points a game, one decimal: the published board's rest-of-season points over the games his club has left from the board's first week through week 17, byes out, as the basis says; null on the preseason number, on a run that does not say its first week, without a projection or with no games left. A player who is out keeps it: it assumes he plays
+			 */
+			rest_of_season_per_game: number | null;
 			/** @description the drafter tags him Hold on a sheet */
 			held: boolean;
 			facts: components['schemas']['WeekFacts'];
