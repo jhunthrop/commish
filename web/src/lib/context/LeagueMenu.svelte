@@ -12,7 +12,7 @@
 	import { choose, switchProblem } from './choose.svelte.ts';
 	import { signInReturn } from './sign-in.ts';
 	import { siteContext } from './context.svelte.ts';
-	import { leagueLine } from './menu-words.ts';
+	import { FOLLOW_ANOTHER, leagueLine, phaseWords } from './menu-words.ts';
 	import { FALLBACK_BOARDS, runBoards, type RunBoard } from './run-boards.ts';
 	import { DEFAULT_CONTEXT_FORMAT, leagueName } from './words.ts';
 
@@ -72,6 +72,8 @@
 	);
 	const many = $derived(hasFeature(siteContext.features, 'many_leagues'));
 	const league = $derived(siteContext.league);
+	/** Each league's phase beside its name, only when the account's leagues differ. */
+	const phases = $derived(phaseWords(siteContext.leagues));
 	/** The pressed format: the chosen format with no league, PPR before any choice. */
 	const noLeagueFormat = $derived(
 		league === null ? (siteContext.format ?? DEFAULT_CONTEXT_FORMAT) : null
@@ -91,7 +93,11 @@
 					aria-pressed={candidate.id === league?.id}
 					onclick={() => void choose({ league: candidate.id })}
 				>
-					<span class="name">{leagueName(candidate)}</span>
+					<span class="name"
+						>{leagueName(candidate)}{#if phases.has(candidate.id)}<span class="phase"
+								>{phases.get(candidate.id)}</span
+							>{/if}</span
+					>
 					<span class="line">{leagueLine(candidate)}</span>
 				</button>
 			{/each}
@@ -123,15 +129,13 @@
 			{#if league}
 				<Quiet size="sm" href={links.league(league.id)}>League page</Quiet>
 			{/if}
-			{#if many || siteContext.leagues.length === 0}
-				<Quiet size="sm" href={links.leagueNew()}
-					>{siteContext.leagues.length === 0
-						? 'Follow your league'
-						: 'Follow another league'}</Quiet
-				>
-			{:else}
+			{#if !many && siteContext.leagues.length > 0}
 				<OneLeagueFree />
 			{/if}
+			<!-- The last row, always: the switch is the one place a league is chosen (spec 2026-10-16 §2). -->
+			<Quiet size="sm" href={links.leagueNew()}
+				>{siteContext.leagues.length === 0 ? 'Follow your league' : FOLLOW_ANOTHER}</Quiet
+			>
 		{/if}
 	</div>
 </div>
@@ -179,6 +183,15 @@
 	.name {
 		font-weight: 600;
 		overflow-wrap: anywhere;
+	}
+
+	/* The phase sits on the name's line, at its end, in the line's quiet ink. */
+	.phase {
+		margin-left: var(--s-2);
+		font-size: var(--t-sm);
+		font-weight: 500;
+		color: var(--ink-2);
+		white-space: nowrap;
 	}
 
 	.line {
