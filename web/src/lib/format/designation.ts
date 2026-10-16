@@ -75,7 +75,7 @@ export interface CaptureStamp {
 	checkedAt: string | null;
 }
 
-/** Past this long without a check the capture is behind, and the basis says so. Its statuses stay
+/** Past this long since the check the statuses come from, the basis says how old they are. They stay
  * applied: a player on injured reserve ranked as if he plays would be worse than a stale notice. */
 export const CAPTURE_BEHIND_MS = 36 * 60 * 60 * 1000;
 
@@ -89,7 +89,8 @@ export function stampWords(iso: string, zone: string = memberZone()): string {
 /** The basis line's sentence naming the capture and when it was read, "read" only for a real check:
  * "Injury status from the hourly capture, read Fri Oct 16, 9:05 am Central.", else "as the list
  * stood" at its last change. Past CAPTURE_BEHIND_MS since the last check (or the list, with none) it
- * says the capture is behind and that the statuses are the last it read. */
+ * says how old the statuses are, never that the capture is behind: a static page judges that against
+ * the file it was built from, which may be older than the capture itself. */
 export function captureLine(
 	capture: CaptureStamp,
 	now: number,
@@ -101,7 +102,7 @@ export function captureLine(
 			? `as the list stood ${stampWords(capture.readAt, zone)}`
 			: `read ${stampWords(capture.checkedAt, zone)}`;
 	if (now - Date.parse(last) > CAPTURE_BEHIND_MS) {
-		return `The hourly injury capture is behind, ${when}. Players keep the statuses it read then.`;
+		return `These injury statuses are from the hourly capture, ${when}, over a day and a half before now. Players keep them until a newer list is read.`;
 	}
 	return `Injury status from the hourly capture, ${when}.`;
 }

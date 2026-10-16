@@ -11,7 +11,7 @@
 	import TagChip from '#lib/ui/TagChip.svelte';
 	import ToneChip from '#lib/ui/ToneChip.svelte';
 	import ValueCell from '#lib/ui/ValueCell.svelte';
-	import { vorCell } from '#lib/ui/heat.ts';
+	import { roundlessVorCell, vorCell } from '#lib/ui/heat.ts';
 	import type { LeaguePlayer } from './api.ts';
 	import type { LeagueBoardPlayer } from './board.ts';
 	import { projectionWords, seasonWords } from './model.ts';
@@ -62,7 +62,10 @@
 	const valueEnd = $derived.by(() => {
 		if (!endsOnValue || player === null) return null;
 		const { vor, vorRound } = player;
-		return vor !== null && vorRound !== null ? vorCell(vor, vorRound) : null;
+		// A player on a season-long list shows his rank as the word, so no round places him.
+		const held = player.status?.rank != null;
+		if (vor === null || vorRound === null) return null;
+		return held ? roundlessVorCell(vor, vorRound) : vorCell(vor, vorRound);
 	});
 	/** The season moves beside the projection whenever the end holds another number. */
 	const seasonInMeta = $derived(trailing !== undefined || endsOnValue);

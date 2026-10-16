@@ -56,11 +56,11 @@ void test('"read" is said only for a real check, and a stamp names its month and
 	);
 });
 
-void test('past 36 hours without a check the capture is said to be behind, its statuses kept', () => {
+void test('past 36 hours the basis says how old the statuses are, and they stay applied', () => {
 	const late = Date.parse(CHECKED) + CAPTURE_BEHIND_MS + 1;
 	assert.equal(
 		captureLine({ readAt: LISTED, checkedAt: CHECKED }, late, CENTRAL),
-		'The hourly injury capture is behind, read Fri Oct 16, 9:05 am Central. Players keep the statuses it read then.'
+		'These injury statuses are from the hourly capture, read Fri Oct 16, 9:05 am Central, over a day and a half before now. Players keep them until a newer list is read.'
 	);
 	assert.match(
 		captureLine(
@@ -68,7 +68,7 @@ void test('past 36 hours without a check the capture is said to be behind, its s
 			Date.parse(LISTED) + CAPTURE_BEHIND_MS + 1,
 			CENTRAL
 		),
-		/^The hourly injury capture is behind, as the list stood Mon Oct 12, 9:03 pm Central\./
+		/^These injury statuses are from the hourly capture, as the list stood Mon Oct 12, 9:03 pm Central, over/
 	);
 	assert.match(
 		captureLine(

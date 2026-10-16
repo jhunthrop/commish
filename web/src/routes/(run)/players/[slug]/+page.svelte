@@ -240,15 +240,20 @@
 				{/if}
 			</article>
 			<aside class="tier" aria-label="His tier">
-				<TierMates
-					tier={page.tier.tier}
-					group={POSITION_NAMES[page.position]}
-					{mates}
-					currentId={page.id}
-					cliff={page.tier.cliff}
-					unit={page.format.unit}
-					basis={page.tierBasis}
-				/>
+				{#if page.heldTier !== null}
+					<PanelHead title="Tier" />
+					<Footnote>{page.heldTier}</Footnote>
+				{:else}
+					<TierMates
+						tier={page.tier.tier}
+						group={POSITION_NAMES[page.position]}
+						{mates}
+						currentId={page.id}
+						cliff={page.tier.cliff}
+						unit={page.format.unit}
+						basis={page.tierBasis}
+					/>
+				{/if}
 			</aside>
 		</div>
 
@@ -271,7 +276,7 @@
 							<td class="num">{listed?.rank ?? line.numbers.ourRank}</td>
 							<td class="num">{fixed(line.numbers.projected)}</td>
 							<td class="num">{signed(line.numbers.vor)}</td>
-							<td class="num">{line.numbers.tier}</td>
+							<td class="num">{listed?.rank ?? line.numbers.tier}</td>
 						</tr>
 					{/each}
 				</Table>

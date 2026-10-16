@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
 	draftersWords,
+	HELD_TIER_WORDS,
 	formatTable,
 	lineWords,
 	restFigures,
@@ -186,4 +187,9 @@ void test('a player on a season-long list is never given a rank as if he plays (
 	for (const line of [words.caption, words.value, preseason.value, preseason.drafters]) {
 		assert.doesNotMatch(line, /rank \d|Round \d|pick \d|picks|[—;]/u, line);
 	}
+});
+
+void test('a held player is placed in no tier: his aside says why (Lane 63, N1)', () => {
+	assert.match(HELD_TIER_WORDS, /^No tier while he is on a season-long list\./u);
+	assert.doesNotMatch(HELD_TIER_WORDS, /Tier \d|rank \d|[—;]/u);
 });

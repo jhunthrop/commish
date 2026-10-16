@@ -55,6 +55,11 @@ export function draftersWords(
  * plays, so no sentence gives him the rank it would earn. */
 const BELOW_THE_AVAILABLE = 'He sits below the available players.';
 
+/** A held player's tier aside in place of his tier mates: no tier places him by the rank his figure
+ * would earn. */
+export const HELD_TIER_WORDS =
+	'No tier while he is on a season-long list. Our figure assumes he plays, so he sits below every available player at his position.';
+
 export function lineWords(
 	line: { format: Format; numbers: PlayerFormat; rest: RestFigures | null },
 	sources: readonly string[],

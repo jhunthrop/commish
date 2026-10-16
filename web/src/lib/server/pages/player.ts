@@ -30,6 +30,7 @@ import {
 	seasonUnderway
 } from '../run.ts';
 import {
+	HELD_TIER_WORDS,
 	formatTable,
 	lineWords,
 	restFigures,
@@ -94,6 +95,8 @@ export interface PlayerPage {
 	/** His designation on the run's injury capture, null when it does not list him or the run
 	 * carries no capture; with when the capture was read. */
 	status: { status: PlayerStatus; capture: CaptureStamp; words: PlayerStatusWords } | null;
+	/** In place of his tier mates for a player on a season-long list, null otherwise. */
+	heldTier: string | null;
 }
 
 export async function playerEntries(): Promise<{ slug: string }[]> {
@@ -208,6 +211,7 @@ export async function playerPage(slug: string): Promise<PlayerPage> {
 		capsule: loaded.capsule,
 		season: seasonView(loaded.season, loaded.position, run.formats, kickoffOf),
 		underway,
-		status
+		status,
+		heldTier: listed?.seasonLong === true ? HELD_TIER_WORDS : null
 	};
 }

@@ -17,7 +17,7 @@ const ZONE = 'America/Chicago';
 const HELD = { slug: 'de-von-achane', name: 'Achane', position: 'RB' };
 const DOUBTFUL = { slug: 'david-montgomery', name: 'Montgomery' };
 const CAPTURE =
-	/(Injury status from the hourly capture|The hourly injury capture is behind), (read|as the list stood) \w{3} \w{3} \d{1,2}, \d{1,2}:\d{2} [ap]m Central\./;
+	/(Injury status from the hourly capture|These injury statuses are from the hourly capture), (read|as the list stood) \w{3} \w{3} \d{1,2}, \d{1,2}:\d{2} [ap]m Central\./;
 
 const web = process.argv[2] ?? 'http://localhost:4681';
 const out = new URL(process.argv[3] ?? '../screenshots/injury-status/', import.meta.url);
@@ -129,6 +129,10 @@ async function playerPages(page: Page, tag: string): Promise<void> {
 	check(
 		text.includes('He sits below the available players.') && !/picks? (later|earlier)/.test(text),
 		`${tag}: his drafters fact gives the ADP alone`
+	);
+	check(
+		text.includes('No tier while he is on a season-long list.') && !/\bTier \d/.test(text),
+		`${tag}: no tier aside places him`
 	);
 	await page.screenshot({ path: file(`player-ir-${tag}`) });
 	await open(page, `/players/${DOUBTFUL.slug}`);
