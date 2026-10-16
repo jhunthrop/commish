@@ -6,6 +6,7 @@ import { listWords } from '#lib/format/list.ts';
 import { monthDayLabel } from '#lib/format/date.ts';
 import { memberZone, weekdayTime } from '#lib/format/clock.ts';
 import { designationMark, sitsHim } from '#lib/format/designation.ts';
+import { POINTS_PER_GAME_DECIMALS } from '#lib/run/decimals.ts';
 import type { LeagueHost } from '../api.ts';
 import { recordWords } from '../model.ts';
 import { hostWords } from '../names.ts';
@@ -270,6 +271,12 @@ export function hisPorWords(points: number): string {
 	return `his ${porFigure(points)} ${LINES.overRepl}`;
 }
 
+/** His rest-of-season points a game in the season figure's unit words: "18.4 a game". The basis
+ * line says what the figure is. */
+export function perGameWords(points: number): string {
+	return `${fixed(points, POINTS_PER_GAME_DECIMALS)} ${LINES.aGame}`;
+}
+
 /** The tabs under a followed league's title, each screen by its rail word (spec 2026-10-16 §3). */
 export const TAB_LABELS: Readonly<Record<'league' | LeagueScreen, string>> = {
 	league: 'League',
@@ -290,6 +297,8 @@ export const LINES = {
 	drop: 'Drop',
 	unranked: 'Unranked',
 	aWeek: 'a week',
+	/** A row's rest-of-season points a game, in the unit words the league page's season figure uses. */
+	aGame: 'a game',
 	all: 'All',
 	position: 'Position',
 	waiverAdds: 'Waiver adds',
