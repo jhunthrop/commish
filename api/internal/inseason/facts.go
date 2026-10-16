@@ -239,7 +239,7 @@ func (s *Season) For(p Player) Facts {
 			home, kickoff := g.Home, g.Kickoff
 			f.Opponent, f.Home, f.Kickoff, f.Played = g.Opponent, &home, &kickoff, g.Final
 			f.Locked = g.Final || !s.now.Before(g.Kickoff)
-			f.Game = s.gameFacts[boards.ClubWeek{Week: s.week, Team: p.Team}]
+			f.Game = figuresAt(s.gameFacts[boards.ClubWeek{Week: s.week, Team: p.Team}], s.now, g.Kickoff)
 			if a, ok := s.allowed[teamPosition{g.Opponent, p.Position}]; ok {
 				f.Allowed = &a
 			}

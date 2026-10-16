@@ -11,17 +11,22 @@ import (
 // The week's game facts (Lane 66a; the round 4 preregistration §2.5 and
 // §4): the game's expected score and margin from the hourly capture's
 // figures (research/pipeline/tank01/lines.py, the tank01_lines source),
+// with the game table's weekly read of them beside (nflverse_game_figures,
+// research/pipeline/nflverse/games.py) for when the capture goes stale,
 // the kickoff forecast (research/pipeline/nws/forecast.py, nws_forecast)
-// and the venue's roof (research.stadiums, joined through the game table
-// nflverse_games). Each is a fact with its read time, never a projection.
+// and the venue's roof (research.stadiums, joined through the newest
+// read of the game in nflverse_game_reads). Each is a fact with its read
+// time, never a projection.
 
 // The team-week sources and the metrics the week facts read.
 const (
-	LinesSource    = "tank01_lines"
-	ForecastSource = "nws_forecast"
+	LinesSource       = "tank01_lines"
+	GameFiguresSource = "nflverse_game_figures"
+	ForecastSource    = "nws_forecast"
 
 	metricSpread      = "point_spread"
 	metricTotal       = "game_total"
+	metricTeamPoints  = "implied_team_total"
 	metricTemperature = "temperature_f"
 	metricWind        = "wind_mph"
 	metricChance      = "precipitation_probability"
@@ -58,11 +63,13 @@ const (
 const maxGameFactRows = 8000
 
 // GameFigures is the game's figures from one club's side: the expected
-// total and the club's spread, positive when it is favoured.
+// total, the club's spread, positive when it is favoured, and its own
+// expected points (research's one derivation, read as stored).
 type GameFigures struct {
-	Total  float64
-	Spread float64
-	ReadAt time.Time
+	Total      float64
+	Spread     float64
+	TeamPoints float64
+	ReadAt     time.Time
 }
 
 // Forecast is the weather service's forecast for the kickoff hour; a
@@ -93,9 +100,13 @@ type ClubWeek struct {
 // GameFact is one club's game facts for one week; a fact the store does
 // not hold is nil.
 type GameFact struct {
-	Figures  *GameFigures
-	Forecast *Forecast
-	Venue    *Venue
+	// Figures is the hourly capture's newest read, GameTableFigures the
+	// game table's newest weekly read: the screens fall back to it when
+	// the capture's read is stale (inseason figuresAt).
+	Figures          *GameFigures
+	GameTableFigures *GameFigures
+	Forecast         *Forecast
+	Venue            *Venue
 }
 
 // GameFacts is each club-week's game facts: the newest read of each source before the game's
@@ -130,8 +141,9 @@ from ` + obs + ` o join newest n on n.week = o.week and n.team = o.team and n.so
 where o.season = $1 and o.metric = any($5)
 order by o.week, o.team collate "C", o.source, o.metric limit $6`
 	rows, err := s.Pool.Query(ctx, query, season, scheduleSource, kickoffMetric,
-		[]string{LinesSource, ForecastSource},
-		[]string{metricSpread, metricTotal, metricTemperature, metricWind, metricChance, metricKind}, maxGameFactRows+1)
+		[]string{LinesSource, GameFiguresSource, ForecastSource},
+		[]string{metricSpread, metricTotal, metricTeamPoints, metricTemperature, metricWind, metricChance, metricKind},
+		maxGameFactRows+1)
 	if err != nil {
 		return fmt.Errorf("boards: read game facts %d: %w", season, err)
 	}
@@ -169,11 +181,10 @@ order by o.week, o.team collate "C", o.source, o.metric limit $6`
 	for key, sources := range reads {
 		var f GameFact
 		if l := sources[LinesSource]; l != nil {
-			total, okTotal := l.values[metricTotal]
-			spread, okSpread := l.values[metricSpread]
-			if okTotal && okSpread {
-				f.Figures = &GameFigures{Total: total, Spread: spread, ReadAt: l.at}
-			}
+			f.Figures = figuresOf(l.values, l.at)
+		}
+		if g := sources[GameFiguresSource]; g != nil {
+			f.GameTableFigures = figuresOf(g.values, g.at)
 		}
 		if w := sources[ForecastSource]; w != nil {
 			f.Forecast = &Forecast{TemperatureF: valueOf(w.values, metricTemperature), WindMph: valueOf(w.values, metricWind),
@@ -184,6 +195,17 @@ order by o.week, o.team collate "C", o.source, o.metric limit $6`
 	return nil
 }
 
+// figuresOf is one read's figures, nil unless it holds all three.
+func figuresOf(values map[string]float64, at time.Time) *GameFigures {
+	total, okTotal := values[metricTotal]
+	spread, okSpread := values[metricSpread]
+	points, okPoints := values[metricTeamPoints]
+	if !okTotal || !okSpread || !okPoints {
+		return nil
+	}
+	return &GameFigures{Total: total, Spread: spread, TeamPoints: points, ReadAt: at}
+}
+
 func valueOf(values map[string]float64, metric string) *float64 {
 	if v, ok := values[metric]; ok {
 		return &v
@@ -191,21 +213,27 @@ func valueOf(values map[string]float64, metric string) *float64 {
 	return nil
 }
 
-// readVenues is each club-week's venue, from both clubs' side, when the
-// stadium table confirms it: a game whose venue has no row, or whose
-// recorded name is none of the row's names, has no venue (research
-// pipeline/stadiums.py says why the game table files a game abroad under
-// a club's own id). A store before revision 0009, or a role that cannot
-// read the two tables, answers no venues, never an error.
+// readVenues is each club-week's venue, from both clubs' side, from the
+// newest read of the game (nflverse_game_reads, append-only, so the venue
+// the screens showed can be replayed), when the stadium table confirms
+// it: a game whose venue has no row, or whose recorded name is none of
+// the row's names, has no venue (research pipeline/stadiums.py says why
+// the game table files a game abroad under a club's own id). A store
+// before revision 0010, or a role that cannot read the two tables,
+// answers no venues, never an error.
 func (s *PGSource) readVenues(ctx context.Context, season int, out map[ClubWeek]GameFact) error {
-	readable, err := s.readable(ctx, "nflverse_games", "stadiums")
+	readable, err := s.readable(ctx, "nflverse_game_reads", "stadiums")
 	if err != nil || !readable {
 		return err
 	}
-	rows, err := s.Pool.Query(ctx, `select g.week, g.home_team, g.away_team, s.roof_type, s.international
-		from `+s.table("nflverse_games")+` g join `+s.table("stadiums")+` s on s.stadium_id = g.stadium_id
-		where g.season = $1 and g.stadium = any(s.aliases)
-		order by g.week, g.home_team collate "C" limit $2`, season, maxTeamWeeks+1)
+	rows, err := s.Pool.Query(ctx, `with newest as (
+  select distinct on (game_id) week, home_team, away_team, stadium_id, stadium
+  from `+s.table("nflverse_game_reads")+` where season = $1 order by game_id, read_at desc
+)
+select g.week, g.home_team, g.away_team, s.roof_type, s.international
+from newest g join `+s.table("stadiums")+` s on s.stadium_id = g.stadium_id
+where g.stadium = any(s.aliases)
+order by g.week, g.home_team collate "C" limit $2`, season, maxTeamWeeks+1)
 	if err != nil {
 		return fmt.Errorf("boards: read venues %d: %w", season, err)
 	}

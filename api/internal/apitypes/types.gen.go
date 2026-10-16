@@ -272,9 +272,9 @@ func (e GameRoofKind) Valid() bool {
 
 // Defines values for GameSpreadSide.
 const (
-	GameSpreadSideEven     GameSpreadSide = "even"
-	GameSpreadSideFavoured GameSpreadSide = "favoured"
-	GameSpreadSideUnderdog GameSpreadSide = "underdog"
+	GameSpreadSideEven GameSpreadSide = "even"
+	GameSpreadSideLose GameSpreadSide = "lose"
+	GameSpreadSideWin  GameSpreadSide = "win"
 )
 
 // Valid indicates whether the value is a known member of the GameSpreadSide enum.
@@ -282,9 +282,9 @@ func (e GameSpreadSide) Valid() bool {
 	switch e {
 	case GameSpreadSideEven:
 		return true
-	case GameSpreadSideFavoured:
+	case GameSpreadSideLose:
 		return true
-	case GameSpreadSideUnderdog:
+	case GameSpreadSideWin:
 		return true
 	default:
 		return false
@@ -1721,21 +1721,26 @@ type GameRoofKind string
 // GameSpread the expected margin from this club's side, from the same read as game_total
 type GameSpread struct {
 	// Points the margin, never negative, and 0 when even
-	Points float64        `json:"points"`
-	ReadAt time.Time      `json:"read_at"`
-	Side   GameSpreadSide `json:"side"`
+	Points float64   `json:"points"`
+	ReadAt time.Time `json:"read_at"`
+
+	// Side whether this club is expected to win or lose
+	Side GameSpreadSide `json:"side"`
 }
 
-// GameSpreadSide defines model for GameSpread.Side.
+// GameSpreadSide whether this club is expected to win or lose
 type GameSpreadSide string
 
-// GameTotal the game's expected score, the median of the books in the hourly capture's newest read before kickoff
+// GameTotal the game's expected score, the consensus of the hourly capture's newest read before kickoff; a read more than six hours before kickoff (or before now) gives way to the game table's newest weekly read, with its own read time
 type GameTotal struct {
 	// Points both clubs' points together
 	Points float64 `json:"points"`
 
-	// ReadAt when the capture read it
+	// ReadAt when the figures were read
 	ReadAt time.Time `json:"read_at"`
+
+	// TeamPoints this club's own expected points, from the same read
+	TeamPoints float64 `json:"team_points"`
 }
 
 // GameWeek defines model for GameWeek.

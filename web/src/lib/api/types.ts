@@ -2550,7 +2550,7 @@ export interface components {
 			roof: components['schemas']['GameRoof'] | null;
 			weather: components['schemas']['KickoffWeather'] | null;
 		};
-		/** @description the game's expected score, the median of the books in the hourly capture's newest read before kickoff */
+		/** @description the game's expected score, the consensus of the hourly capture's newest read before kickoff; a read more than six hours before kickoff (or before now) gives way to the game table's newest weekly read, with its own read time */
 		GameTotal: {
 			/**
 			 * Format: double
@@ -2558,15 +2558,23 @@ export interface components {
 			 */
 			points: number;
 			/**
+			 * Format: double
+			 * @description this club's own expected points, from the same read
+			 */
+			team_points: number;
+			/**
 			 * Format: date-time
-			 * @description when the capture read it
+			 * @description when the figures were read
 			 */
 			read_at: string;
 		};
 		/** @description the expected margin from this club's side, from the same read as game_total */
 		GameSpread: {
-			/** @enum {string} */
-			side: 'favoured' | 'underdog' | 'even';
+			/**
+			 * @description whether this club is expected to win or lose
+			 * @enum {string}
+			 */
+			side: 'win' | 'lose' | 'even';
 			/**
 			 * Format: double
 			 * @description the margin, never negative, and 0 when even

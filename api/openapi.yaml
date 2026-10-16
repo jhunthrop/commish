@@ -3028,17 +3028,20 @@ components:
         weather: { allOf: [{ $ref: "#/components/schemas/KickoffWeather" }], nullable: true }
     GameTotal:
       type: object
-      description: the game's expected score, the median of the books in the hourly capture's newest read before kickoff
-      required: [points, read_at]
+      description: >-
+        the game's expected score, the consensus of the hourly capture's newest read before kickoff; a read more than six
+        hours before kickoff (or before now) gives way to the game table's newest weekly read, with its own read time
+      required: [points, team_points, read_at]
       properties:
         points: { type: number, format: double, description: both clubs' points together }
-        read_at: { type: string, format: date-time, description: when the capture read it }
+        team_points: { type: number, format: double, description: "this club's own expected points, from the same read" }
+        read_at: { type: string, format: date-time, description: when the figures were read }
     GameSpread:
       type: object
       description: the expected margin from this club's side, from the same read as game_total
       required: [side, points, read_at]
       properties:
-        side: { type: string, enum: [favoured, underdog, even] }
+        side: { type: string, enum: [win, lose, even], description: "whether this club is expected to win or lose" }
         points: { type: number, format: double, description: "the margin, never negative, and 0 when even" }
         read_at: { type: string, format: date-time }
     GameRoof:

@@ -27,12 +27,17 @@ func gameFactsSchema(t *testing.T, pool *pgxpool.Pool, schema string, venues boo
 			(2026, 7, 'LA', 'tank01_lines', 'game_total', '2026-10-20 13:00:00+00', 46.5),
 			(2026, 7, 'LA', 'tank01_lines', 'point_spread', '2026-10-25 14:05:00+00', 3),
 			(2026, 7, 'LA', 'tank01_lines', 'game_total', '2026-10-25 14:05:00+00', 47.5),
+			(2026, 7, 'LA', 'tank01_lines', 'implied_team_total', '2026-10-25 14:05:00+00', 25.25),
 			(2026, 7, 'LA', 'tank01_lines', 'books', '2026-10-25 14:05:00+00', 8),
+			(2026, 7, 'LA', 'nflverse_game_figures', 'point_spread', '2026-10-21 22:00:00+00', 2),
+			(2026, 7, 'LA', 'nflverse_game_figures', 'game_total', '2026-10-21 22:00:00+00', 46),
+			(2026, 7, 'LA', 'nflverse_game_figures', 'implied_team_total', '2026-10-21 22:00:00+00', 24),
 			(2026, 7, 'LA', 'tank01_lines', 'point_spread', '2026-10-25 21:00:00+00', 10),
 			(2026, 7, 'LA', 'tank01_lines', 'game_total', '2026-10-25 21:00:00+00', 60),
 			(2026, 7, 'LV', 'nflverse_kickoff', 'kickoff_instant', '2026-10-25 20:25:00+00', 1),
 			(2026, 7, 'LV', 'tank01_lines', 'point_spread', '2026-10-25 14:05:00+00', -3),
 			(2026, 7, 'LV', 'tank01_lines', 'game_total', '2026-10-25 14:05:00+00', 47.5),
+			(2026, 7, 'LV', 'tank01_lines', 'implied_team_total', '2026-10-25 14:05:00+00', 22.25),
 			(2026, 7, 'SEA', 'nws_forecast', 'temperature_f', '2026-10-24 13:05:00+00', 51),
 			(2026, 7, 'SEA', 'nws_forecast', 'wind_mph', '2026-10-24 13:05:00+00', 9.2),
 			(2026, 7, 'SEA', 'nws_forecast', 'temperature_f', '2026-10-25 14:05:00+00', 49),
@@ -43,14 +48,17 @@ func gameFactsSchema(t *testing.T, pool *pgxpool.Pool, schema string, venues boo
 	}
 	if venues {
 		qs = append(qs,
-			`create table `+schema+`.nflverse_games (season int, week int, home_team text, away_team text, stadium_id text, stadium text)`,
+			`create table `+schema+`.nflverse_game_reads (game_id text, read_at timestamptz, season int, week int, home_team text, away_team text, stadium_id text, stadium text)`,
 			`create table `+schema+`.stadiums (stadium_id text, aliases text[], roof_type text, international boolean)`,
 			`insert into `+schema+`.stadiums values
 				('VEG00', '{Allegiant Stadium}', 'dome', false), ('SEA00', '{CenturyLink Field,Lumen Field}', 'outdoors', false),
 				('PAR00', '{Stade de France}', 'outdoors', true), ('JAX00', '{EverBank Stadium}', 'outdoors', false)`,
-			`insert into `+schema+`.nflverse_games values
-				(2026, 7, 'LV', 'LA', 'VEG00', 'Allegiant Stadium'), (2026, 7, 'SEA', 'KC', 'SEA00', 'Lumen Field'),
-				(2026, 7, 'NO', 'PIT', 'PAR00', 'Stade de France'), (2026, 5, 'JAX', 'PHI', 'JAX00', 'Tottenham Hotspur Stadium')`)
+			`insert into `+schema+`.nflverse_game_reads values
+				('g1', '2026-10-21', 2026, 7, 'LV', 'LA', 'SEA00', 'Lumen Field'),
+				('g1', '2026-10-22', 2026, 7, 'LV', 'LA', 'VEG00', 'Allegiant Stadium'),
+				('g2', '2026-10-22', 2026, 7, 'SEA', 'KC', 'SEA00', 'Lumen Field'),
+				('g3', '2026-10-22', 2026, 7, 'NO', 'PIT', 'PAR00', 'Stade de France'),
+				('g4', '2026-10-08', 2026, 5, 'JAX', 'PHI', 'JAX00', 'Tottenham Hotspur Stadium')`)
 	}
 	for _, q := range qs {
 		if _, err := pool.Exec(ctx, q); err != nil {
@@ -74,11 +82,15 @@ func TestGameFactsReadTheNewestBeforeKickoffWithTheVenue(t *testing.T) {
 	}
 	read := time.Date(2026, 10, 25, 14, 5, 0, 0, time.UTC)
 	rams := facts[ClubWeek{7, "LAR"}]
-	if f := rams.Figures; f == nil || f.Total != 47.5 || f.Spread != 3 || !f.ReadAt.Equal(read) {
+	if f := rams.Figures; f == nil || f.Total != 47.5 || f.Spread != 3 || f.TeamPoints != 25.25 || !f.ReadAt.Equal(read) {
 		t.Fatalf("the Rams' figures %+v: the newest read before kickoff, never the one after", rams.Figures)
 	}
+	if g := rams.GameTableFigures; g == nil || g.Total != 46 || g.TeamPoints != 24 ||
+		!g.ReadAt.Equal(time.Date(2026, 10, 21, 22, 0, 0, 0, time.UTC)) {
+		t.Fatalf("the Rams' game table figures %+v", rams.GameTableFigures)
+	}
 	if v := rams.Venue; v == nil || v.Roof != RoofDome || v.Abroad {
-		t.Fatalf("the Rams' venue %+v: the away club takes the home venue", rams.Venue)
+		t.Fatalf("the Rams' venue %+v: the away club takes the home venue, from the game's newest read", rams.Venue)
 	}
 	if f := facts[ClubWeek{7, "LV"}].Figures; f == nil || f.Spread != -3 {
 		t.Fatalf("Las Vegas's figures %+v", f)

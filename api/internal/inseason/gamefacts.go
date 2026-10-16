@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"sort"
 	"strconv"
+	"time"
 
 	"github.com/jhunthrop/commish/api/internal/apitypes"
 	"github.com/jhunthrop/commish/api/internal/boards"
@@ -23,6 +24,27 @@ import (
 // can fall on a quarter).
 func halfPoints(n float64) float64 { return jsmath.Round(n*2) / 2 }
 
+// FiguresStaleAfter is how old the hourly capture's figures may be at
+// the game's instant (the round 4 preregistration §2.10: five missed
+// hourly captures). Older, they give way to the game table's weekly read.
+const FiguresStaleAfter = 6 * time.Hour
+
+// figuresAt is the figures the screens say at now for a game kicking off
+// at kickoff: the capture's read while it is no more than
+// FiguresStaleAfter before min(now, kickoff), else the game table's read,
+// else none (no capture read at all is the same as a stale one). A read
+// exactly FiguresStaleAfter old still stands.
+func figuresAt(g boards.GameFact, now, kickoff time.Time) boards.GameFact {
+	instant := now
+	if !kickoff.IsZero() && kickoff.Before(now) {
+		instant = kickoff
+	}
+	if g.Figures == nil || instant.Sub(g.Figures.ReadAt) > FiguresStaleAfter {
+		g.Figures = g.GameTableFigures
+	}
+	return g
+}
+
 // conditions is one club-week's game facts as the contract carries them.
 type conditions struct {
 	total   *apitypes.GameTotal
@@ -34,15 +56,15 @@ type conditions struct {
 func conditionsOf(g boards.GameFact) conditions {
 	var c conditions
 	if f := g.Figures; f != nil {
-		c.total = &apitypes.GameTotal{Points: halfPoints(f.Total), ReadAt: f.ReadAt}
+		c.total = &apitypes.GameTotal{Points: halfPoints(f.Total), TeamPoints: halfPoints(f.TeamPoints), ReadAt: f.ReadAt}
 		margin := halfPoints(math.Abs(f.Spread))
 		side := apitypes.GameSpreadSideEven
 		switch {
 		case margin == 0:
 		case f.Spread > 0:
-			side = apitypes.GameSpreadSideFavoured
+			side = apitypes.GameSpreadSideWin
 		default:
-			side = apitypes.GameSpreadSideUnderdog
+			side = apitypes.GameSpreadSideLose
 		}
 		c.spread = &apitypes.GameSpread{Side: side, Points: margin, ReadAt: f.ReadAt}
 	}
@@ -97,13 +119,13 @@ func nextWeek(games []boards.TeamWeek) int {
 }
 
 // gameWeek is every club's game in the week, ordered by kickoff and club.
-func gameWeek(d Data, season, week int) apitypes.GameWeek {
+func gameWeek(d Data, season, week int, now time.Time) apitypes.GameWeek {
 	out := apitypes.GameWeek{Season: season, Week: week, Games: []apitypes.ClubGame{}}
 	for _, g := range d.Games {
 		if g.Week != week {
 			continue
 		}
-		c := conditionsOf(d.GameFacts[boards.ClubWeek{Week: week, Team: g.Team}])
+		c := conditionsOf(figuresAt(d.GameFacts[boards.ClubWeek{Week: week, Team: g.Team}], now, g.Kickoff))
 		out.Games = append(out.Games, apitypes.ClubGame{Team: g.Team, Opponent: g.Opponent, Home: g.Home,
 			Kickoff: g.Kickoff, Played: g.Final, GameTotal: c.total, Spread: c.spread, Roof: c.roof, Weather: c.weather})
 	}
@@ -132,5 +154,5 @@ func (s *Service) weekGames(w http.ResponseWriter, r *http.Request) {
 	if week == 0 {
 		week = nextWeek(data.Games)
 	}
-	httpx.WriteOK(w, r, http.StatusOK, gameWeek(data, s.Season, week))
+	httpx.WriteOK(w, r, http.StatusOK, gameWeek(data, s.Season, week, s.Now()))
 }

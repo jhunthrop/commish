@@ -20,21 +20,48 @@ func TestConditionsSayTheMarginFromTheClubsSideToTheHalfPoint(t *testing.T) {
 		side   apitypes.GameSpreadSide
 		points float64
 	}{
-		{3, apitypes.GameSpreadSideFavoured, 3},
-		{-3.25, apitypes.GameSpreadSideUnderdog, 3.5},
+		{3, apitypes.GameSpreadSideWin, 3},
+		{-3.25, apitypes.GameSpreadSideLose, 3.5},
 		{0.2, apitypes.GameSpreadSideEven, 0},
 		{0, apitypes.GameSpreadSideEven, 0},
 	} {
-		got := conditionsOf(boards.GameFact{Figures: &boards.GameFigures{Total: 55.25, Spread: c.spread, ReadAt: factsRead}})
+		got := conditionsOf(boards.GameFact{Figures: &boards.GameFigures{Total: 55.25, Spread: c.spread, TeamPoints: 27.75, ReadAt: factsRead}})
 		if got.spread == nil || got.spread.Side != c.side || got.spread.Points != c.points || !got.spread.ReadAt.Equal(factsRead) {
 			t.Fatalf("spread %v: %+v, want %s by %v", c.spread, got.spread, c.side, c.points)
 		}
-		if got.total == nil || got.total.Points != 55.5 {
-			t.Fatalf("total %+v, want 55.5", got.total)
+		if got.total == nil || got.total.Points != 55.5 || got.total.TeamPoints != 28 {
+			t.Fatalf("total %+v, want 55.5 and his club's 28", got.total)
 		}
 	}
 	if empty := conditionsOf(boards.GameFact{}); empty != (conditions{}) {
 		t.Fatalf("no facts held, every field null: %+v", empty)
+	}
+}
+
+func TestStaleCaptureFiguresGiveWayToTheGameTablesAtSixHours(t *testing.T) {
+	kickoff := time.Date(2026, 10, 25, 17, 0, 0, 0, time.UTC)
+	capture := &boards.GameFigures{Total: 47.5, Spread: 3, TeamPoints: 25.25, ReadAt: kickoff.Add(-FiguresStaleAfter)}
+	table := &boards.GameFigures{Total: 46, Spread: 2.5, TeamPoints: 24.25, ReadAt: kickoff.Add(-96 * time.Hour)}
+	fact := boards.GameFact{Figures: capture, GameTableFigures: table}
+	if got := figuresAt(fact, kickoff, kickoff).Figures; got != capture {
+		t.Fatalf("a read six hours before kickoff, at kickoff: %+v, want the capture's", got)
+	}
+	if got := figuresAt(fact, kickoff.Add(3*time.Hour), kickoff).Figures; got != capture {
+		t.Fatalf("after kickoff the age is taken at kickoff: %+v", got)
+	}
+	late := boards.GameFact{Figures: &boards.GameFigures{Total: 47.5, Spread: 3, TeamPoints: 25.25,
+		ReadAt: kickoff.Add(-FiguresStaleAfter - time.Second)}, GameTableFigures: table}
+	if got := figuresAt(late, kickoff, kickoff).Figures; got != table {
+		t.Fatalf("a read a second over six hours before kickoff: %+v, want the game table's", got)
+	}
+	if got := figuresAt(fact, capture.ReadAt.Add(FiguresStaleAfter+time.Second), kickoff.Add(48*time.Hour)).Figures; got != table {
+		t.Fatalf("a read over six hours before now, kickoff later: %+v, want the game table's", got)
+	}
+	if got := figuresAt(boards.GameFact{GameTableFigures: table}, kickoff.Add(-time.Hour), kickoff).Figures; got != table {
+		t.Fatalf("no capture read: %+v, want the game table's", got)
+	}
+	if got := figuresAt(boards.GameFact{Figures: late.Figures}, kickoff, kickoff).Figures; got != nil {
+		t.Fatalf("stale with no game table read: %+v, want none", got)
 	}
 }
 
@@ -102,11 +129,11 @@ func TestTheWeekGamesRouteSaysEveryClubsFacts(t *testing.T) {
 			byTeam[g.Team] = g
 		}
 		ari, atl := byTeam["ARI"], byTeam["ATL"]
-		if ari.Opponent != "ATL" || !ari.Home || ari.Spread == nil || ari.Spread.Side != apitypes.GameSpreadSideFavoured ||
+		if ari.Opponent != "ATL" || !ari.Home || ari.Spread == nil || ari.Spread.Side != apitypes.GameSpreadSideWin ||
 			ari.GameTotal == nil || ari.GameTotal.Points != 47.5 || ari.Weather != nil {
 			t.Fatalf("Arizona %+v", ari)
 		}
-		if atl.Spread == nil || atl.Spread.Side != apitypes.GameSpreadSideUnderdog || atl.Weather == nil || *atl.Weather.WindMph != 14 {
+		if atl.Spread == nil || atl.Spread.Side != apitypes.GameSpreadSideLose || atl.Weather == nil || *atl.Weather.WindMph != 14 {
 			t.Fatalf("Atlanta %+v", atl)
 		}
 		if bal := byTeam["BAL"]; bal.GameTotal != nil || bal.Spread != nil || bal.Roof != nil || bal.Weather != nil {
