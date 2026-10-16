@@ -1,6 +1,6 @@
 {
 	"week": 6,
-	"basis": "Ranked by the gain to your lineup on our rest-of-season order. A drop is the player it costs you least to lose. Points over replacement, and every gain in them, are points above what a free pickup at his position gives you, a week: the rest of the season on our rest-of-season order, averaged over its 12 weeks, not a projection of any one week.",
+	"basis": "Ranked by the gain to your lineup on our rest-of-season order. A drop is the player it costs you least to lose. Points over replacement, and every gain in them, are points above what a free pickup at his position gives you, a week: the rest of the season on our rest-of-season order, averaged over its 12 weeks, not a projection of any one week. Points a game are our rest-of-season projection from week 6 over the games his club has left, byes out.",
 	"basis_note": "Points over replacement are for a 12-team league with 1 QB, 2 RB, 3 WR, 1 TE and two flex spots. Points so far leave out your league's points for two-point conversions, missed field goals, missed extra points, fumble recoveries and safeties: the stat lines we hold do not carry them.",
 	"order_basis": "rest_of_season",
 	"refreshed": "2026-10-14T19:05:37.917Z",
@@ -19,6 +19,7 @@
 			"slug": "xavier-hutchinson",
 			"position_rank": 42,
 			"points_over_replacement": -0.7,
+			"rest_of_season_per_game": 6.4,
 			"held": false,
 			"facts": {
 				"week": 6,
@@ -50,6 +51,7 @@
 			"slug": "jaxson-dart",
 			"position_rank": 31,
 			"points_over_replacement": -8.3,
+			"rest_of_season_per_game": 15.8,
 			"held": false,
 			"facts": {
 				"week": 6,
@@ -86,6 +88,7 @@
 				"slug": "xavier-hutchinson",
 				"position_rank": 42,
 				"points_over_replacement": -0.7,
+				"rest_of_season_per_game": 6.4,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -117,6 +120,7 @@
 				"slug": "jaxson-dart",
 				"position_rank": 31,
 				"points_over_replacement": -8.3,
+				"rest_of_season_per_game": 15.8,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -152,6 +156,7 @@
 				"slug": "de-von-achane",
 				"position_rank": 38,
 				"points_over_replacement": -1.9,
+				"rest_of_season_per_game": 15.3,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -183,6 +188,7 @@
 				"slug": "jaxson-dart",
 				"position_rank": 31,
 				"points_over_replacement": -8.3,
+				"rest_of_season_per_game": 15.8,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -218,6 +224,7 @@
 				"slug": "tommy-tremble",
 				"position_rank": 24,
 				"points_over_replacement": -1.9,
+				"rest_of_season_per_game": 5.3,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -249,6 +256,7 @@
 				"slug": "jaxson-dart",
 				"position_rank": 31,
 				"points_over_replacement": -8.3,
+				"rest_of_season_per_game": 15.8,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -284,6 +292,7 @@
 				"slug": "tyquan-thornton",
 				"position_rank": 52,
 				"points_over_replacement": -2,
+				"rest_of_season_per_game": 5.6,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -315,6 +324,7 @@
 				"slug": "jaxson-dart",
 				"position_rank": 31,
 				"points_over_replacement": -8.3,
+				"rest_of_season_per_game": 15.8,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -350,6 +360,7 @@
 				"slug": "tyler-higbee",
 				"position_rank": 27,
 				"points_over_replacement": -2.3,
+				"rest_of_season_per_game": 3.8,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -381,6 +392,7 @@
 				"slug": "jaxson-dart",
 				"position_rank": 31,
 				"points_over_replacement": -8.3,
+				"rest_of_season_per_game": 15.8,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -416,6 +428,7 @@
 				"slug": "geno-smith",
 				"position_rank": 18,
 				"points_over_replacement": -0.9,
+				"rest_of_season_per_game": 11.2,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -447,6 +460,7 @@
 				"slug": "jaxson-dart",
 				"position_rank": 31,
 				"points_over_replacement": -8.3,
+				"rest_of_season_per_game": 15.8,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -482,6 +496,7 @@
 				"slug": "cam-ward",
 				"position_rank": 19,
 				"points_over_replacement": -0.9,
+				"rest_of_season_per_game": 11.7,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -513,6 +528,7 @@
 				"slug": "jaxson-dart",
 				"position_rank": 31,
 				"points_over_replacement": -8.3,
+				"rest_of_season_per_game": 15.8,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -548,6 +564,7 @@
 				"slug": "daniel-jones",
 				"position_rank": 24,
 				"points_over_replacement": -2.1,
+				"rest_of_season_per_game": 11.8,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -579,6 +596,7 @@
 				"slug": "jaxson-dart",
 				"position_rank": 31,
 				"points_over_replacement": -8.3,
+				"rest_of_season_per_game": 15.8,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -614,6 +632,7 @@
 				"slug": "demario-douglas",
 				"position_rank": 61,
 				"points_over_replacement": -2.6,
+				"rest_of_season_per_game": 2.7,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -645,6 +664,7 @@
 				"slug": "jaxson-dart",
 				"position_rank": 31,
 				"points_over_replacement": -8.3,
+				"rest_of_season_per_game": 15.8,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -680,6 +700,7 @@
 				"slug": "darnell-washington",
 				"position_rank": 31,
 				"points_over_replacement": -2.8,
+				"rest_of_season_per_game": 5.2,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -711,6 +732,7 @@
 				"slug": "jaxson-dart",
 				"position_rank": 31,
 				"points_over_replacement": -8.3,
+				"rest_of_season_per_game": 15.8,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -746,6 +768,7 @@
 				"slug": "jahan-dotson",
 				"position_rank": 67,
 				"points_over_replacement": -3,
+				"rest_of_season_per_game": 5.4,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -777,6 +800,7 @@
 				"slug": "jaxson-dart",
 				"position_rank": 31,
 				"points_over_replacement": -8.3,
+				"rest_of_season_per_game": 15.8,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -812,6 +836,7 @@
 				"slug": "mason-taylor",
 				"position_rank": 32,
 				"points_over_replacement": -3.1,
+				"rest_of_season_per_game": 5.3,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -843,6 +868,7 @@
 				"slug": "jaxson-dart",
 				"position_rank": 31,
 				"points_over_replacement": -8.3,
+				"rest_of_season_per_game": 15.8,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -878,6 +904,7 @@
 				"slug": "theo-johnson",
 				"position_rank": 34,
 				"points_over_replacement": -3.4,
+				"rest_of_season_per_game": 5.3,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -909,6 +936,7 @@
 				"slug": "jaxson-dart",
 				"position_rank": 31,
 				"points_over_replacement": -8.3,
+				"rest_of_season_per_game": 15.8,
 				"held": false,
 				"facts": {
 					"week": 6,
