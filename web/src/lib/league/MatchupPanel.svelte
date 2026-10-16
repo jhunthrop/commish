@@ -29,7 +29,7 @@
 		now: Date;
 		/** A starter's game this week, "at BUF Sun 1:00 pm", null when the run does not say. */
 		gameOf: (team: string, week: number) => string | null;
-		/** His game's facts, "Expected 47.5 total points, favoured by 3. ...", null when none are held. */
+		/** His game's facts, "Expected to win by 3, 47.5 points in the game. ...", null when none are held. */
 		factsOf?: (team: string) => string | null;
 	}
 

@@ -31,15 +31,16 @@ const conditions = (over: Partial<GameConditions> = {}): GameConditions => ({
 });
 
 void test("the figures say the game's expected score and the margin from his club's side", () => {
-	assert.equal(figuresWords(conditions()), 'Expected 47.5 total points, favoured by 3.');
+	assert.equal(figuresWords(conditions()), 'Expected to win by 3, 47.5 points in the game.');
 	assert.equal(
 		figuresWords(conditions({ spread: { side: 'underdog', points: 6.5, read_at: READ } })),
-		'Expected 47.5 total points, underdog by 6.5.'
+		'Expected to lose by 6.5, 47.5 points in the game.'
 	);
 	assert.equal(
 		figuresWords(conditions({ spread: { side: 'even', points: 0, read_at: READ } })),
-		'Expected 47.5 total points, an even game.'
+		'Expected to be even, 47.5 points in the game.'
 	);
+	assert.equal(figuresWords(conditions({ spread: null })), '47.5 points expected in the game.');
 	assert.equal(figuresWords(conditions({ game_total: null, spread: null })), null);
 });
 
@@ -79,11 +80,11 @@ void test('the read time is the older of the two reads, on the member clock', ()
 void test('the whole line, as a row says it', () => {
 	assert.equal(
 		gameFactsLine(conditions(), ZONE),
-		'Expected 47.5 total points, favoured by 3. 52°F and 14 mph wind at kickoff, outdoors. Read Sun 9:05 am.'
+		'Expected to win by 3, 47.5 points in the game. 52°F and 14 mph wind at kickoff, outdoors. Read Sun 9:05 am.'
 	);
 	assert.equal(
 		gameFactsLine(conditions({ roof: { kind: 'dome', abroad: false }, weather: null }), ZONE),
-		'Expected 47.5 total points, favoured by 3. Indoors. Read Sun 9:05 am.'
+		'Expected to win by 3, 47.5 points in the game. Indoors. Read Sun 9:05 am.'
 	);
 	assert.equal(
 		gameFactsLine({ game_total: null, spread: null, roof: null, weather: null }, ZONE),
@@ -107,7 +108,7 @@ void test("a week's answer finds his club's game", () => {
 /** Words the game facts never use: the lines are an input and a fact, named only as the game's
  * expected score and a club favoured or an underdog (Lane 66a). */
 const BETTING =
-	/\b(odds|lines?|spreads?|bets?|betting|vegas|sportsbooks?|books?|props?|over\/under|moneyline|market)\b/i;
+	/\b(favou?red|underdogs?|odds|lines?|spreads?|totals?|bets?|betting|vegas|sportsbooks?|books?|props?|moneyline|market)\b|over\/under/i;
 
 void test('copy guard: no game facts line uses a betting word, a dash, a semicolon or a doubled word', () => {
 	const said = [
@@ -129,5 +130,15 @@ void test('copy guard: no game facts line uses a betting word, a dash, a semicol
 		assert.doesNotMatch(text, /[–—;]/, text);
 		assert.doesNotMatch(text, /\b([a-z]+)\s+\1\b/i, text);
 	}
-	assert.match('the line moved', BETTING);
+	for (const banned of [
+		'favoured by 3',
+		'an underdog',
+		'the odds',
+		'the line',
+		'the spread',
+		'the over/under',
+		'a bet',
+		'the total'
+	])
+		assert.match(banned, BETTING);
 });

@@ -1,6 +1,6 @@
 /** A game's facts as the screens say them (Lane 66a): the expected score and margin from the hourly
  * capture, the roof, and the kickoff forecast, each a fact with its read time, never a projection.
- * "Expected 47.5 total points, favoured by 3. 52°F and 14 mph wind at kickoff, outdoors. Read Sun
+ * "Expected to win by 3, 47.5 points in the game. 52°F and 14 mph wind at kickoff, outdoors. Read Sun
  * 9:05 am." The lineup, waivers and trades rows read them from WeekFacts, the Matchup screen and the
  * player pages from GET /games/week. Pure, so every sentence is tested. */
 import type { components } from '#lib/api/types.ts';
@@ -34,15 +34,26 @@ function halves(points: number): string {
 	return Number.isInteger(points) ? String(points) : fixed(points, 1);
 }
 
-/** "Expected 47.5 total points, favoured by 3.", "..., an even game.", null without the figures. */
+/** How the margin is said from his club's side (the round 4 lock's copy rule, its L5): never the
+ * spread's own idiom. */
+const MARGIN_WORDS: Readonly<Record<NonNullable<GameConditions['spread']>['side'], string>> = {
+	favoured: 'Expected to win by',
+	underdog: 'Expected to lose by',
+	even: 'Expected to be even'
+};
+
+/** "Expected to win by 3, 47.5 points in the game.", "47.5 points expected in the game." without a
+ * margin, null without the figures. */
 export function figuresWords(c: GameConditions): string | null {
 	if (c.game_total === null) return null;
-	const total = `Expected ${halves(c.game_total.points)} total points`;
+	const points = halves(c.game_total.points);
 	const spread = c.spread;
-	if (spread === null) return `${total}.`;
+	if (spread === null) return `${points} points expected in the game.`;
 	const margin =
-		spread.side === 'even' ? 'an even game' : `${spread.side} by ${halves(spread.points)}`;
-	return `${total}, ${margin}.`;
+		spread.side === 'even'
+			? MARGIN_WORDS.even
+			: `${MARGIN_WORDS[spread.side]} ${halves(spread.points)}`;
+	return `${margin}, ${points} points in the game.`;
 }
 
 /** Where the game is played, as the end of the weather sentence or alone. */
@@ -99,8 +110,8 @@ export function clubGame(week: GameWeek, team: string): ClubGame | null {
 	return week.games.find((g) => g.team === team) ?? null;
 }
 
-/** A player page's week line: "Week 7: at SEA Sun 7:20 pm. Expected 47.5 total points, underdog by
- * 3. 49°F and 14 mph wind at kickoff, outdoors. Read Sun 9:05 am.", null once his game is played. */
+/** A player page's week line: "Week 7: at SEA Sun 7:20 pm. Expected to lose by 3, 47.5 points in
+ * the game. 49°F and 14 mph wind at kickoff, outdoors. Read Sun 9:05 am.", null once his game is played. */
 export function clubGameLine(
 	week: GameWeek,
 	game: ClubGame,

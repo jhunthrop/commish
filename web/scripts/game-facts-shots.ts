@@ -21,11 +21,12 @@ const READY_TIMEOUT_MS = 30_000;
 const SIGNED_IN = { name: 'commish_csrf', value: 'fixture' };
 /** A game facts sentence as a row says it. */
 const FACTS =
-	/Expected \d+(\.5)? total points, (favoured by \d+(\.5)?|underdog by \d+(\.5)?|an even game)\./;
+	/(Expected to (win|lose) by \d+(\.5)?|Expected to be even), \d+(\.5)? points in the game\./;
 const READ = /Read \w{3} \d{1,2}:\d{2} [ap]m\./;
 const WEATHER =
 	/\d+°F and \d+ mph wind at kickoff, (outdoors|under a retractable roof)\.|Indoors\.|Played abroad, so no forecast\./;
-const BETTING = /\b(odds|lines?|spreads?|bets?|betting|vegas|sportsbooks?|props?|moneyline)\b/i;
+const BETTING =
+	/\b(favou?red|underdogs?|odds|lines?|spreads?|totals?|bets?|betting|vegas|sportsbooks?|props?|moneyline)\b|over\/under/i;
 
 const web = process.argv[2] ?? 'http://localhost:4682';
 const out = new URL(process.argv[3] ?? '../screenshots/game-facts/', import.meta.url);
