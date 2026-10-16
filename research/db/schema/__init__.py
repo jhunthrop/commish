@@ -10,7 +10,7 @@ Every table lives in the `research` Postgres schema and is defined once here, by
     boards        model_artifacts, the boards and reasons, the register, player_capsules
     custom        preseason_candidates (each board's candidate set), custom_boards (revision 0005)
     published     published_boards, the published run's board rows (revision 0006)
-    game_history  nflverse_pbp_plays, nflverse_depth_chart_weeks, game_weather (revision 0008)
+    game_history  nflverse_pbp_plays, nflverse_depth_chart_weeks, game_weather (revision 0009)
 
 `alembic/versions/0001_research_schema.py` creates exactly this, and the schema gate checks the
 two agree. What changed from the legacy `public` tables, and why, is in the README; the column

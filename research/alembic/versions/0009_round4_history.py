@@ -1,10 +1,11 @@
 """The history the weekly round 4 fits on, and its two benchmarks' tables.
 
-Revision ID: 0008
-Revises: 0007
+Revision ID: 0009
+Revises: 0008
 Create Date: 2026-10-16
 
-Lane 66b (`docs/research/2026-10-16-weekly-projection-round4-preregistration.md` §2.9):
+Lane 66b (`docs/research/2026-10-16-weekly-projection-round4-preregistration.md` §2.9), on Lane 63's
+0008 (the coordinator's ruling: Lane 63 merges first):
 
 - `nflverse_pbp_plays`: nflverse's play-by-play, one row per regular-season play, 2016 on.
 - `nflverse_depth_chart_weeks`: nflverse's weekly depth charts, the offensive skill positions.
@@ -19,8 +20,8 @@ from typing import Final
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "0008"
-down_revision: str | None = "0007"
+revision: str = "0009"
+down_revision: str | None = "0008"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
@@ -189,6 +190,9 @@ def _game_weather() -> None:
         ),
         sa.CheckConstraint("precipitation IN (0, 1)", name="game_weather_precipitation_ck"),
         sa.CheckConstraint("isd_precipitation IN (0, 1)", name="game_weather_isd_precipitation_ck"),
+        sa.CheckConstraint(
+            "precipitation_kind IN ('rain', 'snow', 'sleet', 'mix')", name="game_weather_precipitation_kind_ck"
+        ),
         sa.CheckConstraint(
             "(precipitation IS NULL) = (precipitation_source IS NULL)", name="game_weather_precipitation_pair_ck"
         ),

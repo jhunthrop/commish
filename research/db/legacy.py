@@ -367,11 +367,11 @@ NEW_IN_RESEARCH: Final[Mapping[str, str]] = MappingProxyType(
         "preseason_candidates": "each board's candidate set, kept from revision 0005 so a custom board can be built",
         "custom_boards": "the custom-scoring board cache (revision 0005), rebuilt on demand from the candidates",
         "published_boards": "the published run's board rows (revision 0006), rewritten by every publish",
-        "nflverse_pbp_plays": "the play-level play-by-play the weekly round 4 fits on (revision 0008), from nflverse",
-        "nflverse_depth_chart_weeks": "nflverse's weekly depth charts (revision 0008); legacy held week 1 only",
-        "game_weather": "the recorded kickoff weather with each value's source (revision 0008)",
-        "tank01_projection_rows": "Tank01's weekly projection parsed per player (revision 0008), a benchmark",
-        "player_td_prop_observations": "the anytime-touchdown market (revision 0008), a benchmark",
+        "nflverse_pbp_plays": "the play-level play-by-play the weekly round 4 fits on (revision 0009), from nflverse",
+        "nflverse_depth_chart_weeks": "nflverse's weekly depth charts (revision 0009); legacy held week 1 only",
+        "game_weather": "the recorded kickoff weather with each value's source (revision 0009)",
+        "tank01_projection_rows": "Tank01's weekly projection parsed per player (revision 0009), a benchmark",
+        "player_td_prop_observations": "the anytime-touchdown market (revision 0009), a benchmark",
     }
 )
 

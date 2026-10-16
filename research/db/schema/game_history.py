@@ -1,4 +1,4 @@
-"""THE PLAY-LEVEL AND GAME-LEVEL HISTORY the weekly round 4 fits on (revision 0008).
+"""THE PLAY-LEVEL AND GAME-LEVEL HISTORY the weekly round 4 fits on (revision 0009).
 
 `docs/research/2026-10-16-weekly-projection-round4-preregistration.md` §2.9: the store held the
 play-by-play only as team-week and player-week aggregates, the depth chart for week 1 only, and the
@@ -38,6 +38,7 @@ PLAY_TYPES: Final = (
 )
 WEATHER_SOURCES: Final = ("nflverse_games", "pbp_weather_text", "noaa_isd")
 ROOF_STATES: Final = ("dome", "closed", "open", "outdoors")
+PRECIPITATION_KINDS: Final = ("rain", "snow", "sleet", "mix")
 
 
 def _flag(name: str) -> "Column[bool]":
@@ -170,6 +171,7 @@ GAME_WEATHER: Final = Table(
     one_of("precipitation_source", WEATHER_SOURCES, "game_weather_precipitation_source_ck"),
     CheckConstraint("precipitation IN (0, 1)", name="game_weather_precipitation_ck"),
     CheckConstraint("isd_precipitation IN (0, 1)", name="game_weather_isd_precipitation_ck"),
+    one_of("precipitation_kind", PRECIPITATION_KINDS, "game_weather_precipitation_kind_ck"),
     CheckConstraint("(temperature_f IS NULL) = (temperature_source IS NULL)", name="game_weather_temperature_pair_ck"),
     CheckConstraint("(wind_mph IS NULL) = (wind_source IS NULL)", name="game_weather_wind_pair_ck"),
     CheckConstraint(

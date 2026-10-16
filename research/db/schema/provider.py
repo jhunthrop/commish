@@ -165,7 +165,7 @@ PLAYER_PROP_OBSERVATIONS: Final = Table(
     Index("player_prop_observations_fetched_at_idx", "fetched_at"),
 )
 
-# Tank01's weekly projection, one row per player of one `tank01_projections` snapshot (revision 0008):
+# Tank01's weekly projection, one row per player of one `tank01_projections` snapshot (revision 0009):
 # the prospective benchmark of the weekly round 4, never an input and never a word on the site. The
 # snapshot's own id and instant key it, so the latest capture before a kickoff is the benchmark's read.
 TANK01_PROJECTION_ROWS: Final = Table(
@@ -202,7 +202,7 @@ TANK01_PROJECTION_ROWS: Final = Table(
     Index("tank01_projection_rows_week_idx", "season", "week", "captured_at"),
 )
 
-# The anytime-touchdown market (revision 0008): a Yes price, and a No price where the book quotes one,
+# The anytime-touchdown market (revision 0009): a Yes price, and a No price where the book quotes one,
 # which `player_prop_observations` (point and under price NOT NULL) cannot hold. Append-only like it:
 # one event fetched twice keeps both. The market benchmark only, never an input, never on the site.
 PLAYER_TD_PROP_OBSERVATIONS: Final = Table(
