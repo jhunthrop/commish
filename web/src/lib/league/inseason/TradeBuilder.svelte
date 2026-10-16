@@ -20,7 +20,7 @@
 		toggle,
 		type Picks
 	} from './builder.ts';
-	import PickSelect from './PickSelect.svelte';
+	import PickSelect, { type PickGroup } from './PickSelect.svelte';
 	import { focusOnOpen, hostTab } from './attach.ts';
 	import { Narrowing } from './state.ts';
 	import { CLOSE_FOR_THEM, verbWords } from './words.ts';
@@ -74,6 +74,13 @@
 			: false
 	);
 	const verb = $derived(verbWords('trades', host));
+	/** The teams as the picker names them: name, owner and record. */
+	const teamGroups = $derived<PickGroup[]>([
+		{
+			label: null,
+			options: teams.map((t) => ({ value: String(t.roster_id), label: teamChoice(t) }))
+		}
+	]);
 	const page = $derived(answer?.host_trades_url ?? href);
 
 	/** Reads the answer for the picks, keeping only the latest; the last answer stays, quieter, while
@@ -142,13 +149,10 @@
 		<div class="body">
 			<PickSelect
 				label={BUILDER_LINES.team}
-				value={picks.team ?? ''}
+				value={picks.team === null ? '' : String(picks.team)}
+				groups={teamGroups}
 				onchange={(value: string) => choose(Number(value))}
-			>
-				{#each teams as t (t.roster_id)}
-					<option value={t.roster_id}>{teamChoice(t)}</option>
-				{/each}
-			</PickSelect>
+			/>
 			<div class="answer">
 				<div class="words" aria-live="polite" aria-busy={reading}>
 					{#if problem}

@@ -7,9 +7,16 @@
 	import type { LeagueHost } from '../api.ts';
 	import LineRow from './LineRow.svelte';
 	import Screen from './Screen.svelte';
-	import PickSelect from './PickSelect.svelte';
+	import PickSelect, { type PickGroup, type PickOption } from './PickSelect.svelte';
 	import TradeBuilder from './TradeBuilder.svelte';
-	import type { TradeAdvice, TradeCheck, TradeCheckInput, TradeRow, TradeTeam } from './api.ts';
+	import type {
+		PlayerLine,
+		TradeAdvice,
+		TradeCheck,
+		TradeCheckInput,
+		TradeRow,
+		TradeTeam
+	} from './api.ts';
 	import { BUILDER_LINES, builtFrom, type Picks } from './builder.ts';
 	import {
 		Narrowing,
@@ -90,11 +97,22 @@
 	/** The teams opened past their first trades. */
 	let opened = $state<ReadonlySet<number>>(new Set());
 
+	const pickOption = (line: PlayerLine): PickOption => ({
+		value: pickKey(line),
+		label: line.player.name
+	});
+
 	const holds = (row: TradeRow, id: string): boolean =>
 		[...row.give, ...row.get].some((line) => line.player.board_id === id);
 
 	/** Every player on your roster (a trade found or not), then theirs from the trades, each once. */
 	const players = $derived(pickerPlayers(advice.roster, advice.teams));
+	/** The picker's choices: every trade, then your players and theirs. */
+	const pickGroups = $derived<PickGroup[]>([
+		{ label: null, options: [{ value: '', label: EVERY_TRADE }] },
+		{ label: LINES.yourPlayers, options: players.yours.map(pickOption) },
+		{ label: LINES.theirPlayers, options: players.theirs.map(pickOption) }
+	]);
 	/** The picked player's name, for the sentence when no trade holds him. */
 	const pickedName = $derived(
 		[...players.yours, ...players.theirs].find((l) => pickKey(l) === player)?.player.name ?? ''
@@ -200,20 +218,9 @@
 			<PickSelect
 				label={LINES.tradesHolding}
 				value={player ?? ''}
+				groups={pickGroups}
 				onchange={(value: string) => void pick(value === '' ? null : value)}
-			>
-				<option value="">{EVERY_TRADE}</option>
-				<optgroup label={LINES.yourPlayers}>
-					{#each players.yours as line (line.player.host_id)}
-						<option value={pickKey(line)}>{line.player.name}</option>
-					{/each}
-				</optgroup>
-				<optgroup label={LINES.theirPlayers}>
-					{#each players.theirs as line (line.player.host_id)}
-						<option value={pickKey(line)}>{line.player.name}</option>
-					{/each}
-				</optgroup>
-			</PickSelect>
+			/>
 			<Quiet size="sm" controls={BUILDER_ID} expanded={building !== null} onclick={buildNew}
 				>{BUILDER_LINES.open}</Quiet
 			>

@@ -1,23 +1,45 @@
-<script lang="ts">
-	import type { Snippet } from 'svelte';
+<script lang="ts" module>
+	/** One choice, and a group of them (an optgroup when it has a label). */
+	export interface PickOption {
+		value: string;
+		label: string;
+	}
+	export interface PickGroup {
+		label: string | null;
+		options: readonly PickOption[];
+	}
+</script>
 
+<script lang="ts">
 	/** A labelled choice on an in-season screen (the trades a player holds, the team a trade is
-	 * with): its words, then the native select, which gives way first on a narrow line. */
+	 * with): its words, then the native select, which gives way first on a narrow line. The options
+	 * come as data, not a snippet, so the select needs no runtime the shell's shared chunk carries. */
 	interface Props {
 		label: string;
-		value: string | number;
+		value: string;
+		groups: readonly PickGroup[];
 		onchange: (value: string) => void;
-		/** The options. */
-		children: Snippet;
 	}
 
-	let { label, value, onchange, children }: Props = $props();
+	let { label, value, groups, onchange }: Props = $props();
 </script>
 
 <label class="pick">
 	<span>{label}</span>
 	<select {value} onchange={(event) => onchange(event.currentTarget.value)}>
-		{@render children()}
+		{#each groups as group, i (i)}
+			{#if group.label === null}
+				{#each group.options as option (option.value)}
+					<option value={option.value}>{option.label}</option>
+				{/each}
+			{:else}
+				<optgroup label={group.label}>
+					{#each group.options as option (option.value)}
+						<option value={option.value}>{option.label}</option>
+					{/each}
+				</optgroup>
+			{/if}
+		{/each}
 	</select>
 </label>
 
