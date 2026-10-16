@@ -17,6 +17,7 @@
 	} from './move.ts';
 	import {
 		LINES,
+		carriesPerGame,
 		figureHead,
 		lineupDecision,
 		lineupTitle,
@@ -43,7 +44,13 @@
 
 	let { advice, host, plan, make, reread }: Props = $props();
 	/** The head over the lineup and the bench names the number their rows end on. */
-	const head = $derived(figureHead([...advice.slots.map((s) => s.ours), ...advice.bench]));
+	const shown = $derived([
+		...advice.slots.flatMap((s) => (s.host ? [s.ours, s.host] : [s.ours])),
+		...advice.bench
+	]);
+	const head = $derived(figureHead(shown));
+	/** Whether the rows end on points a game: a row without them then says so. */
+	const perGameScreen = $derived(carriesPerGame(shown));
 
 	const MOVE_ID = 'lineup-move';
 	let step = $state<MoveStep>({ kind: 'closed' });
@@ -115,12 +122,12 @@
 		{#each advice.slots as slot, i (`${slot.slot}-${String(i)}`)}
 			{#if slot.changed}
 				<div class="change">
-					<LineRow line={slot.ours} slot={labels[i]} />
-					{#if slot.host}<LineRow line={slot.host} slot={LINES.sit} />{/if}
+					<LineRow line={slot.ours} slot={labels[i]} {perGameScreen} />
+					{#if slot.host}<LineRow line={slot.host} slot={LINES.sit} {perGameScreen} />{/if}
 					{#if slot.sentence}<p class="why">{slot.sentence}</p>{/if}
 				</div>
 			{:else}
-				<LineRow line={slot.ours} slot={labels[i]} />
+				<LineRow line={slot.ours} slot={labels[i]} {perGameScreen} />
 			{/if}
 		{/each}
 	</Panel>
@@ -132,7 +139,7 @@
 			{@const sits = sat.has(line.player.host_id)}
 			<!-- A starter a change sits is on the change's wash here too, so the two read as one move. -->
 			<div class:change={sits}>
-				<LineRow {line} slot={sits ? LINES.sit : LINES.bench} />
+				<LineRow {line} slot={sits ? LINES.sit : LINES.bench} {perGameScreen} />
 			</div>
 		{:else}
 			<p class="none"><Label>{LINES.noBench}</Label></p>

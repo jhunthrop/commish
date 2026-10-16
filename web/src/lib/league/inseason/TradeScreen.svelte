@@ -174,13 +174,20 @@
 				{line}
 				slot={LINES.give}
 				factsOnPhone={false}
+				perGameScreen={perGame}
 			/>{/each}
 		{#each row.get as line (line.player.host_id)}<LineRow
 				{line}
 				slot={LINES.get}
 				factsOnPhone={false}
+				perGameScreen={perGame}
 			/>{/each}
-		{#if row.drop}<LineRow line={row.drop} slot={LINES.drop} factsOnPhone={false} />{/if}
+		{#if row.drop}<LineRow
+				line={row.drop}
+				slot={LINES.drop}
+				factsOnPhone={false}
+				perGameScreen={perGame}
+			/>{/if}
 		<div class="gains">
 			<p>{tradeGains(row)}</p>
 			{#if row.close_for_them}<ToneChip tone="even">{CLOSE_FOR_THEM}</ToneChip>{/if}

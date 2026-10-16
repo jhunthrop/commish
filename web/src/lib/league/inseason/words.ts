@@ -277,6 +277,22 @@ export function perGameWords(points: number): string {
 	return `${fixed(points, POINTS_PER_GAME_DECIMALS)} ${LINES.aGame}`;
 }
 
+/** What a row ends on: his rest-of-season points a game, else his points over replacement a week,
+ * else words. On a screen whose rows carry points a game, a row without them says "No projection",
+ * so no replacement figure sits under the head "Points a game" with no basis of its own. */
+export type RowEnd =
+	| { kind: 'perGame'; value: number }
+	| { kind: 'por'; value: number }
+	| { kind: 'words'; words: string };
+
+export function rowEnd(line: PlayerLine, screenCarriesPerGame: boolean): RowEnd {
+	const perGame = line.rest_of_season_per_game;
+	if (perGame !== null) return { kind: 'perGame', value: perGame };
+	if (screenCarriesPerGame) return { kind: 'words', words: LINES.noProjection };
+	const por = line.points_over_replacement;
+	return por === null ? { kind: 'words', words: LINES.unranked } : { kind: 'por', value: por };
+}
+
 /** Whether any of the rows carries his rest-of-season points a game. */
 export function carriesPerGame(lines: readonly PlayerLine[]): boolean {
 	return lines.some((line) => line.rest_of_season_per_game !== null);
@@ -307,6 +323,8 @@ export const LINES = {
 	gainHead: 'Your gain a week',
 	drop: 'Drop',
 	unranked: 'Unranked',
+	/** A row's end on a screen whose rows end on points a game, for a player without them. */
+	noProjection: 'No projection',
 	aWeek: 'a week',
 	/** A row's rest-of-season points a game, in the unit words the league page's season figure uses. */
 	aGame: 'a game',

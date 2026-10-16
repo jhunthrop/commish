@@ -20,7 +20,8 @@
 		hisPorWords,
 		lastGamesWords,
 		perGameWords,
-		porFigure
+		porFigure,
+		rowEnd
 	} from './words.ts';
 
 	/** One player of an in-season screen as a league row: his face and name (which opens his game
@@ -45,9 +46,19 @@
 		/** Whether a phone shows his game's facts: the waiver and trade rows keep to their decision there,
 		 * so the first row stays whole above the pinned verb. */
 		factsOnPhone?: boolean;
+		/** Whether the screen's rows end on points a game: a row without them then says so at its end. */
+		perGameScreen?: boolean;
 	}
 
-	let { line, tags = [], slot, note, trailing, factsOnPhone = true }: Props = $props();
+	let {
+		line,
+		tags = [],
+		slot,
+		note,
+		trailing,
+		factsOnPhone = true,
+		perGameScreen = false
+	}: Props = $props();
 
 	const facts = $derived(line.facts);
 	const game = $derived(gameWords(facts));
@@ -61,7 +72,8 @@
 	/** Whether the end holds another number than his points over replacement, which then sit on his
 	 * line. */
 	const porOnLine = $derived(trailing !== undefined || perGame !== null);
-	const none = $derived(por !== null && porFigure(por) === porFigure(0));
+	const end = $derived(rowEnd(line, perGameScreen));
+	const none = $derived(end.kind === 'por' && porFigure(end.value) === porFigure(0));
 </script>
 
 {#snippet meta()}
@@ -92,19 +104,19 @@
 {#snippet value()}
 	{#if trailing}
 		{@render trailing()}
-	{:else if perGame !== null}
-		<ValueCell value={perGame} label={LINES.aGame} decimals={POINTS_PER_GAME_DECIMALS} />
-	{:else if por !== null}
+	{:else if end.kind === 'perGame'}
+		<ValueCell value={end.value} label={LINES.aGame} decimals={POINTS_PER_GAME_DECIMALS} />
+	{:else if end.kind === 'por'}
 		<!-- A figure that rounds to nothing prints "0.0", with no sign. -->
 		<ValueCell
-			value={none ? 0 : por}
+			value={none ? 0 : end.value}
 			label={LINES.overRepl}
 			phoneLabel={false}
 			signed={!none}
 			decimals={GAIN_DECIMALS}
 		/>
 	{:else}
-		<Label size="cell">{LINES.unranked}</Label>
+		<Label size="cell">{end.words}</Label>
 	{/if}
 {/snippet}
 

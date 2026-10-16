@@ -35,6 +35,7 @@ import {
 	hisPorWords,
 	figureHead,
 	perGameWords,
+	rowEnd,
 	porFigure,
 	signInTitle,
 	sharedDropWords,
@@ -216,6 +217,19 @@ void test("a row's rest-of-season points a game are in the season figure's unit 
 	assert.equal(perGameWords(18.44), '18.4 a game');
 	assert.equal(perGameWords(9), '9.0 a game');
 	assert.equal(LINES.aGame, 'a game');
+});
+
+void test('a row ends on points a game, and on a screen that carries them a row without one says so, never a bare replacement figure', () => {
+	const plain = line('Kyren Williams');
+	const figured = { ...plain, rest_of_season_per_game: 14.2 };
+	assert.deepEqual(rowEnd(figured, true), { kind: 'perGame', value: 14.2 });
+	assert.deepEqual(rowEnd(figured, false), { kind: 'perGame', value: 14.2 });
+	assert.deepEqual(rowEnd(plain, true), { kind: 'words', words: 'No projection' });
+	assert.deepEqual(rowEnd(plain, false), { kind: 'por', value: 0.7 });
+	const unranked = { ...plain, points_over_replacement: null };
+	assert.deepEqual(rowEnd(unranked, false), { kind: 'words', words: 'Unranked' });
+	assert.deepEqual(rowEnd(unranked, true), { kind: 'words', words: 'No projection' });
+	assert.equal(LINES.noProjection, 'No projection');
 });
 
 void test("the rows' head names the number they end on: points a game once any row carries it", () => {
