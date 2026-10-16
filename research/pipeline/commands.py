@@ -41,6 +41,7 @@ from research.pipeline.nflverse import (
     pbp_plays,
     roster_weeks,
     team_defense_weeks,
+    usage_feeds,
 )
 from research.pipeline.nflverse.client import NflverseClient
 from research.pipeline.odds import backfill
@@ -189,6 +190,32 @@ def _depth_chart_weeks(conn: Connection, inv: Invocation) -> object:
     return lines
 
 
+# The charted feeds' first published seasons upstream (the data-sources doc): Next Gen Stats weekly
+# from 2016, PFR's advanced stats through nflverse from 2018. FTN charting starts in 2022 and is kept
+# out of the round 4 fit (no 2021 season), so its history is not ingested here.
+NGS_FIRST_SEASON: Final = 2016
+PFR_FIRST_SEASON: Final = 2018
+
+
+def _charted_history(conn: Connection, inv: Invocation) -> object:
+    """Next Gen Stats and PFR advanced stats per season through the weekly pass's own ingests
+    (`usage_feeds`, Lane 23), durable after each feed."""
+    client = NflverseClient(inv.fetcher)
+    seasons = seasons_of(inv.args)
+    week_as_of = ingest.schedule_week_as_of(client, seasons)
+    lines = []
+    for season in seasons:
+        if season >= NGS_FIRST_SEASON:
+            ngs = usage_feeds.ingest_next_gen_stats(conn, client, season, week_as_of.get(season, {}))
+            lines.append(f"next-gen-stats {season}: {ngs.summary()}")
+            inv.checkpoint()
+        if season >= PFR_FIRST_SEASON:
+            pfr = usage_feeds.ingest_pfr_advstats(conn, client, season)
+            lines.append(f"pfr-advstats {season}: {pfr.summary()}")
+            inv.checkpoint()
+    return lines
+
+
 def _win_totals(conn: Connection, inv: Invocation) -> object:
     return vegas.run_win_totals(conn, inv.fetcher, inv.args.last, inv.now, first_kickoff_for(conn, inv.args.last))
 
@@ -234,5 +261,6 @@ COMMANDS: Final = MappingProxyType({
     "pbp-plays": Command("the play-level play-by-play per season into nflverse_pbp_plays", _pbp_plays, atomic=False),
     "depth-chart-weeks": Command("nflverse's weekly depth charts per season into nflverse_depth_chart_weeks", _depth_chart_weeks, atomic=False),
     "depth-chart-check": Command("the round 4 depth chart stamp check (reads charts and filings, writes nothing; the coordinator's recorded run)", lambda c, i: depth_chart_check.run_stamp_check(c).lines()),
+    "charted-history": Command("Next Gen Stats (2016 on) and PFR advanced stats (2018 on) per season through the weekly pass's ingests", _charted_history, atomic=False),
     "history": Command("the seasons the store lost, re-created from nflverse (pipeline/history.py); --first/--last narrow it", _history, atomic=False),
 })  # fmt: skip
