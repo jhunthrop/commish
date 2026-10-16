@@ -1,0 +1,100 @@
+/** Instants on the member's own clock: the API keeps instants, a screen says them in the browser's
+ * time zone and names the zone once when it is not the NFL's Eastern clock. Apart from date.ts,
+ * which prints the run's dates on the Eastern clock for every reader alike. */
+
+/** The member's own time zone, from the browser: the API keeps instants, the screen says them on the
+ * member's clock. */
+export function memberZone(): string {
+	return Intl.DateTimeFormat().resolvedOptions().timeZone;
+}
+
+/** The weekday-and-time format for a zone, made once per zone. */
+const weekdayFormats = new Map<string, Intl.DateTimeFormat>();
+
+function weekdayFormat(zone: string): Intl.DateTimeFormat {
+	const known = weekdayFormats.get(zone);
+	if (known) return known;
+	const made = new Intl.DateTimeFormat('en-US', {
+		weekday: 'short',
+		hour: 'numeric',
+		minute: '2-digit',
+		timeZone: zone
+	});
+	weekdayFormats.set(zone, made);
+	return made;
+}
+
+/** "Sun 1:00 pm": a kickoff or a stamp on the member's clock (zoneLine names the zone once). */
+export function weekdayTime(iso: string, zone: string = memberZone()): string {
+	const parts = weekdayFormat(zone).formatToParts(new Date(iso));
+	const part = (type: Intl.DateTimeFormatPartTypes): string =>
+		parts.find((p) => p.type === type)?.value ?? '';
+	return `${part('weekday')} ${part('hour')}:${part('minute')} ${part('dayPeriod').toLowerCase()}`;
+}
+
+/** The zone's own name, "Central Time", as the browser names it. */
+function zoneName(zone: string): string {
+	const named = new Intl.DateTimeFormat('en-US', { timeZone: zone, timeZoneName: 'longGeneric' })
+		.formatToParts(new Date())
+		.find((p) => p.type === 'timeZoneName')?.value;
+	return named ?? zone;
+}
+
+/** The NFL's clock, which a screen's times need not name. */
+const EASTERN = 'Eastern Time';
+
+/** The member's zone said once on a screen, "Times are in Central Time.", null on the Eastern clock. */
+export function zoneLine(zone: string = memberZone()): string | null {
+	const name = zoneName(zone);
+	return name === EASTERN ? null : `Times are in ${name}.`;
+}
+
+/** The weekday-month-day-and-time format for a zone, made once per zone. */
+const dayTimeFormats = new Map<string, Intl.DateTimeFormat>();
+
+function dayTimeFormat(zone: string): Intl.DateTimeFormat {
+	const known = dayTimeFormats.get(zone);
+	if (known) return known;
+	const made = new Intl.DateTimeFormat('en-US', {
+		weekday: 'long',
+		month: 'long',
+		day: 'numeric',
+		hour: 'numeric',
+		minute: '2-digit',
+		timeZone: zone
+	});
+	dayTimeFormats.set(zone, made);
+	return made;
+}
+
+/** "Sunday, October 25 at 7:00 pm": a day further off than this week, on the member's clock. */
+export function dayAndTime(iso: string, zone: string = memberZone()): string {
+	const parts = dayTimeFormat(zone).formatToParts(new Date(iso));
+	const part = (type: Intl.DateTimeFormatPartTypes): string =>
+		parts.find((p) => p.type === type)?.value ?? '';
+	return `${part('weekday')}, ${part('month')} ${part('day')} at ${part('hour')}:${part('minute')} ${part('dayPeriod').toLowerCase()}`;
+}
+
+/** The short month-and-day format for a zone, made once per zone. */
+const shortDayFormats = new Map<string, Intl.DateTimeFormat>();
+
+/** "Oct 25": an instant's day on the member's clock. */
+export function shortDay(iso: string, zone: string = memberZone()): string {
+	let made = shortDayFormats.get(zone);
+	if (!made) {
+		made = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: zone });
+		shortDayFormats.set(zone, made);
+	}
+	return made.format(new Date(iso));
+}
+
+/** "7:00 pm": a time of day on the member's clock. */
+export function timeOfDay(iso: string, zone: string = memberZone()): string {
+	return weekdayTime(iso, zone).replace(/^\S+ /, '');
+}
+
+/** Whether two instants fall on the same calendar day on the member's clock. */
+export function sameDay(a: Date, b: Date, zone: string = memberZone()): boolean {
+	const day = (date: Date): string => date.toLocaleDateString('en-US', { timeZone: zone });
+	return day(a) === day(b);
+}

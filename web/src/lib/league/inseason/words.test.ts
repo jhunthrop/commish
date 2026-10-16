@@ -1,6 +1,7 @@
 // The in-season screens' words, and the copy guard over every line they compose: run with `npm test`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { memberZone, weekdayTime, zoneLine } from '#lib/format/clock.ts';
 import { readFileSync } from 'node:fs';
 import { isScreen } from './screens.ts';
 import {
@@ -36,9 +37,7 @@ import {
 	signInTitle,
 	sharedDropWords,
 	designationWords,
-	memberZone,
 	noTradeWith,
-	zoneLine,
 	dropWords,
 	gainFigure,
 	gameWords,
@@ -52,8 +51,7 @@ import {
 	tradeDecision,
 	tradeGains,
 	verbWords,
-	waiverDecision,
-	weekdayTime
+	waiverDecision
 } from './words.ts';
 
 const facts = (over: Partial<WeekFacts> = {}): WeekFacts => ({
