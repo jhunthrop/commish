@@ -3,6 +3,11 @@
     uv run python -m research.nightly run [--out DIR] [--skip ingest,fit,capsules,headshots]
                                           [--capsule-budget N] [--regenerate-all] [--mend-only]
     uv run python -m research.nightly publish [--out DIR] [--at ISO] [--no-dispatch]
+    uv run python -m research.nightly mark --out DIR
+
+`mark` writes the newest injury capture beside a local directory's public run (`designations.json`,
+publish's first step alone), reading the store and writing nothing to it: the stand-in's way to the
+statuses the site prints (development).
 
 `run` writes one run under a new run id (05:00 UTC); `publish` makes the newest passed run public
 once its early-access hour is over, dispatches the web build of it (every hour), and
@@ -114,6 +119,17 @@ def _sync_table(args: argparse.Namespace, engine: Engine | None, store: RunStore
     return sync_published_board(engine, store, now)
 
 
+def _mark(args: argparse.Namespace) -> int:
+    engine = make_engine(database_url_from_env(DATABASE_VARIABLE))
+    try:
+        with httpx.Client(timeout=60.0) as http:
+            marked = mark_public_runs(engine, _store(args, http))
+    finally:
+        engine.dispose()
+    _line(marked.line)
+    return 0 if marked.ok else 1
+
+
 def _contract(args: argparse.Namespace) -> int:
     """The schema gate alone, over a run already written (CI runs it in the built image, review N16)."""
     record = schema_gate(Path(args.runs), args.run_id, contract_dir(os.environ))
@@ -140,12 +156,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     published.add_argument("--no-dispatch", action="store_true", help="move the pointer, dispatch nothing")
     for sub in (run, published):
         sub.add_argument("--out", default=None, help="a local directory instead of the R2 bucket")
+    marking = commands.add_parser("mark", help="write the newest injury capture beside a local run")
+    marking.add_argument("--out", required=True, help="the local directory laid out as the bucket")
     contract = commands.add_parser("contract", help="the schema gate alone, over a run already written")
     contract.add_argument("--runs", required=True, help="the directory laid out as the bucket (runs/<id>/...)")
     contract.add_argument("--run-id", required=True)
     args = parser.parse_args(argv)
     configure_logging(logging.WARNING)
-    commands_by_name = {"run": _run, "publish": _publish, "contract": _contract}
+    commands_by_name = {"run": _run, "publish": _publish, "mark": _mark, "contract": _contract}
     return commands_by_name[args.command](args)
 
 

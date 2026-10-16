@@ -42,7 +42,7 @@ from research.model.designations import CODES, SEASON_LONG, season_long, status_
 from research.model.instants import js_iso, ms_instant
 from research.nightly.config import EARLY_KEY, LATEST_KEY
 from research.nightly.publish import Dispatcher, PublishOutcome, encode, read_json, run_key
-from research.nightly.published_board import PublishedBoardError, driver_line, read_published_board
+from research.nightly.published_board import MANIFEST_FILE, driver_line
 from research.nightly.run_store import JSON_TYPE, RunStore
 
 Json = dict[str, Any]
@@ -194,6 +194,31 @@ def _pointer(store: RunStore, key: str) -> str | None:
     return run_id if isinstance(run_id, str) and run_id else None
 
 
+@dataclass(frozen=True, slots=True)
+class Ranked:
+    season: int
+    ids: frozenset[str]
+
+
+def ranked(store: RunStore, run_id: str) -> Ranked | None:
+    """The run's season and every player its boards rank, None for a run whose manifest or boards do
+    not read (the table sync names why)."""
+    manifest = read_json(store, run_key(run_id, MANIFEST_FILE))
+    season = None if manifest is None else manifest.get("season")
+    formats = None if manifest is None else manifest.get("formats")
+    if isinstance(season, bool) or not isinstance(season, int) or not isinstance(formats, list):
+        return None
+    ids: set[str] = set()
+    for format_json in formats:
+        format_id = format_json.get("id") if isinstance(format_json, dict) else None
+        board = read_json(store, run_key(run_id, f"boards/{format_id}.json")) if isinstance(format_id, str) else None
+        rows = None if board is None else board.get("rows")
+        if not isinstance(rows, list):
+            return None
+        ids.update(row["id"] for row in rows if isinstance(row, dict) and isinstance(row.get("id"), str))
+    return Ranked(season, frozenset(ids))
+
+
 def mark_runs(conn: Connection, store: RunStore, keys: Sequence[str]) -> Marked:
     """`designations.json` written into each run the pointers at `keys` name, before `publish`. A run
     whose boards do not read is left unmarked and named (the table sync fails it by name too)."""
@@ -204,14 +229,13 @@ def mark_runs(conn: Connection, store: RunStore, keys: Sequence[str]) -> Marked:
     seasons: dict[str, int] = {}
     unread: list[str] = []
     for run_id in dict.fromkeys(r for r in (_pointer(store, key) for key in keys) if r is not None):
-        try:
-            board = read_published_board(store, run_id)
-        except PublishedBoardError:
+        run = ranked(store, run_id)
+        if run is None:
             unread.append(run_id)
             continue
-        file = designations_file(read, {row.player_id for row in board.rows})
+        file = designations_file(read, run.ids)
         store.put(run_key(run_id, DESIGNATIONS_FILE), encode(file), JSON_TYPE)
-        held[run_id], seasons[run_id] = season_ids(file), board.season
+        held[run_id], seasons[run_id] = season_ids(file), run.season
     runs = ", ".join(f"{r} ({len(ids)} season-long)" for r, ids in held.items()) or "no run"
     skipped = f"; run {', '.join(unread)} does not read as a board, left unmarked" if unread else ""
     return Marked(read, held, seasons, f"designations: capture of {js_iso(read.read_at)} written to {runs}{skipped}")
