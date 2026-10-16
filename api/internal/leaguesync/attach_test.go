@@ -220,6 +220,9 @@ func TestAttachIsScopedToTheAccount(t *testing.T) {
 		list[0].Standing == nil || list[0].Standing.Teams != 12 || list[0].Standing.Place < 1 {
 		t.Fatalf("alice's list %s", body)
 	}
+	if l := list[0]; l.Phase != apitypes.LeaguePhaseInSeason || l.PhaseBasis == "" || l.PlayoffStartWeek == nil || *l.PlayoffStartWeek != 15 || !l.WaiversOpen {
+		t.Fatalf("alice's league's phase in the list: %s", body)
+	}
 
 	// A second league needs many_leagues, so alice holds a Draft Pass for it.
 	if err := (&entitlements.Store{Pool: pool}).Grant(ctx, alice.ID, entitlements.ProductDraftPass, 2026, clock2027(), "test"); err != nil {
