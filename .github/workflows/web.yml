@@ -1,5 +1,5 @@
 # The prep site: check, lint, build every nightly page from a run, hold the Lighthouse budgets, and
-# deploy to the workers.dev preview. Runs on a push to main that touches web/, and when the nightly
+# deploy to the workers.dev preview and the custom domains, then clear the zone's edge cache. Runs on a push to main that touches web/, and when the nightly
 # job dispatches nightly-run with the id of a run that passed its gates
 # (client_payload.runId). A push builds the run runs/latest.json names.
 # The custom domain route is added at cutover (spec §10), not here.
@@ -8,7 +8,7 @@ name: web
 on:
   push:
     branches: [main]
-    paths: ['web/**', '.github/workflows/web.yml']
+    paths: ["web/**", ".github/workflows/web.yml"]
   repository_dispatch:
     types: [nightly-run]
   # The hourly backstop at any hour, the delivery path: `publish` moves runs/latest.json every hour
@@ -17,11 +17,11 @@ on:
   # pending push's place still deploys it; with nothing new it stops in seconds, named. The
   # nightly's own dispatch (WEB_DISPATCH_TOKEN) only makes it sooner and is optional.
   schedule:
-    - cron: '30 * * * *'
+    - cron: "30 * * * *"
   workflow_dispatch:
     inputs:
       runId:
-        description: 'Run id to build, or latest'
+        description: "Run id to build, or latest"
         required: false
         default: latest
 
@@ -130,3 +130,13 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: npx wrangler deploy
+
+      - name: Clear the edge cache so every visitor sees this deploy
+        # The edge kept serving a removed page and the previous stamp after a deploy (ledger
+        # 2026-10-15). The zone is found by name. The deploy above stays if this fails, and the job
+        # goes red naming the purge. Needs the token's Zone > Cache Purge > Purge permission.
+        if: steps.fresh.outputs.build != 'false'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          ZONE_NAME: trycommish.app
+        run: node scripts/purge-cache.ts
