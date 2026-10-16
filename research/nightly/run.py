@@ -13,7 +13,7 @@ gate passed (`research-ts/src/nightly/publish.ts`).
 
 import tempfile
 from collections.abc import Callable, Mapping
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -25,9 +25,10 @@ from research.model.backtest import HeldOutScore
 from research.model.instants import js_iso
 from research.nightly import gates
 from research.nightly.assemble import Assembled, assemble
+from research.nightly.capsule_demotion import DEMOTED_KEY, carried_demotions
 from research.nightly.capsule_step import CapsuleSpend, CapsuleStepPlan
 from research.nightly.config import HELD_OUT_BASELINE_KEY
-from research.nightly.publish import ArtifactWriter, encode, promote_early, run_key, take_run_id
+from research.nightly.publish import ArtifactWriter, encode, promote_early, read_json, run_key, take_run_id
 from research.nightly.reads.record import frozen_weeks
 from research.nightly.register_log import FrozenBy, carry_forward, read_frozen_by, save_frozen_by
 from research.nightly.run_parts import (
@@ -81,6 +82,32 @@ def _copy_run(staging: LocalRunStore, store: RunStore, run_id: str, paths: list[
         store.put(run_key(run_id, path), body, "application/json")
 
 
+def carry_demotions(store: RunStore, plan: CapsuleStepPlan, log: Callable[[str], None]) -> CapsuleStepPlan:
+    """Tonight's capsule plan with the last night's demotions (`DEMOTED_KEY`), written first tonight. A
+    list that cannot be read is named and carries nothing: it is an aid to the writer, never the night."""
+    try:
+        carried = carried_demotions(read_json(store, DEMOTED_KEY))
+    except Exception as error:
+        # A malformed list (ValueError) or a store read that failed: named, and the night goes on.
+        log(f"capsules: the last night's demotions were not read ({error})")
+        return plan
+    if carried:
+        pages = "page" if len(carried) == 1 else "pages"
+        slugs = ", ".join(d.slug for d in carried)
+        log(f"capsules: {len(carried)} {pages} demoted last night is written first tonight: {slugs}")
+    return replace(plan, carried=carried)
+
+
+def keep_demotions(store: RunStore, run_id: str, steps: list[StepOutcome]) -> None:
+    """The capsule step's demotions, kept for the next night whenever the step wrote (an empty list
+    clears the last one); a night that did not write leaves the last list for the next that does."""
+    capsule = next((s for s in steps if s.record.name == "capsules"), None)
+    if capsule is None or capsule.record.status != "ran":
+        return
+    body = {"runId": run_id, "demoted": [d.json() for d in capsule.demoted]}
+    store.put(DEMOTED_KEY, encode(body), "application/json")
+
+
 def _failed(deps: RunDeps, run_id: str, steps: list[StepOutcome], error: BaseException) -> RunOutcome:
     """A run that could not be assembled: its report alone, no pointer moved."""
     report = {"runId": run_id, "status": "failed", "steps": [s.record.json() for s in steps], "error": str(error)}
@@ -126,7 +153,13 @@ def run_nightly(deps: RunDeps, options: RunOptions) -> RunOutcome:
     started = deps.clock()
     run_id = take_run_id(deps.store, started)
     deps.log(f"run {run_id}: season {PRODUCT_SEASON}, writing to {deps.store.locate(f'runs/{run_id}')}")
-    steps = run_steps(deps.engine, deps.fetcher, deps.environ, deps.clock, deps.log, options.skip, options.capsules)
+    plan = carry_demotions(deps.store, options.capsules, deps.log)
+    steps = run_steps(deps.engine, deps.fetcher, deps.environ, deps.clock, deps.log, options.skip, plan)
+    try:
+        keep_demotions(deps.store, run_id, steps)
+    except Exception as unkept:
+        # An aid to the next night's writer, never this night's verdict: named, and the run goes on.
+        deps.log(f"capsules: tonight's demotions were not kept for the next night ({unkept})")
     try:
         with deps.engine.connect() as conn:
             frozen_by = carry_forward(

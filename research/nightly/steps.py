@@ -38,6 +38,14 @@ from research.pipeline.tank01.client import DEFAULT_SEASON, SEASON_ENV, Tank01Cl
 from research.season import PRODUCT_SEASON
 
 ODDS_KEY: Final = "ODDS_API_KEY"
+# A failed feed's reason on the capture line: its first line, at most this many characters (a database
+# error's text runs to several lines of SQL and parameters).
+CAPTURE_REASON_CHARS: Final = 200
+
+
+def _short_reason(reason: str | None) -> str:
+    lines = (reason or "").strip().splitlines()
+    return lines[0][:CAPTURE_REASON_CHARS] if lines else "no reason given"
 
 
 @dataclass(frozen=True, slots=True)
@@ -45,9 +53,12 @@ class StepRecord:
     name: str
     status: str  # "ran", "skipped", "failed"
     summary: str
+    # The capsule step's demoted pages (`capsule_demotion.Demotion.json`), carried beside its summary.
+    demoted: tuple[Mapping[str, str | int], ...] | None = None
 
-    def json(self) -> dict[str, str]:
-        return {"name": self.name, "status": self.status, "summary": self.summary}
+    def json(self) -> dict[str, object]:
+        record: dict[str, object] = {"name": self.name, "status": self.status, "summary": self.summary}
+        return record if self.demoted is None else {**record, "demoted": [dict(d) for d in self.demoted]}
 
 
 @dataclass(frozen=True, slots=True)
@@ -75,7 +86,7 @@ def _capture(context: IngestContext) -> str:
         result = run_capture_harvest(conn, Tank01Client(context.fetcher, key), context.now, season)
     if result.reason is not None:
         return f"refused, {result.reason}"
-    failed = [feed.source for feed in result.feeds if feed.status == "failed"]
+    failed = [f"{feed.source} ({_short_reason(feed.reason)})" for feed in result.feeds if feed.status == "failed"]
     return f"{len(result.feeds)} feeds, {sum(f.requests for f in result.feeds)} requests" + (
         f", failed: {', '.join(failed)}" if failed else ""
     )

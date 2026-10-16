@@ -290,6 +290,9 @@ class SweepPlan:
     # its one generation past it. Every pass over unwritten pages is graced; this marks the other one,
     # the last rewrite of the pages still carrying a shared sentence.
     grace: bool = False
+    # Pages written before any other this pass, whatever their stamp: the last night's demotions
+    # (`nightly.capsule_demotion`), so each has its fresh attempt before it could be demoted again.
+    first: tuple[str, ...] = ()
 
 
 def _eligible(subject: Subject, row: StoredCapsule | None, plan: SweepPlan) -> bool:
@@ -301,16 +304,22 @@ def _eligible(subject: Subject, row: StoredCapsule | None, plan: SweepPlan) -> b
 
 
 def _ordered(subjects: Sequence[Subject], stored: dict[str, StoredCapsule], plan: SweepPlan) -> list[Subject]:
-    """The demoted first, then every unwritten page, then the rest in board order; a repair's own
-    pages (`plan.only`) in the order it gives them."""
+    """The demoted first (`plan.first`, then the rows stamped demoted), then every unwritten page, then
+    the rest in board order; a repair's own pages (`plan.only`) in the order it gives them."""
     eligible = [s for s in subjects if _eligible(s, stored.get(s.universe_id), plan)]
+    by_id = {s.universe_id: s for s in eligible}
     if plan.only is not None:
-        by_id = {s.universe_id: s for s in eligible}
         return [by_id[pid] for pid in plan.only if pid in by_id]
+    first = [by_id[pid] for pid in dict.fromkeys(plan.first) if pid in by_id]
     demoted = [
-        s
-        for s in eligible
-        if (row := stored.get(s.universe_id)) is not None and row.facts_hash == RETRY_FIRST_FACTS_HASH
+        *first,
+        *(
+            s
+            for s in eligible
+            if s.universe_id not in plan.first
+            and (row := stored.get(s.universe_id)) is not None
+            and row.facts_hash == RETRY_FIRST_FACTS_HASH
+        ),
     ]
     unwritten = [s for s in eligible if s not in demoted and _unwritten(stored.get(s.universe_id))]
     return [*demoted, *unwritten, *(s for s in eligible if s not in demoted and s not in unwritten)]

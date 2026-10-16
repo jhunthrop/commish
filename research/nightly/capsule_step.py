@@ -30,7 +30,11 @@ The order, and why each pass exists:
    rewrite of chosen pages may land a sentence another page carries (`landing.BoardSentences`).
 5. **The graced rewrite**: a page still carrying a shared sentence after the last attempt takes one
    more generation, past the night's call ceiling once (the coordinator's ruling of 2026-10-15).
-6. **The capsule gate** (`capsule_gate`), judged once more after the graced rewrite: the step's verdict.
+6. **The demotion** (`capsule_demotion`, the coordinator's ruling of 2026-10-16): a sentence still on
+   two pages after the graced rewrite keeps its first carrier in board order and demotes the others
+   to the facts block, with no model call. The demoted pages are named in the step's summary and the
+   run report, count as unwritten, and are written first on the next night (`CapsuleStepPlan.carried`).
+7. **The capsule gate** (`capsule_gate`), judged once more after the demotion: the step's verdict.
 
 Every pass keeps the writer's pool full (`gateway.GatewayClient.rolling`: a slot refilled the moment its page
 lands, each page told the spans of every page landed before it started, and checked as it lands against the
@@ -56,7 +60,7 @@ demote written reads to facts blocks) and the gate still judges what is stored.
 import os
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field, replace
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Final
 
 import httpx
@@ -66,6 +70,7 @@ from research.capsules.config import CAPSULE_CONFIG, WriterSettings, writer_sett
 from research.capsules.facts.history import history_cache
 from research.capsules.gateway import GatewayClient
 from research.capsules.gateway_ledger import ModelPrice, ModelSpend, fetch_price
+from research.capsules.requeue import served_identities
 from research.capsules.spans import SpanRules
 from research.capsules.store import queue_regeneration
 from research.capsules.sweep import FactsPassMemo, SweepInterruptedError, SweepPlan, SweepReport, sweep_capsules
@@ -73,8 +78,17 @@ from research.db.code_digest import code_digest
 from research.db.engine import once_more_on_disconnect, pooled_like
 from research.db.read_cache import snapshot
 from research.errors import ConfigurationError
+from research.nightly.capsule_demotion import (
+    Demotion,
+    carried_avoid,
+    demotion_line,
+    demotion_targets,
+    demotion_writes,
+    write_demotions,
+)
 from research.nightly.capsule_gate import (
     CapsuleGateResult,
+    SharedSentence,
     board_universe_ids,
     capsule_gate,
     span_rules,
@@ -158,6 +172,9 @@ class CapsuleStepPlan:
     mend_only: bool = False
     # The span repair's pages tonight, every attempt together (`Repetition.span_repair_pages_per_night`).
     span_repair_pages: int = CAPSULE_CONFIG.repetition.span_repair_pages_per_night
+    # The last night's demotions (`capsule_demotion.carried_demotions`): written first in every pass
+    # tonight, each told the sentence it was demoted for.
+    carried: tuple[Demotion, ...] = ()
 
 
 def night_facts(engine: Engine) -> FactsPassMemo:
@@ -174,6 +191,8 @@ class CapsuleStepResult:
     findings: PageFindings
     spend: CapsuleSpend
     wrote: bool
+    # The pages demoted tonight for a sentence still on two pages after the graced rewrite.
+    demoted: tuple[Demotion, ...] = ()
 
 
 def _sweep_line(name: str, report: SweepReport) -> str:
@@ -232,6 +251,9 @@ class _Passes:
         self.graced: set[str] = set()
         # The span repair's pages left tonight (`CapsuleStepPlan.span_repair_pages`).
         self.span_pages_left = plan.span_repair_pages
+        self.first = tuple(dict.fromkeys(d.player_id for d in plan.carried))
+        self.carried_avoid = carried_avoid(plan.carried)
+        self.demoted: list[Demotion] = []
 
     @property
     def left(self) -> int:
@@ -241,7 +263,13 @@ class _Passes:
         graced_pass = plan.unwritten_only or plan.grace
         at_ceiling = spent_out_for(self.calls_by_player, frozenset(), grace=False)
         spent = spent_out_for(self.calls_by_player, frozenset(self.graced), grace=graced_pass)
-        plan = replace(plan, exclude=plan.exclude | spent, span_rules=self.rules)
+        avoid_by_page = {
+            pid: (*plan.avoid_by_page.get(pid, ()), *self.carried_avoid.get(pid, ()))
+            for pid in {*plan.avoid_by_page, *self.carried_avoid}
+        }
+        plan = replace(
+            plan, exclude=plan.exclude | spent, span_rules=self.rules, avoid_by_page=avoid_by_page, first=self.first
+        )
         try:
             report = sweep_capsules(self.engine, self.gateway, self.now, plan, self.facts)
         except SweepInterruptedError as interrupted:
@@ -330,6 +358,7 @@ class _Passes:
                 )
                 self.span_pages_left -= len(self.sweep(name, plan).processed)
         self.grace_shared_sentences()
+        self.demote_shared_sentences()
 
     def grace_shared_sentences(self) -> None:
         """The coordinator's ruling of 2026-10-15, Lane 17's grace extended to the hard targets: a page
@@ -346,6 +375,40 @@ class _Passes:
         )
         self.sweep(name, SweepPlan(self.left, only=pages, avoid=avoid, grace=True))
 
+    def demote_shared_sentences(self) -> None:
+        """The coordinator's ruling of 2026-10-16: a sentence still on two pages after the graced rewrite
+        keeps its first carrier in board order, and every other carrier is demoted to its facts block
+        (`capsule_demotion`), no model call made; the step's gate then counts them unwritten."""
+        gate, order, _ = self._judged()
+        if not gate.shared:
+            return
+        self.demoted = list(self._demote(gate.shared, order))
+        if self.demoted:
+            self.log(f"capsules: {demotion_line(self.demoted)}")
+
+    def _demote(self, shared: tuple[SharedSentence, ...], order: list[str]) -> tuple[Demotion, ...]:
+        """The demotions' facts blocks, committed together. A carrier with no sheet tonight cannot be
+        demoted, so it is the keeper before any other; one that still must go is named."""
+
+        def demote() -> tuple[tuple[Demotion, ...], tuple[str, ...]]:
+            with self.engine.begin() as conn:
+                subjects = self.facts(conn, self.now)
+                sheets = {subject.universe_id for subject in subjects}
+                undemotable = frozenset(pid for s in shared for pid in s.player_ids if pid not in sheets)
+                targets = demotion_targets(shared, order, undemotable)
+                slugs = {identity.id: identity.slug for identity in served_identities(conn, self.now)}
+                writes, demoted, unserved = demotion_writes(subjects, targets, slugs)
+                write_demotions(conn, writes, datetime.now(UTC))
+            return demoted, unserved
+
+        demoted, unserved = once_more_on_disconnect(demote)
+        if unserved:
+            self.log(
+                f"capsules: {len(unserved)} carriers of a shared sentence have no sheet tonight and keep "
+                f"their written read: {', '.join(unserved)}"
+            )
+        return demoted
+
 
 def run_capsule_step(
     engine: Engine, now: datetime, plan: CapsuleStepPlan, log: Log, facts: FactsPassMemo
@@ -354,6 +417,7 @@ def run_capsule_step(
     Every pass reads its sheets from `facts`, one board facts pass for the step."""
     key = os.environ.get(CAPSULE_CONFIG.gateway.api_key_variable, "").strip()
     spend = CapsuleSpend()
+    demoted: tuple[Demotion, ...] = ()
     with engine.connect() as conn:
         rules = span_rules(conn, now, facts)
     if not key:
@@ -362,12 +426,12 @@ def run_capsule_step(
             "(a sweep without it would demote written reads)"
         )
     else:
-        spend = _write(engine, key, now, plan, log, facts, rules)
+        spend, demoted = _write(engine, key, now, plan, log, facts, rules)
         log(f"capsules spent: {spend.line()}")
     gate, findings = once_more_on_disconnect(lambda: _final_judgment(engine, now, rules, facts))
-    gate = replace(gate, throttle_alarm=spend.throttle_alarm)
+    gate = replace(gate, throttle_alarm=spend.throttle_alarm, demoted=len(demoted))
     log(f"{gate.summary()}; {len(findings.by_page)} written pages fail the page gate")
-    return CapsuleStepResult(gate, findings, spend, bool(key))
+    return CapsuleStepResult(gate, findings, spend, bool(key), demoted)
 
 
 class CapsuleStepError(Exception):
@@ -394,9 +458,10 @@ def _checked_price(http: httpx.Client, key: str, settings: WriterSettings) -> Mo
 
 def _write(  # noqa: PLR0913, PLR0917 - the step's parts
     engine: Engine, key: str, now: datetime, plan: CapsuleStepPlan, log: Log, facts: FactsPassMemo, rules: SpanRules
-) -> CapsuleSpend:
+) -> tuple[CapsuleSpend, tuple[Demotion, ...]]:
     """The writing passes: the settings and the model checked before anything is written, then the
-    night on one pool of writers' connections; the spend closed whether the passes finish or raise."""
+    night on one pool of writers' connections; the spend closed whether the passes finish or raise.
+    Returns the spend and the pages demoted tonight."""
     settings = writer_settings(os.environ)
     log(f"capsules: {settings.line()}")
     with httpx.Client() as http:
@@ -415,7 +480,7 @@ def _write(  # noqa: PLR0913, PLR0917 - the step's parts
         finally:
             writers.dispose()
         passes.spend.close(gateway, settings.line(), price)
-        return passes.spend
+        return passes.spend, tuple(passes.demoted)
 
 
 def _final_judgment(
