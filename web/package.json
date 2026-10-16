@@ -17,7 +17,7 @@
 		"screenshots": "node scripts/screenshots.ts",
 		"lighthouse": "lhci autorun && npm run lighthouse:sheet",
 		"lighthouse:sheet": "lhci autorun --config=lighthouserc.sheet.cjs",
-		"fonts": "node scripts/subset-fonts.ts && prettier --write src/lib/ui/fonts/ui.css src/lib/ui/fonts/steady.css",
+		"fonts": "node scripts/subset-fonts.ts && prettier --write src/lib/ui/fonts/ui.css",
 		"preview:static": "node scripts/serve-built.ts",
 		"glyphs": "node --env-file-if-exists=.env scripts/check-glyphs.ts",
 		"standin": "node --env-file-if-exists=.env scripts/run-from-mock-data.ts",

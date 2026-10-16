@@ -3,8 +3,8 @@
 Every recurring feed the research package (`research/`) pulls, where from, how often, into which
 store source, and on what terms. Operator-only ingests (run by hand, once per store or per season)
 are listed after the recurring ones. Last checked 2026-10-14 (Lane 23); FTN's switch and the site's
-credit page 2026-10-15 (Lane 41). The site credits the recurring feeds a page's figures come from on its
-`/data` page, "Where the numbers come from" (`web/src/lib/site/sources.ts`).
+credit 2026-10-15 (Lane 41), taken down the same day (Lane 51). The site carries the licence minimum as
+one line at the foot of the player page (`web/src/lib/site/credit.ts`) and has no credits page.
 
 ## The founder's rule on Pro Football Reference
 
@@ -26,7 +26,7 @@ in-season usage feeds, a per-asset byte cap (`config.ByteCaps`).
 | Snap counts | nflverse `snap_counts/snap_counts_<season>.csv` | same | `nflverse_snap_counts` | CC-BY 4.0 |
 | Schedule and results | nflverse `nfldata` repository, `data/games.csv` (raw.githubusercontent.com) | same, and each usage step that stamps by week | `nflverse_kickoff`, `nflverse_schedule` (team-week) | nflverse |
 | **Play-by-play, current season** | nflverse `pbp/play_by_play_<season>.csv` (and `.csv.gz` for the FTN join) | same (`play-by-play` step, new in Lane 23; before it, history only) | `nflverse_pbp` (team-week), `nflverse_pbp_player`, `nflverse_pbp_passer` (new: dropbacks) | CC-BY 4.0 |
-| **FTN charting** | nflverse `ftn_charting/ftn_charting_<season>.csv` (2022 on), joined to play-by-play | same (`ftn-charting` step, Lane 23) | `nflverse_ftn_charting` | **CC-BY-SA 4.0, attribution "must be made to FTN Data via nflverse"** (nflreadr `load_ftn_charting`). **On pages**, credited on the site's `/data` page; see below |
+| **FTN charting** | nflverse `ftn_charting/ftn_charting_<season>.csv` (2022 on), joined to play-by-play | same (`ftn-charting` step, Lane 23) | `nflverse_ftn_charting` | **CC-BY-SA 4.0, attribution "must be made to FTN Data via nflverse"** (nflreadr `load_ftn_charting`). **On pages**, the licence minimum at the foot of the player page; see below |
 | **Next Gen Stats** | nflverse `nextgen_stats/ngs_<passing\|receiving\|rushing>.csv.gz` (all seasons, rebuilt nightly; the per-season files stopped at 2024) | same (`next-gen-stats` step, Lane 23) | `nflverse_ngs` | nflverse states no licence for this release; the data is the NFL's Next Gen Stats |
 | **PFR advanced stats** | nflverse `pfr_advstats/advstats_week_<pass\|rec\|rush>_<season>.csv` (2018 on) | same (`pfr-advstats` step, Lane 23) | `nflverse_pfr_advstats` | nflverse states no licence for this release; the data is Pro Football Reference's. A nflverse source under the founder's rule above |
 | Player props | The Odds API (`api.the-odds-api.com/v4`, `ODDS_API_KEY`) | the in-season pass; nightly before kickoff | `player_prop_observations` | paid key, the provider's terms |
@@ -51,11 +51,13 @@ nflverse injuries, weekly rosters, depth charts, draft picks, team weekly stats,
   https://FTNFantasy.com/data".
 - CC-BY-SA 4.0 does not forbid commercial use. It requires the credit wherever the material or an
   adaptation of it is shared, and that adaptations be shared under the same licence.
-- **On pages from Lane 41 (coordinator's ruling, 2026-10-15).** The credit is the site's `/data` page,
-  "Where the numbers come from" (`web/src/routes/data/`, its words in `web/src/lib/site/sources.ts`):
-  "Charting from FTN Data via nflverse", linked to https://ftndata.com, under the CC BY-SA 4.0 licence,
-  beside every other feed's credit. Every player page links it once, under the read, the only place a
-  charted figure is printed. The credit shipped one commit before the config turned FTN on.
+- **On pages (coordinator's ruling, 2026-10-15, Lane 51).** No credits page: the founder asked that
+  `/data` not be exposed (the data files under `/data/` are the site's own endpoints and stay). The
+  licence minimum is one line at the foot of the player page, the only place a charted figure is
+  printed, with "Creative Commons licences" linked to the stricter licence, https://creativecommons.org/licenses/by-sa/4.0/:
+  "Stats from nflverse and charting from FTN Data via nflverse, both under Creative Commons licences,
+  our rates worked out from their counts." It names the source, the licence and that the figures were
+  changed, and no other feed is named anywhere on the site. The line shipped before the config turned FTN on.
 - `nflverse_ftn_charting` is in `CapsuleConfig.sources_on_pages` (`research/capsules/config.py`), the one
   licence gate per source, beside play-by-play, the weekly stats, snap counts, NGS and PFR. Its figures
   (contested catches, blitz rate, interception-worthy throws) sit at the tail of the four-figure cap's
