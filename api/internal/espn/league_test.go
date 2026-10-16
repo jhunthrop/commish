@@ -34,7 +34,7 @@ func fullServer(t *testing.T) (*Client, *[]string) {
 		cookies = append(cookies, r.Header.Get("Cookie"))
 		switch {
 		case r.URL.Path == "/apis/v3/games/ffl/seasons/2019/segments/0/leagues/48153503":
-			if got := r.URL.Query()["view"]; strings.Join(got, ",") != "mRoster,mSettings,mMatchup,mTeam" {
+			if got := r.URL.Query()["view"]; strings.Join(got, ",") != "mRoster,mSettings,mMatchup,mTeam,mDraftDetail" {
 				http.Error(w, "views", http.StatusBadRequest)
 				return
 			}

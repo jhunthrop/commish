@@ -20,6 +20,7 @@ from research.capsules.facts.season_so_far import in_season
 from research.capsules.gateway import GatewayClient
 from research.capsules.generate import CapsuleResult, describe_fallback
 from research.capsules.pull_figures import PageValues, capsule_findings, page_numbers, pull_figures_of
+from research.capsules.run_budget import RunBudget
 from research.capsules.season_voice import clock_of
 from research.capsules.store import stored_capsules_for
 from research.capsules.sweep import Subject, subjects_of, worn_phrases, write_one
@@ -55,34 +56,30 @@ class Choice:
     players: tuple[str, ...] = ()
     count: int = 10
     spread: int = 50
-    # The run's gateway calls at most (None: no cap): a player starts only if his worst case fits.
-    call_budget: int | None = None
+    # The run's budget in calls or dollars (None: no cap), a hard stop at the gateway (`run_budget`): a
+    # player starts only if his worst case fits what is left.
+    budget: RunBudget | None = None
 
 
 @dataclass(frozen=True, slots=True)
 class Trial:
-    """What a trial wrote, and the chosen players it never started because the call budget could not
+    """What a trial wrote, and the chosen players it never started because the budget could not
     cover a page's worst case."""
 
     written: tuple[Written, ...]
     unstarted: tuple[str, ...]
 
 
-def within_calls[S, R](
-    subjects: Sequence[S], write: Callable[[S], R], calls_of: Callable[[R], int], call_budget: int | None
+def within_budget[S, R](
+    subjects: Sequence[S], write: Callable[[S], R], room_for_page: Callable[[], bool]
 ) -> tuple[list[R], list[S]]:
-    """Writes subjects in order, refusing to start one whose worst case (the per-player call ceiling,
-    `max_gateway_calls_per_player`) would take the run past `call_budget`, so the budget is a hard stop;
-    the subjects left are returned unstarted."""
-    worst = CAPSULE_CONFIG.max_gateway_calls_per_player
+    """Writes subjects in order, refusing to start one once `room_for_page` says his worst case no
+    longer fits; the subjects left are returned unstarted."""
     done: list[R] = []
-    spent = 0
     for index, subject in enumerate(subjects):
-        if call_budget is not None and spent + worst > call_budget:
+        if not room_for_page():
             return done, list(subjects[index:])
-        result = write(subject)
-        spent += calls_of(result)
-        done.append(result)
+        done.append(write(subject))
     return done, []
 
 
@@ -98,15 +95,17 @@ def _chosen(subjects: Sequence[Subject], choice: Choice) -> list[Subject]:
 
 
 def write_chosen(engine: Engine, gateway: GatewayClient, as_of: datetime, choice: Choice) -> Trial:
-    """Writes the chosen players' capsules, inside the choice's call budget, and gates each stored one."""
+    """Writes the chosen players' capsules, inside the choice's budget, and gates each stored one."""
     with engine.connect() as conn:
         subjects = subjects_of(conn, as_of)
         rows = {row.player_id: row for row in board_rows(conn, PRODUCT_SEASON, as_of)}
         stored = stored_capsules_for(conn, [s.universe_id for s in subjects])
     worn = worn_phrases(subjects, stored)
+    budget = choice.budget or RunBudget.of()
+    paid = gateway.with_budget(budget)
 
     def write(subject: Subject) -> Written:
-        result, _, _ = write_one(engine, subject, stored.get(subject.universe_id), gateway, worn)
+        result, _, _ = write_one(engine, subject, stored.get(subject.universe_id), paid, worn)
         row = rows[subject.facts.identity.id]
         findings = capsule_findings(
             subject.facts.identity.id,
@@ -117,7 +116,7 @@ def write_chosen(engine: Engine, gateway: GatewayClient, as_of: datetime, choice
         )
         return Written(subject, row, result, tuple(findings))
 
-    written, unstarted = within_calls(_chosen(subjects, choice), write, lambda w: w.result.calls, choice.call_budget)
+    written, unstarted = within_budget(_chosen(subjects, choice), write, budget.room_for_page)
     return Trial(tuple(written), tuple(s.facts.identity.name for s in unstarted))
 
 

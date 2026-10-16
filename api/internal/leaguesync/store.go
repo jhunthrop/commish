@@ -10,6 +10,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/jhunthrop/commish/api/internal/season"
 )
 
 // ErrLinkNotFound is a link that does not exist or is someone else's.
@@ -56,7 +58,29 @@ type Link struct {
 
 // Store reads and writes the sync tables. Every link query is scoped by
 // account, so one drafter never reads or changes another's attachment.
-type Store struct{ Pool *pgxpool.Pool }
+//
+// Now is the clock a league's phase is read at, time.Now when nil;
+// Season is the site's season it reads with, none when nil.
+type Store struct {
+	Pool   *pgxpool.Pool
+	Now    func() time.Time
+	Season SiteSeason
+}
+
+// site is the site's season, zero when the store has no source.
+func (s *Store) site(ctx context.Context) season.SitePhase {
+	if s.Season == nil {
+		return season.SitePhase{}
+	}
+	return s.Season.Phase(ctx)
+}
+
+func (s *Store) now() time.Time {
+	if s.Now == nil {
+		return time.Now()
+	}
+	return s.Now()
+}
 
 const linkColumns = `id, account_id, league_id, host, host_league_id, host_season, roster_id, attached_at, last_read_at,
 	coalesce(host_team_key, ''), read_as_member`

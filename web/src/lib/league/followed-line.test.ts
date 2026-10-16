@@ -15,9 +15,9 @@ const league: AttachedLeague = {
 	standing: { wins: 2, losses: 3, ties: 0, place: 11, teams: 12 },
 	attached_at: '2026-10-13T12:00:00Z',
 	phase: 'in_season',
-	phase_basis: 'FFPC says the draft is done.',
+	phase_basis: 'FFPC says the draft is done and week 6 is under way.',
 	draft_at: null,
-	playoff_start_week: 15,
+	playoff_start_week: 13,
 	waivers_open: true
 };
 

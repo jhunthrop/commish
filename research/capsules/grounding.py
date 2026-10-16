@@ -16,7 +16,12 @@ from typing import Final
 from research.model.jsmath import js_pow, js_round
 from research.pipeline.jscompat import js_number
 
-_NUMBER_TOKEN: Final = re.compile(r"(?<![A-Za-z0-9])-?[0-9][0-9,]*(?:\.[0-9]+)?%?(?![A-Za-z])")
+# A digit run is read whole (possessive), whatever letters follow it ("340yds" is 340, "1.1x" is 1.1),
+# so no figure escapes tracing; an ordinal ending is left to `_ORDINAL` ("469th" is 469, never 46) and
+# "49ers" is a club, not a number (Lane 52 and its review's H1).
+_NUMBER_TOKEN: Final = re.compile(
+    r"(?<![A-Za-z0-9])-?[0-9][0-9,]*+(?:\.[0-9]+)?+%?(?!(?:st|nd|rd|th)\b|ers\b)", re.IGNORECASE
+)
 _CARDINALS: Final = {
     "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10,
     "eleven": 11, "twelve": 12, "thirteen": 13, "fourteen": 14, "fifteen": 15, "sixteen": 16, "seventeen": 17,
@@ -35,14 +40,18 @@ _TENS: Final = {
 _UNITS: Final = ("one", "two", "three", "four", "five", "six", "seven", "eight", "nine")
 _CARDINAL_WORD: Final = re.compile(rf"\b({'|'.join(_CARDINALS)})\b", re.IGNORECASE | re.ASCII)
 _COMPOUND: Final = re.compile(rf"\b({'|'.join(_TENS)})(?:[-\s]({'|'.join(_UNITS)}))?\b", re.IGNORECASE | re.ASCII)
-_ORDINAL: Final = re.compile(r"\b([1-9]|1[0-9]|2[0-9]|30)(st|nd|rd|th)\b", re.IGNORECASE | re.ASCII)
+# An ordinal of any size, comma-grouped or not ("469th", "1,000th", "10000th"), read as its whole number
+# (the re-review's N1); the digit-run reader leaves every ordinal ending to this one.
+_ORDINAL: Final = re.compile(
+    r"(?<![A-Za-z0-9,])([1-9][0-9]{0,2}(?:,[0-9]{3})+|[1-9][0-9]*)(st|nd|rd|th)\b", re.IGNORECASE | re.ASCII
+)
 _LOOSE_UNITS: Final = ((100, 10), (1000, 100))
 _EPSILON: Final = 2.220446049250313e-16
 
 
 def extract_numbers(text: str) -> list[tuple[str, float]]:
     """`extractNumbers`: digits (commas and a percent sign allowed), spelled cardinals to ninety-nine
-    and ordinals to the thirtieth, as (as written, value)."""
+    and ordinals ("469th" is 469), as (as written, value)."""
     numbers: list[tuple[str, float]] = []
     for raw in _NUMBER_TOKEN.findall(text):
         value = js_number(raw.replace(",", "").removesuffix("%"))
@@ -55,7 +64,7 @@ def extract_numbers(text: str) -> list[tuple[str, float]]:
         )
     without_compounds = _COMPOUND.sub(" ", text)
     numbers += [(m.group(0), _CARDINALS[m.group(1).lower()]) for m in _CARDINAL_WORD.finditer(without_compounds)]
-    numbers += [(m.group(0), js_number(m.group(1))) for m in _ORDINAL.finditer(text)]
+    numbers += [(m.group(0), js_number(m.group(1).replace(",", ""))) for m in _ORDINAL.finditer(text)]
     return numbers
 
 

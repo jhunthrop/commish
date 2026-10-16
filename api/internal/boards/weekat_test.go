@@ -52,3 +52,43 @@ func TestWeekAt(t *testing.T) {
 		}
 	}
 }
+
+// The site's season reads the regular season's last game day (week 18
+// and before, so a postseason game, should one be loaded, never stretches
+// it) and whether a season's preseason board is stored.
+func TestLastGameDayAndPreseasonBoard(t *testing.T) {
+	pool := dbtest.Pool(t)
+	ctx := context.Background()
+	const schema = "siteseason_test"
+	for _, q := range []string{
+		`drop schema if exists ` + schema + ` cascade`,
+		`create schema ` + schema,
+		`create table ` + schema + `.provider_games (season int, week int, game_date date, kickoff_et text)`,
+		`insert into ` + schema + `.provider_games values
+			(2026, 1, '2026-09-09', '8:20p'), (2026, 18, '2027-01-09', '4:30p'), (2026, 18, '2027-01-10', '1:00p'),
+			(2026, 19, '2027-01-16', '4:30p')`,
+		`create table ` + schema + `.preseason_projections (season int, source text, player_id text, as_of timestamptz)`,
+		`insert into ` + schema + `.preseason_projections values (2026, 'model', 'p1', now())`,
+	} {
+		if _, err := pool.Exec(ctx, q); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Cleanup(func() { _, _ = pool.Exec(context.Background(), `drop schema if exists `+schema+` cascade`) })
+	src, err := NewPGSource(pool, schema, 2026, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	last, ok, err := src.LastGameDay(ctx, 2026)
+	if err != nil || !ok || last.Format("2006-01-02") != "2027-01-10" || last.Location().String() != "America/New_York" {
+		t.Fatalf("2026's last game day %v %v (%v)", last, ok, err)
+	}
+	if _, ok, err := src.LastGameDay(ctx, 2027); err != nil || ok {
+		t.Fatalf("2027 has no schedule: %v (%v)", ok, err)
+	}
+	for y, want := range map[int]bool{2026: true, 2027: false} {
+		if got, err := src.PreseasonBoard(ctx, y); err != nil || got != want {
+			t.Fatalf("%d's preseason board %v (%v), want %v", y, got, err, want)
+		}
+	}
+}

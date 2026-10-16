@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 	"unicode/utf8"
 )
 
@@ -54,6 +55,8 @@ type Draft struct {
 	Order map[string]int
 	// SlotRoster is draft slot to roster id.
 	SlotRoster map[int]int
+	// StartTime is the draft's start_time, nil while none is set.
+	StartTime *time.Time
 }
 
 // Pick is one pick on the host, checked.
@@ -81,6 +84,12 @@ type League struct {
 	Status string
 	// TotalRosters is the league's team count.
 	TotalRosters int
+	// DraftID is the league's draft, empty when it names none.
+	DraftID string
+	// PlayoffWeekStart is settings.playoff_week_start, 0 when unset.
+	PlayoffWeekStart int
+	// AddsDisabled is settings.disable_adds: the league takes no adds.
+	AddsDisabled bool
 }
 
 type wireDraft struct {
@@ -92,6 +101,23 @@ type wireDraft struct {
 	DraftOrder   map[string]int             `json:"draft_order"`
 	SlotToRoster map[string]int             `json:"slot_to_roster_id"`
 	Metadata     map[string]any             `json:"metadata"`
+	StartTime    *int64                     `json:"start_time"`
+}
+
+// Bounds on a time Sleeper states: 2000 to 2100, in Unix milliseconds.
+const (
+	minMillis = 946684800000
+	maxMillis = 4102444800000
+)
+
+// millis is a Sleeper time in Unix milliseconds, nil when absent or out
+// of bounds.
+func millis(ms *int64) *time.Time {
+	if ms == nil || *ms < minMillis || *ms > maxMillis {
+		return nil
+	}
+	t := time.UnixMilli(*ms).UTC()
+	return &t
 }
 
 func intSetting(raw json.RawMessage) (int, bool) {
@@ -121,7 +147,7 @@ func (w wireDraft) validate(id string) (Draft, error) {
 	}
 	d := Draft{
 		ID: id, Type: w.Type, Status: w.Status, ScoringType: text(w.Metadata, "scoring_type"), Name: text(w.Metadata, "name"),
-		Slots: map[string]int{}, Order: map[string]int{}, SlotRoster: map[int]int{},
+		Slots: map[string]int{}, Order: map[string]int{}, SlotRoster: map[int]int{}, StartTime: millis(w.StartTime),
 	}
 	switch d.Type {
 	case TypeSnake, TypeAuction, TypeLinear:
@@ -222,13 +248,15 @@ func validatePicks(w []wirePick, teams, rounds int) ([]Pick, error) {
 }
 
 type wireLeague struct {
-	LeagueID        string             `json:"league_id"`
-	Name            string             `json:"name"`
-	ScoringSettings map[string]float64 `json:"scoring_settings"`
-	RosterPositions []string           `json:"roster_positions"`
-	Season          string             `json:"season"`
-	Status          string             `json:"status"`
-	TotalRosters    int                `json:"total_rosters"`
+	LeagueID        string                     `json:"league_id"`
+	Name            string                     `json:"name"`
+	ScoringSettings map[string]float64         `json:"scoring_settings"`
+	RosterPositions []string                   `json:"roster_positions"`
+	Season          string                     `json:"season"`
+	Status          string                     `json:"status"`
+	TotalRosters    int                        `json:"total_rosters"`
+	DraftID         string                     `json:"draft_id"`
+	Settings        map[string]json.RawMessage `json:"settings"`
 }
 
 // League states as Sleeper names them.
@@ -274,6 +302,15 @@ func (w wireLeague) validate(id string) (League, error) {
 	default:
 		// A state the host adds later is kept out rather than trusted.
 		l.Status = ""
+	}
+	if ValidID(w.DraftID) {
+		l.DraftID = w.DraftID
+	}
+	if n, ok := intSetting(w.Settings["playoff_week_start"]); ok && n > 0 && n <= maxWeek {
+		l.PlayoffWeekStart = n
+	}
+	if n, ok := intSetting(w.Settings["disable_adds"]); ok {
+		l.AddsDisabled = n == 1
 	}
 	return l, nil
 }

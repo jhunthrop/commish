@@ -6,30 +6,38 @@ correction for costs the read a full rewrite. The time frame rules (`season_voic
 advice their slip calls for: a week's season, a week still to play, a month, a draft already behind
 the reader, the weeks he has missed. The page's own facts (`claims`), a label of the facts copied into
 prose and a read that stops mid-sentence (`prose_checks`) each name the sentence and what to say.
+The downside a read must cite is asked for in the form the validator reads (Lane 52): its number with
+a cost word beside it (`validate.COST_WORDS`), since "worth 6.2 a game" alone does not read as a cost.
 """
 
 import re
-from collections.abc import Sequence
 from typing import Final
 
 from research.capsules.claims import CLAIM_RULES
+from research.capsules.multiples import MULTIPLE_VIOLATION
+from research.capsules.own_rate import OWN_RATE_VIOLATION
 from research.capsules.prose_checks import LABEL_VIOLATION, UNFINISHED_VIOLATION
 from research.capsules.season_voice import MISSED_WEEKS_UNNAMED
-from research.capsules.validate import ADP_FIGURE_VIOLATION, NO_PAGE_NUMBER_VIOLATION, UNFRAMED_FLOOR_VIOLATION
+from research.capsules.validate import (
+    ADP_FIGURE_VIOLATION,
+    COST_WORDS_SHOWN,
+    NO_PAGE_NUMBER_VIOLATION,
+    UNFRAMED_FLOOR_VIOLATION,
+)
 
 SOFT_CORRECTIONS: Final = {
     UNFRAMED_FLOOR_VIOLATION: 'One sentence uses "floor" beside a number. Rewrite that sentence, in your own words, so a '
     'reader knows the number comes from seasons shortened by injury, or take the word "floor" out of it.',
 }
-_BANNED_TERM_VIOLATION: Final = re.compile(
+BANNED_TERM_VIOLATION: Final = re.compile(
     r'^The text uses the banned term "([^"]+)" in the sentence "(.+)"\. '
     r"(?:Rewrite without it\.|Say it in (drafting|fantasy) words instead: (.+)\.)$"
 )
-_VOICE_RULE_VIOLATION: Final = re.compile(
+VOICE_RULE_VIOLATION: Final = re.compile(
     r"^The text carries an? (set phrase|doubled word|(?:aside|betting word|draft voice|time frame) \([^)]+\)), "
     r'"([^"]+)", in the sentence "(.+)"\. Rewrite that sentence\.$'
 )
-_TENSION_NUMBER: Final = re.compile(r"\((-?\d+(?:\.\d+)?) pts/game\)")
+TENSION_NUMBER: Final = re.compile(r"\((-?\d+(?:\.\d+)?) pts/game\)")
 _PLAIN: Final = "Use fantasy football words, never betting or trading words. Then leave everything else as it is."
 # What each kind of voice slip asks of the rewrite, beyond losing the words caught.
 _ADVICE: Final = (
@@ -49,7 +57,7 @@ _ADVICE: Final = (
 
 
 def is_voice_rule_violation(violation: str) -> bool:
-    return _VOICE_RULE_VIOLATION.match(violation) is not None
+    return VOICE_RULE_VIOLATION.match(violation) is not None
 
 
 def _advice(kind: str) -> str:
@@ -57,7 +65,7 @@ def _advice(kind: str) -> str:
 
 
 def voice_rule_correction_for(violation: str) -> str | None:
-    match = _VOICE_RULE_VIOLATION.match(violation)
+    match = VOICE_RULE_VIOLATION.match(violation)
     if match is None:
         return None
     return (
@@ -79,7 +87,7 @@ def _page_correction(violation: str) -> str | None:
         )
     if violation.startswith(MISSED_WEEKS_UNNAMED):
         return f"{violation.removeprefix(MISSED_WEEKS_UNNAMED + ': ')} Leave everything else as it is."
-    if violation.startswith((UNFINISHED_VIOLATION, LABEL_VIOLATION)):
+    if violation.startswith((UNFINISHED_VIOLATION, LABEL_VIOLATION, MULTIPLE_VIOLATION, OWN_RATE_VIOLATION)):
         return f"{violation} Leave everything else as it is."
     rule = next((rule for rule in CLAIM_RULES if violation.startswith(f"{rule}: ")), None)
     if rule is not None:
@@ -94,7 +102,7 @@ def soft_correction_for(violation: str) -> str | None:
     page = _page_correction(violation)
     if page is not None:
         return page
-    banned = _BANNED_TERM_VIOLATION.match(violation)
+    banned = BANNED_TERM_VIOLATION.match(violation)
     if banned is not None and banned.group(4) is not None:
         return (
             f'Your text uses the trading word "{banned.group(1)}". Rewrite this sentence: "{banned.group(2)}". Say it in '
@@ -104,21 +112,18 @@ def soft_correction_for(violation: str) -> str | None:
     if voice is not None:
         return voice
     if violation.startswith("Mixed evidence:"):
-        number = _TENSION_NUMBER.search(violation)
-        downside = (
-            "the strongest downside on the sheet" if number is None else f"the {number.group(1)} pts/game downside"
-        )
-        return f"Your text never cites {downside}. Work that number in somewhere before your last sentence, in your own words, and leave everything else as it is."
+        return _downside_correction(violation)
     return None
 
 
-def banned_phrases_in(violations: Sequence[str]) -> tuple[str, ...]:
-    """The exact banned words and phrases these violations found (voice rules and trading words)."""
-    found: list[str] = []
-    for violation in violations:
-        voice = _VOICE_RULE_VIOLATION.match(violation)
-        banned = _BANNED_TERM_VIOLATION.match(violation)
-        phrase = voice.group(2) if voice is not None else banned.group(1) if banned is not None else None
-        if phrase is not None and phrase.lower() not in (f.lower() for f in found):
-            found.append(phrase)
-    return tuple(found)
+def _downside_correction(violation: str) -> str:
+    number = TENSION_NUMBER.search(violation)
+    downside = "the strongest downside on the sheet" if number is None else f"the {number.group(1)} pts/game downside"
+    figure = "its number" if number is None else number.group(1).lstrip("-")
+    return (
+        f"Your text never cites {downside} as a cost. Work it in before your last sentence, in your own words, with "
+        f"the number and a cost word beside it in the same sentence ({COST_WORDS_SHOWN}), as in "
+        f'"that profile has cost players in his spot {figure} points a game on average". The figure is an average '
+        f'among players in his spot, never his own points. "Worth {figure}" alone does not say it is a cost. Leave '
+        "everything else as it is."
+    )

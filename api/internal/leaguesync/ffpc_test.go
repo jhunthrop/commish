@@ -129,6 +129,14 @@ func (f *fakeMember) ReadLeague(_ context.Context, accountID uuid.UUID, ltuid st
 	return f.league, nil
 }
 
+// ReadDraft answers the member's draft as done.
+func (f *fakeMember) ReadDraft(_ context.Context, accountID uuid.UUID, _ string) (ffpc.Draft, error) {
+	if accountID != f.owner {
+		return ffpc.Draft{}, hosts.ErrNotConnected
+	}
+	return ffpc.Draft{Complete: true}, nil
+}
+
 func (f *fakeMember) OpenLeague(_ context.Context, accountID uuid.UUID, leagueID string) (string, error) {
 	if accountID != f.owner {
 		return "", hosts.ErrNotConnected

@@ -23,7 +23,7 @@ import (
 func ffpcSnapshot(l ffpc.League, now time.Time, week int) Snapshot {
 	snap := Snapshot{
 		Ref: Ref{Host: HostFFPC, LeagueID: l.Banner.LeagueID, Season: l.Banner.Season}, Name: scoring.HostText(l.Banner.LeagueName),
-		Status: "in_season", Season: l.Banner.Season, Players: map[string]HostPlayer{}, ReadAt: now,
+		Season: l.Banner.Season, Players: map[string]HostPlayer{}, ReadAt: now,
 	}
 	teams := map[int]*Team{}
 	team := func(id int) *Team {
@@ -86,6 +86,18 @@ func ffpcSnapshot(l ffpc.League, now time.Time, week int) Snapshot {
 	if l.Rules != nil {
 		snap.Scoring = ffpcScoring(*l.Rules)
 		snap.Shape = ffpcShape(*l.Rules, len(snap.Teams))
+		snap.Calendar.PlayoffStartWeek = l.Rules.PlayoffStartWeek
+	}
+	// The league pages do not state the draft (its board does, read by
+	// FFPC.draftStatus): until it is read, anyone rostered has drafted.
+	snap.Status, snap.Calendar.DraftUnstated, snap.Calendar.DraftReadBy = StatusPreDraft, true, ReadByRosters
+	// FFPC states nothing on when its waivers close.
+	snap.Calendar.WaiversUnstated = true
+	for _, t := range snap.Teams {
+		if len(t.Players) > 0 {
+			snap.Status = StatusInSeason
+			break
+		}
 	}
 	return snap
 }

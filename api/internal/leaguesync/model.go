@@ -94,6 +94,9 @@ type Snapshot struct {
 	// time (Yahoo's waiver wire did not answer): nobody is known to be on
 	// waivers or free, rather than everyone free.
 	PoolUnknown bool `json:"pool_unknown,omitempty"`
+	// Calendar is the host's word on the league's draft, playoffs and
+	// waivers, the facts its phase is read from (phase.go).
+	Calendar Calendar `json:"calendar"`
 }
 
 // Pool statuses, as the waiver tool reads them.

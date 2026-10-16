@@ -205,3 +205,31 @@ func FuzzParseMyLeagues(f *testing.F) {
 		_, _ = ParseMyLeagues(leagues, teams)
 	})
 }
+
+// The league's draft time (settings draft_time, Unix seconds) and its
+// playoff start week (settings playoff_start_week, when uses_playoff is
+// 1), on a drafted league and on the constructed pre-draft one.
+func TestParseLeagueCalendar(t *testing.T) {
+	l, err := ParseLeague(fixture(t, "yahoo-league-head.xml"), fixture(t, "yahoo-league-rosters.xml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if l.DraftAt == nil || !l.DraftAt.Equal(time.Date(2026, 8, 30, 23, 0, 0, 0, time.UTC)) || l.PlayoffStartWeek != 15 || l.DraftStatus != "postdraft" {
+		t.Fatalf("drafted: draft at %v, playoffs from %d, %s", l.DraftAt, l.PlayoffStartWeek, l.DraftStatus)
+	}
+	empty := []byte(`<fantasy_content><league><league_id>128934</league_id><teams count="1">` +
+		`<team><team_key>470.l.128934.t.1</team_key><team_id>1</team_id><name>A</name></team></teams></league></fantasy_content>`)
+	pre, err := ParseLeague(fixture(t, "yahoo-league-head-predraft.xml"), empty)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pre.DraftStatus != "predraft" || pre.DraftAt == nil || !pre.DraftAt.Equal(time.Date(2026, 9, 6, 23, 0, 0, 0, time.UTC)) || pre.CurrentWeek != 1 {
+		t.Fatalf("pre-draft: %s at %v week %d", pre.DraftStatus, pre.DraftAt, pre.CurrentWeek)
+	}
+	none := strings.NewReplacer("<draft_time>1788130800</draft_time>", "", "<uses_playoff>1</uses_playoff>", "<uses_playoff>0</uses_playoff>").
+		Replace(string(fixture(t, "yahoo-league-head.xml")))
+	l, err = ParseLeague([]byte(none), fixture(t, "yahoo-league-rosters.xml"))
+	if err != nil || l.DraftAt != nil || l.PlayoffStartWeek != 0 {
+		t.Fatalf("no draft time and no playoffs: %v %d (%v)", l.DraftAt, l.PlayoffStartWeek, err)
+	}
+}

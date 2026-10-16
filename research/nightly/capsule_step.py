@@ -116,6 +116,8 @@ class CapsuleSpend:
     by_model: dict[str, ModelSpend] = field(default_factory=dict)
     rate_limited: int = 0
     stated_limits: tuple[str, ...] = ()
+    # The run's one loud line once its throttle pool ran dry (`throttle_waits.RunWaits.line`), else None.
+    throttle_alarm: str | None = None
 
     def add(self, report: SweepReport) -> None:
         self.calls += report.calls
@@ -135,6 +137,7 @@ class CapsuleSpend:
         self.by_model = gateway.ledger.by_model()
         self.rate_limited = gateway.ledger.rate_limited
         self.stated_limits = gateway.ledger.stated_limits
+        self.throttle_alarm = gateway.waits.line()
 
     def line(self) -> str:
         limits = ", ".join(self.stated_limits) or "none stated"
@@ -143,7 +146,7 @@ class CapsuleSpend:
             f"{self.calls} calls, {self.prompt_tokens} prompt and {self.completion_tokens} completion tokens, "
             f"${self.cost_usd:.6f}, {self.rate_limited} calls met a 429 (the gateway's limit: {limits}), "
             f"{self.landed_sentences} sentences and {self.landed_spans} spans shared as pages landed, left to the repair"
-        )
+        ) + ("" if self.throttle_alarm is None else f"; {self.throttle_alarm}")
 
 
 @dataclass(frozen=True, slots=True)
@@ -362,6 +365,7 @@ def run_capsule_step(
         spend = _write(engine, key, now, plan, log, facts, rules)
         log(f"capsules spent: {spend.line()}")
     gate, findings = once_more_on_disconnect(lambda: _final_judgment(engine, now, rules, facts))
+    gate = replace(gate, throttle_alarm=spend.throttle_alarm)
     log(f"{gate.summary()}; {len(findings.by_page)} written pages fail the page gate")
     return CapsuleStepResult(gate, findings, spend, bool(key))
 

@@ -13,6 +13,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // A whole league read (the rosters, settings, matchups and teams views)
@@ -130,6 +131,24 @@ type FullLeague struct {
 	// Acquisition is how the league takes adds: its waiver budget and
 	// when its claims run (settings.acquisitionSettings).
 	Acquisition Acquisition
+	// Draft is ESPN's draftDetail, nil when the read does not carry it.
+	Draft *DraftState
+	// DraftAt is settings.draftSettings.date, nil when ESPN states none.
+	DraftAt *time.Time
+	// PlayoffStartWeek is the first scoring period of the matchup period
+	// after the regular season's (scheduleSettings.matchupPeriodCount),
+	// 0 when ESPN does not say.
+	PlayoffStartWeek int
+	// FinalScoringPeriod is status.finalScoringPeriod, the season's last
+	// scoring period, 0 when ESPN does not say.
+	FinalScoringPeriod int
+}
+
+// DraftState is ESPN's draftDetail: whether the league has drafted, and
+// whether its draft is under way.
+type DraftState struct {
+	Drafted    bool
+	InProgress bool
 }
 
 // Acquisition is a league's waiver settings as ESPN's mSettings answers
@@ -147,6 +166,9 @@ type Acquisition struct {
 	// ProcessDays is waiverProcessDays, the days ESPN runs claims, as
 	// ESPN names them (MONDAY ...).
 	ProcessDays []string
+	// Closed is an acquisitionLimit of 0: the league takes no adds (-1 is
+	// no limit).
+	Closed bool
 }
 
 // Team is one team, its record, owners and roster.
@@ -221,10 +243,23 @@ type wireFull struct {
 	ScoringPeriodID int `json:"scoringPeriodId"`
 	Status          struct {
 		CurrentMatchupPeriod int `json:"currentMatchupPeriod"`
+		FinalScoringPeriod   int `json:"finalScoringPeriod"`
 	} `json:"status"`
+	DraftDetail *struct {
+		Drafted    bool `json:"drafted"`
+		InProgress bool `json:"inProgress"`
+	} `json:"draftDetail"`
 	Settings struct {
-		Name           string `json:"name"`
-		Size           int    `json:"size"`
+		Name          string `json:"name"`
+		Size          int    `json:"size"`
+		DraftSettings struct {
+			Date int64 `json:"date"`
+		} `json:"draftSettings"`
+		ScheduleSettings struct {
+			MatchupPeriodCount  int              `json:"matchupPeriodCount"`
+			MatchupPeriodLength int              `json:"matchupPeriodLength"`
+			MatchupPeriods      map[string][]int `json:"matchupPeriods"`
+		} `json:"scheduleSettings"`
 		RosterSettings struct {
 			LineupSlotCounts map[string]int `json:"lineupSlotCounts"`
 		} `json:"rosterSettings"`
@@ -277,7 +312,7 @@ func (c *Client) Read(ctx context.Context, id string, season int, cookies *Cooki
 	if !leagueID.MatchString(id) || season < minSeason || season > maxSeason {
 		return FullLeague{}, ErrNotALink
 	}
-	q := url.Values{"view": {"mRoster", "mSettings", "mMatchup", "mTeam"}}
+	q := url.Values{"view": {"mRoster", "mSettings", "mMatchup", "mTeam", "mDraftDetail"}}
 	path := fmt.Sprintf("%s/apis/v3/games/ffl/seasons/%d/segments/0/leagues/%s?%s", c.Base, season, id, q.Encode())
 	body, err := c.get(ctx, path, cookies, maxLeagueBody)
 	if err != nil {
@@ -375,6 +410,11 @@ func checkFull(w wireFull) (FullLeague, error) {
 		ID: strconv.Itoa(w.ID), Name: scoring.Name, Season: w.SeasonID, ScoringPeriod: w.ScoringPeriodID,
 		MatchupPeriod: w.Status.CurrentMatchupPeriod, Size: w.Settings.Size, Items: scoring.Items,
 		Members: map[string]string{}, LineupSlotCount: map[int]int{}, Acquisition: acquisitionOf(w.Settings.AcquisitionSettings),
+		DraftAt: draftDate(w.Settings.DraftSettings.Date), PlayoffStartWeek: playoffStart(w),
+		FinalScoringPeriod: period(w.Status.FinalScoringPeriod),
+	}
+	if d := w.DraftDetail; d != nil {
+		l.Draft = &DraftState{Drafted: d.Drafted, InProgress: d.InProgress}
 	}
 	for k, n := range w.Settings.RosterSettings.LineupSlotCounts {
 		id, err := strconv.Atoi(k)

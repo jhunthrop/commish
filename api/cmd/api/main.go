@@ -115,7 +115,20 @@ func build(ctx context.Context, cfg config.API, pool *pgxpool.Pool, obs httpx.Ob
 	if err != nil {
 		return nil, err
 	}
-	viewer := &account.Viewer{Entitlements: ents, Leagues: &leaguesync.Store{Pool: pool}, Now: now}
+	// The board's pool lives as long as the process.
+	draftBoards, _, err := draftroom.OpenBoards(pool, cfg.Board, now)
+	if err != nil {
+		return nil, err
+	}
+	if err := customBoards(ctx, cfg.Board, draftBoards, now, log); err != nil {
+		return nil, err
+	}
+	// The site's season reads the board's schedule, kept an hour: one
+	// source for /me, GET /season, the leagues' phases and Sleeper's week.
+	site := &season.Site{Facts: draftBoards.Schedule, Now: now, Log: log}
+	viewer := &account.Viewer{
+		Entitlements: ents, Leagues: &leaguesync.Store{Pool: pool, Now: now, Season: site}, Season: site, Now: now,
+	}
 	gate := &leagues.Gate{Entitlements: ents, Now: now, Log: log}
 	leagueStore := &leagues.Store{Pool: pool}
 	sheetStore := &sheets.Store{Pool: pool}
@@ -125,14 +138,6 @@ func build(ctx context.Context, cfg config.API, pool *pgxpool.Pool, obs httpx.Ob
 		IdP:           auth.NewWorkOS(cfg.WorkOS.APIKey, cfg.WorkOS.ClientID, cfg.WorkOS.RedirectURI),
 		PublicBaseURL: cfg.HTTP.PublicBaseURL, TrustedHops: cfg.HTTP.TrustedProxyHops, Now: now, Log: log,
 		Anon: anon, Claimer: mockStore,
-	}
-	// The board's pool lives as long as the process.
-	draftBoards, _, err := draftroom.OpenBoards(pool, cfg.Board, now)
-	if err != nil {
-		return nil, err
-	}
-	if err := customBoards(ctx, cfg.Board, draftBoards, now, log); err != nil {
-		return nil, err
 	}
 	sale := &season.Sale{Schedule: draftBoards.Schedule, Log: log}
 	billingService := &billing.Service{
@@ -163,7 +168,7 @@ func build(ctx context.Context, cfg config.API, pool *pgxpool.Pool, obs httpx.Ob
 		return nil, err
 	}
 
-	leagueSync := leagueSyncService(cfg, pool, draftBoards, leagueStore, ents, viewer, ff, yh, es, log)
+	leagueSync := leagueSyncService(cfg, pool, draftBoards, leagueStore, ents, viewer, site, ff, yh, es, log)
 	moves, err := hostMoves(cfg, pool, ff, es, log)
 	if err != nil {
 		return nil, err
@@ -176,6 +181,7 @@ func build(ctx context.Context, cfg config.API, pool *pgxpool.Pool, obs httpx.Ob
 	routes := slices.Concat(
 		server.Health(pool, version),
 		authHandler.Routes(),
+		(&account.SeasonHandler{Season: site}).Routes(),
 		(&leagues.Handler{Store: leagueStore, Gate: gate, Log: log}).Routes(),
 		(&sheets.Handler{Store: sheetStore, Log: log}).Routes(),
 		exportHandler.Routes(),

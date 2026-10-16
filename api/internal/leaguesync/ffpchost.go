@@ -30,6 +30,7 @@ const rulesTTL = 24 * time.Hour
 type FFPCMember interface {
 	ReadLeague(ctx context.Context, accountID uuid.UUID, ltuid string, rules bool) (ffpc.League, error)
 	OpenLeague(ctx context.Context, accountID uuid.UUID, leagueID string) (string, error)
+	ReadDraft(ctx context.Context, accountID uuid.UUID, ltuid string) (ffpc.Draft, error)
 }
 
 // FFPCTeamKeys finds the league-team id of the account a league is read
@@ -52,6 +53,9 @@ type FFPC struct {
 
 	mu    sync.Mutex
 	rules map[string]rulesEntry
+	// drafted are the league-team ids and seasons whose draft board said
+	// complete: a done draft stays done, so its board is not read again.
+	drafted map[string]bool
 	// columns are the unknown rosters headings already logged.
 	columns sync.Map
 }
@@ -112,7 +116,38 @@ func (f *FFPC) ReadAs(ctx context.Context, accountID uuid.UUID, ltuid string) (S
 	}
 	f.nameColumns(l.OtherRosterColumns)
 	snap := ffpcSnapshot(l, f.Now(), f.week(ctx, l))
+	if status, ok := f.draftStatus(ctx, accountID, ltuid, l.Banner.Season); ok {
+		snap.Status, snap.Calendar.DraftUnstated, snap.Calendar.DraftReadBy = status, false, ""
+	}
 	return snap, l.Banner.TeamID, nil
+}
+
+// draftStatus is the league's state from its draft board: complete is
+// past the draft (kept, so the board is read no more), a pick made is a
+// draft under way, none is before it. false when the board did not
+// answer (logged): the snapshot's own reading by its rosters stands.
+func (f *FFPC) draftStatus(ctx context.Context, accountID uuid.UUID, ltuid string, season int) (string, bool) {
+	key := fmt.Sprintf("%s/%d", ltuid, season)
+	f.mu.Lock()
+	done := f.drafted[key]
+	f.mu.Unlock()
+	if done {
+		return StatusInSeason, true
+	}
+	d, err := f.Member.ReadDraft(ctx, accountID, ltuid)
+	switch {
+	case err != nil:
+		f.warn("leaguesync: ffpc draft board", "err", err)
+		return "", false
+	case d.Complete:
+		f.mu.Lock()
+		f.drafted = keep(f.drafted, key, true)
+		f.mu.Unlock()
+		return StatusInSeason, true
+	case len(d.Picks) > 0:
+		return StatusDrafting, true
+	}
+	return StatusPreDraft, true
 }
 
 // nameColumns logs, once per process, each rosters page heading we do

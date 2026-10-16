@@ -370,6 +370,14 @@ _NOBODY_DRAFTED: Final = re.compile(
     r"|\bundrafted in (?:fantasy|drafts|leagues|most leagues)\b",
     re.IGNORECASE,
 )
+# The claims this rule refuses as the writer's prompt names them (`prompt`), each held to the rule by a
+# test: the shapes that ended Lane 50's sample pages in a facts block.
+NO_ADP_EXAMPLES: Final = (
+    "nobody drafted him",
+    "no one spent a pick on him",
+    "drafters passed on him",
+    "undrafted in most leagues",
+)
 _NFL_CONTEXT: Final = re.compile(r"\bcollege\b|\bNFL\b|\bout of\b|\bfree agent\b|\bno team\b", re.IGNORECASE)
 
 
