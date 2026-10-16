@@ -1005,6 +1005,23 @@ paths:
                   - $ref: "#/components/schemas/Envelope"
                   - properties: { data: { $ref: "#/components/schemas/RoomBoard" } }
         "400": { $ref: "#/components/responses/ErrorResponse" }
+  /games/week:
+    get:
+      tags: [league-sync]
+      operationId: gameWeek
+      summary: >-
+        Every club's game in a week with its facts: the game's expected score and margin from the hourly capture, the
+        venue's roof, and the weather service's forecast for the kickoff hour, each with its read time. Facts, never a
+        projection. Read by a league's Matchup screen and the player pages.
+      parameters:
+        - name: week
+          in: query
+          required: false
+          description: the week, 1 to 18; without it the week of the next game still to be played
+          schema: { type: integer, minimum: 1, maximum: 18 }
+      responses:
+        "200": { $ref: "#/components/responses/GameWeekResponse" }
+        "400": { $ref: "#/components/responses/ErrorResponse" }
   /shared/mocks/{code}:
     parameters: [{ $ref: "#/components/parameters/ShareCode" }]
     get:
@@ -1669,6 +1686,14 @@ components:
             allOf:
               - $ref: "#/components/schemas/Envelope"
               - properties: { data: { $ref: "#/components/schemas/LeagueSync" } }
+    GameWeekResponse:
+      description: every club's game in the week with its facts
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: "#/components/schemas/Envelope"
+              - properties: { data: { $ref: "#/components/schemas/GameWeek" } }
     LineupAdviceResponse:
       description: the week's lineup advice for the drafter's team
       content:
@@ -2964,7 +2989,21 @@ components:
     WeekFacts:
       type: object
       description: one player's week; a fact we do not hold is null, never zero
-      required: [week, opponent, home, kickoff, bye, designation, played, points_this_week, last_games, allowed_to_position]
+      required:
+        - week
+        - opponent
+        - home
+        - kickoff
+        - bye
+        - designation
+        - played
+        - points_this_week
+        - last_games
+        - allowed_to_position
+        - game_total
+        - spread
+        - roof
+        - weather
       properties:
         week: { type: integer }
         opponent: { type: string, nullable: true, description: "the opponent's team code, null on bye or when his team is unknown" }
@@ -2983,6 +3022,66 @@ components:
           description: up to three completed games under the league's scoring, newest first
           items: { $ref: "#/components/schemas/GamePoints" }
         allowed_to_position: { allOf: [{ $ref: "#/components/schemas/PointsAllowed" }], nullable: true }
+        game_total: { allOf: [{ $ref: "#/components/schemas/GameTotal" }], nullable: true }
+        spread: { allOf: [{ $ref: "#/components/schemas/GameSpread" }], nullable: true }
+        roof: { allOf: [{ $ref: "#/components/schemas/GameRoof" }], nullable: true }
+        weather: { allOf: [{ $ref: "#/components/schemas/KickoffWeather" }], nullable: true }
+    GameTotal:
+      type: object
+      description: the game's expected score, the median of the books in the hourly capture's newest read before kickoff
+      required: [points, read_at]
+      properties:
+        points: { type: number, format: double, description: both clubs' points together }
+        read_at: { type: string, format: date-time, description: when the capture read it }
+    GameSpread:
+      type: object
+      description: the expected margin from this club's side, from the same read as game_total
+      required: [side, points, read_at]
+      properties:
+        side: { type: string, enum: [favoured, underdog, even] }
+        points: { type: number, format: double, description: "the margin, never negative, and 0 when even" }
+        read_at: { type: string, format: date-time }
+    GameRoof:
+      type: object
+      description: >-
+        the venue as the stadium table confirms it: a dome takes no forecast, a venue abroad no weather term; null when
+        the venue is not confirmed
+      required: [kind, abroad]
+      properties:
+        kind: { type: string, enum: [outdoors, dome, retractable] }
+        abroad: { type: boolean }
+    KickoffWeather:
+      type: object
+      description: >-
+        the weather service's forecast for the kickoff hour at the stadium, the newest read before kickoff; null for a
+        dome, a venue abroad, or before the forecast reaches the game
+      required: [temperature_f, wind_mph, precipitation_chance, read_at]
+      properties:
+        temperature_f: { type: number, format: double, nullable: true }
+        wind_mph: { type: number, format: double, nullable: true }
+        precipitation_chance: { type: number, format: double, nullable: true, description: "percent, 0 to 100" }
+        read_at: { type: string, format: date-time, description: when the forecast was read }
+    GameWeek:
+      type: object
+      required: [season, week, games]
+      properties:
+        season: { type: integer }
+        week: { type: integer }
+        games: { type: array, items: { $ref: "#/components/schemas/ClubGame" } }
+    ClubGame:
+      type: object
+      description: one club's game in the week, from its side
+      required: [team, opponent, home, kickoff, played, game_total, spread, roof, weather]
+      properties:
+        team: { type: string, description: "the club, in the board's codes" }
+        opponent: { type: string }
+        home: { type: boolean }
+        kickoff: { type: string, format: date-time }
+        played: { type: boolean, description: the game is final }
+        game_total: { allOf: [{ $ref: "#/components/schemas/GameTotal" }], nullable: true }
+        spread: { allOf: [{ $ref: "#/components/schemas/GameSpread" }], nullable: true }
+        roof: { allOf: [{ $ref: "#/components/schemas/GameRoof" }], nullable: true }
+        weather: { allOf: [{ $ref: "#/components/schemas/KickoffWeather" }], nullable: true }
     PlayerLine:
       type: object
       required: [player, headshot, slug, position_rank, points_over_replacement, held, facts]

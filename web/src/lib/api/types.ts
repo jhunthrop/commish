@@ -938,6 +938,23 @@ export interface paths {
 		patch?: never;
 		trace?: never;
 	};
+	'/games/week': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		/** Every club's game in a week with its facts: the game's expected score and margin from the hourly capture, the venue's roof, and the weather service's forecast for the kickoff hour, each with its read time. Facts, never a projection. Read by a league's Matchup screen and the player pages. */
+		get: operations['gameWeek'];
+		put?: never;
+		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
 	'/shared/mocks/{code}': {
 		parameters: {
 			query?: never;
@@ -2528,6 +2545,78 @@ export interface components {
 			/** @description up to three completed games under the league's scoring, newest first */
 			last_games: components['schemas']['GamePoints'][];
 			allowed_to_position: components['schemas']['PointsAllowed'] | null;
+			game_total: components['schemas']['GameTotal'] | null;
+			spread: components['schemas']['GameSpread'] | null;
+			roof: components['schemas']['GameRoof'] | null;
+			weather: components['schemas']['KickoffWeather'] | null;
+		};
+		/** @description the game's expected score, the median of the books in the hourly capture's newest read before kickoff */
+		GameTotal: {
+			/**
+			 * Format: double
+			 * @description both clubs' points together
+			 */
+			points: number;
+			/**
+			 * Format: date-time
+			 * @description when the capture read it
+			 */
+			read_at: string;
+		};
+		/** @description the expected margin from this club's side, from the same read as game_total */
+		GameSpread: {
+			/** @enum {string} */
+			side: 'favoured' | 'underdog' | 'even';
+			/**
+			 * Format: double
+			 * @description the margin, never negative, and 0 when even
+			 */
+			points: number;
+			/** Format: date-time */
+			read_at: string;
+		};
+		/** @description the venue as the stadium table confirms it: a dome takes no forecast, a venue abroad no weather term; null when the venue is not confirmed */
+		GameRoof: {
+			/** @enum {string} */
+			kind: 'outdoors' | 'dome' | 'retractable';
+			abroad: boolean;
+		};
+		/** @description the weather service's forecast for the kickoff hour at the stadium, the newest read before kickoff; null for a dome, a venue abroad, or before the forecast reaches the game */
+		KickoffWeather: {
+			/** Format: double */
+			temperature_f: number | null;
+			/** Format: double */
+			wind_mph: number | null;
+			/**
+			 * Format: double
+			 * @description percent, 0 to 100
+			 */
+			precipitation_chance: number | null;
+			/**
+			 * Format: date-time
+			 * @description when the forecast was read
+			 */
+			read_at: string;
+		};
+		GameWeek: {
+			season: number;
+			week: number;
+			games: components['schemas']['ClubGame'][];
+		};
+		/** @description one club's game in the week, from its side */
+		ClubGame: {
+			/** @description the club, in the board's codes */
+			team: string;
+			opponent: string;
+			home: boolean;
+			/** Format: date-time */
+			kickoff: string;
+			/** @description the game is final */
+			played: boolean;
+			game_total: components['schemas']['GameTotal'] | null;
+			spread: components['schemas']['GameSpread'] | null;
+			roof: components['schemas']['GameRoof'] | null;
+			weather: components['schemas']['KickoffWeather'] | null;
 		};
 		PlayerLine: {
 			player: components['schemas']['LeaguePlayer'];
@@ -3141,6 +3230,15 @@ export interface components {
 			content: {
 				'application/json': components['schemas']['Envelope'] & {
 					data?: components['schemas']['LeagueSync'];
+				};
+			};
+		};
+		/** @description every club's game in the week with its facts */
+		GameWeekResponse: {
+			headers: Record<string, unknown>;
+			content: {
+				'application/json': components['schemas']['Envelope'] & {
+					data?: components['schemas']['GameWeek'];
 				};
 			};
 		};
@@ -4424,6 +4522,22 @@ export interface operations {
 					};
 				};
 			};
+			400: components['responses']['ErrorResponse'];
+		};
+	};
+	gameWeek: {
+		parameters: {
+			query?: {
+				/** @description the week, 1 to 18; without it the week of the next game still to be played */
+				week?: number;
+			};
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			200: components['responses']['GameWeekResponse'];
 			400: components['responses']['ErrorResponse'];
 		};
 	};

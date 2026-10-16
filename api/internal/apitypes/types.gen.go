@@ -249,6 +249,48 @@ func (e Feature) Valid() bool {
 	}
 }
 
+// Defines values for GameRoofKind.
+const (
+	GameRoofKindDome        GameRoofKind = "dome"
+	GameRoofKindOutdoors    GameRoofKind = "outdoors"
+	GameRoofKindRetractable GameRoofKind = "retractable"
+)
+
+// Valid indicates whether the value is a known member of the GameRoofKind enum.
+func (e GameRoofKind) Valid() bool {
+	switch e {
+	case GameRoofKindDome:
+		return true
+	case GameRoofKindOutdoors:
+		return true
+	case GameRoofKindRetractable:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GameSpreadSide.
+const (
+	GameSpreadSideEven     GameSpreadSide = "even"
+	GameSpreadSideFavoured GameSpreadSide = "favoured"
+	GameSpreadSideUnderdog GameSpreadSide = "underdog"
+)
+
+// Valid indicates whether the value is a known member of the GameSpreadSide enum.
+func (e GameSpreadSide) Valid() bool {
+	switch e {
+	case GameSpreadSideEven:
+		return true
+	case GameSpreadSideFavoured:
+		return true
+	case GameSpreadSideUnderdog:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for GroupPassStatus.
 const (
 	GroupPassStatusActive   GroupPassStatus = "active"
@@ -1325,6 +1367,23 @@ type CheckoutRequest struct {
 	Seats *int `json:"seats,omitempty"`
 }
 
+// ClubGame one club's game in the week, from its side
+type ClubGame struct {
+	GameTotal *GameTotal `json:"game_total"`
+	Home      bool       `json:"home"`
+	Kickoff   time.Time  `json:"kickoff"`
+	Opponent  string     `json:"opponent"`
+
+	// Played the game is final
+	Played bool        `json:"played"`
+	Roof   *GameRoof   `json:"roof"`
+	Spread *GameSpread `json:"spread"`
+
+	// Team the club, in the board's codes
+	Team    string          `json:"team"`
+	Weather *KickoffWeather `json:"weather"`
+}
+
 // Companion defines model for Companion.
 type Companion struct {
 	// Basis the board our call reads
@@ -1623,6 +1682,42 @@ type GamePoints struct {
 	Week   int     `json:"week"`
 }
 
+// GameRoof the venue as the stadium table confirms it: a dome takes no forecast, a venue abroad no weather term; null when the venue is not confirmed
+type GameRoof struct {
+	Abroad bool         `json:"abroad"`
+	Kind   GameRoofKind `json:"kind"`
+}
+
+// GameRoofKind defines model for GameRoof.Kind.
+type GameRoofKind string
+
+// GameSpread the expected margin from this club's side, from the same read as game_total
+type GameSpread struct {
+	// Points the margin, never negative, and 0 when even
+	Points float64        `json:"points"`
+	ReadAt time.Time      `json:"read_at"`
+	Side   GameSpreadSide `json:"side"`
+}
+
+// GameSpreadSide defines model for GameSpread.Side.
+type GameSpreadSide string
+
+// GameTotal the game's expected score, the median of the books in the hourly capture's newest read before kickoff
+type GameTotal struct {
+	// Points both clubs' points together
+	Points float64 `json:"points"`
+
+	// ReadAt when the capture read it
+	ReadAt time.Time `json:"read_at"`
+}
+
+// GameWeek defines model for GameWeek.
+type GameWeek struct {
+	Games  []ClubGame `json:"games"`
+	Season int        `json:"season"`
+	Week   int        `json:"week"`
+}
+
 // GroupPass defines model for GroupPass.
 type GroupPass struct {
 	// ClaimCode the code in the claim link
@@ -1905,6 +2000,17 @@ type Keeper struct {
 	PlayerId string `json:"player_id"`
 	Round    int    `json:"round"`
 	Slot     int    `json:"slot"`
+}
+
+// KickoffWeather the weather service's forecast for the kickoff hour at the stadium, the newest read before kickoff; null for a dome, a venue abroad, or before the forecast reaches the game
+type KickoffWeather struct {
+	// PrecipitationChance percent, 0 to 100
+	PrecipitationChance *float64 `json:"precipitation_chance"`
+
+	// ReadAt when the forecast was read
+	ReadAt       time.Time `json:"read_at"`
+	TemperatureF *float64  `json:"temperature_f"`
+	WindMph      *float64  `json:"wind_mph"`
 }
 
 // League defines model for League.
@@ -3080,6 +3186,7 @@ type WeekFacts struct {
 	AllowedToPosition *PointsAllowed     `json:"allowed_to_position"`
 	Bye               bool               `json:"bye"`
 	Designation       *InjuryDesignation `json:"designation"`
+	GameTotal         *GameTotal         `json:"game_total"`
 	Home              *bool              `json:"home"`
 	Kickoff           *time.Time         `json:"kickoff"`
 
@@ -3093,8 +3200,11 @@ type WeekFacts struct {
 	Played bool `json:"played"`
 
 	// PointsThisWeek the host's score for him so far, from the matchup, when he starts there and his game has kicked off
-	PointsThisWeek *float64 `json:"points_this_week"`
-	Week           int      `json:"week"`
+	PointsThisWeek *float64        `json:"points_this_week"`
+	Roof           *GameRoof       `json:"roof"`
+	Spread         *GameSpread     `json:"spread"`
+	Weather        *KickoffWeather `json:"weather"`
+	Week           int             `json:"week"`
 }
 
 // YahooConnectInput defines model for YahooConnectInput.
@@ -3154,6 +3264,15 @@ type ErrorResponse = Envelope
 // ExportLinkResponse defines model for ExportLinkResponse.
 type ExportLinkResponse struct {
 	Data      ExportLink `json:"data"`
+	Error     *ErrorBody `json:"error"`
+	Meta      *PageMeta  `json:"meta,omitempty"`
+	Ok        bool       `json:"ok"`
+	RequestId string     `json:"request_id"`
+}
+
+// GameWeekResponse defines model for GameWeekResponse.
+type GameWeekResponse struct {
+	Data      GameWeek   `json:"data"`
 	Error     *ErrorBody `json:"error"`
 	Meta      *PageMeta  `json:"meta,omitempty"`
 	Ok        bool       `json:"ok"`
@@ -3355,6 +3474,12 @@ type GetCompanionParams struct {
 type ListExportsParams struct {
 	Page    *Page    `form:"page,omitempty" json:"page,omitempty"`
 	PerPage *PerPage `form:"per_page,omitempty" json:"per_page,omitempty"`
+}
+
+// GameWeekParams defines parameters for GameWeek.
+type GameWeekParams struct {
+	// Week the week, 1 to 18; without it the week of the next game still to be played
+	Week *int `form:"week,omitempty" json:"week,omitempty"`
 }
 
 // YahooCallbackParams defines parameters for YahooCallback.

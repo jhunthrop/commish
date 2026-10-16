@@ -17,10 +17,11 @@ type Reads interface {
 	StatLines(ctx context.Context, season int) ([]boards.StatLine, error)
 	Schedule(ctx context.Context, season int) ([]boards.TeamWeek, error)
 	Designations(ctx context.Context) (map[string]boards.Designation, error)
+	GameFacts(ctx context.Context, season int) (map[boards.ClubWeek]boards.GameFact, error)
 }
 
 // Short TTLs (spec §9): the stat lines and the schedule move at most
-// daily, the injury captures hourly.
+// daily, the injury captures, the game figures and the forecasts hourly.
 const (
 	SeasonTTL  = 15 * time.Minute
 	CaptureTTL = 5 * time.Minute
@@ -66,7 +67,13 @@ func (c *Cache) Data(ctx context.Context, season int) (Data, error) {
 	if err != nil {
 		return Data{}, err
 	}
-	return Data{Lines: lines, Games: games, Designations: designations}, nil
+	gameFacts, err := cached(c, ctx, fmt.Sprintf("gamefacts/%d", season), CaptureTTL, func(ctx context.Context) (map[boards.ClubWeek]boards.GameFact, error) {
+		return c.Reads.GameFacts(ctx, season)
+	})
+	if err != nil {
+		return Data{}, err
+	}
+	return Data{Lines: lines, Games: games, Designations: designations, GameFacts: gameFacts}, nil
 }
 
 // cached is the value kept for key while younger than ttl, else read
