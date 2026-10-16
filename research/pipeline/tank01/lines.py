@@ -33,9 +33,10 @@ from research.errors import SchemaDriftError
 from research.pipeline.game_figures import implied_points
 from research.pipeline.nflverse.team_codes import source_team_code
 from research.pipeline.observations import TeamWeekObservation, record_team_observations
+from research.pipeline.tank01.capture import BETTING_ODDS_SOURCE, CaptureResult
 
 LINES_SOURCE: Final = "tank01_lines"
-ODDS_CAPTURE_SOURCE: Final = "tank01_betting_odds"
+
 
 _SPREAD: Final = re.compile(r"^[+-]?\d+(\.\d+)?$")
 _LEVEL_GAME: Final = "PK"
@@ -222,11 +223,17 @@ def backfill_lines(conn: Connection) -> LinesResult:
     table = CAPTURE_SNAPSHOTS
     query = (
         select(table.c.payload, table.c.captured_at)
-        .where(table.c.source == ODDS_CAPTURE_SOURCE)
+        .where(table.c.source == BETTING_ODDS_SOURCE)
         .order_by(table.c.captured_at, table.c.id)
     )
     snapshots = [(r.payload, r.captured_at) for r in conn.execute(query)]
     return _record(conn, snapshots, game_places(conn))
+
+
+def lines_after_harvest(conn: Connection, harvest: CaptureResult, checked_at: datetime) -> LinesResult | None:
+    """The pass's figures when its odds feed was read (captured or unchanged), None otherwise."""
+    read = any(f.source == BETTING_ODDS_SOURCE and f.status in ("captured", "unchanged") for f in harvest.feeds)
+    return record_checked_lines(conn, checked_at) if read else None
 
 
 def record_checked_lines(conn: Connection, checked_at: datetime) -> LinesResult:
@@ -234,7 +241,7 @@ def record_checked_lines(conn: Connection, checked_at: datetime) -> LinesResult:
     table = CAPTURE_SNAPSHOTS
     query = (
         select(table.c.payload)
-        .where(table.c.source == ODDS_CAPTURE_SOURCE, table.c.captured_at <= checked_at)
+        .where(table.c.source == BETTING_ODDS_SOURCE, table.c.captured_at <= checked_at)
         .order_by(table.c.captured_at.desc(), table.c.id.desc())
         .limit(1)
     )

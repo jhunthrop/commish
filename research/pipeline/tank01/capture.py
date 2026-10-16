@@ -36,6 +36,8 @@ Status = Literal["captured", "unchanged", "fresh", "off-cadence", "budget-refuse
 
 _GAME_DAYS_UTC: Final = (0, 1, 4, 5, 6)  # JavaScript's getUTCDay: Sunday 0, Monday 1, Thursday to Saturday.
 CAPTURE_HARVEST_REQUEST_BUDGET: Final = 10
+# The game lines feed, which `tank01.lines` reads into the `tank01_lines` source.
+BETTING_ODDS_SOURCE: Final = "tank01_betting_odds"
 # The provider dates a game by its Eastern day.
 _EASTERN: Final = ZoneInfo("America/New_York")
 
@@ -73,7 +75,7 @@ CAPTURE_FEEDS: tuple[CaptureFeed, ...] = (
     CaptureFeed("tank01_changelog", "daily", lambda _c: [CaptureRequest(Paths.CHANGELOG, {})]),
     CaptureFeed("tank01_news", "daily", lambda _c: [CaptureRequest(Paths.NEWS, {"fantasyNews": "true"})]),
     CaptureFeed(
-        "tank01_betting_odds",
+        BETTING_ODDS_SOURCE,
         "game-week",
         lambda c: [CaptureRequest(Paths.BETTING_ODDS, {"gameDate": d}) for d in (c.game_dates or (c.day,))],
     ),
@@ -87,7 +89,7 @@ CAPTURE_FEEDS: tuple[CaptureFeed, ...] = (
 
 # The harvest's deliberate subset: single-request feeds a player card or capsule reads.
 HARVEST_FEED_SOURCES: Final = frozenset(
-    {"tank01_injuries_by_date", "tank01_news", "tank01_depth_charts", "tank01_inactives", "tank01_betting_odds"}
+    {"tank01_injuries_by_date", "tank01_news", "tank01_depth_charts", "tank01_inactives", BETTING_ODDS_SOURCE}
 )
 
 
