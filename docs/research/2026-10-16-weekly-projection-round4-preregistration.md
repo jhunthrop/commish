@@ -1020,7 +1020,8 @@ use. Item 4 is the benchmark's margin method. Items 5 and 6 are notes.
    now reads: the words match as stems, rain (rainy, raining), showers (shower), drizzle (drizzling),
    snow (snowing, snowy), sleet, flurries and "wintry mix"; a word is not a present condition when
    "no" precedes it, or when any form of "chance", "possible" or "forecast", or a percentage, appears
-   anywhere in the same line; otherwise it is a present condition. The amended rule reads the four
+   anywhere in the same line (the gamebook's own humidity figure, "Humidity: 87%", is a measurement,
+   not a chance, and is not read as a percentage); otherwise it is a present condition. The amended rule reads the four
    lines as 0, 0, 1, 1, agreeing with the gauge. `research/pipeline/weather/gamebook.py` carries the
    amended lists as one tested list, and the results report the flag's agreement with ISD as before.
 2. **The empty gamebook line.** A gamebook weather text with no temperature figure and no wind figure
