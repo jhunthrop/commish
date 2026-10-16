@@ -361,9 +361,10 @@ _WRITER_ONLY_PATTERNS: Final = tuple(
 
 
 def writer_only_hits(text: str, names: Sequence[str]) -> list[VoiceRuleHit]:
-    """The worn phrases that bind new writes only (`Repetition.validator_only_stems`): the validator
-    refuses them as set phrases, each hit as written (a stem's "#" is the number he wrote), so the
-    correction names its sentence; the page gate (`gate_hits`) never reads them on a stored page."""
+    """The worn phrases that bind new writes only (`Repetition.validator_only_stems`, non-stat phrases
+    only: a sentence restating a number the sheet prints is a stat sentence, never a worn stem). The
+    validator refuses them as set phrases, each hit as written, so the correction names its sentence.
+    The page gate (`gate_hits`) never reads them on a stored page."""
     normalised = _normalise_apostrophes(mask_names(text, names))
     matches = (p.pattern.search(normalised) for p in _WRITER_ONLY_PATTERNS)
     return [VoiceRuleHit("set phrase", match.group(0)) for match in matches if match is not None]
