@@ -145,6 +145,9 @@ func espnSnapshot(l espn.FullLeague, now time.Time) Snapshot {
 		Calendar: Calendar{DraftAt: l.DraftAt, DraftUnstated: l.Draft == nil, PlayoffStartWeek: l.PlayoffStartWeek, WaiversClosed: l.Acquisition.Closed},
 	}
 	snap.Status = espnStatus(l)
+	if l.Draft == nil {
+		snap.Calendar.DraftReadBy = ReadByRosters
+	}
 	byID := map[int]Team{}
 	for _, t := range l.Teams {
 		team := Team{RosterID: t.ID, Name: scoring.HostText(t.Name), Wins: t.Wins, Losses: t.Losses, Ties: t.Ties, PointsFor: round2(t.PointsFor)}

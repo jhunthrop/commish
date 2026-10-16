@@ -90,7 +90,9 @@ func ffpcSnapshot(l ffpc.League, now time.Time, week int) Snapshot {
 	}
 	// The league pages do not state the draft (its board does, read by
 	// FFPC.draftStatus): until it is read, anyone rostered has drafted.
-	snap.Status, snap.Calendar.DraftUnstated = StatusPreDraft, true
+	snap.Status, snap.Calendar.DraftUnstated, snap.Calendar.DraftReadBy = StatusPreDraft, true, ReadByRosters
+	// FFPC states nothing on when its waivers close.
+	snap.Calendar.WaiversUnstated = true
 	for _, t := range snap.Teams {
 		if len(t.Players) > 0 {
 			snap.Status = StatusInSeason

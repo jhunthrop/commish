@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -36,11 +35,9 @@ type Attached struct {
 	Status   string
 	Week     int
 	Calendar Calendar
-}
-
-// Phase is the league's phase at now, from its last kept read.
-func (a Attached) Phase(now time.Time) LeaguePhase {
-	return PhaseOf(PhaseFacts{Host: a.Ref.Host, Read: a.Read, Status: a.Status, Season: a.Season, Week: a.Week, Calendar: a.Calendar}, now)
+	// Phase is the league's phase when it was listed, at the store's
+	// clock and the site's season.
+	Phase LeaguePhase
 }
 
 // Attached is the account's links, newest first, each with its league's
@@ -68,6 +65,14 @@ func (s *Store) Attached(ctx context.Context, accountID uuid.UUID) ([]Attached, 
 	out, err := pgx.CollectRows(rows, scanAttached)
 	if err != nil {
 		return nil, fmt.Errorf("leaguesync: attached: %w", err)
+	}
+	if len(out) == 0 {
+		return out, nil
+	}
+	now, site := s.now(), s.site(ctx)
+	for i, a := range out {
+		out[i].Phase = PhaseOf(PhaseFacts{Host: a.Ref.Host, Read: a.Read, Status: a.Status, Season: a.Season,
+			Week: a.Week, Calendar: a.Calendar, Site: site}, now)
 	}
 	return out, nil
 }

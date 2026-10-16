@@ -305,9 +305,8 @@ func (s *Service) attached(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	out := make([]apitypes.AttachedLeague, 0, len(list))
-	now := s.Now()
 	for _, a := range list {
-		p := a.Phase(now)
+		p := a.Phase
 		out = append(out, apitypes.AttachedLeague{
 			Id: a.ID, Host: apitypes.LeagueHost(a.Ref.Host), HostLeagueId: a.Ref.LeagueID, Season: a.Season,
 			Name: a.Name, RosterId: a.RosterID, TeamName: a.TeamName, Standing: standingOf(a.Teams, a.RosterID),

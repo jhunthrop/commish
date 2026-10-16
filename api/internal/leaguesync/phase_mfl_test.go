@@ -55,9 +55,9 @@ func TestMFLPhase(t *testing.T) {
 		{"some made", mfl.DraftResults{Picks: 24, Made: 5}, nil, 0, apitypes.LeaguePhaseDraftDay, "MyFantasyLeague says the draft is under way.", 2},
 		{"none made", mfl.DraftResults{Picks: 24}, nil, 0, apitypes.LeaguePhasePreDraft, "MyFantasyLeague says the league has not drafted yet.", 2},
 		{"no picks", mfl.DraftResults{}, nil, 0, apitypes.LeaguePhaseInSeason,
-			"MyFantasyLeague does not say whether the league has drafted, and its week 6 is under way.", 2},
+			"MyFantasyLeague did not state the draft and week 6 is under way.", 2},
 		{"not recorded", mfl.DraftResults{}, errNotRecorded, 0, apitypes.LeaguePhaseInSeason,
-			"MyFantasyLeague does not say whether the league has drafted, and its week 6 is under way.", 2},
+			"MyFantasyLeague did not state the draft and week 6 is under way.", 2},
 		{"the season over", mfl.DraftResults{Picks: 24, Made: 24}, nil, 17, apitypes.LeaguePhaseOffseason, "MyFantasyLeague says the season is over.", 1},
 	}
 	for _, c := range cases {

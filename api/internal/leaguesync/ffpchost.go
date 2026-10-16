@@ -53,8 +53,8 @@ type FFPC struct {
 
 	mu    sync.Mutex
 	rules map[string]rulesEntry
-	// drafted are the league-team ids whose draft board said complete:
-	// a done draft stays done, so its board is not read again.
+	// drafted are the league-team ids and seasons whose draft board said
+	// complete: a done draft stays done, so its board is not read again.
 	drafted map[string]bool
 	// columns are the unknown rosters headings already logged.
 	columns sync.Map
@@ -116,8 +116,8 @@ func (f *FFPC) ReadAs(ctx context.Context, accountID uuid.UUID, ltuid string) (S
 	}
 	f.nameColumns(l.OtherRosterColumns)
 	snap := ffpcSnapshot(l, f.Now(), f.week(ctx, l))
-	if status, ok := f.draftStatus(ctx, accountID, ltuid); ok {
-		snap.Status, snap.Calendar.DraftUnstated = status, false
+	if status, ok := f.draftStatus(ctx, accountID, ltuid, l.Banner.Season); ok {
+		snap.Status, snap.Calendar.DraftUnstated, snap.Calendar.DraftReadBy = status, false, ""
 	}
 	return snap, l.Banner.TeamID, nil
 }
@@ -126,9 +126,10 @@ func (f *FFPC) ReadAs(ctx context.Context, accountID uuid.UUID, ltuid string) (S
 // past the draft (kept, so the board is read no more), a pick made is a
 // draft under way, none is before it. false when the board did not
 // answer (logged): the snapshot's own reading by its rosters stands.
-func (f *FFPC) draftStatus(ctx context.Context, accountID uuid.UUID, ltuid string) (string, bool) {
+func (f *FFPC) draftStatus(ctx context.Context, accountID uuid.UUID, ltuid string, season int) (string, bool) {
+	key := fmt.Sprintf("%s/%d", ltuid, season)
 	f.mu.Lock()
-	done := f.drafted[ltuid]
+	done := f.drafted[key]
 	f.mu.Unlock()
 	if done {
 		return StatusInSeason, true
@@ -140,10 +141,7 @@ func (f *FFPC) draftStatus(ctx context.Context, accountID uuid.UUID, ltuid strin
 		return "", false
 	case d.Complete:
 		f.mu.Lock()
-		if f.drafted == nil {
-			f.drafted = map[string]bool{}
-		}
-		f.drafted[ltuid] = true
+		f.drafted = keep(f.drafted, key, true)
 		f.mu.Unlock()
 		return StatusInSeason, true
 	case len(d.Picks) > 0:

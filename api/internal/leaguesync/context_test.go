@@ -105,7 +105,7 @@ func TestTheLeagueIsTheContext(t *testing.T) {
 		t.Fatalf("the Sleeper league's phase: %s %q, playoffs %v, waivers %v", sleeper.Phase, sleeper.PhaseBasis, sleeper.PlayoffStartWeek, sleeper.WaiversOpen)
 	}
 	if m := got.Leagues[0]; m.Phase != apitypes.LeaguePhaseInSeason || m.PlayoffStartWeek == nil || *m.PlayoffStartWeek != 15 ||
-		m.PhaseBasis != "MyFantasyLeague does not say whether the league has drafted, and its week 6 is under way." {
+		m.PhaseBasis != "MyFantasyLeague did not state the draft and week 6 is under way." {
 		t.Fatalf("the MyFantasyLeague league's phase: %s %q, playoffs %v", m.Phase, m.PhaseBasis, m.PlayoffStartWeek)
 	}
 

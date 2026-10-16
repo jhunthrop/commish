@@ -6,7 +6,11 @@ import (
 	"time"
 
 	"github.com/jhunthrop/commish/api/internal/apitypes"
+	"github.com/jhunthrop/commish/api/internal/season"
 )
+
+// preseason is the site's season before the 2026 opener.
+var preseason = season.SitePhase{Phase: season.SitePreseason, Opener: time.Date(2026, 9, 10, 0, 20, 0, 0, time.UTC)}
 
 // phaseNow is the Thursday of the 2026 season's week 6.
 var phaseNow = time.Date(2026, 10, 15, 16, 0, 0, 0, time.UTC)
@@ -46,8 +50,26 @@ func TestPhaseOf(t *testing.T) {
 			apitypes.LeaguePhaseInSeason, "Sleeper says the draft is done and week 14 is under way.", true},
 		{"sleeper complete", PhaseFacts{Host: HostSleeper, Read: true, Status: StatusComplete, Season: 2026, Week: 17, Calendar: Calendar{PlayoffStartWeek: 15}},
 			apitypes.LeaguePhaseOffseason, "Sleeper says the season is over.", false},
-		{"sleeper drafted with no week", PhaseFacts{Host: HostSleeper, Read: true, Status: StatusInSeason, Season: 2026},
-			apitypes.LeaguePhaseOffseason, "Sleeper says the draft is done and has no current week.", false},
+		{"drafted before kickoff", PhaseFacts{Host: HostSleeper, Read: true, Status: StatusInSeason, Season: 2026, Site: preseason},
+			apitypes.LeaguePhaseInSeason, "Sleeper says the draft is done and the season starts Wednesday, September 9.", true},
+		{"drafted before kickoff, the schedule not loaded", PhaseFacts{Host: HostYahoo, Read: true, Status: StatusInSeason, Season: 2026,
+			Site: season.SitePhase{Phase: season.SitePreseason}},
+			apitypes.LeaguePhaseInSeason, "Yahoo says the draft is done and the NFL season has not started yet.", true},
+		{"drafted, no week, the NFL regular season over", PhaseFacts{Host: HostSleeper, Read: true, Status: StatusInSeason, Season: 2026,
+			Site: season.SitePhase{Phase: season.SitePlayoffs, Week: 19}},
+			apitypes.LeaguePhaseOffseason, "Sleeper says the draft is done and the NFL regular season is over.", false},
+		{"drafted, no week, the site in season", PhaseFacts{Host: HostSleeper, Read: true, Status: StatusInSeason, Season: 2026,
+			Site: season.SitePhase{Phase: season.SiteInSeason, Week: 6}},
+			apitypes.LeaguePhaseInSeason, "Sleeper says the draft is done and there is no current week.", true},
+		{"ffpc board unread, rosters drafted, before kickoff", PhaseFacts{Host: HostFFPC, Read: true, Status: StatusInSeason, Season: 2026,
+			Calendar: Calendar{DraftUnstated: true, DraftReadBy: ReadByRosters}, Site: preseason},
+			apitypes.LeaguePhaseInSeason, "FFPC did not state the draft but its teams have players and the season starts Wednesday, September 9.", true},
+		{"espn no draftDetail, empty rosters", PhaseFacts{Host: HostESPN, Read: true, Status: StatusPreDraft, Season: 2026, Week: 1,
+			Calendar: Calendar{DraftUnstated: true, DraftReadBy: ReadByRosters}},
+			apitypes.LeaguePhasePreDraft, "ESPN did not state the draft and no team has a player yet.", true},
+		{"ffpc playoffs, waivers unstated", PhaseFacts{Host: HostFFPC, Read: true, Status: StatusInSeason, Season: 2026, Week: 14,
+			Calendar: Calendar{PlayoffStartWeek: 13, WaiversUnstated: true}},
+			apitypes.LeaguePhasePlayoffs, "FFPC is in week 14 and the league's playoffs start in week 13, and FFPC does not say when waivers close so we treat adds as open.", true},
 		{"sleeper adds closed", PhaseFacts{Host: HostSleeper, Read: true, Status: StatusInSeason, Season: 2026, Week: 6, Calendar: Calendar{WaiversClosed: true}},
 			apitypes.LeaguePhaseInSeason, "Sleeper says the draft is done and week 6 is under way.", false},
 		{"a past season", PhaseFacts{Host: HostESPN, Read: true, Status: StatusInSeason, Season: 2025, Week: 6},
@@ -61,9 +83,9 @@ func TestPhaseOf(t *testing.T) {
 		{"ffpc before the draft", PhaseFacts{Host: HostFFPC, Read: true, Status: StatusPreDraft, Season: 2026},
 			apitypes.LeaguePhasePreDraft, "FFPC says the league has not drafted yet.", true},
 		{"mfl unstated, week 6", PhaseFacts{Host: HostMFL, Read: true, Status: StatusInSeason, Season: 2026, Week: 6, Calendar: Calendar{DraftUnstated: true, PlayoffStartWeek: 15}},
-			apitypes.LeaguePhaseInSeason, "MyFantasyLeague does not say whether the league has drafted, and its week 6 is under way.", true},
+			apitypes.LeaguePhaseInSeason, "MyFantasyLeague did not state the draft and week 6 is under way.", true},
 		{"mfl unstated, no week", PhaseFacts{Host: HostMFL, Read: true, Status: StatusPreDraft, Season: 2026, Calendar: Calendar{DraftUnstated: true}},
-			apitypes.LeaguePhasePreDraft, "MyFantasyLeague does not say whether the league has drafted, and its season has no current week yet.", true},
+			apitypes.LeaguePhasePreDraft, "MyFantasyLeague did not state the draft and its season has no current week yet.", true},
 		{"mfl unstated, in the playoffs", PhaseFacts{Host: HostMFL, Read: true, Status: StatusInSeason, Season: 2026, Week: 15, Calendar: Calendar{DraftUnstated: true, PlayoffStartWeek: 15}},
 			apitypes.LeaguePhasePlayoffs, "MyFantasyLeague is in week 15 and the league's playoffs start in week 15.", true},
 		{"never read", PhaseFacts{Host: HostESPN, Season: 2026},

@@ -68,7 +68,7 @@ func TestFFPCPhase(t *testing.T) {
 		{"part of the draft made", part, nil, apitypes.LeaguePhaseDraftDay, "FFPC says the draft is under way."},
 		{"no pick made", empty, nil, apitypes.LeaguePhasePreDraft, "FFPC says the league has not drafted yet."},
 		{"the board does not answer", ffpc.Draft{}, ffpc.ErrNotThisPage, apitypes.LeaguePhaseInSeason,
-			"FFPC does not say whether the league has drafted, and its week 6 is under way."},
+			"FFPC did not state the draft but its teams have players and week 6 is under way."},
 	}
 	for _, c := range cases {
 		member := &draftingMember{fakeMember: fakeMember{t: t, owner: owner, league: fixtureLeagueRead(t)}, draft: c.draft, draftErr: c.draftErr}

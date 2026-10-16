@@ -130,8 +130,12 @@ func (m *MFL) Read(ctx context.Context, ref Ref) (Snapshot, error) {
 	if status.Season == ref.Season && status.CurrentWeek >= 1 {
 		snap.Week = status.CurrentWeek
 	}
-	snap.Calendar.PlayoffStartWeek = mflPlayoffStart(league)
+	// MyFantasyLeague states nothing on when its waivers close.
+	snap.Calendar.PlayoffStartWeek, snap.Calendar.WaiversUnstated = mflPlayoffStart(league), true
 	snap.Status, snap.Calendar.DraftUnstated = m.draftStatus(ctx, ref, snap.Week)
+	if snap.Calendar.DraftUnstated {
+		snap.Calendar.DraftReadBy = ReadByWeek
+	}
 	if league.EndWeek > 0 && status.Season == ref.Season && status.CompletedWeek >= league.EndWeek {
 		snap.Status = StatusComplete
 	}
@@ -196,10 +200,7 @@ func (m *MFL) draftStatus(ctx context.Context, ref Ref, week int) (string, bool)
 		got = mflDraft{status: StatusPreDraft, at: now}
 	}
 	m.mu.Lock()
-	if m.drafts == nil {
-		m.drafts = map[string]mflDraft{}
-	}
-	m.drafts[key] = got
+	m.drafts = keep(m.drafts, key, got)
 	m.mu.Unlock()
 	return m.byWeek(got, week)
 }

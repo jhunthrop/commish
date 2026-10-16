@@ -51,7 +51,7 @@ func TestESPNPhase(t *testing.T) {
 
 	unstated := espnSnapshot(espnRead(t, "league-write-2026.json", 2026, nil), phaseNow)
 	wantPhase(t, "2026, no draftDetail", hostPhase(unstated), apitypes.LeaguePhaseInSeason,
-		"ESPN does not say whether the league has drafted, and its week 7 is under way.", 14)
+		"ESPN did not state the draft but its teams have players and week 7 is under way.", 14)
 
 	drafted := espnSnapshot(espnRead(t, "league-write-2026.json", 2026, withDraftDetail(`{"drafted":true,"inProgress":false}`)), phaseNow)
 	wantPhase(t, "2026 drafted", hostPhase(drafted), apitypes.LeaguePhaseInSeason, "ESPN says the draft is done and week 7 is under way.", 14)

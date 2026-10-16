@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -41,14 +40,14 @@ func LeagueScoring(saved *apitypes.LeagueSettings, rules map[string]float64, sup
 }
 
 // contextLeague is a followed league as the shell's switcher lists it,
-// with its phase at now.
-func contextLeague(a Attached, now time.Time) apitypes.ContextLeague {
+// with its phase as listed.
+func contextLeague(a Attached) apitypes.ContextLeague {
 	scoring, format := LeagueScoring(a.Saved, a.Rules, a.SuperFlex > 0)
 	settings := a.LeagueID
 	if a.Saved == nil {
 		settings = nil
 	}
-	p := a.Phase(now)
+	p := a.Phase
 	return apitypes.ContextLeague{
 		Id: a.ID, Name: a.Name, Host: apitypes.LeagueHost(a.Ref.Host), TeamName: a.TeamName,
 		Standing: standingOf(a.Teams, a.RosterID), Scoring: scoring, Format: format, SettingsLeagueId: settings,
@@ -70,16 +69,16 @@ func (s *Store) Context(ctx context.Context, accountID uuid.UUID) (account.Leagu
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return account.LeagueContext{}, fmt.Errorf("leaguesync: selection for %s: %w", accountID, err)
 	}
-	return contextOf(list, link, format, s.now()), nil
+	return contextOf(list, link, format), nil
 }
 
 // contextOf is the context from the followed leagues and the selection:
 // the selected league while it is followed, none when a format was
 // chosen, and otherwise the newest league.
-func contextOf(list []Attached, link *uuid.UUID, format *apitypes.BoardFormat, now time.Time) account.LeagueContext {
+func contextOf(list []Attached, link *uuid.UUID, format *apitypes.BoardFormat) account.LeagueContext {
 	out := account.LeagueContext{Leagues: make([]apitypes.ContextLeague, 0, len(list))}
 	for _, a := range list {
-		out.Leagues = append(out.Leagues, contextLeague(a, now))
+		out.Leagues = append(out.Leagues, contextLeague(a))
 	}
 	out.League = selected(out.Leagues, link, format)
 	switch {
