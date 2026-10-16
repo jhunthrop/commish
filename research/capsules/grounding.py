@@ -16,8 +16,12 @@ from typing import Final
 from research.model.jsmath import js_pow, js_round
 from research.pipeline.jscompat import js_number
 
-# A digit run is read whole or not at all (possessive): "469th" never reads as "46" (Lane 52).
-_NUMBER_TOKEN: Final = re.compile(r"(?<![A-Za-z0-9])-?[0-9][0-9,]*+(?:\.[0-9]+)?%?(?![A-Za-z])")
+# A digit run is read whole (possessive), whatever letters follow it ("340yds" is 340, "1.1x" is 1.1),
+# so no figure escapes tracing; an ordinal ending is left to `_ORDINAL` ("469th" is 469, never 46) and
+# "49ers" is a club, not a number (Lane 52 and its review's H1).
+_NUMBER_TOKEN: Final = re.compile(
+    r"(?<![A-Za-z0-9])-?[0-9][0-9,]*+(?:\.[0-9]+)?+%?(?!(?:st|nd|rd|th)\b|ers\b)", re.IGNORECASE
+)
 _CARDINALS: Final = {
     "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10,
     "eleven": 11, "twelve": 12, "thirteen": 13, "fourteen": 14, "fifteen": 15, "sixteen": 16, "seventeen": 17,
