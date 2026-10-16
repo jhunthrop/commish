@@ -16,7 +16,8 @@ from typing import Final
 from research.model.jsmath import js_pow, js_round
 from research.pipeline.jscompat import js_number
 
-_NUMBER_TOKEN: Final = re.compile(r"(?<![A-Za-z0-9])-?[0-9][0-9,]*(?:\.[0-9]+)?%?(?![A-Za-z])")
+# A digit run is read whole or not at all (possessive): "469th" never reads as "46" (Lane 52).
+_NUMBER_TOKEN: Final = re.compile(r"(?<![A-Za-z0-9])-?[0-9][0-9,]*+(?:\.[0-9]+)?%?(?![A-Za-z])")
 _CARDINALS: Final = {
     "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10,
     "eleven": 11, "twelve": 12, "thirteen": 13, "fourteen": 14, "fifteen": 15, "sixteen": 16, "seventeen": 17,
@@ -35,14 +36,14 @@ _TENS: Final = {
 _UNITS: Final = ("one", "two", "three", "four", "five", "six", "seven", "eight", "nine")
 _CARDINAL_WORD: Final = re.compile(rf"\b({'|'.join(_CARDINALS)})\b", re.IGNORECASE | re.ASCII)
 _COMPOUND: Final = re.compile(rf"\b({'|'.join(_TENS)})(?:[-\s]({'|'.join(_UNITS)}))?\b", re.IGNORECASE | re.ASCII)
-_ORDINAL: Final = re.compile(r"\b([1-9]|1[0-9]|2[0-9]|30)(st|nd|rd|th)\b", re.IGNORECASE | re.ASCII)
+_ORDINAL: Final = re.compile(r"\b([1-9][0-9]{0,3})(st|nd|rd|th)\b", re.IGNORECASE | re.ASCII)
 _LOOSE_UNITS: Final = ((100, 10), (1000, 100))
 _EPSILON: Final = 2.220446049250313e-16
 
 
 def extract_numbers(text: str) -> list[tuple[str, float]]:
     """`extractNumbers`: digits (commas and a percent sign allowed), spelled cardinals to ninety-nine
-    and ordinals to the thirtieth, as (as written, value)."""
+    and ordinals ("469th" is 469), as (as written, value)."""
     numbers: list[tuple[str, float]] = []
     for raw in _NUMBER_TOKEN.findall(text):
         value = js_number(raw.replace(",", "").removesuffix("%"))
