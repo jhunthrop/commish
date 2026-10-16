@@ -9,7 +9,7 @@ from research.capsules.facts.model import InjuryClean, InjuryDesignated, SeasonS
 from research.capsules.facts.season_so_far import is_in_season
 from research.capsules.prompt import IN_SEASON_RULES, PRESEASON_RULES, writer_rules_for
 from research.capsules.render import _adp_line
-from research.capsules.render_season import bye_line, injury_line, season_section, today_line
+from research.capsules.render_season import SEASON_LONG_FACT, bye_line, injury_line, season_section, today_line
 from research.capsules.season_voice import SeasonClock, time_frame_hits
 
 if TYPE_CHECKING:
@@ -70,6 +70,20 @@ def test_in_season_rules_and_lines() -> None:
     assert bye_line(facts) == "Bye: week 11 of 2026, still to come."
     assert injury_line(facts) == "Injury report: designation Q since before week 6 of 2026."
     assert "Weeks he has missed this season: week 4 of 2026 (1 in all)." in season_section(facts)
+
+
+def test_a_season_long_designation_tells_the_writer_where_the_board_ranks_him() -> None:
+    """Lane 63: a page whose read says to play a player the board lists as on injured reserve
+    contradicts its own row, so the sheet says what the board does with him."""
+    for code in ("IR", "PUP", "NFI", "SUSP"):
+        facts = _facts(_season(5, (), 6), injury=InjuryDesignated("designated", code, "x"))
+        assert injury_line(facts) == (
+            f"Injury report: designation {code} since before week 6 of 2026. {SEASON_LONG_FACT}"
+        )
+    for code in ("Q", "D", "O"):
+        facts = _facts(_season(5, (), 6), injury=InjuryDesignated("designated", code, "x"))
+        assert SEASON_LONG_FACT not in injury_line(facts)
+    assert "below every available player at his position" in SEASON_LONG_FACT
 
 
 def test_the_in_season_instructions_carry_no_phrase_the_in_season_floor_refuses() -> None:

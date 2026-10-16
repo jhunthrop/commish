@@ -227,3 +227,33 @@ When a weekly projection round passes its gates (§10), its rows join `PlayerLin
 | 27 Review | ux-design-architect review of the merged screens live; the record page link | 25 and 26 merged |
 
 Gates as every lane: api `gofmt -l`, `go vet`, `go build`, `make check-gen`, the race tests; web `npm run check`, `npm run lint`, `npm test`, Lighthouse as web.yml runs it; copy guard tests on every new sentence.
+
+## 12. A player who is out is never ranked as if he plays (Lane 63)
+
+Founder, 2026-10-16: a player on injured reserve still ranked high makes people question the board.
+
+**The rule.** A season-long designation (injured reserve, PUP, NFI, suspended, or out with the capture's note saying out for the season) puts him below every available player at his position in the rest-of-season order. His points and points over replacement stay the figures they are, his rank shows as the designation's word ("IR"), and his row says so: "On injured reserve since October 14. Our rest-of-season figure assumes he plays, so he sits below the available players." We do not model return dates. A week's designation (out, doubtful, questionable) moves nothing: the row carries the league screens' mark ("Doubtful as of Thu 4:10 pm") and the player page says "Doubtful this week, which does not move his place on our board." The host's own IR mark counts as season-long on that league's screens (already so in the engine). The public board uses the capture alone.
+
+**Since.** The first capture of his unbroken run under the status, over the last sixty days of by-date captures. A run that reaches the oldest capture read has no date, and the row says "as of" the capture's day. A capture whose list does not read breaks no run.
+
+**The source and the cadence.** The hourly injury capture, the same read the in-season screens use. The API's `GET /boards/{format}` overlays it at read time from that cache (`status` per player, `status_read` for the board), ordering only: ranks stay the store's. Every publish hour writes `runs/<id>/designations.json` beside the public run and the run waiting on its early-access hour, writes `status`, `status_since` and `status_source` into `research.published_boards` (revision 0008), and dispatches the site build when the run's set of season-long ranked players differs from the set its last build was made with. A run without the file renders as before. The provider's codes and the rule are one table for both lanes, pinned in `api/testdata/designation-codes.json`.
+
+**A list that is cut short.** A capture that lists nobody, or under half the newest list before it that lists anyone, is a glitch, never everyone cleared. The newest read takes the list before it, and the run dating skips it. A real drop reads once a second short list follows. The API and the publish hour hold the same floor.
+
+**Out for the season.** The by-date list carries no note. So for each by-date out, the newest roster sweep within 48 hours of the list lends its note. The capture harvest does not take the sweep hourly. Until a source with notes is captured near every list, this case mostly waits on that source, and an out stays a week's designation.
+
+**Read, as the list stood, and behind.** The capture stores a list only when it changed, so its stamp is when the list last changed. Every capture pass records each feed it read, changed or not, in `research.capture_checks`. A page says "read Fri Oct 16, 9:05 am Central" at that check, and "as the list stood Tue Oct 13, 9:03 pm Central" at the list's stamp when no check is recorded. Stamps name the month and day, since a static page can outlive a week. Past 36 hours since that check (or the list, with none), the basis line says how old the statuses are: "These injury statuses are from the hourly capture, read ..., over a day and a half before now. Players keep them until a newer list is read." It never says the capture is behind, because a static page judges against the file it was built from, which may be older than the capture. The last known statuses stay applied, because a player on injured reserve ranked as if he plays would be worse than a stale notice. A static page judges the 36 hours at its build, and again in the browser once it is live. The check names a list only when that list is the feed's newest stored one: a check that returned a list the floor refused leaves the older list shown "as the list stood". The floor counts a list's unique, non-blank players the same way in the reads and in the run dating.
+
+**A held player's row.** A held player's row and page frame no rank: the drafters cell and sentence give the ADP alone, with no round and no tier chip. His page's tier aside says "No tier while he is on a season-long list." in place of his tier mates, the every-format table prints the word in its tier cell, and a league row's value cell names no round.
+
+**Every surface that places a player.** The rule reaches every page that prints our rank, a position rank, a tier or a round from the run's board (`web/src/lib/run/held-places.ts`):
+- another player's tier mates, built from the available players only, so a held player is no one's mate and counts toward no cliff;
+- a club's page, whose rows carry their statuses;
+- the clubs index, which leads with a club's first available player;
+- the players index;
+- the ADP page, which keeps the drafters' order with the ranks as the word;
+- the offline board and the sheet's board;
+- the compare page, whose verdict never sets a held player's places against another's and says why. A week's designation is said "on the latest report". The league page's board carries the same statuses through its rows.
+
+**Basis.** The board's basis line adds "Injury status from the hourly capture, read Fri Oct 16, 9:05 am Central.", on the member's own clock once the page is live (built on the Eastern clock), and the record's method words say the same and that the frozen boards it grades moved no one. The capsule sheet tells the writer that a season-long designation puts him below every available player at his position, so a read never contradicts its row.
+

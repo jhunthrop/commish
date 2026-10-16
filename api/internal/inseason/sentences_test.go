@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/jhunthrop/commish/api/internal/apitypes"
+	"github.com/jhunthrop/commish/api/internal/boards"
 	"github.com/jhunthrop/commish/api/internal/draft"
 	"github.com/jhunthrop/commish/api/internal/scoring"
 )
@@ -32,7 +33,7 @@ func TestChangeSentences(t *testing.T) {
 			"Tank Bigsby is on bye this week, so White starts."},
 		{"a designation forces it, with its stamp", func() *Line {
 			l := bigsby
-			l.Facts.Designation = &Designation{Status: StatusOut, AsOf: thursday}
+			l.Facts.Designation = &Designation{Status: boards.StatusOut, AsOf: thursday}
 			return &l
 		}(), Line{Name: "Rachaad White", Position: draft.RB, Rank: 14},
 			"Tank Bigsby is listed out as of Thursday 4:10 pm, so White starts."},
@@ -43,7 +44,7 @@ func TestChangeSentences(t *testing.T) {
 			Line{Name: "Jauan Jennings", Position: draft.WR, PerWeek: pw(2.5)},
 			"Jennings gives you 1.3 more points over replacement a week than Downs on our preseason number."},
 		{"questionable is a flag", &bigsby, Line{Name: "Rachaad White", Position: draft.RB, Rank: 14,
-			Facts: Facts{Designation: &Designation{Status: StatusQuestionable, AsOf: thursday}}},
+			Facts: Facts{Designation: &Designation{Status: boards.StatusQuestionable, AsOf: thursday}}},
 			"White is RB14 in our preseason order, Bigsby RB31. White is questionable as of Thursday 4:10 pm, so check before kickoff."},
 		{"an empty spot", nil, Line{Name: "Rachaad White"}, "Your lineup has nobody in this spot, so Rachaad White starts."},
 		// M1: the fact under a change never argues against it.
@@ -168,13 +169,13 @@ func TestCopyGuard(t *testing.T) {
 			{Name: "Josh Downs", Position: draft.WR, PerWeek: pw(0.1)},
 			{Name: "Josh Downs", Position: draft.WR},
 		}
-		for _, status := range []string{StatusDoubtful, StatusOut, StatusInjuredReserve, StatusSuspended, StatusPUP, StatusNFI} {
+		for _, status := range []string{boards.StatusDoubtful, boards.StatusOut, boards.StatusInjuredReserve, boards.StatusSuspended, boards.StatusPUP, boards.StatusNFI} {
 			hosts = append(hosts, &Line{Name: "Tank Bigsby", Position: draft.RB, Facts: Facts{Designation: &Designation{Status: status, AsOf: thursday}}})
 		}
 		ours := []Line{
 			{Name: "Rachaad White", Position: draft.RB, Rank: 14, PerWeek: pw(2), Facts: Facts{LastGames: []GamePoints{{5, 18.4}, {4, 11.2}}}},
 			{Name: "Rachaad White", Position: draft.RB, Rank: 14, Facts: Facts{LastGames: []GamePoints{{5, 18.4}},
-				Designation: &Designation{Status: StatusQuestionable, AsOf: thursday}}},
+				Designation: &Designation{Status: boards.StatusQuestionable, AsOf: thursday}}},
 			{Name: "Rachaad White", Position: draft.RB, Facts: Facts{Opponent: "NYG", Allowed: &Allowed{3, 2, 32, draft.RB}}},
 		}
 		for round := 0; round < 3; round++ {
@@ -217,7 +218,7 @@ func TestSentenceGrammarAndBothDoubtful(t *testing.T) {
 		"The Chargers have allowed the 4th fewest points to running backs this season, 14.1 a game in your scoring." {
 		t.Fatalf("%q", got)
 	}
-	doubtful := Facts{Designation: &Designation{Status: StatusDoubtful, AsOf: thursday}}
+	doubtful := Facts{Designation: &Designation{Status: boards.StatusDoubtful, AsOf: thursday}}
 	w := &Writer{Basis: Preseason, Now: thursday}
 	got := w.Change(Line{Name: "Rachaad White", Position: draft.RB, Rank: 14, Facts: doubtful},
 		&Line{Name: "Tank Bigsby", Position: draft.RB, Rank: 31, Facts: doubtful})

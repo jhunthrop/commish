@@ -10,6 +10,7 @@ import {
 	adpSchema,
 	boardSchema,
 	clubsSchema,
+	designationsSchema,
 	indexSchema,
 	manifestSchema,
 	playerSchema,
@@ -18,6 +19,7 @@ import {
 	type Adp,
 	type Board,
 	type Club,
+	type Designations,
 	type Format,
 	type IndexEntry,
 	type Manifest,
@@ -187,6 +189,21 @@ export function clubs(): Promise<Club[]> {
 
 export function schedule(): Promise<Schedule> {
 	return once('schedule', () => read(RUN_PATHS.schedule, scheduleSchema));
+}
+
+/** The newest hourly injury capture beside the run, or null when the run carries none (the pages then
+ * show no status). Every player it keys is one the run indexes. */
+export function designations(): Promise<Designations | null> {
+	return once('designations', async () => {
+		const [open, entries] = await Promise.all([reader(), index()]);
+		const loaded = await open.readOptional(RUN_PATHS.designations, designationsSchema);
+		if (loaded === null) return null;
+		const indexed = new Set(entries.map((entry) => entry.id));
+		const stray = Object.keys(loaded.players).find((id) => !indexed.has(id));
+		if (stray !== undefined)
+			throw new Error(`designations.json marks ${stray}, who is not in index.json.`);
+		return loaded;
+	});
 }
 
 function assertUnique(values: readonly string[], what: string): void {

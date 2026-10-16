@@ -15,8 +15,11 @@ import { fixed } from '#lib/format/number.ts';
 import { links } from '#lib/site/links.ts';
 import type { ScheduleRow } from '#lib/ui/schedule-grid.ts';
 import type { RangeScale } from '#lib/types/player.ts';
+import { withStatuses } from '#lib/run/board-status.ts';
+import { leadOf } from '#lib/run/held-places.ts';
 import { boardSeason } from '../board-season.ts';
-import { board, clubs, defaultFormat, playedThrough, schedule } from '../run.ts';
+import { board, clubs, defaultFormat, designations, playedThrough, schedule } from '../run.ts';
+import { boardStatuses, type BoardStatuses } from '../statuses.ts';
 
 /** The share of opponents the schedule grid shades as the strongest: the top quarter of the league
  * (win totals move in halves, so ties can carry a few more). */
@@ -43,7 +46,7 @@ export interface ScheduleGame extends Game {
 	value: number;
 }
 
-export interface ClubPage {
+export interface ClubPage extends BoardStatuses {
 	club: Club;
 	format: Format;
 	slate: Slate;
@@ -96,16 +99,23 @@ function slateOf(loaded: Schedule, abbr: string): Slate {
 
 export async function clubsPage(): Promise<ClubsPage> {
 	const format = await defaultFormat();
-	const [list, loaded, rows] = await Promise.all([clubs(), schedule(), board(format.id)]);
+	const [list, loaded, rows, capture] = await Promise.all([
+		clubs(),
+		schedule(),
+		board(format.id),
+		designations()
+	]);
+	const ordered = withStatuses(rows.rows, capture);
 	return {
 		format,
 		unit: loaded.unit,
 		clubs: list.map((club) => {
-			const own = rows.rows.filter((row) => row.team === club.abbr);
+			const own = ordered.filter((row) => row.team === club.abbr);
 			return {
 				...club,
 				slate: slateOf(loaded, club.abbr),
-				lead: own[0] ?? null,
+				// Never a player on a season-long list, whose rank assumes he plays (Lane 63).
+				lead: leadOf(own),
 				players: own.length
 			};
 		})
@@ -118,16 +128,17 @@ export async function clubEntries(): Promise<{ abbr: string }[]> {
 
 export async function clubPage(abbr: string): Promise<ClubPage> {
 	const format = await defaultFormat();
-	const [list, loaded, rows, played] = await Promise.all([
+	const [list, loaded, rows, played, capture] = await Promise.all([
 		clubs(),
 		schedule(),
 		board(format.id),
-		playedThrough()
+		playedThrough(),
+		designations()
 	]);
 	const club = list.find((candidate) => candidate.abbr.toLowerCase() === abbr);
 	if (!club) error(NOT_FOUND, 'No such club.');
 	const slate = slateOf(loaded, club.abbr);
-	const own = rows.rows.filter((row) => row.team === club.abbr);
+	const own = withStatuses(rows.rows, capture).filter((row) => row.team === club.abbr);
 	const seasoned = (await boardSeason(format, own)).rows;
 	return {
 		club,
@@ -141,7 +152,8 @@ export async function clubPage(abbr: string): Promise<ClubPage> {
 		rows: seasoned,
 		scale: own.length > 0 ? rangeScale(own) : null,
 		clubs: list,
-		played
+		played,
+		...boardStatuses(seasoned, capture, format)
 	};
 }
 

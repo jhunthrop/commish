@@ -153,7 +153,10 @@ func build(ctx context.Context, cfg config.API, pool *pgxpool.Pool, obs httpx.Ob
 		log.Warn("billing is the development fake", "checkout", cfg.HTTP.APIBaseURL+"/billing/dev-checkout/")
 	}
 	exportHandler := &exports.Handler{Store: &exports.Store{Pool: pool}, Sheets: sheetStore, Objects: objects(cfg, log), Now: now, Log: log}
-	solo, lobbies, err := rooms(ctx, cfg, pool, draftBoards, mockStore, anon, gate, leagueStore, sheetStore, authStore, log)
+	// One hourly capture read, kept for its TTL, serves the in-season
+	// screens and the board route's designations alike.
+	facts := &inseason.Cache{Reads: draftBoards.Schedule, Now: now, Log: log}
+	solo, lobbies, err := rooms(ctx, cfg, pool, draftBoards, mockStore, anon, gate, leagueStore, sheetStore, authStore, facts, log)
 	if err != nil {
 		return nil, err
 	}
@@ -174,7 +177,7 @@ func build(ctx context.Context, cfg config.API, pool *pgxpool.Pool, obs httpx.Ob
 		return nil, err
 	}
 	inSeason := &inseason.Service{
-		Leagues: inseason.SyncLeagues{Sync: leagueSync}, Facts: &inseason.Cache{Reads: draftBoards.Schedule, Now: now},
+		Leagues: inseason.SyncLeagues{Sync: leagueSync}, Facts: facts,
 		Holds: sheetStore, Moves: moves, Season: draftBoards.Schedule.Season, Now: now, Log: log,
 	}
 

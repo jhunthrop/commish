@@ -371,6 +371,12 @@ NEW_IN_RESEARCH: Final[Mapping[str, str]] = MappingProxyType(
         "nflverse_game_reads": "each game-table pass's read of a game's venue and kickoff (revision 0010), append-only",
         "stadiums": "the venues from the reviewed Wikidata seed (revision 0010), rewritten by its validating ingest",
         "nws_grid_points": "the weather service's grid cell per stadium and season (revision 0010), the forecast job's cache",
+        "nflverse_pbp_plays": "the play-level play-by-play the weekly round 4 fits on (revision 0009), from nflverse",
+        "nflverse_depth_chart_weeks": "nflverse's weekly depth charts (revision 0009); legacy held week 1 only",
+        "game_weather": "the recorded kickoff weather with each value's source (revision 0009)",
+        "tank01_projection_rows": "Tank01's weekly projection parsed per player (revision 0009), a benchmark",
+        "player_td_prop_observations": "the anytime-touchdown market (revision 0009), a benchmark",
+        "capture_checks": "each capture feed's last successful check (revision 0008), rewritten by every capture pass",
     }
 )
 

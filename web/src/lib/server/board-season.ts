@@ -18,10 +18,10 @@ export interface BoardSeason {
 }
 
 /** Every row with his season so far from index.json. A board player missing from it fails the build. */
-export async function withSeasons(
-	rows: readonly BoardRow[],
+export async function withSeasons<R extends BoardRow>(
+	rows: readonly R[],
 	format: string
-): Promise<SeasonedRow[]> {
+): Promise<(R & SeasonedRow)[]> {
 	const seasons = new Map((await index()).map((entry) => [entry.id, entry.season] as const));
 	return rows.map((row) => {
 		const season = seasons.get(row.id);
@@ -43,7 +43,7 @@ export function seasonLead(format: Format, reach: SeasonReach, season: number): 
 }
 
 /** A board's rows and basis line as its page prints them. */
-export async function boardSeason(format: Format, rows: BoardRow[]): Promise<BoardSeason> {
+export async function boardSeason(format: Format, rows: BoardRowView[]): Promise<BoardSeason> {
 	if (!(await seasonUnderway())) return { rows, lead: null };
 	const [seasoned, reach, run] = await Promise.all([
 		withSeasons(rows, format.id),

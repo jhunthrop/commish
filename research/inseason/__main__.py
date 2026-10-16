@@ -11,8 +11,13 @@
 for every week nflverse has published: the operator's one-shot for weeks played before the steps
 existed. Idempotent (a re-run writes nothing new), no register trail, each feed's counts printed.
 
+`capture-harvest` also takes, in a kickoff slot's window, the slot week's Tank01 projection, the
+anytime-touchdown market (the weekly round 4's two benchmarks, `pipeline/kickoff_slots.py`) and the
+season's dated depth charts again.
+
 Exit status 1 when any step failed (or the capture was refused), 0 otherwise. Provider keys come
-from the environment: TANK01_API_KEY for the capture, ODDS_API_KEY for the props snapshot.
+from the environment: TANK01_API_KEY for the capture, ODDS_API_KEY for the props snapshot and the
+touchdown market (absent, the market is skipped with a line).
 """
 
 import argparse
@@ -29,6 +34,8 @@ from sqlalchemy import Engine
 from research.cli import log_line as _line
 from research.db.engine import make_engine
 from research.db.url import database_url_from_env
+from research.errors import ResearchError
+from research.inseason import usage_steps
 from research.inseason.season_of import (
     calendar_season,
     out_of_window_reason,
@@ -43,13 +50,17 @@ from research.logging_setup import configure_logging
 from research.nightly.publish import take_run_id
 from research.nightly.r2 import run_store
 from research.nightly.register_log import WEEKLY_SUFFIX, record_freeze, record_pass
-from research.pipeline.commands import now_ms
+from research.pipeline.commands import ODDS_KEY_ENV, now_ms
 from research.pipeline.http import LiveFetcher
+from research.pipeline.kickoff_slots import due_slot, kickoff_slots
+from research.pipeline.kickoffs import stored_kickoffs
 from research.pipeline.nws.client import NwsClient
 from research.pipeline.nws.forecast import FORECAST_SOURCE, run_forecast_pass
+from research.pipeline.odds.touchdowns import run_td_snapshot
 from research.pipeline.tank01.capture import CaptureResult, run_capture_harvest
 from research.pipeline.tank01.client import API_KEY_ENV, DEFAULT_SEASON, SEASON_ENV, Tank01Client
 from research.pipeline.tank01.lines import LINES_SOURCE, lines_after_harvest
+from research.pipeline.tank01.projections import parse_stored_projections
 
 TASKS: Final = ("season-week", "usage-backfill", "capture-harvest")
 LOG: Final = logging.getLogger(__name__)
@@ -179,8 +190,8 @@ def _capture_harvest(now: datetime) -> bool:
         return False
     engine = make_engine(database_url_from_env())
     fetcher = LiveFetcher()
+    season = int(os.environ.get(SEASON_ENV, DEFAULT_SEASON))
     try:
-        season = int(os.environ.get(SEASON_ENV, DEFAULT_SEASON))
         with engine.begin() as conn:
             result = run_capture_harvest(conn, Tank01Client(fetcher, key), now, season)
         facts_ok = _game_facts(engine, fetcher, result, now)
@@ -195,7 +206,67 @@ def _capture_harvest(now: datetime) -> bool:
         return False
     failed = [feed.source for feed in result.feeds if feed.status == "failed"]
     _line(f"capture-harvest: {len(result.feeds)} feeds, {len(failed)} failed")
-    return not failed and facts_ok
+    parsed = _parse_projections()
+    # The market is its own provider and its own line: a failed Tank01 feed never skips it.
+    market = _touchdown_market(now, season)
+    charts = _slot_depth_charts(now, season)
+    return not failed and facts_ok and parsed and market and charts
+
+
+def _slot_depth_charts(now: datetime, season: int) -> bool:
+    """In a kickoff slot's window, the season's dated depth charts again (`usage_steps.depth_charts`),
+    so the slot's games read a snapshot loaded that day; its own line."""
+    engine = make_engine(database_url_from_env())
+    fetcher = LiveFetcher()
+    try:
+        with engine.connect() as conn:
+            slot = due_slot(kickoff_slots(stored_kickoffs(conn, season)), now)
+        if slot is None:
+            _line("depth-charts: no kickoff slot due")
+            return True
+        result = usage_steps.depth_charts(engine, fetcher, season)
+    except (ResearchError, httpx.HTTPError) as error:
+        _line(f"depth-charts: FAILED, {error}")
+        return False
+    finally:
+        fetcher.close()
+        engine.dispose()
+    _line(f"depth-charts, week {slot.week} {slot.name}: {result.status}, {result.summary}")
+    return result.status != "failed"
+
+
+def _parse_projections() -> bool:
+    """The stored projections parsed in a transaction after the capture's, so a refused snapshot is its
+    own failed line and the capture stands."""
+    engine = make_engine(database_url_from_env())
+    try:
+        with engine.begin() as conn:
+            report = parse_stored_projections(conn)
+    finally:
+        engine.dispose()
+    _line(report.line())
+    return not report.refused
+
+
+def _touchdown_market(now: datetime, season: int) -> bool:
+    """The anytime-touchdown benchmark in a kickoff slot's window (`odds.touchdowns`); its own line."""
+    key = os.environ.get(ODDS_KEY_ENV, "").strip()
+    if not key:
+        _line(f"anytime-touchdown market: skipped, {ODDS_KEY_ENV} is not set")
+        return True
+    engine = make_engine(database_url_from_env())
+    fetcher = LiveFetcher()
+    try:
+        with engine.begin() as conn:
+            snapshot = run_td_snapshot(conn, fetcher, key, season, now)
+    except (ResearchError, httpx.HTTPError) as error:
+        _line(f"anytime-touchdown market: FAILED, {error}")
+        return False
+    finally:
+        fetcher.close()
+        engine.dispose()
+    _line(snapshot.line())
+    return True
 
 
 def main(argv: Sequence[str] | None = None) -> int:

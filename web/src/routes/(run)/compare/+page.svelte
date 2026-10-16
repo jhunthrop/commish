@@ -13,6 +13,8 @@
 	import { lazySheet } from '#lib/site/lazy-sheet.svelte.ts';
 	import { links } from '#lib/site/links.ts';
 	import { SAME_PLAYER, verdict as callBetween } from '#lib/site/verdict.ts';
+	import { heldWord } from '#lib/run/held-places.ts';
+	import { roundlessVorCell } from '#lib/run/row-framing.ts';
 	import { fetchPlayer, type PlayerData } from '#lib/site/player-data.ts';
 	import { SEARCH_INDEX_URL, searchable, type SearchablePlayer } from '#lib/site/search.ts';
 	import EmptyState from '#lib/ui/EmptyState.svelte';
@@ -91,6 +93,7 @@
 			name: player.name,
 			ourRank: numbers.ourRank,
 			vor: numbers.vor,
+			held: player.status?.seasonLong === true ? player.status.status : null,
 			player
 		});
 		return callBetween(contender(first), contender(second), format.label);
@@ -185,18 +188,22 @@
 				<Panel as="section" label={pick?.player.name ?? SLOT_LABELS[slot]}>
 					{#if pick}
 						{@const { player, numbers } = pick}
+						{@const held = heldWord(player)}
 						<div class="card">
 							<div class="who">
 								<Face src={player.headshot} size={CARD_FACE} loading="eager" />
 								<PlayerLine
 									name={player.name}
 									position={player.position}
-									positionRank={numbers.positionRank}
+									positionRank={held ?? numbers.positionRank}
 									team={player.team}
 									href={links.player(player.slug)}
 									heads
 								>
-									{#snippet trailing()}<TierChip tier={numbers.tier} long />{/snippet}
+									{#snippet trailing()}{#if held === null}<TierChip
+												tier={numbers.tier}
+												long
+											/>{/if}{/snippet}
 								</PlayerLine>
 							</div>
 							<Figure
@@ -207,12 +214,18 @@
 							/>
 							<dl>
 								<dt><Label>Our rank</Label></dt>
-								<dd><Figure value={String(numbers.ourRank)} size="sm" /></dd>
+								<dd><Figure value={held ?? String(numbers.ourRank)} size="sm" /></dd>
 								<dt><Label>Over replacement</Label></dt>
-								<dd><ValueCell {...vorCell(numbers.vor, numbers.vorRound)} /></dd>
+								<dd>
+									<ValueCell
+										{...held === null
+											? vorCell(numbers.vor, numbers.vorRound)
+											: roundlessVorCell(numbers.vor, numbers.vorRound)}
+									/>
+								</dd>
 								<dt><Label>Drafters</Label></dt>
 								<dd>
-									{#if !words?.caption}<GapChip
+									{#if !words?.caption && held === null}<GapChip
 											gap={draftersGap(numbers.adp, numbers.ourRank)}
 										/>{/if}
 									{#if numbers.adp !== null}<Label>ADP {fixed(numbers.adp)}</Label>{/if}

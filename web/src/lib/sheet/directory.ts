@@ -13,6 +13,8 @@ export interface DirectoryPlayer extends SheetPlayer {
 	positionRank: number;
 	/** Where drafters take him on average, or null when he is not in our ADP window. */
 	adp: number | null;
+	/** The word his ranks show as when he is on a season-long list ("IR", Lane 63), else absent. */
+	held?: string | null;
 }
 
 /** The file's row: short keys, because it is downloaded whole. */
@@ -25,6 +27,8 @@ export interface DirectoryEntry {
 	r: number;
 	pr: number;
 	a: number | null;
+	/** The held word, present only for a player on a season-long list. */
+	w?: string;
 }
 
 /** Our board by player id, for the pages that print our numbers beside yours. */
@@ -48,7 +52,8 @@ export function toEntry(player: DirectoryPlayer): DirectoryEntry {
 		h: player.headshot,
 		r: player.rank,
 		pr: player.positionRank,
-		a: player.adp
+		a: player.adp,
+		...(player.held ? { w: player.held } : {})
 	};
 }
 
@@ -63,7 +68,8 @@ function fromEntry(entry: DirectoryEntry): DirectoryPlayer | null {
 		headshot: entry.h,
 		rank: entry.r,
 		positionRank: entry.pr,
-		adp: entry.a
+		adp: entry.a,
+		held: entry.w ?? null
 	};
 }
 

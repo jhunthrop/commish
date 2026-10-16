@@ -15,9 +15,21 @@ created paused until cutover). Every invocation is one pass; the scheduler owns 
 | Job (Cloud Run) | Command | Schedule | Replaces |
 |---|---|---|---|
 | `nightly` | `research.nightly run`: ingest (capture harvest, ADP in four formats, pre-kickoff props, win totals), fit check, capsules, the run to R2, the gates, the headshots | 05:00 UTC | `adp-snapshot`, `props-preseason-snapshot`, `win-totals`, `capsule-sweep`, the board's nightly check |
-| `nightly-publish` | `research.nightly publish`: the passed run public an hour after it passed, the web build dispatched, and `published_boards` set to the public run's boards (the API's read of the site's order) | hourly, all day | nothing (new: early access, spec §4) |
+| `nightly-publish` | `research.nightly publish`: the passed run public an hour after it passed, the web build dispatched, and `published_boards` set to the public run's boards (the API's read of the site's order); the newest injury capture written beside the run (`designations.json`) and into the table, the build dispatched again when the run's players on a season-long list move (Lane 63) | hourly, all day | nothing (new: early access, spec §4) |
 | `inseason` | `research.inseason --task season-week`: stats (nflverse `stats_player`), the season's play-by-play and charted feeds (FTN charting, Next Gen Stats, PFR advanced stats; `inseason/usage_steps.py`), opponent ratings, props, grade, freeze, scoreboard | Tue 08:00, Wed 18:00, Thu 14:00 America/New_York, September through February; the season is the one the stored schedule places today, and a date none places fails the pass | `season-week` |
 | `inseason-capture` | `research.inseason --task capture-harvest` | hourly 07:00-23:00 and 02:00 America/New_York | `capture-harvest` |
+
+The round 4 history (Lane 66b) is four operator commands, each idempotent and run once per store for
+2016 on: `pbp-plays` (nflverse's plays into `nflverse_pbp_plays`), `depth-chart-weeks` (the weekly
+charts into `nflverse_depth_chart_weeks`), `charted-history` (Next Gen Stats from 2016 and PFR
+advanced stats from 2018 through the weekly pass's own ingests) and `game-weather` (`game_weather`,
+from the game table, the gamebook line and NOAA ISD; it reads `research.stadiums` for the stations).
+The live season keeps them current through the weekly pass (`play-by-play` writes the play table, the
+`depth-charts` step adds the season's newer dated snapshots) and the hourly `inseason-capture`, which
+in each kickoff slot's two hours takes Tank01's projection for the slot's week, the anytime-touchdown
+market from the us, us2 and eu books (three credits an event), and the depth charts again, then parses
+every stored projection snapshot in a transaction of its own (`pipeline/kickoff_slots.py`). `depth-chart-check` is the
+round 4 stamp check (it writes nothing; its recorded run is the coordinator's).
 
 `research.pipeline history` re-creates the seasons the store lost (an operator command, run once
 per store; `pipeline/history.py`).
@@ -49,7 +61,7 @@ write of a new season starts it clean.
 | Job | Schedule today | What it ingests or does | Python destination |
 |---|---|---|---|
 | `season-week` step `stats-ingest` | Tue 08:00, Wed 18:00, Thu 14:00 ET | nflverse universe, snap counts, weekly stats into `players`, `player_week_observations`, `player_week_teams`, `team_week_observations` | `pipeline.nflverse.ingest.ingest_player_universe` + `schedule_week_as_of` + `ingest_season` (phase A, parity `nflverse-season-*`) |
-| `season-week` steps `play-by-play`, `ftn-charting`, `next-gen-stats`, `pfr-advstats` | same | the season's play-by-play (team and player facts, passer dropbacks) and the three charted feeds into `player_week_observations` and `team_week_observations` | new in Python (Lane 23): `inseason.usage_steps`; `--task usage-backfill` runs them alone |
+| `season-week` steps `play-by-play`, `ftn-charting`, `next-gen-stats`, `pfr-advstats`, `depth-charts` | same | the season's play-by-play (team and player facts, passer dropbacks, the play table) and the three charted feeds into `player_week_observations` and `team_week_observations`, and the depth charts into `nflverse_depth_chart_weeks` | new in Python (Lane 23): `inseason.usage_steps`; `--task usage-backfill` runs them alone |
 | `season-week` step `game-table` | same | nflverse's game table for the season into `nflverse_games` (kickoffs, venues, figures, roofs, recorded weather), one stamped row per game, the current state only, and each pass's read append-only: the venue and kickoff in `nflverse_game_reads`, each club's figures as the `nflverse_game_figures` team-week source | new in Python (Lane 66a): `pipeline.nflverse.games.ingest_games` |
 | `season-week` step `opponent-ratings` | same | each club's opponent's pass and rush defence ratings (`commish_opponent_adjustment`) into `team_week_observations`, for every week whose earlier games are all in the stored play-by-play (a game that never gets play-by-play, a cancellation or a no contest, holds every later week back until an operator sees it in the step's counts) | new in Python (Lane 44): `pipeline.nflverse.context.ingest_opponent_defence_to_date`, the weekly number's opponent factor (`docs/research/2026-10-15-weekly-projection-round2-preregistration.md`) |
 | `season-week` step `props-snapshot` | same | The Odds API props into `player_prop_observations` | `pipeline.odds.ingest.run_odds_snapshot` (phase A, parity `odds-snapshot-and-resolve`) |

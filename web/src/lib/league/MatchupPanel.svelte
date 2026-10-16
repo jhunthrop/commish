@@ -6,7 +6,7 @@
 	import PanelHead from '#lib/ui/PanelHead.svelte';
 	import type { LeagueSync, MatchupSide } from './api.ts';
 	import LeagueRow from './LeagueRow.svelte';
-	import PositionPill from '#lib/ui/PositionPill.svelte';
+	import StatusPill from './StatusPill.svelte';
 	import {
 		hostWords,
 		matchupAside,
@@ -83,9 +83,11 @@
 				status={statusOn(mine ? sync.roster : [], starter.player)}
 			>
 				{#snippet meta()}
-					{#if row}<PositionPill position={row.position} rank={row.positionRank} />{:else}<span
-							>{starter.player.position}</span
-						>{/if}
+					{#if row}<StatusPill
+							position={row.position}
+							positionRank={row.positionRank}
+							status={row.status}
+						/>{:else}<span>{starter.player.position}</span>{/if}
 					<span>{starter.player.team}</span>
 					{#if game}<span>{game}</span>{/if}
 					{#if facts}<span class="conditions">{facts}</span>{/if}

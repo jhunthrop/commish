@@ -20,15 +20,24 @@
 		 * preseason order and our rank the rest of the season's: the ADP stands alone, and a player with
 		 * none says so in the chip as the preseason board does. */
 		compare?: boolean;
+		/** The word our rank shows as for a player on a season-long list ("IR"), null otherwise. */
+		rankWord?: string | null;
 	}
 
-	let { adp, ourRank, figure = true, under = 'adp', compare = true }: Props = $props();
+	let {
+		adp,
+		ourRank,
+		figure = true,
+		under = 'adp',
+		compare = true,
+		rankWord = null
+	}: Props = $props();
 </script>
 
 <span class="adp">
 	{#if compare || adp === null}<GapChip gap={compare ? draftersGap(adp, ourRank) : null} />{/if}
 	{#if figure && under === 'rank'}
-		<Label size="cell">Our rank {ourRank}</Label>
+		<Label size="cell">Our rank {rankWord ?? ourRank}</Label>
 	{:else if figure && adp !== null}
 		<Label size="cell">ADP {fixed(adp)}</Label>
 	{/if}

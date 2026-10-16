@@ -1,7 +1,9 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { siteContext } from '#lib/context/context.svelte.ts';
 	import ContextNote from '#lib/context/ContextNote.svelte';
 	import { fixed, plural } from '#lib/format/number.ts';
+	import { liveStatusClock, type LiveStatus } from '#lib/run/live-status.ts';
 	import {
 		allLine,
 		rankAgreement,
@@ -56,6 +58,30 @@
 	}
 
 	const lines = $derived(weekLines(record.weeks, data.page.unplayed).map(withFigure));
+
+	/** The capture's read as built, said again on the member's clock once the page is live. */
+	let live = $state<LiveStatus | null>(null);
+	onMount(() => {
+		liveStatusClock(
+			data.page.capture !== null,
+			() => import('#lib/run/status-view.ts'),
+			(said) => {
+				live = said;
+			}
+		);
+	});
+	const statusWords = $derived.by(() => {
+		const clock = live;
+		const capture = data.page.capture;
+		return clock === null || capture === null
+			? data.page.statusWords
+			: clock.words.recordStatusWords({
+					capture,
+					restOfSeason: false,
+					zone: clock.zone,
+					now: clock.now
+				});
+	});
 
 	const positionColumns: Column[] = [
 		{ label: 'Position' },
@@ -116,6 +142,7 @@
 		<Footnote>
 			{record.method}
 			Each week's board is the nightly run taken just before it froze.
+			{#if statusWords}{statusWords}{/if}
 		</Footnote>
 	</main>
 </SiteShell>

@@ -139,6 +139,8 @@ class PublishOutcome:
     run_id: str | None
     line: str
     ok: bool
+    # This call dispatched the web build of run_id (Lane 63's build-on-change leaves it alone then).
+    dispatched: bool = False
 
 
 def publish(store: RunStore, dispatcher: Dispatcher | str | None, now: datetime) -> PublishOutcome:
@@ -173,4 +175,6 @@ def publish(store: RunStore, dispatcher: Dispatcher | str | None, now: datetime)
         return PublishOutcome(
             run_id, f"publish: run {run_id} is public, the dispatch FAILED ({failure}); retried next hour", False
         )
-    return PublishOutcome(run_id, f"publish: run {run_id} is public and the web build of it was dispatched", True)
+    return PublishOutcome(
+        run_id, f"publish: run {run_id} is public and the web build of it was dispatched", True, dispatched=True
+    )

@@ -147,6 +147,15 @@ CAPTURE_SNAPSHOTS: Final = Table(
     Index("capture_snapshots_source_captured_idx", "source", "captured_at"),
 )
 
+# The capture job's last successful check of each feed (revision 0008, Lane 63): a feed whose list
+# has not changed writes no snapshot, so this says when the list was last read, whatever it held.
+CAPTURE_CHECKS: Final = Table(
+    "capture_checks",
+    METADATA,
+    Column("source", Text, primary_key=True),
+    Column("checked_at", DateTime(True), nullable=False),
+)
+
 # A plain insert: one event's props fetched twice hold identical rows, and both are kept.
 PLAYER_PROP_OBSERVATIONS: Final = Table(
     "player_prop_observations",
@@ -163,4 +172,59 @@ PLAYER_PROP_OBSERVATIONS: Final = Table(
     Column("fetched_at", DateTime(True), nullable=False),
     Index("player_prop_observations_event_market_idx", "event_id", "market"),
     Index("player_prop_observations_fetched_at_idx", "fetched_at"),
+)
+
+# Tank01's weekly projection, one row per player of one `tank01_projections` snapshot (revision 0009):
+# the prospective benchmark of the weekly round 4, never an input and never a word on the site. The
+# snapshot's own id and instant key it, so the latest capture before a kickoff is the benchmark's read.
+TANK01_PROJECTION_ROWS: Final = Table(
+    "tank01_projection_rows",
+    METADATA,
+    Column("snapshot_id", BigInteger, primary_key=True),
+    Column("provider_player_id", Text, primary_key=True),
+    Column("captured_at", DateTime(True), nullable=False),
+    Column("season", Integer, nullable=False),
+    Column("week", Integer, nullable=False),
+    Column("position", Text, nullable=False),
+    Column("team", Text, nullable=False),
+    Column("ppr_points", Double(53), nullable=False),
+    Column("half_points", Double(53), nullable=False),
+    Column("standard_points", Double(53), nullable=False),
+    Column("pass_yards", Double(53)),
+    Column("pass_touchdowns", Double(53)),
+    Column("interceptions", Double(53)),
+    Column("carries", Double(53)),
+    Column("rush_yards", Double(53)),
+    Column("rush_touchdowns", Double(53)),
+    Column("targets", Double(53)),
+    Column("receptions", Double(53)),
+    Column("receiving_yards", Double(53)),
+    Column("receiving_touchdowns", Double(53)),
+    Column("fumbles_lost", Double(53)),
+    recorded_at(),
+    ForeignKeyConstraint(
+        ["snapshot_id"],
+        [f"{RESEARCH_SCHEMA}.capture_snapshots.id"],
+        ondelete="CASCADE",
+        name="tank01_projection_rows_snapshot_fk",
+    ),
+    Index("tank01_projection_rows_week_idx", "season", "week", "captured_at"),
+)
+
+# The anytime-touchdown market (revision 0009): a Yes price, and a No price where the book quotes one,
+# which `player_prop_observations` (point and under price NOT NULL) cannot hold. Append-only like it:
+# one event fetched twice keeps both. The market benchmark only, never an input, never on the site.
+PLAYER_TD_PROP_OBSERVATIONS: Final = Table(
+    "player_td_prop_observations",
+    METADATA,
+    Column("id", BigInteger, Identity(always=False), primary_key=True),
+    Column("event_id", Text, nullable=False),
+    Column("commence_time", DateTime(True), nullable=False),
+    Column("bookmaker", Text, nullable=False),
+    Column("player_name", Text, nullable=False),
+    Column("yes_price", Integer, nullable=False),
+    Column("no_price", Integer),
+    Column("fetched_at", DateTime(True), nullable=False),
+    Index("player_td_prop_observations_event_idx", "event_id", "fetched_at"),
+    Index("player_td_prop_observations_fetched_at_idx", "fetched_at"),
 )

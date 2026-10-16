@@ -23,12 +23,13 @@ from zoneinfo import ZoneInfo
 
 from sqlalchemy import Connection, select, text
 
-from research.db.schema import CAPTURE_SNAPSHOTS, PROVIDER_GAMES, PROVIDER_WEEKS
+from research.db.schema import CAPTURE_CHECKS, CAPTURE_SNAPSHOTS, PROVIDER_GAMES, PROVIDER_WEEKS
 from research.pipeline.budget import FixedBudget, RequestBudget
 from research.pipeline.jscompat import js_iso, js_json_stringify, js_object_keys
 from research.pipeline.nflverse.team_codes import NFL_TEAM_ABBREVIATIONS
 from research.pipeline.tank01.client import Paths, Tank01Client
 from research.pipeline.tank01.mapping import ADP_TYPE
+from research.pipeline.tank01.projections import PROJECTIONS_SOURCE, projection_slot_due
 from research.pipeline.tolerated import TOLERATED_FAILURES
 
 Cadence = Literal["daily", "game-day", "game-week", "weekly"]
@@ -81,7 +82,7 @@ CAPTURE_FEEDS: tuple[CaptureFeed, ...] = (
     ),
     CaptureFeed("tank01_dfs_salaries", "game-day", lambda c: [CaptureRequest(Paths.DFS, {"date": c.day})]),
     CaptureFeed("tank01_adp", "weekly", lambda _c: [CaptureRequest(Paths.ADP, {"adpType": ADP_TYPE})]),
-    CaptureFeed("tank01_projections", "daily", lambda c: [CaptureRequest(Paths.PROJECTIONS, {"week": str(c.week)})]),
+    CaptureFeed(PROJECTIONS_SOURCE, "daily", lambda c: [CaptureRequest(Paths.PROJECTIONS, {"week": str(c.week)})]),
     CaptureFeed("tank01_injuries_by_date", "daily", lambda _c: [CaptureRequest(Paths.INJURIES_BY_DATE, {})]),
     CaptureFeed("tank01_inactives", "game-day", lambda c: [CaptureRequest(Paths.INACTIVES, {"week": str(c.week)})]),
     CaptureFeed("tank01_player_list", "weekly", lambda _c: [CaptureRequest(Paths.PLAYER_LIST, {})]),
@@ -162,6 +163,14 @@ class CaptureResult:
     reason: str | None = None
 
 
+# The feed's last successful check (Lane 63): an unchanged list writes no snapshot, so the check says
+# when the list was last read. Never moved back by an older pass.
+_CHECKED = text(
+    f"insert into {CAPTURE_CHECKS.fullname} (source, checked_at) values (:source, :checked_at) "
+    "on conflict (source) do update set checked_at = greatest(excluded.checked_at, "
+    f"{CAPTURE_CHECKS.name}.checked_at)"
+)
+
 _INSERT = text(
     f"insert into {CAPTURE_SNAPSHOTS.fullname} (source, captured_at, digest, payload) "
     "values (:source, :captured_at, :digest, cast(:payload as jsonb))"
@@ -236,7 +245,16 @@ def capture_once(
             [*skipped, *(FeedOutcome(feed.source, "budget-refused", 0) for feed in due)],
             f"The upstream request budget refused the capture pass ({reservation.denial or 'denied'}).",
         )
-    return CaptureResult([*skipped, *(_capture_feed(conn, client, feed, context, capture.captured_at) for feed in due)])
+    outcomes = [_capture_feed(conn, client, feed, context, capture.captured_at) for feed in due]
+    record_checks(conn, outcomes, capture.captured_at)
+    return CaptureResult([*skipped, *outcomes])
+
+
+def record_checks(conn: Connection, outcomes: Sequence[FeedOutcome], at: datetime) -> None:
+    """Each feed read this pass, captured or unchanged, marked checked at the pass's instant."""
+    checked = [{"source": o.source, "checked_at": at} for o in outcomes if o.status in ("captured", "unchanged")]
+    if checked:
+        conn.execute(_CHECKED, checked)
 
 
 def current_nfl_week(conn: Connection, season: int) -> int:
@@ -251,14 +269,24 @@ def current_nfl_week(conn: Connection, season: int) -> int:
     return 1 if week is None else int(week)
 
 
+def slot_projection_feed(week: int) -> CaptureFeed:
+    """The weekly projection of the kickoff slot's own week (`projections`)."""
+    return CaptureFeed(PROJECTIONS_SOURCE, "daily", lambda _c: [CaptureRequest(Paths.PROJECTIONS, {"week": str(week)})])
+
+
 def run_capture_harvest(conn: Connection, client: Tank01Client, fired_at: datetime, season: int) -> CaptureResult:
-    """The capture-harvest job's capture: five feeds, a ten-request ceiling, no freshness keys. The
-    lines feed takes one request per game day left in the week (at most five, a holiday week)."""
+    """The capture-harvest job's capture: five feeds, a ten-request ceiling, no freshness keys; in a
+    kickoff slot's window not yet captured, the slot week's projection as a sixth. The lines feed takes
+    one request per game day left in the week (at most five, a holiday week). Parsing the stored
+    projections is the caller's next transaction (`projections.parse_stored_projections`), so a refused
+    snapshot never rolls back what this pass captured."""
+    slot = projection_slot_due(conn, season, fired_at)
+    feeds = [*harvest_feeds(), *([] if slot is None else [slot_projection_feed(slot.week)])]
     capture = CapturePass(
         fired_at,
         season,
         current_nfl_week(conn, season),
-        feeds=harvest_feeds(),
+        feeds=feeds,
         game_dates=stored_week_game_dates(conn, season, fired_at),
     )
     return capture_once(conn, client, capture, FixedBudget(CAPTURE_HARVEST_REQUEST_BUDGET))

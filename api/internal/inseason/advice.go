@@ -159,7 +159,7 @@ func wireFacts(f Facts, pointsThisWeek *float64) apitypes.WeekFacts {
 		out.Opponent = &opp
 	}
 	if d := f.Designation; d != nil {
-		out.Designation = &apitypes.InjuryDesignation{Status: apitypes.InjuryDesignationStatus(d.Status), AsOf: d.AsOf}
+		out.Designation = &apitypes.InjuryDesignation{Status: apitypes.DesignationStatus(d.Status), AsOf: d.AsOf}
 	}
 	for _, g := range f.LastGames {
 		out.LastGames = append(out.LastGames, apitypes.GamePoints{Week: g.Week, Points: g.Points})

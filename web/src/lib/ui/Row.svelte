@@ -2,8 +2,9 @@
 	import { fixed } from '#lib/format/number.ts';
 	import type { Snippet } from 'svelte';
 	import type { ShownMark } from '#lib/context/held-words.ts';
-	import { framedVorCell, type RowFraming } from '#lib/run/row-framing.ts';
+	import { HELD_FRAMING, framedVorCell, type RowFraming } from '#lib/run/row-framing.ts';
 	import type { IndexSeason } from '#lib/run/schema.ts';
+	import type { StatusView } from '#lib/run/status-view.ts';
 	import type { BoardPlayer, RangeScale } from '#lib/types/player.ts';
 	import AdpCell from './AdpCell.svelte';
 	import Face from './Face.svelte';
@@ -11,6 +12,7 @@
 	import PositionPill from './PositionPill.svelte';
 	import RangeBar from './RangeBar.svelte';
 	import TierChip from './TierChip.svelte';
+	import ToneChip from './ToneChip.svelte';
 	import ValueCell from './ValueCell.svelte';
 	import { seasonFigures } from './season-figures.ts';
 
@@ -45,6 +47,9 @@
 		/** How the row frames his rank against the drafts, the page's one rule (run/row-framing.ts):
 		 * in season the ADP alone and no round. Match the RowHead's. */
 		framing: RowFraming;
+		/** His injury status when the run's capture lists him (run/status-view.ts): a season-long one
+		 * shows as his rank and carries its sentence on a line of its own, a week's carries its mark. */
+		status?: StatusView | null;
 	}
 
 	let {
@@ -59,8 +64,13 @@
 		order = 'board',
 		season,
 		held = null,
-		framing
+		framing,
+		status = null
 	}: Props = $props();
+
+	/** A player on a season-long list: his rank is the word, so no tier and no framed rank. */
+	const heldOut = $derived(status !== null && status.rank !== null);
+	const shownFraming = $derived(heldOut ? HELD_FRAMING : framing);
 
 	const lead = $derived(
 		order === 'adp' && player.adp !== null ? fixed(player.adp) : String(player.ourRank)
@@ -75,7 +85,8 @@
 	class:act-flat={action !== undefined && !range}
 	class:games={season !== undefined}
 >
-	<span class="rk">{lead}</span>
+	<!-- A held player's rank shows as the word; in ADP order the lead is the drafters' ADP, kept. -->
+	<span class="rk">{order === 'board' ? (status?.rank ?? lead) : lead}</span>
 	<span class="face"
 		><Face src={player.headshot} size={40} loading={eager ? 'eager' : 'lazy'} />{#if held}<held.Mark
 				words={held.words}
@@ -85,8 +96,8 @@
 	<span class="who">
 		<a class="name" {href}><NameWords name={player.name} /></a>
 		<span class="meta" class:seasoned={season !== undefined}>
-			<PositionPill position={player.position} rank={player.positionRank} />
-			{#if showTier}<span class="wide tier"><TierChip tier={player.tier} /></span>{/if}
+			<PositionPill position={player.position} rank={status?.rank ?? player.positionRank} />
+			{#if showTier && !heldOut}<span class="wide tier"><TierChip tier={player.tier} /></span>{/if}
 			<span class="wide team">{player.team}</span>
 			{#if season === undefined}
 				<span class="wide">{fixed(player.expectedGames)} games</span>
@@ -96,10 +107,17 @@
 			{/if}
 			<span class="narrow">{fixed(player.projected)} pts</span>
 		</span>
+		{#if status}
+			<span class="status">
+				{#if status.line}{status.line}{:else}<ToneChip tone={status.sits ? 'loss' : 'even'}
+						>{status.mark}</ToneChip
+					>{/if}
+			</span>
+		{/if}
 	</span>
 	<span class="gp">{season?.games}</span>
 	<span class="proj"><ValueCell value={player.projected} label={unit} /></span>
-	<ValueCell {...framedVorCell(player.vor, player.vorRound, framing)} phoneLabel={false} />
+	<ValueCell {...framedVorCell(player.vor, player.vorRound, shownFraming)} phoneLabel={false} />
 	{#if range}
 		<span class="rng">
 			<RangeBar
@@ -114,7 +132,8 @@
 		adp={player.adp}
 		ourRank={player.ourRank}
 		under={order === 'adp' ? 'rank' : 'adp'}
-		compare={framing.compare}
+		compare={shownFraming.compare}
+		rankWord={status?.rank ?? null}
 	/>
 	{#if action}<span class="action">{@render action()}</span>{/if}
 </div>
@@ -256,6 +275,13 @@
 
 	.meta > :global(*) {
 		flex: none;
+	}
+
+	/* A listed player's status, a line of its own under the meta: the season-long sentence wraps. */
+	.status {
+		font-size: var(--t-sm);
+		color: var(--ink-2);
+		line-height: 1.3;
 	}
 
 	/* His season so far takes the projected games' place. On a desk (1181 px and up) the count has

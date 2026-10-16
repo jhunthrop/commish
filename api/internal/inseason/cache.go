@@ -3,6 +3,7 @@ package inseason
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -17,6 +18,7 @@ type Reads interface {
 	StatLines(ctx context.Context, season int) ([]boards.StatLine, error)
 	Schedule(ctx context.Context, season int) ([]boards.TeamWeek, error)
 	Designations(ctx context.Context) (map[string]boards.Designation, error)
+	SeasonRuns(ctx context.Context, newest time.Time) (map[boards.RunKey]time.Time, error)
 	GameFacts(ctx context.Context, season int) (map[boards.ClubWeek]boards.GameFact, error)
 }
 
@@ -38,6 +40,9 @@ type Cache struct {
 	Now   func() time.Time
 	// Timeout bounds each read, ReadTimeout when zero.
 	Timeout time.Duration
+	// Log takes a dating read that failed (DatedDesignations); nil
+	// discards it.
+	Log *slog.Logger
 
 	group   singleflight.Group
 	mu      sync.Mutex
@@ -63,7 +68,7 @@ func (c *Cache) Data(ctx context.Context, season int) (Data, error) {
 	if err != nil {
 		return Data{}, err
 	}
-	designations, err := cached(c, ctx, "designations", CaptureTTL, c.Reads.Designations)
+	designations, err := c.Designations(ctx)
 	if err != nil {
 		return Data{}, err
 	}
@@ -74,6 +79,35 @@ func (c *Cache) Data(ctx context.Context, season int) (Data, error) {
 		return Data{}, err
 	}
 	return Data{Lines: lines, Games: games, Designations: designations, GameFacts: gameFacts}, nil
+}
+
+// Designations is the newest injury capture, kept for CaptureTTL: the
+// in-season screens' read, undated (they never print a since).
+func (c *Cache) Designations(ctx context.Context) (map[string]boards.Designation, error) {
+	return cached(c, ctx, "designations", CaptureTTL, c.Reads.Designations)
+}
+
+// DatedDesignations is the same capture with each season-long
+// designation dated by its run (the board route's read,
+// solo.DesignationSource), the dating kept for CaptureTTL too. A dating
+// read that fails is logged and the designations answer undated, so a
+// row says "as of" rather than the board losing its statuses.
+func (c *Cache) DatedDesignations(ctx context.Context) (map[string]boards.Designation, error) {
+	designations, err := c.Designations(ctx)
+	if err != nil || len(designations) == 0 {
+		return designations, err
+	}
+	newest := boards.Newest(designations)
+	runs, err := cached(c, ctx, "season-runs/"+newest.Format(time.RFC3339Nano), CaptureTTL, func(ctx context.Context) (map[boards.RunKey]time.Time, error) {
+		return c.Reads.SeasonRuns(ctx, newest)
+	})
+	if err != nil {
+		if c.Log != nil {
+			c.Log.Warn("inseason: the season-long runs were not read; the board answers its statuses undated", "err", err)
+		}
+		return designations, nil
+	}
+	return boards.WithSince(designations, runs), nil
 }
 
 // cached is the value kept for key while younger than ttl, else read

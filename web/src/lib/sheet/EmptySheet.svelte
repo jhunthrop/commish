@@ -52,7 +52,7 @@
 						<PlayerLine
 							name={player.name}
 							position={player.position}
-							positionRank={player.positionRank}
+							positionRank={player.held ?? player.positionRank}
 							team={player.team}
 							headshot={player.headshot ?? undefined}
 							size={40}

@@ -18,13 +18,22 @@ export interface RowFraming {
 export const PRESEASON_FRAMING: RowFraming = { compare: true, round: true };
 const REST_OF_SEASON_FRAMING: RowFraming = { compare: false, round: false };
 
+/** A player on a season-long list (Lane 63): his rank is shown as the word, so nothing frames the
+ * rank his figure would earn. The ADP stands alone and the round goes, on any board. */
+export const HELD_FRAMING: RowFraming = REST_OF_SEASON_FRAMING;
+
 export function rowFraming(format: Pick<Format, 'rosFromWeek'>): RowFraming {
 	return format.rosFromWeek === undefined ? PRESEASON_FRAMING : REST_OF_SEASON_FRAMING;
 }
 
 /** The over replacement cell as the framing prints it: its round named only where the row names it,
  * the tint kept either way. */
+/** The value cell with no round named, its tint kept: a row that frames no rank (an in-season board,
+ * a player on a season-long list, a league row for him). */
+export function roundlessVorCell(vor: number, round: number): VorCellProps {
+	return { ...vorCell(vor, round), label: VOR_LABEL };
+}
+
 export function framedVorCell(vor: number, round: number, framing: RowFraming): VorCellProps {
-	const cell = vorCell(vor, round);
-	return framing.round ? cell : { ...cell, label: VOR_LABEL };
+	return framing.round ? vorCell(vor, round) : roundlessVorCell(vor, round);
 }

@@ -32,7 +32,7 @@
 			</tr>
 		</thead>
 		<tbody>
-			{#each data.rows as row (row.rank)}
+			{#each data.rows as row (row.id)}
 				<tr>
 					<td class="num">{row.rank}</td>
 					<td class="name">{row.name}</td>

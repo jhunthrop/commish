@@ -69,7 +69,7 @@ func customBoards(ctx context.Context, cfg config.Board, b *draftroom.Boards, no
 // engine's own runs for the report. The board's pool, when it has one of
 // its own, lives as long as the process.
 func rooms(ctx context.Context, cfg config.API, pool *pgxpool.Pool, draftBoards *draftroom.Boards, mockStore *mocks.Store, anon *auth.Anon, gate *leagues.Gate, leagueStore *leagues.Store, sheetStore *sheets.Store,
-	authStore *auth.Store, log *slog.Logger) (*solo.Service, *lobby.Handler, error) {
+	authStore *auth.Store, designations solo.DesignationSource, log *slog.Logger) (*solo.Service, *lobby.Handler, error) {
 	workers := runtime.GOMAXPROCS(0)
 	engine := advisor.Engine{Runs: sim.RoomOddsRuns, Workers: workers}
 	card := advisor.Fallback{Secondary: engine, Timeout: cfg.Advisor.Timeout, Log: log}
@@ -89,7 +89,7 @@ func rooms(ctx context.Context, cfg config.API, pool *pgxpool.Pool, draftBoards 
 	hindsight := mock.SimOdds{Runs: sim.RoomOddsRuns, Workers: workers}
 	soloService := &solo.Service{
 		Mocks: mockStore, Anon: anon, Leagues: leagueStore, Gate: gate, Sheets: sheetStore, Boards: draftBoards,
-		Advisor: card, Hindsight: hindsight, ReportWorkers: workers, Site: cfg.HTTP.PublicBaseURL, Shares: shares, Now: time.Now, Log: log,
+		Designations: designations, Advisor: card, Hindsight: hindsight, ReportWorkers: workers, Site: cfg.HTTP.PublicBaseURL, Shares: shares, Now: time.Now, Log: log,
 	}
 	lobbyHandler := &lobby.Handler{
 		Store: &lobby.Store{Pool: pool, Now: time.Now}, Boards: draftBoards, Advisor: card, Engine: engine,
