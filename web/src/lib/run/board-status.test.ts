@@ -1,53 +1,63 @@
-// A board beside the injury capture (Lane 63): run with `npm test`.
+// A board beside the injury capture (Lane 63): run with `npm test`. The order is held to the API's own
+// cases, api/testdata/board-order-cases.json, which api/internal/solo/board_status_test.go reads too.
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import type { Position } from '#lib/types/player.ts';
 import { heldOut, withStatuses } from './board-status.ts';
-import type { Designations } from './schema.ts';
+import type { Designations, PlayerStatus } from './schema.ts';
 
-const row = (id: string, position: Position): { id: string; position: Position } => ({
-	id,
-	position
-});
+interface OrderCase {
+	name: string;
+	rows: [string, Position][];
+	listed: Record<string, { status: PlayerStatus['status']; season_long: boolean }>;
+	want: string[];
+}
+
+const CASES = (
+	JSON.parse(
+		readFileSync(
+			new URL('../../../../api/testdata/board-order-cases.json', import.meta.url),
+			'utf8'
+		)
+	) as { cases: OrderCase[] }
+).cases;
+
 const ids = (rows: readonly { id: string }[]): string[] => rows.map((r) => r.id);
 
-const capture: Designations = {
-	readAt: '2026-10-16T14:05:00.000Z',
-	source: 'tank01_injuries_by_date',
-	players: {
-		'a-wr': { status: 'injured_reserve', seasonLong: true, since: '2026-10-14T15:00:00.000Z' },
-		'd-wr': { status: 'doubtful', seasonLong: false, since: null },
-		'e-rb': { status: 'pup', seasonLong: true, since: null },
-		'f-te': { status: 'injured_reserve', seasonLong: true, since: null }
-	}
-};
+function captureOf(listed: OrderCase['listed']): Designations {
+	const players = Object.fromEntries(
+		Object.entries(listed).map(([id, l]) => [
+			id,
+			{ status: l.status, seasonLong: l.season_long, since: null }
+		])
+	);
+	return { readAt: '2026-10-16T14:05:00.000Z', checkedAt: null, source: 'test', players };
+}
 
-void test('a season-long player follows the last available player at his position, as the API orders him', () => {
-	const rows = [
-		row('a-wr', 'WR'),
-		row('b-rb', 'RB'),
-		row('c-wr', 'WR'),
-		row('d-wr', 'WR'),
-		row('e-rb', 'RB'),
-		row('f-te', 'TE'),
-		row('g-qb', 'QB')
-	];
-	const placed = withStatuses(rows, capture);
-	assert.deepEqual(ids(placed), ['b-rb', 'e-rb', 'c-wr', 'd-wr', 'a-wr', 'f-te', 'g-qb']);
-	assert.equal(placed.find((r) => r.id === 'd-wr')?.status?.status, 'doubtful');
-	assert.equal(placed.find((r) => r.id === 'g-qb')?.status, undefined);
-	assert.deepEqual(
-		placed.filter(heldOut).map((r) => r.id),
-		['e-rb', 'a-wr', 'f-te']
-	);
-	assert.deepEqual(
-		ids(rows),
-		['a-wr', 'b-rb', 'c-wr', 'd-wr', 'e-rb', 'f-te', 'g-qb'],
-		'the rows handed in'
-	);
+void test('the API’s order cases', () => {
+	assert.ok(CASES.length > 0);
+	for (const c of CASES) {
+		const rows = c.rows.map(([id, position]) => ({ id, position }));
+		const placed = withStatuses(rows, captureOf(c.listed));
+		assert.deepEqual(ids(placed), c.want, c.name);
+		assert.deepEqual(
+			placed.filter(heldOut).map((r) => r.id),
+			c.want.filter((id) => c.listed[id]?.season_long === true),
+			c.name
+		);
+		assert.deepEqual(
+			ids(rows),
+			c.rows.map(([id]) => id),
+			`${c.name}: the rows handed in`
+		);
+	}
 });
 
 void test('no capture leaves the board as the run has it', () => {
-	const rows = [row('a-wr', 'WR'), row('c-wr', 'WR')];
+	const rows = [
+		{ id: 'a-wr', position: 'WR' as const },
+		{ id: 'c-wr', position: 'WR' as const }
+	];
 	assert.deepEqual(withStatuses(rows, null), rows);
 });

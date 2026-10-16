@@ -8,8 +8,10 @@ import { apiFormatOf } from '#lib/run/format-ids.ts';
 import type { DirectoryPlayer } from '#lib/sheet/directory.ts';
 import type { LeagueBoardFile } from '#lib/run/league-board.ts';
 import type { BoardFormat } from '#lib/sheet/model.ts';
+import { withStatuses } from '#lib/run/board-status.ts';
 import { withSeasons } from './board-season.ts';
-import { board, manifest, seasonReach } from './run.ts';
+import { board, designations, manifest, seasonReach } from './run.ts';
+import { captureStamp } from './statuses.ts';
 
 /** The run's formats the sheet can read, by the sheet's name, each with its run format id. */
 async function sheetFormats(): Promise<Map<BoardFormat, string>> {
@@ -34,15 +36,26 @@ async function seasonBasis(): Promise<LeagueBoardFile['season']> {
 	return { scoring, through };
 }
 
-/** The run's whole board for a sheet format, its format with it and each player's season so far, or
- * null when the run has none for it: the league page's board (data/league-board). */
+/** The run's whole board for a sheet format, its format with it, each player's season so far and his
+ * injury status in the board's order (run/board-status.ts), or null when the run has none for it: the
+ * league page's board (data/league-board). */
 export async function runBoardFor(format: BoardFormat): Promise<LeagueBoardFile | null> {
 	const id = (await sheetFormats()).get(format);
 	if (id === undefined) return null;
-	const [loaded, { formats }, season] = await Promise.all([board(id), manifest(), seasonBasis()]);
+	const [loaded, { formats }, season, capture] = await Promise.all([
+		board(id),
+		manifest(),
+		seasonBasis(),
+		designations()
+	]);
 	const run = formats.find((f) => f.id === id);
 	if (!run) return null;
-	return { format: run, rows: await withSeasons(loaded.rows, id), season };
+	return {
+		format: run,
+		rows: await withSeasons(withStatuses(loaded.rows, capture), id),
+		season,
+		capture: capture === null ? null : captureStamp(capture)
+	};
 }
 
 /** Our board for a sheet format, best first by our rank, or null when the run has none for it. */

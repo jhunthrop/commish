@@ -2,7 +2,7 @@
 	import { fixed } from '#lib/format/number.ts';
 	import type { Snippet } from 'svelte';
 	import type { ShownMark } from '#lib/context/held-words.ts';
-	import { framedVorCell, type RowFraming } from '#lib/run/row-framing.ts';
+	import { HELD_FRAMING, framedVorCell, type RowFraming } from '#lib/run/row-framing.ts';
 	import type { IndexSeason } from '#lib/run/schema.ts';
 	import type { StatusView } from '#lib/run/status-view.ts';
 	import type { BoardPlayer, RangeScale } from '#lib/types/player.ts';
@@ -68,6 +68,10 @@
 		status = null
 	}: Props = $props();
 
+	/** A player on a season-long list: his rank is the word, so no tier and no framed rank. */
+	const heldOut = $derived(status !== null && status.rank !== null);
+	const shownFraming = $derived(heldOut ? HELD_FRAMING : framing);
+
 	const lead = $derived(
 		order === 'adp' && player.adp !== null ? fixed(player.adp) : String(player.ourRank)
 	);
@@ -92,7 +96,7 @@
 		<a class="name" {href}><NameWords name={player.name} /></a>
 		<span class="meta" class:seasoned={season !== undefined}>
 			<PositionPill position={player.position} rank={status?.rank ?? player.positionRank} />
-			{#if showTier}<span class="wide tier"><TierChip tier={player.tier} /></span>{/if}
+			{#if showTier && !heldOut}<span class="wide tier"><TierChip tier={player.tier} /></span>{/if}
 			<span class="wide team">{player.team}</span>
 			{#if season === undefined}
 				<span class="wide">{fixed(player.expectedGames)} games</span>
@@ -112,7 +116,7 @@
 	</span>
 	<span class="gp">{season?.games}</span>
 	<span class="proj"><ValueCell value={player.projected} label={unit} /></span>
-	<ValueCell {...framedVorCell(player.vor, player.vorRound, framing)} phoneLabel={false} />
+	<ValueCell {...framedVorCell(player.vor, player.vorRound, shownFraming)} phoneLabel={false} />
 	{#if range}
 		<span class="rng">
 			<RangeBar
@@ -127,7 +131,7 @@
 		adp={player.adp}
 		ourRank={player.ourRank}
 		under={order === 'adp' ? 'rank' : 'adp'}
-		compare={framing.compare}
+		compare={shownFraming.compare}
 	/>
 	{#if action}<span class="action">{@render action()}</span>{/if}
 </div>

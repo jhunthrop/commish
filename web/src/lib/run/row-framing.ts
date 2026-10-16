@@ -18,6 +18,10 @@ export interface RowFraming {
 export const PRESEASON_FRAMING: RowFraming = { compare: true, round: true };
 const REST_OF_SEASON_FRAMING: RowFraming = { compare: false, round: false };
 
+/** A player on a season-long list (Lane 63): his rank is shown as the word, so nothing frames the
+ * rank his figure would earn. The ADP stands alone and the round goes, on any board. */
+export const HELD_FRAMING: RowFraming = REST_OF_SEASON_FRAMING;
+
 export function rowFraming(format: Pick<Format, 'rosFromWeek'>): RowFraming {
 	return format.rosFromWeek === undefined ? PRESEASON_FRAMING : REST_OF_SEASON_FRAMING;
 }

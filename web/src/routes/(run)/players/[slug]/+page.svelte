@@ -8,6 +8,7 @@
 	import { fixed, signed } from '#lib/format/number.ts';
 	import { POSITION_NAMES } from '#lib/run/derive.ts';
 	import { readFigures } from '#lib/run/read-figures.ts';
+	import { liveStatusClock, type LiveStatus } from '#lib/run/live-status.ts';
 	import { UNWRITTEN_READ, unwrittenLines } from '#lib/run/unwritten-words.ts';
 	import Credit from '#lib/site/Credit.svelte';
 	import SheetAdd from '#lib/site/SheetAdd.svelte';
@@ -86,29 +87,32 @@
 		})
 	);
 	/** His status words as built, said again on the member's clock once the page is live. */
-	// Said again on the member's clock once the page is live, from words loaded after the first paint,
-	// so the page's first script carries neither the clock nor the words (run/status-view.ts).
-	let live = $state<{ zone: string; words: typeof import('#lib/run/status-view.ts') } | null>(null);
+	let live = $state<LiveStatus | null>(null);
 	onMount(() => {
-		if (page.status === null) return;
-		void import('#lib/run/status-view.ts').then((words) => {
-			live = { zone: Intl.DateTimeFormat().resolvedOptions().timeZone, words };
-		});
+		liveStatusClock(
+			page.status !== null,
+			() => import('#lib/run/status-view.ts'),
+			(said) => {
+				live = said;
+			}
+		);
 	});
 	const statusWords = $derived.by(() => {
 		const clock = live;
 		const status = page.status;
 		if (status === null || clock === null) return status?.words ?? null;
-		return clock.words.playerStatusWords(
-			status.status,
-			status.readAt,
-			page.format.rosFromWeek !== undefined,
-			clock.zone
-		);
+		return clock.words.playerStatusWords(status.status, {
+			capture: status.capture,
+			restOfSeason: page.format.rosFromWeek !== undefined,
+			zone: clock.zone,
+			now: clock.now
+		});
 	});
 	/** A season-long status shows as his rank. */
 	const listed = $derived(statusWords?.view ?? null);
 	const statusNote = $derived(statusWords?.note ?? null);
+	/** On a season-long list: no tier and no gap frame the rank his figure would earn. */
+	const heldOut = $derived(page.status?.status.seasonLong === true);
 	const mates = $derived(
 		page.tier.mates.map((mate) => ({ ...mate, href: links.player(mate.slug) }))
 	);
@@ -152,7 +156,7 @@
 				/>{/snippet}
 			{#snippet meta()}
 				<PositionPill position={page.position} rank={listed?.rank ?? n.positionRank} />
-				<TierChip tier={n.tier} long />
+				{#if !heldOut}<TierChip tier={n.tier} long />{/if}
 				<a href={links.club(page.team)}>{page.team}</a>
 				{#if listed}<ToneChip tone={listed.sits ? 'loss' : 'even'}>{listed.mark}</ToneChip>{/if}
 				<span class="holder" class:filled={rostered !== null}>{rostered ?? ''}</span>
@@ -198,7 +202,7 @@
 			<Fact label={lead.words.draftersLabel}>
 				{#snippet value()}
 					<Figure value={lead.words.draftersFigure} />
-					{#if !lead.rest}<GapChip {gap} />{/if}
+					{#if !lead.rest && !heldOut}<GapChip {gap} />{/if}
 				{/snippet}
 				{lead.words.drafters}
 			</Fact>

@@ -77,8 +77,10 @@ export function lineWords(
 	const inSeason = rest !== null;
 	return {
 		caption,
-		...draftersFact(numbers, inSeason),
-		drafters: draftersWords(numbers, sources, inSeason),
+		...draftersFact(numbers, inSeason || held),
+		drafters: held
+			? heldDraftersWords(numbers, sources)
+			: draftersWords(numbers, sources, inSeason),
 		value: held
 			? heldValueWords(String(boardSize), inSeason)
 			: valueWords(numbers, String(boardSize), inSeason)
@@ -100,6 +102,15 @@ function draftersFact(
 	return inSeason
 		? { draftersLabel: 'ADP', draftersFigure: fixed(numbers.adp) }
 		: { draftersLabel: 'Where drafters take him', draftersFigure: `Pick ${fixed(numbers.adp, 0)}` };
+}
+
+/** A held player's drafters sentence: the ADP alone, never against the rank his figure earns. */
+function heldDraftersWords(numbers: PlayerFormat, sources: readonly string[]): string {
+	const adp =
+		numbers.adp === null
+			? 'None of our ADP sources has him.'
+			: `ADP ${fixed(numbers.adp)} from ${sources.join(' and ')}.`;
+	return `${adp} ${BELOW_THE_AVAILABLE}`;
 }
 
 function heldValueWords(boardSize: string, inSeason: boolean): string {

@@ -16,7 +16,8 @@ const VIEWPORT_HEIGHT = 900;
 const ZONE = 'America/Chicago';
 const HELD = { slug: 'de-von-achane', name: 'Achane', position: 'RB' };
 const DOUBTFUL = { slug: 'david-montgomery', name: 'Montgomery' };
-const CAPTURE = /Injury status from the hourly capture, read \w{3} \d{1,2}:\d{2} [ap]m Central\./;
+const CAPTURE =
+	/(Injury status from the hourly capture|The hourly injury capture is behind), (read|as the list stood) \w{3} \w{3} \d{1,2}, \d{1,2}:\d{2} [ap]m Central\./;
 
 const web = process.argv[2] ?? 'http://localhost:4681';
 const out = new URL(process.argv[3] ?? '../screenshots/injury-status/', import.meta.url);
@@ -70,6 +71,10 @@ async function board(page: Page, tag: string): Promise<void> {
 	const heldText = await held.innerText();
 	check(/\bIR\b/.test(heldText), `${tag}: his rank shows as IR: ${heldText}`);
 	check(
+		!/RD \d|picks (later|earlier)|\bT\d+\b/.test(heldText),
+		`${tag}: no round, gap or tier frames his rank: ${heldText}`
+	);
+	check(
 		heldText.includes('On injured reserve since September 28.') &&
 			heldText.includes('assumes he plays, so he sits below the available players.'),
 		`${tag}: the IR row's sentence: ${heldText}`
@@ -95,7 +100,7 @@ async function board(page: Page, tag: string): Promise<void> {
 	const doubtful = row(page, DOUBTFUL.name);
 	const doubtfulText = await doubtful.innerText();
 	check(
-		/Doubtful as of \w{3} \d{1,2}:\d{2} [ap]m/.test(doubtfulText),
+		/Doubtful as of \w{3} \d{1,2}\b/.test(doubtfulText),
 		`${tag}: the doubtful mark: ${doubtfulText}`
 	);
 	await doubtful.scrollIntoViewIfNeeded();
@@ -120,11 +125,16 @@ async function playerPages(page: Page, tag: string): Promise<void> {
 		`${tag}: his page says since when`
 	);
 	check(CAPTURE.test(text), `${tag}: his page names the capture`);
+	check(!/Tier \d/.test(text.split('This season')[0] ?? ''), `${tag}: no tier chip places him`);
+	check(
+		text.includes('He sits below the available players.') && !/picks? (later|earlier)/.test(text),
+		`${tag}: his drafters fact gives the ADP alone`
+	);
 	await page.screenshot({ path: file(`player-ir-${tag}`) });
 	await open(page, `/players/${DOUBTFUL.slug}`);
 	const week = await page.locator('main').innerText();
 	check(
-		week.includes('Doubtful this week, which does not move his place on our board.'),
+		week.includes('Doubtful on the latest report, which does not move his place on our board.'),
 		`${tag}: the doubtful page's week line`
 	);
 	await page.screenshot({ path: file(`player-doubtful-${tag}`) });

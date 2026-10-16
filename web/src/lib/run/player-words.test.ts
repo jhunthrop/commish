@@ -169,12 +169,21 @@ void test('a player on a season-long list is never given a rank as if he plays (
 		words.value,
 		'If he plays, among the 618 on our board for the rest of the season. He sits below the available players.'
 	);
+	assert.equal(
+		words.drafters,
+		'ADP 15.0 from PPR drafts, Sep 5 to Sep 9. He sits below the available players.'
+	);
 	const preseason = lineWords({ format: PPR, numbers: BARE, rest: null }, SOURCES, 618, held);
+	assert.equal(
+		preseason.drafters,
+		'ADP 15.0 from PPR drafts, Sep 5 to Sep 9. He sits below the available players.'
+	);
+	assert.deepEqual([preseason.draftersLabel, preseason.draftersFigure], ['ADP', '15.0']);
 	assert.equal(
 		preseason.value,
 		'If he plays, among the 618 on our board. He sits below the available players.'
 	);
-	for (const line of [words.caption, words.value, preseason.value]) {
-		assert.doesNotMatch(line, /rank \d|Round \d|[—;]/u, line);
+	for (const line of [words.caption, words.value, preseason.value, preseason.drafters]) {
+		assert.doesNotMatch(line, /rank \d|Round \d|pick \d|picks|[—;]/u, line);
 	}
 });
