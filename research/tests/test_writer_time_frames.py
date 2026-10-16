@@ -74,3 +74,21 @@ def test_the_prompt_names_the_bye_and_the_stretch_and_the_pace() -> None:
     assert "our preseason pace" in IN_SEASON_RULES
     for sentence in ("His bye in week 13 of 2026 is still ahead.", "Through week 5 of 2026 he has 8 touchdowns."):
         assert time_frame_hits(sentence, CLOCK) == []
+
+
+@pytest.mark.parametrize(
+    "sentence",
+    [
+        "Our preseason number was 212 points, about 14.1 a game over the 15 we expected, and he is well past it.",
+        "Our preseason number was 212 points, 14.1 a game over 15 games, and he is well past it.",
+    ],
+)
+def test_the_games_count_reads_without_the_word_games_when_paired_with_a_game(sentence: str) -> None:
+    """The coordinator's ruling (Lane 52): "over the N we expected" names the games."""
+    assert time_frame_hits(sentence, CLOCK) == []
+
+
+def test_a_dishonest_pairing_over_the_games_we_expected_is_still_refused() -> None:
+    # 212 over 15 is 14.1 a game, never 22.0.
+    sentence = "Our preseason number was 212 points, 22.0 a game over the 15 we expected."
+    assert time_frame_hits(sentence, CLOCK) != []
