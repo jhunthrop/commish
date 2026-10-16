@@ -1,4 +1,4 @@
-"""Each published row's injury status on the newest hourly capture, so the table says who is out.
+"""Each published row's injury status on the newest hourly capture, and each feed's last check.
 
 Revision ID: 0008
 Revises: 0007
@@ -8,6 +8,9 @@ Lane 63: every hour `publish` writes `status` (the contract's designation words,
 the like, NULL when the capture does not list him), `status_since` (the first capture of his unbroken
 run under a season-long status, NULL for a week's designation and for a run older than the captures
 read) and `status_source` (the capture's feed). All three are NULL on a row no capture has marked.
+
+`capture_checks` holds the capture job's last successful check of each feed: an unchanged list writes no
+snapshot, so without it a list read an hour ago and one read last week look the same.
 """
 
 from collections.abc import Sequence
@@ -31,6 +34,12 @@ def upgrade() -> None:
         "published_boards", sa.Column("status_since", sa.DateTime(timezone=True), nullable=True), schema=_SCHEMA
     )
     op.add_column("published_boards", sa.Column("status_source", sa.Text(), nullable=True), schema=_SCHEMA)
+    op.create_table(
+        "capture_checks",
+        sa.Column("source", sa.Text(), primary_key=True),
+        sa.Column("checked_at", sa.DateTime(timezone=True), nullable=False),
+        schema=_SCHEMA,
+    )
     listed = ", ".join(f"'{status}'" for status in _STATUSES)
     op.create_check_constraint(
         "published_boards_status_ck", "published_boards", f"status IN ({listed})", schema=_SCHEMA
@@ -38,6 +47,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    op.drop_table("capture_checks", schema=_SCHEMA)
     op.drop_constraint("published_boards_status_ck", "published_boards", schema=_SCHEMA)
     for column in ("status_source", "status_since", "status"):
         op.drop_column("published_boards", column, schema=_SCHEMA)

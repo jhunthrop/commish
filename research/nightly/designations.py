@@ -36,6 +36,7 @@ from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.types import DateTime, Text
 
+from research.capsules.facts.depth_absence import CapturedDesignation
 from research.capsules.facts.depth_reads import ROSTER_SWEEP_SOURCE, designations_in
 from research.errors import ResearchError
 from research.model.designations import CODES, SEASON_LONG, season_long, status_of
@@ -71,32 +72,75 @@ class PlayerStatus:
 
 @dataclass(frozen=True, slots=True)
 class StatusRead:
-    """The newest capture that reads: its stamp, its feed, and each listed player's status."""
+    """The newest capture that reads: its stamp (when the list last changed), the capture job's last
+    successful check of it (None when the store records none), its feed, and each listed status."""
 
     read_at: datetime
+    checked_at: datetime | None
     source: str
     players: Mapping[str, PlayerStatus]
 
 
-def _readable(source: str, payload: object) -> bool:
-    """The shapes the API parses: the sweep's list of teams, the by-date list's object with injList."""
-    if source == ROSTER_SWEEP_SOURCE:
-        return isinstance(payload, list)
-    return isinstance(payload, dict) and isinstance(payload.get("injList"), list)
+# How far a roster sweep's note reaches a by-date out (the API's noteWindow).
+NOTE_WINDOW: Final = timedelta(hours=48)
 
 
-_NEWEST: Final = text(
+@dataclass(frozen=True, slots=True)
+class _Capture:
+    at: datetime
+    entries: Mapping[str, CapturedDesignation] | None
+
+
+def _parsed(source: str, payload: object) -> Mapping[str, CapturedDesignation] | None:
+    """The capture's entries in the shapes the API parses (the sweep's list of teams, the by-date
+    list's object with injList), None for a payload over the cap or of another shape."""
+    if payload is None:
+        return None
+    shaped = (
+        isinstance(payload, list)
+        if source == ROSTER_SWEEP_SOURCE
+        else isinstance(payload, dict) and isinstance(payload.get("injList"), list)
+    )
+    return designations_in(source, payload) if shaped else None
+
+
+def readable_at(captures: Sequence[_Capture], i: int) -> bool:
+    """The API's floor (boards.readableAt): it parses, lists someone, and lists at least half as many
+    as the newest list before it that does, so an empty or cut-short list is a glitch."""
+    entries = captures[i].entries
+    if not entries:
+        return False
+    before = next((c.entries for c in captures[i + 1 :] if c.entries), None)
+    return before is None or 2 * len(entries) >= len(before)
+
+
+_CAPTURES: Final = text(
     "select case when octet_length(payload::text) <= :cap then payload end as payload, captured_at "
-    "from research.capture_snapshots where source = :source order by captured_at desc limit :tried"
+    "from research.capture_snapshots where source = :source and (cast(:before as timestamptz) is null "
+    "or captured_at <= :before) order by captured_at desc limit :n"
 )
 
-# Each season-long status's unbroken run back from the newest capture, as the API reads it.
+
+def _captures(conn: Connection, source: str, n: int, before: datetime | None = None) -> list[_Capture]:
+    rows = conn.execute(_CAPTURES, {"cap": MAX_CAPTURE_BYTES, "source": source, "before": before, "n": n})
+    return [_Capture(r.captured_at, _parsed(source, r.payload)) for r in rows]
+
+
+# Each season-long status's unbroken run back from the newest capture, as the API reads it, over the
+# captures that pass the floor.
 _RUNS: Final = text(
-    """with caps as (
-  select payload, captured_at, row_number() over (order by captured_at desc) as n
+    """with listed_caps as (
+  select payload, captured_at, jsonb_array_length(payload->'injList') as n_listed
   from research.capture_snapshots
   where source = :source and captured_at <= :newest and captured_at > :oldest
     and jsonb_typeof(payload->'injList') = 'array'
+), floored as (
+  select payload, captured_at, n_listed, lead(n_listed) over (order by captured_at desc) as n_before
+  from listed_caps where n_listed > 0
+), caps as (
+  select payload, captured_at, row_number() over (order by captured_at desc) as n
+  from floored
+  where n_before is null or 2 * n_listed >= n_before
   order by captured_at desc limit :most
 ), listed as (
   select c.n, c.captured_at, btrim(e->>'playerID') as player_id, m.status
@@ -127,30 +171,54 @@ def _season_runs(conn: Connection, newest: datetime) -> dict[tuple[str, str], da
     return {(r.player_id, r.status): ms_instant(r.since) for r in rows if r.bounded}
 
 
-def _statuses(conn: Connection, source: str, payload: object, at: datetime) -> StatusRead:
-    runs = _season_runs(conn, at) if source == BY_DATE_SOURCE else {}
+_CHECKED: Final = text("select checked_at from research.capture_checks where source = :source")
+
+
+def _checked(conn: Connection, source: str) -> datetime | None:
+    found = conn.execute(_CHECKED, {"source": source}).scalar_one_or_none()
+    return None if found is None else ms_instant(found)
+
+
+def _sweep_notes(conn: Connection, at: datetime) -> Mapping[str, str]:
+    """The newest roster sweep's notes within NOTE_WINDOW of the by-date list, by player."""
+    sweeps = _captures(conn, ROSTER_SWEEP_SOURCE, 1, at + NOTE_WINDOW)
+    if not sweeps or sweeps[0].entries is None or sweeps[0].at < at - NOTE_WINDOW:
+        return {}
+    return {i: e.description for i, e in sweeps[0].entries.items() if e.description}
+
+
+def _statuses(conn: Connection, source: str, newest: _Capture) -> StatusRead:
+    entries = newest.entries or {}
+    by_date = source == BY_DATE_SOURCE
+    runs = _season_runs(conn, newest.at) if by_date else {}
+    outs = by_date and any(status_of(e.designation) == "out" for e in entries.values())
+    notes = _sweep_notes(conn, newest.at) if outs else {}
     players: dict[str, PlayerStatus] = {}
-    for player_id, captured in designations_in(source, payload).items():
+    for player_id, captured in entries.items():
         status = status_of(captured.designation)
         if status is None:
             continue
-        long = season_long(status, captured.description)
+        note = captured.description if not by_date else notes.get(player_id) if status == "out" else None
+        long = season_long(status, note)
         players[player_id] = PlayerStatus(status, long, runs.get((player_id, status)) if long else None)
-    return StatusRead(ms_instant(at), source, players)
+    return StatusRead(ms_instant(newest.at), _checked(conn, source), source, players)
 
 
 def read_statuses(conn: Connection) -> StatusRead | None:
     """The newest by-date capture that reads, else the roster sweep's; None when neither has one.
 
-    A newest capture over the byte cap or of the wrong shape gives way to the next newest; a source
-    whose newest few all fail is an error, never a silent fall to an older list."""
+    A newest capture over the byte cap, of the wrong shape or under the floor (readable_at) gives way
+    to the next newest; a source whose newest few all fail is an error, never a silent fall to an
+    older list. A by-date out takes the note of the newest roster sweep near it."""
     for source in (BY_DATE_SOURCE, ROSTER_SWEEP_SOURCE):
-        rows = conn.execute(_NEWEST, {"cap": MAX_CAPTURE_BYTES, "source": source, "tried": CAPTURES_TRIED}).all()
-        for row in rows:
-            if row.payload is not None and _readable(source, row.payload):
-                return _statuses(conn, source, row.payload, row.captured_at)
-        if rows:
-            raise DesignationsError(f"none of the {len(rows)} newest injury captures {source} reads")
+        captures = _captures(conn, source, CAPTURES_TRIED + 1)
+        for i in range(min(len(captures), CAPTURES_TRIED)):
+            if readable_at(captures, i):
+                return _statuses(conn, source, captures[i])
+        if captures:
+            raise DesignationsError(
+                f"none of the {min(len(captures), CAPTURES_TRIED)} newest injury captures {source} reads"
+            )
     return None
 
 
@@ -165,7 +233,8 @@ def designations_file(read: StatusRead, ranked: Iterable[str]) -> Json:
         for player_id in sorted(set(ranked))
         if (s := read.players.get(player_id)) is not None
     }
-    return {"readAt": js_iso(read.read_at), "source": read.source, "players": players}
+    checked = None if read.checked_at is None else js_iso(read.checked_at)
+    return {"readAt": js_iso(read.read_at), "checkedAt": checked, "source": read.source, "players": players}
 
 
 def season_ids(file: Json) -> frozenset[str]:
