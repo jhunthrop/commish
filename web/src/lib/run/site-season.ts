@@ -4,7 +4,7 @@
  * the NFL's playoffs follow to the end of Super Bowl day (five weeks after the last game day, the
  * schedule the run carries holding no postseason), then the offseason until the next season's run,
  * and before week 1 the preseason. The build runs hourly, and /me or GET /season corrects it. */
-import type { SitePhase } from '#lib/ui/nav.ts';
+import { railKey, railPhase, type RailKey, type SitePhase } from '#lib/ui/nav.ts';
 
 const EASTERN = 'America/New_York';
 /** Wild card, divisional, conference, the bye, then the Super Bowl: five weeks of days. */
@@ -51,4 +51,9 @@ export function siteSeason(now: Date, kickoffs: readonly string[]): SitePhase {
 	if (clock < Math.min(...times)) return 'preseason';
 	if (clock < regularEnd) return 'in_season';
 	return clock < superBowlEnd ? 'playoffs' : 'offseason';
+}
+
+/** The rail the site's season shows at an instant, with no league selected. */
+export function siteRailAt(now: Date, kickoffs: readonly string[]): RailKey {
+	return railKey(railPhase(null, siteSeason(now, kickoffs)));
 }

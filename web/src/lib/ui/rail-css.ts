@@ -1,8 +1,10 @@
 /** The rail's place in every season phase as styles (spec 2026-10-16 §2): the shell draws every
  * item in one order every rail follows (nav.ts RAIL_ITEMS), and these rules show the root's rail
- * (`data-rail`, set by the boot script before the first paint), the phone's five along the bottom. Built from
- * railFor on the server and put in every page's head by hooks.server.ts, so the phase table never
- * ships in a page's script and the rail is right on the first frame. */
+ * (`data-rail`, written by the build on a prerendered page and set by the boot script before the
+ * first paint), the phone's five along the bottom; a page drawn at request time whose boot never
+ * runs shows the default. Built from railFor on the server and put in every page's head
+ * (server/page-chunk.ts), so the phase table never ships in a page's script and the rail is right
+ * on the first frame. */
 import { DEFAULT_RAIL, RAIL_KEYS } from './nav.ts';
 import { railOfKey } from './rail-order.ts';
 
