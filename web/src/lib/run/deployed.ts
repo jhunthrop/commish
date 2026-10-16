@@ -41,6 +41,31 @@ export function parseDeployedStamp(text: string): DeployedStamp | null {
 	return { runId: parsed.data, commit };
 }
 
+/** How long the backstop waits for the live site before it treats the stamp as unreadable. */
+const SITE_TIMEOUT_MS = 10_000;
+
+/**
+ * The live site's stamp, or null when it does not answer with one: a miss is a reason to build. The
+ * read never trusts the edge: a query string no cached copy has and a request for a fresh copy, so
+ * a page cache that outlives a deploy cannot hand back the previous deploy's stamp.
+ */
+export async function fetchDeployedStamp(
+	site: string,
+	fetchImpl: typeof fetch,
+	now: number
+): Promise<DeployedStamp | null> {
+	try {
+		const url = `${site.replace(/\/+$/, '')}${DEPLOYED_RUN_PATH}?at=${String(now)}`;
+		const response = await fetchImpl(url, {
+			headers: { 'Cache-Control': 'no-cache' },
+			signal: AbortSignal.timeout(SITE_TIMEOUT_MS)
+		});
+		return response.ok ? parseDeployedStamp(await response.text()) : null;
+	} catch {
+		return null;
+	}
+}
+
 const short = (commit: string): string => commit.slice(0, 8);
 
 /** Build unless the site holds the latest run on this commit. A stamp that cannot be read builds. */
