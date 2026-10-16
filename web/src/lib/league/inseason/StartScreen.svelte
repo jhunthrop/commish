@@ -15,7 +15,15 @@
 		setsOnHost,
 		type MoveStep
 	} from './move.ts';
-	import { LINES, lineupDecision, lineupTitle, satIds, slotLabels, verbWords } from './words.ts';
+	import {
+		LINES,
+		figureHead,
+		lineupDecision,
+		lineupTitle,
+		satIds,
+		slotLabels,
+		verbWords
+	} from './words.ts';
 
 	/** Start and sit (spec §4): this week's lineup slot by slot, ours, and where it differs from the
 	 * lineup the host holds, the player it sits with the fact that tipped it; below it the bench, the
@@ -34,6 +42,8 @@
 	}
 
 	let { advice, host, plan, make, reread }: Props = $props();
+	/** The head over the lineup and the bench names the number their rows end on. */
+	const head = $derived(figureHead([...advice.slots.map((s) => s.ours), ...advice.bench]));
 
 	const MOVE_ID = 'lineup-move';
 	let step = $state<MoveStep>({ kind: 'closed' });
@@ -100,7 +110,7 @@
 	{/snippet}
 	<Panel as="section" label={lineupTitle(advice.week)} padding="none">
 		<div class="head">
-			<PanelHead title={lineupTitle(advice.week)} aside={LINES.perWeek} level={2} />
+			<PanelHead title={lineupTitle(advice.week)} aside={head} level={2} />
 		</div>
 		{#each advice.slots as slot, i (`${slot.slot}-${String(i)}`)}
 			{#if slot.changed}
@@ -116,7 +126,7 @@
 	</Panel>
 	<Panel as="section" label={LINES.bench} padding="none">
 		<div class="head">
-			<PanelHead title={LINES.bench} aside={LINES.perWeek} level={2} />
+			<PanelHead title={LINES.bench} aside={head} level={2} />
 		</div>
 		{#each advice.bench as line (line.player.host_id)}
 			{@const sits = sat.has(line.player.host_id)}

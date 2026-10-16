@@ -32,6 +32,8 @@
 		EVERY_TRADE,
 		LINES,
 		NO_TRADES_WITH_TEAM,
+		carriesPerGame,
+		figureHead,
 		noTradeWith,
 		showMore,
 		teamAside,
@@ -107,6 +109,9 @@
 
 	/** Every player on your roster (a trade found or not), then theirs from the trades, each once. */
 	const players = $derived(pickerPlayers(advice.roster, advice.teams));
+	/** Every row the finder can show: the head over them names the number they end on. */
+	const lines = $derived([...advice.roster, ...advice.teams.flatMap((t) => t.roster)]);
+	const perGame = $derived(carriesPerGame(lines));
 	/** The picker's choices: every trade, then your players and theirs. */
 	const pickGroups = $derived<PickGroup[]>([
 		{ label: null, options: [{ value: '', label: EVERY_TRADE }] },
@@ -225,7 +230,8 @@
 				>{BUILDER_LINES.open}</Quiet
 			>
 		</div>
-		<Label>{LINES.perWeek}</Label>
+		<!-- Rows that end on points a game label their own cells, so a phone drops the head. -->
+		<span class="figure-head" class:labelled={perGame}><Label>{figureHead(lines)}</Label></span>
 	</div>
 	{#if problem}<ProblemLine>{problem}</ProblemLine>{/if}
 	<div class="teams" class:reading aria-busy={reading}>
@@ -341,5 +347,12 @@
 
 	.more {
 		padding: var(--s-3);
+	}
+
+	/* On a phone each row's points a game carries its own label, so the head over them gives way. */
+	@media (max-width: 760px) {
+		.figure-head.labelled {
+			display: none;
+		}
 	}
 </style>

@@ -33,6 +33,7 @@ import {
 	LATER_RULE,
 	NO_TRADES_WITH_TEAM,
 	hisPorWords,
+	figureHead,
 	perGameWords,
 	porFigure,
 	signInTitle,
@@ -211,6 +212,13 @@ void test("a row's rest-of-season points a game are in the season figure's unit 
 	assert.equal(perGameWords(18.44), '18.4 a game');
 	assert.equal(perGameWords(9), '9.0 a game');
 	assert.equal(LINES.aGame, 'a game');
+});
+
+void test("the rows' head names the number they end on: points a game once any row carries it", () => {
+	const plain = line('Kyren Williams');
+	assert.equal(figureHead([plain]), 'Over repl a week');
+	assert.equal(figureHead([plain, { ...plain, rest_of_season_per_game: 14.2 }]), 'Points a game');
+	assert.equal(figureHead([]), 'Over repl a week');
 });
 
 void test('a trade says who gets whom and both gains plainly', () => {

@@ -64,6 +64,9 @@
 		<span>{line.player.position}</span>
 	{/if}
 	{#if line.player.team}<span>{line.player.team}</span>{/if}
+	{#if trailing && perGame !== null}
+		<span class="fact">{perGameWords(perGame)}</span>
+	{/if}
 	{#if game}<span class="fact">{game}</span>{/if}
 	{#if facts.designation}
 		<ToneChip tone={designationSitsHim(facts.designation) ? 'loss' : 'even'}
@@ -71,9 +74,6 @@
 		>
 	{/if}
 	{#if last}<span class="fact">{last}</span>{/if}
-	{#if trailing && perGame !== null}
-		<span class="fact">{perGameWords(perGame)}</span>
-	{/if}
 	{#if porOnLine && por !== null}
 		<span class="fact his">{hisPorWords(por)}</span>
 	{/if}
