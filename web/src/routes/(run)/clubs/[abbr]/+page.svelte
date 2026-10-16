@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { fixed } from '#lib/format/number.ts';
+	import { rowFraming } from '#lib/run/row-framing.ts';
 	import { clubCaption, playedWords } from '#lib/run/strength-words.ts';
 	import SiteShell from '#lib/site/SiteShell.svelte';
 	import { links } from '#lib/site/links.ts';
@@ -17,6 +18,8 @@
 	let { data }: PageProps = $props();
 
 	const page = $derived(data.page);
+	/** How every row frames his rank against the drafts, the board's rule (run/row-framing.ts). */
+	const framing = $derived(rowFraming(page.format));
 	const club = $derived(page.club);
 	const name = $derived(`${club.city} ${club.nickname}`);
 	const names = $derived(new Map(page.clubs.map((other) => [other.abbr, other])));
@@ -43,7 +46,7 @@
 			<PanelHead title="On our {page.format.label} board" />
 			{#if page.scale}
 				<Panel padding="none">
-					<RowHead games={page.rows.some((row) => row.season !== undefined)} />
+					<RowHead games={page.rows.some((row) => row.season !== undefined)} {framing} />
 					{#each page.rows as player (player.id)}
 						<Row
 							{player}
@@ -52,6 +55,7 @@
 							showTier
 							unit={page.format.unit}
 							season={player.season}
+							{framing}
 						/>
 					{/each}
 				</Panel>

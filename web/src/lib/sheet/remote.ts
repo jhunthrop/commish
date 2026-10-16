@@ -3,7 +3,9 @@
  * from or written to the API's shape. The API stores positions only in the six spellings this
  * site reads (api/internal/sheets/validate.go and the table's check).
  */
-import type { ApiClient } from '#lib/api/client.ts';
+import { ApiError, type ApiClient } from '#lib/api/client.ts';
+import { hasSessionCookie } from '#lib/api/session.ts';
+import { HTTP_STATUS } from '#lib/api/status.ts';
 import type { components } from '#lib/api/types.ts';
 import { parseFormat } from './format.ts';
 import { DEFAULT_FORMAT, parsePosition, type Sheet, type SheetRow } from './model.ts';
@@ -99,9 +101,17 @@ export interface SheetsApi {
 	signInUrl(returnTo: string): string;
 }
 
+/** What the API answers a browser with no session, said without asking it. */
+function signedOut(): Promise<never> {
+	return Promise.reject(
+		new ApiError(HTTP_STATUS.unauthorized, { code: 'unauthorized', message: 'Not signed in' })
+	);
+}
+
 export function sheetsApi(client: ApiClient): SheetsApi {
 	return {
-		me: () => client.call<Account>('/me'),
+		// With no session the answer is a 401: the sheet stays in this browser without asking.
+		me: () => (hasSessionCookie() ? client.call<Account>('/me') : signedOut()),
 		async list() {
 			const sheets = await client.call<ApiSheet[]>(`/sheets?per_page=${SHEETS_PER_PAGE}`);
 			return sheets.map(fromSummary);

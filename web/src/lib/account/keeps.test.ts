@@ -3,18 +3,18 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { leagueHostsLine } from '#lib/league/hosts.ts';
-import { keeps, leaguesKeptText, memberHosts } from './keeps.ts';
+import { keeps, leaguesKeptText, memberHosts, signedOutTitle } from './keeps.ts';
 
 const ALL_OPEN = { ffpc: true, yahoo: true, espn: true };
 const ALL_SHUT = { ffpc: false, yahoo: false, espn: false };
 
 const words = (open: typeof ALL_OPEN): string[] => [
-	...keeps(open).flatMap((k) => [k.lead, k.text]),
+	...keeps(open, false).flatMap((k) => [k.lead, k.text]),
 	...memberHosts(open).flatMap((h) => [h.lead, h.text, h.verb])
 ];
 
 const leaguesLine = (open: typeof ALL_OPEN): string =>
-	keeps(open).find((k) => k.lead === 'Your leagues')?.text ?? '';
+	keeps(open, false).find((k) => k.lead === 'Your leagues')?.text ?? '';
 
 void test('the leagues line names every host open here, and no host switched off', () => {
 	for (const host of ['Sleeper', 'MyFantasyLeague', 'FFPC', 'Yahoo', 'ESPN']) {
@@ -46,7 +46,7 @@ void test('a connect verb for Yahoo and for ESPN, each only where it is open', (
 void test('connecting ESPN is for any ESPN league and says what the session is kept for', () => {
 	const espn = memberHosts(ALL_OPEN).find((h) => h.lead === 'ESPN')?.text ?? '';
 	assert.match(espn, /public or private/);
-	assert.match(espn, /so your league stays in sync and, when you ask, to make your moves\./);
+	assert.match(espn, /so your league stays in sync and we can make your moves when you ask\./);
 	assert.doesNotMatch(espn, /a private ESPN league/);
 });
 
@@ -56,4 +56,17 @@ void test('the copy has no em-dash, no semicolon, no doubled word and no trading
 		assert.doesNotMatch(line, /\b([a-z]+)\s+\1\b/i, line);
 		assert.doesNotMatch(line, /\b(market|price|buy|sell)\b/i, line);
 	}
+});
+
+void test('in season the signed-out page leads with your leagues, before the draft with your prep', () => {
+	assert.equal(signedOutTitle(true), 'Sign in to keep your leagues and your prep');
+	assert.equal(signedOutTitle(false), 'Sign in to keep your prep');
+	assert.deepEqual(
+		keeps(ALL_OPEN, true).map((k) => k.lead),
+		['Your leagues', 'Your cheat sheets', 'Your mock drafts', 'Your Draft Pass or Membership']
+	);
+	assert.deepEqual(
+		keeps(ALL_OPEN, false).map((k) => k.lead),
+		['Your cheat sheets', 'Your mock drafts', 'Your leagues', 'Your Draft Pass or Membership']
+	);
 });

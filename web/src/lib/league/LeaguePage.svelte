@@ -23,7 +23,8 @@
 	import { followSwitch } from './follow-switch.svelte.ts';
 	import LeagueTabs from './inseason/LeagueTabs.svelte';
 	import SeasonPanel from './SeasonPanel.svelte';
-	import { MOCK_VERB, SEE_MATCHUP, matchupSummary } from './phase-words.ts';
+	import { MOCK_VERB } from '#lib/ui/nav.ts';
+	import { SEE_MATCHUP, matchupSummary } from './phase-words.ts';
 	import { tabHref } from './inseason/tabs.ts';
 	import { siteContext } from '#lib/context/context.svelte.ts';
 	import { sectionHref } from '#lib/ui/nav.ts';

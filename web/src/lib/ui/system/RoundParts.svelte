@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { recordHeadline, weekLines } from '#lib/run/record.ts';
+	import { PRESEASON_FRAMING } from '#lib/run/row-framing.ts';
 	import { runStampText, type RunStamp } from '#lib/run/stamp.ts';
 	import { absentWords } from '#lib/site/absent.ts';
 	import { verdict } from '#lib/site/verdict.ts';
@@ -56,13 +57,28 @@
 	sub="The board row's sheet mark, the ADP order, the chooser, and what a page says when it has nothing to show."
 >
 	<Specimen minWidth={ROW_MIN_WIDTH}>
-		<RowHead action />
-		<Row player={row} href={HREF} scale={nightly.rowScale} showTier {unit}>
+		<RowHead action framing={PRESEASON_FRAMING} />
+		<Row
+			player={row}
+			href={HREF}
+			scale={nightly.rowScale}
+			showTier
+			{unit}
+			framing={PRESEASON_FRAMING}
+		>
 			{#snippet action()}
 				<SheetMark name={row.name} place={null} sheetHref={HREF} onadd={() => undefined} />
 			{/snippet}
 		</Row>
-		<Row player={row} href={HREF} scale={nightly.rowScale} showTier {unit} order="adp">
+		<Row
+			player={row}
+			href={HREF}
+			scale={nightly.rowScale}
+			showTier
+			{unit}
+			framing={PRESEASON_FRAMING}
+			order="adp"
+		>
 			{#snippet action()}
 				<SheetMark name={row.name} place={12} sheetHref={HREF} onadd={() => undefined} />
 			{/snippet}

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { dayLabel } from '#lib/format/date.ts';
 	import { fixed } from '#lib/format/number.ts';
+	import Footnote from '#lib/ui/Footnote.svelte';
 	import PositionPill from '#lib/ui/PositionPill.svelte';
 	import type { PageProps } from './$types';
 
@@ -18,6 +19,7 @@
 			data.runAt
 		)}.
 	</p>
+	<Footnote>{data.basis}</Footnote>
 	<table class="board">
 		<caption>{data.format.label} board, top {data.rows.length}</caption>
 		<thead>

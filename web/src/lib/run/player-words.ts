@@ -16,9 +16,13 @@ export interface RestFigures {
 export interface LineWords {
 	/** The big figure's caption. */
 	caption: string;
-	/** Where drafters take him against our rank. */
+	/** The drafters fact's label and figure: where drafters take him ("Pick 15"), or in season his
+	 * ADP as a fact of the drafts before it ("15.0"). */
+	draftersLabel: string;
+	draftersFigure: string;
+	/** Where drafters take him against our rank, or in season the drafts his ADP is from. */
 	drafters: string;
-	/** His value's round, or below replacement, among the board. */
+	/** His value's round, or in season his rest-of-season rank, or below replacement, among the board. */
 	value: string;
 }
 
@@ -34,7 +38,7 @@ export function draftersWords(
 	if (inSeason) {
 		return numbers.adp === null
 			? 'None of our ADP sources has him.'
-			: `ADP ${fixed(numbers.adp)} from ${sources.join(' and ')}.`;
+			: `His ADP in ${sources.join(' and ')}, before the season.`;
 	}
 	const gap = draftersGap(numbers.adp, numbers.ourRank);
 	if (numbers.adp === null || gap === null) {
@@ -62,11 +66,41 @@ export function lineWords(
 			: season.underway
 				? `${format.label} points in ${year}, projected preseason over ${games} games`
 				: `projected ${format.label} points in ${year}, over ${games} expected games`;
-	const value =
-		numbers.vor < 0
-			? `Below replacement, among the ${String(boardSize)} on our board`
-			: `Round ${String(numbers.vorRound)} value among the ${String(boardSize)} on our board`;
-	return { caption, drafters: draftersWords(numbers, sources, rest !== null), value };
+	const inSeason = rest !== null;
+	return {
+		caption,
+		...draftersFact(numbers, inSeason),
+		drafters: draftersWords(numbers, sources, inSeason),
+		value: valueWords(numbers, String(boardSize), inSeason)
+	};
+}
+
+/** In season the round and the pick are no decision the member makes: the ADP stands as a fact, and
+ * his rest-of-season rank takes the round's place (the figure and its tint stay). */
+function draftersFact(
+	numbers: PlayerFormat,
+	inSeason: boolean
+): Pick<LineWords, 'draftersLabel' | 'draftersFigure'> {
+	if (numbers.adp === null) {
+		return {
+			draftersLabel: inSeason ? 'ADP' : 'Where drafters take him',
+			draftersFigure: 'No ADP'
+		};
+	}
+	return inSeason
+		? { draftersLabel: 'ADP', draftersFigure: fixed(numbers.adp) }
+		: { draftersLabel: 'Where drafters take him', draftersFigure: `Pick ${fixed(numbers.adp, 0)}` };
+}
+
+function valueWords(numbers: PlayerFormat, boardSize: string, inSeason: boolean): string {
+	if (numbers.vor < 0) {
+		return inSeason
+			? `Below replacement for the rest of the season, among the ${boardSize} on our board`
+			: `Below replacement, among the ${boardSize} on our board`;
+	}
+	return inSeason
+		? `Our rank ${String(numbers.ourRank)} of the ${boardSize} on our board for the rest of the season`
+		: `Round ${String(numbers.vorRound)} value among the ${boardSize} on our board`;
 }
 
 export function restFigures(

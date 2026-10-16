@@ -5,6 +5,7 @@
 	import { windowLabel } from '#lib/format/date.ts';
 	import { plural } from '#lib/format/number.ts';
 	import { rangeScale } from '#lib/run/derive.ts';
+	import { rowFraming } from '#lib/run/row-framing.ts';
 	import type { AdpPage } from '#lib/server/pages/adp.ts';
 	import type { RunStamp } from '#lib/run/stamp.ts';
 	import BasisList from '#lib/ui/BasisList.svelte';
@@ -26,6 +27,9 @@
 	}
 
 	let { page, run }: Props = $props();
+
+	/** How every row frames his rank against the drafts, the board's rule (run/row-framing.ts). */
+	const framing = $derived(rowFraming(page.format));
 
 	/** Faces in the first screen load eagerly so they count toward the first paint. */
 	const EAGER_ROWS = 8;
@@ -69,7 +73,7 @@
 				/>
 			</div>
 			<section aria-label="{page.format.label} ADP">
-				<RowHead action order="adp" />
+				<RowHead action order="adp" {framing} />
 				{#each page.rows as player, i (player.id)}
 					<Row
 						{player}
@@ -78,6 +82,7 @@
 						showTier
 						unit={page.format.unit}
 						order="adp"
+						{framing}
 						eager={i < EAGER_ROWS}
 						held={siteContext.held?.mark(player.id) ?? null}
 					>

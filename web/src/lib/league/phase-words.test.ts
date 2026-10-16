@@ -2,17 +2,16 @@
 // line for the screen a rail item led there from, the switch's one word beside a league, the league
 // page's draft line and final standing, and the matchup's one line. Run with `npm test`.
 import assert from 'node:assert/strict';
+import { MOCK_VERB } from '#lib/ui/nav.ts';
 import { test } from 'node:test';
 import type { LeagueSync, MatchupSide } from './api.ts';
 import {
 	ADVISOR_VERB,
 	FOLLOW_FOR,
-	MOCK_VERB,
 	NEXT_DRAFT,
 	SEE_MATCHUP,
 	SHEET_LINK,
 	NEXT_DRAFT_ROWS,
-	railInSeason,
 	TURNS_AFTER_DRAFT,
 	draftLine,
 	finalStanding,
@@ -128,10 +127,6 @@ void test("the league page's one matchup line names both teams and the score so 
 });
 
 void test('the account keeps the next draft a tap away in season', () => {
-	assert.equal(railInSeason('in_season'), true);
-	assert.equal(railInSeason('playoffs_waivers'), true);
-	assert.equal(railInSeason('pre_draft'), false);
-	assert.equal(railInSeason('offseason'), false);
 	assert.deepEqual(
 		NEXT_DRAFT_ROWS.map((row) => row.lead),
 		['Mock draft', 'Cheat sheet']

@@ -1,6 +1,7 @@
 /** The front door: the top of the default board, and the record's headline, from the run. */
 import { rangeScale } from '#lib/run/derive.ts';
 import { recordHeadline, type RecordHeadline } from '#lib/run/record.ts';
+import { rowFraming, type RowFraming } from '#lib/run/row-framing.ts';
 import type { BoardRowView, Format } from '#lib/run/schema.ts';
 import type { RangeScale } from '#lib/types/player.ts';
 import { boardSeason } from '../board-season.ts';
@@ -16,6 +17,8 @@ export interface FrontPage {
 	/** The strip's basis line once the season is underway, null before the first kickoff. */
 	seasonLead: string | null;
 	scale: RangeScale;
+	/** How every row frames his rank against the drafts, as the board does (run/row-framing.ts). */
+	framing: RowFraming;
 	/** How many players the whole board ranks. */
 	boardSize: number;
 	/** The record's one number and its caption, the only part of the record the front door prints. */
@@ -31,6 +34,7 @@ export async function frontPage(): Promise<FrontPage> {
 		rows,
 		seasonLead: lead,
 		scale: rangeScale(rows),
+		framing: rowFraming(format),
 		boardSize: loaded.rows.length,
 		record: { ...recordHeadline(kept), season: kept.season }
 	};

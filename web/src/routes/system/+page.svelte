@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { PRESEASON_FRAMING } from '#lib/run/row-framing.ts';
 	import {
 		DEFAULT_TEAMS,
 		adpWords,
@@ -120,8 +121,9 @@
 			sub="A real board row from the run the board reads, {row.name} in the {row.position} view, taken apart."
 		>
 			<Specimen minWidth={ROW_MIN_WIDTH}>
-				<RowHead />
+				<RowHead framing={PRESEASON_FRAMING} />
 				<Row
+					framing={PRESEASON_FRAMING}
 					player={row}
 					href={PLAYER_HREF}
 					scale={data.nightly.rowScale}

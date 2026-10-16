@@ -3,6 +3,7 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
+	import { hasSessionCookie } from '#lib/api/session.ts';
 	import { isSignedOut } from '#lib/api/status.ts';
 	import { LEAGUE_HOST_PARAM, MEMBER_WAYS, links, type MemberWay } from '#lib/site/links.ts';
 	import ActionBar from '#lib/ui/ActionBar.svelte';
@@ -101,15 +102,18 @@
 				yahooOn = false;
 				espnOn = false;
 			});
-		leagueApi
-			.attached()
-			.then((list) => {
-				attached = list;
-				view = 'form';
-				const pasted = page.url.searchParams.get('link');
-				if (pasted) typed(pasted);
-			})
-			.catch((error: unknown) => (view = isSignedOut(error) ? 'signed-out' : 'unreachable'));
+		// With no session the answer is a 401: the page is the signed-out one without asking.
+		if (!hasSessionCookie()) view = 'signed-out';
+		else
+			leagueApi
+				.attached()
+				.then((list) => {
+					attached = list;
+					view = 'form';
+					const pasted = page.url.searchParams.get('link');
+					if (pasted) typed(pasted);
+				})
+				.catch((error: unknown) => (view = isSignedOut(error) ? 'signed-out' : 'unreachable'));
 		return () => {
 			if (timer !== null) clearTimeout(timer);
 		};
@@ -347,8 +351,7 @@
 	{#if forScreen}<p class="for">{FOLLOW_FOR[forScreen]}</p>{/if}
 	<p class="lede">
 		{#if withField}Paste your league's link.{/if}
-		We keep your roster, this week's matchup and every player nobody in your league holds up to date,
-		on our board. Free.
+		We keep your roster, this week's matchup and your league's free agents up to date, on our board. Free.
 		{#if FLAGS.in_season_tools}{IN_SEASON_TOOLS_LINE}{/if}
 	</p>
 	<p class="hosts">{hostsLine({ ffpc: ffpcOn, yahoo: yahooOn, espn: espnOn })}</p>

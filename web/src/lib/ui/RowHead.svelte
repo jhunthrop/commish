@@ -1,4 +1,5 @@
 <script lang="ts">
+	import type { RowFraming } from '#lib/run/row-framing.ts';
 	import Label from './Label.svelte';
 
 	/** The column heads over a run of Rows, on the same grid. On the phone it names only the columns whose cells print a bare number. */
@@ -11,17 +12,12 @@
 		order?: 'board' | 'adp';
 		/** The rows under it carry this season's figures: a Games column on a desk. */
 		games?: boolean;
-		/** The Drafters column compares drafters with our rank ("vs us"). Off in season. */
-		compare?: boolean;
+		/** How the rows under it frame their rank against the drafts (run/row-framing.ts): the
+		 * Drafters column compares drafters with our rank ("vs us") only where they do. */
+		framing: RowFraming;
 	}
 
-	let {
-		range = true,
-		action = false,
-		order = 'board',
-		games = false,
-		compare = true
-	}: Props = $props();
+	let { range = true, action = false, order = 'board', games = false, framing }: Props = $props();
 </script>
 
 <div
@@ -46,7 +42,7 @@
 	>
 	{#if range}<span class="rng"><Label>Range</Label></span>{/if}
 	<Label
-		><span class="wide">{compare ? 'Drafters vs us' : 'Drafters'}</span><span class="narrow"
+		><span class="wide">{framing.compare ? 'Drafters vs us' : 'Drafters'}</span><span class="narrow"
 			>Drafters</span
 		></Label
 	>

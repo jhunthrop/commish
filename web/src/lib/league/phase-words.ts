@@ -12,7 +12,7 @@ import {
 } from '#lib/format/clock.ts';
 import { fixed, ordinal } from '#lib/format/number.ts';
 import type { ContextLeague } from '#lib/context/words.ts';
-import type { LeagueScreen, RailKey } from '#lib/ui/nav.ts';
+import { MOCK_VERB, type LeagueScreen } from '#lib/ui/nav.ts';
 import type { LeagueStanding, LeagueSync, MatchupSide } from './api.ts';
 import { recordWords, scoreUnread, teamName } from './model.ts';
 
@@ -34,8 +34,6 @@ export const NEXT_DRAFT = 'Next draft';
 
 /** The league page's one verb on draft day: our call beside the real draft. */
 export const ADVISOR_VERB = 'Open the Advisor';
-/** The league page's verb before the draft and after the season. */
-export const MOCK_VERB = 'Start a mock draft';
 /** The cheat sheet's way in beside it. */
 export const SHEET_LINK = 'Cheat sheet';
 /** The account page's Next draft rows in season, where the draft prep has left the rail: each
@@ -52,11 +50,6 @@ export const NEXT_DRAFT_ROWS = [
 		verb: 'Open your sheet'
 	}
 ] as const;
-
-/** Whether a rail is the season's, where the account page shows the Next draft rows. */
-export function railInSeason(rail: RailKey): boolean {
-	return rail === 'in_season' || rail === 'playoffs' || rail === 'playoffs_waivers';
-}
 
 /** The league page's matchup line's way to the Matchup screen. */
 export const SEE_MATCHUP = 'See the matchup';

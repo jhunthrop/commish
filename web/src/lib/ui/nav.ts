@@ -50,6 +50,8 @@ export const HOME_HREF = '/';
 
 /** Where a mock draft starts: the room's setup. */
 const MOCK_SETUP = '/mock/new';
+/** The verb to a mock draft, wherever a page offers one: the season's pages and the league's. */
+export const MOCK_VERB = 'Start a mock draft';
 /** The advisor's own page: our call beside your real draft (the live draft companion). */
 export const COMPANION_START = '/companion/new' as const;
 /** Where a league on another host is attached. */
@@ -191,6 +193,11 @@ export function railKey(state: RailState): RailKey {
 /** Whether a word is a rail key: what the boot script and the kept copy are checked against. */
 export function isRailKey(word: unknown): word is RailKey {
 	return (RAIL_KEYS as readonly unknown[]).includes(word);
+}
+
+/** Whether a rail is the season's: the rails that hold the in-season screens. */
+export function railInSeason(rail: RailKey): boolean {
+	return rail === 'in_season' || rail.startsWith('playoffs');
 }
 
 /** The rail the shell shows before any context is read: the site before its draft. */

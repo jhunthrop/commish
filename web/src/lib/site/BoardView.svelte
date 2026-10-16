@@ -26,10 +26,11 @@
 
 	interface Props {
 		page: BoardPage;
-		season: number;
+		/** The board's own heading, which follows the season (season-words.ts). */
+		heading: string;
 	}
 
-	let { page, season }: Props = $props();
+	let { page, heading }: Props = $props();
 
 	/** Faces in the first screen load eagerly so they count toward the first paint. */
 	const EAGER_ROWS = 8;
@@ -38,8 +39,8 @@
 	let rangeOn = $state(true);
 	/** The floor to ceiling column: shown while the switch is on, and only on a board with a range. */
 	const range = $derived(page.range && rangeOn);
-	/** Drafters against our rank: preseason only (in season the ADP stands alone). */
-	const compare = $derived(page.format.rosFromWeek === undefined);
+	/** How every row frames his rank against the drafts (run/row-framing.ts). */
+	const framing = $derived(page.framing);
 	let onlySheet = $state<boolean>(false);
 
 	// The sheet loads on the reader's first intent, and at once when they ask for only their sheet.
@@ -86,7 +87,7 @@
 		showTier={page.position === null}
 		{unit}
 		{range}
-		{compare}
+		{framing}
 		eager={i < EAGER_ROWS}
 		season={player.season}
 		held={siteContext.held?.mark(player.id) ?? null}
@@ -105,7 +106,7 @@
 	</div>
 	<div class="content">
 		<div class="lead">
-			<PageHead title="{season} Board" lead={page.seasonLead ?? page.format.basis.join(' · ')}>
+			<PageHead title={heading} lead={page.seasonLead ?? page.format.basis.join(' · ')}>
 				{#snippet actions()}
 					<Quiet href={links.adp(page.format.id)} size="sm">ADP</Quiet>
 					<Quiet href={links.schedule()} size="sm">Schedule strength</Quiet>
@@ -128,7 +129,7 @@
 		</div>
 
 		<section aria-label="{page.position ?? 'All'} {page.format.label} board">
-			<RowHead {range} action games={page.seasonLead !== null} {compare} />
+			<RowHead {range} action games={page.seasonLead !== null} {framing} />
 			{#if page.position === null}
 				{#each visible as player, i (player.id)}
 					{@render row(player, i)}

@@ -4,6 +4,7 @@
  * sign out. A signed-out browser is an answer here, not an error.
  */
 import { ApiError, type ApiClient } from '#lib/api/client.ts';
+import { hasSessionCookie } from '#lib/api/session.ts';
 import { isSignedOut } from '#lib/api/status.ts';
 import type { components } from '#lib/api/types.ts';
 
@@ -49,6 +50,8 @@ function unreachableKind(online: () => boolean): AccountState {
 export function accountApi(client: ApiClient, online: () => boolean): AccountApi {
 	return {
 		async load() {
+			// With no session the answer is a 401: signed out without asking.
+			if (!hasSessionCookie()) return { kind: 'signed-out' };
 			let account: Account;
 			try {
 				account = await client.call<Account>('/me');

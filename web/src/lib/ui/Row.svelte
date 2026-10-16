@@ -2,6 +2,7 @@
 	import { fixed } from '#lib/format/number.ts';
 	import type { Snippet } from 'svelte';
 	import type { ShownMark } from '#lib/context/held-words.ts';
+	import { framedVorCell, type RowFraming } from '#lib/run/row-framing.ts';
 	import type { IndexSeason } from '#lib/run/schema.ts';
 	import type { BoardPlayer, RangeScale } from '#lib/types/player.ts';
 	import AdpCell from './AdpCell.svelte';
@@ -11,7 +12,6 @@
 	import RangeBar from './RangeBar.svelte';
 	import TierChip from './TierChip.svelte';
 	import ValueCell from './ValueCell.svelte';
-	import { vorCell } from './heat.ts';
 	import { seasonFigures } from './season-figures.ts';
 
 	interface Props {
@@ -42,8 +42,9 @@
 		/** The league's mark, with the component that draws it (HeldMark, loaded with the rosters):
 		 * yours, which tints the row with your wash, or a free agent. */
 		held?: ShownMark | null;
-		/** The Drafters cell compares drafters with our rank. Off in season: the ADP alone. */
-		compare?: boolean;
+		/** How the row frames his rank against the drafts, the page's one rule (run/row-framing.ts):
+		 * in season the ADP alone and no round. Match the RowHead's. */
+		framing: RowFraming;
 	}
 
 	let {
@@ -58,7 +59,7 @@
 		order = 'board',
 		season,
 		held = null,
-		compare = true
+		framing
 	}: Props = $props();
 
 	const lead = $derived(
@@ -98,7 +99,7 @@
 	</span>
 	<span class="gp">{season?.games}</span>
 	<span class="proj"><ValueCell value={player.projected} label={unit} /></span>
-	<ValueCell {...vorCell(player.vor, player.vorRound)} phoneLabel={false} />
+	<ValueCell {...framedVorCell(player.vor, player.vorRound, framing)} phoneLabel={false} />
 	{#if range}
 		<span class="rng">
 			<RangeBar
@@ -113,7 +114,7 @@
 		adp={player.adp}
 		ourRank={player.ourRank}
 		under={order === 'adp' ? 'rank' : 'adp'}
-		{compare}
+		compare={framing.compare}
 	/>
 	{#if action}<span class="action">{@render action()}</span>{/if}
 </div>

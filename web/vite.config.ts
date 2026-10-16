@@ -9,11 +9,11 @@ const SHELL_HREFS = shellHrefs();
  * on its first response. The design system's CSS for a whole page sits well under it. */
 const INLINE_STYLE_LIMIT = 32_768;
 const PRERENDER_CONCURRENCY = 8;
-/** A board row and its cells, with the row's sheet mark and its season figures: the board, ADP, a
- * club and the front door draw them, a player page never does, so they load as one file with the
- * pages that draw rows. */
+/** A board row and its cells, with the row's sheet mark, its season figures and its framing, and
+ * the words of the pages that draw rows and follow the season: the board, ADP, a club and the front
+ * door draw them, a player page never does, so they load as one file with the pages that draw rows. */
 const ROW_PARTS =
-	/[\\/]src[\\/]lib[\\/](ui[\\/](Row|RowHead|RangeBar|AdpCell|SheetMark|season-figures|ValueCell|NameWords|Place)\.|site[\\/]RowSheetMark\.)/;
+	/[\\/]src[\\/]lib[\\/](ui[\\/](Row|RowHead|RangeBar|AdpCell|SheetMark|season-figures|ValueCell|NameWords|Place)\.|site[\\/](RowSheetMark|season-words|shown-rail\.svelte|verb-links)\.|run[\\/]row-framing\.)/;
 /** The board and ADP pages' own parts: the views, the tier strip, the rail's jump list and toggles,
  * the follow of the switch's format, the chips, and a missing format's page. One file for those
  * pages. */
