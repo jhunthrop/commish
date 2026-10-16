@@ -367,6 +367,9 @@ NEW_IN_RESEARCH: Final[Mapping[str, str]] = MappingProxyType(
         "preseason_candidates": "each board's candidate set, kept from revision 0005 so a custom board can be built",
         "custom_boards": "the custom-scoring board cache (revision 0005), rebuilt on demand from the candidates",
         "published_boards": "the published run's board rows (revision 0006), rewritten by every publish",
+        "nflverse_games": "nflverse's game table (revision 0009), one row per game, updated as a game's facts move",
+        "stadiums": "the venues from the reviewed Wikidata seed (revision 0009), rewritten by its validating ingest",
+        "nws_grid_points": "the weather service's grid cell per stadium and season (revision 0009), the forecast job's cache",
     }
 )
 
