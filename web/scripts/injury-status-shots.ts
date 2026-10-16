@@ -76,19 +76,28 @@ async function board(page: Page, tag: string): Promise<void> {
 	);
 	const order = await page.locator('.row').evaluateAll(
 		(rows, position) =>
-			rows.map((r) => ({ text: (r as HTMLElement).innerText, at: r.textContent?.includes(position) })),
+			rows.map((r) => ({
+				text: (r as HTMLElement).innerText,
+				at: r.textContent?.includes(position)
+			})),
 		HELD.position
 	);
 	const heldAt = order.findIndex((r) => r.text.includes(HELD.name));
 	const lastAvailable = order.findLastIndex(
 		(r, i) => i !== heldAt && r.at === true && !/\bIR\b|PUP|NFI|Susp/.test(r.text)
 	);
-	check(heldAt > lastAvailable, `${tag}: the IR back follows every available back (${heldAt} after ${lastAvailable})`);
+	check(
+		heldAt > lastAvailable,
+		`${tag}: the IR back follows every available back (${heldAt} after ${lastAvailable})`
+	);
 	await held.scrollIntoViewIfNeeded();
 	await page.screenshot({ path: file(`board-ir-row-${tag}`) });
 	const doubtful = row(page, DOUBTFUL.name);
 	const doubtfulText = await doubtful.innerText();
-	check(/Doubtful as of \w{3} \d{1,2}:\d{2} [ap]m/.test(doubtfulText), `${tag}: the doubtful mark: ${doubtfulText}`);
+	check(
+		/Doubtful as of \w{3} \d{1,2}:\d{2} [ap]m/.test(doubtfulText),
+		`${tag}: the doubtful mark: ${doubtfulText}`
+	);
 	await doubtful.scrollIntoViewIfNeeded();
 	await page.screenshot({ path: file(`board-doubtful-row-${tag}`) });
 }
@@ -106,7 +115,10 @@ async function playerPages(page: Page, tag: string): Promise<void> {
 	await open(page, `/players/${HELD.slug}`);
 	const text = await page.locator('main').innerText();
 	check(text.includes('RB IR'), `${tag}: his pill shows IR`);
-	check(text.includes('On injured reserve since September 28.'), `${tag}: his page says since when`);
+	check(
+		text.includes('On injured reserve since September 28.'),
+		`${tag}: his page says since when`
+	);
 	check(CAPTURE.test(text), `${tag}: his page names the capture`);
 	await page.screenshot({ path: file(`player-ir-${tag}`) });
 	await open(page, `/players/${DOUBTFUL.slug}`);
@@ -135,7 +147,9 @@ for (const theme of THEMES) {
 		await positionView(page, tag);
 		await playerPages(page, tag);
 		await recordPage(page, tag);
-		const sideways = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
+		const sideways = await page.evaluate(
+			() => document.documentElement.scrollWidth > window.innerWidth
+		);
 		check(!sideways, `${tag}: nothing scrolls sideways`);
 		await ctx.close();
 	}
@@ -143,5 +157,7 @@ for (const theme of THEMES) {
 await browser.close();
 
 for (const failure of failures) process.stderr.write(`FAIL ${failure}\n`);
-process.stdout.write(`${failures.length === 0 ? 'ok' : 'failed'}: ${String(failures.length)} failures\n`);
+process.stdout.write(
+	`${failures.length === 0 ? 'ok' : 'failed'}: ${String(failures.length)} failures\n`
+);
 process.exit(failures.length === 0 ? 0 : 1);
