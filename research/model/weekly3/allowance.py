@@ -17,7 +17,7 @@ With no game counted the allowance is 1 (the missing-input table); a group whose
 0 (a quarterback's targets) carries no ratio and takes 1 too, counted apart.
 """
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Final
@@ -102,6 +102,16 @@ def allowance(  # noqa: PLR0913, PLR0917 - the allowance's every input, named
             return _dropbacks(team_rows, offence, at, PbpMetric.DROPBACKS)
         return _group(totals, at, offence, position, kind)
 
+    return ratio_allowance(defence, week, schedule, allowed, gained)
+
+
+ValueAt = Callable[[str, int], float | None]  # (offence, week) -> the value, None when not stamped
+
+
+def ratio_allowance(defence: str, week: int, schedule: Schedule, allowed: ValueAt, gained: ValueAt) -> Allowance:
+    """D's allowance of any per-game value before `week`: over D's games, what D allowed against what
+    the same offences gained in their other games, shrunk toward 1 (round 4 reads it for its new
+    allowances, section 2.4, on the same construction)."""
     pairs: list[tuple[float, float]] = []
     for at in schedule.club_weeks(defence, week):
         offence = schedule.opponent(at, defence)
