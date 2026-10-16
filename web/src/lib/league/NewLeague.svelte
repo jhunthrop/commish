@@ -58,8 +58,8 @@
 	type View = 'loading' | 'signed-out' | 'form' | 'unreachable';
 
 	/** The league screen a rail item led here from (`?screen=start`): its line names it, and its item
-	 * stays lit. */
-	const forScreen = leagueScreenOf(page.url.searchParams.get(SCREEN_PARAM));
+	 * stays lit. Derived from the address, so a second rail tap on this page changes both. */
+	const forScreen = $derived(leagueScreenOf(page.url.searchParams.get(SCREEN_PARAM)));
 
 	let view = $state<View>('loading');
 	/** How the league comes in: a pasted link (Sleeper, MyFantasyLeague, a public ESPN league), or a
