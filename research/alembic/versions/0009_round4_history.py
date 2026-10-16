@@ -173,6 +173,7 @@ def _game_weather() -> None:
         sa.Column("isd_precipitation", sa.Integer(), nullable=True),
         sa.Column("isd_station", sa.Text(), nullable=True),
         sa.Column("isd_distance_km", sa.Double(precision=53), nullable=True),
+        sa.Column("isd_precipitation_station", sa.Text(), nullable=True),
         sa.Column("as_of", sa.DateTime(timezone=True), nullable=False),
         sa.Column("ingested_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
         sa.CheckConstraint(

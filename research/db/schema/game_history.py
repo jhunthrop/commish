@@ -162,6 +162,8 @@ GAME_WEATHER: Final = Table(
     Column("isd_precipitation", Integer),
     Column("isd_station", Text),
     Column("isd_distance_km", Double(53)),
+    # The station ISD's precipitation came from, when the nearest had no one-hour depth for the hour.
+    Column("isd_precipitation_station", Text),
     # The recorded weather's stamp: the game's day plus the publication lag, as `nflverse_kickoff`'s.
     Column("as_of", DateTime(True), nullable=False),
     recorded_at(),

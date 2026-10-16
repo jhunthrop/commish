@@ -124,6 +124,7 @@ class WeatherRow:
     isd_precipitation: int | None = None
     isd_station: str | None = None
     isd_distance_km: float | None = None
+    isd_precipitation_station: str | None = None
     as_of: datetime | None = None
 
 
@@ -177,6 +178,7 @@ def fill(game: GameRecord, weather_text: str | None, isd: IsdLookup) -> WeatherR
         isd_precipitation=None if station is None else station.precipitation,
         isd_station=None if station is None else station.station,
         isd_distance_km=None if station is None else station.distance_km,
+        isd_precipitation_station=None if station is None else station.precipitation_station,
     )  # fmt: skip
 
 
@@ -184,6 +186,7 @@ _TEXTS: Final = text(
     f"select distinct on (game_id) game_id, weather from {NFLVERSE_PBP_PLAYS.fullname} "
     "where season = any(:seasons) and weather is not null order by game_id, play_id"
 )
+_HAS_PLAYS: Final = text(f"select exists (select 1 from {NFLVERSE_PBP_PLAYS.fullname} where season = :season)")
 _HAS_STADIUMS: Final = text("select to_regclass('research.stadiums') is not null")
 _STADIUMS: Final = text("select stadium_id, latitude, longitude from research.stadiums")
 
@@ -278,7 +281,11 @@ def weather_report(season: int, rows: Sequence[WeatherRow], written: int, isd_re
 def ingest_game_weather(
     conn: Connection, client: NflverseClient, reader: IsdReader | None, seasons: Sequence[int]
 ) -> list[WeatherReport]:
-    """Every regular-season game of `seasons`; `reader` None reads no ISD."""
+    """Every regular-season game of `seasons`; `reader` None reads no ISD. A season with no plays in the
+    play table is refused: its gamebook lines are not stored yet, and ISD would stand in for them."""
+    unplayed = [s for s in seasons if not conn.execute(_HAS_PLAYS, {"season": s}).scalar_one()]
+    if unplayed:
+        raise SchemaDriftError(f"the play table holds no plays of {unplayed}; run pbp-plays for them first.")
     games = game_records(schedule_client(client).get_csv(SCHEDULE_RELEASE, SCHEDULE_FILE), seasons)
     texts = weather_texts(conn, seasons)
     coordinates = stadium_coordinates(conn)

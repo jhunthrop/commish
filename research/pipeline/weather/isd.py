@@ -12,13 +12,17 @@ service one station and one season at a time with only the fields the fill needs
 - Precipitation is the one-hour liquid depth (`AA1`, period 01) of the first report in the hour after
   the kickoff: any measured depth, or a trace, is 1; a zero depth is 0; no such report says nothing.
   Its kind is read from the present-weather code (`MW1`, else `AW1`) of the report nearest kickoff.
+  The one-hour period is the first of `AA1` to `AA3` that carries one. When the nearest station has
+  no such report for the hour, the next station in range that has one gives the precipitation.
+- QUALITY. ISD's erroneous codes (3 and 7) make a value no value. The suspect codes (2 and 6) are
+  accepted as reported: they mark a value the source flagged, not one it rejected.
 
 Every response is parsed strictly: a missing column or an unreadable field is a changed service.
 """
 
 import math
 from collections.abc import Iterable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, date, datetime, timedelta
 from typing import Final
 from urllib.parse import urlencode
@@ -29,7 +33,8 @@ from research.pipeline.nflverse.csv import CsvRow, parse_csv
 
 STATION_LIST_URL: Final = "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
 DATA_SERVICE_URL: Final = "https://www.ncei.noaa.gov/access/services/data/v1"
-DATA_TYPES: Final = ("TMP", "WND", "AA1", "MW1", "AW1")
+DEPTH_COLUMNS: Final = ("AA1", "AA2", "AA3")
+DATA_TYPES: Final = ("TMP", "WND", *DEPTH_COLUMNS, "MW1", "AW1")
 MAX_STATION_KM: Final = 50.0
 STATIONS_TRIED: Final = 3
 REPORT_WINDOW: Final = timedelta(minutes=60)
@@ -47,7 +52,9 @@ _TRACE: Final = "2"
 _MPH_PER_MS: Final = 2.2369362920544
 _TENTHS: Final = 10.0
 _STATION_COLUMNS: Final = ("USAF", "WBAN", "STATION NAME", "LAT", "LON", "BEGIN", "END")
-_REPORT_COLUMNS: Final = ("STATION", "DATE", *DATA_TYPES)
+# The service answers only the requested fields a station reported in the window, so only these two
+# columns are required; an absent field column reads as no value.
+_REPORT_COLUMNS: Final = ("STATION", "DATE")
 # Present-weather codes (ISD's MW1 and AW1 tables) by the word class the gamebook parser uses.
 _KIND_RANGES: Final = (
     (range(50, 66), "rain"),
@@ -96,6 +103,9 @@ class KickoffWeather:
     precipitation: int | None
     precipitation_mm: float | None
     kind: str | None
+    # The station the precipitation came from: the same one, or the next within range when the nearest
+    # reported no one-hour depth for the hour.
+    precipitation_station: str | None = None
 
 
 def _require(rows: Sequence[CsvRow], columns: Iterable[str], what: str) -> None:
@@ -201,10 +211,19 @@ def _hour_depth(raw: str, at: str) -> tuple[float | None, bool]:
 
 def _weather_code(row: CsvRow, at: str) -> int | None:
     for column in ("MW1", "AW1"):
-        parts = _fields(row[column], 2, column, at)
+        parts = _fields(row.get(column, ""), 2, column, at)
         if parts is not None and parts[0].isdigit():
             return int(parts[0])
     return None
+
+
+def _first_hour_depth(row: CsvRow, at: str) -> tuple[float | None, bool]:
+    """The first one-hour period among AA1 to AA3 (a report can carry several periods)."""
+    for column in DEPTH_COLUMNS:
+        depth, trace = _hour_depth(row.get(column, ""), at)
+        if depth is not None:
+            return depth, trace
+    return None, False
 
 
 def parse_reports(text: str) -> list[Report]:
@@ -218,7 +237,7 @@ def parse_reports(text: str) -> list[Report]:
             instant = datetime.fromisoformat(at).replace(tzinfo=UTC)
         except ValueError as error:
             raise SchemaDriftError(f'ISD report date "{at}" is not ISO 8601.') from error
-        depth, trace = _hour_depth(row["AA1"], at)
+        depth, trace = _first_hour_depth(row, at)
         reports.append(
             Report(instant, _temperature(row["TMP"], at), _wind(row["WND"], at), depth, trace, _weather_code(row, at))
         )
@@ -286,12 +305,23 @@ class IsdReader:
         return self._seasons[key]
 
     def weather(self, latitude: float, longitude: float, season: int, kickoff: datetime) -> KickoffWeather | None:
-        """The nearest station with a temperature or a wind reported near the kickoff, or None."""
+        """The nearest station with a temperature or a wind reported near the kickoff, and the
+        precipitation from it or, when it has no one-hour depth for the hour, from the next station in
+        range that has one; None when no station reports a temperature or a wind."""
+        found: KickoffWeather | None = None
         for station, km in nearest_stations(self.stations(), latitude, longitude, season):
-            found = at_kickoff(self.season(station.id, season), kickoff, station.id, km)
-            if found.temperature_f is not None or found.wind_mph is not None:
-                return found
-        return None
+            here = at_kickoff(self.season(station.id, season), kickoff, station.id, km)
+            if found is None and (here.temperature_f is not None or here.wind_mph is not None):
+                found = here
+            if found is not None and here.precipitation is not None:
+                return replace(
+                    found,
+                    precipitation=here.precipitation,
+                    precipitation_mm=here.precipitation_mm,
+                    kind=here.kind,
+                    precipitation_station=station.id,
+                )
+        return found
 
 
 Coordinates = Mapping[str, tuple[float, float]]

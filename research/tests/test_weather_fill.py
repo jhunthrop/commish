@@ -21,6 +21,7 @@ from research.db.url import sqlalchemy_url
 from research.errors import SchemaDriftError
 from research.parity import databases
 from research.pipeline.http import HttpResponse
+from research.pipeline.nflverse import pbp_plays
 from research.pipeline.nflverse.client import NflverseClient
 from research.pipeline.weather import game_weather as gw
 from research.pipeline.weather import isd
@@ -94,6 +95,41 @@ def test_the_kickoff_report_of_a_rainy_hour() -> None:
     assert (found.precipitation, found.precipitation_mm, found.kind) == (1, 0.0, "rain")
 
 
+def _recut(mapping: Mapping[str, str], blank: str | None = None) -> bytes:
+    """The recorded answer with columns renamed and one column blanked (a constructed variant)."""
+    rows = list(csv.DictReader(io.StringIO((NOAA / "global-hourly-72534014819-2022.csv").read_text())))
+    out = io.StringIO()
+    names = [mapping.get(n, n) for n in rows[0]]
+    writer = csv.writer(out, quoting=csv.QUOTE_ALL, lineterminator="\n")
+    writer.writerow(names)
+    for row in rows:
+        writer.writerow("" if name == blank else value for name, value in zip(names, row.values(), strict=True))
+    return out.getvalue().encode()
+
+
+@dataclass
+class RecutFetcher(NcciFetcher):
+    """Midway with no one-hour depth, O'Hare with its period in AA2; the rest as recorded."""
+
+    bodies: Mapping[str, bytes] = field(
+        default_factory=lambda: {
+            isd.season_url("72534014819", 2022): _recut({}, blank="AA1"),
+            isd.season_url("72530094846", 2022): _recut({"AA1": "AA2"}),
+        }
+    )
+
+    def get(self, url: str, headers: Mapping[str, str] | None = None) -> HttpResponse:
+        return HttpResponse(200, self.bodies[url]) if url in self.bodies else super().get(url, headers)
+
+
+def test_precipitation_comes_from_the_next_station_when_the_nearest_has_no_depth() -> None:
+    found = isd.IsdReader(RecutFetcher()).weather(*SOLDIER_FIELD, 2022, datetime(2022, 9, 11, 17, tzinfo=UTC))
+    assert found is not None
+    assert found.station == "72534014819" and found.temperature_f is not None
+    # O'Hare's one-hour period, read from AA2: the 17:53 report, depth 0000 with a trace.
+    assert (found.precipitation, found.precipitation_station) == (1, "72530094846")
+
+
 def test_an_unreadable_report_field_is_refused() -> None:
     body = (NOAA / "global-hourly-72534014819-2022.csv").read_text().replace('"+0206,5"', '"+0206"')
     with pytest.raises(SchemaDriftError, match="TMP"):
@@ -149,6 +185,13 @@ def engine() -> Any:
     finally:
         built.dispose()
         databases.drop(_DATABASE)
+
+
+def test_a_season_with_no_plays_is_refused(engine: Engine) -> None:
+    with engine.begin() as conn, pytest.raises(SchemaDriftError, match=r"no plays of \[2022\]"):
+        gw.ingest_game_weather(conn, NflverseClient(FixtureFetcher(bodies=GAMES)), None, [2022])
+    with engine.begin() as conn:
+        pbp_plays.ingest_pbp_plays(conn, NflverseClient(FixtureFetcher()), 2022)
 
 
 def test_without_a_stadiums_table_no_station_is_read_and_a_rerun_writes_nothing(engine: Engine) -> None:
