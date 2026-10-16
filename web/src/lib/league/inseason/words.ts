@@ -4,6 +4,7 @@
 import { fixed, signed } from '#lib/format/number.ts';
 import { listWords } from '#lib/format/list.ts';
 import { monthDayLabel } from '#lib/format/date.ts';
+import { memberZone, weekdayTime } from '#lib/format/clock.ts';
 import type { LeagueHost } from '../api.ts';
 import { recordWords } from '../model.ts';
 import { hostWords } from '../names.ts';
@@ -20,9 +21,9 @@ import type {
 	WeekFacts
 } from './api.ts';
 
-import type { InSeasonScreen } from './screens.ts';
+import type { InSeasonScreen, LeagueScreen } from './screens.ts';
 
-export type { InSeasonScreen } from './screens.ts';
+export type { InSeasonScreen, LeagueScreen } from './screens.ts';
 
 /** How a gain and a points-over-replacement figure print: one decimal. */
 export const GAIN_DECIMALS = 1;
@@ -206,61 +207,14 @@ export const NO_START_RULE = 'Nobody here starts for you this week';
 export const LATER_RULE = 'These help your lineup but do not start this week';
 
 /** The signed-out panel's title, naming the screen it is for. */
-export function signInTitle(screen: InSeasonScreen): string {
-	return `Sign in to see ${TAB_LABELS[screen].toLowerCase()} for your league`;
+export function signInTitle(screen: LeagueScreen): string {
+	return `Sign in to see your ${TAB_LABELS[screen].toLowerCase()}`;
 }
 
 /** What the order is, in the refreshed stamp: "Our rest-of-season order, refreshed October 14." */
 export function refreshedWords(basis: OrderBasis, refreshed: string): string {
 	const order = basis === 'rest_of_season' ? 'Our rest-of-season order' : 'Our preseason number';
 	return `${order}, refreshed ${monthDayLabel(refreshed)}.`;
-}
-
-/** The member's own time zone, from the browser: the API keeps instants, the screen says them on the
- * member's clock. */
-export function memberZone(): string {
-	return Intl.DateTimeFormat().resolvedOptions().timeZone;
-}
-
-/** The weekday-and-time format for a zone, made once per zone. */
-const weekdayFormats = new Map<string, Intl.DateTimeFormat>();
-
-function weekdayFormat(zone: string): Intl.DateTimeFormat {
-	const known = weekdayFormats.get(zone);
-	if (known) return known;
-	const made = new Intl.DateTimeFormat('en-US', {
-		weekday: 'short',
-		hour: 'numeric',
-		minute: '2-digit',
-		timeZone: zone
-	});
-	weekdayFormats.set(zone, made);
-	return made;
-}
-
-/** "Sun 1:00 pm": a kickoff or a stamp on the member's clock (zoneLine names the zone once). */
-export function weekdayTime(iso: string, zone: string = memberZone()): string {
-	const parts = weekdayFormat(zone).formatToParts(new Date(iso));
-	const part = (type: Intl.DateTimeFormatPartTypes): string =>
-		parts.find((p) => p.type === type)?.value ?? '';
-	return `${part('weekday')} ${part('hour')}:${part('minute')} ${part('dayPeriod').toLowerCase()}`;
-}
-
-/** The zone's own name, "Central Time", as the browser names it. */
-function zoneName(zone: string): string {
-	const named = new Intl.DateTimeFormat('en-US', { timeZone: zone, timeZoneName: 'longGeneric' })
-		.formatToParts(new Date())
-		.find((p) => p.type === 'timeZoneName')?.value;
-	return named ?? zone;
-}
-
-/** The NFL's clock, which a screen's times need not name. */
-const EASTERN = 'Eastern Time';
-
-/** The member's zone said once on a screen, "Times are in Central Time.", null on the Eastern clock. */
-export function zoneLine(zone: string = memberZone()): string | null {
-	const name = zoneName(zone);
-	return name === EASTERN ? null : `Times are in ${name}.`;
 }
 
 /** His game this week: "at BUF Sun 1:00 pm", "vs BUF ...", "Bye this week", "Played". */
@@ -325,10 +279,11 @@ export function hisPorWords(points: number): string {
 	return `his ${porFigure(points)} ${LINES.overRepl}`;
 }
 
-/** The tabs under a followed league's title. */
-export const TAB_LABELS: Readonly<Record<'league' | InSeasonScreen, string>> = {
+/** The tabs under a followed league's title, each screen by its rail word (spec 2026-10-16 §3). */
+export const TAB_LABELS: Readonly<Record<'league' | LeagueScreen, string>> = {
 	league: 'League',
-	start: 'Start and sit',
+	start: 'Lineup',
+	matchup: 'Matchup',
 	waivers: 'Waivers',
 	trades: 'Trades'
 };

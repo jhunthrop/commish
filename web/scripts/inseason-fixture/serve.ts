@@ -22,6 +22,7 @@ import type {
 } from '../../src/lib/league/inseason/api.ts';
 import type { components } from '../../src/lib/api/types.ts';
 import { FIXTURE_IDS } from './ids.ts';
+import { FIXTURE_SEASON, askedPhase, phaseAccount, phaseLeagues, phaseSync } from './phases.ts';
 
 const PORT = Number(process.env.PORT ?? 8799);
 const DATA = new URL('./data/', import.meta.url);
@@ -83,7 +84,7 @@ const [sync, lineup, waivers, trades] = await Promise.all([
 ]);
 
 const myTeam = sync.teams.find((t) => t.roster_id === sync.me);
-const contextLeague: components['schemas']['ContextLeague'] = {
+const contextBase = {
 	id: LEAGUE,
 	name: sync.name,
 	host: sync.host,
@@ -99,30 +100,26 @@ const contextLeague: components['schemas']['ContextLeague'] = {
 		: null,
 	scoring: sync.scoring_like,
 	format: sync.board_format,
-	settings_league_id: null,
-	phase: 'in_season',
-	phase_basis: `${sync.host === 'ffpc' ? 'FFPC' : 'The host'} says the draft is done and week ${sync.week} is under way.`,
-	draft_at: null,
-	playoff_start_week: null,
-	waivers_open: true
+	settings_league_id: null
 };
+/** The leagues as the switch lists them, one per season phase (phases.ts), drafts timed from now. */
+const leaguesNow = (): components['schemas']['ContextLeague'][] =>
+	phaseLeagues(contextBase, Date.now());
+const contextLeague = leaguesNow().find((league) => league.id === LEAGUE);
+if (!contextLeague) throw new Error('The fixture has no in-season league.');
 const account: components['schemas']['Account'] = {
 	id: '6f1d1c52-2626-4a26-9a26-0000000000a1',
 	email: 'fixture@example.com',
 	league: contextLeague,
 	leagues: [contextLeague],
 	format: contextLeague.format,
+	season: FIXTURE_SEASON,
 	first_name: null,
 	last_name: null,
 	handle: 'fixture',
 	features: [],
 	draft_pass: null,
 	membership: null,
-	season: {
-		phase: 'in_season',
-		week: sync.week,
-		basis: `Week ${sync.week} of the 2026 NFL season is under way.`
-	},
 	created_at: '2026-09-01T12:00:00.000Z'
 };
 
@@ -325,7 +322,25 @@ async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> 
 		return;
 	}
 	if (url.pathname === '/me' || url.pathname === '/me/league') {
-		send(req, res, HTTP.ok, account);
+		const { phase, one, many } = askedPhase(req.headers.cookie);
+		const leagues = leaguesNow();
+		const asked = url.pathname === '/me/league' ? await bodyOf(req) : null;
+		const chosen = (asked as { league_id?: string } | null)?.league_id;
+		const answer = {
+			...phaseAccount(account, leagues, phase, one),
+			features: many ? (['many_leagues'] as const) : []
+		};
+		const picked = leagues.find((league) => league.id === chosen);
+		send(req, res, HTTP.ok, picked ? { ...answer, league: picked } : answer);
+		return;
+	}
+	if (url.pathname === '/season') {
+		send(req, res, HTTP.ok, FIXTURE_SEASON);
+		return;
+	}
+	// The account page's other lists, empty for the fixture account.
+	if (url.pathname === '/mocks' || url.pathname === '/billing/group-passes') {
+		send(req, res, HTTP.ok, []);
 		return;
 	}
 	if (url.pathname === '/sheets') {
@@ -335,27 +350,40 @@ async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> 
 	if (url.pathname === '/leagues/attached') {
 		// Every fixture league is on the account; only the first is in the switch's list (/me), so
 		// the page names the others from this list.
+		const phased = new Map(leaguesNow().map((league) => [league.id, league]));
 		send(
 			req,
 			res,
 			HTTP.ok,
-			Object.values(FIXTURE_IDS).map((id) => ({
-				id,
-				host: ESPN_MOVES.has(id) ? 'espn' : sync.host,
-				host_league_id: sync.host_league_id,
-				season: sync.season,
-				name: sync.name,
-				roster_id: sync.me,
-				team_name: contextLeague.team_name,
-				standing: contextLeague.standing,
-				attached_at: '2026-09-01T12:00:00.000Z'
-			}))
+			Object.values(FIXTURE_IDS).map((id) => {
+				const league = phased.get(id) ?? { ...contextLeague, name: sync.name };
+				return {
+					id,
+					host: ESPN_MOVES.has(id) ? 'espn' : sync.host,
+					host_league_id: sync.host_league_id,
+					season: sync.season,
+					name: league.name,
+					roster_id: sync.me,
+					team_name: league.team_name,
+					standing: league.standing,
+					attached_at: '2026-09-01T12:00:00.000Z',
+					phase: league.phase,
+					phase_basis: league.phase_basis,
+					draft_at: league.draft_at,
+					playoff_start_week: league.playoff_start_week,
+					waivers_open: league.waivers_open
+				};
+			})
 		);
 		return;
 	}
 	const synced = SYNC.exec(url.pathname);
 	if (synced) {
-		send(req, res, HTTP.ok, { ...sync, id: synced[1], read_at: readAt() });
+		send(req, res, HTTP.ok, {
+			...phaseSync(sync, synced[1] ?? ''),
+			id: synced[1],
+			read_at: readAt()
+		});
 		return;
 	}
 	const moved = MOVES.exec(url.pathname);

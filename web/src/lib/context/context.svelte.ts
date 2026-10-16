@@ -11,7 +11,22 @@ import { PUBLIC_API_URL } from '$app/env/public';
 import { ApiError, apiClient } from '#lib/api/client.ts';
 import { sessionToken } from '#lib/api/session.ts';
 import type { components } from '#lib/api/types.ts';
-import { CONTEXT_KEY, LEAGUE_ATTR, LINES_KEY } from './boot.ts';
+import {
+	DEFAULT_RAIL,
+	isRailKey,
+	railKey,
+	railPhase,
+	type RailKey,
+	type SitePhase
+} from '#lib/ui/nav.ts';
+import {
+	ACCOUNT_RAIL_KEY,
+	CONTEXT_KEY,
+	LEAGUE_ATTR,
+	LINES_KEY,
+	RAIL_ATTR,
+	SITE_RAIL_KEY
+} from './boot.ts';
 import type { Marks } from './held-words.ts';
 import type * as NoteLine from './note-line.ts';
 import type { BoardFormat, ContextLeague } from './words.ts';
@@ -20,13 +35,39 @@ type Account = components['schemas']['Account'];
 type Feature = components['schemas']['Feature'];
 
 /** What the browser keeps of the context, with the session it is for (null: signed out, a format
- * this browser chose and never a league) and the account /me named. */
+ * this browser chose and never a league) and the account /me named, and the rail it shows, which
+ * the boot script reads before the first paint. */
 interface Kept {
 	session: string | null;
 	account: string | null;
 	league: ContextLeague | null;
 	leagues: readonly ContextLeague[];
 	format: BoardFormat | null;
+	season: SitePhase | null;
+	rail: RailKey;
+}
+
+/** The site's rail the boot script last kept (the build's), else the site before its draft. */
+function siteRail(): RailKey {
+	try {
+		const kept = localStorage.getItem(SITE_RAIL_KEY);
+		return isRailKey(kept) ? kept : DEFAULT_RAIL;
+	} catch {
+		return DEFAULT_RAIL;
+	}
+}
+
+/** The rail for a selected league, else the account's site season, else the site's build. A
+ * league or an account from an API before the phase answers none of it. */
+function railOf(
+	league: Partial<Pick<ContextLeague, 'phase' | 'waivers_open'>> | null,
+	season: SitePhase | null,
+	site: RailKey
+): RailKey {
+	if (league?.phase !== undefined || season !== null) {
+		return railKey(railPhase(league, season ?? 'preseason'));
+	}
+	return site;
 }
 
 const client = apiClient(PUBLIC_API_URL);
@@ -58,8 +99,12 @@ class SiteContext {
 	notes = $state<typeof NoteLine | null>(null);
 	/** The league the rosters are, or are being read, for. */
 	heldFor: string | null = null;
-	/** The switch's menu is open: the bar's switch and the rail's Leagues open the one menu. */
+	/** The switch's menu is open: its own tap opens it, and a refused choice opens it again. */
 	open = $state(false);
+	/** The site's own season from /me, null signed out or before /me answers. */
+	season = $state<SitePhase | null>(null);
+	/** The rail the shell shows: the selected league's phase, else the site's season (nav.ts). */
+	rail = $derived(railOf(this.league, this.season, siteRail()));
 	/** How many choices the switch has made in this page load: a format page follows the context
 	 * only after one (follow.svelte.ts), and a choice's answer counts only while it is the latest. */
 	choices = $state(0);
@@ -91,6 +136,7 @@ class SiteContext {
 		const kept = this.#copy();
 		if (kept) {
 			this.#account = kept.account;
+			this.season = kept.season;
 			this.#show(kept.league, kept.leagues, kept.format);
 		}
 		await this.refresh();
@@ -104,6 +150,10 @@ class SiteContext {
 			this.#account = null;
 			this.#show(null, [], this.#copy()?.format ?? null);
 			this.features = [];
+			// The site's season for a visitor with no account (GET /season, public): it corrects the
+			// rail the page was built with. Unanswered, the build's stands.
+			this.season =
+				(await client.call<Account['season']>('/season').catch(() => null))?.phase ?? null;
 		} else {
 			try {
 				this.take(await client.call<Account>('/me'));
@@ -135,6 +185,8 @@ class SiteContext {
 			this.#account = me.id;
 		}
 		this.features = me.features;
+		// An API from before the season answers none: the build's stands.
+		this.season = (me as Partial<Account>).season?.phase ?? null;
 		// An API from before the context answers neither; read it as no league.
 		const leagues = Array.isArray(me.leagues) ? me.leagues : [];
 		this.#show(me.league ?? null, leagues, me.format ?? null);
@@ -148,9 +200,12 @@ class SiteContext {
 		this.#readHeld();
 	}
 
+	/** Before its draft a league holds nobody, so every row would read as a free agent: no marks. */
 	#readHeld(): void {
 		const id = this.league?.id;
 		if (!this.#heldWanted || !this.signedIn || id === undefined || this.heldFor === id) return;
+		const phase = this.league?.phase;
+		if (phase === 'pre_draft' || phase === 'draft_day') return;
 		void import('./held.ts').then((module) => module.readHeld(id));
 	}
 
@@ -185,17 +240,22 @@ class SiteContext {
 			account: this.#account,
 			league: this.league,
 			leagues: this.leagues,
-			format: this.format
+			format: this.format,
+			season: this.season,
+			rail: this.rail
 		};
 		try {
 			sessionStorage.setItem(CONTEXT_KEY, JSON.stringify(kept));
 			if (lines === 0) localStorage.removeItem(LINES_KEY);
 			else localStorage.setItem(LINES_KEY, String(lines));
+			if (this.signedIn) localStorage.setItem(ACCOUNT_RAIL_KEY, this.rail);
+			else localStorage.removeItem(ACCOUNT_RAIL_KEY);
 		} catch {
 			// Storage can be off or full: the context still holds for this page.
 		}
 		if (lines === 0) document.documentElement.removeAttribute(LEAGUE_ATTR);
 		else document.documentElement.setAttribute(LEAGUE_ATTR, String(lines));
+		document.documentElement.setAttribute(RAIL_ATTR, this.rail);
 	}
 }
 

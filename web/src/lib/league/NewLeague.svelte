@@ -46,6 +46,8 @@
 	} from './model.ts';
 	import { FLAGS } from '#lib/site/flags.ts';
 	import OneLeagueFree from './OneLeagueFree.svelte';
+	import { FOLLOW_FOR } from './phase-words.ts';
+	import { SCREEN_PARAM, leagueScreenOf, screenSection } from '#lib/ui/nav.ts';
 
 	/** Attach a league: paste its link, say which team is yours (a tap on it, or a Sleeper username),
 	 * one verb. The league is read as soon as the link is pasted, so the teams are there to tap. */
@@ -54,6 +56,10 @@
 	const READ_AFTER_MS = 400;
 
 	type View = 'loading' | 'signed-out' | 'form' | 'unreachable';
+
+	/** The league screen a rail item led here from (`?screen=start`): its line names it, and its item
+	 * stays lit. Derived from the address, so a second rail tap on this page changes both. */
+	const forScreen = $derived(leagueScreenOf(page.url.searchParams.get(SCREEN_PARAM)));
 
 	let view = $state<View>('loading');
 	/** How the league comes in: a pasted link (Sleeper, MyFantasyLeague, a public ESPN league), or a
@@ -215,7 +221,7 @@
 	<title>Follow your league · Commish</title>
 </svelte:head>
 
-<Shell title="League" active="league">
+<Shell title="League" active={forScreen === null ? null : screenSection(forScreen)}>
 	<main class="new">
 		{#if view === 'loading'}
 			<div class="reserve"></div>
@@ -338,6 +344,7 @@
 <!-- What following a league gives, and where from: the same two lines signed in and out. Only the
      link form, which has the field, asks for the link. -->
 {#snippet gives(withField: boolean)}
+	{#if forScreen}<p class="for">{FOLLOW_FOR[forScreen]}</p>{/if}
 	<p class="lede">
 		{#if withField}Paste your league's link.{/if}
 		We keep your roster, this week's matchup and every player nobody in your league holds up to date,
@@ -362,6 +369,11 @@
 		gap: var(--s-4);
 		padding: var(--s-5);
 		max-width: 760px;
+	}
+
+	.for {
+		margin: 0;
+		font-weight: 600;
 	}
 
 	.lede,

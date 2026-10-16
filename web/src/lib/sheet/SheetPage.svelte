@@ -13,7 +13,7 @@
 	import Search from '#lib/ui/Search.svelte';
 	import Shell from '#lib/ui/Shell.svelte';
 	import Verb from '#lib/ui/Verb.svelte';
-	import { RAIL } from '#lib/ui/nav.ts';
+	import { sectionHref } from '#lib/ui/nav.ts';
 	import { POSITIONS, type Position } from '#lib/types/player.ts';
 	import { fileDirectory } from './directory.ts';
 	import EmptySheet from './EmptySheet.svelte';
@@ -31,7 +31,7 @@
 
 	const directory = fileDirectory();
 	/** The mock draft section, whose route another lane builds. */
-	const mockHref = RAIL.find((item) => item.section === 'mock')?.href;
+	const mockHref = sectionHref('mock');
 	const NOTES = 'notes';
 	const UNDO_KEY = 'z';
 	/** The undo key as this machine's keyboard prints it. */

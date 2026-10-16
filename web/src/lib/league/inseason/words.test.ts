@@ -1,6 +1,7 @@
 // The in-season screens' words, and the copy guard over every line they compose: run with `npm test`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { memberZone, weekdayTime, zoneLine } from '#lib/format/clock.ts';
 import { readFileSync } from 'node:fs';
 import { isScreen } from './screens.ts';
 import {
@@ -36,9 +37,7 @@ import {
 	signInTitle,
 	sharedDropWords,
 	designationWords,
-	memberZone,
 	noTradeWith,
-	zoneLine,
 	dropWords,
 	gainFigure,
 	gameWords,
@@ -52,8 +51,7 @@ import {
 	tradeDecision,
 	tradeGains,
 	verbWords,
-	waiverDecision,
-	weekdayTime
+	waiverDecision
 } from './words.ts';
 
 const facts = (over: Partial<WeekFacts> = {}): WeekFacts => ({
@@ -291,8 +289,9 @@ void test("a row's facts: the game on the member's own clock, the designation wi
 });
 
 void test('the signed-out panel names the screen it is for', () => {
-	assert.equal(signInTitle('start'), 'Sign in to see start and sit for your league');
-	assert.equal(signInTitle('trades'), 'Sign in to see trades for your league');
+	assert.equal(signInTitle('start'), 'Sign in to see your lineup');
+	assert.equal(signInTitle('matchup'), 'Sign in to see your matchup');
+	assert.equal(signInTitle('trades'), 'Sign in to see your trades');
 });
 
 void test('the refreshed stamp names the order and its day', () => {

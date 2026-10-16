@@ -14,7 +14,7 @@ import type {
 	WaiverAdvice,
 	WaiverRow
 } from './api.ts';
-import { memberZone, weekdayTime } from './words.ts';
+import { memberZone, weekdayTime } from '#lib/format/clock.ts';
 
 /** The two moves: a lineup set and a claim. */
 export type MoveKind = HostMoveInput['kind'];
