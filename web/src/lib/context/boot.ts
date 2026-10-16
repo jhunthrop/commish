@@ -19,6 +19,11 @@ export const LINES_KEY = 'commish-league-lines';
  * The line's room comes from it (ContextNote). */
 export const LEAGUE_ATTR = 'data-league';
 
+/** The rail the account's context shows, in localStorage so a new tab or a restarted browser
+ * paints it before /me answers: a phase word (nav.ts RAIL_KEYS), never the league. Read by the boot
+ * only with a session, and cleared at sign-out. */
+export const ACCOUNT_RAIL_KEY = 'commish-account-rail';
+
 /** The root's attribute naming the rail the shell shows (nav.ts RAIL_KEYS). */
 export const RAIL_ATTR = 'data-rail';
 
@@ -31,15 +36,17 @@ const json = JSON.stringify;
 
 /** The boot script. `buildRail` is the site's rail at build (the season the run's kickoffs place
  * the build in), null for a page drawn at request time. With a session, the session copy's rail
- * stands (the selected league's phase, else the account's site season); else the build's. */
+ * stands (the selected league's phase, else the account's site season), else the account's rail
+ * kept for a new tab; signed out, or with neither, the build's (or the last build's). A word that
+ * is not a rail key is never taken. */
 export function contextBootScript(buildRail: RailKey | null): string {
-	return `(function(){try{var d=document.documentElement,l=localStorage,b=${json(buildRail)};if(b)l.setItem(${json(
+	return `(function(){try{var d=document.documentElement,l=localStorage,k=${json(RAIL_KEYS)},b=${json(buildRail)};if(b)l.setItem(${json(
 		SITE_RAIL_KEY
 	)},b);else b=l.getItem(${json(SITE_RAIL_KEY)});var m=document.cookie.match(${json(
 		`(?:^|; )${SESSION_CSRF_COOKIE}=([^;]*)`
 	)}),r=b;if(m){var n=l.getItem(${json(LINES_KEY)});if(n==='1'||n==='2'||n==='3')d.setAttribute(${json(
 		LEAGUE_ATTR
-	)},n);var c=JSON.parse(sessionStorage.getItem(${json(CONTEXT_KEY)})||'null');if(c&&c.session===m[1]&&c.rail)r=c.rail;}if(${json(
-		RAIL_KEYS
-	)}.indexOf(r)>=0)d.setAttribute(${json(RAIL_ATTR)},r);}catch(e){}})();`;
+	)},n);var c=JSON.parse(sessionStorage.getItem(${json(CONTEXT_KEY)})||'null'),a=c&&c.session===m[1]?c.rail:l.getItem(${json(
+		ACCOUNT_RAIL_KEY
+	)});if(k.indexOf(a)>=0)r=a;}if(k.indexOf(r)>=0)d.setAttribute(${json(RAIL_ATTR)},r);}catch(e){}})();`;
 }

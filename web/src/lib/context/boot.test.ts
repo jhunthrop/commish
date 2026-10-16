@@ -6,6 +6,7 @@ import {
 	CONTEXT_KEY,
 	LEAGUE_ATTR,
 	LINES_KEY,
+	ACCOUNT_RAIL_KEY,
 	RAIL_ATTR,
 	SITE_RAIL_KEY,
 	contextBootScript
@@ -87,4 +88,25 @@ void test('the basis line keeps its room for a session, as before', () => {
 	local.setItem(LINES_KEY, '2');
 	assert.equal(boot(null, { cookie: `commish_csrf=${TOKEN}`, local }).attrs.get(LEAGUE_ATTR), '2');
 	assert.equal(boot(null, { local }).attrs.has(LEAGUE_ATTR), false);
+});
+
+void test("a new tab with a session and no session copy paints the account's kept rail", () => {
+	const local = new Store();
+	local.setItem(ACCOUNT_RAIL_KEY, 'in_season');
+	const cookie = `commish_csrf=${TOKEN}`;
+	assert.equal(boot('pre_draft', { cookie, local }).attrs.get(RAIL_ATTR), 'in_season');
+	// Signed out, the account's rail is never read.
+	assert.equal(boot('pre_draft', { local }).attrs.get(RAIL_ATTR), 'pre_draft');
+	// The session copy, when it is this session's, stands over the kept rail.
+	const kept = { session: TOKEN, rail: 'playoffs' };
+	assert.equal(boot('pre_draft', { cookie, kept, local }).attrs.get(RAIL_ATTR), 'playoffs');
+});
+
+void test("a session copy's rail that is not a rail key leaves the build's", () => {
+	const cookie = `commish_csrf=${TOKEN}`;
+	const run = boot('in_season', { cookie, kept: { session: TOKEN, rail: 'x" onload="' } });
+	assert.equal(run.attrs.get(RAIL_ATTR), 'in_season');
+	const local = new Store();
+	local.setItem(ACCOUNT_RAIL_KEY, 'bogus');
+	assert.equal(boot('in_season', { cookie, local }).attrs.get(RAIL_ATTR), 'in_season');
 });

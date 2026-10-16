@@ -19,7 +19,14 @@ import {
 	type RailKey,
 	type SitePhase
 } from '#lib/ui/nav.ts';
-import { CONTEXT_KEY, LEAGUE_ATTR, LINES_KEY, RAIL_ATTR, SITE_RAIL_KEY } from './boot.ts';
+import {
+	ACCOUNT_RAIL_KEY,
+	CONTEXT_KEY,
+	LEAGUE_ATTR,
+	LINES_KEY,
+	RAIL_ATTR,
+	SITE_RAIL_KEY
+} from './boot.ts';
 import type { Marks } from './held-words.ts';
 import type * as NoteLine from './note-line.ts';
 import type { BoardFormat, ContextLeague } from './words.ts';
@@ -241,6 +248,8 @@ class SiteContext {
 			sessionStorage.setItem(CONTEXT_KEY, JSON.stringify(kept));
 			if (lines === 0) localStorage.removeItem(LINES_KEY);
 			else localStorage.setItem(LINES_KEY, String(lines));
+			if (this.signedIn) localStorage.setItem(ACCOUNT_RAIL_KEY, this.rail);
+			else localStorage.removeItem(ACCOUNT_RAIL_KEY);
 		} catch {
 			// Storage can be off or full: the context still holds for this page.
 		}
