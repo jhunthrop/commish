@@ -22,7 +22,7 @@ func projectionSchema(t *testing.T, pool *pgxpool.Pool, schema string) {
 		`drop schema if exists ` + schema + ` cascade`,
 		`create schema ` + schema,
 		`create table ` + schema + `.provider_players (id text primary key)`,
-		`insert into ` + schema + `.provider_players values ('4431611'), ('2971573')`,
+		`insert into ` + schema + `.provider_players values ('4431611')`,
 		`create table ` + schema + `.tank01_projection_rows (snapshot_id bigint, provider_player_id text, captured_at timestamptz,
 			season int, week int, position text, team text, ppr_points float8, half_points float8, standard_points float8)`,
 		`insert into ` + schema + `.tank01_projection_rows values
@@ -30,6 +30,8 @@ func projectionSchema(t *testing.T, pool *pgxpool.Pool, schema string) {
 			(11, '4431611', '2026-10-17 01:00:00+00', 2026, 6, 'QB', 'CHI', 19.44, 19.44, 19.44),
 			(11, '2971573', '2026-10-17 01:00:00+00', 2026, 6, 'PK', 'HOU', 8.1, 8.1, 8.1),
 			(11, '9999999', '2026-10-17 01:00:00+00', 2026, 6, 'FB', 'SF', 2.1, 1.6, 1.1),
+			(11, '3000001', '2026-10-17 01:00:00+00', 2026, 6, 'PK', 'DAL', 9.0, 9.0, 9.0),
+			(11, '3000002', '2026-10-17 01:00:00+00', 2026, 6, 'PK', 'DAL', 1.0, 1.0, 1.0),
 			(11, 'DEF-WAS', '2026-10-17 01:00:00+00', 2026, 6, 'DEF', 'WAS', 6.0, 6.0, 6.0),
 			(12, '4431611', '2026-10-21 01:00:00+00', 2026, 7, 'QB', 'CHI', 25.0, 25.0, 25.0)`,
 	}
@@ -42,7 +44,8 @@ func projectionSchema(t *testing.T, pool *pgxpool.Pool, schema string) {
 }
 
 // The week's read is its newest snapshot alone: a player outside our
-// universe is left out, a kicker is kept as filed, a defense is keyed by
+// universe is left out, a kicker is kept whether or not the universe
+// holds him and named by his club when it has one, a defense is keyed by
 // its club in the board's codes.
 func TestWeekProjectionReadsTheNewestSnapshot(t *testing.T) {
 	pool := dbtest.Pool(t)
@@ -59,8 +62,17 @@ func TestWeekProjectionReadsTheNewestSnapshot(t *testing.T) {
 	if !p.ReadAt.Equal(time.Date(2026, 10, 17, 1, 0, 0, 0, time.UTC)) || p.Week != 6 {
 		t.Fatalf("read at %v week %d: the newest snapshot", p.ReadAt, p.Week)
 	}
-	if len(p.Players) != 2 || p.Players["4431611"].PPR != 19.44 || p.Players["2971573"].PPR != 8.1 {
+	if len(p.Players) != 4 || p.Players["4431611"].PPR != 19.44 || p.Players["2971573"].PPR != 8.1 {
 		t.Fatalf("players %+v: the newest snapshot's, the fullback outside the universe left out", p.Players)
+	}
+	if k, ok := p.Player("", "K", "HOU"); !ok || k.PPR != 8.1 {
+		t.Fatalf("Houston's kicker by his club: %+v %v", k, ok)
+	}
+	if k, ok := p.Player("2971573", "K", "HOU"); !ok || k.PPR != 8.1 {
+		t.Fatalf("Houston's kicker by his id: %+v %v", k, ok)
+	}
+	if _, ok := p.Player("", "K", "DAL"); ok {
+		t.Fatal("a club with two kickers names neither by club")
 	}
 	if d, ok := p.Player("", "DEF", "WSH"); !ok || d.Standard != 6 {
 		t.Fatalf("the Washington defense %+v %v", d, ok)

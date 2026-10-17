@@ -2708,7 +2708,7 @@ export interface components {
 			rest_of_season_per_game: number | null;
 			/**
 			 * Format: double
-			 * @description his points this week on the week's published projection, to the cent, in the format the league's scoring is most like (PPR, half PPR or standard); a team defense's by its club. The newest snapshot stored for the league's week (projection_read_at says when). Null when the snapshot has no row for him or none is stored. Our own weekly model replaces it when it passes its test
+			 * @description his points this week on the week's published projection, to the cent, in the format the league's scoring is most like (PPR, half PPR or standard); a team defense's by its club, a kicker with no row of his own by his club's one kicker. The newest snapshot stored for the league's week (projection_read_at says when). Null when the snapshot has no row for him or none is stored. Our own weekly model replaces it when it passes its test
 			 */
 			week_projection: number | null;
 			/** @description the drafter tags him Hold on a sheet */

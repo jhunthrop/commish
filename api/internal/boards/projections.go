@@ -13,13 +13,20 @@ import (
 // (research/pipeline/tank01/projections.py, tank01_projection_rows), the
 // newest snapshot for the week. A player's row is keyed by the provider's
 // id, the board's own id, and kept only for a player in our universe
-// (provider_players); a team defense's row by its club. The screens show
+// (provider_players), so a fullback outside it is left out; a kicker
+// ("PK", our K) is kept always and also named by his club, and a team
+// defense's row is keyed by its club. The screens show
 // it as the week's projection until our own weekly model passes its test,
 // and never name the provider.
 
 // DefensePosition is a team defense's position in the rows
-// (projections.py DEFENSE_POSITION).
-const DefensePosition = "DEF"
+// (projections.py DEFENSE_POSITION); KickerPosition is the provider's
+// for a kicker, our K.
+const (
+	DefensePosition = "DEF"
+	KickerPosition  = "PK"
+	ourKicker       = "K"
+)
 
 // maxProjectionRows bounds the read: one snapshot is about 400 players
 // and 32 defenses.
@@ -54,25 +61,34 @@ type WeekProjection struct {
 	Players map[string]ProjectedPoints
 	// Defenses is each team defense's points by club, in the board's codes.
 	Defenses map[string]ProjectedPoints
+	// Kickers is each club's kicker's points, for a club with one kicker
+	// in the snapshot: a kicker our board does not place has no board id,
+	// and a club fields one.
+	Kickers map[string]ProjectedPoints
 }
 
 // Player is a player's points: a team defense's by his club, anyone
-// else's by his board id.
+// else's by his board id, and a kicker without a row by his id by his
+// club's one kicker.
 func (w WeekProjection) Player(boardID, position, team string) (ProjectedPoints, bool) {
 	if position == DefensePosition {
 		p, ok := w.Defenses[ProductTeam(team)]
 		return p, ok
 	}
-	if boardID == "" {
-		return ProjectedPoints{}, false
+	if p, ok := w.Players[boardID]; ok && boardID != "" {
+		return p, true
 	}
-	p, ok := w.Players[boardID]
-	return p, ok
+	if position == ourKicker {
+		p, ok := w.Kickers[ProductTeam(team)]
+		return p, ok
+	}
+	return ProjectedPoints{}, false
 }
 
 // WeekProjection is the newest stored snapshot of the week's projection.
 func (s *PGSource) WeekProjection(ctx context.Context, season, week int) (WeekProjection, error) {
-	out := WeekProjection{Week: week, Players: map[string]ProjectedPoints{}, Defenses: map[string]ProjectedPoints{}}
+	out := WeekProjection{Week: week, Players: map[string]ProjectedPoints{}, Defenses: map[string]ProjectedPoints{},
+		Kickers: map[string]ProjectedPoints{}}
 	readable, err := s.readable(ctx, "tank01_projection_rows", "provider_players")
 	if err != nil || !readable {
 		return out, err
@@ -84,13 +100,14 @@ func (s *PGSource) WeekProjection(ctx context.Context, season, week int) (WeekPr
 select r.provider_player_id, r.position, r.team, r.ppr_points, r.half_points, r.standard_points, n.captured_at
 from `+s.table("tank01_projection_rows")+` r join newest n on n.snapshot_id = r.snapshot_id
 left join `+s.table("provider_players")+` pp on pp.id = r.provider_player_id
-where r.position = $3 or pp.id is not null
-order by r.provider_player_id collate "C" limit $4`, season, week, DefensePosition, maxProjectionRows+1)
+where r.position = any($3) or pp.id is not null
+order by r.provider_player_id collate "C" limit $4`, season, week, []string{DefensePosition, KickerPosition}, maxProjectionRows+1)
 	if err != nil {
 		return out, fmt.Errorf("boards: read week %d projection: %w", week, err)
 	}
 	defer rows.Close()
 	n := 0
+	kickers := map[string]int{}
 	for rows.Next() {
 		var id, position, team string
 		var p ProjectedPoints
@@ -100,10 +117,22 @@ order by r.provider_player_id collate "C" limit $4`, season, week, DefensePositi
 		}
 		n++
 		out.ReadAt = at.UTC()
-		if position == DefensePosition {
-			out.Defenses[ProductTeam(team)] = p
-		} else {
+		club := ProductTeam(team)
+		switch position {
+		case DefensePosition:
+			out.Defenses[club] = p
+		case KickerPosition:
 			out.Players[id] = p
+			out.Kickers[club] = p
+			kickers[club]++
+		default:
+			out.Players[id] = p
+		}
+	}
+	// A club with two kickers in the snapshot names neither by club.
+	for club, count := range kickers {
+		if count > 1 {
+			delete(out.Kickers, club)
 		}
 	}
 	if err := rows.Err(); err != nil {

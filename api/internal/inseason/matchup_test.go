@@ -15,8 +15,9 @@ import (
 
 var projectionAt = time.Date(2026, 10, 15, 13, 30, 0, 0, time.UTC)
 
-// weekProjection holds team 1's quarterback (p000) and team 1's defense
-// (p009, by his club), and nobody else.
+// weekProjection holds team 1's quarterback (p000), team 1's kicker (p008,
+// by his club alone) and team 1's defense (p009, by his club), and nobody
+// else.
 func weekProjection(f fixture) boards.WeekProjection {
 	defense, _ := f.league.Board.Player("p009")
 	club := f.league.Player("h009").Team
@@ -25,6 +26,7 @@ func weekProjection(f fixture) boards.WeekProjection {
 	}
 	return boards.WeekProjection{ReadAt: projectionAt,
 		Players:  map[string]boards.ProjectedPoints{"p000": {PPR: 21.374, Half: 20.1, Standard: 18.8}},
+		Kickers:  map[string]boards.ProjectedPoints{f.league.Player("h008").Team: {PPR: 8.4, Half: 8.4, Standard: 8.4}},
 		Defenses: map[string]boards.ProjectedPoints{club: {PPR: 7, Half: 7, Standard: 7}}}
 }
 
@@ -84,6 +86,9 @@ func TestMatchupIsBothSidesInSlotsWithTheWeeksProjection(t *testing.T) {
 	qb, def := mine.Starters[0].Line, mine.Starters[9].Line
 	if qb.WeekProjection == nil || *qb.WeekProjection != 21.37 {
 		t.Fatalf("the quarterback's projection %v, PPR to the cent", qb.WeekProjection)
+	}
+	if k := mine.Starters[8].Line; k.Player.Position != "K" || k.WeekProjection == nil || *k.WeekProjection != 8.4 {
+		t.Fatalf("the kicker %+v: by his club when his id has no row", k)
 	}
 	if def.Player.Position != "DEF" || def.WeekProjection == nil || *def.WeekProjection != 7 {
 		t.Fatalf("the defense %+v: by his club", def)
