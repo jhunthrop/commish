@@ -22,8 +22,9 @@ from research.capsules.week.caption import status_changed_caption, written_capti
 from research.capsules.week.store import StoredWeekRead
 from research.model.instants import js_iso
 from research.nightly.build.player_season import SeasonContext, prior_seasons, season_block
-from research.nightly.config import PAGE_FORMAT, TEAMS, RunFormat
+from research.nightly.config import MARKET_ORDER, PAGE_FORMAT, PROJECTION_ORDER, TEAMS, RunFormat
 from research.nightly.reads.board import BoardEntry, FormatBoard
+from research.nightly.reads.market import MarketEntry
 from research.nightly.reads.schedule import Game
 
 # The run names a team defense as the site does.
@@ -56,6 +57,13 @@ class Identity:
     position: str
     team: str
     headshot: str | None
+    # How every board orders him: by our projection (a page of his own), or in the market's draft
+    # order (a kicker or a defense: a row on every board and an index entry, no page).
+    order_basis: str = PROJECTION_ORDER
+
+
+def _slug_with_place(base: str, position: str, team: str) -> str:
+    return f"{base}-{position.lower()}-{team.lower()}"
 
 
 def identities(boards: Sequence[FormatBoard]) -> list[Identity]:
@@ -72,8 +80,34 @@ def identities(boards: Sequence[FormatBoard]) -> list[Identity]:
     for player_id, entry in seen.items():
         row = entry.row
         base = slug_of(row.name)
-        slug = base if counts[base] == 1 else f"{base}-{row.position.lower()}-{row.team.lower()}"
+        slug = base if counts[base] == 1 else _slug_with_place(base, row.position, row.team)
         out.append(Identity(player_id, slug, row.name, WEB_POSITION[row.position], row.team, row.headshot_url))
+    return out
+
+
+def market_identities(people: Sequence[Identity], entries: Sequence[MarketEntry]) -> list[Identity]:
+    """The kickers and defenses in draft order, each slug clear of the pages' and of each other's: a
+    shared name's slug takes his position and club, as a page's does."""
+    taken = {p.slug for p in people}
+    counts: dict[str, int] = {}
+    for entry in entries:
+        counts[slug_of(entry.player.name)] = counts.get(slug_of(entry.player.name), 0) + 1
+    out = []
+    for entry in entries:
+        player = entry.player
+        base = slug_of(player.name)
+        slug = base if counts[base] == 1 and base not in taken else _slug_with_place(base, player.position, player.team)
+        out.append(
+            Identity(
+                player.player_id,
+                slug,
+                player.name,
+                WEB_POSITION[player.position],
+                player.team,
+                player.headshot_url,
+                MARKET_ORDER,
+            )
+        )
     return out
 
 
@@ -104,21 +138,43 @@ def numbers_of(entry: BoardEntry, adp: float | None) -> Json:
     return numbers
 
 
-def board_json(board: FormatBoard, slugs: Mapping[str, Identity], adp: Mapping[str, float]) -> Json:
-    rows = []
-    for entry in board.entries:
-        who = slugs[entry.row.player_id]
-        rows.append(
-            {
-                "id": who.id,
-                "slug": who.slug,
-                "name": who.name,
-                "position": who.position,
-                "team": who.team,
-                "headshot": who.headshot,
-                **numbers_of(entry, adp.get(who.id)),
-            }
-        )
+def _who(who: Identity) -> Json:
+    return {
+        "id": who.id,
+        "slug": who.slug,
+        "name": who.name,
+        "position": who.position,
+        "team": who.team,
+        "headshot": who.headshot,
+        "orderBasis": who.order_basis,
+    }
+
+
+# A kicker's or a defense's projected figures: none (the ruling ships no projection and no tier).
+_UNPROJECTED: Final = ("projected", "vor", "expectedGames", "floor", "median", "ceiling", "tier")
+
+
+def market_row(who: Identity, entry: MarketEntry, our_rank: int, adp: float | None) -> Json:
+    """A kicker's or a defense's row: his place in draft order and the format's ADP, no projected figure."""
+    return {
+        **_who(who),
+        "positionRank": entry.position_rank,
+        "ourRank": our_rank,
+        "vorRound": None,
+        "adp": adp,
+        **dict.fromkeys(_UNPROJECTED),
+    }
+
+
+def board_json(
+    board: FormatBoard, slugs: Mapping[str, Identity], adp: Mapping[str, float], market: Sequence[MarketEntry] = ()
+) -> Json:
+    """The ranked rows in the served order, then the kickers and defenses in draft order, numbered on."""
+    rows = [{**_who(slugs[e.row.player_id]), **numbers_of(e, adp.get(e.row.player_id))} for e in board.entries]
+    ranked = len(rows)
+    for entry in market:
+        who = slugs[entry.player.player_id]
+        rows.append(market_row(who, entry, ranked + entry.order, adp.get(who.id)))
     return {"format": board.format.id, "rows": rows}
 
 
@@ -249,13 +305,23 @@ def _week_read(who: Identity, universe_id: str | None, inputs: PageInputs) -> Js
     return week_read_json(stored, inputs.week.statuses.get(who.id), kicked_off, inputs.week.as_of)
 
 
-def index_json(people: Sequence[Identity], players: Mapping[str, Json]) -> list[Json]:
-    """The search index; each entry's season is his page's own games and points a game, read from it."""
-    return [
-        {"id": p.id, "slug": p.slug, "name": p.name, "team": p.team, "position": p.position, "headshot": p.headshot,
-         "season": season_summary(players[p.id]["season"])}
-        for p in people
-    ]  # fmt: skip
+def _index_entry(p: Identity) -> Json:
+    return {
+        "id": p.id,
+        "slug": p.slug,
+        "name": p.name,
+        "team": p.team,
+        "position": p.position,
+        "headshot": p.headshot,
+        "orderBasis": p.order_basis,
+    }
+
+
+def index_json(people: Sequence[Identity], players: Mapping[str, Json], market: Sequence[Identity] = ()) -> list[Json]:
+    """The index: every page, its season his page's own games and points a game, read from it; then
+    every kicker and defense the boards carry, with no page and no season."""
+    pages = [{**_index_entry(p), "season": season_summary(players[p.id]["season"])} for p in people]
+    return [*pages, *(_index_entry(p) for p in market)]
 
 
 def season_summary(season: Json) -> Json:

@@ -2,7 +2,7 @@
 	import { firstSentence } from '#lib/format/sentence.ts';
 	import type { RoomCard } from '#lib/room/api.ts';
 	import type { Board } from '#lib/room/model.ts';
-	import OddsCell from '#lib/ui/OddsCell.svelte';
+	import StillThereCell from '#lib/ui/StillThereCell.svelte';
 	import Panel from '#lib/ui/Panel.svelte';
 	import PanelHead from '#lib/ui/PanelHead.svelte';
 	import PlayerLine from '#lib/ui/PlayerLine.svelte';
@@ -15,12 +15,12 @@
 	interface Props {
 		card: RoomCard;
 		board: Board;
-		/** What the odds are of: "still there at 6.05". */
-		oddsLabel: string;
+		/** What the chances are of: "still there at 6.05". */
+		chanceLabel: string;
 		ranges: Readonly<Record<string, OutcomeRange>> | null;
 	}
 
-	let { card, board, oddsLabel, ranges }: Props = $props();
+	let { card, board, chanceLabel, ranges }: Props = $props();
 
 	const rows = $derived(
 		// The call has its own panel: the list is who comes after him.
@@ -64,7 +64,7 @@
 						</div>
 					{/if}
 				</div>
-				<OddsCell odds={card.still_there[row.player.id] ?? null} label={oddsLabel} />
+				<StillThereCell chance={card.still_there[row.player.id] ?? null} label={chanceLabel} />
 			</div>
 		{/each}
 	</div>

@@ -9,6 +9,15 @@
 		adp: number | null;
 		/** The word his ranks show as when he is on a season-long list ("IR", Lane 63). */
 		held?: string | null;
+		/** A kicker or a defense (Lane 66m): his position rank is his place in the drafters' order, and
+		 * our rank only follows the ranked players, so neither is set against his ADP. */
+		draftOrder?: boolean;
+	}
+
+	/** Where a kicker or a defense sits in the drafters' order, or the word for his list. */
+	export function draftOrderWords(board: SheetRowBoard): string {
+		if (board.held) return board.held;
+		return `Draft order ${String(board.positionRank)}`;
 	}
 </script>
 
@@ -144,10 +153,16 @@
 			{/if}
 		</span>
 		<span class="meta">
-			<PositionPill {position} rank={board?.held ?? board?.positionRank} />
+			<!-- A kicker's or a defense's number is the drafters' order, never ours: it is said in words, so
+			     the pill carries none ("K", not "K 1" beside "WR 2"). -->
+			<PositionPill
+				{position}
+				rank={board?.draftOrder ? (board.held ?? undefined) : (board?.held ?? board?.positionRank)}
+			/>
 			{#if tier !== null}<TierChip {tier} />{/if}
 			{#if team && !compact}<span class="team">{team}</span>{/if}
-			{#if board && compact}<AdpCell
+			{#if board?.draftOrder && compact}<span class="order-words">{draftOrderWords(board)}</span
+				>{:else if board && compact}<AdpCell
 					adp={board.adp}
 					ourRank={board.rank}
 					figure={false}
@@ -162,7 +177,7 @@
 			{#if board}<AdpCell
 					adp={board.adp}
 					ourRank={board.rank}
-					compare={!board.held}
+					compare={!board.held && !board.draftOrder}
 					rankWord={board.held ?? null}
 				/>{/if}
 		</span>
@@ -171,7 +186,9 @@
 				<Label
 					>{board === null
 						? 'We do not rank him'
-						: `Our rank ${board.held ?? String(board.rank)}`}</Label
+						: board.draftOrder
+							? draftOrderWords(board)
+							: `Our rank ${board.held ?? String(board.rank)}`}</Label
 				>
 			{/if}
 		</span>
@@ -275,6 +292,13 @@
 	.ours {
 		grid-area: ours;
 		text-align: right;
+	}
+
+	/* On the phone a kicker's or a defense's place, in words where a ranked row's chip sits. */
+	.order-words {
+		font-size: var(--t-sm);
+		color: var(--ink-2);
+		white-space: nowrap;
 	}
 
 	.said {

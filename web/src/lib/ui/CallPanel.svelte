@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
-	import { oddsShort } from '#lib/format/draft.ts';
+	import { chanceShort } from '#lib/format/draft.ts';
 	import { signed } from '#lib/format/number.ts';
 	import type { PlayerRef } from '#lib/types/player.ts';
 	import type { CallAction } from '#lib/types/room.ts';
@@ -21,9 +21,9 @@
 		/** Where drafters take him, in words: "drafters take him 1 earlier". */
 		adp: string;
 		/** His chance of lasting to your next pick, the one big number. */
-		odds: number;
-		/** What the odds are of: "chance he is still there at 6.05". */
-		oddsLabel: string;
+		chance: number;
+		/** What the chances are of: "chance he is still there at 6.05". */
+		chanceLabel: string;
 		/** The runner-up in a sentence, with his name in bold. */
 		reason: Snippet;
 		action: CallAction;
@@ -39,8 +39,8 @@
 		player,
 		vor,
 		adp,
-		odds,
-		oddsLabel,
+		chance,
+		chanceLabel,
 		reason,
 		action,
 		waiting = false,
@@ -72,9 +72,9 @@
 			</div>
 			<p>{@render reason()}</p>
 		</div>
-		<div class="odds">
-			<b>{oddsShort(odds)}</b>
-			<span>{oddsLabel}</span>
+		<div class="chance">
+			<b>{chanceShort(chance)}</b>
+			<span>{chanceLabel}</span>
 			<div class="act">
 				{#if reading !== undefined}
 					<Quiet size="lg" fill key={action.key} disabled>Waiting on the call</Quiet>
@@ -113,7 +113,7 @@
 	}
 
 	/* The skeleton: the last call's frame, every word a quiet block of the same size. */
-	.reading :is(h2, .meta, p, .odds b, .odds > span) {
+	.reading :is(h2, .meta, p, .chance b, .chance > span) {
 		color: transparent;
 		background: var(--surface-2);
 		border-radius: var(--r-sm);
@@ -163,7 +163,7 @@
 		font-weight: 600;
 	}
 
-	.odds {
+	.chance {
 		display: flex;
 		flex-direction: column;
 		align-items: flex-end;
@@ -171,7 +171,7 @@
 		text-align: right;
 	}
 
-	.odds b {
+	.chance b {
 		font-family: var(--font-num);
 		font-weight: 800;
 		font-size: 72px;
@@ -179,7 +179,7 @@
 		font-variant-numeric: tabular-nums;
 	}
 
-	.odds span {
+	.chance span {
 		font-size: var(--t-sm);
 		color: var(--ink-2);
 		max-width: 22ch;
@@ -188,7 +188,7 @@
 	@media (max-width: 760px) {
 		.call {
 			grid-template-columns: auto minmax(0, 1fr);
-			/* The odds and the verb keep to the bottom of the held panel. */
+			/* The chance and the verb keep to the bottom of the held panel. */
 			grid-template-rows: 1fr auto;
 			row-gap: var(--s-3);
 			padding: var(--s-3);
@@ -203,7 +203,7 @@
 			min-block-size: 2lh;
 		}
 
-		.odds {
+		.chance {
 			grid-column: 1 / -1;
 			align-self: end;
 			flex-direction: row;
@@ -214,11 +214,11 @@
 			text-align: left;
 		}
 
-		.odds b {
+		.chance b {
 			font-size: 56px;
 		}
 
-		.odds span {
+		.chance span {
 			flex: 1;
 			min-width: 0;
 		}

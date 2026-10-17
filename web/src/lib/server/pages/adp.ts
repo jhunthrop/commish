@@ -1,7 +1,8 @@
 /** ADP for one format: every player its named sources have, in the order drafters take them, beside
  * where our board has him. */
-import type { AdpSource, BoardRow, Format } from '#lib/run/schema.ts';
+import type { AdpSource, BoardRow, Format, MarketRowView } from '#lib/run/schema.ts';
 import { links } from '#lib/site/links.ts';
+import { withFace } from '#lib/site/market.ts';
 import { withStatuses } from '#lib/run/board-status.ts';
 import type { PlayerStatus } from '#lib/run/schema.ts';
 import { adp, board, designations } from '../run.ts';
@@ -20,8 +21,8 @@ export interface AdpPage extends BoardStatuses {
 	format: Format;
 	formats: FormatChip[];
 	sources: AdpSource[];
-	/** Board rows with an ADP, earliest first. */
-	rows: (BoardRow & { adp: number; status?: PlayerStatus })[];
+	/** Board rows with an ADP, earliest first: the ranked rows and the kickers and defenses alike. */
+	rows: ((BoardRow | MarketRowView) & { adp: number; status?: PlayerStatus })[];
 	/** Players our board ranks that no source has yet. */
 	unpriced: number;
 }
@@ -50,7 +51,7 @@ export async function adpPage(formatId: string): Promise<AdpPage> {
 		designations()
 	]);
 	// The drafters' order stays theirs: a held player keeps his place in it, marked (Lane 63).
-	const rows = withStatuses(loaded.rows, capture)
+	const rows = withStatuses([...loaded.rows, ...loaded.market.map(withFace)], capture)
 		.flatMap((row) => (row.adp === null ? [] : [{ ...row, adp: row.adp }]))
 		.sort((a, b) => a.adp - b.adp || a.ourRank - b.ourRank);
 	return {
@@ -58,7 +59,7 @@ export async function adpPage(formatId: string): Promise<AdpPage> {
 		formats,
 		sources: all.sources.filter((source) => source.formats.includes(format.id)),
 		rows,
-		unpriced: loaded.rows.length - rows.length,
+		unpriced: loaded.rows.filter((row) => row.adp === null).length,
 		...boardStatuses(rows, capture, format)
 	};
 }

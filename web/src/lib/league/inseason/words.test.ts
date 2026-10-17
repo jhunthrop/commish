@@ -308,10 +308,10 @@ void test('the refreshed stamp names the order and its day', () => {
 	);
 });
 
-/** The words a fantasy screen never uses: the trading register (founder ruling 2026-09-07) and
+/** The words a fantasy screen never uses: the trading register (founder ruling 2026-09-07), "odds" (Lane 66m) and
  * verdict theatre (spec §2). Matched whole, with their plain inflections. */
 const BANNED =
-	/\b(market|prices?|priced|buy|buys|buying|sell|sells|selling|stock|assets?|value|values|valued|smash|robbery|fleece|fleeced)\b/i;
+	/\b(market|prices?|priced|buy|buys|buying|sell|sells|selling|stock|assets?|value|values|valued|smash|robbery|fleece|fleeced|odds)\b/i;
 /** A dash between clauses (em or en), a semicolon, or a doubled word ("the the"). */
 const DASH = /[–—]/;
 const DOUBLED_WORD = /\b([a-z]+)\s+\1\b/i;

@@ -14,14 +14,6 @@ import (
 // preseason board's. A season with no published rows reads the stored
 // board itself, as before the table.
 
-// boardColumns is one directory row with its board points, the columns
-// Load scans ahead of the board's stamp, order and run.
-const boardColumns = `pp.id, pp.name, pp.position, pp.team, coalesce(pp.headshot_url, ''), pp.adp,
-  board.points, board.floor_points, board.median_points, board.ceiling_points`
-
-const boardOrder = `
-order by pp.adp asc nulls last, pp.id collate "C"`
-
 // preseasonCTEs is the newest stored board for (season $1, source $2):
 // its stamp (latest) and its rows keyed on the provider id through the
 // crosswalk (proj). gate is SQL appended to the stamp's condition; when
@@ -41,10 +33,10 @@ func (s *PGSource) preseasonCTEs(gate string) string {
 // preseasonQuery is the provider's roster (the ids the product names
 // players by) in ADP order, each with the stored board's points: the read
 // for a schema the 0006 migration has not reached.
-func (s *PGSource) preseasonQuery() string {
-	return `with ` + s.preseasonCTEs("") + `
-select ` + boardColumns + `, (select as_of from latest), '` + string(OrderPreseason) + `'::text, ''::text, 0
-from ` + s.table("provider_players") + ` pp left join proj board on board.player_id = pp.id` + boardOrder
+func (s *PGSource) preseasonQuery(m marketRead) string {
+	return `with ` + s.preseasonCTEs("") + m.cte(s) + `
+select ` + m.columns() + `, (select as_of from latest), '` + string(OrderPreseason) + `'::text, ''::text, 0
+from ` + s.table("provider_players") + ` pp left join proj board on board.player_id = pp.id` + m.join() + m.order()
 }
 
 // publishedQuery is the same roster with the published run's rows for
@@ -53,7 +45,7 @@ from ` + s.table("provider_players") + ` pp left join proj board on board.player
 // reads never mixes the two boards. fromWeek is whether the table holds
 // from_week (research revision 0007); without it the run's first week
 // reads as 0.
-func (s *PGSource) publishedQuery(fromWeek bool) string {
+func (s *PGSource) publishedQuery(fromWeek bool, m marketRead) string {
 	week := "0"
 	if fromWeek {
 		week = "from_week"
@@ -64,30 +56,36 @@ func (s *PGSource) publishedQuery(fromWeek bool) string {
 ), ` + s.preseasonCTEs(" and not exists (select 1 from pub)") + `, board as (
   select player_id, points, floor_points, median_points, ceiling_points from pub
   union all select player_id, points, floor_points, median_points, ceiling_points from proj
-)
-select ` + boardColumns + `,
+)` + m.cte(s) + `
+select ` + m.columns() + `,
   coalesce((select max(refreshed) from pub), (select as_of from latest)),
   coalesce((select min(order_basis) from pub), '` + string(OrderPreseason) + `'),
   coalesce((select min(run_id) from pub), ''),
   coalesce((select min(from_week) from pub), 0)
-from ` + s.table("provider_players") + ` pp left join board on board.player_id = pp.id` + boardOrder
+from ` + s.table("provider_players") + ` pp left join board on board.player_id = pp.id` + m.join() + m.order()
 }
 
 // boardRead is the statement Load and Version read f's board with, and
 // its arguments.
 func (s *PGSource) boardRead(ctx context.Context, f Format) (string, []any, error) {
+	market, marketArgs, err := s.marketArgs(ctx, f)
+	if err != nil {
+		return "", nil, err
+	}
 	published, err := s.hasPublished(ctx)
 	if err != nil {
 		return "", nil, err
 	}
 	if !published {
-		return s.preseasonQuery(), []any{s.Season, s.sourceFor(f)}, nil
+		args := []any{s.Season, s.sourceFor(f)}
+		return s.preseasonQuery(marketRead{on: market, first: len(args) + 1}), append(args, marketArgs...), nil
 	}
 	fromWeek, err := s.hasFromWeek(ctx)
 	if err != nil {
 		return "", nil, err
 	}
-	return s.publishedQuery(fromWeek), []any{s.Season, s.sourceFor(f), string(f)}, nil
+	args := []any{s.Season, s.sourceFor(f), string(f)}
+	return s.publishedQuery(fromWeek, marketRead{on: market, first: len(args) + 1}), append(args, marketArgs...), nil
 }
 
 // hasFromWeek is true when published_boards holds from_week (research

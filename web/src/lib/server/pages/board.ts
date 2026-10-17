@@ -10,7 +10,9 @@ import {
 } from '#lib/run/derive.ts';
 import { boardBasisTerms, type BasisTerm } from '#lib/run/board-basis.ts';
 import { rowFraming, type RowFraming } from '#lib/run/row-framing.ts';
-import type { BoardRowView, Format } from '#lib/run/schema.ts';
+import type { BoardRowView, Format, MarketRowView } from '#lib/run/schema.ts';
+import { isMarketPosition, marketAt } from '#lib/run/market.ts';
+import { marketBasis, withFace } from '#lib/site/market.ts';
 import type { Position, RangeScale } from '#lib/types/player.ts';
 import { scoringBasis } from '#lib/run/catalog.ts';
 import { links } from '#lib/site/links.ts';
@@ -40,8 +42,12 @@ export interface BoardPage {
 	/** null is the All view. */
 	position: Position | null;
 	positions: Position[];
-	/** Each with his season figures once the season is underway. */
+	/** Each with his season figures once the season is underway. None on a kicker's or a defense's view. */
 	rows: BoardRowView[];
+	/** A kicker's or a defense's view: the position in draft order, each with his status. */
+	market: MarketRowView[];
+	/** That view's basis, said once in place of the format's: the order and its drafts. */
+	marketBasis: string | null;
 	/** The basis line once the season is underway, which the page prints in place of the format's. */
 	seasonLead: string | null;
 	scale: RangeScale;
@@ -77,11 +83,17 @@ export async function boardPage(formatId: string, segment: string | null): Promi
 		adp(),
 		designations()
 	]);
+	// A kicker's or a defense's view lists his position in draft order, apart from the ranked rows.
+	const marketView = position !== null && isMarketPosition(position);
 	const ranked = withStatuses(
-		position === null ? loaded.rows : rowsAt(loaded.rows, position),
+		position === null ? loaded.rows : marketView ? [] : rowsAt(loaded.rows, position),
 		capture
 	);
-	if (ranked.length === 0) error(NOT_FOUND, 'This board ranks nobody at that position.');
+	const market = marketView
+		? withStatuses(marketAt(loaded.market, position), capture).map(withFace)
+		: [];
+	if (ranked.length === 0 && market.length === 0)
+		error(NOT_FOUND, 'This board ranks nobody at that position.');
 	const { rows, lead } = await boardSeason(format, ranked);
 	const range = carriesRange(rows);
 	const adpBasis = sources.sources
@@ -91,10 +103,12 @@ export async function boardPage(formatId: string, segment: string | null): Promi
 		format,
 		formats,
 		position,
-		positions: positionsIn(loaded.rows),
+		positions: positionsIn([...loaded.rows, ...loaded.market]),
 		rows,
-		seasonLead: lead,
-		scale: rangeScale(rows),
+		market,
+		marketBasis: marketView ? marketBasis(format, sources.sources) : null,
+		seasonLead: marketView ? null : lead,
+		scale: rangeScale(rows.length > 0 ? rows : loaded.rows),
 		range,
 		boardSize: loaded.rows.length,
 		adpBasis,
@@ -107,7 +121,7 @@ export async function boardPage(formatId: string, segment: string | null): Promi
 			range
 		}),
 		framing: rowFraming(format),
-		...boardStatuses(rows, capture, format)
+		...boardStatuses([...rows, ...market], capture, format)
 	};
 }
 
@@ -130,7 +144,8 @@ export async function boardEntries(): Promise<{ format: string; position: string
 	const [{ formats }, slugs] = await Promise.all([manifest(), runFormatSlugs()]);
 	const positions = new Set<string>();
 	for (const format of formats) {
-		for (const position of positionsIn((await board(format.id)).rows)) {
+		const loaded = await board(format.id);
+		for (const position of positionsIn([...loaded.rows, ...loaded.market])) {
 			positions.add(position.toLowerCase());
 		}
 	}

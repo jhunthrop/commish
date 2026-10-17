@@ -15,6 +15,9 @@ export interface DirectoryPlayer extends SheetPlayer {
 	adp: number | null;
 	/** The word his ranks show as when he is on a season-long list ("IR", Lane 63), else absent. */
 	held?: string | null;
+	/** A kicker or a defense (Lane 66m): his position rank is his place in the drafters' order and
+	 * his rank on our board only follows the ranked players, so neither is set against his ADP. */
+	draftOrder?: boolean;
 }
 
 /** The file's row: short keys, because it is downloaded whole. */
@@ -29,6 +32,8 @@ export interface DirectoryEntry {
 	a: number | null;
 	/** The held word, present only for a player on a season-long list. */
 	w?: string;
+	/** Set, to 1, only for a kicker or a defense in draft order. */
+	o?: 1;
 }
 
 /** Our board by player id, for the pages that print our numbers beside yours. */
@@ -53,7 +58,8 @@ export function toEntry(player: DirectoryPlayer): DirectoryEntry {
 		r: player.rank,
 		pr: player.positionRank,
 		a: player.adp,
-		...(player.held ? { w: player.held } : {})
+		...(player.held ? { w: player.held } : {}),
+		...(player.draftOrder ? { o: 1 as const } : {})
 	};
 }
 
@@ -69,7 +75,8 @@ function fromEntry(entry: DirectoryEntry): DirectoryPlayer | null {
 		rank: entry.r,
 		positionRank: entry.pr,
 		adp: entry.a,
-		held: entry.w ?? null
+		held: entry.w ?? null,
+		draftOrder: entry.o === 1
 	};
 }
 

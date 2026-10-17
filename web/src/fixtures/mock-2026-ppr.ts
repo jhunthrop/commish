@@ -653,9 +653,9 @@ export const SOLO_ROOM = {
 	call: player('4426388'),
 	runner: player('2577417'),
 	/** The call's chance of lasting to your next pick. */
-	callOdds: 1.3634829010014169e-8,
+	callChance: 1.3634829010014169e-8,
 	/** The runner-up's chance of lasting to your next pick. */
-	runnerOdds: 0.972591822368457,
+	runnerChance: 0.972591822368457,
 	went: [
 		{ player: player('4870808'), pick: 42, queued: true },
 		{ player: player('4361579'), pick: 43, queued: false },

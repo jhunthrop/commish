@@ -1,9 +1,37 @@
 /** The report's one big number and the sentences beside it, true at every rank: a team that leads
  * is read against the next team, any other against the team just ahead and the leader. */
-import { ordinal } from '#lib/format/number.ts';
+import { ordinal, signed } from '#lib/format/number.ts';
+import { isMarketPosition } from '#lib/run/market.ts';
+import { POSITIONS } from '#lib/types/player.ts';
 import type { MockReport } from '../api.ts';
+import type { RoomPlayer } from '../model.ts';
 
 type Team = MockReport['standings'][number];
+
+/** The positions a team's points count: the projected ones, "QB, RB, WR and TE". A kicker or a
+ * defense ranks in draft order with no projected points (the 2026-09-05 ruling), so no total counts
+ * him. Joined here rather than by format/list.ts, which rides in the forms' chunk the report never
+ * otherwise loads. */
+const COUNTED = POSITIONS.filter((position) => !isMarketPosition(position))
+	.join(', ')
+	.replace(/, (?=[^,]*$)/, ' and ');
+
+/** The team total's caption: "projected points from your QB, RB, WR and TE starters, 5th of 12". */
+export function totalCaption(whose: 'your' | 'their', standing: string): string {
+	return `projected points from ${whose} ${COUNTED} starters, ${standing}`;
+}
+
+/** A pick's figure in the Over repl column: his points over replacement, or for a kicker or a
+ * defense his place in draft order (the API's position rank, the order drafters take them). */
+export function pickFigure(
+	overReplacement: number | null,
+	player: RoomPlayer | undefined
+): { text: string; muted: boolean } {
+	if (player !== undefined && isMarketPosition(player.position))
+		return { text: `Draft order ${String(player.positionRank)}`, muted: true };
+	if (overReplacement === null) return { text: 'no projection', muted: true };
+	return { text: signed(overReplacement), muted: false };
+}
 
 export interface Headline {
 	/** Projected points from the seat's starters. */
