@@ -46,15 +46,15 @@
 
 <div class="signin">
 	<Field
-		label="MyFantasyLeague username or email"
-		autocomplete="username"
+		label="MyFantasyLeague username"
+		autocomplete="section-mfl username"
 		bind:value={username}
 		maxlength={128}
 	/>
 	<Field
 		label="MyFantasyLeague password"
 		kind="password"
-		autocomplete="current-password"
+		autocomplete="section-mfl current-password"
 		bind:value={password}
 		maxlength={128}
 		onenter={() => void connect()}
