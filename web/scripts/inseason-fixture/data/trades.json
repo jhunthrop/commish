@@ -42,7 +42,7 @@
 							{ "week": 4, "points": 19.3 },
 							{ "week": 3, "points": 10.7 }
 						],
-						"allowed_to_position": null,
+						"allowed_to_position": { "points_a_game": 12, "rank": 30, "of": 32, "position": "RB" },
 						"game_total": {
 							"points": 40.5,
 							"team_points": 19,
@@ -52,7 +52,11 @@
 						"roof": { "kind": "outdoors", "abroad": false },
 						"weather": null
 					},
-					"week_projection": 9.1
+					"week_projection": 9.1,
+					"projection_delta": 0,
+					"opp_rank": 30,
+					"season_avg": 10.23,
+					"last_points": 0.7
 				},
 				{
 					"player": {
@@ -85,7 +89,11 @@
 						"roof": null,
 						"weather": null
 					},
-					"week_projection": null
+					"week_projection": null,
+					"projection_delta": null,
+					"opp_rank": null,
+					"season_avg": null,
+					"last_points": null
 				},
 				{
 					"player": {
@@ -116,7 +124,12 @@
 							{ "week": 4, "points": 16.5 },
 							{ "week": 3, "points": 6.2 }
 						],
-						"allowed_to_position": null,
+						"allowed_to_position": {
+							"points_a_game": 17.4,
+							"rank": 21,
+							"of": 32,
+							"position": "TE"
+						},
 						"game_total": {
 							"points": 42.5,
 							"team_points": 23,
@@ -126,7 +139,11 @@
 						"roof": { "kind": "outdoors", "abroad": true },
 						"weather": null
 					},
-					"week_projection": 7.94
+					"week_projection": 7.94,
+					"projection_delta": -0.1,
+					"opp_rank": 21,
+					"season_avg": 12.17,
+					"last_points": 13.8
 				},
 				{
 					"player": {
@@ -157,7 +174,12 @@
 							{ "week": 4, "points": 16.5 },
 							{ "week": 3, "points": 6.6 }
 						],
-						"allowed_to_position": null,
+						"allowed_to_position": {
+							"points_a_game": 16.2,
+							"rank": 23,
+							"of": 32,
+							"position": "TE"
+						},
 						"game_total": {
 							"points": 52.5,
 							"team_points": 27,
@@ -173,7 +195,11 @@
 							"read_at": "2026-10-16T21:01:34.611Z"
 						}
 					},
-					"week_projection": 11.05
+					"week_projection": 11.05,
+					"projection_delta": 0.2,
+					"opp_rank": 23,
+					"season_avg": 11.57,
+					"last_points": 11.6
 				}
 			],
 			"trades": [
@@ -208,7 +234,12 @@
 									{ "week": 3, "points": 18.94 },
 									{ "week": 2, "points": 31.98 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 28.8,
+									"rank": 2,
+									"of": 32,
+									"position": "QB"
+								},
 								"game_total": {
 									"points": 42.5,
 									"team_points": 25.5,
@@ -224,7 +255,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": 17.93
+							"week_projection": 17.93,
+							"projection_delta": -0.1,
+							"opp_rank": 2,
+							"season_avg": 23.31,
+							"last_points": 19
 						}
 					],
 					"get": [
@@ -259,7 +294,11 @@
 								"roof": null,
 								"weather": null
 							},
-							"week_projection": null
+							"week_projection": null,
+							"projection_delta": null,
+							"opp_rank": null,
+							"season_avg": null,
+							"last_points": null
 						},
 						{
 							"player": {
@@ -290,7 +329,12 @@
 									{ "week": 4, "points": 16.5 },
 									{ "week": 3, "points": 6.6 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 16.2,
+									"rank": 23,
+									"of": 32,
+									"position": "TE"
+								},
 								"game_total": {
 									"points": 52.5,
 									"team_points": 27,
@@ -306,7 +350,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": 11.05
+							"week_projection": 11.05,
+							"projection_delta": 0.2,
+							"opp_rank": 23,
+							"season_avg": 11.57,
+							"last_points": 11.6
 						}
 					],
 					"drop": {
@@ -337,7 +385,12 @@
 								{ "week": 2, "points": 0.8 },
 								{ "week": 1, "points": 29.6 }
 							],
-							"allowed_to_position": null,
+							"allowed_to_position": {
+								"points_a_game": 28.2,
+								"rank": 3,
+								"of": 32,
+								"position": "QB"
+							},
 							"game_total": {
 								"points": 45.5,
 								"team_points": 23.5,
@@ -353,7 +406,11 @@
 								"read_at": "2026-10-16T21:01:34.611Z"
 							}
 						},
-						"week_projection": 20.59
+						"week_projection": 20.59,
+						"projection_delta": -0.1,
+						"opp_rank": 3,
+						"season_avg": 15.2,
+						"last_points": 0.8
 					},
 					"my_gain": 2.1,
 					"their_gain": 0.5,
@@ -390,7 +447,12 @@
 									{ "week": 3, "points": 18.94 },
 									{ "week": 2, "points": 31.98 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 28.8,
+									"rank": 2,
+									"of": 32,
+									"position": "QB"
+								},
 								"game_total": {
 									"points": 42.5,
 									"team_points": 25.5,
@@ -406,7 +468,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": 17.93
+							"week_projection": 17.93,
+							"projection_delta": -0.1,
+							"opp_rank": 2,
+							"season_avg": 23.31,
+							"last_points": 19
 						}
 					],
 					"get": [
@@ -439,7 +505,12 @@
 									{ "week": 4, "points": 16.5 },
 									{ "week": 3, "points": 6.2 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 17.4,
+									"rank": 21,
+									"of": 32,
+									"position": "TE"
+								},
 								"game_total": {
 									"points": 42.5,
 									"team_points": 23,
@@ -449,7 +520,11 @@
 								"roof": { "kind": "outdoors", "abroad": true },
 								"weather": null
 							},
-							"week_projection": 7.94
+							"week_projection": 7.94,
+							"projection_delta": -0.1,
+							"opp_rank": 21,
+							"season_avg": 12.17,
+							"last_points": 13.8
 						},
 						{
 							"player": {
@@ -480,7 +555,12 @@
 									{ "week": 4, "points": 16.5 },
 									{ "week": 3, "points": 6.6 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 16.2,
+									"rank": 23,
+									"of": 32,
+									"position": "TE"
+								},
 								"game_total": {
 									"points": 52.5,
 									"team_points": 27,
@@ -496,7 +576,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": 11.05
+							"week_projection": 11.05,
+							"projection_delta": 0.2,
+							"opp_rank": 23,
+							"season_avg": 11.57,
+							"last_points": 11.6
 						}
 					],
 					"drop": {
@@ -527,7 +611,12 @@
 								{ "week": 2, "points": 0.8 },
 								{ "week": 1, "points": 29.6 }
 							],
-							"allowed_to_position": null,
+							"allowed_to_position": {
+								"points_a_game": 28.2,
+								"rank": 3,
+								"of": 32,
+								"position": "QB"
+							},
 							"game_total": {
 								"points": 45.5,
 								"team_points": 23.5,
@@ -543,7 +632,11 @@
 								"read_at": "2026-10-16T21:01:34.611Z"
 							}
 						},
-						"week_projection": 20.59
+						"week_projection": 20.59,
+						"projection_delta": -0.1,
+						"opp_rank": 3,
+						"season_avg": 15.2,
+						"last_points": 0.8
 					},
 					"my_gain": 1.9,
 					"their_gain": 0.7,
@@ -580,7 +673,12 @@
 									{ "week": 3, "points": 18.94 },
 									{ "week": 2, "points": 31.98 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 28.8,
+									"rank": 2,
+									"of": 32,
+									"position": "QB"
+								},
 								"game_total": {
 									"points": 42.5,
 									"team_points": 25.5,
@@ -596,7 +694,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": 17.93
+							"week_projection": 17.93,
+							"projection_delta": -0.1,
+							"opp_rank": 2,
+							"season_avg": 23.31,
+							"last_points": 19
 						}
 					],
 					"get": [
@@ -631,7 +733,11 @@
 								"roof": null,
 								"weather": null
 							},
-							"week_projection": null
+							"week_projection": null,
+							"projection_delta": null,
+							"opp_rank": null,
+							"season_avg": null,
+							"last_points": null
 						},
 						{
 							"player": {
@@ -662,7 +768,12 @@
 									{ "week": 4, "points": 16.5 },
 									{ "week": 3, "points": 6.2 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 17.4,
+									"rank": 21,
+									"of": 32,
+									"position": "TE"
+								},
 								"game_total": {
 									"points": 42.5,
 									"team_points": 23,
@@ -672,7 +783,11 @@
 								"roof": { "kind": "outdoors", "abroad": true },
 								"weather": null
 							},
-							"week_projection": 7.94
+							"week_projection": 7.94,
+							"projection_delta": -0.1,
+							"opp_rank": 21,
+							"season_avg": 12.17,
+							"last_points": 13.8
 						}
 					],
 					"drop": {
@@ -703,7 +818,12 @@
 								{ "week": 2, "points": 0.8 },
 								{ "week": 1, "points": 29.6 }
 							],
-							"allowed_to_position": null,
+							"allowed_to_position": {
+								"points_a_game": 28.2,
+								"rank": 3,
+								"of": 32,
+								"position": "QB"
+							},
 							"game_total": {
 								"points": 45.5,
 								"team_points": 23.5,
@@ -719,7 +839,11 @@
 								"read_at": "2026-10-16T21:01:34.611Z"
 							}
 						},
-						"week_projection": 20.59
+						"week_projection": 20.59,
+						"projection_delta": -0.1,
+						"opp_rank": 3,
+						"season_avg": 15.2,
+						"last_points": 0.8
 					},
 					"my_gain": 1.6,
 					"their_gain": 1,
@@ -756,7 +880,12 @@
 									{ "week": 3, "points": 18.94 },
 									{ "week": 2, "points": 31.98 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 28.8,
+									"rank": 2,
+									"of": 32,
+									"position": "QB"
+								},
 								"game_total": {
 									"points": 42.5,
 									"team_points": 25.5,
@@ -772,7 +901,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": 17.93
+							"week_projection": 17.93,
+							"projection_delta": -0.1,
+							"opp_rank": 2,
+							"season_avg": 23.31,
+							"last_points": 19
 						}
 					],
 					"get": [
@@ -805,7 +938,12 @@
 									{ "week": 4, "points": 19.3 },
 									{ "week": 3, "points": 10.7 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 12,
+									"rank": 30,
+									"of": 32,
+									"position": "RB"
+								},
 								"game_total": {
 									"points": 40.5,
 									"team_points": 19,
@@ -815,7 +953,11 @@
 								"roof": { "kind": "outdoors", "abroad": false },
 								"weather": null
 							},
-							"week_projection": 9.1
+							"week_projection": 9.1,
+							"projection_delta": 0,
+							"opp_rank": 30,
+							"season_avg": 10.23,
+							"last_points": 0.7
 						},
 						{
 							"player": {
@@ -846,7 +988,12 @@
 									{ "week": 4, "points": 16.5 },
 									{ "week": 3, "points": 6.6 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 16.2,
+									"rank": 23,
+									"of": 32,
+									"position": "TE"
+								},
 								"game_total": {
 									"points": 52.5,
 									"team_points": 27,
@@ -862,7 +1009,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": 11.05
+							"week_projection": 11.05,
+							"projection_delta": 0.2,
+							"opp_rank": 23,
+							"season_avg": 11.57,
+							"last_points": 11.6
 						}
 					],
 					"drop": {
@@ -893,7 +1044,12 @@
 								{ "week": 2, "points": 0.8 },
 								{ "week": 1, "points": 29.6 }
 							],
-							"allowed_to_position": null,
+							"allowed_to_position": {
+								"points_a_game": 28.2,
+								"rank": 3,
+								"of": 32,
+								"position": "QB"
+							},
 							"game_total": {
 								"points": 45.5,
 								"team_points": 23.5,
@@ -909,7 +1065,11 @@
 								"read_at": "2026-10-16T21:01:34.611Z"
 							}
 						},
-						"week_projection": 20.59
+						"week_projection": 20.59,
+						"projection_delta": -0.1,
+						"opp_rank": 3,
+						"season_avg": 15.2,
+						"last_points": 0.8
 					},
 					"my_gain": 1.5,
 					"their_gain": 1.1,
@@ -953,7 +1113,7 @@
 							{ "week": 4, "points": 7.2 },
 							{ "week": 3, "points": 6.3 }
 						],
-						"allowed_to_position": null,
+						"allowed_to_position": { "points_a_game": 12, "rank": 30, "of": 32, "position": "RB" },
 						"game_total": {
 							"points": 40.5,
 							"team_points": 19,
@@ -963,7 +1123,11 @@
 						"roof": { "kind": "outdoors", "abroad": false },
 						"weather": null
 					},
-					"week_projection": 8.48
+					"week_projection": 8.48,
+					"projection_delta": -0.3,
+					"opp_rank": 30,
+					"season_avg": 9.63,
+					"last_points": 15.4
 				},
 				{
 					"player": {
@@ -994,7 +1158,12 @@
 							{ "week": 4, "points": 6.6 },
 							{ "week": 3, "points": 5.7 }
 						],
-						"allowed_to_position": null,
+						"allowed_to_position": {
+							"points_a_game": 14.4,
+							"rank": 26,
+							"of": 32,
+							"position": "WR"
+						},
 						"game_total": {
 							"points": 40.5,
 							"team_points": 22.5,
@@ -1010,7 +1179,11 @@
 							"read_at": "2026-10-16T21:01:34.611Z"
 						}
 					},
-					"week_projection": 6.21
+					"week_projection": 6.21,
+					"projection_delta": 0,
+					"opp_rank": 26,
+					"season_avg": 7.83,
+					"last_points": 11.2
 				},
 				{
 					"player": {
@@ -1041,7 +1214,12 @@
 							{ "week": 4, "points": 23.8 },
 							{ "week": 3, "points": 7.9 }
 						],
-						"allowed_to_position": null,
+						"allowed_to_position": {
+							"points_a_game": 18.6,
+							"rank": 19,
+							"of": 32,
+							"position": "WR"
+						},
 						"game_total": {
 							"points": 43.5,
 							"team_points": 25.5,
@@ -1057,7 +1235,11 @@
 							"read_at": "2026-10-16T21:01:34.611Z"
 						}
 					},
-					"week_projection": 9.93
+					"week_projection": 9.93,
+					"projection_delta": -0.1,
+					"opp_rank": 19,
+					"season_avg": 11.43,
+					"last_points": 2.6
 				},
 				{
 					"player": {
@@ -1088,7 +1270,7 @@
 							{ "week": 4, "points": 13.6 },
 							{ "week": 3, "points": 3.3 }
 						],
-						"allowed_to_position": null,
+						"allowed_to_position": { "points_a_game": 28.2, "rank": 3, "of": 32, "position": "TE" },
 						"game_total": {
 							"points": 45.5,
 							"team_points": 23.5,
@@ -1104,7 +1286,11 @@
 							"read_at": "2026-10-16T21:01:34.611Z"
 						}
 					},
-					"week_projection": 9.99
+					"week_projection": 9.99,
+					"projection_delta": -0.2,
+					"opp_rank": 3,
+					"season_avg": 16.43,
+					"last_points": 32.4
 				},
 				{
 					"player": {
@@ -1135,7 +1321,7 @@
 							{ "week": 3, "points": 13.9 },
 							{ "week": 2, "points": 25.1 }
 						],
-						"allowed_to_position": null,
+						"allowed_to_position": { "points_a_game": 28.8, "rank": 2, "of": 32, "position": "TE" },
 						"game_total": {
 							"points": 42.5,
 							"team_points": 25.5,
@@ -1151,7 +1337,11 @@
 							"read_at": "2026-10-16T21:01:34.611Z"
 						}
 					},
-					"week_projection": 10.45
+					"week_projection": 10.45,
+					"projection_delta": -0.3,
+					"opp_rank": 2,
+					"season_avg": 14.17,
+					"last_points": 3.5
 				}
 			],
 			"trades": [
@@ -1192,7 +1382,11 @@
 								"roof": null,
 								"weather": null
 							},
-							"week_projection": null
+							"week_projection": null,
+							"projection_delta": null,
+							"opp_rank": null,
+							"season_avg": 16.53,
+							"last_points": 19.8
 						}
 					],
 					"get": [
@@ -1225,7 +1419,12 @@
 									{ "week": 3, "points": 13.9 },
 									{ "week": 2, "points": 25.1 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 28.8,
+									"rank": 2,
+									"of": 32,
+									"position": "TE"
+								},
 								"game_total": {
 									"points": 42.5,
 									"team_points": 25.5,
@@ -1241,7 +1440,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": 10.45
+							"week_projection": 10.45,
+							"projection_delta": -0.3,
+							"opp_rank": 2,
+							"season_avg": 14.17,
+							"last_points": 3.5
 						},
 						{
 							"player": {
@@ -1272,7 +1475,12 @@
 									{ "week": 4, "points": 23.8 },
 									{ "week": 3, "points": 7.9 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 18.6,
+									"rank": 19,
+									"of": 32,
+									"position": "WR"
+								},
 								"game_total": {
 									"points": 43.5,
 									"team_points": 25.5,
@@ -1288,7 +1496,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": 9.93
+							"week_projection": 9.93,
+							"projection_delta": -0.1,
+							"opp_rank": 19,
+							"season_avg": 11.43,
+							"last_points": 2.6
 						}
 					],
 					"drop": {
@@ -1319,7 +1531,12 @@
 								{ "week": 2, "points": 0.8 },
 								{ "week": 1, "points": 29.6 }
 							],
-							"allowed_to_position": null,
+							"allowed_to_position": {
+								"points_a_game": 28.2,
+								"rank": 3,
+								"of": 32,
+								"position": "QB"
+							},
 							"game_total": {
 								"points": 45.5,
 								"team_points": 23.5,
@@ -1335,7 +1552,11 @@
 								"read_at": "2026-10-16T21:01:34.611Z"
 							}
 						},
-						"week_projection": 20.59
+						"week_projection": 20.59,
+						"projection_delta": -0.1,
+						"opp_rank": 3,
+						"season_avg": 15.2,
+						"last_points": 0.8
 					},
 					"my_gain": 0.7,
 					"their_gain": 0.5,
@@ -1372,7 +1593,12 @@
 									{ "week": 4, "points": 15.4 },
 									{ "week": 3, "points": 7.4 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 22.8,
+									"rank": 12,
+									"of": 32,
+									"position": "WR"
+								},
 								"game_total": {
 									"points": 49.5,
 									"team_points": 26.5,
@@ -1388,7 +1614,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": 10.98
+							"week_projection": 10.98,
+							"projection_delta": -0.1,
+							"opp_rank": 12,
+							"season_avg": 9.27,
+							"last_points": 5
 						}
 					],
 					"get": [
@@ -1421,7 +1651,12 @@
 									{ "week": 4, "points": 6.6 },
 									{ "week": 3, "points": 5.7 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 14.4,
+									"rank": 26,
+									"of": 32,
+									"position": "WR"
+								},
 								"game_total": {
 									"points": 40.5,
 									"team_points": 22.5,
@@ -1437,7 +1672,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": 6.21
+							"week_projection": 6.21,
+							"projection_delta": 0,
+							"opp_rank": 26,
+							"season_avg": 7.83,
+							"last_points": 11.2
 						},
 						{
 							"player": {
@@ -1468,7 +1707,12 @@
 									{ "week": 4, "points": 23.8 },
 									{ "week": 3, "points": 7.9 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 18.6,
+									"rank": 19,
+									"of": 32,
+									"position": "WR"
+								},
 								"game_total": {
 									"points": 43.5,
 									"team_points": 25.5,
@@ -1484,7 +1728,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": 9.93
+							"week_projection": 9.93,
+							"projection_delta": -0.1,
+							"opp_rank": 19,
+							"season_avg": 11.43,
+							"last_points": 2.6
 						}
 					],
 					"drop": {
@@ -1515,7 +1763,12 @@
 								{ "week": 2, "points": 0.8 },
 								{ "week": 1, "points": 29.6 }
 							],
-							"allowed_to_position": null,
+							"allowed_to_position": {
+								"points_a_game": 28.2,
+								"rank": 3,
+								"of": 32,
+								"position": "QB"
+							},
 							"game_total": {
 								"points": 45.5,
 								"team_points": 23.5,
@@ -1531,7 +1784,11 @@
 								"read_at": "2026-10-16T21:01:34.611Z"
 							}
 						},
-						"week_projection": 20.59
+						"week_projection": 20.59,
+						"projection_delta": -0.1,
+						"opp_rank": 3,
+						"season_avg": 15.2,
+						"last_points": 0.8
 					},
 					"my_gain": 0.6,
 					"their_gain": 0.6,
@@ -1568,7 +1825,12 @@
 									{ "week": 4, "points": 6.5 },
 									{ "week": 3, "points": 21.9 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 26.4,
+									"rank": 6,
+									"of": 32,
+									"position": "RB"
+								},
 								"game_total": {
 									"points": 52.5,
 									"team_points": 20,
@@ -1578,7 +1840,11 @@
 								"roof": { "kind": "dome", "abroad": false },
 								"weather": null
 							},
-							"week_projection": 12.3
+							"week_projection": 12.3,
+							"projection_delta": -0.4,
+							"opp_rank": 6,
+							"season_avg": 10.2,
+							"last_points": 2.2
 						}
 					],
 					"get": [
@@ -1611,7 +1877,12 @@
 									{ "week": 4, "points": 7.2 },
 									{ "week": 3, "points": 6.3 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 12,
+									"rank": 30,
+									"of": 32,
+									"position": "RB"
+								},
 								"game_total": {
 									"points": 40.5,
 									"team_points": 19,
@@ -1621,7 +1892,11 @@
 								"roof": { "kind": "outdoors", "abroad": false },
 								"weather": null
 							},
-							"week_projection": 8.48
+							"week_projection": 8.48,
+							"projection_delta": -0.3,
+							"opp_rank": 30,
+							"season_avg": 9.63,
+							"last_points": 15.4
 						},
 						{
 							"player": {
@@ -1652,7 +1927,12 @@
 									{ "week": 4, "points": 23.8 },
 									{ "week": 3, "points": 7.9 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 18.6,
+									"rank": 19,
+									"of": 32,
+									"position": "WR"
+								},
 								"game_total": {
 									"points": 43.5,
 									"team_points": 25.5,
@@ -1668,7 +1948,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": 9.93
+							"week_projection": 9.93,
+							"projection_delta": -0.1,
+							"opp_rank": 19,
+							"season_avg": 11.43,
+							"last_points": 2.6
 						}
 					],
 					"drop": {
@@ -1699,7 +1983,12 @@
 								{ "week": 2, "points": 0.8 },
 								{ "week": 1, "points": 29.6 }
 							],
-							"allowed_to_position": null,
+							"allowed_to_position": {
+								"points_a_game": 28.2,
+								"rank": 3,
+								"of": 32,
+								"position": "QB"
+							},
 							"game_total": {
 								"points": 45.5,
 								"team_points": 23.5,
@@ -1715,7 +2004,11 @@
 								"read_at": "2026-10-16T21:01:34.611Z"
 							}
 						},
-						"week_projection": 20.59
+						"week_projection": 20.59,
+						"projection_delta": -0.1,
+						"opp_rank": 3,
+						"season_avg": 15.2,
+						"last_points": 0.8
 					},
 					"my_gain": 0.6,
 					"their_gain": 0.6,
@@ -1758,7 +2051,11 @@
 								"roof": null,
 								"weather": null
 							},
-							"week_projection": null
+							"week_projection": null,
+							"projection_delta": null,
+							"opp_rank": null,
+							"season_avg": 16.73,
+							"last_points": 19.7
 						}
 					],
 					"get": [
@@ -1791,7 +2088,12 @@
 									{ "week": 4, "points": 23.8 },
 									{ "week": 3, "points": 7.9 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 18.6,
+									"rank": 19,
+									"of": 32,
+									"position": "WR"
+								},
 								"game_total": {
 									"points": 43.5,
 									"team_points": 25.5,
@@ -1807,7 +2109,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": 9.93
+							"week_projection": 9.93,
+							"projection_delta": -0.1,
+							"opp_rank": 19,
+							"season_avg": 11.43,
+							"last_points": 2.6
 						},
 						{
 							"player": {
@@ -1838,7 +2144,12 @@
 									{ "week": 4, "points": 13.6 },
 									{ "week": 3, "points": 3.3 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 28.2,
+									"rank": 3,
+									"of": 32,
+									"position": "TE"
+								},
 								"game_total": {
 									"points": 45.5,
 									"team_points": 23.5,
@@ -1854,7 +2165,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": 9.99
+							"week_projection": 9.99,
+							"projection_delta": -0.2,
+							"opp_rank": 3,
+							"season_avg": 16.43,
+							"last_points": 32.4
 						}
 					],
 					"drop": {
@@ -1885,7 +2200,12 @@
 								{ "week": 2, "points": 0.8 },
 								{ "week": 1, "points": 29.6 }
 							],
-							"allowed_to_position": null,
+							"allowed_to_position": {
+								"points_a_game": 28.2,
+								"rank": 3,
+								"of": 32,
+								"position": "QB"
+							},
 							"game_total": {
 								"points": 45.5,
 								"team_points": 23.5,
@@ -1901,7 +2221,11 @@
 								"read_at": "2026-10-16T21:01:34.611Z"
 							}
 						},
-						"week_projection": 20.59
+						"week_projection": 20.59,
+						"projection_delta": -0.1,
+						"opp_rank": 3,
+						"season_avg": 15.2,
+						"last_points": 0.8
 					},
 					"my_gain": 0.5,
 					"their_gain": 0.7,
@@ -1945,7 +2269,7 @@
 							{ "week": 4, "points": 16.4 },
 							{ "week": 3, "points": 6.8 }
 						],
-						"allowed_to_position": null,
+						"allowed_to_position": { "points_a_game": 25.2, "rank": 8, "of": 32, "position": "RB" },
 						"game_total": {
 							"points": 43.5,
 							"team_points": 25.5,
@@ -1961,7 +2285,11 @@
 							"read_at": "2026-10-16T21:01:34.611Z"
 						}
 					},
-					"week_projection": 14.08
+					"week_projection": 14.08,
+					"projection_delta": 0.2,
+					"opp_rank": 8,
+					"season_avg": 13.57,
+					"last_points": 17.5
 				},
 				{
 					"player": {
@@ -1992,7 +2320,7 @@
 							{ "week": 4, "points": 4.6 },
 							{ "week": 3, "points": 12.7 }
 						],
-						"allowed_to_position": null,
+						"allowed_to_position": { "points_a_game": 29.4, "rank": 1, "of": 32, "position": "WR" },
 						"game_total": {
 							"points": 44.5,
 							"team_points": 26,
@@ -2008,7 +2336,11 @@
 							"read_at": "2026-10-16T21:01:34.611Z"
 						}
 					},
-					"week_projection": 11.28
+					"week_projection": 11.28,
+					"projection_delta": -0.3,
+					"opp_rank": 1,
+					"season_avg": 8.33,
+					"last_points": 7.7
 				},
 				{
 					"player": {
@@ -2039,7 +2371,12 @@
 							{ "week": 4, "points": 11.4 },
 							{ "week": 3, "points": 19.8 }
 						],
-						"allowed_to_position": null,
+						"allowed_to_position": {
+							"points_a_game": 22.8,
+							"rank": 12,
+							"of": 32,
+							"position": "WR"
+						},
 						"game_total": {
 							"points": 49.5,
 							"team_points": 26.5,
@@ -2055,7 +2392,11 @@
 							"read_at": "2026-10-16T21:01:34.611Z"
 						}
 					},
-					"week_projection": 13.09
+					"week_projection": 13.09,
+					"projection_delta": -0.4,
+					"opp_rank": 12,
+					"season_avg": 13.37,
+					"last_points": 8.9
 				},
 				{
 					"player": {
@@ -2086,7 +2427,12 @@
 							{ "week": 4, "points": 2 },
 							{ "week": 3, "points": 13 }
 						],
-						"allowed_to_position": null,
+						"allowed_to_position": {
+							"points_a_game": 11.4,
+							"rank": 31,
+							"of": 32,
+							"position": "WR"
+						},
 						"game_total": {
 							"points": 42.5,
 							"team_points": 23,
@@ -2096,7 +2442,11 @@
 						"roof": { "kind": "outdoors", "abroad": true },
 						"weather": null
 					},
-					"week_projection": 11.92
+					"week_projection": 11.92,
+					"projection_delta": 0.4,
+					"opp_rank": 31,
+					"season_avg": 15.13,
+					"last_points": 30.4
 				}
 			],
 			"trades": [
@@ -2131,7 +2481,12 @@
 									{ "week": 3, "points": 18.94 },
 									{ "week": 2, "points": 31.98 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 28.8,
+									"rank": 2,
+									"of": 32,
+									"position": "QB"
+								},
 								"game_total": {
 									"points": 42.5,
 									"team_points": 25.5,
@@ -2147,7 +2502,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": 17.93
+							"week_projection": 17.93,
+							"projection_delta": -0.1,
+							"opp_rank": 2,
+							"season_avg": 23.31,
+							"last_points": 19
 						}
 					],
 					"get": [
@@ -2180,7 +2539,12 @@
 									{ "week": 4, "points": 11.4 },
 									{ "week": 3, "points": 19.8 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 22.8,
+									"rank": 12,
+									"of": 32,
+									"position": "WR"
+								},
 								"game_total": {
 									"points": 49.5,
 									"team_points": 26.5,
@@ -2196,7 +2560,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": 13.09
+							"week_projection": 13.09,
+							"projection_delta": -0.4,
+							"opp_rank": 12,
+							"season_avg": 13.37,
+							"last_points": 8.9
 						},
 						{
 							"player": {
@@ -2227,7 +2595,12 @@
 									{ "week": 4, "points": 16.4 },
 									{ "week": 3, "points": 6.8 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 25.2,
+									"rank": 8,
+									"of": 32,
+									"position": "RB"
+								},
 								"game_total": {
 									"points": 43.5,
 									"team_points": 25.5,
@@ -2243,7 +2616,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": 14.08
+							"week_projection": 14.08,
+							"projection_delta": 0.2,
+							"opp_rank": 8,
+							"season_avg": 13.57,
+							"last_points": 17.5
 						}
 					],
 					"drop": {
@@ -2274,7 +2651,12 @@
 								{ "week": 2, "points": 0.8 },
 								{ "week": 1, "points": 29.6 }
 							],
-							"allowed_to_position": null,
+							"allowed_to_position": {
+								"points_a_game": 28.2,
+								"rank": 3,
+								"of": 32,
+								"position": "QB"
+							},
 							"game_total": {
 								"points": 45.5,
 								"team_points": 23.5,
@@ -2290,7 +2672,11 @@
 								"read_at": "2026-10-16T21:01:34.611Z"
 							}
 						},
-						"week_projection": 20.59
+						"week_projection": 20.59,
+						"projection_delta": -0.1,
+						"opp_rank": 3,
+						"season_avg": 15.2,
+						"last_points": 0.8
 					},
 					"my_gain": 4.6,
 					"their_gain": 0.7,
@@ -2327,7 +2713,12 @@
 									{ "week": 3, "points": 18.94 },
 									{ "week": 2, "points": 31.98 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 28.8,
+									"rank": 2,
+									"of": 32,
+									"position": "QB"
+								},
 								"game_total": {
 									"points": 42.5,
 									"team_points": 25.5,
@@ -2343,7 +2734,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": 17.93
+							"week_projection": 17.93,
+							"projection_delta": -0.1,
+							"opp_rank": 2,
+							"season_avg": 23.31,
+							"last_points": 19
 						}
 					],
 					"get": [
@@ -2376,7 +2771,12 @@
 									{ "week": 4, "points": 11.4 },
 									{ "week": 3, "points": 19.8 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 22.8,
+									"rank": 12,
+									"of": 32,
+									"position": "WR"
+								},
 								"game_total": {
 									"points": 49.5,
 									"team_points": 26.5,
@@ -2392,7 +2792,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": 13.09
+							"week_projection": 13.09,
+							"projection_delta": -0.4,
+							"opp_rank": 12,
+							"season_avg": 13.37,
+							"last_points": 8.9
 						},
 						{
 							"player": {
@@ -2423,7 +2827,12 @@
 									{ "week": 4, "points": 2 },
 									{ "week": 3, "points": 13 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 11.4,
+									"rank": 31,
+									"of": 32,
+									"position": "WR"
+								},
 								"game_total": {
 									"points": 42.5,
 									"team_points": 23,
@@ -2433,7 +2842,11 @@
 								"roof": { "kind": "outdoors", "abroad": true },
 								"weather": null
 							},
-							"week_projection": 11.92
+							"week_projection": 11.92,
+							"projection_delta": 0.4,
+							"opp_rank": 31,
+							"season_avg": 15.13,
+							"last_points": 30.4
 						}
 					],
 					"drop": {
@@ -2464,7 +2877,12 @@
 								{ "week": 2, "points": 0.8 },
 								{ "week": 1, "points": 29.6 }
 							],
-							"allowed_to_position": null,
+							"allowed_to_position": {
+								"points_a_game": 28.2,
+								"rank": 3,
+								"of": 32,
+								"position": "QB"
+							},
 							"game_total": {
 								"points": 45.5,
 								"team_points": 23.5,
@@ -2480,7 +2898,11 @@
 								"read_at": "2026-10-16T21:01:34.611Z"
 							}
 						},
-						"week_projection": 20.59
+						"week_projection": 20.59,
+						"projection_delta": -0.1,
+						"opp_rank": 3,
+						"season_avg": 15.2,
+						"last_points": 0.8
 					},
 					"my_gain": 4.6,
 					"their_gain": 0.7,
@@ -2517,7 +2939,12 @@
 									{ "week": 3, "points": 18.94 },
 									{ "week": 2, "points": 31.98 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 28.8,
+									"rank": 2,
+									"of": 32,
+									"position": "QB"
+								},
 								"game_total": {
 									"points": 42.5,
 									"team_points": 25.5,
@@ -2533,7 +2960,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": 17.93
+							"week_projection": 17.93,
+							"projection_delta": -0.1,
+							"opp_rank": 2,
+							"season_avg": 23.31,
+							"last_points": 19
 						}
 					],
 					"get": [
@@ -2566,7 +2997,12 @@
 									{ "week": 4, "points": 16.4 },
 									{ "week": 3, "points": 6.8 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 25.2,
+									"rank": 8,
+									"of": 32,
+									"position": "RB"
+								},
 								"game_total": {
 									"points": 43.5,
 									"team_points": 25.5,
@@ -2582,7 +3018,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": 14.08
+							"week_projection": 14.08,
+							"projection_delta": 0.2,
+							"opp_rank": 8,
+							"season_avg": 13.57,
+							"last_points": 17.5
 						},
 						{
 							"player": {
@@ -2613,7 +3053,12 @@
 									{ "week": 4, "points": 4.6 },
 									{ "week": 3, "points": 12.7 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 29.4,
+									"rank": 1,
+									"of": 32,
+									"position": "WR"
+								},
 								"game_total": {
 									"points": 44.5,
 									"team_points": 26,
@@ -2629,7 +3074,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": 11.28
+							"week_projection": 11.28,
+							"projection_delta": -0.3,
+							"opp_rank": 1,
+							"season_avg": 8.33,
+							"last_points": 7.7
 						}
 					],
 					"drop": {
@@ -2660,7 +3109,12 @@
 								{ "week": 2, "points": 0.8 },
 								{ "week": 1, "points": 29.6 }
 							],
-							"allowed_to_position": null,
+							"allowed_to_position": {
+								"points_a_game": 28.2,
+								"rank": 3,
+								"of": 32,
+								"position": "QB"
+							},
 							"game_total": {
 								"points": 45.5,
 								"team_points": 23.5,
@@ -2676,7 +3130,11 @@
 								"read_at": "2026-10-16T21:01:34.611Z"
 							}
 						},
-						"week_projection": 20.59
+						"week_projection": 20.59,
+						"projection_delta": -0.1,
+						"opp_rank": 3,
+						"season_avg": 15.2,
+						"last_points": 0.8
 					},
 					"my_gain": 4.1,
 					"their_gain": 1.2,
@@ -2713,7 +3171,12 @@
 									{ "week": 3, "points": 18.94 },
 									{ "week": 2, "points": 31.98 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 28.8,
+									"rank": 2,
+									"of": 32,
+									"position": "QB"
+								},
 								"game_total": {
 									"points": 42.5,
 									"team_points": 25.5,
@@ -2729,7 +3192,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": 17.93
+							"week_projection": 17.93,
+							"projection_delta": -0.1,
+							"opp_rank": 2,
+							"season_avg": 23.31,
+							"last_points": 19
 						}
 					],
 					"get": [
@@ -2762,7 +3229,12 @@
 									{ "week": 4, "points": 2 },
 									{ "week": 3, "points": 13 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 11.4,
+									"rank": 31,
+									"of": 32,
+									"position": "WR"
+								},
 								"game_total": {
 									"points": 42.5,
 									"team_points": 23,
@@ -2772,7 +3244,11 @@
 								"roof": { "kind": "outdoors", "abroad": true },
 								"weather": null
 							},
-							"week_projection": 11.92
+							"week_projection": 11.92,
+							"projection_delta": 0.4,
+							"opp_rank": 31,
+							"season_avg": 15.13,
+							"last_points": 30.4
 						},
 						{
 							"player": {
@@ -2803,7 +3279,12 @@
 									{ "week": 4, "points": 4.6 },
 									{ "week": 3, "points": 12.7 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 29.4,
+									"rank": 1,
+									"of": 32,
+									"position": "WR"
+								},
 								"game_total": {
 									"points": 44.5,
 									"team_points": 26,
@@ -2819,7 +3300,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": 11.28
+							"week_projection": 11.28,
+							"projection_delta": -0.3,
+							"opp_rank": 1,
+							"season_avg": 8.33,
+							"last_points": 7.7
 						}
 					],
 					"drop": {
@@ -2850,7 +3335,12 @@
 								{ "week": 2, "points": 0.8 },
 								{ "week": 1, "points": 29.6 }
 							],
-							"allowed_to_position": null,
+							"allowed_to_position": {
+								"points_a_game": 28.2,
+								"rank": 3,
+								"of": 32,
+								"position": "QB"
+							},
 							"game_total": {
 								"points": 45.5,
 								"team_points": 23.5,
@@ -2866,7 +3356,11 @@
 								"read_at": "2026-10-16T21:01:34.611Z"
 							}
 						},
-						"week_projection": 20.59
+						"week_projection": 20.59,
+						"projection_delta": -0.1,
+						"opp_rank": 3,
+						"season_avg": 15.2,
+						"last_points": 0.8
 					},
 					"my_gain": 4.1,
 					"their_gain": 1.2,
@@ -2910,7 +3404,7 @@
 							{ "week": 4, "points": 7.4 },
 							{ "week": 3, "points": 10.8 }
 						],
-						"allowed_to_position": null,
+						"allowed_to_position": { "points_a_game": 29.4, "rank": 1, "of": 32, "position": "RB" },
 						"game_total": {
 							"points": 49.5,
 							"team_points": 26.5,
@@ -2926,7 +3420,11 @@
 							"read_at": "2026-10-16T21:01:34.611Z"
 						}
 					},
-					"week_projection": 13.02
+					"week_projection": 13.02,
+					"projection_delta": 0.2,
+					"opp_rank": 1,
+					"season_avg": 11.83,
+					"last_points": 17.3
 				},
 				{
 					"player": {
@@ -2957,7 +3455,12 @@
 							{ "week": 4, "points": 4.3 },
 							{ "week": 3, "points": 6.8 }
 						],
-						"allowed_to_position": null,
+						"allowed_to_position": {
+							"points_a_game": 16.2,
+							"rank": 23,
+							"of": 32,
+							"position": "RB"
+						},
 						"game_total": {
 							"points": 42.5,
 							"team_points": 20,
@@ -2967,7 +3470,11 @@
 						"roof": { "kind": "outdoors", "abroad": true },
 						"weather": null
 					},
-					"week_projection": 12.67
+					"week_projection": 12.67,
+					"projection_delta": 0.4,
+					"opp_rank": 23,
+					"season_avg": 4.07,
+					"last_points": 1.1
 				},
 				{
 					"player": {
@@ -2998,7 +3505,12 @@
 							{ "week": 4, "points": 27 },
 							{ "week": 3, "points": 1.4 }
 						],
-						"allowed_to_position": null,
+						"allowed_to_position": {
+							"points_a_game": 15.6,
+							"rank": 24,
+							"of": 32,
+							"position": "RB"
+						},
 						"game_total": {
 							"points": 40.5,
 							"team_points": 22,
@@ -3008,7 +3520,11 @@
 						"roof": { "kind": "outdoors", "abroad": false },
 						"weather": null
 					},
-					"week_projection": 2.66
+					"week_projection": 2.66,
+					"projection_delta": -0.1,
+					"opp_rank": 24,
+					"season_avg": 13.87,
+					"last_points": 13.2
 				},
 				{
 					"player": {
@@ -3035,7 +3551,7 @@
 						"played": false,
 						"points_this_week": null,
 						"last_games": [],
-						"allowed_to_position": null,
+						"allowed_to_position": { "points_a_game": 28.8, "rank": 2, "of": 32, "position": "WR" },
 						"game_total": {
 							"points": 42.5,
 							"team_points": 20,
@@ -3045,7 +3561,11 @@
 						"roof": { "kind": "outdoors", "abroad": true },
 						"weather": null
 					},
-					"week_projection": null
+					"week_projection": null,
+					"projection_delta": null,
+					"opp_rank": 2,
+					"season_avg": null,
+					"last_points": null
 				}
 			],
 			"trades": [
@@ -3080,7 +3600,12 @@
 									{ "week": 4, "points": 5.1 },
 									{ "week": 3, "points": 3.5 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 15,
+									"rank": 25,
+									"of": 32,
+									"position": "WR"
+								},
 								"game_total": {
 									"points": 50.5,
 									"team_points": 21.5,
@@ -3096,7 +3621,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": 3.21
+							"week_projection": 3.21,
+							"projection_delta": 0,
+							"opp_rank": 25,
+							"season_avg": 4.9,
+							"last_points": 6.1
 						},
 						{
 							"player": {
@@ -3127,7 +3656,12 @@
 									{ "week": 4, "points": 24.96 },
 									{ "week": 3, "points": 26.68 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 23.4,
+									"rank": 11,
+									"of": 32,
+									"position": "QB"
+								},
 								"game_total": {
 									"points": 40.5,
 									"team_points": 22,
@@ -3143,7 +3677,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": 15.76
+							"week_projection": 15.76,
+							"projection_delta": 0,
+							"opp_rank": 11,
+							"season_avg": 25.55,
+							"last_points": 25
 						}
 					],
 					"get": [
@@ -3176,7 +3714,12 @@
 									{ "week": 4, "points": 27 },
 									{ "week": 3, "points": 1.4 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 15.6,
+									"rank": 24,
+									"of": 32,
+									"position": "RB"
+								},
 								"game_total": {
 									"points": 40.5,
 									"team_points": 22,
@@ -3186,7 +3729,11 @@
 								"roof": { "kind": "outdoors", "abroad": false },
 								"weather": null
 							},
-							"week_projection": 2.66
+							"week_projection": 2.66,
+							"projection_delta": -0.1,
+							"opp_rank": 24,
+							"season_avg": 13.87,
+							"last_points": 13.2
 						}
 					],
 					"drop": null,
@@ -3225,7 +3772,12 @@
 									{ "week": 4, "points": 15.4 },
 									{ "week": 3, "points": 7.4 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 22.8,
+									"rank": 12,
+									"of": 32,
+									"position": "WR"
+								},
 								"game_total": {
 									"points": 49.5,
 									"team_points": 26.5,
@@ -3241,7 +3793,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": 10.98
+							"week_projection": 10.98,
+							"projection_delta": -0.1,
+							"opp_rank": 12,
+							"season_avg": 9.27,
+							"last_points": 5
 						},
 						{
 							"player": {
@@ -3272,7 +3828,12 @@
 									{ "week": 3, "points": 18.94 },
 									{ "week": 2, "points": 31.98 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 28.8,
+									"rank": 2,
+									"of": 32,
+									"position": "QB"
+								},
 								"game_total": {
 									"points": 42.5,
 									"team_points": 25.5,
@@ -3288,7 +3849,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": 17.93
+							"week_projection": 17.93,
+							"projection_delta": -0.1,
+							"opp_rank": 2,
+							"season_avg": 23.31,
+							"last_points": 19
 						}
 					],
 					"get": [
@@ -3321,7 +3886,12 @@
 									{ "week": 4, "points": 7.4 },
 									{ "week": 3, "points": 10.8 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 29.4,
+									"rank": 1,
+									"of": 32,
+									"position": "RB"
+								},
 								"game_total": {
 									"points": 49.5,
 									"team_points": 26.5,
@@ -3337,7 +3907,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": 13.02
+							"week_projection": 13.02,
+							"projection_delta": 0.2,
+							"opp_rank": 1,
+							"season_avg": 11.83,
+							"last_points": 17.3
 						}
 					],
 					"drop": null,
@@ -3376,7 +3950,12 @@
 									{ "week": 4, "points": 6.3 },
 									{ "week": 3, "points": 19.4 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 11.4,
+									"rank": 31,
+									"of": 32,
+									"position": "WR"
+								},
 								"game_total": {
 									"points": 42.5,
 									"team_points": 23,
@@ -3386,7 +3965,11 @@
 								"roof": { "kind": "outdoors", "abroad": true },
 								"weather": null
 							},
-							"week_projection": 9.65
+							"week_projection": 9.65,
+							"projection_delta": 0.3,
+							"opp_rank": 31,
+							"season_avg": 10.47,
+							"last_points": 5.7
 						},
 						{
 							"player": {
@@ -3417,7 +4000,12 @@
 									{ "week": 4, "points": 24.96 },
 									{ "week": 3, "points": 26.68 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 23.4,
+									"rank": 11,
+									"of": 32,
+									"position": "QB"
+								},
 								"game_total": {
 									"points": 40.5,
 									"team_points": 22,
@@ -3433,7 +4021,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": 15.76
+							"week_projection": 15.76,
+							"projection_delta": 0,
+							"opp_rank": 11,
+							"season_avg": 25.55,
+							"last_points": 25
 						}
 					],
 					"get": [
@@ -3462,7 +4054,12 @@
 								"played": false,
 								"points_this_week": null,
 								"last_games": [],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 28.8,
+									"rank": 2,
+									"of": 32,
+									"position": "WR"
+								},
 								"game_total": {
 									"points": 42.5,
 									"team_points": 20,
@@ -3472,7 +4069,11 @@
 								"roof": { "kind": "outdoors", "abroad": true },
 								"weather": null
 							},
-							"week_projection": null
+							"week_projection": null,
+							"projection_delta": null,
+							"opp_rank": 2,
+							"season_avg": null,
+							"last_points": null
 						}
 					],
 					"drop": null,
@@ -3511,7 +4112,12 @@
 									{ "week": 4, "points": 5.1 },
 									{ "week": 3, "points": 3.5 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 15,
+									"rank": 25,
+									"of": 32,
+									"position": "WR"
+								},
 								"game_total": {
 									"points": 50.5,
 									"team_points": 21.5,
@@ -3527,7 +4133,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": 3.21
+							"week_projection": 3.21,
+							"projection_delta": 0,
+							"opp_rank": 25,
+							"season_avg": 4.9,
+							"last_points": 6.1
 						},
 						{
 							"player": {
@@ -3558,7 +4168,12 @@
 									{ "week": 4, "points": 24.96 },
 									{ "week": 3, "points": 26.68 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 23.4,
+									"rank": 11,
+									"of": 32,
+									"position": "QB"
+								},
 								"game_total": {
 									"points": 40.5,
 									"team_points": 22,
@@ -3574,7 +4189,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": 15.76
+							"week_projection": 15.76,
+							"projection_delta": 0,
+							"opp_rank": 11,
+							"season_avg": 25.55,
+							"last_points": 25
 						}
 					],
 					"get": [
@@ -3607,7 +4226,12 @@
 									{ "week": 4, "points": 4.3 },
 									{ "week": 3, "points": 6.8 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 16.2,
+									"rank": 23,
+									"of": 32,
+									"position": "RB"
+								},
 								"game_total": {
 									"points": 42.5,
 									"team_points": 20,
@@ -3617,7 +4241,11 @@
 								"roof": { "kind": "outdoors", "abroad": true },
 								"weather": null
 							},
-							"week_projection": 12.67
+							"week_projection": 12.67,
+							"projection_delta": 0.4,
+							"opp_rank": 23,
+							"season_avg": 4.07,
+							"last_points": 1.1
 						}
 					],
 					"drop": null,
@@ -3659,7 +4287,12 @@
 						"played": false,
 						"points_this_week": null,
 						"last_games": [],
-						"allowed_to_position": null,
+						"allowed_to_position": {
+							"points_a_game": 13.2,
+							"rank": 28,
+							"of": 32,
+							"position": "RB"
+						},
 						"game_total": {
 							"points": 41.5,
 							"team_points": 20,
@@ -3675,7 +4308,11 @@
 							"read_at": "2026-10-16T21:01:34.611Z"
 						}
 					},
-					"week_projection": null
+					"week_projection": null,
+					"projection_delta": null,
+					"opp_rank": 28,
+					"season_avg": null,
+					"last_points": null
 				},
 				{
 					"player": {
@@ -3702,7 +4339,12 @@
 						"played": false,
 						"points_this_week": null,
 						"last_games": [],
-						"allowed_to_position": null,
+						"allowed_to_position": {
+							"points_a_game": 16.8,
+							"rank": 22,
+							"of": 32,
+							"position": "RB"
+						},
 						"game_total": {
 							"points": 52.5,
 							"team_points": 27,
@@ -3718,7 +4360,11 @@
 							"read_at": "2026-10-16T21:01:34.611Z"
 						}
 					},
-					"week_projection": null
+					"week_projection": null,
+					"projection_delta": null,
+					"opp_rank": 22,
+					"season_avg": null,
+					"last_points": null
 				},
 				{
 					"player": {
@@ -3749,7 +4395,12 @@
 							{ "week": 4, "points": 12.9 },
 							{ "week": 3, "points": 6.1 }
 						],
-						"allowed_to_position": null,
+						"allowed_to_position": {
+							"points_a_game": 22.8,
+							"rank": 12,
+							"of": 32,
+							"position": "WR"
+						},
 						"game_total": {
 							"points": 40.5,
 							"team_points": 18,
@@ -3765,7 +4416,11 @@
 							"read_at": "2026-10-16T21:01:34.611Z"
 						}
 					},
-					"week_projection": 7.7
+					"week_projection": 7.7,
+					"projection_delta": -0.4,
+					"opp_rank": 12,
+					"season_avg": 10.87,
+					"last_points": 13.6
 				},
 				{
 					"player": {
@@ -3796,7 +4451,7 @@
 							{ "week": 3, "points": 19.7 },
 							{ "week": 2, "points": 7 }
 						],
-						"allowed_to_position": null,
+						"allowed_to_position": { "points_a_game": 15, "rank": 25, "of": 32, "position": "WR" },
 						"game_total": {
 							"points": 50.5,
 							"team_points": 21.5,
@@ -3812,7 +4467,11 @@
 							"read_at": "2026-10-16T21:01:34.611Z"
 						}
 					},
-					"week_projection": 12.34
+					"week_projection": 12.34,
+					"projection_delta": 0.4,
+					"opp_rank": 25,
+					"season_avg": 12.3,
+					"last_points": 10.2
 				},
 				{
 					"player": {
@@ -3843,7 +4502,12 @@
 							{ "week": 4, "points": 8.4 },
 							{ "week": 3, "points": 8.3 }
 						],
-						"allowed_to_position": null,
+						"allowed_to_position": {
+							"points_a_game": 13.8,
+							"rank": 27,
+							"of": 32,
+							"position": "WR"
+						},
 						"game_total": {
 							"points": 52.5,
 							"team_points": 23.5,
@@ -3853,7 +4517,11 @@
 						"roof": { "kind": "dome", "abroad": false },
 						"weather": null
 					},
-					"week_projection": 8.65
+					"week_projection": 8.65,
+					"projection_delta": 0.3,
+					"opp_rank": 27,
+					"season_avg": 8.07,
+					"last_points": 7.5
 				}
 			],
 			"trades": [
@@ -3888,7 +4556,12 @@
 									{ "week": 4, "points": 6.5 },
 									{ "week": 3, "points": 21.9 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 26.4,
+									"rank": 6,
+									"of": 32,
+									"position": "RB"
+								},
 								"game_total": {
 									"points": 52.5,
 									"team_points": 20,
@@ -3898,7 +4571,11 @@
 								"roof": { "kind": "dome", "abroad": false },
 								"weather": null
 							},
-							"week_projection": 12.3
+							"week_projection": 12.3,
+							"projection_delta": -0.4,
+							"opp_rank": 6,
+							"season_avg": 10.2,
+							"last_points": 2.2
 						}
 					],
 					"get": [
@@ -3931,7 +4608,12 @@
 									{ "week": 4, "points": 8.4 },
 									{ "week": 3, "points": 8.3 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 13.8,
+									"rank": 27,
+									"of": 32,
+									"position": "WR"
+								},
 								"game_total": {
 									"points": 52.5,
 									"team_points": 23.5,
@@ -3941,7 +4623,11 @@
 								"roof": { "kind": "dome", "abroad": false },
 								"weather": null
 							},
-							"week_projection": 8.65
+							"week_projection": 8.65,
+							"projection_delta": 0.3,
+							"opp_rank": 27,
+							"season_avg": 8.07,
+							"last_points": 7.5
 						},
 						{
 							"player": {
@@ -3968,7 +4654,12 @@
 								"played": false,
 								"points_this_week": null,
 								"last_games": [],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 16.8,
+									"rank": 22,
+									"of": 32,
+									"position": "RB"
+								},
 								"game_total": {
 									"points": 52.5,
 									"team_points": 27,
@@ -3984,7 +4675,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": null
+							"week_projection": null,
+							"projection_delta": null,
+							"opp_rank": 22,
+							"season_avg": null,
+							"last_points": null
 						}
 					],
 					"drop": {
@@ -4015,7 +4710,12 @@
 								{ "week": 2, "points": 0.8 },
 								{ "week": 1, "points": 29.6 }
 							],
-							"allowed_to_position": null,
+							"allowed_to_position": {
+								"points_a_game": 28.2,
+								"rank": 3,
+								"of": 32,
+								"position": "QB"
+							},
 							"game_total": {
 								"points": 45.5,
 								"team_points": 23.5,
@@ -4031,7 +4731,11 @@
 								"read_at": "2026-10-16T21:01:34.611Z"
 							}
 						},
-						"week_projection": 20.59
+						"week_projection": 20.59,
+						"projection_delta": -0.1,
+						"opp_rank": 3,
+						"season_avg": 15.2,
+						"last_points": 0.8
 					},
 					"my_gain": 2.7,
 					"their_gain": 0.6,
@@ -4068,7 +4772,12 @@
 									{ "week": 4, "points": 6.5 },
 									{ "week": 3, "points": 21.9 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 26.4,
+									"rank": 6,
+									"of": 32,
+									"position": "RB"
+								},
 								"game_total": {
 									"points": 52.5,
 									"team_points": 20,
@@ -4078,7 +4787,11 @@
 								"roof": { "kind": "dome", "abroad": false },
 								"weather": null
 							},
-							"week_projection": 12.3
+							"week_projection": 12.3,
+							"projection_delta": -0.4,
+							"opp_rank": 6,
+							"season_avg": 10.2,
+							"last_points": 2.2
 						}
 					],
 					"get": [
@@ -4111,7 +4824,12 @@
 									{ "week": 4, "points": 8.4 },
 									{ "week": 3, "points": 8.3 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 13.8,
+									"rank": 27,
+									"of": 32,
+									"position": "WR"
+								},
 								"game_total": {
 									"points": 52.5,
 									"team_points": 23.5,
@@ -4121,7 +4839,11 @@
 								"roof": { "kind": "dome", "abroad": false },
 								"weather": null
 							},
-							"week_projection": 8.65
+							"week_projection": 8.65,
+							"projection_delta": 0.3,
+							"opp_rank": 27,
+							"season_avg": 8.07,
+							"last_points": 7.5
 						},
 						{
 							"player": {
@@ -4148,7 +4870,12 @@
 								"played": false,
 								"points_this_week": null,
 								"last_games": [],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 13.2,
+									"rank": 28,
+									"of": 32,
+									"position": "RB"
+								},
 								"game_total": {
 									"points": 41.5,
 									"team_points": 20,
@@ -4164,7 +4891,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": null
+							"week_projection": null,
+							"projection_delta": null,
+							"opp_rank": 28,
+							"season_avg": null,
+							"last_points": null
 						}
 					],
 					"drop": {
@@ -4195,7 +4926,12 @@
 								{ "week": 2, "points": 0.8 },
 								{ "week": 1, "points": 29.6 }
 							],
-							"allowed_to_position": null,
+							"allowed_to_position": {
+								"points_a_game": 28.2,
+								"rank": 3,
+								"of": 32,
+								"position": "QB"
+							},
 							"game_total": {
 								"points": 45.5,
 								"team_points": 23.5,
@@ -4211,7 +4947,11 @@
 								"read_at": "2026-10-16T21:01:34.611Z"
 							}
 						},
-						"week_projection": 20.59
+						"week_projection": 20.59,
+						"projection_delta": -0.1,
+						"opp_rank": 3,
+						"season_avg": 15.2,
+						"last_points": 0.8
 					},
 					"my_gain": 2.7,
 					"their_gain": 0.6,
@@ -4248,7 +4988,12 @@
 									{ "week": 4, "points": 6.5 },
 									{ "week": 3, "points": 21.9 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 26.4,
+									"rank": 6,
+									"of": 32,
+									"position": "RB"
+								},
 								"game_total": {
 									"points": 52.5,
 									"team_points": 20,
@@ -4258,7 +5003,11 @@
 								"roof": { "kind": "dome", "abroad": false },
 								"weather": null
 							},
-							"week_projection": 12.3
+							"week_projection": 12.3,
+							"projection_delta": -0.4,
+							"opp_rank": 6,
+							"season_avg": 10.2,
+							"last_points": 2.2
 						}
 					],
 					"get": [
@@ -4291,7 +5040,12 @@
 									{ "week": 4, "points": 8.4 },
 									{ "week": 3, "points": 8.3 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 13.8,
+									"rank": 27,
+									"of": 32,
+									"position": "WR"
+								},
 								"game_total": {
 									"points": 52.5,
 									"team_points": 23.5,
@@ -4301,7 +5055,11 @@
 								"roof": { "kind": "dome", "abroad": false },
 								"weather": null
 							},
-							"week_projection": 8.65
+							"week_projection": 8.65,
+							"projection_delta": 0.3,
+							"opp_rank": 27,
+							"season_avg": 8.07,
+							"last_points": 7.5
 						},
 						{
 							"player": {
@@ -4332,7 +5090,12 @@
 									{ "week": 3, "points": 19.7 },
 									{ "week": 2, "points": 7 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 15,
+									"rank": 25,
+									"of": 32,
+									"position": "WR"
+								},
 								"game_total": {
 									"points": 50.5,
 									"team_points": 21.5,
@@ -4348,7 +5111,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": 12.34
+							"week_projection": 12.34,
+							"projection_delta": 0.4,
+							"opp_rank": 25,
+							"season_avg": 12.3,
+							"last_points": 10.2
 						}
 					],
 					"drop": {
@@ -4379,7 +5146,12 @@
 								{ "week": 2, "points": 0.8 },
 								{ "week": 1, "points": 29.6 }
 							],
-							"allowed_to_position": null,
+							"allowed_to_position": {
+								"points_a_game": 28.2,
+								"rank": 3,
+								"of": 32,
+								"position": "QB"
+							},
 							"game_total": {
 								"points": 45.5,
 								"team_points": 23.5,
@@ -4395,7 +5167,11 @@
 								"read_at": "2026-10-16T21:01:34.611Z"
 							}
 						},
-						"week_projection": 20.59
+						"week_projection": 20.59,
+						"projection_delta": -0.1,
+						"opp_rank": 3,
+						"season_avg": 15.2,
+						"last_points": 0.8
 					},
 					"my_gain": 2.3,
 					"their_gain": 1,
@@ -4432,7 +5208,12 @@
 									{ "week": 4, "points": 6.5 },
 									{ "week": 3, "points": 21.9 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 26.4,
+									"rank": 6,
+									"of": 32,
+									"position": "RB"
+								},
 								"game_total": {
 									"points": 52.5,
 									"team_points": 20,
@@ -4442,7 +5223,11 @@
 								"roof": { "kind": "dome", "abroad": false },
 								"weather": null
 							},
-							"week_projection": 12.3
+							"week_projection": 12.3,
+							"projection_delta": -0.4,
+							"opp_rank": 6,
+							"season_avg": 10.2,
+							"last_points": 2.2
 						}
 					],
 					"get": [
@@ -4471,7 +5256,12 @@
 								"played": false,
 								"points_this_week": null,
 								"last_games": [],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 16.8,
+									"rank": 22,
+									"of": 32,
+									"position": "RB"
+								},
 								"game_total": {
 									"points": 52.5,
 									"team_points": 27,
@@ -4487,7 +5277,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": null
+							"week_projection": null,
+							"projection_delta": null,
+							"opp_rank": 22,
+							"season_avg": null,
+							"last_points": null
 						},
 						{
 							"player": {
@@ -4518,7 +5312,12 @@
 									{ "week": 4, "points": 12.9 },
 									{ "week": 3, "points": 6.1 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 22.8,
+									"rank": 12,
+									"of": 32,
+									"position": "WR"
+								},
 								"game_total": {
 									"points": 40.5,
 									"team_points": 18,
@@ -4534,7 +5333,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": 7.7
+							"week_projection": 7.7,
+							"projection_delta": -0.4,
+							"opp_rank": 12,
+							"season_avg": 10.87,
+							"last_points": 13.6
 						}
 					],
 					"drop": {
@@ -4565,7 +5368,12 @@
 								{ "week": 2, "points": 0.8 },
 								{ "week": 1, "points": 29.6 }
 							],
-							"allowed_to_position": null,
+							"allowed_to_position": {
+								"points_a_game": 28.2,
+								"rank": 3,
+								"of": 32,
+								"position": "QB"
+							},
 							"game_total": {
 								"points": 45.5,
 								"team_points": 23.5,
@@ -4581,7 +5389,11 @@
 								"read_at": "2026-10-16T21:01:34.611Z"
 							}
 						},
-						"week_projection": 20.59
+						"week_projection": 20.59,
+						"projection_delta": -0.1,
+						"opp_rank": 3,
+						"season_avg": 15.2,
+						"last_points": 0.8
 					},
 					"my_gain": 1.8,
 					"their_gain": 1.5,
@@ -4625,7 +5437,12 @@
 							{ "week": 4, "points": 22.8 },
 							{ "week": 3, "points": 5.1 }
 						],
-						"allowed_to_position": null,
+						"allowed_to_position": {
+							"points_a_game": 14.4,
+							"rank": 26,
+							"of": 32,
+							"position": "RB"
+						},
 						"game_total": {
 							"points": 45.5,
 							"team_points": 22,
@@ -4641,7 +5458,11 @@
 							"read_at": "2026-10-16T21:01:34.611Z"
 						}
 					},
-					"week_projection": 3.54
+					"week_projection": 3.54,
+					"projection_delta": 0.3,
+					"opp_rank": 26,
+					"season_avg": 10.17,
+					"last_points": 2.6
 				},
 				{
 					"player": {
@@ -4668,7 +5489,7 @@
 						"played": false,
 						"points_this_week": null,
 						"last_games": [],
-						"allowed_to_position": null,
+						"allowed_to_position": { "points_a_game": 25.8, "rank": 7, "of": 32, "position": "RB" },
 						"game_total": {
 							"points": 41.5,
 							"team_points": 21.5,
@@ -4684,7 +5505,11 @@
 							"read_at": "2026-10-16T21:01:34.611Z"
 						}
 					},
-					"week_projection": null
+					"week_projection": null,
+					"projection_delta": null,
+					"opp_rank": 7,
+					"season_avg": null,
+					"last_points": null
 				},
 				{
 					"player": {
@@ -4715,7 +5540,12 @@
 							{ "week": 4, "points": 7 },
 							{ "week": 3, "points": 5.3 }
 						],
-						"allowed_to_position": null,
+						"allowed_to_position": {
+							"points_a_game": 21.6,
+							"rank": 14,
+							"of": 32,
+							"position": "RB"
+						},
 						"game_total": {
 							"points": 50.5,
 							"team_points": 21.5,
@@ -4731,7 +5561,11 @@
 							"read_at": "2026-10-16T21:01:34.611Z"
 						}
 					},
-					"week_projection": 9.86
+					"week_projection": 9.86,
+					"projection_delta": 0.2,
+					"opp_rank": 14,
+					"season_avg": 8.83,
+					"last_points": 14.2
 				},
 				{
 					"player": {
@@ -4762,7 +5596,12 @@
 							{ "week": 4, "points": 7.7 },
 							{ "week": 3, "points": 8.6 }
 						],
-						"allowed_to_position": null,
+						"allowed_to_position": {
+							"points_a_game": 18.6,
+							"rank": 19,
+							"of": 32,
+							"position": "TE"
+						},
 						"game_total": {
 							"points": 40.5,
 							"team_points": 19,
@@ -4778,7 +5617,11 @@
 							"read_at": "2026-10-16T21:01:34.611Z"
 						}
 					},
-					"week_projection": 6.93
+					"week_projection": 6.93,
+					"projection_delta": 0.3,
+					"opp_rank": 19,
+					"season_avg": 7.27,
+					"last_points": 5.5
 				},
 				{
 					"player": {
@@ -4809,7 +5652,12 @@
 							{ "week": 4, "points": 9.1 },
 							{ "week": 3, "points": 14.7 }
 						],
-						"allowed_to_position": null,
+						"allowed_to_position": {
+							"points_a_game": 16.2,
+							"rank": 23,
+							"of": 32,
+							"position": "TE"
+						},
 						"game_total": {
 							"points": 44.5,
 							"team_points": 26,
@@ -4825,7 +5673,11 @@
 							"read_at": "2026-10-16T21:01:34.611Z"
 						}
 					},
-					"week_projection": 12.65
+					"week_projection": 12.65,
+					"projection_delta": -0.3,
+					"opp_rank": 23,
+					"season_avg": 15.07,
+					"last_points": 21.4
 				}
 			],
 			"trades": [
@@ -4860,7 +5712,12 @@
 									{ "week": 4, "points": 24.96 },
 									{ "week": 3, "points": 26.68 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 23.4,
+									"rank": 11,
+									"of": 32,
+									"position": "QB"
+								},
 								"game_total": {
 									"points": 40.5,
 									"team_points": 22,
@@ -4876,7 +5733,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": 15.76
+							"week_projection": 15.76,
+							"projection_delta": 0,
+							"opp_rank": 11,
+							"season_avg": 25.55,
+							"last_points": 25
 						}
 					],
 					"get": [
@@ -4909,7 +5770,12 @@
 									{ "week": 4, "points": 7 },
 									{ "week": 3, "points": 5.3 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 21.6,
+									"rank": 14,
+									"of": 32,
+									"position": "RB"
+								},
 								"game_total": {
 									"points": 50.5,
 									"team_points": 21.5,
@@ -4925,7 +5791,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": 9.86
+							"week_projection": 9.86,
+							"projection_delta": 0.2,
+							"opp_rank": 14,
+							"season_avg": 8.83,
+							"last_points": 14.2
 						},
 						{
 							"player": {
@@ -4956,7 +5826,12 @@
 									{ "week": 4, "points": 7.7 },
 									{ "week": 3, "points": 8.6 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 18.6,
+									"rank": 19,
+									"of": 32,
+									"position": "TE"
+								},
 								"game_total": {
 									"points": 40.5,
 									"team_points": 19,
@@ -4972,7 +5847,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": 6.93
+							"week_projection": 6.93,
+							"projection_delta": 0.3,
+							"opp_rank": 19,
+							"season_avg": 7.27,
+							"last_points": 5.5
 						}
 					],
 					"drop": {
@@ -5003,7 +5882,12 @@
 								{ "week": 2, "points": 0.8 },
 								{ "week": 1, "points": 29.6 }
 							],
-							"allowed_to_position": null,
+							"allowed_to_position": {
+								"points_a_game": 28.2,
+								"rank": 3,
+								"of": 32,
+								"position": "QB"
+							},
 							"game_total": {
 								"points": 45.5,
 								"team_points": 23.5,
@@ -5019,7 +5903,11 @@
 								"read_at": "2026-10-16T21:01:34.611Z"
 							}
 						},
-						"week_projection": 20.59
+						"week_projection": 20.59,
+						"projection_delta": -0.1,
+						"opp_rank": 3,
+						"season_avg": 15.2,
+						"last_points": 0.8
 					},
 					"my_gain": 4.6,
 					"their_gain": 0.5,
@@ -5056,7 +5944,12 @@
 									{ "week": 4, "points": 24.96 },
 									{ "week": 3, "points": 26.68 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 23.4,
+									"rank": 11,
+									"of": 32,
+									"position": "QB"
+								},
 								"game_total": {
 									"points": 40.5,
 									"team_points": 22,
@@ -5072,7 +5965,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": 15.76
+							"week_projection": 15.76,
+							"projection_delta": 0,
+							"opp_rank": 11,
+							"season_avg": 25.55,
+							"last_points": 25
 						}
 					],
 					"get": [
@@ -5105,7 +6002,12 @@
 									{ "week": 4, "points": 7.7 },
 									{ "week": 3, "points": 8.6 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 18.6,
+									"rank": 19,
+									"of": 32,
+									"position": "TE"
+								},
 								"game_total": {
 									"points": 40.5,
 									"team_points": 19,
@@ -5121,7 +6023,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": 6.93
+							"week_projection": 6.93,
+							"projection_delta": 0.3,
+							"opp_rank": 19,
+							"season_avg": 7.27,
+							"last_points": 5.5
 						},
 						{
 							"player": {
@@ -5148,7 +6054,12 @@
 								"played": false,
 								"points_this_week": null,
 								"last_games": [],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 25.8,
+									"rank": 7,
+									"of": 32,
+									"position": "RB"
+								},
 								"game_total": {
 									"points": 41.5,
 									"team_points": 21.5,
@@ -5164,7 +6075,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": null
+							"week_projection": null,
+							"projection_delta": null,
+							"opp_rank": 7,
+							"season_avg": null,
+							"last_points": null
 						}
 					],
 					"drop": {
@@ -5195,7 +6110,12 @@
 								{ "week": 2, "points": 0.8 },
 								{ "week": 1, "points": 29.6 }
 							],
-							"allowed_to_position": null,
+							"allowed_to_position": {
+								"points_a_game": 28.2,
+								"rank": 3,
+								"of": 32,
+								"position": "QB"
+							},
 							"game_total": {
 								"points": 45.5,
 								"team_points": 23.5,
@@ -5211,7 +6131,11 @@
 								"read_at": "2026-10-16T21:01:34.611Z"
 							}
 						},
-						"week_projection": 20.59
+						"week_projection": 20.59,
+						"projection_delta": -0.1,
+						"opp_rank": 3,
+						"season_avg": 15.2,
+						"last_points": 0.8
 					},
 					"my_gain": 4.6,
 					"their_gain": 0.5,
@@ -5248,7 +6172,12 @@
 									{ "week": 3, "points": 18.94 },
 									{ "week": 2, "points": 31.98 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 28.8,
+									"rank": 2,
+									"of": 32,
+									"position": "QB"
+								},
 								"game_total": {
 									"points": 42.5,
 									"team_points": 25.5,
@@ -5264,7 +6193,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": 17.93
+							"week_projection": 17.93,
+							"projection_delta": -0.1,
+							"opp_rank": 2,
+							"season_avg": 23.31,
+							"last_points": 19
 						}
 					],
 					"get": [
@@ -5297,7 +6230,12 @@
 									{ "week": 4, "points": 9.1 },
 									{ "week": 3, "points": 14.7 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 16.2,
+									"rank": 23,
+									"of": 32,
+									"position": "TE"
+								},
 								"game_total": {
 									"points": 44.5,
 									"team_points": 26,
@@ -5313,7 +6251,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": 12.65
+							"week_projection": 12.65,
+							"projection_delta": -0.3,
+							"opp_rank": 23,
+							"season_avg": 15.07,
+							"last_points": 21.4
 						},
 						{
 							"player": {
@@ -5344,7 +6286,12 @@
 									{ "week": 4, "points": 22.8 },
 									{ "week": 3, "points": 5.1 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 14.4,
+									"rank": 26,
+									"of": 32,
+									"position": "RB"
+								},
 								"game_total": {
 									"points": 45.5,
 									"team_points": 22,
@@ -5360,7 +6307,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": 3.54
+							"week_projection": 3.54,
+							"projection_delta": 0.3,
+							"opp_rank": 26,
+							"season_avg": 10.17,
+							"last_points": 2.6
 						}
 					],
 					"drop": {
@@ -5391,7 +6342,12 @@
 								{ "week": 2, "points": 0.8 },
 								{ "week": 1, "points": 29.6 }
 							],
-							"allowed_to_position": null,
+							"allowed_to_position": {
+								"points_a_game": 28.2,
+								"rank": 3,
+								"of": 32,
+								"position": "QB"
+							},
 							"game_total": {
 								"points": 45.5,
 								"team_points": 23.5,
@@ -5407,7 +6363,11 @@
 								"read_at": "2026-10-16T21:01:34.611Z"
 							}
 						},
-						"week_projection": 20.59
+						"week_projection": 20.59,
+						"projection_delta": -0.1,
+						"opp_rank": 3,
+						"season_avg": 15.2,
+						"last_points": 0.8
 					},
 					"my_gain": 4.5,
 					"their_gain": 0.6,
@@ -5444,7 +6404,12 @@
 									{ "week": 4, "points": 24.96 },
 									{ "week": 3, "points": 26.68 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 23.4,
+									"rank": 11,
+									"of": 32,
+									"position": "QB"
+								},
 								"game_total": {
 									"points": 40.5,
 									"team_points": 22,
@@ -5460,7 +6425,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": 15.76
+							"week_projection": 15.76,
+							"projection_delta": 0,
+							"opp_rank": 11,
+							"season_avg": 25.55,
+							"last_points": 25
 						}
 					],
 					"get": [
@@ -5493,7 +6462,12 @@
 									{ "week": 4, "points": 7 },
 									{ "week": 3, "points": 5.3 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 21.6,
+									"rank": 14,
+									"of": 32,
+									"position": "RB"
+								},
 								"game_total": {
 									"points": 50.5,
 									"team_points": 21.5,
@@ -5509,7 +6483,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": 9.86
+							"week_projection": 9.86,
+							"projection_delta": 0.2,
+							"opp_rank": 14,
+							"season_avg": 8.83,
+							"last_points": 14.2
 						},
 						{
 							"player": {
@@ -5536,7 +6514,12 @@
 								"played": false,
 								"points_this_week": null,
 								"last_games": [],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 25.8,
+									"rank": 7,
+									"of": 32,
+									"position": "RB"
+								},
 								"game_total": {
 									"points": 41.5,
 									"team_points": 21.5,
@@ -5552,7 +6535,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": null
+							"week_projection": null,
+							"projection_delta": null,
+							"opp_rank": 7,
+							"season_avg": null,
+							"last_points": null
 						}
 					],
 					"drop": {
@@ -5583,7 +6570,12 @@
 								{ "week": 2, "points": 0.8 },
 								{ "week": 1, "points": 29.6 }
 							],
-							"allowed_to_position": null,
+							"allowed_to_position": {
+								"points_a_game": 28.2,
+								"rank": 3,
+								"of": 32,
+								"position": "QB"
+							},
 							"game_total": {
 								"points": 45.5,
 								"team_points": 23.5,
@@ -5599,7 +6591,11 @@
 								"read_at": "2026-10-16T21:01:34.611Z"
 							}
 						},
-						"week_projection": 20.59
+						"week_projection": 20.59,
+						"projection_delta": -0.1,
+						"opp_rank": 3,
+						"season_avg": 15.2,
+						"last_points": 0.8
 					},
 					"my_gain": 4.5,
 					"their_gain": 0.6,
@@ -5643,7 +6639,7 @@
 							{ "week": 4, "points": 11.1 },
 							{ "week": 3, "points": 17 }
 						],
-						"allowed_to_position": null,
+						"allowed_to_position": { "points_a_game": 18, "rank": 20, "of": 32, "position": "RB" },
 						"game_total": {
 							"points": 42.5,
 							"team_points": 23,
@@ -5653,7 +6649,11 @@
 						"roof": { "kind": "outdoors", "abroad": true },
 						"weather": null
 					},
-					"week_projection": 10.65
+					"week_projection": 10.65,
+					"projection_delta": 0,
+					"opp_rank": 20,
+					"season_avg": 13.23,
+					"last_points": 11.6
 				},
 				{
 					"player": {
@@ -5684,7 +6684,7 @@
 							{ "week": 4, "points": 7.6 },
 							{ "week": 3, "points": 13 }
 						],
-						"allowed_to_position": null,
+						"allowed_to_position": { "points_a_game": 28.8, "rank": 2, "of": 32, "position": "RB" },
 						"game_total": {
 							"points": 45.5,
 							"team_points": 23.5,
@@ -5700,7 +6700,11 @@
 							"read_at": "2026-10-16T21:01:34.611Z"
 						}
 					},
-					"week_projection": 13.25
+					"week_projection": 13.25,
+					"projection_delta": 0.1,
+					"opp_rank": 2,
+					"season_avg": 9.23,
+					"last_points": 7.1
 				},
 				{
 					"player": {
@@ -5731,7 +6735,12 @@
 							{ "week": 4, "points": 13.3 },
 							{ "week": 3, "points": 5.6 }
 						],
-						"allowed_to_position": null,
+						"allowed_to_position": {
+							"points_a_game": 23.4,
+							"rank": 11,
+							"of": 32,
+							"position": "RB"
+						},
 						"game_total": {
 							"points": 42.5,
 							"team_points": 17,
@@ -5747,7 +6756,11 @@
 							"read_at": "2026-10-16T21:01:34.611Z"
 						}
 					},
-					"week_projection": 15.78
+					"week_projection": 15.78,
+					"projection_delta": 0.4,
+					"opp_rank": 11,
+					"season_avg": 7.93,
+					"last_points": 4.9
 				},
 				{
 					"player": {
@@ -5774,7 +6787,12 @@
 						"played": false,
 						"points_this_week": null,
 						"last_games": [],
-						"allowed_to_position": null,
+						"allowed_to_position": {
+							"points_a_game": 16.8,
+							"rank": 22,
+							"of": 32,
+							"position": "RB"
+						},
 						"game_total": {
 							"points": 52.5,
 							"team_points": 27,
@@ -5790,7 +6808,11 @@
 							"read_at": "2026-10-16T21:01:34.611Z"
 						}
 					},
-					"week_projection": null
+					"week_projection": null,
+					"projection_delta": null,
+					"opp_rank": 22,
+					"season_avg": null,
+					"last_points": null
 				},
 				{
 					"player": {
@@ -5821,7 +6843,7 @@
 							{ "week": 4, "points": 14.5 },
 							{ "week": 3, "points": 4.4 }
 						],
-						"allowed_to_position": null,
+						"allowed_to_position": { "points_a_game": 24.6, "rank": 9, "of": 32, "position": "WR" },
 						"game_total": {
 							"points": 40.5,
 							"team_points": 19,
@@ -5831,7 +6853,11 @@
 						"roof": { "kind": "outdoors", "abroad": false },
 						"weather": null
 					},
-					"week_projection": 14.13
+					"week_projection": 14.13,
+					"projection_delta": 0.2,
+					"opp_rank": 9,
+					"season_avg": 7.9,
+					"last_points": 4.8
 				}
 			],
 			"trades": [
@@ -5866,7 +6892,12 @@
 									{ "week": 4, "points": 24.96 },
 									{ "week": 3, "points": 26.68 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 23.4,
+									"rank": 11,
+									"of": 32,
+									"position": "QB"
+								},
 								"game_total": {
 									"points": 40.5,
 									"team_points": 22,
@@ -5882,7 +6913,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": 15.76
+							"week_projection": 15.76,
+							"projection_delta": 0,
+							"opp_rank": 11,
+							"season_avg": 25.55,
+							"last_points": 25
 						}
 					],
 					"get": [
@@ -5915,7 +6950,12 @@
 									{ "week": 4, "points": 7.6 },
 									{ "week": 3, "points": 13 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 28.8,
+									"rank": 2,
+									"of": 32,
+									"position": "RB"
+								},
 								"game_total": {
 									"points": 45.5,
 									"team_points": 23.5,
@@ -5931,7 +6971,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": 13.25
+							"week_projection": 13.25,
+							"projection_delta": 0.1,
+							"opp_rank": 2,
+							"season_avg": 9.23,
+							"last_points": 7.1
 						},
 						{
 							"player": {
@@ -5958,7 +7002,12 @@
 								"played": false,
 								"points_this_week": null,
 								"last_games": [],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 16.8,
+									"rank": 22,
+									"of": 32,
+									"position": "RB"
+								},
 								"game_total": {
 									"points": 52.5,
 									"team_points": 27,
@@ -5974,7 +7023,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": null
+							"week_projection": null,
+							"projection_delta": null,
+							"opp_rank": 22,
+							"season_avg": null,
+							"last_points": null
 						}
 					],
 					"drop": {
@@ -6005,7 +7058,12 @@
 								{ "week": 2, "points": 0.8 },
 								{ "week": 1, "points": 29.6 }
 							],
-							"allowed_to_position": null,
+							"allowed_to_position": {
+								"points_a_game": 28.2,
+								"rank": 3,
+								"of": 32,
+								"position": "QB"
+							},
 							"game_total": {
 								"points": 45.5,
 								"team_points": 23.5,
@@ -6021,7 +7079,11 @@
 								"read_at": "2026-10-16T21:01:34.611Z"
 							}
 						},
-						"week_projection": 20.59
+						"week_projection": 20.59,
+						"projection_delta": -0.1,
+						"opp_rank": 3,
+						"season_avg": 15.2,
+						"last_points": 0.8
 					},
 					"my_gain": 5.7,
 					"their_gain": 0.7,
@@ -6058,7 +7120,12 @@
 									{ "week": 4, "points": 24.96 },
 									{ "week": 3, "points": 26.68 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 23.4,
+									"rank": 11,
+									"of": 32,
+									"position": "QB"
+								},
 								"game_total": {
 									"points": 40.5,
 									"team_points": 22,
@@ -6074,7 +7141,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": 15.76
+							"week_projection": 15.76,
+							"projection_delta": 0,
+							"opp_rank": 11,
+							"season_avg": 25.55,
+							"last_points": 25
 						}
 					],
 					"get": [
@@ -6107,7 +7178,12 @@
 									{ "week": 4, "points": 11.1 },
 									{ "week": 3, "points": 17 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 18,
+									"rank": 20,
+									"of": 32,
+									"position": "RB"
+								},
 								"game_total": {
 									"points": 42.5,
 									"team_points": 23,
@@ -6117,7 +7193,11 @@
 								"roof": { "kind": "outdoors", "abroad": true },
 								"weather": null
 							},
-							"week_projection": 10.65
+							"week_projection": 10.65,
+							"projection_delta": 0,
+							"opp_rank": 20,
+							"season_avg": 13.23,
+							"last_points": 11.6
 						},
 						{
 							"player": {
@@ -6148,7 +7228,12 @@
 									{ "week": 4, "points": 14.5 },
 									{ "week": 3, "points": 4.4 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 24.6,
+									"rank": 9,
+									"of": 32,
+									"position": "WR"
+								},
 								"game_total": {
 									"points": 40.5,
 									"team_points": 19,
@@ -6158,7 +7243,11 @@
 								"roof": { "kind": "outdoors", "abroad": false },
 								"weather": null
 							},
-							"week_projection": 14.13
+							"week_projection": 14.13,
+							"projection_delta": 0.2,
+							"opp_rank": 9,
+							"season_avg": 7.9,
+							"last_points": 4.8
 						}
 					],
 					"drop": {
@@ -6189,7 +7278,12 @@
 								{ "week": 2, "points": 0.8 },
 								{ "week": 1, "points": 29.6 }
 							],
-							"allowed_to_position": null,
+							"allowed_to_position": {
+								"points_a_game": 28.2,
+								"rank": 3,
+								"of": 32,
+								"position": "QB"
+							},
 							"game_total": {
 								"points": 45.5,
 								"team_points": 23.5,
@@ -6205,7 +7299,11 @@
 								"read_at": "2026-10-16T21:01:34.611Z"
 							}
 						},
-						"week_projection": 20.59
+						"week_projection": 20.59,
+						"projection_delta": -0.1,
+						"opp_rank": 3,
+						"season_avg": 15.2,
+						"last_points": 0.8
 					},
 					"my_gain": 5.7,
 					"their_gain": 0.7,
@@ -6242,7 +7340,12 @@
 									{ "week": 4, "points": 24.96 },
 									{ "week": 3, "points": 26.68 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 23.4,
+									"rank": 11,
+									"of": 32,
+									"position": "QB"
+								},
 								"game_total": {
 									"points": 40.5,
 									"team_points": 22,
@@ -6258,7 +7361,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": 15.76
+							"week_projection": 15.76,
+							"projection_delta": 0,
+							"opp_rank": 11,
+							"season_avg": 25.55,
+							"last_points": 25
 						}
 					],
 					"get": [
@@ -6291,7 +7398,12 @@
 									{ "week": 4, "points": 13.3 },
 									{ "week": 3, "points": 5.6 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 23.4,
+									"rank": 11,
+									"of": 32,
+									"position": "RB"
+								},
 								"game_total": {
 									"points": 42.5,
 									"team_points": 17,
@@ -6307,7 +7419,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": 15.78
+							"week_projection": 15.78,
+							"projection_delta": 0.4,
+							"opp_rank": 11,
+							"season_avg": 7.93,
+							"last_points": 4.9
 						},
 						{
 							"player": {
@@ -6334,7 +7450,12 @@
 								"played": false,
 								"points_this_week": null,
 								"last_games": [],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 16.8,
+									"rank": 22,
+									"of": 32,
+									"position": "RB"
+								},
 								"game_total": {
 									"points": 52.5,
 									"team_points": 27,
@@ -6350,7 +7471,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": null
+							"week_projection": null,
+							"projection_delta": null,
+							"opp_rank": 22,
+							"season_avg": null,
+							"last_points": null
 						}
 					],
 					"drop": {
@@ -6381,7 +7506,12 @@
 								{ "week": 2, "points": 0.8 },
 								{ "week": 1, "points": 29.6 }
 							],
-							"allowed_to_position": null,
+							"allowed_to_position": {
+								"points_a_game": 28.2,
+								"rank": 3,
+								"of": 32,
+								"position": "QB"
+							},
 							"game_total": {
 								"points": 45.5,
 								"team_points": 23.5,
@@ -6397,7 +7527,11 @@
 								"read_at": "2026-10-16T21:01:34.611Z"
 							}
 						},
-						"week_projection": 20.59
+						"week_projection": 20.59,
+						"projection_delta": -0.1,
+						"opp_rank": 3,
+						"season_avg": 15.2,
+						"last_points": 0.8
 					},
 					"my_gain": 5.6,
 					"their_gain": 0.8,
@@ -6434,7 +7568,12 @@
 									{ "week": 4, "points": 24.96 },
 									{ "week": 3, "points": 26.68 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 23.4,
+									"rank": 11,
+									"of": 32,
+									"position": "QB"
+								},
 								"game_total": {
 									"points": 40.5,
 									"team_points": 22,
@@ -6450,7 +7589,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": 15.76
+							"week_projection": 15.76,
+							"projection_delta": 0,
+							"opp_rank": 11,
+							"season_avg": 25.55,
+							"last_points": 25
 						}
 					],
 					"get": [
@@ -6483,7 +7626,12 @@
 									{ "week": 4, "points": 14.5 },
 									{ "week": 3, "points": 4.4 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 24.6,
+									"rank": 9,
+									"of": 32,
+									"position": "WR"
+								},
 								"game_total": {
 									"points": 40.5,
 									"team_points": 19,
@@ -6493,7 +7641,11 @@
 								"roof": { "kind": "outdoors", "abroad": false },
 								"weather": null
 							},
-							"week_projection": 14.13
+							"week_projection": 14.13,
+							"projection_delta": 0.2,
+							"opp_rank": 9,
+							"season_avg": 7.9,
+							"last_points": 4.8
 						},
 						{
 							"player": {
@@ -6520,7 +7672,12 @@
 								"played": false,
 								"points_this_week": null,
 								"last_games": [],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 16.8,
+									"rank": 22,
+									"of": 32,
+									"position": "RB"
+								},
 								"game_total": {
 									"points": 52.5,
 									"team_points": 27,
@@ -6536,7 +7693,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": null
+							"week_projection": null,
+							"projection_delta": null,
+							"opp_rank": 22,
+							"season_avg": null,
+							"last_points": null
 						}
 					],
 					"drop": {
@@ -6567,7 +7728,12 @@
 								{ "week": 2, "points": 0.8 },
 								{ "week": 1, "points": 29.6 }
 							],
-							"allowed_to_position": null,
+							"allowed_to_position": {
+								"points_a_game": 28.2,
+								"rank": 3,
+								"of": 32,
+								"position": "QB"
+							},
 							"game_total": {
 								"points": 45.5,
 								"team_points": 23.5,
@@ -6583,7 +7749,11 @@
 								"read_at": "2026-10-16T21:01:34.611Z"
 							}
 						},
-						"week_projection": 20.59
+						"week_projection": 20.59,
+						"projection_delta": -0.1,
+						"opp_rank": 3,
+						"season_avg": 15.2,
+						"last_points": 0.8
 					},
 					"my_gain": 5.3,
 					"their_gain": 1.1,
@@ -6627,7 +7797,7 @@
 							{ "week": 4, "points": 7.2 },
 							{ "week": 3, "points": 20.7 }
 						],
-						"allowed_to_position": null,
+						"allowed_to_position": { "points_a_game": 24.6, "rank": 9, "of": 32, "position": "WR" },
 						"game_total": {
 							"points": 52.5,
 							"team_points": 32.5,
@@ -6637,7 +7807,11 @@
 						"roof": { "kind": "dome", "abroad": false },
 						"weather": null
 					},
-					"week_projection": 12.55
+					"week_projection": 12.55,
+					"projection_delta": 0.2,
+					"opp_rank": 9,
+					"season_avg": 16.67,
+					"last_points": 22.1
 				},
 				{
 					"player": {
@@ -6668,7 +7842,7 @@
 							{ "week": 2, "points": 14.6 },
 							{ "week": 1, "points": 33.8 }
 						],
-						"allowed_to_position": null,
+						"allowed_to_position": { "points_a_game": 25.8, "rank": 7, "of": 32, "position": "WR" },
 						"game_total": {
 							"points": 41.5,
 							"team_points": 20,
@@ -6684,7 +7858,11 @@
 							"read_at": "2026-10-16T21:01:34.611Z"
 						}
 					},
-					"week_projection": 10.79
+					"week_projection": 10.79,
+					"projection_delta": -0.3,
+					"opp_rank": 7,
+					"season_avg": 17.4,
+					"last_points": 3.8
 				},
 				{
 					"player": {
@@ -6715,7 +7893,12 @@
 							{ "week": 4, "points": 5.7 },
 							{ "week": 3, "points": 5.9 }
 						],
-						"allowed_to_position": null,
+						"allowed_to_position": {
+							"points_a_game": 19.2,
+							"rank": 18,
+							"of": 32,
+							"position": "WR"
+						},
 						"game_total": {
 							"points": 41.5,
 							"team_points": 21.5,
@@ -6731,7 +7914,11 @@
 							"read_at": "2026-10-16T21:01:34.611Z"
 						}
 					},
-					"week_projection": 6.89
+					"week_projection": 6.89,
+					"projection_delta": -0.4,
+					"opp_rank": 18,
+					"season_avg": 6.97,
+					"last_points": 9.3
 				},
 				{
 					"player": {
@@ -6762,7 +7949,12 @@
 							{ "week": 4, "points": 23.2 },
 							{ "week": 3, "points": 7.6 }
 						],
-						"allowed_to_position": null,
+						"allowed_to_position": {
+							"points_a_game": 22.2,
+							"rank": 13,
+							"of": 32,
+							"position": "WR"
+						},
 						"game_total": {
 							"points": 45.5,
 							"team_points": 23.5,
@@ -6778,7 +7970,11 @@
 							"read_at": "2026-10-16T21:01:34.611Z"
 						}
 					},
-					"week_projection": 14.25
+					"week_projection": 14.25,
+					"projection_delta": -0.2,
+					"opp_rank": 13,
+					"season_avg": 19.97,
+					"last_points": 29.1
 				},
 				{
 					"player": {
@@ -6809,7 +8005,12 @@
 							{ "week": 4, "points": 4.1 },
 							{ "week": 3, "points": 9.3 }
 						],
-						"allowed_to_position": null,
+						"allowed_to_position": {
+							"points_a_game": 23.4,
+							"rank": 11,
+							"of": 32,
+							"position": "TE"
+						},
 						"game_total": {
 							"points": 52.5,
 							"team_points": 25.5,
@@ -6825,7 +8026,11 @@
 							"read_at": "2026-10-16T21:01:34.611Z"
 						}
 					},
-					"week_projection": 9.55
+					"week_projection": 9.55,
+					"projection_delta": -0.1,
+					"opp_rank": 11,
+					"season_avg": 6.1,
+					"last_points": 4.9
 				}
 			],
 			"trades": [
@@ -6866,7 +8071,11 @@
 								"roof": null,
 								"weather": null
 							},
-							"week_projection": null
+							"week_projection": null,
+							"projection_delta": null,
+							"opp_rank": null,
+							"season_avg": 16.73,
+							"last_points": 19.7
 						}
 					],
 					"get": [
@@ -6899,7 +8108,12 @@
 									{ "week": 4, "points": 23.2 },
 									{ "week": 3, "points": 7.6 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 22.2,
+									"rank": 13,
+									"of": 32,
+									"position": "WR"
+								},
 								"game_total": {
 									"points": 45.5,
 									"team_points": 23.5,
@@ -6915,7 +8129,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": 14.25
+							"week_projection": 14.25,
+							"projection_delta": -0.2,
+							"opp_rank": 13,
+							"season_avg": 19.97,
+							"last_points": 29.1
 						},
 						{
 							"player": {
@@ -6946,7 +8164,12 @@
 									{ "week": 2, "points": 14.6 },
 									{ "week": 1, "points": 33.8 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 25.8,
+									"rank": 7,
+									"of": 32,
+									"position": "WR"
+								},
 								"game_total": {
 									"points": 41.5,
 									"team_points": 20,
@@ -6962,7 +8185,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": 10.79
+							"week_projection": 10.79,
+							"projection_delta": -0.3,
+							"opp_rank": 7,
+							"season_avg": 17.4,
+							"last_points": 3.8
 						}
 					],
 					"drop": {
@@ -6993,7 +8220,12 @@
 								{ "week": 2, "points": 0.8 },
 								{ "week": 1, "points": 29.6 }
 							],
-							"allowed_to_position": null,
+							"allowed_to_position": {
+								"points_a_game": 28.2,
+								"rank": 3,
+								"of": 32,
+								"position": "QB"
+							},
 							"game_total": {
 								"points": 45.5,
 								"team_points": 23.5,
@@ -7009,7 +8241,11 @@
 								"read_at": "2026-10-16T21:01:34.611Z"
 							}
 						},
-						"week_projection": 20.59
+						"week_projection": 20.59,
+						"projection_delta": -0.1,
+						"opp_rank": 3,
+						"season_avg": 15.2,
+						"last_points": 0.8
 					},
 					"my_gain": 0.4,
 					"their_gain": 0.5,
@@ -7046,7 +8282,12 @@
 									{ "week": 4, "points": 15.4 },
 									{ "week": 3, "points": 7.4 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 22.8,
+									"rank": 12,
+									"of": 32,
+									"position": "WR"
+								},
 								"game_total": {
 									"points": 49.5,
 									"team_points": 26.5,
@@ -7062,7 +8303,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": 10.98
+							"week_projection": 10.98,
+							"projection_delta": -0.1,
+							"opp_rank": 12,
+							"season_avg": 9.27,
+							"last_points": 5
 						}
 					],
 					"get": [
@@ -7095,7 +8340,12 @@
 									{ "week": 2, "points": 14.6 },
 									{ "week": 1, "points": 33.8 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 25.8,
+									"rank": 7,
+									"of": 32,
+									"position": "WR"
+								},
 								"game_total": {
 									"points": 41.5,
 									"team_points": 20,
@@ -7111,7 +8361,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": 10.79
+							"week_projection": 10.79,
+							"projection_delta": -0.3,
+							"opp_rank": 7,
+							"season_avg": 17.4,
+							"last_points": 3.8
 						},
 						{
 							"player": {
@@ -7142,7 +8396,12 @@
 									{ "week": 4, "points": 5.7 },
 									{ "week": 3, "points": 5.9 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 19.2,
+									"rank": 18,
+									"of": 32,
+									"position": "WR"
+								},
 								"game_total": {
 									"points": 41.5,
 									"team_points": 21.5,
@@ -7158,7 +8417,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": 6.89
+							"week_projection": 6.89,
+							"projection_delta": -0.4,
+							"opp_rank": 18,
+							"season_avg": 6.97,
+							"last_points": 9.3
 						}
 					],
 					"drop": {
@@ -7189,7 +8452,12 @@
 								{ "week": 2, "points": 0.8 },
 								{ "week": 1, "points": 29.6 }
 							],
-							"allowed_to_position": null,
+							"allowed_to_position": {
+								"points_a_game": 28.2,
+								"rank": 3,
+								"of": 32,
+								"position": "QB"
+							},
 							"game_total": {
 								"points": 45.5,
 								"team_points": 23.5,
@@ -7205,7 +8473,11 @@
 								"read_at": "2026-10-16T21:01:34.611Z"
 							}
 						},
-						"week_projection": 20.59
+						"week_projection": 20.59,
+						"projection_delta": -0.1,
+						"opp_rank": 3,
+						"season_avg": 15.2,
+						"last_points": 0.8
 					},
 					"my_gain": 0.3,
 					"their_gain": 0.6,
@@ -7242,7 +8514,12 @@
 									{ "week": 4, "points": 15.4 },
 									{ "week": 3, "points": 7.4 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 22.8,
+									"rank": 12,
+									"of": 32,
+									"position": "WR"
+								},
 								"game_total": {
 									"points": 49.5,
 									"team_points": 26.5,
@@ -7258,7 +8535,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": 10.98
+							"week_projection": 10.98,
+							"projection_delta": -0.1,
+							"opp_rank": 12,
+							"season_avg": 9.27,
+							"last_points": 5
 						}
 					],
 					"get": [
@@ -7291,7 +8572,12 @@
 									{ "week": 2, "points": 14.6 },
 									{ "week": 1, "points": 33.8 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 25.8,
+									"rank": 7,
+									"of": 32,
+									"position": "WR"
+								},
 								"game_total": {
 									"points": 41.5,
 									"team_points": 20,
@@ -7307,7 +8593,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": 10.79
+							"week_projection": 10.79,
+							"projection_delta": -0.3,
+							"opp_rank": 7,
+							"season_avg": 17.4,
+							"last_points": 3.8
 						},
 						{
 							"player": {
@@ -7338,7 +8628,12 @@
 									{ "week": 4, "points": 4.1 },
 									{ "week": 3, "points": 9.3 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 23.4,
+									"rank": 11,
+									"of": 32,
+									"position": "TE"
+								},
 								"game_total": {
 									"points": 52.5,
 									"team_points": 25.5,
@@ -7354,7 +8649,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": 9.55
+							"week_projection": 9.55,
+							"projection_delta": -0.1,
+							"opp_rank": 11,
+							"season_avg": 6.1,
+							"last_points": 4.9
 						}
 					],
 					"drop": {
@@ -7385,7 +8684,12 @@
 								{ "week": 2, "points": 0.8 },
 								{ "week": 1, "points": 29.6 }
 							],
-							"allowed_to_position": null,
+							"allowed_to_position": {
+								"points_a_game": 28.2,
+								"rank": 3,
+								"of": 32,
+								"position": "QB"
+							},
 							"game_total": {
 								"points": 45.5,
 								"team_points": 23.5,
@@ -7401,7 +8705,11 @@
 								"read_at": "2026-10-16T21:01:34.611Z"
 							}
 						},
-						"week_projection": 20.59
+						"week_projection": 20.59,
+						"projection_delta": -0.1,
+						"opp_rank": 3,
+						"season_avg": 15.2,
+						"last_points": 0.8
 					},
 					"my_gain": 0.7,
 					"their_gain": 0.2,
@@ -7444,7 +8752,11 @@
 								"roof": null,
 								"weather": null
 							},
-							"week_projection": null
+							"week_projection": null,
+							"projection_delta": null,
+							"opp_rank": null,
+							"season_avg": 16.73,
+							"last_points": 19.7
 						}
 					],
 					"get": [
@@ -7477,7 +8789,12 @@
 									{ "week": 4, "points": 5.7 },
 									{ "week": 3, "points": 5.9 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 19.2,
+									"rank": 18,
+									"of": 32,
+									"position": "WR"
+								},
 								"game_total": {
 									"points": 41.5,
 									"team_points": 21.5,
@@ -7493,7 +8810,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": 6.89
+							"week_projection": 6.89,
+							"projection_delta": -0.4,
+							"opp_rank": 18,
+							"season_avg": 6.97,
+							"last_points": 9.3
 						},
 						{
 							"player": {
@@ -7524,7 +8845,12 @@
 									{ "week": 4, "points": 7.2 },
 									{ "week": 3, "points": 20.7 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 24.6,
+									"rank": 9,
+									"of": 32,
+									"position": "WR"
+								},
 								"game_total": {
 									"points": 52.5,
 									"team_points": 32.5,
@@ -7534,7 +8860,11 @@
 								"roof": { "kind": "dome", "abroad": false },
 								"weather": null
 							},
-							"week_projection": 12.55
+							"week_projection": 12.55,
+							"projection_delta": 0.2,
+							"opp_rank": 9,
+							"season_avg": 16.67,
+							"last_points": 22.1
 						}
 					],
 					"drop": {
@@ -7565,7 +8895,12 @@
 								{ "week": 2, "points": 0.8 },
 								{ "week": 1, "points": 29.6 }
 							],
-							"allowed_to_position": null,
+							"allowed_to_position": {
+								"points_a_game": 28.2,
+								"rank": 3,
+								"of": 32,
+								"position": "QB"
+							},
 							"game_total": {
 								"points": 45.5,
 								"team_points": 23.5,
@@ -7581,7 +8916,11 @@
 								"read_at": "2026-10-16T21:01:34.611Z"
 							}
 						},
-						"week_projection": 20.59
+						"week_projection": 20.59,
+						"projection_delta": -0.1,
+						"opp_rank": 3,
+						"season_avg": 15.2,
+						"last_points": 0.8
 					},
 					"my_gain": 0.7,
 					"their_gain": 0.2,
@@ -7631,7 +8970,11 @@
 						"roof": null,
 						"weather": null
 					},
-					"week_projection": null
+					"week_projection": null,
+					"projection_delta": null,
+					"opp_rank": null,
+					"season_avg": 26.97,
+					"last_points": 28.6
 				},
 				{
 					"player": {
@@ -7662,7 +9005,12 @@
 							{ "week": 4, "points": 6.1 },
 							{ "week": 3, "points": 7.8 }
 						],
-						"allowed_to_position": null,
+						"allowed_to_position": {
+							"points_a_game": 19.2,
+							"rank": 18,
+							"of": 32,
+							"position": "RB"
+						},
 						"game_total": {
 							"points": 40.5,
 							"team_points": 19,
@@ -7678,7 +9026,11 @@
 							"read_at": "2026-10-16T21:01:34.611Z"
 						}
 					},
-					"week_projection": 12.78
+					"week_projection": 12.78,
+					"projection_delta": 0.1,
+					"opp_rank": 18,
+					"season_avg": 15.13,
+					"last_points": 31.5
 				},
 				{
 					"player": {
@@ -7705,7 +9057,12 @@
 						"played": false,
 						"points_this_week": null,
 						"last_games": [],
-						"allowed_to_position": null,
+						"allowed_to_position": {
+							"points_a_game": 20.4,
+							"rank": 16,
+							"of": 32,
+							"position": "RB"
+						},
 						"game_total": {
 							"points": 52.5,
 							"team_points": 23.5,
@@ -7715,7 +9072,11 @@
 						"roof": { "kind": "dome", "abroad": false },
 						"weather": null
 					},
-					"week_projection": null
+					"week_projection": null,
+					"projection_delta": null,
+					"opp_rank": 16,
+					"season_avg": null,
+					"last_points": null
 				},
 				{
 					"player": {
@@ -7746,7 +9107,12 @@
 							{ "week": 3, "points": 4 },
 							{ "week": 2, "points": 13.5 }
 						],
-						"allowed_to_position": null,
+						"allowed_to_position": {
+							"points_a_game": 22.8,
+							"rank": 12,
+							"of": 32,
+							"position": "WR"
+						},
 						"game_total": {
 							"points": 42.5,
 							"team_points": 25.5,
@@ -7762,7 +9128,11 @@
 							"read_at": "2026-10-16T21:01:34.611Z"
 						}
 					},
-					"week_projection": 8.46
+					"week_projection": 8.46,
+					"projection_delta": 0.1,
+					"opp_rank": 12,
+					"season_avg": 9.5,
+					"last_points": 11
 				},
 				{
 					"player": {
@@ -7793,7 +9163,12 @@
 							{ "week": 4, "points": 2.9 },
 							{ "week": 3, "points": 6 }
 						],
-						"allowed_to_position": null,
+						"allowed_to_position": {
+							"points_a_game": 15.6,
+							"rank": 24,
+							"of": 32,
+							"position": "TE"
+						},
 						"game_total": {
 							"points": 42.5,
 							"team_points": 20,
@@ -7803,7 +9178,11 @@
 						"roof": { "kind": "outdoors", "abroad": true },
 						"weather": null
 					},
-					"week_projection": 8.6
+					"week_projection": 8.6,
+					"projection_delta": -0.2,
+					"opp_rank": 24,
+					"season_avg": 4.97,
+					"last_points": 6
 				},
 				{
 					"player": {
@@ -7834,7 +9213,12 @@
 							{ "week": 4, "points": 17 },
 							{ "week": 3, "points": 26.2 }
 						],
-						"allowed_to_position": null,
+						"allowed_to_position": {
+							"points_a_game": 13.8,
+							"rank": 27,
+							"of": 32,
+							"position": "TE"
+						},
 						"game_total": {
 							"points": 50.5,
 							"team_points": 29,
@@ -7850,7 +9234,11 @@
 							"read_at": "2026-10-16T21:01:34.611Z"
 						}
 					},
-					"week_projection": 9.45
+					"week_projection": 9.45,
+					"projection_delta": 0.1,
+					"opp_rank": 27,
+					"season_avg": 16.87,
+					"last_points": 7.4
 				}
 			],
 			"trades": [
@@ -7885,7 +9273,12 @@
 									{ "week": 3, "points": 18.94 },
 									{ "week": 2, "points": 31.98 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 28.8,
+									"rank": 2,
+									"of": 32,
+									"position": "QB"
+								},
 								"game_total": {
 									"points": 42.5,
 									"team_points": 25.5,
@@ -7901,7 +9294,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": 17.93
+							"week_projection": 17.93,
+							"projection_delta": -0.1,
+							"opp_rank": 2,
+							"season_avg": 23.31,
+							"last_points": 19
 						}
 					],
 					"get": [
@@ -7930,7 +9327,12 @@
 								"played": false,
 								"points_this_week": null,
 								"last_games": [],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 20.4,
+									"rank": 16,
+									"of": 32,
+									"position": "RB"
+								},
 								"game_total": {
 									"points": 52.5,
 									"team_points": 23.5,
@@ -7940,7 +9342,11 @@
 								"roof": { "kind": "dome", "abroad": false },
 								"weather": null
 							},
-							"week_projection": null
+							"week_projection": null,
+							"projection_delta": null,
+							"opp_rank": 16,
+							"season_avg": null,
+							"last_points": null
 						},
 						{
 							"player": {
@@ -7971,7 +9377,12 @@
 									{ "week": 4, "points": 2.9 },
 									{ "week": 3, "points": 6 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 15.6,
+									"rank": 24,
+									"of": 32,
+									"position": "TE"
+								},
 								"game_total": {
 									"points": 42.5,
 									"team_points": 20,
@@ -7981,7 +9392,11 @@
 								"roof": { "kind": "outdoors", "abroad": true },
 								"weather": null
 							},
-							"week_projection": 8.6
+							"week_projection": 8.6,
+							"projection_delta": -0.2,
+							"opp_rank": 24,
+							"season_avg": 4.97,
+							"last_points": 6
 						}
 					],
 					"drop": {
@@ -8012,7 +9427,12 @@
 								{ "week": 2, "points": 0.8 },
 								{ "week": 1, "points": 29.6 }
 							],
-							"allowed_to_position": null,
+							"allowed_to_position": {
+								"points_a_game": 28.2,
+								"rank": 3,
+								"of": 32,
+								"position": "QB"
+							},
 							"game_total": {
 								"points": 45.5,
 								"team_points": 23.5,
@@ -8028,7 +9448,11 @@
 								"read_at": "2026-10-16T21:01:34.611Z"
 							}
 						},
-						"week_projection": 20.59
+						"week_projection": 20.59,
+						"projection_delta": -0.1,
+						"opp_rank": 3,
+						"season_avg": 15.2,
+						"last_points": 0.8
 					},
 					"my_gain": 1.8,
 					"their_gain": 0.5,
@@ -8071,7 +9495,11 @@
 								"roof": null,
 								"weather": null
 							},
-							"week_projection": null
+							"week_projection": null,
+							"projection_delta": null,
+							"opp_rank": null,
+							"season_avg": 16.73,
+							"last_points": 19.7
 						}
 					],
 					"get": [
@@ -8104,7 +9532,12 @@
 									{ "week": 4, "points": 6.1 },
 									{ "week": 3, "points": 7.8 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 19.2,
+									"rank": 18,
+									"of": 32,
+									"position": "RB"
+								},
 								"game_total": {
 									"points": 40.5,
 									"team_points": 19,
@@ -8120,7 +9553,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": 12.78
+							"week_projection": 12.78,
+							"projection_delta": 0.1,
+							"opp_rank": 18,
+							"season_avg": 15.13,
+							"last_points": 31.5
 						},
 						{
 							"player": {
@@ -8151,7 +9588,12 @@
 									{ "week": 3, "points": 4 },
 									{ "week": 2, "points": 13.5 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 22.8,
+									"rank": 12,
+									"of": 32,
+									"position": "WR"
+								},
 								"game_total": {
 									"points": 42.5,
 									"team_points": 25.5,
@@ -8167,7 +9609,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": 8.46
+							"week_projection": 8.46,
+							"projection_delta": 0.1,
+							"opp_rank": 12,
+							"season_avg": 9.5,
+							"last_points": 11
 						}
 					],
 					"drop": {
@@ -8198,7 +9644,12 @@
 								{ "week": 2, "points": 0.8 },
 								{ "week": 1, "points": 29.6 }
 							],
-							"allowed_to_position": null,
+							"allowed_to_position": {
+								"points_a_game": 28.2,
+								"rank": 3,
+								"of": 32,
+								"position": "QB"
+							},
 							"game_total": {
 								"points": 45.5,
 								"team_points": 23.5,
@@ -8214,7 +9665,11 @@
 								"read_at": "2026-10-16T21:01:34.611Z"
 							}
 						},
-						"week_projection": 20.59
+						"week_projection": 20.59,
+						"projection_delta": -0.1,
+						"opp_rank": 3,
+						"season_avg": 15.2,
+						"last_points": 0.8
 					},
 					"my_gain": 1.7,
 					"their_gain": 0.8,
@@ -8251,7 +9706,12 @@
 									{ "week": 3, "points": 18.94 },
 									{ "week": 2, "points": 31.98 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 28.8,
+									"rank": 2,
+									"of": 32,
+									"position": "QB"
+								},
 								"game_total": {
 									"points": 42.5,
 									"team_points": 25.5,
@@ -8267,7 +9727,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": 17.93
+							"week_projection": 17.93,
+							"projection_delta": -0.1,
+							"opp_rank": 2,
+							"season_avg": 23.31,
+							"last_points": 19
 						}
 					],
 					"get": [
@@ -8300,7 +9764,12 @@
 									{ "week": 4, "points": 17 },
 									{ "week": 3, "points": 26.2 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 13.8,
+									"rank": 27,
+									"of": 32,
+									"position": "TE"
+								},
 								"game_total": {
 									"points": 50.5,
 									"team_points": 29,
@@ -8316,7 +9785,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": 9.45
+							"week_projection": 9.45,
+							"projection_delta": 0.1,
+							"opp_rank": 27,
+							"season_avg": 16.87,
+							"last_points": 7.4
 						},
 						{
 							"player": {
@@ -8353,7 +9826,11 @@
 								"roof": null,
 								"weather": null
 							},
-							"week_projection": null
+							"week_projection": null,
+							"projection_delta": null,
+							"opp_rank": null,
+							"season_avg": 26.97,
+							"last_points": 28.6
 						}
 					],
 					"drop": {
@@ -8384,7 +9861,12 @@
 								{ "week": 2, "points": 0.8 },
 								{ "week": 1, "points": 29.6 }
 							],
-							"allowed_to_position": null,
+							"allowed_to_position": {
+								"points_a_game": 28.2,
+								"rank": 3,
+								"of": 32,
+								"position": "QB"
+							},
 							"game_total": {
 								"points": 45.5,
 								"team_points": 23.5,
@@ -8400,7 +9882,11 @@
 								"read_at": "2026-10-16T21:01:34.611Z"
 							}
 						},
-						"week_projection": 20.59
+						"week_projection": 20.59,
+						"projection_delta": -0.1,
+						"opp_rank": 3,
+						"season_avg": 15.2,
+						"last_points": 0.8
 					},
 					"my_gain": 1.5,
 					"their_gain": 1,
@@ -8443,7 +9929,11 @@
 								"roof": null,
 								"weather": null
 							},
-							"week_projection": null
+							"week_projection": null,
+							"projection_delta": null,
+							"opp_rank": null,
+							"season_avg": 16.73,
+							"last_points": 19.7
 						}
 					],
 					"get": [
@@ -8476,7 +9966,12 @@
 									{ "week": 4, "points": 6.1 },
 									{ "week": 3, "points": 7.8 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 19.2,
+									"rank": 18,
+									"of": 32,
+									"position": "RB"
+								},
 								"game_total": {
 									"points": 40.5,
 									"team_points": 19,
@@ -8492,7 +9987,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": 12.78
+							"week_projection": 12.78,
+							"projection_delta": 0.1,
+							"opp_rank": 18,
+							"season_avg": 15.13,
+							"last_points": 31.5
 						},
 						{
 							"player": {
@@ -8519,7 +10018,12 @@
 								"played": false,
 								"points_this_week": null,
 								"last_games": [],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 20.4,
+									"rank": 16,
+									"of": 32,
+									"position": "RB"
+								},
 								"game_total": {
 									"points": 52.5,
 									"team_points": 23.5,
@@ -8529,7 +10033,11 @@
 								"roof": { "kind": "dome", "abroad": false },
 								"weather": null
 							},
-							"week_projection": null
+							"week_projection": null,
+							"projection_delta": null,
+							"opp_rank": 16,
+							"season_avg": null,
+							"last_points": null
 						}
 					],
 					"drop": {
@@ -8560,7 +10068,12 @@
 								{ "week": 2, "points": 0.8 },
 								{ "week": 1, "points": 29.6 }
 							],
-							"allowed_to_position": null,
+							"allowed_to_position": {
+								"points_a_game": 28.2,
+								"rank": 3,
+								"of": 32,
+								"position": "QB"
+							},
 							"game_total": {
 								"points": 45.5,
 								"team_points": 23.5,
@@ -8576,7 +10089,11 @@
 								"read_at": "2026-10-16T21:01:34.611Z"
 							}
 						},
-						"week_projection": 20.59
+						"week_projection": 20.59,
+						"projection_delta": -0.1,
+						"opp_rank": 3,
+						"season_avg": 15.2,
+						"last_points": 0.8
 					},
 					"my_gain": 1.4,
 					"their_gain": 0.6,
@@ -8620,7 +10137,12 @@
 							{ "week": 4, "points": 25.08 },
 							{ "week": 3, "points": 12.68 }
 						],
-						"allowed_to_position": null,
+						"allowed_to_position": {
+							"points_a_game": 15.6,
+							"rank": 24,
+							"of": 32,
+							"position": "QB"
+						},
 						"game_total": {
 							"points": 42.5,
 							"team_points": 20,
@@ -8630,7 +10152,11 @@
 						"roof": { "kind": "outdoors", "abroad": true },
 						"weather": null
 					},
-					"week_projection": 17.3
+					"week_projection": 17.3,
+					"projection_delta": -0.2,
+					"opp_rank": 24,
+					"season_avg": 19.9,
+					"last_points": 21.94
 				},
 				{
 					"player": {
@@ -8661,7 +10187,12 @@
 							{ "week": 3, "points": 11.1 },
 							{ "week": 2, "points": 14.3 }
 						],
-						"allowed_to_position": null,
+						"allowed_to_position": {
+							"points_a_game": 21.6,
+							"rank": 14,
+							"of": 32,
+							"position": "RB"
+						},
 						"game_total": {
 							"points": 50.5,
 							"team_points": 21.5,
@@ -8677,7 +10208,11 @@
 							"read_at": "2026-10-16T21:01:34.611Z"
 						}
 					},
-					"week_projection": 8.88
+					"week_projection": 8.88,
+					"projection_delta": 0.1,
+					"opp_rank": 14,
+					"season_avg": 9.47,
+					"last_points": 3
 				},
 				{
 					"player": {
@@ -8708,7 +10243,7 @@
 							{ "week": 4, "points": 17.4 },
 							{ "week": 3, "points": 6.9 }
 						],
-						"allowed_to_position": null,
+						"allowed_to_position": { "points_a_game": 27, "rank": 5, "of": 32, "position": "WR" },
 						"game_total": {
 							"points": 45.5,
 							"team_points": 22,
@@ -8724,7 +10259,11 @@
 							"read_at": "2026-10-16T21:01:34.611Z"
 						}
 					},
-					"week_projection": 8.52
+					"week_projection": 8.52,
+					"projection_delta": 0.1,
+					"opp_rank": 5,
+					"season_avg": 10.3,
+					"last_points": 6.6
 				},
 				{
 					"player": {
@@ -8761,7 +10300,11 @@
 						"roof": null,
 						"weather": null
 					},
-					"week_projection": null
+					"week_projection": null,
+					"projection_delta": null,
+					"opp_rank": null,
+					"season_avg": 10.83,
+					"last_points": 18.8
 				},
 				{
 					"player": {
@@ -8792,7 +10335,12 @@
 							{ "week": 3, "points": 15.8 },
 							{ "week": 2, "points": 12.3 }
 						],
-						"allowed_to_position": null,
+						"allowed_to_position": {
+							"points_a_game": 22.8,
+							"rank": 12,
+							"of": 32,
+							"position": "WR"
+						},
 						"game_total": {
 							"points": 42.5,
 							"team_points": 25.5,
@@ -8808,7 +10356,11 @@
 							"read_at": "2026-10-16T21:01:34.611Z"
 						}
 					},
-					"week_projection": 14.19
+					"week_projection": 14.19,
+					"projection_delta": -0.1,
+					"opp_rank": 12,
+					"season_avg": 9.37,
+					"last_points": 0
 				},
 				{
 					"player": {
@@ -8839,7 +10391,7 @@
 							{ "week": 4, "points": 11.7 },
 							{ "week": 3, "points": 24.1 }
 						],
-						"allowed_to_position": null,
+						"allowed_to_position": { "points_a_game": 28.8, "rank": 2, "of": 32, "position": "TE" },
 						"game_total": {
 							"points": 40.5,
 							"team_points": 18,
@@ -8855,7 +10407,11 @@
 							"read_at": "2026-10-16T21:01:34.611Z"
 						}
 					},
-					"week_projection": 11.19
+					"week_projection": 11.19,
+					"projection_delta": 0.2,
+					"opp_rank": 2,
+					"season_avg": 12.4,
+					"last_points": 1.4
 				}
 			],
 			"trades": [
@@ -8896,7 +10452,11 @@
 								"roof": null,
 								"weather": null
 							},
-							"week_projection": null
+							"week_projection": null,
+							"projection_delta": null,
+							"opp_rank": null,
+							"season_avg": 16.53,
+							"last_points": 19.8
 						}
 					],
 					"get": [
@@ -8929,7 +10489,12 @@
 									{ "week": 4, "points": 17.4 },
 									{ "week": 3, "points": 6.9 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 27,
+									"rank": 5,
+									"of": 32,
+									"position": "WR"
+								},
 								"game_total": {
 									"points": 45.5,
 									"team_points": 22,
@@ -8945,7 +10510,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": 8.52
+							"week_projection": 8.52,
+							"projection_delta": 0.1,
+							"opp_rank": 5,
+							"season_avg": 10.3,
+							"last_points": 6.6
 						},
 						{
 							"player": {
@@ -8976,7 +10545,12 @@
 									{ "week": 3, "points": 11.1 },
 									{ "week": 2, "points": 14.3 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 21.6,
+									"rank": 14,
+									"of": 32,
+									"position": "RB"
+								},
 								"game_total": {
 									"points": 50.5,
 									"team_points": 21.5,
@@ -8992,7 +10566,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": 8.88
+							"week_projection": 8.88,
+							"projection_delta": 0.1,
+							"opp_rank": 14,
+							"season_avg": 9.47,
+							"last_points": 3
 						}
 					],
 					"drop": {
@@ -9023,7 +10601,12 @@
 								{ "week": 2, "points": 0.8 },
 								{ "week": 1, "points": 29.6 }
 							],
-							"allowed_to_position": null,
+							"allowed_to_position": {
+								"points_a_game": 28.2,
+								"rank": 3,
+								"of": 32,
+								"position": "QB"
+							},
 							"game_total": {
 								"points": 45.5,
 								"team_points": 23.5,
@@ -9039,7 +10622,11 @@
 								"read_at": "2026-10-16T21:01:34.611Z"
 							}
 						},
-						"week_projection": 20.59
+						"week_projection": 20.59,
+						"projection_delta": -0.1,
+						"opp_rank": 3,
+						"season_avg": 15.2,
+						"last_points": 0.8
 					},
 					"my_gain": 0.1,
 					"their_gain": 0.5,
@@ -9076,7 +10663,12 @@
 									{ "week": 3, "points": 18.94 },
 									{ "week": 2, "points": 31.98 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 28.8,
+									"rank": 2,
+									"of": 32,
+									"position": "QB"
+								},
 								"game_total": {
 									"points": 42.5,
 									"team_points": 25.5,
@@ -9092,7 +10684,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": 17.93
+							"week_projection": 17.93,
+							"projection_delta": -0.1,
+							"opp_rank": 2,
+							"season_avg": 23.31,
+							"last_points": 19
 						}
 					],
 					"get": [
@@ -9125,7 +10721,12 @@
 									{ "week": 3, "points": 11.1 },
 									{ "week": 2, "points": 14.3 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 21.6,
+									"rank": 14,
+									"of": 32,
+									"position": "RB"
+								},
 								"game_total": {
 									"points": 50.5,
 									"team_points": 21.5,
@@ -9141,7 +10742,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": 8.88
+							"week_projection": 8.88,
+							"projection_delta": 0.1,
+							"opp_rank": 14,
+							"season_avg": 9.47,
+							"last_points": 3
 						},
 						{
 							"player": {
@@ -9172,7 +10777,12 @@
 									{ "week": 4, "points": 25.08 },
 									{ "week": 3, "points": 12.68 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 15.6,
+									"rank": 24,
+									"of": 32,
+									"position": "QB"
+								},
 								"game_total": {
 									"points": 42.5,
 									"team_points": 20,
@@ -9182,7 +10792,11 @@
 								"roof": { "kind": "outdoors", "abroad": true },
 								"weather": null
 							},
-							"week_projection": 17.3
+							"week_projection": 17.3,
+							"projection_delta": -0.2,
+							"opp_rank": 24,
+							"season_avg": 19.9,
+							"last_points": 21.94
 						}
 					],
 					"drop": {
@@ -9213,7 +10827,12 @@
 								{ "week": 2, "points": 0.8 },
 								{ "week": 1, "points": 29.6 }
 							],
-							"allowed_to_position": null,
+							"allowed_to_position": {
+								"points_a_game": 28.2,
+								"rank": 3,
+								"of": 32,
+								"position": "QB"
+							},
 							"game_total": {
 								"points": 45.5,
 								"team_points": 23.5,
@@ -9229,7 +10848,11 @@
 								"read_at": "2026-10-16T21:01:34.611Z"
 							}
 						},
-						"week_projection": 20.59
+						"week_projection": 20.59,
+						"projection_delta": -0.1,
+						"opp_rank": 3,
+						"season_avg": 15.2,
+						"last_points": 0.8
 					},
 					"my_gain": 0.1,
 					"their_gain": 0.5,
@@ -9272,7 +10895,11 @@
 								"roof": null,
 								"weather": null
 							},
-							"week_projection": null
+							"week_projection": null,
+							"projection_delta": null,
+							"opp_rank": null,
+							"season_avg": 16.73,
+							"last_points": 19.7
 						}
 					],
 					"get": [
@@ -9305,7 +10932,12 @@
 									{ "week": 3, "points": 15.8 },
 									{ "week": 2, "points": 12.3 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 22.8,
+									"rank": 12,
+									"of": 32,
+									"position": "WR"
+								},
 								"game_total": {
 									"points": 42.5,
 									"team_points": 25.5,
@@ -9321,7 +10953,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": 14.19
+							"week_projection": 14.19,
+							"projection_delta": -0.1,
+							"opp_rank": 12,
+							"season_avg": 9.37,
+							"last_points": 0
 						},
 						{
 							"player": {
@@ -9358,7 +10994,11 @@
 								"roof": null,
 								"weather": null
 							},
-							"week_projection": null
+							"week_projection": null,
+							"projection_delta": null,
+							"opp_rank": null,
+							"season_avg": 10.83,
+							"last_points": 18.8
 						}
 					],
 					"drop": {
@@ -9389,7 +11029,12 @@
 								{ "week": 2, "points": 0.8 },
 								{ "week": 1, "points": 29.6 }
 							],
-							"allowed_to_position": null,
+							"allowed_to_position": {
+								"points_a_game": 28.2,
+								"rank": 3,
+								"of": 32,
+								"position": "QB"
+							},
 							"game_total": {
 								"points": 45.5,
 								"team_points": 23.5,
@@ -9405,7 +11050,11 @@
 								"read_at": "2026-10-16T21:01:34.611Z"
 							}
 						},
-						"week_projection": 20.59
+						"week_projection": 20.59,
+						"projection_delta": -0.1,
+						"opp_rank": 3,
+						"season_avg": 15.2,
+						"last_points": 0.8
 					},
 					"my_gain": 0.1,
 					"their_gain": 0.5,
@@ -9448,7 +11097,11 @@
 								"roof": null,
 								"weather": null
 							},
-							"week_projection": null
+							"week_projection": null,
+							"projection_delta": null,
+							"opp_rank": null,
+							"season_avg": 16.53,
+							"last_points": 19.8
 						}
 					],
 					"get": [
@@ -9481,7 +11134,12 @@
 									{ "week": 3, "points": 15.8 },
 									{ "week": 2, "points": 12.3 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 22.8,
+									"rank": 12,
+									"of": 32,
+									"position": "WR"
+								},
 								"game_total": {
 									"points": 42.5,
 									"team_points": 25.5,
@@ -9497,7 +11155,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": 14.19
+							"week_projection": 14.19,
+							"projection_delta": -0.1,
+							"opp_rank": 12,
+							"season_avg": 9.37,
+							"last_points": 0
 						},
 						{
 							"player": {
@@ -9528,7 +11190,12 @@
 									{ "week": 4, "points": 11.7 },
 									{ "week": 3, "points": 24.1 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 28.8,
+									"rank": 2,
+									"of": 32,
+									"position": "TE"
+								},
 								"game_total": {
 									"points": 40.5,
 									"team_points": 18,
@@ -9544,7 +11211,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": 11.19
+							"week_projection": 11.19,
+							"projection_delta": 0.2,
+							"opp_rank": 2,
+							"season_avg": 12.4,
+							"last_points": 1.4
 						}
 					],
 					"drop": {
@@ -9575,7 +11246,12 @@
 								{ "week": 2, "points": 0.8 },
 								{ "week": 1, "points": 29.6 }
 							],
-							"allowed_to_position": null,
+							"allowed_to_position": {
+								"points_a_game": 28.2,
+								"rank": 3,
+								"of": 32,
+								"position": "QB"
+							},
 							"game_total": {
 								"points": 45.5,
 								"team_points": 23.5,
@@ -9591,7 +11267,11 @@
 								"read_at": "2026-10-16T21:01:34.611Z"
 							}
 						},
-						"week_projection": 20.59
+						"week_projection": 20.59,
+						"projection_delta": -0.1,
+						"opp_rank": 3,
+						"season_avg": 15.2,
+						"last_points": 0.8
 					},
 					"my_gain": 0.5,
 					"their_gain": 0.1,
@@ -9635,7 +11315,12 @@
 							{ "week": 4, "points": 8.7 },
 							{ "week": 3, "points": 4.7 }
 						],
-						"allowed_to_position": null,
+						"allowed_to_position": {
+							"points_a_game": 22.2,
+							"rank": 13,
+							"of": 32,
+							"position": "RB"
+						},
 						"game_total": {
 							"points": 43.5,
 							"team_points": 18.5,
@@ -9651,7 +11336,11 @@
 							"read_at": "2026-10-16T21:01:34.611Z"
 						}
 					},
-					"week_projection": 4.3
+					"week_projection": 4.3,
+					"projection_delta": -0.4,
+					"opp_rank": 13,
+					"season_avg": 10.67,
+					"last_points": 18.6
 				},
 				{
 					"player": {
@@ -9682,7 +11371,12 @@
 							{ "week": 2, "points": 14.2 },
 							{ "week": 1, "points": 19.8 }
 						],
-						"allowed_to_position": null,
+						"allowed_to_position": {
+							"points_a_game": 22.2,
+							"rank": 13,
+							"of": 32,
+							"position": "RB"
+						},
 						"game_total": {
 							"points": 43.5,
 							"team_points": 18.5,
@@ -9698,7 +11392,11 @@
 							"read_at": "2026-10-16T21:01:34.611Z"
 						}
 					},
-					"week_projection": 14.68
+					"week_projection": 14.68,
+					"projection_delta": 0.2,
+					"opp_rank": 13,
+					"season_avg": 14.17,
+					"last_points": 8.5
 				},
 				{
 					"player": {
@@ -9729,7 +11427,7 @@
 							{ "week": 4, "points": 18 },
 							{ "week": 3, "points": 15.4 }
 						],
-						"allowed_to_position": null,
+						"allowed_to_position": { "points_a_game": 27, "rank": 5, "of": 32, "position": "WR" },
 						"game_total": {
 							"points": 50.5,
 							"team_points": 29,
@@ -9745,7 +11443,11 @@
 							"read_at": "2026-10-16T21:01:34.611Z"
 						}
 					},
-					"week_projection": 8.5
+					"week_projection": 8.5,
+					"projection_delta": -0.4,
+					"opp_rank": 5,
+					"season_avg": 11.97,
+					"last_points": 2.5
 				},
 				{
 					"player": {
@@ -9782,7 +11484,11 @@
 						"roof": null,
 						"weather": null
 					},
-					"week_projection": null
+					"week_projection": null,
+					"projection_delta": null,
+					"opp_rank": null,
+					"season_avg": 11.73,
+					"last_points": 12.1
 				},
 				{
 					"player": {
@@ -9813,7 +11519,7 @@
 							{ "week": 4, "points": 11.2 },
 							{ "week": 3, "points": 1.5 }
 						],
-						"allowed_to_position": null,
+						"allowed_to_position": { "points_a_game": 24.6, "rank": 9, "of": 32, "position": "TE" },
 						"game_total": {
 							"points": 43.5,
 							"team_points": 25.5,
@@ -9829,7 +11535,11 @@
 							"read_at": "2026-10-16T21:01:34.611Z"
 						}
 					},
-					"week_projection": 8.97
+					"week_projection": 8.97,
+					"projection_delta": 0.1,
+					"opp_rank": 9,
+					"season_avg": 8.7,
+					"last_points": 13.4
 				}
 			],
 			"trades": [
@@ -9870,7 +11580,11 @@
 								"roof": null,
 								"weather": null
 							},
-							"week_projection": null
+							"week_projection": null,
+							"projection_delta": null,
+							"opp_rank": null,
+							"season_avg": 16.53,
+							"last_points": 19.8
 						}
 					],
 					"get": [
@@ -9909,7 +11623,11 @@
 								"roof": null,
 								"weather": null
 							},
-							"week_projection": null
+							"week_projection": null,
+							"projection_delta": null,
+							"opp_rank": null,
+							"season_avg": 11.73,
+							"last_points": 12.1
 						},
 						{
 							"player": {
@@ -9940,7 +11658,12 @@
 									{ "week": 2, "points": 14.2 },
 									{ "week": 1, "points": 19.8 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 22.2,
+									"rank": 13,
+									"of": 32,
+									"position": "RB"
+								},
 								"game_total": {
 									"points": 43.5,
 									"team_points": 18.5,
@@ -9956,7 +11679,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": 14.68
+							"week_projection": 14.68,
+							"projection_delta": 0.2,
+							"opp_rank": 13,
+							"season_avg": 14.17,
+							"last_points": 8.5
 						}
 					],
 					"drop": {
@@ -9987,7 +11714,12 @@
 								{ "week": 2, "points": 0.8 },
 								{ "week": 1, "points": 29.6 }
 							],
-							"allowed_to_position": null,
+							"allowed_to_position": {
+								"points_a_game": 28.2,
+								"rank": 3,
+								"of": 32,
+								"position": "QB"
+							},
 							"game_total": {
 								"points": 45.5,
 								"team_points": 23.5,
@@ -10003,7 +11735,11 @@
 								"read_at": "2026-10-16T21:01:34.611Z"
 							}
 						},
-						"week_projection": 20.59
+						"week_projection": 20.59,
+						"projection_delta": -0.1,
+						"opp_rank": 3,
+						"season_avg": 15.2,
+						"last_points": 0.8
 					},
 					"my_gain": 0.3,
 					"their_gain": 0.5,
@@ -10046,7 +11782,11 @@
 								"roof": null,
 								"weather": null
 							},
-							"week_projection": null
+							"week_projection": null,
+							"projection_delta": null,
+							"opp_rank": null,
+							"season_avg": 16.53,
+							"last_points": 19.8
 						}
 					],
 					"get": [
@@ -10085,7 +11825,11 @@
 								"roof": null,
 								"weather": null
 							},
-							"week_projection": null
+							"week_projection": null,
+							"projection_delta": null,
+							"opp_rank": null,
+							"season_avg": 11.73,
+							"last_points": 12.1
 						},
 						{
 							"player": {
@@ -10116,7 +11860,12 @@
 									{ "week": 4, "points": 11.2 },
 									{ "week": 3, "points": 1.5 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 24.6,
+									"rank": 9,
+									"of": 32,
+									"position": "TE"
+								},
 								"game_total": {
 									"points": 43.5,
 									"team_points": 25.5,
@@ -10132,7 +11881,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": 8.97
+							"week_projection": 8.97,
+							"projection_delta": 0.1,
+							"opp_rank": 9,
+							"season_avg": 8.7,
+							"last_points": 13.4
 						}
 					],
 					"drop": {
@@ -10163,7 +11916,12 @@
 								{ "week": 2, "points": 0.8 },
 								{ "week": 1, "points": 29.6 }
 							],
-							"allowed_to_position": null,
+							"allowed_to_position": {
+								"points_a_game": 28.2,
+								"rank": 3,
+								"of": 32,
+								"position": "QB"
+							},
 							"game_total": {
 								"points": 45.5,
 								"team_points": 23.5,
@@ -10179,7 +11937,11 @@
 								"read_at": "2026-10-16T21:01:34.611Z"
 							}
 						},
-						"week_projection": 20.59
+						"week_projection": 20.59,
+						"projection_delta": -0.1,
+						"opp_rank": 3,
+						"season_avg": 15.2,
+						"last_points": 0.8
 					},
 					"my_gain": 0.1,
 					"their_gain": 0.7,
@@ -10216,7 +11978,12 @@
 									{ "week": 4, "points": 6.5 },
 									{ "week": 3, "points": 21.9 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 26.4,
+									"rank": 6,
+									"of": 32,
+									"position": "RB"
+								},
 								"game_total": {
 									"points": 52.5,
 									"team_points": 20,
@@ -10226,7 +11993,11 @@
 								"roof": { "kind": "dome", "abroad": false },
 								"weather": null
 							},
-							"week_projection": 12.3
+							"week_projection": 12.3,
+							"projection_delta": -0.4,
+							"opp_rank": 6,
+							"season_avg": 10.2,
+							"last_points": 2.2
 						}
 					],
 					"get": [
@@ -10259,7 +12030,12 @@
 									{ "week": 4, "points": 18 },
 									{ "week": 3, "points": 15.4 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 27,
+									"rank": 5,
+									"of": 32,
+									"position": "WR"
+								},
 								"game_total": {
 									"points": 50.5,
 									"team_points": 29,
@@ -10275,7 +12051,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": 8.5
+							"week_projection": 8.5,
+							"projection_delta": -0.4,
+							"opp_rank": 5,
+							"season_avg": 11.97,
+							"last_points": 2.5
 						},
 						{
 							"player": {
@@ -10306,7 +12086,12 @@
 									{ "week": 2, "points": 14.2 },
 									{ "week": 1, "points": 19.8 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 22.2,
+									"rank": 13,
+									"of": 32,
+									"position": "RB"
+								},
 								"game_total": {
 									"points": 43.5,
 									"team_points": 18.5,
@@ -10322,7 +12107,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": 14.68
+							"week_projection": 14.68,
+							"projection_delta": 0.2,
+							"opp_rank": 13,
+							"season_avg": 14.17,
+							"last_points": 8.5
 						}
 					],
 					"drop": {
@@ -10353,7 +12142,12 @@
 								{ "week": 2, "points": 0.8 },
 								{ "week": 1, "points": 29.6 }
 							],
-							"allowed_to_position": null,
+							"allowed_to_position": {
+								"points_a_game": 28.2,
+								"rank": 3,
+								"of": 32,
+								"position": "QB"
+							},
 							"game_total": {
 								"points": 45.5,
 								"team_points": 23.5,
@@ -10369,7 +12163,11 @@
 								"read_at": "2026-10-16T21:01:34.611Z"
 							}
 						},
-						"week_projection": 20.59
+						"week_projection": 20.59,
+						"projection_delta": -0.1,
+						"opp_rank": 3,
+						"season_avg": 15.2,
+						"last_points": 0.8
 					},
 					"my_gain": 0.5,
 					"their_gain": 0.3,
@@ -10406,7 +12204,12 @@
 									{ "week": 4, "points": 6.5 },
 									{ "week": 3, "points": 21.9 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 26.4,
+									"rank": 6,
+									"of": 32,
+									"position": "RB"
+								},
 								"game_total": {
 									"points": 52.5,
 									"team_points": 20,
@@ -10416,7 +12219,11 @@
 								"roof": { "kind": "dome", "abroad": false },
 								"weather": null
 							},
-							"week_projection": 12.3
+							"week_projection": 12.3,
+							"projection_delta": -0.4,
+							"opp_rank": 6,
+							"season_avg": 10.2,
+							"last_points": 2.2
 						}
 					],
 					"get": [
@@ -10449,7 +12256,12 @@
 									{ "week": 4, "points": 8.7 },
 									{ "week": 3, "points": 4.7 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 22.2,
+									"rank": 13,
+									"of": 32,
+									"position": "RB"
+								},
 								"game_total": {
 									"points": 43.5,
 									"team_points": 18.5,
@@ -10465,7 +12277,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": 4.3
+							"week_projection": 4.3,
+							"projection_delta": -0.4,
+							"opp_rank": 13,
+							"season_avg": 10.67,
+							"last_points": 18.6
 						},
 						{
 							"player": {
@@ -10496,7 +12312,12 @@
 									{ "week": 4, "points": 18 },
 									{ "week": 3, "points": 15.4 }
 								],
-								"allowed_to_position": null,
+								"allowed_to_position": {
+									"points_a_game": 27,
+									"rank": 5,
+									"of": 32,
+									"position": "WR"
+								},
 								"game_total": {
 									"points": 50.5,
 									"team_points": 29,
@@ -10512,7 +12333,11 @@
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
 							},
-							"week_projection": 8.5
+							"week_projection": 8.5,
+							"projection_delta": -0.4,
+							"opp_rank": 5,
+							"season_avg": 11.97,
+							"last_points": 2.5
 						}
 					],
 					"drop": {
@@ -10543,7 +12368,12 @@
 								{ "week": 2, "points": 0.8 },
 								{ "week": 1, "points": 29.6 }
 							],
-							"allowed_to_position": null,
+							"allowed_to_position": {
+								"points_a_game": 28.2,
+								"rank": 3,
+								"of": 32,
+								"position": "QB"
+							},
 							"game_total": {
 								"points": 45.5,
 								"team_points": 23.5,
@@ -10559,7 +12389,11 @@
 								"read_at": "2026-10-16T21:01:34.611Z"
 							}
 						},
-						"week_projection": 20.59
+						"week_projection": 20.59,
+						"projection_delta": -0.1,
+						"opp_rank": 3,
+						"season_avg": 15.2,
+						"last_points": 0.8
 					},
 					"my_gain": 0.2,
 					"their_gain": 0.3,
@@ -10599,7 +12433,7 @@
 					{ "week": 4, "points": 24.96 },
 					{ "week": 3, "points": 26.68 }
 				],
-				"allowed_to_position": null,
+				"allowed_to_position": { "points_a_game": 23.4, "rank": 11, "of": 32, "position": "QB" },
 				"game_total": { "points": 40.5, "team_points": 22, "read_at": "2026-10-16T21:01:26.774Z" },
 				"spread": { "side": "win", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
 				"roof": { "kind": "outdoors", "abroad": false },
@@ -10611,7 +12445,11 @@
 					"read_at": "2026-10-16T21:01:34.611Z"
 				}
 			},
-			"week_projection": 15.76
+			"week_projection": 15.76,
+			"projection_delta": 0,
+			"opp_rank": 11,
+			"season_avg": 25.55,
+			"last_points": 25
 		},
 		{
 			"player": {
@@ -10641,7 +12479,7 @@
 					{ "week": 2, "points": 0.8 },
 					{ "week": 1, "points": 29.6 }
 				],
-				"allowed_to_position": null,
+				"allowed_to_position": { "points_a_game": 28.2, "rank": 3, "of": 32, "position": "QB" },
 				"game_total": {
 					"points": 45.5,
 					"team_points": 23.5,
@@ -10657,7 +12495,11 @@
 					"read_at": "2026-10-16T21:01:34.611Z"
 				}
 			},
-			"week_projection": 20.59
+			"week_projection": 20.59,
+			"projection_delta": -0.1,
+			"opp_rank": 3,
+			"season_avg": 15.2,
+			"last_points": 0.8
 		},
 		{
 			"player": {
@@ -10688,7 +12530,7 @@
 					{ "week": 3, "points": 18.94 },
 					{ "week": 2, "points": 31.98 }
 				],
-				"allowed_to_position": null,
+				"allowed_to_position": { "points_a_game": 28.8, "rank": 2, "of": 32, "position": "QB" },
 				"game_total": {
 					"points": 42.5,
 					"team_points": 25.5,
@@ -10704,7 +12546,11 @@
 					"read_at": "2026-10-16T21:01:34.611Z"
 				}
 			},
-			"week_projection": 17.93
+			"week_projection": 17.93,
+			"projection_delta": -0.1,
+			"opp_rank": 2,
+			"season_avg": 23.31,
+			"last_points": 19
 		},
 		{
 			"player": {
@@ -10735,13 +12581,17 @@
 					{ "week": 4, "points": 6.5 },
 					{ "week": 3, "points": 21.9 }
 				],
-				"allowed_to_position": null,
+				"allowed_to_position": { "points_a_game": 26.4, "rank": 6, "of": 32, "position": "RB" },
 				"game_total": { "points": 52.5, "team_points": 20, "read_at": "2026-10-16T21:01:26.774Z" },
 				"spread": { "side": "lose", "points": 12.5, "read_at": "2026-10-16T21:01:26.774Z" },
 				"roof": { "kind": "dome", "abroad": false },
 				"weather": null
 			},
-			"week_projection": 12.3
+			"week_projection": 12.3,
+			"projection_delta": -0.4,
+			"opp_rank": 6,
+			"season_avg": 10.2,
+			"last_points": 2.2
 		},
 		{
 			"player": {
@@ -10772,7 +12622,7 @@
 					{ "week": 4, "points": 10.7 },
 					{ "week": 3, "points": 3 }
 				],
-				"allowed_to_position": null,
+				"allowed_to_position": { "points_a_game": 19.2, "rank": 18, "of": 32, "position": "RB" },
 				"game_total": { "points": 40.5, "team_points": 19, "read_at": "2026-10-16T21:01:26.774Z" },
 				"spread": { "side": "lose", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
 				"roof": { "kind": "outdoors", "abroad": false },
@@ -10784,7 +12634,11 @@
 					"read_at": "2026-10-16T21:01:34.611Z"
 				}
 			},
-			"week_projection": 9.48
+			"week_projection": 9.48,
+			"projection_delta": 0,
+			"opp_rank": 18,
+			"season_avg": 6.5,
+			"last_points": 5.8
 		},
 		{
 			"player": {
@@ -10815,7 +12669,7 @@
 					{ "week": 4, "points": 3.3 },
 					{ "week": 2, "points": 0 }
 				],
-				"allowed_to_position": null,
+				"allowed_to_position": { "points_a_game": 29.4, "rank": 1, "of": 32, "position": "RB" },
 				"game_total": {
 					"points": 49.5,
 					"team_points": 26.5,
@@ -10831,7 +12685,11 @@
 					"read_at": "2026-10-16T21:01:34.611Z"
 				}
 			},
-			"week_projection": 0.57
+			"week_projection": 0.57,
+			"projection_delta": -0.4,
+			"opp_rank": 1,
+			"season_avg": 4.1,
+			"last_points": 9
 		},
 		{
 			"player": {
@@ -10862,7 +12720,7 @@
 					{ "week": 3, "points": -0.5 },
 					{ "week": 2, "points": 11.8 }
 				],
-				"allowed_to_position": null,
+				"allowed_to_position": { "points_a_game": 25.8, "rank": 7, "of": 32, "position": "RB" },
 				"game_total": {
 					"points": 41.5,
 					"team_points": 21.5,
@@ -10878,7 +12736,11 @@
 					"read_at": "2026-10-16T21:01:34.611Z"
 				}
 			},
-			"week_projection": 4.39
+			"week_projection": 4.39,
+			"projection_delta": -0.1,
+			"opp_rank": 7,
+			"season_avg": 5.6,
+			"last_points": 5.5
 		},
 		{
 			"player": {
@@ -10909,7 +12771,7 @@
 					{ "week": 2, "points": 5.1 },
 					{ "week": 1, "points": 14.8 }
 				],
-				"allowed_to_position": null,
+				"allowed_to_position": { "points_a_game": 14.4, "rank": 26, "of": 32, "position": "RB" },
 				"game_total": { "points": 45.5, "team_points": 22, "read_at": "2026-10-16T21:01:26.774Z" },
 				"spread": { "side": "lose", "points": 1.5, "read_at": "2026-10-16T21:01:26.774Z" },
 				"roof": { "kind": "outdoors", "abroad": false },
@@ -10921,7 +12783,11 @@
 					"read_at": "2026-10-16T21:01:34.611Z"
 				}
 			},
-			"week_projection": 14.19
+			"week_projection": 14.19,
+			"projection_delta": 0.2,
+			"opp_rank": 26,
+			"season_avg": 9.63,
+			"last_points": 9
 		},
 		{
 			"player": {
@@ -10948,13 +12814,17 @@
 				"played": false,
 				"points_this_week": null,
 				"last_games": [],
-				"allowed_to_position": null,
+				"allowed_to_position": { "points_a_game": 15.6, "rank": 24, "of": 32, "position": "RB" },
 				"game_total": { "points": 40.5, "team_points": 22, "read_at": "2026-10-16T21:01:26.774Z" },
 				"spread": { "side": "win", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
 				"roof": { "kind": "outdoors", "abroad": false },
 				"weather": null
 			},
-			"week_projection": null
+			"week_projection": null,
+			"projection_delta": null,
+			"opp_rank": 24,
+			"season_avg": null,
+			"last_points": null
 		},
 		{
 			"player": {
@@ -10985,7 +12855,7 @@
 					{ "week": 4, "points": 5.1 },
 					{ "week": 3, "points": 3.5 }
 				],
-				"allowed_to_position": null,
+				"allowed_to_position": { "points_a_game": 15, "rank": 25, "of": 32, "position": "WR" },
 				"game_total": {
 					"points": 50.5,
 					"team_points": 21.5,
@@ -11001,7 +12871,11 @@
 					"read_at": "2026-10-16T21:01:34.611Z"
 				}
 			},
-			"week_projection": 3.21
+			"week_projection": 3.21,
+			"projection_delta": 0,
+			"opp_rank": 25,
+			"season_avg": 4.9,
+			"last_points": 6.1
 		},
 		{
 			"player": {
@@ -11028,7 +12902,7 @@
 				"played": false,
 				"points_this_week": null,
 				"last_games": [],
-				"allowed_to_position": null,
+				"allowed_to_position": { "points_a_game": 27, "rank": 5, "of": 32, "position": "WR" },
 				"game_total": { "points": 50.5, "team_points": 29, "read_at": "2026-10-16T21:01:26.774Z" },
 				"spread": { "side": "win", "points": 7.5, "read_at": "2026-10-16T21:01:26.774Z" },
 				"roof": { "kind": "outdoors", "abroad": false },
@@ -11040,7 +12914,11 @@
 					"read_at": "2026-10-16T21:01:34.611Z"
 				}
 			},
-			"week_projection": null
+			"week_projection": null,
+			"projection_delta": null,
+			"opp_rank": 5,
+			"season_avg": null,
+			"last_points": null
 		},
 		{
 			"player": {
@@ -11077,7 +12955,11 @@
 				"roof": null,
 				"weather": null
 			},
-			"week_projection": null
+			"week_projection": null,
+			"projection_delta": null,
+			"opp_rank": null,
+			"season_avg": 16.73,
+			"last_points": 19.7
 		},
 		{
 			"player": {
@@ -11108,13 +12990,17 @@
 					{ "week": 4, "points": 6.3 },
 					{ "week": 3, "points": 19.4 }
 				],
-				"allowed_to_position": null,
+				"allowed_to_position": { "points_a_game": 11.4, "rank": 31, "of": 32, "position": "WR" },
 				"game_total": { "points": 42.5, "team_points": 23, "read_at": "2026-10-16T21:01:26.774Z" },
 				"spread": { "side": "win", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
 				"roof": { "kind": "outdoors", "abroad": true },
 				"weather": null
 			},
-			"week_projection": 9.65
+			"week_projection": 9.65,
+			"projection_delta": 0.3,
+			"opp_rank": 31,
+			"season_avg": 10.47,
+			"last_points": 5.7
 		},
 		{
 			"player": {
@@ -11151,7 +13037,11 @@
 				"roof": null,
 				"weather": null
 			},
-			"week_projection": null
+			"week_projection": null,
+			"projection_delta": null,
+			"opp_rank": null,
+			"season_avg": 11.07,
+			"last_points": 9.1
 		},
 		{
 			"player": {
@@ -11182,7 +13072,7 @@
 					{ "week": 3, "points": 10.6 },
 					{ "week": 2, "points": 6.5 }
 				],
-				"allowed_to_position": null,
+				"allowed_to_position": { "points_a_game": 16.8, "rank": 22, "of": 32, "position": "WR" },
 				"game_total": { "points": 42.5, "team_points": 17, "read_at": "2026-10-16T21:01:26.774Z" },
 				"spread": { "side": "lose", "points": 8.5, "read_at": "2026-10-16T21:01:26.774Z" },
 				"roof": { "kind": "outdoors", "abroad": false },
@@ -11194,7 +13084,11 @@
 					"read_at": "2026-10-16T21:01:34.611Z"
 				}
 			},
-			"week_projection": 13.24
+			"week_projection": 13.24,
+			"projection_delta": -0.2,
+			"opp_rank": 22,
+			"season_avg": 5.7,
+			"last_points": 0
 		},
 		{
 			"player": {
@@ -11225,7 +13119,7 @@
 					{ "week": 4, "points": 15.4 },
 					{ "week": 3, "points": 7.4 }
 				],
-				"allowed_to_position": null,
+				"allowed_to_position": { "points_a_game": 22.8, "rank": 12, "of": 32, "position": "WR" },
 				"game_total": {
 					"points": 49.5,
 					"team_points": 26.5,
@@ -11241,7 +13135,11 @@
 					"read_at": "2026-10-16T21:01:34.611Z"
 				}
 			},
-			"week_projection": 10.98
+			"week_projection": 10.98,
+			"projection_delta": -0.1,
+			"opp_rank": 12,
+			"season_avg": 9.27,
+			"last_points": 5
 		},
 		{
 			"player": {
@@ -11272,7 +13170,7 @@
 					{ "week": 4, "points": 2.5 },
 					{ "week": 1, "points": 3.6 }
 				],
-				"allowed_to_position": null,
+				"allowed_to_position": { "points_a_game": 21, "rank": 15, "of": 32, "position": "TE" },
 				"game_total": {
 					"points": 50.5,
 					"team_points": 21.5,
@@ -11288,7 +13186,11 @@
 					"read_at": "2026-10-16T21:01:34.611Z"
 				}
 			},
-			"week_projection": 7.76
+			"week_projection": 7.76,
+			"projection_delta": -0.1,
+			"opp_rank": 15,
+			"season_avg": 5.37,
+			"last_points": 10
 		},
 		{
 			"player": {
@@ -11325,7 +13227,11 @@
 				"roof": null,
 				"weather": null
 			},
-			"week_projection": null
+			"week_projection": null,
+			"projection_delta": null,
+			"opp_rank": null,
+			"season_avg": 16.53,
+			"last_points": 19.8
 		},
 		{
 			"player": {
@@ -11352,13 +13258,17 @@
 				"played": false,
 				"points_this_week": null,
 				"last_games": [],
-				"allowed_to_position": null,
+				"allowed_to_position": { "points_a_game": 21, "rank": 15, "of": 32, "position": "DEF" },
 				"game_total": { "points": 42.5, "team_points": 20, "read_at": "2026-10-16T21:01:26.774Z" },
 				"spread": { "side": "lose", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
 				"roof": { "kind": "outdoors", "abroad": true },
 				"weather": null
 			},
-			"week_projection": 7.9
+			"week_projection": 7.9,
+			"projection_delta": -0.3,
+			"opp_rank": 15,
+			"season_avg": null,
+			"last_points": null
 		},
 		{
 			"player": {
@@ -11391,7 +13301,11 @@
 				"roof": null,
 				"weather": null
 			},
-			"week_projection": null
+			"week_projection": null,
+			"projection_delta": null,
+			"opp_rank": null,
+			"season_avg": null,
+			"last_points": null
 		}
 	],
 	"host_trades_url": "https://sleeper.com/leagues/1382163311038038016/team",

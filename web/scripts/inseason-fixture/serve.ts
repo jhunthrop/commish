@@ -301,7 +301,7 @@ function espnLineup(): LineupAdvice {
 	return {
 		...lineup,
 		host_lineup_url: ESPN_LINEUP_URL,
-		moves: { lineup: 'available', note: null }
+		moves: { lineup: 'available', note: null, takes_writes: true, writes_on: true, reason: null }
 	};
 }
 
