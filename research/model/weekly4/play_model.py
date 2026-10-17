@@ -31,6 +31,7 @@ from typing import Final
 import numpy as np
 import pandas as pd
 
+from research.model.weekly4.matrix import design
 from research.model.weekly4.tuning import BOOSTED_GRID, Cell, Fitted, FoldCache, Loss, Seasoned, predict
 
 FROZEN: Final = MappingProxyType
@@ -52,14 +53,6 @@ TOUCHDOWN: Final = 6.0
 PASSING_TOUCHDOWN: Final = 4.0
 INTERCEPTION: Final = -2.0
 
-_VOCABULARY: Final = FROZEN(
-    {
-        "pass_location": ("left", "middle", "right"),
-        "run_location": ("left", "middle", "right"),
-        "run_gap": ("end", "guard", "tackle"),
-        "roof": ("dome", "closed", "open", "outdoors"),
-    }
-)
 _WEATHER: Final = ("roof", "wind_mph", "temperature_f", "precipitation")
 _SITUATION: Final = ("yardline_100", "down", "ydstogo")
 FEATURES: Final = FROZEN(
@@ -104,17 +97,7 @@ def targets_of(plays: pd.DataFrame, kind: str) -> pd.DataFrame:
 
 def play_matrix(plays: pd.DataFrame, kind: str) -> tuple[np.ndarray, tuple[bool, ...]]:
     """The kind's feature matrix, categories as codes with missing as NaN, and the categorical mask."""
-    columns: list[np.ndarray] = []
-    categorical: list[bool] = []
-    for name in FEATURES[kind]:
-        if name in _VOCABULARY:
-            codes = {value: float(i) for i, value in enumerate(_VOCABULARY[name])}
-            columns.append(plays[name].map(codes).to_numpy(dtype=float, na_value=np.nan))
-            categorical.append(True)
-        else:
-            columns.append(plays[name].to_numpy(dtype=float, na_value=np.nan))
-            categorical.append(False)
-    return np.column_stack(columns) if columns else np.empty((len(plays), 0)), tuple(categorical)
+    return design(plays, FEATURES[kind])
 
 
 @dataclass(frozen=True, slots=True)
