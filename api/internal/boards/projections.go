@@ -3,10 +3,10 @@ package boards
 import (
 	"context"
 	"fmt"
-	"math"
 	"time"
 
 	"github.com/jhunthrop/commish/api/internal/apitypes"
+	"github.com/jhunthrop/commish/api/internal/tenth"
 )
 
 // The week's published projection (Lane 66d): the provider's weekly
@@ -198,9 +198,7 @@ func (w WeekProjection) Delta(boardID, position, team string, preset apitypes.Sc
 	if !ok {
 		return 0, false
 	}
-	return tenth(now.For(preset)) - tenth(then.For(preset)), true
+	// The difference of the tenths the screens print, by the site's one rule
+	// (tenth.Round), itself a clean tenth (Lane 66k rereview N3).
+	return tenth.Round(tenth.Round(now.For(preset)) - tenth.Round(then.For(preset))), true
 }
-
-func tenth(v float64) float64 { return math.Round(v*tenths) / tenths }
-
-const tenths = 10

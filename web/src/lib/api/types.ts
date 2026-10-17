@@ -105,6 +105,23 @@ export interface paths {
 		patch: operations['updateMe'];
 		trace?: never;
 	};
+	'/me/week': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		/** The front door's week (Lane 66k): for every league the account follows, newest first, its own score bug (the League page's game for the member's team, with both teams), the lineup's changes and what they add, and up to three facts about the member's roster, each from the reads the in-season routes already make. The front door reads this once and makes no other in-season read. A league whose read fails stays on the list with problem saying why. */
+		get: operations['memberWeek'];
+		put?: never;
+		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
 	'/season': {
 		parameters: {
 			query?: never;
@@ -2682,6 +2699,11 @@ export interface components {
 			standing: components['schemas']['LeagueStanding'] | null;
 			/** Format: date-time */
 			attached_at: string;
+			/**
+			 * Format: date-time
+			 * @description the league's last host read for this account, null when never read
+			 */
+			last_read_at: string | null;
 			phase: components['schemas']['LeaguePhase'];
 			/** @description one sentence naming the fact the phase came from, in the site's words */
 			phase_basis: string;
@@ -2814,7 +2836,7 @@ export interface components {
 			played: boolean;
 			/**
 			 * Format: double
-			 * @description the host's score for him so far, from the matchup, when he starts there and his game has kicked off
+			 * @description the host's score for him so far, from the matchup, when he starts there and his game has kicked off, to the tenth
 			 */
 			points_this_week: number | null;
 			/** @description up to three completed games under the league's scoring, newest first */
@@ -2926,24 +2948,24 @@ export interface components {
 			rest_of_season_per_game: number | null;
 			/**
 			 * Format: double
-			 * @description his points this week on the week's published projection, to the cent, in the format the league's scoring is most like (PPR, half PPR or standard); a team defense's by its club, a kicker our board does not place (no board id) by his club's one kicker, never a teammate's for a kicker the snapshot left out. The newest snapshot stored for the league's week (projection_read_at says when). Null when his club has no game that week (a bye), whatever the snapshot holds, and when the snapshot has no row for him or none is stored. Our own weekly model replaces it when it passes its test
+			 * @description his points this week on the week's published projection, to the tenth (the site's one rounding, half away from zero), in the format the league's scoring is most like (PPR, half PPR or standard); a team defense's by its club, a kicker our board does not place (no board id) by his club's one kicker, never a teammate's for a kicker the snapshot left out. The newest snapshot stored for the league's week (projection_read_at says when). Null when his club has no game that week (a bye), whatever the snapshot holds, and when the snapshot has no row for him or none is stored. Our own weekly model replaces it when it passes its test
 			 */
 			week_projection: number | null;
 			/**
 			 * Format: double
-			 * @description week_projection's change since the week's snapshot before the newest, to the cent, in the same format; null without a row for him in both snapshots or when week_projection is null
+			 * @description week_projection's change since the week's snapshot before the newest, to the tenth, in the same format; null without a row for him in both snapshots or when week_projection is null
 			 */
 			projection_delta: number | null;
 			/** @description this week's opponent's rank in points allowed a game to his position this season under the league's scoring, 1 allowed the fewest (facts.allowed_to_position.rank, of its .of); null on a bye or before the season ranks it */
 			opp_rank: number | null;
 			/**
 			 * Format: double
-			 * @description his points a game over every completed game this season under the league's scoring, to the cent; null before his first game
+			 * @description his points a game over every completed game this season under the league's scoring, to the tenth; null before his first game
 			 */
 			season_avg: number | null;
 			/**
 			 * Format: double
-			 * @description his points in his last completed game under the league's scoring, to the cent; null before his first game
+			 * @description his points in his last completed game under the league's scoring, to the tenth; null before his first game
 			 */
 			last_points: number | null;
 			/** @description the drafter tags him Hold on a sheet */
@@ -3070,7 +3092,7 @@ export interface components {
 			roster_id: number;
 			/**
 			 * Format: double
-			 * @description the side's points so far as the host scores them
+			 * @description the side's points so far as the host scores them, to the tenth
 			 */
 			points: number;
 			/** @description false when the host's score could not be read; points then says nothing */
@@ -3114,6 +3136,95 @@ export interface components {
 			projection_scoring: components['schemas']['ProjectionScoring'];
 			/** @description the drafter's game first, then the rest in the host's order */
 			games: components['schemas']['ScoreboardGame'][];
+		};
+		MemberWeek: {
+			/** @description every league the account follows, newest first, as GET /leagues/attached lists them */
+			leagues: components['schemas']['WeekLeague'][];
+		};
+		WeekLeague: {
+			/**
+			 * Format: uuid
+			 * @description the attachment (AttachedLeague.id)
+			 */
+			id: string;
+			name: string;
+			host: components['schemas']['LeagueHost'];
+			/** @description the member's team at the last read, empty when unread */
+			team_name: string;
+			standing: components['schemas']['LeagueStanding'] | null;
+			phase: components['schemas']['LeaguePhase'];
+			/** @description the league's current week, 0 when it has none or the read failed */
+			week: number;
+			/**
+			 * Format: date-time
+			 * @description the league's last host read
+			 */
+			read_at: string | null;
+			/**
+			 * Format: date-time
+			 * @description when the week's published projection the figures read was captured, null with none
+			 */
+			projection_read_at: string | null;
+			/** @description the scoring the figures' projections are read in, null when the league has no week */
+			projection_scoring: components['schemas']['ProjectionScoring'] | null;
+			/** @description the member's game this week, null when the league has no week, no game, or the read failed */
+			bug: components['schemas']['WeekBug'] | null;
+			/** @description the lineup's changes this week, null when the league has no week or the read failed */
+			lineup: components['schemas']['WeekLineup'] | null;
+			/** @description at most three facts about the member's roster, in this order where each holds: a starter's designation, a starter on bye, the top pickup */
+			chips: components['schemas']['RosterChip'][];
+			/** @description one sentence when a read failed or the league has no saved scoring, naming the platform; null otherwise */
+			problem: string | null;
+		};
+		WeekBug: {
+			game: components['schemas']['ScoreboardGame'];
+			/** @description the game's teams in the order of its sides, the member's first */
+			teams: components['schemas']['LeagueTeam'][];
+			/** @description the member's starters as the platform holds them whose kickoff is the earliest of theirs still to come, empty when none is */
+			first: components['schemas']['PlayerLine'][];
+		};
+		WeekLineup: {
+			/** @description the starting spots our lineup fills with someone other than the platform holds */
+			changes: number;
+			/**
+			 * Format: double
+			 * @description our lineup's starters' week projections summed, each as printed to the tenth; null when none has one
+			 */
+			projection: number | null;
+			/**
+			 * Format: double
+			 * @description the lineup as the platform holds it, summed the same way; null when none has one
+			 */
+			as_set: number | null;
+			/**
+			 * Format: double
+			 * @description projection less as_set to the tenth, null when either is null
+			 */
+			gain: number | null;
+			/** @description each change, in the league's slot order */
+			swaps: components['schemas']['WeekSwap'][];
+		};
+		WeekSwap: {
+			/** @enum {string} */
+			slot: 'QB' | 'RB' | 'WR' | 'TE' | 'FLEX' | 'SUPERFLEX' | 'K' | 'DEF';
+			in: components['schemas']['LeaguePlayer'];
+			/** @description the player the platform starts there, null for a spot left empty */
+			out: components['schemas']['LeaguePlayer'] | null;
+		};
+		RosterChip: {
+			/**
+			 * @description status, a starter as set with this week's designation (the newest); bye, a starter as set on bye whose spot no one on the member's roster can play (never a bye the lineup's changes already fill); pickup, the first pickup worth making as the Waivers screen chooses them, while the league runs waivers
+			 * @enum {string}
+			 */
+			kind: 'status' | 'bye' | 'pickup';
+			line: components['schemas']['PlayerLine'];
+			/**
+			 * Format: double
+			 * @description a pickup's week_gain (the Waivers strip's first card): this week's Proj the lineup the advice sets gains with him in, one decimal; null on the other kinds
+			 */
+			gain: number | null;
+			/** @description true on a bye (no one on the member's roster can play its spot this week); false on the other kinds */
+			idle: boolean;
 		};
 		MatchupBox: {
 			projection_scoring: components['schemas']['ProjectionScoring'];
@@ -3762,6 +3873,12 @@ export interface components {
 			connected_at: string;
 			/** Format: date-time */
 			last_read_at: string | null;
+			/** @description the version of the consent words the member agreed to on connect */
+			consent_version: number;
+			/** @description true when the member's lineup is set on the platform from our screen (the platform takes writes, its switch is on for the account, and the connection agreed to the moves); false otherwise, and writes_reason says why */
+			writes_on: boolean;
+			/** @description the Account room's one line naming the platform when writes are off (it takes none, its switch is off for the account, connect again, agree to moves, or the check failed), null when on */
+			writes_reason: string | null;
 		};
 		HostConnectInput: {
 			/** @description the member's FFPC sign-in (FFPC's form calls it the username) */
@@ -4212,6 +4329,27 @@ export interface operations {
 			200: components['responses']['AccountResponse'];
 			400: components['responses']['ErrorResponse'];
 			409: components['responses']['ErrorResponse'];
+		};
+	};
+	memberWeek: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description the account's leagues this week */
+			200: {
+				headers: Record<string, unknown>;
+				content: {
+					'application/json': components['schemas']['Envelope'] & {
+						data?: components['schemas']['MemberWeek'];
+					};
+				};
+			};
+			401: components['responses']['ErrorResponse'];
 		};
 	};
 	getSeason: {

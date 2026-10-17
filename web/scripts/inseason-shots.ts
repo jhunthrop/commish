@@ -1150,7 +1150,7 @@ for (const theme of THEMES) {
 					const row = document
 						.querySelector('main table.standings tbody tr')
 						?.getBoundingClientRect();
-					const pin = document.querySelector('main .roster .verb')?.getBoundingClientRect();
+					const pin = document.querySelector('main .roster .pinned')?.getBoundingClientRect();
 					return { rowBottom: row?.bottom ?? Infinity, pinTop: pin?.top ?? 0 };
 				});
 				firstRows.set(

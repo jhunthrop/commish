@@ -1,6 +1,7 @@
 // The Matchup and Lineup boxes' rows and totals (Lane 66d): run with `npm test`.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { inTenths } from '../../../../scripts/inseason-fixture/tenths.ts';
 import { test } from 'node:test';
 import type { MatchupSide } from '../api.ts';
 import type { LineupSlot, MatchupBox, PlayerLine, WeekFacts } from '../inseason/api.ts';
@@ -165,7 +166,8 @@ void test('a lineup swap moves ours in and the platform starter it sits out to t
 
 void test("the fixture's bye rows show no projection and its totals leave them out", () => {
 	const url = new URL('../../../../scripts/inseason-fixture/data/matchup.json', import.meta.url);
-	const box = JSON.parse(readFileSync(url, 'utf8')) as MatchupBox;
+	// The recording in tenths, as the API sends it (the fixture's tenths.ts, the API's rule).
+	const box = inTenths(JSON.parse(readFileSync(url, 'utf8')) as MatchupBox);
 	let byes = 0;
 	for (const side of box.sides) {
 		const read: MatchupSide = {
@@ -193,9 +195,9 @@ void test("the fixture's bye rows show no projection and its totals leave them o
 function bothScreens(byPlayer: boolean): { matchup: SideBox; lineup: LineupBox } {
 	const kicked = { kickoff: '2026-10-18T13:30:00.000Z', played: true };
 	const pts = (v: number) => (byPlayer ? v : null);
-	const qb = line('Caleb Williams', 'QB', 'CHI', 17.8, { ...kicked, points_this_week: pts(21.36) });
-	const wr = line('Nico Collins', 'WR', 'HOU', 15.2, { ...kicked, points_this_week: pts(12.04) });
-	const hostTotal = 87.44;
+	const qb = line('Caleb Williams', 'QB', 'CHI', 17.8, { ...kicked, points_this_week: pts(21.4) });
+	const wr = line('Nico Collins', 'WR', 'HOU', 15.2, { ...kicked, points_this_week: pts(12.0) });
+	const hostTotal = 87.4;
 	const read: MatchupSide = { roster_id: 1, points: hostTotal, points_read: true, starters: [] };
 	const matchup = sideBox(
 		read,

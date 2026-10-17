@@ -1,6 +1,7 @@
 package leaguesync
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"time"
@@ -51,20 +52,40 @@ func (s *Service) Follow(w http.ResponseWriter, r *http.Request) (Followed, bool
 	if !ok {
 		return Followed{}, false
 	}
-	read, err := s.Poller.Read(r.Context(), link.Ref)
-	if err != nil {
-		s.writeHostError(w, r, link.Ref.Host, err)
+	f, err := s.follow(r.Context(), link)
+	var host hostError
+	switch {
+	case errors.As(err, &host):
+		s.writeHostError(w, r, link.Ref.Host, host.err)
 		return Followed{}, false
-	}
-	pr, err := s.prepare(r.Context(), link, read)
-	if errors.Is(err, ErrUnavailable) {
-		s.writeHostError(w, r, link.Ref.Host, err)
-		return Followed{}, false
-	}
-	if err != nil {
+	case err != nil:
 		httpx.WriteInternal(w, r, s.Log, "leaguesync: follow", err)
 		return Followed{}, false
 	}
+	return f, true
+}
+
+// hostError is a follow the host stopped (its read, or a placement the
+// host's directory could not make), answered in the host's words.
+type hostError struct{ err error }
+
+func (e hostError) Error() string { return e.err.Error() }
+func (e hostError) Unwrap() error { return e.err }
+
+// follow is Follow for a link already loaded: the shared read, the saved
+// league and the board. A hostError is the host's; any other is ours.
+func (s *Service) follow(ctx context.Context, link Link) (Followed, error) {
+	read, err := s.Poller.Read(ctx, link.Ref)
+	if err != nil {
+		return Followed{}, hostError{err}
+	}
+	pr, err := s.prepare(ctx, link, read)
+	if errors.Is(err, ErrUnavailable) {
+		return Followed{}, hostError{err}
+	}
+	if err != nil {
+		return Followed{}, err
+	}
 	held, _ := heldOnBoard(pr.snap, pr.placed)
-	return Followed{Link: link, Snap: pr.snap, Stale: read.Stale, Saved: pr.saved, Board: pr.board, HeldBy: held, players: pr.players}, true
+	return Followed{Link: link, Snap: pr.snap, Stale: read.Stale, Saved: pr.saved, Board: pr.board, HeldBy: held, players: pr.players}, nil
 }

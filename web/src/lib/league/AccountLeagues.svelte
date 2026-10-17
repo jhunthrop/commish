@@ -4,15 +4,13 @@
 	import { resolve } from '$app/paths';
 	import { LEAGUES_ANCHOR, links } from '#lib/site/links.ts';
 	import EmptyState from '#lib/ui/EmptyState.svelte';
-	import PanelHead from '#lib/ui/PanelHead.svelte';
 	import ProblemLine from '#lib/ui/ProblemLine.svelte';
 	import Quiet from '#lib/ui/Quiet.svelte';
-	import ActionRow from '#lib/ui/ActionRow.svelte';
-	import ActionRows from '#lib/ui/ActionRows.svelte';
 	import { siteContext } from '#lib/context/context.svelte.ts';
 	import { ApiError, leagueApi, type AttachedLeague } from './api.ts';
 	import { followedCount, followingWords } from './follow-many.ts';
-	import { followedLine, followedName } from './model.ts';
+	import { followedName } from './model.ts';
+	import { ATTACHED_WORDS, attachedRow } from './attached-rows.ts';
 	import OneLeagueFree from './OneLeagueFree.svelte';
 
 	interface Props {
@@ -40,6 +38,8 @@
 
 	/** How long a detached league stays on the list with its undo. */
 	const UNDO_MS = 10_000;
+	/** The clock the rows' last reads are said against: the page's, when it was drawn. */
+	const now = new Date();
 
 	onMount(() => {
 		// Read in the browser only: the account page's shell is prerendered.
@@ -90,42 +90,71 @@
 	}
 </script>
 
-<section id={LEAGUES_ANCHOR} aria-label="Your leagues">
-	<PanelHead title="Your leagues" aside={leagues ? String(leagues.length) : undefined} level={2} />
+<section id={LEAGUES_ANCHOR} aria-label={ATTACHED_WORDS.title}>
+	<div class="sec-h">
+		<h2>{ATTACHED_WORDS.title}</h2>
+		{#if leagues}<span>{leagues.length}, newest first</span>{/if}
+	</div>
 	{#if failed}
-		<p class="note">Your leagues can't be read right now.</p>
+		<p class="text">Your leagues can't be read right now.</p>
 	{:else if leagues && leagues.length > 0}
-		{#if followed !== null}<p class="note" role="status">{followingWords(followed)}</p>{/if}
-		<ActionRows label="Your leagues">
-			{#each leagues as league (league.id)}
-				<ActionRow
-					lead={followedName(league)}
-					href={resolve('/league/[id]', { id: league.id })}
-					text={followedLine(league)}
-				>
-					{#snippet action()}
-						{#if detached.has(league.id)}
-							<span class="undo" role="status">
-								<span class="text">Detached.</span>
-								<Quiet size="sm" disabled={busy !== null} onclick={() => void undo(league)}
-									>Undo</Quiet
-								>
-							</span>
-						{:else}
-							<Quiet size="sm" disabled={busy !== null} onclick={() => void detach(league)}
-								>{busy === league.id ? 'Detaching' : 'Detach'}</Quiet
+		{#if followed !== null}<p class="text" role="status">{followingWords(followed)}</p>{/if}
+		<table class="set">
+			<colgroup>
+				<col />
+				<col class="c-rec" />
+				<col class="c-season" />
+				<col class="c-read" />
+				<col class="c-act" />
+			</colgroup>
+			<thead>
+				<tr>
+					<th scope="col">{ATTACHED_WORDS.league}</th>
+					<th scope="col">{ATTACHED_WORDS.record}</th>
+					<th scope="col">{ATTACHED_WORDS.season}</th>
+					<th scope="col">{ATTACHED_WORDS.lastRead}</th>
+					<th scope="col"><span class="sr">Verb</span></th>
+				</tr>
+			</thead>
+			<tbody>
+				{#each leagues as league (league.id)}
+					{@const row = attachedRow(league, now)}
+					<tr>
+						<th scope="row">
+							<a class="st open" href={resolve('/league/[id]', { id: league.id })}
+								><b>{followedName(league)}</b><span>{row.team}</span></a
 							>
-						{/if}
-					{/snippet}
-				</ActionRow>
-			{/each}
-		</ActionRows>
+						</th>
+						<td><span class="st"><b class="num">{row.record}</b><span>{row.place}</span></span></td>
+						<td class="ph-hide">{row.season}</td>
+						<td class="read"><span class="ph-only">Last read&nbsp;</span>{row.read}</td>
+						<td class="act">
+							{#if detached.has(league.id)}
+								<span class="undo" role="status">
+									<span class="text">Detached.</span>
+									<Quiet size="sm" disabled={busy !== null} onclick={() => void undo(league)}
+										>Undo</Quiet
+									>
+								</span>
+							{:else}
+								<Quiet size="sm" href={resolve('/league/[id]', { id: league.id })}>Open</Quiet>
+								<Quiet size="sm" disabled={busy !== null} onclick={() => void detach(league)}
+									>{busy === league.id ? 'Detaching' : 'Detach'}</Quiet
+								>
+							{/if}
+						</td>
+					</tr>
+				{/each}
+			</tbody>
+		</table>
 		{#if problem}<ProblemLine>{problem}</ProblemLine>{/if}
-		{#if many}
-			<Quiet size="sm" href={links.leagueNew()}>Follow another league</Quiet>
-		{:else if live > 0}
-			<OneLeagueFree />
-		{/if}
+		<div class="tfoot">
+			{#if many}
+				<Quiet size="sm" href={links.leagueNew()}>Follow another league</Quiet>
+			{:else if live > 0}
+				<OneLeagueFree />
+			{/if}
+		</div>
 	{:else if leagues}
 		<EmptyState level={3} title="No leagues yet">
 			{#snippet actions()}<Quiet href={links.leagueNew()}>Follow your league</Quiet>{/snippet}
@@ -134,12 +163,48 @@
 </section>
 
 <style>
-	.text,
-	.note {
+	.text {
 		margin: 0;
 		font-size: var(--t-sm);
 		color: var(--ink-2);
 		unicode-bidi: isolate;
+	}
+
+	.c-rec {
+		width: 110px;
+	}
+
+	.c-season {
+		width: 220px;
+	}
+
+	.c-read {
+		width: 120px;
+	}
+
+	.c-act {
+		width: 190px;
+	}
+
+	.act {
+		white-space: nowrap;
+	}
+
+	.act :global(a) {
+		margin-right: var(--s-2);
+	}
+
+	.open {
+		color: var(--ink);
+		text-decoration: none;
+	}
+
+	.open:hover b {
+		text-decoration: underline;
+	}
+
+	.tfoot {
+		margin-top: var(--s-2);
 	}
 
 	.undo {

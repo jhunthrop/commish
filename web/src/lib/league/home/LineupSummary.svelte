@@ -1,5 +1,6 @@
 <script lang="ts">
 	import Verb from '#lib/ui/Verb.svelte';
+	import PinnedVerb from '../box/PinnedVerb.svelte';
 	import Quiet from '#lib/ui/Quiet.svelte';
 	import BoxTable from '../box/BoxTable.svelte';
 	import MoveMark from '../box/MoveMark.svelte';
@@ -52,7 +53,9 @@
 					</li>
 				{/each}
 			</ul>
-			<div class="verb"><Verb href={lineupHref}>{HOME.setYourLineup}</Verb></div>
+			<div class="verb">
+				<PinnedVerb><Verb href={lineupHref}>{HOME.setYourLineup}</Verb></PinnedVerb>
+			</div>
 		{:else}
 			<Quiet href={lineupHref} size="sm">{HOME.openLineup}</Quiet>
 		{/if}
@@ -213,20 +216,7 @@
 		}
 
 		.verb {
-			position: fixed;
-			left: var(--s-3);
-			right: var(--s-3);
-			bottom: calc(var(--tab-bar-h) + env(safe-area-inset-bottom, 0px) + var(--s-2));
-			z-index: 10;
-			display: grid;
 			margin: 0;
-			box-shadow: var(--shadow-pop);
-			border-radius: var(--r-md);
-		}
-
-		.verb :global(a) {
-			width: 100%;
-			justify-content: center;
 		}
 	}
 </style>

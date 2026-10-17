@@ -165,24 +165,24 @@ func (a *advisor) build(id string, lp apitypes.LeaguePlayer, side *leaguesync.Si
 }
 
 // weekProjection is his points on the week's published projection in
-// the league's format, to the cent, nil without a row.
+// the league's format, to the tenth a screen prints, nil without a row.
 func (a *advisor) weekProjection(boardID string, position draft.Position, team string) *float64 {
 	p, ok := a.projection.Player(boardID, string(position), team)
 	if !ok {
 		return nil
 	}
-	v := roundCents(p.For(a.preset))
+	v := roundTenth(p.For(a.preset))
 	return &v
 }
 
 // projectionDelta is his projection's change since the snapshot before,
-// to the cent, nil without a row in both.
+// to the tenth a screen prints, nil without a row in both.
 func (a *advisor) projectionDelta(boardID string, position draft.Position, team string) *float64 {
 	d, ok := a.projection.Delta(boardID, string(position), team, a.preset)
 	if !ok {
 		return nil
 	}
-	v := roundCents(d)
+	v := roundTenth(d)
 	return &v
 }
 
@@ -195,11 +195,11 @@ func evidence(f Facts) (oppRank *int, seasonAvg, lastPoints *float64) {
 		oppRank = &rank
 	}
 	if f.PerGame != nil {
-		avg := roundCents(*f.PerGame)
+		avg := roundTenth(*f.PerGame)
 		seasonAvg = &avg
 	}
 	if len(f.LastGames) > 0 {
-		last := roundCents(f.LastGames[0].Points)
+		last := roundTenth(f.LastGames[0].Points)
 		lastPoints = &last
 	}
 	return oppRank, seasonAvg, lastPoints
@@ -244,7 +244,7 @@ func teamPoints(side *leaguesync.Side, people []person) *float64 {
 	}
 	for _, p := range people {
 		if starting[p.cand.ID] && p.cand.Locked {
-			pts := roundCents(side.Points)
+			pts := roundTenth(side.Points)
 			return &pts
 		}
 	}
@@ -267,7 +267,7 @@ func thisWeek(side *leaguesync.Side, id string, f Facts) *float64 {
 		if !ok {
 			return nil
 		}
-		pts := roundCents(got)
+		pts := roundTenth(got)
 		return &pts
 	}
 	return nil
@@ -284,7 +284,7 @@ func wireFacts(f Facts, pointsThisWeek *float64) apitypes.WeekFacts {
 		out.Designation = &apitypes.InjuryDesignation{Status: apitypes.DesignationStatus(d.Status), AsOf: d.AsOf}
 	}
 	for _, g := range f.LastGames {
-		out.LastGames = append(out.LastGames, apitypes.GamePoints{Week: g.Week, Points: g.Points})
+		out.LastGames = append(out.LastGames, apitypes.GamePoints{Week: g.Week, Points: roundTenth(g.Points)})
 	}
 	if al := f.Allowed; al != nil {
 		out.AllowedToPosition = &apitypes.PointsAllowed{PointsAGame: al.PointsAGame, Rank: al.Rank, Of: al.Of, Position: string(al.Position)}
@@ -486,11 +486,21 @@ func (a *advisor) hostIDOfAdd(p boards.Player) string {
 	return p.ID
 }
 
-// Waivers is the waiver page (§5).
-func (a *advisor) Waivers(position draft.Position) (apitypes.WaiverAdvice, bool) {
+// waiverRun is one ranking of the adds for the member's team: the
+// roster, the pool, this week's lineup and every move the search makes,
+// shared by the waiver page and the front door's pickup (Lane 66k M2).
+type waiverRun struct {
+	mine, pool []person
+	week       *pickupWeek
+	clears     map[string]openapi_types.Date
+	w          *Writer
+	moves      []Waiver
+}
+
+func (a *advisor) waiverRun(position draft.Position) (waiverRun, bool) {
 	team, ok := a.Snap.TeamByRoster(a.Me)
 	if !ok {
-		return apitypes.WaiverAdvice{}, false
+		return waiverRun{}, false
 	}
 	mine := a.active(team)
 	squad := a.squad(mine, true)
@@ -499,27 +509,45 @@ func (a *advisor) Waivers(position draft.Position) (apitypes.WaiverAdvice, bool)
 	for i, p := range pool {
 		cands[i] = p.cand
 	}
+	return waiverRun{mine: mine, pool: pool, week: newPickupWeek(a.config, squad.Players, team.Starters), clears: a.clearsOf(),
+		w: &Writer{Basis: a.basis, Now: a.now}, moves: Waivers(a.config, a.weeks, squad, cands)}, true
+}
+
+// Pickups is the Waivers strip's chosen set alone, without the table's
+// rows: what the front door's pickup chip reads.
+func (a *advisor) Pickups() ([]apitypes.WaiverRow, bool) {
+	run, ok := a.waiverRun("")
+	if !ok {
+		return nil, false
+	}
+	rows, _ := a.strip(run.w, run.week, run.mine, run.pool, run.moves, run.clears)
+	return rows, true
+}
+
+// Waivers is the waiver page (§5).
+func (a *advisor) Waivers(position draft.Position) (apitypes.WaiverAdvice, bool) {
+	run, ok := a.waiverRun(position)
+	if !ok {
+		return apitypes.WaiverAdvice{}, false
+	}
+	mine, pool := run.mine, run.pool
 	h := a.header()
 	out := apitypes.WaiverAdvice{Week: h.week, Basis: WaiversBasis(a.basis), SeasonBasis: withRestOfSeason(a.Board, WaiverSeasonBasis(a.basis, a.weeks), mine, pool),
 		BasisNote: BasisNote(a.settings, a.season.Carries), OrderBasis: h.basis, Refreshed: h.refreshed, ReadAt: h.readAt,
 		ProjectionReadAt: a.projectionReadAt(), ProjectionPreviousReadAt: a.projectionPreviousReadAt(), ProjectionScoring: projectionScoring(a.settings, a.preset),
 		Pickups: []apitypes.WaiverRow{}, Rows: []apitypes.WaiverRow{}, Roster: lines(mine, indexes(len(mine))), Moves: CopyOnlyClaims(a.Snap.Ref.Host)}
 	out.HostWaiversUrl, out.HostNote = a.host(WaiversPage)
-	week := newPickupWeek(a.config, squad.Players, team.Starters)
-	clears := a.clearsOf()
-	w := &Writer{Basis: a.basis, Now: a.now}
-	moves := Waivers(a.config, a.weeks, squad, cands)
-	for _, move := range moves {
+	for _, move := range run.moves {
 		if len(out.Rows) == MaxWaiverRows {
 			break
 		}
-		out.Rows = append(out.Rows, waiverRow(w, week, mine, pool[move.Add], move, clears))
+		out.Rows = append(out.Rows, waiverRow(run.w, run.week, mine, pool[move.Add], move, run.clears))
 	}
 	// The strip is chosen from every add we rank, before the rows' cut.
 	var proj float64
-	out.Pickups, proj = a.strip(w, week, mine, pool, moves, clears)
+	out.Pickups, proj = a.strip(run.w, run.week, mine, pool, run.moves, run.clears)
 	if out.ProjectionReadAt != nil {
-		base := week.base.proj
+		base := run.week.base.proj
 		out.LineupProj, out.PickupsProj = &base, &proj
 	}
 	return out, true

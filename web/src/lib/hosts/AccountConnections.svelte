@@ -1,86 +1,63 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
-	import { dayLabel } from '#lib/format/date.ts';
 	import { links } from '#lib/site/links.ts';
-	import ActionRow from '#lib/ui/ActionRow.svelte';
-	import ActionRows from '#lib/ui/ActionRows.svelte';
-	import EmptyState from '#lib/ui/EmptyState.svelte';
-	import PanelHead from '#lib/ui/PanelHead.svelte';
 	import ProblemLine from '#lib/ui/ProblemLine.svelte';
 	import Quiet from '#lib/ui/Quiet.svelte';
+	import Verb from '#lib/ui/Verb.svelte';
 	import ESPNConnect from './ESPNConnect.svelte';
 	import FFPCSignIn from './FFPCSignIn.svelte';
 	import MFLConnect from './MFLConnect.svelte';
 	import YahooConnect from './YahooConnect.svelte';
-	import { plural } from '#lib/format/number.ts';
-	import { leagueApi } from '#lib/league/api.ts';
-	import { agoWords } from '#lib/league/model.ts';
-	import { hostWords } from '#lib/league/names.ts';
 	import {
 		ApiError,
 		disconnect as disconnectHost,
-		espnOpen,
-		ffpcOpen,
 		goToYahoo,
 		hostsApi,
-		mflOpen,
-		yahooOpen,
 		type ConnectedHost,
 		type HostConnected,
-		type HostConnection
+		type HostConnections
 	} from './api.ts';
-	import { ESPN_CONSENT, MFL_CONSENT, statusWords } from './connection-words.ts';
+	import { ESPN_CONSENT, MFL_CONSENT } from './connection-words.ts';
+	import {
+		PLATFORM_WORDS,
+		platformRows,
+		type Platform,
+		type PlatformRow
+	} from './platform-rows.ts';
 	import { yahooOutcome } from './yahoo.ts';
 
-	/** The hosts the account reads as the member (FFPC, Yahoo, ESPN, MyFantasyLeague), each with its state, a one-tap
-	 * disconnect that deletes what we keep at once, and, when a host has dropped the connection, the
-	 * way back in right here. Yahoo, ESPN or MyFantasyLeague not yet connected is one verb each. It reads its own list. */
-	let connections = $state<HostConnection[] | null>(null);
-	let open = $state<Record<ConnectedHost, boolean>>({
-		ffpc: false,
-		yahoo: false,
-		espn: false,
-		mfl: false
-	});
+	/** The Account room's Platforms table (Lane 66k): every platform a league runs on, one row each,
+	 * with its connection and the consent it was made under, whether its lineup is set from here and
+	 * why not, its last read, and its one verb. Disconnect deletes what we keep at once; a platform
+	 * that dropped the connection has its way back in as the solid verb; one not connected opens its
+	 * connect form under the table. Every state is GET /hosts; it reads its own answer. */
+	let hosts = $state<HostConnections | null>(null);
 	let failed = $state(false);
 	let busy = $state(false);
 	let problem = $state<string | null>(null);
 	/** Set once a Disconnect went through: one line says what went. */
 	let disconnected = $state<ConnectedHost | null>(null);
-	/** How many leagues the account follows on each host, null until read or when it cannot be. */
-	let followed = $state<Partial<Record<ConnectedHost, number>> | null>(null);
+	/** The connect or connect-again form opened from a row. */
+	let form = $state<ConnectedHost | null>(null);
+	/** Said once ESPN connected with a session kept not yet proven, in the API's words. */
+	let espnNote = $state<string | null>(null);
 	/** Yahoo's return to this page, said once. */
 	const returned = yahooOutcome(page.url.searchParams);
 
 	function load(): void {
 		hostsApi
 			.connections()
-			.then((hosts) => {
-				connections = hosts.connections;
-				open = {
-					ffpc: ffpcOpen(hosts),
-					yahoo: yahooOpen(hosts),
-					espn: espnOpen(hosts),
-					mfl: mflOpen(hosts)
-				};
+			.then((answer) => {
+				hosts = answer;
+				failed = false;
 			})
 			.catch(() => (failed = true));
-		leagueApi
-			.attached()
-			.then(
-				(list) =>
-					(followed = {
-						ffpc: list.filter((l) => l.host === 'ffpc').length,
-						yahoo: list.filter((l) => l.host === 'yahoo').length,
-						espn: list.filter((l) => l.host === 'espn').length,
-						mfl: list.filter((l) => l.host === 'mfl').length
-					})
-			)
-			.catch(() => (followed = null));
 	}
 
 	onMount(load);
+
+	const rows = $derived(hosts ? platformRows(hosts, new Date()) : []);
 
 	/** What disconnecting deleted, said once it went through. */
 	const GONE: Readonly<Record<ConnectedHost, string>> = {
@@ -91,34 +68,18 @@
 		mfl: 'MyFantasyLeague disconnected. Your MyFantasyLeague session is deleted, and lineups are no longer set there from here.'
 	};
 
-	/** A read's age: "1 minute ago" within a day, its date after. */
-	const DAY_SECONDS = 86_400;
-	function readWhen(at: string): string {
-		const age = Math.max(0, (Date.now() - Date.parse(at)) / 1000);
-		return age < DAY_SECONDS ? agoWords(age) : `on ${dayLabel(at)}`;
-	}
+	/** What we keep for a connected platform, said once under the table. */
+	const KEEPS: Readonly<Partial<Record<ConnectedHost, string>>> = {
+		ffpc: 'FFPC: we sign in as you to read your league and never make a move or a bid. Disconnect deletes your FFPC password and session at once.',
+		espn: `ESPN: ${ESPN_CONSENT}`,
+		mfl: `MyFantasyLeague: ${MFL_CONSENT}`
+	};
 
-	/** "Signed in. Reads your 2 FFPC leagues, last read 1 minute ago." "Signed out by FFPC. Last
-	 * read on Oct 12." "Connected, not yet checked against a private league." */
-	function line(c: HostConnection): string {
-		const when = c.last_read_at ? readWhen(c.last_read_at) : null;
-		const count = followed?.[c.host] ?? 0;
-		const status = statusWords(c);
-		const reads =
-			c.status === 'connected' && count > 0
-				? `Reads your ${plural(count, `${hostWords(c.host)} league`)}`
-				: null;
-		if (reads) return `${status}. ${reads}${when ? `, last read ${when}` : ''}.`;
-		return `${status}.${when ? ` Last read ${when}.` : ''}`;
-	}
-
-	async function disconnect(gone: HostConnection): Promise<void> {
+	async function act(step: () => Promise<void>): Promise<void> {
 		busy = true;
 		problem = null;
 		try {
-			await disconnectHost(gone.host);
-			connections = (connections ?? []).filter((c) => c !== gone);
-			disconnected = gone.host;
+			await step();
 		} catch (error) {
 			problem = error instanceof ApiError ? error.message : 'That did not go through. Try again.';
 		} finally {
@@ -126,183 +87,278 @@
 		}
 	}
 
-	function connectionOf(host: ConnectedHost): HostConnection | undefined {
-		return (connections ?? []).find((c) => c.host === host);
-	}
-
-	/** A host dropped the connection here, so the way back in shows. */
-	const ffpcAgain = $derived(open.ffpc && connectionOf('ffpc')?.status === 'signed_out');
-	const yahooAgain = $derived(open.yahoo && connectionOf('yahoo')?.status === 'signed_out');
-	const espnAgain = $derived(open.espn && connectionOf('espn')?.status === 'signed_out');
-	/** ESPN's connect form, opened from its row. */
-	let espnForm = $state(false);
-	/** Said once ESPN connected with a session kept not yet proven, in the API's words. */
-	let espnNote = $state<string | null>(null);
-
-	/** ESPN connected here: the form closes, the note shows, and the list reads again. */
-	function espnConnected(answer: HostConnected): void {
-		espnForm = false;
-		espnNote = answer.note ?? null;
+	function connected(answer?: HostConnected): void {
+		form = null;
+		espnNote = answer?.note ?? null;
 		load();
 	}
 
-	/** Open Yahoo's own sign-in from its row. */
-	async function connectYahoo(): Promise<void> {
-		busy = true;
-		problem = null;
-		try {
-			await goToYahoo();
-		} catch (error) {
-			problem = error instanceof ApiError ? error.message : 'That did not go through. Try again.';
-			busy = false;
+	function hostOf(key: Platform): ConnectedHost | null {
+		return key === 'sleeper' ? null : key;
+	}
+
+	/** A row's verb: disconnect at once, open Yahoo's own sign-in, or open the row's form. */
+	function run(row: PlatformRow): void {
+		const host = hostOf(row.key);
+		if (host === null || row.verb === null) return;
+		if (row.verb.kind === 'disconnect') {
+			void act(async () => {
+				await disconnectHost(host);
+				disconnected = host;
+				load();
+			});
+			return;
 		}
+		if (host === 'yahoo' && row.verb.kind === 'connect') {
+			void act(() => goToYahoo());
+			return;
+		}
+		form = form === host ? null : host;
 	}
 
-	/** Yahoo is open and not connected: its row connects it. */
-	const yahooNew = $derived(open.yahoo && connections !== null && !connectionOf('yahoo'));
-	/** ESPN is open and not connected: one verb connects it. */
-	const espnNew = $derived(open.espn && connections !== null && !connectionOf('espn'));
-	/** MyFantasyLeague is open and not connected: its row opens its form. */
-	const mflNew = $derived(open.mfl && connections !== null && !connectionOf('mfl'));
-	const mflAgain = $derived(open.mfl && connectionOf('mfl')?.status === 'signed_out');
-	/** MyFantasyLeague's connect form, opened from its row. */
-	let mflForm = $state(false);
-
-	/** MyFantasyLeague connected here: the form closes and the list reads again. */
-	function mflConnected(): void {
-		mflForm = false;
-		load();
-	}
-	const anyOpen = $derived(open.ffpc || open.yahoo || open.espn || open.mfl);
-	/** The section shows once there is something to say or a host to connect. */
-	const shown = $derived(
-		failed ||
-			disconnected !== null ||
-			returned !== null ||
-			(connections !== null && (connections.length > 0 || anyOpen))
+	const keeps = $derived(
+		(hosts?.connections ?? []).flatMap((c) => {
+			const words = KEEPS[c.host];
+			return c.status === 'connected' && words ? [words] : [];
+		})
 	);
 </script>
 
-{#if shown}
-	<section aria-label="Connected accounts">
-		<PanelHead title="Connected accounts" level={2} />
-		{#if returned}
-			<p class={returned.connected ? 'done' : 'note'} role="status">{returned.words}</p>
-			{#if returned.connected}
-				<div class="again">
-					<Quiet href={links.leagueNew('yahoo')}>Follow a Yahoo league</Quiet>
-				</div>
-			{/if}
+<section class="platforms" aria-label={PLATFORM_WORDS.title}>
+	<div class="sec-h">
+		<h2>{PLATFORM_WORDS.title}</h2>
+		<span>{PLATFORM_WORDS.aside}</span>
+	</div>
+	{#if returned}
+		<p class={returned.connected ? 'done' : 'note'} role="status">{returned.words}</p>
+	{/if}
+	{#if disconnected}<p class="done" role="status">{GONE[disconnected]}</p>{/if}
+	{#if espnNote}<p class="done" role="status">{espnNote}</p>{/if}
+	{#if failed}
+		<p class="note">{PLATFORM_WORDS.unread}</p>
+	{:else if hosts}
+		<table class="set">
+			<colgroup>
+				<col class="c-name" />
+				<col />
+				<col class="c-wr" />
+				<col class="c-read" />
+				<col class="c-act" />
+			</colgroup>
+			<thead>
+				<tr>
+					<th scope="col">{PLATFORM_WORDS.platform}</th>
+					<th scope="col">{PLATFORM_WORDS.connection}</th>
+					<th scope="col">{PLATFORM_WORDS.lineups}</th>
+					<th scope="col">{PLATFORM_WORDS.lastRead}</th>
+					<th scope="col"><span class="sr">Verb</span></th>
+				</tr>
+			</thead>
+			<tbody>
+				{#each rows as row (row.key)}
+					<tr class:bad={row.dot === 'bad'}>
+						<th scope="row" class="name">{row.name}</th>
+						<td class="wide">
+							<span class="st"
+								><b><span class="dot {row.dot}" aria-hidden="true"></span>{row.state}</b><span
+									class:keep={row.writes !== null}>{row.line}</span
+								></span
+							>
+						</td>
+						{#if row.note}
+							<td class="wide note-cell" colspan="2">{row.note}</td>
+						{:else}
+							<td class="wide">
+								{#if row.writes}
+									<span class="wcell"
+										><span class="wr" class:on={row.writes.on}
+											>{row.writes.on ? PLATFORM_WORDS.on : PLATFORM_WORDS.off}</span
+										><span>{row.writes.words}</span></span
+									>
+								{:else}<span class="none">{PLATFORM_WORDS.never}</span>{/if}
+							</td>
+							<td class="read"><span class="ph-only">Last read&nbsp;</span>{row.read}</td>
+						{/if}
+						<td class="act">
+							{#if row.verb?.kind === 'follow'}
+								<Quiet size="sm" href={links.leagueNew()}>{row.verb.words}</Quiet>
+							{:else if row.verb?.kind === 'again'}
+								<Verb size="sm" onclick={() => run(row)}>{row.verb.words}</Verb>
+							{:else if row.verb?.kind === 'connect' && row.key === 'ffpc'}
+								<Quiet size="sm" href={links.leagueNew('ffpc')}>{row.verb.words}</Quiet>
+							{:else if row.verb}
+								<Quiet size="sm" disabled={busy} onclick={() => run(row)}>{row.verb.words}</Quiet>
+							{/if}
+						</td>
+					</tr>
+				{/each}
+			</tbody>
+		</table>
+		{#if form === 'espn'}
+			<div class="form">
+				<ESPNConnect
+					label={rows.find((r) => r.key === 'espn')?.verb?.kind === 'again'
+						? 'Connect ESPN again'
+						: 'Connect ESPN'}
+					onconnected={connected}
+				/>
+			</div>
+		{:else if form === 'mfl'}
+			<div class="form">
+				<MFLConnect
+					label={rows.find((r) => r.key === 'mfl')?.verb?.kind === 'again'
+						? 'Connect MyFantasyLeague again'
+						: 'Connect MyFantasyLeague'}
+					onconnected={() => connected()}
+				/>
+			</div>
+		{:else if form === 'ffpc'}
+			<div class="form"><FFPCSignIn onconnected={load} /></div>
+		{:else if form === 'yahoo'}
+			<div class="form"><YahooConnect label="Connect Yahoo again" /></div>
 		{/if}
-		{#if failed}
-			<p class="note">Your connected accounts can't be read right now.</p>
-		{:else}
-			{#if disconnected}
-				<p class="done" role="status">{GONE[disconnected]}</p>
-			{/if}
-			{#if connections && connections.length > 0}
-				<ActionRows label="Connected accounts">
-					{#each connections as c (c.host)}
-						<ActionRow lead={hostWords(c.host)} text={line(c)}>
-							{#snippet action()}
-								<Quiet size="sm" disabled={busy} onclick={() => void disconnect(c)}
-									>{busy ? 'Disconnecting' : 'Disconnect'}</Quiet
-								>
-							{/snippet}
-						</ActionRow>
-					{/each}
-				</ActionRows>
-				{#if ffpcAgain}
-					<div class="again"><FFPCSignIn onconnected={load} /></div>
-				{:else if connectionOf('ffpc')}
-					<p class="note">
-						We sign in to FFPC as you to read your league. We never make a move or a bid. Disconnect
-						deletes your FFPC password and session at once.
-					</p>
-				{/if}
-				{#if yahooAgain}
-					<div class="again"><YahooConnect label="Connect Yahoo again" /></div>
-				{/if}
-				{#if espnAgain}
-					<div class="again">
-						<ESPNConnect label="Connect ESPN again" onconnected={espnConnected} />
-					</div>
-				{:else if connectionOf('espn')}
-					{#if espnNote}<p class="done" role="status">{espnNote}</p>{/if}
-					<p class="note">{ESPN_CONSENT}</p>
-				{/if}
-				{#if mflAgain}
-					<div class="again">
-						<MFLConnect label="Connect MyFantasyLeague again" onconnected={mflConnected} />
-					</div>
-				{:else if connectionOf('mfl')}
-					<p class="note">{MFL_CONSENT}</p>
-				{/if}
-			{:else if anyOpen && !yahooNew && !espnNew && !mflNew}
-				<EmptyState level={3} title="No connected accounts">
-					{#snippet actions()}{@render follow()}{/snippet}
-				</EmptyState>
-			{/if}
-			{#if yahooNew || espnNew || mflNew}
-				<ActionRows label="Hosts to connect">
-					{#if yahooNew}
-						<ActionRow lead="Yahoo" text="Not connected. Connect to follow your Yahoo leagues.">
-							{#snippet action()}
-								<Quiet size="sm" disabled={busy} onclick={() => void connectYahoo()}>Connect</Quiet>
-							{/snippet}
-						</ActionRow>
-					{/if}
-					{#if espnNew}
-						<ActionRow
-							lead="ESPN"
-							text="Not connected. Connect to follow your ESPN leagues, public or private."
-						>
-							{#snippet action()}
-								<Quiet size="sm" onclick={() => (espnForm = !espnForm)}>Connect</Quiet>
-							{/snippet}
-						</ActionRow>
-					{/if}
-					{#if mflNew}
-						<ActionRow
-							lead="MyFantasyLeague"
-							text="Not connected. Connect to set your lineup on MyFantasyLeague from here."
-						>
-							{#snippet action()}
-								<Quiet size="sm" onclick={() => (mflForm = !mflForm)}>Connect</Quiet>
-							{/snippet}
-						</ActionRow>
-					{/if}
-				</ActionRows>
-				{#if espnNew && espnForm}
-					<div class="again"><ESPNConnect onconnected={espnConnected} /></div>
-				{/if}
-				{#if mflNew && mflForm}
-					<div class="again"><MFLConnect onconnected={mflConnected} /></div>
-				{/if}
-			{/if}
-			{#if problem}<ProblemLine>{problem}</ProblemLine>{/if}
-			{#if disconnected === 'ffpc' && open.ffpc}<div class="again">{@render follow()}</div>{/if}
+		{#if problem}<ProblemLine>{problem}</ProblemLine>{/if}
+		{#if keeps.length > 0}
+			<div class="keeps">
+				{#each keeps as said (said)}<p>{said}</p>{/each}
+			</div>
 		{/if}
-	</section>
-{/if}
-
-{#snippet follow()}
-	{#if open.ffpc}<Quiet href={links.leagueNew('ffpc')}>Follow an FFPC league</Quiet>{/if}
-{/snippet}
+	{/if}
+</section>
 
 <style>
 	.note,
 	.done {
-		margin: var(--s-2) 0 0;
-		max-width: 60ch;
+		margin: 0 0 var(--s-2);
+		max-width: 70ch;
+		font-size: var(--t-sm);
 	}
 
 	.note {
-		font-size: var(--t-sm);
 		color: var(--ink-2);
 	}
 
-	.again {
+	.form {
 		margin-top: var(--s-3);
+	}
+
+	.keeps {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+		margin-top: var(--s-2);
+	}
+
+	.keeps p {
+		margin: 0;
+		font-size: var(--t-xs);
+		color: var(--ink-3);
+		max-width: 110ch;
+	}
+
+	.c-name {
+		width: 170px;
+	}
+
+	.c-wr {
+		width: 240px;
+	}
+
+	.note-cell {
+		color: var(--ink-2);
+	}
+
+	/* A connection's dates and consent hold on one line at a desk. */
+	@media (min-width: 1181px) {
+		.keep {
+			white-space: nowrap;
+		}
+	}
+
+	.c-read {
+		width: 120px;
+	}
+
+	.c-act {
+		width: 180px;
+	}
+
+	.name {
+		font-weight: 600;
+		text-align: left;
+	}
+
+	.wcell {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 3px;
+	}
+
+	.wcell > span:last-child {
+		font-size: var(--t-xs);
+		color: var(--ink-3);
+	}
+
+	.wr {
+		display: inline-flex;
+		align-items: center;
+		height: 22px;
+		padding: 0 8px;
+		border-radius: var(--r-sm);
+		border: 1px solid var(--line-strong);
+		font-size: var(--t-xs);
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: var(--track-label);
+		color: var(--ink-2);
+	}
+
+	.wr.on {
+		border-color: transparent;
+		background: var(--gain-bg);
+		color: var(--gain-ink);
+	}
+
+	.dot {
+		display: inline-block;
+		width: 8px;
+		height: 8px;
+		margin-right: 6px;
+		border-radius: 50%;
+		vertical-align: 1px;
+		background: var(--gain-ink);
+	}
+
+	.dot.bad {
+		background: var(--loss-ink);
+	}
+
+	.dot.off {
+		background: transparent;
+		border: 1.5px solid var(--ink-3);
+	}
+
+	tr.bad td,
+	tr.bad th {
+		background: color-mix(in srgb, var(--loss-bg) 45%, transparent);
+	}
+
+	tr.bad th {
+		box-shadow: inset 3px 0 0 var(--loss-ink);
+	}
+
+	/* A row folded into a card is tinted whole. */
+	@media (max-width: 900px) {
+		tr.bad {
+			background: color-mix(in srgb, var(--loss-bg) 45%, transparent);
+			box-shadow: inset 3px 0 0 var(--loss-ink);
+		}
+
+		tr.bad td,
+		tr.bad th {
+			background: none;
+			box-shadow: none;
+		}
 	}
 </style>

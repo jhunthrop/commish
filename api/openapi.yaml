@@ -102,6 +102,27 @@ paths:
         "200": { $ref: "#/components/responses/AccountResponse" }
         "400": { $ref: "#/components/responses/ErrorResponse" }
         "409": { $ref: "#/components/responses/ErrorResponse" }
+  /me/week:
+    get:
+      tags: [league-sync]
+      operationId: memberWeek
+      summary: >-
+        The front door's week (Lane 66k): for every league the account follows, newest first, its own score bug (the
+        League page's game for the member's team, with both teams), the lineup's changes and what they add, and up to
+        three facts about the member's roster, each from the reads the in-season routes already make. The front door
+        reads this once and makes no other in-season read. A league whose read fails stays on the list with problem
+        saying why.
+      security: [{ session: [] }]
+      responses:
+        "200":
+          description: the account's leagues this week
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - properties: { data: { $ref: "#/components/schemas/MemberWeek" } }
+        "401": { $ref: "#/components/responses/ErrorResponse" }
   /season:
     get:
       tags: [auth]
@@ -3209,7 +3230,7 @@ components:
         seat_by_username: { type: boolean, description: whether the host finds a seat by username (Sleeper does) }
     AttachedLeague:
       type: object
-      required: [id, host, host_league_id, season, name, roster_id, team_name, standing, attached_at, phase, phase_basis, draft_at, playoff_start_week, waivers_open]
+      required: [id, host, host_league_id, season, name, roster_id, team_name, standing, attached_at, last_read_at, phase, phase_basis, draft_at, playoff_start_week, waivers_open]
       properties:
         id: { type: string, format: uuid }
         host: { $ref: "#/components/schemas/LeagueHost" }
@@ -3223,6 +3244,7 @@ components:
           nullable: true
           description: the drafter's record and place at the last read, null when unread
         attached_at: { type: string, format: date-time }
+        last_read_at: { type: string, format: date-time, nullable: true, description: "the league's last host read for this account, null when never read" }
         phase: { $ref: "#/components/schemas/LeaguePhase" }
         phase_basis: { type: string, description: "one sentence naming the fact the phase came from, in the site's words" }
         draft_at: { type: string, format: date-time, nullable: true, description: "the host's draft time, null when the host does not say" }
@@ -3380,7 +3402,7 @@ components:
           type: number
           format: double
           nullable: true
-          description: the host's score for him so far, from the matchup, when he starts there and his game has kicked off
+          description: the host's score for him so far, from the matchup, when he starts there and his game has kicked off, to the tenth
         last_games:
           type: array
           description: up to three completed games under the league's scoring, newest first
@@ -3489,7 +3511,7 @@ components:
           format: double
           nullable: true
           description: >-
-            his points this week on the week's published projection, to the cent, in the format the league's scoring is
+            his points this week on the week's published projection, to the tenth (the site's one rounding, half away from zero), in the format the league's scoring is
             most like (PPR, half PPR or standard); a team defense's by its club, a kicker our board does not place (no board id) by his club's one kicker, never a teammate's for a kicker the snapshot left out. The newest snapshot stored for the
             league's week (projection_read_at says when). Null when his club has no game that week (a bye), whatever the snapshot holds, and when the snapshot has no row for him or none is stored.
             Our own weekly model replaces it when it passes its test
@@ -3498,7 +3520,7 @@ components:
           format: double
           nullable: true
           description: >-
-            week_projection's change since the week's snapshot before the newest, to the cent, in the same format;
+            week_projection's change since the week's snapshot before the newest, to the tenth, in the same format;
             null without a row for him in both snapshots or when week_projection is null
         opp_rank:
           type: integer
@@ -3510,12 +3532,12 @@ components:
           type: number
           format: double
           nullable: true
-          description: his points a game over every completed game this season under the league's scoring, to the cent; null before his first game
+          description: his points a game over every completed game this season under the league's scoring, to the tenth; null before his first game
         last_points:
           type: number
           format: double
           nullable: true
-          description: his points in his last completed game under the league's scoring, to the cent; null before his first game
+          description: his points in his last completed game under the league's scoring, to the tenth; null before his first game
         held: { type: boolean, description: the drafter tags him Hold on a sheet, so he is never a drop or a trade give }
         facts: { $ref: "#/components/schemas/WeekFacts" }
     PlayerWeek:
@@ -3685,7 +3707,7 @@ components:
       required: [roster_id, points, points_read, projection, starters, played]
       properties:
         roster_id: { type: integer }
-        points: { type: number, format: double, description: the side's points so far as the host scores them }
+        points: { type: number, format: double, description: "the side's points so far as the host scores them, to the tenth" }
         points_read: { type: boolean, description: false when the host's score could not be read; points then says nothing }
         projection:
           type: number
@@ -3730,6 +3752,126 @@ components:
           type: array
           description: the drafter's game first, then the rest in the host's order
           items: { $ref: "#/components/schemas/ScoreboardGame" }
+    MemberWeek:
+      type: object
+      required: [leagues]
+      properties:
+        leagues:
+          type: array
+          description: every league the account follows, newest first, as GET /leagues/attached lists them
+          items: { $ref: "#/components/schemas/WeekLeague" }
+    WeekLeague:
+      type: object
+      required: [id, name, host, team_name, standing, phase, week, read_at, projection_read_at, projection_scoring, bug, lineup, chips, problem]
+      properties:
+        id: { type: string, format: uuid, description: the attachment (AttachedLeague.id) }
+        name: { type: string }
+        host: { $ref: "#/components/schemas/LeagueHost" }
+        team_name: { type: string, description: "the member's team at the last read, empty when unread" }
+        standing:
+          allOf: [{ $ref: "#/components/schemas/LeagueStanding" }]
+          nullable: true
+        phase: { $ref: "#/components/schemas/LeaguePhase" }
+        week: { type: integer, description: "the league's current week, 0 when it has none or the read failed" }
+        read_at: { type: string, format: date-time, nullable: true, description: the league's last host read, null when unread }
+        projection_read_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: when the week's published projection the figures read was captured, null with none
+        projection_scoring:
+          allOf: [{ $ref: "#/components/schemas/ProjectionScoring" }]
+          nullable: true
+          description: the scoring the figures' projections are read in, null when the league has no week
+        bug:
+          allOf: [{ $ref: "#/components/schemas/WeekBug" }]
+          nullable: true
+          description: the member's game this week, null when the league has no week, no game, or the read failed
+        lineup:
+          allOf: [{ $ref: "#/components/schemas/WeekLineup" }]
+          nullable: true
+          description: the lineup's changes this week, null when the league has no week or the read failed
+        chips:
+          type: array
+          description: >-
+            at most three facts about the member's roster, in this order where each holds: a starter's designation,
+            a starter on bye, the top pickup
+          items: { $ref: "#/components/schemas/RosterChip" }
+        problem:
+          type: string
+          nullable: true
+          description: one sentence when a read failed or the league has no saved scoring, naming the platform; null otherwise
+    WeekBug:
+      type: object
+      required: [game, teams, first]
+      properties:
+        game: { $ref: "#/components/schemas/ScoreboardGame" }
+        teams:
+          type: array
+          description: the game's teams in the order of its sides, the member's first
+          items: { $ref: "#/components/schemas/LeagueTeam" }
+        first:
+          type: array
+          description: >-
+            the member's starters as the platform holds them whose kickoff is the earliest of theirs still to come,
+            empty when none is
+          items: { $ref: "#/components/schemas/PlayerLine" }
+    WeekLineup:
+      type: object
+      required: [changes, projection, as_set, gain, swaps]
+      properties:
+        changes: { type: integer, description: the starting spots our lineup fills with someone other than the platform holds }
+        projection:
+          type: number
+          format: double
+          nullable: true
+          description: our lineup's starters' week projections summed, each as printed to the tenth; null when none has one
+        as_set:
+          type: number
+          format: double
+          nullable: true
+          description: the lineup as the platform holds it, summed the same way; null when none has one
+        gain:
+          type: number
+          format: double
+          nullable: true
+          description: projection less as_set to the tenth, null when either is null
+        swaps:
+          type: array
+          description: each change, in the league's slot order
+          items: { $ref: "#/components/schemas/WeekSwap" }
+    WeekSwap:
+      type: object
+      required: [slot, in, out]
+      properties:
+        slot: { type: string, enum: [QB, RB, WR, TE, FLEX, SUPERFLEX, K, DEF] }
+        in: { $ref: "#/components/schemas/LeaguePlayer" }
+        out:
+          allOf: [{ $ref: "#/components/schemas/LeaguePlayer" }]
+          nullable: true
+          description: the player the platform starts there, null for a spot left empty
+    RosterChip:
+      type: object
+      required: [kind, line, gain, idle]
+      properties:
+        kind:
+          type: string
+          enum: [status, bye, pickup]
+          description: >-
+            status, a starter as set with this week's designation (the newest); bye, a starter as set on bye whose
+            spot no one on the member's roster can play (never a bye the lineup's changes already fill); pickup, the first pickup worth making as the Waivers
+            screen chooses them, while the league runs waivers
+        line: { $ref: "#/components/schemas/PlayerLine" }
+        gain:
+          type: number
+          format: double
+          nullable: true
+          description: >-
+            a pickup's week_gain (the Waivers strip's first card): this week's Proj the lineup the advice sets gains
+            with him in, one decimal; null on the other kinds
+        idle:
+          type: boolean
+          description: true on a bye (no one on the member's roster can play its spot this week); false on the other kinds
     MatchupBox:
       type: object
       required: [week, read_at, projection_read_at, projection_scoring, sides]
@@ -4573,7 +4715,7 @@ components:
       enum: [connected, signed_out]
     HostConnection:
       type: object
-      required: [host, status, connected_at, last_read_at, proven]
+      required: [host, status, connected_at, last_read_at, proven, consent_version, writes_on, writes_reason]
       properties:
         host: { $ref: "#/components/schemas/ConnectedHost" }
         status: { $ref: "#/components/schemas/HostConnectionStatus" }
@@ -4584,6 +4726,18 @@ components:
             leagues were all public, or ESPN listed none); FFPC and Yahoo prove themselves on connect
         connected_at: { type: string, format: date-time }
         last_read_at: { type: string, format: date-time, nullable: true }
+        consent_version: { type: integer, description: the version of the consent words the member agreed to on connect }
+        writes_on:
+          type: boolean
+          description: >-
+            true when the member's lineup is set on the platform from our screen (the platform takes writes, its switch
+            is on for the account, and the connection agreed to the moves); false otherwise, and writes_reason says why
+        writes_reason:
+          type: string
+          nullable: true
+          description: >-
+            the Account room's one line naming the platform when writes are off (it takes none, its switch is off for
+            the account, connect again, agree to moves, or the check failed), null when on
     HostConnectInput:
       type: object
       required: [email, password, consent]
