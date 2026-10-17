@@ -1,0 +1,722 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Commish Players (Lane 66j mock, dark)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@500;700;800&family=Outfit:wght@400;500;600;700&display=swap">
+<style>
+/* Commish tokens: the Press Box system with two bounded borrowings. One file, both themes.
+   Layout concept: a near-black or paper-white shell, an icon rail on the left, a persistent
+   search across the top, dense rows in the middle, a filter and sheet rail on the right.
+   Borrowed from Scout: a reading serif, allowed on the player page's prose and its pull figures only.
+   Borrowed from Broadcast: the score bug and the lower third, allowed in a live draft room only.
+   Light values live on bare :root. Dark redefines tokens only, twice, so the OS
+   setting and the explicit data-theme toggle both win. */
+
+:root {
+  /* Type. Outfit is the geometric UI face: Poppins's circles with a tighter set width,
+     so a dense row holds "Jaxon Smith-Njigba" at 15px without truncating.
+     Big Shoulders Display is the condensed number face, drawn from stadium and
+     transit lettering, narrow enough that 344.1 fits a 64px cell at display size. */
+  --font-ui: "Outfit", "Outfit Fallback", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --font-num: "Big Shoulders Display", "Big Shoulders Display Fallback", "Oswald", "Arial Narrow", sans-serif;
+  /* Newsreader is the reading face. Optical sizes cut for long screen reading, because the
+     capsule is writing. Allowed on the player page's prose block and its pull figures, nowhere else. */
+  --font-read: "Newsreader", "Newsreader Fallback", "Iowan Old Style", "Charter", Georgia, serif;
+  --t-read: 1.1875rem;  /* 19 capsule prose */
+  --t-pull: 2.75rem;    /* 44 a pull figure, the same step as --t-2xl */
+
+  /* Type scale, 1.2 ratio from a 14px base. Numbers use --font-num at the top three. */
+  --t-xs: 0.6875rem;   /* 11 labels on cells, uppercase, tracked */
+  --t-sm: 0.8125rem;   /* 13 secondary text */
+  --t-md: 0.9375rem;   /* 15 names, body in rows */
+  --t-lg: 1.125rem;    /* 18 section heads, prose */
+  --t-xl: 1.625rem;    /* 26 cell numbers in display face */
+  --t-head: 1.875rem; /* 30 a panel title in the display face */
+  --t-display: 2.375rem; /* 38 a page title in the display face */
+  --t-2xl: 2.75rem;    /* 44 tier cliffs, clock */
+  --t-3xl: 5.5rem;     /* 88 the one big number on a page */
+  --track-label: 0.08em;
+
+  /* Space and shape. Rows are 52px on desktop and 48 on the phone. Radii are small:
+     a press box is glass and steel, not pillows. */
+  --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px; --s-5: 24px; --s-6: 32px; --s-7: 48px;
+  --row-h: 52px;
+  --touch: 44px; /* the smallest target a thumb gets on a phone */
+  --tab-bar-h: 64px; /* the phone's tab bar, the rail laid along the bottom */
+  --rail-w: 84px;
+  --side-w: 296px;
+  --r-sm: 4px; --r-md: 8px; --r-pill: 999px;
+
+  /* Neutrals, light. True paper white with ink that leans a touch warm toward the
+     accent, so the greys read as chosen rather than default. */
+  --bg: #ffffff;
+  --surface: #f8f7f5;
+  --surface-2: #efedea;
+  --line: #e3dfda;
+  --line-strong: #cfc9c2;
+  --ink: #15120f;
+  --ink-2: #48413b;
+  --ink-3: #6b635c;      /* 5.9:1 on --bg */
+  --shell: #ffffff;      /* rail and top bar */
+  --shell-line: #e3dfda;
+
+  /* The one warm accent: burnt orange at hue 20. Streak amber (#E39A0E) sits at 38
+     and reads 2.3:1 as text on white, so it cannot carry a verb in light. This orange
+     holds 5:1 under white text and as text on paper, and stays clear of every tier hue.
+     It marks three things only: the brand, the one solid verb, and you. */
+  --accent: #c2470a;
+  --accent-ink: #ffffff;       /* text on an accent fill */
+  --accent-text: #b03f06;      /* accent used as text on --bg */
+  --accent-wash: #fdebe0;      /* your rows, your picks */
+  --focus: #c2470a;
+
+  /* Magnitude. Over replacement is tinted by the round it would go in on our board
+     of 400 (1 to 4, then none). Below replacement takes the rose wash and a minus. */
+  --heat-1: #a6e3bd;
+  --heat-2: #c8eed5;
+  --heat-3: #e0f5e7;
+  --heat-4: #f0faf3;
+  --heat-neg: #fbe1e4;
+  --heat-ink: #15120f;
+
+  /* Drafters versus us. Later is a gain for you, earlier is a cost. Always with the word. */
+  --gain-bg: #dcf3e4; --gain-ink: #11663a;
+  --loss-bg: #fbe1e4; --loss-ink: #a3243a;
+  /* A player's status on his face: injured reserve, a solid tag at the photo's top left. */
+  --status-ir-bg: #a3243a; --status-ir-ink: #ffffff;
+
+  /* Tiers run hot to cold down the board. Each band's label carries the tier number
+     and the drop to the next tier, so the colour is never the only channel. */
+  --tier-1: #c62a47;
+  --tier-2: #b8287f;
+  --tier-3: #7a3cb0;
+  --tier-4: #3a55b4;
+  --tier-5: #0f6f99;
+  --tier-6: #0b7a68;
+  --tier-7: #5b5a65;
+  --tier-ink: #ffffff;
+  --tier-wash: 9%;   /* how much of the tier hue tints its band */
+
+  /* The scoreboard: a lit board on black in both themes. In Commish it carries the draft room's
+     score bug and lower third, and nothing outside a live draft. The orange on it is the dark-theme
+     accent, so the brand reads the same on the board in either theme. */
+  --scoreboard: #15120f;
+  --scoreboard-2: #221d19;     /* a raised segment of the bug */
+  --scoreboard-line: #3a332d;  /* dividers between segments */
+  --scoreboard-ink: #f5f0ea;
+  --scoreboard-ink-2: #b9b0a7; /* labels on the board */
+  --scoreboard-num: #ff7130;
+  --scoreboard-num-ink: #170802; /* text on an orange segment of the bug */
+
+  --shadow-pop: 0 1px 2px rgb(21 18 15 / 0.06), 0 8px 24px rgb(21 18 15 / 0.08);
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #090807; --surface: #12100e; --surface-2: #1b1815; --line: #29241f; --line-strong: #3a332d;
+    --ink: #f5f0ea; --ink-2: #b9b0a7; --ink-3: #8f857c; --shell: #050404; --shell-line: #1e1a17;
+    --accent: #ff7130; --accent-ink: #170802; --accent-text: #ff8a4f; --accent-wash: #2a160b; --focus: #ff8a4f;
+    --heat-1: #1d6a3e; --heat-2: #17502f; --heat-3: #133a23; --heat-4: #10261a; --heat-neg: #43191f; --heat-ink: #f5f0ea;
+    --gain-bg: #12341f; --gain-ink: #6fdc99; --loss-bg: #3a161c; --loss-ink: #ff8f9f; --status-ir-bg: #ff8f9f; --status-ir-ink: #1a0a0d;
+    --tier-1: #cf3350; --tier-2: #c0338a; --tier-3: #8d52cc; --tier-4: #4b6ad6; --tier-5: #12789f; --tier-6: #0e8070; --tier-7: #6c6b78;
+    --tier-ink: #ffffff; --tier-wash: 16%;
+    --scoreboard: #000000; --scoreboard-2: #15120f; --scoreboard-line: #29241f; --scoreboard-ink: #f5f0ea; --scoreboard-ink-2: #b9b0a7; --scoreboard-num: #ff7130; --scoreboard-num-ink: #170802;
+    --shadow-pop: 0 1px 2px rgb(0 0 0 / 0.5), 0 10px 30px rgb(0 0 0 / 0.5);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #090807; --surface: #12100e; --surface-2: #1b1815; --line: #29241f; --line-strong: #3a332d;
+  --ink: #f5f0ea; --ink-2: #b9b0a7; --ink-3: #8f857c; --shell: #050404; --shell-line: #1e1a17;
+  --accent: #ff7130; --accent-ink: #170802; --accent-text: #ff8a4f; --accent-wash: #2a160b; --focus: #ff8a4f;
+  --heat-1: #1d6a3e; --heat-2: #17502f; --heat-3: #133a23; --heat-4: #10261a; --heat-neg: #43191f; --heat-ink: #f5f0ea;
+  --gain-bg: #12341f; --gain-ink: #6fdc99; --loss-bg: #3a161c; --loss-ink: #ff8f9f; --status-ir-bg: #ff8f9f; --status-ir-ink: #1a0a0d;
+  --tier-1: #cf3350; --tier-2: #c0338a; --tier-3: #8d52cc; --tier-4: #4b6ad6; --tier-5: #12789f; --tier-6: #0e8070; --tier-7: #6c6b78;
+  --tier-ink: #ffffff; --tier-wash: 16%;
+    --scoreboard: #000000; --scoreboard-2: #15120f; --scoreboard-line: #29241f; --scoreboard-ink: #f5f0ea; --scoreboard-ink-2: #b9b0a7; --scoreboard-num: #ff7130; --scoreboard-num-ink: #170802;
+  --shadow-pop: 0 1px 2px rgb(0 0 0 / 0.5), 0 10px 30px rgb(0 0 0 / 0.5);
+  color-scheme: dark;
+}
+
+
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-ui);font-size:var(--t-md);line-height:1.4;
+  -webkit-font-smoothing:antialiased}
+a{color:inherit}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.num{font-family:var(--font-num);font-variant-numeric:tabular-nums;letter-spacing:0.01em}
+.label{font-size:var(--t-xs);text-transform:uppercase;letter-spacing:var(--track-label);color:var(--ink-3);font-weight:500}
+.app{display:grid;grid-template-columns:var(--rail-w) minmax(0,1fr);min-height:100vh}
+.rail{position:sticky;top:0;height:100vh;background:var(--shell);border-right:1px solid var(--shell-line);
+  display:flex;flex-direction:column;align-items:stretch;gap:var(--s-1);padding-block:var(--s-4)}
+.mark{display:grid;place-items:center;height:56px;margin-bottom:var(--s-3);text-decoration:none}
+.mark b{font-family:var(--font-num);font-weight:800;font-size:30px;line-height:1;color:var(--ink);
+  border-bottom:4px solid var(--accent);padding-bottom:2px}
+.rail a.item{display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 4px;text-decoration:none;
+  color:var(--ink-3);font-size:var(--t-xs);font-weight:500;text-align:center;border-left:3px solid transparent}
+.rail a.item:hover{color:var(--ink)}
+.rail a.item[aria-current="page"]{color:var(--accent-text);border-left-color:var(--accent)}
+.rail .spacer{flex:1}
+.main{min-width:0;display:flex;flex-direction:column}
+.top{position:sticky;top:0;z-index:5;background:var(--shell);border-bottom:1px solid var(--shell-line);
+  display:flex;align-items:center;gap:var(--s-4);padding:var(--s-3) var(--s-5);min-height:68px}
+.top h1{margin:0;font-size:var(--t-lg);font-weight:700;white-space:nowrap}
+.search{flex:1;max-width:620px;display:flex;align-items:center;gap:var(--s-2);height:42px;padding:0 var(--s-3);
+  border:1px solid var(--line-strong);border-radius:var(--r-md);background:var(--surface);color:var(--ink-3)}
+.search input{flex:1;min-width:0;border:0;background:transparent;font:inherit;color:var(--ink);outline:none}
+.search input::placeholder{color:var(--ink-3)}
+.search kbd{font-family:var(--font-ui);font-size:var(--t-xs);border:1px solid var(--line-strong);border-radius:var(--r-sm);padding:1px 6px}
+.top .tail{margin-left:auto;display:flex;align-items:center;gap:var(--s-3)}
+.quiet{display:inline-flex;align-items:center;gap:6px;height:38px;padding:0 var(--s-3);border-radius:var(--r-md);
+  border:1px solid var(--line-strong);background:transparent;cursor:pointer;font-size:var(--t-sm);font-weight:500;color:var(--ink-2);text-decoration:none}
+.quiet:hover{color:var(--ink);border-color:var(--ink-3)}
+.theme{display:flex;gap:2px;padding:3px;border:1px solid var(--line-strong);border-radius:var(--r-md);background:var(--surface)}
+.theme button{height:30px;padding:0 10px;border:0;border-radius:var(--r-sm);background:transparent;cursor:pointer;
+  font-size:var(--t-sm);font-weight:500;color:var(--ink-2)}
+.theme button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.verb{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:42px;padding:0 var(--s-5);
+  border:0;border-radius:var(--r-md);background:var(--accent);color:var(--accent-ink);font-weight:700;font-size:var(--t-md);
+  cursor:pointer;text-decoration:none;white-space:nowrap}
+.verb:hover{filter:brightness(1.06)}
+.chips{display:flex;flex-wrap:wrap;gap:var(--s-2);align-items:center}
+.chip{height:32px;padding:0 var(--s-3);border-radius:var(--r-pill);border:1px solid var(--line-strong);background:transparent;
+  font-size:var(--t-sm);font-weight:500;color:var(--ink-2);cursor:pointer;white-space:nowrap}
+.chip[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--bg)}
+.chip-group{display:flex;gap:4px;padding:3px;border:1px solid var(--line);border-radius:var(--r-pill);background:var(--surface)}
+.chip-group .chip{border-color:transparent;height:28px}
+.face{flex:none;border-radius:50%;background:var(--surface-2);overflow:hidden;display:grid;place-items:end center}
+.face img{width:140%;max-width:none;height:auto;display:block;transform:translateY(6%)}
+.pos{display:inline-flex;align-items:center;height:20px;padding:0 7px;border-radius:var(--r-sm);
+  background:var(--surface-2);color:var(--ink);font-size:var(--t-xs);font-weight:700;letter-spacing:0.04em;white-space:nowrap}
+.tier-chip{display:inline-flex;align-items:center;height:20px;padding:0 7px;border-radius:var(--r-sm);
+  color:var(--tier-ink);font-size:var(--t-xs);font-weight:700;letter-spacing:0.04em}
+.t1{--tier:var(--tier-1)}.t2{--tier:var(--tier-2)}.t3{--tier:var(--tier-3)}.t4{--tier:var(--tier-4)}
+.t5{--tier:var(--tier-5)}.t6{--tier:var(--tier-6)}.t7{--tier:var(--tier-7)}
+.tier-chip{background:var(--tier)}
+.heat-1{background:var(--heat-1)}.heat-2{background:var(--heat-2)}.heat-3{background:var(--heat-3)}
+.heat-4{background:var(--heat-4)}.heat-neg{background:var(--heat-neg)}.heat-0{background:transparent}
+.gap{display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:var(--r-sm);font-size:var(--t-sm);font-weight:600;white-space:nowrap}
+.gap.later{background:var(--gain-bg);color:var(--gain-ink)}
+.gap.earlier{background:var(--loss-bg);color:var(--loss-ink)}
+.gap.even{background:var(--surface-2);color:var(--ink-2)}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md)}
+@media (max-width: 760px){
+  :root{--row-h:48px}
+  .app{grid-template-columns:minmax(0,1fr);padding-bottom:64px}
+  .rail{position:fixed;inset:auto 0 0 0;top:auto;height:auto;z-index:20;flex-direction:row;justify-content:space-around;
+    padding:4px 4px calc(4px + env(safe-area-inset-bottom,0px));border-right:0;border-top:1px solid var(--shell-line)}
+  .rail .mark,.rail .spacer,.rail a.item.wide-only{display:none}
+  .rail a.item{border-left:0;border-top:3px solid transparent;padding:6px 2px;flex:1}
+  .rail a.item[aria-current="page"]{border-top-color:var(--accent)}
+  .top{padding:var(--s-2) var(--s-4);gap:var(--s-2);flex-wrap:wrap;min-height:0}
+  .top h1{display:none}
+  .top .search{order:3;flex-basis:100%;max-width:none;height:38px}
+  .top .tail{margin-left:auto}
+  .search kbd{display:none}
+  .theme button{height:26px;padding:0 7px;font-size:var(--t-xs)}
+}
+/* The league switch closes the top bar at the right on every width: the selected league's name (or
+   the format with none) at one width, so the bar never moves when the name arrives. */
+.switch{position:relative;display:flex;flex:none;min-width:0}
+.switch>button{display:inline-flex;align-items:center;gap:var(--s-2);width:232px;height:40px;padding:0 var(--s-3);
+  border:1px solid var(--line-strong);border-radius:var(--r-md);background:var(--surface);font-size:var(--t-sm);
+  font-weight:600;text-align:left;cursor:pointer}
+.switch>button[aria-expanded="true"]{border-color:var(--ink)}
+.switch>button .flag{display:inline-flex;color:var(--accent-text)}
+.switch>button .words{flex:1;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.switch>button .chev{display:inline-flex;color:var(--ink-3)}
+.switch-menu{position:absolute;top:calc(100% + var(--s-2));right:0;z-index:30;width:360px;display:flex;flex-direction:column;
+  gap:var(--s-3);padding:var(--s-3);border:1px solid var(--line-strong);border-radius:var(--r-md);background:var(--bg);
+  box-shadow:var(--shadow-pop)}
+.switch-menu .lg{display:flex;flex-direction:column;gap:2px;width:100%;padding:var(--s-2) var(--s-3);border:0;
+  border-left:3px solid transparent;border-radius:var(--r-sm);background:none;text-align:left;cursor:pointer}
+.switch-menu .lg[aria-pressed="true"]{border-left-color:var(--accent);background:var(--surface)}
+.switch-menu .lg b{font-weight:600}
+.switch-menu .lg small{font-size:var(--t-sm);color:var(--ink-2)}
+.switch-menu .foot{display:flex;flex-direction:column;align-items:flex-start;gap:var(--s-2);padding-top:var(--s-3);
+  border-top:1px solid var(--line)}
+@media (max-width: 760px){
+  .top .switch{order:2;flex:1}
+  .top .switch>button{width:100%}
+  .switch-menu{position:fixed;top:60px;left:var(--s-3);right:var(--s-3);width:auto}
+}
+@media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
+
+
+
+.top .quiet{font-weight:600;color:var(--ink)}
+.mx{display:flex;flex-direction:column;gap:var(--s-4);padding:var(--s-4) var(--s-5) var(--s-7)}
+.mocknote{margin:0;padding:var(--s-2) var(--s-3);border:1px dashed var(--line-strong);border-radius:var(--r-md);font-size:var(--t-xs);color:var(--ink-3);line-height:1.5}
+.si{text-decoration:underline dotted;text-decoration-color:color-mix(in srgb,currentColor 55%,transparent);text-underline-offset:3px;text-decoration-thickness:1.5px}
+.title h2{margin:0;font-family:var(--font-num);font-weight:800;font-size:var(--t-display);line-height:1;text-transform:uppercase;letter-spacing:.01em}
+.title .lede{margin:6px 0 0;font-size:var(--t-sm);color:var(--ink-3)}
+.tabs{align-self:flex-start}
+.tabs .chip{display:inline-flex;align-items:center;text-decoration:none;color:var(--ink-2)}
+.tabs .chip[aria-pressed]{background:var(--ink);color:var(--bg)}
+
+/* The decision strip: the week, the count, the swaps as chips, the gain, one verb. */
+.decide{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;align-items:center;gap:var(--s-5);
+  padding:var(--s-3) var(--s-4);border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:var(--r-md);background:var(--surface)}
+.d-head{display:flex;flex-direction:column;gap:2px}
+.d-wk{font-size:var(--t-xs);font-weight:700;text-transform:uppercase;letter-spacing:var(--track-label);color:var(--accent-text)}
+.d-head h3{margin:0;font-family:var(--font-num);font-weight:800;font-size:var(--t-head);line-height:1;text-transform:uppercase;letter-spacing:.01em;white-space:nowrap}
+.swaps{display:flex;flex-wrap:wrap;gap:var(--s-2);margin:0;padding:0;list-style:none}
+.swap{display:inline-flex;align-items:center;gap:var(--s-2);height:34px;padding:0 var(--s-3) 0 4px;border:1px solid var(--line-strong);border-radius:var(--r-pill);background:var(--bg);font-size:var(--t-sm);white-space:nowrap}
+.sw-slot{display:grid;place-items:center;height:26px;min-width:34px;padding:0 6px;border-radius:var(--r-pill);background:var(--surface-2);font-family:var(--font-num);font-weight:700;font-size:var(--t-sm);letter-spacing:.03em}
+.sw-in,.sw-out{display:inline-flex;align-items:center;gap:3px}
+.sw-in{font-weight:700;color:var(--ink)}
+.sw-in svg{color:var(--accent-text)}
+.sw-out{color:var(--ink-3)}
+.d-sum{display:flex;flex-direction:column;align-items:flex-end;gap:2px;white-space:nowrap}
+.d-sum b{font-family:var(--font-num);font-weight:800;font-size:var(--t-xl);line-height:1;color:var(--accent-text);font-variant-numeric:tabular-nums}
+.d-sum span{font-size:var(--t-xs);color:var(--ink-3);font-variant-numeric:tabular-nums}
+.d-sum em{font-style:normal;font-weight:700;color:var(--gain-ink)}
+.d-act{display:flex;flex-direction:column;align-items:flex-end;gap:4px}
+.d-rec{font-size:var(--t-xs);color:var(--ink-3)}
+
+/* The lineup table: one table, starters, Totals, bench, injured reserve. */
+.lineup{width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);overflow:hidden}
+.c-slot{width:72px}.c-game{width:236px}.c-proj{width:72px}.c-pts{width:60px}.c-rk{width:92px}.c-ev{width:64px}.c-dl{width:72px}.c-op{width:44px}
+.lineup th,.lineup td{padding:0 var(--s-2);border-bottom:1px solid var(--line);vertical-align:middle}
+.lineup tr.cols th{height:32px;font-size:var(--t-xs);font-weight:600;text-transform:uppercase;letter-spacing:var(--track-label);color:var(--ink-3);text-align:left;background:var(--bg);white-space:nowrap}
+.lineup th.n,.lineup td.n{text-align:right}
+.lineup th.ev:first-of-type,.lineup .rkc{padding-left:var(--s-4)}
+.lineup tbody tr{height:var(--row-h)}
+.lineup tbody tr:not(.totals):not(.sect):not(.whyline):hover td{background:var(--surface-2)}
+td.slot{font-family:var(--font-num);font-size:var(--t-md);font-weight:700;letter-spacing:.03em;color:var(--ink-2);white-space:nowrap;padding-left:var(--s-3)}
+.mv{display:inline-grid;place-items:center;width:18px;height:18px;margin-right:4px;border-radius:50%;vertical-align:-3px}
+.mv.in{background:var(--accent);color:var(--accent-ink)}
+.mv.out{background:var(--surface-2);color:var(--ink-2);border:1px solid var(--line-strong)}
+tr.moved td{background:color-mix(in srgb,var(--accent) 8%,var(--surface))}
+tr.moved td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
+tr.moved.out td{background:color-mix(in srgb,var(--ink) 4%,var(--surface))}
+tr.moved.out td:first-child{box-shadow:inset 3px 0 0 var(--line-strong)}
+tr.moved.out .nm a{color:var(--ink-2)}
+.pl{display:flex;align-items:center;gap:var(--s-3);min-width:0}
+.who{display:flex;flex-direction:column;min-width:0;gap:3px}
+.nm{display:flex;align-items:center;min-width:0}
+.nm a{font-weight:600;font-size:var(--t-md);color:var(--ink);text-decoration:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nm a:hover{text-decoration:underline}
+.sub{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.club{font-size:var(--t-xs);color:var(--ink-3);font-weight:500;letter-spacing:.03em;min-width:28px}
+.tchip{display:inline-flex;align-items:center;height:20px;padding:0 7px;border-radius:var(--r-sm);font-size:var(--t-xs);font-weight:600;white-space:nowrap}
+.tchip.even{background:var(--surface-2);color:var(--ink-2)}
+.tchip.loss{background:var(--loss-bg);color:var(--loss-ink)}
+.tag{display:inline-flex;align-items:center;height:20px;padding:0 6px;border-radius:var(--r-sm);border:1px solid color-mix(in srgb,currentColor 40%,transparent);color:var(--accent-text);font-size:var(--t-xs);font-weight:700;text-transform:uppercase;letter-spacing:var(--track-label)}
+.mark-face{background:transparent;place-items:center}
+.mark-face img{width:100%;transform:none}
+.game{font-size:var(--t-sm)}
+td.game{white-space:nowrap}
+.opp{display:flex;gap:6px}
+.opp b{font-weight:700}
+.opp span{color:var(--ink-2);font-variant-numeric:tabular-nums}
+.facts{display:flex;gap:var(--s-2);align-items:center;margin-top:2px;font-size:var(--t-xs);color:var(--ink-3);font-variant-numeric:tabular-nums}
+.facts .exp{font-family:var(--font-num);font-size:var(--t-sm);font-weight:600;color:var(--ink-2);letter-spacing:.02em}
+.facts .wx{display:inline-flex;align-items:center;gap:3px}
+.bye{display:inline-flex;align-items:center;height:20px;padding:0 8px;border-radius:var(--r-sm);background:var(--surface-2);color:var(--ink-2);font-size:var(--t-xs);font-weight:700;text-transform:uppercase;letter-spacing:var(--track-label)}
+td.proj{font-family:var(--font-num);font-weight:700;font-size:var(--t-xl);font-variant-numeric:tabular-nums;line-height:1}
+td.pts{font-family:var(--font-num);font-weight:700;font-size:var(--t-lg)}
+td.ev{font-family:var(--font-num);font-weight:600;font-size:var(--t-lg);color:var(--ink-2);font-variant-numeric:tabular-nums}
+th.rkc,td.rkc{border-left:1px solid var(--line)}
+td.dl{font-size:var(--t-md);color:var(--ink-3)}
+.dash{color:var(--ink-3);font-weight:600}
+.rk{display:inline-flex;align-items:center;justify-content:flex-end;min-width:44px;height:24px;padding:0 6px;border-radius:var(--r-sm)}
+.rk.easy{background:var(--gain-bg);color:var(--gain-ink)}
+.rk.hard{background:var(--loss-bg);color:var(--loss-ink)}
+.rk.mid{color:var(--ink-2)}
+td.op{text-align:center;padding:0}
+.why{display:inline-grid;place-items:center;width:32px;height:32px;border:1px solid var(--line-strong);border-radius:var(--r-md);background:transparent;color:var(--ink-2);cursor:pointer}
+.why[aria-expanded="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.why[aria-expanded="true"] svg{transform:rotate(180deg)}
+tr.open td{border-bottom-color:transparent}
+tr.whyline td{height:auto;padding-block:0 var(--s-3);background:color-mix(in srgb,var(--accent) 8%,var(--surface));font-size:var(--t-sm);color:var(--ink);font-variant-numeric:tabular-nums}
+tr.whyline td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
+tr.whyline td+td{padding-left:calc(32px + var(--s-3) + var(--s-2))}
+tr.totals td{height:56px;background:var(--scoreboard);color:var(--scoreboard-ink);border-bottom:0}
+tr.totals .tl{font-family:var(--font-num);font-weight:800;text-transform:uppercase;letter-spacing:.06em;font-size:var(--t-lg);padding-left:var(--s-1)}
+tr.totals td.proj b{color:var(--scoreboard-num);font-size:var(--t-2xl);font-weight:800}
+tr.totals td.pts b{color:var(--scoreboard-ink-2);font-size:var(--t-xl)}
+tr.sect td{height:32px;font-size:var(--t-xs);font-weight:700;text-transform:uppercase;letter-spacing:var(--track-label);color:var(--ink-3);background:var(--bg);padding-left:var(--s-3)}
+.lower tr.bn{height:48px}
+.lower td.proj{font-size:var(--t-lg);color:var(--ink-2)}
+.lower .face{opacity:.92}
+.basis{display:flex;flex-direction:column;gap:2px;max-width:1000px}
+.basis p{margin:0;font-size:var(--t-sm);color:var(--ink-3);line-height:1.5}
+.basis p:first-child{color:var(--ink-2);font-weight:500}
+.vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.ph{display:none}
+
+@media (max-width: 1180px){
+  .decide{grid-template-columns:auto minmax(0,1fr) auto;row-gap:var(--s-3)}
+  .d-act{grid-column:1 / -1;flex-direction:row;align-items:center;justify-content:space-between}
+}
+@media (max-width: 760px){
+  .mx{padding:var(--s-3) var(--s-3) calc(var(--tab-bar-h) + 92px);gap:var(--s-3)}
+  .mocknote{font-size:10px}
+  .title h2{font-size:var(--t-head)}
+  .title .lede{font-size:var(--t-xs)}
+  .tabs{align-self:stretch;overflow-x:auto}
+  .decide{grid-template-columns:minmax(0,1fr) auto;gap:var(--s-2) var(--s-3);padding:var(--s-3)}
+  .d-head h3{font-size:var(--t-xl)}
+  .swaps{grid-column:1 / -1;grid-row:2;gap:6px}
+  .swap{height:30px;font-size:var(--t-xs);gap:6px}
+  .sw-slot{height:22px;min-width:28px;font-size:var(--t-xs)}
+  .d-sum b{font-size:var(--t-lg)}
+  .d-act{position:fixed;left:var(--s-3);right:var(--s-3);bottom:calc(var(--tab-bar-h) + var(--s-2));z-index:6;flex-direction:row;
+    padding:var(--s-2);border-radius:var(--r-md);background:var(--shell);border:1px solid var(--line-strong);box-shadow:var(--shadow-pop)}
+  .d-act .verb{flex:1}
+  .d-rec{display:none}
+  .c-slot{width:52px}.c-proj{width:52px}.c-pts{width:36px}.c-op{width:36px}
+  .c-game,.c-rk,.c-ev,.c-dl{width:0}
+  .lineup th.game,.lineup td.game,.lineup .ev{padding:0;overflow:hidden;font-size:0;border-left:0}
+  .lineup td.game *,.lineup td.ev *{display:none}
+  .lineup th,.lineup td{padding:0 4px}
+  td.slot{padding-left:var(--s-2);font-size:var(--t-sm)}
+  .mv{width:16px;height:16px;margin-right:2px}
+  .mv svg{width:11px;height:11px}
+  .lineup tbody tr{height:auto}
+  .lineup tbody td{padding-block:8px}
+  .pl{gap:var(--s-2);align-items:flex-start}
+  .face{width:28px!important;height:28px!important;margin-top:2px}
+  .nm a{white-space:normal;font-size:var(--t-sm)}
+  .ph{display:flex;flex-direction:column;gap:1px;font-size:var(--t-xs);color:var(--ink-2)}
+  .ph .opp{gap:4px}
+  .ph .bye{height:18px}
+  .ph-e{color:var(--ink-3);font-variant-numeric:tabular-nums}
+  .ph-e .rk{height:auto;min-width:0;padding:0 3px;font-weight:700}
+  td.proj{font-size:var(--t-lg)}
+  td.pts{font-size:var(--t-sm)}
+  .why{width:28px;height:28px}
+  tr.whyline td+td{padding-left:var(--s-2)}
+  tr.whyline td:first-child{padding:0}
+  tr.totals td.proj b{font-size:var(--t-xl)}
+  tr.totals .tl{font-size:var(--t-md)}
+  .basis p{font-size:var(--t-xs)}
+}
+.lineup tbody tr.sect{height:32px}
+@media (max-width: 760px){
+  .mocknote .long{display:none}
+  .mocknote .short{display:inline!important}
+  .swaps{gap:4px}
+  .swap{height:28px;padding-right:var(--s-2)}
+  .c-slot{width:46px}.c-op{width:34px}.c-pts{width:30px}
+  td.slot{padding-left:6px}
+  .face{width:24px!important;height:24px!important}
+  .sub{gap:4px}
+  .club{min-width:0}
+  tr.whyline{display:none}
+  .why[aria-expanded="true"]{background:transparent;color:var(--ink-2);border-color:var(--line-strong)}
+  .why[aria-expanded="true"] svg{transform:none}
+  tr.open td{border-bottom-color:var(--line)}
+}
+.mocknote .short{display:none}
+@media (max-width: 760px){.ph-e .rk.mid{padding:0}}
+
+/* Lane 66f: Waivers extends the Lineup table (lineup.css above). */
+.c-game{width:228px}.c-ros{width:96px}.c-beats{width:150px}.c-act{width:88px}
+
+/* The decision strip: the week, the count, a card per pickup with its own verb, the sum. */
+.pickups{grid-template-columns:auto minmax(0,1fr);row-gap:var(--s-2);column-gap:var(--s-5)}
+.pickups .d-head{grid-row:1 / span 2;align-self:center}
+.pickups .d-sum{align-items:flex-start;margin-top:var(--s-2)}
+.d-why .short{display:none}
+th.ros .sort{white-space:normal;line-height:1.15;text-align:right}
+.picks{display:flex;flex-wrap:wrap;gap:var(--s-2);margin:0;padding:0;list-style:none}
+.pick{display:flex;align-items:center;gap:var(--s-3);padding:6px 6px 6px 6px;border:1px solid var(--line-strong);border-radius:var(--r-md);background:var(--bg)}
+.pick.on{border-color:color-mix(in srgb,var(--accent) 55%,var(--line-strong))}
+.pick .sw-slot{height:30px;min-width:40px}
+.pk-w{display:flex;flex-direction:column;gap:2px;white-space:nowrap}
+.pk-m{font-size:var(--t-md);color:var(--ink-2)}
+.pk-m b{color:var(--ink);font-weight:700}
+.pk-g{font-size:var(--t-xs);color:var(--ink-3);font-variant-numeric:tabular-nums}
+.pk-g em{font-style:normal;font-weight:700;color:var(--gain-ink)}
+.pick .verb,.pick .pk-v{height:36px;font-size:var(--t-sm);padding:0 var(--s-3)}
+.pk-v{font-weight:600;color:var(--ink)}
+.d-why{grid-column:2 / -1;margin:0;font-size:var(--t-xs);color:var(--ink-3)}
+.d-pin{display:none}
+
+/* The filter row: position, a name search, the count. */
+.filters{display:flex;align-items:center;gap:var(--s-3);flex-wrap:wrap}
+.filters .chip-group .chip{min-width:40px}
+.filters .search{max-width:320px;height:38px}
+.filters .count{margin-left:auto;font-size:var(--t-sm);color:var(--ink-3);font-variant-numeric:tabular-nums}
+.filters .count b{color:var(--ink-2);font-weight:600}
+
+/* The pool table: sortable heads, the two columns only we give, the add. */
+.pool tr.cols th{padding:0}
+.sort{display:inline-flex;align-items:center;gap:3px;width:100%;height:32px;padding:0 var(--s-2);border:0;background:transparent;font:inherit;
+  font-size:var(--t-xs);font-weight:600;text-transform:uppercase;letter-spacing:var(--track-label);color:var(--ink-3);cursor:pointer;white-space:nowrap}
+th.n .sort,th.beats .sort{justify-content:flex-end}
+.pool th.rkc .sort{padding-left:var(--s-4)}
+th.sorted .sort{color:var(--ink)}
+.caret{display:inline-grid;color:var(--accent-text)}
+th.ros,td.ros{border-left:1px solid var(--line)}
+td.ros{font-family:var(--font-num);font-weight:700;font-size:var(--t-lg);color:var(--ink);font-variant-numeric:tabular-nums}
+td.beats{text-align:right}
+.bt{display:inline-flex;align-items:center;gap:var(--s-2)}
+.bt-who{display:flex;flex-direction:column;align-items:flex-end;line-height:1.15}
+.bt-who b{font-size:var(--t-sm);font-weight:600;color:var(--ink)}
+.bt-who span{font-size:var(--t-xs);color:var(--ink-3)}
+.bt-g{font-family:var(--font-num);font-weight:700;font-size:var(--t-xl);line-height:1;min-width:52px;text-align:right;font-variant-numeric:tabular-nums}
+td.beats.st .bt-g{color:var(--gain-ink)}
+td.beats.bn .bt-g{color:var(--ink-2);font-size:var(--t-lg)}
+td.beats.bn .bt-who b{color:var(--ink-2)}
+td.act{text-align:center;padding:0 var(--s-2)}
+.add{display:inline-flex;align-items:center;gap:4px;height:32px;padding:0 var(--s-3) 0 var(--s-2);border:1px solid var(--line-strong);border-radius:var(--r-md);
+  background:transparent;color:var(--ink);font:inherit;font-size:var(--t-sm);font-weight:600;cursor:pointer}
+.add:hover{border-color:var(--ink-3)}
+.add.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+tr.pk.starts td{background:color-mix(in srgb,var(--accent) 6%,var(--surface))}
+tr.pk.starts td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
+tr.pk td.player{padding-left:var(--s-3)}
+tr.pk.open td{border-bottom-color:transparent}
+
+/* The drop panel: the roster players he could replace, in the same columns. */
+tr.dsect td{height:40px;background:var(--surface-2);border-top:2px solid var(--line-strong);padding-left:var(--s-3)}
+.ds-t{font-weight:700;font-size:var(--t-sm);color:var(--ink);margin-right:var(--s-3)}
+.ds-s{font-size:var(--t-xs);color:var(--ink-3)}
+td.ds-h{font-size:var(--t-xs);font-weight:600;text-transform:uppercase;letter-spacing:var(--track-label);color:var(--ink-3);text-align:center}
+tr.dp td{background:var(--surface-2);height:48px}
+tr.dp td.player{padding-left:var(--s-5)}
+tr.dp.chosen td{background:color-mix(in srgb,var(--accent) 10%,var(--surface-2))}
+tr.dp.chosen td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
+tr.dp td.proj{font-size:var(--t-lg);color:var(--ink-2)}
+tr.dp td.ros{font-size:var(--t-md);color:var(--ink-2)}
+.gn{display:inline-flex;flex-direction:column;align-items:flex-end;line-height:1.1}
+.gn b{font-family:var(--font-num);font-weight:700;font-size:var(--t-xl);line-height:1}
+.ds-s b{color:var(--gain-ink);font-weight:700}
+.gn span{font-size:var(--t-xs);font-weight:600;font-variant-numeric:tabular-nums}
+.gn .up{color:var(--gain-ink)}
+.gn .neg{color:var(--loss-ink)}
+.radio{display:inline-block;width:18px;height:18px;border-radius:50%;border:2px solid var(--line-strong);vertical-align:middle;cursor:pointer}
+.radio.on{border-color:var(--accent);background:radial-gradient(circle,var(--accent) 0 4px,transparent 5px)}
+tr.dgo td{background:var(--surface-2);height:auto;padding:var(--s-3) var(--s-3) var(--s-3) var(--s-5);border-bottom:2px solid var(--line-strong)}
+.dgo-in{display:flex;align-items:center;justify-content:space-between;gap:var(--s-4)}
+.dgo-sum{display:flex;flex-direction:column;gap:2px}
+.dgo-sum b{font-size:var(--t-md);color:var(--ink)}
+.dgo-sum span{font-size:var(--t-xs);color:var(--ink-3);font-variant-numeric:tabular-nums}
+.dgo-act{display:flex;align-items:center;gap:var(--s-3)}
+.dgo-why{font-size:var(--t-xs);color:var(--ink-3);max-width:300px;text-align:right}
+
+
+@media (max-width: 760px){
+  .pickups{grid-template-columns:minmax(0,1fr);gap:var(--s-2)}
+  .pickups .d-head{grid-row:auto;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end}
+  .pickups .d-head .d-wk{grid-column:1}
+  .pickups .d-head h3{grid-column:1}
+  .pickups .d-sum{grid-column:2;grid-row:1 / span 2;align-items:flex-end;margin:0}
+  .d-why .long{display:none}
+  .d-why .short{display:inline}
+  .picks{grid-column:1 / -1;flex-wrap:nowrap;overflow-x:auto;margin:0 calc(-1 * var(--s-3));padding:0 var(--s-3);scrollbar-width:none}
+  .pick{flex:none;padding:6px var(--s-3) 6px 6px}
+  .pick .verb,.pick .pk-v{display:none}
+  .pk-m{font-size:var(--t-sm)}
+  .d-why{grid-column:1 / -1}
+  .d-pin{display:flex;align-items:center;gap:var(--s-2);position:fixed;left:var(--s-3);right:var(--s-3);bottom:calc(var(--tab-bar-h) + var(--s-2));z-index:6;
+    padding:var(--s-2);border-radius:var(--r-md);background:var(--shell);border:1px solid var(--line-strong);box-shadow:var(--shadow-pop)}
+  .d-pin .verb{flex:1;height:44px;font-size:var(--t-sm);padding:0 var(--s-2)}
+  .pin-m{font-size:var(--t-xs);color:var(--ink-2);max-width:96px;line-height:1.25}
+  .pin-m b{font-weight:600}
+  .filters{gap:var(--s-2)}
+  .filters{flex-wrap:nowrap}
+  .filters .chip-group{flex:1;min-width:0;overflow-x:auto;scrollbar-width:none}
+  .filters .chip-group .chip{min-width:0;padding:0 9px}
+  .filters .search{flex:0 0 38px;height:38px;padding:0;justify-content:center;border-radius:var(--r-pill)}
+  .filters .search input{display:none}
+  .filters .count{display:none}
+  .c-proj{width:46px}.c-beats{width:88px}.c-act{width:40px}
+  .c-game,.c-rk,.c-ev,.c-dl,.c-ros{width:0}
+  .pool th.ros,.pool td.ros{padding:0;overflow:hidden;font-size:0;border-left:0}
+  .pool td.ros *{display:none}
+  .pool th.ros .sort,.pool th.game .sort,.pool th.ev .sort{display:none}
+  .sort{padding:0 4px}
+  .pool tr.cols th.player .sort{padding-left:var(--s-2)}
+  tr.pk td.player{padding-left:var(--s-2)}
+  .bt{gap:4px}
+  .bt-who b{font-size:var(--t-xs)}
+  .bt-who span{font-size:10px}
+  .bt-g{font-size:var(--t-lg);min-width:0}
+  td.beats.bn .bt-g{font-size:var(--t-md)}
+  td.act{padding:0 4px}
+  .add{width:32px;padding:0;justify-content:center}
+  .add span{display:none}
+  tr.dsect td{padding:var(--s-2)}
+  tr.dsect td:first-child{white-space:normal}
+  .ds-s{display:block}
+  td.ds-h{font-size:10px;white-space:normal;line-height:1.2}
+  tr.dp td.player{padding-left:var(--s-3)}
+  tr.dp td{height:auto}
+  .gn b{font-size:var(--t-md)}
+  .gn span{font-size:10px}
+  tr.dgo td{padding:var(--s-3)}
+  .dgo-in{flex-direction:column;align-items:stretch;gap:var(--s-2)}
+  .dgo-act{flex-direction:column-reverse;align-items:stretch}
+  .dgo-why{max-width:none;text-align:left}
+}
+/* Lane 66j: Rest of season, Players and Our record, on the Lineup table (lineup.css) and Waivers' sort heads (waivers.css). */
+.c-rank{width:52px}.c-delta{width:48px}.c-roster{width:168px}.c-game{width:206px}.c-proj{width:64px}.c-ros{width:76px}.c-tot{width:68px}
+.c-ev{width:58px}.c-rk{width:84px}.c-verb{width:150px}.c-sheet{width:96px}
+.box tr.grp th{height:22px;padding:0;background:var(--bg);border-bottom:0}
+.box tr.grp th.g-ros,.box tr.grp th.mg{border-left:1px solid var(--line);text-align:center}
+.box tr.grp th span{font-size:var(--t-xs);font-weight:700;text-transform:uppercase;letter-spacing:var(--track-label);color:var(--ink-2)}
+.box th.ros,.box td.ros{border-left:1px solid var(--line)}
+.box th.ev.rkc,.box td.ev.rkc{border-left:1px solid var(--line);padding-left:var(--s-2)}
+td.tot{font-size:var(--t-md)}
+td.rank{font-family:var(--font-num);font-weight:800;font-size:var(--t-lg);color:var(--ink);padding-right:var(--s-3)}
+th.rank .sort{justify-content:flex-end}
+td.dl{text-align:right}
+.dlt{display:inline-flex;align-items:center;gap:1px;font-family:var(--font-num);font-weight:700;font-size:var(--t-md)}
+.dlt.up{color:var(--gain-ink)}.dlt.down{color:var(--loss-ink)}.dlt.even{color:var(--ink-3)}
+.pos{display:inline-flex;align-items:center;height:20px;padding:0 6px;border-radius:var(--r-sm);background:var(--surface-2);font-size:var(--t-xs);font-weight:700;letter-spacing:.03em;color:var(--ink-2)}
+.tchip.ir{background:var(--status-ir-bg);color:var(--status-ir-ink)}
+td.roster{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.own{display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:var(--r-pill);font-size:var(--t-xs);font-weight:700;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.own.yours{background:var(--accent);color:var(--accent-ink)}
+.own.free{background:var(--gain-bg);color:var(--gain-ink)}
+.own.team{padding:0;color:var(--ink-3);font-weight:500;font-size:var(--t-sm)}
+tr.pk.mine td{background:color-mix(in srgb,var(--accent) 7%,var(--surface))}
+tr.pk.mine td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
+.add.rv{height:30px;font-size:var(--t-xs)}
+.add.quiet-v{border-color:transparent;color:var(--ink-2);font-weight:600}
+.add.quiet-v:hover{border-color:var(--line-strong)}
+td.act{text-align:right}
+.filters .chip-group+.chip-group{margin-left:var(--s-1)}
+.search.big{display:flex;align-items:center;gap:var(--s-2);max-width:640px;height:48px;padding:0 var(--s-4);border:1px solid var(--line-strong);border-radius:var(--r-md);background:var(--surface)}
+.search.big input{flex:1;min-width:0;border:0;background:transparent;font:inherit;font-size:var(--t-lg);color:var(--ink);outline:0}
+.search.big .hits{font-size:var(--t-sm);color:var(--ink-3);white-space:nowrap}
+
+/* Our record: the to-date bug, the week table, the chart. */
+.recbug{grid-template-columns:auto auto minmax(0,1fr)}
+.tiles{display:flex;gap:var(--s-5)}
+.tile{display:flex;flex-direction:column;gap:2px;padding-left:var(--s-4);border-left:1px solid var(--line)}
+.t-l{font-size:var(--t-xs);font-weight:700;text-transform:uppercase;letter-spacing:var(--track-label);color:var(--ink-3)}
+.t-v{display:flex;align-items:baseline;gap:var(--s-2);white-space:nowrap;font-variant-numeric:tabular-nums}
+.t-v b{font-family:var(--font-num);font-weight:800;font-size:var(--t-2xl);line-height:1;color:var(--accent-text)}
+.t-v>span{font-size:var(--t-sm);color:var(--ink-2)}
+.honest{margin:0;font-size:var(--t-sm);color:var(--ink);line-height:1.45;max-width:520px}
+.segs.m-pick{display:none}
+.c-wk{width:118px}.c-ord{width:180px}.c-plc{width:78px}.c-m{width:auto}.c-st{width:150px}
+.record td.wkn{font-family:var(--font-num);font-weight:700;font-size:var(--t-md);padding-left:var(--s-3);white-space:nowrap}
+.record td.ord b{display:block;font-size:var(--t-sm);font-weight:600}
+.record td.ord span{font-size:var(--t-xs);color:var(--ink-3)}
+.record td.plc{font-family:var(--font-num);font-weight:600;font-size:var(--t-md);color:var(--ink-2)}
+.record th.m.s-ours,.record td.m.s-ours{border-left:1px solid var(--line)}
+.record td.m{font-family:var(--font-num);font-weight:600;font-size:var(--t-lg);color:var(--ink-3);font-variant-numeric:tabular-nums}
+.record td.m.s-ours{color:var(--ink-2)}
+.record td.m.best{color:var(--ink);font-weight:800}
+.record td.m.s-ours.best{color:var(--accent-text)}
+.record td.m .of{display:block;font-family:var(--font-ui);font-size:var(--t-xs);font-weight:500;color:var(--ink-3)}
+.record th.m .sort{justify-content:flex-end;display:flex}
+.record th .sort{display:flex;align-items:center;height:32px;padding:0 var(--s-2);font-size:var(--t-xs);font-weight:600;text-transform:uppercase;letter-spacing:var(--track-label);color:var(--ink-3)}
+.record td.st{font-size:var(--t-sm);color:var(--ink-3);padding-left:var(--s-4)}
+.record tr.live td{background:color-mix(in srgb,var(--accent) 7%,var(--surface))}
+.record tr.live td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
+.record tr.later td{height:44px;color:var(--ink-3)}
+.record tr.later td.ord{white-space:nowrap}
+.record tr.later td.ord b{display:inline;margin-right:var(--s-2)}
+.record tr.totals td.m{color:var(--scoreboard-ink-2)}
+.record tr.totals td.m.best{color:var(--scoreboard-ink)}
+.record tr.totals td.m.s-ours{color:var(--scoreboard-num)}
+.record tr.totals td.m .of{color:var(--scoreboard-ink-2)}
+.record tr.totals td.plc{color:var(--scoreboard-ink-2)}
+.chart{margin:0;max-width:900px}
+.chart figcaption{font-size:var(--t-xs);font-weight:700;text-transform:uppercase;letter-spacing:var(--track-label);color:var(--ink-3);margin-bottom:var(--s-2)}
+.chart svg{width:100%;height:auto;display:block}
+.chart .gl{stroke:var(--line);stroke-width:1}
+.chart .ax{font-size:11px;fill:var(--ink-3);font-family:var(--font-ui)}
+.chart .ax.dim{opacity:.5}
+.chart .now{stroke:var(--accent);stroke-dasharray:3 3}
+.chart g path{fill:none;stroke-width:2.5}
+.chart g text{font-size:12px;font-weight:700;font-family:var(--font-ui)}
+.chart .s-ours path{stroke:var(--accent)}.chart .s-ours circle{fill:var(--accent)}.chart .s-ours text{fill:var(--accent-text)}
+.chart .s-adp path{stroke:var(--ink-3)}.chart .s-adp circle{fill:var(--ink-3)}.chart .s-adp text{fill:var(--ink-3)}
+.chart .s-pub path{stroke:var(--ink);stroke-dasharray:6 4}.chart .s-pub circle{fill:var(--ink)}.chart .s-pub text{fill:var(--ink)}
+
+/* The screen's own number leads: Rest of season a game is the big figure, Proj steps back. */
+.box td.proj{font-size:var(--t-lg);color:var(--ink-2)}
+.box td.ros.pg{font-size:var(--t-xl);font-weight:800;color:var(--ink)}
+.add.quiet-v{color:var(--ink-3)}
+.ph-mark{display:none}
+
+@media (max-width: 1180px){
+  .recbug{grid-template-columns:auto minmax(0,1fr)}
+  .honest{grid-column:1 / -1;max-width:none}
+}
+@media (max-width: 760px){
+  .c-rank{width:34px}.c-delta,.c-roster,.c-tot,.c-ev,.c-rk,.c-game{width:0}.c-proj{width:44px}.c-ros{width:48px}.c-verb,.c-sheet{width:40px}
+  .box tr.grp{display:none}
+  .box td.dl,.box th.dl,.box td.roster,.box th.roster,.box .tot,.box .ev,.box th.game,.box td.game{padding:0;overflow:hidden;font-size:0;border-left:0}
+  .box td.dl *,.box td.roster *,.box td.tot *,.box td.ev *,.box th.dl .sort,.box th.roster .sort,.box th.tot .sort,.box th.ev .sort,.box th.game .sort{display:none}
+  .box th.ros .sort{font-size:0}
+  .box th.ros .sort::before{content:'Rest';font-size:var(--t-xs)}
+  .pool:not(.record) th.ros,.pool:not(.record) td.ros{width:auto;padding:0 4px;font-size:var(--t-md);border-left:1px solid var(--line)}
+  .pool:not(.record) td.ros *{display:inline}
+  .pool th.ros .sort{display:flex!important}
+  td.rank{font-size:var(--t-md);padding-right:2px}
+  .ph-g{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+  .own{height:18px;padding:0 6px;font-size:10px}
+  .own.team{font-size:10px}
+  .add.rv{width:32px;padding:0;justify-content:center}
+  .add.rv span{display:none}
+  .add.quiet-v{border-color:var(--line-strong)}
+  .filters{flex-wrap:wrap}
+  .filters .chip-group+.chip-group{margin-left:0}
+  .search.big{height:44px}
+  .search.big .hits{font-size:var(--t-xs)}
+  .recbug{grid-template-columns:minmax(0,1fr)}
+  .tiles{flex-direction:column;gap:var(--s-2)}
+  .tile{padding-left:0;border-left:0;flex-direction:row;align-items:baseline;justify-content:space-between}
+  .t-v b{font-size:var(--t-xl)}
+  .t-v>span{font-size:var(--t-xs)}
+  .segs.m-pick{display:flex;gap:4px;overflow-x:auto}
+  .record .m-off,.record .m-right{display:none}
+  .record tr.grp{display:none}
+  .c-wk{width:58px}.c-ord{width:auto}.c-plc{width:0}.c-st{width:0}.c-m{width:50px}
+  .record td.plc,.record th.plc,.record td.st,.record th:last-child{padding:0;font-size:0;overflow:hidden}
+  .record td.plc *,.record th.plc *,.record th:last-child *{display:none}
+  .record td.wkn{font-size:var(--t-sm);padding-left:var(--s-2)}
+  .record td.m{font-size:var(--t-md)}
+  .record th .sort{font-size:10px;padding:0 4px}
+  .record tr.later td.ord{white-space:normal}
+  .chart{max-width:none}
+  .filters .chip-group{flex:0 1 auto;max-width:100%;overflow-x:auto;scrollbar-width:none}
+  .filters .chip-group .chip{flex:none}
+  .ph-mark{display:inline-flex}
+  .ph-g .ph-e{margin-left:4px}
+  .ph-g .ph-e::before{content:''}
+  /* The phone's record: one figure at a time, chosen above, in Week, Ours, ADP, Published. */
+  .record{table-layout:auto}
+  .record colgroup{display:none}
+  .record td.plc,.record th.plc,.record td.st,.record th:last-child{display:none}
+  .record td.ord span{display:none}
+  .record td.ord b{font-size:var(--t-xs);font-weight:500;color:var(--ink-3)}
+  .record tr.later td.ord span{display:block}
+  .record td.m{width:64px}
+  .segs.m-pick{flex-basis:100%}
+  .chart svg{min-height:180px}
+}
+</style>
+</head>
+<body class="pg-players">
+<div class="app">
+<nav class="rail" aria-label="Sections"><a class="mark" href="#" aria-label="Commish"><b>C</b></a><a class="item" href="#"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3l-5 4 2 3 2-1v12h10V9l2 1 2-3-5-4c0 2-1.5 3-4 3S8 5 8 3z"/></svg><span>Lineup</span></a><a class="item" href="#"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="3"/><circle cx="16" cy="8" r="3"/><path d="M2 20c.8-3 3-5 6-5s5.2 2 6 5M14 15c3 0 5.2 2 6 5"/></svg><span>Matchup</span></a><a class="item" href="#"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10" cy="8" r="4"/><path d="M3 21c1.2-3.6 3.8-6 7-6 1.5 0 2.9.5 4 1.4M18 12v6M15 15h6"/></svg><span>Waivers</span></a><a class="item" href="#"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h14l-3-3M20 16H6l3 3"/></svg><span>Trades</span></a><a class="item" href="#" aria-current=page><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg><span>Players</span></a><a class="item wide-only" href="#"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 11h12M4 16h8"/></svg><span>Rest of season</span></a><a class="item wide-only" href="#"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg><span>Our record</span></a><span class="spacer"></span><a class="item wide-only" href="#"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M6.5 18c1.5-2 3.4-3 5.5-3s4 1 5.5 3"/></svg><span>Account</span></a></nav>
+<div class="main">
+<header class="top"><h1>Players</h1><div class="tail"><a class="quiet" href="#">Sign in</a></div></header>
+<main class="mx">
+  <p class="mocknote"><span class="long">Mock for Lane 66j, signed out. Dotted figures are stand-ins. Stroud, Montgomery, Hutchinson, Schultz and the Texans are the fixture's real lines. Collins, Harrison, Noel, Boutte, Klein and Fairbairn are named from our frozen board with made-up figures. Every Proj is the week 1 published figure.</span><span class="short">Mock. Dotted figures are stand-ins, named on the desk shot.</span></p>
+  <div class="title"><h2>Players</h2><p class="lede">Every player in our order, with kickers and defenses. Follow your league to see whose roster each is on.</p></div>
+  <label class="search big"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><input type="search" value="Hou" aria-label="Find a player or a club"><span class="hits">11 players</span></label>
+  <div class="filters"><div class="chip-group" role="group" aria-label="Position"><button type="button" class="chip" aria-pressed="true">All</button><button type="button" class="chip" aria-pressed="false">QB</button><button type="button" class="chip" aria-pressed="false">RB</button><button type="button" class="chip" aria-pressed="false">WR</button><button type="button" class="chip" aria-pressed="false">TE</button><button type="button" class="chip" aria-pressed="false">K</button><button type="button" class="chip" aria-pressed="false">D/ST</button></div></div>
+  <table class="lineup pool box" aria-label="Players matching Hou"><colgroup><col class="c-rank"><col class="c-player"><col class="c-game"><col class="c-proj"><col class="c-ros"><col class="c-tot"><col class="c-ev"><col class="c-ev"><col class="c-rk"><col class="c-sheet"></colgroup><thead><tr class="grp"><th colspan="4"></th><th class="g-ros" colspan="2"><span>Rest of season</span></th><th colspan="4"></th></tr><tr class="cols"><th class="n rank"><button type="button" class="sort">Pos #</button></th><th class="player"><button type="button" class="sort">Player</button></th><th class="game"><button type="button" class="sort">Game</button></th><th class="n proj"><button type="button" class="sort">Proj</button></th><th class="n ros pg sorted" aria-sort="descending"><button type="button" class="sort">A game<span class="caret"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></span></button></th><th class="n ev tot"><button type="button" class="sort">Total</button></th><th class="n ev rkc"><button type="button" class="sort">Avg</button></th><th class="n ev"><button type="button" class="sort">Last</button></th><th class="n ev opp-r"><button type="button" class="sort">Opp rank</button></th><th class="act"><span class="vh">Add to your sheet</span></th></tr></thead><tbody><tr class="pk"><td class="n rank"><span class="si">11</span></td><td class="player"><span class="pl"><span class="face" style="width:32px;height:32px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/4258173.png" alt="" width="32" height="32"></span><span class="who"><span class="nm"><a href="#">Nico Collins</a></span><span class="sub"><span class="club">HOU</span><span class="pos">WR<span class="si">11</span></span></span><span class="ph"><span class="ph-g"><span class="opp"><b>at JAX</b><span>Sun 8:30 am</span></span><span class="ph-e">Avg <span class="si">11.9</span>, Last <span class="si">11.9</span></span></span></span></span></span></td><td class="game"><span class="opp"><b>at JAX</b><span>Sun 8:30 am</span></span><span class="facts"><span class="exp">20 to 22.5</span><span class="wx"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>Abroad</span></span></td><td class="n proj"><span class="si">14.9</span></td><td class="n ros pg"><span class="si">14.9</span></td><td class="n ev tot"><span class="si">163.9</span></td><td class="n ev rkc"><span class="si">11.9</span></td><td class="n ev"><span class="si">11.9</span></td><td class="n ev opp-r"><span class="rk mid"><span class="si">17th</span></span></td><td class="act"><button type="button" class="add rv" aria-label="Add Collins to your sheet"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>Sheet</span></button></td></tr><tr class="pk"><td class="n rank">7</td><td class="player"><span class="pl"><span class="face" style="width:32px;height:32px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/4432577.png" alt="" width="32" height="32"></span><span class="who"><span class="nm"><a href="#">C.J. Stroud</a></span><span class="sub"><span class="club">HOU</span><span class="pos">QB7</span></span><span class="ph"><span class="ph-g"><span class="opp"><b>at JAX</b><span>Sun 8:30 am</span></span><span class="ph-e">Avg 19.9, Last 21.9</span></span></span></span></span></td><td class="game"><span class="opp"><b>at JAX</b><span>Sun 8:30 am</span></span><span class="facts"><span class="exp">20 to 22.5</span><span class="wx"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>Abroad</span></span></td><td class="n proj"><span class="si">17.3</span></td><td class="n ros pg">12.8</td><td class="n ev tot">140.8</td><td class="n ev rkc">19.9</td><td class="n ev">21.9</td><td class="n ev opp-r"><span class="rk easy">24th</span></td><td class="act"><button type="button" class="add rv" aria-label="Add Stroud to your sheet"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>Sheet</span></button></td></tr><tr class="pk"><td class="n rank"><span class="si">37</span></td><td class="player"><span class="pl"><span class="face" style="width:32px;height:32px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/4432708.png" alt="" width="32" height="32"></span><span class="who"><span class="nm"><a href="#">Marvin Harrison Jr.</a></span><span class="sub"><span class="club">HOU</span><span class="pos">WR<span class="si">37</span></span></span><span class="ph"><span class="ph-g"><span class="opp"><b>at JAX</b><span>Sun 8:30 am</span></span><span class="ph-e">Avg <span class="si">9.9</span>, Last <span class="si">9.9</span></span></span></span></span></span></td><td class="game"><span class="opp"><b>at JAX</b><span>Sun 8:30 am</span></span><span class="facts"><span class="exp">20 to 22.5</span><span class="wx"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>Abroad</span></span></td><td class="n proj"><span class="si">12.0</span></td><td class="n ros pg"><span class="si">10.5</span></td><td class="n ev tot"><span class="si">115.5</span></td><td class="n ev rkc"><span class="si">9.9</span></td><td class="n ev"><span class="si">9.9</span></td><td class="n ev opp-r"><span class="rk hard"><span class="si">7th</span></span></td><td class="act"><button type="button" class="add rv" aria-label="Add Jr. to your sheet"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>Sheet</span></button></td></tr><tr class="pk"><td class="n rank">31</td><td class="player"><span class="pl"><span class="face" style="width:32px;height:32px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/4035538.png" alt="" width="32" height="32"></span><span class="who"><span class="nm"><a href="#">David Montgomery</a></span><span class="sub"><span class="club">HOU</span><span class="pos">RB31</span></span><span class="ph"><span class="ph-g"><span class="opp"><b>at JAX</b><span>Sun 8:30 am</span></span><span class="ph-e">Avg 4.1, Last 1.1</span></span></span></span></span></td><td class="game"><span class="opp"><b>at JAX</b><span>Sun 8:30 am</span></span><span class="facts"><span class="exp">20 to 22.5</span><span class="wx"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>Abroad</span></span></td><td class="n proj"><span class="si">12.7</span></td><td class="n ros pg">9.5</td><td class="n ev tot">104.5</td><td class="n ev rkc">4.1</td><td class="n ev">1.1</td><td class="n ev opp-r"><span class="rk easy">23rd</span></td><td class="act"><button type="button" class="add rv" aria-label="Add Montgomery to your sheet"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>Sheet</span></button></td></tr><tr class="pk"><td class="n rank">42</td><td class="player"><span class="pl"><span class="face" style="width:32px;height:32px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/4686422.png" alt="" width="32" height="32"></span><span class="who"><span class="nm"><a href="#">Xavier Hutchinson</a></span><span class="sub"><span class="club">HOU</span><span class="pos">WR42</span></span><span class="ph"><span class="ph-g"><span class="opp"><b>at JAX</b><span>Sun 8:30 am</span></span><span class="ph-e">Avg 8.9, Last 10.5</span></span></span></span></span></td><td class="game"><span class="opp"><b>at JAX</b><span>Sun 8:30 am</span></span><span class="facts"><span class="exp">20 to 22.5</span><span class="wx"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>Abroad</span></span></td><td class="n proj"><span class="si">4.3</span></td><td class="n ros pg">6.4</td><td class="n ev tot">70.4</td><td class="n ev rkc">8.9</td><td class="n ev">10.5</td><td class="n ev opp-r"><span class="rk hard">2nd</span></td><td class="act"><button type="button" class="add rv" aria-label="Add Hutchinson to your sheet"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>Sheet</span></button></td></tr><tr class="pk"><td class="n rank">12</td><td class="player"><span class="pl"><span class="face" style="width:32px;height:32px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/3117256.png" alt="" width="32" height="32"></span><span class="who"><span class="nm"><a href="#">Dalton Schultz</a></span><span class="sub"><span class="club">HOU</span><span class="pos">TE12</span></span><span class="ph"><span class="ph-g"><span class="opp"><b>at JAX</b><span>Sun 8:30 am</span></span><span class="ph-e">Avg 5.0, Last 6.0</span></span></span></span></span></td><td class="game"><span class="opp"><b>at JAX</b><span>Sun 8:30 am</span></span><span class="facts"><span class="exp">20 to 22.5</span><span class="wx"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>Abroad</span></span></td><td class="n proj"><span class="si">8.6</span></td><td class="n ros pg">6.2</td><td class="n ev tot">68.2</td><td class="n ev rkc">5.0</td><td class="n ev">6.0</td><td class="n ev opp-r"><span class="rk easy">24th</span></td><td class="act"><button type="button" class="add rv" aria-label="Add Schultz to your sheet"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>Sheet</span></button></td></tr><tr class="pk"><td class="n rank"><span class="si">82</span></td><td class="player"><span class="pl"><span class="face" style="width:32px;height:32px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/4586312.png" alt="" width="32" height="32"></span><span class="who"><span class="nm"><a href="#">Jaylin Noel</a></span><span class="sub"><span class="club">HOU</span><span class="pos">WR<span class="si">82</span></span></span><span class="ph"><span class="ph-g"><span class="opp"><b>at JAX</b><span>Sun 8:30 am</span></span><span class="ph-e">Avg <span class="si">5.9</span>, Last <span class="si">5.9</span></span></span></span></span></span></td><td class="game"><span class="opp"><b>at JAX</b><span>Sun 8:30 am</span></span><span class="facts"><span class="exp">20 to 22.5</span><span class="wx"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>Abroad</span></span></td><td class="n proj"><span class="si">5.3</span></td><td class="n ros pg"><span class="si">5.6</span></td><td class="n ev tot"><span class="si">61.6</span></td><td class="n ev rkc"><span class="si">5.9</span></td><td class="n ev"><span class="si">5.9</span></td><td class="n ev opp-r"><span class="rk hard"><span class="si">10th</span></span></td><td class="act"><button type="button" class="add rv" aria-label="Add Noel to your sheet"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>Sheet</span></button></td></tr><tr class="pk"><td class="n rank"><span class="si">84</span></td><td class="player"><span class="pl"><span class="face" style="width:32px;height:32px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/4429022.png" alt="" width="32" height="32"></span><span class="who"><span class="nm"><a href="#">Kayshon Boutte</a></span><span class="sub"><span class="club">HOU</span><span class="pos">WR<span class="si">84</span></span></span><span class="ph"><span class="ph-g"><span class="opp"><b>at JAX</b><span>Sun 8:30 am</span></span><span class="ph-e">Avg <span class="si">6.4</span>, Last <span class="si">4.3</span></span></span></span></span></span></td><td class="game"><span class="opp"><b>at JAX</b><span>Sun 8:30 am</span></span><span class="facts"><span class="exp">20 to 22.5</span><span class="wx"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>Abroad</span></span></td><td class="n proj"><span class="si">5.3</span></td><td class="n ros pg"><span class="si">5.4</span></td><td class="n ev tot"><span class="si">59.4</span></td><td class="n ev rkc"><span class="si">6.4</span></td><td class="n ev"><span class="si">4.3</span></td><td class="n ev opp-r"><span class="rk mid"><span class="si">16th</span></span></td><td class="act"><button type="button" class="add rv" aria-label="Add Boutte to your sheet"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>Sheet</span></button></td></tr><tr class="pk"><td class="n rank"><span class="si">47</span></td><td class="player"><span class="pl"><span class="face" style="width:32px;height:32px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/4695705.png" alt="" width="32" height="32"></span><span class="who"><span class="nm"><a href="#">Marlin Klein</a></span><span class="sub"><span class="club">HOU</span><span class="pos">TE<span class="si">47</span></span></span><span class="ph"><span class="ph-g"><span class="opp"><b>at JAX</b><span>Sun 8:30 am</span></span><span class="ph-e">Avg <span class="si">4.4</span>, Last <span class="si">2.8</span></span></span></span></span></span></td><td class="game"><span class="opp"><b>at JAX</b><span>Sun 8:30 am</span></span><span class="facts"><span class="exp">20 to 22.5</span><span class="wx"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>Abroad</span></span></td><td class="n proj"><span class="si">3.6</span></td><td class="n ros pg"><span class="si">3.8</span></td><td class="n ev tot"><span class="si">41.8</span></td><td class="n ev rkc"><span class="si">4.4</span></td><td class="n ev"><span class="si">2.8</span></td><td class="n ev opp-r"><span class="rk easy"><span class="si">28th</span></span></td><td class="act"><button type="button" class="add rv" aria-label="Add Klein to your sheet"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>Sheet</span></button></td></tr><tr class="pk"><td class="n rank"><span class="dash">--</span></td><td class="player"><span class="pl"><span class="face" style="width:32px;height:32px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/2971573.png" alt="" width="32" height="32"></span><span class="who"><span class="nm"><a href="#">Ka&#x27;imi Fairbairn</a></span><span class="sub"><span class="club">HOU</span><span class="pos">K</span></span><span class="ph"><span class="ph-g"><span class="opp"><b>at JAX</b><span>Sun 8:30 am</span></span><span class="ph-e">Avg <span class="si">8.4</span>, Last <span class="si">9.0</span></span></span></span></span></span></td><td class="game"><span class="opp"><b>at JAX</b><span>Sun 8:30 am</span></span><span class="facts"><span class="exp">20 to 22.5</span><span class="wx"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>Abroad</span></span></td><td class="n proj"><span class="si">8.1</span></td><td class="n ros pg"><span class="dash">--</span></td><td class="n ev tot"><span class="dash">--</span></td><td class="n ev rkc"><span class="si">8.4</span></td><td class="n ev"><span class="si">9.0</span></td><td class="n ev opp-r"><span class="rk mid"><span class="si">11th</span></span></td><td class="act"><button type="button" class="add rv" aria-label="Add Fairbairn to your sheet"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>Sheet</span></button></td></tr><tr class="pk"><td class="n rank"><span class="dash">--</span></td><td class="player"><span class="pl"><span class="face mark-face" style="width:32px;height:32px"><img src="https://a.espncdn.com/i/teamlogos/nfl/500/hou.png" alt="" width="32" height="32"></span><span class="who"><span class="nm"><a href="#">Houston Texans</a></span><span class="sub"><span class="club">HOU</span><span class="pos">D/ST</span></span><span class="ph"><span class="ph-g"><span class="opp"><b>at JAX</b><span>Sun 8:30 am</span></span><span class="ph-e"></span></span></span></span></span></td><td class="game"><span class="opp"><b>at JAX</b><span>Sun 8:30 am</span></span><span class="facts"><span class="exp">20 to 22.5</span><span class="wx"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>Abroad</span></span></td><td class="n proj"><span class="si">7.9</span></td><td class="n ros pg"><span class="dash">--</span></td><td class="n ev tot"><span class="dash">--</span></td><td class="n ev rkc"><span class="dash">--</span></td><td class="n ev"><span class="dash">--</span></td><td class="n ev opp-r"><span class="dash">--</span></td><td class="act"><button type="button" class="add rv" aria-label="Add Houston Texans to your sheet"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>Sheet</span></button></td></tr></tbody></table>
+  <div class="basis" data-basis><p>Pos # is his place at his position in our rest-of-season order, refreshed Wed Oct 14, 2:05 pm. Rest of season is his points a game over the games his club has left through week 17, byes out, and his total. Kickers and defenses are not in that order.</p><p>Proj is this week's published projection in PPR, read <span class="si">Fri Oct 16, 9:00 pm</span>. Avg and Last are in PPR. Opp rank is points allowed to his position, 1st allows the fewest.</p></div>
+</main>
+</div>
+</div>
+</body>
+</html>
