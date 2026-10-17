@@ -164,7 +164,7 @@
 	}
 
 	th.go {
-		width: 190px;
+		width: 224px;
 	}
 
 	th.who,

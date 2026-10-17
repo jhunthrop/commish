@@ -242,7 +242,7 @@
 		}
 
 		.ph {
-			display: inline;
+			display: block;
 		}
 
 		th,

@@ -116,14 +116,17 @@ export function nearestLobby(s: LeagueSettings): LobbyFormat {
 	return '12_ppr';
 }
 
-/** The setup as a settings table (Lane 66o), where two sentences once said the clocks: the format,
- * the teams, your seat, the rounds, no clock against bots, and the nearest lobby's clock as the API
- * gives it (left out until the lobbies are read). */
+/** The setup as a settings table (Lane 66o), where three sentences once said the clocks and the
+ * lobby: the format, the teams, your seat, the rounds, no clock against bots, the nearest lobby's
+ * clock as the API gives it (left out until the lobbies are read), and when a lobby starts. */
 export function setupCells(
 	s: LeagueSettings,
 	rounds: number,
 	lobby: Pick<LobbyFilling, 'clock_seconds'> | undefined
 ): FactCell[] {
+	const lobbyClock: FactCell[] = lobby
+		? [{ label: 'Clock in a lobby', value: `${String(lobby.clock_seconds)} s a pick`, word: true }]
+		: [];
 	return [
 		{ label: 'Format', value: formatWords(s), word: true },
 		{ label: 'Teams', value: String(s.teams) },
@@ -134,15 +137,12 @@ export function setupCells(
 		},
 		{ label: 'Rounds', value: String(rounds) },
 		{ label: 'Clock against bots', value: 'None', word: true },
-		...(lobby
-			? [
-					{
-						label: 'Clock in a lobby',
-						value: `${String(lobby.clock_seconds)} s a pick`,
-						word: true
-					}
-				]
-			: [])
+		...lobbyClock,
+		{
+			label: 'A lobby starts',
+			value: `Full or ${String(LOBBY_FILL_SECONDS)} s`,
+			word: true
+		}
 	];
 }
 

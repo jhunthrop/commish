@@ -2,7 +2,7 @@
 	import Panel from '#lib/ui/Panel.svelte';
 	import Quiet from '#lib/ui/Quiet.svelte';
 	import type { LobbyFilling, LobbyFormat } from '../api.ts';
-	import { LOBBY_FILL_SECONDS, lobbyTitle } from './setup.ts';
+	import { lobbyTitle } from './setup.ts';
 
 	interface Props {
 		lobbies: readonly LobbyFilling[];
@@ -19,23 +19,14 @@
 
 <Panel>
 	<h3>Lobbies filling now</h3>
-	<p>
-		A lobby starts when it is full, or {LOBBY_FILL_SECONDS} seconds after the first drafter joins, with
-		bots in the open seats.
-	</p>
 	<ul>
 		{#each lobbies as lobby (lobby.format)}
-			{@const empty = lobby.filling === 0}
 			{#snippet body()}
 				<span class="what">
 					<b>{lobbyTitle(lobby.teams, lobby.scoring, lobby.lineup)}</b>
-					<span
-						>{empty
-							? `Nobody here yet. Be the first, it starts ${LOBBY_FILL_SECONDS} seconds after you join.`
-							: `${lobby.clock_seconds} seconds a pick`}</span
-					>
+					<span>{lobby.clock_seconds} s a pick</span>
 				</span>
-				{#if !empty}<span class="fill">{lobby.filling} of {lobby.teams}</span>{/if}
+				<span class="fill">{lobby.filling} of {lobby.teams}</span>
 			{/snippet}
 			<li>
 				{#if joinable}
@@ -57,14 +48,8 @@
 
 <style>
 	h3 {
-		margin: 0 0 var(--s-1);
-		font-size: var(--t-md);
-	}
-
-	p {
 		margin: 0 0 var(--s-3);
-		font-size: var(--t-sm);
-		color: var(--ink-2);
+		font-size: var(--t-md);
 	}
 
 	ul {

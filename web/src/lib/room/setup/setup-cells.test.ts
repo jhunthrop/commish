@@ -14,7 +14,8 @@ void test('the setup says its format, teams, seat, rounds and clocks as cells', 
 			['Your seat', '4'],
 			['Rounds', '15'],
 			['Clock against bots', 'None'],
-			['Clock in a lobby', '30 s a pick']
+			['Clock in a lobby', '30 s a pick'],
+			['A lobby starts', 'Full or 90 s']
 		]
 	);
 });

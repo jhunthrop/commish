@@ -275,7 +275,7 @@ try {
 	await call<Room>(me, 'POST', `/mocks/${created.id}/finish`);
 	await shoot('mock-report', `/mock/${created.id}/report`, 'The field');
 	const sunk = await sunkMock();
-	await shoot('mock-report-low', `/mock/${sunk}/report`, 'the leader at');
+	await shoot('mock-report-low', `/mock/${sunk}/report`, 'Leader');
 
 	// A lobby joined and left unattended: nobody is here when it fills, so it closes, and opening it
 	// after the fill window shows the closed state with the verb to join another.
