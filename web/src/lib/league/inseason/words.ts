@@ -307,7 +307,6 @@ export const LINES = {
 	toYourLineup: 'a week to your lineup',
 	/** The waiver rows' number named once over them on a phone, where the cell prints it alone. */
 	gainHead: 'Your gain a week',
-	drop: 'Drop',
 	unranked: 'Unranked',
 	/** A row's end on a screen whose rows end on points a game, for a player without them. */
 	noProjection: 'No projection',
