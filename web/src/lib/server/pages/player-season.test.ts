@@ -55,9 +55,9 @@ void test('his earlier seasons are rows in the same columns, newest first, worde
 		totals: { ...EMPTY, receptions: 129, targets: 166, snapShare: 0.68, points: 375 }
 	};
 	const [row] = seasonView(season, 'WR', [FORMAT], () => null, [prior]).prior;
-	assert.equal(row?.season, 2025);
-	assert.equal(row?.sub, '16 games, 23.4 a game');
-	assert.equal(row?.total, '375.0');
-	assert.equal(row?.cells[0], '166');
-	assert.equal(row?.cells[1], '129');
+	assert.ok(row);
+	assert.equal(row.season, 2025);
+	assert.equal(row.sub, '16 games, 23.4 a game');
+	assert.equal(row.total, '375.0');
+	assert.deepEqual(row.cells.slice(0, 2), ['166', '129']);
 });

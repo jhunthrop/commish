@@ -4,7 +4,7 @@
  * columns, then the two only we give (Rest of season, and Beats: the member's player he tops with the
  * gain); an add opens the players he could replace in the same columns, the advice's drop first.
  * Pure, tested in waivers.test.ts. */
-import { memberZone, weekdayTime, zoneWord } from '#lib/format/clock.ts';
+import { memberZone } from '#lib/format/clock.ts';
 import { lastName } from '#lib/format/draft.ts';
 import { fixed, signed } from '#lib/format/number.ts';
 import type { LeagueHost } from '../api.ts';

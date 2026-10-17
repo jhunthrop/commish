@@ -181,7 +181,7 @@
 								class:win={wins(row, rows.find((r) => r.id !== row.id) ?? null, column.key)}
 								class:wide={column.key === 'delta'}
 								><span class="fig">{tile?.value ?? NONE}</span
-								>{#if tile && tile.value === NONE && tile.caption !== ''}<span class="nofig"
+								>{#if tile?.value === NONE && tile.caption !== ''}<span class="nofig"
 										>{tile.caption}</span
 									>{/if}</td
 							>

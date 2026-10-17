@@ -467,7 +467,6 @@
 		line-height: 1;
 	}
 
-
 	.unwritten {
 		margin: 0 0 var(--s-3);
 		color: var(--ink-2);
