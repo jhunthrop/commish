@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/jhunthrop/commish/api/internal/apitypes"
 	"github.com/jhunthrop/commish/api/internal/draft"
+	"github.com/jhunthrop/commish/api/internal/scoring"
 )
 
 // A preset reads its stored board, TE premium the PPR one; a board
@@ -76,7 +78,7 @@ func customServer(t *testing.T, answer func(w http.ResponseWriter, in wireCustom
 }
 
 func goodAnswer(w http.ResponseWriter, in wireCustom) {
-	pts := 200 + in.Rules.PointsPerReception
+	pts := 200 + in.Rules["points_per_reception"]
 	_, _ = w.Write([]byte(`{"ok":true,"error":null,"data":{"season":2026,"source":"commish_board_v9_half_12",` +
 		`"as_of":"2026-09-09T02:20:29.697Z","rows":[{"player_id":"00-0039337","projected_points":` + jsonNumber(pts) +
 		`,"floor_points":150,"median_points":200,"ceiling_points":250}]}}`))
@@ -121,6 +123,27 @@ func TestCustomSourceBuildsOncePerRules(t *testing.T) {
 	}
 	if _, err := src.Load(context.Background(), halfRules(), 10, nil); err != nil || calls.Load() != 2 {
 		t.Fatalf("the same rules for another shape: %v, %d calls, want the kept board", err, calls.Load())
+	}
+	kicking := halfRules()
+	kicking.PointsAllowed0, kicking.PointsPerFieldGoal50Plus = 10, 5
+	if _, err := src.Load(context.Background(), kicking, 12, nil); err != nil || calls.Load() != 2 {
+		t.Fatalf("the same board rules with other kicking and defense rules: %v, %d calls, want the kept board", err, calls.Load())
+	}
+}
+
+// The service is sent the board's 21 rules alone: it refuses any other
+// key by name (research/boards/request.py).
+func TestCustomRequestCarriesTheBoardsRules(t *testing.T) {
+	var sent map[string]float64
+	src, _ := customServer(t, func(w http.ResponseWriter, in wireCustom) {
+		sent = in.Rules
+		goodAnswer(w, in)
+	})
+	if _, err := src.Load(context.Background(), scoring.Standard(), 12, nil); err != nil {
+		t.Fatal(err)
+	}
+	if want := scoring.BoardRules(scoring.Standard()); !maps.Equal(sent, want) || len(sent) != 21 {
+		t.Fatalf("sent %v, want the 21 %v", sent, want)
 	}
 }
 

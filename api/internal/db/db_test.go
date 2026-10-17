@@ -2,6 +2,7 @@ package db_test
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"io/fs"
 	"log/slog"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/jhunthrop/commish/api/internal/db"
 	"github.com/jhunthrop/commish/api/internal/db/dbtest"
+	"github.com/jhunthrop/commish/api/internal/scoring"
 	"github.com/jhunthrop/commish/api/migrations"
 )
 
@@ -103,6 +105,7 @@ func TestMigrationsApplyCleanly(t *testing.T) {
 	}
 	scoringRulesMigration(ctx, t, url, pool)
 	ffpcMemberReadsMigration(ctx, t, url, pool)
+	kickDefenseRulesMigration(ctx, t, url, pool)
 }
 
 // gooseProvider runs the app's migrations one by one on the test database.
@@ -209,7 +212,68 @@ func scoringRulesMigration(ctx context.Context, t *testing.T, url string, pool *
 			t.Errorf("%s = %g, want %g", k, rules[k], v)
 		}
 	}
-	if len(rules) != 21 || version != 2 {
-		t.Errorf("%d rules at version %d, want the 21 at version 2", len(rules), version)
+	if len(rules) != len(scoring.Rules()) || version != 2 {
+		t.Errorf("%d rules at version %d, want the %d at version 2", len(rules), version, len(scoring.Rules()))
+	}
+}
+
+// 00025: a custom scoring stored before gains the longer field goals at
+// its own field goal figure and the tiers at the standard figures, and so
+// do the rules of a league's last host read; down takes them away again.
+func kickDefenseRulesMigration(ctx context.Context, t *testing.T, url string, pool *pgxpool.Pool) {
+	t.Helper()
+	provider := gooseProvider(t, url)
+	if _, err := provider.DownTo(ctx, 24); err != nil {
+		t.Fatalf("down to 24: %v", err)
+	}
+	board := scoring.BoardRules(scoring.Standard())
+	board[scoring.FieldGoal] = 3.5
+	custom, err := json.Marshal(map[string]any{"scoring": map[string]any{"preset": nil, "custom": board}, "teams": 12})
+	if err != nil {
+		t.Fatal(err)
+	}
+	snapshot, err := json.Marshal(map[string]any{"scoring": map[string]any{"rules": board}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var league string
+	if err := pool.QueryRow(ctx, `with a as (insert into app.accounts (workos_user_id, email) values ('user_00025', 'k@d.c') returning id)
+		insert into app.leagues (account_id, name, settings) select id, 'Kicking', $1::jsonb from a returning id`, custom).Scan(&league); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, `insert into app.league_snapshots (host, host_league_id, host_season, snapshot, read_at)
+		values ('sleeper', '2500', 2026, $1::jsonb, now())`, snapshot); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := provider.Up(ctx); err != nil {
+		t.Fatalf("up again: %v", err)
+	}
+	read := func(query string) map[string]float64 {
+		var rules map[string]float64
+		if err := pool.QueryRow(ctx, query).Scan(&rules); err != nil {
+			t.Fatal(err)
+		}
+		return rules
+	}
+	leagueQuery := `select settings->'scoring'->'custom' from app.leagues where id = '` + league + `'`
+	snapQuery := `select snapshot->'scoring'->'rules' from app.league_snapshots where host_league_id = '2500'`
+	for name, rules := range map[string]map[string]float64{"league": read(leagueQuery), "snapshot": read(snapQuery)} {
+		r, err := scoring.FromMap(rules)
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		if r.PointsPerFieldGoal != 3.5 || r.PointsPerFieldGoal4049 != 3.5 || r.PointsPerFieldGoal50Plus != 3.5 ||
+			r.PointsAllowed0 != 5 || r.PointsAllowed46Plus != -5 || r.YardsAllowed099 != 5 || r.YardsAllowed550Plus != -7 {
+			t.Errorf("%s: %+v", name, r)
+		}
+	}
+	if _, err := provider.DownTo(ctx, 24); err != nil {
+		t.Fatalf("down to 24 again: %v", err)
+	}
+	if got := read(leagueQuery); len(got) != len(board) {
+		t.Errorf("down left %d rules, want the %d", len(got), len(board))
+	}
+	if _, err := provider.Up(ctx); err != nil {
+		t.Fatalf("up at last: %v", err)
 	}
 }

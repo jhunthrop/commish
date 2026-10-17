@@ -23,6 +23,7 @@ func TestSettingsScoring(t *testing.T) {
 		"points_per_field_goal_missed": -1, "points_per_extra_point": 1, "points_per_sack": 1,
 		"points_per_defensive_interception": 2, "points_per_defensive_fumble_recovery": 2,
 		"points_per_defensive_touchdown": 6, "points_per_safety": 2,
+		"points_allowed_0": 10, "points_allowed_35_45": -4, "points_allowed_46_plus": -4,
 	}
 	for k, v := range want {
 		if im.Rules[k] != v {
@@ -33,7 +34,7 @@ func TestSettingsScoring(t *testing.T) {
 		t.Fatalf("the rules do not make ScoringRules: %v", err)
 	}
 	words := scoring.DroppedWords(im.Dropped)
-	for _, w := range []string{"0 points allowed 10", "35 or more points allowed -4", "Kickoff and Punt Return Touchdowns 6", "Rushing Yards bonus at 100 3"} {
+	for _, w := range []string{"Kickoff and Punt Return Touchdowns 6", "Rushing Yards bonus at 100 3"} {
 		if !slices.Contains(words, w) {
 			t.Errorf("dropped %v lacks %q", words, w)
 		}

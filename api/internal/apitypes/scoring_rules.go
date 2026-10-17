@@ -32,17 +32,16 @@ var ruleKeys = sync.OnceValue(func() []string {
 	return keys
 })
 
-// ScoringRuleKeys is the 21 rule names, as the contract and
-// research/model/domain.py name them.
+// ScoringRuleKeys is every rule name, as the contract names them.
 func ScoringRuleKeys() []string { return append([]string(nil), ruleKeys()...) }
 
-// UnmarshalJSON reads the closed object: exactly the 21 rules, each a
+// UnmarshalJSON reads the closed object: exactly its rules, each a
 // number. An unknown key or a missing one is a FieldError naming it, so
 // no rule is ever read as zero by omission.
 func (r *ScoringRules) UnmarshalJSON(data []byte) error {
 	var raw map[string]json.RawMessage
 	if err := json.Unmarshal(data, &raw); err != nil || raw == nil {
-		return &FieldError{Field: scoringRulesField, Problem: "must be an object of the 21 scoring rules"}
+		return &FieldError{Field: scoringRulesField, Problem: "must be an object of the scoring rules"}
 	}
 	known := map[string]bool{}
 	for _, k := range ruleKeys() {

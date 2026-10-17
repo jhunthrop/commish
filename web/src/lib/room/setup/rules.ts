@@ -84,7 +84,8 @@ export const RULE_GROUPS: readonly RuleGroup[] = [
 	}
 ];
 
-/** STANDARD_SCORING's figures. */
+/** STANDARD_SCORING's figures, then the longer field goals and the defense's tiers at the API's
+ * standard figures (api/internal/scoring). */
 const STANDARD: Readonly<ScoringRules> = {
 	points_per_passing_yard: 0.04,
 	points_per_passing_touchdown: 4,
@@ -106,7 +107,28 @@ const STANDARD: Readonly<ScoringRules> = {
 	points_per_extra_point_missed: 0,
 	points_per_return_touchdown: 6,
 	points_per_defensive_fumble_recovery: 2,
-	points_per_safety: 2
+	points_per_safety: 2,
+	points_per_field_goal_40_49: 3,
+	points_per_field_goal_50_plus: 3,
+	points_allowed_0: 5,
+	points_allowed_1_6: 4,
+	points_allowed_7_13: 3,
+	points_allowed_14_17: 1,
+	points_allowed_18_20: 0,
+	points_allowed_21: 0,
+	points_allowed_22_27: 0,
+	points_allowed_28_34: -1,
+	points_allowed_35_45: -3,
+	points_allowed_46_plus: -5,
+	yards_allowed_0_99: 5,
+	yards_allowed_100_199: 3,
+	yards_allowed_200_299: 2,
+	yards_allowed_300_349: 0,
+	yards_allowed_350_399: -1,
+	yards_allowed_400_449: -3,
+	yards_allowed_450_499: -5,
+	yards_allowed_500_549: -6,
+	yards_allowed_550_plus: -7
 };
 
 /** What each preset changes from standard: reception points, and a tight end's extra. */

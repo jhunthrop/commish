@@ -2,6 +2,7 @@ package espn
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/jhunthrop/commish/api/internal/scoring"
 )
@@ -49,12 +50,26 @@ var alikeStats = map[string][]int{
 	"points_per_field_goal_missed":    {85, 82, 79, 76},
 }
 
-// Field goals by distance: one figure carries them, the under-40 one when
-// the league states no flat figure; a distance scored differently is
-// named dropped.
+// Field goals: ESPN counts a made field goal in its flat stat (83) and in
+// its distance's stat (80 under 40, 77 from 40 to 49, 74 from 50) alike,
+// so a league scoring both adds them, and a stat it does not state scores
+// nothing. A 60-yard stat (201) has no rule of its own and is named left
+// out.
 const statFieldGoal = 83
 
-var fieldGoalsByDistance = []int{80, 77, 74}
+var fieldGoalsByDistance = map[int]string{80: scoring.FieldGoal, 77: scoring.FieldGoal40To49, 74: scoring.FieldGoal50AndUp}
+
+// brackets is each points-allowed and yards-allowed stat ESPN scores a
+// defense by, as its bracket.
+var brackets = map[int]struct {
+	yards  bool
+	lo, hi int
+}{
+	89: {false, 0, 0}, 90: {false, 1, 6}, 91: {false, 7, 13}, 92: {false, 14, 17}, 121: {false, 18, 21},
+	122: {false, 22, 27}, 123: {false, 28, 34}, 124: {false, 35, 45}, 125: {false, 46, math.MaxInt},
+	128: {true, 0, 99}, 129: {true, 100, 199}, 130: {true, 200, 299}, 131: {true, 300, 349}, 132: {true, 350, 399},
+	133: {true, 400, 449}, 134: {true, 450, 499}, 135: {true, 500, 549}, 136: {true, 550, math.MaxInt},
+}
 
 // Map is a league's ESPN scoring as ScoringRules: what it states that
 // the 21 carry, every other rule it scores named in drafter words with
@@ -77,6 +92,7 @@ func Map(items []Item) scoring.Imported {
 	m.yardage()
 	m.single()
 	m.fieldGoals()
+	m.brackets()
 	m.alike()
 	if te != nil {
 		m.rules[scoring.TEBonus] = *te
@@ -133,20 +149,41 @@ func (m *mapper) single() {
 }
 
 func (m *mapper) fieldGoals() {
-	if v, ok := m.take(statFieldGoal); ok {
-		m.rules["points_per_field_goal"] = v
+	flat, stated := m.take(statFieldGoal)
+	for stat := range fieldGoalsByDistance {
+		if _, ok := m.stated[stat]; ok {
+			stated = true
+		}
+	}
+	if !stated {
 		return
 	}
-	base, ok := m.take(fieldGoalsByDistance[0])
-	if !ok {
-		return
+	for stat, rule := range fieldGoalsByDistance {
+		v, _ := m.take(stat)
+		m.rules[rule] = flat + v
 	}
-	m.rules["points_per_field_goal"] = base
-	// The longer buckets are taken with the short one: a kicker is not
-	// projected, so how they were read belongs to the league's record, not
-	// to a list of what the board leaves out.
-	for _, stat := range fieldGoalsByDistance[1:] {
-		m.take(stat)
+}
+
+// brackets puts each points-allowed and yards-allowed stat on the tiers it
+// spans; a tier no stat names is left for finish, which scores it nothing
+// as ESPN does.
+func (m *mapper) brackets() {
+	for stat, b := range brackets {
+		v, ok := m.take(stat)
+		if !ok {
+			continue
+		}
+		tiers := scoring.PointsAllowedTiers()
+		if b.yards {
+			tiers = scoring.YardsAllowedTiers()
+		}
+		keys, ok := scoring.Cover(tiers, b.lo, b.hi, math.MaxInt)
+		if !ok {
+			panic(fmt.Sprintf("espn: stat %d's bracket falls inside a tier", stat))
+		}
+		for _, k := range keys {
+			m.rules[k] = v
+		}
 	}
 }
 
@@ -182,11 +219,6 @@ func (m *mapper) finish() scoring.Imported {
 	}
 	scoring.SortDropped(m.dropped)
 	out := scoring.Imported{Rules: m.rules, Dropped: m.dropped}
-	for _, r := range scoring.Rules() {
-		if _, ok := out.Rules[r.Key]; !ok {
-			out.Rules[r.Key] = r.Standard
-			out.Defaulted = append(out.Defaulted, fmt.Sprintf("%s %g", r.Key, r.Standard))
-		}
-	}
+	out.Defaulted = scoring.Complete(out.Rules)
 	return out
 }

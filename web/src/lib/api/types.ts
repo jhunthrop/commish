@@ -1633,7 +1633,7 @@ export interface components {
 			preset?: components['schemas']['ScoringPreset'] | null;
 			custom?: components['schemas']['ScoringRules'] | null;
 		};
-		/** @description A league's exact scoring, the 21 rules research/model/domain.py ScoringRules names, every one required. An unknown key is a field error that names it. Points per yard for the yardage rules, per event for the rest. */
+		/** @description A league's exact scoring, every rule required: the 21 research/model/domain.py ScoringRules names (the board's rules), then a kicker's longer field goals and a team defense's points-allowed and yards-allowed tiers. An unknown key is a field error that names it. Points per yard for the yardage rules, per event for the rest. points_per_field_goal is a field goal made under 40 yards, and any field goal whose distance the stat line does not say. A tier is the points a defense scores for a game whose points or yards allowed fall in its range, both ends included; a tier the league does not score is 0. */
 		ScoringRules: {
 			/** Format: double */
 			points_per_passing_yard: number;
@@ -1677,6 +1677,48 @@ export interface components {
 			points_per_defensive_fumble_recovery: number;
 			/** Format: double */
 			points_per_safety: number;
+			/** Format: double */
+			points_per_field_goal_40_49: number;
+			/** Format: double */
+			points_per_field_goal_50_plus: number;
+			/** Format: double */
+			points_allowed_0: number;
+			/** Format: double */
+			points_allowed_1_6: number;
+			/** Format: double */
+			points_allowed_7_13: number;
+			/** Format: double */
+			points_allowed_14_17: number;
+			/** Format: double */
+			points_allowed_18_20: number;
+			/** Format: double */
+			points_allowed_21: number;
+			/** Format: double */
+			points_allowed_22_27: number;
+			/** Format: double */
+			points_allowed_28_34: number;
+			/** Format: double */
+			points_allowed_35_45: number;
+			/** Format: double */
+			points_allowed_46_plus: number;
+			/** Format: double */
+			yards_allowed_0_99: number;
+			/** Format: double */
+			yards_allowed_100_199: number;
+			/** Format: double */
+			yards_allowed_200_299: number;
+			/** Format: double */
+			yards_allowed_300_349: number;
+			/** Format: double */
+			yards_allowed_350_399: number;
+			/** Format: double */
+			yards_allowed_400_449: number;
+			/** Format: double */
+			yards_allowed_450_499: number;
+			/** Format: double */
+			yards_allowed_500_549: number;
+			/** Format: double */
+			yards_allowed_550_plus: number;
 		};
 		ScoringImportInput: {
 			/** @enum {string} */
@@ -1703,11 +1745,11 @@ export interface components {
 		};
 		ScoringImport: {
 			rules: components['schemas']['ScoringRules'];
-			/** @description the rules the host states */
+			/** @description the rules the host states, by our names, with every points-allowed and yards-allowed tier: a tier the host does not score is 0, as the host scores it */
 			applied: string[];
-			/** @description every host rule the 21 do not carry, in drafter words by group with its figure, never silently lost */
+			/** @description every host rule ScoringRules does not carry, in drafter words by group with its figure, never silently lost */
 			dropped: components['schemas']['DroppedRule'][];
-			/** @description the rules the host does not state, each at the standard figure */
+			/** @description the rules the host does not state, each at the standard figure (never a tier, see applied) */
 			defaulted: string[];
 		};
 		/** @description starters per position and the bench. Flex spots come from the lineup. */
@@ -3016,7 +3058,7 @@ export interface components {
 			settings_note: string | null;
 			/** @description the preset the league's rules score most like, what a mock without custom scoring drafts on */
 			scoring_like: components['schemas']['ScoringPreset'];
-			/** @description the league's scoring rules the saved league (ScoringRules' 21 keys) does not carry, by the host's own name and figure */
+			/** @description the league's scoring rules the saved league (ScoringRules) does not carry, by the host's own name and figure */
 			scoring_dropped: string[];
 			/** @description the ScoringRules keys the league does not state, each at its standard figure ("key figure") */
 			scoring_defaulted: string[];

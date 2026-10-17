@@ -3,6 +3,7 @@ package scoring
 import (
 	"encoding/json"
 	"errors"
+	"math"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -126,7 +127,7 @@ func TestFromSleeper(t *testing.T) {
 			t.Errorf("a left-out rule that does not read in a list: %+v", d)
 		}
 	}
-	if len(im.Rules) != 21 || slices.Contains(im.Applied(), "points_per_safety") || !slices.Contains(im.Applied(), Reception) {
+	if len(im.Rules) != len(rules) || slices.Contains(im.Applied(), "points_per_safety") || !slices.Contains(im.Applied(), Reception) {
 		t.Errorf("applied %v", im.Applied())
 	}
 }
@@ -189,20 +190,35 @@ func TestScoringFiguresAgreeEverywhere(t *testing.T) {
 	py := repoFile(t, "research/model/domain.py")
 	ts := repoFile(t, "web/src/lib/room/setup/rules.ts")
 	sql := repoFile(t, "api/migrations/00019_scoring_rules.sql")
-	sides := map[string]map[string]float64{
-		"domain.py STANDARD_SCORING": figures(t, py, "STANDARD_SCORING: Final = ScoringRules(", ")",
-			regexp.MustCompile(`(\w+)=`+number)),
-		"rules.ts STANDARD": figures(t, ts, "const STANDARD:", "};", regexp.MustCompile(`(\w+): `+number)),
-		"00019 defaults": figures(t, sql, "jsonb_build_object(", "$$;",
-			regexp.MustCompile(`'(\w+)', coalesce\(.*, `+number+`\)`)),
+	board := map[string]float64{}
+	for _, r := range boardRules {
+		board[r.Key] = r.Standard
 	}
-	for side, got := range sides {
-		if len(got) != len(want) {
-			t.Errorf("%s: %d figures, want %d", side, len(got), len(want))
+	kickDefense := map[string]float64{}
+	for _, r := range kickDefenseRules() {
+		kickDefense[r.Key] = r.Standard
+	}
+	sql25 := repoFile(t, "api/migrations/00025_kick_defense_rules.sql")
+	sides := []struct {
+		name      string
+		got, want map[string]float64
+	}{
+		{"domain.py STANDARD_SCORING", figures(t, py, "STANDARD_SCORING: Final = ScoringRules(", ")",
+			regexp.MustCompile(`(\w+)=`+number)), board},
+		{"rules.ts STANDARD", figures(t, ts, "const STANDARD:", "};", regexp.MustCompile(`(\w+): `+number)), want},
+		{"00019 defaults", figures(t, sql, "jsonb_build_object(", "$$;",
+			regexp.MustCompile(`'(\w+)', coalesce\(.*, `+number+`\)`)), board},
+		{"00025 defaults", figures(t, sql25, "jsonb_build_object(", "$$;",
+			regexp.MustCompile(`'(\w+)', (?:coalesce\(.*, )?`+number)), kickDefense},
+		{"domain.py tier tables", domainTiers(t, py), tierStandards()},
+	}
+	for _, side := range sides {
+		if len(side.got) != len(side.want) {
+			t.Errorf("%s: %d figures, want %d", side.name, len(side.got), len(side.want))
 		}
-		for k, v := range want {
-			if g, ok := got[k]; !ok || g != v {
-				t.Errorf("%s: %s = %g (%v), want %g", side, k, g, ok, v)
+		for k, v := range side.want {
+			if g, ok := side.got[k]; !ok || g != v {
+				t.Errorf("%s: %s = %g (%v), want %g", side.name, k, g, ok, v)
 			}
 		}
 	}
@@ -227,5 +243,174 @@ func TestScoringFiguresAgreeEverywhere(t *testing.T) {
 		if th[0] != th[1] || th[0] != th[2] {
 			t.Errorf("%s threshold: Go %g, boards service %g, web %g", name, th[0], th[1], th[2])
 		}
+	}
+}
+
+// tierStandards is every tier's standard figure, keyed by rule.
+func tierStandards() map[string]float64 {
+	out := map[string]float64{}
+	for _, group := range [][]Tier{PointsAllowedTiers(), YardsAllowedTiers()} {
+		for _, tier := range group {
+			out[tier.Key] = tier.Standard
+		}
+	}
+	return out
+}
+
+// domainTiers is domain.py's two tier tables read onto our tiers: each
+// tier takes the figure of the first ceiling its top does not pass, and a
+// tier's bottom must read the same, so no domain.py ceiling falls inside
+// one of ours.
+func domainTiers(t *testing.T, py string) map[string]float64 {
+	t.Helper()
+	pair := regexp.MustCompile(`\((-?[0-9]+|math\.inf), (-?[0-9]+)\)`)
+	table := func(name string) [][2]float64 {
+		i := strings.Index(py, name+": Final = (")
+		if i < 0 {
+			t.Fatalf("domain.py lost %s", name)
+		}
+		block := py[i : i+strings.Index(py[i:], "\n)")+2]
+		if j := strings.Index(py[i:], ")\n"); j >= 0 && !strings.Contains(py[i:i+j], "\n") {
+			block = py[i : i+j+1]
+		}
+		var out [][2]float64
+		for _, m := range pair.FindAllStringSubmatch(block, -1) {
+			ceiling := math.Inf(1)
+			if m[1] != "math.inf" {
+				ceiling, _ = strconv.ParseFloat(m[1], 64)
+			}
+			points, _ := strconv.ParseFloat(m[2], 64)
+			out = append(out, [2]float64{ceiling, points})
+		}
+		return out
+	}
+	at := func(rows [][2]float64, v float64) float64 {
+		for _, r := range rows {
+			if v <= r[0] {
+				return r[1]
+			}
+		}
+		return 0
+	}
+	out := map[string]float64{}
+	for name, group := range map[string][]Tier{"POINTS_ALLOWED_TIERS": PointsAllowedTiers(), "YARDS_ALLOWED_TIERS": YardsAllowedTiers()} {
+		rows := table(name)
+		for _, tier := range group {
+			top := float64(tier.Hi)
+			if tier.Hi == Open {
+				top = 1e9
+			}
+			if at(rows, float64(tier.Lo)) != at(rows, top) {
+				t.Errorf("%s: a ceiling falls inside %s", name, tier.Key)
+			}
+			out[tier.Key] = at(rows, top)
+		}
+	}
+	return out
+}
+
+// The board's rules are domain.py's ScoringRules fields, exactly: the
+// boards service refuses any other key.
+func TestBoardRulesAreDomains(t *testing.T) {
+	py := repoFile(t, "research/model/domain.py")
+	i := strings.Index(py, "class ScoringRules:")
+	j := strings.Index(py[i:], "\n\n\n")
+	var fields []string
+	for _, m := range regexp.MustCompile(`\n    (\w+): float`).FindAllStringSubmatch(py[i:i+j], -1) {
+		fields = append(fields, m[1])
+	}
+	got := BoardRules(Standard())
+	if len(got) != len(fields) {
+		t.Fatalf("board rules %d, domain.py %d", len(got), len(fields))
+	}
+	for _, f := range fields {
+		if _, ok := got[f]; !ok {
+			t.Errorf("board rules lack %s", f)
+		}
+	}
+	r := PresetRules(apitypes.ScoringPresetPpr)
+	r.PointsAllowed0, r.YardsAllowed550Plus, r.PointsPerFieldGoal50Plus = 10, 0, 5
+	if p, ok := StoredPreset(r); !ok || p != apitypes.ScoringPresetPpr {
+		t.Errorf("PPR with its own kicking and defense rules read as %q %v", p, ok)
+	}
+}
+
+// A host's bracket spans our tiers exactly or not at all.
+func TestCover(t *testing.T) {
+	cases := []struct {
+		lo, hi int
+		want   []string
+	}{
+		{0, 0, []string{"points_allowed_0"}},
+		{14, 20, []string{"points_allowed_14_17", "points_allowed_18_20"}},
+		{18, 21, []string{"points_allowed_18_20", "points_allowed_21"}},
+		{35, 99, []string{"points_allowed_35_45", "points_allowed_46_plus"}},
+		{46, 999, []string{"points_allowed_46_plus"}},
+		{14, 16, nil},
+		{15, 17, nil},
+		{30, 99, nil},
+	}
+	for _, c := range cases {
+		got, ok := Cover(PointsAllowedTiers(), c.lo, c.hi, 99)
+		if !slices.Equal(got, c.want) || ok != (c.want != nil) {
+			t.Errorf("%d to %d: %v %v, want %v", c.lo, c.hi, got, ok, c.want)
+		}
+	}
+	if At(PointsAllowedTiers(), 21).Key != "points_allowed_21" || At(YardsAllowedTiers(), 612).Key != "yards_allowed_550_plus" ||
+		At(YardsAllowedTiers(), 99).Key != "yards_allowed_0_99" {
+		t.Error("At reads a value into the wrong tier")
+	}
+}
+
+// A real Sleeper league's kicking and defense settings land in the rules:
+// field goals by distance, each bracket on the tiers it spans, the yards
+// brackets it does not score at 0 and never named defaulted, and a longer
+// miss scored apart named left out rather than read at the short figure.
+func TestFromSleeperKeepsKickingAndDefense(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "leaguesync", "replay", "sleeper", "league.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var league struct {
+		ScoringSettings map[string]float64 `json:"scoring_settings"`
+	}
+	if err := json.Unmarshal(raw, &league); err != nil {
+		t.Fatal(err)
+	}
+	settings := league.ScoringSettings
+	settings["fgmiss_0_19"], settings["fgmiss_20_29"], settings["fgmiss_30_39"], settings["fgmiss_40_49"] = -1, -1, -1, -2
+	delete(settings, "fgmiss")
+	im := FromSleeper(settings)
+	want := map[string]float64{
+		FieldGoal: 3, FieldGoal40To49: 4, FieldGoal50AndUp: 5, "points_per_field_goal_missed": -1,
+		"points_allowed_0": 10, "points_allowed_1_6": 7, "points_allowed_7_13": 4, "points_allowed_14_17": 1,
+		"points_allowed_18_20": 1, "points_allowed_21": 0, "points_allowed_22_27": 0, "points_allowed_28_34": -1,
+		"points_allowed_35_45": -4, "points_allowed_46_plus": -4, "yards_allowed_0_99": 0, "yards_allowed_550_plus": 0,
+	}
+	for k, v := range want {
+		if im.Rules[k] != v {
+			t.Errorf("%s = %g, want %g", k, im.Rules[k], v)
+		}
+	}
+	for _, d := range im.Defaulted {
+		if IsTier(strings.Fields(d)[0]) {
+			t.Errorf("a tier named defaulted: %s", d)
+		}
+	}
+	words := DroppedWords(im.Dropped)
+	if !slices.Contains(words, "field goal missed from 40 to 49 yards -2") {
+		t.Errorf("dropped %q lacks the longer miss", words)
+	}
+	for _, w := range words {
+		if strings.Contains(w, "allowed") || strings.HasPrefix(w, "field goal made") {
+			t.Errorf("a kept rule named left out: %s", w)
+		}
+	}
+	if _, err := FromMap(im.Rules); err != nil {
+		t.Errorf("the import is not whole: %v", err)
+	}
+	flat := FromSleeper(map[string]float64{"fgm": 3.5, "fgm_50p": 2})
+	if flat.Rules[FieldGoal] != 3.5 || flat.Rules[FieldGoal50AndUp] != 3.5 || !slices.Contains(DroppedWords(flat.Dropped), "field goal made from 50 yards or more 2") {
+		t.Errorf("a flat field goal: %v, dropped %v", flat.Rules, DroppedWords(flat.Dropped))
 	}
 }
