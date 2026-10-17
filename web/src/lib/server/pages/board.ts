@@ -8,21 +8,20 @@ import {
 	rangeScale,
 	rowsAt
 } from '#lib/run/derive.ts';
-import { boardBasisTerms, type BasisTerm } from '#lib/run/board-basis.ts';
+import { boardBasis, type BasisPart } from '#lib/run/board-basis.ts';
 import { rowFraming, type RowFraming } from '#lib/run/row-framing.ts';
 import type { BoardRowView, Format, MarketRowView } from '#lib/run/schema.ts';
 import { isMarketPosition, marketAt } from '#lib/run/market.ts';
 import { marketBasis, withFace } from '#lib/site/market.ts';
 import type { Position, RangeScale } from '#lib/types/player.ts';
-import { scoringBasis } from '#lib/run/catalog.ts';
 import { links } from '#lib/site/links.ts';
-import { windowLabel } from '#lib/format/date.ts';
+import { adpDrafts } from '#lib/run/adp-drafts.ts';
 import { withStatuses } from '#lib/run/board-status.ts';
 import type { CaptureStamp } from '#lib/format/designation.ts';
 import type { BoardStatusWords } from '#lib/run/status-view.ts';
 import { boardStatuses } from '../statuses.ts';
 import { boardSeason } from '../board-season.ts';
-import { adp, board, designations, manifest } from '../run.ts';
+import { adp, board, clubByes, designations, manifest } from '../run.ts';
 import {
 	absentFormatPage,
 	formatChips,
@@ -48,18 +47,18 @@ export interface BoardPage {
 	market: MarketRowView[];
 	/** That view's basis, said once in place of the format's: the order and its drafts. */
 	marketBasis: string | null;
-	/** The basis line once the season is underway, which the page prints in place of the format's. */
-	seasonLead: string | null;
+	/** The ranked view's basis, said once under the title (Lane 66n). */
+	basis: BasisPart[];
+	/** The season is underway: the rows carry this season's GP and A game. */
+	underway: boolean;
+	/** Each club's bye week, for the Bye column and the sort by it. */
+	byes: Record<string, number | null>;
 	scale: RangeScale;
 	/** Whether the rows carry a range. In season they do not, so the board draws no Range column,
 	 * no switch for it and no Range row in its basis. */
 	range: boolean;
 	/** How many players the whole board ranks, the population every round tint is counted in. */
 	boardSize: number;
-	/** The drafts behind this format's ADP and their window, from the run: "PPR drafts, Sep 5 to Sep 9". */
-	adpBasis: string[];
-	/** The Basis panel's rows, in order. */
-	basisTerms: BasisTerm[];
 	/** How every row frames his rank against the drafts (run/row-framing.ts). */
 	framing: RowFraming;
 	/** The run's injury capture, null when the run carries none: the basis line names it, said again
@@ -77,11 +76,13 @@ export async function boardPage(formatId: string, segment: string | null): Promi
 	const position = segment === null ? null : positionFromSegment(segment);
 	if (segment !== null && position === null) error(NOT_FOUND, 'No such position.');
 	const format = await formatForRoute(formatId, (id) => links.board(id, position));
-	const [loaded, formats, sources, capture] = await Promise.all([
+	const [loaded, formats, sources, capture, byes, run] = await Promise.all([
 		board(format.id),
 		formatChips(),
 		adp(),
-		designations()
+		designations(),
+		clubByes(),
+		manifest()
 	]);
 	// A kicker's or a defense's view lists his position in draft order, apart from the ranked rows.
 	const marketView = position !== null && isMarketPosition(position);
@@ -94,11 +95,9 @@ export async function boardPage(formatId: string, segment: string | null): Promi
 		: [];
 	if (ranked.length === 0 && market.length === 0)
 		error(NOT_FOUND, 'This board ranks nobody at that position.');
-	const { rows, lead } = await boardSeason(format, ranked);
+	const { rows, reach } = await boardSeason(format, ranked);
 	const range = carriesRange(rows);
-	const adpBasis = sources.sources
-		.filter((source) => source.formats.includes(format.id))
-		.map((source) => `${source.drafts}, ${windowLabel(source.window)}`);
+	const adpBasis = adpDrafts(sources.sources, format.id);
 	return {
 		format,
 		formats,
@@ -107,19 +106,20 @@ export async function boardPage(formatId: string, segment: string | null): Promi
 		rows,
 		market,
 		marketBasis: marketView ? marketBasis(format, sources.sources) : null,
-		seasonLead: marketView ? null : lead,
+		basis: boardBasis({
+			format,
+			season: run.season,
+			order: 'board',
+			position,
+			adpBasis,
+			gap: rowFraming(format).compare,
+			reach
+		}),
+		underway: reach !== null,
+		byes,
 		scale: rangeScale(rows.length > 0 ? rows : loaded.rows),
 		range,
 		boardSize: loaded.rows.length,
-		adpBasis,
-		basisTerms: boardBasisTerms({
-			format,
-			scoring: scoringBasis(format),
-			underway: lead !== null,
-			boardSize: loaded.rows.length,
-			adpBasis,
-			range
-		}),
 		framing: rowFraming(format),
 		...boardStatuses([...rows, ...market], capture, format)
 	};

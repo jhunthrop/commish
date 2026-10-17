@@ -6,13 +6,15 @@
 		tier: number;
 		/** "Tier 3" where there is room, a player's hero. "T3" in a row. */
 		long?: boolean;
+		/** The number alone, "3", under a column head that names it (the board's Tier column). */
+		bare?: boolean;
 	}
 
-	let { tier, long = false }: Props = $props();
+	let { tier, long = false, bare = false }: Props = $props();
 </script>
 
 <span class="tier-chip" class:long style:--tier={tierColor(tier)}
-	>{long ? `Tier ${String(tier)}` : `T${String(tier)}`}</span
+	>{long ? `Tier ${String(tier)}` : bare ? String(tier) : `T${String(tier)}`}</span
 >
 
 <style>

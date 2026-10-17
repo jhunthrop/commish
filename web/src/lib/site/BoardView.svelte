@@ -7,7 +7,9 @@
 	import type { BoardPage } from '#lib/server/pages/board.ts';
 	import { lazySheet } from './lazy-sheet.svelte.ts';
 	import RowSheetMark from './RowSheetMark.svelte';
-	import BasisList from '#lib/ui/BasisList.svelte';
+	import RowSheetTags from './RowSheetTags.svelte';
+	import BasisLine from '#lib/ui/BasisLine.svelte';
+	import BoardTable from '#lib/ui/BoardTable.svelte';
 	import Chip from '#lib/ui/Chip.svelte';
 	import ChipGroup from '#lib/ui/ChipGroup.svelte';
 	import FilterBar from '#lib/ui/FilterBar.svelte';
@@ -17,10 +19,11 @@
 	import Label from '#lib/ui/Label.svelte';
 	import Quiet from '#lib/ui/Quiet.svelte';
 	import Row from '#lib/ui/Row.svelte';
-	import RowHead from '#lib/ui/RowHead.svelte';
 	import TierJump from '#lib/ui/TierJump.svelte';
 	import TierStrip from '#lib/ui/TierStrip.svelte';
 	import Toggle from '#lib/ui/Toggle.svelte';
+	import { boardColumns } from '#lib/ui/board-columns.ts';
+	import { pressed, sortRows, type Sort, type SortKey } from '#lib/ui/board-sort.ts';
 	import { apiFormatOf } from '#lib/run/format-ids.ts';
 	import { heldOut } from '#lib/run/board-status.ts';
 	import type { BoardRowView } from '#lib/run/schema.ts';
@@ -38,14 +41,31 @@
 
 	/** Faces in the first screen load eagerly so they count toward the first paint. */
 	const EAGER_ROWS = 8;
+	/** Our order: the board's own, tiers drawn as bands on a position view. */
+	const OUR_ORDER: Sort = { key: 'rank', turned: false };
 
 	let belowReplacement = $state(true);
 	let rangeOn = $state(true);
+	let onlySheet = $state<boolean>(false);
+	let sort = $state<Sort>(OUR_ORDER);
 	/** The floor to ceiling column: shown while the switch is on, and only on a board with a range. */
 	const range = $derived(page.range && rangeOn);
 	/** How every row frames his rank against the drafts (run/row-framing.ts). */
 	const framing = $derived(page.framing);
-	let onlySheet = $state<boolean>(false);
+	/** A kicker's or a defense's view: his position in draft order, its basis said once. */
+	const marketView = $derived(page.marketBasis !== null);
+	const columns = $derived(
+		boardColumns({
+			order: 'board',
+			tier: page.position === null,
+			bye: true,
+			range,
+			gap: framing.compare,
+			season: page.underway,
+			action: true,
+			draftOrder: marketView
+		})
+	);
 
 	// The sheet loads on the reader's first intent, and at once when they ask for only their sheet.
 	// The league's rosters mark who is held.
@@ -87,22 +107,22 @@
 	});
 	const words = $derived(sayBoard(page, live));
 	/** A listed player's status as his row prints it. */
-	function status(player: BoardRowView): StatusView | null {
+	function status(player: { id: string }): StatusView | null {
 		return words?.rows[player.id] ?? null;
 	}
-	/** A kicker's or a defense's view: his position in draft order, its basis said once in the lead. */
-	const marketView = $derived(page.marketBasis !== null);
 	const marketShown = $derived(page.market.filter((row) => !onlySheet || lazySheet.has(row.id)));
-	/** The basis line, and the capture's sentence when the run carries one: on a kicker's or a
-	 * defense's view only when one of its rows carries a status. */
-	const lead = $derived.by(() => {
-		const basis = page.marketBasis ?? page.seasonLead ?? page.format.basis.join(' · ');
-		const listed = !marketView || page.market.some((row) => row.status !== undefined);
-		return words === null || !listed ? basis : `${basis} ${words.capture}`;
-	});
+	/** The capture's sentence, on a kicker's or a defense's view only when one of its rows is listed. */
+	const capture = $derived(
+		words !== null && (!marketView || page.market.some((row) => row.status !== undefined))
+			? words.capture
+			: null
+	);
 
-	/** A position view draws its tiers from the available players: a player on a season-long list
-	 * follows them, under a strip of his own. */
+	/** In our order a position view draws its tiers from the available players, a player on a
+	 * season-long list after them under a head of his own. Sorted by any other column, the rows run
+	 * as one list. */
+	const ours = $derived(sort.key === 'rank' && !sort.turned);
+	const banded = $derived(page.position !== null && ours);
 	const groups = $derived(
 		page.position === null
 			? []
@@ -112,11 +132,18 @@
 				)
 	);
 	const heldRows = $derived(page.position === null ? [] : page.rows.filter(heldOut).filter(shown));
-	const visible = $derived(page.rows.filter(shown));
+	const visible = $derived(
+		ours ? page.rows.filter(shown) : sortRows(page.rows.filter(shown), sort, page.byes)
+	);
 	const group = $derived(POSITION_NAMES[page.position ?? 'WR']);
 	const unit = $derived(page.format.unit);
+	const label = $derived(`${page.position ?? 'All'} ${page.format.label} board`);
 
-	/** The side column's anchor: the basis, the toggles and the tiers. */
+	function onsort(key: SortKey): void {
+		sort = pressed(sort, key);
+	}
+
+	/** The side column's anchor: the tiers and your sheet. */
 	const SIDE_ID = 'board-side';
 </script>
 
@@ -124,19 +151,17 @@
 	<Row
 		{player}
 		href={links.player(player.slug)}
+		{columns}
 		scale={page.scale}
-		showTier={page.position === null}
-		{unit}
-		{range}
+		bye={page.byes[player.team] ?? null}
 		{framing}
 		eager={i < EAGER_ROWS}
 		season={player.season}
 		held={siteContext.held?.mark(player.id) ?? null}
 		status={status(player)}
 	>
-		{#snippet action()}
-			<RowSheetMark {player} />
-		{/snippet}
+		{#snippet marks()}<RowSheetTags playerId={player.id} />{/snippet}
+		{#snippet action()}<RowSheetMark {player} />{/snippet}
 	</Row>
 {/snippet}
 
@@ -148,14 +173,17 @@
 	</div>
 	<div class="content">
 		<div class="lead">
-			<PageHead title={heading} {lead}>
+			<PageHead title={heading}>
 				{#snippet actions()}
 					<Quiet href={links.adp(page.format.id)} size="sm">ADP</Quiet>
 					<Quiet href={links.schedule()} size="sm">Schedule strength</Quiet>
-					<!-- Where the side column falls below 400 rows, a way to it from the top. -->
-					<span class="to-side"><Quiet href="#{SIDE_ID}" size="sm">Basis and filters</Quiet></span>
 				{/snippet}
 			</PageHead>
+			{#if marketView}
+				<BasisLine parts={[{ text: page.marketBasis ?? '', phone: true }]} tail={capture} />
+			{:else}
+				<BasisLine parts={page.basis} tail={capture} />
+			{/if}
 		</div>
 		<div class="filters">
 			<FilterBar>
@@ -167,44 +195,51 @@
 						>
 					{/each}
 				</ChipGroup>
+				<span class="shows">
+					{#if !marketView}<Toggle
+							label="Below replacement"
+							chip
+							bind:checked={belowReplacement}
+						/>{/if}
+					{#if page.range && !marketView}<span class="range-toggle"
+							><Toggle label="Floor to ceiling" chip bind:checked={rangeOn} /></span
+						>{/if}
+					<Toggle label="Only my sheet" chip bind:checked={onlySheet} />
+				</span>
 			</FilterBar>
 		</div>
 
-		<section aria-label="{page.position ?? 'All'} {page.format.label} board">
+		<BoardTable
+			{columns}
+			{label}
+			sort={marketView ? undefined : sort}
+			onsort={marketView ? undefined : onsort}
+		>
 			{#if marketView}
-				<RowHead range={false} action market {framing} />
 				{#each marketShown as player, i (player.id)}
 					{@const face = player.face}
 					<Row
 						{player}
 						href={links.club(player.team)}
-						scale={page.scale}
-						showTier={false}
-						{unit}
-						range={false}
+						{columns}
+						bye={page.byes[player.team] ?? null}
 						{framing}
 						eager={i < EAGER_ROWS}
 						held={siteContext.held?.mark(player.id) ?? null}
-						status={words?.rows[player.id] ?? null}
+						status={status(player)}
 					>
-						{#snippet action()}
-							<RowSheetMark player={{ ...player, headshot: face }} />
-						{/snippet}
+						{#snippet marks()}<RowSheetTags playerId={player.id} />{/snippet}
+						{#snippet action()}<RowSheetMark player={{ ...player, headshot: face }} />{/snippet}
 					</Row>
 				{/each}
-			{:else if page.position === null}
-				<RowHead {range} action games={page.seasonLead !== null} {framing} />
-				{#each visible as player, i (player.id)}
-					{@render row(player, i)}
-				{/each}
-			{:else}
-				<RowHead {range} action games={page.seasonLead !== null} {framing} />
+			{:else if banded && page.position !== null}
+				{@const position = page.position}
 				{#each groups as tierGroup (tierGroup.tier)}
 					{@const rows = tierGroup.rows.filter(shown)}
 					{#if rows.length > 0}
 						<div class="tier">
 							<TierStrip
-								id={tierAnchor(page.position, tierGroup.tier)}
+								id={tierAnchor(position, tierGroup.tier)}
 								tier={tierGroup.tier}
 								count={tierGroup.rows.length}
 								{group}
@@ -219,14 +254,20 @@
 				{/each}
 				{#if heldRows.length > 0}
 					<div class="tier">
-						<p class="held-head"><Label>On a season-long list</Label></p>
+						<p class="held-head">
+							<Label>On a season-long list, his figures assume he plays</Label>
+						</p>
 						{#each heldRows as player (player.id)}
 							{@render row(player, page.rows.length)}
 						{/each}
 					</div>
 				{/if}
+			{:else}
+				{#each visible as player, i (player.id)}
+					{@render row(player, i)}
+				{/each}
 			{/if}
-		</section>
+		</BoardTable>
 	</div>
 
 	<aside class="side" id={SIDE_ID} aria-label="Your board">
@@ -242,24 +283,6 @@
 						href: `#${tierAnchor(page.position ?? 'WR', tierGroup.tier)}`
 					}))}
 				/>
-			</Panel>
-		{/if}
-		<Panel>
-			<PanelHead title="Show" />
-			{#if !marketView}<Toggle
-					label="Players below replacement"
-					bind:checked={belowReplacement}
-				/>{/if}
-			{#if page.range && !marketView}<span class="range-toggle"
-					><Toggle label="Floor to ceiling" bind:checked={rangeOn} /></span
-				>{/if}
-			<Toggle label="Only my sheet" bind:checked={onlySheet} />
-		</Panel>
-		<!-- A kicker's or a defense's view says its basis once, in the lead. -->
-		{#if !marketView}
-			<Panel>
-				<PanelHead title="Basis" />
-				<BasisList terms={page.basisTerms} />
 			</Panel>
 		{/if}
 		<!-- Last in the column, so the rail arriving with the sheet moves nothing above it, in a slot
@@ -311,6 +334,12 @@
 	.side {
 		grid-column: 2;
 		grid-row: 2;
+		display: flex;
+		flex-direction: column;
+		gap: var(--s-4);
+		align-self: start;
+		position: sticky;
+		top: 84px;
 	}
 
 	.lead {
@@ -321,7 +350,18 @@
 	}
 
 	.filters {
-		margin-bottom: var(--s-4);
+		margin-bottom: var(--s-3);
+	}
+
+	.shows {
+		display: flex;
+		flex-wrap: wrap;
+		gap: var(--s-2);
+		margin-left: auto;
+	}
+
+	.range-toggle {
+		display: contents;
 	}
 
 	.tier {
@@ -334,39 +374,16 @@
 		border-bottom: 1px solid var(--line);
 	}
 
-	.side {
-		display: flex;
-		flex-direction: column;
-		gap: var(--s-4);
-		align-self: start;
-		position: sticky;
-		top: 84px;
-	}
-
-	.to-side {
-		display: none;
-	}
-
-	.range-toggle {
-		display: contents;
-	}
-
-	/* From 961 to 1439px an in-season row has no floor to ceiling column, so no switch for it. */
-	@media (min-width: 961px) and (max-width: 1439px) {
-		.board:has(:global(.row.games)) .range-toggle {
-			display: none;
-		}
-
-		/* The Range line, last in the Basis list, hides with its column. A board with no range has
-		   neither the line nor the switch, so its last line (Drafters) stays. */
-		.board:has(.range-toggle):has(:global(.row.games)) .side :global(dl > :nth-last-child(-n + 2)) {
-			display: none;
-		}
-	}
-
 	/* The sheet card's height with no one on it yet ("Your sheet", "No one yet"). */
 	.rail-slot {
 		min-height: 86px;
+	}
+
+	/* Below a desk the floor to ceiling column is gone, so no switch for it. */
+	@media (max-width: 1439px) {
+		.range-toggle {
+			display: none;
+		}
 	}
 
 	@media (max-width: 1180px) {
@@ -384,10 +401,6 @@
 
 		.content {
 			margin-bottom: var(--s-5);
-		}
-
-		.to-side {
-			display: contents;
 		}
 
 		.side {
@@ -408,6 +421,10 @@
 
 		.side {
 			grid-template-columns: minmax(0, 1fr);
+		}
+
+		.shows {
+			margin-left: 0;
 		}
 	}
 </style>

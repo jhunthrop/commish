@@ -20,8 +20,21 @@ import type { ScheduleRow } from '#lib/ui/schedule-grid.ts';
 import type { RangeScale } from '#lib/types/player.ts';
 import { withStatuses } from '#lib/run/board-status.ts';
 import { leadOf } from '#lib/run/held-places.ts';
+import { adpDrafts } from '#lib/run/adp-drafts.ts';
+import { boardBasis, type BasisPart } from '#lib/run/board-basis.ts';
+import { rowFraming } from '#lib/run/row-framing.ts';
+import { winsBasis } from '#lib/run/strength-words.ts';
 import { boardSeason } from '../board-season.ts';
-import { board, clubs, defaultFormat, designations, playedThrough, schedule } from '../run.ts';
+import {
+	adp,
+	board,
+	clubs,
+	defaultFormat,
+	designations,
+	manifest,
+	playedThrough,
+	schedule
+} from '../run.ts';
 import { boardStatuses, type BoardStatuses } from '../statuses.ts';
 
 /** The share of opponents the schedule grid shades as the strongest: the top quarter of the league
@@ -63,6 +76,10 @@ export interface ClubPage extends BoardStatuses {
 	clubs: Club[];
 	/** The last week played, 0 before the first kickoff: the schedule sets those weeks back. */
 	played: number;
+	/** The page's basis, said once (Lane 66n): the opponents' figure and source, then the rows'. */
+	basis: BasisPart[];
+	/** The season is underway: the rows carry this season's GP and A game. */
+	underway: boolean;
 }
 
 export interface SchedulePage {
@@ -133,18 +150,21 @@ export async function clubEntries(): Promise<{ abbr: string }[]> {
 
 export async function clubPage(abbr: string): Promise<ClubPage> {
 	const format = await defaultFormat();
-	const [list, loaded, rows, played, capture] = await Promise.all([
+	const [list, loaded, rows, played, capture, sources, run] = await Promise.all([
 		clubs(),
 		schedule(),
 		board(format.id),
 		playedThrough(),
-		designations()
+		designations(),
+		adp(),
+		manifest()
 	]);
 	const club = list.find((candidate) => candidate.abbr.toLowerCase() === abbr);
 	if (!club) error(NOT_FOUND, 'No such club.');
 	const slate = slateOf(loaded, club.abbr);
 	const own = withStatuses(rows.rows, capture).filter((row) => row.team === club.abbr);
-	const seasoned = (await boardSeason(format, own)).rows;
+	const { rows: seasoned, reach } = await boardSeason(format, own);
+	const adpBasis = adpDrafts(sources.sources, format.id);
 	// His kickers and his defense, in draft order (Lane 66m).
 	const market = MARKET_POSITIONS.flatMap((position) =>
 		withStatuses(marketAt(rows.market, position), capture)
@@ -165,6 +185,18 @@ export async function clubPage(abbr: string): Promise<ClubPage> {
 		scale: own.length > 0 ? rangeScale(own) : null,
 		clubs: list,
 		played,
+		basis: [
+			{ text: winsBasis(slate), phone: true },
+			...boardBasis({
+				format,
+				season: run.season,
+				order: 'board',
+				adpBasis,
+				gap: rowFraming(format).compare,
+				reach
+			})
+		],
+		underway: reach !== null,
 		...boardStatuses([...seasoned, ...market], capture, format)
 	};
 }

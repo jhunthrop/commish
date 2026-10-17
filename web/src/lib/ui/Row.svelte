@@ -1,20 +1,18 @@
 <script lang="ts">
-	import { fixed } from '#lib/format/number.ts';
+	import { draftersGap } from '#lib/format/draft.ts';
+	import { fixed, signed } from '#lib/format/number.ts';
 	import type { Snippet } from 'svelte';
 	import type { ShownMark } from '#lib/context/held-words.ts';
 	import { HELD_FRAMING, framedVorCell, type RowFraming } from '#lib/run/row-framing.ts';
 	import type { IndexSeason } from '#lib/run/schema.ts';
 	import type { StatusView } from '#lib/run/status-view.ts';
 	import type { BoardPlayer, MarketPosition, RangeScale } from '#lib/types/player.ts';
-	import AdpCell from './AdpCell.svelte';
+	import type { BoardColumns } from './board-columns.ts';
 	import Face from './Face.svelte';
 	import NameWords from './NameWords.svelte';
-	import PositionPill from './PositionPill.svelte';
 	import RangeBar from './RangeBar.svelte';
+	import StatusPill from './StatusPill.svelte';
 	import TierChip from './TierChip.svelte';
-	import ToneChip from './ToneChip.svelte';
-	import ValueCell from './ValueCell.svelte';
-	import { seasonFigures } from './season-figures.ts';
 
 	/** A kicker or a defense in draft order (Lane 66m, the 2026-09-05 ruling): his place among the
 	 * players the drafts take, the format's ADP, his face (a defense's is its club's mark), and no
@@ -30,62 +28,50 @@
 		face: string | null;
 	}
 
+	/** One board row as a box score (Lane 66n): the player the biggest thing on it, every figure under
+	 * a column head that names it once (RowHead), the columns the view's (board-columns.ts). */
 	interface Props {
 		/** A ranked player, or a kicker or a defense in draft order. */
 		player: BoardPlayer | DraftOrderPlayer;
 		/** The player's page. */
 		href: string;
+		/** The view's columns, the same object its BoardTable and RowHead draw. */
+		columns: BoardColumns;
 		/** The range scale every row in this view shares. */
 		scale?: RangeScale;
-		/** The All view carries the tier as a chip. A position view draws tier strips instead. */
-		showTier: boolean;
-		/** The scoring the points are in, as the cell label prints it: "PPR pts". */
-		unit: string;
+		/** His club's bye week, null when the run names none. */
+		bye: number | null;
 		/** Faces in the first screen of a prerendered board load eagerly. */
 		eager?: boolean;
-		/** The floor to ceiling column, on unless the view switches it off. Match the RowHead above. */
-		range?: boolean;
-		/** The row's sheet control at its end (SheetMark). Off the phone, where the whole row opens his
-		 * page and the page carries the verb. Anything in it marked data-reveal shows only while the row is
-		 * hovered or holds focus, so a board of 400 rows does not print 400 verbs. Match the RowHead's action. */
+		/** The row's sheet control at its end (SheetMark), where the columns carry it. Anything in it
+		 * marked data-reveal shows only while the row is hovered or holds focus. */
 		action?: Snippet;
-		/** What the row is ordered by. board leads with our rank and names his ADP at the end. adp
-		 * leads with his ADP, the order drafters take players in, and names our rank at the end. */
-		order?: 'board' | 'adp';
-		/** His season so far, passed once the run is past the season's first kickoff: the meta line
-		 * prints "18.4 a game, 5 games" in place of his projected games, and the page's basis line
-		 * names it. Left out, the row is the preseason row. */
+		/** Marks on his line from the member's own sheet (its tags), drawn once the sheet is in. */
+		marks?: Snippet;
+		/** His season so far, once the run is past the season's first kickoff: the GP and A game columns. */
 		season?: IndexSeason;
-		/** The league's mark, with the component that draws it (HeldMark, loaded with the rosters):
-		 * yours, which tints the row with your wash, or a free agent. */
+		/** The league's mark, with the component that draws it (HeldMark): yours tints the row. */
 		held?: ShownMark | null;
-		/** How the row frames his rank against the drafts, the page's one rule (run/row-framing.ts):
-		 * in season the ADP alone and no round. Match the RowHead's. */
+		/** How the row frames his rank against the drafts (run/row-framing.ts): the tint it keeps. */
 		framing: RowFraming;
-		/** His injury status when the run's capture lists him (run/status-view.ts): a season-long one
-		 * shows as his rank and carries its sentence on a line of its own, a week's carries its mark. */
+		/** His injury status when the run's capture lists him (run/status-view.ts), drawn by the shared
+		 * pill: a season-long one shows as his rank and its chip ("IR since Sep 22"). */
 		status?: StatusView | null;
-		/** A kicker's or a defense's place: under a Draft order head (RowHead's market heads) the bare
-		 * number in the over replacement track; under a ranked row's heads (ADP) on his position pill,
-		 * "K 3", as a ranked row's place is. */
-		orderColumn?: boolean;
 	}
 
 	let {
 		player,
 		href,
+		columns,
 		scale,
-		showTier,
-		unit,
+		bye,
 		eager = false,
-		range = true,
 		action,
-		order = 'board',
+		marks,
 		season,
 		held = null,
 		framing,
-		status = null,
-		orderColumn = true
+		status = null
 	}: Props = $props();
 
 	function inDraftOrder(row: BoardPlayer | DraftOrderPlayer): row is DraftOrderPlayer {
@@ -95,33 +81,31 @@
 
 	const ranked = $derived(inDraftOrder(player) ? null : player);
 	const drafted = $derived(inDraftOrder(player) ? player : null);
-	/** A kicker's or a defense's place, the word standing in for it on a season-long list. */
-	const place = $derived(status?.rank ?? drafted?.positionRank ?? null);
+	const cell = $derived(columns.cells);
+	const has = (key: keyof typeof columns.cells): boolean => columns.cells[key] !== undefined;
 
-	/** A player on a season-long list: his rank is the word, so no tier and no framed rank. */
+	/** A player on a season-long list: his rank is the word, so no tier and no gap. */
 	const heldOut = $derived(status !== null && status.rank !== null);
-	const shownFraming = $derived(heldOut ? HELD_FRAMING : framing);
-
-	const lead = $derived(
-		order === 'adp' && player.adp !== null
-			? fixed(player.adp)
-			: ranked === null
-				? ''
-				: String(ranked.ourRank)
+	const rankShown = $derived(status?.rank ?? (ranked === null ? '' : String(ranked.ourRank)));
+	const vor = $derived(
+		ranked === null
+			? null
+			: framedVorCell(ranked.vor, ranked.vorRound, heldOut ? HELD_FRAMING : framing)
+	);
+	/** Drafters' ADP less our rank, the one sign on every page: plus when drafters wait. */
+	const gap = $derived(ranked === null || heldOut ? null : draftersGap(ranked.adp, ranked.ourRank));
+	/** A kicker's or a defense's pill carries his place where no Draft order column does (ADP). */
+	const pillRank = $derived(
+		drafted === null ? undefined : has('order') ? undefined : drafted.positionRank
 	);
 </script>
 
-<div
-	class="row"
-	class:mine={held?.kind === 'mine'}
-	class:flat={!range}
-	class:act={action !== undefined}
-	class:act-flat={action !== undefined && !range}
-	class:games={season !== undefined}
->
-	<!-- A held player's rank shows as the word; in ADP order the lead is the drafters' ADP, kept. -->
-	<span class="rk">{order === 'board' ? (status?.rank ?? lead) : lead}</span>
-	<span class="face"
+<div class="row" class:mine={held?.kind === 'mine'}>
+	{#if cell.rank}<span class="n rk {cell.rank}">{rankShown}</span>{/if}
+	{#if cell.adpLead}<span class="n {cell.adpLead}"
+			>{player.adp === null ? '' : fixed(player.adp)}</span
+		>{/if}
+	<span class="face {cell.face}"
 		><Face
 			src={drafted === null ? (ranked?.headshot ?? null) : drafted.face}
 			name={player.name}
@@ -129,143 +113,216 @@
 			loading={eager ? 'eager' : 'lazy'}
 		/>{#if held}<held.Mark words={held.words} kind={held.kind} />{/if}</span
 	>
-	<span class="who">
+	<span class="who {cell.player}">
 		<a class="name" {href}><NameWords name={player.name} /></a>
-		<span class="meta" class:seasoned={season !== undefined}>
-			{#if ranked}
-				<PositionPill position={ranked.position} rank={status?.rank ?? ranked.positionRank} />
-				{#if showTier && !heldOut}<span class="wide tier"><TierChip tier={ranked.tier} /></span
-					>{/if}
-				<span class="wide team">{ranked.team}</span>
-				{#if season === undefined}
-					<span class="wide">{fixed(ranked.expectedGames)} games</span>
-				{:else}
-					{@const figures = seasonFigures(season)}
-					<span class="season">{figures.perGame}<span class="count">{figures.games}</span></span>
-				{/if}
-				<span class="narrow">{fixed(ranked.projected)} pts</span>
-			{:else if drafted}
-				<PositionPill
-					position={drafted.position}
-					rank={orderColumn ? (status?.rank ?? undefined) : (place ?? undefined)}
-				/>
-				<span class="wide team">{drafted.team}</span>
-			{/if}
+		<span class="meta">
+			<StatusPill
+				position={player.position}
+				positionRank={ranked?.positionRank ?? pillRank}
+				{status}
+			/>
+			<span class="club">{player.team}</span>
+			{#if bye !== null}<span class="phone-bye">Bye {bye}</span>{/if}
+			{#if marks}{@render marks()}{/if}
 		</span>
-		{#if status}
-			<span class="status">
-				{#if status.line}{status.line}{:else}<ToneChip tone={status.sits ? 'loss' : 'even'}
-						>{status.mark}</ToneChip
-					>{/if}
-			</span>
-		{/if}
 	</span>
-	<span class="gp">{season?.games}</span>
-	{#if ranked}
-		<span class="proj"><ValueCell value={ranked.projected} label={unit} /></span>
-		<ValueCell {...framedVorCell(ranked.vor, ranked.vorRound, shownFraming)} phoneLabel={false} />
-		{#if range && scale}
-			<span class="rng">
-				<RangeBar
-					floor={ranked.floor ?? 0}
-					median={ranked.median ?? 0}
-					ceiling={ranked.ceiling ?? 0}
+	{#if cell.tier}<span class={cell.tier}
+			>{#if ranked && !heldOut}<TierChip tier={ranked.tier} bare />{/if}</span
+		>{/if}
+	{#if cell.bye}<span class="n quiet {cell.bye}">{bye ?? ''}</span>{/if}
+	{#if cell.proj}<span class="n {cell.proj}">{ranked ? fixed(ranked.projected) : ''}</span>{/if}
+	{#if cell.vor}<span class="end {cell.vor}"
+			>{#if vor}<b class="n tile {vor.heat}">{signed(vor.value, 1)}</b>{/if}</span
+		>{/if}
+	{#if cell.order}<span class="n {cell.order}">{drafted?.positionRank ?? ''}</span>{/if}
+	{#if cell.range}<span class={cell.range}
+			>{#if ranked && scale && ranked.floor !== null && ranked.median !== null && ranked.ceiling !== null}<RangeBar
+					floor={ranked.floor}
+					median={ranked.median}
+					ceiling={ranked.ceiling}
 					{scale}
-				/>
-			</span>
-		{/if}
-		<AdpCell
-			adp={ranked.adp}
-			ourRank={ranked.ourRank}
-			under={order === 'adp' ? 'rank' : 'adp'}
-			compare={shownFraming.compare}
-			rankWord={status?.rank ?? null}
-		/>
-	{:else if drafted}
-		<span class="proj"></span>
-		<span class="order"
-			>{#if orderColumn && status?.rank == null}<b>{drafted.positionRank}</b>{/if}</span
-		>
-		{#if range}<span class="rng"></span>{/if}
-		<!-- In ADP order the lead already prints his ADP, so the drafters' cell is left empty. -->
-		<AdpCell
-			adp={drafted.adp}
-			ourRank={drafted.ourRank}
-			under="adp"
-			compare={false}
-			figure={order !== 'adp'}
-			rankWord={status?.rank ?? null}
-		/>
-	{/if}
-	{#if action}<span class="action">{@render action()}</span>{/if}
+					form="inline"
+				/>{/if}</span
+		>{/if}
+	{#if cell.adp}<span class="n {cell.adp}" class:none={player.adp === null}
+			>{player.adp === null ? 'None' : fixed(player.adp)}</span
+		>{/if}
+	{#if cell.ourRank}<span class="n quiet {cell.ourRank}">{ranked ? rankShown : ''}</span>{/if}
+	{#if cell.gap}<span
+			class="n gap {cell.gap}"
+			class:gain={gap !== null && gap > 0}
+			class:loss={gap !== null && gap < 0}
+			>{gap === null ? '' : gap > 0 ? `+${String(gap)}` : gap < 0 ? `−${String(-gap)}` : '0'}</span
+		>{/if}
+	{#if cell.gp}<span class="n quiet {cell.gp}">{season?.games ?? ''}</span>{/if}
+	{#if cell.agame}<span class="n {cell.agame}" class:none={season?.pointsPerGame === null}
+			>{season === undefined
+				? ''
+				: season.pointsPerGame === null
+					? 'None'
+					: fixed(season.pointsPerGame)}</span
+		>{/if}
+	{#if cell.action}<span class="action {cell.action}"
+			>{#if action}{@render action()}{/if}</span
+		>{/if}
 </div>
 
 <style>
 	/* The name's link stretches over the whole row, so the face, the numbers and the empty space all
-	   open his page. The action sits above it. */
+	   open his page. The action sits above it. The grid is the table's, one template per band
+	   (BoardTable sets them, board-columns.ts decides them). */
 	.row {
 		position: relative;
 		display: grid;
-		grid-template-columns: var(--board-cols);
+		grid-template-columns: var(--cols-desk);
 		align-items: center;
-		column-gap: var(--s-3);
+		column-gap: var(--s-2);
 		min-height: var(--row-h);
 		padding: 4px var(--s-3);
 		border-bottom: 1px solid var(--line);
 	}
 
-	.flat {
-		grid-template-columns: var(--board-cols-flat);
+	.row:hover {
+		background: var(--surface);
 	}
 
-	.act {
-		grid-template-columns: var(--board-cols-act);
+	/* Your own player's row takes your wash, the one tint that means you. */
+	.mine,
+	.mine:hover {
+		background: var(--accent-wash);
 	}
 
-	.act-flat {
-		grid-template-columns: var(--board-cols-act-flat);
-	}
-
-	.games {
-		grid-template-columns: var(--board-cols-games);
-	}
-
-	.games.flat {
-		grid-template-columns: var(--board-cols-games-flat);
-	}
-
-	.games.act {
-		grid-template-columns: var(--board-cols-games-act);
-	}
-
-	.games.act-flat {
-		grid-template-columns: var(--board-cols-games-act-flat);
-	}
-
-	/* This season's games, a bare count under the Games head, in a row that carries the season. */
-	.gp {
-		display: none;
+	/* A figure: the number face, a step under the name, so the player stays the biggest thing. */
+	.n {
 		text-align: right;
 		font-family: var(--font-num);
-		font-size: var(--t-lg);
 		font-variant-numeric: tabular-nums;
+		font-size: var(--t-row-num);
+		font-weight: 600;
+		letter-spacing: 0.01em;
+		white-space: nowrap;
 	}
 
-	/* A kicker's or a defense's place in draft order, in a ranked row's figure type (ValueCell's), its
-	   column head naming it. */
-	.order {
+	.quiet,
+	.rk {
+		color: var(--ink-2);
+	}
+
+	.rk {
+		color: var(--ink-3);
+	}
+
+	.none {
+		font-family: var(--font-ui);
+		font-size: var(--t-xs);
+		font-weight: 500;
+		color: var(--ink-3);
+	}
+
+	.end {
 		display: flex;
 		justify-content: flex-end;
-		align-items: center;
 	}
 
-	.order b {
-		font-family: var(--font-num);
-		font-variant-numeric: tabular-nums;
-		letter-spacing: 0.01em;
-		font-weight: 700;
-		font-size: var(--t-xl);
-		line-height: 1;
+	/* Over replacement: the tinted tile, the signed figure alone, its head naming it. */
+	.tile {
+		display: inline-flex;
+		align-items: center;
+		justify-content: flex-end;
+		min-width: 100%;
+		height: 32px;
+		padding: 0 var(--s-2);
+		border-radius: var(--r-sm);
+		color: var(--heat-ink);
+		font-weight: 600;
+	}
+
+	.heat-1 {
+		background: var(--heat-1);
+	}
+
+	.heat-2 {
+		background: var(--heat-2);
+	}
+
+	.heat-3 {
+		background: var(--heat-3);
+	}
+
+	.heat-4 {
+		background: var(--heat-4);
+	}
+
+	.heat-neg {
+		background: var(--heat-neg);
+	}
+
+	/* The gap: its sign carries it, its tone repeats it. */
+	.gain {
+		color: var(--gain-ink);
+	}
+
+	.loss {
+		color: var(--loss-ink);
+	}
+
+	.face {
+		position: relative;
+		display: inline-grid;
+	}
+
+	.who {
+		min-width: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+	}
+
+	.name {
+		font-weight: 600;
+		font-size: var(--t-row-name);
+		line-height: 1.2;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		text-decoration: none;
+	}
+
+	.name::after {
+		content: '';
+		position: absolute;
+		inset: 0;
+	}
+
+	.row:hover .name {
+		text-decoration: underline;
+	}
+
+	/* His position (with its status chip), club and, on the phone, the bye: small, one line. */
+	.meta {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		min-width: 0;
+		overflow: hidden;
+		color: var(--ink-3);
+		white-space: nowrap;
+	}
+
+	.meta > :global(*) {
+		flex: none;
+	}
+
+	.club,
+	.phone-bye {
+		font-size: var(--t-xs);
+		font-weight: 600;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
+	}
+
+	.phone-bye {
+		display: none;
 	}
 
 	.action {
@@ -290,106 +347,8 @@
 		}
 	}
 
-	.row:hover {
-		background: var(--surface);
-	}
-
-	/* Your own player's row takes your wash, the one tint that means you. */
-	.mine,
-	.mine:hover {
-		background: var(--accent-wash);
-	}
-
-	/* The face's box, kept for every row, so a held mark arriving over its edge moves nothing. */
-	.face {
-		position: relative;
-		display: inline-grid;
-	}
-
-	.rk {
-		font-size: var(--t-sm);
-		color: var(--ink-3);
-		text-align: right;
-		font-variant-numeric: tabular-nums;
-	}
-
-	.who {
-		min-width: 0;
-		container-type: inline-size;
-		display: flex;
-		flex-direction: column;
-		gap: 2px;
-	}
-
-	.name {
-		font-weight: 600;
-		font-size: var(--t-md);
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		text-decoration: none;
-	}
-
-	.name::after {
-		content: '';
-		position: absolute;
-		inset: 0;
-	}
-
-	.row:hover .name {
-		text-decoration: underline;
-	}
-
-	/* Every item keeps its whole width: a unit is never clipped. The widest line with the club
-	   ("WR 6 · T3 · NO · 14.6 games") needs 201px, so only a narrower column drops the club (his page
-	   still names it), and below 170px the tier chip goes too. */
-	.meta {
-		display: flex;
-		align-items: center;
-		gap: 6px;
-		font-size: var(--t-sm);
-		color: var(--ink-3);
-		white-space: nowrap;
-	}
-
-	.meta > :global(*) {
-		flex: none;
-	}
-
-	/* A listed player's status, a line of its own under the meta: the season-long sentence wraps. */
-	.status {
-		font-size: var(--t-sm);
-		color: var(--ink-2);
-		line-height: 1.3;
-	}
-
-	/* His season so far takes the projected games' place. On a desk (1181 px and up) the count has
-	   its own Games column and the line prints "25.9 a game"; below it the line prints the count too,
-	   "8.2 a game, 3 games", taking a line of its own where the column is under the widest such line
-	   (256px, measured on the real run's 536 rows), wrapping its words rather than losing its end. */
-	.season {
-		color: var(--ink-2);
-		font-variant-numeric: tabular-nums;
-	}
-
-	@media (min-width: 1181px) {
-		.count {
-			display: none;
-		}
-
-		.games > .gp {
-			display: block;
-		}
-	}
-
-	@media (min-width: 961px) and (max-width: 1439px) {
-		.games > .rng {
-			display: none;
-		}
-	}
-
-	/* A 32px mark track holds the disc alone: his place on your sheet is in its name. */
-	@media (min-width: 961px) and (max-width: 1180px) {
+	/* Below a desk the sheet mark is its disc: his place on your sheet is in its name. */
+	@media (max-width: 1439px) {
 		.action :global(.place) {
 			display: none;
 		}
@@ -399,85 +358,50 @@
 		}
 	}
 
-	@media (min-width: 1181px) and (max-width: 1439px) {
-		.games > .action :global(.place) {
-			display: none;
+	@media (min-width: 961px) and (max-width: 1439px) {
+		.row {
+			grid-template-columns: var(--cols-lap);
 		}
 
-		.games > .action :global(.add) {
-			padding-left: 2px;
-		}
-	}
-
-	/* iPad landscape: tighter columns and a 32px face, so the tier chip keeps its room. */
-	@media (min-width: 1181px) and (max-width: 1253px) {
-		.games {
-			column-gap: 9px;
-		}
-
-		.games > .face :global(.face) {
-			width: 32px;
-			height: 32px;
-		}
-	}
-
-	@media (max-width: 1180px) {
-		.gp {
-			display: none;
-		}
-
-		@container (max-width: 259px) {
-			.seasoned {
-				flex-wrap: wrap;
-				row-gap: 2px;
-			}
-
-			.seasoned > .season {
-				order: 1;
-				flex: 0 0 100%;
-				white-space: normal;
-			}
-		}
-	}
-
-	@container (max-width: 204px) {
-		.team {
+		.h-lap {
 			display: none;
 		}
 	}
 
-	@container (max-width: 170px) {
-		.tier {
+	@media (min-width: 761px) and (max-width: 960px) {
+		.row {
+			grid-template-columns: var(--cols-tab);
+		}
+
+		.h-tab {
 			display: none;
 		}
 	}
 
-	.narrow {
-		display: none;
-	}
-
-	@media (max-width: 960px) {
-		.rng,
-		.action {
+	@media (min-width: 1440px) {
+		.h-desk {
 			display: none;
 		}
 	}
 
 	@media (max-width: 760px) {
 		.row {
-			column-gap: var(--s-2);
+			grid-template-columns: var(--cols-phone);
+			column-gap: 6px;
 			padding: 4px 0;
 		}
 
-		.rk,
-		.proj,
-		.wide,
-		.action {
+		.h-phone {
 			display: none;
 		}
 
-		.narrow {
+		.phone-bye {
 			display: inline;
+		}
+
+		.tile {
+			height: 30px;
+			padding: 0 6px;
 		}
 
 		/* A long name takes a second line rather than losing its end: "Jaxon Smith-Njigba". */
@@ -487,7 +411,6 @@
 			-webkit-box-orient: vertical;
 			-webkit-line-clamp: 2;
 			line-clamp: 2;
-			line-height: 1.2;
 		}
 	}
 </style>

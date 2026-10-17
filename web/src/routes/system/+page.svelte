@@ -27,7 +27,8 @@
 	import PositionPill from '#lib/ui/PositionPill.svelte';
 	import Quiet from '#lib/ui/Quiet.svelte';
 	import Row from '#lib/ui/Row.svelte';
-	import RowHead from '#lib/ui/RowHead.svelte';
+	import BoardTable from '#lib/ui/BoardTable.svelte';
+	import { boardColumns } from '#lib/ui/board-columns.ts';
 	import ScoreBug from '#lib/ui/ScoreBug.svelte';
 	import Field from '#lib/ui/Field.svelte';
 	import FilePick from '#lib/ui/FilePick.svelte';
@@ -67,6 +68,16 @@
 	const ROW_MIN_WIDTH = 760;
 	const BAND_MIN_WIDTH = 520;
 	const PLAYER_HREF = '/players';
+	/** The specimen row in a position view: no tier chip, the bands carry the tier. */
+	const ROW_COLUMNS = boardColumns({
+		order: 'board',
+		tier: false,
+		bye: true,
+		range: true,
+		gap: true,
+		season: false,
+		action: false
+	});
 	const PAPER_TOKENS = [
 		{ token: '--paper', about: 'The page.' },
 		{ token: '--paper-ink', about: 'Names, ranks and the rules between tiers.' },
@@ -121,16 +132,17 @@
 			sub="A real board row from the run the board reads, {row.name} in the {row.position} view, taken apart."
 		>
 			<Specimen minWidth={ROW_MIN_WIDTH}>
-				<RowHead framing={PRESEASON_FRAMING} />
-				<Row
-					framing={PRESEASON_FRAMING}
-					player={row}
-					href={PLAYER_HREF}
-					scale={data.nightly.rowScale}
-					showTier={false}
-					{unit}
-					eager
-				/>
+				<BoardTable columns={ROW_COLUMNS} label="A board row">
+					<Row
+						framing={PRESEASON_FRAMING}
+						player={row}
+						href={PLAYER_HREF}
+						columns={ROW_COLUMNS}
+						scale={data.nightly.rowScale}
+						bye={null}
+						eager
+					/>
+				</BoardTable>
 			</Specimen>
 			<Parts>
 				<Part name="Face" about="A 40px headshot on every row, before anything else.">

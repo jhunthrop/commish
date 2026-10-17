@@ -7,6 +7,7 @@
  */
 import type { Component } from 'svelte';
 import type { SheetPlayer } from '#lib/sheet/model.ts';
+import type { TagMark } from '#lib/ui/tag.ts';
 
 interface AddToSheetProps {
 	player: SheetPlayer;
@@ -18,6 +19,8 @@ interface SheetParts {
 	store: typeof import('#lib/sheet/store.svelte.ts').sheetStore;
 	Rail: Component<{ shown?: number }>;
 	Add: Component<AddToSheetProps>;
+	/** A row's tags as their chips print them (sheet/tags.ts), loaded with the store. */
+	tagMarks: typeof import('#lib/sheet/tags.ts').tagMarks;
 }
 
 const INTENT_EVENTS = ['pointerdown', 'pointermove', 'keydown', 'touchstart', 'wheel', 'focusin'];
@@ -31,10 +34,16 @@ class LazySheet {
 		this.#loading ??= Promise.all([
 			import('#lib/sheet/store.svelte.ts'),
 			import('#lib/sheet/SheetRail.svelte'),
-			import('#lib/sheet/AddToSheet.svelte')
-		]).then(([store, rail, add]) => {
+			import('#lib/sheet/AddToSheet.svelte'),
+			import('#lib/sheet/tags.ts')
+		]).then(([store, rail, add, tags]) => {
 			store.sheetStore.load();
-			const parts: SheetParts = { store: store.sheetStore, Rail: rail.default, Add: add.default };
+			const parts: SheetParts = {
+				store: store.sheetStore,
+				Rail: rail.default,
+				Add: add.default,
+				tagMarks: tags.tagMarks
+			};
 			this.parts = parts;
 			return parts;
 		});
@@ -50,6 +59,13 @@ class LazySheet {
 
 	has(playerId: string): boolean {
 		return this.parts?.store.has(playerId) ?? false;
+	}
+
+	/** His tags on your sheet as chips, none while he is not on it or the sheet is not in. */
+	tags(playerId: string): readonly TagMark[] {
+		const parts = this.parts;
+		const row = parts?.store.sheet.rows.find((candidate) => candidate.id === playerId);
+		return parts && row ? parts.tagMarks(row.tags) : [];
 	}
 
 	/** His place on your sheet, 1-based, or null while he is not on it or the sheet is not in. */

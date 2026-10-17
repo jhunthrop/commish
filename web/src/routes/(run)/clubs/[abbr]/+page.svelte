@@ -1,20 +1,28 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { fixed } from '#lib/format/number.ts';
+	import { heldOut } from '#lib/run/board-status.ts';
 	import { liveStatusClock, sayBoard, type LiveStatus } from '#lib/run/live-status.ts';
 	import { rowFraming } from '#lib/run/row-framing.ts';
-	import { clubCaption, playedWords } from '#lib/run/strength-words.ts';
+	import {
+		CLUB_FIGURE_CAPTION,
+		hardestFigure,
+		playedWords,
+		readWords
+	} from '#lib/run/strength-words.ts';
 	import SiteShell from '#lib/site/SiteShell.svelte';
 	import { links } from '#lib/site/links.ts';
+	import BasisLine from '#lib/ui/BasisLine.svelte';
+	import BoardTable from '#lib/ui/BoardTable.svelte';
 	import Crumb from '#lib/ui/Crumb.svelte';
 	import Figure from '#lib/ui/Figure.svelte';
 	import HeroCard from '#lib/ui/HeroCard.svelte';
 	import Label from '#lib/ui/Label.svelte';
-	import Panel from '#lib/ui/Panel.svelte';
 	import PanelHead from '#lib/ui/PanelHead.svelte';
 	import Row from '#lib/ui/Row.svelte';
-	import RowHead from '#lib/ui/RowHead.svelte';
 	import Table from '#lib/ui/Table.svelte';
+	import Verb from '#lib/ui/Verb.svelte';
+	import { boardColumns } from '#lib/ui/board-columns.ts';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
@@ -25,7 +33,33 @@
 	const club = $derived(page.club);
 	const name = $derived(`${club.city} ${club.nickname}`);
 	const names = $derived(new Map(page.clubs.map((other) => [other.abbr, other])));
-	const caption = $derived(clubCaption(page.slate, page.clubs.length));
+	const hardest = $derived(hardestFigure(page.slate.rank, page.clubs.length));
+	/** Every row shares the club's bye, said once in the hero, so the rows carry no Bye column. */
+	const columns = $derived(
+		boardColumns({
+			order: 'board',
+			tier: true,
+			bye: false,
+			range: page.scale !== null,
+			gap: framing.compare,
+			season: page.underway,
+			action: false
+		})
+	);
+	const kickers = $derived(
+		boardColumns({
+			order: 'board',
+			tier: false,
+			bye: false,
+			range: false,
+			gap: false,
+			season: false,
+			action: false,
+			draftOrder: true
+		})
+	);
+	/** The page's one verb: his two best available players side by side. */
+	const pair = $derived(page.rows.filter((row) => !heldOut(row)).slice(0, 2));
 	/** The rows' status words as built, said again on the member's clock once the page is live. */
 	let live = $state<LiveStatus | null>(null);
 	onMount(() => {
@@ -41,39 +75,54 @@
 </script>
 
 <SiteShell title={name} run={data.run}>
+	{#snippet tail()}
+		{#if pair.length === 2}<Verb href={links.compare(pair[0]?.slug, pair[1]?.slug)}
+				>Compare two of them</Verb
+			>{/if}
+	{/snippet}
 	<main class="club">
 		<Crumb trail={[{ label: 'Clubs', href: links.clubs() }, { label: name }]} />
 		<HeroCard title={name}>
 			{#snippet meta()}<Label>{club.abbr} · bye week {club.bye ?? 'not set'}</Label>{/snippet}
 			{#snippet aside()}
-				<Figure
-					value={fixed(page.slate.strength, 2)}
-					size="xl"
-					align="end"
-					phoneAlign="start"
-					{caption}
-				/>
+				<div class="figures">
+					<Figure
+						value={fixed(page.slate.strength, 2)}
+						size="xl"
+						align="end"
+						phoneAlign="start"
+						caption={CLUB_FIGURE_CAPTION}
+						note={readWords(page.slate)}
+					/>
+					<Figure
+						value={hardest.figure}
+						size="lg"
+						align="end"
+						phoneAlign="start"
+						caption={hardest.caption}
+					/>
+				</div>
 			{/snippet}
 		</HeroCard>
+		<BasisLine parts={page.basis} tail={words?.capture ?? null} />
 
 		<section aria-label="On our board">
 			<PanelHead title="On our {page.format.label} board" />
-			{#if page.scale}
-				<Panel padding="none">
-					<RowHead games={page.rows.some((row) => row.season !== undefined)} {framing} />
+			{#if page.rows.length > 0}
+				<BoardTable {columns} label="{name} on our {page.format.label} board">
 					{#each page.rows as player (player.id)}
 						<Row
 							{player}
 							href={links.player(player.slug)}
-							scale={page.scale}
-							showTier
-							unit={page.format.unit}
+							{columns}
+							scale={page.scale ?? undefined}
+							bye={null}
 							season={player.season}
 							{framing}
 							status={words?.rows[player.id] ?? null}
 						/>
 					{/each}
-				</Panel>
+				</BoardTable>
 			{:else}
 				<Label>Nobody from {club.city} is on this board</Label>
 			{/if}
@@ -82,20 +131,18 @@
 		{#if page.market.length > 0}
 			<section aria-label="Kickers and defense">
 				<PanelHead title="Kickers and defense, in draft order" />
-				<Panel padding="none">
-					<RowHead range={false} market {framing} />
+				<BoardTable columns={kickers} label="{name} kickers and defense">
 					{#each page.market as player (player.id)}
 						<Row
 							{player}
-							showTier={false}
-							unit={page.format.unit}
-							range={false}
+							columns={kickers}
+							bye={null}
 							{framing}
 							href={links.board(page.format.id, player.position)}
 							status={words?.rows[player.id] ?? null}
 						/>
 					{/each}
-				</Panel>
+				</BoardTable>
 			</section>
 		{/if}
 
@@ -108,7 +155,7 @@
 				columns={[
 					{ label: 'Week' },
 					{ label: 'Opponent' },
-					{ label: page.schedule.opponentBasis, align: 'end' }
+					{ label: 'Expected wins', align: 'end' }
 				]}
 			>
 				{#each page.games as game (game.week)}
@@ -141,13 +188,23 @@
 		display: flex;
 		flex-direction: column;
 		gap: var(--s-5);
-		max-width: 1180px;
+		max-width: 1440px;
+	}
+
+	.figures {
+		display: flex;
+		align-items: flex-end;
+		gap: var(--s-6);
 	}
 
 	@media (max-width: 760px) {
 		.club {
 			padding: var(--s-4);
 			gap: var(--s-4);
+		}
+
+		.figures {
+			gap: var(--s-5);
 		}
 	}
 </style>

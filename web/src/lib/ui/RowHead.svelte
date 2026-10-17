@@ -1,162 +1,170 @@
 <script lang="ts">
-	import type { RowFraming } from '#lib/run/row-framing.ts';
-	import Label from './Label.svelte';
+	import type { BoardColumns, ColumnKey } from './board-columns.ts';
+	import { isSortKey, type Sort, type SortKey } from './board-sort.ts';
 
-	/** The column heads over a run of Rows, on the same grid. On the phone it names only the columns whose cells print a bare number. */
+	/** The column heads over a run of Rows, on the same grid: each figure's unit said once, here, never
+	 * in the rows (Lane 66n). Given a sort, the heads that sort are buttons and the sorted one is marked. */
 	interface Props {
-		/** The floor to ceiling column, on unless the view switches it off. Rows under it take the same. */
-		range?: boolean;
-		/** The rows under it carry an action column at their end. */
-		action?: boolean;
-		/** What the rows under it are ordered by. Match the Rows' order. */
-		order?: 'board' | 'adp';
-		/** The rows under it carry this season's figures: a Games column on a desk. */
-		games?: boolean;
-		/** How the rows under it frame their rank against the drafts (run/row-framing.ts): the
-		 * Drafters column compares drafters with our rank ("vs us") only where they do. */
-		framing: RowFraming;
-		/** The rows under it are kickers and defenses (Row, in draft order): their place in draft order sits
-		 * under a Draft order head, and no column promises a projection. */
-		market?: boolean;
+		columns: BoardColumns;
+		/** The rows' order, when the view sorts. */
+		sort?: Sort;
+		onsort?: (key: SortKey) => void;
 	}
 
-	let {
-		range = true,
-		action = false,
-		order = 'board',
-		games = false,
-		framing,
-		market = false
-	}: Props = $props();
+	let { columns, sort, onsort }: Props = $props();
+
+	/** Each head's words: in full, and on the phone where the column is narrower. */
+	const HEADS: Readonly<Record<ColumnKey, { text: string; short?: string; title?: string }>> = {
+		rank: { text: 'Rk', title: 'Our rank' },
+		adpLead: { text: 'ADP' },
+		face: { text: '' },
+		player: { text: 'Player' },
+		tier: { text: 'Tier' },
+		bye: { text: 'Bye' },
+		proj: { text: 'Projected', short: 'Proj' },
+		vor: { text: 'Over repl', title: 'Over replacement' },
+		order: { text: 'Draft order' },
+		range: { text: 'Floor to ceiling' },
+		adp: { text: 'ADP' },
+		ourRank: { text: 'Rk', title: 'Our rank' },
+		gap: { text: 'Gap', title: "Gap, drafters' ADP less our rank" },
+		gp: { text: 'GP', title: 'Games played' },
+		agame: { text: 'A game' },
+		action: { text: '' }
+	};
+
+	const LEFT: ReadonlySet<ColumnKey> = new Set(['player', 'range']);
 </script>
 
-<div
-	class="head"
-	class:flat={!range}
-	class:act={action}
-	class:act-flat={action && !range}
-	class:games
-	aria-hidden="true"
->
-	<span class="lead"
-		>{#if order === 'adp'}<Label align="end">ADP</Label>{/if}</span
-	>
-	<span></span>
-	<Label>Player</Label>
-	{#if games}<span class="gp"><Label align="end">Games</Label></span>{/if}
-	<span class="proj"
-		>{#if !market}<Label align="end">Projected</Label>{/if}</span
-	>
-	<span class="end"
-		><Label align="end"
-			>{#if market}Draft order{:else}<span class="wide">Over replacement</span><span class="narrow"
-					>Over repl</span
-				>{/if}</Label
-		></span
-	>
-	{#if range}<span class="rng"><Label>Range</Label></span>{/if}
-	<Label
-		><span class="wide">{framing.compare && !market ? 'Drafters vs us' : 'Drafters'}</span><span
-			class="narrow">Drafters</span
-		></Label
-	>
-	{#if action}<span class="act-end"></span>{/if}
+<div class="head">
+	{#each columns.keys as key (key)}
+		{@const head = HEADS[key]}
+		{@const sorts = onsort !== undefined && isSortKey(key)}
+		<span
+			class="h {columns.cells[key]}"
+			class:left={LEFT.has(key)}
+			aria-sort={sort?.key === key ? (sort.turned ? 'descending' : 'ascending') : undefined}
+		>
+			{#if sorts && isSortKey(key)}
+				<button
+					type="button"
+					class:on={sort?.key === key}
+					title={head.title}
+					onclick={() => onsort(key)}
+					>{#if head.short}<span class="full">{head.text}</span><span class="short"
+							>{head.short}</span
+						>{:else}{head.text}{/if}</button
+				>
+			{:else if head.text !== ''}
+				<span title={head.title}
+					>{#if head.short}<span class="full">{head.text}</span><span class="short"
+							>{head.short}</span
+						>{:else}{head.text}{/if}</span
+				>
+			{/if}
+		</span>
+	{/each}
 </div>
 
 <style>
 	.head {
 		display: grid;
-		grid-template-columns: var(--board-cols);
-		align-items: center;
-		column-gap: var(--s-3);
-		padding: 0 var(--s-3) var(--s-2);
-		border-bottom: 1px solid var(--line);
+		grid-template-columns: var(--cols-desk);
+		align-items: end;
+		column-gap: var(--s-2);
+		min-height: 32px;
+		padding: 0 var(--s-3) 6px;
+		border-bottom: 1px solid var(--line-strong);
 	}
 
-	.flat {
-		grid-template-columns: var(--board-cols-flat);
-	}
-
-	.act {
-		grid-template-columns: var(--board-cols-act);
-	}
-
-	.act-flat {
-		grid-template-columns: var(--board-cols-act-flat);
-	}
-
-	.games {
-		grid-template-columns: var(--board-cols-games);
-	}
-
-	.games.flat {
-		grid-template-columns: var(--board-cols-games-flat);
-	}
-
-	.games.act {
-		grid-template-columns: var(--board-cols-games-act);
-	}
-
-	.games.act-flat {
-		grid-template-columns: var(--board-cols-games-act-flat);
-	}
-
-	.gp {
+	.h {
 		display: flex;
 		justify-content: flex-end;
+		min-width: 0;
+		font-size: var(--t-xs);
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: var(--track-label);
+		color: var(--ink-3);
+		white-space: nowrap;
 	}
 
-	@media (max-width: 1180px) {
-		.gp {
-			display: none;
-		}
+	.left {
+		justify-content: flex-start;
 	}
 
-	@media (min-width: 961px) and (max-width: 1439px) {
-		.games > .rng {
-			display: none;
-		}
+	button {
+		padding: 0;
+		border: 0;
+		background: none;
+		font: inherit;
+		letter-spacing: inherit;
+		text-transform: inherit;
+		color: inherit;
+		cursor: pointer;
 	}
 
-	@media (min-width: 1181px) and (max-width: 1253px) {
-		.games {
-			column-gap: 9px;
-		}
+	button:hover {
+		color: var(--ink);
 	}
 
-	.lead,
-	.proj,
-	.end {
-		display: flex;
-		justify-content: flex-end;
+	/* The sorted head: in ink, with a caret in the accent. */
+	.on {
+		color: var(--ink);
 	}
 
-	@media (max-width: 960px) {
-		.rng,
-		.act-end {
-			display: none;
-		}
+	.on::after {
+		content: '';
+		display: inline-block;
+		margin-left: 4px;
+		border: 4px solid transparent;
+		border-top: 5px solid var(--accent);
+		vertical-align: -1px;
 	}
 
-	.narrow {
+	[aria-sort='descending'] .on::after {
+		border-top-color: transparent;
+		border-bottom: 5px solid var(--accent);
+		vertical-align: 3px;
+	}
+
+	.short {
 		display: none;
 	}
 
-	/* On the phone the head names the over replacement column, whose cells print the number alone. */
-	@media (max-width: 760px) {
+	@media (min-width: 961px) and (max-width: 1439px) {
 		.head {
-			column-gap: var(--s-2);
-			padding: 0 0 var(--s-2);
+			grid-template-columns: var(--cols-lap);
 		}
 
-		.lead,
-		.proj,
-		.wide,
-		.act-end {
+		.h-lap {
+			display: none;
+		}
+	}
+
+	@media (min-width: 761px) and (max-width: 960px) {
+		.head {
+			grid-template-columns: var(--cols-tab);
+		}
+
+		.h-tab {
+			display: none;
+		}
+	}
+
+	@media (max-width: 760px) {
+		.head {
+			grid-template-columns: var(--cols-phone);
+			column-gap: 6px;
+			padding: 0 0 6px;
+		}
+
+		.h-phone,
+		.full {
 			display: none;
 		}
 
-		.narrow {
+		.short {
 			display: inline;
 		}
 	}

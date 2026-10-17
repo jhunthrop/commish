@@ -1,17 +1,26 @@
 /**
  * Schedule strength in words, one source for the schedule page, the clubs page and a club's page.
- * The run's method is a noun phrase that carries its own article ("the average of its opponents'
- * expected wins for the season, ..."), so these lines print it as given and never add one.
+ * Every opponent's figure is the season's expected wins, its source named once on each page (the
+ * coordinator's ruling, Lane 66n).
  */
 import { windowLabel } from '#lib/format/date.ts';
 import { ordinal } from '#lib/format/number.ts';
 import type { Slate } from './schema.ts';
 
-type Basis = Pick<Slate, 'method' | 'window'>;
+type Window = Pick<Slate, 'window'>;
 
-/** "the average of its opponents' expected wins ..., read Sep 7". */
-export function strengthBasis(slate: Basis): string {
-	return `${slate.method}, read ${windowLabel(slate.window)}`;
+/** Where every opponent's figure comes from, said once on a page. */
+const WINS_SOURCE = 'from the published season totals';
+
+/** "Each opponent's figure is the season's expected wins, from the published season totals, read
+ * Sep 7.": a club page's basis sentence. */
+export function winsBasis(slate: Window): string {
+	return `Each opponent's figure is the season's expected wins, ${WINS_SOURCE}, read ${windowLabel(slate.window)}.`;
+}
+
+/** What a strength is, with its source and read: the schedule and clubs pages' leads. */
+function strengthWords(slate: Window): string {
+	return `Strength averages the season's expected wins of each club's opponents, ${WINS_SOURCE}, read ${windowLabel(slate.window)}.`;
 }
 
 /** The weeks a schedule sets back, said where it does so: "weeks 1 to 5 are played, so faded",
@@ -23,26 +32,37 @@ export function playedWords(played: number): string {
 		: `weeks 1 to ${String(played)} are played, so faded`;
 }
 
-/** The schedule page's lead: "Strength is the average of ..., read Sep 7 · hardest first · ...". */
+/** The schedule page's lead, two rendered lines on a desk: what strength is and where it comes
+ * from, then how the grid is ordered, shaded and faded. */
 export function scheduleLead(
-	slate: Basis,
-	opponentBasis: string,
+	slate: Window,
 	strong: { count: number; atLeast: string },
 	played: number
 ): string {
-	const faded = played === 0 ? '' : ` · ${playedWords(played)}`;
-	return `Strength is ${strengthBasis(slate)} · hardest first · each week shows the opponent's ${opponentBasis.toLowerCase()}, shaded for the ${String(strong.count)} highest of the 32 (${strong.atLeast} or more)${faded}`;
+	const faded = played === 0 ? '' : `, ${playedWords(played)}`;
+	return `${strengthWords(slate)} Hardest first, the ${String(strong.count)} highest opponents shaded (${strong.atLeast} or more)${faded}.`;
 }
 
-/** The clubs page's lead: "Every club's players on our PPR board · schedule strength is ...". */
-export function clubsLead(formatLabel: string, first: Basis | undefined): string {
-	const strength = first ? ` · schedule strength is ${strengthBasis(first)}` : '';
-	return `Every club's players on our ${formatLabel} board${strength}`;
+/** The clubs page's lead: "Every club's players on our PPR board. Strength averages ...". */
+export function clubsLead(formatLabel: string, first: Window | undefined): string {
+	const strength = first ? ` ${strengthWords(first)}` : '';
+	return `Every club's players on our ${formatLabel} board.${strength}`;
 }
 
-/** A club's figure caption: "the average of ..., the hardest of 32, read Sep 7". */
-export function clubCaption(slate: Basis & Pick<Slate, 'rank'>, of: number): string {
-	return `${slate.method}, ${hardestWords(slate.rank, of)}, read ${windowLabel(slate.window)}`;
+/** A club's hero figure's caption, four words, its read said under it. */
+export const CLUB_FIGURE_CAPTION = "Opponents' average expected wins";
+
+/** "Read Sep 7": when a club's hero figure was read. */
+export function readWords(slate: Window): string {
+	return `Read ${windowLabel(slate.window)}`;
+}
+
+/** A club's schedule rank as a figure and its caption, "10th" and "hardest of 32", the last club
+ * the easiest. */
+export function hardestFigure(rank: number, of: number): { figure: string; caption: string } {
+	return rank === of
+		? { figure: '1st', caption: `easiest of ${String(of)}` }
+		: { figure: ordinal(rank), caption: `hardest of ${String(of)}` };
 }
 
 /** "the hardest of 32", "3rd hardest of 32", "the easiest of 32": a schedule rank where 1 is the

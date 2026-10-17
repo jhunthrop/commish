@@ -1,11 +1,21 @@
 /** ADP for one format: every player its named sources have, in the order drafters take them, beside
  * where our board has him. */
-import type { AdpSource, BoardRow, Format, MarketRowView } from '#lib/run/schema.ts';
+import { adpDrafts } from '#lib/run/adp-drafts.ts';
+import { boardBasis, type BasisPart } from '#lib/run/board-basis.ts';
+import { rowFraming } from '#lib/run/row-framing.ts';
+import type {
+	AdpSource,
+	BoardRow,
+	Format,
+	IndexSeason,
+	MarketRowView,
+	PlayerStatus
+} from '#lib/run/schema.ts';
 import { links } from '#lib/site/links.ts';
 import { withFace } from '#lib/site/market.ts';
 import { withStatuses } from '#lib/run/board-status.ts';
-import type { PlayerStatus } from '#lib/run/schema.ts';
-import { adp, board, designations } from '../run.ts';
+import { boardSeason } from '../board-season.ts';
+import { adp, board, clubByes, designations, manifest } from '../run.ts';
 import { boardStatuses, type BoardStatuses } from '../statuses.ts';
 import {
 	absentFormatPage,
@@ -21,10 +31,19 @@ export interface AdpPage extends BoardStatuses {
 	format: Format;
 	formats: FormatChip[];
 	sources: AdpSource[];
-	/** Board rows with an ADP, earliest first: the ranked rows and the kickers and defenses alike. */
-	rows: ((BoardRow | MarketRowView) & { adp: number; status?: PlayerStatus })[];
-	/** Players our board ranks that no source has yet. */
-	unpriced: number;
+	/** Board rows with an ADP, earliest first: the ranked rows (each with his season so far once it is
+	 * underway) and the kickers and defenses alike. */
+	rows: ((BoardRow | MarketRowView) & {
+		adp: number;
+		status?: PlayerStatus;
+		season?: IndexSeason;
+	})[];
+	/** The page's basis, said once under the title (Lane 66n). */
+	basis: BasisPart[];
+	/** The season is underway: the ranked rows carry this season's GP and A game. */
+	underway: boolean;
+	/** Each club's bye week, for the Bye column and the sort by it. */
+	byes: Record<string, number | null>;
 }
 
 /** A format's ADP, or the page saying the run lacks the format. */
@@ -44,22 +63,36 @@ export async function adpEntries(): Promise<{ format: string }[]> {
 
 export async function adpPage(formatId: string): Promise<AdpPage> {
 	const format = await formatForRoute(formatId, (id) => links.adp(id));
-	const [loaded, all, formats, capture] = await Promise.all([
+	const [loaded, all, formats, capture, byes, run] = await Promise.all([
 		board(format.id),
 		adp(),
 		formatChips(),
-		designations()
+		designations(),
+		clubByes(),
+		manifest()
 	]);
+	const { rows: ranked, reach } = await boardSeason(format, withStatuses(loaded.rows, capture));
 	// The drafters' order stays theirs: a held player keeps his place in it, marked (Lane 63).
-	const rows = withStatuses([...loaded.rows, ...loaded.market.map(withFace)], capture)
+	const rows = [...ranked, ...withStatuses(loaded.market.map(withFace), capture)]
 		.flatMap((row) => (row.adp === null ? [] : [{ ...row, adp: row.adp }]))
 		.sort((a, b) => a.adp - b.adp || a.ourRank - b.ourRank);
+	const sources = all.sources.filter((source) => source.formats.includes(format.id));
 	return {
 		format,
 		formats,
-		sources: all.sources.filter((source) => source.formats.includes(format.id)),
+		sources,
 		rows,
-		unpriced: loaded.rows.filter((row) => row.adp === null).length,
+		basis: boardBasis({
+			format,
+			season: run.season,
+			order: 'adp',
+			adpBasis: adpDrafts(all.sources, format.id),
+			gap: rowFraming(format).compare,
+			reach,
+			noAdp: loaded.rows.filter((row) => row.adp === null).length
+		}),
+		underway: reach !== null,
+		byes,
 		...boardStatuses(rows, capture, format)
 	};
 }
