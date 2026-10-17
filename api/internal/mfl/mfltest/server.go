@@ -8,6 +8,7 @@ package mfltest
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -76,6 +77,8 @@ type Server struct {
 	Expires time.Time
 	// SessionRefused makes every member read answer the login refusal.
 	SessionRefused bool
+	// RefusalWords is a member read's refusal, "" for the default.
+	RefusalWords string
 	// MyLeagues is the myleagues fixture.
 	MyLeagues string
 	// Live is the liveScoring fixture before an import applies.
@@ -153,7 +156,12 @@ func (s *Server) member(w http.ResponseWriter, r *http.Request) bool {
 	s.cookies = append(s.cookies, r.Header.Get("Cookie"))
 	c, err := r.Cookie(mfl.SessionCookie)
 	if err != nil || c.Value != Session || s.SessionRefused {
-		_, _ = w.Write([]byte(`{"error":{"$t":"You must be logged in to view this page."}}`))
+		words := s.RefusalWords
+		if words == "" {
+			words = "You must be logged in to view this page."
+		}
+		b, _ := json.Marshal(map[string]map[string]string{"error": {"$t": words}})
+		_, _ = w.Write(b)
 		return false
 	}
 	return true

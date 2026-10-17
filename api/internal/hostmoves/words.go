@@ -17,7 +17,7 @@ type platformWords struct {
 	// The answers.
 	done, refused, locked, pending, notSent, off string
 	// Why a move is unavailable, said under the verb.
-	reconsent, reconnect, connect, noWrites, switchedOff string
+	reconsent, reconnect, connect, switchedOff string
 	// Why a plan is refused before anything is sent; weekMoved takes the
 	// week, reserve, taxi, lockedPlayers, cannotFill and limit a name.
 	weekMoved, notYourTeam, stale, reserve, taxi, lockedPlayers, cannotFill, limit, fewer, notAnswering string
@@ -36,7 +36,6 @@ var platformTemplates = platformWords{
 	reconsent:     "To set your lineup from here, connect {p} again on your account page and agree to moves.",
 	reconnect:     "{p} no longer accepts your saved sign-in. Connect {p} again on your account page to set your lineup from here.",
 	connect:       "Connect {p} on your account page to set your lineup from here.",
-	noWrites:      "{p} does not take lineups from here, so copy the lineup there.",
 	switchedOff:   "Lineups are not sent to {p} from here yet, so copy the lineup there.",
 	weekMoved:     "{p} is on week %d now. Reload your lineup to see it.",
 	notYourTeam:   "{p} does not list this team as yours, so we cannot set its lineup.",
@@ -57,7 +56,7 @@ func wordsOn(name string) platformWords {
 	t, put := platformTemplates, func(s string) string { return strings.ReplaceAll(s, "{p}", name) }
 	return platformWords{
 		done: put(t.done), refused: put(t.refused), locked: put(t.locked), pending: put(t.pending), notSent: put(t.notSent), off: put(t.off),
-		reconsent: put(t.reconsent), reconnect: put(t.reconnect), connect: put(t.connect), noWrites: put(t.noWrites),
+		reconsent: put(t.reconsent), reconnect: put(t.reconnect), connect: put(t.connect),
 		switchedOff: put(t.switchedOff), weekMoved: put(t.weekMoved), notYourTeam: put(t.notYourTeam), stale: put(t.stale),
 		reserve: put(t.reserve), taxi: put(t.taxi), lockedPlayers: put(t.lockedPlayers), cannotFill: put(t.cannotFill),
 		limit: put(t.limit), fewer: put(t.fewer), notAnswering: put(t.notAnswering), used: put(t.used), now: put(t.now),

@@ -33,7 +33,7 @@ func TestMoveWordsPassTheCopyRules(t *testing.T) {
 		}, roster),
 	}
 	for _, p := range []platformWords{espnWords, mflWords, onHost("sleeper")} {
-		lines = append(lines, p.done, p.refused, p.locked, p.pending, p.notSent, p.off, p.reconsent, p.reconnect, p.connect, p.noWrites,
+		lines = append(lines, p.done, p.refused, p.locked, p.pending, p.notSent, p.off, p.reconsent, p.reconnect, p.connect,
 			p.switchedOff, fmt.Sprintf(p.weekMoved, 7), p.notYourTeam, p.stale, fmt.Sprintf(p.reserve, "A.J. Brown"), fmt.Sprintf(p.taxi, "A.J. Brown"),
 			fmt.Sprintf(p.lockedPlayers, "Josh Downs", verbFor(1)), fmt.Sprintf(p.cannotFill, "Josh Downs"), fmt.Sprintf(p.limit, "WR"),
 			fmt.Sprintf(p.fewer, 1, "RB"), p.notAnswering, p.used, "Start A"+p.now)

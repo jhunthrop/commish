@@ -1482,7 +1482,7 @@ export interface paths {
 			path?: never;
 			cookie?: never;
 		};
-		/** The member's MyFantasyLeague leagues this season, read with their kept session, each with their team in it and whether the account follows it already. 404 when not connected; 409 when MyFantasyLeague no longer accepts the session (or it is past its expiry), which signs it out. */
+		/** The member's MyFantasyLeague leagues this season, read with their kept session, each with their team in it and whether the account follows it already. 503 when MyFantasyLeague is not open to the account (the switch off and the account not on its proof list), as connecting is. 404 when not connected; 409 when MyFantasyLeague no longer accepts the session (or it is past its expiry, at most a year from connecting), which signs it out. */
 		get: operations['mflLeagues'];
 		put?: never;
 		post?: never;
@@ -3333,7 +3333,7 @@ export interface components {
 			consent: boolean;
 		};
 		MFLConnectInput: {
-			/** @description the member's MyFantasyLeague username or email */
+			/** @description the member's MyFantasyLeague username, as MyFantasyLeague's own sign-in takes it */
 			username: string;
 			/** @description sent once to MyFantasyLeague's login in a POST body, never kept, answered or logged */
 			password: string;

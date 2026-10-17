@@ -256,7 +256,7 @@ type moveAccess struct {
 func (s *Service) access(ctx context.Context, accountID uuid.UUID, host string, kind apitypes.HostMoveInputKind) (moveAccess, error) {
 	p := onHost(host)
 	if !takesWrites(host, kind) {
-		return moveAccess{reason: p.noWrites}, nil
+		return moveAccess{reason: *inseason.CopyOnlyMoves(host).Reason}, nil
 	}
 	out := moveAccess{takes: true, reason: p.switchedOff}
 	if !s.wired(host, kind) {

@@ -53,14 +53,21 @@ type Connections interface {
 	Read(ctx context.Context, accountID uuid.UUID, host string, at time.Time) error
 }
 
+// maxSessionLife is the longest a session is kept: a session
+// MyFantasyLeague states no expiry for, or a later one, lapses here then,
+// so an unused session never lives on in the vault.
+const maxSessionLife = 365 * 24 * time.Hour
+
 // Seal is a new connection's session, sealed for the account, with
 // nothing beside it: the password is never kept, and MyFantasyLeague
-// offers no renewal.
-func Seal(v *hosts.Vault, accountID uuid.UUID, s mfl.Session) (hosts.Sealed, error) {
-	session := hosts.Session{keyUserID: s.UserID}
-	if !s.Expires.IsZero() {
-		session[keyExpires] = s.Expires.UTC().Format(time.RFC3339)
+// offers no renewal. It expires when MyFantasyLeague says, or
+// maxSessionLife from now, whichever is sooner.
+func Seal(v *hosts.Vault, accountID uuid.UUID, s mfl.Session, now time.Time) (hosts.Sealed, error) {
+	capAt := now.Add(maxSessionLife)
+	if s.Expires.IsZero() || s.Expires.After(capAt) {
+		s.Expires = capAt
 	}
+	session := hosts.Session{keyUserID: s.UserID, keyExpires: s.Expires.UTC().Format(time.RFC3339)}
 	return v.SealTokens(accountID.String(), Host, session, hosts.Session{})
 }
 

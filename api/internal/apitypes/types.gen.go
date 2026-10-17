@@ -2480,7 +2480,7 @@ type MFLConnectInput struct {
 	// Password sent once to MyFantasyLeague's login in a POST body, never kept, answered or logged
 	Password string `json:"password"`
 
-	// Username the member's MyFantasyLeague username or email
+	// Username the member's MyFantasyLeague username, as MyFantasyLeague's own sign-in takes it
 	Username string `json:"username"`
 }
 

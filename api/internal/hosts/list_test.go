@@ -83,6 +83,23 @@ func (o openTo) OpenTo(_ context.Context, accountID uuid.UUID) ([]apitypes.Conne
 	return nil, nil
 }
 
+type openToFails struct{}
+
+func (openToFails) OpenTo(context.Context, uuid.UUID) ([]apitypes.ConnectedHost, error) {
+	return nil, context.DeadlineExceeded
+}
+
+// A failed check of the hosts open to one account leaves those out and
+// answers the rest: one platform never takes the whole list down.
+func TestHostsOpenToFailsAlone(t *testing.T) {
+	me := auth.Account{ID: uuid.New()}
+	l := &List{Enabled: []apitypes.ConnectedHost{apitypes.ConnectedHostEspn}, Accounts: openToFails{}, Store: &listOnlyStore{},
+		Log: slog.New(slog.NewTextHandler(io.Discard, nil))}
+	if out := listHosts(t, l, &me); len(out.Enabled) != 1 || len(out.Connections) != 1 {
+		t.Fatalf("%+v", out)
+	}
+}
+
 // A host open to one account alone is listed to that account signed in,
 // never signed out, never to another.
 func TestHostsOpenToOneAccount(t *testing.T) {

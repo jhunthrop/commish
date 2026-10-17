@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -105,12 +106,14 @@ type fakeMoves struct {
 	host    string
 	account uuid.UUID
 	err     error
+	// partial is what a failed check answers with its error.
+	partial apitypes.LineupMoves
 }
 
 func (f *fakeMoves) LineupMove(_ context.Context, accountID uuid.UUID, host string) (apitypes.LineupMoves, error) {
 	f.host, f.account = host, accountID
 	if f.err != nil {
-		return apitypes.LineupMoves{}, f.err
+		return f.partial, f.err
 	}
 	note := "To set your lineup from here, connect ESPN again on your account page and agree to moves."
 	return apitypes.LineupMoves{Lineup: apitypes.LineupMovesLineupUnavailable, Note: &note}, nil
@@ -161,7 +164,8 @@ func TestLineupCarriesMoves(t *testing.T) {
 	s := fixtureService(t, f.league, f.data, &fakeHolds{})
 	_, env := serve(t, s, leaguePath+"lineup")
 	var plain apitypes.LineupAdvice
-	if err := json.Unmarshal(env.Data, &plain); err != nil || plain.Moves.Lineup != apitypes.LineupMovesLineupUnavailable || plain.Moves.Note != nil {
+	if err := json.Unmarshal(env.Data, &plain); err != nil || plain.Moves.Lineup != apitypes.LineupMovesLineupUnavailable || plain.Moves.Note != nil ||
+		plain.Moves.TakesWrites || plain.Moves.Reason == nil || !strings.Contains(*plain.Moves.Reason, "copy the lineup") {
 		t.Fatalf("no moves wired: %+v %v", plain.Moves, err)
 	}
 	moves := &fakeMoves{}
@@ -179,8 +183,18 @@ func TestLineupCarriesMoves(t *testing.T) {
 	moves.err = errors.New("the allow list did not answer")
 	code, env := serve(t, s, leaguePath+"lineup")
 	var closed apitypes.LineupAdvice
-	if err := json.Unmarshal(env.Data, &closed); err != nil || code != http.StatusOK || closed.Moves.Lineup != apitypes.LineupMovesLineupUnavailable {
+	if err := json.Unmarshal(env.Data, &closed); err != nil || code != http.StatusOK || closed.Moves.Lineup != apitypes.LineupMovesLineupUnavailable ||
+		closed.Moves.Reason == nil {
 		t.Fatalf("a failed check: %d %+v %v", code, closed.Moves, err)
+	}
+	// What the check knew before it failed is kept: the platform takes
+	// writes, and the line says why not now.
+	why := "Lineups are not sent to ESPN from here yet, so copy the lineup there."
+	moves.partial = apitypes.LineupMoves{Lineup: apitypes.LineupMovesLineupUnavailable, TakesWrites: true, Reason: &why}
+	_, env = serve(t, s, leaguePath+"lineup")
+	var partial apitypes.LineupAdvice
+	if err := json.Unmarshal(env.Data, &partial); err != nil || !partial.Moves.TakesWrites || partial.Moves.Reason == nil || *partial.Moves.Reason != why {
+		t.Fatalf("a partial answer: %+v %v", partial.Moves, err)
 	}
 }
 

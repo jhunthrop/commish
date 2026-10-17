@@ -111,11 +111,10 @@ func planMFL(team mfl.TeamLineup, me int, mv apitypes.HostMoveInput, players map
 	if err := fitsMFL(team, mv.Changes, starters, players, name); err != nil {
 		return mflPlan{}, err
 	}
+	// The franchise is checked above, so a refusal here is the roster or
+	// the count moving under the screen.
 	set, err := mfl.OwnLineup(team, me, starters)
-	switch {
-	case errors.Is(err, mfl.ErrNotYourTeam) && team.Franchise != me:
-		return mflPlan{}, &refusal{words: mflWords.notYourTeam, cause: err, unavailable: true}
-	case err != nil:
+	if err != nil {
 		return mflPlan{}, refuse(mflWords.stale, err)
 	}
 	return mflPlan{set: set, sentence: lineupSentence(mv.Changes, name, mflWords)}, nil
@@ -245,6 +244,10 @@ func (s *Service) outgoingMFL(plan mflPlan, sess mfl.Session) (outgoing, error) 
 // pending when they are not or the read fails. Never a retry.
 func (s *Service) settleMFL(ctx context.Context, sess mfl.Session, set mfl.LineupSet, ans mfl.WriteAnswer) Answer {
 	a := Answer{HostStatus: ans.Status}
+	if ans.Lost != "" {
+		// The cause is kept for the log, never MyFantasyLeague's answer.
+		s.Log.Warn("hostmoves: the answer was lost", "host", mflhost.Host, "lost", ans.Lost, "status", ans.Status)
+	}
 	if ans.Outcome == mfl.WriteRefused {
 		a.Outcome, a.HostWords, a.ReadBack = OutcomeRefused, ans.Words, readNotRead
 		return a

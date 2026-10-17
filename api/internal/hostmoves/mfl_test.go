@@ -202,6 +202,30 @@ func TestMFLLockWordsOnly(t *testing.T) {
 	}
 }
 
+// lostWriter sends and loses the answer.
+type lostWriter struct{}
+
+func (lostWriter) SetLineup(context.Context, mfl.Session, mfl.LineupSet) (mfl.WriteAnswer, error) {
+	return mfl.WriteAnswer{Outcome: mfl.WriteUnknown, Lost: "request"}, nil
+}
+
+func (lostWriter) Applied(context.Context, mfl.Session, mfl.LineupSet) (bool, error) {
+	return false, nil
+}
+
+// A lost answer is logged by its cause, read back, never retried.
+func TestMFLLostAnswerLogged(t *testing.T) {
+	r := newMFLRig(t)
+	p := r.plan(t, mflSwap())
+	r.svc.MFLWriter = lostWriter{}
+	if _, _, res := r.move(t, mflSwap(), *p.Confirm); res.Outcome != apitypes.HostMoveResultOutcomePending {
+		t.Fatalf("%+v", res)
+	}
+	if !strings.Contains(r.logs.String(), "the answer was lost") || !strings.Contains(r.logs.String(), "lost=request") {
+		t.Fatalf("logs: %s", r.logs.String())
+	}
+}
+
 type failingWriter struct{}
 
 func (failingWriter) SetLineup(context.Context, mfl.Session, mfl.LineupSet) (mfl.WriteAnswer, error) {

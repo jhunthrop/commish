@@ -236,6 +236,24 @@ func TestSetLineupAnswers(t *testing.T) {
 	}
 }
 
+// A read's refusal that echoes the session never carries it into an
+// error, which callers log.
+func TestReadRefusalRedacted(t *testing.T) {
+	srv := mfltest.New(t)
+	srv.Set(func(s *mfltest.Server) {
+		s.SessionRefused, s.RefusalWords = true, "cookie "+mfltest.Session+" is not logged in"
+	})
+	_, err := srv.Client().MyLeagues(context.Background(), mfl.Session{UserID: mfltest.Session}, mfltest.Season)
+	if !errors.Is(err, mfl.ErrSignedOut) || strings.Contains(err.Error(), mfltest.Session) {
+		t.Fatalf("%v", err)
+	}
+	srv.Set(func(s *mfltest.Server) { s.RefusalWords = "strange " + mfltest.Session })
+	_, err = srv.Client().MyLeagues(context.Background(), mfl.Session{UserID: mfltest.Session}, mfltest.Season)
+	if err == nil || strings.Contains(err.Error(), mfltest.Session) {
+		t.Fatalf("%v", err)
+	}
+}
+
 // MyFantasyLeague's words that echo the session never carry it out.
 func TestRefusalWordsRedacted(t *testing.T) {
 	got := mfl.RefusalWords([]byte(`<error>bad cookie `+mfltest.Session+` for you</error>`), mfl.Session{UserID: mfltest.Session})

@@ -236,8 +236,13 @@ func (c *Client) memberExport(ctx context.Context, sess Session, server string, 
 	}
 	var refusal wireError
 	if json.Unmarshal(body, &refusal) == nil {
-		if text, ok := refusal.text(); ok && signedOutWords.MatchString(text) {
-			return fmt.Errorf("%w: refused: %.80q", ErrSignedOut, text)
+		if text, ok := refusal.text(); ok {
+			// The words reach logs: the session is cut from them first.
+			text = redact(text, sess)
+			if signedOutWords.MatchString(text) {
+				return fmt.Errorf("%w: refused: %.80q", ErrSignedOut, text)
+			}
+			return refusalError(text)
 		}
 	}
 	return decode(body, out)

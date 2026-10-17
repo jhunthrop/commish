@@ -17,7 +17,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"regexp"
 	"strconv"
 	"strings"
 )
@@ -144,6 +143,9 @@ type WriteAnswer struct {
 	Sent    []byte
 	Outcome WriteOutcome
 	Words   string
+	// Lost is why an answer was not read, for the log: "request" when the
+	// request did not complete, "read" when the body did not, "" when read.
+	Lost string
 }
 
 // SetLineup sends the lineup once with the member's session, as a POST
@@ -169,11 +171,15 @@ func (c *Client) SetLineup(ctx context.Context, sess Session, set LineupSet) (Wr
 	out := WriteAnswer{Sent: body, Outcome: WriteUnknown}
 	resp, err := c.memberHTTP().Do(req)
 	if err != nil {
+		out.Lost = "request"
 		return out, nil
 	}
 	defer func() { _ = resp.Body.Close() }()
 	out.Status = resp.StatusCode
-	answer, _ := io.ReadAll(io.LimitReader(resp.Body, maxWriteAnswer))
+	answer, err := io.ReadAll(io.LimitReader(resp.Body, maxWriteAnswer))
+	if err != nil {
+		out.Lost = "read"
+	}
 	return classify(out, answer, sess), nil
 }
 
@@ -224,7 +230,7 @@ func redact(words string, sess Session) string {
 	if sess.UserID == "" {
 		return words
 	}
-	return regexp.MustCompile(regexp.QuoteMeta(sess.UserID)).ReplaceAllLiteralString(words, redacted)
+	return strings.ReplaceAll(words, sess.UserID, redacted)
 }
 
 func bounded(words string) string {

@@ -275,7 +275,7 @@ func (s *Service) exchange(ctx context.Context, username, password string, yr in
 // keep seals the session and answers the connection and the leagues.
 func (s *Service) keep(w http.ResponseWriter, r *http.Request, sess mfl.Session, list []mfl.MyLeague, shown int) {
 	ctx, accountID := r.Context(), auth.AccountID(r)
-	sealed, err := Seal(s.Vault, accountID, sess)
+	sealed, err := Seal(s.Vault, accountID, sess, s.Now())
 	if err != nil {
 		httpx.WriteInternal(w, r, s.Log, "mflhost: seal", err)
 		return
@@ -294,6 +294,9 @@ func (s *Service) keep(w http.ResponseWriter, r *http.Request, sess mfl.Session,
 
 // leagues is every league MyFantasyLeague lists for the member's session.
 func (s *Service) leagues(w http.ResponseWriter, r *http.Request) {
+	if !s.open(w, r) {
+		return
+	}
 	list, err := s.Leagues.Leagues(r.Context(), auth.AccountID(r), season.Of(s.Now()))
 	switch {
 	case errors.Is(err, hosts.ErrNotConnected):

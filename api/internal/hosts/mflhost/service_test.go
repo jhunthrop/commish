@@ -240,6 +240,19 @@ func TestExpiryKeptAndHeld(t *testing.T) {
 	if _, err := m.Session(context.Background(), me); !errors.Is(err, ErrReconnect) || r.store.conn.Status != hosts.StatusSignedOut {
 		t.Fatalf("an expired session answered %v, status %s", err, r.store.conn.Status)
 	}
+	// A session MyFantasyLeague states no expiry for, or one past ours, is
+	// kept for maxSessionLife at most.
+	for _, stated := range []time.Time{{}, r.now.Add(5 * maxSessionLife)} {
+		r = newRig(t)
+		r.srv.Set(func(s *mfltest.Server) { s.Expires = stated })
+		if code, _, _ := r.call(t, r.svc.connect, good()); code != http.StatusCreated {
+			t.Fatal(code)
+		}
+		sess, err := r.svc.Leagues.(*Member).Session(context.Background(), me)
+		if err != nil || !sess.Expires.Equal(r.now.Add(maxSessionLife)) {
+			t.Fatalf("stated %v: kept %v, %v", stated, sess.Expires, err)
+		}
+	}
 }
 
 // The connect is closed while the switch is off, except to the accounts
@@ -389,6 +402,13 @@ func TestLeagues(t *testing.T) {
 	if err := json.Unmarshal(data, &list); err != nil || code != http.StatusOK || len(list) != 2 {
 		t.Fatalf("%d %s", code, data)
 	}
+	// Behind the switch and its list, as connecting is: the kill switch
+	// stops the reads too.
+	r.svc.Writes = false
+	if code, _, _ := r.call(t, r.svc.leagues, nil); code != http.StatusServiceUnavailable {
+		t.Fatalf("switch off, not listed: %d", code)
+	}
+	r.svc.Writes = true
 	r.srv.Set(func(s *mfltest.Server) { s.SessionRefused = true })
 	if code, env, _ := r.call(t, r.svc.leagues, nil); code != http.StatusConflict || env.Error.Message != reconnectWords {
 		t.Fatalf("refused: %d %+v", code, env.Error)

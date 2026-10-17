@@ -59,10 +59,10 @@ func (l *List) list(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if l.Accounts != nil {
+		// A failed check leaves those hosts out: the rest still answer.
 		more, err := l.Accounts.OpenTo(r.Context(), account.ID)
 		if err != nil {
-			httpx.WriteInternal(w, r, l.Log, "hosts: open to", err)
-			return
+			l.Log.Warn("hosts: open to", "account", account.ID, "err", err)
 		}
 		out.Enabled = append(out.Enabled, more...)
 	}
