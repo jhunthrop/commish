@@ -108,7 +108,7 @@ func (s *Sleeper) Read(ctx context.Context, ref Ref) (Snapshot, error) {
 	}
 	snap := Snapshot{
 		Ref: ref, Name: league.Name, Status: league.Status, Season: league.Season,
-		Teams: sleeperTeams(rosters, users), Scoring: sleeperScoring(league.Scoring),
+		Teams: sleeperTeams(rosters, users, league), Scoring: sleeperScoring(league.Scoring), Terms: sleeperTerms(league),
 		Shape: sleeperShape(league), ReadAt: s.Now(),
 		Calendar: Calendar{PlayoffStartWeek: league.PlayoffWeekStart, WaiversClosed: league.AddsDisabled},
 	}
@@ -163,7 +163,7 @@ func starters(ids []string) []string {
 
 func round2(v float64) float64 { return math.Round(v*100) / 100 }
 
-func sleeperTeams(rosters []sleeper.Roster, users []sleeper.User) []Team {
+func sleeperTeams(rosters []sleeper.Roster, users []sleeper.User, league sleeper.League) []Team {
 	byID := make(map[string]sleeper.User, len(users))
 	for _, u := range users {
 		byID[u.ID] = u
@@ -174,7 +174,14 @@ func sleeperTeams(rosters []sleeper.Roster, users []sleeper.User) []Team {
 		t := Team{
 			RosterID: r.RosterID, Owner: owner.DisplayName, Name: owner.TeamName, Players: r.Players,
 			Starters: starters(r.Starters), Reserve: r.Reserve, Taxi: r.Taxi, Wins: r.Wins, Losses: r.Losses, Ties: r.Ties,
-			PointsFor: round2(r.PointsFor),
+			PointsFor: round2(r.PointsFor), Streak: sleeperStreak(r.Streak), WaiverOrder: r.WaiverPosition,
+			Avatar: sleeperAvatar(owner.Avatar),
+		}
+		against := round2(r.PointsAgainst)
+		t.PointsAgainst = &against
+		if league.WaiverType == sleeper.WaiverBudget && league.WaiverBudget > 0 {
+			left := max(league.WaiverBudget-r.BudgetUsed, 0)
+			t.BudgetLeft = &left
 		}
 		if r.OwnerID != "" {
 			t.OwnerIDs = append(t.OwnerIDs, r.OwnerID)
@@ -205,7 +212,7 @@ func sleeperMoves(txs []sleeper.Transaction) []Move {
 		if t.Status != "complete" {
 			continue
 		}
-		out = append(out, Move{Kind: kind, RosterIDs: t.RosterIDs, Adds: t.Adds, Drops: t.Drops, At: time.UnixMilli(t.Created).UTC()})
+		out = append(out, Move{Kind: kind, RosterIDs: t.RosterIDs, Adds: t.Adds, Drops: t.Drops, At: time.UnixMilli(t.Created).UTC(), Bid: t.Bid})
 	}
 	return out
 }

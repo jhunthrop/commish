@@ -127,7 +127,7 @@ func (p players) moves(moves []Move) []apitypes.LeagueMove {
 			ids = []int{}
 		}
 		out = append(out, apitypes.LeagueMove{
-			Kind: apitypes.LeagueMoveKind(m.Kind), At: m.At, RosterIds: ids, Adds: p.movePlayers(m.Adds), Drops: p.movePlayers(m.Drops),
+			Kind: apitypes.LeagueMoveKind(m.Kind), At: m.At, RosterIds: ids, Adds: p.movePlayers(m.Adds), Drops: p.movePlayers(m.Drops), Bid: m.Bid,
 		})
 	}
 	return out
