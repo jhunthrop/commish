@@ -29,7 +29,9 @@ def test_the_features_read_the_decay_the_cell_names() -> None:
     names = share_features("targets", 0.7)
     assert "share_decay_0_7_targets" in names
     assert "share_decay_0_5_targets" not in names
-    assert {"share_season_carries", "vacated_targets", "returning_targets", "rate_m", "implied_points"} <= set(names)
+    assert {"share_season_carries", "vacated_targets", "returning_targets", "rate_m_ppr", "implied_points"} <= set(
+        names
+    )
 
 
 def _plays() -> pd.DataFrame:

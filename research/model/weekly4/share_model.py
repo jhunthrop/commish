@@ -53,7 +53,7 @@ _COMMON: Final = (
     "default_no_depth_row",
     "returning_teammates",
     "vacating_teammates",
-    "rate_m",
+    "rate_m_ppr",  # 2.2: "the rate m ... as his season-level anchor", its PPR points a game
     "games_played",
     "default_no_game_this_season",
     "target_depth_behind",
