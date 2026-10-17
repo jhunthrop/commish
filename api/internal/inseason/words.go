@@ -320,18 +320,13 @@ func LineupNote(s apitypes.LeagueSettings, carried func(string) bool) string {
 // shows, as the Lineup screen's advice, and the rest of the season on our
 // number.
 func WaiversBasis(b OrderBasis) string {
-	return fmt.Sprintf("A pickup worth making starts for you this week on the Proj shown and does not lower your lineup over "+
-		"the rest of the season on %s. Its drop is the player you lose least by.", numberWords(b))
+	return fmt.Sprintf("A pickup starts for you this week on the Proj shown and does not lower your rest of season on %s. "+
+		"Its drop is the one you lose least by.", numberWords(b))
 }
 
 // WaiverSeasonBasis is what a waiver gain over the rest of the season is.
 func WaiverSeasonBasis(b OrderBasis, weeks int) string {
-	span := "the season on our preseason number"
-	if b == RestOfSeason {
-		span = "the rest of the season on our rest-of-season order"
-	}
-	return fmt.Sprintf("A gain a week is your lineup's points over replacement, above what a free pickup at his position gives you: "+
-		"%s, averaged over its %s.", span, weekCount(weeks))
+	return fmt.Sprintf("A gain a week is your lineup's points over replacement on %s, averaged over its %s.", numberWords(b), weekCount(weeks))
 }
 
 // OnlyCloseCalls is a team's line when every trade found with it is a

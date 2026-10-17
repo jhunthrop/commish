@@ -14,21 +14,27 @@ const MaxPickups = 3
 
 // weekLineup is the lineup the advice sets this week (Lineup, the Lineup
 // screen's rule) from the roster: its Proj as the screen prints and sums
-// it, and who starts by roster index.
+// it, who starts by roster index, the slot each starter fills, and the
+// slots no one who can play fills.
 type weekLineup struct {
 	proj   float64
 	starts []bool
+	slotOf map[int]int
+	idle   []bool
 }
 
 // weekOf sets the week's lineup for roster with the host's starters, as
 // the Lineup screen does. A spot no one who can play fills counts 0.
 func weekOf(config []draft.SlotConfig, roster []Candidate, hostStarters []string) weekLineup {
-	out := weekLineup{starts: make([]bool, len(roster))}
-	for _, r := range Lineup(config, roster, hostStarters) {
+	rows := Lineup(config, roster, hostStarters)
+	out := weekLineup{starts: make([]bool, len(roster)), slotOf: map[int]int{}, idle: make([]bool, len(rows))}
+	for i, r := range rows {
 		if r.Ours < 0 || r.NoOneCanPlay {
+			out.idle[i] = true
 			continue
 		}
 		out.starts[r.Ours] = true
+		out.slotOf[r.Ours] = i
 		if c := roster[r.Ours]; c.HasProj {
 			out.proj += c.Proj
 		}
@@ -44,35 +50,46 @@ type pickupWeek struct {
 	roster       []Candidate
 	hostStarters []string
 	base         weekLineup
-	// buf is the swapped roster, kept between calls.
-	buf []Candidate
 }
 
 func newPickupWeek(config []draft.SlotConfig, roster []Candidate, hostStarters []string) *pickupWeek {
 	return &pickupWeek{config: config, roster: roster, hostStarters: hostStarters, base: weekOf(config, roster, hostStarters)}
 }
 
-// with is this week's Proj gain to the lineup with add in and the roster
-// player at drop out (-1 for none), and whether add starts.
-func (w *pickupWeek) with(add Candidate, drop int) (float64, bool) {
-	w.buf = w.buf[:0]
-	for i, c := range w.roster {
-		if i != drop {
-			w.buf = append(w.buf, c)
+// swapped is roster less the player with the id drop ("" for none), with
+// add last.
+func swapped(roster []Candidate, drop string, add Candidate) []Candidate {
+	out := make([]Candidate, 0, len(roster)+1)
+	for _, c := range roster {
+		if drop == "" || c.ID != drop {
+			out = append(out, c)
 		}
 	}
-	w.buf = append(w.buf, add)
-	after := weekOf(w.config, w.buf, w.hostStarters)
-	starts := after.starts[len(w.buf)-1]
-	if !starts {
-		return 0, false
+	return append(out, add)
+}
+
+// with is this week's Proj gain to the lineup with add in and the roster
+// player at drop out (-1 for none), whether add starts, and whether he
+// fills a starting spot no one of the member's can play (the open spot).
+func (w *pickupWeek) with(add Candidate, drop int) (gain float64, starts, open bool) {
+	id := ""
+	if drop >= 0 {
+		id = w.roster[drop].ID
 	}
-	return roundTenth(after.proj - w.base.proj), true
+	after := swapped(w.roster, id, add)
+	lineup := weekOf(w.config, after, w.hostStarters)
+	at := len(after) - 1
+	if !lineup.starts[at] {
+		return 0, false, false
+	}
+	slot := lineup.slotOf[at]
+	return roundTenth(lineup.proj - w.base.proj), true, slot < len(w.base.idle) && w.base.idle[slot]
 }
 
 // beats is the member's player at add's position with the lowest Proj
 // add tops, the advised lineup's starters first, then the bench; nil when
-// add cannot play this week, has no Proj or tops no one.
+// add cannot play this week, has no Proj or tops no one. A player of the
+// member's who cannot play this week is never named (review 66f M3).
 func (w *pickupWeek) beats(add Candidate, mine []person) *apitypes.WaiverBeats {
 	if add.Tier != Available || !add.HasProj {
 		return nil
@@ -81,7 +98,7 @@ func (w *pickupWeek) beats(add Candidate, mine []person) *apitypes.WaiverBeats {
 		low := -1
 		for i, p := range mine {
 			c := p.cand
-			if c.Position != add.Position || !c.HasProj || w.base.starts[i] != starter || add.Proj <= c.Proj {
+			if c.Position != add.Position || !c.HasProj || c.Tier != Available || w.base.starts[i] != starter || add.Proj <= c.Proj {
 				continue
 			}
 			if low < 0 || c.Proj < mine[low].cand.Proj {
@@ -97,52 +114,83 @@ func (w *pickupWeek) beats(add Candidate, mine []person) *apitypes.WaiverBeats {
 	return nil
 }
 
+// openSpot is Beats for an add who fills a starting spot no one of the
+// member's can play this week: no player named, the week's gain.
+func openSpot(weekGain float64) *apitypes.WaiverBeats {
+	return &apitypes.WaiverBeats{OpenSpot: true, Starter: true, Gain: weekGain}
+}
+
 // isPickup is the strip's rule (Lane 66f): he starts this week, the
 // lineup's Proj rises, and the rest of the season does not fall.
 func isPickup(row apitypes.WaiverRow) bool {
 	return row.Starts && row.WeekGain > 0 && roundTenth(row.Gain) >= 0
 }
 
-// pickupsOf is the strip's cards: the pickups worth making, the highest
-// week gain first, each topping a different player with a different drop,
-// at most MaxPickups.
-func pickupsOf(rows []apitypes.WaiverRow) []apitypes.WaiverRow {
-	var picks []apitypes.WaiverRow
-	for _, r := range rows {
-		if r.Pickup {
-			picks = append(picks, r)
-		}
-	}
-	sort.SliceStable(picks, func(i, j int) bool { return picks[i].WeekGain > picks[j].WeekGain })
-	out := []apitypes.WaiverRow{}
+// setCandidate is one add the strip may name: the add, his drop (a roster
+// index, -1 for none) and the roster places he takes, the player he tops
+// and the player he drops, in one namespace (review 66f H1).
+type setCandidate struct {
+	add  Candidate
+	drop int
+	keys []string
+}
+
+// pickupSet is the strip's cards as chosen: their indexes into the
+// candidates, each card's gain over the lineup with the cards before it
+// made, and the lineup's Proj with every card made.
+type pickupSet struct {
+	chosen []int
+	gains  []float64
+	proj   float64
+}
+
+// set chooses the strip's pickups as a set (review 66f H1): in the order
+// given (the highest week gain alone first), each card is measured against
+// the lineup with the cards already chosen made, and kept only while he
+// still starts, still raises the Proj, takes no roster place another card
+// took, and his drop is still on the roster; at most MaxPickups.
+func (w *pickupWeek) set(cands []setCandidate) pickupSet {
+	out := pickupSet{proj: w.base.proj}
+	roster := append([]Candidate(nil), w.roster...)
 	used := map[string]bool{}
-	for _, r := range picks {
-		if len(out) == MaxPickups {
+	for i, c := range cands {
+		if len(out.chosen) == MaxPickups {
 			break
 		}
-		keys := pickupKeys(r)
-		if anyUsed(used, keys) {
+		if anyUsed(used, c.keys) {
 			continue
 		}
-		for _, k := range keys {
+		drop := ""
+		if c.drop >= 0 {
+			drop = w.roster[c.drop].ID
+			if !onRoster(roster, drop) {
+				continue
+			}
+		}
+		after := swapped(roster, drop, c.add)
+		lineup := weekOf(w.config, after, w.hostStarters)
+		gain := roundTenth(lineup.proj - out.proj)
+		if !lineup.starts[len(after)-1] || gain <= 0 {
+			continue
+		}
+		for _, k := range c.keys {
 			used[k] = true
 		}
-		out = append(out, r)
+		roster, out.proj = after, lineup.proj
+		out.chosen = append(out.chosen, i)
+		out.gains = append(out.gains, gain)
 	}
 	return out
 }
 
-// pickupKeys is the roster places a pickup takes: the player he tops and
-// the player he drops.
-func pickupKeys(r apitypes.WaiverRow) []string {
-	var keys []string
-	if r.Beats != nil {
-		keys = append(keys, "beats:"+r.Beats.HostId)
+// onRoster is whether the roster has the player with the id.
+func onRoster(roster []Candidate, id string) bool {
+	for _, c := range roster {
+		if c.ID == id {
+			return true
+		}
 	}
-	if r.Drop != nil {
-		keys = append(keys, "drop:"+r.Drop.Player.HostId)
-	}
-	return keys
+	return false
 }
 
 func anyUsed(used map[string]bool, keys []string) bool {
@@ -152,6 +200,48 @@ func anyUsed(used map[string]bool, keys []string) bool {
 		}
 	}
 	return false
+}
+
+// strip is the Waivers strip's cards (review 66f H1, L8): every add we
+// rank that is a pickup on his own (he starts, the week rises, the rest of
+// the season does not fall), highest week gain first, chosen as a set; each
+// card's week_gain is his over the cards before him. Also the lineup's Proj
+// with every card made.
+func (a *advisor) strip(w *Writer, week *pickupWeek, mine, pool []person, moves []Waiver, clears map[string]openapi_types.Date) ([]apitypes.WaiverRow, float64) {
+	type ranked struct {
+		move Waiver
+		gain float64
+	}
+	var cands []ranked
+	for _, m := range moves {
+		if m.NoDrop || roundTenth(m.Gain) < 0 {
+			continue
+		}
+		if gain, starts, _ := week.with(pool[m.Add].cand, m.Drop); starts && gain > 0 {
+			cands = append(cands, ranked{move: m, gain: gain})
+		}
+	}
+	sort.SliceStable(cands, func(i, j int) bool { return cands[i].gain > cands[j].gain })
+	set := make([]setCandidate, len(cands))
+	for i, c := range cands {
+		add := pool[c.move.Add].cand
+		var keys []string
+		if b := week.beats(add, mine); b != nil {
+			keys = append(keys, b.HostId)
+		}
+		if c.move.Drop >= 0 {
+			keys = append(keys, mine[c.move.Drop].cand.ID)
+		}
+		set[i] = setCandidate{add: add, drop: c.move.Drop, keys: keys}
+	}
+	chosen := week.set(set)
+	out := make([]apitypes.WaiverRow, 0, len(chosen.chosen))
+	for k, i := range chosen.chosen {
+		row := a.waiverRow(w, week, mine, pool[cands[i].move.Add], cands[i].move, clears)
+		row.WeekGain, row.Pickup = chosen.gains[k], true
+		out = append(out, row)
+	}
+	return out, chosen.proj
 }
 
 // clearsOf is the day a claim on each pool player clears, by board id,

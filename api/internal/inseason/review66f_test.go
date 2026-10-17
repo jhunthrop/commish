@@ -52,7 +52,7 @@ func TestPickupWeekGain(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			gain, starts := week.with(tc.add, tc.drop)
+			gain, starts, _ := week.with(tc.add, tc.drop)
 			if gain != tc.gain || starts != tc.starts {
 				t.Fatalf("gain %v starts %v, want %v %v", gain, starts, tc.gain, tc.starts)
 			}
@@ -111,10 +111,8 @@ func pickRow(beats, drop string, weekGain, gain float64, starts bool) apitypes.W
 }
 
 // The pickup rule (Lane 66f): he starts this week, the lineup's Proj
-// rises, and the rest of the season does not fall. The strip's cards
-// take the highest week gain first, each topping a different player with
-// a different drop, at most three.
-func TestPickupRuleAndStrip(t *testing.T) {
+// rises, and the rest of the season does not fall.
+func TestPickupRule(t *testing.T) {
 	if isPickup(pickRow("rb3", "wr5", 0.2, -0.3, true)) {
 		t.Error("a kicker swap that costs the season is not a pickup")
 	}
@@ -123,28 +121,6 @@ func TestPickupRuleAndStrip(t *testing.T) {
 	}
 	if !isPickup(pickRow("rb3", "wr5", 2, 0, true)) {
 		t.Error("a season gain of 0 does not lower it")
-	}
-	rows := []apitypes.WaiverRow{
-		pickRow("rb3", "rb4", 1.2, 0.4, true),
-		pickRow("rb3", "wr5", 6.7, 1.2, true),
-		pickRow("def1", "def1", 2.7, 0.3, true),
-		pickRow("k1", "k1", 0.2, -0.3, true),
-		pickRow("te1", "wr5", 3, 0.1, true),
-		pickRow("wr3", "te2", 0.9, 0, true),
-		pickRow("qb2", "rb4", 1.1, 0.2, false),
-	}
-	got := pickupsOf(rows)
-	var keys []string
-	for _, r := range got {
-		keys = append(keys, r.Beats.HostId+"/"+r.Drop.Player.HostId)
-	}
-	// rb3/wr5 first; te1/wr5 drops wr5 again; def1/def1 next; rb3/rb4 tops rb3
-	// again; wr3/te2 is the third.
-	if want := "rb3/wr5 def1/def1 wr3/te2"; strings.Join(keys, " ") != want {
-		t.Fatalf("pickups %v, want %s", keys, want)
-	}
-	if len(pickupsOf(nil)) != 0 || pickupsOf(nil) == nil {
-		t.Fatal("no pickup is an empty list")
 	}
 }
 

@@ -3442,9 +3442,6 @@ type WaiverAdvice struct {
 	// BasisNote the rest of the basis, said once under the rows: the league the points over replacement are for and the league's rules points so far leave out
 	BasisNote string `json:"basis_note"`
 
-	// Best the first of pickups, null with none
-	Best *WaiverRow `json:"best"`
-
 	// HostNote one sentence under the verb when we cannot open the host's page ("Make this change on Yahoo. We cannot open that page for you yet."), null when the url opens it
 	HostNote *string `json:"host_note"`
 
@@ -3458,8 +3455,11 @@ type WaiverAdvice struct {
 	// OrderBasis which order ranks the players: our preseason board, or the rest-of-season order (from week 7, once the API reads it)
 	OrderBasis OrderBasis `json:"order_basis"`
 
-	// Pickups the pickups worth making, at most 3, the highest week_gain first, each topping a different player of the member's with a different drop (the strip's cards); empty when no pickup beats the roster
+	// Pickups the pickups worth making, chosen as a set from every add we rank, at most 3: each measured against the lineup with the ones before it made, kept only while he still starts and raises the Proj, no two taking the same player of the member's (topped or dropped); each one's week_gain is his over the ones before (the strip's cards); empty when no pickup beats the roster
 	Pickups []WaiverRow `json:"pickups"`
+
+	// PickupsProj this week's Proj of the lineup the advice sets with every pickup made, one decimal; lineup_proj with none; null before the week's projection is read
+	PickupsProj *float64 `json:"pickups_proj"`
 
 	// ProjectionPreviousReadAt when the snapshot before it was captured, the read projection_delta counts from; null with none
 	ProjectionPreviousReadAt *time.Time `json:"projection_previous_read_at"`
@@ -3483,14 +3483,19 @@ type WaiverAdvice struct {
 	Week        int    `json:"week"`
 }
 
-// WaiverBeats the member's player at his position with the lowest Proj he tops, the advised lineup's starters first, then the bench (Lane 66f's Beats column)
+// WaiverBeats the member's player at his position with the lowest Proj he tops, the advised lineup's starters first, then the bench, never one who cannot play this week (Lane 66f's Beats column); or the open spot he fills, a starting spot no player of the member's can play this week
 type WaiverBeats struct {
 	// Gain his Proj less that player's, as the screen prints them (tenths)
 	Gain float64 `json:"gain"`
 
-	// HostId the member's player's host id, a line in the answer's roster
+	// HostId the member's player's host id, a line in the answer's roster; empty for the open spot
 	HostId string `json:"host_id"`
-	Name   string `json:"name"`
+
+	// Name empty for the open spot
+	Name string `json:"name"`
+
+	// OpenSpot he fills a starting spot no player of the member's can play this week (host_id and name empty, gain his week gain)
+	OpenSpot bool `json:"open_spot"`
 
 	// Starter the player he tops starts in the lineup the advice sets this week
 	Starter bool `json:"starter"`

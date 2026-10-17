@@ -503,33 +503,37 @@ func (a *advisor) Waivers(position draft.Position) (apitypes.WaiverAdvice, bool)
 		Pickups: []apitypes.WaiverRow{}, Rows: []apitypes.WaiverRow{}, Roster: lines(mine, indexes(len(mine))), Moves: CopyOnlyClaims(a.Snap.Ref.Host)}
 	out.HostWaiversUrl, out.HostNote = a.host(WaiversPage)
 	week := newPickupWeek(a.config, squad.Players, team.Starters)
-	if out.ProjectionReadAt != nil {
-		base := week.base.proj
-		out.LineupProj = &base
-	}
 	clears := a.clearsOf()
 	w := &Writer{Basis: a.basis, Now: a.now}
-	for _, move := range Waivers(a.config, a.weeks, squad, cands) {
+	moves := Waivers(a.config, a.weeks, squad, cands)
+	for _, move := range moves {
 		if len(out.Rows) == MaxWaiverRows {
 			break
 		}
 		out.Rows = append(out.Rows, a.waiverRow(w, week, mine, pool[move.Add], move, clears))
 	}
-	out.Pickups = pickupsOf(out.Rows)
-	if len(out.Pickups) > 0 {
-		best := out.Pickups[0]
-		out.Best = &best
+	// The strip is chosen from every add we rank, before the rows' cut.
+	var proj float64
+	out.Pickups, proj = a.strip(w, week, mine, pool, moves, clears)
+	if out.ProjectionReadAt != nil {
+		base := week.base.proj
+		out.LineupProj, out.PickupsProj = &base, &proj
 	}
 	return out, true
 }
 
 // waiverRow is one add's row: the rest-of-season gain with the search's
-// drop, this week's on the Lineup screen's rule, whom he beats, every drop
-// he could take with its gains, and the day a claim on him clears.
+// drop, this week's on the Lineup screen's rule, whom he beats (or the
+// open spot he fills), every drop he could take with its gains, and the
+// day a claim on him clears.
 func (a *advisor) waiverRow(w *Writer, week *pickupWeek, mine []person, add person, move Waiver, clears map[string]openapi_types.Date) apitypes.WaiverRow {
 	row := apitypes.WaiverRow{Add: add.line, Gain: roundTenth(move.Gain), Beats: week.beats(add.cand, mine), Drops: []apitypes.WaiverDrop{}}
 	if !move.NoDrop {
-		row.WeekGain, row.Starts = week.with(add.cand, move.Drop)
+		var open bool
+		row.WeekGain, row.Starts, open = week.with(add.cand, move.Drop)
+		if open {
+			row.Beats = openSpot(row.WeekGain)
+		}
 	}
 	var drop *Line
 	if move.Drop >= 0 {
@@ -537,7 +541,7 @@ func (a *advisor) waiverRow(w *Writer, week *pickupWeek, mine []person, add pers
 		row.Drop, drop = &line, &mine[move.Drop].words
 	}
 	for _, d := range move.Drops {
-		weekGain, _ := week.with(add.cand, d.At)
+		weekGain, _, _ := week.with(add.cand, d.At)
 		row.Drops = append(row.Drops, apitypes.WaiverDrop{HostId: mine[d.At].cand.ID, Gain: roundTenth(d.Gain), WeekGain: weekGain})
 	}
 	row.Pickup = !move.NoDrop && isPickup(row)

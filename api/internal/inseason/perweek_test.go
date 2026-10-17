@@ -63,10 +63,10 @@ func TestBasisSaysWhatAWeekIs(t *testing.T) {
 	if !strings.Contains(LineupBasis(RestOfSeason), "Our rest-of-season order breaks") || !strings.Contains(pre, "Our preseason number breaks") {
 		t.Errorf("the order named: %q %q", LineupBasis(RestOfSeason), pre)
 	}
-	if !strings.Contains(ros, "the rest of the season on our rest-of-season order, averaged over its 11 weeks") {
+	if !strings.Contains(ros, "on our rest-of-season order, averaged over its 11 weeks") {
 		t.Errorf("%q", ros)
 	}
-	if !strings.Contains(WaiverSeasonBasis(Preseason, 17), "the season on our preseason number, averaged over its 17 weeks") {
+	if !strings.Contains(WaiverSeasonBasis(Preseason, 17), "on our preseason number, averaged over its 17 weeks") {
 		t.Errorf("%q", WaiverSeasonBasis(Preseason, 17))
 	}
 	if one := TradesBasis(RestOfSeason, 1); !strings.Contains(one, "averaged over its one week") {

@@ -121,12 +121,18 @@ func TestWaiverAdvice(t *testing.T) {
 		}
 		guard(t, r.Sentence)
 	}
-	// The best is the strip's first pickup (Lane 66f), none without one.
-	if len(out.Pickups) > 0 && (out.Best == nil || boardID(out.Best.Add) != boardID(out.Pickups[0].Add)) {
-		t.Fatalf("best %v", out.Best)
+	// The strip's Proj is the lineup's with every card made (review 66f H1).
+	if (out.LineupProj == nil) != (out.PickupsProj == nil) {
+		t.Fatalf("lineup %v pickups %v", out.LineupProj, out.PickupsProj)
 	}
-	if len(out.Pickups) == 0 && out.Best != nil {
-		t.Fatalf("best %v with no pickup", out.Best)
+	if out.LineupProj != nil {
+		sum := *out.LineupProj
+		for _, p := range out.Pickups {
+			sum = roundTenth(sum + p.WeekGain)
+		}
+		if sum != *out.PickupsProj {
+			t.Fatalf("the cards' gains reach %v, the set's Proj is %v", sum, *out.PickupsProj)
+		}
 	}
 	rbs, _ := newFixtureAdvisor(t, f, held).Waivers(draft.RB)
 	for _, r := range rbs.Rows {

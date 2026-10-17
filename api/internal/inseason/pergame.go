@@ -62,7 +62,7 @@ func withPerGame(b boards.Board, basis string, people ...[]person) string {
 // RestOfSeasonBasis is the Waivers screen's sentence for the figure, which
 // it heads "Rest of season" (Lane 66f).
 func RestOfSeasonBasis(fromWeek int) string {
-	return fmt.Sprintf("Rest of season is his points a game on our rest-of-season projection from week %d over the games his club has left, byes out.", fromWeek)
+	return fmt.Sprintf("Rest of season is his points a game on our rest-of-season projection from week %d, byes out.", fromWeek)
 }
 
 // withRestOfSeason is the Waivers screen's season line: the figure's

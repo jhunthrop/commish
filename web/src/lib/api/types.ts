@@ -2926,10 +2926,13 @@ export interface components {
 			/** @description the drafter's side first, then the opponent's when the week pairs them */
 			sides: components['schemas']['MatchupBoxSide'][];
 		};
-		/** @description the member's player at his position with the lowest Proj he tops, the advised lineup's starters first, then the bench (Lane 66f's Beats column) */
+		/** @description the member's player at his position with the lowest Proj he tops, the advised lineup's starters first, then the bench, never one who cannot play this week (Lane 66f's Beats column); or the open spot he fills, a starting spot no player of the member's can play this week */
 		WaiverBeats: {
-			/** @description the member's player's host id, a line in the answer's roster */
+			/** @description he fills a starting spot no player of the member's can play this week (host_id and name empty, gain his week gain) */
+			open_spot: boolean;
+			/** @description the member's player's host id, a line in the answer's roster; empty for the open spot */
 			host_id: string;
+			/** @description empty for the open spot */
 			name: string;
 			/** @description the player he tops starts in the lineup the advice sets this week */
 			starter: boolean;
@@ -3012,9 +3015,12 @@ export interface components {
 			 * @description when the snapshot before it was captured, the read projection_delta counts from; null with none
 			 */
 			projection_previous_read_at: string | null;
-			/** @description the first of pickups, null with none */
-			best: components['schemas']['WaiverRow'] | null;
-			/** @description the pickups worth making, at most 3, the highest week_gain first, each topping a different player of the member's with a different drop (the strip's cards); empty when no pickup beats the roster */
+			/**
+			 * Format: double
+			 * @description this week's Proj of the lineup the advice sets with every pickup made, one decimal; lineup_proj with none; null before the week's projection is read
+			 */
+			pickups_proj: number | null;
+			/** @description the pickups worth making, chosen as a set from every add we rank, at most 3: each measured against the lineup with the ones before it made, kept only while he still starts and raises the Proj, no two taking the same player of the member's (topped or dropped); each one's week_gain is his over the ones before (the strip's cards); empty when no pickup beats the roster */
 			pickups: components['schemas']['WaiverRow'][];
 			/** @description positive gains first by gain, then the rest by points over replacement, at most 60 */
 			rows: components['schemas']['WaiverRow'][];
