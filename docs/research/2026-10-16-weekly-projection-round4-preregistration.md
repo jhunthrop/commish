@@ -1079,9 +1079,12 @@ population statistic or judged week changes.
    their other games, shrunk toward 0 with the same six games of prior (n x difference / (n + 6)).
 3. **Tempo shrinkage (2.4, 2.5).** Ratified: pass rate over expectation shrinks toward 0 and pace
    toward the league's mean pace over the same weeks, each with six games of prior.
-4. **The returning absence (2.2).** Ratified: the absence is the run of the club's last three games he
-   missed that ends with its latest game; a teammate who missed an earlier game and has played since is
-   not away. The literal rule also counts a healthy player with a week-W chart row, no line in the last
+4. **The returning absence (2.2), the wording repaired.** 2.2's first condition read "he missed at
+   least one of the club's last three games", which taken literally also counts a teammate who missed
+   an earlier game and has played since, whose shares are already in his own features. The condition
+   now reads: he missed the club's latest game, and his absence is the run of missed games ending with
+   it, reaching back at most three games (the cap). A teammate who has played since his absence is not
+   returning. The literal rule also counts a healthy player with a week-W chart row, no line in the last
    three games and a line earlier this season; that stays as written (changing it would be a model
    input change), and the results report, per season, the count of returning teammates whose absence
    carried no Out or Doubtful filing.
@@ -1110,3 +1113,12 @@ population statistic or judged week changes.
 12. **The depth chart check** is the coordinator's run on `lane70_weekly` (6.3), recorded in the
     results before any fit. Lane 68's builds took `--depth-chart week` provisionally; the fit reads the
     build the verdict names.
+13. **A retractable roof, live.** 2.5's forecast rule for a retractable venue is a fitted one-split
+    rule, lane 69's. The feature store writes a live retractable roof's state as NaN with a counted
+    `default_roof_undecided` indicator and the venue's forecast weather beside it; lane 69 applies the
+    rule and sets the roof state and the weather terms from it. "retractable" is never a roof state
+    value, and the fit sees only dome, closed, open and outdoors.
+14. **International games.** In replay their recorded weather is admitted as any outdoor game's is
+    (2.10 gives them no special row). Live, a non-US venue takes 2.10's row: the latest earlier
+    `nws_forecast` row for the game if one exists, else NaN with `no_forecast` 1, never the indoor
+    values.
