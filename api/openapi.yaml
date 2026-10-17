@@ -3539,7 +3539,7 @@ components:
         ties: { type: integer }
     TradeRow:
       type: object
-      required: [give, get, drop, my_gain, their_gain, close_for_them]
+      required: [give, get, drop, my_gain, their_gain, close_for_them, my_proj_change, their_proj_change]
       properties:
         give: { type: array, items: { $ref: "#/components/schemas/PlayerLine" } }
         get: { type: array, items: { $ref: "#/components/schemas/PlayerLine" } }

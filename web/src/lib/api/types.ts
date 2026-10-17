@@ -2994,12 +2994,12 @@ export interface components {
 			 * Format: double
 			 * @description this week's Proj total of the drafter's lineup with the trade less without it, each lineup set as the Lineup screen sets it (Lane 66g), one decimal; null when the week has no published projection read
 			 */
-			my_proj_change?: number | null;
+			my_proj_change: number | null;
 			/**
 			 * Format: double
 			 * @description the same for theirs
 			 */
-			their_proj_change?: number | null;
+			their_proj_change: number | null;
 		};
 		TradeTeam: {
 			roster_id: number;

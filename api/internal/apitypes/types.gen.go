@@ -3455,13 +3455,13 @@ type TradeRow struct {
 	MyGain float64 `json:"my_gain"`
 
 	// MyProjChange this week's Proj total of the drafter's lineup with the trade less without it, each lineup set as the Lineup screen sets it (Lane 66g), one decimal; null when the week has no published projection read
-	MyProjChange *float64 `json:"my_proj_change,omitempty"`
+	MyProjChange *float64 `json:"my_proj_change"`
 
 	// TheirGain the same to theirs
 	TheirGain float64 `json:"their_gain"`
 
 	// TheirProjChange the same for theirs
-	TheirProjChange *float64 `json:"their_proj_change,omitempty"`
+	TheirProjChange *float64 `json:"their_proj_change"`
 }
 
 // TradeSideTotals defines model for TradeSideTotals.
