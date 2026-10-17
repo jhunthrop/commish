@@ -232,7 +232,7 @@ func countables(r apitypes.ScoringRules) []countable {
 		{longer, "field goals of 40 yards or more", kickerSpot, []string{metricFieldGoals40To49, metricFieldGoals50To59, metricFieldGoals60Up}},
 		{r.PointsPerFieldGoalMissed, "missed field goals", kickerSpot, []string{"field_goals_missed"}},
 		{r.PointsPerExtraPointMissed, "missed extra points", kickerSpot, []string{"extra_points_missed"}},
-		{r.PointsPerReturnTouchdown, "return touchdowns", anySpot, []string{"kick_return_touchdowns", "punt_return_touchdowns"}},
+		{r.PointsPerReturnTouchdown, "a player's kick and punt return touchdowns", anySpot, []string{"kick_return_touchdowns", "punt_return_touchdowns"}},
 		{r.PointsPerDefensiveFumbleRecovery, "fumble recoveries", defenseSpot, []string{"defensive_fumbles_recovered"}},
 		{r.PointsPerSafety, "safeties", defenseSpot, []string{"safeties"}},
 		{tierPoints(scoring.PointsAllowedTiers()), "a defense's points allowed", defenseSpot, []string{metricPointsAllowed}},

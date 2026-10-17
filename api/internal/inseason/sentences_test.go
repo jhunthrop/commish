@@ -228,6 +228,12 @@ func TestBasisNamesTheRulesLeftOut(t *testing.T) {
 	rules.PointsPerTwoPointConversion = 0
 	if got := BasisNote(settings, nil); strings.Contains(got, "leave out") {
 		t.Fatalf("%q", got)
+	} // A defense's return touchdowns are on its lines; a player's kick and
+	// punt returns are what the basis names.
+	rules.PointsPerReturnTouchdown = 6
+	want = "Points so far leave out your league's points for a player's kick and punt return touchdowns: the stat lines we hold do not carry them."
+	if got := BasisNote(settings, func(m string) bool { return m == "return_touchdowns" }); !strings.HasSuffix(got, want) {
+		t.Fatalf("return touchdowns: %q", got)
 	}
 }
 
