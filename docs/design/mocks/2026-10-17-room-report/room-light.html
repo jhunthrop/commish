@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Commish draft room, the call at 1.01 (Lane 66o mock, light)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@500;700;800&family=Outfit:wght@400;500;600;700&display=swap">
+<style>
+/* Commish tokens: the Press Box system with two bounded borrowings. One file, both themes.
+   Layout concept: a near-black or paper-white shell, an icon rail on the left, a persistent
+   search across the top, dense rows in the middle, a filter and sheet rail on the right.
+   Borrowed from Scout: a reading serif, allowed on the player page's prose and its pull figures only.
+   Borrowed from Broadcast: the score bug and the lower third, allowed in a live draft room only.
+   Light values live on bare :root. Dark redefines tokens only, twice, so the OS
+   setting and the explicit data-theme toggle both win. */
+
+:root {
+  /* Type. Outfit is the geometric UI face: Poppins's circles with a tighter set width,
+     so a dense row holds "Jaxon Smith-Njigba" at 15px without truncating.
+     Big Shoulders Display is the condensed number face, drawn from stadium and
+     transit lettering, narrow enough that 344.1 fits a 64px cell at display size. */
+  --font-ui: "Outfit", "Outfit Fallback", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --font-num: "Big Shoulders Display", "Big Shoulders Display Fallback", "Oswald", "Arial Narrow", sans-serif;
+  /* Newsreader is the reading face. Optical sizes cut for long screen reading, because the
+     capsule is writing. Allowed on the player page's prose block and its pull figures, nowhere else. */
+  --font-read: "Newsreader", "Newsreader Fallback", "Iowan Old Style", "Charter", Georgia, serif;
+  --t-read: 1.1875rem;  /* 19 capsule prose */
+  --t-pull: 2.75rem;    /* 44 a pull figure, the same step as --t-2xl */
+
+  /* Type scale, 1.2 ratio from a 14px base. Numbers use --font-num at the top three. */
+  --t-xs: 0.6875rem;   /* 11 labels on cells, uppercase, tracked */
+  --t-sm: 0.8125rem;   /* 13 secondary text */
+  --t-md: 0.9375rem;   /* 15 names, body in rows */
+  --t-lg: 1.125rem;    /* 18 section heads, prose */
+  --t-xl: 1.625rem;    /* 26 cell numbers in display face */
+  --t-head: 1.875rem; /* 30 a panel title in the display face */
+  --t-display: 2.375rem; /* 38 a page title in the display face */
+  --t-2xl: 2.75rem;    /* 44 tier cliffs, clock */
+  --t-3xl: 5.5rem;     /* 88 the one big number on a page */
+  --track-label: 0.08em;
+
+  /* Space and shape. Rows are 52px on desktop and 48 on the phone. Radii are small:
+     a press box is glass and steel, not pillows. */
+  --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px; --s-5: 24px; --s-6: 32px; --s-7: 48px;
+  --row-h: 52px;
+  --touch: 44px; /* the smallest target a thumb gets on a phone */
+  --tab-bar-h: 64px; /* the phone's tab bar, the rail laid along the bottom */
+  --rail-w: 84px;
+  --side-w: 296px;
+  --r-sm: 4px; --r-md: 8px; --r-pill: 999px;
+
+  /* Neutrals, light. True paper white with ink that leans a touch warm toward the
+     accent, so the greys read as chosen rather than default. */
+  --bg: #ffffff;
+  --surface: #f8f7f5;
+  --surface-2: #efedea;
+  --line: #e3dfda;
+  --line-strong: #cfc9c2;
+  --ink: #15120f;
+  --ink-2: #48413b;
+  --ink-3: #6b635c;      /* 5.9:1 on --bg */
+  --shell: #ffffff;      /* rail and top bar */
+  --shell-line: #e3dfda;
+
+  /* The one warm accent: burnt orange at hue 20. Streak amber (#E39A0E) sits at 38
+     and reads 2.3:1 as text on white, so it cannot carry a verb in light. This orange
+     holds 5:1 under white text and as text on paper, and stays clear of every tier hue.
+     It marks three things only: the brand, the one solid verb, and you. */
+  --accent: #c2470a;
+  --accent-ink: #ffffff;       /* text on an accent fill */
+  --accent-text: #b03f06;      /* accent used as text on --bg */
+  --accent-wash: #fdebe0;      /* your rows, your picks */
+  --focus: #c2470a;
+
+  /* Magnitude. Over replacement is tinted by the round it would go in on our board
+     of 400 (1 to 4, then none). Below replacement takes the rose wash and a minus. */
+  --heat-1: #a6e3bd;
+  --heat-2: #c8eed5;
+  --heat-3: #e0f5e7;
+  --heat-4: #f0faf3;
+  --heat-neg: #fbe1e4;
+  --heat-ink: #15120f;
+
+  /* Drafters versus us. Later is a gain for you, earlier is a cost. Always with the word. */
+  --gain-bg: #dcf3e4; --gain-ink: #11663a;
+  --loss-bg: #fbe1e4; --loss-ink: #a3243a;
+  /* A player's status on his face: injured reserve, a solid tag at the photo's top left. */
+  --status-ir-bg: #a3243a; --status-ir-ink: #ffffff;
+
+  /* Tiers run hot to cold down the board. Each band's label carries the tier number
+     and the drop to the next tier, so the colour is never the only channel. */
+  --tier-1: #c62a47;
+  --tier-2: #b8287f;
+  --tier-3: #7a3cb0;
+  --tier-4: #3a55b4;
+  --tier-5: #0f6f99;
+  --tier-6: #0b7a68;
+  --tier-7: #5b5a65;
+  --tier-ink: #ffffff;
+  --tier-wash: 9%;   /* how much of the tier hue tints its band */
+
+  /* The scoreboard: a lit board on black in both themes. In Commish it carries the draft room's
+     score bug and lower third, and nothing outside a live draft. The orange on it is the dark-theme
+     accent, so the brand reads the same on the board in either theme. */
+  --scoreboard: #15120f;
+  --scoreboard-2: #221d19;     /* a raised segment of the bug */
+  --scoreboard-line: #3a332d;  /* dividers between segments */
+  --scoreboard-ink: #f5f0ea;
+  --scoreboard-ink-2: #b9b0a7; /* labels on the board */
+  --scoreboard-num: #ff7130;
+  --scoreboard-num-ink: #170802; /* text on an orange segment of the bug */
+
+  --shadow-pop: 0 1px 2px rgb(21 18 15 / 0.06), 0 8px 24px rgb(21 18 15 / 0.08);
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #090807; --surface: #12100e; --surface-2: #1b1815; --line: #29241f; --line-strong: #3a332d;
+    --ink: #f5f0ea; --ink-2: #b9b0a7; --ink-3: #8f857c; --shell: #050404; --shell-line: #1e1a17;
+    --accent: #ff7130; --accent-ink: #170802; --accent-text: #ff8a4f; --accent-wash: #2a160b; --focus: #ff8a4f;
+    --heat-1: #1d6a3e; --heat-2: #17502f; --heat-3: #133a23; --heat-4: #10261a; --heat-neg: #43191f; --heat-ink: #f5f0ea;
+    --gain-bg: #12341f; --gain-ink: #6fdc99; --loss-bg: #3a161c; --loss-ink: #ff8f9f; --status-ir-bg: #ff8f9f; --status-ir-ink: #1a0a0d;
+    --tier-1: #cf3350; --tier-2: #c0338a; --tier-3: #8d52cc; --tier-4: #4b6ad6; --tier-5: #12789f; --tier-6: #0e8070; --tier-7: #6c6b78;
+    --tier-ink: #ffffff; --tier-wash: 16%;
+    --scoreboard: #000000; --scoreboard-2: #15120f; --scoreboard-line: #29241f; --scoreboard-ink: #f5f0ea; --scoreboard-ink-2: #b9b0a7; --scoreboard-num: #ff7130; --scoreboard-num-ink: #170802;
+    --shadow-pop: 0 1px 2px rgb(0 0 0 / 0.5), 0 10px 30px rgb(0 0 0 / 0.5);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #090807; --surface: #12100e; --surface-2: #1b1815; --line: #29241f; --line-strong: #3a332d;
+  --ink: #f5f0ea; --ink-2: #b9b0a7; --ink-3: #8f857c; --shell: #050404; --shell-line: #1e1a17;
+  --accent: #ff7130; --accent-ink: #170802; --accent-text: #ff8a4f; --accent-wash: #2a160b; --focus: #ff8a4f;
+  --heat-1: #1d6a3e; --heat-2: #17502f; --heat-3: #133a23; --heat-4: #10261a; --heat-neg: #43191f; --heat-ink: #f5f0ea;
+  --gain-bg: #12341f; --gain-ink: #6fdc99; --loss-bg: #3a161c; --loss-ink: #ff8f9f; --status-ir-bg: #ff8f9f; --status-ir-ink: #1a0a0d;
+  --tier-1: #cf3350; --tier-2: #c0338a; --tier-3: #8d52cc; --tier-4: #4b6ad6; --tier-5: #12789f; --tier-6: #0e8070; --tier-7: #6c6b78;
+  --tier-ink: #ffffff; --tier-wash: 16%;
+    --scoreboard: #000000; --scoreboard-2: #15120f; --scoreboard-line: #29241f; --scoreboard-ink: #f5f0ea; --scoreboard-ink-2: #b9b0a7; --scoreboard-num: #ff7130; --scoreboard-num-ink: #170802;
+  --shadow-pop: 0 1px 2px rgb(0 0 0 / 0.5), 0 10px 30px rgb(0 0 0 / 0.5);
+  color-scheme: dark;
+}
+
+
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-ui);font-size:var(--t-md);line-height:1.4;
+  -webkit-font-smoothing:antialiased}
+a{color:inherit}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.num{font-family:var(--font-num);font-variant-numeric:tabular-nums;letter-spacing:0.01em}
+.label{font-size:var(--t-xs);text-transform:uppercase;letter-spacing:var(--track-label);color:var(--ink-3);font-weight:500}
+.app{display:grid;grid-template-columns:var(--rail-w) minmax(0,1fr);min-height:100vh}
+.rail{position:sticky;top:0;height:100vh;background:var(--shell);border-right:1px solid var(--shell-line);
+  display:flex;flex-direction:column;align-items:stretch;gap:var(--s-1);padding-block:var(--s-4)}
+.mark{display:grid;place-items:center;height:56px;margin-bottom:var(--s-3);text-decoration:none}
+.mark b{font-family:var(--font-num);font-weight:800;font-size:30px;line-height:1;color:var(--ink);
+  border-bottom:4px solid var(--accent);padding-bottom:2px}
+.rail a.item{display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 4px;text-decoration:none;
+  color:var(--ink-3);font-size:var(--t-xs);font-weight:500;text-align:center;border-left:3px solid transparent}
+.rail a.item:hover{color:var(--ink)}
+.rail a.item[aria-current="page"]{color:var(--accent-text);border-left-color:var(--accent)}
+.rail .spacer{flex:1}
+.main{min-width:0;display:flex;flex-direction:column}
+.top{position:sticky;top:0;z-index:5;background:var(--shell);border-bottom:1px solid var(--shell-line);
+  display:flex;align-items:center;gap:var(--s-4);padding:var(--s-3) var(--s-5);min-height:68px}
+.top h1{margin:0;font-size:var(--t-lg);font-weight:700;white-space:nowrap}
+.search{flex:1;max-width:620px;display:flex;align-items:center;gap:var(--s-2);height:42px;padding:0 var(--s-3);
+  border:1px solid var(--line-strong);border-radius:var(--r-md);background:var(--surface);color:var(--ink-3)}
+.search input{flex:1;min-width:0;border:0;background:transparent;font:inherit;color:var(--ink);outline:none}
+.search input::placeholder{color:var(--ink-3)}
+.search kbd{font-family:var(--font-ui);font-size:var(--t-xs);border:1px solid var(--line-strong);border-radius:var(--r-sm);padding:1px 6px}
+.top .tail{margin-left:auto;display:flex;align-items:center;gap:var(--s-3)}
+.quiet{display:inline-flex;align-items:center;gap:6px;height:38px;padding:0 var(--s-3);border-radius:var(--r-md);
+  border:1px solid var(--line-strong);background:transparent;cursor:pointer;font-size:var(--t-sm);font-weight:500;color:var(--ink-2);text-decoration:none}
+.quiet:hover{color:var(--ink);border-color:var(--ink-3)}
+.theme{display:flex;gap:2px;padding:3px;border:1px solid var(--line-strong);border-radius:var(--r-md);background:var(--surface)}
+.theme button{height:30px;padding:0 10px;border:0;border-radius:var(--r-sm);background:transparent;cursor:pointer;
+  font-size:var(--t-sm);font-weight:500;color:var(--ink-2)}
+.theme button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.verb{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:42px;padding:0 var(--s-5);
+  border:0;border-radius:var(--r-md);background:var(--accent);color:var(--accent-ink);font-weight:700;font-size:var(--t-md);
+  cursor:pointer;text-decoration:none;white-space:nowrap}
+.verb:hover{filter:brightness(1.06)}
+.chips{display:flex;flex-wrap:wrap;gap:var(--s-2);align-items:center}
+.chip{height:32px;padding:0 var(--s-3);border-radius:var(--r-pill);border:1px solid var(--line-strong);background:transparent;
+  font-size:var(--t-sm);font-weight:500;color:var(--ink-2);cursor:pointer;white-space:nowrap}
+.chip[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--bg)}
+.chip-group{display:flex;gap:4px;padding:3px;border:1px solid var(--line);border-radius:var(--r-pill);background:var(--surface)}
+.chip-group .chip{border-color:transparent;height:28px}
+.face{flex:none;border-radius:50%;background:var(--surface-2);overflow:hidden;display:grid;place-items:end center}
+.face img{width:140%;max-width:none;height:auto;display:block;transform:translateY(6%)}
+.pos{display:inline-flex;align-items:center;height:20px;padding:0 7px;border-radius:var(--r-sm);
+  background:var(--surface-2);color:var(--ink);font-size:var(--t-xs);font-weight:700;letter-spacing:0.04em;white-space:nowrap}
+.tier-chip{display:inline-flex;align-items:center;height:20px;padding:0 7px;border-radius:var(--r-sm);
+  color:var(--tier-ink);font-size:var(--t-xs);font-weight:700;letter-spacing:0.04em}
+.t1{--tier:var(--tier-1)}.t2{--tier:var(--tier-2)}.t3{--tier:var(--tier-3)}.t4{--tier:var(--tier-4)}
+.t5{--tier:var(--tier-5)}.t6{--tier:var(--tier-6)}.t7{--tier:var(--tier-7)}
+.tier-chip{background:var(--tier)}
+.heat-1{background:var(--heat-1)}.heat-2{background:var(--heat-2)}.heat-3{background:var(--heat-3)}
+.heat-4{background:var(--heat-4)}.heat-neg{background:var(--heat-neg)}.heat-0{background:transparent}
+.gap{display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:var(--r-sm);font-size:var(--t-sm);font-weight:600;white-space:nowrap}
+.gap.later{background:var(--gain-bg);color:var(--gain-ink)}
+.gap.earlier{background:var(--loss-bg);color:var(--loss-ink)}
+.gap.even{background:var(--surface-2);color:var(--ink-2)}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md)}
+@media (max-width: 760px){
+  :root{--row-h:48px}
+  .app{grid-template-columns:minmax(0,1fr);padding-bottom:64px}
+  .rail{position:fixed;inset:auto 0 0 0;top:auto;height:auto;z-index:20;flex-direction:row;justify-content:space-around;
+    padding:4px 4px calc(4px + env(safe-area-inset-bottom,0px));border-right:0;border-top:1px solid var(--shell-line)}
+  .rail .mark,.rail .spacer,.rail a.item.wide-only{display:none}
+  .rail a.item{border-left:0;border-top:3px solid transparent;padding:6px 2px;flex:1}
+  .rail a.item[aria-current="page"]{border-top-color:var(--accent)}
+  .top{padding:var(--s-2) var(--s-4);gap:var(--s-2);flex-wrap:wrap;min-height:0}
+  .top h1{display:none}
+  .top .search{order:3;flex-basis:100%;max-width:none;height:38px}
+  .top .tail{margin-left:auto}
+  .search kbd{display:none}
+  .theme button{height:26px;padding:0 7px;font-size:var(--t-xs)}
+}
+/* The league switch closes the top bar at the right on every width: the selected league's name (or
+   the format with none) at one width, so the bar never moves when the name arrives. */
+.switch{position:relative;display:flex;flex:none;min-width:0}
+.switch>button{display:inline-flex;align-items:center;gap:var(--s-2);width:232px;height:40px;padding:0 var(--s-3);
+  border:1px solid var(--line-strong);border-radius:var(--r-md);background:var(--surface);font-size:var(--t-sm);
+  font-weight:600;text-align:left;cursor:pointer}
+.switch>button[aria-expanded="true"]{border-color:var(--ink)}
+.switch>button .flag{display:inline-flex;color:var(--accent-text)}
+.switch>button .words{flex:1;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.switch>button .chev{display:inline-flex;color:var(--ink-3)}
+.switch-menu{position:absolute;top:calc(100% + var(--s-2));right:0;z-index:30;width:360px;display:flex;flex-direction:column;
+  gap:var(--s-3);padding:var(--s-3);border:1px solid var(--line-strong);border-radius:var(--r-md);background:var(--bg);
+  box-shadow:var(--shadow-pop)}
+.switch-menu .lg{display:flex;flex-direction:column;gap:2px;width:100%;padding:var(--s-2) var(--s-3);border:0;
+  border-left:3px solid transparent;border-radius:var(--r-sm);background:none;text-align:left;cursor:pointer}
+.switch-menu .lg[aria-pressed="true"]{border-left-color:var(--accent);background:var(--surface)}
+.switch-menu .lg b{font-weight:600}
+.switch-menu .lg small{font-size:var(--t-sm);color:var(--ink-2)}
+.switch-menu .foot{display:flex;flex-direction:column;align-items:flex-start;gap:var(--s-2);padding-top:var(--s-3);
+  border-top:1px solid var(--line)}
+@media (max-width: 760px){
+  .top .switch{order:2;flex:1}
+  .top .switch>button{width:100%}
+  .switch-menu{position:fixed;top:60px;left:var(--s-3);right:var(--s-3);width:auto}
+}
+@media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
+
+
+.mx{display:flex;flex-direction:column;gap:var(--s-4);padding:var(--s-4) var(--s-5) var(--s-7)}
+.mocknote{margin:0;padding:var(--s-2) var(--s-3);border:1px dashed var(--line-strong);border-radius:var(--r-md);font-size:var(--t-xs);color:var(--ink-3);line-height:1.5}
+.mocknote .short{display:none}
+.si{text-decoration:underline dotted;text-decoration-color:color-mix(in srgb,currentColor 55%,transparent);text-underline-offset:3px;text-decoration-thickness:1.5px}
+.face.none{place-items:center;font-size:var(--t-xs);font-weight:700;color:var(--ink-2);border:1px solid var(--line-strong)}
+
+.wrap{padding:var(--s-4) var(--s-5) var(--s-7);display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:var(--s-5);align-items:start}
+.col{display:flex;flex-direction:column;gap:var(--s-4);min-width:0}
+.disp{font-family:var(--font-num);font-weight:800;text-transform:uppercase;letter-spacing:0.01em;line-height:0.95;margin:0}
+.who{display:flex;align-items:center;gap:10px;min-width:0}
+.who .nm{display:flex;flex-direction:column;min-width:0}
+.who b{font-weight:600;font-size:var(--t-md);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.who small{display:flex;align-items:center;gap:6px;font-size:var(--t-sm);color:var(--ink-3)}
+.face.club{background:var(--surface-2);place-items:center}
+.face.club img{width:80%;transform:none}
+table.box{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+table.box th{font-size:var(--t-xs);text-transform:uppercase;letter-spacing:var(--track-label);color:var(--ink-3);font-weight:500;
+  text-align:right;padding:0 var(--s-3) var(--s-2);white-space:nowrap;border-bottom:1px solid var(--line-strong)}
+table.box th.l,table.box td.l{text-align:left}
+table.box td{padding:0 var(--s-3);height:var(--row-h);border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+table.box td.n{font-family:var(--font-num);font-weight:700;font-size:1.25rem}
+table.box td.m{color:var(--ink-3);font-size:var(--t-sm)}
+.neg{color:var(--loss-ink)}.posv{color:var(--gain-ink)}
+.basis{margin:0;font-size:var(--t-sm);color:var(--ink-3);line-height:1.45}
+.basis b{color:var(--ink-2);font-weight:600}
+.dock{display:flex;flex-direction:column;gap:var(--s-4)}
+.dock .panel{padding:var(--s-4)}
+.dock h3{margin:0 0 var(--s-3);font-size:var(--t-md);font-weight:700;display:flex;justify-content:space-between;align-items:baseline}
+.dock h3 small{font-size:var(--t-xs);color:var(--ink-3);font-weight:500}
+.mocknote{grid-column:1/-1}
+.verb kbd,.quiet kbd{font-family:var(--font-ui);font-size:var(--t-xs);border:1px solid currentColor;border-radius:var(--r-sm);padding:0 5px;opacity:.75}
+@media (max-width:760px){
+  .wrap{grid-template-columns:minmax(0,1fr);padding:var(--s-3) var(--s-3) var(--s-7);gap:var(--s-4)}
+  table.box th,table.box td{padding-inline:4px}
+  table.box th{font-size:10px;letter-spacing:.02em;white-space:normal;vertical-align:bottom;overflow-wrap:anywhere}
+  table.box{table-layout:fixed}
+  table.box td.n{font-size:1.0625rem}
+  .who .face{width:28px!important;height:28px!important}
+  .who b{font-size:var(--t-sm);white-space:normal;line-height:1.15}
+  .picks .who .face{display:none}
+  .who small{font-size:var(--t-xs)}
+  .wide{display:none!important}
+  .mocknote .long{display:none}.mocknote .short{display:inline}
+}
+
+
+.bug{display:flex;align-items:baseline;gap:var(--s-4);flex-wrap:wrap}
+.bug .disp{font-size:var(--t-display)}
+.bug .cells{display:flex;gap:var(--s-4);font-size:var(--t-sm);color:var(--ink-2)}
+.bug .cells span{display:flex;flex-direction:column}.bug .cells i{font-style:normal;font-size:var(--t-xs);text-transform:uppercase;letter-spacing:var(--track-label);color:var(--ink-3)}
+.bug .cells b{font-family:var(--font-num);font-size:1.5rem;color:var(--ink);font-weight:700;line-height:1}
+.room-cols{table-layout:fixed}
+.room-cols th:nth-child(2){width:110px}.room-cols th:nth-child(3){width:110px}.room-cols th:nth-child(4){width:80px}.room-cols th:nth-child(5){width:150px}.room-cols th:nth-child(6){width:190px}
+.bug .acts{margin-left:auto;display:flex;gap:var(--s-2)}
+.call{border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:var(--r-md);background:var(--surface);padding:var(--s-3) 0 0}
+.call .tag{display:block;padding:0 var(--s-4) var(--s-2);font-size:var(--t-xs);font-weight:700;letter-spacing:var(--track-label);text-transform:uppercase;color:var(--accent-text)}
+.call table.box tr:last-child td{border-bottom:0}
+.call tr.pick td{background:var(--accent-wash);height:72px}
+.call tr.pick .who b{font-family:var(--font-num);font-weight:800;font-size:1.875rem;text-transform:uppercase;letter-spacing:.01em;overflow:visible}
+.call tr.pick td.n{font-size:1.75rem}
+.call tr.pick td:first-child{box-shadow:inset 0 0 0 0 var(--accent)}
+.call td.rk{font-family:var(--font-num);font-weight:700;color:var(--ink-3);width:28px;text-align:left;padding-right:0}
+.call .alt td.n{color:var(--ink-2)}
+.call .go{width:1%}
+.call .phone-go{display:none}
+.pool{display:flex;flex-direction:column;gap:var(--s-2)}
+.pool .head{display:flex;align-items:center;gap:var(--s-4)}
+.pool .head .disp{font-size:var(--t-head)}
+.pool .head .chip-group{margin-left:auto}
+.pool td .quiet{height:32px}
+.slots{display:grid;grid-template-columns:44px 1fr;row-gap:6px;font-size:var(--t-sm)}
+.slots span:nth-child(odd){font-weight:700;color:var(--accent-text);align-self:center}
+.slots span:nth-child(even){height:30px;border:1px dashed var(--line-strong);border-radius:var(--r-sm)}
+.keys{display:grid;grid-template-columns:auto 1fr;gap:6px var(--s-3);font-size:var(--t-sm);color:var(--ink-2)}
+.keys kbd{font-family:var(--font-ui);font-size:var(--t-xs);border:1px solid var(--line-strong);border-radius:var(--r-sm);padding:1px 6px;justify-self:start}
+@media (max-width:760px){
+  .bug .disp{font-size:1.875rem}
+  .bug .acts{margin-left:0;width:100%;overflow-x:auto;flex-wrap:nowrap}.bug .acts .quiet{white-space:nowrap}
+  .bug .cells{gap:var(--s-3)}
+  .room-cols th{white-space:normal;vertical-align:bottom}
+  .room-cols th:nth-child(3){width:76px}.room-cols th:nth-child(4){width:48px}.room-cols th:nth-child(5){width:64px}
+  .call tr.pick td{height:60px}
+  .call tr.pick .who b{font-size:1.25rem;white-space:normal;line-height:1}
+  .call tr.pick td.n{font-size:1.375rem}
+  .call .go{display:none}
+  .call .phone-go{display:block;padding:var(--s-3)}
+  .call .phone-go .verb{width:100%}
+  .call td.rk{display:none}
+  .pool .head{flex-wrap:wrap;gap:var(--s-2)}
+  .pool .head .chip-group{margin-left:0;overflow-x:auto;max-width:100%}
+  .dock{display:none}
+}
+
+</style>
+</head>
+<body>
+<div class="app">
+<nav class="rail" aria-label="Sections"><a class="mark" href="#" aria-label="Commish"><b>C</b></a><a class="item" href="#"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3l-5 4 2 3 2-1v12h10V9l2 1 2-3-5-4c0 2-1.5 3-4 3S8 5 8 3z"/></svg><span>Lineup</span></a><a class="item" href="#"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="3"/><circle cx="16" cy="8" r="3"/><path d="M2 20c.8-3 3-5 6-5s5.2 2 6 5M14 15c3 0 5.2 2 6 5"/></svg><span>Matchup</span></a><a class="item" href="#"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10" cy="8" r="4"/><path d="M3 21c1.2-3.6 3.8-6 7-6 1.5 0 2.9.5 4 1.4M18 12v6M15 15h6"/></svg><span>Waivers</span></a><a class="item" href="#"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h14l-3-3M20 16H6l3 3"/></svg><span>Trades</span></a><a class="item" href="#"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg><span>Players</span></a><a class="item wide-only" href="#"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 11h12M4 16h8"/></svg><span>Rest of season</span></a><a class="item wide-only" href="#"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg><span>Our record</span></a><span class="spacer"></span><a class="item wide-only" href="#"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M6.5 18c1.5-2 3.4-3 5.5-3s4 1 5.5 3"/></svg><span>Account</span></a></nav>
+<div class="main">
+<header class="top"><h1>Mock draft</h1>
+<label class="search"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><input placeholder="Search the pool" aria-label="Search the pool"><kbd>/</kbd></label>
+<div class="tail"><a class="quiet" href="#">New mock</a></div></header>
+<div class="wrap"><div class="col"><div class="bug"><h1 class="disp">Pick 1.01</h1><div class="cells"><span><i>Round</i><b>1</b></span><span><i>Teams</i><b>12</b></span><span><i>Slot</i><b>1</b></span><span><i>Your next</i><b>2.12</b></span><span><i>Picks away</i><b>22</b></span></div><div class="acts"><button class="quiet">Undo <kbd>U</kbd></button><button class="quiet">Pick for me to round 4</button><button class="quiet">Finish the draft</button><button class="quiet">Save and share</button></div></div><section class="call" aria-label="Our call at 1.01"><span class="tag">Our call at 1.01</span><table class="box room-cols"><thead><tr><th class="l">Player</th><th class="wide">Projected</th><th>Over repl</th><th>ADP</th><th>Still there 2.12</th><th class="go wide"></th></tr></thead><tbody><tr class="pick"><td class="l"><span class="who"><span class="face" style="width:34px;height:34px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/4426515.png" alt="" width="34" height="34"></span><span class="nm"><b>Puka Nacua</b><small><span class="pos">WR 1</span> LAR</small></span></span></td><td class="n wide">344.1</td><td class="n">+164.0</td><td class="n"><span class="si">2.8</span></td><td class="n">17%</td><td class="go"><a class="verb" href="#">Draft him <kbd>Enter</kbd></a></td></tr><tr class="alt"><td class="l"><span class="who"><span class="face" style="width:34px;height:34px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/4362628.png" alt="" width="34" height="34"></span><span class="nm"><b>Ja&#x27;Marr Chase</b><small><span class="pos">WR 2</span> CIN</small></span></span></td><td class="n wide">333.2</td><td class="n">+153.2</td><td class="n"><span class="si">3.8</span></td><td class="n">28%</td><td class="go"></td></tr><tr class="alt"><td class="l"><span class="who"><span class="face" style="width:34px;height:34px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/4430878.png" alt="" width="34" height="34"></span><span class="nm"><b>Jaxon Smith-Njigba</b><small><span class="pos">WR 3</span> SEA</small></span></span></td><td class="n wide">309.8</td><td class="n">+129.8</td><td class="n"><span class="si">5.7</span></td><td class="n">9%</td><td class="go"></td></tr></tbody></table><div class="phone-go"><a class="verb" href="#">Draft him</a></div></section><p class="basis"><b>Basis.</b> Our 2026 PPR projections, over replacement for 12 teams. Kickers and defenses: draft order, no points. Still there at 2.12: 200 runs of this room, each seat drafting as it has so far.</p><section class="pool"><div class="head"><h2 class="disp">Pool</h2><span class="label">1,468 left</span><div class="chip-group"><button class="chip" aria-pressed="true">All</button><button class="chip">QB</button><button class="chip">RB</button><button class="chip">WR</button><button class="chip">TE</button><button class="chip">K</button><button class="chip">DST</button><button class="chip">Queue</button></div></div><table class="box room-cols"><thead><tr><th class="l">Player</th><th class="wide">Projected</th><th>Over repl</th><th>ADP</th><th>Still there 2.12</th><th class="go wide"></th></tr></thead><tbody><tr><td class="l"><span class="who"><span class="face" style="width:34px;height:34px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/4426515.png" alt="" width="34" height="34"></span><span class="nm"><b>Puka Nacua</b><small><span class="pos">WR 1</span> LAR</small></span></span></td><td class="n wide">344.1</td><td class="n">+164.0</td><td class="n"><span class="si">2.8</span></td><td class="n">17%</td><td class="go wide"><a class="quiet" href="#">Queue</a> <a class="quiet" href="#">Draft</a></td></tr><tr><td class="l"><span class="who"><span class="face" style="width:34px;height:34px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/4362628.png" alt="" width="34" height="34"></span><span class="nm"><b>Ja&#x27;Marr Chase</b><small><span class="pos">WR 2</span> CIN</small></span></span></td><td class="n wide">333.2</td><td class="n">+153.2</td><td class="n"><span class="si">3.8</span></td><td class="n">28%</td><td class="go wide"><a class="quiet" href="#">Queue</a> <a class="quiet" href="#">Draft</a></td></tr><tr><td class="l"><span class="who"><span class="face" style="width:34px;height:34px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/4430878.png" alt="" width="34" height="34"></span><span class="nm"><b>Jaxon Smith-Njigba</b><small><span class="pos">WR 3</span> SEA</small></span></span></td><td class="n wide">309.8</td><td class="n">+129.8</td><td class="n"><span class="si">5.7</span></td><td class="n">9%</td><td class="go wide"><a class="quiet" href="#">Queue</a> <a class="quiet" href="#">Draft</a></td></tr><tr><td class="l"><span class="who"><span class="face" style="width:34px;height:34px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/4374302.png" alt="" width="34" height="34"></span><span class="nm"><b>Amon-Ra St. Brown</b><small><span class="pos">WR 4</span> DET</small></span></span></td><td class="n wide">295.2</td><td class="n">+115.2</td><td class="n"><span class="si">7.0</span></td><td class="n">5%</td><td class="go wide"><a class="quiet" href="#">Queue</a> <a class="quiet" href="#">Draft</a></td></tr><tr><td class="l"><span class="who"><span class="face" style="width:34px;height:34px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/4429795.png" alt="" width="34" height="34"></span><span class="nm"><b>Jahmyr Gibbs</b><small><span class="pos">RB 1</span> DET</small></span></span></td><td class="n wide">262.1</td><td class="n">+113.9</td><td class="n"><span class="si">1.4</span></td><td class="n">24%</td><td class="go wide"><a class="quiet" href="#">Queue</a> <a class="quiet" href="#">Draft</a></td></tr><tr><td class="l"><span class="who"><span class="face" style="width:34px;height:34px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/4430807.png" alt="" width="34" height="34"></span><span class="nm"><b>Bijan Robinson</b><small><span class="pos">RB 2</span> ATL</small></span></span></td><td class="n wide">261.4</td><td class="n">+113.2</td><td class="n"><span class="si">2.3</span></td><td class="n">12%</td><td class="go wide"><a class="quiet" href="#">Queue</a> <a class="quiet" href="#">Draft</a></td></tr><tr><td class="l"><span class="who"><span class="face" style="width:34px;height:34px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/4241389.png" alt="" width="34" height="34"></span><span class="nm"><b>CeeDee Lamb</b><small><span class="pos">WR 5</span> DAL</small></span></span></td><td class="n wide">291.1</td><td class="n">+111.1</td><td class="n"><span class="si">10.5</span></td><td class="n">4%</td><td class="go wide"><a class="quiet" href="#">Queue</a> <a class="quiet" href="#">Draft</a></td></tr><tr><td class="l"><span class="who"><span class="face" style="width:34px;height:34px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/4429160.png" alt="" width="34" height="34"></span><span class="nm"><b>De&#x27;Von Achane</b><small><span class="pos">RB 3</span> MIA</small></span></span></td><td class="n wide">245.4</td><td class="n">+97.3</td><td class="n"><span class="si">9.6</span></td><td class="n">14%</td><td class="go wide"><a class="quiet" href="#">Queue</a> <a class="quiet" href="#">Draft</a></td></tr></tbody></table></section></div><aside class="dock"><div class="panel"><h3>Your team <small>0 of 15</small></h3><div class="slots"><span>QB</span><span></span><span>RB</span><span></span><span>RB</span><span></span><span>WR</span><span></span><span>WR</span><span></span><span>TE</span><span></span><span>FLEX</span><span></span><span>K</span><span></span><span>DST</span><span></span></div></div><div class="panel keys"><kbd>Enter</kbd><span>draft our call</span><kbd>↑ ↓</kbd><span>mark a player</span><kbd>D</kbd><span>draft the marked player</span><kbd>Q</kbd><span>queue the marked player</span><kbd>U</kbd><span>undo your last pick</span><kbd>/</kbd><span>search the pool</span></div></aside><p class="mocknote"><span class="long">Mock for Lane 66o. Projected, over replacement and the order are the 2026-10-17T21 run's PPR board. Still there is the room's own read at 1.01, recorded in the Lane 66m room. ADP has a dotted underline: it is the run's figure, and the room prints the API board's. The pool row keeps these columns and defers its look to Lane 66n.</span><span class="short">Mock. Dotted figures are stand-ins, named on the desk shot.</span></p></div>
+</div></div>
+</body></html>
