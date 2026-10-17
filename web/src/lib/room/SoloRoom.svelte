@@ -7,7 +7,7 @@
 	import SinceStrip from '#lib/ui/SinceStrip.svelte';
 	import TeamPanel from '#lib/ui/TeamPanel.svelte';
 	import type { MockRoom, RoomCard } from './api.ts';
-	import { type CallView, callView, frameView, poolBasis } from './call.ts';
+	import { type CallView, callView, draftWords, frameView, poolBasis } from './call.ts';
 	import { roomKeys, soloKeys } from './keys.ts';
 	import {
 		type Board,
@@ -286,12 +286,11 @@
 	{:else if frame}
 		<RoomCall
 			view={frame}
-			pickNumber={room.pick_number}
 			reading={readingFor === null
 				? undefined
 				: `Reading the room for ${pickLabel(readingFor, teams)}`}
 			action={{
-				label: `Draft ${lastName(frame.player.name)}`,
+				label: draftWords(frame.player.position),
 				key: 'Enter',
 				onclick: () => {
 					if (call) draft(call.player.id);

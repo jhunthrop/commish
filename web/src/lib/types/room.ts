@@ -36,9 +36,19 @@ export interface KeyBinding {
 	does: string;
 }
 
+/** One of our top choices as the call card prints it (Lane 66o): the API's tenths as given, and the
+ * chance the card recorded for him. */
+export interface CallRow {
+	player: PlayerRef;
+	projected: number | null;
+	vor: number | null;
+	adp: number | null;
+	chance: number | null;
+}
+
 /** The call's one action: Draft on your turn, Queue off it. */
 export interface CallAction {
-	/** Named with what it does: "Draft Williams". */
+	/** Named with what it does: "Draft him". */
 	label: string;
 	key?: string;
 	onclick?: (event: MouseEvent) => void;
