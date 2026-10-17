@@ -47,7 +47,10 @@ type advisor struct {
 	// weeks is how many weeks the order covers (WeeksCovered).
 	pages pages
 	weeks int
-	now   time.Time
+	// gamesLeft is each club's games from the board's first week, the
+	// divisor of a row's rest-of-season points a game.
+	gamesLeft map[string]int
+	now       time.Time
 }
 
 // newAdvisor reads the league's roster shape and scoring from the saved
@@ -66,7 +69,8 @@ func newAdvisor(l League, data Data, held map[string]bool, now time.Time) (*advi
 		basis = Preseason
 	}
 	return &advisor{League: l, settings: *l.Saved, config: config, slots: Slots(config), held: held, basis: basis, weeks: WeeksCovered(basis, firstWeek(l)), pages: newPages(l.Board.Raw), now: now,
-		season: NewSeason(data, RulesOf(rulesOf(l.Saved.Scoring)), l.Snap.Week, now)}, nil
+		gamesLeft: GamesLeft(data.Games, l.Board.FromWeek),
+		season:    NewSeason(data, RulesOf(rulesOf(l.Saved.Scoring)), l.Snap.Week, now)}, nil
 }
 
 // firstWeek is the first week the order's figures cover: the published
@@ -125,6 +129,7 @@ func (a *advisor) build(id string, lp apitypes.LeaguePlayer, side *leaguesync.Si
 	line.Headshot = faceOf(bp, placed)
 	if placed {
 		line.Slug = a.pages.of(bp.Name, c.Rank > 0)
+		line.RestOfSeasonPerGame = RestOfSeasonPerGame(a.Board, bp, a.gamesLeft)
 	}
 	if v, ok := a.Board.Values[boardID]; ok {
 		c.Value, c.HasValue = v, true
@@ -259,7 +264,7 @@ func (a *advisor) Lineup() (apitypes.LineupAdvice, bool) {
 	}
 	rows := Lineup(a.config, cands, team.Starters)
 	h := a.header()
-	out := apitypes.LineupAdvice{Week: h.week, Basis: LineupBasis(a.basis, a.weeks), BasisNote: BasisNote(a.settings), OrderBasis: h.basis, Refreshed: h.refreshed,
+	out := apitypes.LineupAdvice{Week: h.week, Basis: withPerGame(a.Board, LineupBasis(a.basis, a.weeks), people), BasisNote: BasisNote(a.settings), OrderBasis: h.basis, Refreshed: h.refreshed,
 		ReadAt: h.readAt, Set: true, Slots: []apitypes.LineupSlot{}, Bench: []apitypes.PlayerLine{},
 		Moves: apitypes.LineupMoves{Lineup: apitypes.LineupMovesLineupUnavailable},
 	}
@@ -359,7 +364,7 @@ func (a *advisor) Waivers(position draft.Position) (apitypes.WaiverAdvice, bool)
 		cands[i] = p.cand
 	}
 	h := a.header()
-	out := apitypes.WaiverAdvice{Week: h.week, Basis: WaiversBasis(a.basis, a.weeks), BasisNote: BasisNote(a.settings), OrderBasis: h.basis, Refreshed: h.refreshed,
+	out := apitypes.WaiverAdvice{Week: h.week, Basis: withPerGame(a.Board, WaiversBasis(a.basis, a.weeks), mine, pool), BasisNote: BasisNote(a.settings), OrderBasis: h.basis, Refreshed: h.refreshed,
 		ReadAt: h.readAt, Rows: []apitypes.WaiverRow{}, Moves: apitypes.WaiverMoves{Claim: apitypes.WaiverMovesClaimUnavailable}}
 	out.HostWaiversUrl, out.HostNote = a.host(WaiversPage)
 	w := &Writer{Basis: a.basis, Now: a.now}
@@ -396,14 +401,17 @@ func (a *advisor) Trades(focus string) (apitypes.TradeAdvice, bool) {
 	mine := a.active(team)
 	squad := a.squad(mine, true)
 	h := a.header()
-	out := apitypes.TradeAdvice{Week: h.week, Basis: TradesBasis(a.basis, a.weeks), BasisNote: BasisNote(a.settings), OrderBasis: h.basis, Refreshed: h.refreshed,
-		ReadAt: h.readAt, Teams: []apitypes.TradeTeam{}, Roster: rosterLines(mine), CheckBasis: TradeCheckBasis(a.basis, a.weeks)}
+	out := apitypes.TradeAdvice{Week: h.week, BasisNote: BasisNote(a.settings), OrderBasis: h.basis, Refreshed: h.refreshed,
+		ReadAt: h.readAt, Teams: []apitypes.TradeTeam{}, Roster: rosterLines(mine)}
 	out.HostTradesUrl, out.HostNote = a.host(TradesPage)
+	// Every roster the screen and its builder show, for the basis.
+	shown := [][]person{mine}
 	for _, t := range leaguesync.Standings(a.Snap.Teams) {
 		if t.RosterID == a.Me {
 			continue
 		}
 		theirs := a.active(t)
+		shown = append(shown, theirs)
 		row := apitypes.TradeTeam{RosterId: t.RosterID, Name: t.Name, Owner: t.Owner,
 			Record: apitypes.TradeRecord{Wins: t.Wins, Losses: t.Losses, Ties: t.Ties}, Roster: rosterLines(theirs), Trades: []apitypes.TradeRow{}}
 		close := 0
@@ -419,6 +427,8 @@ func (a *advisor) Trades(focus string) (apitypes.TradeAdvice, bool) {
 		}
 		out.Teams = append(out.Teams, row)
 	}
+	out.Basis = withPerGame(a.Board, TradesBasis(a.basis, a.weeks), shown...)
+	out.CheckBasis = withPerGame(a.Board, TradeCheckBasis(a.basis, a.weeks), shown...)
 	return out, true
 }
 

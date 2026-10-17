@@ -80,7 +80,7 @@ func (a *advisor) CheckTrade(in apitypes.TradeCheckInput) (apitypes.TradeCheck, 
 	}
 	checked := Check(a.config, a.weeks, a.squad(mine, true), a.squad(theirs, false), give, get)
 	h := a.header()
-	out := apitypes.TradeCheck{Week: h.week, Basis: TradeCheckBasis(a.basis, a.weeks), BasisNote: BasisNote(a.settings),
+	out := apitypes.TradeCheck{Week: h.week, Basis: withPerGame(a.Board, TradeCheckBasis(a.basis, a.weeks), mine, theirs), BasisNote: BasisNote(a.settings),
 		OrderBasis: h.basis, Refreshed: h.refreshed, ReadAt: h.readAt, Trade: tradeRow(mine, theirs, checked.Trade),
 		Fills: apitypes.TradeFills{Yours: checked.Mine.Fills, Theirs: checked.Theirs.Fills,
 			YoursOpen: a.openLabel(checked.Mine), TheirsOpen: a.openLabel(checked.Theirs),

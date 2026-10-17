@@ -15,7 +15,16 @@
 		setsOnHost,
 		type MoveStep
 	} from './move.ts';
-	import { LINES, lineupDecision, lineupTitle, satIds, slotLabels, verbWords } from './words.ts';
+	import {
+		LINES,
+		carriesPerGame,
+		figureHead,
+		lineupDecision,
+		lineupTitle,
+		satIds,
+		slotLabels,
+		verbWords
+	} from './words.ts';
 
 	/** Start and sit (spec §4): this week's lineup slot by slot, ours, and where it differs from the
 	 * lineup the host holds, the player it sits with the fact that tipped it; below it the bench, the
@@ -34,6 +43,14 @@
 	}
 
 	let { advice, host, plan, make, reread }: Props = $props();
+	/** The head over the lineup and the bench names the number their rows end on. */
+	const shown = $derived([
+		...advice.slots.flatMap((s) => (s.host ? [s.ours, s.host] : [s.ours])),
+		...advice.bench
+	]);
+	const head = $derived(figureHead(shown));
+	/** Whether the rows end on points a game: a row without them then says so. */
+	const perGameScreen = $derived(carriesPerGame(shown));
 
 	const MOVE_ID = 'lineup-move';
 	let step = $state<MoveStep>({ kind: 'closed' });
@@ -100,29 +117,29 @@
 	{/snippet}
 	<Panel as="section" label={lineupTitle(advice.week)} padding="none">
 		<div class="head">
-			<PanelHead title={lineupTitle(advice.week)} aside={LINES.perWeek} level={2} />
+			<PanelHead title={lineupTitle(advice.week)} aside={head} level={2} />
 		</div>
 		{#each advice.slots as slot, i (`${slot.slot}-${String(i)}`)}
 			{#if slot.changed}
 				<div class="change">
-					<LineRow line={slot.ours} slot={labels[i]} />
-					{#if slot.host}<LineRow line={slot.host} slot={LINES.sit} />{/if}
+					<LineRow line={slot.ours} slot={labels[i]} {perGameScreen} />
+					{#if slot.host}<LineRow line={slot.host} slot={LINES.sit} {perGameScreen} />{/if}
 					{#if slot.sentence}<p class="why">{slot.sentence}</p>{/if}
 				</div>
 			{:else}
-				<LineRow line={slot.ours} slot={labels[i]} />
+				<LineRow line={slot.ours} slot={labels[i]} {perGameScreen} />
 			{/if}
 		{/each}
 	</Panel>
 	<Panel as="section" label={LINES.bench} padding="none">
 		<div class="head">
-			<PanelHead title={LINES.bench} aside={LINES.perWeek} level={2} />
+			<PanelHead title={LINES.bench} aside={head} level={2} />
 		</div>
 		{#each advice.bench as line (line.player.host_id)}
 			{@const sits = sat.has(line.player.host_id)}
 			<!-- A starter a change sits is on the change's wash here too, so the two read as one move. -->
 			<div class:change={sits}>
-				<LineRow {line} slot={sits ? LINES.sit : LINES.bench} />
+				<LineRow {line} slot={sits ? LINES.sit : LINES.bench} {perGameScreen} />
 			</div>
 		{:else}
 			<p class="none"><Label>{LINES.noBench}</Label></p>

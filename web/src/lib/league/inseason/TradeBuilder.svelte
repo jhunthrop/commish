@@ -23,7 +23,7 @@
 	import PickSelect, { type PickGroup } from './PickSelect.svelte';
 	import { focusOnOpen, hostTab } from './attach.ts';
 	import { Narrowing } from './state.ts';
-	import { CLOSE_FOR_THEM, verbWords } from './words.ts';
+	import { CLOSE_FOR_THEM, carriesPerGame, verbWords } from './words.ts';
 
 	/** The trade builder (Lane 61), in the move panel's shape: the other team chosen by name and
 	 * record, your roster and theirs as rows, a tap picking up to two a side, and the answer line,
@@ -62,6 +62,8 @@
 	const team = $derived(teams.find((t) => t.roster_id === picks.team) ?? null);
 	const yours = $derived(roster.filter(pickable));
 	const theirs = $derived((team?.roster ?? []).filter(pickable));
+	/** Whether the rows end on points a game, over every roster the builder can show. */
+	const perGameScreen = $derived(carriesPerGame([...roster, ...teams.flatMap((t) => t.roster)]));
 	const sentence = $derived(answer === null ? pickPrompt(picks) : checkWords(answer));
 	const close = $derived(
 		answer !== null &&
@@ -138,7 +140,7 @@
 				disabled={!on && full}
 				onclick={() => tap(name, hostId)}
 			>
-				<LineRow line={{ ...line, slug: null }} factsOnPhone={false} />
+				<LineRow line={{ ...line, slug: null }} factsOnPhone={false} {perGameScreen} />
 			</button>
 		{/each}
 	</section>

@@ -29,4 +29,11 @@
 		color: var(--accent-text);
 		white-space: nowrap;
 	}
+
+	/* On a phone the line sets a little tighter, so the first row still clears the pinned verb. */
+	@media (max-width: 760px) {
+		.basis {
+			line-height: 1.3;
+		}
+	}
 </style>

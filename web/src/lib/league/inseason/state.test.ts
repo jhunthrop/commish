@@ -116,6 +116,7 @@ const line = (id: string): PlayerLine => ({
 	slug: null,
 	position_rank: 10,
 	points_over_replacement: 0.5,
+	rest_of_season_per_game: null,
 	held: false,
 	facts: {
 		week: 6,

@@ -3,8 +3,9 @@
  * Pure, so every pick and sentence the panel shows is tested here. No price, no grade: the two
  * lineups' change is the whole answer. */
 import { fixed } from '#lib/format/number.ts';
+import { listWords } from '#lib/format/list.ts';
 import type { PlayerLine, TradeCheck, TradeCheckInput, TradeRow, TradeTeam } from './api.ts';
-import { GAIN_DECIMALS, gainAmount, teamAside } from './words.ts';
+import { GAIN_DECIMALS, gainAmount, perGameWords, teamAside } from './words.ts';
 
 /** The most players a side holds: the finder's reach. */
 export const MAX_A_SIDE = 2;
@@ -97,9 +98,25 @@ function changeWords(row: Pick<TradeRow, 'my_gain' | 'their_gain'>): string {
 	return `Your lineup ${mine} ${amount(row.my_gain)} ${PER_WEEK}, theirs ${theirs} ${amount(row.their_gain)}.`;
 }
 
+/** A player as the answer line names him, with his rest-of-season points a game when he has them:
+ * "Kyren Williams (14.2 a game)". */
+function figuredName(line: PlayerLine): string {
+	const perGame = line.rest_of_season_per_game;
+	return perGame === null ? line.player.name : `${line.player.name} (${perGameWords(perGame)})`;
+}
+
+/** The trade's players with their figures: "You give Kyren Williams (14.2 a game) for Nico Collins
+ * (17.8 a game).", "" when no player in it has one (the preseason number). */
+function playersWords(row: Pick<TradeRow, 'give' | 'get'>): string {
+	const all = [...row.give, ...row.get];
+	if (all.every((line) => line.rest_of_season_per_game === null)) return '';
+	const side = (lines: readonly PlayerLine[]): string => listWords(lines.map(figuredName));
+	return ` You give ${side(row.give)} for ${side(row.get)}.`;
+}
+
 /** The answer line: a roster the trade leaves short first ("Your roster would not fill RB2."), then
- * a roster with no one it could drop to take two in, else each lineup's change, with the drop a full
- * roster makes for two in. */
+ * a roster with no one it could drop to take two in, else each lineup's change, the trade's players
+ * with their rest-of-season points a game, and the drop a full roster makes for two in. */
 export function checkWords(check: Pick<TradeCheck, 'trade' | 'fills'>): string {
 	const { fills, trade } = check;
 	if (!fills.yours) return `Your roster would not fill ${slotPlace(fills.yours_open)}.`;
@@ -107,7 +124,7 @@ export function checkWords(check: Pick<TradeCheck, 'trade' | 'fills'>): string {
 	if (!fills.yours_room) return 'Your roster has no one to drop to make room.';
 	if (!fills.theirs_room) return 'Their roster has no one to drop to make room.';
 	const drop = trade.drop ? ` You drop ${trade.drop.player.name} to make room.` : '';
-	return `${changeWords(trade)}${drop}`;
+	return `${changeWords(trade)}${playersWords(trade)}${drop}`;
 }
 
 /** The answer line before an answer: what is still to pick, or, once both sides hold a player, that
