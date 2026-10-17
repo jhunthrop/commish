@@ -97,9 +97,9 @@ void test("the rest tile's parts carry its first week, its rank words and its sc
 		label: 'PPR'
 	});
 	assert.equal(restParts(PRESEASON, NUMBERS, 'WR', undefined), null);
-	const half = { ...IN_SEASON, id: 'half-ppr-12', label: 'Half PPR' } as Format;
+	const half: Format = { ...IN_SEASON, id: 'half-ppr-12', label: 'Half PPR' };
 	assert.equal(restParts(half, NUMBERS, 'WR', undefined)?.scoring, 'half_ppr');
-	const superflex = { ...IN_SEASON, id: 'superflex-12', label: 'Superflex' } as Format;
+	const superflex: Format = { ...IN_SEASON, id: 'superflex-12', label: 'Superflex' };
 	assert.equal(restParts(superflex, NUMBERS, 'WR', undefined)?.scoring, 'ppr');
 });
 

@@ -129,6 +129,26 @@ function verbFor(r: Recorded, id: string, claims: boolean): PlayerVerb {
 	return { ...none, kind: 'waivers', host_url: r.waivers.host_waivers_url };
 }
 
+/** A figure as the API answers it once Lane 66k lands: rounded once to a tenth, half away from zero
+ * on its decimal value (the recordings hold cents). */
+function tenth(value: number | null): number | null {
+	if (value === null) return null;
+	const cents = Math.round(Math.abs(value) * 100);
+	return (Math.sign(value) * Math.round(cents / 10)) / 10;
+}
+
+/** The line's figures in tenths, as the API prints them. */
+function inTenths(line: PlayerLine): PlayerLine {
+	return {
+		...line,
+		week_projection: tenth(line.week_projection),
+		projection_delta: tenth(line.projection_delta),
+		season_avg: tenth(line.season_avg),
+		last_points: tenth(line.last_points),
+		rest_of_season_per_game: tenth(line.rest_of_season_per_game)
+	};
+}
+
 /** His week, read with no league (verb null) or in the fixture's league. */
 export function playerWeek(
 	r: Recorded,
@@ -142,7 +162,7 @@ export function playerWeek(
 	if (team === undefined) return null;
 	return {
 		week: r.lineup.week,
-		line: line ?? built(r, id, team, at?.position ?? ''),
+		line: inTenths(line ?? built(r, id, team, at?.position ?? '')),
 		projection_scoring: r.lineup.projection_scoring,
 		projection_read_at: r.lineup.projection_read_at,
 		projection_previous_read_at: r.lineup.projection_previous_read_at,

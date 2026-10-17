@@ -20,6 +20,13 @@ export interface CardTile {
 /** A number not held. */
 export const NONE = '--';
 
+/** An API figure the API has already rounded to a tenth (Lane 66k's ruling: rounded once, in Go),
+ * printed as given: formatting only, so the web never rounds it again. */
+export function printTenth(value: number): string {
+	const text = String(value);
+	return text.includes('.') ? text : `${text}.0`;
+}
+
 /** The scorings a week's projection is read in: the API's names (ProjectionScoring.format). */
 export type TileScoring = 'ppr' | 'half_ppr' | 'standard';
 

@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { WeekFacts } from '../league/inseason/api.ts';
-import { CARD, NONE, unreadBasis, type CardTile } from './card.ts';
+import { CARD, NONE, printTenth, unreadBasis, type CardTile } from './card.ts';
 import {
 	compareSay,
 	liveCard,
@@ -62,10 +62,10 @@ const week = (
 		position_rank: 1,
 		points_over_replacement: null,
 		rest_of_season_per_game: null,
-		week_projection: 21.84,
+		week_projection: 21.8,
 		projection_delta: 0.4,
 		opp_rank: 26,
-		season_avg: 25.93,
+		season_avg: 25.9,
 		last_points: 37.7,
 		held: false,
 		facts: facts(),
@@ -146,6 +146,16 @@ void test("the rest tile stays in one scoring: the read's figure a game only whe
 	);
 	assert.equal(tile(half.tiles, 'rest').caption, 'from week 6, WR1 in our order, in PPR scoring');
 	assert.equal(tile(half.tiles, 'rest').value, '182.2');
+});
+
+void test("the API's tenths print as given: formatting only, never rounded again (Lane 66k)", () => {
+	assert.equal(printTenth(9.5), '9.5');
+	assert.equal(printTenth(23), '23.0');
+	assert.equal(printTenth(0), '0.0');
+	assert.equal(printTenth(37.7), '37.7');
+	// A per-game figure of 20 prints its tenth.
+	const { tiles } = card(week({}, { season_avg: 20, last_points: 37.7 }));
+	assert.equal(tile(tiles, 'avg').value, '20.0');
 });
 
 void test("the opponent's rank says its direction in words", () => {

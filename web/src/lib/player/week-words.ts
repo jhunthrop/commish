@@ -3,7 +3,6 @@
  * prints; live.ts reads the answer and builds the links. */
 import type { components } from '#lib/api/types.ts';
 import { memberZone, weekdayTime } from '#lib/format/clock.ts';
-import { fixed } from '#lib/format/number.ts';
 import {
 	BOX,
 	EVIDENCE_SHORT,
@@ -21,7 +20,10 @@ import { AGAINST } from '#lib/league/box/lineup.ts';
 import type { LeagueHost } from '#lib/league/api.ts';
 import { hostWords } from '#lib/league/names.ts';
 import type { LogNext } from '#lib/ui/game-log.ts';
-import { CARD, NONE, withTile, type CardTile, type RestParts } from './card.ts';
+import { CARD, NONE, printTenth, withTile, type CardTile, type RestParts } from './card.ts';
+
+/** Tenths in a point, the precision the API prints. */
+const TENTHS = 10;
 
 type Schemas = components['schemas'];
 export type PlayerWeek = Schemas['PlayerWeek'];
@@ -177,7 +179,7 @@ function projTile(week: PlayerWeek): CardTile {
 	return {
 		key: 'proj',
 		label: CARD.proj,
-		value: value === null ? NONE : fixed(value, 1),
+		value: value === null ? NONE : printTenth(value),
 		caption: value === null ? noProjWords(week) : `${CARD.week} ${String(week.week)}, ${scoring}`,
 		tone: 'lead'
 	};
@@ -208,7 +210,7 @@ function oppTile(week: PlayerWeek, position: string): CardTile {
 function avgTile(week: PlayerWeek, games: number, fallback: CardTile): CardTile {
 	const avg = week.line.season_avg;
 	if (avg === null) return fallback;
-	return { ...fallback, value: fixed(avg, 1), caption: games > 0 ? fallback.caption : '' };
+	return { ...fallback, value: printTenth(avg), caption: games > 0 ? fallback.caption : '' };
 }
 
 function lastTile(
@@ -222,7 +224,7 @@ function lastTile(
 	const against = opponents[game.week];
 	return {
 		...fallback,
-		value: fixed(last, 1),
+		value: printTenth(last),
 		caption: `week ${String(game.week)}${against === undefined ? '' : ` ${against}`}`
 	};
 }
@@ -255,7 +257,7 @@ function restTile(week: PlayerWeek, rest: RestParts | null, fallback: CardTile):
 	if (rest === null) return fallback;
 	const same = week.projection_scoring.format === rest.scoring;
 	const perGame = week.line.rest_of_season_per_game;
-	const game = same && perGame !== null ? `, ${fixed(perGame, 1)} a game` : '';
+	const game = same && perGame !== null ? `, ${printTenth(perGame)} a game` : '';
 	const scoring = same ? '' : `, in ${rest.label} scoring`;
 	return {
 		...fallback,
@@ -297,7 +299,7 @@ function nextOf(week: PlayerWeek, zone: string): { cell: NextCell | null; next: 
 			week: week.week,
 			opponent: game.where,
 			when: game.when,
-			proj: proj === null ? NONE : fixed(proj, 1),
+			proj: proj === null ? NONE : printTenth(proj),
 			expected: cell.expected,
 			weather: cell.weather
 		}
@@ -378,7 +380,9 @@ export function compareSay(a: CompareRow, b: CompareRow): string | null {
 		const x = figure(a, key);
 		const y = figure(b, key);
 		if (x === null || y === null || x === y) return null;
-		return `${x > y ? a.name : b.name} by ${fixed(Math.abs(x - y), 1)} ${words}`;
+		// The gap of two printed tenths, taken in whole tenths so no float shows (no new rounding).
+		const tenths = Math.abs(Math.round(x * TENTHS) - Math.round(y * TENTHS));
+		return `${x > y ? a.name : b.name} by ${printTenth(tenths / TENTHS)} ${words}`;
 	};
 	const proj = ahead('proj', `${CARD.proj} this week`);
 	if (proj !== null) return proj;
