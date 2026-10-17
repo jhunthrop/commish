@@ -90,6 +90,8 @@ ABLATIONS: Final = {
     "without_touchdown_reconciliation": Variant(reconcile=False),
     "without_returning_shares": Variant(transform=_returning_off),
     "round_three_input_rule_figure_hidden": Variant(hide_figure=True),
+    # Not in 3.2's list: the shares without the identities' normalisation, for the coordinator's reading.
+    "without_the_identities_normalisation": Variant(normalise=False),
 }
 
 

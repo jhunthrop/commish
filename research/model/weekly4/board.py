@@ -68,6 +68,7 @@ class Variant:
     reconcile: bool = True
     hide_figure: bool = False
     no_charted: bool = False
+    normalise: bool = True  # False: a reported view only, the model shares without the identities
     transform: Callable[[pd.DataFrame], pd.DataFrame] | None = None  # a game-level change (the weather views)
 
 
@@ -106,6 +107,15 @@ def club_target_rates(priced: pd.DataFrame, teams: pd.DataFrame, fallback: float
         found["attempts"].fillna(0.0) > 0, found["targets"] / found["attempts"].where(found["attempts"] > 0), fallback
     )
     return found[GAME_KEY].assign(target_rate=np.asarray(rate, dtype=float))
+
+
+def _raw_shares(board: pd.DataFrame) -> pd.DataFrame:
+    """The projected players' model shares as they are, the identities not applied (a reported view)."""
+    projected = board["projected"].to_numpy() == 1
+    return pd.DataFrame(
+        {f"share_{k}": np.where(projected, board[f"model_{k}"].to_numpy(dtype=float), 0.0) for k in ALL_KINDS},
+        index=board.index,
+    )
 
 
 def _game_level(frame: pd.DataFrame, variant: Variant, home: float | None) -> pd.DataFrame:
@@ -226,7 +236,7 @@ def build_board(
         .merge(_rates(data, shared), on=GAME_KEY, how="left")
     )
     board.index = rows.index
-    board = board.join(normalised_shares(board, ALL_KINDS))
+    board = board.join(normalised_shares(board, ALL_KINDS) if variant.normalise else _raw_shares(board))
     points = analytic_points(board, models.constants, reconcile=variant.reconcile)
     return board.join(points.drop(columns=["season", "week", "club", "player_id", "position"]))
 
