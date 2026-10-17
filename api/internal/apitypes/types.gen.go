@@ -3345,8 +3345,17 @@ type TradeAdvice struct {
 
 	// OrderBasis which order ranks the players: our preseason board, or the rest-of-season order (from week 7, once the API reads it)
 	OrderBasis OrderBasis `json:"order_basis"`
-	ReadAt     time.Time  `json:"read_at"`
-	Refreshed  time.Time  `json:"refreshed"`
+
+	// PlayerPoints as LineupAdvice's: the platform gives each player's points
+	PlayerPoints bool `json:"player_points"`
+
+	// ProjectionReadAt when the week's published projection behind week_projection and each proj change was captured, null with none
+	ProjectionReadAt *time.Time `json:"projection_read_at"`
+
+	// ProjectionScoring the scoring the rows' week_projection is read in: the published projection's column the league scores most like, and whether that is the league's own scoring or the closest of the three to rules of its own (a tight end premium reads PPR and is never its own). A team defense's figure is the published default in every format
+	ProjectionScoring ProjectionScoring `json:"projection_scoring"`
+	ReadAt            time.Time         `json:"read_at"`
+	Refreshed         time.Time         `json:"refreshed"`
 
 	// Roster every player on the drafter's active roster (injured reserve and taxi spots left out), by position then name: the picker's own players, a trade found or not
 	Roster []PlayerLine `json:"roster"`

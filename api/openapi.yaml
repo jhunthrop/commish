@@ -3734,7 +3734,7 @@ components:
         answered_at: { type: string, format: date-time, nullable: true }
     TradeAdvice:
       type: object
-      required: [week, basis, basis_note, order_basis, refreshed, read_at, teams, roster, host_trades_url, host_note, check_basis, moves]
+      required: [week, basis, basis_note, order_basis, refreshed, read_at, teams, roster, host_trades_url, host_note, check_basis, moves, projection_scoring, projection_read_at, player_points]
       properties:
         week: { type: integer }
         check_basis:
@@ -3764,6 +3764,13 @@ components:
             one sentence under the verb when we cannot open the host's page ("Make this change on Yahoo. We cannot
             open that page for you yet."), null when the url opens it
         moves: { $ref: "#/components/schemas/TradeMoves" }
+        projection_scoring: { $ref: "#/components/schemas/ProjectionScoring" }
+        projection_read_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: when the week's published projection behind week_projection and each proj change was captured, null with none
+        player_points: { type: boolean, description: "as LineupAdvice's: the platform gives each player's points" }
     TradeMoves:
       type: object
       required: [propose, reason]

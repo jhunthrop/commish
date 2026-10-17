@@ -3143,6 +3143,14 @@ export interface components {
 			/** @description one sentence under the verb when we cannot open the host's page ("Make this change on Yahoo. We cannot open that page for you yet."), null when the url opens it */
 			host_note: string | null;
 			moves: components['schemas']['TradeMoves'];
+			projection_scoring: components['schemas']['ProjectionScoring'];
+			/**
+			 * Format: date-time
+			 * @description when the week's published projection behind week_projection and each proj change was captured, null with none
+			 */
+			projection_read_at: string | null;
+			/** @description as LineupAdvice's: the platform gives each player's points */
+			player_points: boolean;
 		};
 		TradeMoves: {
 			/**

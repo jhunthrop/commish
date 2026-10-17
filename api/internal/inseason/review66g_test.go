@@ -75,6 +75,9 @@ func TestTradeAnswersCarryTheWeekAndTheTotals(t *testing.T) {
 		!strings.HasPrefix(*advice.Moves.Reason, "Sleeper does not take trade proposals from here") {
 		t.Fatalf("moves %+v", advice.Moves)
 	}
+	if advice.ProjectionReadAt == nil || advice.ProjectionScoring.Format == "" {
+		t.Fatalf("the projection's read and scoring: %v %+v", advice.ProjectionReadAt, advice.ProjectionScoring)
+	}
 	if !strings.Contains(advice.Basis, "best for you first") {
 		t.Fatalf("basis %q", advice.Basis)
 	}
