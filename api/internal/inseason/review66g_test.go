@@ -85,7 +85,8 @@ func TestTheMembersDropLeavesTheWeekFigure(t *testing.T) {
 // and says the order its trades come in (review M2).
 func TestTradesBasisSaysItsOrder(t *testing.T) {
 	rest := TradesBasis(RestOfSeason, 12)
-	if !strings.HasPrefix(rest, "Trades where both lineups gain on our rest-of-season order. ") ||
+	// The order said plainly (rereview N3).
+	if !strings.HasPrefix(rest, "Trades where both lineups gain on our rest-of-season order. Each team's best trade, yours first, ") ||
 		!strings.Contains(rest, "at least 0.5 a week") || !strings.Contains(rest, "then the close calls for them") {
 		t.Fatalf("rest of season: %q", rest)
 	}

@@ -25,8 +25,16 @@ import {
 	ptsTotal,
 	slotWord,
 	statusOf,
-	weatherCell
+	weatherCell,
+	initialName
 } from './box.ts';
+
+void test("a name's short form keeps the surname whole: the first initial, then the last name (rereview N2)", () => {
+	assert.equal(initialName('Aaron Rodgers'), 'A. Rodgers');
+	assert.equal(initialName('Jacory Croskey-Merritt'), 'J. Croskey-Merritt');
+	assert.equal(initialName('Marvin Harrison Jr.'), 'M. Harrison');
+	assert.equal(initialName('Pele'), 'Pele');
+});
 
 const ZONE = 'America/Chicago';
 /** Friday 9:00 pm Central, before every game of the week. */
