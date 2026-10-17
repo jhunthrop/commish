@@ -38,6 +38,16 @@ def test_the_moment_fit_and_full_pooling() -> None:
     assert pooled.k == math.inf
 
 
+def test_the_reported_view_weighs_the_moments_by_opportunities() -> None:
+    observed = _a(5.0, -5.0, 0.4, -0.4)
+    n = _a(1.0, 1.0, 100.0, 100.0)
+    weighted = moment_fit(observed, n, noise=1.0, weighted=True)
+    mean = 0.0
+    expected = float(np.sum(n * (observed - mean) ** 2) / np.sum(n) - np.sum(n * (1.0 / n)) / np.sum(n))
+    assert weighted.tau2 == pytest.approx(expected)
+    assert moment_fit(observed, n, noise=1.0).tau2 != pytest.approx(weighted.tau2)
+
+
 def test_the_beta_binomial_rate_moves_from_the_prior_mean_toward_the_observed() -> None:
     prior = MomentFit(mean=0.0, tau2=0.01, noise=0.0, units=10)
     rates = beta_binomial_rate(_a(9.0, 0.0), _a(10.0, 0.0), _a(0.6, 0.6), prior)

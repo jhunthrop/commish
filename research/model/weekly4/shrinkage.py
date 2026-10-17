@@ -38,13 +38,21 @@ class MomentFit:
         return math.inf if self.pooled_fully else self.noise / self.tau2
 
 
-def moment_fit(observed: np.ndarray, n: np.ndarray, noise: float, mean: float = 0.0) -> MomentFit:
-    """tau^2 = var(observed) - mean(noise / n), over the units with an opportunity."""
+def moment_fit(
+    observed: np.ndarray, n: np.ndarray, noise: float, mean: float = 0.0, weighted: bool = False
+) -> MomentFit:
+    """tau^2 = var(observed) - mean(noise / n), over the units with an opportunity (2.3, as written).
+    `weighted` is a reported view, never the model: the variance and the mean weighted by n."""
     kept = n > 0
     units = int(np.sum(kept))
     if units < 2:  # noqa: PLR2004 - a variance needs two units
         return MomentFit(mean, 0.0, noise, units)
-    tau2 = float(np.var(observed[kept]) - np.mean(noise / n[kept]))
+    o, w = observed[kept], n[kept]
+    if weighted:
+        centre = float(np.sum(w * o) / np.sum(w))
+        tau2 = float(np.sum(w * (o - centre) ** 2) / np.sum(w) - noise * units / np.sum(w))
+    else:
+        tau2 = float(np.var(o) - np.mean(noise / w))
     return MomentFit(mean, tau2, noise, units)
 
 

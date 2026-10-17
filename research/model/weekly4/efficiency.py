@@ -110,39 +110,44 @@ def _units(plays: pd.DataFrame, positions: Mapping[str, str]) -> pd.DataFrame:
     return kept.groupby(["position", "kind", "player_id", "season"], as_index=False)[[*_SUMS, "sq", "xvar"]].sum()
 
 
-def _yards_fit(u: pd.DataFrame) -> MomentFit:
+def _yards_fit(u: pd.DataFrame, weighted: bool) -> MomentFit:
     n = u["h_n"].to_numpy()
     mean_each = u["h_yards_over"].to_numpy() / n
     within = float(np.sum(u["sq"] - n * mean_each**2) / max(float(np.sum(n - 1.0)), 1.0))
-    return moment_fit(mean_each, n, within, float(u["h_yards_over"].sum() / n.sum()))
+    return moment_fit(mean_each, n, within, float(u["h_yards_over"].sum() / n.sum()), weighted=weighted)
 
 
-def _catch_fit(u: pd.DataFrame) -> MomentFit:
+def _catch_fit(u: pd.DataFrame, weighted: bool) -> MomentFit:
     n = u["h_n"].to_numpy()
     observed = (u["h_catch"].to_numpy() - u["h_xcatch"].to_numpy()) / n
     noise = float(u["xvar"].sum() / n.sum())
-    return moment_fit(observed, n, noise, float((u["h_catch"].sum() - u["h_xcatch"].sum()) / n.sum()))
+    return moment_fit(
+        observed, n, noise, float((u["h_catch"].sum() - u["h_xcatch"].sum()) / n.sum()), weighted=weighted
+    )
 
 
-def _td_fit(u: pd.DataFrame) -> MomentFit:
+def _td_fit(u: pd.DataFrame, weighted: bool) -> MomentFit:
     expected = u["h_xtd"].to_numpy()
     mean = float(u["h_td"].sum() / max(expected.sum(), 1e-9))
     observed = np.where(expected > 0, u["h_td"].to_numpy() / np.maximum(expected, 1e-9), 0.0)
-    return moment_fit(observed, expected, mean, mean)
+    return moment_fit(observed, expected, mean, mean, weighted=weighted)
 
 
-def _scramble_fit(u: pd.DataFrame) -> MomentFit:
+def _scramble_fit(u: pd.DataFrame, weighted: bool) -> MomentFit:
     n = u["h_not_sacked"].to_numpy()
     mean = float(u["h_scrambles"].sum() / max(n.sum(), 1e-9))
     observed = np.where(n > 0, u["h_scrambles"].to_numpy() / np.maximum(n, 1e-9), 0.0)
-    return moment_fit(observed, n, mean * (1.0 - mean), mean)
+    return moment_fit(observed, n, mean * (1.0 - mean), mean, weighted=weighted)
 
 
 _FITS: Final = MappingProxyType({"yards": _yards_fit, "catch": _catch_fit, "td": _td_fit, "scramble": _scramble_fit})
 
 
 def fit_efficiency(
-    plays: pd.DataFrame, positions: Mapping[str, str], role_priors: Mapping[str, RolePrior] | None = None
+    plays: pd.DataFrame,
+    positions: Mapping[str, str],
+    role_priors: Mapping[str, RolePrior] | None = None,
+    weighted: bool = False,
 ) -> Efficiency:
     """The moment fits of every (position, kind, component) on the fit seasons' plays (`h_` columns)."""
     units = _units(plays, positions)
@@ -151,7 +156,7 @@ def fit_efficiency(
     for (position, kind), group in units.groupby(["position", "kind"]):
         for k, component in COMPONENTS:
             if k == kind:
-                fit = _FITS[component](group)
+                fit = _FITS[component](group, weighted)
                 cells[(str(position), str(kind), component)] = fit
                 if component == "yards":
                     noise[(str(position), str(kind))] = fit.noise

@@ -32,7 +32,7 @@ from research.model.weekly4.dispersion import (
     fit_script,
     fit_yards_sd,
 )
-from research.model.weekly4.efficiency import RolePrior, fit_efficiency, fit_role_prior
+from research.model.weekly4.efficiency import Efficiency, RolePrior, fit_efficiency, fit_role_prior
 from research.model.weekly4.features.charted import CHARTED_FEATURES
 from research.model.weekly4.gates import RoundFour
 from research.model.weekly4.history import position_means, with_outcomes
@@ -81,6 +81,7 @@ class Fitted:
     models: Mapping[int, SeasonModels]
     data: Mapping[int, SeasonData]
     dispersion: Dispersion
+    weighted_efficiency: Efficiency  # a reported view (3.2), never the number
     seconds: dict[str, float]
     served: dict[str, tuple[int, ...]]
     reported: dict[str, Any] = field(default_factory=dict)
@@ -195,7 +196,9 @@ def fit_system(store: Store, extras: Extras, t: RoundFour) -> Fitted:
     clock["share_models"] = time.monotonic() - mark
     mark = time.monotonic()
     fit_plays_ = priced[priced["season"].isin(t.player_fit_seasons)]
-    efficiency = fit_efficiency(fit_plays_, positions, _role_priors(fit_rows, priced))
+    role_priors = _role_priors(fit_rows, priced)
+    efficiency = fit_efficiency(fit_plays_, positions, role_priors)
+    weighted = fit_efficiency(fit_plays_, positions, role_priors, weighted=True)
     shared = RoundShared(
         efficiency,
         position_means(priced, positions, t.player_fit_seasons),
@@ -227,7 +230,7 @@ def fit_system(store: Store, extras: Extras, t: RoundFour) -> Fitted:
         "players": tuple(sorted(set(fit_rows["season"].unique()) | set(extras.margins["season"].unique()))),
     }
     reported["efficiency_cells_pooled_fully"] = efficiency.pooled_fully
-    return Fitted(play, team, shares, shared, models, data, dispersion, clock, served, reported)
+    return Fitted(play, team, shares, shared, models, data, dispersion, weighted, clock, served, reported)
 
 
 def _boards(

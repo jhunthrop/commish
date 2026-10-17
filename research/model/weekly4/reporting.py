@@ -21,7 +21,7 @@ import pandas as pd
 
 from research.model.weekly2.gates import GateLine
 from research.model.weekly2.statistics import JudgedRow, chance_bins
-from research.model.weekly4.board import THE_NUMBER, Variant, board_points, build_board
+from research.model.weekly4.board import THE_NUMBER, RoundShared, Variant, board_points, build_board
 from research.model.weekly4.gates import RoundFour
 from research.model.weekly4.judgment import (
     Comparison,
@@ -93,9 +93,11 @@ ABLATIONS: Final = {
 }
 
 
-def _variant_numbers(fitted: Fitted, t: RoundFour, variant: Variant) -> dict[tuple[int, str], dict[str, float]]:
+def _variant_numbers(
+    fitted: Fitted, t: RoundFour, variant: Variant, shared: RoundShared | None = None
+) -> dict[tuple[int, str], dict[str, float]]:
     data = fitted.data[t.judgment_season]
-    points = board_points(data, fitted.models[t.judgment_season], fitted.shared, variant)
+    points = board_points(data, fitted.models[t.judgment_season], shared or fitted.shared, variant)
     keyed = data.rows[["week", "player_id"]].join(points)
     return numbers_of(keyed)
 
@@ -120,6 +122,14 @@ def ablations(fitted: Fitted, t: RoundFour, rows: Sequence[Row], judged: bool) -
         numbers = _variant_numbers(fitted, t, variant)
         rows_v = [replace(r, sources={**r.sources, "model": numbers.get((r.week, r.player_id))}) for r in rows]
         found[name] = _comparison_payload(compare(rows_v, t))
+    # The moments of 2.3 as written are unweighted; the view weighs them by opportunities (reported only).
+    weighted = replace(fitted.shared, efficiency=fitted.weighted_efficiency)
+    numbers = _variant_numbers(fitted, t, THE_NUMBER, weighted)
+    rows_w = [replace(r, sources={**r.sources, "model": numbers.get((r.week, r.player_id))}) for r in rows]
+    found["efficiency_moments_weighted_by_opportunities"] = {
+        **_comparison_payload(compare(rows_w, t)),
+        "pooled_fully": fitted.weighted_efficiency.pooled_fully,
+    }
     return found
 
 
