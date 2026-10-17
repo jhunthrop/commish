@@ -112,6 +112,24 @@ def ratio_allowance(defence: str, week: int, schedule: Schedule, allowed: ValueA
     """D's allowance of any per-game value before `week`: over D's games, what D allowed against what
     the same offences gained in their other games, shrunk toward 1 (round 4 reads it for its new
     allowances, section 2.4, on the same construction)."""
+    return _shrunk(allowance_pairs(defence, week, schedule, allowed, gained))
+
+
+def difference_allowance(defence: str, week: int, schedule: Schedule, allowed: ValueAt, gained: ValueAt) -> Allowance:
+    """The same pairs read as a difference, shrunk toward 0 with the same prior: n x (mean allowed less
+    mean elsewhere) / (n + 6), for a value that is itself a difference (round 4, amendment 2 item 2)."""
+    pairs = allowance_pairs(defence, week, schedule, allowed, gained)
+    if not pairs:
+        return Allowance(0.0, 0, NO_GAME)
+    count = len(pairs)
+    gap = sum(a - e for a, e in pairs) / count
+    return Allowance(count * gap / (count + ALLOWANCE_PRIOR_GAMES), count, None)
+
+
+def allowance_pairs(
+    defence: str, week: int, schedule: Schedule, allowed: ValueAt, gained: ValueAt
+) -> list[tuple[float, float]]:
+    """Over D's games before `week`: (what D allowed, the same offence's mean in its other games)."""
     pairs: list[tuple[float, float]] = []
     for at in schedule.club_weeks(defence, week):
         offence = schedule.opponent(at, defence)
@@ -126,4 +144,4 @@ def ratio_allowance(defence: str, week: int, schedule: Schedule, allowed: ValueA
         if given is None or not elsewhere:
             continue
         pairs.append((given, sum(elsewhere) / len(elsewhere)))
-    return _shrunk(pairs)
+    return pairs

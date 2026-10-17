@@ -22,7 +22,15 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Final
 
-from research.model.weekly3.allowance import ALLOWANCE_PRIOR_GAMES, Allowance, TeamRows, ValueAt, ratio_allowance
+from research.model.weekly3.allowance import (
+    ALLOWANCE_PRIOR_GAMES,
+    Allowance,
+    TeamRows,
+    ValueAt,
+    difference_allowance,
+    ratio_allowance,
+)
+from research.model.weekly3.features import club_values
 from research.model.weekly3.instant import Schedule
 from research.model.weekly4.features.plays import DEPTH_BUCKETS, GroupTargets, Tallies
 from research.pipeline.nflverse.pbp import PbpMetric
@@ -133,9 +141,11 @@ def _shrunk(mean: float, games: int, toward: float) -> float:
 
 
 def club_tempo(club: str, week: int, schedule: Schedule, rows: TeamRows, league: float) -> Tempo:
+    """Round 3's mean over the club's games that carry a value (`weekly3.features.club_values`),
+    shrunk as amendment 2 item 3 ratified."""
     weeks = schedule.club_weeks(club, week)
-    paces = [v for w in weeks if (v := rows.get((club, w), {}).get(PbpMetric.PACE_SECONDS_PER_PLAY)) is not None]
-    rates = [v for w in weeks if (v := rows.get((club, w), {}).get(PbpMetric.PASS_RATE_OVER_EXPECTED)) is not None]
+    paces = club_values(rows, schedule, club, week, PbpMetric.PACE_SECONDS_PER_PLAY)
+    rates = club_values(rows, schedule, club, week, PbpMetric.PASS_RATE_OVER_EXPECTED)
     defaults: set[str] = set()
     if len(paces) < len(weeks) or len(rates) < len(weeks):
         defaults.add(CLUB_GAME_WITHOUT_PACE)
@@ -144,3 +154,13 @@ def club_tempo(club: str, week: int, schedule: Schedule, rows: TeamRows, league:
     pace = _shrunk(sum(paces) / len(paces), len(paces), league) if paces else math.nan
     rate = _shrunk(sum(rates) / len(rates), len(rates), 0.0) if rates else math.nan
     return Tempo(pace, rate, len(weeks), frozenset(defaults))
+
+
+def pass_rate_allowed(defence: str, week: int, schedule: Schedule, rows: TeamRows) -> Allowance:
+    """D's pass rate over expectation allowed (2.4, amendment 2 item 2): its opponents' pass rate over
+    expectation against D less theirs elsewhere, shrunk toward 0 with six games of prior."""
+
+    def value(offence: str, at: int) -> float | None:
+        return rows.get((offence, at), {}).get(PbpMetric.PASS_RATE_OVER_EXPECTED)
+
+    return difference_allowance(defence, week, schedule, value, value)

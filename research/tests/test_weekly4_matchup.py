@@ -15,6 +15,7 @@ from research.model.weekly4.features.matchup import (
     RB_AIR_SHARE,
     club_tempo,
     defence_pressure,
+    pass_rate_allowed,
     role_allowances,
 )
 from research.model.weekly4.features.plays import Counts, GroupTargets, PlayerTally, Pressure, Tallies
@@ -81,6 +82,20 @@ def test_the_receivers_allowances_are_shares_of_the_groups_targets() -> None:
     assert found["depth_deep"].value == pytest.approx(deep)
     assert found["outside"].value == pytest.approx((0.75 / 0.5 + 6) / 7)
     assert RB_AIR_SHARE not in found
+
+
+def test_the_pass_rate_allowed_is_a_difference_shrunk_toward_zero() -> None:
+    rows = {
+        ("KC", 1): {"pass_rate_over_expected": 8.0},  # against DEN
+        ("KC", 2): {"pass_rate_over_expected": 2.0},
+        ("LV", 2): {"pass_rate_over_expected": -1.0},  # against DEN
+        ("LV", 1): {"pass_rate_over_expected": -5.0},
+    }
+    found = pass_rate_allowed("DEN", 3, _schedule(), rows)
+    gap = ((8.0 - 2.0) + (-1.0 - -5.0)) / 2
+    assert found.games == 2 and found.value == pytest.approx(2 * gap / 8)
+    first = pass_rate_allowed("DEN", 1, _schedule(), rows)
+    assert (first.value, first.default) == (0.0, "allowance_without_a_game")
 
 
 def test_pressure_is_per_dropback_faced_and_pfr_reads_the_passers_faced() -> None:
