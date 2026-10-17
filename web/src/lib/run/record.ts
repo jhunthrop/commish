@@ -1,8 +1,8 @@
 /** The record in the words a page prints: its one big number and each week as a person says it.
  * The record page and the front door both read these, so the headline is said one way. */
 import { dayLabel, weekdayLabel } from '#lib/format/date.ts';
-import { fixed, plural } from '#lib/format/number.ts';
-import type { RecordLine, RecordWeek, RunRecord } from './schema.ts';
+import { plural } from '#lib/format/number.ts';
+import type { RecordLine, RecordWeek, RunRecord, Score } from './schema.ts';
 
 /** The record's one number and its caption. */
 export interface RecordHeadline {
@@ -10,6 +10,11 @@ export interface RecordHeadline {
 	caption: string;
 	/** True once a week is graded and the number is our agreement with the finish. */
 	graded: boolean;
+}
+
+/** A phrase with its first letter capital. */
+function capitalized(words: string): string {
+	return `${words.charAt(0).toUpperCase()}${words.slice(1)}`;
 }
 
 /** A pooled line for every position, the one the headline and each week's line lead with. */
@@ -34,13 +39,10 @@ function weekSpan(weeks: readonly RecordWeek[]): string {
 	return first === last ? `week ${String(first)}` : `weeks ${String(first)} to ${String(last)}`;
 }
 
-/** The agreement statistic named as a rank figure: "rank agreement with the finish". */
+/** The agreement statistic as the record names it: "order matched" (Lane 66j). */
 export function rankAgreement(record: RunRecord): string {
-	return `rank ${record.statistic.agreement}`;
+	return record.statistic.agreement;
 }
-
-/** The agreement's scale, said inside its label wherever the headline number prints. */
-const AGREEMENT_SCALE = 'where 1 is a perfect order';
 
 /** Graded: our rank agreement with the finish over every graded week, its scale, the span and the
  * players it counts, and ADP's beside it. Not yet: how many of the frozen weeks are graded. */
@@ -50,10 +52,10 @@ export function recordHeadline(record: RunRecord): RecordHeadline {
 	const agreement = overall?.ours.agreement;
 	if (overall && agreement !== null && agreement !== undefined && graded.length > 0) {
 		const adp = overall.adp.agreement;
-		const adpPart = adp === null ? '' : `. ADP ${fixed(adp, 2)} on the same players`;
+		const adpPart = adp === null ? '' : `. ADP ${printPlaces(adp, 2)} on the same players`;
 		return {
-			value: fixed(agreement, 2),
-			caption: `${rankAgreement(record)}, ${AGREEMENT_SCALE}. Ours over ${weekSpan(graded)} and ${plural(overall.ours.graded, 'player')}${adpPart}`,
+			value: printPlaces(agreement, 2),
+			caption: `${capitalized(rankAgreement(record))}, ours over ${weekSpan(graded)} and ${plural(overall.ours.graded, 'player')}${adpPart}. ${record.scale}`,
 			graded: true
 		};
 	}
@@ -149,4 +151,111 @@ export function weekLines(
 			? { lead: lead(run), text: runWords(first), week: null }
 			: { lead: lead(run), text: frozenWords(first, unplayed), week: first };
 	});
+}
+
+/** The three orders a record row compares, ours first. */
+export const RECORD_SOURCES = ['ours', 'adp', 'published'] as const;
+export type RecordSource = (typeof RECORD_SOURCES)[number];
+
+/** The three figures a record row gives each order (Lane 66j). */
+export const RECORD_FIGURES = ['agreement', 'placesOff', 'starters'] as const;
+export type RecordFigure = (typeof RECORD_FIGURES)[number];
+
+/** The record box score's words, in one place for the copy guard. */
+export const RECORD_BOX = {
+	week: 'Week',
+	players: 'Players',
+	status: 'Status',
+	ours: 'Ours',
+	adp: 'ADP',
+	published: 'Published',
+	toDate: 'To date',
+	none: '--',
+	chart: 'Order matched by week'
+} as const;
+
+/** One order's score in a line, null where the line has none (the published projection before its
+ * first graded week). */
+export function scoreOf(line: RecordLine | undefined, source: RecordSource): Score | null {
+	if (line === undefined) return null;
+	return line[source];
+}
+
+/** A figure the run rounded, printed as given with its places filled out (Lane 66k's ruling:
+ * formatting only, never rounded again): 0.5 at two places is "0.50", 43 at one is "43.0". */
+export function printPlaces(value: number, places: number): string {
+	const [whole = '', frac = ''] = String(value).split('.');
+	return `${whole}.${frac.padEnd(places, '0')}`;
+}
+
+/** A figure as its cell prints it: two decimals for order matched, one for places off, the starters as
+ * "50 of 84", "--" when not held. Every figure is the run's. */
+export function figureWords(score: Score | null, figure: RecordFigure): string {
+	if (score === null) return RECORD_BOX.none;
+	if (figure === 'agreement')
+		return score.agreement === null ? 'Too few' : printPlaces(score.agreement, 2);
+	if (figure === 'placesOff')
+		return score.placesOff === null ? RECORD_BOX.none : printPlaces(score.placesOff, 1);
+	return score.startersOf === 0
+		? RECORD_BOX.none
+		: `${String(score.starters)} of ${String(score.startersOf)}`;
+}
+
+/** The published projection's figure to date with ours over the same weeks beside it (review 66j N1):
+ * the run pools ours again over the weeks that graded published, so the two compare like with like.
+ * `ours` is null on a week's line, where both are graded on the same rows already. */
+export function publishedBeside(
+	line: RecordLine | undefined,
+	figure: RecordFigure
+): { published: string; ours: string | null } {
+	const same = line?.oursOnPublished ?? null;
+	return {
+		published: figureWords(scoreOf(line, 'published'), figure),
+		ours: same === null ? null : `${RECORD_BOX.ours} ${figureWords(same, figure)}`
+	};
+}
+
+/** The published projection's columns' basis: from which week it counts, as the register says. */
+export function publishedWords(record: RunRecord): string {
+	const from =
+		record.publishedFromWeek === null
+			? `graded from the first week our register keeps it, ${RECORD_BOX.none} until then`
+			: `graded from week ${String(record.publishedFromWeek)} on the same players under the fill rule, ${RECORD_BOX.none} before`;
+	return `Published is one provider's weekly projection, read before each kickoff, ${from}.`;
+}
+
+/** The order a week graded, in the record's words (review 66j M7). */
+export const ORDER_WORDS: Readonly<Record<NonNullable<RecordWeek['order']>, string>> = {
+	preseason: 'Our preseason order',
+	rest_of_season: 'Our rest-of-season order'
+};
+
+/** The orders the graded weeks graded, said once: "Our preseason order, weeks 1 to 2". */
+export function gradedOrders(record: RunRecord): string {
+	const graded = gradedWeeks(record);
+	const orders = [...new Set(graded.map((w) => w.order).filter((o) => o !== null))];
+	return orders
+		.map((o, i) => (i === 0 ? ORDER_WORDS[o] : ORDER_WORDS[o].replace(/^Our/, 'our')))
+		.join(', then ');
+}
+
+/** The chart's three series: each graded week's order matched for one position, in week order. */
+export function chartSeries(
+	record: RunRecord,
+	position: RecordLine['position']
+): Record<RecordSource, { week: number; value: number }[]> {
+	const out: Record<RecordSource, { week: number; value: number }[]> = {
+		ours: [],
+		adp: [],
+		published: []
+	};
+	for (const week of record.weeks) {
+		if (week.status !== 'graded') continue;
+		const line = week.lines.find((l) => l.position === position);
+		for (const source of RECORD_SOURCES) {
+			const value = scoreOf(line, source)?.agreement;
+			if (value !== null && value !== undefined) out[source].push({ week: week.week, value });
+		}
+	}
+	return out;
 }

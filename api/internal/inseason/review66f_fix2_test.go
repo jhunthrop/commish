@@ -98,7 +98,7 @@ func TestTheStripOnTheRecordedLeague(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	out, ok := a.Waivers("")
+	out, ok := a.Waivers("", "")
 	if !ok || out.LineupProj == nil || out.PickupsProj == nil {
 		t.Fatalf("answer %v, projections %v %v", ok, out.LineupProj, out.PickupsProj)
 	}

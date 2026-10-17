@@ -151,7 +151,7 @@ func TestWaiverDropsListEveryChoice(t *testing.T) {
 // the copy line names the platform.
 func TestWaiverAnswerCarriesTheTable(t *testing.T) {
 	f := newFixture(t)
-	out, ok := newFixtureAdvisor(t, f, nil).Waivers("")
+	out, ok := newFixtureAdvisor(t, f, nil).Waivers("", "")
 	if !ok {
 		t.Fatal("no answer")
 	}

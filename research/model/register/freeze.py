@@ -110,6 +110,27 @@ def week_props_consensus(
     return stances
 
 
+_PUBLISHED: Final = """
+with newest as (
+  select snapshot_id from research.tank01_projection_rows
+  where season = :s and week = :w and captured_at <= :a
+  group by snapshot_id order by max(captured_at) desc, snapshot_id desc limit 1
+)
+select c.player_id, r.ppr_points from research.tank01_projection_rows r
+join newest n on n.snapshot_id = r.snapshot_id
+join research.player_crosswalk c on c.provider_player_id = r.provider_player_id
+where c.player_id is not null
+"""
+
+
+def week_published_points(conn: Connection, season: int, week: int, as_of: datetime) -> dict[str, float]:
+    """The week's published projection at the freeze (Lane 66j): each player's PPR points on the newest
+    snapshot read at or before `as_of`, by research player id through the crosswalk. Empty when no
+    snapshot of the week was read by then."""
+    rows = conn.execute(text(_PUBLISHED), {"s": season, "w": week, "a": as_of})
+    return {str(row.player_id): float(row.ppr_points) for row in rows}
+
+
 def _stored_board(conn: Connection, season: int, source: str, as_of: datetime) -> list[Any]:
     generations = conn.execute(
         text(
@@ -163,11 +184,12 @@ def take_freeze(conn: Connection, season: int, week: int, now: datetime) -> Free
     adp = {row.player_id: row.rank for row in preseason_rankings_as_of(conn, season, ADP_SOURCE, frozen_at)}
     ecr = {row.player_id: row.rank for row in preseason_rankings_as_of(conn, season, ECR_SOURCE, frozen_at)}
     props = week_props_consensus(conn, season, (kickoff, kickoffs.get(week + 1)), frozen_at)
+    published = week_published_points(conn, season, week, frozen_at)
     rows: list[dict[str, Any]] = []
     coverage: dict[str, dict[str, int]] = {}
     for source, role in REGISTER_BOARD_SOURCES:
         board_rows = [
-            _freeze_row(season, week, frozen_at, entry, adp, ecr, props)
+            _freeze_row(season, week, frozen_at, entry, adp, ecr, props, published)
             for entry in _stored_board(conn, season, source, frozen_at)
         ]
         unnamed = sorted({js_iso(row["board_as_of"]) for row in board_rows if row["model_version"] is None})
@@ -186,6 +208,7 @@ def take_freeze(conn: Connection, season: int, week: int, now: datetime) -> Free
             "adp": sum(1 for row in board_rows if row["adp"] is not None),
             "ecr": sum(1 for row in board_rows if row["ecr"] is not None),
             "props": sum(1 for row in board_rows if row["props_points"] is not None),
+            "published": sum(1 for row in board_rows if row["published_points"] is not None),
         }
         rows.extend(board_rows)
     _record(conn, rows)
@@ -200,6 +223,7 @@ def _freeze_row(  # noqa: PLR0913, PLR0917 - the oracle's own parameters, in its
     adp: Mapping[str, float],
     ecr: Mapping[str, float],
     props: Mapping[str, PropsStance],
+    published: Mapping[str, float],
 ) -> dict[str, Any]:
     stance = props.get(entry.player_id)
     return {
@@ -217,6 +241,7 @@ def _freeze_row(  # noqa: PLR0913, PLR0917 - the oracle's own parameters, in its
         "ecr": ecr.get(entry.player_id),
         "props_points": None if stance is None else stance.points,
         "props_markets": None if stance is None else stance.markets,
+        "published_points": published.get(entry.player_id),
         "model_version": entry.model_version,
     }
 
@@ -225,9 +250,9 @@ def _record(conn: Connection, rows: Sequence[Mapping[str, Any]]) -> None:
     """`recordFreezeRows`: a plain insert, no conflict clause; a second claim at an instant is refused."""
     statement = text(
         "insert into research.register_freeze_rows (season, week, frozen_at, board_source, player_id, implementation, board_as_of, "
-        "board_points, board_rank, board_value_rank, adp, ecr, props_points, props_markets, model_version) values (:season, :week, "
-        ":frozen_at, :board_source, :player_id, :implementation, :board_as_of, :board_points, :board_rank, :board_value_rank, :adp, "
-        ":ecr, :props_points, cast(:props_markets as jsonb), :model_version)"
+        "board_points, board_rank, board_value_rank, adp, ecr, props_points, props_markets, published_points, model_version) values "
+        "(:season, :week, :frozen_at, :board_source, :player_id, :implementation, :board_as_of, :board_points, :board_rank, "
+        ":board_value_rank, :adp, :ecr, :props_points, cast(:props_markets as jsonb), :published_points, :model_version)"
     )
     for row in rows:
         conn.execute(

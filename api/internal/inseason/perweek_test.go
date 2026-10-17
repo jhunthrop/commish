@@ -92,17 +92,17 @@ func TestTheRunsFirstWeekSetsTheDivisor(t *testing.T) {
 	out, _ := a.Lineup()
 	line := out.Slots[0].Ours
 	season := f.league.Board.Values[boardID(line)]
-	w, _ := a.Waivers("")
+	w, _ := a.Waivers("", "")
 	if *line.PointsOverReplacement != roundTenth(season/10) || !strings.Contains(w.SeasonBasis, "its 10 weeks") {
 		t.Fatalf("%v %q", *line.PointsOverReplacement, w.SeasonBasis)
 	}
 	f.league.Board.FromWeek = 0
-	if w, _ := newFixtureAdvisor(t, f, nil).Waivers(""); !strings.Contains(w.SeasonBasis, "its 11 weeks") {
+	if w, _ := newFixtureAdvisor(t, f, nil).Waivers("", ""); !strings.Contains(w.SeasonBasis, "its 11 weeks") {
 		t.Fatalf("the league's week: %q", w.SeasonBasis)
 	}
 	// A preseason board's from week is never read.
 	f.league.Board.Order, f.league.Board.FromWeek = boards.OrderPreseason, 8
-	if w, _ := newFixtureAdvisor(t, f, nil).Waivers(""); !strings.Contains(w.SeasonBasis, "its 17 weeks") {
+	if w, _ := newFixtureAdvisor(t, f, nil).Waivers("", ""); !strings.Contains(w.SeasonBasis, "its 17 weeks") {
 		t.Fatalf("preseason: %q", w.SeasonBasis)
 	}
 }

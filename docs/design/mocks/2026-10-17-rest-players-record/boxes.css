@@ -1,0 +1,142 @@
+/* Lane 66j: Rest of season, Players and Our record, on the Lineup table (lineup.css) and Waivers' sort heads (waivers.css). */
+.c-rank{width:52px}.c-delta{width:48px}.c-roster{width:168px}.c-game{width:206px}.c-proj{width:64px}.c-ros{width:76px}.c-tot{width:68px}
+.c-ev{width:58px}.c-rk{width:84px}.c-verb{width:150px}.c-sheet{width:96px}
+.box tr.grp th{height:22px;padding:0;background:var(--bg);border-bottom:0}
+.box tr.grp th.g-ros,.box tr.grp th.mg{border-left:1px solid var(--line);text-align:center}
+.box tr.grp th span{font-size:var(--t-xs);font-weight:700;text-transform:uppercase;letter-spacing:var(--track-label);color:var(--ink-2)}
+.box th.ros,.box td.ros{border-left:1px solid var(--line)}
+.box th.ev.rkc,.box td.ev.rkc{border-left:1px solid var(--line);padding-left:var(--s-2)}
+td.tot{font-size:var(--t-md)}
+td.rank{font-family:var(--font-num);font-weight:800;font-size:var(--t-lg);color:var(--ink);padding-right:var(--s-3)}
+th.rank .sort{justify-content:flex-end}
+td.dl{text-align:right}
+.dlt{display:inline-flex;align-items:center;gap:1px;font-family:var(--font-num);font-weight:700;font-size:var(--t-md)}
+.dlt.up{color:var(--gain-ink)}.dlt.down{color:var(--loss-ink)}.dlt.even{color:var(--ink-3)}
+.pos{display:inline-flex;align-items:center;height:20px;padding:0 6px;border-radius:var(--r-sm);background:var(--surface-2);font-size:var(--t-xs);font-weight:700;letter-spacing:.03em;color:var(--ink-2)}
+.tchip.ir{background:var(--status-ir-bg);color:var(--status-ir-ink)}
+td.roster{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.own{display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:var(--r-pill);font-size:var(--t-xs);font-weight:700;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.own.yours{background:var(--accent);color:var(--accent-ink)}
+.own.free{background:var(--gain-bg);color:var(--gain-ink)}
+.own.team{padding:0;color:var(--ink-3);font-weight:500;font-size:var(--t-sm)}
+tr.pk.mine td{background:color-mix(in srgb,var(--accent) 7%,var(--surface))}
+tr.pk.mine td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
+.add.rv{height:30px;font-size:var(--t-xs)}
+.add.quiet-v{border-color:transparent;color:var(--ink-2);font-weight:600}
+.add.quiet-v:hover{border-color:var(--line-strong)}
+td.act{text-align:right}
+.filters .chip-group+.chip-group{margin-left:var(--s-1)}
+.search.big{display:flex;align-items:center;gap:var(--s-2);max-width:640px;height:48px;padding:0 var(--s-4);border:1px solid var(--line-strong);border-radius:var(--r-md);background:var(--surface)}
+.search.big input{flex:1;min-width:0;border:0;background:transparent;font:inherit;font-size:var(--t-lg);color:var(--ink);outline:0}
+.search.big .hits{font-size:var(--t-sm);color:var(--ink-3);white-space:nowrap}
+
+/* Our record: the to-date bug, the week table, the chart. */
+.recbug{grid-template-columns:auto auto minmax(0,1fr)}
+.tiles{display:flex;gap:var(--s-5)}
+.tile{display:flex;flex-direction:column;gap:2px;padding-left:var(--s-4);border-left:1px solid var(--line)}
+.t-l{font-size:var(--t-xs);font-weight:700;text-transform:uppercase;letter-spacing:var(--track-label);color:var(--ink-3)}
+.t-v{display:flex;align-items:baseline;gap:var(--s-2);white-space:nowrap;font-variant-numeric:tabular-nums}
+.t-v b{font-family:var(--font-num);font-weight:800;font-size:var(--t-2xl);line-height:1;color:var(--accent-text)}
+.t-v>span{font-size:var(--t-sm);color:var(--ink-2)}
+.honest{margin:0;font-size:var(--t-sm);color:var(--ink);line-height:1.45;max-width:520px}
+.segs.m-pick{display:none}
+.c-wk{width:118px}.c-ord{width:180px}.c-plc{width:78px}.c-m{width:auto}.c-st{width:150px}
+.record td.wkn{font-family:var(--font-num);font-weight:700;font-size:var(--t-md);padding-left:var(--s-3);white-space:nowrap}
+.record td.ord b{display:block;font-size:var(--t-sm);font-weight:600}
+.record td.ord span{font-size:var(--t-xs);color:var(--ink-3)}
+.record td.plc{font-family:var(--font-num);font-weight:600;font-size:var(--t-md);color:var(--ink-2)}
+.record th.m.s-ours,.record td.m.s-ours{border-left:1px solid var(--line)}
+.record td.m{font-family:var(--font-num);font-weight:600;font-size:var(--t-lg);color:var(--ink-3);font-variant-numeric:tabular-nums}
+.record td.m.s-ours{color:var(--ink-2)}
+.record td.m.best{color:var(--ink);font-weight:800}
+.record td.m.s-ours.best{color:var(--accent-text)}
+.record td.m .of{display:block;font-family:var(--font-ui);font-size:var(--t-xs);font-weight:500;color:var(--ink-3)}
+.record th.m .sort{justify-content:flex-end;display:flex}
+.record th .sort{display:flex;align-items:center;height:32px;padding:0 var(--s-2);font-size:var(--t-xs);font-weight:600;text-transform:uppercase;letter-spacing:var(--track-label);color:var(--ink-3)}
+.record td.st{font-size:var(--t-sm);color:var(--ink-3);padding-left:var(--s-4)}
+.record tr.live td{background:color-mix(in srgb,var(--accent) 7%,var(--surface))}
+.record tr.live td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
+.record tr.later td{height:44px;color:var(--ink-3)}
+.record tr.later td.ord{white-space:nowrap}
+.record tr.later td.ord b{display:inline;margin-right:var(--s-2)}
+.record tr.totals td.m{color:var(--scoreboard-ink-2)}
+.record tr.totals td.m.best{color:var(--scoreboard-ink)}
+.record tr.totals td.m.s-ours{color:var(--scoreboard-num)}
+.record tr.totals td.m .of{color:var(--scoreboard-ink-2)}
+.record tr.totals td.plc{color:var(--scoreboard-ink-2)}
+.chart{margin:0;max-width:900px}
+.chart figcaption{font-size:var(--t-xs);font-weight:700;text-transform:uppercase;letter-spacing:var(--track-label);color:var(--ink-3);margin-bottom:var(--s-2)}
+.chart svg{width:100%;height:auto;display:block}
+.chart .gl{stroke:var(--line);stroke-width:1}
+.chart .ax{font-size:11px;fill:var(--ink-3);font-family:var(--font-ui)}
+.chart .ax.dim{opacity:.5}
+.chart .now{stroke:var(--accent);stroke-dasharray:3 3}
+.chart g path{fill:none;stroke-width:2.5}
+.chart g text{font-size:12px;font-weight:700;font-family:var(--font-ui)}
+.chart .s-ours path{stroke:var(--accent)}.chart .s-ours circle{fill:var(--accent)}.chart .s-ours text{fill:var(--accent-text)}
+.chart .s-adp path{stroke:var(--ink-3)}.chart .s-adp circle{fill:var(--ink-3)}.chart .s-adp text{fill:var(--ink-3)}
+.chart .s-pub path{stroke:var(--ink);stroke-dasharray:6 4}.chart .s-pub circle{fill:var(--ink)}.chart .s-pub text{fill:var(--ink)}
+
+/* The screen's own number leads: Rest of season a game is the big figure, Proj steps back. */
+.box td.proj{font-size:var(--t-lg);color:var(--ink-2)}
+.box td.ros.pg{font-size:var(--t-xl);font-weight:800;color:var(--ink)}
+.add.quiet-v{color:var(--ink-3)}
+.ph-mark{display:none}
+
+@media (max-width: 1180px){
+  .recbug{grid-template-columns:auto minmax(0,1fr)}
+  .honest{grid-column:1 / -1;max-width:none}
+}
+@media (max-width: 760px){
+  .c-rank{width:34px}.c-delta,.c-roster,.c-tot,.c-ev,.c-rk,.c-game{width:0}.c-proj{width:44px}.c-ros{width:48px}.c-verb,.c-sheet{width:40px}
+  .box tr.grp{display:none}
+  .box td.dl,.box th.dl,.box td.roster,.box th.roster,.box .tot,.box .ev,.box th.game,.box td.game{padding:0;overflow:hidden;font-size:0;border-left:0}
+  .box td.dl *,.box td.roster *,.box td.tot *,.box td.ev *,.box th.dl .sort,.box th.roster .sort,.box th.tot .sort,.box th.ev .sort,.box th.game .sort{display:none}
+  .box th.ros .sort{font-size:0}
+  .box th.ros .sort::before{content:'Rest';font-size:var(--t-xs)}
+  .pool:not(.record) th.ros,.pool:not(.record) td.ros{width:auto;padding:0 4px;font-size:var(--t-md);border-left:1px solid var(--line)}
+  .pool:not(.record) td.ros *{display:inline}
+  .pool th.ros .sort{display:flex!important}
+  td.rank{font-size:var(--t-md);padding-right:2px}
+  .ph-g{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+  .own{height:18px;padding:0 6px;font-size:10px}
+  .own.team{font-size:10px}
+  .add.rv{width:32px;padding:0;justify-content:center}
+  .add.rv span{display:none}
+  .add.quiet-v{border-color:var(--line-strong)}
+  .filters{flex-wrap:wrap}
+  .filters .chip-group+.chip-group{margin-left:0}
+  .search.big{height:44px}
+  .search.big .hits{font-size:var(--t-xs)}
+  .recbug{grid-template-columns:minmax(0,1fr)}
+  .tiles{flex-direction:column;gap:var(--s-2)}
+  .tile{padding-left:0;border-left:0;flex-direction:row;align-items:baseline;justify-content:space-between}
+  .t-v b{font-size:var(--t-xl)}
+  .t-v>span{font-size:var(--t-xs)}
+  .segs.m-pick{display:flex;gap:4px;overflow-x:auto}
+  .record .m-off,.record .m-right{display:none}
+  .record tr.grp{display:none}
+  .c-wk{width:58px}.c-ord{width:auto}.c-plc{width:0}.c-st{width:0}.c-m{width:50px}
+  .record td.plc,.record th.plc,.record td.st,.record th:last-child{padding:0;font-size:0;overflow:hidden}
+  .record td.plc *,.record th.plc *,.record th:last-child *{display:none}
+  .record td.wkn{font-size:var(--t-sm);padding-left:var(--s-2)}
+  .record td.m{font-size:var(--t-md)}
+  .record th .sort{font-size:10px;padding:0 4px}
+  .record tr.later td.ord{white-space:normal}
+  .chart{max-width:none}
+  .filters .chip-group{flex:0 1 auto;max-width:100%;overflow-x:auto;scrollbar-width:none}
+  .filters .chip-group .chip{flex:none}
+  .ph-mark{display:inline-flex}
+  .ph-g .ph-e{margin-left:4px}
+  .ph-g .ph-e::before{content:''}
+  /* The phone's record: one figure at a time, chosen above, in Week, Ours, ADP, Published. */
+  .record{table-layout:auto}
+  .record colgroup{display:none}
+  .record td.plc,.record th.plc,.record td.st,.record th:last-child{display:none}
+  .record td.ord span{display:none}
+  .record td.ord b{font-size:var(--t-xs);font-weight:500;color:var(--ink-3)}
+  .record tr.later td.ord span{display:block}
+  .record td.m{width:64px}
+  .segs.m-pick{flex-basis:100%}
+  .chart svg{min-height:180px}
+}

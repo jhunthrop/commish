@@ -10,7 +10,7 @@
 	import PickupStrip from '../box/PickupStrip.svelte';
 	import WaiverTable from '../box/WaiverTable.svelte';
 	import {
-		addOnWords,
+		addVerbWords,
 		cardName,
 		copiedWords,
 		countWords,
@@ -20,7 +20,6 @@
 		moveWords,
 		namesOnScreen,
 		nextSort,
-		openWaiversWords,
 		pickupCards,
 		poolRows,
 		sortRows,
@@ -48,7 +47,7 @@
 	import {
 		bidProblem,
 		claimMove,
-		claimable,
+		claimsAdd,
 		claimsOnHost,
 		failedStep,
 		planStep,
@@ -56,7 +55,7 @@
 		type MoveStep
 	} from './move.ts';
 	import { Narrowing } from './state.ts';
-	import { NOT_FREE, askedPlayer, markAsked } from '../box/asked.ts';
+	import { NOT_FREE, POSITION_PARAM, askedPlayer, markAsked } from '../box/asked.ts';
 	import { onMount, tick } from 'svelte';
 	import { LINES } from './words.ts';
 
@@ -149,11 +148,11 @@
 
 	/** The verb for a row: the claim from here where the API opens it and names him, else the page. */
 	function claimsHere(row: WaiverRow): boolean {
-		return onHost && claimable(row);
+		return claimsAdd(shown.moves, row.add.player.host_id);
 	}
 
 	function verbWords(row: WaiverRow): string {
-		return claimsHere(row) ? addOnWords(host) : openWaiversWords(host);
+		return addVerbWords(shown.moves, row.add.player.host_id, host);
 	}
 
 	/** The platform verb: his name on the clipboard, started while this page has the focus, and the
@@ -273,7 +272,7 @@
 		const asked = askedPlayer(window.location.href);
 		if (asked === null) return;
 		const his = (): PoolRow | undefined => pool.find((r) => r.source.add.player.board_id === asked);
-		const at = new URL(window.location.href).searchParams.get('position');
+		const at = new URL(window.location.href).searchParams.get(POSITION_PARAM);
 		const narrowTo = POSITIONS.find((p) => p === at);
 		if (his() === undefined && narrowTo !== undefined) await choose(narrowTo);
 		const row = his();

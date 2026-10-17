@@ -9,7 +9,7 @@ import { lastName } from '#lib/format/draft.ts';
 import { fixed, signed } from '#lib/format/number.ts';
 import type { LeagueHost } from '../api.ts';
 import type { PlayerLine, WaiverAdvice, WaiverRow } from '../inseason/api.ts';
-import { addKey } from '../inseason/move.ts';
+import { addKey, claimsAdd } from '../inseason/move.ts';
 import { LINES } from '../inseason/words.ts';
 import { hostWords } from '../names.ts';
 import {
@@ -339,6 +339,15 @@ export function findRows(rows: readonly PoolRow[], query: string): PoolRow[] {
 /** "Open ESPN waivers": the verb where a claim is not made from here. */
 export function openWaiversWords(host: LeagueHost): string {
 	return `Open ${hostWords(host)} waivers`;
+}
+
+/** An add's verb by the Waivers rule (claimsAdd), for the Waivers screen and the order alike. */
+export function addVerbWords(
+	moves: Pick<WaiverAdvice['moves'], 'claim'> | null,
+	hostId: string,
+	host: LeagueHost
+): string {
+	return claimsAdd(moves, hostId) ? addOnWords(host) : openWaiversWords(host);
 }
 
 /** "Add on ESPN": the verb where the claim is made from here. */
