@@ -3,13 +3,14 @@
 	import ClubMark from '#lib/ui/ClubMark.svelte';
 	import Face from '#lib/ui/Face.svelte';
 	import NameWords from '#lib/ui/NameWords.svelte';
+	import StatusPill from '../StatusPill.svelte';
 	import { BOX, boxNumber, type BoxRow } from './box.ts';
 	import WeatherGlyph from './WeatherGlyph.svelte';
 
-	/** One player's row of a box score: the slot, his face (a defense's club mark), his name with his
-	 * status in a word, his club and position, his game in one cell, this week's projection and his
-	 * points so far. On a phone the game cell folds under his name and his status sits under it too,
-	 * so a long name wraps rather than cuts. */
+	/** One player's row of a box score: the slot, his face (a defense's club mark), his name on a line
+	 * of its own, under it his club and Lane 63's status pill (his position and rank, and his status
+	 * when the report lists him), his game in one cell, this week's projection and his points so far.
+	 * On a phone the game cell folds under the pill, so a long name wraps rather than cuts. */
 	interface Props {
 		row: BoxRow;
 		/** A bench row: shorter and quieter. */
@@ -53,10 +54,14 @@
 					{:else}
 						<b><NameWords name={row.name} /></b>
 					{/if}
-					{#if row.status}<span class="chip" class:sits={row.status.sits}>{row.status.words}</span
-						>{/if}
 				</span>
-				<span class="club">{row.club}{row.position === 'D/ST' ? '' : ` · ${row.position}`}</span>
+				<span class="club"
+					><span>{row.club}</span>{#if row.pill}<StatusPill
+							position={row.pill.position}
+							positionRank={row.pill.rank ?? undefined}
+							status={row.status}
+						/>{/if}</span
+				>
 				<span class="phone-game">{@render game()}</span>
 			</span>
 		</span>
@@ -133,25 +138,11 @@
 		text-decoration: underline;
 	}
 
-	.chip {
-		display: inline-flex;
-		align-items: center;
-		flex: none;
-		height: 18px;
-		padding: 0 6px;
-		border-radius: var(--r-sm);
-		font-size: var(--t-xs);
-		font-weight: 700;
-		background: var(--loss-bg);
-		color: var(--loss-ink);
-	}
-
-	.chip.sits {
-		background: var(--status-ir-bg);
-		color: var(--status-ir-ink);
-	}
-
 	.club {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 6px;
 		font-size: var(--t-xs);
 		font-weight: 500;
 		letter-spacing: 0.03em;
@@ -272,12 +263,6 @@
 
 		.game > * {
 			display: none;
-		}
-
-		/* On a phone the status sits under the name, so a long name has the row to itself. */
-		.nm {
-			flex-direction: column;
-			align-items: flex-start;
 		}
 
 		.phone-game {

@@ -112,7 +112,10 @@
 			noBench={LINES.noBench}
 		/>
 	</div>
-	<BoxBasis projectionReadAt={advice.projection_read_at} lines={shown} />
+	<BoxBasis
+		projection={{ readAt: advice.projection_read_at, scoring: advice.projection_scoring }}
+		lines={shown}
+	/>
 </Screen>
 
 <style>

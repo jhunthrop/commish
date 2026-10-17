@@ -7,19 +7,21 @@ import type { MatchupSide } from '../api.ts';
 import type { MatchupBoxSide, PlayerLine } from '../inseason/api.ts';
 import {
 	boxRow,
+	figureCount,
 	hostRow,
 	positionWord,
 	projTotal,
 	slotWord,
 	type BoxRow,
-	type BoxStarter
+	type BoxStarter,
+	type BoxTotals
 } from './box.ts';
 
 /** A side's rows and totals as its box draws them. */
 export interface SideBox {
 	starters: BoxStarter[];
 	bench: BoxRow[];
-	totals: { proj: number | null; pts: number | null };
+	totals: BoxTotals;
 	/** Every line the side's rows came from, for the screen's facts read. */
 	lines: PlayerLine[];
 }
@@ -35,17 +37,18 @@ export function sideBox(
 ): SideBox {
 	if (box !== null) {
 		const starters = box.starters.map((s) => ({ row: boxRow(s.line, slotWord(s.slot), zone) }));
+		const rows = starters.map((s) => s.row);
 		return {
 			starters,
 			bench: box.bench.map((line) => boxRow(line, '', zone)),
-			totals: { proj: projTotal(starters.map((s) => s.row)), pts },
+			totals: { proj: projTotal(rows), pts, count: figureCount(rows) },
 			lines: [...box.starters.map((s) => s.line), ...box.bench]
 		};
 	}
 	const starters = side.starters.map((s) => ({
 		row: hostRow(s.player, positionWord(s.player.position), scored ? s.points : null)
 	}));
-	return { starters, bench: [], totals: { proj: null, pts }, lines: [] };
+	return { starters, bench: [], totals: { proj: null, pts, count: null }, lines: [] };
 }
 
 /** The score bug's middle: the next kickoff among the matchup's starters, "First kickoff" before any

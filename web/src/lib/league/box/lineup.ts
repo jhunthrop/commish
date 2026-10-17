@@ -4,7 +4,16 @@
 import { memberZone } from '#lib/format/clock.ts';
 import type { LineupAdvice } from '../inseason/api.ts';
 import { LINES, satIds } from '../inseason/words.ts';
-import { boxRow, projTotal, ptsTotal, slotWord, type BoxRow, type BoxStarter } from './box.ts';
+import {
+	boxRow,
+	figureCount,
+	projTotal,
+	ptsTotal,
+	slotWord,
+	type BoxRow,
+	type BoxStarter,
+	type BoxTotals
+} from './box.ts';
 
 export interface LineupBox {
 	starters: BoxStarter[];
@@ -12,7 +21,7 @@ export interface LineupBox {
 	/** The bench rows a change sits, by host id. */
 	benchSat: ReadonlySet<string>;
 	/** Our lineup's projection and points so far, summed. */
-	totals: { proj: number | null; pts: number | null };
+	totals: BoxTotals;
 }
 
 export function lineupBox(
@@ -33,6 +42,6 @@ export function lineupBox(
 		starters,
 		bench: advice.bench.map((line) => boxRow(line, '', zone)),
 		benchSat: satIds(advice.slots),
-		totals: { proj: projTotal(ours), pts: ptsTotal(ours) }
+		totals: { proj: projTotal(ours), pts: ptsTotal(ours), count: figureCount(ours) }
 	};
 }

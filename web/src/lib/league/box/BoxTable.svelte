@@ -1,6 +1,13 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
-	import { BOX, boxNumber, type BoxRow, type BoxStarter } from './box.ts';
+	import {
+		BOX,
+		boxNumber,
+		type BoxRow,
+		type BoxStarter,
+		type BoxTotals,
+		figureCountWords
+	} from './box.ts';
 	import BoxLine from './BoxLine.svelte';
 	import TeamAvatar from './TeamAvatar.svelte';
 
@@ -16,7 +23,7 @@
 		bench: readonly BoxRow[];
 		/** The bench rows a change sits, by key, on the change's wash. */
 		benchSat?: ReadonlySet<string>;
-		totals: { proj: number | null; pts: number | null };
+		totals: BoxTotals;
 		/** Said in place of the starters when the host shows none for this team. */
 		empty?: string | null;
 		/** The team's line beside its name: its score so far, its record. */
@@ -75,7 +82,11 @@
 			{/if}
 		{/each}
 		<tr class="totals">
-			<td colspan="3"><span class="tl">{BOX.totals}</span></td>
+			<td colspan="3"
+				><span class="tl">{BOX.totals}</span>{#if totals.count}<span class="tsub"
+						>{figureCountWords(totals.count)}</span
+					>{/if}</td
+			>
 			<td class="n proj">{boxNumber(totals.proj)}</td>
 			<td class="n pts">{boxNumber(totals.pts)}</td>
 		</tr>
@@ -201,6 +212,12 @@
 		padding: 0 var(--s-2);
 		background: var(--scoreboard);
 		color: var(--scoreboard-ink);
+	}
+
+	.tsub {
+		margin-left: var(--s-3);
+		font-size: var(--t-xs);
+		color: var(--scoreboard-ink-2);
 	}
 
 	.tl {

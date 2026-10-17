@@ -10,6 +10,8 @@ import {
 	boxRow,
 	expectedWords,
 	factsReadLine,
+	figureCount,
+	figureCountWords,
 	gameOf,
 	hostRow,
 	positionWord,
@@ -125,19 +127,25 @@ void test('the game cell: the opponent and kickoff, Final once played, the bye',
 	assert.equal(gameOf(facts({ opponent: null }), ZONE), null);
 });
 
-void test('a status is one word: the designation, else the host IR', () => {
+void test("a status is Lane 63's pill: the week's word, a season-long list's word in his rank", () => {
 	const asOf = '2026-10-16T21:00:00.000Z';
 	assert.deepEqual(statusOf({ status: 'questionable', as_of: asOf }, false), {
-		words: 'Questionable',
-		sits: false
+		rank: null,
+		mark: 'Questionable',
+		sits: false,
+		line: null
 	});
-	assert.deepEqual(statusOf({ status: 'out', as_of: asOf }, false), { words: 'Out', sits: true });
-	assert.deepEqual(statusOf({ status: 'injured_reserve', as_of: asOf }, false), {
-		words: 'IR',
-		sits: true
+	assert.deepEqual(statusOf({ status: 'out', as_of: asOf }, false), {
+		rank: null,
+		mark: 'Out',
+		sits: true,
+		line: null
 	});
-	assert.deepEqual(statusOf(null, true), { words: 'IR', sits: true });
+	const ir = { rank: 'IR', mark: 'On injured reserve', sits: true, line: null };
+	assert.deepEqual(statusOf({ status: 'injured_reserve', as_of: asOf }, false), ir);
+	assert.deepEqual(statusOf(null, true), ir);
 	assert.equal(statusOf(null, false), null);
+	assert.deepEqual(boxRow(line(), 'QB', ZONE).pill, { position: 'QB', rank: 7 });
 });
 
 void test('a row carries the projection, not the points a game, and no facts once kicked off', () => {
@@ -178,6 +186,25 @@ void test("a defense's face is its club's mark, said in words", () => {
 	assert.equal(positionWord('K'), 'K');
 });
 
+void test('Totals say how many playing starters have a figure when one lacks it', () => {
+	const bye = 'bye' as const;
+	const game = { where: 'at ATL', when: 'Sun 12:00 pm' };
+	assert.equal(
+		figureCount([
+			{ proj: 10, game },
+			{ proj: null, game: bye }
+		]),
+		null
+	);
+	const count = figureCount([
+		{ proj: 10, game },
+		{ proj: null, game },
+		{ proj: null, game: bye }
+	]);
+	assert.deepEqual(count, { held: 1, of: 2 });
+	assert.equal(figureCountWords({ held: 1, of: 2 }), '1 of 2 starters with a figure');
+});
+
 void test('totals sum what is held, and a number not held prints as --', () => {
 	assert.equal(projTotal([{ proj: 19.44 }, { proj: null }, { proj: 8.1 }]), 27.54);
 	assert.equal(projTotal([{ proj: null }]), null);
@@ -187,19 +214,32 @@ void test('totals sum what is held, and a number not held prints as --', () => {
 	assert.equal(boxNumber(null), '--');
 });
 
-void test("the screen's basis lines say the projection's read and the facts' read once", () => {
+const OWN = { format: 'ppr', league_own: true } as const;
+const CLOSEST = { format: 'half_ppr', league_own: false } as const;
+
+void test("the Proj line names the scoring, whose it is, the read, and the defenses' scoring when one shows", () => {
 	assert.equal(
-		projBasis(READ, ZONE),
-		"Proj is this week's published projection, read Fri 9:00 pm Central. Our own weekly model replaces it when it passes its test."
+		projBasis(READ, OWN, false, ZONE),
+		"Proj is this week's published projection in PPR scoring, this league's own, read Fri 9:00 pm Central. Our own weekly model replaces it when it passes its test."
 	);
-	assert.match(projBasis(null, ZONE), /not in yet for this week/);
+	assert.equal(
+		projBasis(READ, CLOSEST, true, ZONE),
+		"Proj is this week's published projection in half-PPR scoring, the closest match to this league's rules, read Fri 9:00 pm Central. Defenses are on its default defense scoring. Our own weekly model replaces it when it passes its test."
+	);
+	assert.match(
+		projBasis(null, OWN, false, ZONE),
+		/in PPR scoring, this league's own, not in yet for this week\./
+	);
+});
+
+void test("the screen's basis lines say the Game cell's figures and the facts' read once", () => {
 	const older = '2026-10-16T20:00:00.000Z';
 	assert.equal(
 		factsReadLine(
 			[line(), line({}, { game_total: { points: 40, team_points: 20, read_at: older } })],
 			ZONE
 		),
-		'Game facts read Fri 3:00 pm Central.'
+		"The Game cell shows each club's expected points, his club first, then the kickoff weather, read Fri 3:00 pm Central."
 	);
 	assert.equal(factsReadLine([line({}, { bye: true })], ZONE), null);
 });
@@ -212,8 +252,9 @@ void test('copy guard: every box word is fantasy words, with no dash or semicolo
 	const said = [
 		...Object.values(BOX),
 		PTS_BASIS,
-		projBasis(READ, ZONE),
-		projBasis(null, ZONE),
+		projBasis(READ, OWN, true, ZONE),
+		projBasis(null, CLOSEST, false, ZONE),
+		figureCountWords({ held: 7, of: 8 }),
 		factsReadLine([line()], ZONE) ?? ''
 	];
 	for (const text of said) {

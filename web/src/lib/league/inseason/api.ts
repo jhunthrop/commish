@@ -11,6 +11,7 @@ export type LineupAdvice = Schemas['LineupAdvice'];
 export type LineupSlot = Schemas['LineupSlot'];
 export type MatchupBox = Schemas['MatchupBox'];
 export type MatchupBoxSide = Schemas['MatchupBoxSide'];
+export type ProjectionScoring = Schemas['ProjectionScoring'];
 export type WaiverAdvice = Schemas['WaiverAdvice'];
 export type WaiverRow = Schemas['WaiverRow'];
 export type TradeAdvice = Schemas['TradeAdvice'];

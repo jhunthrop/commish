@@ -7,11 +7,13 @@
 import { memberZone, weekdayTime, zoneWord } from '#lib/format/clock.ts';
 import { defenseWords } from '#lib/format/clubs.ts';
 import { designationWord, rankWord, type DesignationStatus } from '#lib/format/designation.ts';
+import type { StatusView } from '#lib/run/status-view.ts';
+import { POSITIONS, type Position } from '#lib/types/player.ts';
 import { halves, toBePlayed, PRECIPITATION_NAMED_FROM } from '#lib/format/game-facts.ts';
 import { fixed } from '#lib/format/number.ts';
 import { clubMark } from '#lib/ui/club-mark.ts';
 import type { LeaguePlayer } from '../api.ts';
-import type { LineupSlot, PlayerLine, WeekFacts } from '../inseason/api.ts';
+import type { LineupSlot, PlayerLine, ProjectionScoring, WeekFacts } from '../inseason/api.ts';
 
 /** A slot as a box labels it: the host's own short words, a defense as "D/ST". */
 export type BoxSlot = LineupSlot['slot'];
@@ -44,6 +46,7 @@ export const BOX = {
 	none: '--',
 	you: 'You',
 	opponent: 'Opponent',
+	noOpponent: 'No opponent this week',
 	/** The kickoff weather's words where the venue says it all. */
 	indoors: 'Indoors',
 	roofOpen: 'Roof TBD',
@@ -75,13 +78,6 @@ export interface BoxGame {
 	when: string;
 }
 
-/** A player's status as a box marks it, in a word: "Questionable", "Out", "IR". */
-export interface BoxStatus {
-	words: string;
-	/** It keeps him out: drawn as a loss. */
-	sits: boolean;
-}
-
 /** One row of a box. */
 export interface BoxRow {
 	key: string;
@@ -92,7 +88,12 @@ export interface BoxRow {
 	face: { src: string | null; mark: boolean; alt: string };
 	club: string;
 	position: string;
-	status: BoxStatus | null;
+	/** His position pill (Lane 63's StatusPill): his position on our order with his rank there, null
+	 * for a defense, which the club mark names. */
+	pill: { position: Position; rank: number | null } | null;
+	/** His status as Lane 63's pill draws it: the week's designation, or a season-long list's word in
+	 * place of his rank. */
+	status: StatusView | null;
 	/** His game, "bye" on a bye week, null when we hold none. */
 	game: BoxGame | 'bye' | null;
 	/** "20 to 22.5": the expected score with his club's first, null once kicked off or without it. */
@@ -102,6 +103,14 @@ export interface BoxRow {
 	proj: number | null;
 	/** His points so far, null until his game has kicked off. */
 	pts: number | null;
+}
+
+/** A box's totals row: the starters' projection and points so far summed, and how many playing
+ * starters have a figure when one lacks it. */
+export interface BoxTotals {
+	proj: number | null;
+	pts: number | null;
+	count: { held: number; of: number } | null;
 }
 
 /** A starter's place in a box: his row, and on a lineup's change the host's starter it sits under
@@ -114,21 +123,32 @@ export interface BoxStarter {
 	sentence?: string | null;
 }
 
-/** The statuses a box says in their short form: the season-long lists. */
-const SHORT_STATUS = new Set<DesignationStatus>(['injured_reserve', 'pup', 'nfi']);
-/** The statuses that do not keep him out. */
+/** The season-long lists: their word stands in his rank ("RB IR"), as on the board. */
+const SEASON_LONG = new Set<DesignationStatus>(['injured_reserve', 'pup', 'nfi']);
+/** The statuses that do not keep him out, drawn grey; the rest are drawn as a loss. */
 const MAY_PLAY = new Set<DesignationStatus>(['questionable', 'doubtful']);
 
-/** His status in a word, the week's designation first, else the host's injured reserve. */
-export function statusOf(designation: WeekFacts['designation'], hostIR: boolean): BoxStatus | null {
-	if (designation) {
-		const { status } = designation;
-		return {
-			words: SHORT_STATUS.has(status) ? rankWord(status) : designationWord(status),
-			sits: !MAY_PLAY.has(status)
-		};
-	}
-	return hostIR ? { words: rankWord('injured_reserve'), sits: true } : null;
+/** His status as Lane 63's pill draws it, the week's designation first, else the host's injured
+ * reserve. */
+export function statusOf(
+	designation: WeekFacts['designation'],
+	hostIR: boolean
+): StatusView | null {
+	const status: DesignationStatus | null =
+		designation?.status ?? (hostIR ? 'injured_reserve' : null);
+	if (status === null) return null;
+	return {
+		rank: SEASON_LONG.has(status) ? rankWord(status) : null,
+		mark: designationWord(status),
+		sits: !MAY_PLAY.has(status),
+		line: null
+	};
+}
+
+/** His position pill: the board's position (a defense has none, the club mark names it). */
+function pillOf(position: string, rank: number | null): BoxRow['pill'] {
+	const known = POSITIONS.find((p) => p === position);
+	return known === undefined ? null : { position: known, rank };
 }
 
 /** "20 to 22.5": his club's expected points, then its opponent's, null without the figures. */
@@ -189,6 +209,7 @@ export function boxRow(line: PlayerLine, slot: string, zone: string = memberZone
 		face: faceOf(player, line.headshot),
 		club: player.team,
 		position: positionWord(player.position),
+		pill: pillOf(player.position, line.position_rank),
 		status: statusOf(facts.designation, player.injured_reserve),
 		game: gameOf(facts, zone),
 		expected: ahead ? expectedWords(facts) : null,
@@ -209,6 +230,7 @@ export function hostRow(player: LeaguePlayer, slot: string, pts: number | null):
 		face: faceOf(player, null),
 		club: player.team,
 		position: positionWord(player.position),
+		pill: pillOf(player.position, null),
 		status: statusOf(null, player.injured_reserve),
 		game: null,
 		expected: null,
@@ -216,6 +238,21 @@ export function hostRow(player: LeaguePlayer, slot: string, pts: number | null):
 		proj: null,
 		pts
 	};
+}
+
+/** How many of the starters with a game this week have a projection, with how many have a game:
+ * Totals say so when one lacks it (review L2), null when none lacks it. */
+export function figureCount(
+	rows: readonly Pick<BoxRow, 'proj' | 'game'>[]
+): { held: number; of: number } | null {
+	const playing = rows.filter((r) => r.game !== 'bye');
+	const held = playing.filter((r) => r.proj !== null).length;
+	return held === playing.length ? null : { held, of: playing.length };
+}
+
+/** "7 of 8 starters with a figure". */
+export function figureCountWords(count: { held: number; of: number }): string {
+	return `${String(count.held)} of ${String(count.of)} starters with a figure`;
 }
 
 /** The rows' projection summed, null when none of them has one. */
@@ -235,13 +272,31 @@ export function boxNumber(value: number | null): string {
 	return value === null ? BOX.none : fixed(value, 1);
 }
 
-/** The projection column's basis, said once on a screen: what it is and when it was read, or that it
- * is not in yet. */
-export function projBasis(readAt: string | null, zone: string = memberZone()): string {
-	const what = `${BOX.proj} is this week's published projection`;
-	const ours = 'Our own weekly model replaces it when it passes its test.';
-	if (readAt === null) return `${what}, not in yet for this week. ${ours}`;
-	return `${what}, read ${weekdayTime(readAt, zone)} ${zoneWord(zone)}. ${ours}`;
+const FORMAT_WORDS: Readonly<Record<ProjectionScoring['format'], string>> = {
+	ppr: 'PPR',
+	half_ppr: 'half-PPR',
+	standard: 'standard'
+};
+
+/** The projection column's basis, said once on a screen (review H2): its scoring and whether that is
+ * the league's own or the closest match, when it was read or that it is not in yet, and, when a
+ * defense is on the screen, that defenses are on the published default scoring. */
+export function projBasis(
+	readAt: string | null,
+	scoring: ProjectionScoring,
+	defense: boolean,
+	zone: string = memberZone()
+): string {
+	const whose = scoring.league_own
+		? "this league's own"
+		: "the closest match to this league's rules";
+	const what = `${BOX.proj} is this week's published projection in ${FORMAT_WORDS[scoring.format]} scoring, ${whose}`;
+	const when =
+		readAt === null
+			? 'not in yet for this week'
+			: `read ${weekdayTime(readAt, zone)} ${zoneWord(zone)}`;
+	const defenses = defense ? ' Defenses are on its default defense scoring.' : '';
+	return `${what}, ${when}.${defenses} Our own weekly model replaces it when it passes its test.`;
 }
 
 /** The game facts' read, said once on a screen in place of a stamp on every row: the oldest read of
@@ -259,7 +314,7 @@ export function factsReadLine(
 	);
 	if (reads.length === 0) return null;
 	const oldest = reads.reduce((a, b) => (Date.parse(a) <= Date.parse(b) ? a : b));
-	return `Game facts read ${weekdayTime(oldest, zone)} ${zoneWord(zone)}.`;
+	return `The ${BOX.game} cell shows each club's expected points, his club first, then the kickoff weather, read ${weekdayTime(oldest, zone)} ${zoneWord(zone)}.`;
 }
 
 /** "Pts are this week's points as your league scores them, -- until his game kicks off." */

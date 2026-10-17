@@ -2,6 +2,7 @@
 	import BoxTable from './box/BoxTable.svelte';
 	import MatchupBug from './box/MatchupBug.svelte';
 	import BoxBasis from './box/BoxBasis.svelte';
+	import { BOX } from './box/box.ts';
 	import { nextKickoff, sideBox, type SideBox } from './box/matchup.ts';
 	import type { LeagueSync, MatchupSide } from './api.ts';
 	import type { MatchupBox } from './inseason/api.ts';
@@ -100,9 +101,14 @@
 					totals={theirs.totals}
 					empty={sync.host === 'ffpc' ? hidden : null}
 				/>
+			{:else if !sync.week_all_play}
+				<p class="note">{BOX.noOpponent}</p>
 			{/if}
 		</div>
-		<BoxBasis projectionReadAt={box?.projection_read_at} {lines} />
+		<BoxBasis
+			projection={box ? { readAt: box.projection_read_at, scoring: box.projection_scoring } : null}
+			{lines}
+		/>
 	</div>
 {:else}
 	<p class="note">{matchupGap(sync, now)}</p>
