@@ -3267,7 +3267,7 @@ components:
         facts: { $ref: "#/components/schemas/WeekFacts" }
     LineupSlot:
       type: object
-      required: [slot, ours, host, changed, sentence]
+      required: [slot, ours, host, changed, no_one_can_play, sentence]
       properties:
         slot: { type: string, enum: [QB, RB, WR, TE, FLEX, SUPERFLEX, K, DEF] }
         ours: { $ref: "#/components/schemas/PlayerLine" }
@@ -3278,6 +3278,12 @@ components:
             the host lineup's player in this place: the same player when unchanged, the starter we sit for a change,
             null for a spot the host left empty
         changed: { type: boolean, description: we start a player the host has on the bench }
+        no_one_can_play:
+          type: boolean
+          description: >-
+            no rostered player who can play this week fills the spot (a bye, out, doubtful, injured reserve or
+            suspended for everyone eligible): ours is the member's current player there, left in place, never a
+            recommendation, and changed is false
         sentence: { type: string, nullable: true, description: the reason for a change, from facts; null when unchanged }
     LineupAdvice:
       type: object

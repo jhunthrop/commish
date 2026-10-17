@@ -103,3 +103,37 @@ func TestLineupCarriesTheProjectionsChangeAndTheReserve(t *testing.T) {
 		}
 	}
 }
+
+// Through the advisor with a real bye (Lane 66e review M5, L10): the
+// fixture's last two clubs have no game in week 6, so their players have
+// no opponent and no Proj. None is ever advised into a spot; a spot whose
+// every eligible player is on bye keeps the member's player, marked, with
+// no change.
+func TestAByeNeverStartsThroughTheAdvisor(t *testing.T) {
+	f := newFixture(t)
+	a, err := newAdvisor(f.league, f.data, boards.WeekProjection{}, nil, fixtureNow)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, _ := a.Lineup()
+	byeStarters, marked := 0, 0
+	for _, s := range got.Slots {
+		if s.Ours.Facts.Bye && s.Ours.WeekProjection != nil {
+			t.Fatalf("a bye with a Proj: %s", s.Ours.Player.Name)
+		}
+		if s.Host != nil && s.Host.Facts.Bye {
+			byeStarters++
+		}
+		if !s.Ours.Facts.Bye {
+			continue
+		}
+		if s.Changed || !s.NoOneCanPlay {
+			t.Fatalf("a player on bye advised into %s: %+v", s.Slot, s.Ours.Player)
+		}
+		marked++
+	}
+	if byeStarters == 0 {
+		t.Fatal("the fixture's lineup holds no starter on bye: the test proves nothing")
+	}
+	t.Logf("%d starters on bye in the set lineup, %d spots no one can play", byeStarters, marked)
+}

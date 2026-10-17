@@ -54,7 +54,8 @@ func TestBasisSaysWhatAWeekIs(t *testing.T) {
 	// The lineup ranks by the Proj its rows show (Lane 66e), our order the
 	// tie-break and the stand-in.
 	for _, s := range []string{LineupBasis(RestOfSeason), pre} {
-		if !strings.HasPrefix(s, "We start the highest Proj at each slot, after this week's designations and byes. ") ||
+		if !strings.HasPrefix(s, "We start the highest Proj at each slot, after this week's designations and byes. "+
+			"A player who cannot play this week never starts. ") ||
 			!strings.HasSuffix(s, " breaks ties and stands in where a player has no Proj.") || strings.Contains(s, "from week") {
 			t.Errorf("%q", s)
 		}

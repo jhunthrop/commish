@@ -2782,6 +2782,8 @@ export interface components {
 			host: components['schemas']['PlayerLine'] | null;
 			/** @description we start a player the host has on the bench */
 			changed: boolean;
+			/** @description no rostered player who can play this week fills the spot (a bye, out, doubtful, injured reserve or suspended for everyone eligible): ours is the member's current player there, left in place, never a recommendation, and changed is false */
+			no_one_can_play: boolean;
 			/** @description the reason for a change */
 			sentence: string | null;
 		};

@@ -2398,7 +2398,10 @@ type LineupSlot struct {
 
 	// Host the host lineup's player in this place: the same player when unchanged, the starter we sit for a change, null for a spot the host left empty
 	Host *PlayerLine `json:"host"`
-	Ours PlayerLine  `json:"ours"`
+
+	// NoOneCanPlay no rostered player who can play this week fills the spot (a bye, out, doubtful, injured reserve or suspended for everyone eligible): ours is the member's current player there, left in place, never a recommendation, and changed is false
+	NoOneCanPlay bool       `json:"no_one_can_play"`
+	Ours         PlayerLine `json:"ours"`
 
 	// Sentence the reason for a change
 	Sentence *string        `json:"sentence"`

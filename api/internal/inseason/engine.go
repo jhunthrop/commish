@@ -339,6 +339,10 @@ type Row struct {
 	Ours    int
 	Host    int
 	Changed bool
+	// NoOneCanPlay is a spot no rostered player who can play this week
+	// fills: Ours is the member's current player there, left in place, never
+	// a recommendation (Lane 66e ruling).
+	NoOneCanPlay bool
 }
 
 // Lineup is §4.2's lineup for the week from the roster (IR and taxi
@@ -370,7 +374,9 @@ func Lineup(config []draft.SlotConfig, roster []Candidate, hostStarters []string
 		}
 	}
 	for p, c := range roster {
-		if c.Locked && !hostStarts[p] {
+		// A player who cannot play this week (a bye, out, doubtful, injured
+		// reserve, suspended) never starts (Lane 66e ruling).
+		if (c.Locked && !hostStarts[p]) || (!c.Locked && c.Tier != Available) {
 			taken[p] = true
 		}
 	}
@@ -381,8 +387,32 @@ func Lineup(config []draft.SlotConfig, roster []Candidate, hostStarters []string
 			ours[i] = p
 		}
 	}
+	idle := keepWhereNoOneCanPlay(open, ours, hostAt)
 	labelled := keepHostSpots(slots, roster, ours, hostAt)
-	return rows(slots, labelled, hostAt, hostStarts, roster)
+	out := rows(slots, labelled, hostAt, hostStarts, roster)
+	for i := range out {
+		out[i].NoOneCanPlay = out[i].Ours >= 0 && idle[out[i].Ours]
+	}
+	return out
+}
+
+// keepWhereNoOneCanPlay leaves the member's current player in each open
+// spot the fill could not fill with a player who can play, when the fill
+// placed him nowhere else, and returns those players.
+func keepWhereNoOneCanPlay(open []bool, ours, hostAt []int) map[int]bool {
+	placed := map[int]bool{}
+	for _, p := range ours {
+		if p >= 0 {
+			placed[p] = true
+		}
+	}
+	idle := map[int]bool{}
+	for i := range ours {
+		if h := hostAt[i]; open[i] && ours[i] < 0 && h >= 0 && !placed[h] {
+			ours[i], placed[h], idle[h] = h, true, true
+		}
+	}
+	return idle
 }
 
 // hostSpots places the host's starters in our slots by draft.AssignSlot,

@@ -402,7 +402,8 @@ func (a *advisor) Lineup() (apitypes.LineupAdvice, bool) {
 			continue
 		}
 		starting[r.Ours] = true
-		slot := apitypes.LineupSlot{Slot: apitypes.LineupSlotSlot(r.Slot.Type), Ours: people[r.Ours].line, Changed: r.Changed}
+		slot := apitypes.LineupSlot{Slot: apitypes.LineupSlotSlot(r.Slot.Type), Ours: people[r.Ours].line, Changed: r.Changed,
+			NoOneCanPlay: r.NoOneCanPlay}
 		var host *Line
 		if r.Host >= 0 {
 			line := people[r.Host].line

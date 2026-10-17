@@ -306,7 +306,7 @@ func LineupBasis(b OrderBasis) string {
 		order = "Our rest-of-season order"
 	}
 	return fmt.Sprintf("We start the highest Proj at each slot, after this week's designations and byes. "+
-		"%s breaks ties and stands in where a player has no Proj.", order)
+		"A player who cannot play this week never starts. %s breaks ties and stands in where a player has no Proj.", order)
 }
 
 // LineupNote is the start and sit page's note under its rows: the league's

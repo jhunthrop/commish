@@ -82,6 +82,68 @@ func TestLineupStartsTheHighestProj(t *testing.T) {
 	}
 }
 
+// A player who cannot play this week never starts, even with nobody else
+// for the spot: the member's current player stays, marked, and no change
+// is advised (Lane 66e ruling, review M5).
+func TestNoOneWhoCannotPlayIsAdvised(t *testing.T) {
+	doubtful := set(projSet(projRoster(), "te1", 9), "te1", func(c Candidate) Candidate { return withTier(c, Doubtful) })
+	bothOut := set(doubtful, "te2", func(c Candidate) Candidate { return withTier(c, Out) })
+	rows := Lineup(twelveTeamPPR(t), bothOut, pprHost())
+	if got := changes(rows, bothOut); got != nil {
+		t.Fatalf("a change into a spot nobody can play: %v", got)
+	}
+	te := rows[6]
+	if te.Slot.Type != draft.SlotTE || bothOut[te.Ours].ID != "te1" || te.Changed || !te.NoOneCanPlay {
+		t.Fatalf("the TE spot: %+v %v", te, lineupWords(rows, bothOut))
+	}
+	for i, r := range rows {
+		if i != 6 && r.NoOneCanPlay {
+			t.Fatalf("spot %d marked: %v", i, lineupWords(rows, bothOut))
+		}
+	}
+	// A doubtful starter sits for an available one whatever his Proj.
+	if got := changes(Lineup(twelveTeamPPR(t), doubtful, pprHost()), doubtful); !equal(got, []string{"te2 over te1"}) {
+		t.Fatalf("doubtful sits: %v", got)
+	}
+	// An out starter in the flex with nobody left who can play the flex.
+	thin := []Candidate{}
+	for _, c := range projRoster() {
+		if c.ID != "rb4" && c.ID != "wr4" && c.ID != "te2" && c.ID != "wr5" {
+			thin = append(thin, c)
+		}
+	}
+	thin = set(thin, "rb3", func(c Candidate) Candidate { return withTier(c, Out) })
+	flex := Lineup(twelveTeamPPR(t), thin, pprHost())
+	if got := changes(flex, thin); got != nil {
+		t.Fatalf("the flex: %v", got)
+	}
+	if f := flex[7]; f.Slot.Type != draft.SlotFlex || thin[f.Ours].ID != "rb3" || !f.NoOneCanPlay {
+		t.Fatalf("the flex spot: %v", lineupWords(flex, thin))
+	}
+}
+
+// The superflex takes the highest Proj left across its positions, and
+// never a player who cannot play.
+func TestSuperflexTakesTheHighestProjLeft(t *testing.T) {
+	roster := []Candidate{
+		withProj(player("qb1", draft.QB, 3, 90), 21), withProj(player("qb2", draft.QB, 20, 10), 17.5),
+		withProj(player("rb1", draft.RB, 5, 80), 15), withProj(player("rb2", draft.RB, 12, 50), 12),
+		withProj(player("rb3", draft.RB, 30, 20), 9), withProj(player("wr1", draft.WR, 4, 85), 16),
+		withProj(player("wr2", draft.WR, 18, 40), 11), withProj(player("wr3", draft.WR, 40, 15), 8),
+		withProj(player("te1", draft.TE, 6, 30), 10), withProj(player("k1", draft.K, 3, 0), 8),
+		withProj(player("def1", draft.DEF, 3, 0), 7),
+	}
+	host := []string{"qb1", "rb1", "rb2", "wr1", "wr2", "te1", "rb3", "wr3", "k1", "def1"}
+	rows := Lineup(tenTeamHalfSuperflex(t), roster, host)
+	if got := changes(rows, roster); !equal(got, []string{"qb2 over wr3"}) {
+		t.Fatalf("the superflex: %v\n%v", got, lineupWords(rows, roster))
+	}
+	out := set(roster, "qb2", func(c Candidate) Candidate { return withTier(c, Out) })
+	if got := changes(Lineup(tenTeamHalfSuperflex(t), out, host), out); got != nil {
+		t.Fatalf("an out quarterback took the superflex: %v", got)
+	}
+}
+
 // The strength and the trade search keep the rest-of-season order: a
 // week's projection never enters them.
 func TestProjStaysOutOfTheSeasonOrder(t *testing.T) {
