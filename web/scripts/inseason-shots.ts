@@ -409,7 +409,7 @@ async function lineupFaults(page: Page): Promise<string[]> {
 				.filter((tr) => tr.classList.contains('moved-out'))
 				.map((tr) => cell(tr.querySelector('td.slot') ?? tr)),
 			chips: document.querySelectorAll('main .swaps .swap:not(.idle)').length,
-			reason: [...document.querySelectorAll('main .verb .foot')]
+			reason: [...document.querySelectorAll('main .verb .verb-line')]
 				.map((el) => (el as HTMLElement).innerText)
 				.join(' '),
 			second: document.querySelector('main .verb a.second[href^="http"]') !== null,
@@ -467,7 +467,7 @@ for (const width of SHOT_WIDTHS) {
 	if (!copied.startsWith('Week 6 lineup\nQB '))
 		missing.push(`start copy ${String(width)}: ${copied}`);
 	const after = await page.evaluate(() => {
-		const foot = [...document.querySelectorAll('main .foot')].find(
+		const foot = [...document.querySelectorAll('main .verb-line')].find(
 			(el) => (el as HTMLElement).offsetParent !== null
 		);
 		return {

@@ -178,9 +178,14 @@
 			font-size: var(--t-xl);
 		}
 
+		/* One scrolling line of chips on a phone, so the strip stays short and the first row clears
+		   the pinned verb. */
 		.swaps {
 			flex-basis: 100%;
 			order: 3;
+			flex-wrap: nowrap;
+			overflow-x: auto;
+			scrollbar-width: none;
 			gap: 3px;
 		}
 

@@ -132,7 +132,8 @@
 	{/snippet}
 	{#snippet verbFoot()}
 		{#if isSet}
-			{#if advice.moves.lineup === 'available'}<span class="foot">{setOnWords(host)}</span>{/if}
+			{#if advice.moves.lineup === 'available'}<span class="verb-line">{setOnWords(host)}</span
+				>{/if}
 		{:else if !onHost}
 			{#if copied === null && advice.host_lineup_url !== ''}<a
 					class="second"
@@ -140,7 +141,7 @@
 					target="_blank"
 					rel="noopener">{lineupPageWords(host)}</a
 				>{/if}
-			<span class="foot" role="status"
+			<span class="verb-line" role="status"
 				>{#if copied}{copied.said}
 					{LINEUP.setItOn}
 					{#if advice.host_lineup_url !== ''}<a
@@ -176,7 +177,7 @@
 </Screen>
 
 <style>
-	.foot {
+	.verb-line {
 		color: var(--ink-2);
 		font-size: var(--t-sm);
 		text-align: right;
@@ -189,10 +190,14 @@
 	}
 
 	@media (max-width: 760px) {
-		.foot,
+		/* The pin stays short so the first row clears it: the page link and the line share one small
+		   block under the verb. */
+		.verb-line,
 		.second {
 			display: block;
-			margin-top: var(--s-1);
+			margin-top: 2px;
+			font-size: var(--t-xs);
+			line-height: 1.35;
 			text-align: center;
 		}
 	}
