@@ -726,7 +726,7 @@
 		}
 
 		.inner .cols .side {
-			width: 44px;
+			width: 54px;
 		}
 
 		.inner .cols .game {
@@ -762,12 +762,18 @@
 		}
 	}
 
-	/* On a phone the opened rows' game folds under the name, as the box score's rows do. */
+	/* On a phone the opened rows' game folds under the name, as the box score's rows do, and wraps
+	   inside the name's cell rather than run under the Proj. */
 	@media (max-width: 760px) {
 		.inner .cols .game {
 			width: 0;
 			padding: 0;
 			font-size: 0;
+		}
+
+		.inner :global(.phone-game .opp) {
+			flex-wrap: wrap;
+			white-space: normal;
 		}
 	}
 </style>
