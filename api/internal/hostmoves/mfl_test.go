@@ -111,7 +111,7 @@ func TestMFLPlanThenMoveDoneOnce(t *testing.T) {
 	}
 	imports := r.srv.Imports()
 	if len(imports) != 1 || imports[0].Get("STARTERS") != strings.Join([]string{mfltest.QB, mfltest.WR1, mfltest.WR2, mfltest.RBBench}, ",") ||
-		imports[0].Get("FRANCHISE_ID") != "0003" || imports[0].Get("W") != "7" {
+		imports[0].Has("FRANCHISE_ID") || imports[0].Get("W") != "7" {
 		t.Fatalf("imports %v", imports)
 	}
 	rec, ans := r.proofs.last(t)

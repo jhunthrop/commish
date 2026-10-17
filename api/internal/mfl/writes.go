@@ -2,8 +2,9 @@ package mfl
 
 // The one MyFantasyLeague write the api makes: a lineup set on the
 // member's own franchise, the move the member confirmed on our screen,
-// through the documented import (TYPE=lineup with the league, the week,
-// the franchise and the starters as MyFantasyLeague player ids). One POST
+// through the documented import (TYPE=lineup with the league, the week
+// and the starters as MyFantasyLeague player ids, the franchise the
+// session's own). One POST
 // with the session cookie; MyFantasyLeague has no dry run and no
 // idempotency key, so a write is sent once and never again on its own,
 // and a lost answer is read back, not retried.
@@ -99,10 +100,14 @@ func setOf(ids []string) map[string]bool {
 	return out
 }
 
-// form is the import's parameters: never the session.
+// form is the import's parameters: never the session. FRANCHISE_ID is
+// left out: MyFantasyLeague documents it as the commissioner's way to set
+// another franchise, and an owner's session already names the franchise.
+// The guard has checked that franchise is the attached seat, and the
+// read-back checks the lineup landed on it.
 func (s LineupSet) form() url.Values {
 	return url.Values{"TYPE": {"lineup"}, "L": {s.leagueID}, "W": {strconv.Itoa(s.week)},
-		"FRANCHISE_ID": {fmt.Sprintf("%04d", s.franchise)}, "STARTERS": {strings.Join(s.starters, ",")}, "XML": {"1"}}
+		"STARTERS": {strings.Join(s.starters, ",")}, "XML": {"1"}}
 }
 
 // Body is the import's parameters as the proof keeps them, JSON with
@@ -110,7 +115,7 @@ func (s LineupSet) form() url.Values {
 func (s LineupSet) Body() ([]byte, error) {
 	f := s.form()
 	b, err := json.Marshal(map[string]string{"TYPE": f.Get("TYPE"), "L": f.Get("L"), "W": f.Get("W"),
-		"FRANCHISE_ID": f.Get("FRANCHISE_ID"), "STARTERS": f.Get("STARTERS")})
+		"STARTERS": f.Get("STARTERS")})
 	if err != nil {
 		return nil, fmt.Errorf("mfl: body: %w", err)
 	}

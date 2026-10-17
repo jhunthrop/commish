@@ -183,7 +183,7 @@ func TestSetLineup(t *testing.T) {
 		t.Fatalf("%d imports", len(imports))
 	}
 	f := imports[0]
-	if f.Get("TYPE") != "lineup" || f.Get("L") != mfltest.LeagueID || f.Get("W") != "7" || f.Get("FRANCHISE_ID") != "0003" ||
+	if f.Get("TYPE") != "lineup" || f.Get("L") != mfltest.LeagueID || f.Get("W") != "7" || f.Has("FRANCHISE_ID") ||
 		f.Get("STARTERS") != strings.Join(swapped, ",") {
 		t.Fatalf("form %v", f)
 	}
