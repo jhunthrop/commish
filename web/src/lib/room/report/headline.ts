@@ -67,7 +67,7 @@ export function settingCells(report: MockReport, seats: string): FactCell[] {
  * and defenses in draft order), what Picks later counts, and what Still there is. */
 export function reportBasis(boardBasis: string, couldWaitFrom: number): string {
 	const from = Math.round(couldWaitFrom * 100);
-	return `${boardBasis} Picks later: the pick less his ADP or his place on our board, which counts no kickers or defenses, plus is later. Still there: the room's read at that pick, tinted from ${String(from)}%.`;
+	return `${boardBasis} Picks later: the pick less his ADP or our board's place (no kickers or defenses), plus is later. Still there: the room's read at that pick, tinted from ${String(from)}%.`;
 }
 
 /** A pick's figure in the Over repl column: his points over replacement, or for a kicker or a

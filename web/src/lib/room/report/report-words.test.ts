@@ -134,7 +134,7 @@ void test('the basis says Picks later and Still there once, after the board', ()
 	const said = reportBasis('Points are our 2026 PPR projections.', 0.6);
 	assert.equal(
 		said,
-		"Points are our 2026 PPR projections. Picks later: the pick less his ADP or his place on our board, which counts no kickers or defenses, plus is later. Still there: the room's read at that pick, tinted from 60%."
+		"Points are our 2026 PPR projections. Picks later: the pick less his ADP or our board's place (no kickers or defenses), plus is later. Still there: the room's read at that pick, tinted from 60%."
 	);
 	assert.doesNotMatch(said, /[;—]|\bodds\b/);
 });

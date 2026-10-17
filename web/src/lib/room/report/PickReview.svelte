@@ -226,8 +226,7 @@
 	   picks in the accent. */
 	.byph {
 		display: none;
-		margin-left: auto;
-		padding-left: 6px;
+		flex-basis: 100%;
 	}
 
 	.byph.mine {
@@ -260,8 +259,13 @@
 			display: block;
 		}
 
+		.nm small {
+			flex-wrap: wrap;
+			row-gap: 0;
+		}
+
 		.byph {
-			display: inline;
+			display: block;
 		}
 
 		th,

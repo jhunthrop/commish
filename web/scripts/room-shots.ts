@@ -278,9 +278,10 @@ try {
 	});
 	await call<Room>(me, 'POST', `/mocks/${created.id}/finish`);
 	await shoot('mock-report', `/mock/${created.id}/report`, 'The field');
-	// The call at your last pick: no next turn, so the card has no chance column (Lane 66o review L9).
+	// The call at your last pick, after Pick for me through round 14: no next turn, so the card has no
+	// chance column (Lane 66o review L9).
 	const last = await newMock(2026);
-	await call<Room>(me, 'POST', `/mocks/${last.id}/autopick?to_round=15`);
+	await call<Room>(me, 'POST', `/mocks/${last.id}/autopick?to_round=14`);
 	await shoot('mock-last-pick', `/mock/${last.id}`, 'Our call at');
 	const sunk = await sunkMock();
 	await shoot('mock-report-low', `/mock/${sunk}/report`, 'Leader');
