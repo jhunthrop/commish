@@ -41,12 +41,13 @@ const FORM_PARTS =
  * account's leagues and the attach page run: the league row, the board read, the league's words and
  * calls, the in-season screens, the season's words, the member's clock and the rail's order a
  * league's tabs read, the switch's choice made on opening a league, and the box score's parts with
- * the club's mark and nickname (Lane 66d, the mark shared with the draft room). Four league pages
+ * the club's mark and nickname (Lane 66d, the mark shared with the draft room), the game facts' words,
+ * the League page's board parts and the front door's week band (Lane 66k, loaded on demand). Four league pages
  * share them, so they are kept out of the shared chunk by name, and the bundler splits them among
  * the pages that load them. (A group of their own would pull in everything they import, the API
  * client too, and land it on every page that reads the API.) */
 const LEAGUE_PAGE_PARTS =
-	/[\\/]src[\\/]lib[\\/](league[\\/](LeagueRow|board|model|api|follow-switch\.svelte|phase-words|sheet-tags)\.|league[\\/](inseason|box)[\\/]|context[\\/]choose\.svelte\.|format[\\/](clock|clubs)\.|ui[\\/](rail-order|club-mark|ClubMark)\.)/;
+	/[\\/]src[\\/]lib[\\/](league[\\/](LeagueRow|board|model|api|follow-switch\.svelte|phase-words|sheet-tags)\.|league[\\/](inseason|box|home)[\\/]|front[\\/]|context[\\/]choose\.svelte\.|format[\\/](clock|clubs|game-facts)\.|ui[\\/](rail-order|club-mark|ClubMark)\.)/;
 /** A player's injury status in words on the member's clock (Lane 63): the designation's words, which
  * the league's screens import and the board, player and record pages load after their first paint.
  * Kept out of the shared chunk by name, as the league's parts are. */
