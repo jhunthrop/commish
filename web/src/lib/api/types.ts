@@ -2744,7 +2744,7 @@ export interface components {
 			played: boolean;
 			/**
 			 * Format: double
-			 * @description the host's score for him so far, from the matchup, when he starts there and his game has kicked off
+			 * @description the host's score for him so far, from the matchup, when he starts there and his game has kicked off, to the tenth
 			 */
 			points_this_week: number | null;
 			/** @description up to three completed games under the league's scoring, newest first */
@@ -2856,24 +2856,24 @@ export interface components {
 			rest_of_season_per_game: number | null;
 			/**
 			 * Format: double
-			 * @description his points this week on the week's published projection, to the cent, in the format the league's scoring is most like (PPR, half PPR or standard); a team defense's by its club, a kicker our board does not place (no board id) by his club's one kicker, never a teammate's for a kicker the snapshot left out. The newest snapshot stored for the league's week (projection_read_at says when). Null when his club has no game that week (a bye), whatever the snapshot holds, and when the snapshot has no row for him or none is stored. Our own weekly model replaces it when it passes its test
+			 * @description his points this week on the week's published projection, to the tenth (the site's one rounding, half away from zero), in the format the league's scoring is most like (PPR, half PPR or standard); a team defense's by its club, a kicker our board does not place (no board id) by his club's one kicker, never a teammate's for a kicker the snapshot left out. The newest snapshot stored for the league's week (projection_read_at says when). Null when his club has no game that week (a bye), whatever the snapshot holds, and when the snapshot has no row for him or none is stored. Our own weekly model replaces it when it passes its test
 			 */
 			week_projection: number | null;
 			/**
 			 * Format: double
-			 * @description week_projection's change since the week's snapshot before the newest, to the cent, in the same format; null without a row for him in both snapshots or when week_projection is null
+			 * @description week_projection's change since the week's snapshot before the newest, to the tenth, in the same format; null without a row for him in both snapshots or when week_projection is null
 			 */
 			projection_delta: number | null;
 			/** @description this week's opponent's rank in points allowed a game to his position this season under the league's scoring, 1 allowed the fewest (facts.allowed_to_position.rank, of its .of); null on a bye or before the season ranks it */
 			opp_rank: number | null;
 			/**
 			 * Format: double
-			 * @description his points a game over every completed game this season under the league's scoring, to the cent; null before his first game
+			 * @description his points a game over every completed game this season under the league's scoring, to the tenth; null before his first game
 			 */
 			season_avg: number | null;
 			/**
 			 * Format: double
-			 * @description his points in his last completed game under the league's scoring, to the cent; null before his first game
+			 * @description his points in his last completed game under the league's scoring, to the tenth; null before his first game
 			 */
 			last_points: number | null;
 			/** @description the drafter tags him Hold on a sheet */
@@ -2969,7 +2969,7 @@ export interface components {
 			roster_id: number;
 			/**
 			 * Format: double
-			 * @description the side's points so far as the host scores them
+			 * @description the side's points so far as the host scores them, to the tenth
 			 */
 			points: number;
 			/** @description false when the host's score could not be read; points then says nothing */

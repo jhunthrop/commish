@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/jhunthrop/commish/api/internal/apitypes"
+	"github.com/jhunthrop/commish/api/internal/tenth"
 )
 
 // WeekRead is one league the account follows as the front door reads it
@@ -85,11 +86,17 @@ func HostProblemWords(host string, err error) string {
 	return HostWords(host) + " is not answering right now. Your standing is from the last read."
 }
 
-// TeamOnWire is a team as the wire names it.
+// TeamOnWire is a team as the wire names it, its points for and against
+// the tenth the standings print (tenth.Round, Lane 66k H1).
 func TeamOnWire(t Team) apitypes.LeagueTeam {
+	var against *float64
+	if t.PointsAgainst != nil {
+		v := tenth.Round(*t.PointsAgainst)
+		against = &v
+	}
 	return apitypes.LeagueTeam{
-		RosterId: t.RosterID, Name: t.Name, Owner: t.Owner, Wins: t.Wins, Losses: t.Losses, Ties: t.Ties, PointsFor: t.PointsFor,
-		PointsAgainst: t.PointsAgainst, Streak: orNil(t.Streak), WaiverOrder: positive(t.WaiverOrder), WaiverBudgetLeft: t.BudgetLeft,
+		RosterId: t.RosterID, Name: t.Name, Owner: t.Owner, Wins: t.Wins, Losses: t.Losses, Ties: t.Ties, PointsFor: tenth.Round(t.PointsFor),
+		PointsAgainst: against, Streak: orNil(t.Streak), WaiverOrder: positive(t.WaiverOrder), WaiverBudgetLeft: t.BudgetLeft,
 		Avatar: orNil(t.Avatar),
 	}
 }

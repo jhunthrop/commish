@@ -92,8 +92,8 @@ func TestMatchupIsBothSidesInSlotsWithTheWeeksProjection(t *testing.T) {
 		t.Fatalf("slots %s", got)
 	}
 	qb, def := mine.Starters[0].Line, mine.Starters[9].Line
-	if qb.WeekProjection == nil || *qb.WeekProjection != 21.37 {
-		t.Fatalf("the quarterback's projection %v, PPR to the cent", qb.WeekProjection)
+	if qb.WeekProjection == nil || *qb.WeekProjection != 21.4 {
+		t.Fatalf("the quarterback's projection %v, PPR to the tenth", qb.WeekProjection)
 	}
 	if k := mine.Starters[8].Line; k.Player.Position != "K" || k.WeekProjection == nil || *k.WeekProjection != 8.4 {
 		t.Fatalf("the kicker %+v: by his club when his id has no row", k)
@@ -203,7 +203,7 @@ func TestLineupCarriesTheWeeksProjection(t *testing.T) {
 	found := false
 	for _, slot := range got.Slots {
 		if slot.Ours.Player.HostId == "h000" {
-			found = slot.Ours.WeekProjection != nil && *slot.Ours.WeekProjection == 21.37
+			found = slot.Ours.WeekProjection != nil && *slot.Ours.WeekProjection == 21.4
 		}
 	}
 	if !found {

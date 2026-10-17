@@ -3006,7 +3006,7 @@ type PlayerLine struct {
 	// Held the drafter tags him Hold on a sheet
 	Held bool `json:"held"`
 
-	// LastPoints his points in his last completed game under the league's scoring, to the cent; null before his first game
+	// LastPoints his points in his last completed game under the league's scoring, to the tenth; null before his first game
 	LastPoints *float64 `json:"last_points"`
 
 	// OppRank this week's opponent's rank in points allowed a game to his position this season under the league's scoring, 1 allowed the fewest (facts.allowed_to_position.rank, of its .of); null on a bye or before the season ranks it
@@ -3019,19 +3019,19 @@ type PlayerLine struct {
 	// PositionRank his place at his position in our order
 	PositionRank *int `json:"position_rank"`
 
-	// ProjectionDelta week_projection's change since the week's snapshot before the newest, to the cent, in the same format; null without a row for him in both snapshots or when week_projection is null
+	// ProjectionDelta week_projection's change since the week's snapshot before the newest, to the tenth, in the same format; null without a row for him in both snapshots or when week_projection is null
 	ProjectionDelta *float64 `json:"projection_delta"`
 
 	// RestOfSeasonPerGame his rest-of-season points a game, one decimal: the published board's rest-of-season points over the games his club has left from the board's first week through week 17, byes out, as the basis says; null on the preseason number, on a run that does not say its first week, without a projection or with no games left. A player who is out keeps it: it assumes he plays
 	RestOfSeasonPerGame *float64 `json:"rest_of_season_per_game"`
 
-	// SeasonAvg his points a game over every completed game this season under the league's scoring, to the cent; null before his first game
+	// SeasonAvg his points a game over every completed game this season under the league's scoring, to the tenth; null before his first game
 	SeasonAvg *float64 `json:"season_avg"`
 
 	// Slug his page on the site (/players/{slug}): set for a player our order ranks whose name no other player in our directory shares, null otherwise (a shared name's page is named by the run, which the API does not read)
 	Slug *string `json:"slug"`
 
-	// WeekProjection his points this week on the week's published projection, to the cent, in the format the league's scoring is most like (PPR, half PPR or standard); a team defense's by its club, a kicker our board does not place (no board id) by his club's one kicker, never a teammate's for a kicker the snapshot left out. The newest snapshot stored for the league's week (projection_read_at says when). Null when his club has no game that week (a bye), whatever the snapshot holds, and when the snapshot has no row for him or none is stored. Our own weekly model replaces it when it passes its test
+	// WeekProjection his points this week on the week's published projection, to the tenth (the site's one rounding, half away from zero), in the format the league's scoring is most like (PPR, half PPR or standard); a team defense's by its club, a kicker our board does not place (no board id) by his club's one kicker, never a teammate's for a kicker the snapshot left out. The newest snapshot stored for the league's week (projection_read_at says when). Null when his club has no game that week (a bye), whatever the snapshot holds, and when the snapshot has no row for him or none is stored. Our own weekly model replaces it when it passes its test
 	WeekProjection *float64 `json:"week_projection"`
 }
 
@@ -3360,7 +3360,7 @@ type ScoreboardSide struct {
 	// Played those starters whose game has kicked off
 	Played int `json:"played"`
 
-	// Points the side's points so far as the host scores them
+	// Points the side's points so far as the host scores them, to the tenth
 	Points float64 `json:"points"`
 
 	// PointsRead false when the host's score could not be read; points then says nothing
@@ -3915,7 +3915,7 @@ type WeekFacts struct {
 	// Played his game this week is final
 	Played bool `json:"played"`
 
-	// PointsThisWeek the host's score for him so far, from the matchup, when he starts there and his game has kicked off
+	// PointsThisWeek the host's score for him so far, from the matchup, when he starts there and his game has kicked off, to the tenth
 	PointsThisWeek *float64        `json:"points_this_week"`
 	Roof           *GameRoof       `json:"roof"`
 	Spread         *GameSpread     `json:"spread"`

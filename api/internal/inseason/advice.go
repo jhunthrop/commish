@@ -162,24 +162,24 @@ func (a *advisor) build(id string, lp apitypes.LeaguePlayer, side *leaguesync.Si
 }
 
 // weekProjection is his points on the week's published projection in
-// the league's format, to the cent, nil without a row.
+// the league's format, to the tenth a screen prints, nil without a row.
 func (a *advisor) weekProjection(boardID string, position draft.Position, team string) *float64 {
 	p, ok := a.projection.Player(boardID, string(position), team)
 	if !ok {
 		return nil
 	}
-	v := roundCents(p.For(a.preset))
+	v := roundTenth(p.For(a.preset))
 	return &v
 }
 
 // projectionDelta is his projection's change since the snapshot before,
-// to the cent, nil without a row in both.
+// to the tenth a screen prints, nil without a row in both.
 func (a *advisor) projectionDelta(boardID string, position draft.Position, team string) *float64 {
 	d, ok := a.projection.Delta(boardID, string(position), team, a.preset)
 	if !ok {
 		return nil
 	}
-	v := roundCents(d)
+	v := roundTenth(d)
 	return &v
 }
 
@@ -192,11 +192,11 @@ func evidence(f Facts) (oppRank *int, seasonAvg, lastPoints *float64) {
 		oppRank = &rank
 	}
 	if f.PerGame != nil {
-		avg := roundCents(*f.PerGame)
+		avg := roundTenth(*f.PerGame)
 		seasonAvg = &avg
 	}
 	if len(f.LastGames) > 0 {
-		last := roundCents(f.LastGames[0].Points)
+		last := roundTenth(f.LastGames[0].Points)
 		lastPoints = &last
 	}
 	return oppRank, seasonAvg, lastPoints
@@ -241,7 +241,7 @@ func teamPoints(side *leaguesync.Side, people []person) *float64 {
 	}
 	for _, p := range people {
 		if starting[p.cand.ID] && p.cand.Locked {
-			pts := roundCents(side.Points)
+			pts := roundTenth(side.Points)
 			return &pts
 		}
 	}
@@ -264,7 +264,7 @@ func thisWeek(side *leaguesync.Side, id string, f Facts) *float64 {
 		if !ok {
 			return nil
 		}
-		pts := roundCents(got)
+		pts := roundTenth(got)
 		return &pts
 	}
 	return nil
@@ -281,7 +281,7 @@ func wireFacts(f Facts, pointsThisWeek *float64) apitypes.WeekFacts {
 		out.Designation = &apitypes.InjuryDesignation{Status: apitypes.DesignationStatus(d.Status), AsOf: d.AsOf}
 	}
 	for _, g := range f.LastGames {
-		out.LastGames = append(out.LastGames, apitypes.GamePoints{Week: g.Week, Points: g.Points})
+		out.LastGames = append(out.LastGames, apitypes.GamePoints{Week: g.Week, Points: roundTenth(g.Points)})
 	}
 	if al := f.Allowed; al != nil {
 		out.AllowedToPosition = &apitypes.PointsAllowed{PointsAGame: al.PointsAGame, Rank: al.Rank, Of: al.Of, Position: string(al.Position)}

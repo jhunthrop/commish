@@ -3262,7 +3262,7 @@ components:
           type: number
           format: double
           nullable: true
-          description: the host's score for him so far, from the matchup, when he starts there and his game has kicked off
+          description: the host's score for him so far, from the matchup, when he starts there and his game has kicked off, to the tenth
         last_games:
           type: array
           description: up to three completed games under the league's scoring, newest first
@@ -3371,7 +3371,7 @@ components:
           format: double
           nullable: true
           description: >-
-            his points this week on the week's published projection, to the cent, in the format the league's scoring is
+            his points this week on the week's published projection, to the tenth (the site's one rounding, half away from zero), in the format the league's scoring is
             most like (PPR, half PPR or standard); a team defense's by its club, a kicker our board does not place (no board id) by his club's one kicker, never a teammate's for a kicker the snapshot left out. The newest snapshot stored for the
             league's week (projection_read_at says when). Null when his club has no game that week (a bye), whatever the snapshot holds, and when the snapshot has no row for him or none is stored.
             Our own weekly model replaces it when it passes its test
@@ -3380,7 +3380,7 @@ components:
           format: double
           nullable: true
           description: >-
-            week_projection's change since the week's snapshot before the newest, to the cent, in the same format;
+            week_projection's change since the week's snapshot before the newest, to the tenth, in the same format;
             null without a row for him in both snapshots or when week_projection is null
         opp_rank:
           type: integer
@@ -3392,12 +3392,12 @@ components:
           type: number
           format: double
           nullable: true
-          description: his points a game over every completed game this season under the league's scoring, to the cent; null before his first game
+          description: his points a game over every completed game this season under the league's scoring, to the tenth; null before his first game
         last_points:
           type: number
           format: double
           nullable: true
-          description: his points in his last completed game under the league's scoring, to the cent; null before his first game
+          description: his points in his last completed game under the league's scoring, to the tenth; null before his first game
         held: { type: boolean, description: the drafter tags him Hold on a sheet, so he is never a drop or a trade give }
         facts: { $ref: "#/components/schemas/WeekFacts" }
     LineupSlot:
@@ -3531,7 +3531,7 @@ components:
       required: [roster_id, points, points_read, projection, starters, played]
       properties:
         roster_id: { type: integer }
-        points: { type: number, format: double, description: the side's points so far as the host scores them }
+        points: { type: number, format: double, description: "the side's points so far as the host scores them, to the tenth" }
         points_read: { type: boolean, description: false when the host's score could not be read; points then says nothing }
         projection:
           type: number
