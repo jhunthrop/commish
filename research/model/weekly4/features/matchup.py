@@ -2,8 +2,9 @@
 
 - **Role allowances** on round 3's construction (`weekly3.allowance.ratio_allowance`, shrunk toward 1
   with 6 games of prior): to running backs, the share of their opportunities that came through the
-  air; to wide receivers and tight ends, targets per game by depth (behind the line, under 10, 10 to
-  19, 20 and over) and by location (outside, the middle). Round 3's volume allowances (targets,
+  air; to wide receivers and tight ends, the share of the group's targets by depth (behind the line,
+  under 10, 10 to 19, 20 and over) and by location (outside, the middle), "target share by role"; a
+  game with no target to the group has no share and is not counted. Round 3's volume allowances (targets,
   carries, red-zone opportunities, the quarterbacks' dropbacks) are read by round 3's own code.
 - **Pressure**: the defence's sack rate and quarterback-hit rate per dropback faced over its games
   before W, from the play table; and the pressures it generates from PFR via nflverse, read here as
@@ -45,11 +46,13 @@ def _group_value(tallies: Tallies, position: str, name: str) -> ValueAt:
         if name == RB_AIR_SHARE:
             touches = group.air + group.ground
             return None if touches <= 0 else group.air / touches
+        if group.air <= 0:
+            return None  # no target to the group that game: no share to compare
         if name == OUTSIDE:
-            return group.outside
+            return group.outside / group.air
         if name == MIDDLE:
-            return group.middle
-        return group.depth[DEPTH_BUCKETS.index(name.removeprefix("depth_"))]
+            return group.middle / group.air
+        return group.depth[DEPTH_BUCKETS.index(name.removeprefix("depth_"))] / group.air
 
     return value
 

@@ -64,6 +64,25 @@ def test_the_running_backs_air_share_allowance_is_round_threes_construction() ->
     assert role_allowances("DEN", 3, "QB", _schedule(), _tallies()) == {}
 
 
+def test_the_receivers_allowances_are_shares_of_the_groups_targets() -> None:
+    schedule = _schedule()
+    groups = {
+        ("KC", 1): {"WR": GroupTargets(air=20.0, depth=(2.0, 8.0, 6.0, 4.0), outside=15.0, middle=5.0)},  # v DEN
+        ("KC", 2): {"WR": GroupTargets(air=10.0, depth=(1.0, 5.0, 3.0, 1.0), outside=5.0, middle=5.0)},
+    }
+    tallies = Tallies(
+        MappingProxyType({}),
+        MappingProxyType(dict.fromkeys(groups, Counts(targets=20.0))),
+        MappingProxyType({}),
+        MappingProxyType({k: MappingProxyType(v) for k, v in groups.items()}),
+    )
+    found = role_allowances("DEN", 3, "WR", schedule, tallies)
+    deep = (0.2 / 0.1 + 6) / 7  # one game: 4 of 20 deep against DEN, 1 of 10 elsewhere
+    assert found["depth_deep"].value == pytest.approx(deep)
+    assert found["outside"].value == pytest.approx((0.75 / 0.5 + 6) / 7)
+    assert RB_AIR_SHARE not in found
+
+
 def test_pressure_is_per_dropback_faced_and_pfr_reads_the_passers_faced() -> None:
     found = defence_pressure("DEN", 3, _schedule(), _tallies(), {1: {"qb_kc": 12.0}, 2: {"qb_lv": 9.0}})
     assert found.sack_rate == pytest.approx(5.0 / 75.0)
