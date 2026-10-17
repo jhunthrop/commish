@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/jhunthrop/commish/api/internal/apitypes"
+	"github.com/jhunthrop/commish/api/internal/scoring"
 )
 
 // ErrNotFound is a league that does not exist or is someone else's.
@@ -131,6 +132,36 @@ func (s *Store) Replace(ctx context.Context, accountID, id uuid.UUID, in apitype
 		return apitypes.League{}, fmt.Errorf("leagues: replace %s: %w", id, err)
 	}
 	return l, nil
+}
+
+// KeepScoring sets the given kicking and defense rules inside one of the
+// account's leagues' custom scoring, in one statement: nothing else of the
+// league (its name, its board rules, its roster) is read or written, so an
+// edit the member makes meanwhile stands, and a league whose rules already
+// hold these figures is not written. It reports whether it wrote. Any rule
+// that is not a kicking or defense rule is refused.
+func (s *Store) KeepScoring(ctx context.Context, accountID, id uuid.UUID, rules map[string]float64) (bool, error) {
+	allowed := scoring.KickDefenseKeys()
+	for k := range rules {
+		if !allowed[k] {
+			return false, fmt.Errorf("leagues: %s is not a kicking or defense rule", k)
+		}
+	}
+	if len(rules) == 0 {
+		return false, nil
+	}
+	raw, err := json.Marshal(rules)
+	if err != nil {
+		return false, fmt.Errorf("leagues: encode rules: %w", err)
+	}
+	tag, err := s.Pool.Exec(ctx, `update app.leagues
+		set settings = jsonb_set(settings, '{scoring,custom}', (settings->'scoring'->'custom') || $3::jsonb)
+		where id = $1 and account_id = $2 and jsonb_typeof(settings->'scoring'->'custom') = 'object'
+		and not ((settings->'scoring'->'custom') @> $3::jsonb)`, id, accountID, raw)
+	if err != nil {
+		return false, fmt.Errorf("leagues: keep scoring %s: %w", id, err)
+	}
+	return tag.RowsAffected() > 0, nil
 }
 
 // Delete removes one of the account's leagues. Mocks saved from it keep

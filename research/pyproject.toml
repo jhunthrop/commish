@@ -12,6 +12,7 @@ dependencies = [
     "psycopg[binary]==3.3.6",
     "pyarrow==26.0.0",
     "pydantic==2.14.1",
+    "scikit-learn==1.9.1",
     "sqlalchemy==2.1.4",
     "starlette==1.7.0",
     "uvicorn==0.54.0",
@@ -68,7 +69,7 @@ plugins = ["pydantic.mypy"]
 exclude = ["^\\.venv/", "^parity/ts/"]
 
 [[tool.mypy.overrides]]
-module = ["pyarrow.*"]
+module = ["pyarrow.*", "sklearn.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

@@ -8,7 +8,11 @@ import type { LeagueSettings } from '../api.ts';
 export type ScoringRules = components['schemas']['ScoringRules'];
 export type ScoringImport = components['schemas']['ScoringImport'];
 export type ImportHost = components['schemas']['ScoringImportInput']['host'];
-export type RuleKey = keyof ScoringRules;
+/** A rule the form edits: the board's 21, which the contract requires. The kicking and defense rules
+ * (optional on the wire, read at their standard figures when absent) are not on the form yet. */
+export type RuleKey = {
+	[K in keyof ScoringRules]-?: undefined extends ScoringRules[K] ? never : K;
+}[keyof ScoringRules];
 type Preset = NonNullable<LeagueSettings['scoring']['preset']>;
 
 /** A group of the form: `boardless` for the kicking and defense rules, which move nothing on the

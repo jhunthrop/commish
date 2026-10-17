@@ -12,10 +12,11 @@ import (
 
 // Both recorded leagues read through the same checks a live answer
 // gets, and their roster and scoring come out as the hosts state them, in
-// ScoringRules' 21 keys: the Sleeper league's two flex spots and half a
+// ScoringRules' keys: the Sleeper league's two flex spots and half a
 // point more per tight end catch, its special teams touchdowns named as
-// dropped; the MyFantasyLeague league's per-unit rules, its points
-// allowed by bracket named as dropped in its own words.
+// dropped; the MyFantasyLeague league's per-unit rules and its points
+// allowed by bracket, its field goal yardage bonus named as dropped in its
+// own words.
 func TestRecordedLeaguesRead(t *testing.T) {
 	now := func() time.Time { return time.Date(2026, 10, 13, 12, 0, 0, 0, time.UTC) }
 	hosts := replayHosts(now)
@@ -35,7 +36,9 @@ func TestRecordedLeaguesRead(t *testing.T) {
 			map[string]float64{
 				"points_per_reception": 1, "points_per_passing_touchdown": 4, "points_per_passing_yard": 0.04,
 				"points_per_rushing_touchdown": 6, "points_per_sack": 1, "points_per_return_touchdown": 6,
-			}, "STPA+OPA 0-0 6 (Def)"},
+				"points_allowed_0": 6, "points_allowed_1_6": 4, "points_allowed_7_13": 2, "points_allowed_14_17": 1,
+				"points_allowed_18_20": 1, "points_allowed_21": 0, "points_allowed_46_plus": 0,
+			}, "FG 31-99 *.1 (QB RB WR TE PK)"},
 	}
 	for _, c := range cases {
 		h, ref, err := hosts.Resolve("", c.link)

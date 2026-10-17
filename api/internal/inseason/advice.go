@@ -293,7 +293,7 @@ func (a *advisor) Lineup() (apitypes.LineupAdvice, bool) {
 	h := a.header()
 	// The rows end on the week's projection (Lane 66d), so the basis says
 	// nothing of points a game; the page says the projection's read itself.
-	out := apitypes.LineupAdvice{Week: h.week, Basis: LineupBasis(a.basis), BasisNote: LineupNote(a.settings), OrderBasis: h.basis, Refreshed: h.refreshed,
+	out := apitypes.LineupAdvice{Week: h.week, Basis: LineupBasis(a.basis), BasisNote: LineupNote(a.settings, a.season.Carries), OrderBasis: h.basis, Refreshed: h.refreshed,
 		ReadAt: h.readAt, ProjectionReadAt: a.projectionReadAt(), Set: true, Slots: []apitypes.LineupSlot{}, Bench: []apitypes.PlayerLine{},
 		Moves: apitypes.LineupMoves{Lineup: apitypes.LineupMovesLineupUnavailable},
 	}
@@ -393,7 +393,7 @@ func (a *advisor) Waivers(position draft.Position) (apitypes.WaiverAdvice, bool)
 		cands[i] = p.cand
 	}
 	h := a.header()
-	out := apitypes.WaiverAdvice{Week: h.week, Basis: withPerGame(a.Board, WaiversBasis(a.basis, a.weeks), mine, pool), BasisNote: BasisNote(a.settings), OrderBasis: h.basis, Refreshed: h.refreshed,
+	out := apitypes.WaiverAdvice{Week: h.week, Basis: withPerGame(a.Board, WaiversBasis(a.basis, a.weeks), mine, pool), BasisNote: BasisNote(a.settings, a.season.Carries), OrderBasis: h.basis, Refreshed: h.refreshed,
 		ReadAt: h.readAt, Rows: []apitypes.WaiverRow{}, Moves: apitypes.WaiverMoves{Claim: apitypes.WaiverMovesClaimUnavailable}}
 	out.HostWaiversUrl, out.HostNote = a.host(WaiversPage)
 	w := &Writer{Basis: a.basis, Now: a.now}
@@ -430,7 +430,7 @@ func (a *advisor) Trades(focus string) (apitypes.TradeAdvice, bool) {
 	mine := a.active(team)
 	squad := a.squad(mine, true)
 	h := a.header()
-	out := apitypes.TradeAdvice{Week: h.week, BasisNote: BasisNote(a.settings), OrderBasis: h.basis, Refreshed: h.refreshed,
+	out := apitypes.TradeAdvice{Week: h.week, BasisNote: BasisNote(a.settings, a.season.Carries), OrderBasis: h.basis, Refreshed: h.refreshed,
 		ReadAt: h.readAt, Teams: []apitypes.TradeTeam{}, Roster: rosterLines(mine)}
 	out.HostTradesUrl, out.HostNote = a.host(TradesPage)
 	// Every roster the screen and its builder show, for the basis.

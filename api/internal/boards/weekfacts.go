@@ -15,14 +15,28 @@ import (
 // (research/pipeline/nflverse/stat_lines.py STAT_LINE_SOURCE).
 const StatLineSource = "nflverse_player_week"
 
-// StatMetrics are the stat line metrics ScoringRules score
-// (research/model/domain.py STAT_FIELDS): the season's lines carry these
-// fourteen and none of the optional seven.
+// KickDefenseSource is a kicker's and a team defense's weekly lines
+// (research/pipeline/nflverse/kdef_lines.py KDEF_LINE_SOURCE, Lane 70a): a
+// kicker keyed by his own id, a defense by team-def:<club>, which the
+// crosswalk resolves to the defense the league sync places. It wins a
+// metric both sources hold: the published stats write a kicker's field
+// goals as zero.
+const KickDefenseSource = "nflverse_kdef_week"
+
+// StatMetrics are the stat line metrics ScoringRules score: domain.py's
+// fourteen STAT_FIELDS, then a kicker's misses and makes by distance
+// (counted inside field_goals_made) and a defense's fumble recoveries,
+// return touchdowns, safeties and points and yards allowed, as Lane 70a
+// names them. A metric the store does not hold reads as absent, never as
+// zero.
 func StatMetrics() []string {
 	return []string{
 		"passing_yards", "passing_touchdowns", "interceptions", "rushing_yards", "rushing_touchdowns",
 		"receiving_yards", "receiving_touchdowns", "receptions", "fumbles_lost", "field_goals_made",
 		"extra_points_made", "sacks", "defensive_interceptions", "defensive_touchdowns",
+		"field_goals_missed", "extra_points_missed", "field_goals_made_40_49", "field_goals_made_50_59",
+		"field_goals_made_60_plus", "defensive_fumbles_recovered", "return_touchdowns", "safeties",
+		"points_allowed", "yards_allowed",
 	}
 }
 
@@ -50,7 +64,8 @@ func ProductTeam(code string) string {
 	return code
 }
 
-// StatLine is one player's line for one week, keyed by the board's id.
+// StatLine is one player's line for one week, keyed by the board's id. A
+// team defense has no club edge in the store and plays for its own club.
 type StatLine struct {
 	PlayerID string
 	Position string
@@ -67,8 +82,8 @@ func (s *PGSource) StatLines(ctx context.Context, season int) ([]StatLine, error
 	query := `with latest as (
   select distinct on (week, player_id, metric) week, player_id, metric, value
   from ` + s.table("player_week_observations") + `
-  where season = $1 and source = $2 and metric = any($3)
-  order by week, player_id, metric, as_of desc
+  where season = $1 and source = any($2) and metric = any($3)
+  order by week, player_id, metric, (source = $5) desc, as_of desc
 ), lines as (
   select week, player_id, array_agg(metric order by metric) as metrics, array_agg(value order by metric) as vals
   from latest group by week, player_id
@@ -77,13 +92,15 @@ func (s *PGSource) StatLines(ctx context.Context, season int) ([]StatLine, error
   from ` + s.table("player_week_teams") + ` where season = $1
   order by week, player_id, as_of desc
 )
-select c.provider_player_id, pp.position, l.week, coalesce(t.team, ''), l.metrics, l.vals
+select c.provider_player_id, pp.position, l.week,
+  coalesce(t.team, case when pp.position = 'DEF' then pp.team end, ''), l.metrics, l.vals
 from lines l
 join ` + s.table("player_crosswalk") + ` c on c.player_id = l.player_id
 join ` + s.table("provider_players") + ` pp on pp.id = c.provider_player_id
 left join teams t on t.week = l.week and t.player_id = l.player_id
 order by c.provider_player_id collate "C", l.week limit $4`
-	rows, err := s.Pool.Query(ctx, query, season, StatLineSource, StatMetrics(), maxStatLines+1)
+	rows, err := s.Pool.Query(ctx, query, season, []string{StatLineSource, KickDefenseSource}, StatMetrics(), maxStatLines+1,
+		KickDefenseSource)
 	if err != nil {
 		return nil, fmt.Errorf("boards: read stat lines %d: %w", season, err)
 	}

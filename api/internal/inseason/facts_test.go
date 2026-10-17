@@ -23,10 +23,8 @@ func rushing(id, team string, week int, yards float64) boards.StatLine {
 	return boards.StatLine{PlayerID: id, Position: "RB", Week: week, Team: team, Metrics: map[string]float64{"rushing_yards": yards}}
 }
 
-// fixtureSeason is four clubs over three weeks: weeks 1 and 2 final,
-// week 3 Miami at home to New England on Thursday (final), Buffalo and
-// the Jets on bye. Points are rushing yards over ten, standard scoring.
-func fixtureSeason(now time.Time) *Season {
+// fixtureGames is the fixture season's schedule.
+func fixtureGames() []boards.TeamWeek {
 	var games []boards.TeamWeek
 	for _, g := range [][]boards.TeamWeek{
 		game(1, "BUF", "MIA", time.Date(2026, 9, 13, 13, 0, 0, 0, east), true),
@@ -37,8 +35,15 @@ func fixtureSeason(now time.Time) *Season {
 	} {
 		games = append(games, g...)
 	}
+	return games
+}
+
+// fixtureSeason is four clubs over three weeks: weeks 1 and 2 final,
+// week 3 Miami at home to New England on Thursday (final), Buffalo and
+// the Jets on bye. Points are rushing yards over ten, standard scoring.
+func fixtureSeason(now time.Time) *Season {
 	data := Data{
-		Games: games,
+		Games: fixtureGames(),
 		Lines: []boards.StatLine{
 			rushing("mia-rb", "MIA", 1, 200), rushing("mia-rb", "MIA", 2, 100), rushing("mia-rb", "MIA", 3, 50),
 			rushing("buf-rb", "BUF", 1, 50), rushing("buf-rb", "BUF", 2, 150),
@@ -133,5 +138,106 @@ func TestUnfinishedGamesAndKickoff(t *testing.T) {
 	before := NewSeason(data, RulesOf(scoring.Standard()), 4, sunday.Add(-time.Hour))
 	if before.For(Player{BoardID: "buf-rb", Team: "BUF", Position: draft.RB}).Locked {
 		t.Fatal("locked before kickoff")
+	}
+}
+
+// kicking is a kicker's line from the kicking source: field goals and
+// extra points made, and the misses only that source writes.
+func kicking(id, team string, week int, fieldGoals, extraPoints float64) boards.StatLine {
+	return boards.StatLine{PlayerID: id, Position: "K", Week: week, Team: team,
+		Metrics: map[string]float64{"field_goals_made": fieldGoals, "extra_points_made": extraPoints,
+			"field_goals_missed": 0, "extra_points_missed": 0}}
+}
+
+// published is a kicker's line from the published stats alone, which
+// write his kicking as zero.
+func published(id, team string, week int) boards.StatLine {
+	return boards.StatLine{PlayerID: id, Position: "K", Week: week, Team: team,
+		Metrics: map[string]float64{"field_goals_made": 0, "extra_points_made": 0}}
+}
+
+// A week the kicking source has not written (it lags, skips or misses a
+// kicker) is no game: a real week counts, the zero week is left out of
+// his last games, his points a game and the points allowed to kickers,
+// and a club no counted kicker line played is not ranked at all.
+func TestMixedKickerWeeks(t *testing.T) {
+	saturday := time.Date(2026, 9, 26, 12, 0, 0, 0, east)
+	data := Data{Games: fixtureGames(), Lines: []boards.StatLine{
+		kicking("mia-k", "MIA", 1, 2, 3), published("mia-k", "MIA", 2), published("ne-k", "NE", 1),
+	}}
+	s := NewSeason(data, RulesOf(scoring.Standard()), 3, saturday)
+	k := s.For(Player{BoardID: "mia-k", Team: "MIA", Position: draft.K})
+	if len(k.LastGames) != 1 || k.LastGames[0] != (GamePoints{1, 9}) || k.PerGame == nil || *k.PerGame != 9 {
+		t.Fatalf("a kicker's real week alone: %v per game %v", k, k.PerGame)
+	}
+	if a, ok := s.allowed[teamPosition{"BUF", draft.K}]; !ok || a.PointsAGame != 9 || a.Rank != 1 || a.Of != 1 {
+		t.Fatalf("Buffalo, the one club a counted kicker played: %+v %v", a, ok)
+	}
+	for _, club := range []string{"NE", "NYJ", "MIA"} {
+		if a, ok := s.allowed[teamPosition{club, draft.K}]; ok {
+			t.Errorf("%s ranked against kickers with no counted kicker line: %+v", club, a)
+		}
+	}
+	if ne := s.For(Player{BoardID: "ne-k", Team: "NE", Position: draft.K}); ne.LastGames != nil || ne.PerGame != nil {
+		t.Fatalf("a kicker with zero weeks alone: %v", ne)
+	}
+}
+
+// A store whose kickers' lines carry no kicking (the player-week source
+// writes them as zeros) holds no results for kickers: no last games, no
+// points a game, no points allowed to kickers, never a row of zeros; a
+// back's results stand.
+func TestZeroKickingIsNoResult(t *testing.T) {
+	saturday := time.Date(2026, 9, 26, 12, 0, 0, 0, east)
+	data := Data{Games: fixtureGames(), Lines: []boards.StatLine{
+		rushing("mia-rb", "MIA", 1, 200), published("mia-k", "MIA", 1), published("mia-k", "MIA", 2),
+		published("ne-k", "NE", 1),
+	}}
+	zero := NewSeason(data, RulesOf(scoring.Standard()), 3, saturday)
+	k := zero.For(Player{BoardID: "mia-k", Team: "MIA", Position: draft.K})
+	if k.LastGames != nil || k.PerGame != nil || k.Allowed != nil {
+		t.Fatalf("zero kicking read as results: %v, allowed %+v", k, k.Allowed)
+	}
+	if _, ranked := zero.allowed[teamPosition{"NE", draft.K}]; ranked {
+		t.Fatal("points allowed to kickers ranked from zeros")
+	}
+	if rb := zero.For(Player{BoardID: "mia-rb", Team: "MIA", Position: draft.RB}); rb.PerGame == nil || *rb.PerGame != 20 {
+		t.Fatalf("a back's results: %v", rb)
+	}
+	if zero.Carries("field_goals_made") || !zero.Carries("rushing_yards") {
+		t.Fatal("zero kicking counted as carried, or rushing not")
+	}
+}
+
+// Real kicking and a defense's line are results: a kicker's last games
+// and points a game, points allowed to kickers ranked from them, and a
+// defense's games under the league's tiers.
+func TestKickerAndDefenseResults(t *testing.T) {
+	saturday := time.Date(2026, 9, 26, 12, 0, 0, 0, east)
+	defense := boards.StatLine{PlayerID: "DST-MIA", Position: "DEF", Week: 1, Team: "MIA",
+		Metrics: map[string]float64{"sacks": 3, "points_allowed": 10, "yards_allowed": 280}}
+	data := Data{Games: fixtureGames(), Lines: []boards.StatLine{
+		kicking("mia-k", "MIA", 1, 2, 3), kicking("mia-k", "MIA", 2, 1, 1), kicking("buf-k", "BUF", 1, 0, 2), defense,
+	}}
+	real := NewSeason(data, RulesOf(scoring.Standard()), 3, saturday)
+	k := real.For(Player{BoardID: "mia-k", Team: "MIA", Position: draft.K})
+	if len(k.LastGames) != 2 || k.LastGames[0] != (GamePoints{2, 4}) || k.LastGames[1] != (GamePoints{1, 9}) || k.PerGame == nil || *k.PerGame != 6.5 {
+		t.Fatalf("a kicker's results: %v per game %v", k, k.PerGame)
+	}
+	// Buffalo allowed Miami's kicker 9 in week 1, the Jets 4 in week 2,
+	// Miami Buffalo's 2; New England played no counted kicker.
+	if a := real.allowed[teamPosition{"BUF", draft.K}]; a.Rank != 3 || a.Of != 3 || a.PointsAGame != 9 {
+		t.Fatalf("allowed to kickers %+v", a)
+	}
+	if _, ok := real.allowed[teamPosition{"NE", draft.K}]; ok {
+		t.Fatal("New England ranked against kickers it never played")
+	}
+	// 3 sacks, 7 to 13 allowed (3) and 200 to 299 yards (2).
+	d := real.For(Player{BoardID: "DST-MIA", Team: "MIA", Position: draft.DEF})
+	if len(d.LastGames) != 1 || d.LastGames[0].Points != 8 {
+		t.Fatalf("a defense's results: %v", d)
+	}
+	if !real.Carries("points_allowed") || !real.Carries("yards_allowed") || real.Carries("safeties") {
+		t.Fatal("carried metrics")
 	}
 }

@@ -20,6 +20,7 @@ import (
 	"github.com/jhunthrop/commish/api/internal/hosts"
 	"github.com/jhunthrop/commish/api/internal/hosts/espnhost"
 	"github.com/jhunthrop/commish/api/internal/leagues"
+	"github.com/jhunthrop/commish/api/internal/scoring"
 )
 
 const espnFixtureLeague = "48153503"
@@ -71,7 +72,7 @@ func TestESPNSnapshot(t *testing.T) {
 	if sh.Teams != 14 || sh.QB != 1 || sh.RB != 1 || sh.WR != 1 || sh.Flex != 2 || sh.DEF != 1 || sh.K != 1 || sh.Bench != 5 || len(sh.Unfollowed) != 0 {
 		t.Fatalf("shape %+v", sh)
 	}
-	if len(snap.Scoring.Rules) != 21 || len(snap.Moves) != 0 {
+	if len(snap.Scoring.Rules) != len(scoring.Rules()) || len(snap.Moves) != 0 {
 		t.Fatalf("rules %v", snap.Scoring.Rules)
 	}
 	if _, reason := SettingsFor(snap); reason != "" {

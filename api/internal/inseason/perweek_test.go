@@ -67,8 +67,8 @@ func TestBasisSaysWhatAWeekIs(t *testing.T) {
 	}
 	// The basis above the rows is short: the league's shape and the rules
 	// points so far leave out are the note under them.
-	if strings.Contains(ros, "12-team") || !strings.Contains(BasisNote(settings), "for a 12-team league with 1 QB, 2 RB, 3 WR, 1 TE and a flex") {
-		t.Errorf("basis %q note %q", ros, BasisNote(settings))
+	if strings.Contains(ros, "12-team") || !strings.Contains(BasisNote(settings, nil), "for a 12-team league with 1 QB, 2 RB, 3 WR, 1 TE and a flex") {
+		t.Errorf("basis %q note %q", ros, BasisNote(settings, nil))
 	}
 }
 
@@ -111,7 +111,9 @@ func TestPlayerLineOverTheOrdersWeeks(t *testing.T) {
 	if line.PointsOverReplacement == nil || *line.PointsOverReplacement != roundTenth(season/11) {
 		t.Fatalf("points over replacement %v, want %v", line.PointsOverReplacement, roundTenth(season/11))
 	}
-	if out.OrderBasis != apitypes.OrderBasisRestOfSeason || out.BasisNote != LineupNote(*f.league.Saved) {
+	// The lineup's note is only what points so far leave out: its rows show
+	// no points over replacement (Lane 66d).
+	if out.OrderBasis != apitypes.OrderBasisRestOfSeason || strings.Contains(out.BasisNote, "Points over replacement") {
 		t.Fatalf("%s %q", out.OrderBasis, out.BasisNote)
 	}
 }

@@ -1,0 +1,5707 @@
+{
+ "model": "commish_weekly_v4",
+ "command": "develop",
+ "implementation": "python",
+ "model_version": "research@8a031c55",
+ "preregistration": {
+  "path": "docs/research/2026-10-16-weekly-projection-round4-preregistration.md",
+  "lock": "b56c05d8",
+  "amendments": [
+   "65cc5b96",
+   "f358f375",
+   "b3796049"
+  ]
+ },
+ "head": "8a031c55a71fb659b7c35bb63b04406603d2b27b",
+ "provisional": null,
+ "exposure": null,
+ "thresholds": {
+  "model_name": "commish_weekly_v4",
+  "player_fit_seasons": [
+   2021,
+   2022
+  ],
+  "team_fit_seasons": [
+   2016,
+   2017,
+   2018,
+   2019,
+   2020,
+   2021,
+   2022
+  ],
+  "judgment_season": 2023,
+  "weeks": [
+   6,
+   7,
+   8,
+   9,
+   10,
+   11,
+   12,
+   13,
+   14,
+   15,
+   16,
+   17
+  ],
+  "fit_weeks": [
+   4,
+   5,
+   6,
+   7,
+   8,
+   9,
+   10,
+   11,
+   12,
+   13,
+   14,
+   15,
+   16,
+   17
+  ],
+  "population": {
+   "QB": 36,
+   "RB": 72,
+   "WR": 108,
+   "TE": 36
+  },
+  "starters": {
+   "QB": 12,
+   "RB": 24,
+   "WR": 24,
+   "TE": 12
+  },
+  "min_week_population": 8,
+  "adp_source": "ffc_adp_ppr_12",
+  "adp_seasons": [
+   2023
+  ],
+  "adp_margin": 0.04,
+  "form_margin": 0.03,
+  "last_three_margin": 0.03,
+  "baseline_margin": 0.015,
+  "round_three_margin": 0.015,
+  "position_floor": -0.02,
+  "places_margins": {
+   "adp": 0.25,
+   "form": 0.75,
+   "baseline": 0.25
+  },
+  "calibration_low": 0.06,
+  "calibration_high": 0.14,
+  "median_low": 0.44,
+  "median_high": 0.56,
+  "calibration_min_size": 100,
+  "band_percentiles": [
+   10.0,
+   50.0,
+   90.0
+  ],
+  "chance_bins": [
+   [
+    0.5,
+    0.6
+   ],
+   [
+    0.6,
+    0.7
+   ],
+   [
+    0.7,
+    0.8
+   ],
+   [
+    0.8,
+    0.9
+   ],
+   [
+    0.9,
+    1.0
+   ]
+  ],
+  "chance_min_pairs": 200,
+  "chance_tolerance": 0.04,
+  "chance_min_bins": 3,
+  "resamples": 10000,
+  "seed": 42,
+  "lower_percentile": 1.6666666666666667,
+  "draws": 10000,
+  "run_seed": 2023,
+  "round_three": {
+   "model_name": "commish_weekly_v3",
+   "fit_seasons": [
+    2021,
+    2022
+   ],
+   "judgment_season": 2023
+  }
+ },
+ "features": {
+  "directory": "/private/tmp/claude-501/-Users-jh-code-fantasy/d1b45147-2ef6-4dae-8e60-c0a2d552f0c5/scratchpad/features-dev",
+  "digests": {
+   "history-2016-teams.parquet": "2073fe020423efaa6016a4489f410630d2e43c5ff7550397a28e7bb145901ec9",
+   "history-2017-teams.parquet": "665a55595a765923388218443fa3799cf41ac1a9f9f42a0dd7bbdd8ef1301dd9",
+   "history-2018-teams.parquet": "896ec9315ba19dae1667f21c3f9454b3830bae0665095f70f30a6e0ba7fcd783",
+   "history-2019-teams.parquet": "50b16674dfa0461194fd22924ab68ac7fb1dbc177df988137396c90ba7e02eb1",
+   "history-2020-teams.parquet": "dcee9da81212ac0998f4627ded8f7ff44472b9e9958032a882e18b018d27bdac",
+   "history-2021-teams.parquet": "2e5c88390599971346edc659c2303ac7d57a2fbe59adb08f4ab2dece2d818f3d",
+   "history-2022-teams.parquet": "60d5d34657b59d50b6c2fa72f21ba0206786111f6060e46e0ef5d7f52d73e4c8",
+   "history-2023-teams.parquet": "126c20b959c88d96a557e0d3b51e8c714e3aa516a423e08bb3da477c8935791f",
+   "history-2016-plays.parquet": "0465af07655d8596759af0008a514724a751d513be163647ece00da6f7ac047a",
+   "history-2017-plays.parquet": "23b0145297f12840396427c6c5b16b54208502ff0b0a3ae77e09fcce18438499",
+   "history-2018-plays.parquet": "dbb09b9906faaf0b500ac578a15856ff3a520df649f947f42195272e7787c290",
+   "history-2019-plays.parquet": "277dadb2e47035f62e5bdd2b0e21e17c1f01df8f2713cdf2027bdb95a62f677f",
+   "history-2020-plays.parquet": "b30c7c93c838ecd35dc93d8ed3d8d5732de37c0c6b0027e8fc6ef06432c20b41",
+   "history-2021-plays.parquet": "4237da9e3930835289a42db58b1e669e1f546cd2a3b0bbbb045939ed45e43987",
+   "history-2022-plays.parquet": "adc050b6f2c107ecedeba5855abf12d55d87245802acc4cb7fd2386d2b6bd5da",
+   "history-2023-plays.parquet": "d74c2777038c2e6b46ba6960c7ec0e54bf3e10b8db713de2e51e41089000fe53",
+   "history-2021-players.parquet": "03a247c592f4d7fff301cf2602dab0b674953c5361e88621d25eaece3e4dc2f3",
+   "history-2022-players.parquet": "a1084f02efd178f27681dcc95230392c687c71e115f9ea7953b58b527b575edd",
+   "history-2023-players.parquet": "e98963a2f584eee51b3412663315ed0f3a39dd84d307e4e60710d3283ef8d3df"
+  },
+  "depth_chart_rule": [
+   "week"
+  ]
+ },
+ "preconditions": {
+  "plays": {
+   "2016": 44372,
+   "2017": 43934,
+   "2018": 43775,
+   "2019": 43991,
+   "2020": 44112,
+   "2021": 46259,
+   "2022": 45773,
+   "2023": 46013
+  },
+  "charts": {
+   "2016": 8483,
+   "2017": 8412,
+   "2018": 8278,
+   "2019": 8387,
+   "2020": 8392,
+   "2021": 8591,
+   "2022": 8590,
+   "2023": 8452
+  },
+  "ngs": {
+   "2016": 20123,
+   "2017": 18559,
+   "2018": 20075,
+   "2019": 20200,
+   "2020": 20909,
+   "2021": 21901,
+   "2022": 20819,
+   "2023": 21181
+  },
+  "pfr": {
+   "2018": 34253,
+   "2019": 33938,
+   "2020": 35266,
+   "2021": 36964,
+   "2022": 36611,
+   "2023": 36916
+  },
+  "roofs": {
+   "2021": [
+    272,
+    272
+   ],
+   "2020": [
+    256,
+    256
+   ],
+   "2023": [
+    272,
+    272
+   ],
+   "2022": [
+    271,
+    271
+   ],
+   "2017": [
+    256,
+    256
+   ],
+   "2019": [
+    256,
+    256
+   ],
+   "2016": [
+    256,
+    256
+   ],
+   "2018": [
+    256,
+    256
+   ]
+  },
+  "figures": {
+   "2016": 512,
+   "2017": 512,
+   "2018": 512,
+   "2019": 512,
+   "2020": 512,
+   "2021": 544,
+   "2022": 542,
+   "2023": 544
+  },
+  "stadiums_missing": 0,
+  "weather_after_the_fill": {
+   "2021": {
+    "outdoor": 193,
+    "missing": 0
+   },
+   "2020": {
+    "outdoor": 165,
+    "missing": 0
+   },
+   "2023": {
+    "outdoor": 191,
+    "missing": 1
+   },
+   "2022": {
+    "outdoor": 187,
+    "missing": 0
+   },
+   "2017": {
+    "outdoor": 197,
+    "missing": 0
+   },
+   "2019": {
+    "outdoor": 197,
+    "missing": 0
+   },
+   "2016": {
+    "outdoor": 194,
+    "missing": 0
+   },
+   "2018": {
+    "outdoor": 196,
+    "missing": 0
+   }
+  },
+  "depth_chart_verdict": "week",
+  "store_built_under": "week",
+  "missing": []
+ },
+ "weather": {
+  "fill_by_source": [
+   {
+    "season": 2016,
+    "temperature": "nflverse_games",
+    "wind": "nflverse_games",
+    "precipitation": "pbp_weather_text",
+    "n": 192
+   },
+   {
+    "season": 2016,
+    "temperature": "pbp_weather_text",
+    "wind": "pbp_weather_text",
+    "precipitation": "pbp_weather_text",
+    "n": 2
+   },
+   {
+    "season": 2017,
+    "temperature": "nflverse_games",
+    "wind": "nflverse_games",
+    "precipitation": "pbp_weather_text",
+    "n": 192
+   },
+   {
+    "season": 2017,
+    "temperature": "pbp_weather_text",
+    "wind": "pbp_weather_text",
+    "precipitation": "pbp_weather_text",
+    "n": 5
+   },
+   {
+    "season": 2018,
+    "temperature": "nflverse_games",
+    "wind": "nflverse_games",
+    "precipitation": "pbp_weather_text",
+    "n": 191
+   },
+   {
+    "season": 2018,
+    "temperature": "noaa_isd",
+    "wind": "noaa_isd",
+    "precipitation": "noaa_isd",
+    "n": 1
+   },
+   {
+    "season": 2018,
+    "temperature": "pbp_weather_text",
+    "wind": "pbp_weather_text",
+    "precipitation": "pbp_weather_text",
+    "n": 4
+   },
+   {
+    "season": 2019,
+    "temperature": "nflverse_games",
+    "wind": "nflverse_games",
+    "precipitation": "pbp_weather_text",
+    "n": 190
+   },
+   {
+    "season": 2019,
+    "temperature": "noaa_isd",
+    "wind": "noaa_isd",
+    "precipitation": "noaa_isd",
+    "n": 1
+   },
+   {
+    "season": 2019,
+    "temperature": "pbp_weather_text",
+    "wind": "noaa_isd",
+    "precipitation": "pbp_weather_text",
+    "n": 2
+   },
+   {
+    "season": 2019,
+    "temperature": "pbp_weather_text",
+    "wind": "pbp_weather_text",
+    "precipitation": "pbp_weather_text",
+    "n": 4
+   },
+   {
+    "season": 2020,
+    "temperature": "nflverse_games",
+    "wind": "nflverse_games",
+    "precipitation": "pbp_weather_text",
+    "n": 165
+   },
+   {
+    "season": 2021,
+    "temperature": "nflverse_games",
+    "wind": "nflverse_games",
+    "precipitation": "pbp_weather_text",
+    "n": 182
+   },
+   {
+    "season": 2021,
+    "temperature": "pbp_weather_text",
+    "wind": "pbp_weather_text",
+    "precipitation": "pbp_weather_text",
+    "n": 11
+   },
+   {
+    "season": 2022,
+    "temperature": "nflverse_games",
+    "wind": "nflverse_games",
+    "precipitation": "pbp_weather_text",
+    "n": 96
+   },
+   {
+    "season": 2022,
+    "temperature": "pbp_weather_text",
+    "wind": "pbp_weather_text",
+    "precipitation": "pbp_weather_text",
+    "n": 91
+   },
+   {
+    "season": 2023,
+    "temperature": "nflverse_games",
+    "wind": "nflverse_games",
+    "precipitation": "pbp_weather_text",
+    "n": 150
+   },
+   {
+    "season": 2023,
+    "temperature": "noaa_isd",
+    "wind": "noaa_isd",
+    "precipitation": "noaa_isd",
+    "n": 1
+   },
+   {
+    "season": 2023,
+    "temperature": "noaa_isd",
+    "wind": "noaa_isd",
+    "precipitation": "none",
+    "n": 1
+   },
+   {
+    "season": 2023,
+    "temperature": "pbp_weather_text",
+    "wind": "pbp_weather_text",
+    "precipitation": "pbp_weather_text",
+    "n": 39
+   }
+  ],
+  "precipitation_agreement_with_isd": {
+   "2016": {
+    "both_read": 181,
+    "agree": 168
+   },
+   "2017": {
+    "both_read": 183,
+    "agree": 171
+   },
+   "2018": {
+    "both_read": 185,
+    "agree": 171
+   },
+   "2019": {
+    "both_read": 182,
+    "agree": 171
+   },
+   "2020": {
+    "both_read": 150,
+    "agree": 137
+   },
+   "2021": {
+    "both_read": 171,
+    "agree": 156
+   },
+   "2022": {
+    "both_read": 169,
+    "agree": 152
+   },
+   "2023": {
+    "both_read": 181,
+    "agree": 167
+   }
+  }
+ },
+ "round_three": {
+  "lines": [
+   {
+    "gate": "G1",
+    "subject": "pooled vs ADP",
+    "passed": true,
+    "detail": "difference +0.0802 against a margin of +0.0400, lower bound +0.0611 against 0, over 12 weeks"
+   },
+   {
+    "gate": "G1",
+    "subject": "QB vs ADP",
+    "passed": true,
+    "detail": "mean difference +0.0096 against a floor of -0.0200"
+   },
+   {
+    "gate": "G1",
+    "subject": "RB vs ADP",
+    "passed": true,
+    "detail": "mean difference +0.1688 against a floor of -0.0200"
+   },
+   {
+    "gate": "G1",
+    "subject": "WR vs ADP",
+    "passed": true,
+    "detail": "mean difference +0.1373 against a floor of -0.0200"
+   },
+   {
+    "gate": "G1",
+    "subject": "TE vs ADP",
+    "passed": true,
+    "detail": "mean difference +0.0050 against a floor of -0.0200"
+   },
+   {
+    "gate": "G2",
+    "subject": "pooled vs recent form",
+    "passed": false,
+    "detail": "difference +0.0106 against a margin of +0.0200, lower bound -0.0140 against 0, over 12 weeks"
+   },
+   {
+    "gate": "G2",
+    "subject": "QB vs recent form",
+    "passed": true,
+    "detail": "mean difference +0.0005 against a floor of -0.0200"
+   },
+   {
+    "gate": "G2",
+    "subject": "RB vs recent form",
+    "passed": true,
+    "detail": "mean difference +0.0172 against a floor of -0.0200"
+   },
+   {
+    "gate": "G2",
+    "subject": "WR vs recent form",
+    "passed": true,
+    "detail": "mean difference +0.0225 against a floor of -0.0200"
+   },
+   {
+    "gate": "G2",
+    "subject": "TE vs recent form",
+    "passed": true,
+    "detail": "mean difference +0.0021 against a floor of -0.0200"
+   },
+   {
+    "gate": "G3",
+    "subject": "places off vs ADP",
+    "passed": true,
+    "detail": "model 11.870, ADP 14.445: +2.575 fewer against a margin of 0.25"
+   },
+   {
+    "gate": "G3",
+    "subject": "places off vs recent form",
+    "passed": true,
+    "detail": "model 11.870, recent form 12.374: +0.505 fewer against a margin of 0.25"
+   },
+   {
+    "gate": "G4",
+    "subject": "QB ppr",
+    "passed": true,
+    "detail": "below floor 0.136, above ceiling 0.126, each against [0.05, 0.15], n=427"
+   },
+   {
+    "gate": "G4",
+    "subject": "QB half",
+    "passed": true,
+    "detail": "below floor 0.136, above ceiling 0.129, each against [0.05, 0.15], n=427"
+   },
+   {
+    "gate": "G4",
+    "subject": "QB std",
+    "passed": true,
+    "detail": "below floor 0.136, above ceiling 0.126, each against [0.05, 0.15], n=427"
+   },
+   {
+    "gate": "G4",
+    "subject": "RB ppr",
+    "passed": true,
+    "detail": "below floor 0.078, above ceiling 0.082, each against [0.05, 0.15], n=1031"
+   },
+   {
+    "gate": "G4",
+    "subject": "RB half",
+    "passed": true,
+    "detail": "below floor 0.075, above ceiling 0.078, each against [0.05, 0.15], n=1031"
+   },
+   {
+    "gate": "G4",
+    "subject": "RB std",
+    "passed": true,
+    "detail": "below floor 0.086, above ceiling 0.075, each against [0.05, 0.15], n=1031"
+   },
+   {
+    "gate": "G4",
+    "subject": "WR ppr",
+    "passed": true,
+    "detail": "below floor 0.074, above ceiling 0.076, each against [0.05, 0.15], n=1600"
+   },
+   {
+    "gate": "G4",
+    "subject": "WR half",
+    "passed": true,
+    "detail": "below floor 0.076, above ceiling 0.073, each against [0.05, 0.15], n=1600"
+   },
+   {
+    "gate": "G4",
+    "subject": "WR std",
+    "passed": true,
+    "detail": "below floor 0.070, above ceiling 0.078, each against [0.05, 0.15], n=1600"
+   },
+   {
+    "gate": "G4",
+    "subject": "TE ppr",
+    "passed": true,
+    "detail": "below floor 0.080, above ceiling 0.101, each against [0.05, 0.15], n=775"
+   },
+   {
+    "gate": "G4",
+    "subject": "TE half",
+    "passed": true,
+    "detail": "below floor 0.083, above ceiling 0.110, each against [0.05, 0.15], n=775"
+   },
+   {
+    "gate": "G4",
+    "subject": "TE std",
+    "passed": true,
+    "detail": "below floor 0.099, above ceiling 0.094, each against [0.05, 0.15], n=775"
+   },
+   {
+    "gate": "G4",
+    "subject": "chance",
+    "passed": true,
+    "detail": "5 bins gated (at least 3), tolerance 0.05: [0.5, 0.6) n=23134 chance 0.549 observed 0.553; [0.6, 0.7) n=20695 chance 0.649 observed 0.653; [0.7, 0.8) n=17394 chance 0.748 observed 0.767; [0.8, 0.9) n=12563 chance 0.847 observed 0.862; [0.9, 1.0) n=4060 chance 0.932 observed 0.930"
+   },
+   {
+    "gate": "G5",
+    "subject": "isolation",
+    "passed": true,
+    "detail": "fit outcomes read for [2021, 2022] (allowed [2021, 2022]), judgment outcomes for [2023] (allowed [2023]); every table as it was; per-game clause: 1058 games, 531 reads, every row before its instant (closest 0.1 h before)"
+   }
+  ],
+  "development_check_reproduced": true
+ },
+ "fitted": {
+  "play_model_cells": {
+   "target|catch": {
+    "2020": {
+     "max_leaf_nodes": 7,
+     "l2_regularization": 1.0,
+     "max_iter": 200,
+     "min_samples_leaf": 200,
+     "decay": null
+    },
+    "2021": {
+     "max_leaf_nodes": 7,
+     "l2_regularization": 1.0,
+     "max_iter": 200,
+     "min_samples_leaf": 200,
+     "decay": null
+    },
+    "2022": {
+     "max_leaf_nodes": 7,
+     "l2_regularization": 1.0,
+     "max_iter": 200,
+     "min_samples_leaf": 200,
+     "decay": null
+    },
+    "2023": {
+     "max_leaf_nodes": 7,
+     "l2_regularization": 1.0,
+     "max_iter": 200,
+     "min_samples_leaf": 200,
+     "decay": null
+    }
+   },
+   "target|yards": {
+    "2020": {
+     "max_leaf_nodes": 7,
+     "l2_regularization": 1.0,
+     "max_iter": 200,
+     "min_samples_leaf": 200,
+     "decay": null
+    },
+    "2021": {
+     "max_leaf_nodes": 7,
+     "l2_regularization": 1.0,
+     "max_iter": 200,
+     "min_samples_leaf": 200,
+     "decay": null
+    },
+    "2022": {
+     "max_leaf_nodes": 7,
+     "l2_regularization": 1.0,
+     "max_iter": 200,
+     "min_samples_leaf": 200,
+     "decay": null
+    },
+    "2023": {
+     "max_leaf_nodes": 7,
+     "l2_regularization": 1.0,
+     "max_iter": 200,
+     "min_samples_leaf": 200,
+     "decay": null
+    }
+   },
+   "target|td": {
+    "2020": {
+     "max_leaf_nodes": 7,
+     "l2_regularization": 1.0,
+     "max_iter": 200,
+     "min_samples_leaf": 200,
+     "decay": null
+    },
+    "2021": {
+     "max_leaf_nodes": 7,
+     "l2_regularization": 1.0,
+     "max_iter": 200,
+     "min_samples_leaf": 200,
+     "decay": null
+    },
+    "2022": {
+     "max_leaf_nodes": 7,
+     "l2_regularization": 1.0,
+     "max_iter": 200,
+     "min_samples_leaf": 200,
+     "decay": null
+    },
+    "2023": {
+     "max_leaf_nodes": 7,
+     "l2_regularization": 1.0,
+     "max_iter": 200,
+     "min_samples_leaf": 200,
+     "decay": null
+    }
+   },
+   "carry|yards": {
+    "2020": {
+     "max_leaf_nodes": 7,
+     "l2_regularization": 1.0,
+     "max_iter": 200,
+     "min_samples_leaf": 200,
+     "decay": null
+    },
+    "2021": {
+     "max_leaf_nodes": 7,
+     "l2_regularization": 1.0,
+     "max_iter": 200,
+     "min_samples_leaf": 200,
+     "decay": null
+    },
+    "2022": {
+     "max_leaf_nodes": 7,
+     "l2_regularization": 1.0,
+     "max_iter": 200,
+     "min_samples_leaf": 200,
+     "decay": null
+    },
+    "2023": {
+     "max_leaf_nodes": 7,
+     "l2_regularization": 1.0,
+     "max_iter": 200,
+     "min_samples_leaf": 200,
+     "decay": null
+    }
+   },
+   "carry|td": {
+    "2020": {
+     "max_leaf_nodes": 7,
+     "l2_regularization": 1.0,
+     "max_iter": 200,
+     "min_samples_leaf": 200,
+     "decay": null
+    },
+    "2021": {
+     "max_leaf_nodes": 7,
+     "l2_regularization": 1.0,
+     "max_iter": 200,
+     "min_samples_leaf": 200,
+     "decay": null
+    },
+    "2022": {
+     "max_leaf_nodes": 7,
+     "l2_regularization": 1.0,
+     "max_iter": 200,
+     "min_samples_leaf": 200,
+     "decay": null
+    },
+    "2023": {
+     "max_leaf_nodes": 7,
+     "l2_regularization": 1.0,
+     "max_iter": 200,
+     "min_samples_leaf": 200,
+     "decay": null
+    }
+   },
+   "dropback|complete": {
+    "2020": {
+     "max_leaf_nodes": 7,
+     "l2_regularization": 1.0,
+     "max_iter": 200,
+     "min_samples_leaf": 200,
+     "decay": null
+    },
+    "2021": {
+     "max_leaf_nodes": 7,
+     "l2_regularization": 1.0,
+     "max_iter": 200,
+     "min_samples_leaf": 200,
+     "decay": null
+    },
+    "2022": {
+     "max_leaf_nodes": 7,
+     "l2_regularization": 1.0,
+     "max_iter": 200,
+     "min_samples_leaf": 200,
+     "decay": null
+    },
+    "2023": {
+     "max_leaf_nodes": 7,
+     "l2_regularization": 1.0,
+     "max_iter": 200,
+     "min_samples_leaf": 200,
+     "decay": null
+    }
+   },
+   "dropback|pass_yards": {
+    "2020": {
+     "max_leaf_nodes": 7,
+     "l2_regularization": 1.0,
+     "max_iter": 200,
+     "min_samples_leaf": 200,
+     "decay": null
+    },
+    "2021": {
+     "max_leaf_nodes": 7,
+     "l2_regularization": 1.0,
+     "max_iter": 200,
+     "min_samples_leaf": 200,
+     "decay": null
+    },
+    "2022": {
+     "max_leaf_nodes": 7,
+     "l2_regularization": 1.0,
+     "max_iter": 200,
+     "min_samples_leaf": 200,
+     "decay": null
+    },
+    "2023": {
+     "max_leaf_nodes": 7,
+     "l2_regularization": 1.0,
+     "max_iter": 200,
+     "min_samples_leaf": 200,
+     "decay": null
+    }
+   },
+   "dropback|pass_td": {
+    "2020": {
+     "max_leaf_nodes": 7,
+     "l2_regularization": 1.0,
+     "max_iter": 200,
+     "min_samples_leaf": 200,
+     "decay": null
+    },
+    "2021": {
+     "max_leaf_nodes": 7,
+     "l2_regularization": 1.0,
+     "max_iter": 200,
+     "min_samples_leaf": 200,
+     "decay": null
+    },
+    "2022": {
+     "max_leaf_nodes": 7,
+     "l2_regularization": 1.0,
+     "max_iter": 200,
+     "min_samples_leaf": 200,
+     "decay": null
+    },
+    "2023": {
+     "max_leaf_nodes": 7,
+     "l2_regularization": 1.0,
+     "max_iter": 200,
+     "min_samples_leaf": 200,
+     "decay": null
+    }
+   },
+   "dropback|interception": {
+    "2020": {
+     "max_leaf_nodes": 7,
+     "l2_regularization": 1.0,
+     "max_iter": 200,
+     "min_samples_leaf": 200,
+     "decay": null
+    },
+    "2021": {
+     "max_leaf_nodes": 7,
+     "l2_regularization": 1.0,
+     "max_iter": 200,
+     "min_samples_leaf": 200,
+     "decay": null
+    },
+    "2022": {
+     "max_leaf_nodes": 7,
+     "l2_regularization": 1.0,
+     "max_iter": 200,
+     "min_samples_leaf": 200,
+     "decay": null
+    },
+    "2023": {
+     "max_leaf_nodes": 7,
+     "l2_regularization": 1.0,
+     "max_iter": 200,
+     "min_samples_leaf": 200,
+     "decay": null
+    }
+   }
+  },
+  "team_model_cells": {
+   "plays": {
+    "2022": {
+     "max_leaf_nodes": 7,
+     "l2_regularization": 1.0,
+     "max_iter": 200,
+     "min_samples_leaf": 200,
+     "decay": null
+    },
+    "2023": {
+     "max_leaf_nodes": 7,
+     "l2_regularization": 1.0,
+     "max_iter": 200,
+     "min_samples_leaf": 200,
+     "decay": null
+    }
+   },
+   "dropbacks": {
+    "2022": {
+     "max_leaf_nodes": 7,
+     "l2_regularization": 1.0,
+     "max_iter": 200,
+     "min_samples_leaf": 200,
+     "decay": null
+    },
+    "2023": {
+     "max_leaf_nodes": 7,
+     "l2_regularization": 1.0,
+     "max_iter": 200,
+     "min_samples_leaf": 200,
+     "decay": null
+    }
+   },
+   "sacks": {
+    "2022": {
+     "max_leaf_nodes": 7,
+     "l2_regularization": 1.0,
+     "max_iter": 200,
+     "min_samples_leaf": 200,
+     "decay": null
+    },
+    "2023": {
+     "max_leaf_nodes": 7,
+     "l2_regularization": 1.0,
+     "max_iter": 200,
+     "min_samples_leaf": 200,
+     "decay": null
+    }
+   },
+   "scrambles": {
+    "2022": {
+     "max_leaf_nodes": 7,
+     "l2_regularization": 0.0,
+     "max_iter": 200,
+     "min_samples_leaf": 200,
+     "decay": null
+    },
+    "2023": {
+     "max_leaf_nodes": 7,
+     "l2_regularization": 0.0,
+     "max_iter": 200,
+     "min_samples_leaf": 200,
+     "decay": null
+    }
+   },
+   "designed_rushes": {
+    "2022": {
+     "max_leaf_nodes": 7,
+     "l2_regularization": 1.0,
+     "max_iter": 200,
+     "min_samples_leaf": 200,
+     "decay": null
+    },
+    "2023": {
+     "max_leaf_nodes": 7,
+     "l2_regularization": 1.0,
+     "max_iter": 200,
+     "min_samples_leaf": 200,
+     "decay": null
+    }
+   },
+   "team_targets": {
+    "2022": {
+     "max_leaf_nodes": 7,
+     "l2_regularization": 0.0,
+     "max_iter": 200,
+     "min_samples_leaf": 200,
+     "decay": null
+    },
+    "2023": {
+     "max_leaf_nodes": 7,
+     "l2_regularization": 1.0,
+     "max_iter": 200,
+     "min_samples_leaf": 200,
+     "decay": null
+    }
+   },
+   "rushing_touchdowns": {
+    "2022": {
+     "max_leaf_nodes": 7,
+     "l2_regularization": 1.0,
+     "max_iter": 200,
+     "min_samples_leaf": 200,
+     "decay": null
+    },
+    "2023": {
+     "max_leaf_nodes": 7,
+     "l2_regularization": 1.0,
+     "max_iter": 200,
+     "min_samples_leaf": 200,
+     "decay": null
+    }
+   },
+   "receiving_touchdowns": {
+    "2022": {
+     "max_leaf_nodes": 7,
+     "l2_regularization": 1.0,
+     "max_iter": 200,
+     "min_samples_leaf": 200,
+     "decay": null
+    },
+    "2023": {
+     "max_leaf_nodes": 7,
+     "l2_regularization": 1.0,
+     "max_iter": 200,
+     "min_samples_leaf": 200,
+     "decay": null
+    }
+   }
+  },
+  "share_cells": {
+   "2021-2022": {
+    "max_leaf_nodes": 7,
+    "l2_regularization": 1.0,
+    "max_iter": 200,
+    "min_samples_leaf": 50,
+    "decay": 0.5
+   },
+   "2021": {
+    "max_leaf_nodes": 7,
+    "l2_regularization": 1.0,
+    "max_iter": 200,
+    "min_samples_leaf": 50,
+    "decay": 0.5
+   }
+  },
+  "share_fold_losses": {
+   "2021-2022": {
+    "Cell(max_leaf_nodes=7, l2_regularization=0.0, max_iter=200, min_samples_leaf=50, decay=0.5)": 0.22372726515169586,
+    "Cell(max_leaf_nodes=7, l2_regularization=0.0, max_iter=200, min_samples_leaf=50, decay=0.7)": 0.2240233171064103,
+    "Cell(max_leaf_nodes=7, l2_regularization=0.0, max_iter=200, min_samples_leaf=50, decay=0.85)": 0.22449523581451025,
+    "Cell(max_leaf_nodes=7, l2_regularization=0.0, max_iter=200, min_samples_leaf=50, decay=1.0)": 0.2248329679727281,
+    "Cell(max_leaf_nodes=7, l2_regularization=0.0, max_iter=200, min_samples_leaf=200, decay=0.5)": 0.22977928192370436,
+    "Cell(max_leaf_nodes=7, l2_regularization=0.0, max_iter=200, min_samples_leaf=200, decay=0.7)": 0.2305174814087681,
+    "Cell(max_leaf_nodes=7, l2_regularization=0.0, max_iter=200, min_samples_leaf=200, decay=0.85)": 0.23022759833210915,
+    "Cell(max_leaf_nodes=7, l2_regularization=0.0, max_iter=200, min_samples_leaf=200, decay=1.0)": 0.2306738380739437,
+    "Cell(max_leaf_nodes=7, l2_regularization=0.0, max_iter=400, min_samples_leaf=50, decay=0.5)": 0.2338519680759026,
+    "Cell(max_leaf_nodes=7, l2_regularization=0.0, max_iter=400, min_samples_leaf=50, decay=0.7)": 0.23463827803772153,
+    "Cell(max_leaf_nodes=7, l2_regularization=0.0, max_iter=400, min_samples_leaf=50, decay=0.85)": 0.2353512449614191,
+    "Cell(max_leaf_nodes=7, l2_regularization=0.0, max_iter=400, min_samples_leaf=50, decay=1.0)": 0.23545293748737728,
+    "Cell(max_leaf_nodes=7, l2_regularization=0.0, max_iter=400, min_samples_leaf=200, decay=0.5)": 0.23597618372212953,
+    "Cell(max_leaf_nodes=7, l2_regularization=0.0, max_iter=400, min_samples_leaf=200, decay=0.7)": 0.23695587068786444,
+    "Cell(max_leaf_nodes=7, l2_regularization=0.0, max_iter=400, min_samples_leaf=200, decay=0.85)": 0.2368877203890309,
+    "Cell(max_leaf_nodes=7, l2_regularization=0.0, max_iter=400, min_samples_leaf=200, decay=1.0)": 0.23733075347315244,
+    "Cell(max_leaf_nodes=7, l2_regularization=1.0, max_iter=200, min_samples_leaf=50, decay=0.5)": 0.2238652655796079,
+    "Cell(max_leaf_nodes=7, l2_regularization=1.0, max_iter=200, min_samples_leaf=50, decay=0.7)": 0.2243125680218645,
+    "Cell(max_leaf_nodes=7, l2_regularization=1.0, max_iter=200, min_samples_leaf=50, decay=0.85)": 0.22421731705486547,
+    "Cell(max_leaf_nodes=7, l2_regularization=1.0, max_iter=200, min_samples_leaf=50, decay=1.0)": 0.22509956719111124,
+    "Cell(max_leaf_nodes=7, l2_regularization=1.0, max_iter=200, min_samples_leaf=200, decay=0.5)": 0.22990116642238062,
+    "Cell(max_leaf_nodes=7, l2_regularization=1.0, max_iter=200, min_samples_leaf=200, decay=0.7)": 0.2304710464947062,
+    "Cell(max_leaf_nodes=7, l2_regularization=1.0, max_iter=200, min_samples_leaf=200, decay=0.85)": 0.23023244548657584,
+    "Cell(max_leaf_nodes=7, l2_regularization=1.0, max_iter=200, min_samples_leaf=200, decay=1.0)": 0.23074535626843884,
+    "Cell(max_leaf_nodes=7, l2_regularization=1.0, max_iter=400, min_samples_leaf=50, decay=0.5)": 0.23368369580031517,
+    "Cell(max_leaf_nodes=7, l2_regularization=1.0, max_iter=400, min_samples_leaf=50, decay=0.7)": 0.23563002990218304,
+    "Cell(max_leaf_nodes=7, l2_regularization=1.0, max_iter=400, min_samples_leaf=50, decay=0.85)": 0.23502982920401197,
+    "Cell(max_leaf_nodes=7, l2_regularization=1.0, max_iter=400, min_samples_leaf=50, decay=1.0)": 0.23501496341767544,
+    "Cell(max_leaf_nodes=7, l2_regularization=1.0, max_iter=400, min_samples_leaf=200, decay=0.5)": 0.23615607988381634,
+    "Cell(max_leaf_nodes=7, l2_regularization=1.0, max_iter=400, min_samples_leaf=200, decay=0.7)": 0.23672769214946532,
+    "Cell(max_leaf_nodes=7, l2_regularization=1.0, max_iter=400, min_samples_leaf=200, decay=0.85)": 0.23686693089698818,
+    "Cell(max_leaf_nodes=7, l2_regularization=1.0, max_iter=400, min_samples_leaf=200, decay=1.0)": 0.23737934081101028,
+    "Cell(max_leaf_nodes=15, l2_regularization=0.0, max_iter=200, min_samples_leaf=50, decay=0.5)": 0.22898582090111885,
+    "Cell(max_leaf_nodes=15, l2_regularization=0.0, max_iter=200, min_samples_leaf=50, decay=0.7)": 0.23053859744388663,
+    "Cell(max_leaf_nodes=15, l2_regularization=0.0, max_iter=200, min_samples_leaf=50, decay=0.85)": 0.23149988749395375,
+    "Cell(max_leaf_nodes=15, l2_regularization=0.0, max_iter=200, min_samples_leaf=50, decay=1.0)": 0.231737719203666,
+    "Cell(max_leaf_nodes=15, l2_regularization=0.0, max_iter=200, min_samples_leaf=200, decay=0.5)": 0.22976221921173348,
+    "Cell(max_leaf_nodes=15, l2_regularization=0.0, max_iter=200, min_samples_leaf=200, decay=0.7)": 0.23053189335285174,
+    "Cell(max_leaf_nodes=15, l2_regularization=0.0, max_iter=200, min_samples_leaf=200, decay=0.85)": 0.23023440329633627,
+    "Cell(max_leaf_nodes=15, l2_regularization=0.0, max_iter=200, min_samples_leaf=200, decay=1.0)": 0.23068540747739968,
+    "Cell(max_leaf_nodes=15, l2_regularization=0.0, max_iter=400, min_samples_leaf=50, decay=0.5)": 0.2407849556980935,
+    "Cell(max_leaf_nodes=15, l2_regularization=0.0, max_iter=400, min_samples_leaf=50, decay=0.7)": 0.24407560612075455,
+    "Cell(max_leaf_nodes=15, l2_regularization=0.0, max_iter=400, min_samples_leaf=50, decay=0.85)": 0.24417857883738825,
+    "Cell(max_leaf_nodes=15, l2_regularization=0.0, max_iter=400, min_samples_leaf=50, decay=1.0)": 0.24486100967758379,
+    "Cell(max_leaf_nodes=15, l2_regularization=0.0, max_iter=400, min_samples_leaf=200, decay=0.5)": 0.23600186717112445,
+    "Cell(max_leaf_nodes=15, l2_regularization=0.0, max_iter=400, min_samples_leaf=200, decay=0.7)": 0.23695383778575324,
+    "Cell(max_leaf_nodes=15, l2_regularization=0.0, max_iter=400, min_samples_leaf=200, decay=0.85)": 0.23701045010767452,
+    "Cell(max_leaf_nodes=15, l2_regularization=0.0, max_iter=400, min_samples_leaf=200, decay=1.0)": 0.23732035036471963,
+    "Cell(max_leaf_nodes=15, l2_regularization=1.0, max_iter=200, min_samples_leaf=50, decay=0.5)": 0.2293989605702143,
+    "Cell(max_leaf_nodes=15, l2_regularization=1.0, max_iter=200, min_samples_leaf=50, decay=0.7)": 0.2303710783633159,
+    "Cell(max_leaf_nodes=15, l2_regularization=1.0, max_iter=200, min_samples_leaf=50, decay=0.85)": 0.23152963684486422,
+    "Cell(max_leaf_nodes=15, l2_regularization=1.0, max_iter=200, min_samples_leaf=50, decay=1.0)": 0.23249793239273184,
+    "Cell(max_leaf_nodes=15, l2_regularization=1.0, max_iter=200, min_samples_leaf=200, decay=0.5)": 0.22983267257516818,
+    "Cell(max_leaf_nodes=15, l2_regularization=1.0, max_iter=200, min_samples_leaf=200, decay=0.7)": 0.23048432802896598,
+    "Cell(max_leaf_nodes=15, l2_regularization=1.0, max_iter=200, min_samples_leaf=200, decay=0.85)": 0.23027196455676308,
+    "Cell(max_leaf_nodes=15, l2_regularization=1.0, max_iter=200, min_samples_leaf=200, decay=1.0)": 0.2307749008513426,
+    "Cell(max_leaf_nodes=15, l2_regularization=1.0, max_iter=400, min_samples_leaf=50, decay=0.5)": 0.2411449517215977,
+    "Cell(max_leaf_nodes=15, l2_regularization=1.0, max_iter=400, min_samples_leaf=50, decay=0.7)": 0.2424980955997557,
+    "Cell(max_leaf_nodes=15, l2_regularization=1.0, max_iter=400, min_samples_leaf=50, decay=0.85)": 0.24353911640190076,
+    "Cell(max_leaf_nodes=15, l2_regularization=1.0, max_iter=400, min_samples_leaf=50, decay=1.0)": 0.24540256724345075,
+    "Cell(max_leaf_nodes=15, l2_regularization=1.0, max_iter=400, min_samples_leaf=200, decay=0.5)": 0.23612980871861972,
+    "Cell(max_leaf_nodes=15, l2_regularization=1.0, max_iter=400, min_samples_leaf=200, decay=0.7)": 0.23676948170262355,
+    "Cell(max_leaf_nodes=15, l2_regularization=1.0, max_iter=400, min_samples_leaf=200, decay=0.85)": 0.23697330945205786,
+    "Cell(max_leaf_nodes=15, l2_regularization=1.0, max_iter=400, min_samples_leaf=200, decay=1.0)": 0.23741833358411427
+   }
+  },
+  "efficiency": {
+   "QB|carry|yards": {
+    "mean": 0.3558544653019917,
+    "tau2": -7.00107565585809,
+    "noise": 32.35772579083944,
+    "units": 132,
+    "k": Infinity,
+    "pooled_fully": true
+   },
+   "QB|carry|td": {
+    "mean": 1.0791022825740468,
+    "tau2": -104.04963340103446,
+    "noise": 1.0791022825740468,
+    "units": 132,
+    "k": Infinity,
+    "pooled_fully": true
+   },
+   "QB|dropback|yards": {
+    "mean": -0.13688300746427728,
+    "tau2": 1.0645589048436692,
+    "noise": 82.53073137593115,
+    "units": 154,
+    "k": 77.52575362473796,
+    "pooled_fully": false
+   },
+   "QB|dropback|scramble": {
+    "mean": 0.04624902896459882,
+    "tau2": 0.0110796014383265,
+    "noise": 0.04411005628443052,
+    "units": 153,
+    "k": 3.9811952198790515,
+    "pooled_fully": false
+   },
+   "QB|target|yards": {
+    "mean": -2.991689946385949,
+    "tau2": -19.67538439743403,
+    "noise": 39.061535491930655,
+    "units": 14,
+    "k": Infinity,
+    "pooled_fully": true
+   },
+   "QB|target|catch": {
+    "mean": 0.11466130873209686,
+    "tau2": -0.08892458683855597,
+    "noise": 0.19437397372567042,
+    "units": 14,
+    "k": Infinity,
+    "pooled_fully": true
+   },
+   "QB|target|td": {
+    "mean": 0.44960218394979895,
+    "tau2": -75.64438411338047,
+    "noise": 0.44960218394979895,
+    "units": 14,
+    "k": Infinity,
+    "pooled_fully": true
+   },
+   "RB|carry|yards": {
+    "mean": 0.033436770358255395,
+    "tau2": -1.242221587724404,
+    "noise": 34.57363719558225,
+    "units": 312,
+    "k": Infinity,
+    "pooled_fully": true
+   },
+   "RB|carry|td": {
+    "mean": 0.9864382931119592,
+    "tau2": -26.41121909833436,
+    "noise": 0.9864382931119592,
+    "units": 312,
+    "k": Infinity,
+    "pooled_fully": true
+   },
+   "RB|dropback|yards": {
+    "mean": -1.1447541295909407,
+    "tau2": 51.96570909530415,
+    "noise": 20.82020471869603,
+    "units": 14,
+    "k": 0.4006527589282417,
+    "pooled_fully": false
+   },
+   "RB|dropback|scramble": {
+    "mean": 0.0,
+    "tau2": 0.0,
+    "noise": 0.0,
+    "units": 13,
+    "k": Infinity,
+    "pooled_fully": true
+   },
+   "RB|target|yards": {
+    "mean": 0.2129924287275022,
+    "tau2": 0.5964888766946821,
+    "noise": 50.68851331152182,
+    "units": 295,
+    "k": 84.97813671296198,
+    "pooled_fully": false
+   },
+   "RB|target|catch": {
+    "mean": 0.0033367577712096926,
+    "tau2": -0.0004982207500951706,
+    "noise": 0.16659694227027408,
+    "units": 295,
+    "k": Infinity,
+    "pooled_fully": true
+   },
+   "RB|target|td": {
+    "mean": 1.0824253399576507,
+    "tau2": -40.61053941576104,
+    "noise": 1.0824253399576507,
+    "units": 295,
+    "k": Infinity,
+    "pooled_fully": true
+   },
+   "TE|carry|yards": {
+    "mean": 0.92439041883242,
+    "tau2": -22.952084744740414,
+    "noise": 62.59056962143317,
+    "units": 33,
+    "k": Infinity,
+    "pooled_fully": true
+   },
+   "TE|carry|td": {
+    "mean": 1.4796218872790599,
+    "tau2": -124.79301062140337,
+    "noise": 1.4796218872790599,
+    "units": 33,
+    "k": Infinity,
+    "pooled_fully": true
+   },
+   "TE|dropback|yards": {
+    "mean": -0.16544627880570908,
+    "tau2": -35.14823370697968,
+    "noise": 118.89063489992735,
+    "units": 4,
+    "k": Infinity,
+    "pooled_fully": true
+   },
+   "TE|dropback|scramble": {
+    "mean": 0.08860759493670886,
+    "tau2": -0.03963007689259465,
+    "noise": 0.08075628905624098,
+    "units": 4,
+    "k": Infinity,
+    "pooled_fully": true
+   },
+   "TE|target|yards": {
+    "mean": 0.19703972016878918,
+    "tau2": -0.3705774459029474,
+    "noise": 63.28936730032696,
+    "units": 243,
+    "k": Infinity,
+    "pooled_fully": true
+   },
+   "TE|target|catch": {
+    "mean": 0.014469051737654911,
+    "tau2": 0.011526920243812182,
+    "noise": 0.2003736422514878,
+    "units": 243,
+    "k": 17.383103033011032,
+    "pooled_fully": false
+   },
+   "TE|target|td": {
+    "mean": 1.0398277044569073,
+    "tau2": -34.41200970848617,
+    "noise": 1.0398277044569073,
+    "units": 243,
+    "k": Infinity,
+    "pooled_fully": true
+   },
+   "WR|carry|yards": {
+    "mean": 1.212791916885324,
+    "tau2": -8.195009687978224,
+    "noise": 78.87475649464507,
+    "units": 198,
+    "k": Infinity,
+    "pooled_fully": true
+   },
+   "WR|carry|td": {
+    "mean": 1.6063727435953594,
+    "tau2": -111.04576859043416,
+    "noise": 1.6063727435953594,
+    "units": 198,
+    "k": Infinity,
+    "pooled_fully": true
+   },
+   "WR|dropback|yards": {
+    "mean": 1.0495273755535368,
+    "tau2": 44.77521235261088,
+    "noise": 82.24730983225659,
+    "units": 37,
+    "k": 1.8368937970533306,
+    "pooled_fully": false
+   },
+   "WR|dropback|scramble": {
+    "mean": 0.13333333333333333,
+    "tau2": 0.006662585450464262,
+    "noise": 0.11555555555555556,
+    "units": 33,
+    "k": 17.34395099540576,
+    "pooled_fully": false
+   },
+   "WR|target|yards": {
+    "mean": -0.07156408450418064,
+    "tau2": -3.568965063567383,
+    "noise": 96.66536142310966,
+    "units": 446,
+    "k": Infinity,
+    "pooled_fully": true
+   },
+   "WR|target|catch": {
+    "mean": 0.005451249938409418,
+    "tau2": -0.0004215257575219643,
+    "noise": 0.20718456433417268,
+    "units": 446,
+    "k": Infinity,
+    "pooled_fully": true
+   },
+   "WR|target|td": {
+    "mean": 0.9336453350500871,
+    "tau2": -15.950064895351332,
+    "noise": 0.9336453350500871,
+    "units": 446,
+    "k": Infinity,
+    "pooled_fully": true
+   }
+  },
+  "efficiency_pooled_fully": [
+   "QB|carry|td",
+   "QB|carry|yards",
+   "QB|target|catch",
+   "QB|target|td",
+   "QB|target|yards",
+   "RB|carry|td",
+   "RB|carry|yards",
+   "RB|dropback|scramble",
+   "RB|target|catch",
+   "RB|target|td",
+   "TE|carry|td",
+   "TE|carry|yards",
+   "TE|dropback|scramble",
+   "TE|dropback|yards",
+   "TE|target|td",
+   "TE|target|yards",
+   "WR|carry|td",
+   "WR|carry|yards",
+   "WR|target|catch",
+   "WR|target|td",
+   "WR|target|yards"
+  ],
+  "role_priors": {
+   "target": {
+    "features": [
+     "ngs_rush_yards_over_expected_per_carry",
+     "ngs_average_separation",
+     "ngs_completion_over_expected",
+     "ngs_time_to_throw",
+     "pfr_broken_tackles_per_touch",
+     "pfr_pressured_per_dropback"
+    ],
+    "coefficients": {
+     "QB": [
+      -3.7280088185471043,
+      1.823430295644357e-12,
+      -3.7280088185461566,
+      -5.684341886080802e-14,
+      -3.7280088185458196,
+      0.22657206989804257,
+      -6.6443474095369455,
+      0.8265270410967626,
+      -6.6443474095369455,
+      277.05068028186685,
+      12.675769271348459,
+      24.722713463851655,
+      12.675769271348459
+     ],
+     "RB": [
+      -0.0009270052476707338,
+      -0.13042840260250635,
+      0.05041160037305499,
+      -1.1102230246251565e-16,
+      -0.0009270052476706067,
+      1.6653345369377348e-16,
+      -0.0009270052476704402,
+      0.0,
+      -0.0009270052476705512,
+      1.00218428868374,
+      1.4096226808409766,
+      0.20606256106656737,
+      0.14406404534758788
+     ],
+     "TE": [
+      0.07448445313595237,
+      -7.292777493006497e-15,
+      0.07448445313594987,
+      -0.10418446431107474,
+      0.112567532085828,
+      0.0,
+      0.07448445313595677,
+      0.0,
+      0.07448445313595398,
+      0.6862222190630859,
+      -2.1026521024344085,
+      3.9523635414043516,
+      0.16003637779899646
+     ],
+     "WR": [
+      0.11160749118707045,
+      1.8735013540549517e-16,
+      0.11160749118706993,
+      -0.18118333311917129,
+      -1.0690553607491862,
+      0.0,
+      0.11160749118706954,
+      0.0,
+      0.11160749118706982,
+      2.9371220884835836,
+      0.45763604351665355,
+      0.6375937143327479,
+      -0.11236699693924264
+     ]
+    }
+   },
+   "carry": {
+    "features": [
+     "ngs_rush_yards_over_expected_per_carry",
+     "ngs_average_separation",
+     "ngs_completion_over_expected",
+     "ngs_time_to_throw",
+     "pfr_broken_tackles_per_touch",
+     "pfr_pressured_per_dropback"
+    ],
+    "coefficients": {
+     "QB": [
+      -1.801038640125337,
+      1.1102230246251565e-16,
+      -1.801038640125343,
+      -2.220446049250313e-15,
+      -1.8010386401253364,
+      -0.00841991804874628,
+      2.4816047864153457,
+      1.9699020870404147,
+      2.481604786415346,
+      4.23456490998233,
+      -1.1704337076956115,
+      0.3621642795083939,
+      0.9144117957564818
+     ],
+     "RB": [
+      -0.035579479881959246,
+      0.19778916927314608,
+      -0.19162184238370428,
+      1.734723475976807e-17,
+      -0.03557947988195923,
+      3.469446951953614e-18,
+      -0.035579479881959204,
+      0.0,
+      -0.03557947988195923,
+      0.011854327462259954,
+      -0.896238374611177,
+      -0.1211757264167551,
+      0.20700829955128425
+     ],
+     "TE": [
+      222.703180110605,
+      -4.050093593832571e-12,
+      222.7031801106048,
+      0.30453384183567733,
+      5.004500655308154,
+      -4.303243801507068,
+      -223.9240286555662,
+      -168.15047144712344,
+      -223.92402865558654,
+      -0.6466797517364591,
+      -6.13799217520298,
+      -12.16903860042025,
+      0.48540839124615165
+     ],
+     "WR": [
+      0.42194043998422276,
+      1.6653345369377348e-16,
+      0.4219404399842232,
+      0.15091192487793365,
+      0.6809417919917684,
+      -4.440892098500626e-16,
+      0.42194043998422254,
+      0.0,
+      0.4219404399842231,
+      -1.3163116449216719,
+      -1.3992586213758909,
+      -2.793216980344593,
+      -0.8244427177954974
+     ]
+    }
+   },
+   "dropback": {
+    "features": [
+     "ngs_rush_yards_over_expected_per_carry",
+     "ngs_average_separation",
+     "ngs_completion_over_expected",
+     "ngs_time_to_throw",
+     "pfr_broken_tackles_per_touch",
+     "pfr_pressured_per_dropback"
+    ],
+    "coefficients": {
+     "QB": [
+      0.22056075889821636,
+      9.71445146547012e-17,
+      0.22056075889821408,
+      5.551115123125783e-16,
+      0.22056075889821547,
+      0.03963167851000547,
+      -0.7002232298522972,
+      -0.06283766949304781,
+      -0.7002232298522969,
+      -2.1632279249491364,
+      1.4053419591166054,
+      -2.446137622934439,
+      -1.461789218416078
+     ],
+     "RB": [
+      0.8496041000527238,
+      3.323826771454861,
+      -1.4406158340896833,
+      0.0,
+      0.8496041000525852,
+      0.0,
+      0.8496041000525852,
+      0.0,
+      0.8496041000525852,
+      -42.49682192662271,
+      0.0,
+      0.0,
+      0.8496041000525852
+     ],
+     "TE": [
+      -161.68029645861458,
+      4.142464149481384e-12,
+      -161.68029645862126,
+      -55.08754279044351,
+      -141.8830017933614,
+      3.916200358578191,
+      228.9499799834248,
+      164.3771505305015,
+      228.94997998343035,
+      17.722887513209862,
+      0.0,
+      79.13515131942638,
+      11.54753403780295
+     ],
+     "WR": [
+      3.287362550016512,
+      4.996003610813204e-16,
+      3.287362550016526,
+      -2.6897226525605964,
+      -9.074558724844596,
+      0.0,
+      3.2873625500165278,
+      0.0,
+      3.2873625500165278,
+      -18.580032030150527,
+      0.0,
+      -7.424681256598303,
+      -2.634921622092187
+     ]
+    }
+   }
+  },
+  "residual_means": {
+   "targets": 0.20073372026548672,
+   "carries": 0.14911193431562092,
+   "air_yards": 0.19085459611429953,
+   "red_zone": 0.17423819561786355,
+   "inside_ten": 0.1660793634044663,
+   "dropbacks": 0.14736595459108723
+  },
+  "target_rate": 0.9647616569826265,
+  "dispersion": {
+   "margin_sd": 11.54073676625782,
+   "script_slope": -0.004727829080727661,
+   "plays_dispersion": 532.2830537784836,
+   "plays_sd": 8.301235734214186,
+   "concentration": {
+    "RB|targets": 43.399475395181675,
+    "TE|targets": 71.97903839319542,
+    "WR|targets": 47.110723986234966,
+    "QB|carries": 19.75929004910217,
+    "RB|carries": 7.455077017625907,
+    "TE|carries": 2.4480235118578357,
+    "WR|carries": 74.79331358420045,
+    "QB|dropbacks": 0.9289801375666582
+   },
+   "yards_sd": {
+    "target": 8.979630153860686,
+    "carry": 6.312304056821618,
+    "dropback": 9.093193415582677
+   },
+   "scale": {
+    "QB": 1.5,
+    "RB": 1.3,
+    "TE": 0.8,
+    "WR": 1.0
+   }
+  },
+  "constants": {
+   "2022": {
+    "scramble_yards": 7.318464507827579,
+    "scramble_touchdowns": 0.036242762170276645,
+    "residual_target_td": 0.045589594886243145,
+    "residual_carry_td": 0.034505175304767335
+   },
+   "2023": {
+    "scramble_yards": 7.34690168998728,
+    "scramble_touchdowns": 0.03579865527893876,
+    "residual_target_td": 0.045589594886243145,
+    "residual_carry_td": 0.034505175304767335
+   }
+  },
+  "reported": {
+   "scale_grid_shares": {
+    "QB": {
+     "0.5": [
+      [
+       0.06336088154269973,
+       0.1487603305785124
+      ],
+      [
+       0.06336088154269973,
+       0.1487603305785124
+      ],
+      [
+       0.06336088154269973,
+       0.14600550964187328
+      ]
+     ],
+     "0.55": [
+      [
+       0.06336088154269973,
+       0.1487603305785124
+      ],
+      [
+       0.06336088154269973,
+       0.1487603305785124
+      ],
+      [
+       0.06336088154269973,
+       0.14600550964187328
+      ]
+     ],
+     "0.6": [
+      [
+       0.06336088154269973,
+       0.1487603305785124
+      ],
+      [
+       0.06336088154269973,
+       0.1487603305785124
+      ],
+      [
+       0.06336088154269973,
+       0.1487603305785124
+      ]
+     ],
+     "0.65": [
+      [
+       0.06336088154269973,
+       0.1487603305785124
+      ],
+      [
+       0.06336088154269973,
+       0.1487603305785124
+      ],
+      [
+       0.06336088154269973,
+       0.14600550964187328
+      ]
+     ],
+     "0.7": [
+      [
+       0.06336088154269973,
+       0.14600550964187328
+      ],
+      [
+       0.06336088154269973,
+       0.14600550964187328
+      ],
+      [
+       0.06336088154269973,
+       0.14325068870523416
+      ]
+     ],
+     "0.75": [
+      [
+       0.05785123966942149,
+       0.14325068870523416
+      ],
+      [
+       0.05785123966942149,
+       0.14325068870523416
+      ],
+      [
+       0.05785123966942149,
+       0.14049586776859505
+      ]
+     ],
+     "0.8": [
+      [
+       0.05509641873278237,
+       0.14325068870523416
+      ],
+      [
+       0.05509641873278237,
+       0.14325068870523416
+      ],
+      [
+       0.05509641873278237,
+       0.14049586776859505
+      ]
+     ],
+     "0.85": [
+      [
+       0.05234159779614325,
+       0.14049586776859505
+      ],
+      [
+       0.05234159779614325,
+       0.14049586776859505
+      ],
+      [
+       0.05234159779614325,
+       0.13774104683195593
+      ]
+     ],
+     "0.9": [
+      [
+       0.05234159779614325,
+       0.14049586776859505
+      ],
+      [
+       0.05234159779614325,
+       0.14049586776859505
+      ],
+      [
+       0.05234159779614325,
+       0.13774104683195593
+      ]
+     ],
+     "0.95": [
+      [
+       0.05234159779614325,
+       0.13774104683195593
+      ],
+      [
+       0.05234159779614325,
+       0.13774104683195593
+      ],
+      [
+       0.05234159779614325,
+       0.1349862258953168
+      ]
+     ],
+     "1.0": [
+      [
+       0.05234159779614325,
+       0.13774104683195593
+      ],
+      [
+       0.05234159779614325,
+       0.13774104683195593
+      ],
+      [
+       0.05234159779614325,
+       0.1322314049586777
+      ]
+     ],
+     "1.05": [
+      [
+       0.05234159779614325,
+       0.13774104683195593
+      ],
+      [
+       0.05234159779614325,
+       0.13774104683195593
+      ],
+      [
+       0.05234159779614325,
+       0.1322314049586777
+      ]
+     ],
+     "1.1": [
+      [
+       0.049586776859504134,
+       0.1349862258953168
+      ],
+      [
+       0.049586776859504134,
+       0.1349862258953168
+      ],
+      [
+       0.049586776859504134,
+       0.12947658402203857
+      ]
+     ],
+     "1.15": [
+      [
+       0.049586776859504134,
+       0.1322314049586777
+      ],
+      [
+       0.049586776859504134,
+       0.12947658402203857
+      ],
+      [
+       0.049586776859504134,
+       0.12672176308539945
+      ]
+     ],
+     "1.2": [
+      [
+       0.049586776859504134,
+       0.1322314049586777
+      ],
+      [
+       0.049586776859504134,
+       0.12947658402203857
+      ],
+      [
+       0.049586776859504134,
+       0.12672176308539945
+      ]
+     ],
+     "1.25": [
+      [
+       0.049586776859504134,
+       0.1322314049586777
+      ],
+      [
+       0.049586776859504134,
+       0.12947658402203857
+      ],
+      [
+       0.049586776859504134,
+       0.12672176308539945
+      ]
+     ],
+     "1.3": [
+      [
+       0.049586776859504134,
+       0.12947658402203857
+      ],
+      [
+       0.049586776859504134,
+       0.12672176308539945
+      ],
+      [
+       0.049586776859504134,
+       0.12396694214876033
+      ]
+     ],
+     "1.35": [
+      [
+       0.049586776859504134,
+       0.12947658402203857
+      ],
+      [
+       0.049586776859504134,
+       0.12672176308539945
+      ],
+      [
+       0.049586776859504134,
+       0.12396694214876033
+      ]
+     ],
+     "1.4": [
+      [
+       0.049586776859504134,
+       0.12672176308539945
+      ],
+      [
+       0.049586776859504134,
+       0.12396694214876033
+      ],
+      [
+       0.049586776859504134,
+       0.12121212121212122
+      ]
+     ],
+     "1.45": [
+      [
+       0.049586776859504134,
+       0.12121212121212122
+      ],
+      [
+       0.049586776859504134,
+       0.1184573002754821
+      ],
+      [
+       0.049586776859504134,
+       0.11570247933884298
+      ]
+     ],
+     "1.5": [
+      [
+       0.049586776859504134,
+       0.11294765840220386
+      ],
+      [
+       0.049586776859504134,
+       0.11294765840220386
+      ],
+      [
+       0.049586776859504134,
+       0.11019283746556474
+      ]
+     ],
+     "1.55": [
+      [
+       0.046831955922865015,
+       0.11019283746556474
+      ],
+      [
+       0.046831955922865015,
+       0.11019283746556474
+      ],
+      [
+       0.046831955922865015,
+       0.10743801652892562
+      ]
+     ],
+     "1.6": [
+      [
+       0.046831955922865015,
+       0.10743801652892562
+      ],
+      [
+       0.046831955922865015,
+       0.10743801652892562
+      ],
+      [
+       0.046831955922865015,
+       0.1046831955922865
+      ]
+     ],
+     "1.65": [
+      [
+       0.046831955922865015,
+       0.10743801652892562
+      ],
+      [
+       0.046831955922865015,
+       0.1046831955922865
+      ],
+      [
+       0.046831955922865015,
+       0.1046831955922865
+      ]
+     ],
+     "1.7": [
+      [
+       0.046831955922865015,
+       0.10192837465564739
+      ],
+      [
+       0.046831955922865015,
+       0.09917355371900827
+      ],
+      [
+       0.046831955922865015,
+       0.09917355371900827
+      ]
+     ],
+     "1.75": [
+      [
+       0.046831955922865015,
+       0.09917355371900827
+      ],
+      [
+       0.046831955922865015,
+       0.09641873278236915
+      ],
+      [
+       0.046831955922865015,
+       0.09641873278236915
+      ]
+     ],
+     "1.8": [
+      [
+       0.046831955922865015,
+       0.09917355371900827
+      ],
+      [
+       0.046831955922865015,
+       0.09641873278236915
+      ],
+      [
+       0.046831955922865015,
+       0.09641873278236915
+      ]
+     ],
+     "1.85": [
+      [
+       0.046831955922865015,
+       0.09641873278236915
+      ],
+      [
+       0.046831955922865015,
+       0.09366391184573003
+      ],
+      [
+       0.046831955922865015,
+       0.09366391184573003
+      ]
+     ],
+     "1.9": [
+      [
+       0.046831955922865015,
+       0.09366391184573003
+      ],
+      [
+       0.046831955922865015,
+       0.09090909090909091
+      ],
+      [
+       0.046831955922865015,
+       0.09090909090909091
+      ]
+     ],
+     "1.95": [
+      [
+       0.0440771349862259,
+       0.09366391184573003
+      ],
+      [
+       0.0440771349862259,
+       0.09090909090909091
+      ],
+      [
+       0.0440771349862259,
+       0.09090909090909091
+      ]
+     ],
+     "2.0": [
+      [
+       0.0440771349862259,
+       0.09366391184573003
+      ],
+      [
+       0.0440771349862259,
+       0.09090909090909091
+      ],
+      [
+       0.0440771349862259,
+       0.09090909090909091
+      ]
+     ]
+    },
+    "RB": {
+     "0.5": [
+      [
+       0.14082687338501293,
+       0.1744186046511628
+      ],
+      [
+       0.14599483204134367,
+       0.18733850129198967
+      ],
+      [
+       0.14470284237726097,
+       0.18733850129198967
+      ]
+     ],
+     "0.55": [
+      [
+       0.14082687338501293,
+       0.1731266149870801
+      ],
+      [
+       0.13953488372093023,
+       0.1847545219638243
+      ],
+      [
+       0.14082687338501293,
+       0.1847545219638243
+      ]
+     ],
+     "0.6": [
+      [
+       0.1343669250645995,
+       0.17183462532299743
+      ],
+      [
+       0.1343669250645995,
+       0.1847545219638243
+      ],
+      [
+       0.13565891472868216,
+       0.1821705426356589
+      ]
+     ],
+     "0.65": [
+      [
+       0.13178294573643412,
+       0.17054263565891473
+      ],
+      [
+       0.13049095607235142,
+       0.1834625322997416
+      ],
+      [
+       0.12919896640826872,
+       0.17958656330749354
+      ]
+     ],
+     "0.7": [
+      [
+       0.12919896640826872,
+       0.17054263565891473
+      ],
+      [
+       0.12661498708010335,
+       0.1834625322997416
+      ],
+      [
+       0.1227390180878553,
+       0.17958656330749354
+      ]
+     ],
+     "0.75": [
+      [
+       0.12403100775193798,
+       0.16925064599483206
+      ],
+      [
+       0.12532299741602068,
+       0.1821705426356589
+      ],
+      [
+       0.11498708010335917,
+       0.17958656330749354
+      ]
+     ],
+     "0.8": [
+      [
+       0.11886304909560723,
+       0.16666666666666666
+      ],
+      [
+       0.12144702842377261,
+       0.18087855297157623
+      ],
+      [
+       0.10852713178294573,
+       0.17700258397932817
+      ]
+     ],
+     "0.85": [
+      [
+       0.11757105943152454,
+       0.16666666666666666
+      ],
+      [
+       0.11757105943152454,
+       0.17829457364341086
+      ],
+      [
+       0.10594315245478036,
+       0.17571059431524547
+      ]
+     ],
+     "0.9": [
+      [
+       0.1124031007751938,
+       0.1640826873385013
+      ],
+      [
+       0.1111111111111111,
+       0.17829457364341086
+      ],
+      [
+       0.09689922480620156,
+       0.1744186046511628
+      ]
+     ],
+     "0.95": [
+      [
+       0.10852713178294573,
+       0.1640826873385013
+      ],
+      [
+       0.1020671834625323,
+       0.17700258397932817
+      ],
+      [
+       0.09302325581395349,
+       0.1731266149870801
+      ]
+     ],
+     "1.0": [
+      [
+       0.10594315245478036,
+       0.1640826873385013
+      ],
+      [
+       0.09689922480620156,
+       0.1744186046511628
+      ],
+      [
+       0.082687338501292,
+       0.17054263565891473
+      ]
+     ],
+     "1.05": [
+      [
+       0.10077519379844961,
+       0.1640826873385013
+      ],
+      [
+       0.09043927648578812,
+       0.17183462532299743
+      ],
+      [
+       0.07751937984496124,
+       0.16925064599483206
+      ]
+     ],
+     "1.1": [
+      [
+       0.09819121447028424,
+       0.16279069767441862
+      ],
+      [
+       0.08527131782945736,
+       0.17183462532299743
+      ],
+      [
+       0.07493540051679587,
+       0.16666666666666666
+      ]
+     ],
+     "1.15": [
+      [
+       0.09560723514211886,
+       0.16279069767441862
+      ],
+      [
+       0.07881136950904392,
+       0.17054263565891473
+      ],
+      [
+       0.0710594315245478,
+       0.165374677002584
+      ]
+     ],
+     "1.2": [
+      [
+       0.0917312661498708,
+       0.16279069767441862
+      ],
+      [
+       0.07235142118863049,
+       0.16666666666666666
+      ],
+      [
+       0.0710594315245478,
+       0.165374677002584
+      ]
+     ],
+     "1.25": [
+      [
+       0.08397932816537468,
+       0.16279069767441862
+      ],
+      [
+       0.06718346253229975,
+       0.16020671834625322
+      ],
+      [
+       0.06201550387596899,
+       0.16279069767441862
+      ]
+     ],
+     "1.3": [
+      [
+       0.08139534883720931,
+       0.16020671834625322
+      ],
+      [
+       0.06459948320413436,
+       0.16020671834625322
+      ],
+      [
+       0.05813953488372093,
+       0.16020671834625322
+      ]
+     ],
+     "1.35": [
+      [
+       0.07493540051679587,
+       0.15633074935400518
+      ],
+      [
+       0.05813953488372093,
+       0.15891472868217055
+      ],
+      [
+       0.05297157622739018,
+       0.15633074935400518
+      ]
+     ],
+     "1.4": [
+      [
+       0.0710594315245478,
+       0.1524547803617571
+      ],
+      [
+       0.056847545219638244,
+       0.15374677002583978
+      ],
+      [
+       0.046511627906976744,
+       0.15633074935400518
+      ]
+     ],
+     "1.45": [
+      [
+       0.06459948320413436,
+       0.1524547803617571
+      ],
+      [
+       0.05167958656330749,
+       0.14987080103359174
+      ],
+      [
+       0.03875968992248062,
+       0.15633074935400518
+      ]
+     ],
+     "1.5": [
+      [
+       0.06201550387596899,
+       0.1511627906976744
+      ],
+      [
+       0.04909560723514212,
+       0.14857881136950904
+      ],
+      [
+       0.03488372093023256,
+       0.15503875968992248
+      ]
+     ],
+     "1.55": [
+      [
+       0.060723514211886306,
+       0.14987080103359174
+      ],
+      [
+       0.04909560723514212,
+       0.14470284237726097
+      ],
+      [
+       0.03359173126614987,
+       0.1511627906976744
+      ]
+     ],
+     "1.6": [
+      [
+       0.056847545219638244,
+       0.14599483204134367
+      ],
+      [
+       0.04392764857881137,
+       0.1434108527131783
+      ],
+      [
+       0.031007751937984496,
+       0.14987080103359174
+      ]
+     ],
+     "1.65": [
+      [
+       0.05555555555555555,
+       0.1434108527131783
+      ],
+      [
+       0.040051679586563305,
+       0.1421188630490956
+      ],
+      [
+       0.028423772609819122,
+       0.14728682170542637
+      ]
+     ],
+     "1.7": [
+      [
+       0.05167958656330749,
+       0.1421188630490956
+      ],
+      [
+       0.03617571059431524,
+       0.13695090439276486
+      ],
+      [
+       0.027131782945736434,
+       0.14082687338501293
+      ]
+     ],
+     "1.75": [
+      [
+       0.04909560723514212,
+       0.13953488372093023
+      ],
+      [
+       0.03488372093023256,
+       0.1343669250645995
+      ],
+      [
+       0.025839793281653745,
+       0.13565891472868216
+      ]
+     ],
+     "1.8": [
+      [
+       0.04521963824289406,
+       0.13824289405684753
+      ],
+      [
+       0.03359173126614987,
+       0.12919896640826872
+      ],
+      [
+       0.025839793281653745,
+       0.13049095607235142
+      ]
+     ],
+     "1.85": [
+      [
+       0.041343669250646,
+       0.1343669250645995
+      ],
+      [
+       0.03229974160206718,
+       0.12790697674418605
+      ],
+      [
+       0.02454780361757106,
+       0.12790697674418605
+      ]
+     ],
+     "1.9": [
+      [
+       0.03875968992248062,
+       0.1330749354005168
+      ],
+      [
+       0.028423772609819122,
+       0.12532299741602068
+      ],
+      [
+       0.023255813953488372,
+       0.12532299741602068
+      ]
+     ],
+     "1.95": [
+      [
+       0.037467700258397935,
+       0.12919896640826872
+      ],
+      [
+       0.027131782945736434,
+       0.12144702842377261
+      ],
+      [
+       0.023255813953488372,
+       0.11886304909560723
+      ]
+     ],
+     "2.0": [
+      [
+       0.03229974160206718,
+       0.12661498708010335
+      ],
+      [
+       0.027131782945736434,
+       0.11886304909560723
+      ],
+      [
+       0.020671834625323,
+       0.11757105943152454
+      ]
+     ]
+    },
+    "TE": {
+     "0.5": [
+      [
+       0.08020050125313283,
+       0.15789473684210525
+      ],
+      [
+       0.09273182957393483,
+       0.16290726817042606
+      ],
+      [
+       0.09523809523809523,
+       0.15789473684210525
+      ]
+     ],
+     "0.55": [
+      [
+       0.07769423558897243,
+       0.15789473684210525
+      ],
+      [
+       0.08771929824561403,
+       0.16290726817042606
+      ],
+      [
+       0.09273182957393483,
+       0.15538847117794485
+      ]
+     ],
+     "0.6": [
+      [
+       0.07518796992481203,
+       0.15538847117794485
+      ],
+      [
+       0.08771929824561403,
+       0.16290726817042606
+      ],
+      [
+       0.09273182957393483,
+       0.15538847117794485
+      ]
+     ],
+     "0.65": [
+      [
+       0.07268170426065163,
+       0.15538847117794485
+      ],
+      [
+       0.08020050125313283,
+       0.16040100250626566
+      ],
+      [
+       0.09022556390977443,
+       0.15288220551378445
+      ]
+     ],
+     "0.7": [
+      [
+       0.06766917293233082,
+       0.15538847117794485
+      ],
+      [
+       0.08020050125313283,
+       0.15789473684210525
+      ],
+      [
+       0.08270676691729323,
+       0.15037593984962405
+      ]
+     ],
+     "0.75": [
+      [
+       0.06516290726817042,
+       0.15288220551378445
+      ],
+      [
+       0.07769423558897243,
+       0.15789473684210525
+      ],
+      [
+       0.08270676691729323,
+       0.15037593984962405
+      ]
+     ],
+     "0.8": [
+      [
+       0.06516290726817042,
+       0.15037593984962405
+      ],
+      [
+       0.07518796992481203,
+       0.15538847117794485
+      ],
+      [
+       0.07518796992481203,
+       0.14786967418546365
+      ]
+     ],
+     "0.85": [
+      [
+       0.06265664160401002,
+       0.15037593984962405
+      ],
+      [
+       0.06766917293233082,
+       0.15288220551378445
+      ],
+      [
+       0.07017543859649122,
+       0.14786967418546365
+      ]
+     ],
+     "0.9": [
+      [
+       0.06265664160401002,
+       0.14786967418546365
+      ],
+      [
+       0.06766917293233082,
+       0.15288220551378445
+      ],
+      [
+       0.06766917293233082,
+       0.14786967418546365
+      ]
+     ],
+     "0.95": [
+      [
+       0.06015037593984962,
+       0.14786967418546365
+      ],
+      [
+       0.06766917293233082,
+       0.15288220551378445
+      ],
+      [
+       0.06015037593984962,
+       0.14786967418546365
+      ]
+     ],
+     "1.0": [
+      [
+       0.06015037593984962,
+       0.14786967418546365
+      ],
+      [
+       0.06766917293233082,
+       0.15288220551378445
+      ],
+      [
+       0.05012531328320802,
+       0.14536340852130325
+      ]
+     ],
+     "1.05": [
+      [
+       0.06015037593984962,
+       0.14786967418546365
+      ],
+      [
+       0.06516290726817042,
+       0.15288220551378445
+      ],
+      [
+       0.045112781954887216,
+       0.14536340852130325
+      ]
+     ],
+     "1.1": [
+      [
+       0.05764411027568922,
+       0.14536340852130325
+      ],
+      [
+       0.06015037593984962,
+       0.14786967418546365
+      ],
+      [
+       0.03759398496240601,
+       0.14536340852130325
+      ]
+     ],
+     "1.15": [
+      [
+       0.05764411027568922,
+       0.14536340852130325
+      ],
+      [
+       0.05764411027568922,
+       0.14786967418546365
+      ],
+      [
+       0.03007518796992481,
+       0.14536340852130325
+      ]
+     ],
+     "1.2": [
+      [
+       0.05513784461152882,
+       0.14536340852130325
+      ],
+      [
+       0.05764411027568922,
+       0.14786967418546365
+      ],
+      [
+       0.02756892230576441,
+       0.14035087719298245
+      ]
+     ],
+     "1.25": [
+      [
+       0.05513784461152882,
+       0.14536340852130325
+      ],
+      [
+       0.05513784461152882,
+       0.14536340852130325
+      ],
+      [
+       0.02506265664160401,
+       0.14035087719298245
+      ]
+     ],
+     "1.3": [
+      [
+       0.05513784461152882,
+       0.14285714285714285
+      ],
+      [
+       0.05263157894736842,
+       0.14536340852130325
+      ],
+      [
+       0.017543859649122806,
+       0.13784461152882205
+      ]
+     ],
+     "1.35": [
+      [
+       0.05513784461152882,
+       0.14285714285714285
+      ],
+      [
+       0.045112781954887216,
+       0.14035087719298245
+      ],
+      [
+       0.017543859649122806,
+       0.13533834586466165
+      ]
+     ],
+     "1.4": [
+      [
+       0.05513784461152882,
+       0.14035087719298245
+      ],
+      [
+       0.045112781954887216,
+       0.13784461152882205
+      ],
+      [
+       0.017543859649122806,
+       0.13533834586466165
+      ]
+     ],
+     "1.45": [
+      [
+       0.05513784461152882,
+       0.14035087719298245
+      ],
+      [
+       0.045112781954887216,
+       0.13784461152882205
+      ],
+      [
+       0.017543859649122806,
+       0.13283208020050125
+      ]
+     ],
+     "1.5": [
+      [
+       0.05513784461152882,
+       0.14035087719298245
+      ],
+      [
+       0.040100250626566414,
+       0.13533834586466165
+      ],
+      [
+       0.015037593984962405,
+       0.13032581453634084
+      ]
+     ],
+     "1.55": [
+      [
+       0.05263157894736842,
+       0.13784461152882205
+      ],
+      [
+       0.03759398496240601,
+       0.13533834586466165
+      ],
+      [
+       0.012531328320802004,
+       0.13032581453634084
+      ]
+     ],
+     "1.6": [
+      [
+       0.05263157894736842,
+       0.13533834586466165
+      ],
+      [
+       0.03508771929824561,
+       0.13533834586466165
+      ],
+      [
+       0.012531328320802004,
+       0.13032581453634084
+      ]
+     ],
+     "1.65": [
+      [
+       0.05263157894736842,
+       0.13032581453634084
+      ],
+      [
+       0.03258145363408521,
+       0.13533834586466165
+      ],
+      [
+       0.012531328320802004,
+       0.12781954887218044
+      ]
+     ],
+     "1.7": [
+      [
+       0.05012531328320802,
+       0.13032581453634084
+      ],
+      [
+       0.02756892230576441,
+       0.13533834586466165
+      ],
+      [
+       0.010025062656641603,
+       0.12531328320802004
+      ]
+     ],
+     "1.75": [
+      [
+       0.045112781954887216,
+       0.13032581453634084
+      ],
+      [
+       0.020050125313283207,
+       0.13283208020050125
+      ],
+      [
+       0.005012531328320802,
+       0.12531328320802004
+      ]
+     ],
+     "1.8": [
+      [
+       0.045112781954887216,
+       0.13032581453634084
+      ],
+      [
+       0.020050125313283207,
+       0.13283208020050125
+      ],
+      [
+       0.005012531328320802,
+       0.12280701754385964
+      ]
+     ],
+     "1.85": [
+      [
+       0.045112781954887216,
+       0.13032581453634084
+      ],
+      [
+       0.017543859649122806,
+       0.13032581453634084
+      ],
+      [
+       0.005012531328320802,
+       0.12280701754385964
+      ]
+     ],
+     "1.9": [
+      [
+       0.042606516290726815,
+       0.13032581453634084
+      ],
+      [
+       0.015037593984962405,
+       0.13032581453634084
+      ],
+      [
+       0.002506265664160401,
+       0.12280701754385964
+      ]
+     ],
+     "1.95": [
+      [
+       0.042606516290726815,
+       0.13032581453634084
+      ],
+      [
+       0.012531328320802004,
+       0.12781954887218044
+      ],
+      [
+       0.002506265664160401,
+       0.12280701754385964
+      ]
+     ],
+     "2.0": [
+      [
+       0.03759398496240601,
+       0.13032581453634084
+      ],
+      [
+       0.012531328320802004,
+       0.12280701754385964
+      ],
+      [
+       0.002506265664160401,
+       0.12030075187969924
+      ]
+     ]
+    },
+    "WR": {
+     "0.5": [
+      [
+       0.11993243243243243,
+       0.16469594594594594
+      ],
+      [
+       0.13175675675675674,
+       0.16891891891891891
+      ],
+      [
+       0.14527027027027026,
+       0.16047297297297297
+      ]
+     ],
+     "0.55": [
+      [
+       0.11739864864864864,
+       0.16385135135135134
+      ],
+      [
+       0.12837837837837837,
+       0.16807432432432431
+      ],
+      [
+       0.14104729729729729,
+       0.15962837837837837
+      ]
+     ],
+     "0.6": [
+      [
+       0.11570945945945946,
+       0.16131756756756757
+      ],
+      [
+       0.125,
+       0.16807432432432431
+      ],
+      [
+       0.13260135135135134,
+       0.15962837837837837
+      ]
+     ],
+     "0.65": [
+      [
+       0.11570945945945946,
+       0.15878378378378377
+      ],
+      [
+       0.12331081081081081,
+       0.16722972972972974
+      ],
+      [
+       0.13091216216216217,
+       0.1579391891891892
+      ]
+     ],
+     "0.7": [
+      [
+       0.11486486486486487,
+       0.1579391891891892
+      ],
+      [
+       0.12077702702702703,
+       0.16469594594594594
+      ],
+      [
+       0.12246621621621621,
+       0.1554054054054054
+      ]
+     ],
+     "0.75": [
+      [
+       0.11233108108108109,
+       0.1570945945945946
+      ],
+      [
+       0.11570945945945946,
+       0.16300675675675674
+      ],
+      [
+       0.11317567567567567,
+       0.1545608108108108
+      ]
+     ],
+     "0.8": [
+      [
+       0.10810810810810811,
+       0.15625
+      ],
+      [
+       0.11317567567567567,
+       0.15962837837837837
+      ],
+      [
+       0.10726351351351351,
+       0.15202702702702703
+      ]
+     ],
+     "0.85": [
+      [
+       0.10557432432432433,
+       0.15625
+      ],
+      [
+       0.1097972972972973,
+       0.1579391891891892
+      ],
+      [
+       0.10135135135135136,
+       0.15118243243243243
+      ]
+     ],
+     "0.9": [
+      [
+       0.10388513513513513,
+       0.1554054054054054
+      ],
+      [
+       0.10557432432432433,
+       0.1554054054054054
+      ],
+      [
+       0.09375,
+       0.14864864864864866
+      ]
+     ],
+     "0.95": [
+      [
+       0.10135135135135136,
+       0.15371621621621623
+      ],
+      [
+       0.10135135135135136,
+       0.15371621621621623
+      ],
+      [
+       0.08952702702702703,
+       0.14695945945945946
+      ]
+     ],
+     "1.0": [
+      [
+       0.10050675675675676,
+       0.15202702702702703
+      ],
+      [
+       0.0945945945945946,
+       0.1545608108108108
+      ],
+      [
+       0.08023648648648649,
+       0.14273648648648649
+      ]
+     ],
+     "1.05": [
+      [
+       0.09881756756756757,
+       0.15118243243243243
+      ],
+      [
+       0.08699324324324324,
+       0.15287162162162163
+      ],
+      [
+       0.07263513513513513,
+       0.14189189189189189
+      ]
+     ],
+     "1.1": [
+      [
+       0.09628378378378379,
+       0.14949324324324326
+      ],
+      [
+       0.08108108108108109,
+       0.15202702702702703
+      ],
+      [
+       0.06587837837837837,
+       0.13851351351351351
+      ]
+     ],
+     "1.15": [
+      [
+       0.0929054054054054,
+       0.14695945945945946
+      ],
+      [
+       0.08023648648648649,
+       0.14949324324324326
+      ],
+      [
+       0.060810810810810814,
+       0.13766891891891891
+      ]
+     ],
+     "1.2": [
+      [
+       0.09121621621621621,
+       0.14611486486486486
+      ],
+      [
+       0.07601351351351351,
+       0.14780405405405406
+      ],
+      [
+       0.05489864864864865,
+       0.13344594594594594
+      ]
+     ],
+     "1.25": [
+      [
+       0.08614864864864864,
+       0.14527027027027026
+      ],
+      [
+       0.07094594594594594,
+       0.14442567567567569
+      ],
+      [
+       0.048986486486486486,
+       0.13006756756756757
+      ]
+     ],
+     "1.3": [
+      [
+       0.08192567567567567,
+       0.14527027027027026
+      ],
+      [
+       0.06925675675675676,
+       0.14273648648648649
+      ],
+      [
+       0.0464527027027027,
+       0.12837837837837837
+      ]
+     ],
+     "1.35": [
+      [
+       0.0777027027027027,
+       0.14527027027027026
+      ],
+      [
+       0.06418918918918919,
+       0.13851351351351351
+      ],
+      [
+       0.03885135135135135,
+       0.1266891891891892
+      ]
+     ],
+     "1.4": [
+      [
+       0.07263513513513513,
+       0.14527027027027026
+      ],
+      [
+       0.05912162162162162,
+       0.13597972972972974
+      ],
+      [
+       0.03209459459459459,
+       0.12246621621621621
+      ]
+     ],
+     "1.45": [
+      [
+       0.07094594594594594,
+       0.14358108108108109
+      ],
+      [
+       0.05574324324324324,
+       0.13175675675675674
+      ],
+      [
+       0.030405405405405407,
+       0.12162162162162163
+      ]
+     ],
+     "1.5": [
+      [
+       0.06925675675675676,
+       0.14189189189189189
+      ],
+      [
+       0.052364864864864864,
+       0.1258445945945946
+      ],
+      [
+       0.030405405405405407,
+       0.11993243243243243
+      ]
+     ],
+     "1.55": [
+      [
+       0.06587837837837837,
+       0.13935810810810811
+      ],
+      [
+       0.04983108108108108,
+       0.1241554054054054
+      ],
+      [
+       0.02787162162162162,
+       0.11739864864864864
+      ]
+     ],
+     "1.6": [
+      [
+       0.0625,
+       0.13682432432432431
+      ],
+      [
+       0.044763513513513514,
+       0.12246621621621621
+      ],
+      [
+       0.024493243243243243,
+       0.11402027027027027
+      ]
+     ],
+     "1.65": [
+      [
+       0.060810810810810814,
+       0.13429054054054054
+      ],
+      [
+       0.04222972972972973,
+       0.12077702702702703
+      ],
+      [
+       0.02364864864864865,
+       0.11317567567567567
+      ]
+     ],
+     "1.7": [
+      [
+       0.05912162162162162,
+       0.13260135135135134
+      ],
+      [
+       0.04054054054054054,
+       0.11993243243243243
+      ],
+      [
+       0.02027027027027027,
+       0.11148648648648649
+      ]
+     ],
+     "1.75": [
+      [
+       0.05827702702702703,
+       0.13175675675675674
+      ],
+      [
+       0.037162162162162164,
+       0.11739864864864864
+      ],
+      [
+       0.016047297297297296,
+       0.10810810810810811
+      ]
+     ],
+     "1.8": [
+      [
+       0.05574324324324324,
+       0.12837837837837837
+      ],
+      [
+       0.033783783783783786,
+       0.11655405405405406
+      ],
+      [
+       0.01266891891891892,
+       0.10726351351351351
+      ]
+     ],
+     "1.85": [
+      [
+       0.04983108108108108,
+       0.1241554054054054
+      ],
+      [
+       0.02787162162162162,
+       0.11486486486486487
+      ],
+      [
+       0.011824324324324325,
+       0.10472972972972973
+      ]
+     ],
+     "1.9": [
+      [
+       0.0472972972972973,
+       0.12077702702702703
+      ],
+      [
+       0.026182432432432432,
+       0.11317567567567567
+      ],
+      [
+       0.009290540540540541,
+       0.10050675675675676
+      ]
+     ],
+     "1.95": [
+      [
+       0.044763513513513514,
+       0.11993243243243243
+      ],
+      [
+       0.02533783783783784,
+       0.11317567567567567
+      ],
+      [
+       0.006756756756756757,
+       0.09797297297297297
+      ]
+     ],
+     "2.0": [
+      [
+       0.041385135135135136,
+       0.11824324324324324
+      ],
+      [
+       0.02533783783783784,
+       0.1089527027027027
+      ],
+      [
+       0.006756756756756757,
+       0.09712837837837837
+      ]
+     ]
+    }
+   },
+   "efficiency_cells_pooled_fully": [
+    "QB|carry|td",
+    "QB|carry|yards",
+    "QB|target|catch",
+    "QB|target|td",
+    "QB|target|yards",
+    "RB|carry|td",
+    "RB|carry|yards",
+    "RB|dropback|scramble",
+    "RB|target|catch",
+    "RB|target|td",
+    "TE|carry|td",
+    "TE|carry|yards",
+    "TE|dropback|scramble",
+    "TE|dropback|yards",
+    "TE|target|td",
+    "TE|target|yards",
+    "WR|carry|td",
+    "WR|carry|yards",
+    "WR|target|catch",
+    "WR|target|td",
+    "WR|target|yards"
+   ]
+  }
+ },
+ "outcome_seasons_read": {
+  "plays and teams": [
+   2016,
+   2017,
+   2018,
+   2019,
+   2020,
+   2021,
+   2022
+  ],
+  "players": [
+   "2021",
+   "2022"
+  ],
+  "judged": [
+   2023
+  ]
+ },
+ "gates": [
+  {
+   "gate": "G1",
+   "subject": "pooled vs ADP",
+   "passed": true,
+   "detail": "difference +0.0572 against a margin of +0.0400, lower bound +0.0208 against 0, over 12 weeks"
+  },
+  {
+   "gate": "G1",
+   "subject": "QB vs ADP",
+   "passed": true,
+   "detail": "mean difference -0.0015 against a floor of -0.0200"
+  },
+  {
+   "gate": "G1",
+   "subject": "RB vs ADP",
+   "passed": true,
+   "detail": "mean difference +0.1656 against a floor of -0.0200"
+  },
+  {
+   "gate": "G1",
+   "subject": "WR vs ADP",
+   "passed": true,
+   "detail": "mean difference +0.1250 against a floor of -0.0200"
+  },
+  {
+   "gate": "G1",
+   "subject": "TE vs ADP",
+   "passed": false,
+   "detail": "mean difference -0.0604 against a floor of -0.0200"
+  },
+  {
+   "gate": "G2",
+   "subject": "pooled vs recent form",
+   "passed": false,
+   "detail": "difference -0.0124 against a margin of +0.0300, lower bound -0.0531 against 0, over 12 weeks"
+  },
+  {
+   "gate": "G2",
+   "subject": "QB vs recent form",
+   "passed": true,
+   "detail": "mean difference -0.0107 against a floor of -0.0200"
+  },
+  {
+   "gate": "G2",
+   "subject": "RB vs recent form",
+   "passed": true,
+   "detail": "mean difference +0.0139 against a floor of -0.0200"
+  },
+  {
+   "gate": "G2",
+   "subject": "WR vs recent form",
+   "passed": true,
+   "detail": "mean difference +0.0102 against a floor of -0.0200"
+  },
+  {
+   "gate": "G2",
+   "subject": "TE vs recent form",
+   "passed": false,
+   "detail": "mean difference -0.0632 against a floor of -0.0200"
+  },
+  {
+   "gate": "G2",
+   "subject": "pooled vs last-three form",
+   "passed": false,
+   "detail": "difference +0.0201 against a margin of +0.0300 (a point comparison)"
+  },
+  {
+   "gate": "G6",
+   "subject": "pooled vs the expert's spreadsheet",
+   "passed": false,
+   "detail": "difference +0.0002 against a margin of +0.0150, lower bound -0.0326 against 0, over 12 weeks"
+  },
+  {
+   "gate": "G6",
+   "subject": "QB vs the expert's spreadsheet",
+   "passed": false,
+   "detail": "mean difference -0.0447 against a floor of -0.0200"
+  },
+  {
+   "gate": "G6",
+   "subject": "RB vs the expert's spreadsheet",
+   "passed": true,
+   "detail": "mean difference +0.0325 against a floor of -0.0200"
+  },
+  {
+   "gate": "G6",
+   "subject": "WR vs the expert's spreadsheet",
+   "passed": true,
+   "detail": "mean difference +0.0171 against a floor of -0.0200"
+  },
+  {
+   "gate": "G6",
+   "subject": "TE vs the expert's spreadsheet",
+   "passed": true,
+   "detail": "mean difference -0.0042 against a floor of -0.0200"
+  },
+  {
+   "gate": "G7",
+   "subject": "pooled vs round 3's number",
+   "passed": false,
+   "detail": "difference -0.0230 against a margin of +0.0150 (a point comparison)"
+  },
+  {
+   "gate": "G3",
+   "subject": "places off vs ADP",
+   "passed": true,
+   "detail": "model 12.307, ADP 14.445: +2.137 fewer against a margin of 0.25"
+  },
+  {
+   "gate": "G3",
+   "subject": "places off vs recent form",
+   "passed": false,
+   "detail": "model 12.307, recent form 12.374: +0.067 fewer against a margin of 0.75"
+  },
+  {
+   "gate": "G3",
+   "subject": "places off vs the expert's spreadsheet",
+   "passed": false,
+   "detail": "model 12.307, the expert's spreadsheet 12.529: +0.221 fewer against a margin of 0.25"
+  },
+  {
+   "gate": "G4",
+   "subject": "QB ppr",
+   "passed": false,
+   "detail": "below floor 0.079, above ceiling 0.125, each against [0.06, 0.14]; below median 0.433 against [0.44, 0.56]; n=305"
+  },
+  {
+   "gate": "G4",
+   "subject": "QB half",
+   "passed": false,
+   "detail": "below floor 0.079, above ceiling 0.125, each against [0.06, 0.14]; below median 0.433 against [0.44, 0.56]; n=305"
+  },
+  {
+   "gate": "G4",
+   "subject": "QB std",
+   "passed": false,
+   "detail": "below floor 0.079, above ceiling 0.125, each against [0.06, 0.14]; below median 0.433 against [0.44, 0.56]; n=305"
+  },
+  {
+   "gate": "G4",
+   "subject": "RB ppr",
+   "passed": true,
+   "detail": "below floor 0.062, above ceiling 0.133, each against [0.06, 0.14]; below median 0.453 against [0.44, 0.56]; n=722"
+  },
+  {
+   "gate": "G4",
+   "subject": "RB half",
+   "passed": false,
+   "detail": "below floor 0.050, above ceiling 0.125, each against [0.06, 0.14]; below median 0.465 against [0.44, 0.56]; n=722"
+  },
+  {
+   "gate": "G4",
+   "subject": "RB std",
+   "passed": false,
+   "detail": "below floor 0.043, above ceiling 0.120, each against [0.06, 0.14]; below median 0.483 against [0.44, 0.56]; n=722"
+  },
+  {
+   "gate": "G4",
+   "subject": "WR ppr",
+   "passed": true,
+   "detail": "below floor 0.087, above ceiling 0.135, each against [0.06, 0.14]; below median 0.466 against [0.44, 0.56]; n=1074"
+  },
+  {
+   "gate": "G4",
+   "subject": "WR half",
+   "passed": true,
+   "detail": "below floor 0.086, above ceiling 0.135, each against [0.06, 0.14]; below median 0.470 against [0.44, 0.56]; n=1074"
+  },
+  {
+   "gate": "G4",
+   "subject": "WR std",
+   "passed": true,
+   "detail": "below floor 0.068, above ceiling 0.138, each against [0.06, 0.14]; below median 0.492 against [0.44, 0.56]; n=1074"
+  },
+  {
+   "gate": "G4",
+   "subject": "TE ppr",
+   "passed": false,
+   "detail": "below floor 0.088, above ceiling 0.174, each against [0.06, 0.14]; below median 0.415 against [0.44, 0.56]; n=340"
+  },
+  {
+   "gate": "G4",
+   "subject": "TE half",
+   "passed": false,
+   "detail": "below floor 0.082, above ceiling 0.174, each against [0.06, 0.14]; below median 0.412 against [0.44, 0.56]; n=340"
+  },
+  {
+   "gate": "G4",
+   "subject": "TE std",
+   "passed": false,
+   "detail": "below floor 0.071, above ceiling 0.174, each against [0.06, 0.14]; below median 0.424 against [0.44, 0.56]; n=340"
+  },
+  {
+   "gate": "G4",
+   "subject": "chance",
+   "passed": true,
+   "detail": "5 bins gated (at least 3), tolerance 0.04: [0.5, 0.6) n=21982 chance 0.550 observed 0.551; [0.6, 0.7) n=20466 chance 0.649 observed 0.651; [0.7, 0.8) n=17913 chance 0.748 observed 0.753; [0.8, 0.9) n=13291 chance 0.846 observed 0.848; [0.9, 1.0) n=4118 chance 0.929 observed 0.916"
+  },
+  {
+   "gate": "G5",
+   "subject": "isolation",
+   "passed": true,
+   "detail": "judged outcomes read for [2023]; players outcomes read for [np.int64(2021), np.int64(2022)]; plays and teams outcomes read for [2016, 2017, 2018, 2019, 2020, 2021, 2022]; every table as it was; per-game clause: round 3's reads: 1058 games, 531 reads, every row before its instant (closest 0.1 h before); the fit weeks' reads: 830 games, 406 reads, every row before its instant (closest 0.1 h before); the store: 0 broken reads over 8 seasons, clauses held, its build read outcomes of 2016 to 2023"
+  }
+ ],
+ "passed": false,
+ "decision": "STOP RULE: the development check fails G2 pooled vs recent form and G6 pooled vs the expert's spreadsheet; the round ends, no judgment",
+ "numbers": {
+  "season": 2023,
+  "weeks": [
+   6,
+   7,
+   8,
+   9,
+   10,
+   11,
+   12,
+   13,
+   14,
+   15,
+   16,
+   17
+  ],
+  "against": {
+   "form": {
+    "pooled": {
+     "value": -0.012435099515854543,
+     "lower_bound": -0.05312961851396247,
+     "weeks": 12
+    },
+    "by_position": {
+     "QB": -0.010650468963530271,
+     "RB": 0.01391250716933235,
+     "WR": 0.010218076389554192,
+     "TE": -0.06322051265877444
+    }
+   },
+   "last_three": {
+    "pooled": {
+     "value": 0.020102704138701535,
+     "lower_bound": -0.03067768955299151,
+     "weeks": 12
+    },
+    "by_position": {
+     "QB": 0.05077756310375697,
+     "RB": 0.041345929374493086,
+     "WR": 0.06698470297056071,
+     "TE": -0.07869737889400467
+    }
+   },
+   "baseline": {
+    "pooled": {
+     "value": 0.00019276680686932646,
+     "lower_bound": -0.032606159897888065,
+     "weeks": 12
+    },
+    "by_position": {
+     "QB": -0.04474291975938683,
+     "RB": 0.032545635407304506,
+     "WR": 0.017119072838983767,
+     "TE": -0.004150721259424136
+    }
+   },
+   "round_three": {
+    "pooled": {
+     "value": -0.023006885007502902,
+     "lower_bound": -0.0525162837689943,
+     "weeks": 12
+    },
+    "by_position": {
+     "QB": -0.011123292456438937,
+     "RB": -0.003238064616158401,
+     "WR": -0.012301218602608443,
+     "TE": -0.06536496435480584
+    }
+   },
+   "adp": {
+    "pooled": {
+     "value": 0.05718217787158986,
+     "lower_bound": 0.020792771132759603,
+     "weeks": 12
+    },
+    "by_position": {
+     "QB": -0.0014800881257585029,
+     "RB": 0.16555295910398557,
+     "WR": 0.12504134337569978,
+     "TE": -0.06038550286756742
+    }
+   }
+  },
+  "mean_rho": {
+   "ppr": {
+    "QB": {
+     "model": 0.3006139731900577,
+     "form": 0.31126444215358806,
+     "last_three": 0.24983641008630086,
+     "baseline": 0.34535689294944466,
+     "round_three": 0.3117372656464968,
+     "adp": 0.3020940613158163
+    },
+    "RB": {
+     "model": 0.597151213411203,
+     "form": 0.5832387062418708,
+     "last_three": 0.55580528403671,
+     "baseline": 0.5646055780038985,
+     "round_three": 0.6003892780273615,
+     "adp": 0.4315982543072175
+    },
+    "WR": {
+     "model": 0.5699984086399018,
+     "form": 0.5597803322503477,
+     "last_three": 0.5030137056693412,
+     "baseline": 0.5528793358009181,
+     "round_three": 0.5822996272425103,
+     "adp": 0.44495706526420215
+    },
+    "TE": {
+     "model": 0.3041153850359659,
+     "form": 0.3673358976947403,
+     "last_three": 0.38281276392997055,
+     "baseline": 0.30826610629539003,
+     "round_three": 0.3694803493907717,
+     "adp": 0.3645008879035334
+    }
+   },
+   "half": {
+    "QB": {
+     "model": 0.3006139731900577,
+     "form": 0.3115425598547194,
+     "last_three": 0.2508620511119419,
+     "baseline": 0.34438118350815805,
+     "round_three": 0.3125299533600144,
+     "adp": 0.3020940613158163
+    },
+    "RB": {
+     "model": 0.5962297956486108,
+     "form": 0.5775560619033899,
+     "last_three": 0.5473575299642187,
+     "baseline": 0.564607811440854,
+     "round_three": 0.5989561453377245,
+     "adp": 0.42672609129663824
+    },
+    "WR": {
+     "model": 0.5508966067557163,
+     "form": 0.5387422342953588,
+     "last_three": 0.4786647751291098,
+     "baseline": 0.5345102488631149,
+     "round_three": 0.5677273338964611,
+     "adp": 0.43531481047819204
+    },
+    "TE": {
+     "model": 0.2644659978655464,
+     "form": 0.32284526234169236,
+     "last_three": 0.3403943785700904,
+     "baseline": 0.2693614754960842,
+     "round_three": 0.34463839922583656,
+     "adp": 0.33748999592483075
+    }
+   },
+   "std": {
+    "QB": {
+     "model": 0.30020346415885907,
+     "form": 0.31123239747559156,
+     "last_three": 0.2503337377335883,
+     "baseline": 0.34484000629456707,
+     "round_three": 0.312916723442385,
+     "adp": 0.301391525080513
+    },
+    "RB": {
+     "model": 0.5867250545327722,
+     "form": 0.5618875665894544,
+     "last_three": 0.5269119975695012,
+     "baseline": 0.5581856419737666,
+     "round_three": 0.5910838700318096,
+     "adp": 0.41620785844430813
+    },
+    "WR": {
+     "model": 0.5107123426267417,
+     "form": 0.5012522862858686,
+     "last_three": 0.4331210124925923,
+     "baseline": 0.500560558113924,
+     "round_three": 0.5383848457936892,
+     "adp": 0.41545471833254627
+    },
+    "TE": {
+     "model": 0.22363202030404464,
+     "form": 0.2518230733320925,
+     "last_three": 0.28172099922735144,
+     "baseline": 0.21512213528596033,
+     "round_three": 0.3027063798821957,
+     "adp": 0.31759644107025303
+    }
+   }
+  },
+  "places_off_pooled": {
+   "model": 12.307334109429569,
+   "form": 12.374272409778813,
+   "last_three": 13.277066356228172,
+   "baseline": 12.528521536670548,
+   "round_three": 11.869615832363213,
+   "adp": 14.444703143189756
+  },
+  "per_week_rho": [
+   {
+    "week": 6,
+    "position": "QB",
+    "n": 29,
+    "model": 0.33842364532019703,
+    "form": 0.2916256157635468,
+    "last_three": 0.33201970443349754,
+    "baseline": 0.36305418719211824,
+    "round_three": 0.3556650246305419,
+    "adp": 0.47414809189925794
+   },
+   {
+    "week": 7,
+    "position": "QB",
+    "n": 25,
+    "model": -0.03461538461538462,
+    "form": -0.016923076923076923,
+    "last_three": -0.13384615384615384,
+    "baseline": -0.07692307692307693,
+    "round_three": 0.11538461538461539,
+    "adp": 0.20096532354964677
+   },
+   {
+    "week": 8,
+    "position": "QB",
+    "n": 30,
+    "model": 0.08165535705217045,
+    "form": 0.38491489836581705,
+    "last_three": 0.31549672016342695,
+    "baseline": 0.29702970480830393,
+    "round_three": 0.4610079013953601,
+    "adp": 0.3591493068781739
+   },
+   {
+    "week": 9,
+    "position": "QB",
+    "n": 24,
+    "model": 0.3244183594847865,
+    "form": 0.2878886782559365,
+    "last_three": 0.3326810254770263,
+    "baseline": 0.25483801428697705,
+    "round_three": 0.33007176253210846,
+    "adp": 0.16542667993212057
+   },
+   {
+    "week": 10,
+    "position": "QB",
+    "n": 26,
+    "model": 0.5083760683760684,
+    "form": 0.452991452991453,
+    "last_three": 0.1986664416110345,
+    "baseline": 0.4625641025641026,
+    "round_three": 0.4584615384615385,
+    "adp": 0.17953321503434166
+   },
+   {
+    "week": 11,
+    "position": "QB",
+    "n": 25,
+    "model": 0.48846153846153845,
+    "form": 0.5969230769230769,
+    "last_three": 0.3253846153846154,
+    "baseline": 0.5723076923076923,
+    "round_three": 0.40692307692307694,
+    "adp": 0.3966020404884393
+   },
+   {
+    "week": 12,
+    "position": "QB",
+    "n": 28,
+    "model": 0.6146688560481663,
+    "form": 0.5462506841817186,
+    "last_three": 0.4302134646962233,
+    "baseline": 0.5894909688013136,
+    "round_three": 0.4006568144499179,
+    "adp": 0.4380281207867566
+   },
+   {
+    "week": 13,
+    "position": "QB",
+    "n": 22,
+    "model": 0.42970073404856013,
+    "form": 0.391304347826087,
+    "last_three": 0.5132693393562959,
+    "baseline": 0.36984754376058726,
+    "round_three": 0.42631281761716544,
+    "adp": 0.3414095168201452
+   },
+   {
+    "week": 14,
+    "position": "QB",
+    "n": 25,
+    "model": 0.11384615384615385,
+    "form": -0.036923076923076927,
+    "last_three": 0.06347374612510459,
+    "baseline": 0.16692307692307692,
+    "round_three": 0.16538461538461538,
+    "adp": 0.16612696273035177
+   },
+   {
+    "week": 15,
+    "position": "QB",
+    "n": 25,
+    "model": 0.28923076923076924,
+    "form": 0.006923076923076923,
+    "last_three": 0.016923076923076923,
+    "baseline": 0.29384615384615387,
+    "round_three": 0.04461538461538461,
+    "adp": 0.10452485932555626
+   },
+   {
+    "week": 16,
+    "position": "QB",
+    "n": 23,
+    "model": 0.3201581027667984,
+    "form": 0.28063241106719367,
+    "last_three": 0.08201581027667984,
+    "baseline": 0.43478260869565216,
+    "round_three": 0.2885375494071146,
+    "adp": 0.4679819202379414
+   },
+   {
+    "week": 17,
+    "position": "QB",
+    "n": 24,
+    "model": 0.13304347826086957,
+    "form": 0.5495652173913044,
+    "last_three": 0.5217391304347826,
+    "baseline": 0.4165217391304348,
+    "round_three": 0.28782608695652173,
+    "adp": 0.33123269810706435
+   },
+   {
+    "week": 6,
+    "position": "RB",
+    "n": 62,
+    "model": 0.7791825158532861,
+    "form": 0.7418936474995828,
+    "last_three": 0.6893581682177534,
+    "baseline": 0.7197471515101026,
+    "round_three": 0.7300979713173265,
+    "adp": 0.5328464105727819
+   },
+   {
+    "week": 7,
+    "position": "RB",
+    "n": 52,
+    "model": 0.5368884033549306,
+    "form": 0.4630574523875506,
+    "last_three": 0.43679412545025437,
+    "baseline": 0.4175988447884355,
+    "round_three": 0.5702758173846368,
+    "adp": 0.3711565800425118
+   },
+   {
+    "week": 8,
+    "position": "RB",
+    "n": 68,
+    "model": 0.628840302386048,
+    "form": 0.6565625745716315,
+    "last_three": 0.7052226718020559,
+    "baseline": 0.6011815603341605,
+    "round_three": 0.6656040961693023,
+    "adp": 0.5242786453521399
+   },
+   {
+    "week": 9,
+    "position": "RB",
+    "n": 59,
+    "model": 0.6694141322380728,
+    "form": 0.609993142374736,
+    "last_three": 0.626523637032186,
+    "baseline": 0.6127113676857494,
+    "round_three": 0.6594765343268408,
+    "adp": 0.6217993667946045
+   },
+   {
+    "week": 10,
+    "position": "RB",
+    "n": 60,
+    "model": 0.5994330897023625,
+    "form": 0.5222321104166341,
+    "last_three": 0.5341059158920495,
+    "baseline": 0.5663906259260014,
+    "round_three": 0.5528012526824013,
+    "adp": 0.4886029798515289
+   },
+   {
+    "week": 11,
+    "position": "RB",
+    "n": 58,
+    "model": 0.6483285094269627,
+    "form": 0.5992215709311423,
+    "last_three": 0.6055477937826679,
+    "baseline": 0.5818987599203985,
+    "round_three": 0.631005698416219,
+    "adp": 0.5047764317109907
+   },
+   {
+    "week": 12,
+    "position": "RB",
+    "n": 66,
+    "model": 0.6326722372672726,
+    "form": 0.6554906089991033,
+    "last_three": 0.6055136871569708,
+    "baseline": 0.6173695231964291,
+    "round_three": 0.660918583976483,
+    "adp": 0.5164213556442023
+   },
+   {
+    "week": 13,
+    "position": "RB",
+    "n": 52,
+    "model": 0.6212638974161915,
+    "form": 0.6927412695312914,
+    "last_three": 0.5363708278455149,
+    "baseline": 0.6602049746975363,
+    "round_three": 0.6024765355699286,
+    "adp": 0.44830436665980206
+   },
+   {
+    "week": 14,
+    "position": "RB",
+    "n": 61,
+    "model": 0.7447210852533247,
+    "form": 0.691303835334579,
+    "last_three": 0.6888850711900293,
+    "baseline": 0.649284028344041,
+    "round_three": 0.7607727044120765,
+    "adp": 0.5081896933380198
+   },
+   {
+    "week": 15,
+    "position": "RB",
+    "n": 65,
+    "model": 0.4004502157097408,
+    "form": 0.46157881110024157,
+    "last_three": 0.4575237688776619,
+    "baseline": 0.4288617902566307,
+    "round_three": 0.45528455458523825,
+    "adp": 0.19113613900869553
+   },
+   {
+    "week": 16,
+    "position": "RB",
+    "n": 61,
+    "model": 0.5478416089183626,
+    "form": 0.5254181276767963,
+    "last_three": 0.43928495890121083,
+    "baseline": 0.5967343174273911,
+    "round_three": 0.5484233501769882,
+    "adp": 0.34305299720532295
+   },
+   {
+    "week": 17,
+    "position": "RB",
+    "n": 59,
+    "model": 0.35677856340788183,
+    "form": 0.37937132407916,
+    "last_three": 0.344532782292165,
+    "baseline": 0.3232839919599067,
+    "round_three": 0.3675342373108965,
+    "adp": 0.12861408550600986
+   },
+   {
+    "week": 6,
+    "position": "WR",
+    "n": 96,
+    "model": 0.6094567686257475,
+    "form": 0.5780128170141494,
+    "last_three": 0.5125291709802017,
+    "baseline": 0.5515841315122033,
+    "round_three": 0.6380329122451055,
+    "adp": 0.48564426184957304
+   },
+   {
+    "week": 7,
+    "position": "WR",
+    "n": 83,
+    "model": 0.574600204134422,
+    "form": 0.5424557128381092,
+    "last_three": 0.508502785601305,
+    "baseline": 0.5203302493421357,
+    "round_three": 0.6100488767327877,
+    "adp": 0.3913622795100283
+   },
+   {
+    "week": 8,
+    "position": "WR",
+    "n": 104,
+    "model": 0.5816882056195755,
+    "form": 0.5762290753642745,
+    "last_three": 0.5549507918102423,
+    "baseline": 0.5514575380767798,
+    "round_three": 0.6169297463879112,
+    "adp": 0.550487285510095
+   },
+   {
+    "week": 9,
+    "position": "WR",
+    "n": 88,
+    "model": 0.5099695153623718,
+    "form": 0.45387310482967624,
+    "last_three": 0.4814619831474776,
+    "baseline": 0.4681798572531159,
+    "round_three": 0.47038255902990567,
+    "adp": 0.4268473788680042
+   },
+   {
+    "week": 10,
+    "position": "WR",
+    "n": 83,
+    "model": 0.6072203382302329,
+    "form": 0.6176880252228073,
+    "last_three": 0.5665944404430637,
+    "baseline": 0.5985375126105147,
+    "round_three": 0.6452063879184318,
+    "adp": 0.5221196267724091
+   },
+   {
+    "week": 11,
+    "position": "WR",
+    "n": 88,
+    "model": 0.4567301676756968,
+    "form": 0.5131168256026447,
+    "last_three": 0.45255124910493494,
+    "baseline": 0.5091005313173138,
+    "round_three": 0.46957174019326786,
+    "adp": 0.3632185525832468
+   },
+   {
+    "week": 12,
+    "position": "WR",
+    "n": 95,
+    "model": 0.5527444065606183,
+    "form": 0.5959275707071054,
+    "last_three": 0.46100889511800114,
+    "baseline": 0.6026451863087492,
+    "round_three": 0.5670237712241317,
+    "adp": 0.3930226550581758
+   },
+   {
+    "week": 13,
+    "position": "WR",
+    "n": 77,
+    "model": 0.6278574794019713,
+    "form": 0.5858419104220267,
+    "last_three": 0.5829311503194553,
+    "baseline": 0.559526588924992,
+    "round_three": 0.6270944467397332,
+    "adp": 0.55177332465072
+   },
+   {
+    "week": 14,
+    "position": "WR",
+    "n": 92,
+    "model": 0.586727809417123,
+    "form": 0.5391581952888687,
+    "last_three": 0.43967869080603955,
+    "baseline": 0.5495956754562716,
+    "round_three": 0.5808218263162068,
+    "adp": 0.5092743379799767
+   },
+   {
+    "week": 15,
+    "position": "WR",
+    "n": 93,
+    "model": 0.6194218281009856,
+    "form": 0.5863020969357581,
+    "last_three": 0.4848280815885073,
+    "baseline": 0.565640520225064,
+    "round_three": 0.6622826566677505,
+    "adp": 0.4601321454104208
+   },
+   {
+    "week": 16,
+    "position": "WR",
+    "n": 92,
+    "model": 0.5081841650937248,
+    "form": 0.5391247554147752,
+    "last_three": 0.4190411702997941,
+    "baseline": 0.5550652488836173,
+    "round_three": 0.5092401842451907,
+    "adp": 0.3128152044650986
+   },
+   {
+    "week": 17,
+    "position": "WR",
+    "n": 84,
+    "model": 0.605380015456353,
+    "form": 0.5896338973639766,
+    "last_three": 0.5720860588130711,
+    "baseline": 0.6028889897002601,
+    "round_three": 0.590960419209701,
+    "adp": 0.3727877305126767
+   },
+   {
+    "week": 6,
+    "position": "TE",
+    "n": 34,
+    "model": 0.26746142163456876,
+    "form": 0.28660960285927095,
+    "last_three": 0.28016813881171504,
+    "baseline": 0.10515858128884885,
+    "round_three": 0.34892252890955455,
+    "adp": 0.43010861125951966
+   },
+   {
+    "week": 7,
+    "position": "TE",
+    "n": 28,
+    "model": 0.3823730705029214,
+    "form": 0.43081976590665594,
+    "last_three": 0.4306049822064057,
+    "baseline": 0.5140276495379288,
+    "round_three": 0.4929519684865866,
+    "adp": 0.6025813067733073
+   },
+   {
+    "week": 8,
+    "position": "TE",
+    "n": 30,
+    "model": 0.2643524765046091,
+    "form": 0.21628838986740745,
+    "last_three": 0.22546182951257512,
+    "baseline": 0.14597241126853835,
+    "round_three": 0.22251891961667433,
+    "adp": 0.3043081818378627
+   },
+   {
+    "week": 9,
+    "position": "TE",
+    "n": 30,
+    "model": 0.5964532114282809,
+    "form": 0.442313617463669,
+    "last_three": 0.4168470758521244,
+    "baseline": 0.48967244923250625,
+    "round_three": 0.4369522402822912,
+    "adp": 0.23507260626345985
+   },
+   {
+    "week": 10,
+    "position": "TE",
+    "n": 27,
+    "model": 0.39352771027868994,
+    "form": 0.5089299402905944,
+    "last_three": 0.5428178967226616,
+    "baseline": 0.5162570660056359,
+    "round_three": 0.5080140495762142,
+    "adp": 0.4781980941000011
+   },
+   {
+    "week": 11,
+    "position": "TE",
+    "n": 23,
+    "model": 0.07905138339920949,
+    "form": 0.4980237154150198,
+    "last_three": 0.6926877470355731,
+    "baseline": 0.37450592885375494,
+    "round_three": 0.4150197628458498,
+    "adp": 0.2771150888077846
+   },
+   {
+    "week": 12,
+    "position": "TE",
+    "n": 28,
+    "model": 0.15131599414075547,
+    "form": 0.3478623126170629,
+    "last_three": 0.27576791685797103,
+    "baseline": 0.36239084103999775,
+    "round_three": 0.45148087382214547,
+    "adp": 0.5382015388599334
+   },
+   {
+    "week": 13,
+    "position": "TE",
+    "n": 24,
+    "model": 0.37529898691068464,
+    "form": 0.40182649351734945,
+    "last_three": 0.3109371676027109,
+    "baseline": 0.34355295441418404,
+    "round_three": 0.36442705797352687,
+    "adp": 0.4095355249259615
+   },
+   {
+    "week": 14,
+    "position": "TE",
+    "n": 25,
+    "model": 0.6443546955124254,
+    "form": 0.49701866662809174,
+    "last_three": 0.3935372259756485,
+    "baseline": 0.32544720740508176,
+    "round_three": 0.4916330154417192,
+    "adp": 0.4366640502554444
+   },
+   {
+    "week": 15,
+    "position": "TE",
+    "n": 32,
+    "model": 0.1257561890974684,
+    "form": 0.36828598235687177,
+    "last_three": 0.49757081518063245,
+    "baseline": 0.21099908695508182,
+    "round_three": 0.17396883885349493,
+    "adp": 0.1704894999778289
+   },
+   {
+    "week": 16,
+    "position": "TE",
+    "n": 30,
+    "model": 0.3654981089019226,
+    "form": 0.3819700090595001,
+    "last_three": 0.3007234744984759,
+    "baseline": 0.31096276378561866,
+    "round_three": 0.3697273805640033,
+    "adp": 0.4797108586539139
+   },
+   {
+    "week": 17,
+    "position": "TE",
+    "n": 29,
+    "model": 0.003941372120054837,
+    "form": 0.028082276355390713,
+    "last_three": 0.2266288969031531,
+    "baseline": 0.0002463357575034273,
+    "round_three": 0.15814755631720032,
+    "adp": 0.012025293127382866
+   }
+  ],
+  "baseline_lead_over_form": {
+   "pooled": {
+    "value": -0.012627866322723865,
+    "lower_bound": -0.0313405771009004,
+    "weeks": 12
+   },
+   "by_position": {
+    "QB": 0.034092450795856565,
+    "RB": -0.018633128237972158,
+    "WR": -0.006900996449429574,
+    "TE": -0.059069791399350306
+   }
+  },
+  "missing": {
+   "model": {
+    "QB|6": 0,
+    "RB|6": 0,
+    "WR|6": 0,
+    "TE|6": 0,
+    "QB|7": 0,
+    "RB|7": 1,
+    "WR|7": 0,
+    "TE|7": 0,
+    "QB|8": 0,
+    "RB|8": 0,
+    "WR|8": 0,
+    "TE|8": 0,
+    "QB|9": 0,
+    "RB|9": 0,
+    "WR|9": 0,
+    "TE|9": 0,
+    "QB|10": 1,
+    "RB|10": 0,
+    "WR|10": 0,
+    "TE|10": 0,
+    "QB|11": 0,
+    "RB|11": 0,
+    "WR|11": 0,
+    "TE|11": 0,
+    "QB|12": 0,
+    "RB|12": 0,
+    "WR|12": 1,
+    "TE|12": 0,
+    "QB|13": 0,
+    "RB|13": 0,
+    "WR|13": 0,
+    "TE|13": 0,
+    "QB|14": 0,
+    "RB|14": 0,
+    "WR|14": 0,
+    "TE|14": 0,
+    "QB|15": 0,
+    "RB|15": 0,
+    "WR|15": 0,
+    "TE|15": 0,
+    "QB|16": 0,
+    "RB|16": 0,
+    "WR|16": 0,
+    "TE|16": 0,
+    "QB|17": 0,
+    "RB|17": 0,
+    "WR|17": 0,
+    "TE|17": 0
+   },
+   "form": {
+    "QB|6": 0,
+    "RB|6": 0,
+    "WR|6": 0,
+    "TE|6": 0,
+    "QB|7": 0,
+    "RB|7": 0,
+    "WR|7": 0,
+    "TE|7": 0,
+    "QB|8": 0,
+    "RB|8": 0,
+    "WR|8": 0,
+    "TE|8": 0,
+    "QB|9": 0,
+    "RB|9": 0,
+    "WR|9": 0,
+    "TE|9": 0,
+    "QB|10": 0,
+    "RB|10": 0,
+    "WR|10": 0,
+    "TE|10": 0,
+    "QB|11": 0,
+    "RB|11": 0,
+    "WR|11": 0,
+    "TE|11": 0,
+    "QB|12": 0,
+    "RB|12": 0,
+    "WR|12": 0,
+    "TE|12": 0,
+    "QB|13": 0,
+    "RB|13": 0,
+    "WR|13": 0,
+    "TE|13": 0,
+    "QB|14": 0,
+    "RB|14": 0,
+    "WR|14": 0,
+    "TE|14": 0,
+    "QB|15": 0,
+    "RB|15": 0,
+    "WR|15": 0,
+    "TE|15": 0,
+    "QB|16": 0,
+    "RB|16": 0,
+    "WR|16": 0,
+    "TE|16": 0,
+    "QB|17": 0,
+    "RB|17": 0,
+    "WR|17": 0,
+    "TE|17": 0
+   },
+   "last_three": {
+    "QB|6": 0,
+    "RB|6": 0,
+    "WR|6": 0,
+    "TE|6": 0,
+    "QB|7": 0,
+    "RB|7": 1,
+    "WR|7": 0,
+    "TE|7": 0,
+    "QB|8": 0,
+    "RB|8": 0,
+    "WR|8": 0,
+    "TE|8": 0,
+    "QB|9": 0,
+    "RB|9": 0,
+    "WR|9": 0,
+    "TE|9": 0,
+    "QB|10": 1,
+    "RB|10": 0,
+    "WR|10": 0,
+    "TE|10": 0,
+    "QB|11": 0,
+    "RB|11": 0,
+    "WR|11": 0,
+    "TE|11": 0,
+    "QB|12": 0,
+    "RB|12": 0,
+    "WR|12": 0,
+    "TE|12": 0,
+    "QB|13": 0,
+    "RB|13": 0,
+    "WR|13": 0,
+    "TE|13": 0,
+    "QB|14": 0,
+    "RB|14": 0,
+    "WR|14": 0,
+    "TE|14": 0,
+    "QB|15": 0,
+    "RB|15": 0,
+    "WR|15": 0,
+    "TE|15": 0,
+    "QB|16": 0,
+    "RB|16": 0,
+    "WR|16": 0,
+    "TE|16": 0,
+    "QB|17": 0,
+    "RB|17": 0,
+    "WR|17": 0,
+    "TE|17": 0
+   },
+   "baseline": {
+    "QB|6": 0,
+    "RB|6": 0,
+    "WR|6": 0,
+    "TE|6": 0,
+    "QB|7": 0,
+    "RB|7": 0,
+    "WR|7": 0,
+    "TE|7": 0,
+    "QB|8": 0,
+    "RB|8": 0,
+    "WR|8": 0,
+    "TE|8": 0,
+    "QB|9": 0,
+    "RB|9": 0,
+    "WR|9": 0,
+    "TE|9": 0,
+    "QB|10": 0,
+    "RB|10": 0,
+    "WR|10": 0,
+    "TE|10": 0,
+    "QB|11": 0,
+    "RB|11": 0,
+    "WR|11": 0,
+    "TE|11": 0,
+    "QB|12": 0,
+    "RB|12": 0,
+    "WR|12": 0,
+    "TE|12": 0,
+    "QB|13": 0,
+    "RB|13": 0,
+    "WR|13": 0,
+    "TE|13": 0,
+    "QB|14": 0,
+    "RB|14": 0,
+    "WR|14": 0,
+    "TE|14": 0,
+    "QB|15": 0,
+    "RB|15": 0,
+    "WR|15": 0,
+    "TE|15": 0,
+    "QB|16": 0,
+    "RB|16": 0,
+    "WR|16": 0,
+    "TE|16": 0,
+    "QB|17": 0,
+    "RB|17": 0,
+    "WR|17": 0,
+    "TE|17": 0
+   },
+   "round_three": {
+    "QB|6": 0,
+    "RB|6": 0,
+    "WR|6": 0,
+    "TE|6": 0,
+    "QB|7": 0,
+    "RB|7": 0,
+    "WR|7": 0,
+    "TE|7": 0,
+    "QB|8": 0,
+    "RB|8": 0,
+    "WR|8": 0,
+    "TE|8": 0,
+    "QB|9": 0,
+    "RB|9": 0,
+    "WR|9": 0,
+    "TE|9": 0,
+    "QB|10": 0,
+    "RB|10": 0,
+    "WR|10": 0,
+    "TE|10": 0,
+    "QB|11": 0,
+    "RB|11": 0,
+    "WR|11": 0,
+    "TE|11": 0,
+    "QB|12": 0,
+    "RB|12": 0,
+    "WR|12": 1,
+    "TE|12": 0,
+    "QB|13": 0,
+    "RB|13": 0,
+    "WR|13": 0,
+    "TE|13": 0,
+    "QB|14": 0,
+    "RB|14": 0,
+    "WR|14": 0,
+    "TE|14": 0,
+    "QB|15": 0,
+    "RB|15": 0,
+    "WR|15": 0,
+    "TE|15": 0,
+    "QB|16": 0,
+    "RB|16": 0,
+    "WR|16": 0,
+    "TE|16": 0,
+    "QB|17": 0,
+    "RB|17": 0,
+    "WR|17": 0,
+    "TE|17": 0
+   },
+   "adp": {
+    "QB|6": 12,
+    "RB|6": 18,
+    "WR|6": 34,
+    "TE|6": 16,
+    "QB|7": 8,
+    "RB|7": 12,
+    "WR|7": 30,
+    "TE|7": 13,
+    "QB|8": 12,
+    "RB|8": 18,
+    "WR|8": 37,
+    "TE|8": 14,
+    "QB|9": 10,
+    "RB|9": 16,
+    "WR|9": 30,
+    "TE|9": 17,
+    "QB|10": 11,
+    "RB|10": 16,
+    "WR|10": 29,
+    "TE|10": 14,
+    "QB|11": 7,
+    "RB|11": 16,
+    "WR|11": 29,
+    "TE|11": 9,
+    "QB|12": 10,
+    "RB|12": 17,
+    "WR|12": 31,
+    "TE|12": 13,
+    "QB|13": 7,
+    "RB|13": 12,
+    "WR|13": 24,
+    "TE|13": 13,
+    "QB|14": 10,
+    "RB|14": 17,
+    "WR|14": 27,
+    "TE|14": 10,
+    "QB|15": 10,
+    "RB|15": 19,
+    "WR|15": 31,
+    "TE|15": 15,
+    "QB|16": 7,
+    "RB|16": 15,
+    "WR|16": 31,
+    "TE|16": 13,
+    "QB|17": 10,
+    "RB|17": 13,
+    "WR|17": 31,
+    "TE|17": 14
+   }
+  },
+  "calibration": {
+   "QB|half": {
+    "below": 0.07868852459016394,
+    "above": 0.12459016393442623,
+    "below_median": 0.43278688524590164,
+    "size": 305
+   },
+   "QB|ppr": {
+    "below": 0.07868852459016394,
+    "above": 0.12459016393442623,
+    "below_median": 0.43278688524590164,
+    "size": 305
+   },
+   "QB|std": {
+    "below": 0.07868852459016394,
+    "above": 0.12459016393442623,
+    "below_median": 0.43278688524590164,
+    "size": 305
+   },
+   "RB|half": {
+    "below": 0.04986149584487535,
+    "above": 0.12465373961218837,
+    "below_median": 0.46537396121883656,
+    "size": 722
+   },
+   "RB|ppr": {
+    "below": 0.062326869806094184,
+    "above": 0.1329639889196676,
+    "below_median": 0.45290858725761773,
+    "size": 722
+   },
+   "RB|std": {
+    "below": 0.04293628808864266,
+    "above": 0.12049861495844875,
+    "below_median": 0.48337950138504154,
+    "size": 722
+   },
+   "TE|half": {
+    "below": 0.08235294117647059,
+    "above": 0.17352941176470588,
+    "below_median": 0.4117647058823529,
+    "size": 340
+   },
+   "TE|ppr": {
+    "below": 0.08823529411764706,
+    "above": 0.17352941176470588,
+    "below_median": 0.4147058823529412,
+    "size": 340
+   },
+   "TE|std": {
+    "below": 0.07058823529411765,
+    "above": 0.17352941176470588,
+    "below_median": 0.4235294117647059,
+    "size": 340
+   },
+   "WR|half": {
+    "below": 0.0856610800744879,
+    "above": 0.13500931098696461,
+    "below_median": 0.4702048417132216,
+    "size": 1074
+   },
+   "WR|ppr": {
+    "below": 0.08659217877094973,
+    "above": 0.13500931098696461,
+    "below_median": 0.4664804469273743,
+    "size": 1074
+   },
+   "WR|std": {
+    "below": 0.06797020484171322,
+    "above": 0.1378026070763501,
+    "below_median": 0.49162011173184356,
+    "size": 1074
+   }
+  },
+  "chance_ppr": [
+   {
+    "low": 0.5,
+    "high": 0.6,
+    "pairs": 21982,
+    "mean_chance": 0.5497058729869894,
+    "observed": 0.5511099990901647
+   },
+   {
+    "low": 0.6,
+    "high": 0.7,
+    "pairs": 20466,
+    "mean_chance": 0.6487499291507868,
+    "observed": 0.6513730088927978
+   },
+   {
+    "low": 0.7,
+    "high": 0.8,
+    "pairs": 17913,
+    "mean_chance": 0.748433626416569,
+    "observed": 0.7534193044157874
+   },
+   {
+    "low": 0.8,
+    "high": 0.9,
+    "pairs": 13291,
+    "mean_chance": 0.8464778459107666,
+    "observed": 0.8475660221202317
+   },
+   {
+    "low": 0.9,
+    "high": 1.0,
+    "pairs": 4118,
+    "mean_chance": 0.9288039946576007,
+    "observed": 0.915857212238951
+   }
+  ],
+  "simulation_mean_breaches": {
+   "count": 14,
+   "examples": [
+    "week 8 00-0033357: mean 6.133 against the point 6.536",
+    "week 9 00-0033357: mean 8.296 against the point 9.210",
+    "week 10 00-0033357: mean 8.742 against the point 9.615",
+    "week 11 00-0035228: mean 9.418 against the point 9.131",
+    "week 11 00-0033282: mean 11.169 against the point 10.751",
+    "week 12 00-0033357: mean 8.537 against the point 9.209",
+    "week 12 00-0033282: mean 9.185 against the point 8.896",
+    "week 13 00-0033357: mean 8.196 against the point 8.756",
+    "week 14 00-0033357: mean 7.409 against the point 8.133",
+    "week 15 00-0033357: mean 7.477 against the point 8.368",
+    "week 16 00-0033858: mean 7.714 against the point 7.993",
+    "week 16 00-0033357: mean 6.074 against the point 6.611",
+    "week 16 00-0033282: mean 10.520 against the point 10.114",
+    "week 17 00-0033357: mean 4.854 against the point 5.413"
+   ]
+  },
+  "ablations": {
+   "without_game_terms": {
+    "against": {
+     "form": {
+      "pooled": {
+       "value": -0.02812628866878096,
+       "lower_bound": -0.07288518097630935,
+       "weeks": 12
+      },
+      "by_position": {
+       "QB": -0.03863502692528086,
+       "RB": 0.00920308807671888,
+       "WR": 0.00018700363771520512,
+       "TE": -0.08326021946427704
+      }
+     },
+     "last_three": {
+      "pooled": {
+       "value": 0.004411514985775115,
+       "lower_bound": -0.04593695251715793,
+       "weeks": 12
+      },
+      "by_position": {
+       "QB": 0.02279300514200638,
+       "RB": 0.03663651028187962,
+       "WR": 0.05695363021872174,
+       "TE": -0.09873708569950725
+      }
+     },
+     "baseline": {
+      "pooled": {
+       "value": -0.015498422346057089,
+       "lower_bound": -0.05245250452077627,
+       "weeks": 12
+      },
+      "by_position": {
+       "QB": -0.07272747772113743,
+       "RB": 0.027836216314691038,
+       "WR": 0.007088000087144779,
+       "TE": -0.02419042806492676
+      }
+     },
+     "round_three": {
+      "pooled": {
+       "value": -0.038698074160429315,
+       "lower_bound": -0.07485352791035171,
+       "weeks": 12
+      },
+      "by_position": {
+       "QB": -0.03910785041818953,
+       "RB": -0.007947483708771871,
+       "WR": -0.02233229135444743,
+       "TE": -0.08540467116030843
+      }
+     },
+     "adp": {
+      "pooled": {
+       "value": 0.041490988718663434,
+       "lower_bound": -0.005868393428610888,
+       "weeks": 12
+      },
+      "by_position": {
+       "QB": -0.02946464608750909,
+       "RB": 0.1608435400113721,
+       "WR": 0.11501027062386082,
+       "TE": -0.08042520967307006
+      }
+     }
+    },
+    "places_off_pooled": {
+     "model": 12.579743888242142,
+     "form": 12.374272409778813,
+     "last_three": 13.277066356228172,
+     "baseline": 12.528521536670548,
+     "round_three": 11.869615832363213,
+     "adp": 14.444703143189756
+    }
+   },
+   "without_weather": {
+    "against": {
+     "form": {
+      "pooled": {
+       "value": -0.021307599664449606,
+       "lower_bound": -0.061466574068296524,
+       "weeks": 12
+      },
+      "by_position": {
+       "QB": -0.033514429906712905,
+       "RB": 0.009487462527424976,
+       "WR": 0.00687378238667143,
+       "TE": -0.06807721366518195
+      }
+     },
+     "last_three": {
+      "pooled": {
+       "value": 0.011230203990106461,
+       "lower_bound": -0.04037949499843851,
+       "weeks": 12
+      },
+      "by_position": {
+       "QB": 0.02791360216057433,
+       "RB": 0.036920884732585715,
+       "WR": 0.06364040896767796,
+       "TE": -0.08355407990041218
+      }
+     },
+     "baseline": {
+      "pooled": {
+       "value": -0.008679733341725745,
+       "lower_bound": -0.04277706640959136,
+       "weeks": 12
+      },
+      "by_position": {
+       "QB": -0.06760688070256947,
+       "RB": 0.028120590765397135,
+       "WR": 0.013774778836101004,
+       "TE": -0.009007422265831636
+      }
+     },
+     "round_three": {
+      "pooled": {
+       "value": -0.03187938515609797,
+       "lower_bound": -0.062057109348807205,
+       "weeks": 12
+      },
+      "by_position": {
+       "QB": -0.033987253399621574,
+       "RB": -0.007663109258065774,
+       "WR": -0.015645512605491203,
+       "TE": -0.07022166536121333
+      }
+     },
+     "adp": {
+      "pooled": {
+       "value": 0.04830967772299479,
+       "lower_bound": 0.011829206033714594,
+       "weeks": 12
+      },
+      "by_position": {
+       "QB": -0.024344049068941137,
+       "RB": 0.1611279144620782,
+       "WR": 0.12169704937281701,
+       "TE": -0.06524220387397493
+      }
+     }
+    },
+    "places_off_pooled": {
+     "model": 12.437718277066356,
+     "form": 12.374272409778813,
+     "last_three": 13.277066356228172,
+     "baseline": 12.528521536670548,
+     "round_three": 11.869615832363213,
+     "adp": 14.444703143189756
+    }
+   },
+   "without_charted_features": {
+    "against": {
+     "form": {
+      "pooled": {
+       "value": -0.01784293053445758,
+       "lower_bound": -0.05988182520337265,
+       "weeks": 12
+      },
+      "by_position": {
+       "QB": -0.012815685846180586,
+       "RB": 0.009930482018213324,
+       "WR": 0.009792016058804887,
+       "TE": -0.07827853436866794
+      }
+     },
+     "last_three": {
+      "pooled": {
+       "value": 0.014694873120098493,
+       "lower_bound": -0.03740813907911719,
+       "weeks": 12
+      },
+      "by_position": {
+       "QB": 0.048612346221106655,
+       "RB": 0.037363904223374066,
+       "WR": 0.06655864263981143,
+       "TE": -0.09375540060389816
+      }
+     },
+     "baseline": {
+      "pooled": {
+       "value": -0.0052150642117337115,
+       "lower_bound": -0.03826395707659558,
+       "weeks": 12
+      },
+      "by_position": {
+       "QB": -0.046908136642037156,
+       "RB": 0.028563610256185482,
+       "WR": 0.01669301250823446,
+       "TE": -0.019208742969317637
+      }
+     },
+     "round_three": {
+      "pooled": {
+       "value": -0.02841471602610593,
+       "lower_bound": -0.059764968322221154,
+       "weeks": 12
+      },
+      "by_position": {
+       "QB": -0.013288509339089259,
+       "RB": -0.0072200897672774255,
+       "WR": -0.012727278933357747,
+       "TE": -0.08042298606469932
+      }
+     },
+     "adp": {
+      "pooled": {
+       "value": 0.05177434685298681,
+       "lower_bound": 0.013103599255057906,
+       "weeks": 12
+      },
+      "by_position": {
+       "QB": -0.0036453050084088306,
+       "RB": 0.16157093395286654,
+       "WR": 0.1246152830449505,
+       "TE": -0.07544352457746092
+      }
+     }
+    },
+    "places_off_pooled": {
+     "model": 12.353899883585564,
+     "form": 12.374272409778813,
+     "last_three": 13.277066356228172,
+     "baseline": 12.528521536670548,
+     "round_three": 11.869615832363213,
+     "adp": 14.444703143189756
+    }
+   },
+   "without_touchdown_reconciliation": {
+    "against": {
+     "form": {
+      "pooled": {
+       "value": -0.013423342900357285,
+       "lower_bound": -0.05910950970050393,
+       "weeks": 12
+      },
+      "by_position": {
+       "QB": 0.008070715822454213,
+       "RB": 0.00692901480906911,
+       "WR": 0.012687848709890042,
+       "TE": -0.08138095094284253
+      }
+     },
+     "last_three": {
+      "pooled": {
+       "value": 0.019114460754198783,
+       "lower_bound": -0.03392748057850775,
+       "weeks": 12
+      },
+      "by_position": {
+       "QB": 0.06949874788974143,
+       "RB": 0.03436243701422985,
+       "WR": 0.06945447529089657,
+       "TE": -0.09685781717807274
+      }
+     },
+     "baseline": {
+      "pooled": {
+       "value": -0.0007954765776334201,
+       "lower_bound": -0.041093890690899595,
+       "weeks": 12
+      },
+      "by_position": {
+       "QB": -0.02602173497340235,
+       "RB": 0.02556214304704127,
+       "WR": 0.019588845159319617,
+       "TE": -0.02231115954349222
+      }
+     },
+     "round_three": {
+      "pooled": {
+       "value": -0.023995128392005644,
+       "lower_bound": -0.06317173763215538,
+       "weeks": 12
+      },
+      "by_position": {
+       "QB": 0.007597892329545555,
+       "RB": -0.01022155697642164,
+       "WR": -0.009831446282272593,
+       "TE": -0.08352540263887391
+      }
+     },
+     "adp": {
+      "pooled": {
+       "value": 0.056193934487087094,
+       "lower_bound": 0.00850242875714896,
+       "weeks": 12
+      },
+      "by_position": {
+       "QB": 0.01724109666022598,
+       "RB": 0.15856946674372233,
+       "WR": 0.12751111569603565,
+       "TE": -0.07854594115163552
+      }
+     }
+    },
+    "places_off_pooled": {
+     "model": 12.374854481955763,
+     "form": 12.374272409778813,
+     "last_three": 13.277066356228172,
+     "baseline": 12.528521536670548,
+     "round_three": 11.869615832363213,
+     "adp": 14.444703143189756
+    }
+   },
+   "without_returning_shares": {
+    "against": {
+     "form": {
+      "pooled": {
+       "value": -0.012177058354257994,
+       "lower_bound": -0.05114306878222216,
+       "weeks": 12
+      },
+      "by_position": {
+       "QB": -0.009302829013941286,
+       "RB": 0.01587244970344158,
+       "WR": 0.009205000339668853,
+       "TE": -0.06448285444620111
+      }
+     },
+     "last_three": {
+      "pooled": {
+       "value": 0.020360745300298074,
+       "lower_bound": -0.028886796055032783,
+       "weeks": 12
+      },
+      "by_position": {
+       "QB": 0.05212520305334595,
+       "RB": 0.04330587190860232,
+       "WR": 0.06597162692067537,
+       "TE": -0.07995972068143133
+      }
+     },
+     "baseline": {
+      "pooled": {
+       "value": 0.0004508079684658733,
+       "lower_bound": -0.030159208528465202,
+       "weeks": 12
+      },
+      "by_position": {
+       "QB": -0.043395279809797856,
+       "RB": 0.03450557794141374,
+       "WR": 0.016105996789098426,
+       "TE": -0.00541306304685082
+      }
+     },
+     "round_three": {
+      "pooled": {
+       "value": -0.02274884384590635,
+       "lower_bound": -0.05192451758082892,
+       "weeks": 12
+      },
+      "by_position": {
+       "QB": -0.009775652506849959,
+       "RB": -0.0012781220820491702,
+       "WR": -0.01331429465249378,
+       "TE": -0.0666273061422325
+      }
+     },
+     "adp": {
+      "pooled": {
+       "value": 0.05744021903318639,
+       "lower_bound": 0.019917766372475543,
+       "weeks": 12
+      },
+      "by_position": {
+       "QB": -0.00013244817616952834,
+       "RB": 0.16751290163809482,
+       "WR": 0.12402826732581446,
+       "TE": -0.06164784465499412
+      }
+     }
+    },
+    "places_off_pooled": {
+     "model": 12.281722933643772,
+     "form": 12.374272409778813,
+     "last_three": 13.277066356228172,
+     "baseline": 12.528521536670548,
+     "round_three": 11.869615832363213,
+     "adp": 14.444703143189756
+    }
+   },
+   "round_three_input_rule_figure_hidden": {
+    "against": {
+     "form": {
+      "pooled": {
+       "value": -0.030302993416861088,
+       "lower_bound": -0.0755377956448172,
+       "weeks": 12
+      },
+      "by_position": {
+       "QB": -0.04325553417245373,
+       "RB": 0.006930277561111596,
+       "WR": -0.0002495051914750644,
+       "TE": -0.08463721186462715
+      }
+     },
+     "last_three": {
+      "pooled": {
+       "value": 0.0022348102376949855,
+       "lower_bound": -0.049280360978492976,
+       "weeks": 12
+      },
+      "by_position": {
+       "QB": 0.01817249789483351,
+       "RB": 0.034363699766272335,
+       "WR": 0.056517121389531466,
+       "TE": -0.10011407809985735
+      }
+     },
+     "baseline": {
+      "pooled": {
+       "value": -0.017675127094137225,
+       "lower_bound": -0.054132259280898785,
+       "weeks": 12
+      },
+      "by_position": {
+       "QB": -0.0773479849683103,
+       "RB": 0.025563405799083755,
+       "WR": 0.00665149125795451,
+       "TE": -0.025567420465276852
+      }
+     },
+     "round_three": {
+      "pooled": {
+       "value": -0.04087477890850945,
+       "lower_bound": -0.07797891143470152,
+       "weeks": 12
+      },
+      "by_position": {
+       "QB": -0.04372835766536239,
+       "RB": -0.010220294224379154,
+       "WR": -0.022768800183637698,
+       "TE": -0.08678166356065853
+      }
+     },
+     "adp": {
+      "pooled": {
+       "value": 0.03931428397058331,
+       "lower_bound": -0.00817721102171861,
+       "weeks": 12
+      },
+      "by_position": {
+       "QB": -0.03408515333468196,
+       "RB": 0.15857072949576478,
+       "WR": 0.11457376179467053,
+       "TE": -0.08180220207342015
+      }
+     }
+    },
+    "places_off_pooled": {
+     "model": 12.635622817229336,
+     "form": 12.374272409778813,
+     "last_three": 13.277066356228172,
+     "baseline": 12.528521536670548,
+     "round_three": 11.869615832363213,
+     "adp": 14.444703143189756
+    }
+   },
+   "without_the_identities_normalisation": {
+    "against": {
+     "form": {
+      "pooled": {
+       "value": 0.003288797848561899,
+       "lower_bound": -0.02455784632379415,
+       "weeks": 12
+      },
+      "by_position": {
+       "QB": -0.010927539544149429,
+       "RB": 0.027135234190813314,
+       "WR": 0.014774711374302271,
+       "TE": -0.017827214626718556
+      }
+     },
+     "last_three": {
+      "pooled": {
+       "value": 0.035826601503117984,
+       "lower_bound": -0.004190852434573103,
+       "weeks": 12
+      },
+      "by_position": {
+       "QB": 0.05050049252313781,
+       "RB": 0.05456865639597406,
+       "WR": 0.0715413379553088,
+       "TE": -0.03330408086194877
+      }
+     },
+     "baseline": {
+      "pooled": {
+       "value": 0.015916664171285764,
+       "lower_bound": -0.006381202383979679,
+       "weeks": 12
+      },
+      "by_position": {
+       "QB": -0.045019990340006,
+       "RB": 0.04576836242878548,
+       "WR": 0.021675707823731846,
+       "TE": 0.04124257677263174
+      }
+     },
+     "round_three": {
+      "pooled": {
+       "value": -0.007282987643086459,
+       "lower_bound": -0.03260176626078096,
+       "weeks": 12
+      },
+      "by_position": {
+       "QB": -0.011400363037058108,
+       "RB": 0.009984662405322564,
+       "WR": -0.007744583617860364,
+       "TE": -0.019971666322749937
+      }
+     },
+     "adp": {
+      "pooled": {
+       "value": 0.0729060752360063,
+       "lower_bound": 0.03804210346338389,
+       "weeks": 12
+      },
+      "by_position": {
+       "QB": -0.001757158706377657,
+       "RB": 0.1787756861254665,
+       "WR": 0.12959797836044787,
+       "TE": -0.014992204835511556
+      }
+     }
+    },
+    "places_off_pooled": {
+     "model": 11.983701979045401,
+     "form": 12.374272409778813,
+     "last_three": 13.277066356228172,
+     "baseline": 12.528521536670548,
+     "round_three": 11.869615832363213,
+     "adp": 14.444703143189756
+    }
+   },
+   "efficiency_moments_weighted_by_opportunities": {
+    "against": {
+     "form": {
+      "pooled": {
+       "value": -0.014403245094917687,
+       "lower_bound": -0.05541185795689001,
+       "weeks": 12
+      },
+      "by_position": {
+       "QB": -0.017307329540056385,
+       "RB": 0.015799011540517424,
+       "WR": 0.011330429942762113,
+       "TE": -0.0674350923228939
+      }
+     },
+     "last_three": {
+      "pooled": {
+       "value": 0.01813455855963839,
+       "lower_bound": -0.03290991366641453,
+       "weeks": 12
+      },
+      "by_position": {
+       "QB": 0.04412070252723086,
+       "RB": 0.043232433745678166,
+       "WR": 0.06809705652376864,
+       "TE": -0.08291195855812412
+      }
+     },
+     "baseline": {
+      "pooled": {
+       "value": -0.0017753787721938204,
+       "lower_bound": -0.0361104275869107,
+       "weeks": 12
+      },
+      "by_position": {
+       "QB": -0.05139978033591295,
+       "RB": 0.034432139778489586,
+       "WR": 0.018231426392191687,
+       "TE": -0.008365300923543593
+      }
+     },
+     "round_three": {
+      "pooled": {
+       "value": -0.02497503058656604,
+       "lower_bound": -0.05403207527245156,
+       "weeks": 12
+      },
+      "by_position": {
+       "QB": -0.017780153032965058,
+       "RB": -0.0013515602449733256,
+       "WR": -0.011188865049400523,
+       "TE": -0.06957954401892529
+      }
+     },
+     "adp": {
+      "pooled": {
+       "value": 0.055214032292526714,
+       "lower_bound": 0.0202468873233652,
+       "weeks": 12
+      },
+      "by_position": {
+       "QB": -0.008136948702284619,
+       "RB": 0.16743946347517066,
+       "WR": 0.1261536969289077,
+       "TE": -0.0646000825316869
+      }
+     }
+    },
+    "places_off_pooled": {
+     "model": 12.281722933643772,
+     "form": 12.374272409778813,
+     "last_three": 13.277066356228172,
+     "baseline": 12.528521536670548,
+     "round_three": 11.869615832363213,
+     "adp": 14.444703143189756
+    },
+    "pooled_fully": [
+     "QB|carry|td",
+     "QB|carry|yards",
+     "QB|target|catch",
+     "QB|target|td",
+     "QB|target|yards",
+     "RB|carry|td",
+     "RB|dropback|scramble",
+     "RB|target|td",
+     "TE|carry|td",
+     "TE|carry|yards",
+     "TE|dropback|scramble",
+     "TE|target|td",
+     "WR|carry|td",
+     "WR|carry|yards",
+     "WR|target|td"
+    ]
+   }
+  },
+  "components": {
+   "team_model": {
+    "plays": {
+     "model": 348.9763591637213,
+     "implied_points_alone": 1121.4519748810694
+    },
+    "dropbacks": {
+     "model": 556.831683829658,
+     "implied_points_alone": 1069.3163377055937
+    },
+    "sacks": {
+     "model": 485.33611692966866,
+     "implied_points_alone": 613.5578989863393
+    },
+    "scrambles": {
+     "model": 627.7504811479121,
+     "implied_points_alone": 662.4437441085034
+    },
+    "designed_rushes": {
+     "model": 707.0141497600853,
+     "implied_points_alone": 963.284267519539
+    },
+    "team_targets": {
+     "model": 572.223278275336,
+     "implied_points_alone": 870.9064601986457
+    },
+    "rushing_touchdowns": {
+     "model": 370.58757863229005,
+     "implied_points_alone": 373.4953599494531
+    },
+    "receiving_touchdowns": {
+     "model": 342.3339565280583,
+     "implied_points_alone": 341.4195547747673
+    }
+   },
+   "share_models": {
+    "targets": {
+     "model": 360.9475607112236,
+     "season_to_date": 346.94022727614805
+    },
+    "carries": {
+     "model": 570.2928444517754,
+     "season_to_date": 590.8440489076991
+    },
+    "dropbacks": {
+     "model": 747.4496299716899,
+     "season_to_date": 406.3609207973011
+    }
+   },
+   "xfp_ppr": {
+    "model": 67041.18245519948,
+    "kind_mean": 72726.49413635627,
+    "plays": 33629
+   }
+  },
+  "defaults": {
+   "board_rows": 6585,
+   "board": {
+    "no_game_figure": 0,
+    "figure_from_the_game_tables_read": 0,
+    "no_roof_state": 0,
+    "no_weather": 0,
+    "no_game_weather_row": 0,
+    "no_forecast": 0,
+    "no_stadium_row": 0,
+    "no_rest_or_division_row": 0,
+    "no_pace": 0,
+    "club_game_without_pace_or_pass_rate": 0,
+    "opponent_no_pace": 0,
+    "defence_without_a_dropback_faced": 0,
+    "defence_without_a_pfr_pressure_row": 0,
+    "surface": 36,
+    "no_surface": 0,
+    "roof_undecided": 0,
+    "pass_rate_allowed_without_a_game": 0,
+    "no_game_this_season": 208,
+    "no_prior_season": 1517,
+    "no_depth_row": 1432,
+    "no_filing": 5378,
+    "line_week_without_snap_row": 0,
+    "no_targets_yet": 1814,
+    "no_carries_yet": 3636,
+    "withheld_teammate_not_in_the_clubs_last_three": 528,
+    "allowance_without_a_game": 0,
+    "allowance_without_an_expected_total": 313,
+    "no_ngs_rush_yards_over_expected_per_carry": 5807,
+    "no_ngs_average_separation": 4759,
+    "no_ngs_completion_over_expected": 6048,
+    "no_ngs_time_to_throw": 6048,
+    "no_pfr_broken_tackles_per_touch": 1334,
+    "no_pfr_pressured_per_dropback": 5763
+   },
+   "population_rows": 2442,
+   "population": {
+    "no_game_figure": 0,
+    "figure_from_the_game_tables_read": 0,
+    "no_roof_state": 0,
+    "no_weather": 0,
+    "no_game_weather_row": 0,
+    "no_forecast": 0,
+    "no_stadium_row": 0,
+    "no_rest_or_division_row": 0,
+    "no_pace": 0,
+    "club_game_without_pace_or_pass_rate": 0,
+    "opponent_no_pace": 0,
+    "defence_without_a_dropback_faced": 0,
+    "defence_without_a_pfr_pressure_row": 0,
+    "surface": 15,
+    "no_surface": 0,
+    "roof_undecided": 0,
+    "pass_rate_allowed_without_a_game": 0,
+    "no_game_this_season": 0,
+    "no_prior_season": 377,
+    "no_depth_row": 64,
+    "no_filing": 1860,
+    "line_week_without_snap_row": 0,
+    "no_targets_yet": 266,
+    "no_carries_yet": 833,
+    "withheld_teammate_not_in_the_clubs_last_three": 188,
+    "allowance_without_a_game": 0,
+    "allowance_without_an_expected_total": 109,
+    "no_ngs_rush_yards_over_expected_per_carry": 1850,
+    "no_ngs_average_separation": 1115,
+    "no_ngs_completion_over_expected": 2138,
+    "no_ngs_time_to_throw": 2138,
+    "no_pfr_broken_tackles_per_touch": 1,
+    "no_pfr_pressured_per_dropback": 2017
+   }
+  },
+  "benchmark_counts": {
+   "baseline_without_a_club": 2
+  },
+  "questionable": {
+   "fit_rows": {
+    "QB": {
+     "n": 34,
+     "played": 0.38235294117647056
+    },
+    "RB": {
+     "n": 91,
+     "played": 0.5714285714285714
+    },
+    "TE": {
+     "n": 67,
+     "played": 0.4626865671641791
+    },
+    "WR": {
+     "n": 174,
+     "played": 0.7471264367816092
+    }
+   },
+   "judged": {
+    "QB": {
+     "n": 20,
+     "played": 0.5
+    },
+    "RB": {
+     "n": 93,
+     "played": 0.6021505376344086
+    },
+    "TE": {
+     "n": 67,
+     "played": 0.5522388059701493
+    },
+    "WR": {
+     "n": 157,
+     "played": 0.5605095541401274
+    }
+   }
+  },
+  "team_residual_by_season": {
+   "2022": {
+    "plays": 0.39087128661498305,
+    "dropbacks": 0.15879690620503076,
+    "sacks": -0.009491203164197768,
+    "scrambles": 0.0958129287498103,
+    "designed_rushes": 0.15566016056594478,
+    "team_targets": -0.15601694290696366,
+    "rushing_touchdowns": 0.007105555483819919,
+    "receiving_touchdowns": -0.07498890428933488
+   },
+   "2023": {
+    "plays": 0.1116347467285106,
+    "dropbacks": 0.40601657714237677,
+    "sacks": 0.2029322343136893,
+    "scrambles": 0.34855880112647825,
+    "designed_rushes": -0.40232416450535435,
+    "team_targets": -0.31010476607192605,
+    "rushing_touchdowns": 0.02183182548173839,
+    "receiving_touchdowns": -0.031031375466481784
+   }
+  },
+  "retractable_club_games": {
+   "2022": 80,
+   "2023": 80
+  }
+ },
+ "stage_digests": {
+  "judged_points": "2e060f94be7391db893098bff2cd8f5c2b8a49365ca5f0d75088085ef41a8778",
+  "judged_shares": "9222c38d7cdb6fed71d6066921b650a0d4ff838cc3895ff1d65a0ee334d52137",
+  "judged_bands": "1974dd7e69a9db1b6f71a311e497dd1d4bf0312ecc54b9f94342be22a872b2ea",
+  "team_expectations_2022": "95e7009caf8b2be6e6d050855b991d9ba89496629b7b7a37f4e4a09d503223d4",
+  "xfp_2022": "241a3244a7d9f95ab4741b488e2f295f8bc376faeee68058471a1e77dfde58dc",
+  "team_expectations_2023": "3866a5bea0905631a15c4e036bca3582e5931bc3213c174863c2b4470ff553d1",
+  "xfp_2023": "8ca0ee507764b785e3aee61f08aa6d57e0ee26d2456fc3b4a811b68ec5ade29a"
+ },
+ "digests": {
+  "before": {
+   "preseason_projections": "26855:2109a11f008d8020cb8c1d9e144d4c74",
+   "preseason_board_reasons": "187631:e9857b63469f70a32a29a65dede38012",
+   "register_freeze_rows": "3409:adc192c3ca6e7005d8412ea1884fa9b8",
+   "register_grade_rows": "1351:7ce3224a7476a9b1bb049931d2478bf8",
+   "model_artifacts": "25:c6317aa555d6e06dd740a49ab3a7947f"
+  },
+  "after": {
+   "preseason_projections": "26855:2109a11f008d8020cb8c1d9e144d4c74",
+   "preseason_board_reasons": "187631:e9857b63469f70a32a29a65dede38012",
+   "register_freeze_rows": "3409:adc192c3ca6e7005d8412ea1884fa9b8",
+   "register_grade_rows": "1351:7ce3224a7476a9b1bb049931d2478bf8",
+   "model_artifacts": "25:c6317aa555d6e06dd740a49ab3a7947f"
+  }
+ },
+ "seconds": {
+  "play_model": 987.0454187080031,
+  "team_model": 700.9015872500604,
+  "share_models": 1941.5048424589913,
+  "efficiency_and_inputs": 2.8766275830566883,
+  "dispersion": 42.05534779210575,
+  "total": 4017.8723902089987
+ },
+ "report": [
+  "fit seconds: play_model 987, team_model 701, share_models 1942, efficiency_and_inputs 3, dispersion 42",
+  "judged: 2444 population rows",
+  "PASS  G1 pooled vs ADP                        difference +0.0572 against a margin of +0.0400, lower bound +0.0208 against 0, over 12 weeks",
+  "PASS  G1 QB vs ADP                            mean difference -0.0015 against a floor of -0.0200",
+  "PASS  G1 RB vs ADP                            mean difference +0.1656 against a floor of -0.0200",
+  "PASS  G1 WR vs ADP                            mean difference +0.1250 against a floor of -0.0200",
+  "FAIL  G1 TE vs ADP                            mean difference -0.0604 against a floor of -0.0200",
+  "FAIL  G2 pooled vs recent form                difference -0.0124 against a margin of +0.0300, lower bound -0.0531 against 0, over 12 weeks",
+  "PASS  G2 QB vs recent form                    mean difference -0.0107 against a floor of -0.0200",
+  "PASS  G2 RB vs recent form                    mean difference +0.0139 against a floor of -0.0200",
+  "PASS  G2 WR vs recent form                    mean difference +0.0102 against a floor of -0.0200",
+  "FAIL  G2 TE vs recent form                    mean difference -0.0632 against a floor of -0.0200",
+  "FAIL  G2 pooled vs last-three form            difference +0.0201 against a margin of +0.0300 (a point comparison)",
+  "FAIL  G6 pooled vs the expert's spreadsheet   difference +0.0002 against a margin of +0.0150, lower bound -0.0326 against 0, over 12 weeks",
+  "FAIL  G6 QB vs the expert's spreadsheet       mean difference -0.0447 against a floor of -0.0200",
+  "PASS  G6 RB vs the expert's spreadsheet       mean difference +0.0325 against a floor of -0.0200",
+  "PASS  G6 WR vs the expert's spreadsheet       mean difference +0.0171 against a floor of -0.0200",
+  "PASS  G6 TE vs the expert's spreadsheet       mean difference -0.0042 against a floor of -0.0200",
+  "FAIL  G7 pooled vs round 3's number           difference -0.0230 against a margin of +0.0150 (a point comparison)",
+  "PASS  G3 places off vs ADP                    model 12.307, ADP 14.445: +2.137 fewer against a margin of 0.25",
+  "FAIL  G3 places off vs recent form            model 12.307, recent form 12.374: +0.067 fewer against a margin of 0.75",
+  "FAIL  G3 places off vs the expert's spreadsheet model 12.307, the expert's spreadsheet 12.529: +0.221 fewer against a margin of 0.25",
+  "FAIL  G4 QB ppr                               below floor 0.079, above ceiling 0.125, each against [0.06, 0.14]; below median 0.433 against [0.44, 0.56]; n=305",
+  "FAIL  G4 QB half                              below floor 0.079, above ceiling 0.125, each against [0.06, 0.14]; below median 0.433 against [0.44, 0.56]; n=305",
+  "FAIL  G4 QB std                               below floor 0.079, above ceiling 0.125, each against [0.06, 0.14]; below median 0.433 against [0.44, 0.56]; n=305",
+  "PASS  G4 RB ppr                               below floor 0.062, above ceiling 0.133, each against [0.06, 0.14]; below median 0.453 against [0.44, 0.56]; n=722",
+  "FAIL  G4 RB half                              below floor 0.050, above ceiling 0.125, each against [0.06, 0.14]; below median 0.465 against [0.44, 0.56]; n=722",
+  "FAIL  G4 RB std                               below floor 0.043, above ceiling 0.120, each against [0.06, 0.14]; below median 0.483 against [0.44, 0.56]; n=722",
+  "PASS  G4 WR ppr                               below floor 0.087, above ceiling 0.135, each against [0.06, 0.14]; below median 0.466 against [0.44, 0.56]; n=1074",
+  "PASS  G4 WR half                              below floor 0.086, above ceiling 0.135, each against [0.06, 0.14]; below median 0.470 against [0.44, 0.56]; n=1074",
+  "PASS  G4 WR std                               below floor 0.068, above ceiling 0.138, each against [0.06, 0.14]; below median 0.492 against [0.44, 0.56]; n=1074",
+  "FAIL  G4 TE ppr                               below floor 0.088, above ceiling 0.174, each against [0.06, 0.14]; below median 0.415 against [0.44, 0.56]; n=340",
+  "FAIL  G4 TE half                              below floor 0.082, above ceiling 0.174, each against [0.06, 0.14]; below median 0.412 against [0.44, 0.56]; n=340",
+  "FAIL  G4 TE std                               below floor 0.071, above ceiling 0.174, each against [0.06, 0.14]; below median 0.424 against [0.44, 0.56]; n=340",
+  "PASS  G4 chance                               5 bins gated (at least 3), tolerance 0.04: [0.5, 0.6) n=21982 chance 0.550 observed 0.551; [0.6, 0.7) n=20466 chance 0.649 observed 0.651; [0.7, 0.8) n=17913 chance 0.748 observed 0.753; [0.8, 0.9) n=13291 chance 0.846 observed 0.848; [0.9, 1.0) n=4118 chance 0.929 observed 0.916",
+  "PASS  G5 isolation                            judged outcomes read for [2023]; players outcomes read for [np.int64(2021), np.int64(2022)]; plays and teams outcomes read for [2016, 2017, 2018, 2019, 2020, 2021, 2022]; every table as it was; per-game clause: round 3's reads: 1058 games, 531 reads, every row before its instant (closest 0.1 h before); the fit weeks' reads: 830 games, 406 reads, every row before its instant (closest 0.1 h before); the store: 0 broken reads over 8 seasons, clauses held, its build read outcomes of 2016 to 2023",
+  "STOP RULE: the development check fails G2 pooled vs recent form and G6 pooled vs the expert's spreadsheet; the round ends, no judgment"
+ ],
+ "tree_status": [],
+ "tree_clean": true
+}
