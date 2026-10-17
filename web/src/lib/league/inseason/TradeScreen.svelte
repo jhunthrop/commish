@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
+	import { page } from '$app/state';
 	import Label from '#lib/ui/Label.svelte';
 	import Panel from '#lib/ui/Panel.svelte';
 	import ProblemLine from '#lib/ui/ProblemLine.svelte';
@@ -6,6 +8,7 @@
 	import ToneChip from '#lib/ui/ToneChip.svelte';
 	import type { LeagueHost } from '../api.ts';
 	import LineRow from './LineRow.svelte';
+	import { TRADE_FOR_PARAM } from './tabs.ts';
 	import Screen from './Screen.svelte';
 	import PickSelect, { type PickGroup, type PickOption } from './PickSelect.svelte';
 	import TradeBuilder from './TradeBuilder.svelte';
@@ -159,6 +162,12 @@
 		if (outcome.kind === 'answer') narrowed = outcome.answer;
 		if (outcome.kind === 'failed') problem = outcome.sentence;
 	}
+
+	// A link naming a player (the Rest of season screen's Trade for him) opens on his trades.
+	onMount(() => {
+		const asked = page.url.searchParams.get(TRADE_FOR_PARAM);
+		if (asked !== null && asked !== '') void pick(asked);
+	});
 
 	function open(team: number): void {
 		opened = new Set([...opened, team]);

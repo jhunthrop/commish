@@ -493,9 +493,14 @@ async function recordFrom(
 		format: FORMAT.id,
 		// The register's own rules (research-ts/src/projections/register/grade.ts), in drafter words:
 		// the agreement is Spearman's rank correlation, the places off the mean distance in places.
-		statistic: { agreement: 'agreement with the finish', placesOff: 'places off, typical player' },
+		statistic: { agreement: 'order matched', placesOff: 'places off', starters: 'starters right' },
+		scale: "1.0 is a perfect match of the week's finishing order, 0 is none.",
+		startersBasis:
+			"Starters right counts the week's top 12 QBs, 24 RBs, 36 WRs, 12 TEs, 12 kickers and 12 defenses, a 12-team league's starters, that the order also put there.",
 		method:
 			'Each week our PPR board is frozen before the first kickoff and graded after the games against how its players finished, with ADP graded the same way on the same players.',
+		publishedFromWeek: 7,
+		honest: null,
 		weeks: seasonWeeks(frozen, games, now),
 		toDate: []
 	};

@@ -1,0 +1,466 @@
+<script lang="ts">
+	import type { Snippet } from 'svelte';
+	import { BOX, boxNumber, easeOf, oppRankWord } from '#lib/league/box/box.ts';
+	import BoxGame from '#lib/league/box/BoxGame.svelte';
+	import BoxPlayer from '#lib/league/box/BoxPlayer.svelte';
+	import { tabHref } from '#lib/league/inseason/tabs.ts';
+	import Icon from '#lib/ui/Icon.svelte';
+	import { ORDER, moveHref, moveWords, type OrderView } from './order.ts';
+
+	/** Our order as a box score (Lane 66j): #, the player, in a league his roster, his game, Proj, Rest of
+	 * season (the total, which the order ranks by, then a game), Avg, Last and Opp rank, and the one
+	 * move his row admits. Your players are tinted. On a phone the game and Avg and Last fold under the
+	 * name, the roster mark onto his club line. */
+	interface Props {
+		label: string;
+		rows: readonly OrderView[];
+		/** The attached league the rows are marked for; null draws no roster and no move. */
+		league: string | null;
+		/** Your sheet's tags on a player, by board id. */
+		tagsOf?: (boardId: string | null) => readonly string[];
+		/** A row's own control at the end (the Players screen's sheet mark), when not a league's move. */
+		end?: Snippet<[OrderView]>;
+	}
+
+	let { label, rows, league, tagsOf = () => [], end }: Props = $props();
+
+	const marked = $derived(league !== null);
+	const SEPARATOR = ', ';
+</script>
+
+{#snippet mark(row: OrderView)}
+	{#if row.roster}<span class="own {row.roster.kind}">{row.roster.words}</span>{/if}
+{/snippet}
+
+<table class="order" class:marked aria-label={label}>
+	<thead>
+		<tr class="grp">
+			<th colspan={marked ? 3 : 2} scope="colgroup" class="g-order">{ORDER.rankGroup}</th>
+			<th colspan="2"></th>
+			<th colspan="2" scope="colgroup" class="g-rest">{ORDER.restGroup}</th>
+			<th colspan={marked || end ? 4 : 3}></th>
+		</tr>
+		<tr class="cols">
+			<th class="n rank" scope="col">{ORDER.rank}</th>
+			<th scope="col">{BOX.player}</th>
+			{#if marked}<th class="roster" scope="col">{ORDER.roster}</th>{/if}
+			<th class="game" scope="col">{BOX.game}</th>
+			<th class="n proj" scope="col">{BOX.proj}</th>
+			<th class="n total" scope="col">{ORDER.total}</th>
+			<th class="n ev pg" scope="col">{ORDER.perGame}</th>
+			<th class="n ev first" scope="col">{BOX.avg}</th>
+			<th class="n ev" scope="col">{BOX.last}</th>
+			<th class="n ev opp" scope="col">{BOX.oppRank}</th>
+			{#if marked || end}<th class="act" scope="col"><span class="vh">{ORDER.add}</span></th>{/if}
+		</tr>
+	</thead>
+	<tbody>
+		{#each rows as row (row.key)}
+			{@const href = moveHref(row, league, tabHref)}
+			{@const rank = row.box.evidence.oppRank}
+			<tr class:mine={row.roster?.kind === 'yours'}>
+				<td class="n rank">{row.rank}</td>
+				<td class="player">
+					<BoxPlayer row={row.box} tags={tagsOf(row.box.boardId)}>
+						{#snippet after()}<span class="ph-mark">{@render mark(row)}</span>{/snippet}
+						<span class="ph-ev"
+							>{BOX.avg}
+							{boxNumber(row.box.evidence.avg)}{SEPARATOR}{BOX.last}
+							{boxNumber(row.box.evidence.last)}</span
+						>
+					</BoxPlayer>
+				</td>
+				{#if marked}<td class="roster">{@render mark(row)}</td>{/if}
+				<td class="game"><BoxGame row={row.box} /></td>
+				<td class="n proj">{boxNumber(row.box.proj)}</td>
+				<td class="n total">{boxNumber(row.total)}</td>
+				<td class="n ev pg">{boxNumber(row.perGame)}</td>
+				<td class="n ev first">{boxNumber(row.box.evidence.avg)}</td>
+				<td class="n ev">{boxNumber(row.box.evidence.last)}</td>
+				<td class="n ev opp"
+					>{#if rank !== null}<span class="rk {easeOf(rank, row.box.evidence.oppOf)}"
+							>{oppRankWord(rank)}</span
+						>{:else}<span class="none">{BOX.none}</span>{/if}</td
+				>
+				{#if marked || end}
+					<td class="act">
+						{#if href !== null && row.move}
+							<a class="verb {row.move}" {href} aria-label="{moveWords(row.move)} {row.box.name}"
+								>{#if row.move === 'add'}<Icon name="plus" size={14} />{:else}<svg
+										width="14"
+										height="14"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										aria-hidden="true"><path d="M4 8h14l-3-3M20 16H6l3 3" /></svg
+									>{/if}<span>{moveWords(row.move)}</span></a
+							>
+						{:else if end}{@render end(row)}{/if}
+					</td>
+				{/if}
+			</tr>
+		{/each}
+	</tbody>
+</table>
+
+<style>
+	.order {
+		width: 100%;
+		border-collapse: separate;
+		border-spacing: 0;
+		background: var(--surface);
+		border: 1px solid var(--line);
+		border-radius: var(--r-md);
+		overflow: hidden;
+	}
+
+	th {
+		padding: 0 var(--s-2);
+		text-align: left;
+		background: var(--bg);
+	}
+
+	.grp th {
+		height: 22px;
+		font-size: var(--t-xs);
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: var(--track-label);
+		color: var(--ink-2);
+	}
+
+	.grp .g-rest {
+		text-align: center;
+		border-left: 1px solid var(--line);
+	}
+
+	.cols th {
+		height: 30px;
+		font-size: var(--t-xs);
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: var(--track-label);
+		color: var(--ink-3);
+		border-bottom: 1px solid var(--line);
+		white-space: nowrap;
+	}
+
+	.cols .rank {
+		width: 52px;
+		color: var(--ink);
+	}
+
+	.cols .roster {
+		width: 168px;
+	}
+
+	.cols .game {
+		width: 200px;
+	}
+
+	.cols .proj {
+		width: 60px;
+	}
+
+	.cols .total {
+		width: 72px;
+		border-left: 1px solid var(--line);
+	}
+
+	.cols .ev {
+		width: 58px;
+	}
+
+	.cols .ev.first {
+		width: 64px;
+		border-left: 1px solid var(--line);
+	}
+
+	.cols .opp {
+		width: 84px;
+	}
+
+	.cols .act {
+		width: 148px;
+	}
+
+	.cols .n {
+		text-align: right;
+	}
+
+	td {
+		padding: 6px var(--s-2);
+		border-bottom: 1px solid var(--line);
+		vertical-align: middle;
+	}
+
+	tr {
+		height: var(--row-h);
+	}
+
+	tbody tr:hover td {
+		background: var(--surface-2);
+	}
+
+	tbody tr:last-child td {
+		border-bottom: 0;
+	}
+
+	.mine td {
+		background: color-mix(in srgb, var(--accent) 7%, var(--surface));
+	}
+
+	.mine td:first-child {
+		box-shadow: inset 3px 0 0 var(--accent);
+	}
+
+	.n {
+		text-align: right;
+		font-family: var(--font-num);
+		font-variant-numeric: tabular-nums;
+		white-space: nowrap;
+	}
+
+	td.rank {
+		font-size: var(--t-lg);
+		font-weight: 800;
+		padding-right: var(--s-3);
+	}
+
+	td.game {
+		font-size: var(--t-sm);
+	}
+
+	td.proj {
+		font-size: var(--t-lg);
+		font-weight: 600;
+		color: var(--ink-2);
+	}
+
+	td.total {
+		font-size: var(--t-xl);
+		font-weight: 800;
+		color: var(--ink);
+		border-left: 1px solid var(--line);
+	}
+
+	.ev {
+		font-size: var(--t-md);
+		font-weight: 600;
+		color: var(--ink-2);
+	}
+
+	td.ev.first {
+		border-left: 1px solid var(--line);
+	}
+
+	td.roster {
+		max-width: 168px;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.own {
+		display: inline-flex;
+		align-items: center;
+		max-width: 100%;
+		height: 22px;
+		padding: 0 var(--s-2);
+		border-radius: var(--r-pill);
+		font-size: var(--t-xs);
+		font-weight: 700;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
+	.own.yours {
+		background: var(--accent);
+		color: var(--accent-ink);
+	}
+
+	.own.free {
+		background: var(--gain-bg);
+		color: var(--gain-ink);
+	}
+
+	.own.team {
+		display: inline;
+		padding: 0;
+		font-size: var(--t-sm);
+		font-weight: 500;
+		color: var(--ink-3);
+	}
+
+	.rk {
+		display: inline-flex;
+		align-items: center;
+		justify-content: flex-end;
+		min-width: 40px;
+		height: 22px;
+		padding: 0 6px;
+		border-radius: var(--r-sm);
+	}
+
+	.rk.easy {
+		background: var(--gain-bg);
+		color: var(--gain-ink);
+	}
+
+	.rk.hard {
+		background: var(--loss-bg);
+		color: var(--loss-ink);
+	}
+
+	.none {
+		color: var(--ink-3);
+	}
+
+	.act {
+		text-align: right;
+		white-space: nowrap;
+	}
+
+	.verb {
+		display: inline-flex;
+		align-items: center;
+		gap: 4px;
+		height: 30px;
+		padding: 0 var(--s-3) 0 var(--s-2);
+		border: 1px solid var(--line-strong);
+		border-radius: var(--r-md);
+		font-size: var(--t-xs);
+		font-weight: 600;
+		color: var(--ink);
+		text-decoration: none;
+	}
+
+	/* Trade for him stays in the quietest ink (the coordinator's ruling 3). */
+	.verb.trade {
+		border-color: transparent;
+		color: var(--ink-3);
+	}
+
+	.verb:hover {
+		border-color: var(--ink-3);
+	}
+
+	.ph-mark,
+	.ph-ev {
+		display: none;
+	}
+
+	.vh {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		overflow: hidden;
+		clip-path: inset(50%);
+		white-space: nowrap;
+	}
+
+	/* Below a wide screen the season's figures fold under the name, as the Lineup's do. */
+	@media (max-width: 1100px) {
+		.ev,
+		.cols .ev,
+		td.ev.first,
+		.grp th:last-child {
+			display: none;
+		}
+
+		.ph-ev {
+			display: block;
+			font-size: var(--t-xs);
+			color: var(--ink-3);
+			font-variant-numeric: tabular-nums;
+		}
+	}
+
+	@media (max-width: 760px) {
+		.grp {
+			display: none;
+		}
+
+		td {
+			padding: 7px 4px;
+		}
+
+		tr {
+			height: auto;
+		}
+
+		.cols .rank,
+		td.rank {
+			width: 30px;
+			font-size: var(--t-md);
+			padding-right: 2px;
+		}
+
+		.cols .proj {
+			width: 44px;
+		}
+
+		.cols .total {
+			width: 52px;
+		}
+
+		.cols .act {
+			width: 40px;
+		}
+
+		.roster,
+		.cols .roster,
+		.game,
+		.cols .game {
+			display: none;
+		}
+
+		td.proj {
+			font-size: var(--t-sm);
+		}
+
+		td.total {
+			font-size: var(--t-md);
+		}
+
+		/* The roster mark moves onto his club line, one line, a long team name cut (ruling 3). */
+		.ph-mark {
+			display: inline-flex;
+			min-width: 0;
+			max-width: 132px;
+		}
+
+		.ph-mark .own {
+			height: 18px;
+			padding: 0 6px;
+			font-size: 10px;
+		}
+
+		.ph-mark .own.team {
+			display: block;
+			padding: 0;
+			overflow: hidden;
+			text-overflow: ellipsis;
+			white-space: nowrap;
+			font-size: var(--t-xs);
+		}
+
+		.verb {
+			width: 32px;
+			padding: 0;
+			justify-content: center;
+		}
+
+		.verb span {
+			display: none;
+		}
+
+		.verb.trade {
+			border-color: var(--line);
+		}
+	}
+</style>

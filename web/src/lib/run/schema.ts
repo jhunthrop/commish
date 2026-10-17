@@ -195,13 +195,20 @@ export const scoreSchema = z.object({
 	/** Spearman rank correlation with the finish, or null when the sample cannot support one. */
 	agreement: z.number().min(-1).max(1).nullable(),
 	/** Mean distance in places between this order and the finish, or null with no sample. */
-	placesOff: z.number().nonnegative().nullable()
+	placesOff: z.number().nonnegative().nullable(),
+	/** The week's top players at each position (a 12-team league's starters) this order also put
+	 * there, of how many (Lane 66j). */
+	starters: z.number().int().nonnegative(),
+	startersOf: z.number().int().nonnegative()
 });
 
 export const recordLineSchema = z.object({
 	position: z.union([position, z.literal('All')]),
 	ours: scoreSchema,
-	adp: scoreSchema
+	adp: scoreSchema,
+	/** The week's published projection on the same players where the freeze kept it (from
+	 * publishedFromWeek), null before it did. */
+	published: scoreSchema.nullable()
 });
 
 /** Where a week of the season stands in the record. Every week of the season is listed, so a week
@@ -256,12 +263,21 @@ export const recordSchema = z.object({
 	season: z.number().int(),
 	/** The format every frozen board ranks in. */
 	format: formatId,
-	/** The statistics the record grades with, in words a drafter says with no gloss: the rank
-	 * agreement as "agreement with the finish", the typical miss as "places off, typical player".
-	 * The page prints them as the big number's caption and the column heads. */
-	statistic: z.object({ agreement: phrase, placesOff: phrase }),
+	/** The statistics the record grades with, in words a drafter says with no gloss (Lane 66j): the
+	 * rank agreement as "order matched", the typical miss as "places off", the starters called right.
+	 * The page prints them as its column heads. */
+	statistic: z.object({ agreement: phrase, placesOff: phrase, starters: phrase }),
+	/** The agreement's scale, said once: "1.0 is a perfect match of the week's finishing order, 0 is none." */
+	scale: phrase,
+	/** What the starters figure counts, said once. */
+	startersBasis: phrase,
 	/** How the record is kept, as one sentence the page prints under the weeks. */
 	method: phrase,
+	/** The first week the published projection is graded beside ours. */
+	publishedFromWeek: z.number().int().min(1),
+	/** The sentence the page prints when ADP or the published projection called the graded weeks
+	 * better than our order on any figure, null when ours leads or ties on every one. */
+	honest: phrase.nullable(),
 	/** Every week of the season in order, whatever its status. */
 	weeks: z.array(recordWeekSchema),
 	/** Every graded week pooled, one line for all players and one per position. */

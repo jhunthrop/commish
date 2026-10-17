@@ -27,6 +27,7 @@
 	import type { StatusView } from '#lib/run/status-view.ts';
 	import { liveStatusClock, sayBoard, type LiveStatus } from '#lib/run/live-status.ts';
 	import { links, tierAnchor } from './links.ts';
+	import type OrderScreenComponent from '#lib/order/OrderScreen.svelte';
 
 	interface Props {
 		page: BoardPage;
@@ -113,6 +114,21 @@
 
 	/** The side column's anchor: the basis, the toggles and the tiers. */
 	const SIDE_ID = 'board-side';
+
+	/** In season the board is the Rest of season screen (Lane 66j): our order as a box score read
+	 * from the API, loaded with the page's script, so the run's rows stay the page without one. */
+	let Order = $state<typeof OrderScreenComponent | null>(null);
+	onMount(() => {
+		if (page.seasonLead === null) return;
+		void import('#lib/order/OrderScreen.svelte').then((module) => {
+			Order = module.default;
+		});
+	});
+	const orderLeague = $derived(
+		siteContext.league === null
+			? null
+			: { id: siteContext.league.id, host: siteContext.league.host }
+	);
 </script>
 
 {#snippet row(player: BoardRowView, i: number)}
@@ -135,7 +151,7 @@
 	</Row>
 {/snippet}
 
-<main class="board">
+<main class="board" class:ordered={Order !== null}>
 	<!-- The league's line sits by the switch, not under the caption: atop the side column on a desk,
 	     first under the bar elsewhere. -->
 	<div class="league-line">
@@ -143,7 +159,7 @@
 	</div>
 	<div class="content">
 		<div class="lead">
-			<PageHead title={heading} {lead}>
+			<PageHead title={heading} lead={Order === null ? lead : undefined}>
 				{#snippet actions()}
 					<Quiet href={links.adp(page.format.id)} size="sm">ADP</Quiet>
 					<Quiet href={links.schedule()} size="sm">Schedule strength</Quiet>
@@ -165,41 +181,52 @@
 			</FilterBar>
 		</div>
 
-		<section aria-label="{page.position ?? 'All'} {page.format.label} board">
-			<RowHead {range} action games={page.seasonLead !== null} {framing} />
-			{#if page.position === null}
-				{#each visible as player, i (player.id)}
-					{@render row(player, i)}
-				{/each}
-			{:else}
-				{#each groups as tierGroup (tierGroup.tier)}
-					{@const rows = tierGroup.rows.filter(shown)}
-					{#if rows.length > 0}
+		{#if Order}
+			{#key orderLeague?.id}
+				<Order
+					mode="rest"
+					position={page.position === 'DST' ? 'DEF' : page.position}
+					league={orderLeague}
+					label="{page.position ?? 'All'} on our rest-of-season order"
+				/>
+			{/key}
+		{:else}
+			<section aria-label="{page.position ?? 'All'} {page.format.label} board">
+				<RowHead {range} action games={page.seasonLead !== null} {framing} />
+				{#if page.position === null}
+					{#each visible as player, i (player.id)}
+						{@render row(player, i)}
+					{/each}
+				{:else}
+					{#each groups as tierGroup (tierGroup.tier)}
+						{@const rows = tierGroup.rows.filter(shown)}
+						{#if rows.length > 0}
+							<div class="tier">
+								<TierStrip
+									id={tierAnchor(page.position, tierGroup.tier)}
+									tier={tierGroup.tier}
+									count={tierGroup.rows.length}
+									{group}
+									cliff={tierGroup.cliff}
+									{unit}
+								/>
+								{#each rows as player (player.id)}
+									{@render row(player, player.positionRank - 1)}
+								{/each}
+							</div>
+						{/if}
+					{/each}
+					{#if heldRows.length > 0}
 						<div class="tier">
-							<TierStrip
-								id={tierAnchor(page.position, tierGroup.tier)}
-								tier={tierGroup.tier}
-								count={tierGroup.rows.length}
-								{group}
-								cliff={tierGroup.cliff}
-								{unit}
-							/>
-							{#each rows as player (player.id)}
-								{@render row(player, player.positionRank - 1)}
+							<p class="held-head"><Label>On a season-long list</Label></p>
+							{#each heldRows as player (player.id)}
+								{@render row(player, page.rows.length)}
 							{/each}
 						</div>
 					{/if}
-				{/each}
-				{#if heldRows.length > 0}
-					<div class="tier">
-						<p class="held-head"><Label>On a season-long list</Label></p>
-						{#each heldRows as player (player.id)}
-							{@render row(player, page.rows.length)}
-						{/each}
-					</div>
 				{/if}
-			{/if}
-		</section>
+			</section>
+		{/if}
 	</div>
 
 	<aside class="side" id={SIDE_ID} aria-label="Your board">
@@ -329,6 +356,15 @@
 		.board:has(.range-toggle):has(:global(.row.games)) .side :global(dl > :nth-last-child(-n + 2)) {
 			display: none;
 		}
+	}
+
+	/* The Rest of season screen takes the page's width: its table carries the basis and the filters. */
+	.ordered {
+		grid-template-columns: minmax(0, 1fr);
+	}
+
+	.ordered .side {
+		display: none;
 	}
 
 	/* The sheet card's height with no one on it yet ("Your sheet", "No one yet"). */

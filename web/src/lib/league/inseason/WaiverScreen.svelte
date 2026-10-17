@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
+	import { page } from '$app/state';
 	import Chip from '#lib/ui/Chip.svelte';
 	import ChipGroup from '#lib/ui/ChipGroup.svelte';
 	import Panel from '#lib/ui/Panel.svelte';
@@ -8,6 +10,7 @@
 	import ValueCell from '#lib/ui/ValueCell.svelte';
 	import type { LeagueHost } from '../api.ts';
 	import LineRow from './LineRow.svelte';
+	import { WAIVERS_AT_PARAM } from './tabs.ts';
 	import MovePanel from './MovePanel.svelte';
 	import Screen from './Screen.svelte';
 	import type {
@@ -177,6 +180,12 @@
 		planned = null;
 		claiming = null;
 	}
+
+	// A link naming a position (the Rest of season screen's Add) opens on it.
+	onMount(() => {
+		const asked = positions.find((p) => p === page.url.searchParams.get(WAIVERS_AT_PARAM));
+		if (asked !== undefined) void choose(asked);
+	});
 
 	async function choose(next: WaiverPosition | null): Promise<void> {
 		position = next;
