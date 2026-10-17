@@ -206,6 +206,7 @@
 					{me}
 					{host}
 					moves={advice.moves}
+					orderBasis={advice.order_basis}
 					start={building.picks}
 					basis={advice.check_basis}
 					href={advice.host_trades_url}
@@ -251,6 +252,7 @@
 			propose={proposeRow}
 			build={buildFrom}
 			builderId={BUILDER_ID}
+			orderBasis={advice.order_basis}
 		/>
 	</div>
 	<div class="basis">

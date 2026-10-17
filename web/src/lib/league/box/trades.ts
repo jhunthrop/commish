@@ -10,6 +10,7 @@ import { listWords } from '#lib/format/list.ts';
 import { fixed, MINUS, signed } from '#lib/format/number.ts';
 import type { LeagueHost } from '../api.ts';
 import type {
+	OrderBasis,
 	PlayerLine,
 	TradeAdvice,
 	TradeCheck,
@@ -25,8 +26,7 @@ import { BOX, EVIDENCE_BASIS, factsReadLine, projBasis, ptsBasis } from './box.t
 
 /** Every word the trade table prints that is not a player's or a team's, for the copy guard. */
 export const TRADES = {
-	/** The two ruled-off groups of the finder's columns. */
-	seasonHead: 'Rest of season, a week',
+	/** The second of the finder's two ruled-off groups; the first is seasonHead's, by the board. */
 	weekHead: `This week, ${BOX.proj}`,
 	you: 'You',
 	them: 'Them',
@@ -65,6 +65,17 @@ export const TRADES = {
 	to: 'to',
 	projForYou: 'Proj for you this week'
 } as const;
+
+const SEASON_HEADS: Readonly<Record<OrderBasis, string>> = {
+	rest_of_season: 'Rest of season, a week',
+	preseason: 'Preseason number, a week'
+};
+
+/** The head over each side's gain, in the finder and on the builder's scoreboard, by what the gains
+ * are on: the rest-of-season order, or the preseason number before the board has one (rereview N1). */
+export function seasonHead(basis: OrderBasis): string {
+	return SEASON_HEADS[basis];
+}
 
 /** A trade as the table lists it: its team and its row, keyed as the screen marks it. */
 export interface FinderRow {

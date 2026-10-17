@@ -13,6 +13,7 @@
 		boxNumber,
 		deltaWord,
 		easeOf,
+		initialName,
 		oppRankWord,
 		type BoxPick,
 		type BoxRow
@@ -48,6 +49,8 @@
 		compact?: boolean;
 		/** The trade builder's tick (Lane 66g), first in the row. */
 		pick?: BoxPick | null;
+		/** A narrow phone cell prints his short form, "A. Rodgers", never a cut surname (rereview N2). */
+		shortOnPhone?: boolean;
 	}
 
 	let {
@@ -60,7 +63,8 @@
 		idle = false,
 		season = false,
 		compact = false,
-		pick = null
+		pick = null,
+		shortOnPhone = false
 	}: Props = $props();
 	const picked = $derived(pick?.state === 'on');
 	const rank = $derived(row.evidence.oppRank);
@@ -72,6 +76,12 @@
 		`${BOX.avg} ${boxNumber(row.evidence.avg)}, ${BOX.last} ${boxNumber(row.evidence.last)}`
 	);
 </script>
+
+{#snippet named()}
+	{#if shortOnPhone}<span class="full"><NameWords name={row.name} /></span><span class="short"
+			>{initialName(row.name)}</span
+		>{:else}<NameWords name={row.name} />{/if}
+{/snippet}
 
 {#snippet game()}
 	{#if row.game === 'bye'}
@@ -145,9 +155,9 @@
 			<span class="who">
 				<span class="nm">
 					{#if row.slug !== null}
-						<a href={links.playerSeason(row.slug)}><NameWords name={row.name} /></a>
+						<a href={links.playerSeason(row.slug)}>{@render named()}</a>
 					{:else}
-						<b><NameWords name={row.name} /></b>
+						<b>{@render named()}</b>
 					{/if}
 				</span>
 				<span class="club"
@@ -468,6 +478,10 @@
 		font-size: var(--t-md);
 	}
 
+	.short {
+		display: none;
+	}
+
 	.phone-game {
 		display: none;
 	}
@@ -579,6 +593,16 @@
 
 		.game > * {
 			display: none;
+		}
+
+		/* A name's short form on a phone, where the row asks for it. */
+		.full {
+			display: none;
+		}
+
+		.short {
+			display: inline;
+			white-space: nowrap;
 		}
 
 		.phone-game {

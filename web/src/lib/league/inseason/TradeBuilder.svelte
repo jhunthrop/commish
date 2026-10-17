@@ -15,11 +15,13 @@
 		checkRoom,
 		gainWord,
 		proposeVerb,
+		seasonHead,
 		TRADES,
 		type CopiedTrade
 	} from '../box/trades.ts';
 	import Basis from './Basis.svelte';
 	import type {
+		OrderBasis,
 		PlayerLine,
 		TradeCheck,
 		TradeCheckInput,
@@ -60,6 +62,8 @@
 		me: { name: string; aside: string };
 		host: LeagueHost;
 		moves: TradeMoves;
+		/** What the gains are on, for the scoreboard's head. */
+		orderBasis: OrderBasis;
 		/** The picks it opens with: a finder row's trade, or a team alone. */
 		start: Picks;
 		/** The builder's honesty line, from the finder's answer, until the first check says it. */
@@ -80,6 +84,7 @@
 		me,
 		host,
 		moves,
+		orderBasis,
 		start,
 		basis,
 		href,
@@ -217,6 +222,7 @@
 			</header>
 			<div class:reading>
 				<TradeBug
+					gainHead={seasonHead(orderBasis)}
 					yours={{
 						name: me.name,
 						figures: bugFigures(

@@ -17,9 +17,11 @@
 		theirs: Side;
 		/** The verb and its line, between the sides. */
 		verb: Snippet;
+		/** The head over each side's gain, by what the gains are on (seasonHead). */
+		gainHead: string;
 	}
 
-	let { yours, theirs, verb }: Props = $props();
+	let { yours, theirs, verb, gainHead }: Props = $props();
 </script>
 
 {#snippet half(side: Side, mine: boolean)}
@@ -37,7 +39,7 @@
 			></span
 		>
 		<span class="fig"
-			><small>{TRADES.seasonHead}</small><span
+			><small>{gainHead}</small><span
 				><i>{side.figures.seasonBefore}</i><span class="to">{TRADES.to}</span><b
 					>{side.figures.seasonAfter}</b
 				><em class={side.figures.seasonTone}>{side.figures.seasonChange}</em></span

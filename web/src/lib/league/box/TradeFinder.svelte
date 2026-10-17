@@ -5,7 +5,7 @@
 	import Quiet from '#lib/ui/Quiet.svelte';
 	import ToneChip from '#lib/ui/ToneChip.svelte';
 	import { memberZone } from '#lib/format/clock.ts';
-	import type { PlayerLine } from '../inseason/api.ts';
+	import type { OrderBasis, PlayerLine } from '../inseason/api.ts';
 	import { hostTab } from '../inseason/attach.ts';
 	import { CLOSE_FOR_THEM, teamAside } from '../inseason/words.ts';
 	import { BOX, boxRow, positionWord } from './box.ts';
@@ -17,6 +17,7 @@
 		gainWord,
 		phoneWith,
 		roomWords,
+		seasonHead,
 		shortSide,
 		sideRows,
 		toneOf,
@@ -54,9 +55,12 @@
 		build: (row: FinderRow) => (() => void) | null;
 		/** The builder's id, which Build from this opens. */
 		builderId: string;
+		/** What the gains are on, for their group's head. */
+		orderBasis: OrderBasis;
 	}
 
-	let { rows, sort, onsort, me, href, verb, reason, propose, build, builderId }: Props = $props();
+	let { rows, sort, onsort, me, href, verb, reason, propose, build, builderId, orderBasis }: Props =
+		$props();
 
 	const COLUMNS = 9;
 	const zone = memberZone();
@@ -101,6 +105,7 @@
 			evidence
 			season
 			bench
+			shortOnPhone
 		/>
 	{/each}
 {/snippet}
@@ -120,7 +125,7 @@
 	<thead>
 		<tr class="groups">
 			<td colspan="4"></td>
-			<th colspan="2" scope="colgroup" class="gh first">{TRADES.seasonHead}</th>
+			<th colspan="2" scope="colgroup" class="gh first">{seasonHead(orderBasis)}</th>
 			<th colspan="2" scope="colgroup" class="gh first">{TRADES.weekHead}</th>
 			<td></td>
 		</tr>

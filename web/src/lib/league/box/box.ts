@@ -6,6 +6,7 @@
  * prints is tested here. */
 import { memberZone, weekdayTime, zoneWord } from '#lib/format/clock.ts';
 import { defenseWords } from '#lib/format/clubs.ts';
+import { lastName } from '#lib/format/draft.ts';
 import {
 	designationWord,
 	rankWord,
@@ -81,6 +82,14 @@ export interface BoxPick {
 	disabled: boolean;
 	/** The tap; null where there is nothing to tap (the drop, a player no trade takes). */
 	toggle: (() => void) | null;
+}
+
+/** A name's short form for a narrow cell (rereview N2): the first initial, then the last name whole,
+ * "A. Rodgers"; a one-word name as it is. */
+export function initialName(name: string): string {
+	const first = name.trim().split(/\s+/)[0] ?? '';
+	const last = lastName(name);
+	return first === last ? name.trim() : `${first.charAt(0)}. ${last}`;
 }
 
 /** The slot's label in a box. */
