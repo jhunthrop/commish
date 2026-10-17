@@ -336,7 +336,11 @@ function espnWaivers(position: string | null): WaiverAdvice {
 /** A player in the waiver answer by his host id, for the plan's words. */
 function nameOf(hostId: string | null): string {
 	const lines = waivers.rows.flatMap((row) => (row.drop ? [row.add, row.drop] : [row.add]));
-	return lines.find((line) => line.player.host_id === hostId)?.player.name ?? '';
+	// An ESPN add is named by his board id (espnWaivers), a roster player by his host id.
+	return (
+		lines.find((line) => line.player.host_id === hostId || line.player.board_id === hostId)?.player
+			.name ?? ''
+	);
 }
 
 /** A claim on an ESPN fixture league: the plan in the API's words with a token (and the bid where

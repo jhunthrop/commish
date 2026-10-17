@@ -149,13 +149,15 @@
 									>{/if}</td
 							>
 							<td class="act"
-								><input
-									type="radio"
-									name="drop-{entry.key}"
-									checked={on}
+								><button
+									type="button"
+									role="radio"
+									class="radio"
+									class:on
+									aria-checked={on}
 									aria-label="Drop {drop.row.name}"
-									onchange={() => onchoose(drop)}
-								/></td
+									onclick={() => onchoose(drop)}
+								></button></td
 							>
 						{/snippet}
 					</BoxLine>
@@ -377,11 +379,20 @@
 		transform: rotate(180deg);
 	}
 
-	input[type='radio'] {
+	/* The drop choice, drawn as a radio: a ring, filled in the accent when chosen. */
+	.radio {
 		width: 18px;
 		height: 18px;
-		accent-color: var(--accent);
+		padding: 0;
+		border: 2px solid var(--line-strong);
+		border-radius: 50%;
+		background: transparent;
 		cursor: pointer;
+	}
+
+	.radio.on {
+		border-color: var(--accent);
+		background: radial-gradient(circle, var(--accent) 0 4px, transparent 5px);
 	}
 
 	.dsect td {
