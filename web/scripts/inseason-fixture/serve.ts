@@ -32,6 +32,7 @@ import { FIXTURE_IDS } from './ids.ts';
 import { lineupProj, seasonStrength } from './week.ts';
 import { FIXTURE_SEASON, askedPhase, phaseAccount, phaseLeagues, phaseSync } from './phases.ts';
 import { ESPN_STAND_IN_NAME, espnSync } from './espn-sync.ts';
+import { inSeason, noWeek } from './member-week.ts';
 
 const PORT = Number(process.env.PORT ?? 8799);
 const DATA = new URL('./data/', import.meta.url);
@@ -159,6 +160,75 @@ const account: components['schemas']['Account'] = {
 };
 
 const readAt = (): string => new Date(Date.now() - READ_MINUTES_AGO * MINUTE_MS).toISOString();
+
+/** The API's sentence for an FFPC read FFPC signed out of (leaguesync HostProblemWords). */
+const FFPC_AGAIN = 'FFPC signed you out. Sign in to FFPC again to keep reading your league.';
+
+/** GET /me/week: every league the front door shows, the Sleeper league first. */
+function memberWeek(): components['schemas']['MemberWeek'] {
+	const now = Date.now();
+	const at = readAt();
+	const base = {
+		name: sync.name,
+		host: sync.host,
+		team_name: contextBase.team_name,
+		standing: contextBase.standing
+	};
+	return {
+		leagues: [
+			inSeason(LEAGUE, { sync, lineup, waivers, scoreboard, readAt: at }, now),
+			inSeason(
+				ESPN_DONE,
+				{
+					sync: espnSync(sync),
+					lineup: espnLineup(),
+					waivers: espnWaivers(null),
+					scoreboard: scoreboardLive,
+					readAt: at
+				},
+				now
+			),
+			noWeek(
+				NO_TEAM,
+				{ ...base, name: 'Main Event (FFPC stand-in)', host: 'ffpc', phase: 'in_season' },
+				FFPC_AGAIN
+			),
+			noWeek(
+				FIXTURE_IDS.offseason,
+				{ ...base, name: 'Last Year Keepers (stand-in)', phase: 'offseason' },
+				null
+			)
+		]
+	};
+}
+
+const HOURS_AGO_2 = 2 * 60 * MINUTE_MS;
+/** GET /hosts as the stand-in account answers it. */
+const HOSTS: components['schemas']['HostConnections'] = {
+	enabled: ['ffpc', 'yahoo', 'espn', 'mfl'],
+	connections: [
+		{
+			host: 'espn',
+			status: 'connected',
+			proven: true,
+			connected_at: '2026-10-03T14:00:00.000Z',
+			last_read_at: new Date(Date.now() - HOURS_AGO_2).toISOString(),
+			consent_version: 3,
+			writes_on: true,
+			writes_reason: null
+		},
+		{
+			host: 'ffpc',
+			status: 'signed_out',
+			proven: true,
+			connected_at: '2026-09-28T14:00:00.000Z',
+			last_read_at: '2026-10-12T14:00:00.000Z',
+			consent_version: 3,
+			writes_on: false,
+			writes_reason: 'FFPC does not take lineups from here, so copy the lineup there.'
+		}
+	]
+};
 
 function send(
 	req: IncomingMessage,
@@ -527,6 +597,22 @@ async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> 
 		send(req, res, HTTP.ok, []);
 		return;
 	}
+	// The front door's week (Lane 66k): the Sleeper league, the ESPN stand-in with its Sunday points,
+	// a stand-in whose read failed and the league out of season.
+	if (url.pathname === '/me/week') {
+		send(req, res, HTTP.ok, memberWeek());
+		return;
+	}
+	// The Account room's platforms (Lane 66k), every connection a stand-in: ESPN connected with
+	// lineups set from here, FFPC signed out, Yahoo and MyFantasyLeague open and not connected.
+	if (url.pathname === '/hosts') {
+		send(req, res, HTTP.ok, HOSTS);
+		return;
+	}
+	if (url.pathname === '/devices') {
+		send(req, res, HTTP.ok, []);
+		return;
+	}
 	if (url.pathname === '/leagues/attached') {
 		// Every fixture league is on the account; only the first is in the switch's list (/me), so
 		// the page names the others from this list.
@@ -547,6 +633,7 @@ async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> 
 					team_name: league.team_name,
 					standing: league.standing,
 					attached_at: '2026-09-01T12:00:00.000Z',
+					last_read_at: league.phase === 'offseason' ? null : readAt(),
 					phase: league.phase,
 					phase_basis: league.phase_basis,
 					draft_at: league.draft_at,
