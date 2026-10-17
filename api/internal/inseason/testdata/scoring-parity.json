@@ -141,6 +141,146 @@
         "points_allowed": 0
       },
       "points": 7.3
+    },
+    {
+      "name": "a defense at the edges, 13 allowed and 100 yards",
+      "rules": "standard",
+      "position": "DEF",
+      "metrics": {
+        "points_allowed": 13,
+        "yards_allowed": 100
+      },
+      "points": 6.0
+    },
+    {
+      "name": "a defense at the edges, 14 allowed and 199 yards",
+      "rules": "standard",
+      "position": "DEF",
+      "metrics": {
+        "points_allowed": 14,
+        "yards_allowed": 199
+      },
+      "points": 4.0
+    },
+    {
+      "name": "a defense at the edges, 27 allowed and 200 yards",
+      "rules": "standard",
+      "position": "DEF",
+      "metrics": {
+        "points_allowed": 27,
+        "yards_allowed": 200
+      },
+      "points": 2.0
+    },
+    {
+      "name": "a defense at the edges, 28 allowed and 299 yards",
+      "rules": "standard",
+      "position": "DEF",
+      "metrics": {
+        "points_allowed": 28,
+        "yards_allowed": 299
+      },
+      "points": 1.0
+    },
+    {
+      "name": "a defense at the edges, 45 allowed and 300 yards",
+      "rules": "standard",
+      "position": "DEF",
+      "metrics": {
+        "points_allowed": 45,
+        "yards_allowed": 300
+      },
+      "points": -3.0
+    },
+    {
+      "name": "a defense at the edges, 46 allowed and 349 yards",
+      "rules": "standard",
+      "position": "DEF",
+      "metrics": {
+        "points_allowed": 46,
+        "yards_allowed": 349
+      },
+      "points": -5.0
+    },
+    {
+      "name": "a defense at the edges, 1 allowed and 350 yards",
+      "rules": "standard",
+      "position": "DEF",
+      "metrics": {
+        "points_allowed": 1,
+        "yards_allowed": 350
+      },
+      "points": 3.0
+    },
+    {
+      "name": "a defense at the edges, 7 allowed and 449 yards",
+      "rules": "standard",
+      "position": "DEF",
+      "metrics": {
+        "points_allowed": 7,
+        "yards_allowed": 449
+      },
+      "points": 0.0
+    },
+    {
+      "name": "a defense at the edges, 20 allowed and 450 yards",
+      "rules": "standard",
+      "position": "DEF",
+      "metrics": {
+        "points_allowed": 20,
+        "yards_allowed": 450
+      },
+      "points": -5.0
+    },
+    {
+      "name": "a defense at the edges, 22 allowed and 499 yards",
+      "rules": "standard",
+      "position": "DEF",
+      "metrics": {
+        "points_allowed": 22,
+        "yards_allowed": 499
+      },
+      "points": -5.0
+    },
+    {
+      "name": "a defense at the edges, 34 allowed and 500 yards",
+      "rules": "standard",
+      "position": "DEF",
+      "metrics": {
+        "points_allowed": 34,
+        "yards_allowed": 500
+      },
+      "points": -7.0
+    },
+    {
+      "name": "a defense at the edges, 5 allowed and 549 yards",
+      "rules": "standard",
+      "position": "DEF",
+      "metrics": {
+        "points_allowed": 5,
+        "yards_allowed": 549
+      },
+      "points": -2.0
+    },
+    {
+      "name": "a defense at the edges, 0 allowed and 550 yards",
+      "rules": "standard",
+      "position": "DEF",
+      "metrics": {
+        "points_allowed": 0,
+        "yards_allowed": 550
+      },
+      "points": -2.0
+    },
+    {
+      "name": "a defense at the edges, 10 allowed and -5 yards",
+      "rules": "standard",
+      "position": "DEF",
+      "metrics": {
+        "points_allowed": 10,
+        "yards_allowed": -5
+      },
+      "points": 8.0
     }
   ]
 }

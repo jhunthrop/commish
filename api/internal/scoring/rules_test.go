@@ -431,3 +431,20 @@ func TestFromSleeperKeepsKickingAndDefense(t *testing.T) {
 		}
 	}
 }
+
+// Each tier table joins up: it starts at 0, each tier begins one past the
+// last one's top with no gap or overlap, and only the last is open, so a
+// game's points or yards allowed fall in exactly one tier.
+func TestTiersJoinUp(t *testing.T) {
+	for name, tiers := range map[string][]Tier{"points allowed": PointsAllowedTiers(), "yards allowed": YardsAllowedTiers()} {
+		if tiers[0].Lo != 0 || tiers[len(tiers)-1].Hi != Open {
+			t.Errorf("%s: from %d, last top %d", name, tiers[0].Lo, tiers[len(tiers)-1].Hi)
+		}
+		for i := 1; i < len(tiers); i++ {
+			prev := tiers[i-1]
+			if prev.Hi == Open || prev.Hi < prev.Lo || tiers[i].Lo != prev.Hi+1 {
+				t.Errorf("%s: %s (%d to %d) then %s from %d", name, prev.Key, prev.Lo, prev.Hi, tiers[i].Key, tiers[i].Lo)
+			}
+		}
+	}
+}
