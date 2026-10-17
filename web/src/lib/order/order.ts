@@ -7,9 +7,9 @@
 import { memberZone, weekdayTime, zoneWord } from '#lib/format/clock.ts';
 import type { LeagueHost } from '#lib/league/api.ts';
 import { BOX, boxRow, factsReadLine, projBasis, type BoxRow } from '#lib/league/box/box.ts';
-import { addOnWords, openWaiversWords } from '#lib/league/box/waivers.ts';
+import { addVerbWords } from '#lib/league/box/waivers.ts';
 import { hostWords } from '#lib/league/names.ts';
-import { ASKED_PARAM } from '#lib/league/box/asked.ts';
+import { askedQuery } from '#lib/league/box/asked.ts';
 import type { OrderAdvice, OrderPosition, OrderRow, RosterMark } from './api.ts';
 
 /** Every word the order's screens print that is not a player's, in one place for the copy guard. */
@@ -61,6 +61,9 @@ export const FIGURE_HEADS: Readonly<Record<FigureKey, string>> = {
 /** A row as the order's table draws it. */
 export interface OrderView {
 	key: string;
+	/** His position and the platform's id for him, which the verb's link and rule read. */
+	position: string;
+	hostId: string;
 	box: BoxRow;
 	rank: number;
 	figures: Readonly<Record<FigureKey, number | null>>;
@@ -84,6 +87,8 @@ export function orderView(row: OrderRow, zone: string = memberZone(), pillRank =
 	const key = row.line.player.board_id ?? row.line.player.host_id;
 	return {
 		key,
+		position: row.line.player.position,
+		hostId: row.line.player.host_id,
 		box: { ...box, key },
 		rank: row.rank,
 		figures: {
@@ -101,31 +106,33 @@ export function rosterFilter(view: RosterView): 'free' | 'yours' | null {
 	return view === 'everyone' ? null : view;
 }
 
-/** A move's verb in words (review 66j H6): an add is the Waivers screen's verb by the claim's moves
- * ("Add on ESPN" where the claim is made from here, "Open Sleeper waivers" where it is not); a trade
- * is "Trade for him". */
+/** A move's verb in words (review 66j H6, N3): an add is the Waivers screen's verb by its own rule
+ * ("Add on ESPN" where claims open and the platform names him, "Open ESPN waivers" where not); a
+ * trade is "Trade for him". */
 export function moveWords(
-	move: NonNullable<OrderRow['move']>,
+	row: Pick<OrderView, 'move' | 'hostId'>,
 	moves: OrderAdvice['moves'],
 	host: LeagueHost
 ): string {
-	if (move === 'trade') return ORDER.tradeFor;
-	return moves?.claim === 'available' ? addOnWords(host) : openWaiversWords(host);
+	if (row.move === 'trade') return ORDER.tradeFor;
+	return addVerbWords(moves, row.hostId, host);
 }
 
 /** A league screen's page for a league (tabs.ts tabHref, given by the caller). */
 export type ScreenHref = (screen: 'waivers' | 'trades', league: string) => string;
 
-/** Where a row's verb goes in the member's league, with him chosen (`?player=`): the Waivers screen
- * for an add, the Trades screen for a trade; null without a league or a move. */
+/** Where a row's verb goes in the member's league, with him chosen by the player card's own query
+ * (review 66j N2): the Waivers screen for an add, the Trades screen for a trade; null without a
+ * league or a move. */
 export function moveHref(
-	row: Pick<OrderView, 'key' | 'move'>,
+	row: Pick<OrderView, 'key' | 'move' | 'position'>,
 	league: string | null,
 	screenHref: ScreenHref
 ): string | null {
 	if (league === null || row.move === null) return null;
 	const screen = row.move === 'add' ? 'waivers' : 'trades';
-	return `${screenHref(screen, league)}?${new URLSearchParams({ [ASKED_PARAM]: row.key }).toString()}`;
+	const query = askedQuery(screen, { id: row.key, position: row.position });
+	return `${screenHref(screen, league)}?${new URLSearchParams(query).toString()}`;
 }
 
 /** The order's evidence columns' basis, said once, in the scoring the rows are in. */

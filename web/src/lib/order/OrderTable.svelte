@@ -113,7 +113,7 @@
 				{#if marked || end}
 					<td class="act">
 						{#if league !== null && href !== null && row.move}
-							{@const said = moveWords(row.move, league.moves, league.host)}
+							{@const said = moveWords(row, league.moves, league.host)}
 							<a class="verb {row.move}" {href} aria-label="{said}, {row.box.name}"
 								>{#if row.move === 'add'}<Icon name="plus" size={14} />{:else}<svg
 										width="14"

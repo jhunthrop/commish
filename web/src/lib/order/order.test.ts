@@ -118,13 +118,17 @@ void test('a roster mark reads Yours, Free or the holding team, never the platfo
 	assert.equal(rosterFilter('free'), 'free');
 });
 
-void test('a verb is the Waivers verb by the claim moves and lands on him (review 66j H6)', () => {
+void test('a verb lands on him through the link the player card builds (review 66j H6, N2)', () => {
 	const add = orderView(row('B', { move: 'add' }), ZONE);
 	const trade = orderView(row('C', { move: 'trade' }), ZONE);
-	assert.equal(moveHref(add, 'L1', screenHref), '/league/L1/waivers?player=b-B');
+	// Waivers reads him by name and narrows to his position, as from the player card.
+	assert.equal(moveHref(add, 'L1', screenHref), '/league/L1/waivers?player=b-B&position=RB');
 	assert.equal(moveHref(trade, 'L1', screenHref), '/league/L1/trades?player=b-C');
 	assert.equal(moveHref(trade, null, screenHref), null);
 	assert.equal(moveHref(orderView(row('D'), ZONE), 'L1', screenHref), null);
+});
+
+void test("the add verb is the Waivers screen's own rule: claims open and the platform names him (review 66j N3)", () => {
 	const closed = {
 		claim: 'unavailable' as const,
 		note: null,
@@ -132,9 +136,20 @@ void test('a verb is the Waivers verb by the claim moves and lands on him (revie
 		writes_on: false,
 		reason: 'x'
 	};
-	assert.equal(moveWords('add', closed, 'sleeper'), 'Open Sleeper waivers');
-	assert.equal(moveWords('add', { ...closed, claim: 'available' }, 'espn'), 'Add on ESPN');
-	assert.equal(moveWords('trade', closed, 'sleeper'), 'Trade for him');
+	const open = { ...closed, claim: 'available' as const };
+	const base = line('B', 'RB');
+	const named = orderView(
+		row('B', { move: 'add', line: { ...base, player: { ...base.player, host_id: '4262921' } } }),
+		ZONE
+	);
+	const unnamed = orderView(row('E', { move: 'add' }), ZONE);
+	const trade = orderView(row('C', { move: 'trade' }), ZONE);
+	assert.equal(moveWords(named, closed, 'sleeper'), 'Open Sleeper waivers');
+	assert.equal(moveWords(named, open, 'espn'), 'Add on ESPN');
+	// No ESPN id for him: Waivers keeps the platform's page, and so does the order.
+	assert.equal(moveWords(unnamed, open, 'espn'), 'Open ESPN waivers');
+	assert.equal(moveWords(named, null, 'espn'), 'Open ESPN waivers');
+	assert.equal(moveWords(trade, open, 'espn'), 'Trade for him');
 });
 
 void test('the basis names the league shape and says every number once, the platform named', () => {

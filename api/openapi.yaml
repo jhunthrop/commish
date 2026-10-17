@@ -441,6 +441,13 @@ paths:
         required: false
         description: only candidates at this position
         schema: { type: string, enum: [QB, RB, WR, TE, K, DEF] }
+      - name: player
+        in: query
+        required: false
+        description: >-
+          a player a link named (his board id): his row is kept on the page past its first 60, so an add from the
+          order or the player card lands on him; an id not among the adds changes nothing
+        schema: { type: string, maxLength: 64 }
     get:
       tags: [league-sync]
       operationId: leagueWaivers

@@ -401,6 +401,8 @@ export interface paths {
 			query?: {
 				/** @description only candidates at this position */
 				position?: 'QB' | 'RB' | 'WR' | 'TE' | 'K' | 'DEF';
+				/** @description a player a link named (his board id): his row is kept on the page past its first 60, so an add from the order or the player card lands on him; an id not among the adds changes nothing */
+				player?: string;
 			};
 			header?: never;
 			path: {
@@ -4701,6 +4703,8 @@ export interface operations {
 			query?: {
 				/** @description only candidates at this position */
 				position?: 'QB' | 'RB' | 'WR' | 'TE' | 'K' | 'DEF';
+				/** @description a player a link named (his board id): his row is kept on the page past its first 60, so an add from the order or the player card lands on him; an id not among the adds changes nothing */
+				player?: string;
 			};
 			header?: never;
 			path: {

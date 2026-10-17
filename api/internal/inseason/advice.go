@@ -524,8 +524,10 @@ func (a *advisor) Pickups() ([]apitypes.WaiverRow, bool) {
 	return rows, true
 }
 
-// Waivers is the waiver page (§5).
-func (a *advisor) Waivers(position draft.Position) (apitypes.WaiverAdvice, bool) {
+// Waivers is the waiver page (§5). asked, a board id or "", is a player a
+// link named (?player=): his row is kept past the page's cut, so the order's
+// add for a free player deep in the pool lands on him (review 66j N2).
+func (a *advisor) Waivers(position draft.Position, asked string) (apitypes.WaiverAdvice, bool) {
 	run, ok := a.waiverRun(position)
 	if !ok {
 		return apitypes.WaiverAdvice{}, false
@@ -537,10 +539,7 @@ func (a *advisor) Waivers(position draft.Position) (apitypes.WaiverAdvice, bool)
 		ProjectionReadAt: a.projectionReadAt(), ProjectionPreviousReadAt: a.projectionPreviousReadAt(), ProjectionScoring: projectionScoring(a.settings, a.preset),
 		Pickups: []apitypes.WaiverRow{}, Rows: []apitypes.WaiverRow{}, Roster: lines(mine, indexes(len(mine))), Moves: CopyOnlyClaims(a.Snap.Ref.Host)}
 	out.HostWaiversUrl, out.HostNote = a.host(WaiversPage)
-	for _, move := range run.moves {
-		if len(out.Rows) == MaxWaiverRows {
-			break
-		}
+	for _, move := range pageMoves(run.moves, pool, asked, MaxWaiverRows) {
 		out.Rows = append(out.Rows, waiverRow(run.w, run.week, mine, pool[move.Add], move, run.clears))
 	}
 	// The strip is chosen from every add we rank, before the rows' cut.
@@ -551,6 +550,23 @@ func (a *advisor) Waivers(position draft.Position) (apitypes.WaiverAdvice, bool)
 		out.LineupProj, out.PickupsProj = &base, &proj
 	}
 	return out, true
+}
+
+// pageMoves is the moves a page carries: the first cut, and past it only
+// the asked player's, in the search's order.
+func pageMoves(moves []Waiver, pool []person, asked string, cut int) []Waiver {
+	out := make([]Waiver, 0, min(len(moves), cut+1))
+	for i, move := range moves {
+		if i < cut || isAsked(pool[move.Add], asked) {
+			out = append(out, move)
+		}
+	}
+	return out
+}
+
+// isAsked is whether p is the player a link named by board id.
+func isAsked(p person, asked string) bool {
+	return asked != "" && p.line.Player.BoardId != nil && *p.line.Player.BoardId == asked
 }
 
 // waiverRow is one add's row: the rest-of-season gain with the search's

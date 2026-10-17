@@ -4544,6 +4544,9 @@ type LeagueTradesParams struct {
 type LeagueWaiversParams struct {
 	// Position only candidates at this position
 	Position *string `form:"position,omitempty" json:"position,omitempty"`
+
+	// Player a player a link named (his board id): his row is kept on the page past its first 60, so an add from the order or the player card lands on him; an id not among the adds changes nothing
+	Player *string `form:"player,omitempty" json:"player,omitempty"`
 }
 
 // ListMocksParams defines parameters for ListMocks.

@@ -199,11 +199,16 @@ func (s *Service) waivers(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteInvalid(w, r, map[string]string{fieldPosition: positionWords})
 		return
 	}
+	asked := r.URL.Query().Get(fieldPlayer)
+	if len(asked) > maxPlayerParam {
+		httpx.WriteInvalid(w, r, map[string]string{fieldPlayer: playerWords})
+		return
+	}
 	a, ok := s.advisorFor(w, r)
 	if !ok {
 		return
 	}
-	out, ok := a.Waivers(position)
+	out, ok := a.Waivers(position, asked)
 	if ok && s.Moves != nil {
 		// A failed check fails closed, as the lineup's does.
 		moves, err := s.Moves.ClaimMove(r.Context(), auth.AccountID(r), a.Snap.Ref.Host)

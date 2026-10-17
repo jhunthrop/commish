@@ -141,7 +141,7 @@ func TestEveryScreenCarriesTheFigure(t *testing.T) {
 	f := restFixture(t)
 	a := newFixtureAdvisor(t, f, nil)
 	lineup, _ := a.Lineup()
-	waivers, _ := a.Waivers("")
+	waivers, _ := a.Waivers("", "")
 	trades, _ := a.Trades("")
 	sentence := PerGameBasis(7)
 	for _, basis := range []string{trades.Basis, trades.CheckBasis} {
@@ -238,7 +238,7 @@ func TestNoSentenceWithoutAFigure(t *testing.T) {
 	f.league.Snap.Week = 7
 	a := newFixtureAdvisor(t, f, nil)
 	lineup, _ := a.Lineup()
-	waivers, _ := a.Waivers("")
+	waivers, _ := a.Waivers("", "")
 	trades, _ := a.Trades("")
 	team := trades.Teams[0]
 	check, _, _ := a.CheckTrade(apitypes.TradeCheckInput{Team: team.RosterId,
