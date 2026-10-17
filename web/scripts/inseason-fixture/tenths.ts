@@ -23,7 +23,8 @@ const FIGURES = new Set([
 	'points',
 	'points_for',
 	'points_against',
-	'team_points'
+	'team_points',
+	'rest_of_season_per_game'
 ]);
 
 /** A recorded answer with every printed figure in tenths, a new value, the recording untouched. */

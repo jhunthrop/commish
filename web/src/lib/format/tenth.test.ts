@@ -26,6 +26,15 @@ void test('every tenth the API sends prints as itself, never rounded again', () 
 	}
 });
 
+void test('a box cell prints the figure as given: no rounding of its own', () => {
+	// A value the API never sends shows the web does not round: it prints as it came.
+	assert.equal(boxNumber(9.45), '9.45');
+	assert.equal(boxNumber(39.2), '39.2');
+	assert.equal(boxNumber(2), '2.0');
+	assert.equal(boxNumber(-1.2), '-1.2');
+	assert.equal(boxNumber(null), '--');
+});
+
 void test('the table is the API rule: half away from zero on the decimal', () => {
 	assert.deepEqual(
 		rows.slice(0, 6).map((r) => [r.in, r.out]),
