@@ -2,7 +2,18 @@
 
 from typing import Final
 
-from sqlalchemy import CheckConstraint, Column, DateTime, Double, ForeignKeyConstraint, Index, Integer, Table, Text
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    Column,
+    DateTime,
+    Double,
+    ForeignKeyConstraint,
+    Index,
+    Integer,
+    Table,
+    Text,
+)
 from sqlalchemy.dialects.postgresql import JSONB
 
 from research.db.schema._base import METADATA, RESEARCH_SCHEMA, one_of, recorded_at
@@ -149,4 +160,37 @@ PLAYER_CAPSULES: Final = Table(
     recorded_at("generated_at"),
     one_of("source", CAPSULE_SOURCES, "player_capsules_source_ck"),
     _player_fk("player_capsules"),
+)
+
+
+# The weekly number's register (revision 0011, Lane 69; round 4, sections 3.3 and 4): each game's frozen
+# numbers before its own kickoff, with the range, the why and the benchmarks beside them. `counted` only
+# for the pinned served version; every other row is a shadow. Append-only.
+_WEEKLY_FORMATS: Final = ("ppr", "half", "std")
+REGISTER_WEEKLY_ROWS: Final = Table(
+    "register_weekly_rows",
+    METADATA,
+    Column("season", Integer, primary_key=True),
+    Column("week", Integer, primary_key=True),
+    Column("game_id", Text, primary_key=True),
+    Column("frozen_at", DateTime(True), primary_key=True),
+    Column("model_version", Text, primary_key=True),
+    Column("player_id", Text, primary_key=True),
+    Column("implementation", Text, nullable=False),
+    Column("kickoff_at", DateTime(True), nullable=False),
+    Column("club", Text, nullable=False),
+    Column("counted", Boolean, nullable=False),
+    Column("questionable", Boolean, nullable=False),
+    *(
+        Column(f"{part}_{name}", Double(53), nullable=False)
+        for name in _WEEKLY_FORMATS
+        for part in ("point", "floor", "median", "ceiling")
+    ),
+    Column("why", JSONB, nullable=False),
+    Column("benchmarks", JSONB, nullable=False),
+    recorded_at("recorded_at"),
+    one_of("implementation", IMPLEMENTATIONS, "register_weekly_rows_implementation_ck"),
+    CheckConstraint("frozen_at < kickoff_at", name="register_weekly_rows_before_kickoff_ck"),
+    _player_fk("register_weekly_rows", "RESTRICT"),
+    Index("register_weekly_rows_week_idx", "season", "week"),
 )

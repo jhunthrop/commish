@@ -7,7 +7,7 @@ Every table lives in the `research` Postgres schema and is defined once here, by
     observations  player_week_observations, team_week_observations, player_week_teams
     provider      the Tank01 current-season store, the capture and odds archives
     market        preseason_rosters, preseason_rankings, adp_snapshots
-    boards        model_artifacts, the boards and reasons, the register, player_capsules
+    boards        model_artifacts, the boards and reasons, the register, the weekly register (revision 0011), player_capsules
     custom        preseason_candidates (each board's candidate set), custom_boards (revision 0005)
     published     published_boards, the published run's board rows (revision 0006)
     venues        stadiums and nws_grid_points, the game's place and its forecast grid (revision 0010)
@@ -26,6 +26,7 @@ from research.db.schema.boards import (
     PRESEASON_PROJECTIONS,
     REGISTER_FREEZE_ROWS,
     REGISTER_GRADE_ROWS,
+    REGISTER_WEEKLY_ROWS,
 )
 from research.db.schema.custom import CUSTOM_BOARDS, PRESEASON_CANDIDATES
 from research.db.schema.game_history import GAME_WEATHER, NFLVERSE_DEPTH_CHART_WEEKS, NFLVERSE_PBP_PLAYS
@@ -94,6 +95,7 @@ __all__ = [
     "PUBLISHED_BOARDS",
     "REGISTER_FREEZE_ROWS",
     "REGISTER_GRADE_ROWS",
+    "REGISTER_WEEKLY_ROWS",
     "RESEARCH_SCHEMA",
     "STADIUMS",
     "TANK01_PROJECTION_ROWS",

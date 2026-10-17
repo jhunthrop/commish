@@ -5,7 +5,7 @@
     uv run python -m research.model.weekly4.features live --database <scratch> --out <dir> \
         --season 2026 --week 7 --after 2026-10-16T22:00:00Z [--depth-chart week|prior]
 
-Both run only on a local scratch copy on 5433 (a `lane68_` or `lane70_` database), in one read-only
+Both run only on a local scratch copy on 5433 (a `lane68_`, `lane69_` or `lane70_` database), in one read-only
 transaction. `history` builds the team-game and play rows of 2016 to 2024 (weeks 1 to 17) and the
 player rows of 2021 to 2024 (weeks 4 to 17, 2020 read as the season before) under round 2's
 `guard_queries`, which refuses any statement naming 2025 or 2026, and reads every outcome through the
@@ -42,7 +42,7 @@ from research.model.weekly4.features.outcomes import LAST_SERVED, OutcomeReader
 from research.model.weekly4.features.season import SeasonBuild, SeasonSpec, build_season
 from research.model.weekly4.features.store import PLAY_KEY, PLAYER_KEY, TEAM_KEY, write_rows
 
-SCRATCH_PREFIXES: Final = ("lane68_", "lane70_")
+SCRATCH_PREFIXES: Final = ("lane68_", "lane69_", "lane70_")  # the store, the model lane, the coordinator
 FIRST_TEAM_SEASON: Final = 2016
 FIRST_PLAYER_SEASON: Final = 2021  # 2.6: the player-level fit 2021 to 2023, 2020 the season before
 TEAM_WEEKS: Final = tuple(range(1, 18))  # 2.5: regular-season weeks 1 to 17
