@@ -4,8 +4,13 @@ The 2026-09-05 ruling (`docs/research/2026-09-05-kicker-defense-preregistration-
 `KDEF_DECISION`): neither position passed its gates, so both ship in market order, labelled, with no
 projected points and no tier. Every board carries them after its ranked rows: every kicker and team
 defense on the provider's roster (the API's board names the same players, `api/internal/boards`), in
-the PPR board's draft order (`MARKET_ORDER_FEED`), a player that board has no ADP for after the ones it
-prices, by provider id. Each position counts its own place from 1.
+the draft order of the board's own ADP feed (`RunFormat.adp`, the ADP its rows print, so the order
+and the ADP column never disagree), a player those drafts do not take after the ones they do, by
+provider id. Each position counts its own place from 1.
+
+The September ingest priced kickers and defenses from the PPR feed alone (`ingest_kdef_adp`); every
+feed's capture prices them now (2026-09-09: PPR 20 kickers and 26 defenses, half PPR 16 and 16,
+standard 16 and 15), so each board reads its own.
 """
 
 from collections.abc import Mapping, Sequence

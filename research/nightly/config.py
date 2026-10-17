@@ -73,12 +73,9 @@ PAGE_FORMAT: Final = RUN_FORMATS[0]
 # The positions the board ranks by projection.
 PROJECTED_POSITIONS: Final = ("QB", "RB", "WR", "TE")
 # Kickers and defenses ship in market order (the 2026-09-05 ruling, `KDEF_DECISION`): rows on every
-# board after the ranked ones, in draft order, with no projected points and no tier
-# (`nightly.reads.market`).
+# board after the ranked ones, in the draft order of that board's own ADP feed (`RunFormat.adp`, the
+# order its ADP column prints), with no projected points and no tier (`nightly.reads.market`).
 MARKET_POSITIONS: Final = ("K", "DEF")
-# The draft order every board's kickers and defenses take: the PPR board's ADP, the one feed the
-# ruling read their market from (`pipeline.preseason.boards`, `ingest_kdef_adp`).
-MARKET_ORDER_FEED: Final = PPR_ADP
 # A board row's `orderBasis`: ranked by our projection, or in the market's draft order.
 PROJECTION_ORDER: Final = "projection"
 MARKET_ORDER: Final = "market"

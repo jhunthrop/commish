@@ -21,7 +21,7 @@ from research.nightly.build import pages, season
 from research.nightly.build.player_season import SeasonContext, season_context
 from research.nightly.build.ros import MODEL_NAME as ROS_MODEL
 from research.nightly.build.ros import RosBasis, RosResult, RosSetup, pending_weeks, ros_boards
-from research.nightly.config import MARKET_ORDER_FEED, PAGE_FORMAT, RUN_FORMATS, RunFormat
+from research.nightly.config import PAGE_FORMAT, RUN_FORMATS, RunFormat
 from research.nightly.designations import read_statuses, status_word
 from research.nightly.reads import record as record_read
 from research.nightly.reads import schedule as schedule_read
@@ -174,10 +174,11 @@ def assemble(conn: Connection, as_of: datetime, frozen_by: FrozenBy, ros: RosSet
     if rest is not None:
         boards = rest.boards
     # The pages and the search index in the order of the boards the run prints, then the kickers and
-    # defenses in the PPR board's draft order (the page format's ADP feed, always carried).
+    # defenses: each board's in its own drafts' order, the index's in the page format's.
     people = tuple(pages.identities(boards))
-    order = market_order(market_players(conn), captures[MARKET_ORDER_FEED.source].by_player)
-    market = tuple(pages.market_identities(people, order))
+    roster = market_players(conn)
+    orders = {f.id: market_order(roster, adp_by_format[f.id]) for f in formats}
+    market = tuple(pages.market_identities(people, orders[PAGE_FORMAT.id]))
     by_slug = {p.id: p for p in (*people, *market)}
     universe_ids = sorted({e.row.universe_id for b in boards for e in b.entries})
     capsules = stored_capsules_for(conn, universe_ids)
@@ -188,7 +189,8 @@ def assemble(conn: Connection, as_of: datetime, frozen_by: FrozenBy, ros: RosSet
     schedule, clubs, schedule_source, clubs_source = _schedule(conn, as_of)
     record, record_source = _record(conn, as_of, frozen_by)
     files: dict[str, Any] = {
-        f"boards/{b.format.id}.json": pages.board_json(b, by_slug, adp_by_format[b.format.id], order) for b in boards
+        f"boards/{b.format.id}.json": pages.board_json(b, by_slug, adp_by_format[b.format.id], orders[b.format.id])
+        for b in boards
     }
     files |= {f"players/{page['id']}.json": page for page in players}
     files |= {

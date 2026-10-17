@@ -9,7 +9,7 @@ from typing import Any
 from research.model.domain import Position
 from research.nightly.build.pages import board_json, identities, index_json, market_identities
 from research.nightly.build.season import format_json
-from research.nightly.config import MARKET_ORDER_FEED, RUN_FORMATS, TEAMS
+from research.nightly.config import RUN_FORMATS, TEAMS
 from research.nightly.designations import ranked
 from research.nightly.gates import basis_gate, depth_gate
 from research.nightly.publish import encode
@@ -44,7 +44,7 @@ def _board(rows: list[StoredRow]) -> FormatBoard:
     return FormatBoard(PPR, StoredBoard(PPR.board_source, AS_OF, "research@test", None), board_entries(rows, PPR))
 
 
-def test_the_order_is_the_ppr_boards_adp_then_the_provider_id() -> None:
+def test_the_order_is_the_formats_adp_then_the_provider_id() -> None:
     players = [_kicker("300"), _defense("BUF"), _kicker("100"), _kicker("200"), _defense("KC")]
     adp = {"300": 150.5, "DST-KC": 140.0, "200": 160.0}
     order = market_order(players, adp)
@@ -57,18 +57,15 @@ def test_the_order_is_the_ppr_boards_adp_then_the_provider_id() -> None:
     assert {e.player.player_id: e.draft_adp for e in order}["100"] is None
 
 
-def test_the_order_reads_the_ppr_feed() -> None:
-    assert MARKET_ORDER_FEED.source == "ffc_adp_ppr_12"
-
-
 def test_a_board_file_carries_its_market_rows_after_the_ranked_ones() -> None:
     board = _board([_row("p1", 250.0), _row("p2", 200.0, "RB")])
     players = [_kicker("100"), _defense("BUF")]
-    order = market_order(players, {"DST-BUF": 170.0})
+    adp = {"p1": 3.5, "DST-BUF": 170.0}
+    order = market_order(players, adp)
     people = identities([board])
     market = market_identities(people, order)
     slugs = {p.id: p for p in (*people, *market)}
-    written = board_json(board, slugs, {"p1": 3.5, "100": 190.0}, order)
+    written = board_json(board, slugs, adp, order)
     rows = written["rows"]
     assert [r["id"] for r in rows] == ["p1", "p2", "DST-BUF", "100"]
     assert {r["orderBasis"] for r in rows[:2]} == {"projection"}
@@ -84,7 +81,7 @@ def test_a_board_file_carries_its_market_rows_after_the_ranked_ones() -> None:
         "positionRank": 1,
         "ourRank": 3,
         "vorRound": None,
-        "adp": None,
+        "adp": 170.0,
         "projected": None,
         "vor": None,
         "expectedGames": None,
@@ -93,8 +90,8 @@ def test_a_board_file_carries_its_market_rows_after_the_ranked_ones() -> None:
         "ceiling": None,
         "tier": None,
     }
-    # The row's ADP is the format's own; the order is the PPR board's.
-    assert (rows[3]["ourRank"], rows[3]["positionRank"], rows[3]["adp"], rows[3]["position"]) == (4, 1, 190.0, "K")
+    # A kicker the format's drafts do not take follows the ones they do, with no ADP.
+    assert (rows[3]["ourRank"], rows[3]["positionRank"], rows[3]["adp"], rows[3]["position"]) == (4, 1, None, "K")
 
 
 def test_a_shared_name_takes_its_position_and_club_across_the_market_rows() -> None:
@@ -173,8 +170,9 @@ def test_a_kicker_on_a_board_is_one_the_statuses_mark(tmp_path: Path) -> None:
 
 
 def test_every_format_names_the_adp_its_kickers_and_defenses_take_their_order_from() -> None:
+    # Each board's own drafts: the order its ADP column prints.
     assert format_json(PPR, 2026)["marketOrder"] == "ffc_adp_ppr_12"
-    assert format_json(RUN_FORMATS[1], 2026)["marketOrder"] == "ffc_adp_ppr_12"
+    assert format_json(RUN_FORMATS[1], 2026)["marketOrder"] == "ffc_adp_half_12"
 
 
 def test_the_basis_gate_fails_a_market_order_with_no_adp_source() -> None:
