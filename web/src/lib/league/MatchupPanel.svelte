@@ -1,7 +1,7 @@
 <script lang="ts">
 	import BoxTable from './box/BoxTable.svelte';
 	import MatchupBug from './box/MatchupBug.svelte';
-	import { PTS_BASIS, factsReadLine, projBasis } from './box/box.ts';
+	import BoxBasis from './box/BoxBasis.svelte';
 	import { nextKickoff, sideBox, type SideBox } from './box/matchup.ts';
 	import type { LeagueSync, MatchupSide } from './api.ts';
 	import type { MatchupBox } from './inseason/api.ts';
@@ -51,7 +51,6 @@
 	const theirs = $derived(matchup?.opponent ? boxOf(matchup.opponent) : null);
 	const lines = $derived([...(mine?.lines ?? []), ...(theirs?.lines ?? [])]);
 	const kickoff = $derived(nextKickoff(lines, now.getTime()));
-	const factsRead = $derived(factsReadLine(lines));
 	/** FFPC is read as one member, so the API keeps only the viewer's own starters. */
 	const hidden = $derived(`${hostWords(sync.host)} shows us your lineup only.`);
 </script>
@@ -103,11 +102,7 @@
 				/>
 			{/if}
 		</div>
-		<p class="basis">
-			{#if box}{projBasis(box.projection_read_at)}{/if}
-			{PTS_BASIS}
-			{#if factsRead}{factsRead}{/if}
-		</p>
+		<BoxBasis projectionReadAt={box?.projection_read_at} {lines} />
 	</div>
 {:else}
 	<p class="note">{matchupGap(sync, now)}</p>
@@ -154,14 +149,6 @@
 	.note {
 		margin: 0;
 		color: var(--ink-2);
-	}
-
-	.basis {
-		margin: 0;
-		max-width: 72ch;
-		font-size: var(--t-sm);
-		line-height: 1.5;
-		color: var(--ink-3);
 	}
 
 	@media (max-width: 1100px) {

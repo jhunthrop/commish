@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { LeagueHost } from '../api.ts';
 	import BoxTable from '../box/BoxTable.svelte';
-	import { PTS_BASIS, factsReadLine, projBasis } from '../box/box.ts';
+	import BoxBasis from '../box/BoxBasis.svelte';
 	import { lineupBox } from '../box/lineup.ts';
 	import MovePanel from './MovePanel.svelte';
 	import Screen from './Screen.svelte';
@@ -40,12 +40,6 @@
 		...advice.slots.flatMap((s) => (s.host ? [s.ours, s.host] : [s.ours])),
 		...advice.bench
 	]);
-	/** Under the rows, once: the league the figures are for, what Proj and Pts are, the facts' read. */
-	const note = $derived(
-		[advice.basis_note, projBasis(advice.projection_read_at), PTS_BASIS, factsReadLine(shown)]
-			.filter((s): s is string => s !== null && s !== '')
-			.join(' ')
-	);
 
 	const MOVE_ID = 'lineup-move';
 	let step = $state<MoveStep>({ kind: 'closed' });
@@ -89,7 +83,7 @@
 	href={advice.host_lineup_url}
 	hostNote={advice.host_note ?? advice.moves.note}
 	basis={advice.basis}
-	basisNote={note}
+	basisNote={advice.basis_note}
 	onverb={onHost ? () => void open() : null}
 	controls={onHost ? MOVE_ID : undefined}
 	expanded={onHost ? step.kind !== 'closed' : undefined}
@@ -118,6 +112,7 @@
 			noBench={LINES.noBench}
 		/>
 	</div>
+	<BoxBasis projectionReadAt={advice.projection_read_at} lines={shown} />
 </Screen>
 
 <style>
