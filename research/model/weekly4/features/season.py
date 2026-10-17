@@ -164,6 +164,7 @@ def build_season(
     weather: dict[str, Weather] = {}
     counts: dict[str, int] = defaultdict(int)
     counts["club_weeks_paired_from_game_rows"] = paired_from_games
+    gaps: set[tuple[str, int]] = set()
     for week in weeks:
         w = read_week(conn, spec.season, week)
         for moment in moments[week]:
@@ -178,8 +179,10 @@ def build_season(
                 player_rows += found.rows
                 stamps += found.stamps
                 placed += [Game(spec.season, week, c, moment) for c in view.clubs]
+                gaps |= found.snap_gaps
                 for name, value in found.counts.items():
                     counts[name] += value
+    counts["club_games_without_snap_rows"] = len(gaps)  # amendment 3: left out of the teammate count
     plays: list[Row] = []
     if reader is not None and spec.team_weeks:
         season_plays, reader = reader.plays(conn, spec.season)

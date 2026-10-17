@@ -27,6 +27,7 @@ from research.model.weekly3.work import KINDS_BY_POSITION, NO_SNAP_ROW, SNAP_SHA
 from research.model.weekly4.features.depth import DepthChart, DepthRule, depth_charts
 from research.model.weekly4.features.filings import earlier_filings, live_statuses
 from research.model.weekly4.features.matchup import role_allowances
+from research.model.weekly4.features.played import played_games, snap_gaps, snap_weeks
 from research.model.weekly4.features.plays import PlayerTally
 from research.model.weekly4.features.reads import DepthRow
 from research.model.weekly4.features.rows import ClubGame, PlayerInputs, Row, player_row
@@ -41,6 +42,7 @@ class PlayerInstant:
     rows: tuple[Row, ...]
     stamps: tuple[Stamp, ...]
     counts: Mapping[str, int]
+    snap_gaps: frozenset[tuple[str, int]]  # club-games of the windows read with no snap row (amendment 3)
 
 
 def _by_player[V](items: Mapping[tuple[str, int], V]) -> dict[str, dict[int, V]]:
@@ -75,6 +77,11 @@ def read_players(  # noqa: PLR0913, PLR0917 - one instant's player reads, named
         statuses, live_stamp = live_statuses(conn, season, week, view.moment)
         stamps.append(live_stamp)
     histories = {pid: history(pid, games, view.tallies) for pid, games in snapshot.games.items()}
+    snaps, snap_stamp = snap_weeks(conn, season, week, view.moment)
+    stamps.append(snap_stamp)
+    played = played_games(snaps, snapshot.games, snapshot.clubs, view.tallies)
+    windows = {c: s.schedule.club_weeks(c, week)[-LAST_GAMES:] for c in view.clubs}
+    gaps = snap_gaps(played, windows)
     charted: dict[str, list[PlayerWeekObservation]] = defaultdict(list)
     for row in view.charted:
         charted[row.player_id].append(row)
@@ -97,8 +104,8 @@ def read_players(  # noqa: PLR0913, PLR0917 - one instant's player reads, named
         chart = depth.ranks.get(club, {})
         mates = Teammates(
             club,
-            s.schedule.club_weeks(club, week)[-LAST_GAMES:],
-            histories,
+            tuple(w for w in windows[club] if (club, w) not in gaps),  # amendment 3: a gap is left out
+            played,
             snapshot.clubs,
             statuses,
             frozenset(chart) if rule == "week" else None,
@@ -106,7 +113,7 @@ def read_players(  # noqa: PLR0913, PLR0917 - one instant's player reads, named
         )
         _count_teammates(counts, mates)
         rows += _club_rows(at, club, chart, mates)
-    return PlayerInstant(tuple(rows), tuple(stamps), dict(counts))
+    return PlayerInstant(tuple(rows), tuple(stamps), dict(counts), frozenset(gaps))
 
 
 @dataclass(frozen=True, slots=True)
@@ -169,6 +176,7 @@ def _club_rows(at: _Instant, club: str, chart: Mapping[str, int], mates: Teammat
             at.depth.week,
             at.depth.mapped,
             mates.recent_weeks,
+            tuple(mates.histories.get(pid, ())),
             vacated(pid, mates),
             returning(pid, mates),
             volume,

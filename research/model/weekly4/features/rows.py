@@ -134,6 +134,7 @@ class PlayerInputs:
     depth_week: int
     depth_mapped: bool  # amendment 2 item 5: a dated chart's rank read on the slot scale
     recent_weeks: tuple[int, ...]
+    played: tuple[GameShare, ...]  # his games with a snap (amendment 3), for played_in_last_three
     vacated: Vacated
     returning: Returning
     round_three: Mapping[str, Allowance]  # round 3's kind -> the opponent's allowance
@@ -218,7 +219,7 @@ def player_row(g: ClubGame, p: PlayerInputs) -> Row:
         "questionable": int(p.status == QUESTIONABLE),
         "withheld": int(p.status == WITHHELD),
         "games_played": len(p.games),
-        "played_in_last_three": int(any(x.week in recent and x.club == g.club for x in p.games)),
+        "played_in_last_three": int(any(x.week in recent and x.club == g.club for x in p.played)),
         **_shares(p),
         "snap_season": snap_season,
         "snap_last_three": snap_last,
