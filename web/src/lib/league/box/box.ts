@@ -324,8 +324,8 @@ export function oppRankWord(rank: number | null): string {
 /** A projection's change as its cell prints it: "+0.4", "−0.3", "0.0", "--" without one. */
 export function deltaWord(delta: number | null): string {
 	if (delta === null) return BOX.none;
-	const shown = Number(fixed(delta, 1));
-	return shown === 0 ? fixed(0, 1) : signed(shown, 1);
+	// The API's tenth (tenth.Round), formatted with its sign, never rounded here (Lane 66k H1).
+	return delta === 0 ? fixed(0, 1) : signed(delta, 1);
 }
 
 /** A row for a host player the box has no line for (the league read alone, without our answer):

@@ -289,7 +289,10 @@ void test('the evidence columns print as the Lineup draws them', () => {
 	assert.equal(easeOf(11, 32), 'even');
 	assert.equal(deltaWord(0.4), '+0.4');
 	assert.equal(deltaWord(-0.3), '−0.3');
-	assert.equal(deltaWord(0.04), '0.0');
+	// The API sends the change in tenths (api tenth.Round): the cell formats it, signed, and no more.
+	assert.equal(deltaWord(0), '0.0');
+	assert.equal(deltaWord(-1.2), '−1.2');
+	assert.equal(deltaWord(10.4), '+10.4');
 	assert.equal(deltaWord(null), '--');
 	const row = boxRow(line(), 'QB', ZONE, false);
 	assert.deepEqual(row.evidence, {
