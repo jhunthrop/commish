@@ -945,6 +945,27 @@ func (e Product) Valid() bool {
 	}
 }
 
+// Defines values for ProjectionScoringFormat.
+const (
+	ProjectionScoringFormatHalfPpr  ProjectionScoringFormat = "half_ppr"
+	ProjectionScoringFormatPpr      ProjectionScoringFormat = "ppr"
+	ProjectionScoringFormatStandard ProjectionScoringFormat = "standard"
+)
+
+// Valid indicates whether the value is a known member of the ProjectionScoringFormat enum.
+func (e ProjectionScoringFormat) Valid() bool {
+	switch e {
+	case ProjectionScoringFormatHalfPpr:
+		return true
+	case ProjectionScoringFormatPpr:
+		return true
+	case ProjectionScoringFormatStandard:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ReportPickChip.
 const (
 	ReportPickChipAtAdp ReportPickChip = "at_adp"
@@ -2320,6 +2341,9 @@ type LineupAdvice struct {
 	// ProjectionReadAt when the week's published projection the rows' week_projection read was captured, null with none
 	ProjectionReadAt *time.Time `json:"projection_read_at"`
 
+	// ProjectionScoring the scoring the rows' week_projection is read in: the published projection's column the league scores most like, and whether that is the league's own scoring or the closest of the three to rules of its own (a tight end premium reads PPR and is never its own). A team defense's figure is the published default in every format
+	ProjectionScoring ProjectionScoring `json:"projection_scoring"`
+
 	// ReadAt the league's last host read
 	ReadAt time.Time `json:"read_at"`
 
@@ -2431,6 +2455,9 @@ type LobbySeatViewKind string
 type MatchupBox struct {
 	// ProjectionReadAt when the week's published projection the rows' week_projection read was captured, null with none
 	ProjectionReadAt *time.Time `json:"projection_read_at"`
+
+	// ProjectionScoring the scoring the rows' week_projection is read in: the published projection's column the league scores most like, and whether that is the league's own scoring or the closest of the three to rules of its own (a tight end premium reads PPR and is never its own). A team defense's figure is the published default in every format
+	ProjectionScoring ProjectionScoring `json:"projection_scoring"`
 
 	// ReadAt the league's last host read
 	ReadAt time.Time `json:"read_at"`
@@ -2734,6 +2761,17 @@ type Price struct {
 
 // Product defines model for Product.
 type Product string
+
+// ProjectionScoring the scoring the rows' week_projection is read in: the published projection's column the league scores most like, and whether that is the league's own scoring or the closest of the three to rules of its own (a tight end premium reads PPR and is never its own). A team defense's figure is the published default in every format
+type ProjectionScoring struct {
+	Format ProjectionScoringFormat `json:"format"`
+
+	// LeagueOwn the league scores exactly as format
+	LeagueOwn bool `json:"league_own"`
+}
+
+// ProjectionScoringFormat defines model for ProjectionScoring.Format.
+type ProjectionScoringFormat string
 
 // Redirect defines model for Redirect.
 type Redirect struct {

@@ -3258,9 +3258,10 @@ components:
         sentence: { type: string, nullable: true, description: the reason for a change, from facts; null when unchanged }
     LineupAdvice:
       type: object
-      required: [week, basis, basis_note, order_basis, refreshed, read_at, projection_read_at, set, slots, bench, host_lineup_url, host_note, moves]
+      required: [week, basis, basis_note, order_basis, refreshed, read_at, projection_read_at, projection_scoring, set, slots, bench, host_lineup_url, host_note, moves]
       properties:
         week: { type: integer }
+        projection_scoring: { $ref: "#/components/schemas/ProjectionScoring" }
         projection_read_at:
           type: string
           format: date-time
@@ -3316,10 +3317,21 @@ components:
           type: array
           description: the side's other active players, by our order (injured reserve and taxi spots left out)
           items: { $ref: "#/components/schemas/PlayerLine" }
+    ProjectionScoring:
+      type: object
+      description: >-
+        the scoring the rows' week_projection is read in: the published projection's column the league scores most
+        like, and whether that is the league's own scoring or the closest of the three to rules of its own (a tight
+        end premium reads PPR and is never its own). A team defense's figure is the published default in every format
+      required: [format, league_own]
+      properties:
+        format: { type: string, enum: [ppr, half_ppr, standard] }
+        league_own: { type: boolean, description: the league scores exactly as format, every rule alike }
     MatchupBox:
       type: object
-      required: [week, read_at, projection_read_at, sides]
+      required: [week, read_at, projection_read_at, projection_scoring, sides]
       properties:
+        projection_scoring: { $ref: "#/components/schemas/ProjectionScoring" }
         week: { type: integer }
         read_at: { type: string, format: date-time, description: the league's last host read }
         projection_read_at:

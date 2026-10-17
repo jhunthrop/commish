@@ -173,16 +173,24 @@ func (a *advisor) projectionReadAt() *time.Time {
 	return &at
 }
 
-// thisWeek is the host's points for a starter whose game has kicked off.
+// thisWeek is the host's points for a starter whose game has kicked off,
+// nil where the host gives no player's points.
 func thisWeek(side *leaguesync.Side, id string, f Facts) *float64 {
 	if side == nil || side.PointsUnread || !f.Locked {
 		return nil
 	}
 	for _, s := range side.Starters {
-		if s == id {
-			pts := roundCents(side.PlayerPoints[id])
-			return &pts
+		if s != id {
+			continue
 		}
+		// A host that gives each side's total and no player's (ESPN, Yahoo,
+		// FFPC) leaves his points unknown, never 0 (Lane 66d review H1).
+		got, ok := side.PlayerPoints[id]
+		if !ok {
+			return nil
+		}
+		pts := roundCents(got)
+		return &pts
 	}
 	return nil
 }
@@ -298,7 +306,7 @@ func (a *advisor) Lineup() (apitypes.LineupAdvice, bool) {
 	// The rows end on the week's projection (Lane 66d), so the basis says
 	// nothing of points a game; the page says the projection's read itself.
 	out := apitypes.LineupAdvice{Week: h.week, Basis: LineupBasis(a.basis), BasisNote: LineupNote(a.settings, a.season.Carries), OrderBasis: h.basis, Refreshed: h.refreshed,
-		ReadAt: h.readAt, ProjectionReadAt: a.projectionReadAt(), Set: true, Slots: []apitypes.LineupSlot{}, Bench: []apitypes.PlayerLine{},
+		ReadAt: h.readAt, ProjectionReadAt: a.projectionReadAt(), ProjectionScoring: projectionScoring(a.settings), Set: true, Slots: []apitypes.LineupSlot{}, Bench: []apitypes.PlayerLine{},
 		Moves: apitypes.LineupMoves{Lineup: apitypes.LineupMovesLineupUnavailable},
 	}
 	out.HostLineupUrl, out.HostNote = a.host(LineupPage)

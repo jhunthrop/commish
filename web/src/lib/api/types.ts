@@ -2770,6 +2770,7 @@ export interface components {
 		};
 		LineupAdvice: {
 			week: number;
+			projection_scoring: components['schemas']['ProjectionScoring'];
 			/**
 			 * Format: date-time
 			 * @description when the week's published projection the rows' week_projection read was captured, null with none
@@ -2814,7 +2815,15 @@ export interface components {
 			/** @description the side's other active players, by our order (injured reserve and taxi spots left out) */
 			bench: components['schemas']['PlayerLine'][];
 		};
+		/** @description the scoring the rows' week_projection is read in: the published projection's column the league scores most like, and whether that is the league's own scoring or the closest of the three to rules of its own (a tight end premium reads PPR and is never its own). A team defense's figure is the published default in every format */
+		ProjectionScoring: {
+			/** @enum {string} */
+			format: 'ppr' | 'half_ppr' | 'standard';
+			/** @description the league scores exactly as format */
+			league_own: boolean;
+		};
 		MatchupBox: {
+			projection_scoring: components['schemas']['ProjectionScoring'];
 			week: number;
 			/**
 			 * Format: date-time

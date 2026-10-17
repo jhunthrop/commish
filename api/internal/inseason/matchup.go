@@ -17,7 +17,8 @@ func (a *advisor) Matchup() (apitypes.MatchupBox, bool) {
 		return apitypes.MatchupBox{}, false
 	}
 	out := apitypes.MatchupBox{Week: a.Snap.Week, ReadAt: a.Snap.ReadAt, ProjectionReadAt: a.projectionReadAt(),
-		Sides: []apitypes.MatchupBoxSide{a.boxSide(team, a.side(a.Me))}}
+		ProjectionScoring: projectionScoring(a.settings),
+		Sides:             []apitypes.MatchupBoxSide{a.boxSide(team, a.side(a.Me))}}
 	if opp := a.opponent(); opp != nil {
 		if t, ok := a.Snap.TeamByRoster(opp.RosterID); ok {
 			out.Sides = append(out.Sides, a.boxSide(t, opp))
