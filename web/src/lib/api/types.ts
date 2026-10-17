@@ -1024,7 +1024,7 @@ export interface paths {
 			path?: never;
 			cookie?: never;
 		};
-		/** One player's week for his page with no league: the week's projection in PPR scoring and its change, his opponent's rank against his position, his points a game and his last game's, each in PPR scoring, and his club's game with its facts. Anyone may read it, as the board is. The page names his club and position, as the run does; a club with no game on the schedule, or a position other than QB, RB, WR or TE, answers 400. */
+		/** One player's week for his page with no league: the week's projection in PPR scoring and its change, his opponent's rank against his position, his points a game and his last game's, each in PPR scoring, his club's game with its facts, and his place and rest-of-season points a game on our board valued for twelve teams, the standard lineup and PPR. Anyone may read it, as the board is. His club and position are our board's. A kicker, a defense or a player our board does not place has no page and answers 404. */
 		get: operations['playerWeek'];
 		put?: never;
 		post?: never;
@@ -5229,12 +5229,7 @@ export interface operations {
 	};
 	playerWeek: {
 		parameters: {
-			query: {
-				/** @description his club, as the run names it */
-				team: string;
-				/** @description his position */
-				position: 'QB' | 'RB' | 'WR' | 'TE';
-			};
+			query?: never;
 			header?: never;
 			path: {
 				/** @description his board id, as his page names him */
@@ -5246,6 +5241,7 @@ export interface operations {
 		responses: {
 			200: components['responses']['PlayerWeekResponse'];
 			400: components['responses']['ErrorResponse'];
+			404: components['responses']['ErrorResponse'];
 			429: components['responses']['ErrorResponse'];
 		};
 	};

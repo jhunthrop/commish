@@ -63,6 +63,8 @@ type Service struct {
 	Facts   SeasonFacts
 	Holds   Holds
 	Moves   Moves
+	// Boards values our board for the public player read (PublicSettings).
+	Boards BoardSource
 	// Season is the season GET /games/week reads, the board's.
 	Season int
 	Now    func() time.Time

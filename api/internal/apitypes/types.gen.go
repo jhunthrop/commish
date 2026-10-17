@@ -1419,30 +1419,6 @@ func (e LoginParamsScreen) Valid() bool {
 	}
 }
 
-// Defines values for PlayerWeekParamsPosition.
-const (
-	PlayerWeekParamsPositionQB PlayerWeekParamsPosition = "QB"
-	PlayerWeekParamsPositionRB PlayerWeekParamsPosition = "RB"
-	PlayerWeekParamsPositionTE PlayerWeekParamsPosition = "TE"
-	PlayerWeekParamsPositionWR PlayerWeekParamsPosition = "WR"
-)
-
-// Valid indicates whether the value is a known member of the PlayerWeekParamsPosition enum.
-func (e PlayerWeekParamsPosition) Valid() bool {
-	switch e {
-	case PlayerWeekParamsPositionQB:
-		return true
-	case PlayerWeekParamsPositionRB:
-		return true
-	case PlayerWeekParamsPositionTE:
-		return true
-	case PlayerWeekParamsPositionWR:
-		return true
-	default:
-		return false
-	}
-}
-
 // Account defines model for Account.
 type Account struct {
 	CreatedAt time.Time       `json:"created_at"`
@@ -4248,18 +4224,6 @@ type ListMocksParams struct {
 type AutopickMockParams struct {
 	ToRound int `form:"to_round" json:"to_round"`
 }
-
-// PlayerWeekParams defines parameters for PlayerWeek.
-type PlayerWeekParams struct {
-	// Team his club, as the run names it
-	Team string `form:"team" json:"team"`
-
-	// Position his position
-	Position PlayerWeekParamsPosition `form:"position" json:"position"`
-}
-
-// PlayerWeekParamsPosition defines parameters for PlayerWeek.
-type PlayerWeekParamsPosition string
 
 // ListSheetsParams defines parameters for ListSheets.
 type ListSheetsParams struct {

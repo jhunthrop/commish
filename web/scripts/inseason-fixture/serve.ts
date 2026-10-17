@@ -613,11 +613,10 @@ async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> 
 	const recorded = { sync, lineup, waivers, trades, matchup: matchupBox, games: gameWeek, sheets };
 	const publicPlayer = PUBLIC_PLAYER.exec(url.pathname);
 	if (publicPlayer) {
-		const team = url.searchParams.get('team');
-		const position = url.searchParams.get('position') ?? '';
-		const week =
-			team === null ? null : playerWeek(recorded, publicPlayer[1] ?? '', { team, position }, false);
-		if (week === null) send(req, res, HTTP.badRequest, 'Name his club.', 'invalid');
+		// His club and position are our board's, as the API's (the built site's run here).
+		const id = publicPlayer[1] ?? '';
+		const week = playerWeek(recorded, id, runIndex.get(id) ?? null, false);
+		if (week === null) send(req, res, HTTP.notFound, 'Nothing here by that id', 'not_found');
 		else send(req, res, HTTP.ok, week);
 		return;
 	}

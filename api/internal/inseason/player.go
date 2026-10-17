@@ -1,6 +1,7 @@
 package inseason
 
 import (
+	"context"
 	"net/http"
 	"time"
 
@@ -17,12 +18,22 @@ import (
 // with no league, in the league's scoring with one, and with a league the
 // one verb its screens would give him.
 
-// Field names and the drafter's words for the player reads.
-const (
-	teamWords       = "Name a club with a game on this season's schedule"
-	cardWords       = "Name a quarterback, running back, receiver or tight end"
-	playerPathParam = "player"
-)
+// The path's name for the player reads.
+const playerPathParam = "player"
+
+// BoardSource values our board for a league's settings. *draftroom.Boards
+// implements it; the public read values it for PublicSettings.
+type BoardSource interface {
+	For(ctx context.Context, s apitypes.LeagueSettings) (boards.Board, error)
+}
+
+// PublicSettings is the league a read with no league is valued in: twelve
+// teams, the standard lineup, PPR.
+func PublicSettings() apitypes.LeagueSettings {
+	preset := pprPreset
+	return apitypes.LeagueSettings{Teams: 12, Lineup: apitypes.LineupStandard, Scoring: apitypes.Scoring{Preset: &preset},
+		Roster: apitypes.RosterCounts{Qb: 1, Rb: 2, Wr: 2, Te: 1, K: 1, Dst: 1, Bench: 6}}
+}
 
 // cardPositions are the positions a player page shows: kickers and
 // defenses have none (founder ruling 2026-10-17).
@@ -37,24 +48,19 @@ func playerParam(r *http.Request) (string, bool) {
 	return id, id != "" && len(id) <= maxPlayerParam
 }
 
-// plays is whether the club has a game on the season's schedule.
-func plays(games []boards.TeamWeek, team string) bool {
-	for _, g := range games {
-		if g.Team == team {
-			return true
-		}
-	}
-	return false
-}
-
-// publicLine is one player's row with no league: his facts for the week,
-// in PPR, and the week's projection read in PPR.
-func publicLine(d Data, projection boards.WeekProjection, boardID string, position draft.Position, team string, week int, now time.Time) apitypes.PlayerLine {
+// publicLine is one placed player's row with no league: his facts for the
+// week, in PPR, the week's projection read in PPR, and his rest-of-season
+// points a game on our board, as a league's rows carry them.
+func publicLine(d Data, projection boards.WeekProjection, b boards.Board, bp boards.Player, week int, now time.Time) apitypes.PlayerLine {
+	boardID, position, team := bp.ID, bp.Position, bp.Team
 	season := NewSeason(d, RulesOf(scoring.PresetRules(pprPreset)), week, now)
 	facts := season.For(Player{BoardID: boardID, Team: team, Position: position})
 	id := boardID
-	line := apitypes.PlayerLine{Player: apitypes.LeaguePlayer{BoardId: &id, Position: string(position), Team: team},
-		Facts: wireFacts(facts, nil)}
+	line := apitypes.PlayerLine{Player: apitypes.LeaguePlayer{BoardId: &id, Name: bp.Name, Position: string(position), Team: team},
+		Facts: wireFacts(facts, nil), RestOfSeasonPerGame: RestOfSeasonPerGame(b, bp, GamesLeft(d.Games, b.FromWeek))}
+	if rank, ok := b.PositionRanks[boardID]; ok && rank > 0 {
+		line.PositionRank = &rank
+	}
 	if facts.Opponent != "" {
 		if p, ok := projection.Player(boardID, string(position), team); ok {
 			v := roundCents(p.For(pprPreset))
@@ -90,27 +96,28 @@ func (s *Service) playerWeek(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteInvalid(w, r, map[string]string{fieldPlayer: playerWords})
 		return
 	}
-	position := draft.Position(r.URL.Query().Get(fieldPosition))
-	if !cardPositions[position] {
-		httpx.WriteInvalid(w, r, map[string]string{fieldPosition: cardWords})
+	ctx := r.Context()
+	board, err := s.Boards.For(ctx, PublicSettings())
+	if err != nil {
+		httpx.WriteInternal(w, r, s.Log, "inseason: player week board", err)
 		return
 	}
-	team := r.URL.Query().Get(fieldTeam)
-	ctx := r.Context()
+	// A kicker or defense has no page, so no read (founder ruling 2026-10-17).
+	bp, placed := board.Player(id)
+	if !placed || !cardPositions[bp.Position] {
+		httpx.WriteNotFound(w, r)
+		return
+	}
 	data, err := s.Facts.Data(ctx, s.Season)
 	if err != nil {
 		httpx.WriteInternal(w, r, s.Log, "inseason: player week", err)
-		return
-	}
-	if !plays(data.Games, team) {
-		httpx.WriteInvalid(w, r, map[string]string{fieldTeam: teamWords})
 		return
 	}
 	week := nextWeek(data.Games)
 	projection := s.projection(ctx, s.Season, week)
 	read, previous := readsOf(projection)
 	httpx.WriteOK(w, r, http.StatusOK, apitypes.PlayerWeek{Week: week,
-		Line:              publicLine(data, projection, id, position, team, week, s.Now()),
+		Line:              publicLine(data, projection, board, bp, week, s.Now()),
 		ProjectionScoring: apitypes.ProjectionScoring{Format: apitypes.ProjectionScoringFormatPpr, LeagueOwn: false},
 		ProjectionReadAt:  read, ProjectionPreviousReadAt: previous})
 }

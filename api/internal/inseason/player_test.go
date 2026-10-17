@@ -1,6 +1,7 @@
 package inseason
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"slices"
@@ -9,6 +10,13 @@ import (
 	"github.com/jhunthrop/commish/api/internal/apitypes"
 	"github.com/jhunthrop/commish/api/internal/boards"
 )
+
+// fakeBoards answers the public read's board: the fixture league's.
+type fakeBoards struct{ board boards.Board }
+
+func (f fakeBoards) For(context.Context, apitypes.LeagueSettings) (boards.Board, error) {
+	return f.board, nil
+}
 
 func playerWeekOf(t *testing.T, s *Service, path string) apitypes.PlayerWeek {
 	t.Helper()
@@ -23,7 +31,7 @@ func playerWeekOf(t *testing.T, s *Service, path string) apitypes.PlayerWeek {
 	return out
 }
 
-// With no league the page reads his week in PPR: the club's game, the
+// With no league the page reads his week in PPR, placed on our board: the club's game, the
 // week's projection, and no verb.
 func TestThePublicPlayerWeekReadsPPRWithNoVerb(t *testing.T) {
 	f := newFixture(t)
@@ -31,29 +39,31 @@ func TestThePublicPlayerWeekReadsPPRWithNoVerb(t *testing.T) {
 	s.Season = 2026
 	bp := f.raw.Players[0]
 	s.Facts = fakeFacts{data: f.data, projection: boards.WeekProjection{}}
-	out := playerWeekOf(t, s, "/players/"+bp.ID+"/week?team="+bp.Team+"&position="+string(bp.Position))
+	s.Boards = fakeBoards{board: f.league.Board}
+	out := playerWeekOf(t, s, "/players/"+bp.ID+"/week")
 	if out.Week != 6 || out.Verb != nil || out.ProjectionScoring.Format != apitypes.ProjectionScoringFormatPpr || out.ProjectionScoring.LeagueOwn {
 		t.Fatalf("week %d verb %+v scoring %+v", out.Week, out.Verb, out.ProjectionScoring)
 	}
 	if out.Line.Facts.Opponent == nil || out.Line.Player.BoardId == nil || *out.Line.Player.BoardId != bp.ID {
 		t.Fatalf("line %+v", out.Line)
 	}
+	if out.Line.Player.Name != bp.Name || out.Line.Player.Team != bp.Team || out.Line.PositionRank == nil {
+		t.Fatalf("his club, position and rank come from our board: %+v", out.Line)
+	}
 	if out.Line.WeekProjection != nil || out.ProjectionReadAt != nil {
 		t.Fatalf("no snapshot stored, no figure: %+v %v", out.Line.WeekProjection, out.ProjectionReadAt)
 	}
 }
 
-func TestThePublicPlayerWeekRefusesWhatHasNoPage(t *testing.T) {
+// A kicker, a defense or a player our board does not place has no page,
+// so the read answers 404 whatever the caller sends.
+func TestThePublicPlayerWeekHasNoKickerOrDefense(t *testing.T) {
 	f := newFixture(t)
 	s := fixtureService(t, f.league, f.data, &fakeHolds{})
 	s.Season = 2026
-	for _, path := range []string{
-		"/players/p008/week?team=ARI&position=K",
-		"/players/p000/week?team=ARI&position=DEF",
-		"/players/p000/week?team=XXX&position=QB",
-		"/players/p000/week?position=QB",
-	} {
-		if code, env := serve(t, s, path); code != http.StatusBadRequest || env.Error == nil {
+	s.Boards = fakeBoards{board: f.league.Board}
+	for _, path := range []string{"/players/p008/week", "/players/p009/week?position=WR", "/players/nobody/week"} {
+		if code, env := serve(t, s, path); code != http.StatusNotFound || env.Error == nil {
 			t.Fatalf("%s: %d", path, code)
 		}
 	}

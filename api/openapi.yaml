@@ -1103,28 +1103,20 @@ paths:
       operationId: playerWeek
       summary: >-
         One player's week for his page with no league: the week's projection in PPR scoring and its change, his
-        opponent's rank against his position, his points a game and his last game's, each in PPR scoring, and his
-        club's game with its facts. Anyone may read it, as the board is. The page names his club and position, as the
-        run does; a club with no game on the schedule, or a position other than QB, RB, WR or TE, answers 400.
+        opponent's rank against his position, his points a game and his last game's, each in PPR scoring, his club's
+        game with its facts, and his place and rest-of-season points a game on our board valued for twelve teams,
+        the standard lineup and PPR. Anyone may read it, as the board is. His club and position are our board's. A
+        kicker, a defense or a player our board does not place has no page and answers 404.
       parameters:
         - name: player
           in: path
           required: true
           description: his board id, as his page names him
           schema: { type: string, minLength: 1, maxLength: 64 }
-        - name: team
-          in: query
-          required: true
-          description: his club, as the run names it
-          schema: { type: string, minLength: 2, maxLength: 3 }
-        - name: position
-          in: query
-          required: true
-          description: his position
-          schema: { type: string, enum: [QB, RB, WR, TE] }
       responses:
         "200": { $ref: "#/components/responses/PlayerWeekResponse" }
         "400": { $ref: "#/components/responses/ErrorResponse" }
+        "404": { $ref: "#/components/responses/ErrorResponse" }
         "429": { $ref: "#/components/responses/ErrorResponse" }
   /shared/mocks/{code}:
     parameters: [{ $ref: "#/components/parameters/ShareCode" }]

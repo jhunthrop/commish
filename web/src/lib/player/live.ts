@@ -23,10 +23,7 @@ export async function readWeek(player: CardPlayer, league: CardLeague | null): P
 			console.warn('player card: the league read', error);
 		}
 	}
-	const query = new URLSearchParams({ team: player.team, position: player.position });
-	return client.call<PlayerWeek>(
-		`/players/${encodeURIComponent(player.id)}/week?${query.toString()}`
-	);
+	return client.call<PlayerWeek>(`/players/${encodeURIComponent(player.id)}/week`);
 }
 
 /** A league screen's address with him named: the screen takes him from ?player=. */
