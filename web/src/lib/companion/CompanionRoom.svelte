@@ -28,7 +28,7 @@
 	import Shortlist from './Shortlist.svelte';
 
 	/** A draft on Sleeper followed from your seat: the host's pick count, the picks as they land, at
-	 * your turn our call with both odds and who we would take next, the pool with each player's
+	 * your turn our call with both chances and who we would take next, the pool with each player's
 	 * chance of lasting, your team, and with synced_sheet your sheet struck as players go. */
 	interface Props {
 		companion: Companion;
@@ -59,7 +59,7 @@
 		card && (c.your_turn || card.conditional) ? callView(card, board, drafted, teams) : null
 	);
 	const onTurn = $derived(call !== null && c.your_turn);
-	const oddsLabel = $derived(
+	const chanceLabel = $derived(
 		card?.conditional
 			? `reaches ${pickLabel(card.for_pick, teams)}`
 			: card?.next_pick
@@ -152,7 +152,7 @@
 			pickNumber={now}
 			action={{ label: `Make the pick on ${host}`, onclick: openHost }}
 		/>
-		<Shortlist {card} {board} {oddsLabel} ranges={c.ranges} />
+		<Shortlist {card} {board} {chanceLabel} ranges={c.ranges} />
 	{:else if call}
 		<RoomCall
 			view={call}
@@ -164,10 +164,10 @@
 		<Pool
 			{rows}
 			left={board.players.length - drafted.size}
-			odds={card?.still_there ?? {}}
-			{oddsLabel}
-			oddsHead={card?.conditional ? 'Reaches' : 'Still there'}
-			oddsShown={call !== null}
+			chance={card?.still_there ?? {}}
+			{chanceLabel}
+			chanceHead={card?.conditional ? 'Reaches' : 'Still there'}
+			chanceShown={call !== null}
 			basis={call ? poolBasis(board, card, teams) : c.basis}
 			pickNumber={now}
 			callId={call?.player.id ?? null}

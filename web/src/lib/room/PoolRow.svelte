@@ -1,23 +1,24 @@
 <script lang="ts">
 	import Face from '#lib/ui/Face.svelte';
 	import Label from '#lib/ui/Label.svelte';
-	import OddsCell from '#lib/ui/OddsCell.svelte';
+	import StillThereCell from '#lib/ui/StillThereCell.svelte';
 	import PositionPill from '#lib/ui/PositionPill.svelte';
 	import Quiet from '#lib/ui/Quiet.svelte';
 	import NameWords from '#lib/ui/NameWords.svelte';
 	import ValueCell from '#lib/ui/ValueCell.svelte';
 	import { vorCell } from '#lib/ui/heat.ts';
+	import { isMarketPosition } from '#lib/types/player.ts';
 	import type { RoomPlayer } from './model.ts';
 
 	interface Props {
 		player: RoomPlayer;
-		/** His chance of lasting to your next pick, null past the card's depth; undefined draws no odds
+		/** His chance of lasting to your next pick, null past the card's depth; undefined draws no cell
 		 * cell at all. */
-		odds: number | null | undefined;
-		/** What the odds are of: "still there at 6.05". */
-		oddsLabel: string;
-		/** What the odds cell says with no chance to show. */
-		oddsMissing: string;
+		chance: number | null | undefined;
+		/** What the chances are of: "still there at 6.05". */
+		chanceLabel: string;
+		/** What the Still there cell says with no chance to show. */
+		chanceMissing: string;
 		/** Where drafters take him against the pick on the clock, in words. */
 		adp: string;
 		/** Our call's row, washed in the accent. */
@@ -39,9 +40,9 @@
 
 	let {
 		player,
-		odds,
-		oddsLabel,
-		oddsMissing,
+		chance,
+		chanceLabel,
+		chanceMissing,
 		adp,
 		isCall,
 		selected,
@@ -74,9 +75,19 @@
 	{#if player.vor !== null && player.vorRound !== null}
 		<ValueCell {...vorCell(player.vor, player.vorRound)} phoneLabel={false} />
 	{:else}
-		<span class="none"><Label size="cell">no projection</Label></span>
+		<span class="none"
+			><Label size="cell"
+				>{isMarketPosition(player.position)
+					? `Draft order ${String(player.positionRank)}`
+					: 'no projection'}</Label
+			></span
+		>
 	{/if}
-	{#if odds !== undefined}<OddsCell {odds} label={oddsLabel} missing={oddsMissing} />{/if}
+	{#if chance !== undefined}<StillThereCell
+			{chance}
+			label={chanceLabel}
+			missing={chanceMissing}
+		/>{/if}
 	<span class="adp">{adp}</span>
 	{#if !readonly}
 		<span class="acts">

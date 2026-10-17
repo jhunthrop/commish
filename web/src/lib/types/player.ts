@@ -1,6 +1,20 @@
 export const POSITIONS = ['QB', 'RB', 'WR', 'TE', 'K', 'DST'] as const;
 export type Position = (typeof POSITIONS)[number];
 
+/** The positions every board carries in draft order, with no projected points and no tier (the
+ * 2026-09-05 ruling): kickers and defenses. */
+export const MARKET_POSITIONS = ['K', 'DST'] as const;
+export type MarketPosition = (typeof MARKET_POSITIONS)[number];
+
+export function isMarketPosition(position: Position): position is MarketPosition {
+	return (MARKET_POSITIONS as readonly Position[]).includes(position);
+}
+
+/** The positions our projection ranks. */
+export const PROJECTED_POSITIONS: readonly Position[] = POSITIONS.filter(
+	(position) => !isMarketPosition(position)
+);
+
 /** Who a player is, enough to draw a face, a name and a position pill. */
 export interface PlayerRef {
 	id: string;

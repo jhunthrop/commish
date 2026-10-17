@@ -192,7 +192,7 @@ function newMock(seed: number): Promise<Room> {
 	return call<Room>(me, 'POST', '/mocks', { settings, seed });
 }
 
-/** One pick by hand, after reading the turn's card so the pick records the odds the room showed. */
+/** One pick by hand, after reading the turn's card so the pick records the chances the room showed. */
 async function pickByHand(room: Room, playerId: string): Promise<Room> {
 	await call<unknown>(me, 'GET', `/mocks/${room.id}/card`);
 	return call<Room>(me, 'POST', `/mocks/${room.id}/picks`, {

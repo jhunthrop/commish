@@ -1,9 +1,9 @@
-/** Words and labels for picks, odds and ADP. Every screen that names a pick or a chance uses these. */
+/** Words and labels for picks, chance and ADP. Every screen that names a pick or a chance uses these. */
 
 export const DEFAULT_TEAMS = 12;
 const NAME_SUFFIXES = new Set(['Jr.', 'Sr.', 'II', 'III', 'IV', 'V']);
-const ODDS_FLOOR = 0.005;
-const ODDS_CEILING = 0.995;
+const CHANCE_FLOOR = 0.005;
+const CHANCE_CEILING = 0.995;
 
 export interface SnakeSlot {
 	round: number;
@@ -40,15 +40,15 @@ export function lastName(name: string): string {
 }
 
 /** "97%", "<1%", ">99%". */
-export function oddsShort(odds: number): string {
-	if (odds < ODDS_FLOOR) return '<1%';
-	if (odds > ODDS_CEILING) return '>99%';
-	return `${Math.round(odds * 100)}%`;
+export function chanceShort(chance: number): string {
+	if (chance < CHANCE_FLOOR) return '<1%';
+	if (chance > CHANCE_CEILING) return '>99%';
+	return `${Math.round(chance * 100)}%`;
 }
 
-/** The odds as they read in a sentence: "under 1%", "97%". */
-export function oddsWords(odds: number): string {
-	return oddsShort(odds).replace('<', 'under ').replace('>', 'over ');
+/** The chances as they read in a sentence: "under 1%", "97%". */
+export function chanceWords(chance: number): string {
+	return chanceShort(chance).replace('<', 'under ').replace('>', 'over ');
 }
 
 /** Drafters' ADP against our rank. Positive means drafters take him later than we would. */
