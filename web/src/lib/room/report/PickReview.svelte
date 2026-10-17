@@ -75,7 +75,9 @@
 							<b>{player?.name ?? pick.player_id}</b>
 							{#if player}<small
 									><PositionPill position={player.position} rank={player.positionRank} />
-									{player.team}</small
+									{player.team}<span class="byph" class:mine={pick.made_by === 'you'}
+										>{byWords(pick, whose)}</span
+									></small
 								>{/if}
 						</span>
 					</span>
@@ -220,6 +222,19 @@
 		color: var(--ink-3);
 	}
 
+	/* Who made the pick, under the player in a hand where the By column has no room: the member's own
+	   picks in the accent. */
+	.byph {
+		display: none;
+		margin-left: auto;
+		padding-left: 6px;
+	}
+
+	.byph.mine {
+		color: var(--accent-text);
+		font-weight: 600;
+	}
+
 	/* A pick nobody chose reads quieter than the ones you made. */
 	.made .no,
 	.made .nm b {
@@ -243,6 +258,10 @@
 
 		.ph {
 			display: block;
+		}
+
+		.byph {
+			display: inline;
 		}
 
 		th,
