@@ -14,6 +14,7 @@ from research.nightly.build.player_season import (
     prior_seasons,
 )
 from research.nightly.config import RUN_FORMATS
+from research.nightly.reads import schedule as schedule_read
 from research.nightly.reads.schedule import Game
 
 NOW = datetime(2026, 10, 17, 12, tzinfo=UTC)
@@ -60,10 +61,8 @@ def test_only_the_page_path_reads_the_seasons_before(monkeypatch: pytest.MonkeyP
         return SeasonStore({}, {}, {}, {}, frozenset())
 
     monkeypatch.setattr(player_season, "read_season_store", store)
-    monkeypatch.setattr(
-        player_season.schedule_read, "slates_by_club", lambda _conn, _season: {"KC": [Game(1, "BUF", True, NOW)]}
-    )
-    monkeypatch.setattr(player_season.schedule_read, "clubs_of", lambda _games: [])
+    monkeypatch.setattr(schedule_read, "slates_by_club", lambda _conn, _season: {"KC": [Game(1, "BUF", True, NOW)]})
+    monkeypatch.setattr(schedule_read, "clubs_of", lambda _games: [])
     conn = Connection.__new__(Connection)
     writers = player_season.season_context(conn, 2026, ["p1"], NOW)
     assert (writers.prior, read) == ({}, [2026])
