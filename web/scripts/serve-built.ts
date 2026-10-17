@@ -10,9 +10,9 @@ import {
 	HEADSHOT_MAX_WIDTH,
 	HEADSHOT_MIN_WIDTH,
 	HEADSHOT_ROUTE,
-	isHeadshotLeague,
-	upstreamHeadshotUrl
+	isHeadshotLeague
 } from '../src/lib/ui/headshot.ts';
+import { upstreamHeadshotUrl } from '../src/lib/ui/headshot-provider.ts';
 
 const PORT = Number(process.env.PORT ?? 4173);
 const ROOT = new URL('../.svelte-kit/cloudflare/', import.meta.url).pathname;

@@ -3,7 +3,8 @@
 	import { clubMark } from '#lib/ui/club-mark.ts';
 	import TeamAvatar from '../box/TeamAvatar.svelte';
 	import MoveMark from '../box/MoveMark.svelte';
-	import { HOME, headshotOf, type FeedPlayer, type FeedRow } from './home.ts';
+	import { headshotUrlFor } from '#lib/ui/headshot-provider.ts';
+	import { HOME, type FeedPlayer, type FeedRow } from './home.ts';
 
 	/** The league's moves as a feed table (Lane 66i): this week's and last week's, newest first, each
 	 * with its day and time, its team (both in a trade), the kind of move, the players in and out
@@ -19,7 +20,7 @@
 
 	function faceSrc(p: FeedPlayer): string | null {
 		if (p.position === 'D/ST') return clubMark(p.club);
-		return p.boardId === null ? null : headshotOf(p.boardId);
+		return p.boardId === null ? null : headshotUrlFor(p.boardId);
 	}
 </script>
 
