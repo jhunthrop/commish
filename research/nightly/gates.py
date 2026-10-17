@@ -6,8 +6,8 @@ so the site keeps building from the last clean run. Every failure is a named rea
 1. `held_out_backtest`: the held-out seasons' rank correlation does not drop past the line against
    the last run whose backtest passed; a season that cannot be scored fails.
 2. `board_depth`: every format's board covers, league-wide, every starting slot its ranked positions
-   alone can fill, and every roster spot but the kicker's and the defense's (market order, never
-   board rows).
+   alone can fill and every roster spot but the kicker's and the defense's with ranked rows, and every
+   kicker and defense spot with rows in draft order (market order, Lane 66m), each counted apart.
 3. `capsules`: at most the run's line of the board's pages unwritten (2% preseason, 3% in season), no written sentence on two pages (the capsule step's gate;
    six-word spans are counted and repaired, never a failure), and every page with a capsule prints at least one of
    its numbers, each word for word and equal to the page's value at the precision printed, with no
@@ -26,11 +26,12 @@ from typing import Any, Final
 
 from research.model.backtest import HeldOutScore
 from research.model.domain import BENCH_SLOT
+from research.nightly.build.pages import WEB_POSITION
 from research.nightly.capsule_gate import CapsuleGateResult
-from research.nightly.config import GATES, PROJECTED_POSITIONS, TEAMS, RunFormat
+from research.nightly.config import GATES, MARKET_ORDER, MARKET_POSITIONS, PROJECTED_POSITIONS, TEAMS, RunFormat
 
 Json = dict[str, Any]
-_MARKET_ORDER_SLOTS: Final = frozenset({"K", "DEF"})
+_MARKET_ORDER_SLOTS: Final = frozenset(MARKET_POSITIONS)
 
 
 @dataclass(frozen=True, slots=True)
@@ -66,10 +67,37 @@ def held_out_gate(current: Sequence[HeldOutScore], previous: Mapping[int, float]
     return gate_record("held_out_backtest", reasons, scores + (", the first baseline" if previous is None else ""))
 
 
-def _depth_findings(run_format: RunFormat, rows: Sequence[Json]) -> list[str]:
+def _market_rows(rows: Sequence[Json]) -> list[Json]:
+    return [row for row in rows if row.get("orderBasis") == MARKET_ORDER]
+
+
+def _market_findings(run_format: RunFormat, rows: Sequence[Json]) -> list[str]:
+    """A kicker and a defense in draft order for every team's starting spot at each."""
+    findings = []
+    for slot in run_format.slots:
+        if slot.slot == BENCH_SLOT or not set(slot.eligible_positions) <= set(MARKET_POSITIONS):
+            continue
+        eligible = {WEB_POSITION[p] for p in slot.eligible_positions}
+        need = TEAMS * slot.count * GATES.depth_players_per_spot
+        have = sum(1 for row in rows if row["position"] in eligible)
+        if have < need:
+            findings.append(f"board_depth_short:{run_format.id}:{slot.slot}:{have}/{need}")
+    return findings
+
+
+def _market_counts(rows: Sequence[Json]) -> str:
+    counts = {WEB_POSITION[p]: 0 for p in MARKET_POSITIONS}
+    for row in rows:
+        counts[row["position"]] = counts.get(row["position"], 0) + 1
+    return ", ".join(f"{position} {count}" for position, count in counts.items())
+
+
+def _depth_findings(run_format: RunFormat, all_rows: Sequence[Json]) -> list[str]:
+    market = _market_rows(all_rows)
+    rows = [row for row in all_rows if row.get("orderBasis") != MARKET_ORDER]
     ranked = set(PROJECTED_POSITIONS)
     starting = [s for s in run_format.slots if s.slot != BENCH_SLOT]
-    findings = []
+    findings = _market_findings(run_format, market)
     for slot in starting:
         eligible = set(slot.eligible_positions)
         if not eligible <= ranked:
@@ -90,7 +118,8 @@ def depth_gate(formats: Sequence[RunFormat], boards: Mapping[str, Json]) -> Gate
     return gate_record(
         "board_depth",
         reasons,
-        f"{len(formats)} boards, every ranked slot covered, kickers and defenses in market order",
+        f"{len(formats)} boards, every ranked slot covered, kickers and defenses in draft order: "
+        + "; ".join(sorted({_market_counts(_market_rows(boards[f.id]["rows"])) for f in formats})),
     )
 
 
@@ -117,6 +146,12 @@ def basis_gate(manifest: Json, adp: Json, record: Json, schedule: Json) -> GateR
         reasons += [f"basis_missing:format:{f['id']}:{what}" for what in ("label", "unit") if _blank(f[what])]
         reasons += [f"basis_missing:format:{f['id']}:basis" for phrase in f["basis"] or [""] if _blank(phrase)]
     reasons += [f"basis_missing:adp:{s['id']}" for s in adp["sources"] if _blank(s["drafts"]) or "window" not in s]
+    priced = {s["id"] for s in adp["sources"]}
+    reasons += [
+        f"basis_missing:market_order:{f['id']}:{f.get('marketOrder')}"
+        for f in manifest["formats"]
+        if f.get("marketOrder") not in priced
+    ]
     reasons += [f"basis_missing:record:{key}" for key in ("method",) if _blank(record[key])]
     reasons += [f"basis_missing:record:statistic:{k}" for k, v in record["statistic"].items() if _blank(v)]
     reasons += [

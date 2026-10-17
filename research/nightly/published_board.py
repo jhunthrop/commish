@@ -21,6 +21,10 @@ in-season window (`rosFromWeek`), else `preseason`, and `from_week` is that `ros
 it), the first week the figures cover; `refreshed` is that format's `refreshedAt` in
 season, and before it the stored board generation the run printed (the manifest's boards source
 for the format's stored board, whose window is the generation's stamp).
+
+A kicker's or a defense's row (the board's market rows, Lane 66m) is published as it is printed: its
+rank and its place in draft order, every point figure NULL, under the board's `order_basis` (the
+table's word for the whole board, which the API reads as one).
 """
 
 from collections.abc import Mapping

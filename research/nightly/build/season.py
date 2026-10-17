@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Any, Final, Protocol
 
 from research.model.instants import js_iso
-from research.nightly.config import PAGE_FORMAT, TEAMS, RunFormat
+from research.nightly.config import MARKET_ORDER_FEED, PAGE_FORMAT, TEAMS, RunFormat
 from research.nightly.reads import record as record_read
 from research.nightly.reads import schedule as schedule_read
 from research.nightly.reads.adp import AdpCapture
@@ -141,6 +141,8 @@ def format_json(run_format: RunFormat, season: int, rest: "RestOfSeason | None" 
         "unit": run_format.unit,
         "teams": TEAMS,
         "basis": basis,
+        # The ADP source (adp.json) whose draft order the board's kickers and defenses take.
+        "marketOrder": MARKET_ORDER_FEED.source,
     }
     if rest is not None:
         out |= {"rosFromWeek": rest.from_week, "rosThroughWeek": rest.through, "refreshedAt": iso(rest.refreshed_at)}
