@@ -26,7 +26,7 @@
 	import SharedHead from './SharedHead.svelte';
 	import SoloBar from './SoloBar.svelte';
 	import Wall from './Wall.svelte';
-	import { botNames, leagueLine } from './words.ts';
+	import { botNames, pickBarCells } from './words.ts';
 
 	/** A shared draft: read by someone else, never drafted in, with one verb that runs it as theirs. */
 	interface Shared {
@@ -234,9 +234,7 @@
 	{:else if room.status === 'active'}
 		<SoloBar
 			now={room.pick_number}
-			{round}
-			league={leagueLine(room.settings, room.slot)}
-			{next}
+			cells={pickBarCells(room.settings, room.slot, { now: room.pick_number, round, next })}
 			{teams}
 			autopickTo={Math.min(room.rounds, round + AUTOPICK_ROUNDS)}
 			canUndo={lastMine !== null}
@@ -338,7 +336,6 @@
 			slots={teamSlots(room.settings, mine, board)}
 			rosterSize={room.rounds}
 			{teams}
-			withCall={!readonly}
 		/>
 		{#if !readonly}<Keys bindings={soloKeys(noCall)} />{/if}
 	{/snippet}
