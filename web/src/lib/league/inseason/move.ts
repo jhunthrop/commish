@@ -62,6 +62,16 @@ export function claimable(row: WaiverRow): boolean {
 	return HOST_ID.test(row.add.player.host_id);
 }
 
+/** Whether an add is claimed from here (review 66j N3): the API opens claims for the league and the
+ * platform names him by an id the claim route takes. One rule for the Waivers screen and the order;
+ * null moves (none read) never claim. */
+export function claimsAdd(
+	moves: Pick<WaiverAdvice['moves'], 'claim'> | null,
+	hostId: string
+): boolean {
+	return moves?.claim === 'available' && HOST_ID.test(hostId);
+}
+
 /** A waiver row's own key, for marking it: the add's host id, else his board id. */
 export function addKey(row: WaiverRow): string {
 	return row.add.player.host_id === ''

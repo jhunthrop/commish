@@ -16,6 +16,7 @@ import {
 	weatherCell,
 	type WeatherCell
 } from '#lib/league/box/box.ts';
+import { askedQuery } from '#lib/league/box/asked.ts';
 import { AGAINST } from '#lib/league/box/lineup.ts';
 import type { LeagueHost } from '#lib/league/api.ts';
 import { hostWords } from '#lib/league/names.ts';
@@ -110,9 +111,9 @@ export function verbOf(
 	screenHref: ScreenHref
 ): CardVerb {
 	const host = hostWords(league.host);
-	const player = { player: who.id };
-	// Waivers narrows to his position when its first answer does not hold him.
-	const pickup = { player: who.id, position: who.position };
+	const asked = { id: who.id, position: who.position };
+	const player = askedQuery('start', asked);
+	const pickup = askedQuery('waivers', asked);
 	switch (verb.kind) {
 		case 'start':
 			return {

@@ -13,6 +13,7 @@
 	import MatchupScreen from '#lib/league/MatchupScreen.svelte';
 	import { LINES, TAB_LABELS, refreshedWords } from '#lib/league/inseason/words.ts';
 	import type { AdviceHead } from '#lib/league/inseason/api.ts';
+	import { ASKED_PARAM } from '#lib/league/box/asked.ts';
 	import { sectionHref } from '#lib/ui/nav.ts';
 	import { siteContext } from '#lib/context/context.svelte.ts';
 	import { standingWords } from '#lib/league/model.ts';
@@ -24,6 +25,9 @@
 	/** The rows each screen holds while its answer is read: a lineup with its bench, the first adds,
 	 * the first teams' trades. */
 	const RESERVE_ROWS = { start: 10, waivers: 10, trades: 8 } as const;
+
+	/** The player a link named (?player=): Waivers keeps his row past its first page (review 66j N2). */
+	const asked = $derived(page.url.searchParams.get(ASKED_PARAM));
 
 	/** What an advice screen was read from: the order and when it was refreshed. */
 	const ordered = (advice: AdviceHead): string =>
@@ -62,14 +66,14 @@
 			screen="waivers"
 			title={TAB_LABELS.waivers}
 			stamp={ordered}
-			read={() => inSeasonApi.waivers(id)}
+			read={() => inSeasonApi.waivers(id, null, asked)}
 			reserve={RESERVE_ROWS.waivers}
 		>
 			{#snippet children(advice, host, reread)}
 				<WaiverScreen
 					{advice}
 					{host}
-					narrow={(position: WaiverPosition) => inSeasonApi.waivers(id, position)}
+					narrow={(position: WaiverPosition) => inSeasonApi.waivers(id, position, asked)}
 					plan={(move: HostMoveInput) => inSeasonApi.planMove(id, move)}
 					make={(move: HostMoveInput, confirm: string) => inSeasonApi.makeMove(id, move, confirm)}
 					{reread}

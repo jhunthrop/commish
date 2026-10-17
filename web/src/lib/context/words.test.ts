@@ -142,6 +142,7 @@ void test("copy guard: no composed line doubles a word, the run's own phrases in
 		status: 'graded',
 		frozenAt: '2026-09-08T12:00:00.000Z',
 		frozenBy: '2026-10-14T04',
+		order: 'preseason',
 		gradedAt: '2026-10-14T04:36:03.983Z',
 		population: 341,
 		lines: [],
@@ -152,18 +153,31 @@ void test("copy guard: no composed line doubles a word, the run's own phrases in
 		week: 7,
 		status: 'upcoming',
 		frozenBy: null,
+		order: null,
 		gradedAt: null,
 		frozenAt: '2026-10-23T00:15:00.000Z'
 	};
-	const score = { graded: 203, agreement: 0.48, placesOff: 43.7 };
+	const score = { graded: 203, agreement: 0.48, placesOff: 43.7, starters: 100, startersOf: 168 };
 	const record = {
 		season: 2026,
 		format: 'ppr-12',
-		statistic: { agreement: 'agreement with the finish', placesOff: 'places off, typical player' },
+		statistic: { agreement: 'order matched', placesOff: 'places off', starters: 'starters right' },
+		scale: "1.0 is a perfect match of the week's finishing order, 0 is none.",
+		startersBasis: "Starters right counts the week's top 12 QBs that the order also put there.",
 		method:
 			"Each week our PPR board is frozen before the week's first kickoff and graded after its games.",
+		publishedFromWeek: 7,
+		honest: null,
 		weeks: [graded, missed(3, 'Our weekly freeze failed that week.'), upcoming],
-		toDate: [{ position: 'All' as const, ours: score, adp: { ...score, agreement: 0.37 } }]
+		toDate: [
+			{
+				position: 'All' as const,
+				ours: score,
+				adp: { ...score, agreement: 0.37 },
+				published: null,
+				oursOnPublished: null
+			}
+		]
 	};
 	const te = league({ scoring: 'te_premium' });
 	const held: Held = { me: 1, teams: { 1: 'Nacua Matata', 2: 'Gmoneyman' }, by: { a: 1, b: 2 } };
@@ -204,6 +218,7 @@ const missed = (week: number, note: string): RecordWeek => ({
 	status: 'missed',
 	frozenAt: null,
 	frozenBy: null,
+	order: null,
 	gradedAt: null,
 	population: 0,
 	lines: [],
@@ -247,6 +262,7 @@ void test('a frozen week says it is not played yet until its first kickoff, then
 		status: 'frozen',
 		frozenAt: '2026-10-13T12:00:17.450Z',
 		frozenBy: '2026-10-14T04',
+		order: 'preseason',
 		gradedAt: null,
 		population: 0,
 		lines: []

@@ -30,6 +30,7 @@
 	import type { StatusView } from '#lib/run/status-view.ts';
 	import { liveStatusClock, sayBoard, type LiveStatus } from '#lib/run/live-status.ts';
 	import { links, tierAnchor } from './links.ts';
+	import type OrderScreenComponent from '#lib/order/OrderScreen.svelte';
 
 	interface Props {
 		page: BoardPage;
@@ -145,6 +146,22 @@
 
 	/** The side column's anchor: the tiers and your sheet. */
 	const SIDE_ID = 'board-side';
+
+	/** In season the board is the Rest of season screen (Lane 66j): our order as a box score read
+	 * from the API, loaded with the page's script, so the run's rows stay the page without one. The
+	 * kickers' and defenses' views keep the run's draft order: the order carries no K or DEF rows. */
+	let Order = $state<typeof OrderScreenComponent | null>(null);
+	onMount(() => {
+		if (!page.underway) return;
+		void import('#lib/order/OrderScreen.svelte').then((module) => {
+			Order = module.default;
+		});
+	});
+	const orderLeague = $derived(
+		siteContext.league === null
+			? null
+			: { id: siteContext.league.id, host: siteContext.league.host }
+	);
 </script>
 
 {#snippet row(player: BoardRowView, i: number)}
@@ -165,7 +182,7 @@
 	</Row>
 {/snippet}
 
-<main class="board">
+<main class="board" class:ordered={Order !== null && !marketView}>
 	<!-- The league's line sits by the switch, not under the caption: atop the side column on a desk,
 	     first under the bar elsewhere. -->
 	<div class="league-line">
@@ -181,7 +198,7 @@
 			</PageHead>
 			{#if marketView}
 				<BasisLine parts={[{ text: page.marketBasis ?? '', phone: true }]} tail={capture} />
-			{:else}
+			{:else if Order === null}
 				<BasisLine parts={page.basis} tail={capture} />
 			{/if}
 		</div>
@@ -209,65 +226,76 @@
 			</span>
 		</div>
 
-		<BoardTable
-			{columns}
-			{label}
-			sort={marketView ? undefined : sort}
-			onsort={marketView ? undefined : onsort}
-		>
-			{#if marketView}
-				{#each marketShown as player, i (player.id)}
-					{@const face = player.face}
-					<Row
-						{player}
-						href={links.club(player.team)}
-						{columns}
-						bye={page.byes[player.team] ?? null}
-						{framing}
-						eager={i < EAGER_ROWS}
-						held={siteContext.held?.mark(player.id) ?? null}
-						status={status(player)}
-					>
-						{#snippet marks()}<RowSheetTags playerId={player.id} />{/snippet}
-						{#snippet action()}<RowSheetMark player={{ ...player, headshot: face }} />{/snippet}
-					</Row>
-				{/each}
-			{:else if banded && page.position !== null}
-				{@const position = page.position}
-				{#each groups as tierGroup (tierGroup.tier)}
-					{@const rows = tierGroup.rows.filter(shown)}
-					{#if rows.length > 0}
+		{#if Order && !marketView}
+			{#key orderLeague?.id}
+				<Order
+					mode="rest"
+					position={page.position === 'DST' || page.position === 'K' ? null : page.position}
+					league={orderLeague}
+					label="{page.position ?? 'All'} on our rest-of-season order"
+				/>
+			{/key}
+		{:else}
+			<BoardTable
+				{columns}
+				{label}
+				sort={marketView ? undefined : sort}
+				onsort={marketView ? undefined : onsort}
+			>
+				{#if marketView}
+					{#each marketShown as player, i (player.id)}
+						{@const face = player.face}
+						<Row
+							{player}
+							href={links.club(player.team)}
+							{columns}
+							bye={page.byes[player.team] ?? null}
+							{framing}
+							eager={i < EAGER_ROWS}
+							held={siteContext.held?.mark(player.id) ?? null}
+							status={status(player)}
+						>
+							{#snippet marks()}<RowSheetTags playerId={player.id} />{/snippet}
+							{#snippet action()}<RowSheetMark player={{ ...player, headshot: face }} />{/snippet}
+						</Row>
+					{/each}
+				{:else if banded && page.position !== null}
+					{@const position = page.position}
+					{#each groups as tierGroup (tierGroup.tier)}
+						{@const rows = tierGroup.rows.filter(shown)}
+						{#if rows.length > 0}
+							<div class="tier">
+								<TierStrip
+									id={tierAnchor(position, tierGroup.tier)}
+									tier={tierGroup.tier}
+									count={tierGroup.rows.length}
+									{group}
+									cliff={tierGroup.cliff}
+									{unit}
+								/>
+								{#each rows as player (player.id)}
+									{@render row(player, player.positionRank - 1)}
+								{/each}
+							</div>
+						{/if}
+					{/each}
+					{#if heldRows.length > 0}
 						<div class="tier">
-							<TierStrip
-								id={tierAnchor(position, tierGroup.tier)}
-								tier={tierGroup.tier}
-								count={tierGroup.rows.length}
-								{group}
-								cliff={tierGroup.cliff}
-								{unit}
-							/>
-							{#each rows as player (player.id)}
-								{@render row(player, player.positionRank - 1)}
+							<p class="held-head">
+								<Label>On a season-long list, his figures assume he plays</Label>
+							</p>
+							{#each heldRows as player (player.id)}
+								{@render row(player, page.rows.length)}
 							{/each}
 						</div>
 					{/if}
-				{/each}
-				{#if heldRows.length > 0}
-					<div class="tier">
-						<p class="held-head">
-							<Label>On a season-long list, his figures assume he plays</Label>
-						</p>
-						{#each heldRows as player (player.id)}
-							{@render row(player, page.rows.length)}
-						{/each}
-					</div>
+				{:else}
+					{#each visible as player, i (player.id)}
+						{@render row(player, i)}
+					{/each}
 				{/if}
-			{:else}
-				{#each visible as player, i (player.id)}
-					{@render row(player, i)}
-				{/each}
-			{/if}
-		</BoardTable>
+			</BoardTable>
+		{/if}
 	</div>
 
 	<aside class="side" id={SIDE_ID} aria-label="Your board">
@@ -378,6 +406,16 @@
 		margin: 0;
 		padding: var(--s-2) var(--s-3);
 		border-bottom: 1px solid var(--line);
+	}
+
+	/* The Rest of season screen takes the page's width: its table carries the basis and the filters. */
+	.ordered {
+		grid-template-columns: minmax(0, 1fr);
+	}
+
+	.ordered .side,
+	.ordered .shows {
+		display: none;
 	}
 
 	/* The sheet card's height with no one on it yet ("Your sheet", "No one yet"). */

@@ -101,7 +101,13 @@ def _schedule(conn: Connection, as_of: datetime) -> tuple[Json, list[Json], Json
 def _record(conn: Connection, as_of: datetime, frozen_by: FrozenBy) -> tuple[Json, Json | None]:
     """The record, and its source; a season with no freeze yet has an empty record and no source."""
     weeks, rows_by_week = record_read.read_record(conn, PRODUCT_SEASON, as_of)
-    record = season.record_json(PRODUCT_SEASON, weeks, record_read.to_date(weeks, rows_by_week), frozen_by)
+    record = season.record_json(
+        PRODUCT_SEASON,
+        weeks,
+        record_read.to_date(weeks, rows_by_week),
+        frozen_by,
+        published_from=record_read.published_from(conn, PRODUCT_SEASON),
+    )
     frozen = [w for w in weeks if w.status in {"frozen", "graded"}]
     if not frozen:
         return record, None

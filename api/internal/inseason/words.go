@@ -347,3 +347,14 @@ func TradesBasis(b OrderBasis, weeks int) string {
 	return fmt.Sprintf("Trades where both lineups gain on %s. Each team's best trade, yours first, among those they gain at least %.1f a week from, "+
 		"then the close calls for them. The other team decides. %s", numberWords(b), CloseCall, porWords(b, weeks))
 }
+
+// OrderScreenBasis is the Rest of season and Players screens' line
+// (Lane 66j): what the order ranks by and what its two figures are.
+func OrderScreenBasis(b OrderBasis, fromWeek int) string {
+	if b != RestOfSeason || fromWeek < 1 {
+		return "Our preseason order: All ranks by Over repl., his season less a free pickup's at his position."
+	}
+	return fmt.Sprintf("Our rest-of-season order from week %d: Total is his points through week %d, byes out, A game the same "+
+		"a game. A position ranks by Total, All by Over repl., his total less a free pickup's.",
+		fromWeek, LastWeek)
+}
