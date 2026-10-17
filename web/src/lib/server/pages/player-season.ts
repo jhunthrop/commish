@@ -3,6 +3,9 @@
  * player with no line gets. */
 import { weekdayLabel } from '#lib/format/date.ts';
 import { fixed, plural } from '#lib/format/number.ts';
+
+/** Tenths in a point, the box's printed precision. */
+const TENTHS = 10;
 import { POINTS_PER_GAME_DECIMALS, type GameLogRow, type PlayerSeason } from '#lib/run/season.ts';
 import type { Format } from '#lib/run/schema.ts';
 import { STAT_COLUMNS, captionFor, type StatColumn } from '#lib/run/stat-columns.ts';
@@ -70,7 +73,8 @@ function splitLog(log: readonly GameLogRow[]): [GameLogRow[], GameLogRow[]] {
 function basisWords(season: PlayerSeason, position: Position, format: Format): string {
 	const source = `Stats from the NFL's records, scored in ${format.label}`;
 	if (season.games === 0) return `${source}.`;
-	const parts = [`${source}, averaged over the ${plural(season.games, 'game')} he played.`];
+	// Avg's tile names his games, so the line says only where the figures come from (review M6).
+	const parts = [`${source}.`];
 	if (position === 'QB' && season.totals.completions === null)
 		parts.push('Completions are not in our records yet.');
 	return parts.join(' ');
@@ -83,6 +87,19 @@ function noneWords(season: PlayerSeason): string {
 		: `He has no ${String(season.season)} stat line through week ${String(through)}.`;
 }
 
+/** The season's points as the box adds them: the sum of the tenths each played row prints (review
+ * M3), summed in whole tenths so no float drifts. */
+function printedTotal(log: readonly GameLogRow[]): string {
+	const tenths = log.reduce(
+		(sum, row) =>
+			row.status === 'played' && row.points !== null
+				? sum + Math.round(Number(fixed(row.points)) * TENTHS)
+				: sum,
+		0
+	);
+	return fixed(tenths / TENTHS);
+}
+
 function seasonLine(
 	season: PlayerSeason,
 	columns: readonly StatColumn[],
@@ -93,7 +110,7 @@ function seasonLine(
 	return {
 		lead: 'Season',
 		sub: `${plural(season.games, 'game')}, ${perGame} a game`,
-		total: season.totals.points === null ? '' : fixed(season.totals.points),
+		total: printedTotal(season.log),
 		points: {
 			value: perGame,
 			caption: `${format.label} points a game`
