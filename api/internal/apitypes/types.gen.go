@@ -963,6 +963,33 @@ func (e PlayerPosition) Valid() bool {
 	}
 }
 
+// Defines values for PlayerVerbKind.
+const (
+	PlayerVerbKindClaim   PlayerVerbKind = "claim"
+	PlayerVerbKindLineup  PlayerVerbKind = "lineup"
+	PlayerVerbKindStart   PlayerVerbKind = "start"
+	PlayerVerbKindTrade   PlayerVerbKind = "trade"
+	PlayerVerbKindWaivers PlayerVerbKind = "waivers"
+)
+
+// Valid indicates whether the value is a known member of the PlayerVerbKind enum.
+func (e PlayerVerbKind) Valid() bool {
+	switch e {
+	case PlayerVerbKindClaim:
+		return true
+	case PlayerVerbKindLineup:
+		return true
+	case PlayerVerbKindStart:
+		return true
+	case PlayerVerbKindTrade:
+		return true
+	case PlayerVerbKindWaivers:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for Product.
 const (
 	ProductDraftPass  Product = "draft_pass"
@@ -1329,6 +1356,30 @@ func (e LoginParamsScreen) Valid() bool {
 	case LoginParamsScreenSignIn:
 		return true
 	case LoginParamsScreenSignUp:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PlayerWeekParamsPosition.
+const (
+	PlayerWeekParamsPositionQB PlayerWeekParamsPosition = "QB"
+	PlayerWeekParamsPositionRB PlayerWeekParamsPosition = "RB"
+	PlayerWeekParamsPositionTE PlayerWeekParamsPosition = "TE"
+	PlayerWeekParamsPositionWR PlayerWeekParamsPosition = "WR"
+)
+
+// Valid indicates whether the value is a known member of the PlayerWeekParamsPosition enum.
+func (e PlayerWeekParamsPosition) Valid() bool {
+	switch e {
+	case PlayerWeekParamsPositionQB:
+		return true
+	case PlayerWeekParamsPositionRB:
+		return true
+	case PlayerWeekParamsPositionTE:
+		return true
+	case PlayerWeekParamsPositionWR:
 		return true
 	default:
 		return false
@@ -2837,6 +2888,44 @@ type PlayerLine struct {
 // PlayerPosition defines model for PlayerPosition.
 type PlayerPosition string
 
+// PlayerVerb defines model for PlayerVerb.
+type PlayerVerb struct {
+	// Holder the team holding him, for trade; null otherwise
+	Holder *string `json:"holder"`
+
+	// HostUrl the platform's waiver page, for waivers; null otherwise or when we do not know it
+	HostUrl *string `json:"host_url"`
+
+	// Kind start when he is on the drafter's roster and our lineup starts him where the platform's lineup does not; lineup when he is on the drafter's roster otherwise; trade when another roster holds him; claim when no roster holds him and a claim can be made from our screen (WaiverMoves.claim available); waivers when no roster holds him and the verb is the platform's waiver page
+	Kind PlayerVerbKind `json:"kind"`
+
+	// Note the claim moves' note, for claim or waivers; null otherwise
+	Note *string `json:"note"`
+}
+
+// PlayerVerbKind start when he is on the drafter's roster and our lineup starts him where the platform's lineup does not; lineup when he is on the drafter's roster otherwise; trade when another roster holds him; claim when no roster holds him and a claim can be made from our screen (WaiverMoves.claim available); waivers when no roster holds him and the verb is the platform's waiver page
+type PlayerVerbKind string
+
+// PlayerWeek defines model for PlayerWeek.
+type PlayerWeek struct {
+	Line PlayerLine `json:"line"`
+
+	// ProjectionPreviousReadAt when the snapshot projection_delta is measured from was captured, null with none
+	ProjectionPreviousReadAt *time.Time `json:"projection_previous_read_at"`
+
+	// ProjectionReadAt when the week's projection was captured, null with none stored
+	ProjectionReadAt *time.Time `json:"projection_read_at"`
+
+	// ProjectionScoring the scoring the rows' week_projection is read in: the published projection's column the league scores most like, and whether that is the league's own scoring or the closest of the three to rules of its own (a tight end premium reads PPR and is never its own). A team defense's figure is the published default in every format
+	ProjectionScoring ProjectionScoring `json:"projection_scoring"`
+
+	// Verb what the league screens would do with him; null on the read with no league
+	Verb *PlayerVerb `json:"verb"`
+
+	// Week the week the line is for: the league's week, else the week of the next game still to be played
+	Week int `json:"week"`
+}
+
 // PointsAllowed defines model for PointsAllowed.
 type PointsAllowed struct {
 	// Of the defenses ranked
@@ -3694,6 +3783,15 @@ type MockRoomResponse struct {
 	RequestId string     `json:"request_id"`
 }
 
+// PlayerWeekResponse defines model for PlayerWeekResponse.
+type PlayerWeekResponse struct {
+	Data      PlayerWeek `json:"data"`
+	Error     *ErrorBody `json:"error"`
+	Meta      *PageMeta  `json:"meta,omitempty"`
+	Ok        bool       `json:"ok"`
+	RequestId string     `json:"request_id"`
+}
+
 // RedirectResponse defines model for RedirectResponse.
 type RedirectResponse struct {
 	Data      Redirect   `json:"data"`
@@ -3833,6 +3931,18 @@ type ListMocksParams struct {
 type AutopickMockParams struct {
 	ToRound int `form:"to_round" json:"to_round"`
 }
+
+// PlayerWeekParams defines parameters for PlayerWeek.
+type PlayerWeekParams struct {
+	// Team his club, as the run names it
+	Team string `form:"team" json:"team"`
+
+	// Position his position
+	Position PlayerWeekParamsPosition `form:"position" json:"position"`
+}
+
+// PlayerWeekParamsPosition defines parameters for PlayerWeek.
+type PlayerWeekParamsPosition string
 
 // ListSheetsParams defines parameters for ListSheets.
 type ListSheetsParams struct {
