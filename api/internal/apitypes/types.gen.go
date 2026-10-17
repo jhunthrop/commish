@@ -933,6 +933,24 @@ func (e MockStatus) Valid() bool {
 	}
 }
 
+// Defines values for OrderAdviceRankBy.
+const (
+	OrderAdviceRankByPointsOverReplacement OrderAdviceRankBy = "points_over_replacement"
+	OrderAdviceRankByRestOfSeasonPoints    OrderAdviceRankBy = "rest_of_season_points"
+)
+
+// Valid indicates whether the value is a known member of the OrderAdviceRankBy enum.
+func (e OrderAdviceRankBy) Valid() bool {
+	switch e {
+	case OrderAdviceRankByPointsOverReplacement:
+		return true
+	case OrderAdviceRankByRestOfSeasonPoints:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for OrderBasis.
 const (
 	OrderBasisPreseason    OrderBasis = "preseason"
@@ -945,6 +963,24 @@ func (e OrderBasis) Valid() bool {
 	case OrderBasisPreseason:
 		return true
 	case OrderBasisRestOfSeason:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for OrderRowMove.
+const (
+	OrderRowMoveAdd   OrderRowMove = "add"
+	OrderRowMoveTrade OrderRowMove = "trade"
+)
+
+// Valid indicates whether the value is a known member of the OrderRowMove enum.
+func (e OrderRowMove) Valid() bool {
+	switch e {
+	case OrderRowMoveAdd:
+		return true
+	case OrderRowMoveTrade:
 		return true
 	default:
 		return false
@@ -1236,6 +1272,27 @@ func (e RosterChipKind) Valid() bool {
 	case RosterChipKindPickup:
 		return true
 	case RosterChipKindStatus:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for RosterMarkKind.
+const (
+	RosterMarkKindFree  RosterMarkKind = "free"
+	RosterMarkKindTeam  RosterMarkKind = "team"
+	RosterMarkKindYours RosterMarkKind = "yours"
+)
+
+// Valid indicates whether the value is a known member of the RosterMarkKind enum.
+func (e RosterMarkKind) Valid() bool {
+	switch e {
+	case RosterMarkKindFree:
+		return true
+	case RosterMarkKindTeam:
+		return true
+	case RosterMarkKindYours:
 		return true
 	default:
 		return false
@@ -2947,8 +3004,76 @@ type NamedPick struct {
 	HostName string `json:"host_name"`
 }
 
+// OrderAdvice defines model for OrderAdvice.
+type OrderAdvice struct {
+	// Basis what the order and its two figures are, said once under the rows
+	Basis string `json:"basis"`
+
+	// BasisNote the league the points over replacement are for (a 12-team PPR league for a reader with none of their own), and the rules it scores that the season's points (Avg and Last) leave out
+	BasisNote string `json:"basis_note"`
+
+	// FromWeek the first week the rest-of-season order covers, null on the preseason order
+	FromWeek *int `json:"from_week"`
+
+	// Moves the claim's moves on the league's platform, the Waivers screen's verb rule for an add; null without a league
+	Moves *WaiverMoves `json:"moves"`
+
+	// OrderBasis which order ranks the players: our preseason board, or the rest-of-season order (from week 7, once the API reads it)
+	OrderBasis OrderBasis `json:"order_basis"`
+
+	// ProjectionReadAt when the week's published projection was read, null when none is stored
+	ProjectionReadAt *time.Time `json:"projection_read_at"`
+
+	// ProjectionScoring the scoring the rows' week_projection is read in: the published projection's column the league scores most like, and whether that is the league's own scoring or the closest of the three to rules of its own (a tight end premium reads PPR and is never its own). A team defense's figure is the published default in every format
+	ProjectionScoring ProjectionScoring `json:"projection_scoring"`
+
+	// RankBy the key the rows' rank sorts on, the figure a screen shows first: the rest-of-season total at a position, points over replacement across positions
+	RankBy OrderAdviceRankBy `json:"rank_by"`
+
+	// ReadAt when the league was read from its platform, null without a league
+	ReadAt *time.Time `json:"read_at"`
+
+	// Refreshed when the order was made
+	Refreshed time.Time `json:"refreshed"`
+
+	// Rows in our order, at most the limit
+	Rows []OrderRow `json:"rows"`
+
+	// Total every player the view holds before the limit
+	Total int `json:"total"`
+
+	// Week the week the rows' Game cell and Proj are for
+	Week int `json:"week"`
+}
+
+// OrderAdviceRankBy the key the rows' rank sorts on, the figure a screen shows first: the rest-of-season total at a position, points over replacement across positions
+type OrderAdviceRankBy string
+
 // OrderBasis which order ranks the players: our preseason board, or the rest-of-season order (from week 7, once the API reads it)
 type OrderBasis string
+
+// OrderRow defines model for OrderRow.
+type OrderRow struct {
+	Line PlayerLine `json:"line"`
+
+	// Move the one move his row admits: add for a player no roster holds at a position the league starts, trade for a player on another roster whom the trade finder's best trade with his team brings in for the drafter, null otherwise (and always for the drafter's own players)
+	Move *OrderRowMove `json:"move"`
+
+	// PointsOverReplacement the key across positions, one decimal: his points over replacement for the league over the weeks the order covers; null at a position the league starts nobody at
+	PointsOverReplacement *float64 `json:"points_over_replacement"`
+
+	// Rank his place in our order for this view: at a position his position rank (by his rest-of-season total, which orders the same as points over replacement there), across every position his place by points over replacement
+	Rank int `json:"rank"`
+
+	// RestOfSeasonPoints the order's key, one decimal: his rest-of-season points over the games his club has left from the order's first week through week 17, byes out; null on the preseason order and without a projection
+	RestOfSeasonPoints *float64 `json:"rest_of_season_points"`
+
+	// Roster whose roster in the league holds him, null without a league
+	Roster *RosterMark `json:"roster"`
+}
+
+// OrderRowMove the one move his row admits: add for a player no roster holds at a position the league starts, trade for a player on another roster whom the trade finder's best trade with his team brings in for the drafter, null otherwise (and always for the drafter's own players)
+type OrderRowMove string
 
 // OutcomeRange defines model for OutcomeRange.
 type OutcomeRange struct {
@@ -3385,6 +3510,17 @@ type RosterCounts struct {
 	Te    int `json:"te"`
 	Wr    int `json:"wr"`
 }
+
+// RosterMark defines model for RosterMark.
+type RosterMark struct {
+	Kind RosterMarkKind `json:"kind"`
+
+	// Team the holding team's name when kind is team
+	Team *string `json:"team"`
+}
+
+// RosterMarkKind defines model for RosterMark.Kind.
+type RosterMarkKind string
 
 // RosterSpot defines model for RosterSpot.
 type RosterSpot struct {
@@ -4245,6 +4381,15 @@ type MockRoomResponse struct {
 	RequestId string     `json:"request_id"`
 }
 
+// OrderAdviceResponse defines model for OrderAdviceResponse.
+type OrderAdviceResponse struct {
+	Data      OrderAdvice `json:"data"`
+	Error     *ErrorBody  `json:"error"`
+	Meta      *PageMeta   `json:"meta,omitempty"`
+	Ok        bool        `json:"ok"`
+	RequestId string      `json:"request_id"`
+}
+
 // PlayerWeekResponse defines model for PlayerWeekResponse.
 type PlayerWeekResponse struct {
 	Data      PlayerWeek `json:"data"`
@@ -4380,6 +4525,21 @@ type ListLeaguesParams struct {
 	PerPage *PerPage `form:"per_page,omitempty" json:"per_page,omitempty"`
 }
 
+// LeagueOrderParams defines parameters for LeagueOrder.
+type LeagueOrderParams struct {
+	// Position only players at this position; without it every position, ranked by points over replacement. Kickers and defenses are not on the order, as the in-season table carries none
+	Position *string `form:"position,omitempty" json:"position,omitempty"`
+
+	// Q only players whose name or club holds these letters, any case
+	Q *string `form:"q,omitempty" json:"q,omitempty"`
+
+	// Limit at most this many rows, 100 without it
+	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Roster only the free players, or only the drafter's own; total and the limit count after it
+	Roster *string `form:"roster,omitempty" json:"roster,omitempty"`
+}
+
 // LeagueTradesParams defines parameters for LeagueTrades.
 type LeagueTradesParams struct {
 	// Player a board id; only trades holding this player, on either side
@@ -4390,6 +4550,9 @@ type LeagueTradesParams struct {
 type LeagueWaiversParams struct {
 	// Position only candidates at this position
 	Position *string `form:"position,omitempty" json:"position,omitempty"`
+
+	// Player a player a link named (his board id): his row is kept on the page past its first 60, so an add from the order or the player card lands on him; an id not among the adds changes nothing
+	Player *string `form:"player,omitempty" json:"player,omitempty"`
 }
 
 // ListMocksParams defines parameters for ListMocks.
@@ -4401,6 +4564,18 @@ type ListMocksParams struct {
 // AutopickMockParams defines parameters for AutopickMock.
 type AutopickMockParams struct {
 	ToRound int `form:"to_round" json:"to_round"`
+}
+
+// OrderParams defines parameters for Order.
+type OrderParams struct {
+	// Position only players at this position; without it every position, ranked by points over replacement. Kickers and defenses are not on the order, as the in-season table carries none
+	Position *string `form:"position,omitempty" json:"position,omitempty"`
+
+	// Q only players whose name or club holds these letters, any case
+	Q *string `form:"q,omitempty" json:"q,omitempty"`
+
+	// Limit at most this many rows, 100 without it
+	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
 }
 
 // ListSheetsParams defines parameters for ListSheets.

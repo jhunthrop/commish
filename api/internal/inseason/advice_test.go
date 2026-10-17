@@ -94,7 +94,7 @@ func TestWaiverAdvice(t *testing.T) {
 	for _, id := range f.league.Snap.Teams[0].Players[10:] {
 		held[*f.league.Player(id).BoardId] = true
 	}
-	out, ok := newFixtureAdvisor(t, f, held).Waivers("")
+	out, ok := newFixtureAdvisor(t, f, held).Waivers("", "")
 	if !ok || len(out.Rows) == 0 || len(out.Rows) > MaxWaiverRows {
 		t.Fatalf("rows %d", len(out.Rows))
 	}
@@ -134,7 +134,7 @@ func TestWaiverAdvice(t *testing.T) {
 			t.Fatalf("the cards' gains reach %v, the set's Proj is %v", sum, *out.PickupsProj)
 		}
 	}
-	rbs, _ := newFixtureAdvisor(t, f, held).Waivers(draft.RB)
+	rbs, _ := newFixtureAdvisor(t, f, held).Waivers(draft.RB, "")
 	for _, r := range rbs.Rows {
 		if r.Add.Player.Position != "RB" {
 			t.Fatalf("a %s in the backs' rows", r.Add.Player.Position)
@@ -256,7 +256,7 @@ func BenchmarkWaiversRoute(b *testing.B) {
 		if err != nil {
 			b.Fatal(err)
 		}
-		if _, ok := a.Waivers(""); !ok {
+		if _, ok := a.Waivers("", ""); !ok {
 			b.Fatal("no team")
 		}
 	}

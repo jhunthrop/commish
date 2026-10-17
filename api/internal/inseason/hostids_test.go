@@ -75,7 +75,7 @@ func mustConfig(t *testing.T) []draft.SlotConfig {
 // ESPN does not name carries none, so its Add stays the host's page.
 func TestESPNWaiverAddsCarryTheirHostIDs(t *testing.T) {
 	f := espnFixture(t)
-	out, ok := newFixtureAdvisor(t, f, nil).Waivers("")
+	out, ok := newFixtureAdvisor(t, f, nil).Waivers("", "")
 	if !ok || len(out.Rows) == 0 {
 		t.Fatal("no waiver rows")
 	}
@@ -90,7 +90,7 @@ func TestESPNWaiverAddsCarryTheirHostIDs(t *testing.T) {
 			t.Fatalf("%s: host id %q, board id %q", row.Add.Player.Name, row.Add.Player.HostId, *row.Add.Player.BoardId)
 		}
 	}
-	defenses, _ := newFixtureAdvisor(t, f, nil).Waivers(draft.DEF)
+	defenses, _ := newFixtureAdvisor(t, f, nil).Waivers(draft.DEF, "")
 	ids := map[string]string{}
 	for _, row := range defenses.Rows {
 		ids[*row.Add.Player.BoardId] = row.Add.Player.HostId
@@ -100,7 +100,7 @@ func TestESPNWaiverAddsCarryTheirHostIDs(t *testing.T) {
 	}
 	// Another host's adds name no host id: their verb is the host's page.
 	f.league.Snap.Ref.Host = leaguesync.HostSleeper
-	sleeper, _ := newFixtureAdvisor(t, f, nil).Waivers("")
+	sleeper, _ := newFixtureAdvisor(t, f, nil).Waivers("", "")
 	for _, row := range sleeper.Rows {
 		if row.Add.Player.HostId != "" {
 			t.Fatalf("a Sleeper add with host id %q", row.Add.Player.HostId)

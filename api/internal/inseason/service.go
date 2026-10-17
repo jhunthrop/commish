@@ -65,8 +65,11 @@ type Service struct {
 	Moves   Moves
 	// Weeks lists the account's leagues for GET /me/week, nil answers none.
 	Weeks Weeks
-	// Boards values our board for the public player read (PublicSettings).
+	// Boards values our board for the reads with no league: the public player read and the public
+	// order (PublicSettings).
 	Boards BoardSource
+	// targets keeps the trade finder's targets per league read (order.go).
+	targets targetCache
 	// Season is the season GET /games/week reads, the board's.
 	Season int
 	Now    func() time.Time
@@ -83,6 +86,8 @@ func (s *Service) Routes() []httpx.Route {
 		{Method: http.MethodGet, Path: "/leagues/attached/{id}/waivers", Access: httpx.SignedIn, Limit: limit, Handler: s.waivers},
 		{Method: http.MethodGet, Path: "/leagues/attached/{id}/trades", Access: httpx.SignedIn, Limit: limit, Handler: s.trades},
 		{Method: http.MethodPost, Path: "/leagues/attached/{id}/trades/check", Access: httpx.SignedIn, Limit: limit, Handler: s.checkTrade},
+		{Method: http.MethodGet, Path: "/leagues/attached/{id}/order", Access: httpx.SignedIn, Limit: limit, Handler: s.leagueOrder},
+		{Method: http.MethodGet, Path: "/order", Access: httpx.Public, Limit: limit, Handler: s.publicOrder},
 		{Method: http.MethodGet, Path: "/games/week", Access: httpx.Public, Limit: limit, Handler: s.weekGames},
 		{Method: http.MethodGet, Path: "/me/week", Access: httpx.SignedIn, Limit: limit, Handler: s.week},
 		{Method: http.MethodGet, Path: "/players/{player}/week", Access: httpx.Public, Limit: limit, Handler: s.playerWeek},
@@ -194,11 +199,16 @@ func (s *Service) waivers(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteInvalid(w, r, map[string]string{fieldPosition: positionWords})
 		return
 	}
+	asked := r.URL.Query().Get(fieldPlayer)
+	if len(asked) > maxPlayerParam {
+		httpx.WriteInvalid(w, r, map[string]string{fieldPlayer: playerWords})
+		return
+	}
 	a, ok := s.advisorFor(w, r)
 	if !ok {
 		return
 	}
-	out, ok := a.Waivers(position)
+	out, ok := a.Waivers(position, asked)
 	if ok && s.Moves != nil {
 		// A failed check fails closed, as the lineup's does.
 		moves, err := s.Moves.ClaimMove(r.Context(), auth.AccountID(r), a.Snap.Ref.Host)

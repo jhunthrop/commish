@@ -401,6 +401,8 @@ export interface paths {
 			query?: {
 				/** @description only candidates at this position */
 				position?: 'QB' | 'RB' | 'WR' | 'TE' | 'K' | 'DEF';
+				/** @description a player a link named (his board id): his row is kept on the page past its first 60, so an add from the order or the player card lands on him; an id not among the adds changes nothing */
+				player?: string;
 			};
 			header?: never;
 			path: {
@@ -411,6 +413,35 @@ export interface paths {
 		};
 		/** Waivers: the unrostered players on our board ranked by the gain to the drafter's lineup, each with the drop it costs least to lose. A player tagged Hold on the drafter's sheets is never the drop. We submit nothing. */
 		get: operations['leagueWaivers'];
+		put?: never;
+		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/leagues/attached/{id}/order': {
+		parameters: {
+			query?: {
+				/** @description only players at this position; without it every position, ranked by points over replacement. Kickers and defenses are not on the order, as the in-season table carries none */
+				position?: 'QB' | 'RB' | 'WR' | 'TE';
+				/** @description only players whose name or club holds these letters, any case */
+				q?: string;
+				/** @description at most this many rows, 100 without it */
+				limit?: number;
+				/** @description only the free players, or only the drafter's own; total and the limit count after it */
+				roster?: 'free' | 'yours';
+			};
+			header?: never;
+			path: {
+				/** @description the attached league's id (AttachedLeague.id) */
+				id: string;
+			};
+			cookie?: never;
+		};
+		/** The Rest of season screen for the drafter's league: our rest-of-season order valued for the league, each player with his week, whose roster holds him and the one move his row admits (add a free player the league starts, trade for one the trade finder's best trade with his team brings in). We submit nothing. */
+		get: operations['leagueOrder'];
 		put?: never;
 		post?: never;
 		delete?: never;
@@ -1009,6 +1040,30 @@ export interface paths {
 		};
 		/** The board a room drafts from in a scoring format, valued for 12 teams on the standard roster: the setup page's player list for keepers. A room values its own league. Each player carries his designation on the newest hourly injury capture, and a player on a season-long list follows the available players at his position. */
 		get: operations['roomBoard'];
+		put?: never;
+		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/order': {
+		parameters: {
+			query?: {
+				/** @description only players at this position; without it every position, ranked by points over replacement. Kickers and defenses are not on the order, as the in-season table carries none */
+				position?: 'QB' | 'RB' | 'WR' | 'TE';
+				/** @description only players whose name or club holds these letters, any case */
+				q?: string;
+				/** @description at most this many rows, 100 without it */
+				limit?: number;
+			};
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		/** Our rest-of-season order for a 12-team PPR league with no league of the reader's own, every QB, RB, WR and TE our board places with his week: the Rest of season and Players screens signed out. Rows carry no roster and no move. */
+		get: operations['order'];
 		put?: never;
 		post?: never;
 		delete?: never;
@@ -3253,6 +3308,72 @@ export interface components {
 			clears: string | null;
 			sentence: string;
 		};
+		OrderAdvice: {
+			/** @description the week the rows' Game cell and Proj are for */
+			week: number;
+			/** @description what the order and its two figures are, said once under the rows */
+			basis: string;
+			/** @description the league the points over replacement are for (a 12-team PPR league for a reader with none of their own), and the rules it scores that the season's points (Avg and Last) leave out */
+			basis_note: string;
+			order_basis: components['schemas']['OrderBasis'];
+			/**
+			 * Format: date-time
+			 * @description when the order was made
+			 */
+			refreshed: string;
+			/** @description the first week the rest-of-season order covers, null on the preseason order */
+			from_week: number | null;
+			/**
+			 * Format: date-time
+			 * @description when the league was read from its platform, null without a league
+			 */
+			read_at: string | null;
+			/**
+			 * Format: date-time
+			 * @description when the week's published projection was read, null when none is stored
+			 */
+			projection_read_at: string | null;
+			projection_scoring: components['schemas']['ProjectionScoring'];
+			/**
+			 * @description the key the rows' rank sorts on, the figure a screen shows first: the rest-of-season total at a position, points over replacement across positions
+			 * @enum {string}
+			 */
+			rank_by: 'rest_of_season_points' | 'points_over_replacement';
+			/** @description the claim's moves on the league's platform, the Waivers screen's verb rule for an add; null without a league */
+			moves: components['schemas']['WaiverMoves'] | null;
+			/** @description every player the view holds before the limit */
+			total: number;
+			/** @description in our order, at most the limit */
+			rows: components['schemas']['OrderRow'][];
+		};
+		OrderRow: {
+			line: components['schemas']['PlayerLine'];
+			/** @description his place in our order for this view: at a position his position rank (by his rest-of-season total, which orders the same as points over replacement there), across every position his place by points over replacement */
+			rank: number;
+			/**
+			 * Format: double
+			 * @description the order's key, one decimal: his rest-of-season points over the games his club has left from the order's first week through week 17, byes out; null on the preseason order and without a projection
+			 */
+			rest_of_season_points: number | null;
+			/**
+			 * Format: double
+			 * @description the key across positions, one decimal: his points over replacement for the league over the weeks the order covers; null at a position the league starts nobody at
+			 */
+			points_over_replacement: number | null;
+			/** @description whose roster in the league holds him, null without a league */
+			roster: components['schemas']['RosterMark'] | null;
+			/**
+			 * @description the one move his row admits: add for a player no roster holds at a position the league starts, trade for a player on another roster whom the trade finder's best trade with his team brings in for the drafter, null otherwise (and always for the drafter's own players)
+			 * @enum {string|null}
+			 */
+			move: 'add' | 'trade' | null;
+		};
+		RosterMark: {
+			/** @enum {string} */
+			kind: 'yours' | 'free' | 'team';
+			/** @description the holding team's name when kind is team */
+			team: string | null;
+		};
 		WaiverAdvice: {
 			week: number;
 			/**
@@ -3997,6 +4118,15 @@ export interface components {
 				};
 			};
 		};
+		/** @description our rest-of-season order with each player's week */
+		OrderAdviceResponse: {
+			headers: Record<string, unknown>;
+			content: {
+				'application/json': components['schemas']['Envelope'] & {
+					data?: components['schemas']['OrderAdvice'];
+				};
+			};
+		};
 		/** @description the waiver pool ranked by the gain to the drafter's lineup */
 		WaiverAdviceResponse: {
 			headers: Record<string, unknown>;
@@ -4577,6 +4707,8 @@ export interface operations {
 			query?: {
 				/** @description only candidates at this position */
 				position?: 'QB' | 'RB' | 'WR' | 'TE' | 'K' | 'DEF';
+				/** @description a player a link named (his board id): his row is kept on the page past its first 60, so an add from the order or the player card lands on him; an id not among the adds changes nothing */
+				player?: string;
 			};
 			header?: never;
 			path: {
@@ -4588,6 +4720,35 @@ export interface operations {
 		requestBody?: never;
 		responses: {
 			200: components['responses']['WaiverAdviceResponse'];
+			400: components['responses']['ErrorResponse'];
+			404: components['responses']['ErrorResponse'];
+			409: components['responses']['ErrorResponse'];
+			422: components['responses']['ErrorResponse'];
+			502: components['responses']['ErrorResponse'];
+		};
+	};
+	leagueOrder: {
+		parameters: {
+			query?: {
+				/** @description only players at this position; without it every position, ranked by points over replacement. Kickers and defenses are not on the order, as the in-season table carries none */
+				position?: 'QB' | 'RB' | 'WR' | 'TE';
+				/** @description only players whose name or club holds these letters, any case */
+				q?: string;
+				/** @description at most this many rows, 100 without it */
+				limit?: number;
+				/** @description only the free players, or only the drafter's own; total and the limit count after it */
+				roster?: 'free' | 'yours';
+			};
+			header?: never;
+			path: {
+				/** @description the attached league's id (AttachedLeague.id) */
+				id: string;
+			};
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			200: components['responses']['OrderAdviceResponse'];
 			400: components['responses']['ErrorResponse'];
 			404: components['responses']['ErrorResponse'];
 			409: components['responses']['ErrorResponse'];
@@ -5350,6 +5511,26 @@ export interface operations {
 					};
 				};
 			};
+			400: components['responses']['ErrorResponse'];
+		};
+	};
+	order: {
+		parameters: {
+			query?: {
+				/** @description only players at this position; without it every position, ranked by points over replacement. Kickers and defenses are not on the order, as the in-season table carries none */
+				position?: 'QB' | 'RB' | 'WR' | 'TE';
+				/** @description only players whose name or club holds these letters, any case */
+				q?: string;
+				/** @description at most this many rows, 100 without it */
+				limit?: number;
+			};
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			200: components['responses']['OrderAdviceResponse'];
 			400: components['responses']['ErrorResponse'];
 		};
 	};

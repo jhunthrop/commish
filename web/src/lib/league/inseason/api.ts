@@ -61,8 +61,10 @@ export const inSeasonApi = {
 	matchup: (id: string) => client.call<MatchupBox>(path(id, 'matchup')),
 	/** Every game of the week: each side's points, its starters' projection and the game's state. */
 	scoreboard: (id: string) => client.call<Scoreboard>(path(id, 'scoreboard')),
-	waivers: (id: string, position: WaiverPosition | null = null) =>
-		client.call<WaiverAdvice>(path(id, 'waivers', { position })),
+	/** The adds, at one position when given, keeping the asked player's row (his board id) past the
+	 * first page when given (review 66j N2). */
+	waivers: (id: string, position: WaiverPosition | null = null, player: string | null = null) =>
+		client.call<WaiverAdvice>(path(id, 'waivers', { position, player })),
 	/** The trades, narrowed to those holding one player when given (his board id). */
 	trades: (id: string, player: string | null = null) =>
 		client.call<TradeAdvice>(path(id, 'trades', { player })),

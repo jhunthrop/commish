@@ -1,27 +1,19 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
-	import { links } from '#lib/site/links.ts';
-	import ClubMark from '#lib/ui/ClubMark.svelte';
-	import Face from '#lib/ui/Face.svelte';
-	import NameWords from '#lib/ui/NameWords.svelte';
-	import StatusPill from '../StatusPill.svelte';
-	import { HELD } from '../inseason/words.ts';
-	import { tagMarks } from '#lib/sheet/tags.ts';
-	import TagChip from '#lib/ui/TagChip.svelte';
 	import Icon from '#lib/ui/Icon.svelte';
 	import {
 		BOX,
 		boxNumber,
 		deltaWord,
 		easeOf,
-		initialName,
 		oppRankWord,
 		type BoxPick,
 		type BoxRow
 	} from './box.ts';
 	import type { Move } from './lineup.ts';
 	import MoveMark from './MoveMark.svelte';
-	import WeatherGlyph from './WeatherGlyph.svelte';
+	import BoxGame from './BoxGame.svelte';
+	import BoxPlayer from './BoxPlayer.svelte';
 
 	/** One player's row of a box score: the slot, his face (a defense's club mark), his name on a line
 	 * of its own, under it his club and Lane 63's status pill (his position and rank, and his status
@@ -99,32 +91,6 @@
 	);
 </script>
 
-{#snippet named()}
-	{#if shortOnPhone}<span class="full"><NameWords name={row.name} /></span><span class="short"
-			>{initialName(row.name)}</span
-		>{:else}<NameWords name={row.name} />{/if}
-{/snippet}
-
-{#snippet game()}
-	{#if row.game === 'bye'}
-		<span class="bye">{BOX.bye}</span>{#if clears}<span class="clears">{clears}</span>{/if}
-	{:else if row.game}
-		<span class="opp"
-			><b>{row.game.where}</b> <span>{row.game.when}</span>{#if clears}<span class="clears"
-					>{clears}</span
-				>{/if}</span
-		>
-	{/if}
-	{#if row.expected !== null || row.weather !== null}
-		<span class="facts">
-			{#if row.expected}<span class="exp">{row.expected}</span>{/if}
-			{#if row.weather}<span class="wx"
-					><WeatherGlyph glyph={row.weather.glyph} />{row.weather.words}</span
-				>{/if}
-		</span>
-	{/if}
-{/snippet}
-
 {#snippet seasonLine()}
 	<!-- The separators are expressions, so the template's own line breaks add no space (review L7). -->
 	<span class="phone-ev"
@@ -174,44 +140,11 @@
 		>
 	{/if}
 	<td class="player">
-		<span class="pl">
-			{#if row.face.mark && row.face.src !== null}
-				<ClubMark src={row.face.src} alt={row.face.alt} size={32} />
-			{:else}
-				<Face src={row.face.src} name={row.name} size={32} />
-			{/if}
-			<span class="who">
-				<span class="nm">
-					{#if row.slug !== null}
-						<a href={links.playerSeason(row.slug)}>{@render named()}</a>
-					{:else}
-						<b>{@render named()}</b>
-					{/if}
-				</span>
-				<span class="club"
-					><span>{row.club}</span>{#if row.pill}<StatusPill
-							position={row.pill.position}
-							positionRank={row.pill.rank ?? undefined}
-							status={row.status}
-						/>{/if}</span
-				>
-				{#if tags.length > 0 || row.held}
-					<!-- Held is the sheet's Hold tag, said by the API: drawn when the sheet's own tags are not in. -->
-					<span class="tags"
-						>{#if row.held && tags.length === 0}<TagChip
-								label={HELD}
-							/>{/if}{#each tagMarks(tags) as mark (mark.label)}<TagChip
-								label={mark.label}
-								tone={mark.tone}
-							/>{/each}</span
-					>
-				{/if}
-				<span class="phone-game">{@render game()}</span>
-				{#if evidence}{@render seasonLine()}{/if}
-			</span>
-		</span>
+		<BoxPlayer {row} {tags} {shortOnPhone} {compact} {clears}
+			>{#if evidence}{@render seasonLine()}{/if}</BoxPlayer
+		>
 	</td>
-	{#if !compact}<td class="game">{@render game()}</td>{/if}
+	{#if !compact}<td class="game"><BoxGame {row} {clears} /></td>{/if}
 	<td class="n proj">{boxNumber(row.proj)}</td>
 	{#if ptsCell && !compact}<td class="n pts" class:none={row.pts === null}>{boxNumber(row.pts)}</td
 		>{/if}
@@ -291,16 +224,6 @@
 
 	.nested.moved-in td {
 		background: color-mix(in srgb, var(--accent) 10%, var(--surface-2));
-	}
-
-	.clears {
-		margin-left: 4px;
-		padding: 0 5px;
-		border-radius: var(--r-sm);
-		background: var(--surface-2);
-		color: var(--ink-2);
-		font-size: var(--t-xs);
-		font-weight: 600;
 	}
 
 	.idle td {
@@ -396,111 +319,8 @@
 		white-space: nowrap;
 	}
 
-	.pl {
-		display: flex;
-		align-items: center;
-		gap: var(--s-2);
-		min-width: 0;
-	}
-
-	.who {
-		display: flex;
-		flex-direction: column;
-		gap: 1px;
-		min-width: 0;
-	}
-
-	.nm {
-		display: flex;
-		flex-wrap: wrap;
-		align-items: center;
-		column-gap: 6px;
-		row-gap: 2px;
-	}
-
-	.nm a,
-	.nm b {
-		font-weight: 600;
-		color: var(--ink);
-		text-decoration: none;
-	}
-
-	.nm a:hover {
-		text-decoration: underline;
-	}
-
-	.tags {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 4px;
-	}
-
-	.club {
-		display: flex;
-		flex-wrap: wrap;
-		align-items: center;
-		gap: 6px;
-		font-size: var(--t-xs);
-		font-weight: 500;
-		letter-spacing: 0.03em;
-		color: var(--ink-3);
-	}
-
 	.game {
 		font-size: var(--t-sm);
-	}
-
-	.opp {
-		display: flex;
-		gap: 4px;
-		white-space: nowrap;
-	}
-
-	.opp b {
-		font-weight: 600;
-	}
-
-	.opp span {
-		color: var(--ink-2);
-		font-variant-numeric: tabular-nums;
-	}
-
-	.facts {
-		display: flex;
-		align-items: center;
-		gap: var(--s-2);
-		font-size: var(--t-xs);
-		color: var(--ink-3);
-		white-space: nowrap;
-		font-variant-numeric: tabular-nums;
-	}
-
-	.exp {
-		font-family: var(--font-num);
-		font-size: var(--t-sm);
-		font-weight: 600;
-		letter-spacing: 0.02em;
-		color: var(--ink-2);
-	}
-
-	.wx {
-		display: inline-flex;
-		align-items: center;
-		gap: 3px;
-	}
-
-	.bye {
-		display: inline-flex;
-		align-items: center;
-		height: 20px;
-		padding: 0 var(--s-2);
-		border-radius: var(--r-sm);
-		background: var(--surface-2);
-		color: var(--ink-2);
-		font-size: var(--t-xs);
-		font-weight: 700;
-		text-transform: uppercase;
-		letter-spacing: var(--track-label);
 	}
 
 	.n {
@@ -536,27 +356,6 @@
 
 	.bench .pts {
 		font-size: var(--t-md);
-	}
-
-	.short {
-		display: none;
-	}
-
-	.phone-game {
-		display: none;
-	}
-
-	/* The trade builder's rows (Lane 66g): the game under the name at every width, a tick first. */
-	.compact .phone-game {
-		display: flex;
-		flex-direction: column;
-		gap: 1px;
-		font-size: var(--t-xs);
-		color: var(--ink-2);
-	}
-
-	.compact .phone-game .facts {
-		display: none;
 	}
 
 	.season {
@@ -651,36 +450,8 @@
 			overflow: hidden;
 		}
 
-		.game > * {
+		td.game > :global(*) {
 			display: none;
-		}
-
-		/* A name's short form on a phone, where the row asks for it. */
-		.full {
-			display: none;
-		}
-
-		.short {
-			display: inline;
-			white-space: nowrap;
-		}
-
-		.phone-game {
-			display: flex;
-			flex-direction: column;
-			gap: 1px;
-			font-size: var(--t-xs);
-			color: var(--ink-2);
-		}
-
-		.phone-game .facts {
-			flex-wrap: wrap;
-			white-space: normal;
-			column-gap: var(--s-1);
-		}
-
-		.phone-game .exp {
-			font-size: var(--t-xs);
 		}
 
 		.proj,

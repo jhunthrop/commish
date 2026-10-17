@@ -27,6 +27,9 @@ import type {
 	WaiverAdvice
 } from '../../src/lib/league/inseason/api.ts';
 import type { components } from '../../src/lib/api/types.ts';
+
+type OrderAdvice = components['schemas']['OrderAdvice'];
+type OrderRow = components['schemas']['OrderRow'];
 import type { GameWeek } from '../../src/lib/format/game-facts.ts';
 import { FIXTURE_IDS } from './ids.ts';
 import { playerWeek, type Sheet } from './player-week.ts';
@@ -98,7 +101,7 @@ async function load<T>(name: string): Promise<T> {
 
 /** Lane 72's recorded week sheets, the player card's line for those players (player-week.ts). */
 const { players: sheets } = await load<{ players: Record<string, Sheet> }>('week-sheets');
-const [sync, lineup, waivers, trades, gameWeek, matchupBox, scoreboard, scoreboardLive] =
+const [sync, lineup, waivers, trades, gameWeek, matchupBox, scoreboard, scoreboardLive, order] =
 	await Promise.all([
 		load<LeagueSync>('sync'),
 		load<LineupAdvice>('lineup'),
@@ -107,7 +110,8 @@ const [sync, lineup, waivers, trades, gameWeek, matchupBox, scoreboard, scoreboa
 		load<GameWeek>('games'),
 		load<MatchupBox>('matchup'),
 		load<Scoreboard>('scoreboard'),
-		load<Scoreboard>('scoreboard-live')
+		load<Scoreboard>('scoreboard-live'),
+		load<OrderAdvice>('order')
 	]);
 
 const myTeam = sync.teams.find((t) => t.roster_id === sync.me);
@@ -580,6 +584,49 @@ async function bodyOf(req: IncomingMessage): Promise<unknown> {
 	return text === '' ? null : (JSON.parse(text) as unknown);
 }
 const SYNC = /^\/leagues\/attached\/([^/]+)\/(sync|refresh)$/;
+const LEAGUE_ORDER = /^\/leagues\/attached\/([^/]+)\/order$/;
+const DEFAULT_ORDER_ROWS = 100;
+const MIN_SEARCH = 2;
+
+/** The order's view as the API answers it (order.ts): one position ranked by its total (a stand-in
+ * place: the fixture's own order of its stand-in totals, 1 to n among the players it holds), or every
+ * position in order.json's order; a search's letters in the name or club;
+ * the limit. Without a league the rows carry no roster and no move, and no read. */
+function orderAt(params: URLSearchParams, league: boolean): OrderAdvice {
+	const position = params.get('position');
+	const q = (params.get('q') ?? '').trim().toLowerCase();
+	const limit = Number(params.get('limit') ?? DEFAULT_ORDER_ROWS);
+	const ranked: OrderRow[] =
+		position === null
+			? order.rows
+			: order.rows
+					.filter((row) => row.line.player.position === position)
+					.sort(
+						(a, b) =>
+							(b.rest_of_season_points ?? Number.NEGATIVE_INFINITY) -
+							(a.rest_of_season_points ?? Number.NEGATIVE_INFINITY)
+					)
+					.map((row, i) => ({ ...row, rank: i + 1 }));
+	const roster = params.get('roster');
+	const found = ranked.filter(
+		(row) =>
+			(roster === null || row.roster?.kind === roster) &&
+			(q.length < MIN_SEARCH ||
+				row.line.player.name.toLowerCase().includes(q) ||
+				row.line.player.team.toLowerCase().includes(q))
+	);
+	const rows = found
+		.slice(0, limit)
+		.map((row) => (league ? row : { ...row, roster: null, move: null }));
+	return {
+		...order,
+		read_at: league ? readAt() : null,
+		moves: league ? order.moves : null,
+		rank_by: position === null ? 'points_over_replacement' : 'rest_of_season_points',
+		total: found.length,
+		rows
+	};
+}
 
 async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> {
 	const url = new URL(req.url ?? '/', `http://localhost:${String(PORT)}`);
@@ -708,6 +755,14 @@ async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> 
 		const checked = tradeCheck((await bodyOf(req)) as TradeCheckInput);
 		if (typeof checked === 'string') send(req, res, HTTP.unprocessable, checked, 'invalid');
 		else send(req, res, HTTP.ok, checked);
+		return;
+	}
+	if (url.pathname === '/order') {
+		send(req, res, HTTP.ok, orderAt(url.searchParams, false));
+		return;
+	}
+	if (LEAGUE_ORDER.test(url.pathname)) {
+		send(req, res, HTTP.ok, orderAt(url.searchParams, true));
 		return;
 	}
 	const recorded = { sync, lineup, waivers, trades, matchup: matchupBox, games: gameWeek, sheets };

@@ -512,6 +512,7 @@ function seasonWeeks(
 				status: 'frozen',
 				frozenAt: row.frozen_at.toISOString(),
 				frozenBy: runIdOf(row.board_as_of),
+				order: 'preseason',
 				...empty
 			};
 		}
@@ -522,13 +523,14 @@ function seasonWeeks(
 				status: 'missed',
 				frozenAt: null,
 				frozenBy: null,
+				order: null,
 				...empty,
 				note: MISSED_WEEK_NOTE
 			};
 		}
 		// The next week names its first kickoff, the day it freezes by.
 		const frozenAt = week === next ? kickoff.toISOString() : null;
-		return { week, status: 'upcoming', frozenAt, frozenBy: null, ...empty };
+		return { week, status: 'upcoming', frozenAt, frozenBy: null, order: null, ...empty };
 	});
 }
 
@@ -554,9 +556,13 @@ async function recordFrom(
 		format: FORMAT.id,
 		// The register's own rules (research-ts/src/projections/register/grade.ts), in drafter words:
 		// the agreement is Spearman's rank correlation, the places off the mean distance in places.
-		statistic: { agreement: 'agreement with the finish', placesOff: 'places off, typical player' },
+		statistic: { agreement: 'order matched', placesOff: 'places off', starters: 'starters right' },
+		scale: "1.0 is a perfect match of the week's finishing order, 0 is none.",
+		startersBasis: null,
 		method:
 			'Each week our PPR board is frozen before the first kickoff and graded after the games against how its players finished, with ADP graded the same way on the same players.',
+		publishedFromWeek: null,
+		honest: null,
 		weeks: seasonWeeks(frozen, games, now),
 		toDate: []
 	};
