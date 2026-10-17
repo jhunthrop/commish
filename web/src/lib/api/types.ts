@@ -419,7 +419,7 @@ export interface paths {
 			};
 			cookie?: never;
 		};
-		/** The Rest of season screen for the drafter's league: our rest-of-season order valued for the league, each player with his week, whose roster holds him and the one move his row admits (add a free player the league starts, trade for one the trade finder would bring in). We submit nothing. */
+		/** The Rest of season screen for the drafter's league: our rest-of-season order valued for the league, each player with his week, whose roster holds him and the one move his row admits (add a free player the league starts, trade for one the trade finder's best trade with his team brings in). We submit nothing. */
 		get: operations['leagueOrder'];
 		put?: never;
 		post?: never;
@@ -3115,7 +3115,7 @@ export interface components {
 			/** @description whose roster in the league holds him, null without a league */
 			roster: components['schemas']['RosterMark'] | null;
 			/**
-			 * @description the one move his row admits: add for a player no roster holds at a position the league starts, trade for a player on another roster whom the trade finder brings in for the drafter, null otherwise (and always for the drafter's own players)
+			 * @description the one move his row admits: add for a player no roster holds at a position the league starts, trade for a player on another roster whom the trade finder's best trade with his team brings in for the drafter, null otherwise (and always for the drafter's own players)
 			 * @enum {string|null}
 			 */
 			move: 'add' | 'trade' | null;

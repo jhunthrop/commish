@@ -41,12 +41,13 @@ const FORM_PARTS =
  * account's leagues and the attach page run: the league row, the board read, the league's words and
  * calls, the in-season screens, the season's words, the member's clock and the rail's order a
  * league's tabs read, the switch's choice made on opening a league, and the box score's parts with
- * the club's mark and nickname (Lane 66d, the mark shared with the draft room). Four league pages
+ * the club's mark and nickname (Lane 66d, the mark shared with the draft room), and the order's
+ * screens the board and Players pages load after their first paint (Lane 66j). Four league pages
  * share them, so they are kept out of the shared chunk by name, and the bundler splits them among
  * the pages that load them. (A group of their own would pull in everything they import, the API
  * client too, and land it on every page that reads the API.) */
 const LEAGUE_PAGE_PARTS =
-	/[\\/]src[\\/]lib[\\/](league[\\/](LeagueRow|board|model|api|follow-switch\.svelte|phase-words|sheet-tags)\.|league[\\/](inseason|box)[\\/]|context[\\/]choose\.svelte\.|format[\\/](clock|clubs)\.|ui[\\/](rail-order|club-mark|ClubMark)\.)/;
+	/[\\/]src[\\/]lib[\\/](league[\\/](LeagueRow|board|model|api|follow-switch\.svelte|phase-words|sheet-tags)\.|league[\\/](inseason|box)[\\/]|order[\\/]|context[\\/]choose\.svelte\.|format[\\/](clock|clubs)\.|ui[\\/](rail-order|club-mark|ClubMark)\.)/;
 /** A player's injury status in words on the member's clock (Lane 63): the designation's words, which
  * the league's screens import and the board, player and record pages load after their first paint.
  * Kept out of the shared chunk by name, as the league's parts are. */
@@ -55,6 +56,12 @@ const LEAGUE_PAGE_PARTS =
  * neither the shared chunk nor a page's group carries it for the others. */
 const LIVE_STATUS = /[\\/]src[\\/]lib[\\/]run[\\/]live-status\./;
 const STATUS_PARTS = /[\\/]src[\\/]lib[\\/](format[\\/]designation\.|run[\\/]status-view\.)/;
+/** A player's week in words (the game's facts, the member's clock, a designation and the held places
+ * a status sets): the player page draws them on its first paint, and the Rest of season and Players
+ * screens after theirs (Lane 66j). A file of their own, without the modules they import, so loading
+ * the order's screens never hoists them into the shared chunk every page carries. */
+const WEEK_PARTS =
+	/[\\/]src[\\/]lib[\\/](format[\\/](game-facts|clock|designation)\.|run[\\/](held-places|board-status)\.)/;
 /** A component joins the shared chunk once this many routes use it. Fewer, and every page would
  * carry code only a couple of pages run. */
 const SHARED_BY_ROUTES = 4;
@@ -106,6 +113,7 @@ export default defineConfig({
 								!FIGURE_PARTS.test(id) &&
 								!STATUS_PARTS.test(id) &&
 								!LIVE_STATUS.test(id) &&
+								!WEEK_PARTS.test(id) &&
 								!LEAGUE_PAGE_PARTS.test(id),
 							minShareCount: SHARED_BY_ROUTES,
 							priority: 1
@@ -115,7 +123,14 @@ export default defineConfig({
 						{ name: 'player', test: PLAYER_PARTS, minShareCount: 2, priority: 1 },
 						{ name: 'figure', test: FIGURE_PARTS, minShareCount: 2, priority: 1 },
 						{ name: 'forms', test: FORM_PARTS, minShareCount: 2, priority: 1 },
-						{ name: 'live', test: LIVE_STATUS, minShareCount: 2, priority: 2 }
+						{ name: 'live', test: LIVE_STATUS, minShareCount: 2, priority: 2 },
+						{
+							name: 'week',
+							test: WEEK_PARTS,
+							minShareCount: 2,
+							priority: 2,
+							includeDependenciesRecursively: false
+						}
 					]
 				}
 			}

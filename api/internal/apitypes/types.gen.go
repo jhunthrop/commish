@@ -2927,7 +2927,7 @@ type OrderBasis string
 type OrderRow struct {
 	Line PlayerLine `json:"line"`
 
-	// Move the one move his row admits: add for a player no roster holds at a position the league starts, trade for a player on another roster whom the trade finder brings in for the drafter, null otherwise (and always for the drafter's own players)
+	// Move the one move his row admits: add for a player no roster holds at a position the league starts, trade for a player on another roster whom the trade finder's best trade with his team brings in for the drafter, null otherwise (and always for the drafter's own players)
 	Move *OrderRowMove `json:"move"`
 
 	// Rank his place in our order for this view: at a position his position rank (by his rest-of-season total, which orders the same as points over replacement there), across every position his place by points over replacement, a kicker or defense after every projected player in the order drafters take them
@@ -2940,7 +2940,7 @@ type OrderRow struct {
 	Roster *RosterMark `json:"roster"`
 }
 
-// OrderRowMove the one move his row admits: add for a player no roster holds at a position the league starts, trade for a player on another roster whom the trade finder brings in for the drafter, null otherwise (and always for the drafter's own players)
+// OrderRowMove the one move his row admits: add for a player no roster holds at a position the league starts, trade for a player on another roster whom the trade finder's best trade with his team brings in for the drafter, null otherwise (and always for the drafter's own players)
 type OrderRowMove string
 
 // OutcomeRange defines model for OutcomeRange.

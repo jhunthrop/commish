@@ -140,9 +140,15 @@ func (a *advisor) hostIDs() map[string]string {
 	return out
 }
 
+// targetsPerTeam is how many of the finder's trades with each team name
+// their players as targets: its best one, the trade the Trades screen leads
+// with for that team (the coordinator's ruling 3: Trade for him on the rows
+// the finder would admit, never on most of the order).
+const targetsPerTeam = 1
+
 // tradeTargets is every board id the trade finder brings in for the
-// drafter from another roster: the players its best trades with each team
-// get. Empty when the drafter's team is not in the read.
+// drafter from another roster: the players its best trade with each team
+// gets. Empty when the drafter's team is not in the read.
 func (a *advisor) tradeTargets() map[string]bool {
 	out := map[string]bool{}
 	team, ok := a.Snap.TeamByRoster(a.Me)
@@ -155,7 +161,7 @@ func (a *advisor) tradeTargets() map[string]bool {
 			continue
 		}
 		theirs := a.active(t)
-		for _, tr := range Trades(a.config, a.weeks, squad, a.squad(theirs, false), "", TradesPerTeam) {
+		for _, tr := range Trades(a.config, a.weeks, squad, a.squad(theirs, false), "", targetsPerTeam) {
 			for _, i := range tr.Get {
 				if id := theirs[i].line.Player.BoardId; id != nil {
 					out[*id] = true
