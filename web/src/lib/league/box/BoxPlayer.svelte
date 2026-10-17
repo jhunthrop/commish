@@ -24,13 +24,23 @@
 		shortOnPhone?: boolean;
 		/** The trade builder's rows (Lane 66g): the game under the name at every width, without facts. */
 		compact?: boolean;
+		/** "Clears Wed" in the folded game, where the platform says it (Lane 66f). */
+		clears?: string | null;
 		/** Drawn on the club line after the pill. */
 		after?: Snippet;
 		/** The screen's own line under the name, as the phone and narrow screens fold it. */
 		children?: Snippet;
 	}
 
-	let { row, tags = [], shortOnPhone = false, compact = false, after, children }: Props = $props();
+	let {
+		row,
+		tags = [],
+		shortOnPhone = false,
+		compact = false,
+		clears = null,
+		after,
+		children
+	}: Props = $props();
 </script>
 
 {#snippet named()}
@@ -71,7 +81,7 @@
 					/>{/each}</span
 			>
 		{/if}
-		<span class="phone-game" class:compact><BoxGame {row} facts={!compact} /></span>
+		<span class="phone-game" class:compact><BoxGame {row} facts={!compact} {clears} /></span>
 		{@render children?.()}
 	</span>
 </span>

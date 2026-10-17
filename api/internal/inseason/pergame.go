@@ -53,15 +53,38 @@ func carriesPerGame(b boards.Board) bool {
 // the page's players carries it: a board that could carry it but whose
 // rows do not (no game read from its first week) says nothing about it.
 func withPerGame(b boards.Board, basis string, people ...[]person) string {
-	if !carriesPerGame(b) {
+	if !perGameShown(b, people...) {
 		return basis
+	}
+	return basis + " " + PerGameBasis(b.FromWeek)
+}
+
+// RestOfSeasonBasis is the Waivers screen's sentence for the figure, which
+// it heads "Rest of season" (Lane 66f).
+func RestOfSeasonBasis(fromWeek int) string {
+	return fmt.Sprintf("Rest of season is his points a game on our rest-of-season projection from week %d, byes out.", fromWeek)
+}
+
+// withRestOfSeason is the Waivers screen's season line: the figure's
+// sentence first when any of its players carries it, then basis.
+func withRestOfSeason(b boards.Board, basis string, people ...[]person) string {
+	if !perGameShown(b, people...) {
+		return basis
+	}
+	return RestOfSeasonBasis(b.FromWeek) + " " + basis
+}
+
+// perGameShown is whether any of the page's players carries the figure.
+func perGameShown(b boards.Board, people ...[]person) bool {
+	if !carriesPerGame(b) {
+		return false
 	}
 	for _, side := range people {
 		for _, p := range side {
 			if p.line.RestOfSeasonPerGame != nil {
-				return basis + " " + PerGameBasis(b.FromWeek)
+				return true
 			}
 		}
 	}
-	return basis
+	return false
 }

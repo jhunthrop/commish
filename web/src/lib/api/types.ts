@@ -3059,17 +3059,64 @@ export interface components {
 			/** @description the drafter's side first, then the opponent's when the week pairs them */
 			sides: components['schemas']['MatchupBoxSide'][];
 		};
+		/** @description the member's player at his position with the lowest Proj he tops, the advised lineup's starters first, then the bench, never one who cannot play this week (Lane 66f's Beats column); or the open spot he fills, a starting spot no player of the member's can play this week */
+		WaiverBeats: {
+			/** @description he fills a starting spot no player of the member's can play this week (host_id and name empty, gain his week gain) */
+			open_spot: boolean;
+			/** @description the member's player's host id, a line in the answer's roster; empty for the open spot */
+			host_id: string;
+			/** @description empty for the open spot */
+			name: string;
+			/** @description the player he tops starts in the lineup the advice sets this week */
+			starter: boolean;
+			/**
+			 * Format: double
+			 * @description his Proj less that player's, as the screen prints them (tenths)
+			 */
+			gain: number;
+		};
+		/** @description one player of the member's an add could replace, with the lineup's gains after the swap */
+		WaiverDrop: {
+			/** @description the dropped player's host id, a line in the answer's roster */
+			host_id: string;
+			/**
+			 * Format: double
+			 * @description points over replacement a week to the lineup over the rest of the season, one decimal
+			 */
+			gain: number;
+			/**
+			 * Format: double
+			 * @description this week's Proj to the lineup the advice sets, one decimal
+			 */
+			week_gain: number;
+		};
 		WaiverRow: {
 			add: components['schemas']['PlayerLine'];
 			/** @description null when a roster spot is open or there is no move to make */
 			drop: components['schemas']['PlayerLine'] | null;
 			/**
 			 * Format: double
-			 * @description points over replacement a week to the lineup, one decimal; above 0 sits above the rule
+			 * @description points over replacement a week to the lineup over the rest of the season with the row's drop, one decimal
 			 */
 			gain: number;
-			/** @description he starts for you this week */
+			/**
+			 * Format: double
+			 * @description this week's Proj of the lineup the advice sets (the Lineup screen's rule) with him in and the row's drop out, less the lineup's without him, one decimal; 0 when he would not start
+			 */
+			week_gain: number;
+			/** @description he starts this week in the lineup the advice sets with him in (the highest Proj after designations and byes) */
 			starts: boolean;
+			/** @description a pickup worth making: he starts this week, the lineup's Proj rises, and the gain over the rest of the season is not below 0 */
+			pickup: boolean;
+			/** @description null when he tops no one of the member's at his position, has no Proj, or cannot play this week */
+			beats: components['schemas']['WaiverBeats'] | null;
+			/** @description every player he could replace, the row's drop first, then by gain; empty when a spot is open */
+			drops: components['schemas']['WaiverDrop'][];
+			/**
+			 * Format: date
+			 * @description the day a claim on him clears, from the platform (Yahoo's waiver wire); null when it does not say
+			 */
+			clears: string | null;
 			sentence: string;
 		};
 		OrderAdvice: {
@@ -3128,7 +3175,15 @@ export interface components {
 		};
 		WaiverAdvice: {
 			week: number;
+			/**
+			 * Format: double
+			 * @description this week's Proj of the lineup the advice sets with no add (the Lineup screen's Totals), one decimal, the base every week_gain counts from; null before the week's projection is read
+			 */
+			lineup_proj: number | null;
+			/** @description the pickup rule, the basis's first line */
 			basis: string;
+			/** @description what the Rest of season column and a gain over the rest of the season are, said once under the rows */
+			season_basis: string;
 			/** @description the rest of the basis, said once under the rows: the league the points over replacement are for and the league's rules points so far leave out */
 			basis_note: string;
 			order_basis: components['schemas']['OrderBasis'];
@@ -3136,10 +3191,28 @@ export interface components {
 			refreshed: string;
 			/** Format: date-time */
 			read_at: string;
-			/** @description the add that gains most */
-			best: components['schemas']['WaiverRow'] | null;
+			projection_scoring: components['schemas']['ProjectionScoring'];
+			/**
+			 * Format: date-time
+			 * @description when the week's published projection the rows' week_projection read was captured, null with none
+			 */
+			projection_read_at: string | null;
+			/**
+			 * Format: date-time
+			 * @description when the snapshot before it was captured, the read projection_delta counts from; null with none
+			 */
+			projection_previous_read_at: string | null;
+			/**
+			 * Format: double
+			 * @description this week's Proj of the lineup the advice sets with every pickup made, one decimal; lineup_proj with none; null before the week's projection is read
+			 */
+			pickups_proj: number | null;
+			/** @description the pickups worth making, chosen as a set from every add we rank, at most 3: each measured against the lineup with the ones before it made, kept only while he still starts and raises the Proj, no two taking the same player of the member's (topped or dropped); each one's week_gain is his over the ones before (the strip's cards); empty when no pickup beats the roster */
+			pickups: components['schemas']['WaiverRow'][];
 			/** @description positive gains first by gain, then the rest by points over replacement, at most 60 */
 			rows: components['schemas']['WaiverRow'][];
+			/** @description the member's active roster (injured reserve and taxi spots left out), the lines beats and drops name */
+			roster: components['schemas']['PlayerLine'][];
 			/** @description the host's waiver page, empty when we know none */
 			host_waivers_url: string;
 			/** @description one sentence under the verb when we cannot open the host's page ("Make this change on Yahoo. We cannot open that page for you yet."), null when the url opens it */
@@ -3154,6 +3227,12 @@ export interface components {
 			claim: 'available' | 'unavailable';
 			/** @description one sentence when a claim waits on the member (connect again to agree to moves), null otherwise */
 			note: string | null;
+			/** @description true where the league's platform takes a claim from our screen at all (ESPN) */
+			takes_writes: boolean;
+			/** @description true when the platform's claim switch is on for this account (HOST_WRITES_ESPN_CLAIM or its proof list) */
+			writes_on: boolean;
+			/** @description one line under the platform's waiver page verb saying why a claim is not made from here, naming the platform; null when claim is available */
+			reason: string | null;
 		};
 		TradeRecord: {
 			wins: number;

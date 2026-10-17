@@ -9,15 +9,21 @@
 		row: Pick<BoxRow, 'game' | 'expected' | 'weather'>;
 		/** The expected score and weather under the opponent; the trade builder's rows leave them out. */
 		facts?: boolean;
+		/** "Clears Wed", after the kickoff in the first line, where the platform says it (Lane 66f). */
+		clears?: string | null;
 	}
 
-	let { row, facts = true }: Props = $props();
+	let { row, facts = true, clears = null }: Props = $props();
 </script>
 
 {#if row.game === 'bye'}
-	<span class="bye">{BOX.bye}</span>
+	<span class="bye">{BOX.bye}</span>{#if clears}<span class="clears">{clears}</span>{/if}
 {:else if row.game}
-	<span class="opp"><b>{row.game.where}</b> <span>{row.game.when}</span></span>
+	<span class="opp"
+		><b>{row.game.where}</b> <span>{row.game.when}</span>{#if clears}<span class="clears"
+				>{clears}</span
+			>{/if}</span
+	>
 {/if}
 {#if facts && (row.expected !== null || row.weather !== null)}
 	<span class="facts">
@@ -66,6 +72,16 @@
 		display: inline-flex;
 		align-items: center;
 		gap: 3px;
+	}
+
+	.clears {
+		margin-left: 4px;
+		padding: 0 5px;
+		border-radius: var(--r-sm);
+		background: var(--surface-2);
+		color: var(--ink-2);
+		font-size: var(--t-xs);
+		font-weight: 600;
 	}
 
 	.bye {

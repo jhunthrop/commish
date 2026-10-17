@@ -3,16 +3,43 @@
 	import { page } from '$app/state';
 	import Chip from '#lib/ui/Chip.svelte';
 	import ChipGroup from '#lib/ui/ChipGroup.svelte';
-	import Panel from '#lib/ui/Panel.svelte';
-	import PanelHead from '#lib/ui/PanelHead.svelte';
+	import Icon from '#lib/ui/Icon.svelte';
 	import ProblemLine from '#lib/ui/ProblemLine.svelte';
 	import Quiet from '#lib/ui/Quiet.svelte';
-	import ValueCell from '#lib/ui/ValueCell.svelte';
+	import Verb from '#lib/ui/Verb.svelte';
 	import type { LeagueHost } from '../api.ts';
-	import LineRow from './LineRow.svelte';
-	import { WAIVERS_AT_PARAM } from './tabs.ts';
+	import { positionWord } from '../box/box.ts';
+	import PickupStrip from '../box/PickupStrip.svelte';
+	import WaiverTable from '../box/WaiverTable.svelte';
+	import {
+		addOnWords,
+		cardName,
+		copiedWords,
+		countWords,
+		DEFAULT_SORT,
+		dropRows,
+		findRows,
+		moveWords,
+		namesOnScreen,
+		nextSort,
+		openWaiversWords,
+		pickupCards,
+		poolRows,
+		sortRows,
+		stripDecision,
+		WAIVERS,
+		waiverBasis,
+		withDrop,
+		type CopiedLine,
+		type DropRow,
+		type PickupCard,
+		type PoolRow,
+		type Sort,
+		type SortKey
+	} from '../box/waivers.ts';
 	import MovePanel from './MovePanel.svelte';
 	import Screen from './Screen.svelte';
+	import { WAIVERS_AT_PARAM } from './tabs.ts';
 	import type {
 		HostMoveInput,
 		HostMovePlan,
@@ -23,7 +50,6 @@
 	} from './api.ts';
 	import {
 		bidProblem,
-		addKey,
 		claimMove,
 		claimable,
 		claimsOnHost,
@@ -32,27 +58,17 @@
 		resultStep,
 		type MoveStep
 	} from './move.ts';
-	import Label from '#lib/ui/Label.svelte';
-	import { Narrowing, sharedDrop, waiverGroups } from './state.ts';
-	import {
-		GAIN_DECIMALS,
-		LATER_RULE,
-		LINES,
-		NO_START_RULE,
-		addsTitle,
-		dropWords,
-		sharedDropWords,
-		startingCount,
-		verbWords,
-		waiverDecision
-	} from './words.ts';
+	import { Narrowing } from './state.ts';
+	import { LINES } from './words.ts';
 
-	/** Waivers (spec §5): the unrostered players ranked by what they add to this lineup, each with
-	 * the player it costs least to drop for him, a position at a time if you like (read again for
-	 * that position, so it is never cut to the first rows of every position). Add marks the pair as
-	 * the decision, and the one verb opens the host's waiver page to claim it. Where the API opens
-	 * the claim (spec §10.2), Add opens a confirmation on this screen naming the add, the drop and,
-	 * where the league bids, the bid the member types; its one verb claims on the host. */
+	/** Waivers (spec §5) as a pickup table (Lane 66f): a strip with a card for each pickup worth
+	 * making (it starts this week, the lineup's Proj rises and the rest of the season does not fall),
+	 * then the players free to add in the Lineup's columns with Rest of season and Beats, sorted by
+	 * any head, a position at a time or by name. Add opens the players he could replace in the same
+	 * columns, the advice's drop first. One rule for every verb, read from the API's moves fields as
+	 * the Lineup reads its own: where the claim is made from here it reads "Add on ESPN" and opens
+	 * the confirmation (spec §10.2); elsewhere "Open ESPN waivers" copies his name and opens the
+	 * platform's waiver page, the API's line under it saying why. */
 	interface Props {
 		advice: WaiverAdvice;
 		host: LeagueHost;
@@ -64,14 +80,30 @@
 		make: (move: HostMoveInput, confirm: string) => Promise<HostMoveResult>;
 		/** Reads the adds again, once a claim has been made. */
 		reread: () => void;
+		/** Puts a name on the clipboard. */
+		copy?: (text: string) => Promise<void>;
+		/** Opens the platform's page in a new tab. */
+		openPage?: (href: string) => void;
 	}
 
-	let { advice, host, narrow, plan, make, reread }: Props = $props();
+	let {
+		advice,
+		host,
+		narrow,
+		plan,
+		make,
+		reread,
+		copy = (text) => navigator.clipboard.writeText(text),
+		openPage = (href) => void window.open(href, '_blank', 'noopener')
+	}: Props = $props();
 
 	const MOVE_ID = 'claim-move';
 	/** How long a typed bid rests before the claim is planned again for it: long enough that a
 	 * member still typing costs no plan (each plan reads ESPN twice). */
 	const BID_PAUSE_MS = 600;
+	/** The positions the route narrows to, in the board's order. */
+	const POSITIONS: readonly WaiverPosition[] = ['QB', 'RB', 'WR', 'TE', 'K', 'DEF'];
+
 	let step = $state<MoveStep>({ kind: 'closed' });
 	/** The claim as last planned: the one the token makes, whatever is typed meanwhile. */
 	let planned: HostMoveInput | null = null;
@@ -82,39 +114,66 @@
 	let replanning = $state(false);
 	let pause: ReturnType<typeof setTimeout> | undefined;
 
-	/** The positions the route narrows to, in the board's order. */
-	const POSITIONS: readonly WaiverPosition[] = ['QB', 'RB', 'WR', 'TE', 'K', 'DEF'];
-
 	let position = $state<WaiverPosition | null>(null);
 	/** The answer for the chosen position, null for every position or until it is read. */
 	let narrowed = $state<WaiverAdvice | null>(null);
 	let reading = $state(false);
 	let problem = $state<string | null>(null);
-	/** The add the member marked, by his host id; null keeps the best add as the decision. */
-	let marked = $state<string | null>(null);
+	let query = $state('');
+	let sort = $state<Sort>(DEFAULT_SORT);
+	/** The row whose drops are open, and the drop chosen there. */
+	let open = $state<string | null>(null);
+	let chosenDrop = $state<string | null>(null);
+	/** The card the pinned verb acts on. */
+	let chosenCard = $state<string | null>(null);
+	/** What the platform verb said, once pressed. */
+	let copied = $state<CopiedLine | null>(null);
 
-	const idOf = addKey;
+	const shown = $derived(narrowed ?? advice);
 	const positions = $derived(
 		POSITIONS.filter((p) => advice.rows.some((r) => r.add.player.position === p))
 	);
-	const shown = $derived(narrowed ?? advice);
-	/** The rows of the chosen position: the narrowed answer's, or this answer's own while it is read. */
-	const visible = $derived(
-		position === null || narrowed !== null
-			? shown.rows
-			: advice.rows.filter((r) => r.add.player.position === position)
-	);
-	/** Who starts this week (the count), who helps but sits this week, and the rest. */
-	const groups = $derived(waiverGroups(visible));
-	/** The drop every add shares, said once over the rows rather than on each. */
-	const shared = $derived(sharedDrop(visible));
-	const chosen = $derived(visible.find((r) => idOf(r) === marked) ?? shown.best);
+	const pool = $derived(poolRows({ rows: shown.rows, pickups: advice.pickups }));
+	const rows = $derived(findRows(sortRows(pool, sort), query));
+	const cards = $derived(pickupCards(advice));
+	const card = $derived(cards.find((c) => c.key === chosenCard) ?? cards[0] ?? null);
+	const openRow = $derived(pool.find((r) => r.key === open) ?? null);
+	const drops = $derived(openRow ? dropRows(openRow.source, shown.roster) : []);
+	const drop = $derived(drops.find((d) => d.key === chosenDrop) ?? drops[0] ?? null);
+	const onHost = $derived(claimsOnHost(shown));
+	/** Every line on the screen, for the game facts' read said once under the rows. */
+	const lines = $derived([...shown.rows.map((r) => r.add), ...shown.roster]);
 
 	// The route's reader is fixed for the page's life.
 	// svelte-ignore state_referenced_locally
 	const narrowing = new Narrowing(narrow);
 
-	const onHost = $derived(claimsOnHost(shown));
+	/** The verb for a row: the claim from here where the API opens it and names him, else the page. */
+	function claimsHere(row: WaiverRow): boolean {
+		return onHost && claimable(row);
+	}
+
+	function verbWords(row: WaiverRow): string {
+		return claimsHere(row) ? addOnWords(host) : openWaiversWords(host);
+	}
+
+	/** The platform verb: his name on the clipboard, started while this page has the focus, and the
+	 * platform's waiver page in a new tab. */
+	function openPlatform(row: WaiverRow): void {
+		const name = row.add.player.name;
+		const said = copy(name);
+		if (shown.host_waivers_url !== '') openPage(shown.host_waivers_url);
+		const saidAs = cardName(name, namesOnScreen(shown));
+		said.then(
+			() => (copied = copiedWords(host, saidAs, true)),
+			() => (copied = copiedWords(host, saidAs, false))
+		);
+	}
+
+	function act(row: WaiverRow): void {
+		if (claimsHere(row)) openClaim(row);
+		else openPlatform(row);
+	}
 
 	/** Plans the claim for the row with the bid (null: none typed yet, the plan says the league's
 	 * least where it bids). Only the latest plan is kept. */
@@ -142,11 +201,9 @@
 		}
 	}
 
-	/** Add on a row: marks it and opens the claim for it. */
 	function openClaim(row: WaiverRow): void {
 		// One claim at a time: while one is on its way, its answer stays on screen.
-		if (step.kind === 'sending' || !claimable(row)) return;
-		marked = idOf(row);
+		if (step.kind === 'sending') return;
 		claiming = row;
 		typed = '';
 		void planFor(row, null);
@@ -191,6 +248,7 @@
 		position = next;
 		narrowed = null;
 		problem = null;
+		open = null;
 		reading = next !== null;
 		const outcome = await narrowing.choose(next);
 		if (outcome.kind === 'overtaken') return;
@@ -198,52 +256,94 @@
 		if (outcome.kind === 'answer') narrowed = outcome.answer;
 		if (outcome.kind === 'failed') problem = outcome.sentence;
 	}
+
+	/** Another row's drops or another card: the last copy's confirm is for neither (review 66f L6). */
+	function toggle(row: PoolRow): void {
+		open = open === row.key ? null : row.key;
+		chosenDrop = null;
+		copied = null;
+	}
+
+	function chooseCard(c: PickupCard): void {
+		chosenCard = c.key;
+		copied = null;
+	}
+
+	function onsort(key: SortKey): void {
+		sort = nextSort(sort, key);
+	}
+
+	/** The pair the drop panel's verb acts on: the open add with the drop chosen. */
+	const pair = $derived(openRow ? withDrop(openRow.source, drop) : null);
+	/** The basis, five short lines at most, the pickup rule first (review 66f M5). */
+	const basis = $derived(waiverBasis(shown, lines));
 </script>
 
-{#snippet row(r: WaiverRow)}
-	{@const on = marked === idOf(r)}
-	<div class="pick" class:on>
-		<LineRow line={r.add} note={shared === null ? dropWords(r) : undefined} factsOnPhone={false}>
-			{#snippet trailing()}
-				<span class="end">
-					{#if r.gain > 0}
-						<ValueCell
-							value={r.gain}
-							label={LINES.toYourLineup}
-							phoneLabel={false}
-							signed
-							decimals={GAIN_DECIMALS}
-						/>
-					{/if}
-					<span class="mark">
-						{#if onHost && claimable(r)}
-							<Quiet size="sm" onclick={() => openClaim(r)} disabled={step.kind === 'sending'}
-								>{LINES.add}</Quiet
-							>
-						{:else}
-							<Quiet size="sm" onclick={() => (marked = on ? null : idOf(r))}
-								>{on ? LINES.chosen : LINES.add}</Quiet
-							>
-						{/if}
-					</span>
-				</span>
-			{/snippet}
-		</LineRow>
-	</div>
+{#snippet why()}
+	<span class="why" role="status"
+		>{#if copied}{copied.said}
+			{#if shown.host_waivers_url !== ''}<a
+					href={shown.host_waivers_url}
+					target="_blank"
+					rel="noopener">{copied.page}</a
+				>{:else}{copied.page}{/if}.{:else}{shown.moves.reason ??
+				shown.host_note ??
+				shown.moves.note ??
+				''}{/if}</span
+	>
+{/snippet}
+
+{#snippet cardVerb(c: PickupCard, on: boolean)}
+	{#if on}
+		<Verb size="sm" onclick={() => act(c.source)}>{verbWords(c.source)}</Verb>
+	{:else}
+		<Quiet size="sm" onclick={() => act(c.source)}>{verbWords(c.source)}</Quiet>
+	{/if}
+{/snippet}
+
+{#snippet go()}
+	{#if pair}
+		<div class="go">
+			<span class="pair"
+				><b
+					>{moveWords({
+						add: cardName(pair.add.player.name, namesOnScreen(shown)),
+						drop: drop ? cardName(drop.row.name, namesOnScreen(shown)) : null
+					})}</b
+				></span
+			>
+			<span class="go-act">
+				{@render why()}
+				<Verb size="sm" onclick={() => act(pair)}>{verbWords(pair)}</Verb>
+			</span>
+		</div>
+	{/if}
 {/snippet}
 
 <Screen
-	decision={waiverDecision(chosen)}
-	reason={chosen && !chosen.starts ? chosen.sentence : null}
-	verb={verbWords('waivers', host)}
+	decision={stripDecision(cards)}
+	verb={card ? verbWords(card.source) : null}
 	href={shown.host_waivers_url}
-	hostNote={shown.host_note ?? shown.moves.note}
-	basis={shown.basis}
-	basisNote={shown.basis_note}
-	onverb={onHost && chosen && claimable(chosen) ? () => openClaim(chosen) : null}
+	basis={null}
+	basisNote={shown.basis_note === '' ? null : shown.basis_note}
+	deskVerb={false}
+	onverb={card ? () => act(card.source) : null}
 	controls={onHost ? MOVE_ID : undefined}
 	expanded={onHost ? step.kind !== 'closed' : undefined}
+	footSays={card !== null}
 >
+	{#snippet summary()}
+		<PickupStrip
+			week={advice.week}
+			{cards}
+			sum={advice}
+			chosen={card?.key ?? null}
+			onchoose={chooseCard}
+			verb={cardVerb}
+			foot={cards.length > 0 ? why : undefined}
+		/>
+	{/snippet}
+	{#snippet verbFoot()}{@render why()}{/snippet}
 	{#snippet move()}
 		{#if step.kind !== 'closed'}
 			<MovePanel
@@ -259,102 +359,168 @@
 			/>
 		{/if}
 	{/snippet}
-	<Panel as="section" label={LINES.waiverAdds} padding="none">
-		<div class="head">
-			<PanelHead
-				title={addsTitle(advice.week)}
-				aside={startingCount(groups.starting.length)}
-				level={2}
-			/>
-			<ChipGroup label={LINES.position}>
-				<Chip size="sm" pressed={position === null} onclick={() => void choose(null)}
-					>{LINES.all}</Chip
+	<div class="filters">
+		<ChipGroup label={LINES.position}>
+			<Chip size="sm" pressed={position === null} onclick={() => void choose(null)}
+				>{LINES.all}</Chip
+			>
+			{#each positions as p (p)}
+				<Chip size="sm" pressed={position === p} onclick={() => void choose(p)}
+					>{positionWord(p)}</Chip
 				>
-				{#each positions as p (p)}
-					<Chip size="sm" pressed={position === p} onclick={() => void choose(p)}>{p}</Chip>
-				{/each}
-			</ChipGroup>
-			{#if problem}<ProblemLine>{problem}</ProblemLine>{/if}
-			{#if shared !== null || groups.starting.length + groups.later.length > 0}
-				<div class="under">
-					<span
-						>{#if shared}{sharedDropWords(shared)}{/if}</span
-					>
-					<span class="phone"><Label>{LINES.gainHead}</Label></span>
-				</div>
-			{/if}
-		</div>
-		<div class="rows" class:reading aria-busy={reading}>
-			{#each groups.starting as r (idOf(r))}{@render row(r)}{/each}
-			{#if groups.later.length > 0}
-				<p class="rule">{LATER_RULE}</p>
-				{#each groups.later as r (idOf(r))}{@render row(r)}{/each}
-			{/if}
-			{#if groups.rest.length > 0}
-				<p class="rule">{NO_START_RULE}</p>
-				{#each groups.rest as r (idOf(r))}{@render row(r)}{/each}
-			{/if}
-		</div>
-	</Panel>
+			{/each}
+		</ChipGroup>
+		<label class="search"
+			><Icon name="search" size={16} /><input
+				type="search"
+				placeholder={WAIVERS.find}
+				aria-label={WAIVERS.find}
+				bind:value={query}
+			/></label
+		>
+		<span class="count">{countWords(pool, host)}</span>
+	</div>
+	{#if problem}<ProblemLine>{problem}</ProblemLine>{/if}
+	<div class="rows" class:reading aria-busy={reading}>
+		<WaiverTable
+			label={LINES.waiverAdds}
+			{rows}
+			{sort}
+			{onsort}
+			{open}
+			ontoggle={toggle}
+			{drops}
+			chosen={drop?.key ?? null}
+			onchoose={(d: DropRow) => (chosenDrop = d.key)}
+			{go}
+			empty={WAIVERS.noneFound}
+		/>
+	</div>
+	<div class="basis">
+		{#each basis as line, i (i)}<p class:first={i === 0}>{line}</p>{/each}
+	</div>
 </Screen>
 
 <style>
-	.head {
-		display: flex;
-		flex-direction: column;
-		gap: var(--s-2);
-		padding: var(--s-3);
-	}
-
 	/* While a position is read, its rows from the last answer stay, quieter. */
 	.reading {
 		opacity: 0.6;
 	}
 
-	.pick.on {
-		background: var(--accent-wash);
-	}
-
-	.end {
+	.filters {
 		display: flex;
+		flex-wrap: wrap;
 		align-items: center;
 		gap: var(--s-3);
 	}
 
-	/* The row's link covers it; the mark sits above so a tap on it marks rather than opens. */
-	.mark {
-		position: relative;
-		z-index: 1;
+	.search {
+		display: flex;
+		align-items: center;
+		gap: var(--s-2);
+		flex: 0 1 320px;
+		height: 36px;
+		padding: 0 var(--s-3);
+		border: 1px solid var(--line-strong);
+		border-radius: var(--r-md);
+		background: var(--surface);
+		color: var(--ink-3);
 	}
 
-	/* Over the rows: the drop they share, and on a phone what the rows' number is, since the cell
-	   prints it alone there. */
-	.under {
-		display: flex;
-		align-items: baseline;
-		justify-content: space-between;
-		gap: var(--s-3);
+	.search input {
+		flex: 1;
+		min-width: 0;
+		border: 0;
+		background: transparent;
+		font: inherit;
+		color: var(--ink);
+		outline: none;
+	}
+
+	.count {
+		margin-left: auto;
 		font-size: var(--t-sm);
-		font-weight: 600;
+		color: var(--ink-3);
+		font-variant-numeric: tabular-nums;
+	}
+
+	.why {
+		font-size: var(--t-xs);
+		color: var(--ink-3);
+	}
+
+	.go {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: var(--s-4);
+	}
+
+	.pair b {
 		color: var(--ink);
 	}
 
-	.phone {
-		display: none;
+	.go-act {
+		display: flex;
+		align-items: center;
+		gap: var(--s-3);
+		text-align: right;
+	}
+
+	.basis {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+	}
+
+	/* Each line is one short sentence pair, the table's width: five lines at a desk (review 66f M5). */
+	.basis p {
+		margin: 0;
+		font-size: var(--t-sm);
+		line-height: 1.45;
+		color: var(--ink-3);
+	}
+
+	.basis .first {
+		color: var(--ink-2);
+		font-weight: 500;
 	}
 
 	@media (max-width: 760px) {
-		.phone {
-			display: inline;
+		/* The position chips scroll on one line, the search under them. */
+		.filters {
+			gap: var(--s-2);
 		}
-	}
 
-	.rule {
-		margin: 0;
-		padding: var(--s-3) var(--s-3) var(--s-2);
-		border-top: 2px solid var(--line-strong);
-		color: var(--ink-2);
-		font-size: var(--t-sm);
-		font-weight: 600;
+		.filters :global([role='group']) {
+			max-width: 100%;
+			overflow-x: auto;
+			scrollbar-width: none;
+		}
+
+		.search {
+			flex: 1 1 100%;
+		}
+
+		.count {
+			display: none;
+		}
+
+		.go {
+			flex-direction: column;
+			align-items: stretch;
+			gap: var(--s-2);
+		}
+
+		.go-act {
+			flex-direction: column-reverse;
+			align-items: stretch;
+			text-align: left;
+		}
+
+		.why {
+			display: block;
+			text-align: center;
+		}
 	}
 </style>

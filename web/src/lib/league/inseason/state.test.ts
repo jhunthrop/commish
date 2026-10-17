@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { ApiError } from '#lib/api/client.ts';
-import type { PlayerLine, TradeRow, TradeTeam, WaiverRow } from './api.ts';
+import type { PlayerLine, TradeRow, TradeTeam } from './api.ts';
 import { screenOf } from './screens.ts';
 import {
 	Narrowing,
@@ -13,9 +13,7 @@ import {
 	tradeHolding,
 	readFailure,
 	screenView,
-	sharedDrop,
-	tradeKey,
-	waiverGroups
+	tradeKey
 } from './state.ts';
 import { LINES } from './words.ts';
 
@@ -158,43 +156,6 @@ const team = (trades: TradeRow[], roster = 4): TradeTeam => ({
 	roster: [],
 	trades,
 	note: null
-});
-
-const add = (id: string, gain: number, starts: boolean): WaiverRow => ({
-	add: line(id),
-	drop: null,
-	gain,
-	starts,
-	sentence: id
-});
-
-void test('a drop every add shares is said once', () => {
-	const dart = line('Jaxson Dart');
-	const rows = [
-		{ ...add('a', 1.3, true), drop: dart },
-		{ ...add('b', 0.5, false), drop: dart }
-	];
-	assert.equal(sharedDrop(rows), dart);
-	assert.equal(sharedDrop([...rows, { ...add('c', 0, false), drop: line('Other') }]), null);
-	assert.equal(sharedDrop([...rows, add('d', 0, false)]), null);
-	assert.equal(sharedDrop([]), null);
-});
-
-void test('the waiver rows split on who starts this week, never on the sign of the gain', () => {
-	const rows = [add('a', 1.3, true), add('b', 0.5, false), add('c', 0.2, true), add('d', 0, false)];
-	const groups = waiverGroups(rows);
-	assert.deepEqual(
-		groups.starting.map((r) => r.add.player.host_id),
-		['a', 'c']
-	);
-	assert.deepEqual(
-		groups.later.map((r) => r.add.player.host_id),
-		['b']
-	);
-	assert.deepEqual(
-		groups.rest.map((r) => r.add.player.host_id),
-		['d']
-	);
 });
 
 void test("a trade's key is who is in it, whatever the order a re-read gives either side", () => {
