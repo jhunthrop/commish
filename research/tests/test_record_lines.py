@@ -175,3 +175,57 @@ def test_a_figure_is_rounded_once_half_away_from_zero_on_its_decimal_value() -> 
     for value, places, said in cases:
         assert repr(printed(value, places)) == said
     assert printed(None, 1) is None
+
+
+def _two_weeks(first: list[Mapping[str, Any]], second: list[Mapping[str, Any]]) -> Any:
+    weeks = [
+        Week(1, "graded", None, None, None, _QUARTERBACKS, week_lines(first), "preseason"),
+        Week(2, "graded", None, None, None, _QUARTERBACKS, week_lines(second), "preseason"),
+    ]
+    return to_date(weeks, {1: first, 2: second})
+
+
+def test_to_date_compares_ours_with_published_over_the_weeks_that_graded_it() -> None:
+    """Review 66j N1: from the first week the register keeps the published projection, the season to
+    date sets it against ours on those weeks only. Ours trails on the shared week alone here."""
+    first = _quarterbacks(ours_right=True, published=False)
+    second = _quarterbacks(ours_right=False, published=True)
+    lines = _two_weeks(first, second)
+    total = _line(lines, ALL)
+    shared = _line(week_lines(second), ALL)
+    assert total.ours_on_published == shared.ours
+    assert total.ours.starters_of == 2 * LEAGUE_TEAMS
+    sentence = honest_line(lines) or ""
+    its = printed(shared.published.agreement, 2)
+    mine = printed(shared.ours.agreement, 2)
+    assert f"The published projection's order matched the finish better, {its:.2f} against our {mine:.2f}." in sentence
+    assert f"{shared.published.starters} of {LEAGUE_TEAMS} against our {shared.ours.starters}." in sentence
+
+
+def test_to_date_names_no_published_lead_that_only_other_weeks_made() -> None:
+    """Review 66j N1: ours missed in a week the published projection was not graded and matched it in
+    the week it was, so the sentence names no published lead."""
+    first = _quarterbacks(ours_right=False, published=False)
+    second = _quarterbacks(ours_right=True, published=True)
+    lines = _two_weeks(first, second)
+    assert _line(lines, ALL).ours_on_published == _line(week_lines(second), ALL).ours
+    assert "The published projection" not in (honest_line(lines) or "")
+
+
+def test_a_week_line_carries_no_separate_ours_for_published() -> None:
+    """Within a week published is graded on the same rows as ours, so only the season to date needs it."""
+    assert _line(week_lines(_quarterbacks(ours_right=True, published=True)), ALL).ours_on_published is None
+
+
+def test_published_starters_right_counts_only_the_players_it_listed() -> None:
+    """Review 66j N5: listing the top four of fourteen quarterbacks is four starters right, never more
+    from unlisted players filling its top twelve."""
+    top = 4
+    rows = [
+        row if i < top else {**row, "published_points": None}
+        for i, row in enumerate(_quarterbacks(ours_right=True, published=True))
+    ]
+    qb = _line(week_lines(rows), "QB")
+    assert qb.published is not None
+    assert qb.published.starters == top
+    assert qb.published.starters_of == LEAGUE_TEAMS

@@ -201,6 +201,20 @@ export function figureWords(score: Score | null, figure: RecordFigure): string {
 		: `${String(score.starters)} of ${String(score.startersOf)}`;
 }
 
+/** The published projection's figure to date with ours over the same weeks beside it (review 66j N1):
+ * the run pools ours again over the weeks that graded published, so the two compare like with like.
+ * `ours` is null on a week's line, where both are graded on the same rows already. */
+export function publishedBeside(
+	line: RecordLine | undefined,
+	figure: RecordFigure
+): { published: string; ours: string | null } {
+	const same = line?.oursOnPublished ?? null;
+	return {
+		published: figureWords(scoreOf(line, 'published'), figure),
+		ours: same === null ? null : `${RECORD_BOX.ours} ${figureWords(same, figure)}`
+	};
+}
+
 /** The published projection's columns' basis: from which week it counts, as the register says. */
 export function publishedWords(record: RunRecord): string {
 	const from =

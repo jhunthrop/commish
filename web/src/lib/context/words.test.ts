@@ -170,7 +170,13 @@ void test("copy guard: no composed line doubles a word, the run's own phrases in
 		honest: null,
 		weeks: [graded, missed(3, 'Our weekly freeze failed that week.'), upcoming],
 		toDate: [
-			{ position: 'All' as const, ours: score, adp: { ...score, agreement: 0.37 }, published: null }
+			{
+				position: 'All' as const,
+				ours: score,
+				adp: { ...score, agreement: 0.37 },
+				published: null,
+				oursOnPublished: null
+			}
 		]
 	};
 	const te = league({ scoring: 'te_premium' });

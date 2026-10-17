@@ -73,6 +73,7 @@ def _line(line: record_read.Line) -> Json:
         "ours": _score(line.ours),
         "adp": _score(line.adp),
         "published": None if line.published is None else _score(line.published),
+        "oursOnPublished": None if line.ours_on_published is None else _score(line.ours_on_published),
     }
 
 

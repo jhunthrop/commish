@@ -1,7 +1,13 @@
 // The record box score's words (Lane 66j fix round 1): run with `npm test`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { figureWords, gradedOrders, printPlaces, publishedWords } from './record.ts';
+import {
+	figureWords,
+	gradedOrders,
+	printPlaces,
+	publishedBeside,
+	publishedWords
+} from './record.ts';
 import type { RecordWeek, RunRecord } from './schema.ts';
 
 const week = (n: number, order: RecordWeek['order'], status: RecordWeek['status']): RecordWeek => ({
@@ -62,4 +68,21 @@ void test('a figure prints as the run gives it', () => {
 	assert.equal(printPlaces(9.5, 1), '9.5');
 	assert.equal(figureWords(score, 'starters'), '50 of 84');
 	assert.equal(figureWords(null, 'starters'), '--');
+});
+
+void test('the published figure to date stands beside ours over the weeks that graded it', () => {
+	const score = { graded: 10, agreement: 0.5, placesOff: 43, starters: 50, startersOf: 84 };
+	const line = {
+		position: 'All' as const,
+		ours: { ...score, agreement: 0.62 },
+		adp: score,
+		published: { ...score, agreement: 0.55 },
+		oursOnPublished: { ...score, agreement: 0.48 }
+	};
+	assert.deepEqual(publishedBeside(line, 'agreement'), { published: '0.55', ours: 'Ours 0.48' });
+	assert.deepEqual(publishedBeside({ ...line, oursOnPublished: null }, 'agreement'), {
+		published: '0.55',
+		ours: null
+	});
+	assert.deepEqual(publishedBeside(undefined, 'agreement'), { published: '--', ours: null });
 });

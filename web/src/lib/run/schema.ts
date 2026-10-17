@@ -267,7 +267,10 @@ export const recordLineSchema = z.object({
 	adp: scoreSchema,
 	/** The week's published projection on the same players where the freeze kept it (from
 	 * publishedFromWeek), null before it did. */
-	published: scoreSchema.nullable()
+	published: scoreSchema.nullable(),
+	/** The season to date only: ours over the weeks that graded the published projection, printed
+	 * beside it so the two compare like with like (review 66j N1); null on a week's line. */
+	oursOnPublished: scoreSchema.nullable()
 });
 
 /** Where a week of the season stands in the record. Every week of the season is listed, so a week

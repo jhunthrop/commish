@@ -11,6 +11,7 @@
 		chartSeries,
 		figureWords,
 		gradedOrders,
+		publishedBeside,
 		ORDER_WORDS,
 		publishedWords,
 		recordHeadline,
@@ -102,7 +103,14 @@
 {#snippet cells(line: RecordLine | undefined)}
 	{#each RECORD_FIGURES as f (f)}
 		{#each RECORD_SOURCES as source (source)}
-			<td class="n m {f} {source}">{figureWords(scoreOf(line, source), f)}</td>
+			{#if source === 'published'}
+				{@const beside = publishedBeside(line, f)}
+				<td class="n m {f} {source}"
+					>{beside.published}{#if beside.ours}<span class="same">{beside.ours}</span>{/if}</td
+				>
+			{:else}
+				<td class="n m {f} {source}">{figureWords(scoreOf(line, source), f)}</td>
+			{/if}
 		{/each}
 	{/each}
 {/snippet}
@@ -123,6 +131,7 @@
 				</div>
 				<div class="tiles">
 					{#each RECORD_FIGURES as f (f)}
+						{@const beside = publishedBeside(toDateAll, f)}
 						<div class="tile">
 							<span class="label">{FIGURE_HEADS[f]}</span>
 							<span class="vals"
@@ -130,7 +139,7 @@
 									>{RECORD_BOX.adp} {figureWords(scoreOf(toDateAll, 'adp'), f)}</span
 								><span
 									>{RECORD_BOX.published}
-									{figureWords(scoreOf(toDateAll, 'published'), f)}</span
+									{beside.published}{#if beside.ours}, {beside.ours.toLowerCase()}{/if}</span
 								></span
 							>
 						</div>
@@ -421,6 +430,14 @@
 
 	.cols .n {
 		text-align: right;
+	}
+
+	/* Ours over the weeks that graded the published projection, under its figure to date (N1). */
+	.same {
+		display: block;
+		font-family: var(--font-ui);
+		font-size: var(--t-xs);
+		color: var(--ink-3);
 	}
 
 	td.wk {

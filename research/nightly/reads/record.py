@@ -85,6 +85,9 @@ class Line:
     adp: Score
     # The week's published projection on the same players where the freeze kept it, None before it did.
     published: Score | None
+    # The season to date only: ours over the weeks that graded the published projection, so the two
+    # are set side by side like with like (review 66j N1). None on a week's line and before any such week.
+    ours_on_published: Score | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -121,14 +124,17 @@ def filled_ranks(entries: Sequence[Entry]) -> dict[str, float]:
 
 
 def _starters(entries: Sequence[Entry], ranks: Mapping[str, float]) -> tuple[int, int]:
-    """Per position, the order's top N against the finish's top N (N a 12-team league's starters there)."""
+    """Per position, the order's top N against the finish's top N (N a 12-team league's starters there).
+    Only the players the order listed can be called: an order that lists fewer than N has called only
+    those (review 66j N5), never the unlisted rows the fill rule ties below them."""
     right = of = 0
     for position, per_team in STARTERS_A_TEAM.items():
         at = [entry for entry in entries if entry[3] == position]
         n = min(per_team * LEAGUE_TEAMS, len(at))
         if n == 0:
             continue
-        called = {pid for pid, _, _, _ in sorted(at, key=lambda e: (ranks[e[0]], e[0]))[:n]}
+        listed = [entry for entry in at if entry[1] is not None]
+        called = {pid for pid, _, _, _ in sorted(listed, key=lambda e: (ranks[e[0]], e[0]))[:n]}
         finished = {pid for pid, _, _, _ in sorted(at, key=lambda e: (-e[2], e[0]))[:n]}
         right += len(called & finished)
         of += n
@@ -202,7 +208,8 @@ def _pooled(scores: Sequence[Score], players: int) -> Score:
 
 def to_date(weeks: Sequence[Week], rows_by_week: Mapping[int, Sequence[Mapping[str, Any]]]) -> tuple[Line, ...]:
     """The running score: per position, the mean of each graded week's numbers, the starters summed. The
-    published projection pools only the weeks that graded it, None before any did."""
+    published projection pools only the weeks that graded it, None before any did, and ours is pooled
+    again over those same weeks beside it (review 66j N1)."""
     graded = [week for week in weeks if week.status == "graded"]
     lines = []
     for position in (ALL, *RECORD_POSITIONS):
@@ -215,13 +222,16 @@ def to_date(weeks: Sequence[Week], rows_by_week: Mapping[int, Sequence[Mapping[s
             for row in rows_by_week[week.week]
             if row["adp"] is not None and (position == ALL or row["position"] == position)
         }
-        published = [line.published for line in found if line.published is not None]
+        shared = [line for line in found if line.published is not None]
+        published = [line.published for line in shared if line.published is not None]
+        shared_players = max((score.graded for score in published), default=0)
         lines.append(
             Line(
                 position,
                 _pooled([line.ours for line in found], len(players)),
                 _pooled([line.adp for line in found], len(players)),
-                _pooled(published, max(score.graded for score in published)) if published else None,
+                _pooled(published, shared_players) if published else None,
+                _pooled([line.ours for line in shared], shared_players) if shared else None,
             )
         )
     return tuple(lines)
@@ -251,8 +261,8 @@ def honest_line(to_date_lines: Sequence[Line]) -> str | None:
     if line is None:
         return None
     clauses = _trails(line.ours, line.adp, "ADP")
-    if line.published is not None:
-        clauses += _trails(line.ours, line.published, "The published projection")
+    if line.published is not None and line.ours_on_published is not None:
+        clauses += _trails(line.ours_on_published, line.published, "The published projection")
     if not clauses:
         return None
     return " ".join(f"{clause[0].upper()}{clause[1:]}." for clause in clauses)
