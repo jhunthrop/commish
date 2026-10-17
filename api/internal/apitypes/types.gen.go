@@ -63,6 +63,42 @@ func (e BotStyle) Valid() bool {
 	}
 }
 
+// Defines values for BoxStarterSlot.
+const (
+	BoxStarterSlotDEF       BoxStarterSlot = "DEF"
+	BoxStarterSlotFLEX      BoxStarterSlot = "FLEX"
+	BoxStarterSlotK         BoxStarterSlot = "K"
+	BoxStarterSlotQB        BoxStarterSlot = "QB"
+	BoxStarterSlotRB        BoxStarterSlot = "RB"
+	BoxStarterSlotSUPERFLEX BoxStarterSlot = "SUPERFLEX"
+	BoxStarterSlotTE        BoxStarterSlot = "TE"
+	BoxStarterSlotWR        BoxStarterSlot = "WR"
+)
+
+// Valid indicates whether the value is a known member of the BoxStarterSlot enum.
+func (e BoxStarterSlot) Valid() bool {
+	switch e {
+	case BoxStarterSlotDEF:
+		return true
+	case BoxStarterSlotFLEX:
+		return true
+	case BoxStarterSlotK:
+		return true
+	case BoxStarterSlotQB:
+		return true
+	case BoxStarterSlotRB:
+		return true
+	case BoxStarterSlotSUPERFLEX:
+		return true
+	case BoxStarterSlotTE:
+		return true
+	case BoxStarterSlotWR:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for CompanionHost.
 const (
 	CompanionHostFfpc    CompanionHost = "ffpc"
@@ -1393,6 +1429,15 @@ type BoardStatus struct {
 // BotStyle defines model for BotStyle.
 type BotStyle string
 
+// BoxStarter defines model for BoxStarter.
+type BoxStarter struct {
+	Line PlayerLine     `json:"line"`
+	Slot BoxStarterSlot `json:"slot"`
+}
+
+// BoxStarterSlot defines model for BoxStarter.Slot.
+type BoxStarterSlot string
+
 // CardCandidate defines model for CardCandidate.
 type CardCandidate struct {
 	PlayerId string `json:"player_id"`
@@ -2272,6 +2317,9 @@ type LineupAdvice struct {
 	// OrderBasis which order ranks the players: our preseason board, or the rest-of-season order (from week 7, once the API reads it)
 	OrderBasis OrderBasis `json:"order_basis"`
 
+	// ProjectionReadAt when the week's published projection the rows' week_projection read was captured, null with none
+	ProjectionReadAt *time.Time `json:"projection_read_at"`
+
 	// ReadAt the league's last host read
 	ReadAt time.Time `json:"read_at"`
 
@@ -2378,6 +2426,29 @@ type LobbySeatView struct {
 
 // LobbySeatViewKind defines model for LobbySeatView.Kind.
 type LobbySeatViewKind string
+
+// MatchupBox defines model for MatchupBox.
+type MatchupBox struct {
+	// ProjectionReadAt when the week's published projection the rows' week_projection read was captured, null with none
+	ProjectionReadAt *time.Time `json:"projection_read_at"`
+
+	// ReadAt the league's last host read
+	ReadAt time.Time `json:"read_at"`
+
+	// Sides the drafter's side first, then the opponent's when the week pairs them
+	Sides []MatchupBoxSide `json:"sides"`
+	Week  int              `json:"week"`
+}
+
+// MatchupBoxSide defines model for MatchupBoxSide.
+type MatchupBoxSide struct {
+	// Bench the side's other active players, by our order (injured reserve and taxi spots left out)
+	Bench    []PlayerLine `json:"bench"`
+	RosterId int          `json:"roster_id"`
+
+	// Starters the host's starters in the league's slot order (QB, RB, WR, TE, the flex spots, K, DEF); an empty spot is left out, and a starter no slot takes ends the list in his position's slot. Empty where the host shows us no lineup for the side (FFPC's opponents)
+	Starters []BoxStarter `json:"starters"`
+}
 
 // MatchupSide defines model for MatchupSide.
 type MatchupSide struct {
@@ -2632,6 +2703,9 @@ type PlayerLine struct {
 
 	// Slug his page on the site (/players/{slug}): set for a player our order ranks whose name no other player in our directory shares, null otherwise (a shared name's page is named by the run, which the API does not read)
 	Slug *string `json:"slug"`
+
+	// WeekProjection his points this week on the week's published projection, to the cent, in the format the league's scoring is most like (PPR, half PPR or standard); a team defense's by its club. The newest snapshot stored for the league's week (projection_read_at says when). Null when the snapshot has no row for him or none is stored. Our own weekly model replaces it when it passes its test
+	WeekProjection *float64 `json:"week_projection"`
 }
 
 // PlayerPosition defines model for PlayerPosition.
@@ -3429,6 +3503,15 @@ type LobbyRoomResponse struct {
 // LobbySeatResponse defines model for LobbySeatResponse.
 type LobbySeatResponse struct {
 	Data      LobbySeat  `json:"data"`
+	Error     *ErrorBody `json:"error"`
+	Meta      *PageMeta  `json:"meta,omitempty"`
+	Ok        bool       `json:"ok"`
+	RequestId string     `json:"request_id"`
+}
+
+// MatchupBoxResponse defines model for MatchupBoxResponse.
+type MatchupBoxResponse struct {
+	Data      MatchupBox `json:"data"`
 	Error     *ErrorBody `json:"error"`
 	Meta      *PageMeta  `json:"meta,omitempty"`
 	Ok        bool       `json:"ok"`

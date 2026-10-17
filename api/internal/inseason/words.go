@@ -240,13 +240,14 @@ func BasisNote(s apitypes.LeagueSettings) string {
 }
 
 // LineupBasis is the start and sit page's honesty line (§4.4), on either
-// order: neither projects a week, and the stamp dates the order.
+// order: neither ranks by a week's projection (the rows show the
+// published one, Lane 66d), and the stamp dates the order.
 func LineupBasis(b OrderBasis, weeks int) string {
 	order := "our preseason number"
 	if b == RestOfSeason {
 		order = "our rest-of-season order"
 	}
-	return fmt.Sprintf("Ranked by %s and this week's designations. We do not project a week's points. %s",
+	return fmt.Sprintf("Ranked by %s and this week's designations, not by a week's projection. %s",
 		order, porWords(b, weeks))
 }
 

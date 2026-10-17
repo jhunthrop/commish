@@ -339,6 +339,26 @@ export interface paths {
 		patch?: never;
 		trace?: never;
 	};
+	'/leagues/attached/{id}/matchup': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				/** @description the attached league's id (AttachedLeague.id) */
+				id: string;
+			};
+			cookie?: never;
+		};
+		/** The week's matchup as a box score: each side's starters in the host's slots and its bench, every player with his line (his game's facts, his points so far once his game has kicked off, the week's published projection). Reads the league as the sync route does; the sync answer's matchup keeps the score and the teams. */
+		get: operations['leagueMatchup'];
+		put?: never;
+		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
 	'/leagues/attached/{id}/waivers': {
 		parameters: {
 			query?: {
@@ -2686,6 +2706,11 @@ export interface components {
 			 * @description his rest-of-season points a game, one decimal: the published board's rest-of-season points over the games his club has left from the board's first week through week 17, byes out, as the basis says; null on the preseason number, on a run that does not say its first week, without a projection or with no games left. A player who is out keeps it: it assumes he plays
 			 */
 			rest_of_season_per_game: number | null;
+			/**
+			 * Format: double
+			 * @description his points this week on the week's published projection, to the cent, in the format the league's scoring is most like (PPR, half PPR or standard); a team defense's by its club. The newest snapshot stored for the league's week (projection_read_at says when). Null when the snapshot has no row for him or none is stored. Our own weekly model replaces it when it passes its test
+			 */
+			week_projection: number | null;
 			/** @description the drafter tags him Hold on a sheet */
 			held: boolean;
 			facts: components['schemas']['WeekFacts'];
@@ -2703,6 +2728,11 @@ export interface components {
 		};
 		LineupAdvice: {
 			week: number;
+			/**
+			 * Format: date-time
+			 * @description when the week's published projection the rows' week_projection read was captured, null with none
+			 */
+			projection_read_at: string | null;
 			/** @description the honesty line above the rows: the order, and what points over replacement a week are */
 			basis: string;
 			/** @description the rest of the basis, said once under the rows: the league the points over replacement are for and the league's rules points so far leave out */
@@ -2729,6 +2759,33 @@ export interface components {
 			/** @description one sentence under the verb when we cannot open the host's page ("Make this change on Yahoo. We cannot open that page for you yet."), null when the url opens it */
 			host_note: string | null;
 			moves: components['schemas']['LineupMoves'];
+		};
+		BoxStarter: {
+			/** @enum {string} */
+			slot: 'QB' | 'RB' | 'WR' | 'TE' | 'FLEX' | 'SUPERFLEX' | 'K' | 'DEF';
+			line: components['schemas']['PlayerLine'];
+		};
+		MatchupBoxSide: {
+			roster_id: number;
+			/** @description the host's starters in the league's slot order (QB, RB, WR, TE, the flex spots, K, DEF); an empty spot is left out, and a starter no slot takes ends the list in his position's slot. Empty where the host shows us no lineup for the side (FFPC's opponents) */
+			starters: components['schemas']['BoxStarter'][];
+			/** @description the side's other active players, by our order (injured reserve and taxi spots left out) */
+			bench: components['schemas']['PlayerLine'][];
+		};
+		MatchupBox: {
+			week: number;
+			/**
+			 * Format: date-time
+			 * @description the league's last host read
+			 */
+			read_at: string;
+			/**
+			 * Format: date-time
+			 * @description when the week's published projection the rows' week_projection read was captured, null with none
+			 */
+			projection_read_at: string | null;
+			/** @description the drafter's side first, then the opponent's when the week pairs them */
+			sides: components['schemas']['MatchupBoxSide'][];
 		};
 		WaiverRow: {
 			add: components['schemas']['PlayerLine'];
@@ -3306,6 +3363,15 @@ export interface components {
 				};
 			};
 		};
+		/** @description the week's matchup as a box score */
+		MatchupBoxResponse: {
+			headers: Record<string, unknown>;
+			content: {
+				'application/json': components['schemas']['Envelope'] & {
+					data?: components['schemas']['MatchupBox'];
+				};
+			};
+		};
 		/** @description the waiver pool ranked by the gain to the drafter's lineup */
 		WaiverAdviceResponse: {
 			headers: Record<string, unknown>;
@@ -3816,6 +3882,25 @@ export interface operations {
 		requestBody?: never;
 		responses: {
 			200: components['responses']['LineupAdviceResponse'];
+			404: components['responses']['ErrorResponse'];
+			409: components['responses']['ErrorResponse'];
+			422: components['responses']['ErrorResponse'];
+			502: components['responses']['ErrorResponse'];
+		};
+	};
+	leagueMatchup: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				/** @description the attached league's id (AttachedLeague.id) */
+				id: string;
+			};
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			200: components['responses']['MatchupBoxResponse'];
 			404: components['responses']['ErrorResponse'];
 			409: components['responses']['ErrorResponse'];
 			422: components['responses']['ErrorResponse'];

@@ -50,8 +50,9 @@ type PGSource struct {
 	// unreadable is set once published_boards was found and not readable,
 	// so the warning is logged once a process.
 	unreadable atomic.Bool
-	// venuesUnreadable is the same for the week facts' venue tables.
-	venuesUnreadable atomic.Bool
+	// tablesUnreadable is the same for the optional research tables the
+	// week reads (the venues, the weekly projection).
+	tablesUnreadable atomic.Bool
 }
 
 // NewPGSource checks the schema name once.

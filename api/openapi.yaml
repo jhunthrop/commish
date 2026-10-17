@@ -366,6 +366,27 @@ paths:
         "409": { $ref: "#/components/responses/ErrorResponse" }
         "422": { $ref: "#/components/responses/ErrorResponse" }
         "502": { $ref: "#/components/responses/ErrorResponse" }
+  /leagues/attached/{id}/matchup:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: the attached league's id (AttachedLeague.id)
+        schema: { type: string, format: uuid }
+    get:
+      tags: [league-sync]
+      operationId: leagueMatchup
+      summary: >-
+        The week's matchup as a box score: each side's starters in the host's slots and its bench, every player with
+        his line (his game's facts, his points so far once his game has kicked off, the week's published projection).
+        Reads the league as the sync route does; the sync answer's matchup keeps the score and the teams.
+      security: [{ session: [] }]
+      responses:
+        "200": { $ref: "#/components/responses/MatchupBoxResponse" }
+        "404": { $ref: "#/components/responses/ErrorResponse" }
+        "409": { $ref: "#/components/responses/ErrorResponse" }
+        "422": { $ref: "#/components/responses/ErrorResponse" }
+        "502": { $ref: "#/components/responses/ErrorResponse" }
   /leagues/attached/{id}/waivers:
     parameters:
       - name: id
@@ -1704,6 +1725,14 @@ components:
             allOf:
               - $ref: "#/components/schemas/Envelope"
               - properties: { data: { $ref: "#/components/schemas/LineupAdvice" } }
+    MatchupBoxResponse:
+      description: the week's matchup as a box score
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: "#/components/schemas/Envelope"
+              - properties: { data: { $ref: "#/components/schemas/MatchupBox" } }
     WaiverAdviceResponse:
       description: the waiver pool ranked by the gain to the drafter's lineup
       content:
@@ -3143,7 +3172,7 @@ components:
         weather: { allOf: [{ $ref: "#/components/schemas/KickoffWeather" }], nullable: true }
     PlayerLine:
       type: object
-      required: [player, headshot, slug, position_rank, points_over_replacement, rest_of_season_per_game, held, facts]
+      required: [player, headshot, slug, position_rank, points_over_replacement, rest_of_season_per_game, week_projection, held, facts]
       properties:
         player: { $ref: "#/components/schemas/LeaguePlayer" }
         headshot: { type: string, nullable: true, description: "his face from our player directory, null without one" }
@@ -3171,6 +3200,15 @@ components:
             club has left from the board's first week through week 17, byes out, as the basis says; null on the preseason
             number, on a run that does not say its first week, without a projection or with no games left. A player who is
             out keeps it: it assumes he plays
+        week_projection:
+          type: number
+          format: double
+          nullable: true
+          description: >-
+            his points this week on the week's published projection, to the cent, in the format the league's scoring is
+            most like (PPR, half PPR or standard); a team defense's by its club. The newest snapshot stored for the
+            league's week (projection_read_at says when). Null when the snapshot has no row for him or none is stored.
+            Our own weekly model replaces it when it passes its test
         held: { type: boolean, description: the drafter tags him Hold on a sheet, so he is never a drop or a trade give }
         facts: { $ref: "#/components/schemas/WeekFacts" }
     LineupSlot:
@@ -3189,9 +3227,14 @@ components:
         sentence: { type: string, nullable: true, description: the reason for a change, from facts; null when unchanged }
     LineupAdvice:
       type: object
-      required: [week, basis, basis_note, order_basis, refreshed, read_at, set, slots, bench, host_lineup_url, host_note, moves]
+      required: [week, basis, basis_note, order_basis, refreshed, read_at, projection_read_at, set, slots, bench, host_lineup_url, host_note, moves]
       properties:
         week: { type: integer }
+        projection_read_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: when the week's published projection the rows' week_projection read was captured, null with none
         basis: { type: string, description: "the honesty line above the rows: the order, and what points over replacement a week are" }
         basis_note:
           type: string
@@ -3220,6 +3263,43 @@ components:
             one sentence under the verb when we cannot open the host's page ("Make this change on Yahoo. We cannot
             open that page for you yet."), null when the url opens it
         moves: { $ref: "#/components/schemas/LineupMoves" }
+    BoxStarter:
+      type: object
+      required: [slot, line]
+      properties:
+        slot: { type: string, enum: [QB, RB, WR, TE, FLEX, SUPERFLEX, K, DEF] }
+        line: { $ref: "#/components/schemas/PlayerLine" }
+    MatchupBoxSide:
+      type: object
+      required: [roster_id, starters, bench]
+      properties:
+        roster_id: { type: integer }
+        starters:
+          type: array
+          description: >-
+            the host's starters in the league's slot order (QB, RB, WR, TE, the flex spots, K, DEF); an empty spot is
+            left out, and a starter no slot takes ends the list in his position's slot. Empty where the host shows us
+            no lineup for the side (FFPC's opponents)
+          items: { $ref: "#/components/schemas/BoxStarter" }
+        bench:
+          type: array
+          description: the side's other active players, by our order (injured reserve and taxi spots left out)
+          items: { $ref: "#/components/schemas/PlayerLine" }
+    MatchupBox:
+      type: object
+      required: [week, read_at, projection_read_at, sides]
+      properties:
+        week: { type: integer }
+        read_at: { type: string, format: date-time, description: the league's last host read }
+        projection_read_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: when the week's published projection the rows' week_projection read was captured, null with none
+        sides:
+          type: array
+          description: the drafter's side first, then the opponent's when the week pairs them
+          items: { $ref: "#/components/schemas/MatchupBoxSide" }
     WaiverRow:
       type: object
       required: [add, drop, gain, starts, sentence]

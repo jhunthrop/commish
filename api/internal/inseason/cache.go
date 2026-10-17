@@ -20,6 +20,7 @@ type Reads interface {
 	Designations(ctx context.Context) (map[string]boards.Designation, error)
 	SeasonRuns(ctx context.Context, newest time.Time) (map[boards.RunKey]time.Time, error)
 	GameFacts(ctx context.Context, season int) (map[boards.ClubWeek]boards.GameFact, error)
+	WeekProjection(ctx context.Context, season, week int) (boards.WeekProjection, error)
 }
 
 // Short TTLs (spec §9): the stat lines and the schedule move at most
@@ -79,6 +80,14 @@ func (c *Cache) Data(ctx context.Context, season int) (Data, error) {
 		return Data{}, err
 	}
 	return Data{Lines: lines, Games: games, Designations: designations, GameFacts: gameFacts}, nil
+}
+
+// Projection is the week's published projection, kept for CaptureTTL:
+// the harvest captures it per kickoff slot.
+func (c *Cache) Projection(ctx context.Context, season, week int) (boards.WeekProjection, error) {
+	return cached(c, ctx, fmt.Sprintf("projection/%d/%d", season, week), CaptureTTL, func(ctx context.Context) (boards.WeekProjection, error) {
+		return c.Reads.WeekProjection(ctx, season, week)
+	})
 }
 
 // Designations is the newest injury capture, kept for CaptureTTL: the

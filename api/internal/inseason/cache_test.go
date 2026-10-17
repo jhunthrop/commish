@@ -12,8 +12,8 @@ import (
 )
 
 type countingReads struct {
-	lines, games, designations, runs, gameFacts atomic.Int32
-	fail, failRuns                              bool
+	lines, games, designations, runs, gameFacts, projections atomic.Int32
+	fail, failRuns                                           bool
 }
 
 func (r *countingReads) StatLines(context.Context, int) ([]boards.StatLine, error) {
@@ -48,6 +48,36 @@ func (r *countingReads) SeasonRuns(_ context.Context, newest time.Time) (map[boa
 func (r *countingReads) GameFacts(context.Context, int) (map[boards.ClubWeek]boards.GameFact, error) {
 	r.gameFacts.Add(1)
 	return map[boards.ClubWeek]boards.GameFact{{Week: 7, Team: "BUF"}: {Venue: &boards.Venue{Roof: boards.RoofOutdoors}}}, nil
+}
+
+func (r *countingReads) WeekProjection(_ context.Context, _, week int) (boards.WeekProjection, error) {
+	r.projections.Add(1)
+	return boards.WeekProjection{Week: week, Players: map[string]boards.ProjectedPoints{"p1": {PPR: 12.5}}}, nil
+}
+
+// The week's projection is one read per week per TTL, and another week is
+// its own read.
+func TestCacheReadsTheProjectionOncePerWeekAndTTL(t *testing.T) {
+	reads := &countingReads{}
+	now := time.Date(2026, 10, 15, 12, 0, 0, 0, time.UTC)
+	c := &Cache{Reads: reads, Now: func() time.Time { return now }}
+	ctx := context.Background()
+	for i := 0; i < 3; i++ {
+		p, err := c.Projection(ctx, 2026, 6)
+		if err != nil || p.Players["p1"].PPR != 12.5 {
+			t.Fatalf("%+v %v", p, err)
+		}
+	}
+	if _, err := c.Projection(ctx, 2026, 7); err != nil {
+		t.Fatal(err)
+	}
+	if n := reads.projections.Load(); n != 2 {
+		t.Fatalf("%d reads for two weeks inside the TTL", n)
+	}
+	now = now.Add(CaptureTTL + time.Second)
+	if _, err := c.Projection(ctx, 2026, 6); err != nil || reads.projections.Load() != 3 {
+		t.Fatalf("after the TTL: %d reads, %v", reads.projections.Load(), err)
+	}
 }
 
 func TestCacheReadsOncePerTTL(t *testing.T) {

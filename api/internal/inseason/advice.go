@@ -50,13 +50,17 @@ type advisor struct {
 	// gamesLeft is each club's games from the board's first week, the
 	// divisor of a row's rest-of-season points a game.
 	gamesLeft map[string]int
-	now       time.Time
+	// projection is the week's published projection, read in the format
+	// the league's scoring is most like (preset).
+	projection boards.WeekProjection
+	preset     apitypes.ScoringPreset
+	now        time.Time
 }
 
 // newAdvisor reads the league's roster shape and scoring from the saved
 // league and indexes the facts for its week. held is the board ids the
 // drafter tags Hold.
-func newAdvisor(l League, data Data, held map[string]bool, now time.Time) (*advisor, error) {
+func newAdvisor(l League, data Data, projection boards.WeekProjection, held map[string]bool, now time.Time) (*advisor, error) {
 	if l.Saved == nil {
 		return nil, fmt.Errorf("inseason: the league has no saved settings")
 	}
@@ -68,9 +72,10 @@ func newAdvisor(l League, data Data, held map[string]bool, now time.Time) (*advi
 	if basis == "" {
 		basis = Preseason
 	}
+	preset, _ := leaguesync.LeagueScoring(l.Saved, nil, false)
 	return &advisor{League: l, settings: *l.Saved, config: config, slots: Slots(config), held: held, basis: basis, weeks: WeeksCovered(basis, firstWeek(l)), pages: newPages(l.Board.Raw), now: now,
-		gamesLeft: GamesLeft(data.Games, l.Board.FromWeek),
-		season:    NewSeason(data, RulesOf(rulesOf(l.Saved.Scoring)), l.Snap.Week, now)}, nil
+		gamesLeft: GamesLeft(data.Games, l.Board.FromWeek), projection: projection, preset: preset,
+		season: NewSeason(data, RulesOf(rulesOf(l.Saved.Scoring)), l.Snap.Week, now)}, nil
 }
 
 // firstWeek is the first week the order's figures cover: the published
@@ -127,6 +132,7 @@ func (a *advisor) build(id string, lp apitypes.LeaguePlayer, side *leaguesync.Si
 		line.PositionRank = &rank
 	}
 	line.Headshot = faceOf(bp, placed)
+	line.WeekProjection = a.weekProjection(boardID, position, team)
 	if placed {
 		line.Slug = a.pages.of(bp.Name, c.Rank > 0)
 		line.RestOfSeasonPerGame = RestOfSeasonPerGame(a.Board, bp, a.gamesLeft)
@@ -140,6 +146,27 @@ func (a *advisor) build(id string, lp apitypes.LeaguePlayer, side *leaguesync.Si
 		c.PerGame, c.HasPerGame = *facts.PerGame, true
 	}
 	return person{cand: c, line: line, words: words}
+}
+
+// weekProjection is his points on the week's published projection in
+// the league's format, to the cent, nil without a row.
+func (a *advisor) weekProjection(boardID string, position draft.Position, team string) *float64 {
+	p, ok := a.projection.Player(boardID, string(position), team)
+	if !ok {
+		return nil
+	}
+	v := roundCents(p.For(a.preset))
+	return &v
+}
+
+// projectionReadAt is when the week's projection was captured, nil with
+// none read.
+func (a *advisor) projectionReadAt() *time.Time {
+	if a.projection.ReadAt.IsZero() {
+		return nil
+	}
+	at := a.projection.ReadAt
+	return &at
 }
 
 // thisWeek is the host's points for a starter whose game has kicked off.
@@ -264,8 +291,10 @@ func (a *advisor) Lineup() (apitypes.LineupAdvice, bool) {
 	}
 	rows := Lineup(a.config, cands, team.Starters)
 	h := a.header()
-	out := apitypes.LineupAdvice{Week: h.week, Basis: withPerGame(a.Board, LineupBasis(a.basis, a.weeks), people), BasisNote: BasisNote(a.settings), OrderBasis: h.basis, Refreshed: h.refreshed,
-		ReadAt: h.readAt, Set: true, Slots: []apitypes.LineupSlot{}, Bench: []apitypes.PlayerLine{},
+	// The rows end on the week's projection (Lane 66d), so the basis says
+	// nothing of points a game; the page says the projection's read itself.
+	out := apitypes.LineupAdvice{Week: h.week, Basis: LineupBasis(a.basis, a.weeks), BasisNote: BasisNote(a.settings), OrderBasis: h.basis, Refreshed: h.refreshed,
+		ReadAt: h.readAt, ProjectionReadAt: a.projectionReadAt(), Set: true, Slots: []apitypes.LineupSlot{}, Bench: []apitypes.PlayerLine{},
 		Moves: apitypes.LineupMoves{Lineup: apitypes.LineupMovesLineupUnavailable},
 	}
 	out.HostLineupUrl, out.HostNote = a.host(LineupPage)

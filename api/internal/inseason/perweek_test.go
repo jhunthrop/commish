@@ -40,13 +40,14 @@ func TestWaiverGainOverTheOrdersWeeks(t *testing.T) {
 }
 
 // Every basis says what "a week" is, and the start and sit line says we
-// project no week on either order (M2), with no week of its own printed.
+// ranks by no week's projection on either order (M2, Lane 66d), with no
+// week of its own printed.
 func TestBasisSaysWhatAWeekIs(t *testing.T) {
 	settings := fixtureSettings()
 	ros := LineupBasis(RestOfSeason, 11)
 	pre := LineupBasis(Preseason, 17)
 	for _, s := range []string{ros, pre} {
-		if !strings.Contains(s, "We do not project a week's points.") || strings.Contains(s, "from week") {
+		if !strings.Contains(s, "and this week's designations, not by a week's projection.") || strings.Contains(s, "from week") {
 			t.Errorf("%q", s)
 		}
 	}
