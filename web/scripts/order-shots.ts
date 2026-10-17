@@ -169,7 +169,8 @@ async function orderFaults(page: Page, screen: Screen, width: number): Promise<s
 	}
 	if (!seen.heads.includes('Total') && !seen.heads.includes('Over repl.'))
 		said.push(`${screen.name} at ${String(width)}: no key head`);
-	if (width >= FOLDS_AT && !seen.heads.includes('A game')) said.push(`${screen.name}: no A game head`);
+	if (width >= FOLDS_AT && !seen.heads.includes('A game'))
+		said.push(`${screen.name}: no A game head`);
 	if (width < FOLDS_AT && !seen.folded.every((f) => f.includes('Avg')))
 		said.push(`${screen.name} at ${String(width)}: the figures do not fold under the name`);
 	for (const cell of seen.cells) {
@@ -258,15 +259,18 @@ async function tapFaults(): Promise<string[]> {
 		said.push('rest: Free shows no rows and no sentence');
 	if (free.kinds.some((k) => !k.includes('free'))) said.push('rest: Free shows a rostered player');
 	// Show more: the fixture holds fewer rows than a page, so the answer is held to two rows a read.
-	await page.route((url) => url.pathname.endsWith('/order'), async (route) => {
-		const url = new URL(route.request().url());
-		const response = await route.fetch();
-		const body = (await response.json()) as { data: { rows: unknown[]; total: number } };
-		const limit = Number(url.searchParams.get('limit'));
-		body.data.rows = body.data.rows.slice(0, limit === 100 ? 2 : 4);
-		body.data.total = Math.max(body.data.total, 3);
-		await route.fulfill({ response, json: body });
-	});
+	await page.route(
+		(url) => url.pathname.endsWith('/order'),
+		async (route) => {
+			const url = new URL(route.request().url());
+			const response = await route.fetch();
+			const body = (await response.json()) as { data: { rows: unknown[]; total: number } };
+			const limit = Number(url.searchParams.get('limit'));
+			body.data.rows = body.data.rows.slice(0, limit === 100 ? 2 : 4);
+			body.data.total = Math.max(body.data.total, 3);
+			await route.fulfill({ response, json: body });
+		}
+	);
 	await Promise.all([
 		page.waitForResponse((r) => new URL(r.url()).pathname.endsWith('/order')),
 		page.getByRole('button', { name: 'Everyone', exact: true }).click()
@@ -275,10 +279,7 @@ async function tapFaults(): Promise<string[]> {
 	const more = page.getByRole('button', { name: 'Show more', exact: true });
 	if ((await more.count()) === 0) said.push('rest: no Show more though the total is past the rows');
 	else {
-		await Promise.all([
-			page.waitForResponse((r) => r.url().includes('limit=200')),
-			more.click()
-		]);
+		await Promise.all([page.waitForResponse((r) => r.url().includes('limit=200')), more.click()]);
 		await page.waitForTimeout(SETTLE_MS);
 		if ((await tableState(page)).rows <= 2) said.push('rest: Show more read no more rows');
 	}
