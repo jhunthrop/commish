@@ -50,6 +50,14 @@ PLAYER_WEEKS: Final = tuple(range(4, 18))  # 2.6: weeks 4 to 17 (the judgment's 
 CLOSED: Final = frozenset({LAST_SERVED + 1, LAST_SERVED + 2})  # 2025 and the pristine 2026
 
 
+def aware_instant(raw: str) -> datetime:
+    """`--after`: an ISO instant with its offset; a naive time names no instant and is refused."""
+    found = datetime.fromisoformat(raw)
+    if found.tzinfo is None or found.utcoffset() is None:
+        raise argparse.ArgumentTypeError(f"--after {raw!r} has no time zone; give an offset such as +00:00")
+    return found
+
+
 def history_specs(first: int, last: int, rule: DepthRule) -> list[SeasonSpec]:
     if first < FIRST_TEAM_SEASON or last > LAST_SERVED:
         raise ValueError(f"the history build covers {FIRST_TEAM_SEASON} to {LAST_SERVED}")
@@ -74,7 +82,7 @@ def write_season(build: SeasonBuild, out: Path) -> dict[str, str]:
     return digests
 
 
-def _run(url: str, out: Path, specs: Sequence[SeasonSpec], live: bool) -> dict[str, Any]:
+def run(url: str, out: Path, specs: Sequence[SeasonSpec], live: bool) -> dict[str, Any]:
     check_scratch_url(url, SCRATCH_PREFIXES)
     started = time.monotonic()
     engine = make_engine(sqlalchemy_url(url))
@@ -118,14 +126,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     live = sub.choices["live"]
     live.add_argument("--season", type=int, required=True)
     live.add_argument("--week", type=int, required=True)
-    live.add_argument("--after", type=datetime.fromisoformat, required=True)
+    live.add_argument("--after", type=aware_instant, required=True)
     args = parser.parse_args(argv)
     configure_logging(logging.WARNING)
     if args.command == "history":
         specs = history_specs(args.first, args.last, args.depth_chart)
     else:
         specs = [SeasonSpec(args.season, (args.week,), (args.week,), args.depth_chart, args.after)]
-    report = _run(args.database, args.out, specs, args.command == "live")
+    report = run(args.database, args.out, specs, args.command == "live")
     args.out.mkdir(parents=True, exist_ok=True)
     (args.out / f"report-{args.command}.json").write_text(json.dumps(report, indent=1, default=str))
     return 0

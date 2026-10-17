@@ -4,13 +4,14 @@
 the same seasons, the live build holds no reader, and the team-game targets and play rows are counted
 from week W's plays."""
 
+import argparse
 from datetime import UTC, datetime
 from typing import cast
 
 import pytest
 from sqlalchemy import Connection
 
-from research.model.weekly4.features.__main__ import CLOSED, history_specs
+from research.model.weekly4.features.__main__ import CLOSED, aware_instant, history_specs
 from research.model.weekly4.features.game import Weather
 from research.model.weekly4.features.outcomes import (
     OutcomeReader,
@@ -58,6 +59,12 @@ def test_the_history_build_closes_2025_and_2026_and_never_reaches_past_2024() ->
     specs = history_specs(2016, 2024, "week")
     assert [s.season for s in specs if s.player_weeks] == [2021, 2022, 2023, 2024]
     assert all(s.live_after is None for s in specs)
+
+
+def test_the_live_instant_needs_a_time_zone() -> None:
+    assert aware_instant("2026-10-16T23:40:00+00:00") == datetime(2026, 10, 16, 23, 40, tzinfo=UTC)
+    with pytest.raises(argparse.ArgumentTypeError, match="no time zone"):
+        aware_instant("2026-10-16T23:40:00")
 
 
 def test_team_targets_count_week_ws_plays() -> None:

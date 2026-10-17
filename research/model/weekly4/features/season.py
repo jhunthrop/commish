@@ -97,7 +97,7 @@ def read_prior_shares(
     return prior_shares(games, tally(plays, positions)), (rounds.stamp, stamp)
 
 
-def _inputs(  # noqa: PLR0913, PLR0917 - the season's reads, named
+def season_inputs(  # noqa: PLR0913, PLR0917 - the season's reads, named
     conn: Connection,
     spec: SeasonSpec,
     schedule: Schedule,
@@ -148,7 +148,7 @@ def build_season(
     every = sorted(m for found in moments.values() for m in found)
     if not every:
         raise ValueError(f"{spec.season}: no game of weeks {weeks} kicks off after {spec.live_after}")
-    s = _inputs(conn, spec, schedule, positions, every[-1], weeks)
+    s = season_inputs(conn, spec, schedule, positions, every[-1], weeks)
     depth_rows: list[reads.DepthRow] = []
     prior: Mapping[str, tuple[GameShare, ...]] = {}
     stamps: list[Stamp] = []
