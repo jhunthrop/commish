@@ -21,8 +21,8 @@ import type { CaptureStamp } from '#lib/format/designation.ts';
 import { playerStatusWords, type PlayerStatusWords } from '#lib/run/status-view.ts';
 import { builtSaying, captureStamp } from '../statuses.ts';
 import { seasonView, type KickoffOf, type SeasonView } from './player-season.ts';
-import { cardBuild, restTile, type CardBuild } from './player-card.ts';
-import type { CardTile } from '#lib/player/card.ts';
+import { cardBuild, restParts, restTile, type CardBuild } from './player-card.ts';
+import type { CardTile, RestParts } from '#lib/player/card.ts';
 import {
 	adp,
 	board,
@@ -68,8 +68,9 @@ export interface FormatLine {
 	adpSources: string[];
 	/** How many players this format's board ranks. */
 	boardSize: number;
-	/** The card's rest-of-season tile in this format. */
+	/** The card's rest-of-season tile in this format, and the parts the week's read words it from. */
 	restTile: CardTile;
+	restParts: RestParts | null;
 }
 
 export interface PlayerPage {
@@ -110,8 +111,9 @@ export interface PlayerPage {
 	clubName: string;
 	/** The card's tiles and words as the build knows them (Lane 66h). */
 	card: CardBuild;
-	/** The default format's rest-of-season tile, as its line carries it. */
+	/** The default format's rest-of-season tile and its parts, as its line carries them. */
 	restTile: CardTile;
+	restParts: RestParts | null;
 	/** The week-ahead read (Lane 72), null until the nightly writes his. */
 	weekRead: WeekRead | null;
 }
@@ -127,7 +129,7 @@ async function linesFor(
 	numbers: Readonly<Record<string, PlayerFormat>>,
 	sources: readonly AdpSource[],
 	season: { year: number; underway: boolean; heldOut: boolean },
-	tileOf: (format: Format, numbers: PlayerFormat) => CardTile
+	tileOf: (format: Format, numbers: PlayerFormat) => { tile: CardTile; parts: RestParts | null }
 ): Promise<FormatLine[]> {
 	const reach = await seasonReach();
 	const ranked = formats.flatMap((format) => {
@@ -148,7 +150,8 @@ async function linesFor(
 				words,
 				adpSources,
 				boardSize,
-				restTile: tileOf(line.format, line.numbers)
+				restTile: tileOf(line.format, line.numbers).tile,
+				restParts: tileOf(line.format, line.numbers).parts
 			};
 		})
 	);
@@ -223,7 +226,10 @@ export async function playerPage(slug: string): Promise<PlayerPage> {
 			underway,
 			heldOut: listed?.seasonLong === true
 		},
-		(format, numbers) => restTile(format, numbers, loaded.position, run.season)
+		(format, numbers) => ({
+			tile: restTile(format, numbers, loaded.position, run.season, listed),
+			parts: restParts(format, numbers, loaded.position, listed)
+		})
 	);
 	const [lead] = lines;
 	if (!lead) throw new Error(`${loaded.name} has a page but no format ranks him.`);
@@ -269,6 +275,7 @@ export async function playerPage(slug: string): Promise<PlayerPage> {
 		clubName: clubNameOf(clubList, loaded.team),
 		card: cardBuild(loaded.season, loaded.capsule),
 		restTile: lead.restTile,
+		restParts: lead.restParts,
 		weekRead: loaded.weekRead ?? null
 	};
 }

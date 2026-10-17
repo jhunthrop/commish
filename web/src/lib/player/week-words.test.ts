@@ -19,7 +19,7 @@ const PLAYER = { id: '4426515', name: 'Puka Nacua', team: 'LAR', position: 'WR' 
 const LEAGUE = { id: 'league-1', host: 'sleeper' as const };
 const href: ScreenHref = (screen, query) =>
 	`/league/league-1/${screen}?${new URLSearchParams(query).toString()}`;
-const REST = { fromWeek: 6, rank: 'WR1' };
+const REST = { fromWeek: 6, rank: 'WR1 in our order', scoring: 'ppr' as const, label: 'PPR' };
 
 const facts = (over: Partial<WeekFacts> = {}): WeekFacts => ({
 	week: 6,
@@ -135,6 +135,19 @@ void test("rest of season's figure a game is the API's, one source with the leag
 	assert.equal(tile(tiles, 'rest').value, '182.2');
 });
 
+void test("the rest tile stays in one scoring: the read's figure a game only when it is the tile's", () => {
+	// A half-PPR league's read on a PPR tile: no figure a game, and the tile says its scoring.
+	const half = card(
+		week(
+			{ projection_scoring: { format: 'half_ppr', league_own: true } },
+			{ rest_of_season_per_game: 19.4 }
+		),
+		LEAGUE
+	);
+	assert.equal(tile(half.tiles, 'rest').caption, 'from week 6, WR1 in our order, in PPR scoring');
+	assert.equal(tile(half.tiles, 'rest').value, '182.2');
+});
+
 void test("the opponent's rank says its direction in words", () => {
 	assert.equal(oppCaption('NO', 3, 32, 'QB'), 'NO, among the toughest for quarterbacks');
 	assert.equal(oppCaption('GB', 15, 32, 'WR'), 'GB, in the middle for receivers');
@@ -144,12 +157,13 @@ void test("the opponent's rank says its direction in words", () => {
 void test('a figure not held is "--", and its tile says why', () => {
 	// The snapshot is stored, his row is not in it.
 	const missing = card(week({}, { week_projection: null, projection_delta: null, opp_rank: null }));
+	assert.equal(tile(missing.tiles, 'delta').caption, 'No projection to compare');
 	assert.deepEqual(
 		[tile(missing.tiles, 'proj').value, tile(missing.tiles, 'proj').caption],
 		[NONE, "Not in this week's published projection"]
 	);
 	assert.equal(tile(missing.tiles, 'opp').caption, 'ARI, not ranked yet');
-	assert.equal(tile(missing.tiles, 'delta').caption, '');
+
 	// No snapshot stored for the week.
 	const unread = card(
 		week(

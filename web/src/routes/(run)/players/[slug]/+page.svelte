@@ -76,12 +76,9 @@
 	);
 	/** The week's figures over the tiles as built. */
 	const tiles = $derived<CardTile[]>(live === null ? built : live.tiles);
-	/** Rest of season's first week and his rank, which the read's figure a game joins. */
-	const rest = $derived<RestParts | null>(
-		lead.format.rosFromWeek === undefined
-			? null
-			: { fromWeek: lead.format.rosFromWeek, rank: `${page.position}${String(n.positionRank)}` }
-	);
+	/** Rest of season's parts as the build words them (Lane 63's held rule, its scoring), which the
+	 * read's figure a game joins in that scoring only. */
+	const rest = $derived<RestParts | null>(lead.restParts);
 
 	/** Each read's number: only the latest one asked is shown (review M7). */
 	let asked = 0;

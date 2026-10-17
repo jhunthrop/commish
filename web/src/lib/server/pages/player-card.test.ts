@@ -1,10 +1,10 @@
 // The player card as the build words it (Lane 66h): run with `npm test`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import type { Format, PlayerFormat } from '#lib/run/schema.ts';
+import type { Format, PlayerFormat, PlayerStatus } from '#lib/run/schema.ts';
 import type { GameLogRow, PlayerSeason, StatLine } from '#lib/run/season.ts';
 import { STAT_FIELDS } from '#lib/run/season.ts';
-import { cardBuild, readStamp, restTile } from './player-card.ts';
+import { cardBuild, readStamp, restParts, restTile } from './player-card.ts';
 
 const EMPTY = Object.fromEntries(STAT_FIELDS.map((field) => [field, null])) as Omit<
 	StatLine,
@@ -50,20 +50,57 @@ function season(): PlayerSeason {
 }
 
 const NUMBERS = { positionRank: 1, projected: 254.1 } as PlayerFormat;
-const PRESEASON = { id: 'ppr-12', label: 'PPR' } as Format;
+const PRESEASON = { id: 'ppr-12', label: 'PPR', teams: 12 } as Format;
 const IN_SEASON = { ...PRESEASON, rosFromWeek: 6 } as Format;
 
+const HELD = {
+	status: 'injured_reserve',
+	seasonLong: true,
+	asOf: '2026-09-28T12:00:00.000Z'
+} as unknown as PlayerStatus;
+const QUESTIONABLE = { ...HELD, status: 'questionable', seasonLong: false } as PlayerStatus;
+
 void test('rest of season is his points from the first week and his rank in our order', () => {
-	assert.deepEqual(restTile(IN_SEASON, NUMBERS, 'WR', 2026), {
+	assert.deepEqual(restTile(IN_SEASON, NUMBERS, 'WR', 2026, undefined), {
 		key: 'rest',
 		label: 'Rest of season',
 		value: '254.1',
 		caption: 'from week 6, WR1 in our order',
 		tone: null
 	});
-	const preseason = restTile(PRESEASON, NUMBERS, 'WR', 2026);
+	const preseason = restTile(PRESEASON, NUMBERS, 'WR', 2026, undefined);
 	assert.equal(preseason.label, 'Projected');
 	assert.equal(preseason.caption, 'PPR points for 2026, WR1 in our order');
+});
+
+void test("a held player's tile gives the word, never the rank his figure would earn (Lane 63)", () => {
+	assert.equal(
+		restTile(IN_SEASON, NUMBERS, 'RB', 2026, HELD).caption,
+		'from week 6, RB IR, unranked while on a season-long list'
+	);
+	assert.equal(
+		restTile(PRESEASON, NUMBERS, 'RB', 2026, HELD).caption,
+		'PPR points for 2026, RB IR, unranked while on a season-long list'
+	);
+	// A designation for the week is no season-long list: the rank stands.
+	assert.equal(
+		restTile(IN_SEASON, NUMBERS, 'RB', 2026, QUESTIONABLE).caption,
+		'from week 6, RB1 in our order'
+	);
+});
+
+void test("the rest tile's parts carry its first week, its rank words and its scoring", () => {
+	assert.deepEqual(restParts(IN_SEASON, NUMBERS, 'WR', undefined), {
+		fromWeek: 6,
+		rank: 'WR1 in our order',
+		scoring: 'ppr',
+		label: 'PPR'
+	});
+	assert.equal(restParts(PRESEASON, NUMBERS, 'WR', undefined), null);
+	const half = { ...IN_SEASON, id: 'half-ppr-12', label: 'Half PPR' } as Format;
+	assert.equal(restParts(half, NUMBERS, 'WR', undefined)?.scoring, 'half_ppr');
+	const superflex = { ...IN_SEASON, id: 'superflex-12', label: 'Superflex' } as Format;
+	assert.equal(restParts(superflex, NUMBERS, 'WR', undefined)?.scoring, 'ppr');
 });
 
 void test('the build holds Avg and Last from his season, the week tiles "--", and the week ahead', () => {

@@ -20,6 +20,28 @@ export interface CardTile {
 /** A number not held. */
 export const NONE = '--';
 
+/** The scorings a week's projection is read in: the API's names (ProjectionScoring.format). */
+export type TileScoring = 'ppr' | 'half_ppr' | 'standard';
+
+/** Rest of season's parts the caption names (review N1, N2): its first week, his rank in words as
+ * Lane 63's held rule gives it, and the scoring and its label the tile's total is in. */
+export interface RestParts {
+	fromWeek: number;
+	/** "WR1 in our order", or for a player on a season-long list "RB IR, unranked while on a
+	 * season-long list". */
+	rank: string;
+	scoring: TileScoring;
+	label: string;
+}
+
+/** His rank at his position in words: the number in our order, or Lane 63's word for a player on a
+ * season-long list, who is never given the rank his figure would earn. */
+export function restRankWords(position: string, shown: number | string): string {
+	return typeof shown === 'number'
+		? `${position}${String(shown)} in our order`
+		: `${position} ${shown}, unranked while on a season-long list`;
+}
+
 /** The card's words that are not a player's, in one place for the copy guard. */
 export const CARD = {
 	proj: 'Proj',
@@ -42,6 +64,7 @@ export const CARD = {
 	projNotIn: "This week's projection is not in yet",
 	projNotHim: "Not in this week's published projection",
 	noEarlierRead: 'No earlier read this week',
+	noProjToCompare: 'No projection to compare',
 	notInEarlier: 'Not in the earlier read',
 	notRanked: 'not ranked yet',
 	/** The game log's collapsed earlier seasons (review M8). */

@@ -21,7 +21,7 @@ import { AGAINST } from '#lib/league/box/lineup.ts';
 import type { LeagueHost } from '#lib/league/api.ts';
 import { hostWords } from '#lib/league/names.ts';
 import type { LogNext } from '#lib/ui/game-log.ts';
-import { CARD, NONE, withTile, type CardTile } from './card.ts';
+import { CARD, NONE, withTile, type CardTile, type RestParts } from './card.ts';
 
 type Schemas = components['schemas'];
 export type PlayerWeek = Schemas['PlayerWeek'];
@@ -57,12 +57,6 @@ export interface CardVerb {
 	/** The platform's page, opened in a new tab, his name put on the clipboard first. */
 	external: boolean;
 	note: string | null;
-}
-
-/** Rest of season's parts the card's caption names: its first week and his rank, "WR1". */
-export interface RestParts {
-	fromWeek: number;
-	rank: string;
 }
 
 export interface LiveCard {
@@ -237,7 +231,7 @@ function lastTile(
  * says why, so the change says nothing. */
 function deltaCaption(week: PlayerWeek, zone: string): string {
 	const read = week.projection_previous_read_at;
-	if (week.line.week_projection === null) return '';
+	if (week.line.week_projection === null) return CARD.noProjToCompare;
 	if (read === null) return CARD.noEarlierRead;
 	return week.line.projection_delta === null
 		? CARD.notInEarlier
@@ -254,15 +248,18 @@ function deltaTile(week: PlayerWeek, zone: string): CardTile {
 	};
 }
 
-/** Rest of season with his figure a game from the API's read (the league rows' one source), when it
- * carries one; the tile as built otherwise. */
+/** Rest of season with his figure a game from the API's read (the league rows' one source), only
+ * when the read is in the tile's own scoring: a league in another scoring leaves it out and the
+ * caption names the tile's (review N2). The tile as built on a preseason board. */
 function restTile(week: PlayerWeek, rest: RestParts | null, fallback: CardTile): CardTile {
-	const perGame = week.line.rest_of_season_per_game;
 	if (rest === null) return fallback;
-	const game = perGame === null ? '' : `, ${fixed(perGame, 1)} a game`;
+	const same = week.projection_scoring.format === rest.scoring;
+	const perGame = week.line.rest_of_season_per_game;
+	const game = same && perGame !== null ? `, ${fixed(perGame, 1)} a game` : '';
+	const scoring = same ? '' : `, in ${rest.label} scoring`;
 	return {
 		...fallback,
-		caption: `from week ${String(rest.fromWeek)}${game}, ${rest.rank} in our order`
+		caption: `from week ${String(rest.fromWeek)}${game}, ${rest.rank}${scoring}`
 	};
 }
 
@@ -398,3 +395,5 @@ export function compareSay(a: CompareRow, b: CompareRow): string | null {
 	);
 	return rest === null ? null : `${lead}${rest}`;
 }
+
+export type { RestParts } from './card.ts';

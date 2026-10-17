@@ -4,9 +4,18 @@
 import { dayLabel } from '#lib/format/date.ts';
 import { fixed, plural } from '#lib/format/number.ts';
 import type { GameLogRow, PlayerSeason } from '#lib/run/season.ts';
-import type { Capsule, Format, PlayerFormat } from '#lib/run/schema.ts';
+import { apiFormatOf } from '#lib/run/format-ids.ts';
+import { positionRankShown } from '#lib/run/held-places.ts';
+import type { Capsule, Format, PlayerFormat, PlayerStatus } from '#lib/run/schema.ts';
 import type { Position } from '#lib/types/player.ts';
-import { CARD, NONE, type CardTile } from '#lib/player/card.ts';
+import {
+	CARD,
+	NONE,
+	restRankWords,
+	type CardTile,
+	type RestParts,
+	type TileScoring
+} from '#lib/player/card.ts';
 
 export interface CardBuild {
 	/** The tiles but rest of season, which each format line carries. */
@@ -25,28 +34,43 @@ function opponentWords(row: Pick<GameLogRow, 'opponent' | 'home'>): string {
 	return row.opponent === null ? 'Bye' : `${row.home === true ? 'vs' : 'at'} ${row.opponent}`;
 }
 
-/** His rank at his position, "WR1". */
-export function positionRank(position: Position, rank: number): string {
-	return `${position}${String(rank)}`;
+/** His rank in words in a format, by Lane 63's held rule (the board's and the pill's). */
+function rankIn(
+	numbers: PlayerFormat,
+	position: Position,
+	status: PlayerStatus | undefined
+): string {
+	return restRankWords(
+		position,
+		positionRankShown({ positionRank: numbers.positionRank, ...(status ? { status } : {}) })
+	);
+}
+
+/** The scoring a run format's points are in, by the API's names: superflex scores PPR. */
+function scoringOf(format: Format): TileScoring {
+	const api = apiFormatOf(format);
+	return api === 'half_ppr' || api === 'standard' ? api : 'ppr';
 }
 
 /** The rest-of-season tile in a format: in season his points from the board's first week and his
- * place at his position in our order (his points a game arrive with the week's read, the league rows'
- * one source, review L14); on a preseason board his projection for the season. */
+ * place at his position in our order (his points a game arrive with the week's read, in the tile's
+ * own scoring, review L14, N2); on a preseason board his projection for the season. A player on a
+ * season-long list shows Lane 63's word, never the rank his figure would earn (review N1). */
 export function restTile(
 	format: Format,
 	numbers: PlayerFormat,
 	position: Position,
-	year: number
+	year: number,
+	status: PlayerStatus | undefined
 ): CardTile {
-	const rank = positionRank(position, numbers.positionRank);
+	const rank = rankIn(numbers, position, status);
 	const from = format.rosFromWeek;
 	if (from === undefined) {
 		return {
 			key: 'rest',
 			label: CARD.projected,
 			value: fixed(numbers.projected),
-			caption: `${format.label} points for ${String(year)}, ${rank} in our order`,
+			caption: `${format.label} points for ${String(year)}, ${rank}`,
 			tone: null
 		};
 	}
@@ -54,8 +78,25 @@ export function restTile(
 		key: 'rest',
 		label: CARD.rest,
 		value: fixed(numbers.projected),
-		caption: `from week ${String(from)}, ${rank} in our order`,
+		caption: `from week ${String(from)}, ${rank}`,
 		tone: null
+	};
+}
+
+/** The tile's parts the week's read words its caption from, null on a preseason board. */
+export function restParts(
+	format: Format,
+	numbers: PlayerFormat,
+	position: Position,
+	status: PlayerStatus | undefined
+): RestParts | null {
+	const from = format.rosFromWeek;
+	if (from === undefined) return null;
+	return {
+		fromWeek: from,
+		rank: rankIn(numbers, position, status),
+		scoring: scoringOf(format),
+		label: format.label
 	};
 }
 
