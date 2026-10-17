@@ -262,8 +262,10 @@ func (s *Service) settleMFL(ctx context.Context, sess mfl.Session, set mfl.Lineu
 	return a
 }
 
-// lockRefusal is MyFantasyLeague refusing a lineup for a game under way.
-var lockRefusal = regexp.MustCompile(`(?i)lock|kick ?off|started|in progress`)
+// lockRefusal is MyFantasyLeague refusing a lineup for a game under way:
+// lock wording only ("locked", "lock at kickoff"), never "started" alone.
+// The words are guessed until the proof move captures the real refusal.
+var lockRefusal = regexp.MustCompile(`(?i)\block(ed|s)?\b`)
 
 // mflResultWords is our sentence for what a MyFantasyLeague lineup came
 // to: a lock in its words is said plainly.

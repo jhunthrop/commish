@@ -209,7 +209,7 @@ func TestSetLineupAnswers(t *testing.T) {
 		want         mfl.WriteOutcome
 		words        string
 	}{
-		{"locked", "import-locked.xml", http.StatusOK, mfl.WriteRefused, "Lineup cannot be changed: a player's game has started."},
+		{"locked", "import-locked.xml", http.StatusOK, mfl.WriteRefused, "Lineup is locked: a player's game has started."},
 		{"invalid", "import-invalid.xml", http.StatusOK, mfl.WriteRefused, "An error has occurred - probably caused by one or more invalid parameters."},
 		{"a 400 with no words", "", http.StatusBadRequest, mfl.WriteRefused, ""},
 		{"a 500", "", http.StatusInternalServerError, mfl.WriteUnknown, ""},

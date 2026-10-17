@@ -163,7 +163,7 @@ func TestMFLAnswers(t *testing.T) {
 		sentence     string
 		words        string
 	}{
-		{"locked", "import-locked.xml", http.StatusOK, apitypes.HostMoveResultOutcomeRefused, mflWords.locked, "Lineup cannot be changed: a player's game has started."},
+		{"locked", "import-locked.xml", http.StatusOK, apitypes.HostMoveResultOutcomeRefused, mflWords.locked, "Lineup is locked: a player's game has started."},
 		{"invalid", "import-invalid.xml", http.StatusOK, apitypes.HostMoveResultOutcomeRefused, mflWords.refused,
 			"An error has occurred - probably caused by one or more invalid parameters."},
 		{"lost", "", http.StatusInternalServerError, apitypes.HostMoveResultOutcomePending, mflWords.pending, ""},
@@ -181,6 +181,24 @@ func TestMFLAnswers(t *testing.T) {
 			t.Errorf("%s: %+v", tc.name, res)
 		}
 		r.noSessionKept(t)
+	}
+}
+
+// Only lock wording reads as a lock: a refusal that says "started" about
+// something else keeps the plain sentence and MyFantasyLeague's words.
+func TestMFLLockWordsOnly(t *testing.T) {
+	cases := map[string]string{
+		"Lineup is locked.":                   mflWords.locked,
+		"Player 13604 is locked for week 7.":  mflWords.locked,
+		"Lineups lock at kickoff.":            mflWords.locked,
+		"The season has not started.":         mflWords.refused,
+		"Unlocking requires the commissioner": mflWords.refused,
+		"An error has occurred - probably caused by one or more invalid parameters.": mflWords.refused,
+	}
+	for words, want := range cases {
+		if got := mflResultWords(Answer{Outcome: OutcomeRefused, HostWords: words}); got != want {
+			t.Errorf("%q: %q", words, got)
+		}
 	}
 }
 

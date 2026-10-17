@@ -1,21 +1,30 @@
-MyFantasyLeague member fixtures (Lane 67): documented shapes, not recorded exchanges.
+MyFantasyLeague member fixtures (Lane 67): documented shapes and guesses, not recorded exchanges.
 
 No member session for the founder's test league was on hand, so none of these
-files is a capture. Each follows MyFantasyLeague's public API documentation
-(https://api.myfantasyleague.com/2026/api_info: "Authentication", "Import
-requests", the login and myleagues entries) and the export shapes this package
-already reads from recorded public answers (api/internal/leaguesync/replay/mfl).
+files is a capture. Each is marked DOCUMENTED (the shape MyFantasyLeague's
+public API documentation gives, https://api.myfantasyleague.com/2026/api_info:
+"Authentication", "Import requests", the login and myleagues entries),
+TRIMMED (cut from a recorded public answer in api/internal/leaguesync/replay/mfl)
+or GUESSED (our own words or shape, standing in until the proof move captures
+the real answer; a test that passes on a GUESSED file proves nothing about
+MyFantasyLeague).
 
-  login-ok.xml            the login answer, <status> carrying MFL_USER_ID (documented)
-  login-refused.xml       the login refusal, <error> with its reason (documented shape, assumed words)
-  myleagues.json          TYPE=myleagues&FRANCHISE_NAMES=1 for a session (documented fields)
-  league-member.json      TYPE=league, trimmed from the recorded public shape
-  rosters-member.json     TYPE=rosters, the recorded public shape
-  live-member.json        TYPE=liveScoring for the week before the swap, the recorded public shape
-  live-member-after.json  the same after the swap
-  import-ok.xml           an import's success, <status>OK</status> (documented)
-  import-locked.xml       an import refused for a started game (assumed words: replace with the proof move's capture)
-  import-invalid.xml      an import refused for its parameters (the export refusal's recorded words)
+  login-ok.xml             DOCUMENTED  the login answer, <status> carrying MFL_USER_ID
+  login-refused.xml        GUESSED     the login refusal's words ("Invalid Password"); any <error> counts as refused
+  myleagues.json           DOCUMENTED  TYPE=myleagues&FRANCHISE_NAMES=1 for a session, the wwwNN url per league
+  league-member.json       TRIMMED     TYPE=league
+  rosters-member.json      TRIMMED     TYPE=rosters
+  status-member.json       TRIMMED     fflnetdynamic{year}/mfl_status.json, week 7
+  live-member.json         TRIMMED     TYPE=liveScoring before the swap, the member's franchise in a matchup
+  live-member-after.json   TRIMMED     the same after the swap (assumes no export cache lag after the import)
+  live-member-absent.json  GUESSED     a liveScoring that lists the member's franchise nowhere
+  live-member-alone.json   GUESSED     a league with no head-to-head games, franchises listed outside any matchup
+  import-ok.xml            DOCUMENTED  an import's success, <status>OK</status>
+  import-locked.xml        GUESSED     an import refused for a started game ("Lineup is locked: ...")
+  import-invalid.xml       TRIMMED     an import refused for its parameters (the export refusal's recorded words)
 
-The proof move (the lane 67 report) records the real answers: replace the
-assumed files with them and keep this list true.
+The proof move (the lane 67 report) captures the login answer and its cookie
+expiry, myleagues, liveScoring with the member's team, the import's success,
+the read-back right after it, and a lock refusal: replace these files with the
+captures (values replaced by types, no session in them), mark each RECORDED
+with its date, and keep this list true.
