@@ -10,7 +10,7 @@ import pytest
 from research.errors import ConfigurationError
 from research.model.weekly2.gates import GateLine
 from research.model.weekly4.gates import DEVELOPMENT_CHECK, ROUND_FOUR
-from research.model.weekly4.round import STOPPING, decision, stop_rule_refusal, thresholds_for
+from research.model.weekly4.round import STOPPING, decision, stop_rule_refusal, store_clause, thresholds_for
 
 
 def _record(g2: bool, g6: bool) -> dict[str, Any]:
@@ -41,6 +41,18 @@ def test_the_judgment_refuses_without_its_commits_its_check_or_once_taken() -> N
         thresholds_for("judge", lambda: [], never, lambda: _record(False, True))
     with pytest.raises(ConfigurationError, match="taken once"):
         thresholds_for("judge", lambda: [], lambda _: True, lambda: _record(True, True))
+
+
+def test_the_stores_clause_needs_no_broken_read_and_no_season_past_the_judged_one() -> None:
+    seasons = [
+        {"stamps": {"broken": 0}, "clause": {"team": {"holds": True}, "player": None}},
+        {"stamps": {"broken": 0}, "clause": {"team": {"holds": True}, "player": {"holds": True}}},
+    ]
+    report = {"seasons": seasons, "outcome_seasons_read": [2016, 2023]}
+    assert store_clause(report, 2023)[0]
+    assert not store_clause({**report, "outcome_seasons_read": [2016, 2024]}, 2023)[0]
+    broken = [{**seasons[0], "stamps": {"broken": 1}}, seasons[1]]
+    assert not store_clause({**report, "seasons": broken}, 2023)[0]
 
 
 def test_the_check_names_the_stopping_lines() -> None:

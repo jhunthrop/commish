@@ -186,15 +186,23 @@ def thresholds_payload(t: RoundFour) -> dict[str, Any]:
     return found
 
 
-def _store_clause(report: Mapping[str, Any]) -> tuple[bool, str]:
-    """The store's per-game clause (its build's report): no broken read and both clauses held."""
+def store_clause(report: Mapping[str, Any], last_season: int) -> tuple[bool, str]:
+    """The store's per-game clause (its build's report): no broken read, every clause held, and no
+    outcome season read past the judged one."""
     seasons = report["seasons"]
     broken = sum(int(s["stamps"]["broken"]) for s in seasons)
-    held = all(s["clause"]["team"]["holds"] and s["clause"]["player"]["holds"] is not False for s in seasons)
-    return (
-        broken == 0 and held,
-        f"the store: {broken} broken reads over {len(seasons)} seasons, clauses {'held' if held else 'broken'}",
+    held = all(
+        s["clause"]["team"]["holds"] and (s["clause"]["player"] is None or s["clause"]["player"]["holds"])
+        for s in seasons
     )
+    read = sorted(int(x) for x in report.get("outcome_seasons_read", []))
+    beyond = [x for x in read if x > last_season]
+    detail = (
+        f"the store: {broken} broken reads over {len(seasons)} seasons, clauses {'held' if held else 'broken'}, "
+        f"its build read outcomes of {read[0] if read else None} to {read[-1] if read else None}"
+        + (f", past the judged season: {beyond}" if beyond else "")
+    )
+    return broken == 0 and held and not beyond, detail
 
 
 def _extras(  # noqa: PLR0913, PLR0917 - the fit weeks' reads, named
@@ -260,9 +268,9 @@ def _run(command: str, url: str, features: Path, t: RoundFour, out: Path) -> int
     fitted = fit_system(store, extras, t)
     judged = judge_season(t, fitted, r3.rows, extras.lines, store, judgment=command == "judge")
     r3_clause = next(line for line in r3.lines if line.gate == "G5")
-    store_clause = _store_clause(report)
-    held = r3_clause.passed and read_clause[0] and store_clause[0]
-    detail = f"round 3's reads: {r3_clause.detail.split('per-game clause: ')[-1]}; the fit weeks' reads: {read_clause[1]}; {store_clause[1]}"
+    store_check = store_clause(report, t.judgment_season)
+    held = r3_clause.passed and read_clause[0] and store_check[0]
+    detail = f"round 3's reads: {r3_clause.detail.split('per-game clause: ')[-1]}; the fit weeks' reads: {read_clause[1]}; {store_check[1]}"
     served = {
         "plays and teams": fitted.served["plays and teams"],
         "players": tuple(sorted({*fitted.served["players"], *(s for s in r3.fit.served), *extra_served})),
