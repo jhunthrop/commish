@@ -78,6 +78,8 @@ type Server struct {
 	SessionRefused bool
 	// MyLeagues is the myleagues fixture.
 	MyLeagues string
+	// Live is the liveScoring fixture before an import applies.
+	Live string
 
 	loginQueries []string
 	imports      []url.Values
@@ -88,7 +90,8 @@ type Server struct {
 // New starts the stand-in; it closes with the test.
 func New(t testing.TB) *Server {
 	t.Helper()
-	s := &Server{t: t, ImportStatus: http.StatusOK, ImportAnswer: "import-ok.xml", Applies: true, MyLeagues: "myleagues.json"}
+	s := &Server{t: t, ImportStatus: http.StatusOK, ImportAnswer: "import-ok.xml", Applies: true, MyLeagues: "myleagues.json",
+		Live: "live-member.json"}
 	srv := httptest.NewServer(http.HandlerFunc(s.serve))
 	t.Cleanup(srv.Close)
 	s.URL = srv.URL
@@ -173,7 +176,7 @@ func (s *Server) export(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write(Testdata(s.t, "live-member-after.json"))
 			return
 		}
-		_, _ = w.Write(Testdata(s.t, "live-member.json"))
+		_, _ = w.Write(Testdata(s.t, s.Live))
 	default:
 		http.NotFound(w, r)
 	}

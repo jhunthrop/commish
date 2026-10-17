@@ -107,6 +107,23 @@ func TestMemberLineup(t *testing.T) {
 	}
 }
 
+// A franchise live scoring does not list is never an empty lineup: the
+// read fails, and a league with no head-to-head games, whose franchises
+// are listed outside any matchup, reads as any other.
+func TestMemberLineupNeedsTheFranchiseInLiveScoring(t *testing.T) {
+	srv := mfltest.New(t)
+	srv.Set(func(s *mfltest.Server) { s.Live = "live-member-absent.json" })
+	sess := mfl.Session{UserID: mfltest.Session}
+	if _, err := srv.Client().MemberLineup(context.Background(), sess, mfltest.Season, mfltest.LeagueID); !errors.Is(err, mfl.ErrNoLineup) {
+		t.Fatalf("absent: %v", err)
+	}
+	srv.Set(func(s *mfltest.Server) { s.Live = "live-member-alone.json" })
+	l, err := srv.Client().MemberLineup(context.Background(), sess, mfltest.Season, mfltest.LeagueID)
+	if err != nil || !slices.Equal(l.Starters, []string{mfltest.QB, mfltest.RBStarts, mfltest.WR1, mfltest.WR2}) {
+		t.Fatalf("listed outside a matchup: %v %+v", err, l.Starters)
+	}
+}
+
 func lineup(t *testing.T, c *mfl.Client) mfl.TeamLineup {
 	t.Helper()
 	l, err := c.MemberLineup(context.Background(), mfl.Session{UserID: mfltest.Session}, mfltest.Season, mfltest.LeagueID)
@@ -135,6 +152,8 @@ func TestOwnLineup(t *testing.T) {
 		"on IR":             {mfltest.Franchise, []string{mfltest.QB, mfltest.OnIR, mfltest.WR1, mfltest.WR2}, mfl.ErrBadMove},
 		"twice":             {mfltest.Franchise, []string{mfltest.QB, mfltest.QB, mfltest.WR1, mfltest.WR2}, mfl.ErrBadMove},
 		"too many":          {mfltest.Franchise, append(slices.Clone(swapped), mfltest.WRBench), mfl.ErrBadMove},
+		"fewer than starts": {mfltest.Franchise, swapped[:3], mfl.ErrBadMove},
+		"one alone":         {mfltest.Franchise, []string{mfltest.RBBench}, mfl.ErrBadMove},
 		"none":              {mfltest.Franchise, nil, mfl.ErrBadMove},
 	}
 	for name, c := range cases {

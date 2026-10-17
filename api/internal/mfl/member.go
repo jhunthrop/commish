@@ -386,7 +386,8 @@ func (c *Client) memberTeam(ctx context.Context, sess Session, out *TeamLineup) 
 }
 
 // starters is the franchise's starters in the week as live scoring lists
-// them for the session.
+// them for the session: ErrNoLineup when it lists the franchise nowhere,
+// or with no starter, never an empty lineup.
 func (c *Client) starters(ctx context.Context, sess Session, server string, season int, leagueID string, week, franchise int) ([]string, error) {
 	if week < 1 || week > maxWeek {
 		return nil, ErrNotFound
@@ -395,18 +396,8 @@ func (c *Client) starters(ctx context.Context, sess Session, server string, seas
 	if err := c.memberExport(ctx, sess, server, season, leagueID, "liveScoring", url.Values{"W": {strconv.Itoa(week)}}, &w); err != nil {
 		return nil, err
 	}
-	matchups, err := w.validate()
-	if err != nil {
-		return nil, err
-	}
-	for _, m := range matchups {
-		for _, s := range m.Sides {
-			if s.Franchise == franchise {
-				return s.Starters, nil
-			}
-		}
-	}
-	return nil, nil
+	side, err := w.lineupOf(franchise)
+	return side.Starters, err
 }
 
 // wireAnswer is an import's answer in either of MyFantasyLeague's forms:

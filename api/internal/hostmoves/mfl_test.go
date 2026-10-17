@@ -252,6 +252,37 @@ func TestMFLPlanRefusals(t *testing.T) {
 	}
 }
 
+// A whole lineup is sent, so a read that does not list the member's
+// franchise, or a move that would start fewer than start now, sends
+// nothing: never "start X" alone over an empty read.
+func TestMFLNeverSendsAPartialLineup(t *testing.T) {
+	r := newMFLRig(t)
+	r.srv.Set(func(s *mfltest.Server) { s.Live = "live-member-absent.json" })
+	fill := apitypes.HostMoveInput{Kind: apitypes.HostMoveInputKindLineup, Week: mfltest.Week,
+		Changes: []apitypes.HostMoveChange{{Slot: apitypes.HostMoveChangeSlotRB, In: mfltest.RBBench}}}
+	code, env, _ := r.call(t, r.svc.plan, me, fill)
+	if code != http.StatusBadGateway || env.Error == nil || env.Error.Message != mflWords.notAnswering {
+		t.Fatalf("absent franchise, plan: %d %+v", code, env.Error)
+	}
+	token, _ := r.svc.Signer.Sign(me, linkID, fill, r.now.Add(ConfirmFor))
+	if code, _, _ := r.move(t, fill, token); code != http.StatusBadGateway {
+		t.Fatalf("absent franchise, move: %d", code)
+	}
+	r.srv.Set(func(s *mfltest.Server) { s.Live = "live-member.json" })
+	shrink := apitypes.HostMoveInput{Kind: apitypes.HostMoveInputKindLineup, Week: mfltest.Week,
+		Changes: []apitypes.HostMoveChange{{Slot: apitypes.HostMoveChangeSlotFLEX, In: mfltest.WR1, Out: ptr(mfltest.RBStarts)}}}
+	if code, env, _ := r.call(t, r.svc.plan, me, shrink); code != http.StatusUnprocessableEntity || env.Error.Message != mflWords.stale {
+		t.Fatalf("fewer starters: %d %+v", code, env.Error)
+	}
+	r.svc.Players = nil
+	if code, _, _ := r.call(t, r.svc.plan, me, shrink); code != http.StatusUnprocessableEntity {
+		t.Fatalf("fewer starters, no directory: %d", code)
+	}
+	if n := len(r.srv.Imports()); n != 0 || len(r.proofs.order) != 0 {
+		t.Fatalf("%d imports, %d moves kept", n, len(r.proofs.order))
+	}
+}
+
 // The team must be the attached league's seat and the one MyFantasyLeague
 // lists for the session: anything else is unavailable, nothing sent; a
 // session MyFantasyLeague refuses asks to connect again.

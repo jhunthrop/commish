@@ -157,8 +157,13 @@ func startersAfter(team mfl.TeamLineup, changes []apitypes.HostMoveChange, name 
 			out = append(out, c.In)
 		}
 	}
-	if sameSet(out, team.Starters) {
+	switch {
+	case sameSet(out, team.Starters):
 		return nil, refuse(mflWords.stale, errors.New("the move changes no starter"))
+	// The import takes the whole lineup: a move never starts fewer than
+	// start now, nor than the league starts when it says.
+	case len(out) < len(team.Starters) || (team.StarterCount > 0 && len(out) < team.StarterCount):
+		return nil, refuse(mflWords.stale, fmt.Errorf("%d starters after the move, %d now, %d in the league", len(out), len(team.Starters), team.StarterCount))
 	}
 	return out, nil
 }

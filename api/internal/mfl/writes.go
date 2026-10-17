@@ -61,12 +61,16 @@ func (s LineupSet) Starters() []string { return append([]string(nil), s.starters
 // OwnLineup checks a lineup against a fresh read of the member's team:
 // franchise must be theirs (the attached league's seat and the one
 // MyFantasyLeague lists for the session), every starter on the active
-// roster once, no more than the league starts.
+// roster once, no fewer than start now and exactly as many as the league
+// starts when it says.
 func OwnLineup(t TeamLineup, franchise int, starters []string) (LineupSet, error) {
 	if t.Franchise != franchise || franchise < 1 {
 		return LineupSet{}, fmt.Errorf("%w: franchise %d", ErrNotYourTeam, franchise)
 	}
-	if len(starters) == 0 || len(starters) > maxRoster || (t.StarterCount > 0 && len(starters) > t.StarterCount) {
+	// MyFantasyLeague takes STARTERS as the whole lineup: never fewer than
+	// start now, nor than the league starts when it says.
+	if len(starters) == 0 || len(starters) > maxRoster || len(starters) < len(t.Starters) ||
+		(t.StarterCount > 0 && len(starters) != t.StarterCount) {
 		return LineupSet{}, fmt.Errorf("%w: %d starters", ErrBadMove, len(starters))
 	}
 	active := setOf(t.Roster)
