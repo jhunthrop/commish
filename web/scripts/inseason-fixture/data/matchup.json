@@ -721,7 +721,7 @@
 						"played": false,
 						"points_this_week": null,
 						"last_games": [],
-						"allowed_to_position": { "points_a_game": 21, "rank": 15, "of": 32, "position": "DEF" },
+						"allowed_to_position": null,
 						"game_total": {
 							"points": 42.5,
 							"team_points": 20,
@@ -733,7 +733,7 @@
 					},
 					"week_projection": 7.9,
 					"projection_delta": -0.3,
-					"opp_rank": 15,
+					"opp_rank": null,
 					"season_avg": null,
 					"last_points": null
 				},
@@ -1467,7 +1467,7 @@
 						"rest_of_season_per_game": null,
 						"week_projection": 9.4,
 						"projection_delta": 0.3,
-						"opp_rank": 8,
+						"opp_rank": null,
 						"season_avg": null,
 						"last_points": null,
 						"held": false,
@@ -1481,12 +1481,7 @@
 							"played": false,
 							"points_this_week": null,
 							"last_games": [],
-							"allowed_to_position": {
-								"points_a_game": 25.2,
-								"rank": 8,
-								"of": 32,
-								"position": "DEF"
-							},
+							"allowed_to_position": null,
 							"game_total": {
 								"points": 43.5,
 								"team_points": 18.5,

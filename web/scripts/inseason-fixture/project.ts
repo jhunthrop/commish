@@ -141,8 +141,9 @@ function evidenced(line: PlayerLine, projected: number | null): PlayerLine {
 		games.length === 0
 			? null
 			: Math.round((games.reduce((a, g) => a + g.points, 0) / games.length) * CENTS) / CENTS;
+	// The API ranks no defense (facts.go allowedPositions), so a defense has none here either.
 	const rank =
-		facts.bye || facts.opponent === null
+		facts.bye || facts.opponent === null || player.position === DEFENSE
 			? null
 			: (seed(facts.opponent + player.position) % RANKED) + 1;
 	const allowed =
@@ -239,8 +240,9 @@ function advise(advice: LineupAdvice): LineupAdvice {
 	const kinds = advice.slots.map((s) => s.slot);
 	const chosen = new Set<string>();
 	const pick = (slot: LineupSlot['slot']): void => {
+		// A player who cannot play this week never starts (the API's rule, engine.go).
 		const best = order.find(
-			(l) => !chosen.has(l.player.host_id) && accepts(slot, l.player.position)
+			(l) => tierOf(l) === 0 && !chosen.has(l.player.host_id) && accepts(slot, l.player.position)
 		);
 		if (best) chosen.add(best.player.host_id);
 	};
@@ -265,12 +267,31 @@ function advise(advice: LineupAdvice): LineupAdvice {
 		);
 		if (at >= 0) placed[at] = l;
 	}
+	// A spot no one who can play fills keeps the member's player there, marked (keepWhereNoOneCanPlay).
+	const idle = new Set<string>();
+	placed.forEach((p, i) => {
+		const h = hostAt[i];
+		if (p === null && h && !chosen.has(h.player.host_id)) {
+			placed[i] = h;
+			chosen.add(h.player.host_id);
+			idle.add(h.player.host_id);
+		}
+	});
 	const sat = hostAt.filter((h): h is PlayerLine => h !== null && !chosen.has(h.player.host_id));
 	const slots = advice.slots.flatMap((slot, i): LineupSlot[] => {
 		const ours = placed[i];
 		if (!ours) return [];
 		if (hostIds.has(ours.player.host_id)) {
-			return [{ slot: slot.slot, ours, host: ours, changed: false, sentence: null }];
+			return [
+				{
+					slot: slot.slot,
+					ours,
+					host: ours,
+					changed: false,
+					no_one_can_play: idle.has(ours.player.host_id),
+					sentence: null
+				}
+			];
 		}
 		const own = hostAt[i];
 		const host =
@@ -278,7 +299,16 @@ function advise(advice: LineupAdvice): LineupAdvice {
 				? own
 				: (sat.find((l) => l.player.position === ours.player.position) ?? sat[0] ?? null);
 		if (host) sat.splice(sat.indexOf(host), 1);
-		return [{ slot: slot.slot, ours, host, changed: true, sentence: changeWords(ours, host) }];
+		return [
+			{
+				slot: slot.slot,
+				ours,
+				host,
+				changed: true,
+				no_one_can_play: false,
+				sentence: changeWords(ours, host)
+			}
+		];
 	});
 	const starting = new Set(slots.map((s) => s.ours.player.host_id));
 	const reserved = [...advice.reserve, ...advice.bench, ...pool]
@@ -296,7 +326,7 @@ function advise(advice: LineupAdvice): LineupAdvice {
 
 /** The lineup's basis as the API now words it (words.go LineupBasis, Lane 66e). */
 const LINEUP_BASIS =
-	"We start the highest Proj at each slot, after this week's designations and byes. Our rest-of-season order breaks ties and stands in where a player has no Proj.";
+	"We start the highest Proj at each slot, after this week's designations and byes. A player who cannot play this week never starts. Our rest-of-season order breaks ties and stands in where a player has no Proj.";
 
 function lineupNote(note: string): string {
 	return note.replace(/^Points over replacement are for [^.]*\. ?/, '');

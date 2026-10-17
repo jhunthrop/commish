@@ -486,7 +486,9 @@ async function lineup(): Promise<LineupAdvice> {
 		if (!o) return [];
 		const kind = SLOT_OF[slot] ?? 'FLEX';
 		if (hostIds.has(o.player.host_id)) {
-			return [{ slot: kind, ours: o, host: o, changed: false, sentence: null }];
+			return [
+				{ slot: kind, ours: o, host: o, changed: false, no_one_can_play: false, sentence: null }
+			];
 		}
 		const here = hostStarters[i];
 		const h =
@@ -494,7 +496,16 @@ async function lineup(): Promise<LineupAdvice> {
 				? here
 				: (sat.find((l) => eligible(slot, l.player.position)) ?? sat[0] ?? null);
 		if (h) sat.splice(sat.indexOf(h), 1);
-		return [{ slot: kind, ours: o, host: h, changed: true, sentence: changeSentence(o, h) }];
+		return [
+			{
+				slot: kind,
+				ours: o,
+				host: h,
+				changed: true,
+				no_one_can_play: false,
+				sentence: changeSentence(o, h)
+			}
+		];
 	});
 	const bench = myLines
 		.filter((l) => !started.has(l.player.host_id))

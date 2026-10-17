@@ -408,7 +408,11 @@ async function lineupFaults(page: Page): Promise<string[]> {
 			outSlots: rows
 				.filter((tr) => tr.classList.contains('moved-out'))
 				.map((tr) => cell(tr.querySelector('td.slot') ?? tr)),
-			chips: document.querySelectorAll('main .swaps .swap').length,
+			chips: document.querySelectorAll('main .swaps .swap:not(.idle)').length,
+			reason: [...document.querySelectorAll('main .verb .foot')]
+				.map((el) => (el as HTMLElement).innerText)
+				.join(' '),
+			second: document.querySelector('main .verb a.second[href^="http"]') !== null,
 			reserve: rows.some((tr) => tr.textContent.includes('Injured reserve')),
 			text: document.querySelector<HTMLElement>('main')?.innerText ?? ''
 		};
@@ -430,8 +434,11 @@ async function lineupFaults(page: Page): Promise<string[]> {
 		faults.push('the change basis');
 	if (!seen.text.includes('We start the highest Proj at each slot'))
 		faults.push('the advice basis');
-	if (!seen.text.includes('Sleeper takes no lineup from outside.'))
-		faults.push("the copy verb's line naming the platform");
+	// The line under the copy verb is the API's reason: only that it names the platform is checked, so
+	// a change in the API's words changes nothing here (review H1).
+	if (!seen.reason.includes('Sleeper')) faults.push(`the copy verb's line: ${seen.reason}`);
+	if (!seen.second) faults.push("no link to the platform's lineup page beside the copy verb");
+	if (/\bpaste\b/i.test(seen.text)) faults.push('a paste no platform takes');
 	await page.locator('button.why').filter({ visible: true }).first().click();
 	const why = await page.locator('tr.whyline').first().innerText();
 	if (!/Proj against \S+'s \d+\.\d|is on bye\.|is listed /.test(why))
@@ -440,7 +447,8 @@ async function lineupFaults(page: Page): Promise<string[]> {
 	return faults;
 }
 
-/** The copy verb, in the dark theme at both widths: it says where to paste once pressed. */
+/** The copy verb, in the dark theme at both widths: once pressed it says to set the lineup on the
+ * platform's lineup page, the page its link (review H2). */
 for (const width of SHOT_WIDTHS) {
 	const ctx = await context('dark', width);
 	await ctx.grantPermissions(['clipboard-read', 'clipboard-write']);
@@ -454,10 +462,21 @@ for (const width of SHOT_WIDTHS) {
 		.filter({ visible: true })
 		.first()
 		.click();
-	await ready(page, "Copied. Paste it on Sleeper's lineup page.");
+	await ready(page, 'Copied.');
 	const copied = await page.evaluate(() => navigator.clipboard.readText());
 	if (!copied.startsWith('Week 6 lineup\nQB '))
 		missing.push(`start copy ${String(width)}: ${copied}`);
+	const after = await page.evaluate(() => {
+		const foot = [...document.querySelectorAll('main .foot')].find(
+			(el) => (el as HTMLElement).offsetParent !== null
+		);
+		return {
+			text: (foot as HTMLElement | undefined)?.innerText ?? '',
+			link: foot?.querySelector('a[href^="http"]')?.textContent ?? ''
+		};
+	});
+	if (!/^Copied\. Set it on .*Sleeper.*\.$/.test(after.text) || !after.link.includes('Sleeper'))
+		missing.push(`start copied ${String(width)}: "${after.text}" link "${after.link}"`);
 	await page.screenshot({ path: file(`start-copied-dark-${String(width)}`) });
 	await ctx.close();
 }
