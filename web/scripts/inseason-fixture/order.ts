@@ -93,7 +93,9 @@ const gamesLeft = (club: string): number => {
 
 /** A figure to the tenth the API prints, half away from zero on its decimal value (Lane 66k's ruling). */
 const tenth = (v: number | null): number | null =>
-	v === null ? null : Number(Math.sign(v) * Math.round(Number(`${String(Math.abs(v))}e1`)) + 'e-1');
+	v === null
+		? null
+		: Number(`${String(Math.sign(v) * Math.round(Number(`${String(Math.abs(v))}e1`)))}e-1`);
 
 /** The line's figures as the order's route returns them, each a tenth. */
 function tenths(line: PlayerLine): PlayerLine {

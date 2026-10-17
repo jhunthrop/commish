@@ -157,7 +157,6 @@ async function orderFaults(page: Page, screen: Screen, width: number): Promise<s
 		};
 	});
 	const said: string[] = [];
-	const wide = width > PHONE_MAX;
 	if (seen.rows === 0) said.push(`${screen.name}: no rows`);
 	if (width >= FOLDS_AT && !seen.groups.includes('Our rest-of-season order'))
 		said.push(`${screen.name}: no order group over # (${seen.groups.join('|')})`);
