@@ -240,16 +240,21 @@ func BasisNote(s apitypes.LeagueSettings) string {
 }
 
 // LineupBasis is the start and sit page's honesty line (§4.4), on either
-// order: neither ranks by a week's projection (the rows show the
-// published one, Lane 66d), and the stamp dates the order.
-func LineupBasis(b OrderBasis, weeks int) string {
+// order: neither ranks by a week's projection, and the stamp dates the
+// order. Its rows end on the week's published projection and points so far
+// (Lane 66d), which the page says itself, so it says nothing of points over
+// replacement, which no row shows.
+func LineupBasis(b OrderBasis) string {
 	order := "our preseason number"
 	if b == RestOfSeason {
 		order = "our rest-of-season order"
 	}
-	return fmt.Sprintf("Ranked by %s and this week's designations, not by a week's projection. %s",
-		order, porWords(b, weeks))
+	return fmt.Sprintf("Ranked by %s and this week's designations, not by a week's projection.", order)
 }
+
+// LineupNote is the start and sit page's note under its rows: the league's
+// rules its points so far leave out, empty when they leave out none.
+func LineupNote(s apitypes.LeagueSettings) string { return uncountedWords(s) }
 
 // WaiversBasis is the waiver page's (§5.3).
 func WaiversBasis(b OrderBasis, weeks int) string {

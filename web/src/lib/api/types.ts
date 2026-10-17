@@ -2733,9 +2733,9 @@ export interface components {
 			 * @description when the week's published projection the rows' week_projection read was captured, null with none
 			 */
 			projection_read_at: string | null;
-			/** @description the honesty line above the rows: the order, and what points over replacement a week are */
+			/** @description the honesty line above the rows: the order the lineup is ranked by, never a week's projection */
 			basis: string;
-			/** @description the rest of the basis, said once under the rows: the league the points over replacement are for and the league's rules points so far leave out */
+			/** @description the rest of the basis, said once under the rows: the league's rules points so far leave out, empty when they leave out none (the page says what Proj and Pts are itself) */
 			basis_note: string;
 			order_basis: components['schemas']['OrderBasis'];
 			/**

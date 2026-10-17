@@ -2298,10 +2298,10 @@ type Lineup string
 
 // LineupAdvice defines model for LineupAdvice.
 type LineupAdvice struct {
-	// Basis the honesty line above the rows: the order, and what points over replacement a week are
+	// Basis the honesty line above the rows: the order the lineup is ranked by, never a week's projection
 	Basis string `json:"basis"`
 
-	// BasisNote the rest of the basis, said once under the rows: the league the points over replacement are for and the league's rules points so far leave out
+	// BasisNote the rest of the basis, said once under the rows: the league's rules points so far leave out, empty when they leave out none (the page says what Proj and Pts are itself)
 	BasisNote string `json:"basis_note"`
 
 	// Bench everyone else on the active roster, by the same keys (injured reserve and taxi spots left out)
