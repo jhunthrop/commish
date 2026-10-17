@@ -97,6 +97,9 @@ type Snapshot struct {
 	// Calendar is the host's word on the league's draft, playoffs and
 	// waivers, the facts its phase is read from (phase.go).
 	Calendar Calendar `json:"calendar"`
+	// Terms is the host's word on the league's waivers and playoffs, for
+	// the league page's settings (terms.go).
+	Terms Terms `json:"terms"`
 }
 
 // Pool statuses, as the waiver tool reads them.
@@ -129,6 +132,21 @@ type Team struct {
 	Losses    int      `json:"losses"`
 	Ties      int      `json:"ties"`
 	PointsFor float64  `json:"points_for"`
+	// PointsAgainst is the season's points against, nil where the host
+	// does not say.
+	PointsAgainst *float64 `json:"points_against,omitempty"`
+	// Streak is the run of wins or losses, "W3" or "L2", empty where the
+	// host does not say.
+	Streak string `json:"streak,omitempty"`
+	// WaiverOrder is the team's place in the waiver order, 0 where the
+	// host does not say.
+	WaiverOrder int `json:"waiver_order,omitempty"`
+	// BudgetLeft is the waiver budget the team has left, nil without a
+	// budget or where the host does not say.
+	BudgetLeft *int `json:"budget_left,omitempty"`
+	// Avatar is the host's image for the team or its owner, empty where
+	// the host gives none we show.
+	Avatar string `json:"avatar,omitempty"`
 }
 
 // Side is one team's side of the week's matchup.
@@ -160,6 +178,9 @@ type Move struct {
 	Adds      map[string]int `json:"adds"`
 	Drops     map[string]int `json:"drops"`
 	At        time.Time      `json:"at"`
+	// Bid is a claim's bid from the league's waiver budget, nil for a
+	// move with none.
+	Bid *int `json:"bid,omitempty"`
 }
 
 // Scoring is the league's points per stat as ScoringRules (rules.go),
