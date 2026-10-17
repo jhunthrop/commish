@@ -47,11 +47,20 @@ func CopyOnlyMoves(host string) apitypes.LineupMoves {
 // takes no claim from our screen.
 const copyClaimWords = "%s does not take claims from here, so add him on its waiver page."
 
-// CopyOnlyClaims is the waiver verb where the platform takes no claim from
-// here, or no moves are wired: the platform's waiver page, with the line
-// that says why, the platform named (Lane 66f).
+// ClaimsOffWords is the line under the waiver page verb where the
+// platform takes claims from here but not for this member now (ESPN with
+// its claim switch off, or a check that failed).
+const ClaimsOffWords = "Claims are not sent to ESPN from here yet, so add him on ESPN's waiver page."
+
+// CopyOnlyClaims is the waiver verb where the claim is not made from here:
+// the platform's waiver page, with the line that says why, the platform
+// named (Lane 66f). ESPN takes claims, so its line says they are not sent
+// from here yet rather than that ESPN takes none (review 66f M2).
 func CopyOnlyClaims(host string) apitypes.WaiverMoves {
 	reason := fmt.Sprintf(copyClaimWords, leaguesync.HostWords(host))
+	if host == leaguesync.HostESPN {
+		reason = ClaimsOffWords
+	}
 	return apitypes.WaiverMoves{Claim: apitypes.WaiverMovesClaimUnavailable, Reason: &reason}
 }
 

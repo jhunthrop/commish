@@ -197,8 +197,13 @@ func (s *Service) waivers(w http.ResponseWriter, r *http.Request) {
 		// A failed check fails closed, as the lineup's does.
 		moves, err := s.Moves.ClaimMove(r.Context(), auth.AccountID(r), a.Snap.Ref.Host)
 		if err != nil {
+			// What the check knew before it failed is kept, the claim closed,
+			// and the line always set, as the lineup's (review 66f M2).
 			s.Log.Warn("inseason: claim moves", "err", err)
-			moves = apitypes.WaiverMoves{Claim: apitypes.WaiverMovesClaimUnavailable}
+			moves.Claim = apitypes.WaiverMovesClaimUnavailable
+			if moves.Reason == nil {
+				moves.Reason = CopyOnlyClaims(a.Snap.Ref.Host).Reason
+			}
 		}
 		out.Moves = moves
 	}

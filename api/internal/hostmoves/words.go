@@ -134,7 +134,7 @@ type kindWords struct {
 // The claim's lines under the waiver page verb (Lane 66f): ESPN alone
 // takes a claim, so its name is in them.
 const (
-	claimSwitchedOffWords = "Claims are not sent to ESPN from here yet, so add him on ESPN's waiver page."
+	claimSwitchedOffWords = inseason.ClaimsOffWords
 	claimConnectWords     = "Connect ESPN on your account page to claim from here."
 )
 
