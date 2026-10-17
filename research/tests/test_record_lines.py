@@ -13,6 +13,7 @@ from research.nightly.reads.record import (
     Week,
     filled_ranks,
     honest_line,
+    printed,
     starters_basis,
     to_date,
     week_lines,
@@ -166,3 +167,11 @@ def test_honest_line_is_none_when_ours_leads_everywhere() -> None:
     rows = [_row(f"w{i}", "WR", _Stance(_TOP - i, float(receivers - i), _TOP - i)) for i in range(receivers)]
     weeks = [Week(1, "graded", None, None, None, receivers, week_lines(rows))]
     assert honest_line(to_date(weeks, {1: rows})) is None
+
+
+def test_a_figure_is_rounded_once_half_away_from_zero_on_its_decimal_value() -> None:
+    """Lane 66k's ruling: 9.45 prints 9.5 and 0.485 prints 0.49, whatever their binary form."""
+    cases = ((9.45, 1, "9.5"), (0.485, 2, "0.49"), (-0.485, 2, "-0.49"))
+    for value, places, said in cases:
+        assert repr(printed(value, places)) == said
+    assert printed(None, 1) is None

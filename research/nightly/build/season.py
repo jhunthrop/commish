@@ -60,8 +60,8 @@ def _clamped(value: float | None) -> float | None:
 def _score(score: record_read.Score) -> Json:
     return {
         "graded": score.graded,
-        "agreement": _clamped(score.agreement),
-        "placesOff": score.places_off,
+        "agreement": record_read.printed(_clamped(score.agreement), record_read.AGREEMENT_PLACES),
+        "placesOff": record_read.printed(score.places_off, record_read.PLACES_OFF_PLACES),
         "starters": score.starters,
         "startersOf": score.starters_of,
     }

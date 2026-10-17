@@ -68,14 +68,18 @@ type Screen = (typeof SCREENS)[number];
 const CAPTION = `# Lane 66j shots
 
 - Rest of season and Players read the fixture API's order (scripts/inseason-fixture/order.ts): every player line
-  the recorded Sleeper league's answers carry, real as served (position rank, rest-of-season points a game, the
-  week's facts, Avg, Last, Opp rank, status), its rosters and the trade finder's best trade with each team.
+  the recorded Sleeper league's answers carry, real as served (rest-of-season points a game, the week's facts,
+  Proj, Avg, Last, Opp rank, status), its rosters, the trade finder's best trade with each team and the Waivers
+  answer's claim moves (Sleeper takes no claim from here, so the add verb reads "Open Sleeper waivers").
   STAND-INS: the fixture holds 85 of the order's players; each Total is the points a game times his club's games
-  left, which the API divides the other way, and a position's # is the fixture's own order of those totals among
-  the players it holds; every Proj is the fixture's one projection snapshot, the week 1 published figure.
-- Our record reads the run the site was built from (the contract fixture's 2026-10-21T12-ros run, its record
-  regenerated from dev's register, read only): weeks 1 and 2 are real grades, weeks 3 to 5 the register's real
-  misses, the published projection -- until week 7, as the register holds it.
+  left and each Over repl. the points over replacement a week times 12, which the API reads from the board; a
+  position's # is the fixture's own order of those totals among the players it holds; every Proj is the
+  fixture's one projection snapshot, the week 1 published figure.
+- The Rest of season shot is the RB tab. Its tabs are All, QB and RB only because the run the site was built
+  from (the contract fixture's 2026-10-21T12-ros run) carries boards for those two positions.
+- Our record reads that run (its record regenerated from dev's register, read only): weeks 1 and 2 are real
+  grades of our preseason order, weeks 3 to 5 the register's real misses, the published projection -- until the
+  register keeps it.
 `;
 
 await mkdir(out, { recursive: true });
@@ -135,7 +139,7 @@ async function common(page: Page, screen: Screen, width: number): Promise<string
 async function orderFaults(page: Page, screen: Screen, width: number): Promise<string[]> {
 	const seen = await page.evaluate(() => {
 		const table = document.querySelector('main table.order');
-		const text = (el: Element): string => (el.textContent ?? '').trim();
+		const text = (el: Element): string => el.textContent.trim();
 		const visible = (el: Element): boolean => (el as HTMLElement).offsetParent !== null;
 		return {
 			groups: [...(table?.querySelectorAll('tr.grp th') ?? [])].filter(visible).map(text),
@@ -144,7 +148,8 @@ async function orderFaults(page: Page, screen: Screen, width: number): Promise<s
 			trades: [...(table?.querySelectorAll('a.verb.trade') ?? [])].length,
 			adds: [...(table?.querySelectorAll('a.verb.add') ?? [])].length,
 			mine: table?.querySelectorAll('tbody tr.mine').length ?? 0,
-			cells: [...(table?.querySelectorAll('td.n') ?? [])].filter(visible).map(text)
+			cells: [...(table?.querySelectorAll('td.n') ?? [])].filter(visible).map(text),
+			folded: [...(table?.querySelectorAll('.ph-ev') ?? [])].filter(visible).map(text)
 		};
 	});
 	const said: string[] = [];
@@ -154,11 +159,15 @@ async function orderFaults(page: Page, screen: Screen, width: number): Promise<s
 		said.push(`${screen.name}: no order group over # (${seen.groups.join('|')})`);
 	if (wide && !seen.groups.includes('Rest of season'))
 		said.push(`${screen.name}: no Rest of season group`);
-	for (const head of ['#', 'Player', 'Proj', 'Total']) {
+	for (const head of ['#', 'Player', 'Proj']) {
 		if (!seen.heads.includes(head))
 			said.push(`${screen.name} at ${String(width)}: no ${head} head`);
 	}
+	if (!seen.heads.includes('Total') && !seen.heads.includes('Over repl.'))
+		said.push(`${screen.name} at ${String(width)}: no key head`);
 	if (width >= 1100 && !seen.heads.includes('A game')) said.push(`${screen.name}: no A game head`);
+	if (width < 1100 && !seen.folded.every((f) => f.includes('Avg')))
+		said.push(`${screen.name} at ${String(width)}: the figures do not fold under the name`);
 	for (const cell of seen.cells) {
 		if (!FIGURE_CELL.test(cell)) said.push(`${screen.name}: cell "${cell}"`);
 	}
@@ -176,7 +185,7 @@ async function orderFaults(page: Page, screen: Screen, width: number): Promise<s
 
 async function recordFaults(page: Page, width: number): Promise<string[]> {
 	const seen = await page.evaluate(() => {
-		const text = (el: Element): string => (el.textContent ?? '').trim();
+		const text = (el: Element): string => el.textContent.trim();
 		return {
 			heads: [...document.querySelectorAll('main table.weeks th')].map(text),
 			published: [...document.querySelectorAll('main table.weeks td.published')].map(text),
@@ -199,6 +208,72 @@ async function recordFaults(page: Page, width: number): Promise<string[]> {
 	return said;
 }
 
+/** The first row's position and the table's row count, to see a tap change the table. */
+async function tableState(page: Page): Promise<{ first: string; rows: number; kinds: string[] }> {
+	return page.evaluate(() => {
+		const rows = [...document.querySelectorAll('main table.order tbody tr')];
+		return {
+			first: rows[0]?.querySelector('.club')?.textContent ?? '',
+			rows: rows.length,
+			kinds: rows.map((r) => r.querySelector('td.roster .own')?.className ?? '')
+		};
+	});
+}
+
+/** Taps on the Rest of season screen (review 66j L14): a position chip reads that position's order (H1),
+ * the Free chip reads the API's free players with the total after it (H5), Show more reads more rows,
+ * and the basis names the league shape (H4). */
+async function tapFaults(): Promise<string[]> {
+	const said: string[] = [];
+	const ctx = await context('dark', BASIS_WIDTH, true);
+	const page = await ctx.newPage();
+	const rest = SCREENS[0];
+	await open(page, rest);
+	const basis = (await page.locator('main [data-basis]').textContent()) ?? '';
+	if (!basis.includes('Points over replacement are for a 12-team league'))
+		said.push('rest: the basis names no league shape');
+	const before = await tableState(page);
+	await page.getByRole('link', { name: 'QB', exact: true }).first().click();
+	await page.waitForURL(/\/qb$/);
+	await page.waitForFunction(
+		() =>
+			document.querySelector('main table.order tbody tr .club')?.textContent.includes('QB') ??
+			false,
+		undefined,
+		{ timeout: READY_TIMEOUT_MS }
+	);
+	const after = await tableState(page);
+	if (after.first === before.first) said.push('rest: the QB chip left the table as it was');
+	await page.getByRole('button', { name: 'Free', exact: true }).click();
+	await page.waitForLoadState('networkidle');
+	const free = await tableState(page);
+	if (free.rows === 0 && (await page.getByText('No player in our order matches.').count()) === 0)
+		said.push('rest: Free shows no rows and no sentence');
+	if (free.kinds.some((k) => !k.includes('free'))) said.push('rest: Free shows a rostered player');
+	// Show more: the fixture holds fewer rows than a page, so the answer is held to two rows a read.
+	await page.route('**/order?*', async (route) => {
+		const url = new URL(route.request().url());
+		const response = await route.fetch();
+		const body = (await response.json()) as { data: { rows: unknown[]; total: number } };
+		const limit = Number(url.searchParams.get('limit'));
+		body.data.rows = body.data.rows.slice(0, limit === 100 ? 2 : 4);
+		body.data.total = Math.max(body.data.total, 3);
+		await route.fulfill({ response, json: body });
+	});
+	await page.getByRole('button', { name: 'Everyone', exact: true }).click();
+	await page.waitForLoadState('networkidle');
+	const more = page.getByRole('button', { name: 'Show more', exact: true });
+	if ((await more.count()) === 0) said.push('rest: no Show more though the total is past the rows');
+	else {
+		await more.click();
+		await page.waitForLoadState('networkidle');
+		if ((await tableState(page)).rows <= 2) said.push('rest: Show more read no more rows');
+	}
+	await ctx.close();
+	return said;
+}
+
+faults.push(...(await tapFaults()));
 for (const screen of SCREENS) {
 	for (const width of WIDTHS) {
 		const ctx = await context('dark', width, screen.signedIn);

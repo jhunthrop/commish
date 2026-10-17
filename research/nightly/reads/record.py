@@ -16,6 +16,7 @@ player any graded week counted, and the starters summed.
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Any, Final
 
 from sqlalchemy import Connection, text
@@ -41,6 +42,20 @@ SCALE: Final = "1.0 is a perfect match of the week's finishing order, 0 is none.
 LEAGUE_TEAMS: Final = 12
 STARTERS_A_TEAM: Final = {"QB": 1, "RB": 2, "WR": 3, "TE": 1, "K": 1, "DST": 1}
 _STARTER_WORDS: Final = {"QB": "QBs", "RB": "RBs", "WR": "WRs", "TE": "TEs", "K": "kickers", "DST": "defenses"}
+# The places the record page prints each figure to.
+AGREEMENT_PLACES: Final = 2
+PLACES_OFF_PLACES: Final = 1
+
+
+def printed(value: float | None, places: int) -> float | None:
+    """A figure rounded once, here, to the places the page prints, half away from zero on its decimal
+    value (Lane 66k's ruling): the page and the honest sentence print it as given."""
+    if value is None:
+        return None
+    step = Decimal(1).scaleb(-places)
+    return float(Decimal(repr(value)).quantize(step, rounding=ROUND_HALF_UP))
+
+
 # The order each tracked board is (the record names it on every frozen week, review 66j M7): the served
 # board is our preseason order; a rest-of-season freeze would name its own source here.
 ORDER_OF_SOURCE: Final = {SERVED_SOURCE: "preseason"}
@@ -213,22 +228,15 @@ def to_date(weeks: Sequence[Week], rows_by_week: Mapping[int, Sequence[Mapping[s
 
 
 def _trails(ours: Score, theirs: Score, name: str) -> list[str]:
-    """Each figure on which a benchmark called the weeks better than our order, as a clause."""
+    """Each figure on which a benchmark called the weeks better than our order, as a clause, every
+    figure compared and said as the page prints it."""
     out = []
-    if (
-        ours.agreement is not None
-        and theirs.agreement is not None
-        and round(theirs.agreement, 2) > round(ours.agreement, 2)
-    ):
-        out.append(f"{name}'s order matched the finish better, {theirs.agreement:.2f} against our {ours.agreement:.2f}")
-    if (
-        ours.places_off is not None
-        and theirs.places_off is not None
-        and round(theirs.places_off, 1) < round(ours.places_off, 1)
-    ):
-        out.append(
-            f"{name} put a typical player closer to his finish, {theirs.places_off:.1f} places off against our {ours.places_off:.1f}"
-        )
+    mine, its = printed(ours.agreement, AGREEMENT_PLACES), printed(theirs.agreement, AGREEMENT_PLACES)
+    if mine is not None and its is not None and its > mine:
+        out.append(f"{name}'s order matched the finish better, {its:.2f} against our {mine:.2f}")
+    mine, its = printed(ours.places_off, PLACES_OFF_PLACES), printed(theirs.places_off, PLACES_OFF_PLACES)
+    if mine is not None and its is not None and its < mine:
+        out.append(f"{name} put a typical player closer to his finish, {its:.1f} places off against our {mine:.1f}")
     if theirs.starters > ours.starters and theirs.starters_of == ours.starters_of:
         out.append(
             f"{name} had more of the week's starters right, {theirs.starters} of {theirs.starters_of} against our {ours.starters}"

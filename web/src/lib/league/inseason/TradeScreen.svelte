@@ -23,7 +23,7 @@
 		type SortKey
 	} from '../box/trades.ts';
 	import Screen from './Screen.svelte';
-	import { TRADE_FOR_PARAM } from './tabs.ts';
+	import { PLAYER_PARAM } from './tabs.ts';
 	import PickSelect, { type PickGroup, type PickOption } from './PickSelect.svelte';
 	import TradeBuilder from './TradeBuilder.svelte';
 	import type {
@@ -160,7 +160,7 @@
 
 	// A link naming a player (the Rest of season screen's Trade for him) opens on his trades.
 	onMount(() => {
-		const asked = page.url.searchParams.get(TRADE_FOR_PARAM);
+		const asked = page.url.searchParams.get(PLAYER_PARAM);
 		if (asked !== null && asked !== '') void pick(asked);
 	});
 

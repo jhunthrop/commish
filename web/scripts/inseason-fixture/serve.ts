@@ -510,16 +510,25 @@ function orderAt(params: URLSearchParams, league: boolean): OrderAdvice {
 							(a.rest_of_season_points ?? Number.NEGATIVE_INFINITY)
 					)
 					.map((row, i) => ({ ...row, rank: i + 1 }));
+	const roster = params.get('roster');
 	const found = ranked.filter(
 		(row) =>
-			q.length < MIN_SEARCH ||
-			row.line.player.name.toLowerCase().includes(q) ||
-			row.line.player.team.toLowerCase().includes(q)
+			(roster === null || row.roster?.kind === roster) &&
+			(q.length < MIN_SEARCH ||
+				row.line.player.name.toLowerCase().includes(q) ||
+				row.line.player.team.toLowerCase().includes(q))
 	);
 	const rows = found
 		.slice(0, limit)
 		.map((row) => (league ? row : { ...row, roster: null, move: null }));
-	return { ...order, read_at: league ? readAt() : null, total: found.length, rows };
+	return {
+		...order,
+		read_at: league ? readAt() : null,
+		moves: league ? order.moves : null,
+		rank_by: position === null ? 'points_over_replacement' : 'rest_of_season_points',
+		total: found.length,
+		rows
+	};
 }
 
 async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> {

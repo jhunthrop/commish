@@ -1,9 +1,10 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, untrack } from 'svelte';
 	import { plural } from '#lib/format/number.ts';
 	import { ApiError } from '#lib/api/client.ts';
 	import type { LeagueHost } from '#lib/league/api.ts';
 	import { positionWord } from '#lib/league/box/box.ts';
+	import { sheetTags } from '#lib/league/sheet-tags.ts';
 	import RowSheetMark from '#lib/site/RowSheetMark.svelte';
 	import type { Position } from '#lib/types/player.ts';
 	import { orderApi, type OrderAdvice, type OrderPosition } from './api.ts';
@@ -13,7 +14,7 @@
 		ORDER_POSITIONS,
 		orderBasis,
 		orderView,
-		rowsFor,
+		rosterFilter,
 		type OrderView,
 		type RosterView
 	} from './order.ts';
@@ -43,6 +44,17 @@
 
 	// svelte-ignore state_referenced_locally
 	let position = $state<OrderPosition | null>(opened);
+	// The page's position chips are links on the same route: when the page moves to another position
+	// the table reads it (review 66j H1).
+	$effect(() => {
+		const next = opened;
+		untrack(() => {
+			if (next === position) return;
+			position = next;
+			limit = PAGE_ROWS;
+			void read();
+		});
+	});
 	let q = $state('');
 	let limit = $state(PAGE_ROWS);
 	let roster = $state<RosterView>('everyone');
@@ -56,11 +68,15 @@
 	const views = $derived(
 		advice?.rows.map((row) => orderView(row, undefined, position === null)) ?? []
 	);
-	const shown = $derived(rowsFor(views, roster));
 	const basis = $derived(
 		advice === null ? '' : orderBasis(advice, mode === 'rest' && league !== null ? league : null)
 	);
 	const more = $derived(advice !== null && advice.total > advice.rows.length && limit < MAX_ROWS);
+	const tableLeague = $derived(
+		leagueId === null || league === null || advice === null
+			? null
+			: { id: leagueId, host: league.host, moves: advice.moves }
+	);
 
 	async function read(): Promise<void> {
 		const mine = (latest += 1);
@@ -69,6 +85,7 @@
 			const answer = await orderApi.read(leagueId, {
 				position,
 				q: q.trim().length >= MIN_SEARCH ? q : null,
+				roster: rosterFilter(roster),
 				limit
 			});
 			if (mine !== latest) return;
@@ -96,6 +113,13 @@
 
 	function choose(next: OrderPosition | null): void {
 		position = next;
+		limit = PAGE_ROWS;
+		void read();
+	}
+
+	/** The roster chips read the API's filter, so the limit and Show more count after it (review 66j H5). */
+	function filter(next: RosterView): void {
+		roster = next;
 		limit = PAGE_ROWS;
 		void read();
 	}
@@ -157,7 +181,7 @@
 			{#if leagueId !== null}
 				<div class="chips" role="group" aria-label={ORDER.roster}>
 					{#each [['everyone', ORDER.everyone], ['free', ORDER.free], ['yours', ORDER.yours]] as const as [view, words] (view)}
-						<button type="button" aria-pressed={roster === view} onclick={() => (roster = view)}
+						<button type="button" aria-pressed={roster === view} onclick={() => filter(view)}
 							>{words}</button
 						>
 					{/each}
@@ -180,20 +204,22 @@
 	{/if}
 	{#if advice === null}
 		<p class="reading" aria-live="polite">{reading ? ORDER.reading : ''}</p>
-	{:else if shown.length === 0}
+	{:else if advice.total === 0}
 		<p class="reading">{ORDER.none}</p>
 	{:else}
 		<div class:dim={reading}>
 			<OrderTable
 				{label}
-				rows={shown}
-				league={leagueId}
+				rows={views}
+				rankBy={advice.rank_by}
+				league={tableLeague}
+				tagsOf={sheetTags}
 				end={mode === 'players' ? sheetMark : undefined}
 			/>
 		</div>
-		{#if more}
-			<button type="button" class="more" onclick={showMore}>{ORDER.moreRows}</button>
-		{/if}
+	{/if}
+	{#if more}
+		<button type="button" class="more" onclick={showMore}>{ORDER.moreRows}</button>
 	{/if}
 
 	{#if basis !== ''}

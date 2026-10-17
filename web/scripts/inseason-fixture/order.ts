@@ -2,17 +2,20 @@
 // Sleeper league in week 6, from the fixture's own answers, so the Rest of season and Players shots
 // read the same players and figures the league's screens do:
 //   - every player line the lineup, waivers, trades and matchup answers carry (the fullest copy of
-//     each), as served: position rank, rest-of-season points a game, the week's facts, Proj, Avg,
-//     Last and Opp rank;
+//     each), as served: rest-of-season points a game, the week's facts, Proj, Avg, Last, Opp rank and
+//     points over replacement a week;
 //   - roster is the recorded league's holdings (sync.json held_by), and the move is the API's rule
 //     over them: add for a free player, trade for a player the trade finder's best trade with his
-//     team brings in (trades.json), none for the member's own;
-//   - rank across positions is the order of the lines' points over replacement, kickers and defenses
-//     after, as the API ranks; at a position serve.ts ranks by the line's own position rank.
-// STAND-INS, named here and in the shots' caption: the fixture holds 89 of the order's players, so a
-// position's places have gaps (the RBs it holds run from 14th); rest_of_season_points is the line's
-// points a game times his club's games left from week 6 through 17 (the byes in sync.json), the
-// division the API makes the other way; and the published projection's read time is the fixture's.
+//     team brings in (trades.json), none for the member's own; the claim's moves are the Waivers
+//     answer's (waivers.json), Sleeper taking no claim from here;
+//   - across positions the rows are in the order of their points over replacement, kickers and
+//     defenses after, as the API ranks (rank_by points_over_replacement).
+// STAND-INS, named here and in the shots' caption: the fixture holds 85 of the order's players;
+// rest_of_season_points is the line's points a game times his club's games left from week 6 through
+// 17 (the byes in sync.json), the division the API makes the other way; points_over_replacement is
+// the line's a week times the 12 weeks the order covers; at a position serve.ts ranks the players it
+// holds 1 to n by those stand-in totals, as the API ranks by the real ones; and the published
+// projection's read time is the fixture's.
 //
 //   node scripts/inseason-fixture/order.ts
 import { readFile, writeFile } from 'node:fs/promises';
@@ -28,6 +31,8 @@ const DATA = new URL('./data/', import.meta.url);
 const ANSWERS = ['lineup', 'waivers', 'trades', 'matchup'] as const;
 const WEEK = 6;
 const LAST_WEEK = 17;
+/** The weeks the rest-of-season order covers, week 6 through 17. */
+const WEEKS_COVERED = LAST_WEEK - WEEK + 1;
 const TENTH = 10;
 const POSITIONS = new Set(['QB', 'RB', 'WR', 'TE', 'K', 'DEF']);
 
@@ -85,6 +90,21 @@ const gamesLeft = (club: string): number => {
 	return LAST_WEEK - WEEK + 1 - (bye !== undefined && bye >= WEEK && bye <= LAST_WEEK ? 1 : 0);
 };
 
+/** A figure to the tenth the API prints, half away from zero on its decimal value (Lane 66k's ruling). */
+const tenth = (v: number | null): number | null =>
+	v === null ? null : Number(Math.sign(v) * Math.round(Number(`${String(Math.abs(v))}e1`)) + 'e-1');
+
+/** The line's figures as the order's route returns them, each a tenth. */
+function tenths(line: PlayerLine): PlayerLine {
+	return {
+		...line,
+		week_projection: tenth(line.week_projection),
+		projection_delta: tenth(line.projection_delta),
+		season_avg: tenth(line.season_avg),
+		last_points: tenth(line.last_points)
+	};
+}
+
 function rowOf(line: PlayerLine): Omit<OrderRow, 'rank'> {
 	const id = line.player.board_id ?? '';
 	const holder = heldBy[id];
@@ -97,10 +117,13 @@ function rowOf(line: PlayerLine): Omit<OrderRow, 'rank'> {
 	const move: OrderRow['move'] =
 		roster.kind === 'free' ? 'add' : roster.kind === 'team' && targets.has(id) ? 'trade' : null;
 	const perGame = line.rest_of_season_per_game;
+	const perWeek = line.points_over_replacement;
 	return {
-		line,
+		line: tenths(line),
 		rest_of_season_points:
 			perGame === null ? null : Math.round(perGame * gamesLeft(line.player.team) * TENTH) / TENTH,
+		points_over_replacement:
+			perWeek === null ? null : Math.round(perWeek * WEEKS_COVERED * TENTH) / TENTH,
 		roster,
 		move
 	};
@@ -115,11 +138,15 @@ const ranked = [...lines.values()]
 		return (vb ?? 0) - (va ?? 0);
 	});
 const lineup = await read<components['schemas']['LineupAdvice']>('lineup');
+const waivers = await read<components['schemas']['WaiverAdvice']>('waivers');
 const out: OrderAdvice = {
 	week: WEEK,
-	basis: `Our rest-of-season order from week ${String(WEEK)}: Rest of season is his total over the games his club has left through week ${String(LAST_WEEK)}, byes out, then a game. A position ranks by that total, every position together by points over replacement, kickers and defenses last.`,
-	// The rules the season's points leave out, as the API says them (LineupNote): the Lineup's note.
-	basis_note: lineup.basis_note,
+	basis: `Our rest-of-season order from week ${String(WEEK)}: Total is his points over his club's games through week ${String(LAST_WEEK)}, byes out, A game the same a game. A position ranks by Total, All by Over repl., his total less a free pickup's at his position, kickers and defenses last.`,
+	// The league the points over replacement are for and the rules its season points leave out, as
+	// the API says them (BasisNote): the Waivers answer's note.
+	basis_note: waivers.basis_note,
+	rank_by: 'points_over_replacement',
+	moves: waivers.moves,
 	order_basis: 'rest_of_season',
 	refreshed: lineup.refreshed,
 	from_week: WEEK,

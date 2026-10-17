@@ -322,3 +322,14 @@ func TestOrderRoutesCarryTheClaimMovesAndRefuseARosterWithoutALeague(t *testing.
 		t.Fatalf("public moves %+v", public.Moves)
 	}
 }
+
+func TestOrderLinesCarryTenths(t *testing.T) {
+	proj, avg, last := 16.44, 15.13, 22.37
+	line := tenths(apitypes.PlayerLine{WeekProjection: &proj, SeasonAvg: &avg, LastPoints: &last})
+	if *line.WeekProjection != 16.4 || *line.SeasonAvg != 15.1 || *line.LastPoints != 22.4 || line.ProjectionDelta != nil {
+		t.Fatalf("tenths %v %v %v %v", *line.WeekProjection, *line.SeasonAvg, *line.LastPoints, line.ProjectionDelta)
+	}
+	if proj != 16.44 {
+		t.Fatal("the line's own figure changed")
+	}
+}

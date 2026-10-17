@@ -1,19 +1,21 @@
-// The Rest of season and Players screens' words and rows (Lane 66j): run with `npm test`.
+// The Rest of season and Players screens' words and rows (Lane 66j and its fix round 1): run with `npm test`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { PlayerLine, WeekFacts } from '../league/inseason/api.ts';
 import type { OrderAdvice, OrderRow } from './api.ts';
 import { orderPath } from './path.ts';
 import {
+	FIGURE_HEADS,
 	ORDER,
 	evidenceBasis,
+	figureColumns,
 	moveHref,
 	moveWords,
 	orderBasis,
 	orderView,
 	rosterBasis,
-	rosterWords,
-	rowsFor
+	rosterFilter,
+	rosterWords
 } from './order.ts';
 
 const ZONE = 'America/Chicago';
@@ -64,6 +66,7 @@ const row = (name: string, over: Partial<OrderRow> = {}): OrderRow => ({
 	line: line(name, 'RB'),
 	rank: 4,
 	rest_of_season_points: 156.2,
+	points_over_replacement: 41.3,
 	roster: null,
 	move: null,
 	...over
@@ -80,6 +83,8 @@ const advice = (rows: OrderRow[], over: Partial<OrderAdvice> = {}): OrderAdvice 
 	read_at: null,
 	projection_read_at: READ,
 	projection_scoring: { format: 'ppr', league_own: true },
+	rank_by: 'rest_of_season_points',
+	moves: null,
 	total: rows.length,
 	rows,
 	...over
@@ -88,87 +93,76 @@ const advice = (rows: OrderRow[], over: Partial<OrderAdvice> = {}): OrderAdvice 
 const screenHref = (screen: 'waivers' | 'trades', league: string): string =>
 	`/league/${league}/${screen}`;
 
-void test('a row prints the API figures as they come: the place, the total and a game', () => {
+void test('a row prints the API figures as they come', () => {
 	const view = orderView(row('Swift'), ZONE);
 	assert.equal(view.key, 'b-Swift');
 	assert.equal(view.box.key, 'b-Swift');
 	assert.equal(view.rank, 4);
-	assert.equal(view.total, 156.2);
-	assert.equal(view.perGame, 14.2);
+	assert.deepEqual(view.figures, { por: 41.3, total: 156.2, perGame: 14.2 });
 	assert.equal(view.box.proj, 16.4);
 	assert.equal(view.roster, null);
+});
+
+void test('the big figure is the key the rank sorts on (review 66j H2)', () => {
+	assert.deepEqual(figureColumns('points_over_replacement'), ['por', 'total', 'perGame']);
+	assert.deepEqual(figureColumns('rest_of_season_points'), ['total', 'perGame']);
+	assert.equal(FIGURE_HEADS.por, 'Over repl.');
+	assert.equal(FIGURE_HEADS.total, 'Total');
 });
 
 void test('a roster mark reads Yours, Free or the holding team, never the platform word', () => {
 	assert.equal(rosterWords({ kind: 'yours', team: null }), ORDER.yours);
 	assert.equal(rosterWords({ kind: 'free', team: null }), ORDER.free);
 	assert.equal(rosterWords({ kind: 'team', team: 'Muttdogs' }), 'Muttdogs');
+	assert.equal(rosterFilter('everyone'), null);
+	assert.equal(rosterFilter('free'), 'free');
 });
 
-void test('the roster chips select the API rows, never a figure', () => {
-	const views = [
-		orderView(row('A', { roster: { kind: 'yours', team: null } }), ZONE),
-		orderView(row('B', { roster: { kind: 'free', team: null }, move: 'add' }), ZONE),
-		orderView(row('C', { roster: { kind: 'team', team: 'Muttdogs' }, move: 'trade' }), ZONE)
-	];
-	assert.deepEqual(
-		rowsFor(views, 'free').map((v) => v.key),
-		['b-B']
-	);
-	assert.deepEqual(
-		rowsFor(views, 'yours').map((v) => v.key),
-		['b-A']
-	);
-	assert.equal(rowsFor(views, 'everyone').length, 3);
-});
-
-void test('a verb goes to the league screen it names, with him or his position chosen', () => {
+void test('a verb is the Waivers verb by the claim moves and lands on him (review 66j H6)', () => {
 	const add = orderView(row('B', { move: 'add' }), ZONE);
 	const trade = orderView(row('C', { move: 'trade' }), ZONE);
-	const defense = orderView(
-		row('Texans', { line: line('Texans', 'DEF'), move: 'add', rest_of_season_points: null }),
-		ZONE
-	);
-	assert.equal(moveHref(add, 'L1', screenHref), '/league/L1/waivers?position=RB');
-	assert.equal(moveHref(defense, 'L1', screenHref), '/league/L1/waivers?position=DEF');
+	assert.equal(moveHref(add, 'L1', screenHref), '/league/L1/waivers?player=b-B');
 	assert.equal(moveHref(trade, 'L1', screenHref), '/league/L1/trades?player=b-C');
 	assert.equal(moveHref(trade, null, screenHref), null);
 	assert.equal(moveHref(orderView(row('D'), ZONE), 'L1', screenHref), null);
-	assert.equal(moveWords('add'), 'Add');
-	assert.equal(moveWords('trade'), 'Trade for him');
+	const closed = {
+		claim: 'unavailable' as const,
+		note: null,
+		takes_writes: false,
+		writes_on: false,
+		reason: 'x'
+	};
+	assert.equal(moveWords('add', closed, 'sleeper'), 'Open Sleeper waivers');
+	assert.equal(moveWords('add', { ...closed, claim: 'available' }, 'espn'), 'Add on ESPN');
+	assert.equal(moveWords('trade', closed, 'sleeper'), 'Trade for him');
 });
 
-void test('the basis says every number once in one paragraph, the platform named', () => {
+void test('the basis names the league shape and says every number once, the platform named', () => {
 	const signedOut = orderBasis(advice([row('A')]), null, ZONE);
 	assert.ok(signedOut.startsWith('Our rest-of-season order from week 7.'));
+	assert.match(signedOut, /Points over replacement are for a 12-team league/);
 	assert.match(signedOut, /Proj is this week's published projection in PPR/);
-	assert.match(signedOut, /in PPR\.$/);
 	assert.doesNotMatch(signedOut, /Roster is/);
-	const inLeague = orderBasis(
-		advice([row('A')], { read_at: READ, basis_note: 'Points so far leave out safeties.' }),
-		{ host: 'sleeper' },
-		ZONE
-	);
+	const inLeague = orderBasis(advice([row('A')], { read_at: READ }), { host: 'sleeper' }, ZONE);
 	assert.match(inLeague, /Roster is Sleeper's, read /);
-	assert.ok(inLeague.endsWith('Points so far leave out safeties.'));
 	assert.match(evidenceBasis(true), /in this league's scoring\.$/);
 	assert.match(rosterBasis('espn', READ, ZONE), /^Roster is ESPN's, read /);
-	for (const said of [inLeague, ...Object.values(ORDER)]) {
-		assert.doesNotMatch(
-			said,
-			/\bhost\b|\u2014|;|\b(odds|line|spread|bet|market|buy|sell|price)\b/i
-		);
+	for (const said of [inLeague, ...Object.values(ORDER), ...Object.values(FIGURE_HEADS)]) {
+		assert.doesNotMatch(said, /\bhost\b|—|;|\b(odds|line|spread|bet|market|buy|sell|price)\b/i);
 	}
 });
 
 void test('the path asks the league route with a league and the public one without', () => {
 	assert.equal(
-		orderPath(null, { position: 'RB', q: null, limit: 100 }),
+		orderPath(null, { position: 'RB', q: null, roster: null, limit: 100 }),
 		'/order?limit=100&position=RB'
 	);
 	assert.equal(
-		orderPath('7f', { position: null, q: ' hou ', limit: 100 }),
-		'/leagues/attached/7f/order?limit=100&q=hou'
+		orderPath('7f', { position: null, q: ' hou ', roster: 'free', limit: 100 }),
+		'/leagues/attached/7f/order?limit=100&q=hou&roster=free'
 	);
-	assert.equal(orderPath(null, { position: null, q: 'h', limit: 50 }), '/order?limit=50');
+	assert.equal(
+		orderPath(null, { position: null, q: 'h', roster: 'free', limit: 50 }),
+		'/order?limit=50'
+	);
 });

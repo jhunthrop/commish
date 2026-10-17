@@ -1,31 +1,58 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
+	import type { LeagueHost } from '#lib/league/api.ts';
 	import { BOX, boxNumber, easeOf, oppRankWord } from '#lib/league/box/box.ts';
 	import BoxGame from '#lib/league/box/BoxGame.svelte';
 	import BoxPlayer from '#lib/league/box/BoxPlayer.svelte';
 	import { tabHref } from '#lib/league/inseason/tabs.ts';
 	import Icon from '#lib/ui/Icon.svelte';
-	import { ORDER, moveHref, moveWords, type OrderView } from './order.ts';
+	import type { OrderAdvice } from './api.ts';
+	import {
+		FIGURE_HEADS,
+		ORDER,
+		figureColumns,
+		moveHref,
+		moveWords,
+		type OrderView
+	} from './order.ts';
 
-	/** Our order as a box score (Lane 66j): #, the player, in a league his roster, his game, Proj, Rest of
-	 * season (the total, which the order ranks by, then a game), Avg, Last and Opp rank, and the one
-	 * move his row admits. Your players are tinted. On a phone the game and Avg and Last fold under the
-	 * name, the roster mark onto his club line. */
+	/** Our order as a box score (Lane 66j): #, the player, in a league his roster, his game, Proj, then
+	 * Rest of season with the key the # sorts on first and big (Over repl. across positions, Total at a
+	 * position), Avg, Last and Opp rank, and the one move his row admits. Your players are tinted. Below
+	 * 1100 px the figures after the key fold under the name in one short line; on a phone the game folds
+	 * too, the roster mark onto his club line. */
 	interface Props {
 		label: string;
 		rows: readonly OrderView[];
-		/** The attached league the rows are marked for; null draws no roster and no move. */
-		league: string | null;
+		rankBy: OrderAdvice['rank_by'];
+		/** The attached league the rows are marked for, with its platform and the claim's moves; null
+		 * draws no roster and no move. */
+		league: { id: string; host: LeagueHost; moves: OrderAdvice['moves'] } | null;
 		/** Your sheet's tags on a player, by board id. */
 		tagsOf?: (boardId: string | null) => readonly string[];
 		/** A row's own control at the end (the Players screen's sheet mark), when not a league's move. */
 		end?: Snippet<[OrderView]>;
 	}
 
-	let { label, rows, league, tagsOf = () => [], end }: Props = $props();
+	let { label, rows, rankBy, league, tagsOf = () => [], end }: Props = $props();
 
 	const marked = $derived(league !== null);
+	const figures = $derived(figureColumns(rankBy));
 	const SEPARATOR = ', ';
+
+	/** The folded line under the name below 1100 px: every figure after the key, the opponent's rank,
+	 * then Avg and Last. */
+	function folded(row: OrderView): string {
+		const rest = figures.slice(1).map((f) => `${FIGURE_HEADS[f]} ${boxNumber(row.figures[f])}`);
+		const rank = row.box.evidence.oppRank;
+		const opp = rank === null ? [] : [`${BOX.opp} ${oppRankWord(rank)}`];
+		return [
+			...rest,
+			...opp,
+			`${BOX.avg} ${boxNumber(row.box.evidence.avg)}`,
+			`${BOX.last} ${boxNumber(row.box.evidence.last)}`
+		].join(SEPARATOR);
+	}
 </script>
 
 {#snippet mark(row: OrderView)}
@@ -37,44 +64,45 @@
 		<tr class="grp">
 			<th colspan={marked ? 3 : 2} scope="colgroup" class="g-order">{ORDER.rankGroup}</th>
 			<th colspan="2"></th>
-			<th colspan="2" scope="colgroup" class="g-rest">{ORDER.restGroup}</th>
-			<th colspan={marked || end ? 4 : 3}></th>
+			<th colspan={figures.length} scope="colgroup" class="g-rest">{ORDER.restGroup}</th>
+			<th colspan={marked || end ? 4 : 3} class="g-tail"></th>
 		</tr>
 		<tr class="cols">
-			<th class="n rank" scope="col">{ORDER.rank}</th>
+			<th class="n rank" scope="col" aria-label="{ORDER.rank}, {ORDER.rankGroup.toLowerCase()}"
+				>{ORDER.rank}</th
+			>
 			<th scope="col">{BOX.player}</th>
 			{#if marked}<th class="roster" scope="col">{ORDER.roster}</th>{/if}
 			<th class="game" scope="col">{BOX.game}</th>
 			<th class="n proj" scope="col">{BOX.proj}</th>
-			<th class="n total" scope="col">{ORDER.total}</th>
-			<th class="n ev pg" scope="col">{ORDER.perGame}</th>
+			{#each figures as f, i (f)}
+				<th class="n {i === 0 ? 'key' : 'ev fig'}" scope="col">{FIGURE_HEADS[f]}</th>
+			{/each}
 			<th class="n ev first" scope="col">{BOX.avg}</th>
 			<th class="n ev" scope="col">{BOX.last}</th>
 			<th class="n ev opp" scope="col">{BOX.oppRank}</th>
-			{#if marked || end}<th class="act" scope="col"><span class="vh">{ORDER.add}</span></th>{/if}
+			{#if marked || end}<th class="act" scope="col"><span class="vh">{ORDER.tradeFor}</span></th
+				>{/if}
 		</tr>
 	</thead>
 	<tbody>
 		{#each rows as row (row.key)}
-			{@const href = moveHref(row, league, tabHref)}
+			{@const href = moveHref(row, league?.id ?? null, tabHref)}
 			{@const rank = row.box.evidence.oppRank}
 			<tr class:mine={row.roster?.kind === 'yours'}>
 				<td class="n rank">{row.rank}</td>
 				<td class="player">
 					<BoxPlayer row={row.box} tags={tagsOf(row.box.boardId)}>
 						{#snippet after()}<span class="ph-mark">{@render mark(row)}</span>{/snippet}
-						<span class="ph-ev"
-							>{BOX.avg}
-							{boxNumber(row.box.evidence.avg)}{SEPARATOR}{BOX.last}
-							{boxNumber(row.box.evidence.last)}</span
-						>
+						<span class="ph-ev">{folded(row)}</span>
 					</BoxPlayer>
 				</td>
 				{#if marked}<td class="roster">{@render mark(row)}</td>{/if}
 				<td class="game"><BoxGame row={row.box} /></td>
 				<td class="n proj">{boxNumber(row.box.proj)}</td>
-				<td class="n total">{boxNumber(row.total)}</td>
-				<td class="n ev pg">{boxNumber(row.perGame)}</td>
+				{#each figures as f, i (f)}
+					<td class="n {i === 0 ? 'key' : 'ev fig'}">{boxNumber(row.figures[f])}</td>
+				{/each}
 				<td class="n ev first">{boxNumber(row.box.evidence.avg)}</td>
 				<td class="n ev">{boxNumber(row.box.evidence.last)}</td>
 				<td class="n ev opp"
@@ -84,8 +112,9 @@
 				>
 				{#if marked || end}
 					<td class="act">
-						{#if href !== null && row.move}
-							<a class="verb {row.move}" {href} aria-label="{moveWords(row.move)} {row.box.name}"
+						{#if league !== null && href !== null && row.move}
+							{@const said = moveWords(row.move, league.moves, league.host)}
+							<a class="verb {row.move}" {href} aria-label="{said}, {row.box.name}"
 								>{#if row.move === 'add'}<Icon name="plus" size={14} />{:else}<svg
 										width="14"
 										height="14"
@@ -96,7 +125,7 @@
 										stroke-linecap="round"
 										stroke-linejoin="round"
 										aria-hidden="true"><path d="M4 8h14l-3-3M20 16H6l3 3" /></svg
-									>{/if}<span>{moveWords(row.move)}</span></a
+									>{/if}<span>{said}</span></a
 							>
 						{:else if end}{@render end(row)}{/if}
 					</td>
@@ -165,9 +194,13 @@
 		width: 60px;
 	}
 
-	.cols .total {
-		width: 72px;
+	.cols .key {
+		width: 76px;
 		border-left: 1px solid var(--line);
+	}
+
+	.cols .fig {
+		width: 64px;
 	}
 
 	.cols .ev {
@@ -240,7 +273,7 @@
 		color: var(--ink-2);
 	}
 
-	td.total {
+	td.key {
 		font-size: var(--t-xl);
 		font-weight: 800;
 		color: var(--ink);
@@ -368,7 +401,7 @@
 		.ev,
 		.cols .ev,
 		td.ev.first,
-		.grp th:last-child {
+		.grp {
 			display: none;
 		}
 
@@ -418,7 +451,7 @@
 			width: 44px;
 		}
 
-		.cols .total {
+		.cols .key {
 			width: 52px;
 		}
 
@@ -437,7 +470,7 @@
 			font-size: var(--t-sm);
 		}
 
-		td.total {
+		td.key {
 			font-size: var(--t-md);
 		}
 

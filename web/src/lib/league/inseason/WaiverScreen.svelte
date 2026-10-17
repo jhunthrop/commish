@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, tick } from 'svelte';
 	import { page } from '$app/state';
 	import Chip from '#lib/ui/Chip.svelte';
 	import ChipGroup from '#lib/ui/ChipGroup.svelte';
@@ -39,7 +39,7 @@
 	} from '../box/waivers.ts';
 	import MovePanel from './MovePanel.svelte';
 	import Screen from './Screen.svelte';
-	import { WAIVERS_AT_PARAM } from './tabs.ts';
+	import { PLAYER_PARAM } from './tabs.ts';
 	import type {
 		HostMoveInput,
 		HostMovePlan,
@@ -238,10 +238,16 @@
 		claiming = null;
 	}
 
-	// A link naming a position (the Rest of season screen's Add) opens on it.
+	// A link naming a player (the Rest of season screen's add verb) opens his pickup row and brings it
+	// into view (review 66j H6).
 	onMount(() => {
-		const asked = positions.find((p) => p === page.url.searchParams.get(WAIVERS_AT_PARAM));
-		if (asked !== undefined) void choose(asked);
+		const asked = page.url.searchParams.get(PLAYER_PARAM);
+		const found = pool.find((r) => r.row.boardId === asked);
+		if (found === undefined) return;
+		toggle(found);
+		void tick().then(() =>
+			document.getElementById(`drops-${found.key}`)?.scrollIntoView({ block: 'center' })
+		);
 	});
 
 	async function choose(next: WaiverPosition | null): Promise<void> {
