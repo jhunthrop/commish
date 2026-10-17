@@ -2,7 +2,8 @@
 // the dates, never a sentence. Run with `npm test`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { draftPassFacts, groupFacts, membershipFacts, type Price } from './words.ts';
+import { draftPassFacts, groupFacts, membershipFacts } from './plan-facts.ts';
+import type { Price } from './words.ts';
 
 const price = (amount: number, interval: Price['interval'] = null): Price => ({
 	amount_cents: amount,

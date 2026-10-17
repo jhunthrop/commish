@@ -33,15 +33,8 @@
 		type Interval,
 		type PlanCatalog
 	} from './pass-api.ts';
-	import {
-		ALWAYS_FREE,
-		HOSTS,
-		addedFeatures,
-		draftPassFacts,
-		featureLines,
-		groupFacts,
-		membershipFacts
-	} from './words.ts';
+	import { ALWAYS_FREE, HOSTS, addedFeatures, featureLines } from './words.ts';
+	import { draftPassFacts, groupFacts, membershipFacts } from './plan-facts.ts';
 
 	/** The pass page: the Draft Pass, the Membership and the Group Draft Pass with what each unlocks,
 	 * read from the API (the prices from Stripe, the features from the table Can reads), which hosts
