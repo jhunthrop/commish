@@ -27,6 +27,17 @@ type Waiver struct {
 	// NoDrop says every player he could replace is held or a starter he
 	// would not displace, so there is no move to make.
 	NoDrop bool
+	// Drops is every player he could replace with the gain after each,
+	// the move's own drop first, then by gain (Lane 66f's drop panel).
+	// Empty when a roster spot is open or there is no move to make.
+	Drops []Drop
+}
+
+// Drop is one player a candidate could replace (an index into the
+// squad) and the lineup's gain after the swap, as Waiver.Gain.
+type Drop struct {
+	At   int
+	Gain float64
 }
 
 // Waivers is §5.2's gain for every pool candidate, a week's over the
@@ -78,6 +89,7 @@ func (w *waiverSearch) bestDrop(a int, c *Candidate) Waiver {
 		return Waiver{Add: a, Drop: -1, Gain: strength - w.base, Starts: w.f.started(len(after) - 1)}
 	}
 	best := Waiver{Add: a, Drop: -1, NoDrop: true}
+	var drops []Drop
 	for d, p := range w.mine {
 		if w.squad.Held[p.ID] || !droppableFor(p, c, w.dedicated, w.counts) {
 			continue
@@ -90,11 +102,28 @@ func (w *waiverSearch) bestDrop(a int, c *Candidate) Waiver {
 			continue
 		}
 		gain := strength - w.base
+		drops = append(drops, Drop{At: d, Gain: gain})
 		if best.NoDrop || gain > best.Gain || (gain == best.Gain && across(w.mine[best.Drop], p, false)) {
 			best = Waiver{Add: a, Drop: d, Gain: gain, Starts: starts}
 		}
 	}
+	best.Drops = w.ordered(drops, best.Drop)
 	return best
+}
+
+// ordered is the drops with the move's own first, then the highest gain,
+// then the player the order values least.
+func (w *waiverSearch) ordered(drops []Drop, chosen int) []Drop {
+	sort.SliceStable(drops, func(i, j int) bool {
+		if (drops[i].At == chosen) != (drops[j].At == chosen) {
+			return drops[i].At == chosen
+		}
+		if drops[i].Gain != drops[j].Gain {
+			return drops[i].Gain > drops[j].Gain
+		}
+		return across(w.mine[drops[j].At], w.mine[drops[i].At], false)
+	})
+	return drops
 }
 
 // droppableFor is §5.2's position rule: a kicker or defense is dropped

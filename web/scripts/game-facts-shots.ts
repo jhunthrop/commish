@@ -32,7 +32,7 @@ const EXPECTED = /^\d+(\.5)? to \d+(\.5)?$/;
 const CELL_WEATHER =
 	/^(\d+°, \d+ mph(, \d+% (rain|snow|ice))?|Indoors|Roof TBD|Abroad, no forecast|Outdoors)$/;
 const FACTS_READ =
-	/The Game cell shows each club's expected points, his club first, then the kickoff weather, read \w{3} \d{1,2}:\d{2} [ap]m Central\./g;
+	/The Game cell(?: shows each club's expected points, his club first, then the kickoff weather, read|'s expected points and weather were read) \w{3} \d{1,2}:\d{2} [ap]m Central\./g;
 const BETTING =
 	/\b(favou?red|underdogs?|odds|lines?|spreads?|totals?|bets?|betting|vegas|sportsbooks?|props?|moneyline)\b|over\/under/i;
 
@@ -51,9 +51,10 @@ const PAGES = [
 	{
 		name: 'waivers',
 		path: `/league/${id}/waivers`,
-		ready: 'Claim on Sleeper',
-		phone: false,
-		box: false
+		ready: 'Open Sleeper waivers',
+		// The pickup table is a box score too (Lane 66f): its Game cells and one read line.
+		phone: true,
+		box: true
 	},
 	{
 		name: 'trades',
@@ -122,12 +123,16 @@ async function boxFacts(
 				.map((el) => (el as HTMLElement).innerText.trim());
 		const rows = [
 			...document.querySelectorAll(
-				'main table.box tbody tr, main table.lineup tbody tr, main table.inner tbody tr'
+				'main table.box tbody tr, main table.lineup tbody tr, main table.pool tbody tr, main table.inner tbody tr'
 			)
 		];
 		return {
-			expected: texts('main table.box .exp, main table.lineup .exp, main table.inner .exp'),
-			weather: texts('main table.box .wx, main table.lineup .wx, main table.inner .wx'),
+			expected: texts(
+				'main table.box .exp, main table.lineup .exp, main table.pool .exp, main table.inner .exp'
+			),
+			weather: texts(
+				'main table.box .wx, main table.lineup .wx, main table.pool .wx, main table.inner .wx'
+			),
 			text: document.body.innerText,
 			stamped: rows.filter((tr) => /\bRead \w{3} /.test(tr.textContent)).length
 		};
@@ -173,13 +178,10 @@ for (const { name, path, ready, phone, box } of PAGES) {
 					);
 					continue;
 				}
+				// The player page says the game facts as a sentence at every width (the in-season screens are
+				// box scores since Lanes 66f and 66g).
 				const said = await factsLine(page);
-				// The waiver and trade rows keep to their decision on a phone, so the first row clears the pin.
-				const shown = phone || width !== PHONE_WIDTH;
-				check(
-					(said !== null) === shown,
-					`${where}: ${shown ? 'no game facts sentence' : 'game facts on a phone row'}`
-				);
+				check(said !== null, `${where}: no game facts sentence`);
 				if (said !== null) {
 					check(READ.test(said), `${where}: no read time in "${said}"`);
 					check(WEATHER.test(said), `${where}: no roof or weather in "${said}"`);

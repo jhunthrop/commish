@@ -19,7 +19,6 @@ import type {
 	PlayerLine,
 	TradeRow,
 	TradeTeam,
-	WaiverRow,
 	WeekFacts
 } from './api.ts';
 
@@ -130,32 +129,6 @@ export function gainFigure(gain: number): string {
 	return signed(gain, GAIN_DECIMALS);
 }
 
-/** The waiver screen's decision, for the best add or the one the member marked: "Add Bhayshul
- * Tuten, drop Jaylen Wright. Your lineup gains 1.2 points over replacement a week." */
-export function waiverDecision(row: WaiverRow | null): string {
-	if (row === null) return 'Nobody on waivers starts for you this week.';
-	const drop = row.drop ? `, drop ${row.drop.player.name}` : '';
-	const gain =
-		row.gain > 0
-			? ` Your lineup gains ${gainAmount(row.gain)} points over replacement a week.`
-			: ' He would not start for you this week.';
-	return `Add ${row.add.player.name}${drop}.${gain}`;
-}
-
-/** Who a row's add replaces on the roster, with his rank: "drop Jaylen Wright, RB58", "into an
- * open spot". */
-export function dropWords(row: Pick<WaiverRow, 'drop'>): string {
-	if (row.drop === null) return 'into an open spot';
-	const rank = rankWords(row.drop);
-	return `drop ${row.drop.player.name}${rank === null ? '' : `, ${rank}`}`;
-}
-
-/** The drop every add shares, said once over the rows: "Each add drops Jaxson Dart, QB31". */
-export function sharedDropWords(drop: PlayerLine): string {
-	const rank = rankWords(drop);
-	return `Each add drops ${drop.player.name}${rank === null ? '' : `, ${rank}`}`;
-}
-
 /** A trade's two gains: "Your lineup gains 4.1 points over replacement a week, theirs 2.3." */
 export function tradeGains(row: Pick<TradeRow, 'my_gain' | 'their_gain'>): string {
 	return `Your lineup gains ${gainAmount(row.my_gain)} points over replacement a week, theirs ${gainAmount(row.their_gain)}.`;
@@ -198,12 +171,6 @@ export function noTradeWith(name: string): string {
 
 /** A player the drafter tags Hold on a sheet: never a drop, never given in a trade. */
 export const HELD = 'Held';
-
-/** The line over the waiver adds that would not start (spec §5.2). */
-export const NO_START_RULE = 'Nobody here starts for you this week';
-
-/** The line over the adds that gain your lineup but sit this week (a bye, a designation). */
-export const LATER_RULE = 'These help your lineup but do not start this week';
 
 /** The signed-out panel's title, naming the screen it is for. */
 export function signInTitle(screen: LeagueScreen): string {
@@ -303,10 +270,6 @@ export const TAB_LABELS: Readonly<Record<'league' | LeagueScreen, string>> = {
 export const LINES = {
 	/** A row's number cell: a week, apart from the league page's season figure. */
 	overRepl: 'over repl a week',
-	/** A waiver row's number: the gain to your lineup, not his own. */
-	toYourLineup: 'a week to your lineup',
-	/** The waiver rows' number named once over them on a phone, where the cell prints it alone. */
-	gainHead: 'Your gain a week',
 	unranked: 'Unranked',
 	/** A row's end on a screen whose rows end on points a game, for a player without them. */
 	noProjection: 'No projection',
@@ -347,14 +310,4 @@ export const LINES = {
 /** "Your lineup for week 6". */
 export function lineupTitle(week: number): string {
 	return `Your lineup for week ${String(week)}`;
-}
-
-/** "Adds for week 6". */
-export function addsTitle(week: number): string {
-	return `Adds for week ${String(week)}`;
-}
-
-/** The waiver panel's count: "2 would start for you", "None would start for you". */
-export function startingCount(n: number): string {
-	return `${n === 0 ? 'None' : String(n)} would start for you`;
 }

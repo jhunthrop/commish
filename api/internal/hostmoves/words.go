@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/jhunthrop/commish/api/internal/apitypes"
+	"github.com/jhunthrop/commish/api/internal/inseason"
 	"github.com/jhunthrop/commish/api/internal/leaguesync"
 )
 
@@ -124,7 +125,18 @@ const (
 // and where the platform says them.
 type kindWords struct {
 	reconsent, reconnect, notYourTeam, form, used, off, notAnswering, notSent string
+	// Why the move is not made from here, said under the screen's other
+	// verb: the platform takes none, its switch is off, or the member has
+	// not connected it.
+	copyOnly, switchedOff, connect string
 }
+
+// The claim's lines under the waiver page verb (Lane 66f): ESPN alone
+// takes a claim, so its name is in them.
+const (
+	claimSwitchedOffWords = inseason.ClaimsOffWords
+	claimConnectWords     = "Connect ESPN on your account page to claim from here."
+)
 
 // wordsFor is the move's sentences on the host: a claim's are ESPN's, a
 // lineup's name the league's platform.
@@ -132,10 +144,12 @@ func wordsFor(host string, kind apitypes.HostMoveInputKind) kindWords {
 	p := onHost(host)
 	if kind == apitypes.HostMoveInputKindClaim {
 		return kindWords{reconsent: claimReconsentWords, reconnect: claimReconnectWords, notYourTeam: claimNotYourTeamWords,
-			form: claimFormWords, used: claimTokenUsedWords, off: espnWords.off, notAnswering: espnWords.notAnswering, notSent: espnWords.notSent}
+			form: claimFormWords, used: claimTokenUsedWords, off: espnWords.off, notAnswering: espnWords.notAnswering, notSent: espnWords.notSent,
+			copyOnly: *inseason.CopyOnlyClaims(host).Reason, switchedOff: claimSwitchedOffWords, connect: claimConnectWords}
 	}
 	return kindWords{reconsent: p.reconsent, reconnect: p.reconnect, notYourTeam: p.notYourTeam, form: moveFormWords, used: p.used,
-		off: p.off, notAnswering: p.notAnswering, notSent: p.notSent}
+		off: p.off, notAnswering: p.notAnswering, notSent: p.notSent,
+		copyOnly: *inseason.CopyOnlyMoves(host).Reason, switchedOff: p.switchedOff, connect: p.connect}
 }
 
 // andNames joins names: "A", "A and B", "A, B and C".

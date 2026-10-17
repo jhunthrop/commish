@@ -108,6 +108,8 @@ type fakeMoves struct {
 	err     error
 	// partial is what a failed check answers with its error.
 	partial apitypes.LineupMoves
+	// partialClaim is the same for a claim (review 66f M2).
+	partialClaim apitypes.WaiverMoves
 }
 
 func (f *fakeMoves) LineupMove(_ context.Context, accountID uuid.UUID, host string) (apitypes.LineupMoves, error) {
@@ -122,7 +124,7 @@ func (f *fakeMoves) LineupMove(_ context.Context, accountID uuid.UUID, host stri
 func (f *fakeMoves) ClaimMove(_ context.Context, accountID uuid.UUID, host string) (apitypes.WaiverMoves, error) {
 	f.host, f.account = host, accountID
 	if f.err != nil {
-		return apitypes.WaiverMoves{}, f.err
+		return f.partialClaim, f.err
 	}
 	return apitypes.WaiverMoves{Claim: apitypes.WaiverMovesClaimAvailable}, nil
 }
