@@ -290,9 +290,9 @@ def fitted_payload(fitted: Fitted) -> dict[str, Any]:
     d = fitted.dispersion
     efficiency = fitted.shared.efficiency
     return {
-        "play_model_cells": {k: {str(s): repr(c) for s, c in v.items()} for k, v in fitted.play.cells.items()},
-        "team_model_cells": {k: {str(s): repr(c) for s, c in v.items()} for k, v in fitted.team.cells.items()},
-        "share_cells": {"-".join(map(str, k)): repr(m.cell) for k, m in fitted.shares.models.items()},
+        "play_model_cells": {k: {str(s): asdict(c) for s, c in v.items()} for k, v in fitted.play.cells.items()},
+        "team_model_cells": {k: {str(s): asdict(c) for s, c in v.items()} for k, v in fitted.team.cells.items()},
+        "share_cells": {"-".join(map(str, k)): asdict(m.cell) for k, m in fitted.shares.models.items()},
         "share_fold_losses": {"-".join(map(str, k)): dict(v) for k, v in fitted.shares.losses.items()},
         "efficiency": {
             "|".join(k): asdict(v) | {"k": v.k, "pooled_fully": v.pooled_fully} for k, v in efficiency.cells.items()

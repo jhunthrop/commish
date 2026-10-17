@@ -47,6 +47,7 @@ from research.model.weekly4.share_model import (
 )
 from research.model.weekly4.simulate import Dispersion, Simulated, simulate_game
 from research.model.weekly4.team_model import TeamFit, fit_team_models, predict_team
+from research.model.weekly4.tuning import Cell
 from research.model.weekly4.value_allowance import game_values
 
 PROJECTED_KINDS: Final = ("targets", "carries", "dropbacks")
@@ -176,23 +177,44 @@ def _season_data(  # noqa: PLR0913, PLR0917 - one season's inputs, named
     return SeasonData(season, mine, teams, plays, counts[counts["season"] == season], allowances)
 
 
-def fit_system(store: Store, extras: Extras, t: RoundFour) -> Fitted:
+@dataclass(frozen=True, slots=True)
+class FixedCells:
+    """The cells a refit uses with no selection (section 4, the served refit: the judged fit's)."""
+
+    play: Mapping[str, Cell]
+    team: Mapping[str, Cell]
+    shares: Cell
+
+
+def fit_system(store: Store, extras: Extras, t: RoundFour, fixed: FixedCells | None = None) -> Fitted:
     clock: dict[str, float] = {}
     started = time.monotonic()
     positions = positions_of(store)
     pricing = tuple(range(min(t.player_fit_seasons) - 1, t.judgment_season + 1))
-    play = fit_play_models(store.plays[store.plays["season"] <= t.judgment_season], pricing)
+    play = fit_play_models(
+        store.plays[store.plays["season"] <= t.judgment_season],
+        pricing,
+        fixed=None if fixed is None else fixed.play,
+    )
     priced = _price_seasons(store.plays, play)
     clock["play_model"] = time.monotonic() - started
     mark = time.monotonic()
-    team = fit_team_models(store.teams[store.teams["season"] <= t.judgment_season], row_seasons(t))
+    team = fit_team_models(
+        store.teams[store.teams["season"] <= t.judgment_season],
+        row_seasons(t),
+        fixed=None if fixed is None else fixed.team,
+    )
     clock["team_model"] = time.monotonic() - mark
     mark = time.monotonic()
     rows = _player_rows(store, extras, (*t.player_fit_seasons, t.judgment_season))
     counts = week_counts(store.plays[store.plays["season"].isin(rows["season"].unique())])
     fit_rows = rows[rows["season"].isin(t.player_fit_seasons) & rows["week"].isin(t.fit_weeks) & (rows["lined"] == 1)]
     fit_rows = fit_rows.join(realised_shares(fit_rows, counts))
-    shares = fit_share_models(fit_rows, sorted({share_refit(t, s) for s in row_seasons(t)}))
+    shares = fit_share_models(
+        fit_rows,
+        sorted({share_refit(t, s) for s in row_seasons(t)}),
+        fixed=None if fixed is None else fixed.shares,
+    )
     clock["share_models"] = time.monotonic() - mark
     mark = time.monotonic()
     fit_plays_ = priced[priced["season"].isin(t.player_fit_seasons)]
@@ -215,7 +237,12 @@ def fit_system(store: Store, extras: Extras, t: RoundFour) -> Fitted:
         )
         for s in row_seasons(t)
     }
-    data = {s: _season_data(s, rows, store, priced, counts, positions) for s in row_seasons(t)}
+    # A season with no rows (the served refit's next season) has models and no data.
+    data = {
+        s: _season_data(s, rows, store, priced, counts, positions)
+        for s in row_seasons(t)
+        if (rows["season"] == s).any()
+    }
     clock["efficiency_and_inputs"] = time.monotonic() - mark
     mark = time.monotonic()
     dispersion, reported = fit_dispersion(t, models, data, shared, extras, priced)
