@@ -1,13 +1,6 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
-	import {
-		BOX,
-		boxNumber,
-		type BoxRow,
-		type BoxStarter,
-		type BoxTotals,
-		figureCountWords
-	} from './box.ts';
+	import { BOX, boxNumber, type BoxRow, type BoxStarter, type BoxTotals } from './box.ts';
 	import BoxLine from './BoxLine.svelte';
 	import TeamAvatar from './TeamAvatar.svelte';
 
@@ -32,6 +25,8 @@
 		avatar?: boolean;
 		/** Said under the bench's head when the bench is empty; without it an empty bench is left out. */
 		noBench?: string | null;
+		/** Your sheet's tags on a player, by board id: the drafter's own box only. */
+		tagsOf?: (boardId: string | null) => readonly string[];
 	}
 
 	let {
@@ -44,7 +39,8 @@
 		empty = null,
 		aside,
 		avatar = true,
-		noBench = null
+		noBench = null,
+		tagsOf = () => []
 	}: Props = $props();
 
 	const COLUMNS = 5;
@@ -75,16 +71,19 @@
 			<tr><td class="empty" colspan={COLUMNS}>{empty}</td></tr>
 		{/if}
 		{#each starters as entry (entry.row.key)}
-			<BoxLine row={entry.row} tone={entry.sits === undefined ? null : 'start'} />
-			{#if entry.sits}<BoxLine row={entry.sits} tone="sit" />{/if}
+			<BoxLine
+				row={entry.row}
+				tags={tagsOf(entry.row.boardId)}
+				tone={entry.sits === undefined ? null : 'start'}
+			/>
+			{#if entry.sits}<BoxLine row={entry.sits} tags={tagsOf(entry.sits.boardId)} tone="sit" />{/if}
 			{#if entry.sentence}
 				<tr class="why"><td colspan={COLUMNS}>{entry.sentence}</td></tr>
 			{/if}
 		{/each}
 		<tr class="totals">
 			<td colspan="3"
-				><span class="tl">{BOX.totals}</span>{#if totals.count}<span class="tsub"
-						>{figureCountWords(totals.count)}</span
+				><span class="tl">{BOX.totals}</span>{#if totals.note}<span class="tsub">{totals.note}</span
 					>{/if}</td
 			>
 			<td class="n proj">{boxNumber(totals.proj)}</td>
@@ -96,7 +95,12 @@
 			<tr class="bhead"><th colspan={COLUMNS} scope="rowgroup">{BOX.bench}</th></tr>
 			{#each bench as row (row.key)}
 				<!-- A starter a change sits is on the change's wash here too, so the two read as one move. -->
-				<BoxLine {row} bench tone={benchSat.has(row.key) ? 'sit' : null} />
+				<BoxLine
+					{row}
+					tags={tagsOf(row.boardId)}
+					bench
+					tone={benchSat.has(row.key) ? 'sit' : null}
+				/>
 			{:else}
 				<tr><td class="empty" colspan={COLUMNS}>{noBench}</td></tr>
 			{/each}

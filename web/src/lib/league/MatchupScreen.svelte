@@ -1,5 +1,7 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { siteContext } from '#lib/context/context.svelte.ts';
+	import { lazySheet } from '#lib/site/lazy-sheet.svelte.ts';
 	import { ApiError, leagueApi, type LeagueSync } from './api.ts';
 	import { inSeasonApi, type MatchupBox } from './inseason/api.ts';
 	import InSeasonPage from './inseason/InSeasonPage.svelte';
@@ -44,6 +46,9 @@
 		const [sync, box] = await Promise.all([leagueApi.sync(id), readBox()]);
 		return { sync, box, read_at: sync.read_at };
 	}
+
+	// Your sheet's tags mark your own rows once the sheet is in (review L7).
+	onMount(() => void lazySheet.load());
 
 	/** The league's phase basis when it has no game this week: a league drafted before the season
 	 * says the day the season starts. */

@@ -5,17 +5,17 @@ import type { LeaguePlayer } from '../api.ts';
 import type { PlayerLine, WeekFacts } from '../inseason/api.ts';
 import {
 	BOX,
-	PTS_BASIS,
 	boxNumber,
 	boxRow,
 	expectedWords,
 	factsReadLine,
-	figureCount,
-	figureCountWords,
 	gameOf,
 	hostRow,
 	positionWord,
 	projBasis,
+	ptsBasis,
+	totalsNote,
+	totalsPts,
 	projTotal,
 	ptsTotal,
 	slotWord,
@@ -186,27 +186,34 @@ void test("a defense's face is its club's mark, said in words", () => {
 	assert.equal(positionWord('K'), 'K');
 });
 
-void test('Totals say how many playing starters have a figure when one lacks it', () => {
-	const bye = 'bye' as const;
+void test("Totals' note: the projection not in yet, else the playing starters with a Proj when one lacks it", () => {
 	const game = { where: 'at ATL', when: 'Sun 12:00 pm' };
-	assert.equal(
-		figureCount([
-			{ proj: 10, game },
-			{ proj: null, game: bye }
-		]),
-		null
-	);
-	const count = figureCount([
-		{ proj: 10, game },
-		{ proj: null, game },
-		{ proj: null, game: bye }
-	]);
-	assert.deepEqual(count, { held: 1, of: 2 });
-	assert.equal(figureCountWords({ held: 1, of: 2 }), '1 of 2 starters with a figure');
+	const held = { proj: 10, game };
+	const lacking = { proj: null, game };
+	const bye = { proj: null, game: 'bye' as const };
+	assert.equal(totalsNote([held, lacking, bye], false, 6), 'No projection yet for week 6');
+	assert.equal(totalsNote([held, lacking, bye], true, 6), '1 of 2 starters with a Proj');
+	assert.equal(totalsNote([held, bye], true, 6), null);
+});
+
+void test('Totals add the tenths the column prints, so a reader adding the column gets the bar', () => {
+	// Each rounds up to the tenth it prints (1.3, 2.4, 3.5), and the raw sum (7.05) prints 7.0.
+	const rows = [{ proj: 1.25 }, { proj: 2.35 }, { proj: 3.45 }];
+	const column = rows.reduce((sum, r) => sum + Number(boxNumber(r.proj)), 0);
+	assert.equal(boxNumber(projTotal(rows)), boxNumber(column));
+	assert.equal(projTotal(rows), 7.2);
+	// 8.75 prints 8.8 and 0.05 prints 0.1, so the column adds to 8.9, not the raw 8.8.
+	assert.equal(ptsTotal([{ pts: 8.75 }, { pts: 0.05 }]), 8.9);
+});
+
+void test("Totals' Pts: the printed rows where the host gives each player's, else the host's team total", () => {
+	assert.equal(totalsPts([{ pts: 8.74 }, { pts: 3.06 }], true, 87.44), 11.8);
+	assert.equal(totalsPts([{ pts: null }, { pts: null }], false, 87.44), 87.44);
+	assert.equal(totalsPts([{ pts: null }], false, null), null);
 });
 
 void test('totals sum what is held, and a number not held prints as --', () => {
-	assert.equal(projTotal([{ proj: 19.44 }, { proj: null }, { proj: 8.1 }]), 27.54);
+	assert.equal(projTotal([{ proj: 19.44 }, { proj: null }, { proj: 8.1 }]), 27.5);
 	assert.equal(projTotal([{ proj: null }]), null);
 	assert.equal(ptsTotal([{ pts: null }]), null);
 	assert.equal(ptsTotal([{ pts: 3 }, { pts: 4.5 }]), 7.5);
@@ -232,6 +239,17 @@ void test("the Proj line names the scoring, whose it is, the read, and the defen
 	);
 });
 
+void test("the Pts line says the host's team points where it gives no player's", () => {
+	assert.equal(
+		ptsBasis(true),
+		"Pts are this week's points as your league scores them, -- until his game kicks off."
+	);
+	assert.equal(
+		ptsBasis(false),
+		"Pts are this league's team points from the host, which gives no points by player."
+	);
+});
+
 void test("the screen's basis lines say the Game cell's figures and the facts' read once", () => {
 	const older = '2026-10-16T20:00:00.000Z';
 	assert.equal(
@@ -251,10 +269,12 @@ const BANNED =
 void test('copy guard: every box word is fantasy words, with no dash or semicolon', () => {
 	const said = [
 		...Object.values(BOX),
-		PTS_BASIS,
+		ptsBasis(true),
+		ptsBasis(false),
 		projBasis(READ, OWN, true, ZONE),
 		projBasis(null, CLOSEST, false, ZONE),
-		figureCountWords({ held: 7, of: 8 }),
+		totalsNote([{ proj: null, game: null }], true, 6) ?? '',
+		totalsNote([], false, 6) ?? '',
 		factsReadLine([line()], ZONE) ?? ''
 	];
 	for (const text of said) {

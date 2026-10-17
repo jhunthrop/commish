@@ -1,7 +1,10 @@
 <script lang="ts">
 	import type { LeagueHost } from '../api.ts';
 	import BoxTable from '../box/BoxTable.svelte';
+	import { onMount } from 'svelte';
+	import { lazySheet } from '#lib/site/lazy-sheet.svelte.ts';
 	import BoxBasis from '../box/BoxBasis.svelte';
+	import { sheetTags } from '../sheet-tags.ts';
 	import { lineupBox } from '../box/lineup.ts';
 	import MovePanel from './MovePanel.svelte';
 	import Screen from './Screen.svelte';
@@ -35,6 +38,8 @@
 
 	let { advice, host, plan, make, reread }: Props = $props();
 	const box = $derived(lineupBox(advice));
+	// Your sheet's tags mark your rows once the sheet is in (review L7).
+	onMount(() => void lazySheet.load());
 	/** Every line on the screen, for the game facts' read said once under the rows. */
 	const shown = $derived([
 		...advice.slots.flatMap((s) => (s.host ? [s.ours, s.host] : [s.ours])),
@@ -105,6 +110,7 @@
 			team={lineupTitle(advice.week)}
 			mine
 			avatar={false}
+			tagsOf={sheetTags}
 			starters={box.starters}
 			bench={box.bench}
 			benchSat={box.benchSat}
@@ -113,6 +119,7 @@
 		/>
 	</div>
 	<BoxBasis
+		byPlayer={advice.player_points}
 		projection={{ readAt: advice.projection_read_at, scoring: advice.projection_scoring }}
 		lines={shown}
 	/>

@@ -6,9 +6,9 @@ import type { LineupAdvice } from '../inseason/api.ts';
 import { LINES, satIds } from '../inseason/words.ts';
 import {
 	boxRow,
-	figureCount,
 	projTotal,
-	ptsTotal,
+	totalsNote,
+	totalsPts,
 	slotWord,
 	type BoxRow,
 	type BoxStarter,
@@ -25,7 +25,10 @@ export interface LineupBox {
 }
 
 export function lineupBox(
-	advice: Pick<LineupAdvice, 'slots' | 'bench'>,
+	advice: Pick<
+		LineupAdvice,
+		'slots' | 'bench' | 'player_points' | 'team_points' | 'projection_read_at' | 'week'
+	>,
 	zone: string = memberZone()
 ): LineupBox {
 	const starters = advice.slots.map((slot): BoxStarter => {
@@ -42,6 +45,10 @@ export function lineupBox(
 		starters,
 		bench: advice.bench.map((line) => boxRow(line, '', zone)),
 		benchSat: satIds(advice.slots),
-		totals: { proj: projTotal(ours), pts: ptsTotal(ours), count: figureCount(ours) }
+		totals: {
+			proj: projTotal(ours),
+			pts: totalsPts(ours, advice.player_points, advice.team_points),
+			note: totalsNote(ours, advice.projection_read_at !== null, advice.week)
+		}
 	};
 }

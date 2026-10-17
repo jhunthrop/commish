@@ -4,6 +4,9 @@
 	import Face from '#lib/ui/Face.svelte';
 	import NameWords from '#lib/ui/NameWords.svelte';
 	import StatusPill from '../StatusPill.svelte';
+	import { HELD } from '../inseason/words.ts';
+	import { tagMarks } from '#lib/sheet/tags.ts';
+	import TagChip from '#lib/ui/TagChip.svelte';
 	import { BOX, boxNumber, type BoxRow } from './box.ts';
 	import WeatherGlyph from './WeatherGlyph.svelte';
 
@@ -17,9 +20,11 @@
 		bench?: boolean;
 		/** The row a lineup change sits, or starts: marked on the change's wash. */
 		tone?: 'start' | 'sit' | null;
+		/** Your sheet's tags on him, as the league's rows mark them (review L7). */
+		tags?: readonly string[];
 	}
 
-	let { row, bench = false, tone = null }: Props = $props();
+	let { row, bench = false, tone = null, tags = [] }: Props = $props();
 </script>
 
 {#snippet game()}
@@ -62,6 +67,17 @@
 							status={row.status}
 						/>{/if}</span
 				>
+				{#if tags.length > 0 || row.held}
+					<!-- Held is the sheet's Hold tag, said by the API: drawn when the sheet's own tags are not in. -->
+					<span class="tags"
+						>{#if row.held && tags.length === 0}<TagChip
+								label={HELD}
+							/>{/if}{#each tagMarks(tags) as mark (mark.label)}<TagChip
+								label={mark.label}
+								tone={mark.tone}
+							/>{/each}</span
+					>
+				{/if}
 				<span class="phone-game">{@render game()}</span>
 			</span>
 		</span>
@@ -136,6 +152,12 @@
 
 	.nm a:hover {
 		text-decoration: underline;
+	}
+
+	.tags {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 4px;
 	}
 
 	.club {

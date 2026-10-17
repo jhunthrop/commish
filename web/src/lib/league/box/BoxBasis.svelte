@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { PlayerLine, ProjectionScoring } from '../inseason/api.ts';
-	import { PTS_BASIS, factsReadLine, projBasis } from './box.ts';
+	import { factsReadLine, projBasis, ptsBasis } from './box.ts';
 
 	/** What a box score's numbers are, said once under the boxes, one short line each: the projection
 	 * with its scoring and read (defenses' scoring named only when a defense is on the screen), points
@@ -10,9 +10,11 @@
 		projection: { readAt: string | null; scoring: ProjectionScoring } | null;
 		/** Every line the boxes drew. */
 		lines: readonly PlayerLine[];
+		/** The host gives each player's points (else each team's total alone). */
+		byPlayer: boolean;
 	}
 
-	let { projection, lines }: Props = $props();
+	let { projection, lines, byPlayer }: Props = $props();
 
 	const defense = $derived(lines.some((l) => l.player.position === 'DEF'));
 	const facts = $derived(factsReadLine(lines));
@@ -20,7 +22,7 @@
 
 <div class="basis">
 	{#if projection}<p>{projBasis(projection.readAt, projection.scoring, defense)}</p>{/if}
-	<p>{PTS_BASIS}</p>
+	<p>{ptsBasis(byPlayer)}</p>
 	{#if facts}<p>{facts}</p>{/if}
 </div>
 

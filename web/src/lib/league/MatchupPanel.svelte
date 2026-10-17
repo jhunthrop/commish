@@ -2,6 +2,7 @@
 	import BoxTable from './box/BoxTable.svelte';
 	import MatchupBug from './box/MatchupBug.svelte';
 	import BoxBasis from './box/BoxBasis.svelte';
+	import { sheetTags } from './sheet-tags.ts';
 	import { BOX } from './box/box.ts';
 	import { nextKickoff, sideBox, type SideBox } from './box/matchup.ts';
 	import type { LeagueSync, MatchupSide } from './api.ts';
@@ -45,7 +46,12 @@
 
 	function boxOf(s: MatchupSide): SideBox {
 		const answered = box?.sides.find((b) => b.roster_id === s.roster_id) ?? null;
-		return sideBox(s, answered, playersScored(s), showsTotal(s) ? s.points : null);
+		return sideBox(s, answered, {
+			scored: playersScored(s),
+			hostTotal: showsTotal(s) ? s.points : null,
+			landed: box?.projection_read_at != null,
+			week: matchup?.week ?? sync.week
+		});
 	}
 
 	const mine = $derived(matchup ? boxOf(matchup.mine) : null);
@@ -89,6 +95,7 @@
 			<BoxTable
 				team={teamName(sync, matchup.mine.roster_id)}
 				mine
+				tagsOf={sheetTags}
 				starters={mine.starters}
 				bench={mine.bench}
 				totals={mine.totals}
@@ -106,6 +113,7 @@
 			{/if}
 		</div>
 		<BoxBasis
+			byPlayer={mine.byPlayer}
 			projection={box ? { readAt: box.projection_read_at, scoring: box.projection_scoring } : null}
 			{lines}
 		/>

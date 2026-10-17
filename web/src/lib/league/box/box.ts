@@ -6,7 +6,12 @@
  * prints is tested here. */
 import { memberZone, weekdayTime, zoneWord } from '#lib/format/clock.ts';
 import { defenseWords } from '#lib/format/clubs.ts';
-import { designationWord, rankWord, type DesignationStatus } from '#lib/format/designation.ts';
+import {
+	designationWord,
+	rankWord,
+	sitsHim,
+	type DesignationStatus
+} from '#lib/format/designation.ts';
 import type { StatusView } from '#lib/run/status-view.ts';
 import { POSITIONS, type Position } from '#lib/types/player.ts';
 import { halves, toBePlayed, PRECIPITATION_NAMED_FROM } from '#lib/format/game-facts.ts';
@@ -81,6 +86,10 @@ export interface BoxGame {
 /** One row of a box. */
 export interface BoxRow {
 	key: string;
+	/** His board id, for your sheet's tags on him; null for a player our board does not place. */
+	boardId: string | null;
+	/** You tag him Hold on a sheet (the API's held). */
+	held: boolean;
 	slot: string;
 	name: string;
 	/** His page on the site, null without one. */
@@ -110,7 +119,9 @@ export interface BoxRow {
 export interface BoxTotals {
 	proj: number | null;
 	pts: number | null;
-	count: { held: number; of: number } | null;
+	/** Beside Totals: before the week's projection lands, that it has not; once it has, how many
+	 * playing starters have a Proj when one lacks it. Null when there is nothing to say. */
+	note: string | null;
 }
 
 /** A starter's place in a box: his row, and on a lineup's change the host's starter it sits under
@@ -125,8 +136,6 @@ export interface BoxStarter {
 
 /** The season-long lists: their word stands in his rank ("RB IR"), as on the board. */
 const SEASON_LONG = new Set<DesignationStatus>(['injured_reserve', 'pup', 'nfi']);
-/** The statuses that do not keep him out, drawn grey; the rest are drawn as a loss. */
-const MAY_PLAY = new Set<DesignationStatus>(['questionable', 'doubtful']);
 
 /** His status as Lane 63's pill draws it, the week's designation first, else the host's injured
  * reserve. */
@@ -140,7 +149,7 @@ export function statusOf(
 	return {
 		rank: SEASON_LONG.has(status) ? rankWord(status) : null,
 		mark: designationWord(status),
-		sits: !MAY_PLAY.has(status),
+		sits: sitsHim(status),
 		line: null
 	};
 }
@@ -203,6 +212,8 @@ export function boxRow(line: PlayerLine, slot: string, zone: string = memberZone
 	const ahead = !facts.bye && toBePlayed({ played: facts.played, kickoff: facts.kickoff });
 	return {
 		key: player.host_id,
+		boardId: player.board_id,
+		held: line.held,
 		slot,
 		name: player.name,
 		slug: line.slug,
@@ -224,6 +235,8 @@ export function boxRow(line: PlayerLine, slot: string, zone: string = memberZone
 export function hostRow(player: LeaguePlayer, slot: string, pts: number | null): BoxRow {
 	return {
 		key: player.host_id,
+		boardId: player.board_id,
+		held: false,
 		slot,
 		name: player.name,
 		slug: null,
@@ -240,31 +253,55 @@ export function hostRow(player: LeaguePlayer, slot: string, pts: number | null):
 	};
 }
 
-/** How many of the starters with a game this week have a projection, with how many have a game:
- * Totals say so when one lacks it (review L2), null when none lacks it. */
-export function figureCount(
-	rows: readonly Pick<BoxRow, 'proj' | 'game'>[]
-): { held: number; of: number } | null {
+/** The note beside Totals (review L2, N5): "No projection yet for week 6" before the week's
+ * projection lands, "7 of 8 starters with a Proj" once it has when a playing starter lacks one,
+ * else null. */
+export function totalsNote(
+	rows: readonly Pick<BoxRow, 'proj' | 'game'>[],
+	landed: boolean,
+	week: number
+): string | null {
+	if (!landed) return `No projection yet for week ${String(week)}`;
 	const playing = rows.filter((r) => r.game !== 'bye');
 	const held = playing.filter((r) => r.proj !== null).length;
-	return held === playing.length ? null : { held, of: playing.length };
+	return held === playing.length
+		? null
+		: `${String(held)} of ${String(playing.length)} starters with a ${BOX.proj}`;
 }
 
-/** "7 of 8 starters with a figure". */
-export function figureCountWords(count: { held: number; of: number }): string {
-	return `${String(count.held)} of ${String(count.of)} starters with a figure`;
+/** A figure as its cell prints it, back as a number: the tenth the column shows. */
+function printed(value: number): number {
+	return Number(fixed(value, 1));
 }
 
-/** The rows' projection summed, null when none of them has one. */
+/** The printed figures summed, so Totals equal the column a reader adds up (review N2); null when
+ * none is held. */
+function printedSum(values: readonly (number | null)[]): number | null {
+	const held = values.flatMap((v) => (v === null ? [] : [printed(v)]));
+	if (held.length === 0) return null;
+	return Math.round(held.reduce((a, b) => a + b, 0) * TENTHS) / TENTHS;
+}
+
+const TENTHS = 10;
+
+/** The rows' projection as printed, summed; null when none of them has one. */
 export function projTotal(rows: readonly Pick<BoxRow, 'proj'>[]): number | null {
-	const held = rows.flatMap((r) => (r.proj === null ? [] : [r.proj]));
-	return held.length === 0 ? null : held.reduce((a, b) => a + b, 0);
+	return printedSum(rows.map((r) => r.proj));
 }
 
-/** The rows' points so far summed, null before any of them has kicked off. */
+/** The rows' points so far as printed, summed; null before any of them has kicked off. */
 export function ptsTotal(rows: readonly Pick<BoxRow, 'pts'>[]): number | null {
-	const held = rows.flatMap((r) => (r.pts === null ? [] : [r.pts]));
-	return held.length === 0 ? null : held.reduce((a, b) => a + b, 0);
+	return printedSum(rows.map((r) => r.pts));
+}
+
+/** Totals' Pts, one rule for both screens (review N1): where the host gives each player's points,
+ * the rows' as printed; where it gives each team's total alone, that total, the rows staying "--". */
+export function totalsPts(
+	rows: readonly Pick<BoxRow, 'pts'>[],
+	byPlayer: boolean,
+	teamPoints: number | null
+): number | null {
+	return byPlayer ? ptsTotal(rows) : teamPoints;
 }
 
 /** How a box's numbers print: one decimal, "--" when not held. */
@@ -317,5 +354,10 @@ export function factsReadLine(
 	return `The ${BOX.game} cell shows each club's expected points, his club first, then the kickoff weather, read ${weekdayTime(oldest, zone)} ${zoneWord(zone)}.`;
 }
 
-/** "Pts are this week's points as your league scores them, -- until his game kicks off." */
-export const PTS_BASIS = `${BOX.pts} are this week's points as your league scores them, ${BOX.none} until his game kicks off.`;
+/** The Pts column's basis (review N1): a player's points as the league scores them where the host
+ * gives each player's, else the team's points alone. */
+export function ptsBasis(byPlayer: boolean): string {
+	return byPlayer
+		? `${BOX.pts} are this week's points as your league scores them, ${BOX.none} until his game kicks off.`
+		: `${BOX.pts} are this league's team points from the host, which gives no points by player.`;
+}
