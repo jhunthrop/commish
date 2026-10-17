@@ -30,8 +30,8 @@ const KIND_WORDS: Readonly<
 	ice: 'sleet or freezing rain'
 };
 
-/** A figure the books quote in halves: "47", "47.5". */
-function halves(points: number): string {
+/** A game figure in halves, as it is published: "47", "47.5". */
+export function halves(points: number): string {
 	return Number.isInteger(points) ? String(points) : fixed(points, 1);
 }
 

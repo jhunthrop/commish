@@ -3,9 +3,12 @@
 // at 1440 and 390. At 1440, 1024, 800, 768 and 390 it asserts the page never scrolls sideways, and it
 // prints the tallest player row, the taps from the page to its verb, and the shots of the loading
 // rows, the API's refusals and the site's not-found for an unknown screen. On a phone (390 by 844) it
-// asserts the first player row sits whole above the pinned verb. On the three screens it asserts the
-// rows carry the rest-of-season points a game and the basis line says what they are (Lane 64), and
-// the builder's answer names its players with them. Exits non-zero when a page scrolls sideways, a
+// asserts the first player row sits whole above the pinned verb. On the waiver and trade screens it
+// asserts the rows carry the rest-of-season points a game and the basis line says what they are (Lane
+// 64), and the builder's answer names its players with them. On the Lineup and Matchup screens, box
+// scores (Lane 66d), it asserts the column heads, every row's projection and points as one decimal or
+// --, the projection's basis said once, no points a game on a row, no name cut and a defense drawn
+// with its club's mark. Exits non-zero when a page scrolls sideways, a
 // phone's first row is under the pin, or a figure or its sentence is missing.
 //
 //   node scripts/inseason-shots.ts [web origin] [out dir, from scripts/]
@@ -69,7 +72,44 @@ function file(name: string): string {
 
 const scrolls: string[] = [];
 /** The screens whose rows carry his rest-of-season points a game, and the basis sentence saying so. */
-const PER_GAME_SCREENS = new Set(['start', 'waivers', 'trades']);
+const PER_GAME_SCREENS = new Set(['waivers', 'trades']);
+/** The screens drawn as a box score (Lane 66d): columns, the week's projection and points so far,
+ * the projection's basis said once, no points a game on a row. */
+const BOX_SCREENS = new Set(['start', 'matchup']);
+const PROJ_BASIS = /Proj is this week's published projection, read \w{3} \d+:\d\d [ap]m \w+\./;
+const BOX_NUMBER = /^(\d+\.\d|--)$/;
+
+/** What a box score screen draws, for the checks: its column heads, each row's two numbers, its
+ * basis, any row cell whose name is cut, and whether a row says points a game. */
+async function boxFacts(page: Page): Promise<{
+	heads: string[];
+	numbers: string[];
+	basis: string;
+	cut: string[];
+	perGame: boolean;
+	defenseMarks: number;
+}> {
+	return page.evaluate(() => {
+		const box = [...document.querySelectorAll('main table.box')];
+		const rows = box.flatMap((t) => [...t.querySelectorAll('tbody tr')]);
+		const names = box.flatMap((t) => [...t.querySelectorAll('.nm a, .nm b')]);
+		return {
+			// A head the phone folds away keeps its place at no width: only the drawn heads count.
+			heads: [...(box[0]?.querySelectorAll('thead tr.cols th') ?? [])]
+				.filter((th) => th.getBoundingClientRect().width > 1)
+				.map((th) => (th as HTMLElement).innerText.trim()),
+			numbers: rows.flatMap((tr) =>
+				[...tr.querySelectorAll('td.proj, td.pts')].map((td) =>
+					(td as HTMLElement).innerText.trim()
+				)
+			),
+			basis: [...document.querySelectorAll('main p')].map((p) => p.textContent).join(' '),
+			cut: names.flatMap((n) => (n.scrollWidth > n.clientWidth + 1 ? [n.textContent] : [])),
+			perGame: rows.some((tr) => /\d a game/.test(tr.textContent)),
+			defenseMarks: box.flatMap((t) => [...t.querySelectorAll('img[alt$=" defense"]')]).length
+		};
+	});
+}
 const PER_GAME_BASIS =
 	/Points a game are our rest-of-season projection from week \d+ over the games his club has left, byes out\./;
 const PER_GAME = /\d+\.\d a game/;
@@ -110,7 +150,7 @@ for (const { name, path, ready: text } of PAGES) {
 				inner: window.innerWidth,
 				tallest: Math.max(
 					0,
-					...[...document.querySelectorAll('main .row')].map(
+					...[...document.querySelectorAll('main .row, main table.box tbody tr')].map(
 						(r) => r.getBoundingClientRect().height
 					)
 				)
@@ -135,10 +175,34 @@ for (const { name, path, ready: text } of PAGES) {
 					}
 				}
 			}
+			if (BOX_SCREENS.has(name)) {
+				const box = await boxFacts(page);
+				const at = `${name} ${theme} ${String(width)}`;
+				const heads =
+					width <= PHONE.width
+						? ['Slot', 'Player', 'Proj', 'Pts']
+						: ['Slot', 'Player', 'Game', 'Proj', 'Pts'];
+				if (
+					box.heads
+						.filter((h) => h !== '')
+						.join(' ')
+						.toLowerCase() !== heads.join(' ').toLowerCase()
+				)
+					missing.push(`${at} box heads ${box.heads.join(' ')}`);
+				if (box.numbers.length === 0 || !box.numbers.every((n) => BOX_NUMBER.test(n)))
+					missing.push(`${at} box numbers ${box.numbers.join(' ')}`);
+				if (!box.numbers.some((n) => n !== '--')) missing.push(`${at} no projection shown`);
+				if (!PROJ_BASIS.test(box.basis)) missing.push(`${at} projection basis`);
+				if (box.perGame) missing.push(`${at} a row says points a game`);
+				if (box.cut.length > 0) missing.push(`${at} names cut: ${box.cut.join(', ')}`);
+				if (box.defenseMarks === 0) missing.push(`${at} no defense drawn with its club mark`);
+			}
 			if (width === PHONE.width && name !== 'league' && name !== 'matchup') {
 				await page.setViewportSize(PHONE);
 				const fold = await page.evaluate(() => {
-					const row = document.querySelector('main .row')?.getBoundingClientRect();
+					const row = document
+						.querySelector('main .row, main table.box tbody tr')
+						?.getBoundingClientRect();
 					const pin = document.querySelector('.pin')?.getBoundingClientRect();
 					return { rowBottom: row?.bottom ?? Infinity, pinTop: pin?.top ?? 0 };
 				});
@@ -445,7 +509,7 @@ for (const [where, said] of builderLines) process.stdout.write(`builder ${where}
 process.stdout.write(`shots in ${out.pathname}\n`);
 if (scrolls.length > 0) throw new Error(`Pages scroll sideways:\n${scrolls.join('\n')}`);
 if (missing.length > 0)
-	throw new Error(`The rest-of-season points a game are missing:\n${missing.join('\n')}`);
+	throw new Error(`A figure, its basis or a box's columns are wrong:\n${missing.join('\n')}`);
 if (under.length > 0)
 	throw new Error(`A phone's first row is under the pinned verb:\n${under.join('\n')}`);
 process.stdout.write('No page scrolls sideways at 1440, 1024, 800, 768 or 390.\n');

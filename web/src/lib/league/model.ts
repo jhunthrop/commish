@@ -9,7 +9,6 @@ import type { LeagueBoard, LeagueBoardPlayer } from './board.ts';
 import type { FaceStatus } from '#lib/ui/face-status.ts';
 import type {
 	AttachedLeague,
-	LeagueMatchup,
 	LeagueHost,
 	LeagueMove,
 	LeaguePlayer,
@@ -87,18 +86,6 @@ export function readLine(sync: ReadState, now: Date): string {
 export function matchupGap(sync: LeagueSync, now: Date): string {
 	if (sync.week === 0) return 'Your league has no games this week.';
 	return `We could not read this week's game from ${hostWords(sync.host)}. ${readLine(sync, now)}`;
-}
-
-/** The matchup head's aside: nothing when the drafter's score was not read (the panel says so),
- * points so far once a game is on or in an all-play week whose read score is the fact, and no games
- * played only when the read shows every side at 0. */
-export function matchupAside(
-	matchup: LeagueMatchup,
-	allPlay: boolean,
-	started: boolean
-): string | undefined {
-	if (scoreUnread(matchup.mine)) return undefined;
-	return started || allPlay ? 'Points so far' : 'No games played yet';
 }
 
 /** The api said it could not read the side's score. Only an explicit false counts: an api that
@@ -249,11 +236,4 @@ export function myPlace(sync: LeagueSync): number {
  * writes beside his name; none otherwise, whatever slot he is on. */
 export function spotStatus(spot: Pick<RosterSpot, 'slot' | 'player'>): FaceStatus | null {
 	return spot.slot === 'reserve' || spot.player.injured_reserve ? 'ir' : null;
-}
-
-/** The mark on a player's face from the roster that holds him, else from his own word. */
-export function statusOn(roster: readonly RosterSpot[], player: LeaguePlayer): FaceStatus | null {
-	const spot = roster.find((s) => s.player.host_id === player.host_id);
-	if (spot) return spotStatus(spot);
-	return player.injured_reserve ? 'ir' : null;
 }

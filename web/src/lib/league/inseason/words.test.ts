@@ -89,6 +89,7 @@ const line = (name: string, position = 'RB', rank: number | null = 14): PlayerLi
 	position_rank: rank,
 	points_over_replacement: 0.7,
 	rest_of_season_per_game: null,
+	week_projection: null,
 	held: false,
 	facts: facts()
 });

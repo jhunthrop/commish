@@ -1,39 +1,27 @@
 <script lang="ts">
-	import { fixed } from '#lib/format/number.ts';
-	import type { LeagueBoard } from './board.ts';
-	import Label from '#lib/ui/Label.svelte';
-	import Panel from '#lib/ui/Panel.svelte';
-	import PanelHead from '#lib/ui/PanelHead.svelte';
+	import BoxTable from './box/BoxTable.svelte';
+	import MatchupBug from './box/MatchupBug.svelte';
+	import { PTS_BASIS, factsReadLine, projBasis } from './box/box.ts';
+	import { nextKickoff, sideBox, type SideBox } from './box/matchup.ts';
 	import type { LeagueSync, MatchupSide } from './api.ts';
-	import LeagueRow from './LeagueRow.svelte';
-	import StatusPill from './StatusPill.svelte';
-	import {
-		hostWords,
-		matchupAside,
-		matchupGap,
-		rowOf,
-		scoreGap,
-		scoreUnread,
-		statusOn,
-		teamName
-	} from './model.ts';
+	import type { MatchupBox } from './inseason/api.ts';
+	import { hostWords, matchupGap, scoreGap, scoreUnread, teamName } from './model.ts';
 
-	/** This week's game: both lineups as the host has them set, each starter's points so far and his
-	 * game with its kickoff on the member's clock, and each side's total. Side by side on a desk, one
-	 * above the other in a hand. The Matchup screen (spec 2026-10-16 §3). */
+	/** This week's game as a box score (Lane 66d): the score bug with both teams, their points so far
+	 * and their projections, then each team's box (its starters in their slots, its totals, its
+	 * bench), side by side on a desk, the drafter's above in a hand. The rows come from the API's box
+	 * answer (box); without one they are the league read's starters with their points. The screen's
+	 * basis says once what Proj and Pts are and when the game facts were read. The Matchup screen (spec
+	 * 2026-10-16 §3). */
 	interface Props {
 		sync: LeagueSync;
-		board: LeagueBoard;
-		tagsOf: (boardId: string | null) => readonly string[];
-		/** The clock the page's read line uses, for a week we could not read. */
+		/** The API's box score for the week, null when it has none for this league. */
+		box: MatchupBox | null;
+		/** The clock the page's read line uses. */
 		now: Date;
-		/** A starter's game this week, "at BUF Sun 1:00 pm", null when the run does not say. */
-		gameOf: (team: string, week: number) => string | null;
-		/** His game's facts, "Expected to score 25 and to win by 3, 47.5 points in the game. ...", null when none are held. */
-		factsOf?: (team: string) => string | null;
 	}
 
-	let { sync, board, tagsOf, now, gameOf, factsOf = () => null }: Props = $props();
+	let { sync, box, now }: Props = $props();
 
 	const matchup = $derived(sync.matchup);
 
@@ -49,149 +37,142 @@
 		return s.points !== 0 || playersScored(s);
 	}
 
-	const started = $derived(
-		matchup !== null &&
-			[matchup.mine, ...(matchup.opponent ? [matchup.opponent] : [])].some(hasStarted)
-	);
-
 	/** In an all-play week a read score is shown even at 0: the host's own total, read, is the fact. */
 	function showsTotal(s: MatchupSide): boolean {
 		return !scoreUnread(s) && (hasStarted(s) || sync.week_all_play);
 	}
-</script>
 
-{#snippet side(s: MatchupSide, mine: boolean)}
-	{@const live = showsTotal(s)}
-	{@const scored = playersScored(s)}
-	<section class="side" class:mine aria-label={teamName(sync, s.roster_id)}>
-		<header>
-			<span class="team">{teamName(sync, s.roster_id)}</span>
-			{#if live}<span class="total">{fixed(s.points)}</span>{/if}
-		</header>
-		{#if s.starters.length === 0 && sync.host === 'ffpc' && !mine}
-			<!-- FFPC is read as one member, so the API keeps only the viewer's own starters. -->
-			<p class="none">{hostWords(sync.host)} shows us your lineup only.</p>
-		{/if}
-		{#each s.starters as starter (starter.player.host_id)}
-			{@const row = rowOf(board, starter.player)}
-			{@const game = matchup ? gameOf(row?.team ?? starter.player.team, matchup.week) : null}
-			{@const facts = factsOf(row?.team ?? starter.player.team)}
-			<LeagueRow
-				player={row}
-				host={starter.player}
-				tags={mine ? tagsOf(starter.player.board_id) : []}
-				status={statusOn(mine ? sync.roster : [], starter.player)}
-			>
-				{#snippet meta()}
-					{#if row}<StatusPill
-							position={row.position}
-							positionRank={row.positionRank}
-							status={row.status}
-						/>{:else}<span>{starter.player.position}</span>{/if}
-					<span>{starter.player.team}</span>
-					{#if game}<span>{game}</span>{/if}
-					{#if facts}<span class="conditions">{facts}</span>{/if}
-				{/snippet}
-				{#snippet trailing()}
-					{#if scored}<span class="pts">{fixed(starter.points)}</span>{/if}
-				{/snippet}
-			</LeagueRow>
-		{/each}
-	</section>
-{/snippet}
-
-<Panel as="section" label="This week's matchup" padding="none">
-	{#if matchup}
-		<div class="head">
-			<PanelHead
-				title={`Week ${String(matchup.week)}`}
-				aside={matchupAside(matchup, sync.week_all_play, started)}
-				level={2}
-			/>
-			{#if sync.week_all_play}
-				<p class="none">
-					An all-play week on {hostWords(sync.host)}: your score is set against every other team's.
-				</p>
-			{/if}
-			{#if scoreUnread(matchup.mine)}
-				<p class="none">{scoreGap(sync, now)}</p>
-			{/if}
-		</div>
-		<div class="sides">
-			{@render side(matchup.mine, true)}
-			{#if matchup.opponent}
-				{@render side(matchup.opponent, false)}
-			{:else if !sync.week_all_play}
-				<p class="none"><Label>No opponent this week</Label></p>
-			{/if}
-		</div>
-	{:else}
-		<div class="head">
-			<PanelHead title="This week" level={2} />
-			<p class="none">{matchupGap(sync, now)}</p>
-		</div>
-	{/if}
-</Panel>
-
-<style>
-	.head {
-		padding: var(--s-3) var(--s-3) 0;
+	function boxOf(s: MatchupSide): SideBox {
+		const answered = box?.sides.find((b) => b.roster_id === s.roster_id) ?? null;
+		return sideBox(s, answered, playersScored(s), showsTotal(s) ? s.points : null);
 	}
 
-	.sides {
+	const mine = $derived(matchup ? boxOf(matchup.mine) : null);
+	const theirs = $derived(matchup?.opponent ? boxOf(matchup.opponent) : null);
+	const lines = $derived([...(mine?.lines ?? []), ...(theirs?.lines ?? [])]);
+	const kickoff = $derived(nextKickoff(lines, now.getTime()));
+	const factsRead = $derived(factsReadLine(lines));
+	/** FFPC is read as one member, so the API keeps only the viewer's own starters. */
+	const hidden = $derived(`${hostWords(sync.host)} shows us your lineup only.`);
+</script>
+
+{#if matchup && mine}
+	<div class="matchup">
+		<h2 class="title">
+			<span class="wk">Week {matchup.week}</span>
+			{teamName(sync, matchup.mine.roster_id)}{#if matchup.opponent}
+				<i>vs</i>{teamName(sync, matchup.opponent.roster_id)}{/if}
+		</h2>
+		<MatchupBug
+			week={matchup.week}
+			mine={{
+				name: teamName(sync, matchup.mine.roster_id),
+				pts: mine.totals.pts,
+				proj: mine.totals.proj
+			}}
+			opponent={matchup.opponent && theirs
+				? {
+						name: teamName(sync, matchup.opponent.roster_id),
+						pts: theirs.totals.pts,
+						proj: theirs.totals.proj
+					}
+				: null}
+			{kickoff}
+		/>
+		{#if sync.week_all_play}
+			<p class="note">
+				An all-play week on {hostWords(sync.host)}: your score is set against every other team's.
+			</p>
+		{/if}
+		{#if scoreUnread(matchup.mine)}<p class="note">{scoreGap(sync, now)}</p>{/if}
+		<div class="boxes">
+			<BoxTable
+				team={teamName(sync, matchup.mine.roster_id)}
+				mine
+				starters={mine.starters}
+				bench={mine.bench}
+				totals={mine.totals}
+			/>
+			{#if matchup.opponent && theirs}
+				<BoxTable
+					team={teamName(sync, matchup.opponent.roster_id)}
+					starters={theirs.starters}
+					bench={theirs.bench}
+					totals={theirs.totals}
+					empty={sync.host === 'ffpc' ? hidden : null}
+				/>
+			{/if}
+		</div>
+		<p class="basis">
+			{#if box}{projBasis(box.projection_read_at)}{/if}
+			{PTS_BASIS}
+			{#if factsRead}{factsRead}{/if}
+		</p>
+	</div>
+{:else}
+	<p class="note">{matchupGap(sync, now)}</p>
+{/if}
+
+<style>
+	.matchup {
+		display: flex;
+		flex-direction: column;
+		gap: var(--s-4);
+	}
+
+	.title {
+		margin: 0;
+		font-family: var(--font-num);
+		font-weight: 800;
+		font-size: var(--t-head);
+		line-height: 1.05;
+		text-transform: uppercase;
+		letter-spacing: 0.01em;
+		overflow-wrap: anywhere;
+	}
+
+	.title i {
+		margin-inline: 0.25em;
+		font-style: normal;
+		color: var(--ink-3);
+	}
+
+	.wk {
+		display: block;
+		font-size: var(--t-md);
+		color: var(--accent-text);
+		letter-spacing: 0.04em;
+	}
+
+	.boxes {
 		display: grid;
 		grid-template-columns: repeat(2, minmax(0, 1fr));
 		gap: var(--s-4);
-		padding: var(--s-2) 0 var(--s-3);
+		align-items: start;
 	}
 
-	.side header {
-		display: flex;
-		align-items: baseline;
-		justify-content: space-between;
-		gap: var(--s-2);
-		padding: var(--s-2) var(--s-3);
-		border-bottom: 2px solid var(--line-strong);
-	}
-
-	.mine header {
-		border-bottom-color: var(--accent);
-	}
-
-	.team {
-		font-weight: 700;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-		unicode-bidi: isolate;
-	}
-
-	.total {
-		font-family: var(--font-num);
-		font-size: var(--t-xl);
-		font-weight: 700;
-	}
-
-	.pts {
-		font-family: var(--font-num);
-		font-weight: 600;
-	}
-
-	/* A starter's game facts are a sentence: a line of their own under his short facts. */
-	.conditions {
-		flex-basis: 100%;
-		font-variant-numeric: tabular-nums;
-	}
-
-	.none {
+	.note {
 		margin: 0;
-		padding: var(--s-3);
 		color: var(--ink-2);
 	}
 
-	@media (max-width: 760px) {
-		.sides {
+	.basis {
+		margin: 0;
+		max-width: 72ch;
+		font-size: var(--t-sm);
+		line-height: 1.5;
+		color: var(--ink-3);
+	}
+
+	@media (max-width: 1100px) {
+		.boxes {
 			grid-template-columns: minmax(0, 1fr);
+		}
+	}
+
+	@media (max-width: 760px) {
+		.matchup {
+			gap: var(--s-3);
 		}
 	}
 </style>

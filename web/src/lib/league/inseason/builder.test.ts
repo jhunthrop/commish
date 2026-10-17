@@ -33,6 +33,7 @@ const line = (
 	position_rank: 14,
 	points_over_replacement: 1.2,
 	rest_of_season_per_game: null,
+	week_projection: null,
 	held: false,
 	facts: {
 		week: 6,

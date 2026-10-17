@@ -51,7 +51,8 @@
 						"spread": { "side": "lose", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
 						"roof": { "kind": "outdoors", "abroad": false },
 						"weather": null
-					}
+					},
+					"week_projection": 9.1
 				},
 				{
 					"player": {
@@ -83,7 +84,8 @@
 						"spread": null,
 						"roof": null,
 						"weather": null
-					}
+					},
+					"week_projection": null
 				},
 				{
 					"player": {
@@ -123,7 +125,8 @@
 						"spread": { "side": "win", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
 						"roof": { "kind": "outdoors", "abroad": true },
 						"weather": null
-					}
+					},
+					"week_projection": 7.94
 				},
 				{
 					"player": {
@@ -169,7 +172,8 @@
 							"precipitation_kind": "none",
 							"read_at": "2026-10-16T21:01:34.611Z"
 						}
-					}
+					},
+					"week_projection": 11.05
 				}
 			],
 			"trades": [
@@ -219,7 +223,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": 17.93
 						}
 					],
 					"get": [
@@ -253,7 +258,8 @@
 								"spread": null,
 								"roof": null,
 								"weather": null
-							}
+							},
+							"week_projection": null
 						},
 						{
 							"player": {
@@ -299,7 +305,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": 11.05
 						}
 					],
 					"drop": {
@@ -345,7 +352,8 @@
 								"precipitation_kind": "none",
 								"read_at": "2026-10-16T21:01:34.611Z"
 							}
-						}
+						},
+						"week_projection": 20.59
 					},
 					"my_gain": 2.1,
 					"their_gain": 0.5,
@@ -397,7 +405,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": 17.93
 						}
 					],
 					"get": [
@@ -439,7 +448,8 @@
 								"spread": { "side": "win", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
 								"roof": { "kind": "outdoors", "abroad": true },
 								"weather": null
-							}
+							},
+							"week_projection": 7.94
 						},
 						{
 							"player": {
@@ -485,7 +495,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": 11.05
 						}
 					],
 					"drop": {
@@ -531,7 +542,8 @@
 								"precipitation_kind": "none",
 								"read_at": "2026-10-16T21:01:34.611Z"
 							}
-						}
+						},
+						"week_projection": 20.59
 					},
 					"my_gain": 1.9,
 					"their_gain": 0.7,
@@ -583,7 +595,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": 17.93
 						}
 					],
 					"get": [
@@ -617,7 +630,8 @@
 								"spread": null,
 								"roof": null,
 								"weather": null
-							}
+							},
+							"week_projection": null
 						},
 						{
 							"player": {
@@ -657,7 +671,8 @@
 								"spread": { "side": "win", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
 								"roof": { "kind": "outdoors", "abroad": true },
 								"weather": null
-							}
+							},
+							"week_projection": 7.94
 						}
 					],
 					"drop": {
@@ -703,7 +718,8 @@
 								"precipitation_kind": "none",
 								"read_at": "2026-10-16T21:01:34.611Z"
 							}
-						}
+						},
+						"week_projection": 20.59
 					},
 					"my_gain": 1.6,
 					"their_gain": 1,
@@ -755,7 +771,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": 17.93
 						}
 					],
 					"get": [
@@ -797,7 +814,8 @@
 								"spread": { "side": "lose", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
 								"roof": { "kind": "outdoors", "abroad": false },
 								"weather": null
-							}
+							},
+							"week_projection": 9.1
 						},
 						{
 							"player": {
@@ -843,7 +861,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": 11.05
 						}
 					],
 					"drop": {
@@ -889,7 +908,8 @@
 								"precipitation_kind": "none",
 								"read_at": "2026-10-16T21:01:34.611Z"
 							}
-						}
+						},
+						"week_projection": 20.59
 					},
 					"my_gain": 1.5,
 					"their_gain": 1.1,
@@ -942,7 +962,8 @@
 						"spread": { "side": "lose", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
 						"roof": { "kind": "outdoors", "abroad": false },
 						"weather": null
-					}
+					},
+					"week_projection": 8.48
 				},
 				{
 					"player": {
@@ -988,7 +1009,8 @@
 							"precipitation_kind": "none",
 							"read_at": "2026-10-16T21:01:34.611Z"
 						}
-					}
+					},
+					"week_projection": 6.21
 				},
 				{
 					"player": {
@@ -1034,7 +1056,8 @@
 							"precipitation_kind": "none",
 							"read_at": "2026-10-16T21:01:34.611Z"
 						}
-					}
+					},
+					"week_projection": 9.93
 				},
 				{
 					"player": {
@@ -1080,7 +1103,8 @@
 							"precipitation_kind": "none",
 							"read_at": "2026-10-16T21:01:34.611Z"
 						}
-					}
+					},
+					"week_projection": 9.99
 				},
 				{
 					"player": {
@@ -1126,7 +1150,8 @@
 							"precipitation_kind": "none",
 							"read_at": "2026-10-16T21:01:34.611Z"
 						}
-					}
+					},
+					"week_projection": 10.45
 				}
 			],
 			"trades": [
@@ -1166,7 +1191,8 @@
 								"spread": null,
 								"roof": null,
 								"weather": null
-							}
+							},
+							"week_projection": 12.24
 						}
 					],
 					"get": [
@@ -1214,7 +1240,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": 10.45
 						},
 						{
 							"player": {
@@ -1260,7 +1287,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": 9.93
 						}
 					],
 					"drop": {
@@ -1306,7 +1334,8 @@
 								"precipitation_kind": "none",
 								"read_at": "2026-10-16T21:01:34.611Z"
 							}
-						}
+						},
+						"week_projection": 20.59
 					},
 					"my_gain": 0.7,
 					"their_gain": 0.5,
@@ -1358,7 +1387,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": 10.98
 						}
 					],
 					"get": [
@@ -1406,7 +1436,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": 6.21
 						},
 						{
 							"player": {
@@ -1452,7 +1483,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": 9.93
 						}
 					],
 					"drop": {
@@ -1498,7 +1530,8 @@
 								"precipitation_kind": "none",
 								"read_at": "2026-10-16T21:01:34.611Z"
 							}
-						}
+						},
+						"week_projection": 20.59
 					},
 					"my_gain": 0.6,
 					"their_gain": 0.6,
@@ -1544,7 +1577,8 @@
 								"spread": { "side": "lose", "points": 12.5, "read_at": "2026-10-16T21:01:26.774Z" },
 								"roof": { "kind": "dome", "abroad": false },
 								"weather": null
-							}
+							},
+							"week_projection": 12.3
 						}
 					],
 					"get": [
@@ -1586,7 +1620,8 @@
 								"spread": { "side": "lose", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
 								"roof": { "kind": "outdoors", "abroad": false },
 								"weather": null
-							}
+							},
+							"week_projection": 8.48
 						},
 						{
 							"player": {
@@ -1632,7 +1667,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": 9.93
 						}
 					],
 					"drop": {
@@ -1678,7 +1714,8 @@
 								"precipitation_kind": "none",
 								"read_at": "2026-10-16T21:01:34.611Z"
 							}
-						}
+						},
+						"week_projection": 20.59
 					},
 					"my_gain": 0.6,
 					"their_gain": 0.6,
@@ -1720,7 +1757,8 @@
 								"spread": null,
 								"roof": null,
 								"weather": null
-							}
+							},
+							"week_projection": 21.21
 						}
 					],
 					"get": [
@@ -1768,7 +1806,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": 9.93
 						},
 						{
 							"player": {
@@ -1814,7 +1853,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": 9.99
 						}
 					],
 					"drop": {
@@ -1860,7 +1900,8 @@
 								"precipitation_kind": "none",
 								"read_at": "2026-10-16T21:01:34.611Z"
 							}
-						}
+						},
+						"week_projection": 20.59
 					},
 					"my_gain": 0.5,
 					"their_gain": 0.7,
@@ -1919,7 +1960,8 @@
 							"precipitation_kind": "none",
 							"read_at": "2026-10-16T21:01:34.611Z"
 						}
-					}
+					},
+					"week_projection": 14.08
 				},
 				{
 					"player": {
@@ -1965,7 +2007,8 @@
 							"precipitation_kind": "none",
 							"read_at": "2026-10-16T21:01:34.611Z"
 						}
-					}
+					},
+					"week_projection": 11.28
 				},
 				{
 					"player": {
@@ -2011,7 +2054,8 @@
 							"precipitation_kind": "none",
 							"read_at": "2026-10-16T21:01:34.611Z"
 						}
-					}
+					},
+					"week_projection": 13.09
 				},
 				{
 					"player": {
@@ -2051,7 +2095,8 @@
 						"spread": { "side": "win", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
 						"roof": { "kind": "outdoors", "abroad": true },
 						"weather": null
-					}
+					},
+					"week_projection": 11.92
 				}
 			],
 			"trades": [
@@ -2101,7 +2146,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": 17.93
 						}
 					],
 					"get": [
@@ -2149,7 +2195,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": 13.09
 						},
 						{
 							"player": {
@@ -2195,7 +2242,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": 14.08
 						}
 					],
 					"drop": {
@@ -2241,7 +2289,8 @@
 								"precipitation_kind": "none",
 								"read_at": "2026-10-16T21:01:34.611Z"
 							}
-						}
+						},
+						"week_projection": 20.59
 					},
 					"my_gain": 4.6,
 					"their_gain": 0.7,
@@ -2293,7 +2342,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": 17.93
 						}
 					],
 					"get": [
@@ -2341,7 +2391,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": 13.09
 						},
 						{
 							"player": {
@@ -2381,7 +2432,8 @@
 								"spread": { "side": "win", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
 								"roof": { "kind": "outdoors", "abroad": true },
 								"weather": null
-							}
+							},
+							"week_projection": 11.92
 						}
 					],
 					"drop": {
@@ -2427,7 +2479,8 @@
 								"precipitation_kind": "none",
 								"read_at": "2026-10-16T21:01:34.611Z"
 							}
-						}
+						},
+						"week_projection": 20.59
 					},
 					"my_gain": 4.6,
 					"their_gain": 0.7,
@@ -2479,7 +2532,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": 17.93
 						}
 					],
 					"get": [
@@ -2527,7 +2581,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": 14.08
 						},
 						{
 							"player": {
@@ -2573,7 +2628,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": 11.28
 						}
 					],
 					"drop": {
@@ -2619,7 +2675,8 @@
 								"precipitation_kind": "none",
 								"read_at": "2026-10-16T21:01:34.611Z"
 							}
-						}
+						},
+						"week_projection": 20.59
 					},
 					"my_gain": 4.1,
 					"their_gain": 1.2,
@@ -2671,7 +2728,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": 17.93
 						}
 					],
 					"get": [
@@ -2713,7 +2771,8 @@
 								"spread": { "side": "win", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
 								"roof": { "kind": "outdoors", "abroad": true },
 								"weather": null
-							}
+							},
+							"week_projection": 11.92
 						},
 						{
 							"player": {
@@ -2759,7 +2818,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": 11.28
 						}
 					],
 					"drop": {
@@ -2805,7 +2865,8 @@
 								"precipitation_kind": "none",
 								"read_at": "2026-10-16T21:01:34.611Z"
 							}
-						}
+						},
+						"week_projection": 20.59
 					},
 					"my_gain": 4.1,
 					"their_gain": 1.2,
@@ -2864,7 +2925,8 @@
 							"precipitation_kind": "none",
 							"read_at": "2026-10-16T21:01:34.611Z"
 						}
-					}
+					},
+					"week_projection": 13.02
 				},
 				{
 					"player": {
@@ -2904,7 +2966,8 @@
 						"spread": { "side": "lose", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
 						"roof": { "kind": "outdoors", "abroad": true },
 						"weather": null
-					}
+					},
+					"week_projection": 12.67
 				},
 				{
 					"player": {
@@ -2944,7 +3007,8 @@
 						"spread": { "side": "win", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
 						"roof": { "kind": "outdoors", "abroad": false },
 						"weather": null
-					}
+					},
+					"week_projection": 2.66
 				},
 				{
 					"player": {
@@ -2980,7 +3044,8 @@
 						"spread": { "side": "lose", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
 						"roof": { "kind": "outdoors", "abroad": true },
 						"weather": null
-					}
+					},
+					"week_projection": null
 				}
 			],
 			"trades": [
@@ -3030,7 +3095,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": 3.21
 						},
 						{
 							"player": {
@@ -3076,7 +3142,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": 15.76
 						}
 					],
 					"get": [
@@ -3118,7 +3185,8 @@
 								"spread": { "side": "win", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
 								"roof": { "kind": "outdoors", "abroad": false },
 								"weather": null
-							}
+							},
+							"week_projection": 2.66
 						}
 					],
 					"drop": null,
@@ -3172,7 +3240,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": 10.98
 						},
 						{
 							"player": {
@@ -3218,7 +3287,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": 17.93
 						}
 					],
 					"get": [
@@ -3266,7 +3336,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": 13.02
 						}
 					],
 					"drop": null,
@@ -3314,7 +3385,8 @@
 								"spread": { "side": "win", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
 								"roof": { "kind": "outdoors", "abroad": true },
 								"weather": null
-							}
+							},
+							"week_projection": 9.65
 						},
 						{
 							"player": {
@@ -3360,7 +3432,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": 15.76
 						}
 					],
 					"get": [
@@ -3398,7 +3471,8 @@
 								"spread": { "side": "lose", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
 								"roof": { "kind": "outdoors", "abroad": true },
 								"weather": null
-							}
+							},
+							"week_projection": null
 						}
 					],
 					"drop": null,
@@ -3452,7 +3526,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": 3.21
 						},
 						{
 							"player": {
@@ -3498,7 +3573,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": 15.76
 						}
 					],
 					"get": [
@@ -3540,7 +3616,8 @@
 								"spread": { "side": "lose", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
 								"roof": { "kind": "outdoors", "abroad": true },
 								"weather": null
-							}
+							},
+							"week_projection": 12.67
 						}
 					],
 					"drop": null,
@@ -3597,7 +3674,8 @@
 							"precipitation_kind": "none",
 							"read_at": "2026-10-16T21:01:34.611Z"
 						}
-					}
+					},
+					"week_projection": null
 				},
 				{
 					"player": {
@@ -3639,7 +3717,8 @@
 							"precipitation_kind": "none",
 							"read_at": "2026-10-16T21:01:34.611Z"
 						}
-					}
+					},
+					"week_projection": null
 				},
 				{
 					"player": {
@@ -3685,7 +3764,8 @@
 							"precipitation_kind": "none",
 							"read_at": "2026-10-16T21:01:34.611Z"
 						}
-					}
+					},
+					"week_projection": 7.7
 				},
 				{
 					"player": {
@@ -3731,7 +3811,8 @@
 							"precipitation_kind": "none",
 							"read_at": "2026-10-16T21:01:34.611Z"
 						}
-					}
+					},
+					"week_projection": 12.34
 				},
 				{
 					"player": {
@@ -3771,7 +3852,8 @@
 						"spread": { "side": "lose", "points": 6, "read_at": "2026-10-16T21:01:26.774Z" },
 						"roof": { "kind": "dome", "abroad": false },
 						"weather": null
-					}
+					},
+					"week_projection": 8.65
 				}
 			],
 			"trades": [
@@ -3815,7 +3897,8 @@
 								"spread": { "side": "lose", "points": 12.5, "read_at": "2026-10-16T21:01:26.774Z" },
 								"roof": { "kind": "dome", "abroad": false },
 								"weather": null
-							}
+							},
+							"week_projection": 12.3
 						}
 					],
 					"get": [
@@ -3857,7 +3940,8 @@
 								"spread": { "side": "lose", "points": 6, "read_at": "2026-10-16T21:01:26.774Z" },
 								"roof": { "kind": "dome", "abroad": false },
 								"weather": null
-							}
+							},
+							"week_projection": 8.65
 						},
 						{
 							"player": {
@@ -3899,7 +3983,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": null
 						}
 					],
 					"drop": {
@@ -3945,7 +4030,8 @@
 								"precipitation_kind": "none",
 								"read_at": "2026-10-16T21:01:34.611Z"
 							}
-						}
+						},
+						"week_projection": 20.59
 					},
 					"my_gain": 2.7,
 					"their_gain": 0.6,
@@ -3991,7 +4077,8 @@
 								"spread": { "side": "lose", "points": 12.5, "read_at": "2026-10-16T21:01:26.774Z" },
 								"roof": { "kind": "dome", "abroad": false },
 								"weather": null
-							}
+							},
+							"week_projection": 12.3
 						}
 					],
 					"get": [
@@ -4033,7 +4120,8 @@
 								"spread": { "side": "lose", "points": 6, "read_at": "2026-10-16T21:01:26.774Z" },
 								"roof": { "kind": "dome", "abroad": false },
 								"weather": null
-							}
+							},
+							"week_projection": 8.65
 						},
 						{
 							"player": {
@@ -4075,7 +4163,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": null
 						}
 					],
 					"drop": {
@@ -4121,7 +4210,8 @@
 								"precipitation_kind": "none",
 								"read_at": "2026-10-16T21:01:34.611Z"
 							}
-						}
+						},
+						"week_projection": 20.59
 					},
 					"my_gain": 2.7,
 					"their_gain": 0.6,
@@ -4167,7 +4257,8 @@
 								"spread": { "side": "lose", "points": 12.5, "read_at": "2026-10-16T21:01:26.774Z" },
 								"roof": { "kind": "dome", "abroad": false },
 								"weather": null
-							}
+							},
+							"week_projection": 12.3
 						}
 					],
 					"get": [
@@ -4209,7 +4300,8 @@
 								"spread": { "side": "lose", "points": 6, "read_at": "2026-10-16T21:01:26.774Z" },
 								"roof": { "kind": "dome", "abroad": false },
 								"weather": null
-							}
+							},
+							"week_projection": 8.65
 						},
 						{
 							"player": {
@@ -4255,7 +4347,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": 12.34
 						}
 					],
 					"drop": {
@@ -4301,7 +4394,8 @@
 								"precipitation_kind": "none",
 								"read_at": "2026-10-16T21:01:34.611Z"
 							}
-						}
+						},
+						"week_projection": 20.59
 					},
 					"my_gain": 2.3,
 					"their_gain": 1,
@@ -4347,7 +4441,8 @@
 								"spread": { "side": "lose", "points": 12.5, "read_at": "2026-10-16T21:01:26.774Z" },
 								"roof": { "kind": "dome", "abroad": false },
 								"weather": null
-							}
+							},
+							"week_projection": 12.3
 						}
 					],
 					"get": [
@@ -4391,7 +4486,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": null
 						},
 						{
 							"player": {
@@ -4437,7 +4533,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": 7.7
 						}
 					],
 					"drop": {
@@ -4483,7 +4580,8 @@
 								"precipitation_kind": "none",
 								"read_at": "2026-10-16T21:01:34.611Z"
 							}
-						}
+						},
+						"week_projection": 20.59
 					},
 					"my_gain": 1.8,
 					"their_gain": 1.5,
@@ -4542,7 +4640,8 @@
 							"precipitation_kind": "none",
 							"read_at": "2026-10-16T21:01:34.611Z"
 						}
-					}
+					},
+					"week_projection": 3.54
 				},
 				{
 					"player": {
@@ -4584,7 +4683,8 @@
 							"precipitation_kind": "none",
 							"read_at": "2026-10-16T21:01:34.611Z"
 						}
-					}
+					},
+					"week_projection": null
 				},
 				{
 					"player": {
@@ -4630,7 +4730,8 @@
 							"precipitation_kind": "none",
 							"read_at": "2026-10-16T21:01:34.611Z"
 						}
-					}
+					},
+					"week_projection": 9.86
 				},
 				{
 					"player": {
@@ -4676,7 +4777,8 @@
 							"precipitation_kind": "none",
 							"read_at": "2026-10-16T21:01:34.611Z"
 						}
-					}
+					},
+					"week_projection": 6.93
 				},
 				{
 					"player": {
@@ -4722,7 +4824,8 @@
 							"precipitation_kind": "none",
 							"read_at": "2026-10-16T21:01:34.611Z"
 						}
-					}
+					},
+					"week_projection": 12.65
 				}
 			],
 			"trades": [
@@ -4772,7 +4875,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": 15.76
 						}
 					],
 					"get": [
@@ -4820,7 +4924,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": 9.86
 						},
 						{
 							"player": {
@@ -4866,7 +4971,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": 6.93
 						}
 					],
 					"drop": {
@@ -4912,7 +5018,8 @@
 								"precipitation_kind": "none",
 								"read_at": "2026-10-16T21:01:34.611Z"
 							}
-						}
+						},
+						"week_projection": 20.59
 					},
 					"my_gain": 4.6,
 					"their_gain": 0.5,
@@ -4964,7 +5071,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": 15.76
 						}
 					],
 					"get": [
@@ -5012,7 +5120,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": 6.93
 						},
 						{
 							"player": {
@@ -5054,7 +5163,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": null
 						}
 					],
 					"drop": {
@@ -5100,7 +5210,8 @@
 								"precipitation_kind": "none",
 								"read_at": "2026-10-16T21:01:34.611Z"
 							}
-						}
+						},
+						"week_projection": 20.59
 					},
 					"my_gain": 4.6,
 					"their_gain": 0.5,
@@ -5152,7 +5263,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": 17.93
 						}
 					],
 					"get": [
@@ -5200,7 +5312,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": 12.65
 						},
 						{
 							"player": {
@@ -5246,7 +5359,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": 3.54
 						}
 					],
 					"drop": {
@@ -5292,7 +5406,8 @@
 								"precipitation_kind": "none",
 								"read_at": "2026-10-16T21:01:34.611Z"
 							}
-						}
+						},
+						"week_projection": 20.59
 					},
 					"my_gain": 4.5,
 					"their_gain": 0.6,
@@ -5344,7 +5459,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": 15.76
 						}
 					],
 					"get": [
@@ -5392,7 +5508,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": 9.86
 						},
 						{
 							"player": {
@@ -5434,7 +5551,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": null
 						}
 					],
 					"drop": {
@@ -5480,7 +5598,8 @@
 								"precipitation_kind": "none",
 								"read_at": "2026-10-16T21:01:34.611Z"
 							}
-						}
+						},
+						"week_projection": 20.59
 					},
 					"my_gain": 4.5,
 					"their_gain": 0.6,
@@ -5533,7 +5652,8 @@
 						"spread": { "side": "win", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
 						"roof": { "kind": "outdoors", "abroad": true },
 						"weather": null
-					}
+					},
+					"week_projection": 10.65
 				},
 				{
 					"player": {
@@ -5579,7 +5699,8 @@
 							"precipitation_kind": "none",
 							"read_at": "2026-10-16T21:01:34.611Z"
 						}
-					}
+					},
+					"week_projection": 13.25
 				},
 				{
 					"player": {
@@ -5625,7 +5746,8 @@
 							"precipitation_kind": "none",
 							"read_at": "2026-10-16T21:01:34.611Z"
 						}
-					}
+					},
+					"week_projection": 15.78
 				},
 				{
 					"player": {
@@ -5667,7 +5789,8 @@
 							"precipitation_kind": "none",
 							"read_at": "2026-10-16T21:01:34.611Z"
 						}
-					}
+					},
+					"week_projection": null
 				},
 				{
 					"player": {
@@ -5707,7 +5830,8 @@
 						"spread": { "side": "lose", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
 						"roof": { "kind": "outdoors", "abroad": false },
 						"weather": null
-					}
+					},
+					"week_projection": 14.13
 				}
 			],
 			"trades": [
@@ -5757,7 +5881,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": 15.76
 						}
 					],
 					"get": [
@@ -5805,7 +5930,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": 13.25
 						},
 						{
 							"player": {
@@ -5847,7 +5973,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": null
 						}
 					],
 					"drop": {
@@ -5893,7 +6020,8 @@
 								"precipitation_kind": "none",
 								"read_at": "2026-10-16T21:01:34.611Z"
 							}
-						}
+						},
+						"week_projection": 20.59
 					},
 					"my_gain": 5.7,
 					"their_gain": 0.7,
@@ -5945,7 +6073,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": 15.76
 						}
 					],
 					"get": [
@@ -5987,7 +6116,8 @@
 								"spread": { "side": "win", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
 								"roof": { "kind": "outdoors", "abroad": true },
 								"weather": null
-							}
+							},
+							"week_projection": 10.65
 						},
 						{
 							"player": {
@@ -6027,7 +6157,8 @@
 								"spread": { "side": "lose", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
 								"roof": { "kind": "outdoors", "abroad": false },
 								"weather": null
-							}
+							},
+							"week_projection": 14.13
 						}
 					],
 					"drop": {
@@ -6073,7 +6204,8 @@
 								"precipitation_kind": "none",
 								"read_at": "2026-10-16T21:01:34.611Z"
 							}
-						}
+						},
+						"week_projection": 20.59
 					},
 					"my_gain": 5.7,
 					"their_gain": 0.7,
@@ -6125,7 +6257,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": 15.76
 						}
 					],
 					"get": [
@@ -6173,7 +6306,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": 15.78
 						},
 						{
 							"player": {
@@ -6215,7 +6349,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": null
 						}
 					],
 					"drop": {
@@ -6261,7 +6396,8 @@
 								"precipitation_kind": "none",
 								"read_at": "2026-10-16T21:01:34.611Z"
 							}
-						}
+						},
+						"week_projection": 20.59
 					},
 					"my_gain": 5.6,
 					"their_gain": 0.8,
@@ -6313,7 +6449,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": 15.76
 						}
 					],
 					"get": [
@@ -6355,7 +6492,8 @@
 								"spread": { "side": "lose", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
 								"roof": { "kind": "outdoors", "abroad": false },
 								"weather": null
-							}
+							},
+							"week_projection": 14.13
 						},
 						{
 							"player": {
@@ -6397,7 +6535,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": null
 						}
 					],
 					"drop": {
@@ -6443,7 +6582,8 @@
 								"precipitation_kind": "none",
 								"read_at": "2026-10-16T21:01:34.611Z"
 							}
-						}
+						},
+						"week_projection": 20.59
 					},
 					"my_gain": 5.3,
 					"their_gain": 1.1,
@@ -6496,7 +6636,8 @@
 						"spread": { "side": "win", "points": 12.5, "read_at": "2026-10-16T21:01:26.774Z" },
 						"roof": { "kind": "dome", "abroad": false },
 						"weather": null
-					}
+					},
+					"week_projection": 12.55
 				},
 				{
 					"player": {
@@ -6542,7 +6683,8 @@
 							"precipitation_kind": "none",
 							"read_at": "2026-10-16T21:01:34.611Z"
 						}
-					}
+					},
+					"week_projection": 10.79
 				},
 				{
 					"player": {
@@ -6588,7 +6730,8 @@
 							"precipitation_kind": "none",
 							"read_at": "2026-10-16T21:01:34.611Z"
 						}
-					}
+					},
+					"week_projection": 6.89
 				},
 				{
 					"player": {
@@ -6634,7 +6777,8 @@
 							"precipitation_kind": "none",
 							"read_at": "2026-10-16T21:01:34.611Z"
 						}
-					}
+					},
+					"week_projection": 14.25
 				},
 				{
 					"player": {
@@ -6680,7 +6824,8 @@
 							"precipitation_kind": "none",
 							"read_at": "2026-10-16T21:01:34.611Z"
 						}
-					}
+					},
+					"week_projection": 9.55
 				}
 			],
 			"trades": [
@@ -6720,7 +6865,8 @@
 								"spread": null,
 								"roof": null,
 								"weather": null
-							}
+							},
+							"week_projection": 21.21
 						}
 					],
 					"get": [
@@ -6768,7 +6914,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": 14.25
 						},
 						{
 							"player": {
@@ -6814,7 +6961,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": 10.79
 						}
 					],
 					"drop": {
@@ -6860,7 +7008,8 @@
 								"precipitation_kind": "none",
 								"read_at": "2026-10-16T21:01:34.611Z"
 							}
-						}
+						},
+						"week_projection": 20.59
 					},
 					"my_gain": 0.4,
 					"their_gain": 0.5,
@@ -6912,7 +7061,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": 10.98
 						}
 					],
 					"get": [
@@ -6960,7 +7110,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": 10.79
 						},
 						{
 							"player": {
@@ -7006,7 +7157,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": 6.89
 						}
 					],
 					"drop": {
@@ -7052,7 +7204,8 @@
 								"precipitation_kind": "none",
 								"read_at": "2026-10-16T21:01:34.611Z"
 							}
-						}
+						},
+						"week_projection": 20.59
 					},
 					"my_gain": 0.3,
 					"their_gain": 0.6,
@@ -7104,7 +7257,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": 10.98
 						}
 					],
 					"get": [
@@ -7152,7 +7306,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": 10.79
 						},
 						{
 							"player": {
@@ -7198,7 +7353,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": 9.55
 						}
 					],
 					"drop": {
@@ -7244,7 +7400,8 @@
 								"precipitation_kind": "none",
 								"read_at": "2026-10-16T21:01:34.611Z"
 							}
-						}
+						},
+						"week_projection": 20.59
 					},
 					"my_gain": 0.7,
 					"their_gain": 0.2,
@@ -7286,7 +7443,8 @@
 								"spread": null,
 								"roof": null,
 								"weather": null
-							}
+							},
+							"week_projection": 21.21
 						}
 					],
 					"get": [
@@ -7334,7 +7492,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": 6.89
 						},
 						{
 							"player": {
@@ -7374,7 +7533,8 @@
 								"spread": { "side": "win", "points": 12.5, "read_at": "2026-10-16T21:01:26.774Z" },
 								"roof": { "kind": "dome", "abroad": false },
 								"weather": null
-							}
+							},
+							"week_projection": 12.55
 						}
 					],
 					"drop": {
@@ -7420,7 +7580,8 @@
 								"precipitation_kind": "none",
 								"read_at": "2026-10-16T21:01:34.611Z"
 							}
-						}
+						},
+						"week_projection": 20.59
 					},
 					"my_gain": 0.7,
 					"their_gain": 0.2,
@@ -7469,7 +7630,8 @@
 						"spread": null,
 						"roof": null,
 						"weather": null
-					}
+					},
+					"week_projection": 20.73
 				},
 				{
 					"player": {
@@ -7515,7 +7677,8 @@
 							"precipitation_kind": "none",
 							"read_at": "2026-10-16T21:01:34.611Z"
 						}
-					}
+					},
+					"week_projection": 12.78
 				},
 				{
 					"player": {
@@ -7551,7 +7714,8 @@
 						"spread": { "side": "lose", "points": 6, "read_at": "2026-10-16T21:01:26.774Z" },
 						"roof": { "kind": "dome", "abroad": false },
 						"weather": null
-					}
+					},
+					"week_projection": null
 				},
 				{
 					"player": {
@@ -7597,7 +7761,8 @@
 							"precipitation_kind": "none",
 							"read_at": "2026-10-16T21:01:34.611Z"
 						}
-					}
+					},
+					"week_projection": 8.46
 				},
 				{
 					"player": {
@@ -7637,7 +7802,8 @@
 						"spread": { "side": "lose", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
 						"roof": { "kind": "outdoors", "abroad": true },
 						"weather": null
-					}
+					},
+					"week_projection": 8.6
 				},
 				{
 					"player": {
@@ -7683,7 +7849,8 @@
 							"precipitation_kind": "none",
 							"read_at": "2026-10-16T21:01:34.611Z"
 						}
-					}
+					},
+					"week_projection": 9.45
 				}
 			],
 			"trades": [
@@ -7733,7 +7900,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": 17.93
 						}
 					],
 					"get": [
@@ -7771,7 +7939,8 @@
 								"spread": { "side": "lose", "points": 6, "read_at": "2026-10-16T21:01:26.774Z" },
 								"roof": { "kind": "dome", "abroad": false },
 								"weather": null
-							}
+							},
+							"week_projection": null
 						},
 						{
 							"player": {
@@ -7811,7 +7980,8 @@
 								"spread": { "side": "lose", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
 								"roof": { "kind": "outdoors", "abroad": true },
 								"weather": null
-							}
+							},
+							"week_projection": 8.6
 						}
 					],
 					"drop": {
@@ -7857,7 +8027,8 @@
 								"precipitation_kind": "none",
 								"read_at": "2026-10-16T21:01:34.611Z"
 							}
-						}
+						},
+						"week_projection": 20.59
 					},
 					"my_gain": 1.8,
 					"their_gain": 0.5,
@@ -7899,7 +8070,8 @@
 								"spread": null,
 								"roof": null,
 								"weather": null
-							}
+							},
+							"week_projection": 21.21
 						}
 					],
 					"get": [
@@ -7947,7 +8119,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": 12.78
 						},
 						{
 							"player": {
@@ -7993,7 +8166,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": 8.46
 						}
 					],
 					"drop": {
@@ -8039,7 +8213,8 @@
 								"precipitation_kind": "none",
 								"read_at": "2026-10-16T21:01:34.611Z"
 							}
-						}
+						},
+						"week_projection": 20.59
 					},
 					"my_gain": 1.7,
 					"their_gain": 0.8,
@@ -8091,7 +8266,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": 17.93
 						}
 					],
 					"get": [
@@ -8139,7 +8315,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": 9.45
 						},
 						{
 							"player": {
@@ -8175,7 +8352,8 @@
 								"spread": null,
 								"roof": null,
 								"weather": null
-							}
+							},
+							"week_projection": 20.73
 						}
 					],
 					"drop": {
@@ -8221,7 +8399,8 @@
 								"precipitation_kind": "none",
 								"read_at": "2026-10-16T21:01:34.611Z"
 							}
-						}
+						},
+						"week_projection": 20.59
 					},
 					"my_gain": 1.5,
 					"their_gain": 1,
@@ -8263,7 +8442,8 @@
 								"spread": null,
 								"roof": null,
 								"weather": null
-							}
+							},
+							"week_projection": 21.21
 						}
 					],
 					"get": [
@@ -8311,7 +8491,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": 12.78
 						},
 						{
 							"player": {
@@ -8347,7 +8528,8 @@
 								"spread": { "side": "lose", "points": 6, "read_at": "2026-10-16T21:01:26.774Z" },
 								"roof": { "kind": "dome", "abroad": false },
 								"weather": null
-							}
+							},
+							"week_projection": null
 						}
 					],
 					"drop": {
@@ -8393,7 +8575,8 @@
 								"precipitation_kind": "none",
 								"read_at": "2026-10-16T21:01:34.611Z"
 							}
-						}
+						},
+						"week_projection": 20.59
 					},
 					"my_gain": 1.4,
 					"their_gain": 0.6,
@@ -8446,7 +8629,8 @@
 						"spread": { "side": "lose", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
 						"roof": { "kind": "outdoors", "abroad": true },
 						"weather": null
-					}
+					},
+					"week_projection": 17.3
 				},
 				{
 					"player": {
@@ -8492,7 +8676,8 @@
 							"precipitation_kind": "none",
 							"read_at": "2026-10-16T21:01:34.611Z"
 						}
-					}
+					},
+					"week_projection": 8.88
 				},
 				{
 					"player": {
@@ -8538,7 +8723,8 @@
 							"precipitation_kind": "none",
 							"read_at": "2026-10-16T21:01:34.611Z"
 						}
-					}
+					},
+					"week_projection": 8.52
 				},
 				{
 					"player": {
@@ -8574,7 +8760,8 @@
 						"spread": null,
 						"roof": null,
 						"weather": null
-					}
+					},
+					"week_projection": 17.69
 				},
 				{
 					"player": {
@@ -8620,7 +8807,8 @@
 							"precipitation_kind": "none",
 							"read_at": "2026-10-16T21:01:34.611Z"
 						}
-					}
+					},
+					"week_projection": 14.19
 				},
 				{
 					"player": {
@@ -8666,7 +8854,8 @@
 							"precipitation_kind": "none",
 							"read_at": "2026-10-16T21:01:34.611Z"
 						}
-					}
+					},
+					"week_projection": 11.19
 				}
 			],
 			"trades": [
@@ -8706,7 +8895,8 @@
 								"spread": null,
 								"roof": null,
 								"weather": null
-							}
+							},
+							"week_projection": 12.24
 						}
 					],
 					"get": [
@@ -8754,7 +8944,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": 8.52
 						},
 						{
 							"player": {
@@ -8800,7 +8991,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": 8.88
 						}
 					],
 					"drop": {
@@ -8846,7 +9038,8 @@
 								"precipitation_kind": "none",
 								"read_at": "2026-10-16T21:01:34.611Z"
 							}
-						}
+						},
+						"week_projection": 20.59
 					},
 					"my_gain": 0.1,
 					"their_gain": 0.5,
@@ -8898,7 +9091,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": 17.93
 						}
 					],
 					"get": [
@@ -8946,7 +9140,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": 8.88
 						},
 						{
 							"player": {
@@ -8986,7 +9181,8 @@
 								"spread": { "side": "lose", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
 								"roof": { "kind": "outdoors", "abroad": true },
 								"weather": null
-							}
+							},
+							"week_projection": 17.3
 						}
 					],
 					"drop": {
@@ -9032,7 +9228,8 @@
 								"precipitation_kind": "none",
 								"read_at": "2026-10-16T21:01:34.611Z"
 							}
-						}
+						},
+						"week_projection": 20.59
 					},
 					"my_gain": 0.1,
 					"their_gain": 0.5,
@@ -9074,7 +9271,8 @@
 								"spread": null,
 								"roof": null,
 								"weather": null
-							}
+							},
+							"week_projection": 21.21
 						}
 					],
 					"get": [
@@ -9122,7 +9320,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": 14.19
 						},
 						{
 							"player": {
@@ -9158,7 +9357,8 @@
 								"spread": null,
 								"roof": null,
 								"weather": null
-							}
+							},
+							"week_projection": 17.69
 						}
 					],
 					"drop": {
@@ -9204,7 +9404,8 @@
 								"precipitation_kind": "none",
 								"read_at": "2026-10-16T21:01:34.611Z"
 							}
-						}
+						},
+						"week_projection": 20.59
 					},
 					"my_gain": 0.1,
 					"their_gain": 0.5,
@@ -9246,7 +9447,8 @@
 								"spread": null,
 								"roof": null,
 								"weather": null
-							}
+							},
+							"week_projection": 12.24
 						}
 					],
 					"get": [
@@ -9294,7 +9496,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": 14.19
 						},
 						{
 							"player": {
@@ -9340,7 +9543,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": 11.19
 						}
 					],
 					"drop": {
@@ -9386,7 +9590,8 @@
 								"precipitation_kind": "none",
 								"read_at": "2026-10-16T21:01:34.611Z"
 							}
-						}
+						},
+						"week_projection": 20.59
 					},
 					"my_gain": 0.5,
 					"their_gain": 0.1,
@@ -9445,7 +9650,8 @@
 							"precipitation_kind": "none",
 							"read_at": "2026-10-16T21:01:34.611Z"
 						}
-					}
+					},
+					"week_projection": 4.3
 				},
 				{
 					"player": {
@@ -9491,7 +9697,8 @@
 							"precipitation_kind": "none",
 							"read_at": "2026-10-16T21:01:34.611Z"
 						}
-					}
+					},
+					"week_projection": 14.68
 				},
 				{
 					"player": {
@@ -9537,7 +9744,8 @@
 							"precipitation_kind": "none",
 							"read_at": "2026-10-16T21:01:34.611Z"
 						}
-					}
+					},
+					"week_projection": 8.5
 				},
 				{
 					"player": {
@@ -9573,7 +9781,8 @@
 						"spread": null,
 						"roof": null,
 						"weather": null
-					}
+					},
+					"week_projection": 7.68
 				},
 				{
 					"player": {
@@ -9619,7 +9828,8 @@
 							"precipitation_kind": "none",
 							"read_at": "2026-10-16T21:01:34.611Z"
 						}
-					}
+					},
+					"week_projection": 8.97
 				}
 			],
 			"trades": [
@@ -9659,7 +9869,8 @@
 								"spread": null,
 								"roof": null,
 								"weather": null
-							}
+							},
+							"week_projection": 12.24
 						}
 					],
 					"get": [
@@ -9697,7 +9908,8 @@
 								"spread": null,
 								"roof": null,
 								"weather": null
-							}
+							},
+							"week_projection": 7.68
 						},
 						{
 							"player": {
@@ -9743,7 +9955,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": 14.68
 						}
 					],
 					"drop": {
@@ -9789,7 +10002,8 @@
 								"precipitation_kind": "none",
 								"read_at": "2026-10-16T21:01:34.611Z"
 							}
-						}
+						},
+						"week_projection": 20.59
 					},
 					"my_gain": 0.3,
 					"their_gain": 0.5,
@@ -9831,7 +10045,8 @@
 								"spread": null,
 								"roof": null,
 								"weather": null
-							}
+							},
+							"week_projection": 12.24
 						}
 					],
 					"get": [
@@ -9869,7 +10084,8 @@
 								"spread": null,
 								"roof": null,
 								"weather": null
-							}
+							},
+							"week_projection": 7.68
 						},
 						{
 							"player": {
@@ -9915,7 +10131,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": 8.97
 						}
 					],
 					"drop": {
@@ -9961,7 +10178,8 @@
 								"precipitation_kind": "none",
 								"read_at": "2026-10-16T21:01:34.611Z"
 							}
-						}
+						},
+						"week_projection": 20.59
 					},
 					"my_gain": 0.1,
 					"their_gain": 0.7,
@@ -10007,7 +10225,8 @@
 								"spread": { "side": "lose", "points": 12.5, "read_at": "2026-10-16T21:01:26.774Z" },
 								"roof": { "kind": "dome", "abroad": false },
 								"weather": null
-							}
+							},
+							"week_projection": 12.3
 						}
 					],
 					"get": [
@@ -10055,7 +10274,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": 8.5
 						},
 						{
 							"player": {
@@ -10101,7 +10321,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": 14.68
 						}
 					],
 					"drop": {
@@ -10147,7 +10368,8 @@
 								"precipitation_kind": "none",
 								"read_at": "2026-10-16T21:01:34.611Z"
 							}
-						}
+						},
+						"week_projection": 20.59
 					},
 					"my_gain": 0.5,
 					"their_gain": 0.3,
@@ -10193,7 +10415,8 @@
 								"spread": { "side": "lose", "points": 12.5, "read_at": "2026-10-16T21:01:26.774Z" },
 								"roof": { "kind": "dome", "abroad": false },
 								"weather": null
-							}
+							},
+							"week_projection": 12.3
 						}
 					],
 					"get": [
@@ -10241,7 +10464,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": 4.3
 						},
 						{
 							"player": {
@@ -10287,7 +10511,8 @@
 									"precipitation_kind": "none",
 									"read_at": "2026-10-16T21:01:34.611Z"
 								}
-							}
+							},
+							"week_projection": 8.5
 						}
 					],
 					"drop": {
@@ -10333,7 +10558,8 @@
 								"precipitation_kind": "none",
 								"read_at": "2026-10-16T21:01:34.611Z"
 							}
-						}
+						},
+						"week_projection": 20.59
 					},
 					"my_gain": 0.2,
 					"their_gain": 0.3,
@@ -10384,7 +10610,8 @@
 					"precipitation_kind": "none",
 					"read_at": "2026-10-16T21:01:34.611Z"
 				}
-			}
+			},
+			"week_projection": 15.76
 		},
 		{
 			"player": {
@@ -10429,7 +10656,8 @@
 					"precipitation_kind": "none",
 					"read_at": "2026-10-16T21:01:34.611Z"
 				}
-			}
+			},
+			"week_projection": 20.59
 		},
 		{
 			"player": {
@@ -10475,7 +10703,8 @@
 					"precipitation_kind": "none",
 					"read_at": "2026-10-16T21:01:34.611Z"
 				}
-			}
+			},
+			"week_projection": 17.93
 		},
 		{
 			"player": {
@@ -10511,7 +10740,8 @@
 				"spread": { "side": "lose", "points": 12.5, "read_at": "2026-10-16T21:01:26.774Z" },
 				"roof": { "kind": "dome", "abroad": false },
 				"weather": null
-			}
+			},
+			"week_projection": 12.3
 		},
 		{
 			"player": {
@@ -10553,7 +10783,8 @@
 					"precipitation_kind": "none",
 					"read_at": "2026-10-16T21:01:34.611Z"
 				}
-			}
+			},
+			"week_projection": 9.48
 		},
 		{
 			"player": {
@@ -10599,7 +10830,8 @@
 					"precipitation_kind": "none",
 					"read_at": "2026-10-16T21:01:34.611Z"
 				}
-			}
+			},
+			"week_projection": 0.57
 		},
 		{
 			"player": {
@@ -10645,7 +10877,8 @@
 					"precipitation_kind": "none",
 					"read_at": "2026-10-16T21:01:34.611Z"
 				}
-			}
+			},
+			"week_projection": 4.39
 		},
 		{
 			"player": {
@@ -10687,7 +10920,8 @@
 					"precipitation_kind": "none",
 					"read_at": "2026-10-16T21:01:34.611Z"
 				}
-			}
+			},
+			"week_projection": 14.19
 		},
 		{
 			"player": {
@@ -10719,7 +10953,8 @@
 				"spread": { "side": "win", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
 				"roof": { "kind": "outdoors", "abroad": false },
 				"weather": null
-			}
+			},
+			"week_projection": null
 		},
 		{
 			"player": {
@@ -10765,7 +11000,8 @@
 					"precipitation_kind": "none",
 					"read_at": "2026-10-16T21:01:34.611Z"
 				}
-			}
+			},
+			"week_projection": 3.21
 		},
 		{
 			"player": {
@@ -10803,7 +11039,8 @@
 					"precipitation_kind": "none",
 					"read_at": "2026-10-16T21:01:34.611Z"
 				}
-			}
+			},
+			"week_projection": null
 		},
 		{
 			"player": {
@@ -10839,7 +11076,8 @@
 				"spread": null,
 				"roof": null,
 				"weather": null
-			}
+			},
+			"week_projection": 21.21
 		},
 		{
 			"player": {
@@ -10875,7 +11113,8 @@
 				"spread": { "side": "win", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
 				"roof": { "kind": "outdoors", "abroad": true },
 				"weather": null
-			}
+			},
+			"week_projection": 9.65
 		},
 		{
 			"player": {
@@ -10911,7 +11150,8 @@
 				"spread": null,
 				"roof": null,
 				"weather": null
-			}
+			},
+			"week_projection": 11.02
 		},
 		{
 			"player": {
@@ -10953,7 +11193,8 @@
 					"precipitation_kind": "none",
 					"read_at": "2026-10-16T21:01:34.611Z"
 				}
-			}
+			},
+			"week_projection": 13.24
 		},
 		{
 			"player": {
@@ -10999,7 +11240,8 @@
 					"precipitation_kind": "none",
 					"read_at": "2026-10-16T21:01:34.611Z"
 				}
-			}
+			},
+			"week_projection": 10.98
 		},
 		{
 			"player": {
@@ -11045,7 +11287,8 @@
 					"precipitation_kind": "none",
 					"read_at": "2026-10-16T21:01:34.611Z"
 				}
-			}
+			},
+			"week_projection": 7.76
 		},
 		{
 			"player": {
@@ -11081,7 +11324,8 @@
 				"spread": null,
 				"roof": null,
 				"weather": null
-			}
+			},
+			"week_projection": 12.24
 		},
 		{
 			"player": {
@@ -11113,7 +11357,8 @@
 				"spread": { "side": "lose", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
 				"roof": { "kind": "outdoors", "abroad": true },
 				"weather": null
-			}
+			},
+			"week_projection": 7.9
 		},
 		{
 			"player": {
@@ -11145,7 +11390,8 @@
 				"spread": null,
 				"roof": null,
 				"weather": null
-			}
+			},
+			"week_projection": 7.3
 		}
 	],
 	"host_trades_url": "https://sleeper.com/leagues/1382163311038038016/team",

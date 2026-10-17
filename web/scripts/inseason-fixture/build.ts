@@ -23,6 +23,8 @@
 // team's line when every trade with it is a close call for them, so the shots read as members' do.
 //
 //   node scripts/inseason-fixture/build.ts [roster id]   (reads .runs/runs/<PUBLIC_RUN_ID or latest>)
+// then node scripts/inseason-fixture/project.ts, which stamps the week's projection on the answers
+// and writes the Matchup screen's box answer (Lane 66d).
 import { readFile, readdir, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { format as prettierFormat, resolveConfig } from 'prettier';
@@ -353,6 +355,8 @@ async function lineOf(player: LeaguePlayer): Promise<PlayerLine> {
 		position_rank: row?.positionRank ?? null,
 		points_over_replacement: row === null ? null : tenth(row.vor / weeksCovered),
 		rest_of_season_per_game: perGameOf(row),
+		// project.ts stamps the week's projection after this build.
+		week_projection: null,
 		held: false,
 		facts: await factsFor(row?.team ?? player.team, player.board_id)
 	};
@@ -493,8 +497,10 @@ async function lineup(): Promise<LineupAdvice> {
 		.map((l) => (l.player.name === HELD_ON_SHEET ? { ...l, held: true } : l));
 	return {
 		...head(
+			// project.ts words it as the API does now (Lane 66d).
 			`Ranked by our rest-of-season order and this week's designations. We do not project a week's points. ${basisTail}`
 		),
+		projection_read_at: null,
 		set: out.every((s) => !s.changed),
 		slots: out,
 		bench,
