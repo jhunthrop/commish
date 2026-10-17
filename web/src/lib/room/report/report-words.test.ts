@@ -92,7 +92,8 @@ const pick = (over: Partial<Pick>): Pick => ({
 	player_id: 'p',
 	over_replacement: 25.6,
 	board_rank: 44,
-	adp_gap: 1.8,
+	board_gap: -19,
+	adp_gap: -1.8,
 	chip: 'at_adp',
 	still_there: null,
 	could_wait: false,
@@ -101,14 +102,14 @@ const pick = (over: Partial<Pick>): Pick => ({
 	...over
 });
 
-void test('Picks later prints the API tenth as given against drafters, whole picks against our board', () => {
-	assert.deepEqual(adpLater(pick({ adp_gap: 125.4 })), { text: '+125.4', tone: 'loss' });
-	assert.deepEqual(adpLater(pick({ adp_gap: -9 })), { text: '−9.0', tone: 'gain' });
+void test('Picks later prints the API figures as given, green when he came later than his place', () => {
+	assert.deepEqual(adpLater(pick({ adp_gap: -125.4 })), { text: '−125.4', tone: 'loss' });
+	assert.deepEqual(adpLater(pick({ adp_gap: 9 })), { text: '+9.0', tone: 'gain' });
 	assert.deepEqual(adpLater(pick({ adp_gap: 0 })), { text: '0', tone: 'even' });
 	assert.equal(adpLater(pick({ adp_gap: null })), null);
-	assert.deepEqual(boardLater(pick({})), { text: '+19', tone: 'loss' });
-	assert.deepEqual(boardLater(pick({ board_rank: 66, pick: 97 })), { text: '−31', tone: 'gain' });
-	assert.equal(boardLater(pick({ board_rank: null })), null);
+	assert.deepEqual(boardLater(pick({})), { text: '−19', tone: 'loss' });
+	assert.deepEqual(boardLater(pick({ board_gap: 31 })), { text: '+31', tone: 'gain' });
+	assert.equal(boardLater(pick({ board_gap: null })), null);
 	assert.equal(boardLater(pick({ chip: 'kept' })), null);
 });
 
@@ -133,7 +134,7 @@ void test('the basis says Picks later and Still there once, after the board', ()
 	const said = reportBasis('Points are our 2026 PPR projections.', 0.6);
 	assert.equal(
 		said,
-		"Points are our 2026 PPR projections. Picks later: where drafters or our board place him, less the pick, minus is earlier. Still there: the room's read at that pick, tinted from 60%."
+		"Points are our 2026 PPR projections. Picks later: the pick less his ADP or his place on our board, which counts no kickers or defenses, plus is later. Still there: the room's read at that pick, tinted from 60%."
 	);
 	assert.doesNotMatch(said, /[;—]|\bodds\b/);
 });

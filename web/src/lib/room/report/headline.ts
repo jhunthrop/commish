@@ -67,7 +67,7 @@ export function settingCells(report: MockReport, seats: string): FactCell[] {
  * and defenses in draft order), what Picks later counts, and what Still there is. */
 export function reportBasis(boardBasis: string, couldWaitFrom: number): string {
 	const from = Math.round(couldWaitFrom * 100);
-	return `${boardBasis} Picks later: where drafters or our board place him, less the pick, minus is earlier. Still there: the room's read at that pick, tinted from ${String(from)}%.`;
+	return `${boardBasis} Picks later: the pick less his ADP or his place on our board, which counts no kickers or defenses, plus is later. Still there: the room's read at that pick, tinted from ${String(from)}%.`;
 }
 
 /** A pick's figure in the Over repl column: his points over replacement, or for a kicker or a
@@ -82,8 +82,10 @@ export function pickFigure(
 	return { text: signed(overReplacement), muted: false };
 }
 
-/** A Picks later cell: the figure signed, and its tone. Plus (he goes later than the pick, so the
- * pick was early) is a cost, minus a gain, zero even. Null when there is no figure. */
+/** A Picks later cell: the API's figure signed, and its tone. The site's one rule for a signed gap
+ * (Lane 66o review L7): green when the sign favours the member, rose when it does not. Plus here is
+ * a pick that came later than his place (the drafters' ADP or our board's), so plus is green. Null
+ * when there is no figure. */
 export interface Later {
 	text: string;
 	tone: 'loss' | 'gain' | 'even';
@@ -91,19 +93,17 @@ export interface Later {
 
 function later(gap: number, decimals: number): Later {
 	const text = gap === 0 ? '0' : signed(gap, decimals);
-	return { text, tone: gap > 0 ? 'loss' : gap < 0 ? 'gain' : 'even' };
+	return { text, tone: gap > 0 ? 'gain' : gap < 0 ? 'loss' : 'even' };
 }
 
-/** Picks later against the drafters: the API's ADP gap (ADP less the pick), as given. */
+/** Picks later against the drafters: the API's adp_gap (the pick less the printed ADP), as given. */
 export function adpLater(pick: Pick): Later | null {
 	return pick.adp_gap === null || pick.chip === 'kept' ? null : later(pick.adp_gap, 1);
 }
 
-/** Picks later against our board: his place on it less the pick, whole picks. */
+/** Picks later against our board: the API's board_gap, whole picks, as given. */
 export function boardLater(pick: Pick): Later | null {
-	return pick.board_rank === null || pick.chip === 'kept'
-		? null
-		: later(pick.board_rank - pick.pick, 0);
+	return pick.board_gap === null || pick.chip === 'kept' ? null : later(pick.board_gap, 0);
 }
 
 /** The Still there cell: the chance he was there at your next turn, tinted when he could have waited;
