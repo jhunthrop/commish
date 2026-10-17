@@ -33,9 +33,22 @@ type List struct {
 	// Accounts is the hosts open to one signed-in account alone (a host
 	// whose switch is off, open to its proof list), nil for none.
 	Accounts OpenTo
-	Store    Lister
-	Log      *slog.Logger
+	// Writes says whether each connection's lineup is set from our screen,
+	// nil when nothing does: every connection then reads writes off.
+	Writes Writes
+	Store  Lister
+	Log    *slog.Logger
 }
+
+// Writes says whether the member's lineup is set on a platform from our
+// screen, and why not. *hostmoves.Service implements it.
+type Writes interface {
+	LineupMove(ctx context.Context, accountID uuid.UUID, host string) (apitypes.LineupMoves, error)
+}
+
+// uncheckedWords is a connection's writes line when the check failed: the
+// row stays, writes read off, and the reason says so.
+const uncheckedWords = "We could not check lineup moves just now, so they read off."
 
 // OpenTo is the hosts open to an account beyond the ones open to all.
 type OpenTo interface {
@@ -72,9 +85,35 @@ func (l *List) list(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	for _, c := range list {
-		out.Connections = append(out.Connections, View(c))
+		out.Connections = append(out.Connections, l.withWrites(r.Context(), account.ID, View(c)))
 	}
 	httpx.WriteOK(w, r, http.StatusOK, out)
+}
+
+// withWrites is a connection with whether its lineup is set from our
+// screen. A failed check keeps what it knew, writes off, with a reason.
+func (l *List) withWrites(ctx context.Context, accountID uuid.UUID, v apitypes.HostConnection) apitypes.HostConnection {
+	if l.Writes == nil {
+		return v
+	}
+	moves, err := l.Writes.LineupMove(ctx, accountID, string(v.Host))
+	if err != nil {
+		l.Log.Warn("hosts: writes", "host", v.Host, "err", err)
+	}
+	v.WritesOn = err == nil && moves.Lineup == apitypes.LineupMovesLineupAvailable
+	if v.WritesOn {
+		return v
+	}
+	switch {
+	case moves.Reason != nil:
+		v.WritesReason = moves.Reason
+	case moves.Note != nil:
+		v.WritesReason = moves.Note
+	default:
+		reason := uncheckedWords
+		v.WritesReason = &reason
+	}
+	return v
 }
 
 // FollowKey is a followed league's key in a host's league list: its id
@@ -149,6 +188,6 @@ func LeagueView(l LeagueLine, followed map[string]bool) apitypes.HostLeague {
 func View(c Connection) apitypes.HostConnection {
 	return apitypes.HostConnection{
 		Host: apitypes.ConnectedHost(c.Host), Status: apitypes.HostConnectionStatus(c.Status),
-		ConnectedAt: c.CreatedAt, LastReadAt: c.LastReadAt, Proven: c.Proven,
+		ConnectedAt: c.CreatedAt, LastReadAt: c.LastReadAt, Proven: c.Proven, ConsentVersion: c.ConsentVersion,
 	}
 }

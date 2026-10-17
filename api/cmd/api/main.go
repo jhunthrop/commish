@@ -201,7 +201,7 @@ func build(ctx context.Context, cfg config.API, pool *pgxpool.Pool, obs httpx.Ob
 		leagueSync.Routes(),
 		inSeason.Routes(),
 		moves.Routes(),
-		hostList(ff, yh, es, mf, log),
+		hostList(ff, yh, es, mf, moves, log),
 		ff.routes(log),
 		yh.routes(cfg, pool, ff, log),
 		es.routes(pool, ff, log),
