@@ -3348,8 +3348,8 @@ components:
           type: string
           nullable: true
           description: >-
-            his page on the site (/players/{slug}): set for a player our order ranks whose name no other player in our
-            directory shares, null otherwise (a shared name's page is named by the run, which the API does not read)
+            his page on the site (/players/{slug}): set for a quarterback, running back, receiver or tight end our order
+            ranks whose name no other player in our directory shares, null otherwise (a kicker or defense has no page) (a shared name's page is named by the run, which the API does not read)
         position_rank: { type: integer, nullable: true, description: his place at his position in our order, null when unranked }
         points_over_replacement:
           type: number

@@ -126,3 +126,24 @@ func TestTheLeaguePlayerWeekHasNoKickerOrDefense(t *testing.T) {
 		}
 	}
 }
+
+// A kicker or defense has no page, so its row links nowhere.
+func TestAKickerOrDefenseRowLinksNowhere(t *testing.T) {
+	f := newFixture(t)
+	out, ok := newFixtureAdvisor(t, f, nil).Lineup()
+	if !ok {
+		t.Fatal("no team")
+	}
+	kickers := 0
+	for _, s := range out.Slots {
+		if p := s.Ours.Player.Position; p == "K" || p == "DEF" {
+			kickers++
+			if s.Ours.Slug != nil {
+				t.Fatalf("%s %s links to %s", p, s.Ours.Player.Name, *s.Ours.Slug)
+			}
+		}
+	}
+	if kickers == 0 {
+		t.Fatal("the fixture starts no kicker or defense")
+	}
+}

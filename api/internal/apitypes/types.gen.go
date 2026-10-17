@@ -2878,7 +2878,7 @@ type PlayerLine struct {
 	// SeasonAvg his points a game over every completed game this season under the league's scoring, to the cent; null before his first game
 	SeasonAvg *float64 `json:"season_avg"`
 
-	// Slug his page on the site (/players/{slug}): set for a player our order ranks whose name no other player in our directory shares, null otherwise (a shared name's page is named by the run, which the API does not read)
+	// Slug his page on the site (/players/{slug}): set for a quarterback, running back, receiver or tight end our order ranks whose name no other player in our directory shares, null otherwise (a kicker or defense has no page) (a shared name's page is named by the run, which the API does not read)
 	Slug *string `json:"slug"`
 
 	// WeekProjection his points this week on the week's published projection, to the cent, in the format the league's scoring is most like (PPR, half PPR or standard); a team defense's by its club, a kicker our board does not place (no board id) by his club's one kicker, never a teammate's for a kicker the snapshot left out. The newest snapshot stored for the league's week (projection_read_at says when). Null when his club has no game that week (a bye), whatever the snapshot holds, and when the snapshot has no row for him or none is stored. Our own weekly model replaces it when it passes its test
