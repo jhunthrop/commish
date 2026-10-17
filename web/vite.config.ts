@@ -56,12 +56,12 @@ const LEAGUE_PAGE_PARTS =
  * neither the shared chunk nor a page's group carries it for the others. */
 const LIVE_STATUS = /[\\/]src[\\/]lib[\\/]run[\\/]live-status\./;
 const STATUS_PARTS = /[\\/]src[\\/]lib[\\/](format[\\/]designation\.|run[\\/]status-view\.)/;
-/** A player's week in words (the game's facts, the member's clock, a designation and the held places
- * a status sets): the player page draws them on its first paint, and the Rest of season and Players
- * screens after theirs (Lane 66j). A file of their own, without the modules they import, so loading
- * the order's screens never hoists them into the shared chunk every page carries. */
+/** A player's week in words (the game's facts and the held places a status sets): the player page
+ * draws them on its first paint, the league's screens and the Rest of season and Players screens
+ * after theirs (Lane 66j). Kept out of the shared chunk by name, as the league's parts are, so loading
+ * the order's screens never hoists them, and the clock and designation they import, onto every page. */
 const WEEK_PARTS =
-	/[\\/]src[\\/]lib[\\/](format[\\/](game-facts|clock|designation)\.|run[\\/](held-places|board-status)\.)/;
+	/[\\/]src[\\/]lib[\\/](format[\\/]game-facts\.|run[\\/](held-places|board-status)\.)/;
 /** A component joins the shared chunk once this many routes use it. Fewer, and every page would
  * carry code only a couple of pages run. */
 const SHARED_BY_ROUTES = 4;
@@ -123,14 +123,7 @@ export default defineConfig({
 						{ name: 'player', test: PLAYER_PARTS, minShareCount: 2, priority: 1 },
 						{ name: 'figure', test: FIGURE_PARTS, minShareCount: 2, priority: 1 },
 						{ name: 'forms', test: FORM_PARTS, minShareCount: 2, priority: 1 },
-						{ name: 'live', test: LIVE_STATUS, minShareCount: 2, priority: 2 },
-						{
-							name: 'week',
-							test: WEEK_PARTS,
-							minShareCount: 2,
-							priority: 2,
-							includeDependenciesRecursively: false
-						}
+						{ name: 'live', test: LIVE_STATUS, minShareCount: 2, priority: 2 }
 					]
 				}
 			}
