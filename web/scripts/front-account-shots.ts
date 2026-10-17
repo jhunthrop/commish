@@ -1,12 +1,14 @@
 // Screenshots of the front door in season for a member with leagues and of the Account room (Lane
 // 66k), against the fixture API (scripts/inseason-fixture/serve.ts) and the built site, in both themes
 // at 1440 and 390 (the phone's first screen too). At 1440, 1024, 800, 768 and 390 it asserts neither
-// page scrolls sideways. On the front door it asserts the one read (GET /me/week, no other in-season
-// read), the lead score bug with both teams, the strip's count, gain and verb, the three roster chips
-// each with the screen it opens, the other leagues' bugs and the failed league's sentence, the
+// page scrolls sideways. On the front door it asserts the one read (every request to the API beyond
+// the shell's /me and /season is GET /me/week, once), the lead score bug with both teams, the strip's
+// count, gain and verb, the roster chips each with the screen it opens and the head counting them,
+// the other leagues' bugs each with its changes, and the failed league's sentence with its last read, the
 // basis in at most five rendered lines at a desk and eight in a hand, and on a phone the pinned verb
 // clear of the bug. On the Account room it asserts the five platform rows with their states, the
-// signed-out platform's solid verb, the leagues table with a last read on each read league, the
+// signed-out platform's solid verb, Sleeper's row in words, the leagues table with a last read and
+// Open on each league, the
 // theme and time zone under Display, and that neither page says "host". Exits non-zero on any
 // fault. Prints the stand-ins each shot carries.
 //
@@ -28,9 +30,11 @@ const MOST_LINES_PHONE = 8;
 const CHIPS = 3;
 const PLATFORM_ROWS = 5;
 /** A phone's whole-page shot draws the pinned verb in its place in the strip. */
-const PIN_IN_PLACE = '.nudge .n-act{position:static!important;box-shadow:none!important}';
-const IN_SEASON_READS =
-	/\/leagues\/attached\/[^/]+\/(lineup|matchup|scoreboard|waivers|trades|sync)$/;
+const PIN_IN_PLACE = '.nudge .pinned{position:static!important;box-shadow:none!important}';
+/** The shell's own reads on every page: the account and the season. Every other request to the API
+ * a front door load makes is counted, and the only one allowed is GET /me/week, once. */
+const SHELL_READS = new Set(['/me', '/season']);
+const API_ORIGIN = new URL(process.env.API_ORIGIN ?? 'http://localhost:8866').origin;
 
 /** What each shot carries that is not the record's, named so no one reads it as real. */
 const STAND_INS: Readonly<Record<string, string>> = {
@@ -105,8 +109,8 @@ async function front(theme: string, width: number): Promise<void> {
 	const page = await ctx.newPage();
 	const reads: string[] = [];
 	page.on('request', (req) => {
-		const path = new URL(req.url()).pathname;
-		if (path === '/me/week' || IN_SEASON_READS.test(path)) reads.push(path);
+		const url = new URL(req.url());
+		if (url.origin === API_ORIGIN && !SHELL_READS.has(url.pathname)) reads.push(url.pathname);
 	});
 	await page.goto(`${web}/`);
 	await ready(page, 'Your roster');
@@ -124,7 +128,9 @@ async function front(theme: string, width: number): Promise<void> {
 			verb: text('.nudge .n-act a'),
 			chips: text('.chips .chip .go'),
 			others: text('.others a.bug .lb'),
-			said: text('.others .said')
+			said: text('.others .said'),
+			changes: text('.others a.bug .changes'),
+			aside: text('[aria-label="Your roster"] .sec-h span')
 		};
 	});
 	if (seen.lead.length !== 2) fault(where, `lead bug teams ${seen.lead.join(' | ')}`);
@@ -135,7 +141,12 @@ async function front(theme: string, width: number): Promise<void> {
 	if (seen.chips.length !== CHIPS) fault(where, `${String(seen.chips.length)} chips`);
 	if (!seen.others.some((l) => l.includes('ESPN')))
 		fault(where, `other bugs ${seen.others.join()}`);
-	if (!seen.said.some((s) => s.startsWith('FFPC signed you out'))) fault(where, 'no failed read');
+	if (!seen.said.some((s) => s.startsWith('FFPC signed you out') && s.includes('Last read')))
+		fault(where, `no failed read with its last read: ${seen.said.join(' | ')}`);
+	if (!seen.changes.some((c) => /^(\w+ changes?, \+\d+\.\d|Your lineup is set)$/.test(c)))
+		fault(where, `other bugs' changes ${seen.changes.join(' | ')}`);
+	if (!seen.aside[0]?.startsWith(`${['No', 'One', 'Two', 'Three'][seen.chips.length] ?? ''} fact`))
+		fault(where, `roster aside ${seen.aside.join()}`);
 	if (await saysHost(page)) fault(where, 'says host');
 	const lines = await basisLines(page);
 	const most = width < 500 ? MOST_LINES_PHONE : MOST_LINES_DESK;
@@ -144,7 +155,7 @@ async function front(theme: string, width: number): Promise<void> {
 	if (width < 500) {
 		const clear = await page.evaluate(() => {
 			const bug = document.querySelector('.band a.bug')?.getBoundingClientRect();
-			const pin = document.querySelector('.nudge .n-act')?.getBoundingClientRect();
+			const pin = document.querySelector('.nudge .pinned')?.getBoundingClientRect();
 			return bug && pin ? pin.top - bug.bottom : -1;
 		});
 		if (clear < 0) fault(where, `the pinned verb covers the bug by ${String(-clear)} px`);
@@ -179,7 +190,11 @@ async function account(theme: string, width: number): Promise<void> {
 			reads: [...document.querySelectorAll('#your-leagues tbody .read')].map((e) =>
 				e.textContent.trim()
 			),
-			display: document.querySelector('[aria-label="Display"]')?.textContent ?? ''
+			display: document.querySelector('[aria-label="Display"]')?.textContent ?? '',
+			sleeper: document.querySelector('.platforms .note-cell')?.textContent.trim() ?? '',
+			opens: [...document.querySelectorAll('#your-leagues tbody .act a')].filter(
+				(a) => a.textContent.trim() === 'Open'
+			).length
 		};
 	});
 	if (seen.platforms.length !== PLATFORM_ROWS)
@@ -192,6 +207,10 @@ async function account(theme: string, width: number): Promise<void> {
 		fault(where, `solid verbs ${seen.solid.join()}`);
 	if (seen.leagues === 0) fault(where, 'no leagues');
 	if (!seen.reads.some((r) => r.endsWith('ago'))) fault(where, `reads ${seen.reads.join()}`);
+	if (seen.sleeper !== 'Followed by league id, nothing to connect')
+		fault(where, `Sleeper row ${seen.sleeper}`);
+	if (seen.opens !== seen.leagues)
+		fault(where, `${String(seen.opens)} Open of ${String(seen.leagues)}`);
 	if (!seen.display.includes('Time zone') || !seen.display.includes('Theme'))
 		fault(where, 'display');
 	if (await saysHost(page)) fault(where, 'says host');

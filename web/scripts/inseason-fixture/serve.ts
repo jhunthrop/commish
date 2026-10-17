@@ -33,6 +33,7 @@ import { lineupProj, seasonStrength } from './week.ts';
 import { FIXTURE_SEASON, askedPhase, phaseAccount, phaseLeagues, phaseSync } from './phases.ts';
 import { ESPN_STAND_IN_NAME, espnSync } from './espn-sync.ts';
 import { inSeason, noWeek } from './member-week.ts';
+import { inTenths } from './tenths.ts';
 
 const PORT = Number(process.env.PORT ?? 8799);
 const DATA = new URL('./data/', import.meta.url);
@@ -90,7 +91,8 @@ const HTTP = {
 } as const;
 
 async function load<T>(name: string): Promise<T> {
-	return JSON.parse(await readFile(new URL(`${name}.json`, DATA), 'utf8')) as T;
+	// Every printed figure as the API sends it now: one tenth (tenths.ts).
+	return inTenths(JSON.parse(await readFile(new URL(`${name}.json`, DATA), 'utf8')) as T);
 }
 
 const [sync, lineup, waivers, trades, gameWeek, matchupBox, scoreboard, scoreboardLive] =
@@ -191,7 +193,8 @@ function memberWeek(): components['schemas']['MemberWeek'] {
 			noWeek(
 				NO_TEAM,
 				{ ...base, name: 'Main Event (FFPC stand-in)', host: 'ffpc', phase: 'in_season' },
-				FFPC_AGAIN
+				FFPC_AGAIN,
+				'2026-10-12T19:00:00.000Z'
 			),
 			noWeek(
 				FIXTURE_IDS.offseason,
@@ -225,7 +228,7 @@ const HOSTS: components['schemas']['HostConnections'] = {
 			last_read_at: '2026-10-12T14:00:00.000Z',
 			consent_version: 3,
 			writes_on: false,
-			writes_reason: 'FFPC does not take lineups from here, so copy the lineup there.'
+			writes_reason: 'FFPC takes no lineups from here.'
 		}
 	]
 };

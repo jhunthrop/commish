@@ -6,13 +6,14 @@
 import type { components } from '../../src/lib/api/types.ts';
 import type { LeagueSync } from '../../src/lib/league/api.ts';
 import type { LineupAdvice, Scoreboard, WaiverAdvice } from '../../src/lib/league/inseason/api.ts';
+import { roundTenth } from './tenths.ts';
 
 type Schemas = components['schemas'];
 type WeekLeague = Schemas['WeekLeague'];
 type PlayerLine = Schemas['PlayerLine'];
 type LineupSlot = Schemas['LineupSlot'];
 
-const tenth = (n: number): number => Math.round(n * 10) / 10;
+const tenth = roundTenth;
 
 /** The slot's player as the platform holds it. */
 function asSet(slot: LineupSlot): PlayerLine | null {
@@ -37,8 +38,7 @@ function summary(lineup: LineupAdvice): Schemas['WeekLineup'] {
 		projection,
 		as_set: set,
 		gain: projection === null || set === null ? null : tenth(projection - set),
-		swaps,
-		moves: lineup.moves
+		swaps
 	};
 }
 
@@ -51,11 +51,11 @@ function chips(lineup: LineupAdvice, waivers: WaiverAdvice): Schemas['RosterChip
 		)[0];
 	const byes = starters.filter(({ line }) => line?.facts.bye);
 	const idle = byes.find(({ slot }) => slot.no_one_can_play) ?? null;
-	const bye = idle ?? byes[0] ?? null;
 	const pickup = waivers.pickups[0];
 	const out: Schemas['RosterChip'][] = [];
 	if (listed) out.push({ kind: 'status', line: listed, gain: null, idle: false });
-	if (bye?.line) out.push({ kind: 'bye', line: bye.line, gain: null, idle: idle !== null });
+	// Only a bye no one on the roster can play: any other is the strip's swap (review M3).
+	if (idle?.line) out.push({ kind: 'bye', line: idle.line, gain: null, idle: true });
 	if (pickup) out.push({ kind: 'pickup', line: pickup.add, gain: pickup.week_gain, idle: false });
 	return out;
 }
@@ -121,13 +121,14 @@ export function inSeason(id: string, reads: WeekReads, now: number): WeekLeague 
 export function noWeek(
 	id: string,
 	base: Pick<WeekLeague, 'name' | 'host' | 'team_name' | 'standing' | 'phase'>,
-	problem: string | null
+	problem: string | null,
+	readAt: string | null = null
 ): WeekLeague {
 	return {
 		...base,
 		id,
 		week: 0,
-		read_at: null,
+		read_at: readAt,
 		projection_read_at: null,
 		projection_scoring: null,
 		bug: null,
