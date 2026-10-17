@@ -33,8 +33,9 @@
 		type Interval,
 		type PlanCatalog
 	} from './pass-api.ts';
-	import { ALWAYS_FREE, HOSTS, addedFeatures, featureLines } from './words.ts';
-	import { draftPassFacts, groupFacts, membershipFacts } from './plan-facts.ts';
+	import { ALWAYS_FREE, addedFeatures, featureLines } from './words.ts';
+	import { draftPassFacts, groupFacts, hostCells, membershipFacts } from './plan-facts.ts';
+	import FactStrip from '#lib/ui/FactStrip.svelte';
 
 	/** The pass page: the Draft Pass, the Membership and the Group Draft Pass with what each unlocks,
 	 * read from the API (the prices from Stripe, the features from the table Can reads), which hosts
@@ -144,10 +145,7 @@
 					{#snippet more()}
 						<section aria-label="Where your draft is">
 							<PanelHead title="Where your draft is" />
-							<LineList
-								label="Where the live draft works"
-								lines={HOSTS.map((h) => ({ lead: h.name, text: h.line }))}
-							/>
+							<FactStrip label="Where the live draft works" cells={hostCells()} dense />
 						</section>
 					{/snippet}
 					{#snippet action()}

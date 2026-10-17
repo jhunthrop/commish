@@ -2,7 +2,7 @@
 // the dates, never a sentence. Run with `npm test`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { draftPassFacts, groupFacts, membershipFacts } from './plan-facts.ts';
+import { draftPassFacts, groupFacts, hostCells, membershipFacts } from './plan-facts.ts';
 import type { Price } from './words.ts';
 
 const price = (amount: number, interval: Price['interval'] = null): Price => ({
@@ -39,8 +39,12 @@ void test('the Membership names its billing, its reminder and how it is cancelle
 	assert.deepEqual(said(membershipFacts(price(9900, 'year'))), [
 		['A year', '$99'],
 		['Renews', 'Yearly'],
-		['Reminder', '7 days before'],
+		['Notice', '7 days'],
 		['Cancel', 'One click']
+	]);
+	assert.deepEqual(said(membershipFacts(null)).slice(0, 2), [
+		['Price', 'Not open yet'],
+		['Renews', 'Yearly or monthly']
 	]);
 	assert.deepEqual(said(membershipFacts(price(1499, 'month'))).slice(0, 2), [
 		['A month', '$14.99'],
@@ -56,4 +60,12 @@ void test('the group pass is the total for the teams chosen and the price a team
 		['Claims', 'One link']
 	]);
 	assert.deepEqual(said(groupFacts(null, 12)), [['12 teams', 'Not open yet']]);
+});
+
+void test('where the live draft works is cells: the host it works with, how, and the ones not followed yet', () => {
+	assert.deepEqual(said(hostCells()), [
+		['Works today', 'Sleeper'],
+		['How', 'Paste the draft link'],
+		['Not followed yet', 'ESPN, Yahoo']
+	]);
 });

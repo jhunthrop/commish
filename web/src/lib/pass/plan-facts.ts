@@ -3,7 +3,7 @@
  * pass page's cells. */
 import type { components } from '#lib/api/types.ts';
 import type { FactCell } from '#lib/ui/facts.ts';
-import { money, passEnds, type PlanCatalog, type Price } from './words.ts';
+import { FOLLOW_HOW, HOSTS, money, passEnds, type PlanCatalog, type Price } from './words.ts';
 
 type GroupPassPrice = components['schemas']['GroupPassPrice'];
 
@@ -31,15 +31,32 @@ export function draftPassFacts(
 	];
 }
 
-/** The Membership as facts: its price for the billing chosen, how it renews, the reminder before a
- * renewal, and how it is cancelled. */
+/** The Membership as facts: its price for the billing chosen, how it renews, the notice before a
+ * renewal, and how it is cancelled. With no price yet the billing is not chosen, so it says both. */
 export function membershipFacts(price: Price | null): FactCell[] {
 	const monthly = price?.interval === 'month';
 	return [
-		priceCell(price, monthly ? 'A month' : 'A year'),
-		{ label: 'Renews', value: monthly ? 'Monthly' : 'Yearly', word: true },
-		{ label: 'Reminder', value: `${String(RENEWAL_NOTICE_DAYS)} days before`, word: true },
+		price ? priceCell(price, monthly ? 'A month' : 'A year') : priceCell(null, 'Price'),
+		{
+			label: 'Renews',
+			value: price ? (monthly ? 'Monthly' : 'Yearly') : 'Yearly or monthly',
+			word: true
+		},
+		{ label: 'Notice', value: `${String(RENEWAL_NOTICE_DAYS)} days`, word: true },
 		{ label: 'Cancel', value: 'One click', word: true }
+	];
+}
+
+/** Where the live draft works, as cells: the hosts it follows today, how, and the ones not yet. */
+export function hostCells(): FactCell[] {
+	const names = (ready: boolean): string =>
+		HOSTS.filter((h) => h.ready === ready)
+			.map((h) => h.name)
+			.join(', ');
+	return [
+		{ label: 'Works today', value: names(true), word: true },
+		{ label: 'How', value: FOLLOW_HOW, word: true },
+		{ label: 'Not followed yet', value: names(false), word: true }
 	];
 }
 

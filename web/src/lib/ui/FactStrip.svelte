@@ -7,12 +7,14 @@
 		/** Names the strip for assistive tech. */
 		label: string;
 		cells: readonly FactCell[];
+		/** Tighter cells, for a strip inside a narrow panel: a plan's price and dates on one row. */
+		dense?: boolean;
 	}
 
-	let { label, cells }: Props = $props();
+	let { label, cells, dense = false }: Props = $props();
 </script>
 
-<dl class="facts" aria-label={label}>
+<dl class="facts" class:dense aria-label={label}>
 	{#each cells as cell (cell.label)}
 		<div class:mine={cell.mine}>
 			<dt>{cell.label}</dt>
@@ -38,6 +40,10 @@
 		gap: 2px;
 		padding: var(--s-2) var(--s-4);
 		border-right: 1px solid var(--line);
+	}
+
+	.dense div {
+		padding: var(--s-2) var(--s-3);
 	}
 
 	.facts div:last-child {

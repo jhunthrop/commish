@@ -100,27 +100,22 @@ export function passEnds(catalog: Pick<PlanCatalog, 'pass_ends_at'>): string {
 	return dateLabel(catalog.pass_ends_at);
 }
 
-/** A host's live draft, said as a mechanism by the host's own name. ready is today. */
+/** A host's live draft by the host's own name: ready is today. */
 export interface Host {
 	name: string;
 	ready: boolean;
-	line: string;
 }
 
 /** Which hosts the live draft works with today, by the host's own name (spec §2.7). Only what is
  * built is said: the other hosts are named as not followed yet, with no date. */
 export const HOSTS: readonly Host[] = [
-	{
-		name: 'Sleeper',
-		ready: true,
-		line: 'Works with a Sleeper draft today: paste the draft link, no sign-in to Sleeper needed.'
-	},
-	{
-		name: 'ESPN and Yahoo',
-		ready: false,
-		line: 'Drafts on ESPN and Yahoo are not followed yet.'
-	}
+	{ name: 'Sleeper', ready: true },
+	{ name: 'ESPN', ready: false },
+	{ name: 'Yahoo', ready: false }
 ];
+
+/** How a ready host's draft is followed: its link, no sign-in to the host. */
+export const FOLLOW_HOW = 'Paste the draft link';
 
 /** What is free, said plainly: the pass never gates any of it. */
 export const ALWAYS_FREE: readonly FeatureWords[] = [

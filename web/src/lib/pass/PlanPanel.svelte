@@ -35,7 +35,7 @@
 <Panel as="section" label={title} edge={featured ? 'accent' : undefined}>
 	<div class="plan">
 		<DisplayTitle size="panel">{title}</DisplayTitle>
-		<FactStrip label="{title}: price and dates" cells={facts} />
+		<FactStrip label="{title}: price and dates" cells={facts} dense />
 		{#if choose}<div class="choose">{@render choose()}</div>{/if}
 		<div class="holds">
 			<span class="label">Holds</span>
