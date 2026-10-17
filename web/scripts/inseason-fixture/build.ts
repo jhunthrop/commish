@@ -629,7 +629,6 @@ async function waivers(held: ReadonlySet<string>): Promise<WaiverAdvice> {
 		...head(
 			`Ranked by the gain to your lineup on our rest-of-season order. A drop is the player it costs you least to lose. ${basisTail}`
 		),
-		best: gaining[0] ?? null,
 		rows: [...gaining, ...rest],
 		host_waivers_url: `https://sleeper.com/leagues/${league.league_id}/players`,
 		host_note: null,
@@ -644,6 +643,7 @@ async function waivers(held: ReadonlySet<string>): Promise<WaiverAdvice> {
 		// Lane 66f: the pickup table's own fields, stamped by project.ts with the projection.
 		season_basis: '',
 		lineup_proj: null,
+		pickups_proj: null,
 		pickups: [],
 		roster: myLines,
 		projection_read_at: null,

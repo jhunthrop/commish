@@ -167,7 +167,7 @@ function waiversAt(position: string | null): WaiverAdvice {
 	if (position === null) return waivers;
 	const rows = waivers.rows.filter((row) => row.add.player.position === position);
 	const pickups = waivers.pickups.filter((row) => row.add.player.position === position);
-	return { ...waivers, rows, pickups, best: pickups[0] ?? null };
+	return { ...waivers, rows, pickups };
 }
 
 function tradesHolding(player: string | null): TradeAdvice {
@@ -313,21 +313,28 @@ const HOST_ID = /^-?[0-9]{1,12}$/;
 /** The API's words for a claim whose add it cannot name (hostmoves claimFormWords). */
 const CLAIM_FORM_WORDS = 'Send the claim from the waivers screen.';
 
+/** ESPN's D/ST ids, -(16000 + its proTeamId) (api espn DefenseID), for the fixture's pool defense. */
+const ESPN_DEFENSE_IDS: Readonly<Record<string, string>> = { KC: '-16012' };
+
 /** The ESPN league's waivers, as the API answers an ESPN league: each add named by his board id
- * (ESPN's own), the claim open, the verb ESPN's league page. A defense needs ESPN's D/ST id, which
- * the fixture does not carry, so it keeps no host id and its Add stays the host's page. */
+ * (ESPN's own), a defense by its D/ST id (api hostIDOfAdd), the claim open, the verb ESPN's league
+ * page. */
 function espnWaivers(position: string | null): WaiverAdvice {
 	const named = waiversAt(position);
 	const withId = (row: WaiverAdvice['rows'][number]): WaiverAdvice['rows'][number] => {
 		const board = row.add.player.board_id ?? '';
-		const hostId = row.add.player.position !== 'DEF' && HOST_ID.test(board) ? board : '';
+		const hostId =
+			row.add.player.position === 'DEF'
+				? (ESPN_DEFENSE_IDS[row.add.player.team] ?? '')
+				: HOST_ID.test(board)
+					? board
+					: '';
 		return { ...row, add: { ...row.add, player: { ...row.add.player, host_id: hostId } } };
 	};
 	return {
 		...named,
 		rows: named.rows.map(withId),
 		pickups: named.pickups.map(withId),
-		best: named.best ? withId(named.best) : null,
 		host_waivers_url: ESPN_LEAGUE_URL,
 		moves: { claim: 'available', note: null, takes_writes: true, writes_on: true, reason: null }
 	};
@@ -336,10 +343,15 @@ function espnWaivers(position: string | null): WaiverAdvice {
 /** A player in the waiver answer by his host id, for the plan's words. */
 function nameOf(hostId: string | null): string {
 	const lines = waivers.rows.flatMap((row) => (row.drop ? [row.add, row.drop] : [row.add]));
-	// An ESPN add is named by his board id (espnWaivers), a roster player by his host id.
+	// An ESPN add is named by his board id or his D/ST id (espnWaivers), a roster player by his host id.
+	const defense = Object.entries(ESPN_DEFENSE_IDS).find(([, id]) => id === hostId)?.[0];
 	return (
-		lines.find((line) => line.player.host_id === hostId || line.player.board_id === hostId)?.player
-			.name ?? ''
+		lines.find(
+			(line) =>
+				line.player.host_id === hostId ||
+				line.player.board_id === hostId ||
+				(defense !== undefined && line.player.position === 'DEF' && line.player.team === defense)
+		)?.player.name ?? ''
 	);
 }
 

@@ -12,9 +12,9 @@
 // each swap's chip, arrow and evidence line, the bench arrow reading Sit, the copy verb with the
 // platform's own line under it, and that no sentence on the Lineup or Matchup says "host" (the
 // member's platform is named). On the Waivers table (Lane 66f) it asserts the heads, every Proj and Rest of
-// season cell, the tint on the strip's pickups alone, the count of free agents with the platform
-// named, the basis at five lines at most with the pickup rule first, the drop panel and the copy
-// verb's confirm. Exits non-zero when a page scrolls sideways, a
+// season cell, the tint on the strip's pickups alone, the count of the free agents we rank with the
+// platform named, the basis at five rendered lines at most at 1440 with the pickup rule first and
+// Beats and Open spot said, the drop panel and the copy verb's confirm. Exits non-zero when a page scrolls sideways, a
 // phone's first row is under the pin, or a figure or its sentence is missing.
 //
 //   node scripts/inseason-shots.ts [web origin] [out dir, from scripts/]
@@ -119,8 +119,10 @@ const WAIVER_HEADS = [
 ];
 const WAIVER_FOLDED = ['Player', 'Game', 'Proj', 'Beats', 'Add'];
 const WAIVER_PHONE = ['Player', 'Proj', 'Beats', 'Add'];
-const PICKUP_RULE = 'A pickup worth making starts for you this week';
+const PICKUP_RULE = 'A pickup starts for you this week';
 const MOST_BASIS_LINES = 5;
+/** The width the basis is held to five rendered lines at. */
+const BASIS_WIDTH = 1440;
 
 /** What a box score screen draws, for the checks: its column heads, each row's two numbers, its
  * basis, any row cell whose name is cut, and whether a row says points a game. */
@@ -426,10 +428,6 @@ async function hostWordsSaid(page: Page): Promise<string[]> {
 	);
 }
 
-/** What the Lineup table must hold (Lane 66e): every evidence cell printed as its column prints, a
- * swap's chip for every row moved in, each with its arrow and its button, its evidence line opening
- * on a tap, the bench arrow reading Sit, the evidence basis said once, and the copy verb with the
- * platform's line under it. */
 /** What is wrong with the Waivers table at a width, as sentences; none when it holds. */
 async function waiverFaults(page: Page, width: number): Promise<string[]> {
 	const seen = await page.evaluate(() => {
@@ -444,6 +442,13 @@ async function waiverFaults(page: Page, width: number): Promise<string[]> {
 			cards: document.querySelectorAll('main .cards .card').length,
 			count: document.querySelector('main .count')?.textContent ?? '',
 			basis: [...document.querySelectorAll('main .basis p')].map(text),
+			// The basis in rendered lines: each paragraph's height over its line height (review 66f M5).
+			basisLines: [...document.querySelectorAll('main .basis p')].reduce(
+				(sum, p) =>
+					sum +
+					Math.round(p.getBoundingClientRect().height / parseFloat(getComputedStyle(p).lineHeight)),
+				0
+			),
 			phoneRest: rows.some((tr) => /Rest of season (\d+\.\d|--)/.test(text(tr)))
 		};
 	});
@@ -459,15 +464,24 @@ async function waiverFaults(page: Page, width: number): Promise<string[]> {
 	if (width <= EVIDENCE_FOLDS_AT && !seen.phoneRest) faults.push('no Rest of season under a name');
 	if (seen.cards === 0 || seen.tinted !== seen.cards)
 		faults.push(`${String(seen.tinted)} rows tinted for ${String(seen.cards)} cards`);
-	if (width > PHONE.width && !/^\d+ free agents? on Sleeper$/.test(seen.count))
+	if (
+		width > PHONE.width &&
+		!/^\d+ free agents? we rank on Sleeper, \d+ beats? a player of yours$/.test(seen.count)
+	)
 		faults.push(`count ${seen.count}`);
-	if (seen.basis.length === 0 || seen.basis.length > MOST_BASIS_LINES)
-		faults.push(`${String(seen.basis.length)} basis lines`);
+	if (seen.basis.length === 0 || (width === BASIS_WIDTH && seen.basisLines > MOST_BASIS_LINES))
+		faults.push(`basis ${String(seen.basisLines)} rendered lines`);
+	if (!seen.basis.some((line) => /Beats is .*Open spot is /.test(line)))
+		faults.push('basis says no word of Beats and Open spot');
 	if (!seen.basis[0]?.startsWith(PICKUP_RULE)) faults.push(`basis first ${seen.basis[0] ?? ''}`);
 	for (const word of await hostWordsSaid(page)) faults.push(`says host: ${word}`);
 	return faults;
 }
 
+/** What the Lineup table must hold (Lane 66e): every evidence cell printed as its column prints, a
+ * swap's chip for every row moved in, each with its arrow and its button, its evidence line opening
+ * on a tap, the bench arrow reading Sit, the evidence basis said once, and the copy verb with the
+ * platform's line under it. */
 async function lineupFaults(page: Page): Promise<string[]> {
 	const faults: string[] = [];
 	const seen = await page.evaluate(() => {
