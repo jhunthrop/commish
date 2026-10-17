@@ -22,6 +22,8 @@ import {
 	standingsRows,
 	teamBasis,
 	termsView,
+	unstatedWords,
+	movesBasis,
 	waiverCell,
 	waiverColumn
 } from './home.ts';
@@ -96,6 +98,7 @@ const TERMS: LeagueTerms = {
 	playoff_weeks: { first: 15, last: 17 },
 	roster: { qb: 1, rb: 2, wr: 3, te: 1, flex: 2, super_flex: 0, k: 0, def: 1, bench: 10 },
 	scoring: RULES,
+	scoring_unstated: [],
 	scoring_extra: [{ group: 'defense', rule: 'blocked kick', points: 2 }],
 	host_settings_url: 'https://sleeper.com/leagues/1'
 };
@@ -229,14 +232,17 @@ void test('the waiver column is the budget left, the order, or none the platform
 });
 
 void test('the playoff rule sits under the last playoff spot with its weeks', () => {
-	assert.deepEqual(playoffRule(TERMS, 12), { after: 6, words: 'Playoffs above, weeks 15 to 17' });
+	assert.deepEqual(playoffRule(TERMS, 12), {
+		after: 6,
+		words: 'Top 6 by record, playoffs weeks 15 to 17'
+	});
 	assert.deepEqual(playoffRule({ playoff_teams: 4, playoff_weeks: { first: 16, last: 16 } }, 10), {
 		after: 4,
-		words: 'Playoffs above, week 16'
+		words: 'Top 4 by record, playoffs week 16'
 	});
 	assert.deepEqual(playoffRule({ playoff_teams: 4, playoff_weeks: null }, 10), {
 		after: 4,
-		words: 'Playoffs above'
+		words: 'Top 4 by record make the playoffs'
 	});
 	assert.equal(playoffRule({ playoff_teams: null, playoff_weeks: null }, 10), null);
 	assert.equal(playoffRule({ playoff_teams: 12, playoff_weeks: null }, 12), null);
@@ -280,10 +286,19 @@ void test('the moves feed: the time, the teams, the kind, the players in and out
 				{ player: player('Quinshon Judkins', '2', 'CLE', 'RB', null), roster_id: 1 }
 			],
 			bid: null
+		},
+		{
+			kind: 'add',
+			at: '2026-10-08T18:00:00.000Z',
+			roster_ids: [1],
+			adds: [],
+			drops: [{ player: player('Tory Horton', '3', 'SEA', 'WR', null), roster_id: 1 }],
+			bid: null
 		}
 	];
-	const [claim, trade] = feedRows({ ...SYNC, moves }, ZONE);
-	assert.ok(claim && trade);
+	const [claim, trade, drop] = feedRows({ ...SYNC, moves }, ZONE);
+	assert.ok(claim && trade && drop);
+	assert.equal(drop.kind, 'Drop', 'a move that only lets a player go is a drop');
 	assert.equal(claim.when, 'Thu 2:04 am');
 	assert.equal(claim.kind, 'Waiver');
 	assert.equal(claim.detail, 'FAAB $75');
@@ -306,7 +321,7 @@ void test('the moves feed: the time, the teams, the kind, the players in and out
 });
 
 void test('the settings hold all 42 rules in the setup page’s groups and the two ladders', () => {
-	const view = scoringView(RULES);
+	const view = scoringView(RULES, []);
 	assert.equal(view.count, 42);
 	assert.deepEqual(
 		view.groups.map((g) => g.label),
@@ -314,7 +329,8 @@ void test('the settings hold all 42 rules in the setup page’s groups and the t
 	);
 	assert.deepEqual(view.groups[3]?.rules[1], {
 		label: 'Field goal made from 40 to 49 yards',
-		points: 4
+		points: 4,
+		stated: true
 	});
 	assert.equal(view.pointsAllowed.at(-1)?.label, '46 or more');
 	assert.equal(view.yardsAllowed.length, 9);
@@ -341,6 +357,35 @@ void test('the settings hold all 42 rules in the setup page’s groups and the t
 const BANNED =
 	/\b(market|prices?|buy|sell|stock|odds|lines?|spreads?|favou?red|underdog|bets?|betting|vegas|host)\b/i;
 
+void test('a rule the platform does not state prints no figure, and the count leaves it out', () => {
+	const view = scoringView(RULES, ['points_per_return_touchdown', 'points_per_safety']);
+	assert.equal(view.count, 40);
+	const everyone = view.groups.find((g) => g.label === 'Everyone');
+	assert.deepEqual(
+		everyone?.rules.map((r) => [r.label, r.stated]),
+		[
+			['Fumble lost', true],
+			['Two-point conversion', true],
+			['Kick or punt return touchdown', false]
+		]
+	);
+	assert.ok(everyone);
+	assert.equal(everyone.unstated, 1);
+	assert.equal(
+		unstatedWords('sleeper', 1),
+		'Sleeper does not state this rule. We score it at our standard figure.'
+	);
+	assert.equal(
+		unstatedWords('espn', 2),
+		'ESPN does not state these rules. We score them at our standard figure.'
+	);
+	assert.equal(scoringLead(40, 'sleeper').startsWith('40 rules as Sleeper states them.'), true);
+});
+
+void test('a platform whose moves are not read says so in the basis', () => {
+	assert.equal(movesBasis('espn'), 'ESPN gives no move history to us.');
+});
+
 void test('copy guard: every League page word is fantasy words, with no dash or semicolon', () => {
 	const said = [
 		...Object.values(HOME),
@@ -352,7 +397,10 @@ void test('copy guard: every League page word is fantasy words, with no dash or 
 		extraWords('sleeper'),
 		scoringLead(42, 'sleeper'),
 		settingsLink('espn'),
-		...scoringView(RULES).groups.flatMap((g) => [g.label, ...g.rules.map((r) => r.label)]),
+		unstatedWords('sleeper', 1),
+		unstatedWords('espn', 3),
+		movesBasis('espn'),
+		...scoringView(RULES, []).groups.flatMap((g) => [g.label, ...g.rules.map((r) => r.label)]),
 		...termsView(TERMS, 12).map((t) => `${t.label} ${t.value}`),
 		playoffRule(TERMS, 12)?.words ?? '',
 		bugsOf(board('playing'), SYNC, ZONE)[0]?.words ?? ''
@@ -363,7 +411,7 @@ void test('copy guard: every League page word is fantasy words, with no dash or 
 	}
 	assert.equal(
 		standingsBasis('sleeper', TERMS),
-		"Standings are Sleeper's, by record then points for. PF and PA are points for and against in this league's scoring, Streak the current run of wins or losses. FAAB is each team's waiver budget left of $1,000."
+		"Standings follow Sleeper's record, then points for. PF and PA are points for and against in this league's scoring, Streak the current run of wins or losses. FAAB is each team's waiver budget left of $1,000."
 	);
 	assert.equal(
 		teamBasis('sleeper', '2026-10-17T02:00:00.000Z', { format: 'ppr', league_own: false }, ZONE),

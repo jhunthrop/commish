@@ -273,14 +273,21 @@ export function standingsRows(
 	}));
 }
 
-/** The rule drawn under the last playoff spot, with its words: "Playoffs above, weeks 15 to 17". */
+/** The rule drawn under the last playoff spot by record, with its words: "Top 6 by record,
+ * playoffs weeks 15 to 17". The platform seeds the field by its own rules (divisions, tiebreaks),
+ * which we do not read, so the rule says it is drawn by record. */
 export function playoffRule(
 	terms: Pick<LeagueTerms, 'playoff_teams' | 'playoff_weeks'>,
 	teams: number
 ): { after: number; words: string } | null {
 	const n = terms.playoff_teams;
 	if (n === null || n <= 0 || n >= teams) return null;
-	return { after: n, words: `Playoffs above${weeksWords(terms.playoff_weeks)}` };
+	const top = `Top ${String(n)} by record`;
+	const weeks = weeksWords(terms.playoff_weeks);
+	return {
+		after: n,
+		words: weeks === '' ? `${top} make the playoffs` : `${top}, playoffs${weeks.slice(1)}`
+	};
 }
 
 /** The playoffs' weeks after a comma: ", weeks 15 to 17", ", week 16", or nothing unsaid. */
@@ -322,11 +329,8 @@ const KIND_WORDS: Readonly<Record<LeagueMove['kind'], string>> = {
 	trade: 'Trade'
 };
 
-/** A player's headshot by his board id (the provider's id), as a face asks for it: kept out of
- * the shell's headshot module, which every page loads. */
-export function headshotOf(boardId: string): string {
-	return `https://a.espncdn.com/i/headshots/nfl/players/full/${boardId}.png`;
-}
+/** A move that only lets a player go. */
+const DROP_WORD = 'Drop';
 
 /** A move's day and time: "Sun 11:44 am". */
 export function moveWhen(at: string, zone: string = memberZone()): string {
@@ -352,11 +356,12 @@ export function feedRows(
 		});
 	return sync.moves.map((move, i) => {
 		const trade = move.kind === 'trade';
+		const dropOnly = !trade && move.adds.length === 0 && move.drops.length > 0;
 		return {
 			key: `${move.at}-${String(i)}`,
 			at: move.at,
 			when: moveWhen(move.at, zone),
-			kind: KIND_WORDS[move.kind],
+			kind: dropOnly ? DROP_WORD : KIND_WORDS[move.kind],
 			teams: move.roster_ids.map((id) => ({
 				rosterId: id,
 				name: nameOf(id),
@@ -379,11 +384,15 @@ export function feedRows(
 export interface RuleLine {
 	label: string;
 	points: number;
+	/** The platform states it; a rule it does not is held at our standard figure, never printed. */
+	stated: boolean;
 }
 
 export interface RuleGroup {
 	label: string;
 	rules: RuleLine[];
+	/** How many of its rules the platform does not state. */
+	unstated: number;
 }
 
 type RuleKey = keyof ScoringRules;
@@ -465,22 +474,41 @@ const YARDS_TIERS: readonly (readonly [RuleKey, string])[] = [
 	['yards_allowed_550_plus', '550 or more']
 ];
 
-const rulesOf = (rules: ScoringRules, list: readonly (readonly [RuleKey, string])[]): RuleLine[] =>
-	list.map(([key, label]) => ({ label, points: rules[key] ?? 0 }));
-
-/** The scoring in the setup page's groups, then the two tier ladders. */
-export function scoringView(rules: ScoringRules): {
+/** The scoring in the setup page's groups, then the two tier ladders; a rule the platform does not
+ * state is marked so its figure is never printed, and the count is the stated rules alone. */
+export function scoringView(
+	rules: ScoringRules,
+	unstated: readonly string[]
+): {
 	groups: RuleGroup[];
 	pointsAllowed: RuleLine[];
 	yardsAllowed: RuleLine[];
 	count: number;
 } {
-	const groups = GROUPS.map((g) => ({ label: g.label, rules: rulesOf(rules, g.rules) }));
-	const pointsAllowed = rulesOf(rules, POINTS_TIERS);
-	const yardsAllowed = rulesOf(rules, YARDS_TIERS);
-	const count =
-		groups.reduce((n, g) => n + g.rules.length, 0) + pointsAllowed.length + yardsAllowed.length;
+	const missing = new Set(unstated);
+	const rulesOf = (list: readonly (readonly [RuleKey, string])[]): RuleLine[] =>
+		list.map(([key, label]) => ({ label, points: rules[key] ?? 0, stated: !missing.has(key) }));
+	const groups = GROUPS.map((g) => {
+		const lines = rulesOf(g.rules);
+		return { label: g.label, rules: lines, unstated: lines.filter((r) => !r.stated).length };
+	});
+	const pointsAllowed = rulesOf(POINTS_TIERS);
+	const yardsAllowed = rulesOf(YARDS_TIERS);
+	const count = [...groups.flatMap((g) => g.rules), ...pointsAllowed, ...yardsAllowed].filter(
+		(r) => r.stated
+	).length;
 	return { groups, pointsAllowed, yardsAllowed, count };
+}
+
+/** Said once under a group holding rules the platform does not state. */
+export function unstatedWords(host: LeagueHost, n: number): string {
+	const what = n === 1 ? 'this rule. We score it' : 'these rules. We score them';
+	return `${hostWords(host)} does not state ${what} at our standard figure.`;
+}
+
+/** The basis's word where the platform's moves are not read. */
+export function movesBasis(host: LeagueHost): string {
+	return `${hostWords(host)} gives no move history to us.`;
 }
 
 /** A rule's figure: "+0.04", "−2", "0". */
@@ -555,7 +583,7 @@ export function standingsBasis(
 			: terms.waivers === 'order'
 				? ` ${HOME.order} is each team's place in ${platform}'s waiver order.`
 				: '';
-	return `Standings are ${platform}'s, by record then points for. ${HOME.pointsFor} and ${HOME.pointsAgainst} are points for and against in this league's scoring, ${HOME.streak} the current run of wins or losses.${waiver}`;
+	return `Standings follow ${platform}'s record, then points for. ${HOME.pointsFor} and ${HOME.pointsAgainst} are points for and against in this league's scoring, ${HOME.streak} the current run of wins or losses.${waiver}`;
 }
 
 /** What a team's Proj and Pts are on the scoreboard and in the standings. */

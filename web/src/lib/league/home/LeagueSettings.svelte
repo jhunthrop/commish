@@ -10,6 +10,7 @@
 		settingsLink,
 		shapeView,
 		termsView,
+		unstatedWords,
 		type RuleLine
 	} from './home.ts';
 
@@ -25,7 +26,9 @@
 
 	let { terms, host, teams }: Props = $props();
 
-	const scoring = $derived(terms.scoring ? scoringView(terms.scoring) : null);
+	const scoring = $derived(
+		terms.scoring ? scoringView(terms.scoring, terms.scoring_unstated) : null
+	);
 	const shape = $derived(shapeView(terms.roster));
 	const facts = $derived(termsView(terms, teams));
 </script>
@@ -34,12 +37,25 @@
 	<span class="fig" class:neg={points < 0} class:zero={points === 0}>{ruleFigure(points)}</span>
 {/snippet}
 
+{#snippet rule(r: RuleLine)}
+	<tr class:unstated={!r.stated}
+		><td>{r.label}</td><td class="n"
+			>{#if r.stated}{@render figure(r.points)}{/if}</td
+		></tr
+	>
+{/snippet}
+
 {#snippet ladder(title: string, rules: readonly RuleLine[])}
 	<div class="card wide">
 		<h3>{title}</h3>
+		{#if rules.some((r) => !r.stated)}<p class="note">
+				{unstatedWords(host, rules.filter((r) => !r.stated).length)}
+			</p>{/if}
 		<ul class="tiers">
 			{#each rules as r (r.label)}
-				<li><span class="range">{r.label}</span>{@render figure(r.points)}</li>
+				<li class:unstated={!r.stated}>
+					<span class="range">{r.label}</span>{#if r.stated}{@render figure(r.points)}{/if}
+				</li>
 			{/each}
 		</ul>
 	</div>
@@ -63,11 +79,10 @@
 						<h3>{group.label}</h3>
 						<table class="rules">
 							<tbody>
-								{#each group.rules as r (r.label)}
-									<tr><td>{r.label}</td><td class="n">{@render figure(r.points)}</td></tr>
-								{/each}
+								{#each group.rules as r (r.label)}{@render rule(r)}{/each}
 							</tbody>
 						</table>
+						{#if group.unstated > 0}<p class="note">{unstatedWords(host, group.unstated)}</p>{/if}
 					</div>
 				{/each}
 				{@render ladder(HOME.pointsAllowed, scoring.pointsAllowed)}
@@ -190,6 +205,17 @@
 	.n {
 		text-align: right;
 		width: 64px;
+	}
+
+	.note {
+		margin: var(--s-2) 0 0;
+		font-size: var(--t-xs);
+		color: var(--ink-3);
+	}
+
+	.unstated td:first-child,
+	.unstated .range {
+		color: var(--ink-3);
 	}
 
 	.cap::first-letter {
