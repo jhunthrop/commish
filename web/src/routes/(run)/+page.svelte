@@ -18,7 +18,8 @@
 	import Row from '#lib/ui/Row.svelte';
 	import RowHead from '#lib/ui/RowHead.svelte';
 	import Verb from '#lib/ui/Verb.svelte';
-	import { RAIL_OF_WORD_SET, type WordSet } from '#lib/ui/nav.ts';
+	import { RAIL_OF_WORD_SET, railInSeason, type WordSet } from '#lib/ui/nav.ts';
+	import type { Component } from 'svelte';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
@@ -44,6 +45,16 @@
 	const documentTitle = $derived(
 		frontWords(rail(), { ...format, season: data.run.season }, leagueId !== null).title
 	);
+
+	/** In season with a followed league, the week leads the page in place of the board's hero (Lane
+	 * 66k). Its band is loaded once it is wanted, so a visitor's front door carries none of it. */
+	const weekShown = $derived(railInSeason(rail()) && leagueId !== null);
+	let FrontWeek = $state<Component<{ chosen: string | null }> | null>(null);
+	$effect(() => {
+		if (weekShown && FrontWeek === null) {
+			void import('#lib/front/FrontWeek.svelte').then((m) => (FrontWeek = m.default));
+		}
+	});
 </script>
 
 <svelte:head>
@@ -64,24 +75,28 @@
 
 <SiteShell title={documentTitle} heading={barTitle} run={data.run}>
 	<main class="front">
-		<HeroCard title={heading}>
-			{#snippet meta()}
-				<span>{format.basis.join(' · ')}</span>
-			{/snippet}
-			{#snippet aside()}
-				<Phased>
-					{#snippet children(set: WordSet)}
-						{@const words = wordsOf(set)}
-						<Verb href={verbHref(words.verb, leagueId)} size="lg" fill
-							>{PAGE_VERBS[words.verb]}</Verb
-						>
-						{#each words.quiet as verb (verb)}
-							<Quiet href={verbHref(verb, leagueId)} size="lg" fill>{PAGE_VERBS[verb]}</Quiet>
-						{/each}
-					{/snippet}
-				</Phased>
-			{/snippet}
-		</HeroCard>
+		{#if weekShown}
+			{#if FrontWeek}<FrontWeek chosen={leagueId} />{:else}<div class="reserve"></div>{/if}
+		{:else}
+			<HeroCard title={heading}>
+				{#snippet meta()}
+					<span>{format.basis.join(' · ')}</span>
+				{/snippet}
+				{#snippet aside()}
+					<Phased>
+						{#snippet children(set: WordSet)}
+							{@const words = wordsOf(set)}
+							<Verb href={verbHref(words.verb, leagueId)} size="lg" fill
+								>{PAGE_VERBS[words.verb]}</Verb
+							>
+							{#each words.quiet as verb (verb)}
+								<Quiet href={verbHref(verb, leagueId)} size="lg" fill>{PAGE_VERBS[verb]}</Quiet>
+							{/each}
+						{/snippet}
+					</Phased>
+				{/snippet}
+			</HeroCard>
+		{/if}
 
 		<div class="body">
 			<section class="top" aria-label="The top of the board">
@@ -134,6 +149,10 @@
 		flex-direction: column;
 		gap: var(--s-5);
 		padding: var(--s-5);
+	}
+
+	.reserve {
+		min-height: 300px;
 	}
 
 	.body {

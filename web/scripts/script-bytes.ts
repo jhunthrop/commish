@@ -4,7 +4,7 @@
 // count what waits for a reader's first intent. It leaves out the scripts inline in the HTML and is
 // not Lighthouse's transfer size (which adds headers), so compare it only with itself. Run after
 // `npm run build`:
-//   node scripts/script-bytes.ts [slug]       the five pages, with the slug for the player page
+//   node scripts/script-bytes.ts [slug]       the six pages, with the slug for the player page
 //   VERBOSE=1 node scripts/script-bytes.ts    also each file by weight, and the chunks by weight
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -61,7 +61,8 @@ const pages: [route: string, html: string][] = [
 	['/board', 'board.html'],
 	[`/players/${slug}`, `players/${slug}.html`],
 	['/record', 'record.html'],
-	['/sheet', 'sheet.html']
+	['/sheet', 'sheet.html'],
+	['/account', 'account.html']
 ];
 
 function line(text: string): void {

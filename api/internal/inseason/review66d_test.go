@@ -23,7 +23,7 @@ func TestPointsSoFarOnlyWhereTheHostGivesThem(t *testing.T) {
 		want   *float64
 		reason string
 	}{
-		{"sleeper", &leaguesync.Side{Starters: []string{"p"}, PlayerPoints: map[string]float64{"p": 12.345}}, locked, ptr(12.35), "the host's points, to the cent"},
+		{"sleeper", &leaguesync.Side{Starters: []string{"p"}, PlayerPoints: map[string]float64{"p": 12.345}}, locked, ptr(12.3), "the host's points, to the tenth"},
 		{"sleeper", &leaguesync.Side{Starters: []string{"p"}, PlayerPoints: map[string]float64{"p": 0}}, locked, ptr(0), "a read 0 is a 0"},
 		{"mfl", &leaguesync.Side{Starters: []string{"p"}, PlayerPoints: map[string]float64{"p": 7}}, locked, ptr(7), "the host's points"},
 		{"espn", &leaguesync.Side{Starters: []string{"p"}, PlayerPoints: map[string]float64{}}, locked, nil, "a total and no player's"},
@@ -124,7 +124,7 @@ func TestTheAnswersSayWhetherTheHostGivesPlayersPoints(t *testing.T) {
 		if lineup.PlayerPoints != byPlayer || box.Sides[0].PlayerPoints != byPlayer || box.Sides[1].PlayerPoints != byPlayer {
 			t.Fatalf("by player %v: lineup %v, sides %v %v", byPlayer, lineup.PlayerPoints, box.Sides[0].PlayerPoints, box.Sides[1].PlayerPoints)
 		}
-		if lineup.TeamPoints == nil || *lineup.TeamPoints != 87.44 {
+		if lineup.TeamPoints == nil || *lineup.TeamPoints != 87.4 {
 			t.Fatalf("by player %v: the team's points %v", byPlayer, lineup.TeamPoints)
 		}
 		qb := box.Sides[0].Starters[0].Line.Facts.PointsThisWeek

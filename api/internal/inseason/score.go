@@ -5,6 +5,7 @@ import (
 	"github.com/jhunthrop/commish/api/internal/draft"
 	"github.com/jhunthrop/commish/api/internal/jsmath"
 	"github.com/jhunthrop/commish/api/internal/scoring"
+	"github.com/jhunthrop/commish/api/internal/tenth"
 )
 
 // Stat line metrics beyond domain.py's StatLine fields (Lane 70a's
@@ -121,5 +122,6 @@ func (rs Rules) tierPoints(m map[string]float64, position draft.Position) float6
 // roundCents is research's round_points: Math.round(n * 100) / 100.
 func roundCents(n float64) float64 { return jsmath.Round(n*100) / 100 }
 
-// roundTenth keeps one decimal, as a page prints a points-a-game figure.
-func roundTenth(n float64) float64 { return jsmath.Round(n*10) / 10 }
+// roundTenth is the site's one rounding rule for a figure a screen shows
+// (tenth.Round): one decimal, half away from zero on the decimal.
+func roundTenth(n float64) float64 { return tenth.Round(n) }

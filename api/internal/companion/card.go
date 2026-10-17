@@ -12,6 +12,7 @@ import (
 	"github.com/jhunthrop/commish/api/internal/apitypes"
 	"github.com/jhunthrop/commish/api/internal/draftroom"
 	"github.com/jhunthrop/commish/api/internal/entitlements"
+	"github.com/jhunthrop/commish/api/internal/tenth"
 )
 
 // seedOf seeds the engine's runs for a host draft, so its fallback card
@@ -125,7 +126,9 @@ func (s *Service) conditionalFor(ctx context.Context, f followed) (*apitypes.Roo
 	return &view, nil
 }
 
-func round1(v float64) float64 { return float64(int64(v*10+0.5)) / 10 }
+// round1 is the site's one rounding rule for a figure a screen shows
+// (tenth.Round, Lane 66k).
+func round1(v float64) float64 { return tenth.Round(v) }
 
 func (s *Service) can(ctx context.Context, accountID uuid.UUID, f entitlements.Feature) (bool, error) {
 	return s.Entitlements.Can(ctx, accountID, f, s.Now())

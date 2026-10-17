@@ -15,6 +15,7 @@ import type {
 } from '../../src/lib/league/inseason/api.ts';
 import type { components } from '../../src/lib/api/types.ts';
 import type { GameWeek } from '../../src/lib/format/game-facts.ts';
+import { inTenths } from './tenths.ts';
 
 type PlayerWeek = components['schemas']['PlayerWeek'];
 type PlayerVerb = components['schemas']['PlayerVerb'];
@@ -127,26 +128,6 @@ function verbFor(r: Recorded, id: string, claims: boolean): PlayerVerb {
 	// Where the claim is made from here (the ESPN stand-ins), the verb is the claim.
 	if (claims) return { ...none, kind: 'claim' };
 	return { ...none, kind: 'waivers', host_url: r.waivers.host_waivers_url };
-}
-
-/** A figure as the API answers it once Lane 66k lands: rounded once to a tenth, half away from zero
- * on its decimal value (the recordings hold cents). */
-function tenth(value: number | null): number | null {
-	if (value === null) return null;
-	const cents = Math.round(Math.abs(value) * 100);
-	return (Math.sign(value) * Math.round(cents / 10)) / 10;
-}
-
-/** The line's figures in tenths, as the API prints them. */
-function inTenths(line: PlayerLine): PlayerLine {
-	return {
-		...line,
-		week_projection: tenth(line.week_projection),
-		projection_delta: tenth(line.projection_delta),
-		season_avg: tenth(line.season_avg),
-		last_points: tenth(line.last_points),
-		rest_of_season_per_game: tenth(line.rest_of_season_per_game)
-	};
 }
 
 /** His week, read with no league (verb null) or in the fixture's league. */

@@ -105,7 +105,7 @@ func (a *advisor) scoreboardGame(sides []*leaguesync.Side) apitypes.ScoreboardGa
 				projected = true
 			}
 		}
-		side := apitypes.ScoreboardSide{RosterId: s.RosterID, Points: s.Points, PointsRead: !s.PointsUnread,
+		side := apitypes.ScoreboardSide{RosterId: s.RosterID, Points: roundTenth(s.Points), PointsRead: !s.PointsUnread,
 			Starters: len(s.Starters), Played: own.kicked}
 		if projected {
 			total := roundTenth(proj)

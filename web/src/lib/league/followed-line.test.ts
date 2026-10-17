@@ -14,6 +14,7 @@ const league: AttachedLeague = {
 	team_name: 'My Ball Zach Ertz',
 	standing: { wins: 2, losses: 3, ties: 0, place: 11, teams: 12 },
 	attached_at: '2026-10-13T12:00:00Z',
+	last_read_at: null,
 	phase: 'in_season',
 	phase_basis: 'FFPC says the draft is done and week 6 is under way.',
 	draft_at: null,
