@@ -54,7 +54,8 @@ def normal_posterior(observed: np.ndarray, n: np.ndarray, prior: np.ndarray, k: 
         return np.asarray(prior, dtype=float).copy()
     n = np.asarray(n, dtype=float)
     weight = np.where(n > 0, n / np.maximum(n + k, _EDGE), 0.0)
-    return weight * np.nan_to_num(np.asarray(observed, dtype=float)) + (1.0 - weight) * prior
+    found: np.ndarray = weight * np.nan_to_num(np.asarray(observed, dtype=float)) + (1.0 - weight) * prior
+    return found
 
 
 def beta_binomial_rate(successes: np.ndarray, trials: np.ndarray, prior_rate: np.ndarray, fit: MomentFit) -> np.ndarray:
