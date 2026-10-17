@@ -10,6 +10,7 @@ import (
 
 	"github.com/jhunthrop/commish/api/internal/apitypes"
 	"github.com/jhunthrop/commish/api/internal/auth"
+	"github.com/jhunthrop/commish/api/internal/boards"
 	"github.com/jhunthrop/commish/api/internal/db/dbtest"
 )
 
@@ -52,6 +53,38 @@ func TestWeekReadsEachLeagueInSeason(t *testing.T) {
 	}
 	if attached[0].LastReadAt == nil {
 		t.Fatalf("the attached league carries no last read after its attach read it: %s", body)
+	}
+}
+
+// downBoard fails every valuation, a failure on our side.
+type downBoard struct{}
+
+func (downBoard) For(context.Context, apitypes.LeagueSettings) (boards.Board, error) {
+	return boards.Board{}, errors.New("board store down")
+}
+
+// A league whose read fails on our side keeps its row with the sentence and
+// its last read (Lane 66k M1): the list still answers.
+func TestWeekKeepsALeagueThatFailsOnOurSide(t *testing.T) {
+	pool := dbtest.Pool(t)
+	ctx := context.Background()
+	me, err := (&auth.Store{Pool: pool}).UpsertAccount(ctx, auth.Identity{UserID: "user_week_down", Email: "down@example.invalid"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	svc := replayService(pool)
+	a := caller{t, svc, me.ID}
+	link := "https://sleeper.com/leagues/" + ReplaySleeperLeague + "/team"
+	if status, body := a.do(svc.attach, http.MethodPost, "/leagues/attach", apitypes.AttachInput{Link: link, Me: apitypes.AttachSeat{RosterId: intp(1)}}, ""); status != http.StatusCreated {
+		t.Fatalf("attach: %d %s", status, body)
+	}
+	svc.Boards = downBoard{}
+	list, err := svc.Week(ctx, me.ID)
+	if err != nil {
+		t.Fatalf("one league's failure failed the list: %v", err)
+	}
+	if len(list) != 1 || list[0].Problem != ReadFailedWords || list[0].Followed != nil || list[0].Name == "" || list[0].LastReadAt == nil {
+		t.Fatalf("%+v, want the row with its name, last read and the sentence", list)
 	}
 }
 

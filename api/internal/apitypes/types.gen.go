@@ -3293,15 +3293,15 @@ type RosterChip struct {
 	// Gain a pickup's week_gain (the Waivers strip's first card): this week's Proj the lineup the advice sets gains with him in, one decimal; null on the other kinds
 	Gain *float64 `json:"gain"`
 
-	// Idle a bye whose spot no one on the member's roster can play this week; false on the other kinds
+	// Idle true on a bye (no one on the member's roster can play its spot this week); false on the other kinds
 	Idle bool `json:"idle"`
 
-	// Kind status, a starter as set with this week's designation (the newest); bye, a starter as set on bye, one whose spot no one on the member's roster can play first; pickup, the first pickup worth making as the Waivers screen chooses them, while the league runs waivers
+	// Kind status, a starter as set with this week's designation (the newest); bye, a starter as set on bye whose spot no one on the member's roster can play (never a bye the lineup's changes already fill); pickup, the first pickup worth making as the Waivers screen chooses them, while the league runs waivers
 	Kind RosterChipKind `json:"kind"`
 	Line PlayerLine     `json:"line"`
 }
 
-// RosterChipKind status, a starter as set with this week's designation (the newest); bye, a starter as set on bye, one whose spot no one on the member's roster can play first; pickup, the first pickup worth making as the Waivers screen chooses them, while the league runs waivers
+// RosterChipKind status, a starter as set with this week's designation (the newest); bye, a starter as set on bye whose spot no one on the member's roster can play (never a bye the lineup's changes already fill); pickup, the first pickup worth making as the Waivers screen chooses them, while the league runs waivers
 type RosterChipKind string
 
 // RosterCounts starters per position and the bench. Flex spots come from the lineup.
@@ -3973,8 +3973,7 @@ type WeekLineup struct {
 	Changes int `json:"changes"`
 
 	// Gain projection less as_set to the tenth, null when either is null
-	Gain  *float64    `json:"gain"`
-	Moves LineupMoves `json:"moves"`
+	Gain *float64 `json:"gain"`
 
 	// Projection our lineup's starters' week projections summed, each as printed to the tenth; null when none has one
 	Projection *float64 `json:"projection"`

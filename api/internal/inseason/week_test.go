@@ -52,7 +52,7 @@ func weekSlots() []apitypes.LineupSlot {
 // The summary sums each Proj as printed, counts every change, and leaves
 // the spot no one can play out of both totals.
 func TestLineupSummaryCountsChangesAndSumsAsPrinted(t *testing.T) {
-	got := lineupSummary(apitypes.LineupAdvice{Slots: weekSlots()}, CopyOnlyMoves("sleeper"))
+	got := lineupSummary(apitypes.LineupAdvice{Slots: weekSlots()})
 	if got.Changes != 3 || len(got.Swaps) != 3 {
 		t.Fatalf("changes %d swaps %d, want 3 and 3", got.Changes, len(got.Swaps))
 	}
@@ -62,9 +62,6 @@ func TestLineupSummaryCountsChangesAndSumsAsPrinted(t *testing.T) {
 	}
 	if got.Swaps[0].Slot != "QB" || got.Swaps[0].In.HostId != "dart" || got.Swaps[0].Out == nil || got.Swaps[0].Out.HostId != "rodgers" {
 		t.Fatalf("first swap %+v, want Dart in for Rodgers at QB", got.Swaps[0])
-	}
-	if got.Moves.Reason == nil {
-		t.Fatal("the moves carry no reason for the copy verb")
 	}
 }
 
@@ -78,7 +75,7 @@ func orNone(p *float64) any {
 // A lineup with no Proj anywhere says nothing rather than 0.
 func TestLineupSummaryWithNoProjectionIsNull(t *testing.T) {
 	slots := []apitypes.LineupSlot{{Slot: "QB", Ours: line("a", nil, apitypes.WeekFacts{})}}
-	got := lineupSummary(apitypes.LineupAdvice{Slots: slots}, apitypes.LineupMoves{})
+	got := lineupSummary(apitypes.LineupAdvice{Slots: slots})
 	if got.Projection != nil || got.AsSet != nil || got.Gain != nil || got.Changes != 0 {
 		t.Fatalf("%+v, want null totals and no changes", got)
 	}
@@ -107,18 +104,21 @@ func TestRosterChipsInOrder(t *testing.T) {
 	}
 }
 
-// The bye chip is a starter as the platform holds him: Chase sits in the
-// flex as set even though our lineup starts Etienne.
-func TestByeChipReadsTheLineupAsSet(t *testing.T) {
+// The bye chip is a starter as the platform holds him whose spot no one
+// on the roster can play (Lane 66k M3): never a swap the strip names.
+func TestByeChipOnlyWhereNoOneCanPlay(t *testing.T) {
 	slots := weekSlots()[:5]
-	slots[3].NoOneCanPlay = false
-	got, idle := byeStarter(slots)
-	if got == nil || got.Player.HostId != "laporta" || idle {
-		t.Fatalf("%+v idle %v, want LaPorta first as set", got, idle)
+	got := byeStarter(slots)
+	if got == nil || got.Player.HostId != "laporta" {
+		t.Fatalf("%+v, want LaPorta, whose TE spot no one can play", got)
 	}
-	got, _ = byeStarter([]apitypes.LineupSlot{weekSlots()[4]})
-	if got == nil || got.Player.HostId != "chase" {
-		t.Fatalf("%+v, want Chase as set in the flex", got)
+	// A starter on bye the advice already replaces is the strip's swap, never a chip.
+	if got := byeStarter([]apitypes.LineupSlot{weekSlots()[4]}); got != nil {
+		t.Fatalf("%+v, want no chip for Chase, whom Etienne replaces", got)
+	}
+	slots[3].NoOneCanPlay = false
+	if got := byeStarter(slots); got != nil {
+		t.Fatalf("%+v, want no chip once someone can play the TE spot", got)
 	}
 }
 
@@ -193,6 +193,48 @@ func TestWeekRouteSaysWhyAndFailsOnTheList(t *testing.T) {
 	code, _ = serve(t, weekService(t, nil, errors.New("down")), "/me/week")
 	if code != http.StatusInternalServerError {
 		t.Fatalf("a failed list answered %d", code)
+	}
+}
+
+// downHolds fails the member's Hold tags.
+type downHolds struct{}
+
+func (downHolds) Held(context.Context, uuid.UUID) (map[string]bool, error) {
+	return nil, errors.New("sheets down")
+}
+
+// A failed read of the member's Hold tags never fails the list (Lane 66k
+// M1): the week answers without them.
+func TestWeekRouteAnswersWithoutHolds(t *testing.T) {
+	f := newFixture(t)
+	s := weekService(t, []WeekLeague{{ID: uuid.New(), Phase: apitypes.LeaguePhaseInSeason, League: &f.league}}, nil)
+	s.Holds = downHolds{}
+	code, env := serve(t, s, "/me/week")
+	var out apitypes.MemberWeek
+	if err := json.Unmarshal(env.Data, &out); err != nil || code != http.StatusOK {
+		t.Fatalf("%d %v", code, err)
+	}
+	if len(out.Leagues) != 1 || out.Leagues[0].Lineup == nil || out.Leagues[0].Problem != nil {
+		t.Fatalf("%+v, want the week without the tags", out.Leagues)
+	}
+}
+
+// Ten leagues come back in their order whatever order their reads finish.
+func TestWeekRouteKeepsTheOrder(t *testing.T) {
+	f := newFixture(t)
+	var list []WeekLeague
+	for i := 0; i < 10; i++ {
+		list = append(list, WeekLeague{ID: uuid.New(), Name: string(rune('A' + i)), Phase: apitypes.LeaguePhaseInSeason, League: &f.league})
+	}
+	_, env := serve(t, weekService(t, list, nil), "/me/week")
+	var out apitypes.MemberWeek
+	if err := json.Unmarshal(env.Data, &out); err != nil {
+		t.Fatal(err)
+	}
+	for i, l := range out.Leagues {
+		if l.Id != list[i].ID {
+			t.Fatalf("league %d is %s, want %s", i, l.Name, list[i].Name)
+		}
 	}
 }
 

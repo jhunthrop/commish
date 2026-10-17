@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/jhunthrop/commish/api/internal/apitypes"
 	"github.com/jhunthrop/commish/api/internal/auth"
@@ -37,15 +38,15 @@ type Weeks interface {
 	Weeks(ctx context.Context, accountID uuid.UUID) ([]WeekLeague, error)
 }
 
-// The front door's sentences when a part of a league's week is missing.
-const (
-	factsWords = "This week's facts could not be read just now. Your standing is from the last read."
-)
+// factsWords is a league's sentence when its week could not be read on our
+// side: the row stays, and the page names its last read beside it.
+const factsWords = leaguesync.ReadFailedWords
 
 // week is GET /me/week (Lane 66k): every league the account follows, each
 // with its score bug, its lineup's changes and up to three roster facts,
-// read once for the front door. A league whose read fails keeps its row
-// and says why.
+// read once for the front door, at most leaguesync.WeekReads at once. A
+// league whose read fails keeps its row and says why, and a failed read of
+// the member's Hold tags answers without them.
 func (s *Service) week(w http.ResponseWriter, r *http.Request) {
 	out := apitypes.MemberWeek{Leagues: []apitypes.WeekLeague{}}
 	if s.Weeks == nil {
@@ -58,22 +59,28 @@ func (s *Service) week(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteInternal(w, r, s.Log, "inseason: week", err)
 		return
 	}
-	var held map[string]bool
-	for _, wl := range list {
-		if wl.League != nil && held == nil {
-			if held, err = s.Holds.Held(ctx, account); err != nil {
-				httpx.WriteInternal(w, r, s.Log, "inseason: week held", err)
-				return
-			}
-		}
-		out.Leagues = append(out.Leagues, s.weekLeague(ctx, account, wl, held))
+	held, err := s.Holds.Held(ctx, account)
+	if err != nil {
+		// The tags mark nothing the front door prints: the week answers without them.
+		s.Log.Warn("inseason: week held", "err", err)
+		held = map[string]bool{}
 	}
+	out.Leagues = make([]apitypes.WeekLeague, len(list))
+	var g errgroup.Group
+	g.SetLimit(leaguesync.WeekReads)
+	for i, wl := range list {
+		g.Go(func() error {
+			out.Leagues[i] = s.weekLeague(ctx, wl, held)
+			return nil
+		})
+	}
+	_ = g.Wait() // every league keeps its own problem in its row
 	httpx.WriteOK(w, r, http.StatusOK, out)
 }
 
 // weekLeague is one league's week. Every part it could not read is left
 // null with problem saying why; the row itself is always answered.
-func (s *Service) weekLeague(ctx context.Context, account uuid.UUID, wl WeekLeague, held map[string]bool) apitypes.WeekLeague {
+func (s *Service) weekLeague(ctx context.Context, wl WeekLeague, held map[string]bool) apitypes.WeekLeague {
 	out := apitypes.WeekLeague{Id: wl.ID, Name: wl.Name, Host: apitypes.LeagueHost(wl.Host), TeamName: wl.TeamName,
 		Standing: wl.Standing, Phase: wl.Phase, ReadAt: wl.ReadAt, Chips: []apitypes.RosterChip{}}
 	problem := func(words string) apitypes.WeekLeague {
@@ -110,14 +117,12 @@ func (s *Service) weekLeague(ctx context.Context, account uuid.UUID, wl WeekLeag
 		return problem(noTeamWords)
 	}
 	out.Bug = a.weekBug(lineup)
-	moves := s.lineupMoves(ctx, account, l.Snap.Ref.Host)
-	summary := lineupSummary(lineup, moves)
+	summary := lineupSummary(lineup)
 	out.Lineup = &summary
 	var pickups []apitypes.WaiverRow
 	if wl.WaiversOpen {
-		if wa, ok := a.Waivers(""); ok {
-			pickups = wa.Pickups
-		}
+		// The strip's chosen set alone: no table of rows is built for it.
+		pickups, _ = a.Pickups()
 	}
 	out.Chips = rosterChips(lineup, pickups)
 	return out
@@ -215,9 +220,9 @@ func printedSum(lines []*apitypes.PlayerLine) *float64 {
 // lineupSummary is the lineup's changes and what they add: our starters'
 // Proj against the lineup as the platform holds it, a spot no one can
 // play counting nothing on both sides.
-func lineupSummary(lineup apitypes.LineupAdvice, moves apitypes.LineupMoves) apitypes.WeekLineup {
+func lineupSummary(lineup apitypes.LineupAdvice) apitypes.WeekLineup {
 	var ours, set []*apitypes.PlayerLine
-	out := apitypes.WeekLineup{Swaps: []apitypes.WeekSwap{}, Moves: moves}
+	out := apitypes.WeekLineup{Swaps: []apitypes.WeekSwap{}}
 	for i := range lineup.Slots {
 		slot := lineup.Slots[i]
 		if slot.Changed {
@@ -245,15 +250,15 @@ func lineupSummary(lineup apitypes.LineupAdvice, moves apitypes.LineupMoves) api
 
 // rosterChips is at most three facts about the member's roster, in order:
 // a starter as set with this week's newest designation, a starter as set
-// on bye (one whose spot no one can play first), and the first pickup the
-// Waivers screen chooses.
+// on bye whose spot no one can play, and the first pickup the Waivers
+// screen chooses.
 func rosterChips(lineup apitypes.LineupAdvice, pickups []apitypes.WaiverRow) []apitypes.RosterChip {
 	out := []apitypes.RosterChip{}
 	if line := newestDesignation(lineup.Slots); line != nil {
 		out = append(out, apitypes.RosterChip{Kind: apitypes.RosterChipKindStatus, Line: *line})
 	}
-	if line, idle := byeStarter(lineup.Slots); line != nil {
-		out = append(out, apitypes.RosterChip{Kind: apitypes.RosterChipKindBye, Line: *line, Idle: idle})
+	if line := byeStarter(lineup.Slots); line != nil {
+		out = append(out, apitypes.RosterChip{Kind: apitypes.RosterChipKindBye, Line: *line, Idle: true})
 	}
 	if len(pickups) > 0 {
 		gain := pickups[0].WeekGain
@@ -278,23 +283,17 @@ func newestDesignation(slots []apitypes.LineupSlot) *apitypes.PlayerLine {
 	return out
 }
 
-// byeStarter is a starter as set on bye, one whose spot no one on the
-// roster can play first, and whether it is that.
-func byeStarter(slots []apitypes.LineupSlot) (*apitypes.PlayerLine, bool) {
-	var first *apitypes.PlayerLine
+// byeStarter is a starter as set on bye whose spot no one on the roster
+// can play this week (the Lineup's no_one_can_play), nil when every bye has
+// someone to start in his place: that one is the strip's swap (Lane 66k
+// M3).
+func byeStarter(slots []apitypes.LineupSlot) *apitypes.PlayerLine {
 	for _, slot := range slots {
-		line := asSet(slot)
-		if line == nil || !line.Facts.Bye {
-			continue
-		}
-		if slot.NoOneCanPlay {
-			return line, true
-		}
-		if first == nil {
-			first = line
+		if line := asSet(slot); line != nil && line.Facts.Bye && slot.NoOneCanPlay {
+			return line
 		}
 	}
-	return first, false
+	return nil
 }
 
 // Weeks is the account's leagues for the front door, each in season read

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/jhunthrop/commish/api/internal/apitypes"
 	"github.com/jhunthrop/commish/api/internal/tenth"
@@ -38,35 +39,58 @@ func inWeek(p apitypes.LeaguePhase) bool {
 	return p == apitypes.LeaguePhaseInSeason || p == apitypes.LeaguePhasePlayoffs
 }
 
+// WeekReads is how many leagues the front door reads at once (Lane 66k M2):
+// enough that ten leagues take about three rounds, few enough that one
+// account never holds more than this many host reads in flight.
+const WeekReads = 4
+
+// ReadFailedWords is a league's sentence when its read failed on our side:
+// the row stays with its last read, which the page names beside it.
+const ReadFailedWords = "We could not read this league just now."
+
 // Week is every league the account follows, newest first, each read as
-// the in-season routes read it when it is in season. A read the host
-// stopped keeps the row with a sentence; any other error stops the list.
+// the in-season routes read it when it is in season, at most WeekReads at
+// once. A read that fails, the host's or ours, keeps the row with a
+// sentence; only the list itself failing is an error.
 func (s *Service) Week(ctx context.Context, accountID uuid.UUID) ([]WeekRead, error) {
 	list, err := s.Links.Attached(ctx, accountID)
 	if err != nil {
 		return nil, fmt.Errorf("leaguesync: week: %w", err)
 	}
-	out := make([]WeekRead, 0, len(list))
-	for _, a := range list {
-		row := WeekRead{ID: a.ID, Name: a.Name, Host: a.Ref.Host, TeamName: a.TeamName, Standing: standingOf(a.Teams, a.RosterID),
+	out := make([]WeekRead, len(list))
+	var g errgroup.Group
+	g.SetLimit(WeekReads)
+	for i, a := range list {
+		out[i] = WeekRead{ID: a.ID, Name: a.Name, Host: a.Ref.Host, TeamName: a.TeamName, Standing: standingOf(a.Teams, a.RosterID),
 			Phase: a.Phase, LastReadAt: a.LastReadAt}
-		if inWeek(a.Phase.Phase) {
-			f, err := s.follow(ctx, a.Link)
-			var host hostError
-			switch {
-			case errors.As(err, &host):
-				s.Log.Warn("leaguesync: week", "link", a.ID, "host", a.Ref.Host, "err", err)
-				row.Problem = HostProblemWords(a.Ref.Host, host.err)
-			case err != nil:
-				return nil, fmt.Errorf("leaguesync: week: %w", err)
-			default:
-				// The fresh read's standing, not the row's last kept one.
-				row.Followed, row.Standing = &f, standingOf(f.Snap.Teams, a.RosterID)
-			}
+		if !inWeek(a.Phase.Phase) {
+			continue
 		}
-		out = append(out, row)
+		g.Go(func() error {
+			s.readWeek(ctx, a, &out[i])
+			return nil
+		})
 	}
+	_ = g.Wait() // every read keeps its own error in its row
 	return out, nil
+}
+
+// readWeek reads one league in season into its row, or says why it could
+// not.
+func (s *Service) readWeek(ctx context.Context, a Attached, row *WeekRead) {
+	f, err := s.follow(ctx, a.Link)
+	var host hostError
+	switch {
+	case errors.As(err, &host):
+		s.Log.Warn("leaguesync: week", "link", a.ID, "host", a.Ref.Host, "err", err)
+		row.Problem = HostProblemWords(a.Ref.Host, host.err)
+	case err != nil:
+		s.Log.Error("leaguesync: week", "link", a.ID, "err", err)
+		row.Problem = ReadFailedWords
+	default:
+		// The fresh read's standing, not the row's last kept one.
+		row.Followed, row.Standing = &f, standingOf(f.Snap.Teams, a.RosterID)
+	}
 }
 
 // HostProblemWords is one sentence for a read the host stopped, naming

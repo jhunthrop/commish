@@ -483,11 +483,21 @@ func (a *advisor) hostIDOfAdd(p boards.Player) string {
 	return p.ID
 }
 
-// Waivers is the waiver page (§5).
-func (a *advisor) Waivers(position draft.Position) (apitypes.WaiverAdvice, bool) {
+// waiverRun is one ranking of the adds for the member's team: the
+// roster, the pool, this week's lineup and every move the search makes,
+// shared by the waiver page and the front door's pickup (Lane 66k M2).
+type waiverRun struct {
+	mine, pool []person
+	week       *pickupWeek
+	clears     map[string]openapi_types.Date
+	w          *Writer
+	moves      []Waiver
+}
+
+func (a *advisor) waiverRun(position draft.Position) (waiverRun, bool) {
 	team, ok := a.Snap.TeamByRoster(a.Me)
 	if !ok {
-		return apitypes.WaiverAdvice{}, false
+		return waiverRun{}, false
 	}
 	mine := a.active(team)
 	squad := a.squad(mine, true)
@@ -496,27 +506,45 @@ func (a *advisor) Waivers(position draft.Position) (apitypes.WaiverAdvice, bool)
 	for i, p := range pool {
 		cands[i] = p.cand
 	}
+	return waiverRun{mine: mine, pool: pool, week: newPickupWeek(a.config, squad.Players, team.Starters), clears: a.clearsOf(),
+		w: &Writer{Basis: a.basis, Now: a.now}, moves: Waivers(a.config, a.weeks, squad, cands)}, true
+}
+
+// Pickups is the Waivers strip's chosen set alone, without the table's
+// rows: what the front door's pickup chip reads.
+func (a *advisor) Pickups() ([]apitypes.WaiverRow, bool) {
+	run, ok := a.waiverRun("")
+	if !ok {
+		return nil, false
+	}
+	rows, _ := a.strip(run.w, run.week, run.mine, run.pool, run.moves, run.clears)
+	return rows, true
+}
+
+// Waivers is the waiver page (§5).
+func (a *advisor) Waivers(position draft.Position) (apitypes.WaiverAdvice, bool) {
+	run, ok := a.waiverRun(position)
+	if !ok {
+		return apitypes.WaiverAdvice{}, false
+	}
+	mine, pool := run.mine, run.pool
 	h := a.header()
 	out := apitypes.WaiverAdvice{Week: h.week, Basis: WaiversBasis(a.basis), SeasonBasis: withRestOfSeason(a.Board, WaiverSeasonBasis(a.basis, a.weeks), mine, pool),
 		BasisNote: BasisNote(a.settings, a.season.Carries), OrderBasis: h.basis, Refreshed: h.refreshed, ReadAt: h.readAt,
 		ProjectionReadAt: a.projectionReadAt(), ProjectionPreviousReadAt: a.projectionPreviousReadAt(), ProjectionScoring: projectionScoring(a.settings, a.preset),
 		Pickups: []apitypes.WaiverRow{}, Rows: []apitypes.WaiverRow{}, Roster: lines(mine, indexes(len(mine))), Moves: CopyOnlyClaims(a.Snap.Ref.Host)}
 	out.HostWaiversUrl, out.HostNote = a.host(WaiversPage)
-	week := newPickupWeek(a.config, squad.Players, team.Starters)
-	clears := a.clearsOf()
-	w := &Writer{Basis: a.basis, Now: a.now}
-	moves := Waivers(a.config, a.weeks, squad, cands)
-	for _, move := range moves {
+	for _, move := range run.moves {
 		if len(out.Rows) == MaxWaiverRows {
 			break
 		}
-		out.Rows = append(out.Rows, waiverRow(w, week, mine, pool[move.Add], move, clears))
+		out.Rows = append(out.Rows, waiverRow(run.w, run.week, mine, pool[move.Add], move, run.clears))
 	}
 	// The strip is chosen from every add we rank, before the rows' cut.
 	var proj float64
-	out.Pickups, proj = a.strip(w, week, mine, pool, moves, clears)
+	out.Pickups, proj = a.strip(run.w, run.week, mine, pool, run.moves, run.clears)
 	if out.ProjectionReadAt != nil {
-		base := week.base.proj
+		base := run.week.base.proj
 		out.LineupProj, out.PickupsProj = &base, &proj
 	}
 	return out, true

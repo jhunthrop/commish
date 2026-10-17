@@ -3080,7 +3080,6 @@ export interface components {
 			gain: number | null;
 			/** @description each change, in the league's slot order */
 			swaps: components['schemas']['WeekSwap'][];
-			moves: components['schemas']['LineupMoves'];
 		};
 		WeekSwap: {
 			/** @enum {string} */
@@ -3091,7 +3090,7 @@ export interface components {
 		};
 		RosterChip: {
 			/**
-			 * @description status, a starter as set with this week's designation (the newest); bye, a starter as set on bye, one whose spot no one on the member's roster can play first; pickup, the first pickup worth making as the Waivers screen chooses them, while the league runs waivers
+			 * @description status, a starter as set with this week's designation (the newest); bye, a starter as set on bye whose spot no one on the member's roster can play (never a bye the lineup's changes already fill); pickup, the first pickup worth making as the Waivers screen chooses them, while the league runs waivers
 			 * @enum {string}
 			 */
 			kind: 'status' | 'bye' | 'pickup';
@@ -3101,7 +3100,7 @@ export interface components {
 			 * @description a pickup's week_gain (the Waivers strip's first card): this week's Proj the lineup the advice sets gains with him in, one decimal; null on the other kinds
 			 */
 			gain: number | null;
-			/** @description a bye whose spot no one on the member's roster can play this week; false on the other kinds */
+			/** @description true on a bye (no one on the member's roster can play its spot this week); false on the other kinds */
 			idle: boolean;
 		};
 		MatchupBox: {
