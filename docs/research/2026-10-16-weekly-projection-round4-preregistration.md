@@ -1122,3 +1122,22 @@ population statistic or judged week changes.
     (2.10 gives them no special row). Live, a non-US venue takes 2.10's row: the latest earlier
     `nws_forecast` row for the game if one exists, else NaN with `no_forecast` 1, never the indoor
     values.
+
+### Amendment 3, 2026-10-17, before any fit: a played game is a game with a snap
+
+Recorded by the coordinator on lane 68's fix-round report, before any feature file is read by a fit.
+The count the results now carry showed that 495 / 500 / 564 / 541 of the 659 / 691 / 713 / 710
+"returning" teammates of 2021 to 2024 had no Out or Doubtful filing during their absence. The cause
+is the meaning of "played": the feature store read a game as played when the teammate had a line in it,
+so a backup who dressed and took snaps without a touch "missed" the game and "returned" with his
+pre-absence share the next week. 2.2 was written for players who were away. The repair:
+
+1. **Played and missed.** A player played a game when he took at least one offensive snap in it, read
+   from `nflverse_snap_counts` (admitted under section 5 as it was in round 3); he missed it otherwise.
+   A stat line with no snap is not a played game, and a snap with no stat line is. This definition
+   governs the vacated rule's "played in one of the club's last three games", the returning rule's
+   absence and its pre-absence games, and the `played_in_last_three` column. Where a club-game has no
+   snap rows at all (the feed's gaps), that game is left out of the count for every player of the club
+   and the omission is counted per season.
+2. The results keep reporting, per season, the returning teammates and how many of them carried no Out
+   or Doubtful filing during the absence, before and after this repair.
