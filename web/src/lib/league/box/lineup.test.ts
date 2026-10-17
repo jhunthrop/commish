@@ -82,6 +82,7 @@ const advice = {
 	],
 	bench: [stroud, gibbs],
 	reserve: [brown],
+	empty_slots: [] as LineupSlot['slot'][],
 	player_points: false,
 	team_points: null,
 	projection_read_at: READ,
@@ -244,4 +245,12 @@ void test('copy guard: every Lineup word is fantasy words, names the platform, n
 		assert.doesNotMatch(text, BANNED, text);
 		assert.doesNotMatch(text, /[–—;]/, text);
 	}
+});
+
+void test('a spot empty on the platform that no one can play is a row with no player and a chip (review N2)', () => {
+	const box = lineupBox({ ...advice, empty_slots: ['TE'] }, ZONE);
+	assert.deepEqual(box.empty, ['TE']);
+	assert.deepEqual(box.idle, ['TE: no one on your roster can play this week']);
+	assert.equal(box.totals.proj, 34.1, 'the empty spot counts 0');
+	assert.equal(LINEUP.noOneHere, 'No one on your roster can play here this week');
 });

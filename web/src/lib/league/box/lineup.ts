@@ -54,6 +54,9 @@ export interface LineupBox {
 	/** The strip's line for each spot no one who can play fills: "TE: no one on your roster can play
 	 * this week". */
 	idle: string[];
+	/** Spots empty on the platform that no one who can play fills: their slot words, each drawn as a
+	 * row with no player (review N2). */
+	empty: string[];
 	/** The advised lineup's projection and points so far, a spot no one can play counted at 0. */
 	totals: BoxTotals;
 	/** The lineup as the platform has it set now: its projection, as printed and summed, a spot no
@@ -73,7 +76,8 @@ export const LINEUP = {
 	copied: 'Copied.',
 	setItOn: 'Set it on',
 	copyFailed: 'This browser would not copy it.',
-	noOneCanPlay: 'no one on your roster can play this week'
+	noOneCanPlay: 'no one on your roster can play this week',
+	noOneHere: 'No one on your roster can play here this week'
 } as const;
 
 /** A name's second mention: "Stroud", and a defense by its club ("Saints" from "Saints D/ST"). */
@@ -193,7 +197,14 @@ const TENTHS = 10;
 export function lineupBox(
 	advice: Pick<
 		LineupAdvice,
-		'slots' | 'bench' | 'reserve' | 'player_points' | 'team_points' | 'projection_read_at' | 'week'
+		| 'slots'
+		| 'empty_slots'
+		| 'bench'
+		| 'reserve'
+		| 'player_points'
+		| 'team_points'
+		| 'projection_read_at'
+		| 'week'
 	>,
 	zone: string = memberZone()
 ): LineupBox {
@@ -245,7 +256,11 @@ export function lineupBox(
 		bench,
 		reserve: advice.reserve.map((line) => boxRow(line, '', zone, false)),
 		swaps,
-		idle: placed.flatMap((p) => (p.slot.no_one_can_play ? [idleWords(p.row.slot)] : [])),
+		idle: [
+			...placed.flatMap((p) => (p.slot.no_one_can_play ? [p.row.slot] : [])),
+			...advice.empty_slots.map(slotWord)
+		].map(idleWords),
+		empty: advice.empty_slots.map(slotWord),
 		totals: {
 			proj,
 			pts: totalsPts(ours, advice.player_points, advice.team_points),

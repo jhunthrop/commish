@@ -22,6 +22,10 @@
 	</div>
 	{#if box.swaps.length > 0 || box.idle.length > 0}
 		<ul class="swaps">
+			<!-- The spots no one can play first, so a phone shows them before the swaps (review N4). -->
+			{#each box.idle as said (said)}
+				<li class="swap idle">{said}</li>
+			{/each}
 			{#each box.swaps as swap (swap.key)}
 				<li class="swap">
 					<span class="slot">{swap.slot}</span>
@@ -29,9 +33,6 @@
 					{#if swap.out}<span class="out"><MoveMark move="out" size={16} />{swap.out} out</span
 						>{/if}
 				</li>
-			{/each}
-			{#each box.idle as said (said)}
-				<li class="swap idle">{said}</li>
 			{/each}
 		</ul>
 	{/if}
@@ -178,14 +179,10 @@
 			font-size: var(--t-xl);
 		}
 
-		/* One scrolling line of chips on a phone, so the strip stays short and the first row clears
-		   the pinned verb. */
+		/* The chips wrap on a phone, every one in sight (review N4). */
 		.swaps {
 			flex-basis: 100%;
 			order: 3;
-			flex-wrap: nowrap;
-			overflow-x: auto;
-			scrollbar-width: none;
 			gap: 3px;
 		}
 
@@ -194,6 +191,11 @@
 			gap: 6px;
 			padding-right: var(--s-2);
 			font-size: var(--t-xs);
+		}
+
+		/* The phone chip names who comes in; the bench row's Sit arrow names who goes out. */
+		.out {
+			display: none;
 		}
 
 		.slot {

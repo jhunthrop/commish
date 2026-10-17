@@ -78,6 +78,9 @@
 	/** Nothing to change: the strip says so and no verb shows (review M4). */
 	const isSet = $derived(box.swaps.length === 0);
 	const verb = $derived(isSet ? null : onHost ? LINEUP.make : LINEUP.copy);
+	/** Whether the line under the verb says anything: a set lineup on a platform without our writes
+	 * says nothing, and a phone shows no empty bar for it (review N3). */
+	const footSays = $derived(isSet ? advice.moves.lineup === 'available' : !onHost);
 
 	async function open(): Promise<void> {
 		const move = lineupMove(advice);
@@ -120,6 +123,7 @@
 <Screen
 	decision={lineupDecision(advice)}
 	{verb}
+	{footSays}
 	href={advice.host_lineup_url}
 	basis={advice.basis}
 	basisNote={advice.basis_note}

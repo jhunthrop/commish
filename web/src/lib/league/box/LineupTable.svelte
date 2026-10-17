@@ -2,7 +2,7 @@
 	import { SvelteSet } from 'svelte/reactivity';
 	import { BOX, boxNumber } from './box.ts';
 	import BoxLine from './BoxLine.svelte';
-	import type { LineupBox, LineupRow } from './lineup.ts';
+	import { LINEUP, type LineupBox, type LineupRow } from './lineup.ts';
 
 	/** The Lineup screen's one table (Lane 66e): the lineup the advice sets, Totals lit like the score
 	 * bug, the bench and the injured reserve, each row in the same columns (slot, player, game, Proj,
@@ -66,6 +66,16 @@
 			{#if why?.open}
 				<tr class="whyline"><td></td><td id={why.id} colspan={COLUMNS - 1}>{entry.why}</td></tr>
 			{/if}
+		{/each}
+		{#each box.empty as slot (slot)}
+			<!-- A spot empty on the platform that no one who can play fills (review N2). -->
+			<tr class="nobody">
+				<td class="slot-word">{slot}</td>
+				<td colspan="2">{LINEUP.noOneHere}</td>
+				<td class="n">{BOX.none}</td>
+				<td class="n">{BOX.none}</td>
+				<td colspan={COLUMNS - 5}></td>
+			</tr>
 		{/each}
 		<tr class="totals">
 			<td colspan="3"
@@ -189,6 +199,28 @@
 
 	.whyline td + td {
 		padding-left: calc(32px + var(--s-3));
+	}
+
+	.nobody td {
+		height: var(--row-h);
+		padding: 0 var(--s-2);
+		color: var(--ink-3);
+		background: color-mix(in srgb, var(--loss-bg) 35%, var(--surface));
+		border-bottom: 1px solid var(--line);
+		font-size: var(--t-sm);
+	}
+
+	.nobody .slot-word {
+		padding-left: var(--s-3);
+		font-family: var(--font-num);
+		font-size: var(--t-md);
+		font-weight: 700;
+		color: var(--ink-2);
+	}
+
+	.nobody .n {
+		text-align: right;
+		font-family: var(--font-num);
 	}
 
 	.totals td {

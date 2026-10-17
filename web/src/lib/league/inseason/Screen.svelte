@@ -40,6 +40,8 @@
 		move?: Snippet;
 		/** Under the verb in place of hostNote: its second half (the platform's page) and its line. */
 		verbFoot?: Snippet;
+		/** Whether verbFoot has anything to say now; false keeps an empty bar off a phone. */
+		footSays?: boolean;
 		/** The decision drawn as a strip (the Lineup's swaps as chips, Lane 66e) in place of its
 		 * sentence; the sentence stays the strip's name for a screen reader. */
 		summary?: Snippet;
@@ -61,6 +63,7 @@
 		move,
 		summary,
 		verbFoot,
+		footSays = true,
 		children
 	}: Props = $props();
 
@@ -107,7 +110,7 @@
 <Basis {basis} />
 {@render children()}
 <p class="foot">{basisNote}</p>
-{#if !asideForMove && (verb !== null || verbFoot !== undefined || hostNote !== null)}
+{#if !asideForMove && (verb !== null || (verbFoot !== undefined && footSays) || hostNote !== null)}
 	<div class="pin" {@attach hostTab(href)}>
 		{@render action(true)}
 		{@render foot(true)}
