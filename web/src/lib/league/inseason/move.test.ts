@@ -63,6 +63,7 @@ const slots: LineupSlot[] = [
 		ours: player('1', 'Patrick Mahomes'),
 		host: player('1', 'Patrick Mahomes'),
 		changed: false,
+		no_one_can_play: false,
 		sentence: null
 	},
 	{
@@ -70,6 +71,7 @@ const slots: LineupSlot[] = [
 		ours: player('2', 'Rachaad White'),
 		host: player('3', 'Tank Bigsby'),
 		changed: true,
+		no_one_can_play: false,
 		sentence: 'Bigsby is out.'
 	},
 	{
@@ -77,6 +79,7 @@ const slots: LineupSlot[] = [
 		ours: player('4', 'Jauan Jennings'),
 		host: null,
 		changed: true,
+		no_one_can_play: false,
 		sentence: 'An empty spot.'
 	}
 ];

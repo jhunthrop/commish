@@ -122,7 +122,14 @@ void test('a lineup swap moves ours in and the platform starter it sits out to t
 		ours: PlayerLine,
 		host: PlayerLine | null,
 		changed: boolean
-	) => ({ slot: s, ours, host, changed, sentence: changed ? 'The API sentence.' : null });
+	) => ({
+		slot: s,
+		ours,
+		host,
+		changed,
+		no_one_can_play: false,
+		sentence: changed ? 'The API sentence.' : null
+	});
 	const vikings = line('Vikings', 'DEF', 'MIN', 6);
 	const box = lineupBox(
 		{
@@ -208,6 +215,7 @@ function bothScreens(byPlayer: boolean): { matchup: SideBox; lineup: LineupBox }
 		ours: l,
 		host: l,
 		changed: false,
+		no_one_can_play: false,
 		sentence: null
 	});
 	const lineup = lineupBox(

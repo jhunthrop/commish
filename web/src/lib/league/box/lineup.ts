@@ -1,8 +1,8 @@
 /** The Lineup screen as one lineup table (Lane 66e): the lineup the advice sets slot by slot, the
  * players it moves in marked, then Totals, the bench with the starters it sits marked, and the
- * injured reserve; a decision strip above it naming each swap and the Proj it adds over the lineup
- * as the platform has it set now; one evidence line per swap built from the row's own columns.
- * Pure, tested in lineup.test.ts. */
+ * injured reserve; a decision strip above it naming each swap, each spot no one who can play fills,
+ * and the Proj the swaps add over the lineup as the platform has it set now; one evidence line per
+ * swap built from the row's own columns. Pure, tested in lineup.test.ts. */
 import { memberZone } from '#lib/format/clock.ts';
 import { lastName } from '#lib/format/draft.ts';
 import { designationWord } from '#lib/format/designation.ts';
@@ -15,8 +15,10 @@ import {
 	BOX,
 	boxNumber,
 	boxRow,
+	easeOf,
 	oppRankWord,
 	projTotal,
+	RANKED_CLUBS,
 	slotWord,
 	totalsNote,
 	totalsPts,
@@ -32,6 +34,8 @@ export interface LineupRow {
 	move: Move | null;
 	/** The one evidence line a moved-in row opens to, built from the columns; null off a swap. */
 	why: string | null;
+	/** A spot no rostered player who can play this week fills: the member's player, left there. */
+	idle: boolean;
 }
 
 /** One swap as the strip names it: "Williams in, Stroud out" at QB. */
@@ -47,9 +51,13 @@ export interface LineupBox {
 	bench: LineupRow[];
 	reserve: BoxRow[];
 	swaps: Swap[];
-	/** The advised lineup's projection and points so far. */
+	/** The strip's line for each spot no one who can play fills: "TE: no one on your roster can play
+	 * this week". */
+	idle: string[];
+	/** The advised lineup's projection and points so far, a spot no one can play counted at 0. */
 	totals: BoxTotals;
-	/** The lineup as the platform has it set now: its projection, as printed and summed. */
+	/** The lineup as the platform has it set now: its projection, as printed and summed, a spot no
+	 * one can play counted at 0. */
 	asSet: number | null;
 	/** What the swaps add, with to without, one decimal; null without both totals. */
 	gain: number | null;
@@ -61,7 +69,11 @@ export const LINEUP = {
 	copy: 'Copy the lineup',
 	set: 'Your lineup is set',
 	sit: 'Sit',
-	pastWeeks: 'Past weeks on Our record'
+	pastWeeks: 'Past weeks on Our record',
+	copied: 'Copied.',
+	setItOn: 'Set it on',
+	copyFailed: 'This browser would not copy it.',
+	noOneCanPlay: 'no one on your roster can play this week'
 } as const;
 
 /** A name's second mention: "Stroud", and a defense by its club ("Saints" from "Saints D/ST"). */
@@ -97,19 +109,40 @@ export function stripSum(
 	return { figure, words: `${BOX.proj} with them${set}`, gain };
 }
 
-/** The position an opponent's rank is against, in a sentence. */
+/** The position an opponent's rank is against, in a sentence. A defense has no rank (the API ranks
+ * none), so it has no words. */
 const AGAINST: Readonly<Record<string, string>> = {
 	QB: 'quarterbacks',
 	RB: 'running backs',
 	WR: 'receivers',
 	TE: 'tight ends',
-	K: 'kickers',
-	'D/ST': 'defenses'
+	K: 'kickers'
 };
 
+/** An opponent's rank with its direction, one rule for both ends: "3rd toughest against
+ * quarterbacks" (the bottom third, few points allowed), "31st, among the easiest for receivers"
+ * (the top third), "12th of 32 against receivers" between them. */
+export function rankWords(rank: number, of: number | null, against: string): string {
+	const ord = oppRankWord(rank);
+	switch (easeOf(rank, of)) {
+		case 'hard':
+			return `${ord} toughest against ${against}`;
+		case 'easy':
+			return `${ord}, among the easiest for ${against}`;
+		case 'even':
+			return `${ord} of ${String(of ?? RANKED_CLUBS)} against ${against}`;
+	}
+}
+
+/** A status word inside a sentence: its first letter lowered, so "On the PUP list" reads "on the PUP
+ * list". */
+function inSentence(word: string): string {
+	return word.charAt(0).toLowerCase() + word.slice(1);
+}
+
 /** The one evidence line a swap opens to (Lane 66e), from the columns: "18.5 Proj against Stroud's
- * 16.8, Questionable, at ATL 24th against quarterbacks.", the bye or the designation that sits the
- * starter named first when it is why. */
+ * 16.8, Questionable, at ATL, 24th, among the easiest for quarterbacks.", the bye or the designation
+ * that sits the starter named first when it is why. */
 export function whyLine(into: BoxRow, out: BoxRow | null, slot: string): string {
 	const name = shortName(into.name);
 	if (out === null) return `Your ${slot} spot is empty, so ${name} starts.`;
@@ -120,31 +153,39 @@ export function whyLine(into: BoxRow, out: BoxRow | null, slot: string): string 
 			: `${name} is the next ${slot} with a ${BOX.proj}, ${boxNumber(into.proj)}.`;
 	if (out.game === 'bye') return `${sat} is on bye. ${next}`;
 	if (out.status !== null && out.status.mark !== designationWord('questionable'))
-		return `${sat} is listed ${out.status.mark.toLowerCase()}. ${next}`;
+		return `${sat} is listed ${inSentence(out.status.mark)}. ${next}`;
 	if (into.proj === null || out.proj === null) return next;
 	const parts = [`${boxNumber(into.proj)} ${BOX.proj} against ${sat}'s ${boxNumber(out.proj)}`];
 	if (into.status) parts.push(into.status.mark);
 	const against = AGAINST[into.position];
-	if (into.game !== null && into.game !== 'bye' && into.evidence.oppRank !== null && against) {
-		parts.push(`${into.game.where} ${oppRankWord(into.evidence.oppRank)} against ${against}`);
+	const rank = into.evidence.oppRank;
+	if (into.game !== null && into.game !== 'bye') {
+		parts.push(into.game.where);
+		if (rank !== null && against) parts.push(rankWords(rank, into.evidence.oppOf, against));
 	}
 	return `${parts.join(', ')}.`;
 }
 
-/** The lineup as the platform has it set now: each slot's player there, a swap's starter where the
- * advice changes it. */
-function setRows(placed: readonly Placed[], sat: ReadonlyMap<string, BoxRow>): BoxRow[] {
-	return placed.flatMap(({ slot, row }) => {
-		if (!slot.changed) return [row];
-		const host = slot.host ? sat.get(slot.host.player.host_id) : undefined;
-		return host ? [host] : [];
-	});
+/** The strip's line for a spot no one who can play fills. */
+export function idleWords(slot: string): string {
+	return `${slot}: ${LINEUP.noOneCanPlay}`;
 }
 
 /** One starting spot: the platform's slot and our row for it. */
 interface Placed {
 	slot: LineupSlot;
 	row: BoxRow;
+}
+
+/** The lineup as the platform has it set now: each slot's player there, a swap's starter where the
+ * advice changes it, a spot no one can play left out (it counts 0). */
+function setRows(placed: readonly Placed[], sat: ReadonlyMap<string, BoxRow>): BoxRow[] {
+	return placed.flatMap(({ slot, row }) => {
+		if (slot.no_one_can_play) return [];
+		if (!slot.changed) return [row];
+		const host = slot.host ? sat.get(slot.host.player.host_id) : undefined;
+		return host ? [host] : [];
+	});
 }
 
 const TENTHS = 10;
@@ -162,6 +203,7 @@ export function lineupBox(
 		row: boxRow(slot.ours, slotWord(slot.slot), zone, false)
 	}));
 	const ours = placed.map((p) => p.row);
+	const counted = placed.flatMap((p) => (p.slot.no_one_can_play ? [] : [p.row]));
 	const satRows = new Map(
 		advice.slots.flatMap((slot) =>
 			slot.changed && slot.host
@@ -170,16 +212,18 @@ export function lineupBox(
 		)
 	);
 	const starters = placed.map(({ slot, row }): LineupRow => {
-		if (!slot.changed) return { row, move: null, why: null };
+		const idle = slot.no_one_can_play;
+		if (!slot.changed) return { row, move: null, why: null, idle };
 		const out = slot.host ? (satRows.get(slot.host.player.host_id) ?? null) : null;
-		return { row, move: 'in', why: whyLine(row, out, row.slot) };
+		return { row, move: 'in', why: whyLine(row, out, row.slot), idle };
 	});
 	const bench = advice.bench.map((line): LineupRow => {
 		const out = sat.has(line.player.host_id);
 		return {
 			row: boxRow(line, out ? LINEUP.sit : '', zone, false),
 			move: out ? 'out' : null,
-			why: null
+			why: null,
+			idle: false
 		};
 	});
 	const swaps = placed.flatMap(({ slot, row }): Swap[] =>
@@ -194,17 +238,18 @@ export function lineupBox(
 				]
 			: []
 	);
-	const proj = projTotal(ours);
+	const proj = projTotal(counted);
 	const asSet = projTotal(setRows(placed, satRows));
 	return {
 		starters,
 		bench,
 		reserve: advice.reserve.map((line) => boxRow(line, '', zone, false)),
 		swaps,
+		idle: placed.flatMap((p) => (p.slot.no_one_can_play ? [idleWords(p.row.slot)] : [])),
 		totals: {
 			proj,
 			pts: totalsPts(ours, advice.player_points, advice.team_points),
-			note: totalsNote(ours, advice.projection_read_at !== null, advice.week)
+			note: totalsNote(counted, advice.projection_read_at !== null, advice.week)
 		},
 		asSet,
 		gain: proj === null || asSet === null ? null : Math.round((proj - asSet) * TENTHS) / TENTHS
@@ -217,12 +262,23 @@ export function lineupText(box: Pick<LineupBox, 'starters'>, week: number): stri
 	return [`Week ${String(week)} lineup`, ...lines].join('\n');
 }
 
-/** Where the copied lineup goes, said once it is on the clipboard. */
-export function copiedWords(host: LeagueHost): string {
-	return `Copied. Paste it on ${hostWords(host)}'s lineup page.`;
+/** "Sleeper's lineup page": the copy verb's second half, a link where the API knows the page. */
+export function lineupPageWords(host: LeagueHost): string {
+	return `${hostWords(host)}'s lineup page`;
 }
 
-/** Said when the browser would not copy it. */
-export function copyFailedWords(host: LeagueHost): string {
-	return `This browser would not copy it. Set it on ${hostWords(host)}'s lineup page.`;
+/** The line once the copy verb is pressed: what happened, then "Set it on Sleeper's lineup page.",
+ * the page its link; never a paste, which no platform takes. */
+export interface CopyLine {
+	said: string;
+	page: string;
+}
+
+export function copiedLine(host: LeagueHost, copied: boolean): CopyLine {
+	return { said: copied ? LINEUP.copied : LINEUP.copyFailed, page: lineupPageWords(host) };
+}
+
+/** Said when the lineup is set and the platform takes our writes: "Lineup set on ESPN". */
+export function setOnWords(host: LeagueHost): string {
+	return `Lineup set on ${hostWords(host)}`;
 }

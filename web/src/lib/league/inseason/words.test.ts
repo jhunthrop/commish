@@ -108,6 +108,7 @@ const slot = (
 	ours: line(ours),
 	host: host === null ? null : line(host),
 	changed,
+	no_one_can_play: false,
 	sentence: null
 });
 

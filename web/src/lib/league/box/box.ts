@@ -274,8 +274,11 @@ export type Ease = 'easy' | 'hard' | 'even';
 
 const EASE_THIRDS = 3;
 
+/** How many clubs a rank is out of when the API does not say. */
+export const RANKED_CLUBS = 32;
+
 export function easeOf(rank: number, of: number | null): Ease {
-	const ranked = of ?? rank;
+	const ranked = of ?? RANKED_CLUBS;
 	if (rank > (ranked * (EASE_THIRDS - 1)) / EASE_THIRDS) return 'easy';
 	if (rank <= ranked / EASE_THIRDS) return 'hard';
 	return 'even';
