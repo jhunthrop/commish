@@ -89,8 +89,20 @@ void test('the move is each changed slot: the player in and the starter out, for
 });
 
 void test('the verb sets the lineup on the host only when the API opens the move and there is a change', () => {
-	const open = { lineup: 'available' as const, note: null };
-	const closed = { lineup: 'unavailable' as const, note: null };
+	const open = {
+		lineup: 'available' as const,
+		note: null,
+		takes_writes: true,
+		writes_on: true,
+		reason: null
+	};
+	const closed = {
+		lineup: 'unavailable' as const,
+		note: null,
+		takes_writes: false,
+		writes_on: false,
+		reason: 'Sleeper does not take lineups from here, so copy the lineup there.'
+	};
 	assert.equal(setsOnHost({ set: false, slots, moves: open }), true);
 	assert.equal(setsOnHost({ set: false, slots, moves: closed }), false);
 	assert.equal(setsOnHost({ set: true, slots: [], moves: open }), false);
