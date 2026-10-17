@@ -74,10 +74,11 @@ const (
 	TEBonus   = "te_reception_bonus"
 )
 
-// FromMap is a rule-keyed map as ScoringRules. Every rule must be
-// present: a missing one is an error, never a zero.
+// FromMap is a rule-keyed map as ScoringRules. Every board rule must be
+// present: a missing one is an error, never a zero; a missing kicking or
+// defense rule reads at its standard figure, as the contract reads it.
 func FromMap(m map[string]float64) (apitypes.ScoringRules, error) {
-	for _, r := range rules {
+	for _, r := range boardRules {
 		if _, ok := m[r.Key]; !ok {
 			return apitypes.ScoringRules{}, fmt.Errorf("scoring: %s is missing", r.Key)
 		}

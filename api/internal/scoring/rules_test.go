@@ -205,7 +205,7 @@ func TestScoringFiguresAgreeEverywhere(t *testing.T) {
 	}{
 		{"domain.py STANDARD_SCORING", figures(t, py, "STANDARD_SCORING: Final = ScoringRules(", ")",
 			regexp.MustCompile(`(\w+)=`+number)), board},
-		{"rules.ts STANDARD", figures(t, ts, "const STANDARD:", "};", regexp.MustCompile(`(\w+): `+number)), want},
+		{"rules.ts STANDARD", figures(t, ts, "const STANDARD:", "};", regexp.MustCompile(`(\w+): `+number)), board},
 		{"00019 defaults", figures(t, sql, "jsonb_build_object(", "$$;",
 			regexp.MustCompile(`'(\w+)', coalesce\(.*, `+number+`\)`)), board},
 		{"00025 defaults", figures(t, sql25, "jsonb_build_object(", "$$;",
@@ -446,5 +446,39 @@ func TestTiersJoinUp(t *testing.T) {
 				t.Errorf("%s: %s (%d to %d) then %s from %d", name, prev.Key, prev.Lo, prev.Hi, tiers[i].Key, tiers[i].Lo)
 			}
 		}
+	}
+}
+
+// Through a deploy, the web and the API need not agree on the kicking and
+// defense rules: a body of the board's 21 alone (a web from before them)
+// reads each at its standard figure, every rule is always answered, a
+// tier of 0 included, and a map of the 21 alone makes rules too.
+func TestKickingAndDefenseRulesAreOptional(t *testing.T) {
+	board, err := json.Marshal(BoardRules(Standard()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var r apitypes.ScoringRules
+	if err := json.Unmarshal(board, &r); err != nil {
+		t.Fatalf("a body of the 21: %v", err)
+	}
+	if r != Standard() {
+		t.Fatalf("the 21 read as %+v, want the standard figures", r)
+	}
+	r.PointsAllowed21 = 0
+	r.YardsAllowed550Plus = 0
+	out, err := json.Marshal(r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var back map[string]float64
+	if err := json.Unmarshal(out, &back); err != nil || len(back) != len(Rules()) {
+		t.Fatalf("answered %d rules (%v), want every one", len(back), err)
+	}
+	if v, ok := back["yards_allowed_550_plus"]; !ok || v != 0 {
+		t.Fatalf("a tier of 0 answered as %v %v", v, ok)
+	}
+	if got, err := FromMap(BoardRules(Standard())); err != nil || got != Standard() {
+		t.Fatalf("FromMap of the 21: %+v %v", got, err)
 	}
 }

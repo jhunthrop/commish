@@ -2907,7 +2907,7 @@ type ScoringImport struct {
 	// Dropped every host rule ScoringRules does not carry, in drafter words by group with its figure, never silently lost
 	Dropped []DroppedRule `json:"dropped"`
 
-	// Rules A league's exact scoring, every rule required: the 21 research/model/domain.py ScoringRules names (the board's rules), then a kicker's longer field goals and a team defense's points-allowed and yards-allowed tiers. An unknown key is a field error that names it. Points per yard for the yardage rules, per event for the rest. points_per_field_goal is a field goal made under 40 yards, and any field goal whose distance the stat line does not say. A tier is the points a defense scores for a game whose points or yards allowed fall in its range, both ends included; a tier the league does not score is 0.
+	// Rules A league's exact scoring: the 21 research/model/domain.py ScoringRules names (the board's rules), every one required, then a kicker's longer field goals and a team defense's points-allowed and yards-allowed tiers, each optional and read at its standard figure when absent (a body from before they existed stays good); every rule is always answered. An unknown key is a field error that names it. Points per yard for the yardage rules, per event for the rest. points_per_field_goal is a field goal made under 40 yards, and any field goal whose distance the stat line does not say. A tier is the points a defense scores for a game whose points or yards allowed fall in its range, both ends included; a tier the league does not score is 0.
 	Rules ScoringRules `json:"rules"`
 }
 
@@ -2925,7 +2925,7 @@ type ScoringImportInputHost string
 // ScoringPreset defines model for ScoringPreset.
 type ScoringPreset string
 
-// ScoringRules A league's exact scoring, every rule required: the 21 research/model/domain.py ScoringRules names (the board's rules), then a kicker's longer field goals and a team defense's points-allowed and yards-allowed tiers. An unknown key is a field error that names it. Points per yard for the yardage rules, per event for the rest. points_per_field_goal is a field goal made under 40 yards, and any field goal whose distance the stat line does not say. A tier is the points a defense scores for a game whose points or yards allowed fall in its range, both ends included; a tier the league does not score is 0.
+// ScoringRules A league's exact scoring: the 21 research/model/domain.py ScoringRules names (the board's rules), every one required, then a kicker's longer field goals and a team defense's points-allowed and yards-allowed tiers, each optional and read at its standard figure when absent (a body from before they existed stays good); every rule is always answered. An unknown key is a field error that names it. Points per yard for the yardage rules, per event for the rest. points_per_field_goal is a field goal made under 40 yards, and any field goal whose distance the stat line does not say. A tier is the points a defense scores for a game whose points or yards allowed fall in its range, both ends included; a tier the league does not score is 0.
 type ScoringRules struct {
 	PointsAllowed0                   float64 `json:"points_allowed_0"`
 	PointsAllowed1417                float64 `json:"points_allowed_14_17"`

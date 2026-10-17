@@ -1633,7 +1633,7 @@ export interface components {
 			preset?: components['schemas']['ScoringPreset'] | null;
 			custom?: components['schemas']['ScoringRules'] | null;
 		};
-		/** @description A league's exact scoring, every rule required: the 21 research/model/domain.py ScoringRules names (the board's rules), then a kicker's longer field goals and a team defense's points-allowed and yards-allowed tiers. An unknown key is a field error that names it. Points per yard for the yardage rules, per event for the rest. points_per_field_goal is a field goal made under 40 yards, and any field goal whose distance the stat line does not say. A tier is the points a defense scores for a game whose points or yards allowed fall in its range, both ends included; a tier the league does not score is 0. */
+		/** @description A league's exact scoring: the 21 research/model/domain.py ScoringRules names (the board's rules), every one required, then a kicker's longer field goals and a team defense's points-allowed and yards-allowed tiers, each optional and read at its standard figure when absent (a body from before they existed stays good); every rule is always answered. An unknown key is a field error that names it. Points per yard for the yardage rules, per event for the rest. points_per_field_goal is a field goal made under 40 yards, and any field goal whose distance the stat line does not say. A tier is the points a defense scores for a game whose points or yards allowed fall in its range, both ends included; a tier the league does not score is 0. */
 		ScoringRules: {
 			/** Format: double */
 			points_per_passing_yard: number;
@@ -1678,47 +1678,47 @@ export interface components {
 			/** Format: double */
 			points_per_safety: number;
 			/** Format: double */
-			points_per_field_goal_40_49: number;
+			points_per_field_goal_40_49?: number;
 			/** Format: double */
-			points_per_field_goal_50_plus: number;
+			points_per_field_goal_50_plus?: number;
 			/** Format: double */
-			points_allowed_0: number;
+			points_allowed_0?: number;
 			/** Format: double */
-			points_allowed_1_6: number;
+			points_allowed_1_6?: number;
 			/** Format: double */
-			points_allowed_7_13: number;
+			points_allowed_7_13?: number;
 			/** Format: double */
-			points_allowed_14_17: number;
+			points_allowed_14_17?: number;
 			/** Format: double */
-			points_allowed_18_20: number;
+			points_allowed_18_20?: number;
 			/** Format: double */
-			points_allowed_21: number;
+			points_allowed_21?: number;
 			/** Format: double */
-			points_allowed_22_27: number;
+			points_allowed_22_27?: number;
 			/** Format: double */
-			points_allowed_28_34: number;
+			points_allowed_28_34?: number;
 			/** Format: double */
-			points_allowed_35_45: number;
+			points_allowed_35_45?: number;
 			/** Format: double */
-			points_allowed_46_plus: number;
+			points_allowed_46_plus?: number;
 			/** Format: double */
-			yards_allowed_0_99: number;
+			yards_allowed_0_99?: number;
 			/** Format: double */
-			yards_allowed_100_199: number;
+			yards_allowed_100_199?: number;
 			/** Format: double */
-			yards_allowed_200_299: number;
+			yards_allowed_200_299?: number;
 			/** Format: double */
-			yards_allowed_300_349: number;
+			yards_allowed_300_349?: number;
 			/** Format: double */
-			yards_allowed_350_399: number;
+			yards_allowed_350_399?: number;
 			/** Format: double */
-			yards_allowed_400_449: number;
+			yards_allowed_400_449?: number;
 			/** Format: double */
-			yards_allowed_450_499: number;
+			yards_allowed_450_499?: number;
 			/** Format: double */
-			yards_allowed_500_549: number;
+			yards_allowed_500_549?: number;
 			/** Format: double */
-			yards_allowed_550_plus: number;
+			yards_allowed_550_plus?: number;
 		};
 		ScoringImportInput: {
 			/** @enum {string} */

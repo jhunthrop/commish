@@ -3,6 +3,8 @@ package scoring
 import (
 	"fmt"
 	"math"
+
+	"github.com/jhunthrop/commish/api/internal/apitypes"
 )
 
 // Open is a tier's top when it has none: "46 or more".
@@ -19,21 +21,37 @@ type Tier struct {
 	Standard float64
 }
 
-// pointsAllowedTiers and yardsAllowedTiers carry domain.py's
-// POINTS_ALLOWED_TIERS and YARDS_ALLOWED_TIERS as their standard figures.
-var pointsAllowedTiers = []Tier{
-	{"points_allowed_0", 0, 0, 5}, {"points_allowed_1_6", 1, 6, 4}, {"points_allowed_7_13", 7, 13, 3},
-	{"points_allowed_14_17", 14, 17, 1}, {"points_allowed_18_20", 18, 20, 0}, {"points_allowed_21", 21, 21, 0},
-	{"points_allowed_22_27", 22, 27, 0}, {"points_allowed_28_34", 28, 34, -1}, {"points_allowed_35_45", 35, 45, -3},
-	{"points_allowed_46_plus", 46, Open, -5},
+// standardTiers sets each tier's standard figure, the contract's figure
+// for an absent rule (apitypes.KickDefenseStandards).
+func standardTiers(tiers []Tier) []Tier {
+	standards := apitypes.KickDefenseStandards()
+	out := make([]Tier, len(tiers))
+	for i, t := range tiers {
+		std, ok := standards[t.Key]
+		if !ok {
+			panic("scoring: no standard figure for " + t.Key)
+		}
+		t.Standard = std
+		out[i] = t
+	}
+	return out
 }
 
-var yardsAllowedTiers = []Tier{
-	{"yards_allowed_0_99", 0, 99, 5}, {"yards_allowed_100_199", 100, 199, 3}, {"yards_allowed_200_299", 200, 299, 2},
-	{"yards_allowed_300_349", 300, 349, 0}, {"yards_allowed_350_399", 350, 399, -1},
-	{"yards_allowed_400_449", 400, 449, -3}, {"yards_allowed_450_499", 450, 499, -5},
-	{"yards_allowed_500_549", 500, 549, -6}, {"yards_allowed_550_plus", 550, Open, -7},
-}
+// pointsAllowedTiers and yardsAllowedTiers carry domain.py's
+// POINTS_ALLOWED_TIERS and YARDS_ALLOWED_TIERS as their standard figures.
+var pointsAllowedTiers = standardTiers([]Tier{
+	{Key: "points_allowed_0", Lo: 0, Hi: 0}, {Key: "points_allowed_1_6", Lo: 1, Hi: 6}, {Key: "points_allowed_7_13", Lo: 7, Hi: 13},
+	{Key: "points_allowed_14_17", Lo: 14, Hi: 17}, {Key: "points_allowed_18_20", Lo: 18, Hi: 20}, {Key: "points_allowed_21", Lo: 21, Hi: 21},
+	{Key: "points_allowed_22_27", Lo: 22, Hi: 27}, {Key: "points_allowed_28_34", Lo: 28, Hi: 34}, {Key: "points_allowed_35_45", Lo: 35, Hi: 45},
+	{Key: "points_allowed_46_plus", Lo: 46, Hi: Open},
+})
+
+var yardsAllowedTiers = standardTiers([]Tier{
+	{Key: "yards_allowed_0_99", Lo: 0, Hi: 99}, {Key: "yards_allowed_100_199", Lo: 100, Hi: 199}, {Key: "yards_allowed_200_299", Lo: 200, Hi: 299},
+	{Key: "yards_allowed_300_349", Lo: 300, Hi: 349}, {Key: "yards_allowed_350_399", Lo: 350, Hi: 399},
+	{Key: "yards_allowed_400_449", Lo: 400, Hi: 449}, {Key: "yards_allowed_450_499", Lo: 450, Hi: 499},
+	{Key: "yards_allowed_500_549", Lo: 500, Hi: 549}, {Key: "yards_allowed_550_plus", Lo: 550, Hi: Open},
+})
 
 // The longer field goals' rules: points_per_field_goal is a field goal
 // under 40 yards, and any whose distance a stat line does not say.
@@ -52,7 +70,8 @@ func YardsAllowedTiers() []Tier { return append([]Tier(nil), yardsAllowedTiers..
 // kickDefenseRules is the rules after domain.py's 21: the longer field
 // goals at the standard field goal's figure, then the tiers.
 func kickDefenseRules() []Rule {
-	out := []Rule{{FieldGoal40To49, 3}, {FieldGoal50AndUp, 3}}
+	standards := apitypes.KickDefenseStandards()
+	out := []Rule{{FieldGoal40To49, standards[FieldGoal40To49]}, {FieldGoal50AndUp, standards[FieldGoal50AndUp]}}
 	for _, group := range [][]Tier{pointsAllowedTiers, yardsAllowedTiers} {
 		for _, t := range group {
 			out = append(out, Rule{t.Key, t.Standard})
