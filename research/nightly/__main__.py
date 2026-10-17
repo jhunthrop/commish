@@ -1,13 +1,18 @@
 """`python -m research.nightly`: the nightly run and its publication (the Cloud Run Job `nightly`).
 
-    uv run python -m research.nightly run [--out DIR] [--skip ingest,fit,capsules,headshots]
+    uv run python -m research.nightly run [--out DIR] [--skip ingest,fit,capsules,week-reads,headshots]
                                           [--capsule-budget N] [--regenerate-all] [--mend-only]
     uv run python -m research.nightly publish [--out DIR] [--at ISO] [--no-dispatch]
     uv run python -m research.nightly mark --out DIR
+    uv run python -m research.nightly week-reads [--hourly]
 
 `mark` writes the newest injury capture beside a local directory's public run (`designations.json`,
 publish's first step alone), reading the store and writing nothing to it: the stand-in's way to the
 statuses the site prints (development).
+
+`week-reads` is the run's week-ahead read pass alone (Lane 72, `nightly/week_reads.py`): every board
+player's read that is due now; with `--hourly`, the hourly pass the in-season capture job runs after
+its status capture (only a status or projection that moved, under the hourly dollar budget).
 
 `run` writes one run under a new run id (05:00 UTC); `publish` makes the newest passed run public
 once its early-access hour is over, dispatches the web build of it (every hour), and
@@ -42,7 +47,7 @@ from research.cli import log_line as _line
 from research.db.engine import make_engine
 from research.db.url import database_url_from_env
 from research.logging_setup import configure_logging
-from research.nightly.capsule_step import CapsuleStepPlan
+from research.nightly.capsule_step import CapsuleStepPlan, night_facts
 from research.nightly.designations import Hour, finish_marks, mark_public_runs
 from research.nightly.publish import Dispatcher, publish
 from research.nightly.published_board import SyncOutcome, failed, sync_published_board
@@ -50,6 +55,7 @@ from research.nightly.r2 import run_store
 from research.nightly.run import STEPS, RunDeps, RunOptions, run_nightly
 from research.nightly.run_store import RunStore
 from research.nightly.schema_gate import contract_dir, schema_gate
+from research.nightly.week_reads import run_week_read_step
 from research.pipeline.commands import now_ms
 from research.pipeline.http import LiveFetcher
 
@@ -139,6 +145,17 @@ def _contract(args: argparse.Namespace) -> int:
     return 0 if record.passed else 1
 
 
+def _week_reads(args: argparse.Namespace) -> int:
+    """The week-ahead read pass alone, on its own facts pass at now (`--hourly`: the hourly pass's terms)."""
+    engine = make_engine(database_url_from_env(DATABASE_VARIABLE))
+    try:
+        record = run_week_read_step(engine, now_ms(), _line, night_facts(engine), hourly=args.hourly)
+    finally:
+        engine.dispose()
+    _line(f"{record.name}: {record.status}, {record.summary}")
+    return 1 if record.status == "failed" else 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="research.nightly", description=(__doc__ or "").splitlines()[0])
     commands = parser.add_subparsers(dest="command", required=True)
@@ -161,9 +178,17 @@ def main(argv: Sequence[str] | None = None) -> int:
     contract = commands.add_parser("contract", help="the schema gate alone, over a run already written")
     contract.add_argument("--runs", required=True, help="the directory laid out as the bucket (runs/<id>/...)")
     contract.add_argument("--run-id", required=True)
+    week_reads = commands.add_parser("week-reads", help="write every board player's week-ahead read that is due now")
+    week_reads.add_argument("--hourly", action="store_true", help="only the reads a status or projection moved")
     args = parser.parse_args(argv)
     configure_logging(logging.WARNING)
-    commands_by_name = {"run": _run, "publish": _publish, "mark": _mark, "contract": _contract}
+    commands_by_name = {
+        "run": _run,
+        "publish": _publish,
+        "mark": _mark,
+        "contract": _contract,
+        "week-reads": _week_reads,
+    }
     return commands_by_name[args.command](args)
 
 

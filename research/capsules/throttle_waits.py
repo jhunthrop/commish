@@ -3,7 +3,7 @@
 Lane 52's review (M1): one ask could wait the gateway's own 429 backoffs (or a `retry-after` up to its
 300 s cap) inside each of its re-asks, about 12 minutes, or an hour at the cap. Now every throttle
 wait an ask makes, the gateway's 429 backoffs, its `retry-after`, a rate-limit line pause, the retry
-delay and the writer's own re-ask waits (`generate._ask`), is drawn from one allowance (`AskWaits`,
+delay and the writer's own re-ask waits (`generate.ask`), is drawn from one allowance (`AskWaits`,
 `throttle_ask_wait_cap_ms`, 150 s), and every ask of a run draws on one pool (`RunWaits`). The
 gateway's backoffs and the writer's waits are sized so an ask that meets a 429 on every call still
 makes all its re-asks inside the 150 s (`config.Retry`, `throttle_waits_ms`).

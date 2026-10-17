@@ -287,7 +287,7 @@
 				{#if page.weekRead}
 					<section class="week-read" aria-label="The week ahead">
 						<p class="stamp">{page.weekRead.caption}</p>
-						<Capsule body={page.weekRead.body} pulls={[]} />
+						{#if page.weekRead.body !== null}<Capsule body={page.weekRead.body} pulls={[]} />{/if}
 					</section>
 				{/if}
 				{#if page.capsule}

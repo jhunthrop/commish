@@ -266,12 +266,15 @@ function capsuleOf(
 async function weekReads(): Promise<Map<string, WeekRead>> {
 	const file = new URL('./standin-week-reads.json', import.meta.url);
 	const recorded = JSON.parse(await readFile(file, 'utf8')) as {
-		reads: (Omit<WeekRead, 'factsAt'> & { id: string })[];
+		reads: (Pick<WeekRead, 'week' | 'caption' | 'writtenAt' | 'call'> & {
+			id: string;
+			body: string;
+		})[];
 	};
 	return new Map(
-		recorded.reads.map(({ id, week, body, caption, writtenAt }) => [
+		recorded.reads.map(({ id, week, body, caption, writtenAt, call }) => [
 			id,
-			{ week, body, caption, writtenAt, factsAt: null }
+			{ week, body, caption, writtenAt, call, status: null, factsAt: null }
 		])
 	);
 }

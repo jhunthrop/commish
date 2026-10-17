@@ -160,12 +160,16 @@ export const playerFormatSchema = boardRowSchema.omit({
 	headshot: true
 });
 
-/** The week-ahead read (Lane 72): its text, the week it is for, its caption ("Written Fri 9:00 pm
- * Central, for week 6"), when it was written and the newest stamp of the facts it was written from. */
+/** The week-ahead read (Lane 72): the week it is for; its text, null when his status changed since it
+ * was written (the read is withheld and the caption says when the new one is due); its caption
+ * ("Written Fri 9:00 pm Central, for week 6"); the status it was written against; the writer's call,
+ * null when withheld; when it was written and the newest stamp of the facts it was written from. */
 export const weekReadSchema = z.object({
 	week: z.number().int().min(1),
-	body: phrase,
+	body: phrase.nullable(),
 	caption: phrase,
+	status: z.string().nullable(),
+	call: z.enum(['start', 'sit', 'hold', 'none']).nullable(),
 	writtenAt: isoTime,
 	factsAt: isoTime.nullable()
 });

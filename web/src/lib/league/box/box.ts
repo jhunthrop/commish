@@ -6,6 +6,7 @@
  * prints is tested here. */
 import { memberZone, weekdayTime, zoneWord } from '#lib/format/clock.ts';
 import { defenseWords } from '#lib/format/clubs.ts';
+import { lastName } from '#lib/format/draft.ts';
 import {
 	designationWord,
 	rankWord,
@@ -67,8 +68,29 @@ export const BOX = {
 	indoors: 'Indoors',
 	roofOpen: 'Roof TBD',
 	abroad: 'Abroad, no forecast',
-	outdoors: 'Outdoors'
+	outdoors: 'Outdoors',
+	/** The trade builder's tick, as a screen reader hears it, and its mark on the member's drop. */
+	pick: 'Pick',
+	drop: 'Drop'
 } as const;
+
+/** The trade builder's tick on a row (Lane 66g): picked or not, the member's drop (marked, not
+ * tapped), or a player no trade takes (a defense, a kicker, injured reserve); the tap, and whether a
+ * full side holds it back. */
+export interface BoxPick {
+	state: 'on' | 'off' | 'drop' | 'no';
+	disabled: boolean;
+	/** The tap; null where there is nothing to tap (the drop, a player no trade takes). */
+	toggle: (() => void) | null;
+}
+
+/** A name's short form for a narrow cell (rereview N2): the first initial, then the last name whole,
+ * "A. Rodgers"; a one-word name as it is. */
+export function initialName(name: string): string {
+	const first = name.trim().split(/\s+/)[0] ?? '';
+	const last = lastName(name);
+	return first === last ? name.trim() : `${first.charAt(0)}. ${last}`;
+}
 
 /** The slot's label in a box. */
 export function slotWord(slot: BoxSlot): string {
@@ -128,16 +150,25 @@ export interface BoxRow {
 }
 
 /** A Lineup row's evidence columns: his opponent's rank against his position (of how many ranked),
- * his points a game and his last game's, and his projection's change since the read before. */
+ * his points a game and his last game's, and his projection's change since the read before; the
+ * Trades screen's last column, his rest-of-season points a game on our board (Lane 66g). */
 export interface RowEvidence {
 	oppRank: number | null;
 	oppOf: number | null;
 	avg: number | null;
 	last: number | null;
 	delta: number | null;
+	season: number | null;
 }
 
-const NO_EVIDENCE: RowEvidence = { oppRank: null, oppOf: null, avg: null, last: null, delta: null };
+const NO_EVIDENCE: RowEvidence = {
+	oppRank: null,
+	oppOf: null,
+	avg: null,
+	last: null,
+	delta: null,
+	season: null
+};
 
 /** A box's totals row: the starters' projection and points so far summed, and how many playing
  * starters have a figure when one lacks it. */
@@ -264,7 +295,8 @@ function evidenceOf(line: PlayerLine): RowEvidence {
 		oppOf: line.facts.allowed_to_position?.of ?? null,
 		avg: line.season_avg,
 		last: line.last_points,
-		delta: line.projection_delta
+		delta: line.projection_delta,
+		season: line.rest_of_season_per_game
 	};
 }
 

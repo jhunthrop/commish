@@ -14,13 +14,15 @@ from typing import Any, Final
 from sqlalchemy import Connection, text
 
 from research.capsules.store import WRITTEN_SOURCE, StoredCapsule, stored_capsules_for
+from research.capsules.week.store import served_week_reads
 from research.errors import ResearchError
 from research.model.reads.teams import first_kickoff_for
 from research.nightly.build import pages, season
-from research.nightly.build.player_season import season_context
+from research.nightly.build.player_season import SeasonContext, season_context
 from research.nightly.build.ros import MODEL_NAME as ROS_MODEL
-from research.nightly.build.ros import RosBasis, RosSetup, ros_boards
+from research.nightly.build.ros import RosBasis, RosResult, RosSetup, pending_weeks, ros_boards
 from research.nightly.config import PAGE_FORMAT, RUN_FORMATS, RunFormat
+from research.nightly.designations import read_statuses, status_word
 from research.nightly.reads import record as record_read
 from research.nightly.reads import schedule as schedule_read
 from research.nightly.reads.adp import AdpCapture, adp_cutoff, latest_capture
@@ -173,7 +175,9 @@ def assemble(conn: Connection, as_of: datetime, frozen_by: FrozenBy, ros: RosSet
     by_slug = {p.id: p for p in people}
     universe_ids = sorted({e.row.universe_id for b in boards for e in b.entries})
     capsules = stored_capsules_for(conn, universe_ids)
-    inputs = pages.page_inputs(boards, adp_by_format, capsules, context)
+    ids = sorted({(e.row.player_id, e.row.universe_id) for b in boards for e in b.entries})
+    served = _served_week(conn, as_of, context, rest, ids)
+    inputs = pages.page_inputs(boards, adp_by_format, capsules, context, served)
     players = [pages.player_json(who, inputs) for who in people]
     schedule, clubs, schedule_source, clubs_source = _schedule(conn, as_of)
     record, record_source = _record(conn, as_of, frozen_by)
@@ -215,6 +219,22 @@ def assemble(conn: Connection, as_of: datetime, frozen_by: FrozenBy, ros: RosSet
         NO_REST_INPUTS if rest is None else rest.status,
         frozenset() if rest is None else rest.in_season,
     )
+
+
+def _served_week(
+    conn: Connection, as_of: datetime, context: SeasonContext, rest: RosResult | None, ids: Sequence[tuple[str, str]]
+) -> pages.ServedWeek:
+    """The week reads the pages serve (Lane 72): the board week's (the run's rest-of-season window's first
+    week, else the first week with a game still to kick off, as the site's `board_week`), against each
+    player's status on the status read `designations.json` is written from (`designations.read_statuses`). `ids` is each page's (board id, universe id)."""
+    pending = pending_weeks(context.games, as_of)
+    week = rest.basis.from_week if rest is not None and rest.basis is not None else (pending[0] if pending else None)
+    if week is None:
+        return pages.ServedWeek({}, {}, as_of)
+    read = read_statuses(conn, as_of)
+    statuses = {board_id: status_word(read, board_id) for board_id, _ in ids}
+    reads = served_week_reads(conn, PRODUCT_SEASON, week, sorted({uid for _, uid in ids}))
+    return pages.ServedWeek(reads, statuses, as_of)
 
 
 def _rest_source(basis: RosBasis) -> Json:

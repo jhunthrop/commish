@@ -64,6 +64,8 @@ const row = (over: Partial<TradeRow> = {}): TradeRow => ({
 	my_gain: 2.1,
 	their_gain: -0.8,
 	close_for_them: true,
+	my_proj_change: 1.4,
+	their_proj_change: -2.2,
 	...over
 });
 
@@ -86,6 +88,10 @@ const check = (
 		yours_room: true,
 		theirs_room: true,
 		...fills
+	},
+	totals: {
+		yours: { proj_before: 98.4, proj_after: 99.8, season_before: 41.2, season_after: 43.3 },
+		theirs: { proj_before: 101.0, proj_after: 98.8, season_before: 38.0, season_after: 37.2 }
 	},
 	host_trades_url: 'https://sleeper.com/leagues/1/team',
 	host_note: null

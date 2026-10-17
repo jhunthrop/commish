@@ -443,7 +443,7 @@ class CapsuleStepError(Exception):
         self.spend = spend
 
 
-def _checked_price(http: httpx.Client, key: str, settings: WriterSettings) -> ModelPrice:
+def checked_price(http: httpx.Client, key: str, settings: WriterSettings) -> ModelPrice:
     """The model's price from the gateway's list; a list that was read and does not carry the model
     fails the step before any call (a typo in CAPSULE_MODEL would demote written reads board-wide).
     A list that could not be read does not block."""
@@ -465,7 +465,7 @@ def _write(  # noqa: PLR0913, PLR0917 - the step's parts
     settings = writer_settings(os.environ)
     log(f"capsules: {settings.line()}")
     with httpx.Client() as http:
-        price = _checked_price(http, key, settings)
+        price = checked_price(http, key, settings)
         if plan.regenerate_all:
             log(_regenerate_all(engine, now))
         gateway = GatewayClient.for_run(key, http, settings)

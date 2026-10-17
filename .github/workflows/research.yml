@@ -295,4 +295,7 @@ jobs:
           deploy nightly "research.nightly,run" "$nightly" 2 2Gi 8h
           deploy nightly-publish "research.nightly,publish" "$publish" 1 512Mi 10m
           deploy inseason "research.inseason,--task,season-week" "$db,ODDS_API_KEY=ODDS_API_KEY:latest,CLOUDFLARE_API_TOKEN=CLOUDFLARE_API_TOKEN:latest" 2 2Gi 1h
-          deploy inseason-capture "research.inseason,--task,capture-harvest" "$db,TANK01_API_KEY=TANK01_API_KEY:latest" 1 512Mi 10m
+          # The hourly capture rewrites the week-ahead reads its status capture moved (Lane 72): the writer's key,
+          # and the memory and time of the board's facts pass (about 200 MB, a minute) beside the capture.
+          capture="$db,TANK01_API_KEY=TANK01_API_KEY:latest,AI_GATEWAY_API_KEY=AI_GATEWAY_API_KEY:latest"
+          deploy inseason-capture "research.inseason,--task,capture-harvest" "$capture" 1 2Gi 20m

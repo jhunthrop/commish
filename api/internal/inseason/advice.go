@@ -537,7 +537,8 @@ func (a *advisor) Trades(focus string) (apitypes.TradeAdvice, bool) {
 	squad := a.squad(mine, true)
 	h := a.header()
 	out := apitypes.TradeAdvice{Week: h.week, BasisNote: BasisNote(a.settings, a.season.Carries), OrderBasis: h.basis, Refreshed: h.refreshed,
-		ReadAt: h.readAt, Teams: []apitypes.TradeTeam{}, Roster: rosterLines(mine)}
+		ReadAt: h.readAt, Teams: []apitypes.TradeTeam{}, Roster: rosterLines(mine), Moves: TradeMoves(a.Snap.Ref.Host),
+		ProjectionReadAt: a.projectionReadAt(), ProjectionScoring: projectionScoring(a.settings, a.preset), PlayerPoints: givesPlayerPoints(a.side(a.Me))}
 	out.HostTradesUrl, out.HostNote = a.host(TradesPage)
 	// Every roster the screen and its builder show, for the basis.
 	shown := [][]person{mine}
@@ -551,7 +552,7 @@ func (a *advisor) Trades(focus string) (apitypes.TradeAdvice, bool) {
 			Record: apitypes.TradeRecord{Wins: t.Wins, Losses: t.Losses, Ties: t.Ties}, Roster: rosterLines(theirs), Trades: []apitypes.TradeRow{}}
 		close := 0
 		for _, tr := range Trades(a.config, a.weeks, squad, a.squad(theirs, false), focus, TradesPerTeam) {
-			row.Trades = append(row.Trades, tradeRow(mine, theirs, tr))
+			row.Trades = append(row.Trades, a.tradeRow(mine, theirs, tr, a.tradeWeek(team, t, mine, theirs, tr)))
 			if tr.CloseForThem() {
 				close++
 			}

@@ -331,7 +331,11 @@ func TradeCheckBasis(b OrderBasis, weeks int) string {
 	return fmt.Sprintf("What each lineup gains or loses on %s. The other team decides. %s", numberWords(b), porWords(b, weeks))
 }
 
-// TradesBasis is the trade finder's (§6.3).
+// TradesBasis is the trade finder's (§6.3): which trades it lists, on the
+// board's own order, and the order it lists each team's in (orderTrades):
+// those the other team gains at least CloseCall a week from first, best
+// for you first, then the close calls for them.
 func TradesBasis(b OrderBasis, weeks int) string {
-	return fmt.Sprintf("Trades where both lineups gain on %s. The other team decides. %s", numberWords(b), porWords(b, weeks))
+	return fmt.Sprintf("Trades where both lineups gain on %s. Each team's best trade, yours first, among those they gain at least %.1f a week from, "+
+		"then the close calls for them. The other team decides. %s", numberWords(b), CloseCall, porWords(b, weeks))
 }

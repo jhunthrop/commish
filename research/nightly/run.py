@@ -41,10 +41,12 @@ from research.nightly.run_parts import (
 )
 from research.nightly.run_store import LocalRunStore, RunStore
 from research.nightly.schema_gate import contract_dir, schema_gate
+from research.nightly.week_reads import ADVISORY
+from research.nightly.week_reads import STEP as WEEK_READS
 from research.pipeline.http import Fetcher
 from research.season import PRODUCT_SEASON
 
-STEPS = ("ingest", "fit", "capsules", "headshots")
+STEPS = ("ingest", "fit", "capsules", WEEK_READS, "headshots")
 Json = dict[str, Any]
 
 
@@ -205,7 +207,10 @@ def _finish(  # noqa: PLR0913, PLR0917 - the run's parts, handed on from `run_ni
     judged.gates.append(schema_gate(root, run_id, contract_dir(dict(deps.environ))))
     for gate in judged.gates:
         deps.log(f"gate {gate.gate}: {'passed' if gate.passed else 'FAILED'}, {gate.summary}")
-    passed = all(g.passed for g in judged.gates) and all(s.record.status != "failed" for s in steps)
+    # An advisory step's failure is in the report and never holds the board back (`week_reads.ADVISORY`).
+    passed = all(g.passed for g in judged.gates) and all(
+        s.record.status != "failed" for s in steps if s.record.name not in ADVISORY
+    )
     manifest = manifest_of(run_id, finished, assembled, "passed" if passed else "failed", deps.store, frozen_by)
     report: Json = {
         "runId": run_id,
@@ -251,7 +256,7 @@ def _promote(  # noqa: PLR0913, PLR0917 - the verdict and what it moves
         line += f"; early access now, public at {js_iso(promote_early(deps.store, run_id, finished))}"
     else:
         failed = [g.gate for g in judged.gates if not g.passed] + [
-            s.record.name for s in steps if s.record.status == "failed"
+            s.record.name for s in steps if s.record.status == "failed" and s.record.name not in ADVISORY
         ]
         line += f"; failed: {', '.join(failed)}"
     deps.log(line)
