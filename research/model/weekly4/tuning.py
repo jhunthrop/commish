@@ -153,3 +153,64 @@ def squared_error_sum(y: np.ndarray, predicted: np.ndarray, weight: np.ndarray) 
 def log_loss_sum(y: np.ndarray, p: np.ndarray) -> float:
     q = np.clip(p, _EPS, 1.0 - _EPS)
     return float(-np.sum(y * np.log(q) + (1.0 - y) * np.log(1.0 - q)))
+
+
+@dataclass(frozen=True, slots=True)
+class Constant:
+    """A classifier whose training target took one value (no booster can fit it)."""
+
+    value: float
+
+
+Fitted = Booster | Constant
+
+
+def predict(model: Fitted, loss: Loss, x: np.ndarray) -> np.ndarray:
+    """The model's mean: a probability for a classifier, the expectation for a regressor."""
+    if isinstance(model, Constant):
+        return np.full(len(x), model.value)
+    if loss == "log_loss":
+        return probability(model, x)
+    return model.predict(x)
+
+
+def model_loss(loss: Loss, y: np.ndarray, predicted: np.ndarray, weight: np.ndarray | None = None) -> float:
+    """The summed validation loss in the model's own loss (2.6)."""
+    if loss == "log_loss":
+        return log_loss_sum(y, predicted)
+    if loss == "poisson":
+        return poisson_deviance_sum(y, predicted)
+    return squared_error_sum(y, predicted, np.ones(len(y)) if weight is None else weight)
+
+
+@dataclass(frozen=True, slots=True)
+class Seasoned:
+    """One model's rows by season: its matrix, its target, its loss and constraints, and the weight
+    its loss and fit carry (the share models': the club's volume of the kind)."""
+
+    x: np.ndarray
+    y: np.ndarray
+    seasons: np.ndarray
+    loss: Loss
+    categorical: tuple[bool, ...] | None = None
+    monotone: tuple[int, ...] | None = None
+    weight: np.ndarray | None = None
+
+    def fit_on(self, cell: Cell, rows: np.ndarray) -> Fitted:
+        y = self.y[rows]
+        if self.loss == "log_loss" and len(np.unique(y)) < 2:  # noqa: PLR2004 - a classifier needs two classes
+            return Constant(float(y[0]) if len(y) else 0.0)
+        weight = None if self.weight is None else self.weight[rows]
+        model = booster(cell, self.loss, self.monotone, self.categorical)
+        return model.fit(self.x[rows], y, sample_weight=weight)
+
+    def fit_before(self, cell: Cell, season: int) -> Fitted:
+        """Fitted on every season before `season`."""
+        return self.fit_on(cell, self.seasons < season)
+
+    def fold_loss(self, cell: Cell, season: int) -> float:
+        """Trained on the seasons before `season`, its summed loss on `season`."""
+        model = self.fit_before(cell, season)
+        test = self.seasons == season
+        weight = None if self.weight is None else self.weight[test]
+        return model_loss(self.loss, self.y[test], predict(model, self.loss, self.x[test]), weight)
