@@ -3160,6 +3160,9 @@ type ReportPick struct {
 	// AdpGap ADP less the pick
 	AdpGap *float64 `json:"adp_gap"`
 
+	// BoardRank his place on our board, the pool's order by points over replacement; null for a player with none (a kicker or a defense)
+	BoardRank *int `json:"board_rank"`
+
 	// Chip kept is a keeper at his seat and round, with no ADP gap and no hindsight
 	Chip      ReportPickChip `json:"chip"`
 	CouldWait bool           `json:"could_wait"`

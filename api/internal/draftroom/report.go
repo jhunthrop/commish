@@ -64,8 +64,9 @@ func Report(ctx context.Context, in ReportInput) (apitypes.MockReport, error) {
 			ValueCaptured: tenth.Round(g.ValueCaptured),
 		}
 	}
+	ranks := boardRanks(b)
 	for i, p := range r.Picks {
-		out.Picks[i] = pickView(p, b)
+		out.Picks[i] = pickView(p, b, ranks)
 		named[p.PlayerID] = true
 	}
 	out.Starters = starters(final, in.Draft.HumanTeamID, b.Points())
@@ -86,7 +87,7 @@ func Report(ctx context.Context, in ReportInput) (apitypes.MockReport, error) {
 	return out, nil
 }
 
-func pickView(p mock.PickReview, b boards.Board) apitypes.ReportPick {
+func pickView(p mock.PickReview, b boards.Board, ranks map[string]int) apitypes.ReportPick {
 	v := apitypes.ReportPick{
 		Pick: p.PickNumber, Round: p.Round, PlayerId: p.PlayerID, AdpGap: tenthp(p.ADPGap), Chip: apitypes.ReportPickChip(p.Chip),
 		StillThere: chancep(p.StillThere), CouldWait: p.CouldWait, OddsSource: p.OddsSource,
@@ -99,7 +100,29 @@ func pickView(p mock.PickReview, b boards.Board) apitypes.ReportPick {
 		r := tenth.Round(value)
 		v.OverReplacement = &r
 	}
+	if rank, ok := ranks[p.PlayerID]; ok {
+		v.BoardRank = &rank
+	}
 	return v
+}
+
+// boardRanks is each valued player's place on our board: the pool's
+// order by points over replacement, most first, ties in pool (ADP) order,
+// as the room ranks it. A player with no value (a kicker or a defense)
+// has no place.
+func boardRanks(b boards.Board) map[string]int {
+	valued := make([]string, 0, len(b.Values))
+	for _, p := range b.Raw.Players {
+		if _, ok := b.Values[p.ID]; ok {
+			valued = append(valued, p.ID)
+		}
+	}
+	sort.SliceStable(valued, func(i, j int) bool { return b.Values[valued[i]] > b.Values[valued[j]] })
+	ranks := make(map[string]int, len(valued))
+	for i, id := range valued {
+		ranks[id] = i + 1
+	}
+	return ranks
 }
 
 // starters is the drafter's best lineup by points, slot by slot in the

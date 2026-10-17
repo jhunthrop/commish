@@ -2317,6 +2317,8 @@ export interface components {
 			player_id: string;
 			/** Format: double */
 			over_replacement: number | null;
+			/** @description his place on our board, the pool's order by points over replacement; null for a player with none (a kicker or a defense) */
+			board_rank: number | null;
 			/**
 			 * Format: double
 			 * @description ADP less the pick

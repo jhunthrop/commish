@@ -2797,12 +2797,16 @@ components:
         value_captured: { type: number, format: double }
     ReportPick:
       type: object
-      required: [pick, round, player_id, over_replacement, adp_gap, chip, still_there, could_wait, odds_source, made_by]
+      required: [pick, round, player_id, over_replacement, board_rank, adp_gap, chip, still_there, could_wait, odds_source, made_by]
       properties:
         pick: { type: integer }
         round: { type: integer }
         player_id: { type: string }
         over_replacement: { type: number, format: double, nullable: true }
+        board_rank:
+          type: integer
+          nullable: true
+          description: his place on our board, the pool's order by points over replacement; null for a player with none (a kicker or a defense)
         adp_gap: { type: number, format: double, nullable: true, description: ADP less the pick, positive before drafters take him }
         chip:
           type: string

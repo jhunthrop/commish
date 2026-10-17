@@ -138,3 +138,51 @@ func TestTheReportIsInTenths(t *testing.T) {
 		}
 	}
 }
+
+// Each pick names his place on our board, the pool's order by points over
+// replacement (Lane 66o), so the report's Picks later against our board is
+// that place less the pick. A kicker or a defense has none.
+func TestEachPickNamesItsPlaceOnOurBoard(t *testing.T) {
+	s := reportSettings(t)
+	const seed = 20261017
+	d, err := mock.Run(s, seed, nil, mock.Options{AutopickThroughRound: 15})
+	if err != nil {
+		t.Fatal(err)
+	}
+	slots, err := mock.SlotConfig(s.League)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := boards.For(rawFor(s.Pool), 12, slots)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, err := Report(context.Background(), ReportInput{Settings: s, Seed: seed, Draft: d, Board: b, Runs: 4, Workers: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Ahead of him: every player with more over replacement, and every one
+	// with the same who comes first in the pool (ADP) order.
+	place := map[string]int{}
+	for i, p := range b.Raw.Players {
+		place[p.ID] = i
+	}
+	above := func(id string) int {
+		n := 0
+		for other, v := range b.Values {
+			if other != id && (v > b.Values[id] || v == b.Values[id] && place[other] < place[id]) {
+				n++
+			}
+		}
+		return n
+	}
+	for _, p := range out.Picks {
+		_, valued := b.Values[p.PlayerId]
+		switch {
+		case !valued && p.BoardRank != nil:
+			t.Fatalf("pick %d: %s has no value but place %d", p.Pick, p.PlayerId, *p.BoardRank)
+		case valued && (p.BoardRank == nil || *p.BoardRank != above(p.PlayerId)+1):
+			t.Fatalf("pick %d: %s place %v, want %d", p.Pick, p.PlayerId, p.BoardRank, above(p.PlayerId)+1)
+		}
+	}
+}
