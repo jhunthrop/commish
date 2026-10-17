@@ -510,7 +510,7 @@ func (a *advisor) Waivers(position draft.Position) (apitypes.WaiverAdvice, bool)
 		if len(out.Rows) == MaxWaiverRows {
 			break
 		}
-		out.Rows = append(out.Rows, a.waiverRow(w, week, mine, pool[move.Add], move, clears))
+		out.Rows = append(out.Rows, waiverRow(w, week, mine, pool[move.Add], move, clears))
 	}
 	// The strip is chosen from every add we rank, before the rows' cut.
 	var proj float64
@@ -526,7 +526,7 @@ func (a *advisor) Waivers(position draft.Position) (apitypes.WaiverAdvice, bool)
 // drop, this week's on the Lineup screen's rule, whom he beats (or the
 // open spot he fills), every drop he could take with its gains, and the
 // day a claim on him clears.
-func (a *advisor) waiverRow(w *Writer, week *pickupWeek, mine []person, add person, move Waiver, clears map[string]openapi_types.Date) apitypes.WaiverRow {
+func waiverRow(w *Writer, week *pickupWeek, mine []person, add person, move Waiver, clears map[string]openapi_types.Date) apitypes.WaiverRow {
 	row := apitypes.WaiverRow{Add: add.line, Gain: roundTenth(move.Gain), Beats: week.beats(add.cand, mine), Drops: []apitypes.WaiverDrop{}}
 	if !move.NoDrop {
 		var open bool

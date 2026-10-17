@@ -50,10 +50,14 @@ type pickupWeek struct {
 	roster       []Candidate
 	hostStarters []string
 	base         weekLineup
+	// open is the roster spots free: a card with no drop takes one
+	// (rereview N1).
+	open int
 }
 
 func newPickupWeek(config []draft.SlotConfig, roster []Candidate, hostStarters []string) *pickupWeek {
-	return &pickupWeek{config: config, roster: roster, hostStarters: hostStarters, base: weekOf(config, roster, hostStarters)}
+	return &pickupWeek{config: config, roster: roster, hostStarters: hostStarters, base: weekOf(config, roster, hostStarters),
+		open: max(rosterSpots(config)-len(roster), 0)}
 }
 
 // swapped is roster less the player with the id drop ("" for none), with
@@ -153,11 +157,13 @@ func (w *pickupWeek) set(cands []setCandidate) pickupSet {
 	out := pickupSet{proj: w.base.proj}
 	roster := append([]Candidate(nil), w.roster...)
 	used := map[string]bool{}
+	open := w.open
 	for i, c := range cands {
 		if len(out.chosen) == MaxPickups {
 			break
 		}
-		if anyUsed(used, c.keys) {
+		// A card with no drop needs an open spot; once they are taken, it goes.
+		if anyUsed(used, c.keys) || (c.drop < 0 && open == 0) {
 			continue
 		}
 		drop := ""
@@ -177,6 +183,9 @@ func (w *pickupWeek) set(cands []setCandidate) pickupSet {
 			used[k] = true
 		}
 		roster, out.proj = after, lineup.proj
+		if c.drop < 0 {
+			open--
+		}
 		out.chosen = append(out.chosen, i)
 		out.gains = append(out.gains, gain)
 	}
@@ -235,13 +244,74 @@ func (a *advisor) strip(w *Writer, week *pickupWeek, mine, pool []person, moves 
 		set[i] = setCandidate{add: add, drop: c.move.Drop, keys: keys}
 	}
 	chosen := week.set(set)
-	out := make([]apitypes.WaiverRow, 0, len(chosen.chosen))
+	moves = make([]Waiver, len(chosen.chosen))
 	for k, i := range chosen.chosen {
-		row := a.waiverRow(w, week, mine, pool[cands[i].move.Add], cands[i].move, clears)
-		row.WeekGain, row.Pickup = chosen.gains[k], true
-		out = append(out, row)
+		moves[k] = cands[i].move
 	}
-	return out, chosen.proj
+	return cardRows(w, a.config, week.hostStarters, mine, pool, moves, clears), chosen.proj
+}
+
+// cardRows is the strip's cards as rows, each measured against the lineup
+// with the cards before it made (rereview N2): its week gain, whom he
+// beats, its drops (a player an earlier card dropped is gone) and its
+// sentence all on that base.
+func cardRows(w *Writer, config []draft.SlotConfig, hostStarters []string, mine, pool []person, moves []Waiver, clears map[string]openapi_types.Date) []apitypes.WaiverRow {
+	out := make([]apitypes.WaiverRow, 0, len(moves))
+	cum := mine
+	for _, m := range moves {
+		week := newPickupWeek(config, candidates(cum), hostStarters)
+		move := remap(m, mine, cum)
+		row := waiverRow(w, week, cum, pool[m.Add], move, clears)
+		row.Pickup = true
+		out = append(out, row)
+		cum = afterCard(cum, move.Drop, pool[m.Add])
+	}
+	return out
+}
+
+// candidates is the people as the engine reads them.
+func candidates(people []person) []Candidate {
+	out := make([]Candidate, len(people))
+	for i, p := range people {
+		out[i] = p.cand
+	}
+	return out
+}
+
+// remap is the move's drops as indexes into to, from indexes into from, by
+// player; a drop no longer on to is left out (-1 for the move's own).
+func remap(m Waiver, from, to []person) Waiver {
+	at := func(i int) int {
+		if i < 0 {
+			return -1
+		}
+		for j, p := range to {
+			if p.cand.ID == from[i].cand.ID {
+				return j
+			}
+		}
+		return -1
+	}
+	out := m
+	out.Drop = at(m.Drop)
+	out.Drops = nil
+	for _, d := range m.Drops {
+		if j := at(d.At); j >= 0 {
+			out.Drops = append(out.Drops, Drop{At: j, Gain: d.Gain})
+		}
+	}
+	return out
+}
+
+// afterCard is the roster once a card is made: the drop out, the add in.
+func afterCard(roster []person, drop int, add person) []person {
+	out := make([]person, 0, len(roster)+1)
+	for i, p := range roster {
+		if i != drop {
+			out = append(out, p)
+		}
+	}
+	return append(out, add)
 }
 
 // clearsOf is the day a claim on each pool player clears, by board id,
