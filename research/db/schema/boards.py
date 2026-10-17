@@ -194,3 +194,31 @@ REGISTER_WEEKLY_ROWS: Final = Table(
     _player_fk("register_weekly_rows", "RESTRICT"),
     Index("register_weekly_rows_week_idx", "season", "week"),
 )
+
+
+# The week-ahead reads (revision 0012, Lane 72): one per player and week, the writer's three to five
+# sentences about his next game or its facts block, stamped with the write and every fact's own stamp.
+WEEK_READ_SOURCES: Final = ("llm", "facts")
+WEEK_READ_REASONS: Final = ("first", "unwritten", "status", "projection", "demoted")
+PLAYER_WEEK_READS: Final = Table(
+    "player_week_reads",
+    METADATA,
+    Column("player_id", Text, primary_key=True),
+    Column("season", Integer, primary_key=True),
+    Column("week", Integer, primary_key=True),
+    Column("source", Text, nullable=False),
+    Column("body", Text, nullable=False),
+    Column("model", Text),
+    Column("written_at", DateTime(True), nullable=False),
+    Column("facts_at", DateTime(True)),
+    Column("stamps", JSONB, nullable=False),
+    Column("projection_points", Double(53)),
+    Column("status", Text),
+    Column("reason", Text, nullable=False),
+    recorded_at("recorded_at"),
+    one_of("source", WEEK_READ_SOURCES, "player_week_reads_source_ck"),
+    one_of("reason", WEEK_READ_REASONS, "player_week_reads_reason_ck"),
+    CheckConstraint("week BETWEEN 1 AND 18", name="player_week_reads_week_ck"),
+    CheckConstraint("facts_at IS NULL OR facts_at <= written_at", name="player_week_reads_facts_before_write_ck"),
+    _player_fk("player_week_reads"),
+)
