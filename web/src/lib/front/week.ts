@@ -34,7 +34,7 @@ export type ScreenHref = (screen: FrontScreen, id: string) => string;
 /** Every word the band prints that is not a team's, a league's or a player's, for the copy guard. */
 export const FRONT = {
 	yourRoster: 'Your roster',
-	rosterAside: 'Three facts this week. Each opens the screen that acts on it.',
+	rosterAside: 'Each opens the screen that acts on it.',
 	otherLeagues: 'Your other leagues',
 	otherAside: 'This week. Each opens its league.',
 	setYourLineup: 'Set your lineup',
@@ -86,9 +86,39 @@ export interface FrontLeague {
 	chips: FrontChip[];
 	/** The phase in a word for a league with no week ("Season over"), null with a week. */
 	phase: string | null;
+	/** Why its week is missing, with its last read when it has one: "We could not read this league
+	 * just now. Last read Sat 3:05 pm." Null when nothing is. */
 	problem: string | null;
+	/** The other leagues' bug foot: "Three changes, +26.9" or "Your lineup is set". */
+	changes: string | null;
 	matchupHref: string;
 	leagueHref: string;
+}
+
+const FACT_COUNTS = ['No facts', 'One fact', 'Two facts', 'Three facts'] as const;
+
+/** The roster head's aside, counting the chips: "Two facts this week. Each opens the screen that
+ * acts on it." */
+export function rosterAside(chips: number): string {
+	return `${FACT_COUNTS[chips] ?? `${String(chips)} facts`} this week. ${FRONT.rosterAside}`;
+}
+
+/** A league's missing week in words, with its last read where it has one. */
+function problemWords(league: WeekLeague, zone: string): string | null {
+	if (league.problem === null) return null;
+	return league.read_at === null
+		? league.problem
+		: `${league.problem} Last read ${weekdayTime(league.read_at, zone)}.`;
+}
+
+/** An other league's bug foot: its changes and what they add, from the API's summary. */
+function changesWords(league: WeekLeague): string | null {
+	const lineup = league.lineup;
+	if (lineup === null) return null;
+	const title = changesTitle(lineup.changes);
+	return lineup.changes > 0 && lineup.gain !== null && lineup.gain > 0
+		? `${title}, +${fixed(lineup.gain, 1)}`
+		: title;
 }
 
 /** The member's record and place: "1-4, 12th of 12". */
@@ -213,7 +243,8 @@ export function frontLeague(
 			league.week === 0 && league.problem === null
 				? phaseWord({ phase: league.phase, draft_at: null }, now, zone)
 				: null,
-		problem: league.problem,
+		problem: problemWords(league, zone),
+		changes: changesWords(league),
 		matchupHref: href('matchup', league.id),
 		leagueHref: href('league', league.id)
 	};
@@ -236,10 +267,14 @@ export function readWords(league: WeekLeague, now: Date): string | null {
 
 /** The band's basis, said once for the league it leads with: whose record and points, what Proj is
  * and when it was read, and what the strip's and a pickup's figures are. */
-export function weekBasis(league: WeekLeague, zone: string = memberZone()): string[] {
+export function weekBasis(
+	league: WeekLeague,
+	others: boolean,
+	zone: string = memberZone()
+): string[] {
 	const platform = hostWords(league.host);
 	const lines = [
-		`Record, place and ${BOX.pts} are ${platform}'s. A team's ${BOX.proj} adds its starters as set on ${platform}. Your other leagues read the same way, each from its own platform.`
+		`Record, place and ${BOX.pts} are ${platform}'s. A team's ${BOX.proj} adds its starters as set on ${platform}.${others ? ' Your other leagues read the same way, each from its own platform.' : ''}`
 	];
 	const scoring = league.projection_scoring;
 	if (scoring !== null) {

@@ -9,6 +9,7 @@ import {
 	frontLeague,
 	leadOf,
 	nudgeOf,
+	rosterAside,
 	readWords,
 	weekBasis,
 	type ScreenHref,
@@ -108,14 +109,7 @@ const LINEUP: Schemas['WeekLineup'] = {
 		{ slot: 'QB', in: player('Jaxson Dart', 'QB'), out: player('Aaron Rodgers', 'QB') },
 		{ slot: 'FLEX', in: player('Travis Etienne', 'RB'), out: player("Ja'Marr Chase", 'WR') },
 		{ slot: 'DEF', in: player('Houston Texans', 'DEF'), out: null }
-	],
-	moves: {
-		lineup: 'unavailable',
-		note: null,
-		takes_writes: false,
-		writes_on: false,
-		reason: 'Sleeper does not take lineups from here, so copy the lineup there.'
-	}
+	]
 };
 
 const SUCK: WeekLeague = {
@@ -147,14 +141,7 @@ const SUCK: WeekLeague = {
 			{ slot: 'QB', in: player('Jaxson Dart', 'QB'), out: player('Aaron Rodgers', 'QB') },
 			{ slot: 'FLEX', in: player('Travis Etienne', 'RB'), out: player("Ja'Marr Chase", 'WR') },
 			{ slot: 'DEF', in: player('Houston Texans', 'DEF'), out: null }
-		],
-		moves: {
-			lineup: 'unavailable',
-			note: null,
-			takes_writes: false,
-			writes_on: false,
-			reason: 'Sleeper does not take lineups from here, so copy the lineup there.'
-		}
+		]
 	},
 	chips: [
 		{
@@ -287,7 +274,15 @@ void test('a league with no week names its phase, one whose read failed keeps it
 		NOW,
 		ZONE
 	);
-	assert.equal(failed.problem, 'ESPN is not answering right now.');
+	assert.equal(failed.problem, 'ESPN is not answering right now. Last read Sat 10:08 am.');
+	assert.equal(failed.changes, null);
+	const unread = frontLeague(
+		{ ...SUCK, read_at: null, lineup: null, problem: 'We could not read this league just now.' },
+		href,
+		NOW,
+		ZONE
+	);
+	assert.equal(unread.problem, 'We could not read this league just now.');
 	assert.equal(failed.phase, null);
 	assert.equal(failed.line, 'McConkey Kong Country, 1-4, 12th of 12');
 });
@@ -295,21 +290,35 @@ void test('a league with no week names its phase, one whose read failed keeps it
 void test('the basis says whose figures, what Proj is and when it was read, once', () => {
 	assert.equal(readWords(SUCK, NOW), 'Read from Sleeper 4 minutes ago.');
 	assert.equal(readWords({ ...SUCK, read_at: null }, NOW), null);
-	const basis = weekBasis(SUCK, ZONE);
+	const basis = weekBasis(SUCK, true, ZONE);
 	assert.equal(basis.length, 2);
 	assert.match(basis[0] ?? '', /^Record, place and Pts are Sleeper's\. /);
+	assert.match(basis[0] ?? '', /Your other leagues read the same way/);
+	assert.doesNotMatch(weekBasis(SUCK, false, ZONE)[0] ?? '', /other leagues/);
 	assert.match(
 		basis[1] ?? '',
 		/PPR scoring, the closest to this league's rules, read Fri 9:00 pm Central\./
 	);
-	assert.equal(weekBasis({ ...SUCK, projection_scoring: null }, ZONE).length, 1);
+	assert.equal(weekBasis({ ...SUCK, projection_scoring: null }, true, ZONE).length, 1);
+});
+
+void test('the roster head counts its chips, and each other league carries its changes', () => {
+	assert.equal(rosterAside(3), 'Three facts this week. Each opens the screen that acts on it.');
+	assert.equal(rosterAside(1), 'One fact this week. Each opens the screen that acts on it.');
+	assert.equal(frontLeague(SUCK, href, NOW, ZONE).changes, 'Three changes, +26.9');
+	assert.equal(
+		frontLeague({ ...SUCK, lineup: { ...LINEUP, changes: 0, swaps: [], gain: 0 } }, href, NOW, ZONE)
+			.changes,
+		'Your lineup is set'
+	);
 });
 
 void test('the copy guard: no em-dash, semicolon, platform word or betting word in any line', () => {
 	const view = frontLeague(SUCK, href, NOW, ZONE);
 	const said = [
 		...Object.values(FRONT),
-		...weekBasis(SUCK, ZONE),
+		...weekBasis(SUCK, true, ZONE),
+		rosterAside(2),
 		...view.chips.flatMap((c) => [c.label, c.line]),
 		view.first?.words ?? '',
 		view.nudge?.asSet ?? ''

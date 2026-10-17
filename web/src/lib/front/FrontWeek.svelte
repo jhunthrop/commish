@@ -6,6 +6,7 @@
 	import Verb from '#lib/ui/Verb.svelte';
 	import BugCard from '#lib/league/box/BugCard.svelte';
 	import MoveMark from '#lib/league/box/MoveMark.svelte';
+	import PinnedVerb from '#lib/league/box/PinnedVerb.svelte';
 	import type { BoxRow } from '#lib/league/box/box.ts';
 	import { tabHref } from '#lib/league/inseason/tabs.ts';
 	import { weekApi } from './api.ts';
@@ -14,6 +15,7 @@
 		frontLeague,
 		leadOf,
 		readWords,
+		rosterAside,
 		weekBasis,
 		type FrontLeague,
 		type MemberWeek,
@@ -55,7 +57,7 @@
 			: []
 	);
 	const read_ = $derived(lead ? readWords(lead, now) : null);
-	const basis = $derived(lead && view?.bug ? weekBasis(lead) : []);
+	const basis = $derived(lead && view?.bug ? weekBasis(lead, others.length > 0) : []);
 </script>
 
 {#snippet face(row: BoxRow, size: number)}
@@ -136,7 +138,7 @@
 					<div class="n-act">
 						<span class="as-set">{view.nudge.asSet}</span>
 						{#if view.nudge.solid}
-							<Verb href={view.nudge.href}>{view.nudge.verb}</Verb>
+							<PinnedVerb><Verb href={view.nudge.href}>{view.nudge.verb}</Verb></PinnedVerb>
 						{:else}
 							<Quiet href={view.nudge.href} size="sm">{view.nudge.verb}</Quiet>
 						{/if}
@@ -151,7 +153,7 @@
 			<section aria-label={FRONT.yourRoster}>
 				<div class="sec-h">
 					<h3>{FRONT.yourRoster}</h3>
-					<span>{FRONT.rosterAside}</span>
+					<span>{rosterAside(view.chips.length)}</span>
 				</div>
 				<ul class="chips">
 					{#each view.chips as chip (chip.key)}
@@ -179,7 +181,9 @@
 					{#each others as l (l.id)}
 						<li>
 							{#if l.bug}
-								<BugCard bug={l.bug} href={l.leagueHref} label="{l.name}, {l.platform}" />
+								<BugCard bug={l.bug} href={l.leagueHref} label="{l.name}, {l.platform}">
+									{#snippet foot()}<span class="changes">{l.changes ?? ''}</span>{/snippet}
+								</BugCard>
 							{:else}
 								<div class="lgs">{@render quietLeague(l)}</div>
 							{/if}
@@ -494,6 +498,11 @@
 		white-space: nowrap;
 	}
 
+	.changes {
+		color: var(--scoreboard-ink);
+		font-weight: 600;
+	}
+
 	.said {
 		font-size: var(--t-xs);
 		color: var(--ink-2);
@@ -534,23 +543,6 @@
 
 		.nudge {
 			padding: var(--s-3);
-		}
-
-		.n-act {
-			position: fixed;
-			left: var(--s-3);
-			right: var(--s-3);
-			bottom: calc(var(--tab-bar-h) + var(--s-2));
-			z-index: 6;
-			padding: var(--s-2);
-			border-radius: var(--r-md);
-			background: var(--surface);
-			border: 1px solid var(--line-strong);
-			box-shadow: var(--shadow-pop);
-		}
-
-		.n-act :global(a) {
-			flex: 1;
 		}
 
 		.as-set {
