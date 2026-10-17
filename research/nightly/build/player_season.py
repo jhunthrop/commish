@@ -223,7 +223,9 @@ class SeasonContext:
     prior: Mapping[int, SeasonStore]
 
 
-def season_context(conn: Connection, season: int, player_ids: Sequence[str], as_of: datetime) -> SeasonContext:
+def season_context(
+    conn: Connection, season: int, player_ids: Sequence[str], as_of: datetime, *, prior: bool = False
+) -> SeasonContext:
     """The season so far for these players at `as_of`: the slate, the byes, the records' reach, the
     store's lines. The page and the capsule writer read it alike, so a capsule is told the season the
     page prints."""
@@ -231,8 +233,13 @@ def season_context(conn: Connection, season: int, player_ids: Sequence[str], as_
     weeks = max(game.week for slate in games.values() for game in slate)
     store = read_season_store(conn, season, player_ids, as_of)
     byes = {club.abbr: club.bye for club in schedule_read.clubs_of(games)}
-    prior = {year: read_season_store(conn, year, player_ids, as_of) for year in range(season - PRIOR_SEASONS, season)}
-    return SeasonContext(season, weeks, through_of(games, weeks, store), games, byes, store, prior)
+    # The seasons before are the page's alone (Lane 66h): the writers' passes never read them (rereview N5).
+    before = (
+        {year: read_season_store(conn, year, player_ids, as_of) for year in range(season - PRIOR_SEASONS, season)}
+        if prior
+        else {}
+    )
+    return SeasonContext(season, weeks, through_of(games, weeks, store), games, byes, store, before)
 
 
 def season_block(player_id: str, team: str, run_format: RunFormat, position: Position, context: SeasonContext) -> Json:
