@@ -774,7 +774,7 @@ function trades(): TradeAdvice {
 		}));
 	return {
 		...head(
-			`Trades where both lineups gain over the rest of the season, best for you first. The other team decides. ${basisTail}`
+			`Trades where both lineups gain on our rest-of-season order. Each team's come best for you first among those they gain at least 0.5 a week from, then the close calls for them. The other team decides. ${basisTail}`
 		),
 		check_basis: `What each lineup gains or loses on our rest-of-season order. The other team decides. ${basisTail}`,
 		teams,

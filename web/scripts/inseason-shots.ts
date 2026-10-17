@@ -190,7 +190,9 @@ const TRADES_FOLD_AT = 900;
 /** A gain or a week's change as its cell prints it. */
 const SIGNED = /^([+−]\d+\.\d|0\.0|--)$/;
 const TRADE_BASIS_FIRST =
-	'Trades where both lineups gain over the rest of the season, best for you first. The other team decides.';
+	"Trades where both lineups gain on our rest-of-season order. Each team's come best for you first among those they gain at least 0.5 a week from, then the close calls for them. The other team decides.";
+/** A trade's week in one line, from the API's two changes (review H2). */
+const WEEK_LINE = /[+−]?\d+\.\d Proj for you this week, [+−]?\d+\.\d for them/;
 const TRADE_BASIS_MOST = 5;
 
 /** What the Trades table draws wrong at a width: its heads, its cells, its strip and its basis. */
@@ -212,7 +214,13 @@ async function tradeFaults(page: Page, width: number): Promise<string[]> {
 				.map((td) => (td as HTMLElement).innerText.trim()),
 			rows: table?.querySelectorAll(':scope > tbody > tr.trade').length ?? 0,
 			basis: [...document.querySelectorAll('main .basis p')].map((p) => p.textContent.trim()),
-			cards: [...document.querySelectorAll('main .card')].map((c) => (c as HTMLElement).innerText)
+			cards: [...document.querySelectorAll('main .card')].map((c) => (c as HTMLElement).innerText),
+			// The member's drop as each row says it where it is drawn (review M3).
+			drops: [...(table?.querySelectorAll(':scope > tbody > tr.trade') ?? [])].filter((tr) =>
+				[...tr.querySelectorAll<HTMLElement>('td.room span, .drop-mid, .ph-with')].some(
+					(el) => el.offsetParent !== null && /you drop /i.test(el.innerText)
+				)
+			).length
 		};
 	});
 	const faults: string[] = [];
@@ -230,9 +238,14 @@ async function tradeFaults(page: Page, width: number): Promise<string[]> {
 	if (seen.cards.length === 0 || seen.cards.length > 2)
 		faults.push(`${String(seen.cards.length)} cards`);
 	for (const card of seen.cards) {
-		if (!card.includes(TRADE_VERB) || !/[+−]\d+\.\d a week for you/.test(card))
+		if (
+			!card.includes(TRADE_VERB) ||
+			!/[+−]\d+\.\d a week for you/.test(card) ||
+			!WEEK_LINE.test(card)
+		)
 			faults.push(`card ${card.replace(/\s+/g, ' ')}`);
 	}
+	if (seen.drops === 0) faults.push('no row says the drop');
 	if (seen.basis.length > TRADE_BASIS_MOST)
 		faults.push(`basis in ${String(seen.basis.length)} lines`);
 	if (!(seen.basis[0] ?? '').startsWith(TRADE_BASIS_FIRST))
@@ -403,7 +416,9 @@ const OPENED_HEADS = [
 	'Last',
 	'Rest of season'
 ];
-const OPENED_HEADS_PHONE = ['Give', 'Player', 'Proj', 'Pts', 'Rest of season'];
+const OPENED_HEADS_PHONE = ['Give', 'Player', 'Proj', 'Rest of season'];
+/** A name on a phone keeps to one line, and the game under it to one (review H2). */
+const ONE_LINE_PX = 24;
 for (const theme of THEMES) {
 	for (const width of SHOT_WIDTHS) {
 		const ctx = await context(theme, width);
@@ -418,6 +433,13 @@ for (const theme of THEMES) {
 				.map((th) => (th as HTMLElement).innerText.trim()),
 			sides: [...document.querySelectorAll('table.inner tbody td.slot')].map((td) =>
 				(td as HTMLElement).innerText.trim()
+			),
+			week: document.querySelector<HTMLElement>('main .week-line')?.innerText.trim() ?? '',
+			tallest: Math.max(
+				0,
+				...[...document.querySelectorAll('table.inner .nm, table.inner .phone-game .opp')].map(
+					(el) => el.getBoundingClientRect().height
+				)
 			)
 		}));
 		const want = width <= PHONE.width ? OPENED_HEADS_PHONE : OPENED_HEADS;
@@ -425,10 +447,26 @@ for (const theme of THEMES) {
 			missing.push(`trades opened ${theme} ${String(width)} heads ${opened.heads.join('|')}`);
 		if (!opened.sides.includes('Give') || !opened.sides.includes('Get'))
 			missing.push(`trades opened ${theme} ${String(width)} sides ${opened.sides.join('|')}`);
+		if (!WEEK_LINE.test(opened.week))
+			missing.push(`trades opened ${theme} ${String(width)} week "${opened.week}"`);
+		if (opened.tallest > ONE_LINE_PX)
+			missing.push(
+				`trades opened ${theme} ${String(width)} a name or game wraps (${String(opened.tallest)}px)`
+			);
 		await page.screenshot({
 			path: file(`trades-opened-${theme}-${String(width)}`),
 			fullPage: true
 		});
+		// The opened trade's verb copies the offer and opens the platform's trade page, as the card's
+		// does (review H1).
+		await ctx.grantPermissions(['clipboard-read', 'clipboard-write']);
+		const tab = ctx.waitForEvent('page');
+		await page.locator('tr.opened .acts').getByText(TRADE_VERB).click();
+		const opens = await tab;
+		if (!opens.url().includes('sleeper.com'))
+			missing.push(`trades opened ${theme} ${String(width)} verb opened ${opens.url()}`);
+		await opens.close();
+		await ready(page, 'Propose it on');
 		if (width !== PHONE.width) {
 			await page.locator('table.finder thead button.sort').nth(3).click();
 			await page.screenshot({ path: file(`trades-sorted-${theme}-${String(width)}`) });
