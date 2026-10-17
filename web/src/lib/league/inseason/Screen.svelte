@@ -37,6 +37,9 @@
 		panelVerb?: boolean;
 		/** The confirmation, under the decision. */
 		move?: Snippet;
+		/** The decision drawn as a strip (the Lineup's swaps as chips, Lane 66e) in place of its
+		 * sentence; the sentence stays the strip's name for a screen reader. */
+		summary?: Snippet;
 		children: Snippet;
 	}
 
@@ -53,6 +56,7 @@
 		expanded,
 		panelVerb = false,
 		move,
+		summary,
 		children
 	}: Props = $props();
 
@@ -70,8 +74,13 @@
 
 <Panel as="section" label={LINES.ourCall} edge="accent">
 	<div class="decision">
-		<div class="words" role="status">
-			<p class="line">{decision}</p>
+		<div
+			class="words"
+			class:strip={summary !== undefined}
+			role="status"
+			aria-label={summary ? decision : undefined}
+		>
+			{#if summary}{@render summary()}{:else}<p class="line">{decision}</p>{/if}
 			{#if reason}<p class="reason">{reason}</p>{/if}
 		</div>
 		{#if !asideForMove}
@@ -106,6 +115,10 @@
 		flex-direction: column;
 		gap: var(--s-1);
 		min-width: 0;
+	}
+
+	.strip {
+		flex: 1;
 	}
 
 	.line {

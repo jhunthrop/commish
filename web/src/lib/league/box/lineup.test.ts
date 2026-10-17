@@ -1,0 +1,195 @@
+// The Lineup screen's table, strip and verb words (Lane 66e): run with `npm test`.
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+import type { LineupSlot, PlayerLine, WeekFacts } from '../inseason/api.ts';
+import { boxRow } from './box.ts';
+import {
+	changesTitle,
+	copiedWords,
+	copyFailedWords,
+	LINEUP,
+	lineupBox,
+	lineupText,
+	stripSum,
+	whyLine
+} from './lineup.ts';
+
+const ZONE = 'America/Chicago';
+const READ = '2026-10-17T02:00:00.000Z';
+
+const facts = (over: Partial<WeekFacts> = {}): WeekFacts => ({
+	week: 6,
+	opponent: 'ATL',
+	home: false,
+	kickoff: '2026-10-18T17:00:00.000Z',
+	bye: false,
+	designation: null,
+	played: false,
+	points_this_week: null,
+	last_games: [],
+	allowed_to_position: null,
+	game_total: null,
+	spread: null,
+	roof: null,
+	weather: null,
+	...over
+});
+
+const line = (
+	name: string,
+	position: string,
+	proj: number | null,
+	over: Partial<WeekFacts> = {},
+	oppRank: number | null = null
+): PlayerLine => ({
+	player: { host_id: name, board_id: name, name, position, team: 'CHI', injured_reserve: false },
+	headshot: null,
+	slug: null,
+	position_rank: 7,
+	points_over_replacement: null,
+	rest_of_season_per_game: null,
+	week_projection: proj,
+	projection_delta: null,
+	opp_rank: oppRank,
+	season_avg: null,
+	last_points: null,
+	held: false,
+	facts: facts(over)
+});
+
+const QUESTIONABLE = { designation: { status: 'questionable' as const, as_of: READ } };
+const williams = line('Caleb Williams', 'QB', 18.5, QUESTIONABLE, 24);
+const stroud = line('C.J. Stroud', 'QB', 16.8, { opponent: 'JAX' }, 9);
+const irving = line('Bucky Irving', 'RB', 12.8);
+const vidal = line('Kimani Vidal', 'RB', 2.8, { opponent: 'KC' });
+const gibbs = line('Jahmyr Gibbs', 'RB', null, { bye: true, opponent: null });
+const brown = line('A.J. Brown', 'WR', null);
+
+const slot = (
+	s: LineupSlot['slot'],
+	ours: PlayerLine,
+	host: PlayerLine | null,
+	changed: boolean
+): LineupSlot => ({ slot: s, ours, host, changed, sentence: null });
+
+const advice = {
+	slots: [
+		slot('QB', williams, stroud, true),
+		slot('RB', irving, irving, false),
+		slot('RB', vidal, gibbs, true)
+	],
+	bench: [stroud, gibbs],
+	reserve: [brown],
+	player_points: false,
+	team_points: null,
+	projection_read_at: READ,
+	week: 6
+};
+
+void test('the swap opens to one evidence line built from its columns', () => {
+	const box = lineupBox(advice, ZONE);
+	assert.equal(
+		box.starters[0]?.why,
+		"18.5 Proj against Stroud's 16.8, Questionable, at ATL 24th against quarterbacks."
+	);
+	assert.equal(box.starters[1]?.why, null);
+	assert.equal(box.starters[2]?.why, 'Gibbs is on bye. Vidal is the next RB with a Proj, 2.8.');
+});
+
+void test('a starter a designation sits is named first, a lowercase word in the sentence', () => {
+	const out = line('Kyle Pitts Sr.', 'TE', 11.4, {
+		designation: { status: 'doubtful', as_of: READ }
+	});
+	const into = line('Dalton Kincaid', 'TE', 9.4);
+	assert.equal(
+		whyLine(boxRow(into, 'TE', ZONE, false), boxRow(out, 'Sit', ZONE, false), 'TE'),
+		'Pitts is listed doubtful. Kincaid is the next TE with a Proj, 9.4.'
+	);
+	assert.equal(
+		whyLine(boxRow(into, 'TE', ZONE, false), null, 'TE'),
+		'Your TE spot is empty, so Kincaid starts.'
+	);
+	const noProj = line('Dalton Kincaid', 'TE', null);
+	assert.equal(
+		whyLine(boxRow(noProj, 'TE', ZONE, false), boxRow(out, 'Sit', ZONE, false), 'TE'),
+		'Pitts is listed doubtful. Kincaid is next in our order, with no Proj this week.'
+	);
+});
+
+void test('moves are marked: in on the lineup, Sit on the bench, the reserve apart', () => {
+	const box = lineupBox(advice, ZONE);
+	assert.deepEqual(
+		box.starters.map((s) => s.move),
+		['in', null, 'in']
+	);
+	assert.deepEqual(
+		box.bench.map((b) => [b.row.slot, b.move]),
+		[
+			['Sit', 'out'],
+			['Sit', 'out']
+		]
+	);
+	assert.ok(box.bench.every((b) => b.row.slot !== 'Out'));
+	assert.deepEqual(
+		box.reserve.map((r) => r.name),
+		['A.J. Brown']
+	);
+	assert.deepEqual(
+		box.swaps.map((s) => [s.slot, s.in, s.out]),
+		[
+			['QB', 'Williams', 'Stroud'],
+			['RB', 'Vidal', 'Gibbs']
+		]
+	);
+});
+
+void test('the gain compares the advice with the lineup as the platform has it set now', () => {
+	const box = lineupBox(advice, ZONE);
+	assert.equal(box.totals.proj, 34.1);
+	// Stroud 16.8, Irving 12.8, Gibbs on bye with none.
+	assert.equal(box.asSet, 29.6);
+	assert.equal(box.gain, 4.5);
+	assert.deepEqual(stripSum(box), {
+		figure: '34.1',
+		words: 'Proj with them, 29.6 as set',
+		gain: '+4.5'
+	});
+	assert.equal(changesTitle(box.swaps.length), 'Two changes');
+	assert.equal(changesTitle(1), 'One change');
+	assert.equal(changesTitle(0), 'Your lineup is set');
+	const set = lineupBox({ ...advice, slots: [slot('RB', irving, irving, false)] }, ZONE);
+	assert.deepEqual(stripSum(set), { figure: '12.8', words: 'Proj as set', gain: null });
+	assert.equal(stripSum(lineupBox({ ...advice, projection_read_at: null, slots: [] }, ZONE)), null);
+});
+
+void test('the copy verb puts the lineup on the clipboard and says where to paste it', () => {
+	assert.equal(
+		lineupText(lineupBox(advice, ZONE), 6),
+		'Week 6 lineup\nQB Caleb Williams\nRB Bucky Irving\nRB Kimani Vidal'
+	);
+	assert.equal(copiedWords('sleeper'), "Copied. Paste it on Sleeper's lineup page.");
+	assert.equal(copiedWords('espn'), "Copied. Paste it on ESPN's lineup page.");
+	assert.equal(
+		copyFailedWords('yahoo'),
+		"This browser would not copy it. Set it on Yahoo's lineup page."
+	);
+});
+
+const BANNED =
+	/\b(market|prices?|buy|sell|stock|odds|lines?|spreads?|favou?red|underdog|bets?|betting|vegas|host)\b/i;
+
+void test('copy guard: every Lineup word is fantasy words, names the platform, no dash or semicolon', () => {
+	const box = lineupBox(advice, ZONE);
+	const said = [
+		...Object.values(LINEUP),
+		...box.starters.flatMap((s) => (s.why ? [s.why] : [])),
+		copiedWords('espn'),
+		copyFailedWords('espn'),
+		lineupText(box, 6),
+		stripSum(box)?.words ?? ''
+	];
+	for (const text of said) {
+		assert.doesNotMatch(text, BANNED, text);
+		assert.doesNotMatch(text, /[–—;]/, text);
+	}
+});

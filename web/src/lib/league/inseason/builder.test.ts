@@ -34,6 +34,10 @@ const line = (
 	points_over_replacement: 1.2,
 	rest_of_season_per_game: null,
 	week_projection: null,
+	projection_delta: null,
+	opp_rank: null,
+	season_avg: null,
+	last_points: null,
 	held: false,
 	facts: {
 		week: 6,

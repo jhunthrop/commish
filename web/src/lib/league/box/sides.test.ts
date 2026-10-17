@@ -43,6 +43,10 @@ const line = (
 	points_over_replacement: null,
 	rest_of_season_per_game: 12,
 	week_projection: proj,
+	projection_delta: null,
+	opp_rank: null,
+	season_avg: null,
+	last_points: null,
 	held: false,
 	facts: facts(over)
 });
@@ -112,26 +116,19 @@ void test('the bug names the first kickoff, then the next once one has started',
 	assert.equal(nextKickoff([collins], Date.parse('2026-10-19T00:00:00.000Z'), ZONE), null);
 });
 
-void test('a lineup change starts ours over the host starter it sits, with its reason', () => {
+void test('a lineup swap moves ours in and the platform starter it sits out to the bench', () => {
 	const slot = (
 		s: LineupSlot['slot'],
 		ours: PlayerLine,
 		host: PlayerLine | null,
 		changed: boolean
-	) => ({
-		slot: s,
-		ours,
-		host,
-		changed,
-		sentence: changed ? 'Ranked higher on our order.' : null
-	});
+	) => ({ slot: s, ours, host, changed, sentence: changed ? 'The API sentence.' : null });
+	const vikings = line('Vikings', 'DEF', 'MIN', 6);
 	const box = lineupBox(
 		{
-			slots: [
-				slot('WR', collins, collins, false),
-				slot('DEF', texans, line('Vikings', 'DEF', 'MIN', 6), true)
-			],
-			bench: [line('Vikings', 'DEF', 'MIN', 6)],
+			slots: [slot('WR', collins, collins, false), slot('DEF', texans, vikings, true)],
+			bench: [vikings],
+			reserve: [line('A.J. Brown', 'WR', 'NE', null)],
 			player_points: true,
 			team_points: null,
 			projection_read_at: '2026-10-17T02:00:00.000Z',
@@ -139,11 +136,23 @@ void test('a lineup change starts ours over the host starter it sits, with its r
 		},
 		ZONE
 	);
-	assert.equal(box.starters[0]?.sits, undefined);
-	assert.equal(box.starters[1]?.sits?.slot, 'Sit');
-	assert.equal(box.starters.at(1)?.sentence, 'Ranked higher on our order.');
-	assert.ok(box.benchSat.has('Vikings'));
+	assert.equal(box.starters[0]?.move, null);
+	assert.equal(box.starters[1]?.move, 'in');
+	assert.deepEqual(
+		box.starters.map((s) => s.row.slot),
+		['WR', 'D/ST']
+	);
+	assert.equal(box.bench[0]?.move, 'out');
+	assert.deepEqual(
+		box.bench.map((b) => b.row.slot),
+		['Sit'],
+		'the bench arrow reads Sit, never the designation word'
+	);
+	assert.equal(box.reserve[0]?.name, 'A.J. Brown');
 	assert.equal(box.totals.proj, 22.2);
+	assert.equal(box.asSet, 21.2);
+	assert.equal(box.gain, 1);
+	assert.deepEqual(box.swaps, [{ key: 'Texans D/ST', slot: 'D/ST', in: 'Texans', out: 'Vikings' }]);
 });
 
 void test("the fixture's bye rows show no projection and its totals leave them out", () => {
@@ -205,6 +214,7 @@ function bothScreens(byPlayer: boolean): { matchup: SideBox; lineup: LineupBox }
 		{
 			slots: [unchanged('QB', qb), unchanged('WR', wr)],
 			bench: [],
+			reserve: [],
 			player_points: byPlayer,
 			team_points: hostTotal,
 			projection_read_at: '2026-10-17T02:00:00.000Z',
@@ -226,9 +236,9 @@ void test("a host that gives no player's points: rows say --, both screens' Tota
 	assert.equal(boxNumber(matchup.totals.pts), '87.4');
 	assert.equal(boxNumber(lineup.totals.pts), '87.4');
 	assert.equal(matchup.byPlayer, false);
-	assert.match(
-		ptsBasis(matchup.byPlayer),
-		/team points from the host, which gives no points by player/
+	assert.equal(
+		ptsBasis(matchup.byPlayer, 'espn'),
+		"Pts are this league's team points from ESPN, which gives no points by player."
 	);
 });
 
@@ -240,5 +250,5 @@ void test("a host that gives each player's points: both screens' Totals add the 
 	);
 	assert.equal(boxNumber(matchup.totals.pts), '33.4');
 	assert.equal(boxNumber(lineup.totals.pts), '33.4');
-	assert.match(ptsBasis(matchup.byPlayer), /as your league scores them/);
+	assert.match(ptsBasis(matchup.byPlayer, 'sleeper'), /as your league scores them/);
 });
