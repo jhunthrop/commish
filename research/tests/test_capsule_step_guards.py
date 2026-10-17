@@ -26,9 +26,9 @@ from research.nightly.capsule_step import (
     CapsuleSpend,
     CapsuleStepError,
     CapsuleStepPlan,
-    _checked_price,
     _Passes,
     _write,
+    checked_price,
 )
 from research.nightly.steps import StepRecord
 
@@ -46,15 +46,15 @@ def test_a_model_the_list_does_not_carry_fails_before_any_call() -> None:
     with pytest.raises(
         ConfigurationError, match=re.escape("zai/glm-5.3-flsh, which the gateway's model list does not carry")
     ):
-        _checked_price(_http(httpx.Response(200, json=_LISTED)), "test-key", typo)
+        checked_price(_http(httpx.Response(200, json=_LISTED)), "test-key", typo)
 
 
 def test_a_model_the_list_carries_passes() -> None:
-    assert _checked_price(_http(httpx.Response(200, json=_LISTED)), "test-key", SETTINGS).listed is True
+    assert checked_price(_http(httpx.Response(200, json=_LISTED)), "test-key", SETTINGS).listed is True
 
 
 def test_a_list_that_could_not_be_read_does_not_block() -> None:
-    price = _checked_price(_http(httpx.Response(503)), "test-key", SETTINGS)
+    price = checked_price(_http(httpx.Response(503)), "test-key", SETTINGS)
     assert price.listed is None
     assert "not read" in price.basis
 
