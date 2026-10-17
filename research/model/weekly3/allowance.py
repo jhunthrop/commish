@@ -17,7 +17,7 @@ With no game counted the allowance is 1 (the missing-input table); a group whose
 0 (a quarterback's targets) carries no ratio and takes 1 too, counted apart.
 """
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Final
@@ -102,6 +102,34 @@ def allowance(  # noqa: PLR0913, PLR0917 - the allowance's every input, named
             return _dropbacks(team_rows, offence, at, PbpMetric.DROPBACKS)
         return _group(totals, at, offence, position, kind)
 
+    return ratio_allowance(defence, week, schedule, allowed, gained)
+
+
+ValueAt = Callable[[str, int], float | None]  # (offence, week) -> the value, None when not stamped
+
+
+def ratio_allowance(defence: str, week: int, schedule: Schedule, allowed: ValueAt, gained: ValueAt) -> Allowance:
+    """D's allowance of any per-game value before `week`: over D's games, what D allowed against what
+    the same offences gained in their other games, shrunk toward 1 (round 4 reads it for its new
+    allowances, section 2.4, on the same construction)."""
+    return _shrunk(allowance_pairs(defence, week, schedule, allowed, gained))
+
+
+def difference_allowance(defence: str, week: int, schedule: Schedule, allowed: ValueAt, gained: ValueAt) -> Allowance:
+    """The same pairs read as a difference, shrunk toward 0 with the same prior: n x (mean allowed less
+    mean elsewhere) / (n + 6), for a value that is itself a difference (round 4, amendment 2 item 2)."""
+    pairs = allowance_pairs(defence, week, schedule, allowed, gained)
+    if not pairs:
+        return Allowance(0.0, 0, NO_GAME)
+    count = len(pairs)
+    gap = sum(a - e for a, e in pairs) / count
+    return Allowance(count * gap / (count + ALLOWANCE_PRIOR_GAMES), count, None)
+
+
+def allowance_pairs(
+    defence: str, week: int, schedule: Schedule, allowed: ValueAt, gained: ValueAt
+) -> list[tuple[float, float]]:
+    """Over D's games before `week`: (what D allowed, the same offence's mean in its other games)."""
     pairs: list[tuple[float, float]] = []
     for at in schedule.club_weeks(defence, week):
         offence = schedule.opponent(at, defence)
@@ -116,4 +144,4 @@ def allowance(  # noqa: PLR0913, PLR0917 - the allowance's every input, named
         if given is None or not elsewhere:
             continue
         pairs.append((given, sum(elsewhere) / len(elsewhere)))
-    return _shrunk(pairs)
+    return pairs

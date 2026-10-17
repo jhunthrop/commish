@@ -18,7 +18,7 @@ from dataclasses import dataclass, replace
 from typing import Final
 
 from research.model.weekly2.designation import WITHHELD
-from research.model.weekly3.allowance import Allowance
+from research.model.weekly3.allowance import Allowance, TeamRows
 from research.model.weekly3.instant import Schedule
 from research.model.weekly3.snapshot import Snapshot
 from research.model.weekly3.work import ONES, ZERO, Kind, PlayerGame, Work, mean_work, sum_work
@@ -73,10 +73,19 @@ def vacated(player_id: str, club: str, snapshot: Snapshot, schedule: Schedule) -
 
 
 def _club_mean(snapshot: Snapshot, schedule: Schedule, club: str, metric: str) -> tuple[float | None, bool]:
-    """The mean over the club's games before W that carry the metric, and whether any lacked it."""
-    weeks = schedule.club_weeks(club, snapshot.week)
-    values = [v for w in weeks if (v := snapshot.team_rows.get((club, w), {}).get(metric)) is not None]
-    return (sum(values) / len(values) if values else None), len(values) < len(weeks)
+    return club_mean(snapshot.team_rows, schedule, club, snapshot.week, metric)
+
+
+def club_mean(rows: TeamRows, schedule: Schedule, club: str, week: int, metric: str) -> tuple[float | None, bool]:
+    """The mean over the club's games before W that carry the metric, and whether any lacked it (round
+    4 reads its pace and pass rate over expectation by the same rule)."""
+    values = club_values(rows, schedule, club, week, metric)
+    return (sum(values) / len(values) if values else None), len(values) < len(schedule.club_weeks(club, week))
+
+
+def club_values(rows: TeamRows, schedule: Schedule, club: str, week: int, metric: str) -> list[float]:
+    """The metric's value in each of the club's games before W that carries one, in week order."""
+    return [v for w in schedule.club_weeks(club, week) if (v := rows.get((club, w), {}).get(metric)) is not None]
 
 
 def _allowances(position: str, allowance_of: AllowanceOf, kinds: tuple[Kind, ...]) -> tuple[Work, set[str]]:
