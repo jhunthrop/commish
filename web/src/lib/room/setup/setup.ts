@@ -1,7 +1,8 @@
 /** The setup page's league: the defaults, the bounds the API checks (api/internal/leagues), the round
  * count the roster makes, and the lobby closest to it. */
 import type { BoardFormat } from '#lib/sheet/model.ts';
-import type { LeagueSettings, LobbyFormat } from '../api.ts';
+import type { FactCell } from '#lib/ui/facts.ts';
+import type { LeagueSettings, LobbyFilling, LobbyFormat } from '../api.ts';
 import { presetWords } from '../words.ts';
 
 type Roster = LeagueSettings['roster'];
@@ -113,6 +114,44 @@ export function nearestLobby(s: LeagueSettings): LobbyFormat {
 	if (s.lineup === 'superflex') return '12_half_superflex';
 	if (s.teams <= 10) return '10_ppr';
 	return '12_ppr';
+}
+
+/** The setup as a settings table (Lane 66o), where two sentences once said the clocks: the format,
+ * the teams, your seat, the rounds, no clock against bots, and the nearest lobby's clock as the API
+ * gives it (left out until the lobbies are read). */
+export function setupCells(
+	s: LeagueSettings,
+	rounds: number,
+	lobby: Pick<LobbyFilling, 'clock_seconds'> | undefined
+): FactCell[] {
+	return [
+		{ label: 'Format', value: formatWords(s), word: true },
+		{ label: 'Teams', value: String(s.teams) },
+		{
+			label: 'Your seat',
+			value: s.slot === null ? 'Random' : String(s.slot),
+			word: s.slot === null
+		},
+		{ label: 'Rounds', value: String(rounds) },
+		{ label: 'Clock against bots', value: 'None', word: true },
+		...(lobby
+			? [
+					{
+						label: 'Clock in a lobby',
+						value: `${String(lobby.clock_seconds)} s a pick`,
+						word: true
+					}
+				]
+			: [])
+	];
+}
+
+/** "PPR", "Half PPR, superflex". */
+function formatWords(s: LeagueSettings): string {
+	const scoring = s.scoring.preset ? presetWords(s.scoring.preset) : 'Your scoring';
+	const lineup = LINEUP_CHOICES.find((c) => c.lineup === s.lineup && c.lineup !== 'standard');
+	const said = lineup ? `${scoring}, ${lineup.label.toLowerCase()}` : scoring;
+	return said.charAt(0).toUpperCase() + said.slice(1);
 }
 
 /** "12 teams, PPR" for a lobby format. */
