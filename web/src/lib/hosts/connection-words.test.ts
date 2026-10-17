@@ -17,7 +17,10 @@ void test('a proven ESPN session reads connected', () => {
 		status: 'connected',
 		proven: true,
 		connected_at: at,
-		last_read_at: null
+		last_read_at: null,
+		consent_version: 3,
+		writes_on: false,
+		writes_reason: null
 	} as const;
 	assert.equal(statusWords(c), 'Connected');
 });
@@ -28,7 +31,10 @@ void test('an ESPN session kept with only public leagues says it is not yet chec
 		status: 'connected',
 		proven: false,
 		connected_at: at,
-		last_read_at: null
+		last_read_at: null,
+		consent_version: 3,
+		writes_on: false,
+		writes_reason: null
 	} as const;
 	assert.equal(statusWords(c), 'Connected, not yet checked against a private league');
 });
@@ -39,7 +45,10 @@ void test('a signed out session says whether ESPN ever accepted it', () => {
 		status: 'signed_out',
 		proven: true,
 		connected_at: at,
-		last_read_at: null
+		last_read_at: null,
+		consent_version: 3,
+		writes_on: false,
+		writes_reason: null
 	} as const;
 	assert.equal(statusWords(c), 'ESPN no longer accepts your saved sign-in');
 	assert.equal(statusWords({ ...c, proven: false }), 'ESPN did not accept your saved sign-in');
@@ -66,7 +75,10 @@ void test('the MyFantasyLeague words say the password is never kept and name the
 		status: 'signed_out',
 		proven: true,
 		connected_at: at,
-		last_read_at: null
+		last_read_at: null,
+		consent_version: 3,
+		writes_on: false,
+		writes_reason: null
 	} as const;
 	assert.equal(statusWords(c), 'MyFantasyLeague no longer accepts your saved sign-in');
 });

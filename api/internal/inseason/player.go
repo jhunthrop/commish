@@ -63,11 +63,12 @@ func publicLine(d Data, projection boards.WeekProjection, b boards.Board, bp boa
 	}
 	if facts.Opponent != "" {
 		if p, ok := projection.Player(boardID, string(position), team); ok {
-			v := roundCents(p.For(pprPreset))
+			// The tenth the card prints, rounded once here (Lane 66k rereview N1).
+			v := roundTenth(roundCents(p.For(pprPreset)))
 			line.WeekProjection = &v
 		}
 		if d, ok := projection.Delta(boardID, string(position), team, pprPreset); ok {
-			v := roundCents(d)
+			v := roundTenth(d)
 			line.ProjectionDelta = &v
 		}
 	}

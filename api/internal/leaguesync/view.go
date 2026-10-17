@@ -236,11 +236,7 @@ func standings(teams []Team) []apitypes.LeagueTeam {
 	sorted := Standings(teams)
 	out := make([]apitypes.LeagueTeam, 0, len(sorted))
 	for _, t := range sorted {
-		out = append(out, apitypes.LeagueTeam{
-			RosterId: t.RosterID, Name: t.Name, Owner: t.Owner, Wins: t.Wins, Losses: t.Losses, Ties: t.Ties, PointsFor: t.PointsFor,
-			PointsAgainst: t.PointsAgainst, Streak: orNil(t.Streak), WaiverOrder: positive(t.WaiverOrder), WaiverBudgetLeft: t.BudgetLeft,
-			Avatar: orNil(t.Avatar),
-		})
+		out = append(out, TeamOnWire(t))
 	}
 	return out
 }

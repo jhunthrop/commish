@@ -15,7 +15,7 @@ func TestEvidenceFromTheWeeksFacts(t *testing.T) {
 	avg := 14.256
 	f := Facts{Allowed: &Allowed{Rank: 24, Of: 32}, PerGame: &avg, LastGames: []GamePoints{{Week: 5, Points: 21.944}, {Week: 4, Points: 9}}}
 	rank, season, last := evidence(f)
-	if rank == nil || *rank != 24 || season == nil || *season != 14.26 || last == nil || *last != 21.94 {
+	if rank == nil || *rank != 24 || season == nil || *season != 14.3 || last == nil || *last != 21.9 {
 		t.Fatalf("rank %v avg %v last %v", deref(intPtr(rank)), deref(season), deref(last))
 	}
 	f.Bye = true

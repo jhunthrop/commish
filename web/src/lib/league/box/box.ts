@@ -324,8 +324,8 @@ export function oppRankWord(rank: number | null): string {
 /** A projection's change as its cell prints it: "+0.4", "−0.3", "0.0", "--" without one. */
 export function deltaWord(delta: number | null): string {
 	if (delta === null) return BOX.none;
-	const shown = Number(fixed(delta, 1));
-	return shown === 0 ? fixed(0, 1) : signed(shown, 1);
+	// The API's tenth (tenth.Round), formatted with its sign, never rounded here (Lane 66k H1).
+	return delta === 0 ? fixed(0, 1) : signed(delta, 1);
 }
 
 /** A row for a host player the box has no line for (the league read alone, without our answer):
@@ -368,15 +368,17 @@ export function totalsNote(
 		: `${String(held)} of ${String(playing.length)} starters with a ${BOX.proj}`;
 }
 
-/** A figure as its cell prints it, back as a number: the tenth the column shows. */
-function printed(value: number): number {
-	return Number(fixed(value, 1));
+/** An API figure the API has already rounded to a tenth (Lane 66k: rounded once, in Go), printed as
+ * given: formatting only, so the web never rounds it again. */
+export function printTenth(value: number): string {
+	const text = String(value);
+	return text.includes('.') ? text : `${text}.0`;
 }
 
-/** The printed figures summed, so Totals equal the column a reader adds up (review N2); null when
- * none is held. */
+/** The API's tenths summed, so Totals equal the column a reader adds up (review N2); null when none
+ * is held. The sum is cleaned of binary noise back to the tenth it is, never rounded further. */
 function printedSum(values: readonly (number | null)[]): number | null {
-	const held = values.flatMap((v) => (v === null ? [] : [printed(v)]));
+	const held = values.flatMap((v) => (v === null ? [] : [v]));
 	if (held.length === 0) return null;
 	return Math.round(held.reduce((a, b) => a + b, 0) * TENTHS) / TENTHS;
 }
@@ -405,10 +407,10 @@ export function totalsPts(
 
 /** How a box's numbers print: one decimal, "--" when not held. */
 export function boxNumber(value: number | null): string {
-	return value === null ? BOX.none : fixed(value, 1);
+	return value === null ? BOX.none : printTenth(value);
 }
 
-const FORMAT_WORDS: Readonly<Record<ProjectionScoring['format'], string>> = {
+export const FORMAT_WORDS: Readonly<Record<ProjectionScoring['format'], string>> = {
 	ppr: 'PPR',
 	half_ppr: 'half-PPR',
 	standard: 'standard'
