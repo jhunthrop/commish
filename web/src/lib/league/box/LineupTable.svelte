@@ -1,8 +1,9 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { SvelteSet } from 'svelte/reactivity';
 	import { BOX, boxNumber } from './box.ts';
 	import BoxLine from './BoxLine.svelte';
-	import { LINEUP, type LineupBox, type LineupRow } from './lineup.ts';
+	import { BENCH_ANCHOR, LINEUP, type LineupBox, type LineupRow } from './lineup.ts';
 
 	/** The Lineup screen's one table (Lane 66e): the lineup the advice sets, Totals lit like the score
 	 * bug, the bench and the injured reserve, each row in the same columns (slot, player, game, Proj,
@@ -22,6 +23,14 @@
 
 	const COLUMNS = 10;
 	const opened = new SvelteSet<string>();
+
+	// The League page's bench count links here: the table is read after the page opens, so the
+	// browser's own jump to the bench missed it, and the table makes it once it is drawn.
+	onMount(() => {
+		if (location.hash === `#${BENCH_ANCHOR}`) {
+			document.getElementById(BENCH_ANCHOR)?.scrollIntoView({ block: 'start' });
+		}
+	});
 
 	function whyOf(entry: LineupRow): { id: string; open: boolean; toggle: () => void } | null {
 		if (entry.why === null) return null;
@@ -89,7 +98,7 @@
 		</tr>
 	</tbody>
 	<tbody>
-		<tr class="sect"><th colspan={COLUMNS} scope="rowgroup">{BOX.bench}</th></tr>
+		<tr class="sect" id={BENCH_ANCHOR}><th colspan={COLUMNS} scope="rowgroup">{BOX.bench}</th></tr>
 		{#each box.bench as entry (entry.row.key)}
 			<BoxLine row={entry.row} tags={tagsOf(entry.row.boardId)} bench evidence move={entry.move} />
 		{:else}

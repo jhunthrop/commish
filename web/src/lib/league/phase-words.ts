@@ -10,11 +10,11 @@ import {
 	timeOfDay,
 	weekdayTime
 } from '#lib/format/clock.ts';
-import { fixed, ordinal } from '#lib/format/number.ts';
+import { ordinal } from '#lib/format/number.ts';
 import type { ContextLeague } from '#lib/context/words.ts';
 import { MOCK_VERB, type LeagueScreen } from '#lib/ui/nav.ts';
-import type { LeagueStanding, LeagueSync, MatchupSide } from './api.ts';
-import { recordWords, scoreUnread, teamName } from './model.ts';
+import type { LeagueStanding } from './api.ts';
+import { recordWords } from './model.ts';
 
 /** The follow page's line above the form, naming the screen the rail item leads to once a league
  * is followed. */
@@ -50,9 +50,6 @@ export const NEXT_DRAFT_ROWS = [
 		verb: 'Open your sheet'
 	}
 ] as const;
-
-/** The league page's matchup line's way to the Matchup screen. */
-export const SEE_MATCHUP = 'See the matchup';
 
 const DAY_MS = 86_400_000;
 /** A draft this many days off is named by its weekday, further off by its date. */
@@ -109,35 +106,4 @@ export function draftLine(draftAt: string | null, now: Date, zone: string = memb
 export function finalStanding(team: string, standing: LeagueStanding | null): string {
 	if (standing === null || team === '') return 'Your season is over.';
 	return `${team} finished ${ordinal(standing.place)} of ${String(standing.teams)} at ${recordWords(standing)}.`;
-}
-
-/** A side's score so far, one decimal, or nothing before its first point or when unread. */
-function scoreOf(side: MatchupSide): string | null {
-	return scoreUnread(side) || side.points === 0 ? null : fixed(side.points);
-}
-
-/** The league page's one matchup line, linking to the Matchup screen: "Week 6, Ertz Hurts 77.1,
- * Muttdogs 84.2.", "Week 6, Ertz Hurts against Muttdogs. No games played yet.", an all-play week's
- * own score, or null with no game read this week. */
-export function matchupSummary(
-	sync: Pick<LeagueSync, 'matchup' | 'teams' | 'week_all_play'>
-): string | null {
-	const matchup = sync.matchup;
-	if (matchup === null) return null;
-	const week = `Week ${String(matchup.week)}`;
-	const name = (side: MatchupSide): string => teamName(sync, side.roster_id);
-	const mine = name(matchup.mine);
-	const myScore = scoreOf(matchup.mine);
-	if (matchup.opponent === null) {
-		const so = myScore === null ? '' : ` ${mine} ${myScore} so far.`;
-		return sync.week_all_play
-			? `${week}, an all-play week.${so}`
-			: `${week}, no opponent this week.`;
-	}
-	const theirs = name(matchup.opponent);
-	const theirScore = scoreOf(matchup.opponent);
-	if (myScore === null && theirScore === null) {
-		return `${week}, ${mine} against ${theirs}. No games played yet.`;
-	}
-	return `${week}, ${mine} ${myScore ?? fixed(0)}, ${theirs} ${theirScore ?? fixed(0)}.`;
 }

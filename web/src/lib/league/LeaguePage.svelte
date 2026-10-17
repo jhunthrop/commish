@@ -24,33 +24,48 @@
 	import LeagueTabs from './inseason/LeagueTabs.svelte';
 	import SeasonPanel from './SeasonPanel.svelte';
 	import { MOCK_VERB } from '#lib/ui/nav.ts';
-	import { SEE_MATCHUP, matchupSummary } from './phase-words.ts';
 	import { tabHref } from './inseason/tabs.ts';
+	import { inSeasonApi, type LineupAdvice, type Scoreboard } from './inseason/api.ts';
 	import { siteContext } from '#lib/context/context.svelte.ts';
 	import { sectionHref } from '#lib/ui/nav.ts';
-	import MovesPanel from './MovesPanel.svelte';
+	import { factsReadLine } from './box/box.ts';
+	import { BENCH_ANCHOR } from './box/lineup.ts';
 	import RosterPanel from './RosterPanel.svelte';
-	import StandingsStrip from './StandingsStrip.svelte';
-	import WaiverPool from './WaiverPool.svelte';
+	import ScoreBoard from './home/ScoreBoard.svelte';
+	import Standings from './home/Standings.svelte';
+	import LineupSummary from './home/LineupSummary.svelte';
+	import MovesFeed from './home/MovesFeed.svelte';
+	import LeagueSettings from './home/LeagueSettings.svelte';
+	import {
+		HOME,
+		bugsOf,
+		feedRows,
+		lineupSummary,
+		projections,
+		standingsBasis,
+		standingsRows,
+		teamBasis
+	} from './home/home.ts';
 	import {
 		POLL_MS,
 		leagueBasis,
 		hostWords,
 		myPlace,
 		myTeam,
-		poolBasis,
-		poolRows,
 		READING_NOW,
 		readLine,
 		readNowWords,
-		recordWords,
-		seasonStarted
+		recordWords
 	} from './model.ts';
 
-	/** One attached league: read on open and once a minute while open (the API reads the host at most
-	 * once a minute whatever the number of viewers), and again on the drafter's one tap. Everything is
-	 * read in the browser; the shell paints first. The page is the selected league: opening it
-	 * selects it in the shell's switch, and switching there opens the league switched to. */
+	/** One attached league (Lane 66i): read on open and once a minute while open (the API reads the
+	 * host at most once a minute whatever the number of viewers), and again on the drafter's one tap.
+	 * In season it is a standings and roster board: the week's scoreboard across the top, the
+	 * standings as a box score beside the drafter's lineup, the moves as a feed, and the league's
+	 * settings behind a tab. Before the draft and after the season it carries the season's word, the
+	 * standings and the roster on our board. Everything is read in the browser; the shell paints
+	 * first. The page is the selected league: opening it selects it in the shell's switch, and
+	 * switching there opens the league switched to. */
 	interface Props {
 		id: string;
 	}
@@ -59,6 +74,11 @@
 
 	let sync = $state<LeagueSync | null>(null);
 	let board = $state<LeagueBoard | null>(null);
+	/** The week's games and the drafter's lineup, each null where the API has none for this league
+	 * (no saved scoring, no current week) or its read failed: the page stands without it. */
+	let scoreboard = $state<Scoreboard | null>(null);
+	let advice = $state<LineupAdvice | null>(null);
+	let view = $state<'week' | 'settings'>('week');
 	let failure = $state<'signed-out' | 'missing' | 'unreachable' | 'host-sign-in' | null>(null);
 	/** The league's saved name and host, for the way back in a league read as a member asks for when
 	 * no member is connected. */
@@ -74,13 +94,23 @@
 	// svelte-ignore state_referenced_locally
 	followSwitch(id, links.league);
 
+	/** The league as the switch lists it, for its phase; a league it lacks yet, or an API from before
+	 * the phase, reads as in season, the page this always was. */
+	const listed = $derived(siteContext.leagues.find((l) => l.id === id));
+	const phase = $derived(
+		listed && (listed as Partial<typeof listed>).phase !== undefined ? listed.phase : 'in_season'
+	);
+	const drafted = $derived(phase !== 'pre_draft' && phase !== 'draft_day');
+	const playing = $derived(phase === 'in_season' || phase === 'playoffs');
+
 	function take(answer: LeagueSync): void {
 		sync = answer;
 		// The read the page made is the league's rosters for every other page's marks.
 		takeHeld(id, answer);
-		// The board is the run's own file: read once, and again only when the league reads on another.
-		// A failed board read says so and is tried again with the next read of the league.
-		if (board?.format !== answer.board_format) {
+		// The board is the run's own file, for the roster and the basis when no game is on: read once,
+		// and again only when the league reads on another. A failed board read says so and is tried
+		// again with the next read of the league.
+		if (!playing && board?.format !== answer.board_format) {
 			void loadBoard(answer.board_format, answer.byes)
 				.then((loaded) => {
 					board = loaded;
@@ -92,9 +122,30 @@
 		problem = null;
 	}
 
+	/** An in-season read the page stands without: null when the API has none for this league or
+	 * the read fails, the league's own read saying what is wrong. */
+	async function optional<T>(call: () => Promise<T>): Promise<T | null> {
+		if (!playing) return null;
+		try {
+			return await call();
+		} catch {
+			return null;
+		}
+	}
+
+	async function readWeek(): Promise<void> {
+		const [games, lineup] = await Promise.all([
+			optional(() => inSeasonApi.scoreboard(id)),
+			optional(() => inSeasonApi.lineup(id))
+		]);
+		scoreboard = games;
+		advice = lineup;
+	}
+
 	async function read(): Promise<void> {
 		try {
-			take(await leagueApi.sync(id));
+			const [answer] = await Promise.all([leagueApi.sync(id), readWeek()]);
+			take(answer);
 		} catch (error) {
 			if (isSignedOut(error)) failure = 'signed-out';
 			else if (hasStatus(error, HTTP_STATUS.conflict)) {
@@ -122,7 +173,8 @@
 	async function refresh(): Promise<void> {
 		refreshing = true;
 		try {
-			take(await leagueApi.refresh(id));
+			const [answer] = await Promise.all([leagueApi.refresh(id), readWeek()]);
+			take(answer);
 		} catch (error) {
 			problem =
 				error instanceof ApiError ? error.message : 'Your league could not be read just now.';
@@ -138,23 +190,30 @@
 		return () => clearInterval(timer);
 	});
 
-	const tagsOf = sheetTags;
-
 	const here = $derived(links.league(id));
-	/** The league as the switch lists it, for its phase; a league it lacks yet, or an API from before
-	 * the phase, reads as in season, the page this always was. */
-	const listed = $derived(siteContext.leagues.find((l) => l.id === id));
-	const phase = $derived(
-		listed && (listed as Partial<typeof listed>).phase !== undefined ? listed.phase : 'in_season'
-	);
-	const drafted = $derived(phase !== 'pre_draft' && phase !== 'draft_day');
-	const playing = $derived(phase === 'in_season' || phase === 'playoffs');
-	const summary = $derived(sync && playing ? matchupSummary(sync) : null);
 	const dropped = $derived(sync ? droppedKinds(sync.scoring_dropped) : []);
 	const team = $derived(sync ? myTeam(sync) : undefined);
-	/** What every number on the page is, said once under the title: the scoring, the season's
-	 * figures, then the preseason board's. */
-	const basis = $derived(
+	const platform = $derived(sync ? hostWords(sync.host) : '');
+	const bugs = $derived(sync && scoreboard ? bugsOf(scoreboard, sync) : []);
+	const rows = $derived(sync ? standingsRows(sync, projections(scoreboard)) : []);
+	const summary = $derived(advice ? lineupSummary(advice) : null);
+	const moves = $derived(sync ? feedRows(sync) : []);
+	const lineupHref = $derived(tabHref('start', id));
+	/** What every number on the in-season page is, said once and at most five lines: the standings,
+	 * a team's projection and points, the game facts. */
+	const weekBasis = $derived(
+		sync
+			? [
+					standingsBasis(sync.host, sync.terms),
+					scoreboard
+						? teamBasis(sync.host, scoreboard.projection_read_at, scoreboard.projection_scoring)
+						: null,
+					advice ? factsReadLine(advice.slots.flatMap((s) => (s.host ? [s.host] : []))) : null
+				].filter((line): line is string => line !== null)
+			: []
+	);
+	/** Before the draft and after the season: the scoring the board's figures are in. */
+	const boardBasis = $derived(
 		board && sync
 			? leagueBasis(board.seasonScoring, board.seasonThrough, sync.scoring_like, scoresSentence)
 			: ''
@@ -165,6 +224,37 @@
 	<title>{sync?.name ? `${sync.name} · Commish` : 'Your league · Commish'}</title>
 	<meta name="robots" content="noindex" />
 </svelte:head>
+
+{#snippet footnotes(league: LeagueSync)}
+	<footer class="foot">
+		{#if league.settings_league_id}
+			<Footnote>
+				Your league's roster and scoring are saved for mock drafts, under its name in your saved
+				leagues.
+				{#if dropped.length > 0}
+					Mock drafts use them except {listWords(dropped)}.
+				{/if}
+				{#if league.scoring_defaulted.length > 0}
+					For {plural(league.scoring_defaulted.length, 'rule')} your league does not state, they use our
+					standard points.
+				{/if}
+			</Footnote>
+			{#if playing}
+				<!-- Before the draft and after the season the season panel carries the verb. -->
+				<Quiet href={links.mockLeague(league.settings_league_id)} size="sm">{MOCK_VERB}</Quiet>
+			{/if}
+		{:else if league.settings_note}
+			<Footnote>{league.settings_note}</Footnote>
+		{/if}
+		{#if drafted && league.placement.unplaced > 0}
+			<Footnote>
+				{league.placement.unplaced} rostered
+				{league.placement.unplaced === 1 ? 'player is' : 'players are'} not on our board, so the waiver
+				pool cannot rule them out.
+			</Footnote>
+		{/if}
+	</footer>
+{/snippet}
 
 <Shell title="League" active={null}>
 	{#if failure === 'signed-out'}
@@ -207,17 +297,15 @@
 		<div class="pad">
 			<EmptyState title="Your league can't be read right now" line="Reload in a moment." />
 		</div>
-	{:else if sync && !board && boardFailed}
+	{:else if sync && !playing && !board && boardFailed}
 		<div class="pad">
 			<ProblemLine>Our board can't be read right now. We try again in a minute.</ProblemLine>
 		</div>
-	{:else if sync && board}
+	{:else if sync && (playing || board)}
 		<main class="league">
 			<header class="lead">
 				<div class="title">
-					<DisplayTitle size="page"
-						>{sync.name || `Your ${hostWords(sync.host)} league`}</DisplayTitle
-					>
+					<DisplayTitle size="page">{sync.name || `Your ${platform} league`}</DisplayTitle>
 					<p class="sub">
 						{#if team}
 							{team.name}, {recordWords(team)}, {myPlace(sync)} of {sync.teams.length}.
@@ -231,8 +319,26 @@
 					>
 				</div>
 			</header>
-			<LeagueTabs {id} current="league" />
-			{#if basis}<p class="basis">{basis}</p>{/if}
+			<div class="navrow">
+				<LeagueTabs {id} current="league" />
+				<div class="segs" role="tablist" aria-label="League view">
+					<button
+						type="button"
+						role="tab"
+						aria-selected={view === 'week'}
+						onclick={() => (view = 'week')}
+						>{playing && sync.week > 0
+							? `${HOME.week} ${String(sync.week)}`
+							: HOME.standings}</button
+					>
+					<button
+						type="button"
+						role="tab"
+						aria-selected={view === 'settings'}
+						onclick={() => (view = 'settings')}>{HOME.settings}</button
+					>
+				</div>
+			</div>
 			{#if problem}
 				<Panel edge="loss" padding="sm"><ProblemLine>{problem}</ProblemLine></Panel>
 			{/if}
@@ -240,73 +346,51 @@
 				<!-- The read line asks the drafter to connect: the sign-in that mends it sits under it. -->
 				<HostReconnect host={sync.host} returnTo={here} onconnected={() => void refresh()} />
 			{/if}
-			<SeasonPanel
-				{phase}
-				draftAt={listed?.draft_at ?? null}
-				team={team?.name ?? ''}
-				standing={listed?.standing ?? null}
-				mockHref={sync.settings_league_id
-					? links.mockLeague(sync.settings_league_id)
-					: sectionHref('mock')}
-				{now}
-			/>
-			<StandingsStrip teams={sync.teams} me={sync.me} host={sync.host} />
-			{#if summary}
-				<p class="summary">
-					<span>{summary}</span>
-					<Quiet size="sm" href={tabHref('matchup', id)}>{SEE_MATCHUP}</Quiet>
-				</p>
-			{/if}
-			<div class="grid">
-				<div class="col">
-					{#if drafted}
-						<RosterPanel roster={sync.roster} {board} {tagsOf} host={sync.host} />
-					{/if}
-					<footer class="foot">
-						{#if sync.settings_league_id}
-							<Footnote>
-								Your league's roster and scoring are saved for mock drafts, under its name in your
-								saved leagues.
-								{#if dropped.length > 0}
-									Mock drafts use them except {listWords(dropped)}.
-								{/if}
-								{#if sync.scoring_defaulted.length > 0}
-									For {plural(sync.scoring_defaulted.length, 'rule')} your league does not state, they
-									use our standard points.
-								{/if}
-							</Footnote>
-							{#if playing}
-								<!-- Before the draft and after the season the season panel carries the verb. -->
-								<Quiet href={links.mockLeague(sync.settings_league_id)} size="sm">{MOCK_VERB}</Quiet
-								>
-							{/if}
-						{:else if sync.settings_note}
-							<Footnote>{sync.settings_note}</Footnote>
-						{/if}
-
-						{#if drafted && sync.placement.unplaced > 0}
-							<Footnote>
-								{sync.placement.unplaced} rostered
-								{sync.placement.unplaced === 1 ? 'player is' : 'players are'} not on our board, so the
-								waiver pool cannot rule them out.
-							</Footnote>
-						{/if}
-					</footer>
-				</div>
-				<div class="col">
-					{#if playing}
-						<WaiverPool
-							rows={poolRows(board, sync)}
-							{tagsOf}
-							basis={poolBasis(board)}
-							inSeason={seasonStarted(board)}
+			{#if view === 'settings'}
+				<LeagueSettings terms={sync.terms} host={sync.host} teams={sync.teams.length} />
+			{:else if playing}
+				{#if bugs.length > 0 && scoreboard}
+					<ScoreBoard week={scoreboard.week} {bugs} matchupHref={tabHref('matchup', id)} />
+				{/if}
+				<div class="split" class:alone={summary === null}>
+					<Standings {rows} terms={sync.terms} projected={scoreboard !== null} />
+					{#if summary && team}
+						<LineupSummary
+							team={team.name}
+							{platform}
+							{summary}
+							{lineupHref}
+							benchHref={`${lineupHref}#${BENCH_ANCHOR}`}
+							tagsOf={sheetTags}
 						/>
 					{/if}
+				</div>
+				<MovesFeed rows={moves} none={HOME.noMoves} />
+				<div class="basis">
+					{#each weekBasis as line (line)}<p>{line}</p>{/each}
+				</div>
+				{@render footnotes(sync)}
+			{:else if board}
+				<SeasonPanel
+					{phase}
+					draftAt={listed?.draft_at ?? null}
+					team={team?.name ?? ''}
+					standing={listed?.standing ?? null}
+					mockHref={sync.settings_league_id
+						? links.mockLeague(sync.settings_league_id)
+						: sectionHref('mock')}
+					{now}
+				/>
+				<Standings {rows} terms={sync.terms} projected={false} />
+				{#if boardBasis}<p class="basis-line">{boardBasis}</p>{/if}
+				<div class="grid">
 					{#if drafted}
-						<MovesPanel {sync} />
+						<RosterPanel roster={sync.roster} {board} tagsOf={sheetTags} host={sync.host} />
+						<MovesFeed rows={moves} none={HOME.noMoves} />
 					{/if}
 				</div>
-			</div>
+				{@render footnotes(sync)}
+			{/if}
 		</main>
 	{:else}
 		<div class="reserve"></div>
@@ -320,21 +404,68 @@
 		gap: var(--s-3);
 	}
 
-	/* The week's game in one line, its screen a tap away. */
-	.summary {
+	.navrow > :global(:first-child) {
+		min-width: 0;
+	}
+
+	.navrow {
 		display: flex;
-		flex-wrap: wrap;
 		align-items: center;
-		gap: var(--s-2) var(--s-3);
-		margin: 0;
+		justify-content: space-between;
+		gap: var(--s-3);
+		flex-wrap: wrap;
+	}
+
+	.segs {
+		display: inline-flex;
+		gap: 2px;
+		padding: 3px;
+		border: 1px solid var(--line);
+		border-radius: var(--r-pill);
+		background: var(--surface);
+	}
+
+	.segs button {
+		height: 30px;
+		padding: 0 var(--s-3);
+		border: 0;
+		border-radius: var(--r-pill);
+		background: transparent;
+		font-size: var(--t-sm);
 		font-weight: 600;
+		color: var(--ink-2);
+		cursor: pointer;
+	}
+
+	.segs button[aria-selected='true'] {
+		background: var(--ink);
+		color: var(--bg);
+	}
+
+	.split {
+		display: grid;
+		grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+		gap: var(--s-5);
+		align-items: start;
+	}
+
+	.split.alone {
+		grid-template-columns: minmax(0, 1fr);
 	}
 
 	.basis {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+		max-width: 110ch;
+	}
+
+	.basis p,
+	.basis-line {
 		margin: 0;
-		max-width: 90ch;
 		font-size: var(--t-sm);
-		color: var(--ink-2);
+		color: var(--ink-3);
+		line-height: 1.5;
 	}
 
 	.pad {
@@ -382,13 +513,6 @@
 		align-items: start;
 	}
 
-	.col {
-		display: flex;
-		flex-direction: column;
-		gap: var(--s-4);
-		min-width: 0;
-	}
-
 	.foot {
 		display: flex;
 		flex-direction: column;
@@ -401,14 +525,15 @@
 	}
 
 	@media (max-width: 1100px) {
-		.grid {
+		.grid,
+		.split {
 			grid-template-columns: minmax(0, 1fr);
 		}
 	}
 
 	@media (max-width: 760px) {
 		.league {
-			padding: var(--s-3) var(--s-4) var(--s-5);
+			padding: var(--s-3) var(--s-4) calc(var(--s-5) + 64px);
 		}
 
 		.pad {
