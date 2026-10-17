@@ -31,7 +31,8 @@ export interface BasisFacts {
 }
 
 /** The gap's one definition, on every page that prints it, and the column head's title. */
-export const GAP_WORDS = "Gap is drafters' ADP less our rank, plus when drafters wait.";
+export const GAP_WORDS =
+	"Gap, drafters' ADP less our rank, is plus and green when drafters wait, minus and rose when they reach.";
 
 /** "ranked by points over replacement for the full 2026 season", or for the rest of it once the run
  * ranks the rest. */
