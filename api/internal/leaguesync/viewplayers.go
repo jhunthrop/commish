@@ -4,6 +4,7 @@ import (
 	"sort"
 
 	"github.com/jhunthrop/commish/api/internal/apitypes"
+	"github.com/jhunthrop/commish/api/internal/tenth"
 )
 
 // players turns host ids into the wire's players: the host's own name,
@@ -65,10 +66,12 @@ func (p players) roster(t Team) []apitypes.RosterSpot {
 }
 
 func (p players) side(s Side) apitypes.MatchupSide {
-	out := apitypes.MatchupSide{RosterId: s.RosterID, Points: s.Points, PointsRead: !s.PointsUnread,
+	// The host's cents, rounded once by the site's rule to the tenth the
+	// Matchup screen prints (Lane 66k rereview N1).
+	out := apitypes.MatchupSide{RosterId: s.RosterID, Points: tenth.Round(round2(s.Points)), PointsRead: !s.PointsUnread,
 		Starters: make([]apitypes.MatchupStarter, 0, len(s.Starters))}
 	for _, id := range s.Starters {
-		out.Starters = append(out.Starters, apitypes.MatchupStarter{Player: p.player(id), Points: round2(s.PlayerPoints[id])})
+		out.Starters = append(out.Starters, apitypes.MatchupStarter{Player: p.player(id), Points: tenth.Round(round2(s.PlayerPoints[id]))})
 	}
 	return out
 }

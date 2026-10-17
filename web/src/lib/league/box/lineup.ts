@@ -84,7 +84,7 @@ export const LINEUP = {
 export const BENCH_ANCHOR = 'bench';
 
 /** A name's second mention: "Stroud", and a defense by its club ("Saints" from "Saints D/ST"). */
-function shortName(name: string): string {
+export function shortName(name: string): string {
 	return lastName(name.replace(/\s+D\/ST$/, ''));
 }
 

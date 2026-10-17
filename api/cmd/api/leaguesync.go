@@ -212,7 +212,7 @@ func (e espnWiring) leagueHost(log *slog.Logger) *leaguesync.ESPN {
 }
 
 // hostList is GET /hosts: every host open here, in the account page's order.
-func hostList(ff ffpcWiring, y yahooWiring, e espnWiring, m mflWiring, log *slog.Logger) []httpx.Route {
+func hostList(ff ffpcWiring, y yahooWiring, e espnWiring, m mflWiring, writes hosts.Writes, log *slog.Logger) []httpx.Route {
 	var open []apitypes.ConnectedHost
 	if ff.on {
 		open = append(open, apitypes.ConnectedHostFfpc)
@@ -228,7 +228,7 @@ func hostList(ff ffpcWiring, y yahooWiring, e espnWiring, m mflWiring, log *slog
 	if m.ready && m.writes {
 		open = append(open, apitypes.ConnectedHostMfl)
 	}
-	return (&hosts.List{Enabled: open, Accounts: m.service, Store: ff.store, Log: log}).Routes()
+	return (&hosts.List{Enabled: open, Accounts: m.service, Writes: writes, Store: ff.store, Log: log}).Routes()
 }
 
 // leagueSyncService wires league sync: Sleeper first, MyFantasyLeague

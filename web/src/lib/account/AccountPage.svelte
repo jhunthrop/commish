@@ -9,11 +9,11 @@
 	import { PUBLIC_API_URL } from '$app/env/public';
 	import { ApiError, apiClient } from '#lib/api/client.ts';
 	import { dayLabel } from '#lib/format/date.ts';
+	import { zoneName } from '#lib/format/clock.ts';
 	import { lazySheet } from '#lib/site/lazy-sheet.svelte.ts';
 	import ActionRow from '#lib/ui/ActionRow.svelte';
 	import ActionRows from '#lib/ui/ActionRows.svelte';
 	import EmptyState from '#lib/ui/EmptyState.svelte';
-	import Fact from '#lib/ui/Fact.svelte';
 	import Panel from '#lib/ui/Panel.svelte';
 	import HeroCard from '#lib/ui/HeroCard.svelte';
 	import LineList from '#lib/ui/LineList.svelte';
@@ -246,57 +246,18 @@
 					<p class="arrival" role="status">{arrived}</p>
 				</Panel>
 			{/if}
-			<HeroCard title={displayName(account)}>
-				{#snippet meta()}
-					<span>{account.email} · with us since {dayLabel(account.created_at)}</span>
-				{/snippet}
-			</HeroCard>
+			<div class="who">
+				<div class="title">
+					<h2>{displayName(account)}</h2>
+					<p class="lede">{account.email}, with us since {dayLabel(account.created_at)}</p>
+				</div>
+				<Quiet disabled={busy} onclick={() => void signOut()}>Sign out</Quiet>
+			</div>
 
 			<div class="grid">
 				<div class="lists">
-					<section aria-label="Your sheets">
-						<PanelHead title="Your sheets" aside={String(sheets.length)} level={2} />
-						{#if sheets.length > 0}
-							<LineList label="Your sheets" lines={sheetLines(sheets)} />
-						{:else}
-							<EmptyState level={3} title="No sheets yet">
-								{#snippet actions()}
-									<Quiet href={accountLinks.sheet()}>Start a cheat sheet</Quiet>
-								{/snippet}
-							</EmptyState>
-						{/if}
-					</section>
-
-					<section aria-label="Your mock drafts">
-						<PanelHead title="Your mock drafts" aside={String(mocks.length)} level={2} />
-						{#if mocks.length > 0}
-							<LineList label="Your mock drafts" lines={mockLines(mocks)} />
-						{:else}
-							<EmptyState level={3} title="No mock drafts yet" />
-						{/if}
-					</section>
-
-					<AccountLeagues features={account.features} />
-					{#if railInSeason(siteContext.rail)}
-						<!-- In season the draft prep leaves the rail, never the site (spec 2026-10-16 §2). -->
-						<section aria-label={NEXT_DRAFT}>
-							<PanelHead title={NEXT_DRAFT} level={2} />
-							<ActionRows label={NEXT_DRAFT}>
-								{#each NEXT_DRAFT_ROWS as row, i (row.lead)}
-									<ActionRow lead={row.lead} text={row.text}>
-										{#snippet action()}
-											<Quiet size="sm" href={i === 0 ? sectionHref('mock') : accountLinks.sheet()}
-												>{row.verb}</Quiet
-											>
-										{/snippet}
-									</ActionRow>
-								{/each}
-							</ActionRows>
-						</section>
-					{/if}
 					<AccountConnections />
-					<AccountDevices />
-
+					<AccountLeagues features={account.features} />
 					{#if groupPasses.length > 0}
 						<GroupPasses
 							passes={groupPasses}
@@ -306,41 +267,104 @@
 					{/if}
 				</div>
 
-				<aside class="side" aria-label="Your plan">
-					<Fact label="Your plan">
-						{#snippet value()}<PanelHead title={plan.title} />{/snippet}
-						{plan.line}
-					</Fact>
-					<div class="actions">
-						{#if plan.action === 'cancel'}
-							<Quiet disabled={busy} onclick={() => void changeMembership('cancel')}>
-								Cancel my membership
-							</Quiet>
-						{:else if plan.action === 'resume'}
-							<Quiet disabled={busy} onclick={() => void changeMembership('resume')}>
-								Keep my membership
-							</Quiet>
+				<aside class="side" aria-label="Your plan and display">
+					<section aria-label="Plan">
+						<div class="sec-h"><h2>Plan</h2></div>
+						<div class="kv">
+							<div class="kvr">
+								<span class="st"><b class="plan">{plan.title}</b><span>{plan.line}</span></span>
+							</div>
+							{#if plan.action === 'cancel'}
+								<div class="kvr">
+									<span class="st"
+										><b>Cancel</b><span>It runs to its date and does not renew</span></span
+									>
+									<Quiet size="sm" disabled={busy} onclick={() => void changeMembership('cancel')}
+										>Cancel my membership</Quiet
+									>
+								</div>
+							{:else if plan.action === 'resume'}
+								<div class="kvr">
+									<span class="st"><b>Renew</b><span>Keep it past its date</span></span>
+									<Quiet size="sm" disabled={busy} onclick={() => void changeMembership('resume')}
+										>Keep my membership</Quiet
+									>
+								</div>
+							{/if}
+							<!-- Receipts are a purchase question, not a feature one: a claimer's pass has none. -->
+							{#if boughtMembership(account) || account.draft_pass?.source === 'purchase' || groupPasses.length > 0}
+								<div class="kvr">
+									<span class="st"
+										><b>Billing and receipts</b><span>Your card and every receipt</span></span
+									>
+									<Quiet size="sm" disabled={busy} onclick={() => void billing()}>Open</Quiet>
+								</div>
+							{/if}
+							<div class="kvr">
+								{#if hasFeature(account.features, 'live_draft_advisor')}
+									<span class="st"
+										><b>Live draft companion</b><span>On your phone while you draft</span></span
+									>
+									<Quiet size="sm" href={accountLinks.companion()}>Open</Quiet>
+								{:else}
+									<span class="st"
+										><b>Draft Pass</b><span>Every league and the live draft companion</span></span
+									>
+									<Quiet size="sm" href={accountLinks.pass()}>See the Draft Pass</Quiet>
+								{/if}
+							</div>
+						</div>
+						{#if problem}<p class="problem" role="alert">{problem}</p>{/if}
+					</section>
+
+					<section aria-label="Display">
+						<div class="sec-h"><h2>Display</h2></div>
+						<div class="kv">
+							<div class="kvr">
+								<span class="st"><b>Theme</b><span>On this device</span></span>
+								<ThemeSwitch />
+							</div>
+							<div class="kvr">
+								<span class="st"
+									><b>Time zone</b><span
+										>{zoneName()}, from this device. Every time on the site follows it.</span
+									></span
+								>
+							</div>
+						</div>
+					</section>
+
+					<section aria-label={NEXT_DRAFT}>
+						<div class="sec-h"><h2>{NEXT_DRAFT}</h2></div>
+						{#if sheets.length > 0}
+							<LineList label="Your sheets" lines={sheetLines(sheets)} />
 						{/if}
-						{#if hasFeature(account.features, 'live_draft_advisor')}
-							<Quiet href={accountLinks.companion()}>Open the live draft companion</Quiet>
-						{:else}
-							<Quiet href={accountLinks.pass()}>See the Draft Pass</Quiet>
+						{#if mocks.length > 0}
+							<LineList label="Your mock drafts" lines={mockLines(mocks)} />
 						{/if}
-						<!-- Receipts are a purchase question, not a feature one: a claimer's pass has none. -->
-						{#if boughtMembership(account) || account.draft_pass?.source === 'purchase' || groupPasses.length > 0}
-							<Quiet disabled={busy} onclick={() => void billing()}>Billing and receipts</Quiet>
-						{/if}
-						<Quiet disabled={busy} onclick={() => void signOut()}>Sign out</Quiet>
-					</div>
-					{#if problem}<p class="problem" role="alert">{problem}</p>{/if}
+						<div class="kv">
+							{#each NEXT_DRAFT_ROWS as row, i (row.lead)}
+								<div class="kvr">
+									<span class="st"><b>{row.lead}</b><span>{row.text}</span></span>
+									<Quiet size="sm" href={i === 0 ? sectionHref('mock') : accountLinks.sheet()}
+										>{row.verb}</Quiet
+									>
+								</div>
+							{/each}
+						</div>
+					</section>
+
+					<AccountDevices />
 				</aside>
 			</div>
 		{/if}
-		<!-- The theme switch lives here at every width, signed in or out, and on no page bar. -->
-		<section class="theme" aria-label="Theme">
-			<PanelHead title="Theme" level={2} />
-			<ThemeSwitch />
-		</section>
+		<!-- The theme switch lives here at every width and on no page bar: signed in, under Display. -->
+		{#if view?.kind !== 'signed-in'}
+			<section class="theme" aria-label="Theme">
+				<PanelHead title="Theme" level={2} />
+				<ThemeSwitch />
+			</section>
+		{/if}
 	</main>
 </Shell>
 
@@ -365,7 +389,7 @@
 
 	.grid {
 		display: grid;
-		grid-template-columns: minmax(0, 1fr) var(--side-w);
+		grid-template-columns: minmax(0, 1fr) 380px;
 		gap: var(--s-5);
 		align-items: start;
 	}
@@ -375,16 +399,176 @@
 		display: flex;
 		flex-direction: column;
 		gap: var(--s-5);
+		min-width: 0;
 	}
 
-	.side {
+	.who {
+		display: flex;
+		align-items: flex-end;
+		justify-content: space-between;
+		gap: var(--s-4);
+	}
+
+	.title h2 {
+		margin: 0;
+		font-family: var(--font-num);
+		font-weight: 800;
+		font-size: var(--t-display);
+		line-height: 1;
+		text-transform: uppercase;
+		letter-spacing: 0.01em;
+	}
+
+	.lede {
+		margin: 6px 0 0;
+		font-size: var(--t-sm);
+		color: var(--ink-3);
+	}
+
+	/* The room's settings tables (Lane 66k), one look for every section the page draws: the section
+	 * head, a table of rows each with its state in two lines and its one verb at the right, and a
+	 * key and value list for the side's short sections. */
+	.account :global(.sec-h) {
+		display: flex;
+		align-items: baseline;
 		gap: var(--s-3);
+		margin: 0 0 var(--s-2);
 	}
 
-	.actions {
+	.account :global(.sec-h h2) {
+		margin: 0;
+		font-family: var(--font-num);
+		font-weight: 800;
+		font-size: var(--t-xl);
+		line-height: 1;
+		text-transform: uppercase;
+		letter-spacing: 0.02em;
+		white-space: nowrap;
+	}
+
+	.account :global(.sec-h span) {
+		font-size: var(--t-xs);
+		color: var(--ink-3);
+	}
+
+	.account :global(table.set) {
+		width: 100%;
+		border-collapse: separate;
+		border-spacing: 0;
+		table-layout: fixed;
+		background: var(--surface);
+		border: 1px solid var(--line);
+		border-radius: var(--r-md);
+		overflow: hidden;
+	}
+
+	.account :global(.set th),
+	.account :global(.set td) {
+		padding: var(--s-2);
+		border-bottom: 1px solid var(--line);
+		vertical-align: middle;
+		text-align: left;
+		font-size: var(--t-sm);
+	}
+
+	.account :global(.set tbody tr:last-child > *) {
+		border-bottom: 0;
+	}
+
+	.account :global(.set thead th) {
+		height: 32px;
+		padding-block: 0;
+		font-size: var(--t-xs);
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: var(--track-label);
+		color: var(--ink-3);
+		background: var(--bg);
+		white-space: nowrap;
+	}
+
+	.account :global(.set tbody tr) {
+		height: 64px;
+	}
+
+	.account :global(.set .act) {
+		text-align: right;
+	}
+
+	.account :global(.set .read),
+	.account :global(.set .none) {
+		color: var(--ink-2);
+		font-variant-numeric: tabular-nums;
+	}
+
+	.account :global(.st) {
 		display: flex;
 		flex-direction: column;
-		gap: var(--s-2);
+		gap: 2px;
+		min-width: 0;
+	}
+
+	.account :global(.st > b) {
+		font-weight: 600;
+	}
+
+	.account :global(.st > b.num),
+	.account :global(.st > b.plan) {
+		font-family: var(--font-num);
+		font-weight: 800;
+		font-size: var(--t-lg);
+		font-variant-numeric: tabular-nums;
+	}
+
+	.account :global(.st > b.plan) {
+		font-size: var(--t-xl);
+		text-transform: uppercase;
+		letter-spacing: 0.02em;
+	}
+
+	.account :global(.st > span) {
+		font-size: var(--t-xs);
+		color: var(--ink-3);
+	}
+
+	.account :global(.sr) {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		overflow: hidden;
+		clip: rect(0 0 0 0);
+		white-space: nowrap;
+	}
+
+	.account :global(.kv) {
+		display: flex;
+		flex-direction: column;
+		border: 1px solid var(--line);
+		border-radius: var(--r-md);
+		background: var(--surface);
+		overflow: hidden;
+	}
+
+	.account :global(.kvr) {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: var(--s-3);
+		min-height: 60px;
+		padding: var(--s-2) var(--s-3);
+		border-bottom: 1px solid var(--line);
+	}
+
+	.account :global(.kvr:last-child) {
+		border-bottom: 0;
+	}
+
+	.account :global(.ph-only) {
+		display: none;
+	}
+
+	.account :global(.kvr .st) {
+		flex: 1;
 	}
 
 	.arrival {
@@ -404,10 +588,69 @@
 		}
 	}
 
-	@media (max-width: 760px) {
+	/* Below a desk's width each table row is a card: its name and verb on one line, its states under. */
+	@media (max-width: 900px) {
 		.account {
 			padding: var(--s-4);
 			gap: var(--s-4);
+		}
+
+		.who {
+			flex-direction: column;
+			align-items: flex-start;
+		}
+
+		.account :global(.set),
+		.account :global(.set tbody),
+		.account :global(.set tr),
+		.account :global(.set th),
+		.account :global(.set td) {
+			display: block;
+			width: 100%;
+		}
+
+		.account :global(.set colgroup),
+		.account :global(.set thead),
+		.account :global(.set .ph-hide) {
+			display: none;
+		}
+
+		.account :global(.set tbody tr) {
+			height: auto;
+			display: grid;
+			grid-template-columns: minmax(0, 1fr) auto;
+			gap: 6px var(--s-3);
+			padding: var(--s-3);
+			border-bottom: 1px solid var(--line);
+		}
+
+		.account :global(.set tbody tr:last-child) {
+			border-bottom: 0;
+		}
+
+		.account :global(.set tbody th),
+		.account :global(.set tbody td) {
+			padding: 0;
+			border: 0;
+			width: auto;
+		}
+
+		.account :global(.set .act) {
+			grid-column: 2;
+			grid-row: 1;
+		}
+
+		.account :global(.set .wide) {
+			grid-column: 1 / -1;
+		}
+
+		.account :global(.ph-only) {
+			display: inline;
+		}
+
+		.account :global(.set .read) {
+			grid-column: 1 / -1;
+			font-size: var(--t-xs);
 		}
 	}
 </style>

@@ -252,6 +252,8 @@ func consentFor(host string) int {
 type moveAccess struct {
 	open, takes, on bool
 	note, reason    string
+	// off is the check that closed the move, for the Account room's words.
+	off hosts.WritesOff
 }
 
 // access reports whether a move of the kind is open to the account on the
@@ -261,9 +263,9 @@ type moveAccess struct {
 func (s *Service) access(ctx context.Context, accountID uuid.UUID, host string, kind apitypes.HostMoveInputKind) (moveAccess, error) {
 	words := wordsFor(host, kind)
 	if !takesWrites(host, kind) {
-		return moveAccess{reason: words.copyOnly}, nil
+		return moveAccess{reason: words.copyOnly, off: hosts.WritesOffTakesNone}, nil
 	}
-	out := moveAccess{takes: true, reason: words.switchedOff}
+	out := moveAccess{takes: true, reason: words.switchedOff, off: hosts.WritesOffNotOpen}
 	if !s.wired(host, kind) {
 		return out, nil
 	}
@@ -278,20 +280,32 @@ func (s *Service) access(ctx context.Context, accountID uuid.UUID, host string, 
 	conn, err := s.Connections.Get(ctx, accountID, host)
 	switch {
 	case errors.Is(err, hosts.ErrNotConnected):
-		out.reason = words.connect
+		out.reason, out.off = words.connect, hosts.WritesOffConnect
 		return out, nil
 	case err != nil:
 		return out, err
 	case conn.Status != hosts.StatusConnected:
-		out.note = words.reconnect
+		out.note, out.off = words.reconnect, hosts.WritesOffReconnect
 	case conn.ConsentVersion < consentFor(host):
-		out.note = words.reconsent
+		out.note, out.off = words.reconsent, hosts.WritesOffReconsent
 	default:
-		out.open, out.reason = true, ""
+		out.open, out.reason, out.off = true, "", ""
 		return out, nil
 	}
 	out.reason = out.note
 	return out, nil
+}
+
+// LineupWrites is whether the account's lineup is set on the host from
+// our screen and, when not, which of access's checks stopped it: the
+// Account room words it, so it never states a reason the Lineup's verb does
+// not act on (Lane 66k rereview N5).
+func (s *Service) LineupWrites(ctx context.Context, accountID uuid.UUID, host string) (hosts.WriteState, error) {
+	a, err := s.access(ctx, accountID, host, apitypes.HostMoveInputKindLineup)
+	if err != nil {
+		return hosts.WriteState{}, err
+	}
+	return hosts.WriteState{On: a.open, Off: a.off}, nil
 }
 
 // open reports whether a move of the kind is open to the account on the

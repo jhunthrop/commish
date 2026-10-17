@@ -115,7 +115,7 @@ function bugHead(game: ScoreboardGame, zone: string): Pick<Bug, 'head' | 'words'
 
 /** Every game of the week as a score bug, the drafter's first. */
 export function bugsOf(
-	board: Scoreboard,
+	board: Pick<Scoreboard, 'games'>,
 	sync: Pick<LeagueSync, 'teams' | 'me'>,
 	zone: string = memberZone()
 ): Bug[] {

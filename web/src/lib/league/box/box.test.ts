@@ -219,27 +219,27 @@ void test("Totals' note: the projection not in yet, else the playing starters wi
 });
 
 void test('Totals add the tenths the column prints, so a reader adding the column gets the bar', () => {
-	// Each rounds up to the tenth it prints (1.3, 2.4, 3.5), and the raw sum (7.05) prints 7.0.
-	const rows = [{ proj: 1.25 }, { proj: 2.35 }, { proj: 3.45 }];
+	// The API sends tenths (1.3, 2.4, 3.5, its rule on 1.25, 2.35, 3.45): the total is their sum,
+	// cleaned of binary noise, never rounded again.
+	const rows = [{ proj: 1.3 }, { proj: 2.4 }, { proj: 3.5 }];
 	const column = rows.reduce((sum, r) => sum + Number(boxNumber(r.proj)), 0);
-	assert.equal(boxNumber(projTotal(rows)), boxNumber(column));
+	assert.equal(boxNumber(projTotal(rows)), boxNumber(Math.round(column * 10) / 10));
 	assert.equal(projTotal(rows), 7.2);
-	// 8.75 prints 8.8 and 0.05 prints 0.1, so the column adds to 8.9, not the raw 8.8.
-	assert.equal(ptsTotal([{ pts: 8.75 }, { pts: 0.05 }]), 8.9);
+	assert.equal(ptsTotal([{ pts: 8.8 }, { pts: 0.1 }]), 8.9);
 });
 
 void test("Totals' Pts: the printed rows where the host gives each player's, else the host's team total", () => {
-	assert.equal(totalsPts([{ pts: 8.74 }, { pts: 3.06 }], true, 87.44), 11.8);
-	assert.equal(totalsPts([{ pts: null }, { pts: null }], false, 87.44), 87.44);
+	assert.equal(totalsPts([{ pts: 8.7 }, { pts: 3.1 }], true, 87.4), 11.8);
+	assert.equal(totalsPts([{ pts: null }, { pts: null }], false, 87.4), 87.4);
 	assert.equal(totalsPts([{ pts: null }], false, null), null);
 });
 
 void test('totals sum what is held, and a number not held prints as --', () => {
-	assert.equal(projTotal([{ proj: 19.44 }, { proj: null }, { proj: 8.1 }]), 27.5);
+	assert.equal(projTotal([{ proj: 19.4 }, { proj: null }, { proj: 8.1 }]), 27.5);
 	assert.equal(projTotal([{ proj: null }]), null);
 	assert.equal(ptsTotal([{ pts: null }]), null);
 	assert.equal(ptsTotal([{ pts: 3 }, { pts: 4.5 }]), 7.5);
-	assert.equal(boxNumber(27.54), '27.5');
+	assert.equal(boxNumber(27.5), '27.5');
 	assert.equal(boxNumber(null), '--');
 });
 
@@ -294,7 +294,10 @@ void test('the evidence columns print as the Lineup draws them', () => {
 	assert.equal(easeOf(11, 32), 'even');
 	assert.equal(deltaWord(0.4), '+0.4');
 	assert.equal(deltaWord(-0.3), '−0.3');
-	assert.equal(deltaWord(0.04), '0.0');
+	// The API sends the change in tenths (api tenth.Round): the cell formats it, signed, and no more.
+	assert.equal(deltaWord(0), '0.0');
+	assert.equal(deltaWord(-1.2), '−1.2');
+	assert.equal(deltaWord(10.4), '+10.4');
 	assert.equal(deltaWord(null), '--');
 	const row = boxRow(line(), 'QB', ZONE, false);
 	assert.deepEqual(row.evidence, {

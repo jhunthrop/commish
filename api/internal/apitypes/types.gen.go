@@ -1221,6 +1221,27 @@ func (e RoomWelcomeType) Valid() bool {
 	}
 }
 
+// Defines values for RosterChipKind.
+const (
+	RosterChipKindBye    RosterChipKind = "bye"
+	RosterChipKindPickup RosterChipKind = "pickup"
+	RosterChipKindStatus RosterChipKind = "status"
+)
+
+// Valid indicates whether the value is a known member of the RosterChipKind enum.
+func (e RosterChipKind) Valid() bool {
+	switch e {
+	case RosterChipKindBye:
+		return true
+	case RosterChipKindPickup:
+		return true
+	case RosterChipKindStatus:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for RosterSpotSlot.
 const (
 	RosterSpotSlotBench   RosterSpotSlot = "bench"
@@ -1401,6 +1422,42 @@ func (e WaiverMovesClaim) Valid() bool {
 	}
 }
 
+// Defines values for WeekSwapSlot.
+const (
+	WeekSwapSlotDEF       WeekSwapSlot = "DEF"
+	WeekSwapSlotFLEX      WeekSwapSlot = "FLEX"
+	WeekSwapSlotK         WeekSwapSlot = "K"
+	WeekSwapSlotQB        WeekSwapSlot = "QB"
+	WeekSwapSlotRB        WeekSwapSlot = "RB"
+	WeekSwapSlotSUPERFLEX WeekSwapSlot = "SUPERFLEX"
+	WeekSwapSlotTE        WeekSwapSlot = "TE"
+	WeekSwapSlotWR        WeekSwapSlot = "WR"
+)
+
+// Valid indicates whether the value is a known member of the WeekSwapSlot enum.
+func (e WeekSwapSlot) Valid() bool {
+	switch e {
+	case WeekSwapSlotDEF:
+		return true
+	case WeekSwapSlotFLEX:
+		return true
+	case WeekSwapSlotK:
+		return true
+	case WeekSwapSlotQB:
+		return true
+	case WeekSwapSlotRB:
+		return true
+	case WeekSwapSlotSUPERFLEX:
+		return true
+	case WeekSwapSlotTE:
+		return true
+	case WeekSwapSlotWR:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for LoginParamsScreen.
 const (
 	LoginParamsScreenSignIn LoginParamsScreen = "sign-in"
@@ -1504,6 +1561,9 @@ type AttachedLeague struct {
 	Host         LeagueHost         `json:"host"`
 	HostLeagueId string             `json:"host_league_id"`
 	Id           openapi_types.UUID `json:"id"`
+
+	// LastReadAt the league's last host read for this account, null when never read
+	LastReadAt *time.Time `json:"last_read_at"`
 
 	// Name the league's name at its last read
 	Name string `json:"name"`
@@ -2070,6 +2130,9 @@ type HostConnected struct {
 type HostConnection struct {
 	ConnectedAt time.Time `json:"connected_at"`
 
+	// ConsentVersion the version of the consent words the member agreed to on connect
+	ConsentVersion int `json:"consent_version"`
+
 	// Host a host the member connects their own account on, named as a mechanism
 	Host       ConnectedHost `json:"host"`
 	LastReadAt *time.Time    `json:"last_read_at"`
@@ -2079,6 +2142,12 @@ type HostConnection struct {
 
 	// Status connected reads. signed_out: the host no longer honors what we keep (FFPC's session past the one kept sign-in allowed in six hours, a Yahoo refresh Yahoo refused, ESPN cookies ESPN no longer accepts); the member connects again
 	Status HostConnectionStatus `json:"status"`
+
+	// WritesOn true when the member's lineup is set on the platform from our screen (the platform takes writes, its switch is on for the account, and the connection agreed to the moves); false otherwise, and writes_reason says why
+	WritesOn bool `json:"writes_on"`
+
+	// WritesReason the Account room's one line naming the platform when writes are off (it takes none, its switch is off for the account, connect again, agree to moves, or the check failed), null when on
+	WritesReason *string `json:"writes_reason"`
 }
 
 // HostConnectionStatus connected reads. signed_out: the host no longer honors what we keep (FFPC's session past the one kept sign-in allowed in six hours, a Yahoo refresh Yahoo refused, ESPN cookies ESPN no longer accepts); the member connects again
@@ -2735,6 +2804,12 @@ type MatchupStarter struct {
 	Points float64 `json:"points"`
 }
 
+// MemberWeek defines model for MemberWeek.
+type MemberWeek struct {
+	// Leagues every league the account follows, newest first, as GET /leagues/attached lists them
+	Leagues []WeekLeague `json:"leagues"`
+}
+
 // MembershipState the account's Membership, from its live membership entitlement whatever its source, else its latest subscription. A subscription carries its billing (interval, current_period_end and cancel_at_period_end). A grant bought nothing, so those three are null.
 type MembershipState struct {
 	CancelAtPeriodEnd *bool      `json:"cancel_at_period_end"`
@@ -2958,7 +3033,7 @@ type PlayerLine struct {
 	// Held the drafter tags him Hold on a sheet
 	Held bool `json:"held"`
 
-	// LastPoints his points in his last completed game under the league's scoring, to the cent; null before his first game
+	// LastPoints his points in his last completed game under the league's scoring, to the tenth; null before his first game
 	LastPoints *float64 `json:"last_points"`
 
 	// OppRank this week's opponent's rank in points allowed a game to his position this season under the league's scoring, 1 allowed the fewest (facts.allowed_to_position.rank, of its .of); null on a bye or before the season ranks it
@@ -2971,19 +3046,19 @@ type PlayerLine struct {
 	// PositionRank his place at his position in our order
 	PositionRank *int `json:"position_rank"`
 
-	// ProjectionDelta week_projection's change since the week's snapshot before the newest, to the cent, in the same format; null without a row for him in both snapshots or when week_projection is null
+	// ProjectionDelta week_projection's change since the week's snapshot before the newest, to the tenth, in the same format; null without a row for him in both snapshots or when week_projection is null
 	ProjectionDelta *float64 `json:"projection_delta"`
 
 	// RestOfSeasonPerGame his rest-of-season points a game, one decimal: the published board's rest-of-season points over the games his club has left from the board's first week through week 17, byes out, as the basis says; null on the preseason number, on a run that does not say its first week, without a projection or with no games left. A player who is out keeps it: it assumes he plays
 	RestOfSeasonPerGame *float64 `json:"rest_of_season_per_game"`
 
-	// SeasonAvg his points a game over every completed game this season under the league's scoring, to the cent; null before his first game
+	// SeasonAvg his points a game over every completed game this season under the league's scoring, to the tenth; null before his first game
 	SeasonAvg *float64 `json:"season_avg"`
 
 	// Slug his page on the site (/players/{slug}): set for a quarterback, running back, receiver or tight end our order ranks whose name no other player in our directory shares, null otherwise (a kicker or defense has no page) (a shared name's page is named by the run, which the API does not read)
 	Slug *string `json:"slug"`
 
-	// WeekProjection his points this week on the week's published projection, to the cent, in the format the league's scoring is most like (PPR, half PPR or standard); a team defense's by its club, a kicker our board does not place (no board id) by his club's one kicker, never a teammate's for a kicker the snapshot left out. The newest snapshot stored for the league's week (projection_read_at says when). Null when his club has no game that week (a bye), whatever the snapshot holds, and when the snapshot has no row for him or none is stored. Our own weekly model replaces it when it passes its test
+	// WeekProjection his points this week on the week's published projection, to the tenth (the site's one rounding, half away from zero), in the format the league's scoring is most like (PPR, half PPR or standard); a team defense's by its club, a kicker our board does not place (no board id) by his club's one kicker, never a teammate's for a kicker the snapshot left out. The newest snapshot stored for the league's week (projection_read_at says when). Null when his club has no game that week (a bye), whatever the snapshot holds, and when the snapshot has no row for him or none is stored. Our own weekly model replaces it when it passes its test
 	WeekProjection *float64 `json:"week_projection"`
 }
 
@@ -3278,6 +3353,22 @@ type RoomWelcome struct {
 // RoomWelcomeType defines model for RoomWelcome.Type.
 type RoomWelcomeType string
 
+// RosterChip defines model for RosterChip.
+type RosterChip struct {
+	// Gain a pickup's week_gain (the Waivers strip's first card): this week's Proj the lineup the advice sets gains with him in, one decimal; null on the other kinds
+	Gain *float64 `json:"gain"`
+
+	// Idle true on a bye (no one on the member's roster can play its spot this week); false on the other kinds
+	Idle bool `json:"idle"`
+
+	// Kind status, a starter as set with this week's designation (the newest); bye, a starter as set on bye whose spot no one on the member's roster can play (never a bye the lineup's changes already fill); pickup, the first pickup worth making as the Waivers screen chooses them, while the league runs waivers
+	Kind RosterChipKind `json:"kind"`
+	Line PlayerLine     `json:"line"`
+}
+
+// RosterChipKind status, a starter as set with this week's designation (the newest); bye, a starter as set on bye whose spot no one on the member's roster can play (never a bye the lineup's changes already fill); pickup, the first pickup worth making as the Waivers screen chooses them, while the league runs waivers
+type RosterChipKind string
+
 // RosterCounts starters per position and the bench. Flex spots come from the lineup.
 type RosterCounts struct {
 	Bench int `json:"bench"`
@@ -3334,7 +3425,7 @@ type ScoreboardSide struct {
 	// Played those starters whose game has kicked off
 	Played int `json:"played"`
 
-	// Points the side's points so far as the host scores them
+	// Points the side's points so far as the host scores them, to the tenth
 	Points float64 `json:"points"`
 
 	// PointsRead false when the host's score could not be read; points then says nothing
@@ -3861,6 +3952,16 @@ type WaiverRow struct {
 	WeekGain float64 `json:"week_gain"`
 }
 
+// WeekBug defines model for WeekBug.
+type WeekBug struct {
+	// First the member's starters as the platform holds them whose kickoff is the earliest of theirs still to come, empty when none is
+	First []PlayerLine   `json:"first"`
+	Game  ScoreboardGame `json:"game"`
+
+	// Teams the game's teams in the order of its sides, the member's first
+	Teams []LeagueTeam `json:"teams"`
+}
+
 // WeekFacts one player's week; a fact we do not hold is null, never zero
 type WeekFacts struct {
 	AllowedToPosition *PointsAllowed     `json:"allowed_to_position"`
@@ -3879,13 +3980,84 @@ type WeekFacts struct {
 	// Played his game this week is final
 	Played bool `json:"played"`
 
-	// PointsThisWeek the host's score for him so far, from the matchup, when he starts there and his game has kicked off
+	// PointsThisWeek the host's score for him so far, from the matchup, when he starts there and his game has kicked off, to the tenth
 	PointsThisWeek *float64        `json:"points_this_week"`
 	Roof           *GameRoof       `json:"roof"`
 	Spread         *GameSpread     `json:"spread"`
 	Weather        *KickoffWeather `json:"weather"`
 	Week           int             `json:"week"`
 }
+
+// WeekLeague defines model for WeekLeague.
+type WeekLeague struct {
+	// Bug the member's game this week, null when the league has no week, no game, or the read failed
+	Bug *WeekBug `json:"bug"`
+
+	// Chips at most three facts about the member's roster, in this order where each holds: a starter's designation, a starter on bye, the top pickup
+	Chips []RosterChip `json:"chips"`
+
+	// Host the host a league runs on, named as a mechanism
+	Host LeagueHost `json:"host"`
+
+	// Id the attachment (AttachedLeague.id)
+	Id openapi_types.UUID `json:"id"`
+
+	// Lineup the lineup's changes this week, null when the league has no week or the read failed
+	Lineup *WeekLineup `json:"lineup"`
+	Name   string      `json:"name"`
+
+	// Phase where a followed league is in its season, computed at read time from the host's facts: pre_draft before its draft, draft_day when the draft starts within 24 hours or is under way, in_season from the draft to the playoffs (a drafted league the host gives no current week is in_season while the site season is preseason), playoffs from the league's playoff start week until the host says the season is over, offseason after it (or a drafted league with no current week once the NFL regular season has ended)
+	Phase LeaguePhase `json:"phase"`
+
+	// Problem one sentence when a read failed or the league has no saved scoring, naming the platform; null otherwise
+	Problem *string `json:"problem"`
+
+	// ProjectionReadAt when the week's published projection the figures read was captured, null with none
+	ProjectionReadAt *time.Time `json:"projection_read_at"`
+
+	// ProjectionScoring the scoring the figures' projections are read in, null when the league has no week
+	ProjectionScoring *ProjectionScoring `json:"projection_scoring"`
+
+	// ReadAt the league's last host read
+	ReadAt   *time.Time      `json:"read_at"`
+	Standing *LeagueStanding `json:"standing"`
+
+	// TeamName the member's team at the last read, empty when unread
+	TeamName string `json:"team_name"`
+
+	// Week the league's current week, 0 when it has none or the read failed
+	Week int `json:"week"`
+}
+
+// WeekLineup defines model for WeekLineup.
+type WeekLineup struct {
+	// AsSet the lineup as the platform holds it, summed the same way; null when none has one
+	AsSet *float64 `json:"as_set"`
+
+	// Changes the starting spots our lineup fills with someone other than the platform holds
+	Changes int `json:"changes"`
+
+	// Gain projection less as_set to the tenth, null when either is null
+	Gain *float64 `json:"gain"`
+
+	// Projection our lineup's starters' week projections summed, each as printed to the tenth; null when none has one
+	Projection *float64 `json:"projection"`
+
+	// Swaps each change, in the league's slot order
+	Swaps []WeekSwap `json:"swaps"`
+}
+
+// WeekSwap defines model for WeekSwap.
+type WeekSwap struct {
+	In LeaguePlayer `json:"in"`
+
+	// Out the player the platform starts there, null for a spot left empty
+	Out  *LeaguePlayer `json:"out"`
+	Slot WeekSwapSlot  `json:"slot"`
+}
+
+// WeekSwapSlot defines model for WeekSwap.Slot.
+type WeekSwapSlot string
 
 // YahooConnectInput defines model for YahooConnectInput.
 type YahooConnectInput struct {
