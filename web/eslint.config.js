@@ -64,15 +64,16 @@ export default defineConfig(
 		rules: { '@typescript-eslint/no-confusing-void-expression': 'off' }
 	},
 	{
-		// Pages, site and context components link only through src/lib/site/links.ts (the account page
-		// through src/lib/account/links.ts), which build every href and navigation target with resolve(). The
+		// Pages, site, context and player card components link only through src/lib/site/links.ts (the
+		// account page through src/lib/account/links.ts, the card's verb through lib/player/live.ts), which build every href and navigation target with resolve(). The
 		// rule cannot see through those modules.
 		files: [
 			'src/routes/(run)/**/*.svelte',
 			'src/lib/site/**/*.svelte',
 			'src/lib/context/**/*.svelte',
 			'src/lib/account/**/*.svelte',
-			'src/lib/league/**/*.svelte'
+			'src/lib/league/**/*.svelte',
+			'src/lib/player/**/*.svelte'
 		],
 		rules: {
 			'svelte/no-navigation-without-resolve': [

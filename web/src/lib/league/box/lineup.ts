@@ -115,7 +115,7 @@ export function stripSum(
 
 /** The position an opponent's rank is against, in a sentence. A defense has no rank (the API ranks
  * none), so it has no words. */
-const AGAINST: Readonly<Record<string, string>> = {
+export const AGAINST: Readonly<Record<string, string>> = {
 	QB: 'quarterbacks',
 	RB: 'running backs',
 	WR: 'receivers',

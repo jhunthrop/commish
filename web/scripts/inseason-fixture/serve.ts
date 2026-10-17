@@ -28,6 +28,7 @@ import type {
 import type { components } from '../../src/lib/api/types.ts';
 import type { GameWeek } from '../../src/lib/format/game-facts.ts';
 import { FIXTURE_IDS } from './ids.ts';
+import { playerWeek, type Sheet } from './player-week.ts';
 import { FIXTURE_SEASON, askedPhase, phaseAccount, phaseLeagues, phaseSync } from './phases.ts';
 
 const PORT = Number(process.env.PORT ?? 8799);
@@ -89,6 +90,8 @@ async function load<T>(name: string): Promise<T> {
 	return JSON.parse(await readFile(new URL(`${name}.json`, DATA), 'utf8')) as T;
 }
 
+/** Lane 72's recorded week sheets, the player card's line for those players (player-week.ts). */
+const { players: sheets } = await load<{ players: Record<string, Sheet> }>('week-sheets');
 const [sync, lineup, waivers, trades, gameWeek, matchupBox] = await Promise.all([
 	load<LeagueSync>('sync'),
 	load<LineupAdvice>('lineup'),
@@ -272,6 +275,27 @@ function tradeCheck(input: TradeCheckInput): TradeCheck | string {
 
 const CHECK = /^\/leagues\/attached\/([^/]+)\/trades\/check$/;
 const IN_SEASON = /^\/leagues\/attached\/([^/]+)\/(lineup|matchup|waivers|trades)$/;
+/** The player card's reads (Lane 66h): in the league, and with no league. */
+const LEAGUE_PLAYER = /^\/leagues\/attached\/([^/]+)\/players\/([^/]+)$/;
+/** Each player's club and position from the built site's run (web/.runs, npm run standin), so the
+ * league read places a player no recorded screen carries, as the API's board does. */
+const RUNS = new URL('../../.runs/runs/', import.meta.url);
+const runIndex = await (async (): Promise<Map<string, { team: string; position: string }>> => {
+	try {
+		const { runId } = JSON.parse(await readFile(new URL('latest.json', RUNS), 'utf8')) as {
+			runId: string;
+		};
+		const entries = JSON.parse(await readFile(new URL(`${runId}/index.json`, RUNS), 'utf8')) as {
+			id: string;
+			team: string;
+			position: string;
+		}[];
+		return new Map(entries.map(({ id, team, position }) => [id, { team, position }]));
+	} catch {
+		return new Map();
+	}
+})();
+const PUBLIC_PLAYER = /^\/players\/([^/]+)\/week$/;
 const MOVES = /^\/leagues\/attached\/([^/]+)\/moves(\/plan)?$/;
 
 /** A changed slot's place in the API's words: "at RB", "in the flex". */
@@ -514,6 +538,29 @@ async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> 
 		const checked = tradeCheck((await bodyOf(req)) as TradeCheckInput);
 		if (typeof checked === 'string') send(req, res, HTTP.unprocessable, checked, 'invalid');
 		else send(req, res, HTTP.ok, checked);
+		return;
+	}
+	const recorded = { sync, lineup, waivers, trades, matchup: matchupBox, games: gameWeek, sheets };
+	const publicPlayer = PUBLIC_PLAYER.exec(url.pathname);
+	if (publicPlayer) {
+		const team = url.searchParams.get('team');
+		const position = url.searchParams.get('position') ?? '';
+		const week =
+			team === null ? null : playerWeek(recorded, publicPlayer[1] ?? '', { team, position }, false);
+		if (week === null) send(req, res, HTTP.badRequest, 'Name his club.', 'invalid');
+		else send(req, res, HTTP.ok, week);
+		return;
+	}
+	const leaguePlayer = LEAGUE_PLAYER.exec(url.pathname);
+	if (leaguePlayer) {
+		if (leaguePlayer[1] === OUT_OF_SEASON) {
+			send(req, res, HTTP.conflict, NO_GAMES);
+			return;
+		}
+		const id = leaguePlayer[2] ?? '';
+		const week = playerWeek(recorded, id, runIndex.get(id) ?? null, true);
+		if (week === null) send(req, res, HTTP.notFound, 'Nothing here by that id', 'not_found');
+		else send(req, res, HTTP.ok, week);
 		return;
 	}
 	const inSeason = IN_SEASON.exec(url.pathname);

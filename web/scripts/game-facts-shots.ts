@@ -1,12 +1,13 @@
 // Screenshots of the week's game facts (Lane 66a): the expected score and margin, the roof and the
-// kickoff weather with their read time, on the waivers and trades rows and a player page as a sentence,
+// kickoff weather with their read time, on the waivers and trades rows as a sentence,
 // and on the Lineup and Matchup box scores (Lane 66d) as a cell ("20 to 22.5" and the weather in two or
 // three words) with the read said once under the boxes, in both themes at 1440 and 390 on a Central
 // clock (on a phone the waiver and trade rows keep to their decision, so they carry none). Each asserts
 // what it shows, no betting word, and that nothing scrolls sideways. Against the built site served static and the
 // fixture API (scripts/inseason-fixture/serve.ts), whose /games/week answers the recorded week.
 //
-//   node scripts/game-facts-shots.ts [web origin] [out dir] [player slug]
+//   node scripts/game-facts-shots.ts [web origin] [out dir]
+// The player page's Game cell is player-card-shots.ts's (Lane 66h).
 // with the site built against PUBLIC_API_URL pointing at the fixture API.
 import { mkdir } from 'node:fs/promises';
 import { chromium, type BrowserContext, type Page } from 'playwright';
@@ -37,32 +38,27 @@ const BETTING =
 
 const web = process.argv[2] ?? 'http://localhost:4682';
 const out = new URL(process.argv[3] ?? '../screenshots/game-facts/', import.meta.url);
-const player = process.argv[4] ?? 'jordan-love';
 const id = FIXTURE_IDS.league;
 const PAGES = [
 	{
 		name: 'start',
 		path: `/league/${id}/start`,
 		ready: 'Copy the lineup',
-		phone: true,
 		box: true
 	},
 	{
 		name: 'waivers',
 		path: `/league/${id}/waivers`,
 		ready: 'Claim on Sleeper',
-		phone: false,
 		box: false
 	},
 	{
 		name: 'trades',
 		path: `/league/${id}/trades`,
 		ready: 'Propose on Sleeper',
-		phone: false,
 		box: false
 	},
-	{ name: 'matchup', path: `/league/${id}/matchup`, ready: 'Week 6', phone: true, box: true },
-	{ name: 'player', path: `/players/${player}`, ready: 'Week 6:', phone: true, box: false }
+	{ name: 'matchup', path: `/league/${id}/matchup`, ready: 'Week 6', box: true }
 ] as const;
 const failures: string[] = [];
 
@@ -131,7 +127,7 @@ async function boxFacts(
 	});
 }
 
-for (const { name, path, ready, phone, box } of PAGES) {
+for (const { name, path, ready, box } of PAGES) {
 	for (const theme of THEMES) {
 		for (const width of WIDTHS) {
 			const where = `${name} ${theme} ${String(width)}`;
@@ -165,7 +161,7 @@ for (const { name, path, ready, phone, box } of PAGES) {
 				}
 				const said = await factsLine(page);
 				// The waiver and trade rows keep to their decision on a phone, so the first row clears the pin.
-				const shown = phone || width !== PHONE_WIDTH;
+				const shown = width !== PHONE_WIDTH;
 				check(
 					(said !== null) === shown,
 					`${where}: ${shown ? 'no game facts sentence' : 'game facts on a phone row'}`

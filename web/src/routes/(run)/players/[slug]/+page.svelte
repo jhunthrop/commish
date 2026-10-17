@@ -10,6 +10,10 @@
 	import { readFigures } from '#lib/run/read-figures.ts';
 	import { liveStatusClock, type LiveStatus } from '#lib/run/live-status.ts';
 	import { UNWRITTEN_READ, unwrittenLines } from '#lib/run/unwritten-words.ts';
+	import { CARD, unreadBasis, type CardTile } from '#lib/player/card.ts';
+	import type { CardLeague, LiveCard } from '#lib/player/week-words.ts';
+	import PlayerCard from '#lib/player/PlayerCard.svelte';
+	import type PlayerCompare from '#lib/player/PlayerCompare.svelte';
 	import Credit from '#lib/site/Credit.svelte';
 	import SheetAdd from '#lib/site/SheetAdd.svelte';
 	import { lazySheet } from '#lib/site/lazy-sheet.svelte.ts';
@@ -17,38 +21,21 @@
 	import { SEASON_ANCHOR, links } from '#lib/site/links.ts';
 	import Capsule from '#lib/ui/Capsule.svelte';
 	import Crumb from '#lib/ui/Crumb.svelte';
-	import Face from '#lib/ui/Face.svelte';
 	import Fact from '#lib/ui/Fact.svelte';
 	import Figure from '#lib/ui/Figure.svelte';
 	import Footnote from '#lib/ui/Footnote.svelte';
 	import GameLog from '#lib/ui/GameLog.svelte';
 	import GapChip from '#lib/ui/GapChip.svelte';
-	import HeroCard from '#lib/ui/HeroCard.svelte';
 	import LineList from '#lib/ui/LineList.svelte';
 	import Label from '#lib/ui/Label.svelte';
 	import OutcomeBar from '#lib/ui/OutcomeBar.svelte';
 	import PanelHead from '#lib/ui/PanelHead.svelte';
-	import PositionPill from '#lib/ui/PositionPill.svelte';
-	import Quiet from '#lib/ui/Quiet.svelte';
 	import Table from '#lib/ui/Table.svelte';
-	import TierChip from '#lib/ui/TierChip.svelte';
 	import TierMates from '#lib/ui/TierMates.svelte';
-	import ToneChip from '#lib/ui/ToneChip.svelte';
 	import { heatFor } from '#lib/ui/heat.ts';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
-
-	/** His club's game this week with its facts, read from the API after the first paint. */
-	let thisWeek = $state<string | null>(null);
-
-	onMount(() => {
-		lazySheet.armOnFirstIntent(window);
-		siteContext.wantHeld();
-		void import('#lib/run/week-line.ts')
-			.then(({ weekLine }) => weekLine(data.page.team))
-			.then((line) => (thisWeek = line));
-	});
 
 	const page = $derived(data.page);
 	/** His figures lead with the context's format when the run carries it (the league's). */
@@ -61,11 +48,73 @@
 	const figures = $derived(apiFormatOf(lead.format));
 	/** The league's line. */
 	const note = $derived(siteContext.notes?.lineFor(figures, 'These figures are') ?? null);
-	/** Whose roster he is on in the league, on its own line with its own room, once the rosters are
-	 * read: the free-agent read in one glance. */
-	const rostered = $derived.by(() => {
-		return siteContext.held?.holder(page.id) ?? null;
+	/** Whose roster he is on in the league, once the rosters are read: the free-agent read in one
+	 * glance. */
+	const rostered = $derived(siteContext.held?.holder(page.id) ?? null);
+	/** The league the card reads in, null with none selected. */
+	const league = $derived<CardLeague | null>(
+		siteContext.league ? { id: siteContext.league.id, host: siteContext.league.host } : null
+	);
+
+	/** The week's read (Lane 66h): null until it answers, failed when it cannot. */
+	let live = $state<LiveCard | null>(null);
+	let failed = $state(false);
+	let ready = $state(false);
+	let comparing = $state(false);
+	/** Compare's table, loaded the first time it opens (an await block would put Svelte's await
+	 * runtime in every page's shared chunk). */
+	let Compare = $state<typeof PlayerCompare | null>(null);
+
+	function toggleCompare(): void {
+		comparing = !comparing;
+		if (comparing && Compare === null)
+			void import('#lib/player/PlayerCompare.svelte').then((module) => (Compare = module.default));
+	}
+	/** The tiles as built: rest of season in the lead format, the week's tiles "--" until read. */
+	const built = $derived<CardTile[]>(
+		page.card.tiles.flatMap((tile) => (tile.key === 'opp' ? [lead.restTile, tile] : [tile]))
+	);
+	/** The week's figures over the tiles as built, the rest of season always the build's. */
+	const tiles = $derived<CardTile[]>(
+		live === null ? built : live.tiles.map((tile) => (tile.key === 'rest' ? lead.restTile : tile))
+	);
+
+	async function readLive(at: CardLeague | null): Promise<void> {
+		try {
+			const module = await import('#lib/player/live.ts');
+			const player = { id: page.id, name: page.name, team: page.team, position: page.position };
+			const week = await module.readWeek(player, at);
+			live = module.liveCard({
+				week,
+				player,
+				league: at,
+				tiles: built,
+				opponents: page.card.opponents,
+				games: page.card.games,
+				screenHref: module.screenHrefFor(at)
+			});
+			failed = false;
+		} catch (error: unknown) {
+			// eslint-disable-next-line no-console -- the basis line says the figures could not be read
+			console.warn('player card: the week', error);
+			failed = true;
+		}
+	}
+
+	onMount(() => {
+		lazySheet.armOnFirstIntent(window);
+		siteContext.wantHeld();
+		void siteContext.load().then(() => {
+			ready = true;
+		});
 	});
+
+	/** Read once the context is known, and again when the member switches league. */
+	$effect(() => {
+		const at = league;
+		if (ready) void readLive(at);
+	});
+
 	/** What the read will be built from, on a page whose written read is not ready. */
 	const unwritten = $derived(
 		unwrittenLines({
@@ -79,9 +128,7 @@
 			held: page.status?.words.view.rank ?? null
 		})
 	);
-	/** The figures beside our read, each naming its basis: in season the rest of it leads, in the
-	 * context's format. The writer's pulls are matched against the format the capsule was written
-	 * for, the page's default line. */
+	/** The figures beside our read, each naming its basis. */
 	const readPulls = $derived(
 		readFigures(page.capsule?.pulls ?? [], {
 			label: scoring,
@@ -94,18 +141,18 @@
 		})
 	);
 	/** His status words as built, said again on the member's clock once the page is live. */
-	let live = $state<LiveStatus | null>(null);
+	let liveStatus = $state<LiveStatus | null>(null);
 	onMount(() => {
 		liveStatusClock(
 			page.status !== null,
 			() => import('#lib/run/status-view.ts'),
 			(said) => {
-				live = said;
+				liveStatus = said;
 			}
 		);
 	});
 	const statusWords = $derived.by(() => {
-		const clock = live;
+		const clock = liveStatus;
 		const status = page.status;
 		if (status === null || clock === null) return status?.words ?? null;
 		return clock.words.playerStatusWords(status.status, {
@@ -115,7 +162,6 @@
 			now: clock.now
 		});
 	});
-	/** A season-long status shows as his rank. */
 	const listed = $derived(statusWords?.view ?? null);
 	const statusNote = $derived(statusWords?.note ?? null);
 	/** On a season-long list: no tier and no gap frame the rank his figure would earn. */
@@ -123,20 +169,28 @@
 	const mates = $derived(
 		page.tier.mates.map((mate) => ({ ...mate, href: links.player(mate.slug) }))
 	);
+	/** Every number's basis, once: the week's, the rest of season's, the season's. */
+	const basis = $derived([
+		...(live === null ? [unreadBasis(failed)] : live.basis),
+		...(lead.rest ? [lead.rest.lead] : []),
+		page.season.basis
+	]);
 </script>
 
-<!-- His season so far: once the run is past the season's first kickoff it leads the draft facts,
-     before it they lead. -->
+<!-- His season so far as a box score: once the run is past the season's first kickoff it leads the
+     draft facts, before it they lead. -->
 {#snippet thisSeason()}
 	<section class="season" id={SEASON_ANCHOR} aria-label="This season">
 		<PanelHead title="This season" aside={page.season.aside} level={2} />
-		<Footnote>{page.season.basis}</Footnote>
 		<GameLog
 			caption="{page.name} week by week, {page.season.season}"
 			heads={page.season.heads}
+			projHead={{ short: CARD.proj, full: "the week's projection" }}
 			pointsHead={page.season.pointsHead}
+			pastProj="--"
 			line={page.season.line}
 			rows={page.season.rows}
+			next={live?.next ?? null}
 			ahead={page.season.ahead}
 			none={page.season.none}
 		/>
@@ -144,7 +198,6 @@
 {/snippet}
 
 <SiteShell title={page.name} run={data.run}>
-	{#snippet tail()}<Quiet href={links.compare(page.slug)}>Compare</Quiet>{/snippet}
 	<main class="player">
 		<Crumb
 			trail={[
@@ -154,38 +207,23 @@
 			]}
 		/>
 
-		<HeroCard title={page.name}>
-			{#snippet media()}<Face
-					src={page.headshot}
-					size={168}
-					phoneSize={96}
-					loading="eager"
-				/>{/snippet}
-			{#snippet meta()}
-				<PositionPill position={page.position} rank={listed?.rank ?? n.positionRank} />
-				{#if !heldOut}<TierChip tier={n.tier} long />{/if}
-				<a href={links.club(page.team)}>{page.team}</a>
-				{#if listed}<ToneChip tone={listed.sits ? 'loss' : 'even'}>{listed.mark}</ToneChip>{/if}
-				<span class="holder" class:filled={rostered !== null}>{rostered ?? ''}</span>
-			{/snippet}
-			{#snippet aside()}
-				<Figure
-					value={fixed(n.projected)}
-					size="xl"
-					align="end"
-					phoneAlign="start"
-					caption={lead.words.caption}
-				/>
-				{#if lead.rest?.preseason}
-					<Figure
-						value={fixed(lead.rest.preseason.points)}
-						size="sm"
-						align="end"
-						phoneAlign="start"
-						caption="projected preseason for all {season}, our rank {lead.rest.preseason.rank}"
-					/>
-				{/if}
-				<SheetAdd
+		<PlayerCard
+			name={page.name}
+			headshot={page.headshot}
+			team={page.team}
+			club={{ name: page.clubName, href: links.club(page.team) }}
+			position={page.position}
+			status={listed ? { mark: listed.mark, sits: listed.sits } : null}
+			holder={rostered}
+			holdRoom={league !== null}
+			next={page.card.next}
+			cell={live?.cell ?? null}
+			verb={live?.verb ?? null}
+			{tiles}
+			{comparing}
+			oncompare={toggleCompare}
+		>
+			{#snippet sheet()}<SheetAdd
 					player={{
 						id: page.id,
 						name: page.name,
@@ -194,74 +232,95 @@
 						headshot: page.headshot
 					}}
 					fill
-				/>
-			{/snippet}
-		</HeroCard>
-		{#if lead.rest}<Footnote>{lead.rest.lead}</Footnote>{/if}
+				/>{/snippet}
+		</PlayerCard>
 		{#if statusNote}<Footnote>{statusNote}</Footnote>{/if}
-		{#if thisWeek}<p class="this-week">{thisWeek}</p>{/if}
 		<div class="league-lines">
 			<ContextNote note={note?.text ?? null} link={note?.link ?? null} />
 		</div>
 
+		{#if comparing && Compare}
+			<Compare
+				self={{ id: page.id, name: page.name, team: page.team, headshot: page.headshot, tiles }}
+				{league}
+				format={lead.format.id}
+			/>
+		{/if}
+
 		{#if page.underway}{@render thisSeason()}{/if}
 
-		<section class="facts" aria-label="His numbers">
-			<Fact label={lead.words.draftersLabel}>
-				{#snippet value()}
-					<Figure value={lead.words.draftersFigure} />
-					{#if !lead.rest && !heldOut}<GapChip {gap} />{/if}
-				{/snippet}
-				{lead.words.drafters}
-			</Fact>
-			<Fact label="Over replacement" heat={heatFor(n.vor, n.vorRound)}>
-				{#snippet value()}<Figure value={signed(n.vor)} /><span>{unit}</span>{/snippet}
-				{lead.words.value}
-			</Fact>
-			{#if n.floor !== null && n.median !== null && n.ceiling !== null}
-				<Fact label="Floor, median, ceiling">
+		{#if !page.underway}
+			<section class="facts" aria-label="His numbers">
+				<Fact label={lead.words.draftersLabel}>
 					{#snippet value()}
-						<span class="bar"
-							><OutcomeBar
-								floor={n.floor ?? 0}
-								median={n.median ?? 0}
-								ceiling={n.ceiling ?? 0}
-							/></span
-						>
+						<Figure value={lead.words.draftersFigure} />
+						{#if !lead.rest && !heldOut}<GapChip {gap} />{/if}
 					{/snippet}
-					{season}
-					{scoring} points, from his low case to his high case
+					{lead.words.drafters}
 				</Fact>
-			{/if}
-		</section>
-
-		{#if !page.underway}{@render thisSeason()}{/if}
+				<Fact label="Over replacement" heat={heatFor(n.vor, n.vorRound)}>
+					{#snippet value()}<Figure value={signed(n.vor)} /><span>{unit}</span>{/snippet}
+					{lead.words.value}
+				</Fact>
+				{#if n.floor !== null && n.median !== null && n.ceiling !== null}
+					<Fact label="Floor, median, ceiling">
+						{#snippet value()}
+							<span class="bar"
+								><OutcomeBar
+									floor={n.floor ?? 0}
+									median={n.median ?? 0}
+									ceiling={n.ceiling ?? 0}
+								/></span
+							>
+						{/snippet}
+						{season}
+						{scoring} points, from his low case to his high case
+					</Fact>
+				{/if}
+			</section>
+			{@render thisSeason()}
+		{/if}
 
 		<div class="split">
 			<article class="read">
 				<h3><Label>Our read</Label></h3>
+				{#if page.weekRead}
+					<section class="week-read" aria-label="The week ahead">
+						<p class="stamp">{page.weekRead.caption}</p>
+						<Capsule body={page.weekRead.body} pulls={[]} />
+					</section>
+				{/if}
 				{#if page.capsule}
+					{#if page.card.readStamp}<p class="stamp">{page.card.readStamp}</p>{/if}
 					<Capsule body={page.capsule.body} pulls={readPulls} />
 				{:else}
 					<p class="unwritten">{UNWRITTEN_READ}</p>
 					<LineList lines={unwritten} label="What our read of {page.name} will be built from" />
 				{/if}
 			</article>
-			<aside class="tier" aria-label="His tier">
-				{#if page.heldTier !== null}
-					<PanelHead title="Tier" />
-					<Footnote>{page.heldTier}</Footnote>
-				{:else}
-					<TierMates
-						tier={page.tier.tier}
-						group={POSITION_NAMES[page.position]}
-						{mates}
-						currentId={page.id}
-						cliff={page.tier.cliff}
-						unit={page.format.unit}
-						basis={page.tierBasis}
-					/>
+			<aside class="side">
+				{#if page.underway}
+					<section class="why" aria-label={CARD.whyTitle}>
+						<h3><Label>{CARD.whyTitle}</Label></h3>
+						<p>{CARD.why}</p>
+					</section>
 				{/if}
+				<div aria-label="His tier">
+					{#if page.heldTier !== null}
+						<PanelHead title="Tier" />
+						<Footnote>{page.heldTier}</Footnote>
+					{:else}
+						<TierMates
+							tier={page.tier.tier}
+							group={POSITION_NAMES[page.position]}
+							{mates}
+							currentId={page.id}
+							cliff={page.tier.cliff}
+							unit={page.format.unit}
+							basis={page.tierBasis}
+						/>
+					{/if}
+				</div>
 			</aside>
 		</div>
 
@@ -291,38 +350,18 @@
 			</section>
 		{/if}
 
+		<div class="basis">
+			{#each basis as line (line)}<p>{line}</p>{/each}
+		</div>
 		<Credit />
 	</main>
 </SiteShell>
 
 <style>
-	/* His club's game this week with its facts, the row's facts style: a sentence in the second ink. */
-	.this-week {
-		margin: 0;
-		color: var(--ink-2);
-		font-size: var(--t-sm);
-		font-variant-numeric: tabular-nums;
-	}
-
 	/* The league's line; with no league selected it takes no place. */
 	.league-lines {
 		display: flex;
 		flex-direction: column;
-	}
-
-	/* Whose roster he is on, in the hero under his chips: its own line, its room kept from the first
-	   paint while a league is selected, so the rosters arriving move nothing. */
-	.holder {
-		display: none;
-		flex-basis: 100%;
-		min-height: 1lh;
-		font-size: var(--t-sm);
-		color: var(--ink-2);
-	}
-
-	.holder.filled,
-	:global(html[data-league]) .holder {
-		display: block;
 	}
 
 	:global(html:not([data-league])) .league-lines:not(:has(:global(.filled))) {
@@ -368,11 +407,51 @@
 	}
 
 	.read h3 {
-		margin: 0 0 var(--s-3);
+		margin: 0 0 var(--s-1);
 	}
 
-	.tier {
-		grid-column: 2;
+	/* The read's stamp in the reading face's caption: its day and what it was written from. */
+	.stamp {
+		margin: 0 0 var(--s-3);
+		font-family: var(--font-read);
+		font-style: italic;
+		font-size: var(--t-sm);
+		color: var(--ink-3);
+	}
+
+	/* The week-ahead read above the season's, ruled off from it. */
+	.week-read {
+		margin-bottom: var(--s-4);
+		padding-bottom: var(--s-2);
+		border-bottom: 1px solid var(--line);
+	}
+
+	.side {
+		display: flex;
+		flex-direction: column;
+		gap: var(--s-4);
+	}
+
+	/* The slot the weekly model's why fills once a round of it passes its test. */
+	.why {
+		display: flex;
+		flex-direction: column;
+		gap: var(--s-2);
+		padding: var(--s-3) var(--s-4);
+		border: 1px dashed var(--line-strong);
+		border-radius: var(--r-md);
+	}
+
+	.why h3 {
+		margin: 0;
+		line-height: 1;
+	}
+
+	.why p {
+		margin: 0;
+		font-size: var(--t-sm);
+		line-height: 1.5;
+		color: var(--ink-2);
 	}
 
 	.unwritten {
@@ -381,13 +460,23 @@
 		font-size: var(--t-md);
 	}
 
+	.basis {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+		max-width: 1000px;
+	}
+
+	.basis p {
+		margin: 0;
+		font-size: var(--t-sm);
+		line-height: 1.5;
+		color: var(--ink-3);
+	}
+
 	@media (max-width: 1080px) {
 		.split {
 			grid-template-columns: minmax(0, 1fr);
-		}
-
-		.tier {
-			grid-column: auto;
 		}
 
 		.facts {
@@ -396,9 +485,14 @@
 	}
 
 	@media (max-width: 760px) {
+		/* Room under the page for the verb pinned above the tab bar. */
 		.player {
-			padding: var(--s-4);
+			padding: var(--s-4) var(--s-4) calc(var(--s-6) + 64px);
 			gap: var(--s-4);
+		}
+
+		.basis p {
+			font-size: var(--t-xs);
 		}
 	}
 </style>

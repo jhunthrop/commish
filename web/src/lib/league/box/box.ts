@@ -389,12 +389,15 @@ export function projBasis(
 	readAt: string | null,
 	scoring: ProjectionScoring,
 	defense: boolean,
-	zone: string = memberZone()
+	zone: string = memberZone(),
+	league = true
 ): string {
-	const whose = scoring.league_own
-		? "this league's own"
-		: "the closest match to this league's rules";
-	const what = `${BOX.proj} is this week's published projection in ${FORMAT_WORDS[scoring.format]} scoring, ${whose}`;
+	const whose = !league
+		? ''
+		: scoring.league_own
+			? ", this league's own"
+			: ", the closest match to this league's rules";
+	const what = `${BOX.proj} is this week's published projection in ${FORMAT_WORDS[scoring.format]} scoring${whose}`;
 	const when =
 		readAt === null
 			? 'not in yet for this week'

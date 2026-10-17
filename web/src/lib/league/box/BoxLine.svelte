@@ -79,6 +79,7 @@
 {/snippet}
 
 <tr
+	data-player={row.boardId}
 	class:bench
 	class:moved-in={move === 'in'}
 	class:moved-out={move === 'out'}

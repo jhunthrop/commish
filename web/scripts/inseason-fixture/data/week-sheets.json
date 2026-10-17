@@ -1,0 +1,80 @@
+{
+	"note": "The recorded week 6 sheets of Lane 72's three week-ahead reads (research/tests/testdata/week_reads/recorded.json): their published projection, their opponent's rank against their position, their points a game and last games, the player card's line for a player no recorded screen carries.",
+	"players": {
+		"4426515": {
+			"name": "Puka Nacua",
+			"team": "LAR",
+			"position": "WR",
+			"week_projection": 23.04,
+			"projection_read_at": "2026-10-17T17:12:56.267776+00:00",
+			"opp_rank": 28,
+			"opp_of": 32,
+			"points_a_game_allowed": 40.3,
+			"season_avg": 25.9,
+			"last_games": [
+				{
+					"week": 5,
+					"points": 37.7
+				},
+				{
+					"week": 4,
+					"points": 27.7
+				},
+				{
+					"week": 1,
+					"points": 12.4
+				}
+			]
+		},
+		"4429795": {
+			"name": "Jahmyr Gibbs",
+			"team": "DET",
+			"position": "RB",
+			"week_projection": null,
+			"projection_read_at": null,
+			"opp_rank": null,
+			"opp_of": null,
+			"points_a_game_allowed": null,
+			"season_avg": 30.7,
+			"last_games": [
+				{
+					"week": 5,
+					"points": 37.7
+				},
+				{
+					"week": 4,
+					"points": 17.7
+				},
+				{
+					"week": 3,
+					"points": 41.4
+				}
+			]
+		},
+		"4241389": {
+			"name": "CeeDee Lamb",
+			"team": "DAL",
+			"position": "WR",
+			"week_projection": 19.45,
+			"projection_read_at": "2026-10-17T17:12:56.267776+00:00",
+			"opp_rank": 15,
+			"opp_of": 32,
+			"points_a_game_allowed": 29.500000000000007,
+			"season_avg": 22.6,
+			"last_games": [
+				{
+					"week": 5,
+					"points": 2.9
+				},
+				{
+					"week": 4,
+					"points": 41.3
+				},
+				{
+					"week": 3,
+					"points": 18.2
+				}
+			]
+		}
+	}
+}

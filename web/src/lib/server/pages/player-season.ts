@@ -68,7 +68,7 @@ function splitLog(log: readonly GameLogRow[]): [GameLogRow[], GameLogRow[]] {
 }
 
 function basisWords(season: PlayerSeason, position: Position, format: Format): string {
-	const source = `Stat lines from the NFL's records, scored in ${format.label}`;
+	const source = `Stats from the NFL's records, scored in ${format.label}`;
 	if (season.games === 0) return `${source}.`;
 	const parts = [`${source}, averaged over the ${plural(season.games, 'game')} he played.`];
 	if (position === 'QB' && season.totals.completions === null)
@@ -89,11 +89,13 @@ function seasonLine(
 	format: Format
 ): SeasonLine | null {
 	if (season.games === 0 || season.pointsPerGame === null) return null;
+	const perGame = fixed(season.pointsPerGame, POINTS_PER_GAME_DECIMALS);
 	return {
 		lead: 'Season',
-		sub: plural(season.games, 'game'),
+		sub: `${plural(season.games, 'game')}, ${perGame} a game`,
+		total: season.totals.points === null ? '' : fixed(season.totals.points),
 		points: {
-			value: fixed(season.pointsPerGame, POINTS_PER_GAME_DECIMALS),
+			value: perGame,
 			caption: `${format.label} points a game`
 		},
 		cells: columns.map((column) => {

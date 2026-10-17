@@ -13,14 +13,32 @@ export interface LineCell {
 	caption: string;
 }
 
-/** The season line, the log's first row: the games, his points a game, then a total or a rate under
- * each stat head. */
+/** The season line, the box's totals row at its foot: the games and his points a game, his points
+ * for the season, then a total or a rate under each stat head. */
 export interface SeasonLine {
 	lead: string;
+	/** "3 games, 25.9 a game". */
 	sub: string;
+	/** His points for the season. */
+	total: string;
 	points: LineCell;
 	/** One per stat head, in order. */
 	cells: readonly LineCell[];
+}
+
+/** The week ahead as the box's accent row, read after the first paint: the opponent, the kickoff,
+ * this week's projection and the game's facts in the box's cell form. */
+export interface LogNext {
+	week: number;
+	/** "vs ARI". */
+	opponent: string;
+	/** "Sun 3:05 pm". */
+	when: string;
+	/** "21.8", or "--" without one. */
+	proj: string;
+	/** "32.5 to 20", null without the figures. */
+	expected: string | null;
+	weather: { glyph: 'wind' | 'indoors' | 'roof' | 'abroad' | 'outdoors'; words: string } | null;
 }
 
 /** played prints its line, quiet is a week he did not play, bye is his bye. */

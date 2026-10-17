@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import Label from '#lib/ui/Label.svelte';
 	import Panel from '#lib/ui/Panel.svelte';
 	import ProblemLine from '#lib/ui/ProblemLine.svelte';
@@ -159,6 +160,13 @@
 		if (outcome.kind === 'answer') narrowed = outcome.answer;
 		if (outcome.kind === 'failed') problem = outcome.sentence;
 	}
+
+	/** A player page's "Trade for him" names him (?player=, Lane 66h): the trades holding him. */
+	onMount(() => {
+		const asked = new URL(window.location.href).searchParams.get('player');
+		if (asked !== null && [...players.yours, ...players.theirs].some((l) => pickKey(l) === asked))
+			void pick(asked);
+	});
 
 	function open(team: number): void {
 		opened = new Set([...opened, team]);

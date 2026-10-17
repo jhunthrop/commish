@@ -6,12 +6,14 @@
 // Sources, all real, nothing invented, every date read from the data's own stamps:
 //   docs/design/mocks/2026-10-12-commish/data/board-ppr.csv   the 400-row 2026 PPR board (its ADP
 //     column is not used: nothing in the store dates it)
-//   docs/design/mocks/2026-10-12-commish/data/capsules.csv    the written capsules
+//   docs/design/mocks/2026-10-12-commish/data/capsules.csv    the written capsules, where the store holds none
 //   the local dev database (STANDIN_DATABASE_URL, the compose dev database by default):
 //     adp_snapshots: the PPR 12-team captures taken before the season's first kickoff, averaged
 //     nfl_games: the 2026 slate, the byes and the first kickoff
 //     team_week_observations (vegas_win_totals): each club's latest published season win total
 //     register_freeze_rows and register_grade_rows: the record as it stands
+//     research.player_capsules: the writer's newest read for each player and when it wrote it
+//   scripts/standin-week-reads.json   Lane 72's three recorded week-ahead reads, the stand-in's weekRead
 //     research.player_week_observations and friends: each player's season so far
 //     (standin-season.ts, scored with fantasy-points.ts)
 //   research-ts/src/domain/nfl-team-names.ts for each club's city and nickname
@@ -61,6 +63,7 @@ import {
 	type RunRecord,
 	type Schedule,
 	type Source,
+	type WeekRead,
 	type Window
 } from '../src/lib/run/schema.ts';
 import { POSITIONS, type Position } from '../src/lib/types/player.ts';
@@ -219,9 +222,65 @@ function boardRows(csv: readonly BoardCsv[], adpByGsis: ReadonlyMap<string, numb
 	});
 }
 
+/** A capsule the writer stored, with when it wrote it. */
+interface StoredCapsule {
+	body: string;
+	writtenAt: string;
+}
+
+/** The writer's newest stored read for each player, by his board (ESPN) id: the page carries the
+ * writer's current text and its day, as the nightly does, and the mock's CSV only where the store has
+ * none (that text's day is not recorded, so it carries no stamp). */
+async function storedCapsules(sql: postgres.Sql): Promise<Map<string, StoredCapsule>> {
+	const rows = await sql<{ espn_id: string; body_full: string; generated_at: Date }[]>`
+		select p.espn_id, c.body_full, c.generated_at
+		from research.player_capsules c join research.players p on p.id = c.player_id
+		where c.source = 'llm' and p.espn_id is not null`;
+	return new Map(
+		rows.map((row) => [
+			row.espn_id,
+			{ body: row.body_full.trim(), writtenAt: row.generated_at.toISOString() }
+		])
+	);
+}
+
+/** A page's capsule: the stored read when there is one, else the CSV's; the mock's pull figures kept
+ * where the text still carries them, so the schema's check holds. */
+function capsuleOf(
+	name: string,
+	stored: StoredCapsule | undefined,
+	csv: CapsuleCsv | undefined
+): Capsule | null {
+	if (HELD_CAPSULES.has(name)) return null;
+	const pulls = PULL_FIGURES[name] ?? [];
+	if (stored)
+		return {
+			body: stored.body,
+			pulls: pulls.filter((pull) => stored.body.includes(pull.figure)),
+			writtenAt: stored.writtenAt
+		};
+	return csv ? { body: csv.body_full.trim(), pulls } : null;
+}
+
+/** Lane 72's recorded week-ahead reads, by board id: the stand-in's weekRead for those players. */
+async function weekReads(): Promise<Map<string, WeekRead>> {
+	const file = new URL('./standin-week-reads.json', import.meta.url);
+	const recorded = JSON.parse(await readFile(file, 'utf8')) as {
+		reads: (Omit<WeekRead, 'factsAt'> & { id: string })[];
+	};
+	return new Map(
+		recorded.reads.map(({ id, week, body, caption, writtenAt }) => [
+			id,
+			{ week, body, caption, writtenAt, factsAt: null }
+		])
+	);
+}
+
 function playerPages(
 	rows: readonly BoardRow[],
 	capsules: readonly CapsuleCsv[],
+	stored: ReadonlyMap<string, StoredCapsule>,
+	reads: ReadonlyMap<string, WeekRead>,
 	seasons: ReadonlyMap<string, PlayerSeason>
 ): Player[] {
 	const byId = new Map(capsules.map((capsule) => [capsule.player_id, capsule]));
@@ -229,11 +288,7 @@ function playerPages(
 		const season = seasons.get(row.id);
 		if (!season) throw new Error(`${row.name} has no season block.`);
 		const { id, slug, name, position, team, headshot, ...numbers } = row;
-		const written = byId.get(id);
-		const capsule: Capsule | null =
-			written && !HELD_CAPSULES.has(name)
-				? { body: written.body_full.trim(), pulls: PULL_FIGURES[name] ?? [] }
-				: null;
+		const capsule = capsuleOf(name, stored.get(id), byId.get(id));
 		return {
 			id,
 			slug,
@@ -243,6 +298,7 @@ function playerPages(
 			headshot,
 			formats: { [FORMAT.id]: numbers },
 			capsule,
+			weekRead: reads.get(id) ?? null,
 			season
 		};
 	});
@@ -619,7 +675,13 @@ async function main(): Promise<void> {
 			kickoff: clubKickoffs(games),
 			now
 		});
-		const players = playerPages(rows, capsuleCsv, seasons);
+		const players = playerPages(
+			rows,
+			capsuleCsv,
+			await storedCapsules(sql),
+			await weekReads(),
+			seasons
+		);
 		checkRunSeasons(players, schedule);
 		const index: IndexEntry[] = rows.map(({ id, slug, name, team, position, headshot }) => {
 			const season = seasons.get(id);

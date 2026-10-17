@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { SvelteSet } from 'svelte/reactivity';
 	import { BOX, boxNumber } from './box.ts';
 	import BoxLine from './BoxLine.svelte';
@@ -23,6 +24,18 @@
 	const COLUMNS = 10;
 	const opened = new SvelteSet<string>();
 
+	let table = $state<HTMLTableElement | null>(null);
+
+	/** A player page's verb names him (?player=, Lane 66h): his row is marked and brought into view. */
+	onMount(() => {
+		const asked = new URL(window.location.href).searchParams.get('player');
+		const row =
+			asked === null ? null : table?.querySelector(`tr[data-player="${CSS.escape(asked)}"]`);
+		if (!(row instanceof HTMLElement)) return;
+		row.dataset.asked = '';
+		row.scrollIntoView({ block: 'center' });
+	});
+
 	function whyOf(entry: LineupRow): { id: string; open: boolean; toggle: () => void } | null {
 		if (entry.why === null) return null;
 		const key = entry.row.key;
@@ -37,7 +50,7 @@
 	}
 </script>
 
-<table class="lineup" aria-label={label}>
+<table class="lineup" aria-label={label} bind:this={table}>
 	<thead>
 		<tr class="cols">
 			<th class="slot" scope="col">{BOX.slot}</th>
@@ -107,6 +120,13 @@
 </table>
 
 <style>
+	/* The player a player page sent here, marked in the accent's rule. */
+	.lineup :global(tr[data-asked] td) {
+		box-shadow:
+			inset 0 2px 0 var(--accent),
+			inset 0 -2px 0 var(--accent);
+	}
+
 	.lineup {
 		width: 100%;
 		border-collapse: separate;

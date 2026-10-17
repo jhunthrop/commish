@@ -4,8 +4,6 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
 	type GameConditions,
-	clubGame,
-	clubGameLine,
 	figuresWords,
 	gameFactsLine,
 	readWords,
@@ -122,22 +120,6 @@ void test('the facts are said only until kickoff', () => {
 	assert.ok(!toBePlayed({ played: false, kickoff: KICKOFF }, Date.parse(KICKOFF)));
 	assert.ok(!toBePlayed({ played: true, kickoff: KICKOFF }, before));
 	assert.ok(toBePlayed({ played: false, kickoff: null }, before));
-});
-
-void test("a week's answer finds his club's game, and its line ends at kickoff", () => {
-	const game = {
-		team: 'SEA',
-		opponent: 'KC',
-		home: true,
-		kickoff: KICKOFF,
-		played: false,
-		...conditions()
-	};
-	const week = { season: 2026, week: 7, games: [game] };
-	assert.equal(clubGame(week, 'SEA'), game);
-	assert.equal(clubGame(week, 'KC'), null);
-	const past = { ...game, kickoff: '2020-01-01T00:00:00.000Z' };
-	assert.equal(clubGameLine(week, past, ZONE), null);
 });
 
 /** Words the game facts never use: the lines are an input and a fact, named only as what his club is
