@@ -21,11 +21,12 @@
 		href: string;
 		/** The API's sentence under a verb it cannot open: where the member makes the change. */
 		hostNote?: string | null;
-		/** The API's line on how the rows are ranked, above them. */
-		basis: string;
+		/** The API's line on how the rows are ranked, above them; null where the screen says it in its
+		 * own basis block under the rows (the Trades table, Lane 66g). */
+		basis: string | null;
 		/** The rest of the API's basis, under the rows: the league the figures are for and the rules
-		 * points so far leave out. */
-		basisNote: string;
+		 * points so far leave out; null as basis is. */
+		basisNote: string | null;
 		/** When set, the verb is a button that does this (opens the move's confirmation) rather than
 		 * the host's page. */
 		onverb?: (() => void) | null;
@@ -107,9 +108,9 @@
 	</div>
 </Panel>
 {@render move?.()}
-<Basis {basis} />
+{#if basis !== null}<Basis {basis} />{/if}
 {@render children()}
-<p class="foot">{basisNote}</p>
+{#if basisNote !== null}<p class="foot">{basisNote}</p>{/if}
 {#if !asideForMove && (verb !== null || (verbFoot !== undefined && footSays) || hostNote !== null)}
 	<div class="pin" {@attach hostTab(href)}>
 		{@render action(true)}

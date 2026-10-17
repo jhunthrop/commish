@@ -1,0 +1,340 @@
+/** The Trades screen as a trade table (Lane 66g): a strip naming the trades worth proposing, each
+ * with both sides, both gains and its one verb; the finder as a table, one trade a row (you give,
+ * you get, with whom, each side's gain over the rest of the season a week and change in this week's
+ * Proj, the room each roster has), sortable, a row opening its players in the box score's columns;
+ * the builder's two box scores under a scoreboard of each side's totals before and after. Pure,
+ * tested in trades.test.ts, so every word the screen prints is here. */
+import { memberZone } from '#lib/format/clock.ts';
+import { lastName } from '#lib/format/draft.ts';
+import { listWords } from '#lib/format/list.ts';
+import { fixed, MINUS, signed } from '#lib/format/number.ts';
+import type { LeagueHost } from '../api.ts';
+import type {
+	PlayerLine,
+	TradeAdvice,
+	TradeCheck,
+	TradeMoves,
+	TradeRow,
+	TradeSideTotals,
+	TradeTeam
+} from '../inseason/api.ts';
+import { tradeKey } from '../inseason/state.ts';
+import { verbWords } from '../inseason/words.ts';
+import { hostWords } from '../names.ts';
+import { BOX, EVIDENCE_BASIS, factsReadLine, projBasis, ptsBasis } from './box.ts';
+
+/** Every word the trade table prints that is not a player's or a team's, for the copy guard. */
+export const TRADES = {
+	/** The two ruled-off groups of the finder's columns. */
+	seasonHead: 'Rest of season, a week',
+	weekHead: `This week, ${BOX.proj}`,
+	you: 'You',
+	them: 'Them',
+	/** A phone drops the groups' heads, so its two gain heads carry the unit (review of the mock). */
+	youAWeek: 'You, a week',
+	themAWeek: 'Them, a week',
+	give: 'You give',
+	get: 'You get',
+	with: 'With',
+	room: 'Room',
+	best: 'Best with each team',
+	every: 'Every trade',
+	/** The opened trade's rows, by side. */
+	sideGive: 'Give',
+	sideGet: 'Get',
+	sideDrop: 'Drop',
+	restOfSeason: 'Rest of season',
+	why: 'Why this trade',
+	fromThis: 'Build from this',
+	youHaveRoom: 'You have room',
+	theyHaveRoom: 'They have room',
+	noOneToDrop: 'No one to drop',
+	hasRoom: 'Has room',
+	copied: 'Copied.',
+	copyFailed: 'This browser would not copy it.',
+	proposeItOn: 'Propose it on',
+	aWeekForYou: 'a week for you',
+	forThem: 'for them',
+	weekWord: 'Week',
+	/** The builder's scoreboard. */
+	yourSide: 'You',
+	theirSide: 'With',
+	propose: 'Propose',
+	sortBy: 'Sort by'
+} as const;
+
+/** A trade as the table lists it: its team and its row, keyed as the screen marks it. */
+export interface FinderRow {
+	key: string;
+	team: TradeTeam;
+	row: TradeRow;
+}
+
+/** The columns a member sorts the finder by, each best first. */
+export type SortKey = 'mine' | 'theirs' | 'weekMine' | 'weekTheirs';
+
+const SORT_FIGURE: Readonly<Record<SortKey, (row: TradeRow) => number | null>> = {
+	mine: (row) => row.my_gain,
+	theirs: (row) => row.their_gain,
+	weekMine: (row) => row.my_proj_change,
+	weekTheirs: (row) => row.their_proj_change
+};
+
+/** The API's order across teams: the trades the other team gains from first, then the close calls
+ * for them, each by your gain, then theirs. */
+function apiOrder(a: FinderRow, b: FinderRow): number {
+	return (
+		Number(a.row.close_for_them) - Number(b.row.close_for_them) ||
+		b.row.my_gain - a.row.my_gain ||
+		b.row.their_gain - a.row.their_gain
+	);
+}
+
+/** The finder's rows: each team's first trade (the API's best with it), or every trade. */
+export function finderRows(teams: readonly TradeTeam[], every: boolean): FinderRow[] {
+	return teams
+		.flatMap((team) =>
+			(every ? team.trades : team.trades.slice(0, 1)).map((row) => ({
+				key: tradeKey(team.roster_id, row),
+				team,
+				row
+			}))
+		)
+		.sort(apiOrder);
+}
+
+/** The rows by a column, best first, a row without the figure last; ties keep the API's order. */
+export function sortRows(rows: readonly FinderRow[], by: SortKey): FinderRow[] {
+	const figure = SORT_FIGURE[by];
+	return [...rows].sort((a, b) => {
+		const fa = figure(a.row);
+		const fb = figure(b.row);
+		if (fa === fb) return apiOrder(a, b);
+		if (fa === null) return 1;
+		if (fb === null) return -1;
+		return fb - fa;
+	});
+}
+
+/** The most trades the strip names. */
+export const STRIP_MOST = 2;
+
+/** The trades worth proposing: the best with each team the other team gains from (never a close
+ * call for them), at most two, each with a different team; none when no trade clears that bar. */
+export function worthProposing(teams: readonly TradeTeam[]): FinderRow[] {
+	return finderRows(teams, false)
+		.filter(({ row }) => !row.close_for_them && row.my_gain > 0)
+		.slice(0, STRIP_MOST);
+}
+
+const COUNT_WORDS = ['No', 'One', 'Two'];
+
+/** "Two trades worth proposing", "One trade worth proposing". */
+export function worthTitle(count: number): string {
+	const n = COUNT_WORDS[count] ?? String(count);
+	return `${n} ${count === 1 ? 'trade' : 'trades'} worth proposing`;
+}
+
+/** A side by last names: "Skattebo and Strong". */
+export function shortSide(side: readonly PlayerLine[]): string {
+	return listWords(side.map((line) => lastName(line.player.name)));
+}
+
+/** A gain as its cell prints it: "+5.7", "−0.3". */
+export function gainWord(gain: number): string {
+	return signed(Number(fixed(gain, 1)), 1);
+}
+
+/** A change in this week's Proj as its cell prints it: "+7.3", "−5.6", "0.0", "--" without one. */
+export function weekWord(change: number | null): string {
+	if (change === null) return BOX.none;
+	const shown = Number(fixed(change, 1));
+	return shown === 0 ? fixed(0, 1) : signed(shown, 1);
+}
+
+/** A figure's tone: up is a gain, down a loss, none even. */
+export function toneOf(value: number | null): 'gain' | 'loss' | 'even' {
+	if (value === null) return 'even';
+	const shown = Number(fixed(value, 1));
+	if (shown === 0) return 'even';
+	return shown > 0 ? 'gain' : 'loss';
+}
+
+/** The room each roster has for a trade the finder lists: the member's drop by name, else room;
+ * theirs always (the finder keeps only trades both rosters have room for, their drop theirs to
+ * choose). */
+export function roomWords(row: Pick<TradeRow, 'drop'>): { yours: string; theirs: string } {
+	return {
+		yours: row.drop ? `You drop ${lastName(row.drop.player.name)}` : TRADES.youHaveRoom,
+		theirs: TRADES.theyHaveRoom
+	};
+}
+
+/** A trade's second line on a phone: "with Max_Jensen10, you drop Dart". */
+export function phoneWith(team: Pick<TradeTeam, 'name'>, row: Pick<TradeRow, 'drop'>): string {
+	const drop = row.drop ? `, you drop ${lastName(row.drop.player.name)}` : '';
+	return `with ${team.name}${drop}`;
+}
+
+/** The builder's room, from the check: "Drop Dart", "Has room", "No one to drop". */
+export function checkRoom(check: Pick<TradeCheck, 'trade' | 'fills'>): {
+	yours: string;
+	theirs: string;
+} {
+	const { fills, trade } = check;
+	const yours = !fills.yours_room
+		? TRADES.noOneToDrop
+		: trade.drop
+			? `${TRADES.sideDrop} ${lastName(trade.drop.player.name)}`
+			: TRADES.hasRoom;
+	return { yours, theirs: fills.theirs_room ? TRADES.hasRoom : TRADES.noOneToDrop };
+}
+
+/** A player as the copied trade names him: "Aaron Rodgers (QB PIT)". */
+function offerName(line: PlayerLine): string {
+	const club = line.player.team === '' ? '' : ` ${line.player.team}`;
+	return `${line.player.name} (${line.player.position}${club})`;
+}
+
+/** The trade as it is copied, for the member to propose on the platform: "Trade with Max_Jensen10:
+ * Aaron Rodgers (QB PIT) for Cam Skattebo (RB NYG) and Pierre Strong (RB GB)." */
+export function offerText(
+	team: Pick<TradeTeam, 'name'>,
+	row: Pick<TradeRow, 'give' | 'get'>
+): string {
+	const side = (lines: readonly PlayerLine[]): string => listWords(lines.map(offerName));
+	return `Trade with ${team.name}: ${side(row.give)} for ${side(row.get)}.`;
+}
+
+/** The trade verb by the moves rule: "Propose on Sleeper" where the platform takes a proposal from
+ * here (none today), else "Open Sleeper trades", which copies the offer and opens its page. */
+export function proposeVerb(moves: Pick<TradeMoves, 'propose'>, host: LeagueHost): string {
+	return moves.propose === 'available'
+		? verbWords('trades', host)
+		: `Open ${hostWords(host)} trades`;
+}
+
+/** "Sleeper's trade page". */
+export function tradePageWords(host: LeagueHost): string {
+	return `${hostWords(host)}'s trade page`;
+}
+
+/** The line once the verb has copied the offer: what happened, then where to propose it, the page
+ * its link. */
+export interface CopiedTrade {
+	said: string;
+	page: string;
+}
+
+export function copiedTrade(host: LeagueHost, copied: boolean): CopiedTrade {
+	return { said: copied ? TRADES.copied : TRADES.copyFailed, page: tradePageWords(host) };
+}
+
+/** One row of an opened trade: the side, which way he moves for the member, and his line. */
+export interface SideRow {
+	side: string;
+	move: 'in' | 'out';
+	line: PlayerLine;
+}
+
+/** An opened trade's players by roster: the member's give and drop, then their get. */
+export function sideRows(row: Pick<TradeRow, 'give' | 'get' | 'drop'>): {
+	yours: SideRow[];
+	theirs: SideRow[];
+} {
+	const yours: SideRow[] = [
+		...row.give.map((line) => ({ side: TRADES.sideGive, move: 'out' as const, line })),
+		...(row.drop ? [{ side: TRADES.sideDrop, move: 'out' as const, line: row.drop }] : [])
+	];
+	return {
+		yours,
+		theirs: row.get.map((line) => ({ side: TRADES.sideGet, move: 'in' as const, line }))
+	};
+}
+
+const ROSTER_ORDER = ['QB', 'RB', 'WR', 'TE', 'K', 'DEF'];
+
+/** A roster as the builder's box lists it: by position, each by this week's Proj, highest first (a
+ * player without one after), injured reserve last. */
+export function rosterOrder(lines: readonly PlayerLine[]): PlayerLine[] {
+	const ir = (l: PlayerLine): number =>
+		Number(l.player.injured_reserve || l.facts.designation?.status === 'injured_reserve');
+	const at = (l: PlayerLine): number => {
+		const i = ROSTER_ORDER.indexOf(l.player.position);
+		return i < 0 ? ROSTER_ORDER.length : i;
+	};
+	return [...lines].sort(
+		(a, b) =>
+			ir(a) - ir(b) ||
+			at(a) - at(b) ||
+			(b.week_projection ?? Number.NEGATIVE_INFINITY) -
+				(a.week_projection ?? Number.NEGATIVE_INFINITY) ||
+			a.player.name.localeCompare(b.player.name)
+	);
+}
+
+/** One side of the builder's scoreboard: this week's Proj and the rest-of-season strength, each
+ * before and after with the change, "--" before an answer or without a projection. */
+export interface BugFigures {
+	projBefore: string;
+	projAfter: string;
+	projChange: string;
+	projTone: 'gain' | 'loss' | 'even';
+	seasonBefore: string;
+	seasonAfter: string;
+	seasonChange: string;
+	seasonTone: 'gain' | 'loss' | 'even';
+}
+
+export function bugFigures(totals: TradeSideTotals | null, gain: number | null): BugFigures {
+	// A strength below replacement prints with the typographic minus, as every signed figure does.
+	const word = (value: number | null | undefined): string => {
+		if (value === null || value === undefined) return BOX.none;
+		const shown = fixed(Math.abs(value), 1);
+		return value < 0 && Number(shown) !== 0 ? `${MINUS}${shown}` : shown;
+	};
+	const projChange =
+		totals?.proj_before != null && totals.proj_after != null
+			? totals.proj_after - totals.proj_before
+			: null;
+	return {
+		projBefore: word(totals?.proj_before),
+		projAfter: word(totals?.proj_after),
+		projChange: weekWord(projChange),
+		projTone: toneOf(projChange),
+		seasonBefore: word(totals?.season_before),
+		seasonAfter: word(totals?.season_after),
+		seasonChange: gain === null ? BOX.none : gainWord(gain),
+		seasonTone: toneOf(gain)
+	};
+}
+
+/** "From McConkey Kong Country, you", "From Max_Jensen10". */
+export function fromWords(team: string, mine: boolean): string {
+	return mine ? `From ${team}, you` : `From ${team}`;
+}
+
+/** The trade screen's basis, said once under the rows in five lines at most (Lane 66g): which trades
+ * are listed and what their figures are (the API's own line), the Proj and the week's change, the
+ * evidence columns and Pts, the room and the Game cell's read, then the league the figures are for. */
+export function tradeBasis(
+	advice: Pick<
+		TradeAdvice,
+		'basis' | 'basis_note' | 'projection_read_at' | 'projection_scoring' | 'player_points'
+	>,
+	host: LeagueHost,
+	lines: readonly PlayerLine[],
+	zone: string = memberZone()
+): string[] {
+	const defense = lines.some((l) => l.player.position === 'DEF');
+	const week = `${projBasis(advice.projection_read_at, advice.projection_scoring, defense, zone)} ${TRADES.weekHead} is each lineup's ${BOX.proj} total with the trade less without it, each lineup set as the Lineup screen sets it.`;
+	const facts = factsReadLine(lines, zone);
+	const room = `${TRADES.room} says who a roster drops to take two for one.${facts === null ? '' : ` ${facts}`}`;
+	return [
+		advice.basis,
+		week,
+		`${EVIDENCE_BASIS} ${ptsBasis(advice.player_points, host)}`,
+		room,
+		advice.basis_note
+	];
+}
