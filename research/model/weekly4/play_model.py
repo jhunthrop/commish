@@ -125,7 +125,10 @@ def _scramble_means(plays: pd.DataFrame) -> tuple[float, float]:
 
 
 def fit_play_models(
-    plays: pd.DataFrame, pricing_seasons: Sequence[int], grid: Sequence[Cell] = BOOSTED_GRID
+    plays: pd.DataFrame,
+    pricing_seasons: Sequence[int],
+    grid: Sequence[Cell] = BOOSTED_GRID,
+    fixed: Mapping[str, Cell] | None = None,
 ) -> PlayFit:
     """For each pricing season s, every sub-model fitted on the seasons from the first through s - 1,
     its cell chosen by forward-chaining inside those seasons."""
@@ -145,7 +148,7 @@ def fit_play_models(
             cache = FoldCache(data.fold_loss)
             cells[key] = {}
             for s in pricing_seasons:
-                cell = cache.choose(tuple(range(first, s)), grid)
+                cell = fixed[key] if fixed is not None else cache.choose(tuple(range(first, s)), grid)
                 cells[key][s] = cell
                 models[s][key] = data.fit_before(cell, s)
     fitted = {

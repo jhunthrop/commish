@@ -73,8 +73,14 @@ class TeamFit:
     seconds: float
 
 
-def fit_team_models(teams: pd.DataFrame, row_seasons: Sequence[int], grid: Sequence[Cell] = BOOSTED_GRID) -> TeamFit:
-    """For each season s of `row_seasons`, every target fitted on the first season through s - 1."""
+def fit_team_models(
+    teams: pd.DataFrame,
+    row_seasons: Sequence[int],
+    grid: Sequence[Cell] = BOOSTED_GRID,
+    fixed: Mapping[str, Cell] | None = None,
+) -> TeamFit:
+    """For each season s of `row_seasons`, every target fitted on the first season through s - 1;
+    its cell chosen inside those seasons, or `fixed[target]` (the served refit, 4: no selection)."""
     started = time.monotonic()
     first = int(teams["season"].min())
     x, categorical = team_matrix(teams)
@@ -87,7 +93,7 @@ def fit_team_models(teams: pd.DataFrame, row_seasons: Sequence[int], grid: Seque
         cache = FoldCache(data.fold_loss)
         cells[target] = {}
         for s in row_seasons:
-            cell = cache.choose(tuple(range(first, s)), grid)
+            cell = fixed[target] if fixed is not None else cache.choose(tuple(range(first, s)), grid)
             cells[target][s] = cell
             models[s][target] = data.fit_before(cell, s)
     fitted = {s: TeamModel(tuple(range(first, s)), FROZEN(models[s])) for s in row_seasons}

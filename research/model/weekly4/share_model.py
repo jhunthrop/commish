@@ -181,12 +181,16 @@ def _seasoned(rows: pd.DataFrame, position: str, kind: str, decay: float) -> Sea
 
 
 def fit_share_models(
-    rows: pd.DataFrame, refits: Sequence[tuple[int, ...]], grid: Sequence[Cell] = SHARE_GRID
+    rows: pd.DataFrame,
+    refits: Sequence[tuple[int, ...]],
+    grid: Sequence[Cell] = SHARE_GRID,
+    fixed: Cell | None = None,
 ) -> ShareFit:
     """Each refit's family cell chosen inside its seasons (a one-season refit takes the cell of the
     next refit, 2.6's one exception), then every model fitted on the refit's rows."""
     started = time.monotonic()
-    decays = sorted({c.decay for c in grid if c.decay is not None})
+    cells = (*grid, fixed) if fixed is not None else tuple(grid)
+    decays = sorted({c.decay for c in cells if c.decay is not None})
     data = {
         (position, kind, decay): _seasoned(rows, position, kind, decay)
         for position, kinds in SHARE_KINDS.items()
@@ -209,9 +213,12 @@ def fit_share_models(
     chosen: dict[tuple[int, ...], Cell] = {}
     for seasons in sorted(refits, key=len, reverse=True):
         if len(seasons) > 1:
-            chosen[seasons] = cache.choose(seasons, grid)
+            chosen[seasons] = fixed if fixed is not None else cache.choose(seasons, grid)
         else:
             longer = [r for r in chosen if r[: len(seasons)] == seasons]
+            if fixed is not None:
+                chosen[seasons] = fixed
+                continue
             if not longer:
                 raise ValueError(f"a one-season refit {seasons} needs its next refit's cell")
             chosen[seasons] = chosen[min(longer, key=len)]
@@ -222,7 +229,8 @@ def fit_share_models(
             if decay == cell.decay:
                 fitted[(position, kind)] = seasoned.fit_on(cell, np.isin(seasoned.seasons, seasons))
         models[seasons] = ShareModel(seasons, cell, FROZEN(fitted))
-    losses = {seasons: FROZEN(cache.losses(seasons, grid)) for seasons in chosen if len(seasons) > 1}
+    selected = [] if fixed is not None else [s for s in chosen if len(s) > 1]
+    losses = {seasons: FROZEN(cache.losses(seasons, grid)) for seasons in selected}
     return ShareFit(FROZEN(models), FROZEN(losses), time.monotonic() - started)
 
 

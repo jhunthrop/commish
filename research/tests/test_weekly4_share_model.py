@@ -116,6 +116,14 @@ def test_a_one_season_refit_takes_the_cell_its_next_refit_chooses() -> None:
     assert (shares.loc[rows.head(8)["position"] == "QB", "model_targets"] == 0.0).all()
 
 
+def test_a_fixed_cell_is_every_refits_with_no_selection() -> None:
+    rows = _fit_rows((2021, 2022))
+    fixed = Cell(15, 1.0, 200, 200, 0.85)
+    fitted = fit_share_models(rows, [(2021,), (2021, 2022)], (Cell(7, 0.0, 200, 50, 0.5),), fixed=fixed)
+    assert {m.cell for m in fitted.models.values()} == {fixed}
+    assert fitted.losses == {}
+
+
 def test_the_shares_and_the_residual_sum_to_one_and_a_withheld_share_passes_on() -> None:
     rows = pd.DataFrame(
         {
