@@ -116,42 +116,22 @@ export function nearestLobby(s: LeagueSettings): LobbyFormat {
 	return '12_ppr';
 }
 
-/** The setup as a settings table (Lane 66o), where three sentences once said the clocks and the
- * lobby: the format, the teams, your seat, the rounds, no clock against bots, the nearest lobby's
- * clock as the API gives it (left out until the lobbies are read), and when a lobby starts. */
-export function setupCells(
-	s: LeagueSettings,
-	rounds: number,
-	lobby: Pick<LobbyFilling, 'clock_seconds'> | undefined
-): FactCell[] {
+/** The setup's settings table (Lane 66o): only what the form below does not show (review M4), the
+ * clock against bots, the nearest lobby's clock as the API gives it (left out until the lobbies are
+ * read), and when a lobby starts. The format, teams, seat and rounds are the form's own fields. */
+export function setupCells(lobby: Pick<LobbyFilling, 'clock_seconds'> | undefined): FactCell[] {
 	const lobbyClock: FactCell[] = lobby
 		? [{ label: 'Clock in a lobby', value: `${String(lobby.clock_seconds)} s a pick`, word: true }]
 		: [];
 	return [
-		{ label: 'Format', value: formatWords(s), word: true },
-		{ label: 'Teams', value: String(s.teams) },
-		{
-			label: 'Your seat',
-			value: s.slot === null ? 'Random' : String(s.slot),
-			word: s.slot === null
-		},
-		{ label: 'Rounds', value: String(rounds) },
 		{ label: 'Clock against bots', value: 'None', word: true },
 		...lobbyClock,
 		{
 			label: 'A lobby starts',
-			value: `Full or ${String(LOBBY_FILL_SECONDS)} s`,
+			value: `Full, or ${String(LOBBY_FILL_SECONDS)} s after the first join`,
 			word: true
 		}
 	];
-}
-
-/** "PPR", "Half PPR, superflex". */
-function formatWords(s: LeagueSettings): string {
-	const scoring = s.scoring.preset ? presetWords(s.scoring.preset) : 'Your scoring';
-	const lineup = LINEUP_CHOICES.find((c) => c.lineup === s.lineup && c.lineup !== 'standard');
-	const said = lineup ? `${scoring}, ${lineup.label.toLowerCase()}` : scoring;
-	return said.charAt(0).toUpperCase() + said.slice(1);
 }
 
 /** "12 teams, PPR" for a lobby format. */

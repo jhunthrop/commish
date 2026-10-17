@@ -230,12 +230,8 @@
 	<RoomLayout>
 		<DisplayTitle size="page">New mock</DisplayTitle>
 		<FactStrip
-			label="This mock"
-			cells={setupCells(
-				settings,
-				rounds,
-				lobbies.find((l) => l.format === nearestLobby(settings))
-			)}
+			label="The clocks"
+			cells={setupCells(lobbies.find((l) => l.format === nearestLobby(settings)))}
 		/>
 		{#if handleFor}
 			<HandlePrompt problem={handleProblem} {busy} onsave={saveHandle} />
