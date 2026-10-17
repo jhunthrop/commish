@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/jhunthrop/commish/api/internal/apitypes"
+	"github.com/jhunthrop/commish/api/internal/leaguesync"
 )
 
 type fakeWeeks struct {
@@ -216,6 +217,31 @@ func TestWeekRouteAnswersWithoutHolds(t *testing.T) {
 	}
 	if len(out.Leagues) != 1 || out.Leagues[0].Lineup == nil || out.Leagues[0].Problem != nil {
 		t.Fatalf("%+v, want the week without the tags", out.Leagues)
+	}
+}
+
+// panicFacts panics on every read, a bad snapshot in one league.
+type panicFacts struct{ fakeFacts }
+
+func (panicFacts) Data(context.Context, int) (Data, error) { panic("bad snapshot") }
+
+// A league whose week panics keeps its row with the sentence, and the
+// process and the other leagues carry on (Lane 66k rereview N2).
+func TestWeekRouteRecoversALeaguesPanic(t *testing.T) {
+	f := newFixture(t)
+	off := WeekLeague{ID: uuid.New(), Name: "Off", Phase: apitypes.LeaguePhaseOffseason}
+	s := weekService(t, []WeekLeague{{ID: uuid.New(), Name: "Bad", Phase: apitypes.LeaguePhaseInSeason, League: &f.league}, off}, nil)
+	s.Facts = panicFacts{}
+	code, env := serve(t, s, "/me/week")
+	var out apitypes.MemberWeek
+	if err := json.Unmarshal(env.Data, &out); err != nil || code != http.StatusOK {
+		t.Fatalf("%d %v", code, err)
+	}
+	if p := out.Leagues[0].Problem; p == nil || *p != leaguesync.ReadFailedWords || out.Leagues[0].Name != "Bad" {
+		t.Fatalf("%+v, want the row with the sentence", out.Leagues[0])
+	}
+	if out.Leagues[1].Name != "Off" || out.Leagues[1].Problem != nil {
+		t.Fatalf("%+v, want the other league untouched", out.Leagues[1])
 	}
 }
 

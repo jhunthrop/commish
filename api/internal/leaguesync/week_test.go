@@ -88,6 +88,35 @@ func TestWeekKeepsALeagueThatFailsOnOurSide(t *testing.T) {
 	}
 }
 
+// panicBoard panics on every valuation, a bad snapshot on our side.
+type panicBoard struct{}
+
+func (panicBoard) For(context.Context, apitypes.LeagueSettings) (boards.Board, error) {
+	panic("bad snapshot")
+}
+
+// A league whose read panics keeps its row with the sentence; the list
+// answers and the process carries on (Lane 66k rereview N2).
+func TestWeekRecoversALeaguesPanic(t *testing.T) {
+	pool := dbtest.Pool(t)
+	ctx := context.Background()
+	me, err := (&auth.Store{Pool: pool}).UpsertAccount(ctx, auth.Identity{UserID: "user_week_panic", Email: "panic@example.invalid"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	svc := replayService(pool)
+	a := caller{t, svc, me.ID}
+	link := "https://sleeper.com/leagues/" + ReplaySleeperLeague + "/team"
+	if status, body := a.do(svc.attach, http.MethodPost, "/leagues/attach", apitypes.AttachInput{Link: link, Me: apitypes.AttachSeat{RosterId: intp(1)}}, ""); status != http.StatusCreated {
+		t.Fatalf("attach: %d %s", status, body)
+	}
+	svc.Boards = panicBoard{}
+	list, err := svc.Week(ctx, me.ID)
+	if err != nil || len(list) != 1 || list[0].Problem != ReadFailedWords || list[0].Followed != nil {
+		t.Fatalf("%+v %v, want the row with the sentence", list, err)
+	}
+}
+
 // A read the platform stopped is said in one sentence naming it, with
 // what the member does where there is something to do.
 func TestHostProblemWordsNameThePlatform(t *testing.T) {

@@ -67,6 +67,14 @@ func (s *Service) Week(ctx context.Context, accountID uuid.UUID) ([]WeekRead, er
 			continue
 		}
 		g.Go(func() error {
+			// A panic in one league's read keeps its row with the sentence and
+			// leaves the process and the others alone. Logged by counts alone.
+			defer func() {
+				if recover() != nil {
+					s.Log.Error("leaguesync: week league panicked", "league", i+1, "of", len(list))
+					out[i].Followed, out[i].Problem = nil, ReadFailedWords
+				}
+			}()
 			s.readWeek(ctx, a, &out[i])
 			return nil
 		})

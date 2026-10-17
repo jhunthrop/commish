@@ -70,12 +70,29 @@ func (s *Service) week(w http.ResponseWriter, r *http.Request) {
 	g.SetLimit(leaguesync.WeekReads)
 	for i, wl := range list {
 		g.Go(func() error {
+			// A panic in one league's week keeps that league's row with the
+			// sentence and leaves the process and the others alone (net/http
+			// recovers only its own goroutine). Logged by counts alone.
+			defer func() {
+				if recover() != nil {
+					s.Log.Error("inseason: week league panicked", "league", i+1, "of", len(list))
+					out.Leagues[i] = failedLeague(wl)
+				}
+			}()
 			out.Leagues[i] = s.weekLeague(ctx, wl, held)
 			return nil
 		})
 	}
 	_ = g.Wait() // every league keeps its own problem in its row
 	httpx.WriteOK(w, r, http.StatusOK, out)
+}
+
+// failedLeague is a league's row when its week could not be built at all:
+// its name, standing and last read, with the sentence.
+func failedLeague(wl WeekLeague) apitypes.WeekLeague {
+	words := factsWords
+	return apitypes.WeekLeague{Id: wl.ID, Name: wl.Name, Host: apitypes.LeagueHost(wl.Host), TeamName: wl.TeamName,
+		Standing: wl.Standing, Phase: wl.Phase, ReadAt: wl.ReadAt, Chips: []apitypes.RosterChip{}, Problem: &words}
 }
 
 // weekLeague is one league's week. Every part it could not read is left
