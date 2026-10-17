@@ -35,7 +35,7 @@
 			title="Players"
 			lead={Order === null
 				? `Every player on our ${data.format.label} board · by position · our rank overall at the right`
-				: 'Every player in our order, with kickers and defenses'}
+				: 'Every QB, RB, WR and TE in our order'}
 		>
 			{#snippet actions()}
 				<Quiet href={links.clubs()} size="sm">Clubs</Quiet>

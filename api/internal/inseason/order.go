@@ -36,6 +36,8 @@ const (
 	queryWords  = "Type 2 to 40 letters of a name or a club"
 	limitWords  = "Ask for 1 to 400 rows"
 	rosterWords = "Pick free or yours"
+	// orderPositionWords names the positions the order ranks.
+	orderPositionWords = "Pick a position: QB, RB, WR or TE"
 )
 
 // orderQuery is one view of the order: a position or all of them, the
@@ -59,8 +61,8 @@ func parseOrderQuery(r *http.Request, league bool) (orderQuery, map[string]strin
 	if out.roster != "" && (!league || (out.roster != apitypes.RosterMarkKindFree && out.roster != apitypes.RosterMarkKindYours)) {
 		bad[fieldRoster] = rosterWords
 	}
-	if out.position != "" && !out.position.Valid() {
-		bad[fieldPosition] = positionWords
+	if out.position != "" && !orderPositions[out.position] {
+		bad[fieldPosition] = orderPositionWords
 	}
 	if n := utf8.RuneCountInString(out.q); values.Has(fieldQuery) && (n < minOrderQuery || n > maxOrderQuery) {
 		bad[fieldQuery] = queryWords
@@ -75,14 +77,18 @@ func parseOrderQuery(r *http.Request, league bool) (orderQuery, map[string]strin
 	return out, bad
 }
 
+// orderPositions are the positions the order ranks: kickers and defenses
+// are not on it, as the in-season table carries no K or DEF rows (Lane
+// 66m).
+var orderPositions = map[draft.Position]bool{draft.QB: true, draft.RB: true, draft.WR: true, draft.TE: true}
+
 // ranked is the view's players in our order with each one's place in it:
 // at a position his position rank, across positions his place by points
-// over replacement, a kicker or defense (no projection) after every
-// projected player in the order drafters take them.
+// over replacement.
 func (a *advisor) ranked(position draft.Position) ([]boards.Player, []int) {
 	var players []boards.Player
 	for _, p := range a.Board.Raw.Players {
-		if (position == "" || p.Position == position) && a.starts(p.Position) {
+		if (position == "" || p.Position == position) && orderPositions[p.Position] && a.starts(p.Position) {
 			players = append(players, p)
 		}
 	}
@@ -213,7 +219,7 @@ func (a *advisor) restOfSeasonPoints(p boards.Player) *float64 {
 
 // pointsOverReplacement is the key across positions: his points over
 // replacement over the weeks the order covers, to a tenth, nil without a
-// value (a kicker or defense, or a position the league starts nobody at).
+// value (a position the league starts nobody at).
 func (a *advisor) pointsOverReplacement(p boards.Player) *float64 {
 	v, ok := a.Board.Values[p.ID]
 	if !ok {

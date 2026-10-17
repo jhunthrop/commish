@@ -58,24 +58,25 @@ func TestOrderRanksAPositionByItsRestOfSeasonTotal(t *testing.T) {
 	}
 }
 
-func TestOrderAcrossPositionsRanksByValueThenKickersAndDefenses(t *testing.T) {
+func TestOrderAcrossPositionsRanksByValueAndCarriesNoKickerOrDefense(t *testing.T) {
 	f := restOfSeasonFixture(t)
 	a := newFixtureAdvisor(t, f, nil)
 	out := a.Order(orderQuery{limit: MaxOrderRows}, nil)
-	sawMarket := false
+	if len(out.Rows) == 0 {
+		t.Fatal("no rows")
+	}
 	for i, row := range out.Rows {
 		if row.Rank != i+1 {
 			t.Fatalf("row %d ranks %d", i, row.Rank)
 		}
-		market := row.Line.Player.Position == string(draft.K) || row.Line.Player.Position == string(draft.DEF)
-		if market != (row.RestOfSeasonPoints == nil) {
-			t.Fatalf("%s: a %s with total %v", row.Line.Player.Name, row.Line.Player.Position, row.RestOfSeasonPoints)
+		// The in-season table carries no K or DEF rows (Lane 66m), and the order follows it.
+		if p := row.Line.Player.Position; p == string(draft.K) || p == string(draft.DEF) {
+			t.Fatalf("%s is a %s", row.Line.Player.Name, p)
 		}
-		if sawMarket && !market {
-			t.Fatalf("%s follows a kicker or defense", row.Line.Player.Name)
+		if row.RestOfSeasonPoints == nil {
+			t.Fatalf("%s carries no total", row.Line.Player.Name)
 		}
-		sawMarket = sawMarket || market
-		if i > 0 && !market {
+		if i > 0 {
 			prev, cur := *out.Rows[i-1].Line.Player.BoardId, *row.Line.Player.BoardId
 			if a.Board.Values[cur] > a.Board.Values[prev] {
 				t.Fatalf("%s outvalues the row above", row.Line.Player.Name)
@@ -85,8 +86,8 @@ func TestOrderAcrossPositionsRanksByValueThenKickersAndDefenses(t *testing.T) {
 			t.Fatalf("%s carries a roster or a move without marks", row.Line.Player.Name)
 		}
 	}
-	if !sawMarket || out.ReadAt != nil {
-		t.Fatalf("kickers and defenses %v, read at %v", sawMarket, out.ReadAt)
+	if out.ReadAt != nil {
+		t.Fatalf("read at %v", out.ReadAt)
 	}
 }
 
@@ -208,7 +209,7 @@ func TestOrderRoutes(t *testing.T) {
 		t.Fatalf("league: %d %+v", code, env.Error)
 	}
 	for _, bad := range []struct{ path, field string }{
-		{"/order?position=LB", fieldPosition}, {"/order?q=a", fieldQuery}, {"/order?limit=0", fieldLimit},
+		{"/order?position=LB", fieldPosition}, {"/order?position=K", fieldPosition}, {"/order?position=DEF", fieldPosition}, {"/order?q=a", fieldQuery}, {"/order?limit=0", fieldLimit},
 		{"/order?limit=401", fieldLimit}, {leaguePath + "order?q=" + strings.Repeat("x", 41), fieldQuery},
 	} {
 		code, env := serve(t, s, bad.path)

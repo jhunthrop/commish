@@ -2984,13 +2984,13 @@ type OrderRow struct {
 	// Move the one move his row admits: add for a player no roster holds at a position the league starts, trade for a player on another roster whom the trade finder's best trade with his team brings in for the drafter, null otherwise (and always for the drafter's own players)
 	Move *OrderRowMove `json:"move"`
 
-	// PointsOverReplacement the key across positions, one decimal: his points over replacement for the league over the weeks the order covers; null for a kicker or defense and a position the league starts nobody at
+	// PointsOverReplacement the key across positions, one decimal: his points over replacement for the league over the weeks the order covers; null at a position the league starts nobody at
 	PointsOverReplacement *float64 `json:"points_over_replacement"`
 
-	// Rank his place in our order for this view: at a position his position rank (by his rest-of-season total, which orders the same as points over replacement there), across every position his place by points over replacement, a kicker or defense after every projected player in the order drafters take them
+	// Rank his place in our order for this view: at a position his position rank (by his rest-of-season total, which orders the same as points over replacement there), across every position his place by points over replacement
 	Rank int `json:"rank"`
 
-	// RestOfSeasonPoints the order's key, one decimal: his rest-of-season points over the games his club has left from the order's first week through week 17, byes out; null on the preseason order and for a kicker or defense, which the board places in draft order
+	// RestOfSeasonPoints the order's key, one decimal: his rest-of-season points over the games his club has left from the order's first week through week 17, byes out; null on the preseason order and without a projection
 	RestOfSeasonPoints *float64 `json:"rest_of_season_points"`
 
 	// Roster whose roster in the league holds him, null without a league
@@ -4349,7 +4349,7 @@ type ListLeaguesParams struct {
 
 // LeagueOrderParams defines parameters for LeagueOrder.
 type LeagueOrderParams struct {
-	// Position only players at this position; without it every position, ranked by points over replacement
+	// Position only players at this position; without it every position, ranked by points over replacement. Kickers and defenses are not on the order, as the in-season table carries none
 	Position *string `form:"position,omitempty" json:"position,omitempty"`
 
 	// Q only players whose name or club holds these letters, any case
@@ -4387,7 +4387,7 @@ type AutopickMockParams struct {
 
 // OrderParams defines parameters for Order.
 type OrderParams struct {
-	// Position only players at this position; without it every position, ranked by points over replacement
+	// Position only players at this position; without it every position, ranked by points over replacement. Kickers and defenses are not on the order, as the in-season table carries none
 	Position *string `form:"position,omitempty" json:"position,omitempty"`
 
 	// Q only players whose name or club holds these letters, any case

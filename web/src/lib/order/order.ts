@@ -35,8 +35,9 @@ export const ORDER = {
 	reading: 'Reading our order'
 } as const;
 
-/** The position chips, in the board's order: every position, then each. */
-export const ORDER_POSITIONS: readonly OrderPosition[] = ['QB', 'RB', 'WR', 'TE', 'K', 'DEF'];
+/** The position chips, in the board's order: every position, then each. Kickers and defenses are not
+ * on the order (Lane 66m). */
+export const ORDER_POSITIONS: readonly OrderPosition[] = ['QB', 'RB', 'WR', 'TE'];
 
 /** A roster chip: every player, the free ones, or the member's own. */
 export type RosterView = 'everyone' | 'free' | 'yours';
@@ -148,11 +149,11 @@ export function orderBasis(
 	zone: string = memberZone()
 ): string {
 	const lines = advice.rows.map((row) => row.line);
-	const defense = lines.some((line) => line.player.position === 'DEF');
 	const said = [
 		advice.basis,
 		advice.basis_note,
-		projBasis(advice.projection_read_at, advice.projection_scoring, defense, zone),
+		// The order carries no defense (Lane 66m), so the projection's defense words never apply.
+		projBasis(advice.projection_read_at, advice.projection_scoring, false, zone),
 		evidenceBasis(league !== null),
 		factsReadLine(lines, zone),
 		league !== null && advice.read_at !== null

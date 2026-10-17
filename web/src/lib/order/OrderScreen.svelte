@@ -6,6 +6,7 @@
 	import { positionWord } from '#lib/league/box/box.ts';
 	import { sheetTags } from '#lib/league/sheet-tags.ts';
 	import RowSheetMark from '#lib/site/RowSheetMark.svelte';
+	import type { SheetPlayer } from '#lib/sheet/model.ts';
 	import type { Position } from '#lib/types/player.ts';
 	import { orderApi, type OrderAdvice, type OrderPosition } from './api.ts';
 	import { MIN_SEARCH } from './path.ts';
@@ -129,21 +130,14 @@
 		void read();
 	}
 
-	/** The sheet's player for a row: his board id, and a defense as the sheet names one. */
-	function sheetPlayer(row: OrderView): {
-		id: string;
-		name: string;
-		position: Position;
-		team: string;
-		headshot: string | null;
-	} {
-		const known = row.box.position === positionWord('DEF') ? 'DST' : row.box.position;
+	/** The sheet's player for a row: his board id; the order's positions are the sheet's own. */
+	function sheetPlayer(row: OrderView): SheetPlayer {
 		return {
 			id: row.key,
 			name: row.box.name,
-			position: known as Position,
+			position: row.box.position as Position,
 			team: row.box.club,
-			headshot: row.box.face.mark ? null : row.box.face.src
+			headshot: row.box.face.src
 		};
 	}
 </script>

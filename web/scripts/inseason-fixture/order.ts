@@ -8,8 +8,8 @@
 //     over them: add for a free player, trade for a player the trade finder's best trade with his
 //     team brings in (trades.json), none for the member's own; the claim's moves are the Waivers
 //     answer's (waivers.json), Sleeper taking no claim from here;
-//   - across positions the rows are in the order of their points over replacement, kickers and
-//     defenses after, as the API ranks (rank_by points_over_replacement).
+//   - across positions the rows are in the order of their points over replacement, as the API ranks
+//     (rank_by points_over_replacement), with no kicker or defense (Lane 66m).
 // STAND-INS, named here and in the shots' caption: the fixture holds 85 of the order's players;
 // rest_of_season_points is the line's points a game times his club's games left from week 6 through
 // 17 (the byes in sync.json), the division the API makes the other way; points_over_replacement is
@@ -34,7 +34,8 @@ const LAST_WEEK = 17;
 /** The weeks the rest-of-season order covers, week 6 through 17. */
 const WEEKS_COVERED = LAST_WEEK - WEEK + 1;
 const TENTH = 10;
-const POSITIONS = new Set(['QB', 'RB', 'WR', 'TE', 'K', 'DEF']);
+/** The positions the order ranks: no kickers or defenses (Lane 66m). */
+const POSITIONS = new Set(['QB', 'RB', 'WR', 'TE']);
 
 const read = async <T>(name: string): Promise<T> =>
 	JSON.parse(await readFile(new URL(`${name}.json`, DATA), 'utf8')) as T;
@@ -141,7 +142,7 @@ const lineup = await read<components['schemas']['LineupAdvice']>('lineup');
 const waivers = await read<components['schemas']['WaiverAdvice']>('waivers');
 const out: OrderAdvice = {
 	week: WEEK,
-	basis: `Our rest-of-season order from week ${String(WEEK)}: Total is his points through week ${String(LAST_WEEK)}, byes out, A game the same a game. A position ranks by Total, All by Over repl., his total less a free pickup's, kickers and defenses last.`,
+	basis: `Our rest-of-season order from week ${String(WEEK)}: Total is his points through week ${String(LAST_WEEK)}, byes out, A game the same a game. A position ranks by Total, All by Over repl., his total less a free pickup's.`,
 	// The league the points over replacement are for and the rules its season points leave out, as
 	// the API says them (BasisNote): the Waivers answer's note.
 	basis_note: waivers.basis_note,

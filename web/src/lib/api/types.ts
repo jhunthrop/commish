@@ -405,8 +405,8 @@ export interface paths {
 	'/leagues/attached/{id}/order': {
 		parameters: {
 			query?: {
-				/** @description only players at this position; without it every position, ranked by points over replacement */
-				position?: 'QB' | 'RB' | 'WR' | 'TE' | 'K' | 'DEF';
+				/** @description only players at this position; without it every position, ranked by points over replacement. Kickers and defenses are not on the order, as the in-season table carries none */
+				position?: 'QB' | 'RB' | 'WR' | 'TE';
 				/** @description only players whose name or club holds these letters, any case */
 				q?: string;
 				/** @description at most this many rows, 100 without it */
@@ -1032,8 +1032,8 @@ export interface paths {
 	'/order': {
 		parameters: {
 			query?: {
-				/** @description only players at this position; without it every position, ranked by points over replacement */
-				position?: 'QB' | 'RB' | 'WR' | 'TE' | 'K' | 'DEF';
+				/** @description only players at this position; without it every position, ranked by points over replacement. Kickers and defenses are not on the order, as the in-season table carries none */
+				position?: 'QB' | 'RB' | 'WR' | 'TE';
 				/** @description only players whose name or club holds these letters, any case */
 				q?: string;
 				/** @description at most this many rows, 100 without it */
@@ -1043,7 +1043,7 @@ export interface paths {
 			path?: never;
 			cookie?: never;
 		};
-		/** Our rest-of-season order for a 12-team PPR league with no league of the reader's own, every player our board places with his week: the Rest of season and Players screens signed out. Rows carry no roster and no move. */
+		/** Our rest-of-season order for a 12-team PPR league with no league of the reader's own, every QB, RB, WR and TE our board places with his week: the Rest of season and Players screens signed out. Rows carry no roster and no move. */
 		get: operations['order'];
 		put?: never;
 		post?: never;
@@ -3231,16 +3231,16 @@ export interface components {
 		};
 		OrderRow: {
 			line: components['schemas']['PlayerLine'];
-			/** @description his place in our order for this view: at a position his position rank (by his rest-of-season total, which orders the same as points over replacement there), across every position his place by points over replacement, a kicker or defense after every projected player in the order drafters take them */
+			/** @description his place in our order for this view: at a position his position rank (by his rest-of-season total, which orders the same as points over replacement there), across every position his place by points over replacement */
 			rank: number;
 			/**
 			 * Format: double
-			 * @description the order's key, one decimal: his rest-of-season points over the games his club has left from the order's first week through week 17, byes out; null on the preseason order and for a kicker or defense, which the board places in draft order
+			 * @description the order's key, one decimal: his rest-of-season points over the games his club has left from the order's first week through week 17, byes out; null on the preseason order and without a projection
 			 */
 			rest_of_season_points: number | null;
 			/**
 			 * Format: double
-			 * @description the key across positions, one decimal: his points over replacement for the league over the weeks the order covers; null for a kicker or defense and a position the league starts nobody at
+			 * @description the key across positions, one decimal: his points over replacement for the league over the weeks the order covers; null at a position the league starts nobody at
 			 */
 			points_over_replacement: number | null;
 			/** @description whose roster in the league holds him, null without a league */
@@ -4584,8 +4584,8 @@ export interface operations {
 	leagueOrder: {
 		parameters: {
 			query?: {
-				/** @description only players at this position; without it every position, ranked by points over replacement */
-				position?: 'QB' | 'RB' | 'WR' | 'TE' | 'K' | 'DEF';
+				/** @description only players at this position; without it every position, ranked by points over replacement. Kickers and defenses are not on the order, as the in-season table carries none */
+				position?: 'QB' | 'RB' | 'WR' | 'TE';
 				/** @description only players whose name or club holds these letters, any case */
 				q?: string;
 				/** @description at most this many rows, 100 without it */
@@ -5371,8 +5371,8 @@ export interface operations {
 	order: {
 		parameters: {
 			query?: {
-				/** @description only players at this position; without it every position, ranked by points over replacement */
-				position?: 'QB' | 'RB' | 'WR' | 'TE' | 'K' | 'DEF';
+				/** @description only players at this position; without it every position, ranked by points over replacement. Kickers and defenses are not on the order, as the in-season table carries none */
+				position?: 'QB' | 'RB' | 'WR' | 'TE';
 				/** @description only players whose name or club holds these letters, any case */
 				q?: string;
 				/** @description at most this many rows, 100 without it */
