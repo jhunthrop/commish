@@ -10,6 +10,7 @@ from research.model.weekly4.tuning import (
     SHARE_GRID,
     Cell,
     FoldCache,
+    Seasoned,
     booster,
     choose,
     folds,
@@ -75,6 +76,16 @@ def test_the_losses() -> None:
     assert poisson_deviance_sum(y, mu) == pytest.approx(2.0)
     assert squared_error_sum(np.array([0.1, 0.3]), np.array([0.2, 0.2]), np.array([10.0, 30.0])) == pytest.approx(0.4)
     assert log_loss_sum(np.array([1.0, 0.0]), np.array([0.5, 0.5])) == pytest.approx(2 * np.log(2))
+
+
+def test_a_column_missing_in_every_training_row_still_fits() -> None:
+    rng = np.random.default_rng(1)
+    x = np.column_stack([rng.normal(size=300), np.full(300, np.nan)])
+    seasons = np.repeat([2016, 2017, 2018], 100)
+    x[seasons == 2018, 1] = 1.0  # the column exists only in a later season
+    y = rng.poisson(np.exp(0.3 * x[:, 0])).astype(float)
+    data = Seasoned(x, y, seasons, "poisson")
+    assert np.isfinite(data.fold_loss(_cell(iters=200), 2017))
 
 
 def test_a_booster_is_deterministic_without_early_stopping() -> None:

@@ -183,6 +183,17 @@ def model_loss(loss: Loss, y: np.ndarray, predicted: np.ndarray, weight: np.ndar
     return squared_error_sum(y, predicted, np.ones(len(y)) if weight is None else weight)
 
 
+def _fillable(x: np.ndarray) -> np.ndarray:
+    """A column missing in every training row (a feed that starts in a later season, PFR before 2018)
+    can carry no split; it is a constant 0 for the fit, which the booster's binning accepts."""
+    empty = np.all(np.isnan(x), axis=0)
+    if not empty.any():
+        return x
+    found = x.copy()
+    found[:, empty] = 0.0
+    return found
+
+
 @dataclass(frozen=True, slots=True)
 class Seasoned:
     """One model's rows by season: its matrix, its target, its loss and constraints, and the weight
@@ -202,7 +213,7 @@ class Seasoned:
             return Constant(float(y[0]) if len(y) else 0.0)
         weight = None if self.weight is None else self.weight[rows]
         model = booster(cell, self.loss, self.monotone, self.categorical)
-        return model.fit(self.x[rows], y, sample_weight=weight)
+        return model.fit(_fillable(self.x[rows]), y, sample_weight=weight)
 
     def fit_before(self, cell: Cell, season: int) -> Fitted:
         """Fitted on every season before `season`."""
