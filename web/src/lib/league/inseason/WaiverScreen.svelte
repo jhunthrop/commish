@@ -242,6 +242,7 @@
 	// into view (review 66j H6).
 	onMount(() => {
 		const asked = page.url.searchParams.get(PLAYER_PARAM);
+		if (asked === null || asked === '') return;
 		const found = pool.find((r) => r.row.boardId === asked);
 		if (found === undefined) return;
 		toggle(found);
