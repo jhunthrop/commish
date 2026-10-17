@@ -1,0 +1,146 @@
+{
+  "about": "Stat lines scored by research/model/domain.py compute_fantasy_points under its presets; api/internal/inseason Rules.Points must score each the same. One file, kept in both places.",
+  "cases": [
+    {
+      "name": "a quarterback in standard",
+      "rules": "standard",
+      "position": "QB",
+      "metrics": {
+        "passing_yards": 301,
+        "passing_touchdowns": 2,
+        "interceptions": 1,
+        "rushing_yards": 12,
+        "two_point_conversions": 1
+      },
+      "points": 21.24
+    },
+    {
+      "name": "a back in PPR",
+      "rules": "ppr",
+      "position": "RB",
+      "metrics": {
+        "rushing_yards": 100,
+        "rushing_touchdowns": 1,
+        "receptions": 5,
+        "receiving_yards": 40,
+        "fumbles_lost": 1
+      },
+      "points": 23.0
+    },
+    {
+      "name": "a receiver in half PPR with a return touchdown",
+      "rules": "half_ppr",
+      "position": "WR",
+      "metrics": {
+        "receptions": 7,
+        "receiving_yards": 88,
+        "receiving_touchdowns": 1,
+        "punt_return_touchdowns": 1
+      },
+      "points": 24.3
+    },
+    {
+      "name": "a kicker with misses",
+      "rules": "standard",
+      "position": "K",
+      "metrics": {
+        "field_goals_made": 3,
+        "extra_points_made": 4,
+        "field_goals_missed": 1,
+        "extra_points_missed": 1
+      },
+      "points": 12.0
+    },
+    {
+      "name": "a kicker with makes alone",
+      "rules": "ppr",
+      "position": "K",
+      "metrics": {
+        "field_goals_made": 2,
+        "extra_points_made": 2
+      },
+      "points": 8.0
+    },
+    {
+      "name": "a defense allowing 17 and 312 yards",
+      "rules": "standard",
+      "position": "DEF",
+      "metrics": {
+        "sacks": 4,
+        "defensive_interceptions": 2,
+        "defensive_fumbles_recovered": 1,
+        "defensive_touchdowns": 1,
+        "safeties": 1,
+        "points_allowed": 17,
+        "yards_allowed": 312
+      },
+      "points": 19.0
+    },
+    {
+      "name": "a defense's shutout with two return touchdowns",
+      "rules": "ppr",
+      "position": "DEF",
+      "metrics": {
+        "sacks": 6,
+        "points_allowed": 0,
+        "yards_allowed": 88,
+        "kick_return_touchdowns": 1,
+        "punt_return_touchdowns": 1
+      },
+      "points": 28.0
+    },
+    {
+      "name": "a defense allowing 52 and 590 yards",
+      "rules": "half_ppr",
+      "position": "DEF",
+      "metrics": {
+        "sacks": 1,
+        "points_allowed": 52,
+        "yards_allowed": 590
+      },
+      "points": -11.0
+    },
+    {
+      "name": "a defense allowing 21 and 99 yards",
+      "rules": "standard",
+      "position": "DEF",
+      "metrics": {
+        "points_allowed": 21,
+        "yards_allowed": 99
+      },
+      "points": 5.0
+    },
+    {
+      "name": "a defense allowing 35 and 400 yards",
+      "rules": "standard",
+      "position": "DEF",
+      "metrics": {
+        "defensive_interceptions": 1,
+        "points_allowed": 35,
+        "yards_allowed": 400
+      },
+      "points": -4.0
+    },
+    {
+      "name": "a defense with no yards read",
+      "rules": "standard",
+      "position": "DEF",
+      "metrics": {
+        "sacks": 2,
+        "points_allowed": 6
+      },
+      "points": 6.0
+    },
+    {
+      "name": "a tight end's tiers count for nothing",
+      "rules": "ppr",
+      "position": "TE",
+      "metrics": {
+        "receptions": 4,
+        "receiving_yards": 33,
+        "points_allowed": 0
+      },
+      "points": 7.3
+    }
+  ]
+}
