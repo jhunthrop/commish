@@ -1,8 +1,9 @@
 // The Matchup and Lineup boxes' rows and totals (Lane 66d): run with `npm test`.
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import type { MatchupSide } from '../api.ts';
-import type { LineupSlot, PlayerLine, WeekFacts } from '../inseason/api.ts';
+import type { LineupSlot, MatchupBox, PlayerLine, WeekFacts } from '../inseason/api.ts';
 import { lineupBox } from './lineup.ts';
 import { nextKickoff, sideBox } from './matchup.ts';
 
@@ -135,4 +136,32 @@ void test('a lineup change starts ours over the host starter it sits, with its r
 	assert.equal(box.starters.at(1)?.sentence, 'Ranked higher on our order.');
 	assert.ok(box.benchSat.has('Vikings'));
 	assert.equal(box.totals.proj, 22.2);
+});
+
+void test("the fixture's bye rows show no projection and its totals leave them out", () => {
+	const url = new URL('../../../../scripts/inseason-fixture/data/matchup.json', import.meta.url);
+	const box = JSON.parse(readFileSync(url, 'utf8')) as MatchupBox;
+	let byes = 0;
+	for (const side of box.sides) {
+		const read: MatchupSide = {
+			roster_id: side.roster_id,
+			points: 0,
+			points_read: true,
+			starters: []
+		};
+		const drawn = sideBox(read, side, false, null, ZONE);
+		for (const row of [...drawn.starters.map((s) => s.row), ...drawn.bench]) {
+			if (row.game !== 'bye') continue;
+			byes += 1;
+			assert.equal(row.proj, null, `${row.name} on a bye`);
+		}
+		const playing = drawn.starters.flatMap((s) =>
+			s.row.game === 'bye' || s.row.proj === null ? [] : [s.row.proj]
+		);
+		assert.equal(
+			drawn.totals.proj,
+			playing.reduce((a, b) => a + b, 0)
+		);
+	}
+	assert.ok(byes > 0, 'the fixture holds a bye');
 });

@@ -2704,7 +2704,7 @@ type PlayerLine struct {
 	// Slug his page on the site (/players/{slug}): set for a player our order ranks whose name no other player in our directory shares, null otherwise (a shared name's page is named by the run, which the API does not read)
 	Slug *string `json:"slug"`
 
-	// WeekProjection his points this week on the week's published projection, to the cent, in the format the league's scoring is most like (PPR, half PPR or standard); a team defense's by its club, a kicker with no row of his own by his club's one kicker. The newest snapshot stored for the league's week (projection_read_at says when). Null when the snapshot has no row for him or none is stored. Our own weekly model replaces it when it passes its test
+	// WeekProjection his points this week on the week's published projection, to the cent, in the format the league's scoring is most like (PPR, half PPR or standard); a team defense's by its club, a kicker with no row of his own by his club's one kicker. The newest snapshot stored for the league's week (projection_read_at says when). Null when his club has no game that week (a bye), whatever the snapshot holds, and when the snapshot has no row for him or none is stored. Our own weekly model replaces it when it passes its test
 	WeekProjection *float64 `json:"week_projection"`
 }
 

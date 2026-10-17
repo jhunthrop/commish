@@ -132,7 +132,11 @@ func (a *advisor) build(id string, lp apitypes.LeaguePlayer, side *leaguesync.Si
 		line.PositionRank = &rank
 	}
 	line.Headshot = faceOf(bp, placed)
-	line.WeekProjection = a.weekProjection(boardID, position, team)
+	// A club with no game this week (a bye) has no projection, whatever a
+	// snapshot says.
+	if facts.Opponent != "" {
+		line.WeekProjection = a.weekProjection(boardID, position, team)
+	}
 	if placed {
 		line.Slug = a.pages.of(bp.Name, c.Rank > 0)
 		line.RestOfSeasonPerGame = RestOfSeasonPerGame(a.Board, bp, a.gamesLeft)

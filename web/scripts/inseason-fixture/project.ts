@@ -3,7 +3,8 @@
 //   - week_projection on every player line of lineup.json, waivers.json and trades.json, read as the
 //     API reads it (api/internal/boards/projections.go): a player's by his board id, a defense's by
 //     his club, a kicker with no row of his own by his club's one kicker, the PPR column (the league
-//     scores most like PPR); null without a row;
+//     scores most like PPR); null without a row, and null for a club with no game this week (a bye),
+//     whatever the snapshot holds;
 //   - projection_read_at on the lineup, a stand-in stamp of the fixture's own Friday evening, and the
 //     lineup's basis in the API's words since its rows end on the projection;
 //   - matchup.json, GET /leagues/attached/{id}/matchup's answer: the drafter's side and the
@@ -75,7 +76,9 @@ for (const row of Object.values(projection.players)) {
 const defenses = new Map(Object.entries(projection.defenses).map(([c, v]) => [club(c), v]));
 
 function weekProjection(line: PlayerLine): number | null {
-	const { player } = line;
+	const { player, facts } = line;
+	// A club with no game this week has no projection, whatever the snapshot holds (the API's rule).
+	if (facts.bye || facts.opponent === null) return null;
 	if (player.position === DEFENSE) return defenses.get(club(player.team)) ?? null;
 	const own = player.board_id === null ? undefined : projection.players[player.board_id];
 	if (own) return own.ppr;

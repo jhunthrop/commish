@@ -187,7 +187,7 @@
 							"roof": null,
 							"weather": null
 						},
-						"week_projection": 21.21
+						"week_projection": null
 					}
 				},
 				{
@@ -327,7 +327,7 @@
 							"roof": null,
 							"weather": null
 						},
-						"week_projection": 12.24
+						"week_projection": null
 					}
 				},
 				{
@@ -457,7 +457,7 @@
 							"roof": null,
 							"weather": null
 						},
-						"week_projection": 7.3
+						"week_projection": null
 					}
 				}
 			],
@@ -675,7 +675,7 @@
 						"roof": null,
 						"weather": null
 					},
-					"week_projection": 11.02
+					"week_projection": null
 				},
 				{
 					"player": {
@@ -1136,7 +1136,7 @@
 						"position_rank": null,
 						"points_over_replacement": null,
 						"rest_of_season_per_game": null,
-						"week_projection": 5.03,
+						"week_projection": null,
 						"held": false,
 						"facts": {
 							"week": 6,

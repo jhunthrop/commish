@@ -88,6 +88,8 @@ async function boxFacts(page: Page): Promise<{
 	cut: string[];
 	perGame: boolean;
 	defenseMarks: number;
+	/** Each bye row's projection as printed: always "--". */
+	byeProj: string[];
 }> {
 	return page.evaluate(() => {
 		const box = [...document.querySelectorAll('main table.box')];
@@ -106,7 +108,10 @@ async function boxFacts(page: Page): Promise<{
 			basis: [...document.querySelectorAll('main p')].map((p) => p.textContent).join(' '),
 			cut: names.flatMap((n) => (n.scrollWidth > n.clientWidth + 1 ? [n.textContent] : [])),
 			perGame: rows.some((tr) => /\d a game/.test(tr.textContent)),
-			defenseMarks: box.flatMap((t) => [...t.querySelectorAll('img[alt$=" defense"]')]).length
+			defenseMarks: box.flatMap((t) => [...t.querySelectorAll('img[alt$=" defense"]')]).length,
+			byeProj: rows
+				.filter((tr) => tr.querySelector('td.game .bye') !== null)
+				.map((tr) => tr.querySelector<HTMLElement>('td.proj')?.innerText.trim() ?? '?')
 		};
 	});
 }
@@ -196,6 +201,8 @@ for (const { name, path, ready: text } of PAGES) {
 				if (box.perGame) missing.push(`${at} a row says points a game`);
 				if (box.cut.length > 0) missing.push(`${at} names cut: ${box.cut.join(', ')}`);
 				if (box.defenseMarks === 0) missing.push(`${at} no defense drawn with its club mark`);
+				if (box.byeProj.length === 0) missing.push(`${at} no bye row to check`);
+				if (box.byeProj.some((p) => p !== '--')) missing.push(`${at} a bye row with a projection`);
 			}
 			if (width === PHONE.width && name !== 'league' && name !== 'matchup') {
 				await page.setViewportSize(PHONE);

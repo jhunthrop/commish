@@ -661,7 +661,7 @@
 					"roof": null,
 					"weather": null
 				},
-				"week_projection": 12.24
+				"week_projection": null
 			},
 			"changed": true,
 			"sentence": "Sam LaPorta is on bye this week, so Okonkwo starts."
@@ -849,7 +849,7 @@
 					"roof": null,
 					"weather": null
 				},
-				"week_projection": 21.21
+				"week_projection": null
 			},
 			"changed": true,
 			"sentence": "Ja'Marr Chase is on bye this week, so Etienne starts."
@@ -924,7 +924,7 @@
 					"roof": null,
 					"weather": null
 				},
-				"week_projection": 7.3
+				"week_projection": null
 			},
 			"changed": true,
 			"sentence": "Minnesota Vikings is on bye this week, so Texans starts."
@@ -966,7 +966,7 @@
 				"roof": null,
 				"weather": null
 			},
-			"week_projection": 21.21
+			"week_projection": null
 		},
 		{
 			"player": {
@@ -1003,7 +1003,7 @@
 				"roof": null,
 				"weather": null
 			},
-			"week_projection": 12.24
+			"week_projection": null
 		},
 		{
 			"player": {
@@ -1079,7 +1079,7 @@
 				"roof": null,
 				"weather": null
 			},
-			"week_projection": 7.3
+			"week_projection": null
 		},
 		{
 			"player": {
@@ -1116,7 +1116,7 @@
 				"roof": null,
 				"weather": null
 			},
-			"week_projection": 11.02
+			"week_projection": null
 		},
 		{
 			"player": {

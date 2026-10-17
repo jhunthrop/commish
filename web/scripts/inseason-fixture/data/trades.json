@@ -1192,7 +1192,7 @@
 								"roof": null,
 								"weather": null
 							},
-							"week_projection": 12.24
+							"week_projection": null
 						}
 					],
 					"get": [
@@ -1758,7 +1758,7 @@
 								"roof": null,
 								"weather": null
 							},
-							"week_projection": 21.21
+							"week_projection": null
 						}
 					],
 					"get": [
@@ -6866,7 +6866,7 @@
 								"roof": null,
 								"weather": null
 							},
-							"week_projection": 21.21
+							"week_projection": null
 						}
 					],
 					"get": [
@@ -7444,7 +7444,7 @@
 								"roof": null,
 								"weather": null
 							},
-							"week_projection": 21.21
+							"week_projection": null
 						}
 					],
 					"get": [
@@ -7631,7 +7631,7 @@
 						"roof": null,
 						"weather": null
 					},
-					"week_projection": 20.73
+					"week_projection": null
 				},
 				{
 					"player": {
@@ -8071,7 +8071,7 @@
 								"roof": null,
 								"weather": null
 							},
-							"week_projection": 21.21
+							"week_projection": null
 						}
 					],
 					"get": [
@@ -8353,7 +8353,7 @@
 								"roof": null,
 								"weather": null
 							},
-							"week_projection": 20.73
+							"week_projection": null
 						}
 					],
 					"drop": {
@@ -8443,7 +8443,7 @@
 								"roof": null,
 								"weather": null
 							},
-							"week_projection": 21.21
+							"week_projection": null
 						}
 					],
 					"get": [
@@ -8761,7 +8761,7 @@
 						"roof": null,
 						"weather": null
 					},
-					"week_projection": 17.69
+					"week_projection": null
 				},
 				{
 					"player": {
@@ -8896,7 +8896,7 @@
 								"roof": null,
 								"weather": null
 							},
-							"week_projection": 12.24
+							"week_projection": null
 						}
 					],
 					"get": [
@@ -9272,7 +9272,7 @@
 								"roof": null,
 								"weather": null
 							},
-							"week_projection": 21.21
+							"week_projection": null
 						}
 					],
 					"get": [
@@ -9358,7 +9358,7 @@
 								"roof": null,
 								"weather": null
 							},
-							"week_projection": 17.69
+							"week_projection": null
 						}
 					],
 					"drop": {
@@ -9448,7 +9448,7 @@
 								"roof": null,
 								"weather": null
 							},
-							"week_projection": 12.24
+							"week_projection": null
 						}
 					],
 					"get": [
@@ -9782,7 +9782,7 @@
 						"roof": null,
 						"weather": null
 					},
-					"week_projection": 7.68
+					"week_projection": null
 				},
 				{
 					"player": {
@@ -9870,7 +9870,7 @@
 								"roof": null,
 								"weather": null
 							},
-							"week_projection": 12.24
+							"week_projection": null
 						}
 					],
 					"get": [
@@ -9909,7 +9909,7 @@
 								"roof": null,
 								"weather": null
 							},
-							"week_projection": 7.68
+							"week_projection": null
 						},
 						{
 							"player": {
@@ -10046,7 +10046,7 @@
 								"roof": null,
 								"weather": null
 							},
-							"week_projection": 12.24
+							"week_projection": null
 						}
 					],
 					"get": [
@@ -10085,7 +10085,7 @@
 								"roof": null,
 								"weather": null
 							},
-							"week_projection": 7.68
+							"week_projection": null
 						},
 						{
 							"player": {
@@ -11077,7 +11077,7 @@
 				"roof": null,
 				"weather": null
 			},
-			"week_projection": 21.21
+			"week_projection": null
 		},
 		{
 			"player": {
@@ -11151,7 +11151,7 @@
 				"roof": null,
 				"weather": null
 			},
-			"week_projection": 11.02
+			"week_projection": null
 		},
 		{
 			"player": {
@@ -11325,7 +11325,7 @@
 				"roof": null,
 				"weather": null
 			},
-			"week_projection": 12.24
+			"week_projection": null
 		},
 		{
 			"player": {
@@ -11391,7 +11391,7 @@
 				"roof": null,
 				"weather": null
 			},
-			"week_projection": 7.3
+			"week_projection": null
 		}
 	],
 	"host_trades_url": "https://sleeper.com/leagues/1382163311038038016/team",

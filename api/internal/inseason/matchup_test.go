@@ -16,18 +16,16 @@ import (
 var projectionAt = time.Date(2026, 10, 15, 13, 30, 0, 0, time.UTC)
 
 // weekProjection holds team 1's quarterback (p000), team 1's kicker (p008,
-// by his club alone) and team 1's defense (p009, by his club), and nobody
-// else.
+// by his club alone), team 2's defense (p024, by his club) and team 1's
+// defense (p009, whose club is on a bye), and nobody else.
 func weekProjection(f fixture) boards.WeekProjection {
-	defense, _ := f.league.Board.Player("p009")
-	club := f.league.Player("h009").Team
-	if defense.Team != "" {
-		club = defense.Team
-	}
 	return boards.WeekProjection{ReadAt: projectionAt,
-		Players:  map[string]boards.ProjectedPoints{"p000": {PPR: 21.374, Half: 20.1, Standard: 18.8}},
-		Kickers:  map[string]boards.ProjectedPoints{f.league.Player("h008").Team: {PPR: 8.4, Half: 8.4, Standard: 8.4}},
-		Defenses: map[string]boards.ProjectedPoints{club: {PPR: 7, Half: 7, Standard: 7}}}
+		Players: map[string]boards.ProjectedPoints{"p000": {PPR: 21.374, Half: 20.1, Standard: 18.8}},
+		Kickers: map[string]boards.ProjectedPoints{f.league.Player("h008").Team: {PPR: 8.4, Half: 8.4, Standard: 8.4}},
+		Defenses: map[string]boards.ProjectedPoints{
+			f.league.Player("h024").Team: {PPR: 7, Half: 7, Standard: 7},
+			f.league.Player("h009").Team: {PPR: 9, Half: 9, Standard: 9},
+		}}
 }
 
 // pairedFixture is the fixture with team 1 playing team 2 this week.
@@ -90,13 +88,17 @@ func TestMatchupIsBothSidesInSlotsWithTheWeeksProjection(t *testing.T) {
 	if k := mine.Starters[8].Line; k.Player.Position != "K" || k.WeekProjection == nil || *k.WeekProjection != 8.4 {
 		t.Fatalf("the kicker %+v: by his club when his id has no row", k)
 	}
-	if def.Player.Position != "DEF" || def.WeekProjection == nil || *def.WeekProjection != 7 {
-		t.Fatalf("the defense %+v: by his club", def)
+	if def.Player.Position != "DEF" || !def.Facts.Bye || def.WeekProjection != nil {
+		t.Fatalf("the defense on a bye %+v: no projection, though its club has a row", def)
 	}
 	if rb := mine.Starters[1].Line; rb.WeekProjection != nil {
 		t.Fatalf("a player with no row has none: %v", *rb.WeekProjection)
 	}
-	for _, st := range box.Sides[1].Starters {
+	theirs := box.Sides[1].Starters
+	if d := theirs[len(theirs)-1].Line; d.Player.Position != "DEF" || d.WeekProjection == nil || *d.WeekProjection != 7 {
+		t.Fatalf("the opponent's defense %+v: by his club", d)
+	}
+	for _, st := range theirs[:len(theirs)-1] {
 		if st.Line.WeekProjection != nil {
 			t.Fatalf("the opponent's %s has no row: %v", st.Line.Player.Name, *st.Line.WeekProjection)
 		}
@@ -136,6 +138,41 @@ func TestMatchupWithoutAProjectionOrAnOpponent(t *testing.T) {
 		if l.WeekProjection != nil {
 			t.Fatalf("%s: %v without a read", l.Player.Name, *l.WeekProjection)
 		}
+	}
+}
+
+// A player whose club has no game this week has no projection, even when
+// the snapshot holds a row for him.
+func TestAByeHasNoProjection(t *testing.T) {
+	f := pairedFixture(t)
+	every := map[string]boards.ProjectedPoints{}
+	for _, p := range f.raw.Players {
+		every[p.ID] = boards.ProjectedPoints{PPR: 10, Half: 10, Standard: 10}
+	}
+	a, err := newAdvisor(f.league, f.data, boards.WeekProjection{ReadAt: projectionAt, Players: every}, nil, fixtureNow)
+	if err != nil {
+		t.Fatal(err)
+	}
+	byes, playing := 0, 0
+	for _, team := range f.league.Snap.Teams {
+		for _, p := range a.active(team) {
+			if p.line.Player.BoardId == nil || p.line.Player.Position == "DEF" {
+				continue
+			}
+			switch {
+			case p.line.Facts.Bye && p.line.WeekProjection != nil:
+				t.Fatalf("%s is on a bye with a projection %v", p.line.Player.Name, *p.line.WeekProjection)
+			case p.line.Facts.Bye:
+				byes++
+			case p.line.WeekProjection == nil:
+				t.Fatalf("%s plays with no projection", p.line.Player.Name)
+			default:
+				playing++
+			}
+		}
+	}
+	if byes == 0 || playing == 0 {
+		t.Fatalf("the fixture holds %d byes and %d playing", byes, playing)
 	}
 }
 
