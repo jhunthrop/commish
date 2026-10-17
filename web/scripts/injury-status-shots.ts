@@ -183,7 +183,7 @@ async function otherSurfaces(page: Page, tag: string): Promise<void> {
 		`${tag}: the ADP row: ${adpRow}`
 	);
 	await page.goto(`${web}/players/christian-mccaffrey`, { waitUntil: 'networkidle' });
-	const mates = await page.locator('aside.tier').innerText();
+	const mates = await page.locator('[aria-label="His tier"]').innerText();
 	check(!mates.includes(HELD.name), `${tag}: a tier mate's page leaves him out`);
 	await page.goto(`${web}/compare?a=${HELD.slug}&b=christian-mccaffrey`, {
 		waitUntil: 'networkidle'
