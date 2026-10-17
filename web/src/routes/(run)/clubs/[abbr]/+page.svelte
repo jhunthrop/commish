@@ -79,6 +79,26 @@
 			{/if}
 		</section>
 
+		{#if page.market.length > 0}
+			<section aria-label="Kickers and defense">
+				<PanelHead title="Kickers and defense, in draft order" />
+				<Panel padding="none">
+					<RowHead range={false} market {framing} />
+					{#each page.market as player (player.id)}
+						<Row
+							{player}
+							showTier={false}
+							unit={page.format.unit}
+							range={false}
+							{framing}
+							href={links.board(page.format.id, player.position)}
+							status={words?.rows[player.id] ?? null}
+						/>
+					{/each}
+				</Panel>
+			</section>
+		{/if}
+
 		<section aria-label="Schedule">
 			<Table
 				caption={page.played === 0

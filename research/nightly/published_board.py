@@ -21,6 +21,11 @@ in-season window (`rosFromWeek`), else `preseason`, and `from_week` is that `ros
 it), the first week the figures cover; `refreshed` is that format's `refreshedAt` in
 season, and before it the stored board generation the run printed (the manifest's boards source
 for the format's stored board, whose window is the generation's stamp).
+
+A kicker's or a defense's row (the board's market rows, Lane 66m) is published as it is printed: its
+rank and its place in draft order, every point figure NULL, under the board's `order_basis` (the
+table's word for the whole board, which the API reads as one). In season it is not published: the API's
+in-season tools rank by the rest-of-season figure, which a kicker or a defense does not carry.
 """
 
 from collections.abc import Mapping
@@ -33,7 +38,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from research.db.schema import PUBLISHED_BOARDS
 from research.errors import ResearchError
-from research.nightly.config import LATEST_KEY, RUN_FORMATS, RunFormat
+from research.nightly.config import LATEST_KEY, MARKET_ORDER, RUN_FORMATS, RunFormat
 from research.nightly.publish import read_json, run_key
 from research.nightly.run_store import RunStore
 
@@ -185,8 +190,12 @@ def _format_rows(format_json: object, manifest: Json, boards: Mapping[str, Json]
     )
     basis = REST_OF_SEASON if in_season else PRESEASON
     from_week = _from_week(format_json, format_id) if in_season else None
+    # In season the API's tools rank by the rest-of-season figure, which kickers and defenses do not
+    # carry, so their draft-order rows stay on the site's board and out of the table.
     rows = [
-        _row(row, format_id, basis, refreshed, from_week) for row in _list(board, "rows", f"boards/{format_id}.json")
+        _row(row, format_id, basis, refreshed, from_week)
+        for row in _list(board, "rows", f"boards/{format_id}.json")
+        if not (in_season and isinstance(row, dict) and row.get("orderBasis") == MARKET_ORDER)
     ]
     ids = [r.player_id for r in rows]
     twice = sorted({i for i in ids if ids.count(i) > 1})

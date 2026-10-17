@@ -26,7 +26,7 @@ export function positionFromSegment(segment: string): Position | null {
 }
 
 /** The positions a board ranks, in the board order QB, RB, WR, TE, K, DST. */
-export function positionsIn(rows: readonly BoardRow[]): Position[] {
+export function positionsIn(rows: readonly Pick<BoardRow, 'position'>[]): Position[] {
 	const present = new Set(rows.map((row) => row.position));
 	return POSITIONS.filter((position) => present.has(position));
 }

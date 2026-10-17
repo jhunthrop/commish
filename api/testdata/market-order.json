@@ -1,0 +1,40 @@
+{
+  "about": "Kickers and defenses in draft order (Lane 66m): the nightly (research/nightly/reads/market.py) and the room's board read (api/internal/boards/market.go) take each format's own stamped ADP capture, the newest at or before the season's first kickoff, by provider id through the crosswalk, ties and the unpriced by id. Both suites read this file and must reach the same first kicker and first defense. The provider's own ADP (provider_adp) orders them differently on purpose, and so does the capture taken after the kickoff.",
+  "season": 2026,
+  "first_kickoff": { "game_date": "2026-09-10", "kickoff_et": "8:20p" },
+  "players": [
+    { "id": "3055899", "position": "K", "team": "DAL", "provider_adp": 160.0 },
+    { "id": "4360234", "position": "K", "team": "HOU", "provider_adp": 140.0 },
+    { "id": "3124679", "position": "K", "team": "SEA", "provider_adp": 150.0 },
+    { "id": "DST-SEA", "position": "DEF", "team": "SEA", "provider_adp": 200.0 },
+    { "id": "DST-HOU", "position": "DEF", "team": "HOU", "provider_adp": 120.0 },
+    { "id": "DST-DEN", "position": "DEF", "team": "DEN", "provider_adp": 180.0 }
+  ],
+  "captures": {
+    "before_kickoff": "2026-09-09T07:00:00Z",
+    "after_kickoff": "2026-09-11T07:00:00Z",
+    "ppr": {
+      "before_kickoff": { "3055899": 126.4, "4360234": 137.7, "DST-SEA": 80.5, "DST-DEN": 86.5, "DST-HOU": 97.3 },
+      "after_kickoff": { "3124679": 100.0, "DST-DEN": 60.0 }
+    },
+    "half": {
+      "before_kickoff": { "4360234": 130.0, "3055899": 131.0, "DST-DEN": 90.0, "DST-SEA": 95.0 },
+      "after_kickoff": { "3055899": 90.0, "DST-HOU": 50.0 }
+    },
+    "std": {
+      "before_kickoff": { "3124679": 128.0, "3055899": 128.0, "DST-HOU": 88.0, "DST-SEA": 89.0 },
+      "after_kickoff": { "4360234": 70.0, "DST-DEN": 40.0 }
+    }
+  },
+  "first": {
+    "ppr": { "K": "3055899", "DEF": "DST-SEA" },
+    "half": { "K": "4360234", "DEF": "DST-DEN" },
+    "std": { "K": "3055899", "DEF": "DST-HOU" }
+  },
+  "order_about": "The board's order: the priced players alone (the September ruling lists only players the drafters take). The room keeps the unpriced after them, by id.",
+  "order": {
+    "ppr": ["DST-SEA", "DST-DEN", "DST-HOU", "3055899", "4360234"],
+    "half": ["DST-DEN", "DST-SEA", "4360234", "3055899"],
+    "std": ["DST-HOU", "DST-SEA", "3055899", "3124679"]
+  }
+}

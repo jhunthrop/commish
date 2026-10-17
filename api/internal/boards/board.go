@@ -265,7 +265,7 @@ func CustomBasis(f Format) string {
 // Basis is the sentence that names what the numbers are: whose points,
 // over replacement for what league.
 func (b Board) Basis() string {
-	tail := fmt.Sprintf("over replacement for %d teams on this roster. Kickers and defenses carry no projection and sit where drafters take them.", b.teams)
+	tail := fmt.Sprintf("over replacement for %d teams on this roster. Kickers and defenses carry no projection and rank in draft order.", b.teams)
 	if b.Raw.Custom {
 		return fmt.Sprintf("Your league's scoring. Points are our %d projections over replacement for %d teams on this roster. "+
 			"%s", b.Raw.Season, b.teams, CustomBasis(b.Raw.Format))

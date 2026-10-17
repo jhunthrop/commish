@@ -70,9 +70,15 @@ RUN_FORMATS: Final = (
 # The format a player page and the capsule writer read (`capsules.facts.board`, PPR at twelve teams).
 PAGE_FORMAT: Final = RUN_FORMATS[0]
 
-# The positions the board ranks by projection. Kickers and defenses ship in market order (the
-# 2026-09-05 ruling, `KDEF_DECISION`), carry no projection, and are not board rows.
+# The positions the board ranks by projection.
 PROJECTED_POSITIONS: Final = ("QB", "RB", "WR", "TE")
+# Kickers and defenses ship in market order (the 2026-09-05 ruling, `KDEF_DECISION`): rows on every
+# board after the ranked ones, in the draft order of that board's own ADP feed (`RunFormat.adp`, the
+# order its ADP column prints), with no projected points and no tier (`nightly.reads.market`).
+MARKET_POSITIONS: Final = ("K", "DEF")
+# A board row's `orderBasis`: ranked by our projection, or in the market's draft order.
+PROJECTION_ORDER: Final = "projection"
+MARKET_ORDER: Final = "market"
 
 
 @dataclass(frozen=True, slots=True)

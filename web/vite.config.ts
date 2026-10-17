@@ -24,7 +24,7 @@ const BOARD_PARTS =
  * store. A nightly page never loads any of it with the page; the sheet arrives on a reader's first
  * intent, the rest only on the pages that call the API. */
 const USER_PAGE_PARTS =
-	/[\\/]src[\\/]lib[\\/](room|account|api|sheet|pass|companion|hosts)[\\/]|[\\/]src[\\/]lib[\\/]ui[\\/](CallPanel|TeamPanel|PickStrip|OddsCell|ToneChip|Stepper|TextInput|ScoreBug|SinceStrip|Keys)\./;
+	/[\\/]src[\\/]lib[\\/](room|account|api|sheet|pass|companion|hosts)[\\/]|[\\/]src[\\/]lib[\\/]ui[\\/](CallPanel|TeamPanel|PickStrip|StillThereCell|ToneChip|Stepper|TextInput|ScoreBug|SinceStrip|Keys)\.|[\\/]src[\\/]lib[\\/]run[\\/]market\./;
 /** What the player, club and compare pages draw and the others never do: a player's line, the
  * crumb, the outcome bar, the tier mates, the capsule and a fact. One file for those pages. */
 const PLAYER_PARTS =

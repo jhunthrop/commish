@@ -19,7 +19,7 @@ function endsSentence(text: string, at: number): boolean {
 	return after === '' || /^\s+[A-Z0-9"“]/.test(after);
 }
 
-/** The first sentence of the advisor's why: the reason. The sentences after it restate the odds,
+/** The first sentence of the advisor's why: the reason. The sentences after it restate the chances,
  * which the figure beside it already prints, so a view shows the reason alone. */
 export function firstSentence(text: string): string {
 	for (let i = 0; i < text.length; i++) {

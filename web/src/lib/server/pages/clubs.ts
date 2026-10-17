@@ -8,9 +8,12 @@ import type {
 	Club,
 	Format,
 	Game,
+	MarketRowView,
 	Schedule,
 	Slate
 } from '#lib/run/schema.ts';
+import { MARKET_POSITIONS, marketAt } from '#lib/run/market.ts';
+import { withFace } from '#lib/site/market.ts';
 import { fixed } from '#lib/format/number.ts';
 import { links } from '#lib/site/links.ts';
 import type { ScheduleRow } from '#lib/ui/schedule-grid.ts';
@@ -54,6 +57,8 @@ export interface ClubPage extends BoardStatuses {
 	schedule: Pick<Schedule, 'opponentBasis' | 'season'>;
 	/** The club's players on the default board, each with his season so far once it is underway. */
 	rows: BoardRowView[];
+	/** The club's kickers, then its defense, in draft order, each with his status. */
+	market: MarketRowView[];
 	scale: RangeScale | null;
 	clubs: Club[];
 	/** The last week played, 0 before the first kickoff: the schedule sets those weeks back. */
@@ -140,6 +145,12 @@ export async function clubPage(abbr: string): Promise<ClubPage> {
 	const slate = slateOf(loaded, club.abbr);
 	const own = withStatuses(rows.rows, capture).filter((row) => row.team === club.abbr);
 	const seasoned = (await boardSeason(format, own)).rows;
+	// His kickers and his defense, in draft order (Lane 66m).
+	const market = MARKET_POSITIONS.flatMap((position) =>
+		withStatuses(marketAt(rows.market, position), capture)
+			.filter((row) => row.team === club.abbr)
+			.map(withFace)
+	);
 	return {
 		club,
 		format,
@@ -150,10 +161,11 @@ export async function clubPage(abbr: string): Promise<ClubPage> {
 		})),
 		schedule: { opponentBasis: loaded.opponentBasis, season: loaded.season },
 		rows: seasoned,
+		market,
 		scale: own.length > 0 ? rangeScale(own) : null,
 		clubs: list,
 		played,
-		...boardStatuses(seasoned, capture, format)
+		...boardStatuses([...seasoned, ...market], capture, format)
 	};
 }
 

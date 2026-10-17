@@ -1,26 +1,26 @@
 <script lang="ts">
-	import { oddsShort } from '#lib/format/draft.ts';
+	import { chanceShort } from '#lib/format/draft.ts';
 	import Label from './Label.svelte';
 
 	interface Props {
 		/** The chance, 0 to 1, or null when the room has none for him. */
-		odds: number | null;
+		chance: number | null;
 		/** What the chance is of, printed under it: "still there at 6.05". */
 		label: string;
-		/** What prints in place of a chance when there is none to show: "not in the odds". */
+		/** What prints in place of a chance when there is none to show: "not read". */
 		missing?: string;
 	}
 
-	let { odds, label, missing = 'not in the odds' }: Props = $props();
+	let { chance, label, missing = 'not read' }: Props = $props();
 
-	const percent = $derived(odds === null ? 0 : Math.round(odds * 100));
+	const percent = $derived(chance === null ? 0 : Math.round(chance * 100));
 </script>
 
 <span class="cell">
-	{#if odds === null}
+	{#if chance === null}
 		<Label size="cell">{missing}</Label>
 	{:else}
-		<b>{oddsShort(odds)}</b>
+		<b>{chanceShort(chance)}</b>
 		<span class="meter" aria-hidden="true"><i style:width="{percent}%"></i></span>
 		<Label size="cell">{label}</Label>
 	{/if}

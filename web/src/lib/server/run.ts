@@ -27,6 +27,7 @@ import {
 	type RunRecord,
 	type Schedule
 } from '#lib/run/schema.ts';
+import { splitBoard, splitIndex, unindexedMarketRow, type RunIndex } from '#lib/run/market.ts';
 import { checkRunSeasons } from '#lib/run/season-checks.ts';
 import { openRun, type RunReader } from '#lib/run/source.ts';
 import type { RunStamp } from '#lib/run/stamp.ts';
@@ -69,13 +70,23 @@ export function manifest(): Promise<Manifest> {
 	return once('manifest', () => read(RUN_PATHS.manifest, manifestSchema));
 }
 
+/** A format's board: its ranked rows, and its kickers and defenses apart (run/market.ts), each one
+ * the index names. */
 export function board(format: string): Promise<Board> {
 	return once(`board:${format}`, async () => {
-		const loaded = await read(RUN_PATHS.board(format), boardSchema);
+		const [loaded, { market }] = await Promise.all([
+			read(RUN_PATHS.board(format), boardSchema),
+			runIndex()
+		]);
 		if (loaded.format !== format) {
 			throw new Error(`boards/${format}.json says it is the ${loaded.format} board.`);
 		}
-		return loaded;
+		const split = splitBoard(loaded);
+		const stray = unindexedMarketRow(split, market);
+		if (stray !== null) {
+			throw new Error(`boards/${format}.json carries ${stray.id}, who is not in index.json.`);
+		}
+		return split;
 	});
 }
 
@@ -195,10 +206,10 @@ export function schedule(): Promise<Schedule> {
  * show no status). Every player it keys is one the run indexes. */
 export function designations(): Promise<Designations | null> {
 	return once('designations', async () => {
-		const [open, entries] = await Promise.all([reader(), index()]);
+		const [open, { pages, market }] = await Promise.all([reader(), runIndex()]);
 		const loaded = await open.readOptional(RUN_PATHS.designations, designationsSchema);
 		if (loaded === null) return null;
-		const indexed = new Set(entries.map((entry) => entry.id));
+		const indexed = new Set([...pages, ...market].map((entry) => entry.id));
 		const stray = Object.keys(loaded.players).find((id) => !indexed.has(id));
 		if (stray !== undefined)
 			throw new Error(`designations.json marks ${stray}, who is not in index.json.`);
@@ -214,13 +225,15 @@ function assertUnique(values: readonly string[], what: string): void {
 	}
 }
 
-/** The search index, checked against the manifest and for unique ids and slugs. */
-export function index(): Promise<IndexEntry[]> {
+/** The whole index, checked against the manifest (its players are the pages) and for unique ids and
+ * slugs across the pages and the kickers and defenses. */
+export function runIndex(): Promise<RunIndex> {
 	return once('index', async () => {
 		const [entries, run] = await Promise.all([read(RUN_PATHS.index, indexSchema), manifest()]);
-		if (entries.length !== run.players) {
+		const split = splitIndex(entries);
+		if (split.pages.length !== run.players) {
 			throw new Error(
-				`index.json lists ${String(entries.length)} players, the manifest says ${String(run.players)}.`
+				`index.json lists ${String(split.pages.length)} players with a page, the manifest says ${String(run.players)}.`
 			);
 		}
 		assertUnique(
@@ -231,8 +244,13 @@ export function index(): Promise<IndexEntry[]> {
 			entries.map((entry) => entry.slug),
 			'slug'
 		);
-		return entries;
+		return split;
 	});
+}
+
+/** The search index: every player with a page. */
+export async function index(): Promise<IndexEntry[]> {
+	return (await runIndex()).pages;
 }
 
 /** The default format, the first the manifest lists. */

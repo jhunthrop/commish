@@ -1,11 +1,11 @@
 <script lang="ts">
-	import { oddsShort, pickLabel } from '#lib/format/draft.ts';
-	import { signed } from '#lib/format/number.ts';
+	import { chanceShort, pickLabel } from '#lib/format/draft.ts';
 	import Face from '#lib/ui/Face.svelte';
 	import Label from '#lib/ui/Label.svelte';
 	import ToneChip from '#lib/ui/ToneChip.svelte';
 	import type { MockReport } from '../api.ts';
 	import type { Board } from '../model.ts';
+	import { pickFigure } from './headline.ts';
 
 	type Pick = MockReport['picks'][number];
 	type Tone = 'gain' | 'loss' | 'even';
@@ -56,14 +56,14 @@
 	 * lesson. */
 	function hindsight(pick: Pick): { tone: Tone; text: string } {
 		if (pick.made_by !== 'you') return { tone: 'even', text: MADE_FOR[whose][pick.made_by] };
-		const odds = pick.still_there;
+		const chance = pick.still_there;
 		// No chance recorded: at the last pick there is no next turn, anywhere else the player was
-		// deeper than the odds the room computed.
-		if (odds === null)
-			return { tone: 'even', text: pick.pick === lastPick ? 'last pick' : 'not in the odds' };
-		if (odds >= couldWaitFrom)
-			return { tone: 'loss', text: `could wait, ${oddsShort(odds)} there next turn` };
-		return { tone: 'gain', text: `right on time, ${oddsShort(odds)} there next turn` };
+		// deeper than the chances the room computed.
+		if (chance === null)
+			return { tone: 'even', text: pick.pick === lastPick ? 'last pick' : 'not read' };
+		if (chance >= couldWaitFrom)
+			return { tone: 'loss', text: `could wait, ${chanceShort(chance)} there next turn` };
+		return { tone: 'gain', text: `right on time, ${chanceShort(chance)} there next turn` };
 	}
 
 	const lastPick = $derived(picks.filter((p) => p.chip !== 'kept').at(-1)?.pick ?? null);
@@ -82,6 +82,7 @@
 		{@const player = board.byId.get(pick.player_id)}
 		{@const adp = adpChip(pick)}
 		{@const hind = hindsight(pick)}
+		{@const figure = pickFigure(pick.over_replacement, player)}
 		<div class="pk" class:made={pick.made_by !== 'you'}>
 			<span class="no">{pickLabel(pick.pick, teams)}</span>
 			{#if player}<Face src={player.headshot} name={player.name} size={36} />{:else}<span
@@ -90,11 +91,7 @@
 				<b>{player?.name ?? pick.player_id}</b>
 				{#if player}<span>{player.position} {player.positionRank} · {player.team}</span>{/if}
 			</span>
-			{#if pick.over_replacement === null}
-				<span class="vor none">no projection</span>
-			{:else}
-				<span class="vor">{signed(pick.over_replacement)}</span>
-			{/if}
+			<span class="vor" class:none={figure.muted}>{figure.text}</span>
 			<span class="chips">
 				{#if pick.chip === 'kept'}
 					<!-- A keeper was nobody's choice: one grey chip where the gap and hindsight go. -->
@@ -109,7 +106,8 @@
 </div>
 <p class="basis">
 	Hindsight is the chance he was still there at {whose} next turn, as the room said at that pick.
-	{#if fellBack}A pick the room recorded no odds for reads 200 runs of the room from that pick.{/if}
+	{#if fellBack}For a pick the room recorded no chance at, hindsight reads 200 runs of the room from
+		that pick.{/if}
 	"Could wait" starts at {Math.round(couldWaitFrom * 100)}%.
 	{#if madeFor > 0}A pick made by Pick for me, a stand-in or the clock has no hindsight, since
 		nobody chose it.{/if}

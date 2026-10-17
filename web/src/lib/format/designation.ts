@@ -60,12 +60,31 @@ export function seasonLongLine(
 	restOfSeason: boolean,
 	zone: string = memberZone()
 ): string {
+	const figure = restOfSeason ? 'Our rest-of-season figure' : 'Our projection';
+	return `${listedSince(status, readAt, zone)}. ${figure} assumes he plays, so he sits below the available players.`;
+}
+
+/** A kicker's or a defense's season-long status, who carries no figure of ours (Lane 66m): "On injured
+ * reserve since October 14, so he sits below the available players." */
+export function draftOrderLongLine(
+	status: { status: DesignationStatus; since: string | null },
+	readAt: string,
+	zone: string = memberZone()
+): string {
+	return `${listedSince(status, readAt, zone)}, so he sits below the available players.`;
+}
+
+/** "On injured reserve since October 14", or as of the capture when we do not know the start. */
+function listedSince(
+	status: { status: DesignationStatus; since: string | null },
+	readAt: string,
+	zone: string
+): string {
 	const when =
 		status.since === null
 			? `as of ${monthDay(readAt, zone)}`
 			: `since ${monthDay(status.since, zone)}`;
-	const figure = restOfSeason ? 'Our rest-of-season figure' : 'Our projection';
-	return `${DESIGNATION_WORDS[status.status]} ${when}. ${figure} assumes he plays, so he sits below the available players.`;
+	return `${DESIGNATION_WORDS[status.status]} ${when}`;
 }
 
 /** The capture a page's statuses come from: when its list last changed, and the capture job's last

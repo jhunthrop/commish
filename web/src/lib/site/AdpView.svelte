@@ -88,22 +88,43 @@
 			<section aria-label="{page.format.label} ADP">
 				<RowHead action order="adp" {framing} />
 				{#each page.rows as player, i (player.id)}
-					<Row
-						{player}
-						href={links.player(player.slug)}
-						{scale}
-						showTier
-						unit={page.format.unit}
-						order="adp"
-						{framing}
-						eager={i < EAGER_ROWS}
-						held={siteContext.held?.mark(player.id) ?? null}
-						status={words?.rows[player.id] ?? null}
-					>
-						{#snippet action()}
-							<RowSheetMark {player} />
-						{/snippet}
-					</Row>
+					{#if player.orderBasis === 'market'}
+						{@const face = player.face}
+						<Row
+							{player}
+							href={links.club(player.team)}
+							{scale}
+							showTier={false}
+							unit={page.format.unit}
+							{framing}
+							order="adp"
+							orderColumn={false}
+							eager={i < EAGER_ROWS}
+							held={siteContext.held?.mark(player.id) ?? null}
+							status={words?.rows[player.id] ?? null}
+						>
+							{#snippet action()}
+								<RowSheetMark player={{ ...player, headshot: face }} />
+							{/snippet}
+						</Row>
+					{:else}
+						<Row
+							{player}
+							href={links.player(player.slug)}
+							{scale}
+							showTier
+							unit={page.format.unit}
+							order="adp"
+							{framing}
+							eager={i < EAGER_ROWS}
+							held={siteContext.held?.mark(player.id) ?? null}
+							status={words?.rows[player.id] ?? null}
+						>
+							{#snippet action()}
+								<RowSheetMark {player} />
+							{/snippet}
+						</Row>
+					{/if}
 				{/each}
 			</section>
 		</div>
