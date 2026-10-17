@@ -43,6 +43,9 @@
 		verbFoot?: Snippet;
 		/** Whether verbFoot has anything to say now; false keeps an empty bar off a phone. */
 		footSays?: boolean;
+		/** Whether the verb sits beside the decision on a wide screen; false where the strip carries a
+		 * verb on each card (Waivers, Lane 66f), the verb pinned on a phone alone. */
+		deskVerb?: boolean;
 		/** The decision drawn as a strip (the Lineup's swaps as chips, Lane 66e) in place of its
 		 * sentence; the sentence stays the strip's name for a screen reader. */
 		summary?: Snippet;
@@ -65,6 +68,7 @@
 		summary,
 		verbFoot,
 		footSays = true,
+		deskVerb = true,
 		children
 	}: Props = $props();
 
@@ -99,7 +103,7 @@
 			{#if summary}{@render summary()}{:else}<p class="line">{decision}</p>{/if}
 			{#if reason}<p class="reason">{reason}</p>{/if}
 		</div>
-		{#if !asideForMove}
+		{#if !asideForMove && deskVerb}
 			<span class="verb desk" {@attach hostTab(href)}
 				>{@render action(false)}
 				{@render foot(false)}</span

@@ -158,7 +158,7 @@ func TestCopyGuard(t *testing.T) {
 	plain := settings
 	plain.Scoring = apitypes.Scoring{Custom: &none}
 	for _, b := range []OrderBasis{Preseason, RestOfSeason} {
-		for _, s := range []string{LineupBasis(b), WaiversBasis(b, SeasonGames), TradesBasis(b, SeasonGames),
+		for _, s := range []string{LineupBasis(b), WaiversBasis(b), WaiverSeasonBasis(b, SeasonGames), RestOfSeasonBasis(6), TradesBasis(b, SeasonGames),
 			BasisNote(settings, nil), BasisNote(plain, nil), LineupNote(settings, nil), OnlyCloseCalls} {
 			guard(t, s)
 		}

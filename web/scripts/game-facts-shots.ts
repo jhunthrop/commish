@@ -1,14 +1,13 @@
 // Screenshots of the week's game facts (Lane 66a): the expected score and margin, the roof and the
-// kickoff weather with their read time, on the waivers rows as a sentence, on an
-// opened trade of the Trades table (Lane 66g) as a cell,
-// and on the Lineup and Matchup box scores (Lane 66d) as a cell ("20 to 22.5" and the weather in two or
+// kickoff weather with their read time, on the pickup table (Lane 66f) and an opened trade of the
+// Trades table (Lane 66g) as a cell, and on the Lineup and Matchup box scores (Lane 66d) as a cell ("20 to 22.5" and the weather in two or
 // three words) with the read said once under the boxes, in both themes at 1440 and 390 on a Central
 // clock (on a phone the waiver and trade rows keep to their decision, so they carry none). Each asserts
 // what it shows, no betting word, and that nothing scrolls sideways. Against the built site served static and the
 // fixture API (scripts/inseason-fixture/serve.ts), whose /games/week answers the recorded week.
 //
 //   node scripts/game-facts-shots.ts [web origin] [out dir]
-// The player page's Game cell is player-card-shots.ts's (Lane 66h).
+// The player card's Game cell is player-card-shots.ts's (Lane 66h).
 // with the site built against PUBLIC_API_URL pointing at the fixture API.
 import { mkdir } from 'node:fs/promises';
 import { chromium, type BrowserContext, type Page } from 'playwright';
@@ -22,18 +21,12 @@ const VIEWPORT_HEIGHT = 900;
 const ZONE = 'America/Chicago';
 const READY_TIMEOUT_MS = 30_000;
 const SIGNED_IN = { name: 'commish_csrf', value: 'fixture' };
-/** A game facts sentence as a row says it. */
-const FACTS =
-	/(Expected to score \d+(\.5)? and to (win|lose) by \d+(\.5)?|Expected to be a close game), \d+(\.5)? points in the game\./;
-const READ = /Read \w{3} \d{1,2}:\d{2} [ap]m\./;
-const WEATHER =
-	/\d+°F and \d+ mph wind at kickoff, (outdoors|under a retractable roof)\.|Indoors\.|Played abroad, so no forecast\./;
 /** A box score's facts cell: the expected score with his club's first, then the weather's words. */
 const EXPECTED = /^\d+(\.5)? to \d+(\.5)?$/;
 const CELL_WEATHER =
 	/^(\d+°, \d+ mph(, \d+% (rain|snow|ice))?|Indoors|Roof TBD|Abroad, no forecast|Outdoors)$/;
 const FACTS_READ =
-	/The Game cell shows each club's expected points, his club first, then the kickoff weather, read \w{3} \d{1,2}:\d{2} [ap]m Central\./g;
+	/The Game cell(?: shows each club's expected points, his club first, then the kickoff weather, read|'s expected points and weather were read) \w{3} \d{1,2}:\d{2} [ap]m Central\./g;
 const BETTING =
 	/\b(favou?red|underdogs?|odds|lines?|spreads?|totals?|bets?|betting|vegas|sportsbooks?|props?|moneyline)\b|over\/under/i;
 
@@ -45,24 +38,22 @@ const PAGES = [
 		name: 'start',
 		path: `/league/${id}/start`,
 		ready: 'Copy the lineup',
-		phone: true,
-		box: true
+		phone: true
 	},
 	{
 		name: 'waivers',
 		path: `/league/${id}/waivers`,
-		ready: 'Claim on Sleeper',
-		phone: false,
-		box: false
+		ready: 'Open Sleeper waivers',
+		// The pickup table is a box score too (Lane 66f): its Game cells and one read line.
+		phone: true
 	},
 	{
 		name: 'trades',
 		path: `/league/${id}/trades`,
 		ready: 'worth proposing',
-		phone: false,
-		box: true
+		phone: false
 	},
-	{ name: 'matchup', path: `/league/${id}/matchup`, ready: 'Week 6', phone: true, box: true }
+	{ name: 'matchup', path: `/league/${id}/matchup`, ready: 'Week 6', phone: true }
 ] as const;
 const failures: string[] = [];
 
@@ -100,14 +91,6 @@ async function open(page: Page, path: string, text: string): Promise<void> {
 	await page.waitForLoadState('networkidle');
 }
 
-/** The first visible element holding a game facts sentence, scrolled into view. */
-async function factsLine(page: Page): Promise<string | null> {
-	const line = page.getByText(FACTS).filter({ visible: true }).first();
-	if ((await line.count()) === 0) return null;
-	await line.scrollIntoViewIfNeeded();
-	return line.innerText();
-}
-
 /** A box score's facts: every visible row's expected score and weather words, and the screen's text
  * for its one read line, and any row that still carries a read stamp. */
 async function boxFacts(
@@ -121,19 +104,23 @@ async function boxFacts(
 				.map((el) => (el as HTMLElement).innerText.trim());
 		const rows = [
 			...document.querySelectorAll(
-				'main table.box tbody tr, main table.lineup tbody tr, main table.inner tbody tr'
+				'main table.box tbody tr, main table.lineup tbody tr, main table.pool tbody tr, main table.inner tbody tr'
 			)
 		];
 		return {
-			expected: texts('main table.box .exp, main table.lineup .exp, main table.inner .exp'),
-			weather: texts('main table.box .wx, main table.lineup .wx, main table.inner .wx'),
+			expected: texts(
+				'main table.box .exp, main table.lineup .exp, main table.pool .exp, main table.inner .exp'
+			),
+			weather: texts(
+				'main table.box .wx, main table.lineup .wx, main table.pool .wx, main table.inner .wx'
+			),
 			text: document.body.innerText,
 			stamped: rows.filter((tr) => /\bRead \w{3} /.test(tr.textContent)).length
 		};
 	});
 }
 
-for (const { name, path, ready, phone, box } of PAGES) {
+for (const { name, path, ready, phone } of PAGES) {
 	for (const theme of THEMES) {
 		for (const width of WIDTHS) {
 			const where = `${name} ${theme} ${String(width)}`;
@@ -143,7 +130,7 @@ for (const { name, path, ready, phone, box } of PAGES) {
 				await open(page, path, ready);
 				// The Trades table shows its game cells in an opened trade (Lane 66g).
 				if (name === 'trades') await page.locator('table.finder button.why').first().click();
-				if (box) {
+				{
 					const cells = await boxFacts(page);
 					// The opened trade's rows keep to the opponent and kickoff on a phone (Lane 66g).
 					const cellsShown = phone || width !== PHONE_WIDTH;
@@ -170,28 +157,7 @@ for (const { name, path, ready, phone, box } of PAGES) {
 					process.stdout.write(
 						`${where}: ${cells.expected[0] ?? 'none'} | ${cells.weather[0] ?? 'none'}\n`
 					);
-					continue;
 				}
-				const said = await factsLine(page);
-				// The waiver rows keep to their decision on a phone, so the first row clears the pin.
-				const shown = width !== PHONE_WIDTH;
-				check(
-					(said !== null) === shown,
-					`${where}: ${shown ? 'no game facts sentence' : 'game facts on a phone row'}`
-				);
-				if (said !== null) {
-					check(READ.test(said), `${where}: no read time in "${said}"`);
-					check(WEATHER.test(said), `${where}: no roof or weather in "${said}"`);
-					check(!BETTING.test(said), `${where}: a betting word in "${said}"`);
-				}
-				const wide = await page.evaluate(
-					() => document.documentElement.scrollWidth > document.documentElement.clientWidth
-				);
-				check(!wide, `${where}: scrolls sideways`);
-				await page.screenshot({
-					path: new URL(`${name}-${theme}-${String(width)}.png`, out).pathname
-				});
-				process.stdout.write(`${where}: ${said ?? 'none'}\n`);
 			} catch (error: unknown) {
 				failures.push(`${where}: ${String(error)}`);
 			} finally {
