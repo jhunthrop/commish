@@ -40,7 +40,6 @@ export interface KeyBinding {
  * chance the card recorded for him. */
 export interface CallRow {
 	player: PlayerRef;
-	projected: number | null;
 	vor: number | null;
 	adp: number | null;
 	chance: number | null;

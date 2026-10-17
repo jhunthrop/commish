@@ -58,7 +58,6 @@ export function draftWords(position: Position, verb = 'Draft'): string {
 function rowOf(player: RoomPlayer, chance: number | undefined): CallRow {
 	return {
 		player,
-		projected: player.points,
 		vor: player.vor,
 		adp: player.adp,
 		chance: chance ?? null

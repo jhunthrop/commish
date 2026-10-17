@@ -381,14 +381,12 @@
 					rows={[
 						{
 							player: call,
-							projected: call.projected,
 							vor: call.vor,
 							adp: call.adp,
 							chance: data.soloRoom.callChance
 						},
 						{
 							player: runner,
-							projected: runner.projected,
 							vor: runner.vor,
 							adp: runner.adp,
 							chance: data.soloRoom.runnerChance

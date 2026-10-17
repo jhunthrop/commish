@@ -10,8 +10,10 @@
 	import Quiet from './Quiet.svelte';
 	import Verb from './Verb.svelte';
 
-	/** Our call as a box score (Lane 66o): our top three as rows under the pool's own column heads,
-	 * the call first in the accent with the one verb. No sentence restates what the cells say. */
+	/** Our call as a box score (Lane 66o): our top three as rows on the pool's own grid, in the pool's
+	 * column order and widths (face, player, Over repl, the chance, ADP, the verb), so each figure
+	 * sits over the pool's column of it. The call is first, in the accent, with the one verb. No
+	 * sentence restates what the cells say. */
 	interface Props {
 		/** Where the call stands: "Our call at 5.08". */
 		tag: string;
@@ -33,16 +35,14 @@
 	const quiet = $derived(waiting || reading !== undefined);
 </script>
 
-{#snippet verb(phone: boolean)}
-	<span class="act" class:phone>
-		{#if reading !== undefined}
-			<Quiet size="lg" fill key={action.key} disabled>Waiting on the call</Quiet>
-		{:else if waiting}
-			<Quiet size="lg" fill key={action.key} onclick={action.onclick}>{action.label}</Quiet>
-		{:else}
-			<Verb size="lg" fill key={action.key} onclick={action.onclick}>{action.label}</Verb>
-		{/if}
-	</span>
+{#snippet verb()}
+	{#if reading !== undefined}
+		<Quiet fill key={action.key} disabled>Waiting on the call</Quiet>
+	{:else if waiting}
+		<Quiet fill key={action.key} onclick={action.onclick}>{action.label}</Quiet>
+	{:else}
+		<Verb fill key={action.key} onclick={action.onclick}>{action.label}</Verb>
+	{/if}
 {/snippet}
 
 <Panel as="section" label={reading ?? tag} padding="none" edge={quiet ? 'quiet' : 'accent'}>
@@ -50,72 +50,71 @@
 		class="call"
 		class:waiting={quiet}
 		class:reading={reading !== undefined}
+		class:last={chanceHead === null}
 		aria-busy={reading !== undefined}
 		use:holdHeight
 	>
 		<span class="tag">{reading ?? tag}</span>
-		<table>
-			<thead>
-				<tr>
-					<th scope="col" class="who">Player</th>
-					<th scope="col" class="proj">Projected</th>
-					<th scope="col">Over repl</th>
-					<th scope="col">ADP</th>
-					{#if chanceHead !== null}<th scope="col">{chanceHead}</th>{/if}
-					<th class="go"><span class="sr">Verb</span></th>
-				</tr>
-			</thead>
-			<tbody>
-				{#each rows as row, i (row.player.id)}
-					{@const market = isMarketPosition(row.player.position)}
-					<tr class:pick={i === 0}>
-						<td class="who">
-							<span class="p">
-								<Face
-									src={row.player.headshot}
-									name={row.player.name}
-									size={i === 0 ? 48 : 34}
-									phoneSize={i === 0 ? 32 : 28}
-									loading="eager"
-								/>
-								<span class="nm">
-									<b>{row.player.name}</b>
-									<small
-										><PositionPill position={row.player.position} rank={row.player.positionRank} />
-										{row.player.team}</small
-									>
-								</span>
-							</span>
-						</td>
-						<td class="n proj">{row.projected === null ? '' : fixed(row.projected)}</td>
-						{#if market}
-							<td class="n muted">Draft order {row.player.positionRank}</td>
-						{:else}
-							<td class="n">{row.vor === null ? '' : signed(row.vor)}</td>
-						{/if}
-						<td class="n">{row.adp === null ? '' : fixed(row.adp)}</td>
-						{#if chanceHead !== null}<td class="n"
-								>{row.chance === null ? '' : chanceShort(row.chance)}</td
-							>{/if}
-						<td class="go"
-							>{#if i === 0}{@render verb(false)}{/if}</td
-						>
-					</tr>
-				{/each}
-			</tbody>
-		</table>
-		{@render verb(true)}
+		<div class="grid head" aria-hidden="true">
+			<span></span>
+			<span>Player</span>
+			<span class="n">Over repl</span>
+			{#if chanceHead !== null}<span class="n">{chanceHead}</span>{/if}
+			<span class="n adp">ADP</span>
+			<span class="go"></span>
+		</div>
+		{#each rows as row, i (row.player.id)}
+			{@const market = isMarketPosition(row.player.position)}
+			<div class="grid row" class:pick={i === 0}>
+				<span class="face"
+					><Face
+						src={row.player.headshot}
+						name={row.player.name}
+						size={40}
+						phoneSize={32}
+						loading="eager"
+					/></span
+				>
+				<span class="nm">
+					<b>{row.player.name}</b>
+					<small
+						><PositionPill position={row.player.position} rank={row.player.positionRank} />
+						{row.player.team}</small
+					>
+				</span>
+				{#if market}
+					<span class="n muted">Draft order {row.player.positionRank}</span>
+				{:else}
+					<span class="n">{row.vor === null ? '' : signed(row.vor)}</span>
+				{/if}
+				{#if chanceHead !== null}<span class="n"
+						>{row.chance === null ? '' : chanceShort(row.chance)}</span
+					>{/if}
+				<span class="n adp">{row.adp === null ? '' : fixed(row.adp)}</span>
+				<span class="go"
+					>{#if i === 0}{@render verb()}{/if}</span
+				>
+			</div>
+		{/each}
+		<div class="below">{@render verb()}</div>
 	</div>
 </Panel>
 
 <style>
+	/* The pool's grid (Pool.svelte --pool-cols): face, player, over replacement, the chance, ADP, the
+	   actions. At your last pick there is no chance column, as in the pool. */
 	.call {
+		--call-cols: 40px minmax(0, 1fr) 118px 136px 118px 150px;
 		padding: var(--s-3) 0 0;
+	}
+
+	.call.last {
+		--call-cols: 40px minmax(0, 1fr) 118px 118px 150px;
 	}
 
 	.tag {
 		display: block;
-		padding: 0 var(--s-4) var(--s-2);
+		padding: 0 var(--s-3) var(--s-2);
 		font-size: var(--t-xs);
 		font-weight: 700;
 		letter-spacing: var(--track-label);
@@ -127,82 +126,55 @@
 		color: var(--ink-3);
 	}
 
-	table {
-		width: 100%;
-		border-collapse: collapse;
-		table-layout: fixed;
+	.grid {
+		display: grid;
+		grid-template-columns: var(--call-cols);
+		column-gap: var(--s-3);
+		align-items: center;
+		padding: 4px var(--s-3);
 		font-variant-numeric: tabular-nums;
 	}
 
-	th {
+	.head {
+		padding-bottom: var(--s-2);
+		border-bottom: 1px solid var(--line-strong);
 		font-size: var(--t-xs);
 		font-weight: 500;
 		letter-spacing: var(--track-label);
 		text-transform: uppercase;
 		color: var(--ink-3);
-		text-align: right;
-		padding: 0 var(--s-3) var(--s-2);
-		border-bottom: 1px solid var(--line-strong);
-		white-space: nowrap;
 	}
 
-	/* The pool's widths, so the card's columns sit over the pool's. */
-	th:nth-child(2) {
-		width: 110px;
-	}
-
-	th:nth-child(3) {
-		width: 110px;
-	}
-
-	th:nth-child(4) {
-		width: 80px;
-	}
-
-	th:nth-child(5) {
-		width: 150px;
-	}
-
-	th.go {
-		width: 224px;
-	}
-
-	th.who,
-	td.who {
-		text-align: left;
-	}
-
-	td {
-		padding: 0 var(--s-3);
-		height: var(--row-h);
+	.row {
+		min-height: var(--row-h);
 		border-bottom: 1px solid var(--line);
-		text-align: right;
-		white-space: nowrap;
 	}
 
-	tr:last-child td {
+	.row:last-of-type {
 		border-bottom: 0;
 	}
 
-	td.n {
+	.n {
+		text-align: right;
+		white-space: nowrap;
+	}
+
+	.row .n {
 		font-family: var(--font-num);
 		font-weight: 700;
 		font-size: var(--t-lg);
 		color: var(--ink-2);
 	}
 
-	td.muted {
+	.row .n.muted {
 		font-family: var(--font-ui);
 		font-weight: 500;
 		font-size: var(--t-xs);
 		color: var(--ink-3);
 	}
 
-	.p {
+	.face {
 		display: flex;
-		align-items: center;
-		gap: var(--s-3);
-		min-width: 0;
 	}
 
 	.nm {
@@ -228,16 +200,16 @@
 	}
 
 	/* The call: the row in the accent, the name in the display face, the figures at their largest. */
-	tr.pick td {
+	.pick {
+		min-height: 64px;
 		background: var(--accent-wash);
-		height: 72px;
 	}
 
-	.waiting tr.pick td {
+	.waiting .pick {
 		background: var(--surface-2);
 	}
 
-	tr.pick .nm b {
+	.pick .nm b {
 		font-family: var(--font-num);
 		font-weight: 800;
 		font-size: var(--t-head);
@@ -246,90 +218,81 @@
 		letter-spacing: 0.01em;
 	}
 
-	tr.pick td.n {
+	.pick .n {
 		font-size: var(--t-xl);
 		color: var(--ink);
 	}
 
-	td.go {
-		padding-right: var(--s-3);
-	}
-
-	.act {
+	.go {
 		display: flex;
 	}
 
-	.act.phone {
+	.below {
 		display: none;
-	}
-
-	.sr {
-		position: absolute;
-		width: 1px;
-		height: 1px;
-		overflow: hidden;
-		clip-path: inset(50%);
+		padding: var(--s-3);
 	}
 
 	/* The skeleton: the last call's frame, every word a quiet block of the same size. */
-	.reading :is(td.n, .nm b, .nm small) {
+	.reading :is(.row .n, .nm b, .nm small) {
 		color: transparent;
 	}
 
-	.reading :is(.nm b, td.n) {
-		background-clip: content-box;
-	}
-
-	.reading .p :global(.face) {
+	.reading .face {
 		opacity: 0;
 	}
 
-	@media (max-width: 760px) {
-		th,
-		td {
-			padding-inline: 4px;
+	/* The pool's narrower grid: its actions shrink to a key's width, so the verb moves under the rows. */
+	@media (max-width: 1180px) {
+		.call {
+			--call-cols: 40px minmax(0, 1fr) 108px 126px 108px;
 		}
 
-		th {
-			font-size: 10px;
-			letter-spacing: 0.02em;
-			white-space: normal;
-			vertical-align: bottom;
+		.call.last {
+			--call-cols: 40px minmax(0, 1fr) 108px 108px;
 		}
 
-		th.proj,
-		td.proj,
-		th.go,
-		td.go {
+		.go {
 			display: none;
 		}
 
-		th:nth-child(3) {
-			width: 70px;
+		.below {
+			display: block;
+		}
+	}
+
+	/* In a hand: the pool's phone grid, over replacement and the chance; ADP is the pool's desk column. */
+	@media (max-width: 760px) {
+		.call {
+			--call-cols: 36px minmax(0, 1fr) 84px 84px;
 		}
 
-		th:nth-child(4) {
-			width: 48px;
+		.call.last {
+			--call-cols: 36px minmax(0, 1fr) 84px;
 		}
 
-		th:nth-child(5) {
-			width: 64px;
+		.grid {
+			column-gap: var(--s-2);
 		}
 
-		td.n {
+		.adp {
+			display: none;
+		}
+
+		.head {
+			font-size: 10px;
+			letter-spacing: 0.02em;
+		}
+
+		.row .n {
 			font-size: var(--t-md);
 		}
 
-		tr.pick td {
-			height: 60px;
-		}
-
-		tr.pick .nm b {
+		.pick .nm b {
 			font-size: var(--t-lg);
 			white-space: normal;
 		}
 
-		tr.pick td.n {
+		.pick .n {
 			font-size: var(--t-lg);
 		}
 
@@ -341,11 +304,6 @@
 
 		.nm small {
 			font-size: var(--t-xs);
-		}
-
-		.act.phone {
-			display: flex;
-			padding: var(--s-3);
 		}
 	}
 </style>
