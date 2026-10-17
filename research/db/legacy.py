@@ -379,6 +379,7 @@ NEW_IN_RESEARCH: Final[Mapping[str, str]] = MappingProxyType(
         "capture_checks": "each capture feed's last successful check (revision 0008), rewritten by every capture pass",
         "register_weekly_rows": "the weekly number frozen per game before its kickoff (revision 0011), append-only",
         "player_week_reads": "the week-ahead read per player and week (revision 0012), rewritten on the read's cadence",
+        "player_week_read_runs": "each week-read pass's spend (revision 0012), append-only",
     }
 )
 

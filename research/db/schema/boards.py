@@ -6,6 +6,7 @@ from sqlalchemy import (
     Boolean,
     CheckConstraint,
     Column,
+    Date,
     DateTime,
     Double,
     ForeignKeyConstraint,
@@ -200,6 +201,7 @@ REGISTER_WEEKLY_ROWS: Final = Table(
 # sentences about his next game or its facts block, stamped with the write and every fact's own stamp.
 WEEK_READ_SOURCES: Final = ("llm", "facts")
 WEEK_READ_REASONS: Final = ("first", "unwritten", "status", "projection", "demoted")
+WEEK_READ_CALLS: Final = ("start", "sit", "hold", "none")
 PLAYER_WEEK_READS: Final = Table(
     "player_week_reads",
     METADATA,
@@ -215,10 +217,32 @@ PLAYER_WEEK_READS: Final = Table(
     Column("projection_points", Double(53)),
     Column("status", Text),
     Column("reason", Text, nullable=False),
+    Column("call", Text),
+    Column("attempt_day", Date, nullable=False),
+    Column("attempts", Integer, nullable=False),
     recorded_at("recorded_at"),
     one_of("source", WEEK_READ_SOURCES, "player_week_reads_source_ck"),
     one_of("reason", WEEK_READ_REASONS, "player_week_reads_reason_ck"),
     CheckConstraint("week BETWEEN 1 AND 18", name="player_week_reads_week_ck"),
+    one_of("call", WEEK_READ_CALLS, "player_week_reads_call_ck"),
+    CheckConstraint("attempts >= 1", name="player_week_reads_attempts_ck"),
     CheckConstraint("facts_at IS NULL OR facts_at <= written_at", name="player_week_reads_facts_before_write_ck"),
     _player_fk("player_week_reads"),
+    Index("player_week_reads_week_idx", "season", "week"),
+)
+
+# Each week-read pass's spend (revision 0012): the hourly passes hold to a daily dollar cap from it.
+WEEK_READ_MODES: Final = ("nightly", "hourly")
+PLAYER_WEEK_READ_RUNS: Final = Table(
+    "player_week_read_runs",
+    METADATA,
+    Column("ran_at", DateTime(True), primary_key=True),
+    Column("mode", Text, primary_key=True),
+    Column("calls", Integer, nullable=False),
+    Column("cost_usd", Double(53), nullable=False),
+    Column("written", Integer, nullable=False),
+    Column("facts_blocks", Integer, nullable=False),
+    Column("demoted", Integer, nullable=False),
+    recorded_at("recorded_at"),
+    one_of("mode", WEEK_READ_MODES, "player_week_read_runs_mode_ck"),
 )

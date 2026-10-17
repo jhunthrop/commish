@@ -2,19 +2,22 @@
 
 Keyed on the universe id, the season and the week the read is for. A rewrite in the same week replaces
 the row (the cadence says when, `cadence`); a new week is a new row, so last week's read stays on file.
-Each row keeps the write's instant, the facts' newest stamp and every fact's own (`sheet.stamps`), and
-what the cadence compares against: the published projection and the status it was written with.
+Each row keeps the write's instant, the facts' newest stamp and every fact's own (`sheet.stamps`), what
+the cadence compares against (the published projection and the status it was written with), the call
+the writer classified it as, and its attempts on its Central day. The page serves the row of the board
+week only (`served_week_reads`). Each pass's spend is a row of `player_week_read_runs`, which the hourly
+passes' daily cap reads (`hourly_spend_since`).
 """
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 
-from sqlalchemy import Connection, text
-from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy import Connection, insert, text
+from sqlalchemy.dialects.postgresql import insert as upsert
 
-from research.db.schema import PLAYER_WEEK_READS
+from research.db.schema import PLAYER_WEEK_READ_RUNS, PLAYER_WEEK_READS
 
 
 @dataclass(frozen=True, slots=True)
@@ -31,28 +34,35 @@ class StoredWeekRead:
     projection_points: float | None
     status: str | None
     reason: str
+    call: str | None
+    attempt_day: date
+    attempts: int
+
+
+@dataclass(frozen=True, slots=True)
+class WeekReadRun:
+    """One pass's spend, as `player_week_read_runs` keeps it."""
+
+    ran_at: datetime
+    mode: str
+    calls: int
+    cost_usd: float
+    written: int
+    facts_blocks: int
+    demoted: int
+
+
+_COLUMNS = (
+    "player_id, season, week, source, body, model, written_at, facts_at, stamps, projection_points, status, reason, "
+    "call, attempt_day, attempts"
+)
 
 
 def _row(r: Any) -> StoredWeekRead:
     return StoredWeekRead(
-        r.player_id,
-        r.season,
-        r.week,
-        r.source,
-        r.body,
-        r.model,
-        r.written_at,
-        r.facts_at,
-        dict(r.stamps),
-        r.projection_points,
-        r.status,
-        r.reason,
-    )
-
-
-_COLUMNS = (
-    "player_id, season, week, source, body, model, written_at, facts_at, stamps, projection_points, status, reason"
-)
+        r.player_id, r.season, r.week, r.source, r.body, r.model, r.written_at, r.facts_at, dict(r.stamps),
+        r.projection_points, r.status, r.reason, r.call, r.attempt_day, r.attempts,
+    )  # fmt: skip
 
 
 def stored_week_reads(conn: Connection, season: int, weeks: Sequence[int]) -> dict[tuple[str, int], StoredWeekRead]:
@@ -67,17 +77,17 @@ def stored_week_reads(conn: Connection, season: int, weeks: Sequence[int]) -> di
 
 
 def served_week_reads(
-    conn: Connection, season: int, from_week: int, player_ids: Sequence[str]
+    conn: Connection, season: int, board_week: int, player_ids: Sequence[str]
 ) -> dict[str, StoredWeekRead]:
-    """Each player's newest read for a week not yet behind the run (`from_week` on), for his page."""
+    """Each player's read for the board week (the site's `board_week`), and no other week's."""
     if not player_ids:
         return {}
     rows = conn.execute(
         text(
-            f"select distinct on (player_id) {_COLUMNS} from research.player_week_reads "
-            "where season = :s and week >= :w and player_id = any(:ids) order by player_id, week"
+            f"select {_COLUMNS} from research.player_week_reads "
+            "where season = :s and week = :w and player_id = any(:ids)"
         ),
-        {"s": season, "w": from_week, "ids": list(player_ids)},
+        {"s": season, "w": board_week, "ids": list(player_ids)},
     )
     return {r.player_id: _row(r) for r in rows}
 
@@ -97,11 +107,34 @@ def upsert_week_read(conn: Connection, row: StoredWeekRead) -> None:
         "projection_points": row.projection_points,
         "status": row.status,
         "reason": row.reason,
+        "call": row.call,
+        "attempt_day": row.attempt_day,
+        "attempts": row.attempts,
     }
-    statement = insert(PLAYER_WEEK_READS).values(values)
+    statement = upsert(PLAYER_WEEK_READS).values(values)
     keys = ("player_id", "season", "week")
     conn.execute(
         statement.on_conflict_do_update(
             index_elements=list(keys), set_={k: statement.excluded[k] for k in values if k not in keys}
         )
     )
+
+
+def record_run(conn: Connection, run: WeekReadRun) -> None:
+    conn.execute(
+        insert(PLAYER_WEEK_READ_RUNS).values(
+            ran_at=run.ran_at, mode=run.mode, calls=run.calls, cost_usd=run.cost_usd, written=run.written,
+            facts_blocks=run.facts_blocks, demoted=run.demoted,
+        )
+    )  # fmt: skip
+
+
+def hourly_spend_since(conn: Connection, since: datetime) -> float:
+    """What the hourly passes have spent since `since` (the Central day's start), in dollars."""
+    spent = conn.execute(
+        text(
+            "select coalesce(sum(cost_usd), 0) from research.player_week_read_runs where mode = 'hourly' and ran_at >= :t"
+        ),
+        {"t": since},
+    ).scalar_one()
+    return float(spent)

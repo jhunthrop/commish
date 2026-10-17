@@ -45,6 +45,9 @@ def upgrade() -> None:
         sa.Column("projection_points", sa.Double(precision=53), nullable=True),
         sa.Column("status", sa.Text(), nullable=True),
         sa.Column("reason", sa.Text(), nullable=False),
+        sa.Column("call", sa.Text(), nullable=True),
+        sa.Column("attempt_day", sa.Date(), nullable=False),
+        sa.Column("attempts", sa.Integer(), nullable=False),
         sa.Column("recorded_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
         sa.PrimaryKeyConstraint("player_id", "season", "week"),
         sa.CheckConstraint("source IN ('llm', 'facts')", name="player_week_reads_source_ck"),
@@ -52,6 +55,8 @@ def upgrade() -> None:
             "reason IN ('first', 'unwritten', 'status', 'projection', 'demoted')", name="player_week_reads_reason_ck"
         ),
         sa.CheckConstraint("week BETWEEN 1 AND 18", name="player_week_reads_week_ck"),
+        sa.CheckConstraint("call IN ('start', 'sit', 'hold', 'none')", name="player_week_reads_call_ck"),
+        sa.CheckConstraint("attempts >= 1", name="player_week_reads_attempts_ck"),
         sa.CheckConstraint(
             "facts_at IS NULL OR facts_at <= written_at", name="player_week_reads_facts_before_write_ck"
         ),
@@ -60,7 +65,24 @@ def upgrade() -> None:
         ),
         schema=_SCHEMA,
     )
+    op.create_index("player_week_reads_week_idx", "player_week_reads", ["season", "week"], schema=_SCHEMA)
+    op.create_table(
+        "player_week_read_runs",
+        sa.Column("ran_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("mode", sa.Text(), nullable=False),
+        sa.Column("calls", sa.Integer(), nullable=False),
+        sa.Column("cost_usd", sa.Double(precision=53), nullable=False),
+        sa.Column("written", sa.Integer(), nullable=False),
+        sa.Column("facts_blocks", sa.Integer(), nullable=False),
+        sa.Column("demoted", sa.Integer(), nullable=False),
+        sa.Column("recorded_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.PrimaryKeyConstraint("ran_at", "mode"),
+        sa.CheckConstraint("mode IN ('nightly', 'hourly')", name="player_week_read_runs_mode_ck"),
+        schema=_SCHEMA,
+    )
 
 
 def downgrade() -> None:
+    op.drop_table("player_week_read_runs", schema=_SCHEMA)
+    op.drop_index("player_week_reads_week_idx", "player_week_reads", schema=_SCHEMA)
     op.drop_table("player_week_reads", schema=_SCHEMA)
