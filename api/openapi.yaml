@@ -3356,7 +3356,7 @@ components:
         sentence: { type: string, nullable: true, description: the reason for a change, from facts; null when unchanged }
     LineupAdvice:
       type: object
-      required: [week, basis, basis_note, order_basis, refreshed, read_at, projection_read_at, projection_previous_read_at, projection_scoring, player_points, team_points, set, slots, bench, reserve, host_lineup_url, host_note, moves]
+      required: [week, basis, basis_note, order_basis, refreshed, read_at, projection_read_at, projection_previous_read_at, projection_scoring, player_points, team_points, set, slots, empty_slots, bench, reserve, host_lineup_url, host_note, moves]
       properties:
         week: { type: integer }
         player_points:
@@ -3406,6 +3406,13 @@ components:
           type: array
           description: everyone else on the active roster, by the same keys (injured reserve and taxi spots left out)
           items: { $ref: "#/components/schemas/PlayerLine" }
+        empty_slots:
+          type: array
+          description: >-
+            the starting spots no rostered player who can play this week fills and the member left empty (or whose
+            player the advice starts in another spot), in the league's order: the screen shows each as a row with no
+            player and says no one can play there
+          items: { type: string, enum: [QB, RB, WR, TE, FLEX, SUPERFLEX, K, DEF] }
         reserve:
           type: array
           description: the players in the host's injured reserve spots, who start nowhere this week

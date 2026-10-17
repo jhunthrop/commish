@@ -720,6 +720,42 @@ func (e Lineup) Valid() bool {
 	}
 }
 
+// Defines values for LineupAdviceEmptySlots.
+const (
+	LineupAdviceEmptySlotsDEF       LineupAdviceEmptySlots = "DEF"
+	LineupAdviceEmptySlotsFLEX      LineupAdviceEmptySlots = "FLEX"
+	LineupAdviceEmptySlotsK         LineupAdviceEmptySlots = "K"
+	LineupAdviceEmptySlotsQB        LineupAdviceEmptySlots = "QB"
+	LineupAdviceEmptySlotsRB        LineupAdviceEmptySlots = "RB"
+	LineupAdviceEmptySlotsSUPERFLEX LineupAdviceEmptySlots = "SUPERFLEX"
+	LineupAdviceEmptySlotsTE        LineupAdviceEmptySlots = "TE"
+	LineupAdviceEmptySlotsWR        LineupAdviceEmptySlots = "WR"
+)
+
+// Valid indicates whether the value is a known member of the LineupAdviceEmptySlots enum.
+func (e LineupAdviceEmptySlots) Valid() bool {
+	switch e {
+	case LineupAdviceEmptySlotsDEF:
+		return true
+	case LineupAdviceEmptySlotsFLEX:
+		return true
+	case LineupAdviceEmptySlotsK:
+		return true
+	case LineupAdviceEmptySlotsQB:
+		return true
+	case LineupAdviceEmptySlotsRB:
+		return true
+	case LineupAdviceEmptySlotsSUPERFLEX:
+		return true
+	case LineupAdviceEmptySlotsTE:
+		return true
+	case LineupAdviceEmptySlotsWR:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for LineupMovesLineup.
 const (
 	LineupMovesLineupAvailable   LineupMovesLineup = "available"
@@ -2331,6 +2367,9 @@ type LineupAdvice struct {
 	// Bench everyone else on the active roster, by the same keys (injured reserve and taxi spots left out)
 	Bench []PlayerLine `json:"bench"`
 
+	// EmptySlots the starting spots no rostered player who can play this week fills and the member left empty (or whose player the advice starts in another spot), in the league's order: the screen shows each as a row with no player and says no one can play there
+	EmptySlots []LineupAdviceEmptySlots `json:"empty_slots"`
+
 	// HostLineupUrl the host's lineup page, empty when we know none
 	HostLineupUrl string `json:"host_lineup_url"`
 
@@ -2372,6 +2411,9 @@ type LineupAdvice struct {
 	TeamPoints *float64 `json:"team_points"`
 	Week       int      `json:"week"`
 }
+
+// LineupAdviceEmptySlots defines model for LineupAdvice.EmptySlots.
+type LineupAdviceEmptySlots string
 
 // LineupMoves defines model for LineupMoves.
 type LineupMoves struct {

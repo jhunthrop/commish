@@ -2879,6 +2879,8 @@ export interface components {
 			slots: components['schemas']['LineupSlot'][];
 			/** @description everyone else on the active roster, by the same keys (injured reserve and taxi spots left out) */
 			bench: components['schemas']['PlayerLine'][];
+			/** @description the starting spots no rostered player who can play this week fills and the member left empty (or whose player the advice starts in another spot), in the league's order: the screen shows each as a row with no player and says no one can play there */
+			empty_slots: ('QB' | 'RB' | 'WR' | 'TE' | 'FLEX' | 'SUPERFLEX' | 'K' | 'DEF')[];
 			/** @description the players in the host's injured reserve spots, who start nowhere this week */
 			reserve: components['schemas']['PlayerLine'][];
 			/** @description the host's lineup page, empty when we know none */

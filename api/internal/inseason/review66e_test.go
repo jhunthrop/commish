@@ -137,3 +137,43 @@ func TestAByeNeverStartsThroughTheAdvisor(t *testing.T) {
 	}
 	t.Logf("%d starters on bye in the set lineup, %d spots no one can play", byeStarters, marked)
 }
+
+// A spot no one who can play fills, empty on the platform too, comes back
+// as an empty spot (review N2): every tight end on the drafter's roster is
+// out and the platform starts none.
+func TestAnEmptySpotComesBackOnTheAnswer(t *testing.T) {
+	f := newFixture(t)
+	team, _ := f.league.Snap.TeamByRoster(1)
+	out := map[string]boards.Designation{}
+	var starters []string
+	for _, id := range team.Starters {
+		if p := f.league.Player(id); p.Position == "TE" {
+			continue
+		}
+		starters = append(starters, id)
+	}
+	for _, id := range team.Players {
+		if p := f.league.Player(id); p.Position == "TE" && p.BoardId != nil {
+			out[*p.BoardId] = boards.Designation{Code: "O", AsOf: fixtureNow.Add(-time.Hour)}
+		}
+	}
+	for i := range f.league.Snap.Teams {
+		if f.league.Snap.Teams[i].RosterID == 1 {
+			f.league.Snap.Teams[i].Starters = starters
+		}
+	}
+	f.data.Designations = out
+	a, err := newAdvisor(f.league, f.data, boards.WeekProjection{}, nil, fixtureNow)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, _ := a.Lineup()
+	if len(got.EmptySlots) != 1 || got.EmptySlots[0] != "TE" {
+		t.Fatalf("empty spots %v", got.EmptySlots)
+	}
+	for _, s := range got.Slots {
+		if s.Slot == "TE" {
+			t.Fatalf("a TE advised: %+v", s.Ours.Player)
+		}
+	}
+}
