@@ -56,6 +56,8 @@
 		type MoveStep
 	} from './move.ts';
 	import { Narrowing } from './state.ts';
+	import { askedPlayer, markAsked } from '../box/asked.ts';
+	import { onMount, tick } from 'svelte';
 	import { LINES } from './words.ts';
 
 	/** Waivers (spec §5) as a pickup table (Lane 66f): a strip with a card for each pickup worth
@@ -263,6 +265,24 @@
 	function onsort(key: SortKey): void {
 		sort = nextSort(sort, key);
 	}
+
+	/** A player page's verb names him (?player=, and his position, Lane 66h): the adds narrow to his
+	 * position when the first answer does not hold him, his row opens on its drops, the claim's way
+	 * in, and is marked and brought into view. */
+	onMount(async () => {
+		const asked = askedPlayer(window.location.href);
+		if (asked === null) return;
+		const his = (): PoolRow | undefined => pool.find((r) => r.source.add.player.board_id === asked);
+		const at = new URL(window.location.href).searchParams.get('position');
+		const narrowTo = POSITIONS.find((p) => p === at);
+		if (his() === undefined && narrowTo !== undefined) await choose(narrowTo);
+		const row = his();
+		if (row === undefined) return;
+		open = row.key;
+		chosenDrop = null;
+		await tick();
+		markAsked(document, asked);
+	});
 
 	/** The pair the drop panel's verb acts on: the open add with the drop chosen. */
 	const pair = $derived(openRow ? withDrop(openRow.source, drop) : null);

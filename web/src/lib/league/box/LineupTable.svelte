@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { SvelteSet } from 'svelte/reactivity';
 	import { BOX, boxNumber } from './box.ts';
+	import { askedPlayer, markAsked } from './asked.ts';
 	import BoxLine from './BoxLine.svelte';
 	import { BENCH_ANCHOR, LINEUP, type LineupBox, type LineupRow } from './lineup.ts';
 
@@ -36,12 +37,8 @@
 
 	/** A player page's verb names him (?player=, Lane 66h): his row is marked and brought into view. */
 	onMount(() => {
-		const asked = new URL(window.location.href).searchParams.get('player');
-		const row =
-			asked === null ? null : table?.querySelector(`tr[data-player="${CSS.escape(asked)}"]`);
-		if (!(row instanceof HTMLElement)) return;
-		row.dataset.asked = '';
-		row.scrollIntoView({ block: 'center' });
+		const asked = askedPlayer(window.location.href);
+		if (asked !== null && table !== null) markAsked(table, asked);
 	});
 
 	function whyOf(entry: LineupRow): { id: string; open: boolean; toggle: () => void } | null {
@@ -128,13 +125,6 @@
 </table>
 
 <style>
-	/* The player a player page sent here, marked in the accent's rule. */
-	.lineup :global(tr[data-asked] td) {
-		box-shadow:
-			inset 0 2px 0 var(--accent),
-			inset 0 -2px 0 var(--accent);
-	}
-
 	.lineup {
 		width: 100%;
 		border-collapse: separate;

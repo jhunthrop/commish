@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { askedPlayer } from '../box/asked.ts';
 	import Chip from '#lib/ui/Chip.svelte';
 	import ChipGroup from '#lib/ui/ChipGroup.svelte';
 	import ProblemLine from '#lib/ui/ProblemLine.svelte';
@@ -146,7 +147,7 @@
 	/** A player page's "Trade for him" names him (?player=, Lane 66h): the builder opens with him
 	 * picked from the team that holds him, and the trades narrow to those holding him. */
 	onMount(() => {
-		const asked = new URL(window.location.href).searchParams.get('player');
+		const asked = askedPlayer(window.location.href);
 		if (asked === null) return;
 		const holder = advice.teams.find((team) =>
 			team.roster.some((line) => line.player.board_id === asked)
