@@ -336,6 +336,6 @@ func TradeCheckBasis(b OrderBasis, weeks int) string {
 // those the other team gains at least CloseCall a week from first, best
 // for you first, then the close calls for them.
 func TradesBasis(b OrderBasis, weeks int) string {
-	return fmt.Sprintf("Trades where both lineups gain on %s. Each team's come best for you first among those they gain at least %.1f a week from, "+
+	return fmt.Sprintf("Trades where both lineups gain on %s. Each team's best trade, yours first, among those they gain at least %.1f a week from, "+
 		"then the close calls for them. The other team decides. %s", numberWords(b), CloseCall, porWords(b, weeks))
 }
