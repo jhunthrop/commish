@@ -139,19 +139,42 @@ func (s *Service) LineupMove(ctx context.Context, accountID uuid.UUID, host stri
 	if err != nil {
 		return out, err
 	}
+	out.TakesWrites = s.takesLineups(host)
 	if open {
 		out.Lineup = apitypes.LineupMovesLineupAvailable
+		out.WritesOn = true
 		return out, nil
 	}
-	if note == "" {
-		// Closed with nothing for the member to do: the screen's copy verb
-		// says why in one line, the platform named (Lane 66e).
-		if note, err = s.lineupClosedNote(ctx, accountID, host); err != nil {
-			return out, err
-		}
+	if out.WritesOn, err = s.lineupWritesOn(ctx, accountID, host); err != nil {
+		return out, err
 	}
-	out.Note = &note
+	// The one line under the copy verb (Lane 66e, the names Lane 67 set):
+	// the member's step where there is one, else why, the platform named.
+	reason := note
+	if note != "" {
+		out.Note = &note
+	} else if reason, err = s.lineupClosedNote(ctx, accountID, host); err != nil {
+		return out, err
+	}
+	out.Reason = &reason
 	return out, nil
+}
+
+// takesLineups is whether the platform accepts lineups from us at all.
+func (s *Service) takesLineups(host string) bool {
+	return lineupWriteHosts[host] && s.ESPNOpen
+}
+
+// lineupWritesOn is whether the platform's lineup switch is on for the
+// account: on for everyone, or the account on the allow list.
+func (s *Service) lineupWritesOn(ctx context.Context, accountID uuid.UUID, host string) (bool, error) {
+	if !s.takesLineups(host) {
+		return false, nil
+	}
+	if s.ESPNLineup {
+		return true, nil
+	}
+	return s.Proofs.Allowed(ctx, accountID, host, kindLineup)
 }
 
 // lineupClosedNote is why a lineup cannot be set from our screen when the
@@ -163,10 +186,11 @@ func (s *Service) lineupClosedNote(ctx context.Context, accountID uuid.UUID, hos
 	if !lineupWriteHosts[host] {
 		return fmt.Sprintf(noLineupPathWords, leaguesync.HostWords(host)), nil
 	}
-	if !s.ESPNOpen {
-		return lineupOffWords, nil
+	on, err := s.lineupWritesOn(ctx, accountID, host)
+	if err != nil || !on {
+		return lineupOffWords, err
 	}
-	_, err := s.Connections.Get(ctx, accountID, host)
+	_, err = s.Connections.Get(ctx, accountID, host)
 	switch {
 	case errors.Is(err, hosts.ErrNotConnected):
 		return lineupConnectWords, nil

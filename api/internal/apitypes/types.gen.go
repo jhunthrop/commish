@@ -2372,14 +2372,23 @@ type LineupAdvice struct {
 
 // LineupMoves defines model for LineupMoves.
 type LineupMoves struct {
-	// Lineup available when the lineup can be set on the host from our screen (the host has a write path, its switch is on for the account and the account's connection agreed to the moves); unavailable when the verb is the host's page
+	// Lineup available when the lineup can be set on the host from our screen (the host has a write path, its switch is on for the account and the account's connection agreed to the moves); unavailable when the screen's verb copies the lineup instead
 	Lineup LineupMovesLineup `json:"lineup"`
 
-	// Note one sentence under the verb whenever lineup is unavailable, naming the platform: why it cannot be set from our screen ("Sleeper takes no lineup from outside.", "ESPN writes are off until your connection is renewed.") or what the member does to open it (connect again to agree to moves); null when available
+	// Note one sentence when a move waits on the member (connect again to agree to moves), null otherwise
 	Note *string `json:"note"`
+
+	// Reason the one line under "Copy the lineup" whenever lineup is unavailable, naming the platform: why the lineup cannot be set from our screen ("Sleeper takes no lineup from outside.", "ESPN writes are off until your connection is renewed.") or the note's step for the member; null when available
+	Reason *string `json:"reason"`
+
+	// TakesWrites the member's platform accepts lineups from us at all (a write path exists here)
+	TakesWrites bool `json:"takes_writes"`
+
+	// WritesOn the platform's switch is on for this account, or the account is on the allow list; false where the platform takes no writes
+	WritesOn bool `json:"writes_on"`
 }
 
-// LineupMovesLineup available when the lineup can be set on the host from our screen (the host has a write path, its switch is on for the account and the account's connection agreed to the moves); unavailable when the verb is the host's page
+// LineupMovesLineup available when the lineup can be set on the host from our screen (the host has a write path, its switch is on for the account and the account's connection agreed to the moves); unavailable when the screen's verb copies the lineup instead
 type LineupMovesLineup string
 
 // LineupSlot defines model for LineupSlot.

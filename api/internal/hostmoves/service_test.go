@@ -571,7 +571,7 @@ func TestSwitchesAndTheAllowList(t *testing.T) {
 	check("switch on", apitypes.HostMovePlanStatusReady, apitypes.LineupMovesLineupAvailable)
 	r.svc.ESPNLineup = false
 	check("switch off, not listed", apitypes.HostMovePlanStatusUnavailable, apitypes.LineupMovesLineupUnavailable)
-	if got, _ := r.svc.LineupMove(ctx, me, espnhost.Host); got.Note == nil || *got.Note != lineupOffWords {
+	if got, _ := r.svc.LineupMove(ctx, me, espnhost.Host); got.Reason == nil || *got.Reason != lineupOffWords || !got.TakesWrites || got.WritesOn {
 		t.Fatalf("switch off, not listed, says why: %+v", got)
 	}
 	r.proofs.allowed[me] = true
@@ -589,13 +589,14 @@ func TestSwitchesAndTheAllowList(t *testing.T) {
 	if got, _ := r.svc.LineupMove(ctx, me, espnhost.Host); got.Lineup != apitypes.LineupMovesLineupUnavailable {
 		t.Fatalf("ESPN closed here: %+v", got)
 	}
-	if got, _ := r.svc.LineupMove(ctx, me, espnhost.Host); got.Note == nil || *got.Note != lineupOffWords {
+	if got, _ := r.svc.LineupMove(ctx, me, espnhost.Host); got.Note != nil || got.Reason == nil || *got.Reason != lineupOffWords || got.TakesWrites {
 		t.Fatalf("ESPN closed here says its writes are off: %+v", got)
 	}
 	// A platform with no write path says so in one line, by its name.
 	for host, name := range map[string]string{"sleeper": "Sleeper", "yahoo": "Yahoo", "ffpc": "FFPC", "mfl": "MyFantasyLeague"} {
 		got, _ := r.svc.LineupMove(ctx, me, host)
-		if got.Lineup != apitypes.LineupMovesLineupUnavailable || got.Note == nil || *got.Note != name+" takes no lineup from outside." {
+		if got.Lineup != apitypes.LineupMovesLineupUnavailable || got.Note != nil || got.TakesWrites || got.WritesOn ||
+			got.Reason == nil || *got.Reason != name+" takes no lineup from outside." {
 			t.Fatalf("%s: %+v", host, got)
 		}
 	}
@@ -619,7 +620,8 @@ func TestConsentVersionGatesTheMove(t *testing.T) {
 	for _, tc := range cases {
 		r.svc.Connections = conns{tc.conn}
 		got, err := r.svc.LineupMove(ctx, me, espnhost.Host)
-		if err != nil || got.Lineup != apitypes.LineupMovesLineupUnavailable || got.Note == nil || *got.Note != tc.note {
+		if err != nil || got.Lineup != apitypes.LineupMovesLineupUnavailable || got.Reason == nil || *got.Reason != tc.note ||
+			(tc.conn == nil) != (got.Note == nil) || !got.TakesWrites || !got.WritesOn {
 			t.Fatalf("%s: %+v %v", tc.name, got, err)
 		}
 		p := r.plan(t, swap())

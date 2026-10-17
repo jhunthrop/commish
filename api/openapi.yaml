@@ -3497,22 +3497,34 @@ components:
           description: one sentence when every trade found with this team is a close call for them, else null
     LineupMoves:
       type: object
-      required: [lineup, note]
+      required: [lineup, note, takes_writes, writes_on, reason]
       properties:
         lineup:
           type: string
           enum: [available, unavailable]
           description: >-
             available when the lineup can be set on the host from our screen (the host has a write path, its switch
-            is on for the account and the account's connection agreed to the moves); unavailable when the verb is the
-            host's page
+            is on for the account and the account's connection agreed to the moves); unavailable when the screen's
+            verb copies the lineup instead
         note:
           type: string
           nullable: true
+          description: one sentence when a move waits on the member (connect again to agree to moves), null otherwise
+        takes_writes:
+          type: boolean
+          description: the member's platform accepts lineups from us at all (a write path exists here)
+        writes_on:
+          type: boolean
           description: >-
-            one sentence under the verb whenever lineup is unavailable, naming the platform: why it cannot be set from
-            our screen ("Sleeper takes no lineup from outside.", "ESPN writes are off until your connection is renewed.")
-            or what the member does to open it (connect again to agree to moves); null when available
+            the platform's switch is on for this account, or the account is on the allow list; false where the
+            platform takes no writes
+        reason:
+          type: string
+          nullable: true
+          description: >-
+            the one line under "Copy the lineup" whenever lineup is unavailable, naming the platform: why the lineup
+            cannot be set from our screen ("Sleeper takes no lineup from outside.", "ESPN writes are off until your
+            connection is renewed.") or the note's step for the member; null when available
     HostMoveChange:
       type: object
       required: [slot, in, out]
