@@ -2,19 +2,18 @@
 // session, after the member confirms it on our screen (spec 2026-10-15
 // §10.2; docs/research/2026-10-15-host-writes-design.md §6): one
 // host-neutral route plans the move in words with a confirm token, a
-// second makes it once with that token. Two moves today, both on ESPN: a
-// lineup set (behind HOST_WRITES_ESPN_LINEUP) and a claim, an add with
-// its drop and the bid where the league bids (behind
-// HOST_WRITES_ESPN_CLAIM), each also open to the accounts on its allow
-// list. Every move is kept as its proof; a cookie never is, nor is a move
-// retried on its own.
+// second makes it once with that token. Three moves today: an ESPN lineup
+// set (behind HOST_WRITES_ESPN_LINEUP), an ESPN claim, an add with its
+// drop and the bid where the league bids (behind HOST_WRITES_ESPN_CLAIM),
+// and a MyFantasyLeague lineup set (behind HOST_WRITES_MFL_LINEUP), each
+// also open to the accounts on its allow list. Every move is kept as its
+// proof; a cookie or session never is, nor is a move retried on its own.
 package hostmoves
 
 import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"regexp"
@@ -27,9 +26,11 @@ import (
 	"github.com/jhunthrop/commish/api/internal/espn"
 	"github.com/jhunthrop/commish/api/internal/hosts"
 	"github.com/jhunthrop/commish/api/internal/hosts/espnhost"
+	"github.com/jhunthrop/commish/api/internal/hosts/mflhost"
 	"github.com/jhunthrop/commish/api/internal/httpx"
 	"github.com/jhunthrop/commish/api/internal/inseason"
 	"github.com/jhunthrop/commish/api/internal/leaguesync"
+	"github.com/jhunthrop/commish/api/internal/mfl"
 )
 
 // Bounds on the routes, per account: a handful of moves a minute.
@@ -81,6 +82,25 @@ type Writer interface {
 	Applied(ctx context.Context, cookies espn.Cookies, set espn.LineupSet) (bool, error)
 }
 
+// MFLMember reads the member's own MyFantasyLeague team with their kept
+// session. *mflhost.Member implements it.
+type MFLMember interface {
+	Lineup(ctx context.Context, accountID uuid.UUID, leagueID string, season int) (mfl.TeamLineup, mfl.Session, error)
+}
+
+// MFLWriter sends a MyFantasyLeague lineup and reads it back. *mfl.Client
+// implements it.
+type MFLWriter interface {
+	SetLineup(ctx context.Context, sess mfl.Session, set mfl.LineupSet) (mfl.WriteAnswer, error)
+	Applied(ctx context.Context, sess mfl.Session, set mfl.LineupSet) (bool, error)
+}
+
+// Players is a platform's kept directory by player id, for a move's names
+// and positions. *leaguesync.Store implements it.
+type Players interface {
+	HostPlayersByID(ctx context.Context, host string, ids []string) (map[string]leaguesync.HostPlayer, error)
+}
+
 // Proofs is the allow list and the proof records. *Store implements it.
 type Proofs interface {
 	Allowed(ctx context.Context, accountID uuid.UUID, host, kind string) (bool, error)
@@ -99,7 +119,17 @@ type Service struct {
 	// may set an ESPN lineup; off, only the accounts on the allow list.
 	ESPNLineup bool
 	// ESPNClaim is HOST_WRITES_ESPN_CLAIM, the same for a claim.
-	ESPNClaim   bool
+	ESPNClaim bool
+	// MFLOpen is MyFantasyLeague's member side open here: the vault's key.
+	// Closed, no MyFantasyLeague move is.
+	MFLOpen bool
+	// MFLLineup is HOST_WRITES_MFL_LINEUP: on, every connected member may
+	// set a MyFantasyLeague lineup; off, only the accounts on the allow
+	// list.
+	MFLLineup   bool
+	MFLMember   MFLMember
+	MFLWriter   MFLWriter
+	Players     Players
 	Links       Links
 	Connections Connections
 	Member      Member
@@ -133,78 +163,24 @@ func (s *Service) Routes() []httpx.Route {
 // LineupMove says whether the account may set its lineup on the host
 // from our screen, and the sentence when a move waits on the member. The
 // start screen's answer carries it.
-func (s *Service) LineupMove(ctx context.Context, accountID uuid.UUID, host string) (apitypes.LineupMoves, error) {
-	open, note, err := s.open(ctx, accountID, host, apitypes.HostMoveInputKindLineup)
-	out := apitypes.LineupMoves{Lineup: apitypes.LineupMovesLineupUnavailable}
-	if err != nil {
-		return out, err
-	}
-	if out.TakesWrites, out.WritesOn, err = s.espnLineupWritesStandIn(ctx, accountID, host); err != nil {
-		return out, err
-	}
-	if open {
-		out.Lineup = apitypes.LineupMovesLineupAvailable
-		return out, nil
-	}
-	if note != "" {
-		out.Note = &note
-	}
-	reason, err := s.lineupReason(ctx, accountID, host, out.TakesWrites, out.WritesOn)
-	if err != nil {
-		return out, err
-	}
-	out.Reason = &reason
-	return out, nil
-}
-
-// espnLineupWritesStandIn is takes_writes and writes_on for a lineup:
-// ESPN takes lineups from us, and its writes are on for the account when
-// ESPN is open here (HOST_ESPN_ENABLED with the vault's key) and
-// HOST_WRITES_ESPN_LINEUP is on or the account is on the allow list. Every
-// other platform takes none.
 //
-// TODO(lane 67): a stand-in until Lane 67's per-platform write registry
-// merges and answers both for every platform (MyFantasyLeague included);
-// replace this with it.
-func (s *Service) espnLineupWritesStandIn(ctx context.Context, accountID uuid.UUID, host string) (takes, on bool, err error) {
-	if host != espnhost.Host {
-		return false, false, nil
+// It also says whether the league's platform takes a lineup from here at
+// all, whether its switch is on for the account, and the one line under
+// the screen's other verb (Copy the lineup) when the lineup is not set
+// from here.
+func (s *Service) LineupMove(ctx context.Context, accountID uuid.UUID, host string) (apitypes.LineupMoves, error) {
+	a, err := s.access(ctx, accountID, host, apitypes.HostMoveInputKindLineup)
+	out := apitypes.LineupMoves{Lineup: apitypes.LineupMovesLineupUnavailable, TakesWrites: a.takes, WritesOn: a.on}
+	if a.open && err == nil {
+		out.Lineup = apitypes.LineupMovesLineupAvailable
 	}
-	if !s.ESPNOpen {
-		return true, false, nil
+	if a.note != "" {
+		out.Note = &a.note
 	}
-	if s.ESPNLineup {
-		return true, true, nil
+	if out.Lineup == apitypes.LineupMovesLineupUnavailable && a.reason != "" {
+		out.Reason = &a.reason
 	}
-	on, err = s.Proofs.Allowed(ctx, accountID, host, kindLineup)
-	return true, on, err
-}
-
-// lineupReason is the one line under the copy verb (Lane 66e, the field
-// Lane 67 named), true in every state, the platform named: it takes no
-// lineups from us, its writes are not on for the account, the account has
-// not connected it, or the connection needs renewing.
-func (s *Service) lineupReason(ctx context.Context, accountID uuid.UUID, host string, takes, on bool) (string, error) {
-	name := leaguesync.HostWords(host)
-	switch {
-	case !takes:
-		return fmt.Sprintf(noLineupPathWords, name), nil
-	case !on:
-		return fmt.Sprintf(writesNotOnWords, name), nil
-	}
-	conn, err := s.Connections.Get(ctx, accountID, host)
-	switch {
-	case errors.Is(err, hosts.ErrNotConnected):
-		return fmt.Sprintf(connectWords, name), nil
-	case err != nil:
-		return "", err
-	case conn.Status != hosts.StatusConnected || conn.ConsentVersion < hosts.ESPNConsentVersion:
-		return fmt.Sprintf(renewWords, name), nil
-	}
-	// Open in every way this checks: the move is refused for another reason
-	// (a claim's store missing never applies to a lineup), so the writes
-	// are not on here.
-	return fmt.Sprintf(writesNotOnWords, name), nil
+	return out, err
 }
 
 // ClaimMove says whether the account may claim on the host from our
@@ -225,42 +201,103 @@ func (s *Service) ClaimMove(ctx context.Context, accountID uuid.UUID, host strin
 	return out, nil
 }
 
-// switchOn is the kind's switch on ESPN.
-func (s *Service) switchOn(kind apitypes.HostMoveInputKind) bool {
-	if kind == apitypes.HostMoveInputKindClaim {
+// takesWrites reports a platform that takes the move from our screen at
+// all: ESPN a lineup and a claim, MyFantasyLeague a lineup.
+func takesWrites(host string, kind apitypes.HostMoveInputKind) bool {
+	switch host {
+	case espnhost.Host:
+		return true
+	case mflhost.Host:
+		return kind == apitypes.HostMoveInputKindLineup
+	}
+	return false
+}
+
+// wired reports the platform's write path open here for the kind: its
+// key and its readers and writers in place.
+func (s *Service) wired(host string, kind apitypes.HostMoveInputKind) bool {
+	if host == mflhost.Host {
+		return s.MFLOpen && s.MFLMember != nil && s.MFLWriter != nil
+	}
+	return s.ESPNOpen && (kind != apitypes.HostMoveInputKindClaim || s.Claims != nil)
+}
+
+// switchOn is the kind's switch on the platform.
+func (s *Service) switchOn(host string, kind apitypes.HostMoveInputKind) bool {
+	switch {
+	case host == mflhost.Host:
+		return s.MFLLineup
+	case kind == apitypes.HostMoveInputKindClaim:
 		return s.ESPNClaim
 	}
 	return s.ESPNLineup
 }
 
-// open reports whether a move of the kind is open to the account on the
-// host: the host has a write path, the kind's switch or its allow list
-// lets the account make it, and the account's connection is connected and
-// agreed to words that name the moves. When it is closed on the member's
-// side, note says what to do.
-func (s *Service) open(ctx context.Context, accountID uuid.UUID, host string, kind apitypes.HostMoveInputKind) (bool, string, error) {
-	if host != espnhost.Host || !s.ESPNOpen || (kind == apitypes.HostMoveInputKindClaim && s.Claims == nil) {
-		return false, "", nil
+// consentFor is the consent version a move on the platform needs.
+func consentFor(host string) int {
+	if host == mflhost.Host {
+		return hosts.MFLConsentVersion
 	}
-	if !s.switchOn(kind) {
+	return hosts.ESPNConsentVersion
+}
+
+// moveAccess is whether a move is open to an account on a platform, and
+// why not: note is what the member does (connect again, agree to moves),
+// reason the one line under the screen's other verb.
+type moveAccess struct {
+	open, takes, on bool
+	note, reason    string
+}
+
+// access reports whether a move of the kind is open to the account on the
+// host: the platform takes it and is wired here, the kind's switch or its
+// allow list lets the account make it, and the account's connection is
+// connected and agreed to words that name the moves.
+func (s *Service) access(ctx context.Context, accountID uuid.UUID, host string, kind apitypes.HostMoveInputKind) (moveAccess, error) {
+	p := onHost(host)
+	if !takesWrites(host, kind) {
+		return moveAccess{reason: *inseason.CopyOnlyMoves(host).Reason}, nil
+	}
+	out := moveAccess{takes: true, reason: p.switchedOff}
+	if !s.wired(host, kind) {
+		return out, nil
+	}
+	out.on = s.switchOn(host, kind)
+	if !out.on {
 		allowed, err := s.Proofs.Allowed(ctx, accountID, host, string(kind))
 		if err != nil || !allowed {
-			return false, "", err
+			return out, err
 		}
+		out.on = true
 	}
-	words := wordsFor(kind)
+	words := wordsFor(host, kind)
 	conn, err := s.Connections.Get(ctx, accountID, host)
 	switch {
 	case errors.Is(err, hosts.ErrNotConnected):
-		return false, "", nil
+		out.reason = p.connect
+		return out, nil
 	case err != nil:
-		return false, "", err
+		return out, err
 	case conn.Status != hosts.StatusConnected:
-		return false, words.reconnect, nil
-	case conn.ConsentVersion < hosts.ESPNConsentVersion:
-		return false, words.reconsent, nil
+		out.note = words.reconnect
+	case conn.ConsentVersion < consentFor(host):
+		out.note = words.reconsent
+	default:
+		out.open, out.reason = true, ""
+		return out, nil
 	}
-	return true, "", nil
+	out.reason = out.note
+	return out, nil
+}
+
+// open reports whether a move of the kind is open to the account on the
+// host, and when it is closed on the member's side, what to do.
+func (s *Service) open(ctx context.Context, accountID uuid.UUID, host string, kind apitypes.HostMoveInputKind) (bool, string, error) {
+	a, err := s.access(ctx, accountID, host, kind)
+	if err != nil {
+		return false, "", err
+	}
+	return a.open, a.note, nil
 }
 
 // checkMove checks the move's shape before anything is read: a lineup's
@@ -326,17 +363,21 @@ func (s *Service) link(w http.ResponseWriter, r *http.Request) (leaguesync.Link,
 type prepared struct {
 	lineup      *lineupPlan
 	claim       *claimPlan
+	mfl         *mflPlan
 	cookies     espn.Cookies
+	session     mfl.Session
 	unavailable string
 }
 
 // sentence is the move in words.
 func (p prepared) sentence() string {
-	if p.claim != nil {
+	switch {
+	case p.claim != nil:
 		return p.claim.sentence
-	}
-	if p.lineup != nil {
+	case p.lineup != nil:
 		return p.lineup.sentence
+	case p.mfl != nil:
+		return p.mfl.sentence
 	}
 	return ""
 }
@@ -349,7 +390,7 @@ var errSilent = errors.New("hostmoves: the host did not answer")
 // itself and reports false.
 func (s *Service) prepare(w http.ResponseWriter, r *http.Request, link leaguesync.Link, mv apitypes.HostMoveInput, making bool) (prepared, bool) {
 	ctx, accountID := r.Context(), auth.AccountID(r)
-	words := wordsFor(mv.Kind)
+	words := wordsFor(link.Ref.Host, mv.Kind)
 	open, note, err := s.open(ctx, accountID, link.Ref.Host, mv.Kind)
 	if err != nil {
 		httpx.WriteInternal(w, r, s.Log, "hostmoves: open", err)
@@ -357,9 +398,12 @@ func (s *Service) prepare(w http.ResponseWriter, r *http.Request, link leaguesyn
 	}
 	if !open {
 		if note == "" {
-			note = offWords
+			note = words.off
 		}
 		return prepared{unavailable: note}, true
+	}
+	if link.Ref.Host == mflhost.Host {
+		return s.prepareMFL(w, r, link, mv, words)
 	}
 	cookies, err := s.Member.Cookies(ctx, accountID)
 	var l espn.FullLeague
@@ -385,7 +429,7 @@ func (s *Service) prepare(w http.ResponseWriter, r *http.Request, link leaguesyn
 		plan, err = planLineup(l, cookies.SWID, link.RosterID, mv)
 		out.lineup = &plan
 	}
-	if !s.planRefusal(w, r, err) {
+	if !s.planRefusal(w, r, err, words) {
 		return prepared{}, false
 	}
 	var ref *refusal
@@ -402,14 +446,14 @@ func (s *Service) readRefusal(w http.ResponseWriter, r *http.Request, err error,
 	case err == nil:
 		return "", false
 	case errors.Is(err, hosts.ErrNotConnected):
-		return offWords, false
-	case errors.Is(err, espnhost.ErrReconnect), errors.Is(err, espn.ErrSignedOut):
+		return words.off, false
+	case errors.Is(err, espnhost.ErrReconnect), errors.Is(err, espn.ErrSignedOut), errors.Is(err, mflhost.ErrReconnect), errors.Is(err, mfl.ErrSignedOut):
 		return words.reconnect, false
-	case errors.Is(err, espn.ErrPrivate):
+	case errors.Is(err, espn.ErrPrivate), errors.Is(err, mfl.ErrNotYourTeam):
 		return words.notYourTeam, false
 	}
 	s.Log.Warn("hostmoves: read the league", "account", auth.AccountID(r), "err", err)
-	httpx.WriteError(w, r, http.StatusBadGateway, httpx.CodeUnavailable, notAnsweringWord, nil)
+	httpx.WriteError(w, r, http.StatusBadGateway, httpx.CodeUnavailable, words.notAnswering, nil)
 	return "", true
 }
 
@@ -431,7 +475,7 @@ func availabilityRefusal(err error, words kindWords) error {
 // member's words, 502 for a host that did not answer. A refusal that
 // makes the move unavailable, and no refusal, answer nothing and report
 // true.
-func (s *Service) planRefusal(w http.ResponseWriter, r *http.Request, err error) bool {
+func (s *Service) planRefusal(w http.ResponseWriter, r *http.Request, err error, words kindWords) bool {
 	accountID := auth.AccountID(r)
 	var ref *refusal
 	switch {
@@ -445,7 +489,7 @@ func (s *Service) planRefusal(w http.ResponseWriter, r *http.Request, err error)
 		httpx.WriteError(w, r, http.StatusUnprocessableEntity, httpx.CodeInvalid, ref.words, nil)
 	case errors.Is(err, errSilent):
 		s.Log.Warn("hostmoves: read the player", "account", accountID, "err", err)
-		httpx.WriteError(w, r, http.StatusBadGateway, httpx.CodeUnavailable, notAnsweringWord, nil)
+		httpx.WriteError(w, r, http.StatusBadGateway, httpx.CodeUnavailable, words.notAnswering, nil)
 	default:
 		httpx.WriteInternal(w, r, s.Log, "hostmoves: plan", err)
 	}
@@ -469,7 +513,7 @@ func (s *Service) plan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !checkMove(mv) {
-		httpx.WriteInvalid(w, r, map[string]string{fieldMove: wordsFor(mv.Kind).form})
+		httpx.WriteInvalid(w, r, map[string]string{fieldMove: wordsFor("", mv.Kind).form})
 		return
 	}
 	link, ok := s.link(w, r)
@@ -504,15 +548,15 @@ func (s *Service) move(w http.ResponseWriter, r *http.Request) {
 	if !httpx.DecodeJSON(w, r, httpx.MaxSmallBody, &in) {
 		return
 	}
-	words := wordsFor(in.Move.Kind)
 	if !checkMove(in.Move) || in.Confirm == "" || len(in.Confirm) > maxConfirm {
-		httpx.WriteInvalid(w, r, map[string]string{fieldMove: words.form})
+		httpx.WriteInvalid(w, r, map[string]string{fieldMove: wordsFor("", in.Move.Kind).form})
 		return
 	}
 	link, ok := s.link(w, r)
 	if !ok {
 		return
 	}
+	words := wordsFor(link.Ref.Host, in.Move.Kind)
 	accountID := auth.AccountID(r)
 	sum, err := s.Signer.Verify(in.Confirm, accountID, link.ID, in.Move, s.Now())
 	if err != nil {
@@ -556,32 +600,41 @@ type planRecord struct {
 }
 
 // outgoing is the move as it leaves: its body, its plan as the proof
-// keeps it, the one send and what it came to.
+// keeps it, and make, which sends it once and settles what it came to
+// (an error is a move that never left).
 type outgoing struct {
 	body   []byte
 	record any
-	send   func(ctx context.Context) (espn.WriteAnswer, error)
-	settle func(ctx context.Context, ans espn.WriteAnswer) (Answer, string)
+	make   func(ctx context.Context) (Answer, string, error)
 }
 
 // outgoingOf is the prepared move ready to leave.
 func (s *Service) outgoingOf(p prepared) (outgoing, error) {
-	if p.claim != nil {
+	switch {
+	case p.claim != nil:
 		c := *p.claim
 		body, err := c.set.Body()
-		return outgoing{body: body, record: c.record(),
-			send: func(ctx context.Context) (espn.WriteAnswer, error) { return s.Claims.Claim(ctx, p.cookies, c.set) },
-			settle: func(ctx context.Context, ans espn.WriteAnswer) (Answer, string) {
-				return s.settleClaim(ctx, p.cookies, c, ans)
-			}}, err
+		return outgoing{body: body, record: c.record(), make: func(ctx context.Context) (Answer, string, error) {
+			ans, err := s.Claims.Claim(ctx, p.cookies, c.set)
+			if err != nil {
+				return Answer{}, "", err
+			}
+			a, sentence := s.settleClaim(ctx, p.cookies, c, ans)
+			return a, sentence, nil
+		}}, err
+	case p.mfl != nil:
+		return s.outgoingMFL(*p.mfl, p.session)
 	}
 	set := p.lineup.set
 	body, err := set.Body()
 	return outgoing{body: body, record: planRecord{Sentence: p.lineup.sentence, Team: set.Team(), Period: set.Period(), Items: set.Items()},
-		send: func(ctx context.Context) (espn.WriteAnswer, error) { return s.Writer.SetLineup(ctx, p.cookies, set) },
-		settle: func(ctx context.Context, ans espn.WriteAnswer) (Answer, string) {
+		make: func(ctx context.Context) (Answer, string, error) {
+			ans, err := s.Writer.SetLineup(ctx, p.cookies, set)
+			if err != nil {
+				return Answer{}, "", err
+			}
 			a := s.settle(ctx, p.cookies, set, ans)
-			return a, lineupResultWords(a)
+			return a, lineupResultWords(a, espnWords), nil
 		}}, err
 }
 
@@ -600,8 +653,9 @@ func (s *Service) send(w http.ResponseWriter, r *http.Request, link leaguesync.L
 	}
 	id, err := s.Proofs.Begin(r.Context(), Record{AccountID: accountID, LinkID: link.ID, Host: link.Ref.Host, HostLeagueID: link.Ref.LeagueID,
 		Season: link.Ref.Season, Kind: string(mv.Kind), Week: mv.Week, Digest: sum, Plan: planJSON, Body: out.body})
+	words := wordsFor(link.Ref.Host, mv.Kind)
 	if errors.Is(err, ErrUsed) {
-		httpx.WriteError(w, r, http.StatusConflict, httpx.CodeConflict, wordsFor(mv.Kind).used, nil)
+		httpx.WriteError(w, r, http.StatusConflict, httpx.CodeConflict, words.used, nil)
 		return
 	}
 	if err != nil {
@@ -611,20 +665,19 @@ func (s *Service) send(w http.ResponseWriter, r *http.Request, link leaguesync.L
 	// From here the move may have left: nothing the request's end cancels.
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), orDefault(s.SendBudget, sendBudget))
 	defer cancel()
-	ans, err := out.send(ctx)
+	kept, sentence, err := out.make(ctx)
 	if err != nil {
 		s.keep(r.Context(), accountID, id, Answer{Outcome: OutcomeNotSent})
-		s.Log.Warn("hostmoves: not sent", "account", accountID, "move", id, "kind", mv.Kind, "err", err)
-		httpx.WriteError(w, r, http.StatusBadGateway, httpx.CodeUnavailable, notSentWords, nil)
+		s.Log.Warn("hostmoves: not sent", "account", accountID, "move", id, "host", link.Ref.Host, "kind", mv.Kind, "err", err)
+		httpx.WriteError(w, r, http.StatusBadGateway, httpx.CodeUnavailable, words.notSent, nil)
 		return
 	}
-	kept, sentence := out.settle(ctx, ans)
 	s.keep(r.Context(), accountID, id, kept)
 	if kept.Member == string(espn.MemberMismatched) {
 		s.Log.Warn("hostmoves: ESPN named another member on the move", "account", accountID, "move", id)
 	}
-	s.Log.Info("hostmoves: move", "account", accountID, "move", id, "kind", mv.Kind, "outcome", kept.Outcome, "status", ans.Status,
-		"reason", kept.HostReason, "read_back", kept.ReadBack, "member", kept.Member)
+	s.Log.Info("hostmoves: move", "account", accountID, "move", id, "host", link.Ref.Host, "kind", mv.Kind, "outcome", kept.Outcome,
+		"status", kept.HostStatus, "reason", kept.HostReason, "read_back", kept.ReadBack, "member", kept.Member)
 	httpx.WriteOK(w, r, http.StatusOK, result(kept, sentence, id, hostURL(link, mv.Kind)))
 }
 
@@ -650,15 +703,16 @@ func (s *Service) settle(ctx context.Context, cookies espn.Cookies, set espn.Lin
 	return a
 }
 
-// lineupResultWords is our sentence for what a lineup came to.
-func lineupResultWords(a Answer) string {
+// lineupResultWords is our sentence for what a lineup came to on the
+// platform.
+func lineupResultWords(a Answer, p platformWords) string {
 	switch a.Outcome {
 	case OutcomeDone:
-		return doneWords
+		return p.done
 	case OutcomeRefused:
-		return refusedWords
+		return p.refused
 	}
-	return pendingWords
+	return p.pending
 }
 
 // keep writes what the move came to on its own short deadline, cut loose

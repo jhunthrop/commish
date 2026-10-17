@@ -302,6 +302,32 @@ func (s *Store) HostPlayers(ctx context.Context, host string) ([]HostPlayer, tim
 	return out, at, nil
 }
 
+// HostPlayersByID is the host's kept directory rows for the ids, by id;
+// an id the directory does not hold is absent.
+func (s *Store) HostPlayersByID(ctx context.Context, host string, ids []string) (map[string]HostPlayer, error) {
+	out := map[string]HostPlayer{}
+	if len(ids) == 0 {
+		return out, nil
+	}
+	rows, err := s.Pool.Query(ctx, `select player_id, name, position, team, coalesce(espn_id, '')
+		from app.host_players where host = $1 and player_id = any($2::text[])`, host, ids)
+	if err != nil {
+		return nil, fmt.Errorf("leaguesync: host players by id %s: %w", host, err)
+	}
+	list, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (HostPlayer, error) {
+		var p HostPlayer
+		err := r.Scan(&p.ID, &p.Name, &p.Position, &p.Team, &p.ESPNID)
+		return p, err
+	})
+	if err != nil {
+		return nil, fmt.Errorf("leaguesync: host players by id %s: %w", host, err)
+	}
+	for _, p := range list {
+		out[p.ID] = p
+	}
+	return out, nil
+}
+
 // PutHostPlayers replaces a host's kept directory.
 func (s *Store) PutHostPlayers(ctx context.Context, host string, players []HostPlayer, at time.Time) error {
 	ids := make([]string, len(players))

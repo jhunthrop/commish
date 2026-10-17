@@ -53,7 +53,7 @@ func refuse(words string, cause error) error { return &refusal{words: words, cau
 
 // notTheirs is the move on a team ESPN does not list as the member's.
 func notTheirs(cause error) error {
-	return &refusal{words: notYourTeamWords, cause: cause, unavailable: true}
+	return &refusal{words: espnWords.notYourTeam, cause: cause, unavailable: true}
 }
 
 // lineupPlan is a lineup move checked against a fresh read: the set ESPN
@@ -71,7 +71,7 @@ type lineupPlan struct {
 // team, the locks and the eligibility.
 func planLineup(l espn.FullLeague, swid string, me int, mv apitypes.HostMoveInput) (lineupPlan, error) {
 	if mv.Week != l.ScoringPeriod {
-		return lineupPlan{}, refuse(fmt.Sprintf(weekMovedWords, l.ScoringPeriod), fmt.Errorf("week %d is not ESPN's %d", mv.Week, l.ScoringPeriod))
+		return lineupPlan{}, refuse(fmt.Sprintf(espnWords.weekMoved, l.ScoringPeriod), fmt.Errorf("week %d is not ESPN's %d", mv.Week, l.ScoringPeriod))
 	}
 	team, ok := teamOf(l, me)
 	if !ok {
@@ -123,14 +123,14 @@ func targetsOf(changes []apitypes.HostMoveChange, roster map[string]espn.Player)
 		p, on := roster[c.In]
 		switch {
 		case !ok:
-			return nil, nil, refuse(staleWords, fmt.Errorf("slot %q", c.Slot))
+			return nil, nil, refuse(espnWords.stale, fmt.Errorf("slot %q", c.Slot))
 		case !on:
-			return nil, nil, refuse(staleWords, fmt.Errorf("player %s is not on the team", c.In))
+			return nil, nil, refuse(espnWords.stale, fmt.Errorf("player %s is not on the team", c.In))
 		case p.Slot == espn.SlotReserve:
-			return nil, nil, refuse(fmt.Sprintf(reserveWords, p.Name), fmt.Errorf("player %s is on injured reserve", c.In))
+			return nil, nil, refuse(fmt.Sprintf(espnWords.reserve, p.Name), fmt.Errorf("player %s is on injured reserve", c.In))
 		}
 		if _, twice := targets[c.In]; twice {
-			return nil, nil, refuse(staleWords, fmt.Errorf("player %s starts twice", c.In))
+			return nil, nil, refuse(espnWords.stale, fmt.Errorf("player %s starts twice", c.In))
 		}
 		targets[c.In] = slot
 		order = append(order, c.In)
@@ -142,7 +142,7 @@ func targetsOf(changes []apitypes.HostMoveChange, roster map[string]espn.Player)
 		p, on := roster[*c.Out]
 		at, _ := espnSlot(c.Slot)
 		if !on || p.Slot != at || outs[*c.Out] {
-			return nil, nil, refuse(staleWords, fmt.Errorf("player %s is not at %s", *c.Out, c.Slot))
+			return nil, nil, refuse(espnWords.stale, fmt.Errorf("player %s is not at %s", *c.Out, c.Slot))
 		}
 		outs[*c.Out] = true
 		if _, starts := targets[*c.Out]; !starts {
@@ -166,7 +166,7 @@ func fits(roster []espn.Player, targets map[string]int, counts map[int]int) erro
 	}
 	for _, to := range targets {
 		if after[to] > counts[to] {
-			return refuse(staleWords, fmt.Errorf("slot %d holds %d of %d", to, after[to], counts[to]))
+			return refuse(espnWords.stale, fmt.Errorf("slot %d holds %d of %d", to, after[to], counts[to]))
 		}
 	}
 	return nil
@@ -189,11 +189,11 @@ func ownRefusal(err error, items []espn.LineupItem, roster map[string]espn.Playe
 	}
 	switch {
 	case len(locked) > 0:
-		return refuse(fmt.Sprintf(lockedWords, andNames(locked), verbFor(len(locked))), err)
+		return refuse(fmt.Sprintf(espnWords.lockedPlayers, andNames(locked), verbFor(len(locked))), err)
 	case len(cannot) > 0:
-		return refuse(fmt.Sprintf(cannotFillWords, andNames(cannot)), err)
+		return refuse(fmt.Sprintf(espnWords.cannotFill, andNames(cannot)), err)
 	}
-	return refuse(staleWords, err)
+	return refuse(espnWords.stale, err)
 }
 
 func verbFor(n int) string {
@@ -203,17 +203,8 @@ func verbFor(n int) string {
 	return "games have"
 }
 
-// lineupWords is the move as the member confirms it: "Start Rachaad White
-// over Tank Bigsby at RB, and Jauan Jennings over Josh Downs in the flex,
-// on ESPN now."
+// lineupWords is the ESPN move as the member confirms it, each player
+// named as the roster names him.
 func lineupWords(changes []apitypes.HostMoveChange, roster map[string]espn.Player) string {
-	clauses := make([]string, 0, len(changes))
-	for _, c := range changes {
-		clause := roster[c.In].Name
-		if c.Out != nil {
-			clause += " over " + roster[*c.Out].Name
-		}
-		clauses = append(clauses, clause+" "+slotPlace(c.Slot))
-	}
-	return "Start " + andClauses(clauses) + ", on ESPN now."
+	return lineupSentence(changes, func(id string) string { return roster[id].Name }, espnWords)
 }

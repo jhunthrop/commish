@@ -28,10 +28,26 @@ const ConsentVersion = 3
 // names the moves, and a move needs a connection made at 3 or above.
 const ESPNConsentVersion = 3
 
+// MFLConsentVersion is MyFantasyLeague's consent words' version (Lane
+// 67): version 1 says the password is exchanged once and never kept, the
+// session is kept encrypted, and it sets the member's lineup on
+// MyFantasyLeague when they confirm a move. A move needs a connection made
+// at it or above.
+const MFLConsentVersion = 1
+
+// MFLConsentWords is version 1's words exactly as the page shows them
+// (web/src/lib/hosts/connection-words.ts MFL_CONSENT), kept here so a
+// connection's consent version resolves to its text without the web's
+// history. A test holds the two equal.
+const MFLConsentWords = "We send your MyFantasyLeague password to MyFantasyLeague once to sign in, and never keep it. " +
+	"We keep the session MyFantasyLeague gives back, encrypted, to set your lineup there when you confirm a move. " +
+	"Disconnect deletes it at once."
+
 // consentVersions is each host's consent words' version: FFPC's
 // (ConsentVersion), Yahoo's own authorize page (version 1, the scope it
-// shows: Fantasy Sports, read only) and ESPN's (ESPNConsentVersion).
-var consentVersions = map[string]int{"ffpc": ConsentVersion, "yahoo": 1, "espn": ESPNConsentVersion}
+// shows: Fantasy Sports, read only), ESPN's (ESPNConsentVersion) and
+// MyFantasyLeague's (MFLConsentVersion).
+var consentVersions = map[string]int{"ffpc": ConsentVersion, "yahoo": 1, "espn": ESPNConsentVersion, "mfl": MFLConsentVersion}
 
 // consentVersion is the host's consent version, 1 for a host not listed.
 func consentVersion(host string) int {

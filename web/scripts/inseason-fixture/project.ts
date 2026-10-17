@@ -337,13 +337,13 @@ const stampedLineup: LineupAdvice = {
 	...advise(stamp({ ...lineup, reserve: (lineup as Partial<LineupAdvice>).reserve ?? [] })),
 	basis: LINEUP_BASIS,
 	projection_previous_read_at: PREVIOUS_READ_AT,
-	// Sleeper takes no lineup from our screen: the API's line under the copy verb (hostmoves words.go).
+	// Sleeper takes no lineup from our screen: the API's line under the copy verb (inseason CopyOnlyMoves).
 	moves: {
 		lineup: 'unavailable',
 		note: null,
 		takes_writes: false,
 		writes_on: false,
-		reason: 'Sleeper takes no lineup from outside.'
+		reason: 'Sleeper does not take lineups from here, so copy the lineup there.'
 	},
 	basis_note: lineupNote(lineup.basis_note),
 	projection_read_at: PROJECTION_READ_AT,

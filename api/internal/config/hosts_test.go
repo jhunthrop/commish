@@ -25,6 +25,15 @@ func TestWriteSwitchOffByDefault(t *testing.T) {
 	if h := hostLoader(map[string]string{"HOST_WRITES_ESPN_CLAIM": "true"}).hosts(EnvDevelopment); !h.ESPNClaimWrites || h.ESPNLineupWrites {
 		t.Fatal("the claim switch set true and off, or it opened the lineup")
 	}
+	if h := hostLoader(nil).hosts(EnvDevelopment); h.MFLLineupWrites {
+		t.Fatal("MyFantasyLeague lineup writes on by default")
+	}
+	if h := hostLoader(map[string]string{"HOST_WRITES_MFL_LINEUP": "true"}).hosts(EnvDevelopment); !h.MFLLineupWrites || h.ESPNLineupWrites {
+		t.Fatal("the MyFantasyLeague switch set true and off, or it opened ESPN's")
+	}
+	if l := hostLoader(map[string]string{"HOST_WRITES_MFL_LINEUP": "maybe"}); l.hosts(EnvDevelopment).MFLLineupWrites || l.err() == nil {
+		t.Fatal("a MyFantasyLeague switch neither true nor false")
+	}
 	l := hostLoader(map[string]string{"HOST_WRITES_ESPN_LINEUP": "sometimes"})
 	if l.hosts(EnvDevelopment); l.err() == nil {
 		t.Fatal("a switch neither true nor false")

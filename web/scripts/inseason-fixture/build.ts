@@ -52,7 +52,7 @@ const OUT = new URL('./data/', import.meta.url);
 const FORMAT = 'ppr-12';
 const LAST_WEEK = 18;
 /** The API's line under the copy verb on a platform with no lineup write (hostmoves words.go). */
-const SLEEPER_NO_LINEUP = 'Sleeper takes no lineup from outside.';
+const SLEEPER_NO_LINEUP = 'Sleeper does not take lineups from here, so copy the lineup there.';
 const LAST_GAMES = 3;
 const POOL_CANDIDATES = 60;
 const WAIVER_ROWS_UNDER_RULE = 8;

@@ -392,7 +392,7 @@ func (a *advisor) Lineup() (apitypes.LineupAdvice, bool) {
 	// nothing of points a game; the page says the projection's read itself.
 	out := apitypes.LineupAdvice{Week: h.week, Basis: LineupBasis(a.basis), BasisNote: LineupNote(a.settings, a.season.Carries), OrderBasis: h.basis, Refreshed: h.refreshed,
 		ReadAt: h.readAt, ProjectionReadAt: a.projectionReadAt(), ProjectionPreviousReadAt: a.projectionPreviousReadAt(), ProjectionScoring: projectionScoring(a.settings, a.preset), PlayerPoints: givesPlayerPoints(mySide), TeamPoints: teamPoints(mySide, people), Set: true, Slots: []apitypes.LineupSlot{}, Bench: []apitypes.PlayerLine{}, Reserve: a.reserve(team, mySide),
-		Moves: apitypes.LineupMoves{Lineup: apitypes.LineupMovesLineupUnavailable},
+		Moves: CopyOnlyMoves(a.Snap.Ref.Host),
 	}
 	out.HostLineupUrl, out.HostNote = a.host(LineupPage)
 	w := &Writer{Basis: a.basis, Now: a.now}

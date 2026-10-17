@@ -71,3 +71,47 @@ func TestHostsAnswersTheSwitchesSignedOut(t *testing.T) {
 		t.Fatalf("every host off, signed out: %+v, want nothing enabled", out)
 	}
 }
+
+// openTo opens MyFantasyLeague to one account alone, as its switch's proof
+// list does while the switch is off.
+type openTo struct{ id uuid.UUID }
+
+func (o openTo) OpenTo(_ context.Context, accountID uuid.UUID) ([]apitypes.ConnectedHost, error) {
+	if accountID == o.id {
+		return []apitypes.ConnectedHost{apitypes.ConnectedHostMfl}, nil
+	}
+	return nil, nil
+}
+
+type openToFails struct{}
+
+func (openToFails) OpenTo(context.Context, uuid.UUID) ([]apitypes.ConnectedHost, error) {
+	return nil, context.DeadlineExceeded
+}
+
+// A failed check of the hosts open to one account leaves those out and
+// answers the rest: one platform never takes the whole list down.
+func TestHostsOpenToFailsAlone(t *testing.T) {
+	me := auth.Account{ID: uuid.New()}
+	l := &List{Enabled: []apitypes.ConnectedHost{apitypes.ConnectedHostEspn}, Accounts: openToFails{}, Store: &listOnlyStore{},
+		Log: slog.New(slog.NewTextHandler(io.Discard, nil))}
+	if out := listHosts(t, l, &me); len(out.Enabled) != 1 || len(out.Connections) != 1 {
+		t.Fatalf("%+v", out)
+	}
+}
+
+// A host open to one account alone is listed to that account signed in,
+// never signed out, never to another.
+func TestHostsOpenToOneAccount(t *testing.T) {
+	me, other := auth.Account{ID: uuid.New()}, auth.Account{ID: uuid.New()}
+	l := &List{Enabled: []apitypes.ConnectedHost{apitypes.ConnectedHostEspn}, Accounts: openTo{me.ID}, Store: &listOnlyStore{},
+		Log: slog.New(slog.NewTextHandler(io.Discard, nil))}
+	if out := listHosts(t, l, &me); len(out.Enabled) != 2 || out.Enabled[1] != apitypes.ConnectedHostMfl {
+		t.Fatalf("the listed account: %+v", out.Enabled)
+	}
+	for name, acct := range map[string]*auth.Account{"signed out": nil, "another": &other} {
+		if out := listHosts(t, l, acct); len(out.Enabled) != 1 {
+			t.Fatalf("%s: %+v", name, out.Enabled)
+		}
+	}
+}

@@ -14,10 +14,23 @@ export const ESPN_CONSENT_VERSION = 3;
 export const ESPN_CONSENT =
 	'We keep an encrypted copy of your ESPN session so your league stays in sync and, when you ask, to make your moves. Disconnect deletes it at once.';
 
+/** The words that connect MyFantasyLeague, beside its form and on the account page: consent version
+ * 1 (api/internal/hosts MFLConsentVersion), which names the lineup moves; a move needs a connection
+ * made at 1. Change the words, raise the version. */
+export const MFL_CONSENT_VERSION = 1;
+
+/** The words of MFL_CONSENT_VERSION. */
+export const MFL_CONSENT =
+	'We send your MyFantasyLeague password to MyFantasyLeague once to sign in, and never keep it. We keep the session MyFantasyLeague gives back, encrypted, to set your lineup there when you confirm a move. Disconnect deletes it at once.';
+
 const STATUS: Readonly<Record<ConnectedHost, Record<HostConnection['status'], string>>> = {
 	ffpc: { connected: 'Signed in', signed_out: 'Signed out by FFPC' },
 	yahoo: { connected: 'Connected', signed_out: 'Yahoo asks you to connect again' },
-	espn: { connected: 'Connected', signed_out: 'ESPN no longer accepts your saved sign-in' }
+	espn: { connected: 'Connected', signed_out: 'ESPN no longer accepts your saved sign-in' },
+	mfl: {
+		connected: 'Connected',
+		signed_out: 'MyFantasyLeague no longer accepts your saved sign-in'
+	}
 };
 
 /** An ESPN session kept while every league ESPN listed was public, before a private league read

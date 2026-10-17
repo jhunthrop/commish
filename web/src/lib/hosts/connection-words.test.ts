@@ -1,7 +1,13 @@
 // The account page's words for a connected host: run with `npm test`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { ESPN_CONSENT, ESPN_CONSENT_VERSION, statusWords } from './connection-words.ts';
+import {
+	ESPN_CONSENT,
+	ESPN_CONSENT_VERSION,
+	MFL_CONSENT,
+	MFL_CONSENT_VERSION,
+	statusWords
+} from './connection-words.ts';
 
 const at = '2026-10-15T12:00:00Z';
 
@@ -48,4 +54,19 @@ void test('the ESPN session sentence says what it is kept for, the moves the mem
 	assert.match(ESPN_CONSENT, /when you ask, to make your moves/);
 	assert.equal(ESPN_CONSENT_VERSION, 3);
 	assert.doesNotMatch(ESPN_CONSENT, /;|—/);
+});
+
+void test('the MyFantasyLeague words say the password is never kept and name the lineup moves', () => {
+	assert.equal(MFL_CONSENT_VERSION, 1);
+	assert.match(MFL_CONSENT, /never keep it/);
+	assert.match(MFL_CONSENT, /set your lineup there when you confirm a move/);
+	assert.doesNotMatch(MFL_CONSENT, /;|—|\bhost\b/i);
+	const c = {
+		host: 'mfl',
+		status: 'signed_out',
+		proven: true,
+		connected_at: at,
+		last_read_at: null
+	} as const;
+	assert.equal(statusWords(c), 'MyFantasyLeague no longer accepts your saved sign-in');
 });

@@ -4,7 +4,7 @@
 import { PUBLIC_API_URL } from '$app/env/public';
 import { ApiError, apiClient } from '#lib/api/client.ts';
 import type { components } from '#lib/api/types.ts';
-import { ESPN_CONSENT_VERSION } from './connection-words.ts';
+import { ESPN_CONSENT_VERSION, MFL_CONSENT_VERSION } from './connection-words.ts';
 
 type Schemas = components['schemas'];
 export type HostConnection = Schemas['HostConnection'];
@@ -52,6 +52,15 @@ export const hostsApi = {
 		}),
 	espnLeagues: () => client.call<HostLeague[]>('/hosts/espn/leagues'),
 	disconnectESPN: () => client.call<null>('/hosts/espn', { method: 'DELETE' }),
+	/** The member's MyFantasyLeague username and password, sent once: the API exchanges them at
+	 * MyFantasyLeague's login and keeps only the session it answers. */
+	connectMFL: (username: string, password: string) =>
+		client.call<HostConnected>('/hosts/mfl/connect', {
+			method: 'POST',
+			body: { username, password, consent: true, consent_version: MFL_CONSENT_VERSION }
+		}),
+	mflLeagues: () => client.call<HostLeague[]>('/hosts/mfl/leagues'),
+	disconnectMFL: () => client.call<null>('/hosts/mfl', { method: 'DELETE' }),
 	devices: () => client.call<Device[]>('/devices'),
 	pairCode: () => client.call<PairCode>('/devices/codes', { method: 'POST' }),
 	revokeDevice: (id: string) =>
@@ -82,6 +91,12 @@ export function espnOpen(hosts: HostConnections): boolean {
 	return hosts.enabled.includes('espn');
 }
 
+/** Whether connecting MyFantasyLeague is open to this account (HOST_WRITES_MFL_LINEUP with the key,
+ * or the account on its proof list), from the hosts answer. */
+export function mflOpen(hosts: HostConnections): boolean {
+	return hosts.enabled.includes('mfl');
+}
+
 /** Disconnect one host: what we keep for it is deleted at once. */
 export function disconnect(host: ConnectedHost): Promise<null> {
 	switch (host) {
@@ -91,10 +106,12 @@ export function disconnect(host: ConnectedHost): Promise<null> {
 			return hostsApi.disconnectYahoo();
 		case 'espn':
 			return hostsApi.disconnectESPN();
+		case 'mfl':
+			return hostsApi.disconnectMFL();
 	}
 }
 
-export { ESPN_CONSENT } from './connection-words.ts';
+export { ESPN_CONSENT, MFL_CONSENT } from './connection-words.ts';
 
 /** The account's connection to one host, if any. */
 export function connectionTo(

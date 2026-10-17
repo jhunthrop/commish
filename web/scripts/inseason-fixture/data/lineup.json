@@ -1417,7 +1417,7 @@
 		"note": null,
 		"takes_writes": false,
 		"writes_on": false,
-		"reason": "Sleeper takes no lineup from outside."
+		"reason": "Sleeper does not take lineups from here, so copy the lineup there."
 	},
 	"projection_read_at": "2026-10-17T02:00:00.000Z",
 	"projection_scoring": { "format": "ppr", "league_own": false },

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/url"
 
+	"github.com/jhunthrop/commish/api/internal/apitypes"
 	"github.com/jhunthrop/commish/api/internal/leaguesync"
 )
 
@@ -29,6 +30,18 @@ const yahooLeagues = "https://football.fantasysports.yahoo.com/f1/"
 // espnLeague is an ESPN league's address, the one a member pastes to
 // follow it (espn.Parse).
 const espnLeague = "https://fantasy.espn.com/football/league"
+
+// copyLineupWords is the line under "Copy the lineup" where the platform
+// takes no lineup from our screen.
+const copyLineupWords = "%s does not take lineups from here, so copy the lineup there."
+
+// CopyOnlyMoves is the lineup verb where the platform takes no lineup from
+// here, or no moves are wired: copy the lineup, with the line that says
+// why, the platform named.
+func CopyOnlyMoves(host string) apitypes.LineupMoves {
+	reason := fmt.Sprintf(copyLineupWords, leaguesync.HostWords(host))
+	return apitypes.LineupMoves{Lineup: apitypes.LineupMovesLineupUnavailable, Reason: &reason}
+}
 
 // HostURL is the host's page for the verb, empty for a host whose page
 // we do not know. team is the member's roster in the league (0 when

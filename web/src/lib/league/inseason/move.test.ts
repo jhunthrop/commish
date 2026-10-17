@@ -108,7 +108,7 @@ void test('the verb sets the lineup on the host only when the API opens the move
 		note: null,
 		takes_writes: false,
 		writes_on: false,
-		reason: 'Sleeper takes no lineup from outside.'
+		reason: 'Sleeper does not take lineups from here, so copy the lineup there.'
 	};
 	assert.equal(setsOnHost({ set: false, slots, moves: open }), true);
 	assert.equal(setsOnHost({ set: false, slots, moves: closed }), false);
