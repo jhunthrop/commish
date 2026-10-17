@@ -99,8 +99,9 @@ func TestPointsUnderTheLeaguesKickingAndDefenseRules(t *testing.T) {
 		position draft.Position
 		want     float64
 	}{
-		{"three makes, one from 40 to 49 and one from 50", map[string]float64{"field_goals_made": 3, "field_goals_made_40_49": 1,
-			"field_goals_made_50_plus": 1}, draft.K, 12},
+		{"four makes, one from 40 to 49 and two from 50", map[string]float64{"field_goals_made": 4, "field_goals_made_40_49": 1,
+			"field_goals_made_50_59": 1, "field_goals_made_60_plus": 1}, draft.K, 17},
+		{"a defense's return touchdown", map[string]float64{"return_touchdowns": 1}, draft.DEF, 6},
 		{"makes with no distance read", map[string]float64{"field_goals_made": 2}, draft.K, 6},
 		{"a shutout", map[string]float64{"points_allowed": 0, "yards_allowed": 80}, draft.DEF, 10},
 		{"20 allowed", map[string]float64{"points_allowed": 20, "yards_allowed": 600}, draft.DEF, 0},

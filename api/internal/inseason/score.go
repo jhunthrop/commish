@@ -7,13 +7,18 @@ import (
 	"github.com/jhunthrop/commish/api/internal/scoring"
 )
 
-// Stat line metrics beyond domain.py's StatLine fields: a kicker's made
-// field goals by distance, counted inside field_goals_made.
+// Stat line metrics beyond domain.py's StatLine fields (Lane 70a's
+// names): a kicker's made field goals by distance, counted inside
+// field_goals_made, and a defense's return touchdowns.
 const (
-	metricFieldGoals40To49  = "field_goals_made_40_49"
-	metricFieldGoals50AndUp = "field_goals_made_50_plus"
-	metricPointsAllowed     = "points_allowed"
-	metricYardsAllowed      = "yards_allowed"
+	metricFieldGoals40To49 = "field_goals_made_40_49"
+	metricFieldGoals50To59 = "field_goals_made_50_59"
+	metricFieldGoals60Up   = "field_goals_made_60_plus"
+	// metricReturnTouchdowns is a team defense's return touchdowns, one
+	// figure where domain.py splits a player's kick and punt returns.
+	metricReturnTouchdowns = "return_touchdowns"
+	metricPointsAllowed    = "points_allowed"
+	metricYardsAllowed     = "yards_allowed"
 )
 
 // Rules is a league's ScoringRules, the points a stat line scores, with
@@ -79,7 +84,7 @@ func (rs Rules) Points(m map[string]float64, position draft.Position) float64 {
 	total += float64(m["receiving_touchdowns"] * r.PointsPerReceivingTouchdown)
 	total += receptions
 	total += float64(m["fumbles_lost"] * r.PointsPerFumbleLost)
-	long, longer := m[metricFieldGoals40To49], m[metricFieldGoals50AndUp]
+	long, longer := m[metricFieldGoals40To49], m[metricFieldGoals50To59]+m[metricFieldGoals60Up]
 	total += float64((m["field_goals_made"] - long - longer) * r.PointsPerFieldGoal)
 	total += float64(long * r.PointsPerFieldGoal4049)
 	total += float64(longer * r.PointsPerFieldGoal50Plus)
@@ -90,7 +95,7 @@ func (rs Rules) Points(m map[string]float64, position draft.Position) float64 {
 	total += float64(m["two_point_conversions"] * r.PointsPerTwoPointConversion)
 	total += float64(m["field_goals_missed"] * r.PointsPerFieldGoalMissed)
 	total += float64(m["extra_points_missed"] * r.PointsPerExtraPointMissed)
-	total += float64((m["kick_return_touchdowns"] + m["punt_return_touchdowns"]) * r.PointsPerReturnTouchdown)
+	total += float64((m["kick_return_touchdowns"] + m["punt_return_touchdowns"] + m[metricReturnTouchdowns]) * r.PointsPerReturnTouchdown)
 	total += float64(m["defensive_fumbles_recovered"] * r.PointsPerDefensiveFumbleRecovery)
 	total += float64(m["safeties"] * r.PointsPerSafety)
 	total += rs.tierPoints(m, position)

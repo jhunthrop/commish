@@ -229,7 +229,7 @@ func countables(r apitypes.ScoringRules) []countable {
 	longer := math.Abs(r.PointsPerFieldGoal4049-r.PointsPerFieldGoal) + math.Abs(r.PointsPerFieldGoal50Plus-r.PointsPerFieldGoal)
 	return []countable{
 		{r.PointsPerTwoPointConversion, "two-point conversions", anySpot, []string{"two_point_conversions"}},
-		{longer, "field goals of 40 yards or more", kickerSpot, []string{metricFieldGoals40To49, metricFieldGoals50AndUp}},
+		{longer, "field goals of 40 yards or more", kickerSpot, []string{metricFieldGoals40To49, metricFieldGoals50To59, metricFieldGoals60Up}},
 		{r.PointsPerFieldGoalMissed, "missed field goals", kickerSpot, []string{"field_goals_missed"}},
 		{r.PointsPerExtraPointMissed, "missed extra points", kickerSpot, []string{"extra_points_missed"}},
 		{r.PointsPerReturnTouchdown, "return touchdowns", anySpot, []string{"kick_return_touchdowns", "punt_return_touchdowns"}},
