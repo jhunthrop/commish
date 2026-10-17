@@ -10,7 +10,7 @@ completion or one the gateway says was cut at its token limit (`finish_reason: l
 as a whole answer: Lane 29) gets one retry, and usage the gateway billed before a failure is kept on
 the error, so a player's cost is counted whether or not his read survived. A failure the line caused
 (a rate limit, a network error, a 5xx, a response that was not JSON) is marked `transport`, which the
-writer waits out (`generate._ask`, Lane 52); every throttle wait an ask makes, here and there, draws
+writer waits out (`generate.ask`, Lane 52); every throttle wait an ask makes, here and there, draws
 on one allowance per ask and one per run (`throttle_waits`). A run with a budget (`run_budget`) draws on it before
 every HTTP call, so the budget is a hard stop at the gateway.
 
@@ -212,6 +212,11 @@ class GatewayClient:
     def scoped(self) -> "GatewayClient":
         """A view for one page: the same line, bucket and ledger, its own call count from zero."""
         return replace(self, calls=0)
+
+    def with_model(self, model: str) -> "GatewayClient":
+        """A view asking another model on the same line, bucket, ledger and budget, its own call count from
+        zero (the week read's judge, Lane 72)."""
+        return replace(self, model=model, calls=0)
 
     def rolling[T, R](
         self,

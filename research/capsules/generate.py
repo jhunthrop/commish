@@ -14,7 +14,7 @@ numbers as labelled facts, no prose.
 Narrative slots refused only for their voice get one rewrite each from what calls are left. Nothing
 here raises for a gateway failure: the facts block is the answer, and the usage billed is kept.
 A throttle is not a block (Lane 52): an ask the gateway fails on a rate limit or a transport failure
-waits and is asked again with the same prompt (`_ask`, `throttle_waits_ms`), and never counts against
+waits and is asked again with the same prompt (`ask`, `throttle_waits_ms`), and never counts against
 the six; only a line still down after every wait ends in the facts block, named "throttled". An empty
 or cut answer to a correction is an ask spent, and the read asks again while asks remain. A call the
 run's budget refuses (`run_budget`) ends the page at once, named for the budget.
@@ -114,7 +114,7 @@ def _msgs(facts: "PlayerFacts", user: str) -> list[dict[str, str]]:
     return [{"role": "system", "content": writer_rules_for(facts)}, {"role": "user", "content": user}]
 
 
-def _ask(
+def ask(
     gateway: GatewayClient,
     messages: list[dict[str, str]],
     max_tokens: int,
@@ -140,7 +140,7 @@ def _ask(
     raise AssertionError("unreachable: the last try raises or returns")
 
 
-def _gateway_failure(error: GenerationError) -> "Fallback":
+def gateway_failure(error: GenerationError) -> "Fallback":
     """The fallback a gateway failure leaves: the run's budget, or a line that never answered."""
     if isinstance(error, BudgetSpentError):
         return Fallback(BUDGET_SPENT, str(error))
@@ -160,11 +160,11 @@ def _bundle_once(
 ) -> _BundleOutcome:
     prompt = bundle_prompt_for(facts, requests, worn)
     try:
-        answer = _ask(
+        answer = ask(
             gateway, _msgs(facts, prompt if note is None else f"{prompt}\n\n{note}"), CAPSULE_CONFIG.bundle_max_tokens
         )
     except GenerationError as error:
-        return _BundleOutcome(None, error.billed, _gateway_failure(error), 1)
+        return _BundleOutcome(None, error.billed, gateway_failure(error), 1)
     bundle = parse_bundle(answer.content)
     failure = None if bundle is not None else Fallback("failed_validation", NOT_AN_OBJECT)
     return _BundleOutcome(bundle, answer.usage, failure, 1)
@@ -265,12 +265,12 @@ def _settle(
             first = _NOT_WRITTEN if read.result is None or not read.result.violations else read.result.violations[0]
             return _facts_block(facts, read, Fallback("failed_validation", first)), read.calls
         try:
-            answer = _ask(
+            answer = ask(
                 gateway, _msgs(facts, correction_prompt_for(facts, size, prior)), CAPSULE_CONFIG.size(size).max_tokens
             )
         except GenerationError as error:
             spent = replace(read, usage=add_usage(read.usage, error.billed), calls=read.calls + 1)
-            failure = _gateway_failure(error)
+            failure = gateway_failure(error)
             if failure.kind != UNUSABLE or not error.retryable:
                 return _facts_block(facts, spent, failure), spent.calls
             # An empty or cut answer is an ask spent, never the read's end: ask again while asks remain
@@ -300,7 +300,7 @@ def _rewrite_voice_slots(
             attempt += 1
             calls += 1
             try:
-                answer = _ask(
+                answer = ask(
                     gateway,
                     _msgs(facts, slot_rewrite_prompt(request, current)),
                     CAPSULE_CONFIG.bundle_max_tokens,
