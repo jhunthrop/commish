@@ -38,6 +38,7 @@ from research.pipeline.nflverse import (
     ingest_schedule,
     injury_archive,
     injury_reports,
+    kdef_lines,
     kicking_weeks,
     pbp_plays,
     roster_weeks,
@@ -153,6 +154,16 @@ def _kdef(conn: Connection, inv: Invocation) -> object:
     )
 
 
+def _kdef_lines(conn: Connection, inv: Invocation) -> object:
+    """The season-week pass's kicking-defense step for each season: the two weekly tables, then their lines."""
+    reports = []
+    for season in seasons_of(inv.args):
+        refresh = kdef_lines.refresh_kdef_season(conn, NflverseClient(inv.fetcher), season)
+        inv.checkpoint()
+        reports.append("; ".join((refresh.summary(season), *refresh.detail())))
+    return reports
+
+
 def _derived(conn: Connection, inv: Invocation) -> object:
     reports = []
     for season in seasons_of(inv.args):
@@ -256,6 +267,7 @@ COMMANDS: Final = MappingProxyType({
     "roster-weeks": Command("the weekly roster release archived per season", lambda c, i: roster_weeks.ingest_roster_weeks(c, NflverseClient(i.fetcher), seasons_of(i.args))),
     "draft-picks": Command("every NFL draft pick", lambda c, i: draft_picks.ingest_draft_picks(c, NflverseClient(i.fetcher))),
     "kdef": Command("the 32 synthetic defenses, kicking weeks, team defense weeks", _kdef, atomic=False),
+    "kdef-lines": Command("kicking and team defense weeks, then their stat lines (the season-week kicking-defense step)", _kdef_lines, atomic=False),
     "coaches": Command("the committed play-caller seed into coaches", lambda c, i: coaches.ingest_play_callers_csv(c, RESEARCH_ROOT / coaches.PLAY_CALLERS_CSV_PATH)),
     "tank01-roster": Command("the provider roster and its weekly box scores", lambda c, i: tank01.ingest_roster_and_lines(c, tank01_provider(i, i.args.last_week), FixedBudget(TANK01_RUN_BUDGET), i.checkpoint), atomic=False),
     "tank01-schedule": Command("the provider's fixtures into provider_games", lambda c, i: tank01.ingest_schedule(c, tank01_provider(i), FixedBudget(TANK01_RUN_BUDGET))),

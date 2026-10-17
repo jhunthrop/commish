@@ -33,6 +33,8 @@ from research.pipeline.observations import PlayerWeekObservation
 class NflverseSource:
     SNAP_COUNTS = "nflverse_snap_counts"
     PLAYER_WEEK = "nflverse_player_week"
+    # Kickers' and team defenses' weeks as stat lines (`kdef_lines`), beside the published weekly stats.
+    KDEF_WEEK = "nflverse_kdef_week"
 
 
 class ParticipationMetric:
