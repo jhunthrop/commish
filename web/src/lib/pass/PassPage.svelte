@@ -35,13 +35,12 @@
 	} from './pass-api.ts';
 	import {
 		ALWAYS_FREE,
-		freeLine,
 		HOSTS,
 		addedFeatures,
+		draftPassFacts,
 		featureLines,
-		money,
-		passEnds,
-		perInterval
+		groupFacts,
+		membershipFacts
 	} from './words.ts';
 
 	/** The pass page: the Draft Pass, the Membership and the Group Draft Pass with what each unlocks,
@@ -109,31 +108,6 @@
 			})
 			.catch(() => (unreachable = true));
 	});
-
-	const draftPassFigure = $derived(
-		catalog?.draft_pass
-			? {
-					value: money(catalog.draft_pass.amount_cents, catalog.draft_pass.currency),
-					caption: `for the ${String(catalog.season)} season, once`
-				}
-			: null
-	);
-	const membershipFigure = $derived(
-		membershipPrice
-			? {
-					value: money(membershipPrice.amount_cents, membershipPrice.currency),
-					caption: perInterval(membershipPrice)
-				}
-			: null
-	);
-	const groupFigure = $derived(
-		group
-			? {
-					value: money(group.per_seat.amount_cents * seats, group.per_seat.currency),
-					caption: `${String(seats)} teams at ${money(group.per_seat.amount_cents, group.per_seat.currency)} a team`
-				}
-			: null
-	);
 </script>
 
 <svelte:head>
@@ -146,10 +120,7 @@
 
 <Shell title="Passes and Membership" active="account">
 	<main class="pass" aria-busy={catalog === null && !unreachable}>
-		<PageHead
-			title="Passes and Membership"
-			lead={catalog ? `For the ${String(catalog.season)} season. ${freeLine()}` : freeLine()}
-		/>
+		<PageHead title="Passes and Membership" />
 		{#if catalog && !catalog.checkout_open}
 			<Panel edge="quiet" padding="sm">
 				<p class="note">
@@ -170,12 +141,10 @@
 		{#if problem}<p class="problem" role="alert">{problem}</p>{/if}
 
 		{#if catalog}
-			{@const ends = passEnds(catalog)}
 			<div class="plans">
 				<PlanPanel
 					title="Draft Pass"
-					line="One payment for the {catalog.season} season. It ends {ends} and never renews."
-					figure={draftPassFigure}
+					facts={draftPassFacts(catalog)}
 					features={featureLines(catalog.features.draft_pass)}
 					featured
 				>
@@ -206,8 +175,7 @@
 
 				<PlanPanel
 					title="Membership"
-					line="The pass every season, and more. Cancel in one click on your account page, and we email you seven days before any renewal."
-					figure={membershipFigure}
+					facts={membershipFacts(membershipPrice)}
 					lead={{ lead: 'Everything in the Draft Pass', text: 'every season you stay a member' }}
 					features={featureLines(
 						addedFeatures(catalog.features.draft_pass, catalog.features.membership)
@@ -243,8 +211,7 @@
 
 				<PlanPanel
 					title="Group Draft Pass"
-					line="A Draft Pass for every team in your league. You get one link to share, and each drafter, you included, claims a pass with it."
-					figure={groupFigure}
+					facts={groupFacts(group, seats)}
 					features={featureLines(catalog.features.draft_pass)}
 				>
 					{#snippet choose()}

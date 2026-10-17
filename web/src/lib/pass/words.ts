@@ -4,11 +4,13 @@
 import { dateLabel } from '#lib/format/date.ts';
 import { listWords } from '#lib/format/list.ts';
 import type { components } from '#lib/api/types.ts';
+import type { FactCell } from '#lib/ui/facts.ts';
 
 type Schemas = components['schemas'];
 export type Feature = Schemas['Feature'];
 export type Price = Schemas['Price'];
 export type PlanCatalog = Schemas['PlanCatalog'];
+type GroupPassPrice = Schemas['GroupPassPrice'];
 
 export interface FeatureWords {
 	lead: string;
@@ -95,14 +97,61 @@ export function money(cents: number, currency: string): string {
 	}).format(cents / CENTS);
 }
 
-/** A Membership price's basis: "a year", "a month". */
-export function perInterval(price: Price): string {
-	return price.interval === 'month' ? 'a month' : 'a year';
-}
-
 /** "Good through Mar 1, 2027": when a pass bought now ends. */
 export function passEnds(catalog: Pick<PlanCatalog, 'pass_ends_at'>): string {
 	return dateLabel(catalog.pass_ends_at);
+}
+
+/** Said in the price cell while checkout has no price to give. */
+const NOT_OPEN = 'Not open yet';
+
+function priceCell(price: Price | null | undefined, label: string): FactCell {
+	return price
+		? { label, value: money(price.amount_cents, price.currency) }
+		: { label, value: NOT_OPEN, word: true };
+}
+
+/** The Draft Pass as facts (Lane 66o): its price once, its season, when it ends, that it never
+ * renews. */
+export function draftPassFacts(
+	catalog: Pick<PlanCatalog, 'season' | 'pass_ends_at' | 'draft_pass'>
+): FactCell[] {
+	return [
+		priceCell(catalog.draft_pass, 'Once'),
+		{ label: 'Season', value: String(catalog.season) },
+		{ label: 'Ends', value: passEnds(catalog), word: true },
+		{ label: 'Renews', value: 'Never', word: true }
+	];
+}
+
+/** The days before a renewal the Membership's reminder email goes out. */
+export const RENEWAL_NOTICE_DAYS = 7;
+
+/** The Membership as facts: its price for the billing chosen, how it renews, the reminder before a
+ * renewal, and how it is cancelled. */
+export function membershipFacts(price: Price | null): FactCell[] {
+	const monthly = price?.interval === 'month';
+	return [
+		priceCell(price, monthly ? 'A month' : 'A year'),
+		{ label: 'Renews', value: monthly ? 'Monthly' : 'Yearly', word: true },
+		{ label: 'Reminder', value: `${String(RENEWAL_NOTICE_DAYS)} days before`, word: true },
+		{ label: 'Cancel', value: 'One click', word: true }
+	];
+}
+
+/** The Group Draft Pass as facts: the total for the teams chosen, the price a team, how the drafters
+ * claim theirs. */
+export function groupFacts(group: GroupPassPrice | null, seats: number): FactCell[] {
+	if (!group) return [priceCell(null, `${String(seats)} teams`)];
+	const each = group.per_seat;
+	return [
+		{
+			label: `${String(seats)} teams`,
+			value: money(each.amount_cents * seats, each.currency)
+		},
+		{ label: 'A team', value: money(each.amount_cents, each.currency) },
+		{ label: 'Claims', value: 'One link', word: true }
+	];
 }
 
 /** A host's live draft, said as a mechanism by the host's own name. ready is today. */
