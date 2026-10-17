@@ -79,6 +79,11 @@ const EXTRA: readonly (readonly [string, DroppedRule['group'], string])[] = [
 	['def_st_td', 'defense', 'touchdown on defense or special teams']
 ];
 
+/** The rules the recorded league does not state, as the API names them
+ * (TestTermsNameTheRulesThePlatformDoesNotState), and the standard figure it holds the one at. */
+const UNSTATED = ['points_per_return_touchdown'] as const;
+const STANDARD_RETURN_TOUCHDOWN = 6;
+
 /** Every yards-allowed tier: Sleeper scores none, so each is 0. */
 const NO_YARDS_TIERS = {
 	yards_allowed_0_99: 0,
@@ -113,7 +118,9 @@ function scoringOf(sc: Record<string, number>): ScoringRules {
 		points_per_two_point_conversion: rule('pass_2pt'),
 		points_per_field_goal_missed: rule('fgmiss'),
 		points_per_extra_point_missed: rule('xpmiss'),
-		points_per_return_touchdown: rule('st_td'),
+		// The league scores special teams touchdowns, not a player's return touchdowns: the API holds
+		// this rule at the standard figure and names it unstated.
+		points_per_return_touchdown: STANDARD_RETURN_TOUCHDOWN,
 		points_per_defensive_fumble_recovery: rule('fum_rec'),
 		points_per_safety: rule('safe'),
 		points_per_field_goal_40_49: rule('fgm_40_49'),
@@ -157,6 +164,7 @@ function termsOf(league: League): LeagueSync['terms'] {
 			bench: count('BN')
 		},
 		scoring: scoringOf(sc),
+		scoring_unstated: [...UNSTATED],
 		scoring_extra: EXTRA.filter(([k]) => (sc[k] ?? 0) !== 0).map(([k, group, rule]) => ({
 			group,
 			rule,

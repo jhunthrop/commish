@@ -177,7 +177,7 @@ const SUNDAY_FINAL_BY = Date.parse('2026-10-18T17:00:00.000Z') - 1;
 
 const style = await resolveConfig(fileURLToPath(DATA));
 const answers = {
-	sync: { ...sync, teams, moves: syncMoves, terms },
+	sync: { ...sync, teams, moves: syncMoves, terms, moves_read: true },
 	scoreboard: scoreboardAt(recorded, 0, false),
 	'scoreboard-live': scoreboardAt(sunday, SUNDAY_FINAL_BY, true)
 };

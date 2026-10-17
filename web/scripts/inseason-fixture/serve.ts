@@ -30,6 +30,7 @@ import type { components } from '../../src/lib/api/types.ts';
 import type { GameWeek } from '../../src/lib/format/game-facts.ts';
 import { FIXTURE_IDS } from './ids.ts';
 import { FIXTURE_SEASON, askedPhase, phaseAccount, phaseLeagues, phaseSync } from './phases.ts';
+import { espnSync } from './espn-sync.ts';
 
 const PORT = Number(process.env.PORT ?? 8799);
 const DATA = new URL('./data/', import.meta.url);
@@ -494,8 +495,9 @@ async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> 
 	}
 	const synced = SYNC.exec(url.pathname);
 	if (synced) {
+		const asked = synced[1] ?? '';
 		send(req, res, HTTP.ok, {
-			...phaseSync(sync, synced[1] ?? ''),
+			...phaseSync(ESPN_MOVES.has(asked) ? espnSync(sync) : sync, asked),
 			id: synced[1],
 			read_at: readAt()
 		});
@@ -535,7 +537,8 @@ async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> 
 		const bodies = {
 			lineup: ESPN_MOVES.has(id ?? '') ? espnLineup() : lineup,
 			matchup: matchupBox,
-			// The ESPN leagues show the week on its Sunday afternoon, the board's played states.
+			// The ESPN leagues show the week on its Sunday afternoon, a stand-in (league.ts): the
+			// points are made up so the board's played states can be drawn.
 			scoreboard: ESPN_MOVES.has(id ?? '') ? scoreboardLive : scoreboard,
 			waivers: ESPN_MOVES.has(id ?? '')
 				? espnWaivers(url.searchParams.get('position'))

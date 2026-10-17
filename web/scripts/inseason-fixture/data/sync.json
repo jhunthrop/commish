@@ -1684,6 +1684,7 @@
 			"yards_allowed_500_549": 0,
 			"yards_allowed_550_plus": 0
 		},
+		"scoring_unstated": ["points_per_return_touchdown"],
 		"scoring_extra": [
 			{ "group": "offense", "rule": "fumble recovered for a touchdown", "points": 6 },
 			{ "group": "defense", "rule": "blocked kick", "points": 2 },
@@ -1696,5 +1697,6 @@
 			{ "group": "defense", "rule": "touchdown on defense or special teams", "points": 6 }
 		],
 		"host_settings_url": "https://sleeper.com/leagues/1382163311038038016"
-	}
+	},
+	"moves_read": true
 }

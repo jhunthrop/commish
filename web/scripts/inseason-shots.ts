@@ -11,11 +11,13 @@
 // with its club's mark. On the Lineup table (Lane 66e) it asserts the evidence heads and cells,
 // each swap's chip, arrow and evidence line, the bench arrow reading Sit, the copy verb with the
 // platform's own line under it, and that no sentence on the Lineup or Matchup says "host" (the
-// member's platform is named). On the League page (Lane 66i) it asserts the scoreboard's six bugs,
-// the side ahead bright once a game has started and both alike before, the standings' columns and
-// twelve rows with the playoff rule, the lineup's verb and bench link, a bid in the moves, the basis
-// at most five lines, the settings' 42 rules, and on a phone the first standings row clear of the
-// pinned verb. Exits non-zero when a page scrolls sideways, a
+// member's platform is named). On the League page (Lane 66i), for the Sleeper league and the ESPN
+// fixture (its Sunday points a stand-in, named so), it asserts the scoreboard's six bugs, the side
+// ahead bright once a game has started and both alike before, the standings' columns and twelve
+// rows with the playoff rule drawn by record, the lineup's verb and bench link, a bid in Sleeper's
+// moves and no moves on ESPN with the basis saying why, the basis drawn in at most five lines at a
+// desk, the settings' stated rules counted with no figure for an unstated one, the tabs' arrow keys,
+// and on a phone the first standings row clear of the pinned verb. Exits non-zero when a page scrolls sideways, a
 // phone's first row is under the pin, or a figure or its sentence is missing.
 //
 //   node scripts/inseason-shots.ts [web origin] [out dir, from scripts/]
@@ -704,20 +706,40 @@ for (const theme of THEMES) {
 	}
 }
 
-/** The League page (Lane 66i): the recorded league before kickoff and the ESPN league on its Sunday
- * afternoon, the week and the settings, in both themes at both widths. */
-const STANDINGS_HEADS = ['#', 'Team', 'W-L-T', 'PF', 'PA', 'Streak', 'Proj', 'FAAB'];
+/** The League page (Lane 66i): the recorded Sleeper league before kickoff, and the ESPN fixture on
+ * a Sunday afternoon whose points are a stand-in (league.ts makes them up so the played states can be
+ * drawn; its shots say so in their names), the week and the settings, both themes at both widths. */
 const MAX_BASIS_LINES = 5;
 const LEAGUE_PAGES = [
-	{ name: 'league-week', league: id, live: false },
-	{ name: 'league-sunday', league: FIXTURE_IDS.espnDone, live: true }
+	{
+		name: 'league-week',
+		league: id,
+		live: false,
+		platform: 'Sleeper',
+		waiver: 'FAAB',
+		moves: true,
+		rules: 41
+	},
+	{
+		name: 'league-sunday-standin',
+		league: FIXTURE_IDS.espnDone,
+		live: true,
+		platform: 'ESPN',
+		waiver: 'Waiver',
+		moves: false,
+		rules: 40
+	}
 ] as const;
+type LeaguePage = (typeof LEAGUE_PAGES)[number];
+const STANDIN_CAPTION =
+	'league-sunday-standin: the ESPN fixture on a Sunday afternoon. Its points so far are a stand-in, made up from the projection.';
 
-async function leagueFaults(page: Page, live: boolean, width: number): Promise<string[]> {
+async function leagueFaults(page: Page, lp: LeaguePage, width: number): Promise<string[]> {
 	const seen = await page.evaluate(() => {
 		const text = (el: Element | null): string => el?.textContent.trim() ?? '';
 		const bugs = [...document.querySelectorAll('main .bug')];
 		const visible = (el: Element): boolean => getComputedStyle(el).display !== 'none';
+		const basis = [...document.querySelectorAll('main .basis p')];
 		return {
 			bugs: bugs.length,
 			mineFirst: bugs[0]?.classList.contains('mine') ?? false,
@@ -739,33 +761,66 @@ async function leagueFaults(page: Page, live: boolean, width: number): Promise<s
 			bench: [...document.querySelectorAll('main a.bench')].map(
 				(a) => a.getAttribute('href') ?? ''
 			),
+			feed: document.querySelector('main table.feed') !== null,
+			nobody: (document.querySelector('main')?.textContent ?? '').includes('Nobody in your league'),
 			bids: [...document.querySelectorAll('main table.feed td.det')].filter((td) =>
 				/^FAAB \$\d/.test(text(td))
 			).length,
-			basis: document.querySelectorAll('main .basis p').length
+			basisText: basis.map((p) => text(p)).join(' '),
+			// The basis's rendered lines: each paragraph's height over its line height.
+			basisLines: basis.reduce((n, p) => {
+				const style = getComputedStyle(p);
+				return n + Math.round(p.getBoundingClientRect().height / parseFloat(style.lineHeight));
+			}, 0)
 		};
 	});
 	const faults: string[] = [];
 	if (seen.bugs !== 6 || !seen.mineFirst)
 		faults.push(`${String(seen.bugs)} bugs, yours first ${String(seen.mineFirst)}`);
 	const started = seen.stands.filter((s) => s.some((x) => x !== 'level'));
-	if (live && started.length === 0)
+	if (lp.live && started.length === 0)
 		faults.push('no bug draws the side ahead once its game started');
-	if (!live && started.length > 0) faults.push('a bug before kickoff draws one side ahead');
-	if (live && started.some((s) => !(s.includes('ahead') && s.includes('behind'))))
+	if (!lp.live && started.length > 0) faults.push('a bug before kickoff draws one side ahead');
+	if (lp.live && started.some((s) => !(s.includes('ahead') && s.includes('behind'))))
 		faults.push('a started bug without one side ahead and one behind');
-	const want = width === PHONE.width ? ['#', 'Team', 'W-L-T', 'PF', 'Proj'] : STANDINGS_HEADS;
+	const want =
+		width === PHONE.width
+			? ['#', 'Team', 'W-L-T', 'PF', 'Proj']
+			: ['#', 'Team', 'W-L-T', 'PF', 'PA', 'Streak', 'Proj', lp.waiver];
 	if (seen.heads.join(' ') !== want.join(' '))
 		faults.push(`standings heads ${seen.heads.join(' ')}`);
 	if (seen.teams !== 12) faults.push(`${String(seen.teams)} standings rows`);
-	if (!live && seen.rule !== 'Playoffs above, weeks 15 to 17')
+	if (seen.rule !== 'Top 6 by record, playoffs weeks 15 to 17')
 		faults.push(`playoff rule "${seen.rule}"`);
-	if (!live && !seen.verb) faults.push('no Set your lineup verb');
+	if (!lp.live && !seen.verb) faults.push('no Set your lineup verb');
 	if (seen.bench.length !== 1 || !seen.bench[0]?.endsWith('/start#bench'))
 		faults.push(`bench link ${seen.bench.join(' ')}`);
-	if (!live && seen.bids === 0) faults.push('no bid in the moves');
-	if (seen.basis === 0 || seen.basis > MAX_BASIS_LINES)
-		faults.push(`${String(seen.basis)} basis lines`);
+	if (lp.moves && (!seen.feed || seen.bids === 0)) faults.push('no moves with a bid');
+	if (!lp.moves && seen.feed) faults.push('a moves feed where the platform gives none');
+	if (!lp.moves && !seen.basisText.includes(`${lp.platform} gives no move history to us.`))
+		faults.push('the basis does not say the moves are not read');
+	if (!lp.moves && seen.nobody) faults.push('says nobody moved where moves are not read');
+	if (!seen.basisText.startsWith(`Standings follow ${lp.platform}'s record, then points for.`))
+		faults.push(`basis "${seen.basisText.slice(0, 60)}"`);
+	if (width !== PHONE.width && (seen.basisLines === 0 || seen.basisLines > MAX_BASIS_LINES))
+		faults.push(`the basis draws ${String(seen.basisLines)} lines`);
+	return faults;
+}
+
+async function settingsFaults(page: Page, lp: LeaguePage): Promise<string[]> {
+	const seen = await page.evaluate(() => ({
+		lead: document.querySelector('main .settings .lead p')?.textContent.trim() ?? '',
+		notes: [...document.querySelectorAll('main .settings .note')].map((n) => n.textContent.trim()),
+		unstatedFigures: [...document.querySelectorAll('main .settings .unstated .fig')].length,
+		unstated: document.querySelectorAll('main .settings tr.unstated').length
+	}));
+	const faults: string[] = [];
+	if (!seen.lead.startsWith(`${String(lp.rules)} rules as ${lp.platform} states them.`))
+		faults.push(`settings say "${seen.lead}"`);
+	if (seen.unstated === 0) faults.push('no unstated rule drawn');
+	if (seen.unstatedFigures > 0) faults.push('an unstated rule prints a figure');
+	if (!seen.notes.some((n) => n.startsWith(`${lp.platform} does not state`)))
+		faults.push('no note on the unstated rules');
 	return faults;
 }
 
@@ -777,7 +832,7 @@ for (const theme of THEMES) {
 			await page.goto(`${web}/league/${lp.league}`, { waitUntil: 'networkidle' });
 			await ready(page, 'Every game this week, yours first.');
 			const at = `${lp.name} ${theme} ${String(width)}`;
-			for (const fault of await leagueFaults(page, lp.live, width)) missing.push(`${at} ${fault}`);
+			for (const fault of await leagueFaults(page, lp, width)) missing.push(`${at} ${fault}`);
 			for (const word of await hostWordsSaid(page)) missing.push(`${at} says host: ${word}`);
 			if (await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth))
 				scrolls.push(at);
@@ -798,27 +853,26 @@ for (const theme of THEMES) {
 				);
 				if (fold.rowBottom > fold.pinTop) under.push(`league ${theme}`);
 				await page.screenshot({ path: file(`league-phone-${theme}`) });
+				await page.setViewportSize({ width, height: VIEWPORT_HEIGHT });
 			}
-			if (!lp.live) {
-				await page.getByRole('tab', { name: 'Settings' }).click();
-				await ready(page, 'rules as Sleeper states them');
-				const rules = await page.evaluate(
-					() => document.querySelector('main .settings .lead p')?.textContent ?? ''
-				);
-				if (!rules.startsWith('42 rules')) missing.push(`${at} settings say "${rules}"`);
-				for (const word of await hostWordsSaid(page))
-					missing.push(`${at} settings say host: ${word}`);
-				if (await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth))
-					scrolls.push(`${at} settings`);
-				await page.screenshot({
-					path: file(`league-settings-${theme}-${String(width)}`),
-					fullPage: true
-				});
-			}
+			// The tabs move with the arrow keys, as tabs do.
+			await page.getByRole('tab', { selected: true }).focus();
+			await page.keyboard.press('ArrowRight');
+			await ready(page, `rules as ${lp.platform} states them`);
+			for (const fault of await settingsFaults(page, lp)) missing.push(`${at} ${fault}`);
+			for (const word of await hostWordsSaid(page))
+				missing.push(`${at} settings say host: ${word}`);
+			if (await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth))
+				scrolls.push(`${at} settings`);
+			await page.screenshot({
+				path: file(`${lp.name.replace('league-', 'league-settings-')}-${theme}-${String(width)}`),
+				fullPage: true
+			});
 			await ctx.close();
 		}
 	}
 }
+process.stdout.write(`${STANDIN_CAPTION}\n`);
 
 await browser.close();
 for (const [where, height] of rows)

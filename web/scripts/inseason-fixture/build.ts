@@ -874,7 +874,8 @@ function sync(): LeagueSync {
 		host_stale_seconds: 0,
 		host_failed: false,
 		host_signed_out: false,
-		terms: fields.terms
+		terms: fields.terms,
+		moves_read: true
 	};
 }
 
