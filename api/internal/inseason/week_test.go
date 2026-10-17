@@ -150,7 +150,7 @@ func TestWeekRouteKeepsEveryLeague(t *testing.T) {
 	list := []WeekLeague{
 		{ID: in, Name: "In season", Host: "sleeper", Phase: apitypes.LeaguePhaseInSeason, WaiversOpen: true, League: &f.league},
 		{ID: failed, Name: "Failed", Host: "espn", Phase: apitypes.LeaguePhaseInSeason, Standing: standing,
-			Problem: "ESPN is not answering right now. Your standing is from the last read."},
+			Problem: "ESPN is not answering right now."},
 		{ID: off, Name: "Off", Host: "sleeper", Phase: apitypes.LeaguePhaseOffseason},
 	}
 	code, env := serve(t, weekService(t, list, nil), "/me/week")

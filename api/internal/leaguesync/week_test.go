@@ -132,6 +132,12 @@ func TestHostProblemWordsNameThePlatform(t *testing.T) {
 			t.Errorf("%v: %q, want it to start %q", err, got, want)
 		}
 	}
+	// The page names the last read beside the sentence once (rereview N4): the sentence never does.
+	for _, err := range []error{ErrBusy, ErrUnavailable} {
+		if got := HostProblemWords(HostESPN, err); strings.Contains(strings.ToLower(got), "last read") {
+			t.Errorf("%v: %q names the last read", err, got)
+		}
+	}
 	if got := HostProblemWords("ffpc", ErrSignInAgain); !strings.Contains(got, "FFPC") {
 		t.Errorf("FFPC signed out: %q", got)
 	}

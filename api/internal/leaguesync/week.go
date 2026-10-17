@@ -103,6 +103,8 @@ func (s *Service) readWeek(ctx context.Context, a Attached, row *WeekRead) {
 
 // HostProblemWords is one sentence for a read the host stopped, naming
 // the platform and what the member does, where there is something to do.
+// The page names the row's last read beside it, so the sentence never
+// does (Lane 66k rereview N4).
 func HostProblemWords(host string, err error) string {
 	words := wordsFor(host)
 	switch {
@@ -113,9 +115,9 @@ func HostProblemWords(host string, err error) string {
 	case errors.Is(err, ErrSignInAgain):
 		return words.again
 	case errors.Is(err, ErrBusy):
-		return HostWords(host) + " is busy with other leagues right now. Your standing is from the last read."
+		return HostWords(host) + " is busy with other leagues right now."
 	}
-	return HostWords(host) + " is not answering right now. Your standing is from the last read."
+	return HostWords(host) + " is not answering right now."
 }
 
 // TeamOnWire is a team as the wire names it, its points for and against
