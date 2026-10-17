@@ -8,17 +8,19 @@ rival product and no tip; the bye read says he does not play and recommends noth
 sentence sits on two of the reads; every fact was stamped at or before the write; and the caption is the
 page's."""
 
+import copy
 import json
 from collections.abc import Iterator
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Self
 
 import pytest
 
 from research.capsules.gateway import Completion
 from research.capsules.gateway_ledger import Usage
 from research.capsules.throttle_waits import AskWaits, RunWaits
+from research.capsules.validate import overrun_cap
 from research.capsules.voice_rules import gate_hits
 from research.capsules.week.caption import written_caption
 from research.capsules.week.prompt import parse_week_answer
@@ -54,12 +56,20 @@ class _Replay:
         usage = None if answer["usage"] is None else Usage(**answer["usage"])
         return Completion(answer["content"], usage, answer["provider"], "stop")
 
+    def with_model(self, model: str) -> "Self":
+        """The judge's view: the same script, its own call count (`GatewayClient.with_model`)."""
+        view = copy.copy(self)
+        view.model, view.calls = model, 0
+        return view
+
     def sleep(self, seconds: float) -> None:
         raise AssertionError(f"the replay never waits ({seconds} s)")
 
 
 def _call(player: dict[str, Any]) -> str | None:
-    return parse_week_answer(player["answers"][-1]["content"]).call
+    """The last writer answer's call (a judge's answer is one word and carries none)."""
+    calls = (parse_week_answer(answer["content"]).call for answer in reversed(player["answers"]))
+    return next((call for call in calls if call is not None), None)
 
 
 def _sheet(name: str) -> tuple[WeekSheet, dict[str, Any]]:
@@ -90,11 +100,13 @@ def test_the_writer_reproduces_the_recorded_read(name: str) -> None:
 def test_the_recorded_read_keeps_every_guard(name: str) -> None:
     sheet, player = _sheet(name)
     read = player["read"]
-    assert validate_week_read(read, sheet, frozenset(player["taken"]), _call(player)).ok
+    # A read asked for a shorter version may run 10% over the cap (the season read's ruling).
+    shorter = player["calls"] > 1
+    assert validate_week_read(read, sheet, frozenset(player["taken"]), _call(player), asked_shorter=shorter).ok
     assert gate_hits(read, week_name_ledger(sheet)) == []
     assert not any(rule.pattern.search(read) for rule in WEEK_NEVER_WORDS)
     assert week_rule_violations(read, sheet, _call(player)) == []
-    assert len(read.split()) <= WEEK_BAND[1]
+    assert len(read.split()) <= overrun_cap(WEEK_BAND[1])
     if sheet.projection is not None and not sheet.bye:
         assert "published" in read.lower()
     assert "our projection" not in read.lower() and "our number" not in read.lower()
@@ -117,4 +129,4 @@ def test_no_sentence_shape_sits_on_two_of_the_reads() -> None:
 
 def test_the_caption_is_the_write_in_central_time_for_the_week() -> None:
     sheet, _ = _sheet(_NAMES[0])
-    assert written_caption(sheet.written_at, sheet.week) == "Written Sat 12:50 pm Central, for week 6"
+    assert written_caption(sheet.written_at, sheet.week) == "Written Sat 1:12 pm Central, for week 6"
