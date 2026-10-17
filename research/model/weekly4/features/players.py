@@ -15,8 +15,6 @@ the outcome reader; this store reads no week-W line.
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from datetime import datetime
-from typing import Final, Literal
 
 from sqlalchemy import Connection
 
@@ -25,18 +23,15 @@ from research.model.weekly3.allowance import Allowance, GroupTotals, allowance, 
 from research.model.weekly3.ledger import Stamp
 from research.model.weekly3.snapshot import Snapshot, read_snapshot
 from research.model.weekly3.work import KINDS_BY_POSITION, NO_SNAP_ROW, SNAP_SHARE
-from research.model.weekly4.features.admitted import DEPTH_CHARTS, DEPTH_COLUMNS, admit_read
+from research.model.weekly4.features.depth import DepthChart, DepthRule, depth_charts
 from research.model.weekly4.features.matchup import role_allowances
 from research.model.weekly4.features.plays import PlayerTally
-from research.model.weekly4.features.reads import DepthRow, as_of_rows
+from research.model.weekly4.features.reads import DepthRow
 from research.model.weekly4.features.rows import ClubGame, PlayerInputs, Row, player_row
 from research.model.weekly4.features.shares import LAST_GAMES, GameShare, history
 from research.model.weekly4.features.teammates import Teammates, returning, vacated
 from research.model.weekly4.features.view import InstantView, SeasonInputs
 from research.pipeline.observations import PlayerWeekObservation
-
-DepthRule = Literal["week", "prior"]
-DEPTH_PAIRS: Final = tuple((DEPTH_CHARTS, column) for column in DEPTH_COLUMNS)
 
 
 @dataclass(frozen=True, slots=True)
@@ -44,22 +39,6 @@ class PlayerInstant:
     rows: tuple[Row, ...]
     stamps: tuple[Stamp, ...]
     counts: Mapping[str, int]
-
-
-def depth_charts(
-    rows: Sequence[DepthRow], season: int, week: int, moment: datetime, rule: DepthRule
-) -> tuple[dict[str, dict[str, int]], int, Stamp]:
-    """Each club's chart at t_g (week W's, or week W-1's on the stamp check's fallback): player -> his
-    best depth order, the chart's week, and the read's stamp."""
-    chart_week = week if rule == "week" else week - 1
-    kind: Literal["depth", "depth_prior"] = "depth" if rule == "week" else "depth_prior"
-    found = as_of_rows(rows, chart_week, chart_week, moment)
-    stamp = admit_read(kind, DEPTH_PAIRS, found, season, week, moment)
-    by_club: dict[str, dict[str, int]] = defaultdict(dict)
-    for r in found:
-        best = by_club[r.team].get(r.player_id)
-        by_club[r.team][r.player_id] = r.depth_order if best is None else min(best, r.depth_order)
-    return by_club, chart_week, stamp
 
 
 def _by_player[V](items: Mapping[tuple[str, int], V]) -> dict[str, dict[int, V]]:
@@ -86,7 +65,7 @@ def read_players(  # noqa: PLR0913, PLR0917 - one instant's player reads, named
 ) -> PlayerInstant:
     week, season = view.week, s.season
     snapshot = read_snapshot(conn, season, week, view.moment)
-    charts, chart_week, depth_stamp = depth_charts(depth_rows, season, week, view.moment, rule)
+    depth = depth_charts(depth_rows, season, week, view.moment, rule)
     histories = {pid: history(pid, games, view.tallies) for pid, games in snapshot.games.items()}
     charted: dict[str, list[PlayerWeekObservation]] = defaultdict(list)
     for row in view.charted:
@@ -100,13 +79,13 @@ def read_players(  # noqa: PLR0913, PLR0917 - one instant's player reads, named
         _by_player(view.tallies.players),
         charted,
         positions,
-        chart_week,
+        depth,
         group_totals(snapshot.games, positions),
     )
     rows: list[Row] = []
     counts: dict[str, int] = defaultdict(int)
     for club in view.clubs:
-        chart = charts.get(club, {})
+        chart = depth.ranks.get(club, {})
         mates = Teammates(
             club,
             s.schedule.club_weeks(club, week)[-LAST_GAMES:],
@@ -117,7 +96,7 @@ def read_players(  # noqa: PLR0913, PLR0917 - one instant's player reads, named
         )
         _count_teammates(counts, mates)
         rows += _club_rows(at, club, chart, mates)
-    return PlayerInstant(tuple(rows), (*snapshot.stamps, depth_stamp), dict(counts))
+    return PlayerInstant(tuple(rows), (*snapshot.stamps, depth.stamp), dict(counts))
 
 
 @dataclass(frozen=True, slots=True)
@@ -130,7 +109,7 @@ class _Instant:
     tallies: Mapping[str, Mapping[int, PlayerTally]]
     charted: Mapping[str, list[PlayerWeekObservation]]
     positions: Mapping[str, str]
-    chart_week: int
+    depth: DepthChart
     totals: GroupTotals  # round 3's position-group totals, for its volume allowances
 
 
@@ -175,7 +154,8 @@ def _club_rows(at: _Instant, club: str, chart: Mapping[str, int], mates: Teammat
             at.tallies.get(pid, {}),
             at.charted.get(pid, []),
             chart.get(pid),
-            at.chart_week,
+            at.depth.week,
+            at.depth.mapped,
             mates.recent_weeks,
             vacated(pid, mates),
             returning(pid, mates),

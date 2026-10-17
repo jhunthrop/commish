@@ -135,6 +135,7 @@ PLAYER_COLUMNS: Final = (
     ("snap_trend", "float"),
     ("depth_rank", "float"),
     ("depth_chart_week", "int"),
+    ("depth_rank_mapped", "int"),
     *((f"vacated_{kind}", "float") for kind in SHARE_KINDS),
     ("vacating_teammates", "int"),
     *((f"returning_{kind}", "float") for kind in SHARE_KINDS),

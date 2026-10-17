@@ -131,6 +131,7 @@ class PlayerInputs:
     charted: Sequence[PlayerWeekObservation]
     depth_rank: int | None
     depth_week: int
+    depth_mapped: bool  # amendment 2 item 5: a dated chart's rank read on the slot scale
     recent_weeks: tuple[int, ...]
     vacated: Vacated
     returning: Returning
@@ -227,6 +228,7 @@ def player_row(g: ClubGame, p: PlayerInputs) -> Row:
         "snap_trend": snap_last - snap_season,
         "depth_rank": math.nan if p.depth_rank is None else float(p.depth_rank),
         "depth_chart_week": p.depth_week,
+        "depth_rank_mapped": int(p.depth_mapped),
         **{f"vacated_{kind}": p.vacated.shares.of(kind) for kind in SHARE_KINDS},
         "vacating_teammates": p.vacated.counted,
         **{f"returning_{kind}": p.returning.shares.of(kind) for kind in SHARE_KINDS},

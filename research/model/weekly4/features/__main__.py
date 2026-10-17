@@ -37,8 +37,8 @@ from research.model.weekly.round.judge import table_digests
 from research.model.weekly2.guard import guard_queries
 from research.model.weekly4.features.columns import PLAY_SCHEMA, PLAYER_SCHEMA, TEAM_SCHEMA
 from research.model.weekly4.features.coverage import season_report
+from research.model.weekly4.features.depth import DepthRule
 from research.model.weekly4.features.outcomes import LAST_SERVED, OutcomeReader
-from research.model.weekly4.features.players import DepthRule
 from research.model.weekly4.features.season import SeasonBuild, SeasonSpec, build_season
 from research.model.weekly4.features.store import PLAY_KEY, PLAYER_KEY, TEAM_KEY, write_rows
 

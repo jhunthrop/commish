@@ -29,9 +29,10 @@ from research.model.weekly3.work import player_games
 from research.model.weekly4.features import reads
 from research.model.weekly4.features.admitted import CLUB_EDGES, admit_read
 from research.model.weekly4.features.charted import restamp, week_passes
+from research.model.weekly4.features.depth import DepthRule
 from research.model.weekly4.features.game import Weather
 from research.model.weekly4.features.outcomes import OutcomeReader, play_rows, team_outcomes
-from research.model.weekly4.features.players import DepthRule, read_players
+from research.model.weekly4.features.players import read_players
 from research.model.weekly4.features.plays import Play, Tallies, tally
 from research.model.weekly4.features.rows import Row, game_row
 from research.model.weekly4.features.shares import GameShare, prior_shares

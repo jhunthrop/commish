@@ -52,6 +52,7 @@ def _rookie() -> PlayerInputs:
         (),
         None,
         7,
+        False,
         (4, 5, 6),
         Vacated(ZERO_COUNTS, 0, 0),
         Returning(ZERO_COUNTS, 0, 0, 0),
