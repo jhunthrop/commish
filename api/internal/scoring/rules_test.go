@@ -409,8 +409,25 @@ func TestFromSleeperKeepsKickingAndDefense(t *testing.T) {
 	if _, err := FromMap(im.Rules); err != nil {
 		t.Errorf("the import is not whole: %v", err)
 	}
-	flat := FromSleeper(map[string]float64{"fgm": 3.5, "fgm_50p": 2})
-	if flat.Rules[FieldGoal] != 3.5 || flat.Rules[FieldGoal50AndUp] != 3.5 || !slices.Contains(DroppedWords(flat.Dropped), "field goal made from 50 yards or more 2") {
-		t.Errorf("a flat field goal: %v, dropped %v", flat.Rules, DroppedWords(flat.Dropped))
+	// Sleeper adds the flat figure and a make's distance figure, as ESPN
+	// does: a range a league does not state adds nothing, and a flat 0
+	// beside ranges zeroes nothing.
+	cases := []struct {
+		name     string
+		settings map[string]float64
+		want     [3]float64
+	}{
+		{"flat and the longest range", map[string]float64{"fgm": 3.5, "fgm_50p": 2}, [3]float64{3.5, 3.5, 5.5}},
+		{"a flat 0 beside ranges", map[string]float64{"fgm": 0, "fgm_0_19": 3, "fgm_20_29": 3, "fgm_30_39": 3, "fgm_40_49": 4, "fgm_50p": 5},
+			[3]float64{3, 4, 5}},
+		{"flat alone", map[string]float64{"fgm": 3}, [3]float64{3, 3, 3}},
+		{"ranges alone", map[string]float64{"fgm_0_19": 3, "fgm_20_29": 3, "fgm_30_39": 3, "fgm_40_49": 4}, [3]float64{3, 4, 0}},
+	}
+	for _, c := range cases {
+		im := FromSleeper(c.settings)
+		got := [3]float64{im.Rules[FieldGoal], im.Rules[FieldGoal40To49], im.Rules[FieldGoal50AndUp]}
+		if got != c.want || len(im.Dropped) != 0 {
+			t.Errorf("%s: %v, want %v, dropped %v", c.name, got, c.want, DroppedWords(im.Dropped))
+		}
 	}
 }

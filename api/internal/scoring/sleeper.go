@@ -40,7 +40,7 @@ func sleeperNames() map[string]string {
 		"pass_yd": "points_per_passing_yard", "pass_td": "points_per_passing_touchdown", "pass_int": "points_per_interception",
 		"rush_yd": "points_per_rushing_yard", "rush_td": "points_per_rushing_touchdown", "rec_yd": "points_per_receiving_yard",
 		"rec_td": "points_per_receiving_touchdown", "rec": Reception, "fum_lost": "points_per_fumble_lost",
-		"bonus_rec_te": TEBonus, "fgm": "points_per_field_goal", "xpm": "points_per_extra_point",
+		"bonus_rec_te": TEBonus, "xpm": "points_per_extra_point",
 		"sack": "points_per_sack", "int": "points_per_defensive_interception", "def_td": "points_per_defensive_touchdown",
 		"fgmiss": "points_per_field_goal_missed", "xpmiss": "points_per_extra_point_missed",
 		"fum_rec": "points_per_defensive_fumble_recovery", "safe": "points_per_safety",
@@ -56,12 +56,13 @@ func alike() map[string][]string {
 	}
 }
 
-// Sleeper scores field goals by distance when a league says so: the short
-// ranges carry the one under-40 figure (points_per_field_goal) when they
-// score alike, and each longer range its own rule; once a league scores by
-// distance, a range it does not state scores nothing. A miss carries one
-// figure: the short ranges' when alike, and a longer range scoring
-// differently is left out, named by the caller.
+// Sleeper scores a made field goal by its flat setting (fgm) and by its
+// distance's range alike, adding the two as ESPN does: a setting a league
+// does not state adds nothing. The short ranges carry the one under-40
+// figure (points_per_field_goal) when they score alike, and each longer
+// range its own rule. A miss carries one figure: the short ranges' when
+// alike, and a longer range scoring differently is left out, named by the
+// caller.
 var (
 	shortMade   = []string{"fgm_0_19", "fgm_20_29", "fgm_30_39"}
 	longMade    = map[string]string{"fgm_40_49": FieldGoal40To49, "fgm_50p": FieldGoal50AndUp}
@@ -69,33 +70,46 @@ var (
 	longMissed  = []string{"fgmiss_40_49", "fgmiss_50p"}
 )
 
-// madeByDistance reads made field goals by range when the league states no
-// flat figure (fgm, which scores every distance alike).
+// madeByDistance reads made field goals: the flat setting plus each
+// distance's range. When the short ranges score differently there is no
+// one under-40 figure: it is left at the standard and the ranges named.
 func madeByDistance(host, rules map[string]float64, used map[string]bool) {
-	if v, ok := host["fgm"]; ok {
-		rules[FieldGoal40To49], rules[FieldGoal50AndUp] = v, v
-		return
+	flat, flatStated := host["fgm"]
+	stated := flatStated
+	for _, k := range shortMade {
+		_, ok := host[k]
+		stated = stated || ok
 	}
-	stated := false
-	if v, ok := sameFigure(host, shortMade); ok {
-		rules[FieldGoal], stated = v, true
-		for _, k := range shortMade {
-			used[k] = true
-		}
-	}
-	for hostKey, key := range longMade {
-		if v, ok := host[hostKey]; ok {
-			rules[key], used[hostKey], stated = v, true, true
-		}
+	for k := range longMade {
+		_, ok := host[k]
+		stated = stated || ok
 	}
 	if !stated {
 		return
 	}
-	for _, key := range longMade {
-		if _, ok := rules[key]; !ok {
-			rules[key] = 0
+	used["fgm"] = flatStated
+	if short, ok := sameFigure(host, shortMade); ok {
+		rules[FieldGoal] = flat + short
+		for _, k := range shortMade {
+			used[k] = true
+		}
+	} else if !anyStated(host, shortMade) {
+		rules[FieldGoal] = flat
+	}
+	for hostKey, key := range longMade {
+		v, ok := host[hostKey]
+		rules[key], used[hostKey] = flat+v, ok
+	}
+}
+
+// anyStated reports whether the host states any of the keys.
+func anyStated(host map[string]float64, keys []string) bool {
+	for _, k := range keys {
+		if _, ok := host[k]; ok {
+			return true
 		}
 	}
+	return false
 }
 
 // missedByDistance reads one miss figure from the short ranges when the
