@@ -21,7 +21,12 @@
 			"wins": 5,
 			"losses": 0,
 			"ties": 0,
-			"points_for": 818.24
+			"points_for": 818.24,
+			"points_against": 659.06,
+			"streak": "W5",
+			"waiver_order": 6,
+			"waiver_budget_left": 675,
+			"avatar": "https://sleepercdn.com/avatars/thumbs/2aea7c4ff143abb0f01f2ddbec933afc"
 		},
 		{
 			"roster_id": 3,
@@ -30,7 +35,12 @@
 			"wins": 4,
 			"losses": 1,
 			"ties": 0,
-			"points_for": 739.38
+			"points_for": 739.38,
+			"points_against": 584.8,
+			"streak": "W1",
+			"waiver_order": 10,
+			"waiver_budget_left": 780,
+			"avatar": "https://sleepercdn.com/avatars/thumbs/4eb86e314bcc8b55e36499065d6b1a02"
 		},
 		{
 			"roster_id": 12,
@@ -39,7 +49,12 @@
 			"wins": 3,
 			"losses": 2,
 			"ties": 0,
-			"points_for": 784.06
+			"points_for": 784.06,
+			"points_against": 665.1,
+			"streak": "W2",
+			"waiver_order": 3,
+			"waiver_budget_left": 800,
+			"avatar": "https://sleepercdn.com/avatars/thumbs/bbe6128d8abd7990ce5599e7c18568cf"
 		},
 		{
 			"roster_id": 6,
@@ -48,7 +63,12 @@
 			"wins": 3,
 			"losses": 2,
 			"ties": 0,
-			"points_for": 732.94
+			"points_for": 732.94,
+			"points_against": 643.06,
+			"streak": "W3",
+			"waiver_order": 9,
+			"waiver_budget_left": 863,
+			"avatar": "https://sleepercdn.com/avatars/thumbs/8eb8f8bf999945d523f2c4033f70473e"
 		},
 		{
 			"roster_id": 2,
@@ -57,7 +77,12 @@
 			"wins": 3,
 			"losses": 2,
 			"ties": 0,
-			"points_for": 652.7
+			"points_for": 652.7,
+			"points_against": 603.34,
+			"streak": "L1",
+			"waiver_order": 12,
+			"waiver_budget_left": 700,
+			"avatar": "https://sleepercdn.com/avatars/thumbs/cf730b8ae44c68201303f4305431a495"
 		},
 		{
 			"roster_id": 5,
@@ -66,7 +91,12 @@
 			"wins": 3,
 			"losses": 2,
 			"ties": 0,
-			"points_for": 638.88
+			"points_for": 638.88,
+			"points_against": 673.34,
+			"streak": "W2",
+			"waiver_order": 2,
+			"waiver_budget_left": 664,
+			"avatar": "https://sleepercdn.com/avatars/thumbs/f0edbf4278f53f9425db175073df6584"
 		},
 		{
 			"roster_id": 4,
@@ -75,7 +105,12 @@
 			"wins": 2,
 			"losses": 3,
 			"ties": 0,
-			"points_for": 661.48
+			"points_for": 661.48,
+			"points_against": 710.96,
+			"streak": "W1",
+			"waiver_order": 8,
+			"waiver_budget_left": 915,
+			"avatar": "https://sleepercdn.com/avatars/thumbs/ce80fd6a38801322244d46b4abe79a23"
 		},
 		{
 			"roster_id": 9,
@@ -84,7 +119,12 @@
 			"wins": 2,
 			"losses": 3,
 			"ties": 0,
-			"points_for": 660.24
+			"points_for": 660.24,
+			"points_against": 640.46,
+			"streak": "L3",
+			"waiver_order": 4,
+			"waiver_budget_left": 911,
+			"avatar": "https://sleepercdn.com/avatars/thumbs/10e06bc82409ab5dd7c3bdd78b76067d"
 		},
 		{
 			"roster_id": 11,
@@ -93,7 +133,12 @@
 			"wins": 2,
 			"losses": 3,
 			"ties": 0,
-			"points_for": 655.22
+			"points_for": 655.22,
+			"points_against": 666.12,
+			"streak": "L1",
+			"waiver_order": 7,
+			"waiver_budget_left": 556,
+			"avatar": "https://sleepercdn.com/avatars/thumbs/754537eae5522ba30eaa24f0e74066fb"
 		},
 		{
 			"roster_id": 8,
@@ -102,7 +147,12 @@
 			"wins": 1,
 			"losses": 4,
 			"ties": 0,
-			"points_for": 608.7
+			"points_for": 608.7,
+			"points_against": 781.82,
+			"streak": "L3",
+			"waiver_order": 11,
+			"waiver_budget_left": 830,
+			"avatar": "https://sleepercdn.com/avatars/thumbs/15d7cf259bc30eab8f6120f45f652fb6"
 		},
 		{
 			"roster_id": 7,
@@ -111,7 +161,12 @@
 			"wins": 1,
 			"losses": 4,
 			"ties": 0,
-			"points_for": 580.1
+			"points_for": 580.1,
+			"points_against": 740.66,
+			"streak": "L2",
+			"waiver_order": 5,
+			"waiver_budget_left": 959,
+			"avatar": "https://sleepercdn.com/avatars/thumbs/3814e6fcad19a6a4c1dde448c6828a54"
 		},
 		{
 			"roster_id": 1,
@@ -120,7 +175,12 @@
 			"wins": 1,
 			"losses": 4,
 			"ties": 0,
-			"points_for": 567.04
+			"points_for": 567.04,
+			"points_against": 730.26,
+			"streak": "L2",
+			"waiver_order": 1,
+			"waiver_budget_left": 1000,
+			"avatar": "https://sleepercdn.com/avatars/thumbs/c4861381cb205d951bdde51e296c673f"
 		}
 	],
 	"roster": [
@@ -612,7 +672,8 @@
 					},
 					"roster_id": 1
 				}
-			]
+			],
+			"bid": null
 		},
 		{
 			"kind": "add",
@@ -643,7 +704,8 @@
 					},
 					"roster_id": 1
 				}
-			]
+			],
+			"bid": null
 		},
 		{
 			"kind": "add",
@@ -674,7 +736,8 @@
 					},
 					"roster_id": 8
 				}
-			]
+			],
+			"bid": null
 		},
 		{
 			"kind": "add",
@@ -705,7 +768,8 @@
 					},
 					"roster_id": 5
 				}
-			]
+			],
+			"bid": null
 		},
 		{
 			"kind": "add",
@@ -736,7 +800,8 @@
 					},
 					"roster_id": 7
 				}
-			]
+			],
+			"bid": null
 		},
 		{
 			"kind": "add",
@@ -767,7 +832,8 @@
 					},
 					"roster_id": 7
 				}
-			]
+			],
+			"bid": null
 		},
 		{
 			"kind": "waiver",
@@ -798,7 +864,8 @@
 					},
 					"roster_id": 8
 				}
-			]
+			],
+			"bid": 75
 		},
 		{
 			"kind": "waiver",
@@ -829,7 +896,8 @@
 					},
 					"roster_id": 3
 				}
-			]
+			],
+			"bid": 105
 		},
 		{
 			"kind": "waiver",
@@ -860,7 +928,8 @@
 					},
 					"roster_id": 2
 				}
-			]
+			],
+			"bid": 0
 		},
 		{
 			"kind": "add",
@@ -891,7 +960,8 @@
 					},
 					"roster_id": 9
 				}
-			]
+			],
+			"bid": null
 		},
 		{
 			"kind": "waiver",
@@ -922,7 +992,8 @@
 					},
 					"roster_id": 2
 				}
-			]
+			],
+			"bid": 31
 		},
 		{
 			"kind": "add",
@@ -953,7 +1024,8 @@
 					},
 					"roster_id": 7
 				}
-			]
+			],
+			"bid": null
 		},
 		{
 			"kind": "add",
@@ -984,7 +1056,8 @@
 					},
 					"roster_id": 7
 				}
-			]
+			],
+			"bid": null
 		},
 		{
 			"kind": "trade",
@@ -1037,7 +1110,8 @@
 					},
 					"roster_id": 4
 				}
-			]
+			],
+			"bid": null
 		},
 		{
 			"kind": "waiver",
@@ -1068,7 +1142,8 @@
 					},
 					"roster_id": 6
 				}
-			]
+			],
+			"bid": 7
 		}
 	],
 	"held_by": {
@@ -1548,5 +1623,78 @@
 	"read_at": "2026-10-14T19:05:38.329Z",
 	"host_stale_seconds": 0,
 	"host_failed": false,
-	"host_signed_out": false
+	"host_signed_out": false,
+	"terms": {
+		"waivers": "budget",
+		"waiver_budget": 1000,
+		"playoff_teams": 6,
+		"playoff_weeks": { "first": 15, "last": 17 },
+		"roster": {
+			"qb": 1,
+			"rb": 2,
+			"wr": 3,
+			"te": 1,
+			"flex": 2,
+			"super_flex": 0,
+			"k": 0,
+			"def": 1,
+			"bench": 10
+		},
+		"scoring": {
+			"points_per_passing_yard": 0.04,
+			"points_per_passing_touchdown": 5,
+			"points_per_interception": -1,
+			"points_per_rushing_yard": 0.1,
+			"points_per_rushing_touchdown": 6,
+			"points_per_receiving_yard": 0.1,
+			"points_per_receiving_touchdown": 6,
+			"points_per_reception": 1,
+			"points_per_fumble_lost": -2,
+			"te_reception_bonus": 0.5,
+			"points_per_field_goal": 3,
+			"points_per_extra_point": 1,
+			"points_per_sack": 1,
+			"points_per_defensive_interception": 2,
+			"points_per_defensive_touchdown": 6,
+			"points_per_two_point_conversion": 2,
+			"points_per_field_goal_missed": -1,
+			"points_per_extra_point_missed": -1,
+			"points_per_return_touchdown": 6,
+			"points_per_defensive_fumble_recovery": 2,
+			"points_per_safety": 2,
+			"points_per_field_goal_40_49": 4,
+			"points_per_field_goal_50_plus": 5,
+			"points_allowed_0": 10,
+			"points_allowed_1_6": 7,
+			"points_allowed_7_13": 4,
+			"points_allowed_14_17": 1,
+			"points_allowed_18_20": 1,
+			"points_allowed_21": 0,
+			"points_allowed_22_27": 0,
+			"points_allowed_28_34": -1,
+			"points_allowed_35_45": -4,
+			"points_allowed_46_plus": -4,
+			"yards_allowed_0_99": 0,
+			"yards_allowed_100_199": 0,
+			"yards_allowed_200_299": 0,
+			"yards_allowed_300_349": 0,
+			"yards_allowed_350_399": 0,
+			"yards_allowed_400_449": 0,
+			"yards_allowed_450_499": 0,
+			"yards_allowed_500_549": 0,
+			"yards_allowed_550_plus": 0
+		},
+		"scoring_extra": [
+			{ "group": "offense", "rule": "fumble recovered for a touchdown", "points": 6 },
+			{ "group": "defense", "rule": "blocked kick", "points": 2 },
+			{ "group": "defense", "rule": "forced fumble", "points": 1 },
+			{ "group": "defense", "rule": "forced fumble on defense or special teams", "points": 1 },
+			{ "group": "defense", "rule": "fumble recovery on defense or special teams", "points": 1 },
+			{ "group": "defense", "rule": "special teams forced fumble", "points": 1 },
+			{ "group": "defense", "rule": "special teams fumble recovery", "points": 1 },
+			{ "group": "defense", "rule": "special teams touchdown", "points": 6 },
+			{ "group": "defense", "rule": "touchdown on defense or special teams", "points": 6 }
+		],
+		"host_settings_url": "https://sleeper.com/leagues/1382163311038038016"
+	}
 }

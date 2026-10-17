@@ -11,7 +11,11 @@
 // with its club's mark. On the Lineup table (Lane 66e) it asserts the evidence heads and cells,
 // each swap's chip, arrow and evidence line, the bench arrow reading Sit, the copy verb with the
 // platform's own line under it, and that no sentence on the Lineup or Matchup says "host" (the
-// member's platform is named). Exits non-zero when a page scrolls sideways, a
+// member's platform is named). On the League page (Lane 66i) it asserts the scoreboard's six bugs,
+// the side ahead bright once a game has started and both alike before, the standings' columns and
+// twelve rows with the playoff rule, the lineup's verb and bench link, a bid in the moves, the basis
+// at most five lines, the settings' 42 rules, and on a phone the first standings row clear of the
+// pinned verb. Exits non-zero when a page scrolls sideways, a
 // phone's first row is under the pin, or a figure or its sentence is missing.
 //
 //   node scripts/inseason-shots.ts [web origin] [out dir, from scripts/]
@@ -36,7 +40,7 @@ const out = new URL(process.argv[3] ?? '../screenshots/inseason/', import.meta.u
 const id = FIXTURE_IDS.league;
 
 const PAGES = [
-	{ name: 'league', path: `/league/${id}`, ready: 'Waiver pool' },
+	{ name: 'league', path: `/league/${id}`, ready: 'Set your lineup' },
 	{ name: 'start', path: `/league/${id}/start`, ready: 'Copy the lineup' },
 	{ name: 'matchup', path: `/league/${id}/matchup`, ready: 'Week 6' },
 	{ name: 'waivers', path: `/league/${id}/waivers`, ready: 'Claim on Sleeper' },
@@ -667,7 +671,11 @@ const STATES = [
 		ready: 'The site turns to your season'
 	},
 	{ name: 'league-draft-day', path: `/league/${FIXTURE_IDS.draftDay}`, ready: 'Open the Advisor' },
-	{ name: 'league-playoffs', path: `/league/${FIXTURE_IDS.playoffs}`, ready: 'See the matchup' },
+	{
+		name: 'league-playoffs',
+		path: `/league/${FIXTURE_IDS.playoffs}`,
+		ready: 'Every game this week, yours first.'
+	},
 	{ name: 'league-offseason', path: `/league/${FIXTURE_IDS.offseason}`, ready: 'finished' },
 	{
 		name: 'follow-for-lineup',
@@ -691,6 +699,122 @@ for (const theme of THEMES) {
 				path: file(`${state.name}-${theme}-${String(width)}`),
 				fullPage: true
 			});
+			await ctx.close();
+		}
+	}
+}
+
+/** The League page (Lane 66i): the recorded league before kickoff and the ESPN league on its Sunday
+ * afternoon, the week and the settings, in both themes at both widths. */
+const STANDINGS_HEADS = ['#', 'Team', 'W-L-T', 'PF', 'PA', 'Streak', 'Proj', 'FAAB'];
+const MAX_BASIS_LINES = 5;
+const LEAGUE_PAGES = [
+	{ name: 'league-week', league: id, live: false },
+	{ name: 'league-sunday', league: FIXTURE_IDS.espnDone, live: true }
+] as const;
+
+async function leagueFaults(page: Page, live: boolean, width: number): Promise<string[]> {
+	const seen = await page.evaluate(() => {
+		const text = (el: Element | null): string => el?.textContent.trim() ?? '';
+		const bugs = [...document.querySelectorAll('main .bug')];
+		const visible = (el: Element): boolean => getComputedStyle(el).display !== 'none';
+		return {
+			bugs: bugs.length,
+			mineFirst: bugs[0]?.classList.contains('mine') ?? false,
+			stands: bugs.map((b) =>
+				[...b.querySelectorAll('.bt')].map((s) =>
+					s.classList.contains('ahead')
+						? 'ahead'
+						: s.classList.contains('behind')
+							? 'behind'
+							: 'level'
+				)
+			),
+			heads: [...document.querySelectorAll('main table.standings thead th')]
+				.filter(visible)
+				.map((th) => text(th)),
+			teams: document.querySelectorAll('main table.standings tbody tr:not(.rule)').length,
+			rule: text(document.querySelector('main table.standings tr.rule')),
+			verb: [...document.querySelectorAll('main a')].some((a) => text(a) === 'Set your lineup'),
+			bench: [...document.querySelectorAll('main a.bench')].map(
+				(a) => a.getAttribute('href') ?? ''
+			),
+			bids: [...document.querySelectorAll('main table.feed td.det')].filter((td) =>
+				/^FAAB \$\d/.test(text(td))
+			).length,
+			basis: document.querySelectorAll('main .basis p').length
+		};
+	});
+	const faults: string[] = [];
+	if (seen.bugs !== 6 || !seen.mineFirst)
+		faults.push(`${String(seen.bugs)} bugs, yours first ${String(seen.mineFirst)}`);
+	const started = seen.stands.filter((s) => s.some((x) => x !== 'level'));
+	if (live && started.length === 0)
+		faults.push('no bug draws the side ahead once its game started');
+	if (!live && started.length > 0) faults.push('a bug before kickoff draws one side ahead');
+	if (live && started.some((s) => !(s.includes('ahead') && s.includes('behind'))))
+		faults.push('a started bug without one side ahead and one behind');
+	const want = width === PHONE.width ? ['#', 'Team', 'W-L-T', 'PF', 'Proj'] : STANDINGS_HEADS;
+	if (seen.heads.join(' ') !== want.join(' '))
+		faults.push(`standings heads ${seen.heads.join(' ')}`);
+	if (seen.teams !== 12) faults.push(`${String(seen.teams)} standings rows`);
+	if (!live && seen.rule !== 'Playoffs above, weeks 15 to 17')
+		faults.push(`playoff rule "${seen.rule}"`);
+	if (!live && !seen.verb) faults.push('no Set your lineup verb');
+	if (seen.bench.length !== 1 || !seen.bench[0]?.endsWith('/start#bench'))
+		faults.push(`bench link ${seen.bench.join(' ')}`);
+	if (!live && seen.bids === 0) faults.push('no bid in the moves');
+	if (seen.basis === 0 || seen.basis > MAX_BASIS_LINES)
+		faults.push(`${String(seen.basis)} basis lines`);
+	return faults;
+}
+
+for (const theme of THEMES) {
+	for (const width of SHOT_WIDTHS) {
+		for (const lp of LEAGUE_PAGES) {
+			const ctx = await context(theme, width);
+			const page = await ctx.newPage();
+			await page.goto(`${web}/league/${lp.league}`, { waitUntil: 'networkidle' });
+			await ready(page, 'Every game this week, yours first.');
+			const at = `${lp.name} ${theme} ${String(width)}`;
+			for (const fault of await leagueFaults(page, lp.live, width)) missing.push(`${at} ${fault}`);
+			for (const word of await hostWordsSaid(page)) missing.push(`${at} says host: ${word}`);
+			if (await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth))
+				scrolls.push(at);
+			await page.screenshot({ path: file(`${lp.name}-${theme}-${String(width)}`), fullPage: true });
+			await page.screenshot({ path: file(`${lp.name}-first-${theme}-${String(width)}`) });
+			if (width === PHONE.width && !lp.live) {
+				await page.setViewportSize(PHONE);
+				const fold = await page.evaluate(() => {
+					const row = document
+						.querySelector('main table.standings tbody tr')
+						?.getBoundingClientRect();
+					const pin = document.querySelector('main .roster .verb')?.getBoundingClientRect();
+					return { rowBottom: row?.bottom ?? Infinity, pinTop: pin?.top ?? 0 };
+				});
+				firstRows.set(
+					`league ${theme}`,
+					`first row ends ${fold.rowBottom.toFixed(0)}px, pin starts ${fold.pinTop.toFixed(0)}px`
+				);
+				if (fold.rowBottom > fold.pinTop) under.push(`league ${theme}`);
+				await page.screenshot({ path: file(`league-phone-${theme}`) });
+			}
+			if (!lp.live) {
+				await page.getByRole('tab', { name: 'Settings' }).click();
+				await ready(page, 'rules as Sleeper states them');
+				const rules = await page.evaluate(
+					() => document.querySelector('main .settings .lead p')?.textContent ?? ''
+				);
+				if (!rules.startsWith('42 rules')) missing.push(`${at} settings say "${rules}"`);
+				for (const word of await hostWordsSaid(page))
+					missing.push(`${at} settings say host: ${word}`);
+				if (await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth))
+					scrolls.push(`${at} settings`);
+				await page.screenshot({
+					path: file(`league-settings-${theme}-${String(width)}`),
+					fullPage: true
+				});
+			}
 			await ctx.close();
 		}
 	}

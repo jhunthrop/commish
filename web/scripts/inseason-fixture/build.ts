@@ -30,6 +30,7 @@ import { fileURLToPath } from 'node:url';
 import { format as prettierFormat, resolveConfig } from 'prettier';
 import { listWords } from '../../src/lib/format/list.ts';
 import { FIXTURE_IDS } from './ids.ts';
+import { leagueFields } from './league-fields.ts';
 import type { LeaguePlayer, LeagueSync, MatchupSide } from '../../src/lib/league/api.ts';
 import type {
 	AdviceHead,
@@ -176,6 +177,7 @@ const [league, rosters, users, matchups, moves, sleeperPlayers, state] = await P
 	json<Record<string, SleeperPlayer>>(new URL('players.json', REPLAY)),
 	json<{ week: number }>(new URL('state.json', REPLAY))
 ]);
+const fields = await leagueFields();
 const [manifest, board, schedule] = await Promise.all([
 	json<{ runAt: string; formats: RunFormat[] }>(new URL('manifest.json', run)),
 	json<{ rows: BoardRow[] }>(new URL(`boards/${FORMAT}.json`, run)),
@@ -839,7 +841,8 @@ function sync(): LeagueSync {
 			wins: r.settings.wins,
 			losses: r.settings.losses,
 			ties: r.settings.ties,
-			points_for: round(points(r))
+			points_for: round(points(r)),
+			...fields.team(r.roster_id)
 		})),
 		roster: order.map((id) => ({ player: leaguePlayer(id, me), slot: spot(id) })),
 		matchup: myMatchup
@@ -851,6 +854,7 @@ function sync(): LeagueSync {
 			.map((m) => ({
 				kind: m.type === 'free_agent' ? 'add' : m.type,
 				at: new Date(m.created).toISOString(),
+				bid: fields.bid(m.created),
 				roster_ids: m.roster_ids,
 				adds: Object.entries(m.adds ?? {}).map(([id, rid]) => ({
 					player: leaguePlayer(id, null),
@@ -869,7 +873,8 @@ function sync(): LeagueSync {
 		read_at: manifest.runAt,
 		host_stale_seconds: 0,
 		host_failed: false,
-		host_signed_out: false
+		host_signed_out: false,
+		terms: fields.terms
 	};
 }
 
