@@ -12,7 +12,7 @@ recomputed with his alone changed (`_player_alone`). The values sum to the point
 A player on the rate m has every value 0 (his number reads no group).
 """
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from itertools import combinations
 from math import factorial
@@ -193,7 +193,10 @@ def shared_residual(board: pd.DataFrame, kind: str) -> np.ndarray:
 
 
 def coalition_points(
-    data: SeasonData, models: SeasonModels, shared: RoundShared
+    data: SeasonData,
+    models: SeasonModels,
+    shared: RoundShared,
+    transform: Callable[[pd.DataFrame], pd.DataFrame] | None = None,
 ) -> dict[frozenset[str], dict[str, np.ndarray]]:
     """v(S) for every coalition S of present groups: each row's point in each format."""
     c = models.constants
@@ -202,7 +205,7 @@ def coalition_points(
         homes = (0.0, 1.0) if "home_rest" in game_neutral else (None,)
         parts: dict[frozenset[str], list[dict[str, np.ndarray]]] = {}
         for home in homes:
-            board = build_board(data, models, shared, Variant(groups=game_neutral), home=home)
+            board = build_board(data, models, shared, Variant(groups=game_neutral, transform=transform), home=home)
             board = board.assign(residual_target_td=c.residual_target_td, residual_carry_td=c.residual_carry_td)
             actual_eff = _efficiency(board, shared, neutral=False)
             neutral_eff = _efficiency(board, shared, neutral=True)
