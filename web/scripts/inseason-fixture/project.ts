@@ -39,6 +39,7 @@ import type {
 	TradeAdvice,
 	WaiverAdvice
 } from '../../src/lib/league/inseason/api.ts';
+import { accepts, better, lineupProj, printedProj, tenth, tierOf } from './week.ts';
 
 const DATA = new URL('./data/', import.meta.url);
 /** The stand-in projection's read: Friday 9:00 pm Central of the fixture's week 6. */
@@ -181,34 +182,6 @@ function stamp<T>(value: T): T {
 	}
 	return out as T;
 }
-
-/** The week's order the API's lineup now follows (engine.go weekKeys): who may start (a bye or a
- * designation that keeps him off the field last, doubtful before them), then the Proj as printed,
- * a player with one first, then the rest-of-season order. */
-const tierOf = (l: PlayerLine): number => {
-	if (l.facts.bye) return 2;
-	const status = l.facts.designation?.status;
-	if (status === undefined || status === 'questionable') return 0;
-	return status === 'doubtful' ? 1 : 2;
-};
-const printedProj = (l: PlayerLine): number | null =>
-	l.week_projection === null ? null : Math.round(l.week_projection * TENTH) / TENTH;
-function better(a: PlayerLine, b: PlayerLine): number {
-	const tier = tierOf(a) - tierOf(b);
-	if (tier !== 0) return tier;
-	const pa = printedProj(a);
-	const pb = printedProj(b);
-	if ((pa === null) !== (pb === null)) return pa === null ? 1 : -1;
-	if (pa !== null && pb !== null && pa !== pb) return pb - pa;
-	const ra = a.position_rank ?? Number.MAX_SAFE_INTEGER;
-	const rb = b.position_rank ?? Number.MAX_SAFE_INTEGER;
-	if (ra !== rb) return ra - rb;
-	return (b.points_over_replacement ?? 0) - (a.points_over_replacement ?? 0);
-}
-
-const FLEX_POSITIONS = new Set(['RB', 'WR', 'TE']);
-const accepts = (slot: LineupSlot['slot'], position: string): boolean =>
-	slot === position || (slot === 'FLEX' && FLEX_POSITIONS.has(position));
 
 /** A change's sentence as the API words it (sentences.go): the bye that forces it, else the Proj. */
 function changeWords(ours: PlayerLine, host: PlayerLine | null): string {
@@ -374,7 +347,7 @@ const stampedLineup: LineupAdvice = {
 	team_points: null
 };
 const stampedWaivers = stamp(waivers);
-const stampedTrades = stamp(trades);
+const stampedFinder = stamp(trades);
 
 /** Every line the answers carry, by host id: the drafter's from the lineup, the rest from the trade
  * finder's rosters. */
@@ -385,7 +358,7 @@ for (const slot of stampedLineup.slots) {
 }
 for (const line of [...stampedLineup.bench, ...stampedLineup.reserve])
 	byHost.set(line.player.host_id, line);
-for (const team of stampedTrades.teams) {
+for (const team of stampedFinder.teams) {
 	for (const line of team.roster) byHost.set(line.player.host_id, line);
 }
 
@@ -464,6 +437,71 @@ function boxSide(
 
 const matchup = sync.matchup;
 if (!matchup) throw new Error('The fixture league has no matchup this week.');
+
+/** The trade finder as the API now answers it (Lane 66g): the week's opponent's whole roster (the
+ * one team the recorded week shows whole, its starters with the finder's rows), each trade's change
+ * in this week's Proj for both sides (trades.go WeekProj, by week.ts), the verb's moves rule
+ * (hosturls.go TradeMoves) and the projection's read and scoring for the columns' basis. */
+function withWeek(finder: TradeAdvice): TradeAdvice {
+	const opponent = matchup?.opponent ?? null;
+	const teams = finder.teams.map((team) => {
+		if (team.roster_id !== opponent?.roster_id) return team;
+		const held = new Set(team.roster.map((l) => l.player.host_id));
+		const starters = opponent.starters
+			.map((s) => byHost.get(s.player.host_id) ?? lineOf(s.player))
+			.filter((l) => !held.has(l.player.host_id));
+		return { ...team, roster: [...starters, ...team.roster] };
+	});
+	const change = (
+		roster: readonly PlayerLine[],
+		out: readonly PlayerLine[],
+		into: readonly PlayerLine[]
+	): number => {
+		const gone = new Set(out.map((l) => l.player.host_id));
+		const after = [...roster.filter((l) => !gone.has(l.player.host_id)), ...into];
+		return tenth(lineupProj(after, SLOTS) - lineupProj(roster, SLOTS));
+	};
+	// A team the fixture holds only in part (the players its trades name) cannot set a lineup: its
+	// change stands in as the Proj it takes in less the Proj it sends, each as printed.
+	const swapOnly = (out: readonly PlayerLine[], into: readonly PlayerLine[]): number => {
+		const sum = (lines: readonly PlayerLine[]): number =>
+			lines.reduce((s, l) => s + (tierOf(l) === 0 ? (printedProj(l) ?? 0) : 0), 0);
+		return tenth(sum(into) - sum(out));
+	};
+	return {
+		...finder,
+		teams: teams.map((team) => ({
+			...team,
+			trades: team.trades.map((row) => ({
+				...row,
+				my_proj_change: change(
+					finder.roster,
+					[...row.give, ...(row.drop ? [row.drop] : [])],
+					row.get
+				),
+				their_proj_change:
+					team.roster_id === opponent?.roster_id
+						? change(team.roster, row.get, row.give)
+						: swapOnly(row.get, row.give)
+			}))
+		})),
+		// The finder's first sentence as the API now says it (words.go TradesBasis).
+		basis: finder.basis.replace(
+			/^Trades where both lineups gain [^.]*\./,
+			'Trades where both lineups gain over the rest of the season, best for you first.'
+		),
+		moves: {
+			propose: 'unavailable',
+			reason:
+				'Sleeper does not take trade proposals from here, so we copy the trade for you to propose there.'
+		},
+		projection_read_at: PROJECTION_READ_AT,
+		projection_scoring: PROJECTION_SCORING,
+		player_points: true
+	};
+}
+const stampedTrades = withWeek(stampedFinder);
+
 const myRoster = [...stampedLineup.slots.map((s) => s.ours), ...stampedLineup.bench];
 const sides = [
 	boxSide(

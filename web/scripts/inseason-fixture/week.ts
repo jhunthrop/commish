@@ -1,0 +1,87 @@
+// The week's order and a lineup's two totals, as the fixture stands in for the API's engine:
+// project.ts advises the lineup and stamps each trade's change in this week's Proj with it, and
+// serve.ts answers the trade builder's totals with it (Lane 66g). The API's own engine replaces all
+// of it (engine.go weekKeys, trades.go WeekProj and the filler's strength); only the rules are meant
+// to hold.
+import type { LineupSlot, PlayerLine } from '../../src/lib/league/inseason/api.ts';
+
+const TENTH = 10;
+
+/** A figure to the tenth a page prints. */
+export const tenth = (value: number): number => Math.round(value * TENTH) / TENTH;
+
+/** Who may start this week (engine.go weekKeys): a bye or a designation that keeps him off the
+ * field last, doubtful before them. */
+export const tierOf = (l: PlayerLine): number => {
+	if (l.facts.bye || l.player.injured_reserve) return 2;
+	const status = l.facts.designation?.status;
+	if (status === undefined || status === 'questionable') return 0;
+	return status === 'doubtful' ? 1 : 2;
+};
+
+export const printedProj = (l: PlayerLine): number | null =>
+	l.week_projection === null ? null : tenth(l.week_projection);
+
+/** The week's order: the tier, then the Proj as printed, a player with one first, then the
+ * rest-of-season order. */
+export function better(a: PlayerLine, b: PlayerLine): number {
+	const tier = tierOf(a) - tierOf(b);
+	if (tier !== 0) return tier;
+	const pa = printedProj(a);
+	const pb = printedProj(b);
+	if ((pa === null) !== (pb === null)) return pa === null ? 1 : -1;
+	if (pa !== null && pb !== null && pa !== pb) return pb - pa;
+	const ra = a.position_rank ?? Number.MAX_SAFE_INTEGER;
+	const rb = b.position_rank ?? Number.MAX_SAFE_INTEGER;
+	if (ra !== rb) return ra - rb;
+	return (b.points_over_replacement ?? 0) - (a.points_over_replacement ?? 0);
+}
+
+const FLEX_POSITIONS = new Set(['RB', 'WR', 'TE']);
+
+export const accepts = (slot: LineupSlot['slot'], position: string): boolean =>
+	slot === position || (slot === 'FLEX' && FLEX_POSITIONS.has(position));
+
+/** The starters an order fills the slots with: each position's own slots first, then the flex. */
+function fill(
+	lines: readonly PlayerLine[],
+	slots: readonly LineupSlot['slot'][],
+	order: (a: PlayerLine, b: PlayerLine) => number,
+	may: (l: PlayerLine) => boolean
+): PlayerLine[] {
+	const sorted = [...lines].filter(may).sort(order);
+	const chosen: PlayerLine[] = [];
+	const pick = (slot: LineupSlot['slot']): void => {
+		const best = sorted.find((l) => !chosen.includes(l) && accepts(slot, l.player.position));
+		if (best) chosen.push(best);
+	};
+	slots.filter((s) => s !== 'FLEX').forEach(pick);
+	slots.filter((s) => s === 'FLEX').forEach(pick);
+	return chosen;
+}
+
+/** This week's Proj total of the lineup the Lineup screen sets: only a player who can play starts,
+ * a starter with no Proj adds none. */
+export function lineupProj(
+	lines: readonly PlayerLine[],
+	slots: readonly LineupSlot['slot'][]
+): number {
+	const starters = fill(lines, slots, better, (l) => tierOf(l) === 0);
+	return tenth(starters.reduce((sum, l) => sum + (printedProj(l) ?? 0), 0));
+}
+
+/** The lineup's strength on the rest-of-season order: its starters' points over replacement a week
+ * summed, nobody's week counted, injured reserve left out. */
+export function seasonStrength(
+	lines: readonly PlayerLine[],
+	slots: readonly LineupSlot['slot'][]
+): number {
+	const por = (l: PlayerLine): number => l.points_over_replacement ?? Number.NEGATIVE_INFINITY;
+	const starters = fill(
+		lines,
+		slots,
+		(a, b) => por(b) - por(a),
+		(l) => !l.player.injured_reserve && l.facts.designation?.status !== 'injured_reserve'
+	);
+	return tenth(starters.reduce((sum, l) => sum + (l.points_over_replacement ?? 0), 0));
+}
