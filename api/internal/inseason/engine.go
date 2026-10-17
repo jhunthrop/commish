@@ -387,11 +387,13 @@ func Lineup(config []draft.SlotConfig, roster []Candidate, hostStarters []string
 			ours[i] = p
 		}
 	}
-	idle := keepWhereNoOneCanPlay(open, ours, hostAt)
+	idle := keepWhereNoOneCanPlay(slots, roster, open, ours, hostAt)
 	labelled := keepHostSpots(slots, roster, ours, hostAt)
 	out := rows(slots, labelled, hostAt, hostStarts, roster)
 	for i := range out {
-		out[i].NoOneCanPlay = out[i].Ours >= 0 && idle[out[i].Ours]
+		// A spot still empty after the fill and the keep: no one who can play
+		// fills it and no member's starter is left for it (review N2).
+		out[i].NoOneCanPlay = out[i].Ours < 0 || idle[out[i].Ours]
 	}
 	return out
 }
@@ -399,7 +401,14 @@ func Lineup(config []draft.SlotConfig, roster []Candidate, hostStarters []string
 // keepWhereNoOneCanPlay leaves the member's current player in each open
 // spot the fill could not fill with a player who can play, when the fill
 // placed him nowhere else, and returns those players.
-func keepWhereNoOneCanPlay(open []bool, ours, hostAt []int) map[int]bool {
+//
+// A member's starter the fill placed nowhere is one who cannot play (any
+// starter who can would have taken a spot that takes him). His own spot is
+// tried first; when the fill slid another starter into it, any empty spot
+// that takes him holds him (review N1: an RB on bye, an RB in the flex,
+// nobody else eligible), and the relabel then puts each back in his own
+// spot.
+func keepWhereNoOneCanPlay(slots []Slot, roster []Candidate, open []bool, ours, hostAt []int) map[int]bool {
 	placed := map[int]bool{}
 	for _, p := range ours {
 		if p >= 0 {
@@ -407,9 +416,23 @@ func keepWhereNoOneCanPlay(open []bool, ours, hostAt []int) map[int]bool {
 		}
 	}
 	idle := map[int]bool{}
+	keep := func(i, h int) {
+		ours[i], placed[h], idle[h] = h, true, true
+	}
 	for i := range ours {
 		if h := hostAt[i]; open[i] && ours[i] < 0 && h >= 0 && !placed[h] {
-			ours[i], placed[h], idle[h] = h, true, true
+			keep(i, h)
+		}
+	}
+	for i := range ours {
+		if !open[i] || ours[i] >= 0 {
+			continue
+		}
+		for _, h := range hostAt {
+			if h >= 0 && !placed[h] && slots[i].accepts(roster[h].Position) {
+				keep(i, h)
+				break
+			}
 		}
 	}
 	return idle

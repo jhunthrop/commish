@@ -122,6 +122,49 @@ func TestNoOneWhoCannotPlayIsAdvised(t *testing.T) {
 	}
 }
 
+// The reviewer's case (review N1): an RB on bye, an RB in the flex and
+// nobody else eligible. The fill slides the flex back into the RB spot and
+// leaves the flex empty; the bye RB is kept in his own RB spot, marked, and
+// nothing changes, never a vanished row.
+func TestAnOutStarterKeepsHisSpotWhenTheFlexSlides(t *testing.T) {
+	var roster []Candidate
+	for _, c := range projRoster() {
+		if c.ID != "rb4" && c.ID != "wr4" && c.ID != "te2" && c.ID != "wr5" {
+			roster = append(roster, c)
+		}
+	}
+	roster = set(roster, "rb1", func(c Candidate) Candidate { return withTier(c, Out) })
+	rows := Lineup(twelveTeamPPR(t), roster, pprHost())
+	words := lineupWords(rows, roster)
+	if got := changes(rows, roster); got != nil {
+		t.Fatalf("changes %v\n%v", got, words)
+	}
+	if rb := rows[1]; rb.Ours < 0 || roster[rb.Ours].ID != "rb1" || !rb.NoOneCanPlay || rb.Changed {
+		t.Fatalf("the RB spot: %+v\n%v", rb, words)
+	}
+	for i, r := range rows {
+		if r.Ours < 0 {
+			t.Fatalf("spot %d vanished: %v", i, words)
+		}
+		if i != 1 && r.NoOneCanPlay {
+			t.Fatalf("spot %d marked: %v", i, words)
+		}
+	}
+}
+
+// A spot empty on the platform with no one who can play stays a spot, marked
+// (review N2).
+func TestAnEmptySpotNoOneCanPlayIsMarked(t *testing.T) {
+	roster := set(set(projRoster(), "te1", func(c Candidate) Candidate { return withTier(c, Out) }),
+		"te2", func(c Candidate) Candidate { return withTier(c, Doubtful) })
+	host := []string{"qb1", "rb1", "rb2", "wr1", "wr2", "wr3", "rb3", "k1", "def1"}
+	rows := Lineup(twelveTeamPPR(t), roster, host)
+	te := rows[6]
+	if te.Slot.Type != draft.SlotTE || te.Ours >= 0 || !te.NoOneCanPlay || te.Changed {
+		t.Fatalf("the TE spot: %+v\n%v", te, lineupWords(rows, roster))
+	}
+}
+
 // The superflex takes the highest Proj left across its positions, and
 // never a player who cannot play.
 func TestSuperflexTakesTheHighestProjLeft(t *testing.T) {
