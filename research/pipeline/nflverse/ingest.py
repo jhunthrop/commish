@@ -20,6 +20,7 @@ from research.pipeline.nflverse.participation import (
     SNAP_COUNT_ASSET_FLOOR,
     NflverseSource,
     ParticipationMetric,
+    SnapCountTally,
     map_participation,
     participation_observations,
     week_as_of_from_snap_counts,
@@ -84,6 +85,8 @@ class SeasonIngestReport:
     player_week_unavailable: bool
     snap_counts_unavailable: bool
     player_team_edges: int
+    snap_counts: SnapCountTally
+    snap_observations_written: int
 
 
 def schedule_client(client: NflverseClient) -> NflverseClient:
@@ -205,16 +208,18 @@ def ingest_season(  # noqa: PLR0913 - the oracle's four, its schedule stamps, an
     week_as_of = _week_as_of(season, snap_counts, schedule_as_of)
     participation = map_participation(snap_counts, player_week, universe)
     stat_lines = map_stat_lines(player_week, week_as_of, universe)
-    # With no player-week release its participation rows are false zeros: not written, and retracted.
-    participation_rows = [
-        row
-        for row in participation_observations(participation.participation)
-        if player_week or row.source != NflverseSource.PLAYER_WEEK
-    ]
+    # Snap observations go in for every mapped snap row, stat line or none (round 4 amendment 3: a
+    # played game is a game with a snap). With no player-week release the weekly-file participation
+    # rows are false zeros: not written, and retracted.
+    observed = participation_observations(participation.participation)
+    snap_written = record_observations(conn, [row for row in observed if row.source == NflverseSource.SNAP_COUNTS])
+    week_file_rows = [row for row in observed if player_week and row.source == NflverseSource.PLAYER_WEEK]
     if not player_week:
         _retract_false_zeros(conn, season)
-    written = record_observations(conn, participation_rows) + record_observations(
-        conn, stat_line_observations(stat_lines.stat_lines)
+    written = (
+        snap_written
+        + record_observations(conn, week_file_rows)
+        + record_observations(conn, stat_line_observations(stat_lines.stat_lines))
     )
     if completions:
         written += record_observations(conn, completion_observations(stat_lines.stat_lines))
@@ -239,4 +244,6 @@ def ingest_season(  # noqa: PLR0913 - the oracle's four, its schedule stamps, an
         player_week_unavailable=not player_week,
         snap_counts_unavailable=not snap_counts,
         player_team_edges=edges,
+        snap_counts=participation.snap_counts,
+        snap_observations_written=snap_written,
     )
