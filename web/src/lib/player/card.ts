@@ -34,9 +34,18 @@ export const CARD = {
 	/** The read's stamp, after its day: the writer reads from his facts through the last full
 	 * season until the in-season read is written. */
 	writtenFrom: 'from his facts through last season',
-	/** The slot the weekly model's why fills once a round of it passes its test. */
+	/** The slot the weekly model's why fills once a round of it passes its test: its title alone
+	 * until then (review M9). */
 	whyTitle: "Why this week's Proj",
-	why: 'Our weekly model writes this once a round of it passes its test. Until then the Proj is the published projection, and the tiles and the game log are the evidence.'
+	/** A "--" says why on its tile (review M4). */
+	byeWeek: 'Bye this week',
+	projNotIn: "This week's projection is not in yet",
+	projNotHim: "Not in this week's published projection",
+	noEarlierRead: 'No earlier read this week',
+	notInEarlier: 'Not in the earlier read',
+	notRanked: 'not ranked yet',
+	/** The waiver verb where we know no page of the platform's: our own screen, named as ours. */
+	findOnWaivers: 'Find him on Waivers'
 } as const;
 
 /** The tiles in the card's order. */

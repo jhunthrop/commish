@@ -17,7 +17,7 @@ import {
 	boxNumber,
 	boxRow,
 	EVIDENCE_SHORT,
-	factsReadAt,
+	factsReadShort,
 	positionWord,
 	projShort,
 	type BoxRow
@@ -397,7 +397,7 @@ export function waiverBasis(
 		defense,
 		zone
 	);
-	const read = factsReadAt(lines);
-	const evidence = `${EVIDENCE_SHORT}${read === null ? '' : ` The ${BOX.game} cell's expected points and weather were read ${weekdayTime(read, zone)} ${zoneWord(zone)}.`}`;
+	const read = factsReadShort(lines, zone);
+	const evidence = `${EVIDENCE_SHORT}${read === null ? '' : ` ${read}`}`;
 	return [advice.basis, proj, BEATS_BASIS, advice.season_basis, evidence].filter((l) => l !== '');
 }

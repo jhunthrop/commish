@@ -3,14 +3,23 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { WeekFacts } from '../league/inseason/api.ts';
 import { CARD, NONE, unreadBasis, type CardTile } from './card.ts';
-import { liveCard, oppCaption, verbOf, type PlayerWeek, type ScreenHref } from './week-words.ts';
+import {
+	compareSay,
+	liveCard,
+	oppCaption,
+	verbOf,
+	type PlayerWeek,
+	type ScreenHref
+} from './week-words.ts';
 
 const ZONE = 'America/Chicago';
 const READ = '2026-10-17T02:00:00.000Z';
 const BEFORE = '2026-10-16T02:00:00.000Z';
 const PLAYER = { id: '4426515', name: 'Puka Nacua', team: 'LAR', position: 'WR' };
 const LEAGUE = { id: 'league-1', host: 'sleeper' as const };
-const href: ScreenHref = (screen, player) => `/league/league-1/${screen}?player=${player}`;
+const href: ScreenHref = (screen, query) =>
+	`/league/league-1/${screen}?${new URLSearchParams(query).toString()}`;
+const REST = { fromWeek: 6, rank: 'WR1' };
 
 const facts = (over: Partial<WeekFacts> = {}): WeekFacts => ({
 	week: 6,
@@ -88,6 +97,7 @@ const card = (w: PlayerWeek, league: typeof LEAGUE | null = null) =>
 		tiles: BUILT,
 		opponents: { 5: 'vs BUF' },
 		games: 3,
+		rest: REST,
 		screenHref: href,
 		zone: ZONE
 	});
@@ -116,6 +126,13 @@ void test('the read fills the week tiles and keeps the rest of season as built',
 	assert.equal(tile(tiles, 'opp').tone, 'easy');
 	assert.equal(tile(tiles, 'last').caption, 'week 5 vs BUF');
 	assert.equal(tile(tiles, 'delta').caption, 'since Thu 9:00 pm');
+	assert.equal(tile(tiles, 'rest').caption, 'from week 6, WR1 in our order');
+});
+
+void test("rest of season's figure a game is the API's, one source with the league's rows", () => {
+	const { tiles } = card(week({}, { rest_of_season_per_game: 23.1 }));
+	assert.equal(tile(tiles, 'rest').caption, 'from week 6, 23.1 a game, WR1 in our order');
+	assert.equal(tile(tiles, 'rest').value, '182.2');
 });
 
 void test("the opponent's rank says its direction in words", () => {
@@ -124,20 +141,32 @@ void test("the opponent's rank says its direction in words", () => {
 	assert.equal(oppCaption('ARI', 26, 32, 'TE'), 'ARI, among the easiest for tight ends');
 });
 
-void test('a figure not held is "--", and the basis says why in one clause', () => {
-	const { tiles, basis } = card(
+void test('a figure not held is "--", and its tile says why', () => {
+	// The snapshot is stored, his row is not in it.
+	const missing = card(week({}, { week_projection: null, projection_delta: null, opp_rank: null }));
+	assert.deepEqual(
+		[tile(missing.tiles, 'proj').value, tile(missing.tiles, 'proj').caption],
+		[NONE, "Not in this week's published projection"]
+	);
+	assert.equal(tile(missing.tiles, 'opp').caption, 'ARI, not ranked yet');
+	assert.equal(tile(missing.tiles, 'delta').caption, '');
+	// No snapshot stored for the week.
+	const unread = card(
 		week(
-			{ projection_previous_read_at: null },
-			{ week_projection: null, projection_delta: null, opp_rank: null }
+			{ projection_read_at: null, projection_previous_read_at: null },
+			{ week_projection: null, projection_delta: null }
 		)
 	);
-	assert.equal(tile(tiles, 'proj').value, NONE);
-	assert.equal(tile(tiles, 'opp').value, NONE);
-	assert.equal(tile(tiles, 'delta').value, NONE);
-	assert.ok(
-		basis.some((line) => line.includes("until this week's projection has been read twice"))
+	assert.equal(tile(unread.tiles, 'proj').caption, "This week's projection is not in yet");
+	// One read this week: no change to show.
+	const once = card(week({ projection_previous_read_at: null }, { projection_delta: null }));
+	assert.deepEqual(
+		[tile(once.tiles, 'delta').value, tile(once.tiles, 'delta').caption],
+		[NONE, 'No earlier read this week']
 	);
-	assert.ok(basis.some((line) => line.includes('until the season ranks his opponent')));
+	// Two reads, his row only in the newest.
+	const newer = card(week({}, { projection_delta: null }));
+	assert.equal(tile(newer.tiles, 'delta').caption, 'Not in the earlier read');
 	assert.match(unreadBasis(true), /could not be read just now/);
 });
 
@@ -153,11 +182,17 @@ void test('the week ahead is the box row and the cell under his name', () => {
 	const bye = card(
 		week(
 			{},
-			{ opp_rank: null, facts: facts({ bye: true, opponent: null, home: null, kickoff: null }) }
+			{
+				opp_rank: null,
+				week_projection: null,
+				projection_delta: null,
+				facts: facts({ bye: true, opponent: null, home: null, kickoff: null })
+			}
 		)
 	);
 	assert.equal(bye.next, null);
 	assert.equal(tile(bye.tiles, 'opp').caption, 'Bye');
+	assert.equal(tile(bye.tiles, 'proj').caption, 'Bye this week');
 });
 
 void test('with no league the basis names PPR and no league, and there is no verb', () => {
@@ -165,17 +200,21 @@ void test('with no league the basis names PPR and no league, and there is no ver
 		week({ verb: { kind: 'trade', holder: 'Nacua Matata', host_url: null, note: null } })
 	);
 	assert.equal(verb, null);
-	assert.ok(
-		basis[0]?.startsWith(
-			"Proj is this week's published projection in PPR scoring, read Fri 9:00 pm Central."
-		)
+	assert.equal(
+		basis[0],
+		"Proj is this week's published projection in PPR scoring, read Fri 9:00 pm Central. Δ Proj is its change since Thu 9:00 pm."
 	);
-	assert.ok(basis.every((line) => !line.includes('league')));
+	assert.match(
+		basis[1] ?? '',
+		/PPR scoring\. The Game cell's expected points and weather were read Fri 9:00 pm Central\.$/
+	);
+	assert.equal(basis.length, 2);
+	assert.ok(basis.every((line) => !line.includes('league') && !line.includes('your')));
 });
 
 void test("with a league the verb is the league screens', the platform named", () => {
 	const at = (kind: NonNullable<PlayerWeek['verb']>['kind'], host_url: string | null = null) =>
-		verbOf({ kind, holder: null, host_url, note: null }, LEAGUE, PLAYER.id, href);
+		verbOf({ kind, holder: null, host_url, note: null }, LEAGUE, PLAYER, href);
 	assert.deepEqual(at('start'), {
 		kind: 'start',
 		label: 'Start him',
@@ -185,7 +224,15 @@ void test("with a league the verb is the league screens', the platform named", (
 	});
 	assert.equal(at('lineup').label, 'Open your lineup');
 	assert.equal(at('trade').href, '/league/league-1/trades?player=4426515');
-	assert.equal(at('claim').label, 'Add on Sleeper');
+	assert.deepEqual(
+		[at('claim').label, at('claim').href, at('claim').external],
+		['Add on Sleeper', '/league/league-1/waivers?player=4426515&position=WR', false]
+	);
+	// No page of the platform's known: our Waivers screen, landing on him, named as ours.
+	assert.deepEqual(
+		[at('waivers').label, at('waivers').href, at('waivers').external],
+		['Find him on Waivers', '/league/league-1/waivers?player=4426515&position=WR', false]
+	);
 	const waivers = at('waivers', 'https://sleeper.com/leagues/1/players');
 	assert.equal(waivers.label, 'Open Sleeper waivers');
 	assert.ok(waivers.external);
@@ -197,8 +244,8 @@ void test("with a league the verb is the league screens', the platform named", (
 		week({ verb: { kind: 'start', holder: null, host_url: null, note: null } }),
 		LEAGUE
 	);
-	assert.match(basis[0] ?? '', /the closest match to this league's rules/);
-	assert.match(basis[2] ?? '', /in this league's scoring/);
+	assert.match(basis[0] ?? '', /the closest to this league's rules/);
+	assert.match(basis[1] ?? '', /your scoring/);
 });
 
 const BANNED =
@@ -214,11 +261,37 @@ void test('copy guard: no card word uses a betting or trading word, the word hos
 		...live.basis,
 		live.verb?.label ?? '',
 		live.verb?.note ?? '',
-		CARD.why,
 		CARD.whyTitle,
 		CARD.writtenFrom,
 		unreadBasis(false),
 		unreadBasis(true)
 	];
 	for (const line of said) assert.doesNotMatch(line, BANNED, line);
+});
+
+const row = (name: string, values: Partial<Record<CardTile['key'], string>>) => ({
+	name,
+	tiles: BUILT.map((t) => ({ ...t, value: values[t.key] ?? NONE }))
+});
+
+void test('Compare answers the start or sit question from the figures both rows hold', () => {
+	assert.equal(
+		compareSay(
+			row('Puka Nacua', { proj: '23.0', avg: '25.9' }),
+			row("Ja'Marr Chase", { proj: '16.3', avg: '16.7' })
+		),
+		'Puka Nacua by 6.7 Proj this week'
+	);
+	assert.equal(
+		compareSay(
+			row('Puka Nacua', { proj: '23.0', avg: '25.9' }),
+			row("Ja'Marr Chase", { avg: '16.7' })
+		),
+		"No Proj for Ja'Marr Chase this week. Puka Nacua by 9.2 a game this season"
+	);
+	assert.equal(
+		compareSay(row('Puka Nacua', { rest: '344.1' }), row("Ja'Marr Chase", { rest: '333.2' })),
+		'Puka Nacua by 10.9 points rest of season'
+	);
+	assert.equal(compareSay(row('A', {}), row('B', {})), null);
 });

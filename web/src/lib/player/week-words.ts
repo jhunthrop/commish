@@ -6,15 +6,14 @@ import { memberZone, weekdayTime } from '#lib/format/clock.ts';
 import { fixed } from '#lib/format/number.ts';
 import {
 	BOX,
-	EVIDENCE_BASIS,
-	deltaBasis,
+	EVIDENCE_SHORT,
 	deltaWord,
 	easeOf,
 	expectedWords,
-	factsReadLine,
+	factsReadShort,
 	gameOf,
 	oppRankWord,
-	projBasis,
+	projShort,
 	weatherCell,
 	type WeatherCell
 } from '#lib/league/box/box.ts';
@@ -60,6 +59,12 @@ export interface CardVerb {
 	note: string | null;
 }
 
+/** Rest of season's parts the card's caption names: its first week and his rank, "WR1". */
+export interface RestParts {
+	fromWeek: number;
+	rank: string;
+}
+
 export interface LiveCard {
 	week: number;
 	tiles: CardTile[];
@@ -94,17 +99,24 @@ export function oppCaption(
 	}
 }
 
-/** A league screen's address with him named, as live.ts builds it. */
-export type ScreenHref = (screen: 'start' | 'waivers' | 'trades', player: string) => string;
+/** A league screen's address with him named (?player=, and his position for Waivers), as live.ts
+ * builds it. */
+export type ScreenHref = (
+	screen: 'start' | 'waivers' | 'trades',
+	query: Readonly<Record<string, string>>
+) => string;
 
 /** The verb the league's screens give him, the platform named. */
 export function verbOf(
 	verb: NonNullable<PlayerWeek['verb']>,
 	league: CardLeague,
-	player: string,
+	who: CardPlayer,
 	screenHref: ScreenHref
 ): CardVerb {
 	const host = hostWords(league.host);
+	const player = { player: who.id };
+	// Waivers narrows to his position when its first answer does not hold him.
+	const pickup = { player: who.id, position: who.position };
 	switch (verb.kind) {
 		case 'start':
 			return {
@@ -134,7 +146,7 @@ export function verbOf(
 			return {
 				kind: verb.kind,
 				label: `Add on ${host}`,
-				href: screenHref('waivers', player),
+				href: screenHref('waivers', pickup),
 				external: false,
 				note: verb.note
 			};
@@ -142,8 +154,8 @@ export function verbOf(
 			return verb.host_url === null
 				? {
 						kind: verb.kind,
-						label: `Open ${host} waivers`,
-						href: screenHref('waivers', player),
+						label: CARD.findOnWaivers,
+						href: screenHref('waivers', pickup),
 						external: false,
 						note: verb.note
 					}
@@ -159,6 +171,12 @@ export function verbOf(
 	}
 }
 
+/** Why his Proj is "--": his bye, no snapshot stored for the week, or the snapshot leaves him out. */
+function noProjWords(week: PlayerWeek): string {
+	if (week.line.facts.bye) return CARD.byeWeek;
+	return week.projection_read_at === null ? CARD.projNotIn : CARD.projNotHim;
+}
+
 function projTile(week: PlayerWeek): CardTile {
 	const value = week.line.week_projection;
 	const scoring = SCORING_WORDS[week.projection_scoring.format];
@@ -166,7 +184,7 @@ function projTile(week: PlayerWeek): CardTile {
 		key: 'proj',
 		label: CARD.proj,
 		value: value === null ? NONE : fixed(value, 1),
-		caption: `${CARD.week} ${String(week.week)}, ${scoring}`,
+		caption: value === null ? noProjWords(week) : `${CARD.week} ${String(week.week)}, ${scoring}`,
 		tone: 'lead'
 	};
 }
@@ -179,7 +197,7 @@ function oppTile(week: PlayerWeek, position: string): CardTile {
 			key: 'opp',
 			label: CARD.opp,
 			value: NONE,
-			caption: facts.bye ? BOX.bye : opponent,
+			caption: facts.bye ? BOX.bye : `${opponent}, ${CARD.notRanked}`,
 			tone: null
 		};
 	}
@@ -215,37 +233,55 @@ function lastTile(
 	};
 }
 
-function deltaTile(week: PlayerWeek, zone: string): CardTile {
+/** The change's caption: when it is measured from, or why there is none. With no Proj the Proj tile
+ * says why, so the change says nothing. */
+function deltaCaption(week: PlayerWeek, zone: string): string {
 	const read = week.projection_previous_read_at;
+	if (week.line.week_projection === null) return '';
+	if (read === null) return CARD.noEarlierRead;
+	return week.line.projection_delta === null
+		? CARD.notInEarlier
+		: `since ${weekdayTime(read, zone)}`;
+}
+
+function deltaTile(week: PlayerWeek, zone: string): CardTile {
 	return {
 		key: 'delta',
 		label: CARD.delta,
 		value: deltaWord(week.line.projection_delta),
-		caption:
-			read === null || week.line.projection_delta === null
-				? ''
-				: `since ${weekdayTime(read, zone)}`,
+		caption: deltaCaption(week, zone),
 		tone: 'quiet'
 	};
 }
 
-/** The basis lines the week's read says, once each: the projection's, its change's (or why it has
- * none), and the evidence columns' scoring, then the game facts' read. */
+/** Rest of season with his figure a game from the API's read (the league rows' one source), when it
+ * carries one; the tile as built otherwise. */
+function restTile(week: PlayerWeek, rest: RestParts | null, fallback: CardTile): CardTile {
+	const perGame = week.line.rest_of_season_per_game;
+	if (rest === null) return fallback;
+	const game = perGame === null ? '' : `, ${fixed(perGame, 1)} a game`;
+	return {
+		...fallback,
+		caption: `from week ${String(rest.fromWeek)}${game}, ${rest.rank} in our order`
+	};
+}
+
+/** The basis lines the week's read says, once each and short (the Waivers forms): the projection's
+ * with its change's, then the evidence columns' scoring with the game facts' read. A "--" says why on
+ * its own tile. */
 export function liveBasis(week: PlayerWeek, league: boolean, zone: string): string[] {
-	const proj = projBasis(week.projection_read_at, week.projection_scoring, false, zone, league);
-	const delta =
-		deltaBasis(week.projection_previous_read_at, zone) ??
-		`${CARD.delta} shows "${NONE}" until this week's projection has been read twice.`;
-	const scoring = league
-		? "this league's scoring"
-		: `${SCORING_WORDS[week.projection_scoring.format]} scoring`;
-	const evidence = EVIDENCE_BASIS.replace("in this league's scoring", `in ${scoring}`);
-	const opp =
-		week.line.opp_rank === null && !week.line.facts.bye
-			? ` ${CARD.opp} shows "${NONE}" until the season ranks his opponent.`
-			: '';
-	const facts = factsReadLine([week.line], zone);
-	return [proj, delta, `${evidence}${opp}`, ...(facts === null ? [] : [facts])];
+	const proj = projShort(
+		week.projection_read_at,
+		week.projection_previous_read_at,
+		week.projection_scoring,
+		false,
+		zone,
+		league
+	);
+	const scoring = `${SCORING_WORDS[week.projection_scoring.format]} scoring`;
+	const evidence = league ? EVIDENCE_SHORT : EVIDENCE_SHORT.replace('your scoring', scoring);
+	const facts = factsReadShort([week.line], zone);
+	return [proj, facts === null ? evidence : `${evidence} ${facts}`];
 }
 
 function nextOf(week: PlayerWeek, zone: string): { cell: NextCell | null; next: LogNext | null } {
@@ -281,6 +317,9 @@ export interface LiveInput {
 	opponents: Readonly<Record<number, string>>;
 	/** His games so far, for Avg's caption. */
 	games: number;
+	/** Rest of season's first week and his rank at his position in our order, null before the run
+	 * ranks the rest of the season. */
+	rest: RestParts | null;
 	screenHref: ScreenHref;
 	zone?: string;
 }
@@ -293,6 +332,7 @@ export function liveCard({
 	tiles,
 	opponents,
 	games,
+	rest,
 	screenHref,
 	zone = memberZone()
 }: LiveInput): LiveCard {
@@ -303,6 +343,7 @@ export function liveCard({
 	};
 	const updated = [
 		projTile(week),
+		restTile(week, rest, fallback('rest')),
 		oppTile(week, player.position),
 		avgTile(week, games, fallback('avg')),
 		lastTile(week, opponents, fallback('last')),
@@ -310,7 +351,7 @@ export function liveCard({
 	].reduce<CardTile[]>((all, tile) => withTile(all, tile), [...tiles]);
 	const { cell, next } = nextOf(week, zone);
 	const verb =
-		league !== null && week.verb !== null ? verbOf(week.verb, league, player.id, screenHref) : null;
+		league !== null && week.verb !== null ? verbOf(week.verb, league, player, screenHref) : null;
 	return {
 		week: week.week,
 		tiles: updated,
@@ -319,4 +360,41 @@ export function liveCard({
 		verb,
 		basis: liveBasis(week, verb !== null, zone)
 	};
+}
+
+/** A Compare row: his name and the card's tiles. */
+export interface CompareRow {
+	name: string;
+	tiles: readonly CardTile[];
+}
+
+function figure(row: CompareRow, key: CardTile['key']): number | null {
+	const value = Number(row.tiles.find((tile) => tile.key === key)?.value);
+	return Number.isFinite(value) ? value : null;
+}
+
+/** The start or sit question answered from the figures both rows hold (review M5): this week's Proj
+ * first, else points a game this season, else the board's figure in its own words; null when they
+ * share none or tie. */
+export function compareSay(a: CompareRow, b: CompareRow): string | null {
+	const ahead = (key: CardTile['key'], words: string): string | null => {
+		const x = figure(a, key);
+		const y = figure(b, key);
+		if (x === null || y === null || x === y) return null;
+		return `${x > y ? a.name : b.name} by ${fixed(Math.abs(x - y), 1)} ${words}`;
+	};
+	const proj = ahead('proj', `${CARD.proj} this week`);
+	if (proj !== null) return proj;
+	// One row with no Proj is named, so the figure that answers instead is read as such.
+	const missing = [a, b].filter((row) => figure(row, 'proj') === null);
+	const [one] = missing;
+	const lead = missing.length === 1 && one ? `No ${CARD.proj} for ${one.name} this week. ` : '';
+	const avg = ahead('avg', 'a game this season');
+	if (avg !== null) return `${lead}${avg}`;
+	const restLabel = a.tiles.find((tile) => tile.key === 'rest')?.label;
+	const rest = ahead(
+		'rest',
+		restLabel === CARD.projected ? 'projected points for the season' : 'points rest of season'
+	);
+	return rest === null ? null : `${lead}${rest}`;
 }

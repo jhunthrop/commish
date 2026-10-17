@@ -28,9 +28,9 @@ export async function readWeek(player: CardPlayer, league: CardLeague | null): P
 
 /** A league screen's address with him named: the screen takes him from ?player=. */
 export function screenHrefFor(league: CardLeague | null): ScreenHref {
-	return (screen, player) => {
+	return (screen, query) => {
 		if (league === null) throw new Error('A league screen needs a league.');
 		const base = resolve('/league/[id]/[screen]', { id: league.id, screen });
-		return `${base}?${new URLSearchParams({ player }).toString()}`;
+		return `${base}?${new URLSearchParams(query).toString()}`;
 	};
 }

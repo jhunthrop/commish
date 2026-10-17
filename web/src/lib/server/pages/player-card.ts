@@ -8,9 +8,6 @@ import type { Capsule, Format, PlayerFormat } from '#lib/run/schema.ts';
 import type { Position } from '#lib/types/player.ts';
 import { CARD, NONE, type CardTile } from '#lib/player/card.ts';
 
-/** The last week a rest-of-season figure counts, as the API's rest_of_season_per_game does. */
-export const LAST_COUNTED_WEEK = 17;
-
 export interface CardBuild {
 	/** The tiles but rest of season, which each format line carries. */
 	tiles: CardTile[];
@@ -33,20 +30,12 @@ export function positionRank(position: Position, rank: number): string {
 	return `${position}${String(rank)}`;
 }
 
-/** The games his club has from a week through the last counted week, byes out. */
-export function gamesFrom(season: PlayerSeason, fromWeek: number): number {
-	return season.log.filter(
-		(row) => row.week >= fromWeek && row.week <= LAST_COUNTED_WEEK && row.opponent !== null
-	).length;
-}
-
-/** The rest-of-season tile in a format: in season his points from the board's first week with his
- * points a game and his place at his position in our order; on a preseason board his projection for
- * the season. */
+/** The rest-of-season tile in a format: in season his points from the board's first week and his
+ * place at his position in our order (his points a game arrive with the week's read, the league rows'
+ * one source, review L14); on a preseason board his projection for the season. */
 export function restTile(
 	format: Format,
 	numbers: PlayerFormat,
-	season: PlayerSeason,
 	position: Position,
 	year: number
 ): CardTile {
@@ -61,13 +50,11 @@ export function restTile(
 			tone: null
 		};
 	}
-	const games = gamesFrom(season, from);
-	const perGame = games === 0 ? '' : `, ${fixed(numbers.projected / games)} a game`;
 	return {
 		key: 'rest',
 		label: CARD.rest,
 		value: fixed(numbers.projected),
-		caption: `from week ${String(from)}${perGame}, ${rank} in our order`,
+		caption: `from week ${String(from)}, ${rank} in our order`,
 		tone: null
 	};
 }

@@ -1,10 +1,10 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import WeatherGlyph from '#lib/league/box/WeatherGlyph.svelte';
+	import StatusPill from '#lib/league/StatusPill.svelte';
+	import type { StatusView } from '#lib/run/status-view.ts';
 	import Face from '#lib/ui/Face.svelte';
-	import PositionPill from '#lib/ui/PositionPill.svelte';
 	import Quiet from '#lib/ui/Quiet.svelte';
-	import ToneChip from '#lib/ui/ToneChip.svelte';
 	import Verb from '#lib/ui/Verb.svelte';
 	import { clubMark } from '#lib/ui/club-mark.ts';
 	import type { Position } from '#lib/types/player.ts';
@@ -21,8 +21,11 @@
 		/** His club's city and nickname, and its page. */
 		club: { name: string; href: string };
 		position: Position;
-		/** His designation's mark, null when the capture does not list him. */
-		status: { mark: string; sits: boolean } | null;
+		/** His designation as Lane 63 says it, null when the capture does not list him: the shared
+		 * pill draws it with his rank (IR for a season-long list). */
+		status: StatusView | null;
+		/** His place at his position in our order. */
+		positionRank: number;
 		/** Whose roster he is on in the league, null with none or until read. */
 		holder: string | null;
 		/** Whether the page keeps the holder's line its room from the first paint. */
@@ -47,6 +50,7 @@
 		club,
 		position,
 		status,
+		positionRank,
 		holder,
 		holdRoom,
 		next,
@@ -74,8 +78,7 @@
 				<a class="club" href={club.href}
 					><img src={clubMark(team)} alt="" width="20" height="20" />{club.name}</a
 				>
-				<PositionPill {position} />
-				{#if status}<ToneChip tone={status.sits ? 'loss' : 'even'}>{status.mark}</ToneChip>{/if}
+				<StatusPill {position} {positionRank} {status} />
 			</div>
 			<p class="holder" class:room={holdRoom}>{holder ?? ''}</p>
 		</div>

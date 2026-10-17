@@ -11,7 +11,7 @@
 	import { liveStatusClock, type LiveStatus } from '#lib/run/live-status.ts';
 	import { UNWRITTEN_READ, unwrittenLines } from '#lib/run/unwritten-words.ts';
 	import { CARD, unreadBasis, type CardTile } from '#lib/player/card.ts';
-	import type { CardLeague, LiveCard } from '#lib/player/week-words.ts';
+	import type { CardLeague, LiveCard, RestParts } from '#lib/player/week-words.ts';
 	import PlayerCard from '#lib/player/PlayerCard.svelte';
 	import type PlayerCompare from '#lib/player/PlayerCompare.svelte';
 	import Credit from '#lib/site/Credit.svelte';
@@ -74,16 +74,29 @@
 	const built = $derived<CardTile[]>(
 		page.card.tiles.flatMap((tile) => (tile.key === 'opp' ? [lead.restTile, tile] : [tile]))
 	);
-	/** The week's figures over the tiles as built, the rest of season always the build's. */
-	const tiles = $derived<CardTile[]>(
-		live === null ? built : live.tiles.map((tile) => (tile.key === 'rest' ? lead.restTile : tile))
+	/** The week's figures over the tiles as built. */
+	const tiles = $derived<CardTile[]>(live === null ? built : live.tiles);
+	/** Rest of season's first week and his rank, which the read's figure a game joins. */
+	const rest = $derived<RestParts | null>(
+		lead.format.rosFromWeek === undefined
+			? null
+			: { fromWeek: lead.format.rosFromWeek, rank: `${page.position}${String(n.positionRank)}` }
 	);
 
+	/** Each read's number: only the latest one asked is shown (review M7). */
+	let asked = 0;
+	/** The league the shown read is for: a switch clears it before the next answers. */
+	let readFor: string | null = null;
+
 	async function readLive(at: CardLeague | null): Promise<void> {
+		const mine = ++asked;
+		const key = at?.id ?? null;
+		if (key !== readFor) live = null;
 		try {
 			const module = await import('#lib/player/live.ts');
 			const player = { id: page.id, name: page.name, team: page.team, position: page.position };
 			const week = await module.readWeek(player, at);
+			if (mine !== asked) return;
 			live = module.liveCard({
 				week,
 				player,
@@ -91,12 +104,18 @@
 				tiles: built,
 				opponents: page.card.opponents,
 				games: page.card.games,
+				rest,
 				screenHref: module.screenHrefFor(at)
 			});
+			readFor = key;
 			failed = false;
 		} catch (error: unknown) {
+			if (mine !== asked) return;
 			// eslint-disable-next-line no-console -- the basis line says the figures could not be read
 			console.warn('player card: the week', error);
+			// No league's tiles or verb outlive a failed read: the card goes back to its build.
+			live = null;
+			readFor = null;
 			failed = true;
 		}
 	}
@@ -172,7 +191,6 @@
 	/** Every number's basis, once: the week's, the rest of season's, the season's. */
 	const basis = $derived([
 		...(live === null ? [unreadBasis(failed)] : live.basis),
-		...(lead.rest ? [lead.rest.lead] : []),
 		page.season.basis
 	]);
 </script>
@@ -191,7 +209,7 @@
 			line={page.season.line}
 			rows={page.season.rows}
 			next={live?.next ?? null}
-			ahead={page.season.ahead}
+			ahead={page.season.ahead.filter((week) => week.week !== live?.next?.week)}
 			none={page.season.none}
 		/>
 	</section>
@@ -213,7 +231,8 @@
 			team={page.team}
 			club={{ name: page.clubName, href: links.club(page.team) }}
 			position={page.position}
-			status={listed ? { mark: listed.mark, sits: listed.sits } : null}
+			status={listed}
+			positionRank={n.positionRank}
 			holder={rostered}
 			holdRoom={league !== null}
 			next={page.card.next}
@@ -302,7 +321,6 @@
 				{#if page.underway}
 					<section class="why" aria-label={CARD.whyTitle}>
 						<h3><Label>{CARD.whyTitle}</Label></h3>
-						<p>{CARD.why}</p>
 					</section>
 				{/if}
 				<div aria-label="His tier">
@@ -447,12 +465,6 @@
 		line-height: 1;
 	}
 
-	.why p {
-		margin: 0;
-		font-size: var(--t-sm);
-		line-height: 1.5;
-		color: var(--ink-2);
-	}
 
 	.unwritten {
 		margin: 0 0 var(--s-3);

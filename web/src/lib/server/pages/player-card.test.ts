@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import type { Format, PlayerFormat } from '#lib/run/schema.ts';
 import type { GameLogRow, PlayerSeason, StatLine } from '#lib/run/season.ts';
 import { STAT_FIELDS } from '#lib/run/season.ts';
-import { cardBuild, gamesFrom, readStamp, restTile } from './player-card.ts';
+import { cardBuild, readStamp, restTile } from './player-card.ts';
 
 const EMPTY = Object.fromEntries(STAT_FIELDS.map((field) => [field, null])) as Omit<
 	StatLine,
@@ -53,16 +53,15 @@ const NUMBERS = { positionRank: 1, projected: 254.1 } as PlayerFormat;
 const PRESEASON = { id: 'ppr-12', label: 'PPR' } as Format;
 const IN_SEASON = { ...PRESEASON, rosFromWeek: 6 } as Format;
 
-void test('rest of season is his points from the first week, his points a game over his games left, and his rank in our order', () => {
-	assert.equal(gamesFrom(season(), 6), 11);
-	assert.deepEqual(restTile(IN_SEASON, NUMBERS, season(), 'WR', 2026), {
+void test('rest of season is his points from the first week and his rank in our order', () => {
+	assert.deepEqual(restTile(IN_SEASON, NUMBERS, 'WR', 2026), {
 		key: 'rest',
 		label: 'Rest of season',
 		value: '254.1',
-		caption: 'from week 6, 23.1 a game, WR1 in our order',
+		caption: 'from week 6, WR1 in our order',
 		tone: null
 	});
-	const preseason = restTile(PRESEASON, NUMBERS, season(), 'WR', 2026);
+	const preseason = restTile(PRESEASON, NUMBERS, 'WR', 2026);
 	assert.equal(preseason.label, 'Projected');
 	assert.equal(preseason.caption, 'PPR points for 2026, WR1 in our order');
 });

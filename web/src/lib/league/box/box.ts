@@ -421,15 +421,12 @@ export function projBasis(
 	readAt: string | null,
 	scoring: ProjectionScoring,
 	defense: boolean,
-	zone: string = memberZone(),
-	league = true
+	zone: string = memberZone()
 ): string {
-	const whose = !league
-		? ''
-		: scoring.league_own
-			? ", this league's own"
-			: ", the closest match to this league's rules";
-	const what = `${BOX.proj} is this week's published projection in ${FORMAT_WORDS[scoring.format]} scoring${whose}`;
+	const whose = scoring.league_own
+		? "this league's own"
+		: "the closest match to this league's rules";
+	const what = `${BOX.proj} is this week's published projection in ${FORMAT_WORDS[scoring.format]} scoring, ${whose}`;
 	const when =
 		readAt === null
 			? 'not in yet for this week'
@@ -470,9 +467,15 @@ export function projShort(
 	previousReadAt: string | null,
 	scoring: ProjectionScoring,
 	defense: boolean,
-	zone: string = memberZone()
+	zone: string = memberZone(),
+	league = true
 ): string {
-	const whose = scoring.league_own ? "this league's own" : "the closest to this league's rules";
+	// With no league (a player page signed out) the scoring is named alone.
+	const whose = !league
+		? ''
+		: scoring.league_own
+			? ", this league's own"
+			: ", the closest to this league's rules";
 	const when =
 		readAt === null ? 'not in yet' : `read ${weekdayTime(readAt, zone)} ${zoneWord(zone)}`;
 	const defenses = defense ? ', defenses on its default scoring' : '';
@@ -480,11 +483,23 @@ export function projShort(
 		previousReadAt === null
 			? ''
 			: ` ${BOX.delta} is its change since ${weekdayTime(previousReadAt, zone)}.`;
-	return `${BOX.proj} is this week's published projection in ${FORMAT_WORDS[scoring.format]} scoring, ${whose}, ${when}${defenses}.${delta}`;
+	return `${BOX.proj} is this week's published projection in ${FORMAT_WORDS[scoring.format]} scoring${whose}, ${when}${defenses}.${delta}`;
 }
 
 /** The evidence columns in one short sentence pair (the Waivers basis). */
 export const EVIDENCE_SHORT = `${BOX.oppRank} is points allowed to his position, 1st the fewest. ${BOX.avg} and ${BOX.last} are his points a game and last game, your scoring.`;
+
+/** The game facts' read in one short sentence, null when no line holds one (the Waivers basis and
+ * the player card's). */
+export function factsReadShort(
+	lines: readonly PlayerLine[],
+	zone: string = memberZone()
+): string | null {
+	const read = factsReadAt(lines);
+	return read === null
+		? null
+		: `The ${BOX.game} cell's expected points and weather were read ${weekdayTime(read, zone)} ${zoneWord(zone)}.`;
+}
 
 /** The Pts column's basis (review N1): a player's points as the league scores them where the
  * platform gives each player's, else the team's points alone, the platform named (Lane 66e). */

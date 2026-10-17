@@ -223,7 +223,7 @@ export async function playerPage(slug: string): Promise<PlayerPage> {
 			underway,
 			heldOut: listed?.seasonLong === true
 		},
-		(format, numbers) => restTile(format, numbers, loaded.season, loaded.position, run.season)
+		(format, numbers) => restTile(format, numbers, loaded.position, run.season)
 	);
 	const [lead] = lines;
 	if (!lead) throw new Error(`${loaded.name} has a page but no format ranks him.`);
