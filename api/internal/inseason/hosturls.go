@@ -43,6 +43,18 @@ func CopyOnlyMoves(host string) apitypes.LineupMoves {
 	return apitypes.LineupMoves{Lineup: apitypes.LineupMovesLineupUnavailable, Reason: &reason}
 }
 
+// copyClaimWords is the line under the waiver page verb where the platform
+// takes no claim from our screen.
+const copyClaimWords = "%s does not take claims from here, so add him on its waiver page."
+
+// CopyOnlyClaims is the waiver verb where the platform takes no claim from
+// here, or no moves are wired: the platform's waiver page, with the line
+// that says why, the platform named (Lane 66f).
+func CopyOnlyClaims(host string) apitypes.WaiverMoves {
+	reason := fmt.Sprintf(copyClaimWords, leaguesync.HostWords(host))
+	return apitypes.WaiverMoves{Claim: apitypes.WaiverMovesClaimUnavailable, Reason: &reason}
+}
+
 // HostURL is the host's page for the verb, empty for a host whose page
 // we do not know. team is the member's roster in the league (0 when
 // unknown). Sleeper: the member's team page sets the lineup and starts a

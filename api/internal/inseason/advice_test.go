@@ -121,8 +121,12 @@ func TestWaiverAdvice(t *testing.T) {
 		}
 		guard(t, r.Sentence)
 	}
-	if out.Rows[0].Gain > 0 && (out.Best == nil || boardID(out.Best.Add) != boardID(out.Rows[0].Add)) {
+	// The best is the strip's first pickup (Lane 66f), none without one.
+	if len(out.Pickups) > 0 && (out.Best == nil || boardID(out.Best.Add) != boardID(out.Pickups[0].Add)) {
 		t.Fatalf("best %v", out.Best)
+	}
+	if len(out.Pickups) == 0 && out.Best != nil {
+		t.Fatalf("best %v with no pickup", out.Best)
 	}
 	rbs, _ := newFixtureAdvisor(t, f, held).Waivers(draft.RB)
 	for _, r := range rbs.Rows {

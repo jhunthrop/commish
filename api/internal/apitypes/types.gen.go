@@ -3436,12 +3436,13 @@ type TradeTeam struct {
 
 // WaiverAdvice defines model for WaiverAdvice.
 type WaiverAdvice struct {
+	// Basis the pickup rule, the basis's first line
 	Basis string `json:"basis"`
 
 	// BasisNote the rest of the basis, said once under the rows: the league the points over replacement are for and the league's rules points so far leave out
 	BasisNote string `json:"basis_note"`
 
-	// Best the add that gains most
+	// Best the first of pickups, null with none
 	Best *WaiverRow `json:"best"`
 
 	// HostNote one sentence under the verb when we cannot open the host's page ("Make this change on Yahoo. We cannot open that page for you yet."), null when the url opens it
@@ -3453,12 +3454,55 @@ type WaiverAdvice struct {
 
 	// OrderBasis which order ranks the players: our preseason board, or the rest-of-season order (from week 7, once the API reads it)
 	OrderBasis OrderBasis `json:"order_basis"`
-	ReadAt     time.Time  `json:"read_at"`
-	Refreshed  time.Time  `json:"refreshed"`
+
+	// Pickups the pickups worth making, at most 3, the highest week_gain first, each topping a different player of the member's with a different drop (the strip's cards); empty when no pickup beats the roster
+	Pickups []WaiverRow `json:"pickups"`
+
+	// ProjectionPreviousReadAt when the snapshot before it was captured, the read projection_delta counts from; null with none
+	ProjectionPreviousReadAt *time.Time `json:"projection_previous_read_at"`
+
+	// ProjectionReadAt when the week's published projection the rows' week_projection read was captured, null with none
+	ProjectionReadAt *time.Time `json:"projection_read_at"`
+
+	// ProjectionScoring the scoring the rows' week_projection is read in: the published projection's column the league scores most like, and whether that is the league's own scoring or the closest of the three to rules of its own (a tight end premium reads PPR and is never its own). A team defense's figure is the published default in every format
+	ProjectionScoring ProjectionScoring `json:"projection_scoring"`
+	ReadAt            time.Time         `json:"read_at"`
+	Refreshed         time.Time         `json:"refreshed"`
+
+	// Roster the member's active roster (injured reserve and taxi spots left out), the lines beats and drops name
+	Roster []PlayerLine `json:"roster"`
 
 	// Rows positive gains first by gain, then the rest by points over replacement, at most 60
 	Rows []WaiverRow `json:"rows"`
-	Week int         `json:"week"`
+
+	// SeasonBasis what the Rest of season column and a gain over the rest of the season are, said once under the rows
+	SeasonBasis string `json:"season_basis"`
+	Week        int    `json:"week"`
+}
+
+// WaiverBeats the member's player at his position with the lowest Proj he tops, the advised lineup's starters first, then the bench (Lane 66f's Beats column)
+type WaiverBeats struct {
+	// Gain his Proj less that player's, as the screen prints them (tenths)
+	Gain float64 `json:"gain"`
+
+	// HostId the member's player's host id, a line in the answer's roster
+	HostId string `json:"host_id"`
+	Name   string `json:"name"`
+
+	// Starter the player he tops starts in the lineup the advice sets this week
+	Starter bool `json:"starter"`
+}
+
+// WaiverDrop one player of the member's an add could replace, with the lineup's gains after the swap
+type WaiverDrop struct {
+	// Gain points over replacement a week to the lineup over the rest of the season, one decimal
+	Gain float64 `json:"gain"`
+
+	// HostId the dropped player's host id, a line in the answer's roster
+	HostId string `json:"host_id"`
+
+	// WeekGain this week's Proj to the lineup the advice sets, one decimal
+	WeekGain float64 `json:"week_gain"`
 }
 
 // WaiverMoves defines model for WaiverMoves.
@@ -3468,6 +3512,15 @@ type WaiverMoves struct {
 
 	// Note one sentence when a claim waits on the member (connect again to agree to moves), null otherwise
 	Note *string `json:"note"`
+
+	// Reason one line under the platform's waiver page verb saying why a claim is not made from here, naming the platform; null when claim is available
+	Reason *string `json:"reason"`
+
+	// TakesWrites true where the league's platform takes a claim from our screen at all (ESPN)
+	TakesWrites bool `json:"takes_writes"`
+
+	// WritesOn true when the platform's claim switch is on for this account (HOST_WRITES_ESPN_CLAIM or its proof list)
+	WritesOn bool `json:"writes_on"`
 }
 
 // WaiverMovesClaim available when a claim can be made on the host from our screen (the host has a write path, its claim switch is on for the account and the account's connection agreed to the moves); unavailable when the verb is the host's page
@@ -3477,15 +3530,30 @@ type WaiverMovesClaim string
 type WaiverRow struct {
 	Add PlayerLine `json:"add"`
 
+	// Beats null when he tops no one of the member's at his position, has no Proj, or cannot play this week
+	Beats *WaiverBeats `json:"beats"`
+
+	// Clears the day a claim on him clears, from the platform (Yahoo's waiver wire); null when it does not say
+	Clears *openapi_types.Date `json:"clears"`
+
 	// Drop null when a roster spot is open or there is no move to make
 	Drop *PlayerLine `json:"drop"`
 
-	// Gain points over replacement a week to the lineup, one decimal; above 0 sits above the rule
-	Gain     float64 `json:"gain"`
-	Sentence string  `json:"sentence"`
+	// Drops every player he could replace, the row's drop first, then by gain; empty when a spot is open
+	Drops []WaiverDrop `json:"drops"`
 
-	// Starts he starts for you this week
+	// Gain points over replacement a week to the lineup over the rest of the season with the row's drop, one decimal
+	Gain float64 `json:"gain"`
+
+	// Pickup a pickup worth making: he starts this week, the lineup's Proj rises, and the gain over the rest of the season is not below 0
+	Pickup   bool   `json:"pickup"`
+	Sentence string `json:"sentence"`
+
+	// Starts he starts this week in the lineup the advice sets with him in (the highest Proj after designations and byes)
 	Starts bool `json:"starts"`
+
+	// WeekGain this week's Proj of the lineup the advice sets (the Lineup screen's rule) with him in and the row's drop out, less the lineup's without him, one decimal; 0 when he would not start
+	WeekGain float64 `json:"week_gain"`
 }
 
 // WeekFacts one player's week; a fact we do not hold is null, never zero

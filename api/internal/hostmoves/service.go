@@ -186,19 +186,24 @@ func (s *Service) LineupMove(ctx context.Context, accountID uuid.UUID, host stri
 // ClaimMove says whether the account may claim on the host from our
 // screen, and the sentence when a claim waits on the member. The waivers
 // screen's answer carries it.
+//
+// It also says, as LineupMove does, whether the platform takes a claim
+// from here at all, whether its switch is on for the account, and the one
+// line under the screen's other verb (the platform's waiver page) when the
+// claim is not made from here (Lane 66f).
 func (s *Service) ClaimMove(ctx context.Context, accountID uuid.UUID, host string) (apitypes.WaiverMoves, error) {
-	open, note, err := s.open(ctx, accountID, host, apitypes.HostMoveInputKindClaim)
-	out := apitypes.WaiverMoves{Claim: apitypes.WaiverMovesClaimUnavailable}
-	if err != nil {
-		return out, err
-	}
-	if open {
+	a, err := s.access(ctx, accountID, host, apitypes.HostMoveInputKindClaim)
+	out := apitypes.WaiverMoves{Claim: apitypes.WaiverMovesClaimUnavailable, TakesWrites: a.takes, WritesOn: a.on}
+	if a.open && err == nil {
 		out.Claim = apitypes.WaiverMovesClaimAvailable
 	}
-	if note != "" {
-		out.Note = &note
+	if a.note != "" {
+		out.Note = &a.note
 	}
-	return out, nil
+	if out.Claim == apitypes.WaiverMovesClaimUnavailable && a.reason != "" {
+		out.Reason = &a.reason
+	}
+	return out, err
 }
 
 // takesWrites reports a platform that takes the move from our screen at
@@ -254,11 +259,11 @@ type moveAccess struct {
 // allow list lets the account make it, and the account's connection is
 // connected and agreed to words that name the moves.
 func (s *Service) access(ctx context.Context, accountID uuid.UUID, host string, kind apitypes.HostMoveInputKind) (moveAccess, error) {
-	p := onHost(host)
+	words := wordsFor(host, kind)
 	if !takesWrites(host, kind) {
-		return moveAccess{reason: *inseason.CopyOnlyMoves(host).Reason}, nil
+		return moveAccess{reason: words.copyOnly}, nil
 	}
-	out := moveAccess{takes: true, reason: p.switchedOff}
+	out := moveAccess{takes: true, reason: words.switchedOff}
 	if !s.wired(host, kind) {
 		return out, nil
 	}
@@ -270,11 +275,10 @@ func (s *Service) access(ctx context.Context, accountID uuid.UUID, host string, 
 		}
 		out.on = true
 	}
-	words := wordsFor(host, kind)
 	conn, err := s.Connections.Get(ctx, accountID, host)
 	switch {
 	case errors.Is(err, hosts.ErrNotConnected):
-		out.reason = p.connect
+		out.reason = words.connect
 		return out, nil
 	case err != nil:
 		return out, err

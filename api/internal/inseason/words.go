@@ -315,10 +315,23 @@ func LineupNote(s apitypes.LeagueSettings, carried func(string) bool) string {
 	return uncountedWords(s, carried)
 }
 
-// WaiversBasis is the waiver page's (§5.3).
-func WaiversBasis(b OrderBasis, weeks int) string {
-	return fmt.Sprintf("Ranked by the gain to your lineup on %s. A drop is the player it costs you least to lose. %s",
-		numberWords(b), porWords(b, weeks))
+// WaiversBasis is the waiver page's first basis line (§5.3), the pickup
+// rule the strip follows (Lane 66f): the week on the Proj the screen
+// shows, as the Lineup screen's advice, and the rest of the season on our
+// number.
+func WaiversBasis(b OrderBasis) string {
+	return fmt.Sprintf("A pickup worth making starts for you this week on the Proj shown and does not lower your lineup over "+
+		"the rest of the season on %s. Its drop is the player you lose least by.", numberWords(b))
+}
+
+// WaiverSeasonBasis is what a waiver gain over the rest of the season is.
+func WaiverSeasonBasis(b OrderBasis, weeks int) string {
+	span := "the season on our preseason number"
+	if b == RestOfSeason {
+		span = "the rest of the season on our rest-of-season order"
+	}
+	return fmt.Sprintf("A gain a week is your lineup's points over replacement, above what a free pickup at his position gives you: "+
+		"%s, averaged over its %s.", span, weekCount(weeks))
 }
 
 // OnlyCloseCalls is a team's line when every trade found with it is a
