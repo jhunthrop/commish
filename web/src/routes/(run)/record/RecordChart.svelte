@@ -14,9 +14,15 @@
 	const WIDTH = 860;
 	const HEIGHT = 230;
 	const PAD = { left: 40, right: 104, top: 14, bottom: 28 };
-	/** The axis's top: order matched runs to 1, and a week's rarely passes 0.8. */
-	const TOP = 0.8;
-	const TICKS = [0, 0.2, 0.4, 0.6, 0.8];
+	/** The axis runs from 0 (or the lowest week below it) to 0.8 (or the highest week above it), in
+	 * steps of 0.2, so no week is drawn clamped (review 66j L12). */
+	const STEP = 0.2;
+	const values = $derived(RECORD_SOURCES.flatMap((source) => series[source].map((p) => p.value)));
+	const BOTTOM = $derived(Math.floor(Math.min(0, ...values) / STEP) * STEP);
+	const TOP = $derived(Math.ceil(Math.max(0.8, ...values) / STEP) * STEP);
+	const TICKS = $derived(
+		Array.from({ length: Math.round((TOP - BOTTOM) / STEP) + 1 }, (_, i) => BOTTOM + i * STEP)
+	);
 	/** How far apart two line names stand where their lines end close together. */
 	const LABEL_GAP = 15;
 	const NAMES: Record<RecordSource, string> = {
@@ -28,7 +34,7 @@
 	const x = (week: number): number =>
 		PAD.left + ((week - 1) * (WIDTH - PAD.left - PAD.right)) / Math.max(1, weeks - 1);
 	const y = (value: number): number =>
-		PAD.top + (1 - Math.max(0, Math.min(TOP, value)) / TOP) * (HEIGHT - PAD.top - PAD.bottom);
+		PAD.top + (1 - (value - BOTTOM) / (TOP - BOTTOM)) * (HEIGHT - PAD.top - PAD.bottom);
 
 	const drawn = $derived.by(() => {
 		const ends = RECORD_SOURCES.filter((source) => series[source].length > 0)

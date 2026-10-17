@@ -10,6 +10,8 @@
 		allLine,
 		chartSeries,
 		figureWords,
+		gradedOrders,
+		ORDER_WORDS,
 		publishedWords,
 		recordHeadline,
 		scoreOf,
@@ -109,15 +111,15 @@
 	<main class="record">
 		<PageHead
 			title="Our record"
-			lead="How our order called each week, beside ADP and a published projection, graded in {scoring}"
+			lead="How the order we froze each week called its games, beside ADP and a published projection, graded in {scoring}"
 		/>
 		<ContextNote {note} />
 
 		{#if toDateAll}
 			<section class="bug" aria-label="{span} to date">
 				<div class="head">
-					<span class="span">{span}</span>
-					<h2>{RECORD_BOX.toDate}</h2>
+					<span class="span">{span}, {RECORD_BOX.toDate.toLowerCase()}</span>
+					<h2>{gradedOrders(record)}</h2>
 				</div>
 				<div class="tiles">
 					{#each RECORD_FIGURES as f (f)}
@@ -187,14 +189,21 @@
 					{@const line = row.week?.lines.find((l) => l.position === position)}
 					{#if row.week !== null && row.week.status === 'graded'}
 						<tr>
-							<td class="wk">{row.lead}</td>
+							<td class="wk"
+								>{row.lead}{#if row.week.order}<span class="ord">{ORDER_WORDS[row.week.order]}</span
+									>{/if}</td
+							>
 							<td class="n plc">{line?.ours.graded ?? RECORD_BOX.none}</td>
 							{@render cells(line)}
 							<td class="st">{capitalized(row.text)}</td>
 						</tr>
 					{:else}
 						<tr class="quiet" class:live={row.week !== null}>
-							<td class="wk">{row.lead}</td>
+							<td class="wk"
+								>{row.lead}{#if row.week?.order}<span class="ord"
+										>{ORDER_WORDS[row.week.order]}</span
+									>{/if}</td
+							>
 							<td class="st wide" colspan={COLUMNS - 1}>{capitalized(row.text)}</td>
 						</tr>
 					{/if}
@@ -216,7 +225,10 @@
 
 		<div class="basis" data-basis>
 			<p>{record.method} {statusWords ?? ''}</p>
-			<p>{capitalized(record.statistic.agreement)}: {record.scale} {record.startersBasis}</p>
+			<p>
+				{capitalized(record.statistic.agreement)}: {record.scale}
+				{record.startersBasis ?? ''}
+			</p>
 			<p>{publishedWords(record)}</p>
 		</div>
 	</main>
@@ -260,10 +272,9 @@
 		margin: 0;
 		font-family: var(--font-num);
 		font-weight: 800;
-		font-size: var(--t-head);
-		line-height: 1;
+		font-size: var(--t-xl);
+		line-height: 1.05;
 		text-transform: uppercase;
-		white-space: nowrap;
 	}
 
 	.tiles {
@@ -418,6 +429,14 @@
 		font-size: var(--t-md);
 		white-space: nowrap;
 		padding-left: var(--s-3);
+	}
+
+	td.wk .ord {
+		display: block;
+		font-family: var(--font-ui);
+		font-size: var(--t-xs);
+		font-weight: 500;
+		color: var(--ink-3);
 	}
 
 	td.plc {

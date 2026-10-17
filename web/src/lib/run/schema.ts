@@ -232,6 +232,8 @@ export const recordWeekSchema = z
 		frozenBy: runIdSchema.nullable(),
 		/** When the week was graded. Null unless the status is graded. */
 		gradedAt: isoTime.nullable(),
+		/** The order the week's freeze graded (review 66j M7); null for a week with no freeze. */
+		order: z.enum(['preseason', 'rest_of_season']).nullable(),
 		/** Frozen players with a stat line for the week. */
 		population: z.number().int().nonnegative(),
 		lines: z.array(recordLineSchema),
@@ -255,6 +257,7 @@ export const recordWeekSchema = z
 			fail('a week carries a grading time exactly when it is graded.');
 		if ((week.status === 'missed') !== (week.note !== undefined))
 			fail('a week carries a note exactly when it was missed.');
+		if (froze !== (week.order !== null)) fail('a week names its order exactly when it froze.');
 		if (!froze && (week.population !== 0 || week.lines.length > 0))
 			fail('only a frozen week has players and lines.');
 	});
@@ -269,12 +272,13 @@ export const recordSchema = z.object({
 	statistic: z.object({ agreement: phrase, placesOff: phrase, starters: phrase }),
 	/** The agreement's scale, said once: "1.0 is a perfect match of the week's finishing order, 0 is none." */
 	scale: phrase,
-	/** What the starters figure counts, said once. */
-	startersBasis: phrase,
+	/** What the starters figure counts, from the positions graded, said once; null before a week is graded. */
+	startersBasis: phrase.nullable(),
 	/** How the record is kept, as one sentence the page prints under the weeks. */
 	method: phrase,
-	/** The first week the published projection is graded beside ours. */
-	publishedFromWeek: z.number().int().min(1),
+	/** The first week whose freeze keeps the published projection, read from the register; null
+	 * while none does. */
+	publishedFromWeek: z.number().int().min(1).nullable(),
 	/** The sentence the page prints when ADP or the published projection called the graded weeks
 	 * better than our order on any figure, null when ours leads or ties on every one. */
 	honest: phrase.nullable(),

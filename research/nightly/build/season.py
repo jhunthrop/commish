@@ -82,6 +82,7 @@ def _week(week: record_read.Week, frozen_by: FrozenBy, season: int) -> Json:
         "status": week.status,
         "frozenAt": None if week.at is None else iso(week.at),
         "frozenBy": frozen_by.run_id(season, week.week) if week.status in {"frozen", "graded"} else None,
+        "order": week.order,
         "gradedAt": None if week.graded_at is None else iso(week.graded_at),
         "population": week.population,
         "lines": [_line(line) for line in week.lines],
@@ -92,16 +93,21 @@ def _week(week: record_read.Week, frozen_by: FrozenBy, season: int) -> Json:
 
 
 def record_json(
-    season: int, weeks: Sequence[record_read.Week], to_date: Sequence[record_read.Line], frozen_by: FrozenBy
+    season: int,
+    weeks: Sequence[record_read.Week],
+    to_date: Sequence[record_read.Line],
+    frozen_by: FrozenBy,
+    *,
+    published_from: int | None,
 ) -> Json:
     return {
         "season": season,
         "format": PAGE_FORMAT.id,
         "statistic": dict(record_read.STATISTIC),
         "scale": record_read.SCALE,
-        "startersBasis": record_read.STARTERS_BASIS,
+        "startersBasis": record_read.starters_basis(to_date),
         "method": record_read.METHOD,
-        "publishedFromWeek": record_read.PUBLISHED_FROM_WEEK,
+        "publishedFromWeek": published_from,
         "honest": record_read.honest_line(to_date),
         "weeks": [_week(week, frozen_by, season) for week in weeks],
         "toDate": [_line(line) for line in to_date],

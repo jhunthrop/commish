@@ -142,6 +142,7 @@ void test("copy guard: no composed line doubles a word, the run's own phrases in
 		status: 'graded',
 		frozenAt: '2026-09-08T12:00:00.000Z',
 		frozenBy: '2026-10-14T04',
+		order: 'preseason',
 		gradedAt: '2026-10-14T04:36:03.983Z',
 		population: 341,
 		lines: [],
@@ -152,6 +153,7 @@ void test("copy guard: no composed line doubles a word, the run's own phrases in
 		week: 7,
 		status: 'upcoming',
 		frozenBy: null,
+		order: null,
 		gradedAt: null,
 		frozenAt: '2026-10-23T00:15:00.000Z'
 	};
@@ -210,6 +212,7 @@ const missed = (week: number, note: string): RecordWeek => ({
 	status: 'missed',
 	frozenAt: null,
 	frozenBy: null,
+	order: null,
 	gradedAt: null,
 	population: 0,
 	lines: [],
@@ -253,6 +256,7 @@ void test('a frozen week says it is not played yet until its first kickoff, then
 		status: 'frozen',
 		frozenAt: '2026-10-13T12:00:17.450Z',
 		frozenBy: '2026-10-14T04',
+		order: 'preseason',
 		gradedAt: null,
 		population: 0,
 		lines: []

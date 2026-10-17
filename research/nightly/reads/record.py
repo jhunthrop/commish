@@ -37,17 +37,13 @@ ALL: Final = "All"
 STATISTIC: Final = {"agreement": "order matched", "placesOff": "places off", "starters": "starters right"}
 SCALE: Final = "1.0 is a perfect match of the week's finishing order, 0 is none."
 # A 12-team league's starters at each position, the week's top players the starters figure counts:
-# 12 QB, 24 RB, 36 WR, 12 TE, 12 K and 12 defenses.
+# 12 QB, 24 RB, 36 WR, 12 TE, 12 K and 12 defenses, where the register grades the position.
 LEAGUE_TEAMS: Final = 12
 STARTERS_A_TEAM: Final = {"QB": 1, "RB": 2, "WR": 3, "TE": 1, "K": 1, "DST": 1}
 _STARTER_WORDS: Final = {"QB": "QBs", "RB": "RBs", "WR": "WRs", "TE": "TEs", "K": "kickers", "DST": "defenses"}
-_COUNTS: Final = [f"{n * LEAGUE_TEAMS} {_STARTER_WORDS[p]}" for p, n in STARTERS_A_TEAM.items()]
-STARTERS_BASIS: Final = (
-    f"Starters right counts the week's top {', '.join(_COUNTS[:-1])} and {_COUNTS[-1]}, a {LEAGUE_TEAMS}-team league's "
-    "starters, that the order also put there."
-)
-# The first week whose freeze keeps the week's published projection (revision 0013).
-PUBLISHED_FROM_WEEK: Final = 7
+# The order each tracked board is (the record names it on every frozen week, review 66j M7): the served
+# board is our preseason order; a rest-of-season freeze would name its own source here.
+ORDER_OF_SOURCE: Final = {SERVED_SOURCE: "preseason"}
 # Graded against the preseason board in season too: freezing and grading the rest-of-season board is
 # a later lane's (the coordinator's ruling of 2026-10-14), so the line says which board it grades.
 METHOD: Final = (
@@ -88,9 +84,28 @@ class Week:
     graded_at: datetime | None
     population: int
     lines: tuple[Line, ...]
+    # The order the week's freeze graded ("preseason" or "rest_of_season"), None for a week with no freeze.
+    order: str | None = None
 
 
-def _starters(entries: Sequence[tuple[str, float, float, str]]) -> tuple[int, int]:
+# (player, the order's stance or None where it has none, his points, his position)
+Entry = tuple[str, float | None, float, str]
+
+
+def filled_ranks(entries: Sequence[Entry]) -> dict[str, float]:
+    """The fill rule (round 2's `NO_OPINION`, review 66j H3): the rows an order has a stance on in its
+    ordinal order, highest first, and every row it has none on below them all, sharing their average
+    rank, so every source is graded on the same rows."""
+    listed = [(pid, stance) for pid, stance, _, _ in entries if stance is not None]
+    ranks: dict[str, float] = {pid: float(rank) for pid, rank in ordinal_ranks(listed).items()}
+    missing = [pid for pid, stance, _, _ in entries if stance is None]
+    shared = (len(listed) + 1 + len(entries)) / 2
+    for pid in missing:
+        ranks[pid] = shared
+    return ranks
+
+
+def _starters(entries: Sequence[Entry], ranks: Mapping[str, float]) -> tuple[int, int]:
     """Per position, the order's top N against the finish's top N (N a 12-team league's starters there)."""
     right = of = 0
     for position, per_team in STARTERS_A_TEAM.items():
@@ -98,48 +113,66 @@ def _starters(entries: Sequence[tuple[str, float, float, str]]) -> tuple[int, in
         n = min(per_team * LEAGUE_TEAMS, len(at))
         if n == 0:
             continue
-        called = {pid for pid, _, _, _ in sorted(at, key=lambda e: (-e[1], e[0]))[:n]}
+        called = {pid for pid, _, _, _ in sorted(at, key=lambda e: (ranks[e[0]], e[0]))[:n]}
         finished = {pid for pid, _, _, _ in sorted(at, key=lambda e: (-e[2], e[0]))[:n]}
         right += len(called & finished)
         of += n
     return right, of
 
 
-def _score(entries: Sequence[tuple[str, float, float, str]]) -> Score:
-    """One order's score over (player, stance, points, position): its ordinal ranks against the finish."""
+def _score(entries: Sequence[Entry]) -> Score:
+    """One order's score over its entries: its ranks under the fill rule against the finish."""
     if not entries:
         return Score(0, None, None, 0, 0)
-    ranks = ordinal_ranks([(pid, stance) for pid, stance, _, _ in entries])
+    ranks = filled_ranks(entries)
     outcome = average_outcome_ranks([(pid, points) for pid, _, points, _ in entries])
     error = sum_left([abs(ranks[pid] - outcome[pid]) for pid, _, _, _ in entries]) / len(entries)
     agreement = spearman([Observation(-ranks[pid], points) for pid, _, points, _ in entries])
-    right, of = _starters(entries)
+    right, of = _starters(entries, ranks)
     return Score(len(entries), agreement, error, right, of)
 
 
-def _entries(rows: Sequence[Mapping[str, Any]], stance: str) -> list[tuple[str, float, float, str]]:
-    """Each row as (player, the order's stance, his points, position); ADP's stance is minus its ADP."""
-    return [
-        (row["player_id"], -row["adp"] if stance == "adp" else row[stance], row["actual_points"], row["position"])
-        for row in rows
-    ]
+def _entries(rows: Sequence[Mapping[str, Any]], stance: str) -> list[Entry]:
+    """Each row as an entry; ADP's stance is minus its ADP, and a row a source has no number for has
+    none."""
+    out: list[Entry] = []
+    for row in rows:
+        value = row.get(stance)
+        held = None if value is None else (-value if stance == "adp" else float(value))
+        out.append((row["player_id"], held, row["actual_points"], row["position"]))
+    return out
 
 
 def week_lines(rows: Sequence[Mapping[str, Any]]) -> tuple[Line, ...]:
     """All players, then each position present, on the players both orders rank; the published
-    projection on those of them it lists, when the freeze kept it."""
+    projection on the same rows under the fill rule, when the freeze kept it for any of them."""
     both = [row for row in rows if row["adp"] is not None]
     lines = []
     for position in (ALL, *RECORD_POSITIONS):
         subset = both if position == ALL else [row for row in both if row["position"] == position]
         if not subset:
             continue
-        listed = [row for row in subset if row.get("published_points") is not None]
-        published = _score(_entries(listed, "published_points")) if listed else None
+        kept = any(row.get("published_points") is not None for row in subset)
+        published = _score(_entries(subset, "published_points")) if kept else None
         lines.append(
             Line(position, _score(_entries(subset, "board_points")), _score(_entries(subset, "adp")), published)
         )
     return tuple(lines)
+
+
+def starters_basis(to_date_lines: Sequence[Line]) -> str | None:
+    """What the starters figure counts, from the positions the record graded (review 66j M8): "Starters
+    right counts the week's top 12 QBs, 24 RBs, 36 WRs and 12 TEs, a 12-team league's starters, that the
+    order also put there." None before any week is graded."""
+    graded = {line.position for line in to_date_lines if line.position != ALL and line.ours.starters_of > 0}
+    counts = [f"{n * LEAGUE_TEAMS} {_STARTER_WORDS[p]}" for p, n in STARTERS_A_TEAM.items() if p in graded]
+    if not counts:
+        return None
+    listed = counts[0] if len(counts) == 1 else f"{', '.join(counts[:-1])} and {counts[-1]}"
+    return (
+        f"Starters right counts the week's top {listed}, a {LEAGUE_TEAMS}-team league's starters, that the order "
+        "also put there."
+    )
 
 
 def _pooled(scores: Sequence[Score], players: int) -> Score:
@@ -246,7 +279,8 @@ def _frozen_week(conn: Connection, season: int, week: int, frozen_at: datetime) 
     ).scalar_one()
     graded_at = max((row["graded_at"] for row in rows), default=None)
     status = "frozen" if graded_at is None else "graded"
-    return Week(week, status, frozen_at, board_as_of, graded_at, len(rows), week_lines(rows)), rows
+    order = ORDER_OF_SOURCE[SERVED_SOURCE]
+    return Week(week, status, frozen_at, board_as_of, graded_at, len(rows), week_lines(rows), order), rows
 
 
 def read_record(
@@ -272,6 +306,19 @@ def read_record(
         else:
             weeks.append(Week(week, "upcoming", kickoff, None, None, 0, ()))
     return weeks, rows_by_week
+
+
+def published_from(conn: Connection, season: int) -> int | None:
+    """The first week whose freeze of the served board keeps the published projection for any player
+    (review 66j L11), None while none does."""
+    week = conn.execute(
+        text(
+            "select min(week) from research.register_freeze_rows "
+            "where season = :s and board_source = :source and published_points is not null"
+        ),
+        {"s": season, "source": SERVED_SOURCE},
+    ).scalar_one()
+    return None if week is None else int(week)
 
 
 def frozen_weeks(conn: Connection, season: int) -> dict[int, str]:

@@ -194,9 +194,28 @@ export function figureWords(score: Score | null, figure: RecordFigure): string {
 		: `${String(score.starters)} of ${String(score.startersOf)}`;
 }
 
-/** The published projection's columns' basis: from which week it counts. */
+/** The published projection's columns' basis: from which week it counts, as the register says. */
 export function publishedWords(record: RunRecord): string {
-	return `Published is one provider's weekly projection, read before each kickoff, graded from week ${String(record.publishedFromWeek)} as it accrues, ${RECORD_BOX.none} before.`;
+	const from =
+		record.publishedFromWeek === null
+			? `graded from the first week our register keeps it, ${RECORD_BOX.none} until then`
+			: `graded from week ${String(record.publishedFromWeek)} on the same players under the fill rule, ${RECORD_BOX.none} before`;
+	return `Published is one provider's weekly projection, read before each kickoff, ${from}.`;
+}
+
+/** The order a week graded, in the record's words (review 66j M7). */
+export const ORDER_WORDS: Readonly<Record<NonNullable<RecordWeek['order']>, string>> = {
+	preseason: 'Our preseason order',
+	rest_of_season: 'Our rest-of-season order'
+};
+
+/** The orders the graded weeks graded, said once: "Our preseason order, weeks 1 to 2". */
+export function gradedOrders(record: RunRecord): string {
+	const graded = gradedWeeks(record);
+	const orders = [...new Set(graded.map((w) => w.order).filter((o) => o !== null))];
+	return orders
+		.map((o, i) => (i === 0 ? ORDER_WORDS[o] : ORDER_WORDS[o].replace(/^Our/, 'our')))
+		.join(', then ');
 }
 
 /** The chart's three series: each graded week's order matched for one position, in week order. */
