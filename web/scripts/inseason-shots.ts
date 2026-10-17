@@ -409,6 +409,12 @@ async function lineupFaults(page: Page): Promise<string[]> {
 				.filter((tr) => tr.classList.contains('moved-out'))
 				.map((tr) => cell(tr.querySelector('td.slot') ?? tr)),
 			chips: document.querySelectorAll('main .swaps .swap:not(.idle)').length,
+			idleChips: [...document.querySelectorAll('main .swaps .swap.idle')].map(
+				(el) => (el as HTMLElement).innerText
+			),
+			idleRows: rows.filter((tr) => tr.classList.contains('idle')).length,
+			firstChipIdle:
+				document.querySelector('main .swaps .swap')?.classList.contains('idle') ?? false,
 			reason: [...document.querySelectorAll('main .verb .verb-line')]
 				.map((el) => (el as HTMLElement).innerText)
 				.join(' '),
@@ -428,6 +434,14 @@ async function lineupFaults(page: Page): Promise<string[]> {
 	if (seen.outSlots.length === 0 || seen.outSlots.some((s) => s !== 'Sit'))
 		faults.push(`the bench arrows read ${seen.outSlots.join(', ')}`);
 	if (!seen.reserve) faults.push('no injured reserve section');
+	// The fixture's TE spot has no one who can play (review N1 to N4): its chip first, its row kept.
+	if (
+		seen.idleChips.length !== 1 ||
+		!seen.idleChips.every((c) => c.endsWith('no one on your roster can play this week'))
+	)
+		faults.push(`the no one can play chips: ${seen.idleChips.join(', ')}`);
+	if (!seen.firstChipIdle) faults.push('the no one can play chip is not first');
+	if (seen.idleRows !== 1) faults.push(`${String(seen.idleRows)} rows marked no one can play`);
 	if ((seen.text.match(/Opp rank is where his opponent stands/g) ?? []).length !== 1)
 		faults.push('the evidence basis not said once');
 	if (!/Δ Proj is its change since the read before, \w{3} \d+:\d\d [ap]m \w+\./.test(seen.text))

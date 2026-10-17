@@ -591,57 +591,6 @@
 				},
 				{
 					"player": {
-						"host_id": "8210",
-						"board_id": "4360635",
-						"name": "Chig Okonkwo",
-						"position": "TE",
-						"team": "WAS",
-						"injured_reserve": false
-					},
-					"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4360635.png",
-					"slug": "chig-okonkwo",
-					"position_rank": 26,
-					"points_over_replacement": -2,
-					"rest_of_season_per_game": 5.9,
-					"held": false,
-					"facts": {
-						"week": 6,
-						"opponent": "SF",
-						"home": false,
-						"kickoff": "2026-10-20T00:15:00.000Z",
-						"bye": false,
-						"designation": null,
-						"played": false,
-						"points_this_week": null,
-						"last_games": [
-							{ "week": 5, "points": 10 },
-							{ "week": 4, "points": 2.5 },
-							{ "week": 1, "points": 3.6 }
-						],
-						"allowed_to_position": { "points_a_game": 21, "rank": 15, "of": 32, "position": "TE" },
-						"game_total": {
-							"points": 50.5,
-							"team_points": 21.5,
-							"read_at": "2026-10-16T21:01:26.774Z"
-						},
-						"spread": { "side": "lose", "points": 7.5, "read_at": "2026-10-16T21:01:26.774Z" },
-						"roof": { "kind": "outdoors", "abroad": false },
-						"weather": {
-							"temperature_f": 63,
-							"wind_mph": 12.7,
-							"precipitation_chance": 2,
-							"precipitation_kind": "none",
-							"read_at": "2026-10-16T21:01:34.611Z"
-						}
-					},
-					"week_projection": 7.76,
-					"projection_delta": -0.1,
-					"opp_rank": 15,
-					"season_avg": 5.37,
-					"last_points": 10
-				},
-				{
-					"player": {
 						"host_id": "7543",
 						"board_id": "4239996",
 						"name": "Travis Etienne",
@@ -931,6 +880,57 @@
 					"opp_rank": 5,
 					"season_avg": null,
 					"last_points": null
+				},
+				{
+					"player": {
+						"host_id": "8210",
+						"board_id": "4360635",
+						"name": "Chig Okonkwo",
+						"position": "TE",
+						"team": "WAS",
+						"injured_reserve": false
+					},
+					"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4360635.png",
+					"slug": "chig-okonkwo",
+					"position_rank": 26,
+					"points_over_replacement": -2,
+					"rest_of_season_per_game": 5.9,
+					"held": false,
+					"facts": {
+						"week": 6,
+						"opponent": "SF",
+						"home": false,
+						"kickoff": "2026-10-20T00:15:00.000Z",
+						"bye": false,
+						"designation": { "status": "out", "as_of": "2026-10-16T21:00:00.000Z" },
+						"played": false,
+						"points_this_week": null,
+						"last_games": [
+							{ "week": 5, "points": 10 },
+							{ "week": 4, "points": 2.5 },
+							{ "week": 1, "points": 3.6 }
+						],
+						"allowed_to_position": { "points_a_game": 21, "rank": 15, "of": 32, "position": "TE" },
+						"game_total": {
+							"points": 50.5,
+							"team_points": 21.5,
+							"read_at": "2026-10-16T21:01:26.774Z"
+						},
+						"spread": { "side": "lose", "points": 7.5, "read_at": "2026-10-16T21:01:26.774Z" },
+						"roof": { "kind": "outdoors", "abroad": false },
+						"weather": {
+							"temperature_f": 63,
+							"wind_mph": 12.7,
+							"precipitation_chance": 2,
+							"precipitation_kind": "none",
+							"read_at": "2026-10-16T21:01:34.611Z"
+						}
+					},
+					"week_projection": 7.76,
+					"projection_delta": -0.1,
+					"opp_rank": 15,
+					"season_avg": 5.37,
+					"last_points": 10
 				},
 				{
 					"player": {

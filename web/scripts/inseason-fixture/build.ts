@@ -527,6 +527,7 @@ async function lineup(): Promise<LineupAdvice> {
 		slots: out,
 		bench,
 		reserve: [],
+		empty_slots: [],
 		host_lineup_url: `https://sleeper.com/leagues/${league.league_id}/team`,
 		host_note: null,
 		// Sleeper has no write API: the verb copies the lineup, the API's line saying why.

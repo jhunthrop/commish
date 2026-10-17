@@ -13162,7 +13162,7 @@
 				"home": false,
 				"kickoff": "2026-10-20T00:15:00.000Z",
 				"bye": false,
-				"designation": null,
+				"designation": { "status": "out", "as_of": "2026-10-16T21:00:00.000Z" },
 				"played": false,
 				"points_this_week": null,
 				"last_games": [

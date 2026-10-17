@@ -5,8 +5,8 @@
 //     his club, a kicker with no row of his own by his club's one kicker, the PPR column (the league
 //     scores most like PPR); null without a row, and null for a club with no game this week (a bye),
 //     whatever the snapshot holds;
-//   - two stand-in designations (Rome Odunze Questionable, Tank Bigsby on injured reserve) so a shot
-//     shows the status pill both ways;
+//   - stand-in designations (Rome Odunze Questionable, Tank Bigsby on injured reserve, Chig Okonkwo
+//     out) so a shot shows the status pill both ways and a spot no one can play;
 //   - projection_scoring on both answers (PPR, the closest to the recorded league's own rules);
 //   - projection_read_at on the lineup, a stand-in stamp of the fixture's own Friday evening, and the
 //     lineup's basis in the API's words since its rows end on the projection;
@@ -107,7 +107,10 @@ function weekProjection(line: PlayerLine): number | null {
 const DESIGNATED_AS_OF = '2026-10-16T21:00:00.000Z';
 const DESIGNATIONS: Readonly<Record<string, DesignationStatus>> = {
 	'Rome Odunze': 'questionable',
-	'Tank Bigsby': 'injured_reserve'
+	'Tank Bigsby': 'injured_reserve',
+	// Lane 66e: the bench's one tight end is out while the starter is on bye, so the TE spot has no
+	// one who can play and a shot shows its chip and its row.
+	'Chig Okonkwo': 'out'
 };
 
 function designated(line: PlayerLine): PlayerLine {
@@ -277,6 +280,18 @@ function advise(advice: LineupAdvice): LineupAdvice {
 			idle.add(h.player.host_id);
 		}
 	});
+	// Then any member's starter left over, into any empty spot that takes him (review N1).
+	placed.forEach((p, i) => {
+		if (p !== null) return;
+		const h = hostAt.find(
+			(l) => l && !chosen.has(l.player.host_id) && accepts(kinds[i] ?? 'FLEX', l.player.position)
+		);
+		if (h) {
+			placed[i] = h;
+			chosen.add(h.player.host_id);
+			idle.add(h.player.host_id);
+		}
+	});
 	const sat = hostAt.filter((h): h is PlayerLine => h !== null && !chosen.has(h.player.host_id));
 	const slots = advice.slots.flatMap((slot, i): LineupSlot[] => {
 		const ours = placed[i];
@@ -334,7 +349,13 @@ function lineupNote(note: string): string {
 
 const stampedLineup: LineupAdvice = {
 	// A lineup.json from before Lane 66e has no reserve.
-	...advise(stamp({ ...lineup, reserve: (lineup as Partial<LineupAdvice>).reserve ?? [] })),
+	...advise(
+		stamp({
+			...lineup,
+			reserve: (lineup as Partial<LineupAdvice>).reserve ?? [],
+			empty_slots: []
+		})
+	),
 	basis: LINEUP_BASIS,
 	projection_previous_read_at: PREVIOUS_READ_AT,
 	// Sleeper takes no lineup from our screen: the API's line under the copy verb (inseason CopyOnlyMoves).
