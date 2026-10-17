@@ -264,7 +264,9 @@ function checkCard(card: Card, shot: Shot, where: string, width: number): void {
 			/Written \w{3} \d{1,2}, from his facts through last season/.test(card.readText),
 			`${where}: the season read's stamp`
 		);
-	check(card.nextRow !== '', `${where}: no week ahead row in the game log`);
+	// A week on bye has no game ahead to draw, and the Proj tile says so.
+	if (card.captions.Proj !== 'Bye this week')
+		check(card.nextRow !== '', `${where}: no week ahead row in the game log`);
 	if (!ROS)
 		check(/earlier seasons/i.test(card.earlier) && !card.earlierOpen, `${where}: earlier seasons`);
 	const most = BASIS_LINES[width] ?? 0;
