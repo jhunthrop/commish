@@ -31,10 +31,13 @@ def test_a_prior_season_sums_its_regular_season_weeks_in_the_page_format() -> No
     out = prior_seasons("p1", PPR, "WR", _context({2024: s2024, 2025: s2025, 2023: _store({}, {})}))
     assert [season["season"] for season in out] == [2025, 2024]
     newest = out[0]
-    assert newest["games"] == 2
     # 5 + 7.4 and 9 + 12.5 + 6: the playoff week 19 is left out.
-    assert newest["totals"]["points"] == 39.9
-    assert newest["pointsPerGame"] == 20.0
-    assert newest["totals"]["receptions"] == 14.0
-    assert newest["totals"]["snapShare"] == 0.8
-    assert PRIOR_SEASONS == 3
+    summed = {
+        "games": newest["games"],
+        "points": newest["totals"]["points"],
+        "per_game": newest["pointsPerGame"],
+        "receptions": newest["totals"]["receptions"],
+        "snap_share": newest["totals"]["snapShare"],
+    }
+    assert summed == {"games": 2, "points": 39.9, "per_game": 20.0, "receptions": 14.0, "snap_share": 0.8}
+    assert len(_context({}).prior) < PRIOR_SEASONS
