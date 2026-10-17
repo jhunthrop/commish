@@ -39,7 +39,8 @@ void test('every platform has its row, in the table order, Sleeper as a fixed fa
 	);
 	const espn = rowOf(rows, 'espn');
 	const sleeper = rowOf(rows, 'sleeper');
-	assert.equal(sleeper.line, 'Sleeper leagues follow by id, nothing to connect');
+	assert.equal(sleeper.note, 'Followed by league id, nothing to connect');
+	assert.deepEqual([sleeper.state, sleeper.line], ['No sign-in', 'Leagues read in public']);
 	assert.equal(sleeper.verb?.kind, 'follow');
 	assert.equal(espn.state, PLATFORM_WORDS.notOpen);
 	assert.equal(espn.verb, null);

@@ -137,6 +137,7 @@
 									>
 								</span>
 							{:else}
+								<Quiet size="sm" href={resolve('/league/[id]', { id: league.id })}>Open</Quiet>
 								<Quiet size="sm" disabled={busy !== null} onclick={() => void detach(league)}
 									>{busy === league.id ? 'Detaching' : 'Detach'}</Quiet
 								>
@@ -182,7 +183,15 @@
 	}
 
 	.c-act {
-		width: 150px;
+		width: 190px;
+	}
+
+	.act {
+		white-space: nowrap;
+	}
+
+	.act :global(a) {
+		margin-right: var(--s-2);
 	}
 
 	.open {

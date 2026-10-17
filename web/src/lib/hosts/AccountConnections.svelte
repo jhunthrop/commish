@@ -161,20 +161,24 @@
 						<td class="wide">
 							<span class="st"
 								><b><span class="dot {row.dot}" aria-hidden="true"></span>{row.state}</b><span
-									>{row.line}</span
+									class:keep={row.writes !== null}>{row.line}</span
 								></span
 							>
 						</td>
-						<td class="wide">
-							{#if row.writes}
-								<span class="wcell"
-									><span class="wr" class:on={row.writes.on}
-										>{row.writes.on ? PLATFORM_WORDS.on : PLATFORM_WORDS.off}</span
-									><span>{row.writes.words}</span></span
-								>
-							{:else}<span class="none">{PLATFORM_WORDS.never}</span>{/if}
-						</td>
-						<td class="read"><span class="ph-only">Last read&nbsp;</span>{row.read}</td>
+						{#if row.note}
+							<td class="wide note-cell" colspan="2">{row.note}</td>
+						{:else}
+							<td class="wide">
+								{#if row.writes}
+									<span class="wcell"
+										><span class="wr" class:on={row.writes.on}
+											>{row.writes.on ? PLATFORM_WORDS.on : PLATFORM_WORDS.off}</span
+										><span>{row.writes.words}</span></span
+									>
+								{:else}<span class="none">{PLATFORM_WORDS.never}</span>{/if}
+							</td>
+							<td class="read"><span class="ph-only">Last read&nbsp;</span>{row.read}</td>
+						{/if}
 						<td class="act">
 							{#if row.verb?.kind === 'follow'}
 								<Quiet size="sm" href={links.leagueNew()}>{row.verb.words}</Quiet>
@@ -257,7 +261,18 @@
 	}
 
 	.c-wr {
-		width: 260px;
+		width: 240px;
+	}
+
+	.note-cell {
+		color: var(--ink-2);
+	}
+
+	/* A connection's dates and consent hold on one line at a desk. */
+	@media (min-width: 1181px) {
+		.keep {
+			white-space: nowrap;
+		}
 	}
 
 	.c-read {
@@ -265,7 +280,7 @@
 	}
 
 	.c-act {
-		width: 190px;
+		width: 180px;
 	}
 
 	.name {

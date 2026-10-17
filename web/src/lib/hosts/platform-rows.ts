@@ -30,6 +30,8 @@ export interface PlatformRow {
 	line: string;
 	/** Lineups from here, null where there is no connection to say it for. */
 	writes: { on: boolean; words: string } | null;
+	/** One sentence across the Lineups and Last read cells where neither applies, null elsewhere. */
+	note: string | null;
 	read: string;
 	verb: { kind: PlatformVerb; words: string } | null;
 }
@@ -46,8 +48,9 @@ export const PLATFORM_WORDS = {
 	off: 'Lineups off',
 	onWords: 'Set there when you confirm a move',
 	never: '--',
-	sleeperState: 'Nothing to connect',
-	sleeperLine: 'Sleeper leagues follow by id, nothing to connect',
+	sleeperState: 'No sign-in',
+	sleeperLine: 'Leagues read in public',
+	sleeperNote: 'Followed by league id, nothing to connect',
 	notConnected: 'Not connected',
 	notOpen: 'Not open to your account yet',
 	notOpenLine: 'Connecting opens here soon',
@@ -93,6 +96,7 @@ function connectedRow(c: HostConnection, now: Date): PlatformRow {
 		writes: c.writes_on
 			? { on: true, words: PLATFORM_WORDS.onWords }
 			: { on: false, words: c.writes_reason ?? PLATFORM_WORDS.never },
+		note: null,
 		read: readWords(c.last_read_at, now),
 		verb: dropped
 			? { kind: 'again', words: AGAIN_WORDS[c.host] }
@@ -108,6 +112,7 @@ function unconnectedRow(host: ConnectedHost, open: boolean): PlatformRow {
 		state: open ? PLATFORM_WORDS.notConnected : PLATFORM_WORDS.notOpen,
 		line: open ? CONNECT_LINES[host] : PLATFORM_WORDS.notOpenLine,
 		writes: null,
+		note: null,
 		read: PLATFORM_WORDS.never,
 		verb: open ? { kind: 'connect', words: PLATFORM_WORDS.connect } : null
 	};
@@ -120,6 +125,7 @@ const SLEEPER_ROW: PlatformRow = {
 	state: PLATFORM_WORDS.sleeperState,
 	line: PLATFORM_WORDS.sleeperLine,
 	writes: null,
+	note: PLATFORM_WORDS.sleeperNote,
 	read: PLATFORM_WORDS.never,
 	verb: { kind: 'follow', words: PLATFORM_WORDS.followSleeper }
 };
