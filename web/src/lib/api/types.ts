@@ -2985,6 +2985,11 @@ export interface components {
 		};
 		WaiverAdvice: {
 			week: number;
+			/**
+			 * Format: double
+			 * @description this week's Proj of the lineup the advice sets with no add (the Lineup screen's Totals), one decimal, the base every week_gain counts from; null before the week's projection is read
+			 */
+			lineup_proj: number | null;
 			/** @description the pickup rule, the basis's first line */
 			basis: string;
 			/** @description what the Rest of season column and a gain over the rest of the season are, said once under the rows */

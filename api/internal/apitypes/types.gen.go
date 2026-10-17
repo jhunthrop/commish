@@ -3449,8 +3449,11 @@ type WaiverAdvice struct {
 	HostNote *string `json:"host_note"`
 
 	// HostWaiversUrl the host's waiver page, empty when we know none
-	HostWaiversUrl string      `json:"host_waivers_url"`
-	Moves          WaiverMoves `json:"moves"`
+	HostWaiversUrl string `json:"host_waivers_url"`
+
+	// LineupProj this week's Proj of the lineup the advice sets with no add (the Lineup screen's Totals), one decimal, the base every week_gain counts from; null before the week's projection is read
+	LineupProj *float64    `json:"lineup_proj"`
+	Moves      WaiverMoves `json:"moves"`
 
 	// OrderBasis which order ranks the players: our preseason board, or the rest-of-season order (from week 7, once the API reads it)
 	OrderBasis OrderBasis `json:"order_basis"`

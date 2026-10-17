@@ -3533,9 +3533,16 @@ components:
         sentence: { type: string }
     WaiverAdvice:
       type: object
-      required: [week, basis, season_basis, basis_note, order_basis, refreshed, read_at, projection_read_at, projection_previous_read_at, projection_scoring, best, pickups, rows, roster, host_waivers_url, host_note, moves]
+      required: [week, basis, season_basis, basis_note, order_basis, refreshed, read_at, projection_read_at, projection_previous_read_at, projection_scoring, lineup_proj, best, pickups, rows, roster, host_waivers_url, host_note, moves]
       properties:
         week: { type: integer }
+        lineup_proj:
+          type: number
+          format: double
+          nullable: true
+          description: >-
+            this week's Proj of the lineup the advice sets with no add (the Lineup screen's Totals), one decimal, the
+            base every week_gain counts from; null before the week's projection is read
         basis: { type: string, description: "the pickup rule, the basis's first line" }
         season_basis:
           type: string

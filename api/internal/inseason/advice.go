@@ -503,6 +503,10 @@ func (a *advisor) Waivers(position draft.Position) (apitypes.WaiverAdvice, bool)
 		Pickups: []apitypes.WaiverRow{}, Rows: []apitypes.WaiverRow{}, Roster: lines(mine, indexes(len(mine))), Moves: CopyOnlyClaims(a.Snap.Ref.Host)}
 	out.HostWaiversUrl, out.HostNote = a.host(WaiversPage)
 	week := newPickupWeek(a.config, squad.Players, team.Starters)
+	if out.ProjectionReadAt != nil {
+		base := week.base.proj
+		out.LineupProj = &base
+	}
 	clears := a.clearsOf()
 	w := &Writer{Basis: a.basis, Now: a.now}
 	for _, move := range Waivers(a.config, a.weeks, squad, cands) {
