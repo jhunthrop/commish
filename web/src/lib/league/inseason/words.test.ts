@@ -27,13 +27,10 @@ import {
 	TAB_LABELS,
 	addsTitle,
 	lineupTitle,
-	showMore,
 	startingCount,
 	NO_START_RULE,
 	LATER_RULE,
-	NO_TRADES_WITH_TEAM,
 	hisPorWords,
-	figureHead,
 	perGameWords,
 	rowEnd,
 	porFigure,
@@ -127,7 +124,9 @@ const trade: TradeRow = {
 	drop: null,
 	my_gain: 4.06,
 	their_gain: 0.31,
-	close_for_them: true
+	close_for_them: true,
+	my_proj_change: null,
+	their_proj_change: null
 };
 
 void test('only the three screens are pages under a league', () => {
@@ -236,13 +235,6 @@ void test('a row ends on points a game, and on a screen that carries them a row 
 	assert.deepEqual(rowEnd(unranked, false), { kind: 'words', words: 'Unranked' });
 	assert.deepEqual(rowEnd(unranked, true), { kind: 'words', words: 'No projection' });
 	assert.equal(LINES.noProjection, 'No projection');
-});
-
-void test("the rows' head names the number they end on: points a game once any row carries it", () => {
-	const plain = line('Kyren Williams');
-	assert.equal(figureHead([plain]), 'Over repl a week');
-	assert.equal(figureHead([plain, { ...plain, rest_of_season_per_game: 14.2 }]), 'Points a game');
-	assert.equal(figureHead([]), 'Over repl a week');
 });
 
 void test('a trade says who gets whom and both gains plainly', () => {
@@ -375,7 +367,6 @@ void test('copy guard: every in-season line is fantasy words, with no dash, semi
 		tradeDecision(null),
 		tradeGains(trade),
 		tradeGains({ my_gain: 5.93, their_gain: 0.03 }),
-		NO_TRADES_WITH_TEAM,
 		CLOSE_FOR_THEM,
 		EVERY_TRADE,
 		teamAside({ name: 'Muttdogs', owner: 'muttdog', record: { wins: 5, losses: 0, ties: 0 } }),
@@ -408,7 +399,6 @@ void test('copy guard: every in-season line is fantasy words, with no dash, semi
 		addsTitle(6),
 		startingCount(0),
 		startingCount(2),
-		showMore(2),
 		...Object.values(TAB_LABELS),
 		...Object.values(LINES),
 		verbWords('start', 'espn'),
