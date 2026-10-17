@@ -19,11 +19,13 @@ from dataclasses import dataclass
 from sqlalchemy import Connection
 
 from research.model.weekly.round.scoring import SKILL_POSITIONS
+from research.model.weekly2.designation import WeekStatus
 from research.model.weekly3.allowance import Allowance, GroupTotals, allowance, group_totals
 from research.model.weekly3.ledger import Stamp
 from research.model.weekly3.snapshot import Snapshot, read_snapshot
 from research.model.weekly3.work import KINDS_BY_POSITION, NO_SNAP_ROW, SNAP_SHARE
 from research.model.weekly4.features.depth import DepthChart, DepthRule, depth_charts
+from research.model.weekly4.features.filings import earlier_filings, live_statuses
 from research.model.weekly4.features.matchup import role_allowances
 from research.model.weekly4.features.plays import PlayerTally
 from research.model.weekly4.features.reads import DepthRow
@@ -66,6 +68,12 @@ def read_players(  # noqa: PLR0913, PLR0917 - one instant's player reads, named
     week, season = view.week, s.season
     snapshot = read_snapshot(conn, season, week, view.moment)
     depth = depth_charts(depth_rows, season, week, view.moment, rule)
+    earlier, earlier_stamp = earlier_filings(conn, season, week, view.moment)
+    stamps: list[Stamp] = [*snapshot.stamps, depth.stamp, earlier_stamp]
+    statuses: Mapping[str, WeekStatus] = snapshot.statuses
+    if s.live:  # amendment 2 item 7: live, Tank01's word from lane 63's status rows
+        statuses, live_stamp = live_statuses(conn, season, week, view.moment)
+        stamps.append(live_stamp)
     histories = {pid: history(pid, games, view.tallies) for pid, games in snapshot.games.items()}
     charted: dict[str, list[PlayerWeekObservation]] = defaultdict(list)
     for row in view.charted:
@@ -81,6 +89,7 @@ def read_players(  # noqa: PLR0913, PLR0917 - one instant's player reads, named
         positions,
         depth,
         group_totals(snapshot.games, positions),
+        statuses,
     )
     rows: list[Row] = []
     counts: dict[str, int] = defaultdict(int)
@@ -91,12 +100,13 @@ def read_players(  # noqa: PLR0913, PLR0917 - one instant's player reads, named
             s.schedule.club_weeks(club, week)[-LAST_GAMES:],
             histories,
             snapshot.clubs,
-            snapshot.statuses,
+            statuses,
             frozenset(chart) if rule == "week" else None,
+            earlier,
         )
         _count_teammates(counts, mates)
         rows += _club_rows(at, club, chart, mates)
-    return PlayerInstant(tuple(rows), (*snapshot.stamps, depth.stamp), dict(counts))
+    return PlayerInstant(tuple(rows), tuple(stamps), dict(counts))
 
 
 @dataclass(frozen=True, slots=True)
@@ -111,6 +121,7 @@ class _Instant:
     positions: Mapping[str, str]
     depth: DepthChart
     totals: GroupTotals  # round 3's position-group totals, for its volume allowances
+    statuses: Mapping[str, WeekStatus]  # week W's filings at t_g (live: Tank01's word)
 
 
 def _count_teammates(counts: dict[str, int], mates: Teammates) -> None:
@@ -120,6 +131,7 @@ def _count_teammates(counts: dict[str, int], mates: Teammates) -> None:
     counts["returning_teammates"] += back.counted
     counts["club_games_with_a_returning_teammate"] += int(back.counted > 0)
     counts["teammates_absent_without_evidence"] += back.without_evidence
+    counts["returning_teammates_without_an_out_or_doubtful_filing"] += back.without_withheld_filing
     counts["vacating_teammates"] += gone.counted
     counts["club_games_with_vacated_shares"] += int(gone.counted > 0)
     counts["withheld_teammates_not_in_the_last_three"] += gone.left_out
@@ -147,7 +159,7 @@ def _club_rows(at: _Instant, club: str, chart: Mapping[str, int], mates: Teammat
         inputs = PlayerInputs(
             pid,
             position,
-            at.snapshot.statuses.get(pid),
+            at.statuses.get(pid),
             at.histories.get(pid, ()),
             at.prior.get(pid, ()),
             frozenset(d for g in edge_games for d in g.defaults if d == NO_SNAP_ROW),

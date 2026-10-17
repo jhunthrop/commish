@@ -28,7 +28,7 @@ from research.model.weekly3.snapshot import read_prior
 from research.model.weekly3.work import player_games
 from research.model.weekly4.features import reads
 from research.model.weekly4.features.admitted import CLUB_EDGES, admit_read
-from research.model.weekly4.features.charted import restamp, week_passes
+from research.model.weekly4.features.charted import week_passes
 from research.model.weekly4.features.depth import DepthRule
 from research.model.weekly4.features.game import Weather
 from research.model.weekly4.features.outcomes import OutcomeReader, play_rows, team_outcomes
@@ -66,10 +66,16 @@ class SeasonBuild:
     seconds: float = 0.0
 
 
-def _game_tallies(plays: Sequence[Play], positions: Mapping[str, str]) -> dict[str, Tallies]:
+def game_tallies(plays: Sequence[Play], positions: Mapping[str, str]) -> dict[str, Tallies]:
+    """Each game's tallies. An instant merges whole games, which equals tallying its admitted plays
+    only because every play of a game carries the game's one stamp (2.9); a game with two is refused."""
     by_game: dict[str, list[Play]] = defaultdict(list)
     for play in plays:
         by_game[play.game_id].append(play)
+    for game_id, found in by_game.items():
+        stamps = {p.as_of for p in found}
+        if len(stamps) != 1:
+            raise InputRuleError(f"the plays of {game_id} carry {len(stamps)} stamps; a game's plays carry one")
     return {game_id: tally(found, positions) for game_id, found in by_game.items()}
 
 
@@ -101,15 +107,14 @@ def _inputs(  # noqa: PLR0913, PLR0917 - the season's reads, named
 ) -> SeasonInputs:
     input_week = max(weeks) - 1
     plays = reads.plays(conn, spec.season, input_week, last)
-    charted = restamp(reads.charted(conn, spec.season, input_week, last), week_passes(schedule))
-    stadiums = reads.stadiums(conn) if spec.live_after is not None else {}
     return SeasonInputs(
         spec.season,
         schedule,
         tuple(plays),
-        _game_tallies(plays, positions),
-        tuple(charted),
-        stadiums,
+        game_tallies(plays, positions),
+        tuple(reads.charted(conn, spec.season, input_week, last)),
+        week_passes(schedule),
+        reads.stadiums(conn),
         spec.live_after is not None,
     )
 

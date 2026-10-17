@@ -20,10 +20,8 @@ from research.model.weekly4.features.columns import (
     NO_DEPTH_ROW,
     NO_GAME_THIS_SEASON,
     OPPONENT_NO_PACE,
-    PASS_RATE_ALLOWED_STOPPED,
+    PASS_RATE_ALLOWED_WITHOUT_A_GAME,
     PLAYER_DEFAULTS,
-    RETURNING_WITHOUT_EVIDENCE,
-    RETURNING_WITHOUT_PRE_ABSENCE,
     ROUND_THREE_ALLOWANCES,
     decay_label,
     default_column,
@@ -63,13 +61,16 @@ class ClubGame:
     own: Tempo
     opponent_tempo: Tempo
     pressure: DefencePressure
+    pass_rate_allowed: Allowance  # the opponent defence's, a shrunk difference (amendment 2 item 2)
 
     @property
     def defaults(self) -> frozenset[str]:
         found = set(self.figures.defaults | self.weather.defaults | self.venue.defaults)
-        found |= self.own.defaults | self.pressure.defaults | {PASS_RATE_ALLOWED_STOPPED}
+        found |= self.own.defaults | self.pressure.defaults
         if NO_PACE in self.opponent_tempo.defaults:
             found.add(OPPONENT_NO_PACE)
+        if self.pass_rate_allowed.default is not None:
+            found.add(PASS_RATE_ALLOWED_WITHOUT_A_GAME)
         return frozenset(found)
 
 
@@ -104,12 +105,12 @@ def game_row(g: ClubGame) -> Row:
         "wind_mph": w.wind_mph,
         "precipitation": w.precipitation,
         "precipitation_probability": w.precipitation_probability,
-        "surface": math.nan,
+        "surface": v.surface,
         "own_pace": g.own.pace,
         "own_pass_rate_over_expected": g.own.pass_rate_over_expected,
         "opponent_pace": g.opponent_tempo.pace,
         "opponent_pass_rate_over_expected": g.opponent_tempo.pass_rate_over_expected,
-        "opponent_pass_rate_allowed": math.nan,
+        "opponent_pass_rate_allowed": g.pass_rate_allowed.value,
         "opponent_sack_rate": g.pressure.sack_rate,
         "opponent_hit_rate": g.pressure.hit_rate,
         "opponent_pfr_pressure_rate": g.pressure.pfr_rate,
@@ -199,10 +200,6 @@ def _player_defaults(p: PlayerInputs) -> set[str]:
             found.add(f"no_{kind}_yet")
     if p.vacated.left_out:
         found.add(TEAMMATE_NOT_IN_LAST_THREE)
-    if p.returning.without_evidence:
-        found.add(RETURNING_WITHOUT_EVIDENCE)
-    if p.returning.without_pre_absence:
-        found.add(RETURNING_WITHOUT_PRE_ABSENCE)
     return found
 
 
@@ -233,6 +230,10 @@ def player_row(g: ClubGame, p: PlayerInputs) -> Row:
         "vacating_teammates": p.vacated.counted,
         **{f"returning_{kind}": p.returning.shares.of(kind) for kind in SHARE_KINDS},
         "returning_teammates": p.returning.counted,
+        # 2.2's counts, not defaults this row took (review L4): teammates away with no evidence of a
+        # return, and away with no game before the absence.
+        "teammates_absent_without_evidence": p.returning.without_evidence,
+        "teammates_absent_without_a_pre_absence_share": p.returning.without_pre_absence,
         **_targets(p),
         **charted,
         **allowances,

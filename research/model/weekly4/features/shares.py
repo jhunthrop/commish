@@ -75,6 +75,15 @@ def share_vector(games: Sequence[GameShare]) -> Counts:
     return Counts(*(season_share(games, kind) for kind in Counts.__dataclass_fields__))
 
 
+def mean_share_vector(games: Sequence[GameShare]) -> Counts:
+    """The mean of his per-game shares of every kind (a game the club had none of a kind is a share
+    of 0); the pre-absence share alone is read this way (2.2, amendment 2 item 9)."""
+    if not games:
+        return ZERO_COUNTS
+    per_game = [share_vector([g]) for g in games]
+    return Counts(*(sum(c.of(kind) for c in per_game) / len(per_game) for kind in Counts.__dataclass_fields__))
+
+
 def snap_mean(games: Sequence[GameShare]) -> float:
     return sum(g.snap_share for g in games) / len(games) if games else math.nan
 

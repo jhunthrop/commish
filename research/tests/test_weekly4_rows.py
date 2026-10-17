@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 
 import pytest
 
+from research.model.weekly3.allowance import NO_GAME, Allowance
 from research.model.weekly4.features.columns import (
     PLAYER_SCHEMA,
     TEAM_OUTCOME_COLUMNS,
@@ -33,10 +34,11 @@ def _game() -> ClubGame:
         _T,
         Figures(nan, nan, nan, None, frozenset({"no_game_figure"})),
         Weather("dome", 1.0, 70.0, 0.0, 0.0, 0.0, frozenset()),
-        Venue(1.0, 7.0, 1.0, 1.0, frozenset({"surface_stopped"})),
+        Venue(1.0, 7.0, 1.0, 1.0, "grass", frozenset({"surface"})),
         Tempo(28.0, 1.0, 6, frozenset()),
         Tempo(nan, nan, 0, frozenset({"no_pace"})),
         DefencePressure(0.07, 0.15, nan, frozenset({"defence_without_a_pfr_pressure_row"})),
+        Allowance(0.0, 0, NO_GAME),
     )
 
 
@@ -66,7 +68,9 @@ def test_a_team_row_is_the_schemas_and_marks_its_game_defaults() -> None:
     assert set(row) == {n for n, _ in TEAM_SCHEMA} - {n for n, _ in TEAM_OUTCOME_COLUMNS}
     assert row[default_column("no_game_figure")] == 1
     assert row[default_column("opponent_no_pace")] == 1
-    assert row[default_column("defence_pass_rate_allowed_stopped")] == 1
+    assert row[default_column("pass_rate_allowed_without_a_game")] == 1
+    assert row[default_column("surface")] == 1 and row["surface"] == "grass"
+    assert row["opponent_pass_rate_allowed"] == 0.0
     assert row[default_column("no_weather")] == 0
     assert math.isnan(float(str(row["spread"])))
 

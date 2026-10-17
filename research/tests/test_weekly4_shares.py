@@ -5,6 +5,7 @@ three games; and returning shares only with the evidence a return needs (a week-
 Out or Doubtful, or a week-W depth-chart row), a teammate without it counted as absent."""
 
 import math
+from dataclasses import replace
 
 import pytest
 
@@ -72,6 +73,33 @@ def test_returning_needs_a_filing_that_is_not_out_or_a_week_w_chart_row() -> Non
     assert found.shares.targets == pytest.approx(6.0 / 20.0 + 2.0 / 20.0)
     assert found.without_evidence == 1  # "back_no_word": no filing never means returned
     assert found.without_pre_absence == 1  # "never_played"
+
+
+def test_the_absence_ends_with_the_clubs_latest_game_and_its_share_is_the_mean_of_game_shares() -> None:
+    small = Counts(targets=5.0)
+    histories = {
+        "back": (
+            GameShare(1, "KC", Counts(targets=1.0), small, 0.5),
+            GameShare(2, "KC", Counts(targets=4.0), _TEAM, 0.5),
+        ),
+        "played_since": (_game(1, 2.0), _game(3, 2.0), _game(5, 2.0)),  # missed week 4 only
+        "me": (_game(4, 1.0), _game(5, 1.0)),
+    }
+    mates = Teammates(
+        club="KC",
+        recent_weeks=(3, 4, 5),
+        histories=histories,
+        clubs=dict.fromkeys(histories, "KC"),
+        statuses={"back": "questionable", "played_since": "questionable"},
+        depth=frozenset(),
+        earlier={("back", 3): "withheld"},
+    )
+    found = returning("me", mates)
+    assert found.counted == 1  # "played_since" played the club's latest game: not away
+    assert found.shares.targets == pytest.approx((1.0 / 5.0 + 4.0 / 10.0) / 2)
+    assert found.without_withheld_filing == 0  # his absence carried an Out filing in week 3
+    unfiled = returning("me", replace(mates, earlier={}))
+    assert unfiled.without_withheld_filing == 1
 
 
 def test_on_the_charts_fallback_only_the_filing_is_evidence() -> None:

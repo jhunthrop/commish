@@ -20,9 +20,11 @@ from research.model.weekly4.features.game import (
     NO_ROOF_STATE,
     NO_SCHEDULE_ROW,
     NO_STADIUM_ROW,
+    NO_SURFACE,
     NO_WEATHER,
     NO_WEATHER_ROW,
-    SURFACE_STOPPED,
+    ROOF_UNDECIDED,
+    SURFACE_FROM_STADIUM,
 )
 from research.model.weekly4.features.matchup import (
     CLUB_GAME_WITHOUT_PACE,
@@ -34,15 +36,13 @@ from research.model.weekly4.features.matchup import (
 from research.model.weekly4.features.plays import DEPTH_BUCKETS, SHARE_KINDS
 from research.model.weekly4.features.shares import DECAYS
 
-# Stopped features (the lane's brief: a required input absent in a way 2.10 does not cover is stopped,
-# counted and named), and the opponent's tempo default beside the club's own.
-PASS_RATE_ALLOWED_STOPPED: Final = "defence_pass_rate_allowed_stopped"
+# The opponent's tempo default beside the club's own; the defence's pass rate allowed with no game
+# (amendment 2 item 2: the shrinkage's prior, 0).
 OPPONENT_NO_PACE: Final = "opponent_no_pace"
+PASS_RATE_ALLOWED_WITHOUT_A_GAME: Final = "pass_rate_allowed_without_a_game"
 NO_GAME_THIS_SEASON: Final = "no_game_this_season"
 NO_DEPTH_ROW: Final = "no_depth_row"
 NO_OPPORTUNITY_YET: Final = tuple(f"no_{kind}_yet" for kind in ("targets", "carries"))
-RETURNING_WITHOUT_EVIDENCE: Final = "returning_teammate_without_evidence"
-RETURNING_WITHOUT_PRE_ABSENCE: Final = "returning_teammate_without_pre_absence_share"
 
 GAME_DEFAULTS: Final = (
     NO_GAME_FIGURE,
@@ -58,8 +58,10 @@ GAME_DEFAULTS: Final = (
     OPPONENT_NO_PACE,
     NO_PRESSURE_GAME,
     NO_PFR_PRESSURE,
-    SURFACE_STOPPED,
-    PASS_RATE_ALLOWED_STOPPED,
+    SURFACE_FROM_STADIUM,
+    NO_SURFACE,
+    ROOF_UNDECIDED,
+    PASS_RATE_ALLOWED_WITHOUT_A_GAME,
 )
 PLAYER_DEFAULTS: Final = (
     NO_GAME_THIS_SEASON,
@@ -69,8 +71,6 @@ PLAYER_DEFAULTS: Final = (
     NO_SNAP_ROW,
     *NO_OPPORTUNITY_YET,
     TEAMMATE_NOT_IN_LAST_THREE,
-    RETURNING_WITHOUT_EVIDENCE,
-    RETURNING_WITHOUT_PRE_ABSENCE,
     NO_GAME,
     NO_EXPECTATION,
     *(missing_indicator(name) for name in CHARTED_FEATURES),
@@ -111,7 +111,7 @@ GAME_COLUMNS: Final = (
     ("wind_mph", "float"),
     ("precipitation", "float"),
     ("precipitation_probability", "float"),
-    ("surface", "float"),
+    ("surface", "str"),
     ("own_pace", "float"),
     ("own_pass_rate_over_expected", "float"),
     ("opponent_pace", "float"),
@@ -140,6 +140,8 @@ PLAYER_COLUMNS: Final = (
     ("vacating_teammates", "int"),
     *((f"returning_{kind}", "float") for kind in SHARE_KINDS),
     ("returning_teammates", "int"),
+    ("teammates_absent_without_evidence", "int"),
+    ("teammates_absent_without_a_pre_absence_share", "int"),
     *((f"target_depth_{bucket}", "float") for bucket in DEPTH_BUCKETS),
     ("target_outside", "float"),
     ("target_middle", "float"),
