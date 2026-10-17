@@ -41,9 +41,29 @@ type List struct {
 }
 
 // Writes says whether the member's lineup is set on a platform from our
-// screen, and why not. *hostmoves.Service implements it.
+// screen, and which check stops it. *hostmoves.Service implements it from
+// the same checks the Lineup's verb follows.
 type Writes interface {
-	LineupMove(ctx context.Context, accountID uuid.UUID, host string) (apitypes.LineupMoves, error)
+	LineupWrites(ctx context.Context, accountID uuid.UUID, host string) (WriteState, error)
+}
+
+// WritesOff is the check that stops a platform's lineup being set from our
+// screen, in hostmoves' order.
+type WritesOff string
+
+// The checks, as hostmoves.access makes them.
+const (
+	WritesOffTakesNone WritesOff = "takes_none"
+	WritesOffNotOpen   WritesOff = "not_open"
+	WritesOffConnect   WritesOff = "connect"
+	WritesOffReconnect WritesOff = "reconnect"
+	WritesOffReconsent WritesOff = "reconsent"
+)
+
+// WriteState is whether the lineup is set from here and, when not, why.
+type WriteState struct {
+	On  bool
+	Off WritesOff
 }
 
 // uncheckedWords is a connection's writes line when the check failed: the
@@ -98,16 +118,16 @@ func (l *List) withWrites(ctx context.Context, accountID uuid.UUID, c Connection
 	if l.Writes == nil {
 		return v
 	}
-	moves, err := l.Writes.LineupMove(ctx, accountID, c.Host)
+	state, err := l.Writes.LineupWrites(ctx, accountID, c.Host)
 	if err != nil {
 		l.Log.Warn("hosts: writes", "host", c.Host, "err", err)
 		reason := uncheckedWords
 		v.WritesReason = &reason
 		return v
 	}
-	v.WritesOn = moves.Lineup == apitypes.LineupMovesLineupAvailable
+	v.WritesOn = state.On
 	if !v.WritesOn {
-		reason := writesOffWords(c, moves)
+		reason := writesOffWords(c.Host, state.Off)
 		v.WritesReason = &reason
 	}
 	return v
@@ -116,19 +136,22 @@ func (l *List) withWrites(ctx context.Context, accountID uuid.UUID, c Connection
 // platformNames are the platforms as the Account room names them.
 var platformNames = map[string]string{"ffpc": "FFPC", "yahoo": "Yahoo", "espn": "ESPN", "mfl": "MyFantasyLeague"}
 
-// writesOffWords is the Account room's own sentence for why a platform's
-// lineup is not set from here (Lane 66k L1): it names the platform and
-// what the member does on this page, never the Lineup screen's copy verb.
-func writesOffWords(c Connection, moves apitypes.LineupMoves) string {
-	name := platformNames[c.Host]
-	switch {
-	case !moves.TakesWrites:
+// writesOffWords is the Account room's own sentence for the check that
+// stops a platform's lineup being set from here (Lane 66k L1): it names the
+// platform and what the member does on this page, never the Lineup
+// screen's copy verb. The check is hostmoves' own (rereview N5).
+func writesOffWords(host string, off WritesOff) string {
+	name := platformNames[host]
+	switch off {
+	case WritesOffTakesNone:
 		return name + " takes no lineups from here."
-	case !moves.WritesOn:
+	case WritesOffNotOpen:
 		return "Lineups on " + name + " are not open to your account yet."
-	case c.Status != StatusConnected:
+	case WritesOffConnect:
+		return "Connect " + name + " to set your lineup from here."
+	case WritesOffReconnect:
 		return "Connect " + name + " again to set your lineup from here."
-	case c.ConsentVersion < consentVersions[c.Host]:
+	case WritesOffReconsent:
 		return "Connect " + name + " again and agree to moves to set your lineup from here."
 	}
 	return uncheckedWords
