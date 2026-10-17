@@ -161,6 +161,29 @@ def read_counts(conn: Connection, t: RoundFour) -> Counts:
     )
 
 
+_FILL_SOURCES: Final = text(
+    "select season, coalesce(temperature_source, 'none') as temperature, coalesce(wind_source, 'none') as wind, "
+    "coalesce(precipitation_source, 'none') as precipitation, count(*) as n from research.game_weather "
+    "where roof in ('open', 'outdoors') and season = any(:seasons) group by 1, 2, 3, 4 order by 1, 2, 3, 4"
+)
+_ISD_AGREEMENT: Final = text(
+    "select season, count(*) as both_read, count(*) filter (where precipitation = isd_precipitation) as agree "
+    "from research.game_weather where precipitation_source = 'pbp_weather_text' and isd_precipitation is not null "
+    "and season = any(:seasons) group by season order by season"
+)
+
+
+def weather_report(conn: Connection, t: RoundFour) -> dict[str, Any]:
+    """3.2, reported: the weather fill's counts by source, and the precipitation flag's agreement with
+    the ISD gauge where both were read."""
+    by = {"seasons": list(_seasons(t))}
+    fill = [dict(r._mapping) for r in conn.execute(_FILL_SOURCES, by)]
+    agreement = {
+        int(r.season): {"both_read": int(r.both_read), "agree": int(r.agree)} for r in conn.execute(_ISD_AGREEMENT, by)
+    }
+    return {"fill_by_source": fill, "precipitation_agreement_with_isd": agreement}
+
+
 def payload(counts: Counts, t: RoundFour, verdict: str | None, built: str | None) -> dict[str, Any]:
     return {
         "plays": dict(counts.plays),

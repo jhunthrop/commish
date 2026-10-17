@@ -54,7 +54,7 @@ from research.model.weekly4 import gates
 from research.model.weekly4.files import build_report, load_store
 from research.model.weekly4.gates import DEVELOPMENT_CHECK, GATE_LINES, ROUND_FOUR, RoundFour
 from research.model.weekly4.margins import MarginReader, margins
-from research.model.weekly4.preconditions import depth_chart_verdict, payload, read_counts
+from research.model.weekly4.preconditions import depth_chart_verdict, payload, read_counts, weather_report
 from research.model.weekly4.preconditions import missing_preconditions as missing_round_four
 from research.model.weekly4.reporting import fitted_payload, judge_season, stage_digests
 from research.model.weekly4.round_three import (
@@ -243,6 +243,7 @@ def _run(command: str, url: str, features: Path, t: RoundFour, out: Path) -> int
             conn.execute(text("set transaction read only"))
             guard_queries(conn, closed_seasons(t.round_three))
             counts = read_counts(conn, t)
+            weather = weather_report(conn, t)
             verdict = depth_chart_verdict()
             missing = missing_round_four(counts, t, verdict, next(iter(built)) if len(built) == 1 else None)
             if missing:
@@ -298,6 +299,7 @@ def _run(command: str, url: str, features: Path, t: RoundFour, out: Path) -> int
         "thresholds": thresholds_payload(t),
         "features": {"directory": str(features), "digests": dict(store.digests), "depth_chart_rule": sorted(built)},
         "preconditions": payload(counts, t, verdict, next(iter(built)) if len(built) == 1 else None),
+        "weather": weather,
         "round_three": {"lines": [asdict(line) for line in r3.lines], "development_check_reproduced": True},
         "fitted": fitted_payload(fitted),
         "outcome_seasons_read": {name: list(found) for name, found in served.items()},
