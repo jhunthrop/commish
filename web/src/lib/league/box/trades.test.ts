@@ -16,6 +16,7 @@ import {
 	rosterOrder,
 	shortSide,
 	sideRows,
+	weekLine,
 	sortRows,
 	toneOf,
 	tradeBasis,
@@ -150,6 +151,19 @@ void test('a trade reads by last names, its gains and week signed, its room by n
 	assert.equal(fromWords('Max_Jensen10', false), 'From Max_Jensen10');
 });
 
+void test("a trade's week reads from the API's two changes, on the card and atop an opened trade", () => {
+	assert.equal(weekLine(row(5.7, 0.7)), '+7.3 Proj for you this week, +2.5 for them');
+	assert.equal(
+		weekLine(row(4.6, 0.5, { my_proj_change: 10.9, their_proj_change: -5.6 })),
+		'+10.9 Proj for you this week, −5.6 for them'
+	);
+	assert.equal(
+		weekLine(row(1, 1, { my_proj_change: 0.02, their_proj_change: 0 })),
+		'0.0 Proj for you this week, 0.0 for them'
+	);
+	assert.equal(weekLine(row(1, 1, { my_proj_change: null, their_proj_change: null })), null);
+});
+
 void test('the opened trade lists your give and drop, then their get, each moving the right way', () => {
 	const sides = sideRows(row(5.7, 0.7));
 	assert.deepEqual(
@@ -217,7 +231,7 @@ void test("the builder's room and scoreboard come from the check, '--' before on
 		theirs: 'No one to drop'
 	});
 	const answer = check();
-	assert.deepEqual(bugFigures(answer.totals.theirs, answer.trade.their_gain), {
+	assert.deepEqual(bugFigures(answer.totals.theirs, answer.trade.their_gain, -5.6), {
 		projBefore: '104.7',
 		projAfter: '99.1',
 		projChange: '−5.6',
@@ -229,15 +243,19 @@ void test("the builder's room and scoreboard come from the check, '--' before on
 	});
 	const below = bugFigures(
 		{ proj_before: 50, proj_after: 41.1, season_before: -1.3, season_after: -0.5 },
-		0.8
+		0.8,
+		-8.9
 	);
+	assert.equal(below.projChange, '−8.9');
+	// The week's change is the API's own, never the totals subtracted here (review M1).
+	assert.equal(bugFigures(answer.totals.yours, 4.6, 7.3).projChange, '+7.3');
 	assert.equal(below.seasonBefore, '−1.3');
 	assert.equal(below.seasonAfter, '−0.5');
-	const before = bugFigures(null, null);
+	const before = bugFigures(null, null, null);
 	assert.equal(before.projAfter, '--');
 	assert.equal(before.seasonChange, '--');
 	assert.equal(
-		bugFigures({ proj_before: null, proj_after: null, season_before: 1, season_after: 2 }, 1)
+		bugFigures({ proj_before: null, proj_after: null, season_before: 1, season_after: 2 }, 1, null)
 			.projChange,
 		'--'
 	);
@@ -266,7 +284,7 @@ const advice: Pick<
 	'basis' | 'basis_note' | 'projection_read_at' | 'projection_scoring' | 'player_points'
 > = {
 	basis:
-		'Trades where both lineups gain over the rest of the season on our rest-of-season order, best for you first. The other team decides.',
+		"Trades where both lineups gain on our rest-of-season order. Each team's come best for you first among those they gain at least 0.5 a week from, then the close calls for them. The other team decides.",
 	basis_note: 'Points over replacement are for a 12-team league.',
 	projection_read_at: '2026-10-17T02:00:00.000Z',
 	projection_scoring: { format: 'ppr', league_own: false },
@@ -278,7 +296,7 @@ void test('the basis is five lines at most, the first saying which trades are li
 	assert.ok(lines.length <= 5, String(lines.length));
 	assert.match(
 		lines[0] ?? '',
-		/^Trades where both lineups gain over the rest of the season.*best for you first\. The other team decides\./
+		/^Trades where both lineups gain on our rest-of-season order\. .*then the close calls for them\. The other team decides\./
 	);
 	assert.match(
 		lines[1] ?? '',
@@ -301,6 +319,7 @@ void test('copy guard: every word the trade table prints is fantasy words, the p
 		worthTitle(2),
 		worthTitle(1),
 		phoneWith({ name: 'Max_Jensen10' }, row(5.7, 0.7)),
+		weekLine(row(5.7, 0.7)) ?? '',
 		offerText({ name: 'Max_Jensen10' }, row(5.7, 0.7)),
 		proposeVerb({ propose: 'unavailable' }, 'sleeper'),
 		copied.said,
