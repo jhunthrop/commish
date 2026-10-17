@@ -1,9 +1,11 @@
 <script lang="ts">
-	import Label from '#lib/ui/Label.svelte';
-	import Panel from '#lib/ui/Panel.svelte';
-	import PanelHead from '#lib/ui/PanelHead.svelte';
 	import type { LeagueHost } from '../api.ts';
-	import LineRow from './LineRow.svelte';
+	import BoxTable from '../box/BoxTable.svelte';
+	import { onMount } from 'svelte';
+	import { lazySheet } from '#lib/site/lazy-sheet.svelte.ts';
+	import BoxBasis from '../box/BoxBasis.svelte';
+	import { sheetTags } from '../sheet-tags.ts';
+	import { lineupBox } from '../box/lineup.ts';
 	import MovePanel from './MovePanel.svelte';
 	import Screen from './Screen.svelte';
 	import type { HostMoveInput, HostMovePlan, HostMoveResult, LineupAdvice } from './api.ts';
@@ -15,20 +17,12 @@
 		setsOnHost,
 		type MoveStep
 	} from './move.ts';
-	import {
-		LINES,
-		carriesPerGame,
-		figureHead,
-		lineupDecision,
-		lineupTitle,
-		satIds,
-		slotLabels,
-		verbWords
-	} from './words.ts';
+	import { LINES, lineupDecision, lineupTitle, verbWords } from './words.ts';
 
-	/** Start and sit (spec §4): this week's lineup slot by slot, ours, and where it differs from the
-	 * lineup the host holds, the player it sits with the fact that tipped it; below it the bench, the
-	 * players a change sits marked. One column at every width, as §4.1 lays it out. Where the API
+	/** Start and sit (spec §4) as a box score (Lane 66d): this week's lineup slot by slot, ours, and
+	 * where it differs from the lineup the host holds, the player it sits with the fact that tipped it;
+	 * the totals; below it the bench, the players a change sits marked. Each row is columns: the slot,
+	 * the player, his game with its facts, this week's projection and his points so far. Where the API
 	 * opens the move (spec §10.2), the verb opens a confirmation on this screen naming the exact
 	 * changes, and its one verb sets them on the host; otherwise the verb is the host's page. */
 	interface Props {
@@ -43,14 +37,14 @@
 	}
 
 	let { advice, host, plan, make, reread }: Props = $props();
-	/** The head over the lineup and the bench names the number their rows end on. */
+	const box = $derived(lineupBox(advice));
+	// Your sheet's tags mark your rows once the sheet is in (review L7).
+	onMount(() => void lazySheet.load());
+	/** Every line on the screen, for the game facts' read said once under the rows. */
 	const shown = $derived([
 		...advice.slots.flatMap((s) => (s.host ? [s.ours, s.host] : [s.ours])),
 		...advice.bench
 	]);
-	const head = $derived(figureHead(shown));
-	/** Whether the rows end on points a game: a row without them then says so. */
-	const perGameScreen = $derived(carriesPerGame(shown));
 
 	const MOVE_ID = 'lineup-move';
 	let step = $state<MoveStep>({ kind: 'closed' });
@@ -86,10 +80,6 @@
 		step = { kind: 'closed' };
 		planned = null;
 	}
-
-	const labels = $derived(slotLabels(advice.slots.map((s) => s.slot)));
-	/** The host's starters our lineup sits, marked on the bench. */
-	const sat = $derived(satIds(advice.slots));
 </script>
 
 <Screen
@@ -115,61 +105,29 @@
 			/>
 		{/if}
 	{/snippet}
-	<Panel as="section" label={lineupTitle(advice.week)} padding="none">
-		<div class="head">
-			<PanelHead title={lineupTitle(advice.week)} aside={head} level={2} />
-		</div>
-		{#each advice.slots as slot, i (`${slot.slot}-${String(i)}`)}
-			{#if slot.changed}
-				<div class="change">
-					<LineRow line={slot.ours} slot={labels[i]} {perGameScreen} />
-					{#if slot.host}<LineRow line={slot.host} slot={LINES.sit} {perGameScreen} />{/if}
-					{#if slot.sentence}<p class="why">{slot.sentence}</p>{/if}
-				</div>
-			{:else}
-				<LineRow line={slot.ours} slot={labels[i]} {perGameScreen} />
-			{/if}
-		{/each}
-	</Panel>
-	<Panel as="section" label={LINES.bench} padding="none">
-		<div class="head">
-			<PanelHead title={LINES.bench} aside={head} level={2} />
-		</div>
-		{#each advice.bench as line (line.player.host_id)}
-			{@const sits = sat.has(line.player.host_id)}
-			<!-- A starter a change sits is on the change's wash here too, so the two read as one move. -->
-			<div class:change={sits}>
-				<LineRow {line} slot={sits ? LINES.sit : LINES.bench} {perGameScreen} />
-			</div>
-		{:else}
-			<p class="none"><Label>{LINES.noBench}</Label></p>
-		{/each}
-	</Panel>
+	<div class="box">
+		<BoxTable
+			team={lineupTitle(advice.week)}
+			mine
+			avatar={false}
+			tagsOf={sheetTags}
+			starters={box.starters}
+			bench={box.bench}
+			benchSat={box.benchSat}
+			totals={box.totals}
+			noBench={LINES.noBench}
+		/>
+	</div>
+	<BoxBasis
+		byPlayer={advice.player_points}
+		projection={{ readAt: advice.projection_read_at, scoring: advice.projection_scoring }}
+		lines={shown}
+	/>
 </Screen>
 
 <style>
-	.head {
-		padding: var(--s-3) var(--s-3) var(--s-2);
-	}
-
-	/* A change is ours over the host's, on our wash, with the fact that tipped it. */
-	.change {
-		background: var(--accent-wash);
-		border-left: 4px solid var(--accent);
-	}
-
-	.why {
-		margin: 0;
-		padding: var(--s-2) var(--s-3) var(--s-3);
-		font-size: var(--t-sm);
-		color: var(--ink);
-		border-bottom: 1px solid var(--line);
-	}
-
-	.none {
-		margin: 0;
-		padding: var(--s-3);
-		color: var(--ink-3);
-		font-size: var(--t-sm);
+	/* One team's box reads best at a box's width: past it the game sits far from the name. */
+	.box {
+		max-width: 920px;
 	}
 </style>

@@ -18,6 +18,7 @@ import type {
 	HostMovePlan,
 	HostMoveResult,
 	LineupAdvice,
+	MatchupBox,
 	PlayerLine,
 	TradeAdvice,
 	TradeCheck,
@@ -88,12 +89,13 @@ async function load<T>(name: string): Promise<T> {
 	return JSON.parse(await readFile(new URL(`${name}.json`, DATA), 'utf8')) as T;
 }
 
-const [sync, lineup, waivers, trades, gameWeek] = await Promise.all([
+const [sync, lineup, waivers, trades, gameWeek, matchupBox] = await Promise.all([
 	load<LeagueSync>('sync'),
 	load<LineupAdvice>('lineup'),
 	load<WaiverAdvice>('waivers'),
 	load<TradeAdvice>('trades'),
-	load<GameWeek>('games')
+	load<GameWeek>('games'),
+	load<MatchupBox>('matchup')
 ]);
 
 const myTeam = sync.teams.find((t) => t.roster_id === sync.me);
@@ -269,7 +271,7 @@ function tradeCheck(input: TradeCheckInput): TradeCheck | string {
 }
 
 const CHECK = /^\/leagues\/attached\/([^/]+)\/trades\/check$/;
-const IN_SEASON = /^\/leagues\/attached\/([^/]+)\/(lineup|waivers|trades)$/;
+const IN_SEASON = /^\/leagues\/attached\/([^/]+)\/(lineup|matchup|waivers|trades)$/;
 const MOVES = /^\/leagues\/attached\/([^/]+)\/moves(\/plan)?$/;
 
 /** A changed slot's place in the API's words: "at RB", "in the flex". */
@@ -526,6 +528,7 @@ async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> 
 		if (id === SLOW) await new Promise((resolve) => setTimeout(resolve, HOLD_MS));
 		const bodies = {
 			lineup: ESPN_MOVES.has(id ?? '') ? espnLineup() : lineup,
+			matchup: matchupBox,
 			waivers: ESPN_MOVES.has(id ?? '')
 				? espnWaivers(url.searchParams.get('position'))
 				: waiversAt(url.searchParams.get('position')),

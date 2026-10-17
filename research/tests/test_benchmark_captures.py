@@ -1,6 +1,6 @@
 """The two benchmarks captured per kickoff slot: the slots themselves, Tank01's weekly projection
-parsed per player (`testdata/tank01/projections-2026-week-1.json`, eight players of the one stored
-snapshot), and The Odds API's anytime-touchdown market (`testdata/odds/`, recorded 2026-10-16: the
+parsed per player (`testdata/tank01/projections-2026-week-1.json`, eight players and one team defense
+of the one stored snapshot), and The Odds API's anytime-touchdown market (`testdata/odds/`, recorded 2026-10-16: the
 event list and HOU at JAX in London, 2026-10-18)."""
 
 import json
@@ -80,12 +80,33 @@ def _projections() -> object:
 def test_each_projected_player_is_a_row_with_his_points_and_stats() -> None:
     captured = datetime(2026, 9, 9, 0, 53, tzinfo=UTC)
     rows = {r["provider_player_id"]: r for r in projections.parse_projection_snapshot(_projections(), 41, captured)}
-    assert len(rows) == 8  # noqa: PLR2004 - the fixture's eight players
+    assert len(rows) == 9  # noqa: PLR2004 - the fixture's eight players and one defense
     rodgers = rows["8439"]
     assert (rodgers["position"], rodgers["team"], rodgers["season"], rodgers["week"]) == ("QB", "PIT", 2026, 1)
     assert (rodgers["ppr_points"], rodgers["pass_yards"], rodgers["pass_touchdowns"]) == (15.76, 230.0, 1.7)
     kicker = rows["10621"]
     assert (kicker["position"], kicker["pass_yards"], kicker["ppr_points"]) == ("PK", None, 6.0)
+
+
+def test_a_team_defense_is_a_row_with_its_one_figure_in_every_format() -> None:
+    captured = datetime(2026, 9, 9, 0, 53, tzinfo=UTC)
+    rows = {r["provider_player_id"]: r for r in projections.parse_projection_snapshot(_projections(), 41, captured)}
+    defense = rows[projections.defense_player_id("ARI")]
+    assert (defense["position"], defense["team"], defense["season"], defense["week"]) == ("DEF", "ARI", 2026, 1)
+    assert (defense["ppr_points"], defense["half_points"], defense["standard_points"]) == (7.0, 7.0, 7.0)
+    assert defense["pass_yards"] is None
+    assert defense["fumbles_lost"] is None
+
+
+def test_a_defense_without_its_figure_is_refused_and_a_payload_without_defenses_has_none() -> None:
+    payload = _projections()
+    assert isinstance(payload, dict)
+    del payload["teamDefenseProjections"]["1"]["fantasyPointsDefault"]
+    with pytest.raises(SchemaDriftError, match=r"teamDefenseProjections\.1\.fantasyPointsDefault"):
+        projections.parse_projection_snapshot(payload, 41, datetime(2026, 9, 9, tzinfo=UTC))
+    del payload["teamDefenseProjections"]
+    rows = projections.parse_projection_snapshot(payload, 41, datetime(2026, 9, 9, tzinfo=UTC))
+    assert all(r["position"] != projections.DEFENSE_POSITION for r in rows)
 
 
 def test_a_player_without_points_is_refused() -> None:
@@ -210,7 +231,34 @@ def test_the_harvest_window_captures_the_slots_projection_and_every_snapshot_is_
         parsed = projections.parse_stored_projections(conn)
         again = projections.parse_stored_projections(conn)
         rows = conn.execute(select(func.count()).select_from(TANK01_PROJECTION_ROWS)).scalar_one()
-    assert (parsed.snapshots, parsed.rows, rows) == (1, 8, 8)
+    assert (parsed.snapshots, parsed.rows, rows) == (1, 9, 9)
+    assert (again.snapshots, again.rows) == (0, 0)
+
+
+def test_a_snapshot_parsed_before_defenses_were_kept_gains_them_once(engine: Engine) -> None:
+    with engine.begin() as conn:
+        snapshot = conn.execute(
+            text(
+                f"insert into {CAPTURE_SNAPSHOTS.fullname} (source, captured_at, digest, payload) "
+                "values (:source, :at, 'd', cast(:payload as jsonb)) returning id"
+            ),
+            {"source": projections.PROJECTIONS_SOURCE, "at": _at(16, 20), "payload": json.dumps(_projections())},
+        ).scalar_one()
+        players_only = [
+            row
+            for row in projections.parse_projection_snapshot(_projections(), snapshot, _at(16, 20))
+            if row["position"] != projections.DEFENSE_POSITION
+        ]
+        conn.execute(insert(TANK01_PROJECTION_ROWS), players_only)
+        parsed = projections.parse_stored_projections(conn)
+        again = projections.parse_stored_projections(conn)
+        defenses = conn.execute(
+            select(func.count())
+            .select_from(TANK01_PROJECTION_ROWS)
+            .where(TANK01_PROJECTION_ROWS.c.position == projections.DEFENSE_POSITION)
+            .where(TANK01_PROJECTION_ROWS.c.snapshot_id == snapshot)
+        ).scalar_one()
+    assert (parsed.snapshots, parsed.rows, defenses) == (1, 1, 1)
     assert (again.snapshots, again.rows) == (0, 0)
 
 

@@ -1,0 +1,363 @@
+/** The box score (Lane 66d): a team's players as columns, not sentences, for the Matchup and Lineup
+ * screens. Each row is the slot, the player (his face, or a defense's club mark, his name, his status
+ * in a word, his club and position), his game in one cell (the opponent and kickoff, then the
+ * expected score with his club's first and the kickoff weather in two or three words), this week's
+ * projection and his points so far. Pure functions over the API's player lines, so every word a box
+ * prints is tested here. */
+import { memberZone, weekdayTime, zoneWord } from '#lib/format/clock.ts';
+import { defenseWords } from '#lib/format/clubs.ts';
+import {
+	designationWord,
+	rankWord,
+	sitsHim,
+	type DesignationStatus
+} from '#lib/format/designation.ts';
+import type { StatusView } from '#lib/run/status-view.ts';
+import { POSITIONS, type Position } from '#lib/types/player.ts';
+import { halves, toBePlayed, PRECIPITATION_NAMED_FROM } from '#lib/format/game-facts.ts';
+import { fixed } from '#lib/format/number.ts';
+import { clubMark } from '#lib/ui/club-mark.ts';
+import type { LeaguePlayer } from '../api.ts';
+import type { LineupSlot, PlayerLine, ProjectionScoring, WeekFacts } from '../inseason/api.ts';
+
+/** A slot as a box labels it: the host's own short words, a defense as "D/ST". */
+export type BoxSlot = LineupSlot['slot'];
+
+const SLOT_WORDS: Readonly<Record<BoxSlot, string>> = {
+	QB: 'QB',
+	RB: 'RB',
+	WR: 'WR',
+	TE: 'TE',
+	FLEX: 'Flex',
+	SUPERFLEX: 'SFlex',
+	K: 'K',
+	DEF: 'D/ST'
+};
+
+/** Every word a box prints that is not a player's, in one place for the copy guard. */
+export const BOX = {
+	slot: 'Slot',
+	player: 'Player',
+	game: 'Game',
+	/** This week's projection, the published one until our own weekly model passes its test. */
+	proj: 'Proj',
+	/** Points so far this week. */
+	pts: 'Pts',
+	totals: 'Totals',
+	bench: 'Bench',
+	bye: 'Bye',
+	final: 'Final',
+	/** A number not held yet: before kickoff, or with no projection. */
+	none: '--',
+	you: 'You',
+	opponent: 'Opponent',
+	noOpponent: 'No opponent this week',
+	/** The kickoff weather's words where the venue says it all. */
+	indoors: 'Indoors',
+	roofOpen: 'Roof TBD',
+	abroad: 'Abroad, no forecast',
+	outdoors: 'Outdoors'
+} as const;
+
+/** The slot's label in a box. */
+export function slotWord(slot: BoxSlot): string {
+	return SLOT_WORDS[slot];
+}
+
+/** A position as a box prints it: a defense is "D/ST". */
+export function positionWord(position: string): string {
+	return position === 'DEF' ? SLOT_WORDS.DEF : position;
+}
+
+/** The weather glyph a cell draws beside its words. */
+export type WeatherGlyph = 'wind' | 'indoors' | 'roof' | 'abroad' | 'outdoors';
+
+export interface WeatherCell {
+	glyph: WeatherGlyph;
+	words: string;
+}
+
+/** His game in the cell's first line: "at JAX" and "Sun 8:30 am", or "Final" once played. */
+export interface BoxGame {
+	where: string;
+	when: string;
+}
+
+/** One row of a box. */
+export interface BoxRow {
+	key: string;
+	/** His board id, for your sheet's tags on him; null for a player our board does not place. */
+	boardId: string | null;
+	/** You tag him Hold on a sheet (the API's held). */
+	held: boolean;
+	slot: string;
+	name: string;
+	/** His page on the site, null without one. */
+	slug: string | null;
+	face: { src: string | null; mark: boolean; alt: string };
+	club: string;
+	position: string;
+	/** His position pill (Lane 63's StatusPill): his position on our order with his rank there, null
+	 * for a defense, which the club mark names. */
+	pill: { position: Position; rank: number | null } | null;
+	/** His status as Lane 63's pill draws it: the week's designation, or a season-long list's word in
+	 * place of his rank. */
+	status: StatusView | null;
+	/** His game, "bye" on a bye week, null when we hold none. */
+	game: BoxGame | 'bye' | null;
+	/** "20 to 22.5": the expected score with his club's first, null once kicked off or without it. */
+	expected: string | null;
+	weather: WeatherCell | null;
+	/** This week's projection, null without one. */
+	proj: number | null;
+	/** His points so far, null until his game has kicked off. */
+	pts: number | null;
+}
+
+/** A box's totals row: the starters' projection and points so far summed, and how many playing
+ * starters have a figure when one lacks it. */
+export interface BoxTotals {
+	proj: number | null;
+	pts: number | null;
+	/** Beside Totals: before the week's projection lands, that it has not; once it has, how many
+	 * playing starters have a Proj when one lacks it. Null when there is nothing to say. */
+	note: string | null;
+}
+
+/** A starter's place in a box: his row, and on a lineup's change the host's starter it sits under
+ * him with the fact that tipped it. */
+export interface BoxStarter {
+	row: BoxRow;
+	/** The host's starter a change sits, under the one it starts; undefined off a change. */
+	sits?: BoxRow | null;
+	/** The fact that tipped the change. */
+	sentence?: string | null;
+}
+
+/** The season-long lists: their word stands in his rank ("RB IR"), as on the board. */
+const SEASON_LONG = new Set<DesignationStatus>(['injured_reserve', 'pup', 'nfi']);
+
+/** His status as Lane 63's pill draws it, the week's designation first, else the host's injured
+ * reserve. */
+export function statusOf(
+	designation: WeekFacts['designation'],
+	hostIR: boolean
+): StatusView | null {
+	const status: DesignationStatus | null =
+		designation?.status ?? (hostIR ? 'injured_reserve' : null);
+	if (status === null) return null;
+	return {
+		rank: SEASON_LONG.has(status) ? rankWord(status) : null,
+		mark: designationWord(status),
+		sits: sitsHim(status),
+		line: null
+	};
+}
+
+/** His position pill: the board's position (a defense has none, the club mark names it). */
+function pillOf(position: string, rank: number | null): BoxRow['pill'] {
+	const known = POSITIONS.find((p) => p === position);
+	return known === undefined ? null : { position: known, rank };
+}
+
+/** "20 to 22.5": his club's expected points, then its opponent's, null without the figures. */
+export function expectedWords(facts: Pick<WeekFacts, 'game_total'>): string | null {
+	const total = facts.game_total;
+	if (total === null) return null;
+	return `${halves(total.team_points)} to ${halves(total.points - total.team_points)}`;
+}
+
+/** The kickoff weather in two or three words with its glyph: "63°, 13 mph", "Indoors", "Roof TBD",
+ * "Abroad, no forecast", with the chance of rain or snow when it is worth naming; null when the venue
+ * is not confirmed and no forecast is held. */
+export function weatherCell(facts: Pick<WeekFacts, 'roof' | 'weather'>): WeatherCell | null {
+	const { roof, weather } = facts;
+	if (roof?.abroad) return { glyph: 'abroad', words: BOX.abroad };
+	if (roof?.kind === 'dome') return { glyph: 'indoors', words: BOX.indoors };
+	if (roof?.kind === 'retractable') return { glyph: 'roof', words: BOX.roofOpen };
+	const parts: string[] = [];
+	if (weather?.temperature_f != null) parts.push(`${String(Math.round(weather.temperature_f))}°`);
+	if (weather?.wind_mph != null) parts.push(`${String(Math.round(weather.wind_mph))} mph`);
+	const chance = weather?.precipitation_chance;
+	if (chance != null && chance >= PRECIPITATION_NAMED_FROM) {
+		const kind = weather?.precipitation_kind;
+		const what = kind === 'snow' ? 'snow' : kind === 'ice' ? 'ice' : 'rain';
+		parts.push(`${String(Math.round(chance))}% ${what}`);
+	}
+	if (parts.length > 0) return { glyph: 'wind', words: parts.join(', ') };
+	return roof === null ? null : { glyph: 'outdoors', words: BOX.outdoors };
+}
+
+/** His game's first line: the opponent with "at" or "vs", then the kickoff on the member's clock, or
+ * "Final" once played; "bye" on a bye week; null when we hold no game. */
+export function gameOf(facts: WeekFacts, zone: string = memberZone()): BoxGame | 'bye' | null {
+	if (facts.bye) return 'bye';
+	if (facts.opponent === null) return null;
+	const where = `${facts.home === false ? 'at' : 'vs'} ${facts.opponent}`;
+	if (facts.played) return { where, when: BOX.final };
+	return { where, when: facts.kickoff === null ? '' : weekdayTime(facts.kickoff, zone) };
+}
+
+/** A player's face: his headshot, or a defense's club mark with the club in its words. */
+function faceOf(player: LeaguePlayer, headshot: string | null): BoxRow['face'] {
+	if (player.position === 'DEF' && player.team !== '') {
+		return { src: clubMark(player.team), mark: true, alt: defenseWords(player.team) };
+	}
+	return { src: headshot, mark: false, alt: '' };
+}
+
+/** A box row from the API's line for him. */
+export function boxRow(line: PlayerLine, slot: string, zone: string = memberZone()): BoxRow {
+	const { facts, player } = line;
+	const ahead = !facts.bye && toBePlayed({ played: facts.played, kickoff: facts.kickoff });
+	return {
+		key: player.host_id,
+		boardId: player.board_id,
+		held: line.held,
+		slot,
+		name: player.name,
+		slug: line.slug,
+		face: faceOf(player, line.headshot),
+		club: player.team,
+		position: positionWord(player.position),
+		pill: pillOf(player.position, line.position_rank),
+		status: statusOf(facts.designation, player.injured_reserve),
+		game: gameOf(facts, zone),
+		expected: ahead ? expectedWords(facts) : null,
+		weather: ahead ? weatherCell(facts) : null,
+		proj: line.week_projection,
+		pts: facts.points_this_week
+	};
+}
+
+/** A row for a host player the box has no line for (the league read alone, without our answer):
+ * his name, club and position, and his points so far when the host gives them. */
+export function hostRow(player: LeaguePlayer, slot: string, pts: number | null): BoxRow {
+	return {
+		key: player.host_id,
+		boardId: player.board_id,
+		held: false,
+		slot,
+		name: player.name,
+		slug: null,
+		face: faceOf(player, null),
+		club: player.team,
+		position: positionWord(player.position),
+		pill: pillOf(player.position, null),
+		status: statusOf(null, player.injured_reserve),
+		game: null,
+		expected: null,
+		weather: null,
+		proj: null,
+		pts
+	};
+}
+
+/** The note beside Totals (review L2, N5): "No projection yet for week 6" before the week's
+ * projection lands, "7 of 8 starters with a Proj" once it has when a playing starter lacks one,
+ * else null. */
+export function totalsNote(
+	rows: readonly Pick<BoxRow, 'proj' | 'game'>[],
+	landed: boolean,
+	week: number
+): string | null {
+	if (!landed) return `No projection yet for week ${String(week)}`;
+	const playing = rows.filter((r) => r.game !== 'bye');
+	const held = playing.filter((r) => r.proj !== null).length;
+	return held === playing.length
+		? null
+		: `${String(held)} of ${String(playing.length)} starters with a ${BOX.proj}`;
+}
+
+/** A figure as its cell prints it, back as a number: the tenth the column shows. */
+function printed(value: number): number {
+	return Number(fixed(value, 1));
+}
+
+/** The printed figures summed, so Totals equal the column a reader adds up (review N2); null when
+ * none is held. */
+function printedSum(values: readonly (number | null)[]): number | null {
+	const held = values.flatMap((v) => (v === null ? [] : [printed(v)]));
+	if (held.length === 0) return null;
+	return Math.round(held.reduce((a, b) => a + b, 0) * TENTHS) / TENTHS;
+}
+
+const TENTHS = 10;
+
+/** The rows' projection as printed, summed; null when none of them has one. */
+export function projTotal(rows: readonly Pick<BoxRow, 'proj'>[]): number | null {
+	return printedSum(rows.map((r) => r.proj));
+}
+
+/** The rows' points so far as printed, summed; null before any of them has kicked off. */
+export function ptsTotal(rows: readonly Pick<BoxRow, 'pts'>[]): number | null {
+	return printedSum(rows.map((r) => r.pts));
+}
+
+/** Totals' Pts, one rule for both screens (review N1): where the host gives each player's points,
+ * the rows' as printed; where it gives each team's total alone, that total, the rows staying "--". */
+export function totalsPts(
+	rows: readonly Pick<BoxRow, 'pts'>[],
+	byPlayer: boolean,
+	teamPoints: number | null
+): number | null {
+	return byPlayer ? ptsTotal(rows) : teamPoints;
+}
+
+/** How a box's numbers print: one decimal, "--" when not held. */
+export function boxNumber(value: number | null): string {
+	return value === null ? BOX.none : fixed(value, 1);
+}
+
+const FORMAT_WORDS: Readonly<Record<ProjectionScoring['format'], string>> = {
+	ppr: 'PPR',
+	half_ppr: 'half-PPR',
+	standard: 'standard'
+};
+
+/** The projection column's basis, said once on a screen (review H2): its scoring and whether that is
+ * the league's own or the closest match, when it was read or that it is not in yet, and, when a
+ * defense is on the screen, that defenses are on the published default scoring. */
+export function projBasis(
+	readAt: string | null,
+	scoring: ProjectionScoring,
+	defense: boolean,
+	zone: string = memberZone()
+): string {
+	const whose = scoring.league_own
+		? "this league's own"
+		: "the closest match to this league's rules";
+	const what = `${BOX.proj} is this week's published projection in ${FORMAT_WORDS[scoring.format]} scoring, ${whose}`;
+	const when =
+		readAt === null
+			? 'not in yet for this week'
+			: `read ${weekdayTime(readAt, zone)} ${zoneWord(zone)}`;
+	const defenses = defense ? ' Defenses are on its default defense scoring.' : '';
+	return `${what}, ${when}.${defenses} Our own weekly model replaces it when it passes its test.`;
+}
+
+/** The game facts' read, said once on a screen in place of a stamp on every row: the oldest read of
+ * any game still to be played, null when no row holds one. */
+export function factsReadLine(
+	lines: readonly PlayerLine[],
+	zone: string = memberZone()
+): string | null {
+	const reads = lines.flatMap(({ facts }) =>
+		facts.bye || !toBePlayed({ played: facts.played, kickoff: facts.kickoff })
+			? []
+			: [facts.game_total?.read_at, facts.weather?.read_at].filter(
+					(at): at is string => at !== undefined
+				)
+	);
+	if (reads.length === 0) return null;
+	const oldest = reads.reduce((a, b) => (Date.parse(a) <= Date.parse(b) ? a : b));
+	return `The ${BOX.game} cell shows each club's expected points, his club first, then the kickoff weather, read ${weekdayTime(oldest, zone)} ${zoneWord(zone)}.`;
+}
+
+/** The Pts column's basis (review N1): a player's points as the league scores them where the host
+ * gives each player's, else the team's points alone. */
+export function ptsBasis(byPlayer: boolean): string {
+	return byPlayer
+		? `${BOX.pts} are this week's points as your league scores them, ${BOX.none} until his game kicks off.`
+		: `${BOX.pts} are this league's team points from the host, which gives no points by player.`;
+}

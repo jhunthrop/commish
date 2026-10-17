@@ -275,8 +275,8 @@ func (s *PGSource) readable(ctx context.Context, tables ...string) (bool, error)
 		if err != nil {
 			return false, fmt.Errorf("boards: look for %s: %w", name, err)
 		}
-		if exists && !ok && s.venuesUnreadable.CompareAndSwap(false, true) {
-			slog.Warn("boards: a venue table exists but this role cannot select from it; the week facts carry no roof",
+		if exists && !ok && s.tablesUnreadable.CompareAndSwap(false, true) {
+			slog.Warn("boards: a research table exists but this role cannot select from it; the read that needs it answers without it",
 				"table", s.table(name))
 		}
 		if !ok {

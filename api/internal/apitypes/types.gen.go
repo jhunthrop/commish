@@ -63,6 +63,42 @@ func (e BotStyle) Valid() bool {
 	}
 }
 
+// Defines values for BoxStarterSlot.
+const (
+	BoxStarterSlotDEF       BoxStarterSlot = "DEF"
+	BoxStarterSlotFLEX      BoxStarterSlot = "FLEX"
+	BoxStarterSlotK         BoxStarterSlot = "K"
+	BoxStarterSlotQB        BoxStarterSlot = "QB"
+	BoxStarterSlotRB        BoxStarterSlot = "RB"
+	BoxStarterSlotSUPERFLEX BoxStarterSlot = "SUPERFLEX"
+	BoxStarterSlotTE        BoxStarterSlot = "TE"
+	BoxStarterSlotWR        BoxStarterSlot = "WR"
+)
+
+// Valid indicates whether the value is a known member of the BoxStarterSlot enum.
+func (e BoxStarterSlot) Valid() bool {
+	switch e {
+	case BoxStarterSlotDEF:
+		return true
+	case BoxStarterSlotFLEX:
+		return true
+	case BoxStarterSlotK:
+		return true
+	case BoxStarterSlotQB:
+		return true
+	case BoxStarterSlotRB:
+		return true
+	case BoxStarterSlotSUPERFLEX:
+		return true
+	case BoxStarterSlotTE:
+		return true
+	case BoxStarterSlotWR:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for CompanionHost.
 const (
 	CompanionHostFfpc    CompanionHost = "ffpc"
@@ -909,6 +945,27 @@ func (e Product) Valid() bool {
 	}
 }
 
+// Defines values for ProjectionScoringFormat.
+const (
+	ProjectionScoringFormatHalfPpr  ProjectionScoringFormat = "half_ppr"
+	ProjectionScoringFormatPpr      ProjectionScoringFormat = "ppr"
+	ProjectionScoringFormatStandard ProjectionScoringFormat = "standard"
+)
+
+// Valid indicates whether the value is a known member of the ProjectionScoringFormat enum.
+func (e ProjectionScoringFormat) Valid() bool {
+	switch e {
+	case ProjectionScoringFormatHalfPpr:
+		return true
+	case ProjectionScoringFormatPpr:
+		return true
+	case ProjectionScoringFormatStandard:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ReportPickChip.
 const (
 	ReportPickChipAtAdp ReportPickChip = "at_adp"
@@ -1392,6 +1449,15 @@ type BoardStatus struct {
 
 // BotStyle defines model for BotStyle.
 type BotStyle string
+
+// BoxStarter defines model for BoxStarter.
+type BoxStarter struct {
+	Line PlayerLine     `json:"line"`
+	Slot BoxStarterSlot `json:"slot"`
+}
+
+// BoxStarterSlot defines model for BoxStarter.Slot.
+type BoxStarterSlot string
 
 // CardCandidate defines model for CardCandidate.
 type CardCandidate struct {
@@ -2253,10 +2319,10 @@ type Lineup string
 
 // LineupAdvice defines model for LineupAdvice.
 type LineupAdvice struct {
-	// Basis the honesty line above the rows: the order, and what points over replacement a week are
+	// Basis the honesty line above the rows: the order the lineup is ranked by, never a week's projection
 	Basis string `json:"basis"`
 
-	// BasisNote the rest of the basis, said once under the rows: the league the points over replacement are for and the league's rules points so far leave out
+	// BasisNote the rest of the basis, said once under the rows: the league's rules points so far leave out, empty when they leave out none (the page says what Proj and Pts are itself)
 	BasisNote string `json:"basis_note"`
 
 	// Bench everyone else on the active roster, by the same keys (injured reserve and taxi spots left out)
@@ -2272,6 +2338,15 @@ type LineupAdvice struct {
 	// OrderBasis which order ranks the players: our preseason board, or the rest-of-season order (from week 7, once the API reads it)
 	OrderBasis OrderBasis `json:"order_basis"`
 
+	// PlayerPoints the host gives each player's points (Sleeper, MFL); false where it gives each team's total alone (ESPN, Yahoo, FFPC), so a player's points_this_week stay null and the team's total is team_points
+	PlayerPoints bool `json:"player_points"`
+
+	// ProjectionReadAt when the week's published projection the rows' week_projection read was captured, null with none
+	ProjectionReadAt *time.Time `json:"projection_read_at"`
+
+	// ProjectionScoring the scoring the rows' week_projection is read in: the published projection's column the league scores most like, and whether that is the league's own scoring or the closest of the three to rules of its own (a tight end premium reads PPR and is never its own). A team defense's figure is the published default in every format
+	ProjectionScoring ProjectionScoring `json:"projection_scoring"`
+
 	// ReadAt the league's last host read
 	ReadAt time.Time `json:"read_at"`
 
@@ -2283,7 +2358,10 @@ type LineupAdvice struct {
 
 	// Slots every starting spot in the league's order (QB, RB, WR, TE, the flex spots, K, DEF); a spot no rostered player can fill is left out
 	Slots []LineupSlot `json:"slots"`
-	Week  int          `json:"week"`
+
+	// TeamPoints the host's points so far for the drafter's team this week, null before any of its starters has kicked off or when the host's score could not be read
+	TeamPoints *float64 `json:"team_points"`
+	Week       int      `json:"week"`
 }
 
 // LineupMoves defines model for LineupMoves.
@@ -2378,6 +2456,35 @@ type LobbySeatView struct {
 
 // LobbySeatViewKind defines model for LobbySeatView.Kind.
 type LobbySeatViewKind string
+
+// MatchupBox defines model for MatchupBox.
+type MatchupBox struct {
+	// ProjectionReadAt when the week's published projection the rows' week_projection read was captured, null with none
+	ProjectionReadAt *time.Time `json:"projection_read_at"`
+
+	// ProjectionScoring the scoring the rows' week_projection is read in: the published projection's column the league scores most like, and whether that is the league's own scoring or the closest of the three to rules of its own (a tight end premium reads PPR and is never its own). A team defense's figure is the published default in every format
+	ProjectionScoring ProjectionScoring `json:"projection_scoring"`
+
+	// ReadAt the league's last host read
+	ReadAt time.Time `json:"read_at"`
+
+	// Sides the drafter's side first, then the opponent's when the week pairs them
+	Sides []MatchupBoxSide `json:"sides"`
+	Week  int              `json:"week"`
+}
+
+// MatchupBoxSide defines model for MatchupBoxSide.
+type MatchupBoxSide struct {
+	// Bench the side's other active players, by our order (injured reserve and taxi spots left out)
+	Bench []PlayerLine `json:"bench"`
+
+	// PlayerPoints the host gives each player's points for this side; false where it gives the side's total alone
+	PlayerPoints bool `json:"player_points"`
+	RosterId     int  `json:"roster_id"`
+
+	// Starters the host's starters in the league's slot order (QB, RB, WR, TE, the flex spots, K, DEF); an empty spot is left out, and a starter no slot takes ends the list in his position's slot. Empty where the host shows us no lineup for the side (FFPC's opponents)
+	Starters []BoxStarter `json:"starters"`
+}
 
 // MatchupSide defines model for MatchupSide.
 type MatchupSide struct {
@@ -2632,6 +2739,9 @@ type PlayerLine struct {
 
 	// Slug his page on the site (/players/{slug}): set for a player our order ranks whose name no other player in our directory shares, null otherwise (a shared name's page is named by the run, which the API does not read)
 	Slug *string `json:"slug"`
+
+	// WeekProjection his points this week on the week's published projection, to the cent, in the format the league's scoring is most like (PPR, half PPR or standard); a team defense's by its club, a kicker our board does not place (no board id) by his club's one kicker, never a teammate's for a kicker the snapshot left out. The newest snapshot stored for the league's week (projection_read_at says when). Null when his club has no game that week (a bye), whatever the snapshot holds, and when the snapshot has no row for him or none is stored. Our own weekly model replaces it when it passes its test
+	WeekProjection *float64 `json:"week_projection"`
 }
 
 // PlayerPosition defines model for PlayerPosition.
@@ -2660,6 +2770,17 @@ type Price struct {
 
 // Product defines model for Product.
 type Product string
+
+// ProjectionScoring the scoring the rows' week_projection is read in: the published projection's column the league scores most like, and whether that is the league's own scoring or the closest of the three to rules of its own (a tight end premium reads PPR and is never its own). A team defense's figure is the published default in every format
+type ProjectionScoring struct {
+	Format ProjectionScoringFormat `json:"format"`
+
+	// LeagueOwn the league scores exactly as format
+	LeagueOwn bool `json:"league_own"`
+}
+
+// ProjectionScoringFormat defines model for ProjectionScoring.Format.
+type ProjectionScoringFormat string
 
 // Redirect defines model for Redirect.
 type Redirect struct {
@@ -3450,6 +3571,15 @@ type LobbyRoomResponse struct {
 // LobbySeatResponse defines model for LobbySeatResponse.
 type LobbySeatResponse struct {
 	Data      LobbySeat  `json:"data"`
+	Error     *ErrorBody `json:"error"`
+	Meta      *PageMeta  `json:"meta,omitempty"`
+	Ok        bool       `json:"ok"`
+	RequestId string     `json:"request_id"`
+}
+
+// MatchupBoxResponse defines model for MatchupBoxResponse.
+type MatchupBoxResponse struct {
+	Data      MatchupBox `json:"data"`
 	Error     *ErrorBody `json:"error"`
 	Meta      *PageMeta  `json:"meta,omitempty"`
 	Ok        bool       `json:"ok"`

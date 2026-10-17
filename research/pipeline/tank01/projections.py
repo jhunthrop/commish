@@ -9,7 +9,11 @@ is fetched for a past week: the one earlier snapshot is parsed as stored.
 
 The payload is parsed strictly: a player entry without a position, a club or the three formats'
 points is a changed feed, refused; a stat group the provider leaves out (a kicker's passing) is NULL.
-Never an input to a fit, never a word on the site.
+Kickers are player entries (position "PK"). Team defenses are their own map with one figure for every
+format, and become rows too (Lane 66d): position "DEF", the club as the team, the id `DEF-<club>`, the
+one figure in all three points columns, every stat NULL. A snapshot parsed before defenses were kept
+gains its defense rows on the next parse. Never an input to a fit. The site shows the points as the
+week's published projection and never names the provider (Lane 66d).
 """
 
 from collections.abc import Mapping
@@ -87,20 +91,55 @@ def _player_row(player_id: str, raw: object, snapshot: int, captured_at: datetim
     return row
 
 
+DEFENSE_POSITION: Final = "DEF"
+_STAT_COLUMNS: Final = (*(column for column, _, _ in _STATS), "fumbles_lost")
+
+
+def defense_player_id(club: str) -> str:
+    """A team defense's id in the rows: the provider gives a defense no player id."""
+    return f"{DEFENSE_POSITION}-{club}"
+
+
+def _defense_row(team_id: str, raw: object, snapshot: int, captured_at: datetime) -> dict[str, object]:
+    where = f"teamDefenseProjections.{team_id}"
+    entry = _object(raw, where)
+    club = _text(entry.get("teamAbv"), f"{where}.teamAbv")
+    points = _number(entry.get("fantasyPointsDefault"), f"{where}.fantasyPointsDefault")
+    return {
+        "snapshot_id": snapshot,
+        "provider_player_id": defense_player_id(club),
+        "captured_at": captured_at,
+        "position": DEFENSE_POSITION,
+        "team": club,
+        **{column: points for column, _ in _POINTS},
+        **dict.fromkeys(_STAT_COLUMNS),
+    }
+
+
 def parse_projection_snapshot(payload: object, snapshot: int, captured_at: datetime) -> list[dict[str, object]]:
-    """One snapshot's player rows."""
+    """One snapshot's rows: every player, kickers among them, then every team defense. A payload
+    without the defense map has no defense rows."""
     root = _object(payload, "payload")
     season = int(_number(root.get("season"), "season"))
     week = int(_number(root.get("week"), "week"))
     players = _object(root.get("playerProjections"), "playerProjections")
     rows = [_player_row(pid, raw, snapshot, captured_at) for pid, raw in players.items()]
+    raw_defenses = root.get("teamDefenseProjections")
+    defenses = {} if raw_defenses is None else _object(raw_defenses, "teamDefenseProjections")
+    rows += [_defense_row(tid, raw, snapshot, captured_at) for tid, raw in defenses.items()]
     return [{**row, "season": season, "week": week} for row in rows]
 
 
+# A snapshot with no rows, or one whose payload has defenses its rows lack (parsed before defenses were
+# kept): parsing it again inserts only the rows it lacks.
 _UNPARSED: Final = text(
     f"select s.id, s.captured_at, s.payload from {CAPTURE_SNAPSHOTS.fullname} s "
-    "where s.source = :source and not exists "
-    f"(select 1 from {TANK01_PROJECTION_ROWS.fullname} r where r.snapshot_id = s.id) order by s.id"
+    "where s.source = :source and (not exists "
+    f"(select 1 from {TANK01_PROJECTION_ROWS.fullname} r where r.snapshot_id = s.id) "
+    "or (jsonb_typeof(s.payload -> 'teamDefenseProjections') = 'object' "
+    "and s.payload -> 'teamDefenseProjections' <> '{}'::jsonb and not exists "
+    f"(select 1 from {TANK01_PROJECTION_ROWS.fullname} r where r.snapshot_id = s.id "
+    "and r.position = :defense))) order by s.id"
 )
 
 
@@ -121,7 +160,7 @@ def parse_stored_projections(conn: Connection) -> ParseReport:
     named and left unparsed, and never undoes another."""
     snapshots = rows = 0
     refused: list[str] = []
-    for stored in conn.execute(_UNPARSED, {"source": PROJECTIONS_SOURCE}).all():
+    for stored in conn.execute(_UNPARSED, {"source": PROJECTIONS_SOURCE, "defense": DEFENSE_POSITION}).all():
         try:
             with conn.begin_nested():
                 parsed = parse_projection_snapshot(stored.payload, int(stored.id), stored.captured_at)

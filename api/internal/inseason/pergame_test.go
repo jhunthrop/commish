@@ -133,8 +133,10 @@ func samePerGame(a, b *float64) bool {
 	return (a == nil) == (b == nil) && (a == nil || *a == *b)
 }
 
-// Every row on the three screens carries the same figure, and each
-// screen's basis says what it is (Lane 64).
+// Every row on the three screens carries the same figure (the lineup's
+// for the player page and the API's readers, Lane 64), and the waiver and
+// trade bases say what it is. Start and sit ends its rows on the week's
+// projection instead (Lane 66d), so its basis says nothing of it.
 func TestEveryScreenCarriesTheFigure(t *testing.T) {
 	f := restFixture(t)
 	a := newFixtureAdvisor(t, f, nil)
@@ -142,10 +144,13 @@ func TestEveryScreenCarriesTheFigure(t *testing.T) {
 	waivers, _ := a.Waivers("")
 	trades, _ := a.Trades("")
 	sentence := PerGameBasis(7)
-	for _, basis := range []string{lineup.Basis, waivers.Basis, trades.Basis, trades.CheckBasis} {
+	for _, basis := range []string{waivers.Basis, trades.Basis, trades.CheckBasis} {
 		if !strings.HasSuffix(basis, " "+sentence) {
 			t.Errorf("basis %q does not end on %q", basis, sentence)
 		}
+	}
+	if strings.Contains(lineup.Basis, sentence) {
+		t.Errorf("the lineup basis %q speaks of points a game", lineup.Basis)
 	}
 	var rows []apitypes.PlayerLine
 	for _, s := range lineup.Slots {

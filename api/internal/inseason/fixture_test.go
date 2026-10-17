@@ -126,7 +126,7 @@ func fixtureData(clubs []string) Data {
 
 func newFixtureAdvisor(t testing.TB, f fixture, held map[string]bool) *advisor {
 	t.Helper()
-	a, err := newAdvisor(f.league, f.data, held, fixtureNow)
+	a, err := newAdvisor(f.league, f.data, boards.WeekProjection{}, held, fixtureNow)
 	if err != nil {
 		t.Fatal(err)
 	}

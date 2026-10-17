@@ -2,6 +2,7 @@
  * picks since your last one, your team by slot and the wall. Pure functions over the API's answers. */
 import { snakeSlot } from '#lib/format/draft.ts';
 import type { PlayerRef, Position } from '#lib/types/player.ts';
+import { clubMark } from '#lib/ui/club-mark.ts';
 import type { TeamSlot, WentPick } from '#lib/types/room.ts';
 import type { BoardPlayer, LeagueSettings, RoomBoard, RoomPick } from './api.ts';
 
@@ -30,11 +31,6 @@ function positionOf(position: BoardPlayer['position']): Position {
 	return position === 'DEF' ? 'DST' : position;
 }
 
-/** A defense's face is its team's logo, from the same image host as the headshots. */
-function teamLogo(team: string): string {
-	return `https://a.espncdn.com/i/teamlogos/nfl/500/${team.toLowerCase()}.png`;
-}
-
 export function boardOf(board: RoomBoard, teams: number): Board {
 	const valued = board.players
 		.filter((p): p is BoardPlayer & { vor: number } => p.vor !== null)
@@ -48,7 +44,8 @@ export function boardOf(board: RoomBoard, teams: number): Board {
 			position: positionOf(p.position),
 			positionRank: p.position_rank,
 			team: p.team,
-			headshot: p.headshot === '' && p.position === 'DEF' ? teamLogo(p.team) : p.headshot,
+			// A defense's face is its club's mark.
+			headshot: p.headshot === '' && p.position === 'DEF' ? clubMark(p.team) : p.headshot,
 			adp: p.adp,
 			points: p.points,
 			vor: p.vor,

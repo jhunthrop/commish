@@ -15,6 +15,7 @@ import (
 
 	"github.com/jhunthrop/commish/api/internal/apitypes"
 	"github.com/jhunthrop/commish/api/internal/auth"
+	"github.com/jhunthrop/commish/api/internal/boards"
 	"github.com/jhunthrop/commish/api/internal/httpx"
 	"github.com/jhunthrop/commish/api/internal/leaguesync"
 )
@@ -23,9 +24,22 @@ type fakeLeagues struct{ league League }
 
 func (f fakeLeagues) Follow(http.ResponseWriter, *http.Request) (League, bool) { return f.league, true }
 
-type fakeFacts struct{ data Data }
+type fakeFacts struct {
+	data       Data
+	projection boards.WeekProjection
+	err        error
+}
 
 func (f fakeFacts) Data(context.Context, int) (Data, error) { return f.data, nil }
+
+func (f fakeFacts) Projection(_ context.Context, _, week int) (boards.WeekProjection, error) {
+	if f.err != nil {
+		return boards.WeekProjection{}, f.err
+	}
+	p := f.projection
+	p.Week = week
+	return p, nil
+}
 
 type fakeHolds struct {
 	held    map[string]bool
@@ -66,7 +80,7 @@ func serve(t *testing.T, s *Service, path string) (int, envelope) {
 
 func fixtureService(t *testing.T, l League, data Data, holds *fakeHolds) *Service {
 	t.Helper()
-	return &Service{Leagues: fakeLeagues{l}, Facts: fakeFacts{data}, Holds: holds, Now: func() time.Time { return fixtureNow },
+	return &Service{Leagues: fakeLeagues{l}, Facts: fakeFacts{data: data}, Holds: holds, Now: func() time.Time { return fixtureNow },
 		Log: slog.New(slog.NewTextHandler(io.Discard, nil))}
 }
 
@@ -76,7 +90,7 @@ func TestRoutesAnswerInTheEnvelope(t *testing.T) {
 	f := newFixture(t)
 	holds := &fakeHolds{}
 	s := fixtureService(t, f.league, f.data, holds)
-	for _, route := range []string{"lineup", "waivers", "waivers?position=RB", "trades", "trades?player=p003"} {
+	for _, route := range []string{"lineup", "matchup", "waivers", "waivers?position=RB", "trades", "trades?player=p003"} {
 		code, env := serve(t, s, leaguePath+route)
 		if code != http.StatusOK || !env.Ok || len(env.Data) == 0 {
 			t.Fatalf("%s: %d %+v", route, code, env.Error)
@@ -175,7 +189,7 @@ func TestLineupCarriesMoves(t *testing.T) {
 func TestMissingTeamHasItsOwnCode(t *testing.T) {
 	f := newFixture(t)
 	f.league.Me = 99
-	for _, route := range []string{"lineup", "waivers", "trades"} {
+	for _, route := range []string{"lineup", "matchup", "waivers", "trades"} {
 		code, env := serve(t, fixtureService(t, f.league, f.data, &fakeHolds{}), leaguePath+route)
 		if code != http.StatusNotFound || env.Error == nil || env.Error.Code != httpx.CodeTeamNotRead {
 			t.Fatalf("%s: %d %+v", route, code, env.Error)

@@ -40,13 +40,19 @@ func TestWaiverGainOverTheOrdersWeeks(t *testing.T) {
 }
 
 // Every basis says what "a week" is, and the start and sit line says we
-// project no week on either order (M2), with no week of its own printed.
+// ranks by no week's projection on either order (M2, Lane 66d), with no
+// week of its own printed.
 func TestBasisSaysWhatAWeekIs(t *testing.T) {
 	settings := fixtureSettings()
-	ros := LineupBasis(RestOfSeason, 11)
-	pre := LineupBasis(Preseason, 17)
-	for _, s := range []string{ros, pre} {
-		if !strings.Contains(s, "We do not project a week's points.") || strings.Contains(s, "from week") {
+	ros := WaiversBasis(RestOfSeason, 11)
+	for _, s := range []string{LineupBasis(RestOfSeason), LineupBasis(Preseason)} {
+		if strings.Contains(s, "Points over replacement") {
+			t.Errorf("the lineup's rows show no points over replacement: %q", s)
+		}
+	}
+	pre := LineupBasis(Preseason)
+	for _, s := range []string{LineupBasis(RestOfSeason), pre} {
+		if !strings.Contains(s, "and this week's designations, not by a week's projection.") || strings.Contains(s, "from week") {
 			t.Errorf("%q", s)
 		}
 	}
@@ -68,27 +74,29 @@ func TestBasisSaysWhatAWeekIs(t *testing.T) {
 
 // The weeks come from the run's own first week when the table says it,
 // not the league's: a run that rolled to week 8 while the host still
-// says 7 divides by 10, and the basis names 10. Without the run's week
-// the league's stands.
+// says 7 divides by 10, and the basis names 10 (the waiver page's, whose
+// rows show the figure). Without the run's week the league's stands.
 func TestTheRunsFirstWeekSetsTheDivisor(t *testing.T) {
 	f := newFixture(t)
 	f.league.Board.Order = boards.OrderRestOfSeason
 	f.league.Board.FromWeek = 8
 	f.league.Snap.Week = 7
-	out, _ := newFixtureAdvisor(t, f, nil).Lineup()
+	a := newFixtureAdvisor(t, f, nil)
+	out, _ := a.Lineup()
 	line := out.Slots[0].Ours
 	season := f.league.Board.Values[boardID(line)]
-	if *line.PointsOverReplacement != roundTenth(season/10) || !strings.Contains(out.Basis, "its 10 weeks") {
-		t.Fatalf("%v %q", *line.PointsOverReplacement, out.Basis)
+	w, _ := a.Waivers("")
+	if *line.PointsOverReplacement != roundTenth(season/10) || !strings.Contains(w.Basis, "its 10 weeks") {
+		t.Fatalf("%v %q", *line.PointsOverReplacement, w.Basis)
 	}
 	f.league.Board.FromWeek = 0
-	if out, _ := newFixtureAdvisor(t, f, nil).Lineup(); !strings.Contains(out.Basis, "its 11 weeks") {
-		t.Fatalf("the league's week: %q", out.Basis)
+	if w, _ := newFixtureAdvisor(t, f, nil).Waivers(""); !strings.Contains(w.Basis, "its 11 weeks") {
+		t.Fatalf("the league's week: %q", w.Basis)
 	}
 	// A preseason board's from week is never read.
 	f.league.Board.Order, f.league.Board.FromWeek = boards.OrderPreseason, 8
-	if out, _ := newFixtureAdvisor(t, f, nil).Lineup(); !strings.Contains(out.Basis, "its 17 weeks") {
-		t.Fatalf("preseason: %q", out.Basis)
+	if w, _ := newFixtureAdvisor(t, f, nil).Waivers(""); !strings.Contains(w.Basis, "its 17 weeks") {
+		t.Fatalf("preseason: %q", w.Basis)
 	}
 }
 
@@ -103,7 +111,9 @@ func TestPlayerLineOverTheOrdersWeeks(t *testing.T) {
 	if line.PointsOverReplacement == nil || *line.PointsOverReplacement != roundTenth(season/11) {
 		t.Fatalf("points over replacement %v, want %v", line.PointsOverReplacement, roundTenth(season/11))
 	}
-	if out.OrderBasis != apitypes.OrderBasisRestOfSeason || !strings.Contains(out.Basis, "its 11 weeks") || !strings.HasPrefix(out.BasisNote, BasisNote(*f.league.Saved, func(string) bool { return true })) {
-		t.Fatalf("%s %q", out.OrderBasis, out.Basis)
+	// The lineup's note is only what points so far leave out: its rows show
+	// no points over replacement (Lane 66d).
+	if out.OrderBasis != apitypes.OrderBasisRestOfSeason || strings.Contains(out.BasisNote, "Points over replacement") {
+		t.Fatalf("%s %q", out.OrderBasis, out.BasisNote)
 	}
 }

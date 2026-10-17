@@ -18,6 +18,7 @@ import (
 
 	"github.com/jhunthrop/commish/api/internal/apitypes"
 	"github.com/jhunthrop/commish/api/internal/auth"
+	"github.com/jhunthrop/commish/api/internal/boards"
 	"github.com/jhunthrop/commish/api/internal/draft"
 	"github.com/jhunthrop/commish/api/internal/httpx"
 	"github.com/jhunthrop/commish/api/internal/leaguesync"
@@ -36,9 +37,11 @@ type Leagues interface {
 	Follow(w http.ResponseWriter, r *http.Request) (League, bool)
 }
 
-// SeasonFacts is the season's facts. *Cache implements it.
+// SeasonFacts is the season's facts and a week's published projection.
+// *Cache implements it.
 type SeasonFacts interface {
 	Data(ctx context.Context, season int) (Data, error)
+	Projection(ctx context.Context, season, week int) (boards.WeekProjection, error)
 }
 
 // Holds is the board ids an account tags Hold. *sheets.Store implements it.
@@ -71,6 +74,7 @@ func (s *Service) Routes() []httpx.Route {
 	limit := httpx.PerMinute(limitPerMinute)
 	return []httpx.Route{
 		{Method: http.MethodGet, Path: "/leagues/attached/{id}/lineup", Access: httpx.SignedIn, Limit: limit, Handler: s.lineup},
+		{Method: http.MethodGet, Path: "/leagues/attached/{id}/matchup", Access: httpx.SignedIn, Limit: limit, Handler: s.matchup},
 		{Method: http.MethodGet, Path: "/leagues/attached/{id}/waivers", Access: httpx.SignedIn, Limit: limit, Handler: s.waivers},
 		{Method: http.MethodGet, Path: "/leagues/attached/{id}/trades", Access: httpx.SignedIn, Limit: limit, Handler: s.trades},
 		{Method: http.MethodPost, Path: "/leagues/attached/{id}/trades/check", Access: httpx.SignedIn, Limit: limit, Handler: s.checkTrade},
@@ -115,12 +119,24 @@ func (s *Service) advisorFor(w http.ResponseWriter, r *http.Request) (*advisor, 
 		httpx.WriteInternal(w, r, s.Log, "inseason: held", err)
 		return nil, false
 	}
-	a, err := newAdvisor(l, data, held, s.Now())
+	a, err := newAdvisor(l, data, s.projection(ctx, seasonOf(l), l.Snap.Week), held, s.Now())
 	if err != nil {
 		httpx.WriteInternal(w, r, s.Log, "inseason: advisor", err)
 		return nil, false
 	}
 	return a, true
+}
+
+// projection is the week's published projection. A read that fails is
+// logged and the rows answer without it: the column says "--", the page
+// still answers.
+func (s *Service) projection(ctx context.Context, season, week int) boards.WeekProjection {
+	p, err := s.Facts.Projection(ctx, season, week)
+	if err != nil {
+		s.Log.Warn("inseason: the week's projection was not read; the rows answer without it", "week", week, "err", err)
+		return boards.WeekProjection{Week: week}
+	}
+	return p
 }
 
 // seasonOf is the season whose facts the league's week reads: the
@@ -148,6 +164,16 @@ func (s *Service) lineup(w http.ResponseWriter, r *http.Request) {
 		}
 		out.Moves = moves
 	}
+	s.answer(w, r, out, ok)
+}
+
+// matchup is the week's matchup as a box score.
+func (s *Service) matchup(w http.ResponseWriter, r *http.Request) {
+	a, ok := s.advisorFor(w, r)
+	if !ok {
+		return
+	}
+	out, ok := a.Matchup()
 	s.answer(w, r, out, ok)
 }
 

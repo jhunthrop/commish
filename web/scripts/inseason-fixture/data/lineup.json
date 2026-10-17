@@ -1,7 +1,7 @@
 {
 	"week": 6,
-	"basis": "Ranked by our rest-of-season order and this week's designations. We do not project a week's points. Points over replacement, and every gain in them, are points above what a free pickup at his position gives you, a week: the rest of the season on our rest-of-season order, averaged over its 12 weeks, not a projection of any one week. Points a game are our rest-of-season projection from week 6 over the games his club has left, byes out.",
-	"basis_note": "Points over replacement are for a 12-team league with 1 QB, 2 RB, 3 WR, 1 TE and two flex spots. Points so far leave out your league's points for two-point conversions, missed field goals, missed extra points, fumble recoveries and safeties: the stat lines we hold do not carry them.",
+	"basis": "Ranked by our rest-of-season order and this week's designations, not by a week's projection.",
+	"basis_note": "Points so far leave out your league's points for two-point conversions, missed field goals, missed extra points, fumble recoveries and safeties: the stat lines we hold do not carry them.",
 	"order_basis": "rest_of_season",
 	"refreshed": "2026-10-14T19:05:37.917Z",
 	"read_at": "2026-10-14T19:05:38.329Z",
@@ -53,7 +53,8 @@
 						"precipitation_kind": "none",
 						"read_at": "2026-10-16T21:01:34.611Z"
 					}
-				}
+				},
+				"week_projection": 17.93
 			},
 			"host": {
 				"player": {
@@ -99,7 +100,8 @@
 						"precipitation_kind": "none",
 						"read_at": "2026-10-16T21:01:34.611Z"
 					}
-				}
+				},
+				"week_projection": 15.76
 			},
 			"changed": true,
 			"sentence": "Mahomes is QB3 in our rest-of-season order, Rodgers QB12."
@@ -144,7 +146,8 @@
 					"spread": { "side": "lose", "points": 12.5, "read_at": "2026-10-16T21:01:26.774Z" },
 					"roof": { "kind": "dome", "abroad": false },
 					"weather": null
-				}
+				},
+				"week_projection": 12.3
 			},
 			"host": {
 				"player": {
@@ -184,7 +187,8 @@
 					"spread": { "side": "lose", "points": 12.5, "read_at": "2026-10-16T21:01:26.774Z" },
 					"roof": { "kind": "dome", "abroad": false },
 					"weather": null
-				}
+				},
+				"week_projection": 12.3
 			},
 			"changed": false,
 			"sentence": null
@@ -235,7 +239,8 @@
 						"precipitation_kind": "none",
 						"read_at": "2026-10-16T21:01:34.611Z"
 					}
-				}
+				},
+				"week_projection": 9.48
 			},
 			"host": {
 				"player": {
@@ -281,7 +286,8 @@
 						"precipitation_kind": "none",
 						"read_at": "2026-10-16T21:01:34.611Z"
 					}
-				}
+				},
+				"week_projection": 9.48
 			},
 			"changed": false,
 			"sentence": null
@@ -326,7 +332,8 @@
 					"spread": { "side": "win", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
 					"roof": { "kind": "outdoors", "abroad": true },
 					"weather": null
-				}
+				},
+				"week_projection": 9.65
 			},
 			"host": {
 				"player": {
@@ -366,7 +373,8 @@
 					"spread": { "side": "win", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
 					"roof": { "kind": "outdoors", "abroad": true },
 					"weather": null
-				}
+				},
+				"week_projection": 9.65
 			},
 			"changed": false,
 			"sentence": null
@@ -394,7 +402,7 @@
 					"home": false,
 					"kickoff": "2026-10-18T17:00:00.000Z",
 					"bye": false,
-					"designation": null,
+					"designation": { "status": "questionable", "as_of": "2026-10-16T21:00:00.000Z" },
 					"played": false,
 					"points_this_week": null,
 					"last_games": [
@@ -417,7 +425,8 @@
 						"precipitation_kind": "none",
 						"read_at": "2026-10-16T21:01:34.611Z"
 					}
-				}
+				},
+				"week_projection": 10.98
 			},
 			"host": {
 				"player": {
@@ -440,7 +449,7 @@
 					"home": false,
 					"kickoff": "2026-10-18T17:00:00.000Z",
 					"bye": false,
-					"designation": null,
+					"designation": { "status": "questionable", "as_of": "2026-10-16T21:00:00.000Z" },
 					"played": false,
 					"points_this_week": null,
 					"last_games": [
@@ -463,7 +472,8 @@
 						"precipitation_kind": "none",
 						"read_at": "2026-10-16T21:01:34.611Z"
 					}
-				}
+				},
+				"week_projection": 10.98
 			},
 			"changed": false,
 			"sentence": null
@@ -514,7 +524,8 @@
 						"precipitation_kind": "none",
 						"read_at": "2026-10-16T21:01:34.611Z"
 					}
-				}
+				},
+				"week_projection": 3.21
 			},
 			"host": {
 				"player": {
@@ -560,7 +571,8 @@
 						"precipitation_kind": "none",
 						"read_at": "2026-10-16T21:01:34.611Z"
 					}
-				}
+				},
+				"week_projection": 3.21
 			},
 			"changed": false,
 			"sentence": null
@@ -611,7 +623,8 @@
 						"precipitation_kind": "none",
 						"read_at": "2026-10-16T21:01:34.611Z"
 					}
-				}
+				},
+				"week_projection": 7.76
 			},
 			"host": {
 				"player": {
@@ -647,7 +660,8 @@
 					"spread": null,
 					"roof": null,
 					"weather": null
-				}
+				},
+				"week_projection": null
 			},
 			"changed": true,
 			"sentence": "Sam LaPorta is on bye this week, so Okonkwo starts."
@@ -698,7 +712,8 @@
 						"precipitation_kind": "none",
 						"read_at": "2026-10-16T21:01:34.611Z"
 					}
-				}
+				},
+				"week_projection": 13.24
 			},
 			"host": {
 				"player": {
@@ -744,7 +759,8 @@
 						"precipitation_kind": "none",
 						"read_at": "2026-10-16T21:01:34.611Z"
 					}
-				}
+				},
+				"week_projection": 13.24
 			},
 			"changed": false,
 			"sentence": null
@@ -795,7 +811,8 @@
 						"precipitation_kind": "none",
 						"read_at": "2026-10-16T21:01:34.611Z"
 					}
-				}
+				},
+				"week_projection": 14.19
 			},
 			"host": {
 				"player": {
@@ -831,7 +848,8 @@
 					"spread": null,
 					"roof": null,
 					"weather": null
-				}
+				},
+				"week_projection": null
 			},
 			"changed": true,
 			"sentence": "Ja'Marr Chase is on bye this week, so Etienne starts."
@@ -872,7 +890,8 @@
 					"spread": { "side": "lose", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
 					"roof": { "kind": "outdoors", "abroad": true },
 					"weather": null
-				}
+				},
+				"week_projection": 7.9
 			},
 			"host": {
 				"player": {
@@ -904,7 +923,8 @@
 					"spread": null,
 					"roof": null,
 					"weather": null
-				}
+				},
+				"week_projection": null
 			},
 			"changed": true,
 			"sentence": "Minnesota Vikings is on bye this week, so Texans starts."
@@ -945,7 +965,8 @@
 				"spread": null,
 				"roof": null,
 				"weather": null
-			}
+			},
+			"week_projection": null
 		},
 		{
 			"player": {
@@ -981,7 +1002,8 @@
 				"spread": null,
 				"roof": null,
 				"weather": null
-			}
+			},
+			"week_projection": null
 		},
 		{
 			"player": {
@@ -1023,7 +1045,8 @@
 					"precipitation_kind": "none",
 					"read_at": "2026-10-16T21:01:34.611Z"
 				}
-			}
+			},
+			"week_projection": 15.76
 		},
 		{
 			"player": {
@@ -1055,7 +1078,8 @@
 				"spread": null,
 				"roof": null,
 				"weather": null
-			}
+			},
+			"week_projection": null
 		},
 		{
 			"player": {
@@ -1091,7 +1115,8 @@
 				"spread": null,
 				"roof": null,
 				"weather": null
-			}
+			},
+			"week_projection": null
 		},
 		{
 			"player": {
@@ -1114,7 +1139,7 @@
 				"home": true,
 				"kickoff": "2026-10-18T17:00:00.000Z",
 				"bye": false,
-				"designation": null,
+				"designation": { "status": "injured_reserve", "as_of": "2026-10-16T21:00:00.000Z" },
 				"played": false,
 				"points_this_week": null,
 				"last_games": [
@@ -1137,7 +1162,8 @@
 					"precipitation_kind": "none",
 					"read_at": "2026-10-16T21:01:34.611Z"
 				}
-			}
+			},
+			"week_projection": 4.39
 		},
 		{
 			"player": {
@@ -1169,7 +1195,8 @@
 				"spread": { "side": "win", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
 				"roof": { "kind": "outdoors", "abroad": false },
 				"weather": null
-			}
+			},
+			"week_projection": null
 		},
 		{
 			"player": {
@@ -1215,7 +1242,8 @@
 					"precipitation_kind": "none",
 					"read_at": "2026-10-16T21:01:34.611Z"
 				}
-			}
+			},
+			"week_projection": 0.57
 		},
 		{
 			"player": {
@@ -1253,7 +1281,8 @@
 					"precipitation_kind": "none",
 					"read_at": "2026-10-16T21:01:34.611Z"
 				}
-			}
+			},
+			"week_projection": null
 		},
 		{
 			"player": {
@@ -1298,10 +1327,15 @@
 					"precipitation_kind": "none",
 					"read_at": "2026-10-16T21:01:34.611Z"
 				}
-			}
+			},
+			"week_projection": 20.59
 		}
 	],
 	"host_lineup_url": "https://sleeper.com/leagues/1382163311038038016/team",
 	"host_note": null,
-	"moves": { "lineup": "unavailable", "note": null }
+	"moves": { "lineup": "unavailable", "note": null },
+	"projection_read_at": "2026-10-17T02:00:00.000Z",
+	"projection_scoring": { "format": "ppr", "league_own": false },
+	"player_points": true,
+	"team_points": null
 }
