@@ -3,6 +3,7 @@ package boards
 import (
 	"context"
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/jhunthrop/commish/api/internal/apitypes"
@@ -183,7 +184,8 @@ func (w *WeekProjection) dropSharedKickers(kickers map[string]int) {
 }
 
 // Delta is a player's change in points since the snapshot before, in the
-// preset's format; false without a row in both.
+// preset's format, from the tenths the screens print (so a change never
+// disagrees with the two figures shown); false without a row in both.
 func (w WeekProjection) Delta(boardID, position, team string, preset apitypes.ScoringPreset) (float64, bool) {
 	if w.Previous == nil {
 		return 0, false
@@ -196,5 +198,9 @@ func (w WeekProjection) Delta(boardID, position, team string, preset apitypes.Sc
 	if !ok {
 		return 0, false
 	}
-	return now.For(preset) - then.For(preset), true
+	return tenth(now.For(preset)) - tenth(then.For(preset)), true
 }
+
+func tenth(v float64) float64 { return math.Round(v*tenths) / tenths }
+
+const tenths = 10

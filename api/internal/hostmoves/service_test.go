@@ -571,7 +571,8 @@ func TestSwitchesAndTheAllowList(t *testing.T) {
 	check("switch on", apitypes.HostMovePlanStatusReady, apitypes.LineupMovesLineupAvailable)
 	r.svc.ESPNLineup = false
 	check("switch off, not listed", apitypes.HostMovePlanStatusUnavailable, apitypes.LineupMovesLineupUnavailable)
-	if got, _ := r.svc.LineupMove(ctx, me, espnhost.Host); got.Reason == nil || *got.Reason != lineupOffWords || !got.TakesWrites || got.WritesOn {
+	if got, _ := r.svc.LineupMove(ctx, me, espnhost.Host); got.Reason == nil || *got.Reason != "Lineup writes to ESPN are not on yet." ||
+		!got.TakesWrites || got.WritesOn {
 		t.Fatalf("switch off, not listed, says why: %+v", got)
 	}
 	r.proofs.allowed[me] = true
@@ -589,8 +590,9 @@ func TestSwitchesAndTheAllowList(t *testing.T) {
 	if got, _ := r.svc.LineupMove(ctx, me, espnhost.Host); got.Lineup != apitypes.LineupMovesLineupUnavailable {
 		t.Fatalf("ESPN closed here: %+v", got)
 	}
-	if got, _ := r.svc.LineupMove(ctx, me, espnhost.Host); got.Note != nil || got.Reason == nil || *got.Reason != lineupOffWords || got.TakesWrites {
-		t.Fatalf("ESPN closed here says its writes are off: %+v", got)
+	if got, _ := r.svc.LineupMove(ctx, me, espnhost.Host); got.Note != nil || got.Reason == nil ||
+		*got.Reason != "Lineup writes to ESPN are not on yet." || !got.TakesWrites || got.WritesOn {
+		t.Fatalf("ESPN closed here says its writes are not on: %+v", got)
 	}
 	// A platform with no write path says so in one line, by its name.
 	for host, name := range map[string]string{"sleeper": "Sleeper", "yahoo": "Yahoo", "ffpc": "FFPC", "mfl": "MyFantasyLeague"} {
@@ -615,13 +617,19 @@ func TestConsentVersionGatesTheMove(t *testing.T) {
 	}{
 		{"version 2", &hosts.Connection{Status: hosts.StatusConnected, ConsentVersion: 2}, reconsentWords},
 		{"signed out", &hosts.Connection{Status: hosts.StatusSignedOut, ConsentVersion: 3}, reconnectWords},
-		{"none", nil, lineupConnectWords},
+		{"none", nil, ""},
+	}
+	// The line under the copy verb is true in each state, the platform named.
+	reasons := map[string]string{
+		"version 2":  "Your ESPN connection needs renewing.",
+		"signed out": "Your ESPN connection needs renewing.",
+		"none":       "Connect ESPN on your account page to set your lineup from here.",
 	}
 	for _, tc := range cases {
 		r.svc.Connections = conns{tc.conn}
 		got, err := r.svc.LineupMove(ctx, me, espnhost.Host)
-		if err != nil || got.Lineup != apitypes.LineupMovesLineupUnavailable || got.Reason == nil || *got.Reason != tc.note ||
-			(tc.conn == nil) != (got.Note == nil) || !got.TakesWrites || !got.WritesOn {
+		if err != nil || got.Lineup != apitypes.LineupMovesLineupUnavailable || got.Reason == nil || *got.Reason != reasons[tc.name] ||
+			(tc.note == "") != (got.Note == nil) || (got.Note != nil && *got.Note != tc.note) || !got.TakesWrites || !got.WritesOn {
 			t.Fatalf("%s: %+v %v", tc.name, got, err)
 		}
 		p := r.plan(t, swap())

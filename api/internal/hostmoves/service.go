@@ -139,69 +139,73 @@ func (s *Service) LineupMove(ctx context.Context, accountID uuid.UUID, host stri
 	if err != nil {
 		return out, err
 	}
-	out.TakesWrites = s.takesLineups(host)
-	if open {
-		out.Lineup = apitypes.LineupMovesLineupAvailable
-		out.WritesOn = true
-		return out, nil
-	}
-	if out.WritesOn, err = s.lineupWritesOn(ctx, accountID, host); err != nil {
+	if out.TakesWrites, out.WritesOn, err = s.espnLineupWritesStandIn(ctx, accountID, host); err != nil {
 		return out, err
 	}
-	// The one line under the copy verb (Lane 66e, the names Lane 67 set):
-	// the member's step where there is one, else why, the platform named.
-	reason := note
+	if open {
+		out.Lineup = apitypes.LineupMovesLineupAvailable
+		return out, nil
+	}
 	if note != "" {
 		out.Note = &note
-	} else if reason, err = s.lineupClosedNote(ctx, accountID, host); err != nil {
+	}
+	reason, err := s.lineupReason(ctx, accountID, host, out.TakesWrites, out.WritesOn)
+	if err != nil {
 		return out, err
 	}
 	out.Reason = &reason
 	return out, nil
 }
 
-// takesLineups is whether the platform accepts lineups from us at all.
-func (s *Service) takesLineups(host string) bool {
-	return lineupWriteHosts[host] && s.ESPNOpen
-}
-
-// lineupWritesOn is whether the platform's lineup switch is on for the
-// account: on for everyone, or the account on the allow list.
-func (s *Service) lineupWritesOn(ctx context.Context, accountID uuid.UUID, host string) (bool, error) {
-	if !s.takesLineups(host) {
-		return false, nil
+// espnLineupWritesStandIn is takes_writes and writes_on for a lineup:
+// ESPN takes lineups from us, and its writes are on for the account when
+// ESPN is open here (HOST_ESPN_ENABLED with the vault's key) and
+// HOST_WRITES_ESPN_LINEUP is on or the account is on the allow list. Every
+// other platform takes none.
+//
+// TODO(lane 67): a stand-in until Lane 67's per-platform write registry
+// merges and answers both for every platform (MyFantasyLeague included);
+// replace this with it.
+func (s *Service) espnLineupWritesStandIn(ctx context.Context, accountID uuid.UUID, host string) (takes, on bool, err error) {
+	if host != espnhost.Host {
+		return false, false, nil
+	}
+	if !s.ESPNOpen {
+		return true, false, nil
 	}
 	if s.ESPNLineup {
-		return true, nil
+		return true, true, nil
 	}
-	return s.Proofs.Allowed(ctx, accountID, host, kindLineup)
+	on, err = s.Proofs.Allowed(ctx, accountID, host, kindLineup)
+	return true, on, err
 }
 
-// lineupClosedNote is why a lineup cannot be set from our screen when the
-// member has nothing to agree to: the platform has no write path here, its
-// writes are off for the account, or the account has not connected it.
-// A platform gains writes in open and lineupWriteHosts alone; the screen
-// reads only the answer.
-func (s *Service) lineupClosedNote(ctx context.Context, accountID uuid.UUID, host string) (string, error) {
-	if !lineupWriteHosts[host] {
-		return fmt.Sprintf(noLineupPathWords, leaguesync.HostWords(host)), nil
+// lineupReason is the one line under the copy verb (Lane 66e, the field
+// Lane 67 named), true in every state, the platform named: it takes no
+// lineups from us, its writes are not on for the account, the account has
+// not connected it, or the connection needs renewing.
+func (s *Service) lineupReason(ctx context.Context, accountID uuid.UUID, host string, takes, on bool) (string, error) {
+	name := leaguesync.HostWords(host)
+	switch {
+	case !takes:
+		return fmt.Sprintf(noLineupPathWords, name), nil
+	case !on:
+		return fmt.Sprintf(writesNotOnWords, name), nil
 	}
-	on, err := s.lineupWritesOn(ctx, accountID, host)
-	if err != nil || !on {
-		return lineupOffWords, err
-	}
-	_, err = s.Connections.Get(ctx, accountID, host)
+	conn, err := s.Connections.Get(ctx, accountID, host)
 	switch {
 	case errors.Is(err, hosts.ErrNotConnected):
-		return lineupConnectWords, nil
+		return fmt.Sprintf(connectWords, name), nil
 	case err != nil:
 		return "", err
+	case conn.Status != hosts.StatusConnected || conn.ConsentVersion < hosts.ESPNConsentVersion:
+		return fmt.Sprintf(renewWords, name), nil
 	}
-	return lineupOffWords, nil
+	// Open in every way this checks: the move is refused for another reason
+	// (a claim's store missing never applies to a lineup), so the writes
+	// are not on here.
+	return fmt.Sprintf(writesNotOnWords, name), nil
 }
-
-// lineupWriteHosts is every platform with a lineup write path here.
-var lineupWriteHosts = map[string]bool{espnhost.Host: true}
 
 // ClaimMove says whether the account may claim on the host from our
 // screen, and the sentence when a claim waits on the member. The waivers

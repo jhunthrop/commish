@@ -90,7 +90,8 @@ func TestWeekProjectionReadsTheNewestSnapshot(t *testing.T) {
 	if p.Previous == nil || !p.Previous.ReadAt.Equal(time.Date(2026, 10, 15, 13, 0, 0, 0, time.UTC)) {
 		t.Fatalf("the snapshot before: %+v", p.Previous)
 	}
-	if d, ok := p.Delta("4431611", "QB", "CHI", apitypes.ScoringPresetPpr); !ok || d < 1.439 || d > 1.441 {
+	// From the printed tenths: 19.4 against 18.0 (review L11).
+	if d, ok := p.Delta("4431611", "QB", "CHI", apitypes.ScoringPresetPpr); !ok || d < 1.399 || d > 1.401 {
 		t.Fatalf("Williams's change since the read before: %v %v", d, ok)
 	}
 	if _, ok := p.Delta("2971573", "K", "HOU", apitypes.ScoringPresetPpr); ok {
