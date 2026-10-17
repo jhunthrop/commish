@@ -1,5 +1,6 @@
 // Screenshots of the week's game facts (Lane 66a): the expected score and margin, the roof and the
-// kickoff weather with their read time, on the waivers and trades rows and a player page as a sentence,
+// kickoff weather with their read time, on the waivers rows and a player page as a sentence, on an
+// opened trade of the Trades table (Lane 66g) as a cell,
 // and on the Lineup and Matchup box scores (Lane 66d) as a cell ("20 to 22.5" and the weather in two or
 // three words) with the read said once under the boxes, in both themes at 1440 and 390 on a Central
 // clock (on a phone the waiver and trade rows keep to their decision, so they carry none). Each asserts
@@ -58,9 +59,9 @@ const PAGES = [
 	{
 		name: 'trades',
 		path: `/league/${id}/trades`,
-		ready: 'Propose on Sleeper',
+		ready: 'worth proposing',
 		phone: false,
-		box: false
+		box: true
 	},
 	{ name: 'matchup', path: `/league/${id}/matchup`, ready: 'Week 6', phone: true, box: true },
 	{ name: 'player', path: `/players/${player}`, ready: 'Week 6:', phone: true, box: false }
@@ -122,12 +123,16 @@ async function boxFacts(
 				.map((el) => (el as HTMLElement).innerText.trim());
 		const rows = [
 			...document.querySelectorAll(
-				'main table.box tbody tr, main table.lineup tbody tr, main table.pool tbody tr'
+				'main table.box tbody tr, main table.lineup tbody tr, main table.pool tbody tr, main table.inner tbody tr'
 			)
 		];
 		return {
-			expected: texts('main table.box .exp, main table.lineup .exp, main table.pool .exp'),
-			weather: texts('main table.box .wx, main table.lineup .wx, main table.pool .wx'),
+			expected: texts(
+				'main table.box .exp, main table.lineup .exp, main table.pool .exp, main table.inner .exp'
+			),
+			weather: texts(
+				'main table.box .wx, main table.lineup .wx, main table.pool .wx, main table.inner .wx'
+			),
 			text: document.body.innerText,
 			stamped: rows.filter((tr) => /\bRead \w{3} /.test(tr.textContent)).length
 		};
@@ -142,11 +147,18 @@ for (const { name, path, ready, phone, box } of PAGES) {
 			const page = await ctx.newPage();
 			try {
 				await open(page, path, ready);
+				// The Trades table shows its game cells in an opened trade (Lane 66g).
+				if (name === 'trades') await page.locator('table.finder button.why').first().click();
 				if (box) {
 					const cells = await boxFacts(page);
-					check(cells.expected.length > 0, `${where}: no expected score in a box`);
+					// The opened trade's rows keep to the opponent and kickoff on a phone (Lane 66g).
+					const cellsShown = phone || width !== PHONE_WIDTH;
+					check(
+						cells.expected.length > 0 === cellsShown,
+						`${where}: ${cellsShown ? 'no expected score in a box' : 'game cells on a phone'}`
+					);
 					for (const e of cells.expected) check(EXPECTED.test(e), `${where}: expected "${e}"`);
-					check(cells.weather.length > 0, `${where}: no weather in a box`);
+					check(cells.weather.length > 0 === cellsShown, `${where}: weather in a box`);
 					for (const w of cells.weather) check(CELL_WEATHER.test(w), `${where}: weather "${w}"`);
 					const read = (cells.text.match(FACTS_READ) ?? []).length;
 					check(read === 1, `${where}: the Game cell's line said ${String(read)} times`);
@@ -166,13 +178,10 @@ for (const { name, path, ready, phone, box } of PAGES) {
 					);
 					continue;
 				}
+				// The player page says the game facts as a sentence at every width (the in-season screens are
+				// box scores since Lanes 66f and 66g).
 				const said = await factsLine(page);
-				// The waiver and trade rows keep to their decision on a phone, so the first row clears the pin.
-				const shown = phone || width !== PHONE_WIDTH;
-				check(
-					(said !== null) === shown,
-					`${where}: ${shown ? 'no game facts sentence' : 'game facts on a phone row'}`
-				);
+				check(said !== null, `${where}: no game facts sentence`);
 				if (said !== null) {
 					check(READ.test(said), `${where}: no read time in "${said}"`);
 					check(WEATHER.test(said), `${where}: no roof or weather in "${said}"`);

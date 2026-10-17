@@ -36,10 +36,10 @@
 			>{/if}
 	</div>
 	{#if cards.length > 0}
-		<ul class="cards">
+		<ul class="pickups">
 			{#each cards as card (card.key)}
 				{@const on = chosen === card.key}
-				<li class="card" class:on>
+				<li class="pickup" class:on>
 					<button type="button" class="pick" aria-pressed={on} onclick={() => onchoose(card)}>
 						<span class="slot">{card.slot}</span>
 						<span class="text"
@@ -122,7 +122,7 @@
 		color: var(--gain-ink);
 	}
 
-	.cards {
+	.pickups {
 		display: flex;
 		flex-wrap: wrap;
 		gap: var(--s-2);
@@ -132,7 +132,7 @@
 	}
 
 	/* A card never passes the strip: on a narrow desk its verb drops under its words. */
-	.card {
+	.pickup {
 		display: flex;
 		flex-wrap: wrap;
 		align-items: center;
@@ -145,7 +145,7 @@
 		background: var(--bg);
 	}
 
-	.card.on {
+	.pickup.on {
 		border-color: color-mix(in srgb, var(--accent) 55%, var(--line-strong));
 	}
 
@@ -232,13 +232,13 @@
 		}
 
 		/* The cards scroll on one line; the chosen one's verb is pinned at the foot. */
-		.cards {
+		.pickups {
 			flex-wrap: nowrap;
 			overflow-x: auto;
 			scrollbar-width: none;
 		}
 
-		.card {
+		.pickup {
 			flex: none;
 			max-width: none;
 			padding-right: var(--s-3);

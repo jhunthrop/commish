@@ -9,7 +9,16 @@
 	import { tagMarks } from '#lib/sheet/tags.ts';
 	import TagChip from '#lib/ui/TagChip.svelte';
 	import Icon from '#lib/ui/Icon.svelte';
-	import { BOX, boxNumber, deltaWord, easeOf, oppRankWord, type BoxRow } from './box.ts';
+	import {
+		BOX,
+		boxNumber,
+		deltaWord,
+		easeOf,
+		initialName,
+		oppRankWord,
+		type BoxPick,
+		type BoxRow
+	} from './box.ts';
 	import type { Move } from './lineup.ts';
 	import MoveMark from './MoveMark.svelte';
 	import WeatherGlyph from './WeatherGlyph.svelte';
@@ -47,6 +56,16 @@
 		marked?: boolean;
 		/** A row of the panel under another row (the Waivers drop choices): set in, quieter ground. */
 		nested?: boolean;
+		/** The Trades screen's last column (Lane 66g): his rest-of-season points a game, in place of
+		 * the projection's change and the evidence line's button. */
+		season?: boolean;
+		/** The trade builder's columns (Lane 66g): his game folds under his name at every width, and
+		 * the slot and Pts are left out (a roster, not a lineup), so two boxes sit side by side. */
+		compact?: boolean;
+		/** The trade builder's tick (Lane 66g), first in the row. */
+		pick?: BoxPick | null;
+		/** A narrow phone cell prints his short form, "A. Rodgers", never a cut surname (rereview N2). */
+		shortOnPhone?: boolean;
 	}
 
 	let {
@@ -63,8 +82,13 @@
 		phoneMore = null,
 		clears = null,
 		marked = false,
-		nested = false
+		nested = false,
+		season = false,
+		compact = false,
+		pick = null,
+		shortOnPhone = false
 	}: Props = $props();
+	const picked = $derived(pick?.state === 'on');
 	const rank = $derived(row.evidence.oppRank);
 	/** The phone's evidence line's own words and separator, so the template adds no space. */
 	const oppLead = `${BOX.opp} `;
@@ -74,6 +98,12 @@
 		`${BOX.avg} ${boxNumber(row.evidence.avg)}, ${BOX.last} ${boxNumber(row.evidence.last)}${phoneMore === null ? '' : `${SEPARATOR}${phoneMore}`}`
 	);
 </script>
+
+{#snippet named()}
+	{#if shortOnPhone}<span class="full"><NameWords name={row.name} /></span><span class="short"
+			>{initialName(row.name)}</span
+		>{:else}<NameWords name={row.name} />{/if}
+{/snippet}
 
 {#snippet game()}
 	{#if row.game === 'bye'}
@@ -111,8 +141,31 @@
 	class:open={why?.open === true}
 	class:idle
 	class:nested
+	class:compact
+	class:picked
+	class:dropped={pick?.state === 'drop'}
 >
-	{#if slotCell}
+	{#if pick}
+		<td class="tk">
+			{#if pick.state === 'drop'}
+				<span class="drop-mark">{BOX.drop}</span>
+			{:else if pick.state === 'no'}
+				<span class="tick no" aria-hidden="true"></span>
+			{:else}
+				<button
+					type="button"
+					class="tick"
+					class:on={picked}
+					aria-pressed={picked}
+					aria-label="{BOX.pick} {row.name}"
+					disabled={pick.disabled}
+					onclick={pick.toggle ?? undefined}
+					>{#if picked}<Icon name="check" size={14} />{/if}</button
+				>
+			{/if}
+		</td>
+	{/if}
+	{#if slotCell && !compact}
 		<td class="slot"
 			><span class="sl"
 				>{#if move}<MoveMark {move} />{/if}{row.slot}</span
@@ -129,9 +182,9 @@
 			<span class="who">
 				<span class="nm">
 					{#if row.slug !== null}
-						<a href={links.playerSeason(row.slug)}><NameWords name={row.name} /></a>
+						<a href={links.playerSeason(row.slug)}>{@render named()}</a>
 					{:else}
-						<b><NameWords name={row.name} /></b>
+						<b>{@render named()}</b>
 					{/if}
 				</span>
 				<span class="club"
@@ -157,9 +210,10 @@
 			</span>
 		</span>
 	</td>
-	<td class="game">{@render game()}</td>
+	{#if !compact}<td class="game">{@render game()}</td>{/if}
 	<td class="n proj">{boxNumber(row.proj)}</td>
-	{#if ptsCell}<td class="n pts" class:none={row.pts === null}>{boxNumber(row.pts)}</td>{/if}
+	{#if ptsCell && !compact}<td class="n pts" class:none={row.pts === null}>{boxNumber(row.pts)}</td
+		>{/if}
 	{#if evidence}
 		<td class="n ev first"
 			>{#if rank !== null}<span class="rk {easeOf(rank, row.evidence.oppOf)}"
@@ -168,6 +222,10 @@
 		>
 		<td class="n ev">{boxNumber(row.evidence.avg)}</td>
 		<td class="n ev">{boxNumber(row.evidence.last)}</td>
+	{/if}
+	{#if season}
+		<td class="n season">{boxNumber(row.evidence.season)}</td>
+	{:else if evidence}
 		<td class="n ev delta">{deltaWord(row.evidence.delta)}</td>
 		{#if tail}{@render tail()}{:else}
 			<td class="op"
@@ -472,8 +530,101 @@
 		font-size: var(--t-md);
 	}
 
+	.short {
+		display: none;
+	}
+
 	.phone-game {
 		display: none;
+	}
+
+	/* The trade builder's rows (Lane 66g): the game under the name at every width, a tick first. */
+	.compact .phone-game {
+		display: flex;
+		flex-direction: column;
+		gap: 1px;
+		font-size: var(--t-xs);
+		color: var(--ink-2);
+	}
+
+	.compact .phone-game .facts {
+		display: none;
+	}
+
+	.season {
+		font-size: var(--t-lg);
+		font-weight: 700;
+	}
+
+	.tk {
+		width: 36px;
+		padding: 0;
+		text-align: center;
+	}
+
+	.tick {
+		display: inline-grid;
+		place-items: center;
+		width: 24px;
+		height: 24px;
+		padding: 0;
+		border: 1.5px solid var(--ink-3);
+		border-radius: 5px;
+		background: transparent;
+		color: var(--accent-ink);
+		cursor: pointer;
+		vertical-align: middle;
+	}
+
+	.tick.on {
+		background: var(--accent);
+		border-color: var(--accent);
+	}
+
+	.tick:disabled {
+		cursor: not-allowed;
+		opacity: 0.45;
+	}
+
+	.tick.no {
+		border-style: dashed;
+		border-color: var(--line-strong);
+		cursor: default;
+	}
+
+	.tick:focus-visible {
+		outline: 2px solid var(--focus);
+		outline-offset: 2px;
+	}
+
+	.drop-mark {
+		display: inline-flex;
+		align-items: center;
+		height: 20px;
+		padding: 0 5px;
+		border-radius: var(--r-sm);
+		background: var(--loss-bg);
+		color: var(--loss-ink);
+		font-size: var(--t-xs);
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.04em;
+	}
+
+	.picked td {
+		background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+	}
+
+	.picked td:first-child {
+		box-shadow: inset 3px 0 0 var(--accent);
+	}
+
+	.dropped td {
+		background: color-mix(in srgb, var(--loss-ink) 7%, var(--surface));
+	}
+
+	.dropped td:first-child {
+		box-shadow: inset 3px 0 0 var(--loss-ink);
 	}
 
 	@media (max-width: 760px) {
@@ -494,6 +645,16 @@
 
 		.game > * {
 			display: none;
+		}
+
+		/* A name's short form on a phone, where the row asks for it. */
+		.full {
+			display: none;
+		}
+
+		.short {
+			display: inline;
+			white-space: nowrap;
 		}
 
 		.phone-game {

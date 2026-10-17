@@ -1,6 +1,6 @@
 // The in-season screens' behaviour: the flag's gate, what each failed read shows, the page's view
-// while its reads land, the narrowing that keeps only the latest answer, and a marked trade across
-// a re-read. Run with `npm test`.
+// while its reads land, the narrowing that keeps only the latest answer, and a trade's key across a
+// re-read. Run with `npm test`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { ApiError } from '#lib/api/client.ts';
@@ -8,8 +8,6 @@ import type { PlayerLine, TradeRow, TradeTeam } from './api.ts';
 import { screenOf } from './screens.ts';
 import {
 	Narrowing,
-	bestTrade,
-	markedTrade,
 	pickKey,
 	pickerPlayers,
 	tradeHolding,
@@ -145,7 +143,9 @@ const row = (give: string[], get: string[], mine: number, close = false): TradeR
 	drop: null,
 	my_gain: mine,
 	their_gain: close ? 0.1 : 0.6,
-	close_for_them: close
+	close_for_them: close,
+	my_proj_change: null,
+	their_proj_change: null
 });
 
 const team = (trades: TradeRow[], roster = 4): TradeTeam => ({
@@ -158,27 +158,12 @@ const team = (trades: TradeRow[], roster = 4): TradeTeam => ({
 	note: null
 });
 
-void test('the trade decision is the best one the other team gains from, a close call only when none is', () => {
-	const lopsided = row(['p1'], ['q1', 'q2'], 4.5, true);
-	const fair = row(['p2'], ['q3'], 1.5);
-	const fairer = row(['p3'], ['q4'], 1.1);
-	const teams = [team([lopsided], 4), team([fair, fairer], 5)];
-	assert.equal(bestTrade(teams)?.row, fair);
-	assert.equal(bestTrade(teams)?.team.roster_id, 5);
-	assert.equal(bestTrade([team([lopsided])])?.row, lopsided);
-	assert.equal(bestTrade([team([])]), null);
-});
-
-void test('a marked trade is the same trade after a re-read reorders the team, and gone when it is', () => {
+void test("a trade's key is who is in it, whatever the order a re-read gives either side", () => {
 	const a = row(['p1'], ['q1', 'q2'], 2.1);
 	const b = row(['p2'], ['q3'], 1.4);
-	const key = tradeKey(4, b);
-	assert.equal(key, tradeKey(4, row(['p2'], ['q3'], 9)));
+	assert.equal(tradeKey(4, b), tradeKey(4, row(['p2'], ['q3'], 9)));
 	assert.equal(tradeKey(4, row(['p1'], ['q2', 'q1'], 0)), tradeKey(4, a));
-	const reread = [team([row(['p2'], ['q3'], 2.5), a])];
-	assert.equal(markedTrade(reread, key)?.row.my_gain, 2.5);
-	assert.equal(markedTrade([team([a])], key), null);
-	assert.equal(markedTrade(reread, null), null);
+	assert.notEqual(tradeKey(4, a), tradeKey(5, a));
 });
 
 void test('the picker lists every player on your roster, a trade found or not, and theirs from the trades', () => {

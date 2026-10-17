@@ -62,6 +62,12 @@ def week_of(week: int, season: int) -> str:
     return f"week {week} of {season}"
 
 
+def ordinal(rank: int) -> str:
+    """A rank as English writes it: 1st, 2nd, 3rd, 11th, 26th."""
+    suffix = "th" if 10 <= rank % 100 <= 20 else {1: "st", 2: "nd", 3: "rd"}.get(rank % 10, "th")  # noqa: PLR2004 - English ordinals
+    return f"{rank}{suffix}"
+
+
 def whole(value: float) -> str:
     """`${Math.round(value)}`."""
     return js_string(js_round(value))

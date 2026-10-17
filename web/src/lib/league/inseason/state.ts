@@ -53,18 +53,6 @@ export function screenView(reads: {
 	return 'loading';
 }
 
-/** The trade screen's decision when none is marked: the best trade for you among those the other
- * team gains from, a close call for them only when no other trade is found. */
-export function bestTrade(teams: readonly TradeTeam[]): { row: TradeRow; team: TradeTeam } | null {
-	const all = teams.flatMap((team) => team.trades.map((row) => ({ row, team })));
-	const best = (rows: typeof all): (typeof all)[number] | null =>
-		rows.reduce<(typeof all)[number] | null>(
-			(top, t) => (top === null || t.row.my_gain > top.row.my_gain ? t : top),
-			null
-		);
-	return best(all.filter((t) => !t.row.close_for_them)) ?? best(all);
-}
-
 /** A picker player's key: his board id, which the trades narrow by, or his host id for a player our
  * board does not place (no trade can hold him). */
 export function pickKey(line: PlayerLine): string {
@@ -126,7 +114,7 @@ export class Narrowing<K, T> {
 }
 
 /** A trade by who is in it: the team and both sides' players, each side in a fixed order, so a
- * re-read that reorders a team's trades keeps the same trade marked. */
+ * re-read that reorders a team's trades keeps the same row open. */
 export function tradeKey(team: number, row: TradeRow): string {
 	const ids = (side: TradeRow['give']): string =>
 		side
@@ -134,17 +122,4 @@ export function tradeKey(team: number, row: TradeRow): string {
 			.sort()
 			.join('+');
 	return `${String(team)}:${ids(row.give)}>${ids(row.get)}`;
-}
-
-/** The marked trade in an answer, null when it is no longer there. */
-export function markedTrade(
-	teams: readonly TradeTeam[],
-	key: string | null
-): { row: TradeRow; team: TradeTeam } | null {
-	if (key === null) return null;
-	for (const team of teams) {
-		const row = team.trades.find((r) => tradeKey(team.roster_id, r) === key);
-		if (row) return { row, team };
-	}
-	return null;
 }

@@ -154,7 +154,8 @@ def _pedigree(depth: Depth) -> str | None:
     return None if not parts else f"{', '.join(parts)}."
 
 
-def _slot_word(slot: float) -> str:
+def slot_word(slot: float) -> str:
+    """A depth chart slot as a word: "first" to "fifth", else "number 6"."""
     index = int(slot) - 1 if slot == int(slot) else -1
     return _SLOT_WORDS[index] if 0 <= index < len(_SLOT_WORDS) else f"number {js_string(slot)}"
 
@@ -166,12 +167,12 @@ def _depth_chart(facts: "PlayerFacts") -> str | None:
     around = (
         "No other player at his position is listed on that release"
         if not chart.around_him
-        else "Listed with him: " + ", ".join(f"{peer.name} {_slot_word(peer.slot)}" for peer in chart.around_him)
+        else "Listed with him: " + ", ".join(f"{peer.name} {slot_word(peer.slot)}" for peer in chart.around_him)
     )
     team, position = facts.identity.team, facts.identity.position
     # In season a capture's day reads back as a month ("as of September"), which the floor refuses.
     when = f"as of {chart.as_of}" if facts.season is None else "(the latest we hold)"
-    return f"Depth chart {when}: listed {_slot_word(chart.slot)} among {team} {position}s. {around}."
+    return f"Depth chart {when}: listed {slot_word(chart.slot)} among {team} {position}s. {around}."
 
 
 def _span(weeks: Sequence[int], season: int) -> str:

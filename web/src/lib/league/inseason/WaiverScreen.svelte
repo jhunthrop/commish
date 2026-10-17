@@ -315,8 +315,8 @@
 	decision={stripDecision(cards)}
 	verb={card ? verbWords(card.source) : null}
 	href={shown.host_waivers_url}
-	basis=""
-	basisNote={shown.basis_note}
+	basis={null}
+	basisNote={shown.basis_note === '' ? null : shown.basis_note}
 	deskVerb={false}
 	onverb={card ? () => act(card.source) : null}
 	controls={onHost ? MOVE_ID : undefined}

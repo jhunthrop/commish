@@ -3,9 +3,14 @@
 // at 1440 and 390. At 1440, 1024, 800, 768 and 390 it asserts the page never scrolls sideways, and it
 // prints the tallest player row, the taps from the page to its verb, and the shots of the loading
 // rows, the API's refusals and the site's not-found for an unknown screen. On a phone (390 by 844) it
-// asserts the first player row sits whole above the pinned verb. On the waiver and trade screens it
-// asserts the rows carry the rest-of-season points a game and the basis line says what they are (Lane
-// 64), and the builder's answer names its players with them. On the Lineup and Matchup screens, box
+// asserts the first player row sits whole above the pinned verb (or, where nothing is pinned at rest,
+// the tab bar). On the waiver screen it asserts the rows carry the rest-of-season points a game and the
+// basis line says what they are (Lane 64). On the Trades table (Lane 66g) it asserts the strip's cards
+// and their verb, the finder's heads (the phone's naming the unit), every gain and week cell signed,
+// an opened trade's box-score heads, the basis in five lines at most opening on which trades are
+// listed, the copy verb's confirm naming Sleeper's trade page, and that nothing says "host"; the
+// builder's two boxes, its scoreboard's figures before and after once answered, and its answer naming
+// its players with their points a game. On the Lineup and Matchup screens, box
 // scores (Lane 66d), it asserts the column heads, every row's projection and points as one decimal or
 // --, the projection's basis said once, no points a game on a row, no name cut and a defense drawn
 // with its club's mark. On the Lineup table (Lane 66e) it asserts the evidence heads and cells,
@@ -43,8 +48,10 @@ const PAGES = [
 	{ name: 'start', path: `/league/${id}/start`, ready: 'Copy the lineup' },
 	{ name: 'matchup', path: `/league/${id}/matchup`, ready: 'Week 6' },
 	{ name: 'waivers', path: `/league/${id}/waivers`, ready: 'Open Sleeper waivers' },
-	{ name: 'trades', path: `/league/${id}/trades`, ready: 'Propose on Sleeper' }
+	{ name: 'trades', path: `/league/${id}/trades`, ready: 'worth proposing' }
 ] as const;
+/** The Trades screen's verb on every platform today: the offer copied, the trade page opened. */
+const TRADE_VERB = 'Open Sleeper trades';
 
 await mkdir(out, { recursive: true });
 const browser = await chromium.launch();
@@ -78,7 +85,7 @@ function file(name: string): string {
 
 const scrolls: string[] = [];
 /** The screens whose rows carry his rest-of-season points a game, and the basis sentence saying so. */
-const PER_GAME_SCREENS = new Set(['trades']);
+const PER_GAME_SCREENS = new Set<string>();
 /** The screens drawn as a box score (Lane 66d): columns, the week's projection and points so far,
  * the projection's basis said once, no points a game on a row. */
 const BOX_SCREENS = new Set(['start', 'matchup']);
@@ -184,26 +191,93 @@ async function boxFacts(page: Page): Promise<{
 const PER_GAME_BASIS =
 	/Points a game are our rest-of-season projection from week \d+ over the games his club has left, byes out\./;
 const PER_GAME = /\d+\.\d a game/;
-/** The screens whose rows end on their own figure, not on a gain: every row's end names its basis. */
-const OWN_END_SCREENS = new Set(['start', 'trades']);
-/** A row's end on those screens: points a game, or words saying why it has none. */
-const NAMED_END = /a game|No projection|Unranked/i;
+/** The Trades table's heads (Lane 66g): at a desk, below the room's width, and on a phone, where the
+ * gain heads name their unit. The open column's own words are read by a screen reader. */
+const TRADE_HEADS = [
+	'Why this trade',
+	'You give',
+	'You get',
+	'With',
+	'You',
+	'Them',
+	'You',
+	'Them',
+	'Room'
+];
+const TRADE_HEADS_NARROW = TRADE_HEADS.slice(0, -1);
+const TRADE_HEADS_PHONE = ['Why this trade', 'You give', 'You, a week', 'Them, a week'];
+const ROOM_FOLDS_AT = 1180;
+/** Below it a trade folds as on a phone. */
+const TRADES_FOLD_AT = 900;
+/** A gain or a week's change as its cell prints it. */
+const SIGNED = /^([+−]\d+\.\d|0\.0|--)$/;
+const TRADE_BASIS_FIRST =
+	"Trades where both lineups gain on our rest-of-season order. Each team's best trade, yours first, among those they gain at least 0.5 a week from, then the close calls for them. The other team decides.";
+/** A trade's week in one line, from the API's two changes (review H2). */
+const WEEK_LINE = /[+−]?\d+\.\d Proj for you this week, [+−]?\d+\.\d for them/;
+const TRADE_BASIS_MOST = 5;
 
-/** Every row under root whose end is a bare number or names no basis we expect, by player name. */
-async function unnamedEnds(page: Page, root: string): Promise<string[]> {
-	return page.evaluate(
-		([scope, pattern]) =>
-			[...document.querySelectorAll(`${scope} .row`)].flatMap((row) => {
-				const end = row.querySelector('.end');
-				if (!end) return [];
-				const bare = end.querySelector('.bare') !== null;
-				const text = (end as HTMLElement).innerText;
-				return bare || !new RegExp(pattern, 'i').test(text)
-					? [row.querySelector('b')?.textContent ?? '?']
-					: [];
-			}),
-		[root, NAMED_END.source] as const
-	);
+/** What the Trades table draws wrong at a width: its heads, its cells, its strip and its basis. */
+async function tradeFaults(page: Page, width: number): Promise<string[]> {
+	const seen = await page.evaluate(() => {
+		const table = document.querySelector('main table.finder');
+		const drawn = (el: Element): boolean => el.getBoundingClientRect().width > 1;
+		return {
+			heads: [...(table?.querySelectorAll(':scope > thead tr.cols > th') ?? [])]
+				.filter(drawn)
+				.map((th) => (th as HTMLElement).innerText.trim())
+				.filter((h) => h !== ''),
+			cells: [
+				...(table?.querySelectorAll(
+					':scope > tbody > tr.trade > td.g, :scope > tbody > tr.trade > td.w'
+				) ?? [])
+			]
+				.filter(drawn)
+				.map((td) => (td as HTMLElement).innerText.trim()),
+			rows: table?.querySelectorAll(':scope > tbody > tr.trade').length ?? 0,
+			basis: [...document.querySelectorAll('main .basis p')].map((p) => p.textContent.trim()),
+			cards: [...document.querySelectorAll('main .card')].map((c) => (c as HTMLElement).innerText),
+			// The member's drop as each row says it where it is drawn (review M3).
+			drops: [...(table?.querySelectorAll(':scope > tbody > tr.trade') ?? [])].filter((tr) =>
+				[...tr.querySelectorAll<HTMLElement>('td.room span, .drop-mid, .ph-with')].some(
+					(el) => el.offsetParent !== null && /you drop /i.test(el.innerText)
+				)
+			).length
+		};
+	});
+	const faults: string[] = [];
+	const heads =
+		width <= TRADES_FOLD_AT
+			? TRADE_HEADS_PHONE
+			: width <= ROOM_FOLDS_AT
+				? TRADE_HEADS_NARROW
+				: TRADE_HEADS;
+	if (seen.heads.join('|').toLowerCase() !== heads.join('|').toLowerCase())
+		faults.push(`finder heads ${seen.heads.join('|')}`);
+	if (seen.rows === 0) faults.push('no trade rows');
+	if (seen.cells.length === 0 || !seen.cells.every((c) => SIGNED.test(c)))
+		faults.push(`finder cells ${seen.cells.join(' ')}`);
+	if (seen.cards.length === 0 || seen.cards.length > 2)
+		faults.push(`${String(seen.cards.length)} cards`);
+	for (const card of seen.cards) {
+		if (
+			!card.includes(TRADE_VERB) ||
+			!/[+−]\d+\.\d a week for you/.test(card) ||
+			!WEEK_LINE.test(card)
+		)
+			faults.push(`card ${card.replace(/\s+/g, ' ')}`);
+	}
+	if (seen.drops === 0) faults.push('no row says the drop');
+	if (seen.basis.length > TRADE_BASIS_MOST)
+		faults.push(`basis in ${String(seen.basis.length)} lines`);
+	if (!(seen.basis[0] ?? '').startsWith(TRADE_BASIS_FIRST))
+		faults.push(`basis opens ${seen.basis[0] ?? ''}`);
+	const all = seen.basis.join(' ');
+	if (!PER_GAME_BASIS.test(all)) faults.push('basis says no points a game');
+	const proj = (all.match(PROJ_BASIS) ?? []).length;
+	if (proj !== 1) faults.push(`projection basis said ${String(proj)} times`);
+	for (const word of await hostWordsSaid(page)) faults.push(`says host: ${word}`);
+	return faults;
 }
 const missing: string[] = [];
 const rows = new Map<string, number>();
@@ -242,11 +316,10 @@ for (const { name, path, ready: text } of PAGES) {
 				if (!PER_GAME_BASIS.test(said.basis))
 					missing.push(`${name} ${theme} ${String(width)} basis`);
 				if (!PER_GAME.test(said.row)) missing.push(`${name} ${theme} ${String(width)} first row`);
-				if (OWN_END_SCREENS.has(name)) {
-					for (const who of await unnamedEnds(page, 'main')) {
-						missing.push(`${name} ${theme} ${String(width)} row end unnamed: ${who}`);
-					}
-				}
+			}
+			if (name === 'trades') {
+				for (const fault of await tradeFaults(page, width))
+					missing.push(`${name} ${theme} ${String(width)} ${fault}`);
 			}
 			if (name === 'waivers') {
 				for (const fault of await waiverFaults(page, width)) {
@@ -304,14 +377,21 @@ for (const { name, path, ready: text } of PAGES) {
 			}
 			if (width === PHONE.width && name !== 'league' && name !== 'matchup') {
 				await page.setViewportSize(PHONE);
+				// The Trades screen's first row is its first trade, the strip's first card; nothing is pinned
+				// there at rest (Lane 66g), so the card must clear the tab bar.
 				const fold = await page.evaluate(() => {
 					const row = document
 						.querySelector(
-							'main .row, main table.box tbody tr, main table.lineup tbody tr, main table.pool tbody tr'
+							'main .card, main .row, main table.box tbody tr, main table.lineup tbody tr, main table.pool tbody tr'
 						)
 						?.getBoundingClientRect();
-					const pin = document.querySelector('.pin')?.getBoundingClientRect();
-					return { rowBottom: row?.bottom ?? Infinity, pinTop: pin?.top ?? 0 };
+					const pin = [...document.querySelectorAll<HTMLElement>('.pin')]
+						.find((p) => p.offsetParent !== null)
+						?.getBoundingClientRect();
+					const tabBar = parseFloat(
+						getComputedStyle(document.documentElement).getPropertyValue('--tab-bar-h')
+					);
+					return { rowBottom: row?.bottom ?? Infinity, pinTop: pin?.top ?? innerHeight - tabBar };
 				});
 				firstRows.set(
 					`${name} ${theme}`,
@@ -354,10 +434,118 @@ for (const width of SHOT_WIDTHS) {
 	await page.locator('.rows[aria-busy="false"]').waitFor({ timeout: READY_TIMEOUT_MS });
 	await page.screenshot({ path: file(`waivers-wr-dark-${String(width)}`), fullPage: true });
 	await page.goto(`${web}/league/${id}/trades`, { waitUntil: 'networkidle' });
-	await ready(page, 'Propose on Sleeper');
+	await ready(page, 'worth proposing');
 	await page.getByRole('combobox').selectOption({ label: 'Patrick Mahomes' });
-	await page.locator('.teams[aria-busy="false"]').waitFor({ timeout: READY_TIMEOUT_MS });
+	await page.locator('.finder-wrap[aria-busy="false"]').waitFor({ timeout: READY_TIMEOUT_MS });
 	await page.screenshot({ path: file(`trades-narrowed-dark-${String(width)}`), fullPage: true });
+	await ctx.close();
+}
+
+/** An opened trade: its players in the box score's columns (Lane 66g), in both themes at both
+ * widths, and every trade sorted by their week's change. */
+const OPENED_HEADS = [
+	'Give',
+	'Player',
+	'Game',
+	'Proj',
+	'Pts',
+	'Opp rank',
+	'Avg',
+	'Last',
+	'Rest of season'
+];
+const OPENED_HEADS_PHONE = ['Give', 'Player', 'Proj', 'Rest of season'];
+/** A name on a phone keeps to one line, and the game under it to one (review H2). */
+const ONE_LINE_PX = 24;
+for (const theme of THEMES) {
+	for (const width of SHOT_WIDTHS) {
+		const ctx = await context(theme, width);
+		const page = await ctx.newPage();
+		await page.goto(`${web}/league/${id}/trades`, { waitUntil: 'networkidle' });
+		await ready(page, 'worth proposing');
+		await page.locator('table.finder button.why').first().click();
+		await page.getByText('Build from this').first().waitFor({ timeout: READY_TIMEOUT_MS });
+		const opened = await page.evaluate(() => ({
+			heads: [...document.querySelectorAll('table.inner thead th')]
+				.filter((th) => th.getBoundingClientRect().width > 1)
+				.map((th) => (th as HTMLElement).innerText.trim()),
+			sides: [...document.querySelectorAll('table.inner tbody td.slot')].map((td) =>
+				(td as HTMLElement).innerText.trim()
+			),
+			week: document.querySelector<HTMLElement>('main .week-line')?.innerText.trim() ?? '',
+			tallest: Math.max(
+				0,
+				...[...document.querySelectorAll('table.inner .nm, table.inner .phone-game .opp')].map(
+					(el) => el.getBoundingClientRect().height
+				)
+			),
+			// Each name as drawn, and whether its cell cuts it (rereview N2).
+			names: [...document.querySelectorAll<HTMLElement>('table.inner .nm')].map((nm) => ({
+				said: nm.innerText.trim(),
+				cut: nm.scrollWidth > nm.clientWidth + 1
+			}))
+		}));
+		if (width <= PHONE.width) {
+			for (const { said, cut } of opened.names) {
+				if (cut || !/^[A-Z]\. \S/.test(said))
+					missing.push(
+						`trades opened ${theme} ${String(width)} name "${said}"${cut ? ' cut' : ''}`
+					);
+			}
+		}
+		const want = width <= PHONE.width ? OPENED_HEADS_PHONE : OPENED_HEADS;
+		if (opened.heads.join('|').toLowerCase() !== want.join('|').toLowerCase())
+			missing.push(`trades opened ${theme} ${String(width)} heads ${opened.heads.join('|')}`);
+		if (!opened.sides.includes('Give') || !opened.sides.includes('Get'))
+			missing.push(`trades opened ${theme} ${String(width)} sides ${opened.sides.join('|')}`);
+		if (!WEEK_LINE.test(opened.week))
+			missing.push(`trades opened ${theme} ${String(width)} week "${opened.week}"`);
+		if (opened.tallest > ONE_LINE_PX)
+			missing.push(
+				`trades opened ${theme} ${String(width)} a name or game wraps (${String(opened.tallest)}px)`
+			);
+		await page.screenshot({
+			path: file(`trades-opened-${theme}-${String(width)}`),
+			fullPage: true
+		});
+		// The opened trade's verb copies the offer and opens the platform's trade page, as the card's
+		// does (review H1).
+		await ctx.grantPermissions(['clipboard-read', 'clipboard-write']);
+		const tab = ctx.waitForEvent('page');
+		await page.locator('tr.opened .acts').getByText(TRADE_VERB).click();
+		const opens = await tab;
+		if (!opens.url().includes('sleeper.com'))
+			missing.push(`trades opened ${theme} ${String(width)} verb opened ${opens.url()}`);
+		await opens.close();
+		await ready(page, 'Propose it on');
+		if (width !== PHONE.width) {
+			await page.locator('table.finder thead button.sort').nth(3).click();
+			await page.screenshot({ path: file(`trades-sorted-${theme}-${String(width)}`) });
+		}
+		await ctx.close();
+	}
+}
+
+/** The trade verb copies the offer and says where to propose it (Lane 66g), at both widths. */
+for (const width of SHOT_WIDTHS) {
+	const ctx = await context('dark', width);
+	await ctx.grantPermissions(['clipboard-read', 'clipboard-write']);
+	const page = await ctx.newPage();
+	await page.goto(`${web}/league/${id}/trades`, { waitUntil: 'networkidle' });
+	await ready(page, 'worth proposing');
+	const tab = ctx.waitForEvent('page');
+	await page.locator('main .card').first().getByText(TRADE_VERB).click();
+	await (await tab).close();
+	await ready(page, 'Propose it on');
+	const copied = await page.evaluate(() => navigator.clipboard.readText());
+	if (!/^Trade with .+: .+ for .+\.$/.test(copied))
+		missing.push(`trades copy ${String(width)}: ${copied}`);
+	const said = await page.evaluate(
+		() => document.querySelector<HTMLElement>('main .card .said')?.innerText.trim() ?? ''
+	);
+	if (said !== "Copied. Propose it on Sleeper's trade page.")
+		missing.push(`trades copied ${String(width)}: "${said}"`);
+	await page.screenshot({ path: file(`trades-copied-dark-${String(width)}`) });
 	await ctx.close();
 }
 
@@ -439,7 +627,7 @@ async function waiverFaults(page: Page, width: number): Promise<string[]> {
 			proj: rows.map((tr) => text(tr.querySelector('td.proj') ?? tr)),
 			rest: rows.map((tr) => tr.querySelector('td.rest')?.textContent.trim() ?? ''),
 			tinted: rows.filter((tr) => tr.classList.contains('moved-in')).length,
-			cards: document.querySelectorAll('main .cards .card').length,
+			cards: document.querySelectorAll('main .pickups .pickup').length,
 			count: document.querySelector('main .count')?.textContent ?? '',
 			basis: [...document.querySelectorAll('main .basis p')].map(text),
 			// The basis in rendered lines: each paragraph's height over its line height (review 66f M5).
@@ -636,7 +824,7 @@ for (const theme of THEMES) {
 		const ctx = await context(theme, width);
 		const page = await ctx.newPage();
 		await page.goto(`${web}/league/${id}/trades`, { waitUntil: 'networkidle' });
-		await ready(page, 'Propose on Sleeper');
+		await ready(page, 'worth proposing');
 		const kicker = await page.locator('optgroup[label="Your players"] option').last().textContent();
 		await page.getByRole('combobox').selectOption({ label: kicker ?? '' });
 		await ready(page, 'No trade we found includes');
@@ -648,10 +836,11 @@ for (const theme of THEMES) {
 	}
 }
 
-/** The trade builder (Lane 61), in both themes at both widths: Build a trade opens it empty, a tap
- * a side reads the answer, a finder row's Build from this opens it with that trade and answers the
- * row's own two gains, one player changed reads it again, and giving both tight ends says the TE
- * would not be filled. Each must not scroll sideways. */
+/** The trade builder (Lane 61) as two box scores (Lane 66g), in both themes at both widths: Build a
+ * trade opens it empty, a tick a side reads the answer and lights the scoreboard's figures, a finder
+ * row's Build from this opens it with that trade and answers the row's own two gains, one player
+ * changed reads it again, and giving both tight ends says the TE would not be filled. Each must not
+ * scroll sideways. */
 const builder = '#trade-builder';
 /** The gains in an answer line: its figures before the players it names with their points a game. */
 const gainsOf = (text: string): string[] =>
@@ -661,90 +850,105 @@ async function answered(page: Page): Promise<string> {
 	await line.waitFor({ timeout: READY_TIMEOUT_MS });
 	return (await line.textContent()) ?? '';
 }
-async function tapSide(page: Page, side: 'You give' | 'You get', name: string): Promise<void> {
-	await page
-		.locator(`${builder} section[aria-label="${side}"] button.pick`)
+/** A side's box: the member's first, theirs second. */
+const sideBox = (page: Page, side: 'give' | 'get') =>
+	page.locator(`${builder} table.box`).nth(side === 'give' ? 0 : 1);
+async function tapSide(page: Page, side: 'give' | 'get', name: string): Promise<void> {
+	await sideBox(page, side)
+		.locator('tbody tr')
 		.filter({ hasText: name })
+		.locator('button.tick')
 		.first()
 		.click();
+}
+/** The scoreboard's figures once answered: each a figure to the tenth. */
+async function bugFaults(page: Page): Promise<string[]> {
+	const figures = await page
+		.locator(`${builder} .bug .fig b, ${builder} .bug .fig i`)
+		.allInnerTexts();
+	return figures.length === 8 && figures.every((f) => /^−?\d+\.\d$/.test(f.trim()))
+		? []
+		: [`scoreboard ${figures.join(' ')}`];
 }
 const builderLines = new Map<string, string>();
 for (const theme of THEMES) {
 	for (const width of SHOT_WIDTHS) {
 		const ctx = await context(theme, width);
 		const page = await ctx.newPage();
+		const at = `${theme} ${String(width)}`;
 		const shot = async (name: string): Promise<void> => {
 			const wide = await page.evaluate(
 				() => document.documentElement.scrollWidth > window.innerWidth
 			);
-			if (wide) scrolls.push(`trades builder ${name} ${theme} ${String(width)}`);
+			if (wide) scrolls.push(`trades builder ${name} ${at}`);
 			await page.screenshot({
 				path: file(`trades-builder-${name}-${theme}-${String(width)}`),
 				fullPage: name !== 'pinned'
 			});
 		};
 		await page.goto(`${web}/league/${id}/trades`, { waitUntil: 'networkidle' });
-		await ready(page, 'Propose on Sleeper');
+		await ready(page, 'worth proposing');
 		await page.getByRole('button', { name: 'Build a trade' }).click();
 		await ready(page, 'Pick one or two of your players and one or two of theirs.');
 		await shot('open');
-		const yours = page.locator(`${builder} section[aria-label="You give"] button.pick`);
-		const theirs = page.locator(`${builder} section[aria-label="You get"] button.pick`);
+		const yours = sideBox(page, 'give').locator('button.tick');
+		const theirs = sideBox(page, 'get').locator('button.tick');
 		await yours.nth(1).click();
 		await theirs.first().click();
-		for (const who of await unnamedEnds(page, builder)) {
-			missing.push(`builder ${theme} ${String(width)} row end unnamed: ${who}`);
-		}
 		const picked = await answered(page);
-		builderLines.set(`picked ${theme} ${String(width)}`, picked);
+		builderLines.set(`picked ${at}`, picked);
 		if (!/You give .+ for .+\(\d+\.\d a game\)\./.test(picked)) {
-			missing.push(`builder answer ${theme} ${String(width)}: ${picked}`);
+			missing.push(`builder answer ${at}: ${picked}`);
 		}
+		for (const fault of await bugFaults(page)) missing.push(`builder ${at} ${fault}`);
 		await shot('picked');
 		if (width === PHONE.width) {
-			// The answer and its verb stay pinned while the member scrolls the rosters.
+			// The gains and the verb stay pinned while the member scrolls the rosters.
 			await page.setViewportSize(PHONE);
 			await theirs.last().scrollIntoViewIfNeeded();
+			const pinned = await page.locator(`${builder} .pin`).isVisible();
+			if (!pinned) missing.push(`builder ${at} nothing pinned`);
 			await shot('pinned');
 			await page.setViewportSize({ width, height: VIEWPORT_HEIGHT });
 		}
 		// A finder row opens the builder with its trade, and answers the row's own gains.
 		await page.getByRole('button', { name: 'Not now' }).click();
-		const row = page.locator('.trade').first();
-		const rowGains = gainsOf((await row.locator('.gains p').textContent()) ?? '');
-		await row.getByRole('button', { name: 'Build from this' }).click();
+		const row = page.locator('table.finder tr.trade').first();
+		const rowGains = (await row.locator('td.g').allInnerTexts()).map((g) =>
+			g.trim().replace(/^[+−]/, '')
+		);
+		await row.locator('button.why').click();
+		await page.getByRole('button', { name: 'Build from this' }).first().click();
 		// Opened with both sides held, the line says it is checking, never to pick a player.
 		const first = (await page.locator(`${builder} .words .line`).textContent()) ?? '';
 		if (/pick one or two/i.test(first)) {
 			throw new Error(`A filled builder asked to pick: ${first}`);
 		}
 		const fromRow = await answered(page);
-		builderLines.set(`from a row ${theme} ${String(width)}`, fromRow);
+		builderLines.set(`from a row ${at}`, fromRow);
 		if (gainsOf(fromRow).join(' ') !== rowGains.join(' ')) {
 			throw new Error(`The builder answered ${fromRow} for a finder row of ${rowGains.join(', ')}`);
 		}
 		await shot('from-row');
 		// One player changed reads the trade again.
-		const firstTheirs = page.locator(`${builder} section[aria-label="You get"] button.pick`);
-		const pickedTheirs = firstTheirs.and(page.locator('[aria-pressed="true"]')).first();
-		await pickedTheirs.click();
-		await firstTheirs.and(page.locator('[aria-pressed="false"]')).first().click();
-		builderLines.set(`changed ${theme} ${String(width)}`, await answered(page));
+		await theirs.and(page.locator('[aria-pressed="true"]')).first().click();
+		await theirs.and(page.locator('[aria-pressed="false"]:not([disabled])')).first().click();
+		builderLines.set(`changed ${at}`, await answered(page));
 		await shot('changed');
 		// Both tight ends given: the member's TE would not be filled.
 		await page.getByRole('button', { name: 'Not now' }).click();
 		await page.getByRole('button', { name: 'Build a trade' }).click();
-		await tapSide(page, 'You give', 'Chig Okonkwo');
-		await tapSide(page, 'You give', 'Sam LaPorta');
+		await tapSide(page, 'give', 'Chig Okonkwo');
+		await tapSide(page, 'give', 'Sam LaPorta');
 		await theirs.first().click();
 		const short = await answered(page);
-		builderLines.set(`short ${theme} ${String(width)}`, short);
+		builderLines.set(`short ${at}`, short);
 		if (short !== 'Your roster would not fill TE.') {
 			throw new Error(`Giving both tight ends answered ${short}`);
 		}
 		// Two given: the side says why its other rows wait, in words, not a tooltip.
-		await page
-			.locator(`${builder} section[aria-label="You give"] .full`)
+		await sideBox(page, 'give')
+			.locator('.holds')
 			.getByText('Two picked, tap one to put him back')
 			.waitFor({ timeout: READY_TIMEOUT_MS });
 		await shot('short');

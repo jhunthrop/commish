@@ -3639,7 +3639,7 @@ components:
         ties: { type: integer }
     TradeRow:
       type: object
-      required: [give, get, drop, my_gain, their_gain, close_for_them]
+      required: [give, get, drop, my_gain, their_gain, close_for_them, my_proj_change, their_proj_change]
       properties:
         give: { type: array, items: { $ref: "#/components/schemas/PlayerLine" } }
         get: { type: array, items: { $ref: "#/components/schemas/PlayerLine" } }
@@ -3653,6 +3653,14 @@ components:
         my_gain: { type: number, format: double, description: points over replacement a week to the drafter's lineup, one decimal }
         their_gain: { type: number, format: double, description: the same to theirs }
         close_for_them: { type: boolean, description: their gain is under 0.5 a week }
+        my_proj_change:
+          type: number
+          format: double
+          nullable: true
+          description: >-
+            this week's Proj total of the drafter's lineup with the trade less without it, each lineup set as the
+            Lineup screen sets it (Lane 66g), one decimal; null when the week has no published projection read
+        their_proj_change: { type: number, format: double, nullable: true, description: the same for theirs }
     TradeTeam:
       type: object
       required: [roster_id, name, owner, record, roster, trades, note]
@@ -3826,7 +3834,7 @@ components:
         answered_at: { type: string, format: date-time, nullable: true }
     TradeAdvice:
       type: object
-      required: [week, basis, basis_note, order_basis, refreshed, read_at, teams, roster, host_trades_url, host_note, check_basis]
+      required: [week, basis, basis_note, order_basis, refreshed, read_at, teams, roster, host_trades_url, host_note, check_basis, moves, projection_scoring, projection_read_at, player_points]
       properties:
         week: { type: integer }
         check_basis:
@@ -3855,6 +3863,51 @@ components:
           description: >-
             one sentence under the verb when we cannot open the host's page ("Make this change on Yahoo. We cannot
             open that page for you yet."), null when the url opens it
+        moves: { $ref: "#/components/schemas/TradeMoves" }
+        projection_scoring: { $ref: "#/components/schemas/ProjectionScoring" }
+        projection_read_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: when the week's published projection behind week_projection and each proj change was captured, null with none
+        player_points: { type: boolean, description: "as LineupAdvice's: the platform gives each player's points" }
+    TradeMoves:
+      type: object
+      required: [propose, reason]
+      properties:
+        propose:
+          type: string
+          enum: [available, unavailable]
+          description: >-
+            available when a trade can be proposed on the platform from our screen (none today: the verb would read
+            Propose on the platform); unavailable when the verb copies the offer and opens the platform's trade page
+        reason:
+          type: string
+          nullable: true
+          description: one line under the verb saying why the trade is not proposed from here, naming the platform; null when available
+    TradeSideTotals:
+      type: object
+      required: [proj_before, proj_after, season_before, season_after]
+      properties:
+        proj_before:
+          type: number
+          format: double
+          nullable: true
+          description: this week's Proj total of the side's lineup as the Lineup screen sets it, one decimal; null with no projection read
+        proj_after: { type: number, format: double, nullable: true, description: the same after the trade }
+        season_before:
+          type: number
+          format: double
+          description: >-
+            the side's lineup strength on our rest-of-season order, points over replacement a week, one decimal: the
+            figure the gains are a change in
+        season_after: { type: number, format: double, description: "the same after the trade: season_before plus the side's gain" }
+    TradeTotals:
+      type: object
+      required: [yours, theirs]
+      properties:
+        yours: { $ref: "#/components/schemas/TradeSideTotals" }
+        theirs: { $ref: "#/components/schemas/TradeSideTotals" }
     TradeCheckInput:
       type: object
       required: [team, give, get]
@@ -3894,7 +3947,7 @@ components:
         theirs_room: { type: boolean, description: "the same for theirs (their drop is theirs to choose, so it is not named)" }
     TradeCheck:
       type: object
-      required: [week, basis, basis_note, order_basis, refreshed, read_at, trade, fills, host_trades_url, host_note]
+      required: [week, basis, basis_note, order_basis, refreshed, read_at, trade, fills, totals, host_trades_url, host_note]
       properties:
         week: { type: integer }
         basis: { type: string, description: the honesty line beside the answer }
@@ -3908,6 +3961,7 @@ components:
             the trade as the finder reckons one: my_gain and their_gain fall below zero for a lineup that loses,
             close_for_them as the finder marks it
         fills: { $ref: "#/components/schemas/TradeFills" }
+        totals: { $ref: "#/components/schemas/TradeTotals" }
         host_trades_url: { type: string, description: "the host's trade page, the finder's, empty when we know none" }
         host_note: { type: string, nullable: true, description: "as TradeAdvice's" }
     LeagueMove:

@@ -13,7 +13,9 @@ existed. Idempotent (a re-run writes nothing new), no register trail, each feed'
 
 `capture-harvest` also takes, in a kickoff slot's window, the slot week's Tank01 projection, the
 anytime-touchdown market (the weekly round 4's two benchmarks, `pipeline/kickoff_slots.py`) and the
-season's dated depth charts again.
+season's dated depth charts again. Last, after the status capture, the hourly week-ahead reads pass
+(Lane 72, `nightly/week_reads.py`): the reads whose status or published projection the hour moved,
+under the hourly dollar budget; advisory, its own line, never the job's verdict.
 
 Exit status 1 when any step failed (or the capture was refused), 0 otherwise. Provider keys come
 from the environment: TANK01_API_KEY for the capture, ODDS_API_KEY for the props snapshot and the
@@ -47,9 +49,11 @@ from research.inseason.season_of import (
 from research.inseason.season_week import STEPS, SeasonWeekContext, run_season_week, run_usage_backfill
 from research.inseason.step_result import StepResult
 from research.logging_setup import configure_logging
+from research.nightly.capsule_step import night_facts
 from research.nightly.publish import take_run_id
 from research.nightly.r2 import run_store
 from research.nightly.register_log import WEEKLY_SUFFIX, record_freeze, record_pass
+from research.nightly.week_reads import run_week_read_step
 from research.pipeline.commands import ODDS_KEY_ENV, now_ms
 from research.pipeline.http import LiveFetcher
 from research.pipeline.kickoff_slots import due_slot, kickoff_slots
@@ -210,7 +214,21 @@ def _capture_harvest(now: datetime) -> bool:
     # The market is its own provider and its own line: a failed Tank01 feed never skips it.
     market = _touchdown_market(now, season)
     charts = _slot_depth_charts(now, season)
+    _week_reads(now)
     return not failed and facts_ok and parsed and market and charts
+
+
+def _week_reads(now: datetime) -> None:
+    """The hourly week-ahead reads pass after the status capture: its line, a failure named and never the
+    job's verdict (the nightly's step is advisory the same way)."""
+    engine = make_engine(database_url_from_env())
+    try:
+        record = run_week_read_step(engine, now, _line, night_facts(engine), hourly=True)
+        _line(f"{record.name}: {record.status}, {record.summary}")
+    except Exception as error:  # an aid to the page, never the capture's verdict; named, not swallowed
+        _line(f"week-reads: FAILED, {type(error).__name__}: {error}")
+    finally:
+        engine.dispose()
 
 
 def _slot_depth_charts(now: datetime, season: int) -> bool:
