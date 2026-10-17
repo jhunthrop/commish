@@ -1,29 +1,36 @@
-"""WHEN A WEEK READ IS WRITTEN AGAIN: the nightly writes a read for every player on a board, and rewrites
-it only when the week in front of him moved.
+"""WHEN A WEEK READ IS WRITTEN AGAIN: the nightly writes a read for every player on a board, and an hourly
+pass after the status capture rewrites the reads whose week moved.
 
-- No read for his week yet (a new week, or his first): `FIRST`.
+- No read for his week yet (a new week, or his first): `FIRST`, nightly.
 - The last one fell to its facts block (the writer could not serve him, or it was demoted for a shared
-  sentence): `UNWRITTEN`, retried every night until written.
-- His status changed since it was written (Lane 63's capture marks it: a designation added, changed or
-  cleared): `STATUS_CHANGED`.
-- The published projection moved by more than `PROJECTION_MOVE_POINTS` since it was written:
-  `PROJECTION_MOVED`.
+  sentence): `UNWRITTEN`, nightly, and at most once an hour and three times a Central day (`RETRY_GAP`,
+  `RETRIES_A_DAY`), so a read that keeps failing never spends a day's budget.
+- His status changed since it was written (Lane 63's capture marks it): `STATUS_CHANGED`, nightly and hourly.
+- The published projection moved by more than `PROJECTION_MOVE_POINTS`: `PROJECTION_MOVED`, nightly and hourly.
 
 Anything else (a new forecast, a new depth chart) waits for one of those, so a quiet week costs nothing.
 """
 
+from datetime import date, datetime, timedelta
 from typing import Final
 
 from research.capsules.store import WRITTEN_SOURCE
-from research.capsules.week.sheet import WeekSheet
+from research.capsules.week.sheet import CENTRAL, WeekSheet
 from research.capsules.week.store import StoredWeekRead
 
 PROJECTION_MOVE_POINTS: Final = 1.0
+RETRY_GAP: Final = timedelta(hours=1)
+RETRIES_A_DAY: Final = 3
 FIRST: Final = "first"
 UNWRITTEN: Final = "unwritten"
 STATUS_CHANGED: Final = "status"
 PROJECTION_MOVED: Final = "projection"
-REASONS: Final = (FIRST, UNWRITTEN, STATUS_CHANGED, PROJECTION_MOVED)
+# What an hourly pass writes: only the reads whose status or projection moved (the coordinator's M3).
+HOURLY_REASONS: Final = frozenset({STATUS_CHANGED, PROJECTION_MOVED})
+
+
+def central_day(instant: datetime) -> date:
+    return instant.astimezone(CENTRAL).date()
 
 
 def _projection_moved(sheet: WeekSheet, stored: StoredWeekRead) -> bool:
@@ -34,14 +41,25 @@ def _projection_moved(sheet: WeekSheet, stored: StoredWeekRead) -> bool:
     return abs(now - then) > PROJECTION_MOVE_POINTS
 
 
-def due_reason(sheet: WeekSheet, stored: StoredWeekRead | None) -> str | None:
-    """Why `sheet`'s read is written tonight, or None when the stored read for his week stands."""
+def attempts_today(stored: StoredWeekRead | None, now: datetime) -> int:
+    """The attempts the stored row counts on `now`'s Central day."""
+    return 0 if stored is None or stored.attempt_day != central_day(now) else stored.attempts
+
+
+def _retry_allowed(stored: StoredWeekRead, now: datetime) -> bool:
+    return stored.written_at <= now - RETRY_GAP and attempts_today(stored, now) < RETRIES_A_DAY
+
+
+def due_reason(sheet: WeekSheet, stored: StoredWeekRead | None, now: datetime, *, hourly: bool = False) -> str | None:
+    """Why `sheet`'s read is written at `now`, or None when the stored read for his week stands."""
     if stored is None or stored.season != sheet.season or stored.week != sheet.week:
-        return FIRST
-    if stored.source != WRITTEN_SOURCE:
-        return UNWRITTEN
-    if stored.status != sheet.status.status:
-        return STATUS_CHANGED
-    if _projection_moved(sheet, stored):
-        return PROJECTION_MOVED
-    return None
+        reason: str | None = FIRST
+    elif stored.status != sheet.status.status:
+        reason = STATUS_CHANGED
+    elif _projection_moved(sheet, stored):
+        reason = PROJECTION_MOVED
+    elif stored.source != WRITTEN_SOURCE and _retry_allowed(stored, now):
+        reason = UNWRITTEN
+    else:
+        reason = None
+    return reason if not hourly or reason in HOURLY_REASONS else None

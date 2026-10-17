@@ -1,34 +1,44 @@
 """THE WEEK READ'S INSTRUCTIONS: the writer's voice and word lists (`capsules.prompt`), the week's own rules.
 
 One system prompt for every week read, so a correction is held to what the draft was. The request is the
-week's facts (`sheet.render_week_sheet`), the sentences other pages already carry this week, and the ask;
-a correction quotes the attempt and every rule broken on any attempt so far, each with its sentence
-(`rule_notes`, Lane 52). The prompt states the week, the kickoff (on the sheet), and that the week's number
-is a published projection, never ours, while `sheet.PROJECTION_BASIS` says so.
+week's facts (`render.render_week_sheet`), the sentences other pages already carry this week, and the ask;
+a correction quotes the attempt, how far it is from its length, and every rule broken on any attempt so
+far, each with its sentence (`rule_notes`, Lane 52). The prompt states the week, the kickoff (on the
+sheet), and that the week's number is a published projection, never ours, while `sheet.PROJECTION_BASIS`
+says so. The answer is one JSON object: the read, and the writer's own call for it in one word (`CALLS`),
+which the rules hold to the sheet (a player who may not be started is never "start", the review's H2).
 """
 
+import json
 from collections.abc import Sequence
+from dataclasses import dataclass
 from typing import Final
 
+from research.capsules.bundle import parse_object
 from research.capsules.prompt import NEVER_ON_THE_PAGE
 from research.capsules.render_words import week_of
 from research.capsules.rule_notes import RuleNote
 from research.capsules.validate import word_count
-from research.capsules.week.rules import MAX_SENTENCES, MIN_SENTENCES, shown_week_words
-from research.capsules.week.sheet import PROJECTION_BASIS, WeekSheet, render_week_sheet
+from research.capsules.week.render import render_week_sheet
+from research.capsules.week.rules import CALLS, MAX_SENTENCES, MIN_SENTENCES, shown_week_words
+from research.capsules.week.sheet import PROJECTION_BASIS, WeekSheet
 from research.capsules.week.validate import WEEK_BAND
 
 _LOW, _HIGH = WEEK_BAND
-# The words to aim at: the probe's first drafts ran 136 to 151 words when told only the band.
-_TARGET: Final = 80
+# The words to aim at (the coordinator's ruling: 80, never more than 100).
+TARGET_WORDS: Final = 80
 _NUMBER_RULE: Final = {
     "published": (
-        "- The week's number is the published projection: a projection published for the week, never ours. Every "
-        "sentence that quotes its figure says it is the published projection, and you name it at least once when "
-        'the facts carry one. Never "our projection", "our number", "our model" or "we project" for this week. '
-        "The only thing of ours is our board: his place in our order, as the facts give it."
+        "- The week's number is the published projection: a projection published for the week, never ours. Name "
+        'it once, with its figure exactly as the facts print it, in the sentence that names it: "the published '
+        'projection has him at 23 points". Never put another figure on it, never say "published" without its '
+        'figure, and never "our projection", "our number", "our model" or "we project" for this week.'
     ),
 }
+_RETURN: Final = (
+    'Return ONE JSON object and nothing else: {"read": "<the read>", "call": "<one word>"}. "call" is what '
+    f"your read tells a manager who has him to do this week, one of {', '.join(CALLS)}."
+)
 
 
 def _quoted(words: Sequence[str]) -> str:
@@ -38,27 +48,56 @@ def _quoted(words: Sequence[str]) -> str:
 WEEK_RULES: Final = f"""You write the week-ahead read on one player's page for a fantasy football manager setting his lineup for the week in front of him. You sound like a sharp analyst talking to a friend in the same league: direct, specific, opinionated, never a lab report and never a style guide.
 
 THE READ
-- {MIN_SENTENCES} to {MAX_SENTENCES} short sentences, about {_TARGET} words in all and never more than {_HIGH}: count them before you answer. One paragraph, about the week the facts name and nothing else. Pick the two or three facts that decide his week (his game, his status, the published projection and what moved it, the matchup, the weather, his role) and build on those. Leave the rest unquoted.
-- Open on the fact that matters most for him this week. Never open with a set-up phrase, a greeting, a question, or his name followed by a verdict.
-- Every read on this site is written from facts like these, and no sentence may sit on two players' pages: put his name, his club, his opponent or his own numbers in each sentence, and never a sentence that would fit another player.
+- {MIN_SENTENCES} to {MAX_SENTENCES} short sentences, about {TARGET_WORDS} words in all and never more than {_HIGH}: count them before you answer. One paragraph, about the week the facts name and nothing else. Pick the two or three facts that decide his week (his game, his status, the published projection and what moved it, the matchup, the weather, his role) and build on those. Leave the rest unquoted.
+- Open on the fact that matters most for him this week. Never open with a set-up phrase, a greeting, a question, or his name followed by a verdict. Name him in the read.
+- Every read on this site is written from facts like these, and no sentence may sit on two players' pages, even with the names and numbers swapped: build each sentence your own way for this player, never a sentence shape that would fit another player.
 - End on what a manager who has him does this week, in his own terms: start him, sit him, keep him on the bench, find a fill-in for the week.
-- A player who cannot play this week (on his bye, out, on a season-long list) is never recommended for this week. Say he does not play, and what that means for a roster that has him: who fills the spot this week, whether he stays on the roster, his next game.
-- A Questionable or Doubtful player: say what a manager waits on before his kickoff, in words of your own.
+- A player who may not be started this week (on his bye, Out, Doubtful, on a season-long list) is never recommended to start, in any wording: his call is sit, hold or none. If he cannot play, say he does not play and what that means for a roster that has him: who fills the spot this week, whether he stays on the roster, his next game.
+- A Questionable player: say what a manager waits on before his kickoff, in words of your own.
 
 THE NUMBER
 {_NUMBER_RULE[PROJECTION_BASIS]}
+- His place in our order says which order it is: "in our preseason order" or "in our rest-of-season order", as the facts name it.
 
 NUMBERS, TIME AND WORDS
 - Use ONLY the numbers and names in the facts. Never invent a stat, an injury, a teammate or any figure. Quote a number as the facts give it, or as a plain rounding of it, never a figure you worked out.
-- Each number goes with its basis and its unit as the facts give them: points (PPR), points a game, a rank and among how many, degrees, mph, a percent chance.
-- A rank against his position reads as the facts give it, 1st allowed the fewest, said the way a person would: "26th of 32 against receivers", never a code.
-- Name every week with its season: "week 6 of 2026", never a bare "week 6". "This week" is fine. Never a date or the name of a month. A week still to play is only looked ahead to.
+- Every figure carries its unit right after it: "32 points", "19.5 points", "25.9 PPR points a game", "28th of 32 against receivers", "61 degrees", "14 mph", "a 30% chance". Never a bare figure, never "32 to 19.5".
+- A rank against his position reads as the facts give it, 1st allowed the fewest, said the way a person would, never a code.
+- Name the season once, with the first week you name ("week 6 of 2026"), and every week after it without the year ("week 5", "week 7"). Never the year twice. "This week" is fine. Never a date or the name of a month. A week still to play is only looked ahead to.
+- The injury report is the one the facts name, by its day ("on Monday's report"), never "the latest".
 - Fantasy football words, never a trading or a betting word. The game's expected points are an expected score and nothing more. Never a provider, a data source or a rival product by name. Never a tip and never "remember to".
 - Speak for the board as "we" when you need to, never "I", "me" or "my". The facts are yours alone: never mention a sheet.
 - Write like you talk. Contractions are welcome. Never an em-dash, never a semicolon.
 
 {NEVER_ON_THE_PAGE}
-- This read's own words: {_quoted(shown_week_words())}."""
+- This read's own words: {_quoted(shown_week_words())}.
+
+{_RETURN}"""
+
+
+@dataclass(frozen=True, slots=True)
+class WeekAnswer:
+    """The writer's answer: the read and its call; None for a part the answer did not carry."""
+
+    read: str | None
+    call: str | None
+
+
+def parse_week_answer(content: str) -> WeekAnswer:
+    """The answer's read and call; an answer that is no JSON object is taken whole as a read with no call."""
+    found = parse_object(content)
+    if found is None:
+        return WeekAnswer(content.strip() or None, None)
+    read, call = found.get("read"), found.get("call")
+    return WeekAnswer(
+        read.strip() if isinstance(read, str) and read.strip() else None,
+        call.strip().lower() if isinstance(call, str) else None,
+    )
+
+
+def answer_json(read: str, call: str) -> str:
+    """An answer as the writer returns it (the tests' stubs and the recorded fixture)."""
+    return json.dumps({"read": read, "call": call})
 
 
 def _avoid_section(avoid: Sequence[str]) -> list[str]:
@@ -66,7 +105,8 @@ def _avoid_section(avoid: Sequence[str]) -> list[str]:
         return []
     listed = "\n".join(f'- "{sentence}"' for sentence in avoid)
     return [
-        f"These sentences are already on other players' pages this week. Never write them or a near copy:\n{listed}"
+        "These sentences are already on other players' pages this week. Never write them, a near copy, or the "
+        f"same sentence with the names and numbers swapped:\n{listed}"
     ]
 
 
@@ -76,8 +116,7 @@ def week_prompt(sheet: WeekSheet, avoid: Sequence[str]) -> str:
         [
             f"Facts for the week:\n{render_week_sheet(sheet)}",
             *_avoid_section(avoid),
-            f"Write the week-ahead read for {sheet.name} for {week_of(sheet.week, sheet.season)}. Return only the "
-            "read: plain text, one paragraph, no heading, no quotes.",
+            f"Write the week-ahead read for {sheet.name} for {week_of(sheet.week, sheet.season)}. {_RETURN}",
         ]
     )
 
@@ -87,8 +126,8 @@ def length_move(words: int) -> str | None:
     only the band kept a 137-word read at 137 words through three corrections in the recorded run."""
     if words > _HIGH:
         return (
-            f"It is {words} words, {words - _HIGH} over the {_HIGH}-word cap. Cut about {words - _TARGET} words: drop "
-            "the sentence that carries the least for this week, and shorten the others."
+            f"It is {words} words, {words - _HIGH} over the {_HIGH}-word cap. Cut about {words - TARGET_WORDS} words: "
+            "drop the sentence that carries the least for this week, and shorten the others."
         )
     if words < _LOW:
         return f"It is {words} words, under the {_LOW}-word floor. Add one sentence of fact from the week's facts."
@@ -97,7 +136,7 @@ def length_move(words: int) -> str | None:
 
 def week_correction(sheet: WeekSheet, body: str, ledger: Sequence[RuleNote], avoid: Sequence[str]) -> str:
     """A rewrite: the facts, the attempt, how far it is from its length, every rule broken so far with its
-    sentence, a plain-text return."""
+    sentence, the answer's shape."""
     lines = "\n".join(note.line() for note in ledger)
     move = length_move(word_count(body))
     return "\n\n".join(
@@ -106,9 +145,10 @@ def week_correction(sheet: WeekSheet, body: str, ledger: Sequence[RuleNote], avo
             *_avoid_section(avoid),
             f'You wrote this read:\n"""{body}"""',
             *([] if move is None else [move]),
-            f"Write it again, {MIN_SENTENCES} to {MAX_SENTENCES} short sentences, about {_TARGET} words and never "
-            f"more than {_HIGH}, keeping what was right. Every rule this read has broken so far, on this attempt and "
-            f"the ones before it. What you return breaks none of them and brings none of them back:\n{lines}",
-            "Return only the corrected read: plain text, no quotes, no heading.",
+            f"Write it again, {MIN_SENTENCES} to {MAX_SENTENCES} short sentences, about {TARGET_WORDS} words and "
+            f"never more than {_HIGH}, keeping what was right. Every rule this read has broken so far, on this "
+            "attempt and the ones before it. What you return breaks none of them and brings none of them back:"
+            f"\n{lines}",
+            _RETURN,
         ]
     )

@@ -46,7 +46,7 @@ def starter() -> WeekSheet:
         bye=False,
         projection=PublishedProjection(18.4, CAPTURED, 17.9, BEFORE),
         expected=ExpectedScore(32.5, 20.0, FIGURES),
-        weather=Weather("dome", None, None, None, None, None),
+        weather=Weather("dome", None, None, None, None, None, FIGURES),
         allowed=Allowed(26, 32, 41.3, "WR", 5, LINES),
         status=Status(None, REPORT),
         depth=DepthPlace(1.0, (("Davante Adams", 2.0),)),
@@ -136,7 +136,8 @@ _NESTED: Final[Mapping[str, type]] = MappingProxyType(
     }
 )
 _INSTANTS: Final = frozenset(
-    {"kickoff", "written_at", "captured_at", "previous_captured_at", "read_at", "published_at"}
+    {"kickoff", "written_at", "captured_at", "previous_captured_at", "read_at", "published_at", "scheduled_at"}
+    | {"roof_read_at", "released_at"}
 )
 
 
@@ -167,7 +168,7 @@ def _inner_value(name: str, raw: Any) -> Any:
 def _field_value(name: str, raw: Any) -> Any:
     if name in _NESTED:
         return None if raw is None else _NESTED[name](**{k: _inner_value(k, v) for k, v in raw.items()})
-    if name == "written_at":
+    if name in ("written_at", "lines_at") and raw is not None:
         return datetime.fromisoformat(raw)
     if name == "last_games":
         return tuple(GameLine(**line) for line in raw)

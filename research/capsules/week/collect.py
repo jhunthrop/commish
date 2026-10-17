@@ -19,7 +19,7 @@ Each read takes only what was stamped at or before the instant:
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, date, datetime, time
 from typing import Any, Final, cast
 
 from sqlalchemy import Connection, text
@@ -142,13 +142,16 @@ def _expected(read: tuple[datetime, dict[str, float]] | None) -> ExpectedScore |
     return None if club is None or total is None else ExpectedScore(club, total - club, at)
 
 
-def _roofs(conn: Connection, season: int, weeks: Sequence[int], as_of: datetime) -> dict[tuple[int, str], str]:
+def _roofs(
+    conn: Connection, season: int, weeks: Sequence[int], as_of: datetime
+) -> dict[tuple[int, str], tuple[str, datetime]]:
+    """Each club-week's venue roof, from the newest read of its game by then, with that read's stamp."""
     rows = conn.execute(
         text(
-            "with newest as (select distinct on (game_id) week, home_team, away_team, stadium_id, stadium "
+            "with newest as (select distinct on (game_id) week, home_team, away_team, stadium_id, stadium, read_at "
             "from research.nflverse_game_reads where season = :s and week = any(:weeks) and read_at <= :at "
             "order by game_id, read_at desc) "
-            "select g.week, g.home_team, g.away_team, s.roof_type from newest g "
+            "select g.week, g.home_team, g.away_team, s.roof_type, g.read_at from newest g "
             "join research.stadiums s on s.stadium_id = g.stadium_id where g.stadium = any(s.aliases)"
         ),
         {"s": season, "weeks": list(weeks), "at": as_of},
@@ -156,13 +159,43 @@ def _roofs(conn: Connection, season: int, weeks: Sequence[int], as_of: datetime)
     out = {}
     for row in rows:
         for team in (row.home_team, row.away_team):
-            out[(int(row.week), product_team_code(team))] = str(row.roof_type)
+            out[(int(row.week), product_team_code(team))] = (str(row.roof_type), row.read_at)
     return out
 
 
-def _weather(roof: str | None, forecast: tuple[datetime, dict[str, float]] | None) -> Weather | None:
-    if roof is None and forecast is None:
+def _schedule_reads(
+    conn: Connection, season: int, weeks: Sequence[int], as_of: datetime
+) -> dict[tuple[int, str], datetime]:
+    """Each club-week's schedule row's read, by then (the kickoff the sheet prints is that row's)."""
+    rows = conn.execute(
+        text(
+            "select week, home_team, away_team, ingested_at from research.provider_games "
+            "where season = :s and week = any(:weeks) and ingested_at <= :at"
+        ),
+        {"s": season, "weeks": list(weeks), "at": as_of},
+    )
+    return {(int(r.week), team): r.ingested_at for r in rows for team in (r.home_team, r.away_team)}
+
+
+def board_week(conn: Connection, season: int, as_of: datetime, pending: Sequence[int]) -> int | None:
+    """The site's board week: the first week the published rest-of-season board covers (the API's
+    `BoardWeek`), else the first week with a game still to kick off."""
+    published = conn.execute(
+        text(
+            "select min(from_week) from research.published_boards where season = :s "
+            "and order_basis = 'rest_of_season' and published_at <= :at"
+        ),
+        {"s": season, "at": as_of},
+    ).scalar_one()
+    if published is not None:
+        return int(published)
+    return pending[0] if pending else None
+
+
+def _weather(venue: tuple[str, datetime] | None, forecast: tuple[datetime, dict[str, float]] | None) -> Weather | None:
+    if venue is None and forecast is None:
         return None
+    roof, roof_read_at = (None, None) if venue is None else venue
     at, values = forecast if forecast is not None and roof not in ("dome", "retractable") else (None, {})
     code = values.get("precipitation_kind")
     kind = PRECIPITATION_KINDS[int(code)] if code is not None and 0 <= int(code) < len(PRECIPITATION_KINDS) else None
@@ -173,6 +206,7 @@ def _weather(roof: str | None, forecast: tuple[datetime, dict[str, float]] | Non
         values.get("precipitation_probability"),
         kind,
         at,
+        roof_read_at,
     )
 
 
@@ -265,9 +299,12 @@ class WeekFacts:
     projections: Mapping[tuple[str, int], PublishedProjection]
     figures: Mapping[tuple[int, str], tuple[datetime, dict[str, float]]]
     forecasts: Mapping[tuple[int, str], tuple[datetime, dict[str, float]]]
-    roofs: Mapping[tuple[int, str], str]
+    roofs: Mapping[tuple[int, str], tuple[str, datetime]]
     boards: Mapping[str, BoardPlace]
     statuses: Mapping[str, Status]
+    schedule_reads: Mapping[tuple[int, str], datetime]
+    lines_at: datetime | None
+    board_week: int
 
 
 def read_week_facts(conn: Connection, season: int, subjects: Sequence[Subject], as_of: datetime) -> WeekFacts | None:
@@ -278,7 +315,8 @@ def read_week_facts(conn: Connection, season: int, subjects: Sequence[Subject], 
         players.setdefault(identity.id, (identity.position, identity.team))
     context = season_context(conn, season, list(players), as_of)
     pending = pending_weeks(context.games, as_of)
-    if not pending:
+    the_board_week = board_week(conn, season, as_of, pending)
+    if not pending or the_board_week is None:
         return None
     current = pending[0]
     weeks = {club: cw for club, slate in context.games.items() if (cw := club_week(slate, current, as_of)) is not None}
@@ -304,6 +342,9 @@ def read_week_facts(conn: Connection, season: int, subjects: Sequence[Subject], 
         _roofs(conn, season, wanted, as_of),
         _boards(conn, season, as_of),
         statuses,
+        _schedule_reads(conn, season, wanted, as_of),
+        stamp,
+        the_board_week,
     )
 
 
@@ -320,8 +361,12 @@ def _touchdowns(block: Json) -> float | None:
 
 
 def _depth(subject: Subject) -> DepthPlace | None:
+    """The depth chart from the night's facts pass, stamped by its release day (midnight UTC)."""
     chart = subject.facts.depth.depth_chart
-    return None if chart is None else DepthPlace(chart.slot, tuple((n.name, n.slot) for n in chart.around_him))
+    if chart is None:
+        return None
+    released = datetime.combine(date.fromisoformat(chart.as_of[:10]), time(), UTC)
+    return DepthPlace(chart.slot, tuple((n.name, n.slot) for n in chart.around_him), released)
 
 
 def _last_read(stored: StoredWeekRead | None) -> LastRead | None:
@@ -337,7 +382,17 @@ def week_sheet(
     block = facts.blocks.get(identity.id)
     if cw is None or block is None:
         return None
-    game = None if cw.game is None else WeekGame(cw.game.week, cw.game.opponent, cw.game.home, cw.game.kickoff)
+    game = (
+        None
+        if cw.game is None
+        else WeekGame(
+            cw.game.week,
+            cw.game.opponent,
+            cw.game.home,
+            cw.game.kickoff,
+            facts.schedule_reads.get((cw.game.week, identity.team)),
+        )
+    )
     key = (cw.week, identity.team)
     log = block["log"]
     return WeekSheet(
@@ -365,6 +420,7 @@ def week_sheet(
         missed=tuple(row["week"] for row in log if row["status"] == "inactive"),
         board=facts.boards.get(identity.id),
         last_read=_last_read(stored.get((subject.universe_id, cw.week))),
+        lines_at=facts.lines_at,
     )
 
 

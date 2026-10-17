@@ -49,15 +49,20 @@ def _text(value: object) -> str | None:
     return value.strip() if isinstance(value, str) and value.strip() != "" else None
 
 
-def parse_bundle(content: str) -> CapsuleBundle | None:
-    """`parseBundle`: the bundle out of a completion, or None when no object can be read."""
+def parse_object(content: str) -> dict[str, object] | None:
+    """The JSON object between a completion's first `{` and last `}`, a raw line break in a string repaired;
+    None when no object can be read (the week read's answer reads with it too)."""
     start, end = content.find("{"), content.rfind("}")
     if start == -1 or end == -1 or end < start:
         return None
     body = content[start : end + 1]
     found = _object(body)
-    if found is None:
-        found = _object(_repair(body))
+    return found if found is not None else _object(_repair(body))
+
+
+def parse_bundle(content: str) -> CapsuleBundle | None:
+    """`parseBundle`: the bundle out of a completion, or None when no object can be read."""
+    found = parse_object(content)
     if found is None:
         return None
     narrative = found.get("narrative")
