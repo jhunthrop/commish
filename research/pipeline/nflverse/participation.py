@@ -72,10 +72,23 @@ class PlayerWeekParticipation:
 
 
 @dataclass(frozen=True)
+class SnapCountTally:
+    """A season's regular-season snap-count rows, each accounted for once: mapped to a universe
+    player (written, whether or not he has a stat line that week), a projected position the
+    universe cannot map (counted, never invented), or outside the projected positions."""
+
+    rows_read: int
+    mapped: int
+    unmapped: int
+    other_positions: int
+
+
+@dataclass(frozen=True)
 class ParticipationResult:
     participation: list[PlayerWeekParticipation]
     unresolved: Sequence[UnresolvedRef]
     resolution_rate: float | None
+    snap_counts: SnapCountTally
 
 
 def numeric(row: CsvRow, column: str, what: str = "nflverse row") -> float:
@@ -195,15 +208,19 @@ def map_participation(
     universe: PlayerUniverse,
     publication_lag_hours: int = PUBLICATION_LAG_HOURS,
 ) -> ParticipationResult:
-    """`mapParticipation`: the denominator over every position, the output narrowed by the universe."""
+    """`mapParticipation`: the denominator over every position, the output narrowed by the universe.
+    Every snap row of a projected position the universe maps is a participation row, whether or not
+    the weekly file has a line for him that week (his usage then reads zero)."""
     team_snaps = _team_snaps_by_game(snap_counts)
     player_usage, team_usage = _usage_by_player_and_team(player_week)
 
     scored: list[CsvRow] = []
     refs: list[PlayerRef] = []
+    rows_read = 0
     for row in snap_counts:
         if row.get("game_type") != SEASON_TYPE:
             continue
+        rows_read += 1
         ref = PlayerRef(kind="pfr", id=_nullish(row, "pfr_player_id"), name=_nullish(row, "player"))
         if not is_projected_candidate(universe, ref, row.get("position")):
             continue
@@ -236,8 +253,17 @@ def map_participation(
                 as_of=game_day_as_of(_nullish(row, "pfr_game_id"), publication_lag_hours),
             )
         )
+    tally = SnapCountTally(
+        rows_read=rows_read,
+        mapped=len(participation),
+        unmapped=len(scored) - len(participation),
+        other_positions=rows_read - len(scored),
+    )
     return ParticipationResult(
-        participation=participation, unresolved=resolution.unresolved, resolution_rate=resolution.resolution_rate
+        participation=participation,
+        unresolved=resolution.unresolved,
+        resolution_rate=resolution.resolution_rate,
+        snap_counts=tally,
     )
 
 
