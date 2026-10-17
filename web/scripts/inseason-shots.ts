@@ -190,7 +190,7 @@ const TRADES_FOLD_AT = 900;
 /** A gain or a week's change as its cell prints it. */
 const SIGNED = /^([+−]\d+\.\d|0\.0|--)$/;
 const TRADE_BASIS_FIRST =
-	"Trades where both lineups gain on our rest-of-season order. Each team's come best for you first among those they gain at least 0.5 a week from, then the close calls for them. The other team decides.";
+	"Trades where both lineups gain on our rest-of-season order. Each team's best trade, yours first, among those they gain at least 0.5 a week from, then the close calls for them. The other team decides.";
 /** A trade's week in one line, from the API's two changes (review H2). */
 const WEEK_LINE = /[+−]?\d+\.\d Proj for you this week, [+−]?\d+\.\d for them/;
 const TRADE_BASIS_MOST = 5;
@@ -440,8 +440,21 @@ for (const theme of THEMES) {
 				...[...document.querySelectorAll('table.inner .nm, table.inner .phone-game .opp')].map(
 					(el) => el.getBoundingClientRect().height
 				)
-			)
+			),
+			// Each name as drawn, and whether its cell cuts it (rereview N2).
+			names: [...document.querySelectorAll<HTMLElement>('table.inner .nm')].map((nm) => ({
+				said: nm.innerText.trim(),
+				cut: nm.scrollWidth > nm.clientWidth + 1
+			}))
 		}));
+		if (width <= PHONE.width) {
+			for (const { said, cut } of opened.names) {
+				if (cut || !/^[A-Z]\. \S/.test(said))
+					missing.push(
+						`trades opened ${theme} ${String(width)} name "${said}"${cut ? ' cut' : ''}`
+					);
+			}
+		}
 		const want = width <= PHONE.width ? OPENED_HEADS_PHONE : OPENED_HEADS;
 		if (opened.heads.join('|').toLowerCase() !== want.join('|').toLowerCase())
 			missing.push(`trades opened ${theme} ${String(width)} heads ${opened.heads.join('|')}`);

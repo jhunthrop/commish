@@ -488,7 +488,7 @@ function withWeek(finder: TradeAdvice): TradeAdvice {
 		// The finder's first sentence as the API now says it (words.go TradesBasis).
 		basis: finder.basis.replace(
 			/^Trades where both lineups gain .*? The other team decides\./,
-			"Trades where both lineups gain on our rest-of-season order. Each team's come best for you first among those they gain at least 0.5 a week from, then the close calls for them. The other team decides."
+			"Trades where both lineups gain on our rest-of-season order. Each team's best trade, yours first, among those they gain at least 0.5 a week from, then the close calls for them. The other team decides."
 		),
 		moves: {
 			propose: 'unavailable',
