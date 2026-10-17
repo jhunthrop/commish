@@ -112,7 +112,7 @@ function built(r: Recorded, id: string, team: string, position: string): PlayerL
 	};
 }
 
-function verbFor(r: Recorded, id: string): PlayerVerb {
+function verbFor(r: Recorded, id: string, claims: boolean): PlayerVerb {
 	const none = { holder: null, host_url: null, note: null };
 	const advised = r.lineup.slots.find((slot) => slot.ours.player.board_id === id);
 	if (advised) return { ...none, kind: advised.changed ? 'start' : 'lineup' };
@@ -124,6 +124,8 @@ function verbFor(r: Recorded, id: string): PlayerVerb {
 		return { ...none, kind: 'trade', holder: team?.name ?? null };
 	}
 	if (holder === r.sync.me) return { ...none, kind: 'lineup' };
+	// Where the claim is made from here (the ESPN stand-ins), the verb is the claim.
+	if (claims) return { ...none, kind: 'claim' };
 	return { ...none, kind: 'waivers', host_url: r.waivers.host_waivers_url };
 }
 
@@ -132,7 +134,8 @@ export function playerWeek(
 	r: Recorded,
 	id: string,
 	at: { team: string; position: string } | null,
-	inLeague: boolean
+	inLeague: boolean,
+	claims = false
 ): PlayerWeek | null {
 	const line = linesOf(r).find((l) => l.player.board_id === id);
 	const team = line?.player.team ?? at?.team;
@@ -143,6 +146,6 @@ export function playerWeek(
 		projection_scoring: r.lineup.projection_scoring,
 		projection_read_at: r.lineup.projection_read_at,
 		projection_previous_read_at: r.lineup.projection_previous_read_at,
-		verb: inLeague ? verbFor(r, id) : null
+		verb: inLeague ? verbFor(r, id, claims) : null
 	};
 }

@@ -530,7 +530,17 @@ async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> 
 			features: many ? (['many_leagues'] as const) : []
 		};
 		const picked = leagues.find((league) => league.id === chosen);
-		send(req, res, HTTP.ok, picked ? { ...answer, league: picked } : answer);
+		// The player card's claim shot (Lane 66h): the selected league is an ESPN stand-in, whose
+		// claims are made from here.
+		const espn = /(?:^|; )fixture_league=espn(?:;|$)/.test(req.headers.cookie ?? '')
+			? { ...contextLeague, id: ESPN_DONE, host: 'espn' as const }
+			: null;
+		send(
+			req,
+			res,
+			HTTP.ok,
+			espn ? { ...answer, league: espn } : picked ? { ...answer, league: picked } : answer
+		);
 		return;
 	}
 	// The week's games with their facts (Lane 66a), the recorded week whatever week is asked.
@@ -627,7 +637,13 @@ async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> 
 			return;
 		}
 		const id = leaguePlayer[2] ?? '';
-		const week = playerWeek(recorded, id, runIndex.get(id) ?? null, true);
+		const week = playerWeek(
+			recorded,
+			id,
+			runIndex.get(id) ?? null,
+			true,
+			ESPN_MOVES.has(leaguePlayer[1] ?? '')
+		);
 		if (week === null) send(req, res, HTTP.notFound, 'Nothing here by that id', 'not_found');
 		else send(req, res, HTTP.ok, week);
 		return;

@@ -1,14 +1,23 @@
 // Screenshots of the player card (Lane 66h) in both themes at 1440 and 390, on a Central clock:
-// signed out (the week in PPR, Add to my sheet), and in the fixture's Sleeper league, a player another
+// signed out (the week in PPR, Add to my sheet), and in the fixture's Sleeper league a player another
 // roster holds (Trade for him), one our lineup starts (Start him), one no roster holds (Open Sleeper
-// waivers) and Compare open with a second player. Each asserts what it shows: the six tiles, a figure
-// in the Proj tile, the opponent's rank with its direction in words, the verb, the week-ahead read with
-// its caption where the run carries one, the season read's stamp, the week ahead's row in the game log,
-// no betting or trading word, no "host", no dash or semicolon in the card's words, and that nothing
-// scrolls sideways. On a phone the pinned verb clears the first tiles. Against the built site served
-// static and the fixture API (scripts/inseason-fixture/serve.ts).
+// waivers), Compare open with a second player, a player whose week read is withheld (his status
+// changed), and in an ESPN stand-in league the claim (Add on ESPN) followed onto Waivers. Each asserts
+// what it shows:
+//   the six tiles, each "--" with its reason on the tile, Opp rank's direction in words, the shared
+//   status pill, the verb and Compare, the week read's caption (or its withheld caption alone), the
+//   season read's stamp, the week ahead's row, the earlier seasons collapsed, the basis in at most five
+//   rendered lines at 1440 and eight at 390, no betting or trading word, no "host", no dash or
+//   semicolon in the card's words, nothing scrolling sideways, and on a phone the pinned verb clearing
+//   the first tiles.
+// The Rest of season tile shows on a run that ranks the rest of the season: set ROS_FROM_WEEK to its
+// first week (the site built from the nightly's contract fixture run, research/nightly/contract/
+// fixture, PUBLIC_RUN_ID=2026-10-21T12-ros) and one signed-out page is shot with the tile held to
+// "Rest of season ... in our order"; that run predates the reads' stamps and the earlier seasons, so
+// those two are not asked of it. Otherwise the tile is held to "Projected".
+// Against the built site served by the Worker and the fixture API (scripts/inseason-fixture/serve.ts).
 //
-//   node scripts/player-card-shots.ts [web origin] [out dir]
+//   [ROS_FROM_WEEK=6] node scripts/player-card-shots.ts [web origin] [out dir]
 // with the site built against PUBLIC_API_URL pointing at the fixture API.
 import { mkdir } from 'node:fs/promises';
 import { chromium, type BrowserContext, type Page } from 'playwright';
@@ -21,23 +30,36 @@ const VIEWPORT_HEIGHT = 900;
 const ZONE = 'America/Chicago';
 const READY_TIMEOUT_MS = 30_000;
 const SIGNED_IN = { name: 'commish_csrf', value: 'fixture' };
+const ESPN_LEAGUE = { name: 'fixture_league', value: 'espn' };
 const BANNED =
 	/\b(favou?red|underdogs?|odds|spreads?|bets?|betting|market|buy|sell|price|host|tips?)\b|—|;/i;
-const TILES = ['Proj', 'Rest of season', 'Opp rank', 'Avg', 'Last', 'Δ Proj'];
+const NONE = '--';
 const PROJECTED = 'Projected';
+const REST = 'Rest of season';
 const DIRECTION = /, (among the easiest for|among the toughest for|in the middle for) \w/;
+const ROS_FROM_WEEK = process.env.ROS_FROM_WEEK;
+const REST_CAPTION = /^from week \d+, (\d+\.\d a game, )?[A-Z]{2}\d+ in our order$/;
+/** The basis's rendered lines at most, by width (review M6). */
+const BASIS_LINES: Readonly<Record<number, number>> = { 1440: 5, [PHONE_WIDTH]: 8 };
+const WEEK_READ = /Written \w{3} \d{1,2}:\d{2} [ap]m Central, for week \d+/;
+const WITHHELD = 'His status changed since this read was written. A new read is due by';
 
 const web = process.argv[2] ?? 'http://localhost:4173';
 const out = new URL(process.argv[3] ?? '../screenshots/player-card/', import.meta.url);
+
+type WeekReadState = 'shown' | 'withheld' | 'none';
 
 interface Shot {
 	name: string;
 	slug: string;
 	signedIn: boolean;
 	verb: string;
-	/** The run carries his week-ahead read (the stand-in's three, Lane 72). */
-	weekRead: boolean;
+	weekRead: WeekReadState;
 	compare?: string;
+	/** Selects an ESPN stand-in league, whose claims are made from here. */
+	espn?: boolean;
+	/** Follows the verb onto Waivers, his row marked and his drops open. */
+	follow?: boolean;
 }
 
 const SHOTS: readonly Shot[] = [
@@ -46,38 +68,64 @@ const SHOTS: readonly Shot[] = [
 		slug: 'puka-nacua',
 		signedIn: false,
 		verb: 'Add to my sheet',
-		weekRead: true
+		weekRead: 'shown'
 	},
-	{ name: 'trade', slug: 'puka-nacua', signedIn: true, verb: 'Trade for him', weekRead: true },
-	{ name: 'start', slug: 'jaxson-dart', signedIn: true, verb: 'Start him', weekRead: false },
+	{ name: 'trade', slug: 'puka-nacua', signedIn: true, verb: 'Trade for him', weekRead: 'shown' },
+	{ name: 'start', slug: 'jaxson-dart', signedIn: true, verb: 'Start him', weekRead: 'none' },
 	{
 		name: 'waivers',
 		slug: 'xavier-hutchinson',
 		signedIn: true,
 		verb: 'Open Sleeper waivers',
-		weekRead: false
+		weekRead: 'none'
 	},
 	{
 		name: 'compare',
 		slug: 'puka-nacua',
 		signedIn: true,
 		verb: 'Trade for him',
-		weekRead: true,
+		weekRead: 'shown',
 		compare: "Ja'Marr Chase"
+	},
+	{
+		name: 'withheld',
+		slug: 'ceedee-lamb',
+		signedIn: true,
+		verb: 'Trade for him',
+		weekRead: 'withheld'
+	},
+	{
+		name: 'claim',
+		slug: 'xavier-hutchinson',
+		signedIn: true,
+		verb: 'Add on ESPN',
+		weekRead: 'none',
+		espn: true,
+		follow: true
 	}
 ];
+
+/** On the contract fixture's rest-of-season run: one signed-out page, the run's own player. */
+const ROS_SHOTS: readonly Shot[] = [
+	{ name: 'ros', slug: 'josh-allen', signedIn: false, verb: 'Add to my sheet', weekRead: 'none' }
+];
+const ROS = ROS_FROM_WEEK !== undefined;
 
 const failures: string[] = [];
 await mkdir(out, { recursive: true });
 const browser = await chromium.launch();
 
-async function context(theme: string, width: number, signedIn: boolean): Promise<BrowserContext> {
+async function context(theme: string, width: number, shot: Shot): Promise<BrowserContext> {
 	const ctx = await browser.newContext({
 		viewport: { width, height: VIEWPORT_HEIGHT },
 		colorScheme: theme as 'light',
 		timezoneId: ZONE
 	});
-	if (signedIn) await ctx.addCookies([{ ...SIGNED_IN, domain: 'localhost', path: '/' }]);
+	const cookies = [
+		...(shot.signedIn ? [SIGNED_IN] : []),
+		...(shot.espn === true ? [ESPN_LEAGUE] : [])
+	];
+	await ctx.addCookies(cookies.map((c) => ({ ...c, domain: 'localhost', path: '/' })));
 	await ctx.addInitScript(
 		([key, value]: readonly [string, string]) => localStorage.setItem(key, value),
 		[THEME_STORAGE_KEY, theme] as const
@@ -93,10 +141,16 @@ interface Card {
 	labels: string[];
 	values: Record<string, string>;
 	captions: Record<string, string>;
+	pill: string;
 	verbs: string[];
 	text: string;
 	cardText: string;
+	readText: string;
+	basis: string[];
+	basisLines: number;
 	nextRow: string;
+	earlier: string;
+	earlierOpen: boolean;
 	sideways: boolean;
 	pinTop: number | null;
 	tilesBottom: number | null;
@@ -113,16 +167,28 @@ async function read(page: Page): Promise<Card> {
 		const act = document.querySelector('main .card .act');
 		const firstTiles = document.querySelector('main .card .tiles');
 		const pinned = act !== null && getComputedStyle(act).position === 'fixed';
+		const basis = [...document.querySelectorAll<HTMLElement>('main .basis p')];
+		const lines = basis.reduce((sum, p) => {
+			const height = parseFloat(getComputedStyle(p).lineHeight);
+			return sum + Math.round(p.getBoundingClientRect().height / height);
+		}, 0);
+		const toggle = document.querySelector<HTMLElement>('main .season tbody.earlier button');
 		return {
 			labels,
 			values: pick('.v'),
 			captions: pick('.cap'),
+			pill: document.querySelector<HTMLElement>('main .card .sub')?.innerText ?? '',
 			verbs: [...document.querySelectorAll('main .card .act a, main .card .act button')].map((el) =>
 				(el as HTMLElement).innerText.trim()
 			),
 			text: document.body.innerText,
 			cardText: document.querySelector<HTMLElement>('main .card')?.innerText ?? '',
+			readText: document.querySelector<HTMLElement>('main .read')?.innerText ?? '',
+			basis: basis.map((p) => p.innerText),
+			basisLines: lines,
 			nextRow: document.querySelector<HTMLElement>('main .season tr.next')?.innerText ?? '',
+			earlier: toggle?.innerText ?? '',
+			earlierOpen: toggle?.getAttribute('aria-expanded') === 'true',
 			sideways: document.documentElement.scrollWidth > document.documentElement.clientWidth,
 			pinTop: pinned ? act.getBoundingClientRect().top : null,
 			tilesBottom: firstTiles ? firstTiles.getBoundingClientRect().top + 90 : null
@@ -130,12 +196,82 @@ async function read(page: Page): Promise<Card> {
 	});
 }
 
-for (const shot of SHOTS) {
+async function openCompare(page: Page, name: string): Promise<void> {
+	await page.getByRole('button', { name: 'Compare' }).first().click();
+	const input = page.getByPlaceholder('Add a player');
+	await input.waitFor({ timeout: READY_TIMEOUT_MS });
+	await input.fill(name.split(' ')[1] ?? name);
+	await page
+		.getByRole('button', { name: new RegExp(name) })
+		.first()
+		.click();
+	await page.locator('#compare tbody tr').nth(1).waitFor({ timeout: READY_TIMEOUT_MS });
+	await page.waitForLoadState('networkidle');
+}
+
+/** The tiles, each "--" with its reason, and rest of season's label as the run covers it. */
+function checkTiles(card: Card, where: string): void {
+	const rest = ROS_FROM_WEEK === undefined ? PROJECTED : REST;
+	const want = ['Proj', rest, 'Opp rank', 'Avg', 'Last', 'Δ Proj'];
+	check(card.labels.join('|') === want.join('|'), `${where}: tiles ${card.labels.join(', ')}`);
+	if (ROS_FROM_WEEK !== undefined)
+		check(REST_CAPTION.test(card.captions[REST] ?? ''), `${where}: rest of season's caption`);
+	for (const label of card.labels) {
+		const proj = card.values.Proj ?? '';
+		// With no Proj, the Proj tile says why and the change says nothing more.
+		const said = label === 'Δ Proj' && proj === NONE ? true : (card.captions[label] ?? '') !== '';
+		if (card.values[label] === NONE) check(said, `${where}: ${label} is "--" with no reason`);
+	}
+	const opp = card.values['Opp rank'] ?? '';
+	if (opp !== NONE)
+		check(DIRECTION.test(card.captions['Opp rank'] ?? ''), `${where}: Opp rank's caption`);
+}
+
+function checkCard(card: Card, shot: Shot, where: string, width: number): void {
+	checkTiles(card, where);
+	check(/\b(QB|RB|WR|TE)( \d+| IR)?\b/.test(card.pill), `${where}: the status pill "${card.pill}"`);
+	check(card.verbs.includes(shot.verb), `${where}: verbs ${card.verbs.join(', ')}`);
+	check(card.verbs.includes('Compare'), `${where}: no Compare`);
+	check(WEEK_READ.test(card.readText) === (shot.weekRead === 'shown'), `${where}: the week read`);
+	check(card.readText.includes(WITHHELD) === (shot.weekRead === 'withheld'), `${where}: withheld`);
+	if (!ROS && !card.readText.includes('Our written read of him is not ready'))
+		check(
+			/Written \w{3} \d{1,2}, from his facts through last season/.test(card.readText),
+			`${where}: the season read's stamp`
+		);
+	check(card.nextRow !== '', `${where}: no week ahead row in the game log`);
+	if (!ROS)
+		check(/earlier seasons/i.test(card.earlier) && !card.earlierOpen, `${where}: earlier seasons`);
+	const most = BASIS_LINES[width] ?? 0;
+	check(card.basisLines <= most, `${where}: the basis runs ${String(card.basisLines)} lines`);
+	for (const said of [card.cardText, ...card.basis]) {
+		check(!BANNED.test(said), `${where}: a banned word in "${said.slice(0, 80)}"`);
+	}
+	check(!/\bhost\b/i.test(card.text), `${where}: says host`);
+	check(!card.sideways, `${where}: scrolls sideways`);
+	if (width === PHONE_WIDTH && card.pinTop !== null && card.tilesBottom !== null)
+		check(card.pinTop > card.tilesBottom, `${where}: the pinned verb covers the first tiles`);
+}
+
+/** The verb followed onto Waivers: his row marked, his drops open, the claim's way in. */
+async function follow(page: Page, shot: Shot, where: string, file: string): Promise<void> {
+	await page.getByText(shot.verb).filter({ visible: true }).first().click();
+	await page.waitForURL(/\/waivers\?player=/, { timeout: READY_TIMEOUT_MS });
+	const marked = page.locator('tr[data-asked]');
+	await marked.first().waitFor({ timeout: READY_TIMEOUT_MS });
+	check((await marked.count()) === 1, `${where}: his row is not marked on Waivers`);
+	await page.waitForLoadState('networkidle');
+	await page.screenshot({ path: file });
+}
+
+for (const shot of ROS ? ROS_SHOTS : SHOTS) {
 	for (const theme of THEMES) {
 		for (const width of WIDTHS) {
 			const where = `${shot.name} ${theme} ${String(width)}`;
-			const ctx = await context(theme, width, shot.signedIn);
+			const ctx = await context(theme, width, shot);
 			const page = await ctx.newPage();
+			const file = (tag: string): string =>
+				new URL(`${shot.name}-${theme}-${String(width)}${tag}.png`, out).pathname;
 			try {
 				await page.goto(`${web}/players/${shot.slug}`, { waitUntil: 'networkidle' });
 				await page
@@ -145,58 +281,9 @@ for (const shot of SHOTS) {
 					.waitFor({ timeout: READY_TIMEOUT_MS });
 				await page.evaluate(() => document.fonts.ready);
 				await page.waitForLoadState('networkidle');
-				if (shot.compare) {
-					await page.getByRole('button', { name: 'Compare' }).first().click();
-					const input = page.getByPlaceholder('Add a player');
-					await input.waitFor({ timeout: READY_TIMEOUT_MS });
-					await input.fill(shot.compare.split(' ')[1] ?? shot.compare);
-					await page
-						.getByRole('button', { name: new RegExp(shot.compare) })
-						.first()
-						.click();
-					await page.locator('#compare tbody tr').nth(1).waitFor({ timeout: READY_TIMEOUT_MS });
-					await page.waitForLoadState('networkidle');
-				}
+				if (shot.compare !== undefined) await openCompare(page, shot.compare);
 				const card = await read(page);
-				const rest = card.labels.includes(PROJECTED) ? PROJECTED : 'Rest of season';
-				check(
-					card.labels.join('|') === TILES.map((t) => (t === 'Rest of season' ? rest : t)).join('|'),
-					`${where}: tiles ${card.labels.join(', ')}`
-				);
-				check(
-					/^\d+\.\d$/.test(card.values.Proj ?? ''),
-					`${where}: Proj "${card.values.Proj ?? ''}"`
-				);
-				const opp = card.values['Opp rank'] ?? '';
-				if (opp !== '--')
-					check(DIRECTION.test(card.captions['Opp rank'] ?? ''), `${where}: Opp rank's caption`);
-				check(card.verbs.includes(shot.verb), `${where}: verbs ${card.verbs.join(', ')}`);
-				check(card.verbs.includes('Compare'), `${where}: no Compare`);
-				check(
-					/Written \w{3} \d{1,2}:\d{2} [ap]m Central, for week \d+/.test(card.text) ===
-						shot.weekRead,
-					`${where}: the week-ahead read's caption`
-				);
-				if (!card.text.includes('Our written read of him is not ready'))
-					check(
-						/Written \w{3} \d{1,2}, from his facts through last season/.test(card.text),
-						`${where}: the season read's stamp`
-					);
-				check(card.nextRow !== '', `${where}: no week ahead row in the game log`);
-				for (const said of [
-					card.cardText,
-					...card.text
-						.split('\n')
-						.filter((l) => l.startsWith('Proj is') || l.startsWith('Opp rank is'))
-				]) {
-					check(!BANNED.test(said), `${where}: a banned word in "${said.slice(0, 80)}"`);
-				}
-				check(!/\bhost\b/i.test(card.text), `${where}: says host`);
-				check(!card.sideways, `${where}: scrolls sideways`);
-				if (width === PHONE_WIDTH && card.pinTop !== null && card.tilesBottom !== null)
-					check(card.pinTop > card.tilesBottom, `${where}: the pinned verb covers the first tiles`);
-				const file = (tag: string): string =>
-					new URL(`${shot.name}-${theme}-${String(width)}${tag}.png`, out).pathname;
+				checkCard(card, shot, where, width);
 				if (width === PHONE_WIDTH) {
 					await page.screenshot({ path: file('-first-screen') });
 					// The full page in one image: the pinned bars set in the flow, as the page reads.
@@ -205,8 +292,9 @@ for (const shot of SHOTS) {
 					});
 				}
 				await page.screenshot({ path: file(''), fullPage: true });
+				if (shot.follow === true) await follow(page, shot, where, file('-waivers'));
 				process.stdout.write(
-					`${where}: ${card.values.Proj ?? ''} Proj, ${opp} (${card.captions['Opp rank'] ?? ''}), ${card.verbs.join(' / ')}\n`
+					`${where}: ${card.values.Proj ?? ''} Proj (${card.captions.Proj ?? ''}), ${card.values['Opp rank'] ?? ''}, basis ${String(card.basisLines)} lines, ${card.verbs.join(' / ')}\n`
 				);
 			} catch (error: unknown) {
 				failures.push(`${where}: ${String(error)}`);
