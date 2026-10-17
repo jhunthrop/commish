@@ -2,6 +2,7 @@ package leaguesync
 
 import (
 	"net/url"
+	"strings"
 
 	"github.com/jhunthrop/commish/api/internal/apitypes"
 	"github.com/jhunthrop/commish/api/internal/espn"
@@ -108,7 +109,8 @@ func terms(snap Snapshot) apitypes.LeagueTerms {
 			Qb: snap.Shape.QB, Rb: snap.Shape.RB, Wr: snap.Shape.WR, Te: snap.Shape.TE, Flex: snap.Shape.Flex,
 			SuperFlex: snap.Shape.SuperFlex, K: snap.Shape.K, Def: snap.Shape.DEF, Bench: snap.Shape.Bench,
 		},
-		ScoringExtra: scoringExtra(snap.Scoring), HostSettingsUrl: orNil(hostSettingsURL(snap.Ref)),
+		ScoringExtra: scoringExtra(snap.Scoring), ScoringUnstated: unstated(snap.Scoring.Defaulted),
+		HostSettingsUrl: orNil(hostSettingsURL(snap.Ref)),
 	}
 	if t.Waivers != "" {
 		w := apitypes.LeagueTermsWaivers(t.Waivers)
@@ -121,6 +123,23 @@ func terms(snap Snapshot) apitypes.LeagueTerms {
 		out.Scoring = &rules
 	}
 	return out
+}
+
+// unstated is the rule keys a read's scoring held at the standard figure,
+// from its defaulted list ("key figure").
+func unstated(defaulted []string) []string {
+	out := make([]string, 0, len(defaulted))
+	for _, d := range defaulted {
+		key, _, _ := strings.Cut(d, " ")
+		out = append(out, key)
+	}
+	return out
+}
+
+// movesRead says whether the platform's moves are read: ESPN gives us no
+// move history.
+func movesRead(host string) bool {
+	return host != HostESPN
 }
 
 // scoringExtra is the host's rules ScoringRules does not carry: by rule

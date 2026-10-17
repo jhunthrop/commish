@@ -2351,7 +2351,10 @@ type LeagueSync struct {
 
 	// Moves the completed moves of this week and last, newest first
 	Moves []LeagueMove `json:"moves"`
-	Name  string       `json:"name"`
+
+	// MovesRead the platform's moves are read (ESPN gives us no move history): false, moves is empty and says nothing about whether anyone moved
+	MovesRead bool   `json:"moves_read"`
+	Name      string `json:"name"`
 
 	// Placement how the league's rostered players were placed on our board, by rule
 	Placement Placement `json:"placement"`
@@ -2444,6 +2447,9 @@ type LeagueTerms struct {
 
 	// ScoringExtra the host's rules ScoringRules does not carry, in drafter words with the host's figure
 	ScoringExtra []DroppedRule `json:"scoring_extra"`
+
+	// ScoringUnstated the ScoringRules keys the platform does not state, which scoring holds at our standard figure; the settings print no figure for them, never ours as the league's
+	ScoringUnstated []string `json:"scoring_unstated"`
 
 	// WaiverBudget each team's season budget
 	WaiverBudget *int `json:"waiver_budget"`

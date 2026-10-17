@@ -3917,7 +3917,7 @@ components:
     LeagueTerms:
       type: object
       description: the league's settings as its host states them, for the league page's settings; read only
-      required: [waivers, waiver_budget, playoff_teams, playoff_weeks, roster, scoring, scoring_extra, host_settings_url]
+      required: [waivers, waiver_budget, playoff_teams, playoff_weeks, roster, scoring, scoring_unstated, scoring_extra, host_settings_url]
       properties:
         waivers:
           type: string
@@ -3939,6 +3939,12 @@ components:
           type: array
           description: the host's rules ScoringRules does not carry, in drafter words with the host's figure
           items: { $ref: "#/components/schemas/DroppedRule" }
+        scoring_unstated:
+          type: array
+          description: >-
+            the ScoringRules keys the platform does not state, which scoring holds at our standard figure; the
+            settings print no figure for them, never ours as the league's
+          items: { type: string }
         host_settings_url: { type: string, nullable: true, description: the host's page for the league's settings, null where we know none }
     PlayoffWeeks:
       type: object
@@ -4007,8 +4013,14 @@ components:
         - host_failed
         - host_signed_out
         - terms
+        - moves_read
       properties:
         terms: { $ref: "#/components/schemas/LeagueTerms" }
+        moves_read:
+          type: boolean
+          description: >-
+            the platform's moves are read (ESPN gives us no move history): false, moves is empty and says nothing
+            about whether anyone moved
         id: { type: string, format: uuid }
         host: { $ref: "#/components/schemas/LeagueHost" }
         host_league_id: { type: string }

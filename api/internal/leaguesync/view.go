@@ -72,7 +72,7 @@ func (s *Service) view(ctx context.Context, link Link, read Read) (apitypes.Leag
 		HeldBy: held, Rostered: rosteredIDs(held), BoardFormat: format, Byes: byes(board.Raw.Players),
 		Placement: placement(snap, placed), ReadAt: snap.ReadAt, HostStaleSeconds: int(math.Round(read.Stale.Seconds())),
 		HostFailed: read.Failed, HostSignedOut: read.SignedOut,
-		Roster: []apitypes.RosterSpot{}, Terms: terms(snap),
+		Roster: []apitypes.RosterSpot{}, Terms: terms(snap), MovesRead: movesRead(snap.Ref.Host),
 	}
 	if saved == nil {
 		out.SettingsLeagueId = nil

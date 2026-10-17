@@ -3284,6 +3284,8 @@ export interface components {
 			scoring: components['schemas']['ScoringRules'] | null;
 			/** @description the host's rules ScoringRules does not carry, in drafter words with the host's figure */
 			scoring_extra: components['schemas']['DroppedRule'][];
+			/** @description the ScoringRules keys the platform does not state, which scoring holds at our standard figure; the settings print no figure for them, never ours as the league's */
+			scoring_unstated: string[];
 			/** @description the host's page for the league's settings */
 			host_settings_url: string | null;
 		};
@@ -3318,6 +3320,8 @@ export interface components {
 		};
 		LeagueSync: {
 			terms: components['schemas']['LeagueTerms'];
+			/** @description the platform's moves are read (ESPN gives us no move history): false, moves is empty and says nothing about whether anyone moved */
+			moves_read: boolean;
 			/** Format: uuid */
 			id: string;
 			host: components['schemas']['LeagueHost'];
