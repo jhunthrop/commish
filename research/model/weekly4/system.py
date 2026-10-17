@@ -254,7 +254,7 @@ def fit_system(store: Store, extras: Extras, t: RoundFour, fixed: FixedCells | N
                 | {s for m in team.models.values() for s in m.trained_on}
             )
         ),
-        "players": tuple(sorted(set(fit_rows["season"].unique()) | set(extras.margins["season"].unique()))),
+        "players": tuple(sorted({int(s) for s in (*fit_rows["season"].unique(), *extras.margins["season"].unique())})),
     }
     reported["efficiency_cells_pooled_fully"] = efficiency.pooled_fully
     return Fitted(play, team, shares, shared, models, data, dispersion, weighted, clock, served, reported)
