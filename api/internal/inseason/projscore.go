@@ -4,7 +4,6 @@ import (
 	"maps"
 
 	"github.com/jhunthrop/commish/api/internal/apitypes"
-	"github.com/jhunthrop/commish/api/internal/leaguesync"
 	"github.com/jhunthrop/commish/api/internal/scoring"
 )
 
@@ -12,9 +11,9 @@ import (
 // league (Lane 66d review H2): the column the league scores most like
 // (PPR, half PPR or standard; a tight end premium reads PPR), and whether
 // that is the league's own scoring or the closest of the three to rules
-// of its own.
-func projectionScoring(saved apitypes.LeagueSettings) apitypes.ProjectionScoring {
-	like, _ := leaguesync.LeagueScoring(&saved, nil, false)
+// of its own. like is the preset the advisor reads the projection in
+// (advisor.preset), so the column and the words have one source (review N3).
+func projectionScoring(saved apitypes.LeagueSettings, like apitypes.ScoringPreset) apitypes.ProjectionScoring {
 	format := apitypes.ProjectionScoringFormatPpr
 	switch like {
 	case apitypes.ScoringPresetHalfPpr:

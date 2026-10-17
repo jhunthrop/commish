@@ -3258,9 +3258,21 @@ components:
         sentence: { type: string, nullable: true, description: the reason for a change, from facts; null when unchanged }
     LineupAdvice:
       type: object
-      required: [week, basis, basis_note, order_basis, refreshed, read_at, projection_read_at, projection_scoring, set, slots, bench, host_lineup_url, host_note, moves]
+      required: [week, basis, basis_note, order_basis, refreshed, read_at, projection_read_at, projection_scoring, player_points, team_points, set, slots, bench, host_lineup_url, host_note, moves]
       properties:
         week: { type: integer }
+        player_points:
+          type: boolean
+          description: >-
+            the host gives each player's points (Sleeper, MFL); false where it gives each team's total alone (ESPN,
+            Yahoo, FFPC), so a player's points_this_week stay null and the team's total is team_points
+        team_points:
+          type: number
+          format: double
+          nullable: true
+          description: >-
+            the host's points so far for the drafter's team this week, null before any of its starters has kicked off
+            or when the host's score could not be read
         projection_scoring: { $ref: "#/components/schemas/ProjectionScoring" }
         projection_read_at:
           type: string
@@ -3303,9 +3315,12 @@ components:
         line: { $ref: "#/components/schemas/PlayerLine" }
     MatchupBoxSide:
       type: object
-      required: [roster_id, starters, bench]
+      required: [roster_id, player_points, starters, bench]
       properties:
         roster_id: { type: integer }
+        player_points:
+          type: boolean
+          description: the host gives each player's points for this side; false where it gives the side's total alone
         starters:
           type: array
           description: >-

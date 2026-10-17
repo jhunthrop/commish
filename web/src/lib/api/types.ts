@@ -2770,6 +2770,13 @@ export interface components {
 		};
 		LineupAdvice: {
 			week: number;
+			/** @description the host gives each player's points (Sleeper, MFL); false where it gives each team's total alone (ESPN, Yahoo, FFPC), so a player's points_this_week stay null and the team's total is team_points */
+			player_points: boolean;
+			/**
+			 * Format: double
+			 * @description the host's points so far for the drafter's team this week, null before any of its starters has kicked off or when the host's score could not be read
+			 */
+			team_points: number | null;
 			projection_scoring: components['schemas']['ProjectionScoring'];
 			/**
 			 * Format: date-time
@@ -2810,6 +2817,8 @@ export interface components {
 		};
 		MatchupBoxSide: {
 			roster_id: number;
+			/** @description the host gives each player's points for this side; false where it gives the side's total alone */
+			player_points: boolean;
 			/** @description the host's starters in the league's slot order (QB, RB, WR, TE, the flex spots, K, DEF); an empty spot is left out, and a starter no slot takes ends the list in his position's slot. Empty where the host shows us no lineup for the side (FFPC's opponents) */
 			starters: components['schemas']['BoxStarter'][];
 			/** @description the side's other active players, by our order (injured reserve and taxi spots left out) */

@@ -2338,6 +2338,9 @@ type LineupAdvice struct {
 	// OrderBasis which order ranks the players: our preseason board, or the rest-of-season order (from week 7, once the API reads it)
 	OrderBasis OrderBasis `json:"order_basis"`
 
+	// PlayerPoints the host gives each player's points (Sleeper, MFL); false where it gives each team's total alone (ESPN, Yahoo, FFPC), so a player's points_this_week stay null and the team's total is team_points
+	PlayerPoints bool `json:"player_points"`
+
 	// ProjectionReadAt when the week's published projection the rows' week_projection read was captured, null with none
 	ProjectionReadAt *time.Time `json:"projection_read_at"`
 
@@ -2355,7 +2358,10 @@ type LineupAdvice struct {
 
 	// Slots every starting spot in the league's order (QB, RB, WR, TE, the flex spots, K, DEF); a spot no rostered player can fill is left out
 	Slots []LineupSlot `json:"slots"`
-	Week  int          `json:"week"`
+
+	// TeamPoints the host's points so far for the drafter's team this week, null before any of its starters has kicked off or when the host's score could not be read
+	TeamPoints *float64 `json:"team_points"`
+	Week       int      `json:"week"`
 }
 
 // LineupMoves defines model for LineupMoves.
@@ -2470,8 +2476,11 @@ type MatchupBox struct {
 // MatchupBoxSide defines model for MatchupBoxSide.
 type MatchupBoxSide struct {
 	// Bench the side's other active players, by our order (injured reserve and taxi spots left out)
-	Bench    []PlayerLine `json:"bench"`
-	RosterId int          `json:"roster_id"`
+	Bench []PlayerLine `json:"bench"`
+
+	// PlayerPoints the host gives each player's points for this side; false where it gives the side's total alone
+	PlayerPoints bool `json:"player_points"`
+	RosterId     int  `json:"roster_id"`
 
 	// Starters the host's starters in the league's slot order (QB, RB, WR, TE, the flex spots, K, DEF); an empty spot is left out, and a starter no slot takes ends the list in his position's slot. Empty where the host shows us no lineup for the side (FFPC's opponents)
 	Starters []BoxStarter `json:"starters"`

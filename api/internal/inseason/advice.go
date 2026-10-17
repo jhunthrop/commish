@@ -173,6 +173,32 @@ func (a *advisor) projectionReadAt() *time.Time {
 	return &at
 }
 
+// givesPlayerPoints is whether the host gives each player's points for the
+// side (Sleeper and MFL key every rostered player; ESPN, Yahoo and FFPC
+// give the side's total alone, review N1).
+func givesPlayerPoints(side *leaguesync.Side) bool {
+	return side != nil && len(side.PlayerPoints) > 0
+}
+
+// teamPoints is the host's points so far for the side, nil before any of
+// the team's starters has kicked off or when its score was not read.
+func teamPoints(side *leaguesync.Side, people []person) *float64 {
+	if side == nil || side.PointsUnread {
+		return nil
+	}
+	starting := map[string]bool{}
+	for _, id := range side.Starters {
+		starting[id] = true
+	}
+	for _, p := range people {
+		if starting[p.cand.ID] && p.cand.Locked {
+			pts := roundCents(side.Points)
+			return &pts
+		}
+	}
+	return nil
+}
+
 // thisWeek is the host's points for a starter whose game has kicked off,
 // nil where the host gives no player's points.
 func thisWeek(side *leaguesync.Side, id string, f Facts) *float64 {
@@ -302,11 +328,12 @@ func (a *advisor) Lineup() (apitypes.LineupAdvice, bool) {
 		cands[i] = p.cand
 	}
 	rows := Lineup(a.config, cands, team.Starters)
+	mySide := a.side(a.Me)
 	h := a.header()
 	// The rows end on the week's projection (Lane 66d), so the basis says
 	// nothing of points a game; the page says the projection's read itself.
 	out := apitypes.LineupAdvice{Week: h.week, Basis: LineupBasis(a.basis), BasisNote: LineupNote(a.settings, a.season.Carries), OrderBasis: h.basis, Refreshed: h.refreshed,
-		ReadAt: h.readAt, ProjectionReadAt: a.projectionReadAt(), ProjectionScoring: projectionScoring(a.settings), Set: true, Slots: []apitypes.LineupSlot{}, Bench: []apitypes.PlayerLine{},
+		ReadAt: h.readAt, ProjectionReadAt: a.projectionReadAt(), ProjectionScoring: projectionScoring(a.settings, a.preset), PlayerPoints: givesPlayerPoints(mySide), TeamPoints: teamPoints(mySide, people), Set: true, Slots: []apitypes.LineupSlot{}, Bench: []apitypes.PlayerLine{},
 		Moves: apitypes.LineupMoves{Lineup: apitypes.LineupMovesLineupUnavailable},
 	}
 	out.HostLineupUrl, out.HostNote = a.host(LineupPage)

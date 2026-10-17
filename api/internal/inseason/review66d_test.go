@@ -2,8 +2,10 @@ package inseason
 
 import (
 	"testing"
+	"time"
 
 	"github.com/jhunthrop/commish/api/internal/apitypes"
+	"github.com/jhunthrop/commish/api/internal/boards"
 	"github.com/jhunthrop/commish/api/internal/leaguesync"
 	"github.com/jhunthrop/commish/api/internal/scoring"
 )
@@ -65,7 +67,9 @@ func TestProjectionScoringSaysWhoseScoringItIs(t *testing.T) {
 		{"six-point passing, half a catch", custom(sixPoint), apitypes.ProjectionScoring{Format: apitypes.ProjectionScoringFormatHalfPpr, LeagueOwn: false}},
 	}
 	for _, c := range cases {
-		if got := projectionScoring(apitypes.LeagueSettings{Scoring: c.scoring}); got != c.want {
+		settings := apitypes.LeagueSettings{Scoring: c.scoring}
+		like, _ := leaguesync.LeagueScoring(&settings, nil, false)
+		if got := projectionScoring(settings, like); got != c.want {
 			t.Errorf("%s: %+v, want %+v", c.name, got, c.want)
 		}
 	}
@@ -80,5 +84,67 @@ func TestBothScreensSayTheProjectionsScoring(t *testing.T) {
 	want := apitypes.ProjectionScoring{Format: apitypes.ProjectionScoringFormatPpr, LeagueOwn: true}
 	if lineup.ProjectionScoring != want || box.ProjectionScoring != want {
 		t.Fatalf("lineup %+v, matchup %+v", lineup.ProjectionScoring, box.ProjectionScoring)
+	}
+}
+
+// Sunday afternoon, the fixture's week 6 games kicked off at 1:00 pm.
+var sundayAfternoon = time.Date(2026, 10, 18, 15, 0, 0, 0, east)
+
+// hostShaped is the paired fixture after kickoff with both sides' points
+// as a host gives them: a total for each side and, where byPlayer, each
+// starter's points.
+func hostShaped(t *testing.T, byPlayer bool) fixture {
+	t.Helper()
+	f := pairedFixture(t)
+	for i := range f.league.Snap.Matchups {
+		side := &f.league.Snap.Matchups[i]
+		side.Points = 87.44
+		side.PlayerPoints = map[string]float64{}
+		if byPlayer {
+			for _, id := range side.Starters {
+				side.PlayerPoints[id] = 8.74
+			}
+		}
+	}
+	return f
+}
+
+// A host that gives each team's total alone (ESPN, Yahoo, FFPC) says so on
+// both answers, and start and sit carries the team's total; one that gives
+// each player's (Sleeper, MFL) says that (review N1).
+func TestTheAnswersSayWhetherTheHostGivesPlayersPoints(t *testing.T) {
+	for _, byPlayer := range []bool{false, true} {
+		f := hostShaped(t, byPlayer)
+		a, err := newAdvisor(f.league, f.data, boards.WeekProjection{}, nil, sundayAfternoon)
+		if err != nil {
+			t.Fatal(err)
+		}
+		lineup, _ := a.Lineup()
+		box, _ := a.Matchup()
+		if lineup.PlayerPoints != byPlayer || box.Sides[0].PlayerPoints != byPlayer || box.Sides[1].PlayerPoints != byPlayer {
+			t.Fatalf("by player %v: lineup %v, sides %v %v", byPlayer, lineup.PlayerPoints, box.Sides[0].PlayerPoints, box.Sides[1].PlayerPoints)
+		}
+		if lineup.TeamPoints == nil || *lineup.TeamPoints != 87.44 {
+			t.Fatalf("by player %v: the team's points %v", byPlayer, lineup.TeamPoints)
+		}
+		qb := box.Sides[0].Starters[0].Line.Facts.PointsThisWeek
+		if byPlayer != (qb != nil) {
+			t.Fatalf("by player %v: the quarterback's points %v", byPlayer, qb)
+		}
+	}
+	// Before kickoff the team has no points so far.
+	f := hostShaped(t, false)
+	if lineup, _ := newFixtureAdvisor(t, f, nil).Lineup(); lineup.TeamPoints != nil {
+		t.Fatalf("before kickoff: %v", *lineup.TeamPoints)
+	}
+}
+
+// The scoring is derived once, from the preset the projection is read in
+// (review N3).
+func TestProjectionScoringFromTheHeldPreset(t *testing.T) {
+	f := pairedFixture(t)
+	a := newFixtureAdvisor(t, f, nil)
+	if got := projectionScoring(a.settings, apitypes.ScoringPresetHalfPpr); got.Format != apitypes.ProjectionScoringFormatHalfPpr || got.LeagueOwn {
+		t.Fatalf("%+v", got)
 	}
 }
