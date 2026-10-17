@@ -1,6 +1,6 @@
 {
 	"week": 6,
-	"basis": "Ranked by our rest-of-season order and this week's designations. We do not project a week's points. Points over replacement, and every gain in them, are points above what a free pickup at his position gives you, a week: the rest of the season on our rest-of-season order, averaged over its 12 weeks, not a projection of any one week.",
+	"basis": "Ranked by our rest-of-season order and this week's designations. We do not project a week's points. Points over replacement, and every gain in them, are points above what a free pickup at his position gives you, a week: the rest of the season on our rest-of-season order, averaged over its 12 weeks, not a projection of any one week. Points a game are our rest-of-season projection from week 6 over the games his club has left, byes out.",
 	"basis_note": "Points over replacement are for a 12-team league with 1 QB, 2 RB, 3 WR, 1 TE and two flex spots. Points so far leave out your league's points for two-point conversions, missed field goals, missed extra points, fumble recoveries and safeties: the stat lines we hold do not carry them.",
 	"order_basis": "rest_of_season",
 	"refreshed": "2026-10-14T19:05:37.917Z",
@@ -22,6 +22,7 @@
 				"slug": "patrick-mahomes",
 				"position_rank": 3,
 				"points_over_replacement": 2.7,
+				"rest_of_season_per_game": 15.5,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -67,6 +68,7 @@
 				"slug": "aaron-rodgers",
 				"position_rank": 12,
 				"points_over_replacement": 0,
+				"rest_of_season_per_game": 10.8,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -117,6 +119,7 @@
 				"slug": "jeremiyah-love",
 				"position_rank": 22,
 				"points_over_replacement": 0.6,
+				"rest_of_season_per_game": 11.5,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -156,6 +159,7 @@
 				"slug": "jeremiyah-love",
 				"position_rank": 22,
 				"points_over_replacement": 0.6,
+				"rest_of_season_per_game": 11.5,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -200,6 +204,7 @@
 				"slug": "kenny-gainwell",
 				"position_rank": 33,
 				"points_over_replacement": -1.6,
+				"rest_of_season_per_game": 8.7,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -245,6 +250,7 @@
 				"slug": "kenny-gainwell",
 				"position_rank": 33,
 				"points_over_replacement": -1.6,
+				"rest_of_season_per_game": 8.7,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -295,6 +301,7 @@
 				"slug": "jakobi-meyers",
 				"position_rank": 51,
 				"points_over_replacement": -1.7,
+				"rest_of_season_per_game": 10.1,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -334,6 +341,7 @@
 				"slug": "jakobi-meyers",
 				"position_rank": 51,
 				"points_over_replacement": -1.7,
+				"rest_of_season_per_game": 10.1,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -378,6 +386,7 @@
 				"slug": "rome-odunze",
 				"position_rank": 35,
 				"points_over_replacement": 0,
+				"rest_of_season_per_game": 12.4,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -423,6 +432,7 @@
 				"slug": "rome-odunze",
 				"position_rank": 35,
 				"points_over_replacement": 0,
+				"rest_of_season_per_game": 12.4,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -473,6 +483,7 @@
 				"slug": "antonio-williams",
 				"position_rank": 60,
 				"points_over_replacement": -2.5,
+				"rest_of_season_per_game": 4.8,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -518,6 +529,7 @@
 				"slug": "antonio-williams",
 				"position_rank": 60,
 				"points_over_replacement": -2.5,
+				"rest_of_season_per_game": 4.8,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -568,6 +580,7 @@
 				"slug": "chig-okonkwo",
 				"position_rank": 26,
 				"points_over_replacement": -2,
+				"rest_of_season_per_game": 5.9,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -613,6 +626,7 @@
 				"slug": "sam-laporta",
 				"position_rank": 5,
 				"points_over_replacement": 2.1,
+				"rest_of_season_per_game": 8.8,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -653,6 +667,7 @@
 				"slug": "ladd-mcconkey",
 				"position_rank": 69,
 				"points_over_replacement": -3.3,
+				"rest_of_season_per_game": 13.9,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -698,6 +713,7 @@
 				"slug": "ladd-mcconkey",
 				"position_rank": 69,
 				"points_over_replacement": -3.3,
+				"rest_of_season_per_game": 13.9,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -748,6 +764,7 @@
 				"slug": "travis-etienne-jr",
 				"position_rank": 44,
 				"points_over_replacement": -2.6,
+				"rest_of_season_per_game": 11.4,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -793,6 +810,7 @@
 				"slug": "ja-marr-chase",
 				"position_rank": 9,
 				"points_over_replacement": 4.4,
+				"rest_of_season_per_game": 20.8,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -833,6 +851,7 @@
 				"slug": null,
 				"position_rank": null,
 				"points_over_replacement": null,
+				"rest_of_season_per_game": null,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -868,6 +887,7 @@
 				"slug": null,
 				"position_rank": null,
 				"points_over_replacement": null,
+				"rest_of_season_per_game": null,
 				"held": false,
 				"facts": {
 					"week": 6,
@@ -904,6 +924,7 @@
 			"slug": "ja-marr-chase",
 			"position_rank": 9,
 			"points_over_replacement": 4.4,
+			"rest_of_season_per_game": 20.8,
 			"held": false,
 			"facts": {
 				"week": 6,
@@ -939,6 +960,7 @@
 			"slug": "sam-laporta",
 			"position_rank": 5,
 			"points_over_replacement": 2.1,
+			"rest_of_season_per_game": 8.8,
 			"held": false,
 			"facts": {
 				"week": 6,
@@ -974,6 +996,7 @@
 			"slug": "aaron-rodgers",
 			"position_rank": 12,
 			"points_over_replacement": 0,
+			"rest_of_season_per_game": 10.8,
 			"held": false,
 			"facts": {
 				"week": 6,
@@ -1015,6 +1038,7 @@
 			"slug": null,
 			"position_rank": null,
 			"points_over_replacement": null,
+			"rest_of_season_per_game": null,
 			"held": false,
 			"facts": {
 				"week": 6,
@@ -1046,6 +1070,7 @@
 			"slug": "jordan-addison",
 			"position_rank": 70,
 			"points_over_replacement": -3.3,
+			"rest_of_season_per_game": 10.5,
 			"held": false,
 			"facts": {
 				"week": 6,
@@ -1081,6 +1106,7 @@
 			"slug": "tank-bigsby",
 			"position_rank": 65,
 			"points_over_replacement": -5.7,
+			"rest_of_season_per_game": 5.4,
 			"held": false,
 			"facts": {
 				"week": 6,
@@ -1126,6 +1152,7 @@
 			"slug": "zach-charbonnet",
 			"position_rank": 64,
 			"points_over_replacement": -5.7,
+			"rest_of_season_per_game": 4.9,
 			"held": false,
 			"facts": {
 				"week": 6,
@@ -1157,6 +1184,7 @@
 			"slug": "roschon-johnson",
 			"position_rank": 74,
 			"points_over_replacement": -6.2,
+			"rest_of_season_per_game": null,
 			"held": false,
 			"facts": {
 				"week": 6,
@@ -1202,6 +1230,7 @@
 			"slug": "christian-kirk",
 			"position_rank": 149,
 			"points_over_replacement": -6.7,
+			"rest_of_season_per_game": null,
 			"held": true,
 			"facts": {
 				"week": 6,
@@ -1239,6 +1268,7 @@
 			"slug": "jaxson-dart",
 			"position_rank": 31,
 			"points_over_replacement": -8.3,
+			"rest_of_season_per_game": 15.8,
 			"held": false,
 			"facts": {
 				"week": 6,

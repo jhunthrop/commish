@@ -3,6 +3,8 @@
 // as a LeagueSync, and the three answers of spec §7 for one of its teams, every figure taken from the
 // run's own board and game logs:
 //   - position_rank and points_over_replacement are the run's PPR board row, as served;
+//   - rest_of_season_per_game is the row's rest-of-season points over the games his club has left
+//     from the run's first week through week 17 (the run's schedule, byes out), as the API divides;
 //   - last_games are the run's game logs scored with the league's own rules (its scoring settings);
 //   - opponent, home, kickoff and bye are the run's schedule;
 //   - designation, points_this_week and allowed_to_position are not held by the run: absent (null);
@@ -135,6 +137,8 @@ interface BoardRow {
 	team: string;
 	positionRank: number;
 	vor: number;
+	/** His points for the rest of the season on a run that ranks it, null without a projection. */
+	projected: number | null;
 }
 interface RunFormat {
 	id: string;
@@ -184,7 +188,7 @@ const weeksCovered = Math.max(1, LAST_FANTASY_WEEK - week + 1);
 
 /** What every basis ends with, in the API's words (words.go porWords): what points over
  * replacement are and what a week's figure is. */
-const basisTail = `Points over replacement, and every gain in them, are points above what a free pickup at his position gives you, a week: the rest of the season on our rest-of-season order, averaged over its ${String(weeksCovered)} weeks, not a projection of any one week.`;
+const basisTail = `Points over replacement, and every gain in them, are points above what a free pickup at his position gives you, a week: the rest of the season on our rest-of-season order, averaged over its ${String(weeksCovered)} weeks, not a projection of any one week. Points a game are our rest-of-season projection from week ${String(format.rosFromWeek)} over the games his club has left, byes out.`;
 
 /** The rest of the basis, under the rows, in the API's words (words.go BasisNote): the league's
  * shape and the league's rules the stat lines leave out. */
@@ -244,6 +248,26 @@ const byes: Record<string, number> = Object.fromEntries(
 		return bye === undefined ? [] : [[s.abbr, bye] as const];
 	})
 );
+
+/** Each club's games from the run's first week through the last the order covers (the API's
+ * GamesLeft): a bye is no game. */
+const fromWeek = format.rosFromWeek;
+const gamesLeft = new Map(
+	schedule.slates.map(
+		(s) =>
+			[
+				s.abbr,
+				s.games.filter((g) => g.week >= fromWeek && g.week <= LAST_FANTASY_WEEK).length
+			] as const
+	)
+);
+
+/** His rest-of-season points a game, as the API's RestOfSeasonPerGame divides them. */
+function perGameOf(row: BoardRow | null): number | null {
+	const projected = row?.projected ?? null;
+	const left = row === null ? 0 : (gamesLeft.get(row.team) ?? 0);
+	return projected === null || left === 0 ? null : tenth(projected / left);
+}
 
 /** Points under the league's own rules from one game's stat line. Two-point plays are not in the
  * log, so they are not counted. */
@@ -328,6 +352,7 @@ async function lineOf(player: LeaguePlayer): Promise<PlayerLine> {
 		slug: row?.slug ?? null,
 		position_rank: row?.positionRank ?? null,
 		points_over_replacement: row === null ? null : tenth(row.vor / weeksCovered),
+		rest_of_season_per_game: perGameOf(row),
 		held: false,
 		facts: await factsFor(row?.team ?? player.team, player.board_id)
 	};

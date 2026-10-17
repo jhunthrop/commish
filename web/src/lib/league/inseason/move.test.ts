@@ -32,6 +32,7 @@ const player = (id: string, name: string): LineupSlot['ours'] => ({
 	slug: null,
 	position_rank: null,
 	points_over_replacement: null,
+	rest_of_season_per_game: null,
 	held: false,
 	facts: {
 		week: 7,

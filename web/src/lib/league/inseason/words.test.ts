@@ -33,6 +33,9 @@ import {
 	LATER_RULE,
 	NO_TRADES_WITH_TEAM,
 	hisPorWords,
+	figureHead,
+	perGameWords,
+	rowEnd,
 	porFigure,
 	signInTitle,
 	sharedDropWords,
@@ -85,6 +88,7 @@ const line = (name: string, position = 'RB', rank: number | null = 14): PlayerLi
 	slug: null,
 	position_rank: rank,
 	points_over_replacement: 0.7,
+	rest_of_season_per_game: null,
 	held: false,
 	facts: facts()
 });
@@ -207,6 +211,32 @@ void test("a row's own points over replacement is his, and zero carries no sign"
 	assert.equal(porFigure(0.4), '+0.4');
 	assert.equal(LINES.overRepl, 'over repl a week');
 	assert.equal(LINES.toYourLineup, 'a week to your lineup');
+});
+
+void test("a row's rest-of-season points a game are in the season figure's unit words", () => {
+	assert.equal(perGameWords(18.44), '18.4 a game');
+	assert.equal(perGameWords(9), '9.0 a game');
+	assert.equal(LINES.aGame, 'a game');
+});
+
+void test('a row ends on points a game, and on a screen that carries them a row without one says so, never a bare replacement figure', () => {
+	const plain = line('Kyren Williams');
+	const figured = { ...plain, rest_of_season_per_game: 14.2 };
+	assert.deepEqual(rowEnd(figured, true), { kind: 'perGame', value: 14.2 });
+	assert.deepEqual(rowEnd(figured, false), { kind: 'perGame', value: 14.2 });
+	assert.deepEqual(rowEnd(plain, true), { kind: 'words', words: 'No projection' });
+	assert.deepEqual(rowEnd(plain, false), { kind: 'por', value: 0.7 });
+	const unranked = { ...plain, points_over_replacement: null };
+	assert.deepEqual(rowEnd(unranked, false), { kind: 'words', words: 'Unranked' });
+	assert.deepEqual(rowEnd(unranked, true), { kind: 'words', words: 'No projection' });
+	assert.equal(LINES.noProjection, 'No projection');
+});
+
+void test("the rows' head names the number they end on: points a game once any row carries it", () => {
+	const plain = line('Kyren Williams');
+	assert.equal(figureHead([plain]), 'Over repl a week');
+	assert.equal(figureHead([plain, { ...plain, rest_of_season_per_game: 14.2 }]), 'Points a game');
+	assert.equal(figureHead([]), 'Over repl a week');
 });
 
 void test('a trade says who gets whom and both gains plainly', () => {
@@ -367,6 +397,7 @@ void test('copy guard: every in-season line is fantasy words, with no dash, semi
 		designationWords({ status: 'pup', as_of: '2026-10-15T20:10:00.000Z' }),
 		lastGamesWords([{ week: 5, points: 18.4 }]),
 		hisPorWords(0.4),
+		perGameWords(18.4),
 		lineupTitle(6),
 		addsTitle(6),
 		startingCount(0),

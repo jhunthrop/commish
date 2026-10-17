@@ -6,6 +6,7 @@ import { listWords } from '#lib/format/list.ts';
 import { monthDayLabel } from '#lib/format/date.ts';
 import { memberZone, weekdayTime } from '#lib/format/clock.ts';
 import { designationMark, sitsHim } from '#lib/format/designation.ts';
+import { POINTS_PER_GAME_DECIMALS } from '#lib/run/decimals.ts';
 import type { LeagueHost } from '../api.ts';
 import { recordWords } from '../model.ts';
 import { hostWords } from '../names.ts';
@@ -270,6 +271,39 @@ export function hisPorWords(points: number): string {
 	return `his ${porFigure(points)} ${LINES.overRepl}`;
 }
 
+/** His rest-of-season points a game in the season figure's unit words: "18.4 a game". The basis
+ * line says what the figure is. */
+export function perGameWords(points: number): string {
+	return `${fixed(points, POINTS_PER_GAME_DECIMALS)} ${LINES.aGame}`;
+}
+
+/** What a row ends on: his rest-of-season points a game, else his points over replacement a week,
+ * else words. On a screen whose rows carry points a game, a row without them says "No projection",
+ * so no replacement figure sits under the head "Points a game" with no basis of its own. */
+export type RowEnd =
+	| { kind: 'perGame'; value: number }
+	| { kind: 'por'; value: number }
+	| { kind: 'words'; words: string };
+
+export function rowEnd(line: PlayerLine, screenCarriesPerGame: boolean): RowEnd {
+	const perGame = line.rest_of_season_per_game;
+	if (perGame !== null) return { kind: 'perGame', value: perGame };
+	if (screenCarriesPerGame) return { kind: 'words', words: LINES.noProjection };
+	const por = line.points_over_replacement;
+	return por === null ? { kind: 'words', words: LINES.unranked } : { kind: 'por', value: por };
+}
+
+/** Whether any of the rows carries his rest-of-season points a game. */
+export function carriesPerGame(lines: readonly PlayerLine[]): boolean {
+	return lines.some((line) => line.rest_of_season_per_game !== null);
+}
+
+/** The head over rows that end on their own number: "Points a game" once the rows carry it, his
+ * points over replacement a week before. */
+export function figureHead(lines: readonly PlayerLine[]): string {
+	return carriesPerGame(lines) ? LINES.pointsAGame : LINES.perWeek;
+}
+
 /** The tabs under a followed league's title, each screen by its rail word (spec 2026-10-16 §3). */
 export const TAB_LABELS: Readonly<Record<'league' | LeagueScreen, string>> = {
 	league: 'League',
@@ -289,7 +323,11 @@ export const LINES = {
 	gainHead: 'Your gain a week',
 	drop: 'Drop',
 	unranked: 'Unranked',
+	/** A row's end on a screen whose rows end on points a game, for a player without them. */
+	noProjection: 'No projection',
 	aWeek: 'a week',
+	/** A row's rest-of-season points a game, in the unit words the league page's season figure uses. */
+	aGame: 'a game',
 	all: 'All',
 	position: 'Position',
 	waiverAdds: 'Waiver adds',
@@ -301,6 +339,9 @@ export const LINES = {
 	notFoundLine: 'Nothing lives at this address.',
 	toBoard: 'Go to the board',
 	perWeek: 'Over repl a week',
+	/** The head over rows that end on his rest-of-season points a game, as the league page's roster
+	 * names its season figure. */
+	pointsAGame: 'Points a game',
 	add: 'Add',
 	propose: 'Propose',
 	chosen: 'Up top',

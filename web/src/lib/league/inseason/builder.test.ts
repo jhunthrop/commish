@@ -32,6 +32,7 @@ const line = (
 	slug: null,
 	position_rank: 14,
 	points_over_replacement: 1.2,
+	rest_of_season_per_game: null,
 	held: false,
 	facts: {
 		week: 6,
@@ -134,6 +135,35 @@ void test('the answer line says what each lineup gains or loses, in points over 
 		checkWords(check({ drop: line('Jaxson Dart', 'QB') })),
 		'Your lineup gains 2.1 points over replacement a week, theirs loses 0.8. You drop Jaxson Dart to make room.'
 	);
+});
+
+/** A line with his rest-of-season points a game. */
+const figured = (l: PlayerLine, perGame: number | null): PlayerLine => ({
+	...l,
+	rest_of_season_per_game: perGame
+});
+
+void test("the answer line names the trade's players with their rest-of-season points a game", () => {
+	assert.equal(
+		checkWords(
+			check({
+				give: [figured(line('Kyren Williams'), 14.2)],
+				get: [figured(line('Nico Collins', 'WR'), 17.84)]
+			})
+		),
+		'Your lineup gains 2.1 points over replacement a week, theirs loses 0.8. You give Kyren Williams (14.2 a game) for Nico Collins (17.8 a game).'
+	);
+	assert.equal(
+		checkWords(
+			check({
+				give: [figured(line('Kyren Williams'), 14.2), figured(line('Jordan Mason'), 9)],
+				get: [figured(line('Nico Collins', 'WR'), null)],
+				drop: line('Jaxson Dart', 'QB')
+			})
+		),
+		'Your lineup gains 2.1 points over replacement a week, theirs loses 0.8. You give Kyren Williams (14.2 a game) and Jordan Mason (9.0 a game) for Nico Collins. You drop Jaxson Dart to make room.'
+	);
+	assert.doesNotMatch(checkWords(check()), /You give/, 'no figure, no players named');
 });
 
 void test('a roster the trade leaves short says so before any gain', () => {
