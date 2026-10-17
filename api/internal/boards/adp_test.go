@@ -48,8 +48,14 @@ func TestTheRoomsADPIsTheBoards(t *testing.T) {
 	}
 	exec("insert into " + marketSchema + ".provider_players values ('wr', 'A Receiver', 'WR', 'LAR', null, 2.0)")
 	exec("insert into " + marketSchema + ".player_crosswalk values ('wr', 'u-wr')")
-	const roomRB, lateRB = 4.2, 9.0
+	// A second capture row that cross-walks to 'rb' at a higher ADP: the one
+	// rule on every reader (Lane 66o review M2) keeps the lower ADP, as the
+	// nightly's place_capture does (research/tests/test_adp_capture.py).
+	exec("insert into " + marketSchema + ".player_crosswalk values ('rb', 'u-rb-old')")
+	const roomRB, lateRB, olderRB = 4.2, 9.0, 7.7
 	for _, f := range Formats() {
+		exec("insert into "+marketSchema+".adp_snapshots values ('u-rb-old', $1, $2::timestamptz, $3, $4)",
+			adpSourceFor(f), before, string(f), olderRB)
 		exec("insert into "+marketSchema+".adp_snapshots values ('u-rb', $1, $2::timestamptz, $3, $4)",
 			adpSourceFor(f), before, string(f), roomRB)
 		exec("insert into "+marketSchema+".adp_snapshots values ('u-rb', $1, $2::timestamptz, $3, $4)",

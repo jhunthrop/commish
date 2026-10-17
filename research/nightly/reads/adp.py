@@ -40,8 +40,9 @@ def latest_capture(conn: Connection, feed: AdpFeed, as_of: datetime) -> AdpCaptu
     ).scalar()
     if captured_at is None:
         return AdpCapture(feed, None, {}, 0)
-    rows = list(
-        conn.execute(
+    rows = [
+        CaptureRow(row.player_id, float(row.adp), row.provider_player_id)
+        for row in conn.execute(
             text(
                 "select a.player_id, a.adp, c.provider_player_id from research.adp_snapshots a "
                 "left join research.player_crosswalk c on c.player_id = a.player_id "
@@ -49,6 +50,30 @@ def latest_capture(conn: Connection, feed: AdpFeed, as_of: datetime) -> AdpCaptu
             ),
             {"source": feed.source, "at": captured_at},
         )
-    )
-    placed = {row.provider_player_id: float(row.adp) for row in rows if row.provider_player_id is not None}
-    return AdpCapture(feed, captured_at, placed, len(rows) - len(placed))
+    ]
+    placed, unplaced = place_capture(rows)
+    return AdpCapture(feed, captured_at, placed, unplaced)
+
+
+@dataclass(frozen=True, slots=True)
+class CaptureRow:
+    player_id: str
+    adp: float
+    provider_player_id: str | None
+
+
+def place_capture(rows: list[CaptureRow]) -> tuple[dict[str, float], int]:
+    """The capture by the product's player id, and how many rows the crosswalk cannot place.
+
+    When two rows reach one provider id, the lower ADP wins (the earlier row in ADP order): the api's
+    room read takes `min(adp)` for the same id (api/internal/boards/market.go), so the board and the
+    room print one figure. A second row for a placed player is not counted as unplaced.
+    """
+    placed: dict[str, float] = {}
+    unplaced = 0
+    for row in rows:
+        if row.provider_player_id is None:
+            unplaced += 1
+        elif row.adp < placed.get(row.provider_player_id, float("inf")):
+            placed[row.provider_player_id] = row.adp
+    return placed, unplaced
