@@ -30,7 +30,3 @@ export function leagueTabs(league: TabPhase): LeagueTabLink[] {
 	if (screens.length === 0) return [];
 	return (['league', ...screens] as const).map((tab) => ({ tab, label: TAB_LABELS[tab] }));
 }
-
-/** The search parameter a link to the Trades or Waivers screen may carry: his board id, and the screen
- * opens on his trades or his pickup row (the Rest of season screen's verbs, review 66j H6). */
-export const PLAYER_PARAM = 'player';

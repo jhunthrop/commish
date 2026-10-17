@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { page } from '$app/state';
+	import { askedPlayer } from '../box/asked.ts';
 	import Chip from '#lib/ui/Chip.svelte';
 	import ChipGroup from '#lib/ui/ChipGroup.svelte';
 	import ProblemLine from '#lib/ui/ProblemLine.svelte';
@@ -23,7 +23,6 @@
 		type SortKey
 	} from '../box/trades.ts';
 	import Screen from './Screen.svelte';
-	import { PLAYER_PARAM } from './tabs.ts';
 	import PickSelect, { type PickGroup, type PickOption } from './PickSelect.svelte';
 	import TradeBuilder from './TradeBuilder.svelte';
 	import type {
@@ -145,6 +144,20 @@
 	const everyCount = $derived(advice.teams.reduce((n, t) => n + t.trades.length, 0));
 	const bestCount = $derived(advice.teams.filter((t) => t.trades.length > 0).length);
 
+	/** A player page's "Trade for him" names him (?player=, Lane 66h): the builder opens with him
+	 * picked from the team that holds him, and the trades narrow to those holding him. */
+	onMount(() => {
+		const asked = askedPlayer(window.location.href);
+		if (asked === null) return;
+		const holder = advice.teams.find((team) =>
+			team.roster.some((line) => line.player.board_id === asked)
+		);
+		const line = holder?.roster.find((l) => l.player.board_id === asked);
+		if (holder && line && line.player.host_id !== '')
+			build({ team: holder.roster_id, give: [], get: [line.player.host_id] });
+		if ([...players.yours, ...players.theirs].some((l) => pickKey(l) === asked)) void pick(asked);
+	});
+
 	async function pick(next: string | null): Promise<void> {
 		player = next;
 		narrowed = null;
@@ -157,12 +170,6 @@
 		if (outcome.kind === 'answer') narrowed = outcome.answer;
 		if (outcome.kind === 'failed') problem = outcome.sentence;
 	}
-
-	// A link naming a player (the Rest of season screen's Trade for him) opens on his trades.
-	onMount(() => {
-		const asked = page.url.searchParams.get(PLAYER_PARAM);
-		if (asked !== null && asked !== '') void pick(asked);
-	});
 
 	/** Copies a trade's offer for the member to propose on the platform: the line under the verb. */
 	async function propose(

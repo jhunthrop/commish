@@ -173,12 +173,13 @@ func TestOrderOnThePreseasonOrderCarriesNoRestOfSeasonTotal(t *testing.T) {
 	}
 }
 
-type fakeBoards struct {
+// askingBoards answers the public order's board and keeps the settings it was asked for.
+type askingBoards struct {
 	board boards.Board
 	asked apitypes.LeagueSettings
 }
 
-func (f *fakeBoards) For(_ context.Context, s apitypes.LeagueSettings) (boards.Board, error) {
+func (f *askingBoards) For(_ context.Context, s apitypes.LeagueSettings) (boards.Board, error) {
 	f.asked = s
 	return f.board, nil
 }
@@ -186,7 +187,7 @@ func (f *fakeBoards) For(_ context.Context, s apitypes.LeagueSettings) (boards.B
 func TestOrderRoutes(t *testing.T) {
 	f := restOfSeasonFixture(t)
 	s := fixtureService(t, f.league, f.data, &fakeHolds{})
-	public := &fakeBoards{board: f.league.Board}
+	public := &askingBoards{board: f.league.Board}
 	s.Boards, s.Season = public, 2026
 	code, env := serve(t, s, "/order?position=TE&limit=3")
 	if code != http.StatusOK || !env.Ok {
@@ -294,7 +295,7 @@ func TestTheFinderRunsOncePerLeagueRead(t *testing.T) {
 func TestOrderRoutesCarryTheClaimMovesAndRefuseARosterWithoutALeague(t *testing.T) {
 	f := restOfSeasonFixture(t)
 	s := fixtureService(t, f.league, f.data, &fakeHolds{})
-	s.Boards, s.Season = &fakeBoards{board: f.league.Board}, 2026
+	s.Boards, s.Season = fakeBoards{board: f.league.Board}, 2026
 	code, env := serve(t, s, leaguePath+"order?roster=free&limit=2")
 	if code != http.StatusOK || !env.Ok {
 		t.Fatalf("league: %d %+v", code, env.Error)

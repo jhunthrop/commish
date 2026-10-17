@@ -9,7 +9,7 @@ import type { LeagueHost } from '#lib/league/api.ts';
 import { BOX, boxRow, factsReadLine, projBasis, type BoxRow } from '#lib/league/box/box.ts';
 import { addOnWords, openWaiversWords } from '#lib/league/box/waivers.ts';
 import { hostWords } from '#lib/league/names.ts';
-import { PLAYER_PARAM } from '#lib/league/inseason/tab-list.ts';
+import { ASKED_PARAM } from '#lib/league/box/asked.ts';
 import type { OrderAdvice, OrderPosition, OrderRow, RosterMark } from './api.ts';
 
 /** Every word the order's screens print that is not a player's, in one place for the copy guard. */
@@ -124,7 +124,7 @@ export function moveHref(
 ): string | null {
 	if (league === null || row.move === null) return null;
 	const screen = row.move === 'add' ? 'waivers' : 'trades';
-	return `${screenHref(screen, league)}?${new URLSearchParams({ [PLAYER_PARAM]: row.key }).toString()}`;
+	return `${screenHref(screen, league)}?${new URLSearchParams({ [ASKED_PARAM]: row.key }).toString()}`;
 }
 
 /** The order's evidence columns' basis, said once, in the scoring the rows are in. */

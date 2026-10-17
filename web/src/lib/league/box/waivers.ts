@@ -4,7 +4,7 @@
  * columns, then the two only we give (Rest of season, and Beats: the member's player he tops with the
  * gain); an add opens the players he could replace in the same columns, the advice's drop first.
  * Pure, tested in waivers.test.ts. */
-import { memberZone, weekdayTime, zoneWord } from '#lib/format/clock.ts';
+import { memberZone } from '#lib/format/clock.ts';
 import { lastName } from '#lib/format/draft.ts';
 import { fixed, signed } from '#lib/format/number.ts';
 import type { LeagueHost } from '../api.ts';
@@ -17,7 +17,7 @@ import {
 	boxNumber,
 	boxRow,
 	EVIDENCE_SHORT,
-	factsReadAt,
+	factsReadShort,
 	positionWord,
 	projShort,
 	type BoxRow
@@ -397,7 +397,7 @@ export function waiverBasis(
 		defense,
 		zone
 	);
-	const read = factsReadAt(lines);
-	const evidence = `${EVIDENCE_SHORT}${read === null ? '' : ` The ${BOX.game} cell's expected points and weather were read ${weekdayTime(read, zone)} ${zoneWord(zone)}.`}`;
+	const read = factsReadShort(lines, zone);
+	const evidence = `${EVIDENCE_SHORT}${read === null ? '' : ` ${read}`}`;
 	return [advice.basis, proj, BEATS_BASIS, advice.season_basis, evidence].filter((l) => l !== '');
 }

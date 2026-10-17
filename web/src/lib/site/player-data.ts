@@ -3,10 +3,12 @@
 import type { Player, PlayerStatus } from '#lib/run/schema.ts';
 import { links } from './links.ts';
 
-/** Everything a page needs about a player except the capsule and the season, which only his own
+/** Everything a page needs about a player except the reads and the season, which only his own
  * page prints, and his status on the run's injury capture when it lists him (Lane 63), the way the
  * league page's board file carries it. */
-export type PlayerData = Omit<Player, 'capsule' | 'season'> & { status?: PlayerStatus };
+export type PlayerData = Omit<Player, 'capsule' | 'season' | 'weekRead' | 'priorSeasons'> & {
+	status?: PlayerStatus;
+};
 
 export async function fetchPlayer(id: string): Promise<PlayerData> {
 	const response = await fetch(links.playerData(id));

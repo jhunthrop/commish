@@ -38,20 +38,6 @@ const (
 	rosterWords = "Pick free or yours"
 )
 
-// Boards is the board a league of these settings drafts from, valued for
-// its roster. *draftroom.Boards implements it.
-type Boards interface {
-	For(ctx context.Context, s apitypes.LeagueSettings) (boards.Board, error)
-}
-
-// PublicLeague is the league the order is valued for when the reader has
-// none of their own: 12 teams, PPR, QB, 2 RB, 3 WR, TE, a flex, K and DEF.
-func PublicLeague() apitypes.LeagueSettings {
-	ppr := apitypes.ScoringPresetPpr
-	return apitypes.LeagueSettings{Teams: 12, Lineup: apitypes.LineupStandard, Scoring: apitypes.Scoring{Preset: &ppr},
-		Roster: apitypes.RosterCounts{Qb: 1, Rb: 2, Wr: 3, Te: 1, K: 1, Dst: 1, Bench: 6}}
-}
-
 // orderQuery is one view of the order: a position or all of them, the
 // letters a search holds, and how many rows it returns.
 type orderQuery struct {
@@ -347,7 +333,7 @@ func (s *Service) leagueOrder(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteOK(w, r, http.StatusOK, out)
 }
 
-// publicOrder is GET /order: the order valued for PublicLeague, with no
+// publicOrder is GET /order: the order valued for PublicSettings, with no
 // account and no league.
 func (s *Service) publicOrder(w http.ResponseWriter, r *http.Request) {
 	q, bad := parseOrderQuery(r, false)
@@ -363,10 +349,10 @@ func (s *Service) publicOrder(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteOK(w, r, http.StatusOK, a.Order(q, nil))
 }
 
-// publicAdvisor is the order's advisor without a league: PublicLeague's
+// publicAdvisor is the order's advisor without a league: PublicSettings'
 // board and scoring, the week of the next game still to be played.
 func (s *Service) publicAdvisor(ctx context.Context) (*advisor, error) {
-	settings := PublicLeague()
+	settings := PublicSettings()
 	board, err := s.Boards.For(ctx, settings)
 	if err != nil {
 		return nil, err

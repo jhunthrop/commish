@@ -474,6 +474,28 @@ export interface paths {
 		patch?: never;
 		trace?: never;
 	};
+	'/leagues/attached/{id}/players/{player}': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				/** @description the attached league's id (AttachedLeague.id) */
+				id: string;
+				/** @description his board id, as his page names him */
+				player: string;
+			};
+			cookie?: never;
+		};
+		/** One player's week for his page, read in the drafter's league: the Lineup row's figures in the league's scoring (the week's projection in the format the league scores most like, its change, his opponent's rank against his position, his points a game and his last game's), and the one verb the league screens would give him: start him when he is on the drafter's roster and our lineup starts him where the platform does not, the lineup otherwise, a trade for him when another roster holds him, and the claim or the platform's waiver page when no roster does, as the claim moves say. A quarterback, running back, receiver or tight end our board places; anyone else 404s. */
+		get: operations['leaguePlayerWeek'];
+		put?: never;
+		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
 	'/leagues/attached/{id}/moves/plan': {
 		parameters: {
 			query?: never;
@@ -1040,6 +1062,23 @@ export interface paths {
 		};
 		/** Every club's game in a week with its facts: the game's expected score and margin from the hourly capture, the venue's roof, and the weather service's forecast for the kickoff hour, each with its read time. Facts, never a projection. Read by a league's Matchup screen and the player pages. */
 		get: operations['gameWeek'];
+		put?: never;
+		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/players/{player}/week': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		/** One player's week for his page with no league: the week's projection in PPR scoring and its change, his opponent's rank against his position, his points a game and his last game's, each in PPR scoring, his club's game with its facts, and his place and rest-of-season points a game on our board valued for twelve teams, the standard lineup and PPR. Anyone may read it, as the board is. His club and position are our board's. A kicker, a defense or a player our board does not place has no page and answers 404. */
+		get: operations['playerWeek'];
 		put?: never;
 		post?: never;
 		delete?: never;
@@ -2871,7 +2910,7 @@ export interface components {
 			player: components['schemas']['LeaguePlayer'];
 			/** @description his face from our player directory, null without one */
 			headshot: string | null;
-			/** @description his page on the site (/players/{slug}): set for a player our order ranks whose name no other player in our directory shares, null otherwise (a shared name's page is named by the run, which the API does not read) */
+			/** @description his page on the site (/players/{slug}): set for a quarterback, running back, receiver or tight end our order ranks whose name no other player in our directory shares, null otherwise (a kicker or defense has no page) (a shared name's page is named by the run, which the API does not read) */
 			slug: string | null;
 			/** @description his place at his position in our order */
 			position_rank: number | null;
@@ -2910,6 +2949,37 @@ export interface components {
 			/** @description the drafter tags him Hold on a sheet */
 			held: boolean;
 			facts: components['schemas']['WeekFacts'];
+		};
+		PlayerWeek: {
+			/** @description the week the line is for: the league's week, else the week of the next game still to be played */
+			week: number;
+			line: components['schemas']['PlayerLine'];
+			projection_scoring: components['schemas']['ProjectionScoring'];
+			/**
+			 * Format: date-time
+			 * @description when the week's projection was captured, null with none stored
+			 */
+			projection_read_at: string | null;
+			/**
+			 * Format: date-time
+			 * @description when the snapshot projection_delta is measured from was captured, null with none
+			 */
+			projection_previous_read_at: string | null;
+			/** @description what the league screens would do with him; null on the read with no league */
+			verb: components['schemas']['PlayerVerb'] | null;
+		};
+		PlayerVerb: {
+			/**
+			 * @description start when he is on the drafter's roster and our lineup starts him where the platform's lineup does not; lineup when he is on the drafter's roster otherwise; trade when another roster holds him; claim when no roster holds him and a claim can be made from our screen (WaiverMoves.claim available); waivers when no roster holds him and the verb is the platform's waiver page
+			 * @enum {string}
+			 */
+			kind: 'start' | 'lineup' | 'trade' | 'claim' | 'waivers';
+			/** @description the team holding him, for trade; null otherwise */
+			holder: string | null;
+			/** @description the platform's waiver page, for waivers; null otherwise or when we do not know it */
+			host_url: string | null;
+			/** @description the claim moves' note, for claim or waivers; null otherwise */
+			note: string | null;
 		};
 		LineupSlot: {
 			/** @enum {string} */
@@ -3889,6 +3959,15 @@ export interface components {
 				};
 			};
 		};
+		/** @description one player's week for his page */
+		PlayerWeekResponse: {
+			headers: Record<string, unknown>;
+			content: {
+				'application/json': components['schemas']['Envelope'] & {
+					data?: components['schemas']['PlayerWeek'];
+				};
+			};
+		};
 		/** @description the week's lineup advice for the drafter's team */
 		LineupAdviceResponse: {
 			headers: Record<string, unknown>;
@@ -4575,6 +4654,29 @@ export interface operations {
 			404: components['responses']['ErrorResponse'];
 			409: components['responses']['ErrorResponse'];
 			415: components['responses']['ErrorResponse'];
+			422: components['responses']['ErrorResponse'];
+			429: components['responses']['ErrorResponse'];
+			502: components['responses']['ErrorResponse'];
+		};
+	};
+	leaguePlayerWeek: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				/** @description the attached league's id (AttachedLeague.id) */
+				id: string;
+				/** @description his board id, as his page names him */
+				player: string;
+			};
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			200: components['responses']['PlayerWeekResponse'];
+			400: components['responses']['ErrorResponse'];
+			404: components['responses']['ErrorResponse'];
+			409: components['responses']['ErrorResponse'];
 			422: components['responses']['ErrorResponse'];
 			429: components['responses']['ErrorResponse'];
 			502: components['responses']['ErrorResponse'];
@@ -5300,6 +5402,24 @@ export interface operations {
 		responses: {
 			200: components['responses']['GameWeekResponse'];
 			400: components['responses']['ErrorResponse'];
+		};
+	};
+	playerWeek: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				/** @description his board id, as his page names him */
+				player: string;
+			};
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			200: components['responses']['PlayerWeekResponse'];
+			400: components['responses']['ErrorResponse'];
+			404: components['responses']['ErrorResponse'];
+			429: components['responses']['ErrorResponse'];
 		};
 	};
 	sharedMock: {

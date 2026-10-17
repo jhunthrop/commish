@@ -4,7 +4,6 @@ import { resolve } from '$app/paths';
 import type { LeagueTab } from './tab-list.ts';
 
 export {
-	PLAYER_PARAM,
 	leagueScreens,
 	leagueTabs,
 	type LeagueTab,

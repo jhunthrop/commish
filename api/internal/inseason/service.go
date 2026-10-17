@@ -63,8 +63,9 @@ type Service struct {
 	Facts   SeasonFacts
 	Holds   Holds
 	Moves   Moves
-	// Boards values the order for a reader with no league (GET /order).
-	Boards Boards
+	// Boards values our board for the reads with no league: the public player read and the public
+	// order (PublicSettings).
+	Boards BoardSource
 	// targets keeps the trade finder's targets per league read (order.go).
 	targets targetCache
 	// Season is the season GET /games/week reads, the board's.
@@ -86,6 +87,8 @@ func (s *Service) Routes() []httpx.Route {
 		{Method: http.MethodGet, Path: "/leagues/attached/{id}/order", Access: httpx.SignedIn, Limit: limit, Handler: s.leagueOrder},
 		{Method: http.MethodGet, Path: "/order", Access: httpx.Public, Limit: limit, Handler: s.publicOrder},
 		{Method: http.MethodGet, Path: "/games/week", Access: httpx.Public, Limit: limit, Handler: s.weekGames},
+		{Method: http.MethodGet, Path: "/players/{player}/week", Access: httpx.Public, Limit: limit, Handler: s.playerWeek},
+		{Method: http.MethodGet, Path: "/leagues/attached/{id}/players/{player}", Access: httpx.SignedIn, Limit: limit, Handler: s.leaguePlayerWeek},
 	}
 }
 

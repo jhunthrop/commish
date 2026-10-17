@@ -86,6 +86,17 @@ export const statLineSchema = z.object({
 	points: stat
 });
 
+/** A season before this one (Lane 66h): its regular season summed as this season's block sums its
+ * weeks, in the same format. */
+export const priorSeasonSchema = z.object({
+	season: z.number().int(),
+	games: z.number().int().positive(),
+	pointsPerGame: z.number().nullable(),
+	totals: statLineSchema
+});
+
+export type PriorSeason = z.infer<typeof priorSeasonSchema>;
+
 export const gameLogRowSchema = statLineSchema.extend({
 	week: z.number().int().min(1),
 	/** The club he plays, or null on his bye. */

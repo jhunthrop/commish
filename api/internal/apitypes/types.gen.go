@@ -1017,6 +1017,33 @@ func (e PlayerPosition) Valid() bool {
 	}
 }
 
+// Defines values for PlayerVerbKind.
+const (
+	PlayerVerbKindClaim   PlayerVerbKind = "claim"
+	PlayerVerbKindLineup  PlayerVerbKind = "lineup"
+	PlayerVerbKindStart   PlayerVerbKind = "start"
+	PlayerVerbKindTrade   PlayerVerbKind = "trade"
+	PlayerVerbKindWaivers PlayerVerbKind = "waivers"
+)
+
+// Valid indicates whether the value is a known member of the PlayerVerbKind enum.
+func (e PlayerVerbKind) Valid() bool {
+	switch e {
+	case PlayerVerbKindClaim:
+		return true
+	case PlayerVerbKindLineup:
+		return true
+	case PlayerVerbKindStart:
+		return true
+	case PlayerVerbKindTrade:
+		return true
+	case PlayerVerbKindWaivers:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for Product.
 const (
 	ProductDraftPass  Product = "draft_pass"
@@ -3078,7 +3105,7 @@ type PlayerLine struct {
 	// SeasonAvg his points a game over every completed game this season under the league's scoring, to the cent; null before his first game
 	SeasonAvg *float64 `json:"season_avg"`
 
-	// Slug his page on the site (/players/{slug}): set for a player our order ranks whose name no other player in our directory shares, null otherwise (a shared name's page is named by the run, which the API does not read)
+	// Slug his page on the site (/players/{slug}): set for a quarterback, running back, receiver or tight end our order ranks whose name no other player in our directory shares, null otherwise (a kicker or defense has no page) (a shared name's page is named by the run, which the API does not read)
 	Slug *string `json:"slug"`
 
 	// WeekProjection his points this week on the week's published projection, to the cent, in the format the league's scoring is most like (PPR, half PPR or standard); a team defense's by its club, a kicker our board does not place (no board id) by his club's one kicker, never a teammate's for a kicker the snapshot left out. The newest snapshot stored for the league's week (projection_read_at says when). Null when his club has no game that week (a bye), whatever the snapshot holds, and when the snapshot has no row for him or none is stored. Our own weekly model replaces it when it passes its test
@@ -3087,6 +3114,44 @@ type PlayerLine struct {
 
 // PlayerPosition defines model for PlayerPosition.
 type PlayerPosition string
+
+// PlayerVerb defines model for PlayerVerb.
+type PlayerVerb struct {
+	// Holder the team holding him, for trade; null otherwise
+	Holder *string `json:"holder"`
+
+	// HostUrl the platform's waiver page, for waivers; null otherwise or when we do not know it
+	HostUrl *string `json:"host_url"`
+
+	// Kind start when he is on the drafter's roster and our lineup starts him where the platform's lineup does not; lineup when he is on the drafter's roster otherwise; trade when another roster holds him; claim when no roster holds him and a claim can be made from our screen (WaiverMoves.claim available); waivers when no roster holds him and the verb is the platform's waiver page
+	Kind PlayerVerbKind `json:"kind"`
+
+	// Note the claim moves' note, for claim or waivers; null otherwise
+	Note *string `json:"note"`
+}
+
+// PlayerVerbKind start when he is on the drafter's roster and our lineup starts him where the platform's lineup does not; lineup when he is on the drafter's roster otherwise; trade when another roster holds him; claim when no roster holds him and a claim can be made from our screen (WaiverMoves.claim available); waivers when no roster holds him and the verb is the platform's waiver page
+type PlayerVerbKind string
+
+// PlayerWeek defines model for PlayerWeek.
+type PlayerWeek struct {
+	Line PlayerLine `json:"line"`
+
+	// ProjectionPreviousReadAt when the snapshot projection_delta is measured from was captured, null with none
+	ProjectionPreviousReadAt *time.Time `json:"projection_previous_read_at"`
+
+	// ProjectionReadAt when the week's projection was captured, null with none stored
+	ProjectionReadAt *time.Time `json:"projection_read_at"`
+
+	// ProjectionScoring the scoring the rows' week_projection is read in: the published projection's column the league scores most like, and whether that is the league's own scoring or the closest of the three to rules of its own (a tight end premium reads PPR and is never its own). A team defense's figure is the published default in every format
+	ProjectionScoring ProjectionScoring `json:"projection_scoring"`
+
+	// Verb what the league screens would do with him; null on the read with no league
+	Verb *PlayerVerb `json:"verb"`
+
+	// Week the week the line is for: the league's week, else the week of the next game still to be played
+	Week int `json:"week"`
+}
 
 // PlayoffWeeks the playoffs' first and last week
 type PlayoffWeeks struct {
@@ -4145,6 +4210,15 @@ type OrderAdviceResponse struct {
 	Meta      *PageMeta   `json:"meta,omitempty"`
 	Ok        bool        `json:"ok"`
 	RequestId string      `json:"request_id"`
+}
+
+// PlayerWeekResponse defines model for PlayerWeekResponse.
+type PlayerWeekResponse struct {
+	Data      PlayerWeek `json:"data"`
+	Error     *ErrorBody `json:"error"`
+	Meta      *PageMeta  `json:"meta,omitempty"`
+	Ok        bool       `json:"ok"`
+	RequestId string     `json:"request_id"`
 }
 
 // RedirectResponse defines model for RedirectResponse.
