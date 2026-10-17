@@ -33,7 +33,7 @@ export function weekdayTime(iso: string, zone: string = memberZone()): string {
 }
 
 /** The zone's own name, "Central Time", as the browser names it. */
-function zoneName(zone: string): string {
+export function zoneName(zone: string = memberZone()): string {
 	const named = new Intl.DateTimeFormat('en-US', { timeZone: zone, timeZoneName: 'longGeneric' })
 		.formatToParts(new Date())
 		.find((p) => p.type === 'timeZoneName')?.value;
