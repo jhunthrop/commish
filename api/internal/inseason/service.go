@@ -63,6 +63,8 @@ type Service struct {
 	Facts   SeasonFacts
 	Holds   Holds
 	Moves   Moves
+	// Weeks lists the account's leagues for GET /me/week, nil answers none.
+	Weeks Weeks
 	// Season is the season GET /games/week reads, the board's.
 	Season int
 	Now    func() time.Time
@@ -80,6 +82,7 @@ func (s *Service) Routes() []httpx.Route {
 		{Method: http.MethodGet, Path: "/leagues/attached/{id}/trades", Access: httpx.SignedIn, Limit: limit, Handler: s.trades},
 		{Method: http.MethodPost, Path: "/leagues/attached/{id}/trades/check", Access: httpx.SignedIn, Limit: limit, Handler: s.checkTrade},
 		{Method: http.MethodGet, Path: "/games/week", Access: httpx.Public, Limit: limit, Handler: s.weekGames},
+		{Method: http.MethodGet, Path: "/me/week", Access: httpx.SignedIn, Limit: limit, Handler: s.week},
 	}
 }
 
@@ -158,17 +161,7 @@ func (s *Service) lineup(w http.ResponseWriter, r *http.Request) {
 	if ok && s.Moves != nil {
 		// A failed check fails closed: the verb is the host's page, and
 		// start and sit still answers.
-		moves, err := s.Moves.LineupMove(r.Context(), auth.AccountID(r), a.Snap.Ref.Host)
-		if err != nil {
-			// What the check knew before it failed is kept, the verb
-			// closed, and the line always set.
-			s.Log.Warn("inseason: moves", "err", err)
-			moves.Lineup = apitypes.LineupMovesLineupUnavailable
-			if moves.Reason == nil {
-				moves = CopyOnlyMoves(a.Snap.Ref.Host)
-			}
-		}
-		out.Moves = moves
+		out.Moves = s.lineupMoves(r.Context(), auth.AccountID(r), a.Snap.Ref.Host)
 	}
 	s.answer(w, r, out, ok)
 }
@@ -284,9 +277,14 @@ func (l SyncLeagues) Follow(w http.ResponseWriter, r *http.Request) (League, boo
 	if !ok {
 		return League{}, false
 	}
+	return leagueOf(f), true
+}
+
+// leagueOf is a followed league as the advice reads it.
+func leagueOf(f leaguesync.Followed) League {
 	out := League{Snap: f.Snap, Me: f.Link.RosterID, Saved: f.Saved, Board: f.Board, HeldBy: f.HeldBy, Player: f.Player}
 	if f.Saved == nil {
 		out.SettingsNote = f.SettingsNote()
 	}
-	return out, true
+	return out
 }

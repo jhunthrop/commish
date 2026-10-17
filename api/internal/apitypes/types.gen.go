@@ -3290,18 +3290,18 @@ type RoomWelcomeType string
 
 // RosterChip defines model for RosterChip.
 type RosterChip struct {
-	// Gain a pickup's gain, points over replacement a week to the lineup, one decimal; null on the other kinds
+	// Gain a pickup's week_gain (the Waivers strip's first card): this week's Proj the lineup the advice sets gains with him in, one decimal; null on the other kinds
 	Gain *float64 `json:"gain"`
 
 	// Idle a bye whose spot no one on the member's roster can play this week; false on the other kinds
 	Idle bool `json:"idle"`
 
-	// Kind status, a starter as set with this week's designation (the newest); bye, a starter as set on bye, one whose spot no one on the member's roster can play first; pickup, the waiver add that gains most
+	// Kind status, a starter as set with this week's designation (the newest); bye, a starter as set on bye, one whose spot no one on the member's roster can play first; pickup, the first pickup worth making as the Waivers screen chooses them, while the league runs waivers
 	Kind RosterChipKind `json:"kind"`
 	Line PlayerLine     `json:"line"`
 }
 
-// RosterChipKind status, a starter as set with this week's designation (the newest); bye, a starter as set on bye, one whose spot no one on the member's roster can play first; pickup, the waiver add that gains most
+// RosterChipKind status, a starter as set with this week's designation (the newest); bye, a starter as set on bye, one whose spot no one on the member's roster can play first; pickup, the first pickup worth making as the Waivers screen chooses them, while the league runs waivers
 type RosterChipKind string
 
 // RosterCounts starters per position and the bench. Flex spots come from the lineup.
@@ -3889,7 +3889,7 @@ type WaiverRow struct {
 
 // WeekBug defines model for WeekBug.
 type WeekBug struct {
-	// First the member's starters as set whose game is the next kickoff, empty when none is to come
+	// First the member's starters as the platform holds them whose kickoff is the earliest of theirs still to come, empty when none is
 	First []PlayerLine   `json:"first"`
 	Game  ScoreboardGame `json:"game"`
 
