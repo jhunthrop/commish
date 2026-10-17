@@ -186,3 +186,92 @@ func TestEachPickNamesItsPlaceOnOurBoard(t *testing.T) {
 		}
 	}
 }
+
+// builtReport is a finished 15-round autopick draft on rawFor's board, and
+// its report.
+func builtReport(t *testing.T) (mock.Draft, boards.Board, apitypes.MockReport) {
+	t.Helper()
+	s := reportSettings(t)
+	const seed = 20261017
+	d, err := mock.Run(s, seed, nil, mock.Options{AutopickThroughRound: 15})
+	if err != nil {
+		t.Fatal(err)
+	}
+	slots, err := mock.SlotConfig(s.League)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := boards.For(rawFor(s.Pool), 12, slots)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, err := Report(context.Background(), ReportInput{Settings: s, Seed: seed, Draft: d, Board: b, Runs: 4, Workers: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return d, b, out
+}
+
+// Picks later against drafters is the pick less the ADP the column prints,
+// rounded once and then subtracted (Lane 66o review M3), so every row adds
+// up: rawFor's ADPs sit on x.45, where rounding the gap instead would split
+// the column and the gap by a tenth.
+func TestPicksLaterAddsUpWithTheADPColumn(t *testing.T) {
+	_, _, out := builtReport(t)
+	adp := map[string]*float64{}
+	for _, p := range out.Board.Players {
+		adp[p.Id] = p.Adp
+	}
+	checked := 0
+	for _, p := range out.Picks {
+		shown := adp[p.PlayerId]
+		if shown == nil {
+			if p.AdpGap != nil {
+				t.Fatalf("pick %d: a gap %v with no ADP", p.Pick, *p.AdpGap)
+			}
+			continue
+		}
+		want := tenth.Round(float64(p.Pick) - *shown)
+		if p.AdpGap == nil || *p.AdpGap != want {
+			t.Fatalf("pick %d: ADP %v prints a gap %v, want %v", p.Pick, *shown, p.AdpGap, want)
+		}
+		checked++
+	}
+	if checked == 0 {
+		t.Fatal("no pick carries an ADP")
+	}
+}
+
+// Picks later against our board (board_gap) is the pick's place among the
+// draft's picks of players our board ranks, less his place on the board:
+// kickers and defenses are counted on neither side, since our board ranks
+// them by no points. A kicker or defense has none.
+func TestTheBoardGapCountsNeitherKickersNorDefenses(t *testing.T) {
+	d, b, out := builtReport(t)
+	valuedPick := map[int]int{}
+	n, marketBefore := 0, false
+	for _, p := range d.State.Picks {
+		if _, ok := b.Values[p.PlayerID]; ok {
+			n++
+			valuedPick[p.PickNumber] = n
+		}
+	}
+	for _, p := range out.Picks {
+		if _, ok := valuedPick[p.Pick]; !ok {
+			if p.BoardGap != nil {
+				t.Fatalf("pick %d: %s has no place on our board but a gap %d", p.Pick, p.PlayerId, *p.BoardGap)
+			}
+			continue
+		}
+		if valuedPick[p.Pick] < p.Pick {
+			marketBefore = true
+		}
+		want := valuedPick[p.Pick] - *p.BoardRank
+		if p.BoardGap == nil || *p.BoardGap != want {
+			t.Fatalf("pick %d: board gap %v, want %d", p.Pick, p.BoardGap, want)
+		}
+	}
+	if !marketBefore {
+		t.Fatal("no valued pick came after a kicker or defense: the test does not see the basis")
+	}
+}

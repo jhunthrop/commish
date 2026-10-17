@@ -3157,8 +3157,11 @@ type ReportExposure struct {
 
 // ReportPick defines model for ReportPick.
 type ReportPick struct {
-	// AdpGap ADP less the pick
+	// AdpGap Picks later against drafters, a tenth: the pick less his ADP as the report prints it (the ADP rounded once to a tenth, then subtracted), so plus means he came later than drafters take him. Null with no ADP and for a keeper.
 	AdpGap *float64 `json:"adp_gap"`
+
+	// BoardGap Picks later against our board: the pick's place among the draft's picks of players our board ranks, less board_rank, so plus means he came later than our board places him. Kickers and defenses are counted on neither side, since our board ranks them by no points; null for one, and for a keeper.
+	BoardGap *int `json:"board_gap"`
 
 	// BoardRank his place on our board, the pool's order by points over replacement; null for a player with none (a kicker or a defense)
 	BoardRank *int `json:"board_rank"`

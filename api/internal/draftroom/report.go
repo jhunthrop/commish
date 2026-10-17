@@ -64,9 +64,9 @@ func Report(ctx context.Context, in ReportInput) (apitypes.MockReport, error) {
 			ValueCaptured: tenth.Round(g.ValueCaptured),
 		}
 	}
-	ranks := boardRanks(b)
+	basis := newPickBasis(b, final.Picks)
 	for i, p := range r.Picks {
-		out.Picks[i] = pickView(p, b, ranks)
+		out.Picks[i] = pickView(p, b, basis)
 		named[p.PlayerID] = true
 	}
 	out.Starters = starters(final, in.Draft.HumanTeamID, b.Points())
@@ -87,9 +87,22 @@ func Report(ctx context.Context, in ReportInput) (apitypes.MockReport, error) {
 	return out, nil
 }
 
-func pickView(p mock.PickReview, b boards.Board, ranks map[string]int) apitypes.ReportPick {
+// pickBasis is what a pick's two Picks later figures are read against:
+// each player's ADP and place on our board, and each pick's place among the
+// draft's picks of players our board ranks.
+type pickBasis struct {
+	adp        map[string]float64
+	ranks      map[string]int
+	valuedPick map[int]int
+}
+
+func newPickBasis(b boards.Board, picks []draft.Pick) pickBasis {
+	return pickBasis{adp: b.ADPs(), ranks: boardRanks(b), valuedPick: valuedPicks(picks, b)}
+}
+
+func pickView(p mock.PickReview, b boards.Board, basis pickBasis) apitypes.ReportPick {
 	v := apitypes.ReportPick{
-		Pick: p.PickNumber, Round: p.Round, PlayerId: p.PlayerID, AdpGap: tenthp(p.ADPGap), Chip: apitypes.ReportPickChip(p.Chip),
+		Pick: p.PickNumber, Round: p.Round, PlayerId: p.PlayerID, Chip: apitypes.ReportPickChip(p.Chip),
 		StillThere: chancep(p.StillThere), CouldWait: p.CouldWait, OddsSource: p.OddsSource,
 		MadeBy: apitypes.ReportPickMadeBy(p.MadeBy),
 	}
@@ -100,10 +113,45 @@ func pickView(p mock.PickReview, b boards.Board, ranks map[string]int) apitypes.
 		r := tenth.Round(value)
 		v.OverReplacement = &r
 	}
-	if rank, ok := ranks[p.PlayerID]; ok {
+	rank, ranked := basis.ranks[p.PlayerID]
+	if ranked {
 		v.BoardRank = &rank
 	}
+	if p.Chip == mock.Kept {
+		return v
+	}
+	// Picks later against drafters: the pick less the ADP the column
+	// prints, rounded once and then subtracted, so the row adds up. The
+	// difference of a tenth and a whole pick carries binary noise only,
+	// which tenth.Round cleans back to the tenth it is.
+	if adp, ok := basis.adp[p.PlayerID]; ok {
+		gap := tenth.Round(float64(p.PickNumber) - tenth.Round(adp))
+		v.AdpGap = &gap
+	}
+	// Picks later against our board: the pick's place among picks of
+	// players our board ranks, less his place on it. Kickers and defenses
+	// are on neither side: our board ranks them by no points.
+	if at, ok := basis.valuedPick[p.PickNumber]; ok && ranked {
+		gap := at - rank
+		v.BoardGap = &gap
+	}
 	return v
+}
+
+// valuedPicks is each pick of a player our board ranks (one with points
+// over replacement), by its pick number, numbered among those picks alone.
+func valuedPicks(picks []draft.Pick, b boards.Board) map[int]int {
+	sorted := append([]draft.Pick(nil), picks...)
+	sort.SliceStable(sorted, func(i, j int) bool { return sorted[i].PickNumber < sorted[j].PickNumber })
+	out := map[int]int{}
+	n := 0
+	for _, p := range sorted {
+		if _, ok := b.Values[p.PlayerID]; ok {
+			n++
+			out[p.PickNumber] = n
+		}
+	}
+	return out
 }
 
 // boardRanks is each valued player's place on our board: the pool's
