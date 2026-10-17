@@ -33,7 +33,7 @@ func (s *Service) prepare(ctx context.Context, link Link, read Read) (prepared, 
 	if snap.Ref.Host == HostFFPC {
 		snap = ownLineupOnly(snap, link.RosterID)
 	}
-	saved, err := s.savedSettings(ctx, link, snap)
+	saved, err := s.savedSettings(ctx, link, read)
 	if err != nil {
 		return prepared{}, err
 	}

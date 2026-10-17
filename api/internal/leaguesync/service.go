@@ -49,6 +49,9 @@ type SavedLeagues interface {
 	Create(ctx context.Context, accountID uuid.UUID, in apitypes.LeagueInput) (apitypes.League, error)
 	Replace(ctx context.Context, accountID, id uuid.UUID, in apitypes.LeagueInput) (apitypes.League, error)
 	Delete(ctx context.Context, accountID, id uuid.UUID) error
+	// KeepScoring sets kicking and defense rules alone inside a league's
+	// custom scoring, reporting whether it wrote.
+	KeepScoring(ctx context.Context, accountID, id uuid.UUID, rules map[string]float64) (bool, error)
 }
 
 // BoardSource values our board for a league. *draftroom.Boards
@@ -336,11 +339,13 @@ func (s *Service) detach(w http.ResponseWriter, r *http.Request) {
 
 // savedSettings is the saved league a link made, nil when it has none
 // or it was deleted from the setup page. Its kicking and defense rules are
-// the host's: a read whose rules differ rewrites them in the saved league
-// (hostKickDefense), so a league saved before the host's were kept, or
-// whose host changed them, scores its kickers and defenses as the host
-// does from its next read.
-func (s *Service) savedSettings(ctx context.Context, link Link, snap Snapshot) (*apitypes.LeagueSettings, error) {
+// the host's: the rules the read states that differ are set in the saved
+// league (KeepScoring, which touches nothing else), so a league saved
+// before they were kept, or whose host changed them, scores its kickers
+// and defenses as the host does. That write is a repair: when it fails it
+// is logged, the read answers the host's rules, and the next read writes
+// them.
+func (s *Service) savedSettings(ctx context.Context, link Link, read Read) (*apitypes.LeagueSettings, error) {
 	if link.LeagueID == nil {
 		return nil, nil
 	}
@@ -351,46 +356,42 @@ func (s *Service) savedSettings(ctx context.Context, link Link, snap Snapshot) (
 	if err != nil {
 		return nil, err
 	}
-	settings, changed := hostKickDefense(l.Settings, snap.Scoring.Rules)
-	if !changed {
+	settings, stated := hostKickDefense(l.Settings, read)
+	if len(stated) == 0 {
 		return &settings, nil
 	}
-	if _, err := s.Saved.Replace(ctx, link.AccountID, l.Id, apitypes.LeagueInput{Name: l.Name, Settings: settings}); err != nil {
-		return nil, fmt.Errorf("leaguesync: keep the host's kicking and defense rules: %w", err)
+	if _, err := s.Saved.KeepScoring(ctx, link.AccountID, l.Id, stated); err != nil {
+		s.Log.Warn("leaguesync: keep the host's kicking and defense rules", "league", l.Id, "err", err)
 	}
 	return &settings, nil
 }
 
-// hostKickDefense is the saved settings with their kicking and defense
-// rules taken from the read's (the host's own, the standard only where the
-// host states none), and whether any changed. The board's rules stay as
-// saved; a read whose rules are not whole changes nothing.
-func hostKickDefense(saved apitypes.LeagueSettings, host map[string]float64) (apitypes.LeagueSettings, bool) {
-	if saved.Scoring.Custom == nil {
-		return saved, false
-	}
-	read, err := scoring.FromMap(host)
-	if err != nil {
-		return saved, false
+// hostKickDefense is the saved settings with the kicking and defense rules
+// the read states taken from it where they differ, and those rules. Only
+// a rule the host's read states is taken (a read kept before these rules
+// existed states none), never from a failed read, and the board's rules
+// stay as saved.
+func hostKickDefense(saved apitypes.LeagueSettings, read Read) (apitypes.LeagueSettings, map[string]float64) {
+	if read.Failed || saved.Scoring.Custom == nil {
+		return saved, nil
 	}
 	kept := scoring.ToMap(*saved.Scoring.Custom)
-	hostRules := scoring.ToMap(read)
-	changed := false
+	stated := map[string]float64{}
 	for key := range scoring.KickDefenseKeys() {
-		if kept[key] != hostRules[key] {
-			kept[key], changed = hostRules[key], true
+		if v, ok := read.Scoring.Rules[key]; ok && kept[key] != v {
+			kept[key], stated[key] = v, v
 		}
 	}
-	if !changed {
-		return saved, false
+	if len(stated) == 0 {
+		return saved, nil
 	}
 	rules, err := scoring.FromMap(kept)
 	if err != nil {
-		return saved, false
+		return saved, nil
 	}
 	out := saved
 	out.Scoring.Custom = &rules
-	return out, true
+	return out, stated
 }
 
 // restore undoes a detach: the league is followed again with the seat
