@@ -359,6 +359,26 @@ export interface paths {
 		patch?: never;
 		trace?: never;
 	};
+	'/leagues/attached/{id}/scoreboard': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				/** @description the attached league's id (AttachedLeague.id) */
+				id: string;
+			};
+			cookie?: never;
+		};
+		/** Every game of the league's week: each side's points so far as the host scores them, its starters' summed published projection, and the game's state from its starters' kickoffs (before kickoff, playing, final). Reads the league as the sync route does. */
+		get: operations['leagueScoreboard'];
+		put?: never;
+		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
 	'/leagues/attached/{id}/waivers': {
 		parameters: {
 			query?: {
@@ -2653,6 +2673,19 @@ export interface components {
 			ties: number;
 			/** Format: double */
 			points_for: number;
+			/**
+			 * Format: double
+			 * @description null where the host does not say
+			 */
+			points_against: number | null;
+			/** @description the current run of wins or losses ("W3", "L2"), null where the host does not say */
+			streak: string | null;
+			/** @description the team's place in the waiver order */
+			waiver_order: number | null;
+			/** @description the waiver budget the team has left, null in a league without a budget or where the host does not say */
+			waiver_budget_left: number | null;
+			/** @description the host's image for the team or its owner, null where the host gives none we show */
+			avatar: string | null;
 		};
 		LeaguePlayer: {
 			host_id: string;
@@ -2961,6 +2994,55 @@ export interface components {
 			/** @description the league scores exactly as format */
 			league_own: boolean;
 		};
+		ScoreboardSide: {
+			roster_id: number;
+			/**
+			 * Format: double
+			 * @description the side's points so far as the host scores them
+			 */
+			points: number;
+			/** @description false when the host's score could not be read; points then says nothing */
+			points_read: boolean;
+			/**
+			 * Format: double
+			 * @description the side's starters' week projections summed, each as printed to the tenth, a starter with none counting nothing; null when no starter has one
+			 */
+			projection: number | null;
+			/** @description the starters the host lists for the side */
+			starters: number;
+			/** @description those starters whose game has kicked off */
+			played: number;
+		};
+		ScoreboardGame: {
+			/**
+			 * @description upcoming before any starter's game kicks off, final once every starter's game is over, playing between
+			 * @enum {string}
+			 */
+			state: 'upcoming' | 'playing' | 'final';
+			/**
+			 * Format: date-time
+			 * @description the earliest kickoff still to come among both sides' starters, null when none is
+			 */
+			next_kickoff: string | null;
+			/** @description two sides, the drafter's first when the game is theirs; one for a team with no opponent */
+			sides: components['schemas']['ScoreboardSide'][];
+		};
+		Scoreboard: {
+			week: number;
+			/**
+			 * Format: date-time
+			 * @description the league's last host read
+			 */
+			read_at: string;
+			/**
+			 * Format: date-time
+			 * @description when the week's published projection was captured, null with none
+			 */
+			projection_read_at: string | null;
+			projection_scoring: components['schemas']['ProjectionScoring'];
+			/** @description the drafter's game first, then the rest in the host's order */
+			games: components['schemas']['ScoreboardGame'][];
+		};
 		MatchupBox: {
 			projection_scoring: components['schemas']['ProjectionScoring'];
 			week: number;
@@ -3095,6 +3177,16 @@ export interface components {
 			their_gain: number;
 			/** @description their gain is under 0.5 a week */
 			close_for_them: boolean;
+			/**
+			 * Format: double
+			 * @description this week's Proj total of the drafter's lineup with the trade less without it, each lineup set as the Lineup screen sets it (Lane 66g), one decimal; null when the week has no published projection read
+			 */
+			my_proj_change: number | null;
+			/**
+			 * Format: double
+			 * @description the same for theirs
+			 */
+			their_proj_change: number | null;
 		};
 		TradeTeam: {
 			roster_id: number;
@@ -3237,6 +3329,50 @@ export interface components {
 			host_trades_url: string;
 			/** @description one sentence under the verb when we cannot open the host's page ("Make this change on Yahoo. We cannot open that page for you yet."), null when the url opens it */
 			host_note: string | null;
+			moves: components['schemas']['TradeMoves'];
+			projection_scoring: components['schemas']['ProjectionScoring'];
+			/**
+			 * Format: date-time
+			 * @description when the week's published projection behind week_projection and each proj change was captured, null with none
+			 */
+			projection_read_at: string | null;
+			/** @description as LineupAdvice's: the platform gives each player's points */
+			player_points: boolean;
+		};
+		TradeMoves: {
+			/**
+			 * @description available when a trade can be proposed on the platform from our screen (none today: the verb would read Propose on the platform); unavailable when the verb copies the offer and opens the platform's trade page
+			 * @enum {string}
+			 */
+			propose: 'available' | 'unavailable';
+			/** @description one line under the verb saying why the trade is not proposed from here, naming the platform; null when available */
+			reason: string | null;
+		};
+		TradeSideTotals: {
+			/**
+			 * Format: double
+			 * @description this week's Proj total of the side's lineup as the Lineup screen sets it, one decimal; null with no projection read
+			 */
+			proj_before: number | null;
+			/**
+			 * Format: double
+			 * @description the same after the trade
+			 */
+			proj_after: number | null;
+			/**
+			 * Format: double
+			 * @description the side's lineup strength on our rest-of-season order, points over replacement a week, one decimal: the figure the gains are a change in
+			 */
+			season_before: number;
+			/**
+			 * Format: double
+			 * @description the same after the trade: season_before plus the side's gain
+			 */
+			season_after: number;
+		};
+		TradeTotals: {
+			yours: components['schemas']['TradeSideTotals'];
+			theirs: components['schemas']['TradeSideTotals'];
 		};
 		TradeCheckInput: {
 			/** @description the other team's roster_id (TradeTeam.roster_id) */
@@ -3273,12 +3409,15 @@ export interface components {
 			/** @description the trade as the finder reckons one: my_gain and their_gain fall below zero for a lineup that loses, close_for_them as the finder marks it */
 			trade: components['schemas']['TradeRow'];
 			fills: components['schemas']['TradeFills'];
+			totals: components['schemas']['TradeTotals'];
 			/** @description the host's trade page, the finder's, empty when we know none */
 			host_trades_url: string;
 			/** @description as TradeAdvice's */
 			host_note: string | null;
 		};
 		LeagueMove: {
+			/** @description a claim's bid from the league's waiver budget */
+			bid: number | null;
 			/** @enum {string} */
 			kind: 'add' | 'waiver' | 'trade';
 			/** Format: date-time */
@@ -3286,6 +3425,46 @@ export interface components {
 			roster_ids: number[];
 			adds: components['schemas']['MovePlayer'][];
 			drops: components['schemas']['MovePlayer'][];
+		};
+		/** @description the league's settings as its host states them, for the league page's settings; read only */
+		LeagueTerms: {
+			/**
+			 * @description claims carry a bid from a season budget, or run in a waiver order; null where the host does not say
+			 * @enum {string|null}
+			 */
+			waivers: 'budget' | 'order' | null;
+			/** @description each team's season budget */
+			waiver_budget: number | null;
+			/** @description the teams that make the playoffs */
+			playoff_teams: number | null;
+			/** @description null where the host does not say */
+			playoff_weeks: components['schemas']['PlayoffWeeks'] | null;
+			roster: components['schemas']['LeagueShape'];
+			/** @description the league's rules as ScoringRules, null when the host's scoring could not be read whole */
+			scoring: components['schemas']['ScoringRules'] | null;
+			/** @description the host's rules ScoringRules does not carry, in drafter words with the host's figure */
+			scoring_extra: components['schemas']['DroppedRule'][];
+			/** @description the ScoringRules keys the platform does not state, which scoring holds at our standard figure; the settings print no figure for them, never ours as the league's */
+			scoring_unstated: string[];
+			/** @description the host's page for the league's settings */
+			host_settings_url: string | null;
+		};
+		/** @description the playoffs' first and last week */
+		PlayoffWeeks: {
+			first: number;
+			last: number;
+		};
+		/** @description the league's starting lineup by our slots, and its bench */
+		LeagueShape: {
+			qb: number;
+			rb: number;
+			wr: number;
+			te: number;
+			flex: number;
+			super_flex: number;
+			k: number;
+			def: number;
+			bench: number;
 		};
 		MovePlayer: {
 			player: components['schemas']['LeaguePlayer'];
@@ -3300,6 +3479,9 @@ export interface components {
 			unplaced: number;
 		};
 		LeagueSync: {
+			terms: components['schemas']['LeagueTerms'];
+			/** @description the platform's moves are read (ESPN gives us no move history): false, moves is empty and says nothing about whether anyone moved */
+			moves_read: boolean;
 			/** Format: uuid */
 			id: string;
 			host: components['schemas']['LeagueHost'];
@@ -3620,6 +3802,15 @@ export interface components {
 			content: {
 				'application/json': components['schemas']['Envelope'] & {
 					data?: components['schemas']['LineupAdvice'];
+				};
+			};
+		};
+		/** @description every game of the league's week */
+		ScoreboardResponse: {
+			headers: Record<string, unknown>;
+			content: {
+				'application/json': components['schemas']['Envelope'] & {
+					data?: components['schemas']['Scoreboard'];
 				};
 			};
 		};
@@ -4170,6 +4361,25 @@ export interface operations {
 		requestBody?: never;
 		responses: {
 			200: components['responses']['MatchupBoxResponse'];
+			404: components['responses']['ErrorResponse'];
+			409: components['responses']['ErrorResponse'];
+			422: components['responses']['ErrorResponse'];
+			502: components['responses']['ErrorResponse'];
+		};
+	};
+	leagueScoreboard: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path: {
+				/** @description the attached league's id (AttachedLeague.id) */
+				id: string;
+			};
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			200: components['responses']['ScoreboardResponse'];
 			404: components['responses']['ErrorResponse'];
 			409: components['responses']['ErrorResponse'];
 			422: components['responses']['ErrorResponse'];

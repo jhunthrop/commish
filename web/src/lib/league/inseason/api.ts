@@ -11,6 +11,7 @@ export type LineupAdvice = Schemas['LineupAdvice'];
 export type LineupSlot = Schemas['LineupSlot'];
 export type MatchupBox = Schemas['MatchupBox'];
 export type MatchupBoxSide = Schemas['MatchupBoxSide'];
+export type Scoreboard = Schemas['Scoreboard'];
 export type ProjectionScoring = Schemas['ProjectionScoring'];
 export type WaiverAdvice = Schemas['WaiverAdvice'];
 export type WaiverRow = Schemas['WaiverRow'];
@@ -19,6 +20,8 @@ export type TradeTeam = Schemas['TradeTeam'];
 export type TradeRow = Schemas['TradeRow'];
 export type TradeCheck = Schemas['TradeCheck'];
 export type TradeCheckInput = Schemas['TradeCheckInput'];
+export type TradeMoves = Schemas['TradeMoves'];
+export type TradeSideTotals = Schemas['TradeSideTotals'];
 export type PlayerLine = Schemas['PlayerLine'];
 export type WeekFacts = Schemas['WeekFacts'];
 export type InjuryDesignation = Schemas['InjuryDesignation'];
@@ -56,6 +59,8 @@ export const inSeasonApi = {
 	lineup: (id: string) => client.call<LineupAdvice>(path(id, 'lineup')),
 	/** The week's matchup as a box score: both sides' starters in their slots and their benches. */
 	matchup: (id: string) => client.call<MatchupBox>(path(id, 'matchup')),
+	/** Every game of the week: each side's points, its starters' projection and the game's state. */
+	scoreboard: (id: string) => client.call<Scoreboard>(path(id, 'scoreboard')),
 	waivers: (id: string, position: WaiverPosition | null = null) =>
 		client.call<WaiverAdvice>(path(id, 'waivers', { position })),
 	/** The trades, narrowed to those holding one player when given (his board id). */

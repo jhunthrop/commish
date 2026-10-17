@@ -16,6 +16,7 @@ export type AttachInput = Schemas['AttachInput'];
 export type AttachedLeague = Schemas['AttachedLeague'];
 export type LeagueHost = Schemas['LeagueHost'];
 export type LeagueStanding = Schemas['LeagueStanding'];
+export type LeagueTerms = Schemas['LeagueTerms'];
 
 const client = apiClient(PUBLIC_API_URL);
 

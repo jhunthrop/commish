@@ -1,4 +1,4 @@
-"""A freeze keeps the week's published projection beside each row (Lane 66j, revision 0012): his PPR
+"""A freeze keeps the week's published projection beside each row (Lane 66j, revision 0013): his PPR
 points on the snapshot read at the freeze, None where it lists no row for him."""
 
 from datetime import UTC, datetime

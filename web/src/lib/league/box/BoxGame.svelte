@@ -7,9 +7,11 @@
 	 * score's Game column and the phone's folded line under the name. */
 	interface Props {
 		row: Pick<BoxRow, 'game' | 'expected' | 'weather'>;
+		/** The expected score and weather under the opponent; the trade builder's rows leave them out. */
+		facts?: boolean;
 	}
 
-	let { row }: Props = $props();
+	let { row, facts = true }: Props = $props();
 </script>
 
 {#if row.game === 'bye'}
@@ -17,7 +19,7 @@
 {:else if row.game}
 	<span class="opp"><b>{row.game.where}</b> <span>{row.game.when}</span></span>
 {/if}
-{#if row.expected !== null || row.weather !== null}
+{#if facts && (row.expected !== null || row.weather !== null)}
 	<span class="facts">
 		{#if row.expected}<span class="exp">{row.expected}</span>{/if}
 		{#if row.weather}<span class="wx"

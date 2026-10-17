@@ -246,11 +246,15 @@ func Trades(config []draft.SlotConfig, weeks int, mine, theirs Squad, focus stri
 }
 
 // Checked is one trade the member built, on the finder's reckoning: its
-// figures as the finder would list them, and each side's change.
+// figures as the finder would list them, each side's change, and each
+// side's lineup strength before it (points over replacement a week, the
+// figure each gain is a change in: Lane 66g's totals).
 type Checked struct {
 	Trade
-	Mine   Change
-	Theirs Change
+	Mine       Change
+	Theirs     Change
+	MineBase   float64
+	TheirsBase float64
 }
 
 // Check is the builder's trade (Lane 61): the member gives give and gets
@@ -260,7 +264,37 @@ type Checked struct {
 func Check(config []draft.SlotConfig, weeks int, mine, theirs Squad, give, get []int) Checked {
 	t := newSearch(config, weeks, mine, theirs)
 	my, their := t.mine(give, get, true), t.theirs(give, get, true)
-	return Checked{Trade: Trade{Give: give, Get: get, Drop: my.Drop, MyGain: my.Gain, TheirGain: their.Gain}, Mine: my, Theirs: their}
+	return Checked{Trade: Trade{Give: give, Get: get, Drop: my.Drop, MyGain: my.Gain, TheirGain: their.Gain}, Mine: my, Theirs: their,
+		MineBase: t.me.base, TheirsBase: t.them.base}
+}
+
+// WeekProj is this week's Proj total of the lineup the Lineup screen sets
+// from roster (Lane 66g): §4.2's fill by the week's keys, the starters
+// whose games have kicked off kept where they are, a spot no one who can
+// play fills counting nothing. A starter with no Proj adds none.
+func WeekProj(config []draft.SlotConfig, roster []Candidate, starters []string) float64 {
+	total := 0.0
+	for _, r := range Lineup(config, roster, starters) {
+		if r.Ours < 0 || r.NoOneCanPlay {
+			continue
+		}
+		if c := roster[r.Ours]; c.HasProj {
+			total += c.Proj
+		}
+	}
+	return total
+}
+
+// Swapped is roster less the players at out with in appended: a side's
+// roster after a trade, in a new slice.
+func Swapped(roster []Candidate, out []int, in []Candidate) []Candidate {
+	next := make([]Candidate, 0, len(roster)+len(in))
+	for i, c := range roster {
+		if !contains(out, i) {
+			next = append(next, c)
+		}
+	}
+	return append(next, in...)
 }
 
 func holds(s tradeSide, at []int, id string) bool {

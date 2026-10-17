@@ -37,6 +37,15 @@ func draftDate(ms int64) *time.Time {
 // period of the matchup period after the regular season's last
 // (matchupPeriodCount), by matchupPeriods when ESPN lists it, else by the
 // matchup period's length. 0 when ESPN states no regular season.
+// playoffTeams is scheduleSettings.playoffTeamCount, 0 when it is not a
+// count of teams.
+func playoffTeams(n int) int {
+	if n < 1 || n > maxTeams {
+		return 0
+	}
+	return n
+}
+
 func playoffStart(w wireFull) int {
 	s := w.Settings.ScheduleSettings
 	if s.MatchupPeriodCount < 1 || s.MatchupPeriodCount > maxPeriod {

@@ -366,6 +366,12 @@ def validate_capsule(body: str, facts: "PlayerFacts", size: str, *, asked_shorte
     return _validate(body, grounding_of(facts), (band.min_words, cap), tension=True, page_number=size == "full")
 
 
+def validate_prose(body: str, source: Grounding, band: tuple[int, int]) -> ValidationResult:
+    """Every rule of the writer's but the long note's own two (the downside mandate and the page number):
+    a narrative slot's, and the week-ahead read's (Lane 72) with the week's rules on top."""
+    return _validate(body, source, band, tension=False, page_number=False)
+
+
 def validate_narrative_slot(body: str, source: Grounding, max_words: int) -> ValidationResult:
     """`validateNarrativeSlot`: the same grounding and copy rules, a tighter band, no tension mandate."""
-    return _validate(body, source, (NARRATIVE_MIN_WORDS, max_words), tension=False, page_number=False)
+    return validate_prose(body, source, (NARRATIVE_MIN_WORDS, max_words))

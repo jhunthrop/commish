@@ -6,6 +6,7 @@ from sqlalchemy import (
     Boolean,
     CheckConstraint,
     Column,
+    Date,
     DateTime,
     Double,
     ForeignKeyConstraint,
@@ -118,7 +119,7 @@ REGISTER_FREEZE_ROWS: Final = Table(
     Column("props_points", Double(53)),
     Column("props_markets", JSONB),
     # The week's published projection for him in PPR, the newest snapshot at the freeze (revision
-    # 0012): a benchmark the record grades beside ours from week 7, NULL where it lists no row for him.
+    # 0013): a benchmark the record grades beside ours from week 7, NULL where it lists no row for him.
     Column("published_points", Double(53)),
     # The model that made the board the freeze quotes, which is not the process that froze it: a
     # Python freeze of a board the TypeScript persisted is implementation python, model research-ts.
@@ -196,4 +197,55 @@ REGISTER_WEEKLY_ROWS: Final = Table(
     CheckConstraint("frozen_at < kickoff_at", name="register_weekly_rows_before_kickoff_ck"),
     _player_fk("register_weekly_rows", "RESTRICT"),
     Index("register_weekly_rows_week_idx", "season", "week"),
+)
+
+
+# The week-ahead reads (revision 0012, Lane 72): one per player and week, the writer's three to five
+# sentences about his next game or its facts block, stamped with the write and every fact's own stamp.
+WEEK_READ_SOURCES: Final = ("llm", "facts")
+WEEK_READ_REASONS: Final = ("first", "unwritten", "status", "projection", "demoted")
+WEEK_READ_CALLS: Final = ("start", "sit", "hold", "none")
+PLAYER_WEEK_READS: Final = Table(
+    "player_week_reads",
+    METADATA,
+    Column("player_id", Text, primary_key=True),
+    Column("season", Integer, primary_key=True),
+    Column("week", Integer, primary_key=True),
+    Column("source", Text, nullable=False),
+    Column("body", Text, nullable=False),
+    Column("model", Text),
+    Column("written_at", DateTime(True), nullable=False),
+    Column("facts_at", DateTime(True)),
+    Column("stamps", JSONB, nullable=False),
+    Column("projection_points", Double(53)),
+    Column("status", Text),
+    Column("reason", Text, nullable=False),
+    Column("call", Text),
+    Column("attempt_day", Date, nullable=False),
+    Column("attempts", Integer, nullable=False),
+    recorded_at("recorded_at"),
+    one_of("source", WEEK_READ_SOURCES, "player_week_reads_source_ck"),
+    one_of("reason", WEEK_READ_REASONS, "player_week_reads_reason_ck"),
+    CheckConstraint("week BETWEEN 1 AND 18", name="player_week_reads_week_ck"),
+    one_of("call", WEEK_READ_CALLS, "player_week_reads_call_ck"),
+    CheckConstraint("attempts >= 1", name="player_week_reads_attempts_ck"),
+    CheckConstraint("facts_at IS NULL OR facts_at <= written_at", name="player_week_reads_facts_before_write_ck"),
+    _player_fk("player_week_reads"),
+    Index("player_week_reads_week_idx", "season", "week"),
+)
+
+# Each week-read pass's spend (revision 0012): the hourly passes hold to a daily dollar cap from it.
+WEEK_READ_MODES: Final = ("nightly", "hourly")
+PLAYER_WEEK_READ_RUNS: Final = Table(
+    "player_week_read_runs",
+    METADATA,
+    Column("ran_at", DateTime(True), primary_key=True),
+    Column("mode", Text, primary_key=True),
+    Column("calls", Integer, nullable=False),
+    Column("cost_usd", Double(53), nullable=False),
+    Column("written", Integer, nullable=False),
+    Column("facts_blocks", Integer, nullable=False),
+    Column("demoted", Integer, nullable=False),
+    recorded_at("recorded_at"),
+    one_of("mode", WEEK_READ_MODES, "player_week_read_runs_mode_ck"),
 )

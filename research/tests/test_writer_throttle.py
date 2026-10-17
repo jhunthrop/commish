@@ -14,7 +14,7 @@ from research.capsules import generate
 from research.capsules.config import CAPSULE_CONFIG, WriterSettings
 from research.capsules.gateway import Completion, GatewayClient, GenerationError
 from research.capsules.gateway_ledger import ModelPrice, Usage
-from research.capsules.generate import CapsuleResult, _ask, describe_fallback, generate_capsule
+from research.capsules.generate import CapsuleResult, ask, describe_fallback, generate_capsule
 from research.capsules.narrative import NarrativeResult
 from research.capsules.run_budget import BudgetSpentError, RunBudget, parse_budget
 from research.capsules.throttle_waits import AskWaits, RunWaits, run_wait_cap_s
@@ -332,7 +332,7 @@ def test_an_ask_that_meets_429s_on_every_call_still_makes_all_its_re_asks_inside
     client = _client(lambda r: httpx.Response(429))
     slept = _sleeps(client)
     with pytest.raises(GenerationError, match="429"):
-        _ask(client, [{"role": "user", "content": "hi"}], 10)
+        ask(client, [{"role": "user", "content": "hi"}], 10)
     posts_per_call = len(CAPSULE_CONFIG.gateway.retry.rate_limit_backoff_ms) + 1
     assert client.calls == posts_per_call * (len(WAITS) + 1)  # the first call and every re-ask were made
     assert sum(slept) <= _ASK_CAP_S
@@ -342,7 +342,7 @@ def test_an_ask_with_two_429s_on_its_re_ask_completes_inside_the_cap() -> None:
     posts_per_call = len(CAPSULE_CONFIG.gateway.retry.rate_limit_backoff_ms) + 1
     client = _client(_answers(*[httpx.Response(429)] * (posts_per_call + 2), _ok()))
     slept = _sleeps(client)
-    answer = _ask(client, [{"role": "user", "content": "hi"}], 10)
+    answer = ask(client, [{"role": "user", "content": "hi"}], 10)
     assert answer.content == _WORDS
     assert sum(slept) <= _ASK_CAP_S
 

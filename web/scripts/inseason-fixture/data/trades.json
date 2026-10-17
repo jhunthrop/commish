@@ -1,6 +1,6 @@
 {
 	"week": 6,
-	"basis": "Trades where both lineups gain on our rest-of-season order. The other team decides. Points over replacement, and every gain in them, are points above what a free pickup at his position gives you, a week: the rest of the season on our rest-of-season order, averaged over its 12 weeks, not a projection of any one week. Points a game are our rest-of-season projection from week 6 over the games his club has left, byes out.",
+	"basis": "Trades where both lineups gain on our rest-of-season order. Each team's best trade, yours first, among those they gain at least 0.5 a week from, then the close calls for them. The other team decides. Points over replacement, and every gain in them, are points above what a free pickup at his position gives you, a week: the rest of the season on our rest-of-season order, averaged over its 12 weeks, not a projection of any one week. Points a game are our rest-of-season projection from week 6 over the games his club has left, byes out.",
 	"check_basis": "What each lineup gains or loses on our rest-of-season order. The other team decides. Points over replacement, and every gain in them, are points above what a free pickup at his position gives you, a week: the rest of the season on our rest-of-season order, averaged over its 12 weeks, not a projection of any one week. Points a game are our rest-of-season projection from week 6 over the games his club has left, byes out.",
 	"basis_note": "Points over replacement are for a 12-team league with 1 QB, 2 RB, 3 WR, 1 TE and two flex spots. Points so far leave out your league's points for two-point conversions, missed field goals, missed extra points, fumble recoveries and safeties: the stat lines we hold do not carry them.",
 	"order_basis": "rest_of_season",
@@ -414,7 +414,9 @@
 					},
 					"my_gain": 2.1,
 					"their_gain": 0.5,
-					"close_for_them": false
+					"close_for_them": false,
+					"my_proj_change": 6.3,
+					"their_proj_change": 6.8
 				},
 				{
 					"give": [
@@ -640,7 +642,9 @@
 					},
 					"my_gain": 1.9,
 					"their_gain": 0.7,
-					"close_for_them": false
+					"close_for_them": false,
+					"my_proj_change": 11,
+					"their_proj_change": -1.1
 				},
 				{
 					"give": [
@@ -847,7 +851,9 @@
 					},
 					"my_gain": 1.6,
 					"their_gain": 1,
-					"close_for_them": false
+					"close_for_them": false,
+					"my_proj_change": 3.1,
+					"their_proj_change": 10
 				},
 				{
 					"give": [
@@ -1073,7 +1079,9 @@
 					},
 					"my_gain": 1.5,
 					"their_gain": 1.1,
-					"close_for_them": false
+					"close_for_them": false,
+					"my_proj_change": 12.2,
+					"their_proj_change": -2.3
 				}
 			],
 			"note": null
@@ -1560,7 +1568,9 @@
 					},
 					"my_gain": 0.7,
 					"their_gain": 0.5,
-					"close_for_them": false
+					"close_for_them": false,
+					"my_proj_change": 14.5,
+					"their_proj_change": -20.4
 				},
 				{
 					"give": [
@@ -1792,7 +1802,9 @@
 					},
 					"my_gain": 0.6,
 					"their_gain": 0.6,
-					"close_for_them": false
+					"close_for_them": false,
+					"my_proj_change": -0.8,
+					"their_proj_change": -5.1
 				},
 				{
 					"give": [
@@ -2012,7 +2024,9 @@
 					},
 					"my_gain": 0.6,
 					"their_gain": 0.6,
-					"close_for_them": false
+					"close_for_them": false,
+					"my_proj_change": 0.2,
+					"their_proj_change": -6.1
 				},
 				{
 					"give": [
@@ -2229,7 +2243,9 @@
 					},
 					"my_gain": 0.5,
 					"their_gain": 0.7,
-					"close_for_them": false
+					"close_for_them": false,
+					"my_proj_change": 14,
+					"their_proj_change": -19.9
 				}
 			],
 			"note": null
@@ -2680,7 +2696,9 @@
 					},
 					"my_gain": 4.6,
 					"their_gain": 0.7,
-					"close_for_them": false
+					"close_for_them": false,
+					"my_proj_change": 9.7,
+					"their_proj_change": -9.3
 				},
 				{
 					"give": [
@@ -2906,7 +2924,9 @@
 					},
 					"my_gain": 4.6,
 					"their_gain": 0.7,
-					"close_for_them": false
+					"close_for_them": false,
+					"my_proj_change": 7.5,
+					"their_proj_change": -7.1
 				},
 				{
 					"give": [
@@ -3138,7 +3158,9 @@
 					},
 					"my_gain": 4.1,
 					"their_gain": 1.2,
-					"close_for_them": false
+					"close_for_them": false,
+					"my_proj_change": 7.9,
+					"their_proj_change": -7.5
 				},
 				{
 					"give": [
@@ -3364,7 +3386,9 @@
 					},
 					"my_gain": 4.1,
 					"their_gain": 1.2,
-					"close_for_them": false
+					"close_for_them": false,
+					"my_proj_change": 5.7,
+					"their_proj_change": -5.3
 				}
 			],
 			"note": null
@@ -3739,7 +3763,9 @@
 					"drop": null,
 					"my_gain": 1.8,
 					"their_gain": 0.5,
-					"close_for_them": false
+					"close_for_them": false,
+					"my_proj_change": -0.5,
+					"their_proj_change": 16.3
 				},
 				{
 					"give": [
@@ -3917,7 +3943,9 @@
 					"drop": null,
 					"my_gain": 1.7,
 					"their_gain": 0.6,
-					"close_for_them": false
+					"close_for_them": false,
+					"my_proj_change": 2,
+					"their_proj_change": 15.9
 				},
 				{
 					"give": [
@@ -4079,7 +4107,9 @@
 					"drop": null,
 					"my_gain": 1.7,
 					"their_gain": 0.6,
-					"close_for_them": false
+					"close_for_them": false,
+					"my_proj_change": -9.1,
+					"their_proj_change": 25.5
 				},
 				{
 					"give": [
@@ -4251,7 +4281,9 @@
 					"drop": null,
 					"my_gain": 1.6,
 					"their_gain": 0.7,
-					"close_for_them": false
+					"close_for_them": false,
+					"my_proj_change": 9.5,
+					"their_proj_change": 6.3
 				}
 			],
 			"note": null
@@ -4739,7 +4771,9 @@
 					},
 					"my_gain": 2.7,
 					"their_gain": 0.6,
-					"close_for_them": false
+					"close_for_them": false,
+					"my_proj_change": -6.3,
+					"their_proj_change": 3.6
 				},
 				{
 					"give": [
@@ -4955,7 +4989,9 @@
 					},
 					"my_gain": 2.7,
 					"their_gain": 0.6,
-					"close_for_them": false
+					"close_for_them": false,
+					"my_proj_change": -6.3,
+					"their_proj_change": 3.6
 				},
 				{
 					"give": [
@@ -5175,7 +5211,9 @@
 					},
 					"my_gain": 2.3,
 					"their_gain": 1,
-					"close_for_them": false
+					"close_for_them": false,
+					"my_proj_change": 2.8,
+					"their_proj_change": -8.7
 				},
 				{
 					"give": [
@@ -5397,7 +5435,9 @@
 					},
 					"my_gain": 1.8,
 					"their_gain": 1.5,
-					"close_for_them": false
+					"close_for_them": false,
+					"my_proj_change": -7.3,
+					"their_proj_change": 4.6
 				}
 			],
 			"note": null
@@ -5408,6 +5448,369 @@
 			"owner": "thatmattkelley",
 			"record": { "wins": 1, "losses": 4, "ties": 0 },
 			"roster": [
+				{
+					"player": {
+						"host_id": "3257",
+						"board_id": "2578570",
+						"name": "Jacoby Brissett",
+						"position": "QB",
+						"team": "ARI",
+						"injured_reserve": false
+					},
+					"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/2578570.png",
+					"slug": null,
+					"position_rank": null,
+					"points_over_replacement": null,
+					"rest_of_season_per_game": null,
+					"week_projection": 15,
+					"projection_delta": 0.2,
+					"opp_rank": 7,
+					"season_avg": null,
+					"last_points": null,
+					"held": false,
+					"facts": {
+						"week": 6,
+						"opponent": "LAR",
+						"home": false,
+						"kickoff": "2026-10-18T20:05:00.000Z",
+						"bye": false,
+						"designation": null,
+						"played": false,
+						"points_this_week": null,
+						"last_games": [],
+						"allowed_to_position": { "points_a_game": 25.8, "rank": 7, "of": 32, "position": "QB" },
+						"game_total": {
+							"points": 52.5,
+							"team_points": 20,
+							"read_at": "2026-10-16T21:01:26.774Z"
+						},
+						"spread": { "side": "lose", "points": 12.5, "read_at": "2026-10-16T21:01:26.774Z" },
+						"roof": { "kind": "dome", "abroad": false },
+						"weather": null
+					}
+				},
+				{
+					"player": {
+						"host_id": "12512",
+						"board_id": "4685702",
+						"name": "Quinshon Judkins",
+						"position": "RB",
+						"team": "CLE",
+						"injured_reserve": false
+					},
+					"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4685702.png",
+					"slug": null,
+					"position_rank": null,
+					"points_over_replacement": null,
+					"rest_of_season_per_game": null,
+					"week_projection": 12.21,
+					"projection_delta": -0.3,
+					"opp_rank": 1,
+					"season_avg": null,
+					"last_points": null,
+					"held": false,
+					"facts": {
+						"week": 6,
+						"opponent": "BAL",
+						"home": true,
+						"kickoff": "2026-10-18T17:00:00.000Z",
+						"bye": false,
+						"designation": null,
+						"played": false,
+						"points_this_week": null,
+						"last_games": [],
+						"allowed_to_position": { "points_a_game": 29.4, "rank": 1, "of": 32, "position": "RB" },
+						"game_total": {
+							"points": 40.5,
+							"team_points": 18,
+							"read_at": "2026-10-16T21:01:26.774Z"
+						},
+						"spread": { "side": "lose", "points": 4.5, "read_at": "2026-10-16T21:01:26.774Z" },
+						"roof": { "kind": "outdoors", "abroad": false },
+						"weather": {
+							"temperature_f": 57,
+							"wind_mph": 6.9,
+							"precipitation_chance": 0,
+							"precipitation_kind": "none",
+							"read_at": "2026-10-16T21:01:34.611Z"
+						}
+					}
+				},
+				{
+					"player": {
+						"host_id": "12474",
+						"board_id": "4429059",
+						"name": "Woody Marks",
+						"position": "RB",
+						"team": "HOU",
+						"injured_reserve": false
+					},
+					"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4429059.png",
+					"slug": null,
+					"position_rank": null,
+					"points_over_replacement": null,
+					"rest_of_season_per_game": null,
+					"week_projection": 7.64,
+					"projection_delta": -0.2,
+					"opp_rank": 23,
+					"season_avg": null,
+					"last_points": null,
+					"held": false,
+					"facts": {
+						"week": 6,
+						"opponent": "JAX",
+						"home": false,
+						"kickoff": "2026-10-18T13:30:00.000Z",
+						"bye": false,
+						"designation": null,
+						"played": false,
+						"points_this_week": null,
+						"last_games": [],
+						"allowed_to_position": {
+							"points_a_game": 16.2,
+							"rank": 23,
+							"of": 32,
+							"position": "RB"
+						},
+						"game_total": {
+							"points": 42.5,
+							"team_points": 20,
+							"read_at": "2026-10-16T21:01:26.774Z"
+						},
+						"spread": { "side": "lose", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
+						"roof": { "kind": "outdoors", "abroad": true },
+						"weather": null
+					}
+				},
+				{
+					"player": {
+						"host_id": "13298",
+						"board_id": "4870653",
+						"name": "KC Concepcion",
+						"position": "WR",
+						"team": "CLE",
+						"injured_reserve": false
+					},
+					"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4870653.png",
+					"slug": null,
+					"position_rank": null,
+					"points_over_replacement": null,
+					"rest_of_season_per_game": null,
+					"week_projection": 9.03,
+					"projection_delta": -0.3,
+					"opp_rank": 12,
+					"season_avg": null,
+					"last_points": null,
+					"held": false,
+					"facts": {
+						"week": 6,
+						"opponent": "BAL",
+						"home": true,
+						"kickoff": "2026-10-18T17:00:00.000Z",
+						"bye": false,
+						"designation": null,
+						"played": false,
+						"points_this_week": null,
+						"last_games": [],
+						"allowed_to_position": {
+							"points_a_game": 22.8,
+							"rank": 12,
+							"of": 32,
+							"position": "WR"
+						},
+						"game_total": {
+							"points": 40.5,
+							"team_points": 18,
+							"read_at": "2026-10-16T21:01:26.774Z"
+						},
+						"spread": { "side": "lose", "points": 4.5, "read_at": "2026-10-16T21:01:26.774Z" },
+						"roof": { "kind": "outdoors", "abroad": false },
+						"weather": {
+							"temperature_f": 57,
+							"wind_mph": 6.9,
+							"precipitation_chance": 0,
+							"precipitation_kind": "none",
+							"read_at": "2026-10-16T21:01:34.611Z"
+						}
+					}
+				},
+				{
+					"player": {
+						"host_id": "8146",
+						"board_id": "4569618",
+						"name": "Garrett Wilson",
+						"position": "WR",
+						"team": "NYJ",
+						"injured_reserve": false
+					},
+					"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4569618.png",
+					"slug": null,
+					"position_rank": null,
+					"points_over_replacement": null,
+					"rest_of_season_per_game": null,
+					"week_projection": 13.74,
+					"projection_delta": -0.4,
+					"opp_rank": 24,
+					"season_avg": null,
+					"last_points": null,
+					"held": false,
+					"facts": {
+						"week": 6,
+						"opponent": "NE",
+						"home": false,
+						"kickoff": "2026-10-18T17:00:00.000Z",
+						"bye": false,
+						"designation": null,
+						"played": false,
+						"points_this_week": null,
+						"last_games": [],
+						"allowed_to_position": {
+							"points_a_game": 15.6,
+							"rank": 24,
+							"of": 32,
+							"position": "WR"
+						},
+						"game_total": {
+							"points": 43.5,
+							"team_points": 18.5,
+							"read_at": "2026-10-16T21:01:26.774Z"
+						},
+						"spread": { "side": "lose", "points": 7, "read_at": "2026-10-16T21:01:26.774Z" },
+						"roof": { "kind": "outdoors", "abroad": false },
+						"weather": {
+							"temperature_f": 48,
+							"wind_mph": 4.6,
+							"precipitation_chance": 0,
+							"precipitation_kind": "none",
+							"read_at": "2026-10-16T21:01:34.611Z"
+						}
+					}
+				},
+				{
+					"player": {
+						"host_id": "12535",
+						"board_id": "5123663",
+						"name": "Isaac TeSlaa",
+						"position": "WR",
+						"team": "DET",
+						"injured_reserve": false
+					},
+					"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/5123663.png",
+					"slug": null,
+					"position_rank": null,
+					"points_over_replacement": null,
+					"rest_of_season_per_game": null,
+					"week_projection": null,
+					"projection_delta": null,
+					"opp_rank": null,
+					"season_avg": null,
+					"last_points": null,
+					"held": false,
+					"facts": {
+						"week": 6,
+						"opponent": null,
+						"home": null,
+						"kickoff": null,
+						"bye": true,
+						"designation": null,
+						"played": false,
+						"points_this_week": null,
+						"last_games": [],
+						"allowed_to_position": null,
+						"game_total": null,
+						"spread": null,
+						"roof": null,
+						"weather": null
+					}
+				},
+				{
+					"player": {
+						"host_id": "8138",
+						"board_id": "4379399",
+						"name": "James Cook",
+						"position": "RB",
+						"team": "BUF",
+						"injured_reserve": false
+					},
+					"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4379399.png",
+					"slug": null,
+					"position_rank": null,
+					"points_over_replacement": null,
+					"rest_of_season_per_game": null,
+					"week_projection": 15.25,
+					"projection_delta": -0.3,
+					"opp_rank": 20,
+					"season_avg": null,
+					"last_points": null,
+					"held": false,
+					"facts": {
+						"week": 6,
+						"opponent": "LV",
+						"home": false,
+						"kickoff": "2026-10-18T20:25:00.000Z",
+						"bye": false,
+						"designation": null,
+						"played": false,
+						"points_this_week": null,
+						"last_games": [],
+						"allowed_to_position": { "points_a_game": 18, "rank": 20, "of": 32, "position": "RB" },
+						"game_total": {
+							"points": 52.5,
+							"team_points": 29.5,
+							"read_at": "2026-10-16T21:01:26.774Z"
+						},
+						"spread": { "side": "win", "points": 6, "read_at": "2026-10-16T21:01:26.774Z" },
+						"roof": { "kind": "dome", "abroad": false },
+						"weather": null
+					}
+				},
+				{
+					"player": {
+						"host_id": "NYJ",
+						"board_id": null,
+						"name": "New York Jets",
+						"position": "DEF",
+						"team": "NYJ",
+						"injured_reserve": false
+					},
+					"headshot": null,
+					"slug": null,
+					"position_rank": null,
+					"points_over_replacement": null,
+					"rest_of_season_per_game": null,
+					"week_projection": 9.4,
+					"projection_delta": 0.3,
+					"opp_rank": null,
+					"season_avg": null,
+					"last_points": null,
+					"held": false,
+					"facts": {
+						"week": 6,
+						"opponent": "NE",
+						"home": false,
+						"kickoff": "2026-10-18T17:00:00.000Z",
+						"bye": false,
+						"designation": null,
+						"played": false,
+						"points_this_week": null,
+						"last_games": [],
+						"allowed_to_position": null,
+						"game_total": {
+							"points": 43.5,
+							"team_points": 18.5,
+							"read_at": "2026-10-16T21:01:26.774Z"
+						},
+						"spread": { "side": "lose", "points": 7, "read_at": "2026-10-16T21:01:26.774Z" },
+						"roof": { "kind": "outdoors", "abroad": false },
+						"weather": {
+							"temperature_f": 48,
+							"wind_mph": 4.6,
+							"precipitation_chance": 0,
+							"precipitation_kind": "none",
+							"read_at": "2026-10-16T21:01:34.611Z"
+						}
+					}
+				},
 				{
 					"player": {
 						"host_id": "4035",
@@ -5911,7 +6314,9 @@
 					},
 					"my_gain": 4.6,
 					"their_gain": 0.5,
-					"close_for_them": false
+					"close_for_them": false,
+					"my_proj_change": 10.9,
+					"their_proj_change": -5.6
 				},
 				{
 					"give": [
@@ -6139,7 +6544,9 @@
 					},
 					"my_gain": 4.6,
 					"their_gain": 0.5,
-					"close_for_them": false
+					"close_for_them": false,
+					"my_proj_change": 4.2,
+					"their_proj_change": 0.8
 				},
 				{
 					"give": [
@@ -6371,7 +6778,9 @@
 					},
 					"my_gain": 4.5,
 					"their_gain": 0.6,
-					"close_for_them": false
+					"close_for_them": false,
+					"my_proj_change": 8.2,
+					"their_proj_change": -2.9
 				},
 				{
 					"give": [
@@ -6599,7 +7008,9 @@
 					},
 					"my_gain": 4.5,
 					"their_gain": 0.6,
-					"close_for_them": false
+					"close_for_them": false,
+					"my_proj_change": 4,
+					"their_proj_change": -2.2
 				}
 			],
 			"note": null
@@ -7087,7 +7498,9 @@
 					},
 					"my_gain": 5.7,
 					"their_gain": 0.7,
-					"close_for_them": false
+					"close_for_them": false,
+					"my_proj_change": 7.4,
+					"their_proj_change": 2.5
 				},
 				{
 					"give": [
@@ -7307,7 +7720,9 @@
 					},
 					"my_gain": 5.7,
 					"their_gain": 0.7,
-					"close_for_them": false
+					"close_for_them": false,
+					"my_proj_change": 9.4,
+					"their_proj_change": -9
 				},
 				{
 					"give": [
@@ -7535,7 +7950,9 @@
 					},
 					"my_gain": 5.6,
 					"their_gain": 0.8,
-					"close_for_them": false
+					"close_for_them": false,
+					"my_proj_change": 9.9,
+					"their_proj_change": 0
 				},
 				{
 					"give": [
@@ -7757,7 +8174,9 @@
 					},
 					"my_gain": 5.3,
 					"their_gain": 1.1,
-					"close_for_them": false
+					"close_for_them": false,
+					"my_proj_change": 8.2,
+					"their_proj_change": 1.7
 				}
 			],
 			"note": null
@@ -8249,7 +8668,9 @@
 					},
 					"my_gain": 0.4,
 					"their_gain": 0.5,
-					"close_for_them": false
+					"close_for_them": false,
+					"my_proj_change": 9.7,
+					"their_proj_change": -25.1
 				},
 				{
 					"give": [
@@ -8481,7 +8902,9 @@
 					},
 					"my_gain": 0.3,
 					"their_gain": 0.6,
-					"close_for_them": false
+					"close_for_them": false,
+					"my_proj_change": 0.8,
+					"their_proj_change": -6.7
 				},
 				{
 					"give": [
@@ -8713,7 +9136,9 @@
 					},
 					"my_gain": 0.7,
 					"their_gain": 0.2,
-					"close_for_them": true
+					"close_for_them": true,
+					"my_proj_change": 6.7,
+					"their_proj_change": -9.4
 				},
 				{
 					"give": [
@@ -8924,7 +9349,9 @@
 					},
 					"my_gain": 0.7,
 					"their_gain": 0.2,
-					"close_for_them": true
+					"close_for_them": true,
+					"my_proj_change": 6.7,
+					"their_proj_change": -19.5
 				}
 			],
 			"note": null
@@ -9456,7 +9883,9 @@
 					},
 					"my_gain": 1.8,
 					"their_gain": 0.5,
-					"close_for_them": false
+					"close_for_them": false,
+					"my_proj_change": 3.8,
+					"their_proj_change": 9.3
 				},
 				{
 					"give": [
@@ -9673,7 +10102,9 @@
 					},
 					"my_gain": 1.7,
 					"their_gain": 0.8,
-					"close_for_them": false
+					"close_for_them": false,
+					"my_proj_change": 6.9,
+					"their_proj_change": -21.3
 				},
 				{
 					"give": [
@@ -9890,7 +10321,9 @@
 					},
 					"my_gain": 1.5,
 					"their_gain": 1,
-					"close_for_them": false
+					"close_for_them": false,
+					"my_proj_change": 4.7,
+					"their_proj_change": 8.4
 				},
 				{
 					"give": [
@@ -10097,7 +10530,9 @@
 					},
 					"my_gain": 1.4,
 					"their_gain": 0.6,
-					"close_for_them": false
+					"close_for_them": false,
+					"my_proj_change": 6.9,
+					"their_proj_change": -12.8
 				}
 			],
 			"note": null
@@ -10630,7 +11065,9 @@
 					},
 					"my_gain": 0.1,
 					"their_gain": 0.5,
-					"close_for_them": false
+					"close_for_them": false,
+					"my_proj_change": 3,
+					"their_proj_change": -17.4
 				},
 				{
 					"give": [
@@ -10856,7 +11293,9 @@
 					},
 					"my_gain": 0.1,
 					"their_gain": 0.5,
-					"close_for_them": false
+					"close_for_them": false,
+					"my_proj_change": 2.4,
+					"their_proj_change": -8.3
 				},
 				{
 					"give": [
@@ -11058,7 +11497,9 @@
 					},
 					"my_gain": 0.1,
 					"their_gain": 0.5,
-					"close_for_them": false
+					"close_for_them": false,
+					"my_proj_change": 8.3,
+					"their_proj_change": -14.2
 				},
 				{
 					"give": [
@@ -11275,7 +11716,9 @@
 					},
 					"my_gain": 0.5,
 					"their_gain": 0.1,
-					"close_for_them": true
+					"close_for_them": true,
+					"my_proj_change": 19.5,
+					"their_proj_change": -25.4
 				}
 			],
 			"note": null
@@ -11743,7 +12186,9 @@
 					},
 					"my_gain": 0.3,
 					"their_gain": 0.5,
-					"close_for_them": false
+					"close_for_them": false,
+					"my_proj_change": 8.8,
+					"their_proj_change": -14.7
 				},
 				{
 					"give": [
@@ -11945,7 +12390,9 @@
 					},
 					"my_gain": 0.1,
 					"their_gain": 0.7,
-					"close_for_them": false
+					"close_for_them": false,
+					"my_proj_change": 6.3,
+					"their_proj_change": -9
 				},
 				{
 					"give": [
@@ -12171,7 +12618,9 @@
 					},
 					"my_gain": 0.5,
 					"their_gain": 0.3,
-					"close_for_them": true
+					"close_for_them": true,
+					"my_proj_change": 5,
+					"their_proj_change": -10.9
 				},
 				{
 					"give": [
@@ -12397,7 +12846,9 @@
 					},
 					"my_gain": 0.2,
 					"their_gain": 0.3,
-					"close_for_them": true
+					"close_for_them": true,
+					"my_proj_change": -5.4,
+					"their_proj_change": -0.5
 				}
 			],
 			"note": null
@@ -13309,5 +13760,12 @@
 		}
 	],
 	"host_trades_url": "https://sleeper.com/leagues/1382163311038038016/team",
-	"host_note": null
+	"host_note": null,
+	"moves": {
+		"propose": "unavailable",
+		"reason": "Sleeper does not take trade proposals from here, so we copy the trade for you to propose there."
+	},
+	"projection_read_at": "2026-10-17T02:00:00.000Z",
+	"projection_scoring": { "format": "ppr", "league_own": false },
+	"player_points": true
 }

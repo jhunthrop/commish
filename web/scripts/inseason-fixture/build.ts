@@ -30,6 +30,7 @@ import { fileURLToPath } from 'node:url';
 import { format as prettierFormat, resolveConfig } from 'prettier';
 import { listWords } from '../../src/lib/format/list.ts';
 import { FIXTURE_IDS } from './ids.ts';
+import { leagueFields } from './league-fields.ts';
 import type { LeaguePlayer, LeagueSync, MatchupSide } from '../../src/lib/league/api.ts';
 import type {
 	AdviceHead,
@@ -176,6 +177,7 @@ const [league, rosters, users, matchups, moves, sleeperPlayers, state] = await P
 	json<Record<string, SleeperPlayer>>(new URL('players.json', REPLAY)),
 	json<{ week: number }>(new URL('state.json', REPLAY))
 ]);
+const fields = await leagueFields();
 const [manifest, board, schedule] = await Promise.all([
 	json<{ runAt: string; formats: RunFormat[] }>(new URL('manifest.json', run)),
 	json<{ rows: BoardRow[] }>(new URL(`boards/${FORMAT}.json`, run)),
@@ -720,7 +722,10 @@ function tradesWith(theirs: readonly PlayerLine[]): TradeRow[] {
 						drop,
 						my_gain: myGain,
 						their_gain: theirGain,
-						close_for_them: theirGain < CLOSE_FOR_THEM
+						close_for_them: theirGain < CLOSE_FOR_THEM,
+						// The week's Proj is stamped by project.ts (Lane 66g).
+						my_proj_change: null,
+						their_proj_change: null
 					}
 				];
 			})
@@ -771,13 +776,23 @@ function trades(): TradeAdvice {
 		}));
 	return {
 		...head(
-			`Trades where both lineups gain on our rest-of-season order. The other team decides. ${basisTail}`
+			`Trades where both lineups gain on our rest-of-season order. Each team's best trade, yours first, among those they gain at least 0.5 a week from, then the close calls for them. The other team decides. ${basisTail}`
 		),
 		check_basis: `What each lineup gains or loses on our rest-of-season order. The other team decides. ${basisTail}`,
 		teams,
 		roster: rosterByPosition(myLines),
 		host_trades_url: `https://sleeper.com/leagues/${league.league_id}/team`,
-		host_note: null
+		host_note: null,
+		// No platform takes a proposal from here (inseason hosturls.go TradeMoves); project.ts stamps the
+		// projection's read.
+		moves: {
+			propose: 'unavailable',
+			reason:
+				'Sleeper does not take trade proposals from here, so we copy the trade for you to propose there.'
+		},
+		projection_read_at: null,
+		projection_scoring: { format: 'ppr', league_own: false },
+		player_points: true
 	};
 }
 
@@ -839,7 +854,8 @@ function sync(): LeagueSync {
 			wins: r.settings.wins,
 			losses: r.settings.losses,
 			ties: r.settings.ties,
-			points_for: round(points(r))
+			points_for: round(points(r)),
+			...fields.team(r.roster_id)
 		})),
 		roster: order.map((id) => ({ player: leaguePlayer(id, me), slot: spot(id) })),
 		matchup: myMatchup
@@ -851,6 +867,7 @@ function sync(): LeagueSync {
 			.map((m) => ({
 				kind: m.type === 'free_agent' ? 'add' : m.type,
 				at: new Date(m.created).toISOString(),
+				bid: fields.bid(m.created),
 				roster_ids: m.roster_ids,
 				adds: Object.entries(m.adds ?? {}).map(([id, rid]) => ({
 					player: leaguePlayer(id, null),
@@ -869,7 +886,9 @@ function sync(): LeagueSync {
 		read_at: manifest.runAt,
 		host_stale_seconds: 0,
 		host_failed: false,
-		host_signed_out: false
+		host_signed_out: false,
+		terms: fields.terms,
+		moves_read: true
 	};
 }
 

@@ -1,10 +1,18 @@
 <script lang="ts">
 	import Icon from '#lib/ui/Icon.svelte';
-	import { BOX, boxNumber, deltaWord, easeOf, oppRankWord, type BoxRow } from './box.ts';
-	import BoxGame from './BoxGame.svelte';
-	import BoxPlayer from './BoxPlayer.svelte';
+	import {
+		BOX,
+		boxNumber,
+		deltaWord,
+		easeOf,
+		oppRankWord,
+		type BoxPick,
+		type BoxRow
+	} from './box.ts';
 	import type { Move } from './lineup.ts';
 	import MoveMark from './MoveMark.svelte';
+	import BoxGame from './BoxGame.svelte';
+	import BoxPlayer from './BoxPlayer.svelte';
 
 	/** One player's row of a box score: the slot, his face (a defense's club mark), his name on a line
 	 * of its own, under it his club and Lane 63's status pill (his position and rank, and his status
@@ -25,6 +33,16 @@
 		idle?: boolean;
 		/** A swap's evidence line, opened by its button: its row's id, whether it is open. */
 		why?: { id: string; open: boolean; toggle: () => void } | null;
+		/** The Trades screen's last column (Lane 66g): his rest-of-season points a game, in place of
+		 * the projection's change and the evidence line's button. */
+		season?: boolean;
+		/** The trade builder's columns (Lane 66g): his game folds under his name at every width, and
+		 * the slot and Pts are left out (a roster, not a lineup), so two boxes sit side by side. */
+		compact?: boolean;
+		/** The trade builder's tick (Lane 66g), first in the row. */
+		pick?: BoxPick | null;
+		/** A narrow phone cell prints his short form, "A. Rodgers", never a cut surname (rereview N2). */
+		shortOnPhone?: boolean;
 	}
 
 	let {
@@ -34,8 +52,13 @@
 		evidence = false,
 		move = null,
 		why = null,
-		idle = false
+		idle = false,
+		season = false,
+		compact = false,
+		pick = null,
+		shortOnPhone = false
 	}: Props = $props();
+	const picked = $derived(pick?.state === 'on');
 	const rank = $derived(row.evidence.oppRank);
 	/** The phone's evidence line's own words and separator, so the template adds no space. */
 	const oppLead = `${BOX.opp} `;
@@ -61,20 +84,45 @@
 	class:moved-out={move === 'out'}
 	class:open={why?.open === true}
 	class:idle
+	class:compact
+	class:picked
+	class:dropped={pick?.state === 'drop'}
 >
-	<td class="slot"
-		><span class="sl"
-			>{#if move}<MoveMark {move} />{/if}{row.slot}</span
-		></td
-	>
+	{#if pick}
+		<td class="tk">
+			{#if pick.state === 'drop'}
+				<span class="drop-mark">{BOX.drop}</span>
+			{:else if pick.state === 'no'}
+				<span class="tick no" aria-hidden="true"></span>
+			{:else}
+				<button
+					type="button"
+					class="tick"
+					class:on={picked}
+					aria-pressed={picked}
+					aria-label="{BOX.pick} {row.name}"
+					disabled={pick.disabled}
+					onclick={pick.toggle ?? undefined}
+					>{#if picked}<Icon name="check" size={14} />{/if}</button
+				>
+			{/if}
+		</td>
+	{/if}
+	{#if !compact}
+		<td class="slot"
+			><span class="sl"
+				>{#if move}<MoveMark {move} />{/if}{row.slot}</span
+			></td
+		>
+	{/if}
 	<td class="player">
-		<BoxPlayer {row} {tags}
+		<BoxPlayer {row} {tags} {shortOnPhone} {compact}
 			>{#if evidence}{@render seasonLine()}{/if}</BoxPlayer
 		>
 	</td>
-	<td class="game"><BoxGame {row} /></td>
+	{#if !compact}<td class="game"><BoxGame {row} /></td>{/if}
 	<td class="n proj">{boxNumber(row.proj)}</td>
-	<td class="n pts" class:none={row.pts === null}>{boxNumber(row.pts)}</td>
+	{#if !compact}<td class="n pts" class:none={row.pts === null}>{boxNumber(row.pts)}</td>{/if}
 	{#if evidence}
 		<td class="n ev first"
 			>{#if rank !== null}<span class="rk {easeOf(rank, row.evidence.oppOf)}"
@@ -83,6 +131,10 @@
 		>
 		<td class="n ev">{boxNumber(row.evidence.avg)}</td>
 		<td class="n ev">{boxNumber(row.evidence.last)}</td>
+	{/if}
+	{#if season}
+		<td class="n season">{boxNumber(row.evidence.season)}</td>
+	{:else if evidence}
 		<td class="n ev delta">{deltaWord(row.evidence.delta)}</td>
 		<td class="op"
 			>{#if why}<button
@@ -258,6 +310,82 @@
 
 	.bench .pts {
 		font-size: var(--t-md);
+	}
+
+	.season {
+		font-size: var(--t-lg);
+		font-weight: 700;
+	}
+
+	.tk {
+		width: 36px;
+		padding: 0;
+		text-align: center;
+	}
+
+	.tick {
+		display: inline-grid;
+		place-items: center;
+		width: 24px;
+		height: 24px;
+		padding: 0;
+		border: 1.5px solid var(--ink-3);
+		border-radius: 5px;
+		background: transparent;
+		color: var(--accent-ink);
+		cursor: pointer;
+		vertical-align: middle;
+	}
+
+	.tick.on {
+		background: var(--accent);
+		border-color: var(--accent);
+	}
+
+	.tick:disabled {
+		cursor: not-allowed;
+		opacity: 0.45;
+	}
+
+	.tick.no {
+		border-style: dashed;
+		border-color: var(--line-strong);
+		cursor: default;
+	}
+
+	.tick:focus-visible {
+		outline: 2px solid var(--focus);
+		outline-offset: 2px;
+	}
+
+	.drop-mark {
+		display: inline-flex;
+		align-items: center;
+		height: 20px;
+		padding: 0 5px;
+		border-radius: var(--r-sm);
+		background: var(--loss-bg);
+		color: var(--loss-ink);
+		font-size: var(--t-xs);
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.04em;
+	}
+
+	.picked td {
+		background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+	}
+
+	.picked td:first-child {
+		box-shadow: inset 3px 0 0 var(--accent);
+	}
+
+	.dropped td {
+		background: color-mix(in srgb, var(--loss-ink) 7%, var(--surface));
+	}
+
+	.dropped td:first-child {
+		box-shadow: inset 3px 0 0 var(--loss-ink);
 	}
 
 	@media (max-width: 760px) {

@@ -80,6 +80,9 @@ export const LINEUP = {
 	noOneHere: 'No one on your roster can play here this week'
 } as const;
 
+/** The Lineup's bench, as a link from another page opens it (the League page's bench count). */
+export const BENCH_ANCHOR = 'bench';
+
 /** A name's second mention: "Stroud", and a defense by its club ("Saints" from "Saints D/ST"). */
 function shortName(name: string): string {
 	return lastName(name.replace(/\s+D\/ST$/, ''));

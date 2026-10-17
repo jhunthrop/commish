@@ -46,7 +46,7 @@ STARTERS_BASIS: Final = (
     f"Starters right counts the week's top {', '.join(_COUNTS[:-1])} and {_COUNTS[-1]}, a {LEAGUE_TEAMS}-team league's "
     "starters, that the order also put there."
 )
-# The first week whose freeze keeps the week's published projection (revision 0012).
+# The first week whose freeze keeps the week's published projection (revision 0013).
 PUBLISHED_FROM_WEEK: Final = 7
 # Graded against the preseason board in season too: freezing and grading the rest-of-season board is
 # a later lane's (the coordinator's ruling of 2026-10-14), so the line says which board it grades.

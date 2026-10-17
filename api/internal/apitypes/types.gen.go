@@ -699,6 +699,24 @@ func (e LeaguePhase) Valid() bool {
 	}
 }
 
+// Defines values for LeagueTermsWaivers.
+const (
+	LeagueTermsWaiversBudget LeagueTermsWaivers = "budget"
+	LeagueTermsWaiversOrder  LeagueTermsWaivers = "order"
+)
+
+// Valid indicates whether the value is a known member of the LeagueTermsWaivers enum.
+func (e LeagueTermsWaivers) Valid() bool {
+	switch e {
+	case LeagueTermsWaiversBudget:
+		return true
+	case LeagueTermsWaiversOrder:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for Lineup.
 const (
 	LineupStandard  Lineup = "standard"
@@ -1239,6 +1257,27 @@ func (e RosterSpotSlot) Valid() bool {
 	}
 }
 
+// Defines values for ScoreboardGameState.
+const (
+	ScoreboardGameStateFinal    ScoreboardGameState = "final"
+	ScoreboardGameStatePlaying  ScoreboardGameState = "playing"
+	ScoreboardGameStateUpcoming ScoreboardGameState = "upcoming"
+)
+
+// Valid indicates whether the value is a known member of the ScoreboardGameState enum.
+func (e ScoreboardGameState) Valid() bool {
+	switch e {
+	case ScoreboardGameStateFinal:
+		return true
+	case ScoreboardGameStatePlaying:
+		return true
+	case ScoreboardGameStateUpcoming:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ScoringImportInputHost.
 const (
 	ScoringImportInputHostEspn    ScoringImportInputHost = "espn"
@@ -1332,6 +1371,24 @@ func (e SiteSeasonPhase) Valid() bool {
 	case SiteSeasonPhasePlayoffs:
 		return true
 	case SiteSeasonPhasePreseason:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for TradeMovesPropose.
+const (
+	TradeMovesProposeAvailable   TradeMovesPropose = "available"
+	TradeMovesProposeUnavailable TradeMovesPropose = "unavailable"
+)
+
+// Valid indicates whether the value is a known member of the TradeMovesPropose enum.
+func (e TradeMovesPropose) Valid() bool {
+	switch e {
+	case TradeMovesProposeAvailable:
+		return true
+	case TradeMovesProposeUnavailable:
 		return true
 	default:
 		return false
@@ -2250,8 +2307,11 @@ type LeagueMatchup struct {
 
 // LeagueMove defines model for LeagueMove.
 type LeagueMove struct {
-	Adds      []MovePlayer   `json:"adds"`
-	At        time.Time      `json:"at"`
+	Adds []MovePlayer `json:"adds"`
+	At   time.Time    `json:"at"`
+
+	// Bid a claim's bid from the league's waiver budget
+	Bid       *int           `json:"bid"`
 	Drops     []MovePlayer   `json:"drops"`
 	Kind      LeagueMoveKind `json:"kind"`
 	RosterIds []int          `json:"roster_ids"`
@@ -2291,6 +2351,19 @@ type LeagueSettings struct {
 	// Slot null drafts from a random slot
 	Slot  *int `json:"slot"`
 	Teams int  `json:"teams"`
+}
+
+// LeagueShape the league's starting lineup by our slots, and its bench
+type LeagueShape struct {
+	Bench     int `json:"bench"`
+	Def       int `json:"def"`
+	Flex      int `json:"flex"`
+	K         int `json:"k"`
+	Qb        int `json:"qb"`
+	Rb        int `json:"rb"`
+	SuperFlex int `json:"super_flex"`
+	Te        int `json:"te"`
+	Wr        int `json:"wr"`
 }
 
 // LeagueStanding defines model for LeagueStanding.
@@ -2335,7 +2408,10 @@ type LeagueSync struct {
 
 	// Moves the completed moves of this week and last, newest first
 	Moves []LeagueMove `json:"moves"`
-	Name  string       `json:"name"`
+
+	// MovesRead the platform's moves are read (ESPN gives us no move history): false, moves is empty and says nothing about whether anyone moved
+	MovesRead bool   `json:"moves_read"`
+	Name      string `json:"name"`
 
 	// Placement how the league's rostered players were placed on our board, by rule
 	Placement Placement `json:"placement"`
@@ -2370,6 +2446,9 @@ type LeagueSync struct {
 	// Teams every team, in standings order (wins, then points for)
 	Teams []LeagueTeam `json:"teams"`
 
+	// Terms the league's settings as its host states them, for the league page's settings; read only
+	Terms LeagueTerms `json:"terms"`
+
 	// Week the host's current week
 	Week int `json:"week"`
 
@@ -2379,18 +2458,65 @@ type LeagueSync struct {
 
 // LeagueTeam defines model for LeagueTeam.
 type LeagueTeam struct {
-	Losses int `json:"losses"`
+	// Avatar the host's image for the team or its owner, null where the host gives none we show
+	Avatar *string `json:"avatar"`
+	Losses int     `json:"losses"`
 
 	// Name the team's name
 	Name string `json:"name"`
 
 	// Owner the owner's display name
-	Owner     string  `json:"owner"`
-	PointsFor float64 `json:"points_for"`
-	RosterId  int     `json:"roster_id"`
-	Ties      int     `json:"ties"`
-	Wins      int     `json:"wins"`
+	Owner string `json:"owner"`
+
+	// PointsAgainst null where the host does not say
+	PointsAgainst *float64 `json:"points_against"`
+	PointsFor     float64  `json:"points_for"`
+	RosterId      int      `json:"roster_id"`
+
+	// Streak the current run of wins or losses ("W3", "L2"), null where the host does not say
+	Streak *string `json:"streak"`
+	Ties   int     `json:"ties"`
+
+	// WaiverBudgetLeft the waiver budget the team has left, null in a league without a budget or where the host does not say
+	WaiverBudgetLeft *int `json:"waiver_budget_left"`
+
+	// WaiverOrder the team's place in the waiver order
+	WaiverOrder *int `json:"waiver_order"`
+	Wins        int  `json:"wins"`
 }
+
+// LeagueTerms the league's settings as its host states them, for the league page's settings; read only
+type LeagueTerms struct {
+	// HostSettingsUrl the host's page for the league's settings
+	HostSettingsUrl *string `json:"host_settings_url"`
+
+	// PlayoffTeams the teams that make the playoffs
+	PlayoffTeams *int `json:"playoff_teams"`
+
+	// PlayoffWeeks null where the host does not say
+	PlayoffWeeks *PlayoffWeeks `json:"playoff_weeks"`
+
+	// Roster the league's starting lineup by our slots, and its bench
+	Roster LeagueShape `json:"roster"`
+
+	// Scoring the league's rules as ScoringRules, null when the host's scoring could not be read whole
+	Scoring *ScoringRules `json:"scoring"`
+
+	// ScoringExtra the host's rules ScoringRules does not carry, in drafter words with the host's figure
+	ScoringExtra []DroppedRule `json:"scoring_extra"`
+
+	// ScoringUnstated the ScoringRules keys the platform does not state, which scoring holds at our standard figure; the settings print no figure for them, never ours as the league's
+	ScoringUnstated []string `json:"scoring_unstated"`
+
+	// WaiverBudget each team's season budget
+	WaiverBudget *int `json:"waiver_budget"`
+
+	// Waivers claims carry a bid from a season budget, or run in a waiver order; null where the host does not say
+	Waivers *LeagueTermsWaivers `json:"waivers"`
+}
+
+// LeagueTermsWaivers claims carry a bid from a season budget, or run in a waiver order; null where the host does not say
+type LeagueTermsWaivers string
 
 // Lineup defines model for Lineup.
 type Lineup string
@@ -2932,6 +3058,12 @@ type PlayerLine struct {
 // PlayerPosition defines model for PlayerPosition.
 type PlayerPosition string
 
+// PlayoffWeeks the playoffs' first and last week
+type PlayoffWeeks struct {
+	First int `json:"first"`
+	Last  int `json:"last"`
+}
+
 // PointsAllowed defines model for PointsAllowed.
 type PointsAllowed struct {
 	// Of the defenses ranked
@@ -3207,6 +3339,56 @@ type RosterSpot struct {
 // RosterSpotSlot defines model for RosterSpot.Slot.
 type RosterSpotSlot string
 
+// Scoreboard defines model for Scoreboard.
+type Scoreboard struct {
+	// Games the drafter's game first, then the rest in the host's order
+	Games []ScoreboardGame `json:"games"`
+
+	// ProjectionReadAt when the week's published projection was captured, null with none
+	ProjectionReadAt *time.Time `json:"projection_read_at"`
+
+	// ProjectionScoring the scoring the rows' week_projection is read in: the published projection's column the league scores most like, and whether that is the league's own scoring or the closest of the three to rules of its own (a tight end premium reads PPR and is never its own). A team defense's figure is the published default in every format
+	ProjectionScoring ProjectionScoring `json:"projection_scoring"`
+
+	// ReadAt the league's last host read
+	ReadAt time.Time `json:"read_at"`
+	Week   int       `json:"week"`
+}
+
+// ScoreboardGame defines model for ScoreboardGame.
+type ScoreboardGame struct {
+	// NextKickoff the earliest kickoff still to come among both sides' starters, null when none is
+	NextKickoff *time.Time `json:"next_kickoff"`
+
+	// Sides two sides, the drafter's first when the game is theirs; one for a team with no opponent
+	Sides []ScoreboardSide `json:"sides"`
+
+	// State upcoming before any starter's game kicks off, final once every starter's game is over, playing between
+	State ScoreboardGameState `json:"state"`
+}
+
+// ScoreboardGameState upcoming before any starter's game kicks off, final once every starter's game is over, playing between
+type ScoreboardGameState string
+
+// ScoreboardSide defines model for ScoreboardSide.
+type ScoreboardSide struct {
+	// Played those starters whose game has kicked off
+	Played int `json:"played"`
+
+	// Points the side's points so far as the host scores them
+	Points float64 `json:"points"`
+
+	// PointsRead false when the host's score could not be read; points then says nothing
+	PointsRead bool `json:"points_read"`
+
+	// Projection the side's starters' week projections summed, each as printed to the tenth, a starter with none counting nothing; null when no starter has one
+	Projection *float64 `json:"projection"`
+	RosterId   int      `json:"roster_id"`
+
+	// Starters the starters the host lists for the side
+	Starters int `json:"starters"`
+}
+
 // Scoring exactly one of preset and custom. custom needs the custom_scoring feature.
 type Scoring struct {
 	Custom *ScoringRules  `json:"custom,omitempty"`
@@ -3428,12 +3610,22 @@ type TradeAdvice struct {
 	HostNote *string `json:"host_note"`
 
 	// HostTradesUrl the host's trade page, empty when we know none
-	HostTradesUrl string `json:"host_trades_url"`
+	HostTradesUrl string     `json:"host_trades_url"`
+	Moves         TradeMoves `json:"moves"`
 
 	// OrderBasis which order ranks the players: our preseason board, or the rest-of-season order (from week 7, once the API reads it)
 	OrderBasis OrderBasis `json:"order_basis"`
-	ReadAt     time.Time  `json:"read_at"`
-	Refreshed  time.Time  `json:"refreshed"`
+
+	// PlayerPoints as LineupAdvice's: the platform gives each player's points
+	PlayerPoints bool `json:"player_points"`
+
+	// ProjectionReadAt when the week's published projection behind week_projection and each proj change was captured, null with none
+	ProjectionReadAt *time.Time `json:"projection_read_at"`
+
+	// ProjectionScoring the scoring the rows' week_projection is read in: the published projection's column the league scores most like, and whether that is the league's own scoring or the closest of the three to rules of its own (a tight end premium reads PPR and is never its own). A team defense's figure is the published default in every format
+	ProjectionScoring ProjectionScoring `json:"projection_scoring"`
+	ReadAt            time.Time         `json:"read_at"`
+	Refreshed         time.Time         `json:"refreshed"`
 
 	// Roster every player on the drafter's active roster (injured reserve and taxi spots left out), by position then name: the picker's own players, a trade found or not
 	Roster []PlayerLine `json:"roster"`
@@ -3457,9 +3649,10 @@ type TradeCheck struct {
 	HostTradesUrl string `json:"host_trades_url"`
 
 	// OrderBasis which order ranks the players: our preseason board, or the rest-of-season order (from week 7, once the API reads it)
-	OrderBasis OrderBasis `json:"order_basis"`
-	ReadAt     time.Time  `json:"read_at"`
-	Refreshed  time.Time  `json:"refreshed"`
+	OrderBasis OrderBasis  `json:"order_basis"`
+	ReadAt     time.Time   `json:"read_at"`
+	Refreshed  time.Time   `json:"refreshed"`
+	Totals     TradeTotals `json:"totals"`
 
 	// Trade the trade as the finder reckons one: my_gain and their_gain fall below zero for a lineup that loses, close_for_them as the finder marks it
 	Trade TradeRow `json:"trade"`
@@ -3499,6 +3692,18 @@ type TradeFills struct {
 	YoursRoom bool `json:"yours_room"`
 }
 
+// TradeMoves defines model for TradeMoves.
+type TradeMoves struct {
+	// Propose available when a trade can be proposed on the platform from our screen (none today: the verb would read Propose on the platform); unavailable when the verb copies the offer and opens the platform's trade page
+	Propose TradeMovesPropose `json:"propose"`
+
+	// Reason one line under the verb saying why the trade is not proposed from here, naming the platform; null when available
+	Reason *string `json:"reason"`
+}
+
+// TradeMovesPropose available when a trade can be proposed on the platform from our screen (none today: the verb would read Propose on the platform); unavailable when the verb copies the offer and opens the platform's trade page
+type TradeMovesPropose string
+
 // TradeRecord defines model for TradeRecord.
 type TradeRecord struct {
 	Losses int `json:"losses"`
@@ -3519,8 +3724,29 @@ type TradeRow struct {
 	// MyGain points over replacement a week to the drafter's lineup
 	MyGain float64 `json:"my_gain"`
 
+	// MyProjChange this week's Proj total of the drafter's lineup with the trade less without it, each lineup set as the Lineup screen sets it (Lane 66g), one decimal; null when the week has no published projection read
+	MyProjChange *float64 `json:"my_proj_change"`
+
 	// TheirGain the same to theirs
 	TheirGain float64 `json:"their_gain"`
+
+	// TheirProjChange the same for theirs
+	TheirProjChange *float64 `json:"their_proj_change"`
+}
+
+// TradeSideTotals defines model for TradeSideTotals.
+type TradeSideTotals struct {
+	// ProjAfter the same after the trade
+	ProjAfter *float64 `json:"proj_after"`
+
+	// ProjBefore this week's Proj total of the side's lineup as the Lineup screen sets it, one decimal; null with no projection read
+	ProjBefore *float64 `json:"proj_before"`
+
+	// SeasonAfter the same after the trade: season_before plus the side's gain
+	SeasonAfter float64 `json:"season_after"`
+
+	// SeasonBefore the side's lineup strength on our rest-of-season order, points over replacement a week, one decimal: the figure the gains are a change in
+	SeasonBefore float64 `json:"season_before"`
 }
 
 // TradeTeam defines model for TradeTeam.
@@ -3538,6 +3764,12 @@ type TradeTeam struct {
 
 	// Trades at most 10: the trades their lineup gains 0.5 a week or more from first, then the close calls for them, each group best for the drafter first
 	Trades []TradeRow `json:"trades"`
+}
+
+// TradeTotals defines model for TradeTotals.
+type TradeTotals struct {
+	Theirs TradeSideTotals `json:"theirs"`
+	Yours  TradeSideTotals `json:"yours"`
 }
 
 // WaiverAdvice defines model for WaiverAdvice.
@@ -3821,6 +4053,15 @@ type RedirectResponse struct {
 // RoomCardResponse defines model for RoomCardResponse.
 type RoomCardResponse struct {
 	Data      RoomCard   `json:"data"`
+	Error     *ErrorBody `json:"error"`
+	Meta      *PageMeta  `json:"meta,omitempty"`
+	Ok        bool       `json:"ok"`
+	RequestId string     `json:"request_id"`
+}
+
+// ScoreboardResponse defines model for ScoreboardResponse.
+type ScoreboardResponse struct {
+	Data      Scoreboard `json:"data"`
 	Error     *ErrorBody `json:"error"`
 	Meta      *PageMeta  `json:"meta,omitempty"`
 	Ok        bool       `json:"ok"`

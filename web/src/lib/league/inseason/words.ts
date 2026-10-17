@@ -196,9 +196,6 @@ export function noTradeWith(name: string): string {
 	return `No trade we found includes ${name}.`;
 }
 
-/** What a team's trades are when the finder holds none for it. */
-export const NO_TRADES_WITH_TEAM = 'No trade with this team helps both lineups.';
-
 /** A player the drafter tags Hold on a sheet: never a drop, never given in a trade. */
 export const HELD = 'Held';
 
@@ -293,17 +290,6 @@ export function rowEnd(line: PlayerLine, screenCarriesPerGame: boolean): RowEnd 
 	return por === null ? { kind: 'words', words: LINES.unranked } : { kind: 'por', value: por };
 }
 
-/** Whether any of the rows carries his rest-of-season points a game. */
-export function carriesPerGame(lines: readonly PlayerLine[]): boolean {
-	return lines.some((line) => line.rest_of_season_per_game !== null);
-}
-
-/** The head over rows that end on their own number: "Points a game" once the rows carry it, his
- * points over replacement a week before. */
-export function figureHead(lines: readonly PlayerLine[]): string {
-	return carriesPerGame(lines) ? LINES.pointsAGame : LINES.perWeek;
-}
-
 /** The tabs under a followed league's title, each screen by its rail word (spec 2026-10-16 §3). */
 export const TAB_LABELS: Readonly<Record<'league' | LeagueScreen, string>> = {
 	league: 'League',
@@ -321,7 +307,6 @@ export const LINES = {
 	toYourLineup: 'a week to your lineup',
 	/** The waiver rows' number named once over them on a phone, where the cell prints it alone. */
 	gainHead: 'Your gain a week',
-	drop: 'Drop',
 	unranked: 'Unranked',
 	/** A row's end on a screen whose rows end on points a game, for a player without them. */
 	noProjection: 'No projection',
@@ -338,17 +323,10 @@ export const LINES = {
 	notFound: 'Not found',
 	notFoundLine: 'Nothing lives at this address.',
 	toBoard: 'Go to the board',
-	perWeek: 'Over repl a week',
-	/** The head over rows that end on his rest-of-season points a game, as the league page's roster
-	 * names its season figure. */
-	pointsAGame: 'Points a game',
 	add: 'Add',
-	propose: 'Propose',
 	chosen: 'Up top',
 	sit: 'Sit',
 	bench: 'Bench',
-	give: 'Give',
-	get: 'Get',
 	ourCall: 'Our call',
 	reading: 'Reading your league',
 	noBench: 'Nobody on your bench',
@@ -379,9 +357,4 @@ export function addsTitle(week: number): string {
 /** The waiver panel's count: "2 would start for you", "None would start for you". */
 export function startingCount(n: number): string {
 	return `${n === 0 ? 'None' : String(n)} would start for you`;
-}
-
-/** A team's Show more: "Show 2 more". */
-export function showMore(n: number): string {
-	return `Show ${String(n)} more`;
 }

@@ -43,6 +43,8 @@ from research.nightly.reads.schedule import slates_by_club
 from research.nightly.register_log import FrozenBy, carried_note, last_pass
 from research.nightly.run_store import RunStore
 from research.nightly.steps import IngestContext, StepRecord, ingest_step, run_fit_step
+from research.nightly.week_reads import STEP as WEEK_READS
+from research.nightly.week_reads import run_week_read_step
 from research.pipeline.http import Fetcher
 from research.season import PRODUCT_SEASON
 
@@ -142,6 +144,8 @@ def run_steps(  # noqa: PLR0913, PLR0917 - the steps' shared dependencies
             gate = capsule_gate(conn, at, span_rules(conn, at, facts))
             findings = page_findings(conn, at, facts)
         steps[-1] = StepOutcome(capsule.record, gate, tuple(findings.reasons))
+    # The week-ahead reads, on the capsule step's instant and facts pass (Lane 72); advisory to the verdict.
+    steps.append(_isolated(WEEK_READS, lambda: StepOutcome(StepRecord(WEEK_READS, "skipped", "skipped by --skip") if WEEK_READS in skip else run_week_read_step(engine, capsule_clock(), log, facts)), log))  # fmt: skip
     return steps
 
 

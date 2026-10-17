@@ -8,25 +8,36 @@
 	import { tagMarks } from '#lib/sheet/tags.ts';
 	import StatusPill from '../StatusPill.svelte';
 	import { HELD } from '../inseason/words.ts';
-	import type { BoxRow } from './box.ts';
+	import { initialName, type BoxRow } from './box.ts';
 	import BoxGame from './BoxGame.svelte';
 
 	/** A box row's player cell (Lane 66d), shared by every box score: his face (a defense's club mark),
 	 * his name on a line of its own, under it his club and Lane 63's status pill (his position and
-	 * rank, and his status when the report lists him), your sheet's tags, and on a phone his game
-	 * folded under the pill. A screen adds its own short line under all of it (children). */
+	 * rank, and his status when the report lists him), your sheet's tags, and his game folded under
+	 * the pill on a phone (or at every width in a compact box, its facts left out). A screen adds its
+	 * own mark after the pill (after) and its own short line under it all (children). */
 	interface Props {
 		row: BoxRow;
 		/** Your sheet's tags on him, as the league's rows mark them (review L7). */
 		tags?: readonly string[];
+		/** A narrow phone cell prints his short form, "A. Rodgers", never a cut surname (rereview N2). */
+		shortOnPhone?: boolean;
+		/** The trade builder's rows (Lane 66g): the game under the name at every width, without facts. */
+		compact?: boolean;
 		/** Drawn on the club line after the pill. */
 		after?: Snippet;
 		/** The screen's own line under the name, as the phone and narrow screens fold it. */
 		children?: Snippet;
 	}
 
-	let { row, tags = [], after, children }: Props = $props();
+	let { row, tags = [], shortOnPhone = false, compact = false, after, children }: Props = $props();
 </script>
+
+{#snippet named()}
+	{#if shortOnPhone}<span class="full"><NameWords name={row.name} /></span><span class="short"
+			>{initialName(row.name)}</span
+		>{:else}<NameWords name={row.name} />{/if}
+{/snippet}
 
 <span class="pl">
 	{#if row.face.mark && row.face.src !== null}
@@ -37,9 +48,9 @@
 	<span class="who">
 		<span class="nm">
 			{#if row.slug !== null}
-				<a href={links.playerSeason(row.slug)}><NameWords name={row.name} /></a>
+				<a href={links.playerSeason(row.slug)}>{@render named()}</a>
 			{:else}
-				<b><NameWords name={row.name} /></b>
+				<b>{@render named()}</b>
 			{/if}
 		</span>
 		<span class="club"
@@ -60,7 +71,7 @@
 					/>{/each}</span
 			>
 		{/if}
-		<span class="phone-game"><BoxGame {row} /></span>
+		<span class="phone-game" class:compact><BoxGame {row} facts={!compact} /></span>
 		{@render children?.()}
 	</span>
 </span>
@@ -116,11 +127,33 @@
 		color: var(--ink-3);
 	}
 
+	.short {
+		display: none;
+	}
+
 	.phone-game {
 		display: none;
 	}
 
+	.phone-game.compact {
+		display: flex;
+		flex-direction: column;
+		gap: 1px;
+		font-size: var(--t-xs);
+		color: var(--ink-2);
+	}
+
 	@media (max-width: 760px) {
+		/* A name's short form on a phone, where the row asks for it. */
+		.full {
+			display: none;
+		}
+
+		.short {
+			display: inline;
+			white-space: nowrap;
+		}
+
 		.phone-game {
 			display: flex;
 			flex-direction: column;

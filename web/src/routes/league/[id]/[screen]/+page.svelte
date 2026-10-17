@@ -14,6 +14,8 @@
 	import { LINES, TAB_LABELS, refreshedWords } from '#lib/league/inseason/words.ts';
 	import type { AdviceHead } from '#lib/league/inseason/api.ts';
 	import { sectionHref } from '#lib/ui/nav.ts';
+	import { siteContext } from '#lib/context/context.svelte.ts';
+	import { standingWords } from '#lib/league/model.ts';
 	import EmptyState from '#lib/ui/EmptyState.svelte';
 	import Shell from '#lib/ui/Shell.svelte';
 	import Verb from '#lib/ui/Verb.svelte';
@@ -29,6 +31,9 @@
 
 	let { data }: PageProps = $props();
 	const id = $derived(page.params.id ?? '');
+	/** The followed league as the switch lists it: the member's team and standing for the Trades
+	 * screen's builder (Lane 66g). */
+	const league = $derived(siteContext.leagues.find((l) => l.id === id) ?? null);
 </script>
 
 {#key `${id}-${data.screen}`}
@@ -84,6 +89,7 @@
 				<TradeScreen
 					{advice}
 					{host}
+					me={{ name: league?.team_name ?? '', aside: league ? standingWords(league) : '' }}
 					narrow={(player: string) => inSeasonApi.trades(id, player)}
 					check={(trade: TradeCheckInput) => inSeasonApi.checkTrade(id, trade)}
 				/>

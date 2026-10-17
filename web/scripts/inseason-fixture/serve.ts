@@ -19,6 +19,7 @@ import type {
 	HostMoveResult,
 	LineupAdvice,
 	MatchupBox,
+	Scoreboard,
 	PlayerLine,
 	TradeAdvice,
 	TradeCheck,
@@ -28,7 +29,9 @@ import type {
 import type { components } from '../../src/lib/api/types.ts';
 import type { GameWeek } from '../../src/lib/format/game-facts.ts';
 import { FIXTURE_IDS } from './ids.ts';
+import { lineupProj, seasonStrength } from './week.ts';
 import { FIXTURE_SEASON, askedPhase, phaseAccount, phaseLeagues, phaseSync } from './phases.ts';
+import { ESPN_STAND_IN_NAME, espnSync } from './espn-sync.ts';
 
 const PORT = Number(process.env.PORT ?? 8799);
 const DATA = new URL('./data/', import.meta.url);
@@ -89,14 +92,17 @@ async function load<T>(name: string): Promise<T> {
 	return JSON.parse(await readFile(new URL(`${name}.json`, DATA), 'utf8')) as T;
 }
 
-const [sync, lineup, waivers, trades, gameWeek, matchupBox] = await Promise.all([
-	load<LeagueSync>('sync'),
-	load<LineupAdvice>('lineup'),
-	load<WaiverAdvice>('waivers'),
-	load<TradeAdvice>('trades'),
-	load<GameWeek>('games'),
-	load<MatchupBox>('matchup')
-]);
+const [sync, lineup, waivers, trades, gameWeek, matchupBox, scoreboard, scoreboardLive] =
+	await Promise.all([
+		load<LeagueSync>('sync'),
+		load<LineupAdvice>('lineup'),
+		load<WaiverAdvice>('waivers'),
+		load<TradeAdvice>('trades'),
+		load<GameWeek>('games'),
+		load<MatchupBox>('matchup'),
+		load<Scoreboard>('scoreboard'),
+		load<Scoreboard>('scoreboard-live')
+	]);
 
 const myTeam = sync.teams.find((t) => t.roster_id === sync.me);
 const contextBase = {
@@ -118,8 +124,22 @@ const contextBase = {
 	settings_league_id: null
 };
 /** The leagues as the switch lists them, one per season phase (phases.ts), drafts timed from now. */
-const leaguesNow = (): components['schemas']['ContextLeague'][] =>
-	phaseLeagues(contextBase, Date.now());
+/** The leagues as the switch lists them, one per season phase (phases.ts), drafts timed from now,
+ * then the ESPN stand-ins in season under their own name and platform, so the switch on an ESPN
+ * screen names the league it shows. */
+const leaguesNow = (): components['schemas']['ContextLeague'][] => {
+	const phased = phaseLeagues(contextBase, Date.now());
+	const inSeason = phased.find((league) => league.id === LEAGUE);
+	const espn = inSeason
+		? [...ESPN_MOVES.keys()].map((espnId) => ({
+				...inSeason,
+				id: espnId,
+				name: ESPN_STAND_IN_NAME,
+				host: 'espn' as const
+			}))
+		: [];
+	return [...phased, ...espn];
+};
 const contextLeague = leaguesNow().find((league) => league.id === LEAGUE);
 if (!contextLeague) throw new Error('The fixture has no in-season league.');
 const account: components['schemas']['Account'] = {
@@ -239,13 +259,40 @@ function tradeCheck(input: TradeCheckInput): TradeCheck | string {
 	const por = (side: readonly PlayerLine[]): number =>
 		side.reduce((sum, line) => sum + (line.points_over_replacement ?? 0), 0);
 	const swing = tenth(por(gets) - por(gives));
+	const slots = lineup.slots.map((s) => s.slot);
+	const without = (roster: readonly PlayerLine[], out: readonly PlayerLine[]): PlayerLine[] =>
+		roster.filter((line) => !out.includes(line));
+	const myBefore = lineupProj(trades.roster, slots);
+	const theirBefore = lineupProj(team.roster, slots);
 	const trade = listed ?? {
 		give: gives,
 		get: gets,
 		drop: null,
 		my_gain: swing,
 		their_gain: -swing,
-		close_for_them: -swing < CLOSE_CALL
+		close_for_them: -swing < CLOSE_CALL,
+		my_proj_change: tenth(
+			lineupProj([...without(trades.roster, gives), ...gets], slots) - myBefore
+		),
+		their_proj_change: tenth(
+			lineupProj([...without(team.roster, gets), ...gives], slots) - theirBefore
+		)
+	};
+	/** A side's totals as the API's check carries them (check.go sideTotals): the Proj before and
+	 * after, and the strength before and after, after being before plus the gain. */
+	const side = (
+		roster: readonly PlayerLine[],
+		before: number,
+		change: number | null,
+		gain: number
+	): TradeCheck['totals']['yours'] => {
+		const season = seasonStrength(roster, slots);
+		return {
+			proj_before: before,
+			proj_after: change === null ? null : tenth(before + change),
+			season_before: season,
+			season_after: tenth(season + gain)
+		};
 	};
 	const yoursOpen = openSlot([...trades.roster.filter((line) => !gives.includes(line)), ...gets]);
 	return {
@@ -265,13 +312,17 @@ function tradeCheck(input: TradeCheckInput): TradeCheck | string {
 			yours_room: true,
 			theirs_room: true
 		},
+		totals: {
+			yours: side(trades.roster, myBefore, trade.my_proj_change, trade.my_gain),
+			theirs: side(team.roster, theirBefore, trade.their_proj_change, trade.their_gain)
+		},
 		host_trades_url: trades.host_trades_url,
 		host_note: trades.host_note
 	};
 }
 
 const CHECK = /^\/leagues\/attached\/([^/]+)\/trades\/check$/;
-const IN_SEASON = /^\/leagues\/attached\/([^/]+)\/(lineup|matchup|waivers|trades)$/;
+const IN_SEASON = /^\/leagues\/attached\/([^/]+)\/(lineup|matchup|scoreboard|waivers|trades)$/;
 const MOVES = /^\/leagues\/attached\/([^/]+)\/moves(\/plan)?$/;
 
 /** A changed slot's place in the API's words: "at RB", "in the flex". */
@@ -490,8 +541,9 @@ async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> 
 	}
 	const synced = SYNC.exec(url.pathname);
 	if (synced) {
+		const asked = synced[1] ?? '';
 		send(req, res, HTTP.ok, {
-			...phaseSync(sync, synced[1] ?? ''),
+			...phaseSync(ESPN_MOVES.has(asked) ? espnSync(sync) : sync, asked),
 			id: synced[1],
 			read_at: readAt()
 		});
@@ -531,6 +583,9 @@ async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> 
 		const bodies = {
 			lineup: ESPN_MOVES.has(id ?? '') ? espnLineup() : lineup,
 			matchup: matchupBox,
+			// The ESPN leagues show the week on its Sunday afternoon, a stand-in (league.ts): the
+			// points are made up so the board's played states can be drawn.
+			scoreboard: ESPN_MOVES.has(id ?? '') ? scoreboardLive : scoreboard,
 			waivers: ESPN_MOVES.has(id ?? '')
 				? espnWaivers(url.searchParams.get('position'))
 				: waiversAt(url.searchParams.get('position')),

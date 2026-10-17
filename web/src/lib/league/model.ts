@@ -10,7 +10,6 @@ import type { FaceStatus } from '#lib/ui/face-status.ts';
 import type {
 	AttachedLeague,
 	LeagueHost,
-	LeagueMove,
 	LeaguePlayer,
 	LeagueSync,
 	LeagueTeam,
@@ -124,24 +123,6 @@ export function teamName(sync: Pick<LeagueSync, 'teams'>, rosterId: number): str
 	return name !== '' ? name : `Team ${String(rosterId)}`;
 }
 
-/** A move as a sentence, with no closing period: "Alpha and Beta traded. Alpha got X, Beta got Y",
- * "Alpha claimed X and dropped Y". The list leads it with its day. */
-export function moveWords(sync: LeagueSync, move: LeagueMove): string {
-	const names = (list: LeagueMove['adds']): string => list.map((m) => m.player.name).join(', ');
-	if (move.kind === 'trade') {
-		const [a = 0, b = 0] = move.roster_ids;
-		const toA = move.adds.filter((m) => m.roster_id === a);
-		const toB = move.adds.filter((m) => m.roster_id === b);
-		const [nameA, nameB] = [teamName(sync, a), teamName(sync, b)];
-		return `${nameA} and ${nameB} traded. ${nameA} got ${names(toA) || 'nobody'}, ${nameB} got ${names(toB) || 'nobody'}`;
-	}
-	const who = teamName(sync, move.roster_ids[0] ?? 0);
-	const how = move.kind === 'waiver' ? 'claimed' : 'picked up';
-	const added = move.adds.length > 0 ? `${how} ${names(move.adds)}` : '';
-	const dropped = move.drops.length > 0 ? `dropped ${names(move.drops)}` : '';
-	return `${who} ${[added, dropped].filter((part) => part !== '').join(' and ')}`;
-}
-
 /** His season so far with its basis: "5 games, 18.4 a game", or "No games yet". */
 export function seasonWords(season: IndexSeason): string {
 	if (season.pointsPerGame === null) return 'No games yet';
@@ -177,29 +158,6 @@ export function rowOf(board: LeagueBoard, player: LeaguePlayer): LeagueBoardPlay
 		if (placed) return placed;
 	}
 	return null;
-}
-
-/** Whether the season has kicked off on the run's board: any player has a game. */
-export function seasonStarted(board: LeagueBoard): boolean {
-	return board.players.some((p) => p.season.games > 0);
-}
-
-/** The waiver pool: our board without every player a team in the league holds, in our board's
- * order (points over replacement), so a one-QB league's pickups lead rather than its backup
- * quarterbacks. In season each row shows his points a game. */
-export function poolRows(board: LeagueBoard, sync: LeagueSync): readonly LeagueBoardPlayer[] {
-	// An API from before held_by omits it and still names the rostered ids: read those then.
-	const byId = sync.held_by as LeagueSync['held_by'] | undefined;
-	// eslint-disable-next-line @typescript-eslint/no-deprecated -- the deploy window's fallback, removed with the field.
-	const held = new Set(byId === undefined ? sync.rostered : Object.keys(byId));
-	return board.players.filter((p) => !held.has(p.id));
-}
-
-/** How the pool is ranked and what its figure is, said once above it. */
-export function poolBasis(board: LeagueBoard): string {
-	const order =
-		"Unrostered in your league, ranked by our preseason board's points over replacement.";
-	return seasonStarted(board) ? `${order} The figure is his points a game this season.` : order;
 }
 
 /** The page's one basis line, once: the scoring the figures are in (the run's season scoring, never

@@ -77,6 +77,7 @@ func (s *Service) Routes() []httpx.Route {
 	return []httpx.Route{
 		{Method: http.MethodGet, Path: "/leagues/attached/{id}/lineup", Access: httpx.SignedIn, Limit: limit, Handler: s.lineup},
 		{Method: http.MethodGet, Path: "/leagues/attached/{id}/matchup", Access: httpx.SignedIn, Limit: limit, Handler: s.matchup},
+		{Method: http.MethodGet, Path: "/leagues/attached/{id}/scoreboard", Access: httpx.SignedIn, Limit: limit, Handler: s.scoreboard},
 		{Method: http.MethodGet, Path: "/leagues/attached/{id}/waivers", Access: httpx.SignedIn, Limit: limit, Handler: s.waivers},
 		{Method: http.MethodGet, Path: "/leagues/attached/{id}/trades", Access: httpx.SignedIn, Limit: limit, Handler: s.trades},
 		{Method: http.MethodPost, Path: "/leagues/attached/{id}/trades/check", Access: httpx.SignedIn, Limit: limit, Handler: s.checkTrade},
@@ -184,6 +185,14 @@ func (s *Service) matchup(w http.ResponseWriter, r *http.Request) {
 	}
 	out, ok := a.Matchup()
 	s.answer(w, r, out, ok)
+}
+
+func (s *Service) scoreboard(w http.ResponseWriter, r *http.Request) {
+	a, ok := s.advisorFor(w, r)
+	if !ok {
+		return
+	}
+	s.answer(w, r, a.Scoreboard(), true)
 }
 
 func (s *Service) waivers(w http.ResponseWriter, r *http.Request) {
