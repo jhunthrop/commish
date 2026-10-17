@@ -333,5 +333,5 @@ func TradeCheckBasis(b OrderBasis, weeks int) string {
 
 // TradesBasis is the trade finder's (§6.3).
 func TradesBasis(b OrderBasis, weeks int) string {
-	return fmt.Sprintf("Trades where both lineups gain on %s. The other team decides. %s", numberWords(b), porWords(b, weeks))
+	return fmt.Sprintf("Trades where both lineups gain over the rest of the season on %s, best for you first. The other team decides. %s", numberWords(b), porWords(b, weeks))
 }

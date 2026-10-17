@@ -79,14 +79,83 @@ func (a *advisor) CheckTrade(in apitypes.TradeCheckInput) (apitypes.TradeCheck, 
 		return apitypes.TradeCheck{}, r, true
 	}
 	checked := Check(a.config, a.weeks, a.squad(mine, true), a.squad(theirs, false), give, get)
+	week := a.tradeWeek(team, other, mine, theirs, checked.Trade)
 	h := a.header()
 	out := apitypes.TradeCheck{Week: h.week, Basis: withPerGame(a.Board, TradeCheckBasis(a.basis, a.weeks), mine, theirs), BasisNote: BasisNote(a.settings, a.season.Carries),
-		OrderBasis: h.basis, Refreshed: h.refreshed, ReadAt: h.readAt, Trade: tradeRow(mine, theirs, checked.Trade),
+		OrderBasis: h.basis, Refreshed: h.refreshed, ReadAt: h.readAt, Trade: a.tradeRow(mine, theirs, checked.Trade, week),
 		Fills: apitypes.TradeFills{Yours: checked.Mine.Fills, Theirs: checked.Theirs.Fills,
 			YoursOpen: a.openLabel(checked.Mine), TheirsOpen: a.openLabel(checked.Theirs),
-			YoursRoom: checked.Mine.Room, TheirsRoom: checked.Theirs.Room}}
+			YoursRoom: checked.Mine.Room, TheirsRoom: checked.Theirs.Room},
+		Totals: apitypes.TradeTotals{Yours: sideTotals(week.mine, checked.MineBase, checked.MyGain),
+			Theirs: sideTotals(week.theirs, checked.TheirsBase, checked.TheirGain)}}
 	out.HostTradesUrl, out.HostNote = a.host(TradesPage)
 	return out, nil, true
+}
+
+// weekSide is one side's Proj total this week before and after a trade,
+// each lineup set as the Lineup screen sets it (Lane 66g); nil both with
+// no projection read.
+type weekSide struct{ before, after *float64 }
+
+// change is after less before, nil without a projection read.
+func (w weekSide) change() *float64 {
+	if w.before == nil || w.after == nil {
+		return nil
+	}
+	d := roundTenth(*w.after - *w.before)
+	return &d
+}
+
+// tradeWeek is each side's weekSide: the member loses his give and his
+// drop and takes their get, they lose their get and take his give. Their
+// drop, theirs to choose, is never a starter, so it moves no Proj.
+type tradeWeek struct{ mine, theirs weekSide }
+
+func (a *advisor) tradeWeek(team, other leaguesync.Team, mine, theirs []person, tr Trade) tradeWeek {
+	if a.projectionReadAt() == nil {
+		return tradeWeek{}
+	}
+	out := tr.Give
+	if tr.Drop >= 0 {
+		out = append(append([]int(nil), tr.Give...), tr.Drop)
+	}
+	return tradeWeek{
+		mine:   a.weekSide(team, mine, out, candidatesAt(theirs, tr.Get)),
+		theirs: a.weekSide(other, theirs, tr.Get, candidatesAt(mine, tr.Give)),
+	}
+}
+
+func (a *advisor) weekSide(t leaguesync.Team, people []person, out []int, in []Candidate) weekSide {
+	roster := candidatesAt(people, nil)
+	before := roundTenth(WeekProj(a.config, roster, t.Starters))
+	after := roundTenth(WeekProj(a.config, Swapped(roster, out, in), t.Starters))
+	return weekSide{before: &before, after: &after}
+}
+
+// candidatesAt is the people at the indexes as the engine orders them,
+// every one of them for nil.
+func candidatesAt(people []person, at []int) []Candidate {
+	if at == nil {
+		out := make([]Candidate, len(people))
+		for i, p := range people {
+			out[i] = p.cand
+		}
+		return out
+	}
+	out := make([]Candidate, len(at))
+	for i, p := range at {
+		out[i] = people[p].cand
+	}
+	return out
+}
+
+// sideTotals is a side's totals on the wire: the week's Proj before and
+// after, and the lineup strength before and after, after being before
+// plus the gain as each prints so the three figures agree to the tenth.
+func sideTotals(w weekSide, base, gain float64) apitypes.TradeSideTotals {
+	before := roundTenth(base)
+	return apitypes.TradeSideTotals{ProjBefore: w.before, ProjAfter: w.after,
+		SeasonBefore: before, SeasonAfter: roundTenth(before + roundTenth(gain))}
 }
 
 // openLabel is the first slot a side leaves empty as a lineup row labels
@@ -171,10 +240,12 @@ func possessive(name string) string {
 }
 
 // tradeRow is a trade on the wire, its players' lines from each side's
-// people: the finder's rows and the builder's answer alike.
-func tradeRow(mine, theirs []person, tr Trade) apitypes.TradeRow {
+// people, with each side's change in this week's Proj: the finder's rows
+// and the builder's answer alike.
+func (a *advisor) tradeRow(mine, theirs []person, tr Trade, week tradeWeek) apitypes.TradeRow {
 	row := apitypes.TradeRow{Give: lines(mine, tr.Give), Get: lines(theirs, tr.Get),
-		MyGain: roundTenth(tr.MyGain), TheirGain: roundTenth(tr.TheirGain), CloseForThem: tr.CloseForThem()}
+		MyGain: roundTenth(tr.MyGain), TheirGain: roundTenth(tr.TheirGain), CloseForThem: tr.CloseForThem(),
+		MyProjChange: week.mine.change(), TheirProjChange: week.theirs.change()}
 	if tr.Drop >= 0 {
 		drop := mine[tr.Drop].line
 		row.Drop = &drop

@@ -2990,6 +2990,16 @@ export interface components {
 			their_gain: number;
 			/** @description their gain is under 0.5 a week */
 			close_for_them: boolean;
+			/**
+			 * Format: double
+			 * @description this week's Proj total of the drafter's lineup with the trade less without it, each lineup set as the Lineup screen sets it (Lane 66g), one decimal; null when the week has no published projection read
+			 */
+			my_proj_change?: number | null;
+			/**
+			 * Format: double
+			 * @description the same for theirs
+			 */
+			their_proj_change?: number | null;
 		};
 		TradeTeam: {
 			roster_id: number;
@@ -3132,6 +3142,42 @@ export interface components {
 			host_trades_url: string;
 			/** @description one sentence under the verb when we cannot open the host's page ("Make this change on Yahoo. We cannot open that page for you yet."), null when the url opens it */
 			host_note: string | null;
+			moves: components['schemas']['TradeMoves'];
+		};
+		TradeMoves: {
+			/**
+			 * @description available when a trade can be proposed on the platform from our screen (none today: the verb would read Propose on the platform); unavailable when the verb copies the offer and opens the platform's trade page
+			 * @enum {string}
+			 */
+			propose: 'available' | 'unavailable';
+			/** @description one line under the verb saying why the trade is not proposed from here, naming the platform; null when available */
+			reason: string | null;
+		};
+		TradeSideTotals: {
+			/**
+			 * Format: double
+			 * @description this week's Proj total of the side's lineup as the Lineup screen sets it, one decimal; null with no projection read
+			 */
+			proj_before: number | null;
+			/**
+			 * Format: double
+			 * @description the same after the trade
+			 */
+			proj_after: number | null;
+			/**
+			 * Format: double
+			 * @description the side's lineup strength on our rest-of-season order, points over replacement a week, one decimal: the figure the gains are a change in
+			 */
+			season_before: number;
+			/**
+			 * Format: double
+			 * @description the same after the trade: season_before plus the side's gain
+			 */
+			season_after: number;
+		};
+		TradeTotals: {
+			yours: components['schemas']['TradeSideTotals'];
+			theirs: components['schemas']['TradeSideTotals'];
 		};
 		TradeCheckInput: {
 			/** @description the other team's roster_id (TradeTeam.roster_id) */
@@ -3168,6 +3214,7 @@ export interface components {
 			/** @description the trade as the finder reckons one: my_gain and their_gain fall below zero for a lineup that loses, close_for_them as the finder marks it */
 			trade: components['schemas']['TradeRow'];
 			fills: components['schemas']['TradeFills'];
+			totals: components['schemas']['TradeTotals'];
 			/** @description the host's trade page, the finder's, empty when we know none */
 			host_trades_url: string;
 			/** @description as TradeAdvice's */

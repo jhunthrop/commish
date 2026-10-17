@@ -43,6 +43,19 @@ func CopyOnlyMoves(host string) apitypes.LineupMoves {
 	return apitypes.LineupMoves{Lineup: apitypes.LineupMovesLineupUnavailable, Reason: &reason}
 }
 
+// proposeWords is the line under the trade verb: no platform takes a
+// trade proposal from our screen yet (Lane 66g).
+const proposeWords = "%s does not take trade proposals from here, so we copy the trade for you to propose there."
+
+// TradeMoves is the trade verb's rule, the lineup verb's twin: Propose
+// on the platform where it takes proposals from here (none today), else
+// the offer copied and the platform's trade page opened, with the line
+// that says why, the platform named.
+func TradeMoves(host string) apitypes.TradeMoves {
+	reason := fmt.Sprintf(proposeWords, leaguesync.HostWords(host))
+	return apitypes.TradeMoves{Propose: apitypes.TradeMovesProposeUnavailable, Reason: &reason}
+}
+
 // HostURL is the host's page for the verb, empty for a host whose page
 // we do not know. team is the member's roster in the league (0 when
 // unknown). Sleeper: the member's team page sets the lineup and starts a

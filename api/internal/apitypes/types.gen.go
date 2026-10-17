@@ -1299,6 +1299,24 @@ func (e SiteSeasonPhase) Valid() bool {
 	}
 }
 
+// Defines values for TradeMovesPropose.
+const (
+	TradeMovesProposeAvailable   TradeMovesPropose = "available"
+	TradeMovesProposeUnavailable TradeMovesPropose = "unavailable"
+)
+
+// Valid indicates whether the value is a known member of the TradeMovesPropose enum.
+func (e TradeMovesPropose) Valid() bool {
+	switch e {
+	case TradeMovesProposeAvailable:
+		return true
+	case TradeMovesProposeUnavailable:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for WaiverMovesClaim.
 const (
 	WaiverMovesClaimAvailable   WaiverMovesClaim = "available"
@@ -3322,7 +3340,8 @@ type TradeAdvice struct {
 	HostNote *string `json:"host_note"`
 
 	// HostTradesUrl the host's trade page, empty when we know none
-	HostTradesUrl string `json:"host_trades_url"`
+	HostTradesUrl string     `json:"host_trades_url"`
+	Moves         TradeMoves `json:"moves"`
 
 	// OrderBasis which order ranks the players: our preseason board, or the rest-of-season order (from week 7, once the API reads it)
 	OrderBasis OrderBasis `json:"order_basis"`
@@ -3351,9 +3370,10 @@ type TradeCheck struct {
 	HostTradesUrl string `json:"host_trades_url"`
 
 	// OrderBasis which order ranks the players: our preseason board, or the rest-of-season order (from week 7, once the API reads it)
-	OrderBasis OrderBasis `json:"order_basis"`
-	ReadAt     time.Time  `json:"read_at"`
-	Refreshed  time.Time  `json:"refreshed"`
+	OrderBasis OrderBasis  `json:"order_basis"`
+	ReadAt     time.Time   `json:"read_at"`
+	Refreshed  time.Time   `json:"refreshed"`
+	Totals     TradeTotals `json:"totals"`
 
 	// Trade the trade as the finder reckons one: my_gain and their_gain fall below zero for a lineup that loses, close_for_them as the finder marks it
 	Trade TradeRow `json:"trade"`
@@ -3393,6 +3413,18 @@ type TradeFills struct {
 	YoursRoom bool `json:"yours_room"`
 }
 
+// TradeMoves defines model for TradeMoves.
+type TradeMoves struct {
+	// Propose available when a trade can be proposed on the platform from our screen (none today: the verb would read Propose on the platform); unavailable when the verb copies the offer and opens the platform's trade page
+	Propose TradeMovesPropose `json:"propose"`
+
+	// Reason one line under the verb saying why the trade is not proposed from here, naming the platform; null when available
+	Reason *string `json:"reason"`
+}
+
+// TradeMovesPropose available when a trade can be proposed on the platform from our screen (none today: the verb would read Propose on the platform); unavailable when the verb copies the offer and opens the platform's trade page
+type TradeMovesPropose string
+
 // TradeRecord defines model for TradeRecord.
 type TradeRecord struct {
 	Losses int `json:"losses"`
@@ -3413,8 +3445,29 @@ type TradeRow struct {
 	// MyGain points over replacement a week to the drafter's lineup
 	MyGain float64 `json:"my_gain"`
 
+	// MyProjChange this week's Proj total of the drafter's lineup with the trade less without it, each lineup set as the Lineup screen sets it (Lane 66g), one decimal; null when the week has no published projection read
+	MyProjChange *float64 `json:"my_proj_change,omitempty"`
+
 	// TheirGain the same to theirs
 	TheirGain float64 `json:"their_gain"`
+
+	// TheirProjChange the same for theirs
+	TheirProjChange *float64 `json:"their_proj_change,omitempty"`
+}
+
+// TradeSideTotals defines model for TradeSideTotals.
+type TradeSideTotals struct {
+	// ProjAfter the same after the trade
+	ProjAfter *float64 `json:"proj_after"`
+
+	// ProjBefore this week's Proj total of the side's lineup as the Lineup screen sets it, one decimal; null with no projection read
+	ProjBefore *float64 `json:"proj_before"`
+
+	// SeasonAfter the same after the trade: season_before plus the side's gain
+	SeasonAfter float64 `json:"season_after"`
+
+	// SeasonBefore the side's lineup strength on our rest-of-season order, points over replacement a week, one decimal: the figure the gains are a change in
+	SeasonBefore float64 `json:"season_before"`
 }
 
 // TradeTeam defines model for TradeTeam.
@@ -3432,6 +3485,12 @@ type TradeTeam struct {
 
 	// Trades at most 10: the trades their lineup gains 0.5 a week or more from first, then the close calls for them, each group best for the drafter first
 	Trades []TradeRow `json:"trades"`
+}
+
+// TradeTotals defines model for TradeTotals.
+type TradeTotals struct {
+	Theirs TradeSideTotals `json:"theirs"`
+	Yours  TradeSideTotals `json:"yours"`
 }
 
 // WaiverAdvice defines model for WaiverAdvice.
