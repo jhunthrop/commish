@@ -65,6 +65,15 @@ def test_every_sentence_keeps_the_copy_rules(group: str) -> None:
         assert not any(name in lowered for name in COMPETITOR_NAMES), (group, text)
 
 
+def test_a_missing_fact_says_so_in_the_sites_words() -> None:
+    nan = float("nan")
+    missing = replace(FACTS, implied_points=nan, spread=nan, wind_mph=nan, temperature_f=nan, roof=None)
+    assert sentence("game", missing) == "No expected score for this game yet"
+    assert sentence("weather", missing) == "No forecast for kickoff yet"
+    for group in ("role", "teammates", "matchup", "game", "weather", "home_rest", "efficiency"):
+        assert not voice_rule_hits(sentence(group, missing), ["BUF"])
+
+
 def test_the_game_sentence_speaks_of_winning_not_of_a_figure() -> None:
     assert sentence("game", FACTS) == "His team is expected to score 25 and to win by 3"
     losing = replace(FACTS, spread=-3.5)

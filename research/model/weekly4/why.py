@@ -5,6 +5,7 @@ no tips, no competitor names, no betting or trading words ("expected to win by 3
 idiom). The facts come from the row the number read, at its instant; the screen shows the read time.
 """
 
+import math
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Final
@@ -90,7 +91,11 @@ def _matchup(f: Facts) -> str:
 
 
 def _game(f: Facts) -> str:
+    if not math.isfinite(f.implied_points):
+        return "No expected score for this game yet"
     score = f"His team is expected to score {round(f.implied_points):.0f}"
+    if not math.isfinite(f.spread):
+        return score
     if abs(f.spread) < HALF_A_POINT / 2:
         return f"{score} in an even game"
     verb = "win" if f.spread > 0 else "lose"
@@ -100,6 +105,8 @@ def _game(f: Facts) -> str:
 def _weather(f: Facts) -> str:
     if f.roof in ("dome", "closed"):
         return "Indoors, roof expected closed" if f.roof == "closed" else "Indoors, under a dome"
+    if not (math.isfinite(f.wind_mph) and math.isfinite(f.temperature_f)):
+        return "No forecast for kickoff yet"
     parts = [f"Wind {f.wind_mph:.0f} mph at kickoff", f"{f.temperature_f:.0f} degrees"]
     if f.precipitation_probability is not None:
         parts.append(f"a {f.precipitation_probability:.0%} chance of rain or snow")
@@ -110,6 +117,8 @@ def _weather(f: Facts) -> str:
 
 def _home(f: Facts) -> str:
     place = "At home" if f.home >= 1.0 else "On the road"
+    if not math.isfinite(f.rest_days):
+        return place
     return f"{place}, on {f.rest_days:.0f} days of rest"
 
 

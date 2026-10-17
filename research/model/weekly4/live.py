@@ -242,7 +242,7 @@ def _facts(row: pd.Series, rank: int | None) -> Facts:
         opponent=str(row["opponent"]),
         opponent_rank=rank,
         home=float(row["home"]),
-        rest_days=float(row["rest_days"]) if np.isfinite(row["rest_days"]) else 7.0,
+        rest_days=float(row["rest_days"]),
         implied_points=float(row["implied_points"]),
         spread=float(row["spread"]),
         roof=None if pd.isna(row["roof"]) else str(row["roof"]),
