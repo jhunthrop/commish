@@ -159,8 +159,13 @@ func (s *Service) lineup(w http.ResponseWriter, r *http.Request) {
 		// start and sit still answers.
 		moves, err := s.Moves.LineupMove(r.Context(), auth.AccountID(r), a.Snap.Ref.Host)
 		if err != nil {
+			// What the check knew before it failed is kept, the verb
+			// closed, and the line always set.
 			s.Log.Warn("inseason: moves", "err", err)
-			moves = apitypes.LineupMoves{Lineup: apitypes.LineupMovesLineupUnavailable}
+			moves.Lineup = apitypes.LineupMovesLineupUnavailable
+			if moves.Reason == nil {
+				moves = CopyOnlyMoves(a.Snap.Ref.Host)
+			}
 		}
 		out.Moves = moves
 	}

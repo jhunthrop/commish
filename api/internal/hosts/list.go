@@ -30,8 +30,16 @@ type List struct {
 	// Enabled is the hosts open here, in the order the account page lists
 	// them.
 	Enabled []apitypes.ConnectedHost
-	Store   Lister
-	Log     *slog.Logger
+	// Accounts is the hosts open to one signed-in account alone (a host
+	// whose switch is off, open to its proof list), nil for none.
+	Accounts OpenTo
+	Store    Lister
+	Log      *slog.Logger
+}
+
+// OpenTo is the hosts open to an account beyond the ones open to all.
+type OpenTo interface {
+	OpenTo(ctx context.Context, accountID uuid.UUID) ([]apitypes.ConnectedHost, error)
 }
 
 // Routes is GET /hosts.
@@ -49,6 +57,14 @@ func (l *List) list(w http.ResponseWriter, r *http.Request) {
 	if !signedIn {
 		httpx.WriteOK(w, r, http.StatusOK, out)
 		return
+	}
+	if l.Accounts != nil {
+		// A failed check leaves those hosts out: the rest still answer.
+		more, err := l.Accounts.OpenTo(r.Context(), account.ID)
+		if err != nil {
+			l.Log.Warn("hosts: open to", "account", account.ID, "err", err)
+		}
+		out.Enabled = append(out.Enabled, more...)
 	}
 	list, err := l.Store.List(r.Context(), account.ID)
 	if err != nil {

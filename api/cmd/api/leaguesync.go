@@ -17,6 +17,7 @@ import (
 	"github.com/jhunthrop/commish/api/internal/hosts"
 	"github.com/jhunthrop/commish/api/internal/hosts/espnhost"
 	"github.com/jhunthrop/commish/api/internal/hosts/ffpc"
+	"github.com/jhunthrop/commish/api/internal/hosts/mflhost"
 	"github.com/jhunthrop/commish/api/internal/hosts/yahoo"
 	"github.com/jhunthrop/commish/api/internal/httpx"
 	"github.com/jhunthrop/commish/api/internal/leagues"
@@ -145,20 +146,59 @@ func (e espnWiring) routes(pool *pgxpool.Pool, ff ffpcWiring, log *slog.Logger) 
 	}).Routes()
 }
 
+// mflWiring is MyFantasyLeague: the one client every read and write goes
+// through (league sync's public reads too, so one per-server gap holds
+// for the process), and the member reader over the vault. Ready is the
+// vault's key; connecting and the lineup move also need
+// HOST_WRITES_MFL_LINEUP, or the account on its proof list.
+type mflWiring struct {
+	ready   bool
+	writes  bool
+	client  *mfl.Client
+	member  *mflhost.Member
+	service *mflhost.Service
+}
+
+func newMFLWiring(cfg config.API, pool *pgxpool.Pool, ff ffpcWiring, log *slog.Logger) (mflWiring, error) {
+	usernameKey, err := auth.DeriveKey(cfg.Session.CookiePassword, mflhost.PurposeUsername)
+	if err != nil {
+		return mflWiring{}, err
+	}
+	client := mfl.New()
+	member := &mflhost.Member{Client: client, Store: ff.store, Vault: ff.vault, Now: time.Now, Log: log}
+	if !cfg.Hosts.MFLLineupWrites {
+		log.Info("mfl lineup writes are off", "key", ff.vault.Ready(), "effect", "only the proof list's accounts connect and set lineups")
+	}
+	ready, writes := ff.vault.Ready(), cfg.Hosts.MFLLineupWrites
+	service := &mflhost.Service{
+		Ready: ready, Writes: writes, Proofs: &hostmoves.Store{Pool: pool}, Client: client, Store: ff.store, Vault: ff.vault,
+		Leagues: member, Followed: &leaguesync.Store{Pool: pool}, UsernameKey: usernameKey, Now: time.Now, Log: log,
+	}
+	return mflWiring{ready: ready, writes: writes, client: client, member: member, service: service}, nil
+}
+
+// routes are connecting, listing and disconnecting MyFantasyLeague.
+func (m mflWiring) routes() []httpx.Route { return m.service.Routes() }
+
 // hostMoves is a move on a host the member confirms on our screen: an
 // ESPN lineup set or claim, open while ESPN is (HOST_ESPN_ENABLED with the
-// vault's key), each to every member when its switch is on
-// (HOST_WRITES_ESPN_LINEUP, HOST_WRITES_ESPN_CLAIM) and to the allow
-// list's accounts for that kind alone when it is off. Its confirm tokens are
-// signed under a key derived from the session secret.
-func hostMoves(cfg config.API, pool *pgxpool.Pool, ff ffpcWiring, e espnWiring, log *slog.Logger) (*hostmoves.Service, error) {
+// vault's key), and a MyFantasyLeague lineup set, open with the vault's
+// key, each to every member when its switch is on
+// (HOST_WRITES_ESPN_LINEUP, HOST_WRITES_ESPN_CLAIM, HOST_WRITES_MFL_LINEUP)
+// and to the allow list's accounts for that kind alone when it is off.
+// Its confirm tokens are signed under a key derived from the session
+// secret.
+func hostMoves(cfg config.API, pool *pgxpool.Pool, ff ffpcWiring, e espnWiring, m mflWiring, log *slog.Logger) (*hostmoves.Service, error) {
 	key, err := auth.DeriveKey(cfg.Session.CookiePassword, hostmoves.PurposeConfirm)
 	if err != nil {
 		return nil, err
 	}
+	links := &leaguesync.Store{Pool: pool}
 	return &hostmoves.Service{
-		ESPNOpen: e.connect, ESPNLineup: cfg.Hosts.ESPNLineupWrites, ESPNClaim: cfg.Hosts.ESPNClaimWrites, Links: &leaguesync.Store{Pool: pool}, Connections: ff.store,
-		Member: e.member, Writer: e.client, Claims: e.client, Proofs: &hostmoves.Store{Pool: pool}, Signer: hostmoves.Signer{Key: key}, Now: time.Now, Log: log,
+		ESPNOpen: e.connect, ESPNLineup: cfg.Hosts.ESPNLineupWrites, ESPNClaim: cfg.Hosts.ESPNClaimWrites,
+		MFLOpen: m.ready, MFLLineup: m.writes, MFLMember: m.member, MFLWriter: m.client, Players: links,
+		Links: links, Connections: ff.store, Member: e.member, Writer: e.client, Claims: e.client, Proofs: &hostmoves.Store{Pool: pool},
+		Signer: hostmoves.Signer{Key: key}, Now: time.Now, Log: log,
 	}, nil
 }
 
@@ -172,7 +212,7 @@ func (e espnWiring) leagueHost(log *slog.Logger) *leaguesync.ESPN {
 }
 
 // hostList is GET /hosts: every host open here, in the account page's order.
-func hostList(ff ffpcWiring, y yahooWiring, e espnWiring, log *slog.Logger) []httpx.Route {
+func hostList(ff ffpcWiring, y yahooWiring, e espnWiring, m mflWiring, log *slog.Logger) []httpx.Route {
 	var open []apitypes.ConnectedHost
 	if ff.on {
 		open = append(open, apitypes.ConnectedHostFfpc)
@@ -183,17 +223,22 @@ func hostList(ff ffpcWiring, y yahooWiring, e espnWiring, log *slog.Logger) []ht
 	if e.connect {
 		open = append(open, apitypes.ConnectedHostEspn)
 	}
-	return (&hosts.List{Enabled: open, Store: ff.store, Log: log}).Routes()
+	// MyFantasyLeague is listed to all only with its switch on: while it is
+	// off it is listed to the proof list's accounts alone.
+	if m.ready && m.writes {
+		open = append(open, apitypes.ConnectedHostMfl)
+	}
+	return (&hosts.List{Enabled: open, Accounts: m.service, Store: ff.store, Log: log}).Routes()
 }
 
 // leagueSyncService wires league sync: Sleeper first, MyFantasyLeague
 // second, FFPC third, Yahoo fourth and ESPN fifth behind one poller, the rooms' board, and the
 // recorded leagues when COMPANION_REPLAY is on (development only). The
 // host directories are read at start, so the first view finds them.
-func leagueSyncService(cfg config.API, pool *pgxpool.Pool, board *draftroom.Boards, saved *leagues.Store, ents *entitlements.Store, accounts leaguesync.AccountViewer, site leaguesync.SiteSeason, ff ffpcWiring, y yahooWiring, e espnWiring, log *slog.Logger) *leaguesync.Service {
+func leagueSyncService(cfg config.API, pool *pgxpool.Pool, board *draftroom.Boards, saved *leagues.Store, ents *entitlements.Store, accounts leaguesync.AccountViewer, site leaguesync.SiteSeason, ff ffpcWiring, y yahooWiring, e espnWiring, m mflWiring, log *slog.Logger) *leaguesync.Service {
 	now := time.Now
 	var sleeperAPI leaguesync.SleeperAPI = sleeper.New()
-	var mflAPI leaguesync.MFLAPI = mfl.New()
+	var mflAPI leaguesync.MFLAPI = m.client
 	if cfg.Dev.CompanionReplay {
 		sleeperAPI = leaguesync.SleeperReplay{Live: sleeperAPI}
 		mflAPI = leaguesync.MFLReplay{Live: mflAPI}

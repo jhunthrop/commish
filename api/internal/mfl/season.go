@@ -2,7 +2,9 @@ package mfl
 
 import (
 	"context"
+	"fmt"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -84,23 +86,81 @@ type Matchup struct {
 	Sides []Side
 }
 
+// wireSide is one franchise in live scoring, in a matchup or, in a league
+// with no head-to-head games, listed on its own.
+type wireSide struct {
+	ID      string `json:"id"`
+	Score   string `json:"score"`
+	Players struct {
+		Player list[struct {
+			ID     string `json:"id"`
+			Score  string `json:"score"`
+			Status string `json:"status"`
+		}] `json:"player"`
+	} `json:"players"`
+}
+
 type wireLive struct {
 	LiveScoring struct {
 		Week    string `json:"week"`
 		Matchup list[struct {
-			Franchise list[struct {
-				ID      string `json:"id"`
-				Score   string `json:"score"`
-				Players struct {
-					Player list[struct {
-						ID     string `json:"id"`
-						Score  string `json:"score"`
-						Status string `json:"status"`
-					}] `json:"player"`
-				} `json:"players"`
-			}] `json:"franchise"`
+			Franchise list[wireSide] `json:"franchise"`
 		}] `json:"matchup"`
+		// Franchise is the franchises listed outside any matchup.
+		Franchise list[wireSide] `json:"franchise"`
 	} `json:"liveScoring"`
+}
+
+// side checks one franchise's side: its score, its starters and each
+// player's points.
+func (f wireSide) side() (Side, error) {
+	n, ok := franchiseNumber(f.ID)
+	score, ok2 := number(f.Score, maxPoints)
+	if !ok || !ok2 || len(f.Players.Player) > maxRoster {
+		return Side{}, malformed("matchup side %q", f.ID)
+	}
+	side := Side{Franchise: n, Score: score, Points: map[string]float64{}}
+	for _, p := range f.Players.Player {
+		pts, ok := number(p.Score, maxPoints)
+		if !playerIDPattern.MatchString(p.ID) || !ok {
+			return Side{}, malformed("matchup player %q", p.ID)
+		}
+		if p.Status == "starter" {
+			side.Starters = append(side.Starters, p.ID)
+		}
+		side.Points[p.ID] = pts
+	}
+	return side, nil
+}
+
+// ErrNoLineup is a franchise live scoring does not list, or lists with no
+// starter: never read as an empty lineup.
+var ErrNoLineup = fmt.Errorf("%w: the franchise has no lineup in live scoring", ErrNotFound)
+
+// lineupOf is the franchise's side wherever live scoring lists it, in a
+// matchup or on its own, with at least one starter.
+func (w wireLive) lineupOf(franchise int) (Side, error) {
+	if len(w.LiveScoring.Matchup) > maxTeams*2 || len(w.LiveScoring.Franchise) > maxTeams {
+		return Side{}, malformed("%d matchups, %d franchises", len(w.LiveScoring.Matchup), len(w.LiveScoring.Franchise))
+	}
+	sides := slices.Clone(w.LiveScoring.Franchise)
+	for _, m := range w.LiveScoring.Matchup {
+		sides = append(sides, m.Franchise...)
+	}
+	for _, f := range sides {
+		if n, ok := franchiseNumber(f.ID); !ok || n != franchise {
+			continue
+		}
+		s, err := f.side()
+		if err != nil {
+			return Side{}, err
+		}
+		if len(s.Starters) == 0 {
+			return Side{}, ErrNoLineup
+		}
+		return s, nil
+	}
+	return Side{}, ErrNoLineup
 }
 
 // LiveScoring reads a week's matchups with the points so far.
@@ -141,21 +201,9 @@ func (w wireLive) validate() ([]Matchup, error) {
 			if f.ID == "AVG" || f.ID == "BYE" {
 				continue
 			}
-			n, ok := franchiseNumber(f.ID)
-			score, ok2 := number(f.Score, maxPoints)
-			if !ok || !ok2 || len(f.Players.Player) > maxRoster {
-				return nil, malformed("matchup side %q", f.ID)
-			}
-			side := Side{Franchise: n, Score: score, Points: map[string]float64{}}
-			for _, p := range f.Players.Player {
-				pts, ok := number(p.Score, maxPoints)
-				if !playerIDPattern.MatchString(p.ID) || !ok {
-					return nil, malformed("matchup player %q", p.ID)
-				}
-				if p.Status == "starter" {
-					side.Starters = append(side.Starters, p.ID)
-				}
-				side.Points[p.ID] = pts
+			side, err := f.side()
+			if err != nil {
+				return nil, err
 			}
 			mm.Sides = append(mm.Sides, side)
 		}

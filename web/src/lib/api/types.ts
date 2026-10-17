@@ -1278,7 +1278,7 @@ export interface paths {
 			path?: never;
 			cookie?: never;
 		};
-		/** The hosts connecting is open for here (HOST_FFPC_ENABLED, HOST_YAHOO_ENABLED, HOST_ESPN_ENABLED, each with the credentials key present), and the hosts the account is connected to, each with its state and when it was last read. No credential is ever answered. Signed out it answers the switches with no connections: a switch is not account data. */
+		/** The hosts connecting is open for here (HOST_FFPC_ENABLED, HOST_YAHOO_ENABLED, HOST_ESPN_ENABLED, each with the credentials key present), and the hosts the account is connected to, each with its state and when it was last read. No credential is ever answered. Signed out it answers the switches with no connections: a switch is not account data. MyFantasyLeague is listed with HOST_WRITES_MFL_LINEUP on and the key present, and while the switch is off, signed in, to the accounts on its proof list alone. */
 		get: operations['listHostConnections'];
 		put?: never;
 		post?: never;
@@ -1453,6 +1453,57 @@ export interface paths {
 		post?: never;
 		/** Disconnect ESPN. The kept cookies are deleted at once; private leagues read from ESPN keep their last read, shown as stale. */
 		delete: operations['disconnectESPN'];
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/hosts/mfl/connect': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		get?: never;
+		put?: never;
+		/** Exchange the member's MyFantasyLeague username and password once, in a POST to MyFantasyLeague's own login, for its session (MFL_USER_ID), then read the member's leagues with that session and keep it envelope encrypted with the expiry its cookie states. The password is never kept, logged or answered. Records the consent words' version the page showed (1 names the lineup moves), which a lineup move needs. Answers the member's MyFantasyLeague leagues this season (201). Open while HOST_WRITES_MFL_LINEUP is on, and to the accounts on its proof list while it is off (else 503). 422 when MyFantasyLeague refuses the pair, in the same words for a bad username as for a bad password; three refusals in an hour pause the account for the hour (423), as do three refusals of one username from any account, or the site's hourly cap on MyFantasyLeague sign-ins across every account (423, one sentence for both). 502, with nothing kept, when MyFantasyLeague does not answer. 5 an hour an account. */
+		post: operations['connectMFL'];
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/hosts/mfl/leagues': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		/** The member's MyFantasyLeague leagues this season, read with their kept session, each with their team in it and whether the account follows it already. 503 when MyFantasyLeague is not open to the account (the switch off and the account not on its proof list), as connecting is. 404 when not connected; 409 when MyFantasyLeague no longer accepts the session (or it is past its expiry, at most a year from connecting), which signs it out. */
+		get: operations['mflLeagues'];
+		put?: never;
+		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/hosts/mfl': {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		get?: never;
+		put?: never;
+		post?: never;
+		/** Disconnect MyFantasyLeague. The kept session is deleted at once; lineup moves on MyFantasyLeague stop. */
+		delete: operations['disconnectMFL'];
 		options?: never;
 		head?: never;
 		patch?: never;
@@ -2925,6 +2976,12 @@ export interface components {
 			note: string | null;
 		};
 		LineupMoves: {
+			/** @description true where the league's platform takes a lineup from our screen at all (ESPN, MyFantasyLeague), false where it has no write path (the verb is always Copy the lineup there) */
+			takes_writes: boolean;
+			/** @description true when the platform's write switch is on for this account (HOST_WRITES_ESPN_LINEUP or HOST_WRITES_MFL_LINEUP, or the account is on the switch's proof list); false where the platform takes no writes */
+			writes_on: boolean;
+			/** @description one line under Copy the lineup saying why the lineup is not set from here (the platform takes no writes, its switch is off, or the member must connect or agree to moves), naming the platform; null when lineup is available */
+			reason: string | null;
 			/**
 			 * @description available when the lineup can be set on the host from our screen (the host has a write path, its switch is on for the account and the account's connection agreed to the moves); unavailable when the verb is the host's page
 			 * @enum {string}
@@ -3212,7 +3269,7 @@ export interface components {
 		 * @description a host the member connects their own account on, named as a mechanism
 		 * @enum {string}
 		 */
-		ConnectedHost: 'ffpc' | 'yahoo' | 'espn';
+		ConnectedHost: 'ffpc' | 'yahoo' | 'espn' | 'mfl';
 		/**
 		 * @description connected reads. signed_out: the host no longer honors what we keep (FFPC's session past the one kept sign-in allowed in six hours, a Yahoo refresh Yahoo refused, ESPN cookies ESPN no longer accepts); the member connects again
 		 * @enum {string}
@@ -3274,6 +3331,16 @@ export interface components {
 			espn_s2: string;
 			/** @description the member agrees that we keep an encrypted copy of their ESPN session so their league stays in sync, and that disconnect deletes it; must be true */
 			consent: boolean;
+		};
+		MFLConnectInput: {
+			/** @description the member's MyFantasyLeague username, as MyFantasyLeague's own sign-in takes it */
+			username: string;
+			/** @description sent once to MyFantasyLeague's login in a POST body, never kept, answered or logged */
+			password: string;
+			/** @description the member agrees that we exchange their password once for a MyFantasyLeague session, keep that session encrypted (never the password), and set their lineup on MyFantasyLeague when they confirm a move; must be true */
+			consent: boolean;
+			/** @description the version of the consent words the page showed (1 names the lineup moves); kept never above the server's own */
+			consent_version: number;
 		};
 		HostConnected: {
 			connection: components['schemas']['HostConnection'];
@@ -5292,6 +5359,73 @@ export interface operations {
 		};
 	};
 	disconnectESPN: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			200: components['responses']['EmptyResponse'];
+			404: components['responses']['ErrorResponse'];
+		};
+	};
+	connectMFL: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody: {
+			content: {
+				'application/json': components['schemas']['MFLConnectInput'];
+			};
+		};
+		responses: {
+			/** @description connected, the session kept */
+			201: {
+				headers: Record<string, unknown>;
+				content: {
+					'application/json': components['schemas']['Envelope'] & {
+						data?: components['schemas']['HostConnected'];
+					};
+				};
+			};
+			400: components['responses']['ErrorResponse'];
+			422: components['responses']['ErrorResponse'];
+			423: components['responses']['ErrorResponse'];
+			429: components['responses']['ErrorResponse'];
+			502: components['responses']['ErrorResponse'];
+			503: components['responses']['ErrorResponse'];
+		};
+	};
+	mflLeagues: {
+		parameters: {
+			query?: never;
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			/** @description the leagues */
+			200: {
+				headers: Record<string, unknown>;
+				content: {
+					'application/json': components['schemas']['Envelope'] & {
+						data?: components['schemas']['HostLeague'][];
+					};
+				};
+			};
+			404: components['responses']['ErrorResponse'];
+			409: components['responses']['ErrorResponse'];
+			502: components['responses']['ErrorResponse'];
+			503: components['responses']['ErrorResponse'];
+		};
+	};
+	disconnectMFL: {
 		parameters: {
 			query?: never;
 			header?: never;

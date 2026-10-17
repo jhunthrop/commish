@@ -11,6 +11,7 @@
 	import Quiet from '#lib/ui/Quiet.svelte';
 	import ESPNConnect from './ESPNConnect.svelte';
 	import FFPCSignIn from './FFPCSignIn.svelte';
+	import MFLConnect from './MFLConnect.svelte';
 	import YahooConnect from './YahooConnect.svelte';
 	import { plural } from '#lib/format/number.ts';
 	import { leagueApi } from '#lib/league/api.ts';
@@ -23,19 +24,25 @@
 		ffpcOpen,
 		goToYahoo,
 		hostsApi,
+		mflOpen,
 		yahooOpen,
 		type ConnectedHost,
 		type HostConnected,
 		type HostConnection
 	} from './api.ts';
-	import { ESPN_CONSENT, statusWords } from './connection-words.ts';
+	import { ESPN_CONSENT, MFL_CONSENT, statusWords } from './connection-words.ts';
 	import { yahooOutcome } from './yahoo.ts';
 
-	/** The hosts the account reads as the member (FFPC, Yahoo, ESPN), each with its state, a one-tap
+	/** The hosts the account reads as the member (FFPC, Yahoo, ESPN, MyFantasyLeague), each with its state, a one-tap
 	 * disconnect that deletes what we keep at once, and, when a host has dropped the connection, the
-	 * way back in right here. Yahoo or ESPN not yet connected is one verb each. It reads its own list. */
+	 * way back in right here. Yahoo, ESPN or MyFantasyLeague not yet connected is one verb each. It reads its own list. */
 	let connections = $state<HostConnection[] | null>(null);
-	let open = $state<Record<ConnectedHost, boolean>>({ ffpc: false, yahoo: false, espn: false });
+	let open = $state<Record<ConnectedHost, boolean>>({
+		ffpc: false,
+		yahoo: false,
+		espn: false,
+		mfl: false
+	});
 	let failed = $state(false);
 	let busy = $state(false);
 	let problem = $state<string | null>(null);
@@ -51,7 +58,12 @@
 			.connections()
 			.then((hosts) => {
 				connections = hosts.connections;
-				open = { ffpc: ffpcOpen(hosts), yahoo: yahooOpen(hosts), espn: espnOpen(hosts) };
+				open = {
+					ffpc: ffpcOpen(hosts),
+					yahoo: yahooOpen(hosts),
+					espn: espnOpen(hosts),
+					mfl: mflOpen(hosts)
+				};
 			})
 			.catch(() => (failed = true));
 		leagueApi
@@ -61,7 +73,8 @@
 					(followed = {
 						ffpc: list.filter((l) => l.host === 'ffpc').length,
 						yahoo: list.filter((l) => l.host === 'yahoo').length,
-						espn: list.filter((l) => l.host === 'espn').length
+						espn: list.filter((l) => l.host === 'espn').length,
+						mfl: list.filter((l) => l.host === 'mfl').length
 					})
 			)
 			.catch(() => (followed = null));
@@ -74,7 +87,8 @@
 		ffpc: 'FFPC disconnected. Your password and session are deleted. Your FFPC league keeps its last read.',
 		yahoo:
 			'Yahoo disconnected. What Yahoo gave us to read with is deleted. Your Yahoo league keeps its last read.',
-		espn: 'ESPN disconnected. Your ESPN session is deleted. Your ESPN league keeps its last read.'
+		espn: 'ESPN disconnected. Your ESPN session is deleted. Your ESPN league keeps its last read.',
+		mfl: 'MyFantasyLeague disconnected. Your MyFantasyLeague session is deleted, and lineups are no longer set there from here.'
 	};
 
 	/** A read's age: "1 minute ago" within a day, its date after. */
@@ -148,7 +162,18 @@
 	const yahooNew = $derived(open.yahoo && connections !== null && !connectionOf('yahoo'));
 	/** ESPN is open and not connected: one verb connects it. */
 	const espnNew = $derived(open.espn && connections !== null && !connectionOf('espn'));
-	const anyOpen = $derived(open.ffpc || open.yahoo || open.espn);
+	/** MyFantasyLeague is open and not connected: its row opens its form. */
+	const mflNew = $derived(open.mfl && connections !== null && !connectionOf('mfl'));
+	const mflAgain = $derived(open.mfl && connectionOf('mfl')?.status === 'signed_out');
+	/** MyFantasyLeague's connect form, opened from its row. */
+	let mflForm = $state(false);
+
+	/** MyFantasyLeague connected here: the form closes and the list reads again. */
+	function mflConnected(): void {
+		mflForm = false;
+		load();
+	}
+	const anyOpen = $derived(open.ffpc || open.yahoo || open.espn || open.mfl);
 	/** The section shows once there is something to say or a host to connect. */
 	const shown = $derived(
 		failed ||
@@ -206,12 +231,19 @@
 					{#if espnNote}<p class="done" role="status">{espnNote}</p>{/if}
 					<p class="note">{ESPN_CONSENT}</p>
 				{/if}
-			{:else if anyOpen && !yahooNew && !espnNew}
+				{#if mflAgain}
+					<div class="again">
+						<MFLConnect label="Connect MyFantasyLeague again" onconnected={mflConnected} />
+					</div>
+				{:else if connectionOf('mfl')}
+					<p class="note">{MFL_CONSENT}</p>
+				{/if}
+			{:else if anyOpen && !yahooNew && !espnNew && !mflNew}
 				<EmptyState level={3} title="No connected accounts">
 					{#snippet actions()}{@render follow()}{/snippet}
 				</EmptyState>
 			{/if}
-			{#if yahooNew || espnNew}
+			{#if yahooNew || espnNew || mflNew}
 				<ActionRows label="Hosts to connect">
 					{#if yahooNew}
 						<ActionRow lead="Yahoo" text="Not connected. Connect to follow your Yahoo leagues.">
@@ -230,9 +262,22 @@
 							{/snippet}
 						</ActionRow>
 					{/if}
+					{#if mflNew}
+						<ActionRow
+							lead="MyFantasyLeague"
+							text="Not connected. Connect to set your lineup on MyFantasyLeague from here."
+						>
+							{#snippet action()}
+								<Quiet size="sm" onclick={() => (mflForm = !mflForm)}>Connect</Quiet>
+							{/snippet}
+						</ActionRow>
+					{/if}
 				</ActionRows>
 				{#if espnNew && espnForm}
 					<div class="again"><ESPNConnect onconnected={espnConnected} /></div>
+				{/if}
+				{#if mflNew && mflForm}
+					<div class="again"><MFLConnect onconnected={mflConnected} /></div>
 				{/if}
 			{/if}
 			{#if problem}<ProblemLine>{problem}</ProblemLine>{/if}

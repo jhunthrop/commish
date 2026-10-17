@@ -36,6 +36,11 @@ type Hosts struct {
 	// off unless set true, and while off only the accounts on
 	// app.host_write_accounts with kind claim may.
 	ESPNClaimWrites bool
+	// MFLLineupWrites is HOST_WRITES_MFL_LINEUP, the switch for setting a
+	// MyFantasyLeague lineup from our screen (Lane 67): off unless set
+	// true, and while off only the accounts on app.host_write_accounts
+	// (host mfl, kind lineup) may connect MyFantasyLeague or set a lineup.
+	MFLLineupWrites bool
 	// Keys wrap each connected account's own data key: KeyVersion is the
 	// current key's version (HOST_CREDENTIALS_KEY_VERSION, 1 unless set),
 	// Key is HOST_CREDENTIALS_KEY, and Previous is
@@ -52,7 +57,7 @@ const hostKeyLen = 32
 func (l *loader) hosts(env Env) Hosts {
 	h := Hosts{FFPCEnabled: l.hostSwitch("HOST_FFPC_ENABLED"), YahooEnabled: l.hostSwitch("HOST_YAHOO_ENABLED"),
 		ESPNEnabled: l.hostSwitch("HOST_ESPN_ENABLED"), ESPNLineupWrites: l.writeSwitch("HOST_WRITES_ESPN_LINEUP"),
-		ESPNClaimWrites: l.writeSwitch("HOST_WRITES_ESPN_CLAIM"), KeyVersion: 1}
+		ESPNClaimWrites: l.writeSwitch("HOST_WRITES_ESPN_CLAIM"), MFLLineupWrites: l.writeSwitch("HOST_WRITES_MFL_LINEUP"), KeyVersion: 1}
 	h.YahooClientID = strings.TrimSpace(l.get("YAHOO_CLIENT_ID"))
 	h.YahooClientSecret = strings.TrimSpace(l.get("YAHOO_CLIENT_SECRET"))
 	if (h.YahooClientID == "") != (h.YahooClientSecret == "") {

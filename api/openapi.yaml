@@ -1305,7 +1305,8 @@ paths:
         The hosts connecting is open for here (HOST_FFPC_ENABLED, HOST_YAHOO_ENABLED, HOST_ESPN_ENABLED, each with the
         credentials key present), and the hosts the account is connected to, each with its state and when it was last
         read. No credential is ever answered. Signed out it answers the switches with no
-        connections: a switch is not account data.
+        connections: a switch is not account data. MyFantasyLeague is listed with HOST_WRITES_MFL_LINEUP on and the
+        key present, and while the switch is off, signed in, to the accounts on its proof list alone.
       security: [{ session: [] }, {}]
       responses:
         "200":
@@ -1520,6 +1521,74 @@ paths:
       tags: [hosts]
       operationId: disconnectESPN
       summary: Disconnect ESPN. The kept cookies are deleted at once; private leagues read from ESPN keep their last read, shown as stale.
+      security: [{ session: [] }]
+      responses:
+        "200": { $ref: "#/components/responses/EmptyResponse" }
+        "404": { $ref: "#/components/responses/ErrorResponse" }
+  /hosts/mfl/connect:
+    post:
+      tags: [hosts]
+      operationId: connectMFL
+      summary: >-
+        Exchange the member's MyFantasyLeague username and password once, in a POST to MyFantasyLeague's own login,
+        for its session (MFL_USER_ID), then read the member's leagues with that session and keep it envelope
+        encrypted with the expiry its cookie states. The password is never kept, logged or answered. Records the
+        consent words' version the page showed (1 names the lineup moves), which a lineup move needs. Answers the
+        member's MyFantasyLeague leagues this season (201). Open while HOST_WRITES_MFL_LINEUP is on, and to the
+        accounts on its proof list while it is off (else 503). 422 when MyFantasyLeague refuses the pair, in the same
+        words for a bad username as for a bad password; three refusals in an hour pause the account for the hour
+        (423), as do three refusals of one username from any account, or the site's hourly cap on MyFantasyLeague
+        sign-ins across every account (423, one sentence for both). 502, with nothing kept, when MyFantasyLeague does
+        not answer. 5 an hour an account.
+      security: [{ session: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MFLConnectInput" }
+      responses:
+        "201":
+          description: connected, the session kept
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - properties: { data: { $ref: "#/components/schemas/HostConnected" } }
+        "400": { $ref: "#/components/responses/ErrorResponse" }
+        "422": { $ref: "#/components/responses/ErrorResponse" }
+        "423": { $ref: "#/components/responses/ErrorResponse" }
+        "429": { $ref: "#/components/responses/ErrorResponse" }
+        "502": { $ref: "#/components/responses/ErrorResponse" }
+        "503": { $ref: "#/components/responses/ErrorResponse" }
+  /hosts/mfl/leagues:
+    get:
+      tags: [hosts]
+      operationId: mflLeagues
+      summary: >-
+        The member's MyFantasyLeague leagues this season, read with their kept session, each with their team in it and
+        whether the account follows it already. 503 when MyFantasyLeague is not open to the account (the switch off and
+        the account not on its proof list), as connecting is. 404 when not connected; 409 when MyFantasyLeague no
+        longer accepts the session (or it is past its expiry, at most a year from connecting), which signs it out.
+      security: [{ session: [] }]
+      responses:
+        "200":
+          description: the leagues
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Envelope"
+                  - properties: { data: { type: array, items: { $ref: "#/components/schemas/HostLeague" } } }
+        "404": { $ref: "#/components/responses/ErrorResponse" }
+        "409": { $ref: "#/components/responses/ErrorResponse" }
+        "502": { $ref: "#/components/responses/ErrorResponse" }
+        "503": { $ref: "#/components/responses/ErrorResponse" }
+  /hosts/mfl:
+    delete:
+      tags: [hosts]
+      operationId: disconnectMFL
+      summary: Disconnect MyFantasyLeague. The kept session is deleted at once; lineup moves on MyFantasyLeague stop.
       security: [{ session: [] }]
       responses:
         "200": { $ref: "#/components/responses/EmptyResponse" }
@@ -3461,8 +3530,27 @@ components:
           description: one sentence when every trade found with this team is a close call for them, else null
     LineupMoves:
       type: object
-      required: [lineup, note]
+      required: [lineup, note, takes_writes, writes_on, reason]
       properties:
+        takes_writes:
+          type: boolean
+          description: >-
+            true where the league's platform takes a lineup from our screen at all (ESPN, MyFantasyLeague), false where
+            it has no write path (the verb is always Copy the lineup there)
+        writes_on:
+          type: boolean
+          description: >-
+            true when the platform's write switch is on for this account (HOST_WRITES_ESPN_LINEUP or
+            HOST_WRITES_MFL_LINEUP, or the account is on the switch's proof list); false where the platform takes no
+            writes
+        reason:
+          type: string
+          nullable: true
+          description: >-
+            one line under Copy the lineup saying why the lineup is not set from here (the platform takes no writes,
+            its switch is off, or the member must connect or agree to moves), naming the platform; null when lineup is
+            available
+
         lineup:
           type: string
           enum: [available, unavailable]
@@ -3852,7 +3940,7 @@ components:
     ConnectedHost:
       type: string
       description: a host the member connects their own account on, named as a mechanism
-      enum: [ffpc, yahoo, espn]
+      enum: [ffpc, yahoo, espn, mfl]
     HostConnectionStatus:
       type: string
       description: >-
@@ -3937,6 +4025,26 @@ components:
           description: >-
             the member agrees that we keep an encrypted copy of their ESPN session so their league stays in sync, and
             that disconnect deletes it; must be true
+    MFLConnectInput:
+      type: object
+      required: [username, password, consent, consent_version]
+      properties:
+        username: { type: string, minLength: 1, maxLength: 128, description: "the member's MyFantasyLeague username, as MyFantasyLeague's own sign-in takes it" }
+        password:
+          type: string
+          minLength: 1
+          maxLength: 128
+          description: sent once to MyFantasyLeague's login in a POST body, never kept, answered or logged
+        consent:
+          type: boolean
+          description: >-
+            the member agrees that we exchange their password once for a MyFantasyLeague session, keep that session
+            encrypted (never the password), and set their lineup on MyFantasyLeague when they confirm a move; must be
+            true
+        consent_version:
+          type: integer
+          minimum: 1
+          description: the version of the consent words the page showed (1 names the lineup moves); kept never above the server's own
     HostConnected:
       type: object
       required: [connection, leagues]

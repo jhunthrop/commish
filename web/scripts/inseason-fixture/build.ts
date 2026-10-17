@@ -511,7 +511,13 @@ async function lineup(): Promise<LineupAdvice> {
 		host_lineup_url: `https://sleeper.com/leagues/${league.league_id}/team`,
 		host_note: null,
 		// Sleeper has no write API: the verb is the host's page.
-		moves: { lineup: 'unavailable', note: null }
+		moves: {
+			lineup: 'unavailable',
+			note: null,
+			takes_writes: false,
+			writes_on: false,
+			reason: 'Sleeper does not take lineups from here, so copy the lineup there.'
+		}
 	};
 }
 

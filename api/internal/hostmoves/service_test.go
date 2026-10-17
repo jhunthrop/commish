@@ -153,7 +153,7 @@ func newProofs() *proofs {
 }
 
 func (p *proofs) Allowed(_ context.Context, accountID uuid.UUID, host, kind string) (bool, error) {
-	return p.allowed[accountID] && host == "espn" && (kind == kindLineup || kind == kindClaim), nil
+	return p.allowed[accountID] && ((host == "espn" && (kind == kindLineup || kind == kindClaim)) || (host == "mfl" && kind == kindLineup)), nil
 }
 
 func (p *proofs) Used(_ context.Context, _ uuid.UUID, digest []byte) (bool, error) {
@@ -326,7 +326,7 @@ func TestPlanThenMoveDone(t *testing.T) {
 		t.Fatal("a plan sent a move")
 	}
 	code, env, res := r.move(t, mv, *p.Confirm)
-	if code != http.StatusOK || res.Outcome != apitypes.HostMoveResultOutcomeDone || res.Sentence != doneWords || res.MoveId == nil {
+	if code != http.StatusOK || res.Outcome != apitypes.HostMoveResultOutcomeDone || res.Sentence != espnWords.done || res.MoveId == nil {
 		t.Fatalf("move %d %+v %+v", code, env.Error, res)
 	}
 	if r.host.sent() != 1 || r.host.cookies[0] != "SWID="+swid+"; espn_s2="+s2 {
@@ -392,7 +392,7 @@ func TestTokenBindsTheMove(t *testing.T) {
 	if code, _, res := r.move(t, mv, token); code != http.StatusOK || res.Outcome != apitypes.HostMoveResultOutcomeDone {
 		t.Fatalf("in time: %d %+v", code, res)
 	}
-	if code, env, _ := r.move(t, mv, token); code != http.StatusConflict || env.Error.Message != tokenUsedWords {
+	if code, env, _ := r.move(t, mv, token); code != http.StatusConflict || env.Error.Message != espnWords.used {
 		t.Fatalf("used again: %d %+v", code, env.Error)
 	}
 	if r.host.sent() != 1 {
@@ -418,7 +418,7 @@ func TestRefusedInESPNsWords(t *testing.T) {
 	r := newRig(t, http.StatusConflict, "write-lineup-locked.json", false)
 	mv := swap()
 	_, _, res := r.move(t, mv, *r.plan(t, mv).Confirm)
-	if res.Outcome != apitypes.HostMoveResultOutcomeRefused || res.Sentence != refusedWords || res.HostWords == nil ||
+	if res.Outcome != apitypes.HostMoveResultOutcomeRefused || res.Sentence != espnWords.refused || res.HostWords == nil ||
 		*res.HostWords != "Lineup transaction could not be completed, Alexander Mattison is locked" {
 		t.Fatalf("refused %+v", res)
 	}
@@ -438,7 +438,7 @@ func TestPendingWhenTheReadBackDoesNotConfirm(t *testing.T) {
 	r := newRig(t, http.StatusOK, "write-lineup-executed.json", false)
 	mv := swap()
 	_, _, res := r.move(t, mv, *r.plan(t, mv).Confirm)
-	if res.Outcome != apitypes.HostMoveResultOutcomePending || res.Sentence != pendingWords || res.HostWords != nil {
+	if res.Outcome != apitypes.HostMoveResultOutcomePending || res.Sentence != espnWords.pending || res.HostWords != nil {
 		t.Fatalf("pending %+v", res)
 	}
 	if _, ans := r.proofs.last(t); ans.Outcome != OutcomePending || ans.ReadBack != readNotMatched {
@@ -466,7 +466,7 @@ func TestNotSent(t *testing.T) {
 	token := *r.plan(t, mv).Confirm
 	r.svc.Writer = refusing{}
 	code, env, _ := r.move(t, mv, token)
-	if code != http.StatusBadGateway || env.Error.Message != notSentWords {
+	if code != http.StatusBadGateway || env.Error.Message != espnWords.notSent {
 		t.Fatalf("not sent: %d %+v", code, env.Error)
 	}
 	if _, ans := r.proofs.last(t); ans.Outcome != OutcomeNotSent {
@@ -495,11 +495,11 @@ func TestAnotherTeamIsRefusedBeforeAnyPost(t *testing.T) {
 	mv := apitypes.HostMoveInput{Kind: apitypes.HostMoveInputKindLineup, Week: week, Changes: []apitypes.HostMoveChange{
 		{Slot: apitypes.HostMoveChangeSlotRB, In: "17359", Out: ptr("4047365")},
 	}}
-	if p := r.plan(t, mv); p.Status != apitypes.HostMovePlanStatusUnavailable || p.Sentence != notYourTeamWords || p.Confirm != nil {
+	if p := r.plan(t, mv); p.Status != apitypes.HostMovePlanStatusUnavailable || p.Sentence != espnWords.notYourTeam || p.Confirm != nil {
 		t.Fatalf("another team: %+v", p)
 	}
 	token, _ := r.svc.Signer.Sign(me, linkID, mv, r.now.Add(ConfirmFor))
-	if _, _, res := r.move(t, mv, token); res.Outcome != apitypes.HostMoveResultOutcomeUnavailable || res.Sentence != notYourTeamWords {
+	if _, _, res := r.move(t, mv, token); res.Outcome != apitypes.HostMoveResultOutcomeUnavailable || res.Sentence != espnWords.notYourTeam {
 		t.Fatalf("another team, a good token: %+v", res)
 	}
 	if r.host.sent() != 0 || len(r.proofs.order) != 0 {
@@ -530,9 +530,9 @@ func TestPlanRefusals(t *testing.T) {
 		words string
 	}{
 		"another week": {otherWeek, "ESPN is on week 7 now. Reload your lineup to see it."},
-		"stale":        {stale, staleWords},
+		"stale":        {stale, espnWords.stale},
 		"locked":       {locked, "ESPN has locked Odell Beckham Jr., whose game has started."},
-		"too many":     {tooMany, staleWords},
+		"too many":     {tooMany, espnWords.stale},
 		"ineligible":   {ineligible, "ESPN does not let Alexander Mattison start in that spot."},
 	}
 	for name, tc := range cases {
@@ -564,7 +564,7 @@ func TestSwitchesAndTheAllowList(t *testing.T) {
 		if err != nil || p.Status != want || got.Lineup != wantMove {
 			t.Fatalf("%s: plan %+v, moves %+v %v", name, p, got, err)
 		}
-		if want == apitypes.HostMovePlanStatusUnavailable && (p.Confirm != nil || p.Sentence != offWords || p.HostUrl == "") {
+		if want == apitypes.HostMovePlanStatusUnavailable && (p.Confirm != nil || p.Sentence != espnWords.off || p.HostUrl == "") {
 			t.Fatalf("%s: unavailable %+v", name, p)
 		}
 	}
@@ -604,8 +604,8 @@ func TestConsentVersionGatesTheMove(t *testing.T) {
 		conn *hosts.Connection
 		note string
 	}{
-		{"version 2", &hosts.Connection{Status: hosts.StatusConnected, ConsentVersion: 2}, reconsentWords},
-		{"signed out", &hosts.Connection{Status: hosts.StatusSignedOut, ConsentVersion: 3}, reconnectWords},
+		{"version 2", &hosts.Connection{Status: hosts.StatusConnected, ConsentVersion: 2}, espnWords.reconsent},
+		{"signed out", &hosts.Connection{Status: hosts.StatusSignedOut, ConsentVersion: 3}, espnWords.reconnect},
 		{"none", nil, ""},
 	}
 	for _, tc := range cases {
@@ -617,7 +617,7 @@ func TestConsentVersionGatesTheMove(t *testing.T) {
 		p := r.plan(t, swap())
 		want := tc.note
 		if want == "" {
-			want = offWords
+			want = espnWords.off
 		}
 		if p.Status != apitypes.HostMovePlanStatusUnavailable || p.Sentence != want {
 			t.Fatalf("%s: plan %+v", tc.name, p)
@@ -625,7 +625,7 @@ func TestConsentVersionGatesTheMove(t *testing.T) {
 	}
 	r.svc.Connections = conns{&hosts.Connection{Status: hosts.StatusConnected, ConsentVersion: 3}}
 	r.svc.Member = member{err: espnhost.ErrReconnect}
-	if p := r.plan(t, swap()); p.Status != apitypes.HostMovePlanStatusUnavailable || p.Sentence != reconnectWords {
+	if p := r.plan(t, swap()); p.Status != apitypes.HostMovePlanStatusUnavailable || p.Sentence != espnWords.reconnect {
 		t.Fatalf("ESPN refused the cookies: %+v", p)
 	}
 	if r.host.sent() != 0 {
@@ -642,7 +642,7 @@ func TestTheStoredSWIDMustOwnTheTeam(t *testing.T) {
 	r := newRig(t, http.StatusOK, "write-lineup-executed.json", true)
 	m := r.svc.Member.(member)
 	r.svc.Member = member{client: m.client, cookies: espn.Cookies{SWID: "{0000000D-0000-4000-8000-00000000000D}", S2: s2}}
-	if p := r.plan(t, swap()); p.Status != apitypes.HostMovePlanStatusUnavailable || p.Sentence != notYourTeamWords {
+	if p := r.plan(t, swap()); p.Status != apitypes.HostMovePlanStatusUnavailable || p.Sentence != espnWords.notYourTeam {
 		t.Fatalf("a SWID that owns another team: %+v", p)
 	}
 	token, _ := r.svc.Signer.Sign(me, linkID, swap(), r.now.Add(ConfirmFor))
