@@ -117,6 +117,9 @@ REGISTER_FREEZE_ROWS: Final = Table(
     Column("ecr", Double(53)),
     Column("props_points", Double(53)),
     Column("props_markets", JSONB),
+    # The week's published projection for him in PPR, the newest snapshot at the freeze (revision
+    # 0012): a benchmark the record grades beside ours from week 7, NULL where it lists no row for him.
+    Column("published_points", Double(53)),
     # The model that made the board the freeze quotes, which is not the process that froze it: a
     # Python freeze of a board the TypeScript persisted is implementation python, model research-ts.
     Column("model_version", Text, nullable=False),

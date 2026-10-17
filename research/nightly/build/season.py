@@ -58,11 +58,22 @@ def _clamped(value: float | None) -> float | None:
 
 
 def _score(score: record_read.Score) -> Json:
-    return {"graded": score.graded, "agreement": _clamped(score.agreement), "placesOff": score.places_off}
+    return {
+        "graded": score.graded,
+        "agreement": _clamped(score.agreement),
+        "placesOff": score.places_off,
+        "starters": score.starters,
+        "startersOf": score.starters_of,
+    }
 
 
 def _line(line: record_read.Line) -> Json:
-    return {"position": line.position, "ours": _score(line.ours), "adp": _score(line.adp)}
+    return {
+        "position": line.position,
+        "ours": _score(line.ours),
+        "adp": _score(line.adp),
+        "published": None if line.published is None else _score(line.published),
+    }
 
 
 def _week(week: record_read.Week, frozen_by: FrozenBy, season: int) -> Json:
@@ -87,7 +98,11 @@ def record_json(
         "season": season,
         "format": PAGE_FORMAT.id,
         "statistic": dict(record_read.STATISTIC),
+        "scale": record_read.SCALE,
+        "startersBasis": record_read.STARTERS_BASIS,
         "method": record_read.METHOD,
+        "publishedFromWeek": record_read.PUBLISHED_FROM_WEEK,
+        "honest": record_read.honest_line(to_date),
         "weeks": [_week(week, frozen_by, season) for week in weeks],
         "toDate": [_line(line) for line in to_date],
     }

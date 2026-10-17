@@ -332,6 +332,11 @@ _ENTRIES: Final = (
                     "'typescript'", (), "every legacy freeze was taken by the TypeScript (2026 weeks 1 and 2)"
                 ),
                 "model_version": _FREEZE_MODEL_VERSION,
+                "published_points": Derived(
+                    "NULL::double precision",
+                    (),
+                    "no legacy freeze kept the week's published projection (revision 0012)",
+                ),
             }
         ),
         dropped=_surrogate(),
