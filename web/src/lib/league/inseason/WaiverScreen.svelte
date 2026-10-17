@@ -56,7 +56,7 @@
 		type MoveStep
 	} from './move.ts';
 	import { Narrowing } from './state.ts';
-	import { askedPlayer, markAsked } from '../box/asked.ts';
+	import { NOT_FREE, askedPlayer, markAsked } from '../box/asked.ts';
 	import { onMount, tick } from 'svelte';
 	import { LINES } from './words.ts';
 
@@ -277,7 +277,11 @@
 		const narrowTo = POSITIONS.find((p) => p === at);
 		if (his() === undefined && narrowTo !== undefined) await choose(narrowTo);
 		const row = his();
-		if (row === undefined) return;
+		// Claimed since, or not free in this league: the screen says so rather than nothing.
+		if (row === undefined) {
+			problem = NOT_FREE;
+			return;
+		}
 		open = row.key;
 		chosenDrop = null;
 		await tick();
