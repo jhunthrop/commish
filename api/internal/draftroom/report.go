@@ -12,6 +12,7 @@ import (
 	"github.com/jhunthrop/commish/api/internal/leagues"
 	"github.com/jhunthrop/commish/api/internal/mock"
 	"github.com/jhunthrop/commish/api/internal/sim"
+	"github.com/jhunthrop/commish/api/internal/tenth"
 )
 
 // exposureRows is how many players "who you end up with" lists.
@@ -58,9 +59,9 @@ func Report(ctx context.Context, in ReportInput) (apitypes.MockReport, error) {
 	}
 	for i, g := range r.Standings {
 		out.Standings[i] = apitypes.ReportTeam{
-			Seat: SeatNumber(final.DraftOrder, g.TeamID), Points: round2(g.ProjectedPoints), Rank: g.ProjectedRank,
+			Seat: SeatNumber(final.DraftOrder, g.TeamID), Points: tenth.Round(g.ProjectedPoints), Rank: g.ProjectedRank,
 			StartersFilled: g.StartingSlotsFilled, StartersTotal: g.StartingSlotsTotal, ByeCollisions: g.ByeCollisions,
-			ValueCaptured: round2(g.ValueCaptured),
+			ValueCaptured: tenth.Round(g.ValueCaptured),
 		}
 	}
 	for i, p := range r.Picks {
@@ -87,15 +88,15 @@ func Report(ctx context.Context, in ReportInput) (apitypes.MockReport, error) {
 
 func pickView(p mock.PickReview, b boards.Board) apitypes.ReportPick {
 	v := apitypes.ReportPick{
-		Pick: p.PickNumber, Round: p.Round, PlayerId: p.PlayerID, AdpGap: round2p(p.ADPGap), Chip: apitypes.ReportPickChip(p.Chip),
-		StillThere: round2p(p.StillThere), CouldWait: p.CouldWait, OddsSource: p.OddsSource,
+		Pick: p.PickNumber, Round: p.Round, PlayerId: p.PlayerID, AdpGap: tenthp(p.ADPGap), Chip: apitypes.ReportPickChip(p.Chip),
+		StillThere: chancep(p.StillThere), CouldWait: p.CouldWait, OddsSource: p.OddsSource,
 		MadeBy: apitypes.ReportPickMadeBy(p.MadeBy),
 	}
 	if p.Chip == mock.NoADP {
 		v.Chip = "none"
 	}
 	if value, ok := b.Values[p.PlayerID]; ok {
-		r := round2(value)
+		r := tenth.Round(value)
 		v.OverReplacement = &r
 	}
 	return v
@@ -135,11 +136,11 @@ func starters(final draft.State, team string, points map[string]float64) []apity
 
 func runsView(r mock.RunsSummary) apitypes.ReportRuns {
 	out := apitypes.ReportRuns{
-		Runs: r.Runs, Median: round2(r.Median), MiddleLow: round2(r.MiddleLow), MiddleHigh: round2(r.MiddleHigh),
+		Runs: r.Runs, Median: tenth.Round(r.Median), MiddleLow: tenth.Round(r.MiddleLow), MiddleHigh: tenth.Round(r.MiddleHigh),
 		TopShare: r.TopShare, TopFinish: mock.TopFinish, RankCounts: r.RankCounts, Points: make([]float64, len(r.Points)),
 	}
 	for i, p := range r.Points {
-		out.Points[i] = round2(p)
+		out.Points[i] = tenth.Round(p)
 	}
 	ids := make([]string, 0, len(r.PlayerShare))
 	for id := range r.PlayerShare {
