@@ -269,3 +269,33 @@ func TestESPNConsentVersion(t *testing.T) {
 		}
 	}
 }
+
+// A MyFantasyLeague connection keeps the session alone at the words that
+// name the lineup moves (version 1), and its refused sign-ins are kept.
+func TestMFLConnection(t *testing.T) {
+	pool := dbtest.Pool(t)
+	ctx := context.Background()
+	acct, err := (&auth.Store{Pool: pool}).UpsertAccount(ctx, auth.Identity{UserID: "user_mfl", Email: "mfl@example.invalid"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	v, _ := NewVault(OneKey(key(t)))
+	store := &Store{Pool: pool}
+	sealed, _ := v.SealTokens(acct.ID.String(), "mfl", Session{"mfl_user_id": "a"}, Session{})
+	conn, err := store.PutConsented(ctx, acct.ID, "mfl", sealed, time.Now(), true, MFLConsentVersion)
+	if err != nil || conn.ConsentVersion != MFLConsentVersion || MFLConsentVersion != 1 || !conn.Proven {
+		t.Fatalf("put: %+v, %v", conn, err)
+	}
+	if err := store.Refused(ctx, acct.ID, "mfl", time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if n, err := store.Refusals(ctx, acct.ID, "mfl", time.Now().Add(-time.Hour)); err != nil || n != 1 {
+		t.Fatalf("refusals %d, %v", n, err)
+	}
+	for shown, want := range map[int]int{0: 1, 1: 1, 5: MFLConsentVersion} {
+		conn, err := store.PutConsented(ctx, acct.ID, "mfl", sealed, time.Now(), true, shown)
+		if err != nil || conn.ConsentVersion != want {
+			t.Fatalf("shown %d: version %d, %v", shown, conn.ConsentVersion, err)
+		}
+	}
+}

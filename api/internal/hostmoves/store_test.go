@@ -119,4 +119,25 @@ func TestStore(t *testing.T) {
 	if _, err := pool.Exec(ctx, `insert into app.host_write_accounts (account_id, host, kind) values ($1, 'espn', 'trade')`, other.ID); err == nil {
 		t.Fatal("a kind with no write path was allowed")
 	}
+
+	// MyFantasyLeague: a lineup alone, on the allow list and in the proof.
+	if _, err := pool.Exec(ctx, `insert into app.host_write_accounts (account_id, host, kind) values ($1, 'mfl', 'lineup')`, acct.ID); err != nil {
+		t.Fatal(err)
+	}
+	if ok, err := s.Allowed(ctx, acct.ID, "mfl", "lineup"); err != nil || !ok {
+		t.Fatalf("mfl lineup allowed: %v %v", ok, err)
+	}
+	if _, err := pool.Exec(ctx, `insert into app.host_write_accounts (account_id, host, kind) values ($1, 'mfl', 'claim')`, acct.ID); err == nil {
+		t.Fatal("a MyFantasyLeague claim was allowed")
+	}
+	mflMove := record(200)
+	mflMove.Host, mflMove.HostLeagueID, mflMove.Body = "mfl", "10010", []byte(`{"TYPE":"lineup","L":"10010","W":"7"}`)
+	if _, err := s.Begin(ctx, mflMove); err != nil {
+		t.Fatalf("an mfl lineup: %v", err)
+	}
+	mflClaim := record(201)
+	mflClaim.Host, mflClaim.Kind = "mfl", "claim"
+	if _, err := s.Begin(ctx, mflClaim); err == nil {
+		t.Fatal("an mfl claim was kept")
+	}
 }
