@@ -449,7 +449,7 @@ export function projShort(
 }
 
 /** The evidence columns in one short sentence pair (the Waivers basis). */
-export const EVIDENCE_SHORT = `${BOX.oppRank} is points allowed to his position, 1st allows the fewest. ${BOX.avg} and ${BOX.last} are his points a game and in his last game, your scoring.`;
+export const EVIDENCE_SHORT = `${BOX.oppRank} is points allowed to his position, 1st the fewest. ${BOX.avg} and ${BOX.last} are his points a game and last game, your scoring.`;
 
 /** The Pts column's basis (review N1): a player's points as the league scores them where the
  * platform gives each player's, else the team's points alone, the platform named (Lane 66e). */

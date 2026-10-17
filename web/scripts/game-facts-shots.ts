@@ -31,7 +31,7 @@ const EXPECTED = /^\d+(\.5)? to \d+(\.5)?$/;
 const CELL_WEATHER =
 	/^(\d+°, \d+ mph(, \d+% (rain|snow|ice))?|Indoors|Roof TBD|Abroad, no forecast|Outdoors)$/;
 const FACTS_READ =
-	/The Game cell shows each club's expected points, his club first, then the kickoff weather, read \w{3} \d{1,2}:\d{2} [ap]m Central\./g;
+	/The Game cell(?: shows each club's expected points, his club first, then the kickoff weather, read|'s expected points and weather were read) \w{3} \d{1,2}:\d{2} [ap]m Central\./g;
 const BETTING =
 	/\b(favou?red|underdogs?|odds|lines?|spreads?|totals?|bets?|betting|vegas|sportsbooks?|props?|moneyline)\b|over\/under/i;
 

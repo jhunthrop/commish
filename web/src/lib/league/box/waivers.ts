@@ -398,6 +398,6 @@ export function waiverBasis(
 		zone
 	);
 	const read = factsReadAt(lines);
-	const evidence = `${EVIDENCE_SHORT}${read === null ? '' : ` ${BOX.game} cells read ${weekdayTime(read, zone)} ${zoneWord(zone)}.`}`;
+	const evidence = `${EVIDENCE_SHORT}${read === null ? '' : ` The ${BOX.game} cell's expected points and weather were read ${weekdayTime(read, zone)} ${zoneWord(zone)}.`}`;
 	return [advice.basis, proj, BEATS_BASIS, advice.season_basis, evidence].filter((l) => l !== '');
 }
