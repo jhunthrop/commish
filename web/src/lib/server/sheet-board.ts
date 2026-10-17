@@ -10,6 +10,8 @@ import type { LeagueBoardFile } from '#lib/run/league-board.ts';
 import type { BoardFormat } from '#lib/sheet/model.ts';
 import { withStatuses } from '#lib/run/board-status.ts';
 import { heldWord } from '#lib/run/held-places.ts';
+import type { BoardRow, MarketRow, PlayerStatus } from '#lib/run/schema.ts';
+import { marketFace } from '#lib/site/market.ts';
 import { withSeasons } from './board-season.ts';
 import { board, designations, manifest, seasonReach } from './run.ts';
 import { captureStamp } from './statuses.ts';
@@ -65,16 +67,31 @@ export async function sheetBoard(format: BoardFormat): Promise<readonly Director
 	if (id === undefined) return null;
 	// The board's order beside the capture: a player on a season-long list follows the available ones
 	// at his position, his ranks shown as the word (Lane 63).
+	// The kickers and defenses follow in draft order, as the board file carries them (Lane 66m).
 	const [loaded, capture] = await Promise.all([board(id), designations()]);
-	return withStatuses(loaded.rows, capture).map((row) => ({
+	const ranked = withStatuses(loaded.rows, capture).map((row) => ({
+		...directoryOf(row),
+		headshot: row.headshot
+	}));
+	const market = withStatuses(loaded.market, capture).map((row) => ({
+		...directoryOf(row),
+		headshot: marketFace(row),
+		draftOrder: true
+	}));
+	return [...ranked, ...market];
+}
+
+function directoryOf(
+	row: (BoardRow | MarketRow) & { status?: PlayerStatus }
+): Omit<DirectoryPlayer, 'headshot'> {
+	return {
 		id: row.id,
 		name: row.name,
 		position: row.position,
 		team: row.team,
-		headshot: row.headshot,
 		rank: row.ourRank,
 		positionRank: row.positionRank,
 		adp: row.adp,
 		held: heldWord(row)
-	}));
+	};
 }

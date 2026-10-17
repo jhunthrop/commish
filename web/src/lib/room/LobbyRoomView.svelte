@@ -59,7 +59,7 @@
 	const queue = $derived(lobby.queue.filter((id) => !drafted.has(id)));
 	const rows = $derived(poolRows(board, drafted, filter, queue, search));
 	const call = $derived(card && lobby.drafting ? callView(card, board, drafted, teams) : null);
-	const odds = $derived(card?.still_there ?? {});
+	const chance = $derived(card?.still_there ?? {});
 	const landing = $derived(lobby.picks.slice(-teams).reverse());
 	const round = $derived(snakeSlot(Math.min(lobby.pickNumber, total), teams).round);
 	const secondsLeft = $derived(
@@ -86,7 +86,7 @@
 		})
 	);
 	const onClockName = $derived(onClock === null ? '' : (names[onClock - 1] ?? ''));
-	const oddsLabel = $derived.by(() => {
+	const chanceLabel = $derived.by(() => {
 		if (!card) return '';
 		if (card.conditional) return `reaches ${pickLabel(card.for_pick, teams)}`;
 		return card.next_pick ? `still there at ${pickLabel(card.next_pick, teams)}` : 'your last pick';
@@ -162,9 +162,9 @@
 		<Pool
 			{rows}
 			left={board.players.length - drafted.size}
-			{odds}
-			{oddsLabel}
-			oddsShown={card !== null}
+			{chance}
+			{chanceLabel}
+			chanceShown={card !== null}
 			basis={poolBasis(board, card, teams)}
 			pickNumber={lobby.pickNumber}
 			callId={call?.player.id ?? null}

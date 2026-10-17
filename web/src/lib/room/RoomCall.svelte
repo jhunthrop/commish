@@ -18,7 +18,7 @@
 	const tag = $derived(
 		view.conditional ? `If the board holds to ${view.forLabel}` : `Our call at ${view.forLabel}`
 	);
-	const oddsLabel = $derived(
+	const chanceLabel = $derived(
 		view.conditional
 			? `chance he reaches your pick at ${view.forLabel}`
 			: view.nextLabel === null
@@ -33,8 +33,8 @@
 	player={view.player}
 	vor={view.player.vor ?? 0}
 	adp={adpWords(view.player.adp, pickNumber)}
-	odds={view.odds ?? 0}
-	{oddsLabel}
+	chance={view.chance ?? 0}
+	{chanceLabel}
 	{action}
 	waiting={view.conditional}
 	{reading}

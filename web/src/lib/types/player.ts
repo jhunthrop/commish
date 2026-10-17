@@ -1,6 +1,11 @@
 export const POSITIONS = ['QB', 'RB', 'WR', 'TE', 'K', 'DST'] as const;
 export type Position = (typeof POSITIONS)[number];
 
+/** The positions every board carries in draft order, with no projected points and no tier (the
+ * 2026-09-05 ruling): kickers and defenses. The list and its test are in run/market.ts, out of the
+ * shell's chunk, which carries this file. */
+export type MarketPosition = Extract<Position, 'K' | 'DST'>;
+
 /** Who a player is, enough to draw a face, a name and a position pill. */
 export interface PlayerRef {
 	id: string;

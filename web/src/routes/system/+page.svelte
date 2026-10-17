@@ -5,7 +5,7 @@
 		adpWords,
 		draftersGap,
 		lastName,
-		oddsWords,
+		chanceWords,
 		pickLabel
 	} from '#lib/format/draft.ts';
 	import { fixed, plural, signed } from '#lib/format/number.ts';
@@ -18,7 +18,7 @@
 	import GapChip from '#lib/ui/GapChip.svelte';
 	import Icon from '#lib/ui/Icon.svelte';
 	import Keys from '#lib/ui/Keys.svelte';
-	import OddsCell from '#lib/ui/OddsCell.svelte';
+	import StillThereCell from '#lib/ui/StillThereCell.svelte';
 	import Panel from '#lib/ui/Panel.svelte';
 	import PickStrip from '#lib/ui/PickStrip.svelte';
 	import Stepper from '#lib/ui/Stepper.svelte';
@@ -379,7 +379,7 @@
 
 		<DocSection
 			title="Mock room parts"
-			sub="The solo room at pick 5.08 of a 12-team PPR mock, with real survival odds, and the lobby score bug."
+			sub="The solo room at pick 5.08 of a 12-team PPR mock, with real chances a player is still there, and the lobby score bug."
 		>
 			<Specimen frame="dashed">
 				<SinceStrip since={data.soloRoom.since} went={data.soloRoom.went} />
@@ -388,15 +388,15 @@
 					player={call}
 					vor={call.vor}
 					adp={adpWords(call.adp, data.soloRoom.now)}
-					odds={data.soloRoom.callOdds}
-					oddsLabel="chance he is still there at {nextLabel}"
+					chance={data.soloRoom.callChance}
+					chanceLabel="chance he is still there at {nextLabel}"
 					action={{ label: `Draft ${lastName(call.name)}`, key: 'Enter' }}
 				>
 					{#snippet reason()}
 						<b>{runner.name}</b> has more over replacement at {signed(runner.vor)}, but he is still
 						there at {nextLabel}
-						{oddsWords(data.soloRoom.runnerOdds)} of the time. {lastName(call.name)} is there {oddsWords(
-							data.soloRoom.callOdds
+						{chanceWords(data.soloRoom.runnerChance)} of the time. {lastName(call.name)} is there {chanceWords(
+							data.soloRoom.callChance
 						)} of the time.
 					{/snippet}
 				</CallPanel>
@@ -409,7 +409,7 @@
 				/>
 				<Part
 					name="Our call"
-					about="His face, the survival odds as the one big number, the runner-up in a sentence, the verb with its key. A panel with an orange edge, so it never covers the pool."
+					about="His face, the chance he is still there as the one big number, the runner-up in a sentence, the verb with its key. A panel with an orange edge, so it never covers the pool."
 				/>
 				<Part
 					name="Score bug, lobby only"
@@ -426,8 +426,8 @@
 		</DocSection>
 
 		<DocSection
-			title="Odds, verdicts and the setup's controls"
-			sub="The pool's odds cell, the strip every room shares, the report's verdict chips, and the setup page's stepper and field."
+			title="Still there, verdicts and the setup's controls"
+			sub="The pool's Still there cell, the strip every room shares, the report's verdict chips, and the setup page's stepper and field."
 		>
 			<Specimen frame="dashed">
 				<PickStrip
@@ -445,13 +445,13 @@
 			</Specimen>
 			<Parts>
 				<Part
-					name="Odds cell"
+					name="Still there cell"
 					about="The chance he lasts to your next pick, a meter under it, and what the chance is of."
 				>
-					{#snippet show()}<OddsCell
-							odds={data.soloRoom.runnerOdds}
+					{#snippet show()}<StillThereCell
+							chance={data.soloRoom.runnerChance}
 							label="still there at {nextLabel}"
-						/><OddsCell odds={null} label="" />{/snippet}
+						/><StillThereCell chance={null} label="" />{/snippet}
 				</Part>
 				<Part
 					name="Pick strip"

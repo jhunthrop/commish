@@ -145,8 +145,8 @@
 		return () => cancelAnimationFrame(frameId);
 	});
 	const callReady = $derived(call !== null && paintedFor === room.pick_number);
-	const odds = $derived(card?.still_there ?? {});
-	const oddsLabel = $derived(
+	const chance = $derived(card?.still_there ?? {});
+	const chanceLabel = $derived(
 		card?.next_pick ? `still there at ${pickLabel(card.next_pick, teams)}` : 'your last pick'
 	);
 	/** The marked player, else our call, else with no call coming the pool's top row. */
@@ -303,11 +303,11 @@
 		<Pool
 			{rows}
 			{left}
-			{odds}
-			{oddsLabel}
-			oddsShown={!readonly}
+			{chance}
+			{chanceLabel}
+			chanceShown={!readonly}
 			basis={readonly ? board.basis : poolBasis(board, card, teams, noCall)}
-			oddsGone={noCall}
+			chanceGone={noCall}
 			pickNumber={room.pick_number}
 			callId={call?.player.id ?? null}
 			{selectedId}

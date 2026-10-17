@@ -141,6 +141,8 @@ def format_json(run_format: RunFormat, season: int, rest: "RestOfSeason | None" 
         "unit": run_format.unit,
         "teams": TEAMS,
         "basis": basis,
+        # The ADP source (adp.json) whose draft order the board's kickers and defenses take: its own.
+        "marketOrder": run_format.adp.source,
     }
     if rest is not None:
         out |= {"rosFromWeek": rest.from_week, "rosThroughWeek": rest.through, "refreshedAt": iso(rest.refreshed_at)}

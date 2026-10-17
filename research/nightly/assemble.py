@@ -27,6 +27,7 @@ from research.nightly.reads import record as record_read
 from research.nightly.reads import schedule as schedule_read
 from research.nightly.reads.adp import AdpCapture, adp_cutoff, latest_capture
 from research.nightly.reads.board import FormatBoard, format_board
+from research.nightly.reads.market import market_order, market_players
 from research.nightly.register_log import FrozenBy
 from research.season import PRODUCT_SEASON
 
@@ -46,7 +47,9 @@ class AssemblyError(ResearchError):
 class Assembled:
     files: dict[str, Any]  # path in the run to its JSON
     boards: tuple[FormatBoard, ...]
-    people: tuple[pages.Identity, ...]
+    people: tuple[pages.Identity, ...]  # every player with a page
+    # The kickers and defenses every board carries in draft order: index entries with no page.
+    market: tuple[pages.Identity, ...]
     sources: tuple[Json, ...]
     model_versions: tuple[str, ...]
     formats: tuple[RunFormat, ...]
@@ -170,9 +173,15 @@ def assemble(conn: Connection, as_of: datetime, frozen_by: FrozenBy, ros: RosSet
     rest = None if ros is None else ros_boards(boards, context, as_of, ros)
     if rest is not None:
         boards = rest.boards
-    # The pages and the search index in the order of the boards the run prints.
+    # The pages and the search index in the order of the boards the run prints, then the kickers and
+    # defenses: each board's those its own drafts take, in their order; the index's every one any board
+    # carries, the page format's order first.
     people = tuple(pages.identities(boards))
-    by_slug = {p.id: p for p in people}
+    roster = market_players(conn)
+    orders = {f.id: market_order(roster, adp_by_format[f.id]) for f in formats}
+    carried = {e.player.player_id: e for f in (PAGE_FORMAT.id, *orders) for e in orders[f]}
+    market = tuple(pages.market_identities(people, tuple(carried.values())))
+    by_slug = {p.id: p for p in (*people, *market)}
     universe_ids = sorted({e.row.universe_id for b in boards for e in b.entries})
     capsules = stored_capsules_for(conn, universe_ids)
     ids = sorted({(e.row.player_id, e.row.universe_id) for b in boards for e in b.entries})
@@ -182,13 +191,14 @@ def assemble(conn: Connection, as_of: datetime, frozen_by: FrozenBy, ros: RosSet
     schedule, clubs, schedule_source, clubs_source = _schedule(conn, as_of)
     record, record_source = _record(conn, as_of, frozen_by)
     files: dict[str, Any] = {
-        f"boards/{b.format.id}.json": pages.board_json(b, by_slug, adp_by_format[b.format.id]) for b in boards
+        f"boards/{b.format.id}.json": pages.board_json(b, by_slug, adp_by_format[b.format.id], orders[b.format.id])
+        for b in boards
     }
     files |= {f"players/{page['id']}.json": page for page in players}
     files |= {
         "adp.json": season.adp_json(formats, captures),
         "record.json": record,
-        "index.json": pages.index_json(people, {page["id"]: page for page in players}),
+        "index.json": pages.index_json(people, {page["id"]: page for page in players}, market),
         "clubs.json": clubs,
         "schedule.json": schedule,
     }
@@ -211,6 +221,7 @@ def assemble(conn: Connection, as_of: datetime, frozen_by: FrozenBy, ros: RosSet
         files,
         boards,
         people,
+        market,
         sources,
         model_versions,
         formats,

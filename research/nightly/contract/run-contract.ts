@@ -15,81 +15,108 @@
 // `$app/env/public` (the build's PUBLIC_RUN_ID and PUBLIC_RUN_BASE_URL), is answered here with the run
 // to check. Every refusal is printed as one line, `schema:<file>:<message>`, and the exit status is 1
 // when there is any, 2 when the checker itself could not run.
-import { registerHooks } from 'node:module';
-import { resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { registerHooks } from "node:module";
+import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 
 const [webDir, root, runId] = process.argv.slice(2);
 if (!webDir || !root || !runId) {
-	process.stderr.write('usage: run-contract.ts <web dir> <runs root> <run id>\n');
-	process.exit(2);
+  process.stderr.write(
+    "usage: run-contract.ts <web dir> <runs root> <run id>\n",
+  );
+  process.exit(2);
 }
 
-const ENV_MODULE = '$app/env/public';
+const ENV_MODULE = "$app/env/public";
 const envSource =
-	`export const PUBLIC_RUN_ID = ${JSON.stringify(runId)};\n` +
-	`export const PUBLIC_RUN_BASE_URL = ${JSON.stringify(resolve(root))};\n`;
+  `export const PUBLIC_RUN_ID = ${JSON.stringify(runId)};\n` +
+  `export const PUBLIC_RUN_BASE_URL = ${JSON.stringify(resolve(root))};\n`;
 registerHooks({
-	resolve(specifier, context, nextResolve) {
-		if (specifier === ENV_MODULE) {
-			return { url: `data:text/javascript,${encodeURIComponent(envSource)}`, shortCircuit: true };
-		}
-		return nextResolve(specifier, context);
-	}
+  resolve(specifier, context, nextResolve) {
+    if (specifier === ENV_MODULE) {
+      return {
+        url: `data:text/javascript,${encodeURIComponent(envSource)}`,
+        shortCircuit: true,
+      };
+    }
+    return nextResolve(specifier, context);
+  },
 });
 
-const web = await import(pathToFileURL(resolve(webDir, 'src/lib/server/run.ts')).href);
+const web = await import(
+  pathToFileURL(resolve(webDir, "src/lib/server/run.ts")).href
+);
 
 interface Entry {
-	id: string;
+  id: string;
 }
 interface Format {
-	id: string;
+  id: string;
 }
 
 // One line per refusal, named by the first file that met it: the reader shares one read per artifact,
 // so a broken schedule refuses every page through the same error.
 const refusals = new Map<string, string>();
-async function check<T>(file: string, read: () => Promise<T>): Promise<T | null> {
-	try {
-		return await read();
-	} catch (error) {
-		const message = (error instanceof Error ? error.message : String(error)).replaceAll('\n', ' ');
-		if (!refusals.has(message)) refusals.set(message, `schema:${file}:${message}`);
-		return null;
-	}
+async function check<T>(
+  file: string,
+  read: () => Promise<T>,
+): Promise<T | null> {
+  try {
+    return await read();
+  } catch (error) {
+    const message = (
+      error instanceof Error ? error.message : String(error)
+    ).replaceAll("\n", " ");
+    if (!refusals.has(message))
+      refusals.set(message, `schema:${file}:${message}`);
+    return null;
+  }
 }
 
-const manifest = await check<{ formats: Format[] }>('manifest.json', () => web.manifest());
-await check('manifest.json', () => web.stamp());
-const index = await check<Entry[]>('index.json', () => web.index());
+const manifest = await check<{ formats: Format[] }>("manifest.json", () =>
+  web.manifest(),
+);
+await check("manifest.json", () => web.stamp());
+const index = await check<Entry[]>("index.json", () => web.index());
 let rows = 0;
 for (const format of manifest?.formats ?? []) {
-	const board = await check<{ rows: unknown[] }>(`boards/${format.id}.json`, () => web.board(format.id));
-	rows += board?.rows.length ?? 0;
+  const board = await check<{ rows: unknown[]; market?: unknown[] }>(
+    `boards/${format.id}.json`,
+    () => web.board(format.id),
+  );
+  rows += (board?.rows.length ?? 0) + (board?.market?.length ?? 0);
 }
 let pages = 0;
 for (const entry of index ?? []) {
-	if (await check(`players/${entry.id}.json`, () => web.player(entry.id))) pages += 1;
+  if (await check(`players/${entry.id}.json`, () => web.player(entry.id)))
+    pages += 1;
 }
-await check('adp.json', () => web.adp());
-await check('record.json', () => web.record());
-await check('clubs.json', () => web.clubs());
-await check('schedule.json', () => web.schedule());
-await check('designations.json', () => web.designations());
+await check("adp.json", () => web.adp());
+await check("record.json", () => web.record());
+await check("clubs.json", () => web.clubs());
+await check("schedule.json", () => web.schedule());
+await check("designations.json", () => web.designations());
 // The run-wide loaders the build's pages call (fix round 3, R5): each holds the run to a rule no single
 // file carries (the season blocks' reach and format, the first kickoff, the default format).
-for (const name of ['firstKickoff', 'seasonUnderway', 'seasonReach', 'defaultFormat'] as const) {
-	if (typeof web[name] !== 'function') {
-		refusals.set(`missing ${name}`, `schema:run:the web reader exports no ${name}`);
-		continue;
-	}
-	await check('run', () => web[name]());
+for (const name of [
+  "firstKickoff",
+  "seasonUnderway",
+  "seasonReach",
+  "defaultFormat",
+] as const) {
+  if (typeof web[name] !== "function") {
+    refusals.set(
+      `missing ${name}`,
+      `schema:run:the web reader exports no ${name}`,
+    );
+    continue;
+  }
+  await check("run", () => web[name]());
 }
 
 for (const line of refusals.values()) process.stdout.write(`${line}\n`);
 process.stdout.write(
-	`run ${runId}: ${refusals.size} refusals; ${manifest?.formats.length ?? 0} formats (${rows} board rows), ` +
-		`${pages} of ${index?.length ?? 0} player pages parsed, adp, record, clubs, schedule, designations\n`
+  `run ${runId}: ${refusals.size} refusals; ${manifest?.formats.length ?? 0} formats (${rows} board rows), ` +
+    `${pages} of ${index?.length ?? 0} player pages parsed, adp, record, clubs, schedule, designations\n`,
 );
 process.exit(refusals.size === 0 ? 0 : 1);

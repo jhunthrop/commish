@@ -196,7 +196,7 @@ def ros_setup(engine: Engine, instant: datetime, log: Log) -> RosSetup:
 def mirror_faces(http: httpx.Client, store: RunStore, assembled: Assembled, skip: bool) -> tuple[Json, str]:
     if skip:
         return {}, "skipped by --skip"
-    faces = [Face(p.id, p.headshot) for p in assembled.people if p.headshot]
+    faces = [Face(p.id, p.headshot) for p in (*assembled.people, *assembled.market) if p.headshot]
     result = mirror_headshots(http, store, faces)
     counts = ", ".join(f"{count} {outcome}" for outcome, count in sorted(result.counts.items()))
     return result.by_player, f"{len(faces)} faces: {counts}"

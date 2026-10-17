@@ -13,18 +13,18 @@
 		rows: readonly RoomPlayer[];
 		/** Players left in the pool, before the filter. */
 		left: number;
-		/** No call, so no odds, is coming for this turn. */
-		oddsGone?: boolean;
+		/** No call, so no chance, comes for this turn. */
+		chanceGone?: boolean;
 		/** Each player's chance of lasting to your next pick. */
-		odds: Readonly<Record<string, number>>;
-		/** What the odds are of: "still there at 6.05". */
-		oddsLabel: string;
-		/** The odds column's head: Still there, or Reaches for a call that waits on the board. */
-		oddsHead?: string;
-		/** The odds column is drawn only when there is a call to come with odds; a draft read without
+		chance: Readonly<Record<string, number>>;
+		/** What the chances are of: "still there at 6.05". */
+		chanceLabel: string;
+		/** The Still there column's head: Still there, or Reaches for a call that waits on the board. */
+		chanceHead?: string;
+		/** The Still there column is drawn only when a call with chances is coming; a draft read without
 		 * one (shared, or a lobby before your call) has no column promising them. */
-		oddsShown: boolean;
-		/** Whose points rank the pool and where the odds come from. */
+		chanceShown: boolean;
+		/** Whose points rank the pool and where the chances come from. */
 		basis: string;
 		/** The pick the ADP sentence is read against. */
 		pickNumber: number;
@@ -49,11 +49,11 @@
 	let {
 		rows,
 		left,
-		oddsGone = false,
-		odds,
-		oddsLabel,
-		oddsHead = 'Still there',
-		oddsShown,
+		chanceGone = false,
+		chance,
+		chanceLabel,
+		chanceHead = 'Still there',
+		chanceShown,
 		basis,
 		pickNumber,
 		callId,
@@ -77,10 +77,10 @@
 	const MORE_ROWS = 25;
 
 	let shown = $state(FIRST_ROWS);
-	/** Under a row with no chance to show, in words that fit the column: not in this card's odds,
+	/** Under a row with no chance to show, in words that fit the column: not in this card's chances,
 	 * on their way with the call, or none at all when no call is coming. */
-	const oddsMissing = $derived(
-		oddsGone ? 'no odds' : Object.keys(odds).length > 0 ? 'not in the odds' : 'odds to come'
+	const chanceMissing = $derived(
+		chanceGone ? 'no call' : Object.keys(chance).length > 0 ? 'not read' : 'with our call'
 	);
 	const visible = $derived(Math.max(shown, rows.findIndex((p) => p.id === selectedId) + 1));
 	const empty = $derived.by(() => {
@@ -92,7 +92,7 @@
 	});
 </script>
 
-<section class="pool" class:no-odds={!oddsShown} class:readonly aria-label="Pool">
+<section class="pool" class:no-chance={!chanceShown} class:readonly aria-label="Pool">
 	<div class="head">
 		<DisplayTitle size="panel">Pool</DisplayTitle>
 		<Label>{count(left)} left, ranked by points over replacement</Label>
@@ -111,16 +111,16 @@
 		<Label align="end"
 			><span class="wide">Over replacement</span><span class="narrow">Over repl</span></Label
 		>
-		{#if oddsShown}<Label align="end">{oddsHead}</Label>{/if}
+		{#if chanceShown}<Label align="end">{chanceHead}</Label>{/if}
 		<span class="adp"><Label align="end">ADP</Label></span>
 		{#if !readonly}<span class="acts-head"></span>{/if}
 	</div>
 	{#each rows.slice(0, visible) as player (player.id)}
 		<PoolRow
 			{player}
-			odds={oddsShown ? (odds[player.id] ?? null) : undefined}
-			{oddsLabel}
-			{oddsMissing}
+			chance={chanceShown ? (chance[player.id] ?? null) : undefined}
+			{chanceLabel}
+			{chanceMissing}
 			adp={adpWords(player.adp, pickNumber)}
 			isCall={player.id === callId}
 			selected={player.id === selectedId}
@@ -145,24 +145,24 @@
 </section>
 
 <style>
-	/* The columns: face, player, over replacement, odds, ADP, actions. A draft with no odds drops the
-	   odds column, a read-only draft drops the actions. */
+	/* The columns: face, player, over replacement, chance, ADP, actions. A draft with no chances drops the
+	   chance column, a read-only draft drops the actions. */
 	.pool {
-		--col-odds: 136px;
+		--col-chance: 136px;
 		--col-acts: 150px;
-		--pool-cols: 40px minmax(0, 1fr) 118px var(--col-odds) 118px var(--col-acts);
+		--pool-cols: 40px minmax(0, 1fr) 118px var(--col-chance) 118px var(--col-acts);
 		min-width: 0;
 	}
 
-	.no-odds {
+	.no-chance {
 		--pool-cols: 40px minmax(0, 1fr) 118px 118px var(--col-acts);
 	}
 
 	.readonly {
-		--pool-cols: 40px minmax(0, 1fr) 118px var(--col-odds) 118px;
+		--pool-cols: 40px minmax(0, 1fr) 118px var(--col-chance) 118px;
 	}
 
-	.no-odds.readonly {
+	.no-chance.readonly {
 		--pool-cols: 40px minmax(0, 1fr) 118px 118px;
 	}
 
@@ -213,20 +213,20 @@
 
 	@media (max-width: 1180px) {
 		.pool {
-			--col-odds: 126px;
+			--col-chance: 126px;
 			--col-acts: 64px;
-			--pool-cols: 40px minmax(0, 1fr) 108px var(--col-odds) 108px var(--col-acts);
+			--pool-cols: 40px minmax(0, 1fr) 108px var(--col-chance) 108px var(--col-acts);
 		}
 
-		.no-odds {
+		.no-chance {
 			--pool-cols: 40px minmax(0, 1fr) 108px 108px var(--col-acts);
 		}
 
 		.readonly {
-			--pool-cols: 40px minmax(0, 1fr) 108px var(--col-odds) 108px;
+			--pool-cols: 40px minmax(0, 1fr) 108px var(--col-chance) 108px;
 		}
 
-		.no-odds.readonly {
+		.no-chance.readonly {
 			--pool-cols: 40px minmax(0, 1fr) 108px 108px;
 		}
 	}
@@ -237,13 +237,13 @@
 			--pool-cols: 36px minmax(0, 1fr) 84px 84px;
 		}
 
-		.no-odds,
-		.no-odds.readonly {
+		.no-chance,
+		.no-chance.readonly {
 			--pool-cols: 36px minmax(0, 1fr) 84px;
 		}
 
 		/* On the phone the head names the over replacement column, whose cells print the number
-		   alone, the board's rows' treatment. The odds cells still name what they are. */
+		   alone, the board's rows' treatment. The Still there cells still name what they are. */
 		.cols {
 			column-gap: var(--s-2);
 			padding: var(--s-2) 0;

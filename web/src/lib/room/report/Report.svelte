@@ -8,7 +8,7 @@
 	import { scoringWords, slotLabel } from '../words.ts';
 	import Exposure from './Exposure.svelte';
 	import FieldBars from './FieldBars.svelte';
-	import { headline, points } from './headline.ts';
+	import { headline, points, totalCaption } from './headline.ts';
 	import PickReview from './PickReview.svelte';
 	import RunsSection from './RunsSection.svelte';
 
@@ -58,7 +58,7 @@
 		{#if head}
 			<div class="big">
 				<b>{points(head.points)}</b>
-				<span>projected points from {their} starters, {head.standing}</span>
+				<span>{totalCaption(their, head.standing)}</span>
 			</div>
 		{/if}
 		<div>
