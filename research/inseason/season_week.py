@@ -1,6 +1,6 @@
 """THE REGISTER'S WEEKLY PASS (`season-week`), ported from `research-ts/src/projections/season-week/steps.ts`.
 
-Eleven steps, each isolated: a step that raises is reported as failed and the pass carries on to the
+Thirteen steps, each isolated: a step that raises is reported as failed and the pass carries on to the
 next, because a dead odds key must never stop the freeze that runs after it. The exit status is
 non-zero when any step failed.
 
@@ -13,6 +13,9 @@ non-zero when any step failed.
    (`docs/research/2026-10-15-weekly-projection-round2-preregistration.md`, section 4's build items).
 1c. **game-table**: nflverse's game table for the season into `nflverse_games` (Lane 66a): the
    kickoffs and venues the hourly forecast reads, and the figures the live default falls back to.
+1d. **kicking-defense**: the season's kicking and team-defense weeks (`nflverse_kicking_weeks`,
+   `nflverse_team_defense_weeks`), then both as stat lines the API reads (`kdef_lines`, source
+   `nflverse_kdef_week`), each stamped as its club's lines that week (Lane 70a).
 2. **props-snapshot**: the odds provider's player props for the coming fourteen days.
 3. **grade**: every frozen week not yet graded, whose games are complete (below), against the
    stats now held. Each grade row is stamped `implementation = 'python'`.
@@ -47,9 +50,10 @@ from research.model.register.freeze import SERVED_SOURCE, take_freeze
 from research.model.register.grade import grade_week, latest_freeze_for
 from research.pipeline.http import Fetcher
 from research.pipeline.nflverse import ingest, ingest_schedule
-from research.pipeline.nflverse.client import NflverseClient
+from research.pipeline.nflverse.client import NflverseClient, NflverseError
 from research.pipeline.nflverse.context import ingest_opponent_defence_to_date
 from research.pipeline.nflverse.games import ingest_games
+from research.pipeline.nflverse.kdef_lines import refresh_kdef_season
 from research.pipeline.nflverse.schedule import ScheduleMetric, ScheduleSource
 from research.pipeline.odds.ingest import run_odds_snapshot
 
@@ -61,11 +65,13 @@ GRADE_OVERDUE: Final = timedelta(days=4)
 LAST_POSSIBLE_WEEK: Final = 22
 OPPONENT_RATINGS: Final = "opponent-ratings"
 GAME_TABLE: Final = "game-table"
+KICKING_DEFENSE: Final = "kicking-defense"
 STEPS: Final = (
     "stats-ingest",
     *usage_steps.USAGE_STEPS,
     OPPONENT_RATINGS,
     GAME_TABLE,
+    KICKING_DEFENSE,
     "props-snapshot",
     "grade",
     "freeze",
@@ -139,6 +145,26 @@ def game_table(context: SeasonWeekContext) -> StepResult:
         report = ingest_games(conn, NflverseClient(context.fetcher), [context.season], context.now)
     return usage_steps.written_result(
         GAME_TABLE, report.written, f"{report.written} games of {context.season} written or updated"
+    )
+
+
+def kicking_defense(context: SeasonWeekContext) -> StepResult:
+    """The season's kicking and team-defense weeks, then their stat lines (`kdef_lines`), each club-week
+    stamped as its club's lines; a re-run writes nothing."""
+    try:
+        with context.engine.connect() as conn:
+            refresh = refresh_kdef_season(conn, NflverseClient(context.fetcher), context.season)
+            conn.commit()
+    except NflverseError as error:
+        if error.kind != "not_found":
+            raise
+        return StepResult(
+            KICKING_DEFENSE,
+            "skipped",
+            f"nflverse has not published kicking or team stats for {context.season} yet ({error.asset})",
+        )
+    return usage_steps.written_result(
+        KICKING_DEFENSE, refresh.written, refresh.summary(context.season), refresh.detail()
     )
 
 
@@ -293,6 +319,7 @@ def _bodies(context: SeasonWeekContext) -> dict[str, Callable[[], StepResult]]:
         **{name: _usage_body(name, context) for name in usage_steps.USAGE_STEPS},
         OPPONENT_RATINGS: lambda: opponent_ratings(context),
         GAME_TABLE: lambda: game_table(context),
+        KICKING_DEFENSE: lambda: kicking_defense(context),
         "props-snapshot": lambda: props_snapshot(context),
         "grade": lambda: grade(context),
         "freeze": lambda: freeze(context),
