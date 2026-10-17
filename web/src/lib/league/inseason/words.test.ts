@@ -18,27 +18,21 @@ import {
 	settingWords
 } from './move.ts';
 import { READING_NOW, readNowWords } from '../model.ts';
-import type { LineupSlot, PlayerLine, TradeRow, WaiverRow, WeekFacts } from './api.ts';
+import type { LineupSlot, PlayerLine, TradeRow, WeekFacts } from './api.ts';
 import {
 	CLOSE_FOR_THEM,
 	EVERY_TRADE,
 	HELD,
 	LINES,
 	TAB_LABELS,
-	addsTitle,
 	lineupTitle,
-	startingCount,
-	NO_START_RULE,
-	LATER_RULE,
 	hisPorWords,
 	perGameWords,
 	rowEnd,
 	porFigure,
 	signInTitle,
-	sharedDropWords,
 	designationWords,
 	noTradeWith,
-	dropWords,
 	gainFigure,
 	gameWords,
 	lastGamesWords,
@@ -50,8 +44,7 @@ import {
 	teamAside,
 	tradeDecision,
 	tradeGains,
-	verbWords,
-	waiverDecision
+	verbWords
 } from './words.ts';
 
 const facts = (over: Partial<WeekFacts> = {}): WeekFacts => ({
@@ -107,15 +100,6 @@ const slot = (
 	changed,
 	no_one_can_play: false,
 	sentence: null
-});
-
-const waiver = (over: Partial<WaiverRow> = {}): WaiverRow => ({
-	add: line('Bhayshul Tuten'),
-	drop: line('Jaylen Wright'),
-	gain: 1.24,
-	starts: true,
-	sentence: 'He would start at RB2 over Jaylen Wright.',
-	...over
 });
 
 const trade: TradeRow = {
@@ -192,19 +176,7 @@ void test("the bench marks the starters a change sits, the host's player in each
 	assert.deepEqual([...satIds(slots)], ["Ja'Marr Chase"]);
 });
 
-void test('the waiver decision names the add, the drop and the gain a week', () => {
-	assert.equal(
-		waiverDecision(waiver()),
-		'Add Bhayshul Tuten, drop Jaylen Wright. Your lineup gains 1.2 points over replacement a week.'
-	);
-	assert.equal(
-		waiverDecision(waiver({ drop: null, gain: 0, starts: false })),
-		'Add Bhayshul Tuten. He would not start for you this week.'
-	);
-	assert.equal(waiverDecision(null), 'Nobody on waivers starts for you this week.');
-	assert.equal(dropWords(waiver()), 'drop Jaylen Wright, RB14');
-	assert.equal(dropWords({ drop: null }), 'into an open spot');
-	assert.equal(sharedDropWords(line('Jaxson Dart', 'QB', 31)), 'Each add drops Jaxson Dart, QB31');
+void test('a gain a week is signed to the tenth', () => {
 	assert.equal(gainFigure(1.24), '+1.2');
 });
 
@@ -215,7 +187,6 @@ void test("a row's own points over replacement is his, and zero carries no sign"
 	assert.equal(porFigure(-0.02), '0.0');
 	assert.equal(porFigure(0.4), '+0.4');
 	assert.equal(LINES.overRepl, 'over repl a week');
-	assert.equal(LINES.toYourLineup, 'a week to your lineup');
 });
 
 void test("a row's rest-of-season points a game are in the season figure's unit words", () => {
@@ -358,11 +329,6 @@ void test('copy guard: every in-season line is fantasy words, with no dash, semi
 			]
 		}),
 		lineupDecision({ set: true, slots: [] }),
-		waiverDecision(waiver()),
-		waiverDecision(waiver({ drop: null, gain: 0, starts: false })),
-		waiverDecision(null),
-		dropWords(waiver()),
-		dropWords({ drop: null }),
 		tradeDecision({ row: trade, team: 'Muttdogs' }),
 		tradeDecision(null),
 		tradeGains(trade),
@@ -370,10 +336,7 @@ void test('copy guard: every in-season line is fantasy words, with no dash, semi
 		CLOSE_FOR_THEM,
 		EVERY_TRADE,
 		teamAside({ name: 'Muttdogs', owner: 'muttdog', record: { wins: 5, losses: 0, ties: 0 } }),
-		NO_START_RULE,
-		LATER_RULE,
 		hisPorWords(-0.5),
-		sharedDropWords(line('Jaxson Dart', 'QB', 31)),
 		signInTitle('start'),
 		signInTitle('waivers'),
 		signInTitle('trades'),
@@ -396,9 +359,6 @@ void test('copy guard: every in-season line is fantasy words, with no dash, semi
 		hisPorWords(0.4),
 		perGameWords(18.4),
 		lineupTitle(6),
-		addsTitle(6),
-		startingCount(0),
-		startingCount(2),
 		...Object.values(TAB_LABELS),
 		...Object.values(LINES),
 		verbWords('start', 'espn'),

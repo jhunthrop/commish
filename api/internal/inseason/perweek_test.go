@@ -44,7 +44,7 @@ func TestWaiverGainOverTheOrdersWeeks(t *testing.T) {
 // week of its own printed.
 func TestBasisSaysWhatAWeekIs(t *testing.T) {
 	settings := fixtureSettings()
-	ros := WaiversBasis(RestOfSeason, 11)
+	ros := WaiverSeasonBasis(RestOfSeason, 11)
 	for _, s := range []string{LineupBasis(RestOfSeason), LineupBasis(Preseason)} {
 		if strings.Contains(s, "Points over replacement") {
 			t.Errorf("the lineup's rows show no points over replacement: %q", s)
@@ -63,11 +63,11 @@ func TestBasisSaysWhatAWeekIs(t *testing.T) {
 	if !strings.Contains(LineupBasis(RestOfSeason), "Our rest-of-season order breaks") || !strings.Contains(pre, "Our preseason number breaks") {
 		t.Errorf("the order named: %q %q", LineupBasis(RestOfSeason), pre)
 	}
-	if !strings.Contains(ros, "the rest of the season on our rest-of-season order, averaged over its 11 weeks") {
+	if !strings.Contains(ros, "on our rest-of-season order, averaged over its 11 weeks") {
 		t.Errorf("%q", ros)
 	}
-	if !strings.Contains(WaiversBasis(Preseason, 17), "the season on our preseason number, averaged over its 17 weeks") {
-		t.Errorf("%q", WaiversBasis(Preseason, 17))
+	if !strings.Contains(WaiverSeasonBasis(Preseason, 17), "on our preseason number, averaged over its 17 weeks") {
+		t.Errorf("%q", WaiverSeasonBasis(Preseason, 17))
 	}
 	if one := TradesBasis(RestOfSeason, 1); !strings.Contains(one, "averaged over its one week") {
 		t.Errorf("%q", one)
@@ -93,17 +93,17 @@ func TestTheRunsFirstWeekSetsTheDivisor(t *testing.T) {
 	line := out.Slots[0].Ours
 	season := f.league.Board.Values[boardID(line)]
 	w, _ := a.Waivers("")
-	if *line.PointsOverReplacement != roundTenth(season/10) || !strings.Contains(w.Basis, "its 10 weeks") {
-		t.Fatalf("%v %q", *line.PointsOverReplacement, w.Basis)
+	if *line.PointsOverReplacement != roundTenth(season/10) || !strings.Contains(w.SeasonBasis, "its 10 weeks") {
+		t.Fatalf("%v %q", *line.PointsOverReplacement, w.SeasonBasis)
 	}
 	f.league.Board.FromWeek = 0
-	if w, _ := newFixtureAdvisor(t, f, nil).Waivers(""); !strings.Contains(w.Basis, "its 11 weeks") {
-		t.Fatalf("the league's week: %q", w.Basis)
+	if w, _ := newFixtureAdvisor(t, f, nil).Waivers(""); !strings.Contains(w.SeasonBasis, "its 11 weeks") {
+		t.Fatalf("the league's week: %q", w.SeasonBasis)
 	}
 	// A preseason board's from week is never read.
 	f.league.Board.Order, f.league.Board.FromWeek = boards.OrderPreseason, 8
-	if w, _ := newFixtureAdvisor(t, f, nil).Waivers(""); !strings.Contains(w.Basis, "its 17 weeks") {
-		t.Fatalf("preseason: %q", w.Basis)
+	if w, _ := newFixtureAdvisor(t, f, nil).Waivers(""); !strings.Contains(w.SeasonBasis, "its 17 weeks") {
+		t.Fatalf("preseason: %q", w.SeasonBasis)
 	}
 }
 

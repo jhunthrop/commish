@@ -3570,24 +3570,83 @@ components:
           type: array
           description: the drafter's side first, then the opponent's when the week pairs them
           items: { $ref: "#/components/schemas/MatchupBoxSide" }
+    WaiverBeats:
+      type: object
+      description: >-
+        the member's player at his position with the lowest Proj he tops, the advised lineup's starters first, then the
+        bench, never one who cannot play this week (Lane 66f's Beats column); or the open spot he fills, a starting spot
+        no player of the member's can play this week
+      required: [host_id, name, starter, gain, open_spot]
+      properties:
+        open_spot:
+          type: boolean
+          description: >-
+            he fills a starting spot no player of the member's can play this week (host_id and name empty, gain his week
+            gain)
+        host_id: { type: string, description: "the member's player's host id, a line in the answer's roster; empty for the open spot" }
+        name: { type: string, description: empty for the open spot }
+        starter: { type: boolean, description: the player he tops starts in the lineup the advice sets this week }
+        gain: { type: number, format: double, description: "his Proj less that player's, as the screen prints them (tenths)" }
+    WaiverDrop:
+      type: object
+      description: one player of the member's an add could replace, with the lineup's gains after the swap
+      required: [host_id, gain, week_gain]
+      properties:
+        host_id: { type: string, description: "the dropped player's host id, a line in the answer's roster" }
+        gain: { type: number, format: double, description: "points over replacement a week to the lineup over the rest of the season, one decimal" }
+        week_gain: { type: number, format: double, description: "this week's Proj to the lineup the advice sets, one decimal" }
     WaiverRow:
       type: object
-      required: [add, drop, gain, starts, sentence]
+      required: [add, drop, gain, week_gain, starts, pickup, beats, drops, clears, sentence]
       properties:
         add: { $ref: "#/components/schemas/PlayerLine" }
         drop:
           allOf: [{ $ref: "#/components/schemas/PlayerLine" }]
           nullable: true
           description: null when a roster spot is open or there is no move to make
-        gain: { type: number, format: double, description: "points over replacement a week to the lineup, one decimal; above 0 sits above the rule" }
-        starts: { type: boolean, description: he starts for you this week }
+        gain: { type: number, format: double, description: "points over replacement a week to the lineup over the rest of the season with the row's drop, one decimal" }
+        week_gain:
+          type: number
+          format: double
+          description: >-
+            this week's Proj of the lineup the advice sets (the Lineup screen's rule) with him in and the row's drop out,
+            less the lineup's without him, one decimal; 0 when he would not start
+        starts: { type: boolean, description: "he starts this week in the lineup the advice sets with him in (the highest Proj after designations and byes)" }
+        pickup:
+          type: boolean
+          description: >-
+            a pickup worth making: he starts this week, the lineup's Proj rises, and the gain over the rest of the season
+            is not below 0
+        beats:
+          allOf: [{ $ref: "#/components/schemas/WaiverBeats" }]
+          nullable: true
+          description: null when he tops no one of the member's at his position, has no Proj, or cannot play this week
+        drops:
+          type: array
+          description: every player he could replace, the row's drop first, then by gain; empty when a spot is open
+          items: { $ref: "#/components/schemas/WaiverDrop" }
+        clears:
+          type: string
+          format: date
+          nullable: true
+          description: "the day a claim on him clears, from the platform (Yahoo's waiver wire); null when it does not say"
         sentence: { type: string }
     WaiverAdvice:
       type: object
-      required: [week, basis, basis_note, order_basis, refreshed, read_at, best, rows, host_waivers_url, host_note, moves]
+      required: [week, basis, season_basis, basis_note, order_basis, refreshed, read_at, projection_read_at, projection_previous_read_at, projection_scoring, lineup_proj, pickups_proj, pickups, rows, roster, host_waivers_url, host_note, moves]
       properties:
         week: { type: integer }
-        basis: { type: string }
+        lineup_proj:
+          type: number
+          format: double
+          nullable: true
+          description: >-
+            this week's Proj of the lineup the advice sets with no add (the Lineup screen's Totals), one decimal, the
+            base every week_gain counts from; null before the week's projection is read
+        basis: { type: string, description: "the pickup rule, the basis's first line" }
+        season_basis:
+          type: string
+          description: what the Rest of season column and a gain over the rest of the season are, said once under the rows
         basis_note:
           type: string
           description: >-
@@ -3596,11 +3655,40 @@ components:
         order_basis: { $ref: "#/components/schemas/OrderBasis" }
         refreshed: { type: string, format: date-time }
         read_at: { type: string, format: date-time }
-        best: { allOf: [{ $ref: "#/components/schemas/WaiverRow" }], nullable: true, description: the add that gains most, null when none gains }
+        projection_scoring: { $ref: "#/components/schemas/ProjectionScoring" }
+        projection_read_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: when the week's published projection the rows' week_projection read was captured, null with none
+        projection_previous_read_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: when the snapshot before it was captured, the read projection_delta counts from; null with none
+        pickups_proj:
+          type: number
+          format: double
+          nullable: true
+          description: >-
+            this week's Proj of the lineup the advice sets with every pickup made, one decimal; lineup_proj with none;
+            null before the week's projection is read
+        pickups:
+          type: array
+          description: >-
+            the pickups worth making, chosen as a set from every add we rank, at most 3: each measured against the
+            lineup with the ones before it made, kept only while he still starts and raises the Proj, no two taking the
+            same player of the member's (topped or dropped); each one's week_gain is his over the ones before (the
+            strip's cards); empty when no pickup beats the roster
+          items: { $ref: "#/components/schemas/WaiverRow" }
         rows:
           type: array
           description: positive gains first by gain, then the rest by points over replacement, at most 60
           items: { $ref: "#/components/schemas/WaiverRow" }
+        roster:
+          type: array
+          description: the member's active roster (injured reserve and taxi spots left out), the lines beats and drops name
+          items: { $ref: "#/components/schemas/PlayerLine" }
         host_waivers_url: { type: string, description: "the host's waiver page, empty when we know none" }
         host_note:
           type: string
@@ -3611,7 +3699,7 @@ components:
         moves: { $ref: "#/components/schemas/WaiverMoves" }
     WaiverMoves:
       type: object
-      required: [claim, note]
+      required: [claim, note, takes_writes, writes_on, reason]
       properties:
         claim:
           type: string
@@ -3624,6 +3712,18 @@ components:
           type: string
           nullable: true
           description: one sentence when a claim waits on the member (connect again to agree to moves), null otherwise
+        takes_writes:
+          type: boolean
+          description: true where the league's platform takes a claim from our screen at all (ESPN)
+        writes_on:
+          type: boolean
+          description: true when the platform's claim switch is on for this account (HOST_WRITES_ESPN_CLAIM or its proof list)
+        reason:
+          type: string
+          nullable: true
+          description: >-
+            one line under the platform's waiver page verb saying why a claim is not made from here, naming the platform;
+            null when claim is available
     TradeRecord:
       type: object
       required: [wins, losses, ties]
