@@ -42,20 +42,23 @@ const FORM_PARTS =
  * calls, the in-season screens, the season's words, the member's clock and the rail's order a
  * league's tabs read, the switch's choice made on opening a league, and the box score's parts with
  * the club's mark and nickname (Lane 66d, the mark shared with the draft room), and the game's facts in
- * words, which the player card's week reads too (Lane 66h). Four league pages
+ * words, which the player card's week reads too, and Lane 63's status pill, which the player card
+ * draws too (Lane 66h). Four league pages
  * share them, so they are kept out of the shared chunk by name, and the bundler splits them among
  * the pages that load them. (A group of their own would pull in everything they import, the API
  * client too, and land it on every page that reads the API.) */
 const LEAGUE_PAGE_PARTS =
-	/[\\/]src[\\/]lib[\\/](league[\\/](LeagueRow|board|model|api|follow-switch\.svelte|phase-words|sheet-tags)\.|league[\\/](inseason|box)[\\/]|context[\\/]choose\.svelte\.|format[\\/](clock|clubs|game-facts)\.|ui[\\/](rail-order|club-mark|ClubMark)\.)/;
+	/[\\/]src[\\/]lib[\\/](league[\\/](LeagueRow|StatusPill|board|model|api|follow-switch\.svelte|phase-words|sheet-tags)\.|league[\\/](inseason|box)[\\/]|context[\\/]choose\.svelte\.|format[\\/](clock|clubs|game-facts)\.|ui[\\/](rail-order|club-mark|ClubMark)\.)/;
 /** A player's injury status in words on the member's clock (Lane 63): the designation's words, which
  * the league's screens import and the board, player and record pages load after their first paint.
- * Kept out of the shared chunk by name, as the league's parts are. */
+ * The held places' pill rank joins them now the player card draws the status pill (Lane 66h). Kept out
+ * of the shared chunk by name, as the league's parts are. */
 /** The live clock the board, player and record pages call to say their status words again on the
  * member's clock: a few lines with no import but the words' own lazy one, in a file of its own, so
  * neither the shared chunk nor a page's group carries it for the others. */
 const LIVE_STATUS = /[\\/]src[\\/]lib[\\/]run[\\/]live-status\./;
-const STATUS_PARTS = /[\\/]src[\\/]lib[\\/](format[\\/]designation\.|run[\\/]status-view\.)/;
+const STATUS_PARTS =
+	/[\\/]src[\\/]lib[\\/](format[\\/]designation\.|run[\\/](status-view|held-places)\.)/;
 /** A component joins the shared chunk once this many routes use it. Fewer, and every page would
  * carry code only a couple of pages run. */
 const SHARED_BY_ROUTES = 4;
