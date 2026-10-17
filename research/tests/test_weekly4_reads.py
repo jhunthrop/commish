@@ -26,6 +26,8 @@ def test_each_table_read_selects_its_kinds_pairs_and_nothing_else() -> None:
     assert _selected(reads.DEPTH_QUERY) == ADMITTED["depth"] == ADMITTED["depth_prior"]
     assert _selected(reads.STADIUM_QUERY) == {p for p in ADMITTED["schedule"] if p[0] == STADIUMS}
     assert {t for t, _ in _selected(reads.WEATHER_QUERY)} == {GAME_WEATHER}
+    assert _selected(reads.GAME_SURFACE_QUERY) == {p for p in ADMITTED["schedule"] if p[0] == "nflverse_games"}
+    assert {c for t, c in ADMITTED["schedule"] if t == "nflverse_games"} == {"game_id", "season", "week", "surface"}
     pairing = {p for p in ADMITTED["schedule"] if p[0] == GAME_WEATHER}
     assert _selected(reads.GAME_PAIRING_QUERY) == pairing
     assert {c for _, c in pairing} == {"season", "week", "home_team", "away_team"}

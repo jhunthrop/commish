@@ -19,8 +19,8 @@ Item by item:
    (`forecast`): `nws_forecast` at or before t_g;
 4. schedule knowledge (`schedule`): the kickoff, home field, rest days, division game and indoors
    rows of week W, the `stadiums` row, and the game rows' pairing columns where the play-by-play
-   pairing has none (a game still to be played). (`nflverse_schedule`, `surface`) is named by item 4 but
-   the store holds no such metric (section 2.10 has no default for it): the surface feature stops;
+   pairing has none (a game still to be played), and the game's surface (`nflverse_games`,
+   `surface`) by name (amendment 2 item 1);
 5. no other (`nflverse_kickoff`, metric) pair of week W: `game_result` and `points_allowed` are in
    no list;
 6. the depth chart (`depth`, or `depth_prior` on the check's fallback): `nflverse_depth_chart_weeks`;
@@ -89,7 +89,10 @@ FORECAST_METRICS: Final = (
     ForecastMetric.ISSUED_AT,
 )
 SCHEDULE_METRICS: Final = (ScheduleMetric.REST_DAYS, ScheduleMetric.DIVISION_GAME, ScheduleMetric.INDOORS)
-STADIUM_COLUMNS: Final = ("stadium_id", "roof_type", "international")
+STADIUM_COLUMNS: Final = ("stadium_id", "roof_type", "international", "surface", "read_at")
+# Amendment 2 item 1: the game's surface by name, schedule knowledge (never a figure's source).
+GAMES: Final = "nflverse_games"
+GAME_SURFACE_COLUMNS: Final = ("game_id", "season", "week", "surface")
 # The game rows' pairing columns: who plays whom each week, the pairing's own four columns (item 4),
 # read where the play-by-play pairing has no row yet (a game still to be played).
 GAME_PAIRING_COLUMNS: Final = ("season", "week", "home_team", "away_team")
@@ -103,7 +106,19 @@ NGS_METRICS: Final = (
     "pass_completion_pct_above_expectation",
     "pass_avg_time_to_throw",
 )
-PFR_METRICS: Final = ("receiving_broken_tackles", "rushing_broken_tackles", "times_pressured")
+# Amendment 2 item 7: live, the filing is Tank01's word from lane 63's status rows, by the universe
+# player its provider id is crosswalked to, read at the capture's last check of its feed.
+LIVE_FILING_PAIRS: Final = frozenset(
+    {
+        ("published_boards", "player_id"),
+        ("published_boards", "status"),
+        ("published_boards", "status_source"),
+        ("player_crosswalk", "player_id"),
+        ("capture_checks", "checked_at"),
+    }
+)
+PRESSURED_METRIC: Final = "times_pressured"
+PFR_METRICS: Final = ("receiving_broken_tackles", "rushing_broken_tackles", PRESSURED_METRIC)
 # Round 3's club rows (`snapshot.TEAM_METRICS`) and the pass rate over expectation round 4 adds (2.4).
 BOX_TEAM_METRICS: Final = (*TEAM_METRICS, PbpMetric.PASS_RATE_OVER_EXPECTED)
 
@@ -118,7 +133,7 @@ def _pairs(source: str, names: Iterable[str]) -> frozenset[Pair]:
 
 ADMITTED: Final[Mapping[ReadKind, frozenset[Pair]]] = MappingProxyType(
     {
-        "filings": frozenset({(INJURY_SOURCE, InjuryMetric.REPORT_STATUS)}),
+        "filings": frozenset({(INJURY_SOURCE, InjuryMetric.REPORT_STATUS)}) | LIVE_FILING_PAIRS,
         "figures": _pairs(ScheduleSource.KICKOFF, FIGURE_METRICS),
         "live_figures": frozenset(p for s in LIVE_FIGURE_SOURCES for p in _pairs(s, LIVE_FIGURE_METRICS)),
         "weather": _pairs(GAME_WEATHER, (*WEATHER_KEY_COLUMNS, *WEATHER_COLUMNS, *WEATHER_SOURCE_COLUMNS)),
@@ -126,16 +141,28 @@ ADMITTED: Final[Mapping[ReadKind, frozenset[Pair]]] = MappingProxyType(
         "schedule": _pairs(ScheduleSource.SCHEDULE, SCHEDULE_METRICS)
         | _pairs(STADIUMS, STADIUM_COLUMNS)
         | _pairs(GAME_WEATHER, GAME_PAIRING_COLUMNS)
+        | _pairs(GAMES, GAME_SURFACE_COLUMNS)
         | {(ScheduleSource.KICKOFF, ScheduleMetric.KICKOFF_INSTANT)},
         "depth": _pairs(DEPTH_CHARTS, DEPTH_COLUMNS),
         "depth_prior": _pairs(DEPTH_CHARTS, DEPTH_COLUMNS),
         "plays": _pairs(PLAYS, PLAY_COLUMNS),
         "charted": _pairs(NGS_SOURCE, NGS_METRICS) | _pairs(PFR_SOURCE, PFR_METRICS),
-        "box": frozenset(USAGE_ROWS) | _pairs(PBP_SOURCE, BOX_TEAM_METRICS) | {(CLUB_EDGES, "team")},
+        "box": frozenset(USAGE_ROWS)
+        | _pairs(PBP_SOURCE, BOX_TEAM_METRICS)
+        | {(CLUB_EDGES, "team"), (INJURY_SOURCE, InjuryMetric.REPORT_STATUS)},
         "prior": frozenset(USAGE_ROWS) | {(CLUB_EDGES, "team")} | _pairs(PLAYS, PLAY_COLUMNS),
     }
 )
-assert not any(_EXPLICIT_REFUSALS & pairs for pairs in ADMITTED.values()), "item 5: no outcome pair is admitted"
+
+
+def _refuse_outcome_pairs() -> None:
+    """Item 5, held at import: no read kind's list admits a week-W outcome pair."""
+    for kind, pairs in ADMITTED.items():
+        if _EXPLICIT_REFUSALS & pairs:
+            raise InputRuleError(f"item 5: the {kind} list admits {sorted(_EXPLICIT_REFUSALS & pairs)}")
+
+
+_refuse_outcome_pairs()
 
 
 class SourcedRow(Stamped, Protocol):

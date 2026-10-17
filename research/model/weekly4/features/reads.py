@@ -29,7 +29,9 @@ from research.model.weekly4.features.admitted import (
     FIGURE_METRICS,
     FORECAST_METRICS,
     GAME_PAIRING_COLUMNS,
+    GAME_SURFACE_COLUMNS,
     GAME_WEATHER,
+    GAMES,
     LIVE_FIGURE_METRICS,
     LIVE_FIGURE_SOURCES,
     NGS_METRICS,
@@ -90,11 +92,16 @@ _TEAM_WEEK: Final = (
     "and as_of <= :as_of and source = any(:sources) and metric = any(:metrics) "
     "order by week asc, team asc, source asc, metric asc, as_of desc"
 )
-_PLAYER_WEEK: Final = (
-    "select distinct on (week, player_id, source, metric) season, week, player_id, source, metric, value, as_of "
+# Every stored version, not the newest at the bound: an instant takes the newest at or before it (M4).
+_CHARTED_VERSIONS: Final = (
+    "select season, week, player_id, source, metric, value, as_of "
     "from research.player_week_observations where season = :season and week >= :first and week <= :last "
     "and as_of <= :as_of and source = :source and metric = any(:metrics) "
-    "order by week asc, player_id asc, source asc, metric asc, as_of desc"
+    "order by week asc, player_id asc, source asc, metric asc, as_of asc"
+)
+GAME_SURFACE_QUERY: Final = (
+    f"select {', '.join(GAME_SURFACE_COLUMNS)} from research.{GAMES} "
+    "where season = :season and week = :week order by game_id"
 )
 
 
@@ -181,6 +188,24 @@ class Stadium:
     stadium_id: str
     roof_type: str
     international: bool
+    surface: str | None
+    read_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class GameSurface:
+    """A game's recorded surface (`nflverse_games`, by name: amendment 2 item 1)."""
+
+    game_id: str
+    season: int
+    week: int
+    surface: str | None
+    as_of: datetime  # schedule knowledge: admitted by name, the stamp no part of the rule
+
+
+def game_surfaces(conn: Connection, season: int, week: int) -> dict[str, GameSurface]:
+    rows = conn.execute(text(GAME_SURFACE_QUERY), {"season": season, "week": week})
+    return {str(r[0]): GameSurface(str(r[0]), int(r[1]), int(r[2]), r[3] or None, SCHEDULE_UNTIL) for r in rows}
 
 
 def game_pairing(conn: Connection, season: int) -> dict[tuple[int, str], str]:
@@ -193,7 +218,10 @@ def game_pairing(conn: Connection, season: int) -> dict[tuple[int, str], str]:
 
 def stadiums(conn: Connection) -> dict[str, Stadium]:
     """The venues (schedule knowledge, section 5 item 4)."""
-    return {str(r[0]): Stadium(str(r[0]), str(r[1]), bool(r[2])) for r in conn.execute(text(STADIUM_QUERY))}
+    return {
+        str(r[0]): Stadium(str(r[0]), str(r[1]), bool(r[2]), r[3] or None, ms_instant(r[4]))
+        for r in conn.execute(text(STADIUM_QUERY))
+    }
 
 
 def team_rows(  # noqa: PLR0913, PLR0917 - the as-of read's every bound, named
@@ -221,7 +249,8 @@ def team_rows(  # noqa: PLR0913, PLR0917 - the as-of read's every bound, named
 
 
 def charted(conn: Connection, season: int, last_week: int, until: datetime) -> list[PlayerWeekObservation]:
-    """The NGS and PFR rows of weeks 1 to `last_week` stored at or before `until`."""
+    """Every stored version of the NGS and PFR rows of weeks 1 to `last_week` at or before `until`;
+    each instant keeps the newest version at or before it (`charted.charted_at`)."""
     found: list[PlayerWeekObservation] = []
     for source, metrics in CHARTED_SOURCES:
         params = {
@@ -234,6 +263,6 @@ def charted(conn: Connection, season: int, last_week: int, until: datetime) -> l
         }
         found.extend(
             PlayerWeekObservation(r.season, r.week, r.player_id, r.source, r.metric, r.value, ms_instant(r.as_of))
-            for r in conn.execute(text(_PLAYER_WEEK), params)
+            for r in conn.execute(text(_CHARTED_VERSIONS), params)
         )
     return found

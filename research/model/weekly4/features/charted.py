@@ -22,6 +22,8 @@ from typing import Final
 from zoneinfo import ZoneInfo
 
 from research.model.weekly3.instant import Schedule
+from research.model.weekly3.ledger import InputRuleError
+from research.model.weekly4.features.admitted import PRESSURED_METRIC
 from research.model.weekly4.features.plays import PlayerTally
 from research.pipeline.nflverse.depth_chart_weeks import GAME_LENGTH
 from research.pipeline.observations import PlayerWeekObservation
@@ -41,7 +43,6 @@ PFR_BROKEN_TACKLES: Final = "pfr_broken_tackles_per_touch"
 PFR_PRESSURED: Final = "pfr_pressured_per_dropback"
 CHARTED_FEATURES: Final = (*(name for name, _, _ in NGS_FEATURES), PFR_BROKEN_TACKLES, PFR_PRESSURED)
 _BROKEN: Final = ("receiving_broken_tackles", "rushing_broken_tackles")
-_PRESSURED: Final = "times_pressured"
 
 
 def missing_indicator(feature: str) -> str:
@@ -67,7 +68,28 @@ def week_passes(schedule: Schedule) -> dict[int, datetime]:
 
 def restamp(rows: Sequence[PlayerWeekObservation], passes: Mapping[int, datetime]) -> list[PlayerWeekObservation]:
     """Each row stamped at its week's Wednesday pass (item 8); a week with no kickoff is refused."""
+    missing = sorted({row.week for row in rows} - set(passes))
+    if missing:
+        raise InputRuleError(f"charted rows of weeks {missing} have no kickoff, so no Wednesday pass admits them")
     return [replace(row, as_of=passes[row.week]) for row in rows]
+
+
+def charted_at(
+    versions: Sequence[PlayerWeekObservation], passes: Mapping[int, datetime], week: int, moment: datetime
+) -> list[PlayerWeekObservation]:
+    """What the charted read returns at t_g: of each row's stored versions of weeks before W, the
+    newest stored at or before t_g, then stamped at its Wednesday pass and kept if that pass is at
+    or before t_g (a version stored after t_g never reaches an earlier instant)."""
+    newest: dict[tuple[int, str, str, str], PlayerWeekObservation] = {}
+    for row in versions:
+        if row.week >= week or row.as_of > moment:
+            continue
+        key = (row.week, row.player_id, row.source, row.metric)
+        held = newest.get(key)
+        if held is None or row.as_of >= held.as_of:
+            newest[key] = row
+    ordered = [newest[k] for k in sorted(newest)]
+    return [row for row in restamp(ordered, passes) if row.as_of <= moment]
 
 
 def _weighted(values: Mapping[int, float], weights: Mapping[int, float]) -> float:
@@ -92,7 +114,7 @@ def charted_features(
     touches = sum(t.receptions + t.rush_attempts for w, t in tallies.items() if w in broken_weeks)
     broken = sum(by_metric.get(m, {}).get(w, 0.0) for m in _BROKEN for w in broken_weeks)
     found[PFR_BROKEN_TACKLES] = broken / touches if touches > 0 else math.nan
-    pressured = by_metric.get(_PRESSURED, {})
+    pressured = by_metric.get(PRESSURED_METRIC, {})
     dropbacks = sum(t.counts.dropbacks for w, t in tallies.items() if w in pressured)
     found[PFR_PRESSURED] = sum(pressured.values()) / dropbacks if dropbacks > 0 else math.nan
     return found, frozenset(missing_indicator(n) for n, v in found.items() if math.isnan(v))
