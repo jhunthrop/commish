@@ -284,7 +284,14 @@ void test('the evidence columns print as the Lineup draws them', () => {
 	assert.equal(deltaWord(0.04), '0.0');
 	assert.equal(deltaWord(null), '--');
 	const row = boxRow(line(), 'QB', ZONE, false);
-	assert.deepEqual(row.evidence, { oppRank: 24, oppOf: null, avg: 17.94, last: 22.4, delta: 0.4 });
+	assert.deepEqual(row.evidence, {
+		oppRank: 24,
+		oppOf: null,
+		avg: 17.94,
+		last: 22.4,
+		delta: 0.4,
+		season: 17.8
+	});
 	assert.equal(row.pill?.rank, null, 'the Lineup leaves the rest-of-season rank out');
 	assert.equal(boxRow(line(), 'QB', ZONE).pill?.rank, 7, 'the Matchup keeps it');
 	assert.equal(
