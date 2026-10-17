@@ -247,6 +247,7 @@
 			me={me.name}
 			href={advice.host_trades_url}
 			{verb}
+			reason={advice.host_note}
 			propose={proposeRow}
 			build={buildFrom}
 			builderId={BUILDER_ID}

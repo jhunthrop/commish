@@ -6,6 +6,7 @@
 	import ToneChip from '#lib/ui/ToneChip.svelte';
 	import { memberZone } from '#lib/format/clock.ts';
 	import type { PlayerLine } from '../inseason/api.ts';
+	import { hostTab } from '../inseason/attach.ts';
 	import { CLOSE_FOR_THEM, teamAside } from '../inseason/words.ts';
 	import { BOX, boxRow, positionWord } from './box.ts';
 	import BoxLine from './BoxLine.svelte';
@@ -20,6 +21,7 @@
 		sideRows,
 		toneOf,
 		TRADES,
+		weekLine,
 		weekWord,
 		type CopiedTrade,
 		type FinderRow,
@@ -31,17 +33,21 @@
 	 * other team, then two ruled-off groups, each side's gain over the rest of the season a week and
 	 * each side's change in this week's Proj, then the room each roster has. A head sorts by its
 	 * column. One tap opens the trade's players in the box score's columns (Proj, Pts, Opp rank, Avg,
-	 * Last, Rest of season), the member's give and drop, then theirs, with Build from this and the
-	 * trade verb under them. */
+	 * Last, Rest of season), the member's give and drop, then theirs, under the trade's week in one
+	 * line, with Build from this and the trade verb under them: the verb copies the offer and opens
+	 * the platform's trade page, as the strip's does. */
 	interface Props {
 		rows: readonly FinderRow[];
 		sort: SortKey;
 		onsort: (by: SortKey) => void;
 		/** The member's team, for the opened trade's first group. */
 		me: string;
-		/** The platform's trade page, the verb's second half. */
+		/** The platform's trade page, the verb's second half; empty when the API knows none, and the
+		 * verb stands disabled with reason under it. */
 		href: string;
 		verb: string;
+		/** Why the verb cannot open the platform's page: the API's note, said when href is empty. */
+		reason: string | null;
 		/** Copies a trade's offer, answering the line under its verb. */
 		propose: (row: FinderRow) => Promise<CopiedTrade>;
 		/** Opens the builder with the trade filled; null when a player in it has no host id. */
@@ -50,7 +56,7 @@
 		builderId: string;
 	}
 
-	let { rows, sort, onsort, me, href, verb, propose, build, builderId }: Props = $props();
+	let { rows, sort, onsort, me, href, verb, reason, propose, build, builderId }: Props = $props();
 
 	const COLUMNS = 9;
 	const zone = memberZone();
@@ -168,7 +174,8 @@
 					><span class="wt"
 						><TeamAvatar name={entry.team.name} size={28} /><span
 							><b>{entry.team.name}</b><small>{teamAside(entry.team)}</small
-							>{#if entry.row.close_for_them}<ToneChip tone="even">{CLOSE_FOR_THEM}</ToneChip
+							>{#if entry.row.drop}<small class="drop-mid">{room.yours}</small
+								>{/if}{#if entry.row.close_for_them}<ToneChip tone="even">{CLOSE_FOR_THEM}</ToneChip
 								>{/if}</span
 						></span
 					></td
@@ -191,10 +198,23 @@
 				{@const sides = sideRows(entry.row)}
 				{@const filled = build(entry)}
 				{@const line = said[entry.key]}
+				{@const week = weekLine(entry.row)}
 				<tr class="opened" {id}>
 					<td class="edge"></td>
 					<td colspan={COLUMNS - 1}>
+						{#if week}<p class="week-line">{week}</p>{/if}
 						<table class="inner" aria-label={TRADES.why}>
+							<colgroup>
+								<col class="i-side" />
+								<col />
+								<col class="i-game" />
+								<col class="i-num" />
+								<col class="i-pts" />
+								<col class="i-rk" />
+								<col class="i-ev" />
+								<col class="i-ev" />
+								<col class="i-season" />
+							</colgroup>
 							<thead>
 								<tr class="cols">
 									<th class="side" scope="col"><span class="vh">{TRADES.sideGive}</span></th>
@@ -217,9 +237,20 @@
 							{#if filled}<Quiet size="sm" controls={builderId} onclick={filled}
 									>{TRADES.fromThis}</Quiet
 								>{/if}
-							<Quiet size="sm" onclick={() => void press(entry)}>{verb}</Quiet>
+							<span class="go" {@attach hostTab(href)}
+								><Quiet
+									size="sm"
+									href={href === '' ? undefined : href}
+									disabled={href === ''}
+									onclick={() => void press(entry)}>{verb}</Quiet
+								></span
+							>
 						</div>
-						{#if line}<p class="said"><TradeCopied {line} {href} /></p>{/if}
+						{#if line}<p class="said">
+								<TradeCopied {line} {href} />
+							</p>{:else if href === '' && reason}<p class="said">
+								{reason}
+							</p>{/if}
 					</td>
 				</tr>
 			{/if}
@@ -503,6 +534,7 @@
 
 	.inner {
 		width: 100%;
+		table-layout: fixed;
 		border-collapse: separate;
 		border-spacing: 0;
 		background: var(--surface);
@@ -517,29 +549,49 @@
 		background: var(--bg);
 	}
 
-	.inner .cols .side {
+	/* The opened trade's widths, set once in its colgroup, so a phone can fold a column to nothing
+	   and give its width to the name. */
+	.i-side {
 		width: 76px;
 	}
 
-	.inner .cols .game {
+	.i-game {
 		width: 200px;
 	}
 
-	.inner .cols .num {
+	.i-num,
+	.i-pts {
 		width: 64px;
 	}
 
-	.inner .cols .ev {
+	.i-ev {
 		width: 60px;
 	}
 
-	.inner .cols .ev.first {
+	.i-rk {
 		width: 88px;
+	}
+
+	.i-season {
+		width: 120px;
+	}
+
+	.inner .cols .ev.first {
 		padding-left: var(--s-3);
 	}
 
-	.inner .cols .season {
-		width: 120px;
+	/* The trade's week in one line, over its players (review H2). */
+	.week-line {
+		margin: var(--s-2) 0;
+		font-size: var(--t-sm);
+		font-weight: 600;
+		color: var(--ink);
+		font-variant-numeric: tabular-nums;
+	}
+
+	/* The member's drop, said in the With cell once the Room column folds (review M3). */
+	.drop-mid {
+		display: none;
 	}
 
 	.grp th {
@@ -588,15 +640,24 @@
 			display: none;
 		}
 
+		.wt small.drop-mid {
+			display: block;
+			color: var(--ink-2);
+		}
+
 		.groups td:last-child {
 			padding: 0;
 		}
 	}
 
 	@media (max-width: 900px) {
+		.i-ev,
+		.i-rk {
+			width: 0;
+		}
+
 		.inner .cols .ev,
 		.inner .cols .ev.first {
-			width: 0;
 			padding: 0;
 			font-size: 0;
 		}
@@ -721,29 +782,32 @@
 			padding: 0;
 		}
 
-		.inner {
-			table-layout: fixed;
-		}
-
-		.inner .cols .side {
+		.i-side {
 			width: 54px;
 		}
 
-		.inner .cols .game {
+		.i-game {
 			width: 150px;
 		}
 
-		.inner .cols .pts {
+		.i-pts {
 			width: 30px;
 		}
 
-		.inner .cols .num {
+		.i-num {
 			width: 44px;
 		}
 
-		.inner .cols .season {
+		.i-season {
 			width: 56px;
+		}
+
+		.inner .cols .season {
 			white-space: normal;
+		}
+
+		.week-line {
+			font-size: var(--t-xs);
 		}
 
 		.acts {
@@ -762,18 +826,35 @@
 		}
 	}
 
-	/* On a phone the opened rows' game folds under the name, as the box score's rows do, and wraps
-	   inside the name's cell rather than run under the Proj. */
+	/* On a phone the opened rows read cleanly (review H2): the game folds under the name in one line,
+	   Pts (nothing before kickoff) gives its width to the name, and a name keeps to one line. */
 	@media (max-width: 760px) {
-		.inner .cols .game {
+		.i-game,
+		.i-pts {
 			width: 0;
+		}
+
+		.inner .cols .game,
+		.inner .cols .pts,
+		.inner :global(td.pts) {
 			padding: 0;
 			font-size: 0;
 		}
 
+		.inner :global(.nm) {
+			flex-wrap: nowrap;
+		}
+
+		.inner :global(.nm a),
+		.inner :global(.nm b) {
+			min-width: 0;
+			overflow: hidden;
+			text-overflow: ellipsis;
+			white-space: nowrap;
+		}
+
 		.inner :global(.phone-game .opp) {
-			flex-wrap: wrap;
-			white-space: normal;
+			white-space: nowrap;
 		}
 	}
 </style>

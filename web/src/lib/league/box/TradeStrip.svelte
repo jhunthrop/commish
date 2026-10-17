@@ -11,6 +11,7 @@
 		roomWords,
 		shortSide,
 		TRADES,
+		weekLine,
 		worthTitle,
 		type CopiedTrade,
 		type FinderRow
@@ -52,6 +53,7 @@
 		{#each rows as entry (entry.key)}
 			{@const room = roomWords(entry.row)}
 			{@const line = said[entry.key]}
+			{@const week = weekLine(entry.row)}
 			<li class="card">
 				<span class="with"
 					><TeamAvatar name={entry.team.name} size={24} />with <b>{entry.team.name}</b></span
@@ -65,6 +67,7 @@
 					<em>{gainWord(entry.row.their_gain)}</em>
 					{TRADES.forThem}</span
 				>
+				{#if week}<span class="week">{week}</span>{/if}
 				{#if entry.row.drop}<span class="drop">{room.yours}</span>{/if}
 				<span class="act" {@attach hostTab(href)}>
 					<Verb
@@ -145,7 +148,7 @@
 
 	.act {
 		grid-column: 2;
-		grid-row: 1 / span 4;
+		grid-row: 1 / span 5;
 	}
 
 	.with {
@@ -187,6 +190,13 @@
 
 	em.mine {
 		color: var(--gain-ink);
+	}
+
+	/* This week's Proj change for both sides, said beside the rest-of-season gains (review H2). */
+	.week {
+		font-size: var(--t-sm);
+		color: var(--ink-2);
+		font-variant-numeric: tabular-nums;
 	}
 
 	.drop {
@@ -241,6 +251,7 @@
 		}
 
 		.gains,
+		.week,
 		.drop,
 		.said {
 			font-size: var(--t-xs);
