@@ -159,7 +159,11 @@ type mflWiring struct {
 	service *mflhost.Service
 }
 
-func newMFLWiring(cfg config.API, pool *pgxpool.Pool, ff ffpcWiring, log *slog.Logger) mflWiring {
+func newMFLWiring(cfg config.API, pool *pgxpool.Pool, ff ffpcWiring, log *slog.Logger) (mflWiring, error) {
+	usernameKey, err := auth.DeriveKey(cfg.Session.CookiePassword, mflhost.PurposeUsername)
+	if err != nil {
+		return mflWiring{}, err
+	}
 	client := mfl.New()
 	member := &mflhost.Member{Client: client, Store: ff.store, Vault: ff.vault, Now: time.Now, Log: log}
 	if !cfg.Hosts.MFLLineupWrites {
@@ -168,9 +172,9 @@ func newMFLWiring(cfg config.API, pool *pgxpool.Pool, ff ffpcWiring, log *slog.L
 	ready, writes := ff.vault.Ready(), cfg.Hosts.MFLLineupWrites
 	service := &mflhost.Service{
 		Ready: ready, Writes: writes, Proofs: &hostmoves.Store{Pool: pool}, Client: client, Store: ff.store, Vault: ff.vault,
-		Leagues: member, Followed: &leaguesync.Store{Pool: pool}, Now: time.Now, Log: log,
+		Leagues: member, Followed: &leaguesync.Store{Pool: pool}, UsernameKey: usernameKey, Now: time.Now, Log: log,
 	}
-	return mflWiring{ready: ready, writes: writes, client: client, member: member, service: service}
+	return mflWiring{ready: ready, writes: writes, client: client, member: member, service: service}, nil
 }
 
 // routes are connecting, listing and disconnecting MyFantasyLeague.

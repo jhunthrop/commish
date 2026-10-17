@@ -1535,8 +1535,10 @@ paths:
         encrypted with the expiry its cookie states. The password is never kept, logged or answered. Records the
         consent words' version the page showed (1 names the lineup moves), which a lineup move needs. Answers the
         member's MyFantasyLeague leagues this season (201). Open while HOST_WRITES_MFL_LINEUP is on, and to the
-        accounts on its proof list while it is off (else 503). 422 when MyFantasyLeague refuses the pair; three
-        refusals in an hour pause connecting for the hour (423). 502, with nothing kept, when MyFantasyLeague does
+        accounts on its proof list while it is off (else 503). 422 when MyFantasyLeague refuses the pair, in the same
+        words for a bad username as for a bad password; three refusals in an hour pause the account for the hour
+        (423), as do three refusals of one username from any account, or the site's hourly cap on MyFantasyLeague
+        sign-ins across every account (423, one sentence for both). 502, with nothing kept, when MyFantasyLeague does
         not answer. 5 an hour an account.
       security: [{ session: [] }]
       requestBody:

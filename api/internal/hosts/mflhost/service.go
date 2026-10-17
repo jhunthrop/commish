@@ -2,6 +2,8 @@ package mflhost
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -27,7 +29,13 @@ const (
 	limitDisconnectPerMin = 30
 	refusalWindow         = time.Hour
 	maxRefusals           = 3
-	maxField              = 128
+	// maxAttemptsPerHour caps the site's MyFantasyLeague sign-ins in an
+	// hour, every account together; maxUsernameRefusals pauses a username
+	// MyFantasyLeague refused that often in the hour, whichever account
+	// sent it.
+	maxAttemptsPerHour  = 120
+	maxUsernameRefusals = 3
+	maxField            = 128
 	// connectBudget bounds a whole connect's requests, under the server's
 	// write timeout: past it nothing is kept.
 	connectBudget = 30 * time.Second
@@ -43,6 +51,7 @@ const (
 	notAnsweringWords = "MyFantasyLeague is not answering right now. Try again in a moment."
 	refusedWords      = "MyFantasyLeague did not accept that username and password."
 	pausedWords       = "MyFantasyLeague refused three tries, so connecting is paused for an hour."
+	busyWords         = "Connecting MyFantasyLeague is paused for now. Try again in an hour."
 	usernameWords     = "Enter your MyFantasyLeague username."
 	passwordWords     = "Enter your MyFantasyLeague password."
 	consentWords      = "Agree to how we keep your MyFantasyLeague session to connect MyFantasyLeague."
@@ -54,6 +63,9 @@ type ConnectionStore interface {
 	Delete(ctx context.Context, accountID uuid.UUID, host string) error
 	Refused(ctx context.Context, accountID uuid.UUID, host string, at time.Time) error
 	Refusals(ctx context.Context, accountID uuid.UUID, host string, since time.Time) (int, error)
+	LoginAttempt(ctx context.Context, host string, usernameKey []byte, at time.Time) (int64, error)
+	LoginRefused(ctx context.Context, id int64) error
+	LoginAttempts(ctx context.Context, host string, usernameKey []byte, since time.Time) (total, refused int, err error)
 }
 
 // LeagueReader reads the member's leagues as them. *Member implements it.
@@ -87,8 +99,10 @@ type Service struct {
 	Vault    *hosts.Vault
 	Leagues  LeagueReader
 	Followed Followed
-	Now      func() time.Time
-	Log      *slog.Logger
+	// UsernameKey keys the hash a username's refusals are counted under.
+	UsernameKey []byte
+	Now         func() time.Time
+	Log         *slog.Logger
 }
 
 // Routes is every route this package serves. Disconnecting is always
@@ -118,8 +132,10 @@ func (s *Service) OpenTo(ctx context.Context, accountID uuid.UUID) ([]apitypes.C
 // open reports MyFantasyLeague open to the account: the key, and the
 // switch or the account on its proof list.
 func (s *Service) open(w http.ResponseWriter, r *http.Request) bool {
-	ok := s.Ready && s.Writes
-	if s.Ready && !s.Writes && s.Proofs != nil {
+	// No username key, no connect: the per-username count needs it.
+	ready := s.Ready && len(s.UsernameKey) > 0
+	ok := ready && s.Writes
+	if ready && !s.Writes && s.Proofs != nil {
 		allowed, err := s.Proofs.Allowed(r.Context(), auth.AccountID(r), Host, kindLineup)
 		if err != nil {
 			httpx.WriteInternal(w, r, s.Log, "mflhost: allowed", err)
@@ -167,19 +183,17 @@ func (s *Service) connect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ctx, accountID, now := r.Context(), auth.AccountID(r), s.Now()
-	n, err := s.Store.Refusals(ctx, accountID, Host, now.Add(-refusalWindow))
-	if err != nil {
-		httpx.WriteInternal(w, r, s.Log, "mflhost: refusals", err)
-		return
-	}
-	if n >= maxRefusals {
-		httpx.WriteError(w, r, http.StatusLocked, httpx.CodeForbidden, pausedWords, nil)
+	attempt, ok := s.admit(w, r, s.usernameKey(in.Username))
+	if !ok {
 		return
 	}
 	sess, list, err := s.exchange(ctx, strings.TrimSpace(in.Username), in.Password, season.Of(now))
 	if errors.Is(err, mfl.ErrSignedOut) {
 		if rerr := s.Store.Refused(ctx, accountID, Host, now); rerr != nil {
 			s.Log.Warn("mflhost: keep refusal", "err", rerr)
+		}
+		if rerr := s.Store.LoginRefused(ctx, attempt); rerr != nil {
+			s.Log.Warn("mflhost: keep login refusal", "err", rerr)
 		}
 		httpx.WriteError(w, r, http.StatusUnprocessableEntity, httpx.CodeInvalid, refusedWords, nil)
 		return
@@ -190,6 +204,51 @@ func (s *Service) connect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.keep(w, r, sess, list, in.ConsentVersion)
+}
+
+// usernameKey is the keyed hash of the lowercased username: what the
+// per-username count keys on, never the username itself.
+func (s *Service) usernameKey(username string) []byte {
+	mac := hmac.New(sha256.New, s.UsernameKey)
+	mac.Write([]byte(strings.ToLower(strings.TrimSpace(username))))
+	return mac.Sum(nil)
+}
+
+// admit checks the three bounds on a sign-in before it is sent (the
+// account's refusals, the site's attempts this hour, the username's
+// refusals) and keeps the attempt. A username pause and the site's cap
+// read the same, so the answer never says whether a username is known. It
+// answers a refusal itself and reports false.
+func (s *Service) admit(w http.ResponseWriter, r *http.Request, key []byte) (int64, bool) {
+	ctx, accountID, now := r.Context(), auth.AccountID(r), s.Now()
+	since := now.Add(-refusalWindow)
+	n, err := s.Store.Refusals(ctx, accountID, Host, since)
+	if err != nil {
+		httpx.WriteInternal(w, r, s.Log, "mflhost: refusals", err)
+		return 0, false
+	}
+	if n >= maxRefusals {
+		httpx.WriteError(w, r, http.StatusLocked, httpx.CodeForbidden, pausedWords, nil)
+		return 0, false
+	}
+	total, refused, err := s.Store.LoginAttempts(ctx, Host, key, since)
+	if err != nil {
+		httpx.WriteInternal(w, r, s.Log, "mflhost: login attempts", err)
+		return 0, false
+	}
+	if total >= maxAttemptsPerHour {
+		s.Log.Error("mflhost: the hour's connect cap is reached, MyFantasyLeague sign-ins paused", "attempts", total, "cap", maxAttemptsPerHour)
+	}
+	if total >= maxAttemptsPerHour || refused >= maxUsernameRefusals {
+		httpx.WriteError(w, r, http.StatusLocked, httpx.CodeForbidden, busyWords, nil)
+		return 0, false
+	}
+	id, err := s.Store.LoginAttempt(ctx, Host, key, now)
+	if err != nil {
+		httpx.WriteInternal(w, r, s.Log, "mflhost: keep login attempt", err)
+		return 0, false
+	}
+	return id, true
 }
 
 // exchange is the login and the first read with its session, within the

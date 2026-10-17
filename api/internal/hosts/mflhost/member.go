@@ -25,6 +25,9 @@ import (
 // Host is this host's key in the connections table and the contract.
 const Host = "mfl"
 
+// PurposeUsername scopes the key a username's refusals are counted under.
+const PurposeUsername = "commish mfl username v1"
+
 // ErrReconnect is a connection whose session MyFantasyLeague no longer
 // accepts, or one past its expiry.
 var ErrReconnect = errors.New("mflhost: connect again")

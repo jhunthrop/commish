@@ -29,6 +29,7 @@ type memStore struct {
 	mu        sync.Mutex
 	conn      *hosts.Connection
 	refusals  int
+	attempts  []attempt
 	signedOut int
 	reads     int
 	deleted   int
@@ -72,6 +73,37 @@ func (m *memStore) Refusals(context.Context, uuid.UUID, string, time.Time) (int,
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return m.refusals, nil
+}
+
+type attempt struct {
+	key     []byte
+	refused bool
+}
+
+func (m *memStore) LoginAttempt(_ context.Context, _ string, key []byte, _ time.Time) (int64, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.attempts = append(m.attempts, attempt{key: key})
+	return int64(len(m.attempts) - 1), nil
+}
+
+func (m *memStore) LoginRefused(_ context.Context, id int64) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.attempts[id].refused = true
+	return nil
+}
+
+func (m *memStore) LoginAttempts(_ context.Context, _ string, key []byte, _ time.Time) (int, int, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	refused := 0
+	for _, a := range m.attempts {
+		if a.refused && bytes.Equal(a.key, key) {
+			refused++
+		}
+	}
+	return len(m.attempts), refused, nil
 }
 
 func (m *memStore) SignedOutAt(_ context.Context, _ uuid.UUID, _ string, wrapped []byte) error {
@@ -126,7 +158,7 @@ func newRig(t *testing.T) *rig {
 	client := srv.Client()
 	member := &Member{Client: client, Store: r.store, Vault: vault, Now: func() time.Time { return r.now }, Log: log}
 	r.svc = &Service{Ready: true, Writes: true, Proofs: allow{}, Client: client, Store: r.store, Vault: vault, Leagues: member,
-		Followed: follows{}, Now: func() time.Time { return r.now }, Log: log}
+		Followed: follows{}, UsernameKey: []byte("a username key of thirty-two b!!"), Now: func() time.Time { return r.now }, Log: log}
 	return r
 }
 
@@ -281,6 +313,64 @@ func TestConnectRefusedAndPaused(t *testing.T) {
 	}
 	if strings.Contains(r.logs.String(), "wrong") || r.store.conn != nil {
 		t.Fatal("the refused password logged, or something kept")
+	}
+}
+
+// The site's sign-ins are capped per hour across every account, with an
+// alert in the log, and nothing is sent past the cap.
+func TestConnectCapAcrossAccounts(t *testing.T) {
+	r := newRig(t)
+	for range maxAttemptsPerHour {
+		_, _ = r.store.LoginAttempt(context.Background(), Host, make([]byte, 32), r.now)
+	}
+	code, env, _ := r.call(t, r.svc.connect, good())
+	if code != http.StatusLocked || env.Error.Message != busyWords || len(r.srv.LoginQueries()) != 0 {
+		t.Fatalf("%d %+v, %d logins", code, env.Error, len(r.srv.LoginQueries()))
+	}
+	if !strings.Contains(r.logs.String(), "level=ERROR") || !strings.Contains(r.logs.String(), "connect cap") {
+		t.Fatalf("no alert: %s", r.logs.String())
+	}
+}
+
+// Refusals are counted per username, whichever account sends it, by a
+// keyed hash never the username itself; a refused username is paused in
+// the same words as the site's cap, so the answer never says which.
+func TestConnectRefusalsPerUsername(t *testing.T) {
+	r := newRig(t)
+	in := good()
+	in.Password = "wrong"
+	for range maxUsernameRefusals {
+		r.store.refusals = 0 // another account each time
+		if code, _, _ := r.call(t, r.svc.connect, in); code != http.StatusUnprocessableEntity {
+			t.Fatal(code)
+		}
+	}
+	r.store.refusals = 0
+	other := good()
+	other.Username = "  " + strings.ToUpper(mfltest.Username) + " "
+	code, env, _ := r.call(t, r.svc.connect, other)
+	if code != http.StatusLocked || env.Error.Message != busyWords || len(r.srv.LoginQueries()) != maxUsernameRefusals {
+		t.Fatalf("%d %+v, %d logins", code, env.Error, len(r.srv.LoginQueries()))
+	}
+	for _, a := range r.store.attempts {
+		if len(a.key) != 32 || bytes.Contains(a.key, []byte("founder")) {
+			t.Fatalf("a username kept, not its keyed hash: %x", a.key)
+		}
+	}
+	// Another username is not paused by these.
+	fresh := good()
+	fresh.Username = "someone@example.com"
+	if code, _, _ := r.call(t, r.svc.connect, fresh); code == http.StatusLocked {
+		t.Fatal("another username paused")
+	}
+	// A bad username and a bad password read the same.
+	r2 := newRig(t)
+	badName := good()
+	badName.Username = "nobody@example.com"
+	_, e1, _ := r2.call(t, r2.svc.connect, badName)
+	_, e2, _ := r2.call(t, r2.svc.connect, in)
+	if e1.Error == nil || e2.Error == nil || e1.Error.Message != e2.Error.Message {
+		t.Fatalf("%+v %+v", e1.Error, e2.Error)
 	}
 }
 
