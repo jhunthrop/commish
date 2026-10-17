@@ -720,7 +720,10 @@ function tradesWith(theirs: readonly PlayerLine[]): TradeRow[] {
 						drop,
 						my_gain: myGain,
 						their_gain: theirGain,
-						close_for_them: theirGain < CLOSE_FOR_THEM
+						close_for_them: theirGain < CLOSE_FOR_THEM,
+						// The week's Proj is stamped by project.ts (Lane 66g).
+						my_proj_change: null,
+						their_proj_change: null
 					}
 				];
 			})
@@ -771,13 +774,23 @@ function trades(): TradeAdvice {
 		}));
 	return {
 		...head(
-			`Trades where both lineups gain on our rest-of-season order. The other team decides. ${basisTail}`
+			`Trades where both lineups gain on our rest-of-season order. Each team's best trade, yours first, among those they gain at least 0.5 a week from, then the close calls for them. The other team decides. ${basisTail}`
 		),
 		check_basis: `What each lineup gains or loses on our rest-of-season order. The other team decides. ${basisTail}`,
 		teams,
 		roster: rosterByPosition(myLines),
 		host_trades_url: `https://sleeper.com/leagues/${league.league_id}/team`,
-		host_note: null
+		host_note: null,
+		// No platform takes a proposal from here (inseason hosturls.go TradeMoves); project.ts stamps the
+		// projection's read.
+		moves: {
+			propose: 'unavailable',
+			reason:
+				'Sleeper does not take trade proposals from here, so we copy the trade for you to propose there.'
+		},
+		projection_read_at: null,
+		projection_scoring: { format: 'ppr', league_own: false },
+		player_points: true
 	};
 }
 

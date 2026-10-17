@@ -28,6 +28,7 @@ import type {
 import type { components } from '../../src/lib/api/types.ts';
 import type { GameWeek } from '../../src/lib/format/game-facts.ts';
 import { FIXTURE_IDS } from './ids.ts';
+import { lineupProj, seasonStrength } from './week.ts';
 import { FIXTURE_SEASON, askedPhase, phaseAccount, phaseLeagues, phaseSync } from './phases.ts';
 
 const PORT = Number(process.env.PORT ?? 8799);
@@ -239,13 +240,40 @@ function tradeCheck(input: TradeCheckInput): TradeCheck | string {
 	const por = (side: readonly PlayerLine[]): number =>
 		side.reduce((sum, line) => sum + (line.points_over_replacement ?? 0), 0);
 	const swing = tenth(por(gets) - por(gives));
+	const slots = lineup.slots.map((s) => s.slot);
+	const without = (roster: readonly PlayerLine[], out: readonly PlayerLine[]): PlayerLine[] =>
+		roster.filter((line) => !out.includes(line));
+	const myBefore = lineupProj(trades.roster, slots);
+	const theirBefore = lineupProj(team.roster, slots);
 	const trade = listed ?? {
 		give: gives,
 		get: gets,
 		drop: null,
 		my_gain: swing,
 		their_gain: -swing,
-		close_for_them: -swing < CLOSE_CALL
+		close_for_them: -swing < CLOSE_CALL,
+		my_proj_change: tenth(
+			lineupProj([...without(trades.roster, gives), ...gets], slots) - myBefore
+		),
+		their_proj_change: tenth(
+			lineupProj([...without(team.roster, gets), ...gives], slots) - theirBefore
+		)
+	};
+	/** A side's totals as the API's check carries them (check.go sideTotals): the Proj before and
+	 * after, and the strength before and after, after being before plus the gain. */
+	const side = (
+		roster: readonly PlayerLine[],
+		before: number,
+		change: number | null,
+		gain: number
+	): TradeCheck['totals']['yours'] => {
+		const season = seasonStrength(roster, slots);
+		return {
+			proj_before: before,
+			proj_after: change === null ? null : tenth(before + change),
+			season_before: season,
+			season_after: tenth(season + gain)
+		};
 	};
 	const yoursOpen = openSlot([...trades.roster.filter((line) => !gives.includes(line)), ...gets]);
 	return {
@@ -264,6 +292,10 @@ function tradeCheck(input: TradeCheckInput): TradeCheck | string {
 			theirs_open: null,
 			yours_room: true,
 			theirs_room: true
+		},
+		totals: {
+			yours: side(trades.roster, myBefore, trade.my_proj_change, trade.my_gain),
+			theirs: side(team.roster, theirBefore, trade.their_proj_change, trade.their_gain)
 		},
 		host_trades_url: trades.host_trades_url,
 		host_note: trades.host_note

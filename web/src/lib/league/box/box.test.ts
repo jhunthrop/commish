@@ -25,8 +25,16 @@ import {
 	ptsTotal,
 	slotWord,
 	statusOf,
-	weatherCell
+	weatherCell,
+	initialName
 } from './box.ts';
+
+void test("a name's short form keeps the surname whole: the first initial, then the last name (rereview N2)", () => {
+	assert.equal(initialName('Aaron Rodgers'), 'A. Rodgers');
+	assert.equal(initialName('Jacory Croskey-Merritt'), 'J. Croskey-Merritt');
+	assert.equal(initialName('Marvin Harrison Jr.'), 'M. Harrison');
+	assert.equal(initialName('Pele'), 'Pele');
+});
 
 const ZONE = 'America/Chicago';
 /** Friday 9:00 pm Central, before every game of the week. */
@@ -284,7 +292,14 @@ void test('the evidence columns print as the Lineup draws them', () => {
 	assert.equal(deltaWord(0.04), '0.0');
 	assert.equal(deltaWord(null), '--');
 	const row = boxRow(line(), 'QB', ZONE, false);
-	assert.deepEqual(row.evidence, { oppRank: 24, oppOf: null, avg: 17.94, last: 22.4, delta: 0.4 });
+	assert.deepEqual(row.evidence, {
+		oppRank: 24,
+		oppOf: null,
+		avg: 17.94,
+		last: 22.4,
+		delta: 0.4,
+		season: 17.8
+	});
 	assert.equal(row.pill?.rank, null, 'the Lineup leaves the rest-of-season rank out');
 	assert.equal(boxRow(line(), 'QB', ZONE).pill?.rank, 7, 'the Matchup keeps it');
 	assert.equal(

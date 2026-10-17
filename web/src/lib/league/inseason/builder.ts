@@ -139,8 +139,6 @@ export function pickPrompt(picks: Picks): string {
 export const BUILDER_LINES = {
 	/** The quiet verb over the finder's rows that opens the builder, and the panel's name. */
 	open: 'Build a trade',
-	/** A finder row's way into the builder with that trade filled. */
-	fromThis: 'Build from this',
 	team: 'Trade with',
 	give: 'You give',
 	get: 'You get',
