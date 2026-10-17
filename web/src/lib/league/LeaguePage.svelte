@@ -19,6 +19,7 @@
 	import HostReconnect from '#lib/hosts/HostReconnect.svelte';
 	import { ApiError, leagueApi, type LeagueSync } from './api.ts';
 	import { loadBoard, type LeagueBoard } from './board.ts';
+	import { boardOnce } from './board-once.ts';
 	import { sheetTags } from './sheet-tags.ts';
 	import { followSwitch } from './follow-switch.svelte.ts';
 	import LeagueTabs from './inseason/LeagueTabs.svelte';
@@ -74,6 +75,11 @@
 
 	let { id }: Props = $props();
 
+	interface ReadStamp {
+		at: string | null;
+		stale: boolean;
+	}
+
 	let sync = $state<LeagueSync | null>(null);
 	let board = $state<LeagueBoard | null>(null);
 	/** The week's games and the drafter's lineup, each null where the API has none for this league
@@ -81,9 +87,9 @@
 	 * good one, with when it was read. */
 	let scoreboard = $state<Scoreboard | null>(null);
 	let advice = $state<LineupAdvice | null>(null);
-	let weekReadAt = $state<string | null>(null);
-	let weekStale = $state(false);
-	let boardLoading = $state(false);
+	/** Each week read's last good time, and whether its latest read failed: each carries its own. */
+	let scoreRead = $state<ReadStamp>({ at: null, stale: false });
+	let lineupRead = $state<ReadStamp>({ at: null, stale: false });
 	let view = $state<'week' | 'settings'>('week');
 	let failure = $state<'signed-out' | 'missing' | 'unreachable' | 'host-sign-in' | null>(null);
 	/** The league's saved name and host, for the way back in a league read as a member asks for when
@@ -117,19 +123,22 @@
 		problem = null;
 	}
 
-	// The board is the run's own file, for the roster and the basis when no game is on: read once the
-	// league's phase is known not to be in play, whenever that is learned, and again only when the
-	// league reads on another. A failed board read says so and is tried again with the next read.
+	// The board is the run's own file, for the roster and the basis when no game is on: asked for on
+	// each league read once the phase is known not to be in play, loaded once for the format asked
+	// (board-once.ts). A failed load says so and is tried again with the next league read.
+	const boards = boardOnce((format) => loadBoard(format as LeagueSync['board_format'], byesNow));
+	let byesNow: Readonly<Record<string, number>> = {};
 	$effect(() => {
-		if (playing || !sync || boardLoading || board?.format === sync.board_format) return;
-		boardLoading = true;
-		void loadBoard(sync.board_format, sync.byes)
-			.then((loaded) => {
+		if (playing || !sync) return;
+		byesNow = sync.byes;
+		boards.read(
+			sync.board_format,
+			(loaded) => {
 				board = loaded;
 				boardFailed = false;
-			})
-			.catch(() => (boardFailed = true))
-			.finally(() => (boardLoading = false));
+			},
+			() => (boardFailed = true)
+		);
 	});
 
 	/** The statuses with which the API says this league has no such answer (no team read, no current
@@ -181,8 +190,15 @@
 				(answer) => (advice = answer)
 			)
 		]);
-		weekStale = read.includes(false);
-		if (!weekStale) weekReadAt = new Date().toISOString();
+		const at = new Date().toISOString();
+		const [scored, lined] = read;
+		scoreRead = scored ? { at, stale: false } : { ...scoreRead, stale: true };
+		lineupRead = lined ? { at, stale: false } : { ...lineupRead, stale: true };
+	}
+
+	/** "Last read Sun 3:05 pm" on a read whose latest try failed, so the page shows its last good one. */
+	function stampOf(read: ReadStamp): string | null {
+		return read.stale && read.at !== null ? `Last read ${weekdayTime(read.at)}` : null;
 	}
 
 	async function read(): Promise<void> {
@@ -393,7 +409,7 @@
 							week={scoreboard.week}
 							{bugs}
 							matchupHref={tabHref('matchup', id)}
-							stamp={weekStale && weekReadAt ? `Last read ${weekdayTime(weekReadAt)}` : null}
+							stamp={stampOf(scoreRead)}
 						/>
 					{/if}
 					<div class="split" class:alone={summary === null}>
@@ -406,6 +422,7 @@
 								{lineupHref}
 								benchHref={`${lineupHref}#${BENCH_ANCHOR}`}
 								tagsOf={sheetTags}
+								stamp={stampOf(lineupRead)}
 							/>
 						{/if}
 					</div>
@@ -430,7 +447,11 @@
 					<div class="grid">
 						{#if drafted}
 							<RosterPanel roster={sync.roster} {board} tagsOf={sheetTags} host={sync.host} />
-							{#if sync.moves_read}<MovesFeed rows={moves} none={HOME.noMoves} />{/if}
+							{#if sync.moves_read}<MovesFeed rows={moves} none={HOME.noMoves} />{:else}<p
+									class="basis-line"
+								>
+									{movesBasis(sync.host)}
+								</p>{/if}
 						{/if}
 					</div>
 					{@render footnotes(sync)}
@@ -582,6 +603,13 @@
 	}
 
 	@media (max-width: 760px) {
+		/* The basis keeps to eight drawn lines in a hand. */
+		.basis p,
+		.basis-line {
+			font-size: var(--t-xs);
+			line-height: 1.45;
+		}
+
 		.league {
 			padding: var(--s-3) var(--s-4) calc(var(--s-5) + 64px);
 		}

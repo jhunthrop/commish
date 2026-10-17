@@ -18,9 +18,11 @@
 		lineupHref: string;
 		benchHref: string;
 		tagsOf: (boardId: string | null) => readonly string[];
+		/** "Last read 3:05 pm" when the latest lineup read failed and this is the last good one. */
+		stamp?: string | null;
 	}
 
-	let { team, platform, summary, lineupHref, benchHref, tagsOf }: Props = $props();
+	let { team, platform, summary, lineupHref, benchHref, tagsOf, stamp = null }: Props = $props();
 
 	const sum = $derived(stripSum(summary.box));
 	const changes = $derived(summary.box.swaps.length);
@@ -30,6 +32,7 @@
 	<div class="head">
 		<h2>{HOME.yourLineup}</h2>
 		<span>As set on {platform}</span>
+		{#if stamp}<span class="stamp" role="status">{stamp}</span>{/if}
 	</div>
 	<div class="decide" class:set={changes === 0}>
 		<div class="what">
@@ -85,6 +88,10 @@
 	.head span {
 		font-size: var(--t-xs);
 		color: var(--ink-3);
+	}
+
+	.head .stamp {
+		margin-left: auto;
 	}
 
 	.decide {

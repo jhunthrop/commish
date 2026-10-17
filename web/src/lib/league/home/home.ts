@@ -579,11 +579,11 @@ export function standingsBasis(
 	const platform = hostWords(host);
 	const waiver =
 		terms.waivers === 'budget'
-			? ` ${HOME.budget} is each team's waiver budget left${terms.waiver_budget === null ? '' : ` of $${terms.waiver_budget.toLocaleString('en-US')}`}.`
+			? `, ${HOME.budget} the budget left${terms.waiver_budget === null ? '' : ` of $${terms.waiver_budget.toLocaleString('en-US')}`}`
 			: terms.waivers === 'order'
-				? ` ${HOME.order} is each team's place in ${platform}'s waiver order.`
+				? `, ${HOME.order} the place in ${platform}'s order`
 				: '';
-	return `Standings follow ${platform}'s record, then points for. ${HOME.pointsFor} and ${HOME.pointsAgainst} are points for and against in this league's scoring, ${HOME.streak} the current run of wins or losses.${waiver}`;
+	return `Standings follow ${platform}'s record, then points for. ${HOME.pointsFor} and ${HOME.pointsAgainst} are points for and against, ${HOME.streak} the current run${waiver}.`;
 }
 
 /** What a team's Proj and Pts are on the scoreboard and in the standings. */
@@ -603,5 +603,5 @@ export function teamBasis(
 		readAt === null
 			? 'not in yet for this week'
 			: `read ${weekdayTime(readAt, zone)} ${zoneWord(zone)}`;
-	return `A team's ${BOX.proj} adds its starters as set on ${platform}, each this week's published projection in ${format} scoring, ${whose}, ${when}. ${BOX.pts} are ${platform}'s points so far this week.`;
+	return `A team's ${BOX.proj} adds its starters' published projections in ${format}, ${whose}, ${when}. ${BOX.pts} are ${platform}'s so far.`;
 }

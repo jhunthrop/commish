@@ -411,10 +411,10 @@ void test('copy guard: every League page word is fantasy words, with no dash or 
 	}
 	assert.equal(
 		standingsBasis('sleeper', TERMS),
-		"Standings follow Sleeper's record, then points for. PF and PA are points for and against in this league's scoring, Streak the current run of wins or losses. FAAB is each team's waiver budget left of $1,000."
+		"Standings follow Sleeper's record, then points for. PF and PA are points for and against, Streak the current run, FAAB the budget left of $1,000."
 	);
 	assert.equal(
 		teamBasis('sleeper', '2026-10-17T02:00:00.000Z', { format: 'ppr', league_own: false }, ZONE),
-		"A team's Proj adds its starters as set on Sleeper, each this week's published projection in PPR scoring, the closest match to this league's rules, read Fri 9:00 pm Central. Pts are Sleeper's points so far this week."
+		"A team's Proj adds its starters' published projections in PPR, the closest match to this league's rules, read Fri 9:00 pm Central. Pts are Sleeper's so far."
 	);
 });
