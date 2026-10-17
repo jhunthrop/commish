@@ -456,6 +456,11 @@ paths:
         required: false
         description: at most this many rows, 100 without it
         schema: { type: integer, minimum: 1, maximum: 400 }
+      - name: roster
+        in: query
+        required: false
+        description: only the free players, or only the drafter's own; total and the limit count after it
+        schema: { type: string, enum: [free, yours] }
     get:
       tags: [league-sync]
       operationId: leagueOrder
@@ -3704,7 +3709,7 @@ components:
         sentence: { type: string }
     OrderAdvice:
       type: object
-      required: [week, basis, basis_note, order_basis, refreshed, from_week, read_at, projection_read_at, projection_scoring, total, rows]
+      required: [week, basis, basis_note, order_basis, refreshed, from_week, read_at, projection_read_at, projection_scoring, rank_by, moves, total, rows]
       properties:
         week: { type: integer, description: the week the rows' Game cell and Proj are for }
         basis:
@@ -3713,8 +3718,8 @@ components:
         basis_note:
           type: string
           description: >-
-            the rules the league scores that the season's points (Avg and Last) leave out, empty when none; the order's
-            points over replacement are for the league, or a 12-team PPR league for a reader with none of their own
+            the league the points over replacement are for (a 12-team PPR league for a reader with none of their own),
+            and the rules it scores that the season's points (Avg and Last) leave out
         order_basis: { $ref: "#/components/schemas/OrderBasis" }
         refreshed: { type: string, format: date-time, description: when the order was made }
         from_week:
@@ -3732,14 +3737,24 @@ components:
           nullable: true
           description: when the week's published projection was read, null when none is stored
         projection_scoring: { $ref: "#/components/schemas/ProjectionScoring" }
-        total: { type: integer, description: every player the view holds before the limit }
+        rank_by:
+          type: string
+          enum: [rest_of_season_points, points_over_replacement]
+          description: >-
+            the key the rows' rank sorts on, the figure a screen shows first: the rest-of-season total at a position,
+            points over replacement across positions
+        moves:
+          allOf: [{ $ref: "#/components/schemas/WaiverMoves" }]
+          nullable: true
+          description: the claim's moves on the league's platform, the Waivers screen's verb rule for an add; null without a league
+        total: { type: integer, description: every player the view holds before the limit, after the search and the roster filter }
         rows:
           type: array
           description: in our order, at most the limit
           items: { $ref: "#/components/schemas/OrderRow" }
     OrderRow:
       type: object
-      required: [line, rank, rest_of_season_points, roster, move]
+      required: [line, rank, rest_of_season_points, points_over_replacement, roster, move]
       properties:
         line: { $ref: "#/components/schemas/PlayerLine" }
         rank:
@@ -3756,6 +3771,13 @@ components:
             the order's key, one decimal: his rest-of-season points over the games his club has left from the order's
             first week through week 17, byes out; null on the preseason order and for a kicker or defense, which the
             board places in draft order
+        points_over_replacement:
+          type: number
+          format: double
+          nullable: true
+          description: >-
+            the key across positions, one decimal: his points over replacement for the league over the weeks the order
+            covers; null for a kicker or defense and a position the league starts nobody at
         roster:
           allOf: [{ $ref: "#/components/schemas/RosterMark" }]
           nullable: true

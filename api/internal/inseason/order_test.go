@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/jhunthrop/commish/api/internal/apitypes"
 	"github.com/jhunthrop/commish/api/internal/boards"
@@ -31,7 +32,8 @@ func restOfSeasonFixture(t *testing.T) fixture {
 
 func TestOrderRanksAPositionByItsRestOfSeasonTotal(t *testing.T) {
 	f := restOfSeasonFixture(t)
-	out := newFixtureAdvisor(t, f, nil).Order(orderQuery{position: draft.RB, limit: MaxOrderRows}, true)
+	a := newFixtureAdvisor(t, f, nil)
+	out := a.Order(orderQuery{position: draft.RB, limit: MaxOrderRows}, a.tradeTargets)
 	if len(out.Rows) == 0 || out.Total != len(out.Rows) {
 		t.Fatalf("rows %d of %d", len(out.Rows), out.Total)
 	}
@@ -59,7 +61,7 @@ func TestOrderRanksAPositionByItsRestOfSeasonTotal(t *testing.T) {
 func TestOrderAcrossPositionsRanksByValueThenKickersAndDefenses(t *testing.T) {
 	f := restOfSeasonFixture(t)
 	a := newFixtureAdvisor(t, f, nil)
-	out := a.Order(orderQuery{limit: MaxOrderRows}, false)
+	out := a.Order(orderQuery{limit: MaxOrderRows}, nil)
 	sawMarket := false
 	for i, row := range out.Rows {
 		if row.Rank != i+1 {
@@ -95,7 +97,7 @@ func TestOrderMarksRostersAndTheMoveARowAdmits(t *testing.T) {
 	if len(targets) == 0 {
 		t.Fatal("the finder brings in nobody, so the test proves nothing")
 	}
-	out := a.Order(orderQuery{limit: MaxOrderRows}, true)
+	out := a.Order(orderQuery{limit: MaxOrderRows}, a.tradeTargets)
 	kinds := map[apitypes.RosterMarkKind]int{}
 	trades := 0
 	for _, row := range out.Rows {
@@ -137,8 +139,8 @@ func TestOrderMarksRostersAndTheMoveARowAdmits(t *testing.T) {
 func TestOrderSearchKeepsPlacesAndTheLimitKeepsTheTotal(t *testing.T) {
 	f := restOfSeasonFixture(t)
 	a := newFixtureAdvisor(t, f, nil)
-	all := a.Order(orderQuery{position: draft.WR, limit: MaxOrderRows}, false)
-	found := a.Order(orderQuery{position: draft.WR, q: "player 1", limit: MaxOrderRows}, false)
+	all := a.Order(orderQuery{position: draft.WR, limit: MaxOrderRows}, nil)
+	found := a.Order(orderQuery{position: draft.WR, q: "player 1", limit: MaxOrderRows}, nil)
 	if len(found.Rows) == 0 || len(found.Rows) >= len(all.Rows) {
 		t.Fatalf("search kept %d of %d", len(found.Rows), len(all.Rows))
 	}
@@ -151,7 +153,7 @@ func TestOrderSearchKeepsPlacesAndTheLimitKeepsTheTotal(t *testing.T) {
 			t.Fatalf("%s at %d, in the order at %d", row.Line.Player.Name, row.Rank, place[*row.Line.Player.BoardId])
 		}
 	}
-	limited := a.Order(orderQuery{position: draft.WR, limit: 5}, false)
+	limited := a.Order(orderQuery{position: draft.WR, limit: 5}, nil)
 	if len(limited.Rows) != 5 || limited.Total != len(all.Rows) {
 		t.Fatalf("limit 5: %d rows of %d", len(limited.Rows), limited.Total)
 	}
@@ -159,7 +161,8 @@ func TestOrderSearchKeepsPlacesAndTheLimitKeepsTheTotal(t *testing.T) {
 
 func TestOrderOnThePreseasonOrderCarriesNoRestOfSeasonTotal(t *testing.T) {
 	f := newFixture(t)
-	out := newFixtureAdvisor(t, f, nil).Order(orderQuery{position: draft.QB, limit: MaxOrderRows}, true)
+	a := newFixtureAdvisor(t, f, nil)
+	out := a.Order(orderQuery{position: draft.QB, limit: MaxOrderRows}, a.tradeTargets)
 	for _, row := range out.Rows {
 		if row.RestOfSeasonPoints != nil {
 			t.Fatalf("%s carries a rest-of-season total on the preseason order", row.Line.Player.Name)
@@ -211,5 +214,111 @@ func TestOrderRoutes(t *testing.T) {
 		if code != http.StatusBadRequest || env.Error == nil || env.Error.Fields[bad.field] == "" {
 			t.Fatalf("%s: %d %+v", bad.path, code, env.Error)
 		}
+	}
+}
+
+func TestOrderSaysWhatItsRankSortsOnAndCarriesBothKeys(t *testing.T) {
+	f := restOfSeasonFixture(t)
+	a := newFixtureAdvisor(t, f, nil)
+	all := a.Order(orderQuery{limit: MaxOrderRows}, nil)
+	if all.RankBy != apitypes.OrderAdviceRankByPointsOverReplacement {
+		t.Fatalf("all ranks by %s", all.RankBy)
+	}
+	for i, row := range all.Rows {
+		if row.PointsOverReplacement == nil {
+			break // kickers and defenses, last
+		}
+		if i > 0 && all.Rows[i-1].PointsOverReplacement != nil && *row.PointsOverReplacement > *all.Rows[i-1].PointsOverReplacement {
+			t.Fatalf("row %d's points over replacement %v top the row above's", i, *row.PointsOverReplacement)
+		}
+	}
+	rb := a.Order(orderQuery{position: draft.RB, limit: MaxOrderRows}, nil)
+	if rb.RankBy != apitypes.OrderAdviceRankByRestOfSeasonPoints {
+		t.Fatalf("RB ranks by %s", rb.RankBy)
+	}
+	if !strings.Contains(all.BasisNote, "Points over replacement are for a 12-team league") {
+		t.Fatalf("the note names no league shape: %q", all.BasisNote)
+	}
+}
+
+func TestOrderFiltersByRosterBeforeTheLimit(t *testing.T) {
+	f := restOfSeasonFixture(t)
+	a := newFixtureAdvisor(t, f, nil)
+	free := a.Order(orderQuery{roster: apitypes.RosterMarkKindFree, limit: 3}, a.tradeTargets)
+	if len(free.Rows) != 3 || free.Total <= 3 {
+		t.Fatalf("free: %d rows of %d", len(free.Rows), free.Total)
+	}
+	for _, row := range free.Rows {
+		if row.Roster.Kind != apitypes.RosterMarkKindFree {
+			t.Fatalf("%s is %s", row.Line.Player.Name, row.Roster.Kind)
+		}
+	}
+	yours := a.Order(orderQuery{roster: apitypes.RosterMarkKindYours, limit: MaxOrderRows}, a.tradeTargets)
+	for _, row := range yours.Rows {
+		if row.Roster.Kind != apitypes.RosterMarkKindYours {
+			t.Fatalf("%s is %s", row.Line.Player.Name, row.Roster.Kind)
+		}
+	}
+	if yours.Total == 0 || yours.Total != len(yours.Rows) {
+		t.Fatalf("yours: %d of %d", len(yours.Rows), yours.Total)
+	}
+}
+
+func TestTheFinderRunsOncePerLeagueRead(t *testing.T) {
+	f := restOfSeasonFixture(t)
+	s := fixtureService(t, f.league, f.data, &fakeHolds{})
+	a := newFixtureAdvisor(t, f, nil)
+	runs := 0
+	find := func() map[string]bool { runs++; return a.tradeTargets() }
+	key := readKey(a, "acct")
+	for range 3 {
+		s.targets.get(key, find)
+	}
+	if runs != 1 {
+		t.Fatalf("the finder ran %d times for one read", runs)
+	}
+	moved := *a
+	moved.Snap.ReadAt = moved.Snap.ReadAt.Add(time.Minute)
+	s.targets.get(readKey(&moved, "acct"), find)
+	if runs != 2 {
+		t.Fatalf("a new league read ran the finder %d times", runs)
+	}
+	// A view with no row on another roster never runs it.
+	asked := 0
+	only := a.Order(orderQuery{roster: apitypes.RosterMarkKindYours, limit: MaxOrderRows}, func() map[string]bool { asked++; return nil })
+	if asked != 0 || len(only.Rows) == 0 {
+		t.Fatalf("the finder ran %d times for the drafter's own rows", asked)
+	}
+}
+
+func TestOrderRoutesCarryTheClaimMovesAndRefuseARosterWithoutALeague(t *testing.T) {
+	f := restOfSeasonFixture(t)
+	s := fixtureService(t, f.league, f.data, &fakeHolds{})
+	s.Boards, s.Season = &fakeBoards{board: f.league.Board}, 2026
+	code, env := serve(t, s, leaguePath+"order?roster=free&limit=2")
+	if code != http.StatusOK || !env.Ok {
+		t.Fatalf("league: %d %+v", code, env.Error)
+	}
+	var out apitypes.OrderAdvice
+	if err := json.Unmarshal(env.Data, &out); err != nil {
+		t.Fatal(err)
+	}
+	if out.Moves == nil || out.Moves.Claim != apitypes.WaiverMovesClaimUnavailable || out.Moves.Reason == nil {
+		t.Fatalf("moves %+v", out.Moves)
+	}
+	code, env = serve(t, s, "/order?roster=free")
+	if code != http.StatusBadRequest || env.Error == nil || env.Error.Fields[fieldRoster] == "" {
+		t.Fatalf("public roster: %d %+v", code, env.Error)
+	}
+	code, env = serve(t, s, "/order")
+	if code != http.StatusOK {
+		t.Fatalf("public: %d", code)
+	}
+	var public apitypes.OrderAdvice
+	if err := json.Unmarshal(env.Data, &public); err != nil {
+		t.Fatal(err)
+	}
+	if public.Moves != nil {
+		t.Fatalf("public moves %+v", public.Moves)
 	}
 }

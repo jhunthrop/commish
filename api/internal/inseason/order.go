@@ -9,6 +9,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/jhunthrop/commish/api/internal/apitypes"
+	"github.com/jhunthrop/commish/api/internal/auth"
 	"github.com/jhunthrop/commish/api/internal/boards"
 	"github.com/jhunthrop/commish/api/internal/draft"
 	"github.com/jhunthrop/commish/api/internal/httpx"
@@ -29,10 +30,12 @@ const (
 
 // Field names and the words for them.
 const (
-	fieldQuery = "q"
-	fieldLimit = "limit"
-	queryWords = "Type 2 to 40 letters of a name or a club"
-	limitWords = "Ask for 1 to 400 rows"
+	fieldQuery  = "q"
+	fieldLimit  = "limit"
+	fieldRoster = "roster"
+	queryWords  = "Type 2 to 40 letters of a name or a club"
+	limitWords  = "Ask for 1 to 400 rows"
+	rosterWords = "Pick free or yours"
 )
 
 // Boards is the board a league of these settings drafts from, valued for
@@ -55,14 +58,21 @@ type orderQuery struct {
 	position draft.Position
 	q        string
 	limit    int
+	// roster keeps only the free players or the drafter's own (review 66j
+	// H5), "" for everyone; the league's route only.
+	roster apitypes.RosterMarkKind
 }
 
-// parseOrderQuery reads ?position=, ?q= and ?limit=, or names each field
-// it refuses.
-func parseOrderQuery(r *http.Request) (orderQuery, map[string]string) {
+// parseOrderQuery reads ?position=, ?q=, ?limit= and, in a league, ?roster=,
+// or names each field it refuses.
+func parseOrderQuery(r *http.Request, league bool) (orderQuery, map[string]string) {
 	values := r.URL.Query()
-	out := orderQuery{position: draft.Position(values.Get(fieldPosition)), q: strings.TrimSpace(values.Get(fieldQuery)), limit: DefaultOrderRows}
+	out := orderQuery{position: draft.Position(values.Get(fieldPosition)), q: strings.TrimSpace(values.Get(fieldQuery)), limit: DefaultOrderRows,
+		roster: apitypes.RosterMarkKind(values.Get(fieldRoster))}
 	bad := map[string]string{}
+	if out.roster != "" && (!league || (out.roster != apitypes.RosterMarkKindFree && out.roster != apitypes.RosterMarkKindYours)) {
+		bad[fieldRoster] = rosterWords
+	}
 	if out.position != "" && !out.position.Valid() {
 		bad[fieldPosition] = positionWords
 	}
@@ -190,13 +200,14 @@ func (a *advisor) rosterMark(boardID string) apitypes.RosterMark {
 }
 
 // moveOf is the one move a row admits: add a free player, trade for one
-// the finder brings in, nothing for the drafter's own.
-func moveOf(mark apitypes.RosterMark, boardID string, targets map[string]bool) *apitypes.OrderRowMove {
+// the finder brings in, nothing for the drafter's own. The finder is read
+// only for a row on another roster.
+func moveOf(mark apitypes.RosterMark, boardID string, targets Targets) *apitypes.OrderRowMove {
 	var m apitypes.OrderRowMove
 	switch {
 	case mark.Kind == apitypes.RosterMarkKindFree:
 		m = apitypes.OrderRowMoveAdd
-	case mark.Kind == apitypes.RosterMarkKindTeam && targets[boardID]:
+	case mark.Kind == apitypes.RosterMarkKindTeam && targets()[boardID]:
 		m = apitypes.OrderRowMoveTrade
 	default:
 		return nil
@@ -214,44 +225,68 @@ func (a *advisor) restOfSeasonPoints(p boards.Player) *float64 {
 	return &v
 }
 
-// Order is one view of our order (spec §7, Lane 66j). marks says whether
-// the rows carry the league's rosters and moves: false for the reader with
-// no league of their own.
-func (a *advisor) Order(q orderQuery, marks bool) apitypes.OrderAdvice {
+// pointsOverReplacement is the key across positions: his points over
+// replacement over the weeks the order covers, to a tenth, nil without a
+// value (a kicker or defense, or a position the league starts nobody at).
+func (a *advisor) pointsOverReplacement(p boards.Player) *float64 {
+	v, ok := a.Board.Values[p.ID]
+	if !ok {
+		return nil
+	}
+	r := roundTenth(v)
+	return &r
+}
+
+// rankBy is the key a view's # sorts on (review 66j H2): the rest-of-season
+// total at a position, points over replacement across positions.
+func rankBy(position draft.Position) apitypes.OrderAdviceRankBy {
+	if position == "" {
+		return apitypes.OrderAdviceRankByPointsOverReplacement
+	}
+	return apitypes.OrderAdviceRankByRestOfSeasonPoints
+}
+
+// Targets is the trade finder's targets for the drafter, read once per
+// league read (review 66j M10); nil for a reader with no league.
+type Targets func() map[string]bool
+
+// Order is one view of our order (spec §7, Lane 66j). targets, set in a
+// league, gives the rows the league's rosters and moves; nil for the reader
+// with no league of their own. The finder runs only when a shown row is on
+// another roster.
+func (a *advisor) Order(q orderQuery, targets Targets) apitypes.OrderAdvice {
+	marks := targets != nil
 	h := a.header()
 	out := apitypes.OrderAdvice{Week: h.week, Basis: OrderScreenBasis(a.basis, a.Board.FromWeek), OrderBasis: h.basis,
 		Refreshed: h.refreshed, ProjectionReadAt: a.projectionReadAt(), ProjectionScoring: projectionScoring(a.settings, a.preset),
-		BasisNote: LineupNote(a.settings, a.season.Carries), Rows: []apitypes.OrderRow{}}
+		BasisNote: BasisNote(a.settings, a.season.Carries), RankBy: rankBy(q.position), Rows: []apitypes.OrderRow{}}
 	if carriesPerGame(a.Board) {
 		from := a.Board.FromWeek
 		out.FromWeek = &from
 	}
+	var hosts map[string]string
 	if marks {
 		readAt := h.readAt
 		out.ReadAt = &readAt
+		hosts = a.hostIDs()
 	}
 	players, ranks := a.ranked(q.position)
-	var hosts map[string]string
-	var targets map[string]bool
-	if marks {
-		hosts, targets = a.hostIDs(), a.tradeTargets()
-	}
 	for i, p := range players {
-		if !matches(p, q.q) {
+		if !matches(p, q.q) || (q.roster != "" && a.rosterMark(p.ID).Kind != q.roster) {
 			continue
 		}
 		out.Total++
 		if len(out.Rows) == q.limit {
 			continue
 		}
-		out.Rows = append(out.Rows, a.orderRow(p, ranks[i], marks, hosts, targets))
+		out.Rows = append(out.Rows, a.orderRow(p, ranks[i], hosts, targets))
 	}
 	return out
 }
 
 // orderRow is one player's row: his line as the league's screens draw it,
-// his place, the order's key, and with marks his roster and move.
-func (a *advisor) orderRow(p boards.Player, rank int, marks bool, hosts map[string]string, targets map[string]bool) apitypes.OrderRow {
+// his place, the order's two keys, and in a league his roster and move.
+func (a *advisor) orderRow(p boards.Player, rank int, hosts map[string]string, targets Targets) apitypes.OrderRow {
 	id := p.ID
 	hostID, rostered := hosts[p.ID]
 	lp := apitypes.LeaguePlayer{HostId: a.hostIDOfAdd(p), BoardId: &id, Name: p.Name, Position: string(p.Position), Team: p.Team}
@@ -260,17 +295,20 @@ func (a *advisor) orderRow(p boards.Player, rank int, marks bool, hosts map[stri
 	} else {
 		hostID = p.ID
 	}
-	row := apitypes.OrderRow{Line: a.build(hostID, lp, nil).line, Rank: rank, RestOfSeasonPoints: a.restOfSeasonPoints(p)}
-	if marks {
+	row := apitypes.OrderRow{Line: a.build(hostID, lp, nil).line, Rank: rank, RestOfSeasonPoints: a.restOfSeasonPoints(p),
+		PointsOverReplacement: a.pointsOverReplacement(p)}
+	if targets != nil {
 		mark := a.rosterMark(p.ID)
 		row.Roster, row.Move = &mark, moveOf(mark, p.ID, targets)
 	}
 	return row
 }
 
-// leagueOrder is GET /leagues/attached/{id}/order.
+// leagueOrder is GET /leagues/attached/{id}/order. The verb for a free
+// player is the Waivers screen's (review 66j H6): its claim moves, a failed
+// check failing closed as the Waivers route's does.
 func (s *Service) leagueOrder(w http.ResponseWriter, r *http.Request) {
-	q, bad := parseOrderQuery(r)
+	q, bad := parseOrderQuery(r, true)
 	if len(bad) > 0 {
 		httpx.WriteInvalid(w, r, bad)
 		return
@@ -279,13 +317,27 @@ func (s *Service) leagueOrder(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	httpx.WriteOK(w, r, http.StatusOK, a.Order(q, true))
+	out := a.Order(q, s.targetsFor(a, auth.AccountID(r).String()))
+	moves := CopyOnlyClaims(a.Snap.Ref.Host)
+	if s.Moves != nil {
+		claim, err := s.Moves.ClaimMove(r.Context(), auth.AccountID(r), a.Snap.Ref.Host)
+		if err != nil {
+			s.Log.Warn("inseason: order claim moves", "err", err)
+			claim.Claim = apitypes.WaiverMovesClaimUnavailable
+			if claim.Reason == nil {
+				claim.Reason = moves.Reason
+			}
+		}
+		moves = claim
+	}
+	out.Moves = &moves
+	httpx.WriteOK(w, r, http.StatusOK, out)
 }
 
 // publicOrder is GET /order: the order valued for PublicLeague, with no
 // account and no league.
 func (s *Service) publicOrder(w http.ResponseWriter, r *http.Request) {
-	q, bad := parseOrderQuery(r)
+	q, bad := parseOrderQuery(r, false)
 	if len(bad) > 0 {
 		httpx.WriteInvalid(w, r, bad)
 		return
@@ -295,7 +347,7 @@ func (s *Service) publicOrder(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteInternal(w, r, s.Log, "inseason: order", err)
 		return
 	}
-	httpx.WriteOK(w, r, http.StatusOK, a.Order(q, false))
+	httpx.WriteOK(w, r, http.StatusOK, a.Order(q, nil))
 }
 
 // publicAdvisor is the order's advisor without a league: PublicLeague's

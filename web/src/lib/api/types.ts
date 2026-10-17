@@ -411,6 +411,8 @@ export interface paths {
 				q?: string;
 				/** @description at most this many rows, 100 without it */
 				limit?: number;
+				/** @description only the free players, or only the drafter's own; total and the limit count after it */
+				roster?: 'free' | 'yours';
 			};
 			header?: never;
 			path: {
@@ -3124,7 +3126,7 @@ export interface components {
 			week: number;
 			/** @description what the order and its two figures are, said once under the rows */
 			basis: string;
-			/** @description the rules the league scores that the season's points (Avg and Last) leave out, empty when none; the order's points over replacement are for the league, or a 12-team PPR league for a reader with none of their own */
+			/** @description the league the points over replacement are for (a 12-team PPR league for a reader with none of their own), and the rules it scores that the season's points (Avg and Last) leave out */
 			basis_note: string;
 			order_basis: components['schemas']['OrderBasis'];
 			/**
@@ -3145,6 +3147,13 @@ export interface components {
 			 */
 			projection_read_at: string | null;
 			projection_scoring: components['schemas']['ProjectionScoring'];
+			/**
+			 * @description the key the rows' rank sorts on, the figure a screen shows first: the rest-of-season total at a position, points over replacement across positions
+			 * @enum {string}
+			 */
+			rank_by: 'rest_of_season_points' | 'points_over_replacement';
+			/** @description the claim's moves on the league's platform, the Waivers screen's verb rule for an add; null without a league */
+			moves: components['schemas']['WaiverMoves'] | null;
 			/** @description every player the view holds before the limit */
 			total: number;
 			/** @description in our order, at most the limit */
@@ -3159,6 +3168,11 @@ export interface components {
 			 * @description the order's key, one decimal: his rest-of-season points over the games his club has left from the order's first week through week 17, byes out; null on the preseason order and for a kicker or defense, which the board places in draft order
 			 */
 			rest_of_season_points: number | null;
+			/**
+			 * Format: double
+			 * @description the key across positions, one decimal: his points over replacement for the league over the weeks the order covers; null for a kicker or defense and a position the league starts nobody at
+			 */
+			points_over_replacement: number | null;
 			/** @description whose roster in the league holds him, null without a league */
 			roster: components['schemas']['RosterMark'] | null;
 			/**
@@ -4497,6 +4511,8 @@ export interface operations {
 				q?: string;
 				/** @description at most this many rows, 100 without it */
 				limit?: number;
+				/** @description only the free players, or only the drafter's own; total and the limit count after it */
+				roster?: 'free' | 'yours';
 			};
 			header?: never;
 			path: {

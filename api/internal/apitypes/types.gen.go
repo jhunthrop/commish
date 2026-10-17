@@ -933,6 +933,24 @@ func (e MockStatus) Valid() bool {
 	}
 }
 
+// Defines values for OrderAdviceRankBy.
+const (
+	OrderAdviceRankByPointsOverReplacement OrderAdviceRankBy = "points_over_replacement"
+	OrderAdviceRankByRestOfSeasonPoints    OrderAdviceRankBy = "rest_of_season_points"
+)
+
+// Valid indicates whether the value is a known member of the OrderAdviceRankBy enum.
+func (e OrderAdviceRankBy) Valid() bool {
+	switch e {
+	case OrderAdviceRankByPointsOverReplacement:
+		return true
+	case OrderAdviceRankByRestOfSeasonPoints:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for OrderBasis.
 const (
 	OrderBasisPreseason    OrderBasis = "preseason"
@@ -2889,11 +2907,14 @@ type OrderAdvice struct {
 	// Basis what the order and its two figures are, said once under the rows
 	Basis string `json:"basis"`
 
-	// BasisNote the rules the league scores that the season's points (Avg and Last) leave out, empty when none; the order's points over replacement are for the league, or a 12-team PPR league for a reader with none of their own
+	// BasisNote the league the points over replacement are for (a 12-team PPR league for a reader with none of their own), and the rules it scores that the season's points (Avg and Last) leave out
 	BasisNote string `json:"basis_note"`
 
 	// FromWeek the first week the rest-of-season order covers, null on the preseason order
 	FromWeek *int `json:"from_week"`
+
+	// Moves the claim's moves on the league's platform, the Waivers screen's verb rule for an add; null without a league
+	Moves *WaiverMoves `json:"moves"`
 
 	// OrderBasis which order ranks the players: our preseason board, or the rest-of-season order (from week 7, once the API reads it)
 	OrderBasis OrderBasis `json:"order_basis"`
@@ -2903,6 +2924,9 @@ type OrderAdvice struct {
 
 	// ProjectionScoring the scoring the rows' week_projection is read in: the published projection's column the league scores most like, and whether that is the league's own scoring or the closest of the three to rules of its own (a tight end premium reads PPR and is never its own). A team defense's figure is the published default in every format
 	ProjectionScoring ProjectionScoring `json:"projection_scoring"`
+
+	// RankBy the key the rows' rank sorts on, the figure a screen shows first: the rest-of-season total at a position, points over replacement across positions
+	RankBy OrderAdviceRankBy `json:"rank_by"`
 
 	// ReadAt when the league was read from its platform, null without a league
 	ReadAt *time.Time `json:"read_at"`
@@ -2920,6 +2944,9 @@ type OrderAdvice struct {
 	Week int `json:"week"`
 }
 
+// OrderAdviceRankBy the key the rows' rank sorts on, the figure a screen shows first: the rest-of-season total at a position, points over replacement across positions
+type OrderAdviceRankBy string
+
 // OrderBasis which order ranks the players: our preseason board, or the rest-of-season order (from week 7, once the API reads it)
 type OrderBasis string
 
@@ -2929,6 +2956,9 @@ type OrderRow struct {
 
 	// Move the one move his row admits: add for a player no roster holds at a position the league starts, trade for a player on another roster whom the trade finder's best trade with his team brings in for the drafter, null otherwise (and always for the drafter's own players)
 	Move *OrderRowMove `json:"move"`
+
+	// PointsOverReplacement the key across positions, one decimal: his points over replacement for the league over the weeks the order covers; null for a kicker or defense and a position the league starts nobody at
+	PointsOverReplacement *float64 `json:"points_over_replacement"`
 
 	// Rank his place in our order for this view: at a position his position rank (by his rest-of-season total, which orders the same as points over replacement there), across every position his place by points over replacement, a kicker or defense after every projected player in the order drafters take them
 	Rank int `json:"rank"`
@@ -4253,6 +4283,9 @@ type LeagueOrderParams struct {
 
 	// Limit at most this many rows, 100 without it
 	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Roster only the free players, or only the drafter's own; total and the limit count after it
+	Roster *string `form:"roster,omitempty" json:"roster,omitempty"`
 }
 
 // LeagueTradesParams defines parameters for LeagueTrades.

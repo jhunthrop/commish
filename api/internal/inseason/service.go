@@ -65,6 +65,8 @@ type Service struct {
 	Moves   Moves
 	// Boards values the order for a reader with no league (GET /order).
 	Boards Boards
+	// targets keeps the trade finder's targets per league read (order.go).
+	targets targetCache
 	// Season is the season GET /games/week reads, the board's.
 	Season int
 	Now    func() time.Time
