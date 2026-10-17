@@ -571,6 +571,9 @@ func TestSwitchesAndTheAllowList(t *testing.T) {
 	check("switch on", apitypes.HostMovePlanStatusReady, apitypes.LineupMovesLineupAvailable)
 	r.svc.ESPNLineup = false
 	check("switch off, not listed", apitypes.HostMovePlanStatusUnavailable, apitypes.LineupMovesLineupUnavailable)
+	if got, _ := r.svc.LineupMove(ctx, me, espnhost.Host); got.Note == nil || *got.Note != lineupOffWords {
+		t.Fatalf("switch off, not listed, says why: %+v", got)
+	}
 	r.proofs.allowed[me] = true
 	check("switch off, listed", apitypes.HostMovePlanStatusReady, apitypes.LineupMovesLineupAvailable)
 
@@ -586,8 +589,13 @@ func TestSwitchesAndTheAllowList(t *testing.T) {
 	if got, _ := r.svc.LineupMove(ctx, me, espnhost.Host); got.Lineup != apitypes.LineupMovesLineupUnavailable {
 		t.Fatalf("ESPN closed here: %+v", got)
 	}
-	for _, host := range []string{"sleeper", "yahoo", "ffpc", "mfl"} {
-		if got, _ := r.svc.LineupMove(ctx, me, host); got.Lineup != apitypes.LineupMovesLineupUnavailable || got.Note != nil {
+	if got, _ := r.svc.LineupMove(ctx, me, espnhost.Host); got.Note == nil || *got.Note != lineupOffWords {
+		t.Fatalf("ESPN closed here says its writes are off: %+v", got)
+	}
+	// A platform with no write path says so in one line, by its name.
+	for host, name := range map[string]string{"sleeper": "Sleeper", "yahoo": "Yahoo", "ffpc": "FFPC", "mfl": "MyFantasyLeague"} {
+		got, _ := r.svc.LineupMove(ctx, me, host)
+		if got.Lineup != apitypes.LineupMovesLineupUnavailable || got.Note == nil || *got.Note != name+" takes no lineup from outside." {
 			t.Fatalf("%s: %+v", host, got)
 		}
 	}
@@ -606,17 +614,17 @@ func TestConsentVersionGatesTheMove(t *testing.T) {
 	}{
 		{"version 2", &hosts.Connection{Status: hosts.StatusConnected, ConsentVersion: 2}, reconsentWords},
 		{"signed out", &hosts.Connection{Status: hosts.StatusSignedOut, ConsentVersion: 3}, reconnectWords},
-		{"none", nil, ""},
+		{"none", nil, lineupConnectWords},
 	}
 	for _, tc := range cases {
 		r.svc.Connections = conns{tc.conn}
 		got, err := r.svc.LineupMove(ctx, me, espnhost.Host)
-		if err != nil || got.Lineup != apitypes.LineupMovesLineupUnavailable || (tc.note == "") != (got.Note == nil) || (got.Note != nil && *got.Note != tc.note) {
+		if err != nil || got.Lineup != apitypes.LineupMovesLineupUnavailable || got.Note == nil || *got.Note != tc.note {
 			t.Fatalf("%s: %+v %v", tc.name, got, err)
 		}
 		p := r.plan(t, swap())
 		want := tc.note
-		if want == "" {
+		if tc.conn == nil {
 			want = offWords
 		}
 		if p.Status != apitypes.HostMovePlanStatusUnavailable || p.Sentence != want {

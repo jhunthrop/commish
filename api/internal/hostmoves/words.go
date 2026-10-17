@@ -16,6 +16,12 @@ const (
 	notSentWords = "ESPN is not answering right now, and nothing was sent. Review the move again in a moment."
 	offWords     = "Make this change on ESPN."
 
+	// Why the lineup cannot be set from our screen, said under the copy
+	// verb (Lane 66e), the platform named.
+	noLineupPathWords  = "%s takes no lineup from outside."
+	lineupOffWords     = "ESPN writes are off until your connection is renewed."
+	lineupConnectWords = "Connect ESPN on your account page to set your lineup from here."
+
 	// Why a move is unavailable, said under the verb.
 	reconsentWords = "To set your lineup from here, connect ESPN again on your account page and agree to moves."
 	reconnectWords = "ESPN no longer accepts your saved sign-in. Connect ESPN again on your account page to set your lineup from here."

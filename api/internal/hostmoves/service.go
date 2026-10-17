@@ -14,6 +14,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"regexp"
@@ -140,12 +141,43 @@ func (s *Service) LineupMove(ctx context.Context, accountID uuid.UUID, host stri
 	}
 	if open {
 		out.Lineup = apitypes.LineupMovesLineupAvailable
+		return out, nil
 	}
-	if note != "" {
-		out.Note = &note
+	if note == "" {
+		// Closed with nothing for the member to do: the screen's copy verb
+		// says why in one line, the platform named (Lane 66e).
+		if note, err = s.lineupClosedNote(ctx, accountID, host); err != nil {
+			return out, err
+		}
 	}
+	out.Note = &note
 	return out, nil
 }
+
+// lineupClosedNote is why a lineup cannot be set from our screen when the
+// member has nothing to agree to: the platform has no write path here, its
+// writes are off for the account, or the account has not connected it.
+// A platform gains writes in open and lineupWriteHosts alone; the screen
+// reads only the answer.
+func (s *Service) lineupClosedNote(ctx context.Context, accountID uuid.UUID, host string) (string, error) {
+	if !lineupWriteHosts[host] {
+		return fmt.Sprintf(noLineupPathWords, leaguesync.HostWords(host)), nil
+	}
+	if !s.ESPNOpen {
+		return lineupOffWords, nil
+	}
+	_, err := s.Connections.Get(ctx, accountID, host)
+	switch {
+	case errors.Is(err, hosts.ErrNotConnected):
+		return lineupConnectWords, nil
+	case err != nil:
+		return "", err
+	}
+	return lineupOffWords, nil
+}
+
+// lineupWriteHosts is every platform with a lineup write path here.
+var lineupWriteHosts = map[string]bool{espnhost.Host: true}
 
 // ClaimMove says whether the account may claim on the host from our
 // screen, and the sentence when a claim waits on the member. The waivers
