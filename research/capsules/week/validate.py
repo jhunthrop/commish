@@ -19,7 +19,7 @@ from typing import Final
 
 from research.capsules.config import CAPSULE_CONFIG
 from research.capsules.narrative import normalize_sentence, sentences_verbatim
-from research.capsules.validate import Grounding, ValidationResult, validate_prose
+from research.capsules.validate import Grounding, ValidationResult, overrun_cap, validate_prose
 from research.capsules.week.render import render_week_sheet
 from research.capsules.week.rules import week_rule_violations
 from research.capsules.week.sheet import WeekSheet, week_name_ledger
@@ -91,11 +91,18 @@ def shared_sentence_violations(text: str, taken: Set[str]) -> list[str]:
 
 
 def validate_week_read(
-    text: str, sheet: WeekSheet, taken: Set[str] = frozenset(), call: str | None = "none"
+    text: str,
+    sheet: WeekSheet,
+    taken: Set[str] = frozenset(),
+    call: str | None = "none",
+    *,
+    asked_shorter: bool = False,
 ) -> ValidationResult:
     """One week read against its sheet, the week's rules given the writer's `call`, and the sentence shapes
-    other pages carry (`taken`)."""
-    base = validate_prose(with_season(text, sheet.season), week_grounding(sheet), WEEK_BAND)
+    other pages carry (`taken`). A read already asked for a shorter version may run the season writer's
+    10% over its cap (`overrun_cap`, the phase C ruling), as the season read may."""
+    band = (WEEK_BAND[0], overrun_cap(WEEK_BAND[1]) if asked_shorter else WEEK_BAND[1])
+    base = validate_prose(with_season(text, sheet.season), week_grounding(sheet), band)
     violations = (
         *base.violations,
         *week_rule_violations(text, sheet, call),

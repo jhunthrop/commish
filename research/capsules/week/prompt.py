@@ -20,7 +20,7 @@ from research.capsules.render_words import week_of
 from research.capsules.rule_notes import RuleNote
 from research.capsules.validate import word_count
 from research.capsules.week.render import render_week_sheet
-from research.capsules.week.rules import CALLS, MAX_SENTENCES, MIN_SENTENCES, shown_week_words
+from research.capsules.week.rules import MAX_SENTENCES, MIN_SENTENCES, shown_week_words
 from research.capsules.week.sheet import PROJECTION_BASIS, WeekSheet
 from research.capsules.week.validate import WEEK_BAND
 
@@ -32,12 +32,24 @@ _NUMBER_RULE: Final = {
         "- The week's number is the published projection: a projection published for the week, never ours. Name "
         'it once, with its figure exactly as the facts print it, in the sentence that names it: "the published '
         'projection has him at 23 points". Never put another figure on it, never say "published" without its '
-        'figure, and never "our projection", "our number", "our model" or "we project" for this week.'
+        'figure, and never "our projection", "our number", "our model" or "we project" for this week. State it and '
+        'never grade it: no "light", "heavy", "high", "low", "generous", "conservative", "too" or '
+        '"only" beside it, no "looks" or "feels" about it. No round of our weekly number has passed to back a '
+        "judgment of it. Say what you see in the matchup or in his rate, in a sentence of its own."
     ),
 }
+# The four calls, defined (the re-review's F4): the page shows the call beside the read.
+CALL_MEANINGS: Final = (
+    ("start", "start him this week"),
+    ("sit", "keep him out of the lineup this week"),
+    ("hold", "no change: keep him where he is, or wait on his status before kickoff"),
+    ("none", "no lineup call"),
+)
 _RETURN: Final = (
     'Return ONE JSON object and nothing else: {"read": "<the read>", "call": "<one word>"}. "call" is what '
-    f"your read tells a manager who has him to do this week, one of {', '.join(CALLS)}."
+    "your read tells a manager who has him to do this week, one word: "
+    + "; ".join(f'"{call}" means {meaning}' for call, meaning in CALL_MEANINGS)
+    + '. A read that waits on his status before saying start calls itself "hold".'
 )
 
 
@@ -65,6 +77,7 @@ NUMBERS, TIME AND WORDS
 - A rank against his position reads as the facts give it, 1st allowed the fewest, said the way a person would, never a code.
 - Name the season once, with the first week you name ("week 6 of 2026"), and every week after it without the year ("week 5", "week 7"). Never the year twice. "This week" is fine. Never a date or the name of a month. A week still to play is only looked ahead to.
 - The injury report is the one the facts name, by its day ("on Monday's report"), never "the latest".
+- Name clubs by name as the facts give them beside the code ("the Cardinals", "Arizona"), never by their code ("ARI").
 - Fantasy football words, never a trading or a betting word. The game's expected points are an expected score and nothing more. Never a provider, a data source or a rival product by name. Never a tip and never "remember to".
 - Speak for the board as "we" when you need to, never "I", "me" or "my". The facts are yours alone: never mention a sheet.
 - Write like you talk. Contractions are welcome. Never an em-dash, never a semicolon.

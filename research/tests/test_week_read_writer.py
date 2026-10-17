@@ -3,9 +3,11 @@ writer's loop within its ceiling, the facts block as its counted fallback, the c
 hourly, the retry limits), the step's dollar budget, and the demotion of a sentence shape on two pages.
 The gateway is stubbed throughout."""
 
+import copy
 from collections.abc import Iterator, Sequence
 from dataclasses import replace
 from datetime import UTC, date, timedelta
+from typing import Self
 
 import pytest
 
@@ -69,6 +71,12 @@ class _StubGateway:
             raise item
         return item
 
+    def with_model(self, model: str) -> "Self":
+        """The judge's view: the same script, its own call count (`GatewayClient.with_model`)."""
+        view = copy.copy(self)
+        view.model, view.calls = model, 0
+        return view
+
     def sleep(self, seconds: float) -> None:
         self.slept.append(seconds)
 
@@ -79,7 +87,7 @@ def test_the_prompt_states_the_week_the_kickoff_and_that_the_number_is_published
     assert "published projection" in WEEK_RULES and "never ours" in WEEK_RULES
     assert "about 80 words" in WEEK_RULES and "never more than 100" in WEEK_RULES
     assert '"in our preseason order" or "in our rest-of-season order"' in WEEK_RULES
-    assert '"call"' in WEEK_RULES and "start, sit, hold, none" in WEEK_RULES
+    assert '"call"' in WEEK_RULES and '"hold" means no change' in WEEK_RULES and 'calls itself "hold"' in WEEK_RULES
     for word in ("odds", "underdog", "favoured", "line", "spread", "bet", "the books"):
         assert f'"{word}"' in WEEK_RULES
 
@@ -109,6 +117,19 @@ def test_a_long_read_is_told_its_count_and_the_cut() -> None:
     correction = gateway.asked[1][-1]["content"]
     assert f"It is {words} words, {words - 100} over the 100-word cap. Cut about {words - 80} words" in correction
     assert length_move(80) is None
+
+
+def test_a_read_asked_shorter_may_run_ten_percent_over_the_cap() -> None:
+    """The season read's ruling, for the week read too: the recorded run's Lamb landed at 108 words."""
+    extra = (
+        " Davante Adams is listed second behind him, and his 25.9 PPR points a game over 3 games came with 4"
+        " touchdowns, the kind of steady work that keeps him first on the Rams depth chart for now."
+    )
+    longer = STARTER_READ.replace(" Start him with confidence.", extra + " Start him with confidence.")
+    assert 100 < len(longer.split()) <= 110  # noqa: PLR2004 - over the cap, inside its 10%
+    gateway = _StubGateway([_answer(" ".join([STARTER_READ, STARTER_READ])), _answer(longer)])
+    result = write_week_read(starter(), gateway)  # type: ignore[arg-type]
+    assert result.source == "llm" and result.text == longer, result.attempts
 
 
 def test_a_broken_rule_is_handed_back_with_its_sentence_and_the_rewrite_lands() -> None:
@@ -150,17 +171,18 @@ def test_a_spent_budget_ends_the_read_at_its_facts_block_named_for_the_budget() 
 
 
 def test_a_bye_read_is_written_and_never_recommends_him() -> None:
-    result = write_week_read(on_bye(), _StubGateway([_answer(BYE_READ, "hold")]))  # type: ignore[arg-type]
-    assert result.source == "llm", result.attempts
+    judged_no = Completion("No", _USAGE, "provider", "stop")
+    result = write_week_read(on_bye(), _StubGateway([_answer(BYE_READ, "hold"), judged_no]))  # type: ignore[arg-type]
+    assert result.source == "llm" and result.calls == _A_DRAFT_AND_ONE_MORE, result.attempts
 
 
 def test_the_step_holds_a_dollar_budget_under_the_nightly_bound() -> None:
     """The review's M3: the pass's own hard stop, its worst read, and a day of week reads beside $4.15."""
     budget = step_budget(_PRICE, NIGHTLY_BUDGET_USD)
     assert budget.max_usd == NIGHTLY_BUDGET_USD and budget.price == _PRICE
-    assert worst_read_usd(_PRICE) == pytest.approx(4 * (3500 * 0.15 + 600 * 0.50) / 1_000_000)
-    assert step_budget(ModelPrice("m", None, None, "unread", None), HOURLY_BUDGET_USD).max_calls == round(0.05 / 0.0006)
-    assert pytest.approx(1.85) == NIGHTLY_BUDGET_USD + HOURLY_DAY_USD
+    assert worst_read_usd(_PRICE) == pytest.approx(4 * (3700 * 0.15 + 600 * 0.50) / 1_000_000)
+    assert step_budget(ModelPrice("m", None, None, "unread", None), HOURLY_BUDGET_USD).max_calls == int(0.05 / 0.00065)
+    assert pytest.approx(2.00) == NIGHTLY_BUDGET_USD + HOURLY_DAY_USD
 
 
 _NOW = WRITTEN_AT

@@ -213,6 +213,11 @@ class GatewayClient:
         """A view for one page: the same line, bucket and ledger, its own call count from zero."""
         return replace(self, calls=0)
 
+    def with_model(self, model: str) -> "GatewayClient":
+        """A view asking another model on the same line, bucket, ledger and budget, its own call count from
+        zero (the week read's judge, Lane 72)."""
+        return replace(self, model=model, calls=0)
+
     def rolling[T, R](
         self,
         items: Sequence[T],

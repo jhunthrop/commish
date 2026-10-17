@@ -25,9 +25,11 @@ import re
 from collections.abc import Sequence
 from typing import Final
 
+from research.capsules.facts.team_names import NFL_TEAM_NAMES
 from research.capsules.sentences import split_sentences
 from research.capsules.voice_rules import named_rule
 from research.capsules.week.sheet import WeekSheet, points_text
+from research.capsules.week.start_advice import start_advice_in
 
 MIN_SENTENCES: Final = 3
 MAX_SENTENCES: Final = 5
@@ -75,9 +77,20 @@ _DOES_NOT_PLAY: Final = re.compile(
     r"\binjured reserve\b|\bsits? out\b|\bis out\b",
     re.IGNORECASE,
 )
-_CLAUSE_BREAK: Final = re.compile(r"[,;:.!?]|\b(?:but|so|and then|then)\b", re.IGNORECASE)
-_NEGATION: Final = re.compile(r"\b(?:not|never|no|don't|do not|can't|cannot|won't|shouldn't)\b|n't\b", re.IGNORECASE)
-_VACANCY: Final = re.compile(r"\b(?:zero|nothing|hole|empty|out of)\b", re.IGNORECASE)
+# A judgment of the published projection (the re-review's F2): the read states it and never grades it
+# until a round of our weekly number passes.
+_GRADES: Final = re.compile(
+    r"\b(?:light|heavy|high|low|generous|conservative|rich|stingy|bullish|bearish|modest|aggressive|"
+    r"too|only|just|undersells?|oversells?|underrates?|overrates?|sells? him short|selling him short|"
+    r"short of|undershoots?|overshoots?|feels?|seems?|looks?|undervalu\w*|overvalu\w*)\b",
+    re.IGNORECASE,
+)
+# A read that waits on his status before saying start (the re-review's F4): its call is hold.
+_WAITS: Final = re.compile(
+    r"\b(?:wait|waiting)\b|\bif (?:he(?:'s| is)?|the inactives) (?:active|cleared|clear him|plays|good to go|"
+    r"suits up|goes)\b|\bcheck (?:his|the) status\b|\bgame-time\b|\bbefore (?:you )?(?:lock|start)\b",
+    re.IGNORECASE,
+)
 # A figure's digits ("19.5", "3", "30%"), with what may stand right after it as its unit or basis.
 _FIGURE: Final = re.compile(r"(?<![\w.:])\d+(?:\.\d+)?%?(?![\w:]|\.\d)")
 _UNIT_AFTER: Final = re.compile(
@@ -190,6 +203,17 @@ def _projection_violations(sentences: Sequence[str], sheet: WeekSheet) -> list[s
                     f"The published projection is {figure} points. Say other figures in a sentence of their own.",
                 )
             )
+        grade = _GRADES.search(s) if _PUBLISHED.search(s) else None
+        if grade is not None:
+            out.append(
+                _sentence_violation(
+                    f'grades the published projection ("{grade.group(0)}")',
+                    s,
+                    "State the published projection and its figure, and never judge it: no round of our weekly "
+                    "number has passed to back a judgment. Say what you see in the matchup or his rate in a "
+                    "sentence of its own.",
+                )
+            )
         if value in stated and not _PUBLISHED.search(s):
             out.append(
                 _sentence_violation(
@@ -206,34 +230,6 @@ def _projection_violations(sentences: Sequence[str], sheet: WeekSheet) -> list[s
     return out
 
 
-def _name_forms(name: str) -> list[str]:
-    words = [w for w in name.split() if w.rstrip(".") not in {"Jr", "Sr", "II", "III", "IV"}]
-    return list(dict.fromkeys([name, " ".join(words), words[0], words[-1]])) if words else [name]
-
-
-def _start_advice(name: str) -> re.Pattern[str]:
-    him = "|".join(["him", "them", *(re.escape(form) for form in _name_forms(name))])
-    return re.compile(
-        rf"\b(?:start|play|use|deploy|trust|roll with|fire up|plug in|slot in|lock in)\s+(?:{him})\b|"
-        rf"\b(?:put|keep|leave|slot|plug|lock|get|have)\s+(?:{him})\s+(?:in|into)\s+(?:your\s+)?(?:starting\s+)?lineups?\b|"
-        r"\bmust[- ]start\b|\bworth a start\b|\bin your (?:starting )?lineup this week\b",
-        re.IGNORECASE,
-    )
-
-
-def _recommends(sentence: str, advice: re.Pattern[str]) -> str | None:
-    for match in advice.finditer(sentence):
-        before = sentence[: match.start()]
-        breaks = list(_CLAUSE_BREAK.finditer(before))
-        clause = before[breaks[-1].end() :] if breaks else before
-        if _NEGATION.search(clause):
-            continue
-        if match.group(0).lower().startswith("in your") and _VACANCY.search(sentence):
-            continue
-        return match.group(0)
-    return None
-
-
 def _cannot_start_violations(sentences: Sequence[str], sheet: WeekSheet, call: str | None) -> list[str]:
     if sheet.may_start:
         return []
@@ -245,9 +241,8 @@ def _cannot_start_violations(sentences: Sequence[str], sheet: WeekSheet, call: s
             f"The read's call is start, but he {why} in {week}. Never recommend him for this week: say what it means "
             "for a roster that has him, and make the call sit, hold or none."
         )
-    advice = _start_advice(sheet.name)
     for s in sentences:
-        found = _recommends(s, advice)
+        found = start_advice_in(s, sheet.name)
         if found is not None:
             out.append(
                 _sentence_violation(
@@ -261,6 +256,33 @@ def _cannot_start_violations(sentences: Sequence[str], sheet: WeekSheet, call: s
             f"The read never says he does not play in {week}. He {why}: say so, and what it means for a roster "
             "that has him."
         )
+    return out
+
+
+def _wait_violation(text: str, sheet: WeekSheet, call: str | None) -> list[str]:
+    if call != START or _WAITS.search(text) is None:
+        return []
+    return [
+        f"The read waits on {sheet.name}'s status before saying start, but its call is start. A read that waits "
+        "on his status calls itself hold."
+    ]
+
+
+_CLUB_CODE: Final = re.compile(r"\b(?:" + "|".join(sorted(NFL_TEAM_NAMES, key=len, reverse=True)) + r")\b")
+
+
+def _code_violations(sentences: Sequence[str]) -> list[str]:
+    out = []
+    for s in sentences:
+        found = _CLUB_CODE.search(s)
+        if found is not None:
+            out.append(
+                _sentence_violation(
+                    f'names a club by its code ("{found.group(0)}")',
+                    s,
+                    "Name clubs by name, as the facts give them beside the code: the Cardinals, Arizona.",
+                )
+            )
     return out
 
 
@@ -319,6 +341,8 @@ def week_rule_violations(text: str, sheet: WeekSheet, call: str | None = "none")
         *_unit_violations(sentences, sheet.season),
         *_order_violations(sentences, sheet),
         *_season_violation(text, sheet.season),
+        *_wait_violation(text, sheet, call),
+        *_code_violations(sentences),
     ]
 
 

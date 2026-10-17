@@ -20,6 +20,7 @@ from research.capsules.week.caption import written_caption
 from research.capsules.week.render import render_week_facts_block, render_week_sheet
 from research.capsules.week.rules import WEEK_NEVER_WORDS, week_rule_violations
 from research.capsules.week.sheet import BoardPlace, DepthPlace, PublishedProjection, Status, WeekGame
+from research.capsules.week.start_advice import start_advice_in
 from research.capsules.week.validate import sentence_shapes, validate_week_read, with_season
 from research.tests.week_read_fixtures import (
     BOARD,
@@ -36,7 +37,7 @@ from research.tests.week_read_fixtures import (
 )
 
 STARTER_READ = (
-    "Puka Nacua gets ARI at home in week 6 of 2026, and the Cardinals have allowed receivers 41.3 PPR points "
+    "Puka Nacua gets Arizona at home in week 6 of 2026, and the Cardinals have allowed receivers 41.3 PPR points "
     "a game, 26th of 32. The published projection has him at 18.4 points, up 0.5 points from the published "
     "figure before it. The Rams are expected to score 32.5 points indoors, plenty of room for his 25.9 PPR "
     "points a game. Start him with confidence."
@@ -288,7 +289,7 @@ def test_a_bare_week_before_the_season_is_named_is_refused() -> None:
 @pytest.mark.parametrize("count", [2, 6])
 def test_a_read_runs_three_to_five_sentences(count: int) -> None:
     sentences = [
-        "Puka Nacua faces ARI at home in week 6 of 2026.",
+        "Puka Nacua faces Arizona at home in week 6 of 2026.",
         "The published projection has him at 18.4 points.",
         "The Cardinals allow receivers 41.3 PPR points a game.",
         "The Rams are expected to score 32.5 points.",
@@ -329,3 +330,62 @@ def test_a_bare_week_beside_a_figure_takes_the_season_and_never_the_figure() -> 
     list made "2026.4", a figure no sheet prints."""
     text = "Lions bye in week 6 of 2026. He had 37.7 PPR points in week 5 and 41.4 PPR points in week 3."
     assert with_season(text, 2026).endswith("in week 5 of 2026 and 41.4 PPR points in week 3 of 2026.")
+
+
+# The re-review's F1: the double negations and the phrasings the first list missed. The judge
+# (`test_week_read_judge`) must refuse each too; this is the list's share.
+REVIEW_START_PHRASINGS = (
+    "There's no reason not to start him this week.",
+    "Don't hesitate to start Gibbs in week 7 of 2026.",
+    "You can't go wrong if you start him.",
+    "Nothing should stop you from starting him.",
+    "Fire him up.",
+    "Ride with Gibbs this week.",
+    "Go with him this week.",
+    "Slide him into your flex this week.",
+    "Keep him active this week.",
+    "Never bench him this week.",
+    "Don't sit him this week.",
+    "He's a locked-in starter for you.",
+    "He belongs in your lineup this week, nothing changes.",
+)
+
+
+@pytest.mark.parametrize("advice", REVIEW_START_PHRASINGS)
+@pytest.mark.parametrize("status", [None, "doubtful"])
+def test_the_list_refuses_every_start_phrasing_the_re_review_found(advice: str, status: str | None) -> None:
+    sheet = on_bye() if status is None else replace(on_bye(), bye=False, status=Status(status, REPORT))
+    assert start_advice_in(advice, sheet.name) is not None, advice
+    assert any("recommends starting" in v for v in week_rule_violations(advice, sheet, "hold")), advice
+
+
+@pytest.mark.parametrize(
+    "sentence",
+    [
+        "The published projection has him at 18.4 points, which looks light.",
+        "The published projection of 18.4 points is too low for him.",
+        "The published projection has him at only 18.4 points.",
+        "The published projection, a generous 18.4 points, says enough.",
+    ],
+)
+def test_the_published_projection_is_stated_and_never_graded(sentence: str) -> None:
+    """The re-review's F2: no round of ours has passed to back a judgment of the week's number."""
+    text = STARTER_READ.replace(
+        "The published projection has him at 18.4 points, up 0.5 points from the published figure before it.", sentence
+    )
+    assert any("grades the published projection" in v for v in week_rule_violations(text, starter(), "start"))
+
+
+def test_a_wait_and_see_read_calls_itself_hold() -> None:
+    """The re-review's F4: Lamb's "Wait on his status ... before you start him" is a hold."""
+    text = "Wait on his status right up to Sunday night before you start him."
+    assert any("calls itself hold" in v for v in week_rule_violations(text, questionable(), "start"))
+    assert not any("calls itself hold" in v for v in week_rule_violations(text, questionable(), "hold"))
+
+
+def test_a_club_is_named_by_name_never_by_its_code() -> None:
+    """The re-review's F7: "ARI", "BUF" and "LAR" in the recorded reads."""
+    assert any('code ("ARI")' in v for v in week_rule_violations("The matchup with ARI is soft.", starter()))
+    assert not any(
+        "code" in v for v in week_rule_violations("The matchup with Arizona is soft. He is a WR2.", starter())
+    )

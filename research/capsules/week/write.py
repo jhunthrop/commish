@@ -20,13 +20,21 @@ from research.capsules.gateway_ledger import Usage, add_usage
 from research.capsules.generate import BUDGET_SPENT, THROTTLED, ask, gateway_failure
 from research.capsules.rule_notes import notes_of
 from research.capsules.store import WRITTEN_SOURCE
+from research.capsules.week.judge import (
+    JUDGE_MAX_TOKENS,
+    JUDGE_MIN_WORDS,
+    JUDGE_MODEL,
+    judge_messages,
+    judge_violation,
+    says_start,
+)
 from research.capsules.week.prompt import WEEK_RULES, parse_week_answer, week_correction, week_prompt
 from research.capsules.week.render import render_week_facts_block
 from research.capsules.week.sheet import WeekSheet
-from research.capsules.week.validate import validate_week_read
+from research.capsules.week.validate import WEEK_BAND, validate_week_read
 
-# A draft and three corrections: a week read is short, and a fourth failure is a facts block, retried on
-# the cadence's terms. The season read's ceiling is six for two reads and a narrative.
+# A draft and three corrections, the judge's call among them for a player who may not be started: a week
+# read is short, and a fourth failure is a facts block, retried on the cadence's terms. The season read's ceiling is six for two reads and a narrative.
 MAX_CALLS_PER_READ: Final = 4
 # A five-sentence read and its call run about 180 tokens; the cap leaves room and never cuts an honest read.
 MAX_TOKENS: Final = 600
@@ -72,33 +80,79 @@ def _gateway_why(error: GenerationError) -> str:
     return "the gateway's answer was refused, empty or cut"
 
 
+class _Asks:
+    """The read's asks so far, the writer's and the judge's together, within `MAX_CALLS_PER_READ`."""
+
+    def __init__(self) -> None:
+        self.made = 0
+
+    @property
+    def left(self) -> bool:
+        return self.made < MAX_CALLS_PER_READ
+
+
+def _judged_start(sheet: WeekSheet, text: str, judge: GatewayClient) -> tuple[bool, Usage | None]:
+    """The judge's verdict on a passing read for a player who may not be started (`judge`): True for start."""
+    answer = ask(judge, judge_messages(sheet, text), JUDGE_MAX_TOKENS, JUDGE_MIN_WORDS)
+    return says_start(answer.content), answer.usage
+
+
 def write_week_read(
-    sheet: WeekSheet, gateway: GatewayClient, avoid: Sequence[str] = (), taken: Set[str] = frozenset()
+    sheet: WeekSheet,
+    gateway: GatewayClient,
+    avoid: Sequence[str] = (),
+    taken: Set[str] = frozenset(),
+    judge_model: str = JUDGE_MODEL,
 ) -> WeekReadResult:
     """`sheet`'s read, told the sentences other pages carry (`avoid`, quoted) and held to their shapes
-    (`taken`). `calls` counts every HTTP call made for him, retries and re-asks included."""
+    (`taken`). For a player who may not be started, a read that passes goes to the judge (`judge`), whose
+    call is one of the read's four, made to `judge_model` on the same line and budget. `calls` counts every
+    HTTP call made for him, the judge's, retries and re-asks included."""
+    judge = gateway.with_model(judge_model)
     before = gateway.calls
+
+    def made() -> int:
+        return gateway.calls - before + judge.calls
+
     usage: Usage | None = None
     attempts: list[WeekAttempt] = []
+    asks = _Asks()
+    asked_shorter = False
     user = week_prompt(sheet, avoid)
-    for _ in range(MAX_CALLS_PER_READ):
+    while asks.left:
+        asks.made += 1
         try:
             completion = ask(gateway, messages_for(user), MAX_TOKENS)
         except GenerationError as error:
             usage = add_usage(usage, error.billed)
             failure = gateway_failure(error)
             if failure.kind in (BUDGET_SPENT, THROTTLED) or not error.retryable:
-                return _facts(sheet, usage, gateway.calls - before, attempts, _gateway_why(error))
+                return _facts(sheet, usage, made(), attempts, _gateway_why(error))
             continue  # an empty or cut answer is an ask spent: ask again while asks remain
         usage = add_usage(usage, completion.usage)
         answer = parse_week_answer(completion.content)
         text = answer.read or ""
-        result = validate_week_read(text, sheet, taken, answer.call)
-        attempts.append(WeekAttempt(text, answer.call, result.violations))
-        if result.ok:
-            calls = gateway.calls - before
+        result = validate_week_read(text, sheet, taken, answer.call, asked_shorter=asked_shorter)
+        asked_shorter = asked_shorter or (result.band_failure is not None and result.band_failure.words > WEEK_BAND[1])
+        violations = result.violations
+        if result.ok and not sheet.may_start:
+            if not asks.left:
+                attempts.append(WeekAttempt(text, answer.call, ("No ask was left for the judge.",)))
+                break
+            asks.made += 1
+            try:
+                says, judged = _judged_start(sheet, text, judge)
+            except GenerationError as error:
+                usage = add_usage(usage, error.billed)
+                attempts.append(WeekAttempt(text, answer.call, ()))
+                return _facts(sheet, usage, made(), attempts, _gateway_why(error))
+            usage = add_usage(usage, judged)
+            violations = (judge_violation(sheet),) if says else ()
+        attempts.append(WeekAttempt(text, answer.call, violations))
+        if not violations:
+            calls = made()
             return WeekReadResult(text, WRITTEN_SOURCE, answer.call, gateway.model, usage, calls, tuple(attempts), None)
         ledger = notes_of([(attempt.body, attempt.violations) for attempt in attempts])
         user = week_correction(sheet, text, ledger, avoid)
     first = attempts[-1].violations[0] if attempts and attempts[-1].violations else "no answer was written"
-    return _facts(sheet, usage, gateway.calls - before, attempts, f"failed validation: {first}")
+    return _facts(sheet, usage, made(), attempts, f"failed validation: {first}")
