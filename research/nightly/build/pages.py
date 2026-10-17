@@ -18,7 +18,7 @@ from typing import Any, Final
 
 from research.capsules.pull_figures import PageValues, page_numbers, pull_figures_of
 from research.capsules.store import WRITTEN_SOURCE, StoredCapsule
-from research.capsules.week.caption import written_caption
+from research.capsules.week.caption import status_changed_caption, written_caption
 from research.capsules.week.store import StoredWeekRead
 from research.model.instants import js_iso
 from research.nightly.build.player_season import SeasonContext, season_block
@@ -146,9 +146,6 @@ def capsule_json(stored: StoredCapsule | None, page: PageValues | None) -> Json 
     }
 
 
-STATUS_CHANGED_CAPTION: Final = "A new read is being written since his status changed"
-
-
 @dataclass(frozen=True, slots=True)
 class ServedWeek:
     """What the page's week read is served against (Lane 72, the review's H1 and H3): the reads of the board
@@ -160,18 +157,19 @@ class ServedWeek:
     as_of: datetime
 
 
-def week_read_json(stored: StoredWeekRead | None, status: str | None, kicked_off: bool) -> Json | None:
+def week_read_json(stored: StoredWeekRead | None, status: str | None, kicked_off: bool, as_of: datetime) -> Json | None:
     """The board week's read (Lane 72) with the page's caption, its stamps, the status it was written against
     and its call. None for a page the writer did not write for the board week, or whose board-week game has
-    kicked off. A read written against another status than his current one is withheld: its caption says a
-    new read is being written, and the page shows the season read beneath it (the review's H3)."""
+    kicked off. A read written against another status than his current one is withheld: its caption says his
+    status changed and when the hourly pass writes the new read, and the page shows the season read beneath
+    it (the review's H3, the re-review's F5)."""
     if stored is None or stored.source != WRITTEN_SOURCE or kicked_off:
         return None
     standing = stored.status == status
     return {
         "week": stored.week,
         "body": stored.body.strip() if standing else None,
-        "caption": written_caption(stored.written_at, stored.week) if standing else STATUS_CHANGED_CAPTION,
+        "caption": written_caption(stored.written_at, stored.week) if standing else status_changed_caption(as_of),
         "status": stored.status,
         "call": stored.call if standing else None,
         "writtenAt": js_iso(stored.written_at),
@@ -245,7 +243,7 @@ def _week_read(who: Identity, universe_id: str | None, inputs: PageInputs) -> Js
     if stored is None:
         return None
     kicked_off = _kicked_off(inputs.season.games.get(who.team, ()), stored.week, inputs.week.as_of)
-    return week_read_json(stored, inputs.week.statuses.get(who.id), kicked_off)
+    return week_read_json(stored, inputs.week.statuses.get(who.id), kicked_off, inputs.week.as_of)
 
 
 def index_json(people: Sequence[Identity], players: Mapping[str, Json]) -> list[Json]:

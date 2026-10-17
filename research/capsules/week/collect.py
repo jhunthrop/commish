@@ -24,8 +24,6 @@ from typing import Any, Final, cast
 
 from sqlalchemy import Connection, text
 
-from research.capsules.facts.model import InjuryDesignated
-from research.capsules.facts.reference import injury_snapshot
 from research.capsules.sweep import Subject
 from research.capsules.week.sheet import (
     Allowed,
@@ -41,11 +39,11 @@ from research.capsules.week.sheet import (
     WeekSheet,
 )
 from research.capsules.week.store import StoredWeekRead
-from research.model.designations import status_of
 from research.model.domain import Position
 from research.nightly.build.player_season import SeasonContext, season_block, season_context
 from research.nightly.build.ros import pending_weeks
 from research.nightly.config import PAGE_FORMAT
+from research.nightly.designations import read_statuses, status_word
 from research.nightly.reads.schedule import Game
 from research.pipeline.nflverse.team_codes import product_team_code
 from research.pipeline.nws.grid import PRECIPITATION_KINDS
@@ -323,12 +321,9 @@ def read_week_facts(conn: Connection, season: int, subjects: Sequence[Subject], 
     wanted = sorted({cw.week for cw in weeks.values()} | {cw.game.week for cw in weeks.values() if cw.game is not None})
     stamp = _lines_stamp(conn, season, as_of)
     blocks = _blocks(context, players)
-    snapshot = injury_snapshot(conn, as_of)
-    statuses = {}
-    for subject in subjects:
-        status = snapshot.status_for(subject.facts.identity.id)
-        word = status_of(status.designation) if isinstance(status, InjuryDesignated) else None
-        statuses[subject.facts.identity.id] = Status(word, snapshot.captured_at)
+    read = read_statuses(conn, as_of)
+    at = None if read is None else read.read_at
+    statuses = {s.facts.identity.id: Status(status_word(read, s.facts.identity.id), at) for s in subjects}
     return WeekFacts(
         as_of,
         season,

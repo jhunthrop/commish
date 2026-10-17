@@ -31,17 +31,18 @@ from research.capsules.week.store import (
     upsert_week_read,
 )
 from research.db.engine import make_engine
-from research.db.schema import PLAYER_WEEK_READ_RUNS, PLAYER_WEEK_READS, PLAYERS
+from research.db.schema import CAPTURE_SNAPSHOTS, PLAYER_WEEK_READ_RUNS, PLAYER_WEEK_READS, PLAYERS
 from research.db.url import sqlalchemy_url
+from research.nightly.designations import designations_file, read_statuses, status_word
 from research.nightly.week_read_demotion import DEMOTED, demote_shared
-from research.nightly.week_reads import _Night, _write
+from research.nightly.week_reads import WeekReadSpend, _Night, _write, record_spend
 from research.parity import databases
 from research.tests.test_week_read_rules import STARTER_READ
 from research.tests.week_read_fixtures import WRITTEN_AT, questionable, starter
 
 _DATABASE = "parity_test_week_reads"
 _QUESTIONABLE_READ = (
-    "Bijan Robinson is Questionable on Friday's report, so whether he plays in week 6 of 2026 against CHI is "
+    "Bijan Robinson is Questionable on Friday's report, so whether he plays in week 6 of 2026 against Chicago is "
     "not settled until Sunday. The published projection has him at 15.2 points, down 1.8 points since our last "
     "read. The Bears allow running backs 18.7 PPR points a game, 9th of 32, and the Falcons are expected to "
     "score 25 points. If he is active, Bijan Robinson stays in your lineup over a lesser back."
@@ -101,11 +102,12 @@ def test_the_nights_pool_lands_each_read_with_its_stamps_call_and_attempt(engine
         user = json.loads(request.content)["messages"][-1]["content"]
         asked.append(user)
         puka = "Puka Nacua" in user.split("\n", 2)[1]
-        return _completion(STARTER_READ, "start") if puka else _completion(_QUESTIONABLE_READ, "start")
+        return _completion(STARTER_READ, "start") if puka else _completion(_QUESTIONABLE_READ, "hold")
 
     first, second = starter(), questionable()
     night = _Night((first, second), {}, 6)
-    spend = _write(engine, _gateway(answer), night, [(first, FIRST), (second, STATUS_CHANGED)], lambda: True)
+    spend = WeekReadSpend()
+    _write(engine, _gateway(answer), night, [(first, FIRST), (second, STATUS_CHANGED)], room=lambda: True, spend=spend)
     with engine.connect() as conn:
         stored = stored_week_reads(conn, 2026, [6])
     assert spend.written == _BOTH and spend.facts_blocks == 0
@@ -123,7 +125,8 @@ def test_a_read_the_budget_stopped_writes_nothing(engine: Engine) -> None:
         upsert_week_read(conn, _row(pid, 6, "A written read that stands."))
     gateway = _gateway(lambda _request: _completion(STARTER_READ, "start")).with_budget(RunBudget.of(calls=0))
     night = _Night((starter(),), {}, 6)
-    spend = _write(engine, gateway, night, [(starter(), FIRST)], lambda: True)
+    spend = WeekReadSpend()
+    _write(engine, gateway, night, [(starter(), FIRST)], room=lambda: True, spend=spend)
     with engine.connect() as conn:
         stored = stored_week_reads(conn, 2026, [6])
     assert spend.budget_stopped == 1 and spend.written == 0
@@ -188,3 +191,40 @@ def test_the_hourly_passes_spend_is_read_back_for_the_days_cap(engine: Engine) -
         record_run(conn, WeekReadRun(day - timedelta(hours=1), "hourly", 50, 0.05, 40, 0, 0))
     with engine.connect() as conn:
         assert hourly_spend_since(conn, day) == pytest.approx(0.020)
+
+
+def test_a_pass_records_what_its_budget_reserved_even_when_no_read_landed(engine: Engine) -> None:
+    """The re-review's F6: the pass's row comes from the budget's own tally (a read that raised included),
+    written in the pass's `finally`."""
+    budget = RunBudget.of(calls=10)
+    budget.calls_made, budget.spent_usd = 3, 0.0019
+    at = datetime(2026, 10, 16, 15, 0, tzinfo=UTC)
+    record_spend(engine, at, "hourly", WeekReadSpend(), budget)
+    with engine.connect() as conn:
+        assert hourly_spend_since(conn, at - timedelta(hours=1)) == pytest.approx(0.0019)
+
+
+def _capture(conn: Any, at: datetime, listed: dict[str, str]) -> None:
+    payload = {"injList": [{"playerID": pid, "designation": word} for pid, word in listed.items()]}
+    conn.execute(
+        insert(CAPTURE_SNAPSHOTS).values(
+            source="tank01_injuries_by_date", captured_at=at, digest=str(at), payload=payload
+        )
+    )
+
+
+def test_a_refused_capture_leaves_the_page_and_the_web_on_the_same_status(engine: Engine) -> None:
+    """The re-review's F3: a capture cut short (under half the list before it) is refused by the one read
+    both sides take, so neither clears a designation the other keeps."""
+    full = {"4426515": "Questionable", "4430807": "Out", "4241478": "Injured Reserve", "4362628": "Doubtful"}
+    first, short = datetime(2026, 10, 16, 12, 0, tzinfo=UTC), datetime(2026, 10, 16, 13, 0, tzinfo=UTC)
+    with engine.begin() as conn:
+        conn.execute(delete(CAPTURE_SNAPSHOTS))
+        _capture(conn, first, full)
+        _capture(conn, short, {"4430807": "Out"})
+    with engine.connect() as conn:
+        read = read_statuses(conn, short + timedelta(minutes=5))
+    assert read is not None and read.read_at == first
+    web = designations_file(read, full)["players"]
+    assert {pid: status_word(read, pid) for pid in full} == {pid: web[pid]["status"] for pid in full}
+    assert status_word(read, "4426515") == "questionable"

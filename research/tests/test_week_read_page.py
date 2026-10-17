@@ -6,7 +6,7 @@ kicked off (H1)."""
 from datetime import UTC, date, datetime
 
 from research.capsules.week.store import StoredWeekRead
-from research.nightly.build.pages import STATUS_CHANGED_CAPTION, week_read_json
+from research.nightly.build.pages import week_read_json
 
 _WRITTEN = datetime(2026, 10, 17, 2, 0, tzinfo=UTC)
 
@@ -19,7 +19,7 @@ def _read(source: str = "llm", status: str | None = "questionable") -> StoredWee
 
 
 def test_a_standing_read_is_served_with_its_caption_status_and_call() -> None:
-    served = week_read_json(_read(), "questionable", kicked_off=False)
+    served = week_read_json(_read(), "questionable", kicked_off=False, as_of=_WRITTEN)
     assert served == {
         "week": 6,
         "body": "Bijan Robinson is Questionable on Friday's report.",
@@ -32,14 +32,18 @@ def test_a_standing_read_is_served_with_its_caption_status_and_call() -> None:
 
 
 def test_a_read_written_against_another_status_is_withheld_behind_its_caption() -> None:
-    served = week_read_json(_read(), "out", kicked_off=False)
+    served = week_read_json(_read(), "out", kicked_off=False, as_of=_WRITTEN)
     assert served is not None
     assert served["body"] is None and served["call"] is None
-    assert served["caption"] == STATUS_CHANGED_CAPTION == "A new read is being written since his status changed"
+    # Friday 9:00 pm Central: the next hourly pass is Friday 11:00 pm Eastern.
+    assert (
+        served["caption"]
+        == "His status changed since this read was written. A new read is due by Fri 10:00 pm Central."
+    )
     assert served["status"] == "questionable"
 
 
 def test_a_facts_row_or_a_kicked_off_game_serves_no_read() -> None:
-    assert week_read_json(_read(source="facts"), "questionable", kicked_off=False) is None
-    assert week_read_json(_read(), "questionable", kicked_off=True) is None
-    assert week_read_json(None, None, kicked_off=False) is None
+    assert week_read_json(_read(source="facts"), "questionable", kicked_off=False, as_of=_WRITTEN) is None
+    assert week_read_json(_read(), "questionable", kicked_off=True, as_of=_WRITTEN) is None
+    assert week_read_json(None, None, kicked_off=False, as_of=_WRITTEN) is None

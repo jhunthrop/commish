@@ -215,14 +215,16 @@ def _statuses(conn: Connection, source: str, newest: _Capture, stored_newest: bo
     return StatusRead(ms_instant(newest.at), checked, source, players)
 
 
-def read_statuses(conn: Connection) -> StatusRead | None:
-    """The newest by-date capture that reads, else the roster sweep's; None when neither has one.
+def read_statuses(conn: Connection, before: datetime | None = None) -> StatusRead | None:
+    """The newest by-date capture that reads (captured at or before `before`, when given), else the roster
+    sweep's; None when neither has one. The one status read for `designations.json`, the published table,
+    the week-ahead read's sheet and the page's serve rule (Lane 72, the re-review's F3).
 
     A newest capture over the byte cap, of the wrong shape or under the floor (readable_at) gives way
     to the next newest; a source whose newest few all fail is an error, never a silent fall to an
     older list. A by-date out takes the note of the newest roster sweep near it."""
     for source in (BY_DATE_SOURCE, ROSTER_SWEEP_SOURCE):
-        captures = _captures(conn, source, CAPTURES_TRIED + 1)
+        captures = _captures(conn, source, CAPTURES_TRIED + 1, before)
         for i in range(min(len(captures), CAPTURES_TRIED)):
             if readable_at(captures, i):
                 return _statuses(conn, source, captures[i], stored_newest=i == 0)
@@ -231,6 +233,13 @@ def read_statuses(conn: Connection) -> StatusRead | None:
                 f"none of the {min(len(captures), CAPTURES_TRIED)} newest injury captures {source} reads"
             )
     return None
+
+
+def status_word(read: StatusRead | None, player_id: str) -> str | None:
+    """His status in the contract's words on the read, None when it lists none for him: the same reading
+    `designations_file` makes, so a page's week read and the web's hide rule never disagree."""
+    found = None if read is None else read.players.get(player_id)
+    return None if found is None else found.status
 
 
 def designations_file(read: StatusRead, ranked: Iterable[str]) -> Json:

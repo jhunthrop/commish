@@ -26,7 +26,7 @@ replaces the written row, and the page then shows no week read.
 import os
 from collections import deque
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, time
 from typing import Final
 
@@ -43,6 +43,7 @@ from research.capsules.store import WRITTEN_SOURCE
 from research.capsules.sweep import FactsPassMemo
 from research.capsules.week.cadence import attempts_today, central_day, due_reason
 from research.capsules.week.collect import collect_week_sheets, read_week_facts
+from research.capsules.week.judge import JUDGE_MODEL, judge_model
 from research.capsules.week.sheet import CENTRAL, WeekSheet
 from research.capsules.week.store import (
     StoredWeekRead,
@@ -65,20 +66,21 @@ NIGHTLY: Final = "nightly"
 HOURLY: Final = "hourly"
 # A night's reads: the whole board (about 536 pages) with room.
 PAGES_PER_NIGHT: Final = 700
-# THE DOLLARS (the coordinator's M3), from the fix-round recorded run (11 calls, 3 reads): a read averaged
-# $0.0018, the dearest call $0.00057, so a read's worst case (4 calls) is $0.0023 and a full week turnover
-# of 536 reads $0.95 on average and $1.23 at worst: the night holds $1.25. An hourly pass writes only the
-# reads a status or a projection moved, about two dozen on a busy hour: $0.05 a pass, and $0.60 across a
-# Central day's passes (the capture runs 18 times). A day of week reads is at most $1.85, beside the
-# capsule night's ruled bound of about $4.15.
-NIGHTLY_BUDGET_USD: Final = 1.25
+# THE DOLLARS (the coordinator's M3), from fix round 2's recordings (the fixture run, 11 calls; the 50-player
+# sample, 27 live calls over 8 reads; the judge, 16 calls): a read averages $0.0016 to $0.0019, the judge's
+# call $0.00006 (one of the read's four, on the 152 of 536 sheets that may not start him), the dearest call
+# $0.00065, so a read's worst case (4 calls) is $0.0026 and a full week turnover of 536 reads about $0.95 on
+# average and $1.39 at worst: the night holds $1.40. An hourly pass writes only the reads a status or a
+# projection moved: $0.05 a pass, and $0.60 across a Central day's passes (the capture runs 18 times). A day
+# of week reads is at most $2.00, beside the capsule night's ruled bound of about $4.15.
+NIGHTLY_BUDGET_USD: Final = 1.40
 HOURLY_BUDGET_USD: Final = 0.05
 HOURLY_DAY_USD: Final = 0.60
-# The heaviest prompt a week read's ask carries (a correction with its ledger; the recorded run's largest
-# was about 3,100 tokens), for a read's worst case against what is left of the budget.
-WORST_PROMPT_TOKENS: Final = 3_500
-# The recorded run's dearest call, for a budget in calls when the price list cannot be read.
-WORST_CALL_USD: Final = 0.0006
+# The heaviest prompt a week read's ask carries (a correction with its ledger and every line's stamp; the
+# recordings' largest was 3,630 tokens), for a read's worst case against what is left of the budget.
+WORST_PROMPT_TOKENS: Final = 3_700
+# The recordings' dearest call, for a budget in calls when the price list cannot be read.
+WORST_CALL_USD: Final = 0.00065
 Log = Callable[[str], None]
 
 
@@ -192,20 +194,23 @@ def _read_night(engine: Engine, now: datetime, facts: FactsPassMemo) -> _Night |
         return _Night(sheets, stored, week_facts.board_week)
 
 
-def _write(
+def _write(  # noqa: PLR0913 - the pass's parts
     engine: Engine,
     gateway: GatewayClient,
     night: _Night,
     due: Sequence[tuple[WeekSheet, str]],
+    *,
     room: Callable[[], bool],
-) -> WeekReadSpend:
-    spend = WeekReadSpend()
+    spend: WeekReadSpend,
+    judge: str = JUDGE_MODEL,
+) -> None:
+    """The due reads on the writer's pool, each landed in its own transaction, tallied on `spend`."""
     board = _Board(night.stored)
 
     def start(item: tuple[WeekSheet, str]) -> Callable[[GatewayClient], WeekReadResult]:
         sheet = item[0]
         avoid, taken = board.avoid(sheet.week), board.taken(sheet)
-        return lambda scoped: write_week_read(sheet, scoped, avoid, taken)
+        return lambda scoped: write_week_read(sheet, scoped, avoid, taken, judge)
 
     def land(item: tuple[WeekSheet, str], result: WeekReadResult) -> None:
         spend.add(result)
@@ -220,7 +225,21 @@ def _write(
 
     if gateway.rolling(due, start, land, stop=lambda: not room()):
         spend.budget_stopped += len(due) - spend.landed
-    return spend
+
+
+def _room(budget: RunBudget, worst: float) -> Callable[[], bool]:
+    """Whether another read may start: its worst case fits what is left (the gateway's reservation is the
+    hard stop for the reads in flight)."""
+    return lambda: budget.max_usd is None or budget.spent_usd + worst <= budget.max_usd
+
+
+def record_spend(engine: Engine, now: datetime, mode: str, spend: WeekReadSpend, budget: RunBudget | None) -> None:
+    """The pass's row on `player_week_read_runs`: the budget's own tally of calls and dollars when it ran
+    (every call it reserved, a raised read's included), else what the landed reads billed."""
+    calls = spend.calls if budget is None else max(spend.calls, budget.calls_made)
+    cost = spend.cost_usd if budget is None else max(spend.cost_usd, budget.spent_usd)
+    with engine.begin() as conn:
+        record_run(conn, WeekReadRun(now, mode, calls, cost, spend.written, spend.facts_blocks, spend.demoted))
 
 
 def _day_start(now: datetime) -> datetime:
@@ -256,26 +275,25 @@ def run_week_read_step(
         if (reason := due_reason(sheet, night.stored.get((sheet.player_id, sheet.week)), now, hourly=hourly))
         is not None
     ]
-    settings = writer_settings(os.environ)
-    with httpx.Client() as http:
-        price = checked_price(http, key, settings)
-        budget = step_budget(price, usd)
-        worst = worst_read_usd(price) if budget.max_usd is not None else 0.0
-
-        def room() -> bool:
-            return budget.max_usd is None or budget.spent_usd + worst <= budget.max_usd
-
-        gateway = GatewayClient.for_run(key, http, settings).with_budget(budget)
-        spend = _write(engine, gateway, night, due[:PAGES_PER_NIGHT], room)
+    spend = WeekReadSpend()
     for _, reason in due:
         spend.due[reason] = spend.due.get(reason, 0) + 1
     spend.left = max(0, len(due) - PAGES_PER_NIGHT)
-    spend.demoted = demote_shared(engine, night.sheets, night.board_week, now)
-    with engine.begin() as conn:
-        record_run(
-            conn,
-            WeekReadRun(now, mode, spend.calls, spend.cost_usd, spend.written, spend.facts_blocks, spend.demoted),
-        )
+    budget: RunBudget | None = None
+    settings = writer_settings(os.environ)
+    try:
+        with httpx.Client() as http:
+            price = checked_price(http, key, settings)
+            judge = judge_model(os.environ)
+            checked_price(http, key, replace(settings, model=judge))  # the judge's model is listed too
+            budget = step_budget(price, usd)
+            room = _room(budget, worst_read_usd(price))
+            gateway = GatewayClient.for_run(key, http, settings).with_budget(budget)
+            _write(engine, gateway, night, due[:PAGES_PER_NIGHT], room=room, spend=spend, judge=judge)
+        spend.demoted = demote_shared(engine, night.sheets, night.board_week, now)
+    finally:
+        # Whatever the pass spent is on the day's ledger even when it raised (the re-review's F6).
+        record_spend(engine, now, mode, spend, budget)
     line = (
         f"{mode}, board week {night.board_week}, {len(night.sheets)} board players with a week ahead, "
         f"{budget.line()}; {spend.line()}"
