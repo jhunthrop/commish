@@ -15,7 +15,7 @@
 		/** How the rows under it frame their rank against the drafts (run/row-framing.ts): the
 		 * Drafters column compares drafters with our rank ("vs us") only where they do. */
 		framing: RowFraming;
-		/** The rows under it are kickers and defenses (MarketRow): their place in draft order sits
+		/** The rows under it are kickers and defenses (Row, in draft order): their place in draft order sits
 		 * under a Draft order head, and no column promises a projection. */
 		market?: boolean;
 	}

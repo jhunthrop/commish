@@ -32,5 +32,5 @@ export function marketBasis(
 ): string {
 	const source = sources.find((candidate) => candidate.id === format.marketOrder);
 	const from = source ? ` from ${source.drafts}, ${windowLabel(source.window)}` : '';
-	return `Kickers and defenses rank in draft order${from}, with no projected points and no tiers.`;
+	return `Kickers and defenses the drafters take rank in their draft order${from}, with no projected points and no tiers.`;
 }

@@ -138,8 +138,9 @@ export const marketRowSchema = z.object({
 	orderBasis: z.literal('market'),
 	/** His place on the whole board, after every ranked row. */
 	ourRank: z.number().int().min(1),
-	/** This format's ADP, or null when no source has him. */
-	adp: points.positive().nullable(),
+	/** This format's ADP: a kicker or a defense its drafts do not take is not on the board (the
+	 * September ruling). */
+	adp: points.positive(),
 	vorRound: z.null(),
 	projected: z.null(),
 	vor: z.null(),

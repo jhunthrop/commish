@@ -13,7 +13,6 @@
 	import PageHead from '#lib/ui/PageHead.svelte';
 	import Panel from '#lib/ui/Panel.svelte';
 	import PanelHead from '#lib/ui/PanelHead.svelte';
-	import MarketRow from '#lib/ui/MarketRow.svelte';
 	import Row from '#lib/ui/Row.svelte';
 	import RowHead from '#lib/ui/RowHead.svelte';
 	import Verb from '#lib/ui/Verb.svelte';
@@ -91,11 +90,13 @@
 				{#each page.rows as player, i (player.id)}
 					{#if player.orderBasis === 'market'}
 						{@const face = player.face}
-						<MarketRow
+						<Row
 							{player}
-							{face}
 							href={links.club(player.team)}
-							range
+							{scale}
+							showTier={false}
+							unit={page.format.unit}
+							{framing}
 							order="adp"
 							orderColumn={false}
 							eager={i < EAGER_ROWS}
@@ -105,7 +106,7 @@
 							{#snippet action()}
 								<RowSheetMark player={{ ...player, headshot: face }} />
 							{/snippet}
-						</MarketRow>
+						</Row>
 					{:else}
 						<Row
 							{player}

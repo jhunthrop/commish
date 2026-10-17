@@ -5,7 +5,7 @@
 	import { HELD_FRAMING, framedVorCell, type RowFraming } from '#lib/run/row-framing.ts';
 	import type { IndexSeason } from '#lib/run/schema.ts';
 	import type { StatusView } from '#lib/run/status-view.ts';
-	import type { BoardPlayer, RangeScale } from '#lib/types/player.ts';
+	import type { BoardPlayer, MarketPosition, RangeScale } from '#lib/types/player.ts';
 	import AdpCell from './AdpCell.svelte';
 	import Face from './Face.svelte';
 	import NameWords from './NameWords.svelte';
@@ -16,12 +16,27 @@
 	import ValueCell from './ValueCell.svelte';
 	import { seasonFigures } from './season-figures.ts';
 
+	/** A kicker or a defense in draft order (Lane 66m, the 2026-09-05 ruling): his place among the
+	 * players the drafts take, the format's ADP, his face (a defense's is its club's mark), and no
+	 * projected points, no tier and no range. */
+	interface DraftOrderPlayer {
+		orderBasis: 'market';
+		name: string;
+		position: MarketPosition;
+		positionRank: number;
+		team: string;
+		adp: number;
+		ourRank: number;
+		face: string | null;
+	}
+
 	interface Props {
-		player: BoardPlayer;
+		/** A ranked player, or a kicker or a defense in draft order. */
+		player: BoardPlayer | DraftOrderPlayer;
 		/** The player's page. */
 		href: string;
 		/** The range scale every row in this view shares. */
-		scale: RangeScale;
+		scale?: RangeScale;
 		/** The All view carries the tier as a chip. A position view draws tier strips instead. */
 		showTier: boolean;
 		/** The scoring the points are in, as the cell label prints it: "PPR pts". */
@@ -50,6 +65,10 @@
 		/** His injury status when the run's capture lists him (run/status-view.ts): a season-long one
 		 * shows as his rank and carries its sentence on a line of its own, a week's carries its mark. */
 		status?: StatusView | null;
+		/** A kicker's or a defense's place: under a Draft order head (RowHead's market heads) the bare
+		 * number in the over replacement track; under a ranked row's heads (ADP) on his position pill,
+		 * "K 3", as a ranked row's place is. */
+		orderColumn?: boolean;
 	}
 
 	let {
@@ -65,15 +84,30 @@
 		season,
 		held = null,
 		framing,
-		status = null
+		status = null,
+		orderColumn = true
 	}: Props = $props();
+
+	function inDraftOrder(row: BoardPlayer | DraftOrderPlayer): row is DraftOrderPlayer {
+		// A ranked row read from the run carries orderBasis "projection" though its type does not name it.
+		return (row as { orderBasis?: unknown }).orderBasis === 'market';
+	}
+
+	const ranked = $derived(inDraftOrder(player) ? null : player);
+	const drafted = $derived(inDraftOrder(player) ? player : null);
+	/** A kicker's or a defense's place, the word standing in for it on a season-long list. */
+	const place = $derived(status?.rank ?? drafted?.positionRank ?? null);
 
 	/** A player on a season-long list: his rank is the word, so no tier and no framed rank. */
 	const heldOut = $derived(status !== null && status.rank !== null);
 	const shownFraming = $derived(heldOut ? HELD_FRAMING : framing);
 
 	const lead = $derived(
-		order === 'adp' && player.adp !== null ? fixed(player.adp) : String(player.ourRank)
+		order === 'adp' && player.adp !== null
+			? fixed(player.adp)
+			: ranked === null
+				? ''
+				: String(ranked.ourRank)
 	);
 </script>
 
@@ -88,24 +122,35 @@
 	<!-- A held player's rank shows as the word; in ADP order the lead is the drafters' ADP, kept. -->
 	<span class="rk">{order === 'board' ? (status?.rank ?? lead) : lead}</span>
 	<span class="face"
-		><Face src={player.headshot} size={40} loading={eager ? 'eager' : 'lazy'} />{#if held}<held.Mark
-				words={held.words}
-				kind={held.kind}
-			/>{/if}</span
+		><Face
+			src={drafted === null ? (ranked?.headshot ?? null) : drafted.face}
+			name={player.name}
+			size={40}
+			loading={eager ? 'eager' : 'lazy'}
+		/>{#if held}<held.Mark words={held.words} kind={held.kind} />{/if}</span
 	>
 	<span class="who">
 		<a class="name" {href}><NameWords name={player.name} /></a>
 		<span class="meta" class:seasoned={season !== undefined}>
-			<PositionPill position={player.position} rank={status?.rank ?? player.positionRank} />
-			{#if showTier && !heldOut}<span class="wide tier"><TierChip tier={player.tier} /></span>{/if}
-			<span class="wide team">{player.team}</span>
-			{#if season === undefined}
-				<span class="wide">{fixed(player.expectedGames)} games</span>
-			{:else}
-				{@const figures = seasonFigures(season)}
-				<span class="season">{figures.perGame}<span class="count">{figures.games}</span></span>
+			{#if ranked}
+				<PositionPill position={ranked.position} rank={status?.rank ?? ranked.positionRank} />
+				{#if showTier && !heldOut}<span class="wide tier"><TierChip tier={ranked.tier} /></span
+					>{/if}
+				<span class="wide team">{ranked.team}</span>
+				{#if season === undefined}
+					<span class="wide">{fixed(ranked.expectedGames)} games</span>
+				{:else}
+					{@const figures = seasonFigures(season)}
+					<span class="season">{figures.perGame}<span class="count">{figures.games}</span></span>
+				{/if}
+				<span class="narrow">{fixed(ranked.projected)} pts</span>
+			{:else if drafted}
+				<PositionPill
+					position={drafted.position}
+					rank={orderColumn ? (status?.rank ?? undefined) : (place ?? undefined)}
+				/>
+				<span class="wide team">{drafted.team}</span>
 			{/if}
-			<span class="narrow">{fixed(player.projected)} pts</span>
 		</span>
 		{#if status}
 			<span class="status">
@@ -116,25 +161,42 @@
 		{/if}
 	</span>
 	<span class="gp">{season?.games}</span>
-	<span class="proj"><ValueCell value={player.projected} label={unit} /></span>
-	<ValueCell {...framedVorCell(player.vor, player.vorRound, shownFraming)} phoneLabel={false} />
-	{#if range}
-		<span class="rng">
-			<RangeBar
-				floor={player.floor ?? 0}
-				median={player.median ?? 0}
-				ceiling={player.ceiling ?? 0}
-				{scale}
-			/>
-		</span>
+	{#if ranked}
+		<span class="proj"><ValueCell value={ranked.projected} label={unit} /></span>
+		<ValueCell {...framedVorCell(ranked.vor, ranked.vorRound, shownFraming)} phoneLabel={false} />
+		{#if range && scale}
+			<span class="rng">
+				<RangeBar
+					floor={ranked.floor ?? 0}
+					median={ranked.median ?? 0}
+					ceiling={ranked.ceiling ?? 0}
+					{scale}
+				/>
+			</span>
+		{/if}
+		<AdpCell
+			adp={ranked.adp}
+			ourRank={ranked.ourRank}
+			under={order === 'adp' ? 'rank' : 'adp'}
+			compare={shownFraming.compare}
+			rankWord={status?.rank ?? null}
+		/>
+	{:else if drafted}
+		<span class="proj"></span>
+		<span class="order"
+			>{#if orderColumn && status?.rank == null}<b>{drafted.positionRank}</b>{/if}</span
+		>
+		{#if range}<span class="rng"></span>{/if}
+		<!-- In ADP order the lead already prints his ADP, so the drafters' cell is left empty. -->
+		<AdpCell
+			adp={drafted.adp}
+			ourRank={drafted.ourRank}
+			under="adp"
+			compare={false}
+			figure={order !== 'adp'}
+			rankWord={status?.rank ?? null}
+		/>
 	{/if}
-	<AdpCell
-		adp={player.adp}
-		ourRank={player.ourRank}
-		under={order === 'adp' ? 'rank' : 'adp'}
-		compare={shownFraming.compare}
-		rankWord={status?.rank ?? null}
-	/>
 	{#if action}<span class="action">{@render action()}</span>{/if}
 </div>
 
@@ -187,6 +249,23 @@
 		font-family: var(--font-num);
 		font-size: var(--t-lg);
 		font-variant-numeric: tabular-nums;
+	}
+
+	/* A kicker's or a defense's place in draft order, in a ranked row's figure type (ValueCell's), its
+	   column head naming it. */
+	.order {
+		display: flex;
+		justify-content: flex-end;
+		align-items: center;
+	}
+
+	.order b {
+		font-family: var(--font-num);
+		font-variant-numeric: tabular-nums;
+		letter-spacing: 0.01em;
+		font-weight: 700;
+		font-size: var(--t-xl);
+		line-height: 1;
 	}
 
 	.action {

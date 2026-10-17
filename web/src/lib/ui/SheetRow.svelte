@@ -14,10 +14,10 @@
 		draftOrder?: boolean;
 	}
 
-	/** Where a kicker or a defense sits in the drafters' order, or that they do not take him. */
+	/** Where a kicker or a defense sits in the drafters' order, or the word for his list. */
 	export function draftOrderWords(board: SheetRowBoard): string {
 		if (board.held) return board.held;
-		return board.adp === null ? 'Not drafted' : `Draft order ${String(board.positionRank)}`;
+		return `Draft order ${String(board.positionRank)}`;
 	}
 </script>
 
@@ -153,14 +153,20 @@
 			{/if}
 		</span>
 		<span class="meta">
-			<PositionPill {position} rank={board?.held ?? board?.positionRank} />
+			<!-- A kicker's or a defense's number is the drafters' order, never ours: it is said in words, so
+			     the pill carries none ("K", not "K 1" beside "WR 2"). -->
+			<PositionPill
+				{position}
+				rank={board?.draftOrder ? (board.held ?? undefined) : (board?.held ?? board?.positionRank)}
+			/>
 			{#if tier !== null}<TierChip {tier} />{/if}
 			{#if team && !compact}<span class="team">{team}</span>{/if}
-			{#if board && compact}<AdpCell
+			{#if board?.draftOrder && compact}<span class="order-words">{draftOrderWords(board)}</span
+				>{:else if board && compact}<AdpCell
 					adp={board.adp}
 					ourRank={board.rank}
 					figure={false}
-					compare={!board.held && !board.draftOrder}
+					compare={!board.held}
 					rankWord={board.held ?? null}
 				/>{/if}
 		</span>
@@ -286,6 +292,13 @@
 	.ours {
 		grid-area: ours;
 		text-align: right;
+	}
+
+	/* On the phone a kicker's or a defense's place, in words where a ranked row's chip sits. */
+	.order-words {
+		font-size: var(--t-sm);
+		color: var(--ink-2);
+		white-space: nowrap;
 	}
 
 	.said {

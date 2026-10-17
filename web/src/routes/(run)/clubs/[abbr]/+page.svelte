@@ -10,7 +10,6 @@
 	import Figure from '#lib/ui/Figure.svelte';
 	import HeroCard from '#lib/ui/HeroCard.svelte';
 	import Label from '#lib/ui/Label.svelte';
-	import MarketRow from '#lib/ui/MarketRow.svelte';
 	import Panel from '#lib/ui/Panel.svelte';
 	import PanelHead from '#lib/ui/PanelHead.svelte';
 	import Row from '#lib/ui/Row.svelte';
@@ -86,9 +85,12 @@
 				<Panel padding="none">
 					<RowHead range={false} market {framing} />
 					{#each page.market as player (player.id)}
-						<MarketRow
+						<Row
 							{player}
-							face={player.face}
+							showTier={false}
+							unit={page.format.unit}
+							range={false}
+							{framing}
 							href={links.board(page.format.id, player.position)}
 							status={words?.rows[player.id] ?? null}
 						/>

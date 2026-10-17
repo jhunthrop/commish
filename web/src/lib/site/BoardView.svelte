@@ -16,7 +16,6 @@
 	import PanelHead from '#lib/ui/PanelHead.svelte';
 	import Label from '#lib/ui/Label.svelte';
 	import Quiet from '#lib/ui/Quiet.svelte';
-	import MarketRow from '#lib/ui/MarketRow.svelte';
 	import Row from '#lib/ui/Row.svelte';
 	import RowHead from '#lib/ui/RowHead.svelte';
 	import TierJump from '#lib/ui/TierJump.svelte';
@@ -94,10 +93,12 @@
 	/** A kicker's or a defense's view: his position in draft order, its basis said once in the lead. */
 	const marketView = $derived(page.marketBasis !== null);
 	const marketShown = $derived(page.market.filter((row) => !onlySheet || lazySheet.has(row.id)));
-	/** The basis line, and the capture's sentence when the run carries one. */
+	/** The basis line, and the capture's sentence when the run carries one: on a kicker's or a
+	 * defense's view only when one of its rows carries a status. */
 	const lead = $derived.by(() => {
 		const basis = page.marketBasis ?? page.seasonLead ?? page.format.basis.join(' · ');
-		return words === null ? basis : `${basis} ${words.capture}`;
+		const listed = !marketView || page.market.some((row) => row.status !== undefined);
+		return words === null || !listed ? basis : `${basis} ${words.capture}`;
 	});
 
 	/** A position view draws its tiers from the available players: a player on a season-long list
@@ -174,10 +175,14 @@
 				<RowHead range={false} action market {framing} />
 				{#each marketShown as player, i (player.id)}
 					{@const face = player.face}
-					<MarketRow
+					<Row
 						{player}
-						{face}
 						href={links.club(player.team)}
+						scale={page.scale}
+						showTier={false}
+						{unit}
+						range={false}
+						{framing}
 						eager={i < EAGER_ROWS}
 						held={siteContext.held?.mark(player.id) ?? null}
 						status={words?.rows[player.id] ?? null}
@@ -185,7 +190,7 @@
 						{#snippet action()}
 							<RowSheetMark player={{ ...player, headshot: face }} />
 						{/snippet}
-					</MarketRow>
+					</Row>
 				{/each}
 			{:else if page.position === null}
 				<RowHead {range} action games={page.seasonLead !== null} {framing} />

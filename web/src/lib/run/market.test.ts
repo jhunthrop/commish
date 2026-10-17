@@ -40,7 +40,7 @@ const NULLS = {
 	tier: null
 };
 
-const kicker = (id: string, positionRank: number, ourRank: number, adp: number | null) => ({
+const kicker = (id: string, positionRank: number, ourRank: number, adp: number) => ({
 	id,
 	slug: `kicker-${id}`,
 	name: `Kicker ${id}`,
@@ -73,7 +73,7 @@ const FILE = {
 	rows: [
 		{ ...ranked, orderBasis: 'projection' },
 		defense,
-		kicker('3', 2, 4, null),
+		kicker('3', 2, 4, 160.2),
 		kicker('2', 1, 3, 150.5)
 	]
 };
@@ -100,7 +100,9 @@ void test('a run older than the market rows still reads, every row ranked', () =
 	assert.deepEqual(board.market, []);
 });
 
-void test('a market row with a projection is refused', () => {
+void test('a market row with a projection, or one the drafts do not take, is refused', () => {
+	const undrafted = { ...FILE, rows: [ranked, { ...defense, adp: null }] };
+	assert.equal(boardSchema.safeParse(undrafted).success, false);
 	const bad = { ...FILE, rows: [ranked, { ...defense, projected: 120 }] };
 	assert.equal(boardSchema.safeParse(bad).success, false);
 	const noTier = { ...FILE, rows: [ranked, { ...defense, position: 'WR' }] };
@@ -182,11 +184,11 @@ void test('the basis names the order and its drafts once', () => {
 	];
 	assert.equal(
 		marketBasis({ marketOrder: 'ffc_adp_ppr_12' }, sources),
-		'Kickers and defenses rank in draft order from PPR drafts, Sep 9, with no projected points and no tiers.'
+		'Kickers and defenses the drafters take rank in their draft order from PPR drafts, Sep 9, with no projected points and no tiers.'
 	);
 	assert.equal(
 		marketBasis({}, sources),
-		'Kickers and defenses rank in draft order, with no projected points and no tiers.'
+		'Kickers and defenses the drafters take rank in their draft order, with no projected points and no tiers.'
 	);
 });
 

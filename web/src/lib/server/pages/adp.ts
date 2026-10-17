@@ -59,7 +59,7 @@ export async function adpPage(formatId: string): Promise<AdpPage> {
 		formats,
 		sources: all.sources.filter((source) => source.formats.includes(format.id)),
 		rows,
-		unpriced: loaded.rows.length + loaded.market.length - rows.length,
+		unpriced: loaded.rows.filter((row) => row.adp === null).length,
 		...boardStatuses(rows, capture, format)
 	};
 }
