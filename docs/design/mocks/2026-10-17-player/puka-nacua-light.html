@@ -1,0 +1,485 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Puka Nacua (Lane 66h mock, light)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500&family=Big+Shoulders+Display:wght@500;700;800&family=Outfit:wght@400;500;600;700&display=swap">
+<style>
+/* Commish tokens: the Press Box system with two bounded borrowings. One file, both themes.
+   Layout concept: a near-black or paper-white shell, an icon rail on the left, a persistent
+   search across the top, dense rows in the middle, a filter and sheet rail on the right.
+   Borrowed from Scout: a reading serif, allowed on the player page's prose and its pull figures only.
+   Borrowed from Broadcast: the score bug and the lower third, allowed in a live draft room only.
+   Light values live on bare :root. Dark redefines tokens only, twice, so the OS
+   setting and the explicit data-theme toggle both win. */
+
+:root {
+  /* Type. Outfit is the geometric UI face: Poppins's circles with a tighter set width,
+     so a dense row holds "Jaxon Smith-Njigba" at 15px without truncating.
+     Big Shoulders Display is the condensed number face, drawn from stadium and
+     transit lettering, narrow enough that 344.1 fits a 64px cell at display size. */
+  --font-ui: "Outfit", "Outfit Fallback", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --font-num: "Big Shoulders Display", "Big Shoulders Display Fallback", "Oswald", "Arial Narrow", sans-serif;
+  /* Newsreader is the reading face. Optical sizes cut for long screen reading, because the
+     capsule is writing. Allowed on the player page's prose block and its pull figures, nowhere else. */
+  --font-read: "Newsreader", "Newsreader Fallback", "Iowan Old Style", "Charter", Georgia, serif;
+  --t-read: 1.1875rem;  /* 19 capsule prose */
+  --t-pull: 2.75rem;    /* 44 a pull figure, the same step as --t-2xl */
+
+  /* Type scale, 1.2 ratio from a 14px base. Numbers use --font-num at the top three. */
+  --t-xs: 0.6875rem;   /* 11 labels on cells, uppercase, tracked */
+  --t-sm: 0.8125rem;   /* 13 secondary text */
+  --t-md: 0.9375rem;   /* 15 names, body in rows */
+  --t-lg: 1.125rem;    /* 18 section heads, prose */
+  --t-xl: 1.625rem;    /* 26 cell numbers in display face */
+  --t-head: 1.875rem; /* 30 a panel title in the display face */
+  --t-display: 2.375rem; /* 38 a page title in the display face */
+  --t-2xl: 2.75rem;    /* 44 tier cliffs, clock */
+  --t-3xl: 5.5rem;     /* 88 the one big number on a page */
+  --track-label: 0.08em;
+
+  /* Space and shape. Rows are 52px on desktop and 48 on the phone. Radii are small:
+     a press box is glass and steel, not pillows. */
+  --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px; --s-5: 24px; --s-6: 32px; --s-7: 48px;
+  --row-h: 52px;
+  --touch: 44px; /* the smallest target a thumb gets on a phone */
+  --tab-bar-h: 64px; /* the phone's tab bar, the rail laid along the bottom */
+  --rail-w: 84px;
+  --side-w: 296px;
+  --r-sm: 4px; --r-md: 8px; --r-pill: 999px;
+
+  /* Neutrals, light. True paper white with ink that leans a touch warm toward the
+     accent, so the greys read as chosen rather than default. */
+  --bg: #ffffff;
+  --surface: #f8f7f5;
+  --surface-2: #efedea;
+  --line: #e3dfda;
+  --line-strong: #cfc9c2;
+  --ink: #15120f;
+  --ink-2: #48413b;
+  --ink-3: #6b635c;      /* 5.9:1 on --bg */
+  --shell: #ffffff;      /* rail and top bar */
+  --shell-line: #e3dfda;
+
+  /* The one warm accent: burnt orange at hue 20. Streak amber (#E39A0E) sits at 38
+     and reads 2.3:1 as text on white, so it cannot carry a verb in light. This orange
+     holds 5:1 under white text and as text on paper, and stays clear of every tier hue.
+     It marks three things only: the brand, the one solid verb, and you. */
+  --accent: #c2470a;
+  --accent-ink: #ffffff;       /* text on an accent fill */
+  --accent-text: #b03f06;      /* accent used as text on --bg */
+  --accent-wash: #fdebe0;      /* your rows, your picks */
+  --focus: #c2470a;
+
+  /* Magnitude. Over replacement is tinted by the round it would go in on our board
+     of 400 (1 to 4, then none). Below replacement takes the rose wash and a minus. */
+  --heat-1: #a6e3bd;
+  --heat-2: #c8eed5;
+  --heat-3: #e0f5e7;
+  --heat-4: #f0faf3;
+  --heat-neg: #fbe1e4;
+  --heat-ink: #15120f;
+
+  /* Drafters versus us. Later is a gain for you, earlier is a cost. Always with the word. */
+  --gain-bg: #dcf3e4; --gain-ink: #11663a;
+  --loss-bg: #fbe1e4; --loss-ink: #a3243a;
+  /* A player's status on his face: injured reserve, a solid tag at the photo's top left. */
+  --status-ir-bg: #a3243a; --status-ir-ink: #ffffff;
+
+  /* Tiers run hot to cold down the board. Each band's label carries the tier number
+     and the drop to the next tier, so the colour is never the only channel. */
+  --tier-1: #c62a47;
+  --tier-2: #b8287f;
+  --tier-3: #7a3cb0;
+  --tier-4: #3a55b4;
+  --tier-5: #0f6f99;
+  --tier-6: #0b7a68;
+  --tier-7: #5b5a65;
+  --tier-ink: #ffffff;
+  --tier-wash: 9%;   /* how much of the tier hue tints its band */
+
+  /* The scoreboard: a lit board on black in both themes. In Commish it carries the draft room's
+     score bug and lower third, and nothing outside a live draft. The orange on it is the dark-theme
+     accent, so the brand reads the same on the board in either theme. */
+  --scoreboard: #15120f;
+  --scoreboard-2: #221d19;     /* a raised segment of the bug */
+  --scoreboard-line: #3a332d;  /* dividers between segments */
+  --scoreboard-ink: #f5f0ea;
+  --scoreboard-ink-2: #b9b0a7; /* labels on the board */
+  --scoreboard-num: #ff7130;
+  --scoreboard-num-ink: #170802; /* text on an orange segment of the bug */
+
+  --shadow-pop: 0 1px 2px rgb(21 18 15 / 0.06), 0 8px 24px rgb(21 18 15 / 0.08);
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #090807; --surface: #12100e; --surface-2: #1b1815; --line: #29241f; --line-strong: #3a332d;
+    --ink: #f5f0ea; --ink-2: #b9b0a7; --ink-3: #8f857c; --shell: #050404; --shell-line: #1e1a17;
+    --accent: #ff7130; --accent-ink: #170802; --accent-text: #ff8a4f; --accent-wash: #2a160b; --focus: #ff8a4f;
+    --heat-1: #1d6a3e; --heat-2: #17502f; --heat-3: #133a23; --heat-4: #10261a; --heat-neg: #43191f; --heat-ink: #f5f0ea;
+    --gain-bg: #12341f; --gain-ink: #6fdc99; --loss-bg: #3a161c; --loss-ink: #ff8f9f; --status-ir-bg: #ff8f9f; --status-ir-ink: #1a0a0d;
+    --tier-1: #cf3350; --tier-2: #c0338a; --tier-3: #8d52cc; --tier-4: #4b6ad6; --tier-5: #12789f; --tier-6: #0e8070; --tier-7: #6c6b78;
+    --tier-ink: #ffffff; --tier-wash: 16%;
+    --scoreboard: #000000; --scoreboard-2: #15120f; --scoreboard-line: #29241f; --scoreboard-ink: #f5f0ea; --scoreboard-ink-2: #b9b0a7; --scoreboard-num: #ff7130; --scoreboard-num-ink: #170802;
+    --shadow-pop: 0 1px 2px rgb(0 0 0 / 0.5), 0 10px 30px rgb(0 0 0 / 0.5);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #090807; --surface: #12100e; --surface-2: #1b1815; --line: #29241f; --line-strong: #3a332d;
+  --ink: #f5f0ea; --ink-2: #b9b0a7; --ink-3: #8f857c; --shell: #050404; --shell-line: #1e1a17;
+  --accent: #ff7130; --accent-ink: #170802; --accent-text: #ff8a4f; --accent-wash: #2a160b; --focus: #ff8a4f;
+  --heat-1: #1d6a3e; --heat-2: #17502f; --heat-3: #133a23; --heat-4: #10261a; --heat-neg: #43191f; --heat-ink: #f5f0ea;
+  --gain-bg: #12341f; --gain-ink: #6fdc99; --loss-bg: #3a161c; --loss-ink: #ff8f9f; --status-ir-bg: #ff8f9f; --status-ir-ink: #1a0a0d;
+  --tier-1: #cf3350; --tier-2: #c0338a; --tier-3: #8d52cc; --tier-4: #4b6ad6; --tier-5: #12789f; --tier-6: #0e8070; --tier-7: #6c6b78;
+  --tier-ink: #ffffff; --tier-wash: 16%;
+    --scoreboard: #000000; --scoreboard-2: #15120f; --scoreboard-line: #29241f; --scoreboard-ink: #f5f0ea; --scoreboard-ink-2: #b9b0a7; --scoreboard-num: #ff7130; --scoreboard-num-ink: #170802;
+  --shadow-pop: 0 1px 2px rgb(0 0 0 / 0.5), 0 10px 30px rgb(0 0 0 / 0.5);
+  color-scheme: dark;
+}
+
+
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-ui);font-size:var(--t-md);line-height:1.4;
+  -webkit-font-smoothing:antialiased}
+a{color:inherit}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.num{font-family:var(--font-num);font-variant-numeric:tabular-nums;letter-spacing:0.01em}
+.label{font-size:var(--t-xs);text-transform:uppercase;letter-spacing:var(--track-label);color:var(--ink-3);font-weight:500}
+.app{display:grid;grid-template-columns:var(--rail-w) minmax(0,1fr);min-height:100vh}
+.rail{position:sticky;top:0;height:100vh;background:var(--shell);border-right:1px solid var(--shell-line);
+  display:flex;flex-direction:column;align-items:stretch;gap:var(--s-1);padding-block:var(--s-4)}
+.mark{display:grid;place-items:center;height:56px;margin-bottom:var(--s-3);text-decoration:none}
+.mark b{font-family:var(--font-num);font-weight:800;font-size:30px;line-height:1;color:var(--ink);
+  border-bottom:4px solid var(--accent);padding-bottom:2px}
+.rail a.item{display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 4px;text-decoration:none;
+  color:var(--ink-3);font-size:var(--t-xs);font-weight:500;text-align:center;border-left:3px solid transparent}
+.rail a.item:hover{color:var(--ink)}
+.rail a.item[aria-current="page"]{color:var(--accent-text);border-left-color:var(--accent)}
+.rail .spacer{flex:1}
+.main{min-width:0;display:flex;flex-direction:column}
+.top{position:sticky;top:0;z-index:5;background:var(--shell);border-bottom:1px solid var(--shell-line);
+  display:flex;align-items:center;gap:var(--s-4);padding:var(--s-3) var(--s-5);min-height:68px}
+.top h1{margin:0;font-size:var(--t-lg);font-weight:700;white-space:nowrap}
+.search{flex:1;max-width:620px;display:flex;align-items:center;gap:var(--s-2);height:42px;padding:0 var(--s-3);
+  border:1px solid var(--line-strong);border-radius:var(--r-md);background:var(--surface);color:var(--ink-3)}
+.search input{flex:1;min-width:0;border:0;background:transparent;font:inherit;color:var(--ink);outline:none}
+.search input::placeholder{color:var(--ink-3)}
+.search kbd{font-family:var(--font-ui);font-size:var(--t-xs);border:1px solid var(--line-strong);border-radius:var(--r-sm);padding:1px 6px}
+.top .tail{margin-left:auto;display:flex;align-items:center;gap:var(--s-3)}
+.quiet{display:inline-flex;align-items:center;gap:6px;height:38px;padding:0 var(--s-3);border-radius:var(--r-md);
+  border:1px solid var(--line-strong);background:transparent;cursor:pointer;font-size:var(--t-sm);font-weight:500;color:var(--ink-2);text-decoration:none}
+.quiet:hover{color:var(--ink);border-color:var(--ink-3)}
+.theme{display:flex;gap:2px;padding:3px;border:1px solid var(--line-strong);border-radius:var(--r-md);background:var(--surface)}
+.theme button{height:30px;padding:0 10px;border:0;border-radius:var(--r-sm);background:transparent;cursor:pointer;
+  font-size:var(--t-sm);font-weight:500;color:var(--ink-2)}
+.theme button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.verb{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:42px;padding:0 var(--s-5);
+  border:0;border-radius:var(--r-md);background:var(--accent);color:var(--accent-ink);font-weight:700;font-size:var(--t-md);
+  cursor:pointer;text-decoration:none;white-space:nowrap}
+.verb:hover{filter:brightness(1.06)}
+.chips{display:flex;flex-wrap:wrap;gap:var(--s-2);align-items:center}
+.chip{height:32px;padding:0 var(--s-3);border-radius:var(--r-pill);border:1px solid var(--line-strong);background:transparent;
+  font-size:var(--t-sm);font-weight:500;color:var(--ink-2);cursor:pointer;white-space:nowrap}
+.chip[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--bg)}
+.chip-group{display:flex;gap:4px;padding:3px;border:1px solid var(--line);border-radius:var(--r-pill);background:var(--surface)}
+.chip-group .chip{border-color:transparent;height:28px}
+.face{flex:none;border-radius:50%;background:var(--surface-2);overflow:hidden;display:grid;place-items:end center}
+.face img{width:140%;max-width:none;height:auto;display:block;transform:translateY(6%)}
+.pos{display:inline-flex;align-items:center;height:20px;padding:0 7px;border-radius:var(--r-sm);
+  background:var(--surface-2);color:var(--ink);font-size:var(--t-xs);font-weight:700;letter-spacing:0.04em;white-space:nowrap}
+.tier-chip{display:inline-flex;align-items:center;height:20px;padding:0 7px;border-radius:var(--r-sm);
+  color:var(--tier-ink);font-size:var(--t-xs);font-weight:700;letter-spacing:0.04em}
+.t1{--tier:var(--tier-1)}.t2{--tier:var(--tier-2)}.t3{--tier:var(--tier-3)}.t4{--tier:var(--tier-4)}
+.t5{--tier:var(--tier-5)}.t6{--tier:var(--tier-6)}.t7{--tier:var(--tier-7)}
+.tier-chip{background:var(--tier)}
+.heat-1{background:var(--heat-1)}.heat-2{background:var(--heat-2)}.heat-3{background:var(--heat-3)}
+.heat-4{background:var(--heat-4)}.heat-neg{background:var(--heat-neg)}.heat-0{background:transparent}
+.gap{display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:var(--r-sm);font-size:var(--t-sm);font-weight:600;white-space:nowrap}
+.gap.later{background:var(--gain-bg);color:var(--gain-ink)}
+.gap.earlier{background:var(--loss-bg);color:var(--loss-ink)}
+.gap.even{background:var(--surface-2);color:var(--ink-2)}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md)}
+@media (max-width: 760px){
+  :root{--row-h:48px}
+  .app{grid-template-columns:minmax(0,1fr);padding-bottom:64px}
+  .rail{position:fixed;inset:auto 0 0 0;top:auto;height:auto;z-index:20;flex-direction:row;justify-content:space-around;
+    padding:4px 4px calc(4px + env(safe-area-inset-bottom,0px));border-right:0;border-top:1px solid var(--shell-line)}
+  .rail .mark,.rail .spacer,.rail a.item.wide-only{display:none}
+  .rail a.item{border-left:0;border-top:3px solid transparent;padding:6px 2px;flex:1}
+  .rail a.item[aria-current="page"]{border-top-color:var(--accent)}
+  .top{padding:var(--s-2) var(--s-4);gap:var(--s-2);flex-wrap:wrap;min-height:0}
+  .top h1{display:none}
+  .top .search{order:3;flex-basis:100%;max-width:none;height:38px}
+  .top .tail{margin-left:auto}
+  .search kbd{display:none}
+  .theme button{height:26px;padding:0 7px;font-size:var(--t-xs)}
+}
+/* The league switch closes the top bar at the right on every width: the selected league's name (or
+   the format with none) at one width, so the bar never moves when the name arrives. */
+.switch{position:relative;display:flex;flex:none;min-width:0}
+.switch>button{display:inline-flex;align-items:center;gap:var(--s-2);width:232px;height:40px;padding:0 var(--s-3);
+  border:1px solid var(--line-strong);border-radius:var(--r-md);background:var(--surface);font-size:var(--t-sm);
+  font-weight:600;text-align:left;cursor:pointer}
+.switch>button[aria-expanded="true"]{border-color:var(--ink)}
+.switch>button .flag{display:inline-flex;color:var(--accent-text)}
+.switch>button .words{flex:1;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.switch>button .chev{display:inline-flex;color:var(--ink-3)}
+.switch-menu{position:absolute;top:calc(100% + var(--s-2));right:0;z-index:30;width:360px;display:flex;flex-direction:column;
+  gap:var(--s-3);padding:var(--s-3);border:1px solid var(--line-strong);border-radius:var(--r-md);background:var(--bg);
+  box-shadow:var(--shadow-pop)}
+.switch-menu .lg{display:flex;flex-direction:column;gap:2px;width:100%;padding:var(--s-2) var(--s-3);border:0;
+  border-left:3px solid transparent;border-radius:var(--r-sm);background:none;text-align:left;cursor:pointer}
+.switch-menu .lg[aria-pressed="true"]{border-left-color:var(--accent);background:var(--surface)}
+.switch-menu .lg b{font-weight:600}
+.switch-menu .lg small{font-size:var(--t-sm);color:var(--ink-2)}
+.switch-menu .foot{display:flex;flex-direction:column;align-items:flex-start;gap:var(--s-2);padding-top:var(--s-3);
+  border-top:1px solid var(--line)}
+@media (max-width: 760px){
+  .top .switch{order:2;flex:1}
+  .top .switch>button{width:100%}
+  .switch-menu{position:fixed;top:60px;left:var(--s-3);right:var(--s-3);width:auto}
+}
+@media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
+
+
+.top .quiet{font-weight:600;color:var(--ink)}
+.mx{display:flex;flex-direction:column;gap:var(--s-5);padding:var(--s-4) var(--s-5) var(--s-7);max-width:1320px}
+.mocknote{margin:0;padding:var(--s-2) var(--s-3);border:1px dashed var(--line-strong);border-radius:var(--r-md);font-size:var(--t-xs);color:var(--ink-3);line-height:1.5}
+.mocknote .short{display:none}
+.si{text-decoration:underline dotted;text-decoration-color:color-mix(in srgb,currentColor 55%,transparent);text-underline-offset:3px;text-decoration-thickness:1.5px}
+.crumb{display:flex;gap:6px;font-size:var(--t-sm);color:var(--ink-3)}
+.crumb a{color:var(--ink-2);text-decoration:none}
+.dash{color:var(--ink-3);font-weight:600}
+.vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+
+/* The card: who he is, his next game, the one verb, then the tiles. */
+.card{border:1px solid var(--line);border-radius:var(--r-md);background:var(--surface);overflow:hidden}
+.hd{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;align-items:center;gap:var(--s-5);padding:var(--s-4) var(--s-5)}
+.hd .face{width:104px;height:104px}
+.mark-face{background:transparent!important;place-items:center!important}
+.mark-face img{width:100%!important;transform:none!important}
+.id h2{margin:0;font-family:var(--font-num);font-weight:800;font-size:var(--t-display);line-height:.95;text-transform:uppercase;letter-spacing:.01em}
+.id .sub{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px}
+.club{display:inline-flex;align-items:center;gap:6px;font-size:var(--t-sm);color:var(--ink-2);font-weight:500;text-decoration:none}
+.club img{width:20px;height:20px}
+.tchip{display:inline-flex;align-items:center;height:20px;padding:0 7px;border-radius:var(--r-sm);font-size:var(--t-xs);font-weight:600;white-space:nowrap}
+.tchip.even{background:var(--surface-2);color:var(--ink-2)}
+.holder{margin:8px 0 0;font-size:var(--t-sm);color:var(--ink-2)}
+.holder b{color:var(--ink);font-weight:600}
+.next{display:flex;flex-direction:column;gap:3px;padding-left:var(--s-5);border-left:1px solid var(--line);min-width:220px}
+.next .wk{font-size:var(--t-xs);font-weight:700;text-transform:uppercase;letter-spacing:var(--track-label);color:var(--accent-text)}
+.opp{display:flex;gap:6px;font-size:var(--t-md)}
+.opp b{font-weight:700}
+.opp span{color:var(--ink-2);font-variant-numeric:tabular-nums}
+.facts{display:flex;gap:var(--s-2);align-items:center;font-size:var(--t-xs);color:var(--ink-3);font-variant-numeric:tabular-nums}
+.facts .exp{font-family:var(--font-num);font-size:var(--t-md);font-weight:600;color:var(--ink-2);letter-spacing:.02em}
+.facts .wx{display:inline-flex;align-items:center;gap:3px}
+.act{display:flex;flex-direction:column;align-items:stretch;gap:var(--s-2);min-width:200px}
+.act .quiet{justify-content:center}
+
+.tiles{display:grid;grid-template-columns:repeat(var(--n,6),minmax(0,1fr));border-top:1px solid var(--line);background:var(--bg)}
+.tile{display:flex;flex-direction:column;gap:4px;padding:var(--s-3) var(--s-4);border-left:1px solid var(--line);min-width:0}
+.tile:first-child{border-left:0}
+.tile .lb{font-size:var(--t-xs);font-weight:700;text-transform:uppercase;letter-spacing:var(--track-label);color:var(--ink-3);white-space:nowrap}
+.tile .v{font-family:var(--font-num);font-weight:800;font-size:var(--t-2xl);line-height:1;font-variant-numeric:tabular-nums;color:var(--ink)}
+.tile.lead .v{color:var(--accent-text)}
+.tile.quiet-v .v{color:var(--ink-2);font-size:var(--t-xl);font-weight:700}
+.tile .cap{font-size:var(--t-xs);color:var(--ink-3);line-height:1.35}
+.rk{display:inline-flex;align-items:center;padding:0 6px;border-radius:var(--r-sm)}
+.rk.easy{background:var(--gain-bg);color:var(--gain-ink)}
+.rk.hard{background:var(--loss-bg);color:var(--loss-ink)}
+
+/* Compare: one other player's tiles as a second row of the same columns. */
+.cmp{display:flex;flex-direction:column;gap:var(--s-2)}
+.cmp-head{display:flex;align-items:center;gap:var(--s-3);flex-wrap:wrap}
+.cmp-head h3,.sec-head h3{margin:0;font-size:var(--t-xs);font-weight:700;text-transform:uppercase;letter-spacing:var(--track-label);color:var(--ink-3)}
+.pick{display:inline-flex;align-items:center;gap:8px;height:34px;padding:0 6px 0 4px;border:1px solid var(--line-strong);border-radius:var(--r-pill);background:var(--surface);font-size:var(--t-sm);font-weight:600}
+.pick .face{width:26px;height:26px}
+.pick button{display:grid;place-items:center;width:24px;height:24px;border:0;border-radius:50%;background:var(--surface-2);color:var(--ink-2);cursor:pointer}
+.cmp-say{margin-left:auto;font-size:var(--t-sm);color:var(--ink-2);font-variant-numeric:tabular-nums}
+.cmp-say b{color:var(--ink)}
+
+table.box{width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);overflow:hidden}
+.box th,.box td{padding:0 var(--s-2);border-bottom:1px solid var(--line);vertical-align:middle;white-space:nowrap}
+.box tr.grp th{height:24px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:var(--track-label);color:var(--ink-3);background:var(--bg);text-align:center;border-bottom:0}
+.box tr.cols th{height:30px;font-size:var(--t-xs);font-weight:600;text-transform:uppercase;letter-spacing:var(--track-label);color:var(--ink-3);text-align:left;background:var(--bg)}
+.box th.n,.box td.n{text-align:right}
+.box .g{border-left:1px solid var(--line)}
+.box tbody tr{height:var(--row-h)}
+.box td.n{font-family:var(--font-num);font-weight:600;font-size:var(--t-lg);color:var(--ink-2);font-variant-numeric:tabular-nums}
+.box td.pts{font-weight:700;font-size:var(--t-xl);color:var(--ink)}
+.box td.proj{font-weight:700;font-size:var(--t-lg);color:var(--ink-2)}
+.box td.wk{font-family:var(--font-num);font-weight:700;font-size:var(--t-md);color:var(--ink-2);padding-left:var(--s-3)}
+.box td.op{font-size:var(--t-sm)}
+.box td.op b{font-weight:700}
+.res{font-size:var(--t-sm);color:var(--ink-2);font-variant-numeric:tabular-nums}
+.res i{font-style:normal;font-weight:700;margin-right:4px}
+.res i.w{color:var(--gain-ink)}
+.res i.l{color:var(--loss-ink)}
+.box td.dnp{font-size:var(--t-sm);color:var(--ink-3);font-style:normal}
+.box tr.dnp-row td{height:40px}
+.box tr.nextrow td{background:color-mix(in srgb,var(--accent) 7%,var(--surface))}
+.box tr.nextrow td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
+.box tr.nextrow td.proj{color:var(--accent-text);font-size:var(--t-xl)}
+.box td.gfacts{font-size:var(--t-sm);color:var(--ink-2)}
+.box tr.totals td{height:56px;background:var(--scoreboard);color:var(--scoreboard-ink);border-bottom:0}
+.box tr.totals td.n{color:var(--scoreboard-ink);font-weight:700}
+.box tr.totals td.pts{color:var(--scoreboard-num);font-size:var(--t-2xl);font-weight:800}
+.box tr.totals .tl{font-family:var(--font-num);font-weight:800;text-transform:uppercase;letter-spacing:.06em;font-size:var(--t-lg)}
+.box tr.totals .tl small{display:block;font-family:var(--font-ui);font-size:var(--t-xs);font-weight:500;letter-spacing:0;text-transform:none;color:var(--scoreboard-ink-2)}
+.box tr.sect td{height:32px;font-size:var(--t-xs);font-weight:700;text-transform:uppercase;letter-spacing:var(--track-label);color:var(--ink-3);background:var(--bg);padding-left:var(--s-3)}
+.box tr.prior td{height:44px}
+.box tr.prior td.wk{font-size:var(--t-md);color:var(--ink)}
+.box tr.prior .open{display:inline-grid;place-items:center;width:22px;height:22px;margin-right:6px;border:1px solid var(--line-strong);border-radius:var(--r-sm);vertical-align:-5px;color:var(--ink-2)}
+.box .face{width:30px;height:30px}
+.box td.who{white-space:nowrap}
+.box td.who .pl{display:flex;align-items:center;gap:var(--s-2)}
+.box td.who b{font-weight:600;font-size:var(--t-md)}
+.box td.who small{font-size:var(--t-xs);color:var(--ink-3);margin-left:4px}
+.box tr.better td.win{color:var(--accent-text)}
+.box td.win{color:var(--accent-text)!important}
+.box td.rkc .rk{min-width:44px;justify-content:flex-end;height:24px}
+
+.sec-head{display:flex;align-items:baseline;gap:var(--s-3)}
+.sec-head .aside{margin-left:auto;font-size:var(--t-xs);text-transform:uppercase;letter-spacing:var(--track-label);color:var(--ink-3)}
+.log{display:flex;flex-direction:column;gap:var(--s-2)}
+.ahead{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:0 var(--s-4);margin:0;padding:0;list-style:none}
+.ahead li{display:flex;gap:8px;align-items:baseline;height:30px;border-bottom:1px solid var(--line);font-size:var(--t-sm);color:var(--ink-2);white-space:nowrap}
+.ahead li span:first-child{font-family:var(--font-num);font-weight:700;color:var(--ink-3);min-width:34px}
+.ahead li b{font-weight:600;color:var(--ink)}
+.ahead li em{margin-left:auto;font-style:normal;color:var(--ink-3);font-size:var(--t-xs)}
+.ahead li.bye b{color:var(--ink-3);font-weight:700;text-transform:uppercase;font-size:var(--t-xs);letter-spacing:var(--track-label)}
+
+/* The read: the writer's prose in the reading face, then the slot the weekly why will fill. */
+.split{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:var(--s-6);align-items:start}
+.read h3{margin:0 0 4px;font-size:var(--t-xs);font-weight:700;text-transform:uppercase;letter-spacing:var(--track-label);color:var(--ink-3)}
+.read .stamp{margin:0 0 var(--s-3);font-size:var(--t-xs);color:var(--ink-3)}
+.prose{font-family:var(--font-read);font-optical-sizing:auto;max-width:68ch}
+.prose p{margin:0 0 1em;font-size:var(--t-read);line-height:1.62;color:var(--ink)}
+.prose p.lead{font-size:1.375rem;line-height:1.5}
+.unwritten{margin:0 0 var(--s-3);color:var(--ink-2);font-size:var(--t-md)}
+.built{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px;font-size:var(--t-sm);color:var(--ink-2)}
+.built li{padding-left:14px;position:relative}
+.built li::before{content:"";position:absolute;left:0;top:.6em;width:6px;height:6px;border-radius:50%;background:var(--line-strong)}
+.why-slot{border:1px dashed var(--line-strong);border-radius:var(--r-md);padding:var(--s-3) var(--s-4);display:flex;flex-direction:column;gap:6px}
+.why-slot h3{margin:0;font-size:var(--t-xs);font-weight:700;text-transform:uppercase;letter-spacing:var(--track-label);color:var(--ink-3)}
+.why-slot p{margin:0;font-size:var(--t-sm);color:var(--ink-2);line-height:1.5}
+.basis{display:flex;flex-direction:column;gap:2px;max-width:1000px}
+.basis p{margin:0;font-size:var(--t-sm);color:var(--ink-3);line-height:1.5}
+.credit{margin:0;font-size:var(--t-xs);color:var(--ink-3)}
+.credit a{color:var(--ink-2)}
+.ph{display:none}
+.ls{display:none}
+
+@media (max-width: 1180px){
+  .hd{grid-template-columns:auto minmax(0,1fr) auto}
+  .act{grid-column:1 / -1;flex-direction:row}
+  .act .verb{flex:1}
+}
+@media (max-width: 760px){
+  .mx{padding:var(--s-3) var(--s-3) calc(var(--tab-bar-h) + 92px);gap:var(--s-4)}
+  .mocknote{font-size:10px}
+  .mocknote .long{display:none}
+  .mocknote .short{display:inline}
+  .crumb{display:none}
+  .hd{grid-template-columns:auto minmax(0,1fr);gap:var(--s-3);padding:var(--s-3)}
+  .hd .face{width:72px;height:72px}
+  .id h2{font-size:var(--t-head)}
+  .holder{font-size:var(--t-xs)}
+  .next{grid-column:1 / -1;border-left:0;border-top:1px solid var(--line);padding:var(--s-2) 0 0;min-width:0;flex-direction:row;flex-wrap:wrap;align-items:baseline;gap:4px 10px}
+  .next .wk{flex-basis:100%}
+  .act{position:fixed;left:var(--s-3);right:var(--s-3);bottom:calc(var(--tab-bar-h) + var(--s-2));z-index:6;flex-direction:row;min-width:0;
+    padding:var(--s-2);border-radius:var(--r-md);background:var(--shell);border:1px solid var(--line-strong);box-shadow:var(--shadow-pop)}
+  .act .verb{flex:1}
+  .act .quiet{flex:none}
+  .tiles{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .tile{padding:var(--s-2) var(--s-3);border-top:1px solid var(--line)}
+  .tile:nth-child(3n+1){border-left:0}
+  .tile:nth-child(-n+3){border-top:0}
+  .tile .v{font-size:var(--t-xl)}
+  .tile .lb{font-size:10px}
+  .tile .cap{font-size:11px}
+  .cmp-say{margin-left:0;flex-basis:100%;font-size:var(--t-xs)}
+  .box{table-layout:auto}
+  .box colgroup,.box tr.grp{display:none}
+  .lw{display:none}
+  .ls{display:inline}
+  .box .g{border-left:0}
+  .box th,.box td{padding:0 5px}
+  .box tr.cols th{white-space:normal;line-height:1.1;padding-block:4px}
+  .box td.who .face{display:none}
+  .box td.who b{font-size:var(--t-sm)}
+  .box .wide,.box .wide *{display:none}
+  .box td.wk{padding-left:var(--s-2)}
+  .box tbody tr{height:auto}
+  .box tbody td{padding-block:7px}
+  .box td.pts{font-size:var(--t-lg)}
+  .box td.n{font-size:var(--t-md)}
+  .box tr.totals td.pts{font-size:var(--t-xl)}
+  .box tr.totals .tl{font-size:var(--t-sm)}
+  .box td.op{white-space:nowrap}
+  .box tr.totals .tl small{white-space:normal;max-width:120px}
+  .box tr.prior .ph{white-space:normal;max-width:120px}
+  .sec-head{flex-wrap:wrap}
+  .sec-head .aside{margin-left:0}
+  .box td.dnp{white-space:normal}
+  .ph{display:block;font-size:11px;color:var(--ink-3);margin-top:1px}
+  .ahead{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .split{grid-template-columns:minmax(0,1fr);gap:var(--s-4)}
+  .prose p,.prose p.lead{font-size:1.0625rem}
+  .basis p{font-size:var(--t-xs)}
+}
+@media (max-width: 760px){.box td.op .ph{white-space:normal;max-width:130px}.box tr.nextrow td.proj{font-size:var(--t-lg)}}
+</style>
+</head>
+<body>
+<div class="app">
+<nav class="rail" aria-label="Sections"><a class="mark" href="#" aria-label="Commish"><b>C</b></a><a class="item" href="#"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3l-5 4 2 3 2-1v12h10V9l2 1 2-3-5-4c0 2-1.5 3-4 3S8 5 8 3z"/></svg><span>Lineup</span></a><a class="item" href="#"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="3"/><circle cx="16" cy="8" r="3"/><path d="M2 20c.8-3 3-5 6-5s5.2 2 6 5M14 15c3 0 5.2 2 6 5"/></svg><span>Matchup</span></a><a class="item" href="#"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10" cy="8" r="4"/><path d="M3 21c1.2-3.6 3.8-6 7-6 1.5 0 2.9.5 4 1.4M18 12v6M15 15h6"/></svg><span>Waivers</span></a><a class="item" href="#"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h14l-3-3M20 16H6l3 3"/></svg><span>Trades</span></a><a class="item" href="#" aria-current=page><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg><span>Players</span></a><a class="item wide-only" href="#"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 11h12M4 16h8"/></svg><span>Rest of season</span></a><a class="item wide-only" href="#"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg><span>Our record</span></a><span class="spacer"></span><a class="item wide-only" href="#"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M6.5 18c1.5-2 3.4-3 5.5-3s4 1 5.5 3"/></svg><span>Account</span></a></nav>
+<div class="main">
+<header class="top"><h1>Puka Nacua</h1><div class="tail"><button type="button" class="quiet"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d='M5 21V4M5 4h13l-3 4.5L18 13H5'/></svg><span>McConkey Kong Country</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d='M6 9l6 6 6-6'/></svg></button></div></header>
+<main class="mx">
+  <p class="mocknote"><span class="long">Mock for Lane 66h. Figures with a dotted underline are stand-ins. Real: his 2026 weeks, points, snaps and earlier seasons, Avg and its rank, Arizona's rank against receivers through week 5, Collins's Avg and Last, the results, the game facts, the league and who holds him, and the read, which is the writer's newest text. Stand-ins: Proj and its change (the store holds no week 6 projection for him), and rest of season (the run on main has no rest-of-season figures).</span><span class="short">Mock. Dotted figures are stand-ins, named on the desk shot.</span></p>
+  <nav class="crumb"><a href="#">Players</a><span>/</span><a href="#">WR</a><span>/</span><span>Puka Nacua</span></nav>
+  <section class="card" aria-label="Puka Nacua">
+  <div class="hd">
+    <span class="face" style="width:104px;height:104px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/4426515.png" alt="" width="104" height="104"></span>
+    <div class="id"><h2>Puka Nacua</h2>
+      <div class="sub"><a class="club" href="#"><img src="https://a.espncdn.com/i/teamlogos/nfl/500/lar.png" alt="" width="20" height="20">Los Angeles Rams</a><span class="pos">WR</span></div>
+      <p class="holder">On <b>Nacua Matata</b>'s roster in your Sleeper league.</p></div>
+    <div class="next"><span class="wk">Week 6</span><span class="opp"><b>vs ARI</b><span>Sun 3:05 pm</span></span>
+      <span class="facts"><span class="exp">32.5 to 20</span><span class="wx"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 19h18M5 19v-5a7 7 0 0 1 14 0v5"/></svg>Indoors</span></span></div>
+    <div class="act"><button type="button" class="verb"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h14l-3-3M20 16H6l3 3"/></svg>Trade for him</button>
+      <button type="button" class="quiet"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4v16M15 4v16M4 9h5M15 15h5"/></svg>Compare</button></div>
+  </div>
+  <div class="tiles" style="--n:6"><div class="tile lead"><span class="lb">Proj</span><span class="v"><span class="si">21.8</span></span><span class="cap">Week 6, PPR</span></div><div class="tile "><span class="lb">Rest of season</span><span class="v"><span class="si">23.1</span></span><span class="cap">a game, <span class="si">254.1</span> from week 6, <span class="si">WR1</span> in our order</span></div><div class="tile "><span class="lb">Opp rank</span><span class="v"><span class="rk easy">26th</span></span><span class="cap">ARI against receivers</span></div><div class="tile "><span class="lb">Avg</span><span class="v">25.9</span><span class="cap">a game in 3 games, WR2</span></div><div class="tile "><span class="lb">Last</span><span class="v">37.7</span><span class="cap">week 5 vs BUF</span></div><div class="tile quiet-v"><span class="lb">&Delta; Proj</span><span class="v"><span class="si">+0.4</span></span><span class="cap">since Thu 9:00 pm</span></div></div>
+</section>
+  <section class="cmp" aria-label="Compare">
+  <div class="cmp-head"><h3>Compare</h3>
+    <span class="pick"><span class="face" style="width:26px;height:26px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/4258173.png" alt="" width="26" height="26"></span>Nico Collins<button type="button" aria-label="Clear"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></span>
+    <span class="cmp-say"><b>Nacua</b> by <span class="si">6.7</span> Proj this week and <span class="si">5.7</span> a game rest of season</span></div>
+  <table class="box" aria-label="Nacua and Collins"><colgroup><col><col style="width:96px"><col style="width:150px"><col style="width:120px"><col style="width:96px"><col style="width:96px"><col class="wide" style="width:96px"></colgroup><thead><tr class="cols"><th>Player</th><th class="n">Proj</th><th class="n">Rest of season</th><th class="n">Opp rank</th><th class="n">Avg</th><th class="n">Last</th><th class="n wide">&Delta; Proj</th></tr></thead><tbody><tr><td class="who"><span class="pl"><span class="face" style="width:30px;height:30px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/4426515.png" alt="" width="30" height="30"></span><b>Puka Nacua</b><small class="wide">LAR vs ARI</small></span></td><td class="n win"><span class="si">21.8</span></td><td class="n win"><span class="si">23.1</span></td><td class="n rkc"><span class="rk easy">26th</span></td><td class="n win">25.9</td><td class="n win">37.7</td><td class="n wide"><span class="si">+0.4</span></td></tr><tr><td class="who"><span class="pl"><span class="face" style="width:30px;height:30px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/4258173.png" alt="" width="30" height="30"></span><b>Nico Collins</b><small class="wide">HOU at JAX</small></span></td><td class="n"><span class="si">15.1</span></td><td class="n"><span class="si">17.4</span></td><td class="n rkc"><span class="rk easy">25th</span></td><td class="n">20.9</td><td class="n">10.6</td><td class="n wide"><span class="si">&minus;0.2</span></td></tr></tbody></table>
+</section>
+  <section class="log" aria-label="This season">
+    <div class="sec-head"><h3>This season</h3><span class="aside">2026, PPR, through week 5</span></div>
+    <table class="box" aria-label="Puka Nacua week by week, 2026"><colgroup><col style="width:56px"><col style="width:120px"><col class="wide" style="width:96px"><col style="width:64px"><col style="width:72px"><col class=wide style="width:52px"><col style="width:52px"><col style="width:60px"><col style="width:48px"><col class=wide style="width:52px"><col class=wide style="width:56px"><col class=wide style="width:48px"><col class=wide style="width:72px"></colgroup><thead><tr class="grp"><th colspan="5"></th><th colspan="4" class="g">Receiving</th><th colspan="3" class="g wide">Rushing</th><th colspan="1" class=" wide"></th></tr><tr class="cols"><th>Wk</th><th>Opp</th><th class="wide">Result</th><th class="n">Proj</th><th class="n">Pts</th><th class="n g wide">Tgt</th><th class="n">Rec</th><th class="n">Yds</th><th class="n">TD</th><th class="n g wide">Car</th><th class="n wide">Yds</th><th class="n wide">TD</th><th class="n wide">Snap %</th></tr></thead><tbody><tr><td class="wk">1</td><td class="op"><b>vs SF</b><span class="ph"><span class="res"><i class="l">L</i>7-27</span></span></td><td class="wide"><span class="res"><i class="l">L</i>7-27</span></td><td class="n proj"><span class="dash">--</span></td><td class="n pts">12.4</td><td class="n g wide">9</td><td class="n">5</td><td class="n">74</td><td class="n">0</td><td class="n g wide">0</td><td class="n wide">0</td><td class="n wide">0</td><td class="n wide">70%</td></tr><tr class="dnp-row"><td class="wk">2</td><td class="op"><b>vs NYG</b><span class="ph"><span class="res"><i class="w">W</i>28-6</span>, did not play</span></td><td class="wide"><span class="res"><i class="w">W</i>28-6</span></td><td class="n proj"><span class="dash">--</span></td><td class="dnp wide" colspan="9">Did not play</td></tr><tr class="dnp-row"><td class="wk">3</td><td class="op"><b>at DEN</b><span class="ph"><span class="res"><i class="l">L</i>26-30</span>, did not play</span></td><td class="wide"><span class="res"><i class="l">L</i>26-30</span></td><td class="n proj"><span class="dash">--</span></td><td class="dnp wide" colspan="9">Did not play</td></tr><tr><td class="wk">4</td><td class="op"><b>at PHI</b><span class="ph"><span class="res"><i class="w">W</i>24-20</span></span></td><td class="wide"><span class="res"><i class="w">W</i>24-20</span></td><td class="n proj"><span class="dash">--</span></td><td class="n pts">27.7</td><td class="n g wide">12</td><td class="n">9</td><td class="n">125</td><td class="n">0</td><td class="n g wide">1</td><td class="n wide">2</td><td class="n wide">1</td><td class="n wide">90%</td></tr><tr><td class="wk">5</td><td class="op"><b>vs BUF</b><span class="ph"><span class="res"><i class="l">L</i>34-37</span></span></td><td class="wide"><span class="res"><i class="l">L</i>34-37</span></td><td class="n proj"><span class="dash">--</span></td><td class="n pts">37.7</td><td class="n g wide">24</td><td class="n">17</td><td class="n">138</td><td class="n">1</td><td class="n g wide">2</td><td class="n wide">9</td><td class="n wide">0</td><td class="n wide">85%</td></tr><tr class="nextrow"><td class="wk">6</td><td class="op"><b>vs ARI</b><span class="ph">Sun 3:05 pm, 32.5 to 20</span></td><td class="wide res">Sun 3:05 pm</td><td class="n proj"><span class="si">21.8</span></td><td class="n pts"><span class="dash">--</span></td><td class="gfacts wide" colspan="8"><span class="facts"><span class="exp">32.5 to 20</span><span class="wx"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 19h18M5 19v-5a7 7 0 0 1 14 0v5"/></svg>Indoors</span></span></td></tr><tr class="totals"><td colspan="2"><span class="tl">Season<small>3 games, 25.9 a game</small></span></td><td class="wide"></td><td class="n"></td><td class="n pts">77.8</td><td class="n g wide">45</td><td class="n">31</td><td class="n">337</td><td class="n">1</td><td class="n g wide">3</td><td class="n wide">11</td><td class="n wide">1</td><td class="n wide">83%</td></tr></tbody><tbody class="lower"><tr class="sect"><td colspan="2">Earlier seasons</td><td class="wide" colspan="11"></td></tr><tr class="prior"><td class="wk" colspan="2"><span class="open"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></span>2025<span class="ph">16 games, 23.4 a game</span></td><td class="wide res">16 games, 23.4 a game</td><td class="n"></td><td class="n pts">375.0</td><td class="n g wide">166</td><td class="n">129</td><td class="n">1715</td><td class="n">10</td><td class="n g wide">10</td><td class="n wide">105</td><td class="n wide">1</td><td class="n wide">68%</td></tr><tr class="prior"><td class="wk" colspan="2"><span class="open"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></span>2024<span class="ph">11 games, 18.8 a game</span></td><td class="wide res">11 games, 18.8 a game</td><td class="n"></td><td class="n pts">206.6</td><td class="n g wide">106</td><td class="n">79</td><td class="n">990</td><td class="n">3</td><td class="n g wide">11</td><td class="n wide">46</td><td class="n wide">1</td><td class="n wide"><span class="dash">--</span></td></tr><tr class="prior"><td class="wk" colspan="2"><span class="open"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></span>2023<span class="ph">17 games, 17.6 a game</span></td><td class="wide res">17 games, 17.6 a game</td><td class="n"></td><td class="n pts">298.5</td><td class="n g wide">160</td><td class="n">105</td><td class="n">1486</td><td class="n">6</td><td class="n g wide">12</td><td class="n wide">89</td><td class="n wide">0</td><td class="n wide"><span class="dash">--</span></td></tr></tbody></table>
+    <ul class="ahead" aria-label="Still to play"><li><span>Wk 7</span><b>at LV</b><em>Sun Oct 25</em></li><li><span>Wk 8</span><b>vs LAC</b><em>Sun Nov 1</em></li><li><span>Wk 9</span><b>at WAS</b><em>Sun Nov 8</em></li><li><span>Wk 10</span><b>at ARI</b><em>Sun Nov 15</em></li><li class="bye"><span>Wk 11</span><b>Bye</b></li><li><span>Wk 12</span><b>vs GB</b><em>Wed Nov 25</em></li><li><span>Wk 13</span><b>vs KC</b><em>Thu Dec 3</em></li><li><span>Wk 14</span><b>at SF</b><em>Sun Dec 13</em></li><li><span>Wk 15</span><b>vs DAL</b><em>Sun Dec 20</em></li><li><span>Wk 16</span><b>at SEA</b><em>Fri Dec 25</em></li><li><span>Wk 17</span><b>at TB</b><em>Sun Jan 3</em></li><li><span>Wk 18</span><b>vs SEA</b><em>Sun Jan 10</em></li></ul>
+  </section>
+  <div class="split">
+  <article class="read"><h3>Our read</h3><p class="stamp">Written Oct 12, from his facts through last season</p><div class="prose"><p class="lead">Our board has him WR1 overall and 344 points, about 30 better than receivers drafted around pick 3, and he earned that talk: 375 points last year, WR1 among 228, over a 30% target share worth about 10 points a game on its own. The real downside is availability, 11 of 17 games in 2024, and our 15-game expectation carries a range from 10 to 17. He cleared 15 points in 13 of 16 weeks, so when he plays, he plays. Take him at pick 3 without blinking, and don&#x27;t let the slow ADP drift from 2.8 to 4.2 talk you out of it.</p></div></article>
+  <aside class="why-slot" aria-label="This week's why"><h3>Why this week's Proj</h3>
+    <p>Our weekly model writes this once a round of it passes its test. Until then the Proj is the published projection, and the game log and tiles above are the evidence.</p></aside>
+</div>
+  <div class="basis"><p>Proj is this week's published projection in PPR scoring, the closest match to this league's rules, read Fri 9:00 pm Central. Our own weekly model replaces it when it passes its test. &Delta; Proj is its change since the read before, Thu 9:00 pm.</p><p>Rest of season is his points a game on our rest-of-season order, week 6 through week 17 with byes out, and his place among receivers in that order.</p><p>Opp rank is where his opponent stands in points allowed to his position this season, 1st allows the fewest. Avg and Last are his points a game this season and in his last game, in this league's scoring. Avg's rank is among receivers with 3 games or more.</p><p>Pts come from the NFL's records, scored in this league's scoring. A past week's Proj is the one we showed that week, filled in once our record holds it.</p><p>The Game shows each club's expected points, his club first, then the kickoff weather, read Fri 4:01 pm Central. Times are in Central Time.</p></div>
+  <p class="credit">Stats from nflverse and charting from FTN Data via nflverse, both under <a href="#">Creative Commons licences</a>, our rates worked out from their counts.</p>
+</main>
+</div>
+</div>
+</body>
+</html>

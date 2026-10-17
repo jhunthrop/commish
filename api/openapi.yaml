@@ -514,6 +514,37 @@ paths:
         "422": { $ref: "#/components/responses/ErrorResponse" }
         "429": { $ref: "#/components/responses/ErrorResponse" }
         "502": { $ref: "#/components/responses/ErrorResponse" }
+  /leagues/attached/{id}/players/{player}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: the attached league's id (AttachedLeague.id)
+        schema: { type: string, format: uuid }
+      - name: player
+        in: path
+        required: true
+        description: his board id, as his page names him
+        schema: { type: string, minLength: 1, maxLength: 64 }
+    get:
+      tags: [league-sync]
+      operationId: leaguePlayerWeek
+      summary: >-
+        One player's week for his page, read in the drafter's league: the Lineup row's figures in the league's scoring
+        (the week's projection in the format the league scores most like, its change, his opponent's rank against his
+        position, his points a game and his last game's), and the one verb the league screens would give him: start him
+        when he is on the drafter's roster and our lineup starts him where the platform does not, the lineup otherwise,
+        a trade for him when another roster holds him, and the claim or the platform's waiver page when no roster does,
+        as the claim moves say. A quarterback, running back, receiver or tight end our board places; anyone else 404s.
+      security: [{ session: [] }]
+      responses:
+        "200": { $ref: "#/components/responses/PlayerWeekResponse" }
+        "400": { $ref: "#/components/responses/ErrorResponse" }
+        "404": { $ref: "#/components/responses/ErrorResponse" }
+        "409": { $ref: "#/components/responses/ErrorResponse" }
+        "422": { $ref: "#/components/responses/ErrorResponse" }
+        "429": { $ref: "#/components/responses/ErrorResponse" }
+        "502": { $ref: "#/components/responses/ErrorResponse" }
   /leagues/attached/{id}/moves/plan:
     parameters:
       - name: id
@@ -1087,6 +1118,27 @@ paths:
       responses:
         "200": { $ref: "#/components/responses/GameWeekResponse" }
         "400": { $ref: "#/components/responses/ErrorResponse" }
+  /players/{player}/week:
+    get:
+      tags: [league-sync]
+      operationId: playerWeek
+      summary: >-
+        One player's week for his page with no league: the week's projection in PPR scoring and its change, his
+        opponent's rank against his position, his points a game and his last game's, each in PPR scoring, his club's
+        game with its facts, and his place and rest-of-season points a game on our board valued for twelve teams,
+        the standard lineup and PPR. Anyone may read it, as the board is. His club and position are our board's. A
+        kicker, a defense or a player our board does not place has no page and answers 404.
+      parameters:
+        - name: player
+          in: path
+          required: true
+          description: his board id, as his page names him
+          schema: { type: string, minLength: 1, maxLength: 64 }
+      responses:
+        "200": { $ref: "#/components/responses/PlayerWeekResponse" }
+        "400": { $ref: "#/components/responses/ErrorResponse" }
+        "404": { $ref: "#/components/responses/ErrorResponse" }
+        "429": { $ref: "#/components/responses/ErrorResponse" }
   /shared/mocks/{code}:
     parameters: [{ $ref: "#/components/parameters/ShareCode" }]
     get:
@@ -1828,6 +1880,14 @@ components:
             allOf:
               - $ref: "#/components/schemas/Envelope"
               - properties: { data: { $ref: "#/components/schemas/GameWeek" } }
+    PlayerWeekResponse:
+      description: one player's week for his page
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: "#/components/schemas/Envelope"
+              - properties: { data: { $ref: "#/components/schemas/PlayerWeek" } }
     LineupAdviceResponse:
       description: the week's lineup advice for the drafter's team
       content:
@@ -3346,8 +3406,8 @@ components:
           type: string
           nullable: true
           description: >-
-            his page on the site (/players/{slug}): set for a player our order ranks whose name no other player in our
-            directory shares, null otherwise (a shared name's page is named by the run, which the API does not read)
+            his page on the site (/players/{slug}): set for a quarterback, running back, receiver or tight end our order
+            ranks whose name no other player in our directory shares, null otherwise (a kicker or defense has no page) (a shared name's page is named by the run, which the API does not read)
         position_rank: { type: integer, nullable: true, description: his place at his position in our order, null when unranked }
         points_over_replacement:
           type: number
@@ -3400,6 +3460,42 @@ components:
           description: his points in his last completed game under the league's scoring, to the tenth; null before his first game
         held: { type: boolean, description: the drafter tags him Hold on a sheet, so he is never a drop or a trade give }
         facts: { $ref: "#/components/schemas/WeekFacts" }
+    PlayerWeek:
+      type: object
+      required: [week, line, projection_scoring, projection_read_at, projection_previous_read_at, verb]
+      properties:
+        week: { type: integer, description: "the week the line is for: the league's week, else the week of the next game still to be played" }
+        line: { $ref: "#/components/schemas/PlayerLine" }
+        projection_scoring: { $ref: "#/components/schemas/ProjectionScoring" }
+        projection_read_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: when the week's projection was captured, null with none stored
+        projection_previous_read_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: when the snapshot projection_delta is measured from was captured, null with none
+        verb:
+          allOf: [{ $ref: "#/components/schemas/PlayerVerb" }]
+          nullable: true
+          description: what the league screens would do with him; null on the read with no league
+    PlayerVerb:
+      type: object
+      required: [kind, holder, host_url, note]
+      properties:
+        kind:
+          type: string
+          enum: [start, lineup, trade, claim, waivers]
+          description: >-
+            start when he is on the drafter's roster and our lineup starts him where the platform's lineup does not;
+            lineup when he is on the drafter's roster otherwise; trade when another roster holds him; claim when no
+            roster holds him and a claim can be made from our screen (WaiverMoves.claim available); waivers when no
+            roster holds him and the verb is the platform's waiver page
+        holder: { type: string, nullable: true, description: "the team holding him, for trade; null otherwise" }
+        host_url: { type: string, nullable: true, description: "the platform's waiver page, for waivers; null otherwise or when we do not know it" }
+        note: { type: string, nullable: true, description: "the claim moves' note, for claim or waivers; null otherwise" }
     LineupSlot:
       type: object
       required: [slot, ours, host, changed, no_one_can_play, sentence]

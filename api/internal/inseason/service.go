@@ -65,6 +65,8 @@ type Service struct {
 	Moves   Moves
 	// Weeks lists the account's leagues for GET /me/week, nil answers none.
 	Weeks Weeks
+	// Boards values our board for the public player read (PublicSettings).
+	Boards BoardSource
 	// Season is the season GET /games/week reads, the board's.
 	Season int
 	Now    func() time.Time
@@ -83,6 +85,8 @@ func (s *Service) Routes() []httpx.Route {
 		{Method: http.MethodPost, Path: "/leagues/attached/{id}/trades/check", Access: httpx.SignedIn, Limit: limit, Handler: s.checkTrade},
 		{Method: http.MethodGet, Path: "/games/week", Access: httpx.Public, Limit: limit, Handler: s.weekGames},
 		{Method: http.MethodGet, Path: "/me/week", Access: httpx.SignedIn, Limit: limit, Handler: s.week},
+		{Method: http.MethodGet, Path: "/players/{player}/week", Access: httpx.Public, Limit: limit, Handler: s.playerWeek},
+		{Method: http.MethodGet, Path: "/leagues/attached/{id}/players/{player}", Access: httpx.SignedIn, Limit: limit, Handler: s.leaguePlayerWeek},
 	}
 }
 

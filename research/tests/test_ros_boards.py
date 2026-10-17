@@ -58,7 +58,7 @@ def _context(through: int) -> SeasonContext:
     }
     teams = {pid: dict.fromkeys(weeks, "KC") for pid, weeks in lines.items()}
     store = SeasonStore(lines, snaps, teams, {}, frozenset())
-    return SeasonContext(2026, 18, through, _schedule(), dict.fromkeys(CLUBS), store)
+    return SeasonContext(2026, 18, through, _schedule(), dict.fromkeys(CLUBS), store, {})
 
 
 def _row(pid: str, projected: float, position: Position = "WR") -> StoredRow:

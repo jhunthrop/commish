@@ -30,6 +30,7 @@ import {
 	pointsTotalOf,
 	type GameLogRow,
 	type PlayerSeason,
+	type PriorSeason,
 	type StatField,
 	type StatLine
 } from '../src/lib/run/season.ts';
@@ -332,6 +333,62 @@ export async function seasonBlocks(
 				log
 			};
 			return [row.id, season];
+		})
+	);
+}
+
+/** The seasons before this one a page sums, newest first, and a regular season's last week: the feed's
+ * later weeks are the playoffs (research/nightly/build/player_season.py, PRIOR_SEASONS). */
+export const PRIOR_SEASONS = 3;
+const REGULAR_SEASON_WEEKS = 18;
+
+/** Each board player's earlier seasons (Lane 66h), by the nightly's rule: the regular season's played
+ * weeks (a stat line, or snaps with no stats row) summed as the season block sums them, newest first,
+ * a season he did not play left out. */
+export async function priorSeasonBlocks(
+	sql: postgres.Sql,
+	rows: readonly BoardRow[],
+	inputs: SeasonInputs
+): Promise<Map<string, PriorSeason[]>> {
+	const ids = rows.map((row) => row.id);
+	const years = Array.from({ length: PRIOR_SEASONS }, (_, i) => inputs.season - 1 - i);
+	const stores = await Promise.all(
+		years.map((season) => readStore(sql, ids, { ...inputs, season }))
+	);
+	const rules = rulesFor(inputs.format);
+	return new Map(
+		rows.map((row) => {
+			const score = (line: PointsLine): number => computeFantasyPoints(line, row.position, rules);
+			const seasons = years.flatMap((season, i): PriorSeason[] => {
+				const store = stores[i];
+				if (store === undefined) return [];
+				const lines = store.lines.get(row.id) ?? new Map<number, Map<string, number>>();
+				const snaps = store.snaps.get(row.id) ?? new Map<number, Map<string, number>>();
+				const weeks = [...new Set([...lines.keys(), ...snaps.keys()])]
+					.filter((week) => week <= REGULAR_SEASON_WEEKS)
+					.sort((a, b) => a - b);
+				const played = weeks.flatMap((week) => {
+					const found = lines.get(week) ?? new Map<string, number>();
+					const snapped = (snaps.get(week)?.get(SNAPS) ?? 0) > 0;
+					if (!hasIngest(found, false) && !snapped) return [];
+					const carried = store.carried.get(week) ?? new Set<string>();
+					return [{ week, line: lineOf(found, snaps.get(week), carried, score) }];
+				});
+				if (played.length === 0) return [];
+				const lines_ = played.map((p) => p.line);
+				return [
+					{
+						season,
+						games: played.length,
+						pointsPerGame: pointsPerGameOf(lines_.map((line) => line.points ?? 0)),
+						totals: totalsOf(
+							lines_,
+							played.map((p) => snaps.get(p.week))
+						)
+					}
+				];
+			});
+			return [row.id, seasons];
 		})
 	);
 }

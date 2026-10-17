@@ -182,7 +182,7 @@ func build(ctx context.Context, cfg config.API, pool *pgxpool.Pool, obs httpx.Ob
 	}
 	inSeason := &inseason.Service{
 		Leagues: inseason.SyncLeagues{Sync: leagueSync}, Weeks: inseason.SyncLeagues{Sync: leagueSync}, Facts: facts,
-		Holds: sheetStore, Moves: moves, Season: draftBoards.Schedule.Season, Now: now, Log: log,
+		Holds: sheetStore, Moves: moves, Boards: draftBoards, Season: draftBoards.Schedule.Season, Now: now, Log: log,
 	}
 
 	routes := slices.Concat(
