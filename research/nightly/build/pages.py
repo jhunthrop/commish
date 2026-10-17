@@ -17,6 +17,9 @@ from typing import Any, Final
 
 from research.capsules.pull_figures import PageValues, page_numbers, pull_figures_of
 from research.capsules.store import WRITTEN_SOURCE, StoredCapsule
+from research.capsules.week.caption import written_caption
+from research.capsules.week.store import StoredWeekRead
+from research.model.instants import js_iso
 from research.nightly.build.player_season import SeasonContext, season_block
 from research.nightly.config import PAGE_FORMAT, TEAMS, RunFormat
 from research.nightly.reads.board import BoardEntry, FormatBoard
@@ -137,6 +140,21 @@ def capsule_json(stored: StoredCapsule | None, page: PageValues | None) -> Json 
     return {
         "body": stored.body_full.strip(),
         "pulls": [{"figure": f.text, "caption": PULL_CAPTIONS[f.label]} for f in figures],
+        "writtenAt": js_iso(stored.generated_at),
+    }
+
+
+def week_read_json(stored: StoredWeekRead | None) -> Json | None:
+    """The week-ahead read (Lane 72) with the page's caption and its stamps: when it was written, the newest
+    stamp of the facts it was written from. None for a page the writer did not write for the week ahead."""
+    if stored is None or stored.source != WRITTEN_SOURCE:
+        return None
+    return {
+        "week": stored.week,
+        "body": stored.body.strip(),
+        "caption": written_caption(stored.written_at, stored.week),
+        "writtenAt": js_iso(stored.written_at),
+        "factsAt": None if stored.facts_at is None else js_iso(stored.facts_at),
     }
 
 
@@ -148,6 +166,7 @@ class PageInputs:
     capsules: Mapping[str, StoredCapsule]  # by universe id
     formats: Mapping[str, RunFormat]
     season: SeasonContext
+    week_reads: Mapping[str, StoredWeekRead]  # by universe id, the week ahead's
 
 
 def page_inputs(
@@ -155,9 +174,11 @@ def page_inputs(
     adp_by_format: Mapping[str, Mapping[str, float]],
     capsules: Mapping[str, StoredCapsule],
     season: SeasonContext,
+    week_reads: Mapping[str, StoredWeekRead],
 ) -> PageInputs:
     entries = {board.format.id: {entry.row.player_id: entry for entry in board.entries} for board in boards}
-    return PageInputs(entries, adp_by_format, capsules, {board.format.id: board.format for board in boards}, season)
+    formats = {board.format.id: board.format for board in boards}
+    return PageInputs(entries, adp_by_format, capsules, formats, season, week_reads)
 
 
 def player_json(who: Identity, inputs: PageInputs) -> Json:
@@ -189,6 +210,7 @@ def player_json(who: Identity, inputs: PageInputs) -> Json:
         "headshot": who.headshot,
         "formats": formats,
         "capsule": capsule_json(stored, page),
+        "weekRead": week_read_json(None if universe_id is None else inputs.week_reads.get(universe_id)),
         "season": season,
     }
 

@@ -164,10 +164,11 @@ def test_the_failure_path_reads_the_pass_the_step_already_holds(monkeypatch: pyt
         {},
         lambda: next(ticks),
         lambda _: None,
-        frozenset({"ingest", "fit"}),
+        frozenset({"ingest", "fit", "week-reads"}),
         CapsuleStepPlan(),
     )
-    assert steps[-1].record == StepRecord("capsules", "failed", "RuntimeError: the gateway went away")
+    capsules = next(step for step in steps if step.record.name == "capsules")
+    assert capsules.record == StepRecord("capsules", "failed", "RuntimeError: the gateway went away")
     assert len(reads) == 1
 
 

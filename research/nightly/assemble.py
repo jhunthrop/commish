@@ -14,12 +14,13 @@ from typing import Any, Final
 from sqlalchemy import Connection, text
 
 from research.capsules.store import WRITTEN_SOURCE, StoredCapsule, stored_capsules_for
+from research.capsules.week.store import served_week_reads
 from research.errors import ResearchError
 from research.model.reads.teams import first_kickoff_for
 from research.nightly.build import pages, season
 from research.nightly.build.player_season import season_context
 from research.nightly.build.ros import MODEL_NAME as ROS_MODEL
-from research.nightly.build.ros import RosBasis, RosSetup, ros_boards
+from research.nightly.build.ros import RosBasis, RosSetup, pending_weeks, ros_boards
 from research.nightly.config import PAGE_FORMAT, RUN_FORMATS, RunFormat
 from research.nightly.reads import record as record_read
 from research.nightly.reads import schedule as schedule_read
@@ -173,7 +174,9 @@ def assemble(conn: Connection, as_of: datetime, frozen_by: FrozenBy, ros: RosSet
     by_slug = {p.id: p for p in people}
     universe_ids = sorted({e.row.universe_id for b in boards for e in b.entries})
     capsules = stored_capsules_for(conn, universe_ids)
-    inputs = pages.page_inputs(boards, adp_by_format, capsules, context)
+    pending = pending_weeks(context.games, as_of)
+    week_reads = {} if not pending else served_week_reads(conn, PRODUCT_SEASON, pending[0], universe_ids)
+    inputs = pages.page_inputs(boards, adp_by_format, capsules, context, week_reads)
     players = [pages.player_json(who, inputs) for who in people]
     schedule, clubs, schedule_source, clubs_source = _schedule(conn, as_of)
     record, record_source = _record(conn, as_of, frozen_by)
