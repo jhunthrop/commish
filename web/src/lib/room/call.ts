@@ -22,7 +22,7 @@ export interface CallView {
 	why: string | null;
 }
 
-/** The pool's basis, printed over it: whose points rank it, on which board, and where the chance come
+/** The pool's basis, printed over it: whose points rank it, on which board, and where the chances come
  * from. Every number names its basis in the same view. */
 export function poolBasis(
 	board: Board,

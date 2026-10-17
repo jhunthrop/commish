@@ -19,6 +19,7 @@ const SRC = fileURLToPath(new URL('../../', import.meta.url));
 /** Where the rooms, the call card and the reports are drawn from. */
 const ROOTS = [
 	'lib/room',
+	'lib/companion',
 	'lib/ui/CallPanel.svelte',
 	'lib/ui/StillThereCell.svelte',
 	'lib/format/draft.ts',
