@@ -15,6 +15,10 @@
 // fixture, PUBLIC_RUN_ID=2026-10-21T12-ros) and one signed-out page is shot with the tile held to
 // "Rest of season ... in our order"; that run predates the reads' stamps and the earlier seasons, so
 // those two are not asked of it. Otherwise the tile is held to "Projected".
+// A season-long player (De'Von Achane on injured reserve) needs the run's designations: after
+// `npm run standin`, `uv run python -m research.nightly mark --out ../web/.runs` (from research/,
+// RESEARCH_DATABASE_URL the dev store, read only) writes the newest capture beside it; his pill and
+// his rest tile are held to Lane 63's word.
 // Against the built site served by the Worker and the fixture API (scripts/inseason-fixture/serve.ts).
 //
 //   [ROS_FROM_WEEK=6] node scripts/player-card-shots.ts [web origin] [out dir]
@@ -60,6 +64,8 @@ interface Shot {
 	espn?: boolean;
 	/** Follows the verb onto Waivers, his row marked and his drops open. */
 	follow?: boolean;
+	/** On a season-long list: the pill and the rest tile show Lane 63's word, never a rank. */
+	held?: string;
 }
 
 const SHOTS: readonly Shot[] = [
@@ -93,6 +99,14 @@ const SHOTS: readonly Shot[] = [
 		signedIn: true,
 		verb: 'Trade for him',
 		weekRead: 'withheld'
+	},
+	{
+		name: 'held',
+		slug: 'de-von-achane',
+		signedIn: false,
+		verb: 'Add to my sheet',
+		weekRead: 'none',
+		held: 'RB IR'
 	},
 	{
 		name: 'claim',
@@ -217,10 +231,8 @@ function checkTiles(card: Card, where: string): void {
 	if (ROS_FROM_WEEK !== undefined)
 		check(REST_CAPTION.test(card.captions[REST] ?? ''), `${where}: rest of season's caption`);
 	for (const label of card.labels) {
-		const proj = card.values.Proj ?? '';
-		// With no Proj, the Proj tile says why and the change says nothing more.
-		const said = label === 'Δ Proj' && proj === NONE ? true : (card.captions[label] ?? '') !== '';
-		if (card.values[label] === NONE) check(said, `${where}: ${label} is "--" with no reason`);
+		if (card.values[label] === NONE)
+			check((card.captions[label] ?? '') !== '', `${where}: ${label} is "--" with no reason`);
 	}
 	const opp = card.values['Opp rank'] ?? '';
 	if (opp !== NONE)
@@ -229,7 +241,20 @@ function checkTiles(card: Card, where: string): void {
 
 function checkCard(card: Card, shot: Shot, where: string, width: number): void {
 	checkTiles(card, where);
-	check(/\b(QB|RB|WR|TE)( \d+| IR)?\b/.test(card.pill), `${where}: the status pill "${card.pill}"`);
+	// The shared pill always carries his rank or Lane 63's word (review N4).
+	check(
+		/\b(QB|RB|WR|TE) (\d+|[A-Z]{2,3})\b/.test(card.pill),
+		`${where}: the status pill "${card.pill}"`
+	);
+	if (shot.held !== undefined) {
+		check(card.pill.includes(shot.held), `${where}: the pill does not say ${shot.held}`);
+		const rest = card.captions[PROJECTED] ?? card.captions[REST] ?? '';
+		check(
+			rest.includes(`${shot.held}, unranked while on a season-long list`) &&
+				!/\d+ in our order/.test(rest),
+			`${where}: the rest tile ranks a held player: "${rest}"`
+		);
+	}
 	check(card.verbs.includes(shot.verb), `${where}: verbs ${card.verbs.join(', ')}`);
 	check(card.verbs.includes('Compare'), `${where}: no Compare`);
 	check(WEEK_READ.test(card.readText) === (shot.weekRead === 'shown'), `${where}: the week read`);
