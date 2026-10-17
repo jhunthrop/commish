@@ -7,6 +7,7 @@ import (
 	"github.com/jhunthrop/commish/api/internal/apitypes"
 	"github.com/jhunthrop/commish/api/internal/boards"
 	"github.com/jhunthrop/commish/api/internal/draft"
+	"github.com/jhunthrop/commish/api/internal/leaguesync"
 )
 
 // rosterWithProj gives every player in a roster the same Proj, so a swap's
@@ -33,12 +34,65 @@ func TestWeekProjFollowsTheLineup(t *testing.T) {
 	if got := WeekProj(config, Swapped(roster, []int{starter}, []Candidate{in}), nil) - before; roundTenth(got) != 20 {
 		t.Fatalf("a 25 Proj quarterback for a 5: %v", got)
 	}
-	in.Tier = Out
-	if got := WeekProj(config, Swapped(roster, []int{starter}, []Candidate{in}), nil) - before; roundTenth(got) != 0 {
+	// A bye as the advisor builds it: out this week and no Proj at all.
+	bye := Candidate{ID: "x-qb", Position: draft.QB, Tier: Out}
+	if got := WeekProj(config, Swapped(roster, []int{starter}, []Candidate{bye}), nil) - before; roundTenth(got) != 0 {
 		t.Fatalf("a quarterback on a bye starts: %v", got)
 	}
 	if len(roster) != len(deepAtBack()) || roster[starter].ID != "m-qb" {
 		t.Fatal("the swap changed the roster it read")
+	}
+}
+
+// A player traded in whose game has kicked off is not one of the member's
+// starters, so he cannot be moved in and adds no Proj (review L3).
+func TestALockedIncomingPlayerDoesNotStart(t *testing.T) {
+	config := twelveTeamPPR(t)
+	roster := rosterWithProj(deepAtBack(), 5)
+	starters := []string{"m-qb", "m-rb1", "m-rb2", "m-wr1", "m-wr2", "m-wr3", "m-te", "m-k", "m-def"}
+	before := WeekProj(config, roster, starters)
+	locked := Candidate{ID: "x-qb", Position: draft.QB, Proj: 30, HasProj: true, Tier: Available, Locked: true}
+	if got := WeekProj(config, Swapped(roster, nil, []Candidate{locked}), starters) - before; roundTenth(got) != 0 {
+		t.Fatalf("a locked quarterback traded in moved the week by %v", got)
+	}
+	locked.Locked = false
+	if got := WeekProj(config, Swapped(roster, nil, []Candidate{locked}), starters) - before; roundTenth(got) != 25 {
+		t.Fatalf("the same quarterback unlocked moved the week by %v", got)
+	}
+}
+
+// The member's drop leaves his lineup with the trade (review L3, the Dart
+// case): Dart starts at QB before; giving Rodgers and dropping Dart for a
+// back leaves Mahomes at QB and the back in an empty RB spot, so the week
+// moves by 18 + 10 - 20, not by the back's 10 alone.
+func TestTheMembersDropLeavesTheWeekFigure(t *testing.T) {
+	who := func(id string, pos draft.Position, proj float64) person {
+		return person{cand: Candidate{ID: id, Position: pos, Proj: proj, HasProj: true, Tier: Available}}
+	}
+	mine := []person{who("dart", draft.QB, 20), who("mahomes", draft.QB, 18), who("rodgers", draft.QB, 15)}
+	theirs := []person{who("back", draft.RB, 10)}
+	a := &advisor{config: twelveTeamPPR(t), projection: boards.WeekProjection{ReadAt: fixtureNow}}
+	week := a.tradeWeek(leaguesync.Team{}, leaguesync.Team{}, mine, theirs, Trade{Give: []int{2}, Get: []int{0}, Drop: 0})
+	if got := week.mine.change(); got == nil || *got != 8 {
+		t.Fatalf("the member's week change with Dart dropped: %v", deref(got))
+	}
+	if got := week.theirs.change(); got == nil || *got != 5 {
+		t.Fatalf("their week change, Rodgers in for a back: %v", deref(got))
+	}
+}
+
+// The finder's basis keeps the board's own words for what the gains are on,
+// and says the order its trades come in (review M2).
+func TestTradesBasisSaysItsOrder(t *testing.T) {
+	rest := TradesBasis(RestOfSeason, 12)
+	if !strings.HasPrefix(rest, "Trades where both lineups gain on our rest-of-season order. ") ||
+		!strings.Contains(rest, "at least 0.5 a week") || !strings.Contains(rest, "then the close calls for them") {
+		t.Fatalf("rest of season: %q", rest)
+	}
+	pre := TradesBasis(Preseason, 17)
+	if !strings.HasPrefix(pre, "Trades where both lineups gain on our preseason number. ") ||
+		strings.Contains(pre, "rest of the season") || strings.Contains(pre, "rest-of-season") {
+		t.Fatalf("preseason: %q", pre)
 	}
 }
 
@@ -78,7 +132,7 @@ func TestTradeAnswersCarryTheWeekAndTheTotals(t *testing.T) {
 	if advice.ProjectionReadAt == nil || advice.ProjectionScoring.Format == "" {
 		t.Fatalf("the projection's read and scoring: %v %+v", advice.ProjectionReadAt, advice.ProjectionScoring)
 	}
-	if !strings.Contains(advice.Basis, "best for you first") {
+	if !strings.Contains(advice.Basis, "then the close calls for them") {
 		t.Fatalf("basis %q", advice.Basis)
 	}
 	checked := 0
