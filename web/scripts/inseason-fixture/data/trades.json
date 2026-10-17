@@ -1364,7 +1364,7 @@
 								"home": false,
 								"kickoff": "2026-10-18T17:00:00.000Z",
 								"bye": false,
-								"designation": null,
+								"designation": { "status": "questionable", "as_of": "2026-10-16T21:00:00.000Z" },
 								"played": false,
 								"points_this_week": null,
 								"last_games": [
@@ -3217,7 +3217,7 @@
 								"home": false,
 								"kickoff": "2026-10-18T17:00:00.000Z",
 								"bye": false,
-								"designation": null,
+								"designation": { "status": "questionable", "as_of": "2026-10-16T21:00:00.000Z" },
 								"played": false,
 								"points_this_week": null,
 								"last_games": [
@@ -7038,7 +7038,7 @@
 								"home": false,
 								"kickoff": "2026-10-18T17:00:00.000Z",
 								"bye": false,
-								"designation": null,
+								"designation": { "status": "questionable", "as_of": "2026-10-16T21:00:00.000Z" },
 								"played": false,
 								"points_this_week": null,
 								"last_games": [
@@ -7234,7 +7234,7 @@
 								"home": false,
 								"kickoff": "2026-10-18T17:00:00.000Z",
 								"bye": false,
-								"designation": null,
+								"designation": { "status": "questionable", "as_of": "2026-10-16T21:00:00.000Z" },
 								"played": false,
 								"points_this_week": null,
 								"last_games": [
@@ -10854,7 +10854,7 @@
 				"home": true,
 				"kickoff": "2026-10-18T17:00:00.000Z",
 				"bye": false,
-				"designation": null,
+				"designation": { "status": "injured_reserve", "as_of": "2026-10-16T21:00:00.000Z" },
 				"played": false,
 				"points_this_week": null,
 				"last_games": [
@@ -11217,7 +11217,7 @@
 				"home": false,
 				"kickoff": "2026-10-18T17:00:00.000Z",
 				"bye": false,
-				"designation": null,
+				"designation": { "status": "questionable", "as_of": "2026-10-16T21:00:00.000Z" },
 				"played": false,
 				"points_this_week": null,
 				"last_games": [

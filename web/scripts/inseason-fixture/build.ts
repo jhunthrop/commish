@@ -501,6 +501,7 @@ async function lineup(): Promise<LineupAdvice> {
 			`Ranked by our rest-of-season order and this week's designations. We do not project a week's points. ${basisTail}`
 		),
 		projection_read_at: null,
+		projection_scoring: { format: 'ppr', league_own: false },
 		set: out.every((s) => !s.changed),
 		slots: out,
 		bench,

@@ -76,7 +76,8 @@ const PER_GAME_SCREENS = new Set(['waivers', 'trades']);
 /** The screens drawn as a box score (Lane 66d): columns, the week's projection and points so far,
  * the projection's basis said once, no points a game on a row. */
 const BOX_SCREENS = new Set(['start', 'matchup']);
-const PROJ_BASIS = /Proj is this week's published projection, read \w{3} \d+:\d\d [ap]m \w+\./;
+const PROJ_BASIS =
+	/Proj is this week's published projection in (PPR|half-PPR|standard) scoring, (this league's own|the closest match to this league's rules), read \w{3} \d+:\d\d [ap]m \w+\./g;
 const BOX_NUMBER = /^(\d+\.\d|--)$/;
 
 /** What a box score screen draws, for the checks: its column heads, each row's two numbers, its
@@ -87,7 +88,11 @@ async function boxFacts(page: Page): Promise<{
 	basis: string;
 	cut: string[];
 	perGame: boolean;
+	/** Defense rows (no position pill under the name), and how many of them draw the club mark. */
+	defenseRows: number;
 	defenseMarks: number;
+	/** The status pills drawn: "Questionable", "RB IR". */
+	statuses: string[];
 	/** Each bye row's projection as printed: always "--". */
 	byeProj: string[];
 }> {
@@ -108,7 +113,17 @@ async function boxFacts(page: Page): Promise<{
 			basis: [...document.querySelectorAll('main p')].map((p) => p.textContent).join(' '),
 			cut: names.flatMap((n) => (n.scrollWidth > n.clientWidth + 1 ? [n.textContent] : [])),
 			perGame: rows.some((tr) => /\d a game/.test(tr.textContent)),
-			defenseMarks: box.flatMap((t) => [...t.querySelectorAll('img[alt$=" defense"]')]).length,
+			defenseRows: rows.filter((tr) => tr.querySelector('.club') && !tr.querySelector('.club .pos'))
+				.length,
+			defenseMarks: rows.filter(
+				(tr) =>
+					tr.querySelector('.club') &&
+					!tr.querySelector('.club .pos') &&
+					tr.querySelector('img[alt$=" defense"]')
+			).length,
+			statuses: rows.flatMap((tr) =>
+				[...tr.querySelectorAll('.club .pos, .club .chip')].map((el) => el.textContent.trim())
+			),
 			byeProj: rows
 				.filter((tr) => tr.querySelector('td.game .bye') !== null)
 				.map((tr) => tr.querySelector<HTMLElement>('td.proj')?.innerText.trim() ?? '?')
@@ -197,10 +212,18 @@ for (const { name, path, ready: text } of PAGES) {
 				if (box.numbers.length === 0 || !box.numbers.every((n) => BOX_NUMBER.test(n)))
 					missing.push(`${at} box numbers ${box.numbers.join(' ')}`);
 				if (!box.numbers.some((n) => n !== '--')) missing.push(`${at} no projection shown`);
-				if (!PROJ_BASIS.test(box.basis)) missing.push(`${at} projection basis`);
+				const said = (box.basis.match(PROJ_BASIS) ?? []).length;
+				if (said !== 1) missing.push(`${at} projection basis said ${String(said)} times`);
 				if (box.perGame) missing.push(`${at} a row says points a game`);
 				if (box.cut.length > 0) missing.push(`${at} names cut: ${box.cut.join(', ')}`);
-				if (box.defenseMarks === 0) missing.push(`${at} no defense drawn with its club mark`);
+				if (box.defenseRows === 0 || box.defenseMarks !== box.defenseRows)
+					missing.push(
+						`${at} ${String(box.defenseRows - box.defenseMarks)} defense rows without a club mark`
+					);
+				if (!box.statuses.includes('Questionable') || !box.statuses.some((s) => s.endsWith(' IR')))
+					missing.push(
+						`${at} the status pills: ${box.statuses.filter((s) => !/ \d+$/.test(s)).join(', ')}`
+					);
 				if (box.byeProj.length === 0) missing.push(`${at} no bye row to check`);
 				if (box.byeProj.some((p) => p !== '--')) missing.push(`${at} a bye row with a projection`);
 			}

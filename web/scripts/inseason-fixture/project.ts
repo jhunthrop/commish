@@ -5,6 +5,9 @@
 //     his club, a kicker with no row of his own by his club's one kicker, the PPR column (the league
 //     scores most like PPR); null without a row, and null for a club with no game this week (a bye),
 //     whatever the snapshot holds;
+//   - two stand-in designations (Rome Odunze Questionable, Tank Bigsby on injured reserve) so a shot
+//     shows the status pill both ways;
+//   - projection_scoring on both answers (PPR, the closest to the recorded league's own rules);
 //   - projection_read_at on the lineup, a stand-in stamp of the fixture's own Friday evening, and the
 //     lineup's basis in the API's words since its rows end on the projection;
 //   - matchup.json, GET /leagues/attached/{id}/matchup's answer: the drafter's side and the
@@ -19,6 +22,7 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { format as prettierFormat, resolveConfig } from 'prettier';
+import type { DesignationStatus } from '../../src/lib/format/designation.ts';
 import type { GameWeek } from '../../src/lib/format/game-facts.ts';
 import type { LeaguePlayer, LeagueSync } from '../../src/lib/league/api.ts';
 import type {
@@ -34,6 +38,8 @@ import type {
 const DATA = new URL('./data/', import.meta.url);
 /** The stand-in projection's read: Friday 9:00 pm Central of the fixture's week 6. */
 const PROJECTION_READ_AT = '2026-10-17T02:00:00.000Z';
+/** The recorded league scores by rules of its own, closest to PPR: the API's projection_scoring. */
+const PROJECTION_SCORING: LineupAdvice['projection_scoring'] = { format: 'ppr', league_own: false };
 const DEFENSE = 'DEF';
 const KICKER = 'K';
 const PROVIDER_KICKER = 'PK';
@@ -86,13 +92,29 @@ function weekProjection(line: PlayerLine): number | null {
 }
 
 /** Every player line in an answer, stamped, however deep. */
+/** Two stand-in designations, so a shot shows Lane 63's pill both ways (review M2): one starter
+ * Questionable on the week's report, one bench player on injured reserve. The run holds no
+ * designations for the recorded week; these are the fixture's own. */
+const DESIGNATED_AS_OF = '2026-10-16T21:00:00.000Z';
+const DESIGNATIONS: Readonly<Record<string, DesignationStatus>> = {
+	'Rome Odunze': 'questionable',
+	'Tank Bigsby': 'injured_reserve'
+};
+
+function designated(line: PlayerLine): PlayerLine {
+	const status = DESIGNATIONS[line.player.name];
+	if (status === undefined) return line;
+	return { ...line, facts: { ...line.facts, designation: { status, as_of: DESIGNATED_AS_OF } } };
+}
+
 function stamp<T>(value: T): T {
 	if (Array.isArray(value)) return value.map(stamp) as T;
 	if (typeof value !== 'object' || value === null) return value;
 	const entries = Object.entries(value).map(([key, field]) => [key, stamp(field)] as const);
 	const out = Object.fromEntries(entries) as Record<string, unknown>;
 	if ('player' in out && 'facts' in out && 'rest_of_season_per_game' in out) {
-		out.week_projection = weekProjection(out as unknown as PlayerLine);
+		const line = designated(out as unknown as PlayerLine);
+		return { ...line, week_projection: weekProjection(line) } as T;
 	}
 	return out as T;
 }
@@ -117,7 +139,8 @@ const stampedLineup: LineupAdvice = {
 	...stamp(lineup),
 	basis: lineupBasis(lineup.basis),
 	basis_note: lineupNote(lineup.basis_note),
-	projection_read_at: PROJECTION_READ_AT
+	projection_read_at: PROJECTION_READ_AT,
+	projection_scoring: PROJECTION_SCORING
 };
 const stampedWaivers = stamp(waivers);
 const stampedTrades = stamp(trades);
@@ -225,6 +248,7 @@ const box: MatchupBox = {
 	week: matchup.week,
 	read_at: sync.read_at,
 	projection_read_at: PROJECTION_READ_AT,
+	projection_scoring: PROJECTION_SCORING,
 	sides
 };
 

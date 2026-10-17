@@ -30,7 +30,8 @@ const WEATHER =
 const EXPECTED = /^\d+(\.5)? to \d+(\.5)?$/;
 const CELL_WEATHER =
 	/^(\d+°, \d+ mph(, \d+% (rain|snow|ice))?|Indoors|Roof TBD|Abroad, no forecast|Outdoors)$/;
-const FACTS_READ = /Game facts read \w{3} \d{1,2}:\d{2} [ap]m Central\./;
+const FACTS_READ =
+	/The Game cell shows each club's expected points, his club first, then the kickoff weather, read \w{3} \d{1,2}:\d{2} [ap]m Central\./g;
 const BETTING =
 	/\b(favou?red|underdogs?|odds|lines?|spreads?|totals?|bets?|betting|vegas|sportsbooks?|props?|moneyline)\b|over\/under/i;
 
@@ -142,7 +143,8 @@ for (const { name, path, ready, phone, box } of PAGES) {
 					for (const e of cells.expected) check(EXPECTED.test(e), `${where}: expected "${e}"`);
 					check(cells.weather.length > 0, `${where}: no weather in a box`);
 					for (const w of cells.weather) check(CELL_WEATHER.test(w), `${where}: weather "${w}"`);
-					check(FACTS_READ.test(cells.text), `${where}: no game facts read line`);
+					const read = (cells.text.match(FACTS_READ) ?? []).length;
+					check(read === 1, `${where}: the Game cell's line said ${String(read)} times`);
 					check(cells.stamped === 0, `${where}: ${String(cells.stamped)} rows carry a read stamp`);
 					for (const said of [...cells.expected, ...cells.weather]) {
 						check(!BETTING.test(said), `${where}: a betting word in "${said}"`);
