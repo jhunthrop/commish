@@ -2753,6 +2753,23 @@ export interface components {
 			 * @description his points this week on the week's published projection, to the cent, in the format the league's scoring is most like (PPR, half PPR or standard); a team defense's by its club, a kicker our board does not place (no board id) by his club's one kicker, never a teammate's for a kicker the snapshot left out. The newest snapshot stored for the league's week (projection_read_at says when). Null when his club has no game that week (a bye), whatever the snapshot holds, and when the snapshot has no row for him or none is stored. Our own weekly model replaces it when it passes its test
 			 */
 			week_projection: number | null;
+			/**
+			 * Format: double
+			 * @description week_projection's change since the week's snapshot before the newest, to the cent, in the same format; null without a row for him in both snapshots or when week_projection is null
+			 */
+			projection_delta: number | null;
+			/** @description this week's opponent's rank in points allowed a game to his position this season under the league's scoring, 1 allowed the fewest (facts.allowed_to_position.rank, of its .of); null on a bye or before the season ranks it */
+			opp_rank: number | null;
+			/**
+			 * Format: double
+			 * @description his points a game over every completed game this season under the league's scoring, to the cent; null before his first game
+			 */
+			season_avg: number | null;
+			/**
+			 * Format: double
+			 * @description his points in his last completed game under the league's scoring, to the cent; null before his first game
+			 */
+			last_points: number | null;
 			/** @description the drafter tags him Hold on a sheet */
 			held: boolean;
 			facts: components['schemas']['WeekFacts'];
@@ -2783,7 +2800,12 @@ export interface components {
 			 * @description when the week's published projection the rows' week_projection read was captured, null with none
 			 */
 			projection_read_at: string | null;
-			/** @description the honesty line above the rows: the order the lineup is ranked by, never a week's projection */
+			/**
+			 * Format: date-time
+			 * @description when the snapshot before it was captured, the read projection_delta counts from; null with none
+			 */
+			projection_previous_read_at: string | null;
+			/** @description the honesty line: the lineup starts the highest week_projection at each slot after this week's designations and byes, the rest-of-season order breaking ties and standing in where a player has none */
 			basis: string;
 			/** @description the rest of the basis, said once under the rows: the league's rules points so far leave out, empty when they leave out none (the page says what Proj and Pts are itself) */
 			basis_note: string;
@@ -2804,6 +2826,8 @@ export interface components {
 			slots: components['schemas']['LineupSlot'][];
 			/** @description everyone else on the active roster, by the same keys (injured reserve and taxi spots left out) */
 			bench: components['schemas']['PlayerLine'][];
+			/** @description the players in the host's injured reserve spots, who start nowhere this week */
+			reserve: components['schemas']['PlayerLine'][];
 			/** @description the host's lineup page, empty when we know none */
 			host_lineup_url: string;
 			/** @description one sentence under the verb when we cannot open the host's page ("Make this change on Yahoo. We cannot open that page for you yet."), null when the url opens it */
@@ -2930,7 +2954,7 @@ export interface components {
 			 * @enum {string}
 			 */
 			lineup: 'available' | 'unavailable';
-			/** @description one sentence when a move waits on the member (connect again to agree to moves), null otherwise */
+			/** @description one sentence under the verb whenever lineup is unavailable, naming the platform: why it cannot be set from our screen ("Sleeper takes no lineup from outside.", "ESPN writes are off until your connection is renewed.") or what the member does to open it (connect again to agree to moves); null when available */
 			note: string | null;
 		};
 		HostMoveChange: {

@@ -32,7 +32,11 @@ type Candidate struct {
 	// valid when HasPerGame.
 	PerGame    float64
 	HasPerGame bool
-	Tier       Tier
+	// Proj is this week's projection in the league's closest scoring, the
+	// figure the Lineup screen shows, valid when HasProj (Lane 66e).
+	Proj    float64
+	HasProj bool
+	Tier    Tier
 	// Locked is a player whose game has kicked off: he cannot be moved
 	// into or out of the lineup.
 	Locked bool
@@ -97,11 +101,11 @@ func withinBetter(a, b *Candidate) bool { return within(a, b, true) }
 // then the form.
 func acrossBetter(a, b *Candidate) bool { return across(a, b, true) }
 
-// within and across are the two orders, with this week's tiers or, for
+// within and across are the two orders, with this week's keys or, for
 // the rest-of-season lineup strength, without them.
 func within(a, b *Candidate, week bool) bool {
-	if week && a.Tier != b.Tier {
-		return a.Tier < b.Tier
+	if decided, better := weekKeys(a, b, week); decided {
+		return better
 	}
 	if (a.Rank == 0) != (b.Rank == 0) {
 		return a.Rank != 0
@@ -113,8 +117,8 @@ func within(a, b *Candidate, week bool) bool {
 }
 
 func across(a, b *Candidate, week bool) bool {
-	if week && a.Tier != b.Tier {
-		return a.Tier < b.Tier
+	if decided, better := weekKeys(a, b, week); decided {
+		return better
 	}
 	if a.HasValue != b.HasValue {
 		return a.HasValue
@@ -126,6 +130,29 @@ func across(a, b *Candidate, week bool) bool {
 		return within(a, b, week)
 	}
 	return valueThenForm(a, b)
+}
+
+// weekKeys is the week's first keys, the advice rule the Lineup screen
+// states (Lane 66e): the tier (a bye, and a designation that keeps him
+// off the field, before anything else, so a Questionable player keeps his
+// number), then the projection the screen shows, a player with one ahead
+// of a player without, the higher first. decided is false when the keys
+// tie or the order is not the week's: the rest-of-season order then
+// breaks the tie, and stands in where neither has a projection.
+func weekKeys(a, b *Candidate, week bool) (decided, better bool) {
+	if !week {
+		return false, false
+	}
+	if a.Tier != b.Tier {
+		return true, a.Tier < b.Tier
+	}
+	if a.HasProj != b.HasProj {
+		return true, a.HasProj
+	}
+	if a.HasProj && a.Proj != b.Proj {
+		return true, a.Proj > b.Proj
+	}
+	return false, false
 }
 
 func valueThenForm(a, b *Candidate) bool {

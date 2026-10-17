@@ -51,10 +51,16 @@ func TestBasisSaysWhatAWeekIs(t *testing.T) {
 		}
 	}
 	pre := LineupBasis(Preseason)
+	// The lineup ranks by the Proj its rows show (Lane 66e), our order the
+	// tie-break and the stand-in.
 	for _, s := range []string{LineupBasis(RestOfSeason), pre} {
-		if !strings.Contains(s, "and this week's designations, not by a week's projection.") || strings.Contains(s, "from week") {
+		if !strings.HasPrefix(s, "We start the highest Proj at each slot, after this week's designations and byes. ") ||
+			!strings.HasSuffix(s, " breaks ties and stands in where a player has no Proj.") || strings.Contains(s, "from week") {
 			t.Errorf("%q", s)
 		}
+	}
+	if !strings.Contains(LineupBasis(RestOfSeason), "Our rest-of-season order breaks") || !strings.Contains(pre, "Our preseason number breaks") {
+		t.Errorf("the order named: %q %q", LineupBasis(RestOfSeason), pre)
 	}
 	if !strings.Contains(ros, "the rest of the season on our rest-of-season order, averaged over its 11 weeks") {
 		t.Errorf("%q", ros)

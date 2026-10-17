@@ -2319,7 +2319,7 @@ type Lineup string
 
 // LineupAdvice defines model for LineupAdvice.
 type LineupAdvice struct {
-	// Basis the honesty line above the rows: the order the lineup is ranked by, never a week's projection
+	// Basis the honesty line: the lineup starts the highest week_projection at each slot after this week's designations and byes, the rest-of-season order breaking ties and standing in where a player has none
 	Basis string `json:"basis"`
 
 	// BasisNote the rest of the basis, said once under the rows: the league's rules points so far leave out, empty when they leave out none (the page says what Proj and Pts are itself)
@@ -2341,6 +2341,9 @@ type LineupAdvice struct {
 	// PlayerPoints the host gives each player's points (Sleeper, MFL); false where it gives each team's total alone (ESPN, Yahoo, FFPC), so a player's points_this_week stay null and the team's total is team_points
 	PlayerPoints bool `json:"player_points"`
 
+	// ProjectionPreviousReadAt when the snapshot before it was captured, the read projection_delta counts from; null with none
+	ProjectionPreviousReadAt *time.Time `json:"projection_previous_read_at"`
+
 	// ProjectionReadAt when the week's published projection the rows' week_projection read was captured, null with none
 	ProjectionReadAt *time.Time `json:"projection_read_at"`
 
@@ -2352,6 +2355,9 @@ type LineupAdvice struct {
 
 	// Refreshed when the order was made
 	Refreshed time.Time `json:"refreshed"`
+
+	// Reserve the players in the host's injured reserve spots, who start nowhere this week
+	Reserve []PlayerLine `json:"reserve"`
 
 	// Set true when the host's lineup is already ours
 	Set bool `json:"set"`
@@ -2369,7 +2375,7 @@ type LineupMoves struct {
 	// Lineup available when the lineup can be set on the host from our screen (the host has a write path, its switch is on for the account and the account's connection agreed to the moves); unavailable when the verb is the host's page
 	Lineup LineupMovesLineup `json:"lineup"`
 
-	// Note one sentence when a move waits on the member (connect again to agree to moves), null otherwise
+	// Note one sentence under the verb whenever lineup is unavailable, naming the platform: why it cannot be set from our screen ("Sleeper takes no lineup from outside.", "ESPN writes are off until your connection is renewed.") or what the member does to open it (connect again to agree to moves); null when available
 	Note *string `json:"note"`
 }
 
@@ -2725,8 +2731,14 @@ type PlayerLine struct {
 	Headshot *string `json:"headshot"`
 
 	// Held the drafter tags him Hold on a sheet
-	Held   bool         `json:"held"`
-	Player LeaguePlayer `json:"player"`
+	Held bool `json:"held"`
+
+	// LastPoints his points in his last completed game under the league's scoring, to the cent; null before his first game
+	LastPoints *float64 `json:"last_points"`
+
+	// OppRank this week's opponent's rank in points allowed a game to his position this season under the league's scoring, 1 allowed the fewest (facts.allowed_to_position.rank, of its .of); null on a bye or before the season ranks it
+	OppRank *int         `json:"opp_rank"`
+	Player  LeaguePlayer `json:"player"`
 
 	// PointsOverReplacement points over replacement a week for this league, one decimal: the order's averaged over the weeks it covers (the preseason number's season over 17, the rest-of-season order's over its own first week, the league's when the run does not say, through week 17), as the basis says; null without a projection
 	PointsOverReplacement *float64 `json:"points_over_replacement"`
@@ -2734,8 +2746,14 @@ type PlayerLine struct {
 	// PositionRank his place at his position in our order
 	PositionRank *int `json:"position_rank"`
 
+	// ProjectionDelta week_projection's change since the week's snapshot before the newest, to the cent, in the same format; null without a row for him in both snapshots or when week_projection is null
+	ProjectionDelta *float64 `json:"projection_delta"`
+
 	// RestOfSeasonPerGame his rest-of-season points a game, one decimal: the published board's rest-of-season points over the games his club has left from the board's first week through week 17, byes out, as the basis says; null on the preseason number, on a run that does not say its first week, without a projection or with no games left. A player who is out keeps it: it assumes he plays
 	RestOfSeasonPerGame *float64 `json:"rest_of_season_per_game"`
+
+	// SeasonAvg his points a game over every completed game this season under the league's scoring, to the cent; null before his first game
+	SeasonAvg *float64 `json:"season_avg"`
 
 	// Slug his page on the site (/players/{slug}): set for a player our order ranks whose name no other player in our directory shares, null otherwise (a shared name's page is named by the run, which the API does not read)
 	Slug *string `json:"slug"`
