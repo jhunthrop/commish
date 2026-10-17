@@ -387,6 +387,27 @@ paths:
         "409": { $ref: "#/components/responses/ErrorResponse" }
         "422": { $ref: "#/components/responses/ErrorResponse" }
         "502": { $ref: "#/components/responses/ErrorResponse" }
+  /leagues/attached/{id}/scoreboard:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: the attached league's id (AttachedLeague.id)
+        schema: { type: string, format: uuid }
+    get:
+      tags: [league-sync]
+      operationId: leagueScoreboard
+      summary: >-
+        Every game of the league's week: each side's points so far as the host scores them, its starters' summed
+        published projection, and the game's state from its starters' kickoffs (before kickoff, playing, final). Reads
+        the league as the sync route does.
+      security: [{ session: [] }]
+      responses:
+        "200": { $ref: "#/components/responses/ScoreboardResponse" }
+        "404": { $ref: "#/components/responses/ErrorResponse" }
+        "409": { $ref: "#/components/responses/ErrorResponse" }
+        "422": { $ref: "#/components/responses/ErrorResponse" }
+        "502": { $ref: "#/components/responses/ErrorResponse" }
   /leagues/attached/{id}/waivers:
     parameters:
       - name: id
@@ -1862,6 +1883,14 @@ components:
             allOf:
               - $ref: "#/components/schemas/Envelope"
               - properties: { data: { $ref: "#/components/schemas/LineupAdvice" } }
+    ScoreboardResponse:
+      description: every game of the league's week
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: "#/components/schemas/Envelope"
+              - properties: { data: { $ref: "#/components/schemas/Scoreboard" } }
     MatchupBoxResponse:
       description: the week's matchup as a box score
       content:
@@ -3145,7 +3174,7 @@ components:
         teams: { type: integer }
     LeagueTeam:
       type: object
-      required: [roster_id, name, owner, wins, losses, ties, points_for]
+      required: [roster_id, name, owner, wins, losses, ties, points_for, points_against, streak, waiver_order, waiver_budget_left, avatar]
       properties:
         roster_id: { type: integer }
         name: { type: string, description: the team's name, or its owner's when it has none }
@@ -3154,6 +3183,21 @@ components:
         losses: { type: integer }
         ties: { type: integer }
         points_for: { type: number, format: double }
+        points_against: { type: number, format: double, nullable: true, description: null where the host does not say }
+        streak:
+          type: string
+          nullable: true
+          pattern: "^[WL][1-9][0-9]?$"
+          description: the current run of wins or losses ("W3", "L2"), null where the host does not say
+        waiver_order: { type: integer, nullable: true, description: the team's place in the waiver order, null where the host does not say }
+        waiver_budget_left:
+          type: integer
+          nullable: true
+          description: the waiver budget the team has left, null in a league without a budget or where the host does not say
+        avatar:
+          type: string
+          nullable: true
+          description: the host's image for the team or its owner, null where the host gives none we show
     LeaguePlayer:
       type: object
       required: [host_id, board_id, name, position, team, injured_reserve]
@@ -3564,6 +3608,56 @@ components:
       properties:
         format: { type: string, enum: [ppr, half_ppr, standard] }
         league_own: { type: boolean, description: the league scores exactly as format, every rule alike }
+    ScoreboardSide:
+      type: object
+      required: [roster_id, points, points_read, projection, starters, played]
+      properties:
+        roster_id: { type: integer }
+        points: { type: number, format: double, description: the side's points so far as the host scores them }
+        points_read: { type: boolean, description: false when the host's score could not be read; points then says nothing }
+        projection:
+          type: number
+          format: double
+          nullable: true
+          description: >-
+            the side's starters' week projections summed, each as printed to the tenth, a starter with none counting
+            nothing; null when no starter has one
+        starters: { type: integer, description: the starters the host lists for the side }
+        played: { type: integer, description: those starters whose game has kicked off }
+    ScoreboardGame:
+      type: object
+      required: [state, next_kickoff, sides]
+      properties:
+        state:
+          type: string
+          enum: [upcoming, playing, final]
+          description: >-
+            upcoming before any starter's game kicks off, final once every starter's game is over, playing between
+        next_kickoff:
+          type: string
+          format: date-time
+          nullable: true
+          description: the earliest kickoff still to come among both sides' starters, null when none is
+        sides:
+          type: array
+          description: two sides, the drafter's first when the game is theirs; one for a team with no opponent
+          items: { $ref: "#/components/schemas/ScoreboardSide" }
+    Scoreboard:
+      type: object
+      required: [week, read_at, projection_read_at, projection_scoring, games]
+      properties:
+        week: { type: integer }
+        read_at: { type: string, format: date-time, description: the league's last host read }
+        projection_read_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: when the week's published projection was captured, null with none
+        projection_scoring: { $ref: "#/components/schemas/ProjectionScoring" }
+        games:
+          type: array
+          description: the drafter's game first, then the rest in the host's order
+          items: { $ref: "#/components/schemas/ScoreboardGame" }
     MatchupBox:
       type: object
       required: [week, read_at, projection_read_at, projection_scoring, sides]
@@ -3970,13 +4064,67 @@ components:
         host_note: { type: string, nullable: true, description: "as TradeAdvice's" }
     LeagueMove:
       type: object
-      required: [kind, at, roster_ids, adds, drops]
+      required: [kind, at, roster_ids, adds, drops, bid]
       properties:
+        bid: { type: integer, nullable: true, description: a claim's bid from the league's waiver budget, null for a move with none }
         kind: { type: string, enum: [add, waiver, trade] }
         at: { type: string, format: date-time }
         roster_ids: { type: array, items: { type: integer } }
         adds: { type: array, items: { $ref: "#/components/schemas/MovePlayer" } }
         drops: { type: array, items: { $ref: "#/components/schemas/MovePlayer" } }
+    LeagueTerms:
+      type: object
+      description: the league's settings as its host states them, for the league page's settings; read only
+      required: [waivers, waiver_budget, playoff_teams, playoff_weeks, roster, scoring, scoring_unstated, scoring_extra, host_settings_url]
+      properties:
+        waivers:
+          type: string
+          nullable: true
+          enum: [budget, order]
+          description: claims carry a bid from a season budget, or run in a waiver order; null where the host does not say
+        waiver_budget: { type: integer, nullable: true, description: each team's season budget, null without one }
+        playoff_teams: { type: integer, nullable: true, description: the teams that make the playoffs, null where the host does not say }
+        playoff_weeks:
+          allOf: [{ $ref: "#/components/schemas/PlayoffWeeks" }]
+          nullable: true
+          description: null where the host does not say
+        roster: { $ref: "#/components/schemas/LeagueShape" }
+        scoring:
+          allOf: [{ $ref: "#/components/schemas/ScoringRules" }]
+          nullable: true
+          description: the league's rules as ScoringRules, null when the host's scoring could not be read whole
+        scoring_extra:
+          type: array
+          description: the host's rules ScoringRules does not carry, in drafter words with the host's figure
+          items: { $ref: "#/components/schemas/DroppedRule" }
+        scoring_unstated:
+          type: array
+          description: >-
+            the ScoringRules keys the platform does not state, which scoring holds at our standard figure; the
+            settings print no figure for them, never ours as the league's
+          items: { type: string }
+        host_settings_url: { type: string, nullable: true, description: the host's page for the league's settings, null where we know none }
+    PlayoffWeeks:
+      type: object
+      description: the playoffs' first and last week
+      required: [first, last]
+      properties:
+        first: { type: integer }
+        last: { type: integer }
+    LeagueShape:
+      type: object
+      description: the league's starting lineup by our slots, and its bench
+      required: [qb, rb, wr, te, flex, super_flex, k, def, bench]
+      properties:
+        qb: { type: integer }
+        rb: { type: integer }
+        wr: { type: integer }
+        te: { type: integer }
+        flex: { type: integer }
+        super_flex: { type: integer }
+        k: { type: integer }
+        def: { type: integer }
+        bench: { type: integer }
     MovePlayer:
       type: object
       required: [player, roster_id]
@@ -4022,7 +4170,15 @@ components:
         - host_stale_seconds
         - host_failed
         - host_signed_out
+        - terms
+        - moves_read
       properties:
+        terms: { $ref: "#/components/schemas/LeagueTerms" }
+        moves_read:
+          type: boolean
+          description: >-
+            the platform's moves are read (ESPN gives us no move history): false, moves is empty and says nothing
+            about whether anyone moved
         id: { type: string, format: uuid }
         host: { $ref: "#/components/schemas/LeagueHost" }
         host_league_id: { type: string }

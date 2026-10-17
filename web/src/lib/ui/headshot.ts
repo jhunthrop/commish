@@ -1,12 +1,10 @@
 /** Headshots are served from our own origin at the size they are drawn (spec §2.5). A face asks
  * /img/headshots/<league>/<id>/<width> for its drawn width at 1x and 2x, and the image route
- * fetches that size from the provider once and caches it at the edge. A provider change is the one
- * line in upstreamHeadshotUrl. */
+ * fetches that size from the provider once and caches it at the edge. The provider's addresses are
+ * built in headshot-provider.ts; a provider change touches it and the matcher here. */
 
 const ESPN_HEADSHOT =
 	/^https:\/\/a\.espncdn\.com\/i\/headshots\/([a-z]+)\/players\/full\/(\d+)\.png$/;
-const ESPN_COMBINER = 'https://a.espncdn.com/combiner/i';
-const HEADSHOT_ASPECT = 436 / 600;
 const DENSITIES = [1, 2] as const;
 
 /** Where the image route lives. */
@@ -32,16 +30,6 @@ export interface HeadshotSources {
 
 export function isHeadshotLeague(value: string): value is HeadshotLeague {
 	return (HEADSHOT_LEAGUES as readonly string[]).includes(value);
-}
-
-/** The provider's image at a width. The one line a provider change touches. */
-export function upstreamHeadshotUrl(league: HeadshotLeague, id: string, width: number): string {
-	const query = new URLSearchParams({
-		img: `/i/headshots/${league}/players/full/${id}.png`,
-		w: String(width),
-		h: String(Math.round(width * HEADSHOT_ASPECT))
-	});
-	return `${ESPN_COMBINER}?${query.toString()}`;
 }
 
 function routeUrl(league: string, id: string, width: number): string {

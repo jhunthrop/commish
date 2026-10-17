@@ -1,0 +1,672 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Commish League, S.U.C.K. - Severely Underrated Carolina Keepers (Lane 66i mock, light)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@500;700;800&family=Outfit:wght@400;500;600;700&display=swap">
+<style>
+/* Commish tokens: the Press Box system with two bounded borrowings. One file, both themes.
+   Layout concept: a near-black or paper-white shell, an icon rail on the left, a persistent
+   search across the top, dense rows in the middle, a filter and sheet rail on the right.
+   Borrowed from Scout: a reading serif, allowed on the player page's prose and its pull figures only.
+   Borrowed from Broadcast: the score bug and the lower third, allowed in a live draft room only.
+   Light values live on bare :root. Dark redefines tokens only, twice, so the OS
+   setting and the explicit data-theme toggle both win. */
+
+:root {
+  /* Type. Outfit is the geometric UI face: Poppins's circles with a tighter set width,
+     so a dense row holds "Jaxon Smith-Njigba" at 15px without truncating.
+     Big Shoulders Display is the condensed number face, drawn from stadium and
+     transit lettering, narrow enough that 344.1 fits a 64px cell at display size. */
+  --font-ui: "Outfit", "Outfit Fallback", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --font-num: "Big Shoulders Display", "Big Shoulders Display Fallback", "Oswald", "Arial Narrow", sans-serif;
+  /* Newsreader is the reading face. Optical sizes cut for long screen reading, because the
+     capsule is writing. Allowed on the player page's prose block and its pull figures, nowhere else. */
+  --font-read: "Newsreader", "Newsreader Fallback", "Iowan Old Style", "Charter", Georgia, serif;
+  --t-read: 1.1875rem;  /* 19 capsule prose */
+  --t-pull: 2.75rem;    /* 44 a pull figure, the same step as --t-2xl */
+
+  /* Type scale, 1.2 ratio from a 14px base. Numbers use --font-num at the top three. */
+  --t-xs: 0.6875rem;   /* 11 labels on cells, uppercase, tracked */
+  --t-sm: 0.8125rem;   /* 13 secondary text */
+  --t-md: 0.9375rem;   /* 15 names, body in rows */
+  --t-lg: 1.125rem;    /* 18 section heads, prose */
+  --t-xl: 1.625rem;    /* 26 cell numbers in display face */
+  --t-head: 1.875rem; /* 30 a panel title in the display face */
+  --t-display: 2.375rem; /* 38 a page title in the display face */
+  --t-2xl: 2.75rem;    /* 44 tier cliffs, clock */
+  --t-3xl: 5.5rem;     /* 88 the one big number on a page */
+  --track-label: 0.08em;
+
+  /* Space and shape. Rows are 52px on desktop and 48 on the phone. Radii are small:
+     a press box is glass and steel, not pillows. */
+  --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px; --s-5: 24px; --s-6: 32px; --s-7: 48px;
+  --row-h: 52px;
+  --touch: 44px; /* the smallest target a thumb gets on a phone */
+  --tab-bar-h: 64px; /* the phone's tab bar, the rail laid along the bottom */
+  --rail-w: 84px;
+  --side-w: 296px;
+  --r-sm: 4px; --r-md: 8px; --r-pill: 999px;
+
+  /* Neutrals, light. True paper white with ink that leans a touch warm toward the
+     accent, so the greys read as chosen rather than default. */
+  --bg: #ffffff;
+  --surface: #f8f7f5;
+  --surface-2: #efedea;
+  --line: #e3dfda;
+  --line-strong: #cfc9c2;
+  --ink: #15120f;
+  --ink-2: #48413b;
+  --ink-3: #6b635c;      /* 5.9:1 on --bg */
+  --shell: #ffffff;      /* rail and top bar */
+  --shell-line: #e3dfda;
+
+  /* The one warm accent: burnt orange at hue 20. Streak amber (#E39A0E) sits at 38
+     and reads 2.3:1 as text on white, so it cannot carry a verb in light. This orange
+     holds 5:1 under white text and as text on paper, and stays clear of every tier hue.
+     It marks three things only: the brand, the one solid verb, and you. */
+  --accent: #c2470a;
+  --accent-ink: #ffffff;       /* text on an accent fill */
+  --accent-text: #b03f06;      /* accent used as text on --bg */
+  --accent-wash: #fdebe0;      /* your rows, your picks */
+  --focus: #c2470a;
+
+  /* Magnitude. Over replacement is tinted by the round it would go in on our board
+     of 400 (1 to 4, then none). Below replacement takes the rose wash and a minus. */
+  --heat-1: #a6e3bd;
+  --heat-2: #c8eed5;
+  --heat-3: #e0f5e7;
+  --heat-4: #f0faf3;
+  --heat-neg: #fbe1e4;
+  --heat-ink: #15120f;
+
+  /* Drafters versus us. Later is a gain for you, earlier is a cost. Always with the word. */
+  --gain-bg: #dcf3e4; --gain-ink: #11663a;
+  --loss-bg: #fbe1e4; --loss-ink: #a3243a;
+  /* A player's status on his face: injured reserve, a solid tag at the photo's top left. */
+  --status-ir-bg: #a3243a; --status-ir-ink: #ffffff;
+
+  /* Tiers run hot to cold down the board. Each band's label carries the tier number
+     and the drop to the next tier, so the colour is never the only channel. */
+  --tier-1: #c62a47;
+  --tier-2: #b8287f;
+  --tier-3: #7a3cb0;
+  --tier-4: #3a55b4;
+  --tier-5: #0f6f99;
+  --tier-6: #0b7a68;
+  --tier-7: #5b5a65;
+  --tier-ink: #ffffff;
+  --tier-wash: 9%;   /* how much of the tier hue tints its band */
+
+  /* The scoreboard: a lit board on black in both themes. In Commish it carries the draft room's
+     score bug and lower third, and nothing outside a live draft. The orange on it is the dark-theme
+     accent, so the brand reads the same on the board in either theme. */
+  --scoreboard: #15120f;
+  --scoreboard-2: #221d19;     /* a raised segment of the bug */
+  --scoreboard-line: #3a332d;  /* dividers between segments */
+  --scoreboard-ink: #f5f0ea;
+  --scoreboard-ink-2: #b9b0a7; /* labels on the board */
+  --scoreboard-num: #ff7130;
+  --scoreboard-num-ink: #170802; /* text on an orange segment of the bug */
+
+  --shadow-pop: 0 1px 2px rgb(21 18 15 / 0.06), 0 8px 24px rgb(21 18 15 / 0.08);
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #090807; --surface: #12100e; --surface-2: #1b1815; --line: #29241f; --line-strong: #3a332d;
+    --ink: #f5f0ea; --ink-2: #b9b0a7; --ink-3: #8f857c; --shell: #050404; --shell-line: #1e1a17;
+    --accent: #ff7130; --accent-ink: #170802; --accent-text: #ff8a4f; --accent-wash: #2a160b; --focus: #ff8a4f;
+    --heat-1: #1d6a3e; --heat-2: #17502f; --heat-3: #133a23; --heat-4: #10261a; --heat-neg: #43191f; --heat-ink: #f5f0ea;
+    --gain-bg: #12341f; --gain-ink: #6fdc99; --loss-bg: #3a161c; --loss-ink: #ff8f9f; --status-ir-bg: #ff8f9f; --status-ir-ink: #1a0a0d;
+    --tier-1: #cf3350; --tier-2: #c0338a; --tier-3: #8d52cc; --tier-4: #4b6ad6; --tier-5: #12789f; --tier-6: #0e8070; --tier-7: #6c6b78;
+    --tier-ink: #ffffff; --tier-wash: 16%;
+    --scoreboard: #000000; --scoreboard-2: #15120f; --scoreboard-line: #29241f; --scoreboard-ink: #f5f0ea; --scoreboard-ink-2: #b9b0a7; --scoreboard-num: #ff7130; --scoreboard-num-ink: #170802;
+    --shadow-pop: 0 1px 2px rgb(0 0 0 / 0.5), 0 10px 30px rgb(0 0 0 / 0.5);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #090807; --surface: #12100e; --surface-2: #1b1815; --line: #29241f; --line-strong: #3a332d;
+  --ink: #f5f0ea; --ink-2: #b9b0a7; --ink-3: #8f857c; --shell: #050404; --shell-line: #1e1a17;
+  --accent: #ff7130; --accent-ink: #170802; --accent-text: #ff8a4f; --accent-wash: #2a160b; --focus: #ff8a4f;
+  --heat-1: #1d6a3e; --heat-2: #17502f; --heat-3: #133a23; --heat-4: #10261a; --heat-neg: #43191f; --heat-ink: #f5f0ea;
+  --gain-bg: #12341f; --gain-ink: #6fdc99; --loss-bg: #3a161c; --loss-ink: #ff8f9f; --status-ir-bg: #ff8f9f; --status-ir-ink: #1a0a0d;
+  --tier-1: #cf3350; --tier-2: #c0338a; --tier-3: #8d52cc; --tier-4: #4b6ad6; --tier-5: #12789f; --tier-6: #0e8070; --tier-7: #6c6b78;
+  --tier-ink: #ffffff; --tier-wash: 16%;
+    --scoreboard: #000000; --scoreboard-2: #15120f; --scoreboard-line: #29241f; --scoreboard-ink: #f5f0ea; --scoreboard-ink-2: #b9b0a7; --scoreboard-num: #ff7130; --scoreboard-num-ink: #170802;
+  --shadow-pop: 0 1px 2px rgb(0 0 0 / 0.5), 0 10px 30px rgb(0 0 0 / 0.5);
+  color-scheme: dark;
+}
+
+
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-ui);font-size:var(--t-md);line-height:1.4;
+  -webkit-font-smoothing:antialiased}
+a{color:inherit}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.num{font-family:var(--font-num);font-variant-numeric:tabular-nums;letter-spacing:0.01em}
+.label{font-size:var(--t-xs);text-transform:uppercase;letter-spacing:var(--track-label);color:var(--ink-3);font-weight:500}
+.app{display:grid;grid-template-columns:var(--rail-w) minmax(0,1fr);min-height:100vh}
+.rail{position:sticky;top:0;height:100vh;background:var(--shell);border-right:1px solid var(--shell-line);
+  display:flex;flex-direction:column;align-items:stretch;gap:var(--s-1);padding-block:var(--s-4)}
+.mark{display:grid;place-items:center;height:56px;margin-bottom:var(--s-3);text-decoration:none}
+.mark b{font-family:var(--font-num);font-weight:800;font-size:30px;line-height:1;color:var(--ink);
+  border-bottom:4px solid var(--accent);padding-bottom:2px}
+.rail a.item{display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 4px;text-decoration:none;
+  color:var(--ink-3);font-size:var(--t-xs);font-weight:500;text-align:center;border-left:3px solid transparent}
+.rail a.item:hover{color:var(--ink)}
+.rail a.item[aria-current="page"]{color:var(--accent-text);border-left-color:var(--accent)}
+.rail .spacer{flex:1}
+.main{min-width:0;display:flex;flex-direction:column}
+.top{position:sticky;top:0;z-index:5;background:var(--shell);border-bottom:1px solid var(--shell-line);
+  display:flex;align-items:center;gap:var(--s-4);padding:var(--s-3) var(--s-5);min-height:68px}
+.top h1{margin:0;font-size:var(--t-lg);font-weight:700;white-space:nowrap}
+.search{flex:1;max-width:620px;display:flex;align-items:center;gap:var(--s-2);height:42px;padding:0 var(--s-3);
+  border:1px solid var(--line-strong);border-radius:var(--r-md);background:var(--surface);color:var(--ink-3)}
+.search input{flex:1;min-width:0;border:0;background:transparent;font:inherit;color:var(--ink);outline:none}
+.search input::placeholder{color:var(--ink-3)}
+.search kbd{font-family:var(--font-ui);font-size:var(--t-xs);border:1px solid var(--line-strong);border-radius:var(--r-sm);padding:1px 6px}
+.top .tail{margin-left:auto;display:flex;align-items:center;gap:var(--s-3)}
+.quiet{display:inline-flex;align-items:center;gap:6px;height:38px;padding:0 var(--s-3);border-radius:var(--r-md);
+  border:1px solid var(--line-strong);background:transparent;cursor:pointer;font-size:var(--t-sm);font-weight:500;color:var(--ink-2);text-decoration:none}
+.quiet:hover{color:var(--ink);border-color:var(--ink-3)}
+.theme{display:flex;gap:2px;padding:3px;border:1px solid var(--line-strong);border-radius:var(--r-md);background:var(--surface)}
+.theme button{height:30px;padding:0 10px;border:0;border-radius:var(--r-sm);background:transparent;cursor:pointer;
+  font-size:var(--t-sm);font-weight:500;color:var(--ink-2)}
+.theme button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.verb{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:42px;padding:0 var(--s-5);
+  border:0;border-radius:var(--r-md);background:var(--accent);color:var(--accent-ink);font-weight:700;font-size:var(--t-md);
+  cursor:pointer;text-decoration:none;white-space:nowrap}
+.verb:hover{filter:brightness(1.06)}
+.chips{display:flex;flex-wrap:wrap;gap:var(--s-2);align-items:center}
+.chip{height:32px;padding:0 var(--s-3);border-radius:var(--r-pill);border:1px solid var(--line-strong);background:transparent;
+  font-size:var(--t-sm);font-weight:500;color:var(--ink-2);cursor:pointer;white-space:nowrap}
+.chip[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--bg)}
+.chip-group{display:flex;gap:4px;padding:3px;border:1px solid var(--line);border-radius:var(--r-pill);background:var(--surface)}
+.chip-group .chip{border-color:transparent;height:28px}
+.face{flex:none;border-radius:50%;background:var(--surface-2);overflow:hidden;display:grid;place-items:end center}
+.face img{width:140%;max-width:none;height:auto;display:block;transform:translateY(6%)}
+.pos{display:inline-flex;align-items:center;height:20px;padding:0 7px;border-radius:var(--r-sm);
+  background:var(--surface-2);color:var(--ink);font-size:var(--t-xs);font-weight:700;letter-spacing:0.04em;white-space:nowrap}
+.tier-chip{display:inline-flex;align-items:center;height:20px;padding:0 7px;border-radius:var(--r-sm);
+  color:var(--tier-ink);font-size:var(--t-xs);font-weight:700;letter-spacing:0.04em}
+.t1{--tier:var(--tier-1)}.t2{--tier:var(--tier-2)}.t3{--tier:var(--tier-3)}.t4{--tier:var(--tier-4)}
+.t5{--tier:var(--tier-5)}.t6{--tier:var(--tier-6)}.t7{--tier:var(--tier-7)}
+.tier-chip{background:var(--tier)}
+.heat-1{background:var(--heat-1)}.heat-2{background:var(--heat-2)}.heat-3{background:var(--heat-3)}
+.heat-4{background:var(--heat-4)}.heat-neg{background:var(--heat-neg)}.heat-0{background:transparent}
+.gap{display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:var(--r-sm);font-size:var(--t-sm);font-weight:600;white-space:nowrap}
+.gap.later{background:var(--gain-bg);color:var(--gain-ink)}
+.gap.earlier{background:var(--loss-bg);color:var(--loss-ink)}
+.gap.even{background:var(--surface-2);color:var(--ink-2)}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md)}
+@media (max-width: 760px){
+  :root{--row-h:48px}
+  .app{grid-template-columns:minmax(0,1fr);padding-bottom:64px}
+  .rail{position:fixed;inset:auto 0 0 0;top:auto;height:auto;z-index:20;flex-direction:row;justify-content:space-around;
+    padding:4px 4px calc(4px + env(safe-area-inset-bottom,0px));border-right:0;border-top:1px solid var(--shell-line)}
+  .rail .mark,.rail .spacer,.rail a.item.wide-only{display:none}
+  .rail a.item{border-left:0;border-top:3px solid transparent;padding:6px 2px;flex:1}
+  .rail a.item[aria-current="page"]{border-top-color:var(--accent)}
+  .top{padding:var(--s-2) var(--s-4);gap:var(--s-2);flex-wrap:wrap;min-height:0}
+  .top h1{display:none}
+  .top .search{order:3;flex-basis:100%;max-width:none;height:38px}
+  .top .tail{margin-left:auto}
+  .search kbd{display:none}
+  .theme button{height:26px;padding:0 7px;font-size:var(--t-xs)}
+}
+/* The league switch closes the top bar at the right on every width: the selected league's name (or
+   the format with none) at one width, so the bar never moves when the name arrives. */
+.switch{position:relative;display:flex;flex:none;min-width:0}
+.switch>button{display:inline-flex;align-items:center;gap:var(--s-2);width:232px;height:40px;padding:0 var(--s-3);
+  border:1px solid var(--line-strong);border-radius:var(--r-md);background:var(--surface);font-size:var(--t-sm);
+  font-weight:600;text-align:left;cursor:pointer}
+.switch>button[aria-expanded="true"]{border-color:var(--ink)}
+.switch>button .flag{display:inline-flex;color:var(--accent-text)}
+.switch>button .words{flex:1;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.switch>button .chev{display:inline-flex;color:var(--ink-3)}
+.switch-menu{position:absolute;top:calc(100% + var(--s-2));right:0;z-index:30;width:360px;display:flex;flex-direction:column;
+  gap:var(--s-3);padding:var(--s-3);border:1px solid var(--line-strong);border-radius:var(--r-md);background:var(--bg);
+  box-shadow:var(--shadow-pop)}
+.switch-menu .lg{display:flex;flex-direction:column;gap:2px;width:100%;padding:var(--s-2) var(--s-3);border:0;
+  border-left:3px solid transparent;border-radius:var(--r-sm);background:none;text-align:left;cursor:pointer}
+.switch-menu .lg[aria-pressed="true"]{border-left-color:var(--accent);background:var(--surface)}
+.switch-menu .lg b{font-weight:600}
+.switch-menu .lg small{font-size:var(--t-sm);color:var(--ink-2)}
+.switch-menu .foot{display:flex;flex-direction:column;align-items:flex-start;gap:var(--s-2);padding-top:var(--s-3);
+  border-top:1px solid var(--line)}
+@media (max-width: 760px){
+  .top .switch{order:2;flex:1}
+  .top .switch>button{width:100%}
+  .switch-menu{position:fixed;top:60px;left:var(--s-3);right:var(--s-3);width:auto}
+}
+@media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
+
+
+
+.top .quiet{font-weight:600;color:var(--ink)}
+.mx{display:flex;flex-direction:column;gap:var(--s-4);padding:var(--s-4) var(--s-5) var(--s-7)}
+.mocknote{margin:0;padding:var(--s-2) var(--s-3);border:1px dashed var(--line-strong);border-radius:var(--r-md);font-size:var(--t-xs);color:var(--ink-3);line-height:1.5}
+.si{text-decoration:underline dotted;text-decoration-color:color-mix(in srgb,currentColor 55%,transparent);text-underline-offset:3px;text-decoration-thickness:1.5px}
+.title h2{margin:0;font-family:var(--font-num);font-weight:800;font-size:var(--t-display);line-height:1;text-transform:uppercase;letter-spacing:.01em}
+.title .lede{margin:6px 0 0;font-size:var(--t-sm);color:var(--ink-3)}
+.tabs{align-self:flex-start}
+.tabs .chip{display:inline-flex;align-items:center;text-decoration:none;color:var(--ink-2)}
+.tabs .chip[aria-pressed]{background:var(--ink);color:var(--bg)}
+
+/* The decision strip: the week, the count, the swaps as chips, the gain, one verb. */
+.decide{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;align-items:center;gap:var(--s-5);
+  padding:var(--s-3) var(--s-4);border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:var(--r-md);background:var(--surface)}
+.d-head{display:flex;flex-direction:column;gap:2px}
+.d-wk{font-size:var(--t-xs);font-weight:700;text-transform:uppercase;letter-spacing:var(--track-label);color:var(--accent-text)}
+.d-head h3{margin:0;font-family:var(--font-num);font-weight:800;font-size:var(--t-head);line-height:1;text-transform:uppercase;letter-spacing:.01em;white-space:nowrap}
+.swaps{display:flex;flex-wrap:wrap;gap:var(--s-2);margin:0;padding:0;list-style:none}
+.swap{display:inline-flex;align-items:center;gap:var(--s-2);height:34px;padding:0 var(--s-3) 0 4px;border:1px solid var(--line-strong);border-radius:var(--r-pill);background:var(--bg);font-size:var(--t-sm);white-space:nowrap}
+.sw-slot{display:grid;place-items:center;height:26px;min-width:34px;padding:0 6px;border-radius:var(--r-pill);background:var(--surface-2);font-family:var(--font-num);font-weight:700;font-size:var(--t-sm);letter-spacing:.03em}
+.sw-in,.sw-out{display:inline-flex;align-items:center;gap:3px}
+.sw-in{font-weight:700;color:var(--ink)}
+.sw-in svg{color:var(--accent-text)}
+.sw-out{color:var(--ink-3)}
+.d-sum{display:flex;flex-direction:column;align-items:flex-end;gap:2px;white-space:nowrap}
+.d-sum b{font-family:var(--font-num);font-weight:800;font-size:var(--t-xl);line-height:1;color:var(--accent-text);font-variant-numeric:tabular-nums}
+.d-sum span{font-size:var(--t-xs);color:var(--ink-3);font-variant-numeric:tabular-nums}
+.d-sum em{font-style:normal;font-weight:700;color:var(--gain-ink)}
+.d-act{display:flex;flex-direction:column;align-items:flex-end;gap:4px}
+.d-rec{font-size:var(--t-xs);color:var(--ink-3)}
+
+/* The lineup table: one table, starters, Totals, bench, injured reserve. */
+.lineup{width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);overflow:hidden}
+.c-slot{width:72px}.c-game{width:236px}.c-proj{width:72px}.c-pts{width:60px}.c-rk{width:92px}.c-ev{width:64px}.c-dl{width:72px}.c-op{width:44px}
+.lineup th,.lineup td{padding:0 var(--s-2);border-bottom:1px solid var(--line);vertical-align:middle}
+.lineup tr.cols th{height:32px;font-size:var(--t-xs);font-weight:600;text-transform:uppercase;letter-spacing:var(--track-label);color:var(--ink-3);text-align:left;background:var(--bg);white-space:nowrap}
+.lineup th.n,.lineup td.n{text-align:right}
+.lineup th.ev:first-of-type,.lineup .rkc{padding-left:var(--s-4)}
+.lineup tbody tr{height:var(--row-h)}
+.lineup tbody tr:not(.totals):not(.sect):not(.whyline):hover td{background:var(--surface-2)}
+td.slot{font-family:var(--font-num);font-size:var(--t-md);font-weight:700;letter-spacing:.03em;color:var(--ink-2);white-space:nowrap;padding-left:var(--s-3)}
+.mv{display:inline-grid;place-items:center;width:18px;height:18px;margin-right:4px;border-radius:50%;vertical-align:-3px}
+.mv.in{background:var(--accent);color:var(--accent-ink)}
+.mv.out{background:var(--surface-2);color:var(--ink-2);border:1px solid var(--line-strong)}
+tr.moved td{background:color-mix(in srgb,var(--accent) 8%,var(--surface))}
+tr.moved td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
+tr.moved.out td{background:color-mix(in srgb,var(--ink) 4%,var(--surface))}
+tr.moved.out td:first-child{box-shadow:inset 3px 0 0 var(--line-strong)}
+tr.moved.out .nm a{color:var(--ink-2)}
+.pl{display:flex;align-items:center;gap:var(--s-3);min-width:0}
+.who{display:flex;flex-direction:column;min-width:0;gap:3px}
+.nm{display:flex;align-items:center;min-width:0}
+.nm a{font-weight:600;font-size:var(--t-md);color:var(--ink);text-decoration:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nm a:hover{text-decoration:underline}
+.sub{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.club{font-size:var(--t-xs);color:var(--ink-3);font-weight:500;letter-spacing:.03em;min-width:28px}
+.tchip{display:inline-flex;align-items:center;height:20px;padding:0 7px;border-radius:var(--r-sm);font-size:var(--t-xs);font-weight:600;white-space:nowrap}
+.tchip.even{background:var(--surface-2);color:var(--ink-2)}
+.tchip.loss{background:var(--loss-bg);color:var(--loss-ink)}
+.tag{display:inline-flex;align-items:center;height:20px;padding:0 6px;border-radius:var(--r-sm);border:1px solid color-mix(in srgb,currentColor 40%,transparent);color:var(--accent-text);font-size:var(--t-xs);font-weight:700;text-transform:uppercase;letter-spacing:var(--track-label)}
+.mark-face{background:transparent;place-items:center}
+.mark-face img{width:100%;transform:none}
+.game{font-size:var(--t-sm)}
+td.game{white-space:nowrap}
+.opp{display:flex;gap:6px}
+.opp b{font-weight:700}
+.opp span{color:var(--ink-2);font-variant-numeric:tabular-nums}
+.facts{display:flex;gap:var(--s-2);align-items:center;margin-top:2px;font-size:var(--t-xs);color:var(--ink-3);font-variant-numeric:tabular-nums}
+.facts .exp{font-family:var(--font-num);font-size:var(--t-sm);font-weight:600;color:var(--ink-2);letter-spacing:.02em}
+.facts .wx{display:inline-flex;align-items:center;gap:3px}
+.bye{display:inline-flex;align-items:center;height:20px;padding:0 8px;border-radius:var(--r-sm);background:var(--surface-2);color:var(--ink-2);font-size:var(--t-xs);font-weight:700;text-transform:uppercase;letter-spacing:var(--track-label)}
+td.proj{font-family:var(--font-num);font-weight:700;font-size:var(--t-xl);font-variant-numeric:tabular-nums;line-height:1}
+td.pts{font-family:var(--font-num);font-weight:700;font-size:var(--t-lg)}
+td.ev{font-family:var(--font-num);font-weight:600;font-size:var(--t-lg);color:var(--ink-2);font-variant-numeric:tabular-nums}
+th.rkc,td.rkc{border-left:1px solid var(--line)}
+td.dl{font-size:var(--t-md);color:var(--ink-3)}
+.dash{color:var(--ink-3);font-weight:600}
+.rk{display:inline-flex;align-items:center;justify-content:flex-end;min-width:44px;height:24px;padding:0 6px;border-radius:var(--r-sm)}
+.rk.easy{background:var(--gain-bg);color:var(--gain-ink)}
+.rk.hard{background:var(--loss-bg);color:var(--loss-ink)}
+.rk.mid{color:var(--ink-2)}
+td.op{text-align:center;padding:0}
+.why{display:inline-grid;place-items:center;width:32px;height:32px;border:1px solid var(--line-strong);border-radius:var(--r-md);background:transparent;color:var(--ink-2);cursor:pointer}
+.why[aria-expanded="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.why[aria-expanded="true"] svg{transform:rotate(180deg)}
+tr.open td{border-bottom-color:transparent}
+tr.whyline td{height:auto;padding-block:0 var(--s-3);background:color-mix(in srgb,var(--accent) 8%,var(--surface));font-size:var(--t-sm);color:var(--ink);font-variant-numeric:tabular-nums}
+tr.whyline td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
+tr.whyline td+td{padding-left:calc(32px + var(--s-3) + var(--s-2))}
+tr.totals td{height:56px;background:var(--scoreboard);color:var(--scoreboard-ink);border-bottom:0}
+tr.totals .tl{font-family:var(--font-num);font-weight:800;text-transform:uppercase;letter-spacing:.06em;font-size:var(--t-lg);padding-left:var(--s-1)}
+tr.totals td.proj b{color:var(--scoreboard-num);font-size:var(--t-2xl);font-weight:800}
+tr.totals td.pts b{color:var(--scoreboard-ink-2);font-size:var(--t-xl)}
+tr.sect td{height:32px;font-size:var(--t-xs);font-weight:700;text-transform:uppercase;letter-spacing:var(--track-label);color:var(--ink-3);background:var(--bg);padding-left:var(--s-3)}
+.lower tr.bn{height:48px}
+.lower td.proj{font-size:var(--t-lg);color:var(--ink-2)}
+.lower .face{opacity:.92}
+.basis{display:flex;flex-direction:column;gap:2px;max-width:1000px}
+.basis p{margin:0;font-size:var(--t-sm);color:var(--ink-3);line-height:1.5}
+.basis p:first-child{color:var(--ink-2);font-weight:500}
+.vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.ph{display:none}
+
+@media (max-width: 1180px){
+  .decide{grid-template-columns:auto minmax(0,1fr) auto;row-gap:var(--s-3)}
+  .d-act{grid-column:1 / -1;flex-direction:row;align-items:center;justify-content:space-between}
+}
+@media (max-width: 760px){
+  .mx{padding:var(--s-3) var(--s-3) calc(var(--tab-bar-h) + 92px);gap:var(--s-3)}
+  .mocknote{font-size:10px}
+  .title h2{font-size:var(--t-head)}
+  .title .lede{font-size:var(--t-xs)}
+  .tabs{align-self:stretch;overflow-x:auto}
+  .decide{grid-template-columns:minmax(0,1fr) auto;gap:var(--s-2) var(--s-3);padding:var(--s-3)}
+  .d-head h3{font-size:var(--t-xl)}
+  .swaps{grid-column:1 / -1;grid-row:2;gap:6px}
+  .swap{height:30px;font-size:var(--t-xs);gap:6px}
+  .sw-slot{height:22px;min-width:28px;font-size:var(--t-xs)}
+  .d-sum b{font-size:var(--t-lg)}
+  .d-act{position:fixed;left:var(--s-3);right:var(--s-3);bottom:calc(var(--tab-bar-h) + var(--s-2));z-index:6;flex-direction:row;
+    padding:var(--s-2);border-radius:var(--r-md);background:var(--shell);border:1px solid var(--line-strong);box-shadow:var(--shadow-pop)}
+  .d-act .verb{flex:1}
+  .d-rec{display:none}
+  .c-slot{width:52px}.c-proj{width:52px}.c-pts{width:36px}.c-op{width:36px}
+  .c-game,.c-rk,.c-ev,.c-dl{width:0}
+  .lineup th.game,.lineup td.game,.lineup .ev{padding:0;overflow:hidden;font-size:0;border-left:0}
+  .lineup td.game *,.lineup td.ev *{display:none}
+  .lineup th,.lineup td{padding:0 4px}
+  td.slot{padding-left:var(--s-2);font-size:var(--t-sm)}
+  .mv{width:16px;height:16px;margin-right:2px}
+  .mv svg{width:11px;height:11px}
+  .lineup tbody tr{height:auto}
+  .lineup tbody td{padding-block:8px}
+  .pl{gap:var(--s-2);align-items:flex-start}
+  .face{width:28px!important;height:28px!important;margin-top:2px}
+  .nm a{white-space:normal;font-size:var(--t-sm)}
+  .ph{display:flex;flex-direction:column;gap:1px;font-size:var(--t-xs);color:var(--ink-2)}
+  .ph .opp{gap:4px}
+  .ph .bye{height:18px}
+  .ph-e{color:var(--ink-3);font-variant-numeric:tabular-nums}
+  .ph-e .rk{height:auto;min-width:0;padding:0 3px;font-weight:700}
+  td.proj{font-size:var(--t-lg)}
+  td.pts{font-size:var(--t-sm)}
+  .why{width:28px;height:28px}
+  tr.whyline td+td{padding-left:var(--s-2)}
+  tr.whyline td:first-child{padding:0}
+  tr.totals td.proj b{font-size:var(--t-xl)}
+  tr.totals .tl{font-size:var(--t-md)}
+  .basis p{font-size:var(--t-xs)}
+}
+.lineup tbody tr.sect{height:32px}
+@media (max-width: 760px){
+  .mocknote .long{display:none}
+  .mocknote .short{display:inline!important}
+  .swaps{gap:4px}
+  .swap{height:28px;padding-right:var(--s-2)}
+  .c-slot{width:46px}.c-op{width:34px}.c-pts{width:30px}
+  td.slot{padding-left:6px}
+  .face{width:24px!important;height:24px!important}
+  .sub{gap:4px}
+  .club{min-width:0}
+  tr.whyline{display:none}
+  .why[aria-expanded="true"]{background:transparent;color:var(--ink-2);border-color:var(--line-strong)}
+  .why[aria-expanded="true"] svg{transform:none}
+  tr.open td{border-bottom-color:var(--line)}
+}
+.mocknote .short{display:none}
+@media (max-width: 760px){.ph-e .rk.mid{padding:0}}
+
+/* Lane 66i: the League page. Builds on Lane 66e's lineup table (lineup.css). */
+.title h2{font-size:var(--t-display);max-width:28ch}
+.navrow{display:flex;align-items:center;justify-content:space-between;gap:var(--s-3);flex-wrap:wrap}
+.segs{display:inline-flex;gap:2px;padding:3px;border:1px solid var(--line);border-radius:var(--r-pill);background:var(--surface)}
+.seg{display:inline-flex;align-items:center;height:30px;padding:0 var(--s-3);border-radius:var(--r-pill);font-size:var(--t-sm);font-weight:600;color:var(--ink-2);text-decoration:none}
+.seg[aria-current]{background:var(--ink);color:var(--bg)}
+.sec-h{display:flex;align-items:baseline;gap:var(--s-3);margin:0 0 var(--s-2)}
+.sec-h h3{margin:0;font-family:var(--font-num);font-weight:800;font-size:var(--t-xl);line-height:1;text-transform:uppercase;letter-spacing:.02em}
+.sec-h span{font-size:var(--t-xs);color:var(--ink-3)}
+
+/* Avatars: the team's initials in a circle, yours in the accent. */
+.av{display:inline-grid;place-items:center;flex:none;border-radius:50%;border:2px solid var(--line-strong);background:var(--surface-2);
+  color:var(--ink);font-weight:800;font-size:11px;letter-spacing:.02em;line-height:1}
+.av.me{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.av.board{background:var(--scoreboard-2);border-color:var(--scoreboard-line);color:var(--scoreboard-ink);font-size:10px}
+.av.board.me{background:var(--scoreboard-num);border-color:var(--scoreboard-num);color:var(--scoreboard-num-ink)}
+
+/* The week's scoreboard: every matchup a score bug pair on the lit board, yours first. */
+.bugs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--s-2)}
+.bug{display:flex;flex-direction:column;gap:2px;padding:var(--s-2) var(--s-3) var(--s-3);border-radius:var(--r-md);background:var(--scoreboard);
+  color:var(--scoreboard-ink);border:1px solid var(--scoreboard-line);text-decoration:none;position:relative}
+.bug:hover{border-color:var(--scoreboard-ink-2)}
+.bug.mine{box-shadow:inset 0 3px 0 var(--scoreboard-num);background:linear-gradient(180deg,color-mix(in srgb,var(--scoreboard-num) 14%,var(--scoreboard)) 0,var(--scoreboard) 70%)}
+.bh,.bt{display:grid;grid-template-columns:26px minmax(0,1fr) auto 52px 60px;align-items:center;column-gap:var(--s-2)}
+.bh{grid-template-columns:auto minmax(0,1fr) 52px 60px;height:24px;font-size:var(--t-xs);color:var(--scoreboard-ink-2);text-transform:uppercase;letter-spacing:var(--track-label);font-weight:600}
+.bh .st{display:inline-flex;align-items:center;gap:6px;color:var(--scoreboard-ink);font-weight:700}
+.bh .st.live{color:var(--scoreboard-num)}
+.bh .sw{text-transform:none;letter-spacing:0;font-weight:500;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.bhn{text-align:right}
+.pulse{width:7px;height:7px;border-radius:50%;background:var(--scoreboard-num);box-shadow:0 0 0 3px color-mix(in srgb,var(--scoreboard-num) 30%,transparent)}
+.bt{height:34px}
+.bn{font-weight:600;font-size:var(--t-md);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.br{font-family:var(--font-num);font-size:var(--t-sm);color:var(--scoreboard-ink-2);font-variant-numeric:tabular-nums}
+.bp{font-family:var(--font-num);font-size:var(--t-lg);font-weight:600;color:var(--scoreboard-ink-2);text-align:right;font-variant-numeric:tabular-nums}
+.bs{font-family:var(--font-num);font-size:var(--t-xl);font-weight:800;text-align:right;line-height:1;font-variant-numeric:tabular-nums}
+.bt.me .bs{color:var(--scoreboard-num)}
+.bt:not(.lead) .bs{color:color-mix(in srgb,var(--scoreboard-ink) 70%,transparent)}
+.bt.me:not(.lead) .bs{color:var(--scoreboard-num)}
+.bt.lead .bs{color:var(--scoreboard-ink)}
+.bt.me.lead .bs{color:var(--scoreboard-num)}
+.bug .dash{color:var(--scoreboard-ink-2)}
+
+/* Standings left, your lineup right. */
+.split{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:var(--s-5);align-items:start}
+.standings,.feed{width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);overflow:hidden}
+.standings th,.standings td,.feed th,.feed td{padding:0 var(--s-2);border-bottom:1px solid var(--line);vertical-align:middle;text-align:left}
+.standings thead th,.feed thead th{height:32px;font-size:var(--t-xs);font-weight:600;text-transform:uppercase;letter-spacing:var(--track-label);color:var(--ink-3);background:var(--bg);white-space:nowrap}
+.standings th button{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:2px}
+.standings th.sorted{color:var(--ink)}
+.standings .n{text-align:right}
+.c-pn{width:40px}.c-wl{width:66px}.c-pf{width:66px}.c-pa{width:66px}.c-sk{width:62px}.c-pj{width:60px}.c-wv{width:62px}
+.standings tbody tr{height:50px}
+.standings tbody tr:hover td{background:var(--surface-2)}
+td.pn{font-family:var(--font-num);font-weight:700;font-size:var(--t-lg);color:var(--ink-3);text-align:center!important}
+th.pn{text-align:center!important}
+.tmw{display:flex;align-items:center;gap:var(--s-2);min-width:0}
+.tmn{display:flex;flex-direction:column;min-width:0}
+.tmn b{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tmn .mg{font-size:var(--t-xs);color:var(--ink-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ph-stk{display:none}
+td.wl,td.pf,td.pa,td.pj,td.wv{font-family:var(--font-num);font-size:var(--t-lg);font-weight:600;font-variant-numeric:tabular-nums}
+td.wl{color:var(--ink)}
+td.pf{color:var(--ink)}
+td.pa,td.wv{color:var(--ink-2)}
+td.pj{color:var(--ink-2)}
+.stk{display:inline-flex;align-items:center;height:22px;padding:0 7px;border-radius:var(--r-sm);font-family:var(--font-num);font-weight:700;font-size:var(--t-md);letter-spacing:.02em}
+.stk.gain{background:var(--gain-bg);color:var(--gain-ink)}
+.stk.loss{background:var(--loss-bg);color:var(--loss-ink)}
+.standings tr.me td,.feed tr.me td{background:var(--accent-wash)}
+.standings tr.me td:first-child,.feed tr.me td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
+.standings tr.me td.pn{color:var(--accent-text)}
+.standings tbody tr.cut{height:0}
+tr.cut td{height:0;padding:0;border-bottom:0;position:relative}
+tr.cut td span{position:absolute;right:var(--s-2);top:-9px;padding:0 6px;background:var(--surface);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:var(--track-label);color:var(--accent-text);line-height:16px;border-radius:var(--r-sm)}
+.standings tbody tr:has(+ tr.cut) td{border-bottom:2px solid var(--accent)}
+
+/* Your lineup: the Lineup table's starters in its columns, the one verb above. */
+.roster{display:flex;flex-direction:column;min-width:0}
+.rs-verb{display:flex;align-items:center;justify-content:space-between;gap:var(--s-3);padding:var(--s-2) var(--s-2) var(--s-2) var(--s-3);margin-bottom:var(--s-2);
+  border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:var(--r-md);background:var(--surface)}
+.rs-sum{display:flex;flex-direction:column;gap:1px;min-width:0}
+.rs-sum b{font-family:var(--font-num);font-weight:800;font-size:var(--t-lg);text-transform:uppercase;letter-spacing:.02em;line-height:1.1}
+.rs-sum span{font-size:var(--t-xs);color:var(--ink-3);font-variant-numeric:tabular-nums}
+.rs-sum em{font-style:normal;font-weight:700;color:var(--gain-ink)}
+.rs-verb .verb{display:inline-flex;align-items:center;gap:4px;text-decoration:none;white-space:nowrap}
+.rs-verb.set{border-left-color:var(--gain-ink)}
+.rs-verb .done{display:inline-flex;align-items:center;gap:6px;font-weight:700;color:var(--gain-ink)}
+.rs-sub{font-size:var(--t-xs);color:var(--ink-3);margin-right:auto}
+.quiet-link{font-size:var(--t-sm);color:var(--ink-2);font-weight:600;padding:6px var(--s-2)}
+.lineup.mini .c-slot{width:58px}.lineup.mini .c-game{width:180px}.lineup.mini .c-proj{width:58px}.lineup.mini .c-pts{width:56px}
+.lineup.mini tbody tr{height:48px}
+.lineup.mini td.proj{font-size:var(--t-lg)}
+.lineup.mini td.pts{font-size:var(--t-lg)}
+.lineup.mini .face{width:28px!important;height:28px!important}
+.lineup.mini .nm a{font-size:var(--t-md)}
+.lineup.mini .sub{gap:5px}
+.lineup.mini .who{gap:1px}
+.lineup.mini tr.totals td{height:48px}
+.lineup.mini tr.totals td.proj b{font-size:var(--t-xl)}
+.tsub{margin-left:var(--s-2);font-size:var(--t-xs);color:var(--scoreboard-ink-2)}
+.swapin{display:inline-flex;align-items:center;gap:3px;font-size:var(--t-xs);font-weight:700;color:var(--accent-text);white-space:nowrap}
+.gs{display:inline-flex;align-items:center;height:16px;padding:0 5px;border-radius:var(--r-sm);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:var(--track-label)}
+.gs.live{background:color-mix(in srgb,var(--accent) 16%,transparent);color:var(--accent-text)}
+.gs.final{background:var(--surface-2);color:var(--ink-2)}
+.benchlink{display:inline-flex;align-items:center;gap:2px;align-self:flex-start;margin-top:var(--s-2);font-size:var(--t-sm);color:var(--ink-3);text-decoration:none;font-weight:500}
+.benchlink:hover{color:var(--ink)}
+
+/* Moves: a feed table, newest first, yours tinted. */
+.c-when{width:118px}.c-who{width:260px}.c-kind{width:118px}.c-det{width:150px}
+.feed tbody tr{height:50px}
+.feed td.when{font-size:var(--t-sm);color:var(--ink-2);font-variant-numeric:tabular-nums;white-space:nowrap}
+.mt{display:flex;align-items:center;gap:var(--s-2);min-width:0}
+.mt+.mt{margin-top:4px}
+.mt b{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kchip{white-space:nowrap;display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:var(--r-sm);font-size:var(--t-xs);font-weight:700;text-transform:uppercase;letter-spacing:var(--track-label);border:1px solid var(--line-strong);color:var(--ink-2)}
+.kchip.k-trade{border-color:color-mix(in srgb,var(--tier-4) 60%,transparent);color:var(--ink)}
+.kchip.k-lineup{border-style:dashed}
+.pls-w{display:flex;flex-wrap:wrap;gap:4px var(--s-4);padding-block:6px}
+.mp{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.mp .face{flex:none}
+.mp b{font-weight:600}
+.mp small{font-size:var(--t-xs);color:var(--ink-3)}
+.mp .ar{display:inline-grid;place-items:center;width:16px;height:16px;border-radius:50%}
+.mp.in .ar{background:var(--accent);color:var(--accent-ink)}
+.mp.out .ar{background:var(--surface-2);color:var(--ink-2);border:1px solid var(--line-strong)}
+.mp.out b{color:var(--ink-2);font-weight:500}
+.mp .to{font-size:var(--t-sm);color:var(--ink-2)}
+.feed td.det{font-size:var(--t-sm);color:var(--ink-2);text-align:right;font-variant-numeric:tabular-nums}
+.feed th.det{text-align:right}
+.feed tr.sect td{height:30px;font-size:var(--t-xs);font-weight:700;text-transform:uppercase;letter-spacing:var(--track-label);color:var(--ink-3);background:var(--bg);padding-left:var(--s-3)}
+.feed tr.none td{height:40px;color:var(--ink-3);font-size:var(--t-sm);padding-left:var(--s-3)}
+
+/* Settings: scoring in the setup page's groups, then the roster and the league. */
+.set-head{display:flex;align-items:flex-end;justify-content:space-between;gap:var(--s-4);margin-bottom:var(--s-3)}
+.set-head h3{margin:0;font-family:var(--font-num);font-weight:800;font-size:var(--t-xl);text-transform:uppercase;letter-spacing:.02em;line-height:1}
+.set-head p{margin:4px 0 0;font-size:var(--t-sm);color:var(--ink-3)}
+.ext{display:inline-flex;align-items:center;gap:6px;height:36px;padding:0 var(--s-3);border:1px solid var(--line-strong);border-radius:var(--r-md);font-size:var(--t-sm);font-weight:600;text-decoration:none;color:var(--ink);white-space:nowrap}
+.set-grid{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:var(--s-5);align-items:start}
+.scoring{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--s-3)}
+.rg,.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);padding:var(--s-3)}
+.rg.wide{grid-column:1 / -1}
+.rg h4,.card h4{margin:0 0 var(--s-2);font-size:var(--t-xs);font-weight:700;text-transform:uppercase;letter-spacing:var(--track-label);color:var(--ink-2)}
+.rules{width:100%;border-collapse:collapse}
+.rules td{padding:5px 0;border-bottom:1px solid var(--line);font-size:var(--t-sm)}
+.rules tr:last-child td{border-bottom:0}
+.rules td.n{text-align:right;font-family:var(--font-num);font-size:var(--t-lg);font-weight:700;font-variant-numeric:tabular-nums;width:64px}
+.rules .vpos,.tiers .vpos{color:var(--ink)}
+.rules .vneg,.tiers .vneg{color:var(--loss-ink)}
+.zero{color:var(--ink-3)}
+.tr-u{display:block;margin:-4px 0 var(--s-2);font-size:var(--t-xs);color:var(--ink-3)}
+.tiers{display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:4px;margin:0;padding:0;list-style:none}
+.tiers li{display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 2px;border-radius:var(--r-sm);background:var(--bg);border:1px solid var(--line)}
+.tr-r{font-size:10px;color:var(--ink-3);white-space:nowrap}
+.tr-v{font-family:var(--font-num);font-size:var(--t-xl);font-weight:800;line-height:1}
+.also .rules{max-width:520px}
+.set-side{display:flex;flex-direction:column;gap:var(--s-3)}
+.shape{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px;margin:0;padding:0;list-style:none}
+.shape li{display:flex;flex-direction:column;align-items:center;padding:6px 0;border-radius:var(--r-sm);background:var(--bg);border:1px solid var(--line)}
+.shape li b{font-family:var(--font-num);font-size:var(--t-xl);font-weight:800;line-height:1}
+.shape li span{font-size:10px;font-weight:700;color:var(--ink-3);text-transform:uppercase;letter-spacing:.04em}
+.shape li.none b{color:var(--ink-3);font-weight:600}
+.fine{margin:var(--s-2) 0 0;font-size:var(--t-xs);color:var(--ink-3)}
+.kv td:last-child{text-align:right;font-weight:600}
+.basis{display:flex;flex-direction:column;gap:2px;max-width:1000px}
+.basis p{margin:0;font-size:var(--t-sm);color:var(--ink-3);line-height:1.5}
+
+@media (max-width: 1180px){
+  .split{grid-template-columns:minmax(0,1fr)}
+  .bugs{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .set-grid{grid-template-columns:minmax(0,1fr)}
+}
+@media (max-width: 760px){
+  .title h2{font-size:var(--t-xl);line-height:1.05}
+  .navrow{gap:var(--s-2)}
+  .segs{align-self:flex-start}
+  .bugs{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;margin-inline:calc(var(--s-3) * -1);padding-inline:var(--s-3);gap:var(--s-2)}
+  .bug{flex:0 0 300px;scroll-snap-align:start}
+  .bh,.bt{grid-template-columns:24px minmax(0,1fr) auto 40px 48px;column-gap:6px}
+  .bh{grid-template-columns:auto minmax(0,1fr) 40px 48px}
+  .bs{font-size:var(--t-lg)}
+  .bp{font-size:var(--t-md)}
+  .sec-h h3{font-size:var(--t-lg)}
+  .c-pn{width:28px}.c-pa,.c-sk,.c-wv{width:0}.c-wl{width:48px}.c-pf{width:54px}.c-pj{width:48px}
+  .standings th.pa,.standings td.pa,.standings th.sk,.standings td.sk,.standings th.wv,.standings td.wv{padding:0;overflow:hidden;font-size:0;border-left:0}
+  .standings td.sk *,.standings td.wv *,.standings td.pa *{display:none}
+  .standings th,.standings td{padding:0 4px}
+  td.wl,td.pf,td.pj{font-size:var(--t-md)}
+  .standings tbody tr{height:auto}
+  .standings tbody td{padding-block:7px}
+  .tmw .av{width:24px!important;height:24px!important;font-size:9px}
+  .tmn b{font-size:var(--t-sm)}
+  .ph-stk{display:block;margin-top:2px}
+  .ph-stk .stk{height:16px;font-size:var(--t-xs);padding:0 4px}
+  .tmn .mg{display:none}
+  .rs-verb{position:fixed;left:var(--s-3);right:var(--s-3);bottom:calc(var(--tab-bar-h) + var(--s-2));z-index:6;margin:0;
+    background:var(--shell);border:1px solid var(--line-strong);border-left:4px solid var(--accent);box-shadow:var(--shadow-pop)}
+  .rs-verb.set{position:static;box-shadow:none}
+  .lineup.mini .c-slot{width:46px}.lineup.mini .c-proj{width:46px}.lineup.mini .c-pts{width:40px}
+  .lineup.mini .c-game{width:0}
+  .lineup.mini th.game,.lineup.mini td.game{padding:0;overflow:hidden;font-size:0}
+  .lineup.mini td.game *{display:none}
+  .lineup.mini .face{width:24px!important;height:24px!important}
+  .lineup.mini .nm a{font-size:var(--t-sm)}
+  .lineup.mini .ph{display:flex}
+  .lineup.mini .ph .facts{display:none}
+  .lineup.mini tbody tr{height:auto}
+  .lineup.mini tbody td{padding-block:6px}
+  .tsub{display:none}
+  .feed thead{display:none}
+  .feed,.feed tbody,.feed tr,.feed td{display:block;width:auto}
+  .feed colgroup{display:none}
+  .feed tbody tr{display:grid;grid-template-columns:auto 1fr auto;grid-template-areas:'kind mwho when' 'pls pls pls' 'det det det';gap:4px var(--s-2);height:auto;padding:var(--s-2) var(--s-3);border-bottom:1px solid var(--line)}
+  .feed td{border:0;padding:0;height:auto!important}
+  .feed td.when{grid-area:when;font-size:var(--t-xs)}
+  .feed td.mwho{grid-area:mwho;min-width:0}
+  .feed td.kind{grid-area:kind}
+  .feed td.pls{grid-area:pls}
+  .feed td.det{grid-area:det;text-align:left;font-size:var(--t-xs)}
+  .feed td.det:empty{display:none}
+  .feed tr.sect,.feed tr.none{display:block;padding:6px var(--s-3)}
+  .feed tr.sect td,.feed tr.none td{background:transparent;padding:0}
+  .feed tr.me{box-shadow:inset 3px 0 0 var(--accent);background:var(--accent-wash)}
+  .feed tr.me td{background:transparent;box-shadow:none!important}
+  .pls-w{flex-direction:column;gap:3px;padding:0}
+  .mp{white-space:normal}
+  .mt .av{width:20px!important;height:20px!important;font-size:8px}
+  .mt b{font-size:var(--t-sm)}
+  .scoring{grid-template-columns:minmax(0,1fr)}
+  .tiers{grid-template-columns:repeat(5,minmax(0,1fr))}
+  .set-head{flex-direction:column;align-items:flex-start}
+  .mx{padding-bottom:calc(var(--tab-bar-h) + 96px)}
+}
+.lineup.mini td.game{overflow:hidden}
+.lineup.mini .facts{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.lineup.mini .opp .gs{align-self:center}
+</style>
+</head>
+<body class="v-week">
+<div class="app">
+<nav class="rail" aria-label="Sections"><a class="mark" href="#" aria-label="Commish"><b>C</b></a><a class="item" href="#"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3l-5 4 2 3 2-1v12h10V9l2 1 2-3-5-4c0 2-1.5 3-4 3S8 5 8 3z"/></svg><span>Lineup</span></a><a class="item" href="#"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="3"/><circle cx="16" cy="8" r="3"/><path d="M2 20c.8-3 3-5 6-5s5.2 2 6 5M14 15c3 0 5.2 2 6 5"/></svg><span>Matchup</span></a><a class="item" href="#"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10" cy="8" r="4"/><path d="M3 21c1.2-3.6 3.8-6 7-6 1.5 0 2.9.5 4 1.4M18 12v6M15 15h6"/></svg><span>Waivers</span></a><a class="item" href="#"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h14l-3-3M20 16H6l3 3"/></svg><span>Trades</span></a><a class="item" href="#"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg><span>Players</span></a><a class="item wide-only" href="#"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 11h12M4 16h8"/></svg><span>Rest of season</span></a><a class="item wide-only" href="#"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg><span>Our record</span></a><span class="spacer"></span><a class="item wide-only" href="#"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M6.5 18c1.5-2 3.4-3 5.5-3s4 1 5.5 3"/></svg><span>Account</span></a></nav>
+<div class="main">
+<header class="top"><h1>League</h1><div class="tail"><button type="button" class="quiet"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 21V4M5 4h13l-3 4.5L18 13H5"/></svg><span>McConkey Kong Country</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button></div></header>
+<main class="mx">
+  <p class="mocknote"><span class="long">Mock for Lane 66i. Figures with a dotted underline are stand-ins. S.U.C.K. is the recorded Sleeper league: names, managers, records, PF, PA, streaks, FAAB left, the pairings, the lineup as set and every move are real. Every Proj is the week 1 published figure standing in for week 6, the ten other teams' Proj totals and the Thursday starters' points are made up.</span><span class="short">Mock. Dotted figures are stand-ins, named on the desk shot.</span></p>
+  <div class="title"><h2>S.U.C.K. - Severely Underrated Carolina Keepers</h2><p class="lede">McConkey Kong Country, 1-4, 12th of 12. Read from Sleeper 4 minutes ago. Times are in Central Time.</p></div>
+  <div class="navrow"><nav class="chip-group tabs" aria-label="League"><a href="#" class="chip" aria-pressed=true>League</a><a href="#" class="chip">Lineup</a><a href="#" class="chip">Matchup</a><a href="#" class="chip">Waivers</a><a href="#" class="chip">Trades</a></nav><nav class="segs" aria-label="League view"><a href="#" class="seg" aria-current=page>Week 6</a><a href="#" class="seg">Settings</a></nav></div>
+  <section class="board" aria-label="Week 6 scoreboard"><div class="sec-h"><h3>Week 6</h3><span>Every matchup. Yours first, each opens its Matchup.</span></div><div class="bugs"><a class="bug mine" href="#" aria-label="Matchup"><div class="bh"><span class="st pre">Sun 8:30 am</span><span class="sw">Next kickoff</span><span class="bhn">Proj</span><span class="bhn">Pts</span></div><div class="bt me"><span class="av me board" style="width:26px;height:26px" aria-hidden="true">MK</span><span class="bn">McConkey Kong Country</span><span class="br">1-4</span><span class="bp"><span class="si">74.7</span></span><span class="bs"><span class="dash">--</span></span></div><div class="bt"><span class="av board" style="width:26px;height:26px" aria-hidden="true">TH</span><span class="bn">thatmattkelley</span><span class="br">1-4</span><span class="bp"><span class="si">98.4</span></span><span class="bs"><span class="dash">--</span></span></div></a><a class="bug" href="#" aria-label="Matchup"><div class="bh"><span class="st pre">Sun 8:30 am</span><span class="sw">Next kickoff</span><span class="bhn">Proj</span><span class="bhn">Pts</span></div><div class="bt"><span class="av board" style="width:26px;height:26px" aria-hidden="true">ON</span><span class="bn">OnlyFannins</span><span class="br">2-3</span><span class="bp"><span class="si">103.5</span></span><span class="bs"><span class="dash">--</span></span></div><div class="bt"><span class="av board" style="width:26px;height:26px" aria-hidden="true">NM</span><span class="bn">Nacua Matata</span><span class="br">3-2</span><span class="bp"><span class="si">115.0</span></span><span class="bs"><span class="si">22.0</span></span></div></a><a class="bug" href="#" aria-label="Matchup"><div class="bh"><span class="st pre">Sun 8:30 am</span><span class="sw">Next kickoff</span><span class="bhn">Proj</span><span class="bhn">Pts</span></div><div class="bt lead"><span class="av board" style="width:26px;height:26px" aria-hidden="true">BS</span><span class="bn">Ball Snatchers</span><span class="br">3-2</span><span class="bp"><span class="si">97.8</span></span><span class="bs"><span class="si">22.0</span></span></div><div class="bt"><span class="av board" style="width:26px;height:26px" aria-hidden="true">MU</span><span class="bn">Muttdogs</span><span class="br">5-0</span><span class="bp"><span class="si">121.9</span></span><span class="bs"><span class="si">13.4</span></span></div></a><a class="bug" href="#" aria-label="Matchup"><div class="bh"><span class="st pre">Sun 8:30 am</span><span class="sw">Next kickoff</span><span class="bhn">Proj</span><span class="bhn">Pts</span></div><div class="bt"><span class="av board" style="width:26px;height:26px" aria-hidden="true">DR</span><span class="bn">Dad Runners</span><span class="br">2-3</span><span class="bp"><span class="si">101.2</span></span><span class="bs"><span class="dash">--</span></span></div><div class="bt"><span class="av board" style="width:26px;height:26px" aria-hidden="true">MJ</span><span class="bn">Max_Jensen10</span><span class="br">1-4</span><span class="bp"><span class="si">95.1</span></span><span class="bs"><span class="si">8.6</span></span></div></a><a class="bug" href="#" aria-label="Matchup"><div class="bh"><span class="st pre">Sun 8:30 am</span><span class="sw">Next kickoff</span><span class="bhn">Proj</span><span class="bhn">Pts</span></div><div class="bt"><span class="av board" style="width:26px;height:26px" aria-hidden="true">CB</span><span class="bn">Carried by QJs</span><span class="br">3-2</span><span class="bp"><span class="si">104.6</span></span><span class="bs"><span class="si">8.6</span></span></div><div class="bt"><span class="av board" style="width:26px;height:26px" aria-hidden="true">BR</span><span class="bn">Bower Rangers</span><span class="br">3-2</span><span class="bp"><span class="si">112.4</span></span><span class="bs"><span class="dash">--</span></span></div></a><a class="bug" href="#" aria-label="Matchup"><div class="bh"><span class="st pre">Sun 12:00 pm</span><span class="sw">Next kickoff</span><span class="bhn">Proj</span><span class="bhn">Pts</span></div><div class="bt"><span class="av board" style="width:26px;height:26px" aria-hidden="true">KI</span><span class="bn">Keeper? I Hardly Know Her</span><span class="br">4-1</span><span class="bp"><span class="si">118.3</span></span><span class="bs"><span class="si">22.0</span></span></div><div class="bt"><span class="av board" style="width:26px;height:26px" aria-hidden="true">AD</span><span class="bn">Aaron Donald Dependent</span><span class="br">2-3</span><span class="bp"><span class="si">99.7</span></span><span class="bs"><span class="dash">--</span></span></div></a></div></section><div class="split"><section class="stand" aria-label="Standings"><div class="sec-h"><h3>Standings</h3><span>Week 6</span></div><table class="standings"><colgroup><col class="c-pn"><col class="c-tm"><col class="c-wl"><col class="c-pf"><col class="c-pa"><col class="c-sk"><col class="c-pj"><col class="c-wv"></colgroup><thead><tr><th class="pn n sorted" aria-sort="ascending"><button type="button">#<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 10l5 5 5-5"/></svg></button></th><th class="tm">Team</th><th class="n wl"><button type="button">W-L-T</button></th><th class="n pf"><button type="button">PF</button></th><th class="n pa"><button type="button">PA</button></th><th class="sk">Streak</th><th class="n pj"><button type="button">Proj</button></th><th class="n wv"><button type="button">FAAB</button></th></tr></thead><tbody><tr class=""><td class="pn n">1</td><td class="tm"><span class="tmw"><span class="av" style="width:30px;height:30px" aria-hidden="true">MU</span><span class="tmn"><b>Muttdogs</b><span class="mg">muttdog</span><span class="ph-stk"><span class="stk gain">W5</span></span></span></span></td><td class="n wl">5-0-0</td><td class="n pf">818.2</td><td class="n pa">659.1</td><td class="sk"><span class="stk gain">W5</span></td><td class="n pj"><span class="si">121.9</span></td><td class="n wv">$675</td></tr><tr class=""><td class="pn n">2</td><td class="tm"><span class="tmw"><span class="av" style="width:30px;height:30px" aria-hidden="true">KI</span><span class="tmn"><b>Keeper? I Hardly Know Her</b><span class="mg">JeffHaseleyFBG</span><span class="ph-stk"><span class="stk gain">W1</span></span></span></span></td><td class="n wl">4-1-0</td><td class="n pf">739.4</td><td class="n pa">584.8</td><td class="sk"><span class="stk gain">W1</span></td><td class="n pj"><span class="si">118.3</span></td><td class="n wv">$780</td></tr><tr class=""><td class="pn n">3</td><td class="tm"><span class="tmw"><span class="av" style="width:30px;height:30px" aria-hidden="true">NM</span><span class="tmn"><b>Nacua Matata</b><span class="mg">Rad_Thad1</span><span class="ph-stk"><span class="stk gain">W2</span></span></span></span></td><td class="n wl">3-2-0</td><td class="n pf">784.1</td><td class="n pa">665.1</td><td class="sk"><span class="stk gain">W2</span></td><td class="n pj"><span class="si">115.0</span></td><td class="n wv">$800</td></tr><tr class=""><td class="pn n">4</td><td class="tm"><span class="tmw"><span class="av" style="width:30px;height:30px" aria-hidden="true">BR</span><span class="tmn"><b>Bower Rangers</b><span class="mg">pricej07</span><span class="ph-stk"><span class="stk gain">W3</span></span></span></span></td><td class="n wl">3-2-0</td><td class="n pf">732.9</td><td class="n pa">643.1</td><td class="sk"><span class="stk gain">W3</span></td><td class="n pj"><span class="si">112.4</span></td><td class="n wv">$863</td></tr><tr class=""><td class="pn n">5</td><td class="tm"><span class="tmw"><span class="av" style="width:30px;height:30px" aria-hidden="true">CB</span><span class="tmn"><b>Carried by QJs</b><span class="mg">PeakedInHighSkool</span><span class="ph-stk"><span class="stk loss">L1</span></span></span></span></td><td class="n wl">3-2-0</td><td class="n pf">652.7</td><td class="n pa">603.3</td><td class="sk"><span class="stk loss">L1</span></td><td class="n pj"><span class="si">104.6</span></td><td class="n wv">$700</td></tr><tr class=""><td class="pn n">6</td><td class="tm"><span class="tmw"><span class="av" style="width:30px;height:30px" aria-hidden="true">BS</span><span class="tmn"><b>Ball Snatchers</b><span class="mg">Quinnifer</span><span class="ph-stk"><span class="stk gain">W2</span></span></span></span></td><td class="n wl">3-2-0</td><td class="n pf">638.9</td><td class="n pa">673.3</td><td class="sk"><span class="stk gain">W2</span></td><td class="n pj"><span class="si">97.8</span></td><td class="n wv">$664</td></tr><tr class="cut"><td colspan="8"><span>Playoffs above, weeks 15 to 17</span></td></tr><tr class=""><td class="pn n">7</td><td class="tm"><span class="tmw"><span class="av" style="width:30px;height:30px" aria-hidden="true">DR</span><span class="tmn"><b>Dad Runners</b><span class="mg">jjzachariason</span><span class="ph-stk"><span class="stk gain">W1</span></span></span></span></td><td class="n wl">2-3-0</td><td class="n pf">661.5</td><td class="n pa">711.0</td><td class="sk"><span class="stk gain">W1</span></td><td class="n pj"><span class="si">101.2</span></td><td class="n wv">$915</td></tr><tr class=""><td class="pn n">8</td><td class="tm"><span class="tmw"><span class="av" style="width:30px;height:30px" aria-hidden="true">AD</span><span class="tmn"><b>Aaron Donald Dependent</b><span class="mg">Nowlan</span><span class="ph-stk"><span class="stk loss">L3</span></span></span></span></td><td class="n wl">2-3-0</td><td class="n pf">660.2</td><td class="n pa">640.5</td><td class="sk"><span class="stk loss">L3</span></td><td class="n pj"><span class="si">99.7</span></td><td class="n wv">$911</td></tr><tr class=""><td class="pn n">9</td><td class="tm"><span class="tmw"><span class="av" style="width:30px;height:30px" aria-hidden="true">ON</span><span class="tmn"><b>OnlyFannins</b><span class="mg">jordanp2323</span><span class="ph-stk"><span class="stk loss">L1</span></span></span></span></td><td class="n wl">2-3-0</td><td class="n pf">655.2</td><td class="n pa">666.1</td><td class="sk"><span class="stk loss">L1</span></td><td class="n pj"><span class="si">103.5</span></td><td class="n wv">$556</td></tr><tr class=""><td class="pn n">10</td><td class="tm"><span class="tmw"><span class="av" style="width:30px;height:30px" aria-hidden="true">MJ</span><span class="tmn"><b>Max_Jensen10</b><span class="ph-stk"><span class="stk loss">L3</span></span></span></span></td><td class="n wl">1-4-0</td><td class="n pf">608.7</td><td class="n pa">781.8</td><td class="sk"><span class="stk loss">L3</span></td><td class="n pj"><span class="si">95.1</span></td><td class="n wv">$830</td></tr><tr class=""><td class="pn n">11</td><td class="tm"><span class="tmw"><span class="av" style="width:30px;height:30px" aria-hidden="true">TH</span><span class="tmn"><b>thatmattkelley</b><span class="ph-stk"><span class="stk loss">L2</span></span></span></span></td><td class="n wl">1-4-0</td><td class="n pf">580.1</td><td class="n pa">740.7</td><td class="sk"><span class="stk loss">L2</span></td><td class="n pj"><span class="si">98.4</span></td><td class="n wv">$959</td></tr><tr class="me"><td class="pn n">12</td><td class="tm"><span class="tmw"><span class="av me" style="width:30px;height:30px" aria-hidden="true">MK</span><span class="tmn"><b>McConkey Kong Country</b><span class="mg">GMenJay</span><span class="ph-stk"><span class="stk loss">L2</span></span></span></span></td><td class="n wl">1-4-0</td><td class="n pf">567.0</td><td class="n pa">730.3</td><td class="sk"><span class="stk loss">L2</span></td><td class="n pj"><span class="si">74.7</span></td><td class="n wv">$1,000</td></tr></tbody></table></section><section class="roster" aria-label="Your lineup"><div class="sec-h"><h3>Your lineup</h3><span>As set on Sleeper</span></div><div class="rs-verb"><span class="rs-sum"><b>Three changes</b><span><span class="si">101.6</span> Proj with them, <span class="si">74.7</span> as set, <em><span class="si">+26.9</span></em></span></span><a class="verb" href="#">Set your lineup<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></a></div><table class="lineup mini"><colgroup><col class="c-slot"><col class="c-player"><col class="c-game"><col class="c-proj"><col class="c-pts"></colgroup><thead><tr class="cols"><th class="slot">Slot</th><th class="player">Player</th><th class="game">Game</th><th class="n">Proj</th><th class="n">Pts</th></tr></thead><tbody><tr class="st moved out"><td class="slot"><span class="mv out" title="The advice sits him"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12l7 7 7-7"/></svg></span>QB</td><td class="player"><span class="pl"><span class="face" style="width:30px;height:30px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/8439.png" alt="" width="30" height="30"></span><span class="who"><span class="nm"><a href="#">Aaron Rodgers</a></span><span class="sub"><span class="club">PIT</span><span class="pos">QB</span><span class="swapin"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg>Dart starts, <span class="si">20.6</span></span></span><span class="ph"><span class="ph-g"><span class="opp"><b>at TB</b><span>Sun 12:00 pm</span></span></span></span></span></span></td><td class="game"><span class="opp"><b>at TB</b><span>Sun 12:00 pm</span></span><span class="facts"><span class="exp">22 to 18.5</span><span class="wx"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8h11a3 3 0 1 0-3-3M3 12h15a3 3 0 1 1-3 3M3 16h8"/></svg>74°, 15 mph</span></span></td><td class="n proj"><span class="si">15.8</span></td><td class="n pts"><span class="dash">--</span></td></tr><tr class="st"><td class="slot">RB</td><td class="player"><span class="pl"><span class="face" style="width:30px;height:30px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/4870808.png" alt="" width="30" height="30"></span><span class="who"><span class="nm"><a href="#">Jeremiyah Love</a></span><span class="sub"><span class="club">ARI</span><span class="pos">RB</span></span><span class="ph"><span class="ph-g"><span class="opp"><b>at LAR</b><span>Sun 3:05 pm</span></span></span></span></span></span></td><td class="game"><span class="opp"><b>at LAR</b><span>Sun 3:05 pm</span></span><span class="facts"><span class="exp">20 to 32.5</span><span class="wx"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 19h18M5 19v-5a7 7 0 0 1 14 0v5"/></svg>Indoors</span></span></td><td class="n proj"><span class="si">12.3</span></td><td class="n pts"><span class="dash">--</span></td></tr><tr class="st"><td class="slot">RB</td><td class="player"><span class="pl"><span class="face" style="width:30px;height:30px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/4371733.png" alt="" width="30" height="30"></span><span class="who"><span class="nm"><a href="#">Kenny Gainwell</a></span><span class="sub"><span class="club">TB</span><span class="pos">RB</span></span><span class="ph"><span class="ph-g"><span class="opp"><b>vs PIT</b><span>Sun 12:00 pm</span></span></span></span></span></span></td><td class="game"><span class="opp"><b>vs PIT</b><span>Sun 12:00 pm</span></span><span class="facts"><span class="exp">19 to 21.5</span><span class="wx"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8h11a3 3 0 1 0-3-3M3 12h15a3 3 0 1 1-3 3M3 16h8"/></svg>74°, 15 mph</span></span></td><td class="n proj"><span class="si">9.5</span></td><td class="n pts"><span class="dash">--</span></td></tr><tr class="st"><td class="slot">WR</td><td class="player"><span class="pl"><span class="face" style="width:30px;height:30px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/3916433.png" alt="" width="30" height="30"></span><span class="who"><span class="nm"><a href="#">Jakobi Meyers</a></span><span class="sub"><span class="club">JAX</span><span class="pos">WR</span></span><span class="ph"><span class="ph-g"><span class="opp"><b>vs HOU</b><span>Sun 8:30 am</span></span></span></span></span></span></td><td class="game"><span class="opp"><b>vs HOU</b><span>Sun 8:30 am</span></span><span class="facts"><span class="exp">23 to 19.5</span><span class="wx"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>Abroad, no forecast</span></span></td><td class="n proj"><span class="si">9.7</span></td><td class="n pts"><span class="dash">--</span></td></tr><tr class="st"><td class="slot">WR</td><td class="player"><span class="pl"><span class="face" style="width:30px;height:30px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/4431299.png" alt="" width="30" height="30"></span><span class="who"><span class="nm"><a href="#">Rome Odunze</a></span><span class="sub"><span class="club">CHI</span><span class="pos">WR</span></span><span class="ph"><span class="ph-g"><span class="opp"><b>at ATL</b><span>Sun 12:00 pm</span></span></span></span></span></span></td><td class="game"><span class="opp"><b>at ATL</b><span>Sun 12:00 pm</span></span><span class="facts"><span class="exp">26.5 to 23</span><span class="wx"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 19h18M5 19v-6l7-5 7 5v6"/><path d="M12 8V4"/></svg>Roof TBD</span></span></td><td class="n proj"><span class="si">11.0</span></td><td class="n pts"><span class="dash">--</span></td></tr><tr class="st"><td class="slot">WR</td><td class="player"><span class="pl"><span class="face" style="width:30px;height:30px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/5081432.png" alt="" width="30" height="30"></span><span class="who"><span class="nm"><a href="#">Antonio Williams</a></span><span class="sub"><span class="club">WAS</span><span class="pos">WR</span></span><span class="ph"><span class="ph-g"><span class="opp"><b>at SF</b><span>Mon 7:15 pm</span></span></span></span></span></span></td><td class="game"><span class="opp"><b>at SF</b><span>Mon 7:15 pm</span></span><span class="facts"><span class="exp">21.5 to 29</span><span class="wx"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8h11a3 3 0 1 0-3-3M3 12h15a3 3 0 1 1-3 3M3 16h8"/></svg>63°, 13 mph</span></span></td><td class="n proj"><span class="si">3.2</span></td><td class="n pts"><span class="dash">--</span></td></tr><tr class="st"><td class="slot">TE</td><td class="player"><span class="pl"><span class="face" style="width:30px;height:30px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/4430027.png" alt="" width="30" height="30"></span><span class="who"><span class="nm"><a href="#">Sam LaPorta</a></span><span class="sub"><span class="club">DET</span><span class="pos">TE</span></span><span class="ph"><span class="ph-g"><span class="bye">Bye</span></span></span></span></span></td><td class="game"><span class="bye">Bye</span></td><td class="n proj"><span class="dash">--</span></td><td class="n pts"><span class="dash">--</span></td></tr><tr class="st"><td class="slot">FLEX</td><td class="player"><span class="pl"><span class="face" style="width:30px;height:30px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/4612826.png" alt="" width="30" height="30"></span><span class="who"><span class="nm"><a href="#">Ladd McConkey</a></span><span class="sub"><span class="club">LAC</span><span class="pos">WR</span></span><span class="ph"><span class="ph-g"><span class="opp"><b>at KC</b><span>Sun 3:25 pm</span></span></span></span></span></span></td><td class="game"><span class="opp"><b>at KC</b><span>Sun 3:25 pm</span></span><span class="facts"><span class="exp">17 to 25.5</span><span class="wx"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8h11a3 3 0 1 0-3-3M3 12h15a3 3 0 1 1-3 3M3 16h8"/></svg>66°, 10 mph</span></span></td><td class="n proj"><span class="si">13.2</span></td><td class="n pts"><span class="dash">--</span></td></tr><tr class="st moved out"><td class="slot"><span class="mv out" title="The advice sits him"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12l7 7 7-7"/></svg></span>FLEX</td><td class="player"><span class="pl"><span class="face" style="width:30px;height:30px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/4362628.png" alt="" width="30" height="30"></span><span class="who"><span class="nm"><a href="#">Ja&#x27;Marr Chase</a></span><span class="sub"><span class="club">CIN</span><span class="pos">WR</span><span class="swapin"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg>Etienne starts, <span class="si">14.2</span></span></span><span class="ph"><span class="ph-g"><span class="bye">Bye</span></span></span></span></span></td><td class="game"><span class="bye">Bye</span></td><td class="n proj"><span class="dash">--</span></td><td class="n pts"><span class="dash">--</span></td></tr><tr class="st moved out"><td class="slot"><span class="mv out" title="The advice sits him"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12l7 7 7-7"/></svg></span>D/ST</td><td class="player"><span class="pl"><span class="face mark-face" style="width:30px;height:30px"><img src="https://a.espncdn.com/i/teamlogos/nfl/500/min.png" alt="" width="30" height="30"></span><span class="who"><span class="nm"><a href="#">Minnesota Vikings</a></span><span class="sub"><span class="club">MIN</span><span class="swapin"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg>Texans starts, <span class="si">7.9</span></span></span><span class="ph"><span class="ph-g"><span class="bye">Bye</span></span></span></span></span></td><td class="game"><span class="bye">Bye</span></td><td class="n proj"><span class="dash">--</span></td><td class="n pts"><span class="dash">--</span></td></tr><tr class="totals"><td colspan="3"><span class="tl">Totals</span><span class="tsub">as set on Sleeper</span></td><td class="n proj"><b><span class="si">74.7</span></b></td><td class="n pts"><b>--</b></td></tr></tbody></table><a class="benchlink" href="#">Bench, 10 players<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></a></section></div><section class="moves" aria-label="Moves"><div class="sec-h"><h3>Moves</h3><span>This week and last, newest first. 15 moves.</span></div><table class="feed"><colgroup><col class="c-when"><col class="c-who"><col class="c-kind"><col class="c-pls"><col class="c-det"></colgroup><thead><tr><th>When</th><th>Team</th><th>Move</th><th>Players</th><th class="det">Detail</th></tr></thead><tbody><tr class="sect"><td colspan="5">Week 6</td></tr><tr class="none"><td colspan="5">No moves yet this week on Sleeper.</td></tr><tr class="sect"><td colspan="5">Week 5</td></tr><tr class="me"><td class="when">Sun 11:44 am</td><td class="mwho"><span class="mt"><span class="av me" style="width:24px;height:24px" aria-hidden="true">MK</span><b>McConkey Kong Country</b></span></td><td class="kind"><span class="kchip k-add">Free agent</span></td><td class="pls"><span class="pls-w"><span class="mp in"><span class="ar"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg></span><span class="face" style="width:22px;height:22px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/4426386.png" alt="" width="22" height="22"></span><b>Roschon Johnson</b><small>CHI RB</small></span><span class="mp out"><span class="ar"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12l7 7 7-7"/></svg></span><span class="face" style="width:22px;height:22px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/4429835.png" alt="" width="22" height="22"></span><b>George Holani</b><small>SEA RB</small></span></span></td><td class="det"></td></tr><tr class="me"><td class="when">Sun 11:43 am</td><td class="mwho"><span class="mt"><span class="av me" style="width:24px;height:24px" aria-hidden="true">MK</span><b>McConkey Kong Country</b></span></td><td class="kind"><span class="kchip k-add">Free agent</span></td><td class="pls"><span class="pls-w"><span class="mp in"><span class="ar"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg></span><span class="face" style="width:22px;height:22px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/8439.png" alt="" width="22" height="22"></span><b>Aaron Rodgers</b><small>PIT QB</small></span><span class="mp out"><span class="ar"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12l7 7 7-7"/></svg></span><span class="face" style="width:22px;height:22px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/4685555.png" alt="" width="22" height="22"></span><b>Nicholas Singleton</b><small>TEN RB</small></span></span></td><td class="det"></td></tr><tr class=""><td class="when">Sun 8:23 am</td><td class="mwho"><span class="mt"><span class="av" style="width:24px;height:24px" aria-hidden="true">MJ</span><b>Max_Jensen10</b></span></td><td class="kind"><span class="kchip k-add">Free agent</span></td><td class="pls"><span class="pls-w"><span class="mp in"><span class="ar"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg></span><span class="face mark-face" style="width:22px;height:22px"><img src="https://a.espncdn.com/i/teamlogos/nfl/500/gb.png" alt="" width="22" height="22"></span><b>Pierre Strong</b><small>GB RB</small></span><span class="mp out"><span class="ar"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12l7 7 7-7"/></svg></span><span class="face" style="width:22px;height:22px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/4384852.png" alt="" width="22" height="22"></span><b>Dohnte Meyers</b><small>CIN WR</small></span></span></td><td class="det"></td></tr><tr class=""><td class="when">Sun 8:10 am</td><td class="mwho"><span class="mt"><span class="av" style="width:24px;height:24px" aria-hidden="true">BS</span><b>Ball Snatchers</b></span></td><td class="kind"><span class="kchip k-add">Free agent</span></td><td class="pls"><span class="pls-w"><span class="mp in"><span class="ar"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg></span><span class="face" style="width:22px;height:22px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/4715355.png" alt="" width="22" height="22"></span><b>Darius Cooper</b><small>PHI WR</small></span><span class="mp out"><span class="ar"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12l7 7 7-7"/></svg></span><span class="face" style="width:22px;height:22px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/4429160.png" alt="" width="22" height="22"></span><b>De&#x27;Von Achane</b><small>MIA RB</small></span></span></td><td class="det"></td></tr><tr class=""><td class="when">Sun 5:21 am</td><td class="mwho"><span class="mt"><span class="av" style="width:24px;height:24px" aria-hidden="true">TH</span><b>thatmattkelley</b></span></td><td class="kind"><span class="kchip k-add">Free agent</span></td><td class="pls"><span class="pls-w"><span class="mp in"><span class="ar"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg></span><span class="face" style="width:22px;height:22px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/5123663.png" alt="" width="22" height="22"></span><b>Isaac TeSlaa</b><small>DET WR</small></span><span class="mp out"><span class="ar"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12l7 7 7-7"/></svg></span><span class="face" style="width:22px;height:22px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/4569371.png" alt="" width="22" height="22"></span><b>Isaiah Williams</b><small>NYJ WR</small></span></span></td><td class="det"></td></tr><tr class=""><td class="when">Sun 5:19 am</td><td class="mwho"><span class="mt"><span class="av" style="width:24px;height:24px" aria-hidden="true">TH</span><b>thatmattkelley</b></span></td><td class="kind"><span class="kchip k-add">Free agent</span></td><td class="pls"><span class="pls-w"><span class="mp in"><span class="ar"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg></span><span class="face mark-face" style="width:22px;height:22px"><img src="https://a.espncdn.com/i/teamlogos/nfl/500/nyj.png" alt="" width="22" height="22"></span><b>New York Jets</b><small>NYJ D/ST</small></span><span class="mp out"><span class="ar"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12l7 7 7-7"/></svg></span><span class="face mark-face" style="width:22px;height:22px"><img src="https://a.espncdn.com/i/teamlogos/nfl/500/ind.png" alt="" width="22" height="22"></span><b>Indianapolis Colts</b><small>IND D/ST</small></span></span></td><td class="det"></td></tr><tr class=""><td class="when">Sat 10:20 am</td><td class="mwho"><span class="mt"><span class="av" style="width:24px;height:24px" aria-hidden="true">MJ</span><b>Max_Jensen10</b></span></td><td class="kind"><span class="kchip k-waiver">Waiver</span></td><td class="pls"><span class="pls-w"><span class="mp in"><span class="ar"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg></span><span class="face" style="width:22px;height:22px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/3045523.png" alt="" width="22" height="22"></span><b>Kendrick Bourne</b><small>ARI WR</small></span><span class="mp out"><span class="ar"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12l7 7 7-7"/></svg></span><span class="face" style="width:22px;height:22px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/4686422.png" alt="" width="22" height="22"></span><b>Xavier Hutchinson</b><small>HOU WR</small></span></span></td><td class="det">FAAB $75</td></tr><tr class=""><td class="when">Fri 4:57 pm</td><td class="mwho"><span class="mt"><span class="av" style="width:24px;height:24px" aria-hidden="true">KI</span><b>Keeper? I Hardly Know Her</b></span></td><td class="kind"><span class="kchip k-waiver">Waiver</span></td><td class="pls"><span class="pls-w"><span class="mp in"><span class="ar"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg></span><span class="face" style="width:22px;height:22px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/4685246.png" alt="" width="22" height="22"></span><b>Kaytron Allen</b><small>MIA RB</small></span><span class="mp out"><span class="ar"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12l7 7 7-7"/></svg></span><span class="face" style="width:22px;height:22px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/4686468.png" alt="" width="22" height="22"></span><b>Seth McGowan</b><small>IND RB</small></span></span></td><td class="det">FAAB $105</td></tr><tr class=""><td class="when">Fri 1:52 pm</td><td class="mwho"><span class="mt"><span class="av" style="width:24px;height:24px" aria-hidden="true">CB</span><b>Carried by QJs</b></span></td><td class="kind"><span class="kchip k-waiver">Waiver</span></td><td class="pls"><span class="pls-w"><span class="mp in"><span class="ar"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg></span><span class="face mark-face" style="width:22px;height:22px"><img src="https://a.espncdn.com/i/teamlogos/nfl/500/lar.png" alt="" width="22" height="22"></span><b>Los Angeles Rams</b><small>LAR D/ST</small></span><span class="mp out"><span class="ar"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12l7 7 7-7"/></svg></span><span class="face mark-face" style="width:22px;height:22px"><img src="https://a.espncdn.com/i/teamlogos/nfl/500/bal.png" alt="" width="22" height="22"></span><b>Baltimore Ravens</b><small>BAL D/ST</small></span></span></td><td class="det">FAAB $0</td></tr><tr class=""><td class="when">Thu 9:53 pm</td><td class="mwho"><span class="mt"><span class="av" style="width:24px;height:24px" aria-hidden="true">AD</span><b>Aaron Donald Dependent</b></span></td><td class="kind"><span class="kchip k-add">Free agent</span></td><td class="pls"><span class="pls-w"><span class="mp in"><span class="ar"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg></span><span class="face mark-face" style="width:22px;height:22px"><img src="https://a.espncdn.com/i/teamlogos/nfl/500/lv.png" alt="" width="22" height="22"></span><b>Las Vegas Raiders</b><small>LV D/ST</small></span><span class="mp out"><span class="ar"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12l7 7 7-7"/></svg></span><span class="face mark-face" style="width:22px;height:22px"><img src="https://a.espncdn.com/i/teamlogos/nfl/500/lar.png" alt="" width="22" height="22"></span><b>Los Angeles Rams</b><small>LAR D/ST</small></span></span></td><td class="det"></td></tr><tr class=""><td class="when">Thu 12:42 pm</td><td class="mwho"><span class="mt"><span class="av" style="width:24px;height:24px" aria-hidden="true">CB</span><b>Carried by QJs</b></span></td><td class="kind"><span class="kchip k-waiver">Waiver</span></td><td class="pls"><span class="pls-w"><span class="mp in"><span class="ar"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg></span><span class="face" style="width:22px;height:22px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/4819231.png" alt="" width="22" height="22"></span><b>Kaleb Johnson</b><small>GB RB</small></span><span class="mp out"><span class="ar"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12l7 7 7-7"/></svg></span><span class="face" style="width:22px;height:22px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/4597703.png" alt="" width="22" height="22"></span><b>Tory Horton</b><small>SEA WR</small></span></span></td><td class="det">FAAB $31</td></tr><tr class=""><td class="when">Thu 11:52 am</td><td class="mwho"><span class="mt"><span class="av" style="width:24px;height:24px" aria-hidden="true">TH</span><b>thatmattkelley</b></span></td><td class="kind"><span class="kchip k-add">Free agent</span></td><td class="pls"><span class="pls-w"><span class="mp in"><span class="ar"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg></span><span class="face mark-face" style="width:22px;height:22px"><img src="https://a.espncdn.com/i/teamlogos/nfl/500/phi.png" alt="" width="22" height="22"></span><b>Dameon Pierce</b><small>PHI RB</small></span><span class="mp out"><span class="ar"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12l7 7 7-7"/></svg></span><span class="face" style="width:22px;height:22px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/4819231.png" alt="" width="22" height="22"></span><b>Kaleb Johnson</b><small>GB RB</small></span></span></td><td class="det"></td></tr><tr class=""><td class="when">Thu 11:13 am</td><td class="mwho"><span class="mt"><span class="av" style="width:24px;height:24px" aria-hidden="true">TH</span><b>thatmattkelley</b></span></td><td class="kind"><span class="kchip k-add">Free agent</span></td><td class="pls"><span class="pls-w"><span class="mp in"><span class="ar"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg></span><span class="face mark-face" style="width:22px;height:22px"><img src="https://a.espncdn.com/i/teamlogos/nfl/500/ind.png" alt="" width="22" height="22"></span><b>Indianapolis Colts</b><small>IND D/ST</small></span><span class="mp out"><span class="ar"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12l7 7 7-7"/></svg></span><span class="face mark-face" style="width:22px;height:22px"><img src="https://a.espncdn.com/i/teamlogos/nfl/500/gb.png" alt="" width="22" height="22"></span><b>Green Bay Packers</b><small>GB D/ST</small></span></span></td><td class="det"></td></tr><tr class=""><td class="when">Wed 8:43 am</td><td class="mwho"><span class="mt"><span class="av" style="width:24px;height:24px" aria-hidden="true">DR</span><b>Dad Runners</b></span><span class="mt"><span class="av" style="width:24px;height:24px" aria-hidden="true">TH</span><b>thatmattkelley</b></span></td><td class="kind"><span class="kchip k-trade">Trade</span></td><td class="pls"><span class="pls-w"><span class="mp in"><span class="face" style="width:22px;height:22px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/4360761.png" alt="" width="22" height="22"></span><b>Michael Wilson</b><small>ARI WR</small><span class="to">to Dad Runners</span></span><span class="mp in"><span class="face" style="width:22px;height:22px"><img src="https://a.espncdn.com/i/headshots/nfl/players/full/4685702.png" alt="" width="22" height="22"></span><b>Quinshon Judkins</b><small>CLE RB</small><span class="to">to thatmattkelley</span></span></span></td><td class="det"></td></tr><tr class=""><td class="when">Wed 6:37 am</td><td class="mwho"><span class="mt"><span class="av" style="width:24px;height:24px" aria-hidden="true">BR</span><b>Bower Rangers</b></span></td><td class="kind"><span class="kchip k-waiver">Waiver</span></td><td class="pls"><span class="pls-w"><span class="mp in"><span class="ar"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg></span><span class="face mark-face" style="width:22px;height:22px"><img src="https://a.espncdn.com/i/teamlogos/nfl/500/cle.png" alt="" width="22" height="22"></span><b>Cleveland Browns</b><small>CLE D/ST</small></span><span class="mp out"><span class="ar"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12l7 7 7-7"/></svg></span><span class="face mark-face" style="width:22px;height:22px"><img src="https://a.espncdn.com/i/teamlogos/nfl/500/chi.png" alt="" width="22" height="22"></span><b>Chicago Bears</b><small>CHI D/ST</small></span></span></td><td class="det">FAAB $7</td></tr></tbody></table></section><div class="basis"><p>Standings are Sleeper's: record, then points for. PF and PA are points for and against in this league's scoring, weeks 1 to 5. Streak is the current run of wins or losses.</p><p>Proj is this week's published projection in PPR scoring, the closest match to this league's rules, read Fri 9:00 pm Central. A team's Proj adds its starters as set on Sleeper, so a starter on bye counts nothing.</p><p>Pts are Sleeper's points so far this week. The Game cell shows each club's expected points, his club first, then the kickoff weather, read Fri 4:01 pm Central.</p><p>FAAB is each team's waiver budget left of $1,000.</p></div>
+</main>
+</div>
+</div>
+</body>
+</html>

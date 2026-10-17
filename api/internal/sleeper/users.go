@@ -3,6 +3,7 @@ package sleeper
 import (
 	"context"
 	"encoding/json"
+	"regexp"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -22,11 +23,15 @@ type User struct {
 	// TeamName is the member's team name in this league, empty when they
 	// set none.
 	TeamName string
+	// Avatar is the member's avatar id on the host's image server, empty
+	// when they set none.
+	Avatar string
 }
 
 type wireUser struct {
 	UserID      string `json:"user_id"`
 	DisplayName string `json:"display_name"`
+	Avatar      string `json:"avatar"`
 	Metadata    struct {
 		TeamName string `json:"team_name"`
 	} `json:"metadata"`
@@ -62,10 +67,21 @@ func validateUsers(w []wireUser) ([]User, error) {
 	for _, u := range w {
 		name := cleanName(u.DisplayName)
 		if ValidID(u.UserID) && name != "" {
-			out = append(out, User{ID: u.UserID, DisplayName: name, TeamName: cleanName(u.Metadata.TeamName)})
+			out = append(out, User{ID: u.UserID, DisplayName: name, TeamName: cleanName(u.Metadata.TeamName), Avatar: validAvatar(u.Avatar)})
 		}
 	}
 	return out, nil
+}
+
+// avatarPattern is a Sleeper avatar id: 32 hex digits.
+var avatarPattern = regexp.MustCompile(`^[0-9a-f]{32}$`)
+
+// validAvatar is the avatar id, empty when it is not one.
+func validAvatar(s string) string {
+	if !avatarPattern.MatchString(s) {
+		return ""
+	}
+	return s
 }
 
 func cleanName(s string) string { return cleanText(s, maxDisplayName) }

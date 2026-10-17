@@ -172,7 +172,15 @@ export function phaseSync(sync: LeagueSync, id: string): LeagueSync {
 			...named,
 			status: 'pre_draft',
 			week: 0,
-			teams: sync.teams.map((team) => ({ ...team, wins: 0, losses: 0, ties: 0, points_for: 0 })),
+			teams: sync.teams.map((team) => ({
+				...team,
+				wins: 0,
+				losses: 0,
+				ties: 0,
+				points_for: 0,
+				points_against: null,
+				streak: null
+			})),
 			placement: { ...sync.placement, unplaced: 0 },
 			roster: [],
 			matchup: null,

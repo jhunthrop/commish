@@ -19,6 +19,7 @@ import type {
 	HostMoveResult,
 	LineupAdvice,
 	MatchupBox,
+	Scoreboard,
 	PlayerLine,
 	TradeAdvice,
 	TradeCheck,
@@ -31,6 +32,7 @@ import { FIXTURE_IDS } from './ids.ts';
 import { playerWeek, type Sheet } from './player-week.ts';
 import { lineupProj, seasonStrength } from './week.ts';
 import { FIXTURE_SEASON, askedPhase, phaseAccount, phaseLeagues, phaseSync } from './phases.ts';
+import { ESPN_STAND_IN_NAME, espnSync } from './espn-sync.ts';
 
 const PORT = Number(process.env.PORT ?? 8799);
 const DATA = new URL('./data/', import.meta.url);
@@ -93,14 +95,17 @@ async function load<T>(name: string): Promise<T> {
 
 /** Lane 72's recorded week sheets, the player card's line for those players (player-week.ts). */
 const { players: sheets } = await load<{ players: Record<string, Sheet> }>('week-sheets');
-const [sync, lineup, waivers, trades, gameWeek, matchupBox] = await Promise.all([
-	load<LeagueSync>('sync'),
-	load<LineupAdvice>('lineup'),
-	load<WaiverAdvice>('waivers'),
-	load<TradeAdvice>('trades'),
-	load<GameWeek>('games'),
-	load<MatchupBox>('matchup')
-]);
+const [sync, lineup, waivers, trades, gameWeek, matchupBox, scoreboard, scoreboardLive] =
+	await Promise.all([
+		load<LeagueSync>('sync'),
+		load<LineupAdvice>('lineup'),
+		load<WaiverAdvice>('waivers'),
+		load<TradeAdvice>('trades'),
+		load<GameWeek>('games'),
+		load<MatchupBox>('matchup'),
+		load<Scoreboard>('scoreboard'),
+		load<Scoreboard>('scoreboard-live')
+	]);
 
 const myTeam = sync.teams.find((t) => t.roster_id === sync.me);
 const contextBase = {
@@ -122,8 +127,22 @@ const contextBase = {
 	settings_league_id: null
 };
 /** The leagues as the switch lists them, one per season phase (phases.ts), drafts timed from now. */
-const leaguesNow = (): components['schemas']['ContextLeague'][] =>
-	phaseLeagues(contextBase, Date.now());
+/** The leagues as the switch lists them, one per season phase (phases.ts), drafts timed from now,
+ * then the ESPN stand-ins in season under their own name and platform, so the switch on an ESPN
+ * screen names the league it shows. */
+const leaguesNow = (): components['schemas']['ContextLeague'][] => {
+	const phased = phaseLeagues(contextBase, Date.now());
+	const inSeason = phased.find((league) => league.id === LEAGUE);
+	const espn = inSeason
+		? [...ESPN_MOVES.keys()].map((espnId) => ({
+				...inSeason,
+				id: espnId,
+				name: ESPN_STAND_IN_NAME,
+				host: 'espn' as const
+			}))
+		: [];
+	return [...phased, ...espn];
+};
 const contextLeague = leaguesNow().find((league) => league.id === LEAGUE);
 if (!contextLeague) throw new Error('The fixture has no in-season league.');
 const account: components['schemas']['Account'] = {
@@ -306,7 +325,7 @@ function tradeCheck(input: TradeCheckInput): TradeCheck | string {
 }
 
 const CHECK = /^\/leagues\/attached\/([^/]+)\/trades\/check$/;
-const IN_SEASON = /^\/leagues\/attached\/([^/]+)\/(lineup|matchup|waivers|trades)$/;
+const IN_SEASON = /^\/leagues\/attached\/([^/]+)\/(lineup|matchup|scoreboard|waivers|trades)$/;
 /** The player card's reads (Lane 66h): in the league, and with no league. */
 const LEAGUE_PLAYER = /^\/leagues\/attached\/([^/]+)\/players\/([^/]+)$/;
 /** Each player's club and position from the built site's run (web/.runs, npm run standin), so the
@@ -546,8 +565,9 @@ async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> 
 	}
 	const synced = SYNC.exec(url.pathname);
 	if (synced) {
+		const asked = synced[1] ?? '';
 		send(req, res, HTTP.ok, {
-			...phaseSync(sync, synced[1] ?? ''),
+			...phaseSync(ESPN_MOVES.has(asked) ? espnSync(sync) : sync, asked),
 			id: synced[1],
 			read_at: readAt()
 		});
@@ -610,6 +630,9 @@ async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> 
 		const bodies = {
 			lineup: ESPN_MOVES.has(id ?? '') ? espnLineup() : lineup,
 			matchup: matchupBox,
+			// The ESPN leagues show the week on its Sunday afternoon, a stand-in (league.ts): the
+			// points are made up so the board's played states can be drawn.
+			scoreboard: ESPN_MOVES.has(id ?? '') ? scoreboardLive : scoreboard,
 			waivers: ESPN_MOVES.has(id ?? '')
 				? espnWaivers(url.searchParams.get('position'))
 				: waiversAt(url.searchParams.get('position')),
