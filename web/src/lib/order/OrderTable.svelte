@@ -425,6 +425,25 @@
 			min-width: 0;
 			max-width: 132px;
 		}
+
+		/* The verb keeps its glyph and its spoken words, its printed words giving their width away. */
+		.cols .act {
+			width: 40px;
+		}
+
+		.verb {
+			width: 32px;
+			padding: 0;
+			justify-content: center;
+		}
+
+		.verb span {
+			display: none;
+		}
+
+		.verb.trade {
+			border-color: var(--line);
+		}
 	}
 
 	@media (max-width: 760px) {

@@ -29,6 +29,10 @@ const VIEWPORT_HEIGHT = 900;
 const PHONE_HEIGHT = 844;
 const PHONE_MAX = 760;
 const READY_TIMEOUT_MS = 30_000;
+/** A beat for the table to draw an answer that has arrived. */
+const SETTLE_MS = 300;
+/** Below this width the figures after the key fold under the name and the group heads go. */
+const FOLDS_AT = 1100;
 const BASIS_WIDTH = 1440;
 const MOST_BASIS_LINES = 5;
 const CHART_MIN_HEIGHT = 200;
@@ -37,7 +41,7 @@ const ROSTER_FOLDS_AT = 900;
 /** Trade for him on fewer rows than this share (the coordinator's ruling 3). */
 const MOST_TRADE_SHARE = 1 / 3;
 const SIGNED_IN = { name: 'commish_csrf', value: 'fixture' };
-const FIGURE_CELL = /^(\d+(\.\d)?|\d+(st|nd|rd|th)|--)$/;
+const FIGURE_CELL = /^([-−]?\d+(\.\d)?|\d+(st|nd|rd|th)|--)$/;
 
 const SCREENS = [
 	{
@@ -155,9 +159,9 @@ async function orderFaults(page: Page, screen: Screen, width: number): Promise<s
 	const said: string[] = [];
 	const wide = width > PHONE_MAX;
 	if (seen.rows === 0) said.push(`${screen.name}: no rows`);
-	if (wide && !seen.groups.includes('Our rest-of-season order'))
+	if (width >= FOLDS_AT && !seen.groups.includes('Our rest-of-season order'))
 		said.push(`${screen.name}: no order group over # (${seen.groups.join('|')})`);
-	if (wide && !seen.groups.includes('Rest of season'))
+	if (width >= FOLDS_AT && !seen.groups.includes('Rest of season'))
 		said.push(`${screen.name}: no Rest of season group`);
 	for (const head of ['#', 'Player', 'Proj']) {
 		if (!seen.heads.includes(head))
@@ -165,8 +169,8 @@ async function orderFaults(page: Page, screen: Screen, width: number): Promise<s
 	}
 	if (!seen.heads.includes('Total') && !seen.heads.includes('Over repl.'))
 		said.push(`${screen.name} at ${String(width)}: no key head`);
-	if (width >= 1100 && !seen.heads.includes('A game')) said.push(`${screen.name}: no A game head`);
-	if (width < 1100 && !seen.folded.every((f) => f.includes('Avg')))
+	if (width >= FOLDS_AT && !seen.heads.includes('A game')) said.push(`${screen.name}: no A game head`);
+	if (width < FOLDS_AT && !seen.folded.every((f) => f.includes('Avg')))
 		said.push(`${screen.name} at ${String(width)}: the figures do not fold under the name`);
 	for (const cell of seen.cells) {
 		if (!FIGURE_CELL.test(cell)) said.push(`${screen.name}: cell "${cell}"`);
@@ -244,14 +248,17 @@ async function tapFaults(): Promise<string[]> {
 	);
 	const after = await tableState(page);
 	if (after.first === before.first) said.push('rest: the QB chip left the table as it was');
-	await page.getByRole('button', { name: 'Free', exact: true }).click();
-	await page.waitForLoadState('networkidle');
+	await Promise.all([
+		page.waitForResponse((r) => r.url().includes('roster=free')),
+		page.getByRole('button', { name: 'Free', exact: true }).click()
+	]);
+	await page.waitForTimeout(SETTLE_MS);
 	const free = await tableState(page);
 	if (free.rows === 0 && (await page.getByText('No player in our order matches.').count()) === 0)
 		said.push('rest: Free shows no rows and no sentence');
 	if (free.kinds.some((k) => !k.includes('free'))) said.push('rest: Free shows a rostered player');
 	// Show more: the fixture holds fewer rows than a page, so the answer is held to two rows a read.
-	await page.route('**/order?*', async (route) => {
+	await page.route((url) => url.pathname.endsWith('/order'), async (route) => {
 		const url = new URL(route.request().url());
 		const response = await route.fetch();
 		const body = (await response.json()) as { data: { rows: unknown[]; total: number } };
@@ -260,13 +267,19 @@ async function tapFaults(): Promise<string[]> {
 		body.data.total = Math.max(body.data.total, 3);
 		await route.fulfill({ response, json: body });
 	});
-	await page.getByRole('button', { name: 'Everyone', exact: true }).click();
-	await page.waitForLoadState('networkidle');
+	await Promise.all([
+		page.waitForResponse((r) => new URL(r.url()).pathname.endsWith('/order')),
+		page.getByRole('button', { name: 'Everyone', exact: true }).click()
+	]);
+	await page.waitForTimeout(SETTLE_MS);
 	const more = page.getByRole('button', { name: 'Show more', exact: true });
 	if ((await more.count()) === 0) said.push('rest: no Show more though the total is past the rows');
 	else {
-		await more.click();
-		await page.waitForLoadState('networkidle');
+		await Promise.all([
+			page.waitForResponse((r) => r.url().includes('limit=200')),
+			more.click()
+		]);
+		await page.waitForTimeout(SETTLE_MS);
 		if ((await tableState(page)).rows <= 2) said.push('rest: Show more read no more rows');
 	}
 	await ctx.close();

@@ -130,7 +130,7 @@ export function moveHref(
 /** The order's evidence columns' basis, said once, in the scoring the rows are in. */
 export function evidenceBasis(league: boolean): string {
 	const scoring = league ? "in this league's scoring" : 'in PPR';
-	return `${BOX.oppRank} is points allowed to his position, 1st the fewest. ${BOX.avg} and ${BOX.last} are this season's points a game and his last game's, ${scoring}.`;
+	return `${BOX.oppRank} is points allowed to his position, 1st the fewest. ${BOX.avg} and ${BOX.last} are a game this season and his last, ${scoring}.`;
 }
 
 /** Whose rosters the marks are, named once with the member's platform. */

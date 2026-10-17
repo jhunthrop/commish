@@ -141,7 +141,7 @@ const lineup = await read<components['schemas']['LineupAdvice']>('lineup');
 const waivers = await read<components['schemas']['WaiverAdvice']>('waivers');
 const out: OrderAdvice = {
 	week: WEEK,
-	basis: `Our rest-of-season order from week ${String(WEEK)}: Total is his points over his club's games through week ${String(LAST_WEEK)}, byes out, A game the same a game. A position ranks by Total, All by Over repl., his total less a free pickup's at his position, kickers and defenses last.`,
+	basis: `Our rest-of-season order from week ${String(WEEK)}: Total is his points through week ${String(LAST_WEEK)}, byes out, A game the same a game. A position ranks by Total, All by Over repl., his total less a free pickup's, kickers and defenses last.`,
 	// The league the points over replacement are for and the rules its season points leave out, as
 	// the API says them (BasisNote): the Waivers answer's note.
 	basis_note: waivers.basis_note,
