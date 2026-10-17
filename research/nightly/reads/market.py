@@ -2,11 +2,12 @@
 
 The 2026-09-05 ruling (`docs/research/2026-09-05-kicker-defense-preregistration-results.md`,
 `KDEF_DECISION`): neither position passed its gates, so both ship in market order, labelled, with no
-projected points and no tier. Every board carries them after its ranked rows: every kicker and team
-defense on the provider's roster (the API's board names the same players, `api/internal/boards`), in
-the draft order of the board's own ADP feed (`RunFormat.adp`, the ADP its rows print, so the order
-and the ADP column never disagree), a player those drafts do not take after the ones they do, by
-provider id. Each position counts its own place from 1.
+projected points and no tier, and a position in market order shows only the players the market has an
+opinion about. Every board carries them after its ranked rows: every kicker and team defense on the
+provider's roster that the board's own ADP feed prices (`RunFormat.adp`, the ADP its rows print, so the
+order and the ADP column never disagree), in that draft order, ties by provider id. Each position
+counts its own place from 1. The room's board takes the same order from the same capture
+(`api/internal/boards/market.go`); `api/testdata/market-order.json` holds both to it.
 
 The September ingest priced kickers and defenses from the PPR feed alone (`ingest_kdef_adp`); every
 feed's capture prices them now (2026-09-09: PPR 20 kickers and 26 defenses, half PPR 16 and 16,
@@ -34,8 +35,8 @@ class MarketPlayer:
 @dataclass(frozen=True, slots=True)
 class MarketEntry:
     player: MarketPlayer
-    # The ADP that placed him, None for a player the order's board does not price.
-    draft_adp: float | None
+    # The ADP that placed him.
+    draft_adp: float
     position_rank: int
     # His place among every board's market rows, 1 first.
     order: int
@@ -54,15 +55,12 @@ def market_players(conn: Connection) -> list[MarketPlayer]:
 
 
 def market_order(players: Sequence[MarketPlayer], adp: Mapping[str, float]) -> tuple[MarketEntry, ...]:
-    """The players in draft order: by `adp` (the order's board, by provider id), then the unpriced by id."""
-
-    def key(player: MarketPlayer) -> tuple[bool, float, str]:
-        found = adp.get(player.player_id)
-        return (found is None, 0.0 if found is None else found, player.player_id)
-
+    """The players `adp` prices (the board's own feed, by provider id), in its draft order, ties by id.
+    A player the drafts do not take is not on the board."""
+    priced = sorted((adp[p.player_id], p.player_id, p) for p in players if p.player_id in adp)
     counts: dict[str, int] = {}
     entries = []
-    for order, player in enumerate(sorted(players, key=key), start=1):
+    for order, (draft_adp, _, player) in enumerate(priced, start=1):
         counts[player.position] = counts.get(player.position, 0) + 1
-        entries.append(MarketEntry(player, adp.get(player.player_id), counts[player.position], order))
+        entries.append(MarketEntry(player, draft_adp, counts[player.position], order))
     return tuple(entries)

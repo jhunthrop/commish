@@ -174,11 +174,13 @@ def assemble(conn: Connection, as_of: datetime, frozen_by: FrozenBy, ros: RosSet
     if rest is not None:
         boards = rest.boards
     # The pages and the search index in the order of the boards the run prints, then the kickers and
-    # defenses: each board's in its own drafts' order, the index's in the page format's.
+    # defenses: each board's those its own drafts take, in their order; the index's every one any board
+    # carries, the page format's order first.
     people = tuple(pages.identities(boards))
     roster = market_players(conn)
     orders = {f.id: market_order(roster, adp_by_format[f.id]) for f in formats}
-    market = tuple(pages.market_identities(people, orders[PAGE_FORMAT.id]))
+    carried = {e.player.player_id: e for f in (PAGE_FORMAT.id, *orders) for e in orders[f]}
+    market = tuple(pages.market_identities(people, tuple(carried.values())))
     by_slug = {p.id: p for p in (*people, *market)}
     universe_ids = sorted({e.row.universe_id for b in boards for e in b.entries})
     capsules = stored_capsules_for(conn, universe_ids)
