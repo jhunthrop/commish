@@ -413,6 +413,43 @@ paths:
         "409": { $ref: "#/components/responses/ErrorResponse" }
         "422": { $ref: "#/components/responses/ErrorResponse" }
         "502": { $ref: "#/components/responses/ErrorResponse" }
+  /leagues/attached/{id}/order:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: the attached league's id (AttachedLeague.id)
+        schema: { type: string, format: uuid }
+      - name: position
+        in: query
+        required: false
+        description: only players at this position; without it every position, ranked by points over replacement
+        schema: { type: string, enum: [QB, RB, WR, TE, K, DEF] }
+      - name: q
+        in: query
+        required: false
+        description: only players whose name or club holds these letters, any case
+        schema: { type: string, minLength: 2, maxLength: 40 }
+      - name: limit
+        in: query
+        required: false
+        description: at most this many rows, 100 without it
+        schema: { type: integer, minimum: 1, maximum: 400 }
+    get:
+      tags: [league-sync]
+      operationId: leagueOrder
+      summary: >-
+        The Rest of season screen for the drafter's league: our rest-of-season order valued for the league, each
+        player with his week, whose roster holds him and the one move his row admits (add a free player the league
+        starts, trade for one the trade finder would bring in). We submit nothing.
+      security: [{ session: [] }]
+      responses:
+        "200": { $ref: "#/components/responses/OrderAdviceResponse" }
+        "400": { $ref: "#/components/responses/ErrorResponse" }
+        "404": { $ref: "#/components/responses/ErrorResponse" }
+        "409": { $ref: "#/components/responses/ErrorResponse" }
+        "422": { $ref: "#/components/responses/ErrorResponse" }
+        "502": { $ref: "#/components/responses/ErrorResponse" }
   /leagues/attached/{id}/trades:
     parameters:
       - name: id
@@ -1027,6 +1064,32 @@ paths:
                 allOf:
                   - $ref: "#/components/schemas/Envelope"
                   - properties: { data: { $ref: "#/components/schemas/RoomBoard" } }
+        "400": { $ref: "#/components/responses/ErrorResponse" }
+  /order:
+    parameters:
+      - name: position
+        in: query
+        required: false
+        description: only players at this position; without it every position, ranked by points over replacement
+        schema: { type: string, enum: [QB, RB, WR, TE, K, DEF] }
+      - name: q
+        in: query
+        required: false
+        description: only players whose name or club holds these letters, any case
+        schema: { type: string, minLength: 2, maxLength: 40 }
+      - name: limit
+        in: query
+        required: false
+        description: at most this many rows, 100 without it
+        schema: { type: integer, minimum: 1, maximum: 400 }
+    get:
+      tags: [league-sync]
+      operationId: order
+      summary: >-
+        Our rest-of-season order for a 12-team PPR league with no league of the reader's own, every player our board
+        places with his week: the Rest of season and Players screens signed out. Rows carry no roster and no move.
+      responses:
+        "200": { $ref: "#/components/responses/OrderAdviceResponse" }
         "400": { $ref: "#/components/responses/ErrorResponse" }
   /games/week:
     get:
@@ -1802,6 +1865,14 @@ components:
             allOf:
               - $ref: "#/components/schemas/Envelope"
               - properties: { data: { $ref: "#/components/schemas/MatchupBox" } }
+    OrderAdviceResponse:
+      description: our rest-of-season order with each player's week
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: "#/components/schemas/Envelope"
+              - properties: { data: { $ref: "#/components/schemas/OrderAdvice" } }
     WaiverAdviceResponse:
       description: the waiver pool ranked by the gain to the drafter's lineup
       content:
@@ -3488,6 +3559,78 @@ components:
         gain: { type: number, format: double, description: "points over replacement a week to the lineup, one decimal; above 0 sits above the rule" }
         starts: { type: boolean, description: he starts for you this week }
         sentence: { type: string }
+    OrderAdvice:
+      type: object
+      required: [week, basis, basis_note, order_basis, refreshed, from_week, read_at, projection_read_at, projection_scoring, total, rows]
+      properties:
+        week: { type: integer, description: the week the rows' Game cell and Proj are for }
+        basis:
+          type: string
+          description: what the order and its two figures are, said once under the rows
+        basis_note:
+          type: string
+          description: >-
+            the league the points over replacement are for (a 12-team PPR league for a reader with none of their own)
+            and what its points leave out
+        order_basis: { $ref: "#/components/schemas/OrderBasis" }
+        refreshed: { type: string, format: date-time, description: when the order was made }
+        from_week:
+          type: integer
+          nullable: true
+          description: the first week the rest-of-season order covers, null on the preseason order
+        read_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: when the league was read from its platform, null without a league
+        projection_read_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: when the week's published projection was read, null when none is stored
+        projection_scoring: { $ref: "#/components/schemas/ProjectionScoring" }
+        total: { type: integer, description: every player the view holds before the limit }
+        rows:
+          type: array
+          description: in our order, at most the limit
+          items: { $ref: "#/components/schemas/OrderRow" }
+    OrderRow:
+      type: object
+      required: [line, rank, rest_of_season_points, roster, move]
+      properties:
+        line: { $ref: "#/components/schemas/PlayerLine" }
+        rank:
+          type: integer
+          description: >-
+            his place in our order for this view: at a position his position rank (by his rest-of-season total, which
+            orders the same as points over replacement there), across every position his place by points over
+            replacement, a kicker or defense after every projected player in the order drafters take them
+        rest_of_season_points:
+          type: number
+          format: double
+          nullable: true
+          description: >-
+            the order's key, one decimal: his rest-of-season points over the games his club has left from the order's
+            first week through week 17, byes out; null on the preseason order and for a kicker or defense, which the
+            board places in draft order
+        roster:
+          allOf: [{ $ref: "#/components/schemas/RosterMark" }]
+          nullable: true
+          description: whose roster in the league holds him, null without a league
+        move:
+          type: string
+          nullable: true
+          enum: [add, trade]
+          description: >-
+            the one move his row admits: add for a player no roster holds at a position the league starts, trade for a
+            player on another roster whom the trade finder brings in for the drafter, null otherwise (and always for
+            the drafter's own players)
+    RosterMark:
+      type: object
+      required: [kind, team]
+      properties:
+        kind: { type: string, enum: [yours, free, team] }
+        team: { type: string, nullable: true, description: the holding team's name when kind is team, else null }
     WaiverAdvice:
       type: object
       required: [week, basis, basis_note, order_basis, refreshed, read_at, best, rows, host_waivers_url, host_note, moves]
