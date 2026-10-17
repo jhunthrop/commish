@@ -9,6 +9,15 @@
 		adp: number | null;
 		/** The word his ranks show as when he is on a season-long list ("IR", Lane 63). */
 		held?: string | null;
+		/** A kicker or a defense (Lane 66m): his position rank is his place in the drafters' order, and
+		 * our rank only follows the ranked players, so neither is set against his ADP. */
+		draftOrder?: boolean;
+	}
+
+	/** Where a kicker or a defense sits in the drafters' order, or that they do not take him. */
+	export function draftOrderWords(board: SheetRowBoard): string {
+		if (board.held) return board.held;
+		return board.adp === null ? 'Not drafted' : `Draft order ${String(board.positionRank)}`;
 	}
 </script>
 
@@ -151,7 +160,7 @@
 					adp={board.adp}
 					ourRank={board.rank}
 					figure={false}
-					compare={!board.held}
+					compare={!board.held && !board.draftOrder}
 					rankWord={board.held ?? null}
 				/>{/if}
 		</span>
@@ -162,7 +171,7 @@
 			{#if board}<AdpCell
 					adp={board.adp}
 					ourRank={board.rank}
-					compare={!board.held}
+					compare={!board.held && !board.draftOrder}
 					rankWord={board.held ?? null}
 				/>{/if}
 		</span>
@@ -171,7 +180,9 @@
 				<Label
 					>{board === null
 						? 'We do not rank him'
-						: `Our rank ${board.held ?? String(board.rank)}`}</Label
+						: board.draftOrder
+							? draftOrderWords(board)
+							: `Our rank ${board.held ?? String(board.rank)}`}</Label
 				>
 			{/if}
 		</span>

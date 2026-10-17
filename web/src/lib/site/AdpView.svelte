@@ -97,6 +97,7 @@
 							href={links.club(player.team)}
 							range
 							order="adp"
+							orderColumn={false}
 							eager={i < EAGER_ROWS}
 							held={siteContext.held?.mark(player.id) ?? null}
 							status={words?.rows[player.id] ?? null}

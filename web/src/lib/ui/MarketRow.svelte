@@ -9,7 +9,6 @@
 	import NameWords from './NameWords.svelte';
 	import PositionPill from './PositionPill.svelte';
 	import ToneChip from './ToneChip.svelte';
-	import ValueCell from './ValueCell.svelte';
 
 	/**
 	 * A kicker or a defense on a board (Lane 66m, the 2026-09-05 ruling), in the house row on the
@@ -40,6 +39,10 @@
 		/** His injury status (a season-long one shows as his place). */
 		status?: StatusView | null;
 		action?: Snippet;
+		/** Under a Draft order head (RowHead's market heads: a board's kicker or defense view, a club
+		 * page) his place is that column's bare number. Under a ranked row's heads (ADP) it rides his
+		 * position pill, "K 3", as a ranked row's place does. */
+		orderColumn?: boolean;
 	}
 
 	let {
@@ -52,12 +55,15 @@
 		order = 'board',
 		held = null,
 		status = null,
-		action
+		action,
+		orderColumn = true
 	}: Props = $props();
 
-	/** A player on a season-long list has no place in the order: the word stands in for it. */
+	/** A player on a season-long list has no place in the order: the word stands in for it. A player
+	 * the drafts do not take has none either. */
 	const word = $derived(status?.rank ?? null);
-	const drafted = $derived(player.adp !== null);
+	const place = $derived(player.adp !== null && word === null ? player.positionRank : null);
+	const pillRank = $derived(word ?? (orderColumn ? undefined : (place ?? undefined)));
 	const lead = $derived(order === 'adp' && player.adp !== null ? fixed(player.adp) : '');
 </script>
 
@@ -81,7 +87,7 @@
 	<span class="who">
 		<a class="name" {href}><NameWords name={player.name} /></a>
 		<span class="meta">
-			<PositionPill position={player.position} rank={word ?? undefined} />
+			<PositionPill position={player.position} rank={pillRank} />
 			<span class="team">{player.team}</span>
 		</span>
 		{#if status}
@@ -95,11 +101,7 @@
 	{#if games}<span class="gp"></span>{/if}
 	<span class="proj"></span>
 	<span class="order"
-		>{#if drafted && word === null}<ValueCell
-				value={player.positionRank}
-				label="Draft order"
-				decimals={0}
-			/>{/if}</span
+		>{#if orderColumn && place !== null}<b>{place}</b>{/if}</span
 	>
 	{#if range}<span class="rng"></span>{/if}
 	<AdpCell adp={player.adp} ourRank={player.ourRank} under="adp" compare={false} rankWord={word} />
@@ -210,9 +212,20 @@
 		line-height: 1.3;
 	}
 
+	/* The place, a ranked row's figure in its type (ValueCell's), its column head naming it. */
 	.order {
 		display: flex;
 		justify-content: flex-end;
+		align-items: center;
+	}
+
+	.order b {
+		font-family: var(--font-num);
+		font-variant-numeric: tabular-nums;
+		letter-spacing: 0.01em;
+		font-weight: 700;
+		font-size: var(--t-xl);
+		line-height: 1;
 	}
 
 	.gp {

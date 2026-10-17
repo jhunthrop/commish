@@ -75,7 +75,8 @@ export async function sheetBoard(format: BoardFormat): Promise<readonly Director
 	}));
 	const market = withStatuses(loaded.market, capture).map((row) => ({
 		...directoryOf(row),
-		headshot: marketFace(row)
+		headshot: marketFace(row),
+		draftOrder: true
 	}));
 	return [...ranked, ...market];
 }
