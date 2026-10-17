@@ -126,10 +126,8 @@ async function playerPages(page: Page, tag: string): Promise<void> {
 	);
 	check(CAPTURE.test(text), `${tag}: his page names the capture`);
 	check(!/Tier \d/.test(text.split('This season')[0] ?? ''), `${tag}: no tier chip places him`);
-	check(
-		text.includes('He sits below the available players.') && !/picks? (later|earlier)/.test(text),
-		`${tag}: his drafters fact gives the ADP alone`
-	);
+	// In season the player card carries no drafters fact (Lane 66h); nothing frames a draft spot.
+	check(!/picks? (later|earlier)/.test(text), `${tag}: nothing frames his draft spot`);
 	check(
 		text.includes('No tier while he is on a season-long list.') && !/\bTier \d/.test(text),
 		`${tag}: no tier aside places him`
@@ -185,7 +183,7 @@ async function otherSurfaces(page: Page, tag: string): Promise<void> {
 		`${tag}: the ADP row: ${adpRow}`
 	);
 	await page.goto(`${web}/players/christian-mccaffrey`, { waitUntil: 'networkidle' });
-	const mates = await page.locator('aside.tier').innerText();
+	const mates = await page.locator('[aria-label="His tier"]').innerText();
 	check(!mates.includes(HELD.name), `${tag}: a tier mate's page leaves him out`);
 	await page.goto(`${web}/compare?a=${HELD.slug}&b=christian-mccaffrey`, {
 		waitUntil: 'networkidle'

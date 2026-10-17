@@ -166,7 +166,7 @@ def assemble(conn: Connection, as_of: datetime, frozen_by: FrozenBy, ros: RosSet
     # season (the judged universe ranks him whether or not the preseason board did).
     extra = () if ros is None else tuple(p.provider_id for p in ros.season_players)
     on_boards = {e.row.player_id for b in boards for e in b.entries}
-    context = season_context(conn, PRODUCT_SEASON, sorted({*on_boards, *extra}), as_of)
+    context = season_context(conn, PRODUCT_SEASON, sorted({*on_boards, *extra}), as_of, prior=True)
     rest = None if ros is None else ros_boards(boards, context, as_of, ros)
     if rest is not None:
         boards = rest.boards

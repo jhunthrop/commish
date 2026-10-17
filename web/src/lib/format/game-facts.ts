@@ -105,22 +105,3 @@ export function gameFactsLine(c: GameConditions, zone: string = memberZone()): s
 	const read = readWords(c, zone);
 	return [...said, ...(read === null ? [] : [read])].join(' ');
 }
-
-/** His club's game in a week's answer, null without one. */
-export function clubGame(week: GameWeek, team: string): ClubGame | null {
-	return week.games.find((g) => g.team === team) ?? null;
-}
-
-/** A player page's week line: "Week 7: at SEA Sun 7:20 pm. Expected to score 22 and to lose by 3, 47.5 points in
- * the game. 49°F and 14 mph wind at kickoff, outdoors. Read Sun 9:05 am.", null from his game's kickoff. */
-export function clubGameLine(
-	week: GameWeek,
-	game: ClubGame,
-	zone: string = memberZone()
-): string | null {
-	if (!toBePlayed(game)) return null;
-	const side = game.home ? 'vs' : 'at';
-	const head = `Week ${String(week.week)}: ${side} ${game.opponent} ${weekdayTime(game.kickoff, zone)}.`;
-	const facts = gameFactsLine(game, zone);
-	return facts === null ? head : `${head} ${facts}`;
-}

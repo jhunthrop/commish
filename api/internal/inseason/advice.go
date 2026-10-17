@@ -147,7 +147,10 @@ func (a *advisor) build(id string, lp apitypes.LeaguePlayer, side *leaguesync.Si
 	}
 	line.OppRank, line.SeasonAvg, line.LastPoints = evidence(facts)
 	if placed {
-		line.Slug = a.pages.of(bp.Name, c.Rank > 0)
+		// A kicker or defense has no page, so no link (founder ruling 2026-10-17).
+		if cardPositions[position] {
+			line.Slug = a.pages.of(bp.Name, c.Rank > 0)
+		}
 		line.RestOfSeasonPerGame = RestOfSeasonPerGame(a.Board, bp, a.gamesLeft)
 	}
 	if v, ok := a.Board.Values[boardID]; ok {

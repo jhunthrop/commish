@@ -21,7 +21,7 @@ from research.capsules.store import WRITTEN_SOURCE, StoredCapsule
 from research.capsules.week.caption import status_changed_caption, written_caption
 from research.capsules.week.store import StoredWeekRead
 from research.model.instants import js_iso
-from research.nightly.build.player_season import SeasonContext, season_block
+from research.nightly.build.player_season import SeasonContext, prior_seasons, season_block
 from research.nightly.config import PAGE_FORMAT, TEAMS, RunFormat
 from research.nightly.reads.board import BoardEntry, FormatBoard
 from research.nightly.reads.schedule import Game
@@ -209,6 +209,7 @@ def player_json(who: Identity, inputs: PageInputs) -> Json:
     page_entry: BoardEntry | None = None
     universe_id: str | None = None
     season: Json | None = None
+    prior: list[Json] = []
     for format_id, by_player in inputs.entries.items():
         entry = by_player.get(who.id)
         if entry is None:
@@ -218,6 +219,7 @@ def player_json(who: Identity, inputs: PageInputs) -> Json:
             # holds every block to one format, review N15).
             row = entry.row
             season = season_block(who.id, row.team, inputs.formats[PAGE_FORMAT.id], row.position, inputs.season)
+            prior = prior_seasons(who.id, inputs.formats[PAGE_FORMAT.id], row.position, inputs.season)
         formats[format_id] = numbers_of(entry, inputs.adp_by_format[format_id].get(who.id))
         universe_id = entry.row.universe_id
         if format_id == PAGE_FORMAT.id:
@@ -235,6 +237,7 @@ def player_json(who: Identity, inputs: PageInputs) -> Json:
         "capsule": capsule_json(stored, page),
         "weekRead": _week_read(who, universe_id, inputs),
         "season": season,
+        "priorSeasons": prior,
     }
 
 

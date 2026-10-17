@@ -135,6 +135,7 @@
 {/snippet}
 
 <tr
+	data-player={row.boardId}
 	class:bench
 	class:moved-in={move === 'in' || marked}
 	class:moved-out={move === 'out'}
@@ -243,6 +244,13 @@
 </tr>
 
 <style>
+	/* The player a player page sent here (?player=, asked.ts), marked in the accent's rule. */
+	tr:global([data-asked]) td {
+		box-shadow:
+			inset 0 2px 0 var(--accent),
+			inset 0 -2px 0 var(--accent);
+	}
+
 	td {
 		padding: 6px var(--s-2);
 		border-bottom: 1px solid var(--line);
