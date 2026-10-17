@@ -408,7 +408,7 @@ export function boxNumber(value: number | null): string {
 	return value === null ? BOX.none : fixed(value, 1);
 }
 
-const FORMAT_WORDS: Readonly<Record<ProjectionScoring['format'], string>> = {
+export const FORMAT_WORDS: Readonly<Record<ProjectionScoring['format'], string>> = {
 	ppr: 'PPR',
 	half_ppr: 'half-PPR',
 	standard: 'standard'
