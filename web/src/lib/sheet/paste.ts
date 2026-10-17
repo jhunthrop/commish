@@ -5,6 +5,10 @@
  *   1. Puka Nacua
  *   Ja'Marr Chase, WR
  *   Bijan Robinson (RB, ATL)
+ *   Bills D/ST
+ *
+ * A defense answers to its name, its club, its nickname or its city ("Buffalo Bills", "BUF DST",
+ * "Bills D/ST", "Buffalo Defense"); a city two clubs share is never guessed.
  *
  * A name is matched to a player on our board only when it is unmistakable: the same name once
  * case, periods, apostrophes, hyphens and a Jr., Sr. or numeral suffix are set aside, and, when two
@@ -39,11 +43,30 @@ export type NameIndex = ReadonlyMap<string, readonly SheetPlayer[]>;
 export function nameIndex(players: readonly SheetPlayer[]): NameIndex {
 	const index = new Map<string, SheetPlayer[]>();
 	for (const player of players) {
-		const key = nameKey(player.name);
-		index.set(key, [...(index.get(key) ?? []), player]);
+		for (const key of keysOf(player)) index.set(key, [...(index.get(key) ?? []), player]);
 	}
 	return index;
 }
+
+/** A defense also answers to its club, its nickname and its city ("BUF", "Bills", "Buffalo"), the
+ * ways a ranking writes one (Lane 66m); anyone else to his name. */
+function keysOf(player: SheetPlayer): string[] {
+	const name = nameKey(player.name);
+	if (player.position !== 'DST') return [name];
+	const words = name.split(' ');
+	const keys = [
+		name,
+		words.at(-1) ?? '',
+		words.slice(0, -1).join(' '),
+		(player.team ?? '').toLowerCase()
+	];
+	return [...new Set(keys.filter((key) => key !== ''))];
+}
+
+/** A defense's own word after its name: "Bills D/ST", "BUF DST", "Buffalo Defense". */
+const DEFENSE_WORD = /\s+(dst|def|defense|defence)$/;
+/** "D/ST" holds the slash a line's hints split on, so it is read as one word first. */
+const SLASHED_DEFENSE = /\bd\s*\/\s*st\b/gi;
 
 export function looksLikeCsv(text: string): boolean {
 	const firstLine = text.trimStart().split(/\r?\n/, 1)[0] ?? '';
@@ -56,7 +79,7 @@ interface ListLine {
 }
 
 function readListLine(line: string): ListLine {
-	const withoutRank = line.replace(LEADING_RANK, '');
+	const withoutRank = line.replace(LEADING_RANK, '').replace(SLASHED_DEFENSE, 'DST');
 	const [namePart = '', ...hints] = withoutRank.split(HINT_SPLIT);
 	const position =
 		hints
@@ -67,13 +90,18 @@ function readListLine(line: string): ListLine {
 }
 
 function matchLine(line: ListLine, index: NameIndex): SheetPlayer | string {
-	const candidates = index.get(nameKey(line.name)) ?? [];
+	const written = nameKey(line.name);
+	const defense = DEFENSE_WORD.test(written);
+	const key = written.replace(DEFENSE_WORD, '');
+	const position = defense ? 'DST' : line.position;
+	const candidates = index.get(key) ?? [];
 	const fitting =
-		line.position === null
-			? candidates
-			: candidates.filter((player) => player.position === line.position);
-	if (fitting.length === 1 && fitting[0]) return fitting[0];
-	if (fitting.length > 1) return 'Two players share this name. Add his position after a comma';
+		position === null ? candidates : candidates.filter((player) => player.position === position);
+	const [only, other] = fitting;
+	if (only && !other) return only;
+	if (only && other?.position === 'DST' && only.position === 'DST')
+		return `Two clubs share this city. Write the club, like ${only.team ?? ''}`;
+	if (only) return 'Two players share this name. Add his position after a comma';
 	return 'No player on our board has this name';
 }
 

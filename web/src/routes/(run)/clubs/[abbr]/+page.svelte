@@ -10,6 +10,7 @@
 	import Figure from '#lib/ui/Figure.svelte';
 	import HeroCard from '#lib/ui/HeroCard.svelte';
 	import Label from '#lib/ui/Label.svelte';
+	import MarketRow from '#lib/ui/MarketRow.svelte';
 	import Panel from '#lib/ui/Panel.svelte';
 	import PanelHead from '#lib/ui/PanelHead.svelte';
 	import Row from '#lib/ui/Row.svelte';
@@ -78,6 +79,23 @@
 				<Label>Nobody from {club.city} is on this board</Label>
 			{/if}
 		</section>
+
+		{#if page.market.length > 0}
+			<section aria-label="Kickers and defense">
+				<PanelHead title="Kickers and defense, in draft order" />
+				<Panel padding="none">
+					<RowHead range={false} market {framing} />
+					{#each page.market as player (player.id)}
+						<MarketRow
+							{player}
+							face={player.face}
+							href={links.board(page.format.id, player.position)}
+							status={words?.rows[player.id] ?? null}
+						/>
+					{/each}
+				</Panel>
+			</section>
+		{/if}
 
 		<section aria-label="Schedule">
 			<Table

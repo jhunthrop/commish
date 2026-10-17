@@ -1,11 +1,12 @@
 /** The run's injury capture as a page's loader says it (Lane 63): the stamp the page carries for its
  * live clock, and the clock the built words are said on, the Eastern zone at the build's instant. */
 import type { CaptureStamp } from '#lib/format/designation.ts';
-import type { Designations, Format, PlayerStatus } from '#lib/run/schema.ts';
+import type { Designations, Format } from '#lib/run/schema.ts';
 import {
 	BUILT_ZONE,
 	boardStatusWords,
 	type BoardStatusWords,
+	type ListedRow,
 	type Saying
 } from '#lib/run/status-view.ts';
 
@@ -30,7 +31,7 @@ export interface BoardStatuses {
 }
 
 export function boardStatuses(
-	rows: readonly { id: string; status?: PlayerStatus }[],
+	rows: readonly ListedRow[],
 	capture: Designations | null,
 	format: Pick<Format, 'rosFromWeek'>
 ): BoardStatuses {

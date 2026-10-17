@@ -11,9 +11,11 @@ const INLINE_STYLE_LIMIT = 32_768;
 const PRERENDER_CONCURRENCY = 8;
 /** A board row and its cells, with the row's sheet mark, its season figures and its framing, and
  * the words of the pages that draw rows and follow the season: the board, ADP, a club and the front
- * door draw them, a player page never does, so they load as one file with the pages that draw rows. */
+ * door draw them, a player page never does, so they load as one file with the pages that draw rows.
+ * A kicker's or a defense's row (MarketRow, Lane 66m) rides in it too: a file of its own would add its
+ * name to every preload list the shell carries. */
 const ROW_PARTS =
-	/[\\/]src[\\/]lib[\\/](ui[\\/](Row|RowHead|RangeBar|AdpCell|SheetMark|season-figures|ValueCell|NameWords|Place)\.|site[\\/](RowSheetMark|season-words|shown-rail\.svelte|verb-links)\.|run[\\/]row-framing\.)/;
+	/[\\/]src[\\/]lib[\\/](ui[\\/](Row|MarketRow|RowHead|RangeBar|AdpCell|SheetMark|season-figures|ValueCell|NameWords|Place)\.|site[\\/](RowSheetMark|season-words|shown-rail\.svelte|verb-links)\.|run[\\/]row-framing\.)/;
 /** The board and ADP pages' own parts: the views, the tier strip, the rail's jump list and toggles,
  * the follow of the switch's format, the chips, and a missing format's page. One file for those
  * pages. */
@@ -24,7 +26,7 @@ const BOARD_PARTS =
  * store. A nightly page never loads any of it with the page; the sheet arrives on a reader's first
  * intent, the rest only on the pages that call the API. */
 const USER_PAGE_PARTS =
-	/[\\/]src[\\/]lib[\\/](room|account|api|sheet|pass|companion|hosts)[\\/]|[\\/]src[\\/]lib[\\/]ui[\\/](CallPanel|TeamPanel|PickStrip|OddsCell|ToneChip|Stepper|TextInput|ScoreBug|SinceStrip|Keys)\./;
+	/[\\/]src[\\/]lib[\\/](room|account|api|sheet|pass|companion|hosts)[\\/]|[\\/]src[\\/]lib[\\/]ui[\\/](CallPanel|TeamPanel|PickStrip|StillThereCell|ToneChip|Stepper|TextInput|ScoreBug|SinceStrip|Keys)\.|[\\/]src[\\/]lib[\\/]run[\\/]market\./;
 /** What the player, club and compare pages draw and the others never do: a player's line, the
  * crumb, the outcome bar, the tier mates, the capsule and a fact. One file for those pages. */
 const PLAYER_PARTS =

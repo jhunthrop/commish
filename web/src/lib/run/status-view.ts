@@ -6,6 +6,7 @@ import {
 	designationWord,
 	listedMark,
 	rankWord,
+	draftOrderLongLine,
 	seasonLongLine,
 	sitsHim,
 	type CaptureStamp
@@ -34,14 +35,16 @@ export interface Saying {
 }
 
 /** His status as a row and a page print it. */
-export function statusView(status: PlayerStatus, saying: Saying): StatusView {
+export function statusView(status: PlayerStatus, saying: Saying, draftOrder = false): StatusView {
 	const { capture, restOfSeason, zone } = saying;
 	if (status.seasonLong) {
 		return {
 			rank: rankWord(status.status),
 			mark: designationWord(status.status),
 			sits: true,
-			line: seasonLongLine(status, capture.readAt, restOfSeason, zone)
+			line: draftOrder
+				? draftOrderLongLine(status, capture.readAt, zone)
+				: seasonLongLine(status, capture.readAt, restOfSeason, zone)
 		};
 	}
 	return {
@@ -71,12 +74,19 @@ export interface BoardStatusWords {
 	rows: Readonly<Record<string, StatusView>>;
 }
 
-export function boardStatusWords(
-	rows: readonly { id: string; status?: PlayerStatus }[],
-	saying: Saying
-): BoardStatusWords {
+/** A row the status words are said for: a kicker's or a defense's (in draft order) carries no figure
+ * of ours, so his season-long line names none. */
+export interface ListedRow {
+	id: string;
+	status?: PlayerStatus;
+	orderBasis?: 'projection' | 'market';
+}
+
+export function boardStatusWords(rows: readonly ListedRow[], saying: Saying): BoardStatusWords {
 	const listed = rows.flatMap((row) =>
-		row.status === undefined ? [] : [[row.id, statusView(row.status, saying)] as const]
+		row.status === undefined
+			? []
+			: [[row.id, statusView(row.status, saying, row.orderBasis === 'market')] as const]
 	);
 	return {
 		capture: captureLine(saying.capture, saying.now, saying.zone),

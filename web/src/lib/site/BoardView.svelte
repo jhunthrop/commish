@@ -16,6 +16,7 @@
 	import PanelHead from '#lib/ui/PanelHead.svelte';
 	import Label from '#lib/ui/Label.svelte';
 	import Quiet from '#lib/ui/Quiet.svelte';
+	import MarketRow from '#lib/ui/MarketRow.svelte';
 	import Row from '#lib/ui/Row.svelte';
 	import RowHead from '#lib/ui/RowHead.svelte';
 	import TierJump from '#lib/ui/TierJump.svelte';
@@ -90,9 +91,12 @@
 	function status(player: BoardRowView): StatusView | null {
 		return words?.rows[player.id] ?? null;
 	}
+	/** A kicker's or a defense's view: his position in draft order, its basis said once in the lead. */
+	const marketView = $derived(page.marketBasis !== null);
+	const marketShown = $derived(page.market.filter((row) => !onlySheet || lazySheet.has(row.id)));
 	/** The basis line, and the capture's sentence when the run carries one. */
 	const lead = $derived.by(() => {
-		const basis = page.seasonLead ?? page.format.basis.join(' · ');
+		const basis = page.marketBasis ?? page.seasonLead ?? page.format.basis.join(' · ');
 		return words === null ? basis : `${basis} ${words.capture}`;
 	});
 
@@ -166,12 +170,30 @@
 		</div>
 
 		<section aria-label="{page.position ?? 'All'} {page.format.label} board">
-			<RowHead {range} action games={page.seasonLead !== null} {framing} />
-			{#if page.position === null}
+			{#if marketView}
+				<RowHead range={false} action market {framing} />
+				{#each marketShown as player, i (player.id)}
+					{@const face = player.face}
+					<MarketRow
+						{player}
+						{face}
+						href={links.club(player.team)}
+						eager={i < EAGER_ROWS}
+						held={siteContext.held?.mark(player.id) ?? null}
+						status={words?.rows[player.id] ?? null}
+					>
+						{#snippet action()}
+							<RowSheetMark player={{ ...player, headshot: face }} />
+						{/snippet}
+					</MarketRow>
+				{/each}
+			{:else if page.position === null}
+				<RowHead {range} action games={page.seasonLead !== null} {framing} />
 				{#each visible as player, i (player.id)}
 					{@render row(player, i)}
 				{/each}
 			{:else}
+				<RowHead {range} action games={page.seasonLead !== null} {framing} />
 				{#each groups as tierGroup (tierGroup.tier)}
 					{@const rows = tierGroup.rows.filter(shown)}
 					{#if rows.length > 0}
@@ -203,7 +225,7 @@
 	</div>
 
 	<aside class="side" id={SIDE_ID} aria-label="Your board">
-		{#if page.position !== null}
+		{#if page.position !== null && !marketView}
 			<Panel>
 				<PanelHead title="Tiers" aside="Drop to next" />
 				<TierJump
@@ -219,16 +241,22 @@
 		{/if}
 		<Panel>
 			<PanelHead title="Show" />
-			<Toggle label="Players below replacement" bind:checked={belowReplacement} />
-			{#if page.range}<span class="range-toggle"
+			{#if !marketView}<Toggle
+					label="Players below replacement"
+					bind:checked={belowReplacement}
+				/>{/if}
+			{#if page.range && !marketView}<span class="range-toggle"
 					><Toggle label="Floor to ceiling" bind:checked={rangeOn} /></span
 				>{/if}
 			<Toggle label="Only my sheet" bind:checked={onlySheet} />
 		</Panel>
-		<Panel>
-			<PanelHead title="Basis" />
-			<BasisList terms={page.basisTerms} />
-		</Panel>
+		<!-- A kicker's or a defense's view says its basis once, in the lead. -->
+		{#if !marketView}
+			<Panel>
+				<PanelHead title="Basis" />
+				<BasisList terms={page.basisTerms} />
+			</Panel>
+		{/if}
 		<!-- Last in the column, so the rail arriving with the sheet moves nothing above it, in a slot
 		     holding an empty sheet's height, so the column does not grow when it arrives. -->
 		<div class="rail-slot">

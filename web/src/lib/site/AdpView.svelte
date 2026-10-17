@@ -13,6 +13,7 @@
 	import PageHead from '#lib/ui/PageHead.svelte';
 	import Panel from '#lib/ui/Panel.svelte';
 	import PanelHead from '#lib/ui/PanelHead.svelte';
+	import MarketRow from '#lib/ui/MarketRow.svelte';
 	import Row from '#lib/ui/Row.svelte';
 	import RowHead from '#lib/ui/RowHead.svelte';
 	import Verb from '#lib/ui/Verb.svelte';
@@ -88,22 +89,40 @@
 			<section aria-label="{page.format.label} ADP">
 				<RowHead action order="adp" {framing} />
 				{#each page.rows as player, i (player.id)}
-					<Row
-						{player}
-						href={links.player(player.slug)}
-						{scale}
-						showTier
-						unit={page.format.unit}
-						order="adp"
-						{framing}
-						eager={i < EAGER_ROWS}
-						held={siteContext.held?.mark(player.id) ?? null}
-						status={words?.rows[player.id] ?? null}
-					>
-						{#snippet action()}
-							<RowSheetMark {player} />
-						{/snippet}
-					</Row>
+					{#if player.orderBasis === 'market'}
+						{@const face = player.face}
+						<MarketRow
+							{player}
+							{face}
+							href={links.club(player.team)}
+							range
+							order="adp"
+							eager={i < EAGER_ROWS}
+							held={siteContext.held?.mark(player.id) ?? null}
+							status={words?.rows[player.id] ?? null}
+						>
+							{#snippet action()}
+								<RowSheetMark player={{ ...player, headshot: face }} />
+							{/snippet}
+						</MarketRow>
+					{:else}
+						<Row
+							{player}
+							href={links.player(player.slug)}
+							{scale}
+							showTier
+							unit={page.format.unit}
+							order="adp"
+							{framing}
+							eager={i < EAGER_ROWS}
+							held={siteContext.held?.mark(player.id) ?? null}
+							status={words?.rows[player.id] ?? null}
+						>
+							{#snippet action()}
+								<RowSheetMark {player} />
+							{/snippet}
+						</Row>
+					{/if}
 				{/each}
 			</section>
 		</div>

@@ -23,6 +23,7 @@
 import { z } from 'zod';
 import type { components } from '#lib/api/types.ts';
 import { POSITIONS } from '#lib/types/player.ts';
+import { MARKET_POSITIONS } from './market.ts';
 import { club, formatId } from './primitives.ts';
 import { seasonSchema } from './season.ts';
 
@@ -69,7 +70,10 @@ export const formatSchema = z.object({
 	/** In season, the last week whose games are in the season figures. */
 	rosThroughWeek: z.number().int().min(0).optional(),
 	/** In season, when the run refreshed the rest-of-season board. */
-	refreshedAt: isoTime.optional()
+	refreshedAt: isoTime.optional(),
+	/** The ADP source (adp.json) whose draft order the board's kickers and defenses take. Absent on a
+	 * run older than the rows. */
+	marketOrder: z.string().min(1).optional()
 });
 
 export const manifestSchema = z.object({
@@ -97,6 +101,8 @@ export const boardRowSchema = z.object({
 	positionRank: z.number().int().min(1),
 	team: club,
 	headshot: z.url(),
+	/** Ranked by our projection. Absent on a run older than the kickers' and defenses' rows. */
+	orderBasis: z.literal('projection').optional(),
 	/** Our rank on this board, by points over replacement. */
 	ourRank: z.number().int().min(1),
 	/** The round of this format's draft his points over replacement rank in. */
@@ -118,9 +124,35 @@ export const boardRowSchema = z.object({
 	preseasonPoints: points.nullable().optional()
 });
 
+/** A kicker or a defense on a board (the 2026-09-05 ruling): after the ranked rows, in the drafters'
+ * order, with no projected points and no tier. His position rank is his place in that order. */
+export const marketRowSchema = z.object({
+	id: playerId,
+	slug,
+	name: phrase,
+	position: z.enum(MARKET_POSITIONS),
+	positionRank: z.number().int().min(1),
+	team: club,
+	/** Null for a defense (its face is its club's mark) and a kicker the provider has no face for. */
+	headshot: z.url().nullable(),
+	orderBasis: z.literal('market'),
+	/** His place on the whole board, after every ranked row. */
+	ourRank: z.number().int().min(1),
+	/** This format's ADP, or null when no source has him. */
+	adp: points.positive().nullable(),
+	vorRound: z.null(),
+	projected: z.null(),
+	vor: z.null(),
+	expectedGames: z.null(),
+	floor: z.null(),
+	median: z.null(),
+	ceiling: z.null(),
+	tier: z.null()
+});
+
 export const boardSchema = z.object({
 	format: formatId,
-	rows: z.array(boardRowSchema).min(1)
+	rows: z.array(z.union([marketRowSchema, boardRowSchema])).min(1)
 });
 
 export const pullFigureSchema = z.object({
@@ -154,7 +186,8 @@ export const playerFormatSchema = boardRowSchema.omit({
 	name: true,
 	position: true,
 	team: true,
-	headshot: true
+	headshot: true,
+	orderBasis: true
 });
 
 export const playerSchema = z.object({
@@ -289,10 +322,25 @@ export const indexEntrySchema = z.object({
 	position,
 	/** His face, so a search hit leads with it like every other list. */
 	headshot: z.url(),
+	/** A player with a page, ranked by our projection. Absent on a run older than the kickers' and
+	 * defenses' entries. */
+	orderBasis: z.literal('projection').optional(),
 	season: indexSeasonSchema
 });
 
-export const indexSchema = z.array(indexEntrySchema).min(1);
+/** A kicker or a defense the boards carry in draft order: in the index, so every board row and every
+ * status is one it names, but with no page and no season figures. */
+export const marketEntrySchema = z.object({
+	id: playerId,
+	slug,
+	name: phrase,
+	team: club,
+	position: z.enum(MARKET_POSITIONS),
+	headshot: z.url().nullable(),
+	orderBasis: z.literal('market')
+});
+
+export const indexSchema = z.array(z.union([marketEntrySchema, indexEntrySchema])).min(1);
 
 export const clubSchema = z.object({
 	abbr: club,
@@ -402,7 +450,16 @@ export type Manifest = z.infer<typeof manifestSchema>;
 export type Source = z.infer<typeof sourceSchema>;
 export type Window = z.infer<typeof windowSchema>;
 export type BoardRow = z.infer<typeof boardRowSchema>;
-export type Board = z.infer<typeof boardSchema>;
+export type MarketRow = z.infer<typeof marketRowSchema>;
+/** A board as the pages read it: the ranked rows, and the kickers and defenses in draft order apart. */
+export interface Board {
+	format: string;
+	rows: BoardRow[];
+	market: MarketRow[];
+}
+/** A kicker's or a defense's row as a page prints it: his status when the capture lists him, and his
+ * face (a defense's is its club's mark, site/market.ts). */
+export type MarketRowView = MarketRow & { status?: PlayerStatus; face: string | null };
 export type PullFigure = z.infer<typeof pullFigureSchema>;
 export type Capsule = z.infer<typeof capsuleSchema>;
 export type PlayerFormat = z.infer<typeof playerFormatSchema>;
@@ -415,6 +472,7 @@ export type RecordWeek = z.infer<typeof recordWeekSchema>;
 export type RecordWeekStatus = z.infer<typeof recordWeekStatus>;
 export type RunRecord = z.infer<typeof recordSchema>;
 export type IndexEntry = z.infer<typeof indexEntrySchema>;
+export type MarketEntry = z.infer<typeof marketEntrySchema>;
 export type IndexSeason = z.infer<typeof indexSeasonSchema>;
 /** A board row with his games and points a game this season, from index.json. */
 export type SeasonedRow = BoardRow & { season: IndexSeason };

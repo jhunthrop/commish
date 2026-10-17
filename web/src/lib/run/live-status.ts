@@ -11,9 +11,8 @@
  *   onMount(() => liveStatusClock(hasCapture, () => import('#lib/run/status-view.ts'), (said) => (live = said)));
  */
 import type { CaptureStamp } from '#lib/format/designation.ts';
-import type { PlayerStatus } from './schema.ts';
 import type * as StatusWords from './status-view.ts';
-import type { BoardStatusWords } from './status-view.ts';
+import type { BoardStatusWords, ListedRow } from './status-view.ts';
 
 export interface LiveStatus {
 	zone: string;
@@ -38,7 +37,9 @@ export function liveStatusClock(
  * the ADP page and a club page draw their rows' statuses through it. */
 export function sayBoard(
 	page: {
-		rows: readonly { id: string; status?: PlayerStatus }[];
+		rows: readonly ListedRow[];
+		/** The kickers and defenses the page lists in draft order, when it lists any. */
+		market?: readonly ListedRow[];
 		capture: CaptureStamp | null;
 		statusWords: BoardStatusWords | null;
 		format: { rosFromWeek?: number };
@@ -46,7 +47,7 @@ export function sayBoard(
 	live: LiveStatus | null
 ): BoardStatusWords | null {
 	if (live === null || page.capture === null) return page.statusWords;
-	return live.words.boardStatusWords(page.rows, {
+	return live.words.boardStatusWords([...page.rows, ...(page.market ?? [])], {
 		capture: page.capture,
 		restOfSeason: page.format.rosFromWeek !== undefined,
 		zone: live.zone,

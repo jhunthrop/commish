@@ -15,9 +15,19 @@
 		/** How the rows under it frame their rank against the drafts (run/row-framing.ts): the
 		 * Drafters column compares drafters with our rank ("vs us") only where they do. */
 		framing: RowFraming;
+		/** The rows under it are kickers and defenses (MarketRow): their place in draft order sits
+		 * under a Draft order head, and no column promises a projection. */
+		market?: boolean;
 	}
 
-	let { range = true, action = false, order = 'board', games = false, framing }: Props = $props();
+	let {
+		range = true,
+		action = false,
+		order = 'board',
+		games = false,
+		framing,
+		market = false
+	}: Props = $props();
 </script>
 
 <div
@@ -34,16 +44,20 @@
 	<span></span>
 	<Label>Player</Label>
 	{#if games}<span class="gp"><Label align="end">Games</Label></span>{/if}
-	<span class="proj"><Label align="end">Projected</Label></span>
+	<span class="proj"
+		>{#if !market}<Label align="end">Projected</Label>{/if}</span
+	>
 	<span class="end"
 		><Label align="end"
-			><span class="wide">Over replacement</span><span class="narrow">Over repl</span></Label
+			>{#if market}Draft order{:else}<span class="wide">Over replacement</span><span class="narrow"
+					>Over repl</span
+				>{/if}</Label
 		></span
 	>
 	{#if range}<span class="rng"><Label>Range</Label></span>{/if}
 	<Label
-		><span class="wide">{framing.compare ? 'Drafters vs us' : 'Drafters'}</span><span class="narrow"
-			>Drafters</span
+		><span class="wide">{framing.compare && !market ? 'Drafters vs us' : 'Drafters'}</span><span
+			class="narrow">Drafters</span
 		></Label
 	>
 	{#if action}<span class="act-end"></span>{/if}

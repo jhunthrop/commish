@@ -7,7 +7,7 @@
 	import NameWords from '#lib/ui/NameWords.svelte';
 	import ValueCell from '#lib/ui/ValueCell.svelte';
 	import { vorCell } from '#lib/ui/heat.ts';
-	import { isMarketPosition } from '#lib/types/player.ts';
+	import { isMarketPosition } from '#lib/run/market.ts';
 	import type { RoomPlayer } from './model.ts';
 
 	interface Props {

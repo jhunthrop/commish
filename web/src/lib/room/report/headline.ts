@@ -1,16 +1,20 @@
 /** The report's one big number and the sentences beside it, true at every rank: a team that leads
  * is read against the next team, any other against the team just ahead and the leader. */
-import { listWords } from '#lib/format/list.ts';
 import { ordinal, signed } from '#lib/format/number.ts';
-import { PROJECTED_POSITIONS, isMarketPosition } from '#lib/types/player.ts';
+import { isMarketPosition } from '#lib/run/market.ts';
+import { POSITIONS } from '#lib/types/player.ts';
 import type { MockReport } from '../api.ts';
 import type { RoomPlayer } from '../model.ts';
 
 type Team = MockReport['standings'][number];
 
-/** The positions a team's points count: the projected ones. A kicker or a defense ranks in draft
- * order with no projected points (the 2026-09-05 ruling), so no total counts him. */
-const COUNTED = listWords(PROJECTED_POSITIONS);
+/** The positions a team's points count: the projected ones, "QB, RB, WR and TE". A kicker or a
+ * defense ranks in draft order with no projected points (the 2026-09-05 ruling), so no total counts
+ * him. Joined here rather than by format/list.ts, which rides in the forms' chunk the report never
+ * otherwise loads. */
+const COUNTED = POSITIONS.filter((position) => !isMarketPosition(position))
+	.join(', ')
+	.replace(/, (?=[^,]*$)/, ' and ');
 
 /** The team total's caption: "projected points from your QB, RB, WR and TE starters, 5th of 12". */
 export function totalCaption(whose: 'your' | 'their', standing: string): string {
