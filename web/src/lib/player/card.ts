@@ -44,6 +44,8 @@ export const CARD = {
 	noEarlierRead: 'No earlier read this week',
 	notInEarlier: 'Not in the earlier read',
 	notRanked: 'not ranked yet',
+	/** The game log's collapsed earlier seasons (review M8). */
+	earlierSeasons: 'Earlier seasons',
 	/** The waiver verb where we know no page of the platform's: our own screen, named as ours. */
 	findOnWaivers: 'Find him on Waivers'
 } as const;

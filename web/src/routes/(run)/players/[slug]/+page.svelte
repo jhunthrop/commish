@@ -211,6 +211,8 @@
 			next={live?.next ?? null}
 			ahead={page.season.ahead.filter((week) => week.week !== live?.next?.week)}
 			none={page.season.none}
+			prior={page.season.prior}
+			priorLabel={CARD.earlierSeasons}
 		/>
 	</section>
 {/snippet}

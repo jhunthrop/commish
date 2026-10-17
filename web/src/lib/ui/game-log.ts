@@ -26,6 +26,16 @@ export interface SeasonLine {
 	cells: readonly LineCell[];
 }
 
+/** An earlier season as the box's collapsed row: the season, its games and points a game, its points,
+ * then a total or a rate under each stat head. */
+export interface PriorRow {
+	season: number;
+	/** "16 games, 23.4 a game". */
+	sub: string;
+	total: string;
+	cells: readonly string[];
+}
+
 /** The week ahead as the box's accent row, read after the first paint: the opponent, the kickoff,
  * this week's projection and the game's facts in the box's cell form. */
 export interface LogNext {

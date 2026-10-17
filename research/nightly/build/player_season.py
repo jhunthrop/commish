@@ -62,6 +62,10 @@ SCORING: Final[Mapping[str, ScoringRules]] = {"ppr": PPR_SCORING, "half": HALF_P
 _SNAPS: Final = ParticipationMetric.OFFENSIVE_SNAPS
 _TEAM_SNAPS: Final = ParticipationMetric.TEAM_OFFENSIVE_SNAPS
 _CENTS: Final = 100
+# The seasons before this one a page sums, newest first (Lane 66h), and the last week of a regular
+# season: the feed's later weeks are the playoffs, which a fantasy season leaves out.
+PRIOR_SEASONS: Final = 3
+REGULAR_SEASON_WEEKS: Final = 18
 Metrics = dict[str, float]
 
 
@@ -215,6 +219,8 @@ class SeasonContext:
     games: Mapping[str, Sequence[Game]]
     byes: Mapping[str, int | None]
     store: SeasonStore
+    # The seasons before, each one's store, for the page's earlier seasons (Lane 66h).
+    prior: Mapping[int, SeasonStore]
 
 
 def season_context(conn: Connection, season: int, player_ids: Sequence[str], as_of: datetime) -> SeasonContext:
@@ -225,7 +231,8 @@ def season_context(conn: Connection, season: int, player_ids: Sequence[str], as_
     weeks = max(game.week for slate in games.values() for game in slate)
     store = read_season_store(conn, season, player_ids, as_of)
     byes = {club.abbr: club.bye for club in schedule_read.clubs_of(games)}
-    return SeasonContext(season, weeks, through_of(games, weeks, store), games, byes, store)
+    prior = {year: read_season_store(conn, year, player_ids, as_of) for year in range(season - PRIOR_SEASONS, season)}
+    return SeasonContext(season, weeks, through_of(games, weeks, store), games, byes, store, prior)
 
 
 def season_block(player_id: str, team: str, run_format: RunFormat, position: Position, context: SeasonContext) -> Json:
@@ -262,3 +269,36 @@ def season_block(player_id: str, team: str, run_format: RunFormat, position: Pos
         "totals": _totals(played, [snaps.get(row["week"]) for row in played]),
         "log": log,
     }
+
+
+def prior_seasons(player_id: str, run_format: RunFormat, position: Position, context: SeasonContext) -> list[Json]:
+    """His earlier seasons, newest first, each summed as this season's block sums its weeks: the regular
+    season's played weeks (a stat line, or snaps with no stats row), their points in the page format, the
+    points a game and the totals. A season he did not play is left out."""
+    scorer = Scorer(SCORING[run_format.scoring], position)
+    out: list[Json] = []
+    for year in sorted(context.prior, reverse=True):
+        store = context.prior[year]
+        lines, snaps = store.lines.get(player_id, {}), store.snaps.get(player_id, {})
+        played: list[Json] = []
+        weeks_snaps: list[Metrics | None] = []
+        for week in sorted({*lines, *snaps}):
+            if week > REGULAR_SEASON_WEEKS:
+                continue
+            found = lines.get(week, {})
+            snapped = (snaps.get(week) or {}).get(_SNAPS, 0.0) > 0
+            if not (_has_ingest(found, usage=False) or snapped):
+                continue
+            played.append(_played(found, snaps.get(week), store.carried.get(week, frozenset()), scorer))
+            weeks_snaps.append(snaps.get(week))
+        if not played:
+            continue
+        out.append(
+            {
+                "season": year,
+                "games": len(played),
+                "pointsPerGame": points_per_game([row["points"] for row in played]),
+                "totals": _totals(played, weeks_snaps),
+            }
+        )
+    return out

@@ -256,7 +256,13 @@ export async function playerPage(slug: string): Promise<PlayerPage> {
 		adpSources: lead.adpSources,
 		boardSize: lead.boardSize,
 		capsule: loaded.capsule,
-		season: seasonView(loaded.season, loaded.position, run.formats, kickoffOf),
+		season: seasonView(
+			loaded.season,
+			loaded.position,
+			run.formats,
+			kickoffOf,
+			loaded.priorSeasons ?? []
+		),
 		underway,
 		status,
 		heldTier: listed?.seasonLong === true ? HELD_TIER_WORDS : null,

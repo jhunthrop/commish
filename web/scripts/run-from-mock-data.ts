@@ -13,6 +13,7 @@
 //     team_week_observations (vegas_win_totals): each club's latest published season win total
 //     register_freeze_rows and register_grade_rows: the record as it stands
 //     research.player_capsules: the writer's newest read for each player and when it wrote it
+//     and the three seasons before it for each page's earlier seasons (standin-season.ts)
 //   scripts/standin-week-reads.json   Lane 72's three recorded week-ahead reads, the stand-in's weekRead
 //     research.player_week_observations and friends: each player's season so far
 //     (standin-season.ts, scored with fantasy-points.ts)
@@ -69,8 +70,8 @@ import {
 import { POSITIONS, type Position } from '../src/lib/types/player.ts';
 import { bucketUrl, credentialsFromToken } from './r2.ts';
 import { checkRunSeasons } from '../src/lib/run/season-checks.ts';
-import { seasonBlocks } from './standin-season.ts';
-import type { PlayerSeason } from '../src/lib/run/season.ts';
+import { priorSeasonBlocks, seasonBlocks } from './standin-season.ts';
+import type { PlayerSeason, PriorSeason } from '../src/lib/run/season.ts';
 
 const RUN_ID = '2026-10-12T00-standin';
 const SEASON = 2026;
@@ -284,7 +285,8 @@ function playerPages(
 	capsules: readonly CapsuleCsv[],
 	stored: ReadonlyMap<string, StoredCapsule>,
 	reads: ReadonlyMap<string, WeekRead>,
-	seasons: ReadonlyMap<string, PlayerSeason>
+	seasons: ReadonlyMap<string, PlayerSeason>,
+	prior: ReadonlyMap<string, PriorSeason[]>
 ): Player[] {
 	const byId = new Map(capsules.map((capsule) => [capsule.player_id, capsule]));
 	return rows.map((row) => {
@@ -302,7 +304,8 @@ function playerPages(
 			formats: { [FORMAT.id]: numbers },
 			capsule,
 			weekRead: reads.get(id) ?? null,
-			season
+			season,
+			priorSeasons: prior.get(id) ?? []
 		};
 	});
 }
@@ -668,7 +671,7 @@ async function main(): Promise<void> {
 			throw new Error(`The board names ${String(codes.length)} clubs.`);
 		const clubs = clubList(codes, games);
 		const schedule = scheduleFrom(codes, games, winTotals);
-		const seasons = await seasonBlocks(sql, rows, {
+		const seasonInputs = {
 			season: SEASON,
 			format: FORMAT.id,
 			weeks: LAST_WEEK,
@@ -677,13 +680,15 @@ async function main(): Promise<void> {
 			clubs,
 			kickoff: clubKickoffs(games),
 			now
-		});
+		};
+		const seasons = await seasonBlocks(sql, rows, seasonInputs);
 		const players = playerPages(
 			rows,
 			capsuleCsv,
 			await storedCapsules(sql),
 			await weekReads(),
-			seasons
+			seasons,
+			await priorSeasonBlocks(sql, rows, seasonInputs)
 		);
 		checkRunSeasons(players, schedule);
 		const index: IndexEntry[] = rows.map(({ id, slug, name, team, position, headshot }) => {

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import WeatherGlyph from '#lib/league/box/WeatherGlyph.svelte';
 	import Label from './Label.svelte';
-	import type { AheadRow, LogHead, LogNext, LogRow, SeasonLine } from './game-log.ts';
+	import type { AheadRow, LogHead, LogNext, LogRow, PriorRow, SeasonLine } from './game-log.ts';
 
 	/** A player's season as a box score (Lane 66h): every week so far with its opponent, the
 	 * projection we showed, his points and his line, the week ahead in the accent with this week's
@@ -31,10 +31,29 @@
 		none: string;
 		/** The projection a past week shows: "--" until our record holds the one we showed. */
 		pastProj: string;
+		/** His earlier seasons, newest first, collapsed under the totals until opened. */
+		prior: readonly PriorRow[];
+		/** The toggle's words: "Earlier seasons". */
+		priorLabel: string;
 	}
 
-	let { caption, heads, projHead, pointsHead, line, rows, next, ahead, none, pastProj }: Props =
-		$props();
+	let {
+		caption,
+		heads,
+		projHead,
+		pointsHead,
+		line,
+		rows,
+		next,
+		ahead,
+		none,
+		pastProj,
+		prior,
+		priorLabel
+	}: Props = $props();
+
+	/** The earlier seasons start collapsed, as the box's mock had them. */
+	let opened = $state(false);
 </script>
 
 {#if line}
@@ -108,6 +127,37 @@
 						{/each}
 					</tr>
 				</tbody>
+				{#if prior.length > 0}
+					<tbody class="earlier">
+						<tr class="toggle">
+							<td class="pin lead" colspan="2"
+								><button
+									type="button"
+									aria-expanded={opened}
+									aria-controls="earlier-seasons"
+									onclick={() => (opened = !opened)}
+									><span class="chev" class:open={opened} aria-hidden="true"
+									></span>{priorLabel}</button
+								></td
+							>
+							<td class="rest" colspan={heads.length + 2}></td>
+						</tr>
+					</tbody>
+					<tbody id="earlier-seasons" hidden={!opened}>
+						{#each prior as season (season.season)}
+							<tr class="prior">
+								<th scope="row" colspan="2" class="pin lead"
+									><b>{season.season}</b><span>{season.sub}</span></th
+								>
+								<td class="proj"></td>
+								<td class="pts n">{season.total}</td>
+								{#each season.cells as cell, i (i)}
+									<td class="n" class:first={i === 0}>{cell}</td>
+								{/each}
+							</tr>
+						{/each}
+					</tbody>
+				{/if}
 			</table>
 		</div>
 	</div>
@@ -389,6 +439,49 @@
 		font-size: var(--t-xs);
 		font-weight: 500;
 		color: var(--scoreboard-ink-2);
+	}
+
+	/* The earlier seasons: a quiet toggle under the totals, each season a row in the same columns. */
+	.toggle > * {
+		height: 40px;
+		background: var(--bg);
+	}
+
+	.toggle button {
+		display: inline-flex;
+		align-items: center;
+		gap: var(--s-2);
+		padding: 0;
+		border: 0;
+		background: none;
+		color: var(--ink-2);
+		font: inherit;
+		font-size: var(--t-xs);
+		font-weight: 700;
+		letter-spacing: var(--track-label);
+		text-transform: uppercase;
+		cursor: pointer;
+	}
+
+	.chev {
+		width: 7px;
+		height: 7px;
+		border-right: 2px solid currentColor;
+		border-bottom: 2px solid currentColor;
+		transform: rotate(-45deg);
+	}
+
+	.chev.open {
+		transform: rotate(45deg);
+	}
+
+	.prior .lead b {
+		font-size: var(--t-md);
+		letter-spacing: 0.02em;
+	}
+
+	.prior .lead span {
+		color: var(--ink-3);
 	}
 
 	/* The weeks still to play: one compact line each, as many across as the width holds. */

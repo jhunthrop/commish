@@ -24,7 +24,7 @@ import { z } from 'zod';
 import type { components } from '#lib/api/types.ts';
 import { POSITIONS } from '#lib/types/player.ts';
 import { club, formatId } from './primitives.ts';
-import { seasonSchema } from './season.ts';
+import { seasonSchema, priorSeasonSchema } from './season.ts';
 
 const RUN_ID = /^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}(-[a-z0-9-]+)?$/;
 const SLUG = /^[a-z0-9]+(-[a-z0-9]+)*$/;
@@ -190,7 +190,10 @@ export const playerSchema = z.object({
 	 * player the writer did not write for the week ahead. */
 	weekRead: weekReadSchema.nullable().optional(),
 	/** His season so far: the season line and every week's game log, scored in one format. */
-	season: seasonSchema
+	season: seasonSchema,
+	/** His earlier seasons, newest first, in the season block's format (Lane 66h); absent on a run
+	 * from before the nightly wrote them. */
+	priorSeasons: z.array(priorSeasonSchema).optional()
 });
 
 export const adpSourceSchema = z.object({

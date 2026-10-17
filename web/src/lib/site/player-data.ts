@@ -6,7 +6,7 @@ import { links } from './links.ts';
 /** Everything a page needs about a player except the reads and the season, which only his own
  * page prints, and his status on the run's injury capture when it lists him (Lane 63), the way the
  * league page's board file carries it. */
-export type PlayerData = Omit<Player, 'capsule' | 'season' | 'weekRead'> & {
+export type PlayerData = Omit<Player, 'capsule' | 'season' | 'weekRead' | 'priorSeasons'> & {
 	status?: PlayerStatus;
 };
 

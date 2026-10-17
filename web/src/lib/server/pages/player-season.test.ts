@@ -36,3 +36,28 @@ void test("the season's total is the sum of the points the rows print, so the bo
 	);
 	assert.equal(view.line?.total, '30.0');
 });
+
+void test('his earlier seasons are rows in the same columns, newest first, worded like the season line', () => {
+	const season: PlayerSeason = {
+		season: 2026,
+		format: 'ppr-12',
+		weeks: 1,
+		through: 1,
+		games: 1,
+		pointsPerGame: 10,
+		totals: { ...EMPTY, snapShare: null, points: 10 },
+		log: [played(1, 10)]
+	};
+	const prior = {
+		season: 2025,
+		games: 16,
+		pointsPerGame: 23.4,
+		totals: { ...EMPTY, receptions: 129, targets: 166, snapShare: 0.68, points: 375 }
+	};
+	const [row] = seasonView(season, 'WR', [FORMAT], () => null, [prior]).prior;
+	assert.equal(row?.season, 2025);
+	assert.equal(row?.sub, '16 games, 23.4 a game');
+	assert.equal(row?.total, '375.0');
+	assert.equal(row?.cells[0], '166');
+	assert.equal(row?.cells[1], '129');
+});
