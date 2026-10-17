@@ -10,6 +10,7 @@ import { lastName } from '#lib/format/draft.ts';
 import {
 	designationWord,
 	rankWord,
+	seasonLongMark,
 	sitsHim,
 	type DesignationStatus
 } from '#lib/format/designation.ts';
@@ -189,17 +190,24 @@ export interface BoxStarter {
 const SEASON_LONG = new Set<DesignationStatus>(['injured_reserve', 'pup', 'nfi']);
 
 /** His status as Lane 63's pill draws it, the week's designation first, else the host's injured
- * reserve. */
+ * reserve. A season-long list's chip is the board's (Lane 66n): "IR as of Oct 16" dated by the
+ * designation, or "IR" alone when only the host lists him. */
 export function statusOf(
 	designation: WeekFacts['designation'],
-	hostIR: boolean
+	hostIR: boolean,
+	zone: string = memberZone()
 ): StatusView | null {
 	const status: DesignationStatus | null =
 		designation?.status ?? (hostIR ? 'injured_reserve' : null);
 	if (status === null) return null;
+	const seasonLong = SEASON_LONG.has(status);
 	return {
-		rank: SEASON_LONG.has(status) ? rankWord(status) : null,
-		mark: designationWord(status),
+		rank: seasonLong ? rankWord(status) : null,
+		mark: !seasonLong
+			? designationWord(status)
+			: designation
+				? seasonLongMark({ status, since: null }, designation.as_of, zone)
+				: rankWord(status),
 		sits: sitsHim(status),
 		line: null
 	};
@@ -278,7 +286,7 @@ export function boxRow(
 		club: player.team,
 		position: positionWord(player.position),
 		pill: pillOf(player.position, ranked ? line.position_rank : null),
-		status: statusOf(facts.designation, player.injured_reserve),
+		status: statusOf(facts.designation, player.injured_reserve, zone),
 		game: gameOf(facts, zone),
 		expected: ahead ? expectedWords(facts) : null,
 		weather: ahead ? weatherCell(facts) : null,

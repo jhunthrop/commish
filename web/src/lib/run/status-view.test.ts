@@ -20,7 +20,7 @@ const CENTRAL: Saying = {
 	now: Date.parse('2026-10-16T16:00:00.000Z')
 };
 
-void test('a season-long status shows as his rank and says why he sits below', () => {
+void test('a season-long status shows as his rank, its chip says since when, its line why he sits below', () => {
 	assert.deepEqual(
 		statusView(
 			{ status: 'injured_reserve', seasonLong: true, since: '2026-10-14T15:00:00.000Z' },
@@ -28,17 +28,17 @@ void test('a season-long status shows as his rank and says why he sits below', (
 		),
 		{
 			rank: 'IR',
-			mark: 'On injured reserve',
+			mark: 'IR since Oct 14',
 			sits: true,
 			line: 'On injured reserve since October 14. Our rest-of-season figure assumes he plays, so he sits below the available players.'
 		}
 	);
 });
 
-void test('a week’s designation keeps his rank and carries a mark dated by the list', () => {
+void test('a week’s designation keeps his rank and its chip is the word, as the league rows say it', () => {
 	assert.deepEqual(statusView({ status: 'doubtful', seasonLong: false, since: null }, CENTRAL), {
 		rank: null,
-		mark: 'Doubtful as of Oct 16',
+		mark: 'Doubtful',
 		sits: false,
 		line: null
 	});
@@ -61,10 +61,8 @@ void test('a board and a page built on the Eastern clock and said again on the m
 		{ id: 'free' }
 	];
 	const built = boardStatusWords(rows, { ...CENTRAL, zone: BUILT_ZONE });
-	assert.equal(
-		built.capture,
-		'Injury status from the hourly capture, read Fri Oct 16, 11:05 am Eastern.'
-	);
+	// A page of board rows says the capture in the few words its basis has left (Lane 66n).
+	assert.equal(built.capture, 'Status read Fri Oct 16, 11:05 am Eastern.');
 	assert.deepEqual(Object.keys(built.rows), ['ir']);
 	assert.equal(boardStatusWords(rows, CENTRAL).capture.endsWith('10:05 am Central.'), true);
 	assert.equal(

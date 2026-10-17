@@ -1,8 +1,8 @@
 <script lang="ts">
 	import type { StatusView } from '#lib/run/status-view.ts';
 	import { pillRank } from '#lib/run/held-places.ts';
-	import PositionPill from '#lib/ui/PositionPill.svelte';
-	import ToneChip from '#lib/ui/ToneChip.svelte';
+	import PositionPill from './PositionPill.svelte';
+	import ToneChip from './ToneChip.svelte';
 	import type { Position } from '#lib/types/player.ts';
 
 	/** A league row's position pill and, when the injury capture lists him, its mark (Lane 63): a

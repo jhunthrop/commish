@@ -159,6 +159,8 @@ export function whyLine(into: BoxRow, out: BoxRow | null, slot: string): string 
 			? `${name} is next in our order, with no ${BOX.proj} this week.`
 			: `${name} is the next ${slot} with a ${BOX.proj}, ${boxNumber(into.proj)}.`;
 	if (out.game === 'bye') return `${sat} is on bye. ${next}`;
+	if (out.status?.rank != null)
+		return `${sat} is on a season-long list, ${out.status.mark}. ${next}`;
 	if (out.status !== null && out.status.mark !== designationWord('questionable'))
 		return `${sat} is listed ${inSentence(out.status.mark)}. ${next}`;
 	if (into.proj === null || out.proj === null) return next;

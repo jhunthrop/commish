@@ -4,7 +4,7 @@
 	import ClubMark from '#lib/ui/ClubMark.svelte';
 	import Face from '#lib/ui/Face.svelte';
 	import NameWords from '#lib/ui/NameWords.svelte';
-	import StatusPill from '../StatusPill.svelte';
+	import StatusPill from '#lib/ui/StatusPill.svelte';
 	import { HELD } from '../inseason/words.ts';
 	import { tagMarks } from '#lib/sheet/tags.ts';
 	import TagChip from '#lib/ui/TagChip.svelte';

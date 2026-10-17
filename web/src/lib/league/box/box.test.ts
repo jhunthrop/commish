@@ -158,9 +158,14 @@ void test("a status is Lane 63's pill: the week's word, a season-long list's wor
 		sits: true,
 		line: null
 	});
-	const ir = { rank: 'IR', mark: 'On injured reserve', sits: true, line: null };
-	assert.deepEqual(statusOf({ status: 'injured_reserve', as_of: asOf }, false), ir);
-	assert.deepEqual(statusOf(null, true), ir);
+	// A season-long list's chip is the board's (Lane 66n), dated by the designation when there is one.
+	assert.deepEqual(statusOf({ status: 'injured_reserve', as_of: asOf }, false, ZONE), {
+		rank: 'IR',
+		mark: 'IR as of Oct 16',
+		sits: true,
+		line: null
+	});
+	assert.deepEqual(statusOf(null, true), { rank: 'IR', mark: 'IR', sits: true, line: null });
 	assert.equal(statusOf(null, false), null);
 	assert.deepEqual(boxRow(line(), 'QB', ZONE).pill, { position: 'QB', rank: 7 });
 });

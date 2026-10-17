@@ -6,11 +6,12 @@ import { monthDay, zoneWord } from './clock.ts';
 import {
 	CAPTURE_BEHIND_MS,
 	captureLine,
+	captureShort,
 	designationMark,
 	designationWord,
-	listedMark,
 	rankWord,
 	seasonLongLine,
+	seasonLongMark,
 	sitsHim,
 	stampWords
 } from './designation.ts';
@@ -82,7 +83,11 @@ void test('past 36 hours the basis says how old the statuses are, and they stay 
 
 void test('the marks', () => {
 	assert.equal(designationMark('doubtful', CHECKED, CENTRAL), 'Doubtful as of Fri 9:05 am');
-	assert.equal(listedMark('doubtful', LISTED, CENTRAL), 'Doubtful as of Oct 12');
+	assert.equal(
+		seasonLongMark({ status: 'injured_reserve', since: CHECKED }, LISTED, CENTRAL),
+		'IR since Oct 16'
+	);
+	assert.equal(seasonLongMark({ status: 'pup', since: null }, LISTED, CENTRAL), 'PUP as of Oct 12');
 	assert.equal(rankWord('injured_reserve'), 'IR');
 	assert.equal(designationWord('nfi'), 'On the NFI list');
 	assert.deepEqual(
@@ -91,12 +96,23 @@ void test('the marks', () => {
 	);
 });
 
+void test('the short capture for a board basis says the read, and how old past a day and a half', () => {
+	const capture = { readAt: LISTED, checkedAt: CHECKED };
+	assert.equal(captureShort(capture, SOON, CENTRAL), 'Status read Fri Oct 16, 9:05 am Central.');
+	assert.equal(
+		captureShort({ readAt: LISTED, checkedAt: null }, SOON, CENTRAL),
+		'Status as the list stood Mon Oct 12, 9:03 pm Central, over a day and a half ago.'
+	);
+});
+
 void test('no line carries an em-dash or a semicolon', () => {
 	const lines = [
 		...DESIGNATION_STATUSES.map((status) =>
 			seasonLongLine({ status, since: null }, CHECKED, true, CENTRAL)
 		),
-		...DESIGNATION_STATUSES.map((status) => listedMark(status, CHECKED, CENTRAL)),
+		...DESIGNATION_STATUSES.map((status) =>
+			seasonLongMark({ status, since: null }, CHECKED, CENTRAL)
+		),
 		captureLine({ readAt: LISTED, checkedAt: CHECKED }, SOON, CENTRAL),
 		captureLine({ readAt: LISTED, checkedAt: null }, SOON + CAPTURE_BEHIND_MS, CENTRAL)
 	];
