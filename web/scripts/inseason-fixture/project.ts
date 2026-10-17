@@ -140,7 +140,10 @@ const stampedLineup: LineupAdvice = {
 	basis: lineupBasis(lineup.basis),
 	basis_note: lineupNote(lineup.basis_note),
 	projection_read_at: PROJECTION_READ_AT,
-	projection_scoring: PROJECTION_SCORING
+	projection_scoring: PROJECTION_SCORING,
+	// Sleeper gives each player's points; no game has kicked off in the recorded week.
+	player_points: true,
+	team_points: null
 };
 const stampedWaivers = stamp(waivers);
 const stampedTrades = stamp(trades);
@@ -219,6 +222,8 @@ function boxSide(
 	const starting = new Set(placed.map((s) => s.line.player.host_id));
 	return {
 		roster_id: rosterId,
+		// Sleeper gives each player's points.
+		player_points: true,
 		starters: placed,
 		bench: roster.filter((line) => !starting.has(line.player.host_id))
 	};

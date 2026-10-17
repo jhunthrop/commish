@@ -502,6 +502,9 @@ async function lineup(): Promise<LineupAdvice> {
 		),
 		projection_read_at: null,
 		projection_scoring: { format: 'ppr', league_own: false },
+		// Sleeper gives each player's points; no game has kicked off in the recorded week.
+		player_points: true,
+		team_points: null,
 		set: out.every((s) => !s.changed),
 		slots: out,
 		bench,

@@ -99,7 +99,9 @@ async function boxFacts(page: Page): Promise<{
 	return page.evaluate(() => {
 		const box = [...document.querySelectorAll('main table.box')];
 		const rows = box.flatMap((t) => [...t.querySelectorAll('tbody tr')]);
-		const names = box.flatMap((t) => [...t.querySelectorAll('.nm a, .nm b')]);
+		// Every row's name block (the line the name owns), measured for overflow: a name cut by its
+		// cell, clipped or ellipsed, scrolls wider than the block shows (review L5).
+		const names = rows.flatMap((tr) => [...tr.querySelectorAll('.nm')]);
 		return {
 			// A head the phone folds away keeps its place at no width: only the drawn heads count.
 			heads: [...(box[0]?.querySelectorAll('thead tr.cols th') ?? [])]
@@ -111,7 +113,12 @@ async function boxFacts(page: Page): Promise<{
 				)
 			),
 			basis: [...document.querySelectorAll('main p')].map((p) => p.textContent).join(' '),
-			cut: names.flatMap((n) => (n.scrollWidth > n.clientWidth + 1 ? [n.textContent] : [])),
+			cut: names.flatMap((n) =>
+				n.scrollWidth > n.clientWidth + 1 ||
+				n.getBoundingClientRect().right > (n.closest('td')?.getBoundingClientRect().right ?? 0) + 1
+					? [n.textContent.trim()]
+					: []
+			),
 			perGame: rows.some((tr) => /\d a game/.test(tr.textContent)),
 			defenseRows: rows.filter((tr) => tr.querySelector('.club') && !tr.querySelector('.club .pos'))
 				.length,

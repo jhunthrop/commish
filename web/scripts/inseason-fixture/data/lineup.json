@@ -1335,5 +1335,7 @@
 	"host_note": null,
 	"moves": { "lineup": "unavailable", "note": null },
 	"projection_read_at": "2026-10-17T02:00:00.000Z",
-	"projection_scoring": { "format": "ppr", "league_own": false }
+	"projection_scoring": { "format": "ppr", "league_own": false },
+	"player_points": true,
+	"team_points": null
 }
