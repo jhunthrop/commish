@@ -10,9 +10,9 @@
 	} from '#lib/site/search.ts';
 	import { fetchPlayer } from '#lib/site/player-data.ts';
 	import Face from '#lib/ui/Face.svelte';
-	import { CARD, NONE, type CardTile, type TileKey } from './card.ts';
+	import { CARD, NONE, TILE_ORDER, type CardTile, type TileKey } from './card.ts';
 	import { liveCard, readWeek, screenHrefFor } from './live.ts';
-	import type { CardLeague } from './week-words.ts';
+	import { compareSay, type CardLeague } from './week-words.ts';
 
 	/** Compare (Lane 66h): one other player beside him in the card's columns, his own row first, so
 	 * the start or sit question is answered by the same numbers. Loaded only when opened. */
@@ -34,14 +34,14 @@
 		tiles: readonly CardTile[];
 	}
 
-	const COLUMNS: readonly { key: TileKey; label: string }[] = [
-		{ key: 'proj', label: CARD.proj },
-		{ key: 'rest', label: CARD.rest },
-		{ key: 'opp', label: CARD.opp },
-		{ key: 'avg', label: CARD.avg },
-		{ key: 'last', label: CARD.last },
-		{ key: 'delta', label: CARD.delta }
-	];
+	/** The card's columns under the card's own labels: "Projected" for the season's projection,
+	 * "Rest of season" only for the board's rest-of-season figure (review M5). */
+	const COLUMNS = $derived<readonly { key: TileKey; label: string }[]>(
+		TILE_ORDER.map((key) => ({
+			key,
+			label: self.tiles.find((tile) => tile.key === key)?.label ?? key
+		}))
+	);
 	/** The columns where more is better, which the higher row's number marks. */
 	const MORE_IS_BETTER: ReadonlySet<TileKey> = new Set(['proj', 'rest', 'avg', 'last']);
 
@@ -51,10 +51,21 @@
 	let failed = $state(false);
 	const hits = $derived(searchPlayers(players, query).filter((player) => player.id !== self.id));
 
+	/** The picker's names could not be read (review L13): the line under it says so. */
+	let unlisted = $state(false);
+
 	onMount(() => {
-		void fetch(SEARCH_INDEX_URL)
-			.then((response) => response.json<IndexEntry[]>())
-			.then((entries) => (players = searchable(entries)));
+		fetch(SEARCH_INDEX_URL)
+			.then((response) => {
+				if (!response.ok) throw new Error(`The index answered ${String(response.status)}.`);
+				return response.json<IndexEntry[]>();
+			})
+			.then((entries) => (players = searchable(entries)))
+			.catch((error: unknown) => {
+				// eslint-disable-next-line no-console -- the line under the picker says so
+				console.warn('compare: the index', error);
+				unlisted = true;
+			});
 	});
 
 	async function pick(player: SearchablePlayer): Promise<void> {
@@ -83,6 +94,7 @@
 				tiles: base,
 				opponents: {},
 				games: player.season.games,
+				rest: null,
 				screenHref: screenHrefFor(league)
 			});
 			other = {
@@ -112,15 +124,8 @@
 	}
 
 	const rows = $derived<Row[]>(other === null ? [self] : [self, other]);
-	/** "Nacua by 6.7 Proj this week", when both have a Proj. */
-	const say = $derived.by(() => {
-		if (other === null) return null;
-		const a = Number(valueOf(self, 'proj')?.value);
-		const b = Number(valueOf(other, 'proj')?.value);
-		if (!Number.isFinite(a) || !Number.isFinite(b) || a === b) return null;
-		const [ahead, by] = a > b ? [self.name, a - b] : [other.name, b - a];
-		return `${ahead} by ${fixed(by)} ${CARD.proj} this week`;
-	});
+	/** The start or sit answer from the figures both rows hold. */
+	const say = $derived(other === null ? null : compareSay(self, other));
 </script>
 
 <section class="cmp" id="compare" aria-label={CARD.compare}>
@@ -137,6 +142,7 @@
 		</label>
 		{#if say}<p class="say">{say}</p>{/if}
 		{#if failed}<p class="say">That player's figures could not be read just now.</p>{/if}
+		{#if unlisted}<p class="say">The players to compare could not be read just now.</p>{/if}
 	</div>
 	{#if hits.length > 0}
 		<ul class="hits" id="compare-hits">
@@ -174,7 +180,10 @@
 								class="{tile?.tone ?? ''} {column.key}"
 								class:win={wins(row, rows.find((r) => r.id !== row.id) ?? null, column.key)}
 								class:wide={column.key === 'delta'}
-								><span class="fig">{tile?.value ?? NONE}</span></td
+								><span class="fig">{tile?.value ?? NONE}</span
+								>{#if tile && tile.value === NONE && tile.caption !== ''}<span class="nofig"
+										>{tile.caption}</span
+									>{/if}</td
 							>
 						{/each}
 					</tr>
@@ -317,6 +326,19 @@
 		font-weight: 600;
 		color: var(--ink-2);
 		font-variant-numeric: tabular-nums;
+	}
+
+	/* Why a cell holds no figure, under its "--" (review M5). */
+	.nofig {
+		display: block;
+		max-width: 16ch;
+		margin-left: auto;
+		font-family: var(--font-ui);
+		font-size: var(--t-xs);
+		font-weight: 400;
+		line-height: 1.25;
+		white-space: normal;
+		color: var(--ink-3);
 	}
 
 	td.win {
