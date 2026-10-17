@@ -51,6 +51,8 @@ const RUNS = new URL('../../.runs/runs/', import.meta.url);
 const OUT = new URL('./data/', import.meta.url);
 const FORMAT = 'ppr-12';
 const LAST_WEEK = 18;
+/** The API's line under the copy verb on a platform with no lineup write (hostmoves words.go). */
+const SLEEPER_NO_LINEUP = 'Sleeper does not take lineups from here, so copy the lineup there.';
 const LAST_GAMES = 3;
 const POOL_CANDIDATES = 60;
 const WAIVER_ROWS_UNDER_RULE = 8;
@@ -355,8 +357,12 @@ async function lineOf(player: LeaguePlayer): Promise<PlayerLine> {
 		position_rank: row?.positionRank ?? null,
 		points_over_replacement: row === null ? null : tenth(row.vor / weeksCovered),
 		rest_of_season_per_game: perGameOf(row),
-		// project.ts stamps the week's projection after this build.
+		// project.ts stamps the week's projection and the evidence after this build.
 		week_projection: null,
+		projection_delta: null,
+		opp_rank: null,
+		season_avg: null,
+		last_points: null,
 		held: false,
 		facts: await factsFor(row?.team ?? player.team, player.board_id)
 	};
@@ -480,7 +486,9 @@ async function lineup(): Promise<LineupAdvice> {
 		if (!o) return [];
 		const kind = SLOT_OF[slot] ?? 'FLEX';
 		if (hostIds.has(o.player.host_id)) {
-			return [{ slot: kind, ours: o, host: o, changed: false, sentence: null }];
+			return [
+				{ slot: kind, ours: o, host: o, changed: false, no_one_can_play: false, sentence: null }
+			];
 		}
 		const here = hostStarters[i];
 		const h =
@@ -488,7 +496,16 @@ async function lineup(): Promise<LineupAdvice> {
 				? here
 				: (sat.find((l) => eligible(slot, l.player.position)) ?? sat[0] ?? null);
 		if (h) sat.splice(sat.indexOf(h), 1);
-		return [{ slot: kind, ours: o, host: h, changed: true, sentence: changeSentence(o, h) }];
+		return [
+			{
+				slot: kind,
+				ours: o,
+				host: h,
+				changed: true,
+				no_one_can_play: false,
+				sentence: changeSentence(o, h)
+			}
+		];
 	});
 	const bench = myLines
 		.filter((l) => !started.has(l.player.host_id))
@@ -501,6 +518,7 @@ async function lineup(): Promise<LineupAdvice> {
 			`Ranked by our rest-of-season order and this week's designations. We do not project a week's points. ${basisTail}`
 		),
 		projection_read_at: null,
+		projection_previous_read_at: null,
 		projection_scoring: { format: 'ppr', league_own: false },
 		// Sleeper gives each player's points; no game has kicked off in the recorded week.
 		player_points: true,
@@ -508,15 +526,17 @@ async function lineup(): Promise<LineupAdvice> {
 		set: out.every((s) => !s.changed),
 		slots: out,
 		bench,
+		reserve: [],
+		empty_slots: [],
 		host_lineup_url: `https://sleeper.com/leagues/${league.league_id}/team`,
 		host_note: null,
-		// Sleeper has no write API: the verb is the host's page.
+		// Sleeper has no write API: the verb copies the lineup, the API's line saying why.
 		moves: {
 			lineup: 'unavailable',
 			note: null,
 			takes_writes: false,
 			writes_on: false,
-			reason: 'Sleeper does not take lineups from here, so copy the lineup there.'
+			reason: SLEEPER_NO_LINEUP
 		}
 	};
 }

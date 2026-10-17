@@ -296,17 +296,17 @@ func BasisNote(s apitypes.LeagueSettings, carried func(string) bool) string {
 	return shape
 }
 
-// LineupBasis is the start and sit page's honesty line (§4.4), on either
-// order: neither ranks by a week's projection, and the stamp dates the
-// order. Its rows end on the week's published projection and points so far
-// (Lane 66d), which the page says itself, so it says nothing of points over
-// replacement, which no row shows.
+// LineupBasis is the start and sit page's honesty line (§4.4), the
+// advice rule the coordinator ruled (Lane 66e): the page never argues with
+// its own numbers, so the lineup starts the highest Proj the rows show,
+// and our order only breaks ties and stands in where a row has none.
 func LineupBasis(b OrderBasis) string {
-	order := "our preseason number"
+	order := "Our preseason number"
 	if b == RestOfSeason {
-		order = "our rest-of-season order"
+		order = "Our rest-of-season order"
 	}
-	return fmt.Sprintf("Ranked by %s and this week's designations, not by a week's projection.", order)
+	return fmt.Sprintf("We start the highest Proj at each slot, after this week's designations and byes. "+
+		"A player who cannot play this week never starts. %s breaks ties and stands in where a player has no Proj.", order)
 }
 
 // LineupNote is the start and sit page's note under its rows: the league's

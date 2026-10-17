@@ -3,6 +3,7 @@ package boards
 import (
 	"context"
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/jhunthrop/commish/api/internal/apitypes"
@@ -65,6 +66,9 @@ type WeekProjection struct {
 	// in the snapshot: a kicker our board does not place has no board id,
 	// and a club fields one.
 	Kickers map[string]ProjectedPoints
+	// Previous is the week's snapshot before this one (Lane 66e: a row's
+	// change since the read before), nil with none.
+	Previous *WeekProjection
 }
 
 // Player is a player's points: a team defense's by his club, anyone
@@ -87,61 +91,116 @@ func (w WeekProjection) Player(boardID, position, team string) (ProjectedPoints,
 	return ProjectedPoints{}, false
 }
 
-// WeekProjection is the newest stored snapshot of the week's projection.
+// WeekProjection is the newest stored snapshot of the week's projection,
+// with the snapshot before it as Previous, in one read.
 func (s *PGSource) WeekProjection(ctx context.Context, season, week int) (WeekProjection, error) {
-	out := WeekProjection{Week: week, Players: map[string]ProjectedPoints{}, Defenses: map[string]ProjectedPoints{},
-		Kickers: map[string]ProjectedPoints{}}
+	out := emptyProjection(week)
 	readable, err := s.readable(ctx, "tank01_projection_rows", "provider_players")
 	if err != nil || !readable {
 		return out, err
 	}
 	rows, err := s.Pool.Query(ctx, `with newest as (
-  select snapshot_id, captured_at from `+s.table("tank01_projection_rows")+`
-  where season = $1 and week = $2 order by captured_at desc, snapshot_id desc limit 1
+  select snapshot_id, max(captured_at) as captured_at from `+s.table("tank01_projection_rows")+`
+  where season = $1 and week = $2 group by snapshot_id order by max(captured_at) desc, snapshot_id desc limit 2
 )
-select r.provider_player_id, r.position, r.team, r.ppr_points, r.half_points, r.standard_points, n.captured_at
+select r.provider_player_id, r.position, r.team, r.ppr_points, r.half_points, r.standard_points, n.captured_at, r.snapshot_id
 from `+s.table("tank01_projection_rows")+` r join newest n on n.snapshot_id = r.snapshot_id
 left join `+s.table("provider_players")+` pp on pp.id = r.provider_player_id
 where r.position = any($3) or pp.id is not null
-order by r.provider_player_id collate "C" limit $4`, season, week, []string{DefensePosition, KickerPosition}, maxProjectionRows+1)
+order by n.captured_at desc, r.snapshot_id desc, r.provider_player_id collate "C" limit $4`, season, week,
+		[]string{DefensePosition, KickerPosition}, snapshotsRead*maxProjectionRows+1)
 	if err != nil {
 		return out, fmt.Errorf("boards: read week %d projection: %w", week, err)
 	}
 	defer rows.Close()
 	n := 0
-	kickers := map[string]int{}
+	newest := int64(-1)
+	before := emptyProjection(week)
+	kickers, beforeKickers := map[string]int{}, map[string]int{}
 	for rows.Next() {
 		var id, position, team string
 		var p ProjectedPoints
 		var at time.Time
-		if err := rows.Scan(&id, &position, &team, &p.PPR, &p.Half, &p.Standard, &at); err != nil {
+		var snapshot int64
+		if err := rows.Scan(&id, &position, &team, &p.PPR, &p.Half, &p.Standard, &at, &snapshot); err != nil {
 			return out, fmt.Errorf("boards: scan week %d projection: %w", week, err)
 		}
 		n++
-		out.ReadAt = at.UTC()
-		club := ProductTeam(team)
-		switch position {
-		case DefensePosition:
-			out.Defenses[club] = p
-		case KickerPosition:
-			out.Players[id] = p
-			out.Kickers[club] = p
-			kickers[club]++
-		default:
-			out.Players[id] = p
+		if newest < 0 {
+			newest = snapshot
 		}
-	}
-	// A club with two kickers in the snapshot names neither by club.
-	for club, count := range kickers {
-		if count > 1 {
-			delete(out.Kickers, club)
+		if snapshot == newest {
+			out.add(id, position, team, p, at, kickers)
+		} else {
+			before.add(id, position, team, p, at, beforeKickers)
 		}
 	}
 	if err := rows.Err(); err != nil {
 		return out, fmt.Errorf("boards: read week %d projection: %w", week, err)
 	}
-	if n > maxProjectionRows {
-		return out, fmt.Errorf("boards: over %d projection rows for week %d", maxProjectionRows, week)
+	if n > snapshotsRead*maxProjectionRows {
+		return out, fmt.Errorf("boards: over %d projection rows for week %d", snapshotsRead*maxProjectionRows, week)
+	}
+	out.dropSharedKickers(kickers)
+	if !before.ReadAt.IsZero() {
+		before.dropSharedKickers(beforeKickers)
+		out.Previous = &before
 	}
 	return out, nil
 }
+
+// snapshotsRead is the newest snapshot and the one before it.
+const snapshotsRead = 2
+
+func emptyProjection(week int) WeekProjection {
+	return WeekProjection{Week: week, Players: map[string]ProjectedPoints{}, Defenses: map[string]ProjectedPoints{},
+		Kickers: map[string]ProjectedPoints{}}
+}
+
+// add files one row: a defense by its club, a kicker by his id and his
+// club, anyone else by his id.
+func (w *WeekProjection) add(id, position, team string, p ProjectedPoints, at time.Time, kickers map[string]int) {
+	w.ReadAt = at.UTC()
+	club := ProductTeam(team)
+	switch position {
+	case DefensePosition:
+		w.Defenses[club] = p
+	case KickerPosition:
+		w.Players[id] = p
+		w.Kickers[club] = p
+		kickers[club]++
+	default:
+		w.Players[id] = p
+	}
+}
+
+// dropSharedKickers names no kicker by a club with two in the snapshot.
+func (w *WeekProjection) dropSharedKickers(kickers map[string]int) {
+	for club, count := range kickers {
+		if count > 1 {
+			delete(w.Kickers, club)
+		}
+	}
+}
+
+// Delta is a player's change in points since the snapshot before, in the
+// preset's format, from the tenths the screens print (so a change never
+// disagrees with the two figures shown); false without a row in both.
+func (w WeekProjection) Delta(boardID, position, team string, preset apitypes.ScoringPreset) (float64, bool) {
+	if w.Previous == nil {
+		return 0, false
+	}
+	now, ok := w.Player(boardID, position, team)
+	if !ok {
+		return 0, false
+	}
+	then, ok := w.Previous.Player(boardID, position, team)
+	if !ok {
+		return 0, false
+	}
+	return tenth(now.For(preset)) - tenth(then.For(preset)), true
+}
+
+func tenth(v float64) float64 { return math.Round(v*tenths) / tenths }
+
+const tenths = 10

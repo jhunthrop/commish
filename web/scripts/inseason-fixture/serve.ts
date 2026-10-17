@@ -278,6 +278,8 @@ const MOVES = /^\/leagues\/attached\/([^/]+)\/moves(\/plan)?$/;
 function slotPlace(slot: string): string {
 	if (slot === 'FLEX') return 'in the flex';
 	if (slot === 'SUPERFLEX') return 'in the superflex';
+	// A defense's slot as the Lineup prints it (hostmoves slotPlace).
+	if (slot === 'DEF') return 'at D/ST';
 	return `at ${slot}`;
 }
 
