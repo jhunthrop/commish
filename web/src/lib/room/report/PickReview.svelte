@@ -1,222 +1,300 @@
 <script lang="ts">
-	import { chanceShort, pickLabel } from '#lib/format/draft.ts';
+	import { fixed } from '#lib/format/number.ts';
+	import { pickLabel } from '#lib/format/draft.ts';
 	import Face from '#lib/ui/Face.svelte';
-	import Label from '#lib/ui/Label.svelte';
-	import ToneChip from '#lib/ui/ToneChip.svelte';
+	import PositionPill from '#lib/ui/PositionPill.svelte';
 	import type { MockReport } from '../api.ts';
 	import type { Board } from '../model.ts';
-	import { pickFigure } from './headline.ts';
+	import { slotLabel } from '../words.ts';
+	import { adpLater, boardLater, byWords, pickFigure, stillThereCell } from './headline.ts';
 
-	type Pick = MockReport['picks'][number];
-	type Tone = 'gain' | 'loss' | 'even';
-
+	/** Pick by pick as a box score (Lane 66o): each pick's slot, his points over replacement (or his
+	 * place in draft order), where drafters and our board place him with how many picks later than
+	 * the pick, whether he was still there at the next turn, and who made it. The basis is the
+	 * report's, said once above. */
 	interface Props {
 		picks: MockReport['picks'];
+		starters: MockReport['starters'];
 		board: Board;
 		teams: number;
-		/** "Could wait" starts here. */
+		/** Still there is tinted from here. */
 		couldWaitFrom: number;
 		/** Whose picks: your own, or a shared draft's drafter. */
 		whose?: 'your' | 'their';
 	}
 
-	let { picks, board, teams, couldWaitFrom, whose = 'your' }: Props = $props();
+	let { picks, starters, board, teams, couldWaitFrom, whose = 'your' }: Props = $props();
 
-	type MadeFor = Readonly<Record<Exclude<Pick['made_by'], 'you'>, string>>;
+	const BENCH = 'Bench';
 
-	/** Who made a pick nobody chose, in the row's words, for your draft and for a shared one. */
-	const MADE_FOR: Readonly<Record<'your' | 'their', MadeFor>> = {
-		your: {
-			for_you: 'picked for you',
-			queue: 'your queue, after you left',
-			clock: 'your clock ran out'
-		},
-		their: {
-			for_you: 'picked for them',
-			queue: 'their queue, after they left',
-			clock: 'their clock ran out'
-		}
-	};
-
-	function adpChip(pick: Pick): { tone: Tone; text: string } {
-		const gap = pick.adp_gap === null ? null : Math.round(pick.adp_gap);
-		switch (pick.chip) {
-			case 'reach':
-				return { tone: 'loss', text: `${Math.abs(gap ?? 0)} before drafters` };
-			case 'steal':
-				return { tone: 'gain', text: `${Math.abs(gap ?? 0)} after drafters` };
-			case 'at_adp':
-				return { tone: 'even', text: 'at ADP' };
-			default:
-				return { tone: 'even', text: 'no ADP' };
-		}
-	}
-
-	/** The hindsight chip, or who made the pick when nobody chose it: a pick made for you carries no
-	 * lesson. */
-	function hindsight(pick: Pick): { tone: Tone; text: string } {
-		if (pick.made_by !== 'you') return { tone: 'even', text: MADE_FOR[whose][pick.made_by] };
-		const chance = pick.still_there;
-		// No chance recorded: at the last pick there is no next turn, anywhere else the player was
-		// deeper than the chances the room computed.
-		if (chance === null)
-			return { tone: 'even', text: pick.pick === lastPick ? 'last pick' : 'not read' };
-		if (chance >= couldWaitFrom)
-			return { tone: 'loss', text: `could wait, ${chanceShort(chance)} there next turn` };
-		return { tone: 'gain', text: `right on time, ${chanceShort(chance)} there next turn` };
-	}
-
+	const slotOf = $derived(
+		new Map(
+			starters.flatMap((s) =>
+				s.player_id === null ? [] : [[s.player_id, slotLabel(s.slot)] as const]
+			)
+		)
+	);
 	const lastPick = $derived(picks.filter((p) => p.chip !== 'kept').at(-1)?.pick ?? null);
-	const fellBack = $derived(picks.some((p) => p.odds_source.startsWith('fallback')));
-	const madeFor = $derived(picks.filter((p) => p.made_by !== 'you').length);
 </script>
 
-<div class="picks">
-	<div class="pk head" aria-hidden="true">
-		<Label>Pick</Label><span></span><Label>Player</Label>
-		<Label align="end">Over repl</Label>
-		<span class="gapc"><Label>Against ADP</Label></span>
-		<span class="hind"><Label>Hindsight</Label></span>
-	</div>
-	{#each picks as pick (pick.pick)}
-		{@const player = board.byId.get(pick.player_id)}
-		{@const adp = adpChip(pick)}
-		{@const hind = hindsight(pick)}
-		{@const figure = pickFigure(pick.over_replacement, player)}
-		<div class="pk" class:made={pick.made_by !== 'you'}>
-			<span class="no">{pickLabel(pick.pick, teams)}</span>
-			{#if player}<Face src={player.headshot} name={player.name} size={36} />{:else}<span
-				></span>{/if}
-			<span class="who">
-				<b>{player?.name ?? pick.player_id}</b>
-				{#if player}<span>{player.position} {player.positionRank} · {player.team}</span>{/if}
-			</span>
-			<span class="vor" class:none={figure.muted}>{figure.text}</span>
-			<span class="chips">
-				{#if pick.chip === 'kept'}
-					<!-- A keeper was nobody's choice: one grey chip where the gap and hindsight go. -->
-					<span class="gapc"><ToneChip tone="even">kept</ToneChip></span>
-				{:else}
-					<span class="gapc"><ToneChip tone={adp.tone}>{adp.text}</ToneChip></span>
-					<span class="hind"><ToneChip tone={hind.tone}>{hind.text}</ToneChip></span>
-				{/if}
-			</span>
-		</div>
-	{/each}
-</div>
-<p class="basis">
-	Hindsight is the chance he was still there at {whose} next turn, as the room said at that pick.
-	{#if fellBack}For a pick the room recorded no chance at, hindsight reads 200 runs of the room from
-		that pick.{/if}
-	"Could wait" starts at {Math.round(couldWaitFrom * 100)}%.
-	{#if madeFor > 0}A pick made by Pick for me, a stand-in or the clock has no hindsight, since
-		nobody chose it.{/if}
-</p>
+<table class="picks">
+	<thead>
+		<tr class="groups">
+			<th colspan="4"></th>
+			<th colspan="2" class="grp"><span>Drafters</span></th>
+			<th colspan="2" class="grp"><span>Our board</span></th>
+			<th colspan="2"></th>
+		</tr>
+		<tr>
+			<th scope="col" class="l">Pick</th>
+			<th scope="col" class="l">Player</th>
+			<th scope="col" class="wide">Slot</th>
+			<th scope="col">Over repl</th>
+			<th scope="col" class="wide">ADP</th>
+			<th scope="col"><span class="ph">ADP </span>Picks later</th>
+			<th scope="col" class="wide">Rank</th>
+			<th scope="col"><span class="ph">Ours </span>Picks later</th>
+			<th scope="col">Still there</th>
+			<th scope="col" class="wide">By</th>
+		</tr>
+	</thead>
+	<tbody>
+		{#each picks as pick (pick.pick)}
+			{@const player = board.byId.get(pick.player_id)}
+			{@const figure = pickFigure(pick.over_replacement, player)}
+			{@const adp = adpLater(pick)}
+			{@const ours = boardLater(pick)}
+			{@const still = stillThereCell(pick, lastPick, couldWaitFrom)}
+			{@const slot = slotOf.get(pick.player_id) ?? BENCH}
+			<tr class:made={pick.made_by !== 'you'}>
+				<td class="l n no">{pickLabel(pick.pick, teams)}</td>
+				<td class="l">
+					<span class="who">
+						{#if player}<Face src={player.headshot} name={player.name} size={34} />{/if}
+						<span class="nm">
+							<b>{player?.name ?? pick.player_id}</b>
+							{#if player}<small
+									><PositionPill position={player.position} rank={player.positionRank} />
+									{player.team}</small
+								>{/if}
+						</span>
+					</span>
+				</td>
+				<td class="wide"><span class="slot" class:bench={slot === BENCH}>{slot}</span></td>
+				<td class="n" class:muted={figure.muted}>{figure.text}</td>
+				<td class="n wide"
+					>{player?.adp === null || player === undefined ? '' : fixed(player.adp)}</td
+				>
+				<td class="n {adp?.tone ?? ''}">{adp?.text ?? ''}</td>
+				<td class="n wide">{pick.board_rank ?? ''}</td>
+				<td class="n {ours?.tone ?? ''}">{ours?.text ?? ''}</td>
+				<td class="n" class:wait={still.wait} class:muted={still.muted}>{still.text}</td>
+				<td class="by wide">{byWords(pick, whose)}</td>
+			</tr>
+		{/each}
+	</tbody>
+</table>
 
 <style>
 	.picks {
-		display: flex;
-		flex-direction: column;
-	}
-
-	.pk {
-		display: grid;
-		grid-template-columns: 52px 36px minmax(0, 1fr) 112px 150px 190px;
-		gap: var(--s-3);
-		align-items: center;
-		min-height: var(--row-h);
-		padding: 4px 0;
-		border-bottom: 1px solid var(--line);
-		font-size: var(--t-sm);
-	}
-
-	.head {
-		min-height: 0;
-		padding-bottom: var(--s-2);
-		border-bottom: 1px solid var(--line-strong);
-	}
-
-	/* On a desk the two chips sit in their own columns. */
-	.chips {
-		display: contents;
-	}
-
-	.no {
-		font-family: var(--font-num);
-		font-weight: 700;
-		font-size: var(--t-lg);
-		color: var(--ink-2);
-	}
-
-	.who {
-		min-width: 0;
-	}
-
-	.who b {
-		display: block;
-		font-weight: 600;
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
-	}
-
-	.who span {
-		color: var(--ink-3);
-		font-size: var(--t-xs);
-	}
-
-	.vor {
-		font-family: var(--font-num);
-		font-weight: 700;
-		font-size: var(--t-lg);
-		text-align: right;
+		width: 100%;
+		border-collapse: collapse;
 		font-variant-numeric: tabular-nums;
 	}
 
-	.vor.none {
+	th {
+		font-size: var(--t-xs);
+		font-weight: 500;
+		letter-spacing: var(--track-label);
+		text-transform: uppercase;
+		color: var(--ink-3);
+		text-align: right;
+		padding: 0 var(--s-3) var(--s-2);
+		white-space: nowrap;
+		border-bottom: 1px solid var(--line-strong);
+	}
+
+	.groups th {
+		border-bottom: 0;
+		padding-bottom: 0;
+	}
+
+	th.grp {
+		text-align: center;
+		color: var(--ink-2);
+	}
+
+	th.grp span {
+		display: block;
+		padding-bottom: 4px;
+		border-bottom: 1px solid var(--line-strong);
+	}
+
+	.l {
+		text-align: left;
+	}
+
+	td {
+		padding: 0 var(--s-3);
+		height: var(--row-h);
+		border-bottom: 1px solid var(--line);
+		text-align: right;
+		white-space: nowrap;
+	}
+
+	td.n {
+		font-family: var(--font-num);
+		font-weight: 700;
+		font-size: var(--t-lg);
+	}
+
+	td.no {
+		color: var(--ink-2);
+	}
+
+	td.muted {
 		font-family: var(--font-ui);
 		font-weight: 500;
 		font-size: var(--t-xs);
 		color: var(--ink-3);
 	}
 
+	td.loss,
+	td.wait {
+		color: var(--loss-ink);
+	}
+
+	td.gain {
+		color: var(--gain-ink);
+	}
+
+	.who {
+		display: flex;
+		align-items: center;
+		gap: var(--s-3);
+		min-width: 0;
+	}
+
+	.nm {
+		display: flex;
+		flex-direction: column;
+		min-width: 0;
+	}
+
+	.nm b {
+		font-weight: 600;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
+	.nm small {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		font-size: var(--t-sm);
+		color: var(--ink-3);
+	}
+
+	.slot {
+		display: inline-flex;
+		align-items: center;
+		height: 20px;
+		padding: 0 6px;
+		border: 1px solid var(--line-strong);
+		border-radius: var(--r-sm);
+		font-size: var(--t-xs);
+		font-weight: 700;
+		letter-spacing: 0.04em;
+		color: var(--ink-2);
+	}
+
+	.slot.bench {
+		border-color: transparent;
+		font-weight: 500;
+		color: var(--ink-3);
+	}
+
+	td.by {
+		font-size: var(--t-sm);
+		color: var(--ink-3);
+	}
+
 	/* A pick nobody chose reads quieter than the ones you made. */
 	.made .no,
-	.made .who b {
+	.made .nm b {
 		color: var(--ink-3);
 	}
 
-	.basis {
-		font-size: var(--t-xs);
-		color: var(--ink-3);
-		margin-top: var(--s-3);
-		max-width: 70ch;
+	.ph {
+		display: none;
 	}
 
-	/* Narrower: Against ADP and Hindsight move to a second line under the player, never dropped. */
-	@media (max-width: 1180px) {
-		.pk {
-			grid-template-columns: 48px 36px minmax(0, 1fr) 90px;
-			row-gap: 6px;
-			padding: var(--s-2) 0;
+	/* In a hand: the signed figures stay, the slot, the raw ADP and rank and who made it go. */
+	@media (max-width: 760px) {
+		.picks {
+			table-layout: fixed;
 		}
 
-		.head .gapc,
-		.head .hind {
+		.wide,
+		.groups {
 			display: none;
 		}
 
-		.chips {
-			grid-column: 3 / -1;
-			display: flex;
-			flex-wrap: wrap;
-			gap: 6px;
+		.ph {
+			display: inline;
 		}
-	}
 
-	@media (max-width: 760px) {
-		.pk {
-			grid-template-columns: 44px 32px minmax(0, 1fr) 70px;
+		th,
+		td {
+			padding-inline: 4px;
+		}
+
+		th {
+			font-size: 10px;
+			letter-spacing: 0.02em;
+			white-space: normal;
+			vertical-align: bottom;
+		}
+
+		th:nth-child(1) {
+			width: 40px;
+		}
+
+		th:nth-child(4) {
+			width: 60px;
+		}
+
+		th:nth-child(6),
+		th:nth-child(8) {
+			width: 50px;
+		}
+
+		th:nth-child(9) {
+			width: 50px;
+		}
+
+		td.n {
+			font-size: var(--t-md);
+		}
+
+		td.muted {
+			white-space: normal;
+			line-height: 1.2;
+		}
+
+		.who :global(.face) {
+			display: none;
+		}
+
+		.nm b {
+			font-size: var(--t-sm);
+			white-space: normal;
+			line-height: 1.15;
+		}
+
+		.nm small {
+			font-size: var(--t-xs);
 		}
 	}
 </style>

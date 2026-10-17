@@ -64,7 +64,7 @@
 		<Report
 			report={r}
 			{names}
-			field="{plural(people, 'drafter')} and {plural(r.teams - people, 'bot')}"
+			seats="{plural(people, 'drafter')}, {plural(r.teams - people, 'bot')}"
 		>
 			{#snippet verbs()}
 				<Verb href={resolve('/mock/new')}>Join another lobby</Verb>
