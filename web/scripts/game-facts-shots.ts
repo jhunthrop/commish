@@ -173,8 +173,8 @@ for (const { name, path, ready, phone, box } of PAGES) {
 					continue;
 				}
 				const said = await factsLine(page);
-				// The waiver and trade rows keep to their decision on a phone, so the first row clears the pin.
-				const shown = phone || width !== PHONE_WIDTH;
+				// The waiver rows keep to their decision on a phone, so the first row clears the pin.
+				const shown = width !== PHONE_WIDTH;
 				check(
 					(said !== null) === shown,
 					`${where}: ${shown ? 'no game facts sentence' : 'game facts on a phone row'}`
