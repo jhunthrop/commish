@@ -6,7 +6,15 @@
 	import LineupStrip from '../box/LineupStrip.svelte';
 	import LineupTable from '../box/LineupTable.svelte';
 	import { sheetTags } from '../sheet-tags.ts';
-	import { copiedWords, copyFailedWords, LINEUP, lineupBox, lineupText } from '../box/lineup.ts';
+	import {
+		copiedLine,
+		LINEUP,
+		lineupBox,
+		lineupPageWords,
+		lineupText,
+		setOnWords,
+		type CopyLine
+	} from '../box/lineup.ts';
 	import MovePanel from './MovePanel.svelte';
 	import Screen from './Screen.svelte';
 	import type { HostMoveInput, HostMovePlan, HostMoveResult, LineupAdvice } from './api.ts';
@@ -25,8 +33,9 @@
 	 * with one verb; then the lineup the advice sets, Totals, the bench and the injured reserve, each
 	 * row in the same columns with the season's evidence beside this week's projection. The verb
 	 * makes the changes on the platform where the API opens the move (spec §10.2), through the
-	 * confirmation on this screen; elsewhere it copies the lineup, the API's one line under it saying
-	 * why. A platform that gains writes changes the API's answer, never this screen. */
+	 * confirmation on this screen; elsewhere it copies the lineup with the platform's lineup page as
+	 * its second half, the API's one line (moves.reason) under it saying why. A lineup already set has
+	 * no verb. A platform that gains writes changes the API's answer, never this screen. */
 	interface Props {
 		advice: LineupAdvice;
 		host: LeagueHost;
@@ -63,9 +72,12 @@
 	/** The move as it was planned: the one the token makes, whatever the page reads meanwhile. */
 	let planned: HostMoveInput | null = null;
 	/** What the copy verb said, once pressed. */
-	let copied = $state<string | null>(null);
+	let copied = $state<CopyLine | null>(null);
 
 	const onHost = $derived(setsOnHost(advice));
+	/** Nothing to change: the strip says so and no verb shows (review M4). */
+	const isSet = $derived(box.swaps.length === 0);
+	const verb = $derived(isSet ? null : onHost ? LINEUP.make : LINEUP.copy);
 
 	async function open(): Promise<void> {
 		const move = lineupMove(advice);
@@ -81,9 +93,9 @@
 	async function copyLineup(): Promise<void> {
 		try {
 			await copy(lineupText(box, advice.week));
-			copied = copiedWords(host);
+			copied = copiedLine(host, true);
 		} catch {
-			copied = copyFailedWords(host);
+			copied = copiedLine(host, false);
 		}
 	}
 
@@ -107,9 +119,8 @@
 
 <Screen
 	decision={lineupDecision(advice)}
-	verb={onHost ? LINEUP.make : LINEUP.copy}
+	{verb}
 	href={advice.host_lineup_url}
-	hostNote={onHost ? null : (copied ?? advice.moves.reason ?? advice.host_note)}
 	basis={advice.basis}
 	basisNote={advice.basis_note}
 	onverb={onHost ? () => void open() : () => void copyLineup()}
@@ -118,6 +129,29 @@
 >
 	{#snippet summary()}
 		<LineupStrip week={advice.week} {box} />
+	{/snippet}
+	{#snippet verbFoot()}
+		{#if isSet}
+			{#if advice.moves.lineup === 'available'}<span class="foot">{setOnWords(host)}</span>{/if}
+		{:else if !onHost}
+			{#if copied === null && advice.host_lineup_url !== ''}<a
+					class="second"
+					href={advice.host_lineup_url}
+					target="_blank"
+					rel="noopener">{lineupPageWords(host)}</a
+				>{/if}
+			<span class="foot" role="status"
+				>{#if copied}{copied.said}
+					{LINEUP.setItOn}
+					{#if advice.host_lineup_url !== ''}<a
+							href={advice.host_lineup_url}
+							target="_blank"
+							rel="noopener">{copied.page}</a
+						>{:else}{copied.page}{/if}.{:else}{advice.moves.reason ??
+						advice.host_note ??
+						''}{/if}</span
+			>
+		{/if}
 	{/snippet}
 	{#snippet move()}
 		{#if step.kind !== 'closed'}
@@ -140,3 +174,26 @@
 		lines={shown}
 	/>
 </Screen>
+
+<style>
+	.foot {
+		color: var(--ink-2);
+		font-size: var(--t-sm);
+		text-align: right;
+	}
+
+	.second {
+		font-size: var(--t-sm);
+		font-weight: 600;
+		color: var(--ink);
+	}
+
+	@media (max-width: 760px) {
+		.foot,
+		.second {
+			display: block;
+			margin-top: var(--s-1);
+			text-align: center;
+		}
+	}
+</style>

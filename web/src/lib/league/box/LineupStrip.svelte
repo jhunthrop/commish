@@ -20,7 +20,7 @@
 		<span class="wk">Week {week}</span>
 		<span class="title">{changesTitle(box.swaps.length)}</span>
 	</div>
-	{#if box.swaps.length > 0}
+	{#if box.swaps.length > 0 || box.idle.length > 0}
 		<ul class="swaps">
 			{#each box.swaps as swap (swap.key)}
 				<li class="swap">
@@ -29,6 +29,9 @@
 					{#if swap.out}<span class="out"><MoveMark move="out" size={16} />{swap.out} out</span
 						>{/if}
 				</li>
+			{/each}
+			{#each box.idle as said (said)}
+				<li class="swap idle">{said}</li>
 			{/each}
 		</ul>
 	{/if}
@@ -107,6 +110,12 @@
 		font-size: var(--t-sm);
 		font-weight: 700;
 		letter-spacing: 0.03em;
+	}
+
+	.idle {
+		padding: 0 var(--s-3);
+		color: var(--loss-ink);
+		border-color: color-mix(in srgb, var(--loss-ink) 40%, transparent);
 	}
 
 	.in,
@@ -191,10 +200,6 @@
 		.words {
 			white-space: normal;
 			font-size: var(--t-xs);
-		}
-
-		.past {
-			display: none;
 		}
 	}
 </style>

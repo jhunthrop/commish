@@ -15,7 +15,8 @@
 		decision: string;
 		/** The fact that tipped it, under the decision. */
 		reason?: string | null;
-		verb: string;
+		/** The one verb; null where there is nothing to do (the Lineup already set). */
+		verb: string | null;
 		/** The host's page; empty when the API knows none, and the verb stands disabled. */
 		href: string;
 		/** The API's sentence under a verb it cannot open: where the member makes the change. */
@@ -37,6 +38,8 @@
 		panelVerb?: boolean;
 		/** The confirmation, under the decision. */
 		move?: Snippet;
+		/** Under the verb in place of hostNote: its second half (the platform's page) and its line. */
+		verbFoot?: Snippet;
 		/** The decision drawn as a strip (the Lineup's swaps as chips, Lane 66e) in place of its
 		 * sentence; the sentence stays the strip's name for a screen reader. */
 		summary?: Snippet;
@@ -57,6 +60,7 @@
 		panelVerb = false,
 		move,
 		summary,
+		verbFoot,
 		children
 	}: Props = $props();
 
@@ -65,11 +69,19 @@
 </script>
 
 {#snippet action(fill: boolean)}
-	{#if onverb}
+	{#if verb === null}
+		<!-- Nothing to do: the line under it says so. -->
+	{:else if onverb}
 		<Verb onclick={onverb} {fill} {controls} {expanded}>{verb}</Verb>
 	{:else}
 		<Verb {href} {fill} disabled={href === ''}>{verb}</Verb>
 	{/if}
+{/snippet}
+
+{#snippet foot(pinned: boolean)}
+	{#if verbFoot}{@render verbFoot()}{:else if hostNote}{#if pinned}<p class="note">
+				{hostNote}
+			</p>{:else}<span class="note">{hostNote}</span>{/if}{/if}
 {/snippet}
 
 <Panel as="section" label={LINES.ourCall} edge="accent">
@@ -86,7 +98,7 @@
 		{#if !asideForMove}
 			<span class="verb desk" {@attach hostTab(href)}
 				>{@render action(false)}
-				{#if hostNote}<span class="note">{hostNote}</span>{/if}</span
+				{@render foot(false)}</span
 			>
 		{/if}
 	</div>
@@ -95,10 +107,10 @@
 <Basis {basis} />
 {@render children()}
 <p class="foot">{basisNote}</p>
-{#if !asideForMove}
+{#if !asideForMove && (verb !== null || verbFoot !== undefined || hostNote !== null)}
 	<div class="pin" {@attach hostTab(href)}>
 		{@render action(true)}
-		{#if hostNote}<p class="note">{hostNote}</p>{/if}
+		{@render foot(true)}
 	</div>
 {/if}
 

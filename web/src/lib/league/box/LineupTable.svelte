@@ -55,7 +55,14 @@
 	<tbody>
 		{#each box.starters as entry (entry.row.key)}
 			{@const why = whyOf(entry)}
-			<BoxLine row={entry.row} tags={tagsOf(entry.row.boardId)} evidence move={entry.move} {why} />
+			<BoxLine
+				row={entry.row}
+				tags={tagsOf(entry.row.boardId)}
+				evidence
+				move={entry.move}
+				{why}
+				idle={entry.idle}
+			/>
 			{#if why?.open}
 				<tr class="whyline"><td></td><td id={why.id} colspan={COLUMNS - 1}>{entry.why}</td></tr>
 			{/if}

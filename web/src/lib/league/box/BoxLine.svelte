@@ -28,6 +28,8 @@
 		evidence?: boolean;
 		/** A row the advice moves, marked in its slot cell. */
 		move?: Move | null;
+		/** A spot no one who can play this week fills: the member's player, left there, muted. */
+		idle?: boolean;
 		/** A swap's evidence line, opened by its button: its row's id, whether it is open. */
 		why?: { id: string; open: boolean; toggle: () => void } | null;
 	}
@@ -38,9 +40,17 @@
 		tags = [],
 		evidence = false,
 		move = null,
-		why = null
+		why = null,
+		idle = false
 	}: Props = $props();
 	const rank = $derived(row.evidence.oppRank);
+	/** The phone's evidence line's own words and separator, so the template adds no space. */
+	const oppLead = `${BOX.opp} `;
+	const SEPARATOR = ', ';
+	/** "Avg 15.2, Last 0.8": the phone's evidence after the opponent's rank. */
+	const seasonWords = $derived(
+		`${BOX.avg} ${boxNumber(row.evidence.avg)}, ${BOX.last} ${boxNumber(row.evidence.last)}`
+	);
 </script>
 
 {#snippet game()}
@@ -60,12 +70,11 @@
 {/snippet}
 
 {#snippet seasonLine()}
+	<!-- The separators are expressions, so the template's own line breaks add no space (review L7). -->
 	<span class="phone-ev"
-		>{#if rank !== null}{BOX.opp}
-			<span class="rk {easeOf(rank, row.evidence.oppOf)}">{oppRankWord(rank)}</span>,
-		{/if}{BOX.avg}
-		{boxNumber(row.evidence.avg)}, {BOX.last}
-		{boxNumber(row.evidence.last)}</span
+		>{#if rank !== null}{oppLead}<span class="rk {easeOf(rank, row.evidence.oppOf)}"
+				>{oppRankWord(rank)}</span
+			>{SEPARATOR}{/if}{seasonWords}</span
 	>
 {/snippet}
 
@@ -74,6 +83,7 @@
 	class:moved-in={move === 'in'}
 	class:moved-out={move === 'out'}
 	class:open={why?.open === true}
+	class:idle
 >
 	<td class="slot"
 		><span class="sl"
@@ -172,6 +182,11 @@
 
 	.moved-out td:first-child {
 		box-shadow: inset 3px 0 0 var(--line-strong);
+	}
+
+	.idle td {
+		color: var(--ink-3);
+		background: color-mix(in srgb, var(--loss-bg) 35%, var(--surface));
 	}
 
 	.open td {
