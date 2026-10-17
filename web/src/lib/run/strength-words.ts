@@ -12,10 +12,10 @@ type Window = Pick<Slate, 'window'>;
 /** Where every opponent's figure comes from, said once on a page. */
 const WINS_SOURCE = 'from the published season totals';
 
-/** "Each opponent's figure is the season's expected wins, from the published season totals, read
- * Sep 7.": a club page's basis sentence. */
-export function winsBasis(slate: Window): string {
-	return `Each opponent's figure is the season's expected wins, ${WINS_SOURCE}, read ${windowLabel(slate.window)}.`;
+/** "Opponents show the season's expected wins, from the published season totals.": a club page's
+ * basis sentence, its read said once under the hero's figure (readWords). */
+export function winsBasis(): string {
+	return `Opponents show the season's expected wins, ${WINS_SOURCE}.`;
 }
 
 /** What a strength is, with its source and read: the schedule and clubs pages' leads. */

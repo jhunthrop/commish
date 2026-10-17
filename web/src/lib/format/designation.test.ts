@@ -98,10 +98,10 @@ void test('the marks', () => {
 
 void test('the short capture for a board basis says the read, and how old past a day and a half', () => {
 	const capture = { readAt: LISTED, checkedAt: CHECKED };
-	assert.equal(captureShort(capture, SOON, CENTRAL), 'Status read Fri Oct 16, 9:05 am Central.');
+	assert.equal(captureShort(capture, SOON, CENTRAL), 'Status read Oct 16.');
 	assert.equal(
 		captureShort({ readAt: LISTED, checkedAt: null }, SOON, CENTRAL),
-		'Status as the list stood Mon Oct 12, 9:03 pm Central, over a day and a half ago.'
+		'Status as of Oct 12, over 36 hours ago.'
 	);
 });
 

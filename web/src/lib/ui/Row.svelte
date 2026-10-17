@@ -399,6 +399,13 @@
 			display: inline;
 		}
 
+		/* His club and bye never give way to a status chip: the line takes a second row instead. */
+		.meta {
+			flex-wrap: wrap;
+			row-gap: 2px;
+			overflow: visible;
+		}
+
 		.tile {
 			height: 30px;
 			padding: 0 6px;

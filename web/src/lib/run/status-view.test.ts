@@ -62,9 +62,9 @@ void test('a board and a page built on the Eastern clock and said again on the m
 	];
 	const built = boardStatusWords(rows, { ...CENTRAL, zone: BUILT_ZONE });
 	// A page of board rows says the capture in the few words its basis has left (Lane 66n).
-	assert.equal(built.capture, 'Status read Fri Oct 16, 11:05 am Eastern.');
+	assert.equal(built.capture, 'Status read Oct 16.');
 	assert.deepEqual(Object.keys(built.rows), ['ir']);
-	assert.equal(boardStatusWords(rows, CENTRAL).capture.endsWith('10:05 am Central.'), true);
+	assert.equal(boardStatusWords(rows, CENTRAL).capture, 'Status read Oct 16.');
 	assert.equal(
 		playerStatusWords({ status: 'doubtful', seasonLong: false, since: null }, CENTRAL).note,
 		'Doubtful on the latest report, which does not move his place on our board. Injury status from the hourly capture, read Fri Oct 16, 10:05 am Central.'

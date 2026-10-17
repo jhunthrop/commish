@@ -86,11 +86,15 @@
 		text-transform: uppercase;
 		letter-spacing: var(--track-label);
 		color: var(--ink-3);
-		white-space: nowrap;
+		/* A head wider than its column ("Over repl" on a phone) takes a second line, never its
+		   neighbour's room. */
+		text-align: right;
+		line-height: 1.15;
 	}
 
 	.left {
 		justify-content: flex-start;
+		text-align: left;
 	}
 
 	button {

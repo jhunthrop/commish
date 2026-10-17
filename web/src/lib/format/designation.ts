@@ -106,7 +106,7 @@ export function stampWords(iso: string, zone: string = memberZone()): string {
 }
 
 /** The capture in the few words a page of board rows has left in its five-line basis (Lane 66n):
- * "Status read Fri Oct 16, 9:05 am Central.", "as the list stood" with no check, and past
+ * "Status read Oct 16.", "as of" its last change with no check, and past
  * CAPTURE_BEHIND_MS how old it is. The player page and the record keep captureLine's fuller words. */
 export function captureShort(
 	capture: CaptureStamp,
@@ -114,11 +114,12 @@ export function captureShort(
 	zone: string = memberZone()
 ): string {
 	const last = capture.checkedAt ?? capture.readAt;
+	const stamp = (iso: string): string => shortDay(iso, zone);
 	const when =
 		capture.checkedAt === null
-			? `as the list stood ${stampWords(capture.readAt, zone)}`
-			: `read ${stampWords(capture.checkedAt, zone)}`;
-	const old = now - Date.parse(last) > CAPTURE_BEHIND_MS ? ', over a day and a half ago' : '';
+			? `as of ${stamp(capture.readAt)}`
+			: `read ${stamp(capture.checkedAt)}`;
+	const old = now - Date.parse(last) > CAPTURE_BEHIND_MS ? ', over 36 hours ago' : '';
 	return `Status ${when}${old}.`;
 }
 

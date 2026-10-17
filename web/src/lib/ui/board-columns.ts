@@ -51,7 +51,7 @@ const WIDTHS: Readonly<Record<ColumnKey, Widths>> = {
 	player: PLAYER_TRACK,
 	tier: { desk: 36, lap: 32, tab: null, phone: null },
 	bye: { desk: 36, lap: 32, tab: 32, phone: null },
-	proj: { desk: 64, lap: 60, tab: 56, phone: 50 },
+	proj: { desk: 80, lap: 76, tab: 76, phone: 50 },
 	vor: { desk: 76, lap: 72, tab: 68, phone: 60 },
 	order: { desk: 88, lap: 80, tab: 72, phone: 64 },
 	range: { desk: 150, lap: null, tab: null, phone: null },

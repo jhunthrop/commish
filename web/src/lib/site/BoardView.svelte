@@ -195,18 +195,18 @@
 						>
 					{/each}
 				</ChipGroup>
-				<span class="shows">
-					{#if !marketView}<Toggle
-							label="Below replacement"
-							chip
-							bind:checked={belowReplacement}
-						/>{/if}
-					{#if page.range && !marketView}<span class="range-toggle"
-							><Toggle label="Floor to ceiling" chip bind:checked={rangeOn} /></span
-						>{/if}
-					<Toggle label="Only my sheet" chip bind:checked={onlySheet} />
-				</span>
 			</FilterBar>
+			<span class="shows">
+				{#if !marketView}<Toggle
+						label="Below replacement"
+						chip
+						bind:checked={belowReplacement}
+					/>{/if}
+				{#if page.range && !marketView}<span class="range-toggle"
+						><Toggle label="Floor to ceiling" chip bind:checked={rangeOn} /></span
+					>{/if}
+				<Toggle label="Only my sheet" chip bind:checked={onlySheet} />
+			</span>
 		</div>
 
 		<BoardTable
@@ -349,7 +349,13 @@
 		margin-bottom: var(--s-4);
 	}
 
+	/* The position chips and the switches share a line on a desk; on a phone the chips scroll and
+	   the switches wrap under them. */
 	.filters {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: var(--s-3);
 		margin-bottom: var(--s-3);
 	}
 
@@ -423,8 +429,12 @@
 			grid-template-columns: minmax(0, 1fr);
 		}
 
+		.filters {
+			display: block;
+		}
+
 		.shows {
-			margin-left: 0;
+			margin: var(--s-3) 0 0;
 		}
 	}
 </style>

@@ -22,7 +22,7 @@ const text = (facts: BasisFacts, phone = false): string =>
 void test('the board says its order, its drafts, the gap and the season columns once', () => {
 	assert.equal(
 		text(PRESEASON),
-		"Our PPR board, ranked by points over replacement for the full 2026 season in a 12-team league. ADP from PPR drafts, Sep 9. Gap, drafters' ADP less our rank, is plus and green when drafters wait, minus and rose when they reach. GP and A game are this season's, through week 5."
+		"Our PPR board, by points over replacement for 12 teams. ADP from PPR drafts, Sep 9. Gap, drafters' ADP less our rank: green when they wait, rose when they reach. GP and A game are this season's, through week 5."
 	);
 });
 
@@ -34,7 +34,7 @@ void test('the phone leaves out the season columns it does not draw', () => {
 void test('a position view names its tiers, ADP leads with the drafts and counts the undrafted', () => {
 	assert.match(text({ ...PRESEASON, position: 'WR' }), /Tiers are drawn within WR\./);
 	const adp = text({ ...PRESEASON, order: 'adp', noAdp: 333 });
-	assert.match(adp, /^ADP from PPR drafts, Sep 9, earliest pick first\. Rk is our PPR board, /);
+	assert.match(adp, /^ADP from PPR drafts, Sep 9, earliest first\. Our PPR board, by points /);
 	assert.match(adp, /333 players on our board have no ADP yet\.$/);
 });
 
@@ -44,7 +44,10 @@ void test('a rest-of-season board names the week and the refresh, and no gap', (
 		format: { label: 'PPR', teams: 12, rosFromWeek: 6, refreshedAt: '2026-10-14T12:00:00.000Z' },
 		gap: false
 	});
-	assert.match(rest, /for the rest of the 2026 season from week 6, refreshed October 14\./);
+	assert.match(
+		rest,
+		/the rest of the 2026 season from week 6, by points over replacement for 12 teams, refreshed October 14\./
+	);
 	assert.doesNotMatch(rest, /Gap, drafters/);
 });
 

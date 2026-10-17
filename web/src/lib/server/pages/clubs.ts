@@ -186,7 +186,7 @@ export async function clubPage(abbr: string): Promise<ClubPage> {
 		clubs: list,
 		played,
 		basis: [
-			{ text: winsBasis(slate), phone: true },
+			{ text: winsBasis(), phone: true },
 			...boardBasis({
 				format,
 				season: run.season,

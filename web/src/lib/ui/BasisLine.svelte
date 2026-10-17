@@ -13,9 +13,8 @@
 </script>
 
 <p class="basis">
-	{#each parts as part, i (i)}<span class:desk={!part.phone}
-			>{part.text}
-		</span>{/each}{#if tail}{tail}{/if}
+	{#each parts as part, i (i)}{#if i > 0}{' '}{/if}<span class:desk={!part.phone}>{part.text}</span
+		>{/each}{#if tail}{' '}{tail}{/if}
 </p>
 
 <style>

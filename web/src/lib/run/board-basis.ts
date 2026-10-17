@@ -32,16 +32,17 @@ export interface BasisFacts {
 
 /** The gap's one definition, on every page that prints it, and the column head's title. */
 export const GAP_WORDS =
-	"Gap, drafters' ADP less our rank, is plus and green when drafters wait, minus and rose when they reach.";
+	"Gap, drafters' ADP less our rank: green when they wait, rose when they reach.";
 
-/** "ranked by points over replacement for the full 2026 season", or for the rest of it once the run
- * ranks the rest. */
-function rankedBy(facts: BasisFacts): string {
+/** "Our PPR board, 2026 season, by points over replacement in a 12-team league.", or the rest of the
+ * season from its week once the run ranks the rest. */
+function ourBoard(facts: BasisFacts): string {
 	const { format, season } = facts;
+	const league = `for ${String(format.teams)} teams`;
 	if (format.rosFromWeek !== undefined && format.refreshedAt !== undefined) {
-		return `ranked by points over replacement for the rest of the ${String(season)} season from week ${String(format.rosFromWeek)}, refreshed ${monthDayLabel(format.refreshedAt)}`;
+		return `Our ${format.label} board, the rest of the ${String(season)} season from week ${String(format.rosFromWeek)}, by points over replacement ${league}, refreshed ${monthDayLabel(format.refreshedAt)}.`;
 	}
-	return `ranked by points over replacement for the full ${String(season)} season in a ${String(format.teams)}-team league`;
+	return `Our ${format.label} board, by points over replacement ${league}.`;
 }
 
 /** "GP and A game are this season's, through week 5.", naming the scoring when it is another's. */
@@ -57,11 +58,11 @@ export function boardBasis(facts: BasisFacts): BasisPart[] {
 	const parts: BasisPart[] =
 		facts.order === 'adp'
 			? [
-					{ text: `ADP from ${drafts}, earliest pick first.`, phone: true },
-					{ text: `Rk is our ${format.label} board, ${rankedBy(facts)}.`, phone: true }
+					{ text: `ADP from ${drafts}, earliest first.`, phone: true },
+					{ text: ourBoard(facts), phone: true }
 				]
 			: [
-					{ text: `Our ${format.label} board, ${rankedBy(facts)}.`, phone: true },
+					{ text: ourBoard(facts), phone: true },
 					...(facts.position
 						? [{ text: `Tiers are drawn within ${facts.position}.`, phone: true }]
 						: []),
