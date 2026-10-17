@@ -85,6 +85,25 @@ func TestWeekProjectionReadsTheNewestSnapshot(t *testing.T) {
 	if _, ok := p.Player("", "WR", "CHI"); ok {
 		t.Fatal("a player with no board id has no row")
 	}
+	// The snapshot before is read with it (Lane 66e): the change since it,
+	// none for a player it lacks.
+	if p.Previous == nil || !p.Previous.ReadAt.Equal(time.Date(2026, 10, 15, 13, 0, 0, 0, time.UTC)) {
+		t.Fatalf("the snapshot before: %+v", p.Previous)
+	}
+	// From the printed tenths: 19.4 against 18.0 (review L11).
+	if d, ok := p.Delta("4431611", "QB", "CHI", apitypes.ScoringPresetPpr); !ok || d < 1.399 || d > 1.401 {
+		t.Fatalf("Williams's change since the read before: %v %v", d, ok)
+	}
+	if _, ok := p.Delta("2971573", "K", "HOU", apitypes.ScoringPresetPpr); ok {
+		t.Fatal("a kicker the snapshot before lacks has no change")
+	}
+	only, err := src.WeekProjection(context.Background(), 2026, 7)
+	if err != nil || only.Previous != nil || only.Players["4431611"].PPR != 25 {
+		t.Fatalf("a week with one snapshot has none before: %+v %v", only, err)
+	}
+	if _, ok := only.Delta("4431611", "QB", "CHI", apitypes.ScoringPresetPpr); ok {
+		t.Fatal("no change without a snapshot before")
+	}
 	none, err := src.WeekProjection(context.Background(), 2026, 9)
 	if err != nil || !none.ReadAt.IsZero() || len(none.Players) != 0 {
 		t.Fatalf("a week with no snapshot: %+v %v", none, err)

@@ -43,7 +43,7 @@ const PAGES = [
 	{
 		name: 'start',
 		path: `/league/${id}/start`,
-		ready: 'Set it on Sleeper',
+		ready: 'Copy the lineup',
 		phone: true,
 		box: true
 	},
@@ -119,10 +119,12 @@ async function boxFacts(
 			[...document.querySelectorAll(selector)]
 				.filter(visible)
 				.map((el) => (el as HTMLElement).innerText.trim());
-		const rows = [...document.querySelectorAll('main table.box tbody tr')];
+		const rows = [
+			...document.querySelectorAll('main table.box tbody tr, main table.lineup tbody tr')
+		];
 		return {
-			expected: texts('main table.box .exp'),
-			weather: texts('main table.box .wx'),
+			expected: texts('main table.box .exp, main table.lineup .exp'),
+			weather: texts('main table.box .wx, main table.lineup .wx'),
 			text: document.body.innerText,
 			stamped: rows.filter((tr) => /\bRead \w{3} /.test(tr.textContent)).length
 		};

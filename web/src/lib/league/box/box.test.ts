@@ -7,6 +7,11 @@ import {
 	BOX,
 	boxNumber,
 	boxRow,
+	deltaBasis,
+	deltaWord,
+	easeOf,
+	EVIDENCE_BASIS,
+	oppRankWord,
 	expectedWords,
 	factsReadLine,
 	gameOf,
@@ -64,6 +69,10 @@ const line = (over: Partial<PlayerLine> = {}, factsOver: Partial<WeekFacts> = {}
 	points_over_replacement: 1.2,
 	rest_of_season_per_game: 17.8,
 	week_projection: 19.44,
+	projection_delta: 0.4,
+	opp_rank: 24,
+	season_avg: 17.94,
+	last_points: 22.4,
 	held: false,
 	facts: facts(factsOver),
 	...over
@@ -239,15 +248,50 @@ void test("the Proj line names the scoring, whose it is, the read, and the defen
 	);
 });
 
-void test("the Pts line says the host's team points where it gives no player's", () => {
+void test("the Pts line names the member's platform where it gives no player's points", () => {
 	assert.equal(
-		ptsBasis(true),
+		ptsBasis(true, 'sleeper'),
 		"Pts are this week's points as your league scores them, -- until his game kicks off."
 	);
 	assert.equal(
-		ptsBasis(false),
-		"Pts are this league's team points from the host, which gives no points by player."
+		ptsBasis(false, 'espn'),
+		"Pts are this league's team points from ESPN, which gives no points by player."
 	);
+	assert.equal(
+		ptsBasis(false, 'yahoo'),
+		"Pts are this league's team points from Yahoo, which gives no points by player."
+	);
+	assert.equal(
+		ptsBasis(false, 'ffpc'),
+		"Pts are this league's team points from FFPC, which gives no points by player."
+	);
+	for (const host of ['espn', 'yahoo', 'ffpc', 'sleeper', 'mfl'] as const) {
+		assert.doesNotMatch(ptsBasis(false, host), /\bhost\b/i);
+	}
+});
+
+void test('the evidence columns print as the Lineup draws them', () => {
+	assert.equal(oppRankWord(24), '24th');
+	assert.equal(oppRankWord(1), '1st');
+	assert.equal(oppRankWord(null), '--');
+	assert.equal(easeOf(24, 32), 'easy');
+	assert.equal(easeOf(22, 32), 'easy');
+	assert.equal(easeOf(21, 32), 'even');
+	assert.equal(easeOf(10, 32), 'hard');
+	assert.equal(easeOf(11, 32), 'even');
+	assert.equal(deltaWord(0.4), '+0.4');
+	assert.equal(deltaWord(-0.3), '−0.3');
+	assert.equal(deltaWord(0.04), '0.0');
+	assert.equal(deltaWord(null), '--');
+	const row = boxRow(line(), 'QB', ZONE, false);
+	assert.deepEqual(row.evidence, { oppRank: 24, oppOf: null, avg: 17.94, last: 22.4, delta: 0.4 });
+	assert.equal(row.pill?.rank, null, 'the Lineup leaves the rest-of-season rank out');
+	assert.equal(boxRow(line(), 'QB', ZONE).pill?.rank, 7, 'the Matchup keeps it');
+	assert.equal(
+		deltaBasis('2026-10-16T02:00:00.000Z', ZONE),
+		'Δ Proj is its change since the read before, Thu 9:00 pm Central.'
+	);
+	assert.equal(deltaBasis(null, ZONE), null);
 });
 
 void test("the screen's basis lines say the Game cell's figures and the facts' read once", () => {
@@ -269,8 +313,10 @@ const BANNED =
 void test('copy guard: every box word is fantasy words, with no dash or semicolon', () => {
 	const said = [
 		...Object.values(BOX),
-		ptsBasis(true),
-		ptsBasis(false),
+		ptsBasis(true, 'espn'),
+		ptsBasis(false, 'espn'),
+		EVIDENCE_BASIS,
+		deltaBasis(READ, ZONE) ?? '',
 		projBasis(READ, OWN, true, ZONE),
 		projBasis(null, CLOSEST, false, ZONE),
 		totalsNote([{ proj: null, game: null }], true, 6) ?? '',
