@@ -212,7 +212,8 @@ def simulate_game(game: pd.DataFrame, d: Dispersion, c: Constants, run_seed: int
     first = game.iloc[0]
     rng = np.random.default_rng(game_seed(run_seed, int(first["season"]), int(first["week"]), home))
     home_rows = game[game["club"] == home]
-    spread = float(home_rows["spread"].iloc[0]) if not home_rows.empty else 0.0
+    recorded = float(home_rows["spread"].iloc[0]) if not home_rows.empty else float("nan")
+    spread = recorded if np.isfinite(recorded) else 0.0  # 2.10: no game figure, the margin expected even
     margin = rng.normal(spread, d.margin_sd, draws)
     clubs = [home, *sorted(set(game["club"]) - {home})]
     players: list[str] = []

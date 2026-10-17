@@ -115,6 +115,12 @@ def test_the_simulation_is_deterministic_and_its_mean_is_the_point() -> None:
     assert breaches == []
 
 
+def test_a_game_with_no_figure_draws_its_margin_around_zero() -> None:
+    game = _game().assign(spread=np.nan)
+    simulated = simulate_game(game, DISPERSION, CONSTANTS, run_seed=2023, draws=2_000)
+    assert np.isfinite(simulated.points["ppr"]).all()
+
+
 def test_the_bands_and_the_scale() -> None:
     simulated = simulate_game(_game(), DISPERSION, CONSTANTS, run_seed=2023, draws=4_000)
     floor, median, ceiling = bands(simulated, "ppr", {"QB": 1.0, "RB": 1.0, "WR": 1.0, "TE": 1.0})
