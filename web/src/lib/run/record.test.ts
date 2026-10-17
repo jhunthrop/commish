@@ -1,7 +1,7 @@
 // The record box score's words (Lane 66j fix round 1): run with `npm test`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { figureWords, gradedOrders, publishedWords } from './record.ts';
+import { figureWords, gradedOrders, printPlaces, publishedWords } from './record.ts';
 import type { RecordWeek, RunRecord } from './schema.ts';
 
 const week = (n: number, order: RecordWeek['order'], status: RecordWeek['status']): RecordWeek => ({
@@ -55,9 +55,11 @@ void test('the bug names the orders the graded weeks graded', () => {
 });
 
 void test('a figure prints as the run gives it', () => {
-	const score = { graded: 10, agreement: 0.4821, placesOff: 43.66, starters: 50, startersOf: 84 };
-	assert.equal(figureWords(score, 'agreement'), '0.48');
-	assert.equal(figureWords(score, 'placesOff'), '43.7');
+	const score = { graded: 10, agreement: 0.5, placesOff: 43, starters: 50, startersOf: 84 };
+	assert.equal(figureWords(score, 'agreement'), '0.50');
+	assert.equal(figureWords(score, 'placesOff'), '43.0');
+	assert.equal(printPlaces(-0.49, 2), '-0.49');
+	assert.equal(printPlaces(9.5, 1), '9.5');
 	assert.equal(figureWords(score, 'starters'), '50 of 84');
 	assert.equal(figureWords(null, 'starters'), '--');
 });

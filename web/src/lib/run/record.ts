@@ -1,7 +1,7 @@
 /** The record in the words a page prints: its one big number and each week as a person says it.
  * The record page and the front door both read these, so the headline is said one way. */
 import { dayLabel, weekdayLabel } from '#lib/format/date.ts';
-import { fixed, plural } from '#lib/format/number.ts';
+import { plural } from '#lib/format/number.ts';
 import type { RecordLine, RecordWeek, RunRecord, Score } from './schema.ts';
 
 /** The record's one number and its caption. */
@@ -52,9 +52,9 @@ export function recordHeadline(record: RunRecord): RecordHeadline {
 	const agreement = overall?.ours.agreement;
 	if (overall && agreement !== null && agreement !== undefined && graded.length > 0) {
 		const adp = overall.adp.agreement;
-		const adpPart = adp === null ? '' : `. ADP ${fixed(adp, 2)} on the same players`;
+		const adpPart = adp === null ? '' : `. ADP ${printPlaces(adp, 2)} on the same players`;
 		return {
-			value: fixed(agreement, 2),
+			value: printPlaces(agreement, 2),
 			caption: `${capitalized(rankAgreement(record))}, ours over ${weekSpan(graded)} and ${plural(overall.ours.graded, 'player')}${adpPart}. ${record.scale}`,
 			graded: true
 		};
@@ -181,14 +181,21 @@ export function scoreOf(line: RecordLine | undefined, source: RecordSource): Sco
 	return line[source];
 }
 
+/** A figure the run rounded, printed as given with its places filled out (Lane 66k's ruling:
+ * formatting only, never rounded again): 0.5 at two places is "0.50", 43 at one is "43.0". */
+export function printPlaces(value: number, places: number): string {
+	const [whole = '', frac = ''] = String(value).split('.');
+	return `${whole}.${frac.padEnd(places, '0')}`;
+}
+
 /** A figure as its cell prints it: two decimals for order matched, one for places off, the starters as
  * "50 of 84", "--" when not held. Every figure is the run's. */
 export function figureWords(score: Score | null, figure: RecordFigure): string {
 	if (score === null) return RECORD_BOX.none;
 	if (figure === 'agreement')
-		return score.agreement === null ? 'Too few' : fixed(score.agreement, 2);
+		return score.agreement === null ? 'Too few' : printPlaces(score.agreement, 2);
 	if (figure === 'placesOff')
-		return score.placesOff === null ? RECORD_BOX.none : fixed(score.placesOff, 1);
+		return score.placesOff === null ? RECORD_BOX.none : printPlaces(score.placesOff, 1);
 	return score.startersOf === 0
 		? RECORD_BOX.none
 		: `${String(score.starters)} of ${String(score.startersOf)}`;

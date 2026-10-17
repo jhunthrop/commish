@@ -14,6 +14,7 @@ import (
 	"github.com/jhunthrop/commish/api/internal/draft"
 	"github.com/jhunthrop/commish/api/internal/httpx"
 	"github.com/jhunthrop/commish/api/internal/leaguesync"
+	"github.com/jhunthrop/commish/api/internal/tenth"
 )
 
 // The Rest of season and Players screens (Lane 66j): our order as a box
@@ -213,7 +214,7 @@ func (a *advisor) restOfSeasonPoints(p boards.Player) *float64 {
 	if !carriesPerGame(a.Board) || p.Points == nil {
 		return nil
 	}
-	v := roundTenth(*p.Points)
+	v := tenth.Round(*p.Points)
 	return &v
 }
 
@@ -225,7 +226,7 @@ func (a *advisor) pointsOverReplacement(p boards.Player) *float64 {
 	if !ok {
 		return nil
 	}
-	r := roundTenth(v)
+	r := tenth.Round(v)
 	return &r
 }
 
@@ -287,26 +288,13 @@ func (a *advisor) orderRow(p boards.Player, rank int, hosts map[string]string, t
 	} else {
 		hostID = p.ID
 	}
-	row := apitypes.OrderRow{Line: tenths(a.build(hostID, lp, nil).line), Rank: rank, RestOfSeasonPoints: a.restOfSeasonPoints(p),
+	row := apitypes.OrderRow{Line: a.build(hostID, lp, nil).line, Rank: rank, RestOfSeasonPoints: a.restOfSeasonPoints(p),
 		PointsOverReplacement: a.pointsOverReplacement(p)}
 	if targets != nil {
 		mark := a.rosterMark(p.ID)
 		row.Roster, row.Move = &mark, moveOf(mark, p.ID, targets)
 	}
 	return row
-}
-
-// tenths is a line with every figure the order's screens print rounded
-// once, here, to the tenth they print (the site-wide ruling of Lane 66k's
-// review): the web prints them as given.
-func tenths(line apitypes.PlayerLine) apitypes.PlayerLine {
-	for _, v := range []**float64{&line.WeekProjection, &line.ProjectionDelta, &line.SeasonAvg, &line.LastPoints} {
-		if *v != nil {
-			r := roundTenth(**v)
-			*v = &r
-		}
-	}
-	return line
 }
 
 // leagueOrder is GET /leagues/attached/{id}/order. The verb for a free
