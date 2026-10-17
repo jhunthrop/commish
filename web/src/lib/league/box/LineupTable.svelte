@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { SvelteSet } from 'svelte/reactivity';
 	import { BOX, boxNumber } from './box.ts';
+	import { askedPlayer, markAsked } from './asked.ts';
 	import BoxLine from './BoxLine.svelte';
 	import { BENCH_ANCHOR, LINEUP, type LineupBox, type LineupRow } from './lineup.ts';
 
@@ -32,6 +33,14 @@
 		}
 	});
 
+	let table = $state<HTMLTableElement | null>(null);
+
+	/** A player page's verb names him (?player=, Lane 66h): his row is marked and brought into view. */
+	onMount(() => {
+		const asked = askedPlayer(window.location.href);
+		if (asked !== null && table !== null) markAsked(table, asked);
+	});
+
 	function whyOf(entry: LineupRow): { id: string; open: boolean; toggle: () => void } | null {
 		if (entry.why === null) return null;
 		const key = entry.row.key;
@@ -46,7 +55,7 @@
 	}
 </script>
 
-<table class="lineup" aria-label={label}>
+<table class="lineup" aria-label={label} bind:this={table}>
 	<thead>
 		<tr class="cols">
 			<th class="slot" scope="col">{BOX.slot}</th>

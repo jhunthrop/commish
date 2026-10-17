@@ -25,7 +25,7 @@ import type { components } from '#lib/api/types.ts';
 import { POSITIONS } from '#lib/types/player.ts';
 import { MARKET_POSITIONS } from './market.ts';
 import { club, formatId } from './primitives.ts';
-import { seasonSchema } from './season.ts';
+import { seasonSchema, priorSeasonSchema } from './season.ts';
 
 const RUN_ID = /^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}(-[a-z0-9-]+)?$/;
 const SLUG = /^[a-z0-9]+(-[a-z0-9]+)*$/;
@@ -167,7 +167,10 @@ export const capsuleSchema = z
 	.object({
 		/** Paragraphs separated by a blank line. */
 		body: phrase,
-		pulls: z.array(pullFigureSchema)
+		pulls: z.array(pullFigureSchema),
+		/** When the writer wrote it, which the page stamps the read with; absent on a run from before
+		 * the nightly wrote it. */
+		writtenAt: isoTime.optional()
 	})
 	.superRefine((capsule, ctx) => {
 		for (const pull of capsule.pulls) {
@@ -191,6 +194,22 @@ export const playerFormatSchema = boardRowSchema.omit({
 	orderBasis: true
 });
 
+/** The week-ahead read (Lane 72): the week it is for; its text, null when his status changed since it
+ * was written (the read is withheld and the caption says when the new one is due); its caption
+ * ("Written Fri 9:00 pm Central, for week 6"); the status it was written against; the writer's call,
+ * null when withheld; when it was written and the newest stamp of the facts it was written from. */
+export const weekReadSchema = z.object({
+	week: z.number().int().min(1),
+	body: phrase.nullable(),
+	caption: phrase,
+	status: z.string().nullable(),
+	call: z.enum(['start', 'sit', 'hold', 'none']).nullable(),
+	writtenAt: isoTime,
+	factsAt: isoTime.nullable()
+});
+
+export type WeekRead = z.infer<typeof weekReadSchema>;
+
 export const playerSchema = z.object({
 	id: playerId,
 	slug,
@@ -201,8 +220,14 @@ export const playerSchema = z.object({
 	/** Keyed by format id, every format the run carries that ranks him. */
 	formats: z.record(formatId, playerFormatSchema),
 	capsule: capsuleSchema.nullable(),
+	/** The week-ahead read (Lane 72): absent on a run from before the nightly wrote it, null for a
+	 * player the writer did not write for the week ahead. */
+	weekRead: weekReadSchema.nullable().optional(),
 	/** His season so far: the season line and every week's game log, scored in one format. */
-	season: seasonSchema
+	season: seasonSchema,
+	/** His earlier seasons, newest first, in the season block's format (Lane 66h); absent on a run
+	 * from before the nightly wrote them. */
+	priorSeasons: z.array(priorSeasonSchema).optional()
 });
 
 export const adpSourceSchema = z.object({

@@ -1,0 +1,5 @@
+# Lane 66h mock: the player page as a player card
+
+The page opens like a box score. The card holds the face (a defense gets its club mark), name, club and position, and whose roster he is on in the member's Sleeper league. It shows week 6 in the Game cell's form ("vs ARI Sun 3:05 pm, 32.5 to 20, Indoors") and one verb. Puka is on another roster, so his verb is "Trade for him". The Texans are on the member's bench with the Vikings on bye, so theirs is "Start the Texans". The kicker is shown signed out, with "Add to your sheet". The tiles are Proj, Rest of season with his rank in our order, Opp rank (ARI 26th against receivers), Avg (25.9, WR2), Last and Δ Proj. Kickers and defenses show Draft order in place of rest of season. Compare adds Nico Collins as a second row in the same columns. The game log is the house box score: week 6 ahead in the accent, "Did not play" for missed weeks, a black Season total, then earlier seasons collapsed. The writer's prose follows in the reading face, with a slot beside it for this week's why.
+
+Dotted figures are stand-ins: every week 6 Proj, every rest-of-season figure, and all 2026 kicker and defense rows.

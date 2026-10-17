@@ -3,11 +3,19 @@
  * player with no line gets. */
 import { weekdayLabel } from '#lib/format/date.ts';
 import { fixed, plural } from '#lib/format/number.ts';
-import { POINTS_PER_GAME_DECIMALS, type GameLogRow, type PlayerSeason } from '#lib/run/season.ts';
+
+/** Tenths in a point, the box's printed precision. */
+const TENTHS = 10;
+import {
+	POINTS_PER_GAME_DECIMALS,
+	type GameLogRow,
+	type PlayerSeason,
+	type PriorSeason
+} from '#lib/run/season.ts';
 import type { Format } from '#lib/run/schema.ts';
 import { STAT_COLUMNS, captionFor, type StatColumn } from '#lib/run/stat-columns.ts';
 import type { Position } from '#lib/types/player.ts';
-import type { AheadRow, LogHead, LogRow, SeasonLine } from '#lib/ui/game-log.ts';
+import type { AheadRow, LogHead, LogRow, PriorRow, SeasonLine } from '#lib/ui/game-log.ts';
 
 export interface SeasonView {
 	season: number;
@@ -22,6 +30,8 @@ export interface SeasonView {
 	/** The one sentence a player with no line gets. */
 	none: string;
 	basis: string;
+	/** His earlier seasons, newest first, collapsed under the box (Lane 66h). */
+	prior: PriorRow[];
 }
 
 /** His kickoff in a week, from the run's schedule, or null on his bye. */
@@ -68,9 +78,10 @@ function splitLog(log: readonly GameLogRow[]): [GameLogRow[], GameLogRow[]] {
 }
 
 function basisWords(season: PlayerSeason, position: Position, format: Format): string {
-	const source = `Stat lines from the NFL's records, scored in ${format.label}`;
+	const source = `Stats from the NFL's records, scored in ${format.label}`;
 	if (season.games === 0) return `${source}.`;
-	const parts = [`${source}, averaged over the ${plural(season.games, 'game')} he played.`];
+	// Avg's tile names his games, so the line says only where the figures come from (review M6).
+	const parts = [`${source}.`];
 	if (position === 'QB' && season.totals.completions === null)
 		parts.push('Completions are not in our records yet.');
 	return parts.join(' ');
@@ -83,17 +94,32 @@ function noneWords(season: PlayerSeason): string {
 		: `He has no ${String(season.season)} stat line through week ${String(through)}.`;
 }
 
+/** The season's points as the box adds them: the sum of the tenths each played row prints (review
+ * M3), summed in whole tenths so no float drifts. */
+function printedTotal(log: readonly GameLogRow[]): string {
+	const tenths = log.reduce(
+		(sum, row) =>
+			row.status === 'played' && row.points !== null
+				? sum + Math.round(Number(fixed(row.points)) * TENTHS)
+				: sum,
+		0
+	);
+	return fixed(tenths / TENTHS);
+}
+
 function seasonLine(
 	season: PlayerSeason,
 	columns: readonly StatColumn[],
 	format: Format
 ): SeasonLine | null {
 	if (season.games === 0 || season.pointsPerGame === null) return null;
+	const perGame = fixed(season.pointsPerGame, POINTS_PER_GAME_DECIMALS);
 	return {
 		lead: 'Season',
-		sub: plural(season.games, 'game'),
+		sub: `${plural(season.games, 'game')}, ${perGame} a game`,
+		total: printedTotal(season.log),
 		points: {
-			value: fixed(season.pointsPerGame, POINTS_PER_GAME_DECIMALS),
+			value: perGame,
 			caption: `${format.label} points a game`
 		},
 		cells: columns.map((column) => {
@@ -103,11 +129,26 @@ function seasonLine(
 	};
 }
 
+/** An earlier season's row, worded like the season line. */
+function priorRow(prior: PriorSeason, columns: readonly StatColumn[]): PriorRow {
+	const perGame =
+		prior.pointsPerGame === null
+			? ''
+			: `, ${fixed(prior.pointsPerGame, POINTS_PER_GAME_DECIMALS)} a game`;
+	return {
+		season: prior.season,
+		sub: `${plural(prior.games, 'game')}${perGame}`,
+		total: prior.totals.points === null ? '' : fixed(prior.totals.points),
+		cells: columns.map((column) => column.value(prior.totals))
+	};
+}
+
 export function seasonView(
 	season: PlayerSeason,
 	position: Position,
 	formats: readonly Format[],
-	kickoffOf: KickoffOf
+	kickoffOf: KickoffOf,
+	prior: readonly PriorSeason[] = []
 ): SeasonView {
 	const format = formats.find((candidate) => candidate.id === season.format);
 	if (!format) throw new Error(`The season block is scored in ${season.format}, not on this run.`);
@@ -123,6 +164,7 @@ export function seasonView(
 		rows: past.map((row) => logRow(row, columns)),
 		ahead: ahead.map((row) => aheadRow(row, kickoffOf)),
 		none: noneWords(season),
-		basis: basisWords(season, position, format)
+		basis: basisWords(season, position, format),
+		prior: prior.map((p) => priorRow(p, columns))
 	};
 }

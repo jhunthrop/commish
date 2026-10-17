@@ -7,6 +7,8 @@ import { availableTierOf } from '#lib/run/held-places.ts';
 import type {
 	AdpSource,
 	Capsule,
+	Club,
+	WeekRead,
 	Designations,
 	Format,
 	IndexEntry,
@@ -19,9 +21,12 @@ import type { CaptureStamp } from '#lib/format/designation.ts';
 import { playerStatusWords, type PlayerStatusWords } from '#lib/run/status-view.ts';
 import { builtSaying, captureStamp } from '../statuses.ts';
 import { seasonView, type KickoffOf, type SeasonView } from './player-season.ts';
+import { cardBuild, restParts, restTile, type CardBuild } from './player-card.ts';
+import type { CardTile, RestParts } from '#lib/player/card.ts';
 import {
 	adp,
 	board,
+	clubs,
 	designations,
 	entryBySlug,
 	index,
@@ -63,6 +68,9 @@ export interface FormatLine {
 	adpSources: string[];
 	/** How many players this format's board ranks. */
 	boardSize: number;
+	/** The card's rest-of-season tile in this format, and the parts the week's read words it from. */
+	restTile: CardTile;
+	restParts: RestParts | null;
 }
 
 export interface PlayerPage {
@@ -99,6 +107,15 @@ export interface PlayerPage {
 	status: { status: PlayerStatus; capture: CaptureStamp; words: PlayerStatusWords } | null;
 	/** In place of his tier mates for a player on a season-long list, null otherwise. */
 	heldTier: string | null;
+	/** His club's city and nickname, "Los Angeles Rams". */
+	clubName: string;
+	/** The card's tiles and words as the build knows them (Lane 66h). */
+	card: CardBuild;
+	/** The default format's rest-of-season tile and its parts, as its line carries them. */
+	restTile: CardTile;
+	restParts: RestParts | null;
+	/** The week-ahead read (Lane 72), null until the nightly writes his. */
+	weekRead: WeekRead | null;
 }
 
 export async function playerEntries(): Promise<{ slug: string }[]> {
@@ -111,7 +128,8 @@ async function linesFor(
 	formats: readonly Format[],
 	numbers: Readonly<Record<string, PlayerFormat>>,
 	sources: readonly AdpSource[],
-	season: { year: number; underway: boolean; heldOut: boolean }
+	season: { year: number; underway: boolean; heldOut: boolean },
+	tileOf: (format: Format, numbers: PlayerFormat) => { tile: CardTile; parts: RestParts | null }
 ): Promise<FormatLine[]> {
 	const reach = await seasonReach();
 	const ranked = formats.flatMap((format) => {
@@ -126,7 +144,15 @@ async function linesFor(
 				.map((source) => `${source.drafts}, ${windowLabel(source.window)}`);
 			const boardSize = (await board(line.format.id)).rows.length;
 			const words = lineWords({ ...line, rest }, adpSources, boardSize, season);
-			return { ...line, rest, words, adpSources, boardSize };
+			return {
+				...line,
+				rest,
+				words,
+				adpSources,
+				boardSize,
+				restTile: tileOf(line.format, line.numbers).tile,
+				restParts: tileOf(line.format, line.numbers).parts
+			};
 		})
 	);
 	const { labels } = formatTable(lines);
@@ -165,6 +191,13 @@ async function mates(
 	};
 }
 
+/** His club's city and nickname. */
+function clubNameOf(list: readonly Club[], team: string): string {
+	const club = list.find((candidate) => candidate.abbr === team);
+	if (!club) throw new Error(`${team} is not among the run's clubs.`);
+	return `${club.city} ${club.nickname}`;
+}
+
 /** His club's kickoff in each week, from the run's schedule. */
 async function kickoffsOf(team: string): Promise<KickoffOf> {
 	const slate = (await schedule()).slates.find((candidate) => candidate.abbr === team);
@@ -174,20 +207,30 @@ async function kickoffsOf(team: string): Promise<KickoffOf> {
 
 export async function playerPage(slug: string): Promise<PlayerPage> {
 	const entry = await entryBySlug(slug);
-	const [loaded, run, sources, kickoffOf, underway, capture] = await Promise.all([
+	const [loaded, run, sources, kickoffOf, underway, capture, clubList] = await Promise.all([
 		player(entry.id),
 		manifest(),
 		adp(),
 		kickoffsOf(entry.team),
 		seasonUnderway(),
-		designations()
+		designations(),
+		clubs()
 	]);
 	const listed = capture?.players[entry.id];
-	const lines = await linesFor(run.formats, loaded.formats, sources.sources, {
-		year: run.season,
-		underway,
-		heldOut: listed?.seasonLong === true
-	});
+	const lines = await linesFor(
+		run.formats,
+		loaded.formats,
+		sources.sources,
+		{
+			year: run.season,
+			underway,
+			heldOut: listed?.seasonLong === true
+		},
+		(format, numbers) => ({
+			tile: restTile(format, numbers, loaded.position, run.season, listed),
+			parts: restParts(format, numbers, loaded.position, listed)
+		})
+	);
 	const [lead] = lines;
 	if (!lead) throw new Error(`${loaded.name} has a page but no format ranks him.`);
 	const status =
@@ -219,9 +262,20 @@ export async function playerPage(slug: string): Promise<PlayerPage> {
 		adpSources: lead.adpSources,
 		boardSize: lead.boardSize,
 		capsule: loaded.capsule,
-		season: seasonView(loaded.season, loaded.position, run.formats, kickoffOf),
+		season: seasonView(
+			loaded.season,
+			loaded.position,
+			run.formats,
+			kickoffOf,
+			loaded.priorSeasons ?? []
+		),
 		underway,
 		status,
-		heldTier: listed?.seasonLong === true ? HELD_TIER_WORDS : null
+		heldTier: listed?.seasonLong === true ? HELD_TIER_WORDS : null,
+		clubName: clubNameOf(clubList, loaded.team),
+		card: cardBuild(loaded.season, loaded.capsule),
+		restTile: lead.restTile,
+		restParts: lead.restParts,
+		weekRead: loaded.weekRead ?? null
 	};
 }
