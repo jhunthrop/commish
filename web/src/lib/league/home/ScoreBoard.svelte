@@ -12,15 +12,18 @@
 		week: number;
 		bugs: readonly Bug[];
 		matchupHref: string;
+		/** "Last read 3:05 pm" when the latest read failed and the board shows the last good one. */
+		stamp?: string | null;
 	}
 
-	let { week, bugs, matchupHref }: Props = $props();
+	let { week, bugs, matchupHref, stamp = null }: Props = $props();
 </script>
 
 <section class="board" aria-label="{HOME.week} {week}">
 	<div class="head">
 		<h2>{HOME.week} {week}</h2>
 		<span>{HOME.scoreboardAside}</span>
+		{#if stamp}<span class="stamp" role="status">{stamp}</span>{/if}
 	</div>
 	<ul class="bugs">
 		{#each bugs as bug (bug.key)}
@@ -71,6 +74,10 @@
 	.head span {
 		font-size: var(--t-xs);
 		color: var(--ink-3);
+	}
+
+	.head .stamp {
+		margin-left: auto;
 	}
 
 	.bugs {

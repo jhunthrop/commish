@@ -29,6 +29,7 @@
 	import { siteContext } from '#lib/context/context.svelte.ts';
 	import { sectionHref } from '#lib/ui/nav.ts';
 	import { factsReadLine } from './box/box.ts';
+	import { weekdayTime } from '#lib/format/clock.ts';
 	import { BENCH_ANCHOR } from './box/lineup.ts';
 	import RosterPanel from './RosterPanel.svelte';
 	import ScoreBoard from './home/ScoreBoard.svelte';
@@ -41,6 +42,7 @@
 		bugsOf,
 		feedRows,
 		lineupSummary,
+		movesBasis,
 		projections,
 		standingsBasis,
 		standingsRows,
@@ -75,9 +77,13 @@
 	let sync = $state<LeagueSync | null>(null);
 	let board = $state<LeagueBoard | null>(null);
 	/** The week's games and the drafter's lineup, each null where the API has none for this league
-	 * (no saved scoring, no current week) or its read failed: the page stands without it. */
+	 * (no saved scoring, no current week): the page stands without it. A failed read keeps the last
+	 * good one, with when it was read. */
 	let scoreboard = $state<Scoreboard | null>(null);
 	let advice = $state<LineupAdvice | null>(null);
+	let weekReadAt = $state<string | null>(null);
+	let weekStale = $state(false);
+	let boardLoading = $state(false);
 	let view = $state<'week' | 'settings'>('week');
 	let failure = $state<'signed-out' | 'missing' | 'unreachable' | 'host-sign-in' | null>(null);
 	/** The league's saved name and host, for the way back in a league read as a member asks for when
@@ -107,39 +113,76 @@
 		sync = answer;
 		// The read the page made is the league's rosters for every other page's marks.
 		takeHeld(id, answer);
-		// The board is the run's own file, for the roster and the basis when no game is on: read once,
-		// and again only when the league reads on another. A failed board read says so and is tried
-		// again with the next read of the league.
-		if (!playing && board?.format !== answer.board_format) {
-			void loadBoard(answer.board_format, answer.byes)
-				.then((loaded) => {
-					board = loaded;
-					boardFailed = false;
-				})
-				.catch(() => (boardFailed = true));
-		}
 		now = new Date();
 		problem = null;
 	}
 
-	/** An in-season read the page stands without: null when the API has none for this league or
-	 * the read fails, the league's own read saying what is wrong. */
-	async function optional<T>(call: () => Promise<T>): Promise<T | null> {
-		if (!playing) return null;
+	// The board is the run's own file, for the roster and the basis when no game is on: read once the
+	// league's phase is known not to be in play, whenever that is learned, and again only when the
+	// league reads on another. A failed board read says so and is tried again with the next read.
+	$effect(() => {
+		if (playing || !sync || boardLoading || board?.format === sync.board_format) return;
+		boardLoading = true;
+		void loadBoard(sync.board_format, sync.byes)
+			.then((loaded) => {
+				board = loaded;
+				boardFailed = false;
+			})
+			.catch(() => (boardFailed = true))
+			.finally(() => (boardLoading = false));
+	});
+
+	/** The statuses with which the API says this league has no such answer (no team read, no current
+	 * week, no saved scoring): the page stands without it. */
+	const HAS_NONE = new Set([404, 409, 422]);
+
+	/** One in-season read: its answer, or null where the API has none, set through keep; false when
+	 * the read failed, so the last good answer stays on the page. */
+	async function readOne<T>(
+		call: () => Promise<T>,
+		keep: (answer: T | null) => void
+	): Promise<boolean> {
+		if (!playing) {
+			keep(null);
+			return true;
+		}
 		try {
-			return await call();
-		} catch {
-			return null;
+			keep(await call());
+			return true;
+		} catch (error: unknown) {
+			if (error instanceof ApiError && HAS_NONE.has(error.status)) {
+				keep(null);
+				return true;
+			}
+			// eslint-disable-next-line no-console -- no user-facing text: the last good read stands, stamped
+			console.warn('League page: the week read', error);
+			return false;
 		}
 	}
 
+	/** The page's two views, a tab each: arrow keys move between them, as tabs do. */
+	const VIEWS = ['week', 'settings'] as const;
+
+	function arrow(event: KeyboardEvent): void {
+		if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+		event.preventDefault();
+		view = view === 'week' ? 'settings' : 'week';
+		document.getElementById(`league-tab-${view}`)?.focus();
+	}
+
 	async function readWeek(): Promise<void> {
-		const [games, lineup] = await Promise.all([
-			optional(() => inSeasonApi.scoreboard(id)),
-			optional(() => inSeasonApi.lineup(id))
+		const read = await Promise.all([
+			readOne(
+				() => inSeasonApi.scoreboard(id),
+				(answer) => (scoreboard = answer)
+			),
+			readOne(
+				() => inSeasonApi.lineup(id),
+				(answer) => (advice = answer)
+			)
 		]);
-		scoreboard = games;
-		advice = lineup;
+		weekStale = read.includes(false);
+		if (!weekStale) weekReadAt = new Date().toISOString();
 	}
 
 	async function read(): Promise<void> {
@@ -208,7 +251,8 @@
 					scoreboard
 						? teamBasis(sync.host, scoreboard.projection_read_at, scoreboard.projection_scoring)
 						: null,
-					advice ? factsReadLine(advice.slots.flatMap((s) => (s.host ? [s.host] : []))) : null
+					advice ? factsReadLine(advice.slots.flatMap((s) => (s.host ? [s.host] : []))) : null,
+					sync.moves_read ? null : movesBasis(sync.host)
 				].filter((line): line is string => line !== null)
 			: []
 	);
@@ -245,13 +289,6 @@
 			{/if}
 		{:else if league.settings_note}
 			<Footnote>{league.settings_note}</Footnote>
-		{/if}
-		{#if drafted && league.placement.unplaced > 0}
-			<Footnote>
-				{league.placement.unplaced} rostered
-				{league.placement.unplaced === 1 ? 'player is' : 'players are'} not on our board, so the waiver
-				pool cannot rule them out.
-			</Footnote>
 		{/if}
 	</footer>
 {/snippet}
@@ -321,22 +358,23 @@
 			</header>
 			<div class="navrow">
 				<LeagueTabs {id} current="league" />
-				<div class="segs" role="tablist" aria-label="League view">
-					<button
-						type="button"
-						role="tab"
-						aria-selected={view === 'week'}
-						onclick={() => (view = 'week')}
-						>{playing && sync.week > 0
-							? `${HOME.week} ${String(sync.week)}`
-							: HOME.standings}</button
-					>
-					<button
-						type="button"
-						role="tab"
-						aria-selected={view === 'settings'}
-						onclick={() => (view = 'settings')}>{HOME.settings}</button
-					>
+				<div class="segs" role="tablist" aria-label="League view" tabindex="-1" onkeydown={arrow}>
+					{#each VIEWS as v (v)}
+						<button
+							type="button"
+							role="tab"
+							id="league-tab-{v}"
+							aria-controls="league-panel"
+							aria-selected={view === v}
+							tabindex={view === v ? 0 : -1}
+							onclick={() => (view = v)}
+							>{v === 'settings'
+								? HOME.settings
+								: playing && sync.week > 0
+									? `${HOME.week} ${String(sync.week)}`
+									: HOME.standings}</button
+						>
+					{/each}
 				</div>
 			</div>
 			{#if problem}
@@ -346,51 +384,58 @@
 				<!-- The read line asks the drafter to connect: the sign-in that mends it sits under it. -->
 				<HostReconnect host={sync.host} returnTo={here} onconnected={() => void refresh()} />
 			{/if}
-			{#if view === 'settings'}
-				<LeagueSettings terms={sync.terms} host={sync.host} teams={sync.teams.length} />
-			{:else if playing}
-				{#if bugs.length > 0 && scoreboard}
-					<ScoreBoard week={scoreboard.week} {bugs} matchupHref={tabHref('matchup', id)} />
-				{/if}
-				<div class="split" class:alone={summary === null}>
-					<Standings {rows} terms={sync.terms} projected={scoreboard !== null} />
-					{#if summary && team}
-						<LineupSummary
-							team={team.name}
-							{platform}
-							{summary}
-							{lineupHref}
-							benchHref={`${lineupHref}#${BENCH_ANCHOR}`}
-							tagsOf={sheetTags}
+			<div class="panel" id="league-panel" role="tabpanel" aria-labelledby="league-tab-{view}">
+				{#if view === 'settings'}
+					<LeagueSettings terms={sync.terms} host={sync.host} teams={sync.teams.length} />
+				{:else if playing}
+					{#if bugs.length > 0 && scoreboard}
+						<ScoreBoard
+							week={scoreboard.week}
+							{bugs}
+							matchupHref={tabHref('matchup', id)}
+							stamp={weekStale && weekReadAt ? `Last read ${weekdayTime(weekReadAt)}` : null}
 						/>
 					{/if}
-				</div>
-				<MovesFeed rows={moves} none={HOME.noMoves} />
-				<div class="basis">
-					{#each weekBasis as line (line)}<p>{line}</p>{/each}
-				</div>
-				{@render footnotes(sync)}
-			{:else if board}
-				<SeasonPanel
-					{phase}
-					draftAt={listed?.draft_at ?? null}
-					team={team?.name ?? ''}
-					standing={listed?.standing ?? null}
-					mockHref={sync.settings_league_id
-						? links.mockLeague(sync.settings_league_id)
-						: sectionHref('mock')}
-					{now}
-				/>
-				<Standings {rows} terms={sync.terms} projected={false} />
-				{#if boardBasis}<p class="basis-line">{boardBasis}</p>{/if}
-				<div class="grid">
-					{#if drafted}
-						<RosterPanel roster={sync.roster} {board} tagsOf={sheetTags} host={sync.host} />
-						<MovesFeed rows={moves} none={HOME.noMoves} />
-					{/if}
-				</div>
-				{@render footnotes(sync)}
-			{/if}
+					<div class="split" class:alone={summary === null}>
+						<Standings {rows} terms={sync.terms} projected={scoreboard !== null} />
+						{#if summary && team}
+							<LineupSummary
+								team={team.name}
+								{platform}
+								{summary}
+								{lineupHref}
+								benchHref={`${lineupHref}#${BENCH_ANCHOR}`}
+								tagsOf={sheetTags}
+							/>
+						{/if}
+					</div>
+					{#if sync.moves_read}<MovesFeed rows={moves} none={HOME.noMoves} />{/if}
+					<div class="basis">
+						{#each weekBasis as line (line)}<p>{line}</p>{/each}
+					</div>
+					{@render footnotes(sync)}
+				{:else if board}
+					<SeasonPanel
+						{phase}
+						draftAt={listed?.draft_at ?? null}
+						team={team?.name ?? ''}
+						standing={listed?.standing ?? null}
+						mockHref={sync.settings_league_id
+							? links.mockLeague(sync.settings_league_id)
+							: sectionHref('mock')}
+						{now}
+					/>
+					<Standings {rows} terms={sync.terms} projected={false} />
+					{#if boardBasis}<p class="basis-line">{boardBasis}</p>{/if}
+					<div class="grid">
+						{#if drafted}
+							<RosterPanel roster={sync.roster} {board} tagsOf={sheetTags} host={sync.host} />
+							{#if sync.moves_read}<MovesFeed rows={moves} none={HOME.noMoves} />{/if}
+						{/if}
+					</div>
+					{@render footnotes(sync)}
+				{/if}
+			</div>
 		</main>
 	{:else}
 		<div class="reserve"></div>
@@ -402,6 +447,12 @@
 		display: flex;
 		align-items: center;
 		gap: var(--s-3);
+	}
+
+	.panel {
+		display: flex;
+		flex-direction: column;
+		gap: var(--s-4);
 	}
 
 	.navrow > :global(:first-child) {
@@ -457,7 +508,6 @@
 		display: flex;
 		flex-direction: column;
 		gap: 2px;
-		max-width: 110ch;
 	}
 
 	.basis p,

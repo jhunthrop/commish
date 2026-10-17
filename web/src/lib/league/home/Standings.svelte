@@ -43,7 +43,11 @@
 	<th
 		class="n {cls}"
 		scope="col"
-		aria-sort={sortBy === key ? (key === 'rank' ? 'ascending' : 'descending') : undefined}
+		aria-sort={sortBy === key
+			? key === 'rank' || key === 'pa'
+				? 'ascending'
+				: 'descending'
+			: undefined}
 	>
 		<button type="button" class:on={sortBy === key} onclick={() => (sortBy = key)}>{label}</button>
 	</th>
