@@ -1,0 +1,21 @@
+MyFantasyLeague member fixtures (Lane 67): documented shapes, not recorded exchanges.
+
+No member session for the founder's test league was on hand, so none of these
+files is a capture. Each follows MyFantasyLeague's public API documentation
+(https://api.myfantasyleague.com/2026/api_info: "Authentication", "Import
+requests", the login and myleagues entries) and the export shapes this package
+already reads from recorded public answers (api/internal/leaguesync/replay/mfl).
+
+  login-ok.xml            the login answer, <status> carrying MFL_USER_ID (documented)
+  login-refused.xml       the login refusal, <error> with its reason (documented shape, assumed words)
+  myleagues.json          TYPE=myleagues&FRANCHISE_NAMES=1 for a session (documented fields)
+  league-member.json      TYPE=league, trimmed from the recorded public shape
+  rosters-member.json     TYPE=rosters, the recorded public shape
+  live-member.json        TYPE=liveScoring for the week before the swap, the recorded public shape
+  live-member-after.json  the same after the swap
+  import-ok.xml           an import's success, <status>OK</status> (documented)
+  import-locked.xml       an import refused for a started game (assumed words: replace with the proof move's capture)
+  import-invalid.xml      an import refused for its parameters (the export refusal's recorded words)
+
+The proof move (the lane 67 report) records the real answers: replace the
+assumed files with them and keep this list true.
