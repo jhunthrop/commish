@@ -230,6 +230,11 @@ const waiverRow: WaiverRow = {
 	drop: player('11674', 'Danny Amendola'),
 	gain: 1.2,
 	starts: true,
+	week_gain: 0,
+	pickup: false,
+	beats: null,
+	drops: [],
+	clears: null,
 	sentence: 'Allen starts for you.'
 };
 
@@ -245,8 +250,24 @@ void test("a claim is the row's add and drop with the bid typed, for the week re
 		drop: null,
 		bid: null
 	});
-	assert.equal(claimsOnHost({ moves: { claim: 'available', note: null } }), true);
-	assert.equal(claimsOnHost({ moves: { claim: 'unavailable', note: null } }), false);
+	assert.equal(
+		claimsOnHost({
+			moves: { claim: 'available', note: null, takes_writes: false, writes_on: false, reason: null }
+		}),
+		true
+	);
+	assert.equal(
+		claimsOnHost({
+			moves: {
+				claim: 'unavailable',
+				note: null,
+				takes_writes: false,
+				writes_on: false,
+				reason: null
+			}
+		}),
+		false
+	);
 });
 
 void test("the bid field names its basis, and a bid outside the league's bounds says them", () => {

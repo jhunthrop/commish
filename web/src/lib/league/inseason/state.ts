@@ -4,7 +4,7 @@
  * in it. */
 import { ApiError } from '#lib/api/client.ts';
 import { HTTP_STATUS, hasStatus } from '#lib/api/status.ts';
-import type { PlayerLine, TradeRow, TradeTeam, WaiverRow } from './api.ts';
+import type { PlayerLine, TradeRow, TradeTeam } from './api.ts';
 import { LINES } from './words.ts';
 
 /** What a failed read shows: the sign-in, the API's own sentence when there is no answer yet (a 409
@@ -51,28 +51,6 @@ export function screenView(reads: {
 	if (reads.leagues === 'done' && !reads.known) return 'missing';
 	if (reads.leagues === 'done' && reads.answered) return 'ready';
 	return 'loading';
-}
-
-/** The waiver rows in their three groups: the adds that start for you this week (the panel's count),
- * those that gain your lineup but sit this week (a bye, a designation), and the rest under the rule.
- * Split on the API's starts, never on the sign of the gain. */
-export function waiverGroups(rows: readonly WaiverRow[]): {
-	starting: WaiverRow[];
-	later: WaiverRow[];
-	rest: WaiverRow[];
-} {
-	return {
-		starting: rows.filter((r) => r.starts),
-		later: rows.filter((r) => !r.starts && r.gain > 0),
-		rest: rows.filter((r) => !r.starts && r.gain <= 0)
-	};
-}
-
-/** The drop every waiver row shares, said once over them; null when any row drops another or none. */
-export function sharedDrop(rows: readonly WaiverRow[]): PlayerLine | null {
-	const first = rows[0]?.drop ?? null;
-	if (first === null) return null;
-	return rows.every((r) => r.drop?.player.host_id === first.player.host_id) ? first : null;
 }
 
 /** The trade screen's decision when none is marked: the best trade for you among those the other

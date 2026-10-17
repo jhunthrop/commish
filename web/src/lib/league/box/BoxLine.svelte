@@ -1,4 +1,5 @@
 <script lang="ts">
+	import type { Snippet } from 'svelte';
 	import { links } from '#lib/site/links.ts';
 	import ClubMark from '#lib/ui/ClubMark.svelte';
 	import Face from '#lib/ui/Face.svelte';
@@ -32,6 +33,20 @@
 		idle?: boolean;
 		/** A swap's evidence line, opened by its button: its row's id, whether it is open. */
 		why?: { id: string; open: boolean; toggle: () => void } | null;
+		/** The Waivers table (Lane 66f) has no slot and no points so far: these drop their cells. */
+		slotCell?: boolean;
+		ptsCell?: boolean;
+		/** The cells after the evidence in place of the evidence line's button (the Waivers table's
+		 * Rest of season, Beats and Add). */
+		tail?: Snippet;
+		/** More for the phone's evidence line: "Rest of season 8.4". */
+		phoneMore?: string | null;
+		/** "Clears Wed", after the kickoff in the game's first line, where the platform says it. */
+		clears?: string | null;
+		/** A row the decision names: the accent tint and edge, as a move in. */
+		marked?: boolean;
+		/** A row of the panel under another row (the Waivers drop choices): set in, quieter ground. */
+		nested?: boolean;
 	}
 
 	let {
@@ -41,7 +56,14 @@
 		evidence = false,
 		move = null,
 		why = null,
-		idle = false
+		idle = false,
+		slotCell = true,
+		ptsCell = true,
+		tail,
+		phoneMore = null,
+		clears = null,
+		marked = false,
+		nested = false
 	}: Props = $props();
 	const rank = $derived(row.evidence.oppRank);
 	/** The phone's evidence line's own words and separator, so the template adds no space. */
@@ -49,15 +71,19 @@
 	const SEPARATOR = ', ';
 	/** "Avg 15.2, Last 0.8": the phone's evidence after the opponent's rank. */
 	const seasonWords = $derived(
-		`${BOX.avg} ${boxNumber(row.evidence.avg)}, ${BOX.last} ${boxNumber(row.evidence.last)}`
+		`${BOX.avg} ${boxNumber(row.evidence.avg)}, ${BOX.last} ${boxNumber(row.evidence.last)}${phoneMore === null ? '' : `${SEPARATOR}${phoneMore}`}`
 	);
 </script>
 
 {#snippet game()}
 	{#if row.game === 'bye'}
-		<span class="bye">{BOX.bye}</span>
+		<span class="bye">{BOX.bye}</span>{#if clears}<span class="clears">{clears}</span>{/if}
 	{:else if row.game}
-		<span class="opp"><b>{row.game.where}</b> <span>{row.game.when}</span></span>
+		<span class="opp"
+			><b>{row.game.where}</b> <span>{row.game.when}</span>{#if clears}<span class="clears"
+					>{clears}</span
+				>{/if}</span
+		>
 	{/if}
 	{#if row.expected !== null || row.weather !== null}
 		<span class="facts">
@@ -80,16 +106,19 @@
 
 <tr
 	class:bench
-	class:moved-in={move === 'in'}
+	class:moved-in={move === 'in' || marked}
 	class:moved-out={move === 'out'}
 	class:open={why?.open === true}
 	class:idle
+	class:nested
 >
-	<td class="slot"
-		><span class="sl"
-			>{#if move}<MoveMark {move} />{/if}{row.slot}</span
-		></td
-	>
+	{#if slotCell}
+		<td class="slot"
+			><span class="sl"
+				>{#if move}<MoveMark {move} />{/if}{row.slot}</span
+			></td
+		>
+	{/if}
 	<td class="player">
 		<span class="pl">
 			{#if row.face.mark && row.face.src !== null}
@@ -130,7 +159,7 @@
 	</td>
 	<td class="game">{@render game()}</td>
 	<td class="n proj">{boxNumber(row.proj)}</td>
-	<td class="n pts" class:none={row.pts === null}>{boxNumber(row.pts)}</td>
+	{#if ptsCell}<td class="n pts" class:none={row.pts === null}>{boxNumber(row.pts)}</td>{/if}
 	{#if evidence}
 		<td class="n ev first"
 			>{#if rank !== null}<span class="rk {easeOf(rank, row.evidence.oppOf)}"
@@ -140,16 +169,18 @@
 		<td class="n ev">{boxNumber(row.evidence.avg)}</td>
 		<td class="n ev">{boxNumber(row.evidence.last)}</td>
 		<td class="n ev delta">{deltaWord(row.evidence.delta)}</td>
-		<td class="op"
-			>{#if why}<button
-					type="button"
-					class="why"
-					aria-expanded={why.open}
-					aria-controls={why.id}
-					aria-label="{BOX.why} {row.name}"
-					onclick={why.toggle}><Icon name="chevron" size={16} /></button
-				>{/if}</td
-		>
+		{#if tail}{@render tail()}{:else}
+			<td class="op"
+				>{#if why}<button
+						type="button"
+						class="why"
+						aria-expanded={why.open}
+						aria-controls={why.id}
+						aria-label="{BOX.why} {row.name}"
+						onclick={why.toggle}><Icon name="chevron" size={16} /></button
+					>{/if}</td
+			>
+		{/if}
 	{/if}
 </tr>
 
@@ -182,6 +213,28 @@
 
 	.moved-out td:first-child {
 		box-shadow: inset 3px 0 0 var(--line-strong);
+	}
+
+	.nested td {
+		background: var(--surface-2);
+	}
+
+	.nested td:nth-child(1) {
+		padding-left: var(--s-5);
+	}
+
+	.nested.moved-in td {
+		background: color-mix(in srgb, var(--accent) 10%, var(--surface-2));
+	}
+
+	.clears {
+		margin-left: 4px;
+		padding: 0 5px;
+		border-radius: var(--r-sm);
+		background: var(--surface-2);
+		color: var(--ink-2);
+		font-size: var(--t-xs);
+		font-weight: 600;
 	}
 
 	.idle td {
