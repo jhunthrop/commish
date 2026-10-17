@@ -121,6 +121,11 @@
 	--scoreboard-ink-2: #b9b0a7; /* labels on the board */
 	--scoreboard-num: #ff7130;
 	--scoreboard-num-ink: #170802; /* text on an orange segment of the bug */
+	/* A gain and a loss on the board, black in both themes (the trade builder's scoreboard). */
+	--scoreboard-gain-bg: #12341f;
+	--scoreboard-gain-ink: #6fdc99;
+	--scoreboard-loss-bg: #3a161c;
+	--scoreboard-loss-ink: #ff9aa9;
 
 	/* Paper: what a printed page is in either theme. Never redefined for dark, so the print
      preview reads as the page that will come out of the printer, and print media below

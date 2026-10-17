@@ -219,12 +219,20 @@
 				<TradeBug
 					yours={{
 						name: me.name,
-						figures: bugFigures(answer?.totals.yours ?? null, answer?.trade.my_gain ?? null),
+						figures: bugFigures(
+							answer?.totals.yours ?? null,
+							answer?.trade.my_gain ?? null,
+							answer?.trade.my_proj_change ?? null
+						),
 						room: room.yours
 					}}
 					theirs={{
 						name: team?.name ?? '',
-						figures: bugFigures(answer?.totals.theirs ?? null, answer?.trade.their_gain ?? null),
+						figures: bugFigures(
+							answer?.totals.theirs ?? null,
+							answer?.trade.their_gain ?? null,
+							answer?.trade.their_proj_change ?? null
+						),
 						room: room.theirs
 					}}
 				>
@@ -391,7 +399,7 @@
 		.pin-gains b {
 			font-family: var(--font-num);
 			font-size: var(--t-lg);
-			color: #6fdc99;
+			color: var(--scoreboard-gain-ink);
 		}
 
 		.pin-said {

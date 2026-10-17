@@ -31,13 +31,14 @@
 		>
 		<span class="fig"
 			><small>{TRADES.weekHead}</small><span
-				><i>{side.figures.projBefore}</i><span class="to">to</span><b>{side.figures.projAfter}</b
+				><i>{side.figures.projBefore}</i><span class="to">{TRADES.to}</span><b
+					>{side.figures.projAfter}</b
 				><em class={side.figures.projTone}>{side.figures.projChange}</em></span
 			></span
 		>
 		<span class="fig"
 			><small>{TRADES.seasonHead}</small><span
-				><i>{side.figures.seasonBefore}</i><span class="to">to</span><b
+				><i>{side.figures.seasonBefore}</i><span class="to">{TRADES.to}</span><b
 					>{side.figures.seasonAfter}</b
 				><em class={side.figures.seasonTone}>{side.figures.seasonChange}</em></span
 			></span
@@ -152,15 +153,15 @@
 		color: var(--scoreboard-ink-2);
 	}
 
-	/* The board is black in both themes, so the gain and loss washes are the dark theme's. */
+	/* The board's own gain and loss washes, the same in both themes. */
 	em.gain {
-		background: #12341f;
-		color: #6fdc99;
+		background: var(--scoreboard-gain-bg);
+		color: var(--scoreboard-gain-ink);
 	}
 
 	em.loss {
-		background: #3a161c;
-		color: #ff9aa9;
+		background: var(--scoreboard-loss-bg);
+		color: var(--scoreboard-loss-ink);
 	}
 
 	.room > span {

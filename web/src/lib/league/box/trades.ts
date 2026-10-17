@@ -60,7 +60,10 @@ export const TRADES = {
 	yourSide: 'You',
 	theirSide: 'With',
 	propose: 'Propose',
-	sortBy: 'Sort by'
+	sortBy: 'Sort by',
+	/** Between a total before the trade and after it, on the builder's scoreboard. */
+	to: 'to',
+	projForYou: 'Proj for you this week'
 } as const;
 
 /** A trade as the table lists it: its team and its row, keyed as the screen marks it. */
@@ -133,6 +136,15 @@ const COUNT_WORDS = ['No', 'One', 'Two'];
 export function worthTitle(count: number): string {
 	const n = COUNT_WORDS[count] ?? String(count);
 	return `${n} ${count === 1 ? 'trade' : 'trades'} worth proposing`;
+}
+
+/** A trade's week in one line, from the API's two changes: "+7.3 Proj for you this week, −5.6 for
+ * them"; null without a projection read (review H2). */
+export function weekLine(
+	row: Pick<TradeRow, 'my_proj_change' | 'their_proj_change'>
+): string | null {
+	if (row.my_proj_change === null || row.their_proj_change === null) return null;
+	return `${weekWord(row.my_proj_change)} ${TRADES.projForYou}, ${weekWord(row.their_proj_change)} ${TRADES.forThem}`;
 }
 
 /** A side by last names: "Skattebo and Strong". */
@@ -286,17 +298,19 @@ export interface BugFigures {
 	seasonTone: 'gain' | 'loss' | 'even';
 }
 
-export function bugFigures(totals: TradeSideTotals | null, gain: number | null): BugFigures {
+/** A side of the scoreboard from the check: its totals, its rest-of-season gain and its change in this
+ * week's Proj, both as the API sends them; the web computes no trade figure (review M1). */
+export function bugFigures(
+	totals: TradeSideTotals | null,
+	gain: number | null,
+	projChange: number | null
+): BugFigures {
 	// A strength below replacement prints with the typographic minus, as every signed figure does.
 	const word = (value: number | null | undefined): string => {
 		if (value === null || value === undefined) return BOX.none;
 		const shown = fixed(Math.abs(value), 1);
 		return value < 0 && Number(shown) !== 0 ? `${MINUS}${shown}` : shown;
 	};
-	const projChange =
-		totals?.proj_before != null && totals.proj_after != null
-			? totals.proj_after - totals.proj_before
-			: null;
 	return {
 		projBefore: word(totals?.proj_before),
 		projAfter: word(totals?.proj_after),
