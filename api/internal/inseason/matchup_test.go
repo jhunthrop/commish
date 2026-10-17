@@ -28,10 +28,20 @@ func weekProjection(f fixture) boards.WeekProjection {
 		}}
 }
 
-// pairedFixture is the fixture with team 1 playing team 2 this week.
+// pairedFixture is the fixture with team 1 playing team 2 this week, team
+// 1's kicker (h008) as a host names a kicker our board does not place: no
+// board id.
 func pairedFixture(t *testing.T) fixture {
 	t.Helper()
 	f := newFixture(t)
+	named := f.league.Player
+	f.league.Player = func(id string) apitypes.LeaguePlayer {
+		p := named(id)
+		if id == "h008" {
+			p.BoardId = nil
+		}
+		return p
+	}
 	one, _ := f.league.Snap.TeamByRoster(1)
 	two, _ := f.league.Snap.TeamByRoster(2)
 	f.league.Snap.Matchups = []leaguesync.Side{

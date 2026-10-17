@@ -68,15 +68,17 @@ type WeekProjection struct {
 }
 
 // Player is a player's points: a team defense's by his club, anyone
-// else's by his board id, and a kicker without a row by his id by his
-// club's one kicker.
+// else's by his board id, and a kicker with no board id (one our board
+// does not place) by his club's one kicker. A kicker with a board id the
+// snapshot left out has none: never a teammate's (review L1).
 func (w WeekProjection) Player(boardID, position, team string) (ProjectedPoints, bool) {
 	if position == DefensePosition {
 		p, ok := w.Defenses[ProductTeam(team)]
 		return p, ok
 	}
-	if p, ok := w.Players[boardID]; ok && boardID != "" {
-		return p, true
+	if boardID != "" {
+		p, ok := w.Players[boardID]
+		return p, ok
 	}
 	if position == ourKicker {
 		p, ok := w.Kickers[ProductTeam(team)]

@@ -74,6 +74,11 @@ func TestWeekProjectionReadsTheNewestSnapshot(t *testing.T) {
 	if _, ok := p.Player("", "K", "DAL"); ok {
 		t.Fatal("a club with two kickers names neither by club")
 	}
+	// A kicker with a board id the snapshot left out has no row: never his
+	// club's kicker's (review L1).
+	if k, ok := p.Player("9999998", "K", "HOU"); ok {
+		t.Fatalf("a kicker the snapshot left out took his club's %+v", k)
+	}
 	if d, ok := p.Player("", "DEF", "WSH"); !ok || d.Standard != 6 {
 		t.Fatalf("the Washington defense %+v %v", d, ok)
 	}
