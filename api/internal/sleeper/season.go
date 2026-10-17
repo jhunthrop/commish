@@ -3,6 +3,7 @@ package sleeper
 import (
 	"context"
 	"encoding/json"
+	"regexp"
 	"strconv"
 )
 
@@ -33,6 +34,15 @@ type Roster struct {
 	Ties     int
 	// PointsFor is the season's points so far.
 	PointsFor float64
+	// PointsAgainst is the season's points scored against the team so far.
+	PointsAgainst float64
+	// Streak is the team's run of wins or losses as the host writes it
+	// ("3W"), empty when the host states none.
+	Streak string
+	// WaiverPosition is the team's place in the waiver order, 0 when unset.
+	WaiverPosition int
+	// BudgetUsed is the waiver budget the team has spent.
+	BudgetUsed int
 }
 
 // Matchup is one team's side of a week's matchup, checked.
@@ -56,6 +66,9 @@ type Transaction struct {
 	Drops map[string]int
 	// Created is the host's milliseconds since the epoch.
 	Created int64
+	// Bid is a waiver claim's bid from the league's budget, nil for a move
+	// with none.
+	Bid *int
 }
 
 // State is the NFL's state on the host: the season and its week.
@@ -74,12 +87,19 @@ type wireRoster struct {
 	Reserve  []string `json:"reserve"`
 	Taxi     []string `json:"taxi"`
 	Settings struct {
-		Wins        int `json:"wins"`
-		Losses      int `json:"losses"`
-		Ties        int `json:"ties"`
-		Fpts        int `json:"fpts"`
-		FptsDecimal int `json:"fpts_decimal"`
+		Wins               int `json:"wins"`
+		Losses             int `json:"losses"`
+		Ties               int `json:"ties"`
+		Fpts               int `json:"fpts"`
+		FptsDecimal        int `json:"fpts_decimal"`
+		FptsAgainst        int `json:"fpts_against"`
+		FptsAgainstDecimal int `json:"fpts_against_decimal"`
+		WaiverPosition     int `json:"waiver_position"`
+		WaiverBudgetUsed   int `json:"waiver_budget_used"`
 	} `json:"settings"`
+	Metadata struct {
+		Streak string `json:"streak"`
+	} `json:"metadata"`
 }
 
 type wireMatchup struct {
@@ -98,6 +118,9 @@ type wireTransaction struct {
 	Adds      map[string]int `json:"adds"`
 	Drops     map[string]int `json:"drops"`
 	Created   int64          `json:"created"`
+	Settings  *struct {
+		WaiverBid *int `json:"waiver_bid"`
+	} `json:"settings"`
 }
 
 type wireState struct {
@@ -217,7 +240,8 @@ func validateRosters(w []wireRoster) ([]Roster, error) {
 			}
 		}
 		s := r.Settings
-		if s.Wins < 0 || s.Losses < 0 || s.Ties < 0 || s.Wins+s.Losses+s.Ties > maxWeek || s.FptsDecimal < 0 || s.FptsDecimal > 99 {
+		if s.Wins < 0 || s.Losses < 0 || s.Ties < 0 || s.Wins+s.Losses+s.Ties > maxWeek || s.FptsDecimal < 0 || s.FptsDecimal > 99 ||
+			s.FptsAgainst < 0 || s.FptsAgainstDecimal < 0 || s.FptsAgainstDecimal > 99 {
 			return nil, malformed("roster %d record", r.RosterID)
 		}
 		owners := make([]string, 0, len(r.CoOwners))
@@ -229,10 +253,34 @@ func validateRosters(w []wireRoster) ([]Roster, error) {
 		out = append(out, Roster{
 			RosterID: r.RosterID, OwnerID: validOwner(r.OwnerID), CoOwners: owners, Players: r.Players,
 			Starters: r.Starters, Reserve: r.Reserve, Taxi: r.Taxi, Wins: s.Wins, Losses: s.Losses, Ties: s.Ties,
-			PointsFor: float64(s.Fpts) + float64(s.FptsDecimal)/100,
+			PointsFor: float64(s.Fpts) + float64(s.FptsDecimal)/100, PointsAgainst: float64(s.FptsAgainst) + float64(s.FptsAgainstDecimal)/100,
+			Streak: validStreak(r.Metadata.Streak), WaiverPosition: bounded(s.WaiverPosition, maxTeams), BudgetUsed: bounded(s.WaiverBudgetUsed, MaxBudget),
 		})
 	}
 	return out, nil
+}
+
+// MaxBudget bounds a waiver budget or a bid.
+const MaxBudget = 100000
+
+// streakPattern is Sleeper's streak, a count then W or L ("3W").
+var streakPattern = regexp.MustCompile(`^[1-9][0-9]?[WL]$`)
+
+// validStreak is the streak as the host writes it, empty when it is not
+// one.
+func validStreak(s string) string {
+	if !streakPattern.MatchString(s) {
+		return ""
+	}
+	return s
+}
+
+// bounded is n when it is 0 to limit, else 0.
+func bounded(n, limit int) int {
+	if n < 0 || n > limit {
+		return 0
+	}
+	return n
 }
 
 func validOwner(id *string) string {
@@ -297,7 +345,12 @@ func validateTransactions(w []wireTransaction) ([]Transaction, error) {
 				return nil, malformed("transaction roster %d", id)
 			}
 		}
-		out = append(out, Transaction{Type: t.Type, Status: t.Status, RosterIDs: t.RosterIDs, Adds: t.Adds, Drops: t.Drops, Created: t.Created})
+		tx := Transaction{Type: t.Type, Status: t.Status, RosterIDs: t.RosterIDs, Adds: t.Adds, Drops: t.Drops, Created: t.Created}
+		if t.Settings != nil && t.Settings.WaiverBid != nil && *t.Settings.WaiverBid >= 0 && *t.Settings.WaiverBid <= MaxBudget {
+			bid := *t.Settings.WaiverBid
+			tx.Bid = &bid
+		}
+		out = append(out, tx)
 	}
 	return out, nil
 }

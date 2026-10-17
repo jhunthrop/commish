@@ -72,7 +72,7 @@ func (s *Service) view(ctx context.Context, link Link, read Read) (apitypes.Leag
 		HeldBy: held, Rostered: rosteredIDs(held), BoardFormat: format, Byes: byes(board.Raw.Players),
 		Placement: placement(snap, placed), ReadAt: snap.ReadAt, HostStaleSeconds: int(math.Round(read.Stale.Seconds())),
 		HostFailed: read.Failed, HostSignedOut: read.SignedOut,
-		Roster: []apitypes.RosterSpot{},
+		Roster: []apitypes.RosterSpot{}, Terms: terms(snap), MovesRead: movesRead(snap.Ref.Host),
 	}
 	if saved == nil {
 		out.SettingsLeagueId = nil
@@ -238,6 +238,8 @@ func standings(teams []Team) []apitypes.LeagueTeam {
 	for _, t := range sorted {
 		out = append(out, apitypes.LeagueTeam{
 			RosterId: t.RosterID, Name: t.Name, Owner: t.Owner, Wins: t.Wins, Losses: t.Losses, Ties: t.Ties, PointsFor: t.PointsFor,
+			PointsAgainst: t.PointsAgainst, Streak: orNil(t.Streak), WaiverOrder: positive(t.WaiverOrder), WaiverBudgetLeft: t.BudgetLeft,
+			Avatar: orNil(t.Avatar),
 		})
 	}
 	return out

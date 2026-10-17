@@ -1,10 +1,6 @@
 import { error } from '@sveltejs/kit';
-import {
-	HEADSHOT_MAX_WIDTH,
-	HEADSHOT_MIN_WIDTH,
-	isHeadshotLeague,
-	upstreamHeadshotUrl
-} from '#lib/ui/headshot.ts';
+import { HEADSHOT_MAX_WIDTH, HEADSHOT_MIN_WIDTH, isHeadshotLeague } from '#lib/ui/headshot.ts';
+import { upstreamHeadshotUrl } from '#lib/ui/headshot-provider.ts';
 import type { RequestHandler } from './$types';
 
 /** The one request-time route of the nightly site: a headshot at a drawn width, fetched from the

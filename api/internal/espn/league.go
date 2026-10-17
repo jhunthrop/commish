@@ -142,6 +142,8 @@ type FullLeague struct {
 	// FinalScoringPeriod is status.finalScoringPeriod, the season's last
 	// scoring period, 0 when ESPN does not say.
 	FinalScoringPeriod int
+	// PlayoffTeams is scheduleSettings.playoffTeamCount, 0 when unset.
+	PlayoffTeams int
 }
 
 // DraftState is ESPN's draftDetail: whether the league has drafted, and
@@ -184,6 +186,13 @@ type Team struct {
 	// BudgetSpent is transactionCounter.acquisitionBudgetSpent, nil when
 	// the read does not carry it.
 	BudgetSpent *int
+	// PointsAgainst is record.overall.pointsAgainst.
+	PointsAgainst float64
+	// Streak is the run of wins or losses, "W3" or "L2", empty when ESPN
+	// states none (record.overall.streakType and streakLength).
+	Streak string
+	// WaiverRank is the team's place in the waiver order, 0 when unset.
+	WaiverRank int
 }
 
 // Player is one rostered player and the slot he fills.
@@ -259,6 +268,7 @@ type wireFull struct {
 			MatchupPeriodCount  int              `json:"matchupPeriodCount"`
 			MatchupPeriodLength int              `json:"matchupPeriodLength"`
 			MatchupPeriods      map[string][]int `json:"matchupPeriods"`
+			PlayoffTeamCount    int              `json:"playoffTeamCount"`
 		} `json:"scheduleSettings"`
 		RosterSettings struct {
 			LineupSlotCounts map[string]int `json:"lineupSlotCounts"`
@@ -273,20 +283,24 @@ type wireFull struct {
 		DisplayName string `json:"displayName"`
 	} `json:"members"`
 	Teams []struct {
-		ID       int      `json:"id"`
-		Name     string   `json:"name"`
-		Location string   `json:"location"`
-		Nickname string   `json:"nickname"`
-		Owners   []string `json:"owners"`
-		Counter  *struct {
+		ID         int      `json:"id"`
+		Name       string   `json:"name"`
+		Location   string   `json:"location"`
+		Nickname   string   `json:"nickname"`
+		Owners     []string `json:"owners"`
+		WaiverRank int      `json:"waiverRank"`
+		Counter    *struct {
 			BudgetSpent *int `json:"acquisitionBudgetSpent"`
 		} `json:"transactionCounter"`
 		Record struct {
 			Overall struct {
-				Wins      int     `json:"wins"`
-				Losses    int     `json:"losses"`
-				Ties      int     `json:"ties"`
-				PointsFor float64 `json:"pointsFor"`
+				Wins          int     `json:"wins"`
+				Losses        int     `json:"losses"`
+				Ties          int     `json:"ties"`
+				PointsFor     float64 `json:"pointsFor"`
+				PointsAgainst float64 `json:"pointsAgainst"`
+				StreakLength  int     `json:"streakLength"`
+				StreakType    string  `json:"streakType"`
 			} `json:"overall"`
 		} `json:"record"`
 		Roster struct {
@@ -410,7 +424,7 @@ func checkFull(w wireFull) (FullLeague, error) {
 		ID: strconv.Itoa(w.ID), Name: scoring.Name, Season: w.SeasonID, ScoringPeriod: w.ScoringPeriodID,
 		MatchupPeriod: w.Status.CurrentMatchupPeriod, Size: w.Settings.Size, Items: scoring.Items,
 		Members: map[string]string{}, LineupSlotCount: map[int]int{}, Acquisition: acquisitionOf(w.Settings.AcquisitionSettings),
-		DraftAt: draftDate(w.Settings.DraftSettings.Date), PlayoffStartWeek: playoffStart(w),
+		DraftAt: draftDate(w.Settings.DraftSettings.Date), PlayoffStartWeek: playoffStart(w), PlayoffTeams: playoffTeams(w.Settings.ScheduleSettings.PlayoffTeamCount),
 		FinalScoringPeriod: period(w.Status.FinalScoringPeriod),
 	}
 	if d := w.DraftDetail; d != nil {
@@ -435,6 +449,11 @@ func checkFull(w wireFull) (FullLeague, error) {
 			spent := *t.Counter.BudgetSpent
 			tm.BudgetSpent = &spent
 		}
+		tm.PointsAgainst = score(t.Record.Overall.PointsAgainst)
+		tm.Streak = streak(t.Record.Overall.StreakType, t.Record.Overall.StreakLength)
+		if t.WaiverRank > 0 && t.WaiverRank <= maxTeams {
+			tm.WaiverRank = t.WaiverRank
+		}
 		l.Teams = append(l.Teams, tm)
 	}
 	for _, g := range w.Schedule {
@@ -444,6 +463,23 @@ func checkFull(w wireFull) (FullLeague, error) {
 		l.Games = append(l.Games, Game{Home: g.Home.TeamID, Away: g.Away.TeamID, HomePoints: score(g.Home.TotalPoints), Points: score(g.Away.TotalPoints)})
 	}
 	return l, nil
+}
+
+// maxStreak bounds a run of wins or losses.
+const maxStreak = 30
+
+// streak is ESPN's run as "W3" or "L2", empty for none or a tie's.
+func streak(kind string, length int) string {
+	if length < 1 || length > maxStreak {
+		return ""
+	}
+	switch kind {
+	case "WIN":
+		return "W" + strconv.Itoa(length)
+	case "LOSS":
+		return "L" + strconv.Itoa(length)
+	}
+	return ""
 }
 
 func team(id int, name, location, nickname string, owners []string, w, lo, ti int, pf float64, roster []Player) Team {

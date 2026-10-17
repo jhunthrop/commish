@@ -72,6 +72,13 @@ type Pick struct {
 	Team     string
 }
 
+// Sleeper's waiver types (settings.waiver_type).
+const (
+	WaiverRolling = 0
+	WaiverReverse = 1
+	WaiverBudget  = 2
+)
+
 // League is a league's scoring and roster, checked.
 type League struct {
 	ID              string
@@ -90,6 +97,16 @@ type League struct {
 	PlayoffWeekStart int
 	// AddsDisabled is settings.disable_adds: the league takes no adds.
 	AddsDisabled bool
+	// WaiverType is settings.waiver_type: WaiverRolling, WaiverReverse or
+	// WaiverBudget; -1 when unset.
+	WaiverType int
+	// WaiverBudget is settings.waiver_budget, each team's season budget.
+	WaiverBudget int
+	// PlayoffTeams is settings.playoff_teams, 0 when unset.
+	PlayoffTeams int
+	// PlayoffRoundType is settings.playoff_round_type: 0 a week a round, 1
+	// a two-week final, 2 two weeks a round.
+	PlayoffRoundType int
 }
 
 type wireDraft struct {
@@ -311,6 +328,19 @@ func (w wireLeague) validate(id string) (League, error) {
 	}
 	if n, ok := intSetting(w.Settings["disable_adds"]); ok {
 		l.AddsDisabled = n == 1
+	}
+	l.WaiverType = -1
+	if n, ok := intSetting(w.Settings["waiver_type"]); ok && n >= 0 && n <= 2 {
+		l.WaiverType = n
+	}
+	if n, ok := intSetting(w.Settings["waiver_budget"]); ok && n > 0 && n <= MaxBudget {
+		l.WaiverBudget = n
+	}
+	if n, ok := intSetting(w.Settings["playoff_teams"]); ok && n > 0 && n <= maxTeams {
+		l.PlayoffTeams = n
+	}
+	if n, ok := intSetting(w.Settings["playoff_round_type"]); ok && n >= 0 && n <= 2 {
+		l.PlayoffRoundType = n
 	}
 	return l, nil
 }

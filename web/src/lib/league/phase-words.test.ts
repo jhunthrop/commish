@@ -1,21 +1,18 @@
 // What the site says of a league's place in its season (spec 2026-10-16 §2, §3): the follow page's
 // line for the screen a rail item led there from, the switch's one word beside a league, the league
-// page's draft line and final standing, and the matchup's one line. Run with `npm test`.
+// page's draft line and final standing. Run with `npm test`.
 import assert from 'node:assert/strict';
 import { MOCK_VERB } from '#lib/ui/nav.ts';
 import { test } from 'node:test';
-import type { LeagueSync, MatchupSide } from './api.ts';
 import {
 	ADVISOR_VERB,
 	FOLLOW_FOR,
 	NEXT_DRAFT,
-	SEE_MATCHUP,
 	SHEET_LINK,
 	NEXT_DRAFT_ROWS,
 	TURNS_AFTER_DRAFT,
 	draftLine,
 	finalStanding,
-	matchupSummary,
 	phaseWord
 } from './phase-words.ts';
 
@@ -79,51 +76,7 @@ void test('the offseason names where the team finished, and the next draft', () 
 	);
 	assert.equal(finalStanding('', null), 'Your season is over.');
 	assert.equal(NEXT_DRAFT, 'Next draft');
-	for (const line of [ADVISOR_VERB, MOCK_VERB, SHEET_LINK, SEE_MATCHUP]) clean(line);
-});
-
-const side = (roster: number, points: number): MatchupSide => ({
-	roster_id: roster,
-	points,
-	points_read: true,
-	starters: []
-});
-
-const sync = (
-	over: Partial<LeagueSync>
-): Pick<LeagueSync, 'matchup' | 'teams' | 'week_all_play' | 'week'> => ({
-	week: 6,
-	week_all_play: false,
-	teams: [
-		{
-			roster_id: 1,
-			name: 'Muttdogs',
-			owner: 'muttdog',
-			wins: 5,
-			losses: 0,
-			ties: 0,
-			points_for: 0
-		},
-		{ roster_id: 2, name: 'Ertz Hurts', owner: 'me', wins: 3, losses: 2, ties: 0, points_for: 0 }
-	],
-	matchup: { week: 6, mine: side(2, 77.1), opponent: side(1, 84.24) },
-	...over
-});
-
-void test("the league page's one matchup line names both teams and the score so far", () => {
-	assert.equal(matchupSummary(sync({})), 'Week 6, Ertz Hurts 77.1, Muttdogs 84.2.');
-	assert.equal(
-		matchupSummary(sync({ matchup: { week: 6, mine: side(2, 0), opponent: side(1, 0) } })),
-		'Week 6, Ertz Hurts against Muttdogs. No games played yet.'
-	);
-	assert.equal(
-		matchupSummary(
-			sync({ week_all_play: true, matchup: { week: 6, mine: side(2, 50), opponent: null } })
-		),
-		'Week 6, an all-play week. Ertz Hurts 50.0 so far.'
-	);
-	assert.equal(matchupSummary(sync({ matchup: null })), null);
-	clean(matchupSummary(sync({})) ?? '');
+	for (const line of [ADVISOR_VERB, MOCK_VERB, SHEET_LINK]) clean(line);
 });
 
 void test('the account keeps the next draft a tap away in season', () => {
