@@ -80,6 +80,16 @@ func kickDefenseRules() []Rule {
 	return out
 }
 
+// KickDefenseKeys is the rules after the board's 21: a kicker's longer
+// field goals and a defense's tiers.
+func KickDefenseKeys() map[string]bool {
+	out := map[string]bool{}
+	for _, r := range kickDefenseRules() {
+		out[r.Key] = true
+	}
+	return out
+}
+
 // IsTier reports whether a rule is a points-allowed or yards-allowed tier.
 func IsTier(key string) bool {
 	for _, group := range [][]Tier{pointsAllowedTiers, yardsAllowedTiers} {

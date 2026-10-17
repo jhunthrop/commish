@@ -16,6 +16,7 @@ import (
 	"github.com/jhunthrop/commish/api/internal/entitlements"
 	"github.com/jhunthrop/commish/api/internal/httpx"
 	"github.com/jhunthrop/commish/api/internal/leagues"
+	"github.com/jhunthrop/commish/api/internal/scoring"
 )
 
 // Rate limits, per account: a page reads its league once on load and
@@ -334,8 +335,12 @@ func (s *Service) detach(w http.ResponseWriter, r *http.Request) {
 }
 
 // savedSettings is the saved league a link made, nil when it has none
-// or it was deleted from the setup page.
-func (s *Service) savedSettings(ctx context.Context, link Link) (*apitypes.LeagueSettings, error) {
+// or it was deleted from the setup page. Its kicking and defense rules are
+// the host's: a read whose rules differ rewrites them in the saved league
+// (hostKickDefense), so a league saved before the host's were kept, or
+// whose host changed them, scores its kickers and defenses as the host
+// does from its next read.
+func (s *Service) savedSettings(ctx context.Context, link Link, snap Snapshot) (*apitypes.LeagueSettings, error) {
 	if link.LeagueID == nil {
 		return nil, nil
 	}
@@ -346,7 +351,46 @@ func (s *Service) savedSettings(ctx context.Context, link Link) (*apitypes.Leagu
 	if err != nil {
 		return nil, err
 	}
-	return &l.Settings, nil
+	settings, changed := hostKickDefense(l.Settings, snap.Scoring.Rules)
+	if !changed {
+		return &settings, nil
+	}
+	if _, err := s.Saved.Replace(ctx, link.AccountID, l.Id, apitypes.LeagueInput{Name: l.Name, Settings: settings}); err != nil {
+		return nil, fmt.Errorf("leaguesync: keep the host's kicking and defense rules: %w", err)
+	}
+	return &settings, nil
+}
+
+// hostKickDefense is the saved settings with their kicking and defense
+// rules taken from the read's (the host's own, the standard only where the
+// host states none), and whether any changed. The board's rules stay as
+// saved; a read whose rules are not whole changes nothing.
+func hostKickDefense(saved apitypes.LeagueSettings, host map[string]float64) (apitypes.LeagueSettings, bool) {
+	if saved.Scoring.Custom == nil {
+		return saved, false
+	}
+	read, err := scoring.FromMap(host)
+	if err != nil {
+		return saved, false
+	}
+	kept := scoring.ToMap(*saved.Scoring.Custom)
+	hostRules := scoring.ToMap(read)
+	changed := false
+	for key := range scoring.KickDefenseKeys() {
+		if kept[key] != hostRules[key] {
+			kept[key], changed = hostRules[key], true
+		}
+	}
+	if !changed {
+		return saved, false
+	}
+	rules, err := scoring.FromMap(kept)
+	if err != nil {
+		return saved, false
+	}
+	out := saved
+	out.Scoring.Custom = &rules
+	return out, true
 }
 
 // restore undoes a detach: the league is followed again with the seat
