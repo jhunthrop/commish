@@ -16,6 +16,10 @@ import (
 // binary noise (74.69999999999999) rounds back to the tenth it is. The
 // result is read from its own decimal string, so it is the double nearest
 // that tenth. A value that is not finite passes through.
+//
+// It reads the double's shortest decimal, so a raw sum of cents with binary
+// noise (1.15000000002) rounds by its noise: round such a sum to the cent
+// first, then pass it in. A sum of tenths needs no such step.
 func Round(n float64) float64 {
 	if math.IsNaN(n) || math.IsInf(n, 0) {
 		return n
