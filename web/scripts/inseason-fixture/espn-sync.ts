@@ -2,11 +2,14 @@
 // answers it, so the ESPN screens are drawn and checked as ESPN's. ESPN gives no avatar we show and
 // no move history (moves_read false), runs its waivers in an order (each team's place, the last in
 // the standings first), and links its own settings page. Two rules stand unstated, as an ESPN league
-// leaves rules unset, so the settings show them with no figure. The teams, records and points are
+// leaves rules unset, so the settings show them with no figure, beside the recorded league's own
+// unstated rule. The teams, records and points are
 // the recorded Sleeper league's, a stand-in for an ESPN league's.
 import type { LeagueSync } from '../../src/lib/league/api.ts';
 
 const ESPN_LEAGUE = '48153503';
+/** The stand-in league's name, in its read and in the switch's list. */
+export const ESPN_STAND_IN_NAME = 'Office League (ESPN stand-in)';
 const UNSTATED = ['points_per_two_point_conversion', 'points_per_extra_point_missed'];
 
 export function espnSync(sync: LeagueSync): LeagueSync {
@@ -15,7 +18,7 @@ export function espnSync(sync: LeagueSync): LeagueSync {
 		...sync,
 		host: 'espn',
 		host_league_id: ESPN_LEAGUE,
-		name: 'Office League (ESPN stand-in)',
+		name: ESPN_STAND_IN_NAME,
 		teams: sync.teams.map((team, i) => ({
 			...team,
 			avatar: null,
@@ -28,7 +31,8 @@ export function espnSync(sync: LeagueSync): LeagueSync {
 			...sync.terms,
 			waivers: 'order',
 			waiver_budget: null,
-			scoring_unstated: UNSTATED,
+			// The recorded league's own unstated rule stays unstated, with ESPN's two beside it.
+			scoring_unstated: [...sync.terms.scoring_unstated, ...UNSTATED],
 			scoring_extra: [],
 			host_settings_url: `https://fantasy.espn.com/football/league/settings?leagueId=${ESPN_LEAGUE}`
 		}

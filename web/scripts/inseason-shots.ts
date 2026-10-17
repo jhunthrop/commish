@@ -709,7 +709,9 @@ for (const theme of THEMES) {
 /** The League page (Lane 66i): the recorded Sleeper league before kickoff, and the ESPN fixture on
  * a Sunday afternoon whose points are a stand-in (league.ts makes them up so the played states can be
  * drawn; its shots say so in their names), the week and the settings, both themes at both widths. */
+/** The basis's drawn lines at most: five at a desk, eight in a hand. */
 const MAX_BASIS_LINES = 5;
+const MAX_BASIS_LINES_PHONE = 8;
 const LEAGUE_PAGES = [
 	{
 		name: 'league-week',
@@ -727,7 +729,7 @@ const LEAGUE_PAGES = [
 		platform: 'ESPN',
 		waiver: 'Waiver',
 		moves: false,
-		rules: 40
+		rules: 39
 	}
 ] as const;
 type LeaguePage = (typeof LEAGUE_PAGES)[number];
@@ -763,6 +765,8 @@ async function leagueFaults(page: Page, lp: LeaguePage, width: number): Promise<
 			),
 			feed: document.querySelector('main table.feed') !== null,
 			nobody: (document.querySelector('main')?.textContent ?? '').includes('Nobody in your league'),
+			// The recorded league's name anywhere on the page, the switch included.
+			recordedName: document.body.textContent.includes('S.U.C.K.'),
 			bids: [...document.querySelectorAll('main table.feed td.det')].filter((td) =>
 				/^FAAB \$\d/.test(text(td))
 			).length,
@@ -802,8 +806,11 @@ async function leagueFaults(page: Page, lp: LeaguePage, width: number): Promise<
 	if (!lp.moves && seen.nobody) faults.push('says nobody moved where moves are not read');
 	if (!seen.basisText.startsWith(`Standings follow ${lp.platform}'s record, then points for.`))
 		faults.push(`basis "${seen.basisText.slice(0, 60)}"`);
-	if (width !== PHONE.width && (seen.basisLines === 0 || seen.basisLines > MAX_BASIS_LINES))
-		faults.push(`the basis draws ${String(seen.basisLines)} lines`);
+	const most = width === PHONE.width ? MAX_BASIS_LINES_PHONE : MAX_BASIS_LINES;
+	if (seen.basisLines === 0 || seen.basisLines > most)
+		faults.push(`the basis draws ${String(seen.basisLines)} lines, at most ${String(most)}`);
+	if (lp.live && seen.recordedName)
+		faults.push('the ESPN stand-in names the recorded Sleeper league');
 	return faults;
 }
 

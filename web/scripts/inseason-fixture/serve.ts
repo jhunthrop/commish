@@ -30,7 +30,7 @@ import type { components } from '../../src/lib/api/types.ts';
 import type { GameWeek } from '../../src/lib/format/game-facts.ts';
 import { FIXTURE_IDS } from './ids.ts';
 import { FIXTURE_SEASON, askedPhase, phaseAccount, phaseLeagues, phaseSync } from './phases.ts';
-import { espnSync } from './espn-sync.ts';
+import { ESPN_STAND_IN_NAME, espnSync } from './espn-sync.ts';
 
 const PORT = Number(process.env.PORT ?? 8799);
 const DATA = new URL('./data/', import.meta.url);
@@ -123,8 +123,22 @@ const contextBase = {
 	settings_league_id: null
 };
 /** The leagues as the switch lists them, one per season phase (phases.ts), drafts timed from now. */
-const leaguesNow = (): components['schemas']['ContextLeague'][] =>
-	phaseLeagues(contextBase, Date.now());
+/** The leagues as the switch lists them, one per season phase (phases.ts), drafts timed from now,
+ * then the ESPN stand-ins in season under their own name and platform, so the switch on an ESPN
+ * screen names the league it shows. */
+const leaguesNow = (): components['schemas']['ContextLeague'][] => {
+	const phased = phaseLeagues(contextBase, Date.now());
+	const inSeason = phased.find((league) => league.id === LEAGUE);
+	const espn = inSeason
+		? [...ESPN_MOVES.keys()].map((espnId) => ({
+				...inSeason,
+				id: espnId,
+				name: ESPN_STAND_IN_NAME,
+				host: 'espn' as const
+			}))
+		: [];
+	return [...phased, ...espn];
+};
 const contextLeague = leaguesNow().find((league) => league.id === LEAGUE);
 if (!contextLeague) throw new Error('The fixture has no in-season league.');
 const account: components['schemas']['Account'] = {
