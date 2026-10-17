@@ -2119,7 +2119,7 @@ type HostConnection struct {
 	// WritesOn true when the member's lineup is set on the platform from our screen (the platform takes writes, its switch is on for the account, and the connection agreed to the moves); false otherwise, and writes_reason says why
 	WritesOn bool `json:"writes_on"`
 
-	// WritesReason one line naming the platform when writes are off (LineupMoves.reason, else its note), null when on
+	// WritesReason the Account room's one line naming the platform when writes are off (it takes none, its switch is off for the account, connect again, agree to moves, or the check failed), null when on
 	WritesReason *string `json:"writes_reason"`
 }
 

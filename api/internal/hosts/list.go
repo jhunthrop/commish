@@ -85,35 +85,53 @@ func (l *List) list(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	for _, c := range list {
-		out.Connections = append(out.Connections, l.withWrites(r.Context(), account.ID, View(c)))
+		out.Connections = append(out.Connections, l.withWrites(r.Context(), account.ID, c))
 	}
 	httpx.WriteOK(w, r, http.StatusOK, out)
 }
 
 // withWrites is a connection with whether its lineup is set from our
-// screen. A failed check keeps what it knew, writes off, with a reason.
-func (l *List) withWrites(ctx context.Context, accountID uuid.UUID, v apitypes.HostConnection) apitypes.HostConnection {
+// screen, and when not, the Account room's sentence why. A failed check
+// keeps the row, writes off, with a reason.
+func (l *List) withWrites(ctx context.Context, accountID uuid.UUID, c Connection) apitypes.HostConnection {
+	v := View(c)
 	if l.Writes == nil {
 		return v
 	}
-	moves, err := l.Writes.LineupMove(ctx, accountID, string(v.Host))
+	moves, err := l.Writes.LineupMove(ctx, accountID, c.Host)
 	if err != nil {
-		l.Log.Warn("hosts: writes", "host", v.Host, "err", err)
-	}
-	v.WritesOn = err == nil && moves.Lineup == apitypes.LineupMovesLineupAvailable
-	if v.WritesOn {
+		l.Log.Warn("hosts: writes", "host", c.Host, "err", err)
+		reason := uncheckedWords
+		v.WritesReason = &reason
 		return v
 	}
-	switch {
-	case moves.Reason != nil:
-		v.WritesReason = moves.Reason
-	case moves.Note != nil:
-		v.WritesReason = moves.Note
-	default:
-		reason := uncheckedWords
+	v.WritesOn = moves.Lineup == apitypes.LineupMovesLineupAvailable
+	if !v.WritesOn {
+		reason := writesOffWords(c, moves)
 		v.WritesReason = &reason
 	}
 	return v
+}
+
+// platformNames are the platforms as the Account room names them.
+var platformNames = map[string]string{"ffpc": "FFPC", "yahoo": "Yahoo", "espn": "ESPN", "mfl": "MyFantasyLeague"}
+
+// writesOffWords is the Account room's own sentence for why a platform's
+// lineup is not set from here (Lane 66k L1): it names the platform and
+// what the member does on this page, never the Lineup screen's copy verb.
+func writesOffWords(c Connection, moves apitypes.LineupMoves) string {
+	name := platformNames[c.Host]
+	switch {
+	case !moves.TakesWrites:
+		return name + " takes no lineups from here."
+	case !moves.WritesOn:
+		return "Lineups on " + name + " are not open to your account yet."
+	case c.Status != StatusConnected:
+		return "Connect " + name + " again to set your lineup from here."
+	case c.ConsentVersion < consentVersions[c.Host]:
+		return "Connect " + name + " again and agree to moves to set your lineup from here."
+	}
+	return uncheckedWords
 }
 
 // FollowKey is a followed league's key in a host's league list: its id

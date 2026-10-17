@@ -4471,7 +4471,9 @@ components:
         writes_reason:
           type: string
           nullable: true
-          description: one line naming the platform when writes are off (LineupMoves.reason, else its note), null when on
+          description: >-
+            the Account room's one line naming the platform when writes are off (it takes none, its switch is off for
+            the account, connect again, agree to moves, or the check failed), null when on
     HostConnectInput:
       type: object
       required: [email, password, consent]
