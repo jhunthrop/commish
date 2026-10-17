@@ -8,7 +8,10 @@
 // 64), and the builder's answer names its players with them. On the Lineup and Matchup screens, box
 // scores (Lane 66d), it asserts the column heads, every row's projection and points as one decimal or
 // --, the projection's basis said once, no points a game on a row, no name cut and a defense drawn
-// with its club's mark. Exits non-zero when a page scrolls sideways, a
+// with its club's mark. On the Lineup table (Lane 66e) it asserts the evidence heads and cells,
+// each swap's chip, arrow and evidence line, the bench arrow reading Sit, the copy verb with the
+// platform's own line under it, and that no sentence on the Lineup or Matchup says "host" (the
+// member's platform is named). Exits non-zero when a page scrolls sideways, a
 // phone's first row is under the pin, or a figure or its sentence is missing.
 //
 //   node scripts/inseason-shots.ts [web origin] [out dir, from scripts/]
@@ -34,7 +37,7 @@ const id = FIXTURE_IDS.league;
 
 const PAGES = [
 	{ name: 'league', path: `/league/${id}`, ready: 'Waiver pool' },
-	{ name: 'start', path: `/league/${id}/start`, ready: 'Set it on Sleeper' },
+	{ name: 'start', path: `/league/${id}/start`, ready: 'Copy the lineup' },
 	{ name: 'matchup', path: `/league/${id}/matchup`, ready: 'Week 6' },
 	{ name: 'waivers', path: `/league/${id}/waivers`, ready: 'Claim on Sleeper' },
 	{ name: 'trades', path: `/league/${id}/trades`, ready: 'Propose on Sleeper' }
@@ -79,6 +82,25 @@ const BOX_SCREENS = new Set(['start', 'matchup']);
 const PROJ_BASIS =
 	/Proj is this week's published projection in (PPR|half-PPR|standard) scoring, (this league's own|the closest match to this league's rules), read \w{3} \d+:\d\d [ap]m \w+\./g;
 const BOX_NUMBER = /^(\d+\.\d|--)$/;
+/** The Lineup's evidence cells: an ordinal rank, a figure, a signed change, or --. */
+const EVIDENCE_CELL = /^(\d+(st|nd|rd|th)|\d+\.\d|[+−]\d+\.\d|--)$/;
+/** The Lineup's heads at the desk and on a phone, the open column's own word read by a screen reader. */
+const LINEUP_HEADS = [
+	'Slot',
+	'Player',
+	'Game',
+	'Proj',
+	'Pts',
+	'Opp rank',
+	'Avg',
+	'Last',
+	'Δ Proj',
+	'Why'
+];
+const PHONE_HEADS = ['Slot', 'Player', 'Proj', 'Pts', 'Why'];
+/** Below 900 px the evidence folds under the name. */
+const FOLDED_HEADS = ['Slot', 'Player', 'Game', 'Proj', 'Pts', 'Why'];
+const EVIDENCE_FOLDS_AT = 900;
 
 /** What a box score screen draws, for the checks: its column heads, each row's two numbers, its
  * basis, any row cell whose name is cut, and whether a row says points a game. */
@@ -97,7 +119,7 @@ async function boxFacts(page: Page): Promise<{
 	byeProj: string[];
 }> {
 	return page.evaluate(() => {
-		const box = [...document.querySelectorAll('main table.box')];
+		const box = [...document.querySelectorAll('main table.box, main table.lineup')];
 		const rows = box.flatMap((t) => [...t.querySelectorAll('tbody tr')]);
 		// Every row's name block (the line the name owns), measured for overflow: a name cut by its
 		// cell, clipped or ellipsed, scrolls wider than the block shows (review L5).
@@ -177,9 +199,11 @@ for (const { name, path, ready: text } of PAGES) {
 				inner: window.innerWidth,
 				tallest: Math.max(
 					0,
-					...[...document.querySelectorAll('main .row, main table.box tbody tr')].map(
-						(r) => r.getBoundingClientRect().height
-					)
+					...[
+						...document.querySelectorAll(
+							'main .row, main table.box tbody tr, main table.lineup tbody tr'
+						)
+					].map((r) => r.getBoundingClientRect().height)
 				)
 			}));
 			if (wide.scroll > wide.inner) {
@@ -205,10 +229,21 @@ for (const { name, path, ready: text } of PAGES) {
 			if (BOX_SCREENS.has(name)) {
 				const box = await boxFacts(page);
 				const at = `${name} ${theme} ${String(width)}`;
-				const heads =
+				const lineupHeads =
+					width <= PHONE.width
+						? PHONE_HEADS
+						: width <= EVIDENCE_FOLDS_AT
+							? FOLDED_HEADS
+							: LINEUP_HEADS;
+				const boxHeads =
 					width <= PHONE.width
 						? ['Slot', 'Player', 'Proj', 'Pts']
 						: ['Slot', 'Player', 'Game', 'Proj', 'Pts'];
+				const heads = name === 'start' ? lineupHeads : boxHeads;
+				for (const word of await hostWordsSaid(page)) missing.push(`${at} says host: ${word}`);
+				if (name === 'start') {
+					for (const fault of await lineupFaults(page)) missing.push(`${at} ${fault}`);
+				}
 				if (
 					box.heads
 						.filter((h) => h !== '')
@@ -227,7 +262,13 @@ for (const { name, path, ready: text } of PAGES) {
 					missing.push(
 						`${at} ${String(box.defenseRows - box.defenseMarks)} defense rows without a club mark`
 					);
-				if (!box.statuses.includes('Questionable') || !box.statuses.some((s) => s.endsWith(' IR')))
+				// The injured reserve spot is the Lineup's own section: the Matchup, like the API, draws the
+				// active roster alone (Lane 66e).
+				const wantsIR = name === 'start';
+				if (
+					!box.statuses.includes('Questionable') ||
+					(wantsIR && !box.statuses.some((s) => s.endsWith(' IR')))
+				)
 					missing.push(
 						`${at} the status pills: ${box.statuses.filter((s) => !/ \d+$/.test(s)).join(', ')}`
 					);
@@ -238,7 +279,7 @@ for (const { name, path, ready: text } of PAGES) {
 				await page.setViewportSize(PHONE);
 				const fold = await page.evaluate(() => {
 					const row = document
-						.querySelector('main .row, main table.box tbody tr')
+						.querySelector('main .row, main table.box tbody tr, main table.lineup tbody tr')
 						?.getBoundingClientRect();
 					const pin = document.querySelector('.pin')?.getBoundingClientRect();
 					return { rowBottom: row?.bottom ?? Infinity, pinTop: pin?.top ?? 0 };
@@ -315,9 +356,9 @@ for (const theme of THEMES) {
 			const ctx = await context(theme, width);
 			const page = await ctx.newPage();
 			await page.goto(`${web}/league/${move.id}/start`, { waitUntil: 'networkidle' });
-			await ready(page, 'Set it on ESPN');
+			await ready(page, 'Make these changes');
 			await page
-				.getByRole('button', { name: 'Set it on ESPN' })
+				.getByRole('button', { name: 'Make these changes' })
 				.filter({ visible: true })
 				.first()
 				.click();
@@ -335,6 +376,123 @@ for (const theme of THEMES) {
 			await ctx.close();
 		}
 	}
+}
+
+/** Every sentence a member reads on a screen, checked for the word "host": the member's platform is
+ * named instead (Lane 66e, founder 2026-10-17). */
+async function hostWordsSaid(page: Page): Promise<string[]> {
+	return page.evaluate(() =>
+		[...document.querySelectorAll('main p, main td, main th, main li, main button, main a')]
+			.map((el) => (el as HTMLElement).innerText)
+			.filter((text) => /\bhosts?\b/i.test(text))
+	);
+}
+
+/** What the Lineup table must hold (Lane 66e): every evidence cell printed as its column prints, a
+ * swap's chip for every row moved in, each with its arrow and its button, its evidence line opening
+ * on a tap, the bench arrow reading Sit, the evidence basis said once, and the copy verb with the
+ * platform's line under it. */
+async function lineupFaults(page: Page): Promise<string[]> {
+	const faults: string[] = [];
+	const seen = await page.evaluate(() => {
+		const table = document.querySelector('main table.lineup');
+		const rows = [...(table?.querySelectorAll('tbody tr') ?? [])];
+		const cell = (el: Element) => (el as HTMLElement).innerText.trim();
+		return {
+			evidence: rows
+				.flatMap((tr) => [...tr.querySelectorAll('td.ev')].map(cell))
+				.filter((t) => t !== ''),
+			movedIn: rows.filter((tr) => tr.classList.contains('moved-in')).length,
+			arrowsIn: rows.filter((tr) => tr.querySelector('td.slot .mark.in')).length,
+			whyButtons: rows.filter((tr) => tr.querySelector('button.why')).length,
+			outSlots: rows
+				.filter((tr) => tr.classList.contains('moved-out'))
+				.map((tr) => cell(tr.querySelector('td.slot') ?? tr)),
+			chips: document.querySelectorAll('main .swaps .swap:not(.idle)').length,
+			idleChips: [...document.querySelectorAll('main .swaps .swap.idle')].map(
+				(el) => (el as HTMLElement).innerText
+			),
+			idleRows: rows.filter((tr) => tr.classList.contains('idle')).length,
+			firstChipIdle:
+				document.querySelector('main .swaps .swap')?.classList.contains('idle') ?? false,
+			reason: [...document.querySelectorAll('main .verb .verb-line')]
+				.map((el) => (el as HTMLElement).innerText)
+				.join(' '),
+			second: document.querySelector('main .verb a.second[href^="http"]') !== null,
+			reserve: rows.some((tr) => tr.textContent.includes('Injured reserve')),
+			text: document.querySelector<HTMLElement>('main')?.innerText ?? ''
+		};
+	});
+	const visible = seen.evidence.filter((t) => t !== '');
+	if (visible.length > 0 && !visible.every((t) => EVIDENCE_CELL.test(t)))
+		faults.push(`evidence cells ${visible.join(' ')}`);
+	if (seen.movedIn === 0) faults.push('no row moved in');
+	if (seen.chips !== seen.movedIn)
+		faults.push(`${String(seen.chips)} chips for ${String(seen.movedIn)} rows moved in`);
+	if (seen.arrowsIn !== seen.movedIn) faults.push('a row moved in without its arrow');
+	if (seen.whyButtons !== seen.movedIn) faults.push('a row moved in without its evidence button');
+	if (seen.outSlots.length === 0 || seen.outSlots.some((s) => s !== 'Sit'))
+		faults.push(`the bench arrows read ${seen.outSlots.join(', ')}`);
+	if (!seen.reserve) faults.push('no injured reserve section');
+	// The fixture's TE spot has no one who can play (review N1 to N4): its chip first, its row kept.
+	if (
+		seen.idleChips.length !== 1 ||
+		!seen.idleChips.every((c) => c.endsWith('no one on your roster can play this week'))
+	)
+		faults.push(`the no one can play chips: ${seen.idleChips.join(', ')}`);
+	if (!seen.firstChipIdle) faults.push('the no one can play chip is not first');
+	if (seen.idleRows !== 1) faults.push(`${String(seen.idleRows)} rows marked no one can play`);
+	if ((seen.text.match(/Opp rank is where his opponent stands/g) ?? []).length !== 1)
+		faults.push('the evidence basis not said once');
+	if (!/Δ Proj is its change since the read before, \w{3} \d+:\d\d [ap]m \w+\./.test(seen.text))
+		faults.push('the change basis');
+	if (!seen.text.includes('We start the highest Proj at each slot'))
+		faults.push('the advice basis');
+	// The line under the copy verb is the API's reason: only that it names the platform is checked, so
+	// a change in the API's words changes nothing here (review H1).
+	if (!seen.reason.includes('Sleeper')) faults.push(`the copy verb's line: ${seen.reason}`);
+	if (!seen.second) faults.push("no link to the platform's lineup page beside the copy verb");
+	if (/\bpaste\b/i.test(seen.text)) faults.push('a paste no platform takes');
+	await page.locator('button.why').filter({ visible: true }).first().click();
+	const why = await page.locator('tr.whyline').first().innerText();
+	if (!/Proj against \S+'s \d+\.\d|is on bye\.|is listed /.test(why))
+		faults.push(`the evidence line: ${why}`);
+	await page.locator('button.why').filter({ visible: true }).first().click();
+	return faults;
+}
+
+/** The copy verb, in the dark theme at both widths: once pressed it says to set the lineup on the
+ * platform's lineup page, the page its link (review H2). */
+for (const width of SHOT_WIDTHS) {
+	const ctx = await context('dark', width);
+	await ctx.grantPermissions(['clipboard-read', 'clipboard-write']);
+	const page = await ctx.newPage();
+	await page.goto(`${web}/league/${id}/start`, { waitUntil: 'networkidle' });
+	await ready(page, 'Copy the lineup');
+	await page.locator('button.why').filter({ visible: true }).first().click();
+	await page.screenshot({ path: file(`start-why-dark-${String(width)}`) });
+	await page
+		.getByRole('button', { name: 'Copy the lineup' })
+		.filter({ visible: true })
+		.first()
+		.click();
+	await ready(page, 'Copied.');
+	const copied = await page.evaluate(() => navigator.clipboard.readText());
+	if (!copied.startsWith('Week 6 lineup\nQB '))
+		missing.push(`start copy ${String(width)}: ${copied}`);
+	const after = await page.evaluate(() => {
+		const foot = [...document.querySelectorAll('main .verb-line')].find(
+			(el) => (el as HTMLElement).offsetParent !== null
+		);
+		return {
+			text: (foot as HTMLElement | undefined)?.innerText ?? '',
+			link: foot?.querySelector('a[href^="http"]')?.textContent ?? ''
+		};
+	});
+	if (!/^Copied\. Set it on .*Sleeper.*\.$/.test(after.text) || !after.link.includes('Sleeper'))
+		missing.push(`start copied ${String(width)}: "${after.text}" link "${after.link}"`);
+	await page.screenshot({ path: file(`start-copied-dark-${String(width)}`) });
+	await ctx.close();
 }
 
 /** The claim on an ESPN league (Lane 39), in both themes at both widths: the row's Add opens the

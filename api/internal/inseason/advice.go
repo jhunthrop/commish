@@ -136,7 +136,15 @@ func (a *advisor) build(id string, lp apitypes.LeaguePlayer, side *leaguesync.Si
 	// snapshot says.
 	if facts.Opponent != "" {
 		line.WeekProjection = a.weekProjection(boardID, position, team)
+		line.ProjectionDelta = a.projectionDelta(boardID, position, team)
 	}
+	if line.WeekProjection != nil {
+		// The advice ranks by the tenth the screen prints (Lane 66e).
+		c.Proj, c.HasProj = roundTenth(*line.WeekProjection), true
+		proj := c.Proj
+		words.Proj = &proj
+	}
+	line.OppRank, line.SeasonAvg, line.LastPoints = evidence(facts)
 	if placed {
 		line.Slug = a.pages.of(bp.Name, c.Rank > 0)
 		line.RestOfSeasonPerGame = RestOfSeasonPerGame(a.Board, bp, a.gamesLeft)
@@ -161,6 +169,46 @@ func (a *advisor) weekProjection(boardID string, position draft.Position, team s
 	}
 	v := roundCents(p.For(a.preset))
 	return &v
+}
+
+// projectionDelta is his projection's change since the snapshot before,
+// to the cent, nil without a row in both.
+func (a *advisor) projectionDelta(boardID string, position draft.Position, team string) *float64 {
+	d, ok := a.projection.Delta(boardID, string(position), team, a.preset)
+	if !ok {
+		return nil
+	}
+	v := roundCents(d)
+	return &v
+}
+
+// evidence is the season's figures a Lineup row shows beside his
+// projection (Lane 66e): his opponent's rank against his position, his
+// points a game and his last game's points, each nil without it.
+func evidence(f Facts) (oppRank *int, seasonAvg, lastPoints *float64) {
+	if f.Allowed != nil && !f.Bye {
+		rank := f.Allowed.Rank
+		oppRank = &rank
+	}
+	if f.PerGame != nil {
+		avg := roundCents(*f.PerGame)
+		seasonAvg = &avg
+	}
+	if len(f.LastGames) > 0 {
+		last := roundCents(f.LastGames[0].Points)
+		lastPoints = &last
+	}
+	return oppRank, seasonAvg, lastPoints
+}
+
+// projectionPreviousReadAt is when the snapshot before the week's newest
+// was captured, nil with none.
+func (a *advisor) projectionPreviousReadAt() *time.Time {
+	if a.projection.Previous == nil || a.projection.Previous.ReadAt.IsZero() {
+		return nil
+	}
+	at := a.projection.Previous.ReadAt
+	return &at
 }
 
 // projectionReadAt is when the week's projection was captured, nil with
@@ -239,6 +287,16 @@ func wireFacts(f Facts, pointsThisWeek *float64) apitypes.WeekFacts {
 	}
 	c := conditionsOf(f.Game)
 	out.GameTotal, out.Spread, out.Roof, out.Weather = c.total, c.spread, c.roof, c.weather
+	return out
+}
+
+// reserve is the team's players in the host's injured reserve spots, in
+// the host's order: on the Lineup screen below the bench, starting nowhere.
+func (a *advisor) reserve(t leaguesync.Team, side *leaguesync.Side) []apitypes.PlayerLine {
+	out := make([]apitypes.PlayerLine, 0, len(t.Reserve))
+	for _, id := range t.Reserve {
+		out = append(out, a.build(id, a.Player(id), side).line)
+	}
 	return out
 }
 
@@ -333,7 +391,7 @@ func (a *advisor) Lineup() (apitypes.LineupAdvice, bool) {
 	// The rows end on the week's projection (Lane 66d), so the basis says
 	// nothing of points a game; the page says the projection's read itself.
 	out := apitypes.LineupAdvice{Week: h.week, Basis: LineupBasis(a.basis), BasisNote: LineupNote(a.settings, a.season.Carries), OrderBasis: h.basis, Refreshed: h.refreshed,
-		ReadAt: h.readAt, ProjectionReadAt: a.projectionReadAt(), ProjectionScoring: projectionScoring(a.settings, a.preset), PlayerPoints: givesPlayerPoints(mySide), TeamPoints: teamPoints(mySide, people), Set: true, Slots: []apitypes.LineupSlot{}, Bench: []apitypes.PlayerLine{},
+		ReadAt: h.readAt, ProjectionReadAt: a.projectionReadAt(), ProjectionPreviousReadAt: a.projectionPreviousReadAt(), ProjectionScoring: projectionScoring(a.settings, a.preset), PlayerPoints: givesPlayerPoints(mySide), TeamPoints: teamPoints(mySide, people), Set: true, Slots: []apitypes.LineupSlot{}, EmptySlots: []apitypes.LineupAdviceEmptySlots{}, Bench: []apitypes.PlayerLine{}, Reserve: a.reserve(team, mySide),
 		Moves: CopyOnlyMoves(a.Snap.Ref.Host),
 	}
 	out.HostLineupUrl, out.HostNote = a.host(LineupPage)
@@ -341,10 +399,16 @@ func (a *advisor) Lineup() (apitypes.LineupAdvice, bool) {
 	starting := map[int]bool{}
 	for _, r := range rows {
 		if r.Ours < 0 {
+			// A spot no one who can play fills, empty on the platform too:
+			// the screen still shows it (review N2).
+			if r.NoOneCanPlay {
+				out.EmptySlots = append(out.EmptySlots, apitypes.LineupAdviceEmptySlots(r.Slot.Type))
+			}
 			continue
 		}
 		starting[r.Ours] = true
-		slot := apitypes.LineupSlot{Slot: apitypes.LineupSlotSlot(r.Slot.Type), Ours: people[r.Ours].line, Changed: r.Changed}
+		slot := apitypes.LineupSlot{Slot: apitypes.LineupSlotSlot(r.Slot.Type), Ours: people[r.Ours].line, Changed: r.Changed,
+			NoOneCanPlay: r.NoOneCanPlay}
 		var host *Line
 		if r.Host >= 0 {
 			line := people[r.Host].line

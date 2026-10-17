@@ -56,3 +56,13 @@ func TestMoveWordsPassTheCopyRules(t *testing.T) {
 		t.Fatalf("%q", got)
 	}
 }
+
+// A defense's slot reads as the Lineup screen prints it (Lane 66e review L12).
+func TestSlotPlaceNamesTheDefenseAsTheScreenDoes(t *testing.T) {
+	if got := slotPlace(apitypes.HostMoveChangeSlotDEF); got != "at D/ST" {
+		t.Fatalf("%q", got)
+	}
+	if got := slotPlace(apitypes.HostMoveChangeSlotFLEX); got != "in the flex" {
+		t.Fatalf("%q", got)
+	}
+}

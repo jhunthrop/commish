@@ -114,6 +114,7 @@
 		</div>
 		<BoxBasis
 			byPlayer={mine.byPlayer}
+			host={sync.host}
 			projection={box ? { readAt: box.projection_read_at, scoring: box.projection_scoring } : null}
 			{lines}
 		/>

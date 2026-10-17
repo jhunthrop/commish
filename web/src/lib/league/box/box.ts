@@ -15,9 +15,10 @@ import {
 import type { StatusView } from '#lib/run/status-view.ts';
 import { POSITIONS, type Position } from '#lib/types/player.ts';
 import { halves, toBePlayed, PRECIPITATION_NAMED_FROM } from '#lib/format/game-facts.ts';
-import { fixed } from '#lib/format/number.ts';
+import { fixed, ordinal, signed } from '#lib/format/number.ts';
 import { clubMark } from '#lib/ui/club-mark.ts';
-import type { LeaguePlayer } from '../api.ts';
+import type { LeagueHost, LeaguePlayer } from '../api.ts';
+import { hostWords } from '../names.ts';
 import type { LineupSlot, PlayerLine, ProjectionScoring, WeekFacts } from '../inseason/api.ts';
 
 /** A slot as a box labels it: the host's own short words, a defense as "D/ST". */
@@ -43,8 +44,18 @@ export const BOX = {
 	proj: 'Proj',
 	/** Points so far this week. */
 	pts: 'Pts',
+	/** The Lineup's evidence columns (Lane 66e). */
+	oppRank: 'Opp rank',
+	avg: 'Avg',
+	last: 'Last',
+	delta: 'Δ Proj',
+	/** The phone's evidence line names the opponent's rank shortly. */
+	opp: 'Opp',
+	/** The button that opens a swap's evidence line, as a screen reader hears it. */
+	why: 'Why',
 	totals: 'Totals',
 	bench: 'Bench',
+	reserve: 'Injured reserve',
 	bye: 'Bye',
 	final: 'Final',
 	/** A number not held yet: before kickoff, or with no projection. */
@@ -112,7 +123,21 @@ export interface BoxRow {
 	proj: number | null;
 	/** His points so far, null until his game has kicked off. */
 	pts: number | null;
+	/** The season's figures the Lineup shows beside his projection (Lane 66e). */
+	evidence: RowEvidence;
 }
+
+/** A Lineup row's evidence columns: his opponent's rank against his position (of how many ranked),
+ * his points a game and his last game's, and his projection's change since the read before. */
+export interface RowEvidence {
+	oppRank: number | null;
+	oppOf: number | null;
+	avg: number | null;
+	last: number | null;
+	delta: number | null;
+}
+
+const NO_EVIDENCE: RowEvidence = { oppRank: null, oppOf: null, avg: null, last: null, delta: null };
 
 /** A box's totals row: the starters' projection and points so far summed, and how many playing
  * starters have a figure when one lacks it. */
@@ -124,14 +149,9 @@ export interface BoxTotals {
 	note: string | null;
 }
 
-/** A starter's place in a box: his row, and on a lineup's change the host's starter it sits under
- * him with the fact that tipped it. */
+/** A starter's place in a box: his row. */
 export interface BoxStarter {
 	row: BoxRow;
-	/** The host's starter a change sits, under the one it starts; undefined off a change. */
-	sits?: BoxRow | null;
-	/** The fact that tipped the change. */
-	sentence?: string | null;
 }
 
 /** The season-long lists: their word stands in his rank ("RB IR"), as on the board. */
@@ -206,8 +226,14 @@ function faceOf(player: LeaguePlayer, headshot: string | null): BoxRow['face'] {
 	return { src: headshot, mark: false, alt: '' };
 }
 
-/** A box row from the API's line for him. */
-export function boxRow(line: PlayerLine, slot: string, zone: string = memberZone()): BoxRow {
+/** A box row from the API's line for him. ranked draws his rest-of-season rank in his pill; the
+ * Lineup leaves it out, since that screen gives the rank no basis (Lane 66e). */
+export function boxRow(
+	line: PlayerLine,
+	slot: string,
+	zone: string = memberZone(),
+	ranked = true
+): BoxRow {
 	const { facts, player } = line;
 	const ahead = !facts.bye && toBePlayed({ played: facts.played, kickoff: facts.kickoff });
 	return {
@@ -220,14 +246,54 @@ export function boxRow(line: PlayerLine, slot: string, zone: string = memberZone
 		face: faceOf(player, line.headshot),
 		club: player.team,
 		position: positionWord(player.position),
-		pill: pillOf(player.position, line.position_rank),
+		pill: pillOf(player.position, ranked ? line.position_rank : null),
 		status: statusOf(facts.designation, player.injured_reserve),
 		game: gameOf(facts, zone),
 		expected: ahead ? expectedWords(facts) : null,
 		weather: ahead ? weatherCell(facts) : null,
 		proj: line.week_projection,
-		pts: facts.points_this_week
+		pts: facts.points_this_week,
+		evidence: evidenceOf(line)
 	};
+}
+
+/** A row's evidence from his line. */
+function evidenceOf(line: PlayerLine): RowEvidence {
+	return {
+		oppRank: line.opp_rank,
+		oppOf: line.facts.allowed_to_position?.of ?? null,
+		avg: line.season_avg,
+		last: line.last_points,
+		delta: line.projection_delta
+	};
+}
+
+/** How easy his opponent is at his position: the top third of points allowed is easy, the bottom
+ * third hard. The rank prints with it, so the tint is never the only channel. */
+export type Ease = 'easy' | 'hard' | 'even';
+
+const EASE_THIRDS = 3;
+
+/** How many clubs a rank is out of when the API does not say. */
+export const RANKED_CLUBS = 32;
+
+export function easeOf(rank: number, of: number | null): Ease {
+	const ranked = of ?? RANKED_CLUBS;
+	if (rank > (ranked * (EASE_THIRDS - 1)) / EASE_THIRDS) return 'easy';
+	if (rank <= ranked / EASE_THIRDS) return 'hard';
+	return 'even';
+}
+
+/** "24th", or "--" without a rank. */
+export function oppRankWord(rank: number | null): string {
+	return rank === null ? BOX.none : ordinal(rank);
+}
+
+/** A projection's change as its cell prints it: "+0.4", "−0.3", "0.0", "--" without one. */
+export function deltaWord(delta: number | null): string {
+	if (delta === null) return BOX.none;
+	const shown = Number(fixed(delta, 1));
+	return shown === 0 ? fixed(0, 1) : signed(shown, 1);
 }
 
 /** A row for a host player the box has no line for (the league read alone, without our answer):
@@ -249,7 +315,8 @@ export function hostRow(player: LeaguePlayer, slot: string, pts: number | null):
 		expected: null,
 		weather: null,
 		proj: null,
-		pts
+		pts,
+		evidence: NO_EVIDENCE
 	};
 }
 
@@ -354,10 +421,22 @@ export function factsReadLine(
 	return `The ${BOX.game} cell shows each club's expected points, his club first, then the kickoff weather, read ${weekdayTime(oldest, zone)} ${zoneWord(zone)}.`;
 }
 
-/** The Pts column's basis (review N1): a player's points as the league scores them where the host
- * gives each player's, else the team's points alone. */
-export function ptsBasis(byPlayer: boolean): string {
+/** The Pts column's basis (review N1): a player's points as the league scores them where the
+ * platform gives each player's, else the team's points alone, the platform named (Lane 66e). */
+export function ptsBasis(byPlayer: boolean, host: LeagueHost): string {
 	return byPlayer
 		? `${BOX.pts} are this week's points as your league scores them, ${BOX.none} until his game kicks off.`
-		: `${BOX.pts} are this league's team points from the host, which gives no points by player.`;
+		: `${BOX.pts} are this league's team points from ${hostWords(host)}, which gives no points by player.`;
+}
+
+/** The Lineup's evidence columns' basis, said once (Lane 66e). */
+export const EVIDENCE_BASIS = `${BOX.oppRank} is where his opponent stands in points allowed to his position this season, 1st allows the fewest. ${BOX.avg} and ${BOX.last} are his points a game this season and in his last game, in this league's scoring.`;
+
+/** The change column's basis: since the snapshot before, its read named; null with none. */
+export function deltaBasis(
+	previousReadAt: string | null,
+	zone: string = memberZone()
+): string | null {
+	if (previousReadAt === null) return null;
+	return `${BOX.delta} is its change since the read before, ${weekdayTime(previousReadAt, zone)} ${zoneWord(zone)}.`;
 }

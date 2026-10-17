@@ -18,7 +18,10 @@ type Line struct {
 	Rank int
 	// PerWeek is points over replacement a week, nil without one.
 	PerWeek *float64
-	Facts   Facts
+	// Proj is this week's projection as the screen prints it, nil
+	// without one (Lane 66e).
+	Proj  *float64
+	Facts Facts
 }
 
 func (l Line) short() string { return lastName(l.Name) }
@@ -66,6 +69,9 @@ func sentence(parts ...string) string {
 func (w *Writer) Change(ours Line, host *Line) string {
 	reason := w.forced(ours, host)
 	if reason == "" {
+		reason = projectionWords(ours, *host)
+	}
+	if reason == "" {
 		reason = w.order(ours, *host)
 	}
 	return sentence(reason, w.support(ours, host), w.questionable(ours))
@@ -97,6 +103,16 @@ func (w *Writer) forced(ours Line, host *Line) string {
 	}
 	frames := []string{"%s is %s as of %s, so %s starts.", "With %s %s as of %s, %s takes the spot."}
 	return fmt.Sprintf(w.next(frames), host.Name, statusWords(d.Status), when, ours.short())
+}
+
+// projectionWords is the change the advice rule makes (Lane 66e): the
+// higher projection the screen shows, "" when either has none or they
+// print alike (the order then decides, and says so).
+func projectionWords(ours, host Line) string {
+	if ours.Proj == nil || host.Proj == nil || *ours.Proj <= *host.Proj {
+		return ""
+	}
+	return fmt.Sprintf("%s has %.1f Proj this week against %s's %.1f.", ours.short(), *ours.Proj, host.short(), *host.Proj)
 }
 
 // statusWords is a designation as a sentence says it.

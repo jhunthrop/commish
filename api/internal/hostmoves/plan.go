@@ -22,13 +22,16 @@ func espnSlot(slot apitypes.HostMoveChangeSlot) (int, bool) {
 	return espn.SlotID(name)
 }
 
-// slotPlace is where a change goes in a sentence: "at RB", "in the flex".
+// slotPlace is where a change goes in a sentence: "at RB", "in the flex",
+// "at D/ST" (the word the Lineup screen prints for a defense's slot).
 func slotPlace(slot apitypes.HostMoveChangeSlot) string {
 	switch slot {
 	case apitypes.HostMoveChangeSlotFLEX:
 		return "in the flex"
 	case apitypes.HostMoveChangeSlotSUPERFLEX:
 		return "in the superflex"
+	case apitypes.HostMoveChangeSlotDEF:
+		return "at D/ST"
 	}
 	return "at " + string(slot)
 }

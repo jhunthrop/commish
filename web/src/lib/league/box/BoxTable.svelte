@@ -6,16 +6,14 @@
 
 	/** One team's box score (Lane 66d): its name with its avatar over the columns (slot, player, game,
 	 * this week's projection, points so far), its starters, a totals row lit like the score bug, and
-	 * its bench below in the same columns. A lineup's change shows the starter we start over the one
-	 * we sit, with the fact that tipped it. */
+	 * its bench below in the same columns (the Matchup's two boxes; the Lineup's table is
+	 * LineupTable). */
 	interface Props {
 		team: string;
 		/** The drafter's own team: its edge and avatar in the accent. */
 		mine?: boolean;
 		starters: readonly BoxStarter[];
 		bench: readonly BoxRow[];
-		/** The bench rows a change sits, by key, on the change's wash. */
-		benchSat?: ReadonlySet<string>;
 		totals: BoxTotals;
 		/** Said in place of the starters when the host shows none for this team. */
 		empty?: string | null;
@@ -34,7 +32,6 @@
 		mine = false,
 		starters,
 		bench,
-		benchSat = new Set<string>(),
 		totals,
 		empty = null,
 		aside,
@@ -71,15 +68,7 @@
 			<tr><td class="empty" colspan={COLUMNS}>{empty}</td></tr>
 		{/if}
 		{#each starters as entry (entry.row.key)}
-			<BoxLine
-				row={entry.row}
-				tags={tagsOf(entry.row.boardId)}
-				tone={entry.sits === undefined ? null : 'start'}
-			/>
-			{#if entry.sits}<BoxLine row={entry.sits} tags={tagsOf(entry.sits.boardId)} tone="sit" />{/if}
-			{#if entry.sentence}
-				<tr class="why"><td colspan={COLUMNS}>{entry.sentence}</td></tr>
-			{/if}
+			<BoxLine row={entry.row} tags={tagsOf(entry.row.boardId)} />
 		{/each}
 		<tr class="totals">
 			<td colspan="3"
@@ -94,13 +83,7 @@
 		<tbody>
 			<tr class="bhead"><th colspan={COLUMNS} scope="rowgroup">{BOX.bench}</th></tr>
 			{#each bench as row (row.key)}
-				<!-- A starter a change sits is on the change's wash here too, so the two read as one move. -->
-				<BoxLine
-					{row}
-					tags={tagsOf(row.boardId)}
-					bench
-					tone={benchSat.has(row.key) ? 'sit' : null}
-				/>
+				<BoxLine {row} tags={tagsOf(row.boardId)} bench />
 			{:else}
 				<tr><td class="empty" colspan={COLUMNS}>{noBench}</td></tr>
 			{/each}
@@ -201,15 +184,6 @@
 		border-bottom: 1px solid var(--line);
 	}
 
-	.why td {
-		padding: 0 var(--s-3) var(--s-3) 60px;
-		font-size: var(--t-sm);
-		color: var(--ink);
-		background: var(--accent-wash);
-		box-shadow: inset 4px 0 0 var(--accent);
-		border-bottom: 1px solid var(--line);
-	}
-
 	/* The totals row is the score bug's board: lit numbers on black in both themes. */
 	.totals td {
 		height: 52px;
@@ -270,10 +244,6 @@
 
 		.cols .n {
 			width: 50px;
-		}
-
-		.why td {
-			padding-left: var(--s-3);
 		}
 
 		.totals .proj,

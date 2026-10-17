@@ -32,7 +32,11 @@ type Candidate struct {
 	// valid when HasPerGame.
 	PerGame    float64
 	HasPerGame bool
-	Tier       Tier
+	// Proj is this week's projection in the league's closest scoring, the
+	// figure the Lineup screen shows, valid when HasProj (Lane 66e).
+	Proj    float64
+	HasProj bool
+	Tier    Tier
 	// Locked is a player whose game has kicked off: he cannot be moved
 	// into or out of the lineup.
 	Locked bool
@@ -97,11 +101,11 @@ func withinBetter(a, b *Candidate) bool { return within(a, b, true) }
 // then the form.
 func acrossBetter(a, b *Candidate) bool { return across(a, b, true) }
 
-// within and across are the two orders, with this week's tiers or, for
+// within and across are the two orders, with this week's keys or, for
 // the rest-of-season lineup strength, without them.
 func within(a, b *Candidate, week bool) bool {
-	if week && a.Tier != b.Tier {
-		return a.Tier < b.Tier
+	if decided, better := weekKeys(a, b, week); decided {
+		return better
 	}
 	if (a.Rank == 0) != (b.Rank == 0) {
 		return a.Rank != 0
@@ -113,8 +117,8 @@ func within(a, b *Candidate, week bool) bool {
 }
 
 func across(a, b *Candidate, week bool) bool {
-	if week && a.Tier != b.Tier {
-		return a.Tier < b.Tier
+	if decided, better := weekKeys(a, b, week); decided {
+		return better
 	}
 	if a.HasValue != b.HasValue {
 		return a.HasValue
@@ -126,6 +130,29 @@ func across(a, b *Candidate, week bool) bool {
 		return within(a, b, week)
 	}
 	return valueThenForm(a, b)
+}
+
+// weekKeys is the week's first keys, the advice rule the Lineup screen
+// states (Lane 66e): the tier (a bye, and a designation that keeps him
+// off the field, before anything else, so a Questionable player keeps his
+// number), then the projection the screen shows, a player with one ahead
+// of a player without, the higher first. decided is false when the keys
+// tie or the order is not the week's: the rest-of-season order then
+// breaks the tie, and stands in where neither has a projection.
+func weekKeys(a, b *Candidate, week bool) (decided, better bool) {
+	if !week {
+		return false, false
+	}
+	if a.Tier != b.Tier {
+		return true, a.Tier < b.Tier
+	}
+	if a.HasProj != b.HasProj {
+		return true, a.HasProj
+	}
+	if a.HasProj && a.Proj != b.Proj {
+		return true, a.Proj > b.Proj
+	}
+	return false, false
 }
 
 func valueThenForm(a, b *Candidate) bool {
@@ -312,6 +339,10 @@ type Row struct {
 	Ours    int
 	Host    int
 	Changed bool
+	// NoOneCanPlay is a spot no rostered player who can play this week
+	// fills: Ours is the member's current player there, left in place, never
+	// a recommendation (Lane 66e ruling).
+	NoOneCanPlay bool
 }
 
 // Lineup is §4.2's lineup for the week from the roster (IR and taxi
@@ -343,7 +374,9 @@ func Lineup(config []draft.SlotConfig, roster []Candidate, hostStarters []string
 		}
 	}
 	for p, c := range roster {
-		if c.Locked && !hostStarts[p] {
+		// A player who cannot play this week (a bye, out, doubtful, injured
+		// reserve, suspended) never starts (Lane 66e ruling).
+		if (c.Locked && !hostStarts[p]) || (!c.Locked && c.Tier != Available) {
 			taken[p] = true
 		}
 	}
@@ -354,8 +387,55 @@ func Lineup(config []draft.SlotConfig, roster []Candidate, hostStarters []string
 			ours[i] = p
 		}
 	}
+	idle := keepWhereNoOneCanPlay(slots, roster, open, ours, hostAt)
 	labelled := keepHostSpots(slots, roster, ours, hostAt)
-	return rows(slots, labelled, hostAt, hostStarts, roster)
+	out := rows(slots, labelled, hostAt, hostStarts, roster)
+	for i := range out {
+		// A spot still empty after the fill and the keep: no one who can play
+		// fills it and no member's starter is left for it (review N2).
+		out[i].NoOneCanPlay = out[i].Ours < 0 || idle[out[i].Ours]
+	}
+	return out
+}
+
+// keepWhereNoOneCanPlay leaves the member's current player in each open
+// spot the fill could not fill with a player who can play, when the fill
+// placed him nowhere else, and returns those players.
+//
+// A member's starter the fill placed nowhere is one who cannot play (any
+// starter who can would have taken a spot that takes him). His own spot is
+// tried first; when the fill slid another starter into it, any empty spot
+// that takes him holds him (review N1: an RB on bye, an RB in the flex,
+// nobody else eligible), and the relabel then puts each back in his own
+// spot.
+func keepWhereNoOneCanPlay(slots []Slot, roster []Candidate, open []bool, ours, hostAt []int) map[int]bool {
+	placed := map[int]bool{}
+	for _, p := range ours {
+		if p >= 0 {
+			placed[p] = true
+		}
+	}
+	idle := map[int]bool{}
+	keep := func(i, h int) {
+		ours[i], placed[h], idle[h] = h, true, true
+	}
+	for i := range ours {
+		if h := hostAt[i]; open[i] && ours[i] < 0 && h >= 0 && !placed[h] {
+			keep(i, h)
+		}
+	}
+	for i := range ours {
+		if !open[i] || ours[i] >= 0 {
+			continue
+		}
+		for _, h := range hostAt {
+			if h >= 0 && !placed[h] && slots[i].accepts(roster[h].Position) {
+				keep(i, h)
+				break
+			}
+		}
+	}
+	return idle
 }
 
 // hostSpots places the host's starters in our slots by draft.AssignSlot,

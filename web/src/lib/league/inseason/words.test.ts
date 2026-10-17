@@ -90,6 +90,10 @@ const line = (name: string, position = 'RB', rank: number | null = 14): PlayerLi
 	points_over_replacement: 0.7,
 	rest_of_season_per_game: null,
 	week_projection: null,
+	projection_delta: null,
+	opp_rank: null,
+	season_avg: null,
+	last_points: null,
 	held: false,
 	facts: facts()
 });
@@ -104,6 +108,7 @@ const slot = (
 	ours: line(ours),
 	host: host === null ? null : line(host),
 	changed,
+	no_one_can_play: false,
 	sentence: null
 });
 
