@@ -286,7 +286,43 @@ async function tapFaults(): Promise<string[]> {
 	return said;
 }
 
+/** The add verb followed through to Waivers (review 66j N2): the order's add opens Waivers with him
+ * named and his position, Waivers reads him by name, and his row is marked, never "not a free agent". */
+async function addFaults(): Promise<string[]> {
+	const said: string[] = [];
+	const ctx = await context('dark', BASIS_WIDTH, true);
+	const page = await ctx.newPage();
+	await open(page, SCREENS[0]);
+	const add = page.locator('main table.order a.verb.add').first();
+	if ((await add.count()) === 0) {
+		await ctx.close();
+		return ['rest: no add verb to follow'];
+	}
+	const href = (await add.getAttribute('href')) ?? '';
+	const asked = new URL(href, web).searchParams;
+	if (asked.get('player') === null || asked.get('position') === null)
+		said.push(`rest: the add link names no player and position: ${href}`);
+	const read = page.waitForRequest((r) => r.url().includes('/waivers'), {
+		timeout: READY_TIMEOUT_MS
+	});
+	await add.click();
+	const request = await read;
+	if (new URL(request.url()).searchParams.get('player') !== asked.get('player'))
+		said.push('waivers: the read does not name the asked player');
+	await page
+		.locator('main tr[data-asked]')
+		.first()
+		.waitFor({ timeout: READY_TIMEOUT_MS })
+		.catch(() => said.push('waivers: the asked player has no marked row'));
+	if ((await page.getByText('He is not a free agent in this league.').count()) > 0)
+		said.push('waivers: says the free player is not a free agent');
+	await page.screenshot({ path: new URL('rest-add-to-waivers-dark-1440.png', out).pathname });
+	await ctx.close();
+	return said;
+}
+
 faults.push(...(await tapFaults()));
+faults.push(...(await addFaults()));
 for (const screen of SCREENS) {
 	for (const width of WIDTHS) {
 		const ctx = await context('dark', width, screen.signedIn);
