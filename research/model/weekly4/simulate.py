@@ -171,9 +171,9 @@ def _club_draws(
     total_dropbacks = np.maximum(dropped.sum(axis=1), 1)
     passing_td = club_receiving[None, :] * db / total_dropbacks[None, :]
     z = rng.standard_normal((4, n, draws))
-    per_target = (_col(club, "target_wx_yards") + _col(club, "target_yards_over"))[:, None]
-    per_carry = (_col(club, "carry_wx_yards") + _col(club, "carry_yards_over"))[:, None]
-    per_dropback = (_col(club, "dropback_wx_pass_yards") + _col(club, "dropback_yards_over"))[:, None]
+    per_target = (_col(club, "target_wx_yards") + _col(club, "target_yoe"))[:, None]
+    per_carry = (_col(club, "carry_wx_yards") + _col(club, "carry_yoe"))[:, None]
+    per_dropback = (_col(club, "dropback_wx_pass_yards") + _col(club, "dropback_yoe"))[:, None]
     sd = d.yards_sd
     noise = (
         z[0] * sd["target"] * np.sqrt(t) / YARDS_PER_POINT

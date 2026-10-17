@@ -98,8 +98,8 @@ def test_a_row_without_history_takes_the_prior_and_a_long_history_moves_toward_i
     )
     found = apply_efficiency(rows, efficiency)
     assert found.loc[0, "target_catch_factor"] == pytest.approx((0.6 + 0.02) / 0.6)
-    assert found.loc[0, "target_yards_over"] == pytest.approx(0.0)
+    assert found.loc[0, "target_yoe"] == pytest.approx(0.0)
     assert found.loc[0, "target_td_factor"] == pytest.approx(1.0)
     assert found["target_catch_factor"].to_numpy()[1] > found["target_catch_factor"].to_numpy()[0]
-    assert 0.0 < found["target_yards_over"].to_numpy()[1] < 2.0
+    assert 0.0 < found["target_yoe"].to_numpy()[1] < 2.0
     assert 1.0 < found["target_td_factor"].to_numpy()[1] < 2.0

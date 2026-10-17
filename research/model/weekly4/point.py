@@ -151,12 +151,12 @@ def analytic_points(board: pd.DataFrame, constants: Constants, reconcile: bool =
     for name in FORMAT_NAMES:
         per_target = (
             RECEPTION_VALUE[name] * catch
-            + (col("target_wx_yards") + col("target_yards_over")) / YARDS_PER_POINT
+            + (col("target_wx_yards") + col("target_yoe")) / YARDS_PER_POINT
             + col(f"allow_target_{name}")
         )
-        per_carry = (col("carry_wx_yards") + col("carry_yards_over")) / YARDS_PER_POINT + col(f"allow_carry_{name}")
+        per_carry = (col("carry_wx_yards") + col("carry_yoe")) / YARDS_PER_POINT + col(f"allow_carry_{name}")
         per_dropback = (
-            (col("dropback_wx_pass_yards") + col("dropback_yards_over")) / PASSING_YARDS_PER_POINT
+            (col("dropback_wx_pass_yards") + col("dropback_yoe")) / PASSING_YARDS_PER_POINT
             + INTERCEPTION * col("dropback_wx_interception")
             + col(f"allow_dropback_{name}")
         )

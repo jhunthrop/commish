@@ -181,7 +181,7 @@ def apply_efficiency(rows: pd.DataFrame, efficiency: Efficiency) -> pd.DataFrame
             prior = part[f"role_prior_{kind}"].to_numpy(dtype=float)
             return normal_posterior(observed, n, prior, efficiency.cell(position, kind, "yards").k)
 
-        found[f"{kind}_yards_over"] = per_position(yards)
+        found[f"{kind}_yoe"] = per_position(yards)
         if kind in ("target", "carry"):
 
             def td(part: pd.DataFrame, position: str, kind: str = kind) -> np.ndarray:
