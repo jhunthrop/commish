@@ -352,9 +352,9 @@ func TradesBasis(b OrderBasis, weeks int) string {
 // (Lane 66j): what the order ranks by and what its two figures are.
 func OrderScreenBasis(b OrderBasis, fromWeek int) string {
 	if b != RestOfSeason || fromWeek < 1 {
-		return "Our preseason order, by points over replacement. Kickers and defenses follow in the order drafters take them."
+		return "Our preseason order, by points over replacement, kickers and defenses last."
 	}
-	return fmt.Sprintf("Our rest-of-season order from week %d. Rest of season is his total over the games his club has left "+
-		"through week %d, byes out, then his points a game. A position ranks by that total, and every position together "+
-		"by points over replacement. Kickers and defenses follow in the order drafters take them.", fromWeek, LastWeek)
+	return fmt.Sprintf("Our rest-of-season order from week %d: Rest of season is his total over the games his club has left "+
+		"through week %d, byes out, then a game. A position ranks by that total, every position together by points over "+
+		"replacement, kickers and defenses last.", fromWeek, LastWeek)
 }

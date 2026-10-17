@@ -67,9 +67,10 @@ export function rosterWords(mark: RosterMark): string {
 }
 
 /** One row's view. Its key is his board id, which every row carries (the order only ranks players
- * our board places). */
-export function orderView(row: OrderRow, zone: string = memberZone()): OrderView {
-	const box = boxRow(row.line, '', zone);
+ * our board places). In a position's view the # is his place there, so his pill names his position
+ * alone; across positions it names his place at his position too. */
+export function orderView(row: OrderRow, zone: string = memberZone(), pillRank = true): OrderView {
+	const box = boxRow(row.line, '', zone, pillRank);
 	const key = row.line.player.board_id ?? row.line.player.host_id;
 	return {
 		key,
@@ -114,32 +115,32 @@ export function moveHref(
 /** The order's evidence columns' basis, said once: the Lineup's words, in the scoring the rows are in. */
 export function evidenceBasis(league: boolean): string {
 	const scoring = league ? "in this league's scoring" : 'in PPR';
-	return `${BOX.oppRank} is where his opponent stands in points allowed to his position, 1st allows the fewest. ${BOX.avg} and ${BOX.last} are his points a game this season and in his last game, ${scoring}.`;
+	return `${BOX.oppRank} is points allowed to his position, 1st the fewest. ${BOX.avg} and ${BOX.last} are this season's points a game and his last game's, ${scoring}.`;
 }
 
 /** Whose rosters the marks are and what a row's verb opens, named once with the member's platform. */
 export function rosterBasis(host: LeagueHost, readAt: string, zone: string = memberZone()): string {
-	return `${ORDER.roster} is ${hostWords(host)}'s, read ${weekdayTime(readAt, zone)} ${zoneWord(zone)}. ${ORDER.add} opens your Waivers at his position and ${ORDER.tradeFor} your Trades with him chosen.`;
+	return `${ORDER.roster} is ${hostWords(host)}'s, read ${weekdayTime(readAt, zone)} ${zoneWord(zone)}.`;
 }
 
-/** The screen's basis, every number named once, at most five short lines: the order and its two
- * figures, the projection with the evidence, the Game cell's read, and in a league the rosters and
- * the league the points over replacement are for. */
+/** The screen's basis, every number named once, in one paragraph held to five rendered lines at a
+ * desk: the order and its two figures, the projection with the evidence, the Game cell's read and,
+ * in a league, whose the rosters are and what the league's season points leave out. */
 export function orderBasis(
 	advice: OrderAdvice,
 	league: { host: LeagueHost } | null,
 	zone: string = memberZone()
-): string[] {
+): string {
 	const lines = advice.rows.map((row) => row.line);
 	const defense = lines.some((line) => line.player.position === 'DEF');
-	const out = [
+	const said = [
 		advice.basis,
-		`${projBasis(advice.projection_read_at, advice.projection_scoring, defense, zone)} ${evidenceBasis(league !== null)}`
+		projBasis(advice.projection_read_at, advice.projection_scoring, defense, zone),
+		evidenceBasis(league !== null),
+		factsReadLine(lines, zone)
 	];
-	const facts = factsReadLine(lines, zone);
-	if (facts !== null) out.push(facts);
 	if (league !== null && advice.read_at !== null) {
-		out.push(`${rosterBasis(league.host, advice.read_at, zone)} ${advice.basis_note}`);
+		said.push(rosterBasis(league.host, advice.read_at, zone), advice.basis_note);
 	}
-	return out;
+	return said.filter((words): words is string => words !== null && words !== '').join(' ');
 }

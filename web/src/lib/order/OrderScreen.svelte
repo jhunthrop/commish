@@ -53,10 +53,12 @@
 	let pause: ReturnType<typeof setTimeout> | undefined;
 
 	const leagueId = $derived(mode === 'rest' ? (league?.id ?? null) : null);
-	const views = $derived(advice?.rows.map((row) => orderView(row)) ?? []);
+	const views = $derived(
+		advice?.rows.map((row) => orderView(row, undefined, position === null)) ?? []
+	);
 	const shown = $derived(rowsFor(views, roster));
 	const basis = $derived(
-		advice === null ? [] : orderBasis(advice, mode === 'rest' && league !== null ? league : null)
+		advice === null ? '' : orderBasis(advice, mode === 'rest' && league !== null ? league : null)
 	);
 	const more = $derived(advice !== null && advice.total > advice.rows.length && limit < MAX_ROWS);
 
@@ -194,10 +196,8 @@
 		{/if}
 	{/if}
 
-	{#if basis.length > 0}
-		<div class="basis" data-basis>
-			{#each basis as line, i (i)}<p>{line}</p>{/each}
-		</div>
+	{#if basis !== ''}
+		<div class="basis" data-basis><p>{basis}</p></div>
 	{/if}
 </div>
 
@@ -320,7 +320,7 @@
 		display: flex;
 		flex-direction: column;
 		gap: 2px;
-		max-width: 1180px;
+		max-width: none;
 	}
 
 	.basis p {
@@ -328,10 +328,6 @@
 		font-size: var(--t-sm);
 		line-height: 1.45;
 		color: var(--ink-3);
-	}
-
-	.basis p:first-child {
-		color: var(--ink-2);
 	}
 
 	.vh {

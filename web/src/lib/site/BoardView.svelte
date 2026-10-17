@@ -363,7 +363,8 @@
 		grid-template-columns: minmax(0, 1fr);
 	}
 
-	.ordered .side {
+	.ordered .side,
+	.ordered .to-side {
 		display: none;
 	}
 

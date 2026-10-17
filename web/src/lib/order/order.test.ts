@@ -138,20 +138,26 @@ void test('a verb goes to the league screen it names, with him or his position c
 	assert.equal(moveWords('trade'), 'Trade for him');
 });
 
-void test('the basis says every number once in at most four lines, the platform named', () => {
+void test('the basis says every number once in one paragraph, the platform named', () => {
 	const signedOut = orderBasis(advice([row('A')]), null, ZONE);
-	assert.equal(signedOut[0], 'Our rest-of-season order from week 7.');
-	assert.match(signedOut[1] ?? '', /^Proj is this week's published projection in PPR/);
-	assert.match(signedOut[1] ?? '', /in PPR\.$/);
-	assert.equal(signedOut.length, 2);
-	const inLeague = orderBasis(advice([row('A')], { read_at: READ }), { host: 'sleeper' }, ZONE);
-	assert.equal(inLeague.length, 3);
-	assert.match(inLeague[2] ?? '', /^Roster is Sleeper's, read /);
-	assert.ok((inLeague[2] ?? '').endsWith('and a flex.'));
+	assert.ok(signedOut.startsWith('Our rest-of-season order from week 7.'));
+	assert.match(signedOut, /Proj is this week's published projection in PPR/);
+	assert.match(signedOut, /in PPR\.$/);
+	assert.doesNotMatch(signedOut, /Roster is/);
+	const inLeague = orderBasis(
+		advice([row('A')], { read_at: READ, basis_note: 'Points so far leave out safeties.' }),
+		{ host: 'sleeper' },
+		ZONE
+	);
+	assert.match(inLeague, /Roster is Sleeper's, read /);
+	assert.ok(inLeague.endsWith('Points so far leave out safeties.'));
 	assert.match(evidenceBasis(true), /in this league's scoring\.$/);
 	assert.match(rosterBasis('espn', READ, ZONE), /^Roster is ESPN's, read /);
-	for (const said of [...inLeague, ...Object.values(ORDER)]) {
-		assert.doesNotMatch(said, /\bhost\b|—|;|\b(odds|line|spread|bet|market|buy|sell|price)\b/i);
+	for (const said of [inLeague, ...Object.values(ORDER)]) {
+		assert.doesNotMatch(
+			said,
+			/\bhost\b|\u2014|;|\b(odds|line|spread|bet|market|buy|sell|price)\b/i
+		);
 	}
 });
 

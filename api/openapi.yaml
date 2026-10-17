@@ -3713,8 +3713,8 @@ components:
         basis_note:
           type: string
           description: >-
-            the league the points over replacement are for (a 12-team PPR league for a reader with none of their own)
-            and what its points leave out
+            the rules the league scores that the season's points (Avg and Last) leave out, empty when none; the order's
+            points over replacement are for the league, or a 12-team PPR league for a reader with none of their own
         order_basis: { $ref: "#/components/schemas/OrderBasis" }
         refreshed: { type: string, format: date-time, description: when the order was made }
         from_week:

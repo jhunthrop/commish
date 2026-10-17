@@ -2889,7 +2889,7 @@ type OrderAdvice struct {
 	// Basis what the order and its two figures are, said once under the rows
 	Basis string `json:"basis"`
 
-	// BasisNote the league the points over replacement are for (a 12-team PPR league for a reader with none of their own) and what its points leave out
+	// BasisNote the rules the league scores that the season's points (Avg and Last) leave out, empty when none; the order's points over replacement are for the league, or a 12-team PPR league for a reader with none of their own
 	BasisNote string `json:"basis_note"`
 
 	// FromWeek the first week the rest-of-season order covers, null on the preseason order

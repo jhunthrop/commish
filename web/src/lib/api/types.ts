@@ -3124,7 +3124,7 @@ export interface components {
 			week: number;
 			/** @description what the order and its two figures are, said once under the rows */
 			basis: string;
-			/** @description the league the points over replacement are for (a 12-team PPR league for a reader with none of their own) and what its points leave out */
+			/** @description the rules the league scores that the season's points (Avg and Last) leave out, empty when none; the order's points over replacement are for the league, or a 12-team PPR league for a reader with none of their own */
 			basis_note: string;
 			order_basis: components['schemas']['OrderBasis'];
 			/**

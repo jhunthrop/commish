@@ -117,7 +117,8 @@ const ranked = [...lines.values()]
 const lineup = await read<components['schemas']['LineupAdvice']>('lineup');
 const out: OrderAdvice = {
 	week: WEEK,
-	basis: `Our rest-of-season order from week ${String(WEEK)}. Rest of season is his total over the games his club has left through week ${String(LAST_WEEK)}, byes out, then his points a game. A position ranks by that total, and every position together by points over replacement. Kickers and defenses follow in the order drafters take them.`,
+	basis: `Our rest-of-season order from week ${String(WEEK)}: Rest of season is his total over the games his club has left through week ${String(LAST_WEEK)}, byes out, then a game. A position ranks by that total, every position together by points over replacement, kickers and defenses last.`,
+	// The rules the season's points leave out, as the API says them (LineupNote): the Lineup's note.
 	basis_note: lineup.basis_note,
 	order_basis: 'rest_of_season',
 	refreshed: lineup.refreshed,

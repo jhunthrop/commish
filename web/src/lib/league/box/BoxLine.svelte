@@ -442,7 +442,7 @@
 			overflow: hidden;
 		}
 
-		.game > :global(*) {
+		td.game > :global(*) {
 			display: none;
 		}
 

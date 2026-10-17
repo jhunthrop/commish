@@ -221,7 +221,7 @@ func (a *advisor) Order(q orderQuery, marks bool) apitypes.OrderAdvice {
 	h := a.header()
 	out := apitypes.OrderAdvice{Week: h.week, Basis: OrderScreenBasis(a.basis, a.Board.FromWeek), OrderBasis: h.basis,
 		Refreshed: h.refreshed, ProjectionReadAt: a.projectionReadAt(), ProjectionScoring: projectionScoring(a.settings, a.preset),
-		BasisNote: BasisNote(a.settings, a.season.Carries), Rows: []apitypes.OrderRow{}}
+		BasisNote: LineupNote(a.settings, a.season.Carries), Rows: []apitypes.OrderRow{}}
 	if carriesPerGame(a.Board) {
 		from := a.Board.FromWeek
 		out.FromWeek = &from

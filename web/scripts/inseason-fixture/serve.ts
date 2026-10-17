@@ -491,8 +491,9 @@ const LEAGUE_ORDER = /^\/leagues\/attached\/([^/]+)\/order$/;
 const DEFAULT_ORDER_ROWS = 100;
 const MIN_SEARCH = 2;
 
-/** The order's view as the API answers it (order.ts): one position ranked by the lines' own
- * position ranks, or every position in order.json's order; a search's letters in the name or club;
+/** The order's view as the API answers it (order.ts): one position ranked by its total (a stand-in
+ * place: the fixture's own order of its stand-in totals, 1 to n among the players it holds), or every
+ * position in order.json's order; a search's letters in the name or club;
  * the limit. Without a league the rows carry no roster and no move, and no read. */
 function orderAt(params: URLSearchParams, league: boolean): OrderAdvice {
 	const position = params.get('position');
@@ -503,8 +504,12 @@ function orderAt(params: URLSearchParams, league: boolean): OrderAdvice {
 			? order.rows
 			: order.rows
 					.filter((row) => row.line.player.position === position)
-					.map((row) => ({ ...row, rank: row.line.position_rank ?? row.rank }))
-					.sort((a, b) => a.rank - b.rank);
+					.sort(
+						(a, b) =>
+							(b.rest_of_season_points ?? Number.NEGATIVE_INFINITY) -
+							(a.rest_of_season_points ?? Number.NEGATIVE_INFINITY)
+					)
+					.map((row, i) => ({ ...row, rank: i + 1 }));
 	const found = ranked.filter(
 		(row) =>
 			q.length < MIN_SEARCH ||

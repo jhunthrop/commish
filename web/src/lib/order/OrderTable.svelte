@@ -380,6 +380,20 @@
 		}
 	}
 
+	/* Below 900 px the roster mark moves onto his club line, as on a phone. */
+	@media (max-width: 900px) {
+		.roster,
+		.cols .roster {
+			display: none;
+		}
+
+		.ph-mark {
+			display: inline-flex;
+			min-width: 0;
+			max-width: 132px;
+		}
+	}
+
 	@media (max-width: 760px) {
 		.grp {
 			display: none;
@@ -427,13 +441,7 @@
 			font-size: var(--t-md);
 		}
 
-		/* The roster mark moves onto his club line, one line, a long team name cut (ruling 3). */
-		.ph-mark {
-			display: inline-flex;
-			min-width: 0;
-			max-width: 132px;
-		}
-
+		/* The roster mark on his club line, one line, a long team name cut (ruling 3). */
 		.ph-mark .own {
 			height: 18px;
 			padding: 0 6px;

@@ -509,13 +509,37 @@
 			grid-template-columns: auto minmax(0, 1fr);
 		}
 
+		.tiles {
+			flex-wrap: wrap;
+			row-gap: var(--s-2);
+		}
+
 		.honest {
 			grid-column: 1 / -1;
 			max-width: none;
 		}
 	}
 
-	/* On a phone one figure at a time: Week, Ours, ADP and Published. */
+	/* Below a wide screen one figure at a time: Week, Ours, ADP and Published. */
+	@media (max-width: 1180px) {
+		.figure-pick {
+			display: inline-flex;
+		}
+
+		.grp,
+		.plc,
+		.st:not(.wide),
+		.cols .st {
+			display: none;
+		}
+
+		.weeks:not(.show-agreement) .agreement,
+		.weeks:not(.show-placesOff) .placesOff,
+		.weeks:not(.show-starters) .starters {
+			display: none;
+		}
+	}
+
 	@media (max-width: 760px) {
 		.record {
 			padding: var(--s-4);
@@ -545,23 +569,6 @@
 
 		.vals span {
 			font-size: var(--t-xs);
-		}
-
-		.figure-pick {
-			display: inline-flex;
-		}
-
-		.grp,
-		.plc,
-		.st:not(.wide),
-		.cols .st {
-			display: none;
-		}
-
-		.weeks:not(.show-agreement) .agreement,
-		.weeks:not(.show-placesOff) .placesOff,
-		.weeks:not(.show-starters) .starters {
-			display: none;
 		}
 
 		td {

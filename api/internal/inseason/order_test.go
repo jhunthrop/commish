@@ -129,7 +129,7 @@ func TestOrderMarksRostersAndTheMoveARowAdmits(t *testing.T) {
 	if trades == kinds[apitypes.RosterMarkKindTeam] {
 		t.Fatal("every rostered player admits a trade: the finder is not deciding")
 	}
-	if out.ReadAt == nil || out.BasisNote == "" {
+	if out.ReadAt == nil {
 		t.Fatalf("read at %v, note %v", out.ReadAt, out.BasisNote)
 	}
 }
