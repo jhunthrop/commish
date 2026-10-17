@@ -1,28 +1,33 @@
-"""THE NIGHTLY'S WEEK READS (Lane 72): every board player's week-ahead read, written when it is due.
+"""THE WEEK READS PASS (Lane 72): every board player's week-ahead read, written when it is due.
 
-After the capsule step, on the night's facts pass (`FactsPassMemo`) and its instant:
+Two modes on one pass (`run_week_read_step`):
+- **Nightly**, after the capsule step, on the night's facts pass and its instant: every read the cadence
+  says is due (`capsules.week.cadence`: a new week, a status or projection that moved, a read that fell to
+  its facts block within its retry limits), at most `PAGES_PER_NIGHT`, board order first, under a dollar
+  budget of `NIGHTLY_BUDGET_USD`.
+- **Hourly**, after the in-season job's status capture (`research.inseason --task capture-harvest`): only
+  the reads whose status or published projection moved, under `HOURLY_BUDGET_USD` a pass and
+  `HOURLY_DAY_USD` across a Central day's passes (`player_week_read_runs`).
 
-1. **The sheets**: each board player's week (`capsules.week.collect`), his read due when the cadence says
-   (`capsules.week.cadence`: no read for his week, the last fell to its facts block, his status changed,
-   or the published projection moved by more than a point). At most `PAGES_PER_NIGHT` a night, board
-   order first.
-2. **The writing**: the season writer's pool (`GatewayClient.rolling`, its bucket and throttle waits), the
-   model checked against the gateway's list before any call (`capsule_step.checked_price`). Each read is
-   told the sentences tonight's latest reads landed and held to every sentence another page carries for
-   its week (`capsules.week.validate`), and lands in its own transaction.
-3. **The demotion** (Lane 62's rule): a sentence still on two written reads of one week keeps its first
-   carrier in board order and the others become their facts blocks, no model call made.
+The writing is the season writer's pool (`GatewayClient.rolling`, its bucket and throttle waits), the model
+checked against the gateway's list before any call (`capsule_step.checked_price`), and the run's dollar
+budget a hard stop at the gateway (`run_budget`): no read starts once its worst case would pass what is
+left, and a read the budget stopped writes nothing, so a written read is never overwritten by a facts
+block for want of budget. Each read is told the sentences tonight's latest reads landed and held to every
+sentence shape another page carries for its week, and lands in its own transaction. Then the demotion
+(`week_read_demotion`) over every read of the board week.
 
-Without AI_GATEWAY_API_KEY nothing is written, by name. The step is advisory: a page without a week read
-shows the read before it or none, so a failed step is reported and never holds the night's board back
-(`ADVISORY`, read by `nightly.run`).
+Without AI_GATEWAY_API_KEY nothing is written, by name. The step is advisory: a page shows a board week's
+read only while it stands (`nightly.build.pages.week_read_json`), so a failed step is reported and never
+holds the night's board back (`ADVISORY`, read by `nightly.run`). A rewrite that falls to its facts block
+replaces the written row, and the page then shows no week read.
 """
 
 import os
 from collections import deque
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import datetime, time
 from typing import Final
 
 import httpx
@@ -31,27 +36,49 @@ from sqlalchemy import Engine
 from research.capsules.config import CAPSULE_CONFIG, writer_settings
 from research.capsules.facts_block import FACTS_SOURCE
 from research.capsules.gateway import GatewayClient
-from research.capsules.narrative import held_sentences, sentences_verbatim
+from research.capsules.gateway_ledger import ModelPrice
+from research.capsules.narrative import sentences_verbatim
+from research.capsules.run_budget import RunBudget
 from research.capsules.store import WRITTEN_SOURCE
 from research.capsules.sweep import FactsPassMemo
-from research.capsules.week.cadence import due_reason
+from research.capsules.week.cadence import attempts_today, central_day, due_reason
 from research.capsules.week.collect import collect_week_sheets, read_week_facts
-from research.capsules.week.sheet import WeekSheet, render_week_facts_block
-from research.capsules.week.store import StoredWeekRead, stored_week_reads, upsert_week_read
-from research.capsules.week.write import WeekReadResult, write_week_read
-from research.nightly.capsule_demotion import Target, demotion_targets
-from research.nightly.capsule_gate import SharedSentence
+from research.capsules.week.sheet import CENTRAL, WeekSheet
+from research.capsules.week.store import (
+    StoredWeekRead,
+    WeekReadRun,
+    hourly_spend_since,
+    record_run,
+    stored_week_reads,
+    upsert_week_read,
+)
+from research.capsules.week.write import MAX_CALLS_PER_READ, MAX_TOKENS, WeekReadResult, write_week_read
 from research.nightly.capsule_step import checked_price
 from research.nightly.steps import StepRecord
+from research.nightly.week_read_demotion import demote_shared, read_shapes
 from research.season import PRODUCT_SEASON
 
 STEP: Final = "week-reads"
 # The nightly's steps whose failure is reported and never fails the run.
 ADVISORY: Final = frozenset({STEP})
-# A night's reads: the whole board (about 536 pages) with room, the hard ceiling on a night's spend
-# at `write.MAX_CALLS_PER_READ` calls each.
+NIGHTLY: Final = "nightly"
+HOURLY: Final = "hourly"
+# A night's reads: the whole board (about 536 pages) with room.
 PAGES_PER_NIGHT: Final = 700
-DEMOTED: Final = "demoted"
+# THE DOLLARS (the coordinator's M3), from the fix-round recorded run (11 calls, 3 reads): a read averaged
+# $0.0018, the dearest call $0.00057, so a read's worst case (4 calls) is $0.0023 and a full week turnover
+# of 536 reads $0.95 on average and $1.23 at worst: the night holds $1.25. An hourly pass writes only the
+# reads a status or a projection moved, about two dozen on a busy hour: $0.05 a pass, and $0.60 across a
+# Central day's passes (the capture runs 18 times). A day of week reads is at most $1.85, beside the
+# capsule night's ruled bound of about $4.15.
+NIGHTLY_BUDGET_USD: Final = 1.25
+HOURLY_BUDGET_USD: Final = 0.05
+HOURLY_DAY_USD: Final = 0.60
+# The heaviest prompt a week read's ask carries (a correction with its ledger; the recorded run's largest
+# was about 3,100 tokens), for a read's worst case against what is left of the budget.
+WORST_PROMPT_TOKENS: Final = 3_500
+# The recorded run's dearest call, for a budget in calls when the price list cannot be read.
+WORST_CALL_USD: Final = 0.0006
 Log = Callable[[str], None]
 
 
@@ -60,6 +87,8 @@ class WeekReadSpend:
     due: dict[str, int] = field(default_factory=dict)
     written: int = 0
     facts_blocks: int = 0
+    budget_stopped: int = 0
+    landed: int = 0
     calls: int = 0
     prompt_tokens: int = 0
     completion_tokens: int = 0
@@ -68,6 +97,7 @@ class WeekReadSpend:
     left: int = 0
 
     def add(self, result: WeekReadResult) -> None:
+        self.landed += 1
         self.written += result.source == WRITTEN_SOURCE
         self.facts_blocks += result.source == FACTS_SOURCE
         self.calls += result.calls
@@ -81,39 +111,28 @@ class WeekReadSpend:
         due = ", ".join(f"{reason} {count}" for reason, count in sorted(self.due.items())) or "none"
         return (
             f"{sum(self.due.values())} reads due ({due}), {self.written} written, {self.facts_blocks} facts blocks, "
-            f"{self.left} left for tomorrow, {self.calls} calls, {self.prompt_tokens} prompt and "
-            f"{self.completion_tokens} completion tokens, ${self.cost_usd:.6f}, {self.demoted} demoted for a "
-            "sentence on two pages"
+            f"{self.budget_stopped} stopped by the budget, {self.left} left for later, {self.calls} calls, "
+            f"{self.prompt_tokens} prompt and {self.completion_tokens} completion tokens, ${self.cost_usd:.6f}, "
+            f"{self.demoted} demoted for a sentence on two pages"
         )
 
 
-# --- the week's sentences ---------------------------------------------------------------------------
+def worst_read_usd(price: ModelPrice) -> float:
+    """A read's worst case in dollars: every ask at the heaviest prompt and the whole completion allowance."""
+    per_in = (price.input_usd_per_million or 0.0) / 1_000_000
+    per_out = (price.output_usd_per_million or 0.0) / 1_000_000
+    return MAX_CALLS_PER_READ * (WORST_PROMPT_TOKENS * per_in + MAX_TOKENS * per_out)
 
 
-def week_sentences(read: StoredWeekRead) -> set[str]:
-    """A written read's sentences held to uniqueness (normalized, four words or more)."""
-    if read.source != WRITTEN_SOURCE:
-        return set()
-    return held_sentences((read.body,), CAPSULE_CONFIG.shared_sentence_min_words)
-
-
-def shared_week_sentences(reads: Mapping[str, StoredWeekRead]) -> tuple[SharedSentence, ...]:
-    """Every held sentence two written reads carry, the most carried first."""
-    pages: dict[str, list[str]] = {}
-    for player_id, read in reads.items():
-        for sentence in week_sentences(read):
-            pages.setdefault(sentence, []).append(player_id)
-    shared = [SharedSentence(sentence, tuple(sorted(ids))) for sentence, ids in pages.items() if len(ids) > 1]
-    return tuple(sorted(shared, key=lambda s: (-len(s.player_ids), s.sentence)))
-
-
-def week_demotions(shared: Sequence[SharedSentence], board_order: Sequence[str]) -> tuple[Target, ...]:
-    """The reads to demote, each once with its sentence: every carrier but the first in board order."""
-    return demotion_targets(shared, board_order)
+def step_budget(price: ModelPrice, usd: float) -> RunBudget:
+    """The pass's hard stop in dollars; with no list price, in calls at the recorded worst call's cost."""
+    if price.input_usd_per_million is None or price.output_usd_per_million is None:
+        return RunBudget.of(calls=int(usd / WORST_CALL_USD))
+    return RunBudget.of(usd=usd, price=price)
 
 
 class _Board:
-    """The week's sentences as reads land: who carries each, and tonight's newest to quote."""
+    """The week's sentence shapes as reads land: who carries each, and tonight's newest sentences to quote."""
 
     def __init__(self, stored: Mapping[tuple[str, int], StoredWeekRead]) -> None:
         self.carriers: dict[int, dict[str, set[str]]] = {}
@@ -122,15 +141,15 @@ class _Board:
             self._hold(player_id, week, read)
 
     def _hold(self, player_id: str, week: int, read: StoredWeekRead) -> None:
-        by_sentence = self.carriers.setdefault(week, {})
-        for held in by_sentence.values():
+        by_shape = self.carriers.setdefault(week, {})
+        for held in by_shape.values():
             held.discard(player_id)
-        for sentence in week_sentences(read):
-            by_sentence.setdefault(sentence, set()).add(player_id)
+        for shape in read_shapes(read):
+            by_shape.setdefault(shape, set()).add(player_id)
 
     def taken(self, sheet: WeekSheet) -> frozenset[str]:
         held = self.carriers.get(sheet.week, {})
-        return frozenset(s for s, ids in held.items() if ids - {sheet.player_id})
+        return frozenset(shape for shape, ids in held.items() if ids - {sheet.player_id})
 
     def avoid(self, week: int) -> tuple[str, ...]:
         return tuple(self.recent.get(week, ()))
@@ -142,28 +161,23 @@ class _Board:
             recent.extend(sentences_verbatim(read.body))
 
 
-def stored_row(sheet: WeekSheet, result: WeekReadResult, reason: str) -> StoredWeekRead:
-    """The row a written (or fallen) read is kept as, with the facts' stamps and what the cadence compares."""
+def stored_row(
+    sheet: WeekSheet, result: WeekReadResult, reason: str, before: StoredWeekRead | None, at: datetime
+) -> StoredWeekRead:
+    """The row a written (or fallen) read is kept as: the facts' stamps, what the cadence compares, the
+    writer's call, and the attempt counted on `at`'s Central day."""
     return StoredWeekRead(
-        sheet.player_id,
-        sheet.season,
-        sheet.week,
-        result.source,
-        result.text,
-        result.model,
-        sheet.written_at,
-        sheet.facts_at,
-        sheet.stamps(),
-        None if sheet.projection is None else sheet.projection.points,
-        sheet.status.status,
-        reason,
-    )
+        sheet.player_id, sheet.season, sheet.week, result.source, result.text, result.model, sheet.written_at,
+        sheet.facts_at, sheet.stamps(), None if sheet.projection is None else sheet.projection.points,
+        sheet.status.status, reason, result.call, central_day(at), attempts_today(before, at) + 1,
+    )  # fmt: skip
 
 
 @dataclass(frozen=True, slots=True)
 class _Night:
     sheets: tuple[WeekSheet, ...]
     stored: Mapping[tuple[str, int], StoredWeekRead]
+    board_week: int
 
 
 def _read_night(engine: Engine, now: datetime, facts: FactsPassMemo) -> _Night | None:
@@ -172,13 +186,18 @@ def _read_night(engine: Engine, now: datetime, facts: FactsPassMemo) -> _Night |
         week_facts = read_week_facts(conn, PRODUCT_SEASON, subjects, now)
         if week_facts is None:
             return None
-        weeks = sorted({cw.week for cw in week_facts.weeks.values()})
+        weeks = sorted({cw.week for cw in week_facts.weeks.values()} | {week_facts.board_week})
         stored = stored_week_reads(conn, PRODUCT_SEASON, weeks)
-        return _Night(tuple(collect_week_sheets(week_facts, subjects, stored)), stored)
+        sheets = tuple(collect_week_sheets(week_facts, subjects, stored))
+        return _Night(sheets, stored, week_facts.board_week)
 
 
 def _write(
-    engine: Engine, gateway: GatewayClient, night: _Night, due: Sequence[tuple[WeekSheet, str]]
+    engine: Engine,
+    gateway: GatewayClient,
+    night: _Night,
+    due: Sequence[tuple[WeekSheet, str]],
+    room: Callable[[], bool],
 ) -> WeekReadSpend:
     spend = WeekReadSpend()
     board = _Board(night.stored)
@@ -189,66 +208,77 @@ def _write(
         return lambda scoped: write_week_read(sheet, scoped, avoid, taken)
 
     def land(item: tuple[WeekSheet, str], result: WeekReadResult) -> None:
-        row = stored_row(item[0], result, item[1])
+        spend.add(result)
+        if result.fallback == "the run's budget is spent":
+            spend.budget_stopped += 1
+            return
+        sheet, reason = item
+        row = stored_row(sheet, result, reason, night.stored.get((sheet.player_id, sheet.week)), sheet.written_at)
         with engine.begin() as conn:
             upsert_week_read(conn, row)
         board.land(row)
-        spend.add(result)
 
-    gateway.rolling(due, start, land)
+    if gateway.rolling(due, start, land, stop=lambda: not room()):
+        spend.budget_stopped += len(due) - spend.landed
     return spend
 
 
-def demote_shared(engine: Engine, sheets: Sequence[WeekSheet], at: datetime) -> int:
-    """Every written read of a week but the first in board order (`sheets`' order) carrying a sentence
-    another one carries, written as its facts block (no model call). Returns how many."""
-    order = [sheet.player_id for sheet in sheets]
-    by_id = {(sheet.player_id, sheet.week): sheet for sheet in sheets}
-    demoted = 0
-    with engine.begin() as conn:
-        stored = stored_week_reads(conn, PRODUCT_SEASON, sorted({sheet.week for sheet in sheets}))
-        for week in sorted({key[1] for key in stored}):
-            reads = {pid: read for (pid, w), read in stored.items() if w == week}
-            for player_id, _ in week_demotions(shared_week_sentences(reads), order):
-                sheet = by_id.get((player_id, week))
-                if sheet is None:
-                    continue
-                read = reads[player_id]
-                block = render_week_facts_block(sheet)
-                upsert_week_read(conn, _demoted(read, block, at))
-                demoted += 1
-    return demoted
+def _day_start(now: datetime) -> datetime:
+    return datetime.combine(central_day(now), time(), CENTRAL)
 
 
-def _demoted(read: StoredWeekRead, block: str, at: datetime) -> StoredWeekRead:
-    return StoredWeekRead(
-        read.player_id, read.season, read.week, FACTS_SOURCE, block, None, max(at, read.written_at), read.facts_at,
-        read.stamps, read.projection_points, read.status, DEMOTED,
-    )  # fmt: skip
+def _budget_usd(engine: Engine, now: datetime, hourly: bool) -> float:
+    if not hourly:
+        return NIGHTLY_BUDGET_USD
+    with engine.connect() as conn:
+        spent = hourly_spend_since(conn, _day_start(now))
+    return max(0.0, min(HOURLY_BUDGET_USD, HOURLY_DAY_USD - spent))
 
 
-def run_week_read_step(engine: Engine, now: datetime, log: Log, facts: FactsPassMemo) -> StepRecord:
-    """The step's record: what was due, written, demoted and spent; skipped by name without the key."""
+def run_week_read_step(
+    engine: Engine, now: datetime, log: Log, facts: FactsPassMemo, *, hourly: bool = False
+) -> StepRecord:
+    """The pass's record: what was due, written, demoted and spent; skipped by name without the key, and
+    an hourly pass skipped once the day's hourly dollars are spent."""
+    mode = HOURLY if hourly else NIGHTLY
     key = os.environ.get(CAPSULE_CONFIG.gateway.api_key_variable, "").strip()
     if not key:
         return StepRecord(STEP, "skipped", f"{CAPSULE_CONFIG.gateway.api_key_variable} is not set, nothing written")
+    usd = _budget_usd(engine, now, hourly)
+    if usd <= 0:
+        return StepRecord(STEP, "skipped", f"the hourly passes' ${HOURLY_DAY_USD:.2f} for the day is spent")
     night = _read_night(engine, now, facts)
     if night is None:
         return StepRecord(STEP, "skipped", "no game is left to kick off this season")
     due = [
         (sheet, reason)
         for sheet in night.sheets
-        if (reason := due_reason(sheet, night.stored.get((sheet.player_id, sheet.week)))) is not None
+        if (reason := due_reason(sheet, night.stored.get((sheet.player_id, sheet.week)), now, hourly=hourly))
+        is not None
     ]
     settings = writer_settings(os.environ)
     with httpx.Client() as http:
-        checked_price(http, key, settings)
-        gateway = GatewayClient.for_run(key, http, settings)
-        spend = _write(engine, gateway, night, due[:PAGES_PER_NIGHT])
+        price = checked_price(http, key, settings)
+        budget = step_budget(price, usd)
+        worst = worst_read_usd(price) if budget.max_usd is not None else 0.0
+
+        def room() -> bool:
+            return budget.max_usd is None or budget.spent_usd + worst <= budget.max_usd
+
+        gateway = GatewayClient.for_run(key, http, settings).with_budget(budget)
+        spend = _write(engine, gateway, night, due[:PAGES_PER_NIGHT], room)
     for _, reason in due:
         spend.due[reason] = spend.due.get(reason, 0) + 1
     spend.left = max(0, len(due) - PAGES_PER_NIGHT)
-    spend.demoted = demote_shared(engine, night.sheets, datetime.now(UTC))
-    line = f"{len(night.sheets)} board players with a week ahead; {spend.line()}"
+    spend.demoted = demote_shared(engine, night.sheets, night.board_week, now)
+    with engine.begin() as conn:
+        record_run(
+            conn,
+            WeekReadRun(now, mode, spend.calls, spend.cost_usd, spend.written, spend.facts_blocks, spend.demoted),
+        )
+    line = (
+        f"{mode}, board week {night.board_week}, {len(night.sheets)} board players with a week ahead, "
+        f"{budget.line()}; {spend.line()}"
+    )
     log(f"{STEP}: {line}")
     return StepRecord(STEP, "ran", line)

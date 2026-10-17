@@ -4,15 +4,15 @@
                                           [--capsule-budget N] [--regenerate-all] [--mend-only]
     uv run python -m research.nightly publish [--out DIR] [--at ISO] [--no-dispatch]
     uv run python -m research.nightly mark --out DIR
-    uv run python -m research.nightly week-reads
+    uv run python -m research.nightly week-reads [--hourly]
 
 `mark` writes the newest injury capture beside a local directory's public run (`designations.json`,
 publish's first step alone), reading the store and writing nothing to it: the stand-in's way to the
 statuses the site prints (development).
 
 `week-reads` is the run's week-ahead read pass alone (Lane 72, `nightly/week_reads.py`): every board
-player's read that is due now (a status the newest injury capture changed, a published projection that
-moved by more than a point, a new week), so an hourly job can rewrite a read the day its facts move.
+player's read that is due now; with `--hourly`, the hourly pass the in-season capture job runs after
+its status capture (only a status or projection that moved, under the hourly dollar budget).
 
 `run` writes one run under a new run id (05:00 UTC); `publish` makes the newest passed run public
 once its early-access hour is over, dispatches the web build of it (every hour), and
@@ -145,11 +145,11 @@ def _contract(args: argparse.Namespace) -> int:
     return 0 if record.passed else 1
 
 
-def _week_reads(_args: argparse.Namespace) -> int:
-    """The week-ahead read pass alone, on its own facts pass at now."""
+def _week_reads(args: argparse.Namespace) -> int:
+    """The week-ahead read pass alone, on its own facts pass at now (`--hourly`: the hourly pass's terms)."""
     engine = make_engine(database_url_from_env(DATABASE_VARIABLE))
     try:
-        record = run_week_read_step(engine, now_ms(), _line, night_facts(engine))
+        record = run_week_read_step(engine, now_ms(), _line, night_facts(engine), hourly=args.hourly)
     finally:
         engine.dispose()
     _line(f"{record.name}: {record.status}, {record.summary}")
@@ -178,7 +178,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     contract = commands.add_parser("contract", help="the schema gate alone, over a run already written")
     contract.add_argument("--runs", required=True, help="the directory laid out as the bucket (runs/<id>/...)")
     contract.add_argument("--run-id", required=True)
-    commands.add_parser("week-reads", help="write every board player's week-ahead read that is due now")
+    week_reads = commands.add_parser("week-reads", help="write every board player's week-ahead read that is due now")
+    week_reads.add_argument("--hourly", action="store_true", help="only the reads a status or projection moved")
     args = parser.parse_args(argv)
     configure_logging(logging.WARNING)
     commands_by_name = {

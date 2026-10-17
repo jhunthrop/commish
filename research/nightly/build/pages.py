@@ -13,6 +13,7 @@ import re
 import unicodedata
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any, Final
 
 from research.capsules.pull_figures import PageValues, page_numbers, pull_figures_of
@@ -23,6 +24,7 @@ from research.model.instants import js_iso
 from research.nightly.build.player_season import SeasonContext, season_block
 from research.nightly.config import PAGE_FORMAT, TEAMS, RunFormat
 from research.nightly.reads.board import BoardEntry, FormatBoard
+from research.nightly.reads.schedule import Game
 
 # The run names a team defense as the site does.
 WEB_POSITION: Final = {"QB": "QB", "RB": "RB", "WR": "WR", "TE": "TE", "K": "K", "DEF": "DST"}
@@ -144,18 +146,41 @@ def capsule_json(stored: StoredCapsule | None, page: PageValues | None) -> Json 
     }
 
 
-def week_read_json(stored: StoredWeekRead | None) -> Json | None:
-    """The week-ahead read (Lane 72) with the page's caption and its stamps: when it was written, the newest
-    stamp of the facts it was written from. None for a page the writer did not write for the week ahead."""
-    if stored is None or stored.source != WRITTEN_SOURCE:
+STATUS_CHANGED_CAPTION: Final = "A new read is being written since his status changed"
+
+
+@dataclass(frozen=True, slots=True)
+class ServedWeek:
+    """What the page's week read is served against (Lane 72, the review's H1 and H3): the reads of the board
+    week by universe id, each player's current status (the injury capture the run reads, by the board's id,
+    the contract's word or None), and the run's instant."""
+
+    reads: Mapping[str, StoredWeekRead]
+    statuses: Mapping[str, str | None]
+    as_of: datetime
+
+
+def week_read_json(stored: StoredWeekRead | None, status: str | None, kicked_off: bool) -> Json | None:
+    """The board week's read (Lane 72) with the page's caption, its stamps, the status it was written against
+    and its call. None for a page the writer did not write for the board week, or whose board-week game has
+    kicked off. A read written against another status than his current one is withheld: its caption says a
+    new read is being written, and the page shows the season read beneath it (the review's H3)."""
+    if stored is None or stored.source != WRITTEN_SOURCE or kicked_off:
         return None
+    standing = stored.status == status
     return {
         "week": stored.week,
-        "body": stored.body.strip(),
-        "caption": written_caption(stored.written_at, stored.week),
+        "body": stored.body.strip() if standing else None,
+        "caption": written_caption(stored.written_at, stored.week) if standing else STATUS_CHANGED_CAPTION,
+        "status": stored.status,
+        "call": stored.call if standing else None,
         "writtenAt": js_iso(stored.written_at),
         "factsAt": None if stored.facts_at is None else js_iso(stored.facts_at),
     }
+
+
+def _kicked_off(games: Sequence[Game], week: int, at: datetime) -> bool:
+    return any(game.week == week and game.kickoff <= at for game in games)
 
 
 @dataclass(frozen=True, slots=True)
@@ -166,7 +191,7 @@ class PageInputs:
     capsules: Mapping[str, StoredCapsule]  # by universe id
     formats: Mapping[str, RunFormat]
     season: SeasonContext
-    week_reads: Mapping[str, StoredWeekRead]  # by universe id, the week ahead's
+    week: ServedWeek
 
 
 def page_inputs(
@@ -174,11 +199,11 @@ def page_inputs(
     adp_by_format: Mapping[str, Mapping[str, float]],
     capsules: Mapping[str, StoredCapsule],
     season: SeasonContext,
-    week_reads: Mapping[str, StoredWeekRead],
+    week: ServedWeek,
 ) -> PageInputs:
     entries = {board.format.id: {entry.row.player_id: entry for entry in board.entries} for board in boards}
     formats = {board.format.id: board.format for board in boards}
-    return PageInputs(entries, adp_by_format, capsules, formats, season, week_reads)
+    return PageInputs(entries, adp_by_format, capsules, formats, season, week)
 
 
 def player_json(who: Identity, inputs: PageInputs) -> Json:
@@ -210,9 +235,17 @@ def player_json(who: Identity, inputs: PageInputs) -> Json:
         "headshot": who.headshot,
         "formats": formats,
         "capsule": capsule_json(stored, page),
-        "weekRead": week_read_json(None if universe_id is None else inputs.week_reads.get(universe_id)),
+        "weekRead": _week_read(who, universe_id, inputs),
         "season": season,
     }
+
+
+def _week_read(who: Identity, universe_id: str | None, inputs: PageInputs) -> Json | None:
+    stored = None if universe_id is None else inputs.week.reads.get(universe_id)
+    if stored is None:
+        return None
+    kicked_off = _kicked_off(inputs.season.games.get(who.team, ()), stored.week, inputs.week.as_of)
+    return week_read_json(stored, inputs.week.statuses.get(who.id), kicked_off)
 
 
 def index_json(people: Sequence[Identity], players: Mapping[str, Json]) -> list[Json]:
