@@ -10,21 +10,21 @@ page's."""
 
 import json
 from collections.abc import Iterator
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 import pytest
 
-from research.capsules.config import CAPSULE_CONFIG
 from research.capsules.gateway import Completion
 from research.capsules.gateway_ledger import Usage
-from research.capsules.narrative import held_sentences
 from research.capsules.throttle_waits import AskWaits, RunWaits
 from research.capsules.voice_rules import gate_hits
 from research.capsules.week.caption import written_caption
-from research.capsules.week.rules import WEEK_NEVER_WORDS, week_rule_violations
+from research.capsules.week.prompt import parse_week_answer
+from research.capsules.week.rules import CALLS, WEEK_NEVER_WORDS, week_rule_violations
 from research.capsules.week.sheet import WeekSheet, week_name_ledger
-from research.capsules.week.validate import validate_week_read
+from research.capsules.week.validate import WEEK_BAND, sentence_shapes, validate_week_read
 from research.capsules.week.write import write_week_read
 from research.tests.week_read_fixtures import sheet_from_json
 
@@ -58,6 +58,10 @@ class _Replay:
         raise AssertionError(f"the replay never waits ({seconds} s)")
 
 
+def _call(player: dict[str, Any]) -> str | None:
+    return parse_week_answer(player["answers"][-1]["content"]).call
+
+
 def _sheet(name: str) -> tuple[WeekSheet, dict[str, Any]]:
     player = next(p for p in _RECORDED if p["sheet"]["name"] == name)
     return sheet_from_json(player["sheet"]), player
@@ -78,31 +82,34 @@ def test_the_writer_reproduces_the_recorded_read(name: str) -> None:
     assert result.source == "llm", result.attempts
     assert result.text == player["read"]
     assert result.calls == player["calls"]
+    assert result.call == _call(player) and result.call in CALLS
+    assert result.call != "start" or sheet.may_start
 
 
 @pytest.mark.parametrize("name", _NAMES)
 def test_the_recorded_read_keeps_every_guard(name: str) -> None:
     sheet, player = _sheet(name)
     read = player["read"]
-    assert validate_week_read(read, sheet, frozenset(player["taken"])).ok
+    assert validate_week_read(read, sheet, frozenset(player["taken"]), _call(player)).ok
     assert gate_hits(read, week_name_ledger(sheet)) == []
     assert not any(rule.pattern.search(read) for rule in WEEK_NEVER_WORDS)
-    assert week_rule_violations(read, sheet) == []
+    assert week_rule_violations(read, sheet, _call(player)) == []
+    assert len(read.split()) <= WEEK_BAND[1]
     if sheet.projection is not None and not sheet.bye:
         assert "published" in read.lower()
     assert "our projection" not in read.lower() and "our number" not in read.lower()
-    assert all(stamp <= sheet.written_at.isoformat() for stamp in sheet.stamps().values())
+    assert all(datetime.fromisoformat(stamp) <= sheet.written_at for stamp in sheet.stamps().values())
 
 
 def test_the_bye_read_says_he_does_not_play_and_recommends_nothing_for_the_week() -> None:
     sheet = next(sheet_from_json(p["sheet"]) for p in _RECORDED if p["sheet"]["bye"])
     read = next(p["read"] for p in _RECORDED if p["sheet"]["bye"])
     assert "doesn't play" in read or "does not play" in read or "bye" in read
-    assert not any("recommends" in v for v in week_rule_violations(read, sheet))
+    assert not any("recommends" in v for v in week_rule_violations(read, sheet, "hold"))
 
 
-def test_no_sentence_sits_on_two_of_the_reads() -> None:
-    held = [held_sentences((p["read"],), CAPSULE_CONFIG.shared_sentence_min_words) for p in _RECORDED]
+def test_no_sentence_shape_sits_on_two_of_the_reads() -> None:
+    held = [set(sentence_shapes(p["read"])) for p in _RECORDED]
     for i, mine in enumerate(held):
         for theirs in held[i + 1 :]:
             assert not (mine & theirs)
@@ -110,4 +117,4 @@ def test_no_sentence_sits_on_two_of_the_reads() -> None:
 
 def test_the_caption_is_the_write_in_central_time_for_the_week() -> None:
     sheet, _ = _sheet(_NAMES[0])
-    assert written_caption(sheet.written_at, sheet.week) == "Written Sat 12:30 pm Central, for week 6"
+    assert written_caption(sheet.written_at, sheet.week) == "Written Sat 12:50 pm Central, for week 6"

@@ -1,6 +1,6 @@
 {
   "recordedAt": "2026-10-17",
-  "note": "Lane 72's recorded run on lane72_scratch at 2026-10-17T17:30Z (week 6 of 2026). Puka Nacua and Jahmyr Gibbs from the first run (9 HTTP calls, CeeDee Lamb's read fell to its facts block on length there); CeeDee Lamb from the second, after the length correction was counted (2 HTTP calls), held to the first two reads' sentences.",
+  "note": "Lane 72's recorded run after fix round 1, on lane72_scratch at 2026-10-17T17:50Z (week 6 of 2026): the writer's own path for the three players in board order, 11 HTTP calls, each later read told and held to the earlier reads' sentences.",
   "players": [
     {
       "sheet": {
@@ -10,17 +10,18 @@
         "team": "LAR",
         "season": 2026,
         "week": 6,
-        "written_at": "2026-10-17T17:30:00+00:00",
+        "written_at": "2026-10-17T17:50:00+00:00",
         "game": {
           "week": 6,
           "opponent": "ARI",
           "home": true,
-          "kickoff": "2026-10-18T16:05:00-04:00"
+          "kickoff": "2026-10-18T16:05:00-04:00",
+          "scheduled_at": "2026-08-30T21:45:40.743638+00:00"
         },
         "bye": false,
         "projection": {
           "points": 23.04,
-          "captured_at": "2026-10-17T17:12:56.267776+00:00",
+          "captured_at": "2026-10-17T17:48:27.560175+00:00",
           "previous_points": null,
           "previous_captured_at": null
         },
@@ -35,7 +36,8 @@
           "wind_mph": null,
           "precipitation_chance": null,
           "precipitation_kind": null,
-          "read_at": null
+          "read_at": null,
+          "roof_read_at": "2026-10-16T23:52:01.137000+00:00"
         },
         "allowed": {
           "rank": 28,
@@ -68,7 +70,8 @@
               "Tutu Atwell",
               5.0
             ]
-          ]
+          ],
+          "released_at": "2026-09-04T00:00:00+00:00"
         },
         "last_games": [
           {
@@ -109,47 +112,58 @@
           "points": 344.08,
           "basis": "preseason",
           "from_week": null,
-          "published_at": "2026-10-17T12:00:00+00:00"
+          "published_at": "2026-10-17T17:45:00+00:00"
         },
         "last_read": null,
+        "lines_at": "2026-10-17T00:00:00+00:00",
         "basis": "published"
       },
       "avoid": [],
       "taken": [],
       "answers": [
         {
-          "content": "Puka Nacua comes off a monster week 5, 37.7 PPR points against Buffalo, and now draws an Arizona defense sitting 28th of 32 against receivers at 40.3 PPR points a game. There's no designation on the latest injury report, so he's a full go for Sunday's 3:05 pm Central kickoff at home, indoors where weather won't touch anything. The published projection for week 6 of 2026 sits at 23 points in PPR scoring, and the expected score has the Rams at 32 points to Arizona's 19.5, meaning plenty of volume in a game they should lead. He's still our WR1 overall from the preseason board, first among Rams receivers with Davante Adams second. Start him without a second thought and enjoy the matchup.",
+          "content": "{\"read\": \"Puka Nacua is a full go for week 6, no designation on Tuesday's report, and the matchup at home against ARI is about as soft as it gets. ARI sits 28th of 32 against receivers, giving up 40.3 PPR points a game to the position. LAR is expected to put up 32 points in this one, and Nacua leads the depth chart ahead of Davante Adams. He's rolling off a 37.7 PPR point week against BUF and averaging 25.9 PPR points a game this year, so the published projection of 23 points may even be light. Start him everywhere.\", \"call\": \"start\"}",
           "usage": {
-            "prompt_tokens": 2001,
-            "completion_tokens": 172,
-            "total_tokens": 2173,
-            "cost_usd": 0.00038615
+            "prompt_tokens": 2316,
+            "completion_tokens": 150,
+            "total_tokens": 2466,
+            "cost_usd": 0.0004224
           },
           "provider": "baseten"
         },
         {
-          "content": "No injury designation for Puka Nacua on the latest report, so he's a full go for Sunday's 3:05 pm Central kickoff against Arizona at home, indoors under a fixed roof. He comes off 37.7 PPR points against Buffalo in week 5 of 2026 and is running 25.9 a game this season, and the Cardinals sit 28th of 32 against receivers, allowing 40.3 PPR points a game through week 5 of 2026. The published projection for week 6 of 2026 is 23 points in PPR scoring, and the expected score has the Rams at 32 to Arizona's 19.5, so plenty of scoring should flow his way. He's first among Rams receivers with Davante Adams second, still our WR1 overall. Start him with confidence this week.",
+          "content": "{\"read\": \"Puka Nacua carries no designation on Tuesday's report, so he's a full go for week 6 of 2026 at home against ARI. The matchup is about as soft as it gets: ARI ranks 28th of 32 against receivers, giving up 40.3 PPR points a game to the position. LAR is expected to score 32 points indoors, with Nacua listed first among the receivers ahead of Davante Adams. He's coming off a 37.7 PPR point game against BUF and sits at 25.9 PPR points a game this year. The published projection has him at 23 points, and that feels light. Start him everywhere.\", \"call\": \"start\"}",
           "usage": {
-            "prompt_tokens": 2323,
-            "completion_tokens": 179,
-            "total_tokens": 2502,
-            "cost_usd": 0.00043795
+            "prompt_tokens": 2768,
+            "completion_tokens": 188,
+            "total_tokens": 2956,
+            "cost_usd": 0.0005092
           },
           "provider": "baseten"
         },
         {
-          "content": "No injury designation for Puka Nacua on the latest report, so he's a full go for Sunday's 3:05 pm Central kickoff against Arizona at home, indoors under a fixed roof. He's coming off 37.7 PPR points against Buffalo in week 5 of 2026 and sits at 25.9 PPR points a game this season. The Cardinals rank 28th of 32 against receivers, giving up 40.3 PPR points a game through week 5 of 2026, and the expected score has the Rams at 32 to Arizona's 19.5. The published projection for week 6 of 2026 is 23 points in PPR scoring. He's first among Rams receivers with Davante Adams second, and we have him WR1 overall on our board, so start him.",
+          "content": "{\"read\": \"Puka Nacua carries no designation on Tuesday's report, so he's a full go for week 6 of 2026 at home against ARI. The matchup is as soft as it gets: ARI ranks 28th of 32 against receivers, giving up 40.3 PPR points a game to the position. LAR is expected to score 32 points indoors, with Nacua listed first among the receivers ahead of Davante Adams. He's coming off a 37.7 PPR point game against BUF in week 5 of 2026 and sits at 25.9 PPR points a game this year. The published projection has him at 23 points, and that feels light. Start him everywhere.\", \"call\": \"start\"}",
           "usage": {
-            "prompt_tokens": 2330,
-            "completion_tokens": 192,
-            "total_tokens": 2522,
-            "cost_usd": 0.0004455
+            "prompt_tokens": 2848,
+            "completion_tokens": 184,
+            "total_tokens": 3032,
+            "cost_usd": 0.0005192
+          },
+          "provider": "baseten"
+        },
+        {
+          "content": "{\"read\": \"Puka Nacua carries no designation on Tuesday's report, so he's a full go for week 6 of 2026 at home against ARI. The matchup is soft: ARI sits 28th of 32 against receivers, allowing 40.3 PPR points a game to the position, and LAR's expected score is 32 points indoors. He's coming off 37.7 PPR points against BUF in week 5, averaging 25.9 PPR points a game this year. The published projection has him at 23 points, which looks light. Start him.\", \"call\": \"start\"}",
+          "usage": {
+            "prompt_tokens": 2911,
+            "completion_tokens": 276,
+            "total_tokens": 3187,
+            "cost_usd": 0.00057465
           },
           "provider": "baseten"
         }
       ],
-      "read": "No injury designation for Puka Nacua on the latest report, so he's a full go for Sunday's 3:05 pm Central kickoff against Arizona at home, indoors under a fixed roof. He's coming off 37.7 PPR points against Buffalo in week 5 of 2026 and sits at 25.9 PPR points a game this season. The Cardinals rank 28th of 32 against receivers, giving up 40.3 PPR points a game through week 5 of 2026, and the expected score has the Rams at 32 to Arizona's 19.5. The published projection for week 6 of 2026 is 23 points in PPR scoring. He's first among Rams receivers with Davante Adams second, and we have him WR1 overall on our board, so start him.",
-      "calls": 3
+      "read": "Puka Nacua carries no designation on Tuesday's report, so he's a full go for week 6 of 2026 at home against ARI. The matchup is soft: ARI sits 28th of 32 against receivers, allowing 40.3 PPR points a game to the position, and LAR's expected score is 32 points indoors. He's coming off 37.7 PPR points against BUF in week 5, averaging 25.9 PPR points a game this year. The published projection has him at 23 points, which looks light. Start him.",
+      "calls": 4
     },
     {
       "sheet": {
@@ -159,12 +173,13 @@
         "team": "DET",
         "season": 2026,
         "week": 6,
-        "written_at": "2026-10-17T17:30:00+00:00",
+        "written_at": "2026-10-17T17:50:00+00:00",
         "game": {
           "week": 7,
           "opponent": "GB",
           "home": true,
-          "kickoff": "2026-10-25T16:25:00-04:00"
+          "kickoff": "2026-10-25T16:25:00-04:00",
+          "scheduled_at": "2026-08-30T21:45:40.897251+00:00"
         },
         "bye": true,
         "projection": null,
@@ -190,7 +205,8 @@
               "Isiah Pacheco",
               4.0
             ]
-          ]
+          ],
+          "released_at": "2026-09-04T00:00:00+00:00"
         },
         "last_games": [
           {
@@ -230,49 +246,69 @@
           "points": 262.1,
           "basis": "preseason",
           "from_week": null,
-          "published_at": "2026-10-17T12:00:00+00:00"
+          "published_at": "2026-10-17T17:45:00+00:00"
         },
         "last_read": null,
+        "lines_at": "2026-10-17T00:00:00+00:00",
         "basis": "published"
       },
       "avoid": [
-        "No injury designation for Puka Nacua on the latest report, so he's a full go for Sunday's 3:05 pm Central kickoff against Arizona at home, indoors under a fixed roof.",
-        "He's coming off 37.7 PPR points against Buffalo in week 5 of 2026 and sits at 25.9 PPR points a game this season.",
-        "The Cardinals rank 28th of 32 against receivers, giving up 40.3 PPR points a game through week 5 of 2026, and the expected score has the Rams at 32 to Arizona's 19.5.",
-        "The published projection for week 6 of 2026 is 23 points in PPR scoring.",
-        "He's first among Rams receivers with Davante Adams second, and we have him WR1 overall on our board, so start him."
+        "Puka Nacua carries no designation on Tuesday's report, so he's a full go for week 6 of 2026 at home against ARI.",
+        "The matchup is soft: ARI sits 28th of 32 against receivers, allowing 40.3 PPR points a game to the position, and LAR's expected score is 32 points indoors.",
+        "He's coming off 37.7 PPR points against BUF in week 5, averaging 25.9 PPR points a game this year.",
+        "The published projection has him at 23 points, which looks light.",
+        "Start him."
       ],
       "taken": [
-        "he s coming off 37.7 ppr points against buffalo in week 5 of 2026 and sits at 25.9 ppr points a game this season",
-        "he s first among rams receivers with davante adams second and we have him wr1 overall on our board so start him",
-        "no injury designation for puka nacua on the latest report so he s a full go for sunday s 3 05 pm central kickoff against arizona at home indoors under a fixed roof",
-        "the cardinals rank 28th of 32 against receivers giving up 40.3 ppr points a game through week 5 of 2026 and the expected score has the rams at 32 to arizona s 19.5.",
-        "the published projection for week 6 of 2026 is 23 points in ppr scoring"
+        "he s coming off 37.7 ppr points against buf in week 5 averaging 25.9 ppr points a game this year",
+        "puka nacua carries no designation on tuesday s report so he s a full go for week 6 of 2026 at home against ari",
+        "the matchup is soft ari sits 28th of 32 against receivers allowing 40.3 ppr points a game to the position and lar s expected score is 32 points indoors",
+        "the published projection has him at 23 points which looks light"
       ],
       "answers": [
         {
-          "content": "Detroit doesn't play in week 6 of 2026, so Jahmyr Gibbs sits this week and scores you nothing while the Lions are on their bye. No need to sweat an injury either, there's no designation for him on the latest report and he's still first among Detroit backs ahead of Sione Vaki. The timing stings a little, because he just dropped 37.7 PPR points at Arizona in week 5 and is running at 30.7 PPR points a game with 9 touchdowns this season. Keep him on your roster and wait it out, then get him back in the lineup for week 7 of 2026 at home against Green Bay, a 3:25 pm Central Sunday kickoff.",
+          "content": "{\"read\": \"Detroit sits on bye in week 6 of 2026, so Gibbs scores you nothing this week and no fill-in exists on his own roster. He doesn't carry a designation on Tuesday's report, and he's still listed first among Lions backs over Sione Vaki, so nothing here threatens his week 7 home date with Green Bay. The wait is worth it: he's put up 37.7, 17.7 and 41.4 PPR points over his last three games while averaging 30.7 PPR points a game with 9 touchdowns this year, and he sits 5 overall, RB1 in our preseason order. Hold him, keep him locked in your lineup spot, and get him back in week 7.\", \"call\": \"hold\"}",
           "usage": {
-            "prompt_tokens": 2096,
-            "completion_tokens": 153,
-            "total_tokens": 2249,
-            "cost_usd": 0.0003909
+            "prompt_tokens": 2327,
+            "completion_tokens": 165,
+            "total_tokens": 2492,
+            "cost_usd": 0.00043155
           },
           "provider": "baseten"
         },
         {
-          "content": "Detroit doesn't play in week 6 of 2026, so Jahmyr Gibbs sits this week and scores you nothing while the Lions are on their bye. No need to sweat an injury either, there's no designation for him on the latest report and he's still first among Detroit backs ahead of Sione Vaki. The timing stings a little, because he just dropped 37.7 PPR points at Arizona in week 5 of 2026 and is running at 30.7 PPR points a game with 9 touchdowns this season. Keep him on your roster and wait it out, then get him back in the lineup for week 7 of 2026 at home against Green Bay, kicking off Sunday 3:25 pm Central.",
+          "content": "{\"read\": \"Detroit sits on bye in week 6 of 2026, so Gibbs scores you nothing this week. He carries no designation on Tuesday's report and stays listed first among Lions backs, so his week 7 home date with Green Bay is not in doubt. He's been a monster, with 37.7 PPR points in week 5 and 41.4 PPR points in week 3, part of 30.7 PPR points a game with 9 touchdowns this season, and he's 5 overall, RB1 in our preseason order. Hold him and get him back in your lineup for week 7.\", \"call\": \"hold\"}",
           "usage": {
-            "prompt_tokens": 2442,
-            "completion_tokens": 240,
-            "total_tokens": 2682,
-            "cost_usd": 0.0004863
+            "prompt_tokens": 2850,
+            "completion_tokens": 141,
+            "total_tokens": 2991,
+            "cost_usd": 0.000498
+          },
+          "provider": "baseten"
+        },
+        {
+          "content": "{\"read\": \"The Lions are on bye in week 6 of 2026, so Gibbs does not play and scores you zero points this week. Keep him parked on your bench, not your waiver wire: he carries no designation on Tuesday's report and still sits first among Detroit backs, and his next game is week 7 at home against Green Bay. He's been carrying lineups at 30.7 PPR points a game with 9 touchdowns through 5 games, including 41.4 PPR points against the Jets in week 3, and he's RB1 in our preseason order. Find a fill-in for this week, then start him Sunday 3:25 pm Central next week.\", \"call\": \"hold\"}",
+          "usage": {
+            "prompt_tokens": 2821,
+            "completion_tokens": 193,
+            "total_tokens": 3014,
+            "cost_usd": 0.00051965
+          },
+          "provider": "baseten"
+        },
+        {
+          "content": "{\"read\": \"Detroit is on bye in week 6 of 2026, so Gibbs does not play and scores zero points this week. His next game is week 7, at home against Green Bay, kicking off Sunday 3:25 pm Central. No reason to move him: he carries no designation on Tuesday's report, sits first among Detroit backs, and has run at 30.7 PPR points a game with 9 touchdowns through 5 games. Grab a fill-in for this week and keep Gibbs stashed for the week 7 start.\", \"call\": \"sit\"}",
+          "usage": {
+            "prompt_tokens": 3009,
+            "completion_tokens": 123,
+            "total_tokens": 3132,
+            "cost_usd": 0.00051285
           },
           "provider": "baseten"
         }
       ],
-      "read": "Detroit doesn't play in week 6 of 2026, so Jahmyr Gibbs sits this week and scores you nothing while the Lions are on their bye. No need to sweat an injury either, there's no designation for him on the latest report and he's still first among Detroit backs ahead of Sione Vaki. The timing stings a little, because he just dropped 37.7 PPR points at Arizona in week 5 of 2026 and is running at 30.7 PPR points a game with 9 touchdowns this season. Keep him on your roster and wait it out, then get him back in the lineup for week 7 of 2026 at home against Green Bay, kicking off Sunday 3:25 pm Central.",
-      "calls": 2
+      "read": "Detroit is on bye in week 6 of 2026, so Gibbs does not play and scores zero points this week. His next game is week 7, at home against Green Bay, kicking off Sunday 3:25 pm Central. No reason to move him: he carries no designation on Tuesday's report, sits first among Detroit backs, and has run at 30.7 PPR points a game with 9 touchdowns through 5 games. Grab a fill-in for this week and keep Gibbs stashed for the week 7 start.",
+      "calls": 4
     },
     {
       "sheet": {
@@ -282,17 +318,18 @@
         "team": "DAL",
         "season": 2026,
         "week": 6,
-        "written_at": "2026-10-17T17:30:00+00:00",
+        "written_at": "2026-10-17T17:50:00+00:00",
         "game": {
           "week": 6,
           "opponent": "GB",
           "home": false,
-          "kickoff": "2026-10-18T20:20:00-04:00"
+          "kickoff": "2026-10-18T20:20:00-04:00",
+          "scheduled_at": "2026-08-30T21:45:40.743638+00:00"
         },
         "bye": false,
         "projection": {
           "points": 19.45,
-          "captured_at": "2026-10-17T17:12:56.267776+00:00",
+          "captured_at": "2026-10-17T17:48:27.560175+00:00",
           "previous_points": null,
           "previous_captured_at": null
         },
@@ -307,7 +344,8 @@
           "wind_mph": null,
           "precipitation_chance": null,
           "precipitation_kind": null,
-          "read_at": null
+          "read_at": null,
+          "roof_read_at": "2026-10-16T23:52:01.137000+00:00"
         },
         "allowed": {
           "rank": 15,
@@ -340,7 +378,8 @@
               "Jonathan Mingo",
               5.0
             ]
-          ]
+          ],
+          "released_at": "2026-09-04T00:00:00+00:00"
         },
         "last_games": [
           {
@@ -380,56 +419,66 @@
           "points": 291.09,
           "basis": "preseason",
           "from_week": null,
-          "published_at": "2026-10-17T12:00:00+00:00"
+          "published_at": "2026-10-17T17:45:00+00:00"
         },
         "last_read": null,
+        "lines_at": "2026-10-17T00:00:00+00:00",
         "basis": "published"
       },
       "avoid": [
-        "He's coming off 37.7 PPR points against Buffalo in week 5 of 2026 and sits at 25.9 PPR points a game this season.",
-        "The Cardinals rank 28th of 32 against receivers, giving up 40.3 PPR points a game through week 5 of 2026, and the expected score has the Rams at 32 to Arizona's 19.5.",
-        "The published projection for week 6 of 2026 is 23 points in PPR scoring.",
-        "He's first among Rams receivers with Davante Adams second, and we have him WR1 overall on our board, so start him.",
-        "Detroit doesn't play in week 6 of 2026, so Jahmyr Gibbs sits this week and scores you nothing while the Lions are on their bye.",
-        "No need to sweat an injury either, there's no designation for him on the latest report and he's still first among Detroit backs ahead of Sione Vaki.",
-        "The timing stings a little, because he just dropped 37.7 PPR points at Arizona in week 5 of 2026 and is running at 30.7 PPR points a game with 9 touchdowns this season.",
-        "Keep him on your roster and wait it out, then get him back in the lineup for week 7 of 2026 at home against Green Bay, kicking off Sunday 3:25 pm Central."
+        "The matchup is soft: ARI sits 28th of 32 against receivers, allowing 40.3 PPR points a game to the position, and LAR's expected score is 32 points indoors.",
+        "He's coming off 37.7 PPR points against BUF in week 5, averaging 25.9 PPR points a game this year.",
+        "The published projection has him at 23 points, which looks light.",
+        "Start him.",
+        "Detroit is on bye in week 6 of 2026, so Gibbs does not play and scores zero points this week.",
+        "His next game is week 7, at home against Green Bay, kicking off Sunday 3:25 pm Central.",
+        "No reason to move him: he carries no designation on Tuesday's report, sits first among Detroit backs, and has run at 30.7 PPR points a game with 9 touchdowns through 5 games.",
+        "Grab a fill-in for this week and keep Gibbs stashed for the week 7 start."
       ],
       "taken": [
-        "detroit doesn t play in week 6 of 2026 so jahmyr gibbs sits this week and scores you nothing while the lions are on their bye",
-        "he s coming off 37.7 ppr points against buffalo in week 5 of 2026 and sits at 25.9 ppr points a game this season",
-        "he s first among rams receivers with davante adams second and we have him wr1 overall on our board so start him",
-        "keep him on your roster and wait it out then get him back in the lineup for week 7 of 2026 at home against green bay kicking off sunday 3 25 pm central",
-        "no injury designation for puka nacua on the latest report so he s a full go for sunday s 3 05 pm central kickoff against arizona at home indoors under a fixed roof",
-        "no need to sweat an injury either there s no designation for him on the latest report and he s still first among detroit backs ahead of sione vaki",
-        "the cardinals rank 28th of 32 against receivers giving up 40.3 ppr points a game through week 5 of 2026 and the expected score has the rams at 32 to arizona s 19.5.",
-        "the published projection for week 6 of 2026 is 23 points in ppr scoring",
-        "the timing stings a little because he just dropped 37.7 ppr points at arizona in week 5 of 2026 and is running at 30.7 ppr points a game with 9 touchdowns this season"
+        "detroit is on bye in week 6 of 2026 so gibbs does not play and scores zero points this week",
+        "grab a fill in for this week and keep gibbs stashed for the week 7 start",
+        "he s coming off 37.7 ppr points against buf in week 5 averaging 25.9 ppr points a game this year",
+        "his next game is week 7 at home against green bay kicking off sunday 3 25 pm central",
+        "no reason to move him he carries no designation on tuesday s report sits first among detroit backs and has run at 30.7 ppr points a game with 9 touchdowns through 5 games",
+        "puka nacua carries no designation on tuesday s report so he s a full go for week 6 of 2026 at home against ari",
+        "the matchup is soft ari sits 28th of 32 against receivers allowing 40.3 ppr points a game to the position and lar s expected score is 32 points indoors",
+        "the published projection has him at 23 points which looks light"
       ],
       "answers": [
         {
-          "content": "He's questionable on the latest report, so his status for week 6 of 2026 at Green Bay isn't settled until you check the inactives before the 7:20 pm Central kickoff Sunday. The 2.9 points against Tampa in week 5 are the reason you're nervous, though the 41.3 at Houston in week 4 sits right behind it, and he's still at 22.6 PPR points a game with 4 touchdowns this season. The published projection for week 6 of 2026 is 19.4 points in PPR scoring, and Green Bay sits 15th of 32 against receivers at 29.5 PPR points a game allowed. If the inactives clear him, start him.",
+          "content": "{\"read\": \"CeeDee Lamb landed as Questionable on Tuesday's report, so whether he suits up for the 7:20 pm Central kickoff at Green Bay is still up in the air and the published projection has him at 19.4 points. The matchup is only middling, 15th of 32 against receivers, and his week 5 was a rough 2.9 PPR points after that 41.3 outburst in week 4. He sits first among Dallas wideouts, so the role holds if he plays. Wait on his status right up to Sunday night before you lock him in.\", \"call\": \"start\"}",
           "usage": {
-            "prompt_tokens": 2328,
-            "completion_tokens": 158,
-            "total_tokens": 2486,
-            "cost_usd": 0.0004282
+            "prompt_tokens": 2560,
+            "completion_tokens": 150,
+            "total_tokens": 2710,
+            "cost_usd": 0.00027468
           },
           "provider": "baseten"
         },
         {
-          "content": "He's questionable on the latest report, so his status for week 6 of 2026 at Green Bay isn't settled until you check the inactives before the 7:20 pm Central kickoff Sunday. The 2.9 points against Tampa in week 5 of 2026 are the reason you're nervous, though the 41.3 at Houston in week 4 of 2026 sits right behind it, and he's still at 22.6 PPR points a game with 4 touchdowns this season. The published projection for week 6 of 2026 is 19.4 points in PPR scoring, and Green Bay sits 15th of 32 against receivers at 29.5 PPR points a game allowed. If the inactives clear him, start him.",
+          "content": "{\"read\": \"CeeDee Lamb is Questionable on Tuesday's report, so his status for the 7:20 pm Central kickoff at Green Bay in week 6 of 2026 is still unsettled. The published projection has him at 19.4 points. Green Bay sits 15th of 32 against receivers, and he's coming off 2.9 PPR points in week 5 of 2026 after a 41.3 PPR points outburst in week 4 of 2026. He still leads Dallas's receivers, so the role is there if he's cleared. Wait on his status right up to Sunday night before you start him.\", \"call\": \"start\"}",
           "usage": {
-            "prompt_tokens": 2729,
-            "completion_tokens": 186,
-            "total_tokens": 2915,
-            "cost_usd": 0.00050235
+            "prompt_tokens": 3107,
+            "completion_tokens": 147,
+            "total_tokens": 3254,
+            "cost_usd": 0.00053955
+          },
+          "provider": "baseten"
+        },
+        {
+          "content": "{\"read\": \"CeeDee Lamb is Questionable on Tuesday's report, so his status for the 7:20 pm Central kickoff at Green Bay in week 6 of 2026 is still unsettled. The published projection has him at 19.4 points. Green Bay sits 15th of 32 against receivers, and he's coming off 2.9 PPR points in week 5 after a 41.3 PPR points outburst in week 4. He still leads Dallas's receivers, so the role is there if he's cleared. Wait on his status right up to Sunday night before you start him.\", \"call\": \"start\"}",
+          "usage": {
+            "prompt_tokens": 3174,
+            "completion_tokens": 150,
+            "total_tokens": 3324,
+            "cost_usd": 0.0005511
           },
           "provider": "baseten"
         }
       ],
-      "read": "He's questionable on the latest report, so his status for week 6 of 2026 at Green Bay isn't settled until you check the inactives before the 7:20 pm Central kickoff Sunday. The 2.9 points against Tampa in week 5 of 2026 are the reason you're nervous, though the 41.3 at Houston in week 4 of 2026 sits right behind it, and he's still at 22.6 PPR points a game with 4 touchdowns this season. The published projection for week 6 of 2026 is 19.4 points in PPR scoring, and Green Bay sits 15th of 32 against receivers at 29.5 PPR points a game allowed. If the inactives clear him, start him.",
-      "calls": 2
+      "read": "CeeDee Lamb is Questionable on Tuesday's report, so his status for the 7:20 pm Central kickoff at Green Bay in week 6 of 2026 is still unsettled. The published projection has him at 19.4 points. Green Bay sits 15th of 32 against receivers, and he's coming off 2.9 PPR points in week 5 after a 41.3 PPR points outburst in week 4. He still leads Dallas's receivers, so the role is there if he's cleared. Wait on his status right up to Sunday night before you start him.",
+      "calls": 3
     }
   ]
 }
