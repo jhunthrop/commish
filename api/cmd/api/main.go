@@ -166,13 +166,14 @@ func build(ctx context.Context, cfg config.API, pool *pgxpool.Pool, obs httpx.Ob
 	}
 	yh := newYahooWiring(cfg, pool, ff, log)
 	es := newESPNWiring(cfg, pool, ff, log)
+	mf := newMFLWiring(cfg, pool, ff, log)
 	companions, err := companionService(cfg, pool, solo, draftBoards.Schedule, ents, ff, log)
 	if err != nil {
 		return nil, err
 	}
 
-	leagueSync := leagueSyncService(cfg, pool, draftBoards, leagueStore, ents, viewer, site, ff, yh, es, log)
-	moves, err := hostMoves(cfg, pool, ff, es, log)
+	leagueSync := leagueSyncService(cfg, pool, draftBoards, leagueStore, ents, viewer, site, ff, yh, es, mf, log)
+	moves, err := hostMoves(cfg, pool, ff, es, mf, log)
 	if err != nil {
 		return nil, err
 	}
@@ -197,10 +198,11 @@ func build(ctx context.Context, cfg config.API, pool *pgxpool.Pool, obs httpx.Ob
 		leagueSync.Routes(),
 		inSeason.Routes(),
 		moves.Routes(),
-		hostList(ff, yh, es, log),
+		hostList(ff, yh, es, mf, log),
 		ff.routes(log),
 		yh.routes(cfg, pool, ff, log),
 		es.routes(pool, ff, log),
+		mf.routes(),
 		devRoutes,
 	)
 	mux := http.NewServeMux()

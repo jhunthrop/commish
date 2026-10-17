@@ -336,7 +336,7 @@ func TestClaimSwitchAndGuards(t *testing.T) {
 	if got, err := r.svc.ClaimMove(ctx, me, espnhost.Host); err != nil || got.Claim != apitypes.WaiverMovesClaimUnavailable || got.Note != nil {
 		t.Fatalf("claim switch off: %+v %v", got, err)
 	}
-	if p := r.plan(t, claimMove(nil, nil)); p.Status != apitypes.HostMovePlanStatusUnavailable || p.Sentence != offWords ||
+	if p := r.plan(t, claimMove(nil, nil)); p.Status != apitypes.HostMovePlanStatusUnavailable || p.Sentence != espnWords.off ||
 		!strings.Contains(p.HostUrl, "leagueId=") {
 		t.Fatalf("claim switch off, plan %+v", p)
 	}

@@ -358,7 +358,15 @@ func (c *Client) memberTeam(ctx context.Context, sess Session, out *TeamLineup) 
 	if err != nil {
 		return err
 	}
-	out.StarterCount, out.Limits = league.Starters, league.StarterLimits
+	out.StarterCount = league.Starters
+	// The limits by the engine's position names (PK is K, Def is DEF); a
+	// position the engine does not start is left to MyFantasyLeague.
+	for _, l := range league.StarterLimits {
+		if pos := positionOf(l.Position); pos != "" {
+			l.Position = pos
+			out.Limits = append(out.Limits, l)
+		}
+	}
 	var wr wireRosters
 	if err := c.memberExport(ctx, sess, out.Server, out.Season, out.LeagueID, "rosters", nil, &wr); err != nil {
 		return err

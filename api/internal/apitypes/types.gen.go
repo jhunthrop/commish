@@ -145,6 +145,7 @@ func (e CompanionStatus) Valid() bool {
 const (
 	ConnectedHostEspn  ConnectedHost = "espn"
 	ConnectedHostFfpc  ConnectedHost = "ffpc"
+	ConnectedHostMfl   ConnectedHost = "mfl"
 	ConnectedHostYahoo ConnectedHost = "yahoo"
 )
 
@@ -154,6 +155,8 @@ func (e ConnectedHost) Valid() bool {
 	case ConnectedHostEspn:
 		return true
 	case ConnectedHostFfpc:
+		return true
+	case ConnectedHostMfl:
 		return true
 	case ConnectedHostYahoo:
 		return true
@@ -2371,6 +2374,15 @@ type LineupMoves struct {
 
 	// Note one sentence when a move waits on the member (connect again to agree to moves), null otherwise
 	Note *string `json:"note"`
+
+	// Reason one line under Copy the lineup saying why the lineup is not set from here (the platform takes no writes, its switch is off, or the member must connect or agree to moves), naming the platform; null when lineup is available
+	Reason *string `json:"reason"`
+
+	// TakesWrites true where the league's platform takes a lineup from our screen at all (ESPN, MyFantasyLeague), false where it has no write path (the verb is always Copy the lineup there)
+	TakesWrites bool `json:"takes_writes"`
+
+	// WritesOn true when the platform's write switch is on for this account (HOST_WRITES_ESPN_LINEUP or HOST_WRITES_MFL_LINEUP, or the account is on the switch's proof list); false where the platform takes no writes
+	WritesOn bool `json:"writes_on"`
 }
 
 // LineupMovesLineup available when the lineup can be set on the host from our screen (the host has a write path, its switch is on for the account and the account's connection agreed to the moves); unavailable when the verb is the host's page
@@ -2456,6 +2468,21 @@ type LobbySeatView struct {
 
 // LobbySeatViewKind defines model for LobbySeatView.Kind.
 type LobbySeatViewKind string
+
+// MFLConnectInput defines model for MFLConnectInput.
+type MFLConnectInput struct {
+	// Consent the member agrees that we exchange their password once for a MyFantasyLeague session, keep that session encrypted (never the password), and set their lineup on MyFantasyLeague when they confirm a move; must be true
+	Consent bool `json:"consent"`
+
+	// ConsentVersion the version of the consent words the page showed (1 names the lineup moves); kept never above the server's own
+	ConsentVersion int `json:"consent_version"`
+
+	// Password sent once to MyFantasyLeague's login in a POST body, never kept, answered or logged
+	Password string `json:"password"`
+
+	// Username the member's MyFantasyLeague username or email
+	Username string `json:"username"`
+}
 
 // MatchupBox defines model for MatchupBox.
 type MatchupBox struct {
@@ -3767,6 +3794,9 @@ type ConnectESPNJSONRequestBody = ESPNConnectInput
 
 // ConnectFFPCJSONRequestBody defines body for ConnectFFPC for application/json ContentType.
 type ConnectFFPCJSONRequestBody = HostConnectInput
+
+// ConnectMFLJSONRequestBody defines body for ConnectMFL for application/json ContentType.
+type ConnectMFLJSONRequestBody = MFLConnectInput
 
 // ConnectYahooJSONRequestBody defines body for ConnectYahoo for application/json ContentType.
 type ConnectYahooJSONRequestBody = YahooConnectInput
