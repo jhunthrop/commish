@@ -56,6 +56,21 @@
 		{ key: 'beats', label: WAIVERS.beats, cls: 'n beats' }
 	];
 	const week = $derived(sameWeekGain(drops));
+
+	/** The arrow keys move the drop chosen through the group, its focus with it (review 66f L11). */
+	const NEXT = new Set(['ArrowDown', 'ArrowRight']);
+	const PREVIOUS = new Set(['ArrowUp', 'ArrowLeft']);
+	function step(event: KeyboardEvent, at: number): void {
+		const move = NEXT.has(event.key) ? 1 : PREVIOUS.has(event.key) ? -1 : 0;
+		if (move === 0 || drops.length === 0) return;
+		event.preventDefault();
+		const to = (at + move + drops.length) % drops.length;
+		const next = drops[to];
+		if (next === undefined) return;
+		onchoose(next);
+		const group = (event.currentTarget as HTMLElement).closest('[role="radiogroup"]');
+		group?.querySelectorAll<HTMLElement>('[role="radio"]')[to]?.focus();
+	}
 	const ariaSort = (key: SortKey): 'ascending' | 'descending' | undefined =>
 		sort.key === key ? (sort.down ? 'descending' : 'ascending') : undefined;
 </script>
@@ -83,9 +98,9 @@
 			<th class="act" scope="col"><span class="vh">{LINES.add}</span></th>
 		</tr>
 	</thead>
-	<tbody>
-		{#each rows as entry (entry.key)}
-			{@const isOpen = open === entry.key}
+	{#each rows as entry (entry.key)}
+		{@const isOpen = open === entry.key}
+		<tbody>
 			<BoxLine
 				row={entry.row}
 				slotCell={false}
@@ -122,14 +137,23 @@
 					>
 				{/snippet}
 			</BoxLine>
-			{#if isOpen}
-				<tr class="dsect" id="drops-{entry.key}">
+		</tbody>
+		{#if isOpen}
+			<tbody class="panel" id="drops-{entry.key}">
+				<tr class="dsect">
 					<td colspan={LEAD_COLUMNS}
-						><b>{dropTitle(entry.row.name)}</b><span class="lead">{dropLead(week)}</span></td
+						><b id="drops-title-{entry.key}">{dropTitle(entry.row.name)}</b><span class="lead"
+							>{dropLead(week)}</span
+						></td
 					>
 					<td class="dhead" colspan={COLUMNS - LEAD_COLUMNS}>{WAIVERS.gainAWeek}</td>
 				</tr>
-				{#each drops as drop (drop.key)}
+			</tbody>
+			<!-- ARIA in HTML allows any role on a tbody: the drop rows are one radio group with arrow keys
+			     (review 66f L11), kept in the table so their columns stay the table's. -->
+			<!-- svelte-ignore a11y_no_noninteractive_element_to_interactive_role -->
+			<tbody class="panel" role="radiogroup" aria-labelledby="drops-title-{entry.key}">
+				{#each drops as drop, i (drop.key)}
 					{@const on = chosen === drop.key}
 					<BoxLine
 						row={drop.row}
@@ -155,19 +179,23 @@
 									class="radio"
 									class:on
 									aria-checked={on}
+									tabindex={on ? 0 : -1}
 									aria-label="Drop {drop.row.name}"
 									onclick={() => onchoose(drop)}
+									onkeydown={(event) => step(event, i)}
 								></button></td
 							>
 						{/snippet}
 					</BoxLine>
 				{/each}
+			</tbody>
+			<tbody class="panel">
 				<tr class="dgo"><td colspan={COLUMNS}>{@render go()}</td></tr>
-			{/if}
-		{:else}
-			<tr><td class="empty" colspan={COLUMNS}>{empty}</td></tr>
-		{/each}
-	</tbody>
+			</tbody>
+		{/if}
+	{:else}
+		<tbody><tr><td class="empty" colspan={COLUMNS}>{empty}</td></tr></tbody>
+	{/each}
 </table>
 
 <style>

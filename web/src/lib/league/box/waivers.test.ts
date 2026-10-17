@@ -5,6 +5,7 @@ import type { PlayerLine, WaiverRow, WeekFacts } from '../inseason/api.ts';
 import {
 	BEATS_BASIS,
 	cardGains,
+	cardName,
 	clearsWords,
 	copiedWords,
 	countWords,
@@ -26,6 +27,7 @@ import {
 	sortRows,
 	stripDecision,
 	WAIVERS,
+	waiverBasis,
 	withDrop
 } from './waivers.ts';
 
@@ -82,7 +84,13 @@ const row = (add: PlayerLine, over: Partial<WaiverRow> = {}): WaiverRow => ({
 	week_gain: 6.7,
 	starts: true,
 	pickup: true,
-	beats: { host_id: vidal.player.host_id, name: vidal.player.name, starter: true, gain: 6.7 },
+	beats: {
+		host_id: vidal.player.host_id,
+		name: vidal.player.name,
+		starter: true,
+		gain: 6.7,
+		open_spot: false
+	},
 	drops: [
 		{ host_id: lemon.player.host_id, gain: 1.2, week_gain: 6.7 },
 		{ host_id: vidal.player.host_id, gain: 0.6, week_gain: 6.7 }
@@ -97,20 +105,32 @@ const chiefs = row(line('Chiefs D/ST', 'DEF', 9.6, 7), {
 	drop: saints,
 	gain: 0.3,
 	week_gain: 2.7,
-	beats: { host_id: saints.player.host_id, name: saints.player.name, starter: true, gain: 2.7 },
+	beats: {
+		host_id: saints.player.host_id,
+		name: saints.player.name,
+		starter: true,
+		gain: 2.7,
+		open_spot: false
+	},
 	drops: [{ host_id: saints.player.host_id, gain: 0.3, week_gain: 2.7 }]
 });
 const mevis = row(line('Harrison Mevis', 'K', 6.7, 7.6), {
 	gain: -0.3,
 	week_gain: 0.2,
 	pickup: false,
-	beats: { host_id: 'Fairbairn', name: "Ka'imi Fairbairn", starter: true, gain: 0.2 }
+	beats: {
+		host_id: 'Fairbairn',
+		name: "Ka'imi Fairbairn",
+		starter: true,
+		gain: 0.2,
+		open_spot: false
+	}
 });
 const jones = row(line('Daniel Jones', 'QB', 17.86, 11.8), {
 	week_gain: 0,
 	starts: false,
 	pickup: false,
-	beats: { host_id: 'Stroud', name: 'C.J. Stroud', starter: false, gain: 1.1 }
+	beats: { host_id: 'Stroud', name: 'C.J. Stroud', starter: false, gain: 1.1, open_spot: false }
 });
 const allen = row(line('Kaytron Allen', 'RB', null, 9.6, { bye: true, opponent: null }), {
 	week_gain: 0,
@@ -121,7 +141,11 @@ const allen = row(line('Kaytron Allen', 'RB', null, 9.6, { bye: true, opponent: 
 });
 const advice = {
 	rows: [jones, gainwell, mevis, allen, chiefs],
-	pickups: [gainwell, chiefs]
+	pickups: [gainwell, chiefs],
+	roster: [lemon, vidal, saints],
+	lineup_proj: 87,
+	// The set's Proj from the API (review 66f H1): never the cards' gains summed here.
+	pickups_proj: 96.1
 };
 
 void test('the strip names each pickup as a card: the move, both gains, the sum on the Lineup', () => {
@@ -135,14 +159,14 @@ void test('the strip names each pickup as a card: the move, both gains, the sum 
 	assert.equal(pickupsTitle(2), 'Two pickups');
 	assert.equal(pickupsTitle(1), 'One pickup');
 	assert.equal(pickupsTitle(0), WAIVERS.noPickup);
-	assert.deepEqual(pickupSum(87, cards), {
-		figure: '96.4',
+	assert.deepEqual(pickupSum(advice, cards.length), {
+		figure: '96.1',
 		words: 'Proj with both, 87.0 without',
-		gain: '+9.4'
+		gain: '+9.1'
 	});
-	assert.equal(pickupSum(87, cards.slice(0, 1))?.words, 'Proj with him, 87.0 without');
-	assert.equal(pickupSum(null, cards), null);
-	assert.equal(pickupSum(87, []), null);
+	assert.equal(pickupSum(advice, 1)?.words, 'Proj with him, 87.0 without');
+	assert.equal(pickupSum({ lineup_proj: null, pickups_proj: null }, 2), null);
+	assert.equal(pickupSum(advice, 0), null);
 	assert.equal(
 		stripDecision(cards),
 		'Two pickups. Add Gainwell, drop Lemon. Add Chiefs, drop Saints.'
@@ -221,8 +245,12 @@ void test("the verbs name the member's platform, and the copy says where he goes
 		page: "ESPN's waiver page"
 	});
 	assert.equal(copiedWords('sleeper', 'Gainwell', false).page, "Sleeper's waiver page");
-	assert.equal(countWords(60, 'espn'), '60 free agents on ESPN');
-	assert.equal(countWords(1, 'espn'), '1 free agent on ESPN');
+	const rows = poolRows(advice, ZONE);
+	assert.equal(countWords(rows, 'espn'), '5 free agents we rank on ESPN, 4 beat a player of yours');
+	assert.equal(
+		countWords(rows.slice(3, 4), 'sleeper'),
+		'1 free agent we rank on Sleeper, 0 beat a player of yours'
+	);
 	assert.equal(clearsWords(null), null);
 	assert.equal(clearsWords('not a day'), null);
 });
@@ -239,21 +267,58 @@ void test('copy guard: every Waivers line is fantasy words, with no dash, semico
 		addOnWords('yahoo'),
 		copiedWords('espn', 'Gainwell', true).said,
 		copiedWords('espn', 'Gainwell', false).said,
-		countWords(60, 'espn')
+		countWords(poolRows(advice, ZONE), 'espn'),
+		...waiverBasis(BASIS, [gainwell.add, saints], ZONE)
 	];
 	const forbidden =
 		/\b(odds|line|spread|favou?red|underdog|bet|market|buy|sell|price|host|tip)\b|—|–|;/i;
 	for (const said of lines) assert.doesNotMatch(said, forbidden, said);
 });
 
-void test('an add who fills a spot no one of yours can play beats the open spot by his week gain', () => {
-	const taylor = row(line('Mason Taylor', 'TE', 4.77, 5.3), { beats: null, week_gain: 4.8 });
+void test('Beats prints the open spot only when the API says it: an empty Beats is never guessed', () => {
+	const taylor = row(line('Mason Taylor', 'TE', 4.77, 5.3), {
+		beats: { host_id: '', name: '', starter: true, gain: 4.8, open_spot: true },
+		week_gain: 4.8
+	});
 	const [only] = poolRows({ rows: [taylor], pickups: [taylor] }, ZONE);
 	assert.deepEqual(only?.beats, { name: 'Open spot', starter: true, gain: 4.8 });
-	const benched = row(line('Theo Johnson', 'TE', 4.1), {
-		beats: null,
-		starts: false,
-		week_gain: 0
-	});
-	assert.equal(poolRows({ rows: [benched], pickups: [] }, ZONE)[0]?.beats, null);
+	// A flex start that tops no one at his own position is no open spot.
+	const flex = row(line('Theo Johnson', 'WR', 10.8), { beats: null, starts: true, week_gain: 0.3 });
+	assert.equal(poolRows({ rows: [flex], pickups: [] }, ZONE)[0]?.beats, null);
+});
+
+void test('a card says a last name in full when another player on screen shares it', () => {
+	const roschon = line('Roschon Johnson', 'RB', 0.6);
+	const taylor = row(line('Mason Taylor', 'TE', 4.77), { drop: roschon });
+	const theo = row(line('Theo Johnson', 'TE', 4.1));
+	const [card] = pickupCards({ rows: [taylor, theo], pickups: [taylor], roster: [roschon] });
+	assert.equal(card ? moveWords(card) : '', 'Add Taylor, drop Roschon Johnson');
+	assert.equal(cardName('Roschon Johnson', ['Roschon Johnson']), 'Johnson');
+});
+
+const BASIS = {
+	basis:
+		'A pickup starts for you this week on the Proj shown and does not lower your rest of season on our rest-of-season order. Its drop is the one you lose least by.',
+	season_basis:
+		"Rest of season is his points a game on our rest-of-season projection from week 6, byes out. A gain a week is your lineup's points over replacement on our rest-of-season order, averaged over its 12 weeks.",
+	projection_read_at: '2026-10-17T02:00:00.000Z',
+	projection_previous_read_at: '2026-10-16T02:00:00.000Z',
+	projection_scoring: { format: 'ppr' as const, league_own: false }
+};
+
+void test('the basis is five short lines, the pickup rule first, Beats and Open spot each in a clause', () => {
+	const lines = waiverBasis(BASIS, [gainwell.add, saints], ZONE);
+	assert.equal(lines.length, 5);
+	assert.equal(lines[0], BASIS.basis);
+	assert.equal(
+		lines[1],
+		"Proj is this week's published projection in PPR scoring, the closest to this league's rules, read Fri 9:00 pm Central, defenses on its default scoring. Δ Proj is its change since Thu 9:00 pm."
+	);
+	assert.match(
+		lines[2] ?? '',
+		/^Beats is your player .* Open spot is a starting spot no player of yours can play this week\.$/
+	);
+	assert.equal(lines[3], BASIS.season_basis);
+	assert.match(lines[4] ?? '', /^Opp rank is points allowed/);
+	for (const said of lines) assert.ok(said.length <= 215, said);
 });

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
+	import type { WaiverAdvice } from '../inseason/api.ts';
 	import { cardGains, moveWords, pickupsTitle, pickupSum, type PickupCard } from './waivers.ts';
 
 	/** The Waivers decision as a strip (Lane 66f): the board week, the count of pickups worth making
@@ -9,7 +10,8 @@
 	interface Props {
 		week: number;
 		cards: readonly PickupCard[];
-		lineupProj: number | null;
+		/** The API's two figures for the sum: the lineup without the cards and with every one. */
+		sum: Pick<WaiverAdvice, 'lineup_proj' | 'pickups_proj'>;
 		/** The card the pinned verb acts on. */
 		chosen: string | null;
 		onchoose: (card: PickupCard) => void;
@@ -19,8 +21,8 @@
 		foot?: Snippet;
 	}
 
-	let { week, cards, lineupProj, chosen, onchoose, verb, foot }: Props = $props();
-	const sum = $derived(pickupSum(lineupProj, cards));
+	let { week, cards, sum: figures, chosen, onchoose, verb, foot }: Props = $props();
+	const sum = $derived(pickupSum(figures, cards.length));
 </script>
 
 <div class="strip">

@@ -6,32 +6,27 @@
 	import Quiet from '#lib/ui/Quiet.svelte';
 	import Verb from '#lib/ui/Verb.svelte';
 	import type { LeagueHost } from '../api.ts';
-	import {
-		deltaBasis,
-		EVIDENCE_BASIS,
-		factsReadLine,
-		positionWord,
-		projBasis
-	} from '../box/box.ts';
+	import { positionWord } from '../box/box.ts';
 	import PickupStrip from '../box/PickupStrip.svelte';
 	import WaiverTable from '../box/WaiverTable.svelte';
 	import {
 		addOnWords,
-		BEATS_BASIS,
+		cardName,
 		copiedWords,
 		countWords,
 		DEFAULT_SORT,
 		dropRows,
 		findRows,
 		moveWords,
+		namesOnScreen,
 		nextSort,
 		openWaiversWords,
 		pickupCards,
 		poolRows,
-		shortName,
 		sortRows,
 		stripDecision,
 		WAIVERS,
+		waiverBasis,
 		withDrop,
 		type CopiedLine,
 		type DropRow,
@@ -165,9 +160,10 @@
 		const name = row.add.player.name;
 		const said = copy(name);
 		if (shown.host_waivers_url !== '') openPage(shown.host_waivers_url);
+		const saidAs = cardName(name, namesOnScreen(shown));
 		said.then(
-			() => (copied = copiedWords(host, shortName(name), true)),
-			() => (copied = copiedWords(host, shortName(name), false))
+			() => (copied = copiedWords(host, saidAs, true)),
+			() => (copied = copiedWords(host, saidAs, false))
 		);
 	}
 
@@ -252,9 +248,16 @@
 		if (outcome.kind === 'failed') problem = outcome.sentence;
 	}
 
+	/** Another row's drops or another card: the last copy's confirm is for neither (review 66f L6). */
 	function toggle(row: PoolRow): void {
 		open = open === row.key ? null : row.key;
 		chosenDrop = null;
+		copied = null;
+	}
+
+	function chooseCard(c: PickupCard): void {
+		chosenCard = c.key;
+		copied = null;
 	}
 
 	function onsort(key: SortKey): void {
@@ -263,26 +266,8 @@
 
 	/** The pair the drop panel's verb acts on: the open add with the drop chosen. */
 	const pair = $derived(openRow ? withDrop(openRow.source, drop) : null);
-	const projection = $derived({
-		readAt: shown.projection_read_at,
-		scoring: shown.projection_scoring
-	});
-	const defense = $derived(lines.some((l) => l.player.position === 'DEF'));
-	/** The basis, five lines at most, the pickup rule first (Lane 66f). */
-	const basis = $derived(
-		[
-			shown.basis,
-			[
-				projBasis(projection.readAt, projection.scoring, defense),
-				deltaBasis(shown.projection_previous_read_at)
-			]
-				.filter((said) => said !== null)
-				.join(' '),
-			[BEATS_BASIS, shown.season_basis, shown.basis_note].filter((s) => s !== '').join(' '),
-			EVIDENCE_BASIS,
-			factsReadLine(lines)
-		].filter((line): line is string => line !== null && line !== '')
-	);
+	/** The basis, five short lines at most, the pickup rule first (review 66f M5). */
+	const basis = $derived(waiverBasis(shown, lines));
 </script>
 
 {#snippet why()}
@@ -313,8 +298,8 @@
 			<span class="pair"
 				><b
 					>{moveWords({
-						add: shortName(pair.add.player.name),
-						drop: drop ? shortName(drop.row.name) : null
+						add: cardName(pair.add.player.name, namesOnScreen(shown)),
+						drop: drop ? cardName(drop.row.name, namesOnScreen(shown)) : null
 					})}</b
 				></span
 			>
@@ -331,7 +316,7 @@
 	verb={card ? verbWords(card.source) : null}
 	href={shown.host_waivers_url}
 	basis=""
-	basisNote=""
+	basisNote={shown.basis_note}
 	deskVerb={false}
 	onverb={card ? () => act(card.source) : null}
 	controls={onHost ? MOVE_ID : undefined}
@@ -342,9 +327,9 @@
 		<PickupStrip
 			week={advice.week}
 			{cards}
-			lineupProj={advice.lineup_proj}
+			sum={advice}
 			chosen={card?.key ?? null}
-			onchoose={(c: PickupCard) => (chosenCard = c.key)}
+			onchoose={chooseCard}
 			verb={cardVerb}
 			foot={cards.length > 0 ? why : undefined}
 		/>
@@ -384,7 +369,7 @@
 				bind:value={query}
 			/></label
 		>
-		<span class="count">{countWords(shown.rows.length, host)}</span>
+		<span class="count">{countWords(pool, host)}</span>
 	</div>
 	{#if problem}<ProblemLine>{problem}</ProblemLine>{/if}
 	<div class="rows" class:reading aria-busy={reading}>
@@ -477,9 +462,9 @@
 		display: flex;
 		flex-direction: column;
 		gap: 2px;
-		max-width: 90ch;
 	}
 
+	/* Each line is one short sentence pair, the table's width: five lines at a desk (review 66f M5). */
 	.basis p {
 		margin: 0;
 		font-size: var(--t-sm);

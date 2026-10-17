@@ -4,7 +4,7 @@
  * columns, then the two only we give (Rest of season, and Beats: the member's player he tops with the
  * gain); an add opens the players he could replace in the same columns, the advice's drop first.
  * Pure, tested in waivers.test.ts. */
-import { memberZone } from '#lib/format/clock.ts';
+import { memberZone, weekdayTime, zoneWord } from '#lib/format/clock.ts';
 import { lastName } from '#lib/format/draft.ts';
 import { fixed, signed } from '#lib/format/number.ts';
 import type { LeagueHost } from '../api.ts';
@@ -12,7 +12,16 @@ import type { PlayerLine, WaiverAdvice, WaiverRow } from '../inseason/api.ts';
 import { addKey } from '../inseason/move.ts';
 import { LINES } from '../inseason/words.ts';
 import { hostWords } from '../names.ts';
-import { BOX, boxNumber, boxRow, positionWord, type BoxRow } from './box.ts';
+import {
+	BOX,
+	boxNumber,
+	boxRow,
+	EVIDENCE_SHORT,
+	factsReadAt,
+	positionWord,
+	projShort,
+	type BoxRow
+} from './box.ts';
 
 /** Every word the Waivers strip, table and drop panel print, in one place for the copy guard. */
 export const WAIVERS = {
@@ -90,19 +99,16 @@ export function clearsWords(day: string | null): string | null {
 	return Number.isNaN(at.getTime()) ? null : `${WAIVERS.clears} ${WEEKDAY.format(at)}`;
 }
 
-/** Whom an add beats: the API's player, or the open spot he fills when he starts topping no one (a
- * spot no one of the member's can play this week), by this week's gain. */
+/** Whom an add beats, as the API says it: his player, or the open spot he fills (a starting spot no
+ * one of the member's can play this week). Nothing is inferred here (review 66f M3). */
 function beatsOf(source: WaiverRow): BeatsCell | null {
-	if (source.beats) {
-		return {
-			name: shortName(source.beats.name),
-			starter: source.beats.starter,
-			gain: source.beats.gain
-		};
-	}
-	return source.starts && source.week_gain > 0
-		? { name: WAIVERS.openSpot, starter: true, gain: source.week_gain }
-		: null;
+	const { beats } = source;
+	if (beats === null) return null;
+	return {
+		name: beats.open_spot ? WAIVERS.openSpot : shortName(beats.name),
+		starter: beats.starter,
+		gain: beats.gain
+	};
 }
 
 /** The table's rows from the answer: every add, whom he beats, the strip's tint on the ones it names. */
@@ -125,13 +131,31 @@ export function poolRows(
 	});
 }
 
-/** The strip's cards, the answer's order (the highest week gain first). */
-export function pickupCards(advice: Pick<WaiverAdvice, 'pickups'>): PickupCard[] {
+/** A name as a card or the pair line says it: the last name, or the whole name when another player
+ * on the screen shares that last name (review 66f L10: "drop Johnson" over a row for Theo Johnson). */
+export function cardName(name: string, onScreen: readonly string[]): string {
+	const short = shortName(name);
+	const sharing = new Set(onScreen.filter((other) => shortName(other) === short));
+	return sharing.size > 1 ? name : short;
+}
+
+/** Every player's name the screen shows: the adds and the member's roster. */
+export function namesOnScreen(advice: Pick<WaiverAdvice, 'rows' | 'pickups' | 'roster'>): string[] {
+	return [...advice.rows, ...advice.pickups]
+		.map((r) => r.add.player.name)
+		.concat(advice.roster.map((l) => l.player.name));
+}
+
+/** The strip's cards in the API's order: each one's week gain is his over the cards before him. */
+export function pickupCards(
+	advice: Pick<WaiverAdvice, 'rows' | 'pickups' | 'roster'>
+): PickupCard[] {
+	const names = namesOnScreen(advice);
 	return advice.pickups.map((source) => ({
 		key: addKey(source),
 		slot: positionWord(source.add.player.position),
-		add: shortName(source.add.player.name),
-		drop: source.drop ? shortName(source.drop.player.name) : null,
+		add: cardName(source.add.player.name, names),
+		drop: source.drop ? cardName(source.drop.player.name, names) : null,
 		weekGain: source.week_gain,
 		gain: source.gain,
 		source
@@ -170,8 +194,8 @@ export function cardGains(card: Pick<PickupCard, 'weekGain' | 'gain'>): string {
 	return `${gainWord(card.weekGain)} ${WAIVERS.thisWeek}, ${gainWord(card.gain)} ${WAIVERS.aWeekRest}`;
 }
 
-/** The strip's sum: "96.4" then "Proj with both, 87.0 without, +9.4"; null without the lineup's
- * Proj or a card. The gains add because each card tops a different player. */
+/** The strip's sum, every figure the API's (review 66f H1): "96.4" (the lineup's Proj with every
+ * card made) then "Proj with both, 87.0 without, +9.4"; null without both Proj or a card. */
 export interface PickupSum {
 	figure: string;
 	words: string;
@@ -179,16 +203,16 @@ export interface PickupSum {
 }
 
 export function pickupSum(
-	lineupProj: number | null,
-	cards: readonly Pick<PickupCard, 'weekGain'>[]
+	advice: Pick<WaiverAdvice, 'lineup_proj' | 'pickups_proj'>,
+	cards: number
 ): PickupSum | null {
-	if (lineupProj === null || cards.length === 0) return null;
-	const gain = Math.round(cards.reduce((sum, c) => sum + c.weekGain, 0) * 10) / 10;
-	const withWord = cards.length === 1 ? 'him' : cards.length === 2 ? 'both' : 'all three';
+	const { lineup_proj: without, pickups_proj: withAll } = advice;
+	if (without === null || withAll === null || cards === 0) return null;
+	const withWord = cards === 1 ? 'him' : cards === 2 ? 'both' : 'all three';
 	return {
-		figure: boxNumber(lineupProj + gain),
-		words: `${BOX.proj} with ${withWord}, ${boxNumber(lineupProj)} without`,
-		gain: `+${fixed(gain, 1)}`
+		figure: boxNumber(withAll),
+		words: `${BOX.proj} with ${withWord}, ${boxNumber(without)} without`,
+		gain: gainWord(withAll - without)
 	};
 }
 
@@ -336,10 +360,44 @@ export function copiedWords(host: LeagueHost, name: string, copied: boolean): Co
 	};
 }
 
-/** "60 free agents on ESPN" (the commissioner's point): what the table holds, the platform named. */
-export function countWords(n: number, host: LeagueHost): string {
-	return `${String(n)} free ${n === 1 ? 'agent' : 'agents'} on ${hostWords(host)}`;
+/** What the table holds (review 66f M4): "60 free agents we rank on Sleeper, 5 beat a player of
+ * yours", the open spots not counted as players. */
+export function countWords(
+	rows: readonly Pick<PoolRow, 'beats' | 'source'>[],
+	host: LeagueHost
+): string {
+	const n = rows.length;
+	const beating = rows.filter((r) => r.source.beats !== null && !r.source.beats.open_spot).length;
+	return `${String(n)} free ${n === 1 ? 'agent' : 'agents'} we rank on ${hostWords(host)}, ${String(beating)} ${beating === 1 ? 'beats' : 'beat'} a player of yours`;
 }
 
 /** The Beats column's basis, said once. */
-export const BEATS_BASIS = `${WAIVERS.beats} is the player of yours at his position with the lowest ${BOX.proj} he tops, your starters first, and by how much. An open spot is one no player of yours can play this week. A player who cannot play this week beats no one.`;
+export const BEATS_BASIS = `${WAIVERS.beats} is your player at his position with the lowest ${BOX.proj} he tops, starters first. ${WAIVERS.openSpot} is a starting spot no player of yours can play this week.`;
+
+/** The Waivers basis (review 66f M5): five short lines at most, the pickup rule first, then the
+ * projection, Beats and Open spot, Rest of season and the gain a week, and the evidence with the
+ * Game cell's read. The league's shape and the rules points so far leave out are the foot note. */
+export function waiverBasis(
+	advice: Pick<
+		WaiverAdvice,
+		| 'basis'
+		| 'season_basis'
+		| 'projection_read_at'
+		| 'projection_previous_read_at'
+		| 'projection_scoring'
+	>,
+	lines: readonly PlayerLine[],
+	zone: string = memberZone()
+): string[] {
+	const defense = lines.some((l) => l.player.position === 'DEF');
+	const proj = projShort(
+		advice.projection_read_at,
+		advice.projection_previous_read_at,
+		advice.projection_scoring,
+		defense,
+		zone
+	);
+	const read = factsReadAt(lines);
+	const evidence = `${EVIDENCE_SHORT}${read === null ? '' : ` ${BOX.game} cells read ${weekdayTime(read, zone)} ${zoneWord(zone)}.`}`;
+	return [advice.basis, proj, BEATS_BASIS, advice.season_basis, evidence].filter((l) => l !== '');
+}
