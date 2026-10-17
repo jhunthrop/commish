@@ -1060,3 +1060,65 @@ use. Item 4 is the benchmark's margin method. Items 5 and 6 are notes.
    Wednesday 18:00 ET pass. Lane 68 admits those rows at the Wednesday pass regardless of the stored
    stamp, as item 8 says. The two differ only for Wednesday games (Christmas 2024).
 6. **Note, FTN.** No FTN history was ingested and FTN stays out of the fit, as 2.9 states.
+
+### Amendment 2, 2026-10-16, before any fit: rulings on the feature store's questions
+
+Recorded by the coordinator on lane 68's report, before any feature file is read by a fit. Items 1 and
+2 repair wording that named a quantity the store does not hold or an operator the stored quantity
+cannot take; the rest ratify a reading of the text or name the table a read uses. No threshold, seed,
+population statistic or judged week changes.
+
+1. **Surface.** Item 4 named (`nflverse_schedule`, `surface`), a metric the store never held. The
+   surface is (`nflverse_games`, `surface`) for the game, admitted by name as schedule knowledge under
+   item 4 exactly as `roof_state` is admitted under item 3 (a venue's surface on game day is a recorded
+   fact, not a moving figure; `nflverse_games` stays no source for any figure), with the `stadiums`
+   row's `surface` as the fallback when the game's is null, counted under a `default_surface` indicator.
+2. **The defence's pass rate allowed (2.4).** The stored `pass_rate_over_expected` is a difference in
+   percentage points, so "over" cannot be a ratio. It is the difference: the mean pass rate over
+   expectation of D's opponents in their games against D, less their mean pass rate over expectation in
+   their other games, shrunk toward 0 with the same six games of prior (n x difference / (n + 6)).
+3. **Tempo shrinkage (2.4, 2.5).** Ratified: pass rate over expectation shrinks toward 0 and pace
+   toward the league's mean pace over the same weeks, each with six games of prior.
+4. **The returning absence (2.2), the wording repaired.** 2.2's first condition read "he missed at
+   least one of the club's last three games", which taken literally also counts a teammate who missed
+   an earlier game and has played since, whose shares are already in his own features. The condition
+   now reads: he missed the club's latest game, and his absence is the run of missed games ending with
+   it, reaching back at most three games (the cap). A teammate who has played since his absence is not
+   returning. The literal rule also counts a healthy player with a week-W chart row, no line in the last
+   three games and a line earlier this season; that stays as written (changing it would be a model
+   input change), and the results report, per season, the count of returning teammates whose absence
+   carried no Out or Doubtful filing.
+5. **The depth rank's scale.** The 2016 to 2024 weekly charts rank within a slot (three receivers at
+   depth 1); the 2025 and 2026 dated charts rank across the position. The fit's scale is the slot
+   rank. The live read maps an across-position rank r to the slot rank ceil(r / s), with s the number
+   of starting slots the weekly charts carry at the position (QB 1, RB 1, WR 3, TE 1), and records the
+   mapping; the feature stays the player's best rank on that scale.
+6. **Fitted inputs.** Confirmed: the store holds the ingredients at each instant; lane 69 computes xFP,
+   FPOE, the value allowances and the role prior from the forward-chained play model. The rate m is
+   read from `commish_ros_v3`'s records as round 3 read it, never refit.
+7. **Live filings.** Live, the filing is Tank01's word as 2.2 states, read from the status rows lane
+   63's hourly capture writes (`status`, `status_since`, `status_source`; the newest at or before t_g),
+   through `status_of_tank01`. Dev holds no capture, so a dev live build counts every player "no
+   filing"; the served path runs where the capture runs.
+8. **Population.** Ratified: rows for every universe skill player whose latest club edge before W is
+   the club, plus chart-only players; the fit and judged populations are selected by round 3's rule
+   (3.2) through the outcome reader, which serves 2016 to 2024 only.
+9. **Shares.** Ratified: a share over a span is the ratio of his summed counts to the club's summed
+   counts over the span, 0 when the club had none of the kind; the pre-absence share alone is the mean
+   of his per-game shares, as 2.2 states.
+10. **Pressure generated.** Ratified: PFR's pressures on the passers D faced over their dropbacks in
+    D's games, since the feed carries no defence-side pressure.
+11. **The 2024 weather stamp window** starts at 22.50 h, below item 3's stated 22.67 h; the window is
+    no part of the rule. Reported only.
+12. **The depth chart check** is the coordinator's run on `lane70_weekly` (6.3), recorded in the
+    results before any fit. Lane 68's builds took `--depth-chart week` provisionally; the fit reads the
+    build the verdict names.
+13. **A retractable roof, live.** 2.5's forecast rule for a retractable venue is a fitted one-split
+    rule, lane 69's. The feature store writes a live retractable roof's state as NaN with a counted
+    `default_roof_undecided` indicator and the venue's forecast weather beside it; lane 69 applies the
+    rule and sets the roof state and the weather terms from it. "retractable" is never a roof state
+    value, and the fit sees only dome, closed, open and outdoors.
+14. **International games.** In replay their recorded weather is admitted as any outdoor game's is
+    (2.10 gives them no special row). Live, a non-US venue takes 2.10's row: the latest earlier
+    `nws_forecast` row for the game if one exists, else NaN with `no_forecast` 1, never the indoor
+    values.
