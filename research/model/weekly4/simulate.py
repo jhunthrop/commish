@@ -140,7 +140,7 @@ def _club_draws(
     p = np.clip(pass_rate + d.script_slope * deviation, 0.0, 1.0)
     dropbacks = rng.binomial(plays, p)
     designed = plays - dropbacks
-    projected = club["withheld"].to_numpy() == 0
+    projected = club["projected"].to_numpy() == 1
     share = {k: np.where(projected, _col(club, f"share_{k}"), 0.0) for k in _KINDS}
     residual = {k: float(first[f"residual_{k}"]) for k in _KINDS}
     dropped = _allocate(

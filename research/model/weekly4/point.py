@@ -22,8 +22,8 @@ team model's receiving touchdowns, its rushing touchdowns (carries and scrambles
 touchdowns, one scale per club, kind and game. The quarterback's passing touchdowns are the club's
 receiving touchdowns times his dropback share. Yards and receptions are not scaled.
 
-**Defaults** (2.10): a withheld player has no point; a player with no game this season takes the rate
-m in each format.
+**Defaults** (2.10): a withheld player has no point, nor a player outside the projected set
+(`projected`, `share_model`); a player with no game this season takes the rate m in each format.
 """
 
 from dataclasses import dataclass
@@ -65,7 +65,7 @@ def _per_game(board: pd.DataFrame, values: np.ndarray, how: Literal["sum", "max"
 
 def _starter_scramble_rate(board: pd.DataFrame) -> np.ndarray:
     """The club's projected quarterback with the largest dropback share: his shrunk scramble rate."""
-    share = np.where(board["withheld"].to_numpy() == 0, board["share_dropbacks"].to_numpy(dtype=float), -1.0)
+    share = np.where(board["projected"].to_numpy() == 1, board["share_dropbacks"].to_numpy(dtype=float), -1.0)
     best = _per_game(board, share, "max")
     rate = board["dropback_scramble_rate"].to_numpy(dtype=float)
     is_starter = (share == best) & (board["position"].to_numpy() == "QB") & (share >= 0)
@@ -102,9 +102,9 @@ def _scale(board: pd.DataFrame, players: np.ndarray, residual: np.ndarray, team:
 
 
 def analytic_points(board: pd.DataFrame, constants: Constants, reconcile: bool = True) -> pd.DataFrame:
-    """Each row's counts, touchdowns and point in each format (`point_<format>`); NaN when withheld."""
+    """Each row's counts, touchdowns and point in each format (`point_<format>`); NaN unless projected."""
     v = volumes(board)
-    projected = board["withheld"].to_numpy() == 0
+    projected = board["projected"].to_numpy() == 1
 
     def col(name: str) -> np.ndarray:
         return board[name].to_numpy(dtype=float)

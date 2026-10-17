@@ -20,10 +20,11 @@ from sqlalchemy import Connection
 from research.model.domain import Position
 from research.model.priors import ModelArtifacts
 from research.model.weekly.round.judge import table_digests
+from research.model.weekly2.board import WeekBoard
 from research.model.weekly2.gates import GateLine, Thresholds
 from research.model.weekly2.judge import DOCS
 from research.model.weekly2.judgment import assess
-from research.model.weekly2.statistics import JudgedRow
+from research.model.weekly2.statistics import JudgedRow, population
 from research.model.weekly3.gates import isolation_line
 from research.model.weekly3.judge import RoundFit, fit_round
 from research.model.weekly3.judgment import score_season
@@ -87,11 +88,26 @@ def fit_season_reads(  # noqa: PLR0913, PLR0917 - the reads one season needs, na
     return found, reader
 
 
-def rates(reads: Sequence[SeasonRead]) -> pd.DataFrame:
-    """The rate m per (season, week, player) in each format (`rate_m_<format>`)."""
+def candidates(board: WeekBoard, sizes: Mapping[str, int]) -> frozenset[str]:
+    """The week's projected set (2.6, the identities): at each position the union of ADP's top K and
+    the season-to-date top K, the population's own lists before its line filter (3.1), known before
+    kickoff. A player outside it (a backup, a fullback, a third tight end) is the residual's."""
+    everyone = {p.player_id for p in board.players}
+    positions = {p.player_id: str(p.position) for p in board.players}
+    to_date = {p.player_id: p.to_date for p in board.players if p.games > 0}
+    found: set[str] = set()
+    for position, size in sizes.items():
+        found |= population(position, everyone, board.adp, to_date, positions, size)
+    return frozenset(found)
+
+
+def rates(reads: Sequence[SeasonRead], sizes: Mapping[str, int]) -> pd.DataFrame:
+    """The rate m per (season, week, player) in each format (`rate_m_<format>`), and whether he is in
+    the week's projected set (`candidate`)."""
     rows: list[dict[str, Any]] = []
     for read in reads:
         for week in read.weeks:
+            chosen = candidates(week.board, sizes)
             for player in week.board.players:
                 rows.append(
                     {
@@ -99,6 +115,7 @@ def rates(reads: Sequence[SeasonRead]) -> pd.DataFrame:
                         "week": week.board.week,
                         "player_id": player.player_id,
                         **{f"rate_m_{name}": float(player.rate[name]) for name in FORMAT_NAMES},
+                        "candidate": int(player.player_id in chosen),
                     }
                 )
     return pd.DataFrame(rows).drop_duplicates(["season", "week", "player_id"])

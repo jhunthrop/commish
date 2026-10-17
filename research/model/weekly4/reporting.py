@@ -141,7 +141,7 @@ def component_losses(fitted: Fitted, store: Store, t: RoundFour, board: pd.DataF
             "model": poisson_deviance_sum(y, predicted[f"exp_{target}"].to_numpy()),
             "implied_points_alone": poisson_deviance_sum(y, mean * np.nan_to_num(simple, nan=1.0)),
         }
-    lined = board[(board["lined"] == 1) & (board["withheld"] == 0) & board["week"].isin(t.weeks)]
+    lined = board[(board["lined"] == 1) & (board["projected"] == 1) & board["week"].isin(t.weeks)]
     realised = realised_shares(lined, data.counts)
     shares = {}
     for kind in ("targets", "carries", "dropbacks"):

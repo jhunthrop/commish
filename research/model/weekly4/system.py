@@ -109,7 +109,11 @@ def _player_rows(store: Store, extras: Extras, seasons: Sequence[int]) -> pd.Dat
     rows = rows.merge(extras.rates, on=["season", "week", "player_id"], how="left")
     lined = extras.lines[["season", "week", "player_id"]].drop_duplicates().assign(lined=1)
     rows = rows.merge(lined, on=["season", "week", "player_id"], how="left")
-    return rows.assign(lined=rows["lined"].fillna(0).astype(int)).reset_index(drop=True)
+    candidate = rows["candidate"].fillna(0).astype(int)
+    projected = ((rows["withheld"] == 0) & (candidate == 1)).astype(int)
+    return rows.assign(lined=rows["lined"].fillna(0).astype(int), candidate=candidate, projected=projected).reset_index(
+        drop=True
+    )
 
 
 def _price_seasons(plays: pd.DataFrame, fitted: PlayFit) -> pd.DataFrame:
@@ -239,7 +243,7 @@ def _concentration_rows(boards: pd.DataFrame, data: Mapping[int, SeasonData]) ->
     realised = counts.rename(columns={k: f"realised_{k}" for k in PROJECTED_KINDS})
     volume = counts.groupby(["season", "week", "club"], as_index=False)[list(PROJECTED_KINDS)].sum()
     volume = volume.rename(columns={k: f"volume_{k}" for k in PROJECTED_KINDS})
-    keyed = boards[(boards["lined"] == 1) & (boards["withheld"] == 0)]
+    keyed = boards[(boards["lined"] == 1) & (boards["projected"] == 1)]
     joined = keyed.merge(realised, on=["season", "week", "club", "player_id"], how="left")
     joined = joined.merge(volume, on=["season", "week", "club"], how="left")
     return {

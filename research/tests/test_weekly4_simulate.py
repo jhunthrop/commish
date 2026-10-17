@@ -36,6 +36,7 @@ def _club(club: str, opponent: str, home: float, spread: float) -> list[dict[str
         "home": home,
         "spread": spread,
         "withheld": 0,
+        "projected": 1,
         "default_no_game_this_season": 0,
         "rate_m_ppr": 9.0,
         "rate_m_half": 8.0,

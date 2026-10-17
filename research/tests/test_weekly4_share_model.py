@@ -78,7 +78,7 @@ def test_the_residual_is_the_share_outside_the_clubs_rows_shrunk_toward_the_fit_
             "targets": [8.0, 2.0, 9.0, 1.0],
         }
     )
-    rows = pd.DataFrame({"season": [2022], "week": [3], "club": ["AAA"], "player_id": ["a"]})
+    rows = pd.DataFrame({"season": [2022], "week": [3], "club": ["AAA"], "player_id": ["a"], "candidate": [1]})
     found = residual_shares(rows, history, {"targets": 0.05}, ("targets",))
     observed = 3.0 / 20.0
     assert found.loc[0, "residual_targets"] == pytest.approx((2 * observed + 6 * 0.05) / 8)
@@ -123,6 +123,7 @@ def test_the_shares_and_the_residual_sum_to_one_and_a_withheld_share_passes_on()
             "week": [3] * 3,
             "club": ["AAA"] * 3,
             "withheld": [0, 0, 1],
+            "projected": [1, 1, 0],
             "model_targets": [0.3, 0.2, 0.4],
             "residual_targets": [0.1, 0.1, 0.1],
         }

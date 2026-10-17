@@ -19,6 +19,13 @@ sum to 1. r_k is the club's share of the kind that went, over its games of weeks
 to players outside the club's rows, shrunk toward the fit seasons' mean residual share with 6 games of
 prior. A projected player's share is his model share times (1 - r_k) over the projected players' model
 shares; a withheld player is not projected, so his share passes to his teammates and the residual.
+
+The projected set, which 2.6 does not define beyond naming who is outside it ("backups, fullbacks, a
+third tight end, players outside the universe"), is read as the population's own lists before their
+line filter (3.1): at each position ADP's top K and the season-to-date top K, known before kickoff
+(`round_three.candidates`), less the withheld. The share models are "if he plays" (2.6, fitted on
+players with a line), so normalising them over players who will not play would take volume from those
+who will. A row outside the set has no number; its club's use of it is the residual's.
 """
 
 import time
@@ -241,12 +248,13 @@ def residual_shares(
     toward the fit mean with 6 games of prior."""
     found = pd.DataFrame(index=rows.index)
     keys = rows[["season", "week", "club"]].drop_duplicates()
-    members = rows.groupby(["season", "week", "club"])["player_id"].agg(frozenset)
+    chosen = rows[rows["candidate"] == 1]
+    members = chosen.groupby(["season", "week", "club"])["player_id"].agg(frozenset)
     values: dict[tuple[int, int, str], dict[str, float]] = {}
     for season, week, club in zip(keys["season"], keys["week"], keys["club"], strict=True):
         history = counts[(counts["season"] == season) & (counts["week"] < week) & (counts["club"] == club)]
         games = int(history["week"].nunique())
-        inside = history["player_id"].isin(members[(season, week, club)])
+        inside = history["player_id"].isin(members.get((season, week, club), frozenset()))
         out: dict[str, float] = {}
         for kind in kinds:
             total = float(history[kind].sum())
@@ -264,7 +272,8 @@ def fit_residual_means(rows: pd.DataFrame, counts: pd.DataFrame, kinds: Sequence
     """The fit seasons' mean residual share of each kind: per club-week, the week's share that went to
     players outside the club's rows, averaged over the club-weeks with any volume of the kind."""
     club = counts.groupby(["season", "week", "club"], as_index=False)[list(kinds)].sum()
-    member = counts.merge(rows[["season", "week", "club", "player_id"]].drop_duplicates(), how="inner")
+    chosen = rows[rows["candidate"] == 1][["season", "week", "club", "player_id"]].drop_duplicates()
+    member = counts.merge(chosen, how="inner")
     inside = member.groupby(["season", "week", "club"], as_index=False)[list(kinds)].sum()
     weeks = rows[["season", "week", "club"]].drop_duplicates()
     joined = weeks.merge(club, how="inner").merge(
@@ -280,10 +289,10 @@ def fit_residual_means(rows: pd.DataFrame, counts: pd.DataFrame, kinds: Sequence
 
 
 def normalised_shares(rows: pd.DataFrame, kinds: Sequence[str] = ALL_KINDS) -> pd.DataFrame:
-    """The identities: per club-game and kind, the projected (not withheld) players' shares are their
-    model shares times (1 - r) over their sum; a withheld player's is 0."""
+    """The identities: per club-game and kind, the projected players' shares are their model shares
+    times (1 - r) over their sum; a player outside the projected set (or withheld) has 0."""
     found = pd.DataFrame(index=rows.index)
-    projected = rows["withheld"].to_numpy() == 0
+    projected = rows["projected"].to_numpy() == 1
     group = [rows["season"], rows["week"], rows["club"]]
     for kind in kinds:
         model = np.where(projected, rows[f"model_{kind}"].to_numpy(dtype=float), 0.0)

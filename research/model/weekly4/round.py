@@ -213,7 +213,7 @@ def _extras(  # noqa: PLR0913, PLR0917 - the fit weeks' reads, named
         allowed.append(found)
     pairing = teams[["season", "week", "club", "opponent"]]
     extras = Extras(
-        rates([*reads, r3.judged]),
+        rates([*reads, r3.judged], t.population),
         pd.concat([lines_of(r) for r in [*reads, r3.judged]], ignore_index=True),
         margins(pd.concat(allowed, ignore_index=True), pairing),
     )

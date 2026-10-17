@@ -16,6 +16,7 @@ def _board() -> pd.DataFrame:
         "week": 7,
         "club": "AAA",
         "withheld": 0,
+        "projected": 1,
         "default_no_game_this_season": 0,
         "rate_m_ppr": 9.0,
         "rate_m_half": 8.0,
@@ -97,6 +98,7 @@ def test_the_points_in_each_format_and_the_rate_for_no_game_this_season() -> Non
 def test_a_withheld_player_has_no_point() -> None:
     board = _board()
     board.loc[board["player_id"] == "wr", "withheld"] = 1
+    board.loc[board["player_id"] == "wr", "projected"] = 0
     found = analytic_points(board, CONSTANTS).set_index("player_id")
     assert np.isnan(found["point_ppr"].to_numpy()[1])
 
