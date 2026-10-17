@@ -15,14 +15,21 @@ import (
 // (research/pipeline/nflverse/stat_lines.py STAT_LINE_SOURCE).
 const StatLineSource = "nflverse_player_week"
 
-// StatMetrics are the stat line metrics ScoringRules score
-// (research/model/domain.py STAT_FIELDS): the season's lines carry these
-// fourteen and none of the optional seven.
+// StatMetrics are the stat line metrics ScoringRules score: domain.py's
+// fourteen STAT_FIELDS, its optional ones a rule scores (the two-point
+// conversions, the misses, the return touchdowns, a defense's fumble
+// recoveries, safeties and points and yards allowed), and a kicker's makes
+// from 40 to 49 and from 50, counted inside field_goals_made (Lane 70a
+// writes a kicker's and a team defense's results under these names). A
+// metric the store does not hold reads as absent, never as zero.
 func StatMetrics() []string {
 	return []string{
 		"passing_yards", "passing_touchdowns", "interceptions", "rushing_yards", "rushing_touchdowns",
 		"receiving_yards", "receiving_touchdowns", "receptions", "fumbles_lost", "field_goals_made",
 		"extra_points_made", "sacks", "defensive_interceptions", "defensive_touchdowns",
+		"two_point_conversions", "field_goals_missed", "extra_points_missed", "kick_return_touchdowns",
+		"punt_return_touchdowns", "defensive_fumbles_recovered", "safeties", "points_allowed", "yards_allowed",
+		"field_goals_made_40_49", "field_goals_made_50_plus",
 	}
 }
 

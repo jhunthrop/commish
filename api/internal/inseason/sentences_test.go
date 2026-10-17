@@ -159,7 +159,7 @@ func TestCopyGuard(t *testing.T) {
 	plain.Scoring = apitypes.Scoring{Custom: &none}
 	for _, b := range []OrderBasis{Preseason, RestOfSeason} {
 		for _, s := range []string{LineupBasis(b, SeasonGames), WaiversBasis(b, SeasonGames), TradesBasis(b, SeasonGames),
-			BasisNote(settings), BasisNote(plain), OnlyCloseCalls} {
+			BasisNote(settings, nil), BasisNote(plain, nil), OnlyCloseCalls} {
 			guard(t, s)
 		}
 		w := &Writer{Basis: b, Now: thursday}
@@ -194,19 +194,39 @@ func TestCopyGuard(t *testing.T) {
 	}
 }
 
-// The basis names the league's rules that points so far leave out, and
-// says nothing when the league scores none of them.
+// The basis names the league's rules that points so far leave out (the
+// ones whose metric no stat line this season carries), a kicking or
+// defense rule only where the league starts the position, and says
+// nothing when every rule it scores is counted.
 func TestBasisNamesTheRulesLeftOut(t *testing.T) {
 	rules := scoring.PresetRules(apitypes.ScoringPresetPpr)
 	rules.PointsPerFieldGoalMissed, rules.PointsPerReturnTouchdown, rules.PointsPerDefensiveFumbleRecovery = 0, 0, 0
 	settings := apitypes.LeagueSettings{Teams: 12, Lineup: apitypes.LineupStandard, Scoring: apitypes.Scoring{Custom: &rules},
-		Roster: apitypes.RosterCounts{Qb: 1, Rb: 2, Wr: 3, Te: 1}}
-	want := "Points so far leave out your league's points for two-point conversions and safeties: the stat lines we hold do not carry them."
-	if got := BasisNote(settings); !strings.HasSuffix(got, want) {
+		Roster: apitypes.RosterCounts{Qb: 1, Rb: 2, Wr: 3, Te: 1, K: 1, Dst: 1}}
+	want := "Points so far leave out your league's points for two-point conversions, safeties, a defense's points allowed " +
+		"and a defense's yards allowed: the stat lines we hold do not carry them."
+	if got := BasisNote(settings, nil); !strings.HasSuffix(got, want) {
 		t.Fatalf("%q", got)
 	}
-	rules.PointsPerTwoPointConversion, rules.PointsPerSafety = 0, 0
-	if got := BasisNote(settings); strings.Contains(got, "leave out") {
+	carried := func(metric string) bool {
+		return metric == "two_point_conversions" || metric == "safeties" || metric == "points_allowed" || metric == "yards_allowed"
+	}
+	if got := BasisNote(settings, carried); strings.Contains(got, "leave out") {
+		t.Fatalf("every rule carried: %q", got)
+	}
+	rules.PointsPerFieldGoal50Plus = 5
+	want = "Points so far leave out your league's points for field goals of 40 yards or more: the stat lines we hold do not carry them."
+	if got := BasisNote(settings, carried); !strings.HasSuffix(got, want) {
+		t.Fatalf("longer field goals: %q", got)
+	}
+	settings.Roster.K, settings.Roster.Dst = 0, 0
+	rules.PointsPerSafety = 0
+	want = "Points so far leave out your league's points for two-point conversions: the stat lines we hold do not carry them."
+	if got := BasisNote(settings, nil); !strings.HasSuffix(got, want) {
+		t.Fatalf("no kicker or defense spot: %q", got)
+	}
+	rules.PointsPerTwoPointConversion = 0
+	if got := BasisNote(settings, nil); strings.Contains(got, "leave out") {
 		t.Fatalf("%q", got)
 	}
 }

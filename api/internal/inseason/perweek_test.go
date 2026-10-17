@@ -61,8 +61,8 @@ func TestBasisSaysWhatAWeekIs(t *testing.T) {
 	}
 	// The basis above the rows is short: the league's shape and the rules
 	// points so far leave out are the note under them.
-	if strings.Contains(ros, "12-team") || !strings.Contains(BasisNote(settings), "for a 12-team league with 1 QB, 2 RB, 3 WR, 1 TE and a flex") {
-		t.Errorf("basis %q note %q", ros, BasisNote(settings))
+	if strings.Contains(ros, "12-team") || !strings.Contains(BasisNote(settings, nil), "for a 12-team league with 1 QB, 2 RB, 3 WR, 1 TE and a flex") {
+		t.Errorf("basis %q note %q", ros, BasisNote(settings, nil))
 	}
 }
 
@@ -103,7 +103,7 @@ func TestPlayerLineOverTheOrdersWeeks(t *testing.T) {
 	if line.PointsOverReplacement == nil || *line.PointsOverReplacement != roundTenth(season/11) {
 		t.Fatalf("points over replacement %v, want %v", line.PointsOverReplacement, roundTenth(season/11))
 	}
-	if out.OrderBasis != apitypes.OrderBasisRestOfSeason || !strings.Contains(out.Basis, "its 11 weeks") || out.BasisNote != BasisNote(*f.league.Saved) {
+	if out.OrderBasis != apitypes.OrderBasisRestOfSeason || !strings.Contains(out.Basis, "its 11 weeks") || !strings.HasPrefix(out.BasisNote, BasisNote(*f.league.Saved, func(string) bool { return true })) {
 		t.Fatalf("%s %q", out.OrderBasis, out.Basis)
 	}
 }

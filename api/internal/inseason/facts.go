@@ -113,6 +113,8 @@ type Season struct {
 	weekHasGames bool
 	points       map[string][]GamePoints
 	allowed      map[teamPosition]Allowed
+	// carried is every metric a counted line carries.
+	carried      map[string]bool
 	designations map[string]boards.Designation
 	gameFacts    map[boards.ClubWeek]boards.GameFact
 }
@@ -129,14 +131,21 @@ func NewSeason(d Data, rules Rules, week int, now time.Time) *Season {
 		}
 	}
 	sums := map[teamPosition]float64{}
+	lined := map[draft.Position]bool{}
+	s.carried = map[string]bool{}
+	results := positionsWithResults(d.Lines)
 	for _, l := range d.Lines {
 		g, known := s.games[teamWeek{l.Week, l.Team}]
-		if l.Team != "" && (!known || !g.Final) {
+		position := draft.Position(l.Position)
+		if (l.Team != "" && (!known || !g.Final)) || !results[position] {
 			continue
 		}
-		position := draft.Position(l.Position)
 		pts := rules.Points(l.Metrics, position)
 		s.points[l.PlayerID] = append(s.points[l.PlayerID], GamePoints{Week: l.Week, Points: pts})
+		lined[position] = true
+		for m := range l.Metrics {
+			s.carried[m] = true
+		}
 		if known {
 			sums[teamPosition{g.Opponent, position}] += pts
 		}
@@ -144,8 +153,47 @@ func NewSeason(d Data, rules Rules, week int, now time.Time) *Season {
 	for id := range s.points {
 		sort.Slice(s.points[id], func(i, j int) bool { return s.points[id][i].Week < s.points[id][j].Week })
 	}
-	s.allowed = rankAllowed(sums, finalGames(d.Games))
+	s.allowed = rankAllowed(sums, finalGames(d.Games), lined)
 	return s
+}
+
+// Carries reports whether any line counted this season carries the
+// metric: a rule whose metric none carries scores nothing in points so far.
+func (s *Season) Carries(metric string) bool { return s.carried[metric] }
+
+// resultMetrics is the metrics a kicker's or a defense's results are
+// read from: the player-week store writes a kicker's kicking as zeros and
+// holds no defense, so a position whose lines carry none of these above
+// zero all season holds no results, never a row of zeros.
+func resultMetrics() map[draft.Position][]string {
+	return map[draft.Position][]string{
+		draft.K: {"field_goals_made", "extra_points_made", "field_goals_missed", "extra_points_missed"},
+		draft.DEF: {"sacks", "defensive_interceptions", "defensive_touchdowns", "defensive_fumbles_recovered", "safeties",
+			metricPointsAllowed, metricYardsAllowed},
+	}
+}
+
+// positionsWithResults is the positions whose lines are results: every
+// position but a kicker or defense, and those when a line carries one of
+// their result metrics above zero (a defense allowing points counts).
+func positionsWithResults(lines []boards.StatLine) map[draft.Position]bool {
+	out := map[draft.Position]bool{}
+	gated := resultMetrics()
+	for _, l := range lines {
+		position := draft.Position(l.Position)
+		metrics, isGated := gated[position]
+		if !isGated {
+			out[position] = true
+			continue
+		}
+		for _, m := range metrics {
+			if l.Metrics[m] > 0 {
+				out[position] = true
+				break
+			}
+		}
+	}
+	return out
 }
 
 // finalGames is each club's count of final games.
@@ -159,9 +207,11 @@ func finalGames(games []boards.TeamWeek) map[string]int {
 	return out
 }
 
-// rankAllowed is each defense's points allowed a game at each position,
-// ranked among the defenses with a final game: 1 allowed the fewest.
-func rankAllowed(sums map[teamPosition]float64, games map[string]int) map[teamPosition]Allowed {
+// rankAllowed is each defense's points allowed a game at each position
+// the season holds results for, ranked among the defenses with a final
+// game: 1 allowed the fewest. A position with no counted line is not
+// ranked, so no rank is read from zeros.
+func rankAllowed(sums map[teamPosition]float64, games map[string]int, lined map[draft.Position]bool) map[teamPosition]Allowed {
 	out := map[teamPosition]Allowed{}
 	teams := make([]string, 0, len(games))
 	for team, n := range games {
@@ -171,6 +221,9 @@ func rankAllowed(sums map[teamPosition]float64, games map[string]int) map[teamPo
 	}
 	sort.Strings(teams)
 	for _, position := range allowedPositions() {
+		if !lined[position] {
+			continue
+		}
 		type row struct {
 			team    string
 			perGame float64

@@ -2,6 +2,7 @@ package inseason
 
 import (
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -9,6 +10,7 @@ import (
 	"github.com/jhunthrop/commish/api/internal/apitypes"
 	"github.com/jhunthrop/commish/api/internal/boards"
 	"github.com/jhunthrop/commish/api/internal/draft"
+	"github.com/jhunthrop/commish/api/internal/scoring"
 	"github.com/jhunthrop/commish/api/internal/season"
 )
 
@@ -193,29 +195,83 @@ func weekCount(n int) string {
 	return fmt.Sprintf("%d weeks", n)
 }
 
-// uncountedRules are the rules the season's stat lines hold no metric
-// for (score.go), as a sentence names them.
-func uncountedRules(r apitypes.ScoringRules) []struct {
-	points float64
-	words  string
-} {
-	return []struct {
-		points float64
-		words  string
-	}{
-		{r.PointsPerTwoPointConversion, "two-point conversions"}, {r.PointsPerFieldGoalMissed, "missed field goals"},
-		{r.PointsPerExtraPointMissed, "missed extra points"}, {r.PointsPerReturnTouchdown, "return touchdowns"},
-		{r.PointsPerDefensiveFumbleRecovery, "fumble recoveries"}, {r.PointsPerSafety, "safeties"},
+// spot is the starting spot a rule scores, so the basis names it only
+// where the league starts the position: anyone, a kicker or a defense.
+type spot int
+
+const (
+	anySpot spot = iota
+	kickerSpot
+	defenseSpot
+)
+
+// countable is a rule a stat line may carry no metric for (score.go):
+// the league's points for it as the basis weighs them, its words, the
+// spot it scores and the metrics that count it.
+type countable struct {
+	points  float64
+	words   string
+	spot    spot
+	metrics []string
+}
+
+// countables is the league's rules points so far count only where a
+// season's line carries their metric.
+func countables(r apitypes.ScoringRules) []countable {
+	m := scoring.ToMap(r)
+	tierPoints := func(tiers []scoring.Tier) float64 {
+		most := 0.0
+		for _, t := range tiers {
+			most = math.Max(most, math.Abs(m[t.Key]))
+		}
+		return most
+	}
+	longer := math.Abs(r.PointsPerFieldGoal4049-r.PointsPerFieldGoal) + math.Abs(r.PointsPerFieldGoal50Plus-r.PointsPerFieldGoal)
+	return []countable{
+		{r.PointsPerTwoPointConversion, "two-point conversions", anySpot, []string{"two_point_conversions"}},
+		{longer, "field goals of 40 yards or more", kickerSpot, []string{metricFieldGoals40To49, metricFieldGoals50AndUp}},
+		{r.PointsPerFieldGoalMissed, "missed field goals", kickerSpot, []string{"field_goals_missed"}},
+		{r.PointsPerExtraPointMissed, "missed extra points", kickerSpot, []string{"extra_points_missed"}},
+		{r.PointsPerReturnTouchdown, "return touchdowns", anySpot, []string{"kick_return_touchdowns", "punt_return_touchdowns"}},
+		{r.PointsPerDefensiveFumbleRecovery, "fumble recoveries", defenseSpot, []string{"defensive_fumbles_recovered"}},
+		{r.PointsPerSafety, "safeties", defenseSpot, []string{"safeties"}},
+		{tierPoints(scoring.PointsAllowedTiers()), "a defense's points allowed", defenseSpot, []string{metricPointsAllowed}},
+		{tierPoints(scoring.YardsAllowedTiers()), "a defense's yards allowed", defenseSpot, []string{metricYardsAllowed}},
 	}
 }
 
+// starts reports whether the league starts a rule's spot.
+func (c countable) starts(s apitypes.LeagueSettings) bool {
+	switch c.spot {
+	case kickerSpot:
+		return s.Roster.K > 0
+	case defenseSpot:
+		return s.Roster.Dst > 0
+	}
+	return true
+}
+
+// counted reports whether a season's line carries one of the rule's
+// metrics; nil carries none.
+func (c countable) counted(carried func(string) bool) bool {
+	if carried == nil {
+		return false
+	}
+	for _, metric := range c.metrics {
+		if carried(metric) {
+			return true
+		}
+	}
+	return false
+}
+
 // uncountedWords says which of the league's rules points so far leave
-// out, "" when the league scores none of them.
-func uncountedWords(s apitypes.LeagueSettings) string {
+// out, "" when the league scores none of them or every one is counted.
+func uncountedWords(s apitypes.LeagueSettings, carried func(string) bool) string {
 	var named []string
-	for _, u := range uncountedRules(rulesOf(s.Scoring)) {
-		if u.points != 0 {
-			named = append(named, u.words)
+	for _, c := range countables(rulesOf(s.Scoring)) {
+		if c.points != 0 && c.starts(s) && !c.counted(carried) {
+			named = append(named, c.words)
 		}
 	}
 	if len(named) == 0 {
@@ -230,10 +286,11 @@ func uncountedWords(s apitypes.LeagueSettings) string {
 
 // BasisNote is the rest of every page's basis, said once under the rows:
 // the league the points over replacement are for, and the league's rules
-// points so far leave out.
-func BasisNote(s apitypes.LeagueSettings) string {
+// points so far leave out. carried says whether any line this season
+// carries a metric (Season.Carries).
+func BasisNote(s apitypes.LeagueSettings, carried func(string) bool) string {
 	shape := "Points over replacement are for " + shapeWords(s) + "."
-	if u := uncountedWords(s); u != "" {
+	if u := uncountedWords(s, carried); u != "" {
 		return shape + " " + u
 	}
 	return shape
