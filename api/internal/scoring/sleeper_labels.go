@@ -11,16 +11,7 @@ func def(rule string) Label   { return Label{GroupDefense, rule} }
 // settings the 21 rules do not carry, which the setup page lists as left
 // out by group. A setting with no words here is "Sleeper setting <key>".
 var sleeperLabels = map[string]Label{
-	"pts_allow_0": def("0 points allowed"), "pts_allow_1_6": def("1 to 6 points allowed"),
-	"pts_allow_7_13": def("7 to 13 points allowed"), "pts_allow_14_20": def("14 to 20 points allowed"),
-	"pts_allow_21_27": def("21 to 27 points allowed"), "pts_allow_28_34": def("28 to 34 points allowed"),
-	"pts_allow_35p":   def("35 or more points allowed"),
-	"yds_allow_0_100": def("under 100 yards allowed"), "yds_allow_100_199": def("100 to 199 yards allowed"),
-	"yds_allow_200_299": def("200 to 299 yards allowed"), "yds_allow_300_349": def("300 to 349 yards allowed"),
-	"yds_allow_350_399": def("350 to 399 yards allowed"), "yds_allow_400_449": def("400 to 449 yards allowed"),
-	"yds_allow_450_499": def("450 to 499 yards allowed"), "yds_allow_500_549": def("500 to 549 yards allowed"),
-	"yds_allow_550p": def("550 or more yards allowed"),
-	"blk_kick":       def("blocked kick"), "ff": def("forced fumble"), "def_st_ff": def("forced fumble on defense or special teams"),
+	"blk_kick": def("blocked kick"), "ff": def("forced fumble"), "def_st_ff": def("forced fumble on defense or special teams"),
 	"def_st_fum_rec": def("fumble recovery on defense or special teams"), "def_st_td": def("touchdown on defense or special teams"),
 	"def_2pt": def("two-point return"), "st_td": def("special teams touchdown"), "st_ff": def("special teams forced fumble"),
 	"st_fum_rec": def("special teams fumble recovery"), "tkl": def("tackle"), "tkl_solo": def("solo tackle"),

@@ -20,6 +20,7 @@ import (
 	"github.com/jhunthrop/commish/api/internal/apitypes"
 	"github.com/jhunthrop/commish/api/internal/draft"
 	"github.com/jhunthrop/commish/api/internal/memo"
+	"github.com/jhunthrop/commish/api/internal/scoring"
 )
 
 // ErrCustomUnavailable is a league's own rules asked for while the boards
@@ -96,9 +97,11 @@ type wireShape struct {
 }
 
 type wireCustom struct {
-	Season int                   `json:"season"`
-	Rules  apitypes.ScoringRules `json:"rules"`
-	Shape  wireShape             `json:"shape"`
+	Season int `json:"season"`
+	// Rules is the board's 21 (scoring.BoardRules): the service takes
+	// no other key.
+	Rules map[string]float64 `json:"rules"`
+	Shape wireShape          `json:"shape"`
 }
 
 type wireRow struct {
@@ -120,11 +123,11 @@ type wireCustomResponse struct {
 	} `json:"data"`
 }
 
-// RulesHash keys a rules set: the same rules, the same board.
+// RulesHash keys a rules set: the same board rules, the same board.
 func RulesHash(r apitypes.ScoringRules) string {
-	raw, err := json.Marshal(r)
+	raw, err := json.Marshal(scoring.BoardRules(r))
 	if err != nil {
-		panic(fmt.Sprintf("boards: a struct of float64s always encodes: %v", err))
+		panic(fmt.Sprintf("boards: a map of float64s always encodes: %v", err))
 	}
 	sum := sha256.Sum256(raw)
 	return hex.EncodeToString(sum[:])
@@ -159,7 +162,7 @@ func (c *CustomSource) Load(ctx context.Context, rules apitypes.ScoringRules, te
 }
 
 func (c *CustomSource) fetch(ctx context.Context, rules apitypes.ScoringRules, teams int, slots []draft.SlotConfig) (*Raw, error) {
-	body, err := json.Marshal(wireCustom{Season: c.Season, Rules: rules, Shape: wireShape{Teams: teams, Slots: slots}})
+	body, err := json.Marshal(wireCustom{Season: c.Season, Rules: scoring.BoardRules(rules), Shape: wireShape{Teams: teams, Slots: slots}})
 	if err != nil {
 		return nil, fmt.Errorf("boards: encode the custom request: %w", err)
 	}

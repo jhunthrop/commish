@@ -1,12 +1,15 @@
 // Package scoring is a league's exact scoring rules, ScoringRules: the 21
-// rules research/model/domain.py names, in its order, with its standard
-// figures, and the conversions between the contract's closed object and
-// the rule-keyed maps the host readers build.
+// rules research/model/domain.py names (the board's rules), in its order,
+// with its standard figures, then a kicker's longer field goals and a team
+// defense's points-allowed and yards-allowed tiers, whose standard figures
+// are domain.py's fixed tier tables; and the conversions between the
+// contract's closed object and the rule-keyed maps the host readers build.
 package scoring
 
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"math"
 
 	"github.com/jhunthrop/commish/api/internal/apitypes"
@@ -22,8 +25,13 @@ type Rule struct {
 	Standard float64
 }
 
-// rules is domain.py's order and STANDARD_SCORING's figures.
-var rules = []Rule{
+// rules is domain.py's order and STANDARD_SCORING's figures, then the
+// kicking and defense rules the board does not score (tiers.go).
+var rules = append(boardRules, kickDefenseRules()...)
+
+// boardRules is the 21 rules domain.py names, the ones the boards service
+// takes (research/boards/request.py refuses any other key).
+var boardRules = []Rule{
 	{"points_per_passing_yard", 0.04}, {"points_per_passing_touchdown", 4}, {"points_per_interception", -2},
 	{"points_per_rushing_yard", 0.1}, {"points_per_rushing_touchdown", 6}, {"points_per_receiving_yard", 0.1},
 	{"points_per_receiving_touchdown", 6}, {"points_per_reception", 0}, {"points_per_fumble_lost", -2},
@@ -34,8 +42,21 @@ var rules = []Rule{
 	{"points_per_defensive_fumble_recovery", 2}, {"points_per_safety", 2},
 }
 
-// Rules is every rule in domain.py's order.
+// Rules is every rule: domain.py's order, then the kicking and defense
+// rules.
 func Rules() []Rule { return append([]Rule(nil), rules...) }
+
+// BoardRules is the rules as the boards service takes them: domain.py's
+// 21, keyed by rule. The kicking and defense rules move nothing on a
+// board (kickers and defenses rank in market order there).
+func BoardRules(r apitypes.ScoringRules) map[string]float64 {
+	all := ToMap(r)
+	out := make(map[string]float64, len(boardRules))
+	for _, b := range boardRules {
+		out[b.Key] = all[b.Key]
+	}
+	return out
+}
 
 // Reception points from which a league's rules read like PPR or half PPR:
 // the boards service picks its candidate set by them
@@ -53,10 +74,11 @@ const (
 	TEBonus   = "te_reception_bonus"
 )
 
-// FromMap is a rule-keyed map as ScoringRules. Every rule must be
-// present: a missing one is an error, never a zero.
+// FromMap is a rule-keyed map as ScoringRules. Every board rule must be
+// present: a missing one is an error, never a zero; a missing kicking or
+// defense rule reads at its standard figure, as the contract reads it.
 func FromMap(m map[string]float64) (apitypes.ScoringRules, error) {
-	for _, r := range rules {
+	for _, r := range boardRules {
 		if _, ok := m[r.Key]; !ok {
 			return apitypes.ScoringRules{}, fmt.Errorf("scoring: %s is missing", r.Key)
 		}
@@ -115,11 +137,14 @@ func PresetRules(p apitypes.ScoringPreset) apitypes.ScoringRules {
 // StoredPreset is the preset whose stored board a league's rules score
 // exactly the same as (domain.py's PPR_SCORING, HALF_PPR_SCORING,
 // STANDARD_SCORING: the standard figures with 1, 0.5 or 0 a catch), false
-// for any other rules. research.parity proves those three boards are what
-// the boards service builds for those rules, bit for bit.
+// for any other rules. Only the board's 21 rules are compared: the
+// kicking and defense rules move nothing on a board. research.parity
+// proves those three boards are what the boards service builds for those
+// rules, bit for bit.
 func StoredPreset(r apitypes.ScoringRules) (apitypes.ScoringPreset, bool) {
+	board := BoardRules(r)
 	for _, p := range []apitypes.ScoringPreset{apitypes.ScoringPresetPpr, apitypes.ScoringPresetHalfPpr, apitypes.ScoringPresetStandard} {
-		if r == PresetRules(p) {
+		if maps.Equal(board, BoardRules(PresetRules(p))) {
 			return p, true
 		}
 	}

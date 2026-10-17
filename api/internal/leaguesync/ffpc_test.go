@@ -21,6 +21,7 @@ import (
 	"github.com/jhunthrop/commish/api/internal/hosts"
 	"github.com/jhunthrop/commish/api/internal/hosts/ffpc"
 	"github.com/jhunthrop/commish/api/internal/leagues"
+	"github.com/jhunthrop/commish/api/internal/scoring"
 )
 
 const (
@@ -72,7 +73,7 @@ func TestFFPCSnapshotFromTheFixtures(t *testing.T) {
 			t.Fatalf("team %d %q owner %q, %d players", tm.RosterID, tm.Name, tm.Owner, len(tm.Players))
 		}
 	}
-	if len(snap.Scoring.Rules) != 21 || snap.Scoring.Rules["points_per_reception"] != 1 || snap.Scoring.Rules["te_reception_bonus"] != 0.5 ||
+	if len(snap.Scoring.Rules) != len(scoring.Rules()) || snap.Scoring.Rules["points_per_reception"] != 1 || snap.Scoring.Rules["te_reception_bonus"] != 0.5 ||
 		snap.Scoring.Rules["points_per_passing_yard"] != 0.05 || snap.Scoring.Rules["points_per_interception"] != -1 {
 		t.Fatalf("rules %v", snap.Scoring.Rules)
 	}

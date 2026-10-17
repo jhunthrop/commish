@@ -16,6 +16,7 @@ import (
 	"github.com/jhunthrop/commish/api/internal/entitlements"
 	"github.com/jhunthrop/commish/api/internal/httpx"
 	"github.com/jhunthrop/commish/api/internal/leagues"
+	"github.com/jhunthrop/commish/api/internal/scoring"
 )
 
 // Rate limits, per account: a page reads its league once on load and
@@ -48,6 +49,9 @@ type SavedLeagues interface {
 	Create(ctx context.Context, accountID uuid.UUID, in apitypes.LeagueInput) (apitypes.League, error)
 	Replace(ctx context.Context, accountID, id uuid.UUID, in apitypes.LeagueInput) (apitypes.League, error)
 	Delete(ctx context.Context, accountID, id uuid.UUID) error
+	// KeepScoring sets kicking and defense rules alone inside a league's
+	// custom scoring, reporting whether it wrote.
+	KeepScoring(ctx context.Context, accountID, id uuid.UUID, rules map[string]float64) (bool, error)
 }
 
 // BoardSource values our board for a league. *draftroom.Boards
@@ -334,8 +338,14 @@ func (s *Service) detach(w http.ResponseWriter, r *http.Request) {
 }
 
 // savedSettings is the saved league a link made, nil when it has none
-// or it was deleted from the setup page.
-func (s *Service) savedSettings(ctx context.Context, link Link) (*apitypes.LeagueSettings, error) {
+// or it was deleted from the setup page. Its kicking and defense rules are
+// the host's: the rules the read states that differ are set in the saved
+// league (KeepScoring, which touches nothing else), so a league saved
+// before they were kept, or whose host changed them, scores its kickers
+// and defenses as the host does. That write is a repair: when it fails it
+// is logged, the read answers the host's rules, and the next read writes
+// them.
+func (s *Service) savedSettings(ctx context.Context, link Link, read Read) (*apitypes.LeagueSettings, error) {
 	if link.LeagueID == nil {
 		return nil, nil
 	}
@@ -346,7 +356,42 @@ func (s *Service) savedSettings(ctx context.Context, link Link) (*apitypes.Leagu
 	if err != nil {
 		return nil, err
 	}
-	return &l.Settings, nil
+	settings, stated := hostKickDefense(l.Settings, read)
+	if len(stated) == 0 {
+		return &settings, nil
+	}
+	if _, err := s.Saved.KeepScoring(ctx, link.AccountID, l.Id, stated); err != nil {
+		s.Log.Warn("leaguesync: keep the host's kicking and defense rules", "league", l.Id, "err", err)
+	}
+	return &settings, nil
+}
+
+// hostKickDefense is the saved settings with the kicking and defense rules
+// the read states taken from it where they differ, and those rules. Only
+// a rule the host's read states is taken (a read kept before these rules
+// existed states none), never from a failed read, and the board's rules
+// stay as saved.
+func hostKickDefense(saved apitypes.LeagueSettings, read Read) (apitypes.LeagueSettings, map[string]float64) {
+	if read.Failed || saved.Scoring.Custom == nil {
+		return saved, nil
+	}
+	kept := scoring.ToMap(*saved.Scoring.Custom)
+	stated := map[string]float64{}
+	for key := range scoring.KickDefenseKeys() {
+		if v, ok := read.Scoring.Rules[key]; ok && kept[key] != v {
+			kept[key], stated[key] = v, v
+		}
+	}
+	if len(stated) == 0 {
+		return saved, nil
+	}
+	rules, err := scoring.FromMap(kept)
+	if err != nil {
+		return saved, nil
+	}
+	out := saved
+	out.Scoring.Custom = &rules
+	return out, stated
 }
 
 // restore undoes a detach: the league is followed again with the seat

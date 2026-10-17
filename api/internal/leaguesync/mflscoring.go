@@ -42,14 +42,6 @@ func yardBonuses() map[string]string {
 	}
 }
 
-// allowedTiers is a defense's points-allowed bracket by its exact range.
-func allowedTiers() map[string]string {
-	return map[string]string{
-		"0-0": "pts_allow_0", "1-6": "pts_allow_1_6", "7-13": "pts_allow_7_13", "14-20": "pts_allow_14_20",
-		"21-27": "pts_allow_21_27", "28-34": "pts_allow_28_34", "35-99": "pts_allow_35p", "35-999": "pts_allow_35p",
-	}
-}
-
 // fieldGoalTiers is a made field goal's flat points by its exact range.
 func fieldGoalTiers() map[string][]string {
 	return map[string][]string{
@@ -170,9 +162,10 @@ func carry(r mflRule, kind string, put func(string, float64), te map[string]floa
 		te["CC"] = r.value
 		return true
 	case kind == "def" && allowedEvents()[r.Event] && !r.perUnit:
-		key, ok := allowedTiers()[r.Range]
-		if ok {
-			put(key, r.value)
+		// A bracket lands on the points-allowed tiers it spans exactly.
+		keys, ok := scoring.Cover(scoring.PointsAllowedTiers(), r.lo, r.hi, openEnded)
+		for _, k := range keys {
+			put(k, r.value)
 		}
 		return ok
 	case (kind == "k" || kind == "offense") && r.Event == "FG" && !r.perUnit && r.lo <= 0 && r.hi >= openEnded:

@@ -2207,7 +2207,7 @@ type LeagueSync struct {
 	// ScoringDefaulted the ScoringRules keys the league does not state, each at its standard figure ("key figure")
 	ScoringDefaulted []string `json:"scoring_defaulted"`
 
-	// ScoringDropped the league's scoring rules the saved league (ScoringRules' 21 keys) does not carry, by the host's own name and figure
+	// ScoringDropped the league's scoring rules the saved league (ScoringRules) does not carry, by the host's own name and figure
 	ScoringDropped []string `json:"scoring_dropped"`
 
 	// ScoringLike the preset the league's rules score most like, what a mock without custom scoring drafts on
@@ -2898,16 +2898,16 @@ type Scoring struct {
 
 // ScoringImport defines model for ScoringImport.
 type ScoringImport struct {
-	// Applied the rules the host states
+	// Applied the rules the host states, by our names, with every points-allowed and yards-allowed tier: a tier the host does not score is 0, as the host scores it
 	Applied []string `json:"applied"`
 
-	// Defaulted the rules the host does not state, each at the standard figure
+	// Defaulted the rules the host does not state, each at the standard figure (never a tier, see applied)
 	Defaulted []string `json:"defaulted"`
 
-	// Dropped every host rule the 21 do not carry, in drafter words by group with its figure, never silently lost
+	// Dropped every host rule ScoringRules does not carry, in drafter words by group with its figure, never silently lost
 	Dropped []DroppedRule `json:"dropped"`
 
-	// Rules A league's exact scoring, the 21 rules research/model/domain.py ScoringRules names, every one required. An unknown key is a field error that names it. Points per yard for the yardage rules, per event for the rest.
+	// Rules A league's exact scoring: the 21 research/model/domain.py ScoringRules names (the board's rules), every one required, then a kicker's longer field goals and a team defense's points-allowed and yards-allowed tiers, each optional and read at its standard figure when absent (a body from before they existed stays good); every rule is always answered. An unknown key is a field error that names it. Points per yard for the yardage rules, per event for the rest. points_per_field_goal is a field goal made under 40 yards, and any field goal whose distance the stat line does not say. A tier is the points a defense scores for a game whose points or yards allowed fall in its range, both ends included; a tier the league does not score is 0.
 	Rules ScoringRules `json:"rules"`
 }
 
@@ -2925,14 +2925,26 @@ type ScoringImportInputHost string
 // ScoringPreset defines model for ScoringPreset.
 type ScoringPreset string
 
-// ScoringRules A league's exact scoring, the 21 rules research/model/domain.py ScoringRules names, every one required. An unknown key is a field error that names it. Points per yard for the yardage rules, per event for the rest.
+// ScoringRules A league's exact scoring: the 21 research/model/domain.py ScoringRules names (the board's rules), every one required, then a kicker's longer field goals and a team defense's points-allowed and yards-allowed tiers, each optional and read at its standard figure when absent (a body from before they existed stays good); every rule is always answered. An unknown key is a field error that names it. Points per yard for the yardage rules, per event for the rest. points_per_field_goal is a field goal made under 40 yards, and any field goal whose distance the stat line does not say. A tier is the points a defense scores for a game whose points or yards allowed fall in its range, both ends included; a tier the league does not score is 0.
 type ScoringRules struct {
+	PointsAllowed0                   float64 `json:"points_allowed_0"`
+	PointsAllowed1417                float64 `json:"points_allowed_14_17"`
+	PointsAllowed1820                float64 `json:"points_allowed_18_20"`
+	PointsAllowed16                  float64 `json:"points_allowed_1_6"`
+	PointsAllowed21                  float64 `json:"points_allowed_21"`
+	PointsAllowed2227                float64 `json:"points_allowed_22_27"`
+	PointsAllowed2834                float64 `json:"points_allowed_28_34"`
+	PointsAllowed3545                float64 `json:"points_allowed_35_45"`
+	PointsAllowed46Plus              float64 `json:"points_allowed_46_plus"`
+	PointsAllowed713                 float64 `json:"points_allowed_7_13"`
 	PointsPerDefensiveFumbleRecovery float64 `json:"points_per_defensive_fumble_recovery"`
 	PointsPerDefensiveInterception   float64 `json:"points_per_defensive_interception"`
 	PointsPerDefensiveTouchdown      float64 `json:"points_per_defensive_touchdown"`
 	PointsPerExtraPoint              float64 `json:"points_per_extra_point"`
 	PointsPerExtraPointMissed        float64 `json:"points_per_extra_point_missed"`
 	PointsPerFieldGoal               float64 `json:"points_per_field_goal"`
+	PointsPerFieldGoal4049           float64 `json:"points_per_field_goal_40_49"`
+	PointsPerFieldGoal50Plus         float64 `json:"points_per_field_goal_50_plus"`
 	PointsPerFieldGoalMissed         float64 `json:"points_per_field_goal_missed"`
 	PointsPerFumbleLost              float64 `json:"points_per_fumble_lost"`
 	PointsPerInterception            float64 `json:"points_per_interception"`
@@ -2948,6 +2960,15 @@ type ScoringRules struct {
 	PointsPerSafety                  float64 `json:"points_per_safety"`
 	PointsPerTwoPointConversion      float64 `json:"points_per_two_point_conversion"`
 	TeReceptionBonus                 float64 `json:"te_reception_bonus"`
+	YardsAllowed099                  float64 `json:"yards_allowed_0_99"`
+	YardsAllowed100199               float64 `json:"yards_allowed_100_199"`
+	YardsAllowed200299               float64 `json:"yards_allowed_200_299"`
+	YardsAllowed300349               float64 `json:"yards_allowed_300_349"`
+	YardsAllowed350399               float64 `json:"yards_allowed_350_399"`
+	YardsAllowed400449               float64 `json:"yards_allowed_400_449"`
+	YardsAllowed450499               float64 `json:"yards_allowed_450_499"`
+	YardsAllowed500549               float64 `json:"yards_allowed_500_549"`
+	YardsAllowed550Plus              float64 `json:"yards_allowed_550_plus"`
 }
 
 // Sheet defines model for Sheet.

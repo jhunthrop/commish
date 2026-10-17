@@ -16,6 +16,7 @@ import (
 	"github.com/jhunthrop/commish/api/internal/db/dbtest"
 	"github.com/jhunthrop/commish/api/internal/entitlements"
 	"github.com/jhunthrop/commish/api/internal/espn"
+	"github.com/jhunthrop/commish/api/internal/scoring"
 )
 
 var (
@@ -152,7 +153,7 @@ func importAs(t *testing.T, svc *Service, accountID uuid.UUID, host, link string
 	return w.Code, env.Data, env.Error
 }
 
-// A league's scoring imports as the 21 rules with what was applied,
+// A league's scoring imports as every rule with what was applied,
 // dropped and defaulted named, from Sleeper, MyFantasyLeague and a public
 // ESPN league; a private ESPN league says how to make it readable; and the
 // import itself needs custom_scoring.
@@ -171,7 +172,7 @@ func TestImportScoring(t *testing.T) {
 	}
 	for _, c := range []struct{ host, link string }{{"sleeper", sleeperLink}, {"mfl", mflLink}} {
 		status, got, e := importAs(t, svc, alice, c.host, c.link)
-		if status != http.StatusOK || len(got.Applied) == 0 || len(got.Applied)+len(got.Defaulted) != 21 || got.Dropped == nil {
+		if status != http.StatusOK || len(got.Applied) == 0 || len(got.Applied)+len(got.Defaulted) != len(scoring.Rules()) || got.Dropped == nil {
 			t.Errorf("%s: %d %+v %+v", c.host, status, got, e)
 		}
 	}

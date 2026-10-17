@@ -25,8 +25,9 @@ func weekFactsSchema(t *testing.T, pool *pgxpool.Pool, schema string) {
 		`create table ` + schema + `.provider_games (season int, week int, home_team text, away_team text, game_date date, kickoff_et text)`,
 		`create table ` + schema + `.team_week_observations (season int, week int, team text, source text, metric text, as_of timestamptz, value float8)`,
 		`create table ` + schema + `.capture_snapshots (source text, payload jsonb, captured_at timestamptz)`,
-		`insert into ` + schema + `.provider_players values ('p1', 'A Back', 'RB', 'LAR'), ('p2', 'A Receiver', 'WR', 'BUF')`,
-		`insert into ` + schema + `.player_crosswalk values ('p1', 'u1'), ('p2', 'u2')`,
+		`insert into ` + schema + `.provider_players values ('p1', 'A Back', 'RB', 'LAR'), ('p2', 'A Receiver', 'WR', 'BUF'),
+			('p3', 'A Kicker', 'K', 'BUF'), ('DST-BUF', 'Bills defense', 'DEF', 'BUF')`,
+		`insert into ` + schema + `.player_crosswalk values ('p1', 'u1'), ('p2', 'u2'), ('p3', 'u4'), ('DST-BUF', 'team-def:BUF')`,
 		// u1's rushing yards were restated: the newer row wins. u3 is not
 		// crossed to the provider and is left out; a passing row from
 		// another source and a metric no rule scores are ignored.
@@ -38,7 +39,20 @@ func weekFactsSchema(t *testing.T, pool *pgxpool.Pool, schema string) {
 			(2026, 1, 'u1', 'nflverse_pbp_derived', 'passing_yards', '2026-09-10', 999),
 			(2026, 1, 'u3', 'nflverse_player_week', 'receptions', '2026-09-10', 9),
 			(2026, 2, 'u2', 'nflverse_player_week', 'receptions', '2026-09-17', 7),
-			(2025, 2, 'u2', 'nflverse_player_week', 'receptions', '2025-09-17', 1)`,
+			(2025, 2, 'u2', 'nflverse_player_week', 'receptions', '2025-09-17', 1),
+			(2026, 1, 'u4', 'nflverse_kdef_week', 'field_goals_made', '2026-09-14', 2),
+			(2026, 1, 'u4', 'nflverse_player_week', 'field_goals_made', '2026-09-15', 0),
+			(2026, 1, 'u4', 'nflverse_kdef_week', 'field_goals_made_60_plus', '2026-09-14', 1),
+			(2026, 1, 'u4', 'nflverse_kdef_week', 'field_goals_missed', '2026-09-14', 1),
+			(2026, 1, 'u4', 'nflverse_kdef_week', 'extra_points_made', '2026-09-14', 3),
+			(2026, 1, 'u4', 'nflverse_kdef_week', 'field_goals_blocked', '2026-09-14', 0),
+			(2026, 1, 'team-def:BUF', 'nflverse_kdef_week', 'points_allowed', '2026-09-14', 17),
+			(2026, 1, 'team-def:BUF', 'nflverse_kdef_week', 'yards_allowed', '2026-09-14', 320),
+			(2026, 1, 'team-def:BUF', 'nflverse_kdef_week', 'sacks', '2026-09-14', 2),
+			(2026, 1, 'team-def:BUF', 'nflverse_kdef_week', 'safeties', '2026-09-14', 1),
+			(2026, 1, 'team-def:BUF', 'nflverse_kdef_week', 'return_touchdowns', '2026-09-14', 1),
+			(2026, 1, 'team-def:BUF', 'nflverse_kdef_week', 'defensive_fumbles_recovered', '2026-09-14', 1),
+			(2026, 1, 'team-def:BUF', 'nflverse_kdef_week', 'passing_yards_allowed', '2026-09-14', 250)`,
 		`insert into ` + schema + `.player_week_teams values (2026, 1, 'u1', 'LA', '2026-09-10'), (2026, 2, 'u2', 'BUF', '2026-09-17')`,
 		`insert into ` + schema + `.provider_games values
 			(2026, 1, 'LAR', 'BUF', '2026-09-13', '4:25p'), (2026, 2, 'BUF', 'MIA', '2026-09-20', 'TBD')`,
@@ -72,9 +86,24 @@ func TestWeekFactReads(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(lines) != 2 {
-		t.Fatalf("lines %+v, want p1 week 1 and p2 week 2", lines)
+	if len(lines) != 4 {
+		t.Fatalf("lines %+v, want the defense and p1 week 1, p2 week 2, p3 week 1", lines)
 	}
+	// A kicker's and a team defense's results are read with everyone's,
+	// from their own source (Lane 70a's nflverse_kdef_week), which wins a
+	// metric both sources hold: the published stats write a kicker's field
+	// goals as zero. A defense has no club edge and plays for its own club.
+	def, k := lines[0], lines[3]
+	if def.PlayerID != "DST-BUF" || def.Position != "DEF" || def.Team != "BUF" || def.Metrics["points_allowed"] != 17 ||
+		def.Metrics["yards_allowed"] != 320 || def.Metrics["safeties"] != 1 || def.Metrics["return_touchdowns"] != 1 ||
+		def.Metrics["defensive_fumbles_recovered"] != 1 || len(def.Metrics) != 6 {
+		t.Fatalf("the defense's line %+v", def)
+	}
+	if k.PlayerID != "p3" || k.Team != "" || k.Metrics["field_goals_made"] != 2 || k.Metrics["field_goals_made_60_plus"] != 1 ||
+		k.Metrics["field_goals_missed"] != 1 || len(k.Metrics) != 4 {
+		t.Fatalf("the kicker's line %+v", k)
+	}
+	lines = lines[1:3]
 	l := lines[0]
 	if l.PlayerID != "p1" || l.Week != 1 || l.Team != "LAR" || l.Position != "RB" ||
 		l.Metrics["rushing_yards"] != 85 || l.Metrics["receptions"] != 3 || len(l.Metrics) != 2 {
