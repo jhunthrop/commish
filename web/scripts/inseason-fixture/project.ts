@@ -373,7 +373,179 @@ const stampedLineup: LineupAdvice = {
 	player_points: true,
 	team_points: null
 };
-const stampedWaivers = stamp(waivers);
+/** Lane 66f: an unrostered defense in the pool, so the table shows a club mark with its Proj (the
+ * recorded league starts no kicker, so its pool holds none). A stand-in pick: the fixture does not
+ * hold every roster's defense. */
+const POOL_DEFENSE: LeaguePlayer = {
+	host_id: '',
+	board_id: null,
+	name: 'Kansas City Chiefs',
+	position: DEFENSE,
+	team: 'KC',
+	injured_reserve: false
+};
+
+/** A stand-in waiver day for one add, so a shot shows the Game cell's "Clears" (Yahoo gives it; the
+ * recorded Sleeper league does not). */
+const CLEARS: Readonly<Record<string, string>> = { "De'Von Achane": '2026-10-21' };
+
+/** The lineup the advice sets this week from a roster, by the Lineup's rule (the order above): its
+ * Proj as printed and summed, and who starts. */
+function weekFill(roster: readonly PlayerLine[]): { proj: number; starts: Set<string> } {
+	const order = [...roster].sort(better);
+	const kinds = stampedLineup.slots.map((s) => s.slot);
+	const chosen = new Set<string>();
+	const pick = (slot: LineupSlot['slot']): void => {
+		const best = order.find(
+			(l) => tierOf(l) === 0 && !chosen.has(l.player.host_id) && accepts(slot, l.player.position)
+		);
+		if (best) chosen.add(best.player.host_id);
+	};
+	kinds.filter((k) => k !== 'FLEX').forEach(pick);
+	kinds.filter((k) => k === 'FLEX').forEach(pick);
+	const proj = order
+		.filter((l) => chosen.has(l.player.host_id))
+		.reduce((sum, l) => sum + (printedProj(l) ?? 0), 0);
+	return { proj: Math.round(proj * TENTH) / TENTH, starts: chosen };
+}
+
+const tenth = (v: number): number => Math.round(v * TENTH) / TENTH;
+
+/** Lane 66f's waiver fields, as the API answers them (inseason pickups.go), on the fixture's own
+ * figures: this week's Proj gain on the Lineup's rule, whom he beats (the lowest Proj he tops at his
+ * position, starters first), the pickup rule, the strip's cards (each topping a different player
+ * with a different drop) and every drop with both gains. The rest-of-season gain of a drop other
+ * than the row's own is a stand-in: the row's gain moved by the difference in the two players'
+ * points over replacement. */
+function pickupTable(advice: WaiverAdvice): WaiverAdvice {
+	const roster = [...stampedLineup.slots.map((s) => s.ours), ...stampedLineup.bench];
+	const base = weekFill(roster);
+	// An add is named by his board id until a platform names him (the API's pool row).
+	const key = (l: PlayerLine): string =>
+		l.player.host_id || `board:${l.player.board_id ?? l.player.name}`;
+	const swap = (add: PlayerLine, drop: PlayerLine | null): { gain: number; starts: boolean } => {
+		const after = weekFill([
+			...roster.filter((l) => l.player.host_id !== drop?.player.host_id),
+			{ ...add, player: { ...add.player, host_id: key(add) } }
+		]);
+		const starts = after.starts.has(key(add));
+		return { gain: starts ? tenth(after.proj - base.proj) : 0, starts };
+	};
+	const beats = (add: PlayerLine): WaiverAdvice['rows'][number]['beats'] => {
+		const proj = printedProj(add);
+		if (proj === null || tierOf(add) !== 0) return null;
+		for (const starter of [true, false]) {
+			const topped = roster.filter((l) => {
+				const p = printedProj(l);
+				return (
+					l.player.position === add.player.position &&
+					p !== null &&
+					p < proj &&
+					base.starts.has(l.player.host_id) === starter
+				);
+			});
+			const low = topped.sort((a, b) => (printedProj(a) ?? 0) - (printedProj(b) ?? 0))[0];
+			if (low) {
+				return {
+					host_id: low.player.host_id,
+					name: low.player.name,
+					starter,
+					gain: tenth(proj - (printedProj(low) ?? 0))
+				};
+			}
+		}
+		return null;
+	};
+	const por = (l: PlayerLine | null): number => l?.points_over_replacement ?? 0;
+	const defense = lineOf(POOL_DEFENSE);
+	// The defense's row is added once: a rerun reads this file back.
+	const pool = [
+		...advice.rows.filter((r) => r.add.player.name !== POOL_DEFENSE.name),
+		{
+			add: defense,
+			drop: stampedLineup.slots.find((s) => s.slot === 'DEF')?.ours ?? null,
+			gain: 0.3,
+			starts: false,
+			sentence: `${defense.player.name} would start for you this week on the Proj shown.`,
+			week_gain: 0,
+			pickup: false,
+			beats: null,
+			drops: [],
+			clears: null
+		}
+	];
+	const bench = stampedLineup.bench.filter((l) => !l.held && l.player.name !== IN_RESERVE);
+	// The drop it costs least to lose, as the API picks it: the bench player with the least points
+	// over replacement; a defense for a defense, the starter he replaces.
+	const cheapest = [...bench].sort((a, b) => por(a) - por(b))[0] ?? null;
+	const rows = pool.map((source): WaiverAdvice['rows'][number] => {
+		const row = source.add.player.position === DEFENSE ? source : { ...source, drop: cheapest };
+		const own = swap(row.add, row.drop);
+		// A defense replaces the starting defense alone; a skill player any bench player.
+		const choices = source.add.player.position === DEFENSE ? (row.drop ? [row.drop] : []) : bench;
+		const drops = choices
+			.map((d) => ({
+				host_id: d.player.host_id,
+				gain: tenth(row.gain + por(row.drop) - por(d)),
+				week_gain: swap(row.add, d).gain
+			}))
+			.sort((a, b) =>
+				a.host_id === row.drop?.player.host_id
+					? -1
+					: b.host_id === row.drop?.player.host_id
+						? 1
+						: b.gain - a.gain
+			);
+		const out = {
+			...row,
+			week_gain: own.gain,
+			starts: own.starts,
+			beats: beats(row.add),
+			drops,
+			clears: CLEARS[row.add.player.name] ?? null
+		};
+		return { ...out, pickup: out.starts && out.week_gain > 0 && tenth(out.gain) >= 0 };
+	});
+	const used = new Set<string>();
+	const pickups = rows
+		.filter((r) => r.pickup)
+		.sort((a, b) => b.week_gain - a.week_gain)
+		.filter((r) => {
+			const keys = [
+				...(r.beats ? [`beats:${r.beats.host_id}`] : []),
+				...(r.drop ? [`drop:${r.drop.player.host_id}`] : [])
+			];
+			if (keys.some((k) => used.has(k))) return false;
+			keys.forEach((k) => used.add(k));
+			return true;
+		})
+		.slice(0, 3);
+	return {
+		...advice,
+		basis:
+			'A pickup worth making starts for you this week on the Proj shown and does not lower your lineup over the rest of the season on our rest-of-season order. Its drop is the player you lose least by.',
+		season_basis:
+			"Rest of season is his points a game on our rest-of-season projection from week 6 over the games his club has left, byes out. A gain a week is your lineup's points over replacement, above what a free pickup at his position gives you: the rest of the season on our rest-of-season order, averaged over its 12 weeks.",
+		rows,
+		pickups,
+		best: pickups[0] ?? null,
+		roster,
+		lineup_proj: base.proj,
+		// Sleeper takes no claim from our screen: the API's line under the verb (inseason CopyOnlyClaims).
+		moves: {
+			claim: 'unavailable',
+			note: null,
+			takes_writes: false,
+			writes_on: false,
+			reason: 'Sleeper does not take claims from here, so add him on its waiver page.'
+		},
+		projection_read_at: PROJECTION_READ_AT,
+		projection_previous_read_at: PREVIOUS_READ_AT,
+		projection_scoring: PROJECTION_SCORING
+	};
+}
+
+const stampedWaivers = pickupTable(stamp(waivers));
 const stampedTrades = stamp(trades);
 
 /** Every line the answers carry, by host id: the drafter's from the lineup, the rest from the trade

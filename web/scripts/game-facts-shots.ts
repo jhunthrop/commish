@@ -50,9 +50,10 @@ const PAGES = [
 	{
 		name: 'waivers',
 		path: `/league/${id}/waivers`,
-		ready: 'Claim on Sleeper',
-		phone: false,
-		box: false
+		ready: 'Open Sleeper waivers',
+		// The pickup table is a box score too (Lane 66f): its Game cells and one read line.
+		phone: true,
+		box: true
 	},
 	{
 		name: 'trades',
@@ -120,11 +121,13 @@ async function boxFacts(
 				.filter(visible)
 				.map((el) => (el as HTMLElement).innerText.trim());
 		const rows = [
-			...document.querySelectorAll('main table.box tbody tr, main table.lineup tbody tr')
+			...document.querySelectorAll(
+				'main table.box tbody tr, main table.lineup tbody tr, main table.pool tbody tr'
+			)
 		];
 		return {
-			expected: texts('main table.box .exp, main table.lineup .exp'),
-			weather: texts('main table.box .wx, main table.lineup .wx'),
+			expected: texts('main table.box .exp, main table.lineup .exp, main table.pool .exp'),
+			weather: texts('main table.box .wx, main table.lineup .wx, main table.pool .wx'),
 			text: document.body.innerText,
 			stamped: rows.filter((tr) => /\bRead \w{3} /.test(tr.textContent)).length
 		};

@@ -614,7 +614,13 @@ async function waivers(held: ReadonlySet<string>): Promise<WaiverAdvice> {
 			gain,
 			// As the API answers: he starts for you only with a gain to show.
 			starts: at >= 0 && gain > 0,
-			sentence: waiverSentence(add, best?.drop ?? null, gain, at >= 0)
+			sentence: waiverSentence(add, best?.drop ?? null, gain, at >= 0),
+			// The week's figures (Lane 66f) need the projection: project.ts stamps them.
+			week_gain: 0,
+			pickup: false,
+			beats: null,
+			drops: [],
+			clears: null
 		};
 	});
 	const gaining = rows.filter((r) => r.gain > 0).sort((a, b) => b.gain - a.gain);
@@ -627,8 +633,22 @@ async function waivers(held: ReadonlySet<string>): Promise<WaiverAdvice> {
 		rows: [...gaining, ...rest],
 		host_waivers_url: `https://sleeper.com/leagues/${league.league_id}/players`,
 		host_note: null,
-		// Sleeper has no write path: the verb is the host's page.
-		moves: { claim: 'unavailable', note: null }
+		// Sleeper has no write path: the verb is the platform's page (inseason CopyOnlyClaims).
+		moves: {
+			claim: 'unavailable',
+			note: null,
+			takes_writes: false,
+			writes_on: false,
+			reason: 'Sleeper does not take claims from here, so add him on its waiver page.'
+		},
+		// Lane 66f: the pickup table's own fields, stamped by project.ts with the projection.
+		season_basis: '',
+		lineup_proj: null,
+		pickups: [],
+		roster: myLines,
+		projection_read_at: null,
+		projection_previous_read_at: null,
+		projection_scoring: { format: 'ppr', league_own: false }
 	};
 }
 

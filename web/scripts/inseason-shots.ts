@@ -11,7 +11,10 @@
 // with its club's mark. On the Lineup table (Lane 66e) it asserts the evidence heads and cells,
 // each swap's chip, arrow and evidence line, the bench arrow reading Sit, the copy verb with the
 // platform's own line under it, and that no sentence on the Lineup or Matchup says "host" (the
-// member's platform is named). Exits non-zero when a page scrolls sideways, a
+// member's platform is named). On the Waivers table (Lane 66f) it asserts the heads, every Proj and Rest of
+// season cell, the tint on the strip's pickups alone, the count of free agents with the platform
+// named, the basis at five lines at most with the pickup rule first, the drop panel and the copy
+// verb's confirm. Exits non-zero when a page scrolls sideways, a
 // phone's first row is under the pin, or a figure or its sentence is missing.
 //
 //   node scripts/inseason-shots.ts [web origin] [out dir, from scripts/]
@@ -39,7 +42,7 @@ const PAGES = [
 	{ name: 'league', path: `/league/${id}`, ready: 'Waiver pool' },
 	{ name: 'start', path: `/league/${id}/start`, ready: 'Copy the lineup' },
 	{ name: 'matchup', path: `/league/${id}/matchup`, ready: 'Week 6' },
-	{ name: 'waivers', path: `/league/${id}/waivers`, ready: 'Claim on Sleeper' },
+	{ name: 'waivers', path: `/league/${id}/waivers`, ready: 'Open Sleeper waivers' },
 	{ name: 'trades', path: `/league/${id}/trades`, ready: 'Propose on Sleeper' }
 ] as const;
 
@@ -75,7 +78,7 @@ function file(name: string): string {
 
 const scrolls: string[] = [];
 /** The screens whose rows carry his rest-of-season points a game, and the basis sentence saying so. */
-const PER_GAME_SCREENS = new Set(['waivers', 'trades']);
+const PER_GAME_SCREENS = new Set(['trades']);
 /** The screens drawn as a box score (Lane 66d): columns, the week's projection and points so far,
  * the projection's basis said once, no points a game on a row. */
 const BOX_SCREENS = new Set(['start', 'matchup']);
@@ -101,6 +104,23 @@ const PHONE_HEADS = ['Slot', 'Player', 'Proj', 'Pts', 'Why'];
 /** Below 900 px the evidence folds under the name. */
 const FOLDED_HEADS = ['Slot', 'Player', 'Game', 'Proj', 'Pts', 'Why'];
 const EVIDENCE_FOLDS_AT = 900;
+/** The Waivers table's heads at the desk, folded below 900 px, and on a phone (Lane 66f). */
+const WAIVER_HEADS = [
+	'Player',
+	'Game',
+	'Proj',
+	'Opp rank',
+	'Avg',
+	'Last',
+	'Δ Proj',
+	'Rest of season',
+	'Beats',
+	'Add'
+];
+const WAIVER_FOLDED = ['Player', 'Game', 'Proj', 'Beats', 'Add'];
+const WAIVER_PHONE = ['Player', 'Proj', 'Beats', 'Add'];
+const PICKUP_RULE = 'A pickup worth making starts for you this week';
+const MOST_BASIS_LINES = 5;
 
 /** What a box score screen draws, for the checks: its column heads, each row's two numbers, its
  * basis, any row cell whose name is cut, and whether a row says points a game. */
@@ -201,7 +221,7 @@ for (const { name, path, ready: text } of PAGES) {
 					0,
 					...[
 						...document.querySelectorAll(
-							'main .row, main table.box tbody tr, main table.lineup tbody tr'
+							'main .row, main table.box tbody tr, main table.lineup tbody tr, main table.pool tbody tr'
 						)
 					].map((r) => r.getBoundingClientRect().height)
 				)
@@ -224,6 +244,11 @@ for (const { name, path, ready: text } of PAGES) {
 					for (const who of await unnamedEnds(page, 'main')) {
 						missing.push(`${name} ${theme} ${String(width)} row end unnamed: ${who}`);
 					}
+				}
+			}
+			if (name === 'waivers') {
+				for (const fault of await waiverFaults(page, width)) {
+					missing.push(`waivers ${theme} ${String(width)} ${fault}`);
 				}
 			}
 			if (BOX_SCREENS.has(name)) {
@@ -279,7 +304,9 @@ for (const { name, path, ready: text } of PAGES) {
 				await page.setViewportSize(PHONE);
 				const fold = await page.evaluate(() => {
 					const row = document
-						.querySelector('main .row, main table.box tbody tr, main table.lineup tbody tr')
+						.querySelector(
+							'main .row, main table.box tbody tr, main table.lineup tbody tr, main table.pool tbody tr'
+						)
 						?.getBoundingClientRect();
 					const pin = document.querySelector('.pin')?.getBoundingClientRect();
 					return { rowBottom: row?.bottom ?? Infinity, pinTop: pin?.top ?? 0 };
@@ -305,14 +332,25 @@ for (const { name, path, ready: text } of PAGES) {
 for (const width of SHOT_WIDTHS) {
 	const ctx = await context('dark', width);
 	const page = await ctx.newPage();
+	// The copy verb puts his name on the clipboard and opens the platform's page, kept off the network.
+	await ctx.grantPermissions(['clipboard-read', 'clipboard-write']);
+	await ctx.route('https://sleeper.com/**', (route) => route.abort());
 	await page.goto(`${web}/league/${id}/waivers`, { waitUntil: 'networkidle' });
-	await ready(page, 'Claim on Sleeper');
-	await page.getByRole('button', { name: 'Add', exact: true }).nth(2).click();
-	await page.screenshot({ path: file(`waivers-marked-dark-${String(width)}`), fullPage: true });
+	await ready(page, 'Open Sleeper waivers');
+	// Add opens the players he could replace, the advice's drop first.
+	await page.locator('main button.add').first().click();
+	await ready(page, 'Drop one for');
+	await page.screenshot({ path: file(`waivers-drops-dark-${String(width)}`), fullPage: true });
+	await page.locator('main tr.dgo').getByRole('button', { name: 'Open Sleeper waivers' }).click();
+	await ready(page, "Add him on Sleeper's waiver page");
+	const confirmed = await page.locator('main tr.dgo .why').innerText();
+	if (!/^Copied \S+\. Add him on Sleeper's waiver page\.$/.test(confirmed.trim()))
+		missing.push(`waivers copy confirm ${String(width)}: ${confirmed}`);
+	await page.screenshot({ path: file(`waivers-copied-dark-${String(width)}`), fullPage: true });
 	// A position chip reads the adds at that position again (?position=).
-	await page.getByRole('button', { name: 'RB', exact: true }).click();
+	await page.getByRole('button', { name: 'WR', exact: true }).click();
 	await page.locator('.rows[aria-busy="false"]').waitFor({ timeout: READY_TIMEOUT_MS });
-	await page.screenshot({ path: file(`waivers-rb-dark-${String(width)}`), fullPage: true });
+	await page.screenshot({ path: file(`waivers-wr-dark-${String(width)}`), fullPage: true });
 	await page.goto(`${web}/league/${id}/trades`, { waitUntil: 'networkidle' });
 	await ready(page, 'Propose on Sleeper');
 	await page.getByRole('combobox').selectOption({ label: 'Patrick Mahomes' });
@@ -392,6 +430,44 @@ async function hostWordsSaid(page: Page): Promise<string[]> {
  * swap's chip for every row moved in, each with its arrow and its button, its evidence line opening
  * on a tap, the bench arrow reading Sit, the evidence basis said once, and the copy verb with the
  * platform's line under it. */
+/** What is wrong with the Waivers table at a width, as sentences; none when it holds. */
+async function waiverFaults(page: Page, width: number): Promise<string[]> {
+	const seen = await page.evaluate(() => {
+		const table = document.querySelector('main table.pool');
+		const text = (el: Element): string => (el as HTMLElement).innerText.trim();
+		const rows = [...(table?.querySelectorAll('tbody tr:not(.dsect):not(.dgo)') ?? [])];
+		return {
+			heads: [...(table?.querySelectorAll('thead th') ?? [])].map(text).filter((h) => h !== ''),
+			proj: rows.map((tr) => text(tr.querySelector('td.proj') ?? tr)),
+			rest: rows.map((tr) => tr.querySelector('td.rest')?.textContent.trim() ?? ''),
+			tinted: rows.filter((tr) => tr.classList.contains('moved-in')).length,
+			cards: document.querySelectorAll('main .cards .card').length,
+			count: document.querySelector('main .count')?.textContent ?? '',
+			basis: [...document.querySelectorAll('main .basis p')].map(text),
+			phoneRest: rows.some((tr) => /Rest of season (\d+\.\d|--)/.test(text(tr)))
+		};
+	});
+	const faults: string[] = [];
+	const heads =
+		width <= PHONE.width ? WAIVER_PHONE : width <= EVIDENCE_FOLDS_AT ? WAIVER_FOLDED : WAIVER_HEADS;
+	if (seen.heads.join(' ').toLowerCase() !== heads.join(' ').toLowerCase())
+		faults.push(`heads ${seen.heads.join(' ')}`);
+	if (seen.proj.length === 0 || !seen.proj.every((n) => BOX_NUMBER.test(n)))
+		faults.push(`proj ${seen.proj.join(' ')}`);
+	if (width > EVIDENCE_FOLDS_AT && !seen.rest.every((n) => BOX_NUMBER.test(n)))
+		faults.push(`rest of season ${seen.rest.join(' ')}`);
+	if (width <= EVIDENCE_FOLDS_AT && !seen.phoneRest) faults.push('no Rest of season under a name');
+	if (seen.cards === 0 || seen.tinted !== seen.cards)
+		faults.push(`${String(seen.tinted)} rows tinted for ${String(seen.cards)} cards`);
+	if (width > PHONE.width && !/^\d+ free agents? on Sleeper$/.test(seen.count))
+		faults.push(`count ${seen.count}`);
+	if (seen.basis.length === 0 || seen.basis.length > MOST_BASIS_LINES)
+		faults.push(`${String(seen.basis.length)} basis lines`);
+	if (!seen.basis[0]?.startsWith(PICKUP_RULE)) faults.push(`basis first ${seen.basis[0] ?? ''}`);
+	for (const word of await hostWordsSaid(page)) faults.push(`says host: ${word}`);
+	return faults;
+}
+
 async function lineupFaults(page: Page): Promise<string[]> {
 	const faults: string[] = [];
 	const seen = await page.evaluate(() => {
@@ -515,8 +591,12 @@ for (const theme of THEMES) {
 			const ctx = await context(theme, width);
 			const page = await ctx.newPage();
 			await page.goto(`${web}/league/${claim.id}/waivers`, { waitUntil: 'networkidle' });
-			await ready(page, 'Claim on ESPN');
-			await page.getByRole('button', { name: 'Add', exact: true }).first().click();
+			await ready(page, 'Add on ESPN');
+			await page
+				.getByRole('button', { name: 'Add on ESPN' })
+				.filter({ visible: true })
+				.first()
+				.click();
 			await ready(page, claim.plan);
 			await page.screenshot({
 				path: file(`waivers-claim-confirm-${claim.name}-${theme}-${String(width)}`)

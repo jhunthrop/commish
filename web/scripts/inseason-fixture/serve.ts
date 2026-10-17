@@ -166,7 +166,8 @@ function send(
 function waiversAt(position: string | null): WaiverAdvice {
 	if (position === null) return waivers;
 	const rows = waivers.rows.filter((row) => row.add.player.position === position);
-	return { ...waivers, rows, best: rows.find((row) => row.gain > 0) ?? null };
+	const pickups = waivers.pickups.filter((row) => row.add.player.position === position);
+	return { ...waivers, rows, pickups, best: pickups[0] ?? null };
 }
 
 function tradesHolding(player: string | null): TradeAdvice {
@@ -325,9 +326,10 @@ function espnWaivers(position: string | null): WaiverAdvice {
 	return {
 		...named,
 		rows: named.rows.map(withId),
+		pickups: named.pickups.map(withId),
 		best: named.best ? withId(named.best) : null,
 		host_waivers_url: ESPN_LEAGUE_URL,
-		moves: { claim: 'available', note: null }
+		moves: { claim: 'available', note: null, takes_writes: true, writes_on: true, reason: null }
 	};
 }
 
