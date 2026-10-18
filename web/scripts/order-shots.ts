@@ -5,7 +5,7 @@
 // record reads the run the site was built from. At 1440, 1024, 800, 768 and 390 it asserts the page
 // never scrolls sideways, and at 1440 that the basis draws at most five rendered lines (measured, never
 // counted in paragraphs). It also asserts the heads ("Our rest-of-season order" over #, Rest of season
-// over Total and A game), that every figure cell prints one decimal or --, that Trade for him sits on
+// over Points and A game), that every figure cell prints one decimal or --, that Trade for him sits on
 // fewer than a third of the rows, that no word says "host", the record's Order matched head with the
 // published projection's -- before its week, the honest sentence where the run carries one, and the
 // record's chart at least 200 px tall on a phone. Exits non-zero on any fault.
@@ -75,7 +75,7 @@ const CAPTION = `# Lane 66j shots
   the recorded Sleeper league's answers carry, real as served (rest-of-season points a game, the week's facts,
   Proj, Avg, Last, Opp rank, status), its rosters, the trade finder's best trade with each team and the Waivers
   answer's claim moves (Sleeper takes no claim from here, so the add verb reads "Open Sleeper waivers").
-  STAND-INS: the fixture holds 85 of the order's players; each Total is the points a game times his club's games
+  STAND-INS: the fixture holds 85 of the order's players; each Points figure is the points a game times his club's games
   left and each Over repl. the points over replacement a week times 12, which the API reads from the board; a
   position's # is the fixture's own order of those totals among the players it holds; every Proj is the
   fixture's one projection snapshot, the week 1 published figure.
@@ -166,7 +166,7 @@ async function orderFaults(page: Page, screen: Screen, width: number): Promise<s
 		if (!seen.heads.includes(head))
 			said.push(`${screen.name} at ${String(width)}: no ${head} head`);
 	}
-	if (!seen.heads.includes('Total') && !seen.heads.includes('Over repl.'))
+	if (!seen.heads.includes('Points') && !seen.heads.includes('Over repl.'))
 		said.push(`${screen.name} at ${String(width)}: no key head`);
 	if (width >= FOLDS_AT && !seen.heads.includes('A game'))
 		said.push(`${screen.name}: no A game head`);

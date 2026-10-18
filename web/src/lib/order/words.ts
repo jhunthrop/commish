@@ -7,7 +7,9 @@ export const ORDER = {
 	rankGroup: 'Our rest-of-season order',
 	roster: 'Roster',
 	restGroup: 'Rest of season',
-	total: 'Total',
+	/** The rest-of-season points head, under the Rest of season group: "Points", never "Total", a
+	 * betting word on the site's list (Lane 66n re-review 2 F2). */
+	total: 'Points',
 	overRepl: 'Over repl.',
 	perGame: 'A game',
 	yours: 'Yours',

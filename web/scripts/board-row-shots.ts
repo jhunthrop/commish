@@ -82,9 +82,7 @@ async function pageWords(page: Page): Promise<string> {
 	return page.evaluate(() => {
 		const main = document.querySelector('main')?.cloneNode(true);
 		if (!(main instanceof HTMLElement)) return '';
-		for (const name of main.querySelectorAll(
-			'.name, .ph a, .picked b, .opp a, td a, th.club a, .order-screen'
-		))
+		for (const name of main.querySelectorAll('.name, .ph a, .picked b, .opp a, td a, th.club a'))
 			name.remove();
 		return main.innerText;
 	});

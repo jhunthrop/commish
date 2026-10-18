@@ -1,7 +1,7 @@
 {
 	"week": 6,
-	"basis": "Our rest-of-season order from week 6: Total is his points through week 17, byes out, A game the same a game. A position ranks by Total, All by Over repl., his total less a free pickup's.",
-	"basis_note": "Points over replacement are for a 12-team league with 1 QB, 2 RB, 3 WR, 1 TE and two flex spots. Points so far leave out your league's points for two-point conversions, missed field goals, missed extra points, fumble recoveries and safeties: the stat lines we hold do not carry them.",
+	"basis": "Our rest-of-season order from week 6: Points is what he scores through week 17, byes out, A game the same a game. A position ranks by Points, All by Over repl., his points less a free pickup's.",
+	"basis_note": "Points over replacement are for a 12-team league with 1 QB, 2 RB, 3 WR, 1 TE and two flex spots. Points so far leave out your league's points for two-point conversions, missed field goals, missed extra points, fumble recoveries and safeties: the stats we hold do not carry them.",
 	"rank_by": "points_over_replacement",
 	"moves": {
 		"claim": "unavailable",
