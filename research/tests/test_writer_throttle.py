@@ -141,6 +141,16 @@ def test_a_generation_the_gateway_lost_is_charged_a_whole_generations_asks() -> 
     assert clean.asks == 1
 
 
+@pytest.mark.usefixtures("quiet_page")
+def test_any_generation_that_ends_in_its_facts_block_is_charged_a_whole_generations_asks() -> None:
+    """Re-review 73 N1, ruled: a bundle answered twice with no JSON object (two empty answers) falls to
+    its facts block on two asks; whatever ended it, a generation ending in its facts block is charged
+    the whole six, so a page starts at most two ordinary generations and the grace."""
+    result = _write(_StubGateway([Completion("", None), Completion("", None)]))
+    assert result.source == "facts"
+    assert result.asks == CAPSULE_CONFIG.max_gateway_calls_per_player
+
+
 def test_a_page_whose_generations_the_gateway_loses_starts_three_drafts_a_night() -> None:
     whole = CAPSULE_CONFIG.max_gateway_calls_per_player
     assert capsule_step.spent_out_for({"p": whole}, frozenset(), grace=False) == frozenset()

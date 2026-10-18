@@ -358,16 +358,13 @@ def _assemble(  # noqa: PLR0913, PLR0917 - one page's parts
     )
 
 
-# A read the gateway lost (a throttle past every wait, the run's budget, a refused, empty or cut answer).
-_GATEWAY_LOST: Final = frozenset({THROTTLED, BUDGET_SPENT, UNUSABLE})
-
-
 def charged_asks(asks: int, reads: Sequence[ReadResult]) -> int:
-    """The asks a generation is charged against the night's ceiling: its own, or the whole six when the
-    gateway lost a read of it. A lost bundle is one or two asks, so a page under a 429 storm could
-    otherwise start up to seven ordinary generations a night; charged the six, it starts two and the
-    grace, the ceiling's three drafts (review 73 item 5)."""
-    lost = any(read.fallback is not None and read.fallback.kind in _GATEWAY_LOST for read in reads)
+    """The asks a generation is charged against the night's ceiling: its own, or the whole six when it
+    ends in its facts block, whatever ended it (a throttle, the budget, a refused, empty or cut answer,
+    a bundle that was never one JSON object, a read that never validated). A lost bundle is one or two
+    asks, so a page could otherwise start up to seven ordinary generations a night; charged the six, it
+    starts two and the grace, the ceiling's three drafts (review 73 item 5, re-review N1)."""
+    lost = any(read.source == FACTS_SOURCE for read in reads)
     return max(asks, CAPSULE_CONFIG.max_gateway_calls_per_player) if lost else asks
 
 
