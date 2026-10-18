@@ -144,7 +144,7 @@
 					form="inline"
 				/>{/if}</span
 		>{/if}
-	{#if cell.adp}<span class="n {cell.adp}" class:none={player.adp === null}
+	{#if cell.adp}<span class="n {cell.adp}" class:absent={player.adp === null}
 			>{player.adp === null ? 'None' : fixed(player.adp)}</span
 		>{/if}
 	{#if cell.ourRank}<span class="n quiet {cell.ourRank}">{ranked ? rankShown : ''}</span>{/if}
@@ -155,7 +155,7 @@
 			>{gap === null ? '' : gap > 0 ? `+${String(gap)}` : gap < 0 ? `−${String(-gap)}` : '0'}</span
 		>{/if}
 	{#if cell.gp}<span class="n quiet {cell.gp}">{season?.games ?? ''}</span>{/if}
-	{#if cell.agame}<span class="n {cell.agame}" class:none={season?.pointsPerGame === null}
+	{#if cell.agame}<span class="n {cell.agame}" class:absent={season?.pointsPerGame === null}
 			>{season === undefined
 				? ''
 				: season.pointsPerGame === null
@@ -212,7 +212,7 @@
 		color: var(--ink-3);
 	}
 
-	.none {
+	.absent {
 		font-family: var(--font-ui);
 		font-size: var(--t-xs);
 		font-weight: 500;
