@@ -5,10 +5,10 @@
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { test } from 'node:test';
+import { BANNED_WORDS } from '#lib/format/copy-guard.ts';
 import { clubsLead, scheduleLead, winsBasis } from './strength-words.ts';
 
 const FIXTURE = new URL('../../../../research/nightly/contract/fixture/runs/', import.meta.url);
-const BETTING = /\b(odds|line|spread|sportsbook|bets?)\b|\b(season|win) totals?\b|\bvegas\b/iu;
 
 interface ScheduleFile {
 	opponentBasis: string;
@@ -27,14 +27,14 @@ void test("the run's words name expected wins and no betting figure", () => {
 		if (!slate) throw new Error('A schedule with no slate.');
 		for (const words of [schedule.opponentBasis, slate.method]) {
 			assert.match(words, /expected wins/iu, words);
-			assert.doesNotMatch(words, BETTING, words);
+			assert.doesNotMatch(words, BANNED_WORDS, words);
 		}
 	}
 });
 
 void test("the pages print the run's words as given", () => {
 	const slate = {
-		method: "the average of its opponents' expected wins for the season, one per game",
+		method: "the average of each club's opponents' expected wins for the season, one per game",
 		window: { from: '2026-09-07T12:00:00.000Z', to: '2026-09-07T12:00:00.000Z' }
 	};
 	assert.equal(
@@ -43,5 +43,5 @@ void test("the pages print the run's words as given", () => {
 	);
 	const lead = scheduleLead(slate, { count: 9, atLeast: '10.5' }, 5);
 	assert.ok(lead.startsWith(`Strength is ${slate.method}, read Sep 7.`), lead);
-	for (const line of [lead, clubsLead('PPR', slate)]) assert.doesNotMatch(line, BETTING, line);
+	for (const line of [lead, clubsLead('PPR', slate)]) assert.doesNotMatch(line, BANNED_WORDS, line);
 });

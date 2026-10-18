@@ -133,7 +133,7 @@ void test('his page names whose roster he is on, or that he is a free agent', ()
 void test("copy guard: no composed line doubles a word, the run's own phrases included", () => {
 	// The real run's method carries its own article; the pages once added a second ("the the").
 	const slate = {
-		method: "the average of its opponents' expected wins for the season, one per game",
+		method: "the average of each club's opponents' expected wins for the season, one per game",
 		window: { from: '2026-09-07T12:00:00.000Z', to: '2026-09-07T12:00:00.000Z' },
 		rank: 32
 	};

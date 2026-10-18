@@ -3,7 +3,7 @@
  * What strength is and what an opponent's figure is are the run's own words (schedule.json's
  * `method` and `opponentBasis`, research/nightly/reads/schedule.py), printed as given, so the pages
  * never describe a figure the run has changed (Lane 66n). The method is a noun phrase that carries its
- * own article ("the average of its opponents' expected wins for the season, ..."), so these lines
+ * own article ("the average of each club's opponents' expected wins for the season, ..."), so these lines
  * never add one.
  */
 import { windowLabel } from '#lib/format/date.ts';
@@ -20,7 +20,7 @@ export function winsBasis(opponentBasis: string): string {
 	return `Opponents show ${opponentBasis.charAt(0).toLowerCase()}${opponentBasis.slice(1)}.`;
 }
 
-/** "Strength is the average of its opponents' expected wins for the season, ..., read Sep 7.": the
+/** "Strength is the average of each club's opponents' expected wins for the season, ..., read Sep 7.": the
  * schedule and clubs pages' leads. */
 function strengthWords(slate: Basis): string {
 	return `Strength is ${slate.method}, read ${windowLabel(slate.window)}.`;
