@@ -509,3 +509,12 @@ def test_the_unwritten_pages_to_retry_are_those_with_a_sheet_tonight() -> None:
         "b": StoredCapsule("b", "h", "c", "f", "llm", None, None, NOW),
     }
     assert capsule_step.unwritten_with_sheets(["a", "b", "c", "d"], stored, frozenset({"a", "b", "d"})) == ["a", "d"]
+
+
+def test_no_blocked_retry_runs_when_every_unwritten_page_was_dropped(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Re-review 73 N2: the one facts block is the page the check dropped, so no retry pass runs."""
+    script = _Script()
+    passes = _passes(script, monkeypatch)
+    passes.dropped = frozenset({"b"})
+    passes._retry_unwritten("capsule repair 3, pages the rewrite blocked", check_pages=True)
+    assert script.plans == []

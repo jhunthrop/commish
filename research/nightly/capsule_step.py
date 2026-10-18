@@ -393,7 +393,8 @@ class _Passes:
 
     def _retry_unwritten(self, name: str, *, check_pages: bool = False) -> None:
         gate, _, _ = self._judged()
-        if gate.facts_blocks and self.left > 0:
+        # The pages the check dropped are facts blocks no pass writes tonight (re-review N2).
+        if gate.facts_blocks > len(self.dropped) and self.left > 0:
             self.retry(
                 name, gate.facts_blocks, tuple(sentence.sentence for sentence in gate.shared), check_pages=check_pages
             )
