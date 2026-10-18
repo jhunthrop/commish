@@ -28,11 +28,14 @@ interface Shot {
 	path: string;
 	/** The page draws board rows under a Gap head. */
 	rows: boolean;
+	/** Shot as prerendered, script off: in season Lane 66j's Rest of season order takes the board's
+	 * place once the script runs (it reads the API), so the run's rows are the page before it. */
+	prerendered?: true;
 }
 
 const SHOTS: readonly Shot[] = [
-	{ name: 'board-all', path: '/board/ppr-12', rows: true },
-	{ name: 'board-wr', path: '/board/ppr-12/wr', rows: true },
+	{ name: 'board-all', path: '/board/ppr-12', rows: true, prerendered: true },
+	{ name: 'board-wr', path: '/board/ppr-12/wr', rows: true, prerendered: true },
 	{ name: 'board-k', path: '/board/ppr-12/k', rows: false },
 	{ name: 'adp', path: '/adp/ppr-12', rows: true },
 	{ name: 'club-dal', path: '/clubs/dal', rows: true },
@@ -126,17 +129,27 @@ const browser = await chromium.launch();
 try {
 	for (const theme of THEMES) {
 		for (const width of [...SHOT_WIDTHS, ...CHECK_WIDTHS]) {
-			const context = await browser.newContext({
-				viewport: { width, height: VIEWPORT_HEIGHT },
-				colorScheme: theme,
-				deviceScaleFactor: width <= PHONE_MAX ? 2 : 1
-			});
-			await context.addInitScript(
-				([key, value]: readonly [string, string]) => localStorage.setItem(key, value),
-				[THEME_STORAGE_KEY, theme] as const
-			);
-			const page = await context.newPage();
+			const contextFor = async (script: boolean) => {
+				const context = await browser.newContext({
+					viewport: { width, height: VIEWPORT_HEIGHT },
+					colorScheme: theme,
+					deviceScaleFactor: width <= PHONE_MAX ? 2 : 1,
+					javaScriptEnabled: script
+				});
+				await context.addInitScript(
+					([key, value]: readonly [string, string]) => localStorage.setItem(key, value),
+					[THEME_STORAGE_KEY, theme] as const
+				);
+				return context;
+			};
+			const scripted = await contextFor(true);
+			const prerendered = await contextFor(false);
+			const pages = {
+				scripted: await scripted.newPage(),
+				prerendered: await prerendered.newPage()
+			};
 			for (const shot of SHOTS) {
+				const page = shot.prerendered ? pages.prerendered : pages.scripted;
 				const tag = `${shot.name} ${theme} ${String(width)}`;
 				await page.goto(`${web}${shot.path}`, { waitUntil: 'networkidle' });
 				await page.evaluate(() => document.fonts.ready);
@@ -153,7 +166,8 @@ try {
 					});
 				}
 			}
-			await context.close();
+			await scripted.close();
+			await prerendered.close();
 		}
 	}
 } finally {
