@@ -20,6 +20,7 @@ WRITTEN = {"projected": 344.1, "floor": 241.7, "expectedGames": 14.9, "adp": 2.8
 # His ADP as shown less his rank of 1.
 NACUA_GAP = 1.8
 _TABLE = Path(__file__).resolve().parents[2] / "web" / "src" / "lib" / "format" / "tenth-table.json"
+_PICKS_LATER = Path(__file__).resolve().parents[2] / "web" / "src" / "lib" / "format" / "picks-later-table.json"
 
 
 def test_every_case_of_the_shared_table_rounds_as_the_api_does() -> None:
@@ -33,12 +34,14 @@ def test_no_signed_zero_and_no_rounding_of_what_is_not_a_number() -> None:
     assert tenth_or_none(None) is None
 
 
-def test_the_gap_is_the_adp_as_shown_less_our_rank_rounded_once() -> None:
-    """The halves the review found the web's whole-pick rounding missed, and the ADP rounded to the
-    tenth the ADP column shows before the rank comes off (as the API's Picks later does)."""
-    cases = [(5.5, 10, -4.5), (16.5, 17, -0.5), (6.5, 3, 3.5), (2.84, 1, 1.8), (9.45, 9, 0.5), (7.0, 7, 0.0)]
-    for adp, rank, gap in cases:
-        assert gap_of(adp, rank) == gap, (adp, rank)
+def test_the_gap_is_the_apis_picks_later_with_our_rank_as_the_pick_negated() -> None:
+    """The table the API's Picks later test reads (re-review N6): the halves the review found the
+    web's whole-pick rounding missed, and the ADP rounded to the tenth its column shows before the
+    rank comes off. The Gap is ADP less our rank, Picks later the pick less the ADP, so one is the
+    other negated."""
+    for case in json.loads(_PICKS_LATER.read_text()):
+        later = case["later"]
+        assert gap_of(case["adp"], case["pick"]) == (-later if later else 0.0), case
     assert gap_of(None, 1) is None
 
 

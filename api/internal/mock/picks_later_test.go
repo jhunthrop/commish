@@ -1,6 +1,10 @@
 package mock
 
-import "testing"
+import (
+	"encoding/json"
+	"os"
+	"testing"
+)
 
 // A pick's Picks later and its chip come from one function (Lane 66o
 // re-review N6): the pick less the ADP the report prints, rounded once and
@@ -30,5 +34,31 @@ func TestTheChipFollowsThePrintedPicksLater(t *testing.T) {
 				t.Fatalf("pick %d at ADP %v: later %v chip %q, want %v %q", c.pick, c.adp, later, chipFor(later), c.later, c.chip)
 			}
 		})
+	}
+}
+
+// The rule's cases, shared with the nightly's Gap (Lane 66n re-review N6):
+// research/tests/test_board_tenths.py and the web's stand-in read the same
+// table, the Gap being Picks later with our rank as the pick, negated.
+func TestPicksLaterSharedTable(t *testing.T) {
+	raw, err := os.ReadFile("../../../web/src/lib/format/picks-later-table.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var cases []struct {
+		Pick  int     `json:"pick"`
+		ADP   float64 `json:"adp"`
+		Later float64 `json:"later"`
+	}
+	if err := json.Unmarshal(raw, &cases); err != nil {
+		t.Fatal(err)
+	}
+	if len(cases) == 0 {
+		t.Fatal("the shared table is empty")
+	}
+	for _, c := range cases {
+		if got := PicksLater(c.Pick, c.ADP); got != c.Later {
+			t.Errorf("pick %d at ADP %v: later %v, want %v", c.Pick, c.ADP, got, c.Later)
+		}
 	}
 }
