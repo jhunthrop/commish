@@ -200,7 +200,7 @@ def test_the_nights_calls_per_player_are_the_writers_asks() -> None:
     result = cast("CapsuleResult", SimpleNamespace(calls=9, asks=6, usage=None))
     sweep_module._count_spend(report, cast("Any", SimpleNamespace(universe_id="u1")), result)
     assert report.calls == 9  # noqa: PLR2004 - the bill counts every HTTP call
-    assert report.calls_by_player == {"u1": 6}
+    assert report.asks_by_player == {"u1": 6}
 
 
 @pytest.mark.usefixtures("quiet_page")

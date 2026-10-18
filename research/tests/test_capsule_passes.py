@@ -106,10 +106,10 @@ def test_a_page_at_the_ceiling_takes_one_generation_past_it_once(monkeypatch: py
         plan = cast("SweepPlan", args[3])
         seen.append(plan.exclude)
         processed = [] if "x" in plan.exclude else ["x"]
-        return SweepReport(NOW, 4, 1, processed, 0, len(processed), calls_by_player=dict.fromkeys(processed, 6))
+        return SweepReport(NOW, 4, 1, processed, 0, len(processed), asks_by_player=dict.fromkeys(processed, 6))
 
     monkeypatch.setattr(capsule_step, "sweep_capsules", sweep_capsules)
-    passes.calls_by_player["x"] = NIGHT_CALLS_PER_PLAYER
+    passes.asks_by_player["x"] = NIGHT_CALLS_PER_PLAYER
     passes.sweep("retry 1", SweepPlan(10, unwritten_only=True))
     passes.sweep("retry 2", SweepPlan(10, unwritten_only=True))
     passes.sweep("hard", SweepPlan(10, only=("x",)))
@@ -193,11 +193,11 @@ def test_a_shared_sentence_at_the_ceiling_takes_one_generation_past_it_after_the
         plan = cast("SweepPlan", args[3])
         seen.append(plan.exclude)
         processed = [] if "b" in plan.exclude else ["b"]
-        return SweepReport(NOW, 4, 1, processed, 1, 0, calls_by_player=dict.fromkeys(processed, 6))
+        return SweepReport(NOW, 4, 1, processed, 1, 0, asks_by_player=dict.fromkeys(processed, 6))
 
     monkeypatch.setattr(capsule_step, "sweep_capsules", sweep_capsules)
     monkeypatch.setattr(passes, "_judged", lambda: (_gate(0, True, False), ORDER, {}))
-    passes.calls_by_player["b"] = NIGHT_CALLS_PER_PLAYER
+    passes.asks_by_player["b"] = NIGHT_CALLS_PER_PLAYER
     passes.sweep("hard", SweepPlan(10, only=("b",)))
     passes.grace_shared_sentences()
     passes.grace_shared_sentences()
@@ -296,7 +296,7 @@ def test_after_the_demotion_one_retry_writes_the_unwritten_pages_past_the_ceilin
     night's ceiling, each refused a sentence another page carries (`plan.only`); tonight's demotions
     keep their ruling (written first the next night, no model call tonight)."""
     passes, script, _ = _after_demotion(monkeypatch, ["a", "d", "c"], left=10)
-    passes.calls_by_player.update({"a": NIGHT_CALLS_PER_PLAYER + 6, "c": NIGHT_CALLS_PER_PLAYER})
+    passes.asks_by_player.update({"a": NIGHT_CALLS_PER_PLAYER + 6, "c": NIGHT_CALLS_PER_PLAYER})
     passes.graced.update({"a", "c"})
     passes.retry_after_demotion()
     [(name, plan)] = script.plans
@@ -316,7 +316,7 @@ def test_the_retry_after_the_demotion_ignores_the_ceiling_in_the_real_sweep(monk
         return SweepReport(NOW, 4, 1, ["a"], 1, 0)
 
     monkeypatch.setattr(capsule_step, "sweep_capsules", sweep_capsules)
-    passes.calls_by_player["a"] = 2 * NIGHT_CALLS_PER_PLAYER
+    passes.asks_by_player["a"] = 2 * NIGHT_CALLS_PER_PLAYER
     passes.graced.add("a")
     passes.retry_after_demotion()
     assert seen == [frozenset()]

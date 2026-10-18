@@ -228,14 +228,14 @@ def _regenerate_all(engine: Engine, now: datetime) -> str:
     return f"capsules: every board page stamped for regeneration ({queued} rows)"
 
 
-def spent_out_for(calls: Mapping[str, int], graced: frozenset[str], *, grace: bool) -> frozenset[str]:
+def spent_out_for(asks: Mapping[str, int], graced: frozenset[str], *, grace: bool) -> frozenset[str]:
     """The players a pass may not start a generation for. A player is left for the next night once
     another full generation could take him past the ceiling (review N12: at 11 calls a six-call
     generation would reach 17); in a graced pass (`SweepPlan.grace`: a pass over unwritten pages, or
     the last rewrite of the pages still carrying a shared sentence) each may go past it once
     (`graced` holds those that already have)."""
     last_start = NIGHT_CALLS_PER_PLAYER - CAPSULE_CONFIG.max_gateway_calls_per_player
-    spent = frozenset(pid for pid, n in calls.items() if n > last_start)
+    spent = frozenset(pid for pid, n in asks.items() if n > last_start)
     return spent & graced if grace else spent
 
 
@@ -263,7 +263,7 @@ class _Passes:
         self.budget = plan.budget
         self.log = log
         self.spend = CapsuleSpend()
-        self.calls_by_player: dict[str, int] = {}
+        self.asks_by_player: dict[str, int] = {}
         # Pages that took their one generation past the ceiling tonight.
         self.graced: set[str] = set()
         # The span repair's pages left tonight (`CapsuleStepPlan.span_repair_pages`).
@@ -283,9 +283,9 @@ class _Passes:
         """One pass, every page the night's ceiling has spent excluded; `ceiling=False` is the one pass
         the ceiling never holds back, the retry after the demotion (`retry_after_demotion`)."""
         graced_pass = plan.unwritten_only or plan.grace
-        at_ceiling = spent_out_for(self.calls_by_player, frozenset(), grace=False)
+        at_ceiling = spent_out_for(self.asks_by_player, frozenset(), grace=False)
         spent = (
-            spent_out_for(self.calls_by_player, frozenset(self.graced), grace=graced_pass) if ceiling else frozenset()
+            spent_out_for(self.asks_by_player, frozenset(self.graced), grace=graced_pass) if ceiling else frozenset()
         )
         avoid_by_page = {
             pid: (*plan.avoid_by_page.get(pid, ()), *self.carried_avoid.get(pid, ()))
@@ -327,12 +327,12 @@ class _Passes:
             self.log(f"{name}: {len(fell)} written pages failed the page gate and fell to their facts blocks: {named}")
 
     def _account(self, name: str, report: SweepReport, at_ceiling: frozenset[str], *, graced_pass: bool) -> None:
-        """A sweep's report on the night: the grace taken, the calls per player, the spend, the line."""
+        """A sweep's report on the night: the grace taken, the asks per player, the spend, the line."""
         if graced_pass:
             # A page past the ceiling that this pass reached has taken its one extra generation.
             self.graced |= at_ceiling & set(report.processed)
-        for pid, calls in report.calls_by_player.items():
-            self.calls_by_player[pid] = self.calls_by_player.get(pid, 0) + calls
+        for pid, asks in report.asks_by_player.items():
+            self.asks_by_player[pid] = self.asks_by_player.get(pid, 0) + asks
         self.spend.add(report)
         self.log(_sweep_line(name, report))
         if report.fell:
