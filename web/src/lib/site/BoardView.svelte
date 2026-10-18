@@ -126,12 +126,7 @@
 	const ours = $derived(sort.key === 'rank' && !sort.turned);
 	const banded = $derived(page.position !== null && ours);
 	const groups = $derived(
-		page.position === null
-			? []
-			: tierGroups(
-					page.rows.filter((row) => !heldOut(row)),
-					page.position
-				)
+		page.position === null ? [] : tierGroups(page.rows, page.position, heldOut)
 	);
 	const heldRows = $derived(page.position === null ? [] : page.rows.filter(heldOut).filter(shown));
 	const visible = $derived(
@@ -319,7 +314,11 @@
 	<aside class="side" id={SIDE_ID} aria-label="Your board">
 		{#if page.position !== null && !marketView && !inSeason}
 			<Panel>
-				<PanelHead title="Tiers" aside="Drop to next" />
+				<!-- A run older than the tier drop draws no drop, so the head names none. -->
+				<PanelHead
+					title="Tiers"
+					aside={groups.some((g) => g.cliff !== null) ? 'Drop to next' : undefined}
+				/>
 				<TierJump
 					{group}
 					tiers={groups.map((tierGroup) => ({

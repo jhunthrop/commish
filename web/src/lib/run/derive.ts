@@ -44,26 +44,42 @@ export interface TierGroup<R extends BoardRow = BoardRow> {
 	cliff: TierCliff | null;
 }
 
-/** A position's tiers in order, each with its players and the drop in projected points from its
- * last player to the next tier's first. The last tier has no drop. */
+/** A position's tiers in order, each with its players shown and its drop to the next tier as the run
+ * writes it (Lane 66q: `tierDrop`, the web never subtracts). `out` leaves a player out of the tiers (a
+ * held player, Lane 63), who counts toward no drop: a drop whose edge he stands on is not said. The
+ * last tier, a run older than the column, and a tier with no shown player after it have no drop. */
 export function tierGroups<R extends BoardRow>(
 	rows: readonly R[],
-	position: Position
+	position: Position,
+	out: (row: R) => boolean = () => false
 ): TierGroup<R>[] {
+	const all = rowsAt(rows, position);
 	const groups: TierGroup<R>[] = [];
-	for (const row of rowsAt(rows, position)) {
+	for (const row of all.filter((r) => !out(r))) {
 		const last = groups.at(-1);
 		if (last?.tier === row.tier) last.rows.push(row);
 		else groups.push({ tier: row.tier, rows: [row], cliff: null });
 	}
 	return groups.map((group, i) => {
 		const next = groups[i + 1];
-		const end = group.rows.at(-1);
-		const start = next?.rows[0];
-		return next && end && start
-			? { ...group, cliff: { drop: end.projected - start.projected, nextTier: next.tier } }
-			: group;
+		return next ? { ...group, cliff: shownDrop(all, group.tier, next.tier, out) } : group;
 	});
+}
+
+/** The run's drop from a tier to the next, said only where it measures the players shown: the next
+ * shown tier is the very next, and neither player at the edge is left out. */
+function shownDrop<R extends BoardRow>(
+	all: readonly R[],
+	tier: number,
+	nextTier: number,
+	out: (row: R) => boolean
+): TierCliff | null {
+	if (nextTier !== tier + 1) return null;
+	const end = all.findLast((row) => row.tier === tier);
+	const start = all.find((row) => row.tier === nextTier);
+	if (!end || !start || out(end) || out(start)) return null;
+	const drop = end.tierDrop;
+	return drop === undefined || drop === null ? null : { drop, nextTier };
 }
 
 /** The tier group a player sits in. */

@@ -209,7 +209,7 @@
 			basis="Projected {page.format.label} points, {run.season}"
 		/>
 		<Panel>
-			<PanelHead title="Tiers" aside="Drop to next" />
+			<PanelHead title="Tiers" aside={page.tier.cliff ? 'Drop to next' : undefined} />
 			<TierJump
 				{group}
 				tiers={[

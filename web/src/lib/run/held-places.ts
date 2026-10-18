@@ -39,10 +39,7 @@ export function availableTierOf<R extends BoardRow & Listed>(
 	player: R
 ): TierGroup<R> | null {
 	if (heldOut(player)) return null;
-	const group = tierGroups(
-		rows.filter((row) => !heldOut(row)),
-		player.position
-	).find((g) => g.tier === player.tier);
+	const group = tierGroups(rows, player.position, heldOut).find((g) => g.tier === player.tier);
 	if (!group) throw new Error(`${player.name} is in no tier of his position.`);
 	return group;
 }
