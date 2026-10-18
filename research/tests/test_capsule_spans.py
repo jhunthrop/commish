@@ -128,3 +128,24 @@ def test_a_figures_basis_the_facts_print_is_exempt_and_a_label_or_a_paraphrase_i
     gate = judge_capsules(["a", "b", "c", "d", "e", "f"], rows, rules, LINE)
     assert gate.exempt_spans > 0
     assert {s.player_ids for s in gate.spans} == {("c", "d"), ("e", "f")}
+
+
+def test_a_sentence_the_facts_print_on_two_pages_is_exempt_and_a_paraphrase_of_it_is_not(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Lane 73 ruling 3: a whole sentence the facts print (the sheet or the facts block, the span rule's
+    own source, `span_rules.facts_texts`) on two pages is the fact, not stock prose, so it never fails
+    the run nor demotes a page; the writer's own sentence about the same fact is still judged."""
+    monkeypatch.setattr(span_rules, "span_names", lambda conn: NAMES)
+    monkeypatch.setattr(
+        span_rules,
+        "facts_texts",
+        lambda facts: ("Bye: week 6 of 2026, still to come. He missed two games to injury in 2025.", "Facts."),
+    )
+    rules = span_rules.span_rules_for(cast("Connection", None), [cast("Any", object())])
+    printed = {pid: _row(pid, f"Note {pid}. He missed two games to injury in 2025.") for pid in ("a", "b")}
+    gate = judge_capsules(["a", "b"], printed, rules, LINE)
+    assert gate.shared == ()
+    assert gate.ok
+    written = {pid: _row(pid, f"Note {pid}. He is on a bye in week 6 of 2026.") for pid in ("a", "b")}
+    assert [s.player_ids for s in judge_capsules(["a", "b"], written, rules, LINE).shared] == [("a", "b")]

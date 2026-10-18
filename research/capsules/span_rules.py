@@ -14,6 +14,11 @@ pages, exempt as the sheet's words): the exemption covers a figure with its basi
 section labels (`render_words.SHEET_LABELS`: "in our records", "where most outcomes fall", ...) are
 cut from the facts before their spans are read, so a span holding a label is judged like any other,
 and a label in a read is a validator failure besides (`prose_checks.label_copies`).
+
+Lane 73 ruling 3 (2026-10-17): the same texts give the whole sentences the facts print
+(`SpanRules.exempt_sentences`), exempt from the shared-sentence rule and so from the demotion. Only a
+sentence the facts print word for word is exempt: the writer's own sentence about a fact ("he is on a
+bye in week 6 of 2026", against the sheet's "Bye: week 6 of 2026, still to come.") is still judged.
 """
 
 from collections.abc import Iterable
@@ -21,7 +26,9 @@ from typing import TYPE_CHECKING
 
 from sqlalchemy import Connection, text
 
+from research.capsules.config import CAPSULE_CONFIG
 from research.capsules.facts_block import render_facts_block
+from research.capsules.narrative import held_sentences
 from research.capsules.render import render_facts_for_model
 from research.capsules.render_words import SHEET_LABELS
 from research.capsules.spans import SpanRules, cut_phrases, name_words, sheet_spans
@@ -44,5 +51,6 @@ def span_rules_for(conn: Connection, sheets: Iterable["PlayerFacts"]) -> SpanRul
     """The names, and every span the night's sheets and facts blocks print with their labels cut out:
     a figure with its basis is exempt, a label never is (`render_words.SHEET_LABELS`)."""
     names = span_names(conn)
-    texts = (cut_phrases(text, SHEET_LABELS) for facts in sheets for text in facts_texts(facts))
-    return SpanRules(names, sheet_spans(texts, names))
+    texts = [cut_phrases(text, SHEET_LABELS) for facts in sheets for text in facts_texts(facts)]
+    sentences = held_sentences(texts, CAPSULE_CONFIG.shared_sentence_min_words)
+    return SpanRules(names, sheet_spans(texts, names), frozenset(sentences))
