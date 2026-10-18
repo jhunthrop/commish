@@ -229,7 +229,8 @@ def test_the_step_demotes_after_the_graced_rewrite_with_no_model_call(monkeypatc
         targets = demotion_targets(shared, order)
         return tuple(Demotion(pid, f"slug-{pid}", s.sentence, len(s.player_ids)) for pid, s in targets)
 
-    def sweep(name: str, plan: SweepPlan) -> SweepReport:
+    def sweep(name: str, plan: SweepPlan, *, check_pages: bool = False) -> SweepReport:
+        del check_pages
         del plan
         swept.append(name)
         return SweepReport(NOW, 4, 0)

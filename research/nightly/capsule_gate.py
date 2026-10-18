@@ -14,7 +14,7 @@ across players is a defect. The run fails when
   names breaking the run) on two or more pages (the live review's M1, as the coordinator ruled it):
   those are counted, named and repaired within the budget, never a failure. A span the facts
   print (a rendered sheet or a facts block: a figure's basis or a stat's label copied word for word,
-  `capsules.span_rules`) is exempt. Spans read the narrative sentences too; the whole-sentence rule reads the two reads only.
+  `capsules.span_rules`) is exempt, and so is a whole sentence the facts print (Lane 73 ruling 3). Spans read the narrative sentences too; the whole-sentence rule reads the two reads only.
   Each page's shared spans are kept, joined where they overlap, for the repair's prompt.
 
 Phase D extends this gate (the page findings of `capsules.pull_figures`, the run's other gates);
@@ -125,12 +125,15 @@ def _sentences(row: StoredCapsule) -> set[str]:
     return held_sentences((row.body_compact, row.body_full), CAPSULE_CONFIG.shared_sentence_min_words)
 
 
-def shared_written_sentences(rows: Mapping[str, StoredCapsule]) -> tuple[SharedSentence, ...]:
-    """Every sentence of four words or more of a written capsule that another written page carries too."""
+def shared_written_sentences(
+    rows: Mapping[str, StoredCapsule], exempt: frozenset[str] = frozenset()
+) -> tuple[SharedSentence, ...]:
+    """Every sentence of four words or more of a written capsule that another written page carries too,
+    but a sentence the facts print (`exempt`, `SpanRules.exempt_sentences`, Lane 73 ruling 3)."""
     pages: dict[str, list[str]] = {}
     for player_id, row in rows.items():
         if row.source == WRITTEN_SOURCE:
-            for sentence in _sentences(row):
+            for sentence in _sentences(row) - exempt:
                 pages.setdefault(sentence, []).append(player_id)
     shared = [SharedSentence(sentence, tuple(sorted(ids))) for sentence, ids in pages.items() if len(ids) > 1]
     return tuple(sorted(shared, key=lambda s: (-len(s.player_ids), s.sentence)))
@@ -163,7 +166,7 @@ def judge_capsules(
         facts_blocks=sources.count(FACTS_SOURCE),
         template=len(sources) - sources.count(WRITTEN_SOURCE) - sources.count(FACTS_SOURCE),
         missing=len(board_ids) - len(on_board),
-        shared=shared_written_sentences(on_board),
+        shared=shared_written_sentences(on_board, rules.exempt_sentences),
         spans=spans,
         span_phrases=MappingProxyType({pid: phrases_on_page(runs[pid], held) for pid in sorted(carriers)}),
         queued=len(queued),

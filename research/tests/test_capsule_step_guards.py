@@ -150,6 +150,7 @@ def _paid_read(view: GatewayClient) -> Any:
         source="llm",
         usage=answer.usage,
         calls=view.calls,
+        asks=1,
         model="m/x",
     )
 
@@ -194,5 +195,5 @@ def test_a_raising_worker_leaves_the_headline_spend_equal_to_the_ledger(monkeypa
         ledger.prompt_tokens,
         ledger.completion_tokens,
     )
-    assert "b" in passes.calls_by_player
+    assert "b" in passes.asks_by_player
     assert passes.spend.processed == ledger.calls

@@ -35,13 +35,18 @@ class BoardSentences:
     sentence (the production rerun of 2026-10-15 went from 13 to 39 shared sentences while its span
     repair rewrote 509 pages). Every other write records its sentences as it commits."""
 
-    def __init__(self, pages: Mapping[str, Sequence[str]], min_words: int) -> None:
+    def __init__(
+        self, pages: Mapping[str, Sequence[str]], min_words: int, exempt: frozenset[str] = frozenset()
+    ) -> None:
+        """`exempt`: the sentences the facts print (`SpanRules.exempt_sentences`, the gate's and the
+        demotion's own source, Lane 73), never held, so a printed fact never refuses a rewrite."""
         self._lock = threading.Lock()
         self._min_words = min_words
+        self._exempt = exempt
         self._by_page: dict[str, frozenset[str]] = {}
         self._holders: dict[str, set[str]] = {}
         for pid, reads in pages.items():
-            self._put(pid, frozenset(held_sentences(reads, min_words)))
+            self._put(pid, frozenset(held_sentences(reads, min_words)) - exempt)
 
     def _put(self, pid: str, sentences: frozenset[str]) -> None:
         for sentence in self._by_page.get(pid, frozenset()):
@@ -54,7 +59,7 @@ class BoardSentences:
         """Records the page's new sentences (none for a facts block: pass no reads), unless
         `exclusive` and one of them is already on another page, when nothing moves and False says
         the write must not land."""
-        sentences = frozenset(held_sentences(reads, self._min_words))
+        sentences = frozenset(held_sentences(reads, self._min_words)) - self._exempt
         with self._lock:
             if exclusive and any(self._holders.get(s, set()) - {pid} for s in sentences):
                 return False
@@ -93,7 +98,8 @@ class TonightWindow:
         """Adds a landed page (`texts`: every prose text of it; `reads`: its two reads) and returns
         what it shares with the pages landed before it."""
         spans = spans_of(page_runs(texts, self._rules.names)) - self._rules.exempt
-        sentences = frozenset(held_sentences(reads, self._min_words))
+        # A sentence the facts print is never counted (`SpanRules.exempt_sentences`, review 73 item 3).
+        sentences = frozenset(held_sentences(reads, self._min_words)) - self._rules.exempt_sentences
         seen_spans = frozenset(s for page, _ in self._pages for s in page)
         seen_sentences = frozenset(s for _, page in self._pages for s in page)
         self._pages.append((spans, sentences))

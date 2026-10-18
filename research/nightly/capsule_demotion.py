@@ -21,7 +21,7 @@ is never demoted two nights running for the same sentence without a fresh attemp
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import Connection
 
@@ -31,6 +31,9 @@ from research.capsules.sweep import Subject
 from research.nightly.build.pages import slug_of
 from research.nightly.capsule_gate import SharedSentence
 from research.nightly.config import RUNS_PREFIX
+
+if TYPE_CHECKING:
+    from research.capsules.facts.build import PlayerFacts
 
 # The last capsule step's demotions, which the next night reads before it writes.
 DEMOTED_KEY = f"{RUNS_PREFIX}/capsule-demotions.json"
@@ -88,6 +91,13 @@ def demotion_targets(
     return tuple(sorted(demoted.items(), key=lambda item: place.get(item[0], len(place))))
 
 
+def facts_block_write(universe_id: str, facts: "PlayerFacts") -> CapsuleWrite:
+    """A page's facts block row, stamped to be written first the next night: a demotion's, and a page
+    the page gate fails after a pass no repair judges (`capsule_step._Passes._check_pages`)."""
+    block = render_facts_block(facts)
+    return CapsuleWrite(universe_id, RETRY_FIRST_FACTS_HASH, block, block, FACTS_SOURCE, {}, None)
+
+
 def demotion_writes(
     subjects: Sequence[Subject], targets: Sequence[Target], slugs: Mapping[str, str]
 ) -> tuple[tuple[CapsuleWrite, ...], tuple[Demotion, ...], tuple[str, ...]]:
@@ -101,8 +111,7 @@ def demotion_writes(
         subject = by_id.get(pid)
         if subject is None:
             continue
-        block = render_facts_block(subject.facts)
-        writes.append(CapsuleWrite(pid, RETRY_FIRST_FACTS_HASH, block, block, FACTS_SOURCE, {}, None))
+        writes.append(facts_block_write(pid, subject.facts))
         identity = subject.facts.identity
         slug = slugs.get(identity.id) or slug_of(identity.name)
         demoted.append(Demotion(pid, slug, sentence.sentence, len(sentence.player_ids)))

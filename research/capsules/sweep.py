@@ -109,13 +109,17 @@ class SweepReport:
     cost_usd: float = 0.0
     queued: int | None = None
     detail: list[str] = field(default_factory=list)
-    # Universe id to the gateway calls his capsule took in this sweep.
-    calls_by_player: dict[str, int] = field(default_factory=dict)
+    # Universe id to the writer's asks his capsule took in this sweep (`CapsuleResult.asks`), which the
+    # night's ceiling counts; the gateway's HTTP calls are `calls`.
+    asks_by_player: dict[str, int] = field(default_factory=dict)
     # The landing gate (`capsules.landing`): sentences and spans each page shared, as it landed, with
     # the pages landed before it, and those pages (carriers), left to the repair pass.
     landed_sentences: int = 0
     landed_spans: int = 0
     landed_carriers: list[str] = field(default_factory=list)
+    # Each page that fell to its facts block this sweep, by name with why (`describe_fallback`), so
+    # the nightly can say why its pages are unwritten (Lane 73).
+    fell: list[str] = field(default_factory=list)
 
 
 class PageCommitError(Exception):
@@ -142,7 +146,8 @@ def _count_spend(report: SweepReport, subject: Subject, result: CapsuleResult) -
     """A page's calls, tokens and cost on the sweep's report."""
     usage = result.usage
     report.calls += result.calls
-    report.calls_by_player[subject.universe_id] = report.calls_by_player.get(subject.universe_id, 0) + result.calls
+    # The night's ceiling counts the writer's asks, never the gateway's re-asks (Lane 73 ruling 1).
+    report.asks_by_player[subject.universe_id] = report.asks_by_player.get(subject.universe_id, 0) + result.asks
     if usage is not None:
         report.prompt_tokens += usage.prompt_tokens or 0
         report.completion_tokens += usage.completion_tokens or 0
@@ -169,7 +174,9 @@ def _tally(report: SweepReport, subject: Subject, result: CapsuleResult, demoted
     report.facts += 1
     report.demoted += int(demoted)
     suffix = ", kept nothing, was written" if demoted else ""
-    report.detail.append(f"{name}: {describe_fallback(result.compact, result.full)}{suffix}")
+    fell = f"{name}: {describe_fallback(result.compact, result.full)}"
+    report.fell.append(fell)
+    report.detail.append(f"{fell}{suffix}")
 
 
 def write_one(  # noqa: PLR0913 - one write's parts
@@ -364,6 +371,7 @@ def sweep_capsules(
     board = BoardSentences(
         {s.universe_id: _reads(row) for s in subjects if (row := stored.get(s.universe_id)) and row.source == "llm"},
         CAPSULE_CONFIG.shared_sentence_min_words,
+        rules.exempt_sentences,
     )
     # A rewrite of chosen pages (the hard repair, the graced rewrite, the span repair) may not land a
     # sentence another page carries; the sweep and its retries record theirs as they land.
