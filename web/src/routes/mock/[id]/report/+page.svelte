@@ -59,11 +59,7 @@
 	{/if}
 	{#if report}
 		{@const r = report}
-		<Report
-			report={r}
-			names={botNames(r.teams, r.slot)}
-			field="bots drafting from where drafters take players"
-		>
+		<Report report={r} names={botNames(r.teams, r.slot)} seats="Bots by ADP">
 			{#snippet verbs()}
 				<Verb onclick={again} disabled={starting}>Run it again from slot {r.slot}</Verb>
 				<Quiet href="{resolve('/mock/new')}?from={id}">Try another slot</Quiet>

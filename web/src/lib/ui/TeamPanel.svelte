@@ -12,20 +12,11 @@
 		/** Roster size for the draft: 14 in a standard redraft. */
 		rosterSize: number;
 		teams?: number;
-		/** The room has a call that weighs the open slots; off for a draft read without one. */
-		withCall?: boolean;
 	}
 
-	let {
-		title = 'Your team',
-		slots,
-		rosterSize,
-		teams = DEFAULT_TEAMS,
-		withCall = true
-	}: Props = $props();
+	let { title = 'Your team', slots, rosterSize, teams = DEFAULT_TEAMS }: Props = $props();
 
 	const drafted = $derived(slots.filter((slot) => slot.player !== null).length);
-	const open = $derived(slots.filter((slot) => slot.player === null).map((slot) => slot.slot));
 </script>
 
 <Panel>
@@ -51,15 +42,6 @@
 			{/if}
 		{/each}
 	</ol>
-	<div class="need">
-		{#if open.length > 0}
-			Still open: <b>{open.join(', ')}</b>.{withCall
-				? ' The board already weighs that in the call.'
-				: ''}
-		{:else}
-			Every starter filled.{withCall ? ' From here the call is depth.' : ''}
-		{/if}
-	</div>
 </Panel>
 
 <style>
@@ -129,17 +111,5 @@
 		font-weight: 700;
 		font-size: var(--t-md);
 		color: var(--ink-2);
-	}
-
-	.need {
-		margin-top: var(--s-3);
-		padding-top: var(--s-3);
-		border-top: 1px solid var(--line);
-		font-size: var(--t-sm);
-		color: var(--ink-2);
-	}
-
-	.need b {
-		color: var(--ink);
 	}
 </style>

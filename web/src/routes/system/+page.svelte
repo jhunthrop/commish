@@ -1,14 +1,7 @@
 <script lang="ts">
 	import { PRESEASON_FRAMING } from '#lib/run/row-framing.ts';
-	import {
-		DEFAULT_TEAMS,
-		adpWords,
-		draftersGap,
-		lastName,
-		chanceWords,
-		pickLabel
-	} from '#lib/format/draft.ts';
-	import { fixed, plural, signed } from '#lib/format/number.ts';
+	import { DEFAULT_TEAMS, draftersGap, pickLabel } from '#lib/format/draft.ts';
+	import { fixed, plural } from '#lib/format/number.ts';
 	import ActionBar from '#lib/ui/ActionBar.svelte';
 	import CallPanel from '#lib/ui/CallPanel.svelte';
 	import Chip from '#lib/ui/Chip.svelte';
@@ -397,21 +390,23 @@
 				<SinceStrip since={data.soloRoom.since} went={data.soloRoom.went} />
 				<CallPanel
 					tag="Our call at {pickLabel(data.soloRoom.now)}"
-					player={call}
-					vor={call.vor}
-					adp={adpWords(call.adp, data.soloRoom.now)}
-					chance={data.soloRoom.callChance}
-					chanceLabel="chance he is still there at {nextLabel}"
-					action={{ label: `Draft ${lastName(call.name)}`, key: 'Enter' }}
-				>
-					{#snippet reason()}
-						<b>{runner.name}</b> has more over replacement at {signed(runner.vor)}, but he is still
-						there at {nextLabel}
-						{chanceWords(data.soloRoom.runnerChance)} of the time. {lastName(call.name)} is there {chanceWords(
-							data.soloRoom.callChance
-						)} of the time.
-					{/snippet}
-				</CallPanel>
+					rows={[
+						{
+							player: call,
+							vor: call.vor,
+							adp: call.adp,
+							chance: data.soloRoom.callChance
+						},
+						{
+							player: runner,
+							vor: runner.vor,
+							adp: runner.adp,
+							chance: data.soloRoom.runnerChance
+						}
+					]}
+					chanceHead="Still there {nextLabel}"
+					action={{ label: 'Draft him', key: 'Enter' }}
+				/>
 				<ScoreBug {...data.lobbyBug} />
 			</Specimen>
 			<Parts>

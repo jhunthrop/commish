@@ -1,7 +1,8 @@
 /** The setup page's league: the defaults, the bounds the API checks (api/internal/leagues), the round
  * count the roster makes, and the lobby closest to it. */
 import type { BoardFormat } from '#lib/sheet/model.ts';
-import type { LeagueSettings, LobbyFormat } from '../api.ts';
+import type { FactCell } from '#lib/ui/facts.ts';
+import type { LeagueSettings, LobbyFilling, LobbyFormat } from '../api.ts';
 import { presetWords } from '../words.ts';
 
 type Roster = LeagueSettings['roster'];
@@ -113,6 +114,24 @@ export function nearestLobby(s: LeagueSettings): LobbyFormat {
 	if (s.lineup === 'superflex') return '12_half_superflex';
 	if (s.teams <= 10) return '10_ppr';
 	return '12_ppr';
+}
+
+/** The setup's settings table (Lane 66o): only what the form below does not show (review M4), the
+ * clock against bots, the nearest lobby's clock as the API gives it (left out until the lobbies are
+ * read), and when a lobby starts. The format, teams, seat and rounds are the form's own fields. */
+export function setupCells(lobby: Pick<LobbyFilling, 'clock_seconds'> | undefined): FactCell[] {
+	const lobbyClock: FactCell[] = lobby
+		? [{ label: 'Clock in a lobby', value: `${String(lobby.clock_seconds)} s a pick`, word: true }]
+		: [];
+	return [
+		{ label: 'Clock against bots', value: 'None', word: true },
+		...lobbyClock,
+		{
+			label: 'A lobby starts',
+			value: `Full, or ${String(LOBBY_FILL_SECONDS)} s after the first join`,
+			word: true
+		}
+	];
 }
 
 /** "12 teams, PPR" for a lobby format. */

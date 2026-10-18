@@ -127,11 +127,8 @@
 			<Report
 				{report}
 				{names}
-				field={`your league drafting on ${hostName(companion.host)}, read pick by pick as it happened`}
-				others={{
-					who: 'stand-ins for your league',
-					how: 'from where drafters take players'
-				}}
+				seats={`Your league on ${hostName(companion.host)}`}
+				reshuffled="stand-ins for your league"
 			>
 				{#snippet verbs()}
 					<Verb href={links.companionNew()}>Follow another draft</Verb>

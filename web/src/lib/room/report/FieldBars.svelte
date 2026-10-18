@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { count } from '#lib/format/number.ts';
 	import type { MockReport } from '../api.ts';
 
 	interface Props {
@@ -19,7 +20,7 @@
 			<span class="n">{team.rank}</span>
 			<span class="name">{names[team.seat - 1] ?? `Seat ${team.seat}`}</span>
 			<span class="bar"><i style:width="{(team.points / top) * 100}%"></i></span>
-			<span class="pts">{Math.round(team.points).toLocaleString('en-US')}</span>
+			<span class="pts">{count(team.points)}</span>
 		</div>
 	{/each}
 </div>

@@ -15,6 +15,7 @@ import (
 	"github.com/jhunthrop/commish/api/internal/draft"
 	"github.com/jhunthrop/commish/api/internal/mock"
 	"github.com/jhunthrop/commish/api/internal/scoring"
+	"github.com/jhunthrop/commish/api/internal/tenth"
 )
 
 // RawLoader is boards.Cache: one stored board per scoring format.
@@ -104,14 +105,27 @@ func slotKey(slots []draft.SlotConfig) string {
 	return sb.String()
 }
 
-// round2 keeps two decimals on the wire: every page prints one.
-func round2(v float64) float64 { return math.Round(v*100) / 100 }
+// A figure the room or the report shows (ADP, points, over replacement,
+// a gap, a team total) leaves as the tenth the screen prints, rounded once
+// by the site's rule (Lane 66k H1). A chance keeps two decimals: the web
+// reads it as a percentage.
 
-func round2p(v *float64) *float64 {
+func tenthp(v *float64) *float64 {
 	if v == nil {
 		return nil
 	}
-	r := round2(*v)
+	r := tenth.Round(*v)
+	return &r
+}
+
+// chance keeps two decimals of a probability on the wire.
+func chance(v float64) float64 { return math.Round(v*100) / 100 }
+
+func chancep(v *float64) *float64 {
+	if v == nil {
+		return nil
+	}
+	r := chance(*v)
 	return &r
 }
 
@@ -135,10 +149,10 @@ func BoardView(b boards.Board, keep map[string]bool) apitypes.RoomBoard {
 func PlayerView(b boards.Board, p boards.Player) apitypes.BoardPlayer {
 	v := apitypes.BoardPlayer{
 		Id: p.ID, Name: p.Name, Position: apitypes.PlayerPosition(p.Position), Team: p.Team, Headshot: p.Headshot,
-		Adp: round2p(p.ADP), Points: round2p(p.Points), PositionRank: b.PositionRanks[p.ID],
+		Adp: tenthp(p.ADP), Points: tenthp(p.Points), PositionRank: b.PositionRanks[p.ID],
 	}
 	if vor, ok := b.Values[p.ID]; ok {
-		r := round2(vor)
+		r := tenth.Round(vor)
 		v.Vor = &r
 	}
 	if p.Bye > 0 {

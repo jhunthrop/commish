@@ -147,18 +147,10 @@
 	{/if}
 	{#if call && card && onTurn}
 		{#if went.length > 0}<SinceStrip since={prev} {went} {teams} queue={false} />{/if}
-		<RoomCall
-			view={call}
-			pickNumber={now}
-			action={{ label: `Make the pick on ${host}`, onclick: openHost }}
-		/>
+		<RoomCall view={call} action={{ label: `Make the pick on ${host}`, onclick: openHost }} />
 		<Shortlist {card} {board} {chanceLabel} ranges={c.ranges} />
 	{:else if call}
-		<RoomCall
-			view={call}
-			pickNumber={now}
-			action={{ label: `Queue him on ${host}`, onclick: openHost }}
-		/>
+		<RoomCall view={call} action={{ label: `Queue him on ${host}`, onclick: openHost }} />
 	{/if}
 	{#if c.status !== 'complete'}
 		<Pool

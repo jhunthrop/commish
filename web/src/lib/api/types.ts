@@ -2372,9 +2372,13 @@ export interface components {
 			player_id: string;
 			/** Format: double */
 			over_replacement: number | null;
+			/** @description his place on our board, the pool's order by points over replacement; null for a player with none (a kicker or a defense) */
+			board_rank: number | null;
+			/** @description Picks later against our board: the pick's place among the draft's picks of players our board ranks, less board_rank, so plus means he came later than our board places him. Kickers and defenses are counted on neither side, since our board ranks them by no points; null for one, and for a keeper. */
+			board_gap: number | null;
 			/**
 			 * Format: double
-			 * @description ADP less the pick
+			 * @description Picks later against drafters, a tenth: the pick less his ADP as the report prints it (the ADP rounded once to a tenth, then subtracted), so plus means he came later than drafters take him. Null with no ADP and for a keeper.
 			 */
 			adp_gap: number | null;
 			/**

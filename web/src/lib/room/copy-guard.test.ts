@@ -7,7 +7,7 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
-import { poolBasis, runnerWords, type CallView } from './call.ts';
+import { callView, chanceHead, draftWords, poolBasis } from './call.ts';
 import type { RoomCard } from './api.ts';
 import type { Board, RoomPlayer } from './model.ts';
 
@@ -84,23 +84,44 @@ void test('the pool basis names the chance a player is still there, never odds',
 	for (const line of said) assert.doesNotMatch(line, BETTING, line);
 	assert.equal(
 		said[3],
-		'Ranked by our PPR points over replacement. Still there at 2.05 is read from 200 runs of this room, every seat drafting the way it has so far.'
+		'Ranked by our PPR points over replacement. Still there at 2.05: 200 runs of this room, each seat drafting as it has so far.'
 	);
 });
 
-void test("the runner-up's sentence says still there", () => {
-	const view: CallView = {
-		player: player('a', 'Jahmyr Gibbs', 40),
-		chance: 0.2,
-		runner: player('b', 'Bijan Robinson', 50),
-		runnerChance: 0.7,
-		forLabel: '1.05',
-		nextLabel: '2.08',
-		conditional: false,
-		why: null
+void test('the call card is our top three as rows, its chance column headed still there', () => {
+	const call = player('a', 'Jahmyr Gibbs', 40);
+	const second = player('b', 'Bijan Robinson', 50);
+	const third = player('c', 'Puka Nacua', 30);
+	const gone = player('d', 'Ja Marr Chase', 60);
+	const everyone = [call, second, third, gone];
+	const board: Board = {
+		...BOARD,
+		players: everyone,
+		byId: new Map(everyone.map((p) => [p.id, p] as const))
 	};
-	const words = runnerWords(view);
-	assert.ok(words);
-	assert.doesNotMatch(words.rest, BETTING);
-	assert.match(words.rest, /still there at 2\.08 70% of the time/);
+	const roomCard = {
+		for_pick: 5,
+		next_pick: 20,
+		call: 'a',
+		conditional: false,
+		shortlist: [{ player_id: 'd' }, { player_id: 'a' }, { player_id: 'b' }, { player_id: 'c' }],
+		still_there: { a: 0.2, b: 0.7 }
+	} as unknown as RoomCard;
+	const view = callView(roomCard, board, new Set(['d']), 12);
+	assert.ok(view);
+	assert.deepEqual(
+		view.rows.map((r) => [r.player.id, r.chance]),
+		[
+			['a', 0.2],
+			['b', 0.7],
+			['c', null]
+		]
+	);
+	const head = chanceHead(view);
+	assert.equal(head, 'Still there 2.08');
+	assert.doesNotMatch(head, BETTING);
+	assert.equal(chanceHead({ ...view, nextLabel: null }), null);
+	assert.equal(chanceHead({ ...view, conditional: true }), 'Reaches 1.05');
+	assert.equal(draftWords('RB'), 'Draft him');
+	assert.equal(draftWords('DST', 'Queue'), 'Queue them');
 });

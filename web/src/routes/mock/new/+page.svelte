@@ -45,8 +45,10 @@
 		defaultSettings,
 		inFormat,
 		nearestLobby,
-		roundsOf
+		roundsOf,
+		setupCells
 	} from '#lib/room/setup/setup.ts';
+	import FactStrip from '#lib/ui/FactStrip.svelte';
 
 	/** How often the lobbies' fill is read while the page is open. */
 	const LOBBY_POLL_MS = 5000;
@@ -227,10 +229,10 @@
 <Shell title="Mock draft" active="mock">
 	<RoomLayout>
 		<DisplayTitle size="page">New mock</DisplayTitle>
-		<p class="lede">
-			Set it to your league once and save it. Against bots there is no clock, so a mock takes as
-			long as your own picks do. Against people it is 30 seconds a pick.
-		</p>
+		<FactStrip
+			label="The clocks"
+			cells={setupCells(lobbies.find((l) => l.format === nearestLobby(settings)))}
+		/>
 		{#if handleFor}
 			<HandlePrompt problem={handleProblem} {busy} onsave={saveHandle} />
 		{/if}
@@ -278,7 +280,6 @@
 				<ChipGroup label="Bots">
 					<Chip pressed>From where drafters take players</Chip>
 				</ChipGroup>
-				<span class="later">Your league's last draft comes with a league import</span>
 			</SetupRow>
 			<SetupRow label="Keepers">
 				{#if keepersOpen}
@@ -351,17 +352,6 @@
 {/snippet}
 
 <style>
-	.lede {
-		margin: 0;
-		color: var(--ink-2);
-		max-width: 60ch;
-	}
-
-	.later {
-		font-size: var(--t-xs);
-		color: var(--ink-3);
-	}
-
 	.warn {
 		margin: 0;
 		color: var(--loss-ink);
