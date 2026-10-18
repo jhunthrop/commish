@@ -22,6 +22,7 @@ from research.capsules.narrative import NarrativeResult
 from research.capsules.run_budget import BudgetSpentError, RunBudget, parse_budget
 from research.capsules.throttle_waits import AskWaits, RunWaits, run_wait_cap_s
 from research.capsules.validate import ValidationResult
+from research.nightly import capsule_step
 from research.nightly.capsule_gate import CapsuleGateResult
 from research.nightly.capsule_step import CapsuleSpend
 
@@ -125,6 +126,27 @@ def test_a_gateway_down_through_every_wait_is_the_facts_block_named_throttled() 
     assert result.source == "facts"
     assert describe_fallback(result.compact, result.full) == "facts (throttled)"
     assert gateway.slept == [w / 1000 for w in WAITS]
+
+
+@pytest.mark.usefixtures("quiet_page")
+def test_a_generation_the_gateway_lost_is_charged_a_whole_generations_asks() -> None:
+    """Review 73 item 5: a bundle lost to a throttle, a refusal or an empty answer is one or two asks,
+    which under the asks ceiling would let a page under a 429 storm start up to seven ordinary
+    generations; charged the whole six, it starts two and the grace, the ceiling's three drafts."""
+    whole = CAPSULE_CONFIG.max_gateway_calls_per_player
+    throttled = _write(_StubGateway([_transport()] * (len(WAITS) + 1)))
+    refused = _write(_StubGateway([GenerationError("Gateway refused the request: HTTP 400.", False)] * 2))
+    assert (throttled.asks, refused.asks) == (whole, whole)
+    clean = _write(_StubGateway([Completion(_BUNDLE, None)]))
+    assert clean.asks == 1
+
+
+def test_a_page_whose_generations_the_gateway_loses_starts_three_drafts_a_night() -> None:
+    whole = CAPSULE_CONFIG.max_gateway_calls_per_player
+    assert capsule_step.spent_out_for({"p": whole}, frozenset(), grace=False) == frozenset()
+    assert capsule_step.spent_out_for({"p": 2 * whole}, frozenset(), grace=False) == {"p"}
+    assert capsule_step.spent_out_for({"p": 2 * whole}, frozenset(), grace=True) == frozenset()
+    assert capsule_step.spent_out_for({"p": 3 * whole}, frozenset({"p"}), grace=True) == {"p"}
 
 
 @pytest.mark.usefixtures("quiet_page")

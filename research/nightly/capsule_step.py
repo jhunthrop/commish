@@ -120,7 +120,10 @@ RETRY_PASSES: Final = 3
 # (at most 6 calls used), and otherwise waits for the next night. The calls are the writer's own asks
 # (`CapsuleResult.asks`), never the gateway's re-asks of an empty or cut answer nor the throttle's,
 # which count on the bill only (Lane 73 ruling 1: a generation that took 7 HTTP calls had cost a page
-# its second generation).
+# its second generation). A generation the gateway lost (a throttle past every wait, the budget, a refused,
+# empty or cut answer) is charged the whole six (`generate.charged_asks`), so the bound per page a night
+# is three drafts (two ordinary and the grace) plus the one retry after the demotion, each at most six
+# asks, every ask's own re-asks bounded by `throttle_waits_ms` and the run's wait cap (review 73 item 5).
 NIGHT_CALLS_PER_PLAYER: Final = 12
 Log = Callable[[str], None]
 
