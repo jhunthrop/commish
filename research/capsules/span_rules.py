@@ -52,5 +52,8 @@ def span_rules_for(conn: Connection, sheets: Iterable["PlayerFacts"]) -> SpanRul
     a figure with its basis is exempt, a label never is (`render_words.SHEET_LABELS`)."""
     names = span_names(conn)
     texts = [cut_phrases(text, SHEET_LABELS) for facts in sheets for text in facts_texts(facts)]
-    sentences = held_sentences(texts, CAPSULE_CONFIG.shared_sentence_min_words)
+    # Line by line: the facts block's `Label: value` lines and the news bullets carry no full stop, so
+    # a printed line is its own sentence, never merged with the next (review 73 item 4).
+    lines = [line for text in texts for line in text.splitlines()]
+    sentences = held_sentences(lines, CAPSULE_CONFIG.shared_sentence_min_words)
     return SpanRules(names, sheet_spans(texts, names), frozenset(sentences))

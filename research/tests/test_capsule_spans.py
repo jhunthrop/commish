@@ -130,6 +130,26 @@ def test_a_figures_basis_the_facts_print_is_exempt_and_a_label_or_a_paraphrase_i
     assert {s.player_ids for s in gate.spans} == {("c", "d"), ("e", "f")}
 
 
+def test_a_printed_line_with_no_full_stop_and_the_sentence_after_it_are_each_exempt(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Review 73 item 4: the facts block's `Label: value` lines and the news bullets carry no full stop,
+    so each printed line is read on its own, never merged with the next."""
+    monkeypatch.setattr(span_rules, "span_names", lambda conn: NAMES)
+    monkeypatch.setattr(
+        span_rules,
+        "facts_texts",
+        lambda facts: (
+            "Recent news:\n- He was limited in practice on Wednesday\n- He returned to full practice on Friday.",
+            "Facts.",
+        ),
+    )
+    rules = span_rules.span_rules_for(cast("Connection", None), [cast("Any", object())])
+    for printed in ("He was limited in practice on Wednesday.", "He returned to full practice on Friday."):
+        rows = {pid: _row(pid, f"Note {pid}. {printed}") for pid in ("a", "b")}
+        assert judge_capsules(["a", "b"], rows, rules, LINE).shared == (), printed
+
+
 def test_a_sentence_the_facts_print_on_two_pages_is_exempt_and_a_paraphrase_of_it_is_not(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
