@@ -98,7 +98,8 @@ class TonightWindow:
         """Adds a landed page (`texts`: every prose text of it; `reads`: its two reads) and returns
         what it shares with the pages landed before it."""
         spans = spans_of(page_runs(texts, self._rules.names)) - self._rules.exempt
-        sentences = frozenset(held_sentences(reads, self._min_words))
+        # A sentence the facts print is never counted (`SpanRules.exempt_sentences`, review 73 item 3).
+        sentences = frozenset(held_sentences(reads, self._min_words)) - self._rules.exempt_sentences
         seen_spans = frozenset(s for page, _ in self._pages for s in page)
         seen_sentences = frozenset(s for _, page in self._pages for s in page)
         self._pages.append((spans, sentences))

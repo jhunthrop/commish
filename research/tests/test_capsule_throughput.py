@@ -334,6 +334,15 @@ def test_a_landing_page_counts_what_it_shares_with_the_pages_landed_before_it() 
     assert first_span in window.repeated(12)
 
 
+def test_a_sentence_the_facts_print_is_never_counted_as_shared_as_pages_land() -> None:
+    """Review 73 item 3: the landing count reads the same exemption as the gate and the claim."""
+    printed = "He missed two games to injury in 2025."
+    rules = SpanRules(frozenset(), exempt_sentences=frozenset(held_sentences([printed], 4)))
+    window = TonightWindow(rules, 60, 4)
+    window.land(("first",), (printed,))
+    assert window.land(("second",), (printed,)).sentences == 0
+
+
 def test_the_window_forgets_pages_past_its_width() -> None:
     window = TonightWindow(SpanRules(frozenset()), 1, 4)
     window.land((f"{_SHARED}.",), (f"{_SHARED}.",))
