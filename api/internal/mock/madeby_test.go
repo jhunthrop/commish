@@ -145,8 +145,8 @@ func TestReportListsKeepers(t *testing.T) {
 			continue
 		}
 		found = true
-		if p.Chip != mock.Kept || p.Round != keptRound || p.ADPGap != nil || p.StillThere != nil {
-			t.Fatalf("the keeper reads chip %q round %d gap %v still there %v", p.Chip, p.Round, p.ADPGap, p.StillThere)
+		if p.Chip != mock.Kept || p.Round != keptRound || p.PicksLater != nil || p.StillThere != nil {
+			t.Fatalf("the keeper reads chip %q round %d gap %v still there %v", p.Chip, p.Round, p.PicksLater, p.StillThere)
 		}
 	}
 	if !found {

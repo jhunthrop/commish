@@ -112,6 +112,20 @@ func TestTheReportRouteSendsBothPicksLater(t *testing.T) {
 		if want := tenth.Round(float64(p.Pick) - adp); priced && (p.AdpGap == nil || *p.AdpGap != want) {
 			t.Fatalf("pick %d: ADP %v, gap %v, want %v", p.Pick, adp, p.AdpGap, want)
 		}
+		// The chip reads the printed gap: within 3 at ADP, plus a steal,
+		// minus a reach (Lane 66o re-review N6).
+		if priced {
+			gap := *p.AdpGap
+			want := apitypes.ReportPickChip("at_adp")
+			if gap <= -mock.AtADPWithin {
+				want = "reach"
+			} else if gap >= mock.AtADPWithin {
+				want = "steal"
+			}
+			if p.Chip != want {
+				t.Fatalf("pick %d: printed gap %v but chip %q, want %q", p.Pick, gap, p.Chip, want)
+			}
+		}
 		at, valued := valuedPick[p.Pick]
 		if !valued {
 			market++

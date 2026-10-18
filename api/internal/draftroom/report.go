@@ -87,17 +87,16 @@ func Report(ctx context.Context, in ReportInput) (apitypes.MockReport, error) {
 	return out, nil
 }
 
-// pickBasis is what a pick's two Picks later figures are read against:
-// each player's ADP and place on our board, and each pick's place among the
+// pickBasis is what a pick's Picks later against our board is read
+// against: each player's place on it, and each pick's place among the
 // draft's picks of players our board ranks.
 type pickBasis struct {
-	adp        map[string]float64
 	ranks      map[string]int
 	valuedPick map[int]int
 }
 
 func newPickBasis(b boards.Board, picks []draft.Pick) pickBasis {
-	return pickBasis{adp: b.ADPs(), ranks: boardRanks(b), valuedPick: valuedPicks(picks, b)}
+	return pickBasis{ranks: boardRanks(b), valuedPick: valuedPicks(picks, b)}
 }
 
 func pickView(p mock.PickReview, b boards.Board, basis pickBasis) apitypes.ReportPick {
@@ -120,14 +119,9 @@ func pickView(p mock.PickReview, b boards.Board, basis pickBasis) apitypes.Repor
 	if p.Chip == mock.Kept {
 		return v
 	}
-	// Picks later against drafters: the pick less the ADP the column
-	// prints, rounded once and then subtracted, so the row adds up. The
-	// difference of a tenth and a whole pick carries binary noise only,
-	// which tenth.Round cleans back to the tenth it is.
-	if adp, ok := basis.adp[p.PlayerID]; ok {
-		gap := tenth.Round(float64(p.PickNumber) - tenth.Round(adp))
-		v.AdpGap = &gap
-	}
+	// Picks later against drafters: mock.PicksLater, the pick less the
+	// ADP the column prints, the same figure the chip is read from.
+	v.AdpGap = p.PicksLater
 	// Picks later against our board: the pick's place among picks of
 	// players our board ranks, less his place on it. Kickers and defenses
 	// are on neither side: our board ranks them by no points.
