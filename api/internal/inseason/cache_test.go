@@ -119,24 +119,27 @@ func TestCacheReadsOncePerTTL(t *testing.T) {
 }
 
 // The board route's designations are the in-season screens' read: one
-// capture read serves both within the TTL, and the screens never pay for
-// the dating read.
+// capture read and one dating read serve both within the TTL, and the
+// screens' data carries each season-long status's start, so their chip
+// says since when as the board's does (review 66n finding 3).
 func TestCacheSharesTheCaptureRead(t *testing.T) {
 	reads := &countingReads{}
 	c := &Cache{Reads: reads, Now: time.Now}
 	ctx := context.Background()
-	if _, err := c.Data(ctx, 2026); err != nil {
+	data, err := c.Data(ctx, 2026)
+	if err != nil {
 		t.Fatal(err)
 	}
-	if reads.runs.Load() != 0 {
-		t.Fatal("the in-season screens read the season-long runs")
+	if since := data.Designations["p2"].Since; since == nil || !since.Equal(captureAt.Add(-time.Hour)) {
+		t.Fatalf("the screens' designations undated: %+v", data.Designations)
 	}
 	d, err := c.DatedDesignations(ctx)
 	if err != nil || d["p2"].Since == nil || !d["p2"].Since.Equal(captureAt.Add(-time.Hour)) || d["p1"].Since != nil {
 		t.Fatalf("dated designations %+v %v", d, err)
 	}
-	if reads.designations.Load() != 1 {
-		t.Fatalf("the board and the screens read the capture %d times, want once", reads.designations.Load())
+	if reads.designations.Load() != 1 || reads.runs.Load() != 1 {
+		t.Fatalf("the board and the screens read the capture %d and the runs %d times, want once each",
+			reads.designations.Load(), reads.runs.Load())
 	}
 }
 

@@ -109,6 +109,10 @@ export const boardRowSchema = z.object({
 	vorRound: z.number().int().min(1),
 	/** The blended ADP of this format's named sources, or null when no source has him. */
 	adp: points.positive().nullable(),
+	/** Drafters' ADP less our rank, the board's Gap, written by the run to a tenth (Lane 66n): plus
+	 * when drafters take him later than we rank him; null without an ADP. Absent on a run older than
+	 * the column, which then prints no gap: the web never works it out. */
+	gap: points.nullable().optional(),
 	projected: points,
 	vor: points,
 	expectedGames: points.nonnegative(),
@@ -141,6 +145,8 @@ export const marketRowSchema = z.object({
 	/** This format's ADP: a kicker or a defense its drafts do not take is not on the board (the
 	 * September ruling). */
 	adp: points.positive(),
+	/** A kicker or a defense has no rank of ours to set the drafts against. */
+	gap: z.null().optional(),
 	vorRound: z.null(),
 	projected: z.null(),
 	vor: z.null(),
@@ -418,7 +424,7 @@ export const slateSchema = z.object({
 	/** 1 is the hardest slate of the 32. */
 	rank: z.number().int().min(1).max(32),
 	/** How strength is measured, as the page prints it beside the number: a noun phrase with its own
-	 * article, "the average of its opponents' expected wins for the season, ...". */
+	 * article, "the average of each club's opponents' expected wins for the season, ...". */
 	method: phrase,
 	/** When the inputs were read, from their own stamps. */
 	window: windowSchema

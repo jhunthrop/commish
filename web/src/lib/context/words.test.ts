@@ -8,14 +8,14 @@ import { contextNote, scoresSentence } from './note-words.ts';
 import { safeThen } from './then-path.ts';
 import { leagueLine } from './menu-words.ts';
 import {
-	clubCaption,
 	clubsLead,
+	hardestFigure,
 	hardestWords,
 	playedWords,
-	scheduleLead
+	scheduleLead,
+	winsBasis
 } from '#lib/run/strength-words.ts';
 import { leagueBasis } from '#lib/league/model.ts';
-import { seasonFigures } from '#lib/ui/season-figures.ts';
 import { recordHeadline, weekLines } from '#lib/run/record.ts';
 import type { RecordWeek } from '#lib/run/schema.ts';
 
@@ -133,7 +133,7 @@ void test('his page names whose roster he is on, or that he is a free agent', ()
 void test("copy guard: no composed line doubles a word, the run's own phrases included", () => {
 	// The real run's method carries its own article; the pages once added a second ("the the").
 	const slate = {
-		method: "the average of its opponents' expected wins for the season, one per game",
+		method: "the average of each club's opponents' expected wins for the season, one per game",
 		window: { from: '2026-09-07T12:00:00.000Z', to: '2026-09-07T12:00:00.000Z' },
 		rank: 32
 	};
@@ -182,9 +182,10 @@ void test("copy guard: no composed line doubles a word, the run's own phrases in
 	const te = league({ scoring: 'te_premium' });
 	const held: Held = { me: 1, teams: { 1: 'Nacua Matata', 2: 'Gmoneyman' }, by: { a: 1, b: 2 } };
 	const lines = [
-		scheduleLead(slate, 'Expected wins, set before the season', { count: 9, atLeast: '10.5' }, 5),
+		scheduleLead(slate, { count: 9, atLeast: '10.5' }, 5),
 		clubsLead('PPR', slate),
-		clubCaption(slate, 32),
+		winsBasis('Expected wins, set before the season'),
+		hardestFigure(10, 32).caption,
 		hardestWords(1, 32),
 		hardestWords(32, 32),
 		playedWords(1),
@@ -202,8 +203,7 @@ void test("copy guard: no composed line doubles a word, the run's own phrases in
 		leagueBasis('Half PPR', 0, 'half_ppr', scoresSentence),
 		heldMark(held, 'a')?.words,
 		heldMark(held, 'free')?.words,
-		holderWords(held, 'b'),
-		Object.values(seasonFigures({ games: 5, pointsPerGame: 10.5 })).join('')
+		holderWords(held, 'b')
 	];
 	for (const line of lines) {
 		assert.ok(line, 'every composed line is said');

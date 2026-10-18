@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import WeatherGlyph from '#lib/league/box/WeatherGlyph.svelte';
-	import StatusPill from '#lib/league/StatusPill.svelte';
+	import StatusPill from '#lib/ui/StatusPill.svelte';
 	import type { StatusView } from '#lib/run/status-view.ts';
 	import Face from '#lib/ui/Face.svelte';
 	import Quiet from '#lib/ui/Quiet.svelte';

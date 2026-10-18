@@ -12,7 +12,7 @@
 	import { roundlessVorCell } from '#lib/run/row-framing.ts';
 	import { vorCell } from '#lib/ui/heat.ts';
 	import type { LeaguePlayer } from './api.ts';
-	import StatusPill from './StatusPill.svelte';
+	import StatusPill from '#lib/ui/StatusPill.svelte';
 	import type { LeagueBoardPlayer } from './board.ts';
 	import { projectionWords, seasonWords } from './model.ts';
 

@@ -45,112 +45,42 @@ input {
 	outline-offset: 2px;
 }
 
-/* The board row's columns, shared by the row and its header so the two never drift.
-   --board-cols-flat is the same row with the floor to ceiling column switched off. The -act pair
-   adds the row's sheet control at the end: a 32px mark whose words open over the row on hover. The
-   player column takes back what that column gave up (210px), so the meta line with the club, which
-   needs 201px at its widest, fits at 1440 with the range on. */
+/* A player's status chip (StatusChip.svelte, Lane 66n): here rather than in the component, so the
+   chip ships with every prerendered page, styled from the first paint whatever chunk its script rides
+   in. A week's designation is grey, a status that keeps him out rose, as ToneChip draws them. */
+.status-chip {
+	display: inline-flex;
+	align-items: center;
+	height: 20px;
+	padding: 0 7px;
+	border-radius: var(--r-sm);
+	background: var(--surface-2);
+	color: var(--ink-2);
+	font-family: var(--font-ui);
+	font-size: var(--t-xs);
+	font-weight: 600;
+	letter-spacing: 0;
+	text-transform: none;
+	white-space: nowrap;
+}
+
+.status-chip.sits {
+	background: var(--loss-bg);
+	color: var(--loss-ink);
+}
+
+/* The board row's type (Lane 66n): the name the row's largest text, its figures a step under it in
+   the number face. The row's columns are board-columns.ts's, set once per table by BoardTable. */
 :root {
-	--board-cols: 34px 44px minmax(170px, 1fr) 92px 132px minmax(140px, 190px) 150px;
-	--board-cols-flat: 34px 44px minmax(170px, 1fr) 92px 132px 150px;
-	--board-cols-act: 34px 44px minmax(210px, 1fr) 92px 132px minmax(110px, 170px) 140px 72px;
-	--board-cols-act-flat: 34px 44px minmax(210px, 1fr) 92px 132px 140px 72px;
-	/* In season a desk row gives the games count a narrow Games column after the player, its width
-	   taken from the floor to ceiling column (whose cell prints "242 to 446" under its head), so the
-	   meta line keeps "25.9 a game" on one line and the row its 53px. */
-	--games-w: 48px;
-	--board-cols-games: 34px 44px minmax(170px, 1fr) var(--games-w) 92px 132px minmax(110px, 142px)
-		150px;
-	--board-cols-games-flat: 34px 44px minmax(170px, 1fr) var(--games-w) 92px 132px 150px;
-	--board-cols-games-act: 34px 44px minmax(210px, 1fr) var(--games-w) 92px 132px
-		minmax(100px, 122px) 140px 72px;
-	--board-cols-games-act-flat: 34px 44px minmax(210px, 1fr) var(--games-w) 92px 132px 140px 72px;
-}
-
-/* From 1181 to 1439px the in-season row sits beside the 296px rail on a laptop or an iPad: it keeps
-   the Games column and its sheet mark (the row's one verb and its on-sheet state) as a 32px disc, its
-   place on your sheet in the mark's name, and drops the floor to ceiling column (Row and RowHead hide
-   its cell), on the narrower widths the 960px band already uses. Under 1294px the drafters column
-   narrows to 124px, so the row keeps 53px at 1181 and the club stays in the meta line from 1254px
-   (its player column reaches the 204px the club needs). */
-@media (min-width: 1181px) and (max-width: 1439px) {
-	:root {
-		--rank-w: 28px;
-		--face-w: 40px;
-		--drafters-w: 140px;
-		--board-cols-games: var(--rank-w) var(--face-w) minmax(140px, 1fr) var(--games-w) 84px 124px
-			var(--drafters-w);
-		--board-cols-games-flat: var(--board-cols-games);
-		--board-cols-games-act: var(--rank-w) var(--face-w) minmax(140px, 1fr) var(--games-w) 84px 124px
-			var(--drafters-w) 32px;
-		--board-cols-games-act-flat: var(--board-cols-games-act);
-	}
-}
-
-@media (min-width: 1181px) and (max-width: 1293px) {
-	:root {
-		--drafters-w: 124px;
-	}
-}
-
-/* At 1181 to 1253px (iPad landscape) the row finds the tier chip's room: a 24px rank (three digits),
-   a 32px face, 116px for the drafters and 9px between columns (Row and RowHead), so the player
-   column holds the widest meta line with the tier chip and the meta line drops only the club. */
-@media (min-width: 1181px) and (max-width: 1253px) {
-	:root {
-		--rank-w: 24px;
-		--face-w: 32px;
-		--drafters-w: 116px;
-	}
-}
-
-/* Under 1181 px the count rides the meta line ("8.2 a game, 3 games") and the grid has no Games track. */
-@media (max-width: 1180px) {
-	:root {
-		--board-cols-games: var(--board-cols);
-		--board-cols-games-flat: var(--board-cols-flat);
-		--board-cols-games-act: var(--board-cols-act);
-		--board-cols-games-act-flat: var(--board-cols-act-flat);
-	}
-}
-
-/* From 961 to 1180px (the rail folded under, a small laptop or an iPad in landscape at 1024) the row
-   never runs past the page: the player column gives way to nothing ("minmax(0, 1fr)", the meta line's
-   container queries shedding the club and the tier as it narrows) and the sheet mark is the 32px
-   disc. */
-@media (min-width: 961px) and (max-width: 1180px) {
-	:root {
-		--board-cols: 34px 44px minmax(0, 1fr) 92px 132px minmax(110px, 170px) 140px;
-		--board-cols-flat: 34px 44px minmax(0, 1fr) 92px 132px 140px;
-		--board-cols-act: 34px 44px minmax(0, 1fr) 92px 132px minmax(110px, 170px) 140px 32px;
-		--board-cols-act-flat: 34px 44px minmax(0, 1fr) 92px 132px 140px 32px;
-		/* An in-season row drops its floor to ceiling column here too, as from 1181 to 1439px. */
-		--board-cols-games: var(--board-cols-flat);
-		--board-cols-games-flat: var(--board-cols-flat);
-		--board-cols-games-act: var(--board-cols-act-flat);
-		--board-cols-games-act-flat: var(--board-cols-act-flat);
-	}
-}
-
-/* From 761 to 960px (an iPad in portrait) the range column is already gone; the sheet mark goes too,
-   as on the phone (his page carries the verb), and the drafters narrow to 124px, so the row fits. */
-@media (max-width: 960px) {
-	:root {
-		--board-cols: 28px 40px minmax(0, 1fr) 84px 124px 124px;
-		--board-cols-flat: var(--board-cols);
-		--board-cols-act: var(--board-cols);
-		--board-cols-act-flat: var(--board-cols);
-	}
+	--t-row-name: 1.125rem; /* 18 */
+	--t-row-num: 1.0625rem; /* 17 */
 }
 
 @media (max-width: 760px) {
 	:root {
 		--row-h: 48px;
-		/* The over replacement cell is its number alone on the phone ("+164.1"), named by the head. */
-		--board-cols: 36px minmax(0, 1fr) 76px 90px;
-		/* The phone row has no room for the action; a player's page carries it. */
-		--board-cols-act: var(--board-cols);
-		--board-cols-act-flat: var(--board-cols);
+		--t-row-name: 1rem; /* 16 */
+		--t-row-num: 0.9375rem; /* 15 */
 	}
 }
 

@@ -1,0 +1,13 @@
+[
+	{ "pick": 5, "adp": 2.04, "later": 3.0 },
+	{ "pick": 2, "adp": 4.96, "later": -3.0 },
+	{ "pick": 5, "adp": 2.06, "later": 2.9 },
+	{ "pick": 120, "adp": 110.8, "later": 9.2 },
+	{ "pick": 1, "adp": 126.4, "later": -125.4 },
+	{ "pick": 10, "adp": 5.5, "later": 4.5 },
+	{ "pick": 17, "adp": 16.5, "later": 0.5 },
+	{ "pick": 3, "adp": 6.5, "later": -3.5 },
+	{ "pick": 1, "adp": 2.84, "later": -1.8 },
+	{ "pick": 9, "adp": 9.45, "later": -0.5 },
+	{ "pick": 7, "adp": 7.0, "later": 0 }
+]

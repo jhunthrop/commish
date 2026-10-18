@@ -105,6 +105,24 @@ export function stampWords(iso: string, zone: string = memberZone()): string {
 	return `${weekday} ${shortDay(iso, zone)}, ${time.join(' ')} ${zoneWord(zone)}`;
 }
 
+/** The capture in the few words a page of board rows has left in its five-line basis (Lane 66n):
+ * "Status read Oct 16.", "as of" its last change with no check, and past
+ * CAPTURE_BEHIND_MS how old it is. The player page and the record keep captureLine's fuller words. */
+export function captureShort(
+	capture: CaptureStamp,
+	now: number,
+	zone: string = memberZone()
+): string {
+	const last = capture.checkedAt ?? capture.readAt;
+	const stamp = (iso: string): string => shortDay(iso, zone);
+	const when =
+		capture.checkedAt === null
+			? `as of ${stamp(capture.readAt)}`
+			: `read ${stamp(capture.checkedAt)}`;
+	const old = now - Date.parse(last) > CAPTURE_BEHIND_MS ? ', over 36 hours ago' : '';
+	return `Status ${when}${old}.`;
+}
+
 /** The basis line's sentence naming the capture and when it was read, "read" only for a real check:
  * "Injury status from the hourly capture, read Fri Oct 16, 9:05 am Central.", else "as the list
  * stood" at its last change. Past CAPTURE_BEHIND_MS since the last check (or the list, with none) it
@@ -126,12 +144,14 @@ export function captureLine(
 	return `Injury status from the hourly capture, ${when}.`;
 }
 
-/** "Doubtful as of Oct 13": a static page's mark, dated by the list's day, since the page can outlive
- * the week. */
-export function listedMark(
-	status: DesignationStatus,
-	readAt: string,
+/** "IR since Sep 22": a season-long status as the shared chip says it (Lane 66n), on the board, a
+ * club, ADP, the player card, the order and the league rows alike, dated by when his run under it
+ * began, or the word alone ("IR") when we do not know. The capture's read is never the chip's: the
+ * page's basis line says it once. What the order does with him is said at the head of his section. */
+export function seasonLongMark(
+	status: { status: DesignationStatus; since: string | null },
 	zone: string = memberZone()
 ): string {
-	return `${DESIGNATION_WORDS[status]} as of ${shortDay(readAt, zone)}`;
+	const word = RANK_WORDS[status.status];
+	return status.since === null ? word : `${word} since ${shortDay(status.since, zone)}`;
 }

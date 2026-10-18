@@ -6,7 +6,7 @@
 	import NameWords from '#lib/ui/NameWords.svelte';
 	import TagChip from '#lib/ui/TagChip.svelte';
 	import { tagMarks } from '#lib/sheet/tags.ts';
-	import StatusPill from '../StatusPill.svelte';
+	import StatusPill from '#lib/ui/StatusPill.svelte';
 	import { HELD } from '../inseason/words.ts';
 	import { initialName, type BoxRow } from './box.ts';
 	import BoxGame from './BoxGame.svelte';

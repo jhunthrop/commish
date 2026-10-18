@@ -3,9 +3,10 @@
  * the build's instant), then the member's own once the page is live (run/live-status.svelte.ts). */
 import {
 	captureLine,
+	captureShort,
 	designationWord,
-	listedMark,
 	rankWord,
+	seasonLongMark,
 	draftOrderLongLine,
 	seasonLongLine,
 	sitsHim,
@@ -16,7 +17,9 @@ import type { PlayerStatus } from './schema.ts';
 export interface StatusView {
 	/** The word his rank shows as, for a season-long status: "IR". Null for a week's designation. */
 	rank: string | null;
-	/** The chip: the week's mark dated by the list, or the season-long status's word. */
+	/** The chip, the shared pill's (StatusPill): the week's designation ("Questionable"), or the
+	 * season-long status with its start ("IR since Sep 22"). The capture's read is said once, in the
+	 * page's basis. */
 	mark: string;
 	/** Drawn as a loss: a status that keeps him out. */
 	sits: boolean;
@@ -40,7 +43,7 @@ export function statusView(status: PlayerStatus, saying: Saying, draftOrder = fa
 	if (status.seasonLong) {
 		return {
 			rank: rankWord(status.status),
-			mark: designationWord(status.status),
+			mark: seasonLongMark(status, zone),
 			sits: true,
 			line: draftOrder
 				? draftOrderLongLine(status, capture.readAt, zone)
@@ -49,7 +52,7 @@ export function statusView(status: PlayerStatus, saying: Saying, draftOrder = fa
 	}
 	return {
 		rank: null,
-		mark: listedMark(status.status, capture.readAt, zone),
+		mark: designationWord(status.status),
 		sits: sitsHim(status.status),
 		line: null
 	};
@@ -89,7 +92,7 @@ export function boardStatusWords(rows: readonly ListedRow[], saying: Saying): Bo
 			: [[row.id, statusView(row.status, saying, row.orderBasis === 'market')] as const]
 	);
 	return {
-		capture: captureLine(saying.capture, saying.now, saying.zone),
+		capture: captureShort(saying.capture, saying.now, saying.zone),
 		rows: Object.fromEntries(listed)
 	};
 }

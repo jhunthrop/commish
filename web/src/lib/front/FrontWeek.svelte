@@ -1,4 +1,5 @@
 <script lang="ts">
+	import StatusChip from '#lib/ui/StatusChip.svelte';
 	import { onMount } from 'svelte';
 	import ClubMark from '#lib/ui/ClubMark.svelte';
 	import Face from '#lib/ui/Face.svelte';
@@ -162,7 +163,9 @@
 							<a class="chip" href={chip.href}>
 								{@render face(chip.row, 38)}
 								<span class="txt"><b>{chip.row.name}</b><span>{chip.line}</span></span>
-								<span class="kind {chip.kind}">{chip.label}</span>
+								{#if chip.kind === 'status' && chip.row.status}<StatusChip
+										status={chip.row.status}
+									/>{:else}<span class="kind {chip.kind}">{chip.label}</span>{/if}
 								<span class="go">{chip.go}</span>
 							</a>
 						</li>
@@ -475,10 +478,6 @@
 		text-transform: uppercase;
 		letter-spacing: var(--track-label);
 		white-space: nowrap;
-	}
-
-	.kind.status {
-		background: color-mix(in srgb, var(--tier-2) 18%, transparent);
 	}
 
 	.kind.bye {

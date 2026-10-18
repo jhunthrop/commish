@@ -1,7 +1,7 @@
 {
 	"week": 6,
 	"basis": "We start the highest Proj at each slot, after this week's designations and byes. A player who cannot play this week never starts. Our rest-of-season order breaks ties and stands in where a player has no Proj.",
-	"basis_note": "Points so far leave out your league's points for two-point conversions, missed field goals, missed extra points, fumble recoveries and safeties: the stat lines we hold do not carry them.",
+	"basis_note": "Points so far leave out your league's points for two-point conversions, missed field goals, missed extra points, fumble recoveries and safeties: the stats we hold do not carry them.",
 	"order_basis": "rest_of_season",
 	"refreshed": "2026-10-14T19:05:37.917Z",
 	"read_at": "2026-10-14T19:05:38.329Z",

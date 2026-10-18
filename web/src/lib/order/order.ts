@@ -11,29 +11,9 @@ import { addVerbWords } from '#lib/league/box/waivers.ts';
 import { hostWords } from '#lib/league/names.ts';
 import { askedQuery } from '#lib/league/box/asked.ts';
 import type { OrderAdvice, OrderPosition, OrderRow, RosterMark } from './api.ts';
+import { ORDER } from './words.ts';
 
-/** Every word the order's screens print that is not a player's, in one place for the copy guard. */
-export const ORDER = {
-	/** The column's head, and over it the order it is a place in (the coordinator's ruling 1). */
-	rank: '#',
-	rankGroup: 'Our rest-of-season order',
-	roster: 'Roster',
-	restGroup: 'Rest of season',
-	total: 'Total',
-	overRepl: 'Over repl.',
-	perGame: 'A game',
-	yours: 'Yours',
-	free: 'Free',
-	tradeFor: 'Trade for him',
-	every: 'All',
-	everyone: 'Everyone',
-	search: 'Find a player or a club',
-	player: 'player',
-	moreRows: 'Show more',
-	none: 'No player in our order matches.',
-	unread: 'We could not read our order just now. Try again in a minute.',
-	reading: 'Reading our order'
-} as const;
+export { ORDER };
 
 /** The position chips, in the board's order: every position, then each. Kickers and defenses are not
  * on the order (Lane 66m). */
@@ -45,8 +25,8 @@ export type RosterView = 'everyone' | 'free' | 'yours';
 /** The figure columns of a view: the key first and big, then the others (review 66j H2). */
 export type FigureKey = 'por' | 'total' | 'perGame';
 
-/** The view's figure columns from what its rank sorts on: across positions Over repl., Total and A
- * game; at a position Total and A game. */
+/** The view's figure columns from what its rank sorts on: across positions Over repl., Points and A
+ * game; at a position Points and A game. */
 export function figureColumns(rankBy: OrderAdvice['rank_by']): readonly FigureKey[] {
 	return rankBy === 'points_over_replacement' ? ['por', 'total', 'perGame'] : ['total', 'perGame'];
 }

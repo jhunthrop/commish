@@ -15,6 +15,8 @@ export interface BoardSeason {
 	rows: BoardRowView[];
 	/** The basis line naming the sort and the season figures, or null before the first kickoff. */
 	lead: string | null;
+	/** How far the season's figures reach, null before the first kickoff: a page's basis names it. */
+	reach: SeasonReach | null;
 }
 
 /** Every row with his season so far from index.json. A board player missing from it fails the build. */
@@ -44,11 +46,11 @@ export function seasonLead(format: Format, reach: SeasonReach, season: number): 
 
 /** A board's rows and basis line as its page prints them. */
 export async function boardSeason(format: Format, rows: BoardRowView[]): Promise<BoardSeason> {
-	if (!(await seasonUnderway())) return { rows, lead: null };
+	if (!(await seasonUnderway())) return { rows, lead: null, reach: null };
 	const [seasoned, reach, run] = await Promise.all([
 		withSeasons(rows, format.id),
 		seasonReach(),
 		manifest()
 	]);
-	return { rows: seasoned, lead: seasonLead(format, reach, run.season) };
+	return { rows: seasoned, lead: seasonLead(format, reach, run.season), reach };
 }

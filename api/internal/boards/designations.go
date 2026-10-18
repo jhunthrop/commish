@@ -40,8 +40,8 @@ type Designation struct {
 	CheckedAt *time.Time
 	// Since is the first capture of his unbroken run under a season-long
 	// status (WithSince), nil for a week's designation, for a run that
-	// reaches the oldest capture read (we do not know when it began), and
-	// on the in-season screens' read, which does not date.
+	// reaches the oldest capture read (we do not know when it began). The
+	// board route and the in-season screens both read it dated (Lane 66n).
 	Since *time.Time
 }
 

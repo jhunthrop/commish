@@ -69,6 +69,7 @@ import {
 } from '../src/lib/run/schema.ts';
 import { POSITIONS, type Position } from '../src/lib/types/player.ts';
 import { bucketUrl, credentialsFromToken } from './r2.ts';
+import { gapOf } from './tenth.ts';
 import { checkRunSeasons } from '../src/lib/run/season-checks.ts';
 import { priorSeasonBlocks, seasonBlocks } from './standin-season.ts';
 import type { PlayerSeason, PriorSeason } from '../src/lib/run/season.ts';
@@ -201,6 +202,7 @@ function boardRows(csv: readonly BoardCsv[], adpByGsis: ReadonlyMap<string, numb
 	return byValue.map((row, i) => {
 		if (!isPosition(row.position)) throw new Error(`${row.name} plays ${row.position}.`);
 		const ourRank = i + 1;
+		const adp = adpByGsis.get(row.gsis) ?? null;
 		return {
 			id: row.player_id,
 			slug: slugs.get(row.player_id) ?? slugOf(row.name),
@@ -211,7 +213,9 @@ function boardRows(csv: readonly BoardCsv[], adpByGsis: ReadonlyMap<string, numb
 			headshot: row.headshot_url,
 			ourRank,
 			vorRound: Math.ceil(ourRank / TEAMS),
-			adp: adpByGsis.get(row.gsis) ?? null,
+			adp,
+			// The Gap by the nightly's own rule (scripts/tenth.ts gapOf, tested against the shared tables).
+			gap: gapOf(adp, ourRank),
 			projected: round(num(row.projected_points, `${row.name} points`)),
 			vor: round(num(row.value_over_replacement, `${row.name} vor`)),
 			expectedGames: round(num(row.expected_games, `${row.name} games`)),

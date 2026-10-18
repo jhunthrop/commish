@@ -38,7 +38,9 @@ EASTERN: Final = ZoneInfo("America/New_York")
 KICKOFF_NOT_SET: Final = "TBD"
 _KICKOFF_TIME: Final = re.compile(r"^(\d{1,2}):(\d{2})([ap])$")
 _HALF_DAY: Final = 12
-METHOD: Final = "the average of its opponents' expected wins for the season, one per game, set before the first kickoff"
+METHOD: Final = (
+    "the average of each club's opponents' expected wins for the season, one per game, set before the first kickoff"
+)
 
 
 class ScheduleError(ResearchError):

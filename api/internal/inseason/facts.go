@@ -47,6 +47,9 @@ type Allowed struct {
 type Designation struct {
 	Status string
 	AsOf   time.Time
+	// Since is when his run under a season-long status began
+	// (boards.WithSince), nil for a week's designation or the host's mark.
+	Since *time.Time
 }
 
 // Facts is one player's week (spec §3, WeekFacts). A fact we do not hold
@@ -285,7 +288,7 @@ func (s *Season) For(p Player) Facts {
 func (s *Season) designation(p Player) *Designation {
 	if d, ok := s.designations[p.BoardID]; ok && p.BoardID != "" {
 		if status := boards.StatusOf(d.Code); status != "" {
-			return &Designation{Status: status, AsOf: d.AsOf}
+			return &Designation{Status: status, AsOf: d.AsOf, Since: d.Since}
 		}
 	}
 	if p.HostIR {

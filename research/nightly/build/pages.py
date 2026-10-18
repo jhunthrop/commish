@@ -22,6 +22,7 @@ from research.capsules.week.caption import status_changed_caption, written_capti
 from research.capsules.week.store import StoredWeekRead
 from research.model.instants import js_iso
 from research.nightly.build.player_season import SeasonContext, prior_seasons, season_block
+from research.nightly.build.tenth import tenth, tenth_or_none
 from research.nightly.config import MARKET_ORDER, PAGE_FORMAT, PROJECTION_ORDER, TEAMS, RunFormat
 from research.nightly.reads.board import BoardEntry, FormatBoard
 from research.nightly.reads.market import MarketEntry
@@ -111,20 +112,30 @@ def market_identities(people: Sequence[Identity], entries: Sequence[MarketEntry]
     return out
 
 
+def gap_of(adp: float | None, our_rank: int) -> float | None:
+    """Drafters' ADP less our rank, the board's Gap (Lane 66n): plus when drafters take him later than
+    we rank him. The API's rule for Picks later (Lane 66o, `mock.PicksLater`) with our rank in the
+    pick's place: the ADP rounded to the tenth the column shows, the difference cleaned back to the
+    tenth it is. None without an ADP. The web prints it as given."""
+    return None if adp is None else tenth(tenth(adp) - our_rank)
+
+
 def numbers_of(entry: BoardEntry, adp: float | None) -> Json:
-    """A board row without the identity: the page's numbers for one format (`playerFormatSchema`)."""
+    """A board row without the identity: the page's numbers for one format (`playerFormatSchema`),
+    each figure rounded once to a tenth here, the web printing it as given (Lane 66n)."""
     row = entry.row
     numbers: Json = {
         "positionRank": entry.position_rank,
         "ourRank": entry.our_rank,
         "vorRound": math.ceil(entry.our_rank / TEAMS),
-        "adp": adp,
-        "projected": row.projected,
-        "vor": entry.value_over_replacement,
-        "expectedGames": row.expected_games,
-        "floor": row.floor,
-        "median": row.median,
-        "ceiling": row.ceiling,
+        "adp": tenth_or_none(adp),
+        "gap": gap_of(adp, entry.our_rank),
+        "projected": tenth(row.projected),
+        "vor": tenth(entry.value_over_replacement),
+        "expectedGames": tenth(row.expected_games),
+        "floor": tenth_or_none(row.floor),
+        "median": tenth_or_none(row.median),
+        "ceiling": tenth_or_none(row.ceiling),
         "tier": entry.tier,
     }
     if entry.in_season:
@@ -133,7 +144,7 @@ def numbers_of(entry: BoardEntry, adp: float | None) -> Json:
         before = entry.preseason
         numbers |= {
             "preseasonRank": None if before is None else before.our_rank,
-            "preseasonPoints": None if before is None else before.row.projected,
+            "preseasonPoints": None if before is None else tenth(before.row.projected),
         }
     return numbers
 
@@ -161,7 +172,8 @@ def market_row(who: Identity, entry: MarketEntry, our_rank: int, adp: float | No
         "positionRank": entry.position_rank,
         "ourRank": our_rank,
         "vorRound": None,
-        "adp": adp,
+        "adp": tenth_or_none(adp),
+        "gap": None,
         **dict.fromkeys(_UNPROJECTED),
     }
 

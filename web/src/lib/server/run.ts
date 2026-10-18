@@ -198,6 +198,12 @@ export function clubs(): Promise<Club[]> {
 	return once('clubs', () => read(RUN_PATHS.clubs, clubsSchema));
 }
 
+/** Each club's bye week by its abbreviation, null where the run names none: a board row's Bye column
+ * and the sort by it (Lane 66n). */
+export async function clubByes(): Promise<Record<string, number | null>> {
+	return Object.fromEntries((await clubs()).map((club) => [club.abbr, club.bye]));
+}
+
 export function schedule(): Promise<Schedule> {
 	return once('schedule', () => read(RUN_PATHS.schedule, scheduleSchema));
 }

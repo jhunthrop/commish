@@ -12,12 +12,12 @@
 	import Footnote from '../Footnote.svelte';
 	import LineList from '../LineList.svelte';
 	import Quiet from '../Quiet.svelte';
+	import BoardTable from '../BoardTable.svelte';
 	import Row from '../Row.svelte';
-	import RowHead from '../RowHead.svelte';
+	import { boardColumns, type ColumnView } from '../board-columns.ts';
 	import ScheduleGrid from '../ScheduleGrid.svelte';
 	import SheetMark from '../SheetMark.svelte';
 	import Verb from '../Verb.svelte';
-	import Verdict from '../Verdict.svelte';
 	import DocSection from './DocSection.svelte';
 	import Part from './Part.svelte';
 	import Parts from './Parts.svelte';
@@ -36,7 +36,18 @@
 	const HREF = '/players';
 	const ROW_MIN_WIDTH = 760;
 	const row = $derived(nightly.row);
-	const unit = $derived(nightly.page.format.unit);
+	/** The specimen rows' view: the board's All columns before the season, with the sheet mark. */
+	const VIEW: ColumnView = {
+		order: 'board',
+		tier: true,
+		bye: true,
+		range: true,
+		gap: true,
+		season: false,
+		action: true
+	};
+	const ours = boardColumns(VIEW);
+	const theirs = boardColumns({ ...VIEW, order: 'adp' });
 	const headline = $derived(recordHeadline(nightly.record));
 	const [first, second] = $derived(nightly.rows);
 	const call = $derived(first && second ? verdict(first, second, nightly.page.format.label) : null);
@@ -57,32 +68,34 @@
 	sub="The board row's sheet mark, the ADP order, the chooser, and what a page says when it has nothing to show."
 >
 	<Specimen minWidth={ROW_MIN_WIDTH}>
-		<RowHead action framing={PRESEASON_FRAMING} />
-		<Row
-			player={row}
-			href={HREF}
-			scale={nightly.rowScale}
-			showTier
-			{unit}
-			framing={PRESEASON_FRAMING}
-		>
-			{#snippet action()}
-				<SheetMark name={row.name} place={null} sheetHref={HREF} onadd={() => undefined} />
-			{/snippet}
-		</Row>
-		<Row
-			player={row}
-			href={HREF}
-			scale={nightly.rowScale}
-			showTier
-			{unit}
-			framing={PRESEASON_FRAMING}
-			order="adp"
-		>
-			{#snippet action()}
-				<SheetMark name={row.name} place={12} sheetHref={HREF} onadd={() => undefined} />
-			{/snippet}
-		</Row>
+		<BoardTable columns={ours} label="In our order">
+			<Row
+				player={row}
+				href={HREF}
+				columns={ours}
+				scale={nightly.rowScale}
+				bye={null}
+				framing={PRESEASON_FRAMING}
+			>
+				{#snippet action()}
+					<SheetMark name={row.name} place={null} sheetHref={HREF} onadd={() => undefined} />
+				{/snippet}
+			</Row>
+		</BoardTable>
+		<BoardTable columns={theirs} label="In ADP order">
+			<Row
+				player={row}
+				href={HREF}
+				columns={theirs}
+				scale={nightly.rowScale}
+				bye={null}
+				framing={PRESEASON_FRAMING}
+			>
+				{#snippet action()}
+					<SheetMark name={row.name} place={12} sheetHref={HREF} onadd={() => undefined} />
+				{/snippet}
+			</Row>
+		</BoardTable>
 	</Specimen>
 	<Parts>
 		<Part
@@ -125,12 +138,11 @@
 			</EmptyState>
 		{/if}
 		{#if call?.kind === 'call'}
-			<Verdict sentence={call.sentence}>
-				{#snippet actions()}
-					<Verb>Add {call.leaderName} to my sheet</Verb>
-					<Quiet>Add {call.otherName} instead</Quiet>
-				{/snippet}
-			</Verdict>
+			<div class="call">
+				<b>{call.call}</b>
+				<Verb>Add him to your sheet</Verb>
+				<p>{call.evidence}</p>
+			</div>
 		{/if}
 	</Specimen>
 	<Parts>
@@ -140,7 +152,7 @@
 		/>
 		<Part
 			name="Our call"
-			about="A decision between options in one sentence with its evidence, then the verb and a quiet alternative."
+			about="Compare's head cell: the call in the number face, the one verb under it, and one line of evidence under the table."
 		/>
 	</Parts>
 
@@ -174,3 +186,25 @@
 		/>
 	</Parts>
 </DocSection>
+
+<style>
+	.call {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: var(--s-3);
+	}
+
+	.call b {
+		font-family: var(--font-num);
+		font-weight: 800;
+		font-size: var(--t-head);
+		text-transform: uppercase;
+		color: var(--accent-text);
+	}
+
+	.call p {
+		margin: 0;
+		font-weight: 600;
+	}
+</style>

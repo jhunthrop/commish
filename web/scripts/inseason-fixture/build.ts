@@ -220,7 +220,7 @@ const basisNote = ((): string => {
 	const por = `Points over replacement are for ${shape}.`;
 	return left.length === 0
 		? por
-		: `${por} Points so far leave out your league's points for ${listWords(left)}: the stat lines we hold do not carry them.`;
+		: `${por} Points so far leave out your league's points for ${listWords(left)}: the stats we hold do not carry them.`;
 })();
 
 /** "amon-ra st brown": a name as both sources can agree on it. */

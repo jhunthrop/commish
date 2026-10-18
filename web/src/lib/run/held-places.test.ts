@@ -89,18 +89,23 @@ void test('the compare verdict never sets a held player’s places against anoth
 	const one = verdict(ir, free, 'PPR');
 	assert.equal(one.kind, 'call');
 	assert.equal(one.leader.id, 'b');
+	assert.equal(one.call, 'We would take Jacobs');
 	assert.equal(
-		one.sentence,
-		"We'd take Jacobs: Achane is on injured reserve, so he sits below the available players on our PPR board."
+		one.evidence,
+		'Achane is on injured reserve, so he sits below the available players on our PPR board.'
 	);
-	assert.doesNotMatch(one.sentence, /place/u);
+	assert.doesNotMatch(one.evidence, /place/u);
 	const both = verdict(ir, { ...free, held: 'pup' }, 'PPR');
 	if (both.kind === 'call') {
-		assert.match(both.sentence, /^Both are on season-long lists/u);
-		assert.doesNotMatch(both.sentence, /places? higher/u);
+		assert.match(both.evidence, /^Both are on season-long lists/u);
+		assert.doesNotMatch(both.evidence, /places? higher/u);
 	}
 	const neither = verdict({ ...ir, held: null }, free, 'PPR');
-	if (neither.kind === 'call') assert.match(neither.sentence, /22 places higher/u);
+	if (neither.kind === 'call')
+		assert.match(
+			neither.evidence,
+			/^Achane is 8th on our PPR board and Jacobs 30th, with \+97\.0 over replacement against \+40\.0\.$/u
+		);
 });
 
 void test('a club page, the ADP page and the offline board draw a held row by the word', () => {

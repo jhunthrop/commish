@@ -9,9 +9,11 @@
 		align?: 'start' | 'end';
 		/** Where it aligns on the phone, when the layout above it stacks: a hero's number moves to the start. */
 		phoneAlign?: 'start' | 'end';
+		/** A line under the caption, quieter: when the number was read ("Read Sep 7"). */
+		note?: string;
 	}
 
-	let { value, size = 'md', caption, align = 'start', phoneAlign = align }: Props = $props();
+	let { value, size = 'md', caption, align = 'start', phoneAlign = align, note }: Props = $props();
 </script>
 
 <span
@@ -22,6 +24,7 @@
 >
 	<b>{value}</b>
 	{#if caption}<span class="caption">{caption}</span>{/if}
+	{#if note}<span class="note">{note}</span>{/if}
 </span>
 
 <style>
@@ -68,6 +71,12 @@
 		font-size: var(--t-sm);
 		color: var(--ink-2);
 		max-width: 28ch;
+	}
+
+	.note {
+		margin-top: -4px;
+		font-size: var(--t-xs);
+		color: var(--ink-3);
 	}
 
 	@media (max-width: 760px) {

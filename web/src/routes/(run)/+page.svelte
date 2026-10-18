@@ -9,14 +9,16 @@
 	import { verbHref } from '#lib/site/verb-links.ts';
 	import { shownRail } from '#lib/site/shown-rail.svelte.ts';
 	import Figure from '#lib/ui/Figure.svelte';
-	import Footnote from '#lib/ui/Footnote.svelte';
 	import HeroCard from '#lib/ui/HeroCard.svelte';
 	import Panel from '#lib/ui/Panel.svelte';
 	import Phased from '#lib/ui/Phased.svelte';
 	import PanelHead from '#lib/ui/PanelHead.svelte';
 	import Quiet from '#lib/ui/Quiet.svelte';
+	import { liveStatusClock, sayBoard, type LiveStatus } from '#lib/run/live-status.ts';
+	import BasisLine from '#lib/ui/BasisLine.svelte';
+	import BoardTable from '#lib/ui/BoardTable.svelte';
 	import Row from '#lib/ui/Row.svelte';
-	import RowHead from '#lib/ui/RowHead.svelte';
+	import { boardColumns } from '#lib/ui/board-columns.ts';
 	import Verb from '#lib/ui/Verb.svelte';
 	import { RAIL_OF_WORD_SET, railInSeason, type WordSet } from '#lib/ui/nav.ts';
 	import type { Component } from 'svelte';
@@ -30,8 +32,32 @@
 	const page = $derived(data.page);
 	const format = $derived(page.format);
 	const headline = $derived(page.record);
+	const columns = $derived(
+		boardColumns({
+			order: 'board',
+			tier: true,
+			bye: true,
+			range: false,
+			gap: page.gap,
+			season: page.underway,
+			action: true
+		})
+	);
 
 	onMount(() => lazySheet.armOnFirstIntent(window));
+	/** The rows' status words as built, said again on the member's clock once the page is live, as
+	 * the board says them (review finding 7). */
+	let live = $state<LiveStatus | null>(null);
+	onMount(() => {
+		liveStatusClock(
+			page.capture !== null,
+			() => import('#lib/run/status-view.ts'),
+			(said) => {
+				live = said;
+			}
+		);
+	});
+	const words = $derived(sayBoard(page, live));
 
 	/** A member who follows a league is sent back to the one selected in the shell; anyone
 	 * else to follow one. */
@@ -105,24 +131,25 @@
 					aside="{page.rows.length} of {page.boardSize}"
 					level={2}
 				/>
-				{#if page.seasonLead !== null}<Footnote>{page.seasonLead}</Footnote>{/if}
+				<BasisLine parts={page.basis} tail={words?.capture ?? null} />
 				<div class="rows">
-					<RowHead range={false} action games={page.seasonLead !== null} framing={page.framing} />
-					{#each page.rows as player, i (player.id)}
-						<Row
-							{player}
-							href={links.player(player.slug)}
-							scale={page.scale}
-							showTier
-							unit={format.unit}
-							range={false}
-							eager={i < EAGER_ROWS}
-							season={player.season}
-							framing={page.framing}
-						>
-							{#snippet action()}<RowSheetMark {player} />{/snippet}
-						</Row>
-					{/each}
+					<BoardTable {columns} label="The top of our {format.label} board">
+						{#each page.rows as player, i (player.id)}
+							<Row
+								{player}
+								href={links.player(player.slug)}
+								{columns}
+								scale={page.scale}
+								bye={page.byes[player.team] ?? null}
+								eager={i < EAGER_ROWS}
+								season={player.season}
+								framing={page.framing}
+								status={words?.rows[player.id] ?? null}
+							>
+								{#snippet action()}<RowSheetMark {player} />{/snippet}
+							</Row>
+						{/each}
+					</BoardTable>
 				</div>
 				<div class="more">
 					<Quiet href={links.board(format.id)}>All {page.boardSize} on the board</Quiet>

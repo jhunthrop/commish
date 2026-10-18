@@ -281,7 +281,7 @@ func uncountedWords(s apitypes.LeagueSettings, carried func(string) bool) string
 	if len(named) > 1 {
 		list = strings.Join(named[:len(named)-1], ", ") + " and " + named[len(named)-1]
 	}
-	return "Points so far leave out your league's points for " + list + ": the stat lines we hold do not carry them."
+	return "Points so far leave out your league's points for " + list + ": the stats we hold do not carry them."
 }
 
 // BasisNote is the rest of every page's basis, said once under the rows:
@@ -354,7 +354,7 @@ func OrderScreenBasis(b OrderBasis, fromWeek int) string {
 	if b != RestOfSeason || fromWeek < 1 {
 		return "Our preseason order: All ranks by Over repl., his season less a free pickup's at his position."
 	}
-	return fmt.Sprintf("Our rest-of-season order from week %d: Total is his points through week %d, byes out, A game the same "+
-		"a game. A position ranks by Total, All by Over repl., his total less a free pickup's.",
+	return fmt.Sprintf("Our rest-of-season order from week %d: Points is what he scores through week %d, byes out, A game the same "+
+		"a game. A position ranks by Points, All by Over repl., his points less a free pickup's.",
 		fromWeek, LastWeek)
 }
