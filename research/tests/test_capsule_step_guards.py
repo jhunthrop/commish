@@ -150,6 +150,7 @@ def _paid_read(view: GatewayClient) -> Any:
         source="llm",
         usage=answer.usage,
         calls=view.calls,
+        asks=1,
         model="m/x",
     )
 

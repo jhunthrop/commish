@@ -109,7 +109,8 @@ class SweepReport:
     cost_usd: float = 0.0
     queued: int | None = None
     detail: list[str] = field(default_factory=list)
-    # Universe id to the gateway calls his capsule took in this sweep.
+    # Universe id to the writer's asks his capsule took in this sweep (`CapsuleResult.asks`), which the
+    # night's ceiling counts; the gateway's HTTP calls are `calls`.
     calls_by_player: dict[str, int] = field(default_factory=dict)
     # The landing gate (`capsules.landing`): sentences and spans each page shared, as it landed, with
     # the pages landed before it, and those pages (carriers), left to the repair pass.
@@ -145,7 +146,8 @@ def _count_spend(report: SweepReport, subject: Subject, result: CapsuleResult) -
     """A page's calls, tokens and cost on the sweep's report."""
     usage = result.usage
     report.calls += result.calls
-    report.calls_by_player[subject.universe_id] = report.calls_by_player.get(subject.universe_id, 0) + result.calls
+    # The night's ceiling counts the writer's asks, never the gateway's re-asks (Lane 73 ruling 1).
+    report.calls_by_player[subject.universe_id] = report.calls_by_player.get(subject.universe_id, 0) + result.asks
     if usage is not None:
         report.prompt_tokens += usage.prompt_tokens or 0
         report.completion_tokens += usage.completion_tokens or 0

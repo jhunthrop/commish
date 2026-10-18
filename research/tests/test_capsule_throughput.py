@@ -348,7 +348,9 @@ def _subject(pid: str) -> Subject:
 def _result(text: str) -> Any:
     read = SimpleNamespace(text=text, fallback=None)
     narrative = SimpleNamespace(slots={}, rejected=())
-    return SimpleNamespace(compact=read, full=read, narrative=narrative, source="llm", usage=None, calls=1, model="m/x")
+    return SimpleNamespace(
+        compact=read, full=read, narrative=narrative, source="llm", usage=None, calls=1, asks=1, model="m/x"
+    )
 
 
 def _stub_store(monkeypatch: pytest.MonkeyPatch) -> Engine:

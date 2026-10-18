@@ -43,7 +43,7 @@ token bucket (`capsules.pace`), the commits on one small pool of connections. Th
 order, since each reads what the last one stored.
 
 Every pass shares one ceiling per player for the night, `NIGHT_CALLS_PER_PLAYER` (12, two of phase C's
-six-call generations): a player who reached it is left to the next night rather than written again,
+six-ask generations, counted in the writer's asks, not the gateway's HTTP calls): a player who reached it is left to the next night rather than written again,
 with one exception (the coordinator's Lane 17 ruling, extended 2026-10-15): a page at the ceiling may
 start one more generation that night, once, in a graced pass: a pass over unwritten pages, or the
 graced rewrite of the pages still carrying a shared sentence (`spent_out_for`). The night's page
@@ -103,7 +103,10 @@ RETRY_PASSES: Final = 3
 # THE NIGHT'S CALLS FOR ONE PLAYER, shared by the sweep, the retries and the repairs. Phase C caps one
 # generation at six calls; with seven passes a night one player could take 42. Two full generations'
 # worth is the night's ceiling: a player starts a generation only while it cannot take him past it
-# (at most 6 calls used), and otherwise waits for the next night.
+# (at most 6 calls used), and otherwise waits for the next night. The calls are the writer's own asks
+# (`CapsuleResult.asks`), never the gateway's re-asks of an empty or cut answer nor the throttle's,
+# which count on the bill only (Lane 73 ruling 1: a generation that took 7 HTTP calls had cost a page
+# its second generation).
 NIGHT_CALLS_PER_PLAYER: Final = 12
 Log = Callable[[str], None]
 

@@ -5,12 +5,15 @@ the gateway itself, so a re-ask never carries a run past it. The gateway is stub
 
 import json
 from collections.abc import Callable, Iterator, Sequence
+from datetime import UTC, datetime
+from types import SimpleNamespace
 from typing import Any, cast
 
 import httpx
 import pytest
 
 from research.capsules import generate
+from research.capsules import sweep as sweep_module
 from research.capsules.config import CAPSULE_CONFIG, WriterSettings
 from research.capsules.gateway import Completion, GatewayClient, GenerationError
 from research.capsules.gateway_ledger import ModelPrice, Usage
@@ -160,6 +163,44 @@ def test_an_empty_correction_is_an_ask_spent_and_the_read_asks_again(monkeypatch
     assert result.source == "llm"
     assert gateway.slept == []
     assert len(result.compact.attempts) == _THROTTLES  # the draft and the correction that passed
+
+
+class _ReAskingGateway(_StubGateway):
+    """Each ask costs the gateway two HTTP calls: its own re-ask of an empty or cut completion."""
+
+    def complete(
+        self, messages: list[dict[str, str]], max_tokens: int, min_words: int = 20, ask: AskWaits | None = None
+    ) -> Completion:
+        self.calls += 1
+        return super().complete(messages, max_tokens, min_words, ask)
+
+
+@pytest.mark.usefixtures("quiet_page")
+def test_a_page_counts_its_writers_asks_apart_from_the_gateways_http_calls(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Lane 73 ruling 1: the night's ceiling counts the writer's own asks; the gateway's HTTP re-asks
+    and the throttle's waits are on the bill (`calls`) but never an ask (`asks`)."""
+    verdicts = iter([True, False, True])  # the full draft passes, the short draft fails, its correction passes
+    monkeypatch.setattr(
+        generate,
+        "validate_capsule",
+        lambda body, facts, size, asked_shorter=False: (
+            ValidationResult(True, ()) if next(verdicts) else ValidationResult(False, ("The completion was empty.",))
+        ),
+    )
+    answer = Completion(_WORDS, Usage(cost_usd=_CALL_COST))
+    gateway = _ReAskingGateway([_transport(), Completion(_BUNDLE, None), answer])
+    result = _write(gateway)
+    assert result.source == "llm"
+    assert result.asks == _A_CALL_AND_ITS_RETRY  # the bundle and the short note's correction
+    assert result.calls == gateway.calls == 6  # noqa: PLR2004 - three asks to the stub, two HTTP calls each
+
+
+def test_the_nights_calls_per_player_are_the_writers_asks() -> None:
+    report = sweep_module.SweepReport(datetime(2026, 10, 17, 5, tzinfo=UTC), 1, 1)
+    result = cast("CapsuleResult", SimpleNamespace(calls=9, asks=6, usage=None))
+    sweep_module._count_spend(report, cast("Any", SimpleNamespace(universe_id="u1")), result)
+    assert report.calls == 9  # noqa: PLR2004 - the bill counts every HTTP call
+    assert report.calls_by_player == {"u1": 6}
 
 
 @pytest.mark.usefixtures("quiet_page")

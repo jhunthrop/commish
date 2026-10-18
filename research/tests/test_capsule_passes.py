@@ -232,7 +232,7 @@ def test_the_span_repair_rewrites_at_most_the_nights_cap(monkeypatch: pytest.Mon
 def _fell_to_facts(name: str, violation: str) -> tuple[Subject, CapsuleResult]:
     """A page and a result that fell to its facts block on a validation failure."""
     read = ReadResult("facts", FACTS_SOURCE, None, Fallback("failed_validation", violation), ())
-    result = CapsuleResult(read, read, failed_narrative("never written"), FACTS_SOURCE, None, None, 6)
+    result = CapsuleResult(read, read, failed_narrative("never written"), FACTS_SOURCE, None, None, 6, 6)
     return Subject(cast("Any", SimpleNamespace(identity=SimpleNamespace(name=name))), "u1"), result
 
 

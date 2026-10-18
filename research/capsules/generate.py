@@ -106,7 +106,12 @@ class CapsuleResult:
     source: str
     model: str | None
     usage: Usage | None
+    # Every HTTP call the gateway made for him (his bill), the gateway's own re-asks and the
+    # throttle's included.
     calls: int
+    # The writer's own asks (the bundle, each correction, each slot rewrite), which the six bound and
+    # the night's ceiling counts (Lane 73 ruling 1); a re-ask inside one ask is not another.
+    asks: int
 
 
 def _msgs(facts: "PlayerFacts", user: str) -> list[dict[str, str]]:
@@ -288,7 +293,7 @@ def _rewrite_voice_slots(
     requests: Sequence[SlotRequest],
     gateway: GatewayClient,
     calls_left: int,
-) -> tuple[NarrativeResult, Usage | None]:
+) -> tuple[NarrativeResult, Usage | None, int]:
     narrative, usage, calls = settled, None, 0
     grounding = grounding_of(facts)
     by_key = {request.key: request for request in requests}
@@ -318,7 +323,7 @@ def _rewrite_voice_slots(
             current = RefusedSlot(slot.key, text, result.violations)
             if not voice_rewritable(current):
                 break
-    return narrative, usage
+    return narrative, usage, calls
 
 
 def _one_kind(facts: "PlayerFacts", reads: tuple[ReadResult, ReadResult]) -> tuple[ReadResult, ReadResult]:
@@ -330,14 +335,19 @@ def _one_kind(facts: "PlayerFacts", reads: tuple[ReadResult, ReadResult]) -> tup
     return compact, full
 
 
-def _assemble(
-    reads: tuple[ReadResult, ReadResult], narrative: NarrativeResult, usage: Usage | None, model: str, calls: int
+def _assemble(  # noqa: PLR0913, PLR0917 - one page's parts
+    reads: tuple[ReadResult, ReadResult],
+    narrative: NarrativeResult,
+    usage: Usage | None,
+    model: str,
+    calls: int,
+    asks: int,
 ) -> CapsuleResult:
     compact, full = reads
     both = compact.source == "llm" and full.source == "llm"
     total = add_usage(add_usage(usage, compact.usage), full.usage)
     return CapsuleResult(
-        compact, full, narrative, "llm" if both else FACTS_SOURCE, model if both else None, total, calls
+        compact, full, narrative, "llm" if both else FACTS_SOURCE, model if both else None, total, calls, asks
     )
 
 
@@ -376,7 +386,14 @@ def generate_capsule(
         )
         floor = _facts_block(facts, _Read(), failure)
         _note_dry_pool(gateway, floor, floor)
-        return _assemble((floor, floor), failed_narrative(reason), outcome.usage, gateway.model, gateway.calls - before)
+        return _assemble(
+            (floor, floor),
+            failed_narrative(reason),
+            outcome.usage,
+            gateway.model,
+            gateway.calls - before,
+            outcome.calls,
+        )
     remaining = CAPSULE_CONFIG.max_gateway_calls_per_player - outcome.calls
     full_start = _start(facts, "full", outcome.bundle.full)
     compact, compact_calls = _settle(
@@ -389,7 +406,7 @@ def generate_capsule(
     full, full_calls = _settle(facts, "full", full_start, remaining - compact_calls, gateway)
     settled = settle_narrative(outcome.bundle.narrative, facts, requests, gateway.model)
     left = CAPSULE_CONFIG.max_gateway_calls_per_player - outcome.calls - compact_calls - full_calls
-    narrative, voice_usage = _rewrite_voice_slots(settled, facts, requests, gateway, left)
+    narrative, voice_usage, voice_calls = _rewrite_voice_slots(settled, facts, requests, gateway, left)
     _note_dry_pool(gateway, compact, full)
     return _assemble(
         _one_kind(facts, (compact, full)),
@@ -397,4 +414,5 @@ def generate_capsule(
         add_usage(outcome.usage, voice_usage),
         gateway.model,
         gateway.calls - before,
+        outcome.calls + compact_calls + full_calls + voice_calls,
     )
