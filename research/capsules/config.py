@@ -216,8 +216,8 @@ class CapsuleConfig:
     unwritten_line_in_season: UnwrittenLine = UnwrittenLine(
         "in-season",
         0.03,
-        "a full-board night (536 pages, every sheet moved) under the call ceiling and the demotion is "
-        "expected near 2.6% (2026-10-17's numbers under Lane 73), and one page moves the board by 0.19 points",
+        "a full-board night (every sheet moved) under the call ceiling, the demotion and the retry after it "
+        "is expected near 2.6% (2026-10-17's numbers under Lane 73)",
     )
     # A written sentence this long or longer may sit on one page only; shorter ones ("Draft him.",
     # "Let him go.") are the product's vocabulary, not stock prose (ruled in phase C's fix round 3).
