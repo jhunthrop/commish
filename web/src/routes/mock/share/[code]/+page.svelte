@@ -73,7 +73,7 @@
 		<Report
 			report={r}
 			names={botNames(r.teams, r.slot).map((n, i) => (i + 1 === r.slot ? sharer : n))}
-			field="bots drafting from where drafters take players"
+			seats="Bots by ADP"
 			shared={{ by: room.shared_by ?? null }}
 		>
 			{#snippet verbs()}

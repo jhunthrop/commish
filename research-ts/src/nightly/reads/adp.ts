@@ -36,7 +36,19 @@ export async function readLatestAdp(db: Db): Promise<readonly AdpCapture[]> {
       .from(adpSnapshots)
       .innerJoin(playerCrosswalk, eq(playerCrosswalk.nflPlayerId, adpSnapshots.playerId))
       .where(and(eq(adpSnapshots.source, capture.source), eq(adpSnapshots.format, capture.snapshotFormat), eq(adpSnapshots.capturedAt, capturedAt)));
-    captures.push({ format: capture.format, source: capture.source, capturedAt, adpByPlayerId: new Map(rows.map((row) => [row.playerId, row.adp] as const)) });
+    captures.push({ format: capture.format, source: capture.source, capturedAt, adpByPlayerId: placeCapture(rows) });
   }
   return captures;
+}
+
+/** A capture by player id. When two rows reach one player the lower ADP wins, whatever order the rows
+ *  arrive in: the one rule the api's room read (`min(adp)`, api/internal/boards/market.go) and the Python
+ *  nightly (`place_capture`, research/nightly/reads/adp.py) share, so the three readers agree. */
+export function placeCapture(rows: readonly { playerId: string; adp: number }[]): ReadonlyMap<string, number> {
+  const placed = new Map<string, number>();
+  for (const row of rows) {
+    const held = placed.get(row.playerId);
+    if (held === undefined || row.adp < held) placed.set(row.playerId, row.adp);
+  }
+  return placed;
 }

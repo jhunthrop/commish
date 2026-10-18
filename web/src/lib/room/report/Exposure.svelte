@@ -8,12 +8,11 @@
 	interface Props {
 		runs: MockReport['runs'];
 		board: Board;
-		seat: number;
 		/** Whose runs: your own, or a shared draft's drafter. */
 		whose?: 'your' | 'their';
 	}
 
-	let { runs, board, seat, whose = 'your' }: Props = $props();
+	let { runs, board, whose = 'your' }: Props = $props();
 
 	const who = $derived(whose === 'your' ? 'you' : 'they');
 
@@ -39,9 +38,6 @@
 			{/if}
 		{/each}
 	</div>
-	<p class="need">
-		Every player {who} land in more than half the runs from slot {seat} is a player to know cold.
-	</p>
 </Panel>
 
 <style>
@@ -103,13 +99,5 @@
 		font-weight: 700;
 		font-size: var(--t-lg);
 		text-align: right;
-	}
-
-	.need {
-		margin: var(--s-3) 0 0;
-		padding-top: var(--s-3);
-		border-top: 1px solid var(--line);
-		font-size: var(--t-sm);
-		color: var(--ink-2);
 	}
 </style>

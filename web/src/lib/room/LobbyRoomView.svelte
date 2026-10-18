@@ -1,12 +1,12 @@
 <script lang="ts">
-	import { clockLabel, lastName, pickLabel, snakeSlot } from '#lib/format/draft.ts';
+	import { clockLabel, pickLabel, snakeSlot } from '#lib/format/draft.ts';
 	import { plural } from '#lib/format/number.ts';
 	import Keys from '#lib/ui/Keys.svelte';
 	import Panel from '#lib/ui/Panel.svelte';
 	import ScoreBug from '#lib/ui/ScoreBug.svelte';
 	import TeamPanel from '#lib/ui/TeamPanel.svelte';
 	import type { LobbyRoom, RoomCard } from './api.ts';
-	import { callView, poolBasis } from './call.ts';
+	import { callView, draftWords, poolBasis } from './call.ts';
 	import { lobbyKeys, roomKeys } from './keys.ts';
 	import { type LobbyState, seatName, seatedPeople } from './lobby.ts';
 	import LandingStrip from './LandingStrip.svelte';
@@ -145,15 +145,14 @@
 	{#if call}
 		<RoomCall
 			view={call}
-			pickNumber={lobby.pickNumber}
 			action={yourTurn
 				? {
-						label: `Draft ${lastName(call.player.name)}`,
+						label: draftWords(call.player.position),
 						key: 'Enter',
 						onclick: () => draft(call.player.id)
 					}
 				: {
-						label: `Queue ${lastName(call.player.name)} first`,
+						label: `${draftWords(call.player.position, 'Queue')} first`,
 						onclick: () => queueFirst(call.player.id)
 					}}
 		/>

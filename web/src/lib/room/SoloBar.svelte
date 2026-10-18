@@ -1,17 +1,14 @@
 <script lang="ts">
 	import { pickLabel } from '#lib/format/draft.ts';
+	import type { FactCell } from '#lib/ui/facts.ts';
 	import Menu from '#lib/ui/Menu.svelte';
 	import Quiet from '#lib/ui/Quiet.svelte';
-	import { picksAwayWords } from './words.ts';
 
 	interface Props {
 		/** The pick on the clock. */
 		now: number;
-		round: number;
-		/** "12 teams · PPR · slot 8". */
-		league: string;
-		/** Your next pick after this one, null at your last. */
-		next: number | null;
+		/** The round, the league, your slot and your next pick as cells (words.ts pickBarCells). */
+		cells: readonly FactCell[];
 		teams: number;
 		/** The round "Pick for me" drafts through. */
 		autopickTo: number;
@@ -27,9 +24,7 @@
 
 	let {
 		now,
-		round,
-		league,
-		next,
+		cells,
 		teams,
 		autopickTo,
 		canUndo,
@@ -43,16 +38,15 @@
 </script>
 
 <div class="bar">
-	<div class="where">
-		<b>Pick {pickLabel(now, teams)}</b><span>Round {round} · {league}</span>
-	</div>
-	{#if next !== null}
-		<div class="next">
-			<span>Your next</span><b>{pickLabel(next, teams)}</b><span
-				>{picksAwayWords(next - now - 1)}</span
-			>
-		</div>
-	{/if}
+	<b class="pick">Pick {pickLabel(now, teams)}</b>
+	<dl class="cells" aria-label="This pick">
+		{#each cells as cell (cell.label)}
+			<div>
+				<dt>{cell.label}</dt>
+				<dd class:word={cell.word}>{cell.value}</dd>
+			</div>
+		{/each}
+	</dl>
 	<!-- On the phone Undo stays out and the rest fold into More, so the strip and our call come
 		 first. -->
 	<div class="acts">
@@ -77,15 +71,7 @@
 		min-height: 48px;
 	}
 
-	.where,
-	.next {
-		display: flex;
-		align-items: baseline;
-		gap: var(--s-2);
-		white-space: nowrap;
-	}
-
-	.where b {
+	.pick {
 		font-family: var(--font-num);
 		font-variant-numeric: tabular-nums;
 		font-weight: 800;
@@ -94,18 +80,40 @@
 		text-transform: uppercase;
 	}
 
-	.where span,
-	.next span {
-		font-size: var(--t-sm);
-		color: var(--ink-2);
+	.cells {
+		display: flex;
+		flex-wrap: wrap;
+		gap: var(--s-1) var(--s-4);
+		margin: 0;
 	}
 
-	.next b {
+	.cells div {
+		display: flex;
+		flex-direction: column-reverse;
+	}
+
+	dt {
+		font-size: var(--t-xs);
+		font-weight: 500;
+		letter-spacing: var(--track-label);
+		text-transform: uppercase;
+		color: var(--ink-3);
+	}
+
+	dd {
+		margin: 0;
 		font-family: var(--font-num);
 		font-variant-numeric: tabular-nums;
 		font-weight: 700;
 		font-size: var(--t-xl);
 		line-height: 1;
+	}
+
+	dd.word {
+		font-family: var(--font-ui);
+		font-size: var(--t-md);
+		font-weight: 600;
+		line-height: 1.6rem;
 	}
 
 	.acts {
