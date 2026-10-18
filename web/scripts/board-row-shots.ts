@@ -15,6 +15,7 @@
 //   node scripts/board-row-shots.ts [web origin] [out dir]
 import { mkdir } from 'node:fs/promises';
 import { chromium, type Browser, type BrowserContext, type Page } from 'playwright';
+import { BANNED_MARKS, BANNED_WORDS } from '../src/lib/format/copy-guard.ts';
 import { ORDER } from '../src/lib/order/words.ts';
 import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
 
@@ -26,10 +27,12 @@ const VIEWPORT_HEIGHT = 900;
 const PHONE_MAX = 760;
 const MAX_BASIS_LINES = 5;
 const MAX_SCHEDULE_DESK_LINES = 2;
+/** The board row's figure size at its largest (--t-row-num on a desk, 17px). */
+const ROW_FIGURE_MAX_PX = 17;
 const GAP_TITLE = "Gap, drafters' ADP less our rank";
-/** Copy the site never prints (the copy rules), as whole words, the win figure's betting name among them. */
-const BANNED =
-	/—|;|\b(odds|line|spread|favou?red|underdog|bets?|betting|market|buy|sell|price|sportsbook)\b|\b(season|win) totals?\b/iu;
+/** Shooting a run older than the Gap column (EXPECT_GAP=none): every check that the Gap is drawn turns
+ * into a check that it is not. */
+const GAPLESS = process.env.EXPECT_GAP === 'none';
 /** A computed background that paints nothing. */
 const TRANSPARENT = /^(transparent|rgba\(0, 0, 0, 0\))$/u;
 
@@ -79,7 +82,9 @@ async function pageWords(page: Page): Promise<string> {
 	return page.evaluate(() => {
 		const main = document.querySelector('main')?.cloneNode(true);
 		if (!(main instanceof HTMLElement)) return '';
-		for (const name of main.querySelectorAll('.name, .ph a, .picked b, .opp a, td a'))
+		for (const name of main.querySelectorAll(
+			'.name, .ph a, .picked b, .opp a, td a, th.club a, .order-screen'
+		))
 			name.remove();
 		return main.innerText;
 	});
@@ -102,6 +107,15 @@ async function checkGapTones(page: Page, tag: string, selector: string): Promise
 	}
 }
 
+/** A run that carries no Gap draws none (re-review N1): no column, no sort, no Compare row and no
+ * sentence about its colours. */
+async function checkNoGap(page: Page, tag: string): Promise<void> {
+	const drawn = await page.locator('.c-gap, .cmp tr[data-row="Gap"]').count();
+	if (drawn > 0) fail(tag, `a run with no gap draws ${String(drawn)} Gap cells`);
+	const basis = (await page.locator('.basis').allInnerTexts()).join(' ');
+	if (basis.includes(GAP_TITLE)) fail(tag, 'a run with no gap says the Gap sentence');
+}
+
 async function checkRows(page: Page, tag: string): Promise<void> {
 	const sizes = await page.evaluate(() => {
 		const row = document.querySelector('.row');
@@ -117,9 +131,13 @@ async function checkRows(page: Page, tag: string): Promise<void> {
 	if (!sizes) fail(tag, 'no board row with a name and a figure');
 	else if (sizes.name <= sizes.figure)
 		fail(tag, `name ${String(sizes.name)}px not above figure ${String(sizes.figure)}px`);
-	const gapTitle = await page.locator('.h.c-gap [title]').first().getAttribute('title');
-	if (gapTitle !== GAP_TITLE) fail(tag, `Gap head title ${String(gapTitle)}`);
-	await checkGapTones(page, tag, '.c-gap.n');
+	if (GAPLESS) {
+		await checkNoGap(page, tag);
+	} else {
+		const gapTitle = await page.locator('.h.c-gap [title]').first().getAttribute('title');
+		if (gapTitle !== GAP_TITLE) fail(tag, `Gap head title ${String(gapTitle)}`);
+		await checkGapTones(page, tag, '.c-gap.n');
+	}
 	const overrun = await page.evaluate(() =>
 		[...document.querySelectorAll('.row')].some((row) => {
 			const cells = [...row.children].filter((cell) => cell.getBoundingClientRect().width > 0);
@@ -135,7 +153,7 @@ async function checkRows(page: Page, tag: string): Promise<void> {
 
 async function checkPage(page: Page, shot: Shot, tag: string, width: number): Promise<void> {
 	const words = await pageWords(page);
-	const banned = BANNED.exec(words);
+	const banned = BANNED_WORDS.exec(words) ?? BANNED_MARKS.exec(words);
 	if (banned) fail(tag, `rendered "${banned[0]}"`);
 	if (shot.kind === 'schedule') {
 		const lines = await renderedLines(page, 'main .head p');
@@ -155,27 +173,64 @@ async function checkPage(page: Page, shot: Shot, tag: string, width: number): Pr
 		const call = await page.locator('.call-words').first().innerText();
 		if (!/^we would take nacua$/iu.test(call.trim())) fail(tag, `call "${call}"`);
 		if ((await page.locator('.evidence').count()) !== 1) fail(tag, 'no single evidence line');
-		await checkGapTones(page, tag, '.cmp tr[data-row="Gap"] td');
+		if (GAPLESS) await checkNoGap(page, tag);
+		else await checkGapTones(page, tag, '.cmp tr[data-row="Gap"] td');
 	}
 }
 
 /** The prerendered page, script off: the in-season board carries the order's first line and no run
  * row, and a page with a listed player paints his chip styled. */
-async function checkPrerendered(page: Page, shot: Shot, tag: string): Promise<void> {
+/** The pages pictured as they paint before any script: the chip styled on ADP (review 66n finding 1)
+ * and the in-season board's one line (re-review N3). */
+const PICTURED_SCRIPT_OFF: ReadonlySet<string> = new Set(['adp', 'board-all']);
+
+/** The prerendered page, script off: the in-season board says only that the order needs JavaScript
+ * and carries no run row, and a page with a listed player paints his chip styled. */
+async function checkPrerendered(page: Page, shot: Shot, tag: string, file: string): Promise<void> {
 	await page.goto(`${web}${shot.path}`, { waitUntil: 'networkidle' });
 	if (shot.kind === 'order') {
 		const rows = await page.locator('.row').count();
 		const text = await page.locator('main').innerText();
 		if (rows > 0) fail(tag, `the in-season board was built with ${String(rows)} run rows`);
-		if (!text.includes(ORDER.reading))
-			fail(tag, "the in-season board was built without the order's line");
+		if (!text.includes(ORDER.needsScript))
+			fail(tag, 'the in-season board does not say it needs JavaScript');
+		if (text.includes(ORDER.reading))
+			fail(tag, 'the in-season board says it is reading, with no script to read');
 	}
 	if (shot.kind === 'rows') {
 		const chip = page.locator('.status-chip').first();
-		if ((await chip.count()) === 0) return;
-		const paint = await chip.evaluate((el) => getComputedStyle(el).backgroundColor);
-		if (TRANSPARENT.test(paint)) fail(tag, 'the status chip paints unstyled with script off');
+		if ((await chip.count()) > 0) {
+			const paint = await chip.evaluate((el) => getComputedStyle(el).backgroundColor);
+			if (TRANSPARENT.test(paint)) fail(tag, 'the status chip paints unstyled with script off');
+		}
 	}
+	if (PICTURED_SCRIPT_OFF.has(shot.name)) await page.screenshot({ path: file });
+}
+
+/** The tier band (TierStrip) as the system page draws it: one row tall, its drop at a figure's size
+ * (review 66n finding 5). In season the board's position views are the order, so no board draws it. */
+async function shootTierStrip(page: Page, tag: string, file: string): Promise<void> {
+	await page.goto(`${web}/system`, { waitUntil: 'networkidle' });
+	const band = page.locator('.band').first();
+	if ((await band.count()) === 0) {
+		fail(tag, 'the system page draws no tier band');
+		return;
+	}
+	// The specimen frame holds its parts at 520px and scrolls sideways on a phone; the band is laid
+	// out at the page's own width here, as a board's position view draws it.
+	await band.evaluate((el) => {
+		const frame = el.closest('.inner');
+		if (frame instanceof HTMLElement) frame.style.minWidth = '0';
+	});
+	const sizes = await band.evaluate((el) => {
+		const drop = el.querySelector('.cliff b');
+		return {
+			height: el.getBoundingClientRect().height,
+			drop: drop ? parseFloat(getComputedStyle(drop).fontSize) : 0
+		};
+	});
+	if (sizes.drop > ROW_FIGURE_MAX_PX) fail(tag, `the band's drop is ${String(sizes.drop)}px`);
+	await band.screenshot({ path: file });
 }
 
 async function contextFor(
@@ -212,18 +267,36 @@ try {
 				await page.evaluate(() => document.fonts.ready);
 				if (shot.kind === 'compare') await page.locator('.cmp').waitFor();
 				if (shot.kind === 'order') await page.locator('table.order').waitFor();
+				// The order's chip says a season-long status's start from the API's since (re-review N7).
+				if (
+					shot.name === 'board-all' &&
+					!(await page.locator('main').innerText()).includes('IR since')
+				)
+					fail(tag, 'the order shows no "IR since" chip');
 				const wide = await page.evaluate(
 					() => document.documentElement.scrollWidth - window.innerWidth
 				);
 				if (wide > 0) fail(tag, `scrolls sideways by ${String(wide)}px`);
 				if ((SHOT_WIDTHS as readonly number[]).includes(width)) {
 					await checkPage(page, shot, tag, width);
-					await checkPrerendered(bare, shot, `${tag} script off`);
+					await checkPrerendered(
+						bare,
+						shot,
+						`${tag} script off`,
+						new URL(`${shot.name}-script-off-${theme}-${String(width)}.png`, out).pathname
+					);
 					await page.screenshot({
 						path: new URL(`${shot.name}-${theme}-${String(width)}.png`, out).pathname,
 						fullPage: true
 					});
 				}
+			}
+			if ((SHOT_WIDTHS as readonly number[]).includes(width)) {
+				await shootTierStrip(
+					page,
+					`tier-strip ${theme} ${String(width)}`,
+					new URL(`tier-strip-${theme}-${String(width)}.png`, out).pathname
+				);
 			}
 			await scripted.close();
 			await prerendered.close();
