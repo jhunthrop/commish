@@ -2,7 +2,7 @@
 gateway stubbed: the repair attempts' order, the last attempt never rewriting for spans, the grace
 past the night's call ceiling, and one facts pass a night on the skip and failure paths."""
 
-from collections.abc import Sequence
+from collections.abc import Callable, Iterator, Sequence
 from contextlib import nullcontext
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -60,8 +60,8 @@ def _passes(script: _Script, monkeypatch: pytest.MonkeyPatch) -> _Passes:
     def judged() -> tuple[CapsuleGateResult, list[str], dict[str, tuple[str, ...]]]:
         return _gate(1, True, True), ORDER, {}
 
-    def sweep(name: str, plan: SweepPlan, *, ceiling: bool = True) -> SweepReport:
-        del ceiling
+    def sweep(name: str, plan: SweepPlan, *, ceiling: bool = True, check_pages: bool = False) -> SweepReport:
+        del ceiling, check_pages
         script.plans.append((name, plan))
         return SweepReport(NOW, 4, 1, ["b"], 1, 0)
 
@@ -187,6 +187,7 @@ def test_a_shared_sentence_at_the_ceiling_takes_one_generation_past_it_after_the
     """The graced rewrite reaches a page at the ceiling that the hard passes had to leave, once."""
     passes = _passes(_Script(), monkeypatch)
     monkeypatch.undo()
+    monkeypatch.setattr(passes, "_check_pages", lambda name, report: None)
     seen: list[frozenset[str]] = []
 
     def sweep_capsules(*args: Any) -> SweepReport:
@@ -309,6 +310,7 @@ def test_the_retry_after_the_demotion_ignores_the_ceiling_in_the_real_sweep(monk
     passes, _, _ = _after_demotion(monkeypatch, ["a"], left=10)
     monkeypatch.undo()
     monkeypatch.setattr(passes, "_unwritten_pages", lambda: ["a"])
+    monkeypatch.setattr(passes, "_check_pages", lambda name, report: None)
     seen: list[frozenset[str]] = []
 
     def sweep_capsules(*args: Any) -> SweepReport:
@@ -339,14 +341,16 @@ def test_no_retry_after_the_demotion_once_the_budget_is_spent(monkeypatch: pytes
     ]
 
 
-def test_every_pass_no_later_judgment_reads_is_page_checked_and_none_before(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Lane 73: a page written where no later repair reads the page gate (the last attempt's hard rewrite
-    and its blocked retry, the graced rewrite, the retry after the demotion) goes through the page gate
-    before the night's gate counts it, all from one function; the passes before are judged by the next
-    attempt's own read of the page gate."""
+Judged = tuple[CapsuleGateResult, list[str], dict[str, tuple[str, ...]]]
+
+
+def _recording_checks(
+    monkeypatch: pytest.MonkeyPatch, judged: Callable[[], Judged]
+) -> tuple[_Passes, list[str], list[str]]:
+    """The real passes over a stubbed sweep, each pass's name and each checked pass's name recorded."""
     passes = _passes(_Script(), monkeypatch)
     monkeypatch.undo()
-    monkeypatch.setattr(passes, "_judged", lambda: (_gate(1, True, True), ORDER, {}))
+    monkeypatch.setattr(passes, "_judged", judged)
     monkeypatch.setattr(passes, "_demote", lambda shared, order: ())
     monkeypatch.setattr(passes, "_unwritten_pages", lambda: ["c"])
     monkeypatch.setattr(capsule_step, "sweep_capsules", lambda *args: SweepReport(NOW, 4, 1, ["b"], 1, 0))
@@ -360,6 +364,15 @@ def test_every_pass_no_later_judgment_reads_is_page_checked_and_none_before(monk
 
     monkeypatch.setattr(passes, "_account", account)
     monkeypatch.setattr(passes, "_check_pages", lambda name, report: checked.append(name))
+    return passes, swept, checked
+
+
+def test_every_pass_no_later_judgment_reads_is_page_checked_and_none_before(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Lane 73: a page written where no later repair reads the page gate (the last attempt's hard rewrite
+    and its blocked retry, the graced rewrite, the retry after the demotion) goes through the page gate
+    before the night's gate counts it, all from one function; the passes before are judged by the next
+    attempt's own read of the page gate."""
+    passes, swept, checked = _recording_checks(monkeypatch, lambda: (_gate(1, True, True), ORDER, {}))
     passes.repair()
     passes.retry_after_demotion()
     last = f"capsule repair {REPAIR_PASSES}"
@@ -368,6 +381,31 @@ def test_every_pass_no_later_judgment_reads_is_page_checked_and_none_before(monk
     assert [name for name in checked if "past the ceiling" in name or "after the demotion" in name]
     assert any(name.startswith(f"{last} (") for name in checked)
     assert f"{last}, pages the rewrite blocked 1" in checked
+
+
+def test_after_an_early_break_only_the_graced_rewrite_and_the_retry_after_the_demotion_are_checked(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Review 73 item 6: attempt 1 finds nothing to repair and breaks; the passes after it are the
+    graced rewrite and the retry after the demotion, each checked by its own call's argument."""
+    reads: Iterator[Judged] = iter([(_gate(1, False, False), ORDER, {}), (_gate(0, False, False), ORDER, {})])
+    shared: Judged = (_gate(0, True, False), ORDER, {})
+    passes, swept, checked = _recording_checks(monkeypatch, lambda: next(reads, shared))
+    passes.repair()
+    passes.retry_after_demotion()
+    assert swept[0] == "capsule repair 1, unwritten pages first 1"
+    assert checked == swept[1:]
+    assert [name.split(" (")[0] for name in checked] == [
+        "capsule repair, one generation past the ceiling",
+        "capsule retry after the demotion",
+    ]
+
+
+def test_a_pass_is_page_checked_only_when_its_caller_asks(monkeypatch: pytest.MonkeyPatch) -> None:
+    passes, _, checked = _recording_checks(monkeypatch, lambda: (_gate(0, False, False), ORDER, {}))
+    passes.sweep("asked", SweepPlan(10), check_pages=True)
+    passes.sweep("not asked", SweepPlan(10))
+    assert checked == ["asked"]
 
 
 def _fake_facts(name: str) -> Any:

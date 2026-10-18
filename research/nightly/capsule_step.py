@@ -271,17 +271,16 @@ class _Passes:
         self.first = tuple(dict.fromkeys(d.player_id for d in plan.carried))
         self.carried_avoid = carried_avoid(plan.carried)
         self.demoted: list[Demotion] = []
-        # Set once no later repair will read the page gate (`_check_pages`): every pass from then on
-        # has its written pages checked before the night's gate counts them (Lane 73).
-        self.page_check = False
 
     @property
     def left(self) -> int:
         return self.budget - self.spend.processed
 
-    def sweep(self, name: str, plan: SweepPlan, *, ceiling: bool = True) -> SweepReport:
+    def sweep(self, name: str, plan: SweepPlan, *, ceiling: bool = True, check_pages: bool = False) -> SweepReport:
         """One pass, every page the night's ceiling has spent excluded; `ceiling=False` is the one pass
-        the ceiling never holds back, the retry after the demotion (`retry_after_demotion`)."""
+        the ceiling never holds back, the retry after the demotion (`retry_after_demotion`).
+        `check_pages` is asked by a pass no later repair judges (`_check_pages`, Lane 73): the last
+        attempt's hard rewrite and blocked retry, the graced rewrite and the retry after the demotion."""
         graced_pass = plan.unwritten_only or plan.grace
         at_ceiling = spent_out_for(self.asks_by_player, frozenset(), grace=False)
         spent = (
@@ -301,7 +300,7 @@ class _Passes:
             self._account(name, interrupted.report, at_ceiling, graced_pass=graced_pass)
             raise interrupted.cause from interrupted
         self._account(name, report, at_ceiling, graced_pass=graced_pass)
-        if self.page_check:
+        if check_pages:
             self._check_pages(name, report)
         return report
 
@@ -350,11 +349,13 @@ class _Passes:
         self.repair()
         self.retry_after_demotion()
 
-    def retry(self, name: str, unwritten: int, avoid: tuple[str, ...]) -> None:
+    def retry(self, name: str, unwritten: int, avoid: tuple[str, ...], *, check_pages: bool = False) -> None:
         for attempt in range(1, RETRY_PASSES + 1):
             if self.left <= 0 or unwritten == 0:
                 return
-            retry = self.sweep(f"{name} {attempt}", SweepPlan(self.left, unwritten_only=True, avoid=avoid))
+            retry = self.sweep(
+                f"{name} {attempt}", SweepPlan(self.left, unwritten_only=True, avoid=avoid), check_pages=check_pages
+            )
             unwritten = retry.facts
 
     def _judged(self) -> tuple[CapsuleGateResult, list[str], dict[str, tuple[str, ...]]]:
@@ -367,10 +368,12 @@ class _Passes:
             failing = dict(page_findings(conn, self.now, self.facts).by_page)
         return gate, order, failing
 
-    def _retry_unwritten(self, name: str) -> None:
+    def _retry_unwritten(self, name: str, *, check_pages: bool = False) -> None:
         gate, _, _ = self._judged()
         if gate.facts_blocks and self.left > 0:
-            self.retry(name, gate.facts_blocks, tuple(sentence.sentence for sentence in gate.shared))
+            self.retry(
+                name, gate.facts_blocks, tuple(sentence.sentence for sentence in gate.shared), check_pages=check_pages
+            )
 
     def repair(self) -> None:
         """The repair attempts in the ruled order (the module's step 4): unwritten pages, hard targets,
@@ -378,8 +381,9 @@ class _Passes:
         for attempt in range(1, REPAIR_PASSES + 1):
             self._retry_unwritten(f"capsule repair {attempt}, unwritten pages first")
             gate, order, failing = self._judged()
-            # The last attempt's read of the page gate is the last any repair makes.
-            self.page_check = attempt == REPAIR_PASSES
+            # The last attempt's read of the page gate is the last any repair makes: its passes check
+            # their own pages.
+            last = attempt == REPAIR_PASSES
             targets = repair_order(gate, failing, order)
             spans = () if attempt == REPAIR_PASSES else targets.spans[: self.span_pages_left]
             if targets.spans and not spans and attempt < REPAIR_PASSES:
@@ -398,8 +402,8 @@ class _Passes:
                     f"capsule repair {attempt} ({len(gate.shared)} shared sentences, {len(failing)} pages failing "
                     f"the page gate, {len(targets.hard)} pages)"
                 )
-                self.sweep(name, SweepPlan(self.left, only=targets.hard, avoid=avoid))
-                self._retry_unwritten(f"capsule repair {attempt}, pages the rewrite blocked")
+                self.sweep(name, SweepPlan(self.left, only=targets.hard, avoid=avoid), check_pages=last)
+                self._retry_unwritten(f"capsule repair {attempt}, pages the rewrite blocked", check_pages=last)
             if spans and self.left > 0:
                 name = (
                     f"capsule span repair {attempt} ({len(gate.spans)} shared spans, {len(spans)} pages of "
@@ -409,7 +413,6 @@ class _Passes:
                     self.left, only=spans, avoid=avoid, avoid_by_page=quoted_spans(gate, spans), keep_written=True
                 )
                 self.span_pages_left -= len(self.sweep(name, plan).processed)
-        self.page_check = True
         self.grace_shared_sentences()
         self.demote_shared_sentences()
 
@@ -426,7 +429,7 @@ class _Passes:
         name = (
             f"capsule repair, one generation past the ceiling ({len(gate.shared)} shared sentences, {len(pages)} pages)"
         )
-        self.sweep(name, SweepPlan(self.left, only=pages, avoid=avoid, grace=True))
+        self.sweep(name, SweepPlan(self.left, only=pages, avoid=avoid, grace=True), check_pages=True)
 
     def demote_shared_sentences(self) -> None:
         """The coordinator's ruling of 2026-10-16: a sentence still on two pages after the graced rewrite
@@ -474,7 +477,12 @@ class _Passes:
                 f"{len(pages) - self.left} left for the next night"
             )
         )
-        self.sweep(f"{name} ({len(pages)} unwritten pages{reach})", SweepPlan(self.left, only=pages), ceiling=False)
+        self.sweep(
+            f"{name} ({len(pages)} unwritten pages{reach})",
+            SweepPlan(self.left, only=pages),
+            ceiling=False,
+            check_pages=True,
+        )
 
     def _demote(self, shared: tuple[SharedSentence, ...], order: list[str]) -> tuple[Demotion, ...]:
         """The demotions' facts blocks, committed together. A carrier with no sheet tonight cannot be
