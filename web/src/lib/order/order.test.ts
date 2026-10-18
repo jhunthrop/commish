@@ -1,6 +1,7 @@
 // The Rest of season and Players screens' words and rows (Lane 66j and its fix round 1): run with `npm test`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { bannedPattern } from '#lib/format/copy-guard.ts';
 import type { PlayerLine, WeekFacts } from '../league/inseason/api.ts';
 import type { OrderAdvice, OrderRow } from './api.ts';
 import { orderPath } from './path.ts';
@@ -163,7 +164,7 @@ void test('the basis names the league shape and says every number once, the plat
 	assert.match(evidenceBasis(true), /in this league's scoring\.$/);
 	assert.match(rosterBasis('espn', READ, ZONE), /^Roster is ESPN's, read /);
 	for (const said of [inLeague, ...Object.values(ORDER), ...Object.values(FIGURE_HEADS)]) {
-		assert.doesNotMatch(said, /\bhost\b|—|;|\b(odds|line|spread|bet|market|buy|sell|price)\b/i);
+		assert.doesNotMatch(said, bannedPattern(), said);
 	}
 });
 

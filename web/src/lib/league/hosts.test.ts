@@ -3,6 +3,7 @@
 // in-season tools to a first-timer. Run with `npm test`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { bannedPattern } from '#lib/format/copy-guard.ts';
 import { leaguesKeptText } from '#lib/account/keeps.ts';
 import {
 	IN_SEASON_TOOLS_LINE,
@@ -65,7 +66,7 @@ void test('the follow page names the three in-season tools in one sentence, in f
 		IN_SEASON_TOOLS_LINE,
 		'Each week we show the lineup to start, your best add on waivers and the trades that help both teams.'
 	);
-	assert.doesNotMatch(IN_SEASON_TOOLS_LINE, /[—–;]|\b(market|price|buy|sell|value)\b/i);
+	assert.doesNotMatch(IN_SEASON_TOOLS_LINE, bannedPattern(/\bvalue\b|–/));
 });
 
 void test('the account page reads the hosts and the tools from the same two lines', () => {

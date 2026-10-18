@@ -3,6 +3,7 @@
 // compare caption. Run with `npm test`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { bannedPattern } from '#lib/format/copy-guard.ts';
 import {
 	draftersWords,
 	HELD_TIER_WORDS,
@@ -197,11 +198,13 @@ void test('a player on a season-long list is never given a rank as if he plays (
 		'If he plays, among the 618 on our board. He sits below the available players.'
 	);
 	for (const line of [words.caption, words.value, preseason.value, preseason.drafters]) {
-		assert.doesNotMatch(line, /rank \d|Round \d|pick \d|picks|[—;]/u, line);
+		assert.doesNotMatch(line, /rank \d|Round \d|pick \d|picks/u, line);
+		assert.doesNotMatch(line, bannedPattern(), line);
 	}
 });
 
 void test('a held player is placed in no tier: his aside says why (Lane 63, N1)', () => {
 	assert.match(HELD_TIER_WORDS, /^No tier while he is on a season-long list\./u);
-	assert.doesNotMatch(HELD_TIER_WORDS, /Tier \d|rank \d|[—;]/u);
+	assert.doesNotMatch(HELD_TIER_WORDS, /Tier \d|rank \d/u);
+	assert.doesNotMatch(HELD_TIER_WORDS, bannedPattern());
 });

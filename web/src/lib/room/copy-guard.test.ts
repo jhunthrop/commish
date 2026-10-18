@@ -7,13 +7,15 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
+import { BETTING_WORDS, bannedPattern } from '#lib/format/copy-guard.ts';
 import { callView, chanceHead, draftWords, poolBasis } from './call.ts';
 import type { RoomCard } from './api.ts';
 import type { Board, RoomPlayer } from './model.ts';
 
-/** The betting register's words, matched whole. */
-const BETTING =
-	/\b(odds|bets?|betting|wagers?|vegas|sportsbooks?|parlays?|underdogs?|favou?rites?)\b/i;
+/** The betting register's words a source scan reads (format/copy-guard.ts), matched whole; the room's
+ * own copy is held to the whole list. */
+const BETTING = BETTING_WORDS;
+const BANNED = bannedPattern();
 
 const SRC = fileURLToPath(new URL('../../', import.meta.url));
 /** Where the rooms, the call card and the reports are drawn from. */
@@ -81,7 +83,7 @@ void test('the pool basis names the chance a player is still there, never odds',
 		poolBasis(BOARD, card('advisor'), 12),
 		poolBasis(BOARD, card('runs'), 12)
 	];
-	for (const line of said) assert.doesNotMatch(line, BETTING, line);
+	for (const line of said) assert.doesNotMatch(line, BANNED, line);
 	assert.equal(
 		said[3],
 		'Ranked by our PPR points over replacement. Still there at 2.05: 200 runs of this room, each seat drafting as it has so far.'
@@ -119,7 +121,7 @@ void test('the call card is our top three as rows, its chance column headed stil
 	);
 	const head = chanceHead(view);
 	assert.equal(head, 'Still there 2.08');
-	assert.doesNotMatch(head, BETTING);
+	assert.doesNotMatch(head, BANNED);
 	assert.equal(chanceHead({ ...view, nextLabel: null }), null);
 	assert.equal(chanceHead({ ...view, conditional: true }), 'Reaches 1.05');
 	assert.equal(draftWords('RB'), 'Draft him');

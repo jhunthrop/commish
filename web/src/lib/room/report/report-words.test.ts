@@ -2,6 +2,7 @@
 // and the team total says it counts the projected positions. Run with `npm test`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { bannedPattern } from '#lib/format/copy-guard.ts';
 import type { MockReport } from '../api.ts';
 import type { RoomPlayer } from '../model.ts';
 import {
@@ -136,5 +137,5 @@ void test('the basis says Picks later and Still there once, after the board', ()
 		said,
 		"Points are our 2026 PPR projections. Picks later: the pick less his ADP, or less his place on our board (no kickers or defenses there), plus is later. Still there: the room's read at that pick, tinted from 60%."
 	);
-	assert.doesNotMatch(said, /[;—]|\bodds\b/);
+	assert.doesNotMatch(said, bannedPattern());
 });

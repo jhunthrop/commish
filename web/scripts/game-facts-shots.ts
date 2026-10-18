@@ -11,6 +11,7 @@
 // with the site built against PUBLIC_API_URL pointing at the fixture API.
 import { mkdir } from 'node:fs/promises';
 import { chromium, type BrowserContext, type Page } from 'playwright';
+import { bannedPattern } from '../src/lib/format/copy-guard.ts';
 import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
 import { FIXTURE_IDS } from './inseason-fixture/ids.ts';
 
@@ -27,8 +28,8 @@ const CELL_WEATHER =
 	/^(\d+°, \d+ mph(, \d+% (rain|snow|ice))?|Indoors|Roof TBD|Abroad, no forecast|Outdoors)$/;
 const FACTS_READ =
 	/The Game cell(?: shows each club's expected points, his club first, then the kickoff weather, read|'s expected points and weather were read) \w{3} \d{1,2}:\d{2} [ap]m Central\./g;
-const BETTING =
-	/\b(favou?red|underdogs?|odds|lines?|spreads?|totals?|bets?|betting|vegas|sportsbooks?|props?|moneyline)\b|over\/under/i;
+/** The site's copy guard, with the game facts' own words (the round 4 lock's L5). */
+const BETTING = bannedPattern(/\b(books?|props?|moneyline)\b/);
 
 const web = process.argv[2] ?? 'http://localhost:4682';
 const out = new URL(process.argv[3] ?? '../screenshots/game-facts/', import.meta.url);

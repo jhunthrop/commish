@@ -352,7 +352,7 @@ export function tradeBasis(
 	zone: string = memberZone()
 ): string[] {
 	const defense = lines.some((l) => l.player.position === 'DEF');
-	const week = `${projBasis(advice.projection_read_at, advice.projection_scoring, defense, zone)} ${TRADES.weekHead} is each lineup's ${BOX.proj} total with the trade less without it, each lineup set as the Lineup screen sets it.`;
+	const week = `${projBasis(advice.projection_read_at, advice.projection_scoring, defense, zone)} ${TRADES.weekHead} is the sum of each lineup's ${BOX.proj} with the trade less without it, each lineup set as the Lineup screen sets it.`;
 	const facts = factsReadLine(lines, zone);
 	const room = `${TRADES.room} says who a roster drops to take two for one.${facts === null ? '' : ` ${facts}`}`;
 	return [

@@ -55,7 +55,8 @@ export const BOX = {
 	opp: 'Opp',
 	/** The button that opens a swap's evidence line, as a screen reader hears it. */
 	why: 'Why',
-	totals: 'Totals',
+	/** The starters' sums row: "Team", never "Totals", a betting word on the site's list (Lane 66q). */
+	totals: 'Team',
 	bench: 'Bench',
 	reserve: 'Injured reserve',
 	bye: 'Bye',

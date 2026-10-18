@@ -1,6 +1,7 @@
 // The player card's week in words (Lane 66h): run with `npm test`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { bannedPattern } from '#lib/format/copy-guard.ts';
 import type { WeekFacts } from '../league/inseason/api.ts';
 import { CARD, NONE, printTenth, unreadBasis, type CardTile } from './card.ts';
 import {
@@ -272,8 +273,8 @@ void test("with a league the verb is the league screens', the platform named", (
 	assert.match(basis[1] ?? '', /your scoring/);
 });
 
-const BANNED =
-	/\b(favou?red|underdogs?|odds|lines?|spreads?|bets?|betting|market|buy|sell|price|host|tip)\b|—|;/i;
+/** The site's copy guard, with the card's own words: "tip" (the copy rules' no-tips ruling). */
+const BANNED = bannedPattern(/\btips?\b/);
 
 void test('copy guard: no card word uses a betting or trading word, the word host, a dash or a semicolon', () => {
 	const live = card(
