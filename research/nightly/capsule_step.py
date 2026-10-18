@@ -64,7 +64,7 @@ demote written reads to facts blocks) and the gate still judges what is stored.
 """
 
 import os
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from typing import Final
@@ -78,7 +78,7 @@ from research.capsules.gateway import GatewayClient
 from research.capsules.gateway_ledger import ModelPrice, ModelSpend, fetch_price
 from research.capsules.requeue import served_identities
 from research.capsules.spans import SpanRules
-from research.capsules.store import WRITTEN_SOURCE, queue_regeneration, stored_capsules_for
+from research.capsules.store import WRITTEN_SOURCE, StoredCapsule, queue_regeneration, stored_capsules_for
 from research.capsules.sweep import (
     FactsPassMemo,
     Subject,
@@ -237,6 +237,16 @@ def spent_out_for(asks: Mapping[str, int], graced: frozenset[str], *, grace: boo
     last_start = NIGHT_CALLS_PER_PLAYER - CAPSULE_CONFIG.max_gateway_calls_per_player
     spent = frozenset(pid for pid, n in asks.items() if n > last_start)
     return spent & graced if grace else spent
+
+
+def unwritten_with_sheets(
+    order: Sequence[str], stored: Mapping[str, StoredCapsule], sheets: frozenset[str]
+) -> list[str]:
+    """The board's pages the writer has not written (a facts block, the oracle's template, no row) that
+    have a sheet tonight, in board order: a page with no sheet cannot be written (review 73 item 8)."""
+    return [
+        pid for pid in order if pid in sheets and ((row := stored.get(pid)) is None or row.source != WRITTEN_SOURCE)
+    ]
 
 
 class _Passes:
@@ -453,14 +463,15 @@ class _Passes:
             self.log(f"capsules: {demotion_line(self.demoted)}")
 
     def _unwritten_pages(self) -> list[str]:
-        """The board's pages the writer has not written (a facts block, the oracle's template, no row),
-        in board order."""
+        """The board's pages the writer has not written and could write tonight, in board order
+        (`unwritten_with_sheets`)."""
 
         def read() -> list[str]:
             with self.engine.connect() as conn:
                 order = board_universe_ids(conn, self.now)
                 stored = stored_capsules_for(conn, order)
-            return [pid for pid in order if (row := stored.get(pid)) is None or row.source != WRITTEN_SOURCE]
+                sheets = frozenset(subject.universe_id for subject in self.facts(conn, self.now))
+            return unwritten_with_sheets(order, stored, sheets)
 
         return once_more_on_disconnect(read)
 

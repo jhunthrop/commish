@@ -18,7 +18,7 @@ from research.capsules.facts_block import FACTS_SOURCE
 from research.capsules.generate import CapsuleResult, Fallback, ReadResult
 from research.capsules.narrative import failed_narrative
 from research.capsules.spans import SharedSpan, SpanRules
-from research.capsules.store import RETRY_FIRST_FACTS_HASH
+from research.capsules.store import RETRY_FIRST_FACTS_HASH, StoredCapsule
 from research.capsules.sweep import FactsPassMemo, Subject, SweepPlan, SweepReport
 from research.db.read_cache import UNCACHED, ReadThrough
 from research.nightly import capsule_demotion, capsule_step, run_parts
@@ -499,3 +499,13 @@ def test_no_retry_after_the_demotion_when_every_page_is_written(monkeypatch: pyt
     passes.retry_after_demotion()
     assert script.plans == []
     assert lines == []
+
+
+def test_the_unwritten_pages_to_retry_are_those_with_a_sheet_tonight() -> None:
+    """Review 73 item 8: a board page with no sheet tonight cannot be written, so the retry after the
+    demotion neither counts it nor runs for it."""
+    stored = {
+        "a": StoredCapsule("a", "h", "c", "f", FACTS_SOURCE, None, None, NOW),
+        "b": StoredCapsule("b", "h", "c", "f", "llm", None, None, NOW),
+    }
+    assert capsule_step.unwritten_with_sheets(["a", "b", "c", "d"], stored, frozenset({"a", "b", "d"})) == ["a", "d"]
