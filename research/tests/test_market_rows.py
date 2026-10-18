@@ -94,6 +94,7 @@ def test_a_board_file_carries_its_market_rows_after_the_ranked_ones() -> None:
         "ourRank": 3,
         "vorRound": None,
         "adp": 170.0,
+        "gap": None,
         "projected": None,
         "vor": None,
         "expectedGames": None,

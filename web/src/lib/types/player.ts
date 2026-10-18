@@ -24,6 +24,8 @@ export interface BoardPlayer extends PlayerRef {
 	vorRound: number;
 	/** Average draft position across the named sources, or null when no source has him. */
 	adp: number | null;
+	/** Drafters' ADP less our rank as the run writes it, null without an ADP, absent on an older run. */
+	gap?: number | null;
 	projected: number;
 	/** Projected points over the replacement level at his position. */
 	vor: number;

@@ -8,7 +8,7 @@ import math
 from datetime import UTC, datetime
 from pathlib import Path
 
-from research.nightly.build.pages import board_json, identities
+from research.nightly.build.pages import board_json, gap_of, identities
 from research.nightly.build.tenth import tenth, tenth_or_none
 from research.nightly.config import RUN_FORMATS
 from research.nightly.reads.board import FormatBoard, StoredBoard, StoredRow, board_entries
@@ -17,6 +17,8 @@ PPR = RUN_FORMATS[0]
 AS_OF = datetime(2026, 9, 9, 2, tzinfo=UTC)
 # Nacua's raw run figures as the board file writes them.
 WRITTEN = {"projected": 344.1, "floor": 241.7, "expectedGames": 14.9, "adp": 2.8}
+# His ADP as shown less his rank of 1.
+NACUA_GAP = 1.8
 _TABLE = Path(__file__).resolve().parents[2] / "web" / "src" / "lib" / "format" / "tenth-table.json"
 
 
@@ -29,6 +31,15 @@ def test_no_signed_zero_and_no_rounding_of_what_is_not_a_number() -> None:
     assert math.copysign(1.0, tenth(-0.04)) == 1.0
     assert math.isnan(tenth(math.nan))
     assert tenth_or_none(None) is None
+
+
+def test_the_gap_is_the_adp_as_shown_less_our_rank_rounded_once() -> None:
+    """The halves the review found the web's whole-pick rounding missed, and the ADP rounded to the
+    tenth the ADP column shows before the rank comes off (as the API's Picks later does)."""
+    cases = [(5.5, 10, -4.5), (16.5, 17, -0.5), (6.5, 3, 3.5), (2.84, 1, 1.8), (9.45, 9, 0.5), (7.0, 7, 0.0)]
+    for adp, rank, gap in cases:
+        assert gap_of(adp, rank) == gap, (adp, rank)
+    assert gap_of(None, 1) is None
 
 
 def _row(pid: str, projected: float, floor: float) -> StoredRow:
@@ -45,6 +56,7 @@ def test_a_board_file_carries_each_figure_as_a_tenth() -> None:
     people = identities([board])
     written = board_json(board, {p.id: p for p in people}, {"p1": 2.84})["rows"][0]
     assert {key: written[key] for key in WRITTEN} == WRITTEN
-    for key in ("projected", "vor", "expectedGames", "floor", "median", "ceiling", "adp"):
+    assert written["gap"] == NACUA_GAP
+    for key in ("projected", "vor", "expectedGames", "floor", "median", "ceiling", "adp", "gap"):
         value = written[key]
         assert value == tenth(value), key

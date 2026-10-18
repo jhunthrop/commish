@@ -112,6 +112,14 @@ def market_identities(people: Sequence[Identity], entries: Sequence[MarketEntry]
     return out
 
 
+def gap_of(adp: float | None, our_rank: int) -> float | None:
+    """Drafters' ADP less our rank, the board's Gap (Lane 66n): plus when drafters take him later than
+    we rank him. The API's rule for Picks later (Lane 66o, `mock.PicksLater`) with our rank in the
+    pick's place: the ADP rounded to the tenth the column shows, the difference cleaned back to the
+    tenth it is. None without an ADP. The web prints it as given."""
+    return None if adp is None else tenth(tenth(adp) - our_rank)
+
+
 def numbers_of(entry: BoardEntry, adp: float | None) -> Json:
     """A board row without the identity: the page's numbers for one format (`playerFormatSchema`),
     each figure rounded once to a tenth here, the web printing it as given (Lane 66n)."""
@@ -121,6 +129,7 @@ def numbers_of(entry: BoardEntry, adp: float | None) -> Json:
         "ourRank": entry.our_rank,
         "vorRound": math.ceil(entry.our_rank / TEAMS),
         "adp": tenth_or_none(adp),
+        "gap": gap_of(adp, entry.our_rank),
         "projected": tenth(row.projected),
         "vor": tenth(entry.value_over_replacement),
         "expectedGames": tenth(row.expected_games),
@@ -164,6 +173,7 @@ def market_row(who: Identity, entry: MarketEntry, our_rank: int, adp: float | No
         "ourRank": our_rank,
         "vorRound": None,
         "adp": tenth_or_none(adp),
+        "gap": None,
         **dict.fromkeys(_UNPROJECTED),
     }
 
