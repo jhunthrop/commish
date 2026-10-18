@@ -34,7 +34,10 @@ The order, and why each pass exists:
    two pages after the graced rewrite keeps its first carrier in board order and demotes the others
    to the facts block, with no model call. The demoted pages are named in the step's summary and the
    run report, count as unwritten, and are written first on the next night (`CapsuleStepPlan.carried`).
-7. **The capsule gate** (`capsule_gate`), judged once more after the demotion: the step's verdict.
+7. **The retry after the demotion** (the coordinator's Lane 73 ruling 2): the pages still unwritten, but
+   not tonight's demotions, take one more retry past the night's call ceiling, within what is left of
+   the night's page budget, each refused a sentence another page carries.
+8. **The capsule gate** (`capsule_gate`), judged once more after the demotion: the step's verdict.
 
 Every pass keeps the writer's pool full (`gateway.GatewayClient.rolling`: a slot refilled the moment its page
 lands, each page told the spans of every page landed before it started, and checked as it lands against the
@@ -72,7 +75,7 @@ from research.capsules.gateway import GatewayClient
 from research.capsules.gateway_ledger import ModelPrice, ModelSpend, fetch_price
 from research.capsules.requeue import served_identities
 from research.capsules.spans import SpanRules
-from research.capsules.store import queue_regeneration
+from research.capsules.store import WRITTEN_SOURCE, queue_regeneration, stored_capsules_for
 from research.capsules.sweep import FactsPassMemo, SweepInterruptedError, SweepPlan, SweepReport, sweep_capsules
 from research.db.code_digest import code_digest
 from research.db.engine import once_more_on_disconnect, pooled_like
@@ -262,10 +265,14 @@ class _Passes:
     def left(self) -> int:
         return self.budget - self.spend.processed
 
-    def sweep(self, name: str, plan: SweepPlan) -> SweepReport:
+    def sweep(self, name: str, plan: SweepPlan, *, ceiling: bool = True) -> SweepReport:
+        """One pass, every page the night's ceiling has spent excluded; `ceiling=False` is the one pass
+        the ceiling never holds back, the retry after the demotion (`retry_after_demotion`)."""
         graced_pass = plan.unwritten_only or plan.grace
         at_ceiling = spent_out_for(self.calls_by_player, frozenset(), grace=False)
-        spent = spent_out_for(self.calls_by_player, frozenset(self.graced), grace=graced_pass)
+        spent = (
+            spent_out_for(self.calls_by_player, frozenset(self.graced), grace=graced_pass) if ceiling else frozenset()
+        )
         avoid_by_page = {
             pid: (*plan.avoid_by_page.get(pid, ()), *self.carried_avoid.get(pid, ()))
             for pid in {*plan.avoid_by_page, *self.carried_avoid}
@@ -304,6 +311,7 @@ class _Passes:
         report = self.sweep(name, SweepPlan(self.budget, unwritten_only=self.mend_only, avoid=shared))
         self.retry("capsule retries", report.facts, shared)
         self.repair()
+        self.retry_after_demotion()
 
     def retry(self, name: str, unwritten: int, avoid: tuple[str, ...]) -> None:
         for attempt in range(1, RETRY_PASSES + 1):
@@ -390,6 +398,43 @@ class _Passes:
         self.demoted = list(self._demote(gate.shared, order))
         if self.demoted:
             self.log(f"capsules: {demotion_line(self.demoted)}")
+
+    def _unwritten_pages(self) -> list[str]:
+        """The board's pages the writer has not written (a facts block, the oracle's template, no row),
+        in board order."""
+
+        def read() -> list[str]:
+            with self.engine.connect() as conn:
+                order = board_universe_ids(conn, self.now)
+                stored = stored_capsules_for(conn, order)
+            return [pid for pid in order if (row := stored.get(pid)) is None or row.source != WRITTEN_SOURCE]
+
+        return once_more_on_disconnect(read)
+
+    def retry_after_demotion(self) -> None:
+        """The coordinator's Lane 73 ruling 2: the pages still unwritten after the demotion take one more
+        retry, past the night's call ceiling (the ceiling is what left them unwritten), within what is
+        left of the night's page budget, never a new budget; a budget that cannot reach them all says so
+        in the line. Tonight's demotions are not retried: their ruling writes them first the next night.
+        Each page is refused a sentence another page carries (`SweepPlan.only`), so this pass cannot fail
+        the night on a shared sentence."""
+        demoted = {d.player_id for d in self.demoted}
+        pages = tuple(pid for pid in self._unwritten_pages() if pid not in demoted)
+        if not pages:
+            return
+        name = "capsule retry after the demotion"
+        if self.left <= 0:
+            self.log(f"{name}: the night's page budget is spent, {len(pages)} unwritten pages left for the next night")
+            return
+        reach = (
+            ""
+            if self.left >= len(pages)
+            else (
+                f", the night's page budget reaches {self.left} of the {len(pages)} unwritten pages, "
+                f"{len(pages) - self.left} left for the next night"
+            )
+        )
+        self.sweep(f"{name} ({len(pages)} unwritten pages{reach})", SweepPlan(self.left, only=pages), ceiling=False)
 
     def _demote(self, shared: tuple[SharedSentence, ...], order: list[str]) -> tuple[Demotion, ...]:
         """The demotions' facts blocks, committed together. A carrier with no sheet tonight cannot be

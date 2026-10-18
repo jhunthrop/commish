@@ -21,6 +21,7 @@ from research.capsules.spans import SharedSpan, SpanRules
 from research.capsules.sweep import FactsPassMemo, Subject, SweepPlan, SweepReport
 from research.db.read_cache import UNCACHED, ReadThrough
 from research.nightly import capsule_step, run_parts
+from research.nightly.capsule_demotion import Demotion
 from research.nightly.capsule_gate import CapsuleGateResult, SharedSentence
 from research.nightly.capsule_step import NIGHT_CALLS_PER_PLAYER, REPAIR_PASSES, CapsuleStepPlan, _Passes
 from research.nightly.steps import StepRecord
@@ -57,7 +58,8 @@ def _passes(script: _Script, monkeypatch: pytest.MonkeyPatch) -> _Passes:
     def judged() -> tuple[CapsuleGateResult, list[str], dict[str, tuple[str, ...]]]:
         return _gate(1, True, True), ORDER, {}
 
-    def sweep(name: str, plan: SweepPlan) -> SweepReport:
+    def sweep(name: str, plan: SweepPlan, *, ceiling: bool = True) -> SweepReport:
+        del ceiling
         script.plans.append((name, plan))
         return SweepReport(NOW, 4, 1, ["b"], 1, 0)
 
@@ -271,3 +273,72 @@ def test_a_pass_where_no_page_fell_logs_no_fallback_line(monkeypatch: pytest.Mon
     passes.sweep("capsules", SweepPlan(10))
     assert len(lines) == 1
     assert "fell to their facts blocks" not in lines[0]
+
+
+def _after_demotion(
+    monkeypatch: pytest.MonkeyPatch, unwritten: list[str], left: int
+) -> tuple[_Passes, _Script, list[str]]:
+    script, lines = _Script(), list[str]()
+    passes = _passes(script, monkeypatch)
+    passes.log = lines.append
+    passes.budget = passes.spend.processed + left
+    passes.demoted = [Demotion("d", "slug-d", "the role explains it", 2)]
+    monkeypatch.setattr(passes, "_unwritten_pages", lambda: unwritten)
+    return passes, script, lines
+
+
+def test_after_the_demotion_one_retry_writes_the_unwritten_pages_past_the_ceiling_but_not_the_demoted(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Lane 73 ruling 2: the pages still unwritten after the demotion take one more retry, past the
+    night's ceiling, each refused a sentence another page carries (`plan.only`); tonight's demotions
+    keep their ruling (written first the next night, no model call tonight)."""
+    passes, script, _ = _after_demotion(monkeypatch, ["a", "d", "c"], left=10)
+    passes.calls_by_player.update({"a": NIGHT_CALLS_PER_PLAYER + 6, "c": NIGHT_CALLS_PER_PLAYER})
+    passes.graced.update({"a", "c"})
+    passes.retry_after_demotion()
+    [(name, plan)] = script.plans
+    assert name.startswith("capsule retry after the demotion")
+    assert plan.only == ("a", "c")
+    assert plan.budget == 10  # noqa: PLR2004 - the night's page budget left, never a new one
+
+
+def test_the_retry_after_the_demotion_ignores_the_ceiling_in_the_real_sweep(monkeypatch: pytest.MonkeyPatch) -> None:
+    passes, _, _ = _after_demotion(monkeypatch, ["a"], left=10)
+    monkeypatch.undo()
+    monkeypatch.setattr(passes, "_unwritten_pages", lambda: ["a"])
+    seen: list[frozenset[str]] = []
+
+    def sweep_capsules(*args: Any) -> SweepReport:
+        seen.append(cast("SweepPlan", args[3]).exclude)
+        return SweepReport(NOW, 4, 1, ["a"], 1, 0)
+
+    monkeypatch.setattr(capsule_step, "sweep_capsules", sweep_capsules)
+    passes.calls_by_player["a"] = 2 * NIGHT_CALLS_PER_PLAYER
+    passes.graced.add("a")
+    passes.retry_after_demotion()
+    assert seen == [frozenset()]
+
+
+def test_the_retry_after_the_demotion_stops_at_the_nights_budget_and_says_so(monkeypatch: pytest.MonkeyPatch) -> None:
+    passes, script, _ = _after_demotion(monkeypatch, ["a", "b", "c"], left=2)
+    passes.retry_after_demotion()
+    [(name, plan)] = script.plans
+    assert plan.budget == 2  # noqa: PLR2004
+    assert "the night's page budget reaches 2 of the 3 unwritten pages, 1 left for the next night" in name
+
+
+def test_no_retry_after_the_demotion_once_the_budget_is_spent(monkeypatch: pytest.MonkeyPatch) -> None:
+    passes, script, lines = _after_demotion(monkeypatch, ["a"], left=0)
+    passes.retry_after_demotion()
+    assert script.plans == []
+    assert lines == [
+        "capsule retry after the demotion: the night's page budget is spent, 1 unwritten pages left for the next night"
+    ]
+
+
+def test_no_retry_after_the_demotion_when_every_page_is_written(monkeypatch: pytest.MonkeyPatch) -> None:
+    passes, script, lines = _after_demotion(monkeypatch, ["d"], left=10)
+    passes.retry_after_demotion()
+    assert script.plans == []
+    assert lines == []
