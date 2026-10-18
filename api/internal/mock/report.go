@@ -9,6 +9,7 @@ import (
 	"github.com/jhunthrop/commish/api/internal/bots"
 	"github.com/jhunthrop/commish/api/internal/draft"
 	"github.com/jhunthrop/commish/api/internal/sim"
+	"github.com/jhunthrop/commish/api/internal/tenth"
 )
 
 // The report's thresholds (room doc, the report).
@@ -70,9 +71,10 @@ type PickReview struct {
 	Position   draft.Position `json:"position"`
 	// OverReplacement is the board's value over replacement.
 	OverReplacement float64 `json:"overReplacement"`
-	// ADPGap is ADP less the pick: positive took him before drafters do.
-	ADPGap *float64 `json:"adpGap"`
-	Chip   ADPChip  `json:"chip"`
+	// PicksLater is the pick less his ADP as the report prints it
+	// (PicksLater below): plus came later than drafters take him.
+	PicksLater *float64 `json:"picksLater"`
+	Chip       ADPChip  `json:"chip"`
 	// StillThere is the chance he was there at the next turn; nil at the last.
 	StillThere *float64 `json:"stillThere"`
 	CouldWait  bool     `json:"couldWait"`
@@ -128,11 +130,22 @@ func BuildReport(ctx context.Context, in ReportInput) (Report, error) {
 	return Report{Standings: standings, Picks: picks, Runs: runs}, nil
 }
 
-func chipFor(gap float64) ADPChip {
+// PicksLater is a pick against drafters as the report prints it (Lane
+// 66o): the pick less the ADP rounded once to the tenth the column shows,
+// then cleaned of binary noise back to the tenth it is. Plus means he came
+// later than drafters take him. The chip reads this same figure, so the
+// chip and the printed column never disagree at the edge.
+func PicksLater(pick int, adp float64) float64 {
+	return tenth.Round(float64(pick) - tenth.Round(adp))
+}
+
+// chipFor is a pick's chip from its printed Picks later: within the edge
+// at ADP, plus a steal, minus a reach.
+func chipFor(later float64) ADPChip {
 	switch {
-	case math.Abs(gap) < AtADPWithin:
+	case math.Abs(later) < AtADPWithin:
 		return AtADP
-	case gap > 0:
+	case later < 0:
 		return Reach
 	default:
 		return Steal
@@ -190,8 +203,8 @@ func reviewOne(ctx context.Context, in ReportInput, keepers sim.Keepers, before 
 		r.MadeBy = by
 	}
 	if adp, ok := in.Board.ADP[playerID]; ok {
-		gap := adp - float64(before.PickNumber)
-		r.ADPGap, r.Chip = &gap, chipFor(gap)
+		later := PicksLater(before.PickNumber, adp)
+		r.PicksLater, r.Chip = &later, chipFor(later)
 	}
 	if r.MadeBy != MadeByYou {
 		return r, nil

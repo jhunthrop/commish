@@ -1,27 +1,25 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import DisplayTitle from '#lib/ui/DisplayTitle.svelte';
-	import Figure from '#lib/ui/Figure.svelte';
-	import LineList from '#lib/ui/LineList.svelte';
+	import FactStrip from '#lib/ui/FactStrip.svelte';
+	import type { FactCell } from '#lib/ui/facts.ts';
 	import Panel from '#lib/ui/Panel.svelte';
 	import type { FeatureWords } from './words.ts';
 
-	/** One product on the pass page: its name, its figure with the basis, what it unlocks in
-	 * sentences, then its controls and its verb. The figure is null until checkout opens, and the
-	 * line under the name says what the product is in one sentence. */
+	/** One product on the pass page as facts in cells (Lane 66o): its name, its price and dates as a
+	 * strip, what it holds as a list of names, then its controls and its verb. With no price yet
+	 * (checkout not open), the strip carries the dates alone and says so. */
 	interface Props {
 		title: string;
-		line: string;
-		/** "$39" with "for the 2026 season", or null while there is no figure to print. */
-		figure: { value: string; caption: string } | null;
-		/** The sentence that stands where the figure would. */
-		noFigure?: string;
+		/** The price first, then the dates and terms. */
+		facts: readonly FactCell[];
+		/** What the product holds, by name. */
 		features: readonly FeatureWords[];
-		/** Leads the feature list when the product builds on another: everything in the Draft Pass. */
+		/** Leads the list when the product builds on another: everything in the Draft Pass. */
 		lead?: FeatureWords;
 		/** The one product the page leads with takes the accent edge. */
 		featured?: boolean;
-		/** Choices between the figure and the list: the Membership's year or month. */
+		/** Choices between the facts and the list: the Membership's year or month. */
 		choose?: Snippet;
 		/** More under the list, before the verb: where the pass works. */
 		more?: Snippet;
@@ -29,37 +27,22 @@
 		action: Snippet;
 	}
 
-	let {
-		title,
-		line,
-		figure,
-		noFigure = 'Checkout is not open yet',
-		features,
-		lead,
-		featured = false,
-		choose,
-		more,
-		action
-	}: Props = $props();
+	let { title, facts, features, lead, featured = false, choose, more, action }: Props = $props();
 
-	const lines = $derived(lead ? [lead, ...features] : features);
+	const holds = $derived(lead ? [lead, ...features] : features);
 </script>
 
 <Panel as="section" label={title} edge={featured ? 'accent' : undefined}>
 	<div class="plan">
-		<header>
-			<DisplayTitle size="panel">{title}</DisplayTitle>
-			<p class="line">{line}</p>
-		</header>
-		<div class="figure">
-			{#if figure}
-				<Figure value={figure.value} size="lg" caption={figure.caption} />
-			{:else}
-				<p class="none">{noFigure}</p>
-			{/if}
-		</div>
+		<DisplayTitle size="panel">{title}</DisplayTitle>
+		<FactStrip label="{title}: price and dates" cells={facts} dense />
 		{#if choose}<div class="choose">{@render choose()}</div>{/if}
-		<LineList label="What {title} unlocks" {lines} />
+		<div class="holds">
+			<span class="label">Holds</span>
+			<ul aria-label="What {title} holds">
+				{#each holds as line (line.lead)}<li>{line.lead}</li>{/each}
+			</ul>
+		</div>
 		{#if more}{@render more()}{/if}
 		<div class="action">{@render action()}</div>
 	</div>
@@ -73,35 +56,37 @@
 		height: 100%;
 	}
 
-	header {
-		display: flex;
-		flex-direction: column;
-		gap: var(--s-2);
-	}
-
-	.line {
-		margin: 0;
-		color: var(--ink-2);
-		font-size: var(--t-md);
-		max-width: 44ch;
-	}
-
-	.figure {
-		min-height: 76px;
-		display: flex;
-		align-items: flex-end;
-	}
-
-	.none {
-		margin: 0;
-		color: var(--ink-3);
-		font-size: var(--t-sm);
-	}
-
 	.choose {
 		display: flex;
 		flex-direction: column;
 		gap: var(--s-3);
+	}
+
+	.label {
+		font-size: var(--t-xs);
+		font-weight: 500;
+		letter-spacing: var(--track-label);
+		text-transform: uppercase;
+		color: var(--ink-3);
+	}
+
+	ul {
+		margin: var(--s-2) 0 0;
+		padding: 0;
+		list-style: none;
+		display: flex;
+		flex-direction: column;
+	}
+
+	li {
+		padding: var(--s-2) 0;
+		border-bottom: 1px solid var(--line);
+		font-weight: 600;
+		font-size: var(--t-sm);
+	}
+
+	li:last-child {
+		border-bottom: 0;
 	}
 
 	.action {

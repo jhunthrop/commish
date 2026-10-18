@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { ordinal } from '#lib/format/number.ts';
+	import { count as whole, ordinal } from '#lib/format/number.ts';
 	import type { MockReport } from '../api.ts';
 
 	interface Props {
@@ -28,7 +28,8 @@
 		const median = Math.min(BINS - 1, Math.floor((runs.median - lo) / width));
 		return { counts, peak, median, lo, hi };
 	});
-	const round = (x: number) => Math.round(x).toLocaleString('en-US');
+	// The API's tenths, printed whole by formatting.
+	const round = (x: number): string => whole(x);
 </script>
 
 <div class="hist" aria-hidden="true">

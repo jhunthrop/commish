@@ -22,6 +22,8 @@ const OUT_DIR = new URL('../screenshots/', import.meta.url);
 /** The lobby fills for 90 seconds, then the room drafts this long before the shot. */
 const FILL_WAIT_MS = 92_000;
 const DRAFT_WAIT_MS = 25_000;
+/** How long an off-turn call may take to show: the picks between your turns, at the room's pace. */
+const LOBBY_TURN_WAIT_MS = 120_000;
 /** How long the lobby has to finish once everyone has left it, and how often it is asked. */
 const FINISH_WAIT_MS = 10 * 60_000;
 const POLL_MS = 3_000;
@@ -135,13 +137,15 @@ interface ShotOptions {
 	act?: (page: Page) => Promise<void>;
 	/** The text the shot waits for after `act`, when it differs from the page's own. */
 	after?: string;
+	/** How long the page's own text may take: a lobby state that comes with the draft's pace. */
+	timeout?: number;
 }
 
 async function shoot(
 	name: string,
 	path: string | (() => Promise<string>),
 	ready: string,
-	{ who = me, before, act, after }: ShotOptions = {}
+	{ who = me, before, act, after, timeout = 20_000 }: ShotOptions = {}
 ): Promise<void> {
 	for (const theme of THEMES) {
 		for (const width of WIDTHS) {
@@ -150,7 +154,7 @@ async function shoot(
 			const page = await ctx.newPage();
 			const to = typeof path === 'string' ? path : await path();
 			await page.goto(`${web}${to}`, { waitUntil: 'networkidle' });
-			await page.getByText(ready).filter({ visible: true }).first().waitFor({ timeout: 20_000 });
+			await page.getByText(ready).filter({ visible: true }).first().waitFor({ timeout });
 			if (act) {
 				await act(page);
 				if (after)
@@ -274,8 +278,13 @@ try {
 	});
 	await call<Room>(me, 'POST', `/mocks/${created.id}/finish`);
 	await shoot('mock-report', `/mock/${created.id}/report`, 'The field');
+	// The call at your last pick, after Pick for me through round 14: no next turn, so the card has no
+	// chance column (Lane 66o review L9).
+	const last = await newMock(2026);
+	await call<Room>(me, 'POST', `/mocks/${last.id}/autopick?to_round=14`);
+	await shoot('mock-last-pick', `/mock/${last.id}`, 'Our call at');
 	const sunk = await sunkMock();
-	await shoot('mock-report-low', `/mock/${sunk}/report`, 'the leader at');
+	await shoot('mock-report-low', `/mock/${sunk}/report`, 'Leader');
 
 	// A lobby joined and left unattended: nobody is here when it fills, so it closes, and opening it
 	// after the fill window shows the closed state with the verb to join another.
@@ -295,6 +304,10 @@ try {
 	await Promise.all(present.slice(1).map((ctx) => ctx.close()));
 	await new Promise((done) => setTimeout(done, DRAFT_WAIT_MS));
 	await shoot('lobby-room', `/lobby/${lobby}`, 'just taken, newest first');
+	// Off your turn the call waits on the board: "If the board holds to", headed Reaches (review L9).
+	await shoot('lobby-reaches', `/lobby/${lobby}`, 'If the board holds to', {
+		timeout: LOBBY_TURN_WAIT_MS
+	});
 	await shoot('lobby-leave', `/lobby/${lobby}`, 'just taken, newest first', {
 		act: (page) => page.getByRole('button', { name: 'Leave', exact: true }).click(),
 		after: 'Leave? Your queue drafts your seat'
