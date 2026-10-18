@@ -412,9 +412,8 @@ def _fake_facts(name: str) -> Any:
     return SimpleNamespace(identity=SimpleNamespace(name=name))
 
 
-def test_a_page_that_fails_the_page_gate_after_an_unjudged_pass_falls_to_its_facts_block(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def _checking_passes(monkeypatch: pytest.MonkeyPatch) -> tuple[_Passes, list[str], list[tuple[str, str, str]]]:
+    """Passes whose page gate fails page b, every facts block row they write recorded."""
     lines: list[str] = []
     writes: list[tuple[str, str, str]] = []
     passes = _Passes(
@@ -440,21 +439,59 @@ def test_a_page_that_fails_the_page_gate_after_an_unjudged_pass_falls_to_its_fac
         "upsert_capsule",
         lambda conn, row, at: writes.append((row.player_id, row.source, row.facts_hash)),
     )
+    return passes, lines, writes
+
+
+def test_a_page_that_fails_the_page_gate_after_an_unjudged_pass_falls_to_its_facts_block(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    passes, lines, writes = _checking_passes(monkeypatch)
     passes._check_pages(
         "capsule retry after the demotion (2 unwritten pages)", SweepReport(NOW, 4, 2, ["a", "b"], 2, 0)
     )
     assert writes == [("b", FACTS_SOURCE, RETRY_FIRST_FACTS_HASH)]
     assert lines == [
-        "capsule retry after the demotion (2 unwritten pages): 1 written pages failed the page gate and fell to "
+        "capsule retry after the demotion (2 unwritten pages): 1 pages failed the page gate and fell to "
         "their facts blocks: Player B (rank_off_page:b:WR3)"
     ]
 
 
-def test_no_page_written_means_no_page_gate_read(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_a_hard_target_whose_rewrite_was_refused_is_checked_though_the_pass_wrote_nothing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Review 73 item 2: the pass wrote no page (its one rewrite was refused, the page kept its failing
+    read), and the check still runs, so the page falls to its facts block rather than failing the night."""
+    passes, _, writes = _checking_passes(monkeypatch)
+    passes._check_pages("capsule repair 3 (1 pages)", SweepReport(NOW, 4, 1, ["b"], 0, 0, kept=1, refused=1))
+    assert writes == [("b", FACTS_SOURCE, RETRY_FIRST_FACTS_HASH)]
+
+
+def test_a_page_the_check_drops_is_never_written_again_that_night(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Review 73 item 1: a dropped page keeps its write-first-next-night stamp: no later pass tonight
+    (the blocked retries, the retry after the demotion) may write it."""
+    passes, _, _ = _checking_passes(monkeypatch)
+    passes._check_pages("capsule repair, one generation past the ceiling", SweepReport(NOW, 4, 1, ["b"], 1, 0))
+    assert passes.dropped == frozenset({"b"})
+    seen: list[SweepPlan] = []
+
+    def sweep_capsules(*args: Any) -> SweepReport:
+        seen.append(cast("SweepPlan", args[3]))
+        return SweepReport(NOW, 4, 0)
+
+    monkeypatch.setattr(capsule_step, "sweep_capsules", sweep_capsules)
+    passes.sweep("capsule repair 3, pages the rewrite blocked 1", SweepPlan(10, unwritten_only=True))
+    assert "b" in seen[0].exclude
+    monkeypatch.setattr(passes, "_unwritten_pages", lambda: ["a", "b"])
+    monkeypatch.setattr(passes, "_check_pages", lambda name, report: None)
+    passes.retry_after_demotion()
+    assert seen[1].only == ("a",)
+
+
+def test_no_page_processed_means_no_page_gate_read(monkeypatch: pytest.MonkeyPatch) -> None:
     passes = _passes(_Script(), monkeypatch)
     monkeypatch.undo()
     monkeypatch.setattr(capsule_step, "page_findings", lambda *args: pytest.fail("read the page gate"))
-    passes._check_pages("capsule retry", SweepReport(NOW, 4, 1, ["a"], 0, 1))
+    passes._check_pages("capsule retry", SweepReport(NOW, 4, 0))
 
 
 def test_no_retry_after_the_demotion_when_every_page_is_written(monkeypatch: pytest.MonkeyPatch) -> None:

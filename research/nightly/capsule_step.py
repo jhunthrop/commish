@@ -271,6 +271,9 @@ class _Passes:
         self.first = tuple(dict.fromkeys(d.player_id for d in plan.carried))
         self.carried_avoid = carried_avoid(plan.carried)
         self.demoted: list[Demotion] = []
+        # Pages the page check dropped to their facts blocks tonight (`_check_pages`): stamped to be
+        # written first the next night, so no later pass tonight writes them (review 73 item 1).
+        self.dropped: frozenset[str] = frozenset()
 
     @property
     def left(self) -> int:
@@ -291,7 +294,11 @@ class _Passes:
             for pid in {*plan.avoid_by_page, *self.carried_avoid}
         }
         plan = replace(
-            plan, exclude=plan.exclude | spent, span_rules=self.rules, avoid_by_page=avoid_by_page, first=self.first
+            plan,
+            exclude=plan.exclude | spent | self.dropped,
+            span_rules=self.rules,
+            avoid_by_page=avoid_by_page,
+            first=self.first,
         )
         try:
             report = sweep_capsules(self.engine, self.gateway, self.now, plan, self.facts)
@@ -305,12 +312,14 @@ class _Passes:
         return report
 
     def _check_pages(self, name: str, report: SweepReport) -> None:
-        """THE PAGE GATE FOR A PASS NO REPAIR JUDGES (Lane 73): each page the pass wrote that fails the
-        page gate (`page_findings`, the check every written page gets) falls to its facts block, stamped
-        to be written first the next night, so no page is served without the check."""
-        if not report.llm:
-            return
+        """THE PAGE GATE FOR A PASS NO REPAIR JUDGES (Lane 73): each page the pass reached that fails the
+        page gate (`page_findings`, the check every written page gets), written or kept (a hard target
+        whose rewrite was refused keeps its failing read, review 73 item 2), falls to its facts block,
+        stamped to be written first the next night and never written again tonight (`dropped`), so no
+        page is served without the check. A pass that reached no page reads nothing."""
         processed = tuple(dict.fromkeys(report.processed))
+        if not processed:
+            return
 
         def check() -> list[tuple[Subject, tuple[str, ...]]]:
             with self.engine.begin() as conn:
@@ -322,8 +331,9 @@ class _Passes:
 
         fell = once_more_on_disconnect(check)
         if fell:
+            self.dropped = self.dropped | {s.universe_id for s, _ in fell}
             named = ", ".join(f"{s.facts.identity.name} ({'; '.join(reasons)})" for s, reasons in fell)
-            self.log(f"{name}: {len(fell)} written pages failed the page gate and fell to their facts blocks: {named}")
+            self.log(f"{name}: {len(fell)} pages failed the page gate and fell to their facts blocks: {named}")
 
     def _account(self, name: str, report: SweepReport, at_ceiling: frozenset[str], *, graced_pass: bool) -> None:
         """A sweep's report on the night: the grace taken, the asks per player, the spend, the line."""
@@ -461,8 +471,9 @@ class _Passes:
         in the line. Tonight's demotions are not retried: their ruling writes them first the next night.
         Each page is refused a sentence another page carries (`SweepPlan.only`), so this pass cannot fail
         the night on a shared sentence."""
-        demoted = {d.player_id for d in self.demoted}
-        pages = tuple(pid for pid in self._unwritten_pages() if pid not in demoted)
+        # Tonight's demotions and the pages the page check dropped are written first the next night.
+        skip = {d.player_id for d in self.demoted} | self.dropped
+        pages = tuple(pid for pid in self._unwritten_pages() if pid not in skip)
         if not pages:
             return
         name = "capsule retry after the demotion"
