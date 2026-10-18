@@ -31,6 +31,7 @@
 	import { liveStatusClock, sayBoard, type LiveStatus } from '#lib/run/live-status.ts';
 	import { links, tierAnchor } from './links.ts';
 	import type OrderScreenComponent from '#lib/order/OrderScreen.svelte';
+	import { ORDER } from '#lib/order/words.ts';
 
 	interface Props {
 		page: BoardPage;
@@ -148,8 +149,12 @@
 	const SIDE_ID = 'board-side';
 
 	/** In season the board is the Rest of season screen (Lane 66j): our order as a box score read
-	 * from the API, loaded with the page's script, so the run's rows stay the page without one. The
-	 * kickers' and defenses' views keep the run's draft order: the order carries no K or DEF rows. */
+	 * from the API, loaded with the page's script. The page is built in that state, the order's own
+	 * first line, so nothing a member reads before the script runs contradicts the order after it
+	 * (review 66n finding 3, the coordinator's revised ruling): the run's rows, whose Projected is the
+	 * season's, show only while the run says the season has not started. The kickers' and defenses'
+	 * views keep the run's draft order: the order carries no K or DEF rows. */
+	const inSeason = $derived(page.underway && !marketView);
 	let Order = $state<typeof OrderScreenComponent | null>(null);
 	onMount(() => {
 		if (!page.underway) return;
@@ -182,7 +187,7 @@
 	</Row>
 {/snippet}
 
-<main class="board" class:ordered={Order !== null && !marketView}>
+<main class="board" class:ordered={inSeason}>
 	<!-- The league's line sits by the switch, not under the caption: atop the side column on a desk,
 	     first under the bar elsewhere. -->
 	<div class="league-line">
@@ -198,7 +203,7 @@
 			</PageHead>
 			{#if marketView}
 				<BasisLine parts={[{ text: page.marketBasis ?? '', phone: true }]} tail={capture} />
-			{:else if Order === null}
+			{:else if !inSeason}
 				<BasisLine parts={page.basis} tail={capture} />
 			{/if}
 		</div>
@@ -226,15 +231,20 @@
 			</span>
 		</div>
 
-		{#if Order && !marketView}
-			{#key orderLeague?.id}
-				<Order
-					mode="rest"
-					position={page.position === 'DST' || page.position === 'K' ? null : page.position}
-					league={orderLeague}
-					label="{page.position ?? 'All'} on our rest-of-season order"
-				/>
-			{/key}
+		{#if inSeason}
+			{#if Order}
+				{#key orderLeague?.id}
+					<Order
+						mode="rest"
+						position={page.position === 'DST' || page.position === 'K' ? null : page.position}
+						league={orderLeague}
+						label="{page.position ?? 'All'} on our rest-of-season order"
+					/>
+				{/key}
+			{:else}
+				<p class="reading" aria-live="polite">{ORDER.reading}</p>
+				<noscript><p class="reading">{ORDER.needsScript}</p></noscript>
+			{/if}
 		{:else}
 			<BoardTable
 				{columns}
@@ -299,7 +309,7 @@
 	</div>
 
 	<aside class="side" id={SIDE_ID} aria-label="Your board">
-		{#if page.position !== null && !marketView}
+		{#if page.position !== null && !marketView && !inSeason}
 			<Panel>
 				<PanelHead title="Tiers" aside="Drop to next" />
 				<TierJump
@@ -416,6 +426,13 @@
 	.ordered .side,
 	.ordered .shows {
 		display: none;
+	}
+
+	/* The order's first line, as OrderScreen prints it until its read lands. */
+	.reading {
+		margin: 0;
+		font-size: var(--t-sm);
+		color: var(--ink-3);
 	}
 
 	/* The sheet card's height with no one on it yet ("Your sheet", "No one yet"). */
