@@ -371,6 +371,7 @@ def sweep_capsules(
     board = BoardSentences(
         {s.universe_id: _reads(row) for s in subjects if (row := stored.get(s.universe_id)) and row.source == "llm"},
         CAPSULE_CONFIG.shared_sentence_min_words,
+        rules.exempt_sentences,
     )
     # A rewrite of chosen pages (the hard repair, the graced rewrite, the span repair) may not land a
     # sentence another page carries; the sweep and its retries record theirs as they land.

@@ -21,6 +21,7 @@ from research.capsules.config import CAPSULE_CONFIG, CAPSULE_MODEL, WriterSettin
 from research.capsules.gateway import GatewayClient, GenerationError
 from research.capsules.gateway_ledger import fetch_price
 from research.capsules.landing import BoardSentences, TonightWindow
+from research.capsules.narrative import held_sentences
 from research.capsules.pace import TokenBucket
 from research.capsules.prompt import WornPhrases
 from research.capsules.spans import SpanRules
@@ -491,6 +492,33 @@ def test_a_rewrite_that_would_land_another_pages_sentence_is_refused_and_keeps_t
     assert report.processed == ["a"]
     assert committed == (["a"] if lands else [])
     assert (report.llm, report.kept, report.refused) == ((1, 0, 0) if lands else (0, 1, 1))
+
+
+def test_a_sentence_the_facts_print_never_refuses_an_exclusive_claim() -> None:
+    """Lane 73: the claim reads the facts' own sentences from the demotion's source
+    (`SpanRules.exempt_sentences`), so a printed fact on another page never blocks a rewrite."""
+    board = BoardSentences({"x": (_CLOSER,)}, 4, frozenset(held_sentences([_CLOSER], 4)))
+    assert board.claim("a", (f"He is done. {_CLOSER}",), exclusive=True)
+    assert not BoardSentences({"x": (_CLOSER,)}, 4).claim("a", (_CLOSER,), exclusive=True)
+
+
+def test_a_rewrite_landing_a_sentence_the_facts_print_is_not_refused(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The sweep builds its claim from the night's span rules: the same exemption the gate and the
+    demotion read (b58ff1de), never a second list."""
+    subjects = [_subject(pid) for pid in ("a", "x")]
+    stored = {"a": _stored("a", "His own old read, nothing shared."), "x": _stored("x", _CLOSER)}
+    committed: list[str] = []
+    monkeypatch.setattr(sweep, "stored_capsules_for", lambda conn, ids: {k: v for k, v in stored.items() if k in ids})
+    monkeypatch.setattr(sweep, "queue_regeneration", lambda conn, ids: 0)
+    monkeypatch.setattr(sweep, "worn_phrases", lambda subjects, stored: WornPhrases((), ()))
+    monkeypatch.setattr(sweep, "generate_capsule", lambda facts, gateway, worn: _result(f"Fresh words. {_CLOSER}"))
+    monkeypatch.setattr(sweep, "upsert_capsule", lambda conn, row, at: committed.append(row.player_id))
+    engine = cast("Engine", SimpleNamespace(connect=lambda: nullcontext(None), begin=lambda: nullcontext(None)))
+    gateway = _client(lambda r: _ok(), FakeClock(), WriterSettings("m/x", 1, 60))
+    rules = SpanRules(frozenset(), exempt_sentences=frozenset(held_sentences([_CLOSER], 4)))
+    report = sweep_capsules(engine, gateway, NOW, SweepPlan(10, span_rules=rules, only=("a",)), lambda c, a: subjects)
+    assert committed == ["a"]
+    assert (report.llm, report.refused) == (1, 0)
 
 
 def test_two_pages_in_flight_with_the_same_new_sentence_land_it_once(monkeypatch: pytest.MonkeyPatch) -> None:
