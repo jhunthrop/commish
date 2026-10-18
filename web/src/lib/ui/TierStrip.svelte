@@ -28,7 +28,7 @@
 	<span class="name"><b>Tier {tier}</b><span>{plural(count, group.one, group.many)}</span></span>
 	<span class="cliff">
 		{#if cliff}
-			<b>{fixed(cliff.drop)}</b><span>{unit} down to tier {cliff.nextTier}</span>
+			<b>{fixed(cliff.drop)}</b><span>{unit} to tier {cliff.nextTier}</span>
 		{:else if tail}
 			{@render tail()}
 		{:else}
@@ -38,13 +38,16 @@
 </div>
 
 <style>
+	/* The band is a row's height (Lane 66n, the approved mock): its number once on the tier's hue, its
+	   count, and the drop to the next tier in the row's figure size, so no band figure outsizes a
+	   player's name. */
 	.band {
 		display: grid;
-		grid-template-columns: 52px 1fr auto;
+		grid-template-columns: 44px 1fr auto;
 		align-items: center;
 		column-gap: var(--s-3);
-		padding-right: var(--s-4);
-		min-height: 56px;
+		padding-right: var(--s-3);
+		min-height: 40px;
 		border-radius: var(--r-md) var(--r-md) 0 0;
 		background: color-mix(in srgb, var(--tier) var(--tier-wash), var(--bg));
 		border-bottom: 2px solid var(--tier);
@@ -60,18 +63,19 @@
 		font-family: var(--font-num);
 		font-variant-numeric: tabular-nums;
 		font-weight: 800;
-		font-size: var(--t-2xl);
+		font-size: var(--t-row-num);
 		line-height: 1;
 	}
 
 	.name {
 		display: flex;
 		align-items: baseline;
-		gap: var(--s-3);
+		gap: var(--s-2);
+		min-width: 0;
 	}
 
 	.name b {
-		font-size: var(--t-lg);
+		font-size: var(--t-md);
 		font-weight: 700;
 	}
 
@@ -85,35 +89,27 @@
 	.cliff {
 		display: flex;
 		align-items: baseline;
-		gap: 8px;
+		gap: 6px;
 	}
 
 	.cliff b {
 		font-family: var(--font-num);
-		font-weight: 800;
-		font-size: 34px;
+		font-weight: 600;
+		font-size: var(--t-row-num);
 		line-height: 1;
 		font-variant-numeric: tabular-nums;
 	}
 
 	@media (max-width: 760px) {
 		.band {
-			grid-template-columns: 40px 1fr;
-			row-gap: 2px;
-			padding: 6px var(--s-3) 6px 0;
+			grid-template-columns: 36px 1fr auto;
+			column-gap: var(--s-2);
+			padding-right: var(--s-2);
 		}
 
-		.strip {
-			grid-row: span 2;
-			font-size: 30px;
-		}
-
-		.name {
-			gap: var(--s-2);
-		}
-
-		.cliff b {
-			font-size: 24px;
+		.name span,
+		.cliff span {
+			font-size: var(--t-xs);
 		}
 	}
 </style>
