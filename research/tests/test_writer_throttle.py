@@ -5,12 +5,15 @@ the gateway itself, so a re-ask never carries a run past it. The gateway is stub
 
 import json
 from collections.abc import Callable, Iterator, Sequence
+from datetime import UTC, datetime
+from types import SimpleNamespace
 from typing import Any, cast
 
 import httpx
 import pytest
 
 from research.capsules import generate
+from research.capsules import sweep as sweep_module
 from research.capsules.config import CAPSULE_CONFIG, WriterSettings
 from research.capsules.gateway import Completion, GatewayClient, GenerationError
 from research.capsules.gateway_ledger import ModelPrice, Usage
@@ -19,6 +22,7 @@ from research.capsules.narrative import NarrativeResult
 from research.capsules.run_budget import BudgetSpentError, RunBudget, parse_budget
 from research.capsules.throttle_waits import AskWaits, RunWaits, run_wait_cap_s
 from research.capsules.validate import ValidationResult
+from research.nightly import capsule_step
 from research.nightly.capsule_gate import CapsuleGateResult
 from research.nightly.capsule_step import CapsuleSpend
 
@@ -125,6 +129,37 @@ def test_a_gateway_down_through_every_wait_is_the_facts_block_named_throttled() 
 
 
 @pytest.mark.usefixtures("quiet_page")
+def test_a_generation_the_gateway_lost_is_charged_a_whole_generations_asks() -> None:
+    """Review 73 item 5: a bundle lost to a throttle, a refusal or an empty answer is one or two asks,
+    which under the asks ceiling would let a page under a 429 storm start up to seven ordinary
+    generations; charged the whole six, it starts two and the grace, the ceiling's three drafts."""
+    whole = CAPSULE_CONFIG.max_gateway_calls_per_player
+    throttled = _write(_StubGateway([_transport()] * (len(WAITS) + 1)))
+    refused = _write(_StubGateway([GenerationError("Gateway refused the request: HTTP 400.", False)] * 2))
+    assert (throttled.asks, refused.asks) == (whole, whole)
+    clean = _write(_StubGateway([Completion(_BUNDLE, None)]))
+    assert clean.asks == 1
+
+
+@pytest.mark.usefixtures("quiet_page")
+def test_any_generation_that_ends_in_its_facts_block_is_charged_a_whole_generations_asks() -> None:
+    """Re-review 73 N1, ruled: a bundle answered twice with no JSON object (two empty answers) falls to
+    its facts block on two asks; whatever ended it, a generation ending in its facts block is charged
+    the whole six, so a page starts at most two ordinary generations and the grace."""
+    result = _write(_StubGateway([Completion("", None), Completion("", None)]))
+    assert result.source == "facts"
+    assert result.asks == CAPSULE_CONFIG.max_gateway_calls_per_player
+
+
+def test_a_page_whose_generations_the_gateway_loses_starts_three_drafts_a_night() -> None:
+    whole = CAPSULE_CONFIG.max_gateway_calls_per_player
+    assert capsule_step.spent_out_for({"p": whole}, frozenset(), grace=False) == frozenset()
+    assert capsule_step.spent_out_for({"p": 2 * whole}, frozenset(), grace=False) == {"p"}
+    assert capsule_step.spent_out_for({"p": 2 * whole}, frozenset(), grace=True) == frozenset()
+    assert capsule_step.spent_out_for({"p": 3 * whole}, frozenset({"p"}), grace=True) == {"p"}
+
+
+@pytest.mark.usefixtures("quiet_page")
 def test_a_refused_request_or_a_degenerate_completion_is_not_waited_out() -> None:
     """Only a rate limit or a transport failure waits: a 4xx is ours to fix, and a cut or empty
     completion is the writer's answer, an ask like any other."""
@@ -160,6 +195,44 @@ def test_an_empty_correction_is_an_ask_spent_and_the_read_asks_again(monkeypatch
     assert result.source == "llm"
     assert gateway.slept == []
     assert len(result.compact.attempts) == _THROTTLES  # the draft and the correction that passed
+
+
+class _ReAskingGateway(_StubGateway):
+    """Each ask costs the gateway two HTTP calls: its own re-ask of an empty or cut completion."""
+
+    def complete(
+        self, messages: list[dict[str, str]], max_tokens: int, min_words: int = 20, ask: AskWaits | None = None
+    ) -> Completion:
+        self.calls += 1
+        return super().complete(messages, max_tokens, min_words, ask)
+
+
+@pytest.mark.usefixtures("quiet_page")
+def test_a_page_counts_its_writers_asks_apart_from_the_gateways_http_calls(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Lane 73 ruling 1: the night's ceiling counts the writer's own asks; the gateway's HTTP re-asks
+    and the throttle's waits are on the bill (`calls`) but never an ask (`asks`)."""
+    verdicts = iter([True, False, True])  # the full draft passes, the short draft fails, its correction passes
+    monkeypatch.setattr(
+        generate,
+        "validate_capsule",
+        lambda body, facts, size, asked_shorter=False: (
+            ValidationResult(True, ()) if next(verdicts) else ValidationResult(False, ("The completion was empty.",))
+        ),
+    )
+    answer = Completion(_WORDS, Usage(cost_usd=_CALL_COST))
+    gateway = _ReAskingGateway([_transport(), Completion(_BUNDLE, None), answer])
+    result = _write(gateway)
+    assert result.source == "llm"
+    assert result.asks == _A_CALL_AND_ITS_RETRY  # the bundle and the short note's correction
+    assert result.calls == gateway.calls == 6  # noqa: PLR2004 - three asks to the stub, two HTTP calls each
+
+
+def test_the_nights_calls_per_player_are_the_writers_asks() -> None:
+    report = sweep_module.SweepReport(datetime(2026, 10, 17, 5, tzinfo=UTC), 1, 1)
+    result = cast("CapsuleResult", SimpleNamespace(calls=9, asks=6, usage=None))
+    sweep_module._count_spend(report, cast("Any", SimpleNamespace(universe_id="u1")), result)
+    assert report.calls == 9  # noqa: PLR2004 - the bill counts every HTTP call
+    assert report.asks_by_player == {"u1": 6}
 
 
 @pytest.mark.usefixtures("quiet_page")

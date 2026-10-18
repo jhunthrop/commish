@@ -40,4 +40,13 @@ def test_three_percent_unwritten_fails_preseason_and_passes_in_season() -> None:
     assert during.ok
     assert "3.0% unwritten, the preseason line 2%" in before.summary()
     assert "3.0% unwritten, the in-season line 3%" in during.summary()
-    assert "one page moves an 80-page rate by 1.25 points" in during.summary()
+    # Lane 73 ruling 4: the basis is a full-board night under the call ceiling and the demotion, not
+    # Lane 17's 80-page sample; the 3% itself does not move.
+    # Review 73 item 7: no board size or per-page points hard-coded, and the retry after the demotion named.
+    assert "a full-board night (every sheet moved) under the call ceiling, the demotion and the retry after it" in (
+        during.summary()
+    )
+    assert "536 pages," not in CAPSULE_CONFIG.unwritten_line_in_season.basis
+    assert "0.19 points" not in CAPSULE_CONFIG.unwritten_line_in_season.basis
+    assert "80-page" not in during.summary()
+    assert CAPSULE_CONFIG.unwritten_line_in_season.share_max == 0.03  # noqa: PLR2004

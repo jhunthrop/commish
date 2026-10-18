@@ -57,6 +57,9 @@ class SpanRules:
 
     names: frozenset[str]
     exempt: frozenset[str] = frozenset()
+    # The whole sentences the same sheets print, normalized as the shared-sentence rule reads them:
+    # exempt from it as `exempt` is from the span rule (Lane 73 ruling 3).
+    exempt_sentences: frozenset[str] = frozenset()
 
 
 def cut_phrases(text: str, phrases: Iterable[str]) -> str:

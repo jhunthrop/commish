@@ -34,7 +34,13 @@ The order, and why each pass exists:
    two pages after the graced rewrite keeps its first carrier in board order and demotes the others
    to the facts block, with no model call. The demoted pages are named in the step's summary and the
    run report, count as unwritten, and are written first on the next night (`CapsuleStepPlan.carried`).
-7. **The capsule gate** (`capsule_gate`), judged once more after the demotion: the step's verdict.
+7. **The retry after the demotion** (the coordinator's Lane 73 ruling 2): the pages still unwritten, but
+   not tonight's demotions, take one more retry past the night's call ceiling, within what is left of
+   the night's page budget, each refused a sentence another page carries.
+   From the last attempt's read of the page gate on (its hard rewrite and blocked retry, the graced
+   rewrite, this retry), no repair judges the pages a pass writes, so each such pass checks them itself
+   (`_Passes._check_pages`): a page failing the page gate falls to its facts block (Lane 73).
+8. **The capsule gate** (`capsule_gate`), judged once more after the demotion: the step's verdict.
 
 Every pass keeps the writer's pool full (`gateway.GatewayClient.rolling`: a slot refilled the moment its page
 lands, each page told the spans of every page landed before it started, and checked as it lands against the
@@ -43,7 +49,7 @@ token bucket (`capsules.pace`), the commits on one small pool of connections. Th
 order, since each reads what the last one stored.
 
 Every pass shares one ceiling per player for the night, `NIGHT_CALLS_PER_PLAYER` (12, two of phase C's
-six-call generations): a player who reached it is left to the next night rather than written again,
+six-ask generations, counted in the writer's asks, not the gateway's HTTP calls): a player who reached it is left to the next night rather than written again,
 with one exception (the coordinator's Lane 17 ruling, extended 2026-10-15): a page at the ceiling may
 start one more generation that night, once, in a graced pass: a pass over unwritten pages, or the
 graced rewrite of the pages still carrying a shared sentence (`spent_out_for`). The night's page
@@ -58,7 +64,7 @@ demote written reads to facts blocks) and the gate still judges what is stored.
 """
 
 import os
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from typing import Final
@@ -72,8 +78,15 @@ from research.capsules.gateway import GatewayClient
 from research.capsules.gateway_ledger import ModelPrice, ModelSpend, fetch_price
 from research.capsules.requeue import served_identities
 from research.capsules.spans import SpanRules
-from research.capsules.store import queue_regeneration
-from research.capsules.sweep import FactsPassMemo, SweepInterruptedError, SweepPlan, SweepReport, sweep_capsules
+from research.capsules.store import WRITTEN_SOURCE, StoredCapsule, queue_regeneration, stored_capsules_for
+from research.capsules.sweep import (
+    FactsPassMemo,
+    Subject,
+    SweepInterruptedError,
+    SweepPlan,
+    SweepReport,
+    sweep_capsules,
+)
 from research.db.code_digest import code_digest
 from research.db.engine import once_more_on_disconnect, pooled_like
 from research.db.read_cache import snapshot
@@ -84,6 +97,7 @@ from research.nightly.capsule_demotion import (
     demotion_line,
     demotion_targets,
     demotion_writes,
+    facts_block_write,
     write_demotions,
 )
 from research.nightly.capsule_gate import (
@@ -103,7 +117,13 @@ RETRY_PASSES: Final = 3
 # THE NIGHT'S CALLS FOR ONE PLAYER, shared by the sweep, the retries and the repairs. Phase C caps one
 # generation at six calls; with seven passes a night one player could take 42. Two full generations'
 # worth is the night's ceiling: a player starts a generation only while it cannot take him past it
-# (at most 6 calls used), and otherwise waits for the next night.
+# (at most 6 calls used), and otherwise waits for the next night. The calls are the writer's own asks
+# (`CapsuleResult.asks`), never the gateway's re-asks of an empty or cut answer nor the throttle's,
+# which count on the bill only (Lane 73 ruling 1: a generation that took 7 HTTP calls had cost a page
+# its second generation). A generation that ends in its facts block, whatever ended it, is charged the
+# whole six (`generate.charged_asks`, re-review N1), so the bound per page a night
+# is three drafts (two ordinary and the grace) plus the one retry after the demotion, each at most six
+# asks, every ask's own re-asks bounded by `throttle_waits_ms` and the run's wait cap (review 73 item 5).
 NIGHT_CALLS_PER_PLAYER: Final = 12
 Log = Callable[[str], None]
 
@@ -211,15 +231,25 @@ def _regenerate_all(engine: Engine, now: datetime) -> str:
     return f"capsules: every board page stamped for regeneration ({queued} rows)"
 
 
-def spent_out_for(calls: Mapping[str, int], graced: frozenset[str], *, grace: bool) -> frozenset[str]:
+def spent_out_for(asks: Mapping[str, int], graced: frozenset[str], *, grace: bool) -> frozenset[str]:
     """The players a pass may not start a generation for. A player is left for the next night once
     another full generation could take him past the ceiling (review N12: at 11 calls a six-call
     generation would reach 17); in a graced pass (`SweepPlan.grace`: a pass over unwritten pages, or
     the last rewrite of the pages still carrying a shared sentence) each may go past it once
     (`graced` holds those that already have)."""
     last_start = NIGHT_CALLS_PER_PLAYER - CAPSULE_CONFIG.max_gateway_calls_per_player
-    spent = frozenset(pid for pid, n in calls.items() if n > last_start)
+    spent = frozenset(pid for pid, n in asks.items() if n > last_start)
     return spent & graced if grace else spent
+
+
+def unwritten_with_sheets(
+    order: Sequence[str], stored: Mapping[str, StoredCapsule], sheets: frozenset[str]
+) -> list[str]:
+    """The board's pages the writer has not written (a facts block, the oracle's template, no row) that
+    have a sheet tonight, in board order: a page with no sheet cannot be written (review 73 item 8)."""
+    return [
+        pid for pid in order if pid in sheets and ((row := stored.get(pid)) is None or row.source != WRITTEN_SOURCE)
+    ]
 
 
 class _Passes:
@@ -246,7 +276,7 @@ class _Passes:
         self.budget = plan.budget
         self.log = log
         self.spend = CapsuleSpend()
-        self.calls_by_player: dict[str, int] = {}
+        self.asks_by_player: dict[str, int] = {}
         # Pages that took their one generation past the ceiling tonight.
         self.graced: set[str] = set()
         # The span repair's pages left tonight (`CapsuleStepPlan.span_repair_pages`).
@@ -254,21 +284,34 @@ class _Passes:
         self.first = tuple(dict.fromkeys(d.player_id for d in plan.carried))
         self.carried_avoid = carried_avoid(plan.carried)
         self.demoted: list[Demotion] = []
+        # Pages the page check dropped to their facts blocks tonight (`_check_pages`): stamped to be
+        # written first the next night, so no later pass tonight writes them (review 73 item 1).
+        self.dropped: frozenset[str] = frozenset()
 
     @property
     def left(self) -> int:
         return self.budget - self.spend.processed
 
-    def sweep(self, name: str, plan: SweepPlan) -> SweepReport:
+    def sweep(self, name: str, plan: SweepPlan, *, ceiling: bool = True, check_pages: bool = False) -> SweepReport:
+        """One pass, every page the night's ceiling has spent excluded; `ceiling=False` is the one pass
+        the ceiling never holds back, the retry after the demotion (`retry_after_demotion`).
+        `check_pages` is asked by a pass no later repair judges (`_check_pages`, Lane 73): the last
+        attempt's hard rewrite and blocked retry, the graced rewrite and the retry after the demotion."""
         graced_pass = plan.unwritten_only or plan.grace
-        at_ceiling = spent_out_for(self.calls_by_player, frozenset(), grace=False)
-        spent = spent_out_for(self.calls_by_player, frozenset(self.graced), grace=graced_pass)
+        at_ceiling = spent_out_for(self.asks_by_player, frozenset(), grace=False)
+        spent = (
+            spent_out_for(self.asks_by_player, frozenset(self.graced), grace=graced_pass) if ceiling else frozenset()
+        )
         avoid_by_page = {
             pid: (*plan.avoid_by_page.get(pid, ()), *self.carried_avoid.get(pid, ()))
             for pid in {*plan.avoid_by_page, *self.carried_avoid}
         }
         plan = replace(
-            plan, exclude=plan.exclude | spent, span_rules=self.rules, avoid_by_page=avoid_by_page, first=self.first
+            plan,
+            exclude=plan.exclude | spent | self.dropped,
+            span_rules=self.rules,
+            avoid_by_page=avoid_by_page,
+            first=self.first,
         )
         try:
             report = sweep_capsules(self.engine, self.gateway, self.now, plan, self.facts)
@@ -277,17 +320,45 @@ class _Passes:
             self._account(name, interrupted.report, at_ceiling, graced_pass=graced_pass)
             raise interrupted.cause from interrupted
         self._account(name, report, at_ceiling, graced_pass=graced_pass)
+        if check_pages:
+            self._check_pages(name, report)
         return report
 
+    def _check_pages(self, name: str, report: SweepReport) -> None:
+        """THE PAGE GATE FOR A PASS NO REPAIR JUDGES (Lane 73): each page the pass reached that fails the
+        page gate (`page_findings`, the check every written page gets), written or kept (a hard target
+        whose rewrite was refused keeps its failing read, review 73 item 2), falls to its facts block,
+        stamped to be written first the next night and never written again tonight (`dropped`), so no
+        page is served without the check. A pass that reached no page reads nothing."""
+        processed = tuple(dict.fromkeys(report.processed))
+        if not processed:
+            return
+
+        def check() -> list[tuple[Subject, tuple[str, ...]]]:
+            with self.engine.begin() as conn:
+                failing = page_findings(conn, self.now, self.facts).by_page
+                subjects = {subject.universe_id: subject for subject in self.facts(conn, self.now)}
+                fell = [(subjects[pid], failing[pid]) for pid in processed if pid in failing and pid in subjects]
+                write_demotions(conn, [facts_block_write(s.universe_id, s.facts) for s, _ in fell], datetime.now(UTC))
+            return fell
+
+        fell = once_more_on_disconnect(check)
+        if fell:
+            self.dropped = self.dropped | {s.universe_id for s, _ in fell}
+            named = ", ".join(f"{s.facts.identity.name} ({'; '.join(reasons)})" for s, reasons in fell)
+            self.log(f"{name}: {len(fell)} pages failed the page gate and fell to their facts blocks: {named}")
+
     def _account(self, name: str, report: SweepReport, at_ceiling: frozenset[str], *, graced_pass: bool) -> None:
-        """A sweep's report on the night: the grace taken, the calls per player, the spend, the line."""
+        """A sweep's report on the night: the grace taken, the asks per player, the spend, the line."""
         if graced_pass:
             # A page past the ceiling that this pass reached has taken its one extra generation.
             self.graced |= at_ceiling & set(report.processed)
-        for pid, calls in report.calls_by_player.items():
-            self.calls_by_player[pid] = self.calls_by_player.get(pid, 0) + calls
+        for pid, asks in report.asks_by_player.items():
+            self.asks_by_player[pid] = self.asks_by_player.get(pid, 0) + asks
         self.spend.add(report)
         self.log(_sweep_line(name, report))
+        if report.fell:
+            self.log(f"{name}, {len(report.fell)} pages fell to their facts blocks: {'; '.join(report.fell)}")
 
     def run(self) -> None:
         # The sentences already on two pages are quoted to the writer from the first call, so the
@@ -299,12 +370,15 @@ class _Passes:
         report = self.sweep(name, SweepPlan(self.budget, unwritten_only=self.mend_only, avoid=shared))
         self.retry("capsule retries", report.facts, shared)
         self.repair()
+        self.retry_after_demotion()
 
-    def retry(self, name: str, unwritten: int, avoid: tuple[str, ...]) -> None:
+    def retry(self, name: str, unwritten: int, avoid: tuple[str, ...], *, check_pages: bool = False) -> None:
         for attempt in range(1, RETRY_PASSES + 1):
             if self.left <= 0 or unwritten == 0:
                 return
-            retry = self.sweep(f"{name} {attempt}", SweepPlan(self.left, unwritten_only=True, avoid=avoid))
+            retry = self.sweep(
+                f"{name} {attempt}", SweepPlan(self.left, unwritten_only=True, avoid=avoid), check_pages=check_pages
+            )
             unwritten = retry.facts
 
     def _judged(self) -> tuple[CapsuleGateResult, list[str], dict[str, tuple[str, ...]]]:
@@ -317,10 +391,13 @@ class _Passes:
             failing = dict(page_findings(conn, self.now, self.facts).by_page)
         return gate, order, failing
 
-    def _retry_unwritten(self, name: str) -> None:
+    def _retry_unwritten(self, name: str, *, check_pages: bool = False) -> None:
         gate, _, _ = self._judged()
-        if gate.facts_blocks and self.left > 0:
-            self.retry(name, gate.facts_blocks, tuple(sentence.sentence for sentence in gate.shared))
+        # The pages the check dropped are facts blocks no pass writes tonight (re-review N2).
+        if gate.facts_blocks > len(self.dropped) and self.left > 0:
+            self.retry(
+                name, gate.facts_blocks, tuple(sentence.sentence for sentence in gate.shared), check_pages=check_pages
+            )
 
     def repair(self) -> None:
         """The repair attempts in the ruled order (the module's step 4): unwritten pages, hard targets,
@@ -328,6 +405,9 @@ class _Passes:
         for attempt in range(1, REPAIR_PASSES + 1):
             self._retry_unwritten(f"capsule repair {attempt}, unwritten pages first")
             gate, order, failing = self._judged()
+            # The last attempt's read of the page gate is the last any repair makes: its passes check
+            # their own pages.
+            last = attempt == REPAIR_PASSES
             targets = repair_order(gate, failing, order)
             spans = () if attempt == REPAIR_PASSES else targets.spans[: self.span_pages_left]
             if targets.spans and not spans and attempt < REPAIR_PASSES:
@@ -346,8 +426,8 @@ class _Passes:
                     f"capsule repair {attempt} ({len(gate.shared)} shared sentences, {len(failing)} pages failing "
                     f"the page gate, {len(targets.hard)} pages)"
                 )
-                self.sweep(name, SweepPlan(self.left, only=targets.hard, avoid=avoid))
-                self._retry_unwritten(f"capsule repair {attempt}, pages the rewrite blocked")
+                self.sweep(name, SweepPlan(self.left, only=targets.hard, avoid=avoid), check_pages=last)
+                self._retry_unwritten(f"capsule repair {attempt}, pages the rewrite blocked", check_pages=last)
             if spans and self.left > 0:
                 name = (
                     f"capsule span repair {attempt} ({len(gate.spans)} shared spans, {len(spans)} pages of "
@@ -373,7 +453,7 @@ class _Passes:
         name = (
             f"capsule repair, one generation past the ceiling ({len(gate.shared)} shared sentences, {len(pages)} pages)"
         )
-        self.sweep(name, SweepPlan(self.left, only=pages, avoid=avoid, grace=True))
+        self.sweep(name, SweepPlan(self.left, only=pages, avoid=avoid, grace=True), check_pages=True)
 
     def demote_shared_sentences(self) -> None:
         """The coordinator's ruling of 2026-10-16: a sentence still on two pages after the graced rewrite
@@ -385,6 +465,50 @@ class _Passes:
         self.demoted = list(self._demote(gate.shared, order))
         if self.demoted:
             self.log(f"capsules: {demotion_line(self.demoted)}")
+
+    def _unwritten_pages(self) -> list[str]:
+        """The board's pages the writer has not written and could write tonight, in board order
+        (`unwritten_with_sheets`)."""
+
+        def read() -> list[str]:
+            with self.engine.connect() as conn:
+                order = board_universe_ids(conn, self.now)
+                stored = stored_capsules_for(conn, order)
+                sheets = frozenset(subject.universe_id for subject in self.facts(conn, self.now))
+            return unwritten_with_sheets(order, stored, sheets)
+
+        return once_more_on_disconnect(read)
+
+    def retry_after_demotion(self) -> None:
+        """The coordinator's Lane 73 ruling 2: the pages still unwritten after the demotion take one more
+        retry, past the night's call ceiling (the ceiling is what left them unwritten), within what is
+        left of the night's page budget, never a new budget; a budget that cannot reach them all says so
+        in the line. Tonight's demotions are not retried: their ruling writes them first the next night.
+        Each page is refused a sentence another page carries (`SweepPlan.only`), so this pass cannot fail
+        the night on a shared sentence."""
+        # Tonight's demotions and the pages the page check dropped are written first the next night.
+        skip = {d.player_id for d in self.demoted} | self.dropped
+        pages = tuple(pid for pid in self._unwritten_pages() if pid not in skip)
+        if not pages:
+            return
+        name = "capsule retry after the demotion"
+        if self.left <= 0:
+            self.log(f"{name}: the night's page budget is spent, {len(pages)} unwritten pages left for the next night")
+            return
+        reach = (
+            ""
+            if self.left >= len(pages)
+            else (
+                f", the night's page budget reaches {self.left} of the {len(pages)} unwritten pages, "
+                f"{len(pages) - self.left} left for the next night"
+            )
+        )
+        self.sweep(
+            f"{name} ({len(pages)} unwritten pages{reach})",
+            SweepPlan(self.left, only=pages),
+            ceiling=False,
+            check_pages=True,
+        )
 
     def _demote(self, shared: tuple[SharedSentence, ...], order: list[str]) -> tuple[Demotion, ...]:
         """The demotions' facts blocks, committed together. A carrier with no sheet tonight cannot be

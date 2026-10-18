@@ -205,12 +205,19 @@ class CapsuleConfig:
     corrections_per_read: int = 2
     # The share of the board's pages the nightly lets go unwritten (facts blocks, the oracle's template
     # rows and missing pages together), one line per voice, the run's date deciding which.
+    # The in-season basis (Lane 73 ruling 4, 2026-10-17; the 3% is the founder's floor and does not
+    # move): the night that sets the share is a full-board one, every sheet moved when a week's games
+    # land, written under the night's call ceiling (two generations' asks and one grace) and the
+    # demotion. 2026-10-17T05 was the first: 25 of 536 pages unwritten (4.7%), 10 at the ceiling, 5
+    # written pages lost to a shared-sentence rewrite, 10 demoted. Counting the writer's asks rather than
+    # HTTP calls, one retry after the demotion and printed sentences exempt bring that night's numbers
+    # to about 14 pages (2.6%), two under the line; a night that rewrites a few pages stays near 0%.
     unwritten_line_preseason: UnwrittenLine = UnwrittenLine("preseason", 0.02, "the share the board was built to")
     unwritten_line_in_season: UnwrittenLine = UnwrittenLine(
         "in-season",
         0.03,
-        "a full in-season rewrite's estimate tops out near 2.5% (Lane 17's 80-page sample), "
-        "and one page moves an 80-page rate by 1.25 points",
+        "a full-board night (every sheet moved) under the call ceiling, the demotion and the retry after it "
+        "is expected near 2.6% (2026-10-17's numbers under Lane 73)",
     )
     # A written sentence this long or longer may sit on one page only; shorter ones ("Draft him.",
     # "Let him go.") are the product's vocabulary, not stock prose (ruled in phase C's fix round 3).
