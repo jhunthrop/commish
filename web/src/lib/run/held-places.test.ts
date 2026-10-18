@@ -101,7 +101,11 @@ void test('the compare verdict never sets a held player’s places against anoth
 		assert.doesNotMatch(both.evidence, /places? higher/u);
 	}
 	const neither = verdict({ ...ir, held: null }, free, 'PPR');
-	if (neither.kind === 'call') assert.match(neither.evidence, /22 places higher/u);
+	if (neither.kind === 'call')
+		assert.match(
+			neither.evidence,
+			/^Achane is 8th on our PPR board and Jacobs 30th, with \+97\.0 over replacement against \+40\.0\.$/u
+		);
 });
 
 void test('a club page, the ADP page and the offline board draw a held row by the word', () => {

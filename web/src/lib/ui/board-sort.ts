@@ -1,7 +1,6 @@
 /** Sorting a board's rows by a column (Lane 66n): each sortable column's natural direction (a rank
  * or an ADP up, a figure down), the second press turning it, players without the figure last. Pure,
  * so the tests read the order a page prints. */
-import { draftersGap } from '#lib/format/draft.ts';
 import type { ColumnKey } from './board-columns.ts';
 
 /** The columns a head sorts by. The face, the player, the range and the action do not sort. */
@@ -30,6 +29,8 @@ export interface Sort {
 export interface Sortable {
 	ourRank: number;
 	adp: number | null;
+	/** The run's Gap, absent on an older run. */
+	gap?: number | null;
 	tier: number;
 	projected: number;
 	vor: number;
@@ -77,7 +78,7 @@ function figure(
 		case 'vor':
 			return row.vor;
 		case 'gap':
-			return draftersGap(row.adp, row.ourRank);
+			return row.gap ?? null;
 		case 'gp':
 			return row.season?.games ?? null;
 		case 'agame':

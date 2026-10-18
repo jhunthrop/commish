@@ -45,22 +45,22 @@ const PLAYER_TRACK: Widths = {
  * the bye folded under the name; a view in ADP order keeps its ADP lead, and a kicker's or a
  * defense's view its draft order and ADP. */
 const WIDTHS: Readonly<Record<ColumnKey, Widths>> = {
-	rank: { desk: 40, lap: 32, tab: 28, phone: null },
+	rank: { desk: 36, lap: 32, tab: 28, phone: null },
 	adpLead: { desk: 52, lap: 48, tab: 44, phone: 40 },
 	face: { desk: 40, lap: 40, tab: 36, phone: 32 },
 	player: PLAYER_TRACK,
-	tier: { desk: 36, lap: 32, tab: null, phone: null },
-	bye: { desk: 36, lap: 32, tab: 32, phone: null },
-	proj: { desk: 80, lap: 76, tab: 76, phone: 50 },
-	vor: { desk: 76, lap: 72, tab: 68, phone: 60 },
+	tier: { desk: 30, lap: 30, tab: null, phone: null },
+	bye: { desk: 32, lap: 32, tab: 32, phone: null },
+	proj: { desk: 74, lap: 74, tab: 74, phone: 62 },
+	vor: { desk: 72, lap: 70, tab: 68, phone: 58 },
 	order: { desk: 88, lap: 80, tab: 72, phone: 64 },
-	range: { desk: 150, lap: null, tab: null, phone: null },
-	adp: { desk: 48, lap: 44, tab: 44, phone: null },
+	range: { desk: 176, lap: null, tab: null, phone: null },
+	adp: { desk: 46, lap: 44, tab: 44, phone: null },
 	ourRank: { desk: 40, lap: 36, tab: 36, phone: null },
-	gap: { desk: 44, lap: 40, tab: 40, phone: 36 },
-	gp: { desk: 32, lap: null, tab: null, phone: null },
-	agame: { desk: 52, lap: 48, tab: null, phone: null },
-	action: { desk: 68, lap: 36, tab: null, phone: null }
+	gap: { desk: 50, lap: 48, tab: 48, phone: 44 },
+	gp: { desk: 28, lap: null, tab: null, phone: null },
+	agame: { desk: 50, lap: 48, tab: null, phone: null },
+	action: { desk: 60, lap: 36, tab: null, phone: null }
 };
 
 /** A kicker's or a defense's ADP is one of his two figures, so the phone keeps it. */

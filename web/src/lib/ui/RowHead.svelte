@@ -21,7 +21,7 @@
 		player: { text: 'Player' },
 		tier: { text: 'Tier' },
 		bye: { text: 'Bye' },
-		proj: { text: 'Projected', short: 'Proj' },
+		proj: { text: 'Projected' },
 		vor: { text: 'Over repl', title: 'Over replacement' },
 		order: { text: 'Draft order' },
 		range: { text: 'Floor to ceiling' },

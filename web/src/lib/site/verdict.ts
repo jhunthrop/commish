@@ -2,7 +2,7 @@
  * ("We would take Nacua") and its one evidence line under the table (Lane 66n). */
 import { lastName } from '#lib/format/draft.ts';
 import { designationWord, type DesignationStatus } from '#lib/format/designation.ts';
-import { fixed, plural } from '#lib/format/number.ts';
+import { ordinal, signed } from '#lib/format/number.ts';
 
 /** What the call needs about each player: who he is and his place and value on our board. */
 export interface Contender {
@@ -74,7 +74,7 @@ function heldCall<T extends Contender>(a: T, b: T, formatLabel: string): Verdict
 			leader,
 			other,
 			({ leaderName }) =>
-				`Both are on season-long lists, so neither sits above the available players on our ${formatLabel} board. If both play, ${leaderName} has ${fixed(leader.vor - other.vor)} more points over replacement.`
+				`Both are on season-long lists, so neither sits above the available players on our ${formatLabel} board. If both play, ${leaderName} has ${signed(leader.vor)} over replacement against ${signed(other.vor)}.`
 		);
 	}
 	const held = a.held ?? b.held;
@@ -92,11 +92,11 @@ export function verdict<T extends Contender>(a: T, b: T, formatLabel: string): V
 	if (a.id === b.id) return { kind: 'same' };
 	if (a.held || b.held) return heldCall(a, b, formatLabel);
 	const [leader, other] = a.ourRank <= b.ourRank ? [a, b] : [b, a];
-	const places = other.ourRank - leader.ourRank;
+	// Both figures as the run gives them, side by side: the web never works out a difference.
 	return called(
 		leader,
 		other,
-		({ leaderName }) =>
-			`${leaderName} is ${plural(places, 'place')} higher on our ${formatLabel} board, with ${fixed(leader.vor - other.vor)} more points over replacement.`
+		({ leaderName, otherName }) =>
+			`${leaderName} is ${ordinal(leader.ourRank)} on our ${formatLabel} board and ${otherName} ${ordinal(other.ourRank)}, with ${signed(leader.vor)} over replacement against ${signed(other.vor)}.`
 	);
 }

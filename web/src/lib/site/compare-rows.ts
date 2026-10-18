@@ -2,7 +2,7 @@
  * the leader first, and which of the two is better where a row has a better (a rank lower, points
  * higher). A player on a season-long list shows his rank as the word and wins no rank row, since his
  * figures assume he plays. Pure, so the tests read the table the page prints. */
-import { draftersGap } from '#lib/format/draft.ts';
+import { gapText, gapTone, type GapTone } from '#lib/format/gap.ts';
 import { rankWord } from '#lib/format/designation.ts';
 import { fixed, signed } from '#lib/format/number.ts';
 import type { PlayerFormat } from '#lib/run/schema.ts';
@@ -19,6 +19,8 @@ export interface CompareCell {
 	text: string;
 	/** True for the better figure, false for the other, null where the row has no better. */
 	wins: boolean | null;
+	/** A signed gap's colour, the board row's (format/gap.ts); absent on every other row. */
+	tone?: GapTone | null;
 }
 
 export interface CompareRow {
@@ -54,10 +56,6 @@ function figures(
 	return { label, cells: [cell(a, aWins), cell(b, judged && !aWins)] };
 }
 
-function gapText(gap: number): string {
-	return gap === 0 ? '0' : signed(gap, 0);
-}
-
 /** A rank row: the lower rank wins, unless a side is on a season-long list, whose rank is a word. */
 function rankRow(
 	label: string,
@@ -84,8 +82,15 @@ export function compareRows(
 	const pairOf = <T>(read: (side: Side) => T): readonly [T, T] => [read(first), read(second)];
 	const held = pairOf(heldRank);
 	const judged = held[0] === null && held[1] === null;
+	/** The run's Gap, none for a held side: his rank is a word, so no drafts are set against it. */
 	const gap = (side: Side): number | null =>
-		heldRank(side) === null ? draftersGap(side.numbers.adp, side.numbers.ourRank) : null;
+		heldRank(side) === null ? (side.numbers.gap ?? null) : null;
+	const gaps = pairOf(gap);
+	const gapCell = (value: number | null): CompareCell => ({
+		text: value === null ? NONE : gapText(value),
+		wins: null,
+		tone: gapTone(value)
+	});
 	const rows: CompareRow[] = [
 		rankRow(
 			'Our rank',
@@ -127,7 +132,7 @@ export function compareRows(
 			(v) => fixed(v),
 			null
 		),
-		figures('Gap', pairOf(gap), gapText, null),
+		{ label: 'Gap', cells: [gapCell(gaps[0]), gapCell(gaps[1])] },
 		figures(
 			'Bye',
 			pairOf((side) => side.bye),

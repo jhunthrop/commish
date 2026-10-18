@@ -10,6 +10,7 @@ const numbers = (fields: Partial<PlayerFormat>): PlayerFormat => ({
 	ourRank: 1,
 	vorRound: 1,
 	adp: 2.8,
+	gap: 1.8,
 	projected: 344.1,
 	vor: 164,
 	expectedGames: 14.9,
@@ -45,7 +46,14 @@ const CHASE: Side = {
 		seasonSoFar: { games: 5, pointsPerGame: 16 },
 		lastSeason: { season: 2025, games: 16, pointsPerGame: 19.6 }
 	},
-	numbers: numbers({ positionRank: 2, ourRank: 2, adp: 3.8, projected: 333.2, vor: 153.2 }),
+	numbers: numbers({
+		positionRank: 2,
+		ourRank: 2,
+		adp: 3.8,
+		gap: 1.8,
+		projected: 333.2,
+		vor: 153.2
+	}),
 	bye: 6
 };
 
@@ -88,11 +96,12 @@ void test('the better figure wins its row, and the ADP, gap and bye judge no one
 		byLabel(rows, 'Over replacement').cells.map((cell) => cell.text),
 		['+164.0', '+153.2']
 	);
+	// The run's gap, printed as given, toned as the board row tones it, judging no one.
 	assert.deepEqual(
-		byLabel(rows, 'Gap').cells.map((cell) => [cell.text, cell.wins]),
+		byLabel(rows, 'Gap').cells.map((cell) => [cell.text, cell.wins, cell.tone]),
 		[
-			['+2', null],
-			['+2', null]
+			['+1.8', null, 'gain'],
+			['+1.8', null, 'gain']
 		]
 	);
 	assert.equal(byLabel(rows, 'Position rank').cells[1].text, 'WR 2');

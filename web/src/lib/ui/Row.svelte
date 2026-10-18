@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { draftersGap } from '#lib/format/draft.ts';
+	import { gapText, gapTone } from '#lib/format/gap.ts';
 	import { fixed, signed } from '#lib/format/number.ts';
 	import type { Snippet } from 'svelte';
 	import type { ShownMark } from '#lib/context/held-words.ts';
@@ -93,7 +93,8 @@
 			: framedVorCell(ranked.vor, ranked.vorRound, heldOut ? HELD_FRAMING : framing)
 	);
 	/** Drafters' ADP less our rank, the one sign on every page: plus when drafters wait. */
-	const gap = $derived(ranked === null || heldOut ? null : draftersGap(ranked.adp, ranked.ourRank));
+	const gap = $derived(ranked === null || heldOut ? null : (ranked.gap ?? null));
+	const tone = $derived(gapTone(gap));
 	/** A kicker's or a defense's pill carries his place where no Draft order column does (ADP). */
 	const pillRank = $derived(
 		drafted === null ? undefined : has('order') ? undefined : drafted.positionRank
@@ -150,9 +151,8 @@
 	{#if cell.ourRank}<span class="n quiet {cell.ourRank}">{ranked ? rankShown : ''}</span>{/if}
 	{#if cell.gap}<span
 			class="n gap {cell.gap}"
-			class:gain={gap !== null && gap > 0}
-			class:loss={gap !== null && gap < 0}
-			>{gap === null ? '' : gap > 0 ? `+${String(gap)}` : gap < 0 ? `−${String(-gap)}` : '0'}</span
+			class:gain={tone === 'gain'}
+			class:loss={tone === 'loss'}>{gapText(gap)}</span
 		>{/if}
 	{#if cell.gp}<span class="n quiet {cell.gp}">{season?.games ?? ''}</span>{/if}
 	{#if cell.agame}<span class="n {cell.agame}" class:absent={season?.pointsPerGame === null}

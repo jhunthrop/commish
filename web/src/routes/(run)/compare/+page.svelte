@@ -216,10 +216,15 @@
 				</thead>
 				<tbody>
 					{#each rows as row (row.label)}
-						<tr>
+						<tr data-row={row.label}>
 							<th scope="row">{row.label}</th>
 							{#each row.cells as cell, i (i)}
-								<td class:win={cell.wins === true} class:lose={cell.wins === false}>
+								<td
+									class:win={cell.wins === true}
+									class:lose={cell.wins === false}
+									class:gain={cell.tone === 'gain'}
+									class:loss={cell.tone === 'loss'}
+								>
 									{#if row.range && scale}
 										{@const numbers = pair[i]?.numbers}
 										{#if numbers?.floor != null && numbers.median !== null && numbers.ceiling !== null}
@@ -376,6 +381,15 @@
 		font-variant-numeric: tabular-nums;
 		font-size: var(--t-xl);
 		font-weight: 600;
+	}
+
+	/* A signed gap in the board row's colours: green when drafters wait, rose when they reach. */
+	.gain {
+		color: var(--gain-ink);
+	}
+
+	.loss {
+		color: var(--loss-ink);
 	}
 
 	/* The better figure of a row, where a row has one: a gain's wash, never the only channel (the

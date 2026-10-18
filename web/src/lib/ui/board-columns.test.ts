@@ -50,7 +50,7 @@ void test('the phone keeps the face, the player, Projected, Over repl and Gap', 
 	const columns = boardColumns(ALL);
 	assert.equal(
 		columns.templates.phone,
-		'32px minmax(0, 1fr) 50px 60px 36px',
+		'32px minmax(0, 1fr) 62px 58px 44px',
 		'face, player, proj, vor, gap'
 	);
 	assert.match(columns.cells.bye ?? '', /h-phone/);

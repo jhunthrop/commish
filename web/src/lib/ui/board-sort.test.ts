@@ -15,10 +15,10 @@ const row = (name: string, fields: Partial<Sortable>): Sortable & { name: string
 });
 
 const ROWS = [
-	row('Nacua', { ourRank: 1, adp: 2.8, projected: 344.1, vor: 164, team: 'LAR' }),
-	row('Chase', { ourRank: 2, adp: 3.8, projected: 333.2, vor: 153.2, team: 'CIN' }),
-	row('Gibbs', { ourRank: 5, adp: 1.4, projected: 262.1, vor: 113.9, team: 'DET' }),
-	row('Mingo', { ourRank: 425, adp: null, projected: 35.6, vor: -144.5, team: 'DAL' })
+	row('Nacua', { ourRank: 1, adp: 2.8, gap: 1.8, projected: 344.1, vor: 164, team: 'LAR' }),
+	row('Chase', { ourRank: 2, adp: 3.8, gap: 1.8, projected: 333.2, vor: 153.2, team: 'CIN' }),
+	row('Gibbs', { ourRank: 5, adp: 1.4, gap: -3.6, projected: 262.1, vor: 113.9, team: 'DET' }),
+	row('Mingo', { ourRank: 425, adp: null, gap: null, projected: 35.6, vor: -144.5, team: 'DAL' })
 ];
 const BYES = { LAR: 11, CIN: 6, DET: 6, DAL: 14 };
 const names = (rows: readonly { name: string }[]): string[] => rows.map((r) => r.name);
@@ -39,7 +39,7 @@ void test('a rank or an ADP sorts up, a figure down, a missing ADP last', () => 
 });
 
 void test('the gap sorts the biggest wait first, and turned the biggest reach', () => {
-	// Gaps: Nacua +2, Chase +2, Gibbs -4, Mingo none.
+	// The run's gaps: Nacua +1.8, Chase +1.8, Gibbs −3.6, Mingo none.
 	assert.deepEqual(names(sortRows(ROWS, { key: 'gap', turned: false }, BYES)), [
 		'Nacua',
 		'Chase',

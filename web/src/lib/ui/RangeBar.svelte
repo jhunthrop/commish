@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { fixed } from '#lib/format/number.ts';
 	import type { RangeScale } from '#lib/types/player.ts';
 	import Label from './Label.svelte';
 
@@ -36,14 +37,14 @@
 
 {#if form === 'inline'}
 	<span class="inline">
-		<span class="end lo">{floor.toFixed(0)}</span>{@render bar()}<span class="end"
-			>{ceiling.toFixed(0)}</span
+		<span class="end lo">{fixed(floor)}</span>{@render bar()}<span class="end"
+			>{fixed(ceiling)}</span
 		>
 	</span>
 {:else}
 	<span class="range">
 		{@render bar()}
-		<Label size="cell">{floor.toFixed(0)} to {ceiling.toFixed(0)}</Label>
+		<Label size="cell">{fixed(floor)} to {fixed(ceiling)}</Label>
 	</span>
 {/if}
 
@@ -68,7 +69,7 @@
 
 	.end {
 		flex: none;
-		width: 3ch;
+		width: 5ch;
 		font-family: var(--font-num);
 		font-size: 14px;
 		font-weight: 600;
