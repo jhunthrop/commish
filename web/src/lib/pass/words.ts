@@ -114,8 +114,8 @@ export const HOSTS: readonly Host[] = [
 	{ name: 'Yahoo', ready: false }
 ];
 
-/** How a ready host's draft is followed: its link, no sign-in to the host. */
-export const FOLLOW_HOW = 'Paste the draft link';
+/** How a ready platform's draft is followed: by its link, with no sign-in to the platform. */
+export const FOLLOW_HOW = 'Draft link';
 
 /** What is free, said plainly: the pass never gates any of it. */
 export const ALWAYS_FREE: readonly FeatureWords[] = [

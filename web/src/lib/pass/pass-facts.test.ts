@@ -64,8 +64,8 @@ void test('the group pass is the total for the teams chosen and the price a team
 
 void test('where the live draft works is cells: the host it works with, how, and the ones not followed yet', () => {
 	assert.deepEqual(said(hostCells()), [
-		['Works today', 'Sleeper'],
-		['How', 'Paste the draft link'],
-		['Not followed yet', 'ESPN, Yahoo']
+		['Today', 'Sleeper'],
+		['How', 'Draft link'],
+		['Not yet', 'ESPN, Yahoo']
 	]);
 });

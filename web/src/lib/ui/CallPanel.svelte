@@ -50,7 +50,6 @@
 		class="call"
 		class:waiting={quiet}
 		class:reading={reading !== undefined}
-		class:last={chanceHead === null}
 		aria-busy={reading !== undefined}
 		use:holdHeight
 	>
@@ -59,7 +58,7 @@
 			<span></span>
 			<span>Player</span>
 			<span class="n">Over repl</span>
-			{#if chanceHead !== null}<span class="n">{chanceHead}</span>{/if}
+			<span class="n">{chanceHead ?? ''}</span>
 			<span class="n adp">ADP</span>
 			<span class="go"></span>
 		</div>
@@ -87,9 +86,9 @@
 				{:else}
 					<span class="n">{row.vor === null ? '' : signed(row.vor)}</span>
 				{/if}
-				{#if chanceHead !== null}<span class="n"
-						>{row.chance === null ? '' : chanceShort(row.chance)}</span
-					>{/if}
+				<span class="n"
+					>{chanceHead === null || row.chance === null ? '' : chanceShort(row.chance)}</span
+				>
 				<span class="n adp">{row.adp === null ? '' : fixed(row.adp)}</span>
 				<span class="go"
 					>{#if i === 0}{@render verb()}{/if}</span
@@ -102,14 +101,11 @@
 
 <style>
 	/* The pool's grid (Pool.svelte --pool-cols): face, player, over replacement, the chance, ADP, the
-	   actions. At your last pick there is no chance column, as in the pool. */
+	   actions. At your last pick the chance track stays, empty, as the pool keeps its column, so every
+	   figure still sits over the pool's column for it. */
 	.call {
 		--call-cols: 40px minmax(0, 1fr) 118px 136px 118px 150px;
 		padding: var(--s-3) 0 0;
-	}
-
-	.call.last {
-		--call-cols: 40px minmax(0, 1fr) 118px 118px 150px;
 	}
 
 	.tag {
@@ -247,10 +243,6 @@
 			--call-cols: 40px minmax(0, 1fr) 108px 126px 108px;
 		}
 
-		.call.last {
-			--call-cols: 40px minmax(0, 1fr) 108px 108px;
-		}
-
 		.go {
 			display: none;
 		}
@@ -264,10 +256,6 @@
 	@media (max-width: 760px) {
 		.call {
 			--call-cols: 36px minmax(0, 1fr) 84px 84px;
-		}
-
-		.call.last {
-			--call-cols: 36px minmax(0, 1fr) 84px;
 		}
 
 		.grid {

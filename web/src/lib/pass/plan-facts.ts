@@ -54,9 +54,9 @@ export function hostCells(): FactCell[] {
 			.map((h) => h.name)
 			.join(', ');
 	return [
-		{ label: 'Works today', value: names(true), word: true },
+		{ label: 'Today', value: names(true), word: true },
 		{ label: 'How', value: FOLLOW_HOW, word: true },
-		{ label: 'Not followed yet', value: names(false), word: true }
+		{ label: 'Not yet', value: names(false), word: true }
 	];
 }
 
