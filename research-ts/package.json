@@ -10,6 +10,7 @@
   "scripts": {
     "typecheck": "tsc --noEmit -p .",
     "guard": "tsx scripts/guard-imports.ts",
+    "test": "vitest run",
     "nightly": "dotenv -e ../.env.local -- tsx src/nightly/main.ts",
     "inseason": "dotenv -e ../.env.local -- tsx src/inseason/main.ts",
     "advisor": "tsx src/advisor/server.ts",

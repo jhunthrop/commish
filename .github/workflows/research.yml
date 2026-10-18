@@ -98,6 +98,9 @@ jobs:
       - name: The TypeScript oracle's dependencies
         working-directory: .
         run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: The TypeScript oracle's tests on its live nightly paths (the rest of its suite predates the pivot, launch item 2026-10-18)
+        working-directory: research-ts
+        run: npx vitest run src/nightly
       - run: uv sync --frozen
       - run: uv run ruff check .
       - run: uv run ruff format --check .
