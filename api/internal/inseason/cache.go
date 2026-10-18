@@ -69,7 +69,9 @@ func (c *Cache) Data(ctx context.Context, season int) (Data, error) {
 	if err != nil {
 		return Data{}, err
 	}
-	designations, err := c.Designations(ctx)
+	// Dated, so a season-long status says since when on every screen
+	// (review 66n finding 3): the board route's read.
+	designations, err := c.DatedDesignations(ctx)
 	if err != nil {
 		return Data{}, err
 	}

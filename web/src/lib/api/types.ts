@@ -2807,6 +2807,11 @@ export interface components {
 			 * @description the stamp of the injury read that lists it, or of the host read for the host's own IR mark
 			 */
 			as_of: string;
+			/**
+			 * Format: date-time
+			 * @description when his unbroken run under a season-long status began, the first capture that lists it (boards.WithSince, the nightly's designations.json since); null for a week's designation, the host's own IR mark, or a run older than the captures read. The site's status chip says it ("IR since Sep 28") and keeps the read for the basis
+			 */
+			since?: string | null;
 		};
 		GamePoints: {
 			week: number;

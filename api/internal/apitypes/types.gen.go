@@ -2354,7 +2354,10 @@ type ImportSkip struct {
 // InjuryDesignation defines model for InjuryDesignation.
 type InjuryDesignation struct {
 	// AsOf the stamp of the injury read that lists it, or of the host read for the host's own IR mark
-	AsOf   time.Time         `json:"as_of"`
+	AsOf time.Time `json:"as_of"`
+
+	// Since when his unbroken run under a season-long status began, the first capture that lists it (boards.WithSince, the nightly's designations.json since); null for a week's designation, the host's own IR mark, or a run older than the captures read. The site's status chip says it ("IR since Sep 28") and keeps the read for the basis
+	Since  *time.Time        `json:"since,omitempty"`
 	Status DesignationStatus `json:"status"`
 }
 

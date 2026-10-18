@@ -38,6 +38,9 @@ func fixtureGames() []boards.TeamWeek {
 	return games
 }
 
+// irSince is when the fixture's injured-reserve receiver's run began.
+var irSince = time.Date(2026, 9, 22, 22, 0, 0, 0, time.UTC)
+
 // fixtureSeason is four clubs over three weeks: weeks 1 and 2 final,
 // week 3 Miami at home to New England on Thursday (final), Buffalo and
 // the Jets on bye. Points are rushing yards over ten, standard scoring.
@@ -52,6 +55,7 @@ func fixtureSeason(now time.Time) *Season {
 		Designations: map[string]boards.Designation{
 			"buf-rb": {Code: "D", AsOf: time.Date(2026, 9, 25, 16, 10, 0, 0, time.UTC)},
 			"ne-rb":  {Code: "X", AsOf: time.Date(2026, 9, 25, 16, 10, 0, 0, time.UTC)},
+			"mia-wr": {Code: "IR", AsOf: time.Date(2026, 9, 25, 16, 10, 0, 0, time.UTC), Since: &irSince},
 		},
 	}
 	return NewSeason(data, RulesOf(scoring.Standard()), 3, now)
@@ -85,6 +89,12 @@ func TestWeekFacts(t *testing.T) {
 	}
 	if buf.Designation == nil || buf.Designation.Status != boards.StatusDoubtful {
 		t.Fatalf("designation %+v", buf.Designation)
+	}
+
+	// A season-long status carries its start, as the board's does (review 66n finding 3).
+	held := s.For(Player{BoardID: "mia-wr", Team: "MIA", Position: draft.WR})
+	if d := held.Designation; d == nil || d.Status != boards.StatusInjuredReserve || d.Since == nil || !d.Since.Equal(irSince) {
+		t.Fatalf("a season-long designation's start: %+v", held.Designation)
 	}
 
 	ne := s.For(Player{BoardID: "ne-rb", Team: "NE", Position: draft.RB})
