@@ -2,6 +2,7 @@
 // season's columns, short enough for five lines on a phone. Run with `npm test`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { BANNED_MARKS, BANNED_WORDS } from '#lib/format/copy-guard.ts';
 import { GAP_WORDS, boardBasis, type BasisFacts } from './board-basis.ts';
 
 const PRESEASON: BasisFacts = {
@@ -57,9 +58,10 @@ void test('the season columns name another scoring, and nothing before the first
 	assert.doesNotMatch(text({ ...PRESEASON, reach: null }), /GP/);
 });
 
-void test('no sentence carries an em-dash, a semicolon or a betting word', () => {
+void test('no sentence carries a mark or a word the site never prints (the shared copy guard)', () => {
 	const all = [GAP_WORDS, text(PRESEASON), text({ ...PRESEASON, order: 'adp', noAdp: 3 })].join(
 		' '
 	);
-	assert.doesNotMatch(all, /[—;]|\b(odds|line|spread|bet|market|price|buy|sell)\b/iu);
+	assert.doesNotMatch(all, BANNED_WORDS);
+	assert.doesNotMatch(all, BANNED_MARKS);
 });
