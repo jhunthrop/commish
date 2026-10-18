@@ -20,6 +20,7 @@ import type { ScheduleRow } from '#lib/ui/schedule-grid.ts';
 import type { RangeScale } from '#lib/types/player.ts';
 import { withStatuses } from '#lib/run/board-status.ts';
 import { leadOf } from '#lib/run/held-places.ts';
+import { carriesGap } from '#lib/format/gap.ts';
 import { adpDrafts } from '#lib/run/adp-drafts.ts';
 import { boardBasis, type BasisPart } from '#lib/run/board-basis.ts';
 import { rowFraming } from '#lib/run/row-framing.ts';
@@ -79,6 +80,9 @@ export interface ClubPage extends BoardStatuses {
 	/** The page's basis, said once (Lane 66n): the opponents' figure and source, then the rows'. */
 	basis: BasisPart[];
 	/** The season is underway: the rows carry this season's GP and A game. */
+	/** The screen shows the Gap: the board compares drafters with our rank and the run carries the
+	 * figure on one of its rows (re-review N1). */
+	gap: boolean;
 	underway: boolean;
 }
 
@@ -165,6 +169,7 @@ export async function clubPage(abbr: string): Promise<ClubPage> {
 	const own = withStatuses(rows.rows, capture).filter((row) => row.team === club.abbr);
 	const { rows: seasoned, reach } = await boardSeason(format, own);
 	const adpBasis = adpDrafts(sources.sources, format.id);
+	const showsGap = rowFraming(format).compare && carriesGap(seasoned);
 	// His kickers and his defense, in draft order (Lane 66m).
 	const market = MARKET_POSITIONS.flatMap((position) =>
 		withStatuses(marketAt(rows.market, position), capture)
@@ -192,10 +197,11 @@ export async function clubPage(abbr: string): Promise<ClubPage> {
 				season: run.season,
 				order: 'board',
 				adpBasis,
-				gap: rowFraming(format).compare,
+				gap: showsGap,
 				reach
 			})
 		],
+		gap: showsGap,
 		underway: reach !== null,
 		...boardStatuses([...seasoned, ...market], capture, format)
 	};

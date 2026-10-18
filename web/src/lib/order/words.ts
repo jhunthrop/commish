@@ -21,6 +21,6 @@ export const ORDER = {
 	none: 'No player in our order matches.',
 	unread: 'We could not read our order just now. Try again in a minute.',
 	reading: 'Reading our order',
-	/** The board's in-season page without script: the order is read in the browser. */
-	needsScript: 'Our rest-of-season order reads in the browser. Turn on JavaScript to see it.'
+	/** The board's in-season page without script, its one line: the order is read in the browser. */
+	needsScript: 'Our rest-of-season order needs JavaScript.'
 } as const;

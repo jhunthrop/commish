@@ -2,7 +2,7 @@
  * the leader first, and which of the two is better where a row has a better (a rank lower, points
  * higher). A player on a season-long list shows his rank as the word and wins no rank row, since his
  * figures assume he plays. Pure, so the tests read the table the page prints. */
-import { gapText, gapTone, type GapTone } from '#lib/format/gap.ts';
+import { carriesGap, gapText, gapTone, type GapTone } from '#lib/format/gap.ts';
 import { rankWord } from '#lib/format/designation.ts';
 import { fixed, signed } from '#lib/format/number.ts';
 import type { PlayerFormat } from '#lib/run/schema.ts';
@@ -87,10 +87,15 @@ export function compareRows(
 		heldRank(side) === null ? (side.numbers.gap ?? null) : null;
 	const gaps = pairOf(gap);
 	const gapCell = (value: number | null): CompareCell => ({
-		text: value === null ? NONE : gapText(value),
+		text: gapText(value),
 		wins: null,
 		tone: gapTone(value)
 	});
+	/** The Gap row, only when one of the pair carries the run's gap (re-review N1): an older run
+	 * carries none, and the table then has no Gap row rather than two empty cells. */
+	const gapRow: CompareRow[] = carriesGap(gaps.map((value) => ({ gap: value })))
+		? [{ label: 'Gap', cells: [gapCell(gaps[0]), gapCell(gaps[1])] }]
+		: [];
 	const rows: CompareRow[] = [
 		rankRow(
 			'Our rank',
@@ -132,7 +137,7 @@ export function compareRows(
 			(v) => fixed(v),
 			null
 		),
-		{ label: 'Gap', cells: [gapCell(gaps[0]), gapCell(gaps[1])] },
+		...gapRow,
 		figures(
 			'Bye',
 			pairOf((side) => side.bye),

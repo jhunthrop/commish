@@ -1,5 +1,6 @@
 /** ADP for one format: every player its named sources have, in the order drafters take them, beside
  * where our board has him. */
+import { carriesGap } from '#lib/format/gap.ts';
 import { adpDrafts } from '#lib/run/adp-drafts.ts';
 import { boardBasis, type BasisPart } from '#lib/run/board-basis.ts';
 import { rowFraming } from '#lib/run/row-framing.ts';
@@ -41,6 +42,9 @@ export interface AdpPage extends BoardStatuses {
 	/** The page's basis, said once under the title (Lane 66n). */
 	basis: BasisPart[];
 	/** The season is underway: the ranked rows carry this season's GP and A game. */
+	/** The screen shows the Gap: the board compares drafters with our rank and the run carries the
+	 * figure on one of its rows (re-review N1). */
+	gap: boolean;
 	underway: boolean;
 	/** Each club's bye week, for the Bye column and the sort by it. */
 	byes: Record<string, number | null>;
@@ -76,6 +80,7 @@ export async function adpPage(formatId: string): Promise<AdpPage> {
 	const rows = [...ranked, ...withStatuses(loaded.market.map(withFace), capture)]
 		.flatMap((row) => (row.adp === null ? [] : [{ ...row, adp: row.adp }]))
 		.sort((a, b) => a.adp - b.adp || a.ourRank - b.ourRank);
+	const showsGap = rowFraming(format).compare && carriesGap(rows);
 	const sources = all.sources.filter((source) => source.formats.includes(format.id));
 	return {
 		format,
@@ -87,10 +92,11 @@ export async function adpPage(formatId: string): Promise<AdpPage> {
 			season: run.season,
 			order: 'adp',
 			adpBasis: adpDrafts(all.sources, format.id),
-			gap: rowFraming(format).compare,
+			gap: showsGap,
 			reach,
 			noAdp: loaded.rows.filter((row) => row.adp === null).length
 		}),
+		gap: showsGap,
 		underway: reach !== null,
 		byes,
 		...boardStatuses(rows, capture, format)

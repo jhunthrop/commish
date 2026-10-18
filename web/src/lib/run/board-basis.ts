@@ -11,6 +11,8 @@ import type { Format } from './schema.ts';
 export interface BasisPart {
 	text: string;
 	phone: boolean;
+	/** The Gap's sentence, which a screen whose rows carry no gap leaves out (Compare's pair). */
+	topic?: 'gap';
 }
 
 export interface BasisFacts {
@@ -22,7 +24,8 @@ export interface BasisFacts {
 	position?: string | null;
 	/** The drafts behind the format's ADP and their window: "PPR drafts, Sep 9". */
 	adpBasis: readonly string[];
-	/** The rows carry the drafters' gap to our rank (row-framing.ts). */
+	/** The rows show the drafters' gap to our rank: the board compares the two (row-framing.ts) and
+	 * the run carries the figure on one of the screen's rows (format/gap.ts carriesGap). */
 	gap: boolean;
 	/** How far this season's GP and A game reach, null before the first kickoff. */
 	reach: FiguresReach | null;
@@ -68,7 +71,7 @@ export function boardBasis(facts: BasisFacts): BasisPart[] {
 						: []),
 					{ text: `ADP from ${drafts}.`, phone: true }
 				];
-	if (facts.gap) parts.push({ text: GAP_WORDS, phone: true });
+	if (facts.gap) parts.push({ text: GAP_WORDS, phone: true, topic: 'gap' });
 	if (facts.reach !== null) parts.push({ text: seasonColumns(format, facts.reach), phone: false });
 	if (facts.noAdp !== undefined && facts.noAdp > 0) {
 		parts.push({

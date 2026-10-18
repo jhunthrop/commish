@@ -15,6 +15,7 @@ import { isMarketPosition, marketAt } from '#lib/run/market.ts';
 import { marketBasis, withFace } from '#lib/site/market.ts';
 import type { Position, RangeScale } from '#lib/types/player.ts';
 import { links } from '#lib/site/links.ts';
+import { carriesGap } from '#lib/format/gap.ts';
 import { adpDrafts } from '#lib/run/adp-drafts.ts';
 import { withStatuses } from '#lib/run/board-status.ts';
 import type { CaptureStamp } from '#lib/format/designation.ts';
@@ -50,6 +51,9 @@ export interface BoardPage {
 	/** The ranked view's basis, said once under the title (Lane 66n). */
 	basis: BasisPart[];
 	/** The season is underway: the rows carry this season's GP and A game. */
+	/** The screen shows the Gap: the board compares drafters with our rank and the run carries the
+	 * figure on one of its rows (re-review N1). */
+	gap: boolean;
 	underway: boolean;
 	/** Each club's bye week, for the Bye column and the sort by it. */
 	byes: Record<string, number | null>;
@@ -98,6 +102,7 @@ export async function boardPage(formatId: string, segment: string | null): Promi
 	const { rows, reach } = await boardSeason(format, ranked);
 	const range = carriesRange(rows);
 	const adpBasis = adpDrafts(sources.sources, format.id);
+	const showsGap = rowFraming(format).compare && carriesGap(rows);
 	return {
 		format,
 		formats,
@@ -112,9 +117,10 @@ export async function boardPage(formatId: string, segment: string | null): Promi
 			order: 'board',
 			position,
 			adpBasis,
-			gap: rowFraming(format).compare,
+			gap: showsGap,
 			reach
 		}),
+		gap: showsGap,
 		underway: reach !== null,
 		byes,
 		scale: rangeScale(rows.length > 0 ? rows : loaded.rows),

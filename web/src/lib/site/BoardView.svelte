@@ -62,7 +62,7 @@
 			tier: page.position === null,
 			bye: true,
 			range,
-			gap: framing.compare,
+			gap: page.gap,
 			season: page.underway,
 			action: true,
 			draftOrder: marketView
@@ -242,8 +242,16 @@
 					/>
 				{/key}
 			{:else}
-				<p class="reading" aria-live="polite">{ORDER.reading}</p>
-				<noscript><p class="reading">{ORDER.needsScript}</p></noscript>
+				<p class="reading reading-live" aria-live="polite">{ORDER.reading}</p>
+				<!-- Without script the page says one thing: the order needs JavaScript (re-review N3). -->
+				<noscript
+					><style>
+						.reading-live {
+							display: none;
+						}
+					</style>
+					<p class="reading">{ORDER.needsScript}</p></noscript
+				>
 			{/if}
 		{:else}
 			<BoardTable

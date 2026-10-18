@@ -1,5 +1,6 @@
 /** The front door: the top of the default board in the board's order, and the record's headline,
  * from the run. */
+import { carriesGap } from '#lib/format/gap.ts';
 import { adpDrafts } from '#lib/run/adp-drafts.ts';
 import { boardBasis, type BasisPart } from '#lib/run/board-basis.ts';
 import { withStatuses } from '#lib/run/board-status.ts';
@@ -22,6 +23,9 @@ export interface FrontPage extends BoardStatuses {
 	/** The strip's basis, said once under its head (Lane 66n). */
 	basis: BasisPart[];
 	/** The season is underway: the rows carry this season's GP and A game. */
+	/** The screen shows the Gap: the board compares drafters with our rank and the run carries the
+	 * figure on one of its rows (re-review N1). */
+	gap: boolean;
 	underway: boolean;
 	/** Each club's bye week, for the rows' Bye column. */
 	byes: Record<string, number | null>;
@@ -48,6 +52,7 @@ export async function frontPage(): Promise<FrontPage> {
 	// board's own order, which puts him below the available players at his position.
 	const top = withStatuses(loaded.rows, capture).slice(0, TOP_ROWS);
 	const { rows, reach } = await boardSeason(format, top);
+	const showsGap = rowFraming(format).compare && carriesGap(rows);
 	return {
 		format,
 		rows,
@@ -56,9 +61,10 @@ export async function frontPage(): Promise<FrontPage> {
 			season: run.season,
 			order: 'board',
 			adpBasis: adpDrafts(sources.sources, format.id),
-			gap: rowFraming(format).compare,
+			gap: showsGap,
 			reach
 		}),
+		gap: showsGap,
 		underway: reach !== null,
 		byes,
 		scale: rangeScale(rows),

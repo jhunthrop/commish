@@ -246,7 +246,12 @@
 				</tbody>
 			</table>
 			<p class="evidence">{verdict.evidence}</p>
-			<BasisLine parts={basis} />
+			<!-- The Gap's sentence only beside a Gap row (re-review N1). -->
+			<BasisLine
+				parts={rows.some((row) => row.label === 'Gap')
+					? basis
+					: basis.filter((part) => part.topic !== 'gap')}
+			/>
 		{/if}
 	</main>
 </SiteShell>

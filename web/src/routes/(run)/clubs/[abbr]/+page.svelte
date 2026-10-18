@@ -41,7 +41,7 @@
 			tier: true,
 			bye: false,
 			range: page.scale !== null,
-			gap: framing.compare,
+			gap: page.gap,
 			season: page.underway,
 			action: false
 		})

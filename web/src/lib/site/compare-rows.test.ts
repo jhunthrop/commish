@@ -125,5 +125,24 @@ void test('a held player shows his rank as the word, and no rank row is judged',
 		]
 	);
 	assert.equal(byLabel(rows, 'Position rank').cells[1].text, 'WR IR');
-	assert.equal(byLabel(rows, 'Gap').cells[1].text, 'None');
+	assert.equal(byLabel(rows, 'Gap').cells[1].text, '--');
+});
+
+void test('a run without the Gap draws no Gap row, and a pair with one gap prints -- for the other', () => {
+	const older = (side: Side): Side => ({ ...side, numbers: { ...side.numbers, gap: undefined } });
+	const none = compareRows(older(NACUA), older(CHASE), 2026, true);
+	assert.ok(!none.some((row) => row.label === 'Gap'), 'no Gap row on a run that carries none');
+	const mixed = compareRows(
+		NACUA,
+		{ ...CHASE, numbers: { ...CHASE.numbers, gap: null } },
+		2026,
+		true
+	);
+	assert.deepEqual(
+		byLabel(mixed, 'Gap').cells.map((cell) => [cell.text, cell.tone]),
+		[
+			['+1.8', 'gain'],
+			['--', null]
+		]
+	);
 });
