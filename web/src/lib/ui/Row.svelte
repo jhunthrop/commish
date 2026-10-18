@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { EMPTY_FIGURE } from '#lib/format/empty.ts';
 	import { gapText, gapTone } from '#lib/format/gap.ts';
 	import { fixed, signed } from '#lib/format/number.ts';
 	import type { Snippet } from 'svelte';
@@ -103,8 +104,8 @@
 
 <div class="row" class:mine={held?.kind === 'mine'}>
 	{#if cell.rank}<span class="n rk {cell.rank}">{rankShown}</span>{/if}
-	{#if cell.adpLead}<span class="n {cell.adpLead}"
-			>{player.adp === null ? '' : fixed(player.adp)}</span
+	{#if cell.adpLead}<span class="n {cell.adpLead}" class:absent={player.adp === null}
+			>{player.adp === null ? EMPTY_FIGURE : fixed(player.adp)}</span
 		>{/if}
 	<span class="face {cell.face}"
 		><Face
@@ -128,14 +129,24 @@
 		</span>
 	</span>
 	{#if cell.tier}<span class={cell.tier}
-			>{#if ranked && !heldOut}<TierChip tier={ranked.tier} bare />{/if}</span
+			>{#if ranked && !heldOut}<TierChip tier={ranked.tier} bare />{:else}<span class="n absent"
+					>{EMPTY_FIGURE}</span
+				>{/if}</span
 		>{/if}
-	{#if cell.bye}<span class="n quiet {cell.bye}">{bye ?? ''}</span>{/if}
-	{#if cell.proj}<span class="n {cell.proj}">{ranked ? fixed(ranked.projected) : ''}</span>{/if}
+	{#if cell.bye}<span class="n quiet {cell.bye}" class:absent={bye === null}
+			>{bye ?? EMPTY_FIGURE}</span
+		>{/if}
+	{#if cell.proj}<span class="n {cell.proj}" class:absent={ranked === null}
+			>{ranked ? fixed(ranked.projected) : EMPTY_FIGURE}</span
+		>{/if}
 	{#if cell.vor}<span class="end {cell.vor}"
-			>{#if vor}<b class="n tile {vor.heat}">{signed(vor.value, 1)}</b>{/if}</span
+			>{#if vor}<b class="n tile {vor.heat}">{signed(vor.value, 1)}</b>{:else}<span class="n absent"
+					>{EMPTY_FIGURE}</span
+				>{/if}</span
 		>{/if}
-	{#if cell.order}<span class="n {cell.order}">{drafted?.positionRank ?? ''}</span>{/if}
+	{#if cell.order}<span class="n {cell.order}" class:absent={drafted === null}
+			>{drafted?.positionRank ?? EMPTY_FIGURE}</span
+		>{/if}
 	{#if cell.range}<span class={cell.range}
 			>{#if ranked && scale && ranked.floor !== null && ranked.median !== null && ranked.ceiling !== null}<RangeBar
 					floor={ranked.floor}
@@ -143,24 +154,29 @@
 					ceiling={ranked.ceiling}
 					{scale}
 					form="inline"
-				/>{/if}</span
+				/>{:else}<span class="n absent">{EMPTY_FIGURE}</span>{/if}</span
 		>{/if}
 	{#if cell.adp}<span class="n {cell.adp}" class:absent={player.adp === null}
-			>{player.adp === null ? 'None' : fixed(player.adp)}</span
+			>{player.adp === null ? EMPTY_FIGURE : fixed(player.adp)}</span
 		>{/if}
-	{#if cell.ourRank}<span class="n quiet {cell.ourRank}">{ranked ? rankShown : ''}</span>{/if}
+	{#if cell.ourRank}<span class="n quiet {cell.ourRank}" class:absent={ranked === null}
+			>{ranked ? rankShown : EMPTY_FIGURE}</span
+		>{/if}
 	{#if cell.gap}<span
 			class="n gap {cell.gap}"
+			class:absent={gap === null}
 			class:gain={tone === 'gain'}
 			class:loss={tone === 'loss'}>{gapText(gap)}</span
 		>{/if}
-	{#if cell.gp}<span class="n quiet {cell.gp}">{season?.games ?? ''}</span>{/if}
-	{#if cell.agame}<span class="n {cell.agame}" class:absent={season?.pointsPerGame === null}
-			>{season === undefined
-				? ''
-				: season.pointsPerGame === null
-					? 'None'
-					: fixed(season.pointsPerGame)}</span
+	{#if cell.gp}<span class="n quiet {cell.gp}" class:absent={season === undefined}
+			>{season?.games ?? EMPTY_FIGURE}</span
+		>{/if}
+	{#if cell.agame}<span
+			class="n {cell.agame}"
+			class:absent={season === undefined || season.pointsPerGame === null}
+			>{season === undefined || season.pointsPerGame === null
+				? EMPTY_FIGURE
+				: fixed(season.pointsPerGame)}</span
 		>{/if}
 	{#if cell.action}<span class="action {cell.action}"
 			>{#if action}{@render action()}{/if}</span

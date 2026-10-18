@@ -4,14 +4,15 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
-import { NO_GAP, carriesGap, gapText, gapTone } from './gap.ts';
+import { EMPTY_FIGURE } from './empty.ts';
+import { carriesGap, gapText, gapTone } from './gap.ts';
 
 void test('the gap prints the run tenth as given, with a true minus, a plain zero and -- for none', () => {
 	assert.equal(gapText(1.8), '+1.8');
 	assert.equal(gapText(-4.5), '−4.5');
 	assert.equal(gapText(-0.5), '−0.5');
 	assert.equal(gapText(0), '0.0');
-	assert.equal(gapText(null), NO_GAP);
+	assert.equal(gapText(null), EMPTY_FIGURE);
 	assert.equal(gapText(undefined), '--');
 });
 

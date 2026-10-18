@@ -4,6 +4,7 @@
  * figures assume he plays. Pure, so the tests read the table the page prints. */
 import { carriesGap, gapText, gapTone, type GapTone } from '#lib/format/gap.ts';
 import { rankWord } from '#lib/format/designation.ts';
+import { EMPTY_FIGURE } from '#lib/format/empty.ts';
 import { fixed, signed } from '#lib/format/number.ts';
 import type { PlayerFormat } from '#lib/run/schema.ts';
 import type { PlayerData } from './player-data.ts';
@@ -30,8 +31,6 @@ export interface CompareRow {
 	range?: true;
 }
 
-const NONE = 'None';
-
 /** Which is better: 'up' a higher figure, 'down' a lower one, null no better at all. */
 type Better = 'up' | 'down' | null;
 
@@ -50,7 +49,7 @@ function figures(
 	const judged = better !== null && a !== null && b !== null && a !== b;
 	const aWins = judged && (better === 'up' ? a > b : a < b);
 	const cell = (value: number | null, wins: boolean): CompareCell => ({
-		text: value === null ? NONE : text(value),
+		text: value === null ? EMPTY_FIGURE : text(value),
 		wins: judged ? wins : null
 	});
 	return { label, cells: [cell(a, aWins), cell(b, judged && !aWins)] };

@@ -12,6 +12,7 @@
 	import { links } from '#lib/site/links.ts';
 	import { SAME_PLAYER, verdict as callBetween } from '#lib/site/verdict.ts';
 	import { compareRows, type Side } from '#lib/site/compare-rows.ts';
+	import { EMPTY_FIGURE } from '#lib/format/empty.ts';
 	import { fetchPlayer, type PlayerData } from '#lib/site/player-data.ts';
 	import { SEARCH_INDEX_URL, searchable, type SearchablePlayer } from '#lib/site/search.ts';
 	import BasisLine from '#lib/ui/BasisLine.svelte';
@@ -237,7 +238,7 @@
 											/>
 										{/if}
 									{:else}
-										<span class:none={cell.text === 'None'}>{cell.text}</span>
+										<span class:none={cell.text === EMPTY_FIGURE}>{cell.text}</span>
 									{/if}
 								</td>
 							{/each}

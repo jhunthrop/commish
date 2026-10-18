@@ -2,18 +2,15 @@
  * run to a tenth and printed as given, its text and its tone said here once, so the board row and
  * Compare never drift apart on the minus glyph, the zero or the colour. A run older than the column
  * carries none, so a screen shows the Gap only where one of its rows carries it (carriesGap). */
+import { EMPTY_FIGURE } from './empty.ts';
 import { fixed, signed } from './number.ts';
 
 /** Plus is green (drafters wait, a value for you), minus is rose (they reach), zero is neither. */
 export type GapTone = 'gain' | 'loss' | 'even';
 
-/** An empty Gap cell beside rows that carry one: no ADP, a player on a season-long list, or a
- * kicker or a defense. The box score's empty mark. */
-export const NO_GAP = '--';
-
 /** "+1.8", "−4.5", "0.0"; "--" for a player the run gives no gap. */
 export function gapText(gap: number | null | undefined): string {
-	if (gap === null || gap === undefined) return NO_GAP;
+	if (gap === null || gap === undefined) return EMPTY_FIGURE;
 	return gap === 0 ? fixed(0) : signed(gap);
 }
 
