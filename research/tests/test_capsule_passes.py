@@ -6,12 +6,17 @@ from collections.abc import Sequence
 from contextlib import nullcontext
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from types import SimpleNamespace
 from typing import Any, cast
 
 import pytest
 from sqlalchemy import Connection, Engine
 
+from research.capsules import sweep as sweep_module
 from research.capsules.config import CAPSULE_CONFIG
+from research.capsules.facts_block import FACTS_SOURCE
+from research.capsules.generate import CapsuleResult, Fallback, ReadResult
+from research.capsules.narrative import failed_narrative
 from research.capsules.spans import SharedSpan, SpanRules
 from research.capsules.sweep import FactsPassMemo, Subject, SweepPlan, SweepReport
 from research.db.read_cache import UNCACHED, ReadThrough
@@ -222,3 +227,47 @@ def test_the_span_repair_rewrites_at_most_the_nights_cap(monkeypatch: pytest.Mon
     span_plans = [plan for _, plan in script.plans if plan.keep_written]
     assert [plan.only for plan in span_plans] == [("b",)]
     assert passes.span_pages_left == 0
+
+
+def _fell_to_facts(name: str, violation: str) -> tuple[Subject, CapsuleResult]:
+    """A page and a result that fell to its facts block on a validation failure."""
+    read = ReadResult("facts", FACTS_SOURCE, None, Fallback("failed_validation", violation), ())
+    result = CapsuleResult(read, read, failed_narrative("never written"), FACTS_SOURCE, None, None, 6)
+    return Subject(cast("Any", SimpleNamespace(identity=SimpleNamespace(name=name))), "u1"), result
+
+
+def test_a_page_that_falls_to_its_facts_block_is_named_with_why_on_the_report() -> None:
+    report = SweepReport(NOW, 4, 1)
+    subject, result = _fell_to_facts("Ricky Pearsall", "Mixed evidence: the strongest downside is never cited.")
+    sweep_module._tally(report, subject, result, demoted=False, kept=False)
+    assert report.fell == [
+        "Ricky Pearsall: facts (failed validation: Mixed evidence: the strongest downside is never cited.)"
+    ]
+
+
+def _logged_passes(monkeypatch: pytest.MonkeyPatch, report: SweepReport) -> tuple[_Passes, list[str]]:
+    lines: list[str] = []
+    passes = _passes(_Script(), monkeypatch)
+    passes.log = lines.append
+    monkeypatch.undo()  # the real sweep, over a stubbed `sweep_capsules`
+    monkeypatch.setattr(capsule_step, "sweep_capsules", lambda *args: report)
+    return passes, lines
+
+
+def test_each_pass_logs_the_pages_that_fell_to_their_facts_blocks_and_why(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Lane 73: the 2026-10-17T05 night kept no reason any of its 95 first-pass facts blocks fell (the
+    sweep's detail was never read), so each pass now names them in its log."""
+    fell = [
+        "Derius Davis: facts (failed validation: a time frame)",
+        "Chip Trayanum: facts (failed validation: a betting word)",
+    ]
+    passes, lines = _logged_passes(monkeypatch, SweepReport(NOW, 4, 2, ["a", "b"], 0, 2, fell=list(fell)))
+    passes.sweep("capsule retries 1", SweepPlan(10, unwritten_only=True))
+    assert lines[-1] == f"capsule retries 1, 2 pages fell to their facts blocks: {'; '.join(fell)}"
+
+
+def test_a_pass_where_no_page_fell_logs_no_fallback_line(monkeypatch: pytest.MonkeyPatch) -> None:
+    passes, lines = _logged_passes(monkeypatch, SweepReport(NOW, 4, 1, ["a"], 1, 0))
+    passes.sweep("capsules", SweepPlan(10))
+    assert len(lines) == 1
+    assert "fell to their facts blocks" not in lines[0]

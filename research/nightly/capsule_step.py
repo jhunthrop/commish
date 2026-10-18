@@ -288,6 +288,8 @@ class _Passes:
             self.calls_by_player[pid] = self.calls_by_player.get(pid, 0) + calls
         self.spend.add(report)
         self.log(_sweep_line(name, report))
+        if report.fell:
+            self.log(f"{name}, {len(report.fell)} pages fell to their facts blocks: {'; '.join(report.fell)}")
 
     def run(self) -> None:
         # The sentences already on two pages are quoted to the writer from the first call, so the

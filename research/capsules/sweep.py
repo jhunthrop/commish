@@ -116,6 +116,9 @@ class SweepReport:
     landed_sentences: int = 0
     landed_spans: int = 0
     landed_carriers: list[str] = field(default_factory=list)
+    # Each page that fell to its facts block this sweep, by name with why (`describe_fallback`), so
+    # the nightly can say why its pages are unwritten (Lane 73).
+    fell: list[str] = field(default_factory=list)
 
 
 class PageCommitError(Exception):
@@ -169,7 +172,9 @@ def _tally(report: SweepReport, subject: Subject, result: CapsuleResult, demoted
     report.facts += 1
     report.demoted += int(demoted)
     suffix = ", kept nothing, was written" if demoted else ""
-    report.detail.append(f"{name}: {describe_fallback(result.compact, result.full)}{suffix}")
+    fell = f"{name}: {describe_fallback(result.compact, result.full)}"
+    report.fell.append(fell)
+    report.detail.append(f"{fell}{suffix}")
 
 
 def write_one(  # noqa: PLR0913 - one write's parts
