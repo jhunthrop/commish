@@ -1,26 +1,29 @@
 /**
  * Schedule strength in words, one source for the schedule page, the clubs page and a club's page.
- * Every opponent's figure is the season's expected wins, its source named once on each page (the
- * coordinator's ruling, Lane 66n).
+ * What strength is and what an opponent's figure is are the run's own words (schedule.json's
+ * `method` and `opponentBasis`, research/nightly/reads/schedule.py), printed as given, so the pages
+ * never describe a figure the run has changed (Lane 66n). The method is a noun phrase that carries its
+ * own article ("the average of its opponents' expected wins for the season, ..."), so these lines
+ * never add one.
  */
 import { windowLabel } from '#lib/format/date.ts';
 import { ordinal } from '#lib/format/number.ts';
 import type { Slate } from './schema.ts';
 
+type Basis = Pick<Slate, 'method' | 'window'>;
 type Window = Pick<Slate, 'window'>;
 
-/** Where every opponent's figure comes from, said once on a page. */
-const WINS_SOURCE = 'from the published season totals';
-
-/** "Opponents show the season's expected wins, from the published season totals.": a club page's
- * basis sentence, its read said once under the hero's figure (readWords). */
-export function winsBasis(): string {
-	return `Opponents show the season's expected wins, ${WINS_SOURCE}.`;
+/** "Opponents show expected wins, set before the season.": a club page's basis sentence, from the
+ * run's opponent basis ("Expected wins, set before the season"), its read said once under the hero's
+ * figure (readWords). */
+export function winsBasis(opponentBasis: string): string {
+	return `Opponents show ${opponentBasis.charAt(0).toLowerCase()}${opponentBasis.slice(1)}.`;
 }
 
-/** What a strength is, with its source and read: the schedule and clubs pages' leads. */
-function strengthWords(slate: Window): string {
-	return `Strength averages the season's expected wins of each club's opponents, ${WINS_SOURCE}, read ${windowLabel(slate.window)}.`;
+/** "Strength is the average of its opponents' expected wins for the season, ..., read Sep 7.": the
+ * schedule and clubs pages' leads. */
+function strengthWords(slate: Basis): string {
+	return `Strength is ${slate.method}, read ${windowLabel(slate.window)}.`;
 }
 
 /** The weeks a schedule sets back, said where it does so: "weeks 1 to 5 are played, so faded",
@@ -32,10 +35,10 @@ export function playedWords(played: number): string {
 		: `weeks 1 to ${String(played)} are played, so faded`;
 }
 
-/** The schedule page's lead, two rendered lines on a desk: what strength is and where it comes
- * from, then how the grid is ordered, shaded and faded. */
+/** The schedule page's lead, two rendered lines on a desk: what strength is and when it was read,
+ * then how the grid is ordered, shaded and faded. */
 export function scheduleLead(
-	slate: Window,
+	slate: Basis,
 	strong: { count: number; atLeast: string },
 	played: number
 ): string {
@@ -43,8 +46,8 @@ export function scheduleLead(
 	return `${strengthWords(slate)} Hardest first, the ${String(strong.count)} highest opponents shaded (${strong.atLeast} or more)${faded}.`;
 }
 
-/** The clubs page's lead: "Every club's players on our PPR board. Strength averages ...". */
-export function clubsLead(formatLabel: string, first: Window | undefined): string {
+/** The clubs page's lead: "Every club's players on our PPR board. Strength is ...". */
+export function clubsLead(formatLabel: string, first: Basis | undefined): string {
 	const strength = first ? ` ${strengthWords(first)}` : '';
 	return `Every club's players on our ${formatLabel} board.${strength}`;
 }

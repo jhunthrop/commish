@@ -184,7 +184,7 @@ void test("copy guard: no composed line doubles a word, the run's own phrases in
 	const lines = [
 		scheduleLead(slate, { count: 9, atLeast: '10.5' }, 5),
 		clubsLead('PPR', slate),
-		winsBasis(),
+		winsBasis('Expected wins, set before the season'),
 		hardestFigure(10, 32).caption,
 		hardestWords(1, 32),
 		hardestWords(32, 32),
