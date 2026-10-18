@@ -33,6 +33,7 @@ const BARE: PlayerFormat = {
 	ourRank: 12,
 	vorRound: 1,
 	adp: 15,
+	gap: 3,
 	projected: 140,
 	vor: 40,
 	expectedGames: 9.5,
@@ -80,7 +81,18 @@ void test('in season the drafters sentence gives the ADP alone, as a fact of the
 	);
 	assert.match(
 		draftersWords(NUMBERS, ['PPR drafts, Sep 9'], false),
-		/^We have him at pick 12, so drafters take him 3 picks later\./
+		/^We have him at pick 12, so drafters take him 3.0 picks later\./
+	);
+});
+
+void test("the drafters sentence reads the run's gap as given, and names none where the run wrote none", () => {
+	assert.equal(
+		draftersWords({ ...NUMBERS, adp: 5.5, ourRank: 10, gap: -4.5 }, ['PPR drafts'], false),
+		'We have him at pick 10, so drafters take him 4.5 picks earlier. ADP 5.5 from PPR drafts.'
+	);
+	assert.equal(
+		draftersWords({ ...NUMBERS, gap: undefined }, ['PPR drafts'], false),
+		'We have him at pick 12. ADP 15.0 from PPR drafts.'
 	);
 });
 

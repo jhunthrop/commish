@@ -1,6 +1,6 @@
 /** The player page's sentences for each format line, built with the page: no script carries them. */
-import { draftersGap } from '#lib/format/draft.ts';
-import { fixed, plural } from '#lib/format/number.ts';
+import { gapPicks } from '#lib/format/gap.ts';
+import { fixed } from '#lib/format/number.ts';
 import { restLead, type FiguresReach } from './rest-words.ts';
 import type { Format, PlayerFormat } from './schema.ts';
 
@@ -40,15 +40,15 @@ export function draftersWords(
 			? 'None of our ADP sources has him.'
 			: `His ADP in ${sources.join(' and ')}, before the season.`;
 	}
-	const gap = draftersGap(numbers.adp, numbers.ourRank);
-	if (numbers.adp === null || gap === null) {
-		return `None of our ADP sources has him yet. We have him at pick ${String(numbers.ourRank)}.`;
-	}
+	const pick = `We have him at pick ${String(numbers.ourRank)}`;
+	if (numbers.adp === null) return `None of our ADP sources has him yet. ${pick}.`;
+	const adp = `ADP ${fixed(numbers.adp)} from ${sources.join(' and ')}.`;
+	// The run's Gap as given (Lane 66q); a run older than the column says the two figures alone.
+	const { gap } = numbers;
+	if (gap === undefined || gap === null) return `${pick}. ${adp}`;
 	const where =
-		gap === 0
-			? 'drafters take him right where we would'
-			: `drafters take him ${plural(Math.abs(gap), 'pick')} ${gap > 0 ? 'later' : 'earlier'}`;
-	return `We have him at pick ${String(numbers.ourRank)}, so ${where}. ADP ${fixed(numbers.adp)} from ${sources.join(' and ')}.`;
+		gap === 0 ? 'drafters take him right where we would' : `drafters take him ${gapPicks(gap)}`;
+	return `${pick}, so ${where}. ${adp}`;
 }
 
 /** A player on a season-long list sits below the available players (Lane 63): his figure assumes he

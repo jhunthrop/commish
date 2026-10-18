@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { draftersGap } from '#lib/format/draft.ts';
 	import { fixed, signed } from '#lib/format/number.ts';
 	import { scoringBasis } from '#lib/run/catalog.ts';
 	import { POSITION_NAMES } from '#lib/run/derive.ts';
@@ -147,7 +146,7 @@
 		<Fact label="Where drafters take him">
 			{#snippet value()}
 				<Figure value={n.adp === null ? 'No ADP' : `Pick ${fixed(n.adp, 0)}`} />
-				<GapChip gap={draftersGap(n.adp, n.ourRank)} />
+				<GapChip adp={n.adp} gap={n.gap} />
 			{/snippet}
 			We have him at pick {n.ourRank}.
 		</Fact>
@@ -263,7 +262,7 @@
 						/>
 					</td>
 					<td class="num wide">{row.ourRank}</td>
-					<td><GapChip gap={draftersGap(row.adp, row.ourRank)} /></td>
+					<td><GapChip adp={row.adp} gap={row.gap} /></td>
 				</tr>
 			{/each}
 		</Table>

@@ -51,11 +51,6 @@ export function chanceWords(chance: number): string {
 	return chanceShort(chance).replace('<', 'under ').replace('>', 'over ');
 }
 
-/** Drafters' ADP against our rank. Positive means drafters take him later than we would. */
-export function draftersGap(adp: number | null, ourRank: number): number | null {
-	return adp === null ? null : Math.round(adp - ourRank);
-}
-
 /** Where drafters take him against a pick, in words: "drafters take him 1 earlier". */
 export function adpWords(adp: number | null, pick: number): string {
 	if (adp === null) return 'no ADP yet';

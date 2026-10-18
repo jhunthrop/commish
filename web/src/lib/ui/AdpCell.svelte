@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { draftersGap } from '#lib/format/draft.ts';
 	import { fixed } from '#lib/format/number.ts';
 	import GapChip from './GapChip.svelte';
 	import Label from './Label.svelte';
@@ -10,6 +9,8 @@
 	 */
 	interface Props {
 		adp: number | null;
+		/** The run's Gap for him (Lane 66q), absent on a run older than the column: no chip then. */
+		gap?: number | null;
 		ourRank: number;
 		/** The "ADP 19.6" line under the chip. Off where a row has no room for it, the phone sheet. */
 		figure?: boolean;
@@ -26,6 +27,7 @@
 
 	let {
 		adp,
+		gap,
 		ourRank,
 		figure = true,
 		under = 'adp',
@@ -35,7 +37,7 @@
 </script>
 
 <span class="adp">
-	{#if compare || adp === null}<GapChip gap={compare ? draftersGap(adp, ourRank) : null} />{/if}
+	{#if compare}<GapChip {adp} {gap} />{:else if adp === null}<GapChip adp={null} />{/if}
 	{#if figure && under === 'rank'}
 		<Label size="cell">Our rank {rankWord ?? ourRank}</Label>
 	{:else if figure && adp !== null}
