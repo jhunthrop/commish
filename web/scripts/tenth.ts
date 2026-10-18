@@ -22,6 +22,13 @@ export function tenth(n: number): number {
 	return n < 0 && out !== 0 ? -out : out;
 }
 
+/** A tier's drop as the nightly writes it (research/nightly/build/pages.py drop_between): the tier's
+ * last projection less the next tier's first, each rounded to the tenth the board shows, the
+ * difference cleaned back to its tenth. */
+export function dropBetween(last: number, first: number): number {
+	return tenth(tenth(last) - tenth(first));
+}
+
 /** The Gap as the nightly writes it (research/nightly/build/pages.py gap_of): the ADP rounded to the
  * tenth its column shows, less our rank, the difference cleaned back to its tenth. */
 export function gapOf(adp: number | null, ourRank: number): number | null {

@@ -102,6 +102,7 @@ def test_a_board_file_carries_its_market_rows_after_the_ranked_ones() -> None:
         "median": None,
         "ceiling": None,
         "tier": None,
+        "tierDrop": None,
     }
 
 
