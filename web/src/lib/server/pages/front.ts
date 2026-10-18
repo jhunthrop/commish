@@ -9,12 +9,13 @@ import { rowFraming, type RowFraming } from '#lib/run/row-framing.ts';
 import type { BoardRowView, Format } from '#lib/run/schema.ts';
 import type { RangeScale } from '#lib/types/player.ts';
 import { boardSeason } from '../board-season.ts';
+import { boardStatuses, type BoardStatuses } from '../statuses.ts';
 import { adp, board, clubByes, defaultFormat, designations, manifest, record } from '../run.ts';
 
 /** How many of the board's top rows the front door shows. */
 const TOP_ROWS = 10;
 
-export interface FrontPage {
+export interface FrontPage extends BoardStatuses {
 	format: Format;
 	/** Each with his season figures once the season is underway. */
 	rows: BoardRowView[];
@@ -63,6 +64,8 @@ export async function frontPage(): Promise<FrontPage> {
 		scale: rangeScale(rows),
 		framing: rowFraming(format),
 		boardSize: loaded.rows.length,
-		record: { ...recordHeadline(kept), season: kept.season }
+		record: { ...recordHeadline(kept), season: kept.season },
+		// The rows' statuses as the board's, drawn with the shared pill (review finding 7).
+		...boardStatuses(rows, capture, format)
 	};
 }

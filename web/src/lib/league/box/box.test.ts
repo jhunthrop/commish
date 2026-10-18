@@ -158,10 +158,19 @@ void test("a status is Lane 63's pill: the week's word, a season-long list's wor
 		sits: true,
 		line: null
 	});
-	// A season-long list's chip is the board's (Lane 66n), dated by the designation when there is one.
+	// A season-long list's chip is the board's (Lane 66n): the API's start of his run under it, or the
+	// word alone when the API knows none. Never the read's stamp, which the basis line says.
+	assert.deepEqual(
+		statusOf(
+			{ status: 'injured_reserve', as_of: asOf, since: '2026-09-28T15:00:00.000Z' },
+			false,
+			ZONE
+		),
+		{ rank: 'IR', mark: 'IR since Sep 28', sits: true, line: null }
+	);
 	assert.deepEqual(statusOf({ status: 'injured_reserve', as_of: asOf }, false, ZONE), {
 		rank: 'IR',
-		mark: 'IR as of Oct 16',
+		mark: 'IR',
 		sits: true,
 		line: null
 	});

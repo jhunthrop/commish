@@ -190,8 +190,8 @@ export interface BoxStarter {
 const SEASON_LONG = new Set<DesignationStatus>(['injured_reserve', 'pup', 'nfi']);
 
 /** His status as Lane 63's pill draws it, the week's designation first, else the host's injured
- * reserve. A season-long list's chip is the board's (Lane 66n): "IR as of Oct 16" dated by the
- * designation, or "IR" alone when only the host lists him. */
+ * reserve. A season-long list's chip is the board's (Lane 66n): "IR since Sep 28" from the API's
+ * start of his run under it, or "IR" alone when the API knows none (the host's own mark). */
 export function statusOf(
 	designation: WeekFacts['designation'],
 	hostIR: boolean,
@@ -203,11 +203,9 @@ export function statusOf(
 	const seasonLong = SEASON_LONG.has(status);
 	return {
 		rank: seasonLong ? rankWord(status) : null,
-		mark: !seasonLong
-			? designationWord(status)
-			: designation
-				? seasonLongMark({ status, since: null }, designation.as_of, zone)
-				: rankWord(status),
+		mark: seasonLong
+			? seasonLongMark({ status, since: designation?.since ?? null }, zone)
+			: designationWord(status),
 		sits: sitsHim(status),
 		line: null
 	};

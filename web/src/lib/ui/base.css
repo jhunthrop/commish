@@ -45,6 +45,30 @@ input {
 	outline-offset: 2px;
 }
 
+/* A player's status chip (StatusChip.svelte, Lane 66n): here rather than in the component, so the
+   chip ships with every prerendered page, styled from the first paint whatever chunk its script rides
+   in. A week's designation is grey, a status that keeps him out rose, as ToneChip draws them. */
+.status-chip {
+	display: inline-flex;
+	align-items: center;
+	height: 20px;
+	padding: 0 7px;
+	border-radius: var(--r-sm);
+	background: var(--surface-2);
+	color: var(--ink-2);
+	font-family: var(--font-ui);
+	font-size: var(--t-xs);
+	font-weight: 600;
+	letter-spacing: 0;
+	text-transform: none;
+	white-space: nowrap;
+}
+
+.status-chip.sits {
+	background: var(--loss-bg);
+	color: var(--loss-ink);
+}
+
 /* The board row's type (Lane 66n): the name the row's largest text, its figures a step under it in
    the number face. The row's columns are board-columns.ts's, set once per table by BoardTable. */
 :root {

@@ -144,17 +144,14 @@ export function captureLine(
 	return `Injury status from the hourly capture, ${when}.`;
 }
 
-/** "IR since Sep 22": a season-long status as its pill's chip says it (Lane 66n), on the board, a
- * club, ADP, the player card and the league rows alike, dated by its start, or by the capture's day
- * when we do not know it. What the order does with him is said once, at the head of his section. */
+/** "IR since Sep 22": a season-long status as the shared chip says it (Lane 66n), on the board, a
+ * club, ADP, the player card, the order and the league rows alike, dated by when his run under it
+ * began, or the word alone ("IR") when we do not know. The capture's read is never the chip's: the
+ * page's basis line says it once. What the order does with him is said at the head of his section. */
 export function seasonLongMark(
 	status: { status: DesignationStatus; since: string | null },
-	readAt: string,
 	zone: string = memberZone()
 ): string {
-	const when =
-		status.since === null
-			? `as of ${shortDay(readAt, zone)}`
-			: `since ${shortDay(status.since, zone)}`;
-	return `${RANK_WORDS[status.status]} ${when}`;
+	const word = RANK_WORDS[status.status];
+	return status.since === null ? word : `${word} since ${shortDay(status.since, zone)}`;
 }

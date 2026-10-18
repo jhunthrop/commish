@@ -84,10 +84,10 @@ void test('past 36 hours the basis says how old the statuses are, and they stay 
 void test('the marks', () => {
 	assert.equal(designationMark('doubtful', CHECKED, CENTRAL), 'Doubtful as of Fri 9:05 am');
 	assert.equal(
-		seasonLongMark({ status: 'injured_reserve', since: CHECKED }, LISTED, CENTRAL),
+		seasonLongMark({ status: 'injured_reserve', since: CHECKED }, CENTRAL),
 		'IR since Oct 16'
 	);
-	assert.equal(seasonLongMark({ status: 'pup', since: null }, LISTED, CENTRAL), 'PUP as of Oct 12');
+	assert.equal(seasonLongMark({ status: 'pup', since: null }, CENTRAL), 'PUP');
 	assert.equal(rankWord('injured_reserve'), 'IR');
 	assert.equal(designationWord('nfi'), 'On the NFI list');
 	assert.deepEqual(
@@ -110,9 +110,7 @@ void test('no line carries an em-dash or a semicolon', () => {
 		...DESIGNATION_STATUSES.map((status) =>
 			seasonLongLine({ status, since: null }, CHECKED, true, CENTRAL)
 		),
-		...DESIGNATION_STATUSES.map((status) =>
-			seasonLongMark({ status, since: null }, CHECKED, CENTRAL)
-		),
+		...DESIGNATION_STATUSES.map((status) => seasonLongMark({ status, since: null }, CENTRAL)),
 		captureLine({ readAt: LISTED, checkedAt: CHECKED }, SOON, CENTRAL),
 		captureLine({ readAt: LISTED, checkedAt: null }, SOON + CAPTURE_BEHIND_MS, CENTRAL)
 	];

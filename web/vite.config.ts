@@ -14,7 +14,7 @@ const PRERENDER_CONCURRENCY = 8;
  * that draw rows and follow the season: the board, ADP, a club and the front door draw them, a
  * player page never does, so they load as one file with the pages that draw rows. */
 const ROW_PARTS =
-	/[\\/]src[\\/]lib[\\/](ui[\\/](Row|RowHead|BoardTable|BasisLine|board-columns|board-sort|RangeBar|SheetMark|ValueCell|NameWords|Place)\.|site[\\/](RowSheetMark|RowSheetTags|season-words|shown-rail\.svelte|verb-links)\.|run[\\/](row-framing|board-basis|adp-drafts)\.)/;
+	/[\\/]src[\\/]lib[\\/](ui[\\/](Row|RowHead|BoardTable|BasisLine|board-columns|board-sort|RangeBar|SheetMark|ValueCell|NameWords|Place)\.|site[\\/](RowSheetMark|RowSheetTags|season-words|shown-rail\.svelte|verb-links)\.|run[\\/](row-framing|board-basis|adp-drafts)\.|format[\\/]gap\.)/;
 /** The board and ADP pages' own parts: the views, the tier strip, the rail's jump list and toggles,
  * the follow of the switch's format, the chips, and a missing format's page. One file for those
  * pages. */
@@ -52,11 +52,12 @@ const FORM_PARTS =
  * the pages that load them. (A group of their own would pull in everything they import, the API
  * client too, and land it on every page that reads the API.) */
 const LEAGUE_PAGE_PARTS =
-	/[\\/]src[\\/]lib[\\/](league[\\/](LeagueRow|board|model|api|follow-switch\.svelte|phase-words|sheet-tags)\.|league[\\/](inseason|box|home)[\\/]|front[\\/]|order[\\/]|context[\\/]choose\.svelte\.|format[\\/](clock|clubs|game-facts)\.|ui[\\/](rail-order|club-mark|ClubMark|StatusPill)\.)/;
-/** Lane 63's status pill, which the board row (Lane 66n), the player card and the league's rows all
- * draw: a group of its own, listed ahead of the rows group, so the rows group does not pull it in
- * with the row and a player page never loads the board row's chunk for it. */
-const PILL_PARTS = /[\\/]src[\\/]lib[\\/]ui[\\/]StatusPill\./;
+	/[\\/]src[\\/]lib[\\/](league[\\/](LeagueRow|board|model|api|follow-switch\.svelte|phase-words|sheet-tags)\.|league[\\/](inseason|box|home)[\\/]|front[\\/]|order[\\/]|context[\\/]choose\.svelte\.|format[\\/](clock|clubs|game-facts)\.|ui[\\/](rail-order|club-mark|ClubMark|StatusPill|StatusChip)\.)/;
+/** Lane 63's status pill and its chip, which the board row (Lane 66n), the player card, the league's
+ * rows and the front door's week draw: a group of its own, listed ahead of the rows group, so the rows
+ * group does not pull it in and a player page never loads the board row's chunk for it. The chip's
+ * styles are base.css's, so every prerendered page paints it styled (review 66n finding 1). */
+const PILL_PARTS = /[\\/]src[\\/]lib[\\/]ui[\\/](StatusPill|StatusChip)\./;
 /** A player's injury status in words on the member's clock (Lane 63): the designation's words, which
  * the league's screens import and the board, player and record pages load after their first paint.
  * The held places' pill rank joins them now the player card draws the status pill (Lane 66h). Kept out

@@ -14,6 +14,7 @@
 	import Phased from '#lib/ui/Phased.svelte';
 	import PanelHead from '#lib/ui/PanelHead.svelte';
 	import Quiet from '#lib/ui/Quiet.svelte';
+	import { liveStatusClock, sayBoard, type LiveStatus } from '#lib/run/live-status.ts';
 	import BasisLine from '#lib/ui/BasisLine.svelte';
 	import BoardTable from '#lib/ui/BoardTable.svelte';
 	import Row from '#lib/ui/Row.svelte';
@@ -44,6 +45,19 @@
 	);
 
 	onMount(() => lazySheet.armOnFirstIntent(window));
+	/** The rows' status words as built, said again on the member's clock once the page is live, as
+	 * the board says them (review finding 7). */
+	let live = $state<LiveStatus | null>(null);
+	onMount(() => {
+		liveStatusClock(
+			page.capture !== null,
+			() => import('#lib/run/status-view.ts'),
+			(said) => {
+				live = said;
+			}
+		);
+	});
+	const words = $derived(sayBoard(page, live));
 
 	/** A member who follows a league is sent back to the one selected in the shell; anyone
 	 * else to follow one. */
@@ -117,7 +131,7 @@
 					aside="{page.rows.length} of {page.boardSize}"
 					level={2}
 				/>
-				<BasisLine parts={page.basis} />
+				<BasisLine parts={page.basis} tail={words?.capture ?? null} />
 				<div class="rows">
 					<BoardTable {columns} label="The top of our {format.label} board">
 						{#each page.rows as player, i (player.id)}
@@ -130,6 +144,7 @@
 								eager={i < EAGER_ROWS}
 								season={player.season}
 								framing={page.framing}
+								status={words?.rows[player.id] ?? null}
 							>
 								{#snippet action()}<RowSheetMark {player} />{/snippet}
 							</Row>

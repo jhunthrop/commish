@@ -206,7 +206,7 @@ void test("the opponent's rank says its direction, one rule for both ends", () =
 			boxRow(pup, 'Sit', ZONE, false),
 			'TE'
 		),
-		/^Pitts is on a season-long list, PUP as of Oct \d+\. /
+		/^Pitts is on a season-long list, PUP\. /
 	);
 });
 

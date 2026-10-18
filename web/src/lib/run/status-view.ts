@@ -43,7 +43,7 @@ export function statusView(status: PlayerStatus, saying: Saying, draftOrder = fa
 	if (status.seasonLong) {
 		return {
 			rank: rankWord(status.status),
-			mark: seasonLongMark(status, capture.readAt, zone),
+			mark: seasonLongMark(status, zone),
 			sits: true,
 			line: draftOrder
 				? draftOrderLongLine(status, capture.readAt, zone)
