@@ -67,7 +67,8 @@ def place_capture(rows: list[CaptureRow]) -> tuple[dict[str, float], int]:
 
     When two rows reach one provider id, the lower ADP wins (the earlier row in ADP order): the api's
     room read takes `min(adp)` for the same id (api/internal/boards/market.go), so the board and the
-    room print one figure. A second row for a placed player is not counted as unplaced.
+    room print one figure, and the oracle keeps the same (placeCapture, research-ts/src/nightly/reads/adp.ts).
+    A second row for a placed player is not counted as unplaced.
     """
     placed: dict[str, float] = {}
     unplaced = 0

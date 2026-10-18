@@ -35,7 +35,8 @@ type marketRead struct {
 
 // cte is the format's capture, by provider id; empty when off. Two rows
 // that reach one provider id keep the lower ADP, the one rule the nightly
-// shares (research/nightly/reads/adp.py, place_capture).
+// (research/nightly/reads/adp.py, place_capture) and the oracle
+// (research-ts/src/nightly/reads/adp.ts, placeCapture) share.
 func (m marketRead) cte(s *PGSource) string {
 	if !m.on {
 		return ""
