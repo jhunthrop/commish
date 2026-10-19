@@ -44,6 +44,8 @@ export const WAIVERS = {
 	noPickup: 'No pickup beats your roster',
 	/** Beats for an add who fills a spot no one of the member's can play this week. */
 	openSpot: 'Open spot',
+	/** Why a card's drop is the one it names (review L-C). */
+	dropRule: 'Its drop costs least.',
 	clears: 'Clears'
 } as const;
 
@@ -56,9 +58,11 @@ export function shortName(name: string): string {
 export interface BeatsCell {
 	name: string;
 	starter: boolean;
-	/** The week gain, null once his or the beaten player's game has kicked off (review H3): the cell
-	 * draws EMPTY_FIGURE then, the row's Game cell saying Final or Kicked off. */
+	/** The week gain, or the season Gain while the pickups go in that order (unit 'season', review
+	 * M-A: the sorted column draws its own key); null once his or the beaten player's game has kicked
+	 * off in week order (review H3), the cell drawing EMPTY_FIGURE and the Game cell Final. */
 	gain: number | null;
+	unit: 'week' | 'season';
 }
 
 /** One player free to add, as the table draws him. */
@@ -153,14 +157,21 @@ export function seasonOrderWords(week: number): string {
 /** Whom an add beats, as the API says it: his player, or the open spot he fills (a starting spot no
  * one of the member's can play this week), the week gain withheld once a game has kicked off. Nothing
  * is inferred here (review 66f M3). */
-function beatsOf(source: WaiverRow, counts: boolean): BeatsCell | null {
+function beatsOf(source: WaiverRow, counts: boolean, season: boolean): BeatsCell | null {
 	const { beats } = source;
 	if (beats === null) return null;
 	return {
 		name: beats.open_spot ? WAIVERS.openSpot : shortName(beats.name),
 		starter: beats.starter,
-		gain: counts ? beats.gain : null
+		gain: season ? source.gain : counts ? beats.gain : null,
+		unit: season ? 'season' : 'week'
 	};
+}
+
+/** The Beats cell's figure: "+6.7" this week, "+0.3 Gain" in season order, "--" withheld. */
+export function beatsWord(beats: Pick<BeatsCell, 'gain' | 'unit'>): string {
+	if (beats.gain === null) return BOX.none;
+	return beats.unit === 'season' ? `${gainWord(beats.gain)} ${SEASON.gain}` : gainWord(beats.gain);
 }
 
 /** The table's rows from the answer: every add, whom he beats, the strip's tint on the ones it names. */
@@ -174,8 +185,8 @@ export function poolRows(
 	const season = seasonOrdered(advice, now);
 	return advice.rows.map((source) => {
 		const key = addKey(source);
-		const beats = beatsOf(source, weekCounts(source, roster, now));
-		const figure = season ? source.gain : beats?.gain;
+		const beats = beatsOf(source, weekCounts(source, roster, now), season);
+		const figure = beats?.gain;
 		return {
 			key,
 			row: { ...boxRow(source.add, '', zone, false, now), key },
@@ -227,15 +238,16 @@ export function pickupCards(
 	now: number
 ): PickupCard[] {
 	const names = namesOnScreen(advice);
-	const ordered = seasonOrdered(advice, now)
-		? [...advice.pickups].sort((a, b) => b.gain - a.gain)
-		: advice.pickups;
+	const season = seasonOrdered(advice, now);
+	const ordered = season ? [...advice.pickups].sort((a, b) => b.gain - a.gain) : advice.pickups;
 	return ordered.map((source) => ({
 		key: addKey(source),
 		slot: positionWord(source.add.player.position),
 		add: cardName(source.add.player.name, names),
 		drop: source.drop ? cardName(source.drop.player.name, names) : null,
-		weekGain: weekGainOf(source.week_gain, source.add, source.drop, now),
+		// Re-ordered by the season Gain, no card's week gain counts: each was his over the cards
+		// before him in the API's order (review M-B).
+		weekGain: season ? null : weekGainOf(source.week_gain, source.add, source.drop, now),
 		gain: source.gain,
 		source
 	}));
@@ -509,6 +521,7 @@ export function waiverBasis(
 				? seasonOrderWords(advice.week)
 				: advice.basis
 		),
+		...said(WAIVERS.dropRule),
 		...said(advice.season_basis),
 		...said(proj),
 		...said(deltaPart(advice.projection_previous_read_at, clock), false),

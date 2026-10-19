@@ -33,6 +33,7 @@ import { copyFault, watchData } from './copy-scan.ts';
 import { FIXTURE_IDS } from './inseason-fixture/ids.ts';
 import { EMPTY_FIGURE } from '../src/lib/format/empty.ts';
 import { seasonOrderWords } from '../src/lib/league/box/waivers.ts';
+import { SEASON } from '../src/lib/league/box/season.ts';
 import {
 	FIXTURE_MONDAY_CLOCK,
 	FIXTURE_SUNDAY_CLOCK,
@@ -321,8 +322,11 @@ async function checkWaivers(page: Page, at: string): Promise<void> {
 	);
 	const final = rows.filter((r) => /\b(Final|Kicked off)\b/.test(r.text) && r.gain !== null);
 	if (final.length === 0) fault(at, 'no row past its kickoff with a Beats cell');
+	// In season order every Beats cell draws the season Gain, the key it is sorted by (review M-A);
+	// a row past its kickoff never draws a bare week figure.
 	for (const r of final)
-		if (r.gain !== EMPTY_FIGURE) fault(at, `a row past its kickoff draws a week gain ${r.gain}`);
+		if (r.gain !== EMPTY_FIGURE && !r.gain.endsWith(` ${SEASON.gain}`))
+			fault(at, `a row past its kickoff draws a week gain ${r.gain}`);
 	const basis = (await page.locator('main [data-basis]').allInnerTexts()).join(' ');
 	if (!basis.includes(seasonOrderWords(6)))
 		fault(at, 'the basis does not name the season Gain order');

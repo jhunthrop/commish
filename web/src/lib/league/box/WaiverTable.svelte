@@ -8,6 +8,7 @@
 	import {
 		dropLead,
 		dropTitle,
+		beatsWord,
 		gainWord,
 		sameWeekGain,
 		WAIVERS,
@@ -122,7 +123,7 @@
 										>{entry.beats.starter ? WAIVERS.starter : WAIVERS.bench}</span
 									></span
 								><span class="gain" class:held={entry.beats.gain === null}
-									>{entry.beats.gain === null ? BOX.none : gainWord(entry.beats.gain)}</span
+									>{beatsWord(entry.beats)}</span
 								></span
 							>
 						{:else}<span class="none">{entry.row.game === 'bye' ? BOX.bye : BOX.none}</span>{/if}

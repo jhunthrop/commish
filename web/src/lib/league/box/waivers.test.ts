@@ -30,7 +30,8 @@ import {
 	WAIVERS,
 	waiverBasis,
 	withDrop,
-	seasonOrderWords
+	seasonOrderWords,
+	beatsWord
 } from './waivers.ts';
 
 const ZONE = 'America/Chicago';
@@ -297,7 +298,7 @@ void test('Beats prints the open spot only when the API says it: an empty Beats 
 		week_gain: 4.8
 	});
 	const [only] = poolRows({ rows: [taylor], pickups: [taylor] }, ZONE, NOW);
-	assert.deepEqual(only?.beats, { name: 'Open spot', starter: true, gain: 4.8 });
+	assert.deepEqual(only?.beats, { name: 'Open spot', starter: true, gain: 4.8, unit: 'week' });
 	// A flex start that tops no one at his own position is no open spot.
 	const flex = row(line('Theo Johnson', 'WR', 10.8), { beats: null, starts: true, week_gain: 0.3 });
 	assert.equal(poolRows({ rows: [flex], pickups: [] }, ZONE, NOW)[0]?.beats, null);
@@ -329,7 +330,7 @@ void test('the basis is one paragraph, the pickup rule first, each column it dra
 	const parts = waiverBasis(BASIS, [gainwell.add, saints], RULES, CLOCK, NOW);
 	assert.equal(
 		basisText(parts),
-		`${BASIS.basis} ${BASIS.season_basis} Proj is this week's published projection, PPR nearest your rules, defenses on default scoring, read Fri 9:00 pm. Δ Proj is its change since Thu 9:00 pm. ${FACTS_SENTENCE} Opp rank is points allowed to his position, 1st fewest. ${BASIS.basis_note} Which five`
+		`${BASIS.basis} ${WAIVERS.dropRule} ${BASIS.season_basis} Proj is this week's published projection, PPR nearest your rules, defenses on default scoring, read Fri 9:00 pm. Δ Proj is its change since Thu 9:00 pm. ${FACTS_SENTENCE} Opp rank is points allowed to his position, 1st fewest. ${BASIS.basis_note} Which five`
 	);
 	assert.deepEqual(
 		parts.filter((p) => !p.phone).map((p) => p.text),
@@ -376,7 +377,8 @@ void test('a pickup whose game is final keeps its card but says no Proj this wee
 	assert.ok(first && second);
 	assert.equal(first.weekGain, null);
 	assert.equal(cardGains(first), '+1.2 Gain a week');
-	assert.equal(second.weekGain, 2.7);
+	// Re-ordered by the season Gain, no card keeps a week gain measured in the API's order (M-B).
+	assert.equal(second.weekGain, null);
 	// The lineup's Proj with every card made is a week figure too: none once one card has none.
 	assert.equal(pickupSum(tuesday, cards), null);
 	// His row says Final.
@@ -420,7 +422,11 @@ void test('a Final row keeps no week figure in Beats, and the pickups go in seas
 	const pool = poolRows(tuesday, ZONE, NOW);
 	const gainwellRow = pool.find((r) => r.row.name === 'Kenny Gainwell');
 	assert.ok(gainwellRow?.beats);
-	assert.equal(gainwellRow.beats.gain, null);
+	// In season order the Beats cell draws the season Gain, the key the column is sorted by (M-A).
+	assert.deepEqual(gainwellRow.beats, { name: 'Vidal', starter: true, gain: 1.2, unit: 'season' });
+	assert.equal(beatsWord(gainwellRow.beats), '+1.2 Gain');
+	assert.equal(beatsWord({ gain: null, unit: 'week' }), '--');
+	assert.equal(beatsWord({ gain: 6.7, unit: 'week' }), '+6.7');
 	assert.deepEqual(gainwellRow.row.game, { where: 'vs PIT', when: 'Final' });
 	// The default sort reads the season Gain once the week figure is withheld: Gainwell (1.2) over
 	// Chiefs (0.3) over Mevis (-0.3), the starters topped first as before.
