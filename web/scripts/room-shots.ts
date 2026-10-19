@@ -14,6 +14,7 @@
 import { mkdir } from 'node:fs/promises';
 import { chromium, type BrowserContext, type Page } from 'playwright';
 import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
+import { chromeLine, chromeMeasures } from './chrome-measures.ts';
 
 const THEMES = ['light', 'dark'] as const;
 const WIDTHS = [1440, 390] as const;
@@ -141,6 +142,27 @@ interface ShotOptions {
 	timeout?: number;
 }
 
+/** The season's rail with no league selected (Lane 83): a room's drafter follows no league, so a
+ * season rail draws these and none of a league's screens. */
+const NO_LEAGUE_LABELS = ['League', 'Rest of season', 'Players', 'Mock draft', 'Our record'];
+const LEAGUE_SCREENS = ['Lineup', 'Matchup', 'Waivers', 'Trades'];
+const SEASON_RAILS = /^(in_season|playoffs)/;
+const railFaults: string[] = [];
+const chromeLines: string[] = [];
+
+/** The rail a room draws, held to the rail without a league when the root names a season and no
+ * league. */
+async function railCheck(page: Page, where: string, width: number): Promise<void> {
+	const chrome = await chromeMeasures(page);
+	chromeLines.push(chromeLine(where, chrome));
+	if (chrome.league || !SEASON_RAILS.test(chrome.rail ?? '')) return;
+	const want = width === 390 ? NO_LEAGUE_LABELS : [...NO_LEAGUE_LABELS, 'Account'];
+	if (chrome.railLabels.join('|') !== want.join('|'))
+		railFaults.push(`${where}: the rail draws ${chrome.railLabels.join(', ')}`);
+	const screens = chrome.railLabels.filter((label) => LEAGUE_SCREENS.includes(label));
+	if (screens.length > 0) railFaults.push(`${where}: league tabs ${screens.join(', ')}`);
+}
+
 async function shoot(
 	name: string,
 	path: string | (() => Promise<string>),
@@ -165,6 +187,7 @@ async function shoot(
 						.waitFor({ timeout: 20_000 });
 			}
 			await page.evaluate(() => document.fonts.ready);
+			await railCheck(page, `${name} ${theme} ${String(width)}`, width);
 			const file = new URL(`${name}-${theme}-${width}.png`, OUT_DIR);
 			await page.screenshot({ path: file.pathname, fullPage: true });
 			await ctx.close();
@@ -327,3 +350,5 @@ try {
 } finally {
 	await browser.close();
 }
+for (const line of chromeLines) process.stdout.write(`${line}\n`);
+if (railFaults.length > 0) throw new Error(`A room's rail is wrong:\n${railFaults.join('\n')}`);
