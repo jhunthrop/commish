@@ -48,7 +48,8 @@
 	import { FLAGS } from '#lib/site/flags.ts';
 	import OneLeagueFree from './OneLeagueFree.svelte';
 	import { FOLLOW_FOR } from './phase-words.ts';
-	import { SCREEN_PARAM, leagueScreenOf, screenSection } from '#lib/ui/nav.ts';
+	import { SCREEN_PARAM } from '#lib/ui/nav.ts';
+	import { leagueScreenOf, screenSection } from '#lib/ui/rail-league.ts';
 
 	/** Attach a league: paste its link, say which team is yours (a tap on it, or a Sleeper username),
 	 * one verb. The league is read as soon as the link is pasted, so the teams are there to tap. */

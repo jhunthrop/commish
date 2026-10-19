@@ -19,16 +19,17 @@
 		standingWords
 	} from '../model.ts';
 	import { zoneLine } from '#lib/format/clock.ts';
-	import { screenSection } from '#lib/ui/nav.ts';
-	import LeagueTabs from './LeagueTabs.svelte';
+	import { LEAGUE_HOME } from '#lib/ui/nav.ts';
+	import { screenSection } from '#lib/ui/rail-league.ts';
 	import { tabHref } from './tabs.ts';
 	import { readFailure, screenView, type ReadState } from './state.ts';
 	import { leagueScreens } from './tab-list.ts';
-	import { LINES, TAB_LABELS, signInTitle, type LeagueScreen } from './words.ts';
+	import { LINES, SCREEN_TITLES, signInTitle, type LeagueScreen } from './words.ts';
 
 	/** One in-season screen of a followed league: the league's title with its read and order stamps,
-	 * the league's tabs, and the screen's answer once read (reserved rows until then, the API's own
-	 * sentence when it has no answer, a sentence when the account's leagues cannot be read). Read on
+	 * and the screen's answer once read (reserved rows until then, the API's own sentence when it
+	 * has no answer, a sentence when the account's leagues cannot be read); the rail is the way
+	 * between the league's pages. Read on
 	 * open and once a minute while open, as the league page is; a failed read of the account's
 	 * leagues is tried again with it. The answer carries every face and page, so no board is read. Opening it selects its league in the shell's
 	 * switch; switching there opens this screen of the league switched to. */
@@ -75,7 +76,7 @@
 	followSwitch(id, (league) => {
 		const to = siteContext.leagues.find((l) => l.id === league);
 		return to && !leagueScreens(to).includes(screen)
-			? tabHref('league', league)
+			? tabHref(LEAGUE_HOME, league)
 			: tabHref(screen, league);
 	});
 
@@ -154,7 +155,7 @@
 	<meta name="robots" content="noindex" />
 </svelte:head>
 
-<Shell title={TAB_LABELS[screen]} active={screenSection(screen)}>
+<Shell title={SCREEN_TITLES[screen]} active={screenSection(screen)}>
 	{#if signedOut}
 		<div class="pad">
 			<EmptyState title={signInTitle(screen)} line={LINES.signInLine}>
@@ -184,7 +185,6 @@
 					{/if}
 				</p>
 			</header>
-			<LeagueTabs {id} current={screen} />
 			{#if refusal}
 				<Panel edge="loss" padding="sm">
 					<div class="refused">

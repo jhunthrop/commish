@@ -1,19 +1,11 @@
-/** A followed league's tabs (tab-list.ts) and each tab's page: the screens share one route
- * (/league/[id]/[screen]). Kept with the league's parts, so no other page carries them. */
+/** A followed league's page: its own (/league/[id]) or a screen (/league/[id]/[screen]), the
+ * screens sharing one route. Kept with the league's parts, so no other page carries them. */
 import { resolve } from '$app/paths';
-import type { LeagueTab } from './tab-list.ts';
+import { LEAGUE_HOME, type LeaguePage } from '#lib/ui/nav.ts';
 
-export {
-	leagueScreens,
-	leagueTabs,
-	type LeagueTab,
-	type LeagueTabLink,
-	type TabPhase
-} from './tab-list.ts';
-
-/** A tab's page for a league. */
-export function tabHref(tab: LeagueTab, id: string): string {
-	return tab === 'league'
+/** A league's page. */
+export function tabHref(page: LeaguePage, id: string): string {
+	return page === LEAGUE_HOME
 		? resolve('/league/[id]', { id })
-		: resolve('/league/[id]/[screen]', { id, screen: tab });
+		: resolve('/league/[id]/[screen]', { id, screen: page });
 }

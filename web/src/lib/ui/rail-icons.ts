@@ -25,6 +25,12 @@ export const RAIL_ICONS = {
 		{ tag: 'path', d: 'M12 7v5l3 2' }
 	],
 	record: [{ tag: 'path', d: 'M4 20V10M10 20V4M16 20v-7M22 20H2' }],
+	/** Your league's own page, its standings first: a trophy. Apart from the switch's flag (icons.ts
+	 * league), which names the league chosen. */
+	standings: [
+		{ tag: 'path', d: 'M7 4h10v5a5 5 0 0 1-10 0z' },
+		{ tag: 'path', d: 'M7 6H4v1a3 3 0 0 0 3 3M17 6h3v1a3 3 0 0 1-3 3M12 14v3M8 20h8M9.5 17h5' }
+	],
 	/** Your lineup for the week: a jersey. */
 	lineup: [{ tag: 'path', d: 'M9 3.5 4 6l1.8 4 2.2-.9V20h8V9.1l2.2.9L20 6l-5-2.5a3 3 0 0 1-6 0z' }],
 	/** This week's game: two teams face to face. */

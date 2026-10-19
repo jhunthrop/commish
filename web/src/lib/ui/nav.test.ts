@@ -15,10 +15,10 @@ import {
 	railPhase,
 	sectionHref,
 	sectionOf,
-	screenSection,
-	leagueScreenOf,
 	type LeaguePhase
 } from './nav.ts';
+import { leagueScreenOf, screenSection } from './rail-league.ts';
+import { BANNED_MARKS, BANNED_WORDS } from '#lib/format/copy-guard.ts';
 import { railFor, type RailEntry } from './rail-order.ts';
 
 const labels = (items: readonly RailEntry[]): string[] => items.map((item) => item.label);
@@ -38,12 +38,12 @@ const TABLE: Readonly<Record<LeaguePhase, { phone: string[]; wide: string[] }>> 
 		wide: ['Our record']
 	},
 	in_season: {
-		phone: ['Lineup', 'Matchup', 'Waivers', 'Trades', 'Players'],
-		wide: ['Rest of season', 'Our record']
+		phone: ['League', 'Lineup', 'Matchup', 'Waivers', 'Trades'],
+		wide: ['Players', 'Rest of season', 'Our record']
 	},
 	playoffs: {
-		phone: ['Lineup', 'Matchup', 'Trades', 'Players', 'Rest of season'],
-		wide: ['Our record']
+		phone: ['League', 'Lineup', 'Matchup', 'Trades', 'Players'],
+		wide: ['Rest of season', 'Our record']
 	},
 	offseason: {
 		phone: ['Board', 'Players', 'Mock draft', 'Cheat sheet', 'Advisor'],
@@ -64,14 +64,39 @@ for (const phase of LEAGUE_PHASES) {
 	});
 }
 
-void test('waivers return to the wide rail in the playoffs while the host runs them', () => {
+void test("waivers stay on the phone's five in the playoffs while the host runs them", () => {
 	const open = railFor('playoffs', true);
-	assert.deepEqual(phone(open), TABLE.playoffs.phone);
-	assert.deepEqual(wide(open), ['Waivers', 'Our record']);
+	assert.deepEqual(phone(open), TABLE.in_season.phone);
+	assert.deepEqual(wide(open), TABLE.in_season.wide);
 	// Outside the playoffs the flag changes nothing.
 	for (const phase of LEAGUE_PHASES.filter((p) => p !== 'playoffs')) {
 		assert.deepEqual(railFor(phase, true), railFor(phase, false));
 	}
+});
+
+/** A league's pages a phase has: its own page and every screen its rail opens. */
+const leaguePages = (items: readonly RailEntry[]): string[] =>
+	items.flatMap((item) => (item.screen === undefined ? [] : [item.screen]));
+
+void test("the rail is the one way between a league's pages: the phone reaches every one", () => {
+	for (const phase of LEAGUE_PHASES) {
+		for (const open of [true, false]) {
+			const items = railFor(phase, open);
+			const pages = leaguePages(items);
+			assert.deepEqual(leaguePages(items.filter((item) => !item.wideOnly)), pages);
+			// The league page leads whenever the phase has a screen, and only then.
+			assert.equal(pages[0] === 'league', pages.length > 0);
+		}
+	}
+	assert.deepEqual(leaguePages(railFor('in_season', true)), [
+		'league',
+		'start',
+		'matchup',
+		'waivers',
+		'trades'
+	]);
+	assert.deepEqual(leaguePages(railFor('pre_draft', true)), []);
+	assert.deepEqual(leaguePages(railFor('offseason', true)), []);
 });
 
 void test('the rail is the selected league phase, else the site season, preseason as pre_draft', () => {
@@ -106,6 +131,8 @@ void test("the in-season items open the selected league's screens, else the foll
 	const href = (label: string, id: string | null): string =>
 		railHref(items.find((item) => item.label === label) ?? RAIL_FOOT, id);
 	const id = '6f1d1c52-2626-4a26-9a26-000000000026';
+	assert.equal(href('League', id), `/league/${id}`);
+	assert.equal(href('League', null), '/league/new');
 	assert.equal(href('Lineup', id), `/league/${id}/start`);
 	assert.equal(href('Matchup', id), `/league/${id}/matchup`);
 	assert.equal(href('Waivers', id), `/league/${id}/waivers`);
@@ -117,16 +144,14 @@ void test("the in-season items open the selected league's screens, else the foll
 	assert.equal(href('Rest of season', id), '/board');
 });
 
-void test('a page lights the item that owns it, an in-season screen by its segment', () => {
+void test('a page lights the item that owns it, a league page the item it names', () => {
 	assert.equal(sectionOf('/board/ppr-12'), 'board');
 	assert.equal(sectionOf('/adp/ppr-12'), 'board');
 	assert.equal(sectionOf('/players/puka-nacua'), 'players');
 	assert.equal(sectionOf('/companion/new'), 'advisor');
-	assert.equal(sectionOf('/league/abc/start'), 'lineup');
-	assert.equal(sectionOf('/league/abc/matchup'), 'matchup');
-	assert.equal(sectionOf('/league/abc/waivers'), 'waivers');
-	assert.equal(sectionOf('/league/abc/trades'), 'trades');
-	// The league page and the follow page belong to no rail item: the switch names the league.
+	// A league's pages pass their item to the shell (screenSection): no path under /league/ owns one,
+	// so the follow page lights nothing of its own.
+	assert.equal(sectionOf('/league/abc/start'), null);
 	assert.equal(sectionOf('/league/abc'), null);
 	assert.equal(sectionOf('/league/new'), null);
 	assert.equal(sectionOf('/'), null);
@@ -142,9 +167,20 @@ void test('the shell links every page it can reach, and a section href is its pa
 });
 
 void test("a league's screen lights its rail item, and the follow page reads the screen it was sent for", () => {
+	assert.equal(screenSection('league'), 'league');
 	assert.equal(screenSection('start'), 'lineup');
+	assert.equal(screenSection('matchup'), 'matchup');
+	assert.equal(screenSection('waivers'), 'waivers');
 	assert.equal(screenSection('trades'), 'trades');
 	assert.equal(leagueScreenOf('matchup'), 'matchup');
 	assert.equal(leagueScreenOf('league'), null);
 	assert.equal(leagueScreenOf(null), null);
+});
+
+void test('every rail word passes the copy guard', () => {
+	for (const item of [...RAIL_ITEMS, RAIL_FOOT]) {
+		assert.ok(!BANNED_WORDS.test(item.label), item.label);
+		assert.ok(!BANNED_MARKS.test(item.label), item.label);
+	}
+	assert.ok(RAIL_ITEMS.some((item) => item.label === 'League'));
 });

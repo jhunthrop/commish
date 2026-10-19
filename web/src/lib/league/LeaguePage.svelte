@@ -22,7 +22,6 @@
 	import { boardOnce } from './board-once.ts';
 	import { sheetTags } from './sheet-tags.ts';
 	import { followSwitch } from './follow-switch.svelte.ts';
-	import LeagueTabs from './inseason/LeagueTabs.svelte';
 	import SeasonPanel from './SeasonPanel.svelte';
 	import { MOCK_VERB } from '#lib/ui/nav.ts';
 	import { tabHref } from './inseason/tabs.ts';
@@ -309,7 +308,7 @@
 	</footer>
 {/snippet}
 
-<Shell title="League" active={null}>
+<Shell title="League" active="league">
 	{#if failure === 'signed-out'}
 		<div class="pad">
 			<EmptyState
@@ -373,7 +372,6 @@
 				</div>
 			</header>
 			<div class="navrow">
-				<LeagueTabs {id} current="league" />
 				<div class="segs" role="tablist" aria-label="League view" tabindex="-1" onkeydown={arrow}>
 					{#each VIEWS as v (v)}
 						<button
@@ -474,10 +472,6 @@
 		display: flex;
 		flex-direction: column;
 		gap: var(--s-4);
-	}
-
-	.navrow > :global(:first-child) {
-		min-width: 0;
 	}
 
 	.navrow {
