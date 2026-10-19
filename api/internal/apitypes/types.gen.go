@@ -4202,8 +4202,8 @@ type WaiverAdvice struct {
 
 // WaiverBeats the member's player at his position with the lowest Proj he tops, the advised lineup's starters first, then the bench, never one who cannot play this week (Lane 66f's Beats column); or the open spot he fills, a starting spot no player of the member's can play this week
 type WaiverBeats struct {
-	// Gain his Proj less that player's, as the screen prints them (tenths)
-	Gain float64 `json:"gain"`
+	// Gain his Proj less that player's, as the screen prints them (tenths); null while the pickups go in season Gain order (a pickup's game has kicked off), when no week figure counts
+	Gain *float64 `json:"gain"`
 
 	// HostId the member's player's host id, a line in the answer's roster; empty for the open spot
 	HostId string `json:"host_id"`
@@ -4229,8 +4229,8 @@ type WaiverDrop struct {
 	// StartsThisWeek the lineup the Lineup screen sets this week starts him; the panel marks him, and the row's own drop is one only when the lineup stays full with the add in it (Lane 66u)
 	StartsThisWeek bool `json:"starts_this_week"`
 
-	// WeekGain this week's Proj to the lineup the advice sets, one decimal
-	WeekGain float64 `json:"week_gain"`
+	// WeekGain this week's Proj to the lineup the advice sets, one decimal; null in season Gain order
+	WeekGain *float64 `json:"week_gain"`
 }
 
 // WaiverMoves defines model for WaiverMoves.
@@ -4280,8 +4280,8 @@ type WaiverRow struct {
 	// Starts he starts this week in the lineup the advice sets with him in (the highest Proj after designations and byes)
 	Starts bool `json:"starts"`
 
-	// WeekGain this week's Proj of the lineup the advice sets (the Lineup screen's rule) with him in and the row's drop out, less the lineup's without him, one decimal; 0 when he would not start
-	WeekGain float64 `json:"week_gain"`
+	// WeekGain this week's Proj of the lineup the advice sets (the Lineup screen's rule) with him in and the row's drop out, less the lineup's without him, one decimal; 0 when he would not start. Null on every row once any pickup's add or drop has kicked off (gameStateAt): the pickups then go in season Gain order and no week figure counts
+	WeekGain *float64 `json:"week_gain"`
 }
 
 // WeekBug defines model for WeekBug.

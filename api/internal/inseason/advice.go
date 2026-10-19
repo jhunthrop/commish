@@ -599,15 +599,15 @@ func (a *advisor) waiverRun(position draft.Position) (waiverRun, bool) {
 		w: &Writer{Basis: a.basis, Now: a.now}, moves: Waivers(a.config, a.weeks, squad, cands)}, true
 }
 
-// Pickups is the Waivers strip's chosen set alone, without the table's
-// rows: what the front door's pickup chip reads.
+// Pickups is the Waivers strip's chosen set alone: what the front door's
+// pickup chip reads, by the one pickup rule (the page's own strip, its
+// season order once a pickup's game has kicked off).
 func (a *advisor) Pickups() ([]apitypes.WaiverRow, bool) {
-	run, ok := a.waiverRun("")
+	out, ok := a.Waivers("", "")
 	if !ok {
 		return nil, false
 	}
-	rows, _ := a.strip(run.w, run.week, run.mine, run.pool, run.moves, run.clears)
-	return rows, true
+	return out.Pickups, true
 }
 
 // Waivers is the waiver page (§5). asked, a board id or "", is a player a
@@ -636,6 +636,7 @@ func (a *advisor) Waivers(position draft.Position, asked string) (apitypes.Waive
 		base := run.week.base.proj
 		out.LineupProj, out.PickupsProj = &base, &proj
 	}
+	inSeasonOrder(&out)
 	return out, true
 }
 
@@ -664,9 +665,11 @@ func waiverRow(w *Writer, week *pickupWeek, mine []person, add person, move Waiv
 	row := apitypes.WaiverRow{Add: add.line, Gain: roundTenth(move.Gain), Beats: week.beats(add.cand, mine), Drops: []apitypes.WaiverDrop{}}
 	if !move.NoDrop {
 		var open bool
-		row.WeekGain, row.Starts, open = week.with(add.cand, move.Drop)
+		var weekGain float64
+		weekGain, row.Starts, open = week.with(add.cand, move.Drop)
+		row.WeekGain = &weekGain
 		if open {
-			row.Beats = openSpot(row.WeekGain)
+			row.Beats = openSpot(weekGain)
 		}
 	}
 	var drop *Line
@@ -676,7 +679,7 @@ func waiverRow(w *Writer, week *pickupWeek, mine []person, add person, move Waiv
 	}
 	for _, d := range move.Drops {
 		weekGain, _, _ := week.with(add.cand, d.At)
-		row.Drops = append(row.Drops, apitypes.WaiverDrop{HostId: mine[d.At].cand.ID, Gain: roundTenth(d.Gain), WeekGain: weekGain,
+		row.Drops = append(row.Drops, apitypes.WaiverDrop{HostId: mine[d.At].cand.ID, Gain: roundTenth(d.Gain), WeekGain: &weekGain,
 			StartsThisWeek: d.StartsThisWeek})
 	}
 	row.Pickup = !move.NoDrop && isPickup(row)

@@ -86,7 +86,7 @@ func TestLineupSummaryWithNoProjectionIsNull(t *testing.T) {
 // the bye whose spot no one can play, then the first pickup with its
 // week gain.
 func TestRosterChipsInOrder(t *testing.T) {
-	pickup := apitypes.WaiverRow{Add: line("hutchinson", proj(4.28), apitypes.WeekFacts{}), WeekGain: 1.8}
+	pickup := apitypes.WaiverRow{Add: line("hutchinson", proj(4.28), apitypes.WeekFacts{}), WeekGain: fp(1.8)}
 	got := rosterChips(apitypes.LineupAdvice{Slots: weekSlots()}, []apitypes.WaiverRow{pickup})
 	if len(got) != 3 {
 		t.Fatalf("%d chips, want 3", len(got))

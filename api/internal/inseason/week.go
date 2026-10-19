@@ -280,8 +280,7 @@ func rosterChips(lineup apitypes.LineupAdvice, pickups []apitypes.WaiverRow) []a
 		out = append(out, apitypes.RosterChip{Kind: apitypes.RosterChipKindBye, Line: *line, Idle: true})
 	}
 	if len(pickups) > 0 {
-		gain := pickups[0].WeekGain
-		out = append(out, apitypes.RosterChip{Kind: apitypes.RosterChipKindPickup, Line: pickups[0].Add, Gain: &gain})
+		out = append(out, apitypes.RosterChip{Kind: apitypes.RosterChipKindPickup, Line: pickups[0].Add, Gain: pickups[0].WeekGain})
 	}
 	return out
 }

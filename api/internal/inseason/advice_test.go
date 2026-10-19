@@ -128,7 +128,7 @@ func TestWaiverAdvice(t *testing.T) {
 	if out.LineupProj != nil {
 		sum := *out.LineupProj
 		for _, p := range out.Pickups {
-			sum = roundTenth(sum + p.WeekGain)
+			sum = roundTenth(sum + fv(p.WeekGain))
 		}
 		if sum != *out.PickupsProj {
 			t.Fatalf("the cards' gains reach %v, the set's Proj is %v", sum, *out.PickupsProj)

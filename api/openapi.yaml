@@ -4141,7 +4141,13 @@ components:
         host_id: { type: string, description: "the member's player's host id, a line in the answer's roster; empty for the open spot" }
         name: { type: string, description: empty for the open spot }
         starter: { type: boolean, description: the player he tops starts in the lineup the advice sets this week }
-        gain: { type: number, format: double, description: "his Proj less that player's, as the screen prints them (tenths)" }
+        gain:
+          type: number
+          format: double
+          nullable: true
+          description: >-
+            his Proj less that player's, as the screen prints them (tenths); null while the pickups go in season Gain
+            order (a pickup's game has kicked off), when no week figure counts
     WaiverDrop:
       type: object
       description: one player of the member's an add could replace, with the lineup's gains after the swap
@@ -4154,7 +4160,11 @@ components:
             the lineup the Lineup screen sets this week starts him; the panel marks him, and the row's own drop is one
             only when the lineup stays full with the add in it (Lane 66u)
         gain: { type: number, format: double, description: "points over replacement a week to the lineup over the rest of the season, one decimal" }
-        week_gain: { type: number, format: double, description: "this week's Proj to the lineup the advice sets, one decimal" }
+        week_gain:
+          type: number
+          format: double
+          nullable: true
+          description: "this week's Proj to the lineup the advice sets, one decimal; null in season Gain order"
     WaiverRow:
       type: object
       required: [add, drop, gain, week_gain, starts, pickup, beats, drops, clears, sentence]
@@ -4168,9 +4178,11 @@ components:
         week_gain:
           type: number
           format: double
+          nullable: true
           description: >-
             this week's Proj of the lineup the advice sets (the Lineup screen's rule) with him in and the row's drop out,
-            less the lineup's without him, one decimal; 0 when he would not start
+            less the lineup's without him, one decimal; 0 when he would not start. Null on every row once any pickup's
+            add or drop has kicked off (gameStateAt): the pickups then go in season Gain order and no week figure counts
         starts: { type: boolean, description: "he starts this week in the lineup the advice sets with him in (the highest Proj after designations and byes)" }
         pickup:
           type: boolean

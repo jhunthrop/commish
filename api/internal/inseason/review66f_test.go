@@ -91,7 +91,7 @@ func TestPickupBeats(t *testing.T) {
 				}
 				return
 			}
-			if got == nil || got.HostId != tc.want || got.Starter != tc.starter || got.Gain != tc.gain {
+			if got == nil || got.HostId != tc.want || got.Starter != tc.starter || fv(got.Gain) != tc.gain {
 				t.Fatalf("beats %+v, want %s starter %v +%v", got, tc.want, tc.starter, tc.gain)
 			}
 		})
@@ -99,7 +99,7 @@ func TestPickupBeats(t *testing.T) {
 }
 
 func pickRow(beats, drop string, weekGain, gain float64, starts bool) apitypes.WaiverRow {
-	r := apitypes.WaiverRow{WeekGain: weekGain, Gain: gain, Starts: starts}
+	r := apitypes.WaiverRow{WeekGain: fp(weekGain), Gain: gain, Starts: starts}
 	if beats != "" {
 		r.Beats = &apitypes.WaiverBeats{HostId: beats}
 	}

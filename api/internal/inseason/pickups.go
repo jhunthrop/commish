@@ -111,8 +111,8 @@ func (w *pickupWeek) beats(add Candidate, mine []person) *apitypes.WaiverBeats {
 		}
 		if low >= 0 {
 			p := mine[low]
-			return &apitypes.WaiverBeats{HostId: p.cand.ID, Name: p.line.Player.Name, Starter: starter,
-				Gain: roundTenth(add.Proj - p.cand.Proj)}
+			gain := roundTenth(add.Proj - p.cand.Proj)
+			return &apitypes.WaiverBeats{HostId: p.cand.ID, Name: p.line.Player.Name, Starter: starter, Gain: &gain}
 		}
 	}
 	return nil
@@ -121,13 +121,13 @@ func (w *pickupWeek) beats(add Candidate, mine []person) *apitypes.WaiverBeats {
 // openSpot is Beats for an add who fills a starting spot no one of the
 // member's can play this week: no player named, the week's gain.
 func openSpot(weekGain float64) *apitypes.WaiverBeats {
-	return &apitypes.WaiverBeats{OpenSpot: true, Starter: true, Gain: weekGain}
+	return &apitypes.WaiverBeats{OpenSpot: true, Starter: true, Gain: &weekGain}
 }
 
 // isPickup is the strip's rule (Lane 66f): he starts this week, the
 // lineup's Proj rises, and the rest of the season does not fall.
 func isPickup(row apitypes.WaiverRow) bool {
-	return row.Starts && row.WeekGain > 0 && roundTenth(row.Gain) >= 0
+	return row.Starts && row.WeekGain != nil && *row.WeekGain > 0 && roundTenth(row.Gain) >= 0
 }
 
 // setCandidate is one add the strip may name: the add, his drop (a roster

@@ -363,6 +363,12 @@ func WeekDoneWords(week int) string {
 // week on the Proj the screen shows, the rest of the season on its Gain.
 const WaiversBasis = "A pickup starts this week on Proj and keeps Gain at zero or better."
 
+// SeasonOrderWords is the waiver page's rule once a pickup's game has
+// kicked off (Lane 85 fix round 3): the adds go by the season Gain.
+func SeasonOrderWords(week int) string {
+	return fmt.Sprintf("Pickups go in Gain order once their week %d games kick off.", week)
+}
+
 // WaiverSeasonBasis is what a waiver Gain is, the head the card and the
 // drop panel print (Lane 66u).
 func WaiverSeasonBasis(b OrderBasis, weeks int) string {
