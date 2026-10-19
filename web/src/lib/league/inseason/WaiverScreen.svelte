@@ -100,7 +100,7 @@
 		copy = (text) => navigator.clipboard.writeText(text),
 		openPage = (href) => void window.open(href, '_blank', 'noopener'),
 		rulesHref,
-		now
+		now: pageNow
 	}: Props = $props();
 
 	const MOVE_ID = 'claim-move';
@@ -123,6 +123,10 @@
 	let position = $state<WaiverPosition | null>(null);
 	/** The answer for the chosen position, null for every position or until it is read. */
 	let narrowed = $state<WaiverAdvice | null>(null);
+	/** When the narrowed answer was read, in ms: a narrowed read is a read of its own, so its rows
+	 * and basis draw at its instant, the page's clock otherwise (review 77 finding 1). */
+	let narrowedAt = $state<number | null>(null);
+	const now = $derived(narrowed !== null && narrowedAt !== null ? narrowedAt : pageNow);
 	let reading = $state(false);
 	let problem = $state<string | null>(null);
 	let query = $state('');
@@ -253,7 +257,10 @@
 		const outcome = await narrowing.choose(next);
 		if (outcome.kind === 'overtaken') return;
 		reading = false;
-		if (outcome.kind === 'answer') narrowed = outcome.answer;
+		if (outcome.kind === 'answer') {
+			narrowedAt = Date.now();
+			narrowed = outcome.answer;
+		}
 		if (outcome.kind === 'failed') problem = outcome.sentence;
 	}
 

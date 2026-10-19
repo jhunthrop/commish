@@ -16,16 +16,17 @@
 	interface Props {
 		/** What the account may use (/me, Can): many_leagues follows more than one league. */
 		features: readonly Feature[];
-		/** The account room's clock the rows' last reads are said against. */
-		now: Date;
 	}
 
-	let { features, now }: Props = $props();
+	let { features }: Props = $props();
 
 	/** The account's leagues on other hosts, each with a quiet way to stop following it and, for a
 	 * few seconds after, to take that back. It reads its own list, so the account page's other reads
 	 * never wait on it. A detached league keeps its saved settings either way. */
 	let leagues = $state<AttachedLeague[] | null>(null);
+	/** The list's clock: the instant it was read, set with the list, so each last read is said against
+	 * it. No row draws before the list lands. */
+	let now = $state(new Date(0));
 	let failed = $state(false);
 	let busy = $state<string | null>(null);
 	let problem = $state<string | null>(null);
@@ -47,6 +48,7 @@
 		leagueApi
 			.attached()
 			.then((list) => {
+				now = new Date();
 				leagues = list;
 			})
 			.catch(() => (failed = true));

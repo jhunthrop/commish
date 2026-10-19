@@ -346,3 +346,13 @@ void test('the basis is one paragraph, the pickup rule first, each column it dra
 	);
 	assert.ok(!basisText(later).includes('was read'), basisText(later));
 });
+
+void test('a narrowed read draws at its own instant: past his kickoff his game facts drop (review 77)', () => {
+	// The page read the pool Friday evening; the member narrowed to his position 30 minutes after his
+	// kickoff. At the page's clock his expected score would stand; at the narrowed read's it is gone.
+	const total = { game_total: { points: 44.5, team_points: 23, read_at: FACTS_READ } };
+	const pool = { rows: [row(line('Mason Taylor', 'TE', 4.77, 5.3, total))], pickups: [] };
+	const narrowedAt = Date.parse('2026-10-18T17:30:00.000Z');
+	assert.equal(poolRows(pool, ZONE, NOW)[0]?.row.expected, '23 to 21.5');
+	assert.equal(poolRows(pool, ZONE, narrowedAt)[0]?.row.expected, null);
+});
