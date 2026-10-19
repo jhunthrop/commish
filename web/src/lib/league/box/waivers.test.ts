@@ -30,7 +30,6 @@ import {
 	WAIVERS,
 	waiverBasis,
 	withDrop,
-	seasonOrderWords,
 	beatsWord
 } from './waivers.ts';
 
@@ -162,7 +161,7 @@ const advice = {
 };
 
 void test('the strip names each pickup as a card: the move, both gains, the sum on the Lineup', () => {
-	const cards = pickupCards(advice, NOW);
+	const cards = pickupCards(advice);
 	assert.deepEqual(cards.map(moveWords), ['Add Gainwell, drop Lemon', 'Add Chiefs, drop Saints']);
 	assert.equal(
 		cardGains(cards[0] ?? { weekGain: 0, gain: 0 }),
@@ -273,7 +272,7 @@ void test("the verbs name the member's platform, and the copy says where he goes
 });
 
 void test('copy guard: every Waivers line is fantasy words, with no dash, semicolon or the word host', () => {
-	const cards = pickupCards(advice, NOW);
+	const cards = pickupCards(advice);
 	const lines = [
 		...Object.values(WAIVERS),
 		stripDecision(cards),
@@ -308,7 +307,7 @@ void test('a card says a last name in full when another player on screen shares 
 	const roschon = line('Roschon Johnson', 'RB', 0.6);
 	const taylor = row(line('Mason Taylor', 'TE', 4.77), { drop: roschon });
 	const theo = row(line('Theo Johnson', 'TE', 4.1));
-	const [card] = pickupCards({ rows: [taylor, theo], pickups: [taylor], roster: [roschon] }, NOW);
+	const [card] = pickupCards({ rows: [taylor, theo], pickups: [taylor], roster: [roschon] });
 	assert.equal(card ? moveWords(card) : '', 'Add Taylor, drop Roschon Johnson');
 	assert.equal(cardName('Roschon Johnson', ['Roschon Johnson']), 'Johnson');
 });
@@ -327,7 +326,13 @@ const RULES = '/league/1#uncounted';
 const CLOCK = { zone: ZONE, zoned: false };
 
 void test('the basis is one paragraph, the pickup rule first, each column it draws said once (Lane 66t)', () => {
-	const parts = waiverBasis(BASIS, [gainwell.add, saints], RULES, CLOCK, NOW);
+	const parts = waiverBasis(
+		{ ...BASIS, pickups: advice.pickups },
+		[gainwell.add, saints],
+		RULES,
+		CLOCK,
+		NOW
+	);
 	assert.equal(
 		basisText(parts),
 		`${BASIS.basis} ${WAIVERS.dropRule} ${BASIS.season_basis} Proj is this week's published projection, PPR nearest your rules, defenses on default scoring, read Fri 9:00 pm. Δ Proj is its change since Thu 9:00 pm. ${FACTS_SENTENCE} Opp rank is points allowed to his position, 1st fewest. ${BASIS.basis_note} Which five`
@@ -360,47 +365,6 @@ void test('a narrowed read draws at its own instant: past his kickoff his game f
 	assert.equal(poolRows(pool, ZONE, narrowedAt)[0]?.row.expected, null);
 });
 
-void test('a pickup whose game is final keeps its card but says no Proj this week (Lane 85)', () => {
-	const played = (row: WaiverRow): WaiverRow => ({
-		...row,
-		add: { ...row.add, facts: { ...row.add.facts, played: true, game_state: 'final' } }
-	});
-	const tuesday = {
-		...advice,
-		rows: [played(gainwell), chiefs],
-		pickups: [played(gainwell), chiefs]
-	};
-	const cards = pickupCards(tuesday, NOW);
-	// The add is still allowed (it is for next week): the card stays, its week figure goes.
-	assert.deepEqual(cards.map(moveWords), ['Add Gainwell, drop Lemon', 'Add Chiefs, drop Saints']);
-	const [first, second] = cards;
-	assert.ok(first && second);
-	assert.equal(first.weekGain, null);
-	assert.equal(cardGains(first), '+1.2 Gain a week');
-	// Re-ordered by the season Gain, no card keeps a week gain measured in the API's order (M-B).
-	assert.equal(second.weekGain, null);
-	// The lineup's Proj with every card made is a week figure too: none once one card has none.
-	assert.equal(pickupSum(tuesday, cards), null);
-	// His row says Final.
-	const row = poolRows(tuesday, ZONE, NOW).find((r) => r.row.name === 'Kenny Gainwell');
-	assert.deepEqual(row?.row.game, { where: 'vs PIT', when: 'Final' });
-	// A drop whose game is final: the pair has no week figure either.
-	const lemonPlayed = {
-		...lemon,
-		facts: { ...lemon.facts, played: true, game_state: 'final' as const }
-	};
-	const drops = dropRows(gainwell, [vidal, lemonPlayed, saints], ZONE, NOW);
-	assert.deepEqual(
-		drops.map((d) => [d.row.name, d.weekGain]),
-		[
-			['Makai Lemon', null],
-			['Kimani Vidal', 6.7]
-		]
-	);
-	assert.equal(sameWeekGain(drops), null);
-	assert.equal(withDrop(gainwell, drops[0] ?? null).week_gain, gainwell.week_gain);
-});
-
 void test('the basis says when Final and the stats land while a row waits on them (Lane 85)', () => {
 	const final = {
 		...gainwell.add,
@@ -411,62 +375,66 @@ void test('the basis says when Final and the stats land while a row waits on the
 	assert.ok(!basisText(waiverBasis(BASIS, [saints], RULES, CLOCK, NOW)).includes(KICKED_OFF_PART));
 });
 
-void test('a Final row keeps no week figure in Beats, and the pickups go in season Gain order (review H3)', () => {
-	const final = (r: WaiverRow): WaiverRow => ({
-		...r,
-		add: { ...r.add, facts: { ...r.add.facts, played: true, game_state: 'final' } }
-	});
-	const rows = [final(jones), final(gainwell), final(mevis), final(allen), final(chiefs)];
-	// The API's order is this week's: Gainwell then Chiefs by their week gains.
-	const tuesday = { ...advice, rows, pickups: [final(chiefs), final(gainwell)] };
+/** The API's answer once a pickup's game has kicked off (inseason season_order.go, Lane 85 fix round
+ * 3): the rows by the season Gain, the strip its first, every week figure withheld. */
+const seasonOrder = (r: WaiverRow): WaiverRow => ({
+	...r,
+	add: { ...r.add, facts: { ...r.add.facts, played: true, game_state: 'final' } },
+	week_gain: null,
+	beats: r.beats && { ...r.beats, gain: null },
+	drops: r.drops.map((d) => ({ ...d, week_gain: null }))
+});
+const SEASON_WORDS = 'Pickups go in Gain order once their week 6 games kick off.';
+
+void test('in the API season order the web prints it: the season Gain in Beats, no week figure (M-E)', () => {
+	const rows = [gainwell, chiefs, mevis, jones, allen].map(seasonOrder);
+	const tuesday = { ...advice, rows, pickups: [rows[0] ?? gainwell] };
 	const pool = poolRows(tuesday, ZONE, NOW);
-	const gainwellRow = pool.find((r) => r.row.name === 'Kenny Gainwell');
-	assert.ok(gainwellRow?.beats);
-	// In season order the Beats cell draws the season Gain, the key the column is sorted by (M-A).
-	assert.deepEqual(gainwellRow.beats, { name: 'Vidal', starter: true, gain: 1.2, unit: 'season' });
-	assert.equal(beatsWord(gainwellRow.beats), '+1.2 Gain');
-	assert.equal(beatsWord({ gain: null, unit: 'week' }), '--');
+	const top = pool[0];
+	assert.ok(top?.beats);
+	assert.deepEqual(top.beats, { name: 'Vidal', starter: true, gain: 1.2, unit: 'season' });
+	assert.equal(beatsWord(top.beats), '+1.2 Gain');
 	assert.equal(beatsWord({ gain: 6.7, unit: 'week' }), '+6.7');
-	assert.deepEqual(gainwellRow.row.game, { where: 'vs PIT', when: 'Final' });
-	// The default sort reads the season Gain once the week figure is withheld: Gainwell (1.2) over
-	// Chiefs (0.3) over Mevis (-0.3), the starters topped first as before.
 	assert.deepEqual(
 		sortRows(pool, DEFAULT_SORT).map((r) => r.row.name),
 		['Kenny Gainwell', 'Chiefs D/ST', 'Harrison Mevis', 'Daniel Jones', 'Kaytron Allen']
 	);
-	// The strip's cards too: the API sent Chiefs first by the week, the season Gain puts Gainwell first.
-	assert.deepEqual(
-		pickupCards(tuesday, NOW).map((c) => c.add),
-		['Gainwell', 'Chiefs']
-	);
-	// The basis names the column that ordered them, never the week's rule.
+	const [card] = pickupCards(tuesday);
+	assert.ok(card);
+	assert.equal(card.weekGain, null);
+	assert.equal(cardGains(card), '+1.2 Gain a week');
+	assert.equal(pickupSum({ lineup_proj: null, pickups_proj: null }, pickupCards(tuesday)), null);
+	assert.deepEqual(top.row.game, { where: 'vs PIT', when: 'Final' });
+	// The basis is the API's order sentence; the drop's reason is not said, its sentence names none.
 	const text = basisText(
 		waiverBasis(
-			{ ...BASIS, week: 6, pickups: tuesday.pickups, roster: tuesday.roster },
+			{ ...BASIS, basis: SEASON_WORDS, pickups: tuesday.pickups },
 			rows.map((r) => r.add),
 			RULES,
 			CLOCK,
 			NOW
 		)
 	);
-	assert.ok(text.startsWith(seasonOrderWords(6)), text);
-	assert.ok(!text.includes(BASIS.basis), text);
-	assert.equal(seasonOrderWords(6), 'Pickups go in Gain order once their week 6 games kick off.');
-	assert.doesNotMatch(seasonOrderWords(6), bannedPattern());
-	// While every week figure is still drawn, the API's order and rule stand.
+	assert.ok(text.startsWith(SEASON_WORDS), text);
+	assert.ok(!text.includes(WAIVERS.dropRule), text);
+	assert.doesNotMatch(SEASON_WORDS, bannedPattern());
+});
+
+void test('the web never re-orders the strip: the cards are the API pickups in its order (M-E guard)', () => {
+	// The API sent Chiefs first though Gainwell has the higher season Gain: the web keeps its order.
+	const cards = pickupCards({ ...advice, pickups: [chiefs, gainwell] });
 	assert.deepEqual(
-		pickupCards({ ...advice, pickups: [chiefs, gainwell] }, NOW).map((c) => c.add),
+		cards.map((c) => c.add),
 		['Chiefs', 'Gainwell']
 	);
-	assert.ok(
-		basisText(
-			waiverBasis(
-				{ ...BASIS, week: 6, pickups: advice.pickups, roster: advice.roster },
-				[gainwell.add],
-				RULES,
-				CLOCK,
-				NOW
-			)
-		).startsWith(BASIS.basis)
+	const season = [seasonOrder(chiefs), seasonOrder(gainwell)];
+	assert.deepEqual(
+		pickupCards({ ...advice, rows: season, pickups: season }).map((c) => c.add),
+		['Chiefs', 'Gainwell']
 	);
+	// Under the week's rule the drop's reason follows the pickup sentence, at a desk.
+	const week = waiverBasis({ ...BASIS, pickups: [gainwell] }, [gainwell.add], RULES, CLOCK, NOW);
+	assert.ok(week.some((p) => p.text === WAIVERS.dropRule && !p.phone));
+	const none = waiverBasis({ ...BASIS, pickups: [] }, [gainwell.add], RULES, CLOCK, NOW);
+	assert.ok(!none.some((p) => p.text === WAIVERS.dropRule));
 });

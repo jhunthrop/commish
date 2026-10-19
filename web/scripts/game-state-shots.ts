@@ -32,7 +32,7 @@ import { BASIS_BUDGET, basisLines, figureSentenceFaults } from './basis-lines.ts
 import { copyFault, watchData } from './copy-scan.ts';
 import { FIXTURE_IDS } from './inseason-fixture/ids.ts';
 import { EMPTY_FIGURE } from '../src/lib/format/empty.ts';
-import { seasonOrderWords } from '../src/lib/league/box/waivers.ts';
+import { seasonOrderWords } from './inseason-fixture/waivers-at.ts';
 import { SEASON } from '../src/lib/league/box/season.ts';
 import {
 	FIXTURE_MONDAY_CLOCK,

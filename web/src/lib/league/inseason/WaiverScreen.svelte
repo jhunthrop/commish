@@ -143,11 +143,9 @@
 	const positions = $derived(
 		POSITIONS.filter((p) => advice.rows.some((r) => r.add.player.position === p))
 	);
-	const pool = $derived(
-		poolRows({ rows: shown.rows, pickups: advice.pickups, roster: shown.roster }, memberZone(), now)
-	);
+	const pool = $derived(poolRows({ rows: shown.rows, pickups: advice.pickups }, memberZone(), now));
 	const rows = $derived(findRows(sortRows(pool, sort), query));
-	const cards = $derived(pickupCards(advice, now));
+	const cards = $derived(pickupCards(advice));
 	const card = $derived(cards.find((c) => c.key === chosenCard) ?? cards[0] ?? null);
 	const openRow = $derived(pool.find((r) => r.key === open) ?? null);
 	const drops = $derived(openRow ? dropRows(openRow.source, shown.roster, memberZone(), now) : []);

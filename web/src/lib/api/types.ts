@@ -3385,9 +3385,9 @@ export interface components {
 			starter: boolean;
 			/**
 			 * Format: double
-			 * @description his Proj less that player's, as the screen prints them (tenths)
+			 * @description his Proj less that player's, as the screen prints them (tenths); null while the pickups go in season Gain order (a pickup's game has kicked off), when no week figure counts
 			 */
-			gain: number;
+			gain: number | null;
 		};
 		/** @description one player of the member's an add could replace, with the lineup's gains after the swap */
 		WaiverDrop: {
@@ -3402,9 +3402,9 @@ export interface components {
 			gain: number;
 			/**
 			 * Format: double
-			 * @description this week's Proj to the lineup the advice sets, one decimal
+			 * @description this week's Proj to the lineup the advice sets, one decimal; null in season Gain order
 			 */
-			week_gain: number;
+			week_gain: number | null;
 		};
 		WaiverRow: {
 			add: components['schemas']['PlayerLine'];
@@ -3417,9 +3417,9 @@ export interface components {
 			gain: number;
 			/**
 			 * Format: double
-			 * @description this week's Proj of the lineup the advice sets (the Lineup screen's rule) with him in and the row's drop out, less the lineup's without him, one decimal; 0 when he would not start
+			 * @description this week's Proj of the lineup the advice sets (the Lineup screen's rule) with him in and the row's drop out, less the lineup's without him, one decimal; 0 when he would not start. Null on every row once any pickup's add or drop has kicked off (gameStateAt): the pickups then go in season Gain order and no week figure counts
 			 */
-			week_gain: number;
+			week_gain: number | null;
 			/** @description he starts this week in the lineup the advice sets with him in (the highest Proj after designations and byes) */
 			starts: boolean;
 			/** @description a pickup worth making: he starts this week, the lineup's Proj rises, and the gain over the rest of the season is not below 0 */
