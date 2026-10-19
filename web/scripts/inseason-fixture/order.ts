@@ -155,7 +155,7 @@ const out: OrderAdvice = {
 	week: WEEK,
 	// The league the points over replacement are for, said once in the basis, and the rules its season
 	// points leave out as the note, as the API says them (OrderScreenBasis, LineupNote; Lane 66q).
-	basis: `Our rest-of-season order from week ${String(WEEK)}: Points through week ${String(LAST_WEEK)}, byes out. Positions rank by Points, All by Over repl., his points less a free pickup's, for ${TEAMS}.`,
+	basis: `Our rest-of-season order from week ${String(WEEK)}. A position ranks by Projected through week ${String(LAST_WEEK)}, byes out, All by Over repl., his points less a free pickup's, for ${TEAMS}.`,
 	basis_note: NOTE,
 	rank_by: 'points_over_replacement',
 	moves: waivers.moves,

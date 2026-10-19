@@ -69,7 +69,7 @@ import {
 } from '../src/lib/run/schema.ts';
 import { POSITIONS, type Position } from '../src/lib/types/player.ts';
 import { bucketUrl, credentialsFromToken } from './r2.ts';
-import { dropBetween, gapOf } from './tenth.ts';
+import { dropBetween, gapOf, tenth } from './tenth.ts';
 import { checkRunSeasons } from '../src/lib/run/season-checks.ts';
 import { priorSeasonBlocks, seasonBlocks } from './standin-season.ts';
 import type { PlayerSeason, PriorSeason } from '../src/lib/run/season.ts';
@@ -491,20 +491,21 @@ function scheduleFrom(
 			return [];
 		});
 		const values = slate.map((game) => value(game.opponent));
-		const strength = round(values.reduce((sum, v) => sum + v, 0) / values.length);
-		return { abbr, games: slate, strength };
+		// Ranked on the unrounded mean, written to the tenth every screen prints (the nightly's rule, X9).
+		const mean = values.reduce((sum, v) => sum + v, 0) / values.length;
+		return { abbr, games: slate, mean };
 	});
-	const ordered = [...unranked].sort(
-		(a, b) => b.strength - a.strength || a.abbr.localeCompare(b.abbr)
-	);
+	const ordered = [...unranked].sort((a, b) => b.mean - a.mean || a.abbr.localeCompare(b.abbr));
 	return {
 		season: SEASON,
 		opponentValues: Object.fromEntries(codes.map((abbr) => [abbr, value(abbr)])),
 		opponentBasis: 'Published season win total',
 		unit: "opponents' average win total",
-		slates: unranked.map((slate) => ({
-			...slate,
-			rank: ordered.findIndex((other) => other.abbr === slate.abbr) + 1,
+		slates: unranked.map(({ abbr, games: slate, mean }) => ({
+			abbr,
+			games: slate,
+			strength: tenth(mean),
+			rank: ordered.findIndex((other) => other.abbr === abbr) + 1,
 			method: "the average of its opponents' published season win totals",
 			window: winTotals.window
 		}))

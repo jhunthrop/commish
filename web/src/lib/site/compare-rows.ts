@@ -5,6 +5,7 @@
 import { carriesGap, gapText, gapTone, type GapTone } from '#lib/format/gap.ts';
 import { rankWord } from '#lib/format/designation.ts';
 import { EMPTY_FIGURE } from '#lib/format/empty.ts';
+import { FIGURE } from '#lib/format/figure-words.ts';
 import { fixed, signed } from '#lib/format/number.ts';
 import type { PlayerFormat } from '#lib/run/schema.ts';
 import type { PlayerData } from './player-data.ts';
@@ -111,7 +112,7 @@ export function compareRows(
 			judged
 		),
 		figures(
-			'Projected',
+			FIGURE.projected,
 			pairOf((side) => side.numbers.projected),
 			(v) => fixed(v),
 			'up'
@@ -147,7 +148,7 @@ export function compareRows(
 	if (underway) {
 		rows.push(
 			figures(
-				'A game',
+				FIGURE.avg,
 				pairOf((side) => side.player.seasonSoFar?.pointsPerGame ?? null),
 				(v) => fixed(v),
 				'up'
@@ -162,7 +163,7 @@ export function compareRows(
 	}
 	rows.push(
 		figures(
-			`${String(season - 1)} a game`,
+			`${String(season - 1)} ${FIGURE.avg}`,
 			pairOf((side) => side.player.lastSeason?.pointsPerGame ?? null),
 			(v) => fixed(v),
 			'up'

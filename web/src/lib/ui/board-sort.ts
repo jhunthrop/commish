@@ -15,7 +15,7 @@ export const SORT_KEYS = [
 	'ourRank',
 	'gap',
 	'gp',
-	'agame'
+	'avg'
 ] as const satisfies readonly ColumnKey[];
 export type SortKey = (typeof SORT_KEYS)[number];
 
@@ -81,7 +81,7 @@ function figure(
 			return row.gap ?? null;
 		case 'gp':
 			return row.season?.games ?? null;
-		case 'agame':
+		case 'avg':
 			return row.season?.pointsPerGame ?? null;
 	}
 }

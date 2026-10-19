@@ -172,6 +172,28 @@ func NewSeason(d Data, rules Rules, week int, now time.Time) *Season {
 	return s
 }
 
+// playedFromLines is the season's games under the one rule every screen
+// reads (the ruling on the sweep's X3): a club's game is final once the
+// store holds its result or a line from either side of it, as the run's
+// game log counts a week played by its line. The weekly stats are
+// published only after a game ends, so a line never comes from a game in
+// progress; the result can land a pass later. A new slice: the read's own
+// is left as it was.
+func playedFromLines(games []boards.TeamWeek, lines []boards.StatLine) []boards.TeamWeek {
+	lined := map[teamWeek]bool{}
+	for _, l := range lines {
+		if l.Team != "" {
+			lined[teamWeek{l.Week, l.Team}] = true
+		}
+	}
+	out := make([]boards.TeamWeek, len(games))
+	for i, g := range games {
+		g.Final = g.Final || lined[teamWeek{g.Week, g.Team}] || lined[teamWeek{g.Week, g.Opponent}]
+		out[i] = g
+	}
+	return out
+}
+
 // Carries reports whether any line counted this season carries the
 // metric: a rule whose metric none carries scores nothing in points so far.
 func (s *Season) Carries(metric string) bool { return s.carried[metric] }

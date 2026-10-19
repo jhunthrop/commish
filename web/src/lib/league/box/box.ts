@@ -5,6 +5,7 @@
  * projection and his points so far. Pure functions over the API's player lines, so every word a box
  * prints is tested here. */
 import { EMPTY_FIGURE } from '#lib/format/empty.ts';
+import { FIGURE } from '#lib/format/figure-words.ts';
 import { memberZone, weekdayTime, zoneWord } from '#lib/format/clock.ts';
 import { defenseWords } from '#lib/format/clubs.ts';
 import { lastName } from '#lib/format/draft.ts';
@@ -49,7 +50,7 @@ export const BOX = {
 	pts: 'Pts',
 	/** The Lineup's evidence columns (Lane 66e). */
 	oppRank: 'Opp rank',
-	avg: 'Avg',
+	avg: FIGURE.avg,
 	last: 'Last',
 	delta: 'Δ Proj',
 	/** The phone's evidence line names the opponent's rank shortly. */
@@ -480,7 +481,8 @@ export function projShort(
 	scoring: ProjectionScoring,
 	defense: boolean,
 	zone: string = memberZone(),
-	league = true
+	league = true,
+	head: string = BOX.proj
 ): string {
 	// With no league (a player page signed out) the scoring is named alone.
 	const whose = !league
@@ -495,7 +497,7 @@ export function projShort(
 		previousReadAt === null
 			? ''
 			: ` ${BOX.delta} is its change since ${weekdayTime(previousReadAt, zone)}.`;
-	return `${BOX.proj} is this week's published projection in ${FORMAT_WORDS[scoring.format]} scoring${whose}, ${when}${defenses}.${delta}`;
+	return `${head} is this week's published projection in ${FORMAT_WORDS[scoring.format]} scoring${whose}, ${when}${defenses}.${delta}`;
 }
 
 /** The evidence columns in one short sentence pair, in the scoring the rows are in: "your scoring"

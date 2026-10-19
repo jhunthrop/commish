@@ -2,6 +2,7 @@
  * The types and words both halves share: the build words what the run holds (rest of season, Avg and
  * Last before the week is read), and the week's read (live.ts) words what the API holds. */
 import { EMPTY_FIGURE } from '#lib/format/empty.ts';
+import { FIGURE } from '#lib/format/figure-words.ts';
 
 /** A tile's tone: the accent for this week's projection, the ease of his opponent, quiet for the
  * change. */
@@ -48,11 +49,15 @@ export function restRankWords(position: string, shown: number | string): string 
 
 /** The card's words that are not a player's, in one place for the copy guard. */
 export const CARD = {
+	/** The game log's per-week projection column, a one-week box score's head. The card's own week
+	 * tile is headed by its week beside the season's Projected (format/figure-words.ts weekHead). */
 	proj: 'Proj',
+	/** The week tile's caption before the week's read arrives. */
+	readOnOpen: 'Read as the page opens',
 	rest: 'Rest of season',
-	projected: 'Projected',
+	projected: FIGURE.projected,
 	opp: 'Opp rank',
-	avg: 'Avg',
+	avg: FIGURE.avg,
 	last: 'Last',
 	delta: 'Δ Proj',
 	compare: 'Compare',
@@ -85,9 +90,10 @@ export function withTile(tiles: readonly CardTile[], next: CardTile): CardTile[]
 	return tiles.map((tile) => (tile.key === next.key ? next : tile));
 }
 
-/** The basis line while the week is unread, or when it cannot be read. */
-export function unreadBasis(failed: boolean): string {
+/** The basis line while the week is unread, or when it cannot be read, naming the week tile by its
+ * head ("Wk 6"). */
+export function unreadBasis(failed: boolean, weekTile: string): string {
 	return failed
-		? `${CARD.proj}, ${CARD.opp} and ${CARD.delta} show "${NONE}" because this week's figures could not be read just now.`
-		: `${CARD.proj}, ${CARD.opp} and ${CARD.delta} are this week's, read as the page opens.`;
+		? `${weekTile}, ${CARD.opp} and ${CARD.delta} show "${NONE}" because this week's figures could not be read just now.`
+		: `${weekTile}, ${CARD.opp} and ${CARD.delta} are this week's, read as the page opens.`;
 }

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import type { LeagueHost } from '#lib/league/api.ts';
+	import { weekHead } from '#lib/format/figure-words.ts';
 	import { BOX, boxNumber, easeOf, oppRankWord } from '#lib/league/box/box.ts';
 	import BoxGame from '#lib/league/box/BoxGame.svelte';
 	import BoxPlayer from '#lib/league/box/BoxPlayer.svelte';
@@ -27,6 +28,9 @@
 		label: string;
 		rows: readonly OrderView[];
 		rankBy: OrderAdvice['rank_by'];
+		/** The week the answer's projection is for (the API's), which heads it beside the season's
+		 * Projected. */
+		week: number;
 		/** The attached league the rows are marked for, with its platform and the claim's moves; null
 		 * draws no roster and no move. */
 		league: { id: string; host: LeagueHost; moves: OrderAdvice['moves'] } | null;
@@ -36,7 +40,7 @@
 		end?: Snippet<[OrderView]>;
 	}
 
-	let { label, rows, rankBy, league, tagsOf = () => [], end }: Props = $props();
+	let { label, rows, rankBy, week, league, tagsOf = () => [], end }: Props = $props();
 
 	const marked = $derived(league !== null);
 	const figures = $derived(figureColumns(rankBy));
@@ -76,7 +80,7 @@
 			<th scope="col">{BOX.player}</th>
 			{#if marked}<th class="roster" scope="col">{ORDER.roster}</th>{/if}
 			<th class="game" scope="col">{BOX.game}</th>
-			<th class="n proj" scope="col">{BOX.proj}</th>
+			<th class="n proj" scope="col">{weekHead(week)}</th>
 			{#each figures as f, i (f)}
 				<th class="n {i === 0 ? 'key' : 'ev fig'}" scope="col">{FIGURE_HEADS[f]}</th>
 			{/each}

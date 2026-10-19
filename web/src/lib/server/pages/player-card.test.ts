@@ -108,13 +108,15 @@ void test('the build holds Avg and Last from his season, the week tiles "--", an
 	assert.deepEqual(
 		built.tiles.map((t) => [t.key, t.value, t.caption]),
 		[
-			['proj', '--', 'Week 6'],
+			['proj', '--', 'Read as the page opens'],
 			['opp', '--', 'at ARI'],
 			['avg', '33.7', 'a game in 3 games'],
 			['last', '50.4', 'week 5 vs BUF'],
 			['delta', '--', '']
 		]
 	);
+	// Headed by the run's week ahead until the API's read arrives.
+	assert.equal(built.tiles[0]?.label, 'Wk 6');
 	assert.deepEqual(built.next, { week: 6, opponent: 'at ARI' });
 	assert.deepEqual(built.opponents, { 1: 'vs BUF', 4: 'at BUF', 5: 'vs BUF' });
 	assert.equal(built.games, 3);

@@ -14,18 +14,18 @@ const leagueBasis = (
 void test('a TE premium league on the PPR figures says the figures once and the league in plain words', () => {
 	assert.equal(
 		leagueBasis('PPR', 5, 'te_premium'),
-		"PPR. This season's games and points a game through week 5, beside our preseason projection and points over replacement. Your league gives tight ends extra points per catch."
+		"PPR. This season's games and Avg through week 5, beside our preseason projection and points over replacement. Your league gives tight ends extra points per catch."
 	);
 });
 
 void test('a league scoring like the figures says nothing more', () => {
 	assert.equal(
 		leagueBasis('PPR', 5, 'ppr'),
-		"PPR. This season's games and points a game through week 5, beside our preseason projection and points over replacement."
+		"PPR. This season's games and Avg through week 5, beside our preseason projection and points over replacement."
 	);
 	assert.equal(
 		leagueBasis('Half PPR', 0, 'half_ppr'),
-		"Half PPR. This season's games and points a game, beside our preseason projection and points over replacement."
+		"Half PPR. This season's games and Avg, beside our preseason projection and points over replacement."
 	);
 });
 

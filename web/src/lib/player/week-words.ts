@@ -3,6 +3,7 @@
  * prints; live.ts reads the answer and builds the links. */
 import type { components } from '#lib/api/types.ts';
 import { memberZone, weekdayTime } from '#lib/format/clock.ts';
+import { weekHead } from '#lib/format/figure-words.ts';
 import {
 	BOX,
 	EVIDENCE_SHORT,
@@ -183,9 +184,10 @@ function projTile(week: PlayerWeek): CardTile {
 	const scoring = SCORING_WORDS[week.projection_scoring.format];
 	return {
 		key: 'proj',
-		label: CARD.proj,
+		// Beside the season's Projected, headed by the API's week, never the clock (the ruling).
+		label: weekHead(week.week),
 		value: value === null ? NONE : printTenth(value),
-		caption: value === null ? noProjWords(week) : `${CARD.week} ${String(week.week)}, ${scoring}`,
+		caption: value === null ? noProjWords(week) : scoring,
 		tone: 'lead'
 	};
 }
@@ -402,12 +404,12 @@ export function compareSay(a: CompareRow, b: CompareRow): string | null {
 		const tenths = Math.abs(Math.round(x * TENTHS) - Math.round(y * TENTHS));
 		return `${x > y ? a.name : b.name} by ${printTenth(tenths / TENTHS)} ${words}`;
 	};
-	const proj = ahead('proj', `${CARD.proj} this week`);
+	const proj = ahead('proj', 'projected points this week');
 	if (proj !== null) return proj;
 	// One row with no Proj is named, so the figure that answers instead is read as such.
 	const missing = [a, b].filter((row) => figure(row, 'proj') === null);
 	const [one] = missing;
-	const lead = missing.length === 1 && one ? `No ${CARD.proj} for ${one.name} this week. ` : '';
+	const lead = missing.length === 1 && one ? `No projection for ${one.name} this week. ` : '';
 	const avg = ahead('avg', 'a game this season');
 	if (avg !== null) return `${lead}${avg}`;
 	const restLabel = a.tiles.find((tile) => tile.key === 'rest')?.label;

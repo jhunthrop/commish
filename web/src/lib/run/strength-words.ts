@@ -7,7 +7,7 @@
  * never add one.
  */
 import { windowLabel } from '#lib/format/date.ts';
-import { ordinal } from '#lib/format/number.ts';
+import { fixed, ordinal } from '#lib/format/number.ts';
 import type { Slate } from './schema.ts';
 
 type Basis = Pick<Slate, 'method' | 'window'>;
@@ -50,6 +50,12 @@ export function scheduleLead(
 export function clubsLead(formatLabel: string, first: Basis | undefined): string {
 	const strength = first ? ` ${strengthWords(first)}` : '';
 	return `Every club's players on our ${formatLabel} board.${strength}`;
+}
+
+/** A slate's strength as every page prints it: the tenth the run writes (the ruling on the sweep's
+ * X9), formatted, never rounded here. */
+export function strengthFigure(strength: number): string {
+	return fixed(strength, 1);
 }
 
 /** A club's hero figure's caption, four words, its read said under it. */
