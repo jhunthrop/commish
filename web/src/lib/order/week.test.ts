@@ -217,8 +217,8 @@ void test('every word the tab prints passes the copy guard', () => {
 			...Object.values(WEEK_TAB),
 			...Object.values(WEEK)
 		]) {
+			// The one guard's words and marks (format/copy-guard.ts bannedPattern, BANNED_MARKS in it).
 			assert.doesNotMatch(said, banned, said);
-			assert.doesNotMatch(said, /[–—;]/, said);
 		}
 	}
 });

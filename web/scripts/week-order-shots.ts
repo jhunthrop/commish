@@ -38,7 +38,9 @@ const VIEWPORT_HEIGHT = 900;
 const PHONE_HEIGHT = 844;
 const PHONE_MAX = 760;
 const READY_TIMEOUT_MS = 30_000;
-const FIXTURE_START_MS = 1500;
+/** How long the fixture API has to answer its clock, and how often it is asked. */
+const FIXTURE_START_MS = 15_000;
+const FIXTURE_POLL_MS = 250;
 /** A beat for a table to draw an answer that has arrived. */
 const SETTLE_MS = 300;
 /** The most rendered lines the basis may draw, by the widths it is measured at. */
@@ -136,6 +138,26 @@ function startFixture(clock: string): ChildProcess {
 		stdio: 'ignore'
 	});
 	return child;
+}
+
+/** The fixture API started on the state's clock, read from its own /fixture/clock (Lane 66x): the
+ * screens are shot only when the API and the browser agree on the instant. */
+async function fixtureOnClock(clock: string): Promise<void> {
+	const until = Date.now() + FIXTURE_START_MS;
+	while (Date.now() < until) {
+		const said = await fetch(`http://localhost:${String(fixturePort)}/fixture/clock`)
+			.then((r) => r.json<{ data: { clock: string | null } | null }>())
+			.catch(() => null);
+		if (said !== null) {
+			if (said.data?.clock !== clock)
+				throw new Error(
+					`The fixture API on ${String(fixturePort)} runs on ${said.data?.clock ?? 'the real clock'}, not ${clock}.`
+				);
+			return;
+		}
+		await new Promise((resolve) => setTimeout(resolve, FIXTURE_POLL_MS));
+	}
+	throw new Error(`The fixture API on ${String(fixturePort)} did not answer its clock.`);
 }
 
 async function context(theme: string, width: number, screen: Screen): Promise<BrowserContext> {
@@ -359,7 +381,7 @@ async function lateReadFaults(page: Page): Promise<string[]> {
 
 for (const state of ['week', 'empty'] as const) {
 	const fixture = startFixture(CLOCKS[state]);
-	await new Promise((resolve) => setTimeout(resolve, FIXTURE_START_MS));
+	await fixtureOnClock(CLOCKS[state]);
 	try {
 		if (state === 'week') faults.push(...(await tabFaults()));
 		for (const screen of SCREENS.filter((s) => s.state === state)) {

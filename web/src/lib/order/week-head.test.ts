@@ -2,6 +2,7 @@
 // season. Run with `npm test`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { BANNED_MARKS } from '#lib/format/copy-guard.ts';
 import { boardWords } from '#lib/site/season-words.ts';
 import type { RailKey } from '#lib/ui/nav.ts';
 import { weekBoardWords, weekHeading, weekPositionOf, weekReadKey } from './week-head.ts';
@@ -25,7 +26,9 @@ void test("in season the kickers' and defenses' tabs are this week's, never the 
 		assert.equal(dst.heading, "This week's defenses");
 		assert.equal(dst.bar, 'DST this week');
 		for (const said of [k, dst]) {
-			assert.doesNotMatch(`${said.heading} ${said.bar} ${said.title}`, /[Rr]est of|[–—;]/);
+			const line = `${said.heading} ${said.bar} ${said.title}`;
+			assert.doesNotMatch(line, /[Rr]est of/);
+			assert.doesNotMatch(line, BANNED_MARKS);
 		}
 	}
 });
