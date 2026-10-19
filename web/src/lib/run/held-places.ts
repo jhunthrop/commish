@@ -4,7 +4,7 @@
  * player's tier mates, the offline board and the compare page. */
 import { rankWord } from '#lib/format/designation.ts';
 import { heldOut } from './board-status.ts';
-import { tierGroups, type TierGroup } from './derive.ts';
+import { tierGroups, type TierGroup } from './tiers.ts';
 import type { BoardRow, PlayerStatus } from './schema.ts';
 
 interface Listed {

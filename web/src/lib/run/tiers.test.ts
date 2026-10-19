@@ -4,7 +4,7 @@
 // `npm test`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { tierGroups } from './derive.ts';
+import { tierGroups } from './tiers.ts';
 import type { BoardRow } from './schema.ts';
 
 function row(id: string, positionRank: number, tier: number, tierDrop?: number | null): BoardRow {

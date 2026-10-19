@@ -1,5 +1,5 @@
 /** The player page's sentences for each format line, built with the page: no script carries them. */
-import { gapPicks } from '#lib/format/gap.ts';
+import { gapPicks } from '#lib/format/gap-picks.ts';
 import { fixed } from '#lib/format/number.ts';
 import { restLead, type FiguresReach } from './rest-words.ts';
 import type { Format, PlayerFormat } from './schema.ts';

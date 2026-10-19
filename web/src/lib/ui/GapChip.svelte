@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { gapChipWords, gapTone } from '#lib/format/gap.ts';
+	import { gapChipWords, gapTone } from '#lib/format/gap-picks.ts';
 	import ToneChip from './ToneChip.svelte';
 
 	interface Props {

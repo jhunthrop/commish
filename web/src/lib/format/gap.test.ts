@@ -5,7 +5,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { EMPTY_FIGURE } from './empty.ts';
-import { carriesGap, gapChipWords, gapPicks, gapText, gapTone } from './gap.ts';
+import { gapChipWords, gapPicks } from './gap-picks.ts';
+import { carriesGap, gapText, gapTone } from './gap.ts';
 
 void test('the gap prints the run tenth as given, with a true minus, a plain zero and -- for none', () => {
 	assert.equal(gapText(1.8), '+1.8');
