@@ -3,7 +3,7 @@
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { onMount } from 'svelte';
-	import { lastName, pickLabel } from '#lib/format/draft.ts';
+	import { pickLabel } from '#lib/format/draft.ts';
 	import LiveRegion from '#lib/ui/LiveRegion.svelte';
 	import Quiet from '#lib/ui/Quiet.svelte';
 	import Search from '#lib/ui/Search.svelte';
@@ -114,7 +114,7 @@
 		const made = room.picks.find((p) => p.pick === pick);
 		const player = made ? board.byId.get(made.player_id) : undefined;
 		const at = pickLabel(pick, room.teams);
-		const back = player ? ` ${lastName(player.name)} is in the pool again.` : '';
+		const back = player ? ` ${player.name} is in the pool again.` : '';
 		return `Back to ${at}.${back} Same bots, same seed, so the room drafts the same until your pick goes another way.`;
 	}
 

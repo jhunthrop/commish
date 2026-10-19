@@ -4,12 +4,14 @@
  * built in headshot-provider.ts; a provider change touches it and the matcher here. */
 
 const ESPN_HEADSHOT =
-	/^https:\/\/a\.espncdn\.com\/i\/headshots\/([a-z]+)\/players\/full\/(\d+)\.png$/;
+	/^https:\/\/a\.espncdn\.com\/i\/headshots\/([a-z-]+)\/players\/full\/(\d+)\.png$/;
 const DENSITIES = [1, 2] as const;
 
 /** Where the image route lives. */
 export const HEADSHOT_ROUTE = '/img/headshots';
-export const HEADSHOT_LEAGUES = ['nfl'] as const;
+/** The provider's leagues a face comes from: the NFL's, and the college headshot a rookie's row can
+ * still carry before the provider has his NFL one. */
+export const HEADSHOT_LEAGUES = ['nfl', 'college-football'] as const;
 export type HeadshotLeague = (typeof HEADSHOT_LEAGUES)[number];
 /** The widths the route serves, so the cache holds a bounded set of sizes. */
 export const HEADSHOT_MIN_WIDTH = 16;

@@ -4,6 +4,7 @@
 import { PUBLIC_API_URL } from '$app/env/public';
 import { ApiError, apiClient } from '#lib/api/client.ts';
 import type { components } from '#lib/api/types.ts';
+import type { OpenHosts } from '#lib/league/hosts.ts';
 import { ESPN_CONSENT_VERSION, MFL_CONSENT_VERSION } from './connection-words.ts';
 
 type Schemas = components['schemas'];
@@ -89,6 +90,12 @@ export function yahooOpen(hosts: HostConnections): boolean {
 /** Whether connecting ESPN is open here (HOST_ESPN_ENABLED with the key), from the hosts answer. */
 export function espnOpen(hosts: HostConnections): boolean {
 	return hosts.enabled.includes('espn');
+}
+
+/** Which switched platforms are open here, from the hosts answer: the pages that name the platforms
+ * a league is followed from read it (league/hosts.ts). */
+export function openHostsOf(hosts: HostConnections): OpenHosts {
+	return { ffpc: ffpcOpen(hosts), yahoo: yahooOpen(hosts), espn: espnOpen(hosts) };
 }
 
 /** Whether connecting MyFantasyLeague is open to this account (HOST_WRITES_MFL_LINEUP with the key,

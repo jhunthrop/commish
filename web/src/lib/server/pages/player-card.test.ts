@@ -123,6 +123,27 @@ void test('the build holds Avg and Last from his season, the week tiles "--", an
 	assert.equal(built.readStamp, null);
 });
 
+void test('a bye in the week ahead heads the card as the bye, never the week after it (the sweep M6)', () => {
+	const off = season();
+	const log = off.log.map((r) =>
+		r.week === 6 ? row(6, null, 'bye') : r.week === 11 ? row(11, 'ARI', 'upcoming') : r
+	);
+	const built = cardBuild({ ...off, log }, null);
+	assert.deepEqual(built.next, { week: 6, opponent: 'Bye' });
+	assert.equal(built.tiles[0]?.label, 'Wk 6');
+	assert.equal(built.tiles.find((t) => t.key === 'opp')?.caption, 'Bye');
+	// A bye already behind the counted week is history: the next game heads.
+	const past = cardBuild(
+		{
+			...off,
+			through: 6,
+			log: log.map((r) => (r.week === 6 ? r : r.week === 7 ? row(7, 'NYJ', 'upcoming') : r))
+		},
+		null
+	);
+	assert.deepEqual(past.next, { week: 7, opponent: 'vs NYJ' });
+});
+
 void test("the read's stamp is its day and what it was written from", () => {
 	assert.equal(
 		readStamp({ body: 'A read.', pulls: [], writtenAt: '2026-10-13T21:57:34.834Z' }),

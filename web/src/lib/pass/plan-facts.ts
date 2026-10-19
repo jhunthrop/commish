@@ -3,7 +3,9 @@
  * pass page's cells. */
 import type { components } from '#lib/api/types.ts';
 import type { FactCell } from '#lib/ui/facts.ts';
-import { FOLLOW_HOW, HOSTS, money, passEnds, type PlanCatalog, type Price } from './words.ts';
+import { liveDraftHosts, openLeagueHosts, type OpenHosts } from '#lib/league/hosts.ts';
+import { hostWords } from '#lib/league/names.ts';
+import { FOLLOW_HOW, money, passEnds, type PlanCatalog, type Price } from './words.ts';
 
 type GroupPassPrice = components['schemas']['GroupPassPrice'];
 
@@ -47,16 +49,16 @@ export function membershipFacts(price: Price | null): FactCell[] {
 	];
 }
 
-/** Where the live draft works, as cells: the hosts it follows today, how, and the ones not yet. */
-export function hostCells(): FactCell[] {
-	const names = (ready: boolean): string =>
-		HOSTS.filter((h) => h.ready === ready)
-			.map((h) => h.name)
-			.join(', ');
+/** Where it works, as cells, the draft said apart from the league (the sweep's C13): the platforms a
+ * live draft is read from and how, then the platforms a league is followed from that are open here,
+ * from the one platforms module the account and follow pages read. */
+export function hostCells(open: OpenHosts): FactCell[] {
+	const names = (hosts: readonly Parameters<typeof hostWords>[0][]): string =>
+		hosts.map(hostWords).join(', ');
 	return [
-		{ label: 'Today', value: names(true), word: true },
+		{ label: 'Live draft', value: names(liveDraftHosts()), word: true },
 		{ label: 'How', value: FOLLOW_HOW, word: true },
-		{ label: 'Not yet', value: names(false), word: true }
+		{ label: 'Leagues', value: names(openLeagueHosts(open)), word: true }
 	];
 }
 

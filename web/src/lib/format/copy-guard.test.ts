@@ -3,14 +3,19 @@
 // with `npm test`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import LIST_FILE from './banned-words.json' with { type: 'json' };
 import {
+	BANNED_LIST,
 	BANNED_MARKS,
 	BANNED_WORDS,
 	BETTING_WORDS,
 	bannedIn,
 	bannedInCopy,
-	dataStrings
+	dataStrings,
+	frameData
 } from './copy-guard.ts';
+
+const LIST_EXAMPLES = LIST_FILE.examples;
 
 void test('the list holds the betting, trading and platform words, whole words in any case', () => {
 	for (const word of ['Odds', 'line', 'totals', 'over/under', 'Market', 'buy', 'hosts', 'Vegas'])
@@ -20,6 +25,21 @@ void test('the list holds the betting, trading and platform words, whole words i
 	assert.match('a — b', BANNED_MARKS);
 	assert.match('a; b', BANNED_MARKS);
 	assert.match('a – b', BANNED_MARKS);
+});
+
+void test("the guard reads the one list file the writer reads too, every word it shows caught (the sweep's C7)", () => {
+	const shown = [
+		...Object.values(BANNED_LIST.bettingOnly),
+		...Object.values(BANNED_LIST.bettingShared),
+		BANNED_LIST.line.shown,
+		...Object.values(BANNED_LIST.trading),
+		...Object.values(BANNED_LIST.platform)
+	];
+	for (const word of shown) assert.equal(bannedIn(`We ${word} him.`), word, word);
+	for (const mark of BANNED_LIST.marks) assert.equal(bannedIn(`a ${mark} b`), mark, mark);
+	assert.equal(bannedIn('15 total touchdowns'), 'total');
+	assert.equal(bannedIn('holding this line'), 'line');
+	assert.equal(bannedIn('behind the offensive line, inside the goal line, on the O-line'), null);
 });
 
 void test("the trading inflections and the betting register's other words are on the one list (review 66q 1)", () => {
@@ -130,4 +150,21 @@ void test('data strings come from name fields at any depth, numbers and other fi
 		],
 		['Las Vegas Raiders', 'Ja Price']
 	);
+});
+
+void test("the room's socket frames are data by their fields, as an answer is (the sweep's C8)", () => {
+	const frame = JSON.stringify({
+		type: 'update',
+		state: { picks: [{ handle: 'helperA', player: { name: 'Jadarian Price', position: 'RB' } }] }
+	});
+	const data = frameData(frame);
+	assert.deepEqual([...data].sort(), ['Jadarian Price', 'helperA']);
+	assert.equal(bannedInCopy('Jadarian Price, RB, taken by helperA', data), null);
+	assert.equal(bannedInCopy('Price drops', data), 'Price');
+	assert.equal(frameData('not json').size, 0);
+});
+
+void test("the list's own examples: the site catches each caught one and spares each spared one, as the writer does", () => {
+	for (const text of LIST_EXAMPLES.caught) assert.notEqual(bannedIn(text), null, text);
+	for (const text of LIST_EXAMPLES.spared) assert.equal(bannedIn(text), null, text);
 });

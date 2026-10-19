@@ -7,6 +7,10 @@
 //   filling, drafting, asking before Leave, closed unattended, and its report; setup after Leave,
 //   while the lobby drafts and once it is over.
 //
+// Every shot is also held to the site's one copy guard (copy-scan.ts: the names the API's answers and
+// the room's socket frames carry are data, the sweep's C8) and its basis to five rendered lines at
+// 1440 and eight at 390 (basis-lines.ts). It exits non-zero on any fault.
+//
 //   node scripts/room-shots.ts [web origin]
 //
 // SESSION and CSRF are the drafter's cookies, HELPERS three more drafters as session:csrf pairs, each
@@ -14,11 +18,16 @@
 import { mkdir } from 'node:fs/promises';
 import { chromium, type BrowserContext, type Page } from 'playwright';
 import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
+import { basisLines, basisReport } from './basis-lines.ts';
+import { copyFault, watchData } from './copy-scan.ts';
 import { chromeLine, chromeMeasures } from './chrome-measures.ts';
 
 const THEMES = ['light', 'dark'] as const;
 const WIDTHS = [1440, 390] as const;
 const VIEWPORT_HEIGHT = 900;
+/** The room's basis blocks: the pool's and the report's sentence (p.basis; a value cell's span.basis
+ * is its own label, not a basis), and any [data-basis]. */
+const ROOM_BASIS = 'main p.basis, main [data-basis]';
 const OUT_DIR = new URL('../screenshots/', import.meta.url);
 /** The lobby fills for 90 seconds, then the room drafts this long before the shot. */
 const FILL_WAIT_MS = 92_000;
@@ -118,6 +127,7 @@ async function context(
 		viewport: { width, height: VIEWPORT_HEIGHT },
 		colorScheme: theme
 	});
+	watchData(ctx);
 	if (who)
 		await ctx.addCookies([
 			{ name: 'commish_session', value: who.session, domain: 'localhost', path: '/' },
@@ -142,12 +152,26 @@ interface ShotOptions {
 	timeout?: number;
 }
 
+const faults: string[] = [];
+
+/** The shot's copy against the one guard and its basis against the budget: a fault for each miss. A
+ * screen with no basis block is not measured. */
+async function checkShot(name: string, page: Page, width: number): Promise<void> {
+	const fault = await copyFault(page);
+	if (fault !== null) faults.push(`${name} ${String(width)}: the copy says "${fault}"`);
+	const lines = await basisLines(page, ROOM_BASIS);
+	if (lines === 0) return;
+	const report = basisReport(name, width, lines);
+	if (report === null) return;
+	process.stdout.write(`${report.line}\n`);
+	if (report.fault !== null) faults.push(report.fault);
+}
+
 /** The season's rail with no league selected (Lane 83): a room's drafter follows no league, so a
  * season rail draws these and none of a league's screens. */
 const NO_LEAGUE_LABELS = ['League', 'Rest of season', 'Players', 'Mock draft', 'Our record'];
 const LEAGUE_SCREENS = ['Lineup', 'Matchup', 'Waivers', 'Trades'];
 const SEASON_RAILS = /^(in_season|playoffs)/;
-const railFaults: string[] = [];
 const chromeLines: string[] = [];
 
 /** The rail a room draws, held to the rail without a league when the root names a season and no
@@ -158,9 +182,9 @@ async function railCheck(page: Page, where: string, width: number): Promise<void
 	if (chrome.league || !SEASON_RAILS.test(chrome.rail ?? '')) return;
 	const want = width === 390 ? NO_LEAGUE_LABELS : [...NO_LEAGUE_LABELS, 'Account'];
 	if (chrome.railLabels.join('|') !== want.join('|'))
-		railFaults.push(`${where}: the rail draws ${chrome.railLabels.join(', ')}`);
+		faults.push(`${where}: the rail draws ${chrome.railLabels.join(', ')}`);
 	const screens = chrome.railLabels.filter((label) => LEAGUE_SCREENS.includes(label));
-	if (screens.length > 0) railFaults.push(`${where}: league tabs ${screens.join(', ')}`);
+	if (screens.length > 0) faults.push(`${where}: league tabs ${screens.join(', ')}`);
 }
 
 async function shoot(
@@ -187,6 +211,7 @@ async function shoot(
 						.waitFor({ timeout: 20_000 });
 			}
 			await page.evaluate(() => document.fonts.ready);
+			await checkShot(name, page, width);
 			await railCheck(page, `${name} ${theme} ${String(width)}`, width);
 			const file = new URL(`${name}-${theme}-${width}.png`, OUT_DIR);
 			await page.screenshot({ path: file.pathname, fullPage: true });
@@ -197,7 +222,7 @@ async function shoot(
 }
 
 /** A drafter's tab open on the lobby, its socket connected, until the context closes. */
-async function hold(roomId: string, who: Drafter): Promise<BrowserContext> {
+async function keepOpen(roomId: string, who: Drafter): Promise<BrowserContext> {
 	const ctx = await context('dark', WIDTHS[0], who);
 	const page = await ctx.newPage();
 	await page.goto(`${web}/lobby/${roomId}`, { waitUntil: 'networkidle' });
@@ -318,7 +343,7 @@ try {
 		await call<Seat>(helper, 'POST', '/lobbies/join', { format: '12_ppr' });
 	// Every drafter holds the lobby open in a tab, as a person waiting in it does: a seat with no
 	// socket at the fill deadline is not counted as there.
-	const present = await Promise.all([me, ...helpers].map((who) => hold(lobby, who)));
+	const present = await Promise.all([me, ...helpers].map((who) => keepOpen(lobby, who)));
 	await shoot('lobby-filling', `/lobby/${lobby}`, 'The draft starts when');
 	await new Promise((done) => setTimeout(done, FILL_WAIT_MS));
 	await shoot('lobby-abandoned', `/lobby/${lonely.room_id}`, 'Join another lobby');
@@ -351,4 +376,7 @@ try {
 	await browser.close();
 }
 for (const line of chromeLines) process.stdout.write(`${line}\n`);
-if (railFaults.length > 0) throw new Error(`A room's rail is wrong:\n${railFaults.join('\n')}`);
+if (faults.length > 0) {
+	process.stderr.write(`${faults.join('\n')}\n`);
+	process.exit(1);
+}

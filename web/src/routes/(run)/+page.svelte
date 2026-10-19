@@ -152,7 +152,7 @@
 					</BoardTable>
 				</div>
 				<div class="more">
-					<Quiet href={links.board(format.id)}>All {page.boardSize} on the board</Quiet>
+					<Quiet href={links.board(format.id)}>All {page.boardCount}</Quiet>
 					<Quiet href={links.adp(format.id)}>ADP</Quiet>
 				</div>
 			</section>

@@ -41,7 +41,7 @@
 						<span class="cell" class:mine={cell.seat === you}>
 							<Face src={cell.player.headshot} name={cell.player.name} size={22} />
 							<span class="s">{cell.player.position} · {cell.player.team}</span>
-							<b>{lastName(cell.player.name)}</b>
+							<b data-name>{lastName(cell.player.name)}</b>
 						</span>
 					{:else if cell.pick === now}
 						<span class="cell now">

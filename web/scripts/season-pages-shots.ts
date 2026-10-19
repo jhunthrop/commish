@@ -2,7 +2,7 @@
 // page and the account page, signed out, in both themes at 1440 and 390, and the front door with
 // script blocked (the prerendered rail). Each asserts the page's words follow the rail its root
 // names (site/season-words.ts), that the front door with no script names the build's rail and
-// shows its items, that the front door's "All on the board" lands on a page with its rail item
+// shows its items, that the front door's "All N on our board" lands on a page with its rail item
 // lit, and that the front door under a league whose phase differs from the site's (a pre-draft
 // league in season) holds the same words and the same hero shape before its script runs as after
 // (Lane 60: the words are drawn for both phases and the root's rail shows one). Against the built site and the fixture API (scripts/inseason-fixture/serve.ts), which

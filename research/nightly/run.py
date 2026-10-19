@@ -40,11 +40,12 @@ from research.nightly.run_parts import (
     run_steps,
 )
 from research.nightly.run_store import LocalRunStore, RunStore
-from research.nightly.schema_gate import contract_dir, schema_gate
+from research.nightly.schema_gate import schema_gate
 from research.nightly.week_reads import ADVISORY
 from research.nightly.week_reads import STEP as WEEK_READS
 from research.pipeline.http import Fetcher
 from research.season import PRODUCT_SEASON
+from research.web_contract import contract_dir
 
 STEPS = ("ingest", "fit", "capsules", WEEK_READS, "headshots")
 Json = dict[str, Any]

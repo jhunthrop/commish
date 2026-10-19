@@ -54,10 +54,11 @@ from research.nightly.published_board import SyncOutcome, failed, sync_published
 from research.nightly.r2 import run_store
 from research.nightly.run import STEPS, RunDeps, RunOptions, run_nightly
 from research.nightly.run_store import RunStore
-from research.nightly.schema_gate import contract_dir, schema_gate
+from research.nightly.schema_gate import schema_gate
 from research.nightly.week_reads import run_week_read_step
 from research.pipeline.commands import now_ms
 from research.pipeline.http import LiveFetcher
+from research.web_contract import contract_dir
 
 DATABASE_VARIABLE: Final = "RESEARCH_DATABASE_URL"
 

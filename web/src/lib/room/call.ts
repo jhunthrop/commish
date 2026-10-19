@@ -60,6 +60,7 @@ function rowOf(player: RoomPlayer, chance: number | undefined): CallRow {
 		player,
 		vor: player.vor,
 		adp: player.adp,
+		gap: player.gap,
 		chance: chance ?? null
 	};
 }

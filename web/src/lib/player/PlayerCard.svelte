@@ -8,7 +8,7 @@
 	import Verb from '#lib/ui/Verb.svelte';
 	import { clubMark } from '#lib/ui/club-mark.ts';
 	import type { Position } from '#lib/types/player.ts';
-	import { CARD, type CardTile } from './card.ts';
+	import { CARD, type CardHead, type CardTile } from './card.ts';
 	import type { CardVerb, NextCell } from './week-words.ts';
 
 	/** The player card (Lane 66h): his face, name, club and position with his status, whose roster he
@@ -30,8 +30,9 @@
 		holder: string | null;
 		/** Whether the page keeps the holder's line its room from the first paint. */
 		holdRoom: boolean;
-		/** The week ahead as the build knows it, and its cell once read. */
-		next: { week: number; opponent: string } | null;
+		/** The week the card shows: the read's once it is in, the build's before, with its game or
+		 * "Bye"; and the game's cell once read. */
+		next: CardHead | null;
 		cell: NextCell | null;
 		/** The league screens' verb, null with no league: the sheet's add stands in. */
 		verb: CardVerb | null;

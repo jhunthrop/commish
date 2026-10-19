@@ -2264,6 +2264,11 @@ export interface components {
 			 * @description points over replacement for this league
 			 */
 			vor: number | null;
+			/**
+			 * Format: double
+			 * @description drafters' ADP less his place on our board (the pool's order by points over replacement), the ADP the column prints less the place, a tenth: plus when drafters take him later than we rank him; null with no ADP or no place (a kicker, a defense). Absent from a server older than the column
+			 */
+			gap?: number | null;
 			position_rank: number;
 			bye: number | null;
 			status?: components['schemas']['BoardStatus'];

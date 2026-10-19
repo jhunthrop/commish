@@ -1,11 +1,29 @@
-/** The hosts a league is followed from, in the order every page names them, and the two ways a page
- * names them: the follow page's (each where it is open) and the signed-out account page's. One list,
- * so the two pages never disagree. Apart from model.ts so the account page carries only this. */
+/** The platforms, in the order every page names them, with what each does here (the sweep's C13): a
+ * live draft read from it, a league followed from it always or once its switch is open. The follow
+ * page, the signed-out account page and the pass page all name them from this one module, so they
+ * never read against each other. Apart from model.ts so the account and pass pages carry only this. */
 import type { components } from '#lib/api/types.ts';
 import { hostWords } from './names.ts';
 
 type LeagueHost = components['schemas']['LeagueHost'];
 
+/** What a platform does here: its live draft is read (the Draft Pass's companion, by the draft's
+ * link), and its league is followed always or only while its switch is open. */
+export interface Platform {
+	readonly liveDraft: boolean;
+	readonly switched: boolean;
+}
+
+export const PLATFORMS: Readonly<Record<LeagueHost, Platform>> = {
+	sleeper: { liveDraft: true, switched: false },
+	mfl: { liveDraft: false, switched: false },
+	ffpc: { liveDraft: false, switched: true },
+	yahoo: { liveDraft: false, switched: true },
+	espn: { liveDraft: false, switched: true }
+};
+
+/** The platforms in naming order, apart from their flags so a page that only lists them (the shell's
+ * league switch) carries no flags; the test holds the two to one order. */
 export const LEAGUE_HOSTS: readonly LeagueHost[] = ['sleeper', 'mfl', 'ffpc', 'yahoo', 'espn'];
 
 /** What following a league gives in season, in one sentence for a first-timer: the three in-season
@@ -21,8 +39,18 @@ export interface OpenHosts {
 	readonly espn: boolean;
 }
 
+/** A platform followed only while its switch is open. */
+function isSwitched(host: LeagueHost): host is keyof OpenHosts {
+	return PLATFORMS[host].switched;
+}
+
 function isOpen(host: LeagueHost, open: OpenHosts): boolean {
-	return host === 'sleeper' || host === 'mfl' || open[host];
+	return !isSwitched(host) || open[host];
+}
+
+/** The platforms a live draft is read from, in the order every page names them. */
+export function liveDraftHosts(): LeagueHost[] {
+	return LEAGUE_HOSTS.filter((host) => PLATFORMS[host].liveDraft);
 }
 
 /** The hosts open here, in the order every page names them: the one place the shared list is
