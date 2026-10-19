@@ -147,7 +147,16 @@
 	{#if cell.order}<span class="n {cell.order}" class:absent={drafted === null}
 			>{drafted?.positionRank ?? EMPTY_FIGURE}</span
 		>{/if}
-	{#if cell.range}<span class={cell.range}
+	<!-- An empty range sits at the cell's end, as every other empty mark does (Lane 66q). -->
+	{#if cell.range}<span
+			class={cell.range}
+			class:end={!(
+				ranked &&
+				scale &&
+				ranked.floor !== null &&
+				ranked.median !== null &&
+				ranked.ceiling !== null
+			)}
 			>{#if ranked && scale && ranked.floor !== null && ranked.median !== null && ranked.ceiling !== null}<RangeBar
 					floor={ranked.floor}
 					median={ranked.median}

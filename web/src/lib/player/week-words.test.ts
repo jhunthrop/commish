@@ -26,7 +26,8 @@ const facts = (over: Partial<WeekFacts> = {}): WeekFacts => ({
 	week: 6,
 	opponent: 'ARI',
 	home: true,
-	kickoff: '2026-10-18T20:05:00.000Z',
+	// A Sunday kickoff a year out, so the game is still to be played whenever the suite runs.
+	kickoff: '2027-10-17T20:05:00.000Z',
 	bye: false,
 	designation: null,
 	played: false,

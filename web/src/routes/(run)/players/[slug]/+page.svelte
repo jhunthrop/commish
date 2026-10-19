@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { EMPTY_FIGURE } from '#lib/format/empty.ts';
 	import { onMount } from 'svelte';
 	import { siteContext } from '#lib/context/context.svelte.ts';
 	import ContextNote from '#lib/context/ContextNote.svelte';
@@ -200,7 +201,7 @@
 			heads={page.season.heads}
 			projHead={{ short: CARD.proj, full: "the week's projection" }}
 			pointsHead={page.season.pointsHead}
-			pastProj="--"
+			pastProj={EMPTY_FIGURE}
 			line={page.season.line}
 			rows={page.season.rows}
 			next={live?.next ?? null}

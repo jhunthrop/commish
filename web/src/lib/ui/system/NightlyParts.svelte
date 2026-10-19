@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { EMPTY_FIGURE } from '#lib/format/empty.ts';
 	import { fixed, signed } from '#lib/format/number.ts';
 	import { scoringBasis } from '#lib/run/catalog.ts';
 	import { POSITION_NAMES } from '#lib/run/derive.ts';
@@ -250,7 +251,7 @@
 		>
 			{#each nightly.rows as row (row.id)}
 				<tr>
-					<td class="num">{row.adp === null ? 'None' : fixed(row.adp)}</td>
+					<td class="num">{row.adp === null ? EMPTY_FIGURE : fixed(row.adp)}</td>
 					<td>
 						<PlayerLine
 							name={row.name}

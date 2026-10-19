@@ -3,6 +3,7 @@
  * why not, its last read and its one verb. Every state is the API's GET /hosts answer; Sleeper's
  * row is a fixed fact, since Sleeper leagues follow by id with nothing to connect. Pure, tested in
  * platform-rows.test.ts. */
+import { EMPTY_FIGURE } from '#lib/format/empty.ts';
 import type { components } from '#lib/api/types.ts';
 import { dayLabel } from '#lib/format/date.ts';
 import { agoWords } from '#lib/league/model.ts';
@@ -47,7 +48,7 @@ export const PLATFORM_WORDS = {
 	on: 'Lineups on',
 	off: 'Lineups off',
 	onWords: 'Set there when you confirm a move',
-	never: '--',
+	never: EMPTY_FIGURE,
 	sleeperState: 'No sign-in',
 	sleeperLine: 'Leagues read in public',
 	sleeperNote: 'Followed by league id, nothing to connect',

@@ -4,6 +4,7 @@
  * expected score with his club's first and the kickoff weather in two or three words), this week's
  * projection and his points so far. Pure functions over the API's player lines, so every word a box
  * prints is tested here. */
+import { EMPTY_FIGURE } from '#lib/format/empty.ts';
 import { memberZone, weekdayTime, zoneWord } from '#lib/format/clock.ts';
 import { defenseWords } from '#lib/format/clubs.ts';
 import { lastName } from '#lib/format/draft.ts';
@@ -62,7 +63,7 @@ export const BOX = {
 	bye: 'Bye',
 	final: 'Final',
 	/** A number not held yet: before kickoff, or with no projection. */
-	none: '--',
+	none: EMPTY_FIGURE,
 	you: 'You',
 	opponent: 'Opponent',
 	noOpponent: 'No opponent this week',
