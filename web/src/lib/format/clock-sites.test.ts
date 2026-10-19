@@ -2,20 +2,21 @@
 // handler, the build's one instant, and the few places that measure time rather than draw with it.
 // Every product function whose words or figures depend on the time takes `now`, tests pass one from
 // the fixture's week and the shots set the fixture clocks. This guard scans web/src and web/scripts,
-// tests included, for Date.now(), new Date() and Temporal.Now and fails on any read outside the list,
-// and on a listed site that no longer reads it. Run with `npm test`.
+// tests included, .ts, .svelte, .js, .cjs and .mjs alike, for Date.now(), new Date(), a bare Date()
+// and Temporal.Now, counted on tokens (scripts/clock-reads.ts), so a comment naming one is no read and
+// spacing cannot hide one. It fails on any read outside the list and on a listed site that no longer
+// reads the clock. Run with `npm test`.
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { clockReads as readsIn, scriptTokens, tokenReads } from '../../../scripts/clock-reads.ts';
 
 const WEB = fileURLToPath(new URL('../../../', import.meta.url));
 const ROOTS = ['src', 'scripts'] as const;
-const SOURCE = /\.(ts|svelte)$/;
+const SOURCE = /\.(ts|svelte|js|cjs|mjs)$/;
 const SELF = 'src/lib/format/clock-sites.test.ts';
-/** A wall-clock read. performance.now() measures a span and draws nothing, so it is not one. */
-const CLOCK_READ = /Date\.now\(\)|new Date\(\)|Temporal\.Now\b/g;
 
 interface Site {
 	reads: number;
@@ -26,7 +27,7 @@ interface Site {
 const ALLOWED: Readonly<Record<string, Site>> = {
 	'src/lib/server/build-clock.ts': {
 		reads: 1,
-		why: 'the build instant every prerendered page and the site rail are drawn at'
+		why: 'the build instant every prerendered page and the site rail are drawn at; each request its own outside a build'
 	},
 	'src/lib/league/LeaguePage.svelte': {
 		reads: 3,
@@ -38,8 +39,24 @@ const ALLOWED: Readonly<Record<string, Site>> = {
 	},
 	'src/lib/front/FrontWeek.svelte': { reads: 1, why: "the front door's week, drawn once" },
 	'src/lib/account/AccountPage.svelte': {
-		reads: 2,
-		why: "the room's clock its connections and leagues draw at, and whether a bought pass has arrived, asked once a poll"
+		reads: 1,
+		why: 'whether a bought pass has arrived, asked once a poll'
+	},
+	'src/lib/hosts/AccountConnections.svelte': {
+		reads: 1,
+		why: "the Platforms table's clock, set at each read, after a connect or a disconnect too"
+	},
+	'src/lib/league/AccountLeagues.svelte': {
+		reads: 1,
+		why: "the account's leagues' clock, set when the list is read"
+	},
+	'src/lib/league/inseason/WaiverScreen.svelte': {
+		reads: 1,
+		why: "a narrowed read's clock, set when the narrowed answer lands"
+	},
+	'src/lib/league/inseason/TradeScreen.svelte': {
+		reads: 1,
+		why: "a narrowed read's clock, set when the narrowed answer lands"
 	},
 	'src/lib/context/LeagueMenu.svelte': {
 		reads: 1,
@@ -86,6 +103,10 @@ const ALLOWED: Readonly<Record<string, Site>> = {
 		reads: 1,
 		why: "the stand-in run's stamp, the stand-in build's own clock"
 	},
+	'scripts/lighthouse-seed-sheet.cjs': {
+		reads: 1,
+		why: "a seed sheet's edit stamp, nothing drawn"
+	},
 	'scripts/run-fresh.ts': {
 		reads: 1,
 		why: "the deploy check's clock, the command's outermost layer"
@@ -105,7 +126,7 @@ function clockReads(): ReadonlyMap<string, number> {
 		ROOTS.flatMap((root) => sources(join(WEB, root)))
 			.map((path) => [relative(WEB, path), readFileSync(path, 'utf8')] as const)
 			.filter(([file]) => file !== SELF)
-			.map(([file, text]) => [file, text.match(CLOCK_READ)?.length ?? 0] as const)
+			.map(([file, text]) => [file, readsIn(file, text)] as const)
 			.filter(([, count]) => count > 0)
 	);
 }
@@ -128,8 +149,26 @@ void test('every listed site still reads the clock, so the list holds no stale e
 	);
 });
 
-void test('the guard sees each form of a read and nothing else', () => {
-	const said =
-		'a(Date.now()); b(new Date()); c(Temporal.Now.instant()); d(new Date(at)); performance.now();';
-	assert.equal(said.match(CLOCK_READ)?.length, 3);
+void test('the guard counts reads on tokens: every form and spacing, never a comment or a string', () => {
+	const reads = (code: string): number => tokenReads(scriptTokens(code));
+	assert.equal(reads('a(Date.now()); b(new Date()); c(Temporal.Now.instant());'), 3);
+	assert.equal(reads('a(new Date( )); b(Date.now ()); c(Date . now( )); d(Date());'), 4);
+	assert.equal(reads('d(new Date(at)); performance.now(); x.Date(); Date.parse(at);'), 0);
+	assert.equal(reads("// Date.now()\n/* new Date() */ const s = 'Date.now()';"), 0);
+	assert.equal(
+		reads('const t = `at ${String(Date.now())} and ${x}`; const r = /Date\\.now\\(\\)/g;'),
+		1
+	);
+	assert.equal(reads('const half = a / b; const later = Date.now() / 2;'), 1);
+});
+
+void test('a Svelte file is read as its scripts and its markup expressions, its comments left out', () => {
+	const svelte = [
+		'<script lang="ts">\n\t// Date.now() in a comment\n\tlet now = $state(new Date());\n</script>',
+		'<!-- new Date() in markup comment -->',
+		"<p>Can't say Date.now() in text</p>",
+		'<span>{format(Date.now())}</span>',
+		'<style>.a { content: "new Date()"; }</style>'
+	].join('\n');
+	assert.equal(readsIn('x.svelte', svelte), 2);
 });
