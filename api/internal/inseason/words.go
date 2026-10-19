@@ -373,8 +373,8 @@ func OrderScreenBasis(b OrderBasis, fromWeek int, s apitypes.LeagueSettings) str
 	if b != RestOfSeason || fromWeek < 1 {
 		return fmt.Sprintf("Our preseason order: All ranks by Over repl., his season less a free pickup's, for %s.", teamsWords(s))
 	}
-	return fmt.Sprintf("Our rest-of-season order from week %d: %s through week %d, byes out. Positions rank by %s, "+
-		"All by Over repl., his points less a free pickup's, for %s.", fromWeek, HeadProjected, LastWeek, HeadProjected, teamsWords(s))
+	return fmt.Sprintf("Our rest-of-season order from week %d. A position ranks by %s through week %d, byes out, "+
+		"All by Over repl., his points less a free pickup's, for %s.", fromWeek, HeadProjected, LastWeek, teamsWords(s))
 }
 
 // teamsWords is shapeWords in the order screen's few words: "12 teams
