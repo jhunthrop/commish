@@ -624,6 +624,8 @@ async function waivers(held: ReadonlySet<string>): Promise<WaiverAdvice> {
 	const rest = rows.filter((r) => r.gain <= 0).slice(0, WAIVER_ROWS_UNDER_RULE);
 	return {
 		...head(WAIVERS_BASIS),
+		// Saturday's answer: no game kicked off, the week order (inseason season_order.go).
+		pickup_order: 'week',
 		rows: [...gaining, ...rest],
 		host_waivers_url: `https://sleeper.com/leagues/${league.league_id}/players`,
 		host_note: null,

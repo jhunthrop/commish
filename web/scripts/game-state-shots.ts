@@ -34,6 +34,8 @@ import { FIXTURE_IDS } from './inseason-fixture/ids.ts';
 import { EMPTY_FIGURE } from '../src/lib/format/empty.ts';
 import { seasonOrderWords } from './inseason-fixture/waivers-at.ts';
 import { SEASON } from '../src/lib/league/box/season.ts';
+import { BOX } from '../src/lib/league/box/box.ts';
+import { shortName } from '../src/lib/league/box/waivers.ts';
 import {
 	FIXTURE_MONDAY_CLOCK,
 	FIXTURE_SUNDAY_CLOCK,
@@ -354,25 +356,42 @@ async function drawsFacts(page: Page): Promise<boolean> {
 	return rows.some((r) => /\b\d+(\.5)? to \d+(\.5)?\b/.test(r) || WEATHER_FIGURE.test(r));
 }
 
-/** Waivers after the Sunday (review H3): a row whose game is past its kickoff draws no week gain in
- * Beats, and the basis names the season Gain as the pickups' order. */
+/** Waivers after the Sunday (Lane 85 fix round 4): once any row is past its kickoff (every row on
+ * Tuesday) the page is in the API's season Gain order: no Beats cell on any row draws a week figure
+ * (the empty figure, or the season Gain the order sorts by), the strip's pick is the table's top row,
+ * and the basis names the order. */
 async function checkWaivers(page: Page, at: string): Promise<void> {
 	await checkNoWeekFigure(page, at, 'Proj this week');
 	const rows = await page.locator('main table tbody tr').evaluateAll((trs) =>
 		trs
-			.filter((tr) => tr.getClientRects().length > 0)
+			.filter((tr) => tr.getClientRects().length > 0 && tr.querySelector('.nm') !== null)
 			.map((tr) => ({
 				text: (tr as HTMLElement).innerText,
+				name: tr.querySelector<HTMLElement>('.nm')?.innerText.trim() ?? '',
+				named: tr.classList.contains('moved-in'),
 				gain: tr.querySelector('.beats .gain')?.textContent.trim() ?? null
 			}))
 	);
-	const final = rows.filter((r) => /\b(Final|Kicked off)\b/.test(r.text) && r.gain !== null);
-	if (final.length === 0) fault(at, 'no row past its kickoff with a Beats cell');
-	// In season order every Beats cell draws the season Gain, the key it is sorted by (review M-A);
-	// a row past its kickoff never draws a bare week figure.
-	for (const r of final)
-		if (r.gain !== EMPTY_FIGURE && !(r.gain ?? '').endsWith(` ${SEASON.gain}`))
-			fault(at, `a row past its kickoff draws a week gain ${r.gain}`);
+	const locked = rows.filter((r) => /\b(Final|Kicked off)\b/.test(r.text));
+	const toPlay = rows.filter((r) => !locked.includes(r) && !r.text.includes(BOX.bye));
+	if (day === 'tuesday' && toPlay.length > 0)
+		fault(at, `${String(toPlay.length)} rows still to play on a finished week`);
+	if (locked.length === 0) {
+		fault(at, 'no row past its kickoff');
+		return;
+	}
+	for (const r of rows)
+		if (r.gain !== null && r.gain !== EMPTY_FIGURE && !r.gain.endsWith(` ${SEASON.gain}`))
+			fault(at, `${r.name} draws a week gain ${r.gain} in Beats`);
+	const top = rows[0];
+	const moves = await page.locator('main [data-strip="waivers"] .pickup .move').allInnerTexts();
+	if (
+		top === undefined ||
+		!top.named ||
+		moves.length !== 1 ||
+		!(moves[0] ?? '').includes(shortName(top.name))
+	)
+		fault(at, `the strip ${JSON.stringify(moves)} is not the top row ${top?.name ?? 'none'}`);
 	const basis = (await page.locator('main [data-basis]').allInnerTexts()).join(' ');
 	if (!basis.includes(seasonOrderWords(6)))
 		fault(at, 'the basis does not name the season Gain order');

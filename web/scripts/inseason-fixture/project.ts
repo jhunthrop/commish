@@ -423,6 +423,7 @@ function pickupTable(advice: WaiverAdvice): WaiverAdvice {
 	return {
 		...advice,
 		basis: WAIVERS_BASIS,
+		pickup_order: 'week',
 		season_basis: waiverSeasonBasis(weeksCovered(advice.week)),
 		...uncountedOf(lineup.uncounted_rules),
 		rows,
