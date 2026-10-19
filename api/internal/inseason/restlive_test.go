@@ -103,6 +103,10 @@ func TestTheLiveBoardDropsTheGamesPlayedSinceTheRun(t *testing.T) {
 	if got := RestOfSeasonPerGame(live, mia, rest.Left); got == nil || *got != 10 {
 		t.Fatalf("per game %v, want 10", got)
 	}
+	// Over repl. moves with the points: with no back at replacement, by his 10 points exactly.
+	if live.Values["mia"] != b.Values["mia"]-10 || live.Values["tb"] != b.Values["tb"] {
+		t.Fatalf("Over repl. live %v, run %v", live.Values, b.Values)
+	}
 	if run, _ := b.Player("mia"); *run.Points != 120 {
 		t.Fatalf("the run's board changed: %v", *run.Points)
 	}
@@ -110,6 +114,52 @@ func TestTheLiveBoardDropsTheGamesPlayedSinceTheRun(t *testing.T) {
 	pre.Order = boards.OrderPreseason
 	if same, _ := LiveBoard(pre, rest); same.Raw != pre.Raw {
 		t.Fatal("a preseason board is not the rest of season's to rescale")
+	}
+}
+
+// Review M1: through the order on Sunday evening, every row's total, Over
+// repl. and A game are the re-valued board's, and the rows run in its
+// Over repl. order. The fixture's week 6 is Sunday at 1:00 pm, its last
+// two clubs on bye; Saturday's run counts week 6 for the clubs that play,
+// so by the evening every club counts from week 7.
+func TestTheOrderAgreesRowByRowAfterTheRevalue(t *testing.T) {
+	f := restFixture(t)
+	f.league.Board.FromWeek, f.league.Board.Refreshed = 6, restRunInstant
+	sundayEvening := restSunday.Add(5 * time.Hour)
+	a, err := newAdvisor(f.league, f.data, boards.WeekProjection{}, nil, sundayEvening)
+	if err != nil {
+		t.Fatal(err)
+	}
+	clubs := fixtureTeams()
+	onBye := map[string]bool{clubs[len(clubs)-2]: true, clubs[len(clubs)-1]: true}
+	out := a.Order(orderQuery{limit: MaxOrderRows}, nil)
+	if len(out.Rows) == 0 || !strings.HasPrefix(out.Basis, "Our rest-of-season order from week 7.") {
+		t.Fatalf("%d rows, basis %q", len(out.Rows), out.Basis)
+	}
+	var last float64
+	for i, row := range out.Rows {
+		id := boardID(row.Line)
+		run, _ := f.league.Board.Player(id)
+		live, _ := a.Board.Player(id)
+		atRun, left := 12.0, 11.0
+		if onBye[run.Team] {
+			atRun = 11
+		}
+		want := *run.Points * left / atRun
+		if *live.Points != want || row.RestOfSeasonPoints == nil || *row.RestOfSeasonPoints != roundTenth(want) {
+			t.Fatalf("%s (%s): live %v, row %v, want %v", id, run.Team, *live.Points, row.RestOfSeasonPoints, want)
+		}
+		if g := row.Line.RestOfSeasonPerGame; g == nil || *g != roundTenth(*run.Points/atRun) {
+			t.Fatalf("%s: a game %v, want %v", id, g, roundTenth(*run.Points/atRun))
+		}
+		v, valued := a.Board.Values[id]
+		if !valued || row.PointsOverReplacement == nil || *row.PointsOverReplacement != roundTenth(v) {
+			t.Fatalf("%s: Over repl. %v, the live board's %v", id, row.PointsOverReplacement, v)
+		}
+		if i > 0 && v > last {
+			t.Fatalf("row %d (%s) at %v sits under %v", i, id, v, last)
+		}
+		last = v
 	}
 }
 
