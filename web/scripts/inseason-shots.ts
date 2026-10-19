@@ -37,7 +37,7 @@ import { mkdir } from 'node:fs/promises';
 import { chromium, type BrowserContext, type Page } from 'playwright';
 import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
 import { copyFault, watchData } from './copy-scan.ts';
-import { FIXTURE_WEEK_CLOCK } from './inseason-fixture/clock.ts';
+import { FIXTURE_SUNDAY_CLOCK, FIXTURE_WEEK_CLOCK } from './inseason-fixture/clock.ts';
 import { BUILDER_LINE, basisLines, basisReport } from './basis-lines.ts';
 import { UNCOUNTED_ANCHOR } from '../src/lib/league/uncounted.ts';
 import { FIXTURE_IDS } from './inseason-fixture/ids.ts';
@@ -50,6 +50,12 @@ const VIEWPORT_HEIGHT = 900;
 /** A phone's screen: the first row must clear the pinned verb in it. */
 const PHONE = { width: 390, height: 844 } as const;
 const READY_TIMEOUT_MS = 30_000;
+/** ESPN's Pts sentence now that it gives each player's points (Lane 79, basis.ts ptsPart). */
+const ESPN_PTS = "Pts are ESPN's points by player so far.";
+/** The stand-in API's ask for an ESPN league's Sunday afternoon (sunday.ts). */
+const SUNDAY_WEEK = { name: 'fixture_week', value: 'sunday' };
+/** The drafter's side on that Sunday as ESPN totals it (scoreboard-live.json, roster 1). */
+const ESPN_SUNDAY_TOTAL = '39.0';
 /** The CSRF cookie the site reads as signed in; the fixture API asks for nothing more. */
 const SIGNED_IN = { name: 'commish_csrf', value: 'fixture' };
 
@@ -81,7 +87,11 @@ if (fixtureClock.data?.clock !== FIXTURE_WEEK_CLOCK)
 await mkdir(out, { recursive: true });
 const browser = await chromium.launch();
 
-async function context(theme: string, width: number): Promise<BrowserContext> {
+async function context(
+	theme: string,
+	width: number,
+	clock: string = FIXTURE_WEEK_CLOCK
+): Promise<BrowserContext> {
 	const ctx = await browser.newContext({
 		viewport: { width, height: VIEWPORT_HEIGHT },
 		colorScheme: theme as 'light'
@@ -89,7 +99,7 @@ async function context(theme: string, width: number): Promise<BrowserContext> {
 	watchData(ctx);
 	// The fixture week's clock, never the day the script runs (start the fixture API with
 	// FIXTURE_CLOCK at the same instant): past its Sunday every game reads as played.
-	await ctx.clock.install({ time: new Date(FIXTURE_WEEK_CLOCK) });
+	await ctx.clock.install({ time: new Date(clock) });
 	await ctx.addCookies([{ ...SIGNED_IN, domain: 'localhost', path: '/' }]);
 	await ctx.addInitScript(
 		([key, value]: readonly [string, string]) => localStorage.setItem(key, value),
@@ -446,8 +456,8 @@ for (const { name, path, ready: text } of PAGES) {
 	}
 }
 
-/** The bases on a platform that gives team totals alone (ESPN, Lane 66t review 2): the Lineup says
- * Pts once and still holds its budget; Waivers, which draws no Pts, holds it too. */
+/** The bases on ESPN, which gives each player's points (Lane 79): the Lineup says Pts once and still
+ * holds its budget (Lane 66t review 2); Waivers, which draws no Pts, holds it too. */
 for (const width of SHOT_WIDTHS) {
 	const ctx = await context('dark', width);
 	const page = await ctx.newPage();
@@ -466,10 +476,58 @@ for (const width of SHOT_WIDTHS) {
 			if (report.fault !== null) missing.push(report.fault);
 		}
 		const said = (await page.locator('main').textContent()) ?? '';
-		const pts = said.split("Pts are ESPN's team points").length - 1;
+		const pts = said.split(ESPN_PTS).length - 1;
 		if (screen === 'start' && pts !== 1)
 			missing.push(`${basisName} ${String(width)}: Pts said ${String(pts)} times`);
 		await page.screenshot({ path: file(`${screen}-espn-dark-${String(width)}`), fullPage: true });
+	}
+	await ctx.close();
+}
+
+/** ESPN's league on its Sunday afternoon (Lane 79, sunday.ts), in the dark at both widths: the Matchup
+ * and Lineup print ESPN's points by player, the basis says so once in budget, and the Matchup's score
+ * bug is ESPN's own total, which its Totals row (the printed rows' sum) need not match. */
+for (const width of SHOT_WIDTHS) {
+	const ctx = await context('dark', width, FIXTURE_SUNDAY_CLOCK);
+	await ctx.addCookies([{ ...SUNDAY_WEEK, domain: 'localhost', path: '/' }]);
+	const page = await ctx.newPage();
+	for (const [screen, basisName] of [
+		['matchup', 'matchup ESPN Sunday'],
+		['start', 'lineup ESPN Sunday']
+	] as const) {
+		const at = `${basisName} ${String(width)}`;
+		await page.goto(`${web}/league/${FIXTURE_IDS.espnDone}/${screen}`, {
+			waitUntil: 'networkidle'
+		});
+		await page.locator('main [data-basis]').first().waitFor({ timeout: READY_TIMEOUT_MS });
+		await page.evaluate(() => document.fonts.ready);
+		const report = basisReport(basisName, width, await basisLines(page));
+		if (report !== null) {
+			basisCounts.push(report.line);
+			if (report.fault !== null) missing.push(report.fault);
+		}
+		const said = (await page.locator('main').textContent()) ?? '';
+		if (said.split(ESPN_PTS).length - 1 !== 1) missing.push(`${at}: Pts not said once`);
+		if (said.includes("ESPN's team points")) missing.push(`${at}: says team points`);
+		const pts = await page.evaluate(() =>
+			[
+				...document.querySelectorAll(
+					'main table.box tbody tr:not(.totals) td.pts, main table.lineup tbody tr td.pts'
+				)
+			]
+				.map((td) => (td as HTMLElement).innerText.trim())
+				.filter((t) => /^-?\d+\.\d$/.test(t))
+		);
+		if (pts.length === 0) missing.push(`${at}: no player's points drawn`);
+		if (screen === 'matchup') {
+			const bug = await page.locator('main .bug .sd .big').first().innerText();
+			if (bug !== ESPN_SUNDAY_TOTAL)
+				missing.push(`${at}: the bug reads ${bug}, not ESPN's ${ESPN_SUNDAY_TOTAL}`);
+		}
+		await page.screenshot({
+			path: file(`${screen}-espn-sunday-dark-${String(width)}`),
+			fullPage: true
+		});
 	}
 	await ctx.close();
 }

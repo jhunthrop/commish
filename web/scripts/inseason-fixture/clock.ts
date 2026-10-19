@@ -9,6 +9,14 @@ export const FIXTURE_WEEK_CLOCK = '2026-10-17T17:00:00.000Z';
  * game still to be played (Lane 66w's honest empty state). */
 export const FIXTURE_UNREAD_CLOCK = '2026-10-13T17:00:00.000Z';
 
+/** The week's Sunday stand-in read (sunday.ts): 1:52 pm Central, the noon games in their fourth
+ * quarter, the late games still to kick off. */
+export const FIXTURE_SUNDAY_READ = '2026-10-18T18:52:00.000Z';
+
+/** The browser's clock for a shot of that Sunday (Lane 79): four minutes after its read, as the
+ * stand-in API's reads are four minutes old. */
+export const FIXTURE_SUNDAY_CLOCK = '2026-10-18T18:56:00.000Z';
+
 /** The environment variable the fixture API reads its clock from. */
 export const FIXTURE_CLOCK_VARIABLE = 'FIXTURE_CLOCK';
 

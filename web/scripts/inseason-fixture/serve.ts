@@ -36,6 +36,7 @@ import { playerWeek, type Sheet } from './player-week.ts';
 import { lineupProj, seasonStrength } from './week.ts';
 import { FIXTURE_SEASON, askedPhase, phaseAccount, phaseLeagues, phaseSync } from './phases.ts';
 import { ESPN_STAND_IN_NAME, espnSync } from './espn-sync.ts';
+import { SUNDAY, espnSunday } from './sunday.ts';
 import { inSeason, noWeek } from './member-week.ts';
 import { inTenths } from './tenths.ts';
 import { FIXTURE_CLOCK_VARIABLE, fixtureClock } from './clock.ts';
@@ -474,28 +475,28 @@ function planSentence(): string {
 	return `Start ${joined}, on ESPN now.`;
 }
 
-/** A line as ESPN gives it: no player's points, only the team's (inseason thisWeek). */
-const noPlayerPoints = (line: PlayerLine): PlayerLine => ({
-	...line,
-	facts: { ...line.facts, points_this_week: null }
-});
-
-/** The ESPN league's lineup: the move open, the verb ESPN's lineup page, and ESPN's team total in
- * place of each player's points (Lane 66t: its Pts sentence must fit the phone's basis too). */
+/** The ESPN league's lineup: the move open and the verb ESPN's lineup page. ESPN gives each player's
+ * points for the week (Lane 79), so the lines keep the recorded league's. */
 function espnLineup(): LineupAdvice {
 	return {
 		...lineup,
-		player_points: false,
-		slots: lineup.slots.map((s) => ({
-			...s,
-			ours: noPlayerPoints(s.ours),
-			host: s.host === null ? null : noPlayerPoints(s.host)
-		})),
-		bench: lineup.bench.map(noPlayerPoints),
 		host_lineup_url: ESPN_LINEUP_URL,
 		moves: { lineup: 'available', note: null, takes_writes: true, writes_on: true, reason: null }
 	};
 }
+
+/** An ESPN league on its Sunday afternoon (sunday.ts), for a browser that asks for the Sunday with
+ * the fixture_week cookie: its players' points by player, its totals ESPN's own, read at the Sunday. */
+const espnOnSunday = espnSunday({
+	sync: espnSync(sync),
+	lineup: espnLineup(),
+	matchup: matchupBox,
+	scoreboardLive
+});
+const SUNDAY_WEEK = /(?:^|; )fixture_week=sunday(?:;|$)/;
+/** The request asks for an ESPN league's Sunday. */
+const espnSundayAsked = (req: IncomingMessage, id: string): boolean =>
+	ESPN_MOVES.has(id) && SUNDAY_WEEK.test(req.headers.cookie ?? '');
 
 /** The shape of a host id the claim route takes (api hostmoves checkClaim). */
 const HOST_ID = /^-?[0-9]{1,12}$/;
@@ -773,6 +774,14 @@ async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> 
 	const synced = SYNC.exec(url.pathname);
 	if (synced) {
 		const asked = synced[1] ?? '';
+		if (espnSundayAsked(req, asked)) {
+			send(req, res, HTTP.ok, {
+				...phaseSync(espnOnSunday.sync, asked),
+				id: asked,
+				read_at: SUNDAY
+			});
+			return;
+		}
 		send(req, res, HTTP.ok, {
 			...phaseSync(ESPN_MOVES.has(asked) ? espnSync(sync) : sync, asked),
 			id: synced[1],
@@ -860,6 +869,10 @@ async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> 
 			return;
 		}
 		if (id === SLOW) await new Promise((resolve) => setTimeout(resolve, HOLD_MS));
+		if (espnSundayAsked(req, id ?? '') && (route === 'lineup' || route === 'matchup')) {
+			send(req, res, HTTP.ok, { ...espnOnSunday[route], read_at: SUNDAY });
+			return;
+		}
 		const bodies = {
 			lineup: ESPN_MOVES.has(id ?? '') ? espnLineup() : lineup,
 			matchup: matchupBox,
