@@ -11,7 +11,9 @@ import pytest
 from research.capsules.grounding import is_name_grounded, proper_name_phrases
 from research.capsules.names import fold_name
 from research.capsules.rule_notes import note_of
+from research.capsules.voice_rules import mask_names
 from research.capsules.week.sheet import DepthPlace, WeekSheet
+from research.capsules.week.start_advice import start_advice_in
 from research.capsules.week.validate import validate_week_read
 from research.tests.week_read_fixtures import starter
 
@@ -75,3 +77,12 @@ def test_an_untraced_name_with_no_near_name_says_nothing_more() -> None:
 def test_the_rule_note_reads_the_named_violation() -> None:
     body = "Devin Neal shares the backfield with Audric Estim in week 6 of 2026."
     assert note_of(TRUNCATED, body).rule == 'an untraced name, "Audric Estim"'
+
+
+def test_masking_reads_the_name_without_its_accent() -> None:
+    assert mask_names("Estime will Bet on it.", ["Estimé"]) == "Him will Bet on it."
+    assert mask_names("Estimé will Bet on it.", ["Estimé"]) == "Him will Bet on it."
+
+
+def test_start_advice_reads_the_name_without_its_accent() -> None:
+    assert start_advice_in("Start Estime this week.", "Audric Estimé") == "Start Estime"

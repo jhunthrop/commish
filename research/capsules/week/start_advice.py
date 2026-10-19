@@ -14,6 +14,8 @@ A phrase list cannot be complete, so it is the third guard, not the only one. It
 import re
 from typing import Final
 
+from research.capsules.names import name_pattern
+
 _CLAUSE_BREAK: Final = re.compile(r"[,;:.!?]|\b(?:but|so|and then|then)\b", re.IGNORECASE)
 _NEGATION: Final = re.compile(r"\b(?:not|never|no|don't|do not|can't|cannot|won't|shouldn't)\b|n't\b", re.IGNORECASE)
 # A negation that recommends: its clause asks him into the lineup however it is worded.
@@ -33,7 +35,7 @@ def name_forms(name: str) -> list[str]:
 
 
 def _him(name: str) -> str:
-    return "|".join(["him", "them", *(re.escape(form) for form in name_forms(name))])
+    return "|".join(["him", "them", *(name_pattern(form) for form in name_forms(name))])
 
 
 def _affirm(name: str) -> re.Pattern[str]:
