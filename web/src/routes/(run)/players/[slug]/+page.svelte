@@ -13,6 +13,7 @@
 	import { CARD, unreadBasis, type CardTile } from '#lib/player/card.ts';
 	import type { CardLeague, LiveCard, RestParts } from '#lib/player/week-words.ts';
 	import { shownWeekRead } from '#lib/player/week-read.ts';
+	import { cliffAt, lineFiguresAt, matesAt } from '#lib/player/live-figures.ts';
 	import PlayerCard from '#lib/player/PlayerCard.svelte';
 	import type PlayerCompare from '#lib/player/PlayerCompare.svelte';
 	import Credit from '#lib/site/Credit.svelte';
@@ -199,28 +200,23 @@
 	const statusNote = $derived(statusWords?.note ?? null);
 	/** On a season-long list: no tier and no gap frame the rank his figure would earn. */
 	const heldOut = $derived(page.status?.status.seasonLong === true);
-	/** The tier box: each player's figure at the read's clock once it answers (Lane 86), the run's
-	 * before. */
+	/** The tier box and the every-format table on one clock (live-figures.ts, re-review N1): the run's
+	 * figures until the read answers, then the read's alone. */
 	const mates = $derived(
-		page.tier.mates.map((mate) => ({
+		matesAt(page.tier.mates, live?.tier ?? null).map((mate) => ({
 			...mate,
-			projected: live?.tier?.points[mate.id] ?? mate.projected,
 			href: links.player(mate.slug)
 		}))
 	);
-	const tierCliff = $derived(
-		page.tier.cliff && live?.tier?.drop != null
-			? { ...page.tier.cliff, drop: live.tier.drop }
-			: page.tier.cliff
-	);
-	/** The every-format table's figures for a line: the read's at its clock, the run's before. */
+	const tierCliff = $derived(cliffAt(page.tier.cliff, live?.tier ?? null));
 	const lineFigures = (
 		line: (typeof page.lines)[number]
-	): { points: number; vor: number | null } => {
-		const format = apiFormatOf(line.format);
-		const read = format === null ? undefined : live?.formats?.figures[format];
-		return read ?? { points: line.numbers.projected, vor: line.numbers.vor };
-	};
+	): { points: number | null; vor: number | null } =>
+		lineFiguresAt(
+			{ points: line.numbers.projected, vor: line.numbers.vor },
+			apiFormatOf(line.format),
+			live?.formats ?? null
+		);
 	/** The week tile's head as drawn ("Wk 6"), which the unread basis names. */
 	const weekTileHead = $derived(tiles.find((tile) => tile.key === 'proj')?.label ?? CARD.proj);
 	/** Every number's basis, once: the week's, the rest of season's, the season's. */
@@ -397,7 +393,7 @@
 						<tr>
 							<td><a href={links.board(line.format.id, page.position)}>{line.tableLabel}</a></td>
 							<td class="num">{listed?.rank ?? line.numbers.ourRank}</td>
-							<td class="num">{fixed(figures.points)}</td>
+							<td class="num">{figures.points === null ? EMPTY_FIGURE : fixed(figures.points)}</td>
 							<td class="num">{figures.vor === null ? EMPTY_FIGURE : signed(figures.vor)}</td>
 							<td class="num">{listed?.rank ?? line.numbers.tier}</td>
 						</tr>
