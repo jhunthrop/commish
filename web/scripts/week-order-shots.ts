@@ -17,6 +17,7 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { chromium, type BrowserContext, type Page } from 'playwright';
+import { UNCOUNTED_ANCHOR } from '../src/lib/league/uncounted.ts';
 import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
 import {
 	FIXTURE_CLOCK_VARIABLE,
@@ -272,7 +273,7 @@ async function check(
 		said.push(`${at}: the rules left out read "${seen.rules}"`);
 	if (seen.glued) said.push(`${at}: two basis sentences run together`);
 	// Settings at the list of the rules (tabs.ts leagueSettingsHref, Lane 66t).
-	if (screen.member !== /\?view=settings#\w+$/.test(seen.rulesLink))
+	if (screen.member !== seen.rulesLink.endsWith(`?view=settings#${UNCOUNTED_ANCHOR}`))
 		said.push(`${at}: the rules link is "${seen.rulesLink}"`);
 	if (screen.member) {
 		if (width > ROSTER_FROM && !seen.heads.includes('Roster')) said.push(`${at}: no Roster head`);

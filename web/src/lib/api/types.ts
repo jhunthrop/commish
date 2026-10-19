@@ -3092,7 +3092,7 @@ export interface components {
 			projection_previous_read_at: string | null;
 			/** @description the honesty line: the lineup starts the highest week_projection at each slot after this week's designations and byes, the rest-of-season order breaking ties and standing in where a player has none */
 			basis: string;
-			/** @description the league's scoring rules Avg and Last leave out because our stats lack them, counted ("Avg and Last leave out four of your rules our stats lack."), empty when they leave out none */
+			/** @description the league's scoring rules Avg and Last miss because our stats lack them, counted ("Avg and Last miss four of your rules our stats lack."), empty when they miss none */
 			basis_note: string;
 			/** @description the words of basis_note's link to the league's Settings, where the rules are listed ("Which four"); empty with no basis_note */
 			basis_note_link: string;
@@ -3367,7 +3367,7 @@ export interface components {
 			week: number;
 			/** @description what the order and its two figures are, said once under the rows */
 			basis: string;
-			/** @description the league's scoring rules Avg and Last leave out because our stats lack them, counted ("Avg and Last leave out four of your rules our stats lack."), empty when they leave out none */
+			/** @description the league's scoring rules Avg and Last miss because our stats lack them, counted ("Avg and Last miss four of your rules our stats lack."), empty when they miss none */
 			basis_note: string;
 			/** @description the words of basis_note's link to the league's Settings, where the rules are listed ("Which four"); empty with no basis_note */
 			basis_note_link: string;
@@ -3429,8 +3429,10 @@ export interface components {
 			week: number;
 			/** @enum {string} */
 			position: 'K' | 'DEF';
-			/** @description how many of the league's scoring rules at the tab's position (kicking rules for K, defense rules for DEF) the season's points (Avg and Last) leave out, our stats lacking them; the basis says the count once and links to the league's Settings, never a list (Lane 66w) */
-			uncounted_rules: number;
+			/** @description the tab's scoring rules (kicking rules for K, defense rules for DEF) Avg and Last miss, counted ("Avg and Last miss two of your rules our stats lack."; a reader with no league, "of the PPR rules"), empty when none */
+			basis_note: string;
+			/** @description the words of basis_note's link to the league's Settings ("Which two"); empty with none or no league */
+			basis_note_link: string;
 			/**
 			 * Format: date-time
 			 * @description when the league was read from its platform, null without a league
@@ -3479,7 +3481,7 @@ export interface components {
 			basis: string;
 			/** @description what the Rest of season column and a gain over the rest of the season are, said once under the rows */
 			season_basis: string;
-			/** @description the league's scoring rules Avg and Last leave out because our stats lack them, counted ("Avg and Last leave out four of your rules our stats lack."), empty when they leave out none */
+			/** @description the league's scoring rules Avg and Last miss because our stats lack them, counted ("Avg and Last miss four of your rules our stats lack."), empty when they miss none */
 			basis_note: string;
 			/** @description the words of basis_note's link to the league's Settings, where the rules are listed ("Which four"); empty with no basis_note */
 			basis_note_link: string;
@@ -3697,7 +3699,7 @@ export interface components {
 			basis: string;
 			/** @description every player on the drafter's active roster (injured reserve and taxi spots left out), by position then name: the picker's own players, a trade found or not */
 			roster: components['schemas']['PlayerLine'][];
-			/** @description the league's scoring rules Avg and Last leave out because our stats lack them, counted ("Avg and Last leave out four of your rules our stats lack."), empty when they leave out none */
+			/** @description the league's scoring rules Avg and Last miss because our stats lack them, counted ("Avg and Last miss four of your rules our stats lack."), empty when they miss none */
 			basis_note: string;
 			/** @description the words of basis_note's link to the league's Settings, where the rules are listed ("Which four"); empty with no basis_note */
 			basis_note_link: string;
@@ -3783,7 +3785,7 @@ export interface components {
 			week: number;
 			/** @description the honesty line beside the answer */
 			basis: string;
-			/** @description the league's scoring rules Avg and Last leave out because our stats lack them, counted ("Avg and Last leave out four of your rules our stats lack."), empty when they leave out none */
+			/** @description the league's scoring rules Avg and Last miss because our stats lack them, counted ("Avg and Last miss four of your rules our stats lack."), empty when they miss none */
 			basis_note: string;
 			/** @description the words of basis_note's link to the league's Settings, where the rules are listed ("Which four"); empty with no basis_note */
 			basis_note_link: string;

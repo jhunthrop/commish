@@ -3715,8 +3715,8 @@ components:
         basis_note:
           type: string
           description: >-
-            the league's scoring rules Avg and Last leave out because our stats lack them, counted ("Avg and Last
-            leave out four of your rules our stats lack."), empty when they leave out none
+            the league's scoring rules Avg and Last miss because our stats lack them, counted ("Avg and Last
+            miss four of your rules our stats lack."), empty when they miss none
         basis_note_link:
           type: string
           description: the words of basis_note's link to the league's Settings, where the rules are listed ("Which four"); empty with no basis_note
@@ -4057,8 +4057,8 @@ components:
         basis_note:
           type: string
           description: >-
-            the league's scoring rules Avg and Last leave out because our stats lack them, counted ("Avg and Last
-            leave out four of your rules our stats lack."), empty when they leave out none
+            the league's scoring rules Avg and Last miss because our stats lack them, counted ("Avg and Last
+            miss four of your rules our stats lack."), empty when they miss none
         basis_note_link:
           type: string
           description: the words of basis_note's link to the league's Settings, where the rules are listed ("Which four"); empty with no basis_note
@@ -4133,16 +4133,19 @@ components:
             otherwise (and always for the drafter's own players)
     WeekOrderAdvice:
       type: object
-      required: [week, position, uncounted_rules, read_at, projection_read_at, projection_scoring, moves, rows]
+      required: [week, position, basis_note, basis_note_link, read_at, projection_read_at, projection_scoring, moves, rows]
       properties:
         week: { type: integer, description: the week the rows' Game cell and Proj are for }
         position: { type: string, enum: [K, DEF] }
-        uncounted_rules:
-          type: integer
+        basis_note:
+          type: string
           description: >-
-            how many of the league's scoring rules at the tab's position (kicking rules for K, defense rules for DEF)
-            the season's points (Avg and Last) leave out, our stats lacking them; the basis says the count once and
-            links to the league's Settings, never a list (Lane 66w)
+            the tab's scoring rules (kicking rules for K, defense rules for DEF) Avg and Last miss, counted ("Avg and
+            Last miss two of your rules our stats lack."; a reader with no league, "of the PPR rules"), empty when
+            none
+        basis_note_link:
+          type: string
+          description: the words of basis_note's link to the league's Settings ("Which two"); empty with none or no league
         read_at:
           type: string
           format: date-time
@@ -4207,8 +4210,8 @@ components:
         basis_note:
           type: string
           description: >-
-            the league's scoring rules Avg and Last leave out because our stats lack them, counted ("Avg and Last
-            leave out four of your rules our stats lack."), empty when they leave out none
+            the league's scoring rules Avg and Last miss because our stats lack them, counted ("Avg and Last
+            miss four of your rules our stats lack."), empty when they miss none
         basis_note_link:
           type: string
           description: the words of basis_note's link to the league's Settings, where the rules are listed ("Which four"); empty with no basis_note
@@ -4519,8 +4522,8 @@ components:
         basis_note:
           type: string
           description: >-
-            the league's scoring rules Avg and Last leave out because our stats lack them, counted ("Avg and Last
-            leave out four of your rules our stats lack."), empty when they leave out none
+            the league's scoring rules Avg and Last miss because our stats lack them, counted ("Avg and Last
+            miss four of your rules our stats lack."), empty when they miss none
         basis_note_link:
           type: string
           description: the words of basis_note's link to the league's Settings, where the rules are listed ("Which four"); empty with no basis_note
@@ -4626,8 +4629,8 @@ components:
         basis_note:
           type: string
           description: >-
-            the league's scoring rules Avg and Last leave out because our stats lack them, counted ("Avg and Last
-            leave out four of your rules our stats lack."), empty when they leave out none
+            the league's scoring rules Avg and Last miss because our stats lack them, counted ("Avg and Last
+            miss four of your rules our stats lack."), empty when they miss none
         basis_note_link:
           type: string
           description: the words of basis_note's link to the league's Settings, where the rules are listed ("Which four"); empty with no basis_note

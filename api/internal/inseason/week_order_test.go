@@ -179,9 +179,15 @@ func TestWeekOrderCountsTheRulesLeftOut(t *testing.T) {
 	saved.Scoring = apitypes.Scoring{Custom: &rules}
 	f.league.Saved = &saved
 	out := f.advisor(t, f.projection, fixtureNow).WeekOrder(draft.K, true)
-	want := len(uncountedRulesAt(saved, func(string) bool { return false }, draft.K))
-	if want < 2 || out.UncountedRules != want {
-		t.Fatalf("%d rules left out, want %d", out.UncountedRules, want)
+	n := len(uncountedRulesAt(saved, func(string) bool { return false }, draft.K))
+	want := uncountedOf(make([]string, n), "your", true)
+	if n < 2 || out.BasisNote != want.Note || out.BasisNoteLink != want.Link {
+		t.Fatalf("%q %q, want %d rules left out", out.BasisNote, out.BasisNoteLink, n)
+	}
+	// A reader with no league is told the board's scoring, and has no Settings to open.
+	visitor := f.advisor(t, f.projection, fixtureNow).WeekOrder(draft.K, false)
+	if !strings.Contains(visitor.BasisNote, " of the PPR rules our stats lack.") || visitor.BasisNoteLink != "" {
+		t.Fatalf("visitor %q %q", visitor.BasisNote, visitor.BasisNoteLink)
 	}
 }
 
@@ -216,8 +222,8 @@ func TestWeekOrderCountsOnlyTheTabsRulesLeftOut(t *testing.T) {
 	a := f.advisor(t, f.projection, fixtureNow)
 	a.season.carried = map[string]bool{metricPointsAllowed: true, metricYardsAllowed: true}
 	for position := range want {
-		if out := a.WeekOrder(position, true); out.UncountedRules != 2 {
-			t.Errorf("%s tab counts %d", position, out.UncountedRules)
+		if out := a.WeekOrder(position, true); out.BasisNote != "Avg and Last miss two of your rules our stats lack." || out.BasisNoteLink != "Which two" {
+			t.Errorf("%s tab: %q %q", position, out.BasisNote, out.BasisNoteLink)
 		}
 	}
 }

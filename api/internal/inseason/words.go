@@ -264,16 +264,22 @@ type Uncounted struct {
 // UncountedOf is the league's uncounted rules. carried says whether any
 // line this season carries a metric (Season.Carries); nil carries none.
 func UncountedOf(s apitypes.LeagueSettings, carried func(string) bool) Uncounted {
-	rules := uncountedRules(s, carried)
+	return uncountedOf(uncountedRules(s, carried), "your", true)
+}
+
+// uncountedOf counts rules in the one sentence every basis prints, whose
+// rules they are ("your", or a reader's stand-in "the PPR"), and the
+// link's words where there is a Settings to open (linked).
+func uncountedOf(rules []string, whose string, linked bool) Uncounted {
 	if len(rules) == 0 {
 		return Uncounted{Rules: []string{}}
 	}
 	n := countWords(len(rules))
-	return Uncounted{
-		Note:  fmt.Sprintf("Avg and Last miss %s of your rules our stats lack.", n),
-		Link:  "Which " + n,
-		Rules: rules,
+	out := Uncounted{Note: fmt.Sprintf("Avg and Last miss %s of %s rules our stats lack.", n, whose), Rules: rules}
+	if linked {
+		out.Link = "Which " + n
 	}
+	return out
 }
 
 // uncountedRules is the league's rules points so far leave out, in
@@ -317,14 +323,14 @@ func gainWords(whose string, b OrderBasis, weeks int) string {
 
 // LineupBasis is the start and sit page's advice rule (§4.4, Lane 66e),
 // over its rows: the lineup starts the highest Proj the rows show, after
-// the week's designations and byes, and our order only breaks ties and
-// stands in where a row has none.
+// the week's designations and byes, and our order breaks ties (it stands
+// in too where a row has none, which the Totals note counts).
 func LineupBasis(b OrderBasis) string {
 	order := "our order"
 	if b != RestOfSeason {
 		order = "our preseason number"
 	}
-	return fmt.Sprintf("We start the highest Proj at each slot after designations and byes, %s breaking ties and standing in for a missing Proj.", order)
+	return fmt.Sprintf("We start the highest Proj at each slot after designations and byes, %s breaking ties.", order)
 }
 
 // WaiversBasis is the waiver page's pickup rule (§5.3, Lane 66f): the

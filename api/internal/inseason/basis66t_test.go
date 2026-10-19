@@ -35,10 +35,10 @@ func TestBuilderLinePointsAtThePage(t *testing.T) {
 }
 
 func TestLineupAndWaiverRules(t *testing.T) {
-	if got := LineupBasis(RestOfSeason); got != "We start the highest Proj at each slot after designations and byes, our order breaking ties and standing in for a missing Proj." {
+	if got := LineupBasis(RestOfSeason); got != "We start the highest Proj at each slot after designations and byes, our order breaking ties." {
 		t.Errorf("%q", got)
 	}
-	if got := LineupBasis(Preseason); got != "We start the highest Proj at each slot after designations and byes, our preseason number breaking ties and standing in for a missing Proj." {
+	if got := LineupBasis(Preseason); got != "We start the highest Proj at each slot after designations and byes, our preseason number breaking ties." {
 		t.Errorf("%q", got)
 	}
 	if WaiversBasis != "A pickup starts this week on Proj and keeps your Gain at zero or better. Its drop costs least." {

@@ -2715,7 +2715,7 @@ type LineupAdvice struct {
 	// Basis the honesty line: the lineup starts the highest week_projection at each slot after this week's designations and byes, the rest-of-season order breaking ties and standing in where a player has none
 	Basis string `json:"basis"`
 
-	// BasisNote the league's scoring rules Avg and Last leave out because our stats lack them, counted ("Avg and Last leave out four of your rules our stats lack."), empty when they leave out none
+	// BasisNote the league's scoring rules Avg and Last miss because our stats lack them, counted ("Avg and Last miss four of your rules our stats lack."), empty when they miss none
 	BasisNote string `json:"basis_note"`
 
 	// BasisNoteLink the words of basis_note's link to the league's Settings, where the rules are listed ("Which four"); empty with no basis_note
@@ -3090,7 +3090,7 @@ type OrderAdvice struct {
 	// Basis what the order and its two figures are, said once under the rows
 	Basis string `json:"basis"`
 
-	// BasisNote the league's scoring rules Avg and Last leave out because our stats lack them, counted ("Avg and Last leave out four of your rules our stats lack."), empty when they leave out none
+	// BasisNote the league's scoring rules Avg and Last miss because our stats lack them, counted ("Avg and Last miss four of your rules our stats lack."), empty when they miss none
 	BasisNote string `json:"basis_note"`
 
 	// BasisNoteLink the words of basis_note's link to the league's Settings, where the rules are listed ("Which four"); empty with no basis_note
@@ -3877,7 +3877,7 @@ type TradeAdvice struct {
 	// Basis which trades are listed, who decides and what a Gain is
 	Basis string `json:"basis"`
 
-	// BasisNote the league's scoring rules Avg and Last leave out because our stats lack them, counted ("Avg and Last leave out four of your rules our stats lack."), empty when they leave out none
+	// BasisNote the league's scoring rules Avg and Last miss because our stats lack them, counted ("Avg and Last miss four of your rules our stats lack."), empty when they miss none
 	BasisNote string `json:"basis_note"`
 
 	// BasisNoteLink the words of basis_note's link to the league's Settings, where the rules are listed ("Which four"); empty with no basis_note
@@ -3923,7 +3923,7 @@ type TradeCheck struct {
 	// Basis the honesty line beside the answer
 	Basis string `json:"basis"`
 
-	// BasisNote the league's scoring rules Avg and Last leave out because our stats lack them, counted ("Avg and Last leave out four of your rules our stats lack."), empty when they leave out none
+	// BasisNote the league's scoring rules Avg and Last miss because our stats lack them, counted ("Avg and Last miss four of your rules our stats lack."), empty when they miss none
 	BasisNote string `json:"basis_note"`
 
 	// BasisNoteLink the words of basis_note's link to the league's Settings, where the rules are listed ("Which four"); empty with no basis_note
@@ -4068,7 +4068,7 @@ type WaiverAdvice struct {
 	// Basis the pickup rule, the basis's first line
 	Basis string `json:"basis"`
 
-	// BasisNote the league's scoring rules Avg and Last leave out because our stats lack them, counted ("Avg and Last leave out four of your rules our stats lack."), empty when they leave out none
+	// BasisNote the league's scoring rules Avg and Last miss because our stats lack them, counted ("Avg and Last miss four of your rules our stats lack."), empty when they miss none
 	BasisNote string `json:"basis_note"`
 
 	// BasisNoteLink the words of basis_note's link to the league's Settings, where the rules are listed ("Which four"); empty with no basis_note
@@ -4296,6 +4296,12 @@ type WeekLineup struct {
 
 // WeekOrderAdvice defines model for WeekOrderAdvice.
 type WeekOrderAdvice struct {
+	// BasisNote the tab's scoring rules (kicking rules for K, defense rules for DEF) Avg and Last miss, counted ("Avg and Last miss two of your rules our stats lack."; a reader with no league, "of the PPR rules"), empty when none
+	BasisNote string `json:"basis_note"`
+
+	// BasisNoteLink the words of basis_note's link to the league's Settings ("Which two"); empty with none or no league
+	BasisNoteLink string `json:"basis_note_link"`
+
 	// Moves the claim's moves on the league's platform, the Waivers screen's verb rule for an add; null without a league
 	Moves    *WaiverMoves            `json:"moves"`
 	Position WeekOrderAdvicePosition `json:"position"`
@@ -4311,9 +4317,6 @@ type WeekOrderAdvice struct {
 
 	// Rows one a club (a kicker is the club's one the projection names, else the one who kicked for it last): first the games still to play by Proj, ties by Avg, then those kicked off, then the clubs on bye
 	Rows []WeekOrderRow `json:"rows"`
-
-	// UncountedRules how many of the league's scoring rules at the tab's position (kicking rules for K, defense rules for DEF) the season's points (Avg and Last) leave out, our stats lacking them; the basis says the count once and links to the league's Settings, never a list (Lane 66w)
-	UncountedRules int `json:"uncounted_rules"`
 
 	// Week the week the rows' Game cell and Proj are for
 	Week int `json:"week"`

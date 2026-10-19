@@ -6,7 +6,6 @@
  * every figure is the API's, printed as it comes. */
 import { memberZone, weekdayName, weekdayTime, zoneWord } from '#lib/format/clock.ts';
 import { clubNickname } from '#lib/format/clubs.ts';
-import { countWord } from '#lib/format/count-words.ts';
 import type { LeagueHost } from '#lib/league/api.ts';
 import {
 	BOX,
@@ -182,23 +181,18 @@ export interface RulesLeftOut {
 }
 
 export function rulesLeftOut(
-	advice: Pick<WeekOrderAdvice, 'uncounted_rules'>,
+	advice: Pick<WeekOrderAdvice, 'basis_note' | 'basis_note_link'>,
 	reader: WeekReader,
 	settingsHref: (league: string) => string
 ): RulesLeftOut | null {
-	const n = advice.uncounted_rules;
-	if (n <= 0) return null;
-	const counted = countWord(n);
-	const whose = reader.league === null ? `the ${reader.boardScoring}` : 'your';
+	// The API's one sentence (inseason words.go uncountedOf), the reader's form its own.
+	if (advice.basis_note === '') return null;
 	return {
-		text: `${BOX.avg} and ${BOX.last} miss ${counted} of ${whose} rules our stats lack.`,
+		text: advice.basis_note,
 		link:
-			reader.league === null
+			reader.league === null || advice.basis_note_link === ''
 				? null
-				: {
-						words: n === 1 ? 'Which one' : `Which ${counted}`,
-						href: settingsHref(reader.league.id)
-					}
+				: { words: advice.basis_note_link, href: settingsHref(reader.league.id) }
 	};
 }
 
