@@ -37,11 +37,12 @@ import { lineupProj, seasonStrength } from './week.ts';
 import { FIXTURE_SEASON, askedPhase, phaseAccount, phaseLeagues, phaseSync } from './phases.ts';
 import { ESPN_STAND_IN_NAME, espnMatchup, espnSync } from './espn-sync.ts';
 import { yahooStandIn } from './yahoo.ts';
-import { SUNDAY, sundayOf } from './sunday.ts';
+import { afterSundayOf, SUNDAY, sundayOf } from './sunday.ts';
+import { linesOf, recordedMatchups, scoreboardAt } from './scoreboard-at.ts';
 import { inSeason, noWeek } from './member-week.ts';
 import { inTenths } from './tenths.ts';
-import { FIXTURE_CLOCK_VARIABLE, fixtureClock } from './clock.ts';
-import { stamped } from './game-state.ts';
+import { FIXTURE_CLOCK_VARIABLE, FIXTURE_MONDAY_CLOCK, fixtureClock } from './clock.ts';
+import { stamped, stateAt } from './game-state.ts';
 import {
 	espnDefenseId,
 	weekOrderAnswer,
@@ -114,29 +115,27 @@ async function load<T>(name: string): Promise<T> {
 
 /** Lane 72's recorded week sheets, the player card's line for those players (player-week.ts). */
 const { players: sheets } = await load<{ players: Record<string, Sheet> }>('week-sheets');
-const [
-	sync,
-	lineup,
-	waivers,
-	trades,
-	gameWeek,
-	matchupBox,
-	scoreboard,
-	scoreboardLive,
-	order,
-	weekOrders
-] = await Promise.all([
-	load<LeagueSync>('sync'),
-	load<LineupAdvice>('lineup'),
-	load<WaiverAdvice>('waivers'),
-	load<TradeAdvice>('trades'),
-	load<GameWeek>('games'),
-	load<MatchupBox>('matchup'),
-	load<Scoreboard>('scoreboard'),
-	load<Scoreboard>('scoreboard-live'),
-	load<OrderAdvice>('order'),
-	load<WeekOrderStates>('week-order')
-]);
+const [sync, lineup, waivers, trades, gameWeek, matchupBox, scoreboardLive, order, weekOrders] =
+	await Promise.all([
+		load<LeagueSync>('sync'),
+		load<LineupAdvice>('lineup'),
+		load<WaiverAdvice>('waivers'),
+		load<TradeAdvice>('trades'),
+		load<GameWeek>('games'),
+		load<MatchupBox>('matchup'),
+		load<Scoreboard>('scoreboard-live'),
+		load<OrderAdvice>('order'),
+		load<WeekOrderStates>('week-order')
+	]);
+
+/** The recorded week the scoreboard is restated from at the fixture's clock (scoreboard-at.ts). */
+const recordedWeek = {
+	me: sync.me,
+	week: sync.week,
+	matchups: await recordedMatchups(),
+	lines: linesOf({ lineup, waivers, trades, matchup: matchupBox }),
+	box: matchupBox
+};
 
 const myTeam = sync.teams.find((t) => t.roster_id === sync.me);
 const contextBase = {
@@ -194,6 +193,25 @@ const account: components['schemas']['Account'] = {
 
 const readAt = (): string => new Date(now() - READ_MINUTES_AGO * MINUTE_MS).toISOString();
 
+/** The scoreboard as the API answers it at the fixture's clock (Lane 85): each game's state and next
+ * kickoff by its starters' games (stateAt), each kicked-off starter's stand-in share scored, never the
+ * recording's read from before the week's games. */
+function scoreboardNow(): Scoreboard {
+	const at = now();
+	return scoreboardAt(
+		recordedWeek,
+		{ now: at, final: (line) => stateAt(line.facts, at) === 'final', scored: true },
+		readAt()
+	);
+}
+
+/** From the Monday clock on (Lane 80's FIXTURE_MONDAY_CLOCK and FIXTURE_TUESDAY_CLOCK), every league
+ * read is the week after its Sunday at the fixture's clock (sunday.ts afterSundayOf): the Lineup as
+ * the engine would advise it then, the points so far, the scoreboard restated, the week in the books
+ * once every starter's game is final (Lane 85). */
+const AFTER_SUNDAY = Date.parse(FIXTURE_MONDAY_CLOCK);
+const afterSunday = (): boolean => now() >= AFTER_SUNDAY;
+
 /** The API's sentence for an FFPC read FFPC signed out of (leaguesync HostProblemWords). */
 const FFPC_AGAIN = 'FFPC signed you out. Sign in to FFPC again to keep reading your league.';
 
@@ -201,6 +219,11 @@ const FFPC_AGAIN = 'FFPC signed you out. Sign in to FFPC again to keep reading y
 function memberWeek(): components['schemas']['MemberWeek'] {
 	const at = readAt();
 	const when = now();
+	const after = afterSunday();
+	const sleeperWeek = after ? sleeperAfter() : { sync, lineup, scoreboard: scoreboardNow() };
+	const espnWeek = after
+		? espnAfter()
+		: { sync: espnSync(sync), lineup: espnLineup(), scoreboard: scoreboardLive };
 	const base = {
 		name: sync.name,
 		host: sync.host,
@@ -209,18 +232,8 @@ function memberWeek(): components['schemas']['MemberWeek'] {
 	};
 	return {
 		leagues: [
-			inSeason(LEAGUE, { sync, lineup, waivers, scoreboard, readAt: at }, when),
-			inSeason(
-				ESPN_DONE,
-				{
-					sync: espnSync(sync),
-					lineup: espnLineup(),
-					waivers: espnWaivers(null),
-					scoreboard: scoreboardLive,
-					readAt: at
-				},
-				when
-			),
+			inSeason(LEAGUE, { ...sleeperWeek, waivers, readAt: at }, when),
+			inSeason(ESPN_DONE, { ...espnWeek, waivers: espnWaivers(null), readAt: at }, when),
 			noWeek(
 				NO_TEAM,
 				{ ...base, name: 'Main Event (FFPC stand-in)', host: 'ffpc', phase: 'in_season' },
@@ -499,6 +512,17 @@ const espnOnSunday = sundayOf({
 	scoreboardLive
 });
 const SUNDAY_WEEK = /(?:^|; )fixture_week=sunday(?:;|$)/;
+/** The recorded league after its Sunday, at the fixture's clock. */
+const sleeperAfter = (): StandInWeek =>
+	afterSundayOf({ sync, lineup, matchup: matchupBox }, recordedWeek, now(), readAt());
+/** An ESPN league after its Sunday, at the fixture's clock. */
+const espnAfter = (): StandInWeek =>
+	afterSundayOf(
+		{ sync: espnSync(sync), lineup: espnLineup(), matchup: espnMatchup(matchupBox) },
+		recordedWeek,
+		now(),
+		readAt()
+	);
 /** The recorded league as a Yahoo league's (yahoo.ts), for a browser that asks with the
  * fixture_platform cookie: team totals alone, so its Pts sentence keeps a shot, on the week's
  * Saturday or its Sunday. */
@@ -509,12 +533,16 @@ const YAHOO_PLATFORM = /(?:^|; )fixture_platform=yahoo(?:;|$)/;
 const yahooAsked = (req: IncomingMessage, id: string): boolean =>
 	id === LEAGUE && YAHOO_PLATFORM.test(req.headers.cookie ?? '');
 
-/** A stand-in's answers and when they were read. */
-interface StandIn {
+/** A stand-in's answers. */
+interface StandInWeek {
 	sync: LeagueSync;
 	lineup: LineupAdvice;
 	matchup: MatchupBox;
 	scoreboard: Scoreboard;
+}
+
+/** A stand-in's answers and when they were read. */
+interface StandIn extends StandInWeek {
 	readAt: string;
 }
 
@@ -522,9 +550,20 @@ interface StandIn {
  * the recorded league on the Sunday, the recorded league as Yahoo's on either day. */
 function standInAsked(req: IncomingMessage, id: string): StandIn | null {
 	const sunday = SUNDAY_WEEK.test(req.headers.cookie ?? '');
+	if (!sunday && afterSunday()) {
+		const at = readAt();
+		if (yahooAsked(req, id)) {
+			const week = sleeperAfter();
+			return { ...yahooStandIn(week), scoreboard: week.scoreboard, readAt: at };
+		}
+		if (ESPN_MOVES.has(id)) return { ...espnAfter(), readAt: at };
+		return id === LEAGUE ? { ...sleeperAfter(), readAt: at } : null;
+	}
 	const live = { scoreboard: scoreboardLive, readAt: SUNDAY };
 	if (yahooAsked(req, id))
-		return sunday ? { ...yahooOnSunday, ...live } : { ...yahooWeek, scoreboard, readAt: readAt() };
+		return sunday
+			? { ...yahooOnSunday, ...live }
+			: { ...yahooWeek, scoreboard: scoreboardNow(), readAt: readAt() };
 	if (!sunday) return null;
 	if (ESPN_MOVES.has(id)) return { ...espnOnSunday, ...live };
 	return id === LEAGUE ? { ...sleeperOnSunday, ...live } : null;
@@ -925,7 +964,7 @@ async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> 
 			matchup: ESPN_MOVES.has(id ?? '') ? espnMatchup(matchupBox) : matchupBox,
 			// The ESPN leagues show the week on its Sunday afternoon, a stand-in (league.ts): the
 			// points are made up so the board's played states can be drawn.
-			scoreboard: ESPN_MOVES.has(id ?? '') ? scoreboardLive : scoreboard,
+			scoreboard: ESPN_MOVES.has(id ?? '') ? scoreboardLive : scoreboardNow(),
 			waivers: ESPN_MOVES.has(id ?? '')
 				? espnWaivers(url.searchParams.get('position'))
 				: waiversAt(url.searchParams.get('position')),
