@@ -28,7 +28,7 @@ const record = (over: Partial<RunRecord>): RunRecord => ({
 	season: 2026,
 	format: 'ppr-12',
 	statistic: { agreement: 'order matched', placesOff: 'places off', starters: 'starters right' },
-	scale: "1.0 is a perfect match of the week's finishing order, 0 is none.",
+	scale: "1.00 is a perfect match of the week's finishing order, 0.00 is none.",
 	startersBasis: null,
 	method: 'Graded against our preseason board.',
 	publishedFromWeek: null,
@@ -86,7 +86,7 @@ void test('a rate in [0, 1] prints two decimals as given, and the headline says 
 	// The graded page says the scale and the two decimals once, under the bug's tiles (Lane 66t).
 	assert.equal(
 		scaleWords(graded),
-		"Order matched: 1.0 is a perfect match of the week's finishing order, 0 is none. Rates print to two decimals."
+		"Order matched: 1.00 is a perfect match of the week's finishing order, 0.00 is none. Rates print to two decimals."
 	);
 });
 
