@@ -5,7 +5,8 @@ number traces when it is a ledger value, its truncation, ceiling or floor, its m
 percent (for a fraction), or an honest rounding of any of those to zero, one or two decimals; a
 round-number reading ("about 280") of a number the sheet prints traces too. A name traces when the
 whole multi-word phrase is on the name ledger, or is a trailing part of a ledgered name, after a
-sentence verb or starter that merged into it is shed.
+sentence verb or starter that merged into it is shed. Names are read in any script and compared on
+their folded form (`names.fold_name`), so "Audric Estime" traces to the sheet's "Audric Estimé" (Lane 75).
 """
 
 import math
@@ -13,6 +14,7 @@ import re
 from collections.abc import Sequence
 from typing import Final
 
+from research.capsules.names import fold_name
 from research.model.jsmath import js_pow, js_round
 from research.pipeline.jscompat import js_number
 
@@ -216,7 +218,9 @@ _SENTENCE_VERBS: Final = frozenset(
         "Rostering",
     ]
 )
-_WORD: Final = re.compile(r"\b[A-Z][a-zA-Z'\u2019.-]*", re.ASCII)
+# A word of letters in any script, and the apostrophes, stops and hyphens a name holds; a name word is
+# one of these whose first letter is a capital (Lane 75: an ASCII class cut "Estimé" to "Estim").
+_WORD: Final = re.compile(r"\b[^\W\d_](?:[^\W\d_]|['\u2019.-])*")
 _CLITIC: Final = re.compile(r"['\u2019]s$|['\u2019]$", re.IGNORECASE)
 
 
@@ -243,6 +247,8 @@ def proper_name_phrases(text: str) -> list[str]:
     breaking it."""
     words: list[tuple[str, int, int]] = []
     for match in _WORD.finditer(text):
+        if not match.group(0)[0].isupper():
+            continue
         bare = _CLITIC.sub("", match.group(0), count=1)
         if bare == "" or _is_position_code(bare) or _FIRST_PERSON.match(bare):
             continue
@@ -274,12 +280,12 @@ def _split(text: str) -> list[str]:
 def _is_grounded(phrase: str, ledger: Sequence[str]) -> bool:
     cleaned = re.sub(r"['\u2019]s?$", "", phrase.strip(), flags=re.IGNORECASE)
     multi = " " in cleaned
-    lower = cleaned.lower()
+    lower = fold_name(cleaned)
     for name in ledger:
         name_multi = " " in name.strip()
         if multi != name_multi:
             continue
-        lowered = name.lower()
+        lowered = fold_name(name)
         if lowered == lower:
             return True
         if not multi:
@@ -301,10 +307,20 @@ def is_name_grounded(phrase: str, ledger: Sequence[str]) -> bool:
         words = _split(candidate)
         if len(words) <= 2:  # noqa: PLR2004 - never shed below two words: a lone surname is no proof
             if len(words) == 2 and words[0] in _SENTENCE_VERBS:  # noqa: PLR2004
-                surname = words[1].lower()
-                if any(len(_split(n.lower())) >= 2 and surname in _split(n.lower())[1:] for n in ledger):  # noqa: PLR2004
+                surname = fold_name(words[1])
+                if any(len(_split(fold_name(n))) >= 2 and surname in _split(fold_name(n))[1:] for n in ledger):  # noqa: PLR2004
                     return True
             if len(words) == 2 and words[0] in COMMON_SENTENCE_STARTERS:  # noqa: PLR2004
-                return any(n.lower() == words[1].lower() for n in ledger)
+                return any(fold_name(n) == fold_name(words[1]) for n in ledger)
             return False
         candidate = " ".join(words[1:])
+
+
+def sheet_name_begun(phrase: str, ledger: Sequence[str]) -> str | None:
+    """The ledgered multi-word name an untraced `phrase` is a cut-off start of ("Audric Estim" of
+    "Audric Estimé"), so the refusal can say what the sheet carries; None when it begins none."""
+    folded = fold_name(phrase.strip())
+    return next(
+        (n for n in ledger if " " in n.strip() and fold_name(n) != folded and fold_name(n).startswith(folded)),
+        None,
+    )
