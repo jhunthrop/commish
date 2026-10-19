@@ -10,7 +10,6 @@ import { listWords } from '#lib/format/list.ts';
 import { fixed, MINUS, signed } from '#lib/format/number.ts';
 import type { LeagueHost } from '../api.ts';
 import type {
-	OrderBasis,
 	PlayerLine,
 	TradeAdvice,
 	TradeCheck,
@@ -23,16 +22,20 @@ import { tradeKey } from '../inseason/state.ts';
 import { verbWords } from '../inseason/words.ts';
 import { hostWords } from '../names.ts';
 import { BOX, EVIDENCE_BASIS, factsReadLine, projBasis, ptsBasis } from './box.ts';
+import { SEASON, TRADE_GAIN } from './season.ts';
 
 /** Every word the trade table prints that is not a player's or a team's, for the copy guard. */
 export const TRADES = {
-	/** The second of the finder's two ruled-off groups; the first is seasonHead's, by the board. */
+	/** The second of the finder's two ruled-off groups; the first is gainHead's. */
 	weekHead: `This week, ${BOX.proj}`,
 	you: 'You',
 	them: 'Them',
-	/** A phone drops the groups' heads, so its two gain heads carry the unit (review of the mock). */
-	youAWeek: 'You, a week',
-	themAWeek: 'Them, a week',
+	/** The head over each side's gain, in the finder and on the builder's scoreboard: the same on the
+	 * rest-of-season order and the preseason number, which the basis names (Lane 66u). */
+	gainHead: TRADE_GAIN,
+	/** A phone drops the groups' heads, so its two gain heads say the gain (review of the mock). */
+	yourGain: `Your ${SEASON.gain.toLowerCase()}`,
+	theirGain: `Their ${SEASON.gain.toLowerCase()}`,
 	give: 'You give',
 	get: 'You get',
 	with: 'With',
@@ -43,7 +46,7 @@ export const TRADES = {
 	sideGive: 'Give',
 	sideGet: 'Get',
 	sideDrop: 'Drop',
-	restOfSeason: 'Rest of season',
+	restOfSeason: SEASON.restOfSeason,
 	why: 'Why this trade',
 	fromThis: 'Build from this',
 	youHaveRoom: 'You have room',
@@ -65,17 +68,6 @@ export const TRADES = {
 	to: 'to',
 	projForYou: 'Proj for you this week'
 } as const;
-
-const SEASON_HEADS: Readonly<Record<OrderBasis, string>> = {
-	rest_of_season: 'Rest of season, a week',
-	preseason: 'Preseason number, a week'
-};
-
-/** The head over each side's gain, in the finder and on the builder's scoreboard, by what the gains
- * are on: the rest-of-season order, or the preseason number before the board has one (rereview N1). */
-export function seasonHead(basis: OrderBasis): string {
-	return SEASON_HEADS[basis];
-}
 
 /** A trade as the table lists it: its team and its row, keyed as the screen marks it. */
 export interface FinderRow {

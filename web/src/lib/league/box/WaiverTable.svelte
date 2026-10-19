@@ -146,7 +146,7 @@
 							>{dropLead(week)}</span
 						></td
 					>
-					<td class="dhead" colspan={COLUMNS - LEAD_COLUMNS}>{WAIVERS.gainAWeek}</td>
+					<td class="dhead" colspan={COLUMNS - LEAD_COLUMNS}>{WAIVERS.gain}</td>
 				</tr>
 			</tbody>
 			<!-- ARIA in HTML allows any role on a tbody: the drop rows are one radio group with arrow keys

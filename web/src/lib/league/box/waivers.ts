@@ -22,19 +22,20 @@ import {
 	projShort,
 	type BoxRow
 } from './box.ts';
+import { SEASON, WAIVER_GAIN } from './season.ts';
 
 /** Every word the Waivers strip, table and drop panel print, in one place for the copy guard. */
 export const WAIVERS = {
 	close: 'Close',
 	beats: 'Beats',
-	rest: 'Rest of season',
+	rest: SEASON.restOfSeason,
 	starter: 'Starter',
 	bench: 'Bench',
 	find: 'Find a player',
 	noneFound: 'No player free to add by that name.',
-	gainAWeek: 'Gain a week, rest of season',
+	/** The card's rest-of-season gain and the drop panel's head over it. */
+	gain: WAIVER_GAIN,
 	thisWeek: 'Proj this week',
-	aWeekRest: 'a week rest of season',
 	copied: 'Copied',
 	copyFailed: 'This browser would not copy his name.',
 	noPickup: 'No pickup beats your roster',
@@ -189,9 +190,9 @@ export function gainWord(gain: number): string {
 	return shown === 0 ? fixed(0, 1) : signed(shown, 1);
 }
 
-/** "+6.7 Proj this week, +1.2 a week rest of season". */
+/** "+6.7 Proj this week, +1.2 Gain a week". */
 export function cardGains(card: Pick<PickupCard, 'weekGain' | 'gain'>): string {
-	return `${gainWord(card.weekGain)} ${WAIVERS.thisWeek}, ${gainWord(card.gain)} ${WAIVERS.aWeekRest}`;
+	return `${gainWord(card.weekGain)} ${WAIVERS.thisWeek}, ${gainWord(card.gain)} ${WAIVERS.gain}`;
 }
 
 /** The strip's sum, every figure the API's (review 66f H1): "96.4" (the lineup's Proj with every

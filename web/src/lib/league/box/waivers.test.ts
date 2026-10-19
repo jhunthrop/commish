@@ -153,7 +153,7 @@ void test('the strip names each pickup as a card: the move, both gains, the sum 
 	assert.deepEqual(cards.map(moveWords), ['Add Gainwell, drop Lemon', 'Add Chiefs, drop Saints']);
 	assert.equal(
 		cardGains(cards[0] ?? { weekGain: 0, gain: 0 }),
-		'+6.7 Proj this week, +1.2 a week rest of season'
+		'+6.7 Proj this week, +1.2 Gain a week'
 	);
 	assert.equal(cards[1]?.slot, 'D/ST');
 	assert.equal(pickupsTitle(2), 'Two pickups');
@@ -298,9 +298,9 @@ void test('a card says a last name in full when another player on screen shares 
 
 const BASIS = {
 	basis:
-		'A pickup starts for you this week on the Proj shown and does not lower your rest of season on our rest-of-season order. Its drop is the one you lose least by.',
+		'A pickup starts for you this week on the Proj shown and its Gain is not below zero on our rest-of-season order. Its drop is the one you lose least by.',
 	season_basis:
-		"Rest of season is his points a game on our rest-of-season projection from week 6, byes out. A gain a week is your lineup's points over replacement on our rest-of-season order, averaged over its 12 weeks.",
+		"Rest of season is his points a game on our rest-of-season projection from week 6, byes out. Gain is the change in your lineup's points over replacement a week on our rest-of-season order, averaged over its 12 weeks.",
 	projection_read_at: '2026-10-17T02:00:00.000Z',
 	projection_previous_read_at: '2026-10-16T02:00:00.000Z',
 	projection_scoring: { format: 'ppr' as const, league_own: false }

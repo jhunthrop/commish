@@ -14,7 +14,6 @@ import {
 	phoneWith,
 	proposeVerb,
 	rosterOrder,
-	seasonHead,
 	shortSide,
 	sideRows,
 	weekLine,
@@ -296,8 +295,6 @@ const advice: Pick<
 void test('the basis is five lines at most, the first saying which trades are listed', () => {
 	const lines = tradeBasis(advice, 'sleeper', [line('Cam Skattebo')], 'America/Chicago');
 	assert.ok(lines.length <= 5, String(lines.length));
-	assert.equal(seasonHead('rest_of_season'), 'Rest of season, a week');
-	assert.equal(seasonHead('preseason'), 'Preseason number, a week');
 	assert.match(
 		lines[0] ?? '',
 		/^Trades where both lineups gain on our rest-of-season order\. .*then the close calls for them\. The other team decides\./
@@ -320,8 +317,6 @@ void test('copy guard: every word the trade table prints is fantasy words, the p
 	const room = checkRoom(check({}, line('Jaxson Dart', 'QB')));
 	const said: string[] = [
 		...Object.values(TRADES),
-		seasonHead('rest_of_season'),
-		seasonHead('preseason'),
 		worthTitle(2),
 		worthTitle(1),
 		phoneWith({ name: 'Max_Jensen10' }, row(5.7, 0.7)),

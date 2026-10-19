@@ -7,13 +7,13 @@ import type { LineupAdvice, TradeAdvice } from '../inseason/api.ts';
 
 const DATA = new URL('../../../../scripts/inseason-fixture/data/', import.meta.url);
 
-function load<T>(name: string): T {
-	return JSON.parse(readFileSync(new URL(`${name}.json`, DATA), 'utf8')) as T;
+function load(name: string): unknown {
+	return JSON.parse(readFileSync(new URL(`${name}.json`, DATA), 'utf8'));
 }
 
 void test('no trade in the fixture drops a starter the Lineup screen sets', () => {
-	const lineup = load<LineupAdvice>('lineup');
-	const trades = load<TradeAdvice>('trades');
+	const lineup = load('lineup') as LineupAdvice;
+	const trades = load('trades') as TradeAdvice;
 	const starters = new Set(
 		lineup.slots.filter((s) => !s.no_one_can_play).map((s) => s.ours.player.host_id)
 	);
@@ -23,9 +23,17 @@ void test('no trade in the fixture drops a starter the Lineup screen sets', () =
 	for (const row of drops) {
 		const name = row.drop?.player.name ?? '';
 		if (starters.has(row.drop?.player.host_id ?? '')) {
-			assert.equal(typeof row.drop_reason, 'string', `${name} starts this week and the trade drops him`);
+			assert.equal(
+				typeof row.drop_reason,
+				'string',
+				`${name} starts this week and the trade drops him`
+			);
 		} else {
-			assert.equal(row.drop_reason, null, `${name} is on the bench and the trade explains his spot`);
+			assert.equal(
+				row.drop_reason,
+				null,
+				`${name} is on the bench and the trade explains his spot`
+			);
 		}
 	}
 });

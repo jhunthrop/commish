@@ -5,7 +5,7 @@
 	import Quiet from '#lib/ui/Quiet.svelte';
 	import ToneChip from '#lib/ui/ToneChip.svelte';
 	import { memberZone } from '#lib/format/clock.ts';
-	import type { OrderBasis, PlayerLine } from '../inseason/api.ts';
+	import type { PlayerLine } from '../inseason/api.ts';
 	import { hostTab } from '../inseason/attach.ts';
 	import { CLOSE_FOR_THEM, teamAside } from '../inseason/words.ts';
 	import { BOX, boxRow, positionWord } from './box.ts';
@@ -17,7 +17,6 @@
 		gainWord,
 		phoneWith,
 		roomWords,
-		seasonHead,
 		shortSide,
 		sideRows,
 		toneOf,
@@ -55,12 +54,9 @@
 		build: (row: FinderRow) => (() => void) | null;
 		/** The builder's id, which Build from this opens. */
 		builderId: string;
-		/** What the gains are on, for their group's head. */
-		orderBasis: OrderBasis;
 	}
 
-	let { rows, sort, onsort, me, href, verb, reason, propose, build, builderId, orderBasis }: Props =
-		$props();
+	let { rows, sort, onsort, me, href, verb, reason, propose, build, builderId }: Props = $props();
 
 	const COLUMNS = 9;
 	const zone = memberZone();
@@ -77,8 +73,8 @@
 	}
 
 	const heads: readonly { by: SortKey; desk: string; phone: string; first?: boolean }[] = [
-		{ by: 'mine', desk: TRADES.you, phone: TRADES.youAWeek, first: true },
-		{ by: 'theirs', desk: TRADES.them, phone: TRADES.themAWeek },
+		{ by: 'mine', desk: TRADES.you, phone: TRADES.yourGain, first: true },
+		{ by: 'theirs', desk: TRADES.them, phone: TRADES.theirGain },
 		{ by: 'weekMine', desk: TRADES.you, phone: TRADES.you, first: true },
 		{ by: 'weekTheirs', desk: TRADES.them, phone: TRADES.them }
 	];
@@ -125,7 +121,7 @@
 	<thead>
 		<tr class="groups">
 			<td colspan="4"></td>
-			<th colspan="2" scope="colgroup" class="gh first">{seasonHead(orderBasis)}</th>
+			<th colspan="2" scope="colgroup" class="gh first">{TRADES.gainHead}</th>
 			<th colspan="2" scope="colgroup" class="gh first">{TRADES.weekHead}</th>
 			<td></td>
 		</tr>
