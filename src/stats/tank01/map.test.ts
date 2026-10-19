@@ -156,6 +156,21 @@ describe("mapGames", () => {
   });
 
   it("maps every configured spelling, case-insensitively, to its domain status", () => {
+    for (const [fields, expected] of [
+      [{ gameStatus: "Final/OT", gameStatusCode: "2" }, "final"],
+      [{ gameStatus: "Final/OT" }, "final"],
+      [{ gameStatus: "Final OT" }, "final"],
+      [{ gameStatus: "", gameStatusCode: "2" }, "final"],
+      [{ gameStatus: "Halftime", gameStatusCode: "1" }, "in_progress"],
+      [{ gameStatus: "Scheduled", gameStatusCode: "0" }, "scheduled"],
+      [{ gameStatus: "Final", gameStatusCode: "9" }, "final"],
+      [{}, "in_progress"],
+    ] as const) {
+      // An overtime final reads final: the code first, then the words by prefix (Lane 89).
+      expect(mapGames([{ gameID: "g", away: "A", home: "B", ...fields }], 1)).toEqual([
+        expect.objectContaining({ status: expected }),
+      ]);
+    }
     for (const spelling of TANK01_CONFIG.gameStatuses.final) {
       expect(mapGames([{ gameID: "g", away: "A", home: "B", gameStatus: spelling.toUpperCase() }], 1)).toEqual([
         { gameId: "g", week: 1, status: "final", homeNflTeam: "B", awayNflTeam: "A", gameDate: "", kickoffEt: "" },
