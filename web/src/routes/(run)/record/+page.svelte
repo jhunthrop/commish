@@ -16,6 +16,7 @@
 		recordHeadline,
 		recordLead,
 		recordSources,
+		recordStatusSpans,
 		scaleWords,
 		scoreOf,
 		weekLines,
@@ -80,7 +81,7 @@
 	const showPublished = $derived(publishedDrawn(record));
 	const basis = $derived(recordBasis(record).map((text) => ({ text, phone: true })));
 
-	const columns = $derived(2 + RECORD_FIGURES.length * sources.length + 1);
+	const spans = $derived(recordStatusSpans(sources.length));
 </script>
 
 {#snippet cells(line: RecordLine | undefined)}
@@ -193,7 +194,10 @@
 										>{ORDER_WORDS[row.week.order]}</span
 									>{/if}</td
 							>
-							<td class="st wide" colspan={columns - 1}>{capitalized(row.text)}</td>
+							<!-- One status cell per width, each spanning the columns that width draws; the
+							     other is display: none, so the status is read once. -->
+							<td class="st wide desk" colspan={spans.desk}>{capitalized(row.text)}</td>
+							<td class="st wide narrow" colspan={spans.narrow}>{capitalized(row.text)}</td>
 						</tr>
 					{/if}
 				{/each}
@@ -202,7 +206,7 @@
 						<td class="wk">{RECORD_BOX.toDate}</td>
 						<td class="n plc">{toDate.ours.graded}</td>
 						{@render cells(toDate)}
-						<td></td>
+						<td class="st"></td>
 					</tr>
 				{/if}
 			</tbody>
@@ -521,6 +525,10 @@
 		}
 	}
 
+	td.wide.narrow {
+		display: none;
+	}
+
 	/* Below a wide screen one figure at a time: Week, Ours, ADP and Published. */
 	@media (max-width: 1180px) {
 		.figure-pick {
@@ -530,8 +538,12 @@
 		.grp,
 		.plc,
 		.st:not(.wide),
-		.cols .st {
+		td.wide.desk {
 			display: none;
+		}
+
+		td.wide.narrow {
+			display: table-cell;
 		}
 
 		.weeks:not(.show-agreement) .agreement,

@@ -174,6 +174,14 @@ export type RecordSource = (typeof RECORD_SOURCES)[number];
 export const RECORD_FIGURES = ['agreement', 'placesOff', 'starters'] as const;
 export type RecordFigure = (typeof RECORD_FIGURES)[number];
 
+/** The columns a row that is not graded spans with its status, at each width. At a desk: Players,
+ * every figure for each order drawn, and Status. Below 1180px the table draws one figure at a time and
+ * hides Players and Status, so the row spans only the shown figure's orders: a status spanning a
+ * hidden track would keep it alive as an empty strip at the table's right (Lane 87). */
+export function recordStatusSpans(sourceCount: number): { desk: number; narrow: number } {
+	return { desk: 1 + RECORD_FIGURES.length * sourceCount + 1, narrow: sourceCount };
+}
+
 /** The record box score's words, in one place for the copy guard. */
 export const RECORD_BOX = {
 	week: 'Week',
