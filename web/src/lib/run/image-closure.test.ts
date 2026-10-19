@@ -55,7 +55,7 @@ function contractStage(text: string): Stage {
 	const end = lines.findIndex((line, index) => index > start && /^FROM /i.test(line));
 	const body = lines.slice(start + 1, end < 0 ? undefined : end);
 	const workdir = body.find((line) => /^WORKDIR /i.test(line))?.split(/\s+/)[1];
-	if (workdir === undefined || !workdir.startsWith('/')) {
+	if (!workdir?.startsWith('/')) {
 		throw new Error(`the ${STAGE} stage sets no absolute WORKDIR`);
 	}
 	const copies = body.flatMap((line) => {
