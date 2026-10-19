@@ -14,12 +14,16 @@ export function captureStamp(capture: Designations): CaptureStamp {
 	return { readAt: capture.readAt, checkedAt: capture.checkedAt };
 }
 
-export function builtSaying(capture: Designations, format: Pick<Format, 'rosFromWeek'>): Saying {
+export function builtSaying(
+	capture: Designations,
+	format: Pick<Format, 'rosFromWeek'>,
+	now: number
+): Saying {
 	return {
 		capture: captureStamp(capture),
 		restOfSeason: format.rosFromWeek !== undefined,
 		zone: BUILT_ZONE,
-		now: Date.now()
+		now
 	};
 }
 
@@ -33,12 +37,13 @@ export interface BoardStatuses {
 export function boardStatuses(
 	rows: readonly ListedRow[],
 	capture: Designations | null,
-	format: Pick<Format, 'rosFromWeek'>
+	format: Pick<Format, 'rosFromWeek'>,
+	now: number
 ): BoardStatuses {
 	return capture === null
 		? { capture: null, statusWords: null }
 		: {
 				capture: captureStamp(capture),
-				statusWords: boardStatusWords(rows, builtSaying(capture, format))
+				statusWords: boardStatusWords(rows, builtSaying(capture, format, now))
 			};
 }

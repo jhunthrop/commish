@@ -20,9 +20,11 @@
 		lines: readonly PlayerLine[];
 		/** Each row's tick by his host id. */
 		pickOf: (line: PlayerLine) => BoxPick;
+		/** The instant the answer was read, in ms: the page's clock the rows draw at. */
+		now: number;
 	}
 
-	let { team, mine = false, aside, holds, lines, pickOf }: Props = $props();
+	let { team, mine = false, aside, holds, lines, pickOf, now }: Props = $props();
 	const zone = memberZone();
 	const rows = $derived(rosterOrder(lines));
 </script>
@@ -63,7 +65,7 @@
 	<tbody>
 		{#each rows as line (line.player.host_id)}
 			<BoxLine
-				row={boxRow(line, '', zone, false)}
+				row={boxRow(line, '', zone, false, now)}
 				compact
 				evidence
 				season

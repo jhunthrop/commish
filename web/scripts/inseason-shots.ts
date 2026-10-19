@@ -37,7 +37,12 @@ import { mkdir } from 'node:fs/promises';
 import { chromium, type BrowserContext, type Page } from 'playwright';
 import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
 import { copyFault, watchData } from './copy-scan.ts';
-import { FIXTURE_SUNDAY_CLOCK, FIXTURE_WEEK_CLOCK } from './inseason-fixture/clock.ts';
+import {
+	FIXTURE_SUNDAY_CLOCK,
+	FIXTURE_WEEK_CLOCK,
+	installFixtureClock,
+	requireFixtureClock
+} from './inseason-fixture/clock.ts';
 import { BUILDER_LINE, basisLines, basisReport } from './basis-lines.ts';
 import { UNCOUNTED_ANCHOR } from '../src/lib/league/uncounted.ts';
 import { FIXTURE_IDS } from './inseason-fixture/ids.ts';
@@ -90,13 +95,7 @@ const TRADE_VERB = 'Open Sleeper trades';
 /** The fixture API the site was built against: it must run on the browser's clock, the fixture
  * week's, or every read stamp disagrees with the screens. */
 const API_ORIGIN = new URL(process.env.API_ORIGIN ?? 'http://localhost:8799').origin;
-const fixtureClock = await (
-	await fetch(`${API_ORIGIN}/fixture/clock`)
-).json<{ data: { clock: string | null } | null }>();
-if (fixtureClock.data?.clock !== FIXTURE_WEEK_CLOCK)
-	throw new Error(
-		`The fixture API at ${API_ORIGIN} runs on ${fixtureClock.data?.clock ?? 'the real clock'}: start it with FIXTURE_CLOCK=${FIXTURE_WEEK_CLOCK}.`
-	);
+await requireFixtureClock(API_ORIGIN);
 
 await mkdir(out, { recursive: true });
 const browser = await chromium.launch();
@@ -113,7 +112,7 @@ async function context(
 	watchData(ctx);
 	// The fixture week's clock, never the day the script runs (start the fixture API with
 	// FIXTURE_CLOCK at the same instant): past its Sunday every game reads as played.
-	await ctx.clock.install({ time: new Date(clock) });
+	await installFixtureClock(ctx, clock);
 	await ctx.addCookies([{ ...SIGNED_IN, domain: 'localhost', path: '/' }]);
 	await ctx.addInitScript(
 		([key, value]: readonly [string, string]) => localStorage.setItem(key, value),

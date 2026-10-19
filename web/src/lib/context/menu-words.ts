@@ -39,7 +39,7 @@ export function menuLast(leagues: number, many: boolean): MenuLast {
  * Empty when they agree. */
 export function phaseWords(
 	leagues: readonly ContextLeague[],
-	now: Date = new Date(),
+	now: Date,
 	zone: string = memberZone()
 ): ReadonlyMap<string, string> {
 	const phases = new Set(leagues.map((league) => league.phase));

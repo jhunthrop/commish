@@ -52,7 +52,7 @@ export function figuresWords(c: GameConditions): string | null {
 /** Whether the game is still to be played: not final and not yet kicked off. */
 export function toBePlayed(
 	game: { played: boolean; kickoff: string | null },
-	now: number = Date.now()
+	now: number
 ): boolean {
 	return !game.played && (game.kickoff === null || Date.parse(game.kickoff) > now);
 }

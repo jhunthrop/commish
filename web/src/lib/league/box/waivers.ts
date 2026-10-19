@@ -4,7 +4,6 @@
  * columns, then the two only we give (A game, and Beats: the member's player he tops with the
  * gain); an add opens the players he could replace in the same columns, the advice's drop first.
  * Pure, tested in waivers.test.ts. */
-import { memberZone } from '#lib/format/clock.ts';
 import { lastName } from '#lib/format/draft.ts';
 import { fixed, signed } from '#lib/format/number.ts';
 import type { LeagueHost } from '../api.ts';
@@ -127,14 +126,15 @@ function beatsOf(source: WaiverRow): BeatsCell | null {
 /** The table's rows from the answer: every add, whom he beats, the strip's tint on the ones it names. */
 export function poolRows(
 	advice: Pick<WaiverAdvice, 'rows' | 'pickups'>,
-	zone: string = memberZone()
+	zone: string,
+	now: number
 ): PoolRow[] {
 	const named = new Set(advice.pickups.map(addKey));
 	return advice.rows.map((source) => {
 		const key = addKey(source);
 		return {
 			key,
-			row: { ...boxRow(source.add, '', zone, false), key },
+			row: { ...boxRow(source.add, '', zone, false, now), key },
 			rest: source.add.rest_of_season_per_game,
 			beats: beatsOf(source),
 			named: named.has(key),
@@ -234,7 +234,8 @@ export function pickupSum(
 export function dropRows(
 	source: WaiverRow,
 	roster: readonly PlayerLine[],
-	zone: string = memberZone()
+	zone: string,
+	now: number
 ): DropRow[] {
 	const byId = new Map(roster.map((line) => [line.player.host_id, line]));
 	return source.drops.flatMap((drop) => {
@@ -243,7 +244,7 @@ export function dropRows(
 		return [
 			{
 				key: drop.host_id,
-				row: boxRow(line, '', zone, false),
+				row: boxRow(line, '', zone, false, now),
 				rest: line.rest_of_season_per_game,
 				gain: drop.gain,
 				weekGain: drop.week_gain,

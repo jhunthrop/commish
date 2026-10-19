@@ -32,11 +32,12 @@ export interface SideBox {
 }
 
 /** What a side's box reads besides its rows: the host's total for it as the screen shows it, whether
- * the week's projection has landed, and the week. */
+ * the week's projection has landed, the week, and the instant the box is drawn at, in ms. */
 export interface SideRead {
 	hostTotal: number | null;
 	landed: boolean;
 	week: number;
+	now: number;
 }
 
 /** A side's score, the one figure the score bug and the Matchup's Totals row both print (ruling (a),
@@ -60,11 +61,13 @@ export function sideBox(
 	zone: string = memberZone()
 ): SideBox {
 	if (box !== null) {
-		const starters = box.starters.map((s) => ({ row: boxRow(s.line, slotWord(s.slot), zone) }));
+		const starters = box.starters.map((s) => ({
+			row: boxRow(s.line, slotWord(s.slot), zone, true, read.now)
+		}));
 		const rows = starters.map((s) => s.row);
 		return {
 			starters,
-			bench: box.bench.map((line) => boxRow(line, '', zone)),
+			bench: box.bench.map((line) => boxRow(line, '', zone, true, read.now)),
 			totals: {
 				proj: projTotal(rows),
 				pts: sideScore(rows, box, read.hostTotal),

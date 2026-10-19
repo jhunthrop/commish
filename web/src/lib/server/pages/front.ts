@@ -41,7 +41,7 @@ export interface FrontPage extends BoardStatuses {
 	record: RecordHeadline & { season: number };
 }
 
-export async function frontPage(): Promise<FrontPage> {
+export async function frontPage(now: number): Promise<FrontPage> {
 	const format = await defaultFormat();
 	const [loaded, kept, capture, sources, byes, run] = await Promise.all([
 		board(format.id),
@@ -76,6 +76,6 @@ export async function frontPage(): Promise<FrontPage> {
 		boardCount: poolCount(loaded.rows.length, 'board'),
 		record: { ...recordHeadline(kept), season: kept.season },
 		// The rows' statuses as the board's, drawn with the shared pill (review finding 7).
-		...boardStatuses(rows, capture, format)
+		...boardStatuses(rows, capture, format, now)
 	};
 }

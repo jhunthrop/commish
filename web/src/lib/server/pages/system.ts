@@ -37,9 +37,9 @@ async function specimenSlug(rows: readonly BoardRow[]): Promise<string> {
 	return first.slug;
 }
 
-export async function systemNightly(): Promise<SystemNightly> {
+export async function systemNightly(now: number): Promise<SystemNightly> {
 	const { rows } = await board((await defaultFormat()).id);
-	const page = await playerPage(await specimenSlug(rows));
+	const page = await playerPage(await specimenSlug(rows), now);
 	const row = rows.find((candidate) => candidate.slug === page.slug);
 	if (!row) throw new Error(`${page.slug} is not on the default board.`);
 	const [formats, grid, kept] = await Promise.all([formatChips(), schedulePage(), record()]);

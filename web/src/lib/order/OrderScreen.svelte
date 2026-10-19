@@ -3,6 +3,7 @@
 	import BasisBlock from '#lib/ui/BasisBlock.svelte';
 	import { onMount, untrack } from 'svelte';
 	import { hitsWords } from '#lib/format/pool-words.ts';
+	import { memberZone } from '#lib/format/clock.ts';
 	import { ApiError } from '#lib/api/client.ts';
 	import type { LeagueHost } from '#lib/league/api.ts';
 	import { positionWord } from '#lib/league/box/box.ts';
@@ -62,6 +63,8 @@
 	let limit = $state(PAGE_ROWS);
 	let roster = $state<RosterView>('everyone');
 	let advice = $state<OrderAdvice | null>(null);
+	/** The instant the answer is drawn at, in ms, set with each answer (the page's one clock). */
+	let now = $state(0);
 	let problem = $state<string | null>(null);
 	let reading = $state(true);
 	let latest = 0;
@@ -69,7 +72,7 @@
 
 	const leagueId = $derived(mode === 'rest' ? (league?.id ?? null) : null);
 	const views = $derived(
-		advice?.rows.map((row) => orderView(row, undefined, position === null)) ?? []
+		advice?.rows.map((row) => orderView(row, memberZone(), position === null, now)) ?? []
 	);
 	const basis = $derived(
 		advice === null
@@ -78,7 +81,9 @@
 					advice,
 					mode === 'rest' && league !== null
 						? { host: league.host, rulesHref: leagueSettingsHref(league.id) }
-						: null
+						: null,
+					memberZone(),
+					now
 				)
 	);
 	/** A search, a position or a roster filter: the hits are matches, no longer the pool. */
@@ -103,6 +108,7 @@
 				limit
 			});
 			if (mine !== latest) return;
+			now = Date.now();
 			advice = answer;
 			problem = null;
 		} catch (error) {

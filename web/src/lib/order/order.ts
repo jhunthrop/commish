@@ -71,8 +71,8 @@ export function rosterWords(mark: RosterMark): string {
 /** One row's view. Its key is his board id, which every row carries (the order only ranks players
  * our board places). In a position's view the # is his place there, so his pill names his position
  * alone; across positions it names his place at his position too. */
-export function orderView(row: OrderRow, zone: string = memberZone(), pillRank = true): OrderView {
-	const box = boxRow(row.line, '', zone, pillRank);
+export function orderView(row: OrderRow, zone: string, pillRank: boolean, now: number): OrderView {
+	const box = boxRow(row.line, '', zone, pillRank, now);
 	const key = row.line.player.board_id ?? row.line.player.host_id;
 	return {
 		key,
@@ -137,8 +137,8 @@ export function rosterBasis(host: LeagueHost, readAt: string, zone: string = mem
 export function orderBasis(
 	advice: OrderAdvice,
 	league: { host: LeagueHost; rulesHref: string } | null,
-	zone: string = memberZone(),
-	now: number = Date.now()
+	zone: string,
+	now: number
 ): BasisPart[] {
 	const clock = { zone, zoned: true };
 	const lines = advice.rows.map((row) => row.line);

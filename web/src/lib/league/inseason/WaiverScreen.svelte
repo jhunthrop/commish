@@ -86,6 +86,8 @@
 		openPage?: (href: string) => void;
 		/** The league's Settings at the scoring rules our stats lack. */
 		rulesHref: string;
+		/** The instant the answer was read, in ms: the page's clock the rows and the basis draw at. */
+		now: number;
 	}
 
 	let {
@@ -97,7 +99,8 @@
 		reread,
 		copy = (text) => navigator.clipboard.writeText(text),
 		openPage = (href) => void window.open(href, '_blank', 'noopener'),
-		rulesHref
+		rulesHref,
+		now: pageNow
 	}: Props = $props();
 
 	const MOVE_ID = 'claim-move';
@@ -120,6 +123,10 @@
 	let position = $state<WaiverPosition | null>(null);
 	/** The answer for the chosen position, null for every position or until it is read. */
 	let narrowed = $state<WaiverAdvice | null>(null);
+	/** When the narrowed answer was read, in ms: a narrowed read is a read of its own, so its rows
+	 * and basis draw at its instant, the page's clock otherwise (review 77 finding 1). */
+	let narrowedAt = $state<number | null>(null);
+	const now = $derived(narrowed !== null && narrowedAt !== null ? narrowedAt : pageNow);
 	let reading = $state(false);
 	let problem = $state<string | null>(null);
 	let query = $state('');
@@ -136,12 +143,12 @@
 	const positions = $derived(
 		POSITIONS.filter((p) => advice.rows.some((r) => r.add.player.position === p))
 	);
-	const pool = $derived(poolRows({ rows: shown.rows, pickups: advice.pickups }));
+	const pool = $derived(poolRows({ rows: shown.rows, pickups: advice.pickups }, memberZone(), now));
 	const rows = $derived(findRows(sortRows(pool, sort), query));
 	const cards = $derived(pickupCards(advice));
 	const card = $derived(cards.find((c) => c.key === chosenCard) ?? cards[0] ?? null);
 	const openRow = $derived(pool.find((r) => r.key === open) ?? null);
-	const drops = $derived(openRow ? dropRows(openRow.source, shown.roster) : []);
+	const drops = $derived(openRow ? dropRows(openRow.source, shown.roster, memberZone(), now) : []);
 	const drop = $derived(drops.find((d) => d.key === chosenDrop) ?? drops[0] ?? null);
 	const onHost = $derived(claimsOnHost(shown));
 	/** Every line on the screen, for the game facts' read said once under the rows. */
@@ -250,7 +257,10 @@
 		const outcome = await narrowing.choose(next);
 		if (outcome.kind === 'overtaken') return;
 		reading = false;
-		if (outcome.kind === 'answer') narrowed = outcome.answer;
+		if (outcome.kind === 'answer') {
+			narrowedAt = Date.now();
+			narrowed = outcome.answer;
+		}
 		if (outcome.kind === 'failed') problem = outcome.sentence;
 	}
 
@@ -297,7 +307,7 @@
 	/** The basis, one paragraph within five lines at a desk and eight on a phone (Lane 66t). The page
 	 * names the zone in its head. */
 	const basis = $derived(
-		waiverBasis(shown, lines, rulesHref, { zone: memberZone(), zoned: false }, Date.now())
+		waiverBasis(shown, lines, rulesHref, { zone: memberZone(), zoned: false }, now)
 	);
 </script>
 

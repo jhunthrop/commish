@@ -74,9 +74,11 @@ export function bannedIn(text: string, own?: RegExp): string | null {
 }
 
 /** The fields the API's answers (api/types.ts) and the run's files (run/schema.ts) carry names in: a
- * player's, a club's city and nickname, a league's, a team's and its owner's. Only their strings are
- * data; every other string an answer carries (a headline, a label, a caption, a basis) is copy. */
-const NAME_FIELDS: ReadonlySet<string> = new Set([
+ * player's, a club's city and nickname, a league's, a team's and its owner's, a shared mock's drafter's,
+ * a sheet's file's, a lobby handle, the team holding a player and the member's own email. Only
+ * their strings are data (name-fields.test.ts holds the list to both contracts); every other string
+ * an answer carries (a headline, a label, a caption, a basis) is copy. */
+export const NAME_FIELDS: ReadonlySet<string> = new Set([
 	'name',
 	'first_name',
 	'last_name',
@@ -89,9 +91,13 @@ const NAME_FIELDS: ReadonlySet<string> = new Set([
 	'username',
 	'host_name',
 	'host_username',
-	'by_name',
-	'placed_by_name',
-	'seat_names'
+	'seat_names',
+	'shared_by',
+	'file_name',
+	'handle',
+	'purchaser_handle',
+	'holder',
+	'email'
 ]);
 
 /** The strings a page was handed as data, from any JSON the API or the run answered: the values of
