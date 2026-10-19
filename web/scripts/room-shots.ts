@@ -297,6 +297,10 @@ async function waitForStatus(roomId: string, status: string): Promise<void> {
 
 try {
 	await shoot('mock-new', '/mock/new', 'Start against bots', { rows: 1 });
+	// The pass page's plan strips and its platforms strip at 390, under FactStrip's phone rule
+	// (Lane 87 review L2): no row stops short of the strip's right edge.
+	await shoot('pass', '/pass', 'Renews', { rows: 1 });
+	await shoot('pass-signed-out', '/pass', 'Renews', { who: null, rows: 1 });
 	await shoot('mock-new-signed-out', '/mock/new', 'Sign in to keep it', { who: null, rows: 1 });
 	await shoot('mock-new-refused', '/mock/new', 'Start against bots', {
 		who: null,
@@ -385,6 +389,8 @@ try {
 		] as const);
 	await shoot('mock-new-left', '/mock/new', 'Return to the lobby', { before: remembered, rows: 1 });
 	await waitForStatus(lobby, 'complete');
+	// A lobby drafted to the end takes no one: the bar passes no parts (Lane 87 review M1).
+	await shoot('lobby-done', `/lobby/${lobby}`, 'The draft is over.', { rows: 1 });
 	await shoot('mock-new-left-done', '/mock/new', 'Read the report', {
 		before: remembered,
 		rows: 1

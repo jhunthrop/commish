@@ -286,7 +286,9 @@ const NO_PARTS = [
 	{ name: 'claim', path: '/claim/no-such-code' },
 	{ name: 'companion-new', path: '/companion/new' },
 	{ name: 'league-new', path: '/league/new' },
-	{ name: 'notfound', path: '/no-such-page' }
+	{ name: 'notfound', path: '/no-such-page' },
+	// A lobby link the API answers with an error takes no one (Lane 87 review M1).
+	{ name: 'lobby-error', path: '/lobby/no-such-lobby' }
 ] as const;
 const pageLines: string[] = [];
 /** A beat for a page's first answer to draw before it is measured. */

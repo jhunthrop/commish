@@ -22,6 +22,7 @@ export interface PageMeasures {
 	recordStrip: number | null;
 	/** The widest open space at the right of a fact strip's row, any strip on the page. */
 	factsGap: number | null;
+	/** The lobby cards' counts and the lobby room's count, as drawn. */
 	lobbyCounts: string[];
 	sideways: boolean;
 }
@@ -85,9 +86,9 @@ export async function pageMeasures(page: Page): Promise<PageMeasures> {
 			leads,
 			recordStrip,
 			factsGap,
-			lobbyCounts: [...document.querySelectorAll<HTMLElement>('main .card .fill')].map((f) =>
-				f.innerText.trim()
-			),
+			lobbyCounts: [
+				...document.querySelectorAll<HTMLElement>('main .card .fill, main p.wait b')
+			].map((f) => f.innerText.trim()),
 			sideways: document.documentElement.scrollWidth > window.innerWidth
 		};
 	});
@@ -115,7 +116,7 @@ export function pageFaults(m: PageMeasures, phone: boolean, rows: BarRows | null
 	if (phone && m.factsGap !== null && m.factsGap > EDGE_SLACK_PX)
 		faults.push(`a fact strip leaves ${m.factsGap.toFixed(1)}px open at a row's right`);
 	for (const count of m.lobbyCounts)
-		if (/^\d+ of \d+$/.test(count)) faults.push(`a lobby count reads "${count}"`);
+		if (/\d+ of \d+/.test(count)) faults.push(`a lobby count reads "${count}"`);
 	if (m.sideways) faults.push('the page scrolls sideways');
 	return faults;
 }
