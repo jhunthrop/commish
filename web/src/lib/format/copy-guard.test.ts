@@ -66,6 +66,10 @@ void test('the guard scans copy, not data: a name the page was handed is skipped
 	assert.ok(data.has('Las Vegas Raiders'));
 	// A sentence the API wrote is copy, so it is never data.
 	assert.ok(!data.has('Our board reads the spreads.'));
+	// A run's phrase is copy too, stop or none: more words than a name carries.
+	const phrase = "the average of its opponents' published season win totals";
+	assert.ok(!dataStrings({ method: phrase }).has(phrase));
+	assert.ok(dataStrings({ team: 'Keeper? I Hardly Know Her' }).has('Keeper? I Hardly Know Her'));
 	assert.equal(bannedInCopy('Jadarian Price, RB, Las Vegas Raiders. Proj 12.4', data), null);
 	// A data string that is only a banned word excuses nothing: "Totals" as a head is still caught.
 	assert.equal(bannedInCopy('Totals 104.2', data), 'Totals');
@@ -73,6 +77,18 @@ void test('the guard scans copy, not data: a name the page was handed is skipped
 	assert.equal(bannedInCopy('Our board reads the spreads.', data), 'spreads');
 	assert.equal(bannedInCopy('Jadarian Price; Proj 12.4', data), ';');
 	assert.equal(bannedInCopy('his value rises', data, /\bvalue\b/i), 'value');
+});
+
+void test("the field's own lines are football, not a betting line: goal line, offensive line, line of scrimmage", () => {
+	for (const said of [
+		'not close to the goal line',
+		'behind a weak offensive line',
+		'the defensive line',
+		'past the line of scrimmage'
+	])
+		assert.equal(bannedIn(said), null, said);
+	for (const said of ['the line moved', 'his stat lines', 'a betting line'])
+		assert.notEqual(bannedIn(said), null, said);
 });
 
 void test('data strings come from any JSON, nested in arrays and objects, numbers and keys left out', () => {

@@ -20,8 +20,11 @@ const BETTING_ONLY = [
 	'sportsbooks?',
 	'moneyline'
 ];
+/** "Line" as the betting word: the field's own lines (the goal line, the offensive and defensive
+ * line, the line of scrimmage) are football and stay in the writer's prose (Lane 66x). */
+const FIELD_LINE_SPARED = '(?<!(?:goal|offensive|defensive) )lines?(?! of scrimmage)';
 /** The betting register's words that are plain words in code too. */
-const BETTING_SHARED = ['lines?', 'spreads?', 'totals?', 'books?', 'props?'];
+const BETTING_SHARED = [FIELD_LINE_SPARED, 'spreads?', 'totals?', 'books?', 'props?'];
 const TRADING = [
 	'markets?',
 	'prices?',
@@ -61,15 +64,22 @@ export function bannedIn(text: string, own?: RegExp): string | null {
 
 /** A string that ends a sentence is copy (a basis, a writer's line), never data. */
 const SENTENCE_END = /[.!?]$/u;
+/** The most words a name carries ("Keeper? I Hardly Know Her"): a longer string is a phrase, copy. */
+const NAME_WORDS = 5;
+
+/** Whether a string the page was handed reads as copy: a sentence, or a phrase longer than a name. */
+function readsAsCopy(text: string): boolean {
+	return SENTENCE_END.test(text) || text.split(/\s+/u).length > NAME_WORDS;
+}
 
 /** The strings a page was handed as data, from any JSON the API or the run answered: every string
- * value, nested at any depth, that is not a sentence. Player, club and team names and row data are
- * the API's own words, so a page's scan skips them (ruling R3); a sentence the API wrote is copy and
- * is always scanned. */
+ * value, nested at any depth, that is not copy. Player, club and team names and row data are the
+ * API's own words, so a page's scan skips them (ruling R3); a sentence or a phrase the API or the run
+ * wrote is copy and is always scanned. */
 export function dataStrings(value: unknown): Set<string> {
 	if (typeof value === 'string') {
 		const text = value.trim();
-		return new Set(text === '' || SENTENCE_END.test(text) ? [] : [text]);
+		return new Set(text === '' || readsAsCopy(text) ? [] : [text]);
 	}
 	const children = Array.isArray(value)
 		? (value as unknown[])
