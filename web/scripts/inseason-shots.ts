@@ -57,6 +57,13 @@ const ESPN_MATCHUP_PTS =
 	"Pts are ESPN's points by player so far, each to a tenth, and Team is ESPN's score.";
 /** The team-totals sentence (Lane 79 fix 6). */
 const YAHOO_PTS = "Pts are Yahoo's team points, none by player.";
+/** Sleeper's Matchup, whose Team adds the rows (ruling (a)). */
+const SLEEPER_MATCHUP_PTS = "Pts are Sleeper's points by player so far, and Team adds the rows.";
+/** The drafter's four starters under way on the Sunday, their points added (13.4, 8.1, 9.4, 8.2). */
+const SLEEPER_SUNDAY_SUM = '39.1';
+/** The Sunday's changes the engine would make: Kirk (Monday night) for Chase on bye at Flex. Dart,
+ * Etienne and the Texans, Wednesday's changes, have kicked off and are locked (re-review N2). */
+const SUNDAY_MOVES = { offered: ['Kirk'], locked: ['Dart', 'Etienne', 'Texans'] } as const;
 /** The stand-in API's ask for the recorded league as Yahoo's (yahoo.ts). */
 const YAHOO_PLATFORM = { name: 'fixture_platform', value: 'yahoo' };
 /** The stand-in API's ask for an ESPN league's Sunday afternoon (sunday.ts). */
@@ -604,6 +611,33 @@ await platformPass(
 			missing.push(`ESPN Sunday Lineup moves a locked player: ${row.slice(0, 60)}`);
 	await ctx.close();
 }
+
+/** The Matchup after kickoff on the two other kinds of platform (re-review N3): Sleeper's score is
+ * its rows added (39.1, the four starters under way), Yahoo's its own total (39.0), each the bug's
+ * figure and its Totals row's. */
+await platformPass(
+	id,
+	[SUNDAY_WEEK],
+	FIXTURE_SUNDAY_CLOCK,
+	[
+		{
+			screen: 'matchup',
+			basisName: 'matchup Sleeper Sunday',
+			sentence: SLEEPER_MATCHUP_PTS,
+			points: true
+		}
+	],
+	SLEEPER_SUNDAY_SUM,
+	'sleeper-sunday'
+);
+await platformPass(
+	id,
+	[SUNDAY_WEEK, YAHOO_PLATFORM],
+	FIXTURE_SUNDAY_CLOCK,
+	[{ screen: 'matchup', basisName: 'matchup Yahoo Sunday', sentence: YAHOO_PTS, points: false }],
+	ESPN_SUNDAY_TOTAL,
+	'yahoo-sunday'
+);
 
 /** A platform that sends each team's total alone (Yahoo, yahoo.ts): its team-totals sentence once in
  * budget, no player's points, the bug and Totals its total. */
@@ -1339,6 +1373,8 @@ async function leagueFaults(page: Page, lp: LeaguePage, width: number): Promise<
 				/^FAAB \$\d/.test(text(td))
 			).length,
 			basisText: basis.map((p) => text(p)).join(' '),
+			// The lineup card's changes, each a chip naming the player it starts.
+			chips: [...document.querySelectorAll('main .swaps li:not(.idle)')].map((c) => text(c)),
 			// The basis's rendered lines: each paragraph's height over its line height.
 			basisLines: basis.reduce((n, p) => {
 				const style = getComputedStyle(p);
@@ -1379,6 +1415,13 @@ async function leagueFaults(page: Page, lp: LeaguePage, width: number): Promise<
 		faults.push(`the basis draws ${String(seen.basisLines)} lines, at most ${String(most)}`);
 	if (lp.live && seen.recordedName)
 		faults.push('the ESPN stand-in names the recorded Sleeper league');
+	if (lp.live) {
+		// No move offered on a player whose game has kicked off: ESPN would refuse it.
+		for (const name of SUNDAY_MOVES.locked)
+			if (seen.chips.some((c) => c.includes(name))) faults.push(`offers a move on ${name}, locked`);
+		for (const name of SUNDAY_MOVES.offered)
+			if (!seen.chips.some((c) => c.includes(name))) faults.push(`does not offer ${name}`);
+	}
 	return faults;
 }
 
@@ -1402,7 +1445,10 @@ async function settingsFaults(page: Page, lp: LeaguePage): Promise<string[]> {
 for (const theme of THEMES) {
 	for (const width of SHOT_WIDTHS) {
 		for (const lp of LEAGUE_PAGES) {
-			const ctx = await context(theme, width);
+			const ctx = await context(theme, width, lp.live ? FIXTURE_SUNDAY_CLOCK : FIXTURE_WEEK_CLOCK);
+			// The live page is the Sunday's throughout: its scoreboard, its read and its lineup advice
+			// (re-review N2).
+			if (lp.live) await ctx.addCookies([{ ...SUNDAY_WEEK, domain: 'localhost', path: '/' }]);
 			const page = await ctx.newPage();
 			await page.goto(`${web}/league/${lp.league}`, { waitUntil: 'networkidle' });
 			await ready(page, 'Every game this week, yours first.');

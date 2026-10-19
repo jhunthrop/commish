@@ -41,6 +41,7 @@ import type {
 	WaiverAdvice
 } from '../../src/lib/league/inseason/api.ts';
 import { lastName } from '../../src/lib/format/draft.ts';
+import { IN_RESERVE, advise } from './advise.ts';
 import {
 	accepts,
 	better,
@@ -66,7 +67,6 @@ const PROJECTION_READ_AT = '2026-10-17T02:00:00.000Z';
 /** The read before it: Thursday 9:00 pm Central, the change column's basis. */
 const PREVIOUS_READ_AT = '2026-10-16T02:00:00.000Z';
 /** The fixture's injured reserve spot: a bench player the host lists there. */
-const IN_RESERVE = 'Tank Bigsby';
 /** The recorded league scores by rules of its own, closest to PPR: the API's projection_scoring. */
 const PROJECTION_SCORING: LineupAdvice['projection_scoring'] = { format: 'ppr', league_own: false };
 const DEFENSE = 'DEF';
@@ -200,135 +200,6 @@ function stamp<T>(value: T): T {
 		return evidenced(line, weekProjection(line)) as T;
 	}
 	return out as T;
-}
-
-/** A change's sentence as the API words it (sentences.go): the bye that forces it, else the Proj. */
-function changeWords(ours: PlayerLine, host: PlayerLine | null): string {
-	const last = (l: PlayerLine): string => l.player.name.trim().split(/\s+/).at(-1) ?? l.player.name;
-	if (host === null) return `This spot is empty in your lineup, so ${last(ours)} takes it.`;
-	if (host.facts.bye) return `${host.player.name} is on bye this week, so ${last(ours)} starts.`;
-	const a = printedProj(ours);
-	const b = printedProj(host);
-	if (a !== null && b !== null && a > b) {
-		return `${last(ours)} has ${a.toFixed(1)} Proj this week against ${last(host)}'s ${b.toFixed(1)}.`;
-	}
-	return `${last(ours)} is ahead of ${last(host)} in our rest-of-season order.`;
-}
-
-/** The lineup advised by the week's order: each slot's player from the active roster (the
- * position's own slots first, then the flex), each host starter kept in his own spot, a change
- * paired with the host's starter it sits in that spot or of his position. */
-function advise(advice: LineupAdvice): LineupAdvice {
-	const hostAt = advice.slots.map((s) => s.host);
-	const seen = new Set<string>();
-	const pool = [
-		...advice.slots.flatMap((s) => (s.host ? [s.ours, s.host] : [s.ours])),
-		...advice.bench
-	]
-		.filter((l) => {
-			if (seen.has(l.player.host_id)) return false;
-			seen.add(l.player.host_id);
-			return true;
-		})
-		.filter((l) => l.player.name !== IN_RESERVE);
-	const order = [...pool].sort(better);
-	const kinds = advice.slots.map((s) => s.slot);
-	const chosen = new Set<string>();
-	const pick = (slot: LineupSlot['slot']): void => {
-		// A player who cannot play this week never starts (the API's rule, engine.go).
-		const best = order.find(
-			(l) => tierOf(l) === 0 && !chosen.has(l.player.host_id) && accepts(slot, l.player.position)
-		);
-		if (best) chosen.add(best.player.host_id);
-	};
-	kinds.filter((k) => k !== 'FLEX').forEach(pick);
-	kinds.filter((k) => k === 'FLEX').forEach(pick);
-	const placed: (PlayerLine | null)[] = kinds.map((kind, i) => {
-		const h = hostAt[i];
-		return h && chosen.has(h.player.host_id) && accepts(kind, h.player.position) ? h : null;
-	});
-	const hostIds = new Set(hostAt.flatMap((h) => (h ? [h.player.host_id] : [])));
-	const fresh = order.filter((l) => chosen.has(l.player.host_id) && !hostIds.has(l.player.host_id));
-	const keptIds = new Set(placed.flatMap((l) => (l ? [l.player.host_id] : [])));
-	const stray = order.filter(
-		(l) =>
-			chosen.has(l.player.host_id) &&
-			hostIds.has(l.player.host_id) &&
-			!keptIds.has(l.player.host_id)
-	);
-	for (const l of [...fresh, ...stray]) {
-		const at = placed.findIndex(
-			(p, i) => p === null && accepts(kinds[i] ?? 'FLEX', l.player.position)
-		);
-		if (at >= 0) placed[at] = l;
-	}
-	// A spot no one who can play fills keeps the member's player there, marked (keepWhereNoOneCanPlay).
-	const idle = new Set<string>();
-	placed.forEach((p, i) => {
-		const h = hostAt[i];
-		if (p === null && h && !chosen.has(h.player.host_id)) {
-			placed[i] = h;
-			chosen.add(h.player.host_id);
-			idle.add(h.player.host_id);
-		}
-	});
-	// Then any member's starter left over, into any empty spot that takes him (review N1).
-	placed.forEach((p, i) => {
-		if (p !== null) return;
-		const h = hostAt.find(
-			(l) => l && !chosen.has(l.player.host_id) && accepts(kinds[i] ?? 'FLEX', l.player.position)
-		);
-		if (h) {
-			placed[i] = h;
-			chosen.add(h.player.host_id);
-			idle.add(h.player.host_id);
-		}
-	});
-	const sat = hostAt.filter((h): h is PlayerLine => h !== null && !chosen.has(h.player.host_id));
-	const slots = advice.slots.flatMap((slot, i): LineupSlot[] => {
-		const ours = placed[i];
-		if (!ours) return [];
-		if (hostIds.has(ours.player.host_id)) {
-			return [
-				{
-					slot: slot.slot,
-					ours,
-					host: ours,
-					changed: false,
-					no_one_can_play: idle.has(ours.player.host_id),
-					sentence: null
-				}
-			];
-		}
-		const own = hostAt[i];
-		const host =
-			own && sat.includes(own)
-				? own
-				: (sat.find((l) => l.player.position === ours.player.position) ?? sat[0] ?? null);
-		if (host) sat.splice(sat.indexOf(host), 1);
-		return [
-			{
-				slot: slot.slot,
-				ours,
-				host,
-				changed: true,
-				no_one_can_play: false,
-				sentence: changeWords(ours, host)
-			}
-		];
-	});
-	const starting = new Set(slots.map((s) => s.ours.player.host_id));
-	const reserved = [...advice.reserve, ...advice.bench, ...pool]
-		.filter((l) => l.player.name === IN_RESERVE)
-		.slice(0, 1)
-		.map((l) => ({ ...l, player: { ...l.player, injured_reserve: true } }));
-	return {
-		...advice,
-		set: slots.every((s) => !s.changed),
-		slots,
-		bench: pool.filter((l) => !starting.has(l.player.host_id)).sort(better),
-		reserve: reserved
-	};
 }
 
 const stampedLineup: LineupAdvice = {

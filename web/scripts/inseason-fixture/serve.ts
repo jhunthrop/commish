@@ -37,7 +37,7 @@ import { lineupProj, seasonStrength } from './week.ts';
 import { FIXTURE_SEASON, askedPhase, phaseAccount, phaseLeagues, phaseSync } from './phases.ts';
 import { ESPN_STAND_IN_NAME, espnMatchup, espnSync } from './espn-sync.ts';
 import { yahooStandIn } from './yahoo.ts';
-import { SUNDAY, espnSunday } from './sunday.ts';
+import { SUNDAY, sundayOf } from './sunday.ts';
 import { inSeason, noWeek } from './member-week.ts';
 import { inTenths } from './tenths.ts';
 import { FIXTURE_CLOCK_VARIABLE, fixtureClock } from './clock.ts';
@@ -486,25 +486,47 @@ function espnLineup(): LineupAdvice {
 	};
 }
 
-/** An ESPN league on its Sunday afternoon (sunday.ts), for a browser that asks for the Sunday with
- * the fixture_week cookie: its players' points by player, its totals ESPN's own, read at the Sunday. */
-const espnOnSunday = espnSunday({
+/** The leagues on their Sunday afternoon (sunday.ts), for a browser that asks for the Sunday with
+ * the fixture_week cookie: points by player where the platform gives them, totals the platform's,
+ * the Lineup advised with the kicked-off players locked, read at the Sunday. */
+const sleeperOnSunday = sundayOf({ sync, lineup, matchup: matchupBox, scoreboardLive });
+const espnOnSunday = sundayOf({
 	sync: espnSync(sync),
 	lineup: espnLineup(),
-	matchup: matchupBox,
+	matchup: espnMatchup(matchupBox),
 	scoreboardLive
 });
 const SUNDAY_WEEK = /(?:^|; )fixture_week=sunday(?:;|$)/;
-/** The request asks for an ESPN league's Sunday. */
-const espnSundayAsked = (req: IncomingMessage, id: string): boolean =>
-	ESPN_MOVES.has(id) && SUNDAY_WEEK.test(req.headers.cookie ?? '');
 /** The recorded league as a Yahoo league's (yahoo.ts), for a browser that asks with the
- * fixture_platform cookie: team totals alone, so its Pts sentence keeps a shot. */
-const asYahoo = yahooStandIn({ sync, lineup, matchup: matchupBox });
+ * fixture_platform cookie: team totals alone, so its Pts sentence keeps a shot, on the week's
+ * Saturday or its Sunday. */
+const yahooWeek = yahooStandIn({ sync, lineup, matchup: matchupBox });
+const yahooOnSunday = yahooStandIn(sleeperOnSunday);
 const YAHOO_PLATFORM = /(?:^|; )fixture_platform=yahoo(?:;|$)/;
 /** The request asks for the recorded league as Yahoo's. */
 const yahooAsked = (req: IncomingMessage, id: string): boolean =>
 	id === LEAGUE && YAHOO_PLATFORM.test(req.headers.cookie ?? '');
+
+/** A stand-in's answers and when they were read. */
+interface StandIn {
+	sync: LeagueSync;
+	lineup: LineupAdvice;
+	matchup: MatchupBox;
+	scoreboard: Scoreboard;
+	readAt: string;
+}
+
+/** The stand-in a request asks for by its cookies, null for the recorded answers: an ESPN league or
+ * the recorded league on the Sunday, the recorded league as Yahoo's on either day. */
+function standInAsked(req: IncomingMessage, id: string): StandIn | null {
+	const sunday = SUNDAY_WEEK.test(req.headers.cookie ?? '');
+	const live = { scoreboard: scoreboardLive, readAt: SUNDAY };
+	if (yahooAsked(req, id))
+		return sunday ? { ...yahooOnSunday, ...live } : { ...yahooWeek, scoreboard, readAt: readAt() };
+	if (!sunday) return null;
+	if (ESPN_MOVES.has(id)) return { ...espnOnSunday, ...live };
+	return id === LEAGUE ? { ...sleeperOnSunday, ...live } : null;
+}
 
 /** The shape of a host id the claim route takes (api hostmoves checkClaim). */
 const HOST_ID = /^-?[0-9]{1,12}$/;
@@ -790,16 +812,13 @@ async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> 
 	const synced = SYNC.exec(url.pathname);
 	if (synced) {
 		const asked = synced[1] ?? '';
-		if (espnSundayAsked(req, asked)) {
+		const standIn = standInAsked(req, asked);
+		if (standIn) {
 			send(req, res, HTTP.ok, {
-				...phaseSync(espnOnSunday.sync, asked),
+				...phaseSync(standIn.sync, asked),
 				id: asked,
-				read_at: SUNDAY
+				read_at: standIn.readAt
 			});
-			return;
-		}
-		if (yahooAsked(req, asked)) {
-			send(req, res, HTTP.ok, { ...phaseSync(asYahoo.sync, asked), id: asked, read_at: readAt() });
 			return;
 		}
 		send(req, res, HTTP.ok, {
@@ -889,12 +908,9 @@ async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> 
 			return;
 		}
 		if (id === SLOW) await new Promise((resolve) => setTimeout(resolve, HOLD_MS));
-		if (espnSundayAsked(req, id ?? '') && (route === 'lineup' || route === 'matchup')) {
-			send(req, res, HTTP.ok, { ...espnOnSunday[route], read_at: SUNDAY });
-			return;
-		}
-		if (yahooAsked(req, id ?? '') && (route === 'lineup' || route === 'matchup')) {
-			send(req, res, HTTP.ok, { ...asYahoo[route], read_at: readAt() });
+		const standIn = standInAsked(req, id ?? '');
+		if (standIn && (route === 'lineup' || route === 'matchup' || route === 'scoreboard')) {
+			send(req, res, HTTP.ok, { ...standIn[route], read_at: standIn.readAt });
 			return;
 		}
 		const bodies = {

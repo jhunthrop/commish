@@ -11,8 +11,8 @@ import type {
 	PlayerLine,
 	Scoreboard
 } from '../../src/lib/league/inseason/api.ts';
+import { advise } from './advise.ts';
 import { FIXTURE_SUNDAY_READ } from './clock.ts';
-import { espnMatchup } from './espn-sync.ts';
 import { roundTenth } from './tenths.ts';
 
 /** The share of a kicked-off player's projection the Sunday stand-in counts as scored. */
@@ -51,34 +51,19 @@ function sundayLine(line: PlayerLine): PlayerLine {
 	};
 }
 
-type Slot = LineupAdvice['slots'][number];
-
-/** A slot as the API's engine sets it on the Sunday: a change that moves a player whose game has
- * kicked off is no change, since ESPN has locked him (engine.go keeps a locked starter in place). */
-function lockedSlot(slot: Slot): Slot {
-	const locked = kickedOff(slot.ours) || (slot.host !== null && kickedOff(slot.host));
-	if (!slot.changed || !locked || slot.host === null) return slot;
-	return { ...slot, ours: slot.host, changed: false, sentence: null };
-}
-
-/** The Lineup on the Sunday: the locked changes undone, the bench every active player the slots do
- * not start, each line with his points so far. */
+/** The Lineup on the Sunday: the roster advised again as the engine would on that Sunday (advise.ts,
+ * engine.go Lineup), every kicked-off player locked where the host has him, then each line with his
+ * points so far. */
 function sundayLineup(lineup: LineupAdvice): LineupAdvice {
-	const slots = lineup.slots.map(lockedSlot);
-	const starting = new Set(slots.map((s) => s.ours.player.host_id));
-	const active = new Map<string, PlayerLine>();
-	for (const line of [...lineup.bench, ...lineup.slots.flatMap((s) => [s.ours, s.host])]) {
-		if (line !== null && !active.has(line.player.host_id)) active.set(line.player.host_id, line);
-	}
+	const advised = advise(lineup, kickedOff);
 	return {
-		...lineup,
-		set: slots.every((s) => !s.changed),
-		slots: slots.map((s) => ({
+		...advised,
+		slots: advised.slots.map((s) => ({
 			...s,
 			ours: sundayLine(s.ours),
 			host: s.host === null ? null : sundayLine(s.host)
 		})),
-		bench: [...active.values()].filter((l) => !starting.has(l.player.host_id)).map(sundayLine)
+		bench: advised.bench.map(sundayLine)
 	};
 }
 
@@ -90,10 +75,11 @@ export interface Recorded {
 	scoreboardLive: Scoreboard;
 }
 
-/** An ESPN league on the Sunday: the box score's and the Lineup's players with ESPN's points by
- * player, each side's total ESPN's own (scoreboard-live's), which the score and the Matchup's Totals
- * print, and no change offered on a player ESPN has locked. */
-export function espnSunday({ sync, lineup, matchup, scoreboardLive }: Recorded): {
+/** A league on the Sunday, its platform's own answers given (an ESPN league's carry team_total):
+ * the box score's and the Lineup's players with their points by player, each side's total the
+ * platform's (scoreboard-live's), and its Lineup advised as the engine would on that Sunday. Yahoo's
+ * stand-in (yahoo.ts) strips the players' points from it. */
+export function sundayOf({ sync, lineup, matchup, scoreboardLive }: Recorded): {
 	sync: LeagueSync;
 	lineup: LineupAdvice;
 	matchup: MatchupBox;
@@ -113,7 +99,7 @@ export function espnSunday({ sync, lineup, matchup, scoreboardLive }: Recorded):
 		})
 	});
 	const week = sync.matchup;
-	const box = espnMatchup(matchup);
+	const box = matchup;
 	return {
 		sync: {
 			...sync,
