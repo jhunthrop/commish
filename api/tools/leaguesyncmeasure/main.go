@@ -49,11 +49,11 @@ func (m *memoryStore) LastSnapshot(_ context.Context, ref leaguesync.Ref) (leagu
 	return s, ok, nil
 }
 
-func (m *memoryStore) PutSnapshot(_ context.Context, s leaguesync.Snapshot) error {
+func (m *memoryStore) PutSnapshot(_ context.Context, s leaguesync.Snapshot) (bool, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.snaps[s.Ref.Key()] = s
-	return nil
+	return true, nil
 }
 
 func main() {

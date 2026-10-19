@@ -159,15 +159,16 @@ func startersWords(s apitypes.LeagueSettings, flexSpots bool) string {
 	return fmt.Sprintf("%d QB, %d RB, %d WR, %d TE and %s", r.Qb, r.Rb, r.Wr, r.Te, flex)
 }
 
-// porWords is what points over replacement are and what "a week" is,
-// so a week's figure never reads as a week's projection.
+// porWords is what a trade's Gain is (the head Trades prints, Lane 66u)
+// and what "a week" is, so a week's figure never reads as a week's
+// projection.
 func porWords(b OrderBasis, weeks int) string {
 	span := "the season on our preseason number"
 	if b == RestOfSeason {
 		span = "the rest of the season on our rest-of-season order"
 	}
-	return fmt.Sprintf("Points over replacement, and every gain in them, are points above what a free pickup at his "+
-		"position gives you, a week: %s, averaged over its %s, not a projection of any one week.", span, weekCount(weeks))
+	return fmt.Sprintf("Gain is the change in a lineup's points over replacement a week, points above what a free pickup at "+
+		"each position gives you: %s, averaged over its %s, not a projection of any one week.", span, weekCount(weeks))
 }
 
 // slotNames is a slot type as a lineup row labels it (the web's
@@ -330,13 +331,14 @@ func LineupNote(s apitypes.LeagueSettings, carried func(string) bool) string {
 // shows, as the Lineup screen's advice, and the rest of the season on our
 // number.
 func WaiversBasis(b OrderBasis) string {
-	return fmt.Sprintf("A pickup starts for you this week on the Proj shown and does not lower your rest of season on %s. "+
+	return fmt.Sprintf("A pickup starts for you this week on the Proj shown and its Gain is not below zero on %s. "+
 		"Its drop is the one you lose least by.", numberWords(b))
 }
 
-// WaiverSeasonBasis is what a waiver gain over the rest of the season is.
+// WaiverSeasonBasis is what a waiver Gain is, the head the card and the
+// drop panel print (Lane 66u).
 func WaiverSeasonBasis(b OrderBasis, weeks int) string {
-	return fmt.Sprintf("A gain a week is your lineup's points over replacement on %s, averaged over its %s.", numberWords(b), weekCount(weeks))
+	return fmt.Sprintf("Gain is the change in your lineup's points over replacement a week on %s, averaged over its %s.", numberWords(b), weekCount(weeks))
 }
 
 // OnlyCloseCalls is a team's line when every trade found with it is a
@@ -344,9 +346,13 @@ func WaiverSeasonBasis(b OrderBasis, weeks int) string {
 const OnlyCloseCalls = "Every trade we found with this team is a close call for them."
 
 // TradeCheckBasis is the trade builder's: the finder's line for a trade
-// the member built, which either lineup may gain or lose by.
-func TradeCheckBasis(b OrderBasis, weeks int) string {
-	return fmt.Sprintf("What each lineup gains or loses on %s. The other team decides. %s", numberWords(b), porWords(b, weeks))
+// the member built, which either lineup may gain or lose by. The builder
+// opens on the Trades screen, whose basis says what Gain and Rest of
+// season are, so this line points there and says them no second time
+// (review 66u, finding 4).
+func TradeCheckBasis(b OrderBasis) string {
+	return fmt.Sprintf("What each lineup gains or loses on %s. The other team decides. Gain and Rest of season are as the Trades basis says.",
+		numberWords(b))
 }
 
 // TradesBasis is the trade finder's (§6.3): which trades it lists, on the

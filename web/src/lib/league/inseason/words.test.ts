@@ -107,6 +107,7 @@ const trade: TradeRow = {
 	give: [line('Kyren Williams'), line('Jordan Mason')],
 	get: [line('Nico Collins', 'WR', 9)],
 	drop: null,
+	drop_reason: null,
 	my_gain: 4.06,
 	their_gain: 0.31,
 	close_for_them: true,

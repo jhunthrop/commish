@@ -123,7 +123,8 @@ export function checkWords(check: Pick<TradeCheck, 'trade' | 'fills'>): string {
 	if (!fills.theirs) return `Their roster would not fill ${slotPlace(fills.theirs_open)}.`;
 	if (!fills.yours_room) return 'Your roster has no one to drop to make room.';
 	if (!fills.theirs_room) return 'Their roster has no one to drop to make room.';
-	const drop = trade.drop ? ` You drop ${trade.drop.player.name} to make room.` : '';
+	const reason = trade.drop_reason === null ? '' : ` ${trade.drop_reason}`;
+	const drop = trade.drop ? ` You drop ${trade.drop.player.name} to make room.${reason}` : '';
 	return `${changeWords(trade)}${playersWords(trade)}${drop}`;
 }
 

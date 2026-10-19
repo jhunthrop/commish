@@ -218,7 +218,7 @@ async function boxFacts(page: Page): Promise<{
 	});
 }
 const PER_GAME_BASIS =
-	/Points a game are our rest-of-season projection from week \d+ over the games his club has left, byes out\./;
+	/Rest of season is his points a game on our rest-of-season projection from week \d+, byes out\./;
 const PER_GAME = /\d+\.\d a game/;
 /** The Trades table's heads (Lane 66g): at a desk, below the room's width, and on a phone, where the
  * gain heads name their unit. The open column's own words are read by a screen reader. */
@@ -234,7 +234,7 @@ const TRADE_HEADS = [
 	'Room'
 ];
 const TRADE_HEADS_NARROW = TRADE_HEADS.slice(0, -1);
-const TRADE_HEADS_PHONE = ['Why this trade', 'You give', 'You, a week', 'Them, a week'];
+const TRADE_HEADS_PHONE = ['Why this trade', 'You give', 'Your gain', 'Their gain'];
 const ROOM_FOLDS_AT = 1180;
 /** Below it a trade folds as on a phone. */
 const TRADES_FOLD_AT = 900;
@@ -551,6 +551,35 @@ for (const theme of THEMES) {
 			await page.locator('table.finder thead button.sort').nth(3).click();
 			await page.screenshot({ path: file(`trades-sorted-${theme}-${String(width)}`) });
 		}
+		await ctx.close();
+	}
+}
+
+/** A trade whose drop starts this week (Lane 66u, the fixture's one stand-in): its folded row says
+ * "a starter" beside the drop at every width, and the opened trade says the API's whole sentence. */
+const STARTER_DROP = /, a starter\b/;
+const DROP_REASON =
+	/^\S+ starts at [\w ]+ for you this week(, and \S+ takes that spot after the trade\.|\. After the trade \S+ starts at [\w ]+ and your lineup stays full\.)$/;
+for (const theme of THEMES) {
+	for (const width of SHOT_WIDTHS) {
+		const ctx = await context(theme, width);
+		const page = await ctx.newPage();
+		await page.goto(`${web}/league/${id}/trades`, { waitUntil: 'networkidle' });
+		await ready(page, 'worth proposing');
+		const row = page.locator('table.finder tr.trade').filter({ hasText: STARTER_DROP });
+		if ((await row.count()) !== 1) {
+			missing.push(
+				`trades starter drop ${theme} ${String(width)}: ${String(await row.count())} rows say a starter`
+			);
+			await ctx.close();
+			continue;
+		}
+		await row.locator('button.why').click();
+		const why = (await page.locator('tr.opened .drop-why').first().innerText()).trim();
+		if (!DROP_REASON.test(why))
+			missing.push(`trades starter drop ${theme} ${String(width)} reason "${why}"`);
+		await row.scrollIntoViewIfNeeded();
+		await page.screenshot({ path: file(`trades-starter-drop-${theme}-${String(width)}`) });
 		await ctx.close();
 	}
 }

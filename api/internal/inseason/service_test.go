@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -43,11 +44,14 @@ func (f fakeFacts) Projection(_ context.Context, _, week int) (boards.WeekProjec
 }
 
 type fakeHolds struct {
+	mu      sync.Mutex
 	held    map[string]bool
 	account uuid.UUID
 }
 
 func (f *fakeHolds) Held(_ context.Context, id uuid.UUID) (map[string]bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	f.account = id
 	return f.held, nil
 }

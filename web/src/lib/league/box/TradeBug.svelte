@@ -17,7 +17,7 @@
 		theirs: Side;
 		/** The verb and its line, between the sides. */
 		verb: Snippet;
-		/** The head over each side's gain, by what the gains are on (seasonHead). */
+		/** The head over each side's gain, Gain, over repl. a week (TRADES.gainHead). */
 		gainHead: string;
 	}
 

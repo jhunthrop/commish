@@ -37,9 +37,23 @@ import type {
 	MatchupBoxSide,
 	PlayerLine,
 	TradeAdvice,
+	TradeRow,
 	WaiverAdvice
 } from '../../src/lib/league/inseason/api.ts';
-import { accepts, better, lineupProj, printedProj, tenth, tierOf } from './week.ts';
+import { lastName } from '../../src/lib/format/draft.ts';
+import {
+	accepts,
+	better,
+	CHECK_BASIS,
+	tradesBasis,
+	lineupProj,
+	printedProj,
+	seasonStarters,
+	tenth,
+	tierOf,
+	weekSlots,
+	weeksCovered
+} from './week.ts';
 
 const DATA = new URL('./data/', import.meta.url);
 /** The stand-in projection's read: Friday 9:00 pm Central of the fixture's week 6. */
@@ -463,16 +477,37 @@ function pickupTable(advice: WaiverAdvice): WaiverAdvice {
 	// The drop it costs least to lose, as the API picks it: the bench player with the least points
 	// over replacement; a defense for a defense, the starter he replaces.
 	const cheapest = [...bench].sort((a, b) => por(a) - por(b))[0] ?? null;
+	const seasonStarts = new Set(
+		seasonStarters(
+			roster,
+			stampedLineup.slots.map((s) => s.slot)
+		).map((l) => l.player.host_id)
+	);
+	// The drop panel hides nothing (coordinator's ruling, Lane 66u): every player the member could
+	// drop, this week's starters marked; the defense's second is droppable, as the API's position rule
+	// allows with two on the roster.
+	const panel = [
+		...bench,
+		...stampedLineup.slots.map((s) => s.ours).filter((l) => !l.held && !bench.includes(l))
+	];
 	const rows = pool.map((source): WaiverAdvice['rows'][number] => {
 		const row = source.add.player.position === DEFENSE ? source : { ...source, drop: cheapest };
 		const own = week(row.add, row.drop);
-		// A defense replaces the starting defense alone; a skill player any bench player.
-		const choices = source.add.player.position === DEFENSE ? (row.drop ? [row.drop] : []) : bench;
+		// A defense replaces the starting defense alone; a skill player any player on the panel. The
+		// row's own drop is the API's rule on these figures: the largest rest-of-season gain among the
+		// drops that keep this week's lineup full, a bench player first and the cheapest when gains tie,
+		// so the cheapest bench player the rest-of-season lineup does not start.
+		const choices = source.add.player.position === DEFENSE ? (row.drop ? [row.drop] : []) : panel;
 		const drops = choices
 			.map((d) => ({
 				host_id: d.player.host_id,
-				gain: tenth(row.gain + por(row.drop) - por(d)),
-				week_gain: week(row.add, d).gain
+				// A player the rest-of-season lineup does not start costs it nothing, as in the API's
+				// strength; a starter's loss stands in as the swing in points over replacement.
+				gain: seasonStarts.has(d.player.host_id)
+					? tenth(row.gain + por(row.drop) - por(d))
+					: row.gain,
+				week_gain: week(row.add, d).gain,
+				starts_this_week: base.starts.has(d.player.host_id)
 			}))
 			.sort((a, b) =>
 				a.host_id === row.drop?.player.host_id
@@ -518,9 +553,9 @@ function pickupTable(advice: WaiverAdvice): WaiverAdvice {
 	return {
 		...advice,
 		basis:
-			'A pickup starts for you this week on the Proj shown and does not lower your rest of season on our rest-of-season order. Its drop is the one you lose least by.',
+			'A pickup starts for you this week on the Proj shown and its Gain is not below zero on our rest-of-season order. Its drop is the one you lose least by.',
 		season_basis:
-			"Rest of season is his points a game on our rest-of-season projection from week 6, byes out. A gain a week is your lineup's points over replacement on our rest-of-season order, averaged over its 12 weeks.",
+			"Rest of season is his points a game on our rest-of-season projection from week 6, byes out. Gain is the change in your lineup's points over replacement a week on our rest-of-season order, averaged over its 12 weeks.",
 		rows,
 		pickups,
 		roster,
@@ -632,6 +667,122 @@ function boxSide(
 const matchup = sync.matchup;
 if (!matchup) throw new Error('The fixture league has no matchup this week.');
 
+/** A slot as the API's lineup rows label it (words.go SlotLabel): "QB", "RB2", "Flex 1". */
+function slotLabel(slots: readonly LineupSlot['slot'][], at: number): string {
+	const slot = slots[at] ?? '';
+	const name = slot === 'FLEX' ? 'Flex' : slot;
+	if (slots.filter((s) => s === slot).length < 2) return name;
+	const index = slots.slice(0, at).filter((s) => s === slot).length + 1;
+	return slot === 'FLEX' ? `${name} ${String(index)}` : `${name}${String(index)}`;
+}
+
+/** The trade's sentence when its drop starts this week, in the API's words (sentences.go TradeDrop). */
+function dropReason(drop: PlayerLine, by: PlayerLine, slot: string, bySlot: string): string {
+	const dropped = lastName(drop.player.name);
+	const taker = lastName(by.player.name);
+	return slot === bySlot
+		? `${dropped} starts at ${slot} for you this week, and ${taker} takes that spot after the trade.`
+		: `${dropped} starts at ${slot} for you this week. After the trade ${taker} starts at ${bySlot} and your lineup stays full.`;
+}
+
+/** The one stand-in starter drop (review 66u finding 3): the best trade with one team, answered as
+ * though the member held his bench and the starters named (the three our order values least), so
+ * its only drop is a starter and a shot shows the trade's sentence. Every other row keeps the rule on
+ * the roster as it is. */
+const STARTER_DROP_STANDIN = {
+	team: 'Bower Rangers',
+	holds: ['Jaxson Dart', 'Ladd McConkey', 'Travis Etienne']
+} as const;
+
+/** Each trade's drop against this week's lineup, a stand-in simplification of the API's rule (inseason
+ * drops.go recommend, Lane 66u). The API takes the largest rest-of-season gain among the drops that
+ * keep this week's lineup full, then the higher Proj kept, a bench player before a starter, then the
+ * player our order values least. Here the candidates are only the players the rest-of-season lineup
+ * does not start after the trade, never held, never the only defense; those all share the trade's
+ * gain, and dropping a bench player keeps the most Proj, so the rule reduces to: the cheapest bench
+ * player, else the cheapest starter whose place a player brought in takes with the lineup kept full,
+ * the trade then naming the slot that player takes. The Proj kept is not compared among starters the
+ * lineup still starts. A trade with no one to drop is not listed. */
+function followLineup(finder: TradeAdvice): TradeAdvice {
+	const id = (l: PlayerLine): string => l.player.host_id;
+	const roster = [...stampedLineup.slots.map((s) => s.ours), ...stampedLineup.bench];
+	const base = weekSlots(roster, SLOTS);
+	const spotOf = new Map(base.flatMap((l, at) => (l === null ? [] : [[id(l), at] as const])));
+	const defenseSlots = SLOTS.filter((s) => s === DEFENSE).length;
+	/** A starter's row on the Lineup screen, whose slot the sentence names. */
+	const rowOf = (l: PlayerLine): number => stampedLineup.slots.findIndex((s) => s.ours === l);
+	const cost = (a: PlayerLine, b: PlayerLine): number =>
+		(a.points_over_replacement ?? 0) - (b.points_over_replacement ?? 0) ||
+		(b.position_rank ?? 0) - (a.position_rank ?? 0);
+	/** Who takes a dropped starter's place: the lineup after fills every slot it filled, and an incoming
+	 * player starts, the one in his own spot first. */
+	const takes = (
+		after: readonly PlayerLine[],
+		drop: PlayerLine,
+		get: readonly PlayerLine[]
+	): { by: PlayerLine; at: number } | null => {
+		const next = weekSlots(
+			after.filter((l) => l !== drop),
+			SLOTS
+		);
+		if (base.some((l, at) => l !== null && next[at] === null)) return null;
+		const starts = get.flatMap((l) => {
+			const at = next.indexOf(l);
+			return at < 0 ? [] : [{ by: l, at }];
+		});
+		return starts.find((s) => s.at === spotOf.get(id(drop))) ?? starts[0] ?? null;
+	};
+	const pick = (row: TradeRow, held: ReadonlySet<string>): TradeRow | null => {
+		if (row.drop === null) return { ...row, drop_reason: null };
+		const gone = new Set(row.give.map(id));
+		const taken = new Set(row.get.map(id));
+		const after = [...roster.filter((l) => !gone.has(id(l))), ...row.get];
+		const seasonStarts = new Set(seasonStarters(after, SLOTS).map(id));
+		const defenses = after.filter((l) => l.player.position === DEFENSE).length;
+		const may = after
+			.filter(
+				(l) =>
+					!taken.has(id(l)) &&
+					!seasonStarts.has(id(l)) &&
+					!l.held &&
+					!held.has(l.player.name) &&
+					(l.player.position !== DEFENSE || defenses > defenseSlots)
+			)
+			.sort(cost);
+		const bench = may.find((l) => !spotOf.has(id(l)));
+		if (bench) return { ...row, drop: bench, drop_reason: null };
+		for (const drop of may) {
+			const spot = spotOf.get(id(drop));
+			const taker = spot === undefined ? null : takes(after, drop, row.get);
+			if (spot !== undefined && taker !== null) {
+				const reason = dropReason(
+					drop,
+					taker.by,
+					slotLabel(SLOTS, rowOf(drop)),
+					slotLabel(SLOTS, taker.at)
+				);
+				return { ...row, drop, drop_reason: reason };
+			}
+		}
+		return null;
+	};
+	const standInHeld = new Set<string>([
+		...stampedLineup.bench.map((l) => l.player.name),
+		...STARTER_DROP_STANDIN.holds
+	]);
+	return {
+		...finder,
+		teams: finder.teams.map((team) => ({
+			...team,
+			trades: team.trades.flatMap((row, i) => {
+				const standIn = team.name === STARTER_DROP_STANDIN.team && i === 0;
+				const kept = pick(row, standIn ? standInHeld : new Set());
+				return kept === null ? [] : [kept];
+			})
+		}))
+	};
+}
+
 /** The trade finder as the API now answers it (Lane 66g): the week's opponent's whole roster (the
  * one team the recorded week shows whole, its starters with the finder's rows), each trade's change
  * in this week's Proj for both sides (trades.go WeekProj, by week.ts), the verb's moves rule
@@ -679,11 +830,10 @@ function withWeek(finder: TradeAdvice): TradeAdvice {
 						: swapOnly(row.get, row.give)
 			}))
 		})),
-		// The finder's first sentence as the API now says it (words.go TradesBasis).
-		basis: finder.basis.replace(
-			/^Trades where both lineups gain .*? The other team decides\./,
-			"Trades where both lineups gain on our rest-of-season order. Each team's best trade, yours first, among those they gain at least 0.5 a week from, then the close calls for them. The other team decides."
-		),
+		// The finder's basis in the API's words, stamped whole from the one copy (week.ts tradesBasis) so a
+		// rerun on an older answer says it the same way.
+		basis: tradesBasis(weeksCovered(finder.week), finder.week),
+		check_basis: CHECK_BASIS,
 		moves: {
 			propose: 'unavailable',
 			reason:
@@ -694,7 +844,7 @@ function withWeek(finder: TradeAdvice): TradeAdvice {
 		player_points: true
 	};
 }
-const stampedTrades = withWeek(stampedFinder);
+const stampedTrades = withWeek(followLineup(stampedFinder));
 
 const myRoster = [...stampedLineup.slots.map((s) => s.ours), ...stampedLineup.bench];
 const sides = [

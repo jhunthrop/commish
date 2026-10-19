@@ -69,6 +69,7 @@
 				>
 				{#if week}<span class="week">{week}</span>{/if}
 				{#if entry.row.drop}<span class="drop">{room.yours}</span>{/if}
+				{#if entry.row.drop_reason}<span class="drop">{entry.row.drop_reason}</span>{/if}
 				<span class="act" {@attach hostTab(href)}>
 					<Verb
 						size="sm"
