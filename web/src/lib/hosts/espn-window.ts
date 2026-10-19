@@ -29,13 +29,14 @@ export const ALREADY_SIGNED_IN_LINE =
  * init() resolves `{ loggedIn, guest }`. launchLogin() opens the form, and refuses with "Session
  * already established" when a guest is signed in. getGuest(true, { forceRefresh: true }) reads the
  * guest afresh from Disney's guest service with `s2` expanded. logout() ends the session. on() hears
- * init, login, logout and error. */
+ * init, login, logout and error, and off() lets go of a handler. */
 export interface PopupWidget {
 	init: () => Promise<unknown>;
 	launchLogin: () => Promise<unknown>;
 	logout: () => Promise<unknown>;
 	getGuest: (fullPayload?: boolean, options?: { forceRefresh?: boolean }) => Promise<unknown>;
 	on: (event: string, handler: (data: unknown) => void) => void;
+	off: (event: string, handler: (data: unknown) => void) => void;
 }
 
 /** The parts of a window the script uses, so a test can run it. */
@@ -44,12 +45,14 @@ export interface PopupWindow {
 	location: { origin: string; hostname: string };
 	close: () => void;
 	setTimeout: (handler: () => void, ms: number) => unknown;
+	clearTimeout: (handle: unknown) => void;
 	localStorage: { removeItem: (key: string) => void };
 	document: {
 		cookie: string;
 		getElementById: (id: string) => {
 			textContent: string | null;
 			addEventListener: (event: string, handler: () => void) => void;
+			removeEventListener: (event: string, handler: () => void) => void;
 		} | null;
 		createElement: (tag: 'script') => {
 			src: string;
@@ -82,9 +85,11 @@ export interface PopupSetup {
  * widget's init then never settles: the window sat at its first line (Lane 88). Forgotten, the
  * widget starts signed out and opens Disney's form, and the sign-in hands over through the login,
  * which runs inside Disney's own frame. A guest Disney still reports signed in is read through the
- * widget; one whose session the widget keeps is signed out and shown the form once. A form that is
- * not up within STALL_MS ends the window as a sign-in that did not open, so the account page offers
- * the pasted values instead of a window that waits forever. */
+ * widget; one whose session the widget keeps is signed out and shown the form once. A login whose
+ * event carries the two values hands them over at once; only one without them reads the guest. A
+ * form not up within STALL_MS, or a guest read after a login not answered within it, ends the
+ * window as a sign-in that did not open, so the account page offers the pasted values instead of a
+ * window that waits forever. The last message clears the wait and takes every listener off. */
 export function popupMain(win: PopupWindow, setup: PopupSetup): void {
 	const ONEID_SCRIPT = 'https://cdn.registerdisney.go.com/v4/OneID.js';
 	const ESPN_CLIENT_ID = 'ESPN-ONESITE.WEB-PROD';
@@ -103,7 +108,9 @@ export function popupMain(win: PopupWindow, setup: PopupSetup): void {
 	const EXPIRED = '=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/';
 	const seen: string[] = [];
 	let done = false;
-	let formUp = false;
+	let stall: unknown = null;
+	/** What the last message undoes: the listeners the window put on. */
+	const cleanups: (() => void)[] = [];
 
 	const post = (message: Record<string, unknown>): void => {
 		const opener = win.opener;
@@ -116,8 +123,23 @@ export function popupMain(win: PopupWindow, setup: PopupSetup): void {
 	const send = (outcome: Record<string, unknown>): void => {
 		if (done) return;
 		done = true;
+		disarm();
+		for (const cleanup of cleanups) cleanup();
 		post(outcome);
 		win.close();
+	};
+
+	/** Starts the wait afresh: unless something clears it, the window ends as a sign-in that did not
+	 * open. */
+	const arm = (): void => {
+		disarm();
+		stall = win.setTimeout(() => {
+			send({ outcome: 'failed' });
+		}, STALL_MS);
+	};
+	const disarm = (): void => {
+		if (stall !== null) win.clearTimeout(stall);
+		stall = null;
 	};
 
 	/** Hands over the two ESPN values found in what the widget answered, and nothing else of the
@@ -145,9 +167,12 @@ export function popupMain(win: PopupWindow, setup: PopupSetup): void {
 		if (line) line.textContent = words;
 	};
 
-	win.document.getElementById('close')?.addEventListener('click', () => {
+	const closeButton = win.document.getElementById('close');
+	const onClose = (): void => {
 		send({ outcome: 'closed' });
-	});
+	};
+	closeButton?.addEventListener('click', onClose);
+	cleanups.push(() => closeButton?.removeEventListener('click', onClose));
 	if (win.location.origin !== setup.signInOrigin) {
 		say('This page opens from your Commish account page.');
 		return;
@@ -171,7 +196,7 @@ export function popupMain(win: PopupWindow, setup: PopupSetup): void {
 			widget.getGuest(true, { forceRefresh: true }).catch(() => null);
 		const launch = (words: string): Promise<void> =>
 			widget.launchLogin().then(() => {
-				formUp = true;
+				disarm();
 				say(words);
 			});
 		/** A guest already signed in: handed over when the widget yields both values, else signed
@@ -186,16 +211,27 @@ export function popupMain(win: PopupWindow, setup: PopupSetup): void {
 				return widget.logout().then(() => launch(setup.alreadySignedInLine));
 			});
 
-		widget.on('login', (login) => {
+		const listen = (event: string, handler: (data: unknown) => void): void => {
+			widget.on(event, handler);
+			cleanups.push(() => {
+				widget.off(event, handler);
+			});
+		};
+		listen('login', (login) => {
 			saw('login');
+			if (setup.find({ login }) !== null) {
+				handOver({ login });
+				return;
+			}
+			arm();
 			void readGuest().then((guest) => {
 				handOver({ login, guest });
 			});
 		});
-		widget.on('logout', () => {
+		listen('logout', () => {
 			saw('logout');
 		});
-		widget.on('error', () => {
+		listen('error', () => {
 			saw('error');
 		});
 
@@ -226,9 +262,7 @@ export function popupMain(win: PopupWindow, setup: PopupSetup): void {
 		begin(oneId.get({ clientId: ESPN_CLIENT_ID, responderPage: win.location.origin + RESPONDER }));
 	};
 	win.document.head.appendChild(script);
-	win.setTimeout(() => {
-		if (!formUp) send({ outcome: 'failed' });
-	}, STALL_MS);
+	arm();
 }
 
 /** The script the window loads: popupMain's source, run with its window and its setup written out
