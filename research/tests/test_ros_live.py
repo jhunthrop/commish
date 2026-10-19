@@ -23,7 +23,7 @@ from research.model.ros.scratch import check_target_url
 from research.model.ros.ship import first_difference
 from research.nightly.build.player_season import SCORING
 from research.nightly.build.ros import RosBasis, carried
-from research.nightly.build.season import format_json, month_day
+from research.nightly.build.season import format_json, month_day, read_week_templates
 from research.nightly.config import RUN_FORMATS
 from research.nightly.reads.record import method
 
@@ -147,3 +147,18 @@ def test_the_one_shot_guard_refuses_dev_and_the_parity_database(url: str) -> Non
 def test_the_one_shot_guard_admits_an_explicit_other_store() -> None:
     check_target_url("postgres://u:p@localhost:6543/commish")  # a proxy on another port
     check_target_url("postgres://commish:commish@localhost:5433/lane18_live")
+
+
+def test_the_week_templates_are_checked_when_read() -> None:
+    """Re-review N3: the words table's week templates are read once, when the module loads, and a
+    template missing or without exactly one week slot fails then, never at a format's words."""
+    assert read_week_templates(
+        '{"restFrom": "from week {week}", "restFromPartial": "from week {week}\'s games left"}'
+    ) == {
+        "restFrom": "from week {week}",
+        "restFromPartial": "from week {week}'s games left",
+    }
+    for broken in ('{"restFrom": "from week {week}"}', '{"restFrom": "from week", "restFromPartial": "{week}"}',
+                   '{"restFrom": "{week} {week}", "restFromPartial": "{week}"}'):  # fmt: skip
+        with pytest.raises(ValueError, match="week template"):
+            read_week_templates(broken)

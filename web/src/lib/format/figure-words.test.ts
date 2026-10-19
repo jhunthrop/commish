@@ -18,6 +18,11 @@ void test('the words are the one table the API embeds, every head named', () => 
 	});
 });
 
+void test('each week template holds exactly one week slot (re-review N3)', () => {
+	for (const template of [FIGURE.restFrom, FIGURE.restFromPartial])
+		assert.equal(template.split('{week}').length, 2, template);
+});
+
 void test('the projected total is headed Projected on the board rows, the order and the card', () => {
 	assert.equal(COLUMN_HEADS.proj.text, FIGURE.projected);
 	assert.equal(ORDER.total, FIGURE.projected);

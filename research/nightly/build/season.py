@@ -1,6 +1,5 @@
 """ADP, THE RECORD, THE CLUBS AND THE SCHEDULE, in the web's run format (`web/src/lib/run/schema.ts`)."""
 
-import functools
 import json
 import os
 from collections.abc import Mapping, Sequence
@@ -172,17 +171,31 @@ def schedule_json(
 WEEK_SLOT: Final = "{week}"
 
 
-@functools.cache
-def _figure_words() -> dict[str, str]:
-    words: dict[str, str] = json.loads(figure_words_path(os.environ).read_text())
-    return words
+_WEEK_TEMPLATES: Final = ("restFrom", "restFromPartial")
+
+
+def read_week_templates(text: str) -> dict[str, str]:
+    """The words table's week templates, each checked for exactly one week slot (re-review N3, as the
+    API's figurewords.Parse checks them)."""
+    table = json.loads(text)
+    out: dict[str, str] = {}
+    for key in _WEEK_TEMPLATES:
+        template = table.get(key)
+        if not isinstance(template, str) or template.count(WEEK_SLOT) != 1:
+            raise ValueError(f"the words table's {key} week template needs exactly one {WEEK_SLOT}: {template!r}")
+        out[key] = template
+    return out
+
+
+# Read once, when the module loads: a broken table fails the run at its start, never at a format's words.
+_WEEK_WORDS: Final = read_week_templates(figure_words_path(os.environ).read_text())
 
 
 def rest_from_words(rest: "RestOfSeason") -> str:
     """The week the rest of season counts from, said once (Lane 86), from the site's one words table
     (api/internal/figurewords/words.json, the API's restFromWords and the web's): "from week 7", or
     while a game of it is played "from week 6's games left"."""
-    template = _figure_words()["restFromPartial" if rest.partial else "restFrom"]
+    template = _WEEK_WORDS["restFromPartial" if rest.partial else "restFrom"]
     return template.replace(WEEK_SLOT, str(rest.from_week))
 
 

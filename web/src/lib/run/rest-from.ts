@@ -9,7 +9,7 @@ const WEEK_SLOT = '{week}';
 
 /** "from week 7", or while a game of that week is played "from week 6's games left". */
 export function restFromWords(week: number, partial: boolean): string {
-	return (partial ? FIGURE.restFromPartial : FIGURE.restFrom).replace(WEEK_SLOT, String(week));
+	return (partial ? FIGURE.restFromPartial : FIGURE.restFrom).replaceAll(WEEK_SLOT, String(week));
 }
 
 /** A player's own week: "from week 7", or "with no game left" (his club's first game still to play is one
