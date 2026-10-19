@@ -83,10 +83,11 @@ function playerOf(
 	};
 }
 
-/** The run's board for the league's format, or PPR's when the run lacks it. */
+/** The run's board for the league's format, or PPR's when the run lacks it, its words said at `now`. */
 export async function loadBoard(
 	format: BoardFormat,
-	byes: Readonly<Record<string, number>>
+	byes: Readonly<Record<string, number>>,
+	now: number = Date.now()
 ): Promise<LeagueBoard> {
 	const own = await fetchBoard(format);
 	const run = own ?? (await fetchBoard(FALLBACK));
@@ -100,7 +101,7 @@ export async function loadBoard(
 					capture: run.capture,
 					restOfSeason: run.format.rosFromWeek !== undefined,
 					zone: memberZone(),
-					now: Date.now()
+					now
 				};
 	const players = run.rows.map((row) => playerOf(row, byes, floor, saying));
 	return {

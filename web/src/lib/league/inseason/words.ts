@@ -174,7 +174,7 @@ export const HELD = 'Held';
 
 /** The signed-out panel's title, naming the screen it is for. */
 export function signInTitle(screen: LeagueScreen): string {
-	return `Sign in to see your ${TAB_LABELS[screen].toLowerCase()}`;
+	return `Sign in to see your ${SCREEN_TITLES[screen].toLowerCase()}`;
 }
 
 /** What the order is, in the refreshed stamp: "Our rest-of-season order, refreshed October 14." */
@@ -257,9 +257,8 @@ export function rowEnd(line: PlayerLine, screenCarriesPerGame: boolean): RowEnd 
 	return por === null ? { kind: 'words', words: LINES.unranked } : { kind: 'por', value: por };
 }
 
-/** The tabs under a followed league's title, each screen by its rail word (spec 2026-10-16 §3). */
-export const TAB_LABELS: Readonly<Record<'league' | LeagueScreen, string>> = {
-	league: 'League',
+/** A followed league's screens by their rail words (spec 2026-10-16 §3), each its page's title. */
+export const SCREEN_TITLES: Readonly<Record<LeagueScreen, string>> = {
 	start: 'Lineup',
 	matchup: 'Matchup',
 	waivers: 'Waivers',
@@ -279,7 +278,6 @@ export const LINES = {
 	all: 'All',
 	position: 'Position',
 	waiverAdds: 'Waiver adds',
-	leaguePages: "Your league's pages",
 	orderRecord: 'How the order has done',
 	/** The site's not-found, as the root error page says it (routes/+error.svelte). */
 	notFoundBar: 'Page not found',

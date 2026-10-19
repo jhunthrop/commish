@@ -15,6 +15,9 @@ import {
 const ZONE = 'America/Chicago';
 const READ = '2026-10-17T02:00:00.000Z';
 const BEFORE = '2026-10-16T02:00:00.000Z';
+/** The clock the card is drawn at: the read's own time, before the fixture's kickoff. Never the real
+ * clock, so the week's sentences stay what they were whatever day the tests run. */
+const NOW = Date.parse(READ);
 const PLAYER = { id: '4426515', name: 'Puka Nacua', team: 'LAR', position: 'WR' };
 const LEAGUE = { id: 'league-1', host: 'sleeper' as const };
 const href: ScreenHref = (screen, query) =>
@@ -89,7 +92,7 @@ const BUILT: CardTile[] = [
 	{ key: 'delta', label: CARD.delta, value: NONE, caption: '', tone: 'quiet' }
 ];
 
-const card = (w: PlayerWeek, league: typeof LEAGUE | null = null) =>
+const card = (w: PlayerWeek, league: typeof LEAGUE | null = null, now = NOW) =>
 	liveCard({
 		week: w,
 		player: PLAYER,
@@ -99,7 +102,8 @@ const card = (w: PlayerWeek, league: typeof LEAGUE | null = null) =>
 		games: 3,
 		rest: REST,
 		screenHref: href,
-		zone: ZONE
+		zone: ZONE,
+		now
 	});
 
 const tile = (tiles: readonly CardTile[], key: CardTile['key']): CardTile => {
@@ -234,6 +238,15 @@ void test('with no league the basis names PPR and no league, and there is no ver
 	);
 	assert.equal(basis.length, 2);
 	assert.ok(basis.every((line) => !line.includes('league') && !line.includes('your')));
+});
+
+void test("the game facts' read is said only while his game is still to be played", () => {
+	const kickoff = Date.parse(facts().kickoff ?? '');
+	const before = card(week(), null, kickoff - 1).basis[1] ?? '';
+	const after = card(week(), null, kickoff).basis[1] ?? '';
+	assert.match(before, /weather were read Fri 9:00 pm Central\.$/);
+	assert.ok(!after.includes('were read'), after);
+	assert.match(after, /PPR scoring\.$/);
 });
 
 void test("with a league the verb is the league screens', the platform named", () => {

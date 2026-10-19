@@ -267,9 +267,14 @@ function restTile(week: PlayerWeek, rest: RestParts | null, fallback: CardTile):
 }
 
 /** The basis lines the week's read says, once each and short (the Waivers forms): the projection's
- * with its change's, then the evidence columns' scoring with the game facts' read. A "--" says why on
- * its own tile. */
-export function liveBasis(week: PlayerWeek, league: boolean, zone: string): string[] {
+ * with its change's, then the evidence columns' scoring with the game facts' read while his game is
+ * still to be played at `now`. A "--" says why on its own tile. */
+export function liveBasis(
+	week: PlayerWeek,
+	league: boolean,
+	zone: string,
+	now: number = Date.now()
+): string[] {
 	const proj = projShort(
 		week.projection_read_at,
 		week.projection_previous_read_at,
@@ -280,7 +285,7 @@ export function liveBasis(week: PlayerWeek, league: boolean, zone: string): stri
 	);
 	const scoring = `${SCORING_WORDS[week.projection_scoring.format]} scoring`;
 	const evidence = league ? EVIDENCE_SHORT : EVIDENCE_SHORT.replace('your scoring', scoring);
-	const facts = factsReadShort([week.line], zone);
+	const facts = factsReadShort([week.line], zone, now);
 	return [proj, facts === null ? evidence : `${evidence} ${facts}`];
 }
 
@@ -322,6 +327,8 @@ export interface LiveInput {
 	rest: RestParts | null;
 	screenHref: ScreenHref;
 	zone?: string;
+	/** The time the card is drawn at, in ms: a game kicked off by then says no facts read. */
+	now?: number;
 }
 
 /** The card once the week is read. */
@@ -334,7 +341,8 @@ export function liveCard({
 	games,
 	rest,
 	screenHref,
-	zone = memberZone()
+	zone = memberZone(),
+	now = Date.now()
 }: LiveInput): LiveCard {
 	const fallback = (key: CardTile['key']): CardTile => {
 		const found = tiles.find((tile) => tile.key === key);
@@ -358,7 +366,7 @@ export function liveCard({
 		cell,
 		next,
 		verb,
-		basis: liveBasis(week, verb !== null, zone)
+		basis: liveBasis(week, verb !== null, zone, now)
 	};
 }
 

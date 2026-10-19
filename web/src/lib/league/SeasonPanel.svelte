@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { MOCK_VERB } from '#lib/ui/nav.ts';
+	import { MOCK_VERB, type LeaguePhase } from '#lib/ui/nav.ts';
 	import { zoneLine } from '#lib/format/clock.ts';
 	import { links } from '#lib/site/links.ts';
 	import Label from '#lib/ui/Label.svelte';
@@ -15,14 +15,13 @@
 		draftLine,
 		finalStanding
 	} from './phase-words.ts';
-	import type { TabPhase } from './inseason/tabs.ts';
 
 	/** The league page's word on its season when no game is on (spec 2026-10-16 §3): before the draft
 	 * its time on the member's clock and that the site turns to the season after it, with the one
 	 * verb (the Advisor on draft day, a mock draft before); after the season where the team finished
 	 * and the next draft's verbs. Nothing in season. */
 	interface Props {
-		phase: TabPhase['phase'];
+		phase: LeaguePhase;
 		draftAt: string | null;
 		team: string;
 		standing: LeagueStanding | null;
