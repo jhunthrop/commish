@@ -3,7 +3,7 @@
 		"K": {
 			"week": 6,
 			"position": "K",
-			"basis_note": "",
+			"uncounted_rules": 2,
 			"read_at": "2026-10-14T19:05:38.329Z",
 			"projection_read_at": "2026-10-17T02:00:00.000Z",
 			"projection_scoring": { "format": "ppr", "league_own": false },
@@ -1680,7 +1680,7 @@
 		"DEF": {
 			"week": 6,
 			"position": "DEF",
-			"basis_note": "",
+			"uncounted_rules": 2,
 			"read_at": "2026-10-14T19:05:38.329Z",
 			"projection_read_at": "2026-10-17T02:00:00.000Z",
 			"projection_scoring": { "format": "ppr", "league_own": false },
@@ -3409,7 +3409,7 @@
 		"K": {
 			"week": 6,
 			"position": "K",
-			"basis_note": "",
+			"uncounted_rules": 2,
 			"read_at": "2026-10-14T19:05:38.329Z",
 			"projection_read_at": null,
 			"projection_scoring": { "format": "ppr", "league_own": false },
@@ -4854,7 +4854,7 @@
 		"DEF": {
 			"week": 6,
 			"position": "DEF",
-			"basis_note": "",
+			"uncounted_rules": 2,
 			"read_at": "2026-10-14T19:05:38.329Z",
 			"projection_read_at": null,
 			"projection_scoring": { "format": "ppr", "league_own": false },

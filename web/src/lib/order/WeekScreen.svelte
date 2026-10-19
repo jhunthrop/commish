@@ -6,15 +6,18 @@
 	import Chip from '#lib/ui/Chip.svelte';
 	import ChipGroup from '#lib/ui/ChipGroup.svelte';
 	import StatusLine from '#lib/ui/StatusLine.svelte';
+	import { leagueSettingsHref } from '#lib/league/inseason/tabs.ts';
 	import { weekOrderApi, type WeekOrderAdvice } from './api.ts';
 	import { ORDER, type RosterView } from './order.ts';
 	import {
 		landed,
+		rulesLeftOut,
 		weekBasis,
 		weekRosterFilter,
 		weekSections,
 		weekStatus,
 		weekView,
+		type RulesLeftOut,
 		WEEK_TAB
 	} from './week.ts';
 	import WeekTable from './WeekTable.svelte';
@@ -27,11 +30,13 @@
 	interface Props {
 		position: WeekPosition;
 		league?: { id: string; host: LeagueHost } | null;
-		/** The tab's head and basis once the week is read. */
-		onread?: (said: { heading: string; basis: BasisPart[] }) => void;
+		/** The board's scoring a visitor's rows are named in: "PPR", "Half PPR", "Standard". */
+		boardScoring: string;
+		/** The tab's head, basis and the rules our stats lack, once the week is read. */
+		onread?: (said: { heading: string; basis: BasisPart[]; rules: RulesLeftOut | null }) => void;
 	}
 
-	let { position, league = null, onread }: Props = $props();
+	let { position, league = null, boardScoring, onread }: Props = $props();
 
 	let advice = $state<WeekOrderAdvice | null>(null);
 	let problem = $state<string | null>(null);
@@ -51,9 +56,11 @@
 			.then((answer) => {
 				advice = answer;
 				problem = null;
+				const reader = { league, boardScoring };
 				onread?.({
 					heading: weekHeading(answer.position, answer.week),
-					basis: weekBasis(answer, league)
+					basis: weekBasis(answer, reader),
+					rules: rulesLeftOut(answer, reader, leagueSettingsHref)
 				});
 			})
 			.catch((error: unknown) => {

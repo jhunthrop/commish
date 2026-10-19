@@ -9,6 +9,7 @@ import { weekOrderPath } from './path.ts';
 import {
 	foldedEvidence,
 	landed,
+	rulesLeftOut,
 	weekBasis,
 	weekRosterFilter,
 	weekSections,
@@ -37,7 +38,9 @@ const visitor = (a: WeekOrderAdvice): WeekOrderAdvice => ({
 	moves: null,
 	rows: a.rows.map((r) => ({ ...r, roster: null, move: null }))
 });
-const ESPN = { host: 'espn' as const };
+const ESPN = { league: { id: 'office', host: 'espn' as const }, boardScoring: 'PPR' };
+const VISITOR = { league: null, boardScoring: 'PPR' };
+const settingsHref = (id: string): string => `/league/${id}?view=settings`;
 const text = (parts: readonly { text: string }[]): string => parts.map((p) => p.text).join(' ');
 const views = (a: WeekOrderAdvice, now: number): WeekView[] =>
 	a.rows.map((r) => weekView(r, ZONE, now));
@@ -118,35 +121,38 @@ void test('the projection is in once a row has a Proj, and not before', () => {
 	});
 });
 
-void test("a visitor's kickers' basis: the order, the model we lack, Opp rank, Avg and Last in PPR, the Game read", () => {
-	const basis = weekBasis(visitor(fixture.read.K), null, ZONE, SATURDAY);
+void test("a visitor's kickers' basis: the order with the model we lack, Opp rank, Avg and Last in PPR, the Game read", () => {
+	const basis = weekBasis(visitor(fixture.read.K), VISITOR, ZONE, SATURDAY);
 	assert.equal(
 		text(basis),
-		"Kickers are in order of Proj, this week's published projection in PPR scoring, read Fri 9:00 pm Central. " +
-			'We have no kicker model of our own, so there is no rest-of-season order. ' +
-			"Opp rank is his opponent's points allowed to kickers this season, 1st the fewest. " +
-			'Avg and Last are his points a game and in his last game, in PPR. ' +
-			"The Game cell shows each club's expected points, his club first, then the kickoff weather, read Fri 4:01 pm Central."
+		"Kickers are in order of Proj, this week's published projection in PPR scoring, read Fri 9:00 pm Central, as we have no kicker model of our own. " +
+			'Opp rank is points allowed to kickers this season, 1st the fewest. ' +
+			'Avg and Last are his points a game and last game, in PPR. ' +
+			"Game is each club's expected points, his first, and the kickoff weather, read Fri 4:01 pm Central."
 	);
 });
 
 void test("a member's defenses' basis: its default scoring, the league's own points, and whose the rosters are", () => {
 	const basis = weekBasis(fixture.read.DEF, ESPN, ZONE, SATURDAY);
+	assert.deepEqual(
+		basis.map((p) => p.phone),
+		[true, true, true, true, false]
+	);
 	const said = text(basis);
 	assert.match(
 		said,
-		/^Defenses are in order of Proj, this week's published projection on its default defense scoring, read Fri 9:00 pm Central\./
+		/^Defenses are in order of Proj, this week's published projection on its default defense scoring, read Fri 9:00 pm Central, /
 	);
-	assert.match(said, /We have no defense model of our own/);
-	assert.match(said, /Opp rank is its opponent's points allowed to defenses this season/);
-	assert.match(said, /its points a game and in its last game, in this league's scoring\./);
-	assert.match(said, /the defense's club first/);
+	assert.match(said, /read Fri 9:00 pm Central, as we have no defense model of our own\./);
+	assert.match(said, /Opp rank is points allowed to defenses this season/);
+	assert.match(said, /its points a game and last game, in this league's scoring\./);
+	assert.match(said, /the defense's first/);
 	assert.match(said, /Roster is ESPN's, read /);
 	assert.doesNotMatch(said, /host/i);
 });
 
 void test('before the projection the basis orders by Avg and says the Game cell has only the kickoff', () => {
-	const said = text(weekBasis(visitor(fixture.unread.K), null, ZONE, TUESDAY));
+	const said = text(weekBasis(visitor(fixture.unread.K), VISITOR, ZONE, TUESDAY));
 	assert.match(
 		said,
 		/^Kickers are in order of Avg until this week's published projection is in\. /
@@ -156,6 +162,26 @@ void test('before the projection the basis orders by Avg and says the Game cell 
 		said,
 		/The Game cell shows the opponent and kickoff\. Expected points and weather come later in the week\.$/
 	);
+});
+
+void test("a visitor's basis names the board's own scoring", () => {
+	const half = { league: null, boardScoring: 'Half PPR' };
+	const said = text(weekBasis(visitor(fixture.read.K), half, ZONE, SATURDAY));
+	assert.match(said, /projection in Half PPR scoring/);
+	assert.match(said, /and last game, in Half PPR\./);
+	assert.doesNotMatch(said, /\bin PPR\b/);
+});
+
+void test('the rules Avg and Last leave out are a count with the way to Settings, never a list', () => {
+	assert.deepEqual(rulesLeftOut(fixture.read.K, ESPN, settingsHref), {
+		text: 'Avg and Last leave out two of your scoring rules our stats lack.',
+		link: { words: 'Which two', href: '/league/office?view=settings' }
+	});
+	assert.deepEqual(rulesLeftOut({ uncounted_rules: 1 }, VISITOR, settingsHref), {
+		text: 'Avg and Last leave out one of the PPR scoring rules our stats lack.',
+		link: null
+	});
+	assert.equal(rulesLeftOut({ uncounted_rules: 0 }, ESPN, settingsHref), null);
 });
 
 void test('the roster chips filter the rows the API sent, the adds where the API set them', () => {
@@ -182,7 +208,8 @@ void test('every word the tab prints passes the copy guard', () => {
 	for (const position of ['K', 'DEF'] as const) {
 		for (const said of [
 			text(weekBasis(fixture.read[position], ESPN, ZONE, SATURDAY)),
-			text(weekBasis(visitor(fixture.unread[position]), null, ZONE, TUESDAY)),
+			text(weekBasis(visitor(fixture.unread[position]), VISITOR, ZONE, TUESDAY)),
+			rulesLeftOut(fixture.read[position], ESPN, settingsHref)?.text ?? '',
 			Object.values(weekStatus(fixture.unread[position]) ?? {}).join(' '),
 			...Object.values(WEEK_NOUNS[position]),
 			...Object.values(WEEK_TAB),

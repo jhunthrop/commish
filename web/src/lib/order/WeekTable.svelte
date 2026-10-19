@@ -9,7 +9,7 @@
 	import RosterChip from '#lib/ui/RosterChip.svelte';
 	import type { WeekOrderAdvice } from './api.ts';
 	import { ORDER, moveHref, moveWords } from './order.ts';
-	import { foldedEvidence, type WeekSection, type WeekView } from './week.ts';
+	import { foldedEvidence, WEEK_TAB, type WeekSection, type WeekView } from './week.ts';
 
 	/** The kickers' or defenses' week as a box score (Lane 66w): the player (his face or the club's
 	 * mark), his game, Proj big when the week's projection is in, then Opp rank, Avg and Last ruled off,
@@ -42,7 +42,7 @@
 			<th class="n ev" scope="col">{BOX.last}</th>
 			{#if marked}
 				<th class="roster" scope="col">{ORDER.roster}</th>
-				<th class="act" scope="col"><span class="vh">{ORDER.roster}</span></th>
+				<th class="act" scope="col"><span class="vh">{WEEK_TAB.add}</span></th>
 			{/if}
 		</tr>
 	</thead>

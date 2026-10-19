@@ -209,6 +209,9 @@ async function check(
 			rows: table?.querySelectorAll('tbody tr:not(.sec)').length ?? 0,
 			mine: table?.querySelectorAll('tbody tr.mine').length ?? 0,
 			status: document.querySelector('main .status')?.textContent.trim() ?? '',
+			rules: basis?.textContent.match(/leave out (\w+) of [^.]+\./)?.[0] ?? '',
+			rulesLink: basis?.querySelector('a')?.getAttribute('href') ?? '',
+			glued: /[a-z]\.[A-Z]/.test(basis?.textContent ?? ''),
 			host: [...document.querySelectorAll('main p, main td, main th, main a, main button')]
 				.map((el) => (el as HTMLElement).innerText)
 				.filter((said) => /\bhosts?\b/i.test(said))
@@ -239,6 +242,13 @@ async function check(
 		if (!seen.status.includes('is not in yet')) said.push(`${at}: no status line`);
 	}
 	if (!seen.sections.includes('Bye in week 6')) said.push(`${at}: no bye section`);
+	// The fixture's league leaves out two rules (week-order.ts), said as a count, never a list.
+	const whose = screen.member ? 'your' : 'the PPR';
+	if (seen.rules !== `leave out two of ${whose} scoring rules our stats lack.`)
+		said.push(`${at}: the rules left out read "${seen.rules}"`);
+	if (seen.glued) said.push(`${at}: two basis sentences run together`);
+	if (screen.member !== seen.rulesLink.endsWith('?view=settings'))
+		said.push(`${at}: the rules link is "${seen.rulesLink}"`);
 	if (screen.member) {
 		if (width > ROSTER_FROM && !seen.heads.includes('Roster')) said.push(`${at}: no Roster head`);
 		// The member holds two defenses in the recorded league and no kicker.
@@ -259,10 +269,62 @@ async function check(
 	return said;
 }
 
+/** The board's position chips move between tabs on one page (review 66w finding 1): All, RB, K, DST
+ * and back to RB, each tab's own table drawn under its own head, never a stale head or a reading
+ * line. */
+async function tabFaults(): Promise<string[]> {
+	const said: string[] = [];
+	const member = SCREENS.find((s) => s.name === 'dst-member');
+	if (member === undefined) return ['no member screen'];
+	const ctx = await context('dark', 1440, member);
+	const page = await ctx.newPage();
+	await page.goto(`${web}/board/ppr-12`);
+	await page.locator('main table.order').first().waitFor({ timeout: READY_TIMEOUT_MS });
+	const steps = [
+		{ chip: 'RB', table: 'table.order', head: /^(?!.*(kickers|defenses)).+$/ },
+		{ chip: 'K', table: 'table.week', head: /^Week 6 kickers$/ },
+		{ chip: 'DST', table: 'table.week', head: /^Week 6 defenses$/ },
+		{ chip: 'RB', table: 'table.order', head: /^(?!.*(kickers|defenses)).+$/ }
+	] as const;
+	for (const step of steps) {
+		await page.getByRole('link', { name: step.chip, exact: true }).first().click();
+		await page.waitForURL(new RegExp(`/${step.chip.toLowerCase()}$`));
+		const drawn = await page
+			.locator(`main ${step.table} tbody tr`)
+			.first()
+			.waitFor({ timeout: READY_TIMEOUT_MS })
+			.then(() => true)
+			.catch(() => false);
+		if (step.table === 'table.week')
+			await page
+				.getByText(step.head)
+				.first()
+				.waitFor({ timeout: READY_TIMEOUT_MS })
+				.catch(() => undefined);
+		const seen = await page.evaluate(() => ({
+			head: document.querySelector('main .lead h2')?.textContent.trim() ?? '',
+			reading: [...document.querySelectorAll('main p.reading')].filter(
+				(p) => (p as HTMLElement).offsetParent !== null
+			).length,
+			basis: document.querySelector('main .lead .basis')?.textContent ?? ''
+		}));
+		const at = `tabs to ${step.chip}`;
+		if (!drawn) said.push(`${at}: no rows`);
+		if (!step.head.test(seen.head)) said.push(`${at}: head "${seen.head}"`);
+		if (seen.reading > 0) said.push(`${at}: a reading line stays`);
+		if (step.chip === 'RB' && /kickers|defenses/.test(seen.basis))
+			said.push(`${at}: the week's basis stays`);
+	}
+	await page.screenshot({ path: new URL('tabs-back-to-rb-dark-1440.png', out).pathname });
+	await ctx.close();
+	return said;
+}
+
 for (const state of ['week', 'empty'] as const) {
 	const fixture = startFixture(CLOCKS[state]);
 	await new Promise((resolve) => setTimeout(resolve, FIXTURE_START_MS));
 	try {
+		if (state === 'week') faults.push(...(await tabFaults()));
 		for (const screen of SCREENS.filter((s) => s.state === state)) {
 			for (const width of WIDTHS) {
 				const ctx = await context('dark', width, screen);

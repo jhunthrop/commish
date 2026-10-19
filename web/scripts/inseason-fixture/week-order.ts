@@ -60,6 +60,9 @@ const CLUBS = 32;
 const ADDS_SHOWN = 5;
 /** Every third club's kicker or defense sits on another team in the stand-in rosters. */
 const HELD_EVERY = 3;
+/** STAND-IN: two of the league's rules our stats lack (an ESPN league's field goals by distance, a
+ * common kicker rule), so the basis is measured with its rules sentence. */
+const UNCOUNTED_RULES = 2;
 const gameOf = new Map(games.games.map((g) => [g.team, g] as const));
 const clubs = [...new Set(directory.map((row) => row.team))].sort();
 
@@ -210,7 +213,7 @@ function advice(position: Position, at: number, landed: boolean): WeekOrderAdvic
 	return {
 		week: WEEK,
 		position,
-		basis_note: '',
+		uncounted_rules: UNCOUNTED_RULES,
 		read_at: lineup.read_at,
 		projection_read_at: landed ? lineup.projection_read_at : null,
 		projection_scoring: lineup.projection_scoring,
