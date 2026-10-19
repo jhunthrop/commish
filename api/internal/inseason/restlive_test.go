@@ -176,24 +176,3 @@ func TestTheOrderLineSaysWhichWeeksItCounts(t *testing.T) {
 		t.Fatalf("partly played week %q", part)
 	}
 }
-
-// The player read says his own rest of season at the read's clock: the
-// live points and the week his club's next game is in.
-func TestThePlayerReadSaysHisRestOfSeasonNow(t *testing.T) {
-	b := restRunBoard(t)
-	rest := RestAt(restWeekSix(true, false), b.Raw.FromWeek, b.Refreshed, restSunday.Add(5*time.Hour))
-	live, err := LiveBoard(b, rest)
-	if err != nil {
-		t.Fatal(err)
-	}
-	mia, _ := live.Player("mia")
-	points, from := restOfSeasonNow(live, mia, rest)
-	if points == nil || *points != 110 || from == nil || *from != 7 {
-		t.Fatalf("Miami's back: %v from %v", points, from)
-	}
-	pre := restRunBoard(t)
-	pre.Order = boards.OrderPreseason
-	if points, from := restOfSeasonNow(pre, mia, rest); points != nil || from != nil {
-		t.Fatalf("a preseason board says %v from %v", points, from)
-	}
-}

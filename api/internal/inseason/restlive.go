@@ -119,17 +119,3 @@ func LiveBoard(b boards.Board, rest RestNow) (boards.Board, error) {
 	}
 	return live, nil
 }
-
-// restOfSeasonNow is his rest-of-season points on the live board, to a
-// tenth, and the week they start from: nil off a rest-of-season order,
-// without a projection, and the week nil with no game left.
-func restOfSeasonNow(b boards.Board, p boards.Player, rest RestNow) (*float64, *int) {
-	if !carriesPerGame(b) || p.Points == nil {
-		return nil, nil
-	}
-	v := roundTenth(*p.Points)
-	if from := rest.From(p.Team); from > 0 {
-		return &v, &from
-	}
-	return &v, nil
-}
