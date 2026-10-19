@@ -42,19 +42,45 @@ interface Rig {
 	readonly posted: Posted[];
 	readonly appended: ScriptTag[];
 	readonly line: { textContent: string | null };
+	/** Every cookie the window wrote, in order, and what had been written when Disney's script went
+	 * in. */
+	readonly cookiesWritten: string[];
+	readonly removedKeys: string[];
+	readonly writtenBeforeScript: string[];
+	readonly timers: { readonly ms: number; readonly run: () => void }[];
 	click: () => void;
 	closed: boolean;
 }
+
+/** Disney's session as its widget keeps it on the sign-in origin: the names its own sign-out
+ * (responder.js, guest.logout) expires, and the guest it caches. */
+const DISNEY_COOKIES = [
+	'ESPN-ONESITE.WEB-PROD.ab2',
+	'ESPN-ONESITE.WEB-PROD.idn',
+	'ESPN-ONESITE.WEB-PROD.rt',
+	'ESPN-ONESITE.WEB-PROD.token',
+	'ESPN-ONESITE.WEB-PROD.ts',
+	'ESPN-ONESITE.WEB-PROD-ac'
+];
+const DISNEY_GUEST_KEY = 'ESPN-ONESITE.WEB-PROD.guest';
 
 function rig(origin: string): Rig {
 	const posted: Posted[] = [];
 	const appended: ScriptTag[] = [];
 	const line = { textContent: '' as string | null };
+	const cookiesWritten: string[] = [];
+	const removedKeys: string[] = [];
+	const writtenBeforeScript: string[] = [];
+	const timers: { ms: number; run: () => void }[] = [];
 	let onClick: () => void = () => undefined;
 	const state: Rig = {
 		posted,
 		appended,
 		line,
+		cookiesWritten,
+		removedKeys,
+		writtenBeforeScript,
+		timers,
 		closed: false,
 		click: () => {
 			onClick();
@@ -66,11 +92,22 @@ function rig(origin: string): Rig {
 					posted.push({ message: message as Record<string, unknown>, target });
 				}
 			},
-			location: { origin },
+			location: { origin, hostname: new URL(origin).hostname },
 			close: () => {
 				state.closed = true;
 			},
+			setTimeout: (handler, ms) => {
+				timers.push({ ms, run: handler });
+			},
+			localStorage: {
+				removeItem: (key) => {
+					removedKeys.push(key);
+				}
+			},
 			document: {
+				set cookie(written: string) {
+					cookiesWritten.push(written);
+				},
 				getElementById: (id) =>
 					id === 'line'
 						? Object.assign(line, { addEventListener: () => undefined })
@@ -85,7 +122,11 @@ function rig(origin: string): Rig {
 					appended.push(script);
 					return script;
 				},
-				head: { appendChild: () => undefined }
+				head: {
+					appendChild: () => {
+						writtenBeforeScript.push(...cookiesWritten);
+					}
+				}
 			}
 		}
 	};
@@ -98,6 +139,8 @@ interface WidgetScript {
 	readonly guests: readonly unknown[];
 	readonly launchRejects?: unknown;
 	readonly initRejects?: unknown;
+	/** init never settles, as it does when Disney's guest service will not answer this origin. */
+	readonly initHangs?: boolean;
 	readonly logoutRejects?: unknown;
 	/** getGuest's first call rejects, as Disney's guest service can. */
 	readonly guestRejectsFirst?: boolean;
@@ -124,6 +167,7 @@ function stubWidget(script: WidgetScript): WidgetRig {
 			// Disney's widget rejects with plain objects ({ errorCategory, errorCodes }), never an Error.
 			// eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors
 			if (script.initRejects !== undefined) return Promise.reject(script.initRejects);
+			if (script.initHangs === true) return new Promise(() => undefined);
 			return Promise.resolve({ loggedIn: script.loggedIn, guest: null });
 		},
 		launchLogin: () => {
@@ -202,6 +246,66 @@ void test('on any other origin, the site among them, the window loads nothing', 
 		popupMain(r.win, SETUP);
 		assert.equal(r.appended.length, 0, origin);
 	}
+});
+
+void test("Disney's stored session on the sign-in origin is forgotten before its script loads", () => {
+	const r = rig(ESPN_SIGN_IN_ORIGIN);
+	popupMain(r.win, SETUP);
+	const host = new URL(ESPN_SIGN_IN_ORIGIN).hostname;
+	for (const name of DISNEY_COOKIES) {
+		const expired = r.writtenBeforeScript.filter(
+			(written) => written.startsWith(`${name}=;`) && written.includes('expires=Thu, 01 Jan 1970')
+		);
+		assert.ok(
+			expired.some((written) => !written.includes('domain=')),
+			`${name} expired as a host cookie`
+		);
+		assert.ok(
+			expired.some((written) => written.includes(`domain=.${host}`)),
+			`${name} expired on the domain Disney's responder sets it on`
+		);
+	}
+	assert.deepEqual(r.removedKeys, [DISNEY_GUEST_KEY]);
+	assert.equal(r.appended.length, 1, "then Disney's script goes in");
+});
+
+void test('on any other origin the window forgets nothing and writes no cookie', () => {
+	const r = rig(SITE_ORIGIN);
+	popupMain(r.win, SETUP);
+	assert.deepEqual(r.cookiesWritten, []);
+	assert.deepEqual(r.removedKeys, []);
+});
+
+void test('storage the browser refuses does not stop the window', () => {
+	const r = rig(ESPN_SIGN_IN_ORIGIN);
+	r.win.localStorage = {
+		removeItem: () => {
+			throw new Error('SecurityError');
+		}
+	};
+	popupMain(r.win, SETUP);
+	assert.equal(r.appended.length, 1);
+});
+
+void test("a widget that never opens Disney's form ends the window as a sign-in that did not open", async () => {
+	const { r, w } = await run({ loggedIn: false, guests: [null], initHangs: true });
+	assert.deepEqual(w.calls, ['init']);
+	assert.equal(finals(r).length, 0, 'nothing final before the wait is up');
+	const [stall, ...more] = r.timers;
+	assert.ok(stall, 'the window set one wait');
+	assert.equal(more.length, 0);
+	assert.ok(stall.ms >= 15_000 && stall.ms <= 60_000, `a wait a person would sit through: ${stall.ms}`);
+	stall.run();
+	const handed = handedOver(r);
+	assert.deepEqual(handed.message, { kind: MESSAGE_KIND, outcome: 'failed', seen: [] });
+	assert.equal(r.closed, true);
+});
+
+void test("once Disney's form is up the wait never ends the window", async () => {
+	const { r } = await run({ loggedIn: false, guests: [null] });
+	for (const timer of r.timers) timer.run();
+	assert.equal(finals(r).length, 0);
+	assert.equal(r.closed, false);
 });
 
 void test('a guest already signed in is handed over from the widget, with no sign-in form', async () => {
