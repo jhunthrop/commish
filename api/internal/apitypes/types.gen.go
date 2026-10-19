@@ -2799,6 +2799,9 @@ type LineupAdvice struct {
 	// UncountedRules the rules basis_note counts, in words ("two-point conversions"), for the league's Settings to list; empty when it counts none
 	UncountedRules []string `json:"uncounted_rules"`
 	Week           int      `json:"week"`
+
+	// WeekDone the sentence once every starter's game this week is final ("Every starter's game is final, so week 6 is in the books."): no change is left to make, so the screen says it in place of the changes and the verb; null while any starter's game is still to come or under way, or absent from an older answer
+	WeekDone *string `json:"week_done,omitempty"`
 }
 
 // LineupAdviceEmptySlots defines model for LineupAdvice.EmptySlots.

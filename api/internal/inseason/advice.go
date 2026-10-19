@@ -492,7 +492,30 @@ func (a *advisor) Lineup() (apitypes.LineupAdvice, bool) {
 	for _, i := range bench {
 		out.Bench = append(out.Bench, people[i].line)
 	}
+	out.WeekDone = weekDone(out.Slots, out.Week)
 	return out, true
+}
+
+// weekDone is the week's sentence once every starter with a game has it
+// final by the one state (gameStateAt), a bye starter aside; nil while
+// any is still to come or under way, or with no starter who has a game.
+func weekDone(slots []apitypes.LineupSlot, week int) *string {
+	games := 0
+	for _, s := range slots {
+		f := s.Ours.Facts
+		if f.Bye || f.Kickoff == nil {
+			continue
+		}
+		if f.GameState == nil || *f.GameState != apitypes.GameStateFinal {
+			return nil
+		}
+		games++
+	}
+	if games == 0 {
+		return nil
+	}
+	words := WeekDoneWords(week)
+	return &words
 }
 
 // starts reports whether the league starts a position in any slot.

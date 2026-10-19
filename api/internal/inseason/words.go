@@ -333,6 +333,13 @@ func LineupBasis(b OrderBasis) string {
 	return fmt.Sprintf("We start the highest Proj at each slot after designations and byes, %s breaking ties.", order)
 }
 
+// WeekDoneWords is the Lineup's sentence once every starter's game this
+// week is final (Lane 85): nothing is left to change, so it stands where
+// the changes and the verb would.
+func WeekDoneWords(week int) string {
+	return fmt.Sprintf("Every starter's game is final, so week %d is in the books.", week)
+}
+
 // WaiversBasis is the waiver page's pickup rule (§5.3, Lane 66f): the
 // week on the Proj the screen shows, the rest of the season on its Gain.
 const WaiversBasis = "A pickup starts this week on Proj and keeps your Gain at zero or better. Its drop costs least."
