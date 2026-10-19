@@ -1,8 +1,9 @@
+import { buildInstant } from '#lib/server/build-clock.ts';
 import { boardFormatEntries, boardRoute } from '#lib/server/pages/board.ts';
 import type { EntryGenerator, PageServerLoad } from './$types';
 
 export const entries: EntryGenerator = boardFormatEntries;
 
 export const load: PageServerLoad = async ({ params }) => ({
-	view: await boardRoute(params.format)
+	view: await boardRoute(params.format, buildInstant())
 });

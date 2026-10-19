@@ -18,7 +18,7 @@ export interface RecordPage {
 	statusWords: string | null;
 }
 
-export async function recordPage(): Promise<RecordPage> {
+export async function recordPage(now: number): Promise<RecordPage> {
 	const [loaded, run, slates, capture] = await Promise.all([
 		record(),
 		manifest(),
@@ -39,6 +39,6 @@ export async function recordPage(): Promise<RecordPage> {
 		format: await formatById(loaded.format),
 		unplayed,
 		capture: capture === null ? null : captureStamp(capture),
-		statusWords: capture === null ? null : recordStatusWords(builtSaying(capture, {}))
+		statusWords: capture === null ? null : recordStatusWords(builtSaying(capture, {}, now))
 	};
 }

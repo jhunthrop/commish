@@ -58,10 +58,10 @@ export interface AdpPage extends BoardStatuses {
 export type AdpRoute = { kind: 'adp'; page: AdpPage } | { kind: 'absent'; page: AbsentFormatPage };
 
 /** /adp/<format>: ADP for a format the run carries, or the page for one it lacks. */
-export async function adpRoute(formatId: string): Promise<AdpRoute> {
+export async function adpRoute(formatId: string, now: number): Promise<AdpRoute> {
 	const route = await formatRoute(formatId, (id) => links.adp(id));
 	return route.kind === 'run'
-		? { kind: 'adp', page: await adpPage(route.format.id) }
+		? { kind: 'adp', page: await adpPage(route.format.id, now) }
 		: { kind: 'absent', page: await absentFormatPage(route.format) };
 }
 
@@ -69,7 +69,7 @@ export async function adpEntries(): Promise<{ format: string }[]> {
 	return (await formatSlugs()).map((format) => ({ format }));
 }
 
-export async function adpPage(formatId: string): Promise<AdpPage> {
+export async function adpPage(formatId: string, now: number): Promise<AdpPage> {
 	const format = await formatForRoute(formatId, (id) => links.adp(id));
 	const [loaded, all, formats, capture, byes, run] = await Promise.all([
 		board(format.id),
@@ -104,6 +104,6 @@ export async function adpPage(formatId: string): Promise<AdpPage> {
 		gap: showsGap,
 		underway: reach !== null,
 		byes,
-		...boardStatuses(rows, capture, format)
+		...boardStatuses(rows, capture, format, now)
 	};
 }

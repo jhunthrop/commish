@@ -1,3 +1,4 @@
+import { buildInstant } from '#lib/server/build-clock.ts';
 import { error } from '@sveltejs/kit';
 import { dev } from '$app/env';
 import { systemNightly } from '#lib/server/pages/system.ts';
@@ -24,6 +25,6 @@ export const load: PageServerLoad = async () => {
 		valuePlayers: VALUE_PLAYERS,
 		wrTier: WR_TIER,
 		run: await stamp(),
-		nightly: await systemNightly()
+		nightly: await systemNightly(buildInstant())
 	};
 };
