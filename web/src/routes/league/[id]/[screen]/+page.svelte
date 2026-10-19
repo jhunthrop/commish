@@ -11,7 +11,7 @@
 	import TradeScreen from '#lib/league/inseason/TradeScreen.svelte';
 	import WaiverScreen from '#lib/league/inseason/WaiverScreen.svelte';
 	import MatchupScreen from '#lib/league/MatchupScreen.svelte';
-	import { LINES, TAB_LABELS, refreshedWords } from '#lib/league/inseason/words.ts';
+	import { LINES, SCREEN_TITLES, refreshedWords } from '#lib/league/inseason/words.ts';
 	import type { AdviceHead } from '#lib/league/inseason/api.ts';
 	import { ASKED_PARAM } from '#lib/league/box/asked.ts';
 	import { sectionHref } from '#lib/ui/nav.ts';
@@ -45,7 +45,7 @@
 		<InSeasonPage
 			{id}
 			screen="start"
-			title={TAB_LABELS.start}
+			title={SCREEN_TITLES.start}
 			stamp={ordered}
 			read={() => inSeasonApi.lineup(id)}
 			reserve={RESERVE_ROWS.start}
@@ -64,7 +64,7 @@
 		<InSeasonPage
 			{id}
 			screen="waivers"
-			title={TAB_LABELS.waivers}
+			title={SCREEN_TITLES.waivers}
 			stamp={ordered}
 			read={() => inSeasonApi.waivers(id, null, asked)}
 			reserve={RESERVE_ROWS.waivers}
@@ -84,7 +84,7 @@
 		<InSeasonPage
 			{id}
 			screen="trades"
-			title={TAB_LABELS.trades}
+			title={SCREEN_TITLES.trades}
 			stamp={ordered}
 			read={() => inSeasonApi.trades(id)}
 			reserve={RESERVE_ROWS.trades}

@@ -396,7 +396,8 @@ export function waiverBasis(
 		| 'projection_scoring'
 	>,
 	lines: readonly PlayerLine[],
-	zone: string = memberZone()
+	zone: string = memberZone(),
+	now: number = Date.now()
 ): string[] {
 	const defense = lines.some((l) => l.player.position === 'DEF');
 	const proj = projShort(
@@ -406,7 +407,7 @@ export function waiverBasis(
 		defense,
 		zone
 	);
-	const read = factsReadShort(lines, zone);
+	const read = factsReadShort(lines, zone, now);
 	const evidence = `${EVIDENCE_SHORT}${read === null ? '' : ` ${read}`}`;
 	return [advice.basis, proj, BEATS_BASIS, advice.season_basis, evidence].filter((l) => l !== '');
 }
