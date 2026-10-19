@@ -16,9 +16,11 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Final
 
+from research.capsules.page_figures import projection_tenth
 from research.capsules.pull_figures import PageValues, page_numbers, pull_figures_of
 from research.capsules.store import WRITTEN_SOURCE, StoredCapsule
-from research.capsules.week.caption import status_changed_caption, written_caption
+from research.capsules.week.cadence import projection_moved
+from research.capsules.week.caption import PROJECTION_MOVED_CAPTION, status_changed_caption, written_caption
 from research.capsules.week.store import StoredWeekRead
 from research.model.instants import js_iso
 from research.nightly.build.player_season import SeasonContext, prior_seasons, season_block
@@ -223,25 +225,51 @@ class ServedWeek:
     reads: Mapping[str, StoredWeekRead]
     statuses: Mapping[str, str | None]
     as_of: datetime
+    # Each player's published projection for the board week as the card prints it, by the board's id (None
+    # for a player the snapshot leaves out); None when the run read no snapshot for the week (Lane 66v).
+    projections: Mapping[str, float] | None = None
 
 
-def week_read_json(stored: StoredWeekRead | None, status: str | None, kicked_off: bool, as_of: datetime) -> Json | None:
+class _Unread:
+    """The run read no published projection for the board week, so a read is not judged by it."""
+
+
+UNREAD: Final = _Unread()
+
+
+def week_read_json(
+    stored: StoredWeekRead | None,
+    status: str | None,
+    kicked_off: bool,
+    as_of: datetime,
+    projection: float | _Unread | None = UNREAD,
+) -> Json | None:
     """The board week's read (Lane 72) with the page's caption, its stamps, the status it was written against
     and its call. None for a page the writer did not write for the board week, or whose board-week game has
     kicked off. A read written against another status than his current one is withheld: its caption says his
     status changed and when the hourly pass writes the new read, and the page shows the season read beneath
-    it (the review's H3, the re-review's F5)."""
+    it (the review's H3, the re-review's F5). So is a read whose published projection the card no longer
+    prints (`projection`, the run's for him; Lane 66v). `projection` and `movedCaption` are the figure the read
+    quotes, as the card prints it, and the words the page shows once the card's live read prints another."""
     if stored is None or stored.source != WRITTEN_SOURCE or kicked_off:
         return None
-    standing = stored.status == status
+    quoted = None if stored.projection_points is None else projection_tenth(stored.projection_points)
+    moved = not isinstance(projection, _Unread) and projection_moved(projection, stored.projection_points)
+    standing = stored.status == status and not moved
+    if stored.status != status:
+        caption = status_changed_caption(as_of)
+    else:
+        caption = PROJECTION_MOVED_CAPTION if moved else written_caption(stored.written_at, stored.week)
     return {
         "week": stored.week,
         "body": stored.body.strip() if standing else None,
-        "caption": written_caption(stored.written_at, stored.week) if standing else status_changed_caption(as_of),
+        "caption": caption,
         "status": stored.status,
         "call": stored.call if standing else None,
         "writtenAt": js_iso(stored.written_at),
         "factsAt": None if stored.facts_at is None else js_iso(stored.facts_at),
+        "projection": quoted,
+        "movedCaption": PROJECTION_MOVED_CAPTION,
     }
 
 
@@ -314,7 +342,9 @@ def _week_read(who: Identity, universe_id: str | None, inputs: PageInputs) -> Js
     if stored is None:
         return None
     kicked_off = _kicked_off(inputs.season.games.get(who.team, ()), stored.week, inputs.week.as_of)
-    return week_read_json(stored, inputs.week.statuses.get(who.id), kicked_off, inputs.week.as_of)
+    projections = inputs.week.projections
+    projection = UNREAD if projections is None else projections.get(who.id)
+    return week_read_json(stored, inputs.week.statuses.get(who.id), kicked_off, inputs.week.as_of, projection)
 
 
 def _index_entry(p: Identity) -> Json:

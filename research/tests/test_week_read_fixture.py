@@ -13,17 +13,19 @@ import json
 from collections.abc import Iterator
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Self
+from typing import Any, Final, Self
 
 import pytest
 
 from research.capsules.gateway import Completion
 from research.capsules.gateway_ledger import Usage
+from research.capsules.page_figures import FIGURE_OFF_PAGE
 from research.capsules.throttle_waits import AskWaits, RunWaits
 from research.capsules.validate import overrun_cap
 from research.capsules.voice_rules import gate_hits
 from research.capsules.week.caption import written_caption
 from research.capsules.week.prompt import parse_week_answer
+from research.capsules.week.render import render_week_sheet
 from research.capsules.week.rules import CALLS, WEEK_NEVER_WORDS, week_rule_violations
 from research.capsules.week.sheet import WeekSheet, week_name_ledger
 from research.capsules.week.validate import WEEK_BAND, sentence_shapes, validate_week_read
@@ -33,6 +35,11 @@ from research.tests.week_read_fixtures import sheet_from_json
 _FIXTURE = Path(__file__).parent / "testdata" / "week_reads" / "recorded.json"
 _RECORDED: list[dict[str, Any]] = json.loads(_FIXTURE.read_text())["players"]
 _NAMES = [p["sheet"]["name"] for p in _RECORDED]
+# Lane 66v: CeeDee Lamb's recorded read quotes the published projection as 19.4, the old sheet's toFixed of
+# 19.45, where the card prints 19.5 (the API's cents then tenth). The figure guard now refuses it, so his
+# recording is the guard's case and no longer one the writer reproduces.
+_REFUSED: Final = "CeeDee Lamb"
+_STANDING = [name for name in _NAMES if name != _REFUSED]
 
 
 class _Replay:
@@ -84,7 +91,7 @@ def test_the_fixture_is_a_starter_a_questionable_player_and_a_player_on_bye() ->
     assert any(s.bye and not s.can_play for s in sheets)
 
 
-@pytest.mark.parametrize("name", _NAMES)
+@pytest.mark.parametrize("name", _STANDING)
 def test_the_writer_reproduces_the_recorded_read(name: str) -> None:
     sheet, player = _sheet(name)
     gateway = _Replay(player["answers"])
@@ -96,7 +103,7 @@ def test_the_writer_reproduces_the_recorded_read(name: str) -> None:
     assert result.call != "start" or sheet.may_start
 
 
-@pytest.mark.parametrize("name", _NAMES)
+@pytest.mark.parametrize("name", _STANDING)
 def test_the_recorded_read_keeps_every_guard(name: str) -> None:
     sheet, player = _sheet(name)
     read = player["read"]
@@ -111,6 +118,24 @@ def test_the_recorded_read_keeps_every_guard(name: str) -> None:
         assert "published" in read.lower()
     assert "our projection" not in read.lower() and "our number" not in read.lower()
     assert all(datetime.fromisoformat(stamp) <= sheet.written_at for stamp in sheet.stamps().values())
+
+
+def test_a_recorded_figure_the_card_does_not_print_is_refused() -> None:
+    sheet, player = _sheet(_REFUSED)
+    assert "19.5 points in PPR scoring" in render_week_sheet(sheet)
+    result = validate_week_read(player["read"], sheet, frozenset(player["taken"]), _call(player), asked_shorter=True)
+    assert not result.ok
+    assert result.violations[0].startswith(f'{FIGURE_OFF_PAGE}: "19.4", where the sheet prints 19.5')
+
+
+def test_the_cards_figure_on_a_tie_is_the_published_projection_the_rules_ask_for() -> None:
+    """Lamb's 19.45 prints 19.5 on the card: the read saying 19.5 names the published projection with its
+    figure, and passes every rule."""
+    sheet, player = _sheet(_REFUSED)
+    read = player["read"].replace("19.4", "19.5")
+    assert week_rule_violations(read, sheet, _call(player)) == []
+    result = validate_week_read(read, sheet, frozenset(player["taken"]), _call(player), asked_shorter=True)
+    assert result.ok, result.violations
 
 
 def test_the_bye_read_says_he_does_not_play_and_recommends_nothing_for_the_week() -> None:

@@ -9,6 +9,7 @@ from collections.abc import Sequence
 from typing import TYPE_CHECKING, Final
 
 from research.capsules.facts.depth_model import Depth, Fixture, GamesMissed
+from research.capsules.page_figures import page_tenth_text
 from research.capsules.render_words import percent, ranked_clause, week_of, whole
 from research.model.jsmath import js_to_fixed
 from research.pipeline.jscompat import js_string
@@ -280,9 +281,12 @@ def _market_movement(depth: Depth, in_season: bool) -> str | None:
         return None
     window = "before the season" if in_season else f"between {m.earlier_at} and {m.latest_at}"
     if m.picks == 0:
-        return f"ADP held at {js_string(m.latest_adp)} {window}."
+        return f"ADP held at {page_tenth_text(m.latest_adp)} {window}."
     direction = "up" if m.picks > 0 else "down"
-    return f"ADP moved {direction} {js_string(abs(m.picks))} picks {window}, from {js_string(m.earlier_adp)} to {js_string(m.latest_adp)}."
+    return (
+        f"ADP moved {direction} {page_tenth_text(abs(m.picks))} picks {window}, from "
+        f"{page_tenth_text(m.earlier_adp)} to {page_tenth_text(m.latest_adp)}."
+    )
 
 
 def _volatility(depth: Depth) -> str | None:
@@ -292,7 +296,7 @@ def _volatility(depth: Depth) -> str | None:
     weeks = "week" if v.weeks_played == 1 else "weeks"
     return (
         f"He cleared {js_string(v.threshold)} points in {v.weeks_above_threshold} of his {v.weeks_played} played {weeks} in "
-        f"{v.season}, and his worst was {js_string(v.worst_week.points)} in {week_of(v.worst_week.week, v.season)}."
+        f"{v.season}, and his worst was {page_tenth_text(v.worst_week.points)} in {week_of(v.worst_week.week, v.season)}."
     )
 
 
@@ -301,7 +305,7 @@ def _prior_seasons(facts: "PlayerFacts") -> str | None:
     if not seasons:
         return None
     clauses = [
-        f"{s.season}, {js_string(s.points)} points over {s.games_played} games, {position}{s.position_rank} among {s.qualifier_count}"
+        f"{s.season}, {page_tenth_text(s.points)} points over {s.games_played} games, {position}{s.position_rank} among {s.qualifier_count}"
         for s in seasons
     ]
     return f"Season by season: {'. '.join(clauses)}."

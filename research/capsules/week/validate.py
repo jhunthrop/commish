@@ -78,6 +78,7 @@ def week_grounding(sheet: WeekSheet) -> Grounding:
         clock=sheet.clock,
         touchdowns=sheet.touchdowns,
         own_points_per_game=sheet.points_per_game,
+        exact_figures=True,
     )
 
 

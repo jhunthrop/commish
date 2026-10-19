@@ -14,7 +14,7 @@ chart, his last three games, and his place in our order. The parts:
 - `prompt`, `write`: the writer's instructions, and one read written within its ceiling of calls, the
   facts block its counted fallback.
 - `cadence`: when a read is written again (no read for the week, his status changed, the published
-  projection moved by more than a point, the last one fell to its facts block).
+  projection the card prints moved, the last one fell to its facts block).
 - `store`, `shared`: the table (revision 0012), and the demotion of a sentence on two pages.
 - `caption`: the page's "Written Fri 9:00 pm Central, for week 6".
 """
