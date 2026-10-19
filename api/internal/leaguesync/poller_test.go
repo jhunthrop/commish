@@ -252,3 +252,54 @@ func TestPollerKeptReadIsNotAFailure(t *testing.T) {
 		t.Fatalf("a kept read answered %v, stale %s, failed %v, signed out %v; want stale and not failed", err, r.Stale, r.Failed, r.SignedOut)
 	}
 }
+
+// Landed hears every good read once it is stored, and a read that fails
+// tells it nothing, so work done for the read before stands (Lane 66u: the
+// trade search warms on a landed read).
+func TestPollerTellsLandedOfEachGoodRead(t *testing.T) {
+	clock := &fakeClock{now: time.Date(2026, 10, 13, 12, 0, 0, 0, time.UTC)}
+	host := &countingHost{}
+	p := newPoller(host, &memorySnapshots{}, clock)
+	var mu sync.Mutex
+	var landed []time.Time
+	p.Landed = func(s Snapshot) {
+		mu.Lock()
+		defer mu.Unlock()
+		landed = append(landed, s.ReadAt)
+	}
+	count := func() int {
+		mu.Lock()
+		defer mu.Unlock()
+		return len(landed)
+	}
+	// The store keeps a read after its viewers have their answer: wait for it.
+	await := func(n int, wait time.Duration) {
+		for deadline := time.Now().Add(wait); count() < n && time.Now().Before(deadline); {
+			time.Sleep(time.Millisecond)
+		}
+	}
+	readAll(t, p, 3)
+	settle(t, p)
+	await(1, 2*time.Second)
+	if count() != 1 {
+		t.Fatalf("one good read landed %d times", count())
+	}
+	host.down.Store(true)
+	clock.Advance(time.Minute)
+	readAll(t, p, 3)
+	settle(t, p)
+	await(2, 100*time.Millisecond)
+	if count() != 1 {
+		t.Fatalf("a failed read landed: %d", count())
+	}
+	host.down.Store(false)
+	clock.Advance(time.Minute)
+	readAll(t, p, 3)
+	settle(t, p)
+	await(2, 2*time.Second)
+	mu.Lock()
+	defer mu.Unlock()
+	if len(landed) != 2 || !landed[1].After(landed[0]) {
+		t.Fatalf("the next good read landed %v", landed)
+	}
+}

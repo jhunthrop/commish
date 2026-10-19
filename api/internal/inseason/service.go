@@ -10,6 +10,7 @@ package inseason
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"time"
@@ -60,9 +61,12 @@ type Moves interface {
 // Service serves the three pages and the trade check.
 type Service struct {
 	Leagues Leagues
-	Facts   SeasonFacts
-	Holds   Holds
-	Moves   Moves
+	// Landings is every account's league for a read that just landed, so
+	// the trade search is warmed then (warm.go); nil warms nothing.
+	Landings Landings
+	Facts    SeasonFacts
+	Holds    Holds
+	Moves    Moves
 	// Weeks lists the account's leagues for GET /me/week, nil answers none.
 	Weeks Weeks
 	// Boards values our board for the reads with no league: the public player read and the public
@@ -122,24 +126,32 @@ func (s *Service) advisorFor(w http.ResponseWriter, r *http.Request) (*advisor, 
 		httpx.WriteError(w, r, http.StatusConflict, httpx.CodeConflict, leaguesync.NoGamesWords, nil)
 		return nil, false
 	}
-	ctx := r.Context()
-	data, err := s.Facts.Data(ctx, seasonOf(l))
-	if err != nil {
-		httpx.WriteInternal(w, r, s.Log, "inseason: facts", err)
-		return nil, false
-	}
-	held, err := s.Holds.Held(ctx, auth.AccountID(r))
-	if err != nil {
-		httpx.WriteInternal(w, r, s.Log, "inseason: held", err)
-		return nil, false
-	}
-	a, err := newAdvisor(l, data, s.projection(ctx, seasonOf(l), l.Snap.Week), held, s.Now())
+	a, err := s.leagueAdvisor(r.Context(), l, auth.AccountID(r))
 	if err != nil {
 		httpx.WriteInternal(w, r, s.Log, "inseason: advisor", err)
 		return nil, false
 	}
-	a.finds = s.findsFor(a, auth.AccountID(r).String())
 	return a, true
+}
+
+// leagueAdvisor is the account's league with its facts, the week's
+// projection, its holds and the league read's kept trade search: what a
+// request reads, and what a landed read warms (warm.go).
+func (s *Service) leagueAdvisor(ctx context.Context, l League, account uuid.UUID) (*advisor, error) {
+	data, err := s.Facts.Data(ctx, seasonOf(l))
+	if err != nil {
+		return nil, fmt.Errorf("facts: %w", err)
+	}
+	held, err := s.Holds.Held(ctx, account)
+	if err != nil {
+		return nil, fmt.Errorf("held: %w", err)
+	}
+	a, err := newAdvisor(l, data, s.projection(ctx, seasonOf(l), l.Snap.Week), held, s.Now())
+	if err != nil {
+		return nil, err
+	}
+	a.finds = s.findsFor(a, account.String())
+	return a, nil
 }
 
 // projection is the week's published projection. A read that fails is

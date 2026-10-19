@@ -56,6 +56,11 @@ type Poller struct {
 	Store SnapshotStore
 	Now   func() time.Time
 	Log   *slog.Logger
+	// Landed, when set, is told of every good read once it is stored (the
+	// trade search warms on it, Lane 66u); a failed read tells it nothing,
+	// so the work done for the read before stands. It runs on the storing
+	// goroutine and must return at once.
+	Landed func(Snapshot)
 
 	once  sync.Once
 	inner *poll.Poller[Snapshot]
@@ -64,7 +69,7 @@ type Poller struct {
 func (p *Poller) shared() *poll.Poller[Snapshot] {
 	p.once.Do(func() {
 		p.inner = &poll.Poller[Snapshot]{
-			Now: p.Now, Store: snapshots{p.Store}, Log: p.Log, Idle: idleAfter, Timeout: ReadTimeout,
+			Now: p.Now, Store: snapshots{store: p.Store, landed: p.landed}, Log: p.Log, Idle: idleAfter, Timeout: ReadTimeout,
 		}
 	})
 	return p.inner
@@ -125,6 +130,15 @@ func (p *Poller) Keep(snap Snapshot) {
 	defer cancel()
 	if err := p.Store.PutSnapshot(ctx, snap); err != nil {
 		p.Log.Warn("leaguesync: keep snapshot", "league", snap.Ref.Key(), "err", err)
+		return
+	}
+	p.landed(snap)
+}
+
+// landed tells Landed of a stored read, if anyone listens.
+func (p *Poller) landed(snap Snapshot) {
+	if p.Landed != nil {
+		p.Landed(snap)
 	}
 }
 
@@ -132,8 +146,12 @@ func (p *Poller) Keep(snap Snapshot) {
 // the attaching member), so the first view answers it fresh.
 func (p *Poller) Prime(snap Snapshot) { p.shared().Prime(snap.Ref.Key(), snap, snap.ReadAt) }
 
-// snapshots is the store as poll keeps reads: by the league's key.
-type snapshots struct{ store SnapshotStore }
+// snapshots is the store as poll keeps reads: by the league's key, each
+// good read told to landed once kept.
+type snapshots struct {
+	store  SnapshotStore
+	landed func(Snapshot)
+}
 
 func (s snapshots) Last(ctx context.Context, key string) (Snapshot, time.Time, bool, error) {
 	ref, ok := refOfKey(key)
@@ -149,7 +167,11 @@ func (s snapshots) Keep(ctx context.Context, key string, snap Snapshot, at time.
 	if ref, ok := refOfKey(key); ok {
 		snap.Ref.As = ref.As
 	}
-	return s.store.PutSnapshot(ctx, snap)
+	if err := s.store.PutSnapshot(ctx, snap); err != nil {
+		return err
+	}
+	s.landed(snap)
+	return nil
 }
 
 // refOfKey reads Ref.Key back: "host/season/id", with "@account" for a

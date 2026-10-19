@@ -65,6 +65,27 @@ func (s *Service) Follow(w http.ResponseWriter, r *http.Request) (Followed, bool
 	return f, true
 }
 
+// FollowedAt is every live link's league for a read that just landed,
+// each followed as its route would follow it (the shared read, the saved
+// league, the board), for work a landed read starts (Lane 66u: the trade
+// search). A link whose follow fails is logged and left out.
+func (s *Service) FollowedAt(ctx context.Context, ref Ref) ([]Followed, error) {
+	links, err := s.Links.LinksOf(ctx, ref)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]Followed, 0, len(links))
+	for _, link := range links {
+		f, err := s.follow(ctx, link)
+		if err != nil {
+			s.Log.Warn("leaguesync: follow a landed read", "league", ref.Key(), "err", err)
+			continue
+		}
+		out = append(out, f)
+	}
+	return out, nil
+}
+
 // hostError is a follow the host stopped (its read, or a placement the
 // host's directory could not make), answered in the host's words.
 type hostError struct{ err error }
