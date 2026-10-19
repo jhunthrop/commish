@@ -11,7 +11,6 @@ The gate fails, naming each refusal `schema:<file>:<message>`, when the reader r
 also when it cannot run at all (no node, no web contract): a run is never promoted unchecked.
 """
 
-import os
 import shutil
 import subprocess
 from pathlib import Path
@@ -19,20 +18,12 @@ from typing import Final
 
 from research.nightly.gates import GateRecord, gate_record
 
-CONTRACT_DIR_VARIABLE: Final = "WEB_CONTRACT_DIR"
 _SCRIPT: Final = Path(__file__).resolve().parent / "contract" / "run-contract.ts"
-# The repository's web/ in a developer's tree (it needs `npm ci` there for node_modules).
-_REPOSITORY_WEB: Final = Path(__file__).resolve().parents[2] / "web"
 _TIMEOUT_SECONDS: Final = 600
 # The head of a failed reader's stderr the reason carries: node prints the failing source line, a caret,
 # then the error itself (`Error [ERR_MODULE_NOT_FOUND]: Cannot find module ...`), so five lines reach it.
 _STDERR_LINES: Final = 5
 _STDERR_CHARACTERS: Final = 600
-
-
-def contract_dir(environ: dict[str, str] | os._Environ[str]) -> Path:
-    configured = environ.get(CONTRACT_DIR_VARIABLE, "").strip()
-    return Path(configured) if configured else _REPOSITORY_WEB
 
 
 def schema_gate(runs_root: Path, run_id: str, web_dir: Path) -> GateRecord:

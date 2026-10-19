@@ -2,6 +2,8 @@
 generated from the validator's own lists, so the two cannot drift; and it hands the writer the forms
 the validator reads (a downside cited as a cost, a missing ADP left alone)."""
 
+import json
+
 import pytest
 
 from research.capsules.claims import NO_ADP_CLAIM, NO_ADP_EXAMPLES, ClaimLedger, claim_violations
@@ -9,6 +11,7 @@ from research.capsules.config import CAPSULE_CONFIG
 from research.capsules.corrections import soft_correction_for
 from research.capsules.prompt import IN_SEASON_RULES, NEVER_ON_THE_PAGE, PRESEASON_RULES
 from research.capsules.season_voice import SeasonClock
+from research.capsules.site_words import list_file
 from research.capsules.validate import COST_WORDS, cites_tension
 from research.capsules.voice_rules import (
     ALL_TIME_TERMS,
@@ -17,8 +20,10 @@ from research.capsules.voice_rules import (
     HONEST_FRAME,
     LAB_REPORT_TERMS,
     SET_PHRASES,
+    SITE_WORDS,
     TRADING_TERMS,
     banned_term_pattern,
+    gate_hits,
     voice_rule_hits,
     writer_only_hits,
 )
@@ -48,7 +53,7 @@ def test_the_list_words_are_refused_by_the_validator() -> None:
         assert writer_only_hits(f"Yes, {stem} here.", ()), stem
 
 
-@pytest.mark.parametrize("rule", [*BETTING_PATTERNS, *ASIDE_PATTERNS, HONEST_FRAME], ids=lambda r: r.name)
+@pytest.mark.parametrize("rule", [*BETTING_PATTERNS, *ASIDE_PATTERNS, HONEST_FRAME, SITE_WORDS], ids=lambda r: r.name)
 def test_every_pattern_rule_shows_words_it_refuses_and_the_list_carries_them(rule: object) -> None:
     shown = getattr(rule, "shown", ())
     assert shown, f"{getattr(rule, 'name', rule)} lists no words for the prompt"
@@ -108,3 +113,42 @@ def test_each_missing_adp_claim_the_prompt_names_is_one_the_rule_refuses(example
     assert any(v.startswith(NO_ADP_CLAIM) for v in found), example
     for rules in RULES:
         assert f'"{example}"' in rules
+
+
+def test_the_writer_reads_the_sites_one_list_file() -> None:
+    """The sweep of 2026-10-20 (C7, Y6): the site's copy guard and the writer read one file."""
+    raw = json.loads(list_file().read_text(encoding="utf-8"))
+    for group in ("bettingOnly", "bettingShared", "trading", "platform"):
+        for word in raw[group].values():
+            assert word in SITE_WORDS.shown, word
+            hits = (*voice_rule_hits(f"We {word} him.", ()), *writer_only_hits(f"We {word} him.", ()))
+            assert any(hit.found == word for hit in hits), word
+    assert raw["line"]["shown"] in SITE_WORDS.shown
+    for mark in raw["marks"]:
+        assert SITE_WORDS.pattern.search(f"a {mark} b"), mark
+
+
+@pytest.mark.parametrize(
+    ("text", "found"),
+    [
+        ("He has 15 total touchdowns this season.", "total"),
+        ("The Rams keep holding this line on him.", "line"),
+        ("The Bills host the Jets on Sunday.", "host"),
+        ("His stock is up after week 5.", "stock"),
+        ("The game ran 31 to 28 \u2013 a shootout.", "\u2013"),
+    ],
+)
+def test_prose_that_trips_the_site_trips_the_writer(text: str, found: str) -> None:
+    assert [hit.found for hit in writer_only_hits(text, ()) if hit.rule.startswith("site word")] == [found]
+    # A stored page is held to it when he is next written, never failed at the gate for it.
+    assert not any(hit.rule.startswith("site word") for hit in gate_hits(text, ()))
+
+
+def test_the_fields_own_lines_and_a_word_already_refused_are_not_refused_twice() -> None:
+    clean = "He runs behind the offensive line, scores from the goal line and the O-line holds the line of scrimmage."
+    assert writer_only_hits(clean, ()) == []
+    # "odds" is a betting word already: refused once, by its own rule.
+    assert [hit.rule for hit in voice_rule_hits("The odds say he scores.", ())] == ["betting word (odds)"]
+    assert writer_only_hits("The odds say he scores.", ()) == []
+    # A name in the ledger is masked first: Jadarian Price is never the trading word.
+    assert writer_only_hits("Jadarian Price runs hard.", ["Jadarian Price"]) == []

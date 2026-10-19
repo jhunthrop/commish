@@ -32,6 +32,7 @@ from research.capsules.voice_rules import (
     IN_SEASON_SENTENCES,
     LAB_REPORT_TERMS,
     SET_PHRASES,
+    SITE_WORDS,
     TRADING_TERMS,
     NamedPattern,
 )
@@ -115,6 +116,8 @@ NEVER_ON_THE_PAGE: Final = "\n".join(
         "NEVER ON THE PAGE. A note carrying any of these, in any form, is refused, so none is ever written:",
         f"- Trading words: {_quoted(TRADING_TERMS)}.",
         f"- Betting words: {_quoted(_shown(BETTING_PATTERNS))}. This is a fantasy football page, not a sportsbook.",
+        f"- Words the site never prints, in any sense: {_quoted(SITE_WORDS.shown)}, and an en dash. The field's"
+        " own lines pass: the offensive line, the goal line, the line of scrimmage.",
         f"- Lab-report words: {_quoted(LAB_REPORT_TERMS)}.",
         f"- All-time words: {_quoted(ALL_TIME_TERMS)}.",
         f"- Worn and stock phrases: {_quoted(_WORN_PHRASES)}, and {HONEST_FRAME.shown[0]}.",

@@ -27,6 +27,7 @@ from typing import Final
 from research.capsules.config import CAPSULE_CONFIG
 from research.capsules.names import name_pattern
 from research.capsules.sentences import phrase_pattern
+from research.capsules.site_words import SITE_PATTERN, SITE_SHOWN
 
 EM_DASH: Final = chr(0x2014)
 # Curly apostrophes read as straight ones before a phrase is matched.
@@ -160,6 +161,15 @@ BETTING_PATTERNS: Final = (
     ),
     named_rule("an implied total", r"\bimplied (?:team )?totals?\b", shown=("implied total",)),
 )
+
+# THE SITE'S ONE LIST (`capsules.site_words`, the file the site's copy guard reads): every word and mark
+# the site never prints, refused in every new write (`writer_only_hits`), so prose that passes the writer
+# passes the site. A stored page is not refused for it at the gate: measured on the dev store of
+# 2026-10-14, 244 of 621 written pages carry one ("total" 102, "line" 94), and failing them in one night
+# would put the board past its unwritten line; each is rewritten when his facts next move.
+SITE_WORDS: Final = NamedPattern("the site's list", SITE_PATTERN, SITE_SHOWN)
+# The marks the copy rules already name on their own (`validate._copy_violations`).
+_MARKS_RULED: Final = frozenset({EM_DASH, SEMICOLON})
 
 LAB_REPORT_TERMS: Final = (
     "p10",
@@ -397,19 +407,33 @@ def voice_rule_hits(text: str, names: Sequence[str]) -> list[VoiceRuleHit]:
     return hits
 
 
+def _site_hit(normalised: str, hits: Sequence[VoiceRuleHit]) -> VoiceRuleHit | None:
+    """The first word or mark of the site's list that no earlier rule has named, so one word is
+    refused once; the marks the copy rules name on their own are theirs."""
+    named = {hit.found.lower() for hit in hits}
+    for match in SITE_WORDS.pattern.finditer(normalised):
+        found = match.group(0)
+        if found.lower() not in named and found not in _MARKS_RULED:
+            return VoiceRuleHit(f"site word ({SITE_WORDS.name})", found)
+    return None
+
+
 _WRITER_ONLY_PATTERNS: Final = tuple(
     NamedPattern(phrase, phrase_pattern(phrase)) for phrase in CAPSULE_CONFIG.repetition.validator_only_stems
 )
 
 
 def writer_only_hits(text: str, names: Sequence[str]) -> list[VoiceRuleHit]:
-    """The worn phrases that bind new writes only (`Repetition.validator_only_stems`, non-stat phrases
-    only: a sentence restating a number the sheet prints is a stat sentence, never a worn stem). The
-    validator refuses them as set phrases, each hit as written, so the correction names its sentence.
-    The page gate (`gate_hits`) never reads them on a stored page."""
+    """What binds new writes only: the worn phrases (`Repetition.validator_only_stems`, non-stat phrases
+    only: a sentence restating a number the sheet prints is a stat sentence, never a worn stem), which
+    the validator refuses as set phrases, each hit as written, so the correction names its sentence;
+    and the first word of the site's list no other rule names (`SITE_WORDS`). The page gate
+    (`gate_hits`) never reads them on a stored page."""
     normalised = _normalise_apostrophes(mask_names(text, names))
     matches = (p.pattern.search(normalised) for p in _WRITER_ONLY_PATTERNS)
-    return [VoiceRuleHit("set phrase", match.group(0)) for match in matches if match is not None]
+    worn = [VoiceRuleHit("set phrase", match.group(0)) for match in matches if match is not None]
+    site = _site_hit(normalised, voice_rule_hits(text, names))
+    return worn if site is None else [*worn, site]
 
 
 def gate_hits(text: str, names: Sequence[str]) -> list[VoiceRuleHit]:
