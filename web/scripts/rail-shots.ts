@@ -11,7 +11,7 @@ import { mkdir } from 'node:fs/promises';
 import { chromium, type BrowserContext, type Page } from 'playwright';
 import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
 import { RAIL_KEYS, type RailKey } from '../src/lib/ui/nav.ts';
-import { railFor } from '../src/lib/ui/rail-order.ts';
+import { railOfKey } from '../src/lib/ui/rail-order.ts';
 import {
 	FIXTURE_PHASES,
 	MANY_COOKIE,
@@ -41,7 +41,7 @@ const KEY_OF: Readonly<Record<FixturePhase, RailKey>> = {
 };
 
 function railLabels(key: RailKey, phone: boolean): string[] {
-	const items = key === 'playoffs_waivers' ? railFor('playoffs', true) : railFor(key, false);
+	const items = railOfKey(key);
 	const shown = phone ? items.filter((item) => !item.wideOnly) : items;
 	return [...shown.map((item) => item.label), ...(phone ? [] : ['Account'])];
 }
@@ -139,7 +139,7 @@ for (const phase of FIXTURE_PHASES) {
 	}
 }
 
-/** Signed out in season: the in-season five, each opening the follow page. */
+/** Signed out in season: the no-league rail (Lane 83), League opening the follow page. */
 for (const theme of THEMES) {
 	for (const width of WIDTHS) {
 		const where = `signed out ${theme} ${String(width)}`;

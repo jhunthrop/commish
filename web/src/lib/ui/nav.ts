@@ -134,6 +134,8 @@ export const RAIL_ITEMS: readonly RailItem[] = [
 	screenItem('matchup', 'Matchup', 'matchup'),
 	screenItem('waivers', 'Waivers', 'waivers'),
 	screenItem('trades', 'Trades', 'trades'),
+	// The season's rail with no league selected leads with the board after League (Lane 83).
+	{ ...BOARD, key: 'rest_first', label: 'Rest of season' },
 	{ ...ADVISOR, key: 'advisor_first' },
 	BOARD,
 	{
@@ -181,10 +183,12 @@ export const RAIL_FOOT: RailItem = {
 	owns: ['account', 'pass', 'claim']
 };
 
-/** The rail a visitor sees: a phase, and in the playoffs whether waivers still run. */
+/** The rail a visitor sees: a phase, in the playoffs whether waivers still run, and whether a
+ * league is selected. */
 export interface RailState {
 	phase: LeaguePhase;
 	waiversOpen: boolean;
+	league: boolean;
 }
 
 /** The rail's phase: the selected league's, else the site's season, preseason read as before the
@@ -193,17 +197,29 @@ export function railPhase(
 	league: Partial<{ phase: LeaguePhase; waivers_open: boolean }> | null,
 	season: SitePhase
 ): RailState {
+	const selected = league !== null;
 	if (league?.phase !== undefined) {
-		return { phase: league.phase, waiversOpen: league.waivers_open ?? false };
+		return { phase: league.phase, waiversOpen: league.waivers_open ?? false, league: selected };
 	}
-	return { phase: season === 'preseason' ? 'pre_draft' : season, waiversOpen: false };
+	return {
+		phase: season === 'preseason' ? 'pre_draft' : season,
+		waiversOpen: false,
+		league: selected
+	};
 }
 
+/** The season's rail for a visitor with no league selected (signed out, or none followed): League
+ * opens the follow page, and the four screens that could only lead there are not drawn (Lane 83,
+ * amending spec 2026-10-16 §2). */
+export const NO_LEAGUE_RAIL = 'in_season_no_league';
+
 /** Every rail the shell can show, one word each: the root's `data-rail` names it. */
-export const RAIL_KEYS = [...LEAGUE_PHASES, 'playoffs_waivers'] as const;
+export const RAIL_KEYS = [...LEAGUE_PHASES, 'playoffs_waivers', NO_LEAGUE_RAIL] as const;
 export type RailKey = (typeof RAIL_KEYS)[number];
 
 export function railKey(state: RailState): RailKey {
+	const season = state.phase === 'in_season' || state.phase === 'playoffs';
+	if (season && !state.league) return NO_LEAGUE_RAIL;
 	return state.phase === 'playoffs' && state.waiversOpen ? 'playoffs_waivers' : state.phase;
 }
 
@@ -212,9 +228,10 @@ export function isRailKey(word: unknown): word is RailKey {
 	return (RAIL_KEYS as readonly unknown[]).includes(word);
 }
 
-/** Whether a rail is the season's: the rails that hold the in-season screens. */
+/** Whether a rail is the season's: the rails that hold a league's pages, or with no league the
+ * follow page's door. */
 export function railInSeason(rail: RailKey): boolean {
-	return rail === 'in_season' || rail.startsWith('playoffs');
+	return rail === 'in_season' || rail === NO_LEAGUE_RAIL || rail.startsWith('playoffs');
 }
 
 /** The rail the shell shows before any context is read: the site before its draft. */

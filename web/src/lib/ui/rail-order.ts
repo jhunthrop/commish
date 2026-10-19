@@ -2,6 +2,7 @@
  * wide rail adds. Apart from nav.ts, so the shell's script carries only the items: the server
  * builds the rail styles from this (rail-css.ts), and a league's pages read their screens from it. */
 import {
+	NO_LEAGUE_RAIL,
 	PHONE_RAIL_ITEMS,
 	RAIL_ITEMS,
 	type LeaguePhase,
@@ -28,20 +29,28 @@ const RAIL_ORDER: Readonly<Record<LeaguePhase, readonly string[]>> = {
 	offseason: ['board', 'players', 'mock', 'sheet', 'advisor', 'record']
 };
 
+/** The season's rail with no league selected (nav.ts NO_LEAGUE_RAIL): League, the follow page's
+ * one door, then the season's own pages and the mock room, all on the phone's five. */
+const NO_LEAGUE_ORDER: readonly string[] = ['league', 'rest_first', 'players', 'mock', 'record'];
+
 function itemNamed(key: string): RailItem {
 	const item = RAIL_ITEMS.find((candidate) => candidate.key === key);
 	if (!item) throw new Error(`No rail item ${key}.`);
 	return item;
 }
 
-/** The rail for a phase: the phone's five first, the wide rail's own after them. */
+function entries(keys: readonly string[]): readonly RailEntry[] {
+	return keys.map((key, i) => ({ ...itemNamed(key), wideOnly: i >= PHONE_RAIL_ITEMS }));
+}
+
+/** The rail for a selected league's phase: the phone's five first, the wide rail's own after them. */
 export function railFor(phase: LeaguePhase, waiversOpen: boolean): readonly RailEntry[] {
 	const closed = phase === 'playoffs' && !waiversOpen;
-	const keys = RAIL_ORDER[phase].filter((key) => !(closed && key === 'waivers'));
-	return keys.map((key, i) => ({ ...itemNamed(key), wideOnly: i >= PHONE_RAIL_ITEMS }));
+	return entries(RAIL_ORDER[phase].filter((key) => !(closed && key === 'waivers')));
 }
 
 /** A rail key's items. */
 export function railOfKey(key: RailKey): readonly RailEntry[] {
+	if (key === NO_LEAGUE_RAIL) return entries(NO_LEAGUE_ORDER);
 	return key === 'playoffs_waivers' ? railFor('playoffs', true) : railFor(key, false);
 }

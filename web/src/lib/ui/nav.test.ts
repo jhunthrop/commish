@@ -11,6 +11,8 @@ import {
 	SCREEN_PARAM,
 	shellHrefs,
 	railHref,
+	NO_LEAGUE_RAIL,
+	railInSeason,
 	railKey,
 	railPhase,
 	sectionHref,
@@ -19,7 +21,7 @@ import {
 } from './nav.ts';
 import { leagueScreenOf, screenSection } from './rail-league.ts';
 import { BANNED_MARKS, BANNED_WORDS } from '#lib/format/copy-guard.ts';
-import { railFor, type RailEntry } from './rail-order.ts';
+import { railFor, railOfKey, type RailEntry } from './rail-order.ts';
 
 const labels = (items: readonly RailEntry[]): string[] => items.map((item) => item.label);
 const phone = (items: readonly RailEntry[]): string[] =>
@@ -102,16 +104,57 @@ void test("the rail is the one way between a league's pages: the phone reaches e
 void test('the rail is the selected league phase, else the site season, preseason as pre_draft', () => {
 	assert.deepEqual(railPhase({ phase: 'in_season', waivers_open: true }, 'preseason'), {
 		phase: 'in_season',
-		waiversOpen: true
+		waiversOpen: true,
+		league: true
 	});
-	assert.deepEqual(railPhase(null, 'preseason'), { phase: 'pre_draft', waiversOpen: false });
-	assert.deepEqual(railPhase(null, 'playoffs'), { phase: 'playoffs', waiversOpen: false });
-	assert.deepEqual(railPhase(null, 'offseason'), { phase: 'offseason', waiversOpen: false });
-	// An API from before the phase answers none: the site season stands.
-	assert.deepEqual(railPhase({}, 'in_season'), { phase: 'in_season', waiversOpen: false });
-	assert.equal(railKey({ phase: 'playoffs', waiversOpen: true }), 'playoffs_waivers');
-	assert.equal(railKey({ phase: 'playoffs', waiversOpen: false }), 'playoffs');
-	assert.equal(railKey({ phase: 'in_season', waiversOpen: true }), 'in_season');
+	assert.deepEqual(railPhase(null, 'preseason'), {
+		phase: 'pre_draft',
+		waiversOpen: false,
+		league: false
+	});
+	assert.deepEqual(railPhase(null, 'playoffs'), {
+		phase: 'playoffs',
+		waiversOpen: false,
+		league: false
+	});
+	assert.deepEqual(railPhase(null, 'offseason'), {
+		phase: 'offseason',
+		waiversOpen: false,
+		league: false
+	});
+	// An API from before the phase answers none: the site season stands, the league still selected.
+	assert.deepEqual(railPhase({}, 'in_season'), {
+		phase: 'in_season',
+		waiversOpen: false,
+		league: true
+	});
+	assert.equal(railKey({ phase: 'playoffs', waiversOpen: true, league: true }), 'playoffs_waivers');
+	assert.equal(railKey({ phase: 'playoffs', waiversOpen: false, league: true }), 'playoffs');
+	assert.equal(railKey({ phase: 'in_season', waiversOpen: true, league: true }), 'in_season');
+});
+
+void test('in season with no league selected, the rail draws no league tabs (Lane 83)', () => {
+	// The season's own rail, signed out or with no league followed: League still opens the follow
+	// page, and none of the four screens that only led there is drawn.
+	assert.equal(railKey(railPhase(null, 'in_season')), NO_LEAGUE_RAIL);
+	assert.equal(railKey(railPhase(null, 'playoffs')), NO_LEAGUE_RAIL);
+	// Before the draft and after the season the rail never had them.
+	assert.equal(railKey(railPhase(null, 'preseason')), 'pre_draft');
+	assert.equal(railKey(railPhase(null, 'offseason')), 'offseason');
+	assert.ok(RAIL_KEYS.includes(NO_LEAGUE_RAIL));
+	assert.ok(railInSeason(NO_LEAGUE_RAIL));
+	const items = railOfKey(NO_LEAGUE_RAIL);
+	assert.deepEqual(phone(items), [
+		'League',
+		'Rest of season',
+		'Players',
+		'Mock draft',
+		'Our record'
+	]);
+	assert.deepEqual(wide(items), []);
+	assert.deepEqual(leaguePages(items), ['league']);
+	assert.equal(railHref(items[0] ?? RAIL_FOOT, null), '/league/new');
+	assert.equal(railHref(items[1] ?? RAIL_FOOT, null), '/board');
 });
 
 void test('the shell draws every item once, marked for the rail styles', () => {
