@@ -29,6 +29,7 @@ import { chromium, type BrowserContext, type Page } from 'playwright';
 import { copyFault, watchData } from './copy-scan.ts';
 import { EMPTY_FIGURE } from '../src/lib/format/empty.ts';
 import { FIGURE } from '../src/lib/format/figure-words.ts';
+import { CARD } from '../src/lib/player/card.ts';
 import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
 
 const THEMES = ['dark', 'light'] as const;
@@ -166,6 +167,8 @@ interface Card {
 	basis: string[];
 	basisLines: number;
 	nextRow: string;
+	/** The card's head: its week ("Week 6") and the game or "Bye" under it. */
+	head: { week: string; opponent: string };
 	earlier: string;
 	earlierOpen: boolean;
 	sideways: boolean;
@@ -202,6 +205,11 @@ async function read(page: Page): Promise<Card> {
 			basis: basis.map((p) => p.innerText),
 			basisLines: lines,
 			nextRow: document.querySelector<HTMLElement>('main .season tr.next')?.innerText ?? '',
+			head: {
+				week: document.querySelector<HTMLElement>('main .card .next .wk')?.innerText.trim() ?? '',
+				opponent:
+					document.querySelector<HTMLElement>('main .card .next .opp b')?.innerText.trim() ?? ''
+			},
 			earlier: toggle?.innerText ?? '',
 			earlierOpen: toggle?.getAttribute('aria-expanded') === 'true',
 			sideways: document.documentElement.scrollWidth > document.documentElement.clientWidth,
@@ -232,6 +240,18 @@ function checkTiles(card: Card, where: string): void {
 	// The week tile is headed by its week beside the season's Projected ("Wk 6", the ruling).
 	const [weekTile = '', ...others] = card.labels;
 	const want = [rest, 'Opp rank', 'Avg', 'Last', 'Δ Proj'];
+	// One week per card (the sweep's M6): the head names the week tile's week, and a bye says so in
+	// the head as the tile does.
+	const weekOf = (text: string): string => /\d+/u.exec(text)?.[0] ?? '';
+	check(
+		card.head.week === '' || weekOf(card.head.week) === weekOf(weekTile),
+		`${where}: the head says ${card.head.week}, the tile ${weekTile}`
+	);
+	if (card.captions[weekTile] === CARD.byeWeek)
+		check(
+			/^bye$/iu.test(card.head.opponent),
+			`${where}: a bye tile under a head of ${card.head.opponent}`
+		);
 	check(
 		WEEK_TILE.test(weekTile) && others.join('|') === want.join('|'),
 		`${where}: tiles ${card.labels.join(', ')}`

@@ -72,9 +72,9 @@ export interface CardVerb {
 
 export interface LiveCard {
 	week: number;
-	/** The head the read gives the card: the API's week and its game or bye, null when the API names
-	 * no game that week. */
-	head: CardHead | null;
+	/** The head the read gives the card: the API's week and its game or bye, the empty figure when
+	 * the API names no game that week, so the head never shows the build's week over the read's. */
+	head: CardHead;
 	tiles: CardTile[];
 	cell: NextCell | null;
 	next: LogNext | null;
@@ -314,10 +314,10 @@ export function liveBasis(
 }
 
 /** The card's head from the read: its week, and the game or the bye in it. */
-function headOf(week: PlayerWeek, zone: string): CardHead | null {
+function headOf(week: PlayerWeek, zone: string): CardHead {
 	const game = gameOf(week.line.facts, zone);
-	if (game === null) return null;
-	return { week: week.week, opponent: game === 'bye' ? BOX.bye : game.where };
+	const opponent = game === null ? NONE : game === 'bye' ? BOX.bye : game.where;
+	return { week: week.week, opponent };
 }
 
 function nextOf(week: PlayerWeek, zone: string): { cell: NextCell | null; next: LogNext | null } {

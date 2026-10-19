@@ -242,6 +242,12 @@ void test("the card's head is the API's week, the bye said in it, so one card sh
 		)
 	);
 	assert.deepEqual(bye.head, { week: 6, opponent: 'Bye' });
+	// A week the API names no game for heads with its own week and the empty figure, never the
+	// build's week ahead (review 81 finding 4).
+	const none = card(
+		week({ week: 7 }, { facts: facts({ week: 7, opponent: null, home: null, kickoff: null }) })
+	);
+	assert.deepEqual(none.head, { week: 7, opponent: NONE });
 	assert.equal(tile(bye.tiles, 'proj').label, 'Wk 6');
 });
 
