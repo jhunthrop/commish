@@ -2737,7 +2737,7 @@ type LineupAdvice struct {
 	// OrderBasis which order ranks the players: our preseason board, or the rest-of-season order (from week 7, once the API reads it)
 	OrderBasis OrderBasis `json:"order_basis"`
 
-	// PlayerPoints the host gives each player's points (Sleeper, MFL); false where it gives each team's total alone (ESPN, Yahoo, FFPC), so a player's points_this_week stay null and the team's total is team_points
+	// PlayerPoints the host gives each player's points (Sleeper, MFL, ESPN); false where it gives each team's total alone (Yahoo, FFPC) or its read carried no player's, so a player's points_this_week stay null and the team's total is team_points
 	PlayerPoints bool `json:"player_points"`
 
 	// ProjectionPreviousReadAt when the snapshot before it was captured, the read projection_delta counts from; null with none

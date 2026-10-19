@@ -3072,7 +3072,7 @@ export interface components {
 		};
 		LineupAdvice: {
 			week: number;
-			/** @description the host gives each player's points (Sleeper, MFL); false where it gives each team's total alone (ESPN, Yahoo, FFPC), so a player's points_this_week stay null and the team's total is team_points */
+			/** @description the host gives each player's points (Sleeper, MFL, ESPN); false where it gives each team's total alone (Yahoo, FFPC) or its read carried no player's, so a player's points_this_week stay null and the team's total is team_points */
 			player_points: boolean;
 			/**
 			 * Format: double
