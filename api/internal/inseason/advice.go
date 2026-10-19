@@ -49,8 +49,10 @@ type advisor struct {
 	// weeks is how many weeks the order covers (WeeksCovered).
 	pages pages
 	weeks int
-	// gamesLeft is each club's games from the board's first week, the
+	// rest is the rest of season at the read's clock (Lane 86), whose
+	// board League.Board is; gamesLeft its clubs' games still to play, the
 	// divisor of a row's rest-of-season points a game.
+	rest      RestNow
 	gamesLeft map[string]int
 	// projection is the week's published projection, read in the format
 	// the league's scoring is most like (preset).
@@ -130,8 +132,12 @@ func newAdvisor(l League, data Data, projection boards.WeekProjection, held map[
 		basis = Preseason
 	}
 	preset, _ := leaguesync.LeagueScoring(l.Saved, nil, false)
-	return &advisor{League: l, settings: *l.Saved, config: config, slots: Slots(config), held: held, basis: basis, weeks: WeeksCovered(basis, firstWeek(l)), pages: newPages(l.Board.Raw), now: now,
-		gamesLeft: GamesLeft(data.Games, l.Board.FromWeek), projection: projection, preset: preset,
+	rest := RestAt(data.Games, l.Board.FromWeek, l.Board.Refreshed, now)
+	if l.Board, err = LiveBoard(l.Board, rest); err != nil {
+		return nil, fmt.Errorf("inseason: the board at the read's clock: %w", err)
+	}
+	return &advisor{rest: rest, League: l, settings: *l.Saved, config: config, slots: Slots(config), held: held, basis: basis, weeks: WeeksCovered(basis, firstWeek(l)), pages: newPages(l.Board.Raw), now: now,
+		gamesLeft: rest.Left, projection: projection, preset: preset,
 		season: NewSeason(data, RulesOf(rulesOf(l.Saved.Scoring)), l.Snap.Week, now)}, nil
 }
 

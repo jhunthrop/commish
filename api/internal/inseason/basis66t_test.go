@@ -75,14 +75,14 @@ func TestUncountedRulesAreCountedAndListed(t *testing.T) {
 func TestOrderScreenBasisNamesItsLeague(t *testing.T) {
 	want := "Our rest-of-season order from week 6. A position ranks by Projected through week 17, byes out, " +
 		"All by Over repl., his points less a free pickup's in your league."
-	if got := OrderScreenBasis(RestOfSeason, 6, OrderLeague(true, apitypes.LeagueSettings{}, apitypes.ProjectionScoringFormatPpr)); got != want {
+	if got := OrderScreenBasis(RestOfSeason, RestFrom{Week: 6}, OrderLeague(true, apitypes.LeagueSettings{}, apitypes.ProjectionScoringFormatPpr)); got != want {
 		t.Errorf("\n got %q\nwant %q", got, want)
 	}
 	stand := OrderLeague(false, apitypes.LeagueSettings{Teams: 12}, apitypes.ProjectionScoringFormatPpr)
 	if stand != "a 12-team PPR league" {
 		t.Errorf("%q", stand)
 	}
-	if got := OrderScreenBasis(Preseason, 0, stand); got != "Our preseason order: All ranks by Over repl., his season less a free pickup's in a 12-team PPR league." {
+	if got := OrderScreenBasis(Preseason, RestFrom{}, stand); got != "Our preseason order: All ranks by Over repl., his season less a free pickup's in a 12-team PPR league." {
 		t.Errorf("%q", got)
 	}
 }

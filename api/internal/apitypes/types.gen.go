@@ -3133,7 +3133,7 @@ type OrderAdvice struct {
 	// BasisNoteLink the words of basis_note's link to the league's Settings, where the rules are listed ("Which four"); empty with no basis_note
 	BasisNoteLink string `json:"basis_note_link"`
 
-	// FromWeek the first week the rest-of-season order covers, null on the preseason order
+	// FromWeek the first week the rest-of-season order covers at the read's clock: the earliest with a game still to play (Lane 86; a club whose game of it kicked off counts from its next week), null on the preseason order
 	FromWeek *int `json:"from_week"`
 
 	// Moves the claim's moves on the league's platform, the Waivers screen's verb rule for an add; null without a league
@@ -3186,7 +3186,7 @@ type OrderRow struct {
 	// Rank his place in our order for this view: at a position his position rank (by his rest-of-season total, which orders the same as points over replacement there), across every position his place by points over replacement
 	Rank int `json:"rank"`
 
-	// RestOfSeasonPoints the order's key, one decimal: his rest-of-season points over the games his club has left from the order's first week through week 17, byes out; null on the preseason order and without a projection
+	// RestOfSeasonPoints the order's key, one decimal: his rest-of-season points over his club's games still to play at the read's clock (not yet kicked off) through week 17, byes out (Lane 86, as the player read's rest_of_season_points); null on the preseason order and without a projection
 	RestOfSeasonPoints *float64 `json:"rest_of_season_points"`
 
 	// Roster whose roster in the league holds him, null without a league
@@ -3295,7 +3295,7 @@ type PlayerLine struct {
 	// ProjectionDelta week_projection's change since the week's snapshot before the newest, to the tenth, in the same format; null without a row for him in both snapshots or when week_projection is null
 	ProjectionDelta *float64 `json:"projection_delta"`
 
-	// RestOfSeasonPerGame his rest-of-season points a game, one decimal: the published board's rest-of-season points over the games his club has left from the board's first week through week 17, byes out, as the basis says; null on the preseason number, on a run that does not say its first week, without a projection or with no games left. A player who is out keeps it: it assumes he plays
+	// RestOfSeasonPerGame his rest-of-season points a game, one decimal: the published board's rest-of-season points over the games his club had still to play at the run (the games not yet kicked off, from the board's first week through week 17, byes out; the same as his rest-of-season points now over his club's games still to play now), as the basis says; null on the preseason number, on a run that does not say its first week, without a projection or with no games left. A player who is out keeps it: it assumes he plays
 	RestOfSeasonPerGame *float64 `json:"rest_of_season_per_game"`
 
 	// SeasonAvg his points a game over every completed game this season under the league's scoring, to the tenth; null before his first game
@@ -3341,6 +3341,12 @@ type PlayerWeek struct {
 
 	// ProjectionScoring the scoring the rows' week_projection is read in: the published projection's column the league scores most like, and whether that is the league's own scoring or the closest of the three to rules of its own (a tight end premium reads PPR and is never its own). A team defense's figure is the published default in every format
 	ProjectionScoring ProjectionScoring `json:"projection_scoring"`
+
+	// RestFromWeek the week his rest of season starts from: his club's first game still to play at the read's clock (not yet kicked off, through week 17); null with rest_of_season_points null or with no game left. Absent from a read older than the field
+	RestFromWeek *int `json:"rest_from_week,omitempty"`
+
+	// RestOfSeasonPoints his rest-of-season points now, one decimal, in projection_scoring's format: the published board's over the games his club had still to play at the run, taken down to his club's games still to play at the read's clock (Lane 86, the run's points a game times them, so a game kicked off since the run is no longer counted); null on the preseason order, on a run that does not say its first week and without a projection. Absent from a read older than the field
+	RestOfSeasonPoints *float64 `json:"rest_of_season_points,omitempty"`
 
 	// Verb what the league screens would do with him; null on the read with no league
 	Verb *PlayerVerb `json:"verb"`

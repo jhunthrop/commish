@@ -51,13 +51,13 @@ func playerParam(r *http.Request) (string, bool) {
 // publicLine is one placed player's row with no league: his facts for the
 // week, in PPR, the week's projection read in PPR, and his rest-of-season
 // points a game on our board, as a league's rows carry them.
-func publicLine(d Data, projection boards.WeekProjection, b boards.Board, bp boards.Player, week int, now time.Time) apitypes.PlayerLine {
+func publicLine(d Data, projection boards.WeekProjection, b boards.Board, rest RestNow, bp boards.Player, week int, now time.Time) apitypes.PlayerLine {
 	boardID, position, team := bp.ID, bp.Position, bp.Team
 	season := NewSeason(d, RulesOf(scoring.PresetRules(pprPreset)), week, now)
 	facts := season.For(Player{BoardID: boardID, Team: team, Position: position})
 	id := boardID
 	line := apitypes.PlayerLine{Player: apitypes.LeaguePlayer{BoardId: &id, Name: bp.Name, Position: string(position), Team: team},
-		Facts: wireFacts(facts, nil), RestOfSeasonPerGame: RestOfSeasonPerGame(b, bp, GamesLeft(d.Games, b.FromWeek))}
+		Facts: wireFacts(facts, nil), RestOfSeasonPerGame: RestOfSeasonPerGame(b, bp, rest.Left)}
 	if rank, ok := b.PositionRanks[boardID]; ok && rank > 0 {
 		line.PositionRank = &rank
 	}
@@ -114,13 +114,21 @@ func (s *Service) playerWeek(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteInternal(w, r, s.Log, "inseason: player week", err)
 		return
 	}
+	now := s.Now()
+	rest := RestAt(data.Games, board.FromWeek, board.Refreshed, now)
+	if board, err = LiveBoard(board, rest); err != nil {
+		httpx.WriteInternal(w, r, s.Log, "inseason: player week live board", err)
+		return
+	}
+	bp, _ = board.Player(id)
 	week := nextWeek(data.Games)
 	projection := s.projection(ctx, s.Season, week)
 	read, previous := readsOf(projection)
+	points, from := restOfSeasonNow(board, bp, rest)
 	httpx.WriteOK(w, r, http.StatusOK, apitypes.PlayerWeek{Week: week,
-		Line:              publicLine(data, projection, board, bp, week, s.Now()),
+		Line:              publicLine(data, projection, board, rest, bp, week, now),
 		ProjectionScoring: apitypes.ProjectionScoring{Format: apitypes.ProjectionScoringFormatPpr, LeagueOwn: false},
-		ProjectionReadAt:  read, ProjectionPreviousReadAt: previous})
+		ProjectionReadAt:  read, ProjectionPreviousReadAt: previous, RestOfSeasonPoints: points, RestFromWeek: from})
 }
 
 // leaguePlayerWeek answers GET /leagues/attached/{id}/players/{player}.
@@ -181,6 +189,7 @@ func (a *advisor) PlayerWeek(bp boards.Player) (apitypes.PlayerWeek, bool) {
 	read, previous := a.projectionReadAt(), a.projectionPreviousReadAt()
 	out := apitypes.PlayerWeek{Week: a.Snap.Week, ProjectionScoring: projectionScoring(a.settings, a.preset),
 		ProjectionReadAt: read, ProjectionPreviousReadAt: previous}
+	out.RestOfSeasonPoints, out.RestFromWeek = restOfSeasonNow(a.Board, bp, a.rest)
 	holder, held := a.HeldBy[bp.ID]
 	switch {
 	case held && holder == a.Me:
