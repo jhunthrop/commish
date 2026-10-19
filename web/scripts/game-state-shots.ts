@@ -58,10 +58,16 @@ const AFTER_KICKOFF = /Roof TBD|\d+(\.5)? to \d+(\.5)?\b/;
 type CardWeek = Readonly<Record<Day, string | null>>;
 const DART_WEEK: CardWeek = { sunday: KICKED_OFF, monday: FINAL, tuesday: FINAL };
 const ALLEN_WEEK: CardWeek = { sunday: null, monday: FINAL, tuesday: FINAL };
+/** MarShawn Lloyd's GB vs DAL is Sunday night's (Lane 86, re-review N5): a back whose tier box lists
+ * the run's three backs, each on his own club's clock. */
+const LLOYD_WEEK: CardWeek = { sunday: null, monday: FINAL, tuesday: FINAL };
 const CARDS: Readonly<Record<string, CardWeek>> = {
 	'jaxson-dart': DART_WEEK,
-	'josh-allen': ALLEN_WEEK
+	'josh-allen': ALLEN_WEEK,
+	'marshawn-lloyd': LLOYD_WEEK
 };
+/** The front's heading in the run's words (review H2): the Saturday run's partly played week 6. */
+const FRONT_HEADING = "Our board for the rest of the 2026 season from week 6's games left";
 
 interface Screen {
 	name: string;
@@ -100,6 +106,24 @@ const SCREENS: readonly Screen[] = [
 		set: 'contract',
 		signedIn: false,
 		ready: 'Josh Allen',
+		rows: null,
+		strength: false
+	},
+	{
+		name: 'marshawn-lloyd',
+		path: '/players/marshawn-lloyd',
+		set: 'contract',
+		signedIn: false,
+		ready: 'MarShawn Lloyd',
+		rows: null,
+		strength: false
+	},
+	{
+		name: 'front',
+		path: '/',
+		set: 'contract',
+		signedIn: false,
+		ready: 'Our board for the rest of',
 		rows: null,
 		strength: false
 	},
@@ -217,9 +241,11 @@ async function checkCard(page: Page, week: CardWeek, at: string): Promise<void> 
 async function checkOneRest(page: Page, at: string): Promise<void> {
 	const text = async (selector: string): Promise<string> =>
 		(await page.locator(selector).first().innerText()).trim();
+	// A page whose read is not written yet has no lead figure beside it.
+	const read = (await page.locator('.pulls b').count()) > 0 ? { read: await text('.pulls b') } : {};
 	const figures = {
 		tile: await text('.tiles .tile:has(.lb:text-is("Rest of season")) .fig'),
-		read: await text('.pulls b'),
+		...read,
 		table: await text('section[aria-label="Every format"] tbody tr:first-child td:nth-child(3)'),
 		tier: await text('.mates .line.current .end')
 	};
@@ -232,6 +258,10 @@ async function checkPage(page: Page, screen: Screen, width: number, at: string):
 	await checkRows(page, screen, at);
 	const card = CARDS[screen.name];
 	if (card !== undefined) await checkCard(page, card, at);
+	if (screen.name === 'front' && !text.includes(FRONT_HEADING))
+		fault(at, `the front's heading is not "${FRONT_HEADING}"`);
+	if (screen.name === 'marshawn-lloyd' && (await page.locator('.mates li').count()) < 3)
+		fault(at, 'his tier box lists fewer than three players');
 	// Sunday's rows wait on their finals, Monday's on their stats: the basis says when each lands, at a
 	// desk and on a phone (review finding 6).
 	if (day !== 'tuesday' && screen.rows !== null && !text.includes(KICKED_OFF_PART))

@@ -2,7 +2,8 @@
 // after week 6, from week 7) moved back to the fixture's week clock, so the shots on the Sunday, Monday
 // and Tuesday clocks show the rest of season between a run and the next. Written to
 // web/.runs/runs/2026-10-17T17-ros (never committed); the stand-in's latest.json is left as it is.
-// STAND-INS, named here and in the report: each in-season row's points are the contract run's over
+// STAND-INS, named here and in the report: the run's three backs (Gibbs, Lloyd, Jacobs) share one
+// tier in every format, so a tier box lists several players (re-review N5); each in-season row's points are the contract run's over
 // his club's games from week 6 still to play at the Saturday instant, its points a game times them
 // (the API's own rule between runs, restlive.go), its expected games the same way, and its points
 // over replacement moved by the same amount (the replacement level kept); the week each row starts
@@ -87,18 +88,30 @@ function moved(numbers: Json, team: string): Json {
 	};
 }
 
+/** The backs' one tier: tier 1, no drop (the last tier at the position). */
+function sharedTier(numbers: Json, position: unknown): Json {
+	return position === 'RB' && typeof numbers.tier === 'number'
+		? { ...numbers, tier: 1, tierDrop: null }
+		: numbers;
+}
+
 const index = (await read('index.json')) as unknown as { id: string; team: string }[];
 const teamOf = new Map(index.map((p) => [p.id, p.team]));
 for (const file of await readdir(new URL('boards/', OUT))) {
 	const board = await read(`boards/${file}`);
-	board.rows = (board.rows as Json[]).map((row) => moved(row, String(row.team)));
+	board.rows = (board.rows as Json[]).map((row) =>
+		sharedTier(moved(row, String(row.team)), row.position)
+	);
 	await write(`boards/${file}`, board);
 }
 for (const file of await readdir(new URL('players/', OUT))) {
 	const page = await read(`players/${file}`);
 	const team = teamOf.get(String(page.id)) ?? String(page.team);
 	page.formats = Object.fromEntries(
-		Object.entries(page.formats as Record<string, Json>).map(([id, n]) => [id, moved(n, team)])
+		Object.entries(page.formats as Record<string, Json>).map(([id, n]) => [
+			id,
+			sharedTier(moved(n, team), page.position)
+		])
 	);
 	await write(`players/${file}`, page);
 }
