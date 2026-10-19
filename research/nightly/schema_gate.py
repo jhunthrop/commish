@@ -3,7 +3,7 @@
 The web's schema (`web/src/lib/run/schema.ts`) is the run's contract, and the web build refuses a run
 that breaks it, so the nightly runs the same code over the run before it can become early or public:
 `contract/run-contract.ts` under node, which drives the web build's own reader (`src/lib/server/run.ts`,
-its schemas and every cross-file check it makes; the research image copies `src/lib/run` and that
+its schemas and every cross-file check it makes; the research image copies `src/lib/run`, `src/lib/format` and that
 reader from the repository at build, with the web's own zod and aws4fetch, into `WEB_CONTRACT_DIR`). A field the web adds later (the player card's season block) is gated the night the
 image carrying it deploys, with no change here.
 
