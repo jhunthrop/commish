@@ -209,6 +209,22 @@ async function checkCard(page: Page, week: CardWeek, at: string): Promise<void> 
 	const ahead = await page.locator('section.ahead li').allInnerTexts();
 	if (ahead.some((text) => /^Wk 6\b/.test(text.trim())))
 		fault(at, 'week 6 shows twice, in the accent row and still to play');
+	await checkOneRest(page, at);
+}
+
+/** Lane 86 (review H3): his rest of season is one figure on the page, at every clock: the card's tile,
+ * the read's lead figure, the every-format table's PPR row and his line in the tier box. */
+async function checkOneRest(page: Page, at: string): Promise<void> {
+	const text = async (selector: string): Promise<string> =>
+		(await page.locator(selector).first().innerText()).trim();
+	const figures = {
+		tile: await text('.tiles .tile:has(.lb:text-is("Rest of season")) .fig'),
+		read: await text('.pulls b'),
+		table: await text('section[aria-label="Every format"] tbody tr:first-child td:nth-child(3)'),
+		tier: await text('.mates .line.current .end')
+	};
+	if (new Set(Object.values(figures)).size !== 1)
+		fault(at, `his rest of season is more than one figure: ${JSON.stringify(figures)}`);
 }
 
 async function checkPage(page: Page, screen: Screen, width: number, at: string): Promise<void> {
