@@ -15,6 +15,7 @@ from research.nightly.reads.record import (
     Week,
     filled_ranks,
     honest_line,
+    method,
     printed,
     starters_basis,
     to_date,
@@ -237,3 +238,18 @@ def test_the_scale_prints_its_ends_as_the_page_prints_the_rate() -> None:
     ends = re.findall(r"-?\d+(?:\.\d+)?", SCALE)
     assert ends == [f"{1:.{AGREEMENT_PLACES}f}", f"{0:.{AGREEMENT_PLACES}f}"], SCALE
     assert SCALE == "1.00 is a perfect match of the week's finishing order, 0.00 is none."
+
+
+def test_the_method_names_only_the_orders_the_record_draws() -> None:
+    """Lane 82, the honest empty state: Published is named once a graded week carries it, never before."""
+    before = _quarterbacks(ours_right=True, published=False)
+    weeks = [Week(1, "graded", None, None, None, _QUARTERBACKS, week_lines(before), "preseason")]
+    assert method(to_date(weeks, {1: before})) == (
+        "Each week our preseason board froze before the first kickoff and was graded on its players' points, "
+        "ADP on the same players."
+    )
+    assert method(_two_weeks(before, _quarterbacks(ours_right=True, published=True))) == (
+        "Each week our preseason board froze before the first kickoff and was graded on its players' points, "
+        "ADP and Published on the same players."
+    )
+    assert method(()).endswith("ADP on the same players.")

@@ -64,9 +64,9 @@ def printed(value: float | None, places: int) -> float | None:
 ORDER_OF_SOURCE: Final = {SERVED_SOURCE: "preseason"}
 # Graded against the preseason board in season too: freezing and grading the rest-of-season board is
 # a later lane's (the coordinator's ruling of 2026-10-14), so the line says which board it grades.
-METHOD: Final = (
-    "Each week our preseason board froze before the first kickoff and was graded on how its players scored, "
-    "ADP and Published on the same players."
+_METHOD: Final = (
+    "Each week our preseason board froze before the first kickoff and was graded on its players' points, "
+    "{benchmarks} on the same players."
 )
 
 
@@ -193,6 +193,14 @@ def starters_basis(to_date_lines: Sequence[Line]) -> str | None:
         return None
     listed = counts[0] if len(counts) == 1 else f"{', '.join(counts[:-1])} and {counts[-1]}"
     return f"Starters right counts the week's top {listed} it also put there."
+
+
+def method(to_date_lines: Sequence[Line]) -> str:
+    """How the record is kept, naming only the orders the page draws (Lane 82, the honest empty state):
+    ADP always, Published once a graded week carries it, the same rule the page draws its column by
+    (any season-to-date line with a published score)."""
+    drawn = any(line.published is not None for line in to_date_lines)
+    return _METHOD.format(benchmarks="ADP and Published" if drawn else "ADP")
 
 
 def _pooled(scores: Sequence[Score], players: int) -> Score:
