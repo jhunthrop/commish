@@ -14,9 +14,12 @@ import {
 	weekSections,
 	weekStatus,
 	weekView,
+	WEEK_NOUNS,
+	WEEK_TAB,
 	type WeekView
 } from './week.ts';
-import { WEEK_NOUNS, weekHeading, weekPositionOf } from './words.ts';
+import { weekHeading, weekPositionOf } from './week-head.ts';
+import { WEEK } from './words.ts';
 
 const ZONE = 'America/Chicago';
 /** Saturday noon Central of week 6, and the Tuesday before (scripts/inseason-fixture/clock.ts). */
@@ -181,7 +184,9 @@ void test('every word the tab prints passes the copy guard', () => {
 			text(weekBasis(fixture.read[position], ESPN, ZONE, SATURDAY)),
 			text(weekBasis(visitor(fixture.unread[position]), null, ZONE, TUESDAY)),
 			Object.values(weekStatus(fixture.unread[position]) ?? {}).join(' '),
-			...Object.values(WEEK_NOUNS[position])
+			...Object.values(WEEK_NOUNS[position]),
+			...Object.values(WEEK_TAB),
+			...Object.values(WEEK)
 		]) {
 			assert.doesNotMatch(said, banned, said);
 			assert.doesNotMatch(said, /[–—;]/, said);

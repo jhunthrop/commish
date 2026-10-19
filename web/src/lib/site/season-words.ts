@@ -4,7 +4,6 @@
  * own word; before the draft and after the season the draft words stay. A heading names the rest of
  * the season only where the run's board ranks it. Pure, so every sentence is tested. */
 import { MOCK_VERB, RAIL_ITEMS, railInSeason, type RailKey } from '#lib/ui/nav.ts';
-import { WEEK, weekHeading, weekPositionOf } from '#lib/order/words.ts';
 
 /** A page's verbs, each by what it does: the page maps each to its link. */
 export type PageVerb = 'follow' | 'open_league' | 'mock' | 'sheet';
@@ -83,17 +82,6 @@ export function boardWords(
 	following: boolean
 ): BoardWords {
 	const inSeason = railInSeason(rail);
-	// In season the kickers' and defenses' tabs are the week's: we rank neither for the rest of it
-	// (Lane 66w).
-	const week = inSeason ? weekPositionOf(board.position) : null;
-	if (week !== null && board.position !== null) {
-		return {
-			bar: `${board.position} ${WEEK.thisWeek}`,
-			title: `${board.position} ${board.label} ${WEEK.thisWeek}`,
-			heading: weekHeading(week, null),
-			verb: leagueVerb(following)
-		};
-	}
 	// The rest of the season is the board's name only where the run's board ranks it; a board of the
 	// full season keeps its own name in season, with the verb still following the league.
 	const ranksRest = inSeason && board.rosFromWeek !== undefined;

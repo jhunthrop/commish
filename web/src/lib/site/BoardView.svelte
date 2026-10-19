@@ -33,7 +33,8 @@
 	import { links, tierAnchor } from './links.ts';
 	import type OrderScreenComponent from '#lib/order/OrderScreen.svelte';
 	import type WeekScreenComponent from '#lib/order/WeekScreen.svelte';
-	import { ORDER, WEEK, weekPositionOf } from '#lib/order/words.ts';
+	import { weekPositionOf } from '#lib/order/week-head.ts';
+	import { ORDER, WEEK } from '#lib/order/words.ts';
 	import type { BasisPart } from '#lib/run/board-basis.ts';
 
 	interface Props {

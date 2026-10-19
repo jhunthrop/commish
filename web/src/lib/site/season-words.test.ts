@@ -85,26 +85,6 @@ void test('the board in season takes the rail word for its bar, and the rest of 
 	assert.equal(wr.verb, 'open_league');
 });
 
-void test("in season the kickers' and defenses' tabs are this week's, never the rest of the season (Lane 66w)", () => {
-	for (const board of [REST, PRESEASON]) {
-		const k = boardWords('in_season', { ...board, position: 'K' }, false);
-		assert.equal(k.heading, "This week's kickers");
-		assert.equal(k.bar, 'K this week');
-		assert.equal(k.title, 'K PPR this week');
-		const dst = boardWords('playoffs', { ...board, position: 'DST' }, true);
-		assert.equal(dst.heading, "This week's defenses");
-		assert.equal(dst.bar, 'DST this week');
-		for (const words of [k, dst]) {
-			assert.doesNotMatch(`${words.heading} ${words.bar} ${words.title}`, /[Rr]est of/);
-			clean(words.heading);
-		}
-	}
-	assert.equal(
-		boardWords('pre_draft', { ...PRESEASON, position: 'K' }, false).heading,
-		'2026 Board'
-	);
-});
-
 void test('the board before the draft and after the season keeps its name and the mock draft', () => {
 	for (const rail of BEFORE_OR_AFTER) {
 		const words = boardWords(rail, { ...PRESEASON, position: null }, false);

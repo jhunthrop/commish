@@ -14,10 +14,12 @@
 		weekRosterFilter,
 		weekSections,
 		weekStatus,
-		weekView
+		weekView,
+		WEEK_TAB
 	} from './week.ts';
 	import WeekTable from './WeekTable.svelte';
-	import { WEEK, weekHeading, type WeekPosition } from './words.ts';
+	import { weekHeading, type WeekPosition } from './week-head.ts';
+	import { WEEK } from './words.ts';
 
 	/** The kickers' or defenses' tab in season (Lane 66w), read from the API: for the selected league
 	 * with its rosters and adds, for a visitor in the board's scoring. The page draws the head and the
@@ -55,7 +57,7 @@
 				});
 			})
 			.catch((error: unknown) => {
-				problem = error instanceof ApiError ? error.message : WEEK.unread;
+				problem = error instanceof ApiError ? error.message : WEEK_TAB.unread;
 			});
 	});
 </script>

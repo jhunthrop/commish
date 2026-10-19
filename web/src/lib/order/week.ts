@@ -20,7 +20,24 @@ import {
 import type { BasisPart } from '#lib/run/board-basis.ts';
 import type { WeekOrderAdvice, WeekOrderRow } from './api.ts';
 import { rosterBasis, rosterWords, type RosterView } from './order.ts';
-import { WEEK, WEEK_NOUNS } from './words.ts';
+import { WEEK_MANY, type WeekPosition } from './week-head.ts';
+
+/** Each position's words: its rows in the plural, one of them, whose a row's figures are, and whose
+ * club the Game cell names first. */
+export const WEEK_NOUNS: Readonly<
+	Record<WeekPosition, { many: string; one: string; whose: string; clubFirst: string }>
+> = {
+	K: { many: WEEK_MANY.K, one: 'kicker', whose: 'his', clubFirst: 'his club first' },
+	DEF: { many: WEEK_MANY.DEF, one: 'defense', whose: 'its', clubFirst: "the defense's club first" }
+};
+
+/** Every other word the tab prints, for the copy guard. */
+export const WEEK_TAB = {
+	unread: 'We could not read this week just now. Try again in a minute.',
+	kickedOff: 'Kicked off',
+	played: 'Played',
+	byeIn: 'Bye in week'
+} as const;
 
 /** A row as the week's table draws it. */
 export interface WeekView {
@@ -86,10 +103,10 @@ function kickedOffHead(rows: readonly WeekView[], zone: string): string {
 	const final = rows.every(
 		(r) => r.box.game !== null && r.box.game !== 'bye' && r.box.game.when === BOX.final
 	);
-	if (!final) return WEEK.kickedOff;
+	if (!final) return WEEK_TAB.kickedOff;
 	const kickoffs = rows.flatMap((r) => (r.kickoff === null ? [] : [r.kickoff]));
 	const days = [...new Set(kickoffs.map((at) => weekdayName(at, zone)))];
-	return `${WEEK.played} ${days.join(' and ')}`;
+	return `${WEEK_TAB.played} ${days.join(' and ')}`;
 }
 
 /** The rows in their sections, as the API ordered them; a section with no rows is not drawn. */
@@ -105,7 +122,7 @@ export function weekSections(
 			key === 'to_play'
 				? null
 				: key === 'bye'
-					? `${WEEK.byeIn} ${String(week)}`
+					? `${WEEK_TAB.byeIn} ${String(week)}`
 					: kickedOffHead(rows, zone);
 		return [{ key, head, rows }];
 	});

@@ -5,7 +5,7 @@ import { PUBLIC_API_URL } from '$app/env/public';
 import { apiClient } from '#lib/api/client.ts';
 import type { components, operations } from '#lib/api/types.ts';
 import { orderPath, weekOrderPath, type OrderQuery } from './path.ts';
-import type { WeekPosition } from './words.ts';
+import type { WeekPosition } from './week-head.ts';
 
 export type OrderAdvice = components['schemas']['OrderAdvice'];
 /** The kickers' and defenses' week (Lane 66w). */
