@@ -293,6 +293,12 @@ func (a *advisor) Order(q orderQuery, targets Targets) apitypes.OrderAdvice {
 		}
 		out.Rows = append(out.Rows, a.orderRow(p, ranks[i], hosts, targets))
 	}
+	for _, r := range out.Rows {
+		if r.Line.RestOfSeasonPerGame != nil {
+			out.Basis += " " + PerGameBasis()
+			break
+		}
+	}
 	return out
 }
 

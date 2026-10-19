@@ -1,6 +1,7 @@
 /** What the league page reads off a sync: the host's name as a mechanism, the read's age, a team's
  * record, a move in words, and the drafter's roster and the pool as board players. Pure functions
  * over the API's answer. */
+import { FIGURE } from '#lib/format/figure-words.ts';
 import { fixed, plural, signed } from '#lib/format/number.ts';
 import { midSentence } from '#lib/format/sentence.ts';
 import { POINTS_PER_GAME_DECIMALS } from '#lib/run/decimals.ts';
@@ -163,7 +164,7 @@ export function rowOf(board: LeagueBoard, player: LeaguePlayer): LeagueBoardPlay
 /** The page's one basis line, once: the scoring the figures are in (the run's season scoring, never
  * a lineup shape such as superflex), which figures are this season's and which are preseason, in
  * words, and the league's own scoring in plain words when it differs: "PPR. This season's games and
- * points a game through week 5, beside our preseason projection and points over replacement. Your
+ * Avg through week 5, beside our preseason projection and points over replacement. Your
  * league gives tight ends extra points per catch." The league's sentence is note-words'
  * scoresSentence, handed in so this module never pulls the league line in. No page promises the
  * league's exact rules here. */
@@ -177,7 +178,7 @@ export function leagueBasis(
 	const same =
 		midSentence(figuresScoring).toLowerCase() === SCORING_WORDS[scoringLike].toLowerCase();
 	const own = same ? '' : ` ${scoresSentence(scoringLike)}`;
-	return `${figuresScoring}. This season's games and points a game${reach}, beside our preseason projection and points over replacement.${own}`;
+	return `${figuresScoring}. This season's games and ${FIGURE.avg}${reach}, beside our preseason projection and points over replacement.${own}`;
 }
 
 /** The drafter's team. */

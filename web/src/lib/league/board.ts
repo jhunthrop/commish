@@ -43,7 +43,8 @@ export interface LeagueBoard {
 	byId: ReadonlyMap<string, LeagueBoardPlayer>;
 	/** The run's basis for the board's numbers, phrase by phrase. */
 	basis: string;
-	/** The last week whose games are all in, 0 before week 1's: the basis line's "through week 5". */
+	/** The week the newest counted game belongs to (run/season.ts newestCountedWeek), 0 before week
+	 * 1's: the basis line's "through week 5". */
 	seasonThrough: number;
 	/** The scoring the season figures are in, as the run names it: "PPR". */
 	seasonScoring: string;

@@ -2,11 +2,8 @@ package inseason
 
 import (
 	"github.com/jhunthrop/commish/api/internal/boards"
+	"github.com/jhunthrop/commish/api/internal/figurewords"
 )
-
-// perGameWord heads the figure on every screen: the order's A game,
-// Trades' and Waivers' too.
-const perGameWord = "A game"
 
 // GamesLeft is each club's games from week first through LastWeek, the
 // weeks the rest-of-season order covers: a bye is no game.
@@ -68,7 +65,7 @@ func withPerGame(b boards.Board, basis string, people ...[]person) string {
 // every screen (the figure words' perGame, Lane 66s, 66t): one unit, said
 // in one way.
 func PerGameBasis() string {
-	return perGameWord + " is his rest-of-season points over the games his club has left."
+	return figurewords.Table.PerGame + " is his rest-of-season points over the games his club has left."
 }
 
 // perGameShown is whether any of the page's players carries the figure.

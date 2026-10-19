@@ -2,11 +2,11 @@
  * Trades and Waivers both read so one head never means two figures: "A game" heads his rest-of-season
  * points a game wherever it heads a column, as on the order, and a gain is headed "Gain" with its
  * basis beside it. The API's basis says what each is, once (inseason words.go, pergame.go). */
-import { ORDER } from '#lib/order/words.ts';
+import { FIGURE } from '#lib/format/figure-words.ts';
 
 export const SEASON = {
-	/** His rest-of-season points a game, the only figure this head names (the order's A game). */
-	perGame: ORDER.perGame,
+	/** His rest-of-season points a game, the only figure this head names (the figure words' perGame). */
+	perGame: FIGURE.perGame,
 	/** A lineup's change in points over replacement a week. */
 	gain: 'Gain'
 } as const;

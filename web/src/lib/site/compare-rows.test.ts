@@ -75,9 +75,9 @@ void test('the table carries the card figures in order, the season rows once it 
 			'ADP',
 			'Gap',
 			'Bye',
-			'A game',
+			'Avg',
 			'GP',
-			'2025 a game'
+			'2025 Avg'
 		]
 	);
 	assert.ok(!compareRows(NACUA, CHASE, 2026, false).some((row) => row.label === 'GP'));
@@ -105,7 +105,7 @@ void test('the better figure wins its row, and the ADP, gap and bye judge no one
 		]
 	);
 	assert.equal(byLabel(rows, 'Position rank').cells[1].text, 'WR 2');
-	assert.equal(byLabel(rows, '2025 a game').cells[0].wins, true);
+	assert.equal(byLabel(rows, '2025 Avg').cells[0].wins, true);
 });
 
 void test('a held player shows his rank as the word, and no rank row is judged', () => {

@@ -2,6 +2,7 @@
  * Avg and Last from his season so far, the tiles the week's read fills shown as "--" until it does,
  * the week ahead, and the read's stamp. The week's read (lib/player/live.ts) replaces what it holds. */
 import { dayLabel } from '#lib/format/date.ts';
+import { FIGURE, weekHead } from '#lib/format/figure-words.ts';
 import { fixed, plural } from '#lib/format/number.ts';
 import type { GameLogRow, PlayerSeason } from '#lib/run/season.ts';
 import { apiFormatOf } from '#lib/run/format-ids.ts';
@@ -121,9 +122,10 @@ export function cardBuild(season: PlayerSeason, capsule: Capsule | null): CardBu
 	const tiles: CardTile[] = [
 		{
 			key: 'proj',
-			label: CARD.proj,
+			// The run's week ahead heads it until the API's read arrives; never the reader's clock.
+			label: next ? weekHead(next.week) : FIGURE.week,
 			value: NONE,
-			caption: next ? `${CARD.week} ${String(next.week)}` : '',
+			caption: CARD.readOnOpen,
 			tone: 'lead'
 		},
 		{ key: 'opp', label: CARD.opp, value: NONE, caption: next?.opponent ?? '', tone: null },

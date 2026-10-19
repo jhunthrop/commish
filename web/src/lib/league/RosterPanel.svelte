@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { FIGURE } from '#lib/format/figure-words.ts';
 	import type { LeagueBoard } from './board.ts';
 	import Panel from '#lib/ui/Panel.svelte';
 	import PanelHead from '#lib/ui/PanelHead.svelte';
@@ -28,7 +29,7 @@
 
 <Panel as="section" label="Your roster" padding="none">
 	<div class="head">
-		<PanelHead title={`Your roster as set on ${hostWords(host)}`} aside="Points a game" level={2} />
+		<PanelHead title={`Your roster as set on ${hostWords(host)}`} aside={FIGURE.avg} level={2} />
 	</div>
 	{#each roster as spot (spot.player.host_id)}
 		<LeagueRow

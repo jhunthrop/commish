@@ -147,7 +147,7 @@ const out: OrderAdvice = {
 	week: WEEK,
 	// The order, the league its points over replacement are for and the figure a game, then the rules
 	// Avg and Last leave out, as the API says them (OrderScreenBasis, withPerGame, UncountedOf; Lane 66t).
-	basis: `Our rest-of-season order from week ${String(WEEK)}: Points through week ${String(LAST_WEEK)}, byes out. Positions rank by Points, All by Over repl., his points less a free pickup's in your league. ${PER_GAME_BASIS}`,
+	basis: `Our rest-of-season order from week ${String(WEEK)}. A position ranks by Projected through week ${String(LAST_WEEK)}, byes out, All by Over repl., his points less a free pickup's in your league. ${PER_GAME_BASIS}`,
 	...uncountedOf(lineup.uncounted_rules),
 	rank_by: 'points_over_replacement',
 	moves: waivers.moves,

@@ -2,6 +2,7 @@ package inseason
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/jhunthrop/commish/api/internal/apitypes"
@@ -72,7 +73,7 @@ func TestUncountedRulesAreCountedAndListed(t *testing.T) {
 }
 
 func TestOrderScreenBasisNamesItsLeague(t *testing.T) {
-	want := "Our rest-of-season order from week 6: Points through week 17, byes out. Positions rank by Points, " +
+	want := "Our rest-of-season order from week 6. A position ranks by Projected through week 17, byes out, " +
 		"All by Over repl., his points less a free pickup's in your league."
 	if got := OrderScreenBasis(RestOfSeason, 6, OrderLeague(true, apitypes.LeagueSettings{}, apitypes.ProjectionScoringFormatPpr)); got != want {
 		t.Errorf("\n got %q\nwant %q", got, want)
@@ -89,5 +90,18 @@ func TestOrderScreenBasisNamesItsLeague(t *testing.T) {
 func TestPerGameSentenceUsesTheFigureWord(t *testing.T) {
 	if got := PerGameBasis(); got != "A game is his rest-of-season points over the games his club has left." {
 		t.Errorf("%q", got)
+	}
+}
+
+// The order's rows carry the figure a game, so its basis says what it is;
+// a reader with no league is told of no rules of theirs.
+func TestOrderSaysTheFigureAGame(t *testing.T) {
+	a := newFixtureAdvisor(t, restFixture(t), nil)
+	out := a.Order(orderQuery{limit: MaxOrderRows}, nil)
+	if !strings.HasSuffix(out.Basis, " "+PerGameBasis()) {
+		t.Errorf("%q", out.Basis)
+	}
+	if out.BasisNote != "" || out.BasisNoteLink != "" {
+		t.Errorf("no league, note %q %q", out.BasisNote, out.BasisNoteLink)
 	}
 }

@@ -27,7 +27,7 @@ void test('the All board carries every column in the row order', () => {
 		'adp',
 		'gap',
 		'gp',
-		'agame',
+		'avg',
 		'action'
 	]);
 });
@@ -43,7 +43,7 @@ void test('a club page drops the bye, a position view the tier chip, a rest-of-s
 	assert.ok(!boardColumns({ ...ALL, bye: false }).keys.includes('bye'));
 	assert.ok(!boardColumns({ ...ALL, tier: false }).keys.includes('tier'));
 	assert.ok(!boardColumns({ ...ALL, gap: false }).keys.includes('gap'));
-	assert.ok(!boardColumns({ ...ALL, season: false }).keys.includes('agame'));
+	assert.ok(!boardColumns({ ...ALL, season: false }).keys.includes('avg'));
 });
 
 void test('the phone keeps the face, the player, Projected, Over repl and Gap', () => {

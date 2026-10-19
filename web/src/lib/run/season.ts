@@ -229,3 +229,24 @@ export const seasonSchema = seasonShape.superRefine((season, ctx) => {
 export type StatLine = z.infer<typeof statLineSchema>;
 export type GameLogRow = z.infer<typeof gameLogRowSchema>;
 export type PlayerSeason = z.infer<typeof seasonSchema>;
+
+type Counted = Pick<PlayerSeason, 'through'> & {
+	log: readonly Pick<GameLogRow, 'week' | 'status'>[];
+};
+
+/** The week his season's figures reach (the ruling on the sweep's X3): the run's through week, or his
+ * own later game already in the records (played, or inactive once his club's game is in), as a
+ * Thursday game is before Sunday's are. */
+export function countedWeek(season: Counted): number {
+	return season.log.reduce(
+		(week, row) =>
+			row.status === 'played' || row.status === 'inactive' ? Math.max(week, row.week) : week,
+		season.through
+	);
+}
+
+/** The week the run's season figures reach: the newest week any player's counted game belongs to, so
+ * a basis's "through week N" covers every GP it heads; 0 with no season block. */
+export function newestCountedWeek(seasons: readonly Counted[]): number {
+	return seasons.reduce((week, season) => Math.max(week, countedWeek(season)), 0);
+}
