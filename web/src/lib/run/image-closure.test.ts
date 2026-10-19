@@ -242,6 +242,23 @@ void test("the walk refuses the API's words file left out, or copied where the i
 	);
 });
 
+// The writer reads the site's one banned list from the web contract (research/capsules/site_words.py
+// LIST_PATH under WEB_CONTRACT_DIR, review 81 finding 6), on import: no reader imports it, so it is
+// held here.
+const SITE_WORDS = readFileSync(join(REPOSITORY, 'research/capsules/site_words.py'), 'utf8');
+const LIST_PATH = /LIST_PATH: Final = Path\("([^"]+)"\)/.exec(SITE_WORDS)?.[1] ?? '';
+
+void test("the site's banned list is copied where the writer reads it in the image", () => {
+	assert.equal(LIST_PATH, 'src/lib/format/banned-words.json');
+	assert.ok(existsSync(join(WEB_ROOT, LIST_PATH)), LIST_PATH);
+	assert.equal(imagePath(stage, join(WEB_ROOT, LIST_PATH)), posix.join(stage.workdir, LIST_PATH));
+	const without: Stage = {
+		...stage,
+		copies: stage.copies.filter((copy) => !copy.source.endsWith(join('src', 'lib', 'format')))
+	};
+	assert.equal(imagePath(without, join(WEB_ROOT, LIST_PATH)), null);
+});
+
 void test('the final image keeps the contract stage whole, so its relative paths hold', () => {
 	const root = posix.dirname(stage.workdir);
 	assert.notEqual(root, '/', `the ${STAGE} stage's WORKDIR sits in a directory of its own`);

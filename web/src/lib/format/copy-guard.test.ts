@@ -3,6 +3,7 @@
 // with `npm test`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import LIST_FILE from './banned-words.json' with { type: 'json' };
 import {
 	BANNED_LIST,
 	BANNED_MARKS,
@@ -13,6 +14,8 @@ import {
 	dataStrings,
 	frameData
 } from './copy-guard.ts';
+
+const LIST_EXAMPLES = LIST_FILE.examples;
 
 void test('the list holds the betting, trading and platform words, whole words in any case', () => {
 	for (const word of ['Odds', 'line', 'totals', 'over/under', 'Market', 'buy', 'hosts', 'Vegas'])
@@ -159,4 +162,9 @@ void test("the room's socket frames are data by their fields, as an answer is (t
 	assert.equal(bannedInCopy('Jadarian Price, RB, taken by helperA', data), null);
 	assert.equal(bannedInCopy('Price drops', data), 'Price');
 	assert.equal(frameData('not json').size, 0);
+});
+
+void test("the list's own examples: the site catches each caught one and spares each spared one, as the writer does", () => {
+	for (const text of LIST_EXAMPLES.caught) assert.notEqual(bannedIn(text), null, text);
+	for (const text of LIST_EXAMPLES.spared) assert.equal(bannedIn(text), null, text);
 });
