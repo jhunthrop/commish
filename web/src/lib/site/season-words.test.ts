@@ -15,12 +15,7 @@ import { BANNED_MARKS } from '#lib/format/copy-guard.ts';
 import { railOfKey } from '#lib/ui/rail-order.ts';
 import { PAGE_VERBS, boardWords, frontWords } from './season-words.ts';
 
-const IN_SEASON: readonly RailKey[] = [
-	'in_season',
-	'playoffs',
-	'playoffs_waivers',
-	'in_season_no_league'
-];
+const IN_SEASON: readonly RailKey[] = ['in_season', 'playoffs', 'playoffs_waivers'];
 const BEFORE_OR_AFTER: readonly RailKey[] = ['pre_draft', 'draft_day', 'offseason'];
 const REST = { season: 2026, rosFromWeek: 6, label: 'PPR' };
 const PRESEASON = { season: 2026, label: 'PPR' };
@@ -30,10 +25,10 @@ function clean(line: string): void {
 	assert.doesNotMatch(line, BANNED_MARKS, line);
 }
 
-void test("the season is the rails that hold a league's pages", () => {
+void test('the season is the rails that hold the in-season screens', () => {
 	for (const key of RAIL_KEYS) {
-		const league = railOfKey(key).some((item) => item.key === 'league');
-		assert.equal(railInSeason(key), league, key);
+		const lineup = railOfKey(key).some((item) => item.key === 'lineup');
+		assert.equal(railInSeason(key), lineup, key);
 	}
 });
 

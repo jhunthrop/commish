@@ -19,12 +19,11 @@ const KICKOFFS = [
 /** Thursday of week 6, 10 pm Central. */
 const WEEK_6 = new Date('2026-10-16T03:00:00.000Z');
 
-void test('the built front door names the in-season rail with no league on its root when the build runs in week 6', () => {
-	// A built page is everyone's, so it selects no league: no league tabs (Lane 83).
+void test('the built front door names the in-season rail on its root when the build runs in week 6', () => {
 	const html = pageChunk(APP_HTML, siteRailAt(WEEK_6, KICKOFFS));
-	assert.match(html, /<html lang="en" data-rail="in_season_no_league">/);
+	assert.match(html, /<html lang="en" data-rail="in_season">/);
 	// The boot script keeps the same rail for the pages the Worker draws.
-	assert.match(html, /b="in_season_no_league"/);
+	assert.match(html, /b="in_season"/);
 });
 
 void test('a build before week 1 names the draft rail', () => {

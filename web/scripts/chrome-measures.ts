@@ -27,6 +27,8 @@ export interface ChromeMeasures {
 	/** Pts's figure's left edge less Proj's right edge in the Lineup's Team row. */
 	totalsGap: number | null;
 	rail: string | null;
+	/** Whether the root names a league selected (the context's data-league). */
+	league: boolean;
 	/** The bottom bar's (or at a desk the rail's) drawn labels, in order. */
 	railLabels: string[];
 }
@@ -82,7 +84,7 @@ export async function chromeMeasures(page: Page): Promise<ChromeMeasures> {
 				// The drawn width, rounded up: a title sized to its words would wrap at a pixel less.
 				width: `${String(Math.ceil(title.getBoundingClientRect().width))}px`
 			});
-			title.after(uncut);
+			title.insertAdjacentElement('afterend', uncut);
 			const natural = Math.round(uncut.clientHeight / lineHeight);
 			uncut.remove();
 			const lines = Math.round(title.clientHeight / lineHeight);
@@ -106,6 +108,7 @@ export async function chromeMeasures(page: Page): Promise<ChromeMeasures> {
 			name,
 			totalsGap: proj && pts ? pts.left - proj.right : null,
 			rail: document.documentElement.getAttribute('data-rail'),
+			league: document.documentElement.hasAttribute('data-league'),
 			railLabels: labels
 		};
 	});
@@ -120,7 +123,7 @@ export function chromeLine(where: string, m: ChromeMeasures): string {
 		? `name ${String(m.name.lines)} lines (${String(m.name.natural)} uncut)${m.name.cut ? ' cut' : ''}`
 		: 'no name';
 	const gap = m.totalsGap === null ? '' : `, totals gap ${m.totalsGap.toFixed(1)}px`;
-	return `chrome ${where}: bar ${m.barHeight.toFixed(0)}px, band ${m.band.toFixed(0)}px, ${name}${strips ? `, ${strips}` : ''}${gap}, rail ${String(m.rail)}`;
+	return `chrome ${where}: bar ${m.barHeight.toFixed(0)}px, band ${m.band.toFixed(0)}px, ${name}${strips ? `, ${strips}` : ''}${gap}, rail ${String(m.rail)}${m.league ? ' with a league' : ' with no league'}`;
 }
 
 /** What a league page's chrome must hold at a width: no band in the phone bar, one solid verb per

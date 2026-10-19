@@ -43,12 +43,9 @@
 	/** A followed league's own pages, the follow page (/league/new) not among them. */
 	const LEAGUE_PAGE = /^\/league\/(?!new(?:\/|$))[^/]+/;
 	/** On a league's pages the phone bar leads with the site mark, the way home (Lane 66t): the bottom
-	 * bar keeps its five, so the mark takes no tab. */
+	 * bar keeps its five, so the mark takes no tab. A league's page passes no stamp, verb or search,
+	 * so its phone bar is that one row (Lane 83). */
 	const homeMark = $derived(LEAGUE_PAGE.test(page.url.pathname));
-	/** A league's page draws no stamp, no verb and no search in the bar (Lane 83), so its phone bar is
-	 * the one row it fills: the mark, the switch and the account. Fixed by the page's props, never by
-	 * data, so the bar never grows as the page loads. */
-	const oneRow = $derived(homeMark && !stamp && !search && !tail);
 </script>
 
 {#snippet siteMark(cls: string)}
@@ -83,7 +80,7 @@
 		{@render railLink(RAIL_FOOT, true)}
 	</nav>
 	<div class="main">
-		<header class="top" class:homed={homeMark} class:one-row={oneRow}>
+		<header class="top" class:homed={homeMark}>
 			{#if homeMark}{@render siteMark('home')}{/if}
 			<h1>
 				{#if typeof title === 'string'}{title}{:else}{@render title()}{/if}
@@ -344,24 +341,16 @@
 			grid-area: league;
 		}
 
-		/* The mark leads the first row, where the desk rail puts it, the account still its last cell. */
+		/* The mark leads the one row, where the desk rail puts it, the account still its last cell. A
+		   league's page has no stamp, verb or search, so the bar is that row: no empty verb-height row
+		   under the switch (Lane 83). It is fixed by the page's kind, so it never grows as data loads. */
 		.top.homed {
-			grid-template-columns: 44px auto minmax(0, 1fr) auto;
-			grid-template-areas:
-				'home league league account'
-				'stamp stamp tail tail'
-				'find find find find';
-		}
-
-		/* A league's page fills only the first row, so the bar is that row: no empty verb-height row
-		   under the switch (Lane 83). */
-		.top.one-row {
 			grid-template-columns: 44px minmax(0, 1fr) auto;
 			grid-template-rows: auto;
 			grid-template-areas: 'home league account';
 		}
 
-		.top.one-row .tail {
+		.top.homed .tail {
 			display: none;
 		}
 

@@ -45,7 +45,6 @@ import {
 } from './inseason-fixture/clock.ts';
 import { BUILDER_LINE, basisLines, basisReport } from './basis-lines.ts';
 import { chromeFaults, chromeLine, chromeMeasures } from './chrome-measures.ts';
-import { NO_LEAGUE_RAIL } from '../src/lib/ui/nav.ts';
 import { UNCOUNTED_ANCHOR } from '../src/lib/league/uncounted.ts';
 import { FIXTURE_IDS } from './inseason-fixture/ids.ts';
 import { PER_GAME_BASIS, WAIVERS_BASIS } from './inseason-fixture/week.ts';
@@ -1565,8 +1564,8 @@ for (const width of SHOT_WIDTHS) {
 	await ctx.close();
 }
 
-/** In season with no league (Lane 83): signed out, the rail is the no-league rail, League first and
- * none of the four screens drawn, on the phone's five and at a desk. */
+/** In season with no league (Lane 83): signed out, the season's rail with no league selected draws
+ * League first and none of the four screens, on the phone's five and at a desk. */
 const NO_LEAGUE_LABELS = ['League', 'Rest of season', 'Players', 'Mock draft', 'Our record'];
 for (const theme of THEMES) {
 	for (const width of SHOT_WIDTHS) {
@@ -1579,7 +1578,8 @@ for (const theme of THEMES) {
 		const at = `no league ${theme} ${String(width)}`;
 		if (theme === 'dark') chromeLines.push(chromeLine(at, chrome));
 		const labels = width === PHONE.width ? NO_LEAGUE_LABELS : [...NO_LEAGUE_LABELS, 'Account'];
-		if (chrome.rail !== NO_LEAGUE_RAIL) missing.push(`${at}: the rail is ${String(chrome.rail)}`);
+		if (chrome.rail !== 'in_season' || chrome.league)
+			missing.push(`${at}: the rail is ${String(chrome.rail)}, a league ${String(chrome.league)}`);
 		if (chrome.railLabels.join('|') !== labels.join('|'))
 			missing.push(`${at}: the rail draws ${chrome.railLabels.join(', ')}`);
 		await page.screenshot({ path: file(`no-league-mock-${theme}-${String(width)}`) });

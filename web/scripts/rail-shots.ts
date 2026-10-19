@@ -10,8 +10,8 @@
 import { mkdir } from 'node:fs/promises';
 import { chromium, type BrowserContext, type Page } from 'playwright';
 import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
-import { RAIL_KEYS, type RailKey } from '../src/lib/ui/nav.ts';
-import { railOfKey } from '../src/lib/ui/rail-order.ts';
+import { RAIL_KEYS, railInSeason, type RailKey } from '../src/lib/ui/nav.ts';
+import { RAIL_WITHOUT_LEAGUE, railFor } from '../src/lib/ui/rail-order.ts';
 import {
 	FIXTURE_PHASES,
 	MANY_COOKIE,
@@ -40,8 +40,14 @@ const KEY_OF: Readonly<Record<FixturePhase, RailKey>> = {
 	offseason: 'offseason'
 };
 
-function railLabels(key: RailKey, phone: boolean): string[] {
-	const items = railOfKey(key);
+/** A rail's labels; a season rail with no league selected is the rail without a league (Lane 83). */
+function railLabels(key: RailKey, phone: boolean, league: boolean): string[] {
+	const items =
+		!league && railInSeason(key)
+			? RAIL_WITHOUT_LEAGUE
+			: key === 'playoffs_waivers'
+				? railFor('playoffs', true)
+				: railFor(key, false);
 	const shown = phone ? items.filter((item) => !item.wideOnly) : items;
 	return [...shown.map((item) => item.label), ...(phone ? [] : ['Account'])];
 }
@@ -80,7 +86,8 @@ function shownLabels(page: Page): Promise<string[]> {
 async function check(page: Page, where: string, key: RailKey, width: number): Promise<void> {
 	const rail = await page.evaluate(() => document.documentElement.getAttribute('data-rail'));
 	if (rail !== key) failures.push(`${where}: the root names ${String(rail)}, not ${key}`);
-	const want = railLabels(key, width <= PHONE_MAX);
+	const league = await page.evaluate(() => document.documentElement.hasAttribute('data-league'));
+	const want = railLabels(key, width <= PHONE_MAX, league);
 	const got = await shownLabels(page);
 	if (JSON.stringify(got) !== JSON.stringify(want)) {
 		failures.push(`${where}: the rail shows ${got.join(', ')}, not ${want.join(', ')}`);
@@ -139,7 +146,7 @@ for (const phase of FIXTURE_PHASES) {
 	}
 }
 
-/** Signed out in season: the no-league rail (Lane 83), League opening the follow page. */
+/** Signed out in season: the rail without a league (Lane 83), League opening the follow page. */
 for (const theme of THEMES) {
 	for (const width of WIDTHS) {
 		const where = `signed out ${theme} ${String(width)}`;
