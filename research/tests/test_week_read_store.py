@@ -18,6 +18,7 @@ from sqlalchemy.exc import IntegrityError
 
 from research.capsules.facts_block import FACTS_SOURCE
 from research.capsules.gateway import GatewayClient
+from research.capsules.page_figures import FIGURE_OFF_PAGE
 from research.capsules.run_budget import RunBudget
 from research.capsules.week.cadence import FIRST, STATUS_CHANGED
 from research.capsules.week.prompt import answer_json
@@ -117,6 +118,18 @@ def test_the_nights_pool_lands_each_read_with_its_stamps_call_and_attempt(engine
     assert (puka.attempt_day, puka.attempts) == (date(2026, 10, 16), 1)
     assert stored[(second.player_id, 6)].reason == STATUS_CHANGED
     assert '"Start him with confidence."' in asked[1]
+
+
+def test_a_read_that_keeps_quoting_a_figure_off_the_page_falls_and_the_pass_says_why(engine: Engine) -> None:
+    """Lane 66v: every draft says 18.6 where the card prints 18.4, so the read falls to its facts block and
+    the pass's line names him and the figure guard."""
+    off_page = STARTER_READ.replace("18.4 points", "18.6 points")
+    night = _Night((starter(),), {}, 6)
+    spend = WeekReadSpend()
+    gateway = _gateway(lambda _request: _completion(off_page, "start"))
+    _write(engine, gateway, night, [(starter(), FIRST)], room=lambda: True, spend=spend)
+    assert spend.facts_blocks == 1 and spend.written == 0
+    assert f'Puka Nacua: failed validation: {FIGURE_OFF_PAGE}: "18.6"' in spend.line()
 
 
 def test_a_read_the_budget_stopped_writes_nothing(engine: Engine) -> None:

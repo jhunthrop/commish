@@ -12,6 +12,7 @@
 	import { UNWRITTEN_READ, unwrittenLines } from '#lib/run/unwritten-words.ts';
 	import { CARD, unreadBasis, type CardTile } from '#lib/player/card.ts';
 	import type { CardLeague, LiveCard, RestParts } from '#lib/player/week-words.ts';
+	import { shownWeekRead } from '#lib/player/week-read.ts';
 	import PlayerCard from '#lib/player/PlayerCard.svelte';
 	import type PlayerCompare from '#lib/player/PlayerCompare.svelte';
 	import Credit from '#lib/site/Credit.svelte';
@@ -73,6 +74,10 @@
 	/** The tiles as built: rest of season in the lead format, the week's tiles "--" until read. */
 	const built = $derived<CardTile[]>(
 		page.card.tiles.flatMap((tile) => (tile.key === 'opp' ? [lead.restTile, tile] : [tile]))
+	);
+	/** The week-ahead read as the page shows it: withheld once the card prints another projection. */
+	const weekRead = $derived(
+		page.weekRead ? shownWeekRead(page.weekRead, live?.projection ?? null) : null
 	);
 	/** The week's figures over the tiles as built. */
 	const tiles = $derived<CardTile[]>(live === null ? built : live.tiles);
@@ -302,10 +307,10 @@
 		<div class="split">
 			<article class="read">
 				<h3><Label>Our read</Label></h3>
-				{#if page.weekRead}
+				{#if weekRead}
 					<section class="week-read" aria-label="The week ahead">
-						<p class="stamp">{page.weekRead.caption}</p>
-						{#if page.weekRead.body !== null}<Capsule body={page.weekRead.body} pulls={[]} />{/if}
+						<p class="stamp">{weekRead.caption}</p>
+						{#if weekRead.body !== null}<Capsule body={weekRead.body} pulls={[]} />{/if}
 					</section>
 				{/if}
 				{#if page.capsule}

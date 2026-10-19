@@ -41,3 +41,8 @@ def status_changed_caption(as_of: datetime) -> str:
     """The caption over the season read when his status moved past the week read, with the next write."""
     due = central_day_and_time(next_hourly_pass(as_of), short=True)
     return f"His status changed since this read was written. A new read is due by {due} Central."
+
+
+# A read whose published projection the card no longer prints (Lane 66v): withheld at the run's build, and
+# on the page once the card's live read prints another figure, the season read showing beneath it.
+PROJECTION_MOVED_CAPTION: Final = "The published projection moved since this read was written."

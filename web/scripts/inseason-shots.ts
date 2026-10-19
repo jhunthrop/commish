@@ -186,8 +186,11 @@ async function boxFacts(page: Page): Promise<{
 					!tr.querySelector('.club .pos') &&
 					tr.querySelector('img[alt$=" defense"]')
 			).length,
+			// The position pill and the shared status chip beside it (StatusChip, Lane 66n).
 			statuses: rows.flatMap((tr) =>
-				[...tr.querySelectorAll('.club .pos, .club .chip')].map((el) => el.textContent.trim())
+				[...tr.querySelectorAll('.club .pos, .club .status-chip')].map((el) =>
+					el.textContent.trim()
+				)
 			),
 			byeProj: rows
 				.filter((tr) => tr.querySelector('td.game .bye') !== null)

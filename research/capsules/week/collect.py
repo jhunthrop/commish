@@ -4,10 +4,11 @@ Each read takes only what was stamped at or before the instant:
 - the week: his club's first game still to kick off (a club on its bye that week has its bye and its next
   game), from the stored schedule the player page reads (`nightly.reads.schedule`);
 - the published projection: the newest two snapshots of his week captured by then
-  (`tank01_projection_rows`, PPR points), the provider never named;
+  (`tank01_projection_rows`, PPR points), the provider never named, each as the card serves it (the cents,
+  then the tenth);
 - the game's expected points: the newest figures read before his kickoff (`tank01_lines`, else the game
-  table's `nflverse_game_figures`), the club's own and the game total less it for the opponent, never the
-  spread; the venue's roof (`nflverse_game_reads` and `stadiums`) and the kickoff forecast (`nws_forecast`);
+  table's `nflverse_game_figures`), the club's own and the game total less it for the opponent, in the
+  half points the card prints, never the spread; the venue's roof (`nflverse_game_reads` and `stadiums`) and the kickoff forecast (`nws_forecast`);
 - his status: the newest injury capture (`capsules.facts.reference.injury_snapshot`, Lane 63's feed), in
   the contract's words;
 - his season so far and the opponent's PPR points allowed a game to his position, ranked (1 allowed the
@@ -19,11 +20,12 @@ Each read takes only what was stamped at or before the instant:
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from datetime import UTC, date, datetime, time
+from datetime import UTC, date, datetime, time, timedelta
 from typing import Any, Final, cast
 
 from sqlalchemy import Connection, text
 
+from research.capsules.page_figures import expected_score, page_tenth, projection_tenth
 from research.capsules.sweep import Subject
 from research.capsules.week.sheet import (
     Allowed,
@@ -50,7 +52,14 @@ from research.pipeline.nws.grid import PRECIPITATION_KINDS
 from research.season import REGULAR_SEASON_WEEKS
 
 RANKED_POSITIONS: Final = ("QB", "RB", "WR", "TE")
-FIGURE_SOURCES: Final = ("tank01_lines", "nflverse_game_figures")
+# The hourly capture's game figures, and the game table's weekly read the card falls back to.
+LINES_SOURCE: Final = "tank01_lines"
+GAME_TABLE_SOURCE: Final = "nflverse_game_figures"
+# How old the capture's read may be at the game's instant before the card takes the game table's (the API's
+# `FiguresStaleAfter`, five missed hourly captures).
+FIGURES_STALE_AFTER: Final = timedelta(hours=6)
+# A read is the game's figures only with all three, as the API reads it (`figuresOf`).
+_FIGURE_METRICS: Final = ("implied_team_total", "game_total", "point_spread")
 FORECAST_SOURCE: Final = "nws_forecast"
 _TOUCHDOWNS: Final = ("passing_touchdowns", "rushing_touchdowns", "receiving_touchdowns")
 Json = dict[str, Any]
@@ -78,9 +87,10 @@ def club_week(slate: Sequence[Game], current: int, as_of: datetime) -> ClubWeek 
     return None
 
 
-def _projections(
+def published_projections(
     conn: Connection, season: int, weeks: Sequence[int], as_of: datetime
 ) -> dict[tuple[str, int], PublishedProjection]:
+    """Each player's published projection for `weeks` by (board id, week), as the card serves it at `as_of`."""
     rows = conn.execute(
         text(
             "with snapshots as (select week, snapshot_id, max(captured_at) as captured_at, "
@@ -98,13 +108,23 @@ def _projections(
     out = {}
     for key, row in newest.items():
         prior = before.get(key)
-        out[key] = PublishedProjection(
+        out[key] = published_projection(
             float(row.ppr_points),
             row.captured_at,
             None if prior is None else float(prior.ppr_points),
             None if prior is None else prior.captured_at,
         )
     return out
+
+
+def published_projection(
+    points: float, captured_at: datetime, previous: float | None, previous_at: datetime | None
+) -> PublishedProjection:
+    """The week's published projection as the card serves it (`page_figures.projection_tenth`), and the
+    snapshot's before it the same way."""
+    return PublishedProjection(
+        projection_tenth(points), captured_at, None if previous is None else projection_tenth(previous), previous_at
+    )
 
 
 def _team_week_reads(
@@ -132,12 +152,33 @@ def _team_week_reads(
     return out
 
 
-def _expected(read: tuple[datetime, dict[str, float]] | None) -> ExpectedScore | None:
+TeamWeekRead = tuple[datetime, dict[str, float]]
+
+
+def figures_at(
+    capture: TeamWeekRead | None, game_table: TeamWeekRead | None, now: datetime, kickoff: datetime
+) -> TeamWeekRead | None:
+    """The game figures the card shows at `now` (the API's `figuresAt`): the capture's read while it is at most
+    `FIGURES_STALE_AFTER` older than the instant (the kickoff once it has passed), else the game table's; a
+    read without all three figures is none."""
+    capture, game_table = _whole(capture), _whole(game_table)
+    instant = min(now, kickoff)
+    if capture is None or instant - capture[0] > FIGURES_STALE_AFTER:
+        return game_table
+    return capture
+
+
+def _whole(read: TeamWeekRead | None) -> TeamWeekRead | None:
+    return read if read is not None and all(metric in read[1] for metric in _FIGURE_METRICS) else None
+
+
+def expected_from_read(read: tuple[datetime, dict[str, float]] | None) -> ExpectedScore | None:
+    """The game's expected score as the card prints it: half points, the opponent's the total less the club's."""
     if read is None:
         return None
     at, values = read
     club, total = values.get("implied_team_total"), values.get("game_total")
-    return None if club is None or total is None else ExpectedScore(club, total - club, at)
+    return None if club is None or total is None else ExpectedScore(*expected_score(club, total), at)
 
 
 def _roofs(
@@ -296,6 +337,7 @@ class WeekFacts:
     weeks: Mapping[str, ClubWeek]
     projections: Mapping[tuple[str, int], PublishedProjection]
     figures: Mapping[tuple[int, str], tuple[datetime, dict[str, float]]]
+    game_table: Mapping[tuple[int, str], tuple[datetime, dict[str, float]]]
     forecasts: Mapping[tuple[int, str], tuple[datetime, dict[str, float]]]
     roofs: Mapping[tuple[int, str], tuple[str, datetime]]
     boards: Mapping[str, BoardPlace]
@@ -331,8 +373,9 @@ def read_week_facts(conn: Connection, season: int, subjects: Sequence[Subject], 
         blocks,
         {} if stamp is None else allowed_by_opponent(context, blocks, players, stamp),
         weeks,
-        _projections(conn, season, wanted, as_of),
-        _team_week_reads(conn, season, wanted, FIGURE_SOURCES, as_of),
+        published_projections(conn, season, wanted, as_of),
+        _team_week_reads(conn, season, wanted, (LINES_SOURCE,), as_of),
+        _team_week_reads(conn, season, wanted, (GAME_TABLE_SOURCE,), as_of),
         _team_week_reads(conn, season, wanted, (FORECAST_SOURCE,), as_of),
         _roofs(conn, season, wanted, as_of),
         _boards(conn, season, as_of),
@@ -343,10 +386,13 @@ def read_week_facts(conn: Connection, season: int, subjects: Sequence[Subject], 
     )
 
 
-def _last_games(block: Json) -> tuple[GameLine, ...]:
+def last_games(block: Json) -> tuple[GameLine, ...]:
+    """His three newest played games, each week's points to the tenth the card prints."""
     played = [row for row in block["log"] if row["status"] == "played"]
     newest = sorted(played, key=lambda row: row["week"], reverse=True)[:3]
-    return tuple(GameLine(row["week"], row["opponent"], bool(row["home"]), float(row["points"])) for row in newest)
+    return tuple(
+        GameLine(row["week"], row["opponent"], bool(row["home"]), page_tenth(float(row["points"]))) for row in newest
+    )
 
 
 def _touchdowns(block: Json) -> float | None:
@@ -364,8 +410,13 @@ def _depth(subject: Subject) -> DepthPlace | None:
     return DepthPlace(chart.slot, tuple((n.name, n.slot) for n in chart.around_him), released)
 
 
-def _last_read(stored: StoredWeekRead | None) -> LastRead | None:
-    return None if stored is None else LastRead(stored.written_at, stored.projection_points, stored.status)
+def last_read_of(stored: StoredWeekRead | None) -> LastRead | None:
+    """The read before this one, its projection as the card's tenth (a row kept before the tenth was stored
+    reads as the figure the run and the web compare, `cadence.projection_moved`)."""
+    if stored is None:
+        return None
+    points = None if stored.projection_points is None else projection_tenth(stored.projection_points)
+    return LastRead(stored.written_at, points, stored.status)
 
 
 def week_sheet(
@@ -401,12 +452,12 @@ def week_sheet(
         game=game,
         bye=cw.bye,
         projection=facts.projections.get((identity.id, cw.week)),
-        expected=None if cw.bye else _expected(facts.figures.get(key)),
+        expected=None if cw.bye or game is None else expected_from_read(_figures(facts, key, game.kickoff)),
         weather=None if cw.bye else _weather(facts.roofs.get(key), facts.forecasts.get(key)),
         allowed=None if game is None or cw.bye else facts.allowed.get((game.opponent, identity.position)),
         status=facts.statuses.get(identity.id, Status(None, None)),
         depth=_depth(subject),
-        last_games=_last_games(block),
+        last_games=last_games(block),
         points_per_game=block["pointsPerGame"],
         games_played=int(block["games"]),
         touchdowns=_touchdowns(block),
@@ -414,9 +465,13 @@ def week_sheet(
         played=tuple(row["week"] for row in log if row["status"] == "played"),
         missed=tuple(row["week"] for row in log if row["status"] == "inactive"),
         board=facts.boards.get(identity.id),
-        last_read=_last_read(stored.get((subject.universe_id, cw.week))),
+        last_read=last_read_of(stored.get((subject.universe_id, cw.week))),
         lines_at=facts.lines_at,
     )
+
+
+def _figures(facts: WeekFacts, key: tuple[int, str], kickoff: datetime) -> TeamWeekRead | None:
+    return figures_at(facts.figures.get(key), facts.game_table.get(key), facts.as_of, kickoff)
 
 
 def collect_week_sheets(

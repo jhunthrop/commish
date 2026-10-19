@@ -6,7 +6,9 @@ pass after the status capture rewrites the reads whose week moved.
   sentence): `UNWRITTEN`, nightly, and at most once an hour and three times a Central day (`RETRY_GAP`,
   `RETRIES_A_DAY`), so a read that keeps failing never spends a day's budget.
 - His status changed since it was written (Lane 63's capture marks it): `STATUS_CHANGED`, nightly and hourly.
-- The published projection moved by more than `PROJECTION_MOVE_POINTS`: `PROJECTION_MOVED`, nightly and hourly.
+- The published projection the card prints moved, by any tenth (Lane 66v: a read quotes the card's figure,
+  so one it no longer prints is stale): `PROJECTION_MOVED`, nightly only (the page is prerendered, so an
+  hourly rewrite would not be seen before the nightly's; the page withholds the moved read meanwhile).
 
 Anything else (a new forecast, a new depth chart) waits for one of those, so a quiet week costs nothing.
 """
@@ -14,31 +16,36 @@ Anything else (a new forecast, a new depth chart) waits for one of those, so a q
 from datetime import date, datetime, timedelta
 from typing import Final
 
+from research.capsules.page_figures import projection_tenth
 from research.capsules.store import WRITTEN_SOURCE
 from research.capsules.week.sheet import CENTRAL, WeekSheet
 from research.capsules.week.store import StoredWeekRead
 
-PROJECTION_MOVE_POINTS: Final = 1.0
 RETRY_GAP: Final = timedelta(hours=1)
 RETRIES_A_DAY: Final = 3
 FIRST: Final = "first"
 UNWRITTEN: Final = "unwritten"
 STATUS_CHANGED: Final = "status"
 PROJECTION_MOVED: Final = "projection"
-# What an hourly pass writes: only the reads whose status or projection moved (the coordinator's M3).
-HOURLY_REASONS: Final = frozenset({STATUS_CHANGED, PROJECTION_MOVED})
+# What an hourly pass writes: only the reads whose status moved (the coordinator's M3, narrowed by the Lane
+# 66v ruling: the page is prerendered, so a projection rewrite is not seen before the nightly writes it).
+HOURLY_REASONS: Final = frozenset({STATUS_CHANGED})
 
 
 def central_day(instant: datetime) -> date:
     return instant.astimezone(CENTRAL).date()
 
 
-def _projection_moved(sheet: WeekSheet, stored: StoredWeekRead) -> bool:
-    now = None if sheet.projection is None else sheet.projection.points
-    then = stored.projection_points
+def projection_moved(now: float | None, then: float | None) -> bool:
+    """Whether the card's published projection (`now`) prints another figure than the one a read was
+    written with (`then`), each read as the card's tenth (a row kept before the tenth was stored too)."""
     if now is None or then is None:
         return (now is None) != (then is None)
-    return abs(now - then) > PROJECTION_MOVE_POINTS
+    return projection_tenth(now) != projection_tenth(then)
+
+
+def _projection_moved(sheet: WeekSheet, stored: StoredWeekRead) -> bool:
+    return projection_moved(None if sheet.projection is None else sheet.projection.points, stored.projection_points)
 
 
 def attempts_today(stored: StoredWeekRead | None, now: datetime) -> int:

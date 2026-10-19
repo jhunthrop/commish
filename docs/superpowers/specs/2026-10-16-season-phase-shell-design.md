@@ -47,14 +47,18 @@ The rail is a function of one phase: the selected league's, else the site season
 |---|---|---|
 | `pre_draft` | Board, Players, Mock draft, Cheat sheet, Advisor | Our record, Account |
 | `draft_day` | Advisor, Board, Players, Cheat sheet, Mock draft | Our record, Account |
-| `in_season` | Lineup, Matchup, Waivers, Trades, Players | Rest of season, Our record, Account |
-| `playoffs` | Lineup, Matchup, Trades, Players, Rest of season | Our record, Account, and Waivers returns to the wide rail while `waivers_open` is true |
+| `in_season` | League, Lineup, Matchup, Waivers, Trades | Players, Rest of season, Our record, Account |
+| `playoffs`, `waivers_open` true | League, Lineup, Matchup, Waivers, Trades | Players, Rest of season, Our record, Account |
+| `playoffs`, `waivers_open` false | League, Lineup, Matchup, Trades, Players | Rest of season, Our record, Account |
 | `offseason` | Board, Players, Mock draft, Cheat sheet, Advisor | Our record, Account |
+
+Amended 2026-10-19 (Lane 66r): the rail is the one navigation between a league's pages, so the pill strip under a league's title is gone and League (the league page, a trophy glyph) leads the league group in season and in the playoffs. The phone's five are the weekly workflow. On the phone in season and in the playoffs (waivers open) Players and Rest of season are on the wide rail only: the phone's bar holds the five, the site mark and the Account foot are hidden there, and the league pages carry no search, so from a league page a player's name (his page) is the phone's way to the players. Open item (Lane 66r): the board's and the players list's reach on the phone; un-hiding the mark in the bar takes a sixth cell and pushes Trades off the bar at 390. In the playoffs Waivers stay in the phone's five while the platform runs them.
 
 Words: "Rest of season" is the board (`/board`) in season and after, and "Board" before the draft. "Lineup" is the start screen. "Matchup" is a screen of its own (§3). The rail item's label and icon change with the phase, the icon set gains `lineup`, `matchup`, `waivers`, `trades` where the existing set lacks them.
 
 Where a rail item goes:
 
+- League opens the selected league's page (`/league/<id>`), and with no league followed `/league/new`.
 - Lineup, Matchup, Waivers, Trades open the selected league's screen (`/league/<id>/start|matchup|waivers|trades`). With no league followed, each opens `/league/new` with one line above the form naming the screen it leads to ("Follow your league to see your lineup each week."). Signed out in season, the rail still shows the in-season five, since the free followed league is the product's trust loop, each item then opens the follow page the same way.
 - Mock draft, Cheat sheet, Advisor, Board, Players, Our record, Account keep their pages.
 - In season, Mock draft and Cheat sheet are reached from the account page under "Next draft" and from the league page's pre-draft state. They never vanish, they leave the rail.
@@ -67,7 +71,7 @@ A member with two leagues in different phases sees the rail follow the switch. T
 
 - The league page (`/league/<id>`) stays the team overview (standings, roster, moves, pool) and is where the switcher's league name goes. Before the draft it shows the draft time in the member's own time zone, the one verb Advisor on draft day, and the line "The site turns to your season after your draft." In the offseason it shows the final standing and the next-draft verbs.
 - Matchup becomes a screen at `/league/<id>/matchup`, built from the MatchupPanel the league page has (both sides, the week's score so far, the kickoffs in the member's time zone), with the honesty lines the panel carries. The league page keeps a one-line matchup summary that links to it.
-- The three in-season tabs on the league page become the four (Lineup, Matchup, Waivers, Trades) in the phases that have them, and are hidden before the draft.
+- The league's pages carry no tabs of their own (amended 2026-10-19, Lane 66r): the rail's League, Lineup, Matchup, Waivers and Trades are the way between them in the phases that have them.
 - Nothing on these pages changes in words that already passed review, except where a tab name changes to its rail word.
 
 ## 4. What does not change
