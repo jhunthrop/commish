@@ -231,12 +231,16 @@ def test_a_failed_read_is_retried_at_most_once_an_hour_and_three_times_a_day() -
     assert due_reason(sheet, _stored(source="facts", attempt_day=today, attempts=2), _NOW) == UNWRITTEN
 
 
-def test_the_hourly_pass_writes_only_a_status_or_projection_that_moved() -> None:
+def test_the_hourly_pass_writes_only_a_status_that_moved() -> None:
+    """The coordinator's ruling (Lane 66v review, finding 1): the page is prerendered, so a projection move is
+    the nightly's to rewrite, never the hourly pass's."""
     sheet = questionable()
     assert due_reason(sheet, None, _NOW, hourly=True) is None
     assert due_reason(sheet, _stored(source="facts"), _NOW, hourly=True) is None
     assert due_reason(replace(sheet, status=Status("out", REPORT)), _stored(), _NOW, hourly=True) == STATUS_CHANGED
-    assert due_reason(sheet, _stored(projection_points=13.0), _NOW, hourly=True) == PROJECTION_MOVED
+    assert due_reason(sheet, _stored(projection_points=13.0), _NOW, hourly=True) is None
+    assert due_reason(sheet, _stored(projection_points=15.4), _NOW, hourly=True) is None
+    assert due_reason(sheet, _stored(projection_points=15.4), _NOW) == PROJECTION_MOVED
 
 
 def test_a_sentence_shape_on_two_pages_keeps_its_first_carrier_in_board_order() -> None:

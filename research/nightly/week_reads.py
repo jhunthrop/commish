@@ -6,7 +6,7 @@ Two modes on one pass (`run_week_read_step`):
   its facts block within its retry limits), at most `PAGES_PER_NIGHT`, board order first, under a dollar
   budget of `NIGHTLY_BUDGET_USD`.
 - **Hourly**, after the in-season job's status capture (`research.inseason --task capture-harvest`): only
-  the reads whose status or published projection moved, under `HOURLY_BUDGET_USD` a pass and
+  the reads whose status moved (a projection move is the nightly's, Lane 66v), under `HOURLY_BUDGET_USD` a pass and
   `HOURLY_DAY_USD` across a Central day's passes (`player_week_read_runs`).
 
 The writing is the season writer's pool (`GatewayClient.rolling`, its bucket and throttle waits), the model
@@ -70,9 +70,9 @@ PAGES_PER_NIGHT: Final = 700
 # sample, 27 live calls over 8 reads; the judge, 16 calls): a read averages $0.0016 to $0.0019, the judge's
 # call $0.00006 (one of the read's four, on the 152 of 536 sheets that may not start him), the dearest call
 # $0.00065, so a read's worst case (4 calls) is $0.0026 and a full week turnover of 536 reads about $0.95 on
-# average and $1.39 at worst: the night holds $1.40. An hourly pass writes only the reads a status or a
-# projection moved: $0.05 a pass, and $0.60 across a Central day's passes (the capture runs 18 times). A day
-# of week reads is at most $2.00, beside the capsule night's ruled bound of about $4.15.
+# average and $1.39 at worst: the night holds $1.40. An hourly pass writes only the reads a status moved (a
+# projection move waits for the nightly, Lane 66v): $0.05 a pass, and $0.60 across a Central day's passes
+# (the capture runs 18 times). A day of week reads is at most $2.00, beside the capsule night's ruled bound of about $4.15.
 NIGHTLY_BUDGET_USD: Final = 1.40
 HOURLY_BUDGET_USD: Final = 0.05
 HOURLY_DAY_USD: Final = 0.60

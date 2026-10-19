@@ -7,7 +7,8 @@ pass after the status capture rewrites the reads whose week moved.
   `RETRIES_A_DAY`), so a read that keeps failing never spends a day's budget.
 - His status changed since it was written (Lane 63's capture marks it): `STATUS_CHANGED`, nightly and hourly.
 - The published projection the card prints moved, by any tenth (Lane 66v: a read quotes the card's figure,
-  so one it no longer prints is stale): `PROJECTION_MOVED`, nightly and hourly.
+  so one it no longer prints is stale): `PROJECTION_MOVED`, nightly only (the page is prerendered, so an
+  hourly rewrite would not be seen before the nightly's; the page withholds the moved read meanwhile).
 
 Anything else (a new forecast, a new depth chart) waits for one of those, so a quiet week costs nothing.
 """
@@ -26,8 +27,9 @@ FIRST: Final = "first"
 UNWRITTEN: Final = "unwritten"
 STATUS_CHANGED: Final = "status"
 PROJECTION_MOVED: Final = "projection"
-# What an hourly pass writes: only the reads whose status or projection moved (the coordinator's M3).
-HOURLY_REASONS: Final = frozenset({STATUS_CHANGED, PROJECTION_MOVED})
+# What an hourly pass writes: only the reads whose status moved (the coordinator's M3, narrowed by the Lane
+# 66v ruling: the page is prerendered, so a projection rewrite is not seen before the nightly writes it).
+HOURLY_REASONS: Final = frozenset({STATUS_CHANGED})
 
 
 def central_day(instant: datetime) -> date:
