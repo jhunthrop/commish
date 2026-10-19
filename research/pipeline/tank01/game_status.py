@@ -10,9 +10,11 @@ call its own row, so the calls an hour are counted from the store) and read into
 0 scheduled, 1 under way, 2 final. The feed carries no score, so none is written; the final score
 comes with the weekly stats as before.
 
-THE BUDGET. One request a pass, and never more than HOURLY_CAP in any hour: a pass that finds the
-cap reached asks nothing and says so. With the season's game days and a game's few hours to its
-final, that is about 20 calls a week, some 360 a regular season, inside the purchased quota.
+THE BUDGET. One request a pass, on what the harvest left of its request budget, and never more than
+HOURLY_CAP in any hour: a pass that finds the cap reached or the budget spent asks nothing and says
+so, and the count and the call are taken under an advisory lock. With the season's game days and a
+game's few hours to its final, that is about 20 calls a week, and with the 9:30 am Eastern games
+abroad and the late-season Saturdays some 390 a regular season, inside the purchased quota.
 
 A FINAL IS HELD by the one rule, the `club_week_finals` view (revision 0014): the weekly result, a
 Tank01 final, or a line with the club, which the API's week facts and the run's states read too."""
