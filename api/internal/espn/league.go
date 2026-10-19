@@ -16,10 +16,11 @@ import (
 	"time"
 )
 
-// A whole league read (the rosters, settings, matchups and teams views)
-// is bigger than a settings read: a season's schedule rides with it.
+// A whole league read (the rosters, settings, matchups, teams and live
+// score views) is bigger than a settings read: a season's schedule rides
+// with it, 6.9 MB for a 12-team league in week 6 of 2026 (Lane 74).
 const (
-	maxLeagueBody = 8 << 20
+	maxLeagueBody = 16 << 20
 	maxTeams      = 32
 	maxRoster     = 60
 	maxSchedule   = 600
@@ -219,10 +220,58 @@ type Player struct {
 // ESPN says so.
 func (p Player) Droppable() bool { return p.droppable == nil || *p.droppable }
 
-// Game is one matchup in the current matchup period.
+// Game is one matchup in the current matchup period, each side's points
+// as ESPN scores them now: totalPoints once ESPN decides the matchup
+// (the final), else totalPointsLive (the period in play).
 type Game struct {
 	Home, Away         int
 	HomePoints, Points float64
+	// HomeUnread and Unread say ESPN gave no score for a side under way:
+	// an undecided matchup, a starter kicked off, and no live points, so
+	// its 0.0 totalPoints is not a score.
+	HomeUnread, Unread bool
+}
+
+// undecided is ESPN's winner for a matchup not yet decided.
+const undecided = "UNDECIDED"
+
+// wireSide is one side of a scheduled matchup. totalPoints is ESPN's
+// final, 0.0 until the matchup is decided; totalPointsLive is the score
+// so far, carried by mMatchupScore and mScoreboard for the current
+// period alone.
+type wireSide struct {
+	TeamID          int      `json:"teamId"`
+	TotalPoints     float64  `json:"totalPoints"`
+	TotalPointsLive *float64 `json:"totalPointsLive"`
+}
+
+// points is the side's score as ESPN has it now, and whether ESPN gave
+// one: the final once ESPN decides the matchup, else the live points
+// when carried, else 0.0 for a side none of whose starters has kicked
+// off (kicked is any starter lineupLocked). A side under way with no
+// score sent is unread.
+func (s wireSide) points(winner string, kicked bool) (float64, bool) {
+	switch {
+	case winner != "" && winner != undecided:
+		return score(s.TotalPoints), true
+	case s.TotalPointsLive != nil:
+		return score(*s.TotalPointsLive), true
+	}
+	return 0, !kicked
+}
+
+// kickedOff is the teams with a starter whose game has started: ESPN
+// locks his lineup slot (lineupLocked).
+func kickedOff(teams []Team) map[int]bool {
+	out := map[int]bool{}
+	for _, t := range teams {
+		for _, p := range t.Roster {
+			if p.Locked && p.Slot != SlotBench && p.Slot != SlotReserve {
+				out[t.ID] = true
+			}
+		}
+	}
+	return out
 }
 
 type wirePlayer struct {
@@ -308,33 +357,34 @@ type wireFull struct {
 		} `json:"roster"`
 	} `json:"teams"`
 	Schedule []struct {
-		MatchupPeriodID int `json:"matchupPeriodId"`
-		Home            struct {
-			TeamID      int     `json:"teamId"`
-			TotalPoints float64 `json:"totalPoints"`
-		} `json:"home"`
-		Away *struct {
-			TeamID      int     `json:"teamId"`
-			TotalPoints float64 `json:"totalPoints"`
-		} `json:"away"`
+		MatchupPeriodID int       `json:"matchupPeriodId"`
+		Winner          string    `json:"winner"`
+		Home            wireSide  `json:"home"`
+		Away            *wireSide `json:"away"`
 	} `json:"schedule"`
 }
 
 // Read is one whole read of a league for a season: rosters, settings,
-// the matchups and the teams. A nil cookies reads it as the public does.
+// the matchups with their live scores (mMatchupScore and mScoreboard
+// carry totalPointsLive for the period in play) and the teams. A nil
+// cookies reads it as the public does.
 func (c *Client) Read(ctx context.Context, id string, season int, cookies *Cookies) (FullLeague, error) {
 	if !leagueID.MatchString(id) || season < minSeason || season > maxSeason {
 		return FullLeague{}, ErrNotALink
 	}
-	q := url.Values{"view": {"mRoster", "mSettings", "mMatchup", "mTeam", "mDraftDetail"}}
+	q := url.Values{"view": {"mRoster", "mSettings", "mMatchup", "mTeam", "mDraftDetail", "mMatchupScore", "mScoreboard"}}
 	path := fmt.Sprintf("%s/apis/v3/games/ffl/seasons/%d/segments/0/leagues/%s?%s", c.Base, season, id, q.Encode())
-	body, err := c.get(ctx, path, cookies, maxLeagueBody)
+	var wire wireFull
+	err := c.fetch(ctx, path, cookies, "", func(body io.Reader) error {
+		// Decoded as it streams, never held whole: a body past the limit
+		// is cut short and fails to decode.
+		if err := json.NewDecoder(io.LimitReader(body, maxLeagueBody)).Decode(&wire); err != nil {
+			return fmt.Errorf("%w: %w", ErrMalformed, err)
+		}
+		return nil
+	})
 	if err != nil {
 		return FullLeague{}, err
-	}
-	var wire wireFull
-	if err := json.Unmarshal(body, &wire); err != nil {
-		return FullLeague{}, fmt.Errorf("%w: %w", ErrMalformed, err)
 	}
 	return checkFull(wire)
 }
@@ -365,16 +415,36 @@ func (c *Client) get(ctx context.Context, path string, cookies *Cookies, limit i
 // getFiltered is get with ESPN's X-Fantasy-Filter header when filter is
 // set: the players read narrows by it.
 func (c *Client) getFiltered(ctx context.Context, path string, cookies *Cookies, limit int64, filter string) ([]byte, error) {
+	var body []byte
+	err := c.fetch(ctx, path, cookies, filter, func(r io.Reader) error {
+		read, err := io.ReadAll(io.LimitReader(r, limit+1))
+		if err != nil {
+			return fmt.Errorf("%w: body: %w", ErrUnavailable, err)
+		}
+		if int64(len(read)) > limit {
+			return fmt.Errorf("%w: over %d bytes", ErrMalformed, limit)
+		}
+		body = read
+		return nil
+	})
+	return body, err
+}
+
+// fetch reads one address with the cookies when given and the filter
+// when set, handing an answered body to use while the read is open. A
+// refusal with cookies is ErrSignedOut, without them ErrPrivate. Its
+// errors name a status, never a cookie.
+func (c *Client) fetch(ctx context.Context, path string, cookies *Cookies, filter string, use func(io.Reader) error) error {
 	if c.Pace != nil {
 		if err := c.Pace.Wait(ctx); err != nil {
-			return nil, fmt.Errorf("%w: %w", ErrUnavailable, err)
+			return fmt.Errorf("%w: %w", ErrUnavailable, err)
 		}
 	}
 	ctx, cancel := context.WithTimeout(ctx, leagueTimeout)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, path, nil)
 	if err != nil {
-		return nil, fmt.Errorf("espn: request: %w", err)
+		return fmt.Errorf("espn: request: %w", err)
 	}
 	req.Header.Set("User-Agent", UserAgent)
 	req.Header.Set("Accept", "application/json")
@@ -387,29 +457,22 @@ func (c *Client) getFiltered(ctx context.Context, path string, cookies *Cookies,
 	resp, err := c.HTTP.Do(req)
 	if err != nil {
 		if ctx.Err() != nil {
-			return nil, fmt.Errorf("%w: %w", ErrUnavailable, ctx.Err())
+			return fmt.Errorf("%w: %w", ErrUnavailable, ctx.Err())
 		}
-		return nil, fmt.Errorf("%w: unreachable", ErrUnavailable)
+		return fmt.Errorf("%w: unreachable", ErrUnavailable)
 	}
 	defer func() { _ = resp.Body.Close() }()
 	switch {
 	case (resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden) && cookies != nil:
-		return nil, ErrSignedOut
+		return ErrSignedOut
 	case resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden:
-		return nil, ErrPrivate
+		return ErrPrivate
 	case resp.StatusCode == http.StatusNotFound:
-		return nil, ErrNotFound
+		return ErrNotFound
 	case resp.StatusCode != http.StatusOK:
-		return nil, fmt.Errorf("%w: status %d", ErrUnavailable, resp.StatusCode)
+		return fmt.Errorf("%w: status %d", ErrUnavailable, resp.StatusCode)
 	}
-	body, err := io.ReadAll(io.LimitReader(resp.Body, limit+1))
-	if err != nil {
-		return nil, fmt.Errorf("%w: body: %w", ErrUnavailable, err)
-	}
-	if int64(len(body)) > limit {
-		return nil, fmt.Errorf("%w: over %d bytes", ErrMalformed, limit)
-	}
-	return body, nil
+	return use(resp.Body)
 }
 
 func checkFull(w wireFull) (FullLeague, error) {
@@ -456,11 +519,14 @@ func checkFull(w wireFull) (FullLeague, error) {
 		}
 		l.Teams = append(l.Teams, tm)
 	}
+	kicked := kickedOff(l.Teams)
 	for _, g := range w.Schedule {
 		if g.MatchupPeriodID != l.MatchupPeriod || g.Away == nil {
 			continue
 		}
-		l.Games = append(l.Games, Game{Home: g.Home.TeamID, Away: g.Away.TeamID, HomePoints: score(g.Home.TotalPoints), Points: score(g.Away.TotalPoints)})
+		home, homeRead := g.Home.points(g.Winner, kicked[g.Home.TeamID])
+		away, awayRead := g.Away.points(g.Winner, kicked[g.Away.TeamID])
+		l.Games = append(l.Games, Game{Home: g.Home.TeamID, Away: g.Away.TeamID, HomePoints: home, Points: away, HomeUnread: !homeRead, Unread: !awayRead})
 	}
 	return l, nil
 }
