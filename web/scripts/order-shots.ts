@@ -3,8 +3,8 @@
 // built site, dark and light at 1440 and dark at 390 (with its first screen). Rest of season is the
 // board in season, signed in with the recorded Sleeper league selected; Players is signed out; Our
 // record reads the run the site was built from. At 1440, 1024, 800, 768 and 390 it asserts the page
-// never scrolls sideways, and that the basis draws at most five rendered lines at 1440 and eight at 390
-// (measured, never counted in paragraphs; Lane 66q turned the phone's on). It also asserts the heads ("Our rest-of-season order" over #, Rest of season
+// never scrolls sideways, and that every screen's basis draws at most five rendered lines at 1440 and
+// eight at 390 (measured as line boxes, basis-lines.ts; Lane 66q, 66t). It also asserts the heads ("Our rest-of-season order" over #, Rest of season
 // over Projected and A game, the week projection headed "Wk 6"), that every figure cell prints one decimal or --, that Trade for him sits on
 // fewer than a third of the rows, that the copy passes the one guard ("host" among its words, the
 // names the API and the run handed it skipped, copy-scan.ts), the record's Order matched head with the
@@ -18,6 +18,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { chromium, type BrowserContext, type Page } from 'playwright';
 import { FIGURE } from '../src/lib/format/figure-words.ts';
 import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
+import { basisLines, basisReport } from './basis-lines.ts';
 import { copyFault, watchData } from './copy-scan.ts';
 
 const web = process.argv[2] ?? 'http://localhost:4196';
@@ -37,8 +38,6 @@ const SETTLE_MS = 300;
 /** Below this width the figures after the key fold under the name and the group heads go. */
 const FOLDS_AT = 1100;
 const BASIS_WIDTH = 1440;
-/** The most rendered lines the basis may draw, by the widths it is measured at. */
-const MOST_BASIS_LINES: Readonly<Partial<Record<number, number>>> = { 1440: 5, 390: 8 };
 const CHART_MIN_HEIGHT = 200;
 /** Below this width the roster mark folds onto the club line. */
 const ROSTER_FOLDS_AT = 900;
@@ -124,29 +123,19 @@ async function open(page: Page, screen: Screen): Promise<void> {
 }
 
 async function common(page: Page, screen: Screen, width: number): Promise<string[]> {
-	const seen = await page.evaluate(() => {
-		const basis = [...document.querySelectorAll('main [data-basis] p')];
-		return {
-			over: document.documentElement.scrollWidth - window.innerWidth,
-			basisLines: basis.reduce((n, p) => {
-				const style = getComputedStyle(p);
-				return n + Math.round(p.getBoundingClientRect().height / parseFloat(style.lineHeight));
-			}, 0)
-		};
-	});
+	const over = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
 	const said: string[] = [];
-	if (seen.over > 0)
-		said.push(`${screen.name} at ${String(width)} scrolls sideways by ${String(seen.over)}`);
-	// The record's basis is the run's words, held to the desk's five lines here; its phone lines are
-	// the record lane's (Lane 66q held the order's).
-	const most =
-		screen.name === 'record' && width !== BASIS_WIDTH ? undefined : MOST_BASIS_LINES[width];
-	if (most !== undefined && (seen.basisLines === 0 || seen.basisLines > most))
-		said.push(`${screen.name} at ${String(width)}: basis draws ${String(seen.basisLines)} lines`);
-	if (most !== undefined)
-		process.stdout.write(
-			`${screen.name} ${String(width)} basis ${String(seen.basisLines)} lines\n`
-		);
+	if (over > 0) said.push(`${screen.name} at ${String(width)} scrolls sideways by ${String(over)}`);
+	// Every screen's basis is held at both widths (Lane 66t), measured as the line boxes it draws.
+	const report = basisReport(
+		screen.name === 'rest' ? 'board' : screen.name,
+		width,
+		await basisLines(page)
+	);
+	if (report !== null) {
+		process.stdout.write(`${report.line}\n`);
+		if (report.fault !== null) said.push(report.fault);
+	}
 	const banned = await copyFault(page);
 	if (banned !== null) said.push(`${screen.name} at ${String(width)} says ${banned}`);
 	return said;
@@ -249,8 +238,8 @@ async function tapFaults(): Promise<string[]> {
 	const rest = SCREENS[0];
 	await open(page, rest);
 	const basis = (await page.locator('main [data-basis]').textContent()) ?? '';
-	if (!basis.includes("less a free pickup's, for 12 teams with"))
-		said.push('rest: the basis names no league shape');
+	if (!basis.includes("less a free pickup's in your league.") || !basis.includes('Which five'))
+		said.push('rest: the basis names no league or no rules our stats lack');
 	const before = await tableState(page);
 	await page.getByRole('link', { name: 'QB', exact: true }).first().click();
 	await page.waitForURL(/\/qb$/);

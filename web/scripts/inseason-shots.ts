@@ -38,7 +38,9 @@ import { chromium, type BrowserContext, type Page } from 'playwright';
 import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
 import { copyFault, watchData } from './copy-scan.ts';
 import { FIXTURE_WEEK_CLOCK } from './inseason-fixture/clock.ts';
+import { BUILDER_LINE, basisLines, basisReport } from './basis-lines.ts';
 import { FIXTURE_IDS } from './inseason-fixture/ids.ts';
+import { PER_GAME_BASIS, WAIVERS_BASIS } from './inseason-fixture/week.ts';
 
 const THEMES = ['light', 'dark'] as const;
 const SHOT_WIDTHS = new Set([1440, 390]);
@@ -116,7 +118,7 @@ const PER_GAME_SCREENS = new Set<string>();
  * the projection's basis said once, no points a game on a row. */
 const BOX_SCREENS = new Set(['start', 'matchup']);
 const PROJ_BASIS =
-	/Proj is this week's published projection in (PPR|half-PPR|standard) scoring, (this league's own|the closest match to this league's rules), read \w{3} \d+:\d\d [ap]m \w+\./g;
+	/Proj is this week's published projection(, (PPR|half-PPR|standard) nearest your rules| on your rules)(, defenses on default scoring)?, read \w{3} \d+:\d\d [ap]m\./g;
 const BOX_NUMBER = /^(\d+\.\d|--)$/;
 /** The Lineup's evidence cells: an ordinal rank, a figure, a signed change, or --. */
 const EVIDENCE_CELL = /^(\d+(st|nd|rd|th)|\d+\.\d|[+−]\d+\.\d|--)$/;
@@ -146,16 +148,14 @@ const WAIVER_HEADS = [
 	'Avg',
 	'Last',
 	'Δ Proj',
-	'Rest of season',
+	'A game',
 	'Beats',
 	'Add'
 ];
 const WAIVER_FOLDED = ['Player', 'Game', 'Proj', 'Beats', 'Add'];
 const WAIVER_PHONE = ['Player', 'Proj', 'Beats', 'Add'];
-const PICKUP_RULE = 'A pickup starts for you this week';
-const MOST_BASIS_LINES = 5;
-/** The width the basis is held to five rendered lines at. */
-const BASIS_WIDTH = 1440;
+/** The pickup rule and the figure a game's sentence, in the API's words as the fixture says them. */
+const PICKUP_RULE = WAIVERS_BASIS;
 
 /** What a box score screen draws, for the checks: its column heads, each row's two numbers, its
  * basis, any row cell whose name is cut, and whether a row says points a game. */
@@ -189,7 +189,9 @@ async function boxFacts(page: Page): Promise<{
 					(td as HTMLElement).innerText.trim()
 				)
 			),
-			basis: [...document.querySelectorAll('main p')].map((p) => p.textContent).join(' '),
+			basis: [...document.querySelectorAll('main [data-basis]')]
+				.map((p) => p.textContent)
+				.join(' '),
 			cut: names.flatMap((n) =>
 				n.scrollWidth > n.clientWidth + 1 ||
 				n.getBoundingClientRect().right > (n.closest('td')?.getBoundingClientRect().right ?? 0) + 1
@@ -217,8 +219,6 @@ async function boxFacts(page: Page): Promise<{
 		};
 	});
 }
-const PER_GAME_BASIS =
-	/Rest of season is his points a game on our rest-of-season projection from week \d+, byes out\./;
 const PER_GAME = /\d+\.\d a game/;
 /** The Trades table's heads (Lane 66g): at a desk, below the room's width, and on a phone, where the
  * gain heads name their unit. The open column's own words are read by a screen reader. */
@@ -241,10 +241,9 @@ const TRADES_FOLD_AT = 900;
 /** A gain or a week's change as its cell prints it. */
 const SIGNED = /^([+−]\d+\.\d|0\.0|--)$/;
 const TRADE_BASIS_FIRST =
-	"Trades where both lineups gain on our rest-of-season order. Each team's best trade, yours first, among those they gain at least 0.5 a week from, then the close calls for them. The other team decides.";
+	"Each team's best trade both lineups gain by, yours first. The other team decides. Gain is the change in a lineup's points over replacement, a week,";
 /** A trade's week in one line, from the API's two changes (review H2). */
 const WEEK_LINE = /[+−]?\d+\.\d Proj for you this week, [+−]?\d+\.\d for them/;
-const TRADE_BASIS_MOST = 5;
 
 /** What the Trades table draws wrong at a width: its heads, its cells, its strip and its basis. */
 async function tradeFaults(page: Page, width: number): Promise<string[]> {
@@ -264,7 +263,7 @@ async function tradeFaults(page: Page, width: number): Promise<string[]> {
 				.filter(drawn)
 				.map((td) => (td as HTMLElement).innerText.trim()),
 			rows: table?.querySelectorAll(':scope > tbody > tr.trade').length ?? 0,
-			basis: [...document.querySelectorAll('main .basis p')].map((p) => p.textContent.trim()),
+			basis: document.querySelector('main [data-basis]')?.textContent.trim() ?? '',
 			cards: [...document.querySelectorAll('main .card')].map((c) => (c as HTMLElement).innerText),
 			// The member's drop as each row says it where it is drawn (review M3).
 			drops: [...(table?.querySelectorAll(':scope > tbody > tr.trade') ?? [])].filter((tr) =>
@@ -291,24 +290,25 @@ async function tradeFaults(page: Page, width: number): Promise<string[]> {
 	for (const card of seen.cards) {
 		if (
 			!card.includes(TRADE_VERB) ||
-			!/[+−]\d+\.\d a week for you/.test(card) ||
+			!/[+−]\d+\.\d Gain a week for you/.test(card) ||
 			!WEEK_LINE.test(card)
 		)
 			faults.push(`card ${card.replace(/\s+/g, ' ')}`);
 	}
 	if (seen.drops === 0) faults.push('no row says the drop');
-	if (seen.basis.length > TRADE_BASIS_MOST)
-		faults.push(`basis in ${String(seen.basis.length)} lines`);
-	if (!(seen.basis[0] ?? '').startsWith(TRADE_BASIS_FIRST))
-		faults.push(`basis opens ${seen.basis[0] ?? ''}`);
-	const all = seen.basis.join(' ');
-	if (!PER_GAME_BASIS.test(all)) faults.push('basis says no points a game');
+	if (!seen.basis.startsWith(TRADE_BASIS_FIRST)) faults.push(`basis opens ${seen.basis}`);
+	const all = seen.basis;
+	// Closed, no player's columns are drawn, so the basis says none of them (Lane 66t).
+	if (all.includes(PER_GAME_BASIS) || /Opp rank|Which five/.test(all))
+		faults.push(`the closed basis names an opened column: ${all}`);
 	const proj = (all.match(PROJ_BASIS) ?? []).length;
 	if (proj !== 1) faults.push(`projection basis said ${String(proj)} times`);
 	for (const word of await bannedSaid(page)) faults.push(`says ${word}`);
 	return faults;
 }
 const missing: string[] = [];
+/** Each screen's basis lines at 1440 and 390, the sweep's before beside them. */
+const basisCounts: string[] = [];
 const rows = new Map<string, number>();
 const under: string[] = [];
 const firstRows = new Map<string, string>();
@@ -342,9 +342,15 @@ for (const { name, path, ready: text } of PAGES) {
 					basis: document.querySelector('main p.basis')?.textContent ?? '',
 					row: document.querySelector('main .row')?.textContent ?? ''
 				}));
-				if (!PER_GAME_BASIS.test(said.basis))
+				if (!said.basis.includes(PER_GAME_BASIS))
 					missing.push(`${name} ${theme} ${String(width)} basis`);
 				if (!PER_GAME.test(said.row)) missing.push(`${name} ${theme} ${String(width)} first row`);
+			}
+			const basisName = name === 'start' ? 'lineup' : name;
+			const report = basisReport(basisName, width, await basisLines(page));
+			if (report !== null && name !== 'league') {
+				if (theme === 'dark') basisCounts.push(report.line);
+				if (report.fault !== null) missing.push(`${theme} ${report.fault}`);
 			}
 			if (name === 'trades') {
 				for (const fault of await tradeFaults(page, width))
@@ -472,18 +478,8 @@ for (const width of SHOT_WIDTHS) {
 
 /** An opened trade: its players in the box score's columns (Lane 66g), in both themes at both
  * widths, and every trade sorted by their week's change. */
-const OPENED_HEADS = [
-	'Give',
-	'Player',
-	'Game',
-	'Proj',
-	'Pts',
-	'Opp rank',
-	'Avg',
-	'Last',
-	'Rest of season'
-];
-const OPENED_HEADS_PHONE = ['Give', 'Player', 'Proj', 'Rest of season'];
+const OPENED_HEADS = ['Give', 'Player', 'Game', 'Proj', 'Pts', 'Opp rank', 'Avg', 'Last', 'A game'];
+const OPENED_HEADS_PHONE = ['Give', 'Player', 'Proj', 'A game'];
 /** A name on a phone keeps to one line, and the game under it to one (review H2). */
 const ONE_LINE_PX = 24;
 for (const theme of THEMES) {
@@ -529,6 +525,15 @@ for (const theme of THEMES) {
 			missing.push(`trades opened ${theme} ${String(width)} sides ${opened.sides.join('|')}`);
 		if (!WEEK_LINE.test(opened.week))
 			missing.push(`trades opened ${theme} ${String(width)} week "${opened.week}"`);
+		// Opened, the basis adds the players' columns, each once, and stays in its budget (Lane 66t).
+		const openedBasis = (await page.locator('main [data-basis]').first().textContent()) ?? '';
+		if (!openedBasis.includes(PER_GAME_BASIS) || !openedBasis.includes('Which five'))
+			missing.push(`trades opened ${theme} ${String(width)} basis ${openedBasis}`);
+		const openedReport = basisReport('trades opened', width, await basisLines(page));
+		if (openedReport !== null) {
+			if (theme === 'dark') basisCounts.push(openedReport.line);
+			if (openedReport.fault !== null) missing.push(`${theme} ${openedReport.fault}`);
+		}
 		if (opened.tallest > ONE_LINE_PX)
 			missing.push(
 				`trades opened ${theme} ${String(width)} a name or game wraps (${String(opened.tallest)}px)`
@@ -685,15 +690,8 @@ async function waiverFaults(page: Page, width: number): Promise<string[]> {
 			tinted: rows.filter((tr) => tr.classList.contains('moved-in')).length,
 			cards: document.querySelectorAll('main .pickups .pickup').length,
 			count: document.querySelector('main .count')?.textContent ?? '',
-			basis: [...document.querySelectorAll('main .basis p')].map(text),
-			// The basis in rendered lines: each paragraph's height over its line height (review 66f M5).
-			basisLines: [...document.querySelectorAll('main .basis p')].reduce(
-				(sum, p) =>
-					sum +
-					Math.round(p.getBoundingClientRect().height / parseFloat(getComputedStyle(p).lineHeight)),
-				0
-			),
-			phoneRest: rows.some((tr) => /Rest of season (\d+\.\d|--)/.test(text(tr)))
+			basis: document.querySelector('main [data-basis]')?.textContent.trim() ?? '',
+			phoneRest: rows.some((tr) => /A game (\d+\.\d|--)/.test(text(tr)))
 		};
 	});
 	const faults: string[] = [];
@@ -705,7 +703,7 @@ async function waiverFaults(page: Page, width: number): Promise<string[]> {
 		faults.push(`proj ${seen.proj.join(' ')}`);
 	if (width > EVIDENCE_FOLDS_AT && !seen.rest.every((n) => BOX_NUMBER.test(n)))
 		faults.push(`rest of season ${seen.rest.join(' ')}`);
-	if (width <= EVIDENCE_FOLDS_AT && !seen.phoneRest) faults.push('no Rest of season under a name');
+	if (width <= EVIDENCE_FOLDS_AT && !seen.phoneRest) faults.push('no A game under a name');
 	if (seen.cards === 0 || seen.tinted !== seen.cards)
 		faults.push(`${String(seen.tinted)} rows tinted for ${String(seen.cards)} cards`);
 	if (
@@ -713,11 +711,11 @@ async function waiverFaults(page: Page, width: number): Promise<string[]> {
 		!/^\d+ free agents? we rank on Sleeper, \d+ beats? a player of yours$/.test(seen.count)
 	)
 		faults.push(`count ${seen.count}`);
-	if (seen.basis.length === 0 || (width === BASIS_WIDTH && seen.basisLines > MOST_BASIS_LINES))
-		faults.push(`basis ${String(seen.basisLines)} rendered lines`);
-	if (!seen.basis.some((line) => /Beats is .*Open spot is /.test(line)))
-		faults.push('basis says no word of Beats and Open spot');
-	if (!seen.basis[0]?.startsWith(PICKUP_RULE)) faults.push(`basis first ${seen.basis[0] ?? ''}`);
+	// Beats and Open spot say themselves in their cells (Lane 66t); Gain and A game are said once.
+	if (/Beats is|Open spot is/.test(seen.basis)) faults.push('basis explains Beats');
+	if (!seen.basis.includes(PER_GAME_BASIS) || !seen.basis.includes('Which five'))
+		faults.push(`basis ${seen.basis}`);
+	if (!seen.basis.startsWith(PICKUP_RULE)) faults.push(`basis first ${seen.basis}`);
 	for (const word of await bannedSaid(page)) faults.push(`says ${word}`);
 	return faults;
 }
@@ -754,6 +752,8 @@ async function lineupFaults(page: Page): Promise<string[]> {
 				.join(' '),
 			second: document.querySelector('main .verb a.second[href^="http"]') !== null,
 			reserve: rows.some((tr) => tr.textContent.includes('Injured reserve')),
+			// The phone draws no Δ Proj column, so its basis says nothing of it.
+			wide: window.innerWidth > 760,
 			text: document.querySelector<HTMLElement>('main')?.innerText ?? ''
 		};
 	});
@@ -776,10 +776,11 @@ async function lineupFaults(page: Page): Promise<string[]> {
 		faults.push(`the no one can play chips: ${seen.idleChips.join(', ')}`);
 	if (!seen.firstChipIdle) faults.push('the no one can play chip is not first');
 	if (seen.idleRows !== 1) faults.push(`${String(seen.idleRows)} rows marked no one can play`);
-	if ((seen.text.match(/Opp rank is where his opponent stands/g) ?? []).length !== 1)
+	if ((seen.text.match(/Opp rank is points allowed to his position/g) ?? []).length !== 1)
 		faults.push('the evidence basis not said once');
-	if (!/Δ Proj is its change since the read before, \w{3} \d+:\d\d [ap]m \w+\./.test(seen.text))
+	if (!/Δ Proj is its change since \w{3} \d+:\d\d [ap]m\./.test(seen.text) && seen.wide)
 		faults.push('the change basis');
+	if (!seen.text.includes('Which five')) faults.push('no link to the rules our stats lack');
 	if (!seen.text.includes('We start the highest Proj at each slot'))
 		faults.push('the advice basis');
 	// The line under the copy verb is the API's reason: only that it names the platform is checked, so
@@ -958,6 +959,17 @@ for (const theme of THEMES) {
 		}
 		for (const fault of await bugFaults(page)) missing.push(`builder ${at} ${fault}`);
 		await shot('picked');
+		// The builder's own line, then the page's basis with its players' columns (Lane 66t).
+		const builderReport = basisReport('trades builder', width, await basisLines(page));
+		const ownLines = await basisLines(page, BUILDER_LINE);
+		const ownLine = (await page.locator(BUILDER_LINE).textContent()) ?? '';
+		if (builderReport !== null) {
+			if (theme === 'dark')
+				basisCounts.push(`${builderReport.line}, its own line ${String(ownLines)}`);
+			if (builderReport.fault !== null) missing.push(`${theme} ${builderReport.fault}`);
+		}
+		if (ownLines === 0 || ownLines > 2 || !ownLine.includes('What the figures are'))
+			missing.push(`builder ${at} own line ${String(ownLines)} lines: ${ownLine}`);
 		if (width === PHONE.width) {
 			// The gains and the verb stay pinned while the member scrolls the rosters.
 			await page.setViewportSize(PHONE);
@@ -1226,6 +1238,43 @@ for (const theme of THEMES) {
 		}
 	}
 }
+/** The phone's way home (Lane 66t): on a league page the site mark leads the top bar and opens the
+ * front door, and the bottom bar keeps its five on one row. */
+for (const theme of THEMES) {
+	const ctx = await context(theme, PHONE.width);
+	const page = await ctx.newPage();
+	await page.setViewportSize(PHONE);
+	await page.goto(`${web}/league/${id}/trades`, { waitUntil: 'networkidle' });
+	await ready(page, 'worth proposing');
+	const bar = await page.evaluate(() => {
+		const home = document.querySelector<HTMLAnchorElement>('header.top a.home');
+		const account = document.querySelector('header.top a.account')?.getBoundingClientRect();
+		const box = home?.getBoundingClientRect();
+		const items = [...document.querySelectorAll('nav.rail a.item')].filter(
+			(a) => a.getBoundingClientRect().width > 1
+		);
+		return {
+			href: home?.getAttribute('href') ?? null,
+			sameRow: box !== undefined && account !== undefined && Math.abs(box.top - account.top) < 4,
+			target: box === undefined ? 0 : Math.min(box.width, box.height),
+			items: items.length,
+			rows: new Set(items.map((a) => Math.round(a.getBoundingClientRect().top))).size
+		};
+	});
+	if (bar.href !== '/' || !bar.sameRow || bar.target < 44)
+		missing.push(`the phone's mark ${theme}: ${JSON.stringify(bar)}`);
+	if (bar.items !== 5 || bar.rows !== 1)
+		missing.push(
+			`the phone's bottom bar ${theme}: ${String(bar.items)} items on ${String(bar.rows)} rows`
+		);
+	await page.screenshot({
+		path: file(`topbar-${theme}-390`),
+		clip: { x: 0, y: 0, width: 390, height: 200 }
+	});
+	await ctx.close();
+}
+
+for (const said of basisCounts) process.stdout.write(`${said}\n`);
 process.stdout.write(`${STANDIN_CAPTION}\n`);
 
 await browser.close();

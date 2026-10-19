@@ -12,7 +12,7 @@
 	let { basis }: Props = $props();
 </script>
 
-<p class="basis">
+<p class="basis" data-basis="rule">
 	{basis}
 	<a href={links.record()}>{LINES.orderRecord}</a>
 </p>
