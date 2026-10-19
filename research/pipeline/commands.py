@@ -42,6 +42,7 @@ from research.pipeline.nflverse import (
     kicking_weeks,
     pbp_plays,
     roster_weeks,
+    season_stats,
     team_defense_weeks,
     usage_feeds,
 )
@@ -116,13 +117,14 @@ def tank01_provider(inv: Invocation, last_week: int | None = None) -> Tank01Prov
 
 
 def _season(conn: Connection, inv: Invocation) -> object:
+    """The universe, then each season's lines and its game results, durable together after each season."""
     client = NflverseClient(inv.fetcher)
     universe = ingest.ingest_player_universe(conn, client)
     inv.checkpoint()
     as_of = ingest.schedule_week_as_of(client, seasons_of(inv.args))
     reports = []
     for season in seasons_of(inv.args):
-        reports.append(ingest.ingest_season(conn, client, universe, season, as_of.get(season)))
+        reports.append(season_stats.ingest_season_and_results(conn, client, universe, season, as_of.get(season)))
         inv.checkpoint()
     return reports
 
@@ -256,7 +258,7 @@ def _harvest(conn: Connection, inv: Invocation) -> object:
 
 COMMANDS: Final = MappingProxyType({
     "universe": Command("the nflverse player universe", lambda c, i: ingest.ingest_player_universe(c, NflverseClient(i.fetcher))),
-    "season": Command("participation, stat lines and team edges per season (the season-week stats step)", _season, atomic=False),
+    "season": Command("participation, stat lines, team edges and game results per season (the season-week stats step)", _season, atomic=False),
     "context": Command("schedule, play-by-play, coaches, opponent adjustment, injuries, rosters", _context, atomic=False),
     "schedule": Command("games.csv into team_week_observations", lambda c, i: ingest_schedule.ingest_schedule(c, NflverseClient(i.fetcher), seasons_of(i.args))),
     "games": Command("games.csv into nflverse_games, one stamped row per game", lambda c, i: games.ingest_games(c, NflverseClient(i.fetcher), seasons_of(i.args), i.now).line()),
@@ -274,6 +276,7 @@ COMMANDS: Final = MappingProxyType({
     "tank01-adp": Command("the provider's ADP onto provider_players", lambda c, i: tank01.ingest_adp(c, tank01_provider(i), FixedBudget(TANK01_RUN_BUDGET))),
     "headshots": Command("the provider's headshot URLs onto provider_players", lambda c, i: tank01.backfill_headshots(c, tank01_provider(i))),
     "crosswalk": Command("the provider roster against the universe", lambda c, i: crosswalk.build_crosswalk(c, i.now)),
+    "provider-names": Command("each crossed provider name as the universe spells it, its diacritics kept (the Lane 78 backfill)", lambda c, i: crosswalk.respell_provider_names(c).line()),
     "host-ids": Command("the fantasy hosts' player ids onto the universe", lambda c, i: host_ids.ingest_host_ids(c, i.fetcher)),
     "capture-harvest": Command("the capture harvest's five feeds", _harvest),
     "adp-snapshot": Command("the nightly three-format ADP capture", lambda c, i: boards.ingest_adp_snapshot(c, i.fetcher, i.now)),

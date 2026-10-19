@@ -162,7 +162,7 @@ void test("copy guard: no composed line doubles a word, the run's own phrases in
 		season: 2026,
 		format: 'ppr-12',
 		statistic: { agreement: 'order matched', placesOff: 'places off', starters: 'starters right' },
-		scale: "1.0 is a perfect match of the week's finishing order, 0 is none.",
+		scale: "1.00 is a perfect match of the week's finishing order, 0.00 is none.",
 		startersBasis: "Starters right counts the week's top 12 QBs that the order also put there.",
 		method:
 			"Each week our PPR board is frozen before the week's first kickoff and graded after its games.",

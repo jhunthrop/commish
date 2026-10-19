@@ -44,7 +44,7 @@ the legacy table the TypeScript writes (`players` was `nfl_players`, `provider_p
 `python -m research.pipeline <command>` runs each command in the transaction `commands.py`
 declares. Atomic (one transaction, nothing written on failure): `universe`, `schedule`,
 `roster-weeks`, `draft-picks`, `coaches`, `tank01-schedule`, `tank01-adp`, `headshots`,
-`crosswalk`, `capture-harvest`, `adp-snapshot`, `kdef-adp`, `current-ecr`, `props-snapshot`,
+`crosswalk`, `provider-names`, `capture-harvest`, `adp-snapshot`, `kdef-adp`, `current-ecr`, `props-snapshot`,
 `props-resolve`, `win-totals-seed`, `win-totals`. Not atomic, committing where the TypeScript's
 writes become durable, because the TypeScript writes outside a transaction there and a re-run is
 how a stopped run finishes: `season`, `context`, `derived-stat-lines`, `kdef`, `kdef-lines`, `tank01-roster`
