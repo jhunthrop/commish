@@ -603,6 +603,9 @@ paths:
         required: true
         description: his board id, as his page names him
         schema: { type: string, minLength: 1, maxLength: 64 }
+      - $ref: "#/components/parameters/TierMates"
+      - $ref: "#/components/parameters/TierNext"
+      - $ref: "#/components/parameters/TierFormat"
     get:
       tags: [league-sync]
       operationId: leaguePlayerWeek
@@ -1251,6 +1254,9 @@ paths:
           required: true
           description: his board id, as his page names him
           schema: { type: string, minLength: 1, maxLength: 64 }
+        - $ref: "#/components/parameters/TierMates"
+        - $ref: "#/components/parameters/TierNext"
+        - $ref: "#/components/parameters/TierFormat"
       responses:
         "200": { $ref: "#/components/responses/PlayerWeekResponse" }
         "400": { $ref: "#/components/responses/ErrorResponse" }
@@ -1853,6 +1859,24 @@ components:
         expires both cookies. An unclaimed mock is deleted after 90 days idle, or after 24 hours with no pick.
 
   parameters:
+    TierMates:
+      name: tier
+      in: query
+      required: false
+      description: board ids, comma separated, at most 24, whose rest-of-season points the read gives in tier_format (the page's tier box)
+      schema: { type: string, maxLength: 1600 }
+    TierNext:
+      name: tier_next
+      in: query
+      required: false
+      description: the next tier's first board id, whose points the tier's drop is measured to
+      schema: { type: string, maxLength: 64 }
+    TierFormat:
+      name: tier_format
+      in: query
+      required: false
+      description: the format the tier is in, PPR when absent
+      schema: { $ref: "#/components/schemas/BoardFormat" }
     WeekOrderPosition:
       name: position
       in: query
@@ -3613,7 +3637,8 @@ components:
           nullable: true
           description: >-
             his rest-of-season points a game, one decimal: the published board's rest-of-season points over the games his
-            club has left from the board's first week through week 17, byes out, as the basis says; null on the preseason
+            club had still to play at the run (the games not yet kicked off, from the board's first week through week 17, byes out;
+            the same as his rest-of-season points now over his club's games left now), as the basis says; null on the preseason
             number, on a run that does not say its first week, without a projection or with no games left. A player who is
             out keeps it: it assumes he plays
         week_projection:
@@ -3671,6 +3696,73 @@ components:
           allOf: [{ $ref: "#/components/schemas/PlayerVerb" }]
           nullable: true
           description: what the league screens would do with him; null on the read with no league
+        rest_of_season:
+          type: array
+          nullable: true
+          items: { $ref: "#/components/schemas/RestOfSeasonFigure" }
+          description: >-
+            his rest of season at the read's clock in every format the run carries (twelve teams: PPR, half PPR and
+            standard on the standard lineup, PPR on the superflex lineup), each from that format's board re-valued as the
+            order is (LiveBoard: the run's points a game times his club's games still to play now, so a game kicked off
+            since the run is no longer counted); absent off the rest-of-season order, without a projection and from a
+            read older than the field
+        tier:
+          allOf: [{ $ref: "#/components/schemas/RestOfSeasonTier" }]
+          nullable: true
+          description: >-
+            the players the read was asked for (?tier=, ?tier_next=, ?tier_format=) at the read's clock in that format, as
+            the page's tier box lists them; absent when not asked or off the rest-of-season order
+        rest_from_week:
+          type: integer
+          nullable: true
+          description: >-
+            the week his rest of season starts from: his club's first game still to play at the read's clock (not yet
+            kicked off, through week 17); null off the rest-of-season order, without a projection or with no game left. Absent from a read
+            older than the field
+    RestOfSeasonFigure:
+      type: object
+      required: [format, points, points_over_replacement]
+      properties:
+        format: { $ref: "#/components/schemas/BoardFormat" }
+        points:
+          type: number
+          format: double
+          description: his rest-of-season points in this format at the read's clock, one decimal
+        points_over_replacement:
+          type: number
+          format: double
+          nullable: true
+          description: those points less a free pickup's for a twelve-team league of this format, one decimal; null at a position the league starts nobody at
+    TierMate:
+      type: object
+      required: [board_id, points]
+      properties:
+        board_id: { type: string }
+        points:
+          type: number
+          format: double
+          nullable: true
+          description: his rest-of-season points at the read's clock, one decimal; null when the board has no projection for him
+    RestOfSeasonTier:
+      type: object
+      required: [format, mates, drop, from_week, partial]
+      properties:
+        format: { $ref: "#/components/schemas/BoardFormat" }
+        mates:
+          type: array
+          items: { $ref: "#/components/schemas/TierMate" }
+        drop:
+          type: number
+          format: double
+          nullable: true
+          description: the last asked player's points less tier_next's, one decimal; null without tier_next or either figure
+        from_week:
+          type: integer
+          nullable: true
+          description: the earliest week with a game still to play at the read's clock, the week the board's figures count from
+        partial:
+          type: boolean
+          description: a game of from_week has kicked off, so the board counts that week's games left
     PlayerVerb:
       type: object
       required: [kind, holder, host_url, note]
@@ -4100,7 +4192,9 @@ components:
         from_week:
           type: integer
           nullable: true
-          description: the first week the rest-of-season order covers, null on the preseason order
+          description: >-
+            the first week the rest-of-season order covers at the read's clock: the earliest with a game still to play
+            (Lane 86; a club whose game of it kicked off counts from its next week), null on the preseason order
         read_at:
           type: string
           format: date-time
@@ -4143,8 +4237,9 @@ components:
           format: double
           nullable: true
           description: >-
-            the order's key, one decimal: his rest-of-season points over the games his club has left from the order's
-            first week through week 17, byes out; null on the preseason order and without a projection
+            the order's key, one decimal: his rest-of-season points over his club's games left at the read's
+            clock (not yet kicked off) through week 17, byes out (Lane 86, the player read's rest_of_season figure for
+            the order's format); null on the preseason order and without a projection
         points_over_replacement:
           type: number
           format: double

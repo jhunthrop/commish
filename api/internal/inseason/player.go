@@ -51,13 +51,13 @@ func playerParam(r *http.Request) (string, bool) {
 // publicLine is one placed player's row with no league: his facts for the
 // week, in PPR, the week's projection read in PPR, and his rest-of-season
 // points a game on our board, as a league's rows carry them.
-func publicLine(d Data, projection boards.WeekProjection, b boards.Board, bp boards.Player, week int, now time.Time) apitypes.PlayerLine {
+func publicLine(d Data, projection boards.WeekProjection, b boards.Board, rest RestNow, bp boards.Player, week int, now time.Time) apitypes.PlayerLine {
 	boardID, position, team := bp.ID, bp.Position, bp.Team
 	season := NewSeason(d, RulesOf(scoring.PresetRules(pprPreset)), week, now)
 	facts := season.For(Player{BoardID: boardID, Team: team, Position: position})
 	id := boardID
 	line := apitypes.PlayerLine{Player: apitypes.LeaguePlayer{BoardId: &id, Name: bp.Name, Position: string(position), Team: team},
-		Facts: wireFacts(facts, nil), RestOfSeasonPerGame: RestOfSeasonPerGame(b, bp, GamesLeft(d.Games, b.FromWeek))}
+		Facts: wireFacts(facts, nil), RestOfSeasonPerGame: RestOfSeasonPerGame(b, bp, rest.Left)}
 	if rank, ok := b.PositionRanks[boardID]; ok && rank > 0 {
 		line.PositionRank = &rank
 	}
@@ -97,30 +97,56 @@ func (s *Service) playerWeek(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteInvalid(w, r, map[string]string{fieldPlayer: playerWords})
 		return
 	}
+	tier, bad := parseTierQuery(r)
+	if len(bad) > 0 {
+		httpx.WriteInvalid(w, r, bad)
+		return
+	}
 	ctx := r.Context()
-	board, err := s.Boards.For(ctx, PublicSettings())
+	data, err := s.Facts.Data(ctx, s.Season)
+	if err != nil {
+		httpx.WriteInternal(w, r, s.Log, "inseason: player week", err)
+		return
+	}
+	now := s.Now()
+	lives, err := liveRunBoards(ctx, s.Boards, data.Games, now)
 	if err != nil {
 		httpx.WriteInternal(w, r, s.Log, "inseason: player week board", err)
 		return
 	}
+	// The read with no league is PPR's, the run's first format, at the read's clock.
+	board, rest := lives[0].board, lives[0].rest
 	// A kicker or defense has no page, so no read (founder ruling 2026-10-17).
 	bp, placed := board.Player(id)
 	if !placed || !cardPositions[bp.Position] {
 		httpx.WriteNotFound(w, r)
 		return
 	}
-	data, err := s.Facts.Data(ctx, s.Season)
-	if err != nil {
-		httpx.WriteInternal(w, r, s.Log, "inseason: player week", err)
-		return
-	}
 	week := nextWeek(data.Games)
 	projection := s.projection(ctx, s.Season, week)
 	read, previous := readsOf(projection)
-	httpx.WriteOK(w, r, http.StatusOK, apitypes.PlayerWeek{Week: week,
-		Line:              publicLine(data, projection, board, bp, week, s.Now()),
+	out := apitypes.PlayerWeek{Week: week,
+		Line:              publicLine(data, projection, board, rest, bp, week, now),
 		ProjectionScoring: apitypes.ProjectionScoring{Format: apitypes.ProjectionScoringFormatPpr, LeagueOwn: false},
-		ProjectionReadAt:  read, ProjectionPreviousReadAt: previous})
+		ProjectionReadAt:  read, ProjectionPreviousReadAt: previous}
+	fillRest(&out, lives, bp, tier)
+	httpx.WriteOK(w, r, http.StatusOK, out)
+}
+
+// withRest puts his rest of season in every run format on a league's read
+// (fillRest): the run's formats, not the league's own, as his page's
+// every-format table and tier box are.
+func (s *Service) withRest(ctx context.Context, out *apitypes.PlayerWeek, bp boards.Player, tier tierQuery) error {
+	data, err := s.Facts.Data(ctx, s.Season)
+	if err != nil {
+		return err
+	}
+	lives, err := liveRunBoards(ctx, s.Boards, data.Games, s.Now())
+	if err != nil {
+		return err
+	}
+	fillRest(out, lives, bp, tier)
+	return nil
 }
 
 // leaguePlayerWeek answers GET /leagues/attached/{id}/players/{player}.
@@ -128,6 +154,11 @@ func (s *Service) leaguePlayerWeek(w http.ResponseWriter, r *http.Request) {
 	id, ok := playerParam(r)
 	if !ok {
 		httpx.WriteInvalid(w, r, map[string]string{fieldPlayer: playerWords})
+		return
+	}
+	tier, bad := parseTierQuery(r)
+	if len(bad) > 0 {
+		httpx.WriteInvalid(w, r, bad)
 		return
 	}
 	a, ok := s.advisorFor(w, r)
@@ -142,6 +173,10 @@ func (s *Service) leaguePlayerWeek(w http.ResponseWriter, r *http.Request) {
 	out, ok := a.PlayerWeek(bp)
 	if !ok {
 		s.answer(w, r, out, false)
+		return
+	}
+	if err := s.withRest(r.Context(), &out, bp, tier); err != nil {
+		httpx.WriteInternal(w, r, s.Log, "inseason: league player week rest of season", err)
 		return
 	}
 	if out.Verb != nil && (out.Verb.Kind == apitypes.PlayerVerbKindWaivers || out.Verb.Kind == apitypes.PlayerVerbKindClaim) {

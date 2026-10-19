@@ -5,21 +5,9 @@ import (
 	"github.com/jhunthrop/commish/api/internal/figurewords"
 )
 
-// GamesLeft is each club's games from week first through LastWeek, the
-// weeks the rest-of-season order covers: a bye is no game.
-func GamesLeft(games []boards.TeamWeek, first int) map[string]int {
-	out := map[string]int{}
-	for _, g := range games {
-		if g.Week >= first && g.Week <= LastWeek {
-			out[g.Team]++
-		}
-	}
-	return out
-}
-
 // RestOfSeasonPerGame is his rest-of-season points a game (Lane 64): the
-// board's rest-of-season points over the games his club has left from the
-// board's first week (left, from GamesLeft), to one decimal. The same
+// board's rest-of-season points over the games his club has still to
+// play (left, RestNow.Left, Lane 86), to one decimal. The same
 // figure the player page gives as a season total, and the order the
 // screens rank by. Nil on the preseason number, on a run that does not
 // say its first week, for a player with no projection, and for a club

@@ -3133,7 +3133,7 @@ type OrderAdvice struct {
 	// BasisNoteLink the words of basis_note's link to the league's Settings, where the rules are listed ("Which four"); empty with no basis_note
 	BasisNoteLink string `json:"basis_note_link"`
 
-	// FromWeek the first week the rest-of-season order covers, null on the preseason order
+	// FromWeek the first week the rest-of-season order covers at the read's clock: the earliest with a game still to play (Lane 86; a club whose game of it kicked off counts from its next week), null on the preseason order
 	FromWeek *int `json:"from_week"`
 
 	// Moves the claim's moves on the league's platform, the Waivers screen's verb rule for an add; null without a league
@@ -3186,7 +3186,7 @@ type OrderRow struct {
 	// Rank his place in our order for this view: at a position his position rank (by his rest-of-season total, which orders the same as points over replacement there), across every position his place by points over replacement
 	Rank int `json:"rank"`
 
-	// RestOfSeasonPoints the order's key, one decimal: his rest-of-season points over the games his club has left from the order's first week through week 17, byes out; null on the preseason order and without a projection
+	// RestOfSeasonPoints the order's key, one decimal: his rest-of-season points over his club's games left at the read's clock (not yet kicked off) through week 17, byes out (Lane 86, the player read's rest_of_season figure for the order's format); null on the preseason order and without a projection
 	RestOfSeasonPoints *float64 `json:"rest_of_season_points"`
 
 	// Roster whose roster in the league holds him, null without a league
@@ -3295,7 +3295,7 @@ type PlayerLine struct {
 	// ProjectionDelta week_projection's change since the week's snapshot before the newest, to the tenth, in the same format; null without a row for him in both snapshots or when week_projection is null
 	ProjectionDelta *float64 `json:"projection_delta"`
 
-	// RestOfSeasonPerGame his rest-of-season points a game, one decimal: the published board's rest-of-season points over the games his club has left from the board's first week through week 17, byes out, as the basis says; null on the preseason number, on a run that does not say its first week, without a projection or with no games left. A player who is out keeps it: it assumes he plays
+	// RestOfSeasonPerGame his rest-of-season points a game, one decimal: the published board's rest-of-season points over the games his club had still to play at the run (the games not yet kicked off, from the board's first week through week 17, byes out; the same as his rest-of-season points now over his club's games left now), as the basis says; null on the preseason number, on a run that does not say its first week, without a projection or with no games left. A player who is out keeps it: it assumes he plays
 	RestOfSeasonPerGame *float64 `json:"rest_of_season_per_game"`
 
 	// SeasonAvg his points a game over every completed game this season under the league's scoring, to the tenth; null before his first game
@@ -3341,6 +3341,15 @@ type PlayerWeek struct {
 
 	// ProjectionScoring the scoring the rows' week_projection is read in: the published projection's column the league scores most like, and whether that is the league's own scoring or the closest of the three to rules of its own (a tight end premium reads PPR and is never its own). A team defense's figure is the published default in every format
 	ProjectionScoring ProjectionScoring `json:"projection_scoring"`
+
+	// RestFromWeek the week his rest of season starts from: his club's first game still to play at the read's clock (not yet kicked off, through week 17); null off the rest-of-season order, without a projection or with no game left. Absent from a read older than the field
+	RestFromWeek *int `json:"rest_from_week,omitempty"`
+
+	// RestOfSeason his rest of season at the read's clock in every format the run carries (twelve teams: PPR, half PPR and standard on the standard lineup, PPR on the superflex lineup), each from that format's board re-valued as the order is (LiveBoard: the run's points a game times his club's games still to play now, so a game kicked off since the run is no longer counted); absent off the rest-of-season order, without a projection and from a read older than the field
+	RestOfSeason *[]RestOfSeasonFigure `json:"rest_of_season,omitempty"`
+
+	// Tier the players the read was asked for (?tier=, ?tier_next=, ?tier_format=) at the read's clock in that format, as the page's tier box lists them; absent when not asked or off the rest-of-season order
+	Tier *RestOfSeasonTier `json:"tier,omitempty"`
 
 	// Verb what the league screens would do with him; null on the read with no league
 	Verb *PlayerVerb `json:"verb"`
@@ -3473,6 +3482,31 @@ type ReportTeam struct {
 	StartersFilled int     `json:"starters_filled"`
 	StartersTotal  int     `json:"starters_total"`
 	ValueCaptured  float64 `json:"value_captured"`
+}
+
+// RestOfSeasonFigure defines model for RestOfSeasonFigure.
+type RestOfSeasonFigure struct {
+	Format BoardFormat `json:"format"`
+
+	// Points his rest-of-season points in this format at the read's clock, one decimal
+	Points float64 `json:"points"`
+
+	// PointsOverReplacement those points less a free pickup's for a twelve-team league of this format, one decimal; null at a position the league starts nobody at
+	PointsOverReplacement *float64 `json:"points_over_replacement"`
+}
+
+// RestOfSeasonTier defines model for RestOfSeasonTier.
+type RestOfSeasonTier struct {
+	// Drop the last asked player's points less tier_next's, one decimal; null without tier_next or either figure
+	Drop   *float64    `json:"drop"`
+	Format BoardFormat `json:"format"`
+
+	// FromWeek the earliest week with a game still to play at the read's clock, the week the board's figures count from
+	FromWeek *int       `json:"from_week"`
+	Mates    []TierMate `json:"mates"`
+
+	// Partial a game of from_week has kicked off, so the board counts that week's games left
+	Partial bool `json:"partial"`
 }
 
 // RoomAction One entry of the room's log. kind is SEAT_JOINED (payload handle), SEAT_LEFT (payload freed when a filling room gave the seat up, otherwise its stand-in drafts), SEAT_RETURNED, ROOM_STARTED (payload bots, the seats bots took, and solo_pace), ROOM_COMPLETE, ROOM_ABANDONED (payload reason, nobody_here when the fill deadline found no drafter connected or everyone_left), or an engine action (START_DRAFT, SET_QUEUE, MAKE_PICK, TIMER_EXPIRE) whose payload carries the engine action as action and, for a pick, pick (RoomPick with by drafter, queue, clock or bot) and deadline, when the next turn's clock runs out. A socket receives only its own seat's SET_QUEUE payload; another seat's arrives empty, with its seq and kind.
@@ -3907,6 +3941,14 @@ type StatusRead struct {
 
 	// Source the capture's feed in the research store
 	Source string `json:"source"`
+}
+
+// TierMate defines model for TierMate.
+type TierMate struct {
+	BoardId string `json:"board_id"`
+
+	// Points his rest-of-season points at the read's clock, one decimal; null when the board has no projection for him
+	Points *float64 `json:"points"`
 }
 
 // TradeAdvice defines model for TradeAdvice.
@@ -4418,6 +4460,15 @@ type PerPage = int
 // ShareCode defines model for ShareCode.
 type ShareCode = string
 
+// TierFormat defines model for TierFormat.
+type TierFormat = BoardFormat
+
+// TierMates defines model for TierMates.
+type TierMates = string
+
+// TierNext defines model for TierNext.
+type TierNext = string
+
 // WeekOrderPosition defines model for WeekOrderPosition.
 type WeekOrderPosition string
 
@@ -4754,6 +4805,18 @@ type LeagueWeekOrderParams struct {
 	Position WeekOrderPosition `form:"position" json:"position"`
 }
 
+// LeaguePlayerWeekParams defines parameters for LeaguePlayerWeek.
+type LeaguePlayerWeekParams struct {
+	// Tier board ids, comma separated, at most 24, whose rest-of-season points the read gives in tier_format (the page's tier box)
+	Tier *TierMates `form:"tier,omitempty" json:"tier,omitempty"`
+
+	// TierNext the next tier's first board id, whose points the tier's drop is measured to
+	TierNext *TierNext `form:"tier_next,omitempty" json:"tier_next,omitempty"`
+
+	// TierFormat the format the tier is in, PPR when absent
+	TierFormat *TierFormat `form:"tier_format,omitempty" json:"tier_format,omitempty"`
+}
+
 // LeagueTradesParams defines parameters for LeagueTrades.
 type LeagueTradesParams struct {
 	// Player a board id; only trades holding this player, on either side
@@ -4796,6 +4859,18 @@ type OrderParams struct {
 type WeekOrderParams struct {
 	// Position the kickers' tab (K) or the defenses' (DEF)
 	Position WeekOrderPosition `form:"position" json:"position"`
+}
+
+// PlayerWeekParams defines parameters for PlayerWeek.
+type PlayerWeekParams struct {
+	// Tier board ids, comma separated, at most 24, whose rest-of-season points the read gives in tier_format (the page's tier box)
+	Tier *TierMates `form:"tier,omitempty" json:"tier,omitempty"`
+
+	// TierNext the next tier's first board id, whose points the tier's drop is measured to
+	TierNext *TierNext `form:"tier_next,omitempty" json:"tier_next,omitempty"`
+
+	// TierFormat the format the tier is in, PPR when absent
+	TierFormat *TierFormat `form:"tier_format,omitempty" json:"tier_format,omitempty"`
 }
 
 // ListSheetsParams defines parameters for ListSheets.

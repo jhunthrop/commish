@@ -8,6 +8,7 @@ import { countedWeek } from '#lib/run/reach.ts';
 import type { GameLogRow, PlayerSeason } from '#lib/run/season.ts';
 import { apiFormatOf } from '#lib/run/format-ids.ts';
 import { positionRankShown } from '#lib/run/held-places.ts';
+import { playerRestFrom, playerRestWords } from '#lib/run/rest-from.ts';
 import type { Capsule, Format, PlayerFormat, PlayerStatus } from '#lib/run/schema.ts';
 import type { Position } from '#lib/types/player.ts';
 import {
@@ -68,8 +69,7 @@ export function restTile(
 	status: PlayerStatus | undefined
 ): CardTile {
 	const rank = rankIn(numbers, position, status);
-	const from = format.rosFromWeek;
-	if (from === undefined) {
+	if (format.rosFromWeek === undefined) {
 		return {
 			key: 'rest',
 			label: CARD.projected,
@@ -82,7 +82,7 @@ export function restTile(
 		key: 'rest',
 		label: CARD.rest,
 		value: fixed(numbers.projected),
-		caption: `from week ${String(from)}, ${rank}`,
+		caption: `${playerRestWords(playerRestFrom(format, numbers))}, ${rank}`,
 		tone: null
 	};
 }
@@ -94,10 +94,10 @@ export function restParts(
 	position: Position,
 	status: PlayerStatus | undefined
 ): RestParts | null {
-	const from = format.rosFromWeek;
-	if (from === undefined) return null;
+	if (format.rosFromWeek === undefined) return null;
 	return {
-		fromWeek: from,
+		from: playerRestWords(playerRestFrom(format, numbers)),
+		board: apiFormatOf(format),
 		rank: rankIn(numbers, position, status),
 		scoring: scoringOf(format),
 		label: format.label

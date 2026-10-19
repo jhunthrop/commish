@@ -20,9 +20,9 @@ from research.capsules.week.store import served_week_reads
 from research.errors import ResearchError
 from research.model.reads.teams import first_kickoff_for
 from research.nightly.build import pages, season
-from research.nightly.build.player_season import SeasonContext, season_context
+from research.nightly.build.player_season import season_context
 from research.nightly.build.ros import MODEL_NAME as ROS_MODEL
-from research.nightly.build.ros import RosBasis, RosResult, RosSetup, pending_weeks, ros_boards
+from research.nightly.build.ros import RosBasis, RosResult, RosSetup, ros_boards
 from research.nightly.config import PAGE_FORMAT, RUN_FORMATS, RunFormat
 from research.nightly.designations import read_statuses, status_word
 from research.nightly.reads import record as record_read
@@ -30,6 +30,7 @@ from research.nightly.reads import schedule as schedule_read
 from research.nightly.reads.adp import AdpCapture, adp_cutoff, latest_capture
 from research.nightly.reads.board import FormatBoard, format_board
 from research.nightly.reads.market import market_order, market_players
+from research.nightly.reads.schedule import ClubWeek, Game, GameState
 from research.nightly.register_log import FrozenBy
 from research.season import PRODUCT_SEASON
 
@@ -85,11 +86,17 @@ def _fixtures_window(conn: Connection) -> tuple[datetime, datetime]:
     return row[0], row[1]
 
 
-def _schedule(conn: Connection, as_of: datetime) -> tuple[Json, list[Json], Json, Json]:
-    games = schedule_read.slates_by_club(conn, PRODUCT_SEASON)
+def _states(conn: Connection, games: Mapping[str, Sequence[Game]], as_of: datetime) -> dict[ClubWeek, GameState]:
+    """Every game's state at the run's instant (Lane 80): the one the schedule, the clubs and the
+    rest-of-season boards read alike (Lane 86)."""
+    return schedule_read.game_states(games, schedule_read.finals_at(conn, PRODUCT_SEASON, as_of), as_of)
+
+
+def _schedule(
+    conn: Connection, as_of: datetime, games: Mapping[str, list[Game]], states: Mapping[ClubWeek, GameState]
+) -> tuple[Json, list[Json], Json, Json]:
     kickoff = first_kickoff_for(conn, PRODUCT_SEASON) or as_of
     values = schedule_read.opponent_values(conn, PRODUCT_SEASON, kickoff)
-    states = schedule_read.game_states(games, schedule_read.finals_at(conn, PRODUCT_SEASON, as_of), as_of)
     slates = schedule_read.slates(games, values, states)
     published = [value.published for value in values.values()]
     sources = (
@@ -179,7 +186,9 @@ def assemble(conn: Connection, as_of: datetime, frozen_by: FrozenBy, ros: RosSet
     extra = () if ros is None else tuple(p.provider_id for p in ros.season_players)
     on_boards = {e.row.player_id for b in boards for e in b.entries}
     context = season_context(conn, PRODUCT_SEASON, sorted({*on_boards, *extra}), as_of, prior=True)
-    rest = None if ros is None else ros_boards(boards, context, as_of, ros)
+    games = schedule_read.slates_by_club(conn, PRODUCT_SEASON)
+    states = _states(conn, games, as_of)
+    rest = None if ros is None else ros_boards(boards, context, as_of, states, ros)
     if rest is not None:
         boards = rest.boards
     # The pages and the search index in the order of the boards the run prints, then the kickers and
@@ -194,10 +203,10 @@ def assemble(conn: Connection, as_of: datetime, frozen_by: FrozenBy, ros: RosSet
     universe_ids = sorted({e.row.universe_id for b in boards for e in b.entries})
     capsules = stored_capsules_for(conn, universe_ids)
     ids = sorted({(e.row.player_id, e.row.universe_id) for b in boards for e in b.entries})
-    served = _served_week(conn, as_of, context, rest, ids)
+    served = _served_week(conn, as_of, states, rest, ids)
     inputs = pages.page_inputs(boards, adp_by_format, capsules, context, served)
     players = [pages.player_json(who, inputs) for who in people]
-    schedule, clubs, schedule_source, clubs_source = _schedule(conn, as_of)
+    schedule, clubs, schedule_source, clubs_source = _schedule(conn, as_of, games, states)
     record, record_source = _record(conn, as_of, frozen_by)
     files: dict[str, Any] = {
         f"boards/{b.format.id}.json": pages.board_json(b, by_slug, adp_by_format[b.format.id], orders[b.format.id])
@@ -242,12 +251,16 @@ def assemble(conn: Connection, as_of: datetime, frozen_by: FrozenBy, ros: RosSet
 
 
 def _served_week(
-    conn: Connection, as_of: datetime, context: SeasonContext, rest: RosResult | None, ids: Sequence[tuple[str, str]]
+    conn: Connection,
+    as_of: datetime,
+    states: Mapping[ClubWeek, GameState],
+    rest: RosResult | None,
+    ids: Sequence[tuple[str, str]],
 ) -> pages.ServedWeek:
     """The week reads the pages serve (Lane 72): the board week's (the run's rest-of-season window's first
-    week, else the first week with a game still to kick off, as the site's `board_week`), against each
+    week, else the first week with a game still to play by the run's game state, as the site's `board_week`), against each
     player's status on the status read `designations.json` is written from (`designations.read_statuses`). `ids` is each page's (board id, universe id)."""
-    pending = pending_weeks(context.games, as_of)
+    pending = schedule_read.weeks_left(states)
     week = rest.basis.from_week if rest is not None and rest.basis is not None else (pending[0] if pending else None)
     if week is None:
         return pages.ServedWeek({}, {}, as_of)

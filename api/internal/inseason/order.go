@@ -271,7 +271,7 @@ func (a *advisor) Order(q orderQuery, targets Targets) apitypes.OrderAdvice {
 		// "Your scoring rules" are the member's: a reader with no league has none.
 		un = Uncounted{}
 	}
-	out := apitypes.OrderAdvice{Week: h.week, Basis: OrderScreenBasis(a.basis, a.Board.FromWeek, OrderLeague(marks, a.settings, scoring.Format)), OrderBasis: h.basis,
+	out := apitypes.OrderAdvice{Week: h.week, Basis: OrderScreenBasis(a.basis, RestFrom{Week: a.Board.FromWeek, Partial: a.rest.Partial}, OrderLeague(marks, a.settings, scoring.Format)), OrderBasis: h.basis,
 		Refreshed: h.refreshed, ProjectionReadAt: a.projectionReadAt(), ProjectionScoring: scoring,
 		BasisNote: un.Note, BasisNoteLink: un.Link, RankBy: rankBy(q.position), Rows: []apitypes.OrderRow{}}
 	if carriesPerGame(a.Board) {

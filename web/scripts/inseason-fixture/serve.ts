@@ -15,8 +15,6 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import type { LeagueSync } from '../../src/lib/league/api.ts';
 import type {
 	HostMoveInput,
-	HostMovePlan,
-	HostMoveResult,
 	LineupAdvice,
 	MatchupBox,
 	Scoreboard,
@@ -42,12 +40,9 @@ import { inSeason, noWeek } from './member-week.ts';
 import { inTenths } from './tenths.ts';
 import { FIXTURE_CLOCK_VARIABLE, fixtureClock } from './clock.ts';
 import { stamped } from './game-state.ts';
-import {
-	espnDefenseId,
-	weekOrderAnswer,
-	weekPosition,
-	type WeekOrderStates
-} from './week-order-serve.ts';
+import { orderAtClock, restAtClock, runIndex, tierAskOf } from './rest-now.ts';
+import { CLAIM_FORM_WORDS, HOLD_MS, HOST_ID, espnMoves } from './espn-moves.ts';
+import { weekOrderAnswer, weekPosition, type WeekOrderStates } from './week-order-serve.ts';
 
 const PORT = Number(process.env.PORT ?? 8799);
 /** The fixture's clock: the real one, or the shots' week clock (FIXTURE_CLOCK=2026-10-17T17:00:00.000Z,
@@ -69,35 +64,11 @@ const ESPN_MOVES = new Map<string, 'done' | 'refused' | 'pending'>([
 	[ESPN_REFUSED, 'refused'],
 	[ESPN_PENDING, 'pending']
 ]);
-/** The API's own sentences for a move (api/internal/hostmoves words.go). */
-const MOVE_SENTENCES = {
-	done: 'Set on ESPN. Your lineup there now reads as ours.',
-	refused: 'ESPN did not make the move, so nothing changed there.',
-	pending:
-		'Sent to ESPN, but your lineup there did not show it when we read it back. Check your lineup on ESPN before you set it again.'
-} as const;
-/** The API's own sentences for a claim (api/internal/hostmoves words.go and claim.go). */
-const CLAIM_SENTENCES = {
-	done: 'Done on ESPN. He is on your roster there now.',
-	refused: 'ESPN did not take the claim, so nothing changed there.',
-	pending:
-		'Claim submitted. ESPN processes claims on Wednesday, and your lineup screen will show him once it goes through.'
-} as const;
-/** The stand-in leagues' waiver settings: the pending one bids (a budget of 100, 13 spent), the
- * done one adds a free agent at once, the refused one does not bid. */
-const CLAIM_BUDGET = { min: 0, max: 87 } as const;
-/** When the pending league's claims run: ESPN's processDate, a Wednesday's 07:00 UTC. */
-const CLAIM_RUNS_AT = '2026-10-21T07:00:00.000Z';
-const ESPN_LEAGUE_URL =
-	'https://fantasy.espn.com/football/league?leagueId=1081607624&seasonId=2026';
-const ESPN_LINEUP_URL =
-	'https://fantasy.espn.com/football/team?leagueId=1081607624&seasonId=2026&teamId=3';
 /** The API's own sentences (api/internal/inseason): leaguesync.NoGamesWords and noTeamWords. */
 const NO_GAMES = 'Your league has no games this week.';
 const NO_TEAM_WORDS = "We could not find your team in this league's last read.";
 const READ_MINUTES_AGO = 4;
 const MINUTE_MS = 60_000;
-const HOLD_MS = 10 * MINUTE_MS;
 const HTTP = {
 	ok: 200,
 	noContent: 204,
@@ -433,60 +404,17 @@ const CHECK = /^\/leagues\/attached\/([^/]+)\/trades\/check$/;
 const IN_SEASON = /^\/leagues\/attached\/([^/]+)\/(lineup|matchup|scoreboard|waivers|trades)$/;
 /** The player card's reads (Lane 66h): in the league, and with no league. */
 const LEAGUE_PLAYER = /^\/leagues\/attached\/([^/]+)\/players\/([^/]+)$/;
-/** Each player's club and position from the built site's run (web/.runs, npm run standin), so the
- * league read places a player no recorded screen carries, as the API's board does. */
-const RUNS = new URL('../../.runs/runs/', import.meta.url);
-const runIndex = await (async (): Promise<Map<string, { team: string; position: string }>> => {
-	try {
-		const { runId } = JSON.parse(await readFile(new URL('latest.json', RUNS), 'utf8')) as {
-			runId: string;
-		};
-		const entries = JSON.parse(await readFile(new URL(`${runId}/index.json`, RUNS), 'utf8')) as {
-			id: string;
-			team: string;
-			position: string;
-		}[];
-		return new Map(entries.map(({ id, team, position }) => [id, { team, position }]));
-	} catch {
-		return new Map();
-	}
-})();
 const PUBLIC_PLAYER = /^\/players\/([^/]+)\/week$/;
 const MOVES = /^\/leagues\/attached\/([^/]+)\/moves(\/plan)?$/;
 
-/** A changed slot's place in the API's words: "at RB", "in the flex". */
-function slotPlace(slot: string): string {
-	if (slot === 'FLEX') return 'in the flex';
-	if (slot === 'SUPERFLEX') return 'in the superflex';
-	// A defense's slot as the Lineup prints it (hostmoves slotPlace).
-	if (slot === 'DEF') return 'at D/ST';
-	return `at ${slot}`;
-}
-
-/** The plan's sentence as the API words it (hostmoves lineupWords): every change, then the host. */
-function planSentence(): string {
-	const clauses = lineup.slots
-		.filter((slot) => slot.changed)
-		.map(
-			(slot) =>
-				`${slot.ours.player.name}${slot.host ? ` over ${slot.host.player.name}` : ''} ${slotPlace(slot.slot)}`
-		);
-	const joined =
-		clauses.length < 2
-			? (clauses[0] ?? '')
-			: `${clauses.slice(0, -1).join(', ')}, and ${clauses.at(-1) ?? ''}`;
-	return `Start ${joined}, on ESPN now.`;
-}
-
-/** The ESPN league's lineup: the move open and the verb ESPN's lineup page. ESPN gives each player's
- * points for the week (Lane 79), so the lines keep the recorded league's. */
-function espnLineup(): LineupAdvice {
-	return {
-		...lineup,
-		host_lineup_url: ESPN_LINEUP_URL,
-		moves: { lineup: 'available', note: null, takes_writes: true, writes_on: true, reason: null }
-	};
-}
+/** The ESPN stand-ins' lineup, waivers and moves (espn-moves.ts). */
+const { espnLineup, espnWaivers, moveAnswer } = espnMoves({
+	lineup,
+	waivers,
+	waiversAt,
+	now,
+	outcomes: ESPN_MOVES
+});
 
 /** The leagues on their Sunday afternoon (sunday.ts), for a browser that asks for the Sunday with
  * the fixture_week cookie: points by player where the platform gives them, totals the platform's,
@@ -530,118 +458,6 @@ function standInAsked(req: IncomingMessage, id: string): StandIn | null {
 	return id === LEAGUE ? { ...sleeperOnSunday, ...live } : null;
 }
 
-/** The shape of a host id the claim route takes (api hostmoves checkClaim). */
-const HOST_ID = /^-?[0-9]{1,12}$/;
-/** The API's words for a claim whose add it cannot name (hostmoves claimFormWords). */
-const CLAIM_FORM_WORDS = 'Send the claim from the waivers screen.';
-
-/** The ESPN league's waivers, as the API answers an ESPN league: each add named by his board id
- * (ESPN's own), a defense by its D/ST id (api hostIDOfAdd), the claim open, the verb ESPN's league
- * page. */
-function espnWaivers(position: string | null): WaiverAdvice {
-	const named = waiversAt(position);
-	const withId = (row: WaiverAdvice['rows'][number]): WaiverAdvice['rows'][number] => {
-		const board = row.add.player.board_id ?? '';
-		const hostId =
-			row.add.player.position === 'DEF'
-				? espnDefenseId(row.add.player.team)
-				: HOST_ID.test(board)
-					? board
-					: '';
-		return { ...row, add: { ...row.add, player: { ...row.add.player, host_id: hostId } } };
-	};
-	return {
-		...named,
-		rows: named.rows.map(withId),
-		pickups: named.pickups.map(withId),
-		host_waivers_url: ESPN_LEAGUE_URL,
-		moves: { claim: 'available', note: null, takes_writes: true, writes_on: true, reason: null }
-	};
-}
-
-/** A player in the waiver answer by his host id, for the plan's words. */
-function nameOf(hostId: string | null): string {
-	const lines = waivers.rows.flatMap((row) => (row.drop ? [row.add, row.drop] : [row.add]));
-	// An ESPN add is named by his board id or his D/ST id (espnWaivers), a roster player by his host id.
-	return (
-		lines.find(
-			(line) =>
-				line.player.host_id === hostId ||
-				line.player.board_id === hostId ||
-				(line.player.position === 'DEF' && espnDefenseId(line.player.team) === hostId)
-		)?.player.name ?? ''
-	);
-}
-
-/** A claim on an ESPN fixture league: the plan in the API's words with a token (and the bid where
- * the league bids), or what the claim came to. */
-function claimAnswer(
-	id: string,
-	plan: boolean,
-	move: HostMoveInput
-): HostMovePlan | HostMoveResult {
-	const outcome = ESPN_MOVES.get(id) ?? 'done';
-	const claim = move.claim ?? { add: '', drop: null, bid: null };
-	if (plan) {
-		const bids = outcome === 'pending';
-		const amount = claim.bid ?? CLAIM_BUDGET.min;
-		const named = `Add ${nameOf(claim.add)}${claim.drop ? `, drop ${nameOf(claim.drop)}` : ''}`;
-		const bidWords = bids ? `, bid $${String(amount)}` : '';
-		const sentence =
-			outcome === 'done'
-				? `${named}, on ESPN now. He is a free agent, so the add is made at once.`
-				: `${named}${bidWords}. He is on waivers, so ESPN runs the claim on Wednesday.`;
-		return {
-			status: 'ready',
-			sentence,
-			confirm: 'fixture-token',
-			expires_at: new Date(now() + HOLD_MS).toISOString(),
-			host_url: ESPN_LEAGUE_URL,
-			bid: bids ? { amount, ...CLAIM_BUDGET, left_known: true } : null
-		};
-	}
-	return {
-		outcome,
-		sentence: CLAIM_SENTENCES[outcome],
-		// ESPN's refusal as captured live (jwulff 06-espn-add-drop-surface p1, TRAN_PLAYER_NOT_FREEAGENT).
-		host_words: outcome === 'refused' ? `Player ${claim.add} is not a free agent` : null,
-		host_url: ESPN_LEAGUE_URL,
-		move_id: '6f1d1c52-2626-4a26-9a26-0000000000f2',
-		processes_at: outcome === 'pending' ? CLAIM_RUNS_AT : null
-	};
-}
-
-/** A move on an ESPN fixture league: the plan in words with a token, or what the move came to. */
-function moveAnswer(id: string, plan: boolean, body: unknown): HostMovePlan | HostMoveResult {
-	const move = (plan ? body : (body as { move?: unknown } | null)?.move) as
-		HostMoveInput | undefined;
-	if (move?.kind === 'claim') return claimAnswer(id, plan, move);
-	if (plan) {
-		return {
-			status: 'ready',
-			sentence: planSentence(),
-			confirm: 'fixture-token',
-			expires_at: new Date(now() + HOLD_MS).toISOString(),
-			host_url: ESPN_LINEUP_URL,
-			bid: null
-		};
-	}
-	const outcome = ESPN_MOVES.get(id) ?? 'done';
-	const first = lineup.slots.find((slot) => slot.changed)?.ours.player.name ?? '';
-	return {
-		outcome,
-		sentence: MOVE_SENTENCES[outcome],
-		// ESPN's refusal as captured live (jwulff 05-espn-write-surface.md 5.1, TRAN_LINEUP_LOCKED).
-		host_words:
-			outcome === 'refused'
-				? `Lineup transaction could not be completed, ${first} is locked`
-				: null,
-		host_url: ESPN_LINEUP_URL,
-		move_id: '6f1d1c52-2626-4a26-9a26-0000000000f1',
-		processes_at: null
-	};
-}
-
 /** A request's JSON body, or null when it has none. */
 async function bodyOf(req: IncomingMessage): Promise<unknown> {
 	const chunks: Buffer[] = [];
@@ -662,13 +478,15 @@ const MIN_SEARCH = 2;
  * position in order.json's order; a search's letters in the name or club;
  * the limit. Without a league the rows carry no roster and no move, and no read. */
 function orderAt(params: URLSearchParams, league: boolean): OrderAdvice {
+	// Each total over his club's games left at the clock (Lane 86, rest-now.ts).
+	const live = orderAtClock(order, now());
 	const position = params.get('position');
 	const q = (params.get('q') ?? '').trim().toLowerCase();
 	const limit = Number(params.get('limit') ?? DEFAULT_ORDER_ROWS);
 	const ranked: OrderRow[] =
 		position === null
-			? order.rows
-			: order.rows
+			? live.rows
+			: live.rows
 					.filter((row) => row.line.player.position === position)
 					.sort(
 						(a, b) =>
@@ -688,7 +506,7 @@ function orderAt(params: URLSearchParams, league: boolean): OrderAdvice {
 		.slice(0, limit)
 		.map((row) => (league ? row : { ...row, roster: null, move: null }));
 	return {
-		...order,
+		...live,
 		read_at: league ? readAt() : null,
 		moves: league ? order.moves : null,
 		rank_by: position === null ? 'points_over_replacement' : 'rest_of_season_points',
@@ -882,7 +700,8 @@ async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> 
 		const id = publicPlayer[1] ?? '';
 		const week = playerWeek(recorded, id, runIndex.get(id) ?? null, false);
 		if (week === null) send(req, res, HTTP.notFound, 'Nothing here by that id', 'not_found');
-		else send(req, res, HTTP.ok, week);
+		else
+			send(req, res, HTTP.ok, { ...week, ...restAtClock(id, now(), tierAskOf(url.searchParams)) });
 		return;
 	}
 	const leaguePlayer = LEAGUE_PLAYER.exec(url.pathname);
@@ -900,7 +719,8 @@ async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> 
 			ESPN_MOVES.has(leaguePlayer[1] ?? '')
 		);
 		if (week === null) send(req, res, HTTP.notFound, 'Nothing here by that id', 'not_found');
-		else send(req, res, HTTP.ok, week);
+		else
+			send(req, res, HTTP.ok, { ...week, ...restAtClock(id, now(), tierAskOf(url.searchParams)) });
 		return;
 	}
 	const inSeason = IN_SEASON.exec(url.pathname);

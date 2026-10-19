@@ -24,7 +24,7 @@ from research.model.instants import js_iso
 from research.model.ros.live import FIRST_MODEL_WEEK, SeasonPlayer, load_ros_priors, season_players
 from research.model.ros.raw_line import RawLine, latest_raw_line, raw_generation
 from research.nightly.assemble import Assembled
-from research.nightly.build.ros import RosSetup, pending_weeks
+from research.nightly.build.ros import RosSetup
 from research.nightly.build.season import format_json
 from research.nightly.capsule_demotion import Demotion, demotion_line
 from research.nightly.capsule_gate import CapsuleGateResult, capsule_gate, span_rules
@@ -39,7 +39,7 @@ from research.nightly.config import HELD_OUT_BASELINE_KEY, IMPLEMENTATION
 from research.nightly.headshots import Face, mirror_headshots
 from research.nightly.page_findings import page_findings
 from research.nightly.publish import read_json
-from research.nightly.reads.schedule import slates_by_club
+from research.nightly.reads.schedule import slates_by_club, weeks_left_at
 from research.nightly.register_log import FrozenBy, carried_note, last_pass
 from research.nightly.run_store import RunStore
 from research.nightly.steps import IngestContext, StepRecord, ingest_step, run_fit_step
@@ -183,7 +183,7 @@ def ros_setup(engine: Engine, instant: datetime, log: Log) -> RosSetup:
                     lambda: latest_raw_line(conn, PRODUCT_SEASON, moment),
                 )
             )
-            weeks = pending_weeks(slates_by_club(conn, PRODUCT_SEASON), instant)
+            weeks = weeks_left_at(conn, PRODUCT_SEASON, slates_by_club(conn, PRODUCT_SEASON), instant)
             switched = priors is not None and bool(weeks) and min(weeks) >= FIRST_MODEL_WEEK
             players = season_players(conn, PRODUCT_SEASON, instant) if switched else ()
     except Exception as error:

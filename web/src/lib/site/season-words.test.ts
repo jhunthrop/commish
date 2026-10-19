@@ -17,7 +17,7 @@ import { PAGE_VERBS, boardWords, frontWords } from './season-words.ts';
 
 const IN_SEASON: readonly RailKey[] = ['in_season', 'playoffs', 'playoffs_waivers'];
 const BEFORE_OR_AFTER: readonly RailKey[] = ['pre_draft', 'draft_day', 'offseason'];
-const REST = { season: 2026, rosFromWeek: 6, label: 'PPR' };
+const REST = { season: 2026, rosFromWeek: 6, restFrom: 'from week 6', label: 'PPR' };
 const PRESEASON = { season: 2026, label: 'PPR' };
 
 /** The copy rules: no em-dash or en-dash, no semicolon (the one guard's marks). */
@@ -45,6 +45,14 @@ for (const rail of IN_SEASON) {
 		assert.deepEqual(words.quiet, ['mock']);
 	});
 }
+
+void test('the front door says a partly played first week as the run does: its games left (review H2)', () => {
+	const partly = { ...REST, restFrom: "from week 6's games left" };
+	assert.equal(
+		frontWords('in_season', partly, false).heading,
+		"Our board for the rest of the 2026 season from week 6's games left, for your league"
+	);
+});
 
 void test('a member who follows a league opens it from the front door in season', () => {
 	const words = frontWords('in_season', REST, true);

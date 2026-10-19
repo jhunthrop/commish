@@ -42,6 +42,6 @@ function shownDrop<R extends BoardRow>(
 	const start = all.find((row) => row.tier === tier + 1);
 	const drop = end?.tierDrop;
 	return end && start && !out(end) && !out(start) && drop !== undefined && drop !== null
-		? { drop, nextTier: tier + 1 }
+		? { drop, nextTier: tier + 1, nextId: start.id }
 		: null;
 }

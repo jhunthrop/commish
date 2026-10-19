@@ -91,12 +91,24 @@ void test("a held player's tile gives the word, never the rank his figure would 
 
 void test("the rest tile's parts carry its first week, its rank words and its scoring", () => {
 	assert.deepEqual(restParts(IN_SEASON, NUMBERS, 'WR', undefined), {
-		fromWeek: 6,
+		from: 'from week 6',
 		rank: 'WR1 in our order',
 		scoring: 'ppr',
-		label: 'PPR'
+		label: 'PPR',
+		board: 'ppr'
 	});
 	assert.equal(restParts(PRESEASON, NUMBERS, 'WR', undefined), null);
+	// Lane 86: his club's game of the board's first week was played at the run, so his own week leads.
+	const played = { ...NUMBERS, restFromWeek: 7 };
+	assert.equal(restParts(IN_SEASON, played, 'WR', undefined)?.from, 'from week 7');
+	assert.equal(
+		restTile(IN_SEASON, played, 'WR', 2026, undefined).caption,
+		'from week 7, WR1 in our order'
+	);
+	assert.equal(
+		restParts(IN_SEASON, { ...NUMBERS, restFromWeek: null }, 'WR', undefined)?.from,
+		'with no game left'
+	);
 	const half: Format = { ...IN_SEASON, id: 'half-ppr-12', label: 'Half PPR' };
 	assert.equal(restParts(half, NUMBERS, 'WR', undefined)?.scoring, 'half_ppr');
 	const superflex: Format = { ...IN_SEASON, id: 'superflex-12', label: 'Superflex' };
