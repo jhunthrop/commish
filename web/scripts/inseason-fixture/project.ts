@@ -37,9 +37,20 @@ import type {
 	MatchupBoxSide,
 	PlayerLine,
 	TradeAdvice,
+	TradeRow,
 	WaiverAdvice
 } from '../../src/lib/league/inseason/api.ts';
-import { accepts, better, lineupProj, printedProj, tenth, tierOf } from './week.ts';
+import { lastName } from '../../src/lib/format/draft.ts';
+import {
+	accepts,
+	better,
+	lineupProj,
+	printedProj,
+	seasonStarters,
+	tenth,
+	tierOf,
+	weekStarters
+} from './week.ts';
 
 const DATA = new URL('./data/', import.meta.url);
 /** The stand-in projection's read: Friday 9:00 pm Central of the fixture's week 6. */
@@ -632,6 +643,63 @@ function boxSide(
 const matchup = sync.matchup;
 if (!matchup) throw new Error('The fixture league has no matchup this week.');
 
+/** Each trade's drop against this week's lineup, as the API picks it (inseason drops.go, Lane 66u):
+ * the bench player it costs least to lose, never one the rest-of-season lineup starts after the
+ * trade, never held, never the only defense; a player the Lineup starts only when no bench player
+ * may go and a player the trade brings in takes his spot this week, the trade then saying so; a
+ * trade with no one to drop is not listed. */
+function followLineup(finder: TradeAdvice): TradeAdvice {
+	const id = (l: PlayerLine): string => l.player.host_id;
+	const roster = [...stampedLineup.slots.map((s) => s.ours), ...stampedLineup.bench];
+	const spotOf = new Map(
+		stampedLineup.slots.filter((s) => !s.no_one_can_play).map((s) => [id(s.ours), s.slot])
+	);
+	const defenseSlots = SLOTS.filter((s) => s === DEFENSE).length;
+	const cost = (a: PlayerLine, b: PlayerLine): number =>
+		(a.points_over_replacement ?? 0) - (b.points_over_replacement ?? 0) ||
+		(b.position_rank ?? 0) - (a.position_rank ?? 0);
+	const pick = (row: TradeRow): TradeRow | null => {
+		if (row.drop === null) return { ...row, drop_reason: null };
+		const gone = new Set(row.give.map(id));
+		const taken = new Set(row.get.map(id));
+		const after = [...roster.filter((l) => !gone.has(id(l))), ...row.get];
+		const seasonStarts = new Set(seasonStarters(after, SLOTS).map(id));
+		const defenses = after.filter((l) => l.player.position === DEFENSE).length;
+		const may = after
+			.filter(
+				(l) =>
+					!taken.has(id(l)) &&
+					!seasonStarts.has(id(l)) &&
+					!l.held &&
+					(l.player.position !== DEFENSE || defenses > defenseSlots)
+			)
+			.sort(cost);
+		const bench = may.find((l) => !spotOf.has(id(l)));
+		if (bench) return { ...row, drop: bench, drop_reason: null };
+		for (const drop of may) {
+			const slot = spotOf.get(id(drop));
+			if (slot === undefined) continue;
+			const starts = new Set(weekStarters(after.filter((l) => l !== drop), SLOTS).map(id));
+			const by = row.get.find((l) => starts.has(id(l)) && accepts(slot, l.player.position));
+			if (by) {
+				const reason = `${lastName(drop.player.name)} starts at ${slot} for you this week, and ${lastName(by.player.name)} takes that spot after the trade.`;
+				return { ...row, drop, drop_reason: reason };
+			}
+		}
+		return null;
+	};
+	return {
+		...finder,
+		teams: finder.teams.map((team) => ({
+			...team,
+			trades: team.trades.flatMap((row) => {
+				const kept = pick(row);
+				return kept === null ? [] : [kept];
+			})
+		}))
+	};
+}
+
 /** The trade finder as the API now answers it (Lane 66g): the week's opponent's whole roster (the
  * one team the recorded week shows whole, its starters with the finder's rows), each trade's change
  * in this week's Proj for both sides (trades.go WeekProj, by week.ts), the verb's moves rule
@@ -694,7 +762,7 @@ function withWeek(finder: TradeAdvice): TradeAdvice {
 		player_points: true
 	};
 }
-const stampedTrades = withWeek(stampedFinder);
+const stampedTrades = withWeek(followLineup(stampedFinder));
 
 const myRoster = [...stampedLineup.slots.map((s) => s.ours), ...stampedLineup.bench];
 const sides = [

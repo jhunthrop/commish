@@ -686,7 +686,8 @@ function pairs<T>(items: readonly T[]): T[][] {
 
 /** The member's drop for a trade that brings in more than it sends to his full roster (the API's
  * withDrop): the last on our order among those the lineup after the trade does not start, never a
- * player held, never his only defense. */
+ * player held, never his only defense. project.ts picks it again against this week's lineup once
+ * the projection is stamped (Lane 66u). */
 function tradeDrop(
 	after: readonly PlayerLine[],
 	give: readonly PlayerLine[],
@@ -740,6 +741,7 @@ function tradesWith(theirs: readonly PlayerLine[]): TradeRow[] {
 						give,
 						get,
 						drop,
+						drop_reason: null,
 						my_gain: myGain,
 						their_gain: theirGain,
 						close_for_them: theirGain < CLOSE_FOR_THEM,

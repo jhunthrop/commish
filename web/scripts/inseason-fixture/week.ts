@@ -66,7 +66,7 @@ export function lineupProj(
 	lines: readonly PlayerLine[],
 	slots: readonly LineupSlot['slot'][]
 ): number {
-	const starters = fill(lines, slots, better, (l) => tierOf(l) === 0);
+	const starters = weekStarters(lines, slots);
 	return tenth(starters.reduce((sum, l) => sum + (printedProj(l) ?? 0), 0));
 }
 
@@ -76,12 +76,29 @@ export function seasonStrength(
 	lines: readonly PlayerLine[],
 	slots: readonly LineupSlot['slot'][]
 ): number {
+	const starters = seasonStarters(lines, slots);
+	return tenth(starters.reduce((sum, l) => sum + (l.points_over_replacement ?? 0), 0));
+}
+
+/** The players the rest-of-season lineup strength starts: by points over replacement, injured
+ * reserve left out. */
+export function seasonStarters(
+	lines: readonly PlayerLine[],
+	slots: readonly LineupSlot['slot'][]
+): PlayerLine[] {
 	const por = (l: PlayerLine): number => l.points_over_replacement ?? Number.NEGATIVE_INFINITY;
-	const starters = fill(
+	return fill(
 		lines,
 		slots,
 		(a, b) => por(b) - por(a),
 		(l) => !l.player.injured_reserve && l.facts.designation?.status !== 'injured_reserve'
 	);
-	return tenth(starters.reduce((sum, l) => sum + (l.points_over_replacement ?? 0), 0));
+}
+
+/** The starters this week's lineup sets: only a player who can play starts. */
+export function weekStarters(
+	lines: readonly PlayerLine[],
+	slots: readonly LineupSlot['slot'][]
+): PlayerLine[] {
+	return fill(lines, slots, better, (l) => tierOf(l) === 0);
 }
