@@ -128,6 +128,16 @@ def test_a_recorded_figure_the_card_does_not_print_is_refused() -> None:
     assert result.violations[0].startswith(f'{FIGURE_OFF_PAGE}: "19.4", where the sheet prints 19.5')
 
 
+def test_the_cards_figure_on_a_tie_is_the_published_projection_the_rules_ask_for() -> None:
+    """Lamb's 19.45 prints 19.5 on the card: the read saying 19.5 names the published projection with its
+    figure, and passes every rule."""
+    sheet, player = _sheet(_REFUSED)
+    read = player["read"].replace("19.4", "19.5")
+    assert week_rule_violations(read, sheet, _call(player)) == []
+    result = validate_week_read(read, sheet, frozenset(player["taken"]), _call(player), asked_shorter=True)
+    assert result.ok, result.violations
+
+
 def test_the_bye_read_says_he_does_not_play_and_recommends_nothing_for_the_week() -> None:
     sheet = next(sheet_from_json(p["sheet"]) for p in _RECORDED if p["sheet"]["bye"])
     read = next(p["read"] for p in _RECORDED if p["sheet"]["bye"])
