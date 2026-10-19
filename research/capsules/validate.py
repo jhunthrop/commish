@@ -29,6 +29,7 @@ from research.capsules.grounding import (
 )
 from research.capsules.multiples import multiple_violations
 from research.capsules.own_rate import own_points_per_game, own_rate_violations
+from research.capsules.page_figures import figure_violations
 from research.capsules.prose_checks import label_copies, label_violation, unfinished_ending, unfinished_violation
 from research.capsules.pull_figures import adp_figures_off_page, facts_page_numbers, pull_figures_of, renderings_of
 from research.capsules.rank_basis import rank_basis_violation, ranks_without_basis
@@ -133,6 +134,9 @@ class Grounding:
     first_game: tuple[int, float | None] | None = None
     # His own points a game, the most a per-game cost or gain put on him may be (`own_rate`).
     own_points_per_game: float | None = None
+    # Every decimal figure must be one the sheet prints (`page_figures`): a week read, whose sheet is the
+    # card's figures. Otherwise only a figure to more decimals than the page prints is refused.
+    exact_figures: bool = False
 
     @property
     def claims(self) -> ClaimLedger:
@@ -279,12 +283,16 @@ def _form_violations(text: str) -> list[str]:
 
 
 def _grounding_violations(text: str, source: Grounding) -> list[str]:
+    """The figures the page does not print first (`page_figures`), then every other number and name
+    that traces to no fact."""
     printed = prompt_numbers(source.prompt_text)
     ledger = [*source.number_ledger, *printed]
-    violations = [
+    off_page = figure_violations(text, source.prompt_text, exact=source.exact_figures)
+    named = {violation.split('"')[1] for violation in off_page}
+    violations = off_page + [
         f'The number "{raw}" does not trace to any supplied fact.'
         for raw, value in extract_numbers(text)
-        if not is_derived_from_ledger(value, ledger) and not is_loose_reading_of(value, printed)
+        if raw not in named and not is_derived_from_ledger(value, ledger) and not is_loose_reading_of(value, printed)
     ]
     violations += [
         f'The name "{phrase}" does not trace to any supplied fact.'
