@@ -12,10 +12,11 @@
 		weeks: readonly number[];
 		/** Names the grid for assistive tech and as its caption. */
 		caption: string;
-		/** The strength column's head: "Opp. avg wins". */
-		strengthLabel: string;
-		/** The last week played, 0 before the first kickoff: weeks up to it are set back, so what is
-		 * left reads at a glance. The page's lead says so. */
+		/** The strength column's head: "Rest of season". Null with no strength to show: no rank or
+		 * strength column is drawn (Lane 80's honest empty state). */
+		strengthLabel: string | null;
+		/** The last complete week, 0 before the first kickoff: its week heads are set back, as each
+		 * game in is (its cell's played), so what is left reads at a glance. The lead says so. */
 		played?: number;
 	}
 
@@ -30,8 +31,10 @@
 		<thead>
 			<tr>
 				<th scope="col" class="club">Club</th>
-				<th scope="col" class="rank">Rank</th>
-				<th scope="col" class="strength">{strengthLabel}</th>
+				{#if strengthLabel !== null}
+					<th scope="col" class="rank">Rank</th>
+					<th scope="col" class="strength">{strengthLabel}</th>
+				{/if}
 				{#each weeks as week (week)}
 					<th scope="col" class="week" class:played={week <= played}>Wk {week}</th>
 				{/each}
@@ -42,7 +45,8 @@
 				<tr>
 					<th scope="row" class="club">
 						<span class="who">
-							<span class="rank-lead" aria-hidden="true">{row.rank}</span>
+							{#if row.rank !== null}<span class="rank-lead" aria-hidden="true">{row.rank}</span
+								>{/if}
 							<Face src={row.face?.src ?? null} size={32} />
 							<span class="names">
 								<a href={row.href}>{row.name}</a>
@@ -50,13 +54,15 @@
 							</span>
 						</span>
 					</th>
-					<td class="rank"><b>{row.rank}</b></td>
-					<td class="strength">{row.strength}</td>
+					{#if strengthLabel !== null}
+						<td class="rank"><b>{row.rank}</b></td>
+						<td class="strength">{row.strength}</td>
+					{/if}
 					{#each row.cells as cell (cell.week)}
 						{#if cell.opponent === null}
-							<td class="week bye" class:played={cell.week <= played}>Bye</td>
+							<td class="week bye" class:played={cell.played}>Bye</td>
 						{:else}
-							<td class="week" class:hard={cell.hard} class:played={cell.week <= played}>
+							<td class="week" class:hard={cell.hard} class:played={cell.played}>
 								<span class="opp">{cell.home ? 'vs' : 'at'} {cell.opponent}</span>
 								<span class="value">{cell.value}</span>
 							</td>

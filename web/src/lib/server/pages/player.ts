@@ -198,11 +198,14 @@ function clubNameOf(list: readonly Club[], team: string): string {
 	return `${club.city} ${club.nickname}`;
 }
 
-/** His club's kickoff in each week, from the run's schedule. */
+/** His club's game in each week, from the run's schedule: its kickoff and its state at the run. */
 async function kickoffsOf(team: string): Promise<KickoffOf> {
 	const slate = (await schedule()).slates.find((candidate) => candidate.abbr === team);
 	if (!slate) throw new Error(`${team} has no slate on the run's schedule.`);
-	return (week) => slate.games.find((game) => game.week === week)?.kickoff ?? null;
+	return (week) => {
+		const game = slate.games.find((candidate) => candidate.week === week);
+		return game === undefined ? null : { kickoff: game.kickoff, state: game.state ?? null };
+	};
 }
 
 export async function playerPage(slug: string): Promise<PlayerPage> {

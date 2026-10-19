@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { scheduleLead } from '#lib/run/strength-words.ts';
 	import SiteShell from '#lib/site/SiteShell.svelte';
 	import PageHead from '#lib/ui/PageHead.svelte';
 	import ScheduleGrid from '#lib/ui/ScheduleGrid.svelte';
@@ -10,7 +9,7 @@
 	let { data }: PageProps = $props();
 
 	const page = $derived(data.page);
-	const lead = $derived(scheduleLead(page, page.strong, page.played));
+	const lead = $derived(page.lead);
 </script>
 
 <SiteShell title="Schedule strength" run={data.run}>
@@ -20,8 +19,10 @@
 		<ScheduleGrid
 			rows={page.rows}
 			weeks={page.weeks}
-			caption="Every club's schedule, hardest first"
-			strengthLabel="Strength"
+			caption={page.strengthLabel === null
+				? "Every club's schedule"
+				: "Every club's schedule, hardest first"}
+			strengthLabel={page.strengthLabel}
 			played={page.played}
 		/>
 	</main>

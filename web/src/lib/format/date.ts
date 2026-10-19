@@ -66,6 +66,13 @@ export function weekdayLabel(iso: string): string {
 	return `${WEEKDAY.format(parse(iso))} ${dayLabel(iso)}`;
 }
 
+const WEEKDAY_LONG = new Intl.DateTimeFormat('en-US', { weekday: 'long', timeZone: ZONE });
+
+/** "Thursday": an instant's weekday on the Eastern clock, as a sentence names a game's day. */
+export function weekdayWord(iso: string): string {
+	return WEEKDAY_LONG.format(parse(iso));
+}
+
 /** "Oct 12, 1:00 AM EDT". */
 export function dayTimeLabel(iso: string): string {
 	return DAY_TIME.format(parse(iso));

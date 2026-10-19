@@ -44,7 +44,8 @@ const TEAM_SNAPS = 'team_offensive_snaps';
 /** The stand-in's own estimate of when a game is final: four hours after its kickoff. The dev
  * copy's nfl_games marks every game scheduled, so there is no final flag to read. The nightly reads
  * the feed's final flag and drops this. */
-const GAME_LENGTH_MS = 4 * 60 * 60 * 1000;
+/** How long after its kickoff the stand-in takes a game to be over, its estimate of the final. */
+export const GAME_LENGTH_MS = 4 * 60 * 60 * 1000;
 /** The usage ingest's metrics. Every other metric of the player-week feed is the stat ingest's. */
 const USAGE_METRICS: ReadonlySet<string> = new Set([
 	'carries',

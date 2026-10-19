@@ -51,6 +51,13 @@ export function figuresWords(c: GameConditions): string | null {
 
 export type GameState = Schemas['GameState'];
 
+/** A game past its kickoff in a word, the one source every screen prints (Lane 80): its kickoff day
+ * or time stands while it is upcoming. */
+export const GAME_STATE_WORDS = {
+	kicked_off: 'Kicked off',
+	final: 'Final'
+} as const satisfies Record<Exclude<GameState, 'upcoming'>, string>;
+
 /** A game as the API sends it: its state (Lane 80), absent on a read from before the field, beside
  * the final flag and the kickoff. */
 export interface StatedGame {

@@ -170,11 +170,11 @@ export function rowOf(board: LeagueBoard, player: LeaguePlayer): LeagueBoardPlay
  * league's exact rules here. */
 export function leagueBasis(
 	figuresScoring: string,
-	through: number,
+	through: string,
 	scoringLike: ScoringPreset,
 	scoresSentence: (scoring: ScoringPreset) => string
 ): string {
-	const reach = through === 0 ? '' : ` through week ${String(through)}`;
+	const reach = through === '' ? '' : ` ${through}`;
 	const same =
 		midSentence(figuresScoring).toLowerCase() === SCORING_WORDS[scoringLike].toLowerCase();
 	const own = same ? '' : ` ${scoresSentence(scoringLike)}`;

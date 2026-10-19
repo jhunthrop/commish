@@ -19,6 +19,7 @@ import {
 import type { StatusView } from '#lib/run/status-view.ts';
 import { POSITIONS, type Position } from '#lib/types/player.ts';
 import {
+	GAME_STATE_WORDS,
 	gameStateOf,
 	halves,
 	toBePlayed,
@@ -66,9 +67,9 @@ export const BOX = {
 	bench: 'Bench',
 	reserve: 'Injured reserve',
 	bye: 'Bye',
-	final: 'Final',
+	final: GAME_STATE_WORDS.final,
 	/** A game past its kickoff whose final is not in yet (Lane 80). */
-	kickedOff: 'Kicked off',
+	kickedOff: GAME_STATE_WORDS.kicked_off,
 	/** A number not held yet: before kickoff, or with no projection. */
 	none: EMPTY_FIGURE,
 	you: 'You',

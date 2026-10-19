@@ -423,7 +423,19 @@ export const gameSchema = z.object({
 	home: z.boolean(),
 	/** When the game kicks off. A time the league has not set yet is the start of its day on the
 	 * Eastern clock. The season's first kickoff is the earliest of them. */
-	kickoff: isoTime
+	kickoff: isoTime,
+	/** Its state at the run's instant (Lane 80), the API's one rule: final once either side's result
+	 * or line is in, kicked off from its kickoff until then, upcoming before. Absent on a run from
+	 * before the nightly wrote it. */
+	state: z.enum(['upcoming', 'kicked_off', 'final']).optional()
+});
+
+/** A slate's games still to play at the run's instant (Lane 80): their strength to a tenth, its rank
+ * among the clubs with a game left (1 the hardest), and how it is measured. */
+export const restSlateSchema = z.object({
+	strength: points,
+	rank: z.number().int().min(1).max(32),
+	method: phrase
 });
 
 export const slateSchema = z.object({
@@ -437,7 +449,9 @@ export const slateSchema = z.object({
 	 * article, "the average of each club's opponents' expected wins for the season, ...". */
 	method: phrase,
 	/** When the inputs were read, from their own stamps. */
-	window: windowSchema
+	window: windowSchema,
+	/** The rest of the season (Lane 80), null with no game left; absent on a run from before. */
+	rest: restSlateSchema.nullable().optional()
 });
 
 export const scheduleSchema = z

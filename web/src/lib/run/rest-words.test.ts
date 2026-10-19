@@ -23,7 +23,7 @@ const REST: Format = {
 
 void test('from the switch week the lead names the rest of the season, the refresh day and the figures', () => {
 	assert.equal(
-		restLead(REST, { scoring: 'PPR', through: 5 }, 2026),
+		restLead(REST, { scoring: 'PPR', through: 'through week 5' }, 2026),
 		"Ranked by points over replacement for the rest of the 2026 season from week 7, refreshed October 14. Games and Avg are this season's, through week 5."
 	);
 });
@@ -31,7 +31,7 @@ void test('from the switch week the lead names the rest of the season, the refre
 void test('on a board of another scoring the figures name theirs', () => {
 	const half: Format = { ...REST, id: 'half-ppr-12', label: 'Half PPR' };
 	assert.equal(
-		restLead(half, { scoring: 'PPR', through: 5 }, 2026),
+		restLead(half, { scoring: 'PPR', through: 'through week 5' }, 2026),
 		"Ranked by points over replacement for the rest of the 2026 season from week 7, refreshed October 14. Games and Avg are this season's, scored in PPR, through week 5."
 	);
 });
@@ -39,13 +39,13 @@ void test('on a board of another scoring the figures name theirs', () => {
 void test('the refresh day is the day on the Eastern clock', () => {
 	const late: Format = { ...REST, refreshedAt: '2026-10-15T03:30:00.000Z' };
 	assert.match(
-		restLead(late, { scoring: 'PPR', through: 5 }, 2026) ?? '',
+		restLead(late, { scoring: 'PPR', through: 'through week 5' }, 2026) ?? '',
 		/refreshed October 14\./
 	);
 });
 
 void test('a preseason board has no rest-of-season lead', () => {
-	assert.equal(restLead(PPR, { scoring: 'PPR', through: 5 }, 2026), null);
+	assert.equal(restLead(PPR, { scoring: 'PPR', through: 'through week 5' }, 2026), null);
 });
 
 void test('in season the rows carry no range and the scale is one step drawn by no bar', () => {

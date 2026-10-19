@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { plural } from '#lib/format/number.ts';
-	import { clubsLead, hardestWords, strengthFigure } from '#lib/run/strength-words.ts';
 	import SiteShell from '#lib/site/SiteShell.svelte';
 	import { links } from '#lib/site/links.ts';
 	import Figure from '#lib/ui/Figure.svelte';
@@ -13,7 +12,7 @@
 	let { data }: PageProps = $props();
 
 	const page = $derived(data.page);
-	const lead = $derived(clubsLead(page.format.label, page.clubs[0]?.slate));
+	const lead = $derived(page.lead);
 </script>
 
 <SiteShell title="Clubs" run={data.run}>
@@ -27,11 +26,9 @@
 						href={links.club(club.abbr)}
 						meta="{club.abbr} · bye week {club.bye ?? 'not set'}"
 					>
-						<Figure
-							value={strengthFigure(club.slate.strength)}
-							size="md"
-							caption="{page.unit}, {hardestWords(club.slate.rank, page.clubs.length)}"
-						/>
+						{#if club.strength}
+							<Figure value={club.strength.value} size="md" caption={club.strength.caption} />
+						{/if}
 						{#if club.lead}
 							<PlayerLine
 								name={club.lead.name}

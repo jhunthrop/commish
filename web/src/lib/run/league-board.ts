@@ -11,7 +11,7 @@ export interface LeagueBoardFile {
 	 * status when the capture lists him. */
 	rows: readonly (SeasonedRow & { status?: PlayerStatus })[];
 	/** What the season figures are: the format they are scored in and the last week they reach. */
-	season: { scoring: string; through: number };
+	season: { scoring: string; through: string };
 	/** The injury capture the statuses come from, null when the run carries none. */
 	capture: CaptureStamp | null;
 }
