@@ -58,3 +58,39 @@ export function bannedPattern(own?: RegExp): RegExp {
 export function bannedIn(text: string, own?: RegExp): string | null {
 	return bannedPattern(own).exec(text)?.[0] ?? null;
 }
+
+/** A string that ends a sentence is copy (a basis, a writer's line), never data. */
+const SENTENCE_END = /[.!?]$/u;
+
+/** The strings a page was handed as data, from any JSON the API or the run answered: every string
+ * value, nested at any depth, that is not a sentence. Player, club and team names and row data are
+ * the API's own words, so a page's scan skips them (ruling R3); a sentence the API wrote is copy and
+ * is always scanned. */
+export function dataStrings(value: unknown): Set<string> {
+	if (typeof value === 'string') {
+		const text = value.trim();
+		return new Set(text === '' || SENTENCE_END.test(text) ? [] : [text]);
+	}
+	const children = Array.isArray(value)
+		? (value as unknown[])
+		: value !== null && typeof value === 'object'
+			? Object.values(value)
+			: [];
+	return new Set(children.flatMap((child) => [...dataStrings(child)]));
+}
+
+/** The first banned word or mark in a page's copy, the data it was handed skipped (ruling R3): a
+ * name like "Las Vegas Raiders" or "Jadarian Price" is taken out before the scan, while a data
+ * string that is only a banned word ("Totals") excuses nothing, so a head the web prints is still
+ * caught. Null with none. */
+export function bannedInCopy(text: string, data: Iterable<string>, own?: RegExp): string | null {
+	const pattern = bannedPattern(own);
+	const names = [...data]
+		.filter((s) => {
+			const hit = pattern.exec(s)?.[0];
+			return hit !== undefined && hit.length < s.length;
+		})
+		.sort((a, b) => b.length - a.length);
+	const copy = names.reduce((left, name) => left.split(name).join(' '), text);
+	return bannedIn(copy, own);
+}

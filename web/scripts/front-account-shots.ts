@@ -9,7 +9,8 @@
 // clear of the bug. On the Account room it asserts the five platform rows with their states, the
 // signed-out platform's solid verb, Sleeper's row in words, the leagues table with a last read and
 // Open on each league, the
-// theme and time zone under Display, and that neither page says "host". Exits non-zero on any
+// theme and time zone under Display, and that both pages pass the one copy guard ("host" among its
+// words, the names and rows the API handed them skipped, copy-scan.ts). Exits non-zero on any
 // fault. Prints the stand-ins each shot carries.
 //
 //   node scripts/front-account-shots.ts [web origin] [out dir, from scripts/]
@@ -17,6 +18,7 @@
 import { mkdir } from 'node:fs/promises';
 import { chromium, type BrowserContext, type Page } from 'playwright';
 import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
+import { copyFault, watchData } from './copy-scan.ts';
 
 const THEMES = ['dark', 'light'] as const;
 const WIDTHS = [1440, 1024, 800, 768, 390] as const;
@@ -57,6 +59,7 @@ async function context(theme: string, width: number, height: number): Promise<Br
 		colorScheme: theme as 'light',
 		deviceScaleFactor: width < 500 ? 2 : 1
 	});
+	watchData(ctx);
 	await ctx.addCookies([{ ...SIGNED_IN, domain: 'localhost', path: '/' }]);
 	await ctx.addInitScript(
 		([key, value]: readonly [string, string]) => localStorage.setItem(key, value),
@@ -97,10 +100,6 @@ async function basisLines(page: Page): Promise<number> {
 			return n + Math.round(p.getBoundingClientRect().height / lh);
 		}, 0);
 	});
-}
-
-async function saysHost(page: Page): Promise<boolean> {
-	return page.evaluate(() => /\bhosts?\b/i.test(document.querySelector('main')?.innerText ?? ''));
 }
 
 async function front(theme: string, width: number): Promise<void> {
@@ -147,7 +146,8 @@ async function front(theme: string, width: number): Promise<void> {
 		fault(where, `other bugs' changes ${seen.changes.join(' | ')}`);
 	if (!seen.aside[0]?.startsWith(`${['No', 'One', 'Two', 'Three'][seen.chips.length] ?? ''} fact`))
 		fault(where, `roster aside ${seen.aside.join()}`);
-	if (await saysHost(page)) fault(where, 'says host');
+	const banned = await copyFault(page);
+	if (banned !== null) fault(where, `says ${banned}`);
 	const lines = await basisLines(page);
 	const most = width < 500 ? MOST_LINES_PHONE : MOST_LINES_DESK;
 	if (lines === 0 || lines > most)
@@ -213,7 +213,8 @@ async function account(theme: string, width: number): Promise<void> {
 		fault(where, `${String(seen.opens)} Open of ${String(seen.leagues)}`);
 	if (!seen.display.includes('Time zone') || !seen.display.includes('Theme'))
 		fault(where, 'display');
-	if (await saysHost(page)) fault(where, 'says host');
+	const banned = await copyFault(page);
+	if (banned !== null) fault(where, `says ${banned}`);
 	if (width < 500 && theme === 'dark')
 		await page.screenshot({ path: shot(`account-${theme}-390-first-screen`) });
 	if (SHOT_WIDTHS.has(width) && (width > 500 || theme === 'dark')) {

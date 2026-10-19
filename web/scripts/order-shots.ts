@@ -6,7 +6,8 @@
 // never scrolls sideways, and that the basis draws at most five rendered lines at 1440 and eight at 390
 // (measured, never counted in paragraphs; Lane 66q turned the phone's on). It also asserts the heads ("Our rest-of-season order" over #, Rest of season
 // over Points and A game), that every figure cell prints one decimal or --, that Trade for him sits on
-// fewer than a third of the rows, that no word says "host", the record's Order matched head with the
+// fewer than a third of the rows, that the copy passes the one guard ("host" among its words, the
+// names and rows the API and the run handed it skipped, copy-scan.ts), the record's Order matched head with the
 // published projection's -- before its week, the honest sentence where the run carries one, and the
 // record's chart at least 200 px tall on a phone. Exits non-zero on any fault.
 //
@@ -16,6 +17,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { chromium, type BrowserContext, type Page } from 'playwright';
 import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
+import { copyFault, watchData } from './copy-scan.ts';
 
 const web = process.argv[2] ?? 'http://localhost:4196';
 const out = new URL(process.argv[3] ?? '../screenshots/order/', import.meta.url);
@@ -98,6 +100,7 @@ async function context(theme: string, width: number, signedIn: boolean): Promise
 		colorScheme: theme as 'light',
 		deviceScaleFactor: width <= PHONE_MAX ? 2 : 1
 	});
+	watchData(ctx);
 	if (signedIn) await ctx.addCookies([{ ...SIGNED_IN, domain: 'localhost', path: '/' }]);
 	await ctx.addInitScript(
 		([key, value]: readonly [string, string]) => localStorage.setItem(key, value),
@@ -126,10 +129,7 @@ async function common(page: Page, screen: Screen, width: number): Promise<string
 			basisLines: basis.reduce((n, p) => {
 				const style = getComputedStyle(p);
 				return n + Math.round(p.getBoundingClientRect().height / parseFloat(style.lineHeight));
-			}, 0),
-			host: [...document.querySelectorAll('main p, main td, main th, main button, main a')]
-				.map((el) => (el as HTMLElement).innerText)
-				.filter((text) => /\bhosts?\b/i.test(text))
+			}, 0)
 		};
 	});
 	const said: string[] = [];
@@ -145,7 +145,8 @@ async function common(page: Page, screen: Screen, width: number): Promise<string
 		process.stdout.write(
 			`${screen.name} ${String(width)} basis ${String(seen.basisLines)} lines\n`
 		);
-	for (const word of seen.host) said.push(`${screen.name} says host: ${word}`);
+	const banned = await copyFault(page);
+	if (banned !== null) said.push(`${screen.name} at ${String(width)} says ${banned}`);
 	return said;
 }
 

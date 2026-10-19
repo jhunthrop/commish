@@ -3,7 +3,14 @@
 // with `npm test`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { BANNED_MARKS, BANNED_WORDS, BETTING_WORDS, bannedIn } from './copy-guard.ts';
+import {
+	BANNED_MARKS,
+	BANNED_WORDS,
+	BETTING_WORDS,
+	bannedIn,
+	bannedInCopy,
+	dataStrings
+} from './copy-guard.ts';
 
 void test('the list holds the betting, trading and platform words, whole words in any case', () => {
 	for (const word of ['Odds', 'line', 'totals', 'over/under', 'Market', 'buy', 'hosts', 'Vegas'])
@@ -47,4 +54,30 @@ void test('bannedIn names the first banned word or mark, a guard composing its o
 	assert.equal(bannedIn('one; two'), ';');
 	assert.equal(bannedIn('his value rises'), null);
 	assert.equal(bannedIn('his value rises', /\bvalue\b/i), 'value');
+});
+
+void test('the guard scans copy, not data: a name the page was handed is skipped, a sentence never (ruling R3)', () => {
+	const data = dataStrings({
+		players: [{ name: 'Jadarian Price', team: 'Las Vegas Raiders' }],
+		heads: ['Totals'],
+		basis: 'Our board reads the spreads.'
+	});
+	assert.ok(data.has('Jadarian Price'));
+	assert.ok(data.has('Las Vegas Raiders'));
+	// A sentence the API wrote is copy, so it is never data.
+	assert.ok(!data.has('Our board reads the spreads.'));
+	assert.equal(bannedInCopy('Jadarian Price, RB, Las Vegas Raiders. Proj 12.4', data), null);
+	// A data string that is only a banned word excuses nothing: "Totals" as a head is still caught.
+	assert.equal(bannedInCopy('Totals 104.2', data), 'Totals');
+	assert.equal(bannedInCopy('Price is a reach here', data), 'Price');
+	assert.equal(bannedInCopy('Our board reads the spreads.', data), 'spreads');
+	assert.equal(bannedInCopy('Jadarian Price; Proj 12.4', data), ';');
+	assert.equal(bannedInCopy('his value rises', data, /\bvalue\b/i), 'value');
+});
+
+void test('data strings come from any JSON, nested in arrays and objects, numbers and keys left out', () => {
+	assert.deepEqual(
+		[...dataStrings([{ a: 'Las Vegas Raiders', n: 3, nested: [['Ja Price']] }, null, 'Done.'])],
+		['Las Vegas Raiders', 'Ja Price']
+	);
 });
