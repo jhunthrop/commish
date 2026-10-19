@@ -56,6 +56,7 @@ from research.nightly.publish import take_run_id
 from research.nightly.r2 import run_store
 from research.nightly.register_log import WEEKLY_SUFFIX, record_freeze, record_pass
 from research.nightly.week_reads import run_week_read_step
+from research.pipeline.budget import FixedBudget
 from research.pipeline.commands import ODDS_KEY_ENV, now_ms
 from research.pipeline.http import LiveFetcher
 from research.pipeline.kickoff_slots import due_slot, kickoff_slots
@@ -63,7 +64,7 @@ from research.pipeline.kickoffs import stored_kickoffs
 from research.pipeline.nws.client import NwsClient
 from research.pipeline.nws.forecast import FORECAST_SOURCE, run_forecast_pass
 from research.pipeline.odds.touchdowns import run_td_snapshot
-from research.pipeline.tank01.capture import CaptureResult, run_capture_harvest
+from research.pipeline.tank01.capture import CAPTURE_HARVEST_REQUEST_BUDGET, CaptureResult, run_capture_harvest
 from research.pipeline.tank01.client import API_KEY_ENV, DEFAULT_SEASON, SEASON_ENV, Tank01Client
 from research.pipeline.tank01.game_status import STATUS_SOURCE, capture_game_status
 from research.pipeline.tank01.lines import LINES_SOURCE, lines_after_harvest
@@ -202,7 +203,9 @@ def _capture_harvest(now: datetime) -> bool:
         with engine.begin() as conn:
             result = run_capture_harvest(conn, Tank01Client(fetcher, key), now, season)
         facts_ok = _game_facts(engine, fetcher, result, now)
-        status_ok = _game_status(engine, Tank01Client(fetcher, key), now, season)
+        # On what the harvest left of its request budget this pass (Lane 80).
+        left = CAPTURE_HARVEST_REQUEST_BUDGET - sum(feed.requests for feed in result.feeds)
+        status_ok = _game_status(engine, Tank01Client(fetcher, key), now, season, FixedBudget(left))
     finally:
         fetcher.close()
         engine.dispose()
@@ -222,12 +225,12 @@ def _capture_harvest(now: datetime) -> bool:
     return not failed and facts_ok and status_ok and parsed and market and charts
 
 
-def _game_status(engine: Engine, client: Tank01Client, now: datetime, season: int) -> bool:
+def _game_status(engine: Engine, client: Tank01Client, now: datetime, season: int, budget: FixedBudget) -> bool:
     """The games' statuses (Lane 80), in a transaction of their own so a refused read never rolls back
     the capture: its line names its requests, and a refusal by the hourly cap is not a failure."""
     try:
         with engine.begin() as conn:
-            status = capture_game_status(conn, client, season, now)
+            status = capture_game_status(conn, client, season, now, budget)
     except (ResearchError, httpx.HTTPError) as error:
         _line(f"  {STATUS_SOURCE}: FAILED, {error}")
         return False

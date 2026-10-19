@@ -11,9 +11,10 @@ import pytest
 from sqlalchemy import Connection, insert, select
 
 from research.db.engine import make_engine
-from research.db.schema import CAPTURE_SNAPSHOTS, TEAM_WEEK_OBSERVATIONS
+from research.db.schema import CAPTURE_CHECKS, CAPTURE_SNAPSHOTS, TEAM_WEEK_OBSERVATIONS
 from research.db.url import sqlalchemy_url
 from research.parity import databases
+from research.pipeline.budget import FixedBudget
 from research.pipeline.kickoffs import TeamKickoff
 from research.pipeline.nflverse.schedule import ScheduleMetric, ScheduleSource
 from research.pipeline.tank01 import game_status
@@ -33,6 +34,7 @@ THURSDAY: Final = datetime(2026, 10, 16, 0, 15, tzinfo=UTC)
 NEXT_SUNDAY: Final = SUNDAY + timedelta(days=7)
 _DATABASE: Final = "parity_lane80_game_status"
 WEEK: Final = 6
+BUDGET: Final = FixedBudget(10)
 
 
 def _k(week: int, team: str, at: datetime) -> TeamKickoff:
@@ -107,13 +109,17 @@ def test_one_call_a_pass_kept_and_read_under_the_hourly_cap() -> None:
         with engine.begin() as conn:
             _seed(conn)
             # Quiet Saturday: no call.
-            assert capture_game_status(conn, tank01, 2026, SUNDAY - timedelta(hours=20)).requests == 0
+            assert capture_game_status(conn, tank01, 2026, SUNDAY - timedelta(hours=20), BUDGET).requests == 0
             at = SUNDAY + timedelta(hours=4)
-            first = capture_game_status(conn, tank01, 2026, at)
+            first = capture_game_status(conn, tank01, 2026, at, BUDGET)
             assert (first.requests, first.written) == (1, 6)
             assert client.calls == [{"week": "6", "season": "2026", "seasonType": "reg"}]
+            checked = conn.execute(
+                select(CAPTURE_CHECKS.c.checked_at).where(CAPTURE_CHECKS.c.source == game_status.SNAPSHOT_SOURCE)
+            ).scalar_one()
+            assert checked == at
             # MIA's final is held now, so the next hour asks nothing.
-            assert capture_game_status(conn, tank01, 2026, at + timedelta(hours=1)).requests == 0
+            assert capture_game_status(conn, tank01, 2026, at + timedelta(hours=1), BUDGET).requests == 0
             finals = conn.execute(
                 select(TEAM_WEEK_OBSERVATIONS.c.team).where(
                     TEAM_WEEK_OBSERVATIONS.c.source == STATUS_SOURCE, TEAM_WEEK_OBSERVATIONS.c.value == FINAL_VALUE
@@ -127,8 +133,12 @@ def test_one_call_a_pass_kept_and_read_under_the_hourly_cap() -> None:
                 [{"source": game_status.SNAPSHOT_SOURCE, "captured_at": again, "digest": "d", "payload": []}],
             )
             conn.execute(TEAM_WEEK_OBSERVATIONS.delete().where(TEAM_WEEK_OBSERVATIONS.c.source == STATUS_SOURCE))
-            refused = capture_game_status(conn, tank01, 2026, again + timedelta(minutes=1))
+            refused = capture_game_status(conn, tank01, 2026, again + timedelta(minutes=1), BUDGET)
             assert refused.requests == 0 and "REFUSED" in refused.line
+            assert len(client.calls) == HOURLY_CAP - 1
+            # The harvest's budget spent: no call, said so.
+            spent = capture_game_status(conn, tank01, 2026, again + timedelta(hours=2), FixedBudget(0))
+            assert spent.requests == 0 and "request budget" in spent.line
             assert len(client.calls) == HOURLY_CAP - 1
     finally:
         engine.dispose()

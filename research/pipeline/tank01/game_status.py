@@ -14,8 +14,8 @@ THE BUDGET. One request a pass, and never more than HOURLY_CAP in any hour: a pa
 cap reached asks nothing and says so. With the season's game days and a game's few hours to its
 final, that is about 20 calls a week, some 360 a regular season, inside the purchased quota.
 
-A FINAL IS HELD once the store has the club-week's nflverse result, a Tank01 final, or a line for
-either side, the rule the API's gameStateAt and the run's states keep (Lane 66s)."""
+A FINAL IS HELD by the one rule, the `club_week_finals` view (revision 0014): the weekly result, a
+Tank01 final, or a line with the club, which the API's week facts and the run's states read too."""
 
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -24,12 +24,13 @@ from typing import Final
 
 from sqlalchemy import Connection, func, select, text
 
-from research.db.schema import CAPTURE_SNAPSHOTS
+from research.db.schema import CAPTURE_SNAPSHOTS, CLUB_WEEK_FINALS
+from research.pipeline.budget import RequestBudget
 from research.pipeline.jscompat import js_json_stringify
 from research.pipeline.kickoffs import TeamKickoff, stored_kickoffs
 from research.pipeline.nflverse.team_codes import source_team_code
 from research.pipeline.observations import TeamWeekObservation, record_team_observations
-from research.pipeline.tank01.capture import digest_of
+from research.pipeline.tank01.capture import FeedOutcome, digest_of, record_checks
 from research.pipeline.tank01.client import Paths, Tank01Client
 from research.pipeline.tank01.mapping import SEASON_TYPE, GameStatus, map_games
 
@@ -43,12 +44,9 @@ FINAL_VALUE: Final = STATUS_VALUES["final"]
 LOOKBACK: Final = timedelta(hours=12)
 HOURLY_CAP: Final = 2
 _HOUR: Final = timedelta(hours=1)
-
-_HELD: Final = text(
-    "select distinct team, week from research.team_week_observations where season = :s and as_of <= :now and "
-    "((metric = 'game_result') or (source = :status and metric = :metric and value = :final)) "
-    "union select distinct team, week from research.player_week_teams where season = :s and as_of <= :now"
-)
+# The status pass's advisory lock (pg_advisory_xact_lock), released with its transaction.
+_LOCK_KEY: Final = 80_0001
+_LOCK: Final = text("select pg_advisory_xact_lock(:key)")
 
 
 # Every call kept, the same answer twice included: the hour's calls are counted from these rows.
@@ -68,11 +66,10 @@ class StatusResult:
 
 
 def finals_held(conn: Connection, season: int, now: datetime) -> frozenset[tuple[str, int]]:
-    """The club-weeks (source codes) the store holds a final for at `now`, from either source or a line."""
-    rows = conn.execute(
-        _HELD, {"s": season, "now": now, "status": STATUS_SOURCE, "metric": STATUS_METRIC, "final": FINAL_VALUE}
-    )
-    return frozenset((str(r.team), int(r.week)) for r in rows)
+    """The club-weeks (source codes) final at `now` by the one rule, the `club_week_finals` view."""
+    view = CLUB_WEEK_FINALS
+    query = select(view.c.team, view.c.week).where(view.c.season == season, view.c.held_at <= now)
+    return frozenset((str(r.team), int(r.week)) for r in conn.execute(query))
 
 
 def pending_week(kickoffs: Sequence[TeamKickoff], held: frozenset[tuple[str, int]], now: datetime) -> int | None:
@@ -110,17 +107,26 @@ def status_observations(body: object, season: int, week: int, now: datetime) -> 
     return rows
 
 
-def capture_game_status(conn: Connection, client: Tank01Client, season: int, now: datetime) -> StatusResult:
-    """The pass's status read: asked only while a game waits on its final, under the hourly cap."""
+def capture_game_status(
+    conn: Connection, client: Tank01Client, season: int, now: datetime, budget: RequestBudget
+) -> StatusResult:
+    """The pass's status read: asked only while a game waits on its final, on the harvest's request
+    budget, under the hourly cap. The count and the call are taken under a transaction-scoped advisory
+    lock, so two passes at once never both count under the cap and both call."""
     week = pending_week(stored_kickoffs(conn, season), finals_held(conn, season, now), now)
     if week is None:
         return StatusResult(0, 0, "no game waiting on its final, 0 requests")
+    conn.execute(_LOCK, {"key": _LOCK_KEY})
     made = calls_this_hour(conn, now)
     if made >= HOURLY_CAP:
         return StatusResult(0, 0, f"REFUSED, {made} calls this hour, the cap is {HOURLY_CAP}, 0 requests")
+    reservation = budget.reserve(1)
+    if not reservation.granted:
+        return StatusResult(0, 0, f"REFUSED by the request budget ({reservation.denial}), 0 requests")
     body = client.get(Paths.GAMES_FOR_WEEK, {"week": str(week), "season": str(season), "seasonType": SEASON_TYPE})
     row = {"source": SNAPSHOT_SOURCE, "captured_at": now, "digest": digest_of(body), "payload": js_json_stringify(body)}
     conn.execute(_INSERT, row)
+    record_checks(conn, [FeedOutcome(SNAPSHOT_SOURCE, "captured", 1)], now)
     rows = status_observations(body, season, week, now)
     written = record_team_observations(conn, rows)
     finals = sum(1 for row in rows if row.value == FINAL_VALUE)

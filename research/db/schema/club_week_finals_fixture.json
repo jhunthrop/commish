@@ -1,0 +1,27 @@
+{
+	"about": "The one final-held rule's shared fixture (Lane 80): the research test (tests/test_club_week_finals.py) and the API's (api/internal/boards/finals_test.go) load these rows into club_week_finals.sql's tables and both expect exactly `finals` from the view, each with the first instant it was held.",
+	"observations": [
+		{ "season": 2026, "week": 5, "team": "SEA", "source": "nflverse_kickoff", "metric": "game_result", "value": 1, "as_of": "2026-10-14T12:00:00Z" },
+		{ "season": 2026, "week": 5, "team": "ARI", "source": "nflverse_kickoff", "metric": "game_result", "value": 0, "as_of": "2026-10-14T12:00:00Z" },
+		{ "season": 2026, "week": 6, "team": "MIA", "source": "tank01_game_status", "metric": "game_status", "value": 1, "as_of": "2026-10-18T19:00:00Z" },
+		{ "season": 2026, "week": 6, "team": "MIA", "source": "tank01_game_status", "metric": "game_status", "value": 2, "as_of": "2026-10-18T21:00:00Z" },
+		{ "season": 2026, "week": 6, "team": "BUF", "source": "tank01_game_status", "metric": "game_status", "value": 2, "as_of": "2026-10-18T21:00:00Z" },
+		{ "season": 2026, "week": 6, "team": "BUF", "source": "nflverse_kickoff", "metric": "game_result", "value": 1, "as_of": "2026-10-20T12:00:00Z" },
+		{ "season": 2026, "week": 6, "team": "DAL", "source": "tank01_game_status", "metric": "game_status", "value": 1, "as_of": "2026-10-19T01:00:00Z" },
+		{ "season": 2026, "week": 6, "team": "WAS", "source": "other_source", "metric": "game_result", "value": 1, "as_of": "2026-10-19T12:00:00Z" },
+		{ "season": 2026, "week": 6, "team": "KC", "source": "nflverse_kickoff", "metric": "kickoff_instant", "value": 1, "as_of": "2026-10-18T17:00:00Z" }
+	],
+	"teams": [
+		{ "season": 2026, "week": 6, "player_id": "u-jsn", "team": "SEA", "as_of": "2026-10-16T09:00:00Z" },
+		{ "season": 2026, "week": 6, "player_id": "u-bow", "team": "DEN", "as_of": "2026-10-16T09:00:00Z" },
+		{ "season": 2026, "week": 6, "player_id": "u-bow", "team": "DEN", "as_of": "2026-10-20T12:00:00Z" }
+	],
+	"finals": [
+		{ "season": 2026, "week": 5, "team": "ARI", "held_at": "2026-10-14T12:00:00Z" },
+		{ "season": 2026, "week": 5, "team": "SEA", "held_at": "2026-10-14T12:00:00Z" },
+		{ "season": 2026, "week": 6, "team": "BUF", "held_at": "2026-10-18T21:00:00Z" },
+		{ "season": 2026, "week": 6, "team": "DEN", "held_at": "2026-10-16T09:00:00Z" },
+		{ "season": 2026, "week": 6, "team": "MIA", "held_at": "2026-10-18T21:00:00Z" },
+		{ "season": 2026, "week": 6, "team": "SEA", "held_at": "2026-10-16T09:00:00Z" }
+	]
+}
