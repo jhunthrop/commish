@@ -91,7 +91,7 @@ function noneWords(season: PlayerSeason): string {
 	const { through } = season;
 	return through === 0
 		? `The ${String(season.season)} season has not reached its first week.`
-		: `He has no ${String(season.season)} stat line through week ${String(through)}.`;
+		: `He has no ${String(season.season)} stats through week ${String(through)}.`;
 }
 
 /** The season's points as the box adds them: the sum of the tenths each played row prints (review

@@ -27,7 +27,7 @@ function gradedWeeks(record: RunRecord): RecordWeek[] {
 	return record.weeks.filter((week) => week.status === 'graded');
 }
 
-/** Weeks whose board froze, graded or still waiting on the stat lines. */
+/** Weeks whose board froze, graded or still waiting on the stats. */
 function frozenWeeks(record: RunRecord): RecordWeek[] {
 	return record.weeks.filter((week) => week.status === 'graded' || week.status === 'frozen');
 }
@@ -94,13 +94,13 @@ function lead(weeks: readonly RecordWeek[]): string {
 }
 
 /** A graded or frozen week as a person says it: "frozen Sep 8, graded Oct 14", "frozen Oct 13, not
- * played yet" before its first kickoff, "frozen Oct 13, waiting on the stat lines" after it. */
+ * played yet" before its first kickoff, "frozen Oct 13, waiting on the stats" after it. */
 function frozenWords(week: RecordWeek, unplayed: readonly number[]): string {
 	const frozen = `frozen ${stamp(week.frozenAt, week)}`;
 	if (week.status === 'graded') return `${frozen}, graded ${stamp(week.gradedAt, week)}`;
 	return unplayed.includes(week.week)
 		? `${frozen}, not played yet`
-		: `${frozen}, waiting on the stat lines`;
+		: `${frozen}, waiting on the stats`;
 }
 
 /** A missed week's reason as a clause: the run's note ("Our weekly freeze failed that week.") with its
