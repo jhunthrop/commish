@@ -13,6 +13,7 @@ import { mkdir } from 'node:fs/promises';
 import { chromium, type BrowserContext, type Page } from 'playwright';
 import { bannedPattern } from '../src/lib/format/copy-guard.ts';
 import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
+import { FIXTURE_WEEK_CLOCK } from './inseason-fixture/clock.ts';
 import { FIXTURE_IDS } from './inseason-fixture/ids.ts';
 
 const THEMES = ['light', 'dark'] as const;
@@ -67,6 +68,9 @@ async function context(theme: string, width: number): Promise<BrowserContext> {
 		colorScheme: theme as 'light',
 		timezoneId: ZONE
 	});
+	// The week's clock, not the day the script runs: past Sunday's kickoffs every game would read as
+	// played and no box would carry its facts.
+	await ctx.clock.install({ time: new Date(FIXTURE_WEEK_CLOCK) });
 	await ctx.addCookies([{ ...SIGNED_IN, domain: 'localhost', path: '/' }]);
 	await ctx.addInitScript(
 		([key, value]: readonly [string, string]) => localStorage.setItem(key, value),
