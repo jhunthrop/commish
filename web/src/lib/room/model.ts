@@ -12,6 +12,10 @@ export interface RoomPlayer extends PlayerRef {
 	points: number | null;
 	/** Points over replacement for this league, null when he has none. */
 	vor: number | null;
+	/** Drafters' ADP less his place on our board, the API's tenth as given (the board row's Gap),
+	 * null where the API sends none (a kicker, a defense, a player with no ADP, a server older than
+	 * the column). */
+	gap?: number | null;
 	/** The round his points over replacement rank in on this board, for the value cell's tint. */
 	vorRound: number | null;
 	bye: number | null;
@@ -49,6 +53,7 @@ export function boardOf(board: RoomBoard, teams: number): Board {
 			adp: p.adp,
 			points: p.points,
 			vor: p.vor,
+			gap: p.gap ?? null,
 			vorRound: rank === undefined ? null : Math.ceil(rank / teams),
 			bye: p.bye
 		};

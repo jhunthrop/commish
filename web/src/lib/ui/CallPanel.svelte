@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { adpFigure, chanceShort } from '#lib/format/draft.ts';
+	import { gapText, gapTone } from '#lib/format/gap.ts';
 	import { signed } from '#lib/format/number.ts';
 	import { isMarketPosition } from '#lib/run/market.ts';
 	import type { CallAction, CallRow } from '#lib/types/room.ts';
@@ -60,6 +61,7 @@
 			<span class="n">Over repl</span>
 			<span class="n">{chanceHead ?? ''}</span>
 			<span class="n adp">ADP</span>
+			<span class="n adp gapc">Gap</span>
 			<span class="go"></span>
 		</div>
 		{#each rows as row, i (row.player.id)}
@@ -90,6 +92,11 @@
 					>{chanceHead === null || row.chance === null ? '' : chanceShort(row.chance)}</span
 				>
 				<span class="n adp">{adpFigure(row.adp)}</span>
+				<span
+					class="n adp gapc"
+					class:gain={gapTone(row.gap) === 'gain'}
+					class:loss={gapTone(row.gap) === 'loss'}>{gapText(row.gap)}</span
+				>
 				<span class="go"
 					>{#if i === 0}{@render verb()}{/if}</span
 				>
@@ -104,8 +111,22 @@
 	   actions. At your last pick the chance track stays, empty, as the pool keeps its column, so every
 	   figure still sits over the pool's column for it. */
 	.call {
-		--call-cols: 40px minmax(0, 1fr) 118px 136px 118px 150px;
+		--call-cols: 40px minmax(0, 1fr) 118px 136px 118px var(--gap-track,) 150px;
 		padding: var(--s-3) 0 0;
+	}
+
+	/* The Gap sits over the pool's Gap column, drawn only where the room's pool carries one (the
+	   track and the cell come from RoomLayout's --gap-track and --gap-display). */
+	.gapc {
+		display: var(--gap-display, none);
+	}
+
+	.gain {
+		color: var(--gain-ink);
+	}
+
+	.loss {
+		color: var(--loss-ink);
 	}
 
 	.tag {
@@ -240,7 +261,7 @@
 	/* The pool's narrower grid: its actions shrink to a key's width, so the verb moves under the rows. */
 	@media (max-width: 1180px) {
 		.call {
-			--call-cols: 40px minmax(0, 1fr) 108px 126px 108px;
+			--call-cols: 40px minmax(0, 1fr) 108px 126px 108px var(--gap-track,);
 		}
 
 		.go {

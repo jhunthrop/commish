@@ -7,6 +7,7 @@
 	import NameWords from '#lib/ui/NameWords.svelte';
 	import ValueCell from '#lib/ui/ValueCell.svelte';
 	import { vorCell } from '#lib/ui/heat.ts';
+	import { gapText, gapTone } from '#lib/format/gap.ts';
 	import { isMarketPosition } from '#lib/run/market.ts';
 	import type { RoomPlayer } from './model.ts';
 
@@ -21,6 +22,8 @@
 		chanceMissing: string;
 		/** His ADP as the call card and the board's row print it (format/draft.ts adpFigure). */
 		adp: string;
+		/** The Gap column is drawn: some row of the pool carries one. */
+		gapShown: boolean;
 		/** Our call's row, washed in the accent. */
 		isCall: boolean;
 		/** The row the arrow keys are on. */
@@ -44,6 +47,7 @@
 		chanceLabel,
 		chanceMissing,
 		adp,
+		gapShown,
 		isCall,
 		selected,
 		queued,
@@ -54,6 +58,8 @@
 		onqueue,
 		onselect
 	}: Props = $props();
+	const gap = $derived(player.gap ?? null);
+	const tone = $derived(gapTone(gap));
 </script>
 
 <!-- The row's own click marks it, the way the arrow keys do; its buttons act. -->
@@ -89,6 +95,12 @@
 			missing={chanceMissing}
 		/>{/if}
 	<span class="adp">{adp}</span>
+	{#if gapShown}<span
+			class="adp gapc"
+			class:absent={gap === null}
+			class:gain={tone === 'gain'}
+			class:loss={tone === 'loss'}>{gapText(gap)}</span
+		>{/if}
 	{#if !readonly}
 		<span class="acts">
 			<span class="q"><Quiet size="sm" onclick={onqueue}>{queued ? 'Queued' : 'Queue'}</Quiet></span
@@ -156,6 +168,19 @@
 		font-weight: 600;
 		white-space: nowrap;
 		color: var(--ink-2);
+	}
+
+	/* The gap: its sign carries it, its tone repeats it, as on the board row. */
+	.gain {
+		color: var(--gain-ink);
+	}
+
+	.loss {
+		color: var(--loss-ink);
+	}
+
+	.absent {
+		color: var(--ink-3);
 	}
 
 	.acts {

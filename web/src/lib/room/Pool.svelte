@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { adpFigure } from '#lib/format/draft.ts';
+	import { carriesGap } from '#lib/format/gap.ts';
 	import { poolCount } from '#lib/format/pool-words.ts';
 	import Chip from '#lib/ui/Chip.svelte';
 	import ChipGroup from '#lib/ui/ChipGroup.svelte';
@@ -74,6 +75,8 @@
 	const MORE_ROWS = 25;
 
 	let shown = $state(FIRST_ROWS);
+	/** The Gap column, only where a row carries the API's figure (an older server sends none). */
+	const gapShown = $derived(carriesGap(rows));
 	/** Under a row with no chance to show, in words that fit the column: not in this card's chances,
 	 * on their way with the call, or none at all when no call is coming. */
 	const chanceMissing = $derived(
@@ -89,7 +92,13 @@
 	});
 </script>
 
-<section class="pool" class:no-chance={!chanceShown} class:readonly aria-label="Pool">
+<section
+	class="pool"
+	class:no-chance={!chanceShown}
+	class:readonly
+	data-pool-gap={gapShown ? '' : undefined}
+	aria-label="Pool"
+>
 	<div class="head">
 		<DisplayTitle size="panel">Pool</DisplayTitle>
 		<Label>{poolCount(left, 'room')}, ranked by points over replacement</Label>
@@ -110,6 +119,7 @@
 		>
 		{#if chanceShown}<Label align="end">{chanceHead}</Label>{/if}
 		<span class="adp"><Label align="end">ADP</Label></span>
+		{#if gapShown}<span class="gapc"><Label align="end">Gap</Label></span>{/if}
 		{#if !readonly}<span class="acts-head"></span>{/if}
 	</div>
 	{#each rows.slice(0, visible) as player (player.id)}
@@ -119,6 +129,7 @@
 			{chanceLabel}
 			{chanceMissing}
 			adp={adpFigure(player.adp)}
+			{gapShown}
 			isCall={player.id === callId}
 			selected={player.id === selectedId}
 			queued={queue.has(player.id)}
@@ -147,20 +158,20 @@
 	.pool {
 		--col-chance: 136px;
 		--col-acts: 150px;
-		--pool-cols: 40px minmax(0, 1fr) 118px var(--col-chance) 118px var(--col-acts);
+		--pool-cols: 40px minmax(0, 1fr) 118px var(--col-chance) 118px var(--gap-track,) var(--col-acts);
 		min-width: 0;
 	}
 
 	.no-chance {
-		--pool-cols: 40px minmax(0, 1fr) 118px 118px var(--col-acts);
+		--pool-cols: 40px minmax(0, 1fr) 118px 118px var(--gap-track,) var(--col-acts);
 	}
 
 	.readonly {
-		--pool-cols: 40px minmax(0, 1fr) 118px var(--col-chance) 118px;
+		--pool-cols: 40px minmax(0, 1fr) 118px var(--col-chance) 118px var(--gap-track,);
 	}
 
 	.no-chance.readonly {
-		--pool-cols: 40px minmax(0, 1fr) 118px 118px;
+		--pool-cols: 40px minmax(0, 1fr) 118px 118px var(--gap-track,);
 	}
 
 	.head {
@@ -190,9 +201,15 @@
 		border-bottom: 1px solid var(--line-strong);
 	}
 
-	.cols > .adp {
+	.cols > .adp,
+	.cols > .gapc {
 		display: flex;
 		justify-content: flex-end;
+	}
+
+	/* The Gap track: set where the pool carries a Gap (RoomLayout, the call card's grid takes it too). */
+	[data-pool-gap] {
+		--gap-track: 76px;
 	}
 
 	.narrow {
@@ -212,19 +229,20 @@
 		.pool {
 			--col-chance: 126px;
 			--col-acts: 64px;
-			--pool-cols: 40px minmax(0, 1fr) 108px var(--col-chance) 108px var(--col-acts);
+			--pool-cols: 40px minmax(0, 1fr) 108px var(--col-chance) 108px var(--gap-track,)
+				var(--col-acts);
 		}
 
 		.no-chance {
-			--pool-cols: 40px minmax(0, 1fr) 108px 108px var(--col-acts);
+			--pool-cols: 40px minmax(0, 1fr) 108px 108px var(--gap-track,) var(--col-acts);
 		}
 
 		.readonly {
-			--pool-cols: 40px minmax(0, 1fr) 108px var(--col-chance) 108px;
+			--pool-cols: 40px minmax(0, 1fr) 108px var(--col-chance) 108px var(--gap-track,);
 		}
 
 		.no-chance.readonly {
-			--pool-cols: 40px minmax(0, 1fr) 108px 108px;
+			--pool-cols: 40px minmax(0, 1fr) 108px 108px var(--gap-track,);
 		}
 	}
 
@@ -247,6 +265,7 @@
 		}
 
 		.cols > .adp,
+		.cols > .gapc,
 		.acts-head,
 		.wide {
 			display: none;
