@@ -9,24 +9,29 @@ import (
 // Squad is one roster as the waiver and trade searches read it: the
 // players who count (injured reserve and taxi spots left out), the
 // players the member holds (never dropped or given), and whether a
-// roster spot is open, so an add needs no drop.
+// roster spot is open, so an add needs no drop. Starters is the host's
+// starters by id, which this week's lineup reads (Lineup).
 type Squad struct {
-	Players []Candidate
-	Held    map[string]bool
-	Open    bool
+	Players  []Candidate
+	Held     map[string]bool
+	Open     bool
+	Starters []string
 }
 
-// Waiver is one candidate's best move: the drop it costs least to lose
-// (an index into the squad, -1 for none) and the gain to the lineup in
-// points over replacement a week.
+// Waiver is one candidate's best move: the drop with the largest gain
+// that keeps the lineup full (an index into the squad, -1 for none) and
+// the gain to the lineup in points over replacement a week.
 type Waiver struct {
 	Add    int
 	Drop   int
 	Gain   float64
 	Starts bool
-	// NoDrop says every player he could replace is held or a starter he
-	// would not displace, so there is no move to make.
+	// NoDrop says no drop he could take keeps the lineup full this week
+	// and every slot filled, so there is no move to make.
 	NoDrop bool
+	// DropSlot and ForSlot are, for a drop this week's lineup starts, his
+	// slot and the slot the add takes (indexes into Slots), -1 otherwise.
+	DropSlot, ForSlot int
 	// Drops is every player he could replace with the gain after each,
 	// the move's own drop first, then by gain (Lane 66f's drop panel).
 	// Empty when a roster spot is open or there is no move to make.
@@ -34,10 +39,12 @@ type Waiver struct {
 }
 
 // Drop is one player a candidate could replace (an index into the
-// squad) and the lineup's gain after the swap, as Waiver.Gain.
+// squad), the lineup's gain after the swap, as Waiver.Gain, and whether
+// this week's lineup starts him (the panel marks him; Lane 66u).
 type Drop struct {
-	At   int
-	Gain float64
+	At             int
+	Gain           float64
+	StartsThisWeek bool
 }
 
 // Waivers is §5.2's gain for every pool candidate, a week's over the
@@ -45,12 +52,8 @@ type Drop struct {
 // points over replacement.
 func Waivers(config []draft.SlotConfig, weeks int, squad Squad, pool []Candidate) []Waiver {
 	w := waiverSearch{f: newFiller(Slots(config), weeks), squad: squad, mine: pointers(squad.Players),
-		dedicated: dedicatedCounts(config), counts: positionCounts(squad.Players)}
-	w.base, _ = w.f.strength(w.mine)
-	w.baseStarts = make([]bool, len(w.mine))
-	for i := range w.mine {
-		w.baseStarts[i] = w.f.started(i)
-	}
+		drops: newDropRule(config, squad, squad.Held), counts: positionCounts(squad.Players)}
+	w.base, w.baseFilled = w.f.strength(w.mine)
 	out := make([]Waiver, 0, len(pool))
 	for a := range pool {
 		out = append(out, w.bestDrop(a, &pool[a]))
@@ -72,39 +75,49 @@ func Waivers(config []draft.SlotConfig, weeks int, squad Squad, pool []Candidate
 func positive(gain float64) bool { return roundTenth(gain) > 0 }
 
 type waiverSearch struct {
-	f                 *filler
-	squad             Squad
-	mine              []*Candidate
-	base              float64
-	baseStarts        []bool
-	dedicated, counts map[draft.Position]int
+	f          *filler
+	squad      Squad
+	mine       []*Candidate
+	base       float64
+	baseFilled int
+	drops      dropRule
+	counts     map[draft.Position]int
 }
 
 // bestDrop is the move for one candidate: no drop when a spot is open,
-// else the allowed drop whose loss costs least.
+// else, among the allowed drops that keep this week's lineup full and
+// every rest-of-season slot filled, the largest rest-of-season gain (the
+// trade finder's rule, recommend; coordinator's ruling, Lane 66u). The
+// panel keeps every allowed drop, this week's starters marked.
 func (w *waiverSearch) bestDrop(a int, c *Candidate) Waiver {
 	if w.squad.Open {
 		after := w.f.swap(w.mine, nil, c)
 		strength, _ := w.f.strength(after)
-		return Waiver{Add: a, Drop: -1, Gain: strength - w.base, Starts: w.f.started(len(after) - 1)}
+		return Waiver{Add: a, Drop: -1, DropSlot: -1, ForSlot: -1, Gain: strength - w.base, Starts: w.f.started(len(after) - 1)}
 	}
-	best := Waiver{Add: a, Drop: -1, NoDrop: true}
+	in := []Candidate{*c}
 	var drops []Drop
-	for d, p := range w.mine {
-		if w.squad.Held[p.ID] || !droppableFor(p, c, w.dedicated, w.counts) {
+	var options []dropOption
+	starts := map[int]bool{}
+	for d := range w.mine {
+		if !w.drops.allowed(d, c, w.counts) {
 			continue
 		}
 		after := w.f.swap(w.mine, []int{d}, c)
-		strength, _ := w.f.strength(after)
-		starts := w.f.started(len(after) - 1)
-		// A starter goes only to make room for the candidate himself.
-		if w.baseStarts[d] && !starts {
+		strength, filled := w.f.strength(after)
+		starts[d] = w.f.started(len(after) - 1)
+		gain := strength - w.base
+		drops = append(drops, Drop{At: d, Gain: gain, StartsThisWeek: w.drops.startsThisWeek(d)})
+		if filled < w.baseFilled {
 			continue
 		}
-		gain := strength - w.base
-		drops = append(drops, Drop{At: d, Gain: gain})
-		if best.NoDrop || gain > best.Gain || (gain == best.Gain && across(w.mine[best.Drop], p, false)) {
-			best = Waiver{Add: a, Drop: d, Gain: gain, Starts: starts}
+		options = append(options, dropOption{at: d, gain: gain, spot: noSpot})
+	}
+	best := Waiver{Add: a, Drop: -1, DropSlot: -1, ForSlot: -1, NoDrop: true}
+	if o, ok := w.drops.recommend(options, nil, in); ok {
+		best = Waiver{Add: a, Drop: o.at, DropSlot: -1, ForSlot: -1, Gain: o.gain, Starts: starts[o.at]}
+		if o.spot.by >= 0 {
+			best.DropSlot, best.ForSlot = w.drops.spotOf(o.at), o.spot.slot
 		}
 	}
 	best.Drops = w.ordered(drops, best.Drop)

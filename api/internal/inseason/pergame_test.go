@@ -93,14 +93,6 @@ func TestRestOfSeasonPerGame(t *testing.T) {
 	}
 }
 
-func TestPerGameBasis(t *testing.T) {
-	want := "Points a game are our rest-of-season projection from week 7 over the games his club has left, byes out."
-	if got := PerGameBasis(7); got != want {
-		t.Fatalf("%q", got)
-	}
-	guard(t, PerGameBasis(7))
-}
-
 // restFixture is the fixture league on a rest-of-season order from week
 // 7, its clubs playing every week through 17.
 func restFixture(t *testing.T) fixture {
@@ -143,11 +135,13 @@ func TestEveryScreenCarriesTheFigure(t *testing.T) {
 	lineup, _ := a.Lineup()
 	waivers, _ := a.Waivers("", "")
 	trades, _ := a.Trades("")
-	sentence := PerGameBasis(7)
-	for _, basis := range []string{trades.Basis, trades.CheckBasis} {
-		if !strings.HasSuffix(basis, " "+sentence) {
-			t.Errorf("basis %q does not end on %q", basis, sentence)
-		}
+	sentence := RestOfSeasonBasis(7)
+	if !strings.HasSuffix(trades.Basis, " "+sentence) {
+		t.Errorf("basis %q does not end on %q", trades.Basis, sentence)
+	}
+	// The builder opens under the Trades basis, which says it (review 66u).
+	if strings.Contains(trades.CheckBasis, sentence) {
+		t.Errorf("the builder's basis %q says it again", trades.CheckBasis)
 	}
 	// Waivers heads the figure "Rest of season" and says so first (Lane 66f).
 	if !strings.HasPrefix(waivers.SeasonBasis, RestOfSeasonBasis(7)+" ") {
@@ -182,11 +176,12 @@ func TestEveryScreenCarriesTheFigure(t *testing.T) {
 	if figures == 0 {
 		t.Fatal("no row carries a figure")
 	}
-	// The builder's answer carries the sentence and its players' figures.
+	// The builder's answer carries its players' figures; the sentence is the
+	// Trades basis's, on screen with it (review 66u).
 	team := trades.Teams[0]
 	check, refused, ok := a.CheckTrade(apitypes.TradeCheckInput{Team: team.RosterId,
 		Give: []string{lineup.Slots[1].Ours.Player.HostId}, Get: []string{team.Roster[1].Player.HostId}})
-	if !ok || refused != nil || !strings.HasSuffix(check.Basis, " "+sentence) {
+	if !ok || refused != nil || check.Basis != trades.CheckBasis {
 		t.Fatalf("check %v %v %q", ok, refused, check.Basis)
 	}
 	for _, l := range append(check.Trade.Give, check.Trade.Get...) {
@@ -244,7 +239,7 @@ func TestNoSentenceWithoutAFigure(t *testing.T) {
 	check, _, _ := a.CheckTrade(apitypes.TradeCheckInput{Team: team.RosterId,
 		Give: []string{lineup.Slots[1].Ours.Player.HostId}, Get: []string{team.Roster[1].Player.HostId}})
 	for _, basis := range []string{lineup.Basis, waivers.Basis, trades.Basis, trades.CheckBasis, check.Basis} {
-		if strings.Contains(basis, "Points a game") {
+		if strings.Contains(basis, "Rest of season is") {
 			t.Errorf("no row carries the figure, yet %q", basis)
 		}
 	}

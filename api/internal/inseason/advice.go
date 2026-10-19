@@ -1,6 +1,7 @@
 package inseason
 
 import (
+	"context"
 	"fmt"
 	"regexp"
 	"sort"
@@ -56,6 +57,61 @@ type advisor struct {
 	projection boards.WeekProjection
 	preset     apitypes.ScoringPreset
 	now        time.Time
+	// finds is the league read's trades with each team, searched once per
+	// read across requests (Service.findsFor); nil searches for this
+	// advisor alone, once (found).
+	finds     func() (map[int][]Trade, error)
+	foundHere map[int][]Trade
+	// searchErr is a search that stopped (shutdown, its deadline): the
+	// routes answer it as ErrSearchStopped, never as no trades (rereview
+	// 66u F2).
+	searchErr error
+}
+
+// found is every trade the finder keeps with each other team, by roster
+// id, in orderTrades' order: the Trades screen and the order's targets
+// both read it (Lane 66u N3). A search that stopped answers nothing and
+// leaves its error in searchErr.
+func (a *advisor) found() map[int][]Trade {
+	if a.finds != nil {
+		got, err := a.finds()
+		if err != nil {
+			a.searchErr = err
+		}
+		return got
+	}
+	if a.foundHere == nil {
+		// An advisor with no service (the package's own tests) searches on
+		// a context nothing cancels, so findAll cannot stop.
+		found, err := a.findAll(context.Background())
+		if err != nil {
+			a.searchErr = err
+		}
+		a.foundHere = found
+	}
+	return a.foundHere
+}
+
+// findAll is the search found keeps: the drafter's squad against every
+// other team's. Empty when the drafter's team is not in the read. ctx
+// stops the search between teams (rereview 66u W3): a stopped search
+// answers ctx's error and nothing to keep.
+func (a *advisor) findAll(ctx context.Context) (map[int][]Trade, error) {
+	out := map[int][]Trade{}
+	team, ok := a.Snap.TeamByRoster(a.Me)
+	if !ok {
+		return out, nil
+	}
+	squad := a.squad(team, a.active(team), true)
+	for _, t := range a.Snap.Teams {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		if t.RosterID != a.Me {
+			out[t.RosterID] = AllTrades(a.config, a.weeks, squad, a.squad(t, a.active(t), false))
+		}
+	}
+	return out, nil
 }
 
 // newAdvisor reads the league's roster shape and scoring from the saved
@@ -337,9 +393,10 @@ func (a *advisor) active(t leaguesync.Team) []person {
 }
 
 // squad is a team's players for the waiver and trade searches, held by
-// the drafter's Hold tags when own.
-func (a *advisor) squad(people []person, own bool) Squad {
-	s := Squad{Players: make([]Candidate, len(people)), Held: map[string]bool{}}
+// the drafter's Hold tags when own, with the team's starters on the host
+// for this week's lineup.
+func (a *advisor) squad(t leaguesync.Team, people []person, own bool) Squad {
+	s := Squad{Players: make([]Candidate, len(people)), Held: map[string]bool{}, Starters: t.Starters}
 	for i, p := range people {
 		s.Players[i] = p.cand
 		if own && p.line.Held {
@@ -503,7 +560,7 @@ func (a *advisor) waiverRun(position draft.Position) (waiverRun, bool) {
 		return waiverRun{}, false
 	}
 	mine := a.active(team)
-	squad := a.squad(mine, true)
+	squad := a.squad(team, mine, true)
 	pool := a.pool(position)
 	cands := make([]Candidate, len(pool))
 	for i, p := range pool {
@@ -589,7 +646,8 @@ func waiverRow(w *Writer, week *pickupWeek, mine []person, add person, move Waiv
 	}
 	for _, d := range move.Drops {
 		weekGain, _, _ := week.with(add.cand, d.At)
-		row.Drops = append(row.Drops, apitypes.WaiverDrop{HostId: mine[d.At].cand.ID, Gain: roundTenth(d.Gain), WeekGain: weekGain})
+		row.Drops = append(row.Drops, apitypes.WaiverDrop{HostId: mine[d.At].cand.ID, Gain: roundTenth(d.Gain), WeekGain: weekGain,
+			StartsThisWeek: d.StartsThisWeek})
 	}
 	row.Pickup = !move.NoDrop && isPickup(row)
 	if day, ok := clears[add.cand.ID]; ok {
@@ -598,6 +656,12 @@ func waiverRow(w *Writer, week *pickupWeek, mine []person, add person, move Waiv
 	// The sentence says he starts only when he starts this week.
 	move.Starts = row.Starts
 	row.Sentence = w.Waiver(add.words, drop, move)
+	// A drop this week's lineup starts says who starts in his place (Lane 66u).
+	if drop != nil && move.DropSlot >= 0 && move.ForSlot >= 0 {
+		slots := Slots(week.config)
+		row.Sentence = sentence(row.Sentence, w.StarterDrop(*drop, add.words, SlotLabel(slots, move.DropSlot),
+			SlotLabel(slots, move.ForSlot), AddMove))
+	}
 	return row
 }
 
@@ -617,7 +681,7 @@ func (a *advisor) Trades(focus string) (apitypes.TradeAdvice, bool) {
 		return apitypes.TradeAdvice{}, false
 	}
 	mine := a.active(team)
-	squad := a.squad(mine, true)
+	squad := a.squad(team, mine, true)
 	h := a.header()
 	out := apitypes.TradeAdvice{Week: h.week, BasisNote: BasisNote(a.settings, a.season.Carries), OrderBasis: h.basis, Refreshed: h.refreshed,
 		ReadAt: h.readAt, Teams: []apitypes.TradeTeam{}, Roster: rosterLines(mine), Moves: TradeMoves(a.Snap.Ref.Host),
@@ -634,7 +698,7 @@ func (a *advisor) Trades(focus string) (apitypes.TradeAdvice, bool) {
 		row := apitypes.TradeTeam{RosterId: t.RosterID, Name: t.Name, Owner: t.Owner,
 			Record: apitypes.TradeRecord{Wins: t.Wins, Losses: t.Losses, Ties: t.Ties}, Roster: rosterLines(theirs), Trades: []apitypes.TradeRow{}}
 		close := 0
-		for _, tr := range Trades(a.config, a.weeks, squad, a.squad(theirs, false), focus, TradesPerTeam) {
+		for _, tr := range Narrow(a.found()[t.RosterID], squad, a.squad(t, theirs, false), focus, TradesPerTeam) {
 			row.Trades = append(row.Trades, a.tradeRow(mine, theirs, tr, a.tradeWeek(team, t, mine, theirs, tr)))
 			if tr.CloseForThem() {
 				close++
@@ -647,7 +711,7 @@ func (a *advisor) Trades(focus string) (apitypes.TradeAdvice, bool) {
 		out.Teams = append(out.Teams, row)
 	}
 	out.Basis = withPerGame(a.Board, TradesBasis(a.basis, a.weeks), shown...)
-	out.CheckBasis = withPerGame(a.Board, TradeCheckBasis(a.basis, a.weeks), shown...)
+	out.CheckBasis = TradeCheckBasis(a.basis)
 	return out, true
 }
 

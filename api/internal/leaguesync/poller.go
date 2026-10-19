@@ -29,14 +29,20 @@ const (
 	RefreshFloor   = 10 * time.Second
 	ReadTimeout    = 30 * time.Second
 	// idleAfter drops a league no viewer has asked about in this long.
-	idleAfter = 30 * time.Minute
+	idleAfter = ViewWindow
 )
 
+// ViewWindow is how long a league counts as viewed after its last view:
+// the poller keeps reading it that long, and the trade search warms for
+// the accounts that viewed it inside it (Lane 66u).
+const ViewWindow = 30 * time.Minute
+
 // SnapshotStore keeps the last good read per host league. PutSnapshot
-// keeps nothing for a league no account has linked.
+// keeps nothing for a league no account has linked, and says whether it
+// stored the read.
 type SnapshotStore interface {
 	LastSnapshot(ctx context.Context, ref Ref) (Snapshot, bool, error)
-	PutSnapshot(ctx context.Context, snap Snapshot) error
+	PutSnapshot(ctx context.Context, snap Snapshot) (bool, error)
 }
 
 // Read is a snapshot and how stale it is (poll.Read's rule). Failed is a
@@ -56,6 +62,12 @@ type Poller struct {
 	Store SnapshotStore
 	Now   func() time.Time
 	Log   *slog.Logger
+	// Landed, when set, is told of every good read the store wrote (the
+	// trade search warms on it, Lane 66u); a failed read, or one the store
+	// kept nothing of (a league no one has attached), tells it nothing, so
+	// the work done for the read before stands. It runs on the storing
+	// goroutine and must return at once.
+	Landed func(Snapshot)
 
 	once  sync.Once
 	inner *poll.Poller[Snapshot]
@@ -64,7 +76,7 @@ type Poller struct {
 func (p *Poller) shared() *poll.Poller[Snapshot] {
 	p.once.Do(func() {
 		p.inner = &poll.Poller[Snapshot]{
-			Now: p.Now, Store: snapshots{p.Store}, Log: p.Log, Idle: idleAfter, Timeout: ReadTimeout,
+			Now: p.Now, Store: snapshots{store: p.Store, landed: p.landed}, Log: p.Log, Idle: idleAfter, Timeout: ReadTimeout,
 		}
 	})
 	return p.inner
@@ -123,8 +135,20 @@ func signedOut(err error) bool {
 func (p *Poller) Keep(snap Snapshot) {
 	ctx, cancel := context.WithTimeout(context.Background(), ReadTimeout)
 	defer cancel()
-	if err := p.Store.PutSnapshot(ctx, snap); err != nil {
+	stored, err := p.Store.PutSnapshot(ctx, snap)
+	if err != nil {
 		p.Log.Warn("leaguesync: keep snapshot", "league", snap.Ref.Key(), "err", err)
+		return
+	}
+	if stored {
+		p.landed(snap)
+	}
+}
+
+// landed tells Landed of a stored read, if anyone listens.
+func (p *Poller) landed(snap Snapshot) {
+	if p.Landed != nil {
+		p.Landed(snap)
 	}
 }
 
@@ -132,8 +156,12 @@ func (p *Poller) Keep(snap Snapshot) {
 // the attaching member), so the first view answers it fresh.
 func (p *Poller) Prime(snap Snapshot) { p.shared().Prime(snap.Ref.Key(), snap, snap.ReadAt) }
 
-// snapshots is the store as poll keeps reads: by the league's key.
-type snapshots struct{ store SnapshotStore }
+// snapshots is the store as poll keeps reads: by the league's key, each
+// good read told to landed once kept.
+type snapshots struct {
+	store  SnapshotStore
+	landed func(Snapshot)
+}
 
 func (s snapshots) Last(ctx context.Context, key string) (Snapshot, time.Time, bool, error) {
 	ref, ok := refOfKey(key)
@@ -149,7 +177,14 @@ func (s snapshots) Keep(ctx context.Context, key string, snap Snapshot, at time.
 	if ref, ok := refOfKey(key); ok {
 		snap.Ref.As = ref.As
 	}
-	return s.store.PutSnapshot(ctx, snap)
+	stored, err := s.store.PutSnapshot(ctx, snap)
+	if err != nil {
+		return err
+	}
+	if stored {
+		s.landed(snap)
+	}
+	return nil
 }
 
 // refOfKey reads Ref.Key back: "host/season/id", with "@account" for a

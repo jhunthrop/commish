@@ -141,6 +141,7 @@ const row = (give: string[], get: string[], mine: number, close = false): TradeR
 	give: give.map(line),
 	get: get.map(line),
 	drop: null,
+	drop_reason: null,
 	my_gain: mine,
 	their_gain: close ? 0.1 : 0.6,
 	close_for_them: close,
