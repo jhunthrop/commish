@@ -12,3 +12,8 @@ void test("the in-season not-found reads the root error page's three strings", (
 		assert.ok(ERROR_PAGE.includes(`'${words}'`), words);
 	}
 });
+
+void test('the not-found page gives one way on, a single verb (the sweep C14)', () => {
+	const ways = ERROR_PAGE.match(/<(Verb|Quiet)\b/gu) ?? [];
+	assert.deepEqual(ways, ['<Verb']);
+});

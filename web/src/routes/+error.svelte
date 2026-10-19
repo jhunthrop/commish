@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import PageHead from '#lib/ui/PageHead.svelte';
-	import Quiet from '#lib/ui/Quiet.svelte';
 	import Shell from '#lib/ui/Shell.svelte';
 	import Verb from '#lib/ui/Verb.svelte';
 	import { sectionHref } from '#lib/ui/nav.ts';
@@ -24,9 +23,8 @@
 	<main class="error">
 		<PageHead title={missing ? 'Not found' : 'Error'} {lead} />
 		<div class="ways">
+			<!-- One way on (the sweep's C14): the board, where every other page is a tap away. -->
 			<Verb href={sectionHref('board')}>Go to the board</Verb>
-			<Quiet href={sectionHref('players')}>Every player</Quiet>
-			<Quiet href={sectionHref('record')}>Our record</Quiet>
 		</div>
 	</main>
 </Shell>
