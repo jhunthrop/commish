@@ -65,6 +65,7 @@
 	<tbody>
 		{#each rows as line (line.player.host_id)}
 			<BoxLine
+				phoneFacts={false}
 				row={boxRow(line, '', zone, false, now)}
 				compact
 				evidence

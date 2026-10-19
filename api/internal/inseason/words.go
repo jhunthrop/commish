@@ -314,11 +314,11 @@ func uncountedRulesAt(s apitypes.LeagueSettings, carried func(string) bool, posi
 // gainWords is what a Gain is, said once on a screen (Lane 66t): whose
 // lineup, a week, averaged over the weeks the order covers.
 func gainWords(whose string, b OrderBasis, weeks int) string {
-	over := fmt.Sprintf("the %s left on our order", weekCount(weeks))
+	over := fmt.Sprintf("the %s left", weekCount(weeks))
 	if b != RestOfSeason {
 		over = fmt.Sprintf("the season's %s on our preseason number", weekCount(weeks))
 	}
-	return fmt.Sprintf("Gain is the change in %s points over replacement, a week, over %s.", whose, over)
+	return fmt.Sprintf("Gain is %s change in points over replacement a week, over %s.", whose, over)
 }
 
 // LineupBasis is the start and sit page's advice rule (§4.4, Lane 66e),
@@ -349,7 +349,7 @@ func WeekDoneWords(week int) string {
 
 // WaiversBasis is the waiver page's pickup rule (§5.3, Lane 66f): the
 // week on the Proj the screen shows, the rest of the season on its Gain.
-const WaiversBasis = "A pickup starts this week on Proj and keeps your Gain at zero or better. Its drop costs least."
+const WaiversBasis = "A pickup starts this week on Proj and keeps Gain at zero or better."
 
 // WaiverSeasonBasis is what a waiver Gain is, the head the card and the
 // drop panel print (Lane 66u).

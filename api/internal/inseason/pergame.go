@@ -65,7 +65,7 @@ func withPerGame(b boards.Board, basis string, people ...[]person) string {
 // every screen (the figure words' perGame, Lane 66s, 66t): one unit, said
 // in one way.
 func PerGameBasis() string {
-	return figurewords.Table.PerGame + " is that order's points a game."
+	return figurewords.Table.PerGame + " is our order's points a game."
 }
 
 // perGameShown is whether any of the page's players carries the figure.

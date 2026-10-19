@@ -13,8 +13,6 @@ import type { Format } from './schema.ts';
 export interface BasisPart {
 	text: string;
 	phone: boolean;
-	/** False for a part a phone says in place of a longer desk one: left out at a desk (Lane 85). */
-	desk?: boolean;
 	/** The Gap's sentence, which a screen whose rows carry no gap leaves out (Compare's pair). */
 	topic?: 'gap';
 	/** A part drawn as a link: the page its words open (the league's rules, our record). */

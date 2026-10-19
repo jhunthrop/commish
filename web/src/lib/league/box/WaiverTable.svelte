@@ -103,6 +103,7 @@
 		{@const isOpen = open === entry.key}
 		<tbody>
 			<BoxLine
+				phoneFacts={false}
 				row={entry.row}
 				slotCell={false}
 				ptsCell={false}
@@ -159,6 +160,7 @@
 				{#each drops as drop, i (drop.key)}
 					{@const on = chosen === drop.key}
 					<BoxLine
+						phoneFacts={false}
 						row={drop.row}
 						slotCell={false}
 						ptsCell={false}

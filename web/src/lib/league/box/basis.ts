@@ -147,31 +147,10 @@ export function said(text: string | null, phone = true): BasisPart[] {
 	return text === null || text === '' ? [] : [{ text, phone }];
 }
 
-/** The block as one paragraph reads at a desk, every part drawn there: a link that more words follow
- * closes its sentence (BasisBlock draws the same). */
+/** The block as one paragraph reads, every part drawn: a link that more words follow closes its
+ * sentence (BasisBlock draws the same). */
 export function basisText(parts: readonly BasisPart[]): string {
-	const drawn = parts.filter((p) => p.desk !== false);
-	return drawn.map((p, i) => (p.href && i < drawn.length - 1 ? `${p.text}.` : p.text)).join(' ');
-}
-
-/** A phone's room for the stats sentence (Lane 85): while it shows, the phone says the Game cell's
- * read alone in place of its whole sentence and leaves Opp rank to its cell, so the Lineup and
- * Waivers stay within eight lines; a desk keeps both whole. */
-export function phoneRoom(
-	game: { full: string | null; read: string | null },
-	waiting: string | null
-): { game: BasisPart[]; opp: BasisPart[]; waiting: BasisPart[] } {
-	if (waiting === null) return { game: said(game.full), opp: said(OPP_PART), waiting: [] };
-	return {
-		game: [
-			...said(game.full, false),
-			...(game.read === null || game.read === game.full
-				? []
-				: [{ text: game.read, phone: true, desk: false }])
-		],
-		opp: said(OPP_PART, false),
-		waiting: said(waiting)
-	};
+	return parts.map((p, i) => (p.href && i < parts.length - 1 ? `${p.text}.` : p.text)).join(' ');
 }
 
 /** What a box score screen's key is told (BoxBasis): the projection, the lines drawn, the Pts
@@ -208,19 +187,14 @@ export function boxBasisParts(facts: BoxBasisFacts, clock: Clock, now: number): 
 	const waiting = kickedOffPartAt(facts.lines, now);
 	if (lineup === null)
 		return [...proj, ...pts, ...said(gamePart(facts.lines, clock, now, 'full')), ...said(waiting)];
-	const room = phoneRoom(
-		{
-			full: gamePart(facts.lines, clock, now, 'full'),
-			read: gamePart(facts.lines, clock, now, 'read')
-		},
-		waiting
-	);
 	return [
 		...proj,
 		...said(deltaPart(lineup.previousReadAt, clock), false),
-		...room.game,
-		...room.waiting,
-		...room.opp,
+		// The phone's rows draw no expected score or weather here (BoxLine phoneFacts), so the phone
+		// leaves out the sentence that says what they are.
+		...said(gamePart(facts.lines, clock, now, 'full'), false),
+		...said(waiting),
+		...said(OPP_PART),
 		...pts,
 		...uncountedParts(lineup.note, lineup.rulesHref)
 	];

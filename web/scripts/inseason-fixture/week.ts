@@ -16,7 +16,7 @@ export const weeksCovered = (week: number): number => Math.max(1, LAST_FANTASY_W
 /** What a Gain is, in the API's words (words.go gainWords). */
 export function gainWords(whose: string, weeks: number): string {
 	const span = weeks === 1 ? 'one week' : `${String(weeks)} weeks`;
-	return `Gain is the change in ${whose} points over replacement, a week, over the ${span} left on our order.`;
+	return `Gain is ${whose} change in points over replacement a week, over the ${span} left.`;
 }
 
 /** The finder's basis in the API's words (words.go TradesBasis), the one copy build.ts and
@@ -26,7 +26,7 @@ export function tradesBasis(weeks: number): string {
 }
 
 /** The figure a game in the API's words (pergame.go PerGameBasis). */
-export const PER_GAME_BASIS = "A game is that order's points a game.";
+export const PER_GAME_BASIS = "A game is our order's points a game.";
 
 /** The Waivers screen's Gain then the figure a game (words.go WaiverSeasonBasis, withPerGame). */
 export function waiverSeasonBasis(weeks: number): string {
@@ -42,7 +42,7 @@ export const LINEUP_BASIS =
 
 /** The Waivers pickup rule (words.go WaiversBasis). */
 export const WAIVERS_BASIS =
-	'A pickup starts this week on Proj and keeps your Gain at zero or better. Its drop costs least.';
+	'A pickup starts this week on Proj and keeps Gain at zero or better.';
 
 const COUNT_WORDS = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'];
 

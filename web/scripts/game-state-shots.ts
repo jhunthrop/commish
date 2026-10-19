@@ -28,9 +28,11 @@ import { chromium, type BrowserContext, type Page } from 'playwright';
 import { KICKED_OFF_PART } from '../src/lib/league/box/basis.ts';
 import { STRENGTH_HEADS } from '../src/lib/run/strength-words.ts';
 import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
-import { BASIS_BUDGET, basisLines } from './basis-lines.ts';
+import { BASIS_BUDGET, basisLines, figureSentenceFaults } from './basis-lines.ts';
 import { copyFault, watchData } from './copy-scan.ts';
 import { FIXTURE_IDS } from './inseason-fixture/ids.ts';
+import { EMPTY_FIGURE } from '../src/lib/format/empty.ts';
+import { seasonOrderWords } from '../src/lib/league/box/waivers.ts';
 import {
 	FIXTURE_MONDAY_CLOCK,
 	FIXTURE_SUNDAY_CLOCK,
@@ -295,6 +297,27 @@ async function checkNoWeekFigure(page: Page, at: string, words: string): Promise
 	if (day === 'tuesday' && text.includes(words)) fault(at, `"${words}" on a finished week`);
 }
 
+/** Waivers after the Sunday (review H3): a row whose game is past its kickoff draws no week gain in
+ * Beats, and the basis names the season Gain as the pickups' order. */
+async function checkWaivers(page: Page, at: string): Promise<void> {
+	await checkNoWeekFigure(page, at, 'Proj this week');
+	const rows = await page.locator('main table tbody tr').evaluateAll((trs) =>
+		trs
+			.filter((tr) => tr.getClientRects().length > 0)
+			.map((tr) => ({
+				text: (tr as HTMLElement).innerText,
+				gain: tr.querySelector('.beats .gain')?.textContent.trim() ?? null
+			}))
+	);
+	const final = rows.filter((r) => /\b(Final|Kicked off)\b/.test(r.text) && r.gain !== null);
+	if (final.length === 0) fault(at, 'no row past its kickoff with a Beats cell');
+	for (const r of final)
+		if (r.gain !== EMPTY_FIGURE) fault(at, `a row past its kickoff draws a week gain ${r.gain}`);
+	const basis = (await page.locator('main [data-basis]').allInnerTexts()).join(' ');
+	if (!basis.includes(seasonOrderWords(6)))
+		fault(at, 'the basis does not name the season Gain order');
+}
+
 async function checkMatchup(page: Page, at: string): Promise<void> {
 	const mid = ((await page.locator('main .bug .mid').textContent()) ?? '').replace(/\s+/g, ' ');
 	if (day === 'tuesday' && !mid.includes(FINAL)) fault(at, `the Matchup's bug reads "${mid}"`);
@@ -310,7 +333,7 @@ const LEAGUE_SCREENS: readonly LeagueScreen[] = [
 		name: 'waivers',
 		path: `${LEAGUE}/waivers`,
 		ready: 'Open Sleeper waivers',
-		check: (page, at) => checkNoWeekFigure(page, at, 'Proj this week')
+		check: checkWaivers
 	},
 	{
 		name: 'trades',
@@ -340,6 +363,9 @@ for (const screen of set === 'standin' && day !== 'sunday' ? LEAGUE_SCREENS : []
 			const budget = BASIS_BUDGET[width];
 			if (budget !== undefined && lines > budget)
 				fault(at, `basis ${String(lines)} lines, over ${String(budget)}`);
+			// Every figure drawn at this width keeps its sentence in the basis drawn here (review H2).
+			if (screen.name !== 'league')
+				for (const said of await figureSentenceFaults(page)) fault(at, said);
 			if (await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth))
 				fault(at, 'scrolls sideways');
 			const copy = await copyFault(page);

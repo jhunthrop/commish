@@ -170,7 +170,11 @@ void test("the Lineup's key says Proj, its change at a desk, Game, Opp rank, Pts
 	);
 	assert.deepEqual(
 		parts.filter((p) => !p.phone).map((p) => p.text),
-		['Δ Proj is its change since Thu 9:00 pm.']
+		[
+			'Δ Proj is its change since Thu 9:00 pm.',
+			// The phone's Lineup rows draw no expected score or weather (review H2).
+			"Game is each club's expected points, his first, and weather, read Fri 4:01 pm."
+		]
 	);
 });
 
@@ -227,7 +231,7 @@ void test('the Lineup and the Matchup say when Final and the stats land while a 
 	assert.equal(kickedOffPartAt([counted], Date.parse('2026-10-19T16:00:00.000Z')), null);
 });
 
-void test('on a phone the stats sentence takes the room of the Game cell words and Opp rank (Lane 85)', () => {
+void test('on a phone every figure drawn keeps its sentence beside the stats sentence (review H2)', () => {
 	const waiting = line({ kickoff: '2026-10-18T17:00:00.000Z', played: true, game_state: 'final' });
 	const parts = boxBasisParts(
 		{
@@ -246,17 +250,11 @@ void test('on a phone the stats sentence takes the room of the Game cell words a
 		NOW
 	);
 	const phone = parts.filter((p) => p.phone).map((p) => p.text);
-	const desk = parts.filter((p) => p.desk !== false).map((p) => p.text);
 	assert.ok(phone.includes(KICKED_OFF_PART));
-	assert.ok(phone.includes('Game was read Fri 4:01 pm.'));
-	assert.ok(!phone.includes(OPP_PART));
-	assert.ok(desk.includes(OPP_PART));
-	assert.ok(
-		desk.includes("Game is each club's expected points, his first, and weather, read Fri 4:01 pm.")
-	);
-	assert.ok(!desk.includes('Game was read Fri 4:01 pm.'));
-	// The paragraph as a desk reads it says the Game cell once.
-	assert.equal(basisText(parts).match(/Game /g)?.length, 1);
+	assert.ok(phone.includes(OPP_PART));
+	// The phone draws Opp rank, so its sentence stays; it draws no expected score or weather on the
+	// Lineup (BoxLine phoneFacts), so the Game sentence is the desk's alone.
+	assert.ok(!phone.some((t) => t.startsWith("Game is each club's expected points")));
 });
 
 void test('the Final sentence says what holds, never a promise of within the hour (Lane 84)', () => {

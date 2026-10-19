@@ -16,7 +16,7 @@ import {
 	deltaPart,
 	gamePart,
 	kickedOffPartAt,
-	phoneRoom,
+	OPP_PART,
 	projPart,
 	said,
 	uncountedParts,
@@ -492,8 +492,6 @@ export function waiverBasis(
 	now: number
 ): BasisPart[] {
 	const defense = lines.some((l) => l.player.position === 'DEF');
-	const read = gamePart(lines, clock, now, 'read');
-	const room = phoneRoom({ full: read, read }, kickedOffPartAt(lines, now));
 	const proj = projPart(
 		{
 			readAt: advice.projection_read_at,
@@ -514,9 +512,10 @@ export function waiverBasis(
 		...said(advice.season_basis),
 		...said(proj),
 		...said(deltaPart(advice.projection_previous_read_at, clock), false),
-		...room.game,
-		...room.waiting,
-		...room.opp,
+		// The phone's rows draw no expected score or weather (BoxLine phoneFacts): no read to say there.
+		...said(gamePart(lines, clock, now, 'read'), false),
+		...said(kickedOffPartAt(lines, now)),
+		...said(OPP_PART),
 		...uncountedParts(advice, rulesHref)
 	];
 }

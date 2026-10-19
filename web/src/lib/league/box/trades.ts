@@ -440,8 +440,7 @@ export function tradeBasis(
 	const players =
 		opened !== 'none'
 			? [
-					// A phone leaves Opp rank to its cell while the stats sentence shows (phoneRoom).
-					...said(OPP_PART, waiting === null),
+					...said(OPP_PART),
 					// The opened rows' Game cell draws its figures at a desk only.
 					...said(gamePart(lines, clock, now, 'read'), false),
 					...said(ptsPart(advice.player_points, host, 'rows'), false),
@@ -450,8 +449,7 @@ export function tradeBasis(
 			: [];
 	return [
 		...said(advice.basis),
-		// A phone leaves A game to its head while the stats sentence shows (phoneRoom, Lane 85).
-		...(opened === 'none' ? [] : said(advice.per_game_basis, waiting === null)),
+		...(opened === 'none' ? [] : said(advice.per_game_basis)),
 		...proj,
 		...said(waiting),
 		...players,

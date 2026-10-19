@@ -43,10 +43,9 @@ import {
 	installFixtureClock,
 	requireFixtureClock
 } from './inseason-fixture/clock.ts';
-import { BUILDER_LINE, basisLines, basisReport } from './basis-lines.ts';
+import { BUILDER_LINE, basisLines, basisReport, figureSentenceFaults } from './basis-lines.ts';
 import { chromeFaults, chromeLine, chromeMeasures } from './chrome-measures.ts';
 import { UNCOUNTED_ANCHOR } from '../src/lib/league/uncounted.ts';
-import { KICKED_OFF_PART } from '../src/lib/league/box/basis.ts';
 import { FIXTURE_IDS } from './inseason-fixture/ids.ts';
 import { PER_GAME_BASIS, WAIVERS_BASIS } from './inseason-fixture/week.ts';
 
@@ -267,7 +266,7 @@ const TRADES_FOLD_AT = 900;
 /** A gain or a week's change as its cell prints it. */
 const SIGNED = /^([+−]\d+\.\d|0\.0|--)$/;
 const TRADE_BASIS_FIRST =
-	"Each team's best trade both lineups gain by, yours first. The other team decides. Gain is the change in a lineup's points over replacement, a week,";
+	"Each team's best trade both lineups gain by, yours first. The other team decides. Gain is a lineup's change in points over replacement a week,";
 /** A trade's week in one line, from the API's two changes (review H2). */
 const WEEK_LINE = /[+−]?\d+\.\d Proj for you this week, [+−]?\d+\.\d for them/;
 
@@ -383,6 +382,9 @@ for (const { name, path, ready: text } of PAGES) {
 			}
 			const basisName = name === 'start' ? 'lineup' : name;
 			const report = basisReport(basisName, width, await basisLines(page));
+			if (name !== 'league')
+				for (const fault of await figureSentenceFaults(page))
+					missing.push(`${basisName} ${theme} ${String(width)} ${fault}`);
 			if (report !== null && name !== 'league') {
 				if (theme === 'dark') basisCounts.push(report.line);
 				if (report.fault !== null) missing.push(`${theme} ${report.fault}`);
@@ -500,6 +502,8 @@ for (const width of SHOT_WIDTHS) {
 		await page.locator('main [data-basis]').first().waitFor({ timeout: READY_TIMEOUT_MS });
 		await page.evaluate(() => document.fonts.ready);
 		const report = basisReport(basisName, width, await basisLines(page));
+		for (const fault of await figureSentenceFaults(page))
+			missing.push(`${basisName} ${String(width)} ${fault}`);
 		if (report !== null) {
 			basisCounts.push(report.line);
 			if (report.fault !== null) missing.push(report.fault);
@@ -553,6 +557,7 @@ async function platformPass(
 			await page.locator('main [data-basis]').first().waitFor({ timeout: READY_TIMEOUT_MS });
 			await page.evaluate(() => document.fonts.ready);
 			const report = basisReport(basisName, width, await basisLines(page));
+			for (const fault of await figureSentenceFaults(page)) missing.push(`${at} ${fault}`);
 			if (report !== null) {
 				basisCounts.push(report.line);
 				if (report.fault !== null) missing.push(report.fault);
@@ -782,6 +787,8 @@ for (const theme of THEMES) {
 		if (!openedBasis.includes(PER_GAME_BASIS) || !openedBasis.includes('Which five'))
 			missing.push(`trades opened ${theme} ${String(width)} basis ${openedBasis}`);
 		const openedReport = basisReport('trades opened', width, await basisLines(page));
+		for (const fault of await figureSentenceFaults(page))
+			missing.push(`trades opened ${theme} ${String(width)} ${fault}`);
 		if (openedReport !== null) {
 			if (theme === 'dark') basisCounts.push(openedReport.line);
 			if (openedReport.fault !== null) missing.push(`${theme} ${openedReport.fault}`);
@@ -1028,9 +1035,7 @@ async function lineupFaults(page: Page): Promise<string[]> {
 		faults.push(`the no one can play chips: ${seen.idleChips.join(', ')}`);
 	if (!seen.firstChipIdle) faults.push('the no one can play chip is not first');
 	if (seen.idleRows !== 1) faults.push(`${String(seen.idleRows)} rows marked no one can play`);
-	// A phone leaves Opp rank to its cell while the stats sentence shows (basis.ts phoneRoom, Lane 85).
-	const oppSaid = !seen.wide && seen.text.includes(KICKED_OFF_PART) ? 0 : 1;
-	if ((seen.text.match(/Opp rank is points allowed to his position/g) ?? []).length !== oppSaid)
+	if ((seen.text.match(/Opp rank is points allowed to his position/g) ?? []).length !== 1)
 		faults.push('the evidence basis not said once');
 	if (!/Δ Proj is its change since \w{3} \d+:\d\d [ap]m\./.test(seen.text) && seen.wide)
 		faults.push('the change basis');
@@ -1225,6 +1230,7 @@ for (const theme of THEMES) {
 		await shot('picked');
 		// The builder's own line, then the page's basis with its players' columns (Lane 66t).
 		const builderReport = basisReport('trades builder', width, await basisLines(page));
+		for (const fault of await figureSentenceFaults(page)) missing.push(`builder ${at} ${fault}`);
 		const ownLines = await basisLines(page, BUILDER_LINE);
 		const ownLine = (await page.locator(BUILDER_LINE).textContent()) ?? '';
 		if (builderReport !== null) {

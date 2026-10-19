@@ -48,7 +48,7 @@ func TestBasisSaysWhatAWeekIs(t *testing.T) {
 		}
 	}
 	for _, s := range []string{WaiverSeasonBasis(RestOfSeason, 11), WaiverSeasonBasis(Preseason, 17), TradesBasis(RestOfSeason, 1)} {
-		if !strings.Contains(s, "over replacement, a week, over the") || strings.Contains(s, "12-team") {
+		if !strings.Contains(s, "over replacement a week, over the") || strings.Contains(s, "12-team") {
 			t.Errorf("%q", s)
 		}
 	}

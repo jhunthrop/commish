@@ -57,6 +57,8 @@
 		/** The trade builder's tick (Lane 66g), first in the row. */
 		pick?: BoxPick | null;
 		/** A narrow phone cell prints his short form, "A. Rodgers", never a cut surname (rereview N2). */
+		/** The phone's game line draws the expected score and weather (BoxPlayer phoneFacts). */
+		phoneFacts?: boolean;
 		shortOnPhone?: boolean;
 	}
 
@@ -78,7 +80,8 @@
 		season = false,
 		compact = false,
 		pick = null,
-		shortOnPhone = false
+		shortOnPhone = false,
+		phoneFacts = true
 	}: Props = $props();
 	const picked = $derived(pick?.state === 'on');
 	const rank = $derived(row.evidence.oppRank);
@@ -147,7 +150,7 @@
 		>
 	{/if}
 	<td class="player">
-		<BoxPlayer {row} {tags} {shortOnPhone} {compact} {clears}
+		<BoxPlayer {row} {tags} {shortOnPhone} {compact} {clears} {phoneFacts}
 			>{#if evidence}{@render seasonLine()}{/if}</BoxPlayer
 		>
 	</td>

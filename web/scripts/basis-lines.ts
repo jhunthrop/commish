@@ -68,3 +68,29 @@ export function basisReport(
 				: null
 	};
 }
+
+/** A figure a row draws and the words of the sentence that says what it is (review H2). */
+const FIGURE_SENTENCES: readonly { figure: RegExp; sentence: string; what: string }[] = [
+	{ figure: /\bOpp \d+(st|nd|rd|th)\b/, sentence: 'Opp rank is', what: 'Opp rank' },
+	{ figure: /\b\d+(\.5)? to \d+(\.5)?\b/, sentence: 'expected points', what: 'the expected score' },
+	{ figure: /\bA game \d+\.\d\b/, sentence: 'A game is', what: 'A game' }
+];
+
+/** Every figure the page's rows draw where it is shot has its sentence in the basis drawn there: a
+ * phone basis may leave a sentence out only with its figure (review H2). */
+export async function figureSentenceFaults(page: Page): Promise<string[]> {
+	const { rows, basis } = await page.evaluate((selector: string) => {
+		const shown = (el: Element): boolean => el.getClientRects().length > 0;
+		const rows = [...document.querySelectorAll('main table tbody tr')]
+			.filter(shown)
+			.map((tr) => (tr as HTMLElement).innerText)
+			.join('\n');
+		const basis = [...document.querySelectorAll(selector)]
+			.map((el) => (el as HTMLElement).innerText)
+			.join(' ');
+		return { rows, basis };
+	}, PAGE_BASIS);
+	return FIGURE_SENTENCES.filter((f) => f.figure.test(rows) && !basis.includes(f.sentence)).map(
+		(f) => `draws ${f.what} with no sentence saying what it is`
+	);
+}

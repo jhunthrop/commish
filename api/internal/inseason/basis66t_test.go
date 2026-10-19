@@ -14,16 +14,16 @@ import (
 
 func TestTradesBasisSaysWhoDecidesAndGainOnce(t *testing.T) {
 	want := "Each team's best trade both lineups gain by, yours first. The other team decides. " +
-		"Gain is the change in a lineup's points over replacement, a week, over the 12 weeks left on our order."
+		"Gain is a lineup's change in points over replacement a week, over the 12 weeks left."
 	if got := TradesBasis(RestOfSeason, 12); got != want {
 		t.Errorf("rest of season:\n got %q\nwant %q", got, want)
 	}
 	if got := TradesBasis(Preseason, 17); got != "Each team's best trade both lineups gain by, yours first. The other team decides. "+
-		"Gain is the change in a lineup's points over replacement, a week, over the season's 17 weeks on our preseason number." {
+		"Gain is a lineup's change in points over replacement a week, over the season's 17 weeks on our preseason number." {
 		t.Errorf("preseason: %q", got)
 	}
 	if got := TradesBasis(RestOfSeason, 1); got != "Each team's best trade both lineups gain by, yours first. The other team decides. "+
-		"Gain is the change in a lineup's points over replacement, a week, over the one week left on our order." {
+		"Gain is a lineup's change in points over replacement a week, over the one week left." {
 		t.Errorf("one week: %q", got)
 	}
 }
@@ -41,10 +41,10 @@ func TestLineupAndWaiverRules(t *testing.T) {
 	if got := LineupBasis(Preseason); got != "We start the highest Proj at each slot after designations and byes, our preseason number breaking ties." {
 		t.Errorf("%q", got)
 	}
-	if WaiversBasis != "A pickup starts this week on Proj and keeps your Gain at zero or better. Its drop costs least." {
+	if WaiversBasis != "A pickup starts this week on Proj and keeps Gain at zero or better." {
 		t.Errorf("%q", WaiversBasis)
 	}
-	if got := WaiverSeasonBasis(RestOfSeason, 12); got != "Gain is the change in your lineup's points over replacement, a week, over the 12 weeks left on our order." {
+	if got := WaiverSeasonBasis(RestOfSeason, 12); got != "Gain is your lineup's change in points over replacement a week, over the 12 weeks left." {
 		t.Errorf("%q", got)
 	}
 }
@@ -88,7 +88,7 @@ func TestOrderScreenBasisNamesItsLeague(t *testing.T) {
 }
 
 func TestPerGameSentenceUsesTheFigureWord(t *testing.T) {
-	if got := PerGameBasis(); got != "A game is that order's points a game." {
+	if got := PerGameBasis(); got != "A game is our order's points a game." {
 		t.Errorf("%q", got)
 	}
 }
