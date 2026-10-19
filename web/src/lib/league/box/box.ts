@@ -498,8 +498,14 @@ export function projShort(
 	return `${BOX.proj} is this week's published projection in ${FORMAT_WORDS[scoring.format]} scoring${whose}, ${when}${defenses}.${delta}`;
 }
 
-/** The evidence columns in one short sentence pair (the Waivers basis). */
-export const EVIDENCE_SHORT = `${BOX.oppRank} is points allowed to his position, 1st the fewest. ${BOX.avg} and ${BOX.last} are his points a game and last game, your scoring.`;
+/** The evidence columns in one short sentence pair, in the scoring the rows are in: "your scoring"
+ * in a league, "in PPR" without one (the Waivers basis, the order's, the player card's). */
+export function evidenceShort(scoring = 'your scoring'): string {
+	return `${BOX.oppRank} is points allowed to his position, 1st the fewest. ${BOX.avg} and ${BOX.last} are his points a game and last game, ${scoring}.`;
+}
+
+/** The evidence columns' short pair in a league. */
+export const EVIDENCE_SHORT = evidenceShort();
 
 /** The game facts' read in one short sentence, null when no line holds one (the Waivers basis and
  * the player card's). */

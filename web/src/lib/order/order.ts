@@ -6,7 +6,14 @@
  * printed as it comes. */
 import { memberZone, weekdayTime, zoneWord } from '#lib/format/clock.ts';
 import type { LeagueHost } from '#lib/league/api.ts';
-import { BOX, boxRow, factsReadLine, projShort, type BoxRow } from '#lib/league/box/box.ts';
+import {
+	boxRow,
+	EVIDENCE_SHORT,
+	evidenceShort,
+	factsReadLine,
+	projShort,
+	type BoxRow
+} from '#lib/league/box/box.ts';
 import { addVerbWords } from '#lib/league/box/waivers.ts';
 import { hostWords } from '#lib/league/names.ts';
 import type { BasisPart } from '#lib/run/board-basis.ts';
@@ -118,8 +125,7 @@ export function moveHref(
 
 /** The order's evidence columns' basis, said once, in the scoring the rows are in. */
 export function evidenceBasis(league: boolean): string {
-	const scoring = league ? 'your scoring' : 'in PPR';
-	return `${BOX.oppRank} is points allowed to his position, 1st the fewest. ${BOX.avg} and ${BOX.last} are his points a game and last game, ${scoring}.`;
+	return league ? EVIDENCE_SHORT : evidenceShort('in PPR');
 }
 
 /** Whose rosters the marks are, named once with the member's platform. */
