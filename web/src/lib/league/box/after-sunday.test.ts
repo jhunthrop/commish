@@ -78,8 +78,5 @@ void test('on Tuesday every game is final, the lineup is set and the week is ove
 	assert.ok(tuesday.scoreboard.games.every((g) => g.state === 'final' && g.next_kickoff === null));
 	assert.equal(tuesday.lineup.set, true);
 	assert.ok(tuesday.lineup.slots.every((s) => !s.changed));
-	assert.equal(
-		tuesday.lineup.week_done,
-		"Every starter's game is final, so week 6 is over."
-	);
+	assert.equal(tuesday.lineup.week_done, "Every starter's game is final, so week 6 is over.");
 });
