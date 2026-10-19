@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import Icon from '#lib/ui/Icon.svelte';
+	import StatusChip from '#lib/ui/StatusChip.svelte';
 	import { LINES } from '../inseason/words.ts';
 	import { BOX, boxNumber } from './box.ts';
 	import BoxLine from './BoxLine.svelte';
@@ -146,7 +147,7 @@
 							>{dropLead(week)}</span
 						></td
 					>
-					<td class="dhead" colspan={COLUMNS - LEAD_COLUMNS}>{WAIVERS.gainAWeek}</td>
+					<td class="dhead" colspan={COLUMNS - LEAD_COLUMNS}>{WAIVERS.gain}</td>
 				</tr>
 			</tbody>
 			<!-- ARIA in HTML allows any role on a tbody: the drop rows are one radio group with arrow keys
@@ -167,7 +168,8 @@
 						{#snippet tail()}
 							{@render restCell(drop.rest)}
 							<td class="n beats"
-								><span class="dgain" class:up={drop.gain > 0} class:down={drop.gain < 0}
+								>{#if drop.starter}<span class="dmark"><StatusChip status={drop.starter} /></span
+									>{/if}<span class="dgain" class:up={drop.gain > 0} class:down={drop.gain < 0}
 									>{gainWord(drop.gain)}</span
 								>{#if week === null}<span class="dweek">{gainWord(drop.weekGain)} {BOX.proj}</span
 									>{/if}</td
@@ -461,6 +463,12 @@
 
 	.dgain.down {
 		color: var(--loss-ink);
+	}
+
+	/* This week's starter, marked in the shared status chip beside his gain (Lane 66u). */
+	.dmark {
+		margin-right: var(--s-2);
+		vertical-align: middle;
 	}
 
 	.dweek {

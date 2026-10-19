@@ -236,7 +236,7 @@ func (w *Writer) Waiver(add Line, drop *Line, move Waiver) string {
 	number := numberWords(w.Basis)
 	switch {
 	case move.NoDrop:
-		return fmt.Sprintf("%s would start for you, but every player he could replace is held or starts.", add.Name)
+		return fmt.Sprintf("%s would start for you, but no player he could replace leaves your lineup full this week.", add.Name)
 	case positive(move.Gain) && !move.Starts:
 		gain := fmt.Sprintf("%s does not start for you this week, and your lineup still gains %s points over replacement a week with him on %s.",
 			add.Name, points(move.Gain), number)
@@ -252,6 +252,24 @@ func (w *Writer) Waiver(add Line, drop *Line, move Waiver) string {
 		return fmt.Sprintf(w.next(frames), add.Name, rankWords(add.Position, add.Rank), orderWords(w.Basis))
 	}
 	return fmt.Sprintf("%s is not in our order and would not start for you.", add.Name)
+}
+
+// Moves a starter's drop is said for: the trade's, and the waiver add's.
+const (
+	TradeMove = "the trade"
+	AddMove   = "the add"
+)
+
+// StarterDrop is the sentence for a drop this week's lineup starts (Lane
+// 66u): the spot he starts in, and the player the move brings in with the
+// slot he actually takes, the lineup kept full; a chain of moves fills the
+// rest. move is TradeMove or AddMove.
+func (w *Writer) StarterDrop(drop, by Line, slot, bySlot, move string) string {
+	if bySlot == slot {
+		return fmt.Sprintf("%s starts at %s for you this week, and %s takes that spot after %s.", drop.short(), slot, by.short(), move)
+	}
+	return fmt.Sprintf("%s starts at %s for you this week. After %s %s starts at %s and your lineup stays full.",
+		drop.short(), slot, move, by.short(), bySlot)
 }
 
 // dropWords names the drop, or says an open spot needs none.

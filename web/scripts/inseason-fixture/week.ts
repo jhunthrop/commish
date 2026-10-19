@@ -7,6 +7,29 @@ import type { LineupSlot, PlayerLine } from '../../src/lib/league/inseason/api.t
 
 const TENTH = 10;
 
+/** The last week the rest-of-season order covers (the API's LastFantasyWeek). */
+export const LAST_FANTASY_WEEK = 17;
+
+/** The weeks the rest-of-season order covers from a week: a week's figure is over them. */
+export const weeksCovered = (week: number): number => Math.max(1, LAST_FANTASY_WEEK - week + 1);
+
+/** What every basis ends with, in the API's words (words.go porWords, pergame.go
+ * RestOfSeasonBasis): what Gain is and what a week's figure is, then what Rest of season is. */
+export function basisTail(weeks: number, fromWeek: number): string {
+	return `Gain is the change in a lineup's points over replacement a week, points above what a free pickup at each position gives you: the rest of the season on our rest-of-season order, averaged over its ${String(weeks)} weeks, not a projection of any one week. Rest of season is his points a game on our rest-of-season projection from week ${String(fromWeek)}, byes out.`;
+}
+
+/** The finder's basis in the API's words (words.go TradesBasis), the one copy build.ts and
+ * project.ts both write. */
+export function tradesBasis(weeks: number, fromWeek: number): string {
+	return `Trades where both lineups gain on our rest-of-season order. Each team's best trade, yours first, among those they gain at least 0.5 a week from, then the close calls for them. The other team decides. ${basisTail(weeks, fromWeek)}`;
+}
+
+/** The builder's basis in the API's words (words.go TradeCheckBasis): it opens under the Trades basis,
+ * which says what Gain and Rest of season are (review 66u finding 4). */
+export const CHECK_BASIS =
+	'What each lineup gains or loses on our rest-of-season order. The other team decides. Gain and Rest of season are as the Trades basis says.';
+
 /** A figure to the tenth a page prints. */
 export const tenth = (value: number): number => Math.round(value * TENTH) / TENTH;
 
@@ -49,15 +72,38 @@ function fill(
 	order: (a: PlayerLine, b: PlayerLine) => number,
 	may: (l: PlayerLine) => boolean
 ): PlayerLine[] {
+	return fillSlots(lines, slots, order, may).filter((l): l is PlayerLine => l !== null);
+}
+
+/** The same fill by slot: who each slot takes, in the slots' order, null where nobody is left. */
+function fillSlots(
+	lines: readonly PlayerLine[],
+	slots: readonly LineupSlot['slot'][],
+	order: (a: PlayerLine, b: PlayerLine) => number,
+	may: (l: PlayerLine) => boolean
+): (PlayerLine | null)[] {
 	const sorted = [...lines].filter(may).sort(order);
-	const chosen: PlayerLine[] = [];
-	const pick = (slot: LineupSlot['slot']): void => {
-		const best = sorted.find((l) => !chosen.includes(l) && accepts(slot, l.player.position));
-		if (best) chosen.push(best);
+	const out: (PlayerLine | null)[] = slots.map(() => null);
+	const pick = (at: number): void => {
+		const slot = slots[at];
+		const best = sorted.find(
+			(l) => !out.includes(l) && slot !== undefined && accepts(slot, l.player.position)
+		);
+		out[at] = best ?? null;
 	};
-	slots.filter((s) => s !== 'FLEX').forEach(pick);
-	slots.filter((s) => s === 'FLEX').forEach(pick);
-	return chosen;
+	const at = slots.map((_, i) => i);
+	at.filter((i) => slots[i] !== 'FLEX').forEach(pick);
+	at.filter((i) => slots[i] === 'FLEX').forEach(pick);
+	return out;
+}
+
+/** This week's lineup by slot (the Lineup's rule): who each slot starts, null where no one who can
+ * play is left. */
+export function weekSlots(
+	lines: readonly PlayerLine[],
+	slots: readonly LineupSlot['slot'][]
+): (PlayerLine | null)[] {
+	return fillSlots(lines, slots, better, (l) => tierOf(l) === 0);
 }
 
 /** This week's Proj total of the lineup the Lineup screen sets: only a player who can play starts,
@@ -66,7 +112,7 @@ export function lineupProj(
 	lines: readonly PlayerLine[],
 	slots: readonly LineupSlot['slot'][]
 ): number {
-	const starters = fill(lines, slots, better, (l) => tierOf(l) === 0);
+	const starters = weekStarters(lines, slots);
 	return tenth(starters.reduce((sum, l) => sum + (printedProj(l) ?? 0), 0));
 }
 
@@ -76,12 +122,29 @@ export function seasonStrength(
 	lines: readonly PlayerLine[],
 	slots: readonly LineupSlot['slot'][]
 ): number {
+	const starters = seasonStarters(lines, slots);
+	return tenth(starters.reduce((sum, l) => sum + (l.points_over_replacement ?? 0), 0));
+}
+
+/** The players the rest-of-season lineup strength starts: by points over replacement, injured
+ * reserve left out. */
+export function seasonStarters(
+	lines: readonly PlayerLine[],
+	slots: readonly LineupSlot['slot'][]
+): PlayerLine[] {
 	const por = (l: PlayerLine): number => l.points_over_replacement ?? Number.NEGATIVE_INFINITY;
-	const starters = fill(
+	return fill(
 		lines,
 		slots,
 		(a, b) => por(b) - por(a),
 		(l) => !l.player.injured_reserve && l.facts.designation?.status !== 'injured_reserve'
 	);
-	return tenth(starters.reduce((sum, l) => sum + (l.points_over_replacement ?? 0), 0));
+}
+
+/** The starters this week's lineup sets: only a player who can play starts. */
+export function weekStarters(
+	lines: readonly PlayerLine[],
+	slots: readonly LineupSlot['slot'][]
+): PlayerLine[] {
+	return fill(lines, slots, better, (l) => tierOf(l) === 0);
 }

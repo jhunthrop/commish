@@ -10,6 +10,7 @@ package inseason
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"time"
@@ -22,6 +23,7 @@ import (
 	"github.com/jhunthrop/commish/api/internal/draft"
 	"github.com/jhunthrop/commish/api/internal/httpx"
 	"github.com/jhunthrop/commish/api/internal/leaguesync"
+	"sync/atomic"
 )
 
 // limitPerMinute is the sync routes' read limit, per account: a page
@@ -60,16 +62,33 @@ type Moves interface {
 // Service serves the three pages and the trade check.
 type Service struct {
 	Leagues Leagues
-	Facts   SeasonFacts
-	Holds   Holds
-	Moves   Moves
+	// Landings is every account's league for a read that just landed, so
+	// the trade search is warmed then (warm.go); nil warms nothing.
+	Landings Landings
+	Facts    SeasonFacts
+	Holds    Holds
+	Moves    Moves
 	// Weeks lists the account's leagues for GET /me/week, nil answers none.
 	Weeks Weeks
 	// Boards values our board for the reads with no league: the public player read and the public
 	// order (PublicSettings).
 	Boards BoardSource
-	// targets keeps the trade finder's targets per league read (order.go).
-	targets targetCache
+	// Context is main's: shutdown stops every trade search and warm run
+	// (rereview 66u W3); nil is context.Background.
+	Context context.Context
+	// finds keeps each pair's latest trade search (targets.go), for
+	// /trades, the order's targets and a landed read's warm run alike.
+	finds readCache[map[int][]Trade]
+	// SearchTimeout bounds one trade search, searchTimeout when zero.
+	SearchTimeout time.Duration
+	// searches counts the trade searches run, the cache's misses.
+	searches atomic.Int64
+	// beforeSearch, set by a test, runs as a search starts.
+	beforeSearch func()
+	// viewers is who viewed each league lately: the warm run's accounts.
+	viewers viewerSet
+	// warms is the landed reads waiting for a warm worker.
+	warms warmQueue
 	// Season is the season GET /games/week reads, the board's.
 	Season int
 	Now    func() time.Time
@@ -123,23 +142,52 @@ func (s *Service) advisorFor(w http.ResponseWriter, r *http.Request) (*advisor, 
 		httpx.WriteError(w, r, http.StatusConflict, httpx.CodeConflict, leaguesync.NoGamesWords, nil)
 		return nil, false
 	}
-	ctx := r.Context()
-	data, err := s.Facts.Data(ctx, seasonOf(l))
-	if err != nil {
-		httpx.WriteInternal(w, r, s.Log, "inseason: facts", err)
-		return nil, false
-	}
-	held, err := s.Holds.Held(ctx, auth.AccountID(r))
-	if err != nil {
-		httpx.WriteInternal(w, r, s.Log, "inseason: held", err)
-		return nil, false
-	}
-	a, err := newAdvisor(l, data, s.projection(ctx, seasonOf(l), l.Snap.Week), held, s.Now())
+	account := auth.AccountID(r)
+	s.viewers.saw(l.Snap.Ref, account, s.Now())
+	a, err := s.leagueAdvisor(r.Context(), l, account, context.WithoutCancel(s.base()))
 	if err != nil {
 		httpx.WriteInternal(w, r, s.Log, "inseason: advisor", err)
 		return nil, false
 	}
 	return a, true
+}
+
+// SearchStoppedWords is the sentence a screen prints when the trade
+// search stopped before it finished (shutdown, its deadline): never an
+// empty table (rereview 66u F2).
+const SearchStoppedWords = "We could not finish the trade search just now. Try again in a moment."
+
+// searchStopped answers a request whose trade search stopped, 503 with
+// SearchStoppedWords, logging it once; false when the search finished.
+func (s *Service) searchStopped(w http.ResponseWriter, r *http.Request, a *advisor) bool {
+	if a.searchErr == nil {
+		return false
+	}
+	s.Log.Warn("inseason: the trade search stopped", "league", a.Snap.Ref.Key(), "err", a.searchErr)
+	httpx.WriteError(w, r, http.StatusServiceUnavailable, httpx.CodeUnavailable, SearchStoppedWords, nil)
+	return true
+}
+
+// leagueAdvisor is the account's league with its facts, the week's
+// projection, its holds and the pair's kept trade search: what a request
+// reads, and what a landed read warms (warm.go). search is the context a
+// search it starts runs on: the service's for a request (requests share
+// it), the warm run's for a warm.
+func (s *Service) leagueAdvisor(ctx context.Context, l League, account uuid.UUID, search context.Context) (*advisor, error) {
+	data, err := s.Facts.Data(ctx, seasonOf(l))
+	if err != nil {
+		return nil, fmt.Errorf("facts: %w", err)
+	}
+	held, err := s.Holds.Held(ctx, account)
+	if err != nil {
+		return nil, fmt.Errorf("held: %w", err)
+	}
+	a, err := newAdvisor(l, data, s.projection(ctx, seasonOf(l), l.Snap.Week), held, s.Now())
+	if err != nil {
+		return nil, err
+	}
+	a.finds = s.findsFor(a, account.String(), search)
+	return a, nil
 }
 
 // projection is the week's published projection. A read that fails is
@@ -246,6 +294,9 @@ func (s *Service) trades(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	out, ok := a.Trades(focus)
+	if s.searchStopped(w, r, a) {
+		return
+	}
 	s.answer(w, r, out, ok)
 }
 

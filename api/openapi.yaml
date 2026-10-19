@@ -506,6 +506,7 @@ paths:
         "409": { $ref: "#/components/responses/ErrorResponse" }
         "422": { $ref: "#/components/responses/ErrorResponse" }
         "502": { $ref: "#/components/responses/ErrorResponse" }
+        "503": { $ref: "#/components/responses/ErrorResponse" }
   /leagues/attached/{id}/order/week:
     parameters:
       - name: id
@@ -557,6 +558,7 @@ paths:
         "409": { $ref: "#/components/responses/ErrorResponse" }
         "422": { $ref: "#/components/responses/ErrorResponse" }
         "502": { $ref: "#/components/responses/ErrorResponse" }
+        "503": { $ref: "#/components/responses/ErrorResponse" }
   /leagues/attached/{id}/trades/check:
     parameters:
       - name: id
@@ -3989,9 +3991,14 @@ components:
     WaiverDrop:
       type: object
       description: one player of the member's an add could replace, with the lineup's gains after the swap
-      required: [host_id, gain, week_gain]
+      required: [host_id, gain, week_gain, starts_this_week]
       properties:
         host_id: { type: string, description: "the dropped player's host id, a line in the answer's roster" }
+        starts_this_week:
+          type: boolean
+          description: >-
+            the lineup the Lineup screen sets this week starts him; the panel marks him, and the row's own drop is one
+            only when the lineup stays full with the add in it (Lane 66u)
         gain: { type: number, format: double, description: "points over replacement a week to the lineup over the rest of the season, one decimal" }
         week_gain: { type: number, format: double, description: "this week's Proj to the lineup the advice sets, one decimal" }
     WaiverRow:
@@ -4270,7 +4277,7 @@ components:
         ties: { type: integer }
     TradeRow:
       type: object
-      required: [give, get, drop, my_gain, their_gain, close_for_them, my_proj_change, their_proj_change]
+      required: [give, get, drop, drop_reason, my_gain, their_gain, close_for_them, my_proj_change, their_proj_change]
       properties:
         give: { type: array, items: { $ref: "#/components/schemas/PlayerLine" } }
         get: { type: array, items: { $ref: "#/components/schemas/PlayerLine" } }
@@ -4279,8 +4286,16 @@ components:
           nullable: true
           description: >-
             who the drafter drops to make room when the trade brings in more players than it sends and the roster has
-            no open spot (the player it costs least to lose, never held, never a starter after the trade); the gain
-            is after him; null otherwise
+            no open spot: never held, never one whose loss leaves a rest-of-season slot empty; among the drops that
+            keep this week's lineup as the Lineup screen sets it full (a bench player, or a starter whose place a
+            player the trade brings in takes), the largest rest-of-season gain, ties to the higher Proj kept, then a
+            bench player, then the player our order values least (Lane 66u); the gain is after him; null otherwise
+        drop_reason:
+          type: string
+          nullable: true
+          description: >-
+            the trade's sentence when its drop starts this week: the spot he starts in and the player the trade
+            brings in who takes it (Lane 66u); null for a bench drop or none
         my_gain: { type: number, format: double, description: points over replacement a week to the drafter's lineup, one decimal }
         their_gain: { type: number, format: double, description: the same to theirs }
         close_for_them: { type: boolean, description: their gain is under 0.5 a week }

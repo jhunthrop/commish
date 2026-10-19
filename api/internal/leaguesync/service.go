@@ -40,6 +40,7 @@ type Links interface {
 	Restore(ctx context.Context, accountID, id uuid.UUID, many bool) (Link, error)
 	Touch(ctx context.Context, accountID, id uuid.UUID, at time.Time) error
 	Linked(ctx context.Context, ref Ref) (bool, error)
+	LinksOf(ctx context.Context, ref Ref) ([]Link, error)
 }
 
 // SavedLeagues is the part of leagues.Store an attach writes: the saved
