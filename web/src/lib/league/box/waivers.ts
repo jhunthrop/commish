@@ -513,7 +513,7 @@ export function waiverBasis(
 		...said(proj),
 		...said(deltaPart(advice.projection_previous_read_at, clock), false),
 		// The phone's rows draw no expected score or weather (BoxLine phoneFacts): no read to say there.
-		...said(gamePart(lines, clock, now, 'read'), false),
+		...said(gamePart(lines, clock, now, 'full'), false),
 		...said(kickedOffPartAt(lines, now)),
 		...said(OPP_PART),
 		...uncountedParts(advice, rulesHref)

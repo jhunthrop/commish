@@ -38,8 +38,10 @@ const ZONE = 'America/Chicago';
  * before the fixture's kickoff. Never the real clock. */
 const FACTS_READ = '2026-10-17T02:00:00.000Z';
 const NOW = Date.parse(FACTS_READ);
-/** The facts-read sentence the basis ends on while a game on screen is still to be played. */
-const FACTS_SENTENCE = 'Game was read Fri 9:00 pm.';
+/** The Game sentence the basis says at a desk while a game on screen is still to be played: the
+ * expected score and weather its cells draw (review H2). */
+const FACTS_SENTENCE =
+	"Game is each club's expected points, his first, and weather, read Fri 9:00 pm.";
 
 const facts = (over: Partial<WeekFacts> = {}): WeekFacts => ({
 	week: 6,

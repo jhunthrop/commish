@@ -376,7 +376,12 @@ void test("a trade opened or the builder open adds the players' columns, each on
 	);
 	assert.deepEqual(
 		parts.filter((p) => !p.phone).map((p) => p.text),
-		["Pts are Sleeper's points by player so far, and Team adds the rows.", WEEK_ROOM]
+		[
+			// The builder's phone rows draw no Opp rank (review H2).
+			'Opp rank is points allowed to his position, 1st fewest.',
+			"Pts are Sleeper's points by player so far, and Team adds the rows.",
+			WEEK_ROOM
+		]
 	);
 });
 

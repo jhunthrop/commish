@@ -440,9 +440,10 @@ export function tradeBasis(
 	const players =
 		opened !== 'none'
 			? [
-					...said(OPP_PART),
-					// The opened rows' Game cell draws its figures at a desk only.
-					...said(gamePart(lines, clock, now, 'read'), false),
+					// The builder's phone rows draw no Opp rank (TradeBox), so its sentence is the desk's there.
+					...said(OPP_PART, opened !== 'builder'),
+					// The opened rows draw the Game cell's figures at a desk only (BoxLine phoneFacts).
+					...said(gamePart(lines, clock, now, 'full'), false),
 					...said(ptsPart(advice.player_points, host, 'rows'), false),
 					...uncountedParts(advice, hrefs.rules)
 				]
