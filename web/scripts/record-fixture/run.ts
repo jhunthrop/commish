@@ -4,16 +4,15 @@
 // upcoming. Weeks 1 and 2 are the contract fixture's real grades; weeks 3 to 6 are STAND-INS (live
 // has weeks 3 to 5 missed and week 6 waiting on its stats), so the record page's shots measure the
 // basis, the bug and the table on the shape live will carry. Every other artifact is the contract
-// fixture's as written. The manifest takes this run's id and time, a day after the fixture's, so
-// week 7's freeze is before the run.
+// fixture's as written. The manifest keeps the fixture's time (the boards' refresh and the run's header
+// agree, Oct 21) and takes this run's id; week 7 froze the morning of the run, before its kickoff.
 //
-// Usage: node scripts/record-fixture/run.ts   writes web/.runs/runs/2026-10-22T12-live-shape/
-// then build with PUBLIC_RUN_BASE_URL=.runs PUBLIC_RUN_ID=2026-10-22T12-live-shape.
+// Usage: node scripts/record-fixture/run.ts   writes web/.runs/runs/2026-10-21T12-live-shape/
+// then build with PUBLIC_RUN_BASE_URL=.runs PUBLIC_RUN_ID=2026-10-21T12-live-shape.
 import { cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { manifestSchema, recordSchema, RUN_PATHS } from '../../src/lib/run/schema.ts';
 
-const RECORD_SHOTS_RUN = '2026-10-22T12-live-shape';
-const RUN_AT = '2026-10-22T12:00:00.000Z';
+const RECORD_SHOTS_RUN = '2026-10-21T12-live-shape';
 const SOURCE_RUN = new URL(
 	'../../../research/nightly/contract/fixture/runs/2026-10-21T12-ros/',
 	import.meta.url
@@ -40,8 +39,6 @@ await cp(SOURCE_RUN, OUT, { recursive: true });
 await writeFile(new URL(RUN_PATHS.record, OUT), JSON.stringify(record));
 await writeFile(
 	new URL(RUN_PATHS.manifest, OUT),
-	JSON.stringify(
-		manifestSchema.parse({ ...manifest, runId: RECORD_SHOTS_RUN, runAt: RUN_AT, sources })
-	)
+	JSON.stringify(manifestSchema.parse({ ...manifest, runId: RECORD_SHOTS_RUN, sources }))
 );
 process.stdout.write(`wrote ${OUT.pathname}\n`);

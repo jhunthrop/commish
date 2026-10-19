@@ -5,13 +5,17 @@ the page prints when a benchmark called the weeks better than our order."""
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Final
 
 from research.nightly.reads.record import (
     AGREEMENT_PLACES,
     ALL,
     LEAGUE_TEAMS,
+    RECORD_POSITIONS,
     SCALE,
+    Line,
+    Score,
     Week,
     filled_ranks,
     honest_line,
@@ -253,3 +257,23 @@ def test_the_method_names_only_the_orders_the_record_draws() -> None:
         "ADP and Published on the same players."
     )
     assert method(()).endswith("ADP on the same players.")
+
+
+_ORDER_SHOTS: Final = Path(__file__).resolve().parents[2] / "web" / "scripts" / "order-shots.ts"
+
+
+def test_the_order_shots_variants_say_what_the_nightly_writes() -> None:
+    """Review 82: order-shots measures the record's basis with Published drawn and at its worst by
+    sentences it types; they are held here to what method and starters_basis write, so drift fails."""
+    shots = _ORDER_SHOTS.read_text()
+    replaced = re.search(r"RECORD\.method\.replace\('([^']+)', '([^']+)'\)", shots)
+    assert replaced is not None
+    drawn = method(
+        _two_weeks(_quarterbacks(ours_right=True, published=False), _quarterbacks(ours_right=True, published=True))
+    )
+    assert method(()).replace(replaced[1], replaced[2]) == drawn
+    worst = re.search(r'"(Starters right counts [^"]+)"', shots)
+    assert worst is not None
+    graded = Score(1, None, None, 0, 1)
+    every = tuple(Line(position, graded, graded, None) for position in RECORD_POSITIONS)
+    assert starters_basis(every) == worst[1]

@@ -20,6 +20,7 @@
 
 	/** The drawing's width before the page has laid out, and its widest: a wide screen's column. */
 	const WIDE = 860;
+	/** The drawing's height, the svg's own, so the first paint and the measured redraw stand the same. */
 	const HEIGHT = 230;
 	const PAD = { left: 44, right: 72, top: 14, bottom: 28 };
 	/** The drawing is sized to its column (Lane 82), so a phone's labels print at their own size. */
@@ -77,7 +78,7 @@
 
 <figure class="chart" bind:this={figure}>
 	<figcaption>{RECORD_BOX.chart}</figcaption>
-	<svg viewBox="0 0 {width} {HEIGHT}" role="img" aria-label={RECORD_BOX.chart}>
+	<svg viewBox="0 0 {width} {HEIGHT}" height={HEIGHT} role="img" aria-label={RECORD_BOX.chart}>
 		{#each ticks as tick (tick.value)}
 			<line
 				class="grid"
@@ -124,7 +125,6 @@
 	svg {
 		display: block;
 		width: 100%;
-		height: auto;
 	}
 
 	.grid {

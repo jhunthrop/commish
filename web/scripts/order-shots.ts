@@ -111,7 +111,8 @@ const CAPTION = `# Lane 66j shots
 - Our record reads the run the site was built from. On the record shots run (scripts/record-fixture/run.ts,
   Lane 82) that is live's shape a week on: weeks 1 and 2 are real grades of our preseason order, weeks 3 to 6
   are STAND-INS (live has weeks 3 to 5 missed and week 6 waiting on its stats), week 7 frozen and not played,
-  and the published projection kept from week 7 so not drawn yet. The basis lines "record published" and
+  and the published projection kept from week 7 so not drawn yet. The run keeps the contract fixture's time,
+  Oct 21, so its header, the boards' refresh and week 7's freeze that morning agree. The basis lines "record published" and
   "record worst" are the page's basis with the words the nightly writes once Published is graded, and with
   kickers and defenses graded too, measured in the page.
 `;
