@@ -264,14 +264,9 @@ type Uncounted struct {
 // UncountedOf is the league's uncounted rules. carried says whether any
 // line this season carries a metric (Season.Carries); nil carries none.
 func UncountedOf(s apitypes.LeagueSettings, carried func(string) bool) Uncounted {
-	rules := []string{}
-	for _, c := range countables(rulesOf(s.Scoring)) {
-		if c.points != 0 && c.starts(s) && !c.counted(carried) {
-			rules = append(rules, c.words)
-		}
-	}
+	rules := uncountedRules(s, carried)
 	if len(rules) == 0 {
-		return Uncounted{Rules: rules}
+		return Uncounted{Rules: []string{}}
 	}
 	n := countWords(len(rules))
 	return Uncounted{
@@ -279,6 +274,35 @@ func UncountedOf(s apitypes.LeagueSettings, carried func(string) bool) Uncounted
 		Link:  "Which " + n,
 		Rules: rules,
 	}
+}
+
+// uncountedRules is the league's rules points so far leave out, in
+// words: each one the league scores at a spot it starts and no line this
+// season carries.
+func uncountedRules(s apitypes.LeagueSettings, carried func(string) bool) []string {
+	return uncountedWhere(s, carried, func(spot) bool { return true })
+}
+
+// uncountedWhere is the rules left out at the spots keep admits.
+func uncountedWhere(s apitypes.LeagueSettings, carried func(string) bool, keep func(spot) bool) []string {
+	var named []string
+	for _, c := range countables(rulesOf(s.Scoring)) {
+		if keep(c.spot) && c.points != 0 && c.starts(s) && !c.counted(carried) {
+			named = append(named, c.words)
+		}
+	}
+	return named
+}
+
+// tabSpots is the spot each week tab's rows score at (Lane 66w rereview
+// N2): a kicker's Avg and Last leave out only kicking rules, a defense's
+// only defense rules.
+var tabSpots = map[draft.Position]spot{draft.K: kickerSpot, draft.DEF: defenseSpot}
+
+// uncountedRulesAt is uncountedRules for one week tab's position.
+func uncountedRulesAt(s apitypes.LeagueSettings, carried func(string) bool, position draft.Position) []string {
+	want, ok := tabSpots[position]
+	return uncountedWhere(s, carried, func(at spot) bool { return ok && at == want })
 }
 
 // gainWords is what a Gain is, said once on a screen (Lane 66t): whose

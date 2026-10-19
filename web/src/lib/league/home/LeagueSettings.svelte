@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { UNCOUNTED_ANCHOR } from '../rules-link.ts';
+	import { UNCOUNTED_ANCHOR } from '../inseason/tabs.ts';
 	import Quiet from '#lib/ui/Quiet.svelte';
 	import type { LeagueHost, LeagueTerms } from '../api.ts';
 	import {

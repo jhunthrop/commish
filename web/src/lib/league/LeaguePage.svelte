@@ -5,7 +5,6 @@
 	import { scoresSentence } from '#lib/context/note-words.ts';
 	import { lazySheet } from '#lib/site/lazy-sheet.svelte.ts';
 	import { links } from '#lib/site/links.ts';
-	import { UNCOUNTED_ANCHOR } from './rules-link.ts';
 	import DisplayTitle from '#lib/ui/DisplayTitle.svelte';
 	import EmptyState from '#lib/ui/EmptyState.svelte';
 	import Panel from '#lib/ui/Panel.svelte';
@@ -25,7 +24,7 @@
 	import { followSwitch } from './follow-switch.svelte.ts';
 	import SeasonPanel from './SeasonPanel.svelte';
 	import { MOCK_VERB } from '#lib/ui/nav.ts';
-	import { tabHref } from './inseason/tabs.ts';
+	import { SETTINGS_VIEW, tabHref, UNCOUNTED_ANCHOR } from './inseason/tabs.ts';
 	import { inSeasonApi, type LineupAdvice, type Scoreboard } from './inseason/api.ts';
 	import { siteContext } from '#lib/context/context.svelte.ts';
 	import { sectionHref } from '#lib/ui/nav.ts';
@@ -250,12 +249,14 @@
 		void tick().then(() => document.getElementById(UNCOUNTED_ANCHOR)?.scrollIntoView());
 	});
 
+	// A link to the league's scoring rules (the week tab's "Which two", Lane 66w) opens on Settings.
 	onMount(() => {
-		// An in-season basis's "Which five" opens the league on Settings at the rules our stats lack.
-		if (window.location.hash === `#${UNCOUNTED_ANCHOR}`) {
+		if (new URLSearchParams(window.location.search).get(SETTINGS_VIEW.name) === SETTINGS_VIEW.value)
 			view = 'settings';
-			toRules = true;
-		}
+	});
+	onMount(() => {
+		// Asked for the rules our stats lack ("Which five"): shown once the week's read draws them.
+		toRules = view === 'settings' && window.location.hash === `#${UNCOUNTED_ANCHOR}`;
 		void lazySheet.load();
 		void read();
 		const timer = setInterval(() => void read(), POLL_MS);

@@ -8,6 +8,7 @@
 	import BoardView from './BoardView.svelte';
 	import SiteShell from './SiteShell.svelte';
 	import { links } from './links.ts';
+	import { weekBoardWords } from '#lib/order/week-head.ts';
 	import { PAGE_VERBS, boardWords, type BoardWords } from './season-words.ts';
 	import { shownRail } from './shown-rail.svelte.ts';
 	import { verbHref } from './verb-links.ts';
@@ -26,12 +27,11 @@
 	 * it; the document names it. In season the one verb follows your league (season-words.ts). Both
 	 * sets of words are in the HTML and the root's rail shows one (Phased.svelte), so the bar is right
 	 * on the first frame; the document's title follows the rail once the script runs. */
-	const wordsAt = (rail: RailKey): BoardWords =>
-		boardWords(
-			rail,
-			{ ...page.format, season: run.season, position: page.position },
-			leagueId !== null
-		);
+	const wordsAt = (rail: RailKey): BoardWords => {
+		const board = { ...page.format, season: run.season, position: page.position };
+		// In season the kickers' and defenses' tabs are this week's (Lane 66w).
+		return weekBoardWords(boardWords(rail, board, leagueId !== null), rail, board);
+	};
 	const wordsOf = (set: WordSet): BoardWords => wordsAt(RAIL_OF_WORD_SET[set]);
 	const rail = shownRail(() => siteRail);
 	const documentTitle = $derived(wordsAt(rail()).title);

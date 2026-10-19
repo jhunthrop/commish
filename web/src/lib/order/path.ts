@@ -18,6 +18,15 @@ export interface OrderQuery {
 /** The fewest letters a search sends (the API's minimum). */
 export const MIN_SEARCH = 2;
 
+/** The kickers' or defenses' week (Lane 66w): the league's with an attached league's id, else the
+ * public one. */
+export function weekOrderPath(league: string | null, position: 'K' | 'DEF'): string {
+	const params = new URLSearchParams({ position });
+	const head =
+		league === null ? '/order/week' : `/leagues/attached/${encodeURIComponent(league)}/order/week`;
+	return `${head}?${params.toString()}`;
+}
+
 /** The route's path with its query: the league's order with an attached league's id, else the public
  * one, which takes no roster filter. */
 export function orderPath(league: string | null, query: OrderQuery): string {

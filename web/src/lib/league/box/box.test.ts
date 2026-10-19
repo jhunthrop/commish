@@ -206,7 +206,7 @@ void test("a defense's face is its club's mark, said in words", () => {
 		slotWord('DEF')
 	);
 	assert.deepEqual(defense.face, {
-		src: 'https://a.espncdn.com/i/teamlogos/nfl/500/hou.png',
+		src: '/img/clubs/nfl/hou/64',
 		mark: true,
 		alt: 'Texans defense'
 	});

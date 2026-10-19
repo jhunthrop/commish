@@ -15,6 +15,16 @@ export function headshotUrlFor(boardId: string, league: HeadshotLeague = 'nfl'):
 	return `${ESPN_IMAGES}${headshotPath(league, boardId)}`;
 }
 
+/** A club's mark from the provider at a width, square (the club mark route's upstream, Lane 66w). */
+export function upstreamClubMarkUrl(league: string, club: string, width: number): string {
+	const query = new URLSearchParams({
+		img: `/i/teamlogos/${league}/500/${club}.png`,
+		w: String(width),
+		h: String(width)
+	});
+	return `${ESPN_IMAGES}/combiner/i?${query.toString()}`;
+}
+
 /** The provider's image at a width. */
 export function upstreamHeadshotUrl(league: HeadshotLeague, id: string, width: number): string {
 	const query = new URLSearchParams({

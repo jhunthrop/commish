@@ -36,6 +36,14 @@ const NICKNAMES: Readonly<Record<string, string>> = {
 	WAS: 'Commanders'
 };
 
+/** A code some feeds still use for a club the board names by another (WAS for WSH). */
+const ALIASES = new Set(['WAS']);
+
+/** The 32 clubs by the board's own codes (the club mark route serves these and no other). */
+export function clubCodes(): readonly string[] {
+	return Object.keys(NICKNAMES).filter((code) => !ALIASES.has(code));
+}
+
 /** A club's nickname, "Texans"; the code itself for a code we do not know. */
 export function clubNickname(club: string): string {
 	return NICKNAMES[club.toUpperCase()] ?? club;

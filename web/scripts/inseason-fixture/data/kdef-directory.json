@@ -1,0 +1,448 @@
+[
+	{
+		"id": "DST-ARI",
+		"name": "Arizona Cardinals",
+		"position": "DEF",
+		"team": "ARI",
+		"headshot": ""
+	},
+	{ "id": "DST-ATL", "name": "Atlanta Falcons", "position": "DEF", "team": "ATL", "headshot": "" },
+	{ "id": "DST-BAL", "name": "Baltimore Ravens", "position": "DEF", "team": "BAL", "headshot": "" },
+	{ "id": "DST-BUF", "name": "Buffalo Bills", "position": "DEF", "team": "BUF", "headshot": "" },
+	{
+		"id": "DST-CAR",
+		"name": "Carolina Panthers",
+		"position": "DEF",
+		"team": "CAR",
+		"headshot": ""
+	},
+	{ "id": "DST-CHI", "name": "Chicago Bears", "position": "DEF", "team": "CHI", "headshot": "" },
+	{
+		"id": "DST-CIN",
+		"name": "Cincinnati Bengals",
+		"position": "DEF",
+		"team": "CIN",
+		"headshot": ""
+	},
+	{ "id": "DST-CLE", "name": "Cleveland Browns", "position": "DEF", "team": "CLE", "headshot": "" },
+	{ "id": "DST-DAL", "name": "Dallas Cowboys", "position": "DEF", "team": "DAL", "headshot": "" },
+	{ "id": "DST-DEN", "name": "Denver Broncos", "position": "DEF", "team": "DEN", "headshot": "" },
+	{ "id": "DST-DET", "name": "Detroit Lions", "position": "DEF", "team": "DET", "headshot": "" },
+	{ "id": "DST-GB", "name": "Green Bay Packers", "position": "DEF", "team": "GB", "headshot": "" },
+	{ "id": "DST-HOU", "name": "Houston Texans", "position": "DEF", "team": "HOU", "headshot": "" },
+	{
+		"id": "DST-IND",
+		"name": "Indianapolis Colts",
+		"position": "DEF",
+		"team": "IND",
+		"headshot": ""
+	},
+	{
+		"id": "DST-JAX",
+		"name": "Jacksonville Jaguars",
+		"position": "DEF",
+		"team": "JAX",
+		"headshot": ""
+	},
+	{ "id": "DST-KC", "name": "Kansas City Chiefs", "position": "DEF", "team": "KC", "headshot": "" },
+	{
+		"id": "DST-LAC",
+		"name": "Los Angeles Chargers",
+		"position": "DEF",
+		"team": "LAC",
+		"headshot": ""
+	},
+	{ "id": "DST-LAR", "name": "Los Angeles Rams", "position": "DEF", "team": "LAR", "headshot": "" },
+	{ "id": "DST-LV", "name": "Las Vegas Raiders", "position": "DEF", "team": "LV", "headshot": "" },
+	{ "id": "DST-MIA", "name": "Miami Dolphins", "position": "DEF", "team": "MIA", "headshot": "" },
+	{
+		"id": "DST-MIN",
+		"name": "Minnesota Vikings",
+		"position": "DEF",
+		"team": "MIN",
+		"headshot": ""
+	},
+	{
+		"id": "DST-NE",
+		"name": "New England Patriots",
+		"position": "DEF",
+		"team": "NE",
+		"headshot": ""
+	},
+	{ "id": "DST-NO", "name": "New Orleans Saints", "position": "DEF", "team": "NO", "headshot": "" },
+	{ "id": "DST-NYG", "name": "New York Giants", "position": "DEF", "team": "NYG", "headshot": "" },
+	{ "id": "DST-NYJ", "name": "New York Jets", "position": "DEF", "team": "NYJ", "headshot": "" },
+	{
+		"id": "DST-PHI",
+		"name": "Philadelphia Eagles",
+		"position": "DEF",
+		"team": "PHI",
+		"headshot": ""
+	},
+	{
+		"id": "DST-PIT",
+		"name": "Pittsburgh Steelers",
+		"position": "DEF",
+		"team": "PIT",
+		"headshot": ""
+	},
+	{ "id": "DST-SEA", "name": "Seattle Seahawks", "position": "DEF", "team": "SEA", "headshot": "" },
+	{
+		"id": "DST-SF",
+		"name": "San Francisco 49ers",
+		"position": "DEF",
+		"team": "SF",
+		"headshot": ""
+	},
+	{
+		"id": "DST-TB",
+		"name": "Tampa Bay Buccaneers",
+		"position": "DEF",
+		"team": "TB",
+		"headshot": ""
+	},
+	{ "id": "DST-TEN", "name": "Tennessee Titans", "position": "DEF", "team": "TEN", "headshot": "" },
+	{
+		"id": "DST-WSH",
+		"name": "Washington Commanders",
+		"position": "DEF",
+		"team": "WSH",
+		"headshot": ""
+	},
+	{
+		"id": "4363538",
+		"name": "Chad Ryland",
+		"position": "K",
+		"team": "ARI",
+		"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4363538.png"
+	},
+	{
+		"id": "4566192",
+		"name": "Joshua Karty",
+		"position": "K",
+		"team": "ARI",
+		"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4566192.png"
+	},
+	{
+		"id": "10621",
+		"name": "Nick Folk",
+		"position": "K",
+		"team": "ATL",
+		"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/10621.png"
+	},
+	{
+		"id": "4697745",
+		"name": "Tyler Loop",
+		"position": "K",
+		"team": "BAL",
+		"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4697745.png"
+	},
+	{
+		"id": "11122",
+		"name": "Matt Prater",
+		"position": "K",
+		"team": "BUF",
+		"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/11122.png"
+	},
+	{
+		"id": "3917232",
+		"name": "Tyler Bass",
+		"position": "K",
+		"team": "BUF",
+		"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/3917232.png"
+	},
+	{
+		"id": "4879326",
+		"name": "Maddux Trujillo",
+		"position": "K",
+		"team": "BUF",
+		"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4879326.png"
+	},
+	{
+		"id": "4568263",
+		"name": "Ryan Fitzgerald",
+		"position": "K",
+		"team": "CAR",
+		"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4568263.png"
+	},
+	{
+		"id": "17427",
+		"name": "Cairo Santos",
+		"position": "K",
+		"team": "CHI",
+		"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/17427.png"
+	},
+	{
+		"id": "5155087",
+		"name": "Gabriel Plascencia",
+		"position": "K",
+		"team": "CHI",
+		"headshot": "https://a.espncdn.com/i/headshots/college-football/players/full/5155087.png"
+	},
+	{
+		"id": "4360234",
+		"name": "Evan McPherson",
+		"position": "K",
+		"team": "CIN",
+		"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4360234.png"
+	},
+	{
+		"id": "4258620",
+		"name": "Andre Szmyt",
+		"position": "K",
+		"team": "CLE",
+		"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4258620.png"
+	},
+	{
+		"id": "3953687",
+		"name": "Brandon Aubrey",
+		"position": "K",
+		"team": "DAL",
+		"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/3953687.png"
+	},
+	{
+		"id": "2985659",
+		"name": "Wil Lutz",
+		"position": "K",
+		"team": "DEN",
+		"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/2985659.png"
+	},
+	{
+		"id": "4689936",
+		"name": "Jake Bates",
+		"position": "K",
+		"team": "DET",
+		"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4689936.png"
+	},
+	{
+		"id": "4245661",
+		"name": "Lucas Havrisik",
+		"position": "K",
+		"team": "GB",
+		"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4245661.png"
+	},
+	{
+		"id": "4869461",
+		"name": "Trey Smack",
+		"position": "K",
+		"team": "GB",
+		"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4869461.png"
+	},
+	{
+		"id": "5277116",
+		"name": "Lenny Krieg",
+		"position": "K",
+		"team": "GB",
+		"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/5277116.png"
+	},
+	{
+		"id": "2971573",
+		"name": "Ka'imi Fairbairn",
+		"position": "K",
+		"team": "HOU",
+		"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/2971573.png"
+	},
+	{
+		"id": "4577793",
+		"name": "Chris Freeman",
+		"position": "K",
+		"team": "HOU",
+		"headshot": "https://a.espncdn.com/i/headshots/college-football/players/full/4577793.png"
+	},
+	{
+		"id": "4571557",
+		"name": "Spencer Shrader",
+		"position": "K",
+		"team": "IND",
+		"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4571557.png"
+	},
+	{
+		"id": "4686361",
+		"name": "Cam Little",
+		"position": "K",
+		"team": "JAX",
+		"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4686361.png"
+	},
+	{
+		"id": "3055899",
+		"name": "Harrison Butker",
+		"position": "K",
+		"team": "KC",
+		"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/3055899.png"
+	},
+	{
+		"id": "4362081",
+		"name": "Cameron Dicker",
+		"position": "K",
+		"team": "LAC",
+		"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4362081.png"
+	},
+	{
+		"id": "4574716",
+		"name": "Harrison Mevis",
+		"position": "K",
+		"team": "LAR",
+		"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4574716.png"
+	},
+	{
+		"id": "4249087",
+		"name": "Matt Gay",
+		"position": "K",
+		"team": "LV",
+		"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4249087.png"
+	},
+	{
+		"id": "5158921",
+		"name": "Kansei Matsuzawa",
+		"position": "K",
+		"team": "LV",
+		"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/5158921.png"
+	},
+	{
+		"id": "4243371",
+		"name": "Riley Patterson",
+		"position": "K",
+		"team": "MIA",
+		"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4243371.png"
+	},
+	{
+		"id": "4567104",
+		"name": "Will Reichard",
+		"position": "K",
+		"team": "MIN",
+		"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4567104.png"
+	},
+	{
+		"id": "4569923",
+		"name": "Andy Borregales",
+		"position": "K",
+		"team": "NE",
+		"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4569923.png"
+	},
+	{
+		"id": "3051909",
+		"name": "Daniel Carlson",
+		"position": "K",
+		"team": "NO",
+		"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/3051909.png"
+	},
+	{
+		"id": "4696736",
+		"name": "Tanner Brown",
+		"position": "K",
+		"team": "NO",
+		"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4696736.png"
+	},
+	{
+		"id": "4879682",
+		"name": "Mason Shipley",
+		"position": "K",
+		"team": "NO",
+		"headshot": "https://a.espncdn.com/i/headshots/college-football/players/full/4879682.png"
+	},
+	{
+		"id": "5208518",
+		"name": "Charlie Smyth",
+		"position": "K",
+		"team": "NO",
+		"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/5208518.png"
+	},
+	{
+		"id": "4566158",
+		"name": "Ben Sauls",
+		"position": "K",
+		"team": "NYG",
+		"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4566158.png"
+	},
+	{
+		"id": "5082424",
+		"name": "Dominic Zvada",
+		"position": "K",
+		"team": "NYG",
+		"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/5082424.png"
+	},
+	{
+		"id": "4259619",
+		"name": "Blake Grupe",
+		"position": "K",
+		"team": "NYJ",
+		"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4259619.png"
+	},
+	{
+		"id": "4880198",
+		"name": "Will Ferrin",
+		"position": "K",
+		"team": "NYJ",
+		"headshot": "https://a.espncdn.com/i/headshots/college-football/players/full/4880198.png"
+	},
+	{
+		"id": "3050478",
+		"name": "Jake Elliott",
+		"position": "K",
+		"team": "PHI",
+		"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/3050478.png"
+	},
+	{
+		"id": "17372",
+		"name": "Chris Boswell",
+		"position": "K",
+		"team": "PIT",
+		"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/17372.png"
+	},
+	{
+		"id": "4710727",
+		"name": "Laith Marjan",
+		"position": "K",
+		"team": "PIT",
+		"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4710727.png"
+	},
+	{
+		"id": "2473037",
+		"name": "Jason Myers",
+		"position": "K",
+		"team": "SEA",
+		"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/2473037.png"
+	},
+	{
+		"id": "4034949",
+		"name": "Eddy Pineiro",
+		"position": "K",
+		"team": "SF",
+		"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4034949.png"
+	},
+	{
+		"id": "3150744",
+		"name": "Chase McLaughlin",
+		"position": "K",
+		"team": "TB",
+		"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/3150744.png"
+	},
+	{
+		"id": "4360317",
+		"name": "B.T. Potter",
+		"position": "K",
+		"team": "TB",
+		"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4360317.png"
+	},
+	{
+		"id": "3124084",
+		"name": "Joey Slye",
+		"position": "K",
+		"team": "TEN",
+		"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/3124084.png"
+	},
+	{
+		"id": "4372066",
+		"name": "Jake Moody",
+		"position": "K",
+		"team": "WSH",
+		"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4372066.png"
+	},
+	{
+		"id": "5081335",
+		"name": "Drew Stevens",
+		"position": "K",
+		"team": "WSH",
+		"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/5081335.png"
+	}
+]

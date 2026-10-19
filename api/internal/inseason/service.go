@@ -107,6 +107,8 @@ func (s *Service) Routes() []httpx.Route {
 		{Method: http.MethodPost, Path: "/leagues/attached/{id}/trades/check", Access: httpx.SignedIn, Limit: limit, Handler: s.checkTrade},
 		{Method: http.MethodGet, Path: "/leagues/attached/{id}/order", Access: httpx.SignedIn, Limit: limit, Handler: s.leagueOrder},
 		{Method: http.MethodGet, Path: "/order", Access: httpx.Public, Limit: limit, Handler: s.publicOrder},
+		{Method: http.MethodGet, Path: "/leagues/attached/{id}/order/week", Access: httpx.SignedIn, Limit: limit, Handler: s.leagueWeekOrder},
+		{Method: http.MethodGet, Path: "/order/week", Access: httpx.Public, Limit: limit, Handler: s.publicWeekOrder},
 		{Method: http.MethodGet, Path: "/games/week", Access: httpx.Public, Limit: limit, Handler: s.weekGames},
 		{Method: http.MethodGet, Path: "/me/week", Access: httpx.SignedIn, Limit: limit, Handler: s.week},
 		{Method: http.MethodGet, Path: "/players/{player}/week", Access: httpx.Public, Limit: limit, Handler: s.playerWeek},

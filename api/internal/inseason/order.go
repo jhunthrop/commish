@@ -305,6 +305,19 @@ func (a *advisor) Order(q orderQuery, targets Targets) apitypes.OrderAdvice {
 // orderRow is one player's row: his line as the league's screens draw it,
 // his place, the order's two keys, and in a league his roster and move.
 func (a *advisor) orderRow(p boards.Player, rank int, hosts map[string]string, targets Targets) apitypes.OrderRow {
+	row := apitypes.OrderRow{Line: a.boardPerson(p, hosts).line, Rank: rank, RestOfSeasonPoints: a.restOfSeasonPoints(p),
+		PointsOverReplacement: a.pointsOverReplacement(p)}
+	if targets != nil {
+		mark := a.rosterMark(p.ID)
+		row.Roster, row.Move = &mark, moveOf(mark, p.ID, targets)
+	}
+	return row
+}
+
+// boardPerson is a board player as a league's screens draw him: the
+// platform's own wire name for him where a roster holds him (hosts, by
+// board id), else the board's, with the id a claim on him names.
+func (a *advisor) boardPerson(p boards.Player, hosts map[string]string) person {
 	id := p.ID
 	hostID, rostered := hosts[p.ID]
 	lp := apitypes.LeaguePlayer{HostId: a.hostIDOfAdd(p), BoardId: &id, Name: p.Name, Position: string(p.Position), Team: p.Team}
@@ -313,13 +326,7 @@ func (a *advisor) orderRow(p boards.Player, rank int, hosts map[string]string, t
 	} else {
 		hostID = p.ID
 	}
-	row := apitypes.OrderRow{Line: a.build(hostID, lp, nil).line, Rank: rank, RestOfSeasonPoints: a.restOfSeasonPoints(p),
-		PointsOverReplacement: a.pointsOverReplacement(p)}
-	if targets != nil {
-		mark := a.rosterMark(p.ID)
-		row.Roster, row.Move = &mark, moveOf(mark, p.ID, targets)
-	}
-	return row
+	return a.build(hostID, lp, nil)
 }
 
 // leagueOrder is GET /leagues/attached/{id}/order. The verb for a free
@@ -339,20 +346,28 @@ func (s *Service) leagueOrder(w http.ResponseWriter, r *http.Request) {
 	if s.searchStopped(w, r, a) {
 		return
 	}
-	moves := CopyOnlyClaims(a.Snap.Ref.Host)
-	if s.Moves != nil {
-		claim, err := s.Moves.ClaimMove(r.Context(), auth.AccountID(r), a.Snap.Ref.Host)
-		if err != nil {
-			s.Log.Warn("inseason: order claim moves", "err", err)
-			claim.Claim = apitypes.WaiverMovesClaimUnavailable
-			if claim.Reason == nil {
-				claim.Reason = moves.Reason
-			}
-		}
-		moves = claim
-	}
+	moves := s.claimMoves(r, a)
 	out.Moves = &moves
 	httpx.WriteOK(w, r, http.StatusOK, out)
+}
+
+// claimMoves is the claim's moves on the league's platform, the Waivers
+// route's verb rule for an add: a failed check fails closed as that
+// route's does.
+func (s *Service) claimMoves(r *http.Request, a *advisor) apitypes.WaiverMoves {
+	moves := CopyOnlyClaims(a.Snap.Ref.Host)
+	if s.Moves == nil {
+		return moves
+	}
+	claim, err := s.Moves.ClaimMove(r.Context(), auth.AccountID(r), a.Snap.Ref.Host)
+	if err != nil {
+		s.Log.Warn("inseason: order claim moves", "err", err)
+		claim.Claim = apitypes.WaiverMovesClaimUnavailable
+		if claim.Reason == nil {
+			claim.Reason = moves.Reason
+		}
+	}
+	return claim
 }
 
 // publicOrder is GET /order: the order valued for PublicSettings, with no

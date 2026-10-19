@@ -507,6 +507,30 @@ paths:
         "422": { $ref: "#/components/responses/ErrorResponse" }
         "502": { $ref: "#/components/responses/ErrorResponse" }
         "503": { $ref: "#/components/responses/ErrorResponse" }
+  /leagues/attached/{id}/order/week:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: the attached league's id (AttachedLeague.id)
+        schema: { type: string, format: uuid }
+      - { $ref: "#/components/parameters/WeekOrderPosition" }
+    get:
+      tags: [league-sync]
+      operationId: leagueWeekOrder
+      summary: >-
+        The kickers' or defenses' tab in season for the drafter's league (Lane 66w): every club's kicker or defense
+        with its week, in the order of the week's published projection, in the league's scoring, whose roster holds
+        it and an add on the first five free rows still to play. We have no kicker or defense model, so there is no
+        rest-of-season order for these positions. We submit nothing.
+      security: [{ session: [] }]
+      responses:
+        "200": { $ref: "#/components/responses/WeekOrderAdviceResponse" }
+        "400": { $ref: "#/components/responses/ErrorResponse" }
+        "404": { $ref: "#/components/responses/ErrorResponse" }
+        "409": { $ref: "#/components/responses/ErrorResponse" }
+        "422": { $ref: "#/components/responses/ErrorResponse" }
+        "502": { $ref: "#/components/responses/ErrorResponse" }
   /leagues/attached/{id}/trades:
     parameters:
       - name: id
@@ -1182,6 +1206,18 @@ paths:
       responses:
         "200": { $ref: "#/components/responses/OrderAdviceResponse" }
         "400": { $ref: "#/components/responses/ErrorResponse" }
+  /order/week:
+    parameters:
+      - { $ref: "#/components/parameters/WeekOrderPosition" }
+    get:
+      tags: [league-sync]
+      operationId: weekOrder
+      summary: >-
+        The kickers' or defenses' tab in season with no league of the reader's own (Lane 66w): every club's kicker or
+        defense with its week, in the order of the week's published projection, in PPR. Rows carry no roster and no move.
+      responses:
+        "200": { $ref: "#/components/responses/WeekOrderAdviceResponse" }
+        "400": { $ref: "#/components/responses/ErrorResponse" }
   /games/week:
     get:
       tags: [league-sync]
@@ -1817,6 +1853,12 @@ components:
         expires both cookies. An unclaimed mock is deleted after 90 days idle, or after 24 hours with no pick.
 
   parameters:
+    WeekOrderPosition:
+      name: position
+      in: query
+      required: true
+      description: the kickers' tab (K) or the defenses' (DEF)
+      schema: { type: string, enum: [K, DEF] }
     ID:
       name: id
       in: path
@@ -2001,6 +2043,14 @@ components:
             allOf:
               - $ref: "#/components/schemas/Envelope"
               - properties: { data: { $ref: "#/components/schemas/OrderAdvice" } }
+    WeekOrderAdviceResponse:
+      description: every club's kicker or defense with its week, in the order of the week's projection
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: "#/components/schemas/Envelope"
+              - properties: { data: { $ref: "#/components/schemas/WeekOrderAdvice" } }
     WaiverAdviceResponse:
       description: the waiver pool ranked by the gain to the drafter's lineup
       content:
@@ -4081,6 +4131,57 @@ components:
             the one move his row admits: add for a player no roster holds at a position the league starts, trade for a
             player on another roster whom the trade finder's best trade with his team brings in for the drafter, null
             otherwise (and always for the drafter's own players)
+    WeekOrderAdvice:
+      type: object
+      required: [week, position, uncounted_rules, read_at, projection_read_at, projection_scoring, moves, rows]
+      properties:
+        week: { type: integer, description: the week the rows' Game cell and Proj are for }
+        position: { type: string, enum: [K, DEF] }
+        uncounted_rules:
+          type: integer
+          description: >-
+            how many of the league's scoring rules at the tab's position (kicking rules for K, defense rules for DEF)
+            the season's points (Avg and Last) leave out, our stats lacking them; the basis says the count once and
+            links to the league's Settings, never a list (Lane 66w)
+        read_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: when the league was read from its platform, null without a league
+        projection_read_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: when the week's published projection was read, null when none is stored
+        projection_scoring: { $ref: "#/components/schemas/ProjectionScoring" }
+        moves:
+          allOf: [{ $ref: "#/components/schemas/WaiverMoves" }]
+          nullable: true
+          description: the claim's moves on the league's platform, the Waivers screen's verb rule for an add; null without a league
+        rows:
+          type: array
+          description: >-
+            one a club (a kicker is the club's one the projection names, else the one who kicked for it last): first
+            the games still to play by Proj, ties by Avg, then those kicked off, then the clubs on bye
+          items: { $ref: "#/components/schemas/WeekOrderRow" }
+    WeekOrderRow:
+      type: object
+      required: [line, section, roster, move]
+      properties:
+        line: { $ref: "#/components/schemas/PlayerLine" }
+        section:
+          type: string
+          enum: [to_play, kicked_off, bye]
+          description: his game still to play, kicked off (or final) by the read's clock, or his club on bye
+        roster:
+          allOf: [{ $ref: "#/components/schemas/RosterMark" }]
+          nullable: true
+          description: whose roster in the league holds him, null without a league
+        move:
+          type: string
+          nullable: true
+          enum: [add]
+          description: add on the first five free rows still to play at a position the league starts, null otherwise
     RosterMark:
       type: object
       required: [kind, team]
