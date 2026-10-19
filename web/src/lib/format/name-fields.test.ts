@@ -88,7 +88,8 @@ function runNames(schema: Schema, seen: Set<Schema>): string[] {
 function runNameFields(): Set<string> {
 	const seen = new Set<Schema>();
 	return new Set(
-		Object.values(run)
+		// Every export, read as unknown: the walk narrows each to the part of a schema it reads.
+		Object.values(run as Readonly<Record<string, unknown>>)
 			.filter(isSchema)
 			.flatMap((schema) => runNames(schema, seen))
 	);
