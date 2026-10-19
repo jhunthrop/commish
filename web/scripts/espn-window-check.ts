@@ -1,7 +1,8 @@
 // Checks that the ESPN sign-in window gets past its first line for a member Disney already knows:
 // it opens the window from an opener the way the account page does, with a stand-in for the
-// session Disney's widget stores on the sign-in origin after a sign-in (every value made up, no
-// credential, nothing signed in), and waits for the window to put Disney's form up. Before Lane 88
+// session Disney's widget stores on the sign-in origin after a sign-in (its token cookie and its
+// cached guest, every value made up, no credential, nothing signed in), and waits for the window to
+// put Disney's form up. Before Lane 88
 // that stored session left the widget's init waiting on Disney's guest service, which refuses the
 // origin, and the window sat at its first line. Reaches Disney's live CDN, so it is not part of
 // `npm test`. Exits non-zero when the window stalls or closes.
@@ -11,6 +12,7 @@ import { OPENING_LINE } from '../src/lib/hosts/espn-window.ts';
 import { ESPN_SIGN_IN_ORIGIN } from '../src/lib/site/origins.ts';
 
 const DISNEY_TOKEN_COOKIE = 'ESPN-ONESITE.WEB-PROD.token';
+const DISNEY_GUEST_KEY = 'ESPN-ONESITE.WEB-PROD.guest';
 /** Disney's stored-token format: version 5, then the token as base64 JSON, then an empty id token. */
 const TOKEN_FORMAT_VERSION = '5=';
 const HOUR_MS = 3_600_000;
@@ -40,6 +42,12 @@ try {
 			path: '/'
 		}
 	]);
+	await context.addInitScript(
+		([signInOrigin, key]) => {
+			if (window.location.origin === signInOrigin) window.localStorage.setItem(key, 'stand-in');
+		},
+		[origin, DISNEY_GUEST_KEY] as const
+	);
 	const opener = await context.newPage();
 	const [win] = await Promise.all([
 		context.waitForEvent('page'),
@@ -52,7 +60,8 @@ try {
 		.filter({ hasNotText: OPENING_LINE })
 		.waitFor({ timeout: FORM_WAIT_MS })
 		.catch(() => undefined);
-	const said = win.isClosed() ? null : await line.textContent();
+	// A window that closes between the wait and the read says it closed, not a stack trace.
+	const said = win.isClosed() ? null : await line.textContent().catch(() => null);
 	if (said === null || said === OPENING_LINE) {
 		process.stderr.write(
 			`The window ${said === null ? 'closed' : 'stalled'} at ${origin}/espn-connect.\n`
