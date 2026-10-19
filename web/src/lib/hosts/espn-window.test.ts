@@ -47,7 +47,9 @@ interface Rig {
 	readonly cookiesWritten: string[];
 	readonly removedKeys: string[];
 	readonly writtenBeforeScript: string[];
-	readonly timers: { readonly ms: number; readonly run: () => void }[];
+	readonly timers: Timer[];
+	/** Whether the close button still has its listener. */
+	readonly closeListening: () => boolean;
 	click: () => void;
 	closed: boolean;
 }
@@ -64,6 +66,17 @@ const DISNEY_COOKIES = [
 ];
 const DISNEY_GUEST_KEY = 'ESPN-ONESITE.WEB-PROD.guest';
 
+interface Timer {
+	readonly ms: number;
+	readonly run: () => void;
+	cleared: boolean;
+}
+
+/** The waits the window set and has not cleared. */
+function live(r: Rig): Timer[] {
+	return r.timers.filter((timer) => !timer.cleared);
+}
+
 function rig(origin: string): Rig {
 	const posted: Posted[] = [];
 	const appended: ScriptTag[] = [];
@@ -71,8 +84,8 @@ function rig(origin: string): Rig {
 	const cookiesWritten: string[] = [];
 	const removedKeys: string[] = [];
 	const writtenBeforeScript: string[] = [];
-	const timers: { ms: number; run: () => void }[] = [];
-	let onClick: () => void = () => undefined;
+	const timers: Timer[] = [];
+	let onClick: (() => void) | null = null;
 	const state: Rig = {
 		posted,
 		appended,
@@ -81,9 +94,10 @@ function rig(origin: string): Rig {
 		removedKeys,
 		writtenBeforeScript,
 		timers,
+		closeListening: () => onClick !== null,
 		closed: false,
 		click: () => {
-			onClick();
+			onClick?.();
 		},
 		win: {
 			opener: {
@@ -97,7 +111,13 @@ function rig(origin: string): Rig {
 				state.closed = true;
 			},
 			setTimeout: (handler, ms) => {
-				timers.push({ ms, run: handler });
+				const timer: Timer = { ms, run: handler, cleared: false };
+				timers.push(timer);
+				return timer;
+			},
+			clearTimeout: (handle) => {
+				const timer = timers.find((each) => each === handle);
+				if (timer) timer.cleared = true;
 			},
 			localStorage: {
 				removeItem: (key) => {
@@ -110,11 +130,17 @@ function rig(origin: string): Rig {
 				},
 				getElementById: (id) =>
 					id === 'line'
-						? Object.assign(line, { addEventListener: () => undefined })
+						? Object.assign(line, {
+								addEventListener: () => undefined,
+								removeEventListener: () => undefined
+							})
 						: {
 								textContent: '',
 								addEventListener: (_event, handler) => {
 									if (id === 'close') onClick = handler;
+								},
+								removeEventListener: (_event, handler) => {
+									if (id === 'close' && onClick === handler) onClick = null;
 								}
 							},
 				createElement: () => {
@@ -144,6 +170,8 @@ interface WidgetScript {
 	readonly logoutRejects?: unknown;
 	/** getGuest's first call rejects, as Disney's guest service can. */
 	readonly guestRejectsFirst?: boolean;
+	/** getGuest never answers, as the guest service that refuses this origin can leave it. */
+	readonly guestHangs?: boolean;
 }
 
 interface WidgetRig {
@@ -151,6 +179,8 @@ interface WidgetRig {
 	readonly calls: string[];
 	readonly getGuestArgs: unknown[][];
 	emit: (event: string, data?: unknown) => void;
+	/** How many widget listeners are still on. */
+	listening: () => number;
 }
 
 function stubWidget(script: WidgetScript): WidgetRig {
@@ -186,6 +216,7 @@ function stubWidget(script: WidgetScript): WidgetRig {
 		getGuest: (...args: unknown[]) => {
 			calls.push('getGuest');
 			getGuestArgs.push(args);
+			if (script.guestHangs === true) return new Promise(() => undefined);
 			if (script.guestRejectsFirst === true && guestCall === 0) {
 				guestCall += 1;
 				// eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors
@@ -197,9 +228,17 @@ function stubWidget(script: WidgetScript): WidgetRig {
 		},
 		on: (event, handler) => {
 			handlers.set(event, [...(handlers.get(event) ?? []), handler]);
+		},
+		off: (event, handler) => {
+			handlers.set(
+				event,
+				(handlers.get(event) ?? []).filter((each) => each !== handler)
+			);
 		}
 	};
-	return { widget, calls, getGuestArgs, emit };
+	const listening = (): number =>
+		[...handlers.values()].reduce((count, list) => count + list.length, 0);
+	return { widget, calls, getGuestArgs, emit, listening };
 }
 
 /** Runs the window with a stubbed Disney widget and lets its promises settle. */
@@ -306,9 +345,59 @@ void test("a widget that never opens Disney's form ends the window as a sign-in 
 
 void test("once Disney's form is up the wait never ends the window", async () => {
 	const { r } = await run({ loggedIn: false, guests: [null] });
-	for (const timer of r.timers) timer.run();
+	assert.deepEqual(live(r), [], 'the wait is cleared once the form is up');
 	assert.equal(finals(r).length, 0);
 	assert.equal(r.closed, false);
+});
+
+/** The login event as Disney sends it after a sign-in on its form, the two values in it. */
+const LOGIN_WITH_SESSION = { token: { swid: SWID }, s2: S2 };
+
+for (const [name, script] of [
+	['rejects', { guestRejectsFirst: true, guests: [null] }],
+	['answers nothing', { guests: [null] }]
+] as const) {
+	void test(`a login that carries the pair hands it over at once while the guest read ${name}`, async () => {
+		const { r, w } = await run({ loggedIn: false, ...script });
+		w.emit('login', LOGIN_WITH_SESSION);
+		await settle();
+		assert.deepEqual(w.calls, ['init', 'launchLogin'], 'no guest read waited on');
+		const handed = handedOver(r);
+		assert.equal(handed.target, SITE_ORIGIN);
+		assert.equal(handed.message.outcome, 'signed-in');
+		assert.deepEqual(handed.message.payload, { swid: SWID, s2: S2 }, 'the pair alone');
+		assert.equal(r.closed, true);
+	});
+}
+
+void test('a login without the pair whose guest read never answers ends at the wait as a sign-in that did not open', async () => {
+	const { r, w } = await run({ loggedIn: false, guests: [null], guestHangs: true });
+	w.emit('login', { token: {} });
+	await settle();
+	assert.deepEqual(w.calls, ['init', 'launchLogin', 'getGuest']);
+	assert.equal(finals(r).length, 0, 'nothing final before the wait is up');
+	const [wait, ...more] = live(r);
+	assert.ok(wait, 'the login re-armed the wait');
+	assert.equal(more.length, 0);
+	wait.run();
+	const handed = handedOver(r);
+	assert.deepEqual(handed.message, {
+		kind: MESSAGE_KIND,
+		outcome: 'failed',
+		seen: ['init-signed-out', 'login']
+	});
+	assert.equal(r.closed, true);
+});
+
+void test('the last message clears the wait and takes every listener off', async () => {
+	const { r, w } = await run({ loggedIn: false, guests: [null] });
+	assert.ok(w.listening() > 0 && r.closeListening());
+	w.emit('login', LOGIN_WITH_SESSION);
+	await settle();
+	handedOver(r);
+	assert.deepEqual(live(r), []);
+	assert.equal(w.listening(), 0, 'no widget listener left');
+	assert.equal(r.closeListening(), false, 'the close button let go');
 });
 
 void test('a guest already signed in is handed over from the widget, with no sign-in form', async () => {
