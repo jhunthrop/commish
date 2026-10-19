@@ -9,6 +9,7 @@ import { BOX, boxRow, slotWord, totalsPts, type BoxStarter, type BoxTotals } fro
 import { lineupBox, type LineupBox } from '../box/lineup.ts';
 import type { LineupAdvice, ProjectionScoring, Scoreboard } from '../inseason/api.ts';
 import { hostWords } from '../names.ts';
+import { gameHead, KICKOFF, type GameHead } from '../box/kickoff.ts';
 
 type ScoreboardGame = Scoreboard['games'][number];
 type ScoringRules = components['schemas']['ScoringRules'];
@@ -42,9 +43,8 @@ export const HOME = {
 	league: 'League',
 	pointsAllowed: "A defense's points allowed",
 	yardsAllowed: "A defense's yards allowed",
-	nextKickoff: 'Next kickoff',
-	playing: 'In play',
-	final: 'Final',
+	nextKickoff: KICKOFF.next,
+	final: KICKOFF.final,
 	/** The Settings card listing the scoring rules our stats lack (Lane 66t), which the in-season bases
 	 * count and link to. */
 	uncounted: 'Not in Avg and Last',
@@ -71,8 +71,10 @@ export interface BugSide {
 export interface Bug {
 	key: string;
 	mine: boolean;
-	state: ScoreboardGame['state'];
-	/** "Sun 12:00 pm" before kickoff, "In play", "Final". */
+	/** The game's head by the one rule (kickoff.ts): the API's state, a kickoff before the page's
+	 * clock never upcoming. */
+	state: GameHead['state'];
+	/** "Sun 12:00 pm" before kickoff, "Kicked off", "Final". */
 	head: string;
 	/** "Next kickoff", "6 of 20 starters to play", or nothing. */
 	words: string;
@@ -92,48 +94,56 @@ function bugRecord(team: LeagueTeam | undefined): string {
 }
 
 /** Who stands ahead once a game has started; level before kickoff, or with a score unread. */
-function standsOf(game: ScoreboardGame, side: ScoreboardGame['sides'][number]): BugSide['stands'] {
+function standsOf(
+	game: ScoreboardGame,
+	side: ScoreboardGame['sides'][number],
+	started: boolean
+): BugSide['stands'] {
 	const other = game.sides.find((s) => s.roster_id !== side.roster_id);
-	if (game.state === 'upcoming' || !other || !side.points_read || !other.points_read)
-		return 'level';
+	if (!started || !other || !side.points_read || !other.points_read) return 'level';
 	if (side.points === other.points) return 'level';
 	return side.points > other.points ? 'ahead' : 'behind';
 }
 
-/** The state's words at the bug's head. */
-function bugHead(game: ScoreboardGame, zone: string): Pick<Bug, 'head' | 'words'> {
-	const toPlay = game.sides.reduce((n, s) => n + s.starters - s.played, 0);
-	const starters = game.sides.reduce((n, s) => n + s.starters, 0);
-	if (game.state === 'final') return { head: HOME.final, words: '' };
-	if (game.state === 'playing') {
+/** The state's words at the bug's head: the starters still to play only on the API's own count of a
+ * game under way, never on a read that lags the clock. */
+function bugHead(game: ScoreboardGame, head: GameHead, zone: string): Pick<Bug, 'head' | 'words'> {
+	if (head.state === 'final') return { head: KICKOFF.final, words: '' };
+	if (head.state === 'kicked_off') {
+		const toPlay = game.sides.reduce((n, s) => n + s.starters - s.played, 0);
+		const starters = game.sides.reduce((n, s) => n + s.starters, 0);
 		return {
-			head: HOME.playing,
-			words: `${String(toPlay)} of ${String(starters)} starters to play`
+			head: KICKOFF.kickedOff,
+			words:
+				game.state === 'playing' ? `${String(toPlay)} of ${String(starters)} starters to play` : ''
 		};
 	}
 	return {
-		head: game.next_kickoff === null ? '' : weekdayTime(game.next_kickoff, zone),
-		words: game.next_kickoff === null ? '' : HOME.nextKickoff
+		head: head.next === null ? '' : weekdayTime(head.next, zone),
+		words: head.next === null ? '' : HOME.nextKickoff
 	};
 }
 
-/** Every game of the week as a score bug, the drafter's first. */
+/** Every game of the week as a score bug, the drafter's first, each read at `now`, the page's clock
+ * in ms. */
 export function bugsOf(
 	board: Pick<Scoreboard, 'games'>,
 	sync: Pick<LeagueSync, 'teams' | 'me'>,
+	now: number,
 	zone: string = memberZone()
 ): Bug[] {
 	const teams = new Map(sync.teams.map((t) => [t.roster_id, t] as const));
 	return board.games.map((game, i) => {
 		const mine = game.sides.some((s) => s.roster_id === sync.me);
+		const head = gameHead({ state: game.state, next: game.next_kickoff }, now);
+		const started = head.state !== 'upcoming';
 		return {
 			key: `${String(i)}-${game.sides.map((s) => String(s.roster_id)).join('-')}`,
 			mine,
-			state: game.state,
-			...bugHead(game, zone),
+			state: head.state,
+			...bugHead(game, head, zone),
 			sides: game.sides.map((side) => {
 				const team = teams.get(side.roster_id);
-				const started = game.state !== 'upcoming';
 				return {
 					rosterId: side.roster_id,
 					name: team?.name ?? `Team ${String(side.roster_id)}`,
@@ -142,7 +152,7 @@ export function bugsOf(
 					me: side.roster_id === sync.me,
 					proj: side.projection === null ? BOX.none : fixed(side.projection, 1),
 					pts: started && side.points_read ? fixed(side.points, 1) : BOX.none,
-					stands: standsOf(game, side)
+					stands: standsOf(game, side, started)
 				};
 			})
 		};

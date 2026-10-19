@@ -143,7 +143,25 @@ void test('the bug names the first kickoff, then the next once one has started',
 		head: 'Next kickoff',
 		words: 'Sun 12:00 pm, TB vs PIT'
 	});
-	assert.equal(nextKickoff([collins], Date.parse('2026-10-19T00:00:00.000Z'), ZONE), null);
+	// Once every game has kicked off the bug says so, and Final once each is (Lane 85): never null,
+	// never a kickoff already past.
+	const monday = Date.parse('2026-10-19T00:00:00.000Z');
+	assert.deepEqual(nextKickoff([collins], monday, ZONE), { head: 'Kicked off', words: '' });
+	const final = (l: PlayerLine): PlayerLine => ({
+		...l,
+		facts: { ...l.facts, played: true, game_state: 'final' }
+	});
+	assert.deepEqual(nextKickoff([final(collins), final(sunday)], monday, ZONE), {
+		head: 'Final',
+		words: ''
+	});
+	// A line whose state still says upcoming after its kickoff (a lagging read) is never next.
+	const lagging = { ...collins, facts: { ...collins.facts, game_state: 'upcoming' as const } };
+	assert.deepEqual(nextKickoff([lagging, final(sunday)], monday, ZONE), {
+		head: 'Kicked off',
+		words: ''
+	});
+	assert.equal(nextKickoff([bench], monday, ZONE), null);
 });
 
 void test('a lineup swap moves ours in and the platform starter it sits out to the bench', () => {

@@ -236,7 +236,7 @@ export function frontLeague(
 		bug:
 			bug === null || me === undefined
 				? null
-				: (bugsOf({ games: [bug.game] }, { teams: bug.teams, me }, zone)[0] ?? null),
+				: (bugsOf({ games: [bug.game] }, { teams: bug.teams, me }, now.getTime(), zone)[0] ?? null),
 		first: bug === null ? null : firstOf(bug.first, zone, now),
 		nudge: nudgeOf(league, href),
 		chips: chipsOf(league, href, zone, now),

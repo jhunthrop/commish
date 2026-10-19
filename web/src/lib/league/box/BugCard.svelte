@@ -25,8 +25,8 @@
 <a class="bug {size}" class:mine={bug.mine} {href}>
 	{#if label}<span class="lb">{label}</span>{/if}
 	<span class="bh">
-		<span class="st" class:live={bug.state === 'playing'}
-			>{#if bug.state === 'playing'}<span class="pulse" aria-hidden="true"
+		<span class="st" class:live={bug.state === 'kicked_off'}
+			>{#if bug.state === 'kicked_off'}<span class="pulse" aria-hidden="true"
 				></span>{/if}{bug.head}</span
 		>
 		<span class="sw">{bug.words}</span>

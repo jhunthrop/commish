@@ -5,6 +5,7 @@ import { test } from 'node:test';
 import { bannedPattern } from '#lib/format/copy-guard.ts';
 import type { LeagueMove, LeagueTeam, LeagueTerms } from '../api.ts';
 import type { Scoreboard } from '../inseason/api.ts';
+import { KICKOFF } from '../box/kickoff.ts';
 import {
 	HOME,
 	bugsOf,
@@ -30,6 +31,10 @@ import {
 } from './home.ts';
 
 const ZONE = 'America/Chicago';
+/** The fixture's Saturday, before Sunday's games (clock.ts FIXTURE_WEEK_CLOCK). */
+const SATURDAY = Date.parse('2026-10-17T17:00:00.000Z');
+/** The Monday after, every Sunday kickoff past (FIXTURE_MONDAY_CLOCK). */
+const MONDAY = Date.parse('2026-10-19T16:00:00.000Z');
 
 const team = (id: number, over: Partial<LeagueTeam> = {}): LeagueTeam => ({
 	roster_id: id,
@@ -134,7 +139,7 @@ const board = (state: Scoreboard['games'][number]['state']): Scoreboard => ({
 const SYNC = { teams: [team(1), team(2, { ties: 1, avatar: 'https://sleepercdn.com/x' })], me: 1 };
 
 void test('a bug before kickoff names the next kickoff and draws both sides alike', () => {
-	const [bug] = bugsOf(board('upcoming'), SYNC, ZONE);
+	const [bug] = bugsOf(board('upcoming'), SYNC, SATURDAY, ZONE);
 	assert.ok(bug);
 	assert.equal(bug.head, 'Sun 3:25 pm');
 	assert.equal(bug.words, HOME.nextKickoff);
@@ -150,7 +155,7 @@ void test('a bug before kickoff names the next kickoff and draws both sides alik
 
 void test('once a game has started the side ahead is bright and the side behind muted', () => {
 	for (const state of ['playing', 'final'] as const) {
-		const [bug] = bugsOf(board(state), SYNC, ZONE);
+		const [bug] = bugsOf(board(state), SYNC, SATURDAY, ZONE);
 		assert.ok(bug);
 		assert.deepEqual(
 			bug.sides.map((s) => [s.pts, s.stands]),
@@ -160,11 +165,11 @@ void test('once a game has started the side ahead is bright and the side behind 
 			]
 		);
 	}
-	const [playing] = bugsOf(board('playing'), SYNC, ZONE);
+	const [playing] = bugsOf(board('playing'), SYNC, SATURDAY, ZONE);
 	assert.ok(playing);
-	assert.equal(playing.head, HOME.playing);
+	assert.equal(playing.head, KICKOFF.kickedOff);
 	assert.equal(playing.words, '12 of 20 starters to play');
-	const [final] = bugsOf(board('final'), SYNC, ZONE);
+	const [final] = bugsOf(board('final'), SYNC, SATURDAY, ZONE);
 	assert.equal(final?.head, HOME.final);
 	const level = board('playing');
 	const game = level.games[0];
@@ -173,18 +178,41 @@ void test('once a game has started the side ahead is bright and the side behind 
 		s.points = 40;
 	});
 	assert.deepEqual(
-		bugsOf(level, SYNC, ZONE)[0]?.sides.map((s) => s.stands),
+		bugsOf(level, SYNC, SATURDAY, ZONE)[0]?.sides.map((s) => s.stands),
 		['level', 'level']
 	);
 	const unread = board('playing');
 	if (unread.games[0]?.sides[1]) unread.games[0].sides[1].points_read = false;
 	assert.deepEqual(
-		bugsOf(unread, SYNC, ZONE)[0]?.sides.map((s) => [s.pts, s.stands]),
+		bugsOf(unread, SYNC, SATURDAY, ZONE)[0]?.sides.map((s) => [s.pts, s.stands]),
 		[
 			['62.1', 'level'],
 			['--', 'level']
 		]
 	);
+});
+
+void test('a kickoff before the page clock is never the next: the bug reads Kicked off', () => {
+	// The Monday after: a read that still says upcoming with Sunday's kickoff next (a lagging read)
+	// never says "Next kickoff" for a game played (sweep 3 M2).
+	const [lagging] = bugsOf(board('upcoming'), SYNC, MONDAY, ZONE);
+	assert.ok(lagging);
+	assert.equal(lagging.head, KICKOFF.kickedOff);
+	assert.equal(lagging.words, '');
+	assert.equal(lagging.state, 'kicked_off');
+	assert.deepEqual(
+		lagging.sides.map((s) => [s.pts, s.stands]),
+		[
+			['62.1', 'behind'],
+			['71.4', 'ahead']
+		]
+	);
+	// Under way with its next kickoff past: Kicked off, the starters still to play counted.
+	const [playing] = bugsOf(board('playing'), SYNC, MONDAY, ZONE);
+	assert.ok(playing);
+	assert.equal(playing.head, KICKOFF.kickedOff);
+	assert.equal(playing.words, '12 of 20 starters to play');
+	assert.equal(bugsOf(board('final'), SYNC, MONDAY, ZONE)[0]?.head, KICKOFF.final);
 });
 
 void test('the standings carry each team’s projection and sort by a column, best first', () => {
@@ -409,7 +437,7 @@ void test('copy guard: every League page word is fantasy words, with no dash or 
 		...scoringView(RULES, []).groups.flatMap((g) => [g.label, ...g.rules.map((r) => r.label)]),
 		...termsView(TERMS, 12).map((t) => `${t.label} ${t.value}`),
 		playoffRule(TERMS, 12)?.words ?? '',
-		bugsOf(board('playing'), SYNC, ZONE)[0]?.words ?? ''
+		bugsOf(board('playing'), SYNC, SATURDAY, ZONE)[0]?.words ?? ''
 	];
 	for (const text of said) {
 		assert.doesNotMatch(text, BANNED, text);
