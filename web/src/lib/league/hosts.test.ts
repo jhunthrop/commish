@@ -8,8 +8,10 @@ import { leaguesKeptText } from '#lib/account/keeps.ts';
 import {
 	IN_SEASON_TOOLS_LINE,
 	LEAGUE_HOSTS,
+	PLATFORMS,
 	hostsLine,
 	leagueHostsLine,
+	liveDraftHosts,
 	openLeagueHosts
 } from './hosts.ts';
 import { hostWords } from './names.ts';
@@ -74,4 +76,14 @@ void test('the account page reads the hosts and the tools from the same two line
 		leaguesKeptText(ALL_OPEN),
 		`on ${leagueHostsLine(ALL_OPEN)}, kept up to date. ${IN_SEASON_TOOLS_LINE}`
 	);
+});
+
+void test("one platforms module says which a live draft is read from and which a league is followed from (the sweep's C13)", () => {
+	assert.deepEqual(Object.keys(PLATFORMS), [...LEAGUE_HOSTS]);
+	assert.deepEqual(liveDraftHosts(), ['sleeper']);
+	// A platform a draft is read from is one a league is followed from, with no switch.
+	for (const host of liveDraftHosts())
+		assert.ok(openLeagueHosts(SWITCHES[3] ?? ALL_OPEN).includes(host));
+	assert.deepEqual(openLeagueHosts(ALL_OPEN), [...LEAGUE_HOSTS]);
+	assert.deepEqual(openLeagueHosts({ ffpc: false, yahoo: false, espn: false }), ['sleeper', 'mfl']);
 });

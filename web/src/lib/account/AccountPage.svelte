@@ -43,7 +43,7 @@
 	import AccountConnections from '#lib/hosts/AccountConnections.svelte';
 	import AccountDevices from '#lib/hosts/AccountDevices.svelte';
 	import GroupPasses from './GroupPasses.svelte';
-	import { hostsApi, espnOpen, ffpcOpen, yahooOpen } from '#lib/hosts/api.ts';
+	import { hostsApi, openHostsOf } from '#lib/hosts/api.ts';
 	import { SWITCHED_SHUT, type OpenHosts } from '#lib/league/hosts.ts';
 	import { CONNECT, keeps, memberHosts, signedOutTitle } from './keeps.ts';
 	import { accountLinks } from './links.ts';
@@ -69,7 +69,7 @@
 	async function readOpenHosts(): Promise<void> {
 		try {
 			const hosts = await hostsApi.connections();
-			openHosts = { ffpc: ffpcOpen(hosts), yahoo: yahooOpen(hosts), espn: espnOpen(hosts) };
+			openHosts = openHostsOf(hosts);
 		} catch {
 			openHosts = SWITCHED_SHUT;
 		}
