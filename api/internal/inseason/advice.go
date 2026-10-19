@@ -600,8 +600,7 @@ func (a *advisor) waiverRun(position draft.Position) (waiverRun, bool) {
 }
 
 // Pickups is the Waivers strip's chosen set alone: what the front door's
-// pickup chip reads, by the one pickup rule (the page's own strip, its
-// season order once a pickup's game has kicked off).
+// pickup chip reads, by the one pickup rule (the full page's own strip).
 func (a *advisor) Pickups() ([]apitypes.WaiverRow, bool) {
 	out, ok := a.Waivers("", "")
 	if !ok {
@@ -612,32 +611,67 @@ func (a *advisor) Pickups() ([]apitypes.WaiverRow, bool) {
 
 // Waivers is the waiver page (§5). asked, a board id or "", is a player a
 // link named (?player=): his row is kept past the page's cut, so the order's
-// add for a free player deep in the pool lands on him (review 66j N2).
+// add for a free player deep in the pool lands on him (review 66j N2). The
+// page's pickup order is decided once from the full page's rows (pageOrder).
 func (a *advisor) Waivers(position draft.Position, asked string) (apitypes.WaiverAdvice, bool) {
 	run, ok := a.waiverRun(position)
 	if !ok {
 		return apitypes.WaiverAdvice{}, false
 	}
-	mine, pool := run.mine, run.pool
-	h := a.header()
-	un := UncountedOf(a.settings, a.season.Carries)
-	out := apitypes.WaiverAdvice{Week: h.week, Basis: WaiversBasis, SeasonBasis: withPerGame(a.Board, WaiverSeasonBasis(a.basis, a.weeks), mine, pool),
-		BasisNote: un.Note, BasisNoteLink: un.Link, OrderBasis: h.basis, Refreshed: h.refreshed, ReadAt: h.readAt,
-		ProjectionReadAt: a.projectionReadAt(), ProjectionPreviousReadAt: a.projectionPreviousReadAt(), ProjectionScoring: projectionScoring(a.settings, a.preset),
-		Pickups: []apitypes.WaiverRow{}, Rows: []apitypes.WaiverRow{}, Roster: lines(mine, indexes(len(mine))), Moves: CopyOnlyClaims(a.Snap.Ref.Host)}
-	out.HostWaiversUrl, out.HostNote = a.host(WaiversPage)
-	for _, move := range pageMoves(run.moves, pool, asked, MaxWaiverRows) {
-		out.Rows = append(out.Rows, waiverRow(run.w, run.week, mine, pool[move.Add], move, run.clears))
-	}
+	shown := pageMoves(run.moves, run.pool, asked, MaxWaiverRows)
 	// The strip is chosen from every add we rank, before the rows' cut.
-	var proj float64
-	out.Pickups, proj = a.strip(run.w, run.week, mine, pool, run.moves, run.clears)
+	strip, proj := run.stripMoves()
+	order, ok := a.pageOrder(position, asked, run.orderOf(shown, strip))
+	if !ok {
+		return apitypes.WaiverAdvice{}, false
+	}
+	out := a.waiverPage(run)
+	for _, move := range shown {
+		row := waiverRow(run.w, run.week, run.mine, run.pool[move.Add], move, run.clears)
+		// A row past its kickoff has no week figure, whichever the order (Lane 85 fix round 4).
+		if run.pastKickoff(move) {
+			row = withheldWeek(row)
+		}
+		out.Rows = append(out.Rows, row)
+	}
+	if order == seasonOrder {
+		return inSeasonOrder(out, shown), true
+	}
+	out.Pickups = run.strip(strip)
 	if out.ProjectionReadAt != nil {
 		base := run.week.base.proj
 		out.LineupProj, out.PickupsProj = &base, &proj
 	}
-	inSeasonOrder(&out)
 	return out, true
+}
+
+// pageOrder is the page's pickup order: own, the full page's, for a page
+// read whole; a page narrowed to one position carries the full page's
+// (review M-G), so its rows and the strip printed beside them never mix
+// the two rules.
+func (a *advisor) pageOrder(position draft.Position, asked string, own apitypes.WaiverAdvicePickupOrder) (apitypes.WaiverAdvicePickupOrder, bool) {
+	if position == "" {
+		return own, true
+	}
+	full, ok := a.waiverRun("")
+	if !ok {
+		return "", false
+	}
+	strip, _ := full.stripMoves()
+	return full.orderOf(pageMoves(full.moves, full.pool, asked, MaxWaiverRows), strip), true
+}
+
+// waiverPage is the waiver page's frame with no row yet, in the week order.
+func (a *advisor) waiverPage(run waiverRun) apitypes.WaiverAdvice {
+	h := a.header()
+	un := UncountedOf(a.settings, a.season.Carries)
+	out := apitypes.WaiverAdvice{Week: h.week, Basis: WaiversBasis, PickupOrder: weekOrder,
+		SeasonBasis: withPerGame(a.Board, WaiverSeasonBasis(a.basis, a.weeks), run.mine, run.pool),
+		BasisNote:   un.Note, BasisNoteLink: un.Link, OrderBasis: h.basis, Refreshed: h.refreshed, ReadAt: h.readAt,
+		ProjectionReadAt: a.projectionReadAt(), ProjectionPreviousReadAt: a.projectionPreviousReadAt(), ProjectionScoring: projectionScoring(a.settings, a.preset),
+		Pickups: []apitypes.WaiverRow{}, Rows: []apitypes.WaiverRow{}, Roster: lines(run.mine, indexes(len(run.mine))), Moves: CopyOnlyClaims(a.Snap.Ref.Host)}
+	out.HostWaiversUrl, out.HostNote = a.host(WaiversPage)
+	return out
 }
 
 // pageMoves is the moves a page carries: the first cut, and past it only

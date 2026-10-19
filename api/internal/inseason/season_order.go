@@ -6,60 +6,79 @@ import (
 	"github.com/jhunthrop/commish/api/internal/apitypes"
 )
 
-// pastKickoff reports whether a line's game has kicked off or is final by
-// the one game state (gameStateAt, carried on his facts).
-func pastKickoff(line *apitypes.PlayerLine) bool {
-	if line == nil || line.Facts.Bye || line.Facts.GameState == nil {
-		return false
-	}
-	return *line.Facts.GameState != apitypes.GameStateUpcoming
+// The page's two pickup orders (Lane 85 fix round 4).
+const (
+	weekOrder   = apitypes.WaiverAdvicePickupOrderWeek
+	seasonOrder = apitypes.WaiverAdvicePickupOrderSeasonGain
+)
+
+// pastKickoff reports whether a move's add, or the drop it names, has
+// kicked off or is final at the read's clock: his facts' Locked, which the
+// one game state (gameStateAt) sets, the state the score bug reads.
+func (r waiverRun) pastKickoff(m Waiver) bool {
+	return r.pool[m.Add].cand.Locked || (m.Drop >= 0 && r.mine[m.Drop].cand.Locked)
 }
 
-// inSeasonOrder is the one pickup rule once a week figure no longer counts
-// (Lane 85 fix round 3, M-E): when any pickup's add or drop has kicked off
-// at the read's clock, the page orders its adds by the season Gain, the
-// strip names the first of that order worth making with its own drop (the
-// one drop rule), every week gain is withheld (null) and the basis says
-// the order.
-func inSeasonOrder(out *apitypes.WaiverAdvice) {
-	locked := false
-	for i := range out.Pickups {
-		if pastKickoff(&out.Pickups[i].Add) || pastKickoff(out.Pickups[i].Drop) {
-			locked = true
+// orderOf is the page's one pickup rule from every row it shows, the
+// table's and the strip's: the season Gain order once any of them is past
+// its kickoff, the week's otherwise.
+func (r waiverRun) orderOf(shown, strip []Waiver) apitypes.WaiverAdvicePickupOrder {
+	for _, moves := range [][]Waiver{shown, strip} {
+		for _, m := range moves {
+			if r.pastKickoff(m) {
+				return seasonOrder
+			}
 		}
 	}
-	if !locked {
-		return
-	}
-	sort.SliceStable(out.Rows, func(i, j int) bool { return out.Rows[i].Gain > out.Rows[j].Gain })
-	for i := range out.Rows {
-		withholdWeek(&out.Rows[i])
-	}
-	out.Pickups = []apitypes.WaiverRow{}
+	return weekOrder
+}
+
+// inSeasonOrder is the page in the season Gain order (Lane 85 fix round 4):
+// the rows (built from moves, one each) by the season Gain, every week
+// figure withheld, the strip the first row worth making (a Gain above zero,
+// into an open roster spot or with its own drop by the one drop rule), the
+// week's Proj sums held and the basis the order's.
+func inSeasonOrder(out apitypes.WaiverAdvice, moves []Waiver) apitypes.WaiverAdvice {
+	at := indexes(len(out.Rows))
+	sort.SliceStable(at, func(i, j int) bool { return out.Rows[at[i]].Gain > out.Rows[at[j]].Gain })
+	rows := make([]apitypes.WaiverRow, len(at))
 	first := -1
-	for i, row := range out.Rows {
-		if first < 0 && row.Drop != nil && roundTenth(row.Gain) > 0 {
-			first = i
+	for k, i := range at {
+		rows[k] = withheldWeek(out.Rows[i])
+		if first < 0 && worthMaking(moves[i], rows[k]) {
+			first = k
 		}
-		out.Rows[i].Pickup = i == first
+		rows[k].Pickup = k == first
 	}
+	out.Rows, out.Pickups = rows, []apitypes.WaiverRow{}
 	if first >= 0 {
-		out.Pickups = append(out.Pickups, out.Rows[first])
+		out.Pickups = []apitypes.WaiverRow{rows[first]}
 	}
+	out.PickupOrder, out.Basis = seasonOrder, SeasonOrderWords(out.Week)
 	out.LineupProj, out.PickupsProj = nil, nil
-	out.Basis = SeasonOrderWords(out.Week)
+	return out
 }
 
-// withholdWeek nulls a row's week figures: its week gain, its drops' and
-// whom he beats by.
-func withholdWeek(row *apitypes.WaiverRow) {
+// worthMaking is a row the season order's strip may name: a move to make
+// (an open roster spot or a drop) that raises the season Gain.
+func worthMaking(m Waiver, row apitypes.WaiverRow) bool {
+	return !m.NoDrop && positive(row.Gain)
+}
+
+// withheldWeek is a row with its week figures null: its week gain, its
+// drops' and whom he beats by.
+func withheldWeek(row apitypes.WaiverRow) apitypes.WaiverRow {
 	row.WeekGain = nil
-	for i := range row.Drops {
-		row.Drops[i].WeekGain = nil
+	drops := make([]apitypes.WaiverDrop, len(row.Drops))
+	for i, d := range row.Drops {
+		d.WeekGain = nil
+		drops[i] = d
 	}
+	row.Drops = drops
 	if row.Beats != nil {
 		beats := *row.Beats
 		beats.Gain = nil
 		row.Beats = &beats
 	}
+	return row
 }

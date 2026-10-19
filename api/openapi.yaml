@@ -4353,9 +4353,17 @@ components:
         team: { type: string, nullable: true, description: the holding team's name when kind is team, else null }
     WaiverAdvice:
       type: object
-      required: [week, basis, season_basis, basis_note, basis_note_link, order_basis, refreshed, read_at, projection_read_at, projection_previous_read_at, projection_scoring, lineup_proj, pickups_proj, pickups, rows, roster, host_waivers_url, host_note, moves]
+      required: [week, basis, pickup_order, season_basis, basis_note, basis_note_link, order_basis, refreshed, read_at, projection_read_at, projection_previous_read_at, projection_scoring, lineup_proj, pickups_proj, pickups, rows, roster, host_waivers_url, host_note, moves]
       properties:
         week: { type: integer }
+        pickup_order:
+          type: string
+          enum: [week, season_gain]
+          description: >-
+            the order the page's rows and strip are in, decided once from the full page's rows by each row's game state
+            (gameStateAt): week (the strip by this week's Proj gain, the rows as the search ranks them) while no row's add
+            or drop has kicked off; season_gain once any has (the rows by the season Gain, every week figure null, the
+            strip the first row worth making); a page narrowed to one position carries the full page's
         lineup_proj:
           type: number
           format: double
@@ -4406,7 +4414,7 @@ components:
           items: { $ref: "#/components/schemas/WaiverRow" }
         rows:
           type: array
-          description: positive gains first by gain, then the rest by points over replacement, at most 60
+          description: positive gains first by gain, then the rest by points over replacement, at most 60; by the season Gain alone in the season_gain order
           items: { $ref: "#/components/schemas/WaiverRow" }
         roster:
           type: array

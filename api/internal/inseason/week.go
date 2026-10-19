@@ -138,7 +138,9 @@ func (s *Service) weekLeague(ctx context.Context, wl WeekLeague, held map[string
 	out.Lineup = &summary
 	var pickups []apitypes.WaiverRow
 	if wl.WaiversOpen {
-		// The strip's chosen set alone: no table of rows is built for it.
+		// The full waiver page's strip by its one pickup rule: Pickups builds the
+		// whole page (its rows and their sentences) to read it, a cost each front
+		// door read with waivers open pays (review L-J).
 		pickups, _ = a.Pickups()
 	}
 	out.Chips = rosterChips(lineup, pickups)

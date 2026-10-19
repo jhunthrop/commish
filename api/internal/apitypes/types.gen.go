@@ -1482,6 +1482,24 @@ func (e TradeMovesPropose) Valid() bool {
 	}
 }
 
+// Defines values for WaiverAdvicePickupOrder.
+const (
+	WaiverAdvicePickupOrderSeasonGain WaiverAdvicePickupOrder = "season_gain"
+	WaiverAdvicePickupOrderWeek       WaiverAdvicePickupOrder = "week"
+)
+
+// Valid indicates whether the value is a known member of the WaiverAdvicePickupOrder enum.
+func (e WaiverAdvicePickupOrder) Valid() bool {
+	switch e {
+	case WaiverAdvicePickupOrderSeasonGain:
+		return true
+	case WaiverAdvicePickupOrderWeek:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for WaiverMovesClaim.
 const (
 	WaiverMovesClaimAvailable   WaiverMovesClaim = "available"
@@ -4172,6 +4190,9 @@ type WaiverAdvice struct {
 	// OrderBasis which order ranks the players: our preseason board, or the rest-of-season order (from week 7, once the API reads it)
 	OrderBasis OrderBasis `json:"order_basis"`
 
+	// PickupOrder the order the page's rows and strip are in, decided once from the full page's rows by each row's game state (gameStateAt): week (the strip by this week's Proj gain, the rows as the search ranks them) while no row's add or drop has kicked off; season_gain once any has (the rows by the season Gain, every week figure null, the strip the first row worth making); a page narrowed to one position carries the full page's
+	PickupOrder WaiverAdvicePickupOrder `json:"pickup_order"`
+
 	// Pickups the pickups worth making, chosen as a set from every add we rank, at most 3: each measured against the lineup with the ones before it made, kept only while he still starts and raises the Proj, no two taking the same player of the member's (topped or dropped); each one's week_gain is his over the ones before (the strip's cards); empty when no pickup beats the roster
 	Pickups []WaiverRow `json:"pickups"`
 
@@ -4192,13 +4213,16 @@ type WaiverAdvice struct {
 	// Roster the member's active roster (injured reserve and taxi spots left out), the lines beats and drops name
 	Roster []PlayerLine `json:"roster"`
 
-	// Rows positive gains first by gain, then the rest by points over replacement, at most 60
+	// Rows positive gains first by gain, then the rest by points over replacement, at most 60; by the season Gain alone in the season_gain order
 	Rows []WaiverRow `json:"rows"`
 
 	// SeasonBasis what the Rest of season column and a gain over the rest of the season are, said once under the rows
 	SeasonBasis string `json:"season_basis"`
 	Week        int    `json:"week"`
 }
+
+// WaiverAdvicePickupOrder the order the page's rows and strip are in, decided once from the full page's rows by each row's game state (gameStateAt): week (the strip by this week's Proj gain, the rows as the search ranks them) while no row's add or drop has kicked off; season_gain once any has (the rows by the season Gain, every week figure null, the strip the first row worth making); a page narrowed to one position carries the full page's
+type WaiverAdvicePickupOrder string
 
 // WaiverBeats the member's player at his position with the lowest Proj he tops, the advised lineup's starters first, then the bench, never one who cannot play this week (Lane 66f's Beats column); or the open spot he fills, a starting spot no player of the member's can play this week
 type WaiverBeats struct {
