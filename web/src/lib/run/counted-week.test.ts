@@ -9,7 +9,7 @@ const row = (week: number, status: GameLogRow['status']): Pick<GameLogRow, 'week
 	status
 });
 
-void test("a season reaches its through week, or his later game that is already in", () => {
+void test('a season reaches its through week, or his later game that is already in', () => {
 	const thursday = { through: 5, log: [row(5, 'played'), row(6, 'played'), row(7, 'upcoming')] };
 	const sunday = { through: 5, log: [row(5, 'played'), row(6, 'upcoming')] };
 	const bye = { through: 5, log: [row(5, 'played'), row(6, 'bye')] };
