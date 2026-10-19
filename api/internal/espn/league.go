@@ -230,6 +230,11 @@ type Game struct {
 	// an undecided matchup, a starter kicked off, and no live points, so
 	// its 0.0 totalPoints is not a score.
 	HomeUnread, Unread bool
+	// HomePlayerPoints and PlayerPoints are each rostered player's points
+	// for the scoring period by his id, live and final alike (Lane 79);
+	// nil where the read carries no rosterForCurrentScoringPeriod for the
+	// side, which then has ESPN's team total alone.
+	HomePlayerPoints, PlayerPoints map[string]float64
 }
 
 // undecided is ESPN's winner for a matchup not yet decided.
@@ -243,6 +248,18 @@ type wireSide struct {
 	TeamID          int      `json:"teamId"`
 	TotalPoints     float64  `json:"totalPoints"`
 	TotalPointsLive *float64 `json:"totalPointsLive"`
+	// Current is rosterForCurrentScoringPeriod: the side's roster with
+	// each player's points for the period (appliedStatTotal), carried by
+	// the live views for the current period alone. The team roster's own
+	// appliedStatTotal is another figure (Lane 74).
+	Current *struct {
+		Entries []struct {
+			PlayerID        int `json:"playerId"`
+			PlayerPoolEntry struct {
+				AppliedStatTotal float64 `json:"appliedStatTotal"`
+			} `json:"playerPoolEntry"`
+		} `json:"entries"`
+	} `json:"rosterForCurrentScoringPeriod"`
 }
 
 // points is the side's score as ESPN has it now, and whether ESPN gave
@@ -258,6 +275,30 @@ func (s wireSide) points(winner string, kicked bool) (float64, bool) {
 		return score(*s.TotalPointsLive), true
 	}
 	return 0, !kicked
+}
+
+// playerPoints is each of the team's rostered players' points for the
+// period, nil where ESPN sends no roster for it. A player the period's
+// roster leaves out follows the locked-starter rule: unlocked, his game
+// is still to kick off and he has 0.0; locked, his points are not known
+// and he is left out, never a 0.0.
+func (s wireSide) playerPoints(t Team) map[string]float64 {
+	if s.Current == nil {
+		return nil
+	}
+	sent := make(map[string]float64, len(s.Current.Entries))
+	for _, e := range s.Current.Entries {
+		sent[strconv.Itoa(e.PlayerID)] = score(e.PlayerPoolEntry.AppliedStatTotal)
+	}
+	out := make(map[string]float64, len(t.Roster))
+	for _, p := range t.Roster {
+		if v, ok := sent[p.ID]; ok {
+			out[p.ID] = v
+		} else if !p.Locked {
+			out[p.ID] = 0
+		}
+	}
+	return out
 }
 
 // kickedOff is the teams with a starter whose game has started: ESPN
@@ -520,13 +561,18 @@ func checkFull(w wireFull) (FullLeague, error) {
 		l.Teams = append(l.Teams, tm)
 	}
 	kicked := kickedOff(l.Teams)
+	byID := make(map[int]Team, len(l.Teams))
+	for _, t := range l.Teams {
+		byID[t.ID] = t
+	}
 	for _, g := range w.Schedule {
 		if g.MatchupPeriodID != l.MatchupPeriod || g.Away == nil {
 			continue
 		}
 		home, homeRead := g.Home.points(g.Winner, kicked[g.Home.TeamID])
 		away, awayRead := g.Away.points(g.Winner, kicked[g.Away.TeamID])
-		l.Games = append(l.Games, Game{Home: g.Home.TeamID, Away: g.Away.TeamID, HomePoints: home, Points: away, HomeUnread: !homeRead, Unread: !awayRead})
+		l.Games = append(l.Games, Game{Home: g.Home.TeamID, Away: g.Away.TeamID, HomePoints: home, Points: away, HomeUnread: !homeRead, Unread: !awayRead,
+			HomePlayerPoints: g.Home.playerPoints(byID[g.Home.TeamID]), PlayerPoints: g.Away.playerPoints(byID[g.Away.TeamID])})
 	}
 	return l, nil
 }
