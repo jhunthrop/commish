@@ -42,6 +42,7 @@ import { inSeason, noWeek } from './member-week.ts';
 import { inTenths } from './tenths.ts';
 import { FIXTURE_CLOCK_VARIABLE, fixtureClock } from './clock.ts';
 import { stamped } from './game-state.ts';
+import { orderAtClock, playerRest } from './rest-now.ts';
 import {
 	espnDefenseId,
 	weekOrderAnswer,
@@ -662,13 +663,15 @@ const MIN_SEARCH = 2;
  * position in order.json's order; a search's letters in the name or club;
  * the limit. Without a league the rows carry no roster and no move, and no read. */
 function orderAt(params: URLSearchParams, league: boolean): OrderAdvice {
+	// Each total over his club's games still to play at the clock (Lane 86, rest-now.ts).
+	const live = orderAtClock(order, now());
 	const position = params.get('position');
 	const q = (params.get('q') ?? '').trim().toLowerCase();
 	const limit = Number(params.get('limit') ?? DEFAULT_ORDER_ROWS);
 	const ranked: OrderRow[] =
 		position === null
-			? order.rows
-			: order.rows
+			? live.rows
+			: live.rows
 					.filter((row) => row.line.player.position === position)
 					.sort(
 						(a, b) =>
@@ -688,7 +691,7 @@ function orderAt(params: URLSearchParams, league: boolean): OrderAdvice {
 		.slice(0, limit)
 		.map((row) => (league ? row : { ...row, roster: null, move: null }));
 	return {
-		...order,
+		...live,
 		read_at: league ? readAt() : null,
 		moves: league ? order.moves : null,
 		rank_by: position === null ? 'points_over_replacement' : 'rest_of_season_points',
@@ -882,7 +885,7 @@ async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> 
 		const id = publicPlayer[1] ?? '';
 		const week = playerWeek(recorded, id, runIndex.get(id) ?? null, false);
 		if (week === null) send(req, res, HTTP.notFound, 'Nothing here by that id', 'not_found');
-		else send(req, res, HTTP.ok, week);
+		else send(req, res, HTTP.ok, { ...week, ...playerRest(order.rows, id, now()) });
 		return;
 	}
 	const leaguePlayer = LEAGUE_PLAYER.exec(url.pathname);
@@ -900,7 +903,7 @@ async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> 
 			ESPN_MOVES.has(leaguePlayer[1] ?? '')
 		);
 		if (week === null) send(req, res, HTTP.notFound, 'Nothing here by that id', 'not_found');
-		else send(req, res, HTTP.ok, week);
+		else send(req, res, HTTP.ok, { ...week, ...playerRest(order.rows, id, now()) });
 		return;
 	}
 	const inSeason = IN_SEASON.exec(url.pathname);
