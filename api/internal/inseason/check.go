@@ -78,7 +78,7 @@ func (a *advisor) CheckTrade(in apitypes.TradeCheckInput) (apitypes.TradeCheck, 
 	if r != nil {
 		return apitypes.TradeCheck{}, r, true
 	}
-	checked := Check(a.config, a.weeks, a.squad(mine, true), a.squad(theirs, false), give, get)
+	checked := Check(a.config, a.weeks, a.squad(team, mine, true), a.squad(other, theirs, false), give, get)
 	week := a.tradeWeek(team, other, mine, theirs, checked.Trade)
 	h := a.header()
 	out := apitypes.TradeCheck{Week: h.week, Basis: withPerGame(a.Board, TradeCheckBasis(a.basis, a.weeks), mine, theirs), BasisNote: BasisNote(a.settings, a.season.Carries),
@@ -249,6 +249,11 @@ func (a *advisor) tradeRow(mine, theirs []person, tr Trade, week tradeWeek) apit
 	if tr.Drop >= 0 {
 		drop := mine[tr.Drop].line
 		row.Drop = &drop
+	}
+	if tr.Drop >= 0 && tr.DropFor >= 0 && tr.DropSlot >= 0 {
+		w := &Writer{Basis: a.basis, Now: a.now}
+		reason := w.TradeDrop(mine[tr.Drop].words, theirs[tr.Get[tr.DropFor]].words, SlotLabel(a.slots, tr.DropSlot))
+		row.DropReason = &reason
 	}
 	return row
 }

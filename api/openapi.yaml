@@ -4170,7 +4170,7 @@ components:
         ties: { type: integer }
     TradeRow:
       type: object
-      required: [give, get, drop, my_gain, their_gain, close_for_them, my_proj_change, their_proj_change]
+      required: [give, get, drop, drop_reason, my_gain, their_gain, close_for_them, my_proj_change, their_proj_change]
       properties:
         give: { type: array, items: { $ref: "#/components/schemas/PlayerLine" } }
         get: { type: array, items: { $ref: "#/components/schemas/PlayerLine" } }
@@ -4179,8 +4179,15 @@ components:
           nullable: true
           description: >-
             who the drafter drops to make room when the trade brings in more players than it sends and the roster has
-            no open spot (the player it costs least to lose, never held, never a starter after the trade); the gain
+            no open spot (the player it costs least to lose, never held, never a starter after the trade, and never
+            one of this week's lineup as the Lineup screen sets it while a bench player may go, Lane 66u); the gain
             is after him; null otherwise
+        drop_reason:
+          type: string
+          nullable: true
+          description: >-
+            the trade's sentence when its drop starts this week: the spot he starts in and the player the trade
+            brings in who takes it (Lane 66u); null for a bench drop or none
         my_gain: { type: number, format: double, description: points over replacement a week to the drafter's lineup, one decimal }
         their_gain: { type: number, format: double, description: the same to theirs }
         close_for_them: { type: boolean, description: their gain is under 0.5 a week }

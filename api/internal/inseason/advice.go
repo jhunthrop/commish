@@ -337,9 +337,10 @@ func (a *advisor) active(t leaguesync.Team) []person {
 }
 
 // squad is a team's players for the waiver and trade searches, held by
-// the drafter's Hold tags when own.
-func (a *advisor) squad(people []person, own bool) Squad {
-	s := Squad{Players: make([]Candidate, len(people)), Held: map[string]bool{}}
+// the drafter's Hold tags when own, with the team's starters on the host
+// for this week's lineup.
+func (a *advisor) squad(t leaguesync.Team, people []person, own bool) Squad {
+	s := Squad{Players: make([]Candidate, len(people)), Held: map[string]bool{}, Starters: t.Starters}
 	for i, p := range people {
 		s.Players[i] = p.cand
 		if own && p.line.Held {
@@ -503,7 +504,7 @@ func (a *advisor) waiverRun(position draft.Position) (waiverRun, bool) {
 		return waiverRun{}, false
 	}
 	mine := a.active(team)
-	squad := a.squad(mine, true)
+	squad := a.squad(team, mine, true)
 	pool := a.pool(position)
 	cands := make([]Candidate, len(pool))
 	for i, p := range pool {
@@ -617,7 +618,7 @@ func (a *advisor) Trades(focus string) (apitypes.TradeAdvice, bool) {
 		return apitypes.TradeAdvice{}, false
 	}
 	mine := a.active(team)
-	squad := a.squad(mine, true)
+	squad := a.squad(team, mine, true)
 	h := a.header()
 	out := apitypes.TradeAdvice{Week: h.week, BasisNote: BasisNote(a.settings, a.season.Carries), OrderBasis: h.basis, Refreshed: h.refreshed,
 		ReadAt: h.readAt, Teams: []apitypes.TradeTeam{}, Roster: rosterLines(mine), Moves: TradeMoves(a.Snap.Ref.Host),
@@ -634,7 +635,7 @@ func (a *advisor) Trades(focus string) (apitypes.TradeAdvice, bool) {
 		row := apitypes.TradeTeam{RosterId: t.RosterID, Name: t.Name, Owner: t.Owner,
 			Record: apitypes.TradeRecord{Wins: t.Wins, Losses: t.Losses, Ties: t.Ties}, Roster: rosterLines(theirs), Trades: []apitypes.TradeRow{}}
 		close := 0
-		for _, tr := range Trades(a.config, a.weeks, squad, a.squad(theirs, false), focus, TradesPerTeam) {
+		for _, tr := range Trades(a.config, a.weeks, squad, a.squad(t, theirs, false), focus, TradesPerTeam) {
 			row.Trades = append(row.Trades, a.tradeRow(mine, theirs, tr, a.tradeWeek(team, t, mine, theirs, tr)))
 			if tr.CloseForThem() {
 				close++

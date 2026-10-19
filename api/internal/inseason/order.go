@@ -158,13 +158,13 @@ func (a *advisor) tradeTargets() map[string]bool {
 	if !ok {
 		return out
 	}
-	squad := a.squad(a.active(team), true)
+	squad := a.squad(team, a.active(team), true)
 	for _, t := range a.Snap.Teams {
 		if t.RosterID == a.Me {
 			continue
 		}
 		theirs := a.active(t)
-		for _, tr := range Trades(a.config, a.weeks, squad, a.squad(theirs, false), "", targetsPerTeam) {
+		for _, tr := range Trades(a.config, a.weeks, squad, a.squad(t, theirs, false), "", targetsPerTeam) {
 			for _, i := range tr.Get {
 				if id := theirs[i].line.Player.BoardId; id != nil {
 					out[*id] = true

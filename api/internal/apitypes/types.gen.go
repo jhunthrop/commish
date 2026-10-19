@@ -3911,10 +3911,13 @@ type TradeRow struct {
 	// CloseForThem their gain is under 0.5 a week
 	CloseForThem bool `json:"close_for_them"`
 
-	// Drop who the drafter drops to make room when the trade brings in more players than it sends and the roster has no open spot (the player it costs least to lose, never held, never a starter after the trade); the gain is after him; null otherwise
-	Drop *PlayerLine  `json:"drop"`
-	Get  []PlayerLine `json:"get"`
-	Give []PlayerLine `json:"give"`
+	// Drop who the drafter drops to make room when the trade brings in more players than it sends and the roster has no open spot (the player it costs least to lose, never held, never a starter after the trade, and never one of this week's lineup as the Lineup screen sets it while a bench player may go, Lane 66u); the gain is after him; null otherwise
+	Drop *PlayerLine `json:"drop"`
+
+	// DropReason the trade's sentence when its drop starts this week: the spot he starts in and the player the trade brings in who takes it (Lane 66u); null for a bench drop or none
+	DropReason *string      `json:"drop_reason"`
+	Get        []PlayerLine `json:"get"`
+	Give       []PlayerLine `json:"give"`
 
 	// MyGain points over replacement a week to the drafter's lineup
 	MyGain float64 `json:"my_gain"`

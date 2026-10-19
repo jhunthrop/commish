@@ -69,6 +69,7 @@ const row = (mine: number, theirs: number, over: Partial<TradeRow> = {}): TradeR
 	give: [line('Aaron Rodgers', 'QB')],
 	get: [line('Cam Skattebo'), line('Pierre Strong')],
 	drop: line('Jaxson Dart', 'QB'),
+	drop_reason: null,
 	my_gain: mine,
 	their_gain: theirs,
 	close_for_them: theirs < 0.5,

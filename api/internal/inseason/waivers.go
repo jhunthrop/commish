@@ -9,11 +9,13 @@ import (
 // Squad is one roster as the waiver and trade searches read it: the
 // players who count (injured reserve and taxi spots left out), the
 // players the member holds (never dropped or given), and whether a
-// roster spot is open, so an add needs no drop.
+// roster spot is open, so an add needs no drop. Starters is the host's
+// starters by id, which this week's lineup reads (Lineup).
 type Squad struct {
-	Players []Candidate
-	Held    map[string]bool
-	Open    bool
+	Players  []Candidate
+	Held     map[string]bool
+	Open     bool
+	Starters []string
 }
 
 // Waiver is one candidate's best move: the drop it costs least to lose
@@ -45,7 +47,7 @@ type Drop struct {
 // points over replacement.
 func Waivers(config []draft.SlotConfig, weeks int, squad Squad, pool []Candidate) []Waiver {
 	w := waiverSearch{f: newFiller(Slots(config), weeks), squad: squad, mine: pointers(squad.Players),
-		dedicated: dedicatedCounts(config), counts: positionCounts(squad.Players)}
+		drops: newDropRule(config, squad, squad.Held), counts: positionCounts(squad.Players)}
 	w.base, _ = w.f.strength(w.mine)
 	w.baseStarts = make([]bool, len(w.mine))
 	for i := range w.mine {
@@ -72,12 +74,13 @@ func Waivers(config []draft.SlotConfig, weeks int, squad Squad, pool []Candidate
 func positive(gain float64) bool { return roundTenth(gain) > 0 }
 
 type waiverSearch struct {
-	f                 *filler
-	squad             Squad
-	mine              []*Candidate
-	base              float64
-	baseStarts        []bool
-	dedicated, counts map[draft.Position]int
+	f          *filler
+	squad      Squad
+	mine       []*Candidate
+	base       float64
+	baseStarts []bool
+	drops      dropRule
+	counts     map[draft.Position]int
 }
 
 // bestDrop is the move for one candidate: no drop when a spot is open,
@@ -91,7 +94,12 @@ func (w *waiverSearch) bestDrop(a int, c *Candidate) Waiver {
 	best := Waiver{Add: a, Drop: -1, NoDrop: true}
 	var drops []Drop
 	for d, p := range w.mine {
-		if w.squad.Held[p.ID] || !droppableFor(p, c, w.dedicated, w.counts) {
+		if !w.drops.allowed(d, c, w.counts) {
+			continue
+		}
+		// A player this week's lineup starts goes only for an add who
+		// takes his spot this week (Lane 66u, the trade finder's rule).
+		if w.drops.startsThisWeek(d) && w.drops.takesHisSpot(d, nil, []Candidate{*c}) < 0 {
 			continue
 		}
 		after := w.f.swap(w.mine, []int{d}, c)

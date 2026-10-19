@@ -3448,8 +3448,10 @@ export interface components {
 		TradeRow: {
 			give: components['schemas']['PlayerLine'][];
 			get: components['schemas']['PlayerLine'][];
-			/** @description who the drafter drops to make room when the trade brings in more players than it sends and the roster has no open spot (the player it costs least to lose, never held, never a starter after the trade); the gain is after him; null otherwise */
+			/** @description who the drafter drops to make room when the trade brings in more players than it sends and the roster has no open spot (the player it costs least to lose, never held, never a starter after the trade, and never one of this week's lineup as the Lineup screen sets it while a bench player may go, Lane 66u); the gain is after him; null otherwise */
 			drop: components['schemas']['PlayerLine'] | null;
+			/** @description the trade's sentence when its drop starts this week: the spot he starts in and the player the trade brings in who takes it (Lane 66u); null for a bench drop or none */
+			drop_reason: string | null;
 			/**
 			 * Format: double
 			 * @description points over replacement a week to the drafter's lineup
