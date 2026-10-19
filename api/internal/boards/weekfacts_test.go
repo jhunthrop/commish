@@ -59,7 +59,9 @@ func weekFactsSchema(t *testing.T, pool *pgxpool.Pool, schema string) {
 		`insert into ` + schema + `.team_week_observations values
 			(2026, 1, 'LA', 'nflverse_kickoff', 'kickoff_instant', '2026-09-13 20:30:00+00', 1),
 			(2026, 1, 'LA', 'nflverse_kickoff', 'game_result', '2026-09-14 12:00:00+00', 1),
-			(2026, 1, 'BUF', 'nflverse_kickoff', 'game_result', '2026-09-14 12:00:00+00', 0)`,
+			(2026, 1, 'BUF', 'nflverse_kickoff', 'game_result', '2026-09-14 12:00:00+00', 0),
+			(2026, 2, 'BUF', 'tank01_game_status', 'game_status', '2026-09-21 01:00:00+00', 2),
+			(2026, 2, 'MIA', 'tank01_game_status', 'game_status', '2026-09-20 20:00:00+00', 1)`,
 		`insert into ` + schema + `.capture_snapshots values
 			('tank01_injuries_by_date', '{"injDate": "20260912", "injList": [{"playerID": "p1", "designation": "Q"}, {"playerID": "p2", "designation": "O"}]}', '2026-09-12 10:00:00+00'),
 			('tank01_injuries_by_date', '{"injDate": "20260913", "injList": [{"playerID": "p1", "designation": "D"}, {"playerID": " ", "designation": "O"}]}', '2026-09-13 10:00:00+00'),
@@ -128,6 +130,10 @@ func TestWeekFactReads(t *testing.T) {
 	bills := byKey["1|BUF"]
 	if bills.Opponent != "LAR" || bills.Home || !bills.Final || !bills.Kickoff.Equal(time.Date(2026, 9, 13, 20, 25, 0, 0, time.UTC)) {
 		t.Fatalf("Buffalo's week 1 %+v (the schedule's 4:25 Eastern, no kickoff observation of its own)", bills)
+	}
+	// The hourly capture's status (Lane 80): a final is final the hour after; a game under way is not.
+	if buf := byKey["2|BUF"]; !buf.Final {
+		t.Fatalf("Buffalo's week 2 %+v: the hourly status says final", buf)
 	}
 	if mia := byKey["2|MIA"]; mia.Final || mia.Opponent != "BUF" || !mia.Kickoff.Equal(time.Date(2026, 9, 20, 4, 0, 0, 0, time.UTC)) {
 		t.Fatalf("Miami's week 2 %+v: TBD reads as the start of the day", mia)

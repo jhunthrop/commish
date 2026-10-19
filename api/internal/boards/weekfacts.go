@@ -48,6 +48,11 @@ const (
 	scheduleSource   = "nflverse_kickoff"
 	kickoffMetric    = "kickoff_instant"
 	gameResultMetric = "game_result"
+	// The hourly capture's game status (research/pipeline/tank01/game_status.py
+	// STATUS_SOURCE, STATUS_METRIC, FINAL_VALUE).
+	statusSource = "tank01_game_status"
+	statusMetric = "game_status"
+	statusFinal  = 2.0
 )
 
 // nflverseTeams folds nflverse's spellings onto the provider's codes the
@@ -210,11 +215,16 @@ func (s *PGSource) games(ctx context.Context, season int) ([]TeamWeek, error) {
 }
 
 // teamWeekFacts is each club-week's kickoff instant (the observation's
-// stamp) and whether its result is stored.
+// stamp) and whether its final is stored: the weekly result, or the hourly
+// capture's game status saying final (Lane 80,
+// research/pipeline/tank01/game_status.py), so a game is final the hour
+// after it ends.
 func (s *PGSource) teamWeekFacts(ctx context.Context, season int) (map[string]time.Time, map[string]bool, error) {
 	rows, err := s.Pool.Query(ctx, `select week, team, metric, max(as_of) from `+s.table("team_week_observations")+`
-		where season = $1 and source = $2 and metric = any($3) group by week, team, metric
-		order by week, team collate "C", metric limit $4`, season, scheduleSource, []string{kickoffMetric, gameResultMetric}, 2*maxTeamWeeks+1)
+		where season = $1 and ((source = $2 and metric = any($3)) or (source = $5 and metric = $6 and value = $7))
+		group by week, team, metric
+		order by week, team collate "C", metric limit $4`, season, scheduleSource, []string{kickoffMetric, gameResultMetric}, 2*maxTeamWeeks+1,
+		statusSource, statusMetric, statusFinal)
 	if err != nil {
 		return nil, nil, fmt.Errorf("boards: read team weeks %d: %w", season, err)
 	}
