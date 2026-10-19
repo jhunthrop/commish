@@ -246,6 +246,9 @@ export function popupSource(
 	return `'use strict';\n(${popupMain.toString()})(window, { ${setup} });\n`;
 }
 
+/** The window's first line, until Disney's form is up. */
+export const OPENING_LINE = "Opening ESPN's sign-in.";
+
 /** The window's page. Its stylesheet and script are our own; Disney's sign-in loads from its CDN.
  * The page's Content-Security-Policy is in web/_headers. */
 export const POPUP_PAGE = `<!doctype html>
@@ -262,7 +265,7 @@ export const POPUP_PAGE = `<!doctype html>
 	<body>
 		<main>
 			<h1>Sign in to ESPN</h1>
-			<p id="line">Opening ESPN's sign-in.</p>
+			<p id="line">${OPENING_LINE}</p>
 			<button id="close" type="button">Close this window</button>
 		</main>
 	</body>
