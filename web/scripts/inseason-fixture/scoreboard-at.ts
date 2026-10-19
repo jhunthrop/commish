@@ -15,6 +15,7 @@ import type {
 	TradeAdvice,
 	WaiverAdvice
 } from '../../src/lib/league/inseason/api.ts';
+import { roundTenth } from './tenths.ts';
 
 type ScoreboardGame = Scoreboard['games'][number];
 
@@ -147,7 +148,11 @@ export function scoreboardAt(recorded: Recorded, moment: Moment, readAt: string)
 			return {
 				roster_id: m.roster_id,
 				points: moment.scored
-					? tenth(scored.reduce((n, l) => n + (l.week_projection ?? 0) * SCORED_SHARE, 0))
+					? // Each starter's points to the tenth as his row prints them, then added: the one sum the
+						// Matchup's Team prints (sideScore, Lane 79).
+						roundTenth(
+							scored.reduce((n, l) => n + roundTenth((l.week_projection ?? 0) * SCORED_SHARE), 0)
+						)
 					: m.points,
 				points_read: true,
 				projection:

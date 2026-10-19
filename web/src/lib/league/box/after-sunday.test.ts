@@ -12,9 +12,16 @@ import { linesOf, recordedMatchups } from '../../../../scripts/inseason-fixture/
 import { afterSundayOf } from '../../../../scripts/inseason-fixture/sunday.ts';
 import { inTenths } from '../../../../scripts/inseason-fixture/tenths.ts';
 import type { LeagueSync } from '../api.ts';
-import type { LineupAdvice, MatchupBox, TradeAdvice, WaiverAdvice } from '../inseason/api.ts';
+import type {
+	LineupAdvice,
+	MatchupBox,
+	Scoreboard,
+	TradeAdvice,
+	WaiverAdvice
+} from '../inseason/api.ts';
 import { gameHead } from './kickoff.ts';
 import { heldLineup, locked } from './lineup.ts';
+import { sideScore } from './matchup.ts';
 
 const data = (name: string): unknown =>
 	inTenths(
@@ -79,4 +86,18 @@ void test('on Tuesday every game is final, the lineup is set and the week is ove
 	assert.equal(tuesday.lineup.set, true);
 	assert.ok(tuesday.lineup.slots.every((s) => !s.changed));
 	assert.equal(tuesday.lineup.week_done, "Every starter's game is final, so week 6 is over.");
+});
+
+void test('the scoreboard and the Matchup print one figure for each side, its rows added (review M2)', () => {
+	for (const clock of [FIXTURE_MONDAY_CLOCK, FIXTURE_TUESDAY_CLOCK]) {
+		const week = at(clock);
+		const bugs: Scoreboard['games'][number]['sides'] = week.scoreboard.games[0]?.sides ?? [];
+		assert.ok(bugs.length > 0);
+		for (const side of week.matchup.sides) {
+			const rows = side.starters.map((s) => ({ pts: s.line.facts.points_this_week }));
+			const team = sideScore(rows, side, null);
+			const bug = bugs.find((s) => s.roster_id === side.roster_id);
+			assert.equal(bug?.points, team, `${clock} roster ${String(side.roster_id)}`);
+		}
+	}
 });
