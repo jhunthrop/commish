@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { BOX } from '#lib/league/box/box.ts';
 import { ORDER } from '#lib/order/words.ts';
-import { CARD } from '#lib/player/card.ts';
+import { CARD, unreadBasis } from '#lib/player/card.ts';
 import { COLUMN_HEADS } from '#lib/ui/board-columns.ts';
 import { FIGURE, weekHead } from './figure-words.ts';
 
@@ -32,6 +32,15 @@ void test("beside the season's Projected, the week's projection is headed by its
 	assert.notEqual(weekHead(6), FIGURE.projected);
 	// One-week box scores keep their own head.
 	assert.equal(BOX.proj, 'Proj');
+});
+
+void test("the card heads its week tile by the week, never Proj, beside the season's Projected", () => {
+	const projected = CARD.projected;
+	for (const head of [weekHead(6), FIGURE.week]) {
+		assert.notEqual(head, BOX.proj);
+		assert.notEqual(head, projected);
+	}
+	assert.match(unreadBasis(false, weekHead(6)), /^Wk 6, /);
 });
 
 void test('A game heads only the rest-of-season figure a game', () => {

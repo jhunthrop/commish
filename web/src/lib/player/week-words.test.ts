@@ -79,7 +79,7 @@ const week = (
 });
 
 const BUILT: CardTile[] = [
-	{ key: 'proj', label: CARD.proj, value: NONE, caption: 'Week 6', tone: 'lead' },
+	{ key: 'proj', label: 'Wk 6', value: NONE, caption: CARD.readOnOpen, tone: 'lead' },
 	{
 		key: 'rest',
 		label: CARD.rest,
@@ -126,7 +126,9 @@ void test('the read fills the week tiles and keeps the rest of season as built',
 			['delta', '+0.4']
 		]
 	);
-	assert.equal(tile(tiles, 'proj').caption, 'Week 6, PPR');
+	// Beside the season's Projected the week's projection is headed by the API's week (the ruling).
+	assert.equal(tile(tiles, 'proj').label, 'Wk 6');
+	assert.equal(tile(tiles, 'proj').caption, 'PPR');
 	assert.equal(tile(tiles, 'opp').caption, 'ARI, among the easiest for receivers');
 	assert.equal(tile(tiles, 'opp').tone, 'easy');
 	assert.equal(tile(tiles, 'last').caption, 'week 5 vs BUF');
@@ -196,7 +198,7 @@ void test('a figure not held is "--", and its tile says why', () => {
 	// Two reads, his row only in the newest.
 	const newer = card(week({}, { projection_delta: null }));
 	assert.equal(tile(newer.tiles, 'delta').caption, 'Not in the earlier read');
-	assert.match(unreadBasis(true), /could not be read just now/);
+	assert.match(unreadBasis(true, 'Wk 6'), /could not be read just now/);
 });
 
 void test('the week ahead is the box row and the cell under his name', () => {
@@ -301,8 +303,8 @@ void test('copy guard: no card word uses a betting or trading word, the word hos
 		live.verb?.note ?? '',
 		CARD.whyTitle,
 		CARD.writtenFrom,
-		unreadBasis(false),
-		unreadBasis(true)
+		unreadBasis(false, 'Wk 6'),
+		unreadBasis(true, 'Wk 6')
 	];
 	for (const line of said) assert.doesNotMatch(line, BANNED, line);
 });
@@ -318,14 +320,14 @@ void test('Compare answers the start or sit question from the figures both rows 
 			row('Puka Nacua', { proj: '23.0', avg: '25.9' }),
 			row("Ja'Marr Chase", { proj: '16.3', avg: '16.7' })
 		),
-		'Puka Nacua by 6.7 Proj this week'
+		'Puka Nacua by 6.7 projected points this week'
 	);
 	assert.equal(
 		compareSay(
 			row('Puka Nacua', { proj: '23.0', avg: '25.9' }),
 			row("Ja'Marr Chase", { avg: '16.7' })
 		),
-		"No Proj for Ja'Marr Chase this week. Puka Nacua by 9.2 a game this season"
+		"No projection for Ja'Marr Chase this week. Puka Nacua by 9.2 a game this season"
 	);
 	assert.equal(
 		compareSay(row('Puka Nacua', { rest: '344.1' }), row("Ja'Marr Chase", { rest: '333.2' })),
