@@ -19,6 +19,7 @@ import { hostWords } from '#lib/league/names.ts';
 import type { BasisPart } from '#lib/run/board-basis.ts';
 import { askedQuery } from '#lib/league/box/asked.ts';
 import type { OrderAdvice, OrderPosition, OrderRow, RosterMark } from './api.ts';
+import { weekHead } from '#lib/format/figure-words.ts';
 import { ORDER } from './words.ts';
 
 export { ORDER };
@@ -151,7 +152,8 @@ export function orderBasis(
 		advice.projection_scoring,
 		false,
 		zone,
-		league !== null
+		league !== null,
+		weekHead(advice.week)
 	);
 	const said: (BasisPart | null)[] = [
 		part(advice.basis, true),

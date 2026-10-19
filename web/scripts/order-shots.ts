@@ -5,7 +5,7 @@
 // record reads the run the site was built from. At 1440, 1024, 800, 768 and 390 it asserts the page
 // never scrolls sideways, and that the basis draws at most five rendered lines at 1440 and eight at 390
 // (measured, never counted in paragraphs; Lane 66q turned the phone's on). It also asserts the heads ("Our rest-of-season order" over #, Rest of season
-// over Projected and A game), that every figure cell prints one decimal or --, that Trade for him sits on
+// over Projected and A game, the week projection headed "Wk 6"), that every figure cell prints one decimal or --, that Trade for him sits on
 // fewer than a third of the rows, that no word says "host", the record's Order matched head with the
 // published projection's -- before its week, the honest sentence where the run carries one, and the
 // record's chart at least 200 px tall on a phone. Exits non-zero on any fault.
@@ -43,6 +43,7 @@ const ROSTER_FOLDS_AT = 900;
 /** Trade for him on fewer rows than this share (the coordinator's ruling 3). */
 const MOST_TRADE_SHARE = 1 / 3;
 const SIGNED_IN = { name: 'commish_csrf', value: 'fixture' };
+const WEEK_HEAD = new RegExp(`^${FIGURE.week} \\d+$`);
 const FIGURE_CELL = /^([-−]?\d+(\.\d)?|\d+(st|nd|rd|th)|--)$/;
 
 const SCREENS = [
@@ -172,10 +173,13 @@ async function orderFaults(page: Page, screen: Screen, width: number): Promise<s
 		said.push(`${screen.name}: no order group over # (${seen.groups.join('|')})`);
 	if (width >= FOLDS_AT && !seen.groups.includes('Rest of season'))
 		said.push(`${screen.name}: no Rest of season group`);
-	for (const head of ['#', 'Player', 'Proj']) {
+	for (const head of ['#', 'Player']) {
 		if (!seen.heads.includes(head))
 			said.push(`${screen.name} at ${String(width)}: no ${head} head`);
 	}
+	// The week's projection beside the season's Projected is headed by the API's week ("Wk 6").
+	if (!seen.heads.some((head) => WEEK_HEAD.test(head)) || seen.heads.includes('Proj'))
+		said.push(`${screen.name} at ${String(width)}: no week head (${seen.heads.join('|')})`);
 	if (!seen.heads.includes(FIGURE.projected) && !seen.heads.includes('Over repl.'))
 		said.push(`${screen.name} at ${String(width)}: no key head`);
 	if (width >= FOLDS_AT && !seen.heads.includes(FIGURE.perGame))

@@ -481,7 +481,8 @@ export function projShort(
 	scoring: ProjectionScoring,
 	defense: boolean,
 	zone: string = memberZone(),
-	league = true
+	league = true,
+	head: string = BOX.proj
 ): string {
 	// With no league (a player page signed out) the scoring is named alone.
 	const whose = !league
@@ -496,7 +497,7 @@ export function projShort(
 		previousReadAt === null
 			? ''
 			: ` ${BOX.delta} is its change since ${weekdayTime(previousReadAt, zone)}.`;
-	return `${BOX.proj} is this week's published projection in ${FORMAT_WORDS[scoring.format]} scoring${whose}, ${when}${defenses}.${delta}`;
+	return `${head} is this week's published projection in ${FORMAT_WORDS[scoring.format]} scoring${whose}, ${when}${defenses}.${delta}`;
 }
 
 /** The evidence columns in one short sentence pair, in the scoring the rows are in: "your scoring"

@@ -158,7 +158,9 @@ void test('the basis names the league shape and says every number once, the plat
 	const signedOut = words(orderBasis(advice([row('A')]), null, ZONE));
 	assert.ok(signedOut.startsWith('Our rest-of-season order from week 7.'));
 	assert.match(signedOut, /Points over replacement are for a 12-team league/);
-	assert.match(signedOut, /Proj is this week's published projection in PPR scoring, read /);
+	// The order holds the week's projection beside the season's, so its head names the API's week.
+	assert.match(signedOut, /Wk 6 is this week's published projection in PPR scoring, read /);
+	assert.doesNotMatch(signedOut, /Proj is/);
 	// Signed out there is no league whose rules the projection is matched to.
 	assert.doesNotMatch(signedOut, /this league's rules/);
 	assert.doesNotMatch(signedOut, /Roster is/);
@@ -177,7 +179,7 @@ void test('the phone is not told about the columns it does not draw: the Game ce
 	const parts = orderBasis(advice([row('A')], { read_at: READ }), { host: 'sleeper' }, ZONE);
 	const phone = parts.filter((p) => p.phone).map((p) => p.text);
 	assert.ok(phone.some((t) => t.startsWith('Our rest-of-season order')));
-	assert.ok(phone.some((t) => t.startsWith('Proj is')));
+	assert.ok(phone.some((t) => t.startsWith('Wk 6 is')));
 	assert.ok(phone.some((t) => t.startsWith('Opp rank is')));
 	assert.ok(phone.every((t) => !t.startsWith('Roster is') && !t.startsWith('The Game cell')));
 	assert.ok(parts.some((p) => !p.phone && p.text.startsWith('Roster is')));

@@ -5,7 +5,7 @@ import { BOX } from '#lib/league/box/box.ts';
 import { ORDER } from '#lib/order/words.ts';
 import { CARD } from '#lib/player/card.ts';
 import { COLUMN_HEADS } from '#lib/ui/board-columns.ts';
-import { FIGURE } from './figure-words.ts';
+import { FIGURE, weekHead } from './figure-words.ts';
 
 const TABLE = JSON.parse(
 	readFileSync(new URL('./figure-words.json', import.meta.url), 'utf8')
@@ -25,6 +25,13 @@ void test("this season's average is headed Avg on the board rows, the box score 
 	assert.equal(COLUMN_HEADS.avg.text, FIGURE.avg);
 	assert.equal(BOX.avg, FIGURE.avg);
 	assert.equal(CARD.avg, FIGURE.avg);
+});
+
+void test("beside the season's Projected, the week's projection is headed by its week", () => {
+	assert.equal(weekHead(6), 'Wk 6');
+	assert.notEqual(weekHead(6), FIGURE.projected);
+	// One-week box scores keep their own head.
+	assert.equal(BOX.proj, 'Proj');
 });
 
 void test('A game heads only the rest-of-season figure a game', () => {

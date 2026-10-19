@@ -206,6 +206,7 @@
 				{label}
 				rows={views}
 				rankBy={advice.rank_by}
+				week={advice.week}
 				league={tableLeague}
 				tagsOf={sheetTags}
 				end={mode === 'players' ? sheetMark : undefined}

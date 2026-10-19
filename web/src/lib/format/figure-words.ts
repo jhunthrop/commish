@@ -6,10 +6,19 @@
  *   projected  the projection's total for the season, the rest of it in season ("242.5")
  *   points     points scored to date
  *   perGame    the rest-of-season projection a game ("22.0"), never this season's average
- *   avg        this season's points a game to date ("30.7"), as the box score heads it */
+ *   avg        this season's points a game to date ("30.7"), as the box score heads it
+ *   week       this week's projection where the season's Projected sits beside it (the order):
+ *              "Wk 6", the API's week; a one-week box score keeps its own "Proj" */
 export const FIGURE = {
 	projected: 'Projected',
 	points: 'Points',
 	perGame: 'A game',
-	avg: 'Avg'
+	avg: 'Avg',
+	week: 'Wk'
 } as const;
+
+/** "Wk 6": this week's projection's head beside the season's, the week the API's answer is for,
+ * never the reader's clock. */
+export function weekHead(week: number): string {
+	return `${FIGURE.week} ${String(week)}`;
+}
