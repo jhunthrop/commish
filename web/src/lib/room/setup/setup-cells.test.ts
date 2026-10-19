@@ -41,3 +41,9 @@ void test('the lobby list draws the count from its one function', () => {
 	assert.match(list, /lobbyFillWords\(/);
 	assert.doesNotMatch(list, /\{lobby\.filling\} of/);
 });
+
+void test("the lobby room says its count with the card's words, from the same function", () => {
+	const room = readFileSync(new URL('../LobbyRoomView.svelte', import.meta.url), 'utf8');
+	assert.match(room, /lobbyFillWords\(/);
+	assert.doesNotMatch(room, /\} of \{teams\} in/);
+});
