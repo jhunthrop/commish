@@ -179,9 +179,10 @@ func espnSnapshot(l espn.FullLeague, now time.Time) Snapshot {
 		for _, side := range []struct {
 			id     int
 			points float64
-		}{{g.Home, g.HomePoints}, {g.Away, g.Points}} {
+			unread bool
+		}{{g.Home, g.HomePoints, g.HomeUnread}, {g.Away, g.Points, g.Unread}} {
 			snap.Matchups = append(snap.Matchups, Side{
-				RosterID: side.id, Game: i + 1, Points: round2(side.points), Starters: byID[side.id].Starters, PlayerPoints: map[string]float64{},
+				RosterID: side.id, Game: i + 1, Points: round2(side.points), PointsUnread: side.unread, Starters: byID[side.id].Starters, PlayerPoints: map[string]float64{},
 			})
 		}
 	}
