@@ -78,7 +78,7 @@
 		<!-- The link names its host; the chips confirm it, and say which host a bare league id is on. -->
 		<div class="host">
 			<span class="note">On</span>
-			<ChipGroup label="Your league's host">
+			<ChipGroup label="Your league's platform">
 				{#each IMPORT_HOSTS as h (h.host)}
 					<Chip size="sm" pressed={host === h.host} onclick={() => (host = h.host)}>{h.label}</Chip>
 				{/each}

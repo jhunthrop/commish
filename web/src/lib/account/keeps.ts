@@ -1,6 +1,12 @@
 /** What an account keeps and the hosts a signed-out visitor can connect, in the words the page prints,
  * each switched host named only where it is open (the hosts answer's `enabled`). */
-import { IN_SEASON_TOOLS_LINE, leagueHostsLine, type OpenHosts } from '#lib/league/hosts.ts';
+import {
+	IN_SEASON_TOOLS_LINE,
+	leagueHostsLine,
+	openLeagueHosts,
+	type OpenHosts
+} from '#lib/league/hosts.ts';
+import { hostWords } from '#lib/league/names.ts';
 import { FLAGS } from '#lib/site/flags.ts';
 
 /** What following a league says on this page: the hosts open here and, while the in-season screens
@@ -65,6 +71,15 @@ const MEMBER_HOSTS: readonly (MemberHost & { host: 'yahoo' | 'espn' })[] = [
 		verb: 'Connect ESPN'
 	}
 ];
+
+/** The signed-out page's connect section, said by the league and its platforms, never "host"
+ * (ruling R1: FFPC is named here as a place to connect, never in comparative copy). */
+export const CONNECT = { head: 'Connect your league', label: 'Platforms to connect' } as const;
+
+/** The platforms open here, in the order every page names them: the connect section's aside. */
+export function connectPlatforms(open: OpenHosts): string {
+	return openLeagueHosts(open).map(hostWords).join(', ');
+}
 
 /** The hosts read as the member that are open here. */
 export function memberHosts(open: OpenHosts): readonly MemberHost[] {
