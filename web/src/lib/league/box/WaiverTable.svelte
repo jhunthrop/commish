@@ -121,7 +121,7 @@
 									><b>{entry.beats.name}</b><span
 										>{entry.beats.starter ? WAIVERS.starter : WAIVERS.bench}</span
 									></span
-								><span class="gain"
+								><span class="gain" class:held={entry.beats.gain === null}
 									>{entry.beats.gain === null ? BOX.none : gainWord(entry.beats.gain)}</span
 								></span
 							>
@@ -372,6 +372,11 @@
 	.starter .gain {
 		font-size: var(--t-xl);
 		color: var(--gain-ink);
+	}
+
+	/* A week gain withheld past kickoff is no gain: drawn as an empty figure, never in the gain ink. */
+	.starter .gain.held {
+		color: var(--ink-3);
 	}
 
 	.starter .who b {
