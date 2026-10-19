@@ -339,8 +339,8 @@ void test("the screen's basis lines say the Game cell's figures and the facts' r
 	assert.equal(factsReadLine([line({}, { bye: true })], ZONE), null);
 });
 
-/** The site's copy guard, with the screen's own word: "stock". */
-const BANNED = bannedPattern(/\bstock\b/);
+/** The site's copy guard. */
+const BANNED = bannedPattern();
 
 void test('copy guard: every box word is fantasy words, with no dash or semicolon', () => {
 	const said = [

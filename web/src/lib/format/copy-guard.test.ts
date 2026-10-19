@@ -12,6 +12,25 @@ void test('the list holds the betting, trading and platform words, whole words i
 		assert.doesNotMatch(word, BANNED_WORDS);
 	assert.match('a — b', BANNED_MARKS);
 	assert.match('a; b', BANNED_MARKS);
+	assert.match('a – b', BANNED_MARKS);
+});
+
+void test("the trading inflections and the betting register's other words are on the one list (review 66q 1)", () => {
+	for (const word of [
+		'stock',
+		'buys',
+		'buying',
+		'sells',
+		'selling',
+		'priced',
+		'books',
+		'props',
+		'moneyline'
+	])
+		assert.match(`his ${word} here`, BANNED_WORDS, word);
+	// Code says $props and a source file may say "book", so neither is in the source scan's register.
+	assert.doesNotMatch('let props = $props();', BETTING_WORDS);
+	assert.match('the moneyline', BETTING_WORDS);
 });
 
 void test('the betting register a source scan reads is the list without the words code says too', () => {
@@ -26,6 +45,6 @@ void test('bannedIn names the first banned word or mark, a guard composing its o
 	assert.equal(bannedIn('Our rest-of-season order from week 7.'), null);
 	assert.equal(bannedIn('He is favored by 3'), 'favored');
 	assert.equal(bannedIn('one; two'), ';');
-	assert.equal(bannedIn('his stock rises'), null);
-	assert.equal(bannedIn('his stock rises', /\bstock\b/i), 'stock');
+	assert.equal(bannedIn('his value rises'), null);
+	assert.equal(bannedIn('his value rises', /\bvalue\b/i), 'value');
 });

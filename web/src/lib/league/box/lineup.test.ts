@@ -223,8 +223,8 @@ void test('a spot no one who can play fills keeps his player, counts 0 and says 
 	assert.equal(box.gain, 4.5);
 });
 
-/** The site's copy guard, with the screen's own word: "stock". */
-const BANNED = bannedPattern(/\bstock\b/);
+/** The site's copy guard. */
+const BANNED = bannedPattern();
 
 void test('copy guard: every Lineup word is fantasy words, names the platform, no dash or semicolon', () => {
 	const box = lineupBox(advice, ZONE);

@@ -271,7 +271,7 @@ void test('copy guard: every Waivers line is fantasy words, with no dash, semico
 		countWords(poolRows(advice, ZONE), 'espn'),
 		...waiverBasis(BASIS, [gainwell.add, saints], ZONE)
 	];
-	const forbidden = bannedPattern(/\btips?\b|–/);
+	const forbidden = bannedPattern(/\btips?\b/);
 	for (const said of lines) assert.doesNotMatch(said, forbidden, said);
 });
 

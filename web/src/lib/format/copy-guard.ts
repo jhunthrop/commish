@@ -17,11 +17,23 @@ const BETTING_ONLY = [
 	'wagers?',
 	'parlays?',
 	'vegas',
-	'sportsbooks?'
+	'sportsbooks?',
+	'moneyline'
 ];
 /** The betting register's words that are plain words in code too. */
-const BETTING_SHARED = ['lines?', 'spreads?', 'totals?'];
-const TRADING = ['markets?', 'prices?', 'buy', 'sell'];
+const BETTING_SHARED = ['lines?', 'spreads?', 'totals?', 'books?', 'props?'];
+const TRADING = [
+	'markets?',
+	'prices?',
+	'priced',
+	'buy',
+	'buys',
+	'buying',
+	'sell',
+	'sells',
+	'selling',
+	'stock'
+];
 const PLATFORM = ['hosts?'];
 
 const whole = (words: readonly string[]): RegExp => new RegExp(`\\b(${words.join('|')})\\b`, 'iu');
@@ -32,8 +44,8 @@ export const BANNED_WORDS = whole([...BETTING_ONLY, ...BETTING_SHARED, ...TRADIN
  * without the words code says too. */
 export const BETTING_WORDS = whole(BETTING_ONLY);
 
-/** The punctuation the site's copy never uses: the em dash and the semicolon. */
-export const BANNED_MARKS = /[—;]/u;
+/** The punctuation the site's copy never uses: the em dash, the en dash and the semicolon. */
+export const BANNED_MARKS = /[—–;]/u;
 
 /** The list's words and marks as one pattern, with a guard's words of its own (a screen that also
  * never says "stock") composed with them: what a guard matches its copy against. */

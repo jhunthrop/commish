@@ -29,8 +29,8 @@ const CELL_WEATHER =
 	/^(\d+°, \d+ mph(, \d+% (rain|snow|ice))?|Indoors|Roof TBD|Abroad, no forecast|Outdoors)$/;
 const FACTS_READ =
 	/The Game cell(?: shows each club's expected points, his club first, then the kickoff weather, read|'s expected points and weather were read) \w{3} \d{1,2}:\d{2} [ap]m Central\./g;
-/** The site's copy guard, with the game facts' own words (the round 4 lock's L5). */
-const BETTING = bannedPattern(/\b(books?|props?|moneyline)\b/);
+/** The site's copy guard (the round 4 lock's L5 words are on its list). */
+const BETTING = bannedPattern();
 
 const web = process.argv[2] ?? 'http://localhost:4682';
 const out = new URL(process.argv[3] ?? '../screenshots/game-facts/', import.meta.url);

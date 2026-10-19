@@ -312,7 +312,7 @@ void test('the basis is five lines at most, the first saying which trades are li
 
 /** The brief's words a fantasy screen never prints, a dash between clauses, a semicolon, and the
  * platform called anything but its name. */
-const NEVER = bannedPattern(/\b(buys|sells|values?)\b/);
+const NEVER = bannedPattern(/\bvalues?\b/);
 
 void test('copy guard: every word the trade table prints is fantasy words, the platform named', () => {
 	const copied = copiedTrade('sleeper', true);

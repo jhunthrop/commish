@@ -69,7 +69,7 @@ void test('in season the range and the games are the rest of the season, and no 
 void test('the copy has no em-dash, no semicolon and no trading words', () => {
 	for (const line of unwrittenLines(INPUT)) {
 		for (const words of [line.lead, line.text, line.figure, UNWRITTEN_READ]) {
-			assert.doesNotMatch(words, bannedPattern(/\bvalue\b|–/), words);
+			assert.doesNotMatch(words, bannedPattern(/\bvalue\b/), words);
 		}
 	}
 });

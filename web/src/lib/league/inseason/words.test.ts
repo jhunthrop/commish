@@ -309,11 +309,9 @@ void test('the refreshed stamp names the order and its day', () => {
 	);
 });
 
-/** The site's copy guard, with the in-season screens' own words: the trading register's inflections
- * (founder ruling 2026-09-07), verdict theatre (spec §2) and the en dash between clauses. */
-const BANNED = bannedPattern(
-	/\b(priced|buys|buying|sells|selling|stock|assets?|value|values|valued|smash|robbery|fleece|fleeced)\b|–/
-);
+/** The site's copy guard, with the in-season screens' own words: assets and values (founder ruling
+ * 2026-09-07) and verdict theatre (spec §2). */
+const BANNED = bannedPattern(/\b(assets?|value|values|valued|smash|robbery|fleece|fleeced)\b/);
 /** A doubled word ("the the"). */
 const DOUBLED_WORD = /\b([a-z]+)\s+\1\b/i;
 

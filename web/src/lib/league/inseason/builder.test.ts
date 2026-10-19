@@ -259,10 +259,6 @@ void test('copy guard: the builder says no trading words, dashes or semicolons',
 		checkWords(check({}, { yours: false, yours_open: 'Flex' }))
 	];
 	for (const text of said) {
-		assert.doesNotMatch(
-			text,
-			bannedPattern(/\b(value|win|wins|lose a trade|fair|grade)\b|–/),
-			text
-		);
+		assert.doesNotMatch(text, bannedPattern(/\b(value|win|wins|lose a trade|fair|grade)\b/), text);
 	}
 });

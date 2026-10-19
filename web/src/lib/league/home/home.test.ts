@@ -354,8 +354,8 @@ void test('the settings hold all 42 rules in the setup page’s groups and the t
 	);
 });
 
-/** The site's copy guard, with the screen's own word: "stock". */
-const BANNED = bannedPattern(/\bstock\b/);
+/** The site's copy guard. */
+const BANNED = bannedPattern();
 
 void test('a rule the platform does not state prints no figure, and the count leaves it out', () => {
 	const view = scoringView(RULES, ['points_per_return_touchdown', 'points_per_safety']);

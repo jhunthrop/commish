@@ -66,7 +66,7 @@ void test('the follow page names the three in-season tools in one sentence, in f
 		IN_SEASON_TOOLS_LINE,
 		'Each week we show the lineup to start, your best add on waivers and the trades that help both teams.'
 	);
-	assert.doesNotMatch(IN_SEASON_TOOLS_LINE, bannedPattern(/\bvalue\b|–/));
+	assert.doesNotMatch(IN_SEASON_TOOLS_LINE, bannedPattern(/\bvalue\b/));
 });
 
 void test('the account page reads the hosts and the tools from the same two lines', () => {

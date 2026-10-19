@@ -125,7 +125,7 @@ void test('the facts are said only until kickoff', () => {
 
 /** Words the game facts never use: the lines are an input and a fact, named only as what his club is
  * expected to score and to win or lose by (the round 4 lock's copy rule, its L5). */
-const BETTING = bannedPattern(/\b(books?|props?|moneyline)\b|–/);
+const BETTING = bannedPattern();
 
 void test('copy guard: no game facts line uses a betting word, a dash, a semicolon or a doubled word', () => {
 	const said = [
