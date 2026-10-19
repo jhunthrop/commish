@@ -21,6 +21,7 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { format as prettierFormat, resolveConfig } from 'prettier';
 import type { components } from '../../src/lib/api/types.ts';
+import { recordedShape, shapeSentence, teamsWords } from './league-shape.ts';
 
 type PlayerLine = components['schemas']['PlayerLine'];
 type OrderAdvice = components['schemas']['OrderAdvice'];
@@ -142,16 +143,14 @@ const ranked = [...lines.values()]
 	});
 const lineup = await read<components['schemas']['LineupAdvice']>('lineup');
 const waivers = await read<components['schemas']['WaiverAdvice']>('waivers');
-/** The Waivers note split as the order says it: the league shape, and the rules left out. */
-const SHAPE_SENTENCE = /^Points over replacement are for (.+?)\.(?: |$)/;
-const SHAPE = SHAPE_SENTENCE.exec(waivers.basis_note)?.[1] ?? '';
-if (SHAPE === '') throw new Error('The Waivers note names no league shape.');
-const NOTE = waivers.basis_note.replace(SHAPE_SENTENCE, '');
-/** The shape in the order's few words (words.go teamsWords): "12 teams with 1 QB, ... and two flex". */
-const TEAMS = SHAPE.replace(/^a (\d+)-team league/, '$1 teams').replace(
-	/two flex spots$/,
-	'two flex'
-);
+/** The league's shape in the order's few words, from its own settings (league-shape.ts, words.go
+ * teamsWords), and the order's note: the Waivers note without its shape sentence (LineupNote). */
+const shape = await recordedShape();
+const TEAMS = teamsWords(shape);
+const SHAPE_SENTENCE = shapeSentence(shape);
+if (!waivers.basis_note.startsWith(SHAPE_SENTENCE))
+	throw new Error(`The Waivers note does not open with "${SHAPE_SENTENCE}".`);
+const NOTE = waivers.basis_note.slice(SHAPE_SENTENCE.length).trim();
 const out: OrderAdvice = {
 	week: WEEK,
 	// The league the points over replacement are for, said once in the basis, and the rules its season

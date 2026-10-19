@@ -31,6 +31,7 @@ import { format as prettierFormat, resolveConfig } from 'prettier';
 import { listWords } from '../../src/lib/format/list.ts';
 import { FIXTURE_IDS } from './ids.ts';
 import { leagueFields } from './league-fields.ts';
+import { shapeSentence } from './league-shape.ts';
 import type { LeaguePlayer, LeagueSync, MatchupSide } from '../../src/lib/league/api.ts';
 import type {
 	AdviceHead,
@@ -199,11 +200,6 @@ const basisTail = `Points over replacement, and every gain in them, are points a
 /** The rest of the basis, under the rows, in the API's words (words.go BasisNote): the league's
  * shape and the league's rules the stat lines leave out. */
 const basisNote = ((): string => {
-	const count = (slot: string): number => league.roster_positions.filter((s) => s === slot).length;
-	const flexes = count('FLEX');
-	const flex =
-		count('SUPER_FLEX') > 0 ? 'a flex and a superflex' : flexes > 1 ? 'two flex spots' : 'a flex';
-	const shape = `a ${String(rosters.length)}-team league with ${String(count('QB'))} QB, ${String(count('RB'))} RB, ${String(count('WR'))} WR, ${String(count('TE'))} TE and ${flex}`;
 	const s = league.scoring_settings;
 	const scores = (...keys: string[]): boolean =>
 		Object.entries(s).some(
@@ -217,7 +213,7 @@ const basisNote = ((): string => {
 		scores('fum_rec') ? 'fumble recoveries' : null,
 		scores('safe') ? 'safeties' : null
 	].filter((w): w is string => w !== null);
-	const por = `Points over replacement are for ${shape}.`;
+	const por = shapeSentence({ rosterPositions: league.roster_positions, teams: rosters.length });
 	return left.length === 0
 		? por
 		: `${por} Points so far leave out ${listWords(left)}, which our stats lack.`;

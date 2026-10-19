@@ -138,15 +138,25 @@ func numberWords(b OrderBasis) string {
 // shapeWords names the league a points over replacement is for: "a
 // 12-team league with 1 QB, 2 RB, 3 WR, 1 TE and a flex".
 func shapeWords(s apitypes.LeagueSettings) string {
+	return fmt.Sprintf("a %d-team league with %s", s.Teams, startersWords(s, true))
+}
+
+// startersWords is a league's starting spots: "1 QB, 2 RB, 3 WR, 1 TE and two
+// flex spots", or "... and two flex" in the order screen's few words
+// (flexSpots false).
+func startersWords(s apitypes.LeagueSettings, flexSpots bool) string {
 	flex := "a flex"
 	switch s.Lineup {
 	case apitypes.LineupTwoFlex:
-		flex = "two flex spots"
+		flex = "two flex"
+		if flexSpots {
+			flex += " spots"
+		}
 	case apitypes.LineupSuperflex:
 		flex = "a flex and a superflex"
 	}
 	r := s.Roster
-	return fmt.Sprintf("a %d-team league with %d QB, %d RB, %d WR, %d TE and %s", s.Teams, r.Qb, r.Rb, r.Wr, r.Te, flex)
+	return fmt.Sprintf("%d QB, %d RB, %d WR, %d TE and %s", r.Qb, r.Rb, r.Wr, r.Te, flex)
 }
 
 // porWords is what points over replacement are and what "a week" is,
@@ -364,13 +374,5 @@ func OrderScreenBasis(b OrderBasis, fromWeek int, s apitypes.LeagueSettings) str
 // teamsWords is shapeWords in the order screen's few words: "12 teams
 // with 1 QB, 2 RB, 3 WR, 1 TE and two flex".
 func teamsWords(s apitypes.LeagueSettings) string {
-	flex := "a flex"
-	switch s.Lineup {
-	case apitypes.LineupTwoFlex:
-		flex = "two flex"
-	case apitypes.LineupSuperflex:
-		flex = "a flex and a superflex"
-	}
-	r := s.Roster
-	return fmt.Sprintf("%d teams with %d QB, %d RB, %d WR, %d TE and %s", s.Teams, r.Qb, r.Rb, r.Wr, r.Te, flex)
+	return fmt.Sprintf("%d teams with %s", s.Teams, startersWords(s, false))
 }
