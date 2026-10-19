@@ -24,7 +24,12 @@ const PLAYER = { id: '4426515', name: 'Puka Nacua', team: 'LAR', position: 'WR' 
 const LEAGUE = { id: 'league-1', host: 'sleeper' as const };
 const href: ScreenHref = (screen, query) =>
 	`/league/league-1/${screen}?${new URLSearchParams(query).toString()}`;
-const REST = { fromWeek: 6, rank: 'WR1 in our order', scoring: 'ppr' as const, label: 'PPR' };
+const REST = {
+	from: 'from week 6',
+	rank: 'WR1 in our order',
+	scoring: 'ppr' as const,
+	label: 'PPR'
+};
 
 const facts = (over: Partial<WeekFacts> = {}): WeekFacts => ({
 	week: 6,
@@ -162,7 +167,7 @@ void test("on Sunday evening the read's rest of season replaces the run's: his g
 	);
 	assert.equal(tile(live.tiles, 'rest').value, '167.5');
 	assert.equal(tile(live.tiles, 'rest').caption, 'from week 7, 16.8 a game, WR1 in our order');
-	assert.deepEqual(live.rest, { points: 167.5, fromWeek: 7 });
+	assert.deepEqual(live.rest, { points: 167.5, from: 'from week 7' });
 	// A league in another scoring keeps the tile's figure and says its week only.
 	const half = card(
 		week(

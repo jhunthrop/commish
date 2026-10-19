@@ -38,8 +38,9 @@ export type TileScoring = 'ppr' | 'half_ppr' | 'standard';
 /** Rest of season's parts the caption names (review N1, N2): its first week, his rank in words as
  * Lane 63's held rule gives it, and the scoring and its label the tile's total is in. */
 export interface RestParts {
-	/** His club's first week still to play at the run, null with no game left. */
-	fromWeek: number | null;
+	/** The week his rest of season starts from as the run says it (run/rest-from.ts): "from week 7",
+	 * "with no game left". */
+	from: string;
 	/** "WR1 in our order", or for a player on a season-long list "RB IR, unranked while on a
 	 * season-long list". */
 	rank: string;

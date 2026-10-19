@@ -8,7 +8,6 @@
 	import { fixed, signed } from '#lib/format/number.ts';
 	import { POSITION_NAMES } from '#lib/run/derive.ts';
 	import { readFigures } from '#lib/run/read-figures.ts';
-	import { playerRestFrom } from '#lib/run/rest-from.ts';
 	import { liveStatusClock, type LiveStatus } from '#lib/run/live-status.ts';
 	import { UNWRITTEN_READ, unwrittenLines } from '#lib/run/unwritten-words.ts';
 	import { CARD, unreadBasis, type CardTile } from '#lib/player/card.ts';
@@ -159,9 +158,9 @@
 				page.rest === null ? page.numbers.projected : (page.rest.preseason?.points ?? null),
 			// The read's rest of season once it answers in the lead's scoring (Lane 86), the run's before.
 			rest:
-				lead.rest === null || lead.format.rosFromWeek === undefined
+				lead.rest === null || lead.restParts === null
 					? null
-					: (live?.rest ?? { points: n.projected, fromWeek: playerRestFrom(lead.format, n) })
+					: (live?.rest ?? { points: n.projected, from: lead.restParts.from })
 		})
 	);
 	/** His status words as built, said again on the member's clock once the page is live. */

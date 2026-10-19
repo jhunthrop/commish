@@ -12,7 +12,7 @@ const PULLS = [
 	{ figure: '344', caption: 'projected PPR points' },
 	{ figure: '23.4', caption: 'PPR points to the next tier' }
 ];
-const REST = { points: 182.6, fromWeek: 6 };
+const REST = { points: 182.6, from: 'from week 6' };
 
 const shape = (figures: ReturnType<typeof readFigures>): [string | null, string][] =>
 	figures.map((figure) => [figure.label ?? null, figure.figure]);
@@ -75,7 +75,7 @@ void test('a read with no figures gains none, and a player with no preseason pro
 	const figures = readFigures(PULLS, {
 		label: 'PPR',
 		preseason: null,
-		rest: { points: 74, fromWeek: 6 }
+		rest: { points: 74, from: 'from week 6' }
 	});
 	assert.deepEqual(shape(figures), [
 		['Rest of season', '74.0'],

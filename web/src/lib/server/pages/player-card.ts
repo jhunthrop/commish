@@ -96,7 +96,7 @@ export function restParts(
 ): RestParts | null {
 	if (format.rosFromWeek === undefined) return null;
 	return {
-		fromWeek: playerRestFrom(format, numbers),
+		from: playerRestWords(playerRestFrom(format, numbers)),
 		rank: rankIn(numbers, position, status),
 		scoring: scoringOf(format),
 		label: format.label

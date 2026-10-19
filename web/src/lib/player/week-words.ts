@@ -96,11 +96,10 @@ export interface LiveCard {
 	rest: LiveRest | null;
 }
 
-/** His rest-of-season points at the read's clock and the week they start from (null with no game
- * left). */
+/** His rest-of-season points at the read's clock and the week they start from, as words. */
 export interface LiveRest {
 	points: number;
-	fromWeek: number | null;
+	from: string;
 }
 
 const SCORING_WORDS: Readonly<Record<Schemas['ProjectionScoring']['format'], string>> = {
@@ -289,13 +288,18 @@ function deltaTile(week: PlayerWeek, zone: string, now: number): CardTile {
 	};
 }
 
+/** The week his rest of season starts from: the read's when it says one, the run's before. */
+function fromOf(week: PlayerWeek, rest: RestParts): string {
+	return week.rest_from_week == null ? rest.from : playerRestWords(week.rest_from_week);
+}
+
 /** His rest of season at the read's clock (Lane 86), when the read is in the tile's own scoring and
  * says it: the points over his club's games still to play now and the week they start from. Null on a
  * preseason board, in another scoring and on a read older than the fields: the run's stand. */
 function restNow(week: PlayerWeek, rest: RestParts | null): LiveRest | null {
 	const points = week.rest_of_season_points;
 	if (week.projection_scoring.format !== rest?.scoring || points == null) return null;
-	return { points, fromWeek: week.rest_from_week ?? null };
+	return { points, from: fromOf(week, rest) };
 }
 
 /** Rest of season with his figure a game from the API's read (the league rows' one source), only
@@ -310,7 +314,7 @@ function restTile(week: PlayerWeek, rest: RestParts | null, fallback: CardTile):
 	const perGame = week.line.rest_of_season_per_game;
 	const game = same && perGame !== null ? `, ${printTenth(perGame)} a game` : '';
 	const scoring = same ? '' : `, in ${rest.label} scoring`;
-	const from = playerRestWords(week.rest_from_week ?? rest.fromWeek);
+	const from = fromOf(week, rest);
 	return {
 		...fallback,
 		...(now === null ? {} : { value: printTenth(now.points) }),
