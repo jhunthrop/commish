@@ -5,6 +5,7 @@ quotes a figure the page does not print (the sweep's X5: Josh Allen's cards said
 from research.capsules.page_figures import (
     FIGURE_OFF_PAGE,
     expected_score,
+    fallback_violation,
     figure_violations,
     page_tenth,
     page_tenth_text,
@@ -46,26 +47,36 @@ _SHEET = "Week by week: week 3 of 2026, played, 17.5 points. week 4 of 2026, pla
 
 
 def test_a_figure_to_more_decimals_than_the_page_prints_is_refused_by_name() -> None:
-    violations = figure_violations("He put up 17.46 points in week 3 of 2026.", _SHEET, exact=False)
-    assert len(violations) == 1
-    assert violations[0].startswith(FIGURE_OFF_PAGE)
-    assert '"17.46"' in violations[0] and "17.5" in violations[0]
+    refused = figure_violations("He put up 17.46 points in week 3 of 2026.", _SHEET, exact=False)
+    assert [r.raw for r in refused] == ["17.46"]
+    assert refused[0].message.startswith(FIGURE_OFF_PAGE)
+    assert '"17.46"' in refused[0].message and "17.5" in refused[0].message
 
 
 def test_a_figure_the_sheet_prints_to_two_decimals_stands() -> None:
-    assert figure_violations("He gets the ball out in 2.85 seconds.", _SHEET, exact=False) == []
+    assert figure_violations("He gets the ball out in 2.85 seconds.", _SHEET, exact=False) == ()
 
 
 def test_a_figure_the_sheet_prints_stands_and_a_whole_number_is_left_to_the_grounding() -> None:
-    assert figure_violations("He scored 17.5 points, then about 18.", _SHEET, exact=True) == []
+    assert figure_violations("He scored 17.5 points, then about 18.", _SHEET, exact=True) == ()
 
 
 def test_an_exact_read_refuses_every_decimal_the_sheet_does_not_print() -> None:
     sheet = "Published projection for week 7 of 2026: 26.4 points in PPR scoring. Expected points: BUF 29.5 points, NYJ 24 points."
     prose = "The published projection has him at 26.6 points, with Buffalo expected at 29.3 to 24.3."
-    violations = figure_violations(prose, sheet, exact=True)
-    assert [v.split('"')[1] for v in violations] == ["26.6", "29.3", "24.3"]
-    assert all(v.startswith(FIGURE_OFF_PAGE) for v in violations)
-    assert "26.4" in violations[0] and "29.5" in violations[1]
+    refused = figure_violations(prose, sheet, exact=True)
+    assert [r.raw for r in refused] == ["26.6", "29.3", "24.3"]
+    assert all(r.message.startswith(FIGURE_OFF_PAGE) for r in refused)
+    assert "26.4" in refused[0].message and "29.5" in refused[1].message
     # Not exact, a one-decimal figure is left to the grounding rule.
-    assert figure_violations(prose, sheet, exact=False) == []
+    assert figure_violations(prose, sheet, exact=False) == ()
+
+
+def test_the_fallback_reason_is_the_figure_guard_whenever_the_draft_carries_one() -> None:
+    """The review's finding 2: a draft over its band that also misquotes a figure falls with the figure named."""
+    over = "Word count 130 is outside the required 40-100 word band."
+    figure = (
+        f'{FIGURE_OFF_PAGE}: "26.6", where the sheet prints 26.4. Quote each figure exactly as the sheet prints it.'
+    )
+    assert fallback_violation((over, "A copy hit.", figure)) == figure
+    assert fallback_violation((over, "A copy hit.")) == over

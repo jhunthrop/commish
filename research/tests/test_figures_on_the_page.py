@@ -6,9 +6,13 @@ nightly's fallback line says why."""
 from dataclasses import replace
 from datetime import timedelta
 
+import httpx
+
+from research.capsules.gateway import GatewayClient
 from research.capsules.page_figures import FIGURE_OFF_PAGE
 from research.capsules.validate import Grounding, validate_prose
 from research.capsules.week.collect import expected_from_read, figures_at, last_games, published_projection
+from research.capsules.week.prompt import answer_json
 from research.capsules.week.render import render_week_sheet
 from research.capsules.week.sheet import (
     BoardPlace,
@@ -21,7 +25,7 @@ from research.capsules.week.sheet import (
     points_text,
 )
 from research.capsules.week.validate import validate_week_read
-from research.capsules.week.write import WeekReadResult
+from research.capsules.week.write import WeekReadResult, write_week_read
 from research.nightly.week_reads import WeekReadSpend
 from research.tests.week_read_fixtures import BOARD, CAPTURED, FIGURES, KICKOFF, starter
 
@@ -89,6 +93,22 @@ def test_every_figure_of_the_sweeps_prose_is_refused() -> None:
     )
     off = _figure_violations(validate_week_read(draft, allen(), call="start").violations)
     assert [v.split('"')[1] for v in off] == ["26.6", "29.3", "24.3", "18.52", "17.46"]
+
+
+def test_a_read_over_its_band_that_misquotes_a_figure_falls_for_the_figure() -> None:
+    """The review's finding 2: the band leads the draft's violations, but the fall names the figure guard."""
+    padded = GOOD.replace("26.4 points", "26.6 points") + " He has the arm, the legs and the line." * 12
+
+    def answer(_request: httpx.Request) -> httpx.Response:
+        usage = {"prompt_tokens": 2000, "completion_tokens": 120, "total_tokens": 2120, "cost": 0.0004}
+        choice = {"message": {"content": answer_json(padded, "start")}, "finish_reason": "stop"}
+        return httpx.Response(200, json={"choices": [choice], "usage": usage})
+
+    gateway = replace(GatewayClient("test-key", httpx.Client(transport=httpx.MockTransport(answer))), concurrency=1)
+    result = write_week_read(allen(), gateway)
+    assert result.source == "facts"
+    assert result.attempts[-1].violations[0].startswith("Word count")
+    assert result.fallback is not None and result.fallback.startswith(f'failed validation: {FIGURE_OFF_PAGE}: "26.6"')
 
 
 def test_the_nightlys_fallback_reason_names_the_guard() -> None:

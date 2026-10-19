@@ -18,6 +18,7 @@ from research.capsules.facts_block import FACTS_SOURCE
 from research.capsules.gateway import GatewayClient, GenerationError
 from research.capsules.gateway_ledger import Usage, add_usage
 from research.capsules.generate import BUDGET_SPENT, THROTTLED, ask, gateway_failure
+from research.capsules.page_figures import fallback_violation
 from research.capsules.rule_notes import notes_of
 from research.capsules.store import WRITTEN_SOURCE
 from research.capsules.week.judge import (
@@ -154,5 +155,7 @@ def write_week_read(
             return WeekReadResult(text, WRITTEN_SOURCE, answer.call, gateway.model, usage, calls, tuple(attempts), None)
         ledger = notes_of([(attempt.body, attempt.violations) for attempt in attempts])
         user = week_correction(sheet, text, ledger, avoid)
-    first = attempts[-1].violations[0] if attempts and attempts[-1].violations else "no answer was written"
+    first = (
+        fallback_violation(attempts[-1].violations) if attempts and attempts[-1].violations else "no answer was written"
+    )
     return _facts(sheet, usage, made(), attempts, f"failed validation: {first}")

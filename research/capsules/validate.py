@@ -288,8 +288,8 @@ def _grounding_violations(text: str, source: Grounding) -> list[str]:
     printed = prompt_numbers(source.prompt_text)
     ledger = [*source.number_ledger, *printed]
     off_page = figure_violations(text, source.prompt_text, exact=source.exact_figures)
-    named = {violation.split('"')[1] for violation in off_page}
-    violations = off_page + [
+    named = {refusal.raw for refusal in off_page}
+    violations = [refusal.message for refusal in off_page] + [
         f'The number "{raw}" does not trace to any supplied fact.'
         for raw, value in extract_numbers(text)
         if raw not in named and not is_derived_from_ledger(value, ledger) and not is_loose_reading_of(value, printed)

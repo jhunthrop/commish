@@ -18,6 +18,7 @@ correction and the nightly's fallback line say what the page prints.
 
 import re
 from collections.abc import Sequence
+from dataclasses import dataclass
 from typing import Final
 
 from research.capsules.grounding import extract_numbers, prompt_numbers
@@ -63,24 +64,40 @@ def _nearest(value: float, printed: Sequence[float]) -> str:
     return f"the sheet prints {js_string(near)}"
 
 
-def figure_violations(text: str, sheet: str, *, exact: bool) -> list[str]:
+@dataclass(frozen=True, slots=True)
+class FigureRefusal:
+    """A figure the guard refused: as the prose wrote it, and the violation handed back to the writer."""
+
+    raw: str
+    message: str
+
+
+def figure_violations(text: str, sheet: str, *, exact: bool) -> tuple[FigureRefusal, ...]:
     """Each figure in `text` the page does not print: one to two or more decimals the sheet does not
     print, and, `exact`, any decimal figure the sheet does not print."""
     printed = sorted({abs(value) for value in prompt_numbers(sheet)})
     held = set(printed)
-    violations: list[str] = []
+    refused: list[FigureRefusal] = []
     for raw, value in extract_numbers(text):
         places = _DECIMALS.search(raw)
         if places is None or abs(value) in held:
             continue
         if exact:
-            violations.append(
-                f'{FIGURE_OFF_PAGE}: "{raw}", where {_nearest(abs(value), printed)}. '
-                "Quote each figure exactly as the sheet prints it."
-            )
+            message = f'{FIGURE_OFF_PAGE}: "{raw}", where {_nearest(abs(value), printed)}.'
         elif len(places.group(1)) > 1:
-            violations.append(
+            message = (
                 f'{FIGURE_OFF_PAGE}: "{raw}" carries more decimals than the page prints, where '
-                f"{_nearest(abs(value), printed)}. Quote each figure exactly as the sheet prints it."
+                f"{_nearest(abs(value), printed)}."
             )
-    return violations
+        else:
+            continue
+        refused.append(FigureRefusal(raw, f"{message} Quote each figure exactly as the sheet prints it."))
+    return tuple(refused)
+
+
+def fallback_violation(violations: Sequence[str]) -> str:
+    """The violation a read that fell is said to have fallen for: the figure guard's whenever the last draft
+    carried one (what the page would have misprinted), else its first (the band leads, Lane 52)."""
+    if not violations:
+        raise ValueError("a read that failed validation carries at least one violation")
+    return next((v for v in violations if v.startswith(FIGURE_OFF_PAGE)), violations[0])
