@@ -253,7 +253,22 @@ void test('the Monday after his Sunday game: kicked off, no expected score, weat
 	assert.ok(cell);
 	assert.equal(cell.when, 'Final');
 	assert.equal(cell.expected, null);
-	assert.ok(!(final.basis[1] ?? '').includes(KICKED_OFF_PART));
+	// Final the hour after, his stats not in yet: the basis says they follow.
+	assert.ok((final.basis[1] ?? '').includes(KICKED_OFF_PART));
+	// His week's stats in: nothing more to say.
+	const counted = card(
+		week(
+			{},
+			{
+				facts: facts({
+					game_state: 'final',
+					played: true,
+					last_games: [{ week: 6, points: 21 }]
+				})
+			}
+		)
+	);
+	assert.ok(!(counted.basis[1] ?? '').includes(KICKED_OFF_PART));
 });
 
 void test('with no league the basis names PPR and no league, and there is no verb', () => {

@@ -75,15 +75,23 @@ export function gamePart(
 
 export const OPP_PART = `${BOX.oppRank} is points allowed to his position, 1st fewest.`;
 
-/** When a kicked-off game's final lands (Lane 80): the weekly stats bring it, on the weekly pass's
- * Tuesday or Wednesday run (research JOBS.md, the inseason job), since the hourly capture reads no
- * game status. */
-export const KICKED_OFF_PART = `${BOX.kickedOff} turns ${BOX.final} when the week's stats are in, Tuesday or Wednesday.`;
+/** When a game's final and its stats land (Lane 80): the hourly capture reads the game's status, so
+ * it turns Final within the hour after it ends; its stats, and so Avg and Last, come with the weekly
+ * pass on Tuesday or Wednesday (research JOBS.md, the inseason job). */
+export const KICKED_OFF_PART = `${BOX.kickedOff} turns ${BOX.final} within the hour after a game ends, and its stats follow on Tuesday or Wednesday.`;
 
-/** KICKED_OFF_PART where a row's game has kicked off with no final yet, else null. */
+/** KICKED_OFF_PART where a row's game has kicked off with no final yet, or is final with the week's
+ * stats not in his games yet; else null. */
 export function kickedOffPart(lines: readonly PlayerLine[], now: number): string | null {
-	const kicked = lines.some(({ facts }) => !facts.bye && gameStateOf(facts, now) === 'kicked_off');
-	return kicked ? KICKED_OFF_PART : null;
+	const waiting = lines.some(({ facts }) => {
+		if (facts.bye) return false;
+		const state = gameStateOf(facts, now);
+		return (
+			state === 'kicked_off' ||
+			(state === 'final' && !facts.last_games.some((game) => game.week === facts.week))
+		);
+	});
+	return waiting ? KICKED_OFF_PART : null;
 }
 
 /** Avg and Last where a page says what they are (the player card): in the scoring the rows are in. */

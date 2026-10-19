@@ -154,7 +154,8 @@ void test("the Monday after: the API's kicked-off rows say Kicked off, and the b
 		said.some((p) => p.text === KICKED_OFF_PART && !p.phone),
 		text(said)
 	);
-	assert.ok(!text(weekBasis(advice, VISITOR, ZONE, SATURDAY)).includes(KICKED_OFF_PART));
+	// Saturday: Thursday's games are final, their kickers' stats not in yet, so the basis says they follow.
+	assert.ok(text(weekBasis(advice, VISITOR, ZONE, SATURDAY)).includes(KICKED_OFF_PART));
 });
 
 void test('the projection is in once a row has a Proj, and not before', () => {
@@ -175,7 +176,8 @@ void test("a visitor's kickers' basis: the order with the model we lack, Opp ran
 		"Kickers are in order of Proj, this week's published projection in PPR scoring, read Fri 9:00 pm Central, as we have no kicker model of our own. " +
 			'Opp rank is points allowed to kickers this season, 1st the fewest. ' +
 			'Avg and Last are his points a game and last game, in PPR. ' +
-			"Game is each club's expected points, his first, and the kickoff weather, read Fri 4:01 pm Central."
+			"Game is each club's expected points, his first, and the kickoff weather, read Fri 4:01 pm Central. " +
+			KICKED_OFF_PART
 	);
 });
 
@@ -183,7 +185,7 @@ void test("a member's defenses' basis: its default scoring, the league's own poi
 	const basis = weekBasis(fixture.read.DEF, ESPN, ZONE, SATURDAY);
 	assert.deepEqual(
 		basis.map((p) => p.phone),
-		[true, true, true, true, false]
+		[true, true, true, true, false, false]
 	);
 	const said = text(basis);
 	assert.match(
