@@ -269,7 +269,12 @@
 			? [
 					standingsBasis(sync.host, sync.terms),
 					scoreboard
-						? teamBasis(sync.host, scoreboard.projection_read_at, scoreboard.projection_scoring)
+						? teamBasis(
+								sync.host,
+								scoreboard.projection_read_at,
+								scoreboard.projection_scoring,
+								advice?.player_points ?? false
+							)
 						: null,
 					// The season panel names the zone once, so the read's time does not repeat it.
 					advice

@@ -3395,13 +3395,21 @@ components:
       required: [player, points]
       properties:
         player: { $ref: "#/components/schemas/LeaguePlayer" }
-        points: { type: number, format: double, description: his points so far this week }
+        points:
+          type: number
+          format: double
+          nullable: true
+          description: >-
+            his points so far this week; null where the side's player_points is false or the platform's read left
+            him out (an ESPN starter kicked off and missing from its period roster)
     MatchupSide:
       type: object
-      required: [roster_id, points, points_read, starters]
+      required: [roster_id, points, points_read, player_points, team_total, starters]
       properties:
         roster_id: { type: integer }
         points: { type: number, format: double }
+        player_points: { type: boolean, description: "as MatchupBoxSide's: the platform gives each player's points" }
+        team_total: { type: boolean, description: "as MatchupBoxSide's: the platform sends the side's own total" }
         points_read:
           type: boolean
           description: >-
@@ -3698,8 +3706,9 @@ components:
         player_points:
           type: boolean
           description: >-
-            the host gives each player's points (Sleeper, MFL); false where it gives each team's total alone (ESPN,
-            Yahoo, FFPC), so a player's points_this_week stay null and the team's total is team_points
+            the host gives each player's points (Sleeper, MFL, ESPN); false where it gives each team's total alone
+            (Yahoo, FFPC) or its read carried no player's, so a player's points_this_week stay null and the team's
+            total is team_points
         team_points:
           type: number
           format: double
@@ -3778,12 +3787,17 @@ components:
         line: { $ref: "#/components/schemas/PlayerLine" }
     MatchupBoxSide:
       type: object
-      required: [roster_id, player_points, starters, bench]
+      required: [roster_id, player_points, team_total, starters, bench]
       properties:
         roster_id: { type: integer }
         player_points:
           type: boolean
           description: the host gives each player's points for this side; false where it gives the side's total alone
+        team_total:
+          type: boolean
+          description: >-
+            the platform sends the side's own total (ESPN, Yahoo, FFPC), so the score and the Totals row print it;
+            false where it sends each player's points alone (Sleeper, MFL), so both print the rows' sum
         starters:
           type: array
           description: >-

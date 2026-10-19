@@ -1,21 +1,21 @@
 <script lang="ts">
 	import BasisBlock from '#lib/ui/BasisBlock.svelte';
-	import { onMount } from 'svelte';
 	import { siteContext } from '#lib/context/context.svelte.ts';
 	import ContextNote from '#lib/context/ContextNote.svelte';
-	import { liveStatusClock, type LiveStatus } from '#lib/run/live-status.ts';
 	import {
 		RECORD_BOX,
 		RECORD_FIGURES,
-		RECORD_SOURCES,
 		allLine,
 		chartSeries,
 		figureWords,
 		gradedOrders,
 		publishedBeside,
+		publishedDrawn,
 		ORDER_WORDS,
-		publishedWords,
+		recordBasis,
 		recordHeadline,
+		recordLead,
+		recordSources,
 		scaleWords,
 		scoreOf,
 		weekLines,
@@ -75,41 +75,17 @@
 	const capitalized = (words: string): string =>
 		`${words.charAt(0).toUpperCase()}${words.slice(1)}`;
 
-	/** The capture's read as built, said again on the member's clock once the page is live. */
-	let live = $state<LiveStatus | null>(null);
-	onMount(() => {
-		liveStatusClock(
-			data.page.capture !== null,
-			() => import('#lib/run/status-view.ts'),
-			(said) => {
-				live = said;
-			}
-		);
-	});
-	const statusWords = $derived.by(() => {
-		const clock = live;
-		const capture = data.page.capture;
-		return clock === null || capture === null
-			? data.page.statusWords
-			: clock.words.recordStatusWords({
-					capture,
-					restOfSeason: false,
-					zone: clock.zone,
-					now: clock.now
-				});
-	});
-	const basis = $derived(
-		[record.method, statusWords, record.startersBasis, publishedWords(record)].flatMap((text) =>
-			text === null || text === '' ? [] : [{ text, phone: true }]
-		)
-	);
+	/** The orders drawn: Published only once a graded week carries it (the honest empty state). */
+	const sources = $derived(recordSources(record));
+	const showPublished = $derived(publishedDrawn(record));
+	const basis = $derived(recordBasis(record).map((text) => ({ text, phone: true })));
 
-	const COLUMNS = 2 + RECORD_FIGURES.length * RECORD_SOURCES.length + 1;
+	const columns = $derived(2 + RECORD_FIGURES.length * sources.length + 1);
 </script>
 
 {#snippet cells(line: RecordLine | undefined)}
 	{#each RECORD_FIGURES as f (f)}
-		{#each RECORD_SOURCES as source (source)}
+		{#each sources as source (source)}
 			{#if source === 'published'}
 				{@const beside = publishedBeside(line, f)}
 				<td class="n m {f} {source}"
@@ -124,10 +100,7 @@
 
 <SiteShell title="Our record" run={data.run}>
 	<main class="record">
-		<PageHead
-			title="Our record"
-			lead="How the order we froze each week called its games, beside ADP and a published projection, graded in {scoring}"
-		/>
+		<PageHead title="Our record" lead={recordLead(record, scoring)} />
 		<ContextNote {note} />
 
 		{#if toDateAll}
@@ -144,10 +117,10 @@
 							<span class="vals"
 								><b>{figureWords(scoreOf(toDateAll, 'ours'), f)}</b><span
 									>{RECORD_BOX.adp} {figureWords(scoreOf(toDateAll, 'adp'), f)}</span
-								><span
-									>{RECORD_BOX.published}
-									{beside.published}{#if beside.ours}, {beside.ours.toLowerCase()}{/if}</span
-								></span
+								>{#if showPublished}<span
+										>{RECORD_BOX.published}
+										{beside.published}{#if beside.ours}, {beside.ours.toLowerCase()}{/if}</span
+									>{/if}</span
 							>
 						</div>
 					{/each}
@@ -185,8 +158,7 @@
 				<tr class="grp">
 					<th colspan="2"></th>
 					{#each RECORD_FIGURES as f (f)}
-						<th class="g {f}" colspan={RECORD_SOURCES.length} scope="colgroup">{FIGURE_HEADS[f]}</th
-						>
+						<th class="g {f}" colspan={sources.length} scope="colgroup">{FIGURE_HEADS[f]}</th>
 					{/each}
 					<th></th>
 				</tr>
@@ -194,7 +166,7 @@
 					<th scope="col">{RECORD_BOX.week}</th>
 					<th class="n plc" scope="col">{RECORD_BOX.players}</th>
 					{#each RECORD_FIGURES as f (f)}
-						{#each RECORD_SOURCES as source (source)}
+						{#each sources as source (source)}
 							<th class="n m {f} {source}" scope="col">{SOURCE_HEADS[source]}</th>
 						{/each}
 					{/each}
@@ -221,7 +193,7 @@
 										>{ORDER_WORDS[row.week.order]}</span
 									>{/if}</td
 							>
-							<td class="st wide" colspan={COLUMNS - 1}>{capitalized(row.text)}</td>
+							<td class="st wide" colspan={columns - 1}>{capitalized(row.text)}</td>
 						</tr>
 					{/if}
 				{/each}

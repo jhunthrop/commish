@@ -37,7 +37,7 @@ import { mkdir } from 'node:fs/promises';
 import { chromium, type BrowserContext, type Page } from 'playwright';
 import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
 import { copyFault, watchData } from './copy-scan.ts';
-import { FIXTURE_WEEK_CLOCK } from './inseason-fixture/clock.ts';
+import { FIXTURE_SUNDAY_CLOCK, FIXTURE_WEEK_CLOCK } from './inseason-fixture/clock.ts';
 import { BUILDER_LINE, basisLines, basisReport } from './basis-lines.ts';
 import { UNCOUNTED_ANCHOR } from '../src/lib/league/uncounted.ts';
 import { FIXTURE_IDS } from './inseason-fixture/ids.ts';
@@ -50,6 +50,26 @@ const VIEWPORT_HEIGHT = 900;
 /** A phone's screen: the first row must clear the pinned verb in it. */
 const PHONE = { width: 390, height: 844 } as const;
 const READY_TIMEOUT_MS = 30_000;
+/** ESPN's Pts sentence now that it gives each player's points (Lane 79, basis.ts ptsPart). */
+const ESPN_PTS = "Pts are ESPN's points by player so far, and Team adds the rows.";
+/** ESPN's Matchup, whose Team is ESPN's own score (ruling (a)). */
+const ESPN_MATCHUP_PTS =
+	"Pts are ESPN's points by player so far, each to a tenth, and Team is ESPN's score.";
+/** The team-totals sentence (Lane 79 fix 6). */
+const YAHOO_PTS = "Pts are Yahoo's team points, none by player.";
+/** Sleeper's Matchup, whose Team adds the rows (ruling (a)). */
+const SLEEPER_MATCHUP_PTS = "Pts are Sleeper's points by player so far, and Team adds the rows.";
+/** The drafter's four starters under way on the Sunday, their points added (13.4, 8.1, 9.4, 8.2). */
+const SLEEPER_SUNDAY_SUM = '39.1';
+/** The Sunday's changes the engine would make: Kirk (Monday night) for Chase on bye at Flex. Dart,
+ * Etienne and the Texans, Wednesday's changes, have kicked off and are locked (re-review N2). */
+const SUNDAY_MOVES = { offered: ['Kirk'], locked: ['Dart', 'Etienne', 'Texans'] } as const;
+/** The stand-in API's ask for the recorded league as Yahoo's (yahoo.ts). */
+const YAHOO_PLATFORM = { name: 'fixture_platform', value: 'yahoo' };
+/** The stand-in API's ask for an ESPN league's Sunday afternoon (sunday.ts). */
+const SUNDAY_WEEK = { name: 'fixture_week', value: 'sunday' };
+/** The drafter's side on that Sunday as ESPN totals it (scoreboard-live.json, roster 1). */
+const ESPN_SUNDAY_TOTAL = '39.0';
 /** The CSRF cookie the site reads as signed in; the fixture API asks for nothing more. */
 const SIGNED_IN = { name: 'commish_csrf', value: 'fixture' };
 
@@ -81,7 +101,11 @@ if (fixtureClock.data?.clock !== FIXTURE_WEEK_CLOCK)
 await mkdir(out, { recursive: true });
 const browser = await chromium.launch();
 
-async function context(theme: string, width: number): Promise<BrowserContext> {
+async function context(
+	theme: string,
+	width: number,
+	clock: string = FIXTURE_WEEK_CLOCK
+): Promise<BrowserContext> {
 	const ctx = await browser.newContext({
 		viewport: { width, height: VIEWPORT_HEIGHT },
 		colorScheme: theme as 'light'
@@ -89,7 +113,7 @@ async function context(theme: string, width: number): Promise<BrowserContext> {
 	watchData(ctx);
 	// The fixture week's clock, never the day the script runs (start the fixture API with
 	// FIXTURE_CLOCK at the same instant): past its Sunday every game reads as played.
-	await ctx.clock.install({ time: new Date(FIXTURE_WEEK_CLOCK) });
+	await ctx.clock.install({ time: new Date(clock) });
 	await ctx.addCookies([{ ...SIGNED_IN, domain: 'localhost', path: '/' }]);
 	await ctx.addInitScript(
 		([key, value]: readonly [string, string]) => localStorage.setItem(key, value),
@@ -377,6 +401,11 @@ for (const { name, path, ready: text } of PAGES) {
 						: ['Slot', 'Player', 'Game', 'Proj', 'Pts'];
 				const heads = name === 'start' ? lineupHeads : boxHeads;
 				for (const word of await bannedSaid(page)) missing.push(`${at} says ${word}`);
+				// Sleeper adds its players' points: the bug and Totals one figure, the rows' sum (ruling (a)).
+				if (name === 'matchup') {
+					const { bug, row } = await bugAgainstTotals(page);
+					if (bug !== row) missing.push(`${at} the bug reads ${bug}, its Totals ${row}`);
+				}
 				if (name === 'start') {
 					for (const fault of await lineupFaults(page)) missing.push(`${at} ${fault}`);
 				}
@@ -446,8 +475,8 @@ for (const { name, path, ready: text } of PAGES) {
 	}
 }
 
-/** The bases on a platform that gives team totals alone (ESPN, Lane 66t review 2): the Lineup says
- * Pts once and still holds its budget; Waivers, which draws no Pts, holds it too. */
+/** The bases on ESPN, which gives each player's points (Lane 79): the Lineup says Pts once and still
+ * holds its budget (Lane 66t review 2); Waivers, which draws no Pts, holds it too. */
 for (const width of SHOT_WIDTHS) {
 	const ctx = await context('dark', width);
 	const page = await ctx.newPage();
@@ -466,13 +495,163 @@ for (const width of SHOT_WIDTHS) {
 			if (report.fault !== null) missing.push(report.fault);
 		}
 		const said = (await page.locator('main').textContent()) ?? '';
-		const pts = said.split("Pts are ESPN's team points").length - 1;
+		const pts = said.split(ESPN_PTS).length - 1;
 		if (screen === 'start' && pts !== 1)
 			missing.push(`${basisName} ${String(width)}: Pts said ${String(pts)} times`);
 		await page.screenshot({ path: file(`${screen}-espn-dark-${String(width)}`), fullPage: true });
 	}
 	await ctx.close();
 }
+
+/** One screen of a platform's pass: its basis name, the Pts sentence it must say once, and whether
+ * players' points must be drawn. */
+interface PlatformScreen {
+	screen: 'matchup' | 'start';
+	basisName: string;
+	sentence: string;
+	points: boolean;
+}
+
+/** The Matchup's score bug and its Totals row print one figure, the side's score (ruling (a), Lane
+ * 79): the drafter's side, bug against row. */
+async function bugAgainstTotals(page: Page): Promise<{ bug: string; row: string }> {
+	return page.evaluate(() => ({
+		bug: document.querySelector<HTMLElement>('main .bug .sd .big')?.innerText.trim() ?? '',
+		row:
+			document.querySelector<HTMLElement>('main table.box tr.totals td.pts')?.innerText.trim() ?? ''
+	}));
+}
+
+/** A platform's Matchup and Lineup in the dark at both widths (Lane 79): the Pts sentence once, the
+ * basis in budget, players' points drawn where the platform gives them, the bug and Totals one
+ * figure, and the bug at the platform's own score where `bugIs` names it. */
+async function platformPass(
+	league: string,
+	cookies: { name: string; value: string }[],
+	clock: string,
+	screens: readonly PlatformScreen[],
+	bugIs: string | null,
+	shot: string
+): Promise<void> {
+	for (const width of SHOT_WIDTHS) {
+		const ctx = await context('dark', width, clock);
+		await ctx.addCookies(cookies.map((c) => ({ ...c, domain: 'localhost', path: '/' })));
+		const page = await ctx.newPage();
+		for (const { screen, basisName, sentence, points } of screens) {
+			const at = `${basisName} ${String(width)}`;
+			await page.goto(`${web}/league/${league}/${screen}`, { waitUntil: 'networkidle' });
+			await page.locator('main [data-basis]').first().waitFor({ timeout: READY_TIMEOUT_MS });
+			await page.evaluate(() => document.fonts.ready);
+			const report = basisReport(basisName, width, await basisLines(page));
+			if (report !== null) {
+				basisCounts.push(report.line);
+				if (report.fault !== null) missing.push(report.fault);
+			}
+			const said = (await page.locator('main').textContent()) ?? '';
+			if (said.split(sentence).length - 1 !== 1) missing.push(`${at}: "${sentence}" not said once`);
+			const drawn = await page.evaluate(() =>
+				[
+					...document.querySelectorAll(
+						'main table.box tbody tr:not(.totals) td.pts, main table.lineup tbody tr:not(.totals) td.pts'
+					)
+				]
+					.map((td) => (td as HTMLElement).innerText.trim())
+					.filter((t) => /^-?\d+\.\d$/.test(t))
+			);
+			if (points !== drawn.length > 0)
+				missing.push(`${at}: ${String(drawn.length)} players' points drawn`);
+			if (screen === 'matchup') {
+				const { bug, row } = await bugAgainstTotals(page);
+				if (bug !== row) missing.push(`${at}: the bug reads ${bug}, its Totals ${row}`);
+				if (bugIs !== null && bug !== bugIs)
+					missing.push(`${at}: the bug reads ${bug}, not ${bugIs}`);
+				basisCounts.push(`${at}: bug ${bug}, Totals ${row}`);
+			}
+			await page.screenshot({
+				path: file(`${screen}-${shot}-dark-${String(width)}`),
+				fullPage: true
+			});
+		}
+		await ctx.close();
+	}
+}
+
+/** ESPN's league on its Sunday afternoon (sunday.ts): its points by player, its Matchup's bug and
+ * Totals ESPN's own score, its Lineup's Team the rows, no change offered on a locked player. */
+await platformPass(
+	FIXTURE_IDS.espnDone,
+	[SUNDAY_WEEK],
+	FIXTURE_SUNDAY_CLOCK,
+	[
+		{
+			screen: 'matchup',
+			basisName: 'matchup ESPN Sunday',
+			sentence: ESPN_MATCHUP_PTS,
+			points: true
+		},
+		{ screen: 'start', basisName: 'lineup ESPN Sunday', sentence: ESPN_PTS, points: true }
+	],
+	ESPN_SUNDAY_TOTAL,
+	'espn-sunday'
+);
+{
+	const ctx = await context('dark', 1440, FIXTURE_SUNDAY_CLOCK);
+	await ctx.addCookies([{ ...SUNDAY_WEEK, domain: 'localhost', path: '/' }]);
+	const page = await ctx.newPage();
+	await page.goto(`${web}/league/${FIXTURE_IDS.espnDone}/start`, { waitUntil: 'networkidle' });
+	await page.locator('main [data-basis]').first().waitFor({ timeout: READY_TIMEOUT_MS });
+	// A change offered on a player whose game has kicked off would be refused: ESPN locks him.
+	const moved = await page.evaluate(() =>
+		[...document.querySelectorAll('main table.lineup tbody tr')]
+			.filter((tr) => tr.querySelector('.mark.in, .mark.out') !== null)
+			.map((tr) => tr.textContent)
+	);
+	for (const row of moved)
+		if (/\bFinal\b|Sun 12:00 pm/.test(row))
+			missing.push(`ESPN Sunday Lineup moves a locked player: ${row.slice(0, 60)}`);
+	await ctx.close();
+}
+
+/** The Matchup after kickoff on the two other kinds of platform (re-review N3): Sleeper's score is
+ * its rows added (39.1, the four starters under way), Yahoo's its own total (39.0), each the bug's
+ * figure and its Totals row's. */
+await platformPass(
+	id,
+	[SUNDAY_WEEK],
+	FIXTURE_SUNDAY_CLOCK,
+	[
+		{
+			screen: 'matchup',
+			basisName: 'matchup Sleeper Sunday',
+			sentence: SLEEPER_MATCHUP_PTS,
+			points: true
+		}
+	],
+	SLEEPER_SUNDAY_SUM,
+	'sleeper-sunday'
+);
+await platformPass(
+	id,
+	[SUNDAY_WEEK, YAHOO_PLATFORM],
+	FIXTURE_SUNDAY_CLOCK,
+	[{ screen: 'matchup', basisName: 'matchup Yahoo Sunday', sentence: YAHOO_PTS, points: false }],
+	ESPN_SUNDAY_TOTAL,
+	'yahoo-sunday'
+);
+
+/** A platform that sends each team's total alone (Yahoo, yahoo.ts): its team-totals sentence once in
+ * budget, no player's points, the bug and Totals its total. */
+await platformPass(
+	id,
+	[YAHOO_PLATFORM],
+	FIXTURE_WEEK_CLOCK,
+	[
+		{ screen: 'matchup', basisName: 'matchup Yahoo', sentence: YAHOO_PTS, points: false },
+		{ screen: 'start', basisName: 'lineup Yahoo', sentence: YAHOO_PTS, points: false }
+	],
+	null,
+	'yahoo'
+);
 
 /** "Which five" lands on the league's Settings with the rules our stats lack in view (Lane 66t review
  * 4): from Waivers on a phone, the card under the top bar, five rules listed. */
@@ -1194,6 +1373,8 @@ async function leagueFaults(page: Page, lp: LeaguePage, width: number): Promise<
 				/^FAAB \$\d/.test(text(td))
 			).length,
 			basisText: basis.map((p) => text(p)).join(' '),
+			// The lineup card's changes, each a chip naming the player it starts.
+			chips: [...document.querySelectorAll('main .swaps li:not(.idle)')].map((c) => text(c)),
 			// The basis's rendered lines: each paragraph's height over its line height.
 			basisLines: basis.reduce((n, p) => {
 				const style = getComputedStyle(p);
@@ -1234,6 +1415,13 @@ async function leagueFaults(page: Page, lp: LeaguePage, width: number): Promise<
 		faults.push(`the basis draws ${String(seen.basisLines)} lines, at most ${String(most)}`);
 	if (lp.live && seen.recordedName)
 		faults.push('the ESPN stand-in names the recorded Sleeper league');
+	if (lp.live) {
+		// No move offered on a player whose game has kicked off: ESPN would refuse it.
+		for (const name of SUNDAY_MOVES.locked)
+			if (seen.chips.some((c) => c.includes(name))) faults.push(`offers a move on ${name}, locked`);
+		for (const name of SUNDAY_MOVES.offered)
+			if (!seen.chips.some((c) => c.includes(name))) faults.push(`does not offer ${name}`);
+	}
 	return faults;
 }
 
@@ -1257,7 +1445,10 @@ async function settingsFaults(page: Page, lp: LeaguePage): Promise<string[]> {
 for (const theme of THEMES) {
 	for (const width of SHOT_WIDTHS) {
 		for (const lp of LEAGUE_PAGES) {
-			const ctx = await context(theme, width);
+			const ctx = await context(theme, width, lp.live ? FIXTURE_SUNDAY_CLOCK : FIXTURE_WEEK_CLOCK);
+			// The live page is the Sunday's throughout: its scoreboard, its read and its lineup advice
+			// (re-review N2).
+			if (lp.live) await ctx.addCookies([{ ...SUNDAY_WEEK, domain: 'localhost', path: '/' }]);
 			const page = await ctx.newPage();
 			await page.goto(`${web}/league/${lp.league}`, { waitUntil: 'networkidle' });
 			await ready(page, 'Every game this week, yours first.');

@@ -182,7 +182,7 @@ func (a *advisor) build(id string, lp apitypes.LeaguePlayer, side *leaguesync.Si
 	facts := a.season.For(Player{BoardID: boardID, Team: team, Position: position, HostIR: lp.InjuredReserve, ReadAt: a.Snap.ReadAt})
 	c := Candidate{ID: id, Position: position, Rank: a.Board.PositionRanks[boardID], Tier: facts.Tier(),
 		Locked: facts.Locked, InjuredReserve: facts.InjuredReserve()}
-	line := apitypes.PlayerLine{Player: lp, Held: boardID != "" && a.held[boardID], Facts: wireFacts(facts, thisWeek(side, id, facts))}
+	line := apitypes.PlayerLine{Player: lp, Held: boardID != "" && a.held[boardID], Facts: wireFacts(facts, thisWeek(a.Snap.Ref.Host, side, id, facts))}
 	words := Line{Name: lp.Name, Position: position, Rank: c.Rank, Facts: facts}
 	if c.Rank > 0 {
 		rank := c.Rank
@@ -281,11 +281,11 @@ func (a *advisor) projectionReadAt() *time.Time {
 	return &at
 }
 
-// givesPlayerPoints is whether the host gives each player's points for the
-// side (Sleeper and MFL key every rostered player; ESPN, Yahoo and FFPC
-// give the side's total alone, review N1).
-func givesPlayerPoints(side *leaguesync.Side) bool {
-	return side != nil && len(side.PlayerPoints) > 0
+// givesPlayerPoints is whether the platform gives each player's points for
+// the side, by the one per-platform rule (leaguesync GivesPlayerPoints:
+// Sleeper, MFL and ESPN do; Yahoo and FFPC give the side's total alone).
+func (a *advisor) givesPlayerPoints(side *leaguesync.Side) bool {
+	return leaguesync.GivesPlayerPoints(a.Snap.Ref.Host, side)
 }
 
 // teamPoints is the host's points so far for the side, nil before any of
@@ -307,26 +307,21 @@ func teamPoints(side *leaguesync.Side, people []person) *float64 {
 	return nil
 }
 
-// thisWeek is the host's points for a starter whose game has kicked off,
+// thisWeek is the host's points for any rostered player of the side whose
+// game is under way or final, bench and starters alike (Lane 79 fix 3),
 // nil where the host gives no player's points.
-func thisWeek(side *leaguesync.Side, id string, f Facts) *float64 {
-	if side == nil || side.PointsUnread || !f.Locked {
+func thisWeek(host string, side *leaguesync.Side, id string, f Facts) *float64 {
+	if !leaguesync.GivesPlayerPoints(host, side) || side.PointsUnread || !f.Locked {
 		return nil
 	}
-	for _, s := range side.Starters {
-		if s != id {
-			continue
-		}
-		// A host that gives each side's total and no player's (ESPN, Yahoo,
-		// FFPC) leaves his points unknown, never 0 (Lane 66d review H1).
-		got, ok := side.PlayerPoints[id]
-		if !ok {
-			return nil
-		}
-		pts := roundTenth(got)
-		return &pts
+	// A player the read left out (ESPN's period roster, kicked off) has
+	// points unknown, never 0 (Lane 66d review H1).
+	got, ok := side.PlayerPoints[id]
+	if !ok {
+		return nil
 	}
-	return nil
+	pts := roundTenth(got)
+	return &pts
 }
 
 func wireFacts(f Facts, pointsThisWeek *float64) apitypes.WeekFacts {
@@ -457,7 +452,7 @@ func (a *advisor) Lineup() (apitypes.LineupAdvice, bool) {
 	// nothing of points a game; the page says the projection's read itself.
 	un := UncountedOf(a.settings, a.season.Carries)
 	out := apitypes.LineupAdvice{Week: h.week, Basis: LineupBasis(a.basis), BasisNote: un.Note, BasisNoteLink: un.Link, UncountedRules: un.Rules, OrderBasis: h.basis, Refreshed: h.refreshed,
-		ReadAt: h.readAt, ProjectionReadAt: a.projectionReadAt(), ProjectionPreviousReadAt: a.projectionPreviousReadAt(), ProjectionScoring: projectionScoring(a.settings, a.preset), PlayerPoints: givesPlayerPoints(mySide), TeamPoints: teamPoints(mySide, people), Set: true, Slots: []apitypes.LineupSlot{}, EmptySlots: []apitypes.LineupAdviceEmptySlots{}, Bench: []apitypes.PlayerLine{}, Reserve: a.reserve(team, mySide),
+		ReadAt: h.readAt, ProjectionReadAt: a.projectionReadAt(), ProjectionPreviousReadAt: a.projectionPreviousReadAt(), ProjectionScoring: projectionScoring(a.settings, a.preset), PlayerPoints: a.givesPlayerPoints(mySide), TeamPoints: teamPoints(mySide, people), Set: true, Slots: []apitypes.LineupSlot{}, EmptySlots: []apitypes.LineupAdviceEmptySlots{}, Bench: []apitypes.PlayerLine{}, Reserve: a.reserve(team, mySide),
 		Moves: CopyOnlyMoves(a.Snap.Ref.Host),
 	}
 	out.HostLineupUrl, out.HostNote = a.host(LineupPage)
@@ -692,7 +687,7 @@ func (a *advisor) Trades(focus string) (apitypes.TradeAdvice, bool) {
 	un := UncountedOf(a.settings, a.season.Carries)
 	out := apitypes.TradeAdvice{Week: h.week, BasisNote: un.Note, BasisNoteLink: un.Link, OrderBasis: h.basis, Refreshed: h.refreshed,
 		ReadAt: h.readAt, Teams: []apitypes.TradeTeam{}, Roster: rosterLines(mine), Moves: TradeMoves(a.Snap.Ref.Host),
-		ProjectionReadAt: a.projectionReadAt(), ProjectionScoring: projectionScoring(a.settings, a.preset), PlayerPoints: givesPlayerPoints(a.side(a.Me))}
+		ProjectionReadAt: a.projectionReadAt(), ProjectionScoring: projectionScoring(a.settings, a.preset), PlayerPoints: a.givesPlayerPoints(a.side(a.Me))}
 	out.HostTradesUrl, out.HostNote = a.host(TradesPage)
 	// Every roster the screen and its builder show, for the basis.
 	shown := [][]person{mine}

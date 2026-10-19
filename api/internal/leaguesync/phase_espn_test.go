@@ -87,3 +87,26 @@ func TestESPNSnapshotScoresTheWeekInPlay(t *testing.T) {
 		}
 	}
 }
+
+// Lane 79: mid-week each side carries its players' points for the week
+// as ESPN gives them (rosterForCurrentScoringPeriod), and the side's
+// points stay ESPN's live total, never their sum.
+func TestESPNSnapshotCarriesEachPlayersPoints(t *testing.T) {
+	snap := espnSnapshot(espnRead(t, "league-inplay-2026-week6-monday.json", 2026, nil), phaseNow)
+	s := snap.Matchups[0]
+	if s.RosterID != 9 || s.Points != 77.08 || len(s.PlayerPoints) != 17 {
+		t.Fatalf("team 9: %v points, %d players", s.Points, len(s.PlayerPoints))
+	}
+	if s.PlayerPoints["4567048"] != 27.9 || s.PlayerPoints["12483"] != 16.88 || s.PlayerPoints["3117251"] != 0 {
+		t.Fatalf("team 9's players: %v", s.PlayerPoints)
+	}
+	if !GivesPlayerPoints(HostESPN, &s) {
+		t.Fatal("an ESPN side with its players' points reads as team points alone")
+	}
+	// Lane 74's read, before ESPN carried the period's roster, has none.
+	for _, s := range espnSnapshot(espnRead(t, "league-inplay-2026-week6.json", 2026, nil), phaseNow).Matchups {
+		if s.PlayerPoints == nil || len(s.PlayerPoints) != 0 || GivesPlayerPoints(HostESPN, &s) {
+			t.Fatalf("a side with players' points from nowhere: %v", s.PlayerPoints)
+		}
+	}
+}

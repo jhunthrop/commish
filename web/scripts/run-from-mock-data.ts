@@ -618,9 +618,9 @@ async function recordFrom(
 		statistic: { agreement: 'order matched', placesOff: 'places off', starters: 'starters right' },
 		scale: "1.00 is a perfect match of the week's finishing order, 0.00 is none.",
 		startersBasis: null,
-		// The run's words (research/nightly/reads/record.py METHOD).
+		// The run's words (research/nightly/reads/record.py method, ADP alone before a graded published score).
 		method:
-			'Each week our preseason board froze before the first kickoff and was graded on how its players scored, ADP and Published on the same players.',
+			"Each week our preseason board froze before the first kickoff and was graded on its players' points, ADP on the same players.",
 		publishedFromWeek: null,
 		honest: null,
 		weeks: seasonWeeks(frozen, games, now),

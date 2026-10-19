@@ -1,0 +1,869 @@
+{
+	"season": 2026,
+	"format": "ppr-12",
+	"statistic": {
+		"agreement": "order matched",
+		"placesOff": "places off",
+		"starters": "starters right"
+	},
+	"scale": "1.00 is a perfect match of the week's finishing order, 0.00 is none.",
+	"startersBasis": "Starters right counts the week's top 12 QBs, 24 RBs, 36 WRs and 12 TEs it also put there.",
+	"method": "Each week our preseason board froze before the first kickoff and was graded on its players' points, ADP on the same players.",
+	"publishedFromWeek": 7,
+	"honest": "ADP had more of the week's starters right, 296 of 504 against our 289.",
+	"weeks": [
+		{
+			"week": 1,
+			"status": "graded",
+			"frozenAt": "2026-09-08T12:00:16.244Z",
+			"frozenBy": "2026-10-21T12-live-shape",
+			"order": "preseason",
+			"gradedAt": "2026-10-13T07:36:40.448Z",
+			"population": 341,
+			"lines": [
+				{
+					"position": "All",
+					"ours": {
+						"graded": 193,
+						"agreement": 0.5,
+						"placesOff": 43.0,
+						"starters": 50,
+						"startersOf": 84
+					},
+					"adp": {
+						"graded": 193,
+						"agreement": 0.41,
+						"placesOff": 47.9,
+						"starters": 52,
+						"startersOf": 84
+					},
+					"published": null,
+					"oursOnPublished": null
+				},
+				{
+					"position": "QB",
+					"ours": {
+						"graded": 29,
+						"agreement": 0.2,
+						"placesOff": 9.0,
+						"starters": 5,
+						"startersOf": 12
+					},
+					"adp": {
+						"graded": 29,
+						"agreement": 0.24,
+						"placesOff": 8.6,
+						"starters": 7,
+						"startersOf": 12
+					},
+					"published": null,
+					"oursOnPublished": null
+				},
+				{
+					"position": "RB",
+					"ours": {
+						"graded": 54,
+						"agreement": 0.75,
+						"placesOff": 9.1,
+						"starters": 18,
+						"startersOf": 24
+					},
+					"adp": {
+						"graded": 54,
+						"agreement": 0.77,
+						"placesOff": 8.2,
+						"starters": 19,
+						"startersOf": 24
+					},
+					"published": null,
+					"oursOnPublished": null
+				},
+				{
+					"position": "WR",
+					"ours": {
+						"graded": 84,
+						"agreement": 0.47,
+						"placesOff": 19.1,
+						"starters": 22,
+						"startersOf": 36
+					},
+					"adp": {
+						"graded": 84,
+						"agreement": 0.48,
+						"placesOff": 18.6,
+						"starters": 22,
+						"startersOf": 36
+					},
+					"published": null,
+					"oursOnPublished": null
+				},
+				{
+					"position": "TE",
+					"ours": {
+						"graded": 26,
+						"agreement": -0.01,
+						"placesOff": 8.6,
+						"starters": 5,
+						"startersOf": 12
+					},
+					"adp": {
+						"graded": 26,
+						"agreement": -0.09,
+						"placesOff": 9.3,
+						"starters": 4,
+						"startersOf": 12
+					},
+					"published": null,
+					"oursOnPublished": null
+				}
+			]
+		},
+		{
+			"week": 2,
+			"status": "graded",
+			"frozenAt": "2026-09-10T18:00:17.177Z",
+			"frozenBy": "2026-10-21T12-live-shape",
+			"order": "preseason",
+			"gradedAt": "2026-10-13T07:36:40.448Z",
+			"population": 344,
+			"lines": [
+				{
+					"position": "All",
+					"ours": {
+						"graded": 188,
+						"agreement": 0.46,
+						"placesOff": 44.3,
+						"starters": 50,
+						"startersOf": 84
+					},
+					"adp": {
+						"graded": 188,
+						"agreement": 0.32,
+						"placesOff": 51.3,
+						"starters": 52,
+						"startersOf": 84
+					},
+					"published": null,
+					"oursOnPublished": null
+				},
+				{
+					"position": "QB",
+					"ours": {
+						"graded": 27,
+						"agreement": 0.23,
+						"placesOff": 8.1,
+						"starters": 6,
+						"startersOf": 12
+					},
+					"adp": {
+						"graded": 27,
+						"agreement": 0.28,
+						"placesOff": 7.4,
+						"starters": 7,
+						"startersOf": 12
+					},
+					"published": null,
+					"oursOnPublished": null
+				},
+				{
+					"position": "RB",
+					"ours": {
+						"graded": 59,
+						"agreement": 0.64,
+						"placesOff": 11.0,
+						"starters": 16,
+						"startersOf": 24
+					},
+					"adp": {
+						"graded": 59,
+						"agreement": 0.65,
+						"placesOff": 10.9,
+						"starters": 17,
+						"startersOf": 24
+					},
+					"published": null,
+					"oursOnPublished": null
+				},
+				{
+					"position": "WR",
+					"ours": {
+						"graded": 77,
+						"agreement": 0.33,
+						"placesOff": 21.3,
+						"starters": 20,
+						"startersOf": 36
+					},
+					"adp": {
+						"graded": 77,
+						"agreement": 0.33,
+						"placesOff": 20.9,
+						"starters": 20,
+						"startersOf": 36
+					},
+					"published": null,
+					"oursOnPublished": null
+				},
+				{
+					"position": "TE",
+					"ours": {
+						"graded": 25,
+						"agreement": 0.11,
+						"placesOff": 7.6,
+						"starters": 8,
+						"startersOf": 12
+					},
+					"adp": {
+						"graded": 25,
+						"agreement": 0.05,
+						"placesOff": 7.6,
+						"starters": 8,
+						"startersOf": 12
+					},
+					"published": null,
+					"oursOnPublished": null
+				}
+			]
+		},
+		{
+			"week": 3,
+			"status": "graded",
+			"frozenAt": "2026-09-17T12:00:11.000Z",
+			"frozenBy": "2026-10-21T12-live-shape",
+			"gradedAt": "2026-10-13T07:36:40.448Z",
+			"order": "preseason",
+			"population": 333,
+			"lines": [
+				{
+					"position": "All",
+					"ours": {
+						"graded": 196,
+						"agreement": 0.52,
+						"placesOff": 42.1,
+						"starters": 48,
+						"startersOf": 84
+					},
+					"adp": {
+						"graded": 196,
+						"agreement": 0.39,
+						"placesOff": 48.8,
+						"starters": 48,
+						"startersOf": 84
+					},
+					"published": null,
+					"oursOnPublished": null
+				},
+				{
+					"position": "QB",
+					"ours": {
+						"graded": 30,
+						"agreement": 0.31,
+						"placesOff": 8.4,
+						"starters": 6,
+						"startersOf": 12
+					},
+					"adp": {
+						"graded": 30,
+						"agreement": 0.27,
+						"placesOff": 8.9,
+						"starters": 7,
+						"startersOf": 12
+					},
+					"published": null,
+					"oursOnPublished": null
+				},
+				{
+					"position": "RB",
+					"ours": {
+						"graded": 52,
+						"agreement": 0.47,
+						"placesOff": 11.2,
+						"starters": 13,
+						"startersOf": 24
+					},
+					"adp": {
+						"graded": 52,
+						"agreement": 0.36,
+						"placesOff": 12.6,
+						"starters": 12,
+						"startersOf": 24
+					},
+					"published": null,
+					"oursOnPublished": null
+				},
+				{
+					"position": "WR",
+					"ours": {
+						"graded": 78,
+						"agreement": 0.44,
+						"placesOff": 15.9,
+						"starters": 22,
+						"startersOf": 36
+					},
+					"adp": {
+						"graded": 78,
+						"agreement": 0.33,
+						"placesOff": 17.8,
+						"starters": 22,
+						"startersOf": 36
+					},
+					"published": null,
+					"oursOnPublished": null
+				},
+				{
+					"position": "TE",
+					"ours": {
+						"graded": 36,
+						"agreement": 0.38,
+						"placesOff": 7.1,
+						"starters": 7,
+						"startersOf": 12
+					},
+					"adp": {
+						"graded": 36,
+						"agreement": 0.29,
+						"placesOff": 7.6,
+						"starters": 7,
+						"startersOf": 12
+					},
+					"published": null,
+					"oursOnPublished": null
+				}
+			]
+		},
+		{
+			"week": 4,
+			"status": "graded",
+			"frozenAt": "2026-09-24T12:00:09.000Z",
+			"frozenBy": "2026-10-21T12-live-shape",
+			"gradedAt": "2026-10-13T07:36:40.448Z",
+			"order": "preseason",
+			"population": 334,
+			"lines": [
+				{
+					"position": "All",
+					"ours": {
+						"graded": 191,
+						"agreement": 0.44,
+						"placesOff": 45.6,
+						"starters": 44,
+						"startersOf": 84
+					},
+					"adp": {
+						"graded": 191,
+						"agreement": 0.36,
+						"placesOff": 50.2,
+						"starters": 47,
+						"startersOf": 84
+					},
+					"published": null,
+					"oursOnPublished": null
+				},
+				{
+					"position": "QB",
+					"ours": {
+						"graded": 29,
+						"agreement": 0.22,
+						"placesOff": 9.3,
+						"starters": 5,
+						"startersOf": 12
+					},
+					"adp": {
+						"graded": 29,
+						"agreement": 0.25,
+						"placesOff": 9.0,
+						"starters": 6,
+						"startersOf": 12
+					},
+					"published": null,
+					"oursOnPublished": null
+				},
+				{
+					"position": "RB",
+					"ours": {
+						"graded": 51,
+						"agreement": 0.41,
+						"placesOff": 12.4,
+						"starters": 12,
+						"startersOf": 24
+					},
+					"adp": {
+						"graded": 51,
+						"agreement": 0.35,
+						"placesOff": 12.9,
+						"starters": 13,
+						"startersOf": 24
+					},
+					"published": null,
+					"oursOnPublished": null
+				},
+				{
+					"position": "WR",
+					"ours": {
+						"graded": 76,
+						"agreement": 0.4,
+						"placesOff": 16.8,
+						"starters": 21,
+						"startersOf": 36
+					},
+					"adp": {
+						"graded": 76,
+						"agreement": 0.31,
+						"placesOff": 18.1,
+						"starters": 22,
+						"startersOf": 36
+					},
+					"published": null,
+					"oursOnPublished": null
+				},
+				{
+					"position": "TE",
+					"ours": {
+						"graded": 35,
+						"agreement": 0.3,
+						"placesOff": 7.8,
+						"starters": 6,
+						"startersOf": 12
+					},
+					"adp": {
+						"graded": 35,
+						"agreement": 0.27,
+						"placesOff": 7.9,
+						"starters": 6,
+						"startersOf": 12
+					},
+					"published": null,
+					"oursOnPublished": null
+				}
+			]
+		},
+		{
+			"week": 5,
+			"status": "graded",
+			"frozenAt": "2026-10-01T12:00:13.000Z",
+			"frozenBy": "2026-10-21T12-live-shape",
+			"gradedAt": "2026-10-13T07:36:40.448Z",
+			"order": "preseason",
+			"population": 335,
+			"lines": [
+				{
+					"position": "All",
+					"ours": {
+						"graded": 189,
+						"agreement": 0.55,
+						"placesOff": 40.8,
+						"starters": 50,
+						"startersOf": 84
+					},
+					"adp": {
+						"graded": 189,
+						"agreement": 0.41,
+						"placesOff": 47.5,
+						"starters": 49,
+						"startersOf": 84
+					},
+					"published": null,
+					"oursOnPublished": null
+				},
+				{
+					"position": "QB",
+					"ours": {
+						"graded": 28,
+						"agreement": 0.35,
+						"placesOff": 8.0,
+						"starters": 7,
+						"startersOf": 12
+					},
+					"adp": {
+						"graded": 28,
+						"agreement": 0.3,
+						"placesOff": 8.5,
+						"starters": 6,
+						"startersOf": 12
+					},
+					"published": null,
+					"oursOnPublished": null
+				},
+				{
+					"position": "RB",
+					"ours": {
+						"graded": 50,
+						"agreement": 0.5,
+						"placesOff": 10.9,
+						"starters": 14,
+						"startersOf": 24
+					},
+					"adp": {
+						"graded": 50,
+						"agreement": 0.38,
+						"placesOff": 12.1,
+						"starters": 13,
+						"startersOf": 24
+					},
+					"published": null,
+					"oursOnPublished": null
+				},
+				{
+					"position": "WR",
+					"ours": {
+						"graded": 76,
+						"agreement": 0.47,
+						"placesOff": 15.2,
+						"starters": 23,
+						"startersOf": 36
+					},
+					"adp": {
+						"graded": 76,
+						"agreement": 0.35,
+						"placesOff": 17.0,
+						"starters": 24,
+						"startersOf": 36
+					},
+					"published": null,
+					"oursOnPublished": null
+				},
+				{
+					"position": "TE",
+					"ours": {
+						"graded": 35,
+						"agreement": 0.41,
+						"placesOff": 6.8,
+						"starters": 6,
+						"startersOf": 12
+					},
+					"adp": {
+						"graded": 35,
+						"agreement": 0.33,
+						"placesOff": 7.3,
+						"starters": 6,
+						"startersOf": 12
+					},
+					"published": null,
+					"oursOnPublished": null
+				}
+			]
+		},
+		{
+			"week": 6,
+			"status": "graded",
+			"frozenAt": "2026-10-08T12:00:10.000Z",
+			"frozenBy": "2026-10-21T12-live-shape",
+			"gradedAt": "2026-10-21T07:40:02.118Z",
+			"order": "preseason",
+			"population": 336,
+			"lines": [
+				{
+					"position": "All",
+					"ours": {
+						"graded": 187,
+						"agreement": 0.49,
+						"placesOff": 43.9,
+						"starters": 47,
+						"startersOf": 84
+					},
+					"adp": {
+						"graded": 187,
+						"agreement": 0.38,
+						"placesOff": 49.0,
+						"starters": 48,
+						"startersOf": 84
+					},
+					"published": null,
+					"oursOnPublished": null
+				},
+				{
+					"position": "QB",
+					"ours": {
+						"graded": 28,
+						"agreement": 0.28,
+						"placesOff": 8.8,
+						"starters": 6,
+						"startersOf": 12
+					},
+					"adp": {
+						"graded": 28,
+						"agreement": 0.26,
+						"placesOff": 8.7,
+						"starters": 6,
+						"startersOf": 12
+					},
+					"published": null,
+					"oursOnPublished": null
+				},
+				{
+					"position": "RB",
+					"ours": {
+						"graded": 49,
+						"agreement": 0.45,
+						"placesOff": 11.8,
+						"starters": 13,
+						"startersOf": 24
+					},
+					"adp": {
+						"graded": 49,
+						"agreement": 0.37,
+						"placesOff": 12.4,
+						"starters": 13,
+						"startersOf": 24
+					},
+					"published": null,
+					"oursOnPublished": null
+				},
+				{
+					"position": "WR",
+					"ours": {
+						"graded": 75,
+						"agreement": 0.43,
+						"placesOff": 16.1,
+						"starters": 22,
+						"startersOf": 36
+					},
+					"adp": {
+						"graded": 75,
+						"agreement": 0.34,
+						"placesOff": 17.5,
+						"starters": 23,
+						"startersOf": 36
+					},
+					"published": null,
+					"oursOnPublished": null
+				},
+				{
+					"position": "TE",
+					"ours": {
+						"graded": 35,
+						"agreement": 0.36,
+						"placesOff": 7.4,
+						"starters": 6,
+						"startersOf": 12
+					},
+					"adp": {
+						"graded": 35,
+						"agreement": 0.3,
+						"placesOff": 7.7,
+						"starters": 6,
+						"startersOf": 12
+					},
+					"published": null,
+					"oursOnPublished": null
+				}
+			]
+		},
+		{
+			"week": 7,
+			"status": "frozen",
+			"frozenAt": "2026-10-21T11:00:08.000Z",
+			"frozenBy": "2026-10-21T12-live-shape",
+			"gradedAt": null,
+			"order": "preseason",
+			"population": 0,
+			"lines": []
+		},
+		{
+			"week": 8,
+			"status": "upcoming",
+			"frozenAt": "2026-10-30T00:15:00.000Z",
+			"frozenBy": null,
+			"order": null,
+			"gradedAt": null,
+			"population": 0,
+			"lines": []
+		},
+		{
+			"week": 9,
+			"status": "upcoming",
+			"frozenAt": "2026-11-06T01:15:00.000Z",
+			"frozenBy": null,
+			"order": null,
+			"gradedAt": null,
+			"population": 0,
+			"lines": []
+		},
+		{
+			"week": 10,
+			"status": "upcoming",
+			"frozenAt": "2026-11-13T01:15:00.000Z",
+			"frozenBy": null,
+			"order": null,
+			"gradedAt": null,
+			"population": 0,
+			"lines": []
+		},
+		{
+			"week": 11,
+			"status": "upcoming",
+			"frozenAt": "2026-11-20T01:15:00.000Z",
+			"frozenBy": null,
+			"order": null,
+			"gradedAt": null,
+			"population": 0,
+			"lines": []
+		},
+		{
+			"week": 12,
+			"status": "upcoming",
+			"frozenAt": "2026-11-26T01:00:00.000Z",
+			"frozenBy": null,
+			"order": null,
+			"gradedAt": null,
+			"population": 0,
+			"lines": []
+		},
+		{
+			"week": 13,
+			"status": "upcoming",
+			"frozenAt": "2026-12-04T01:15:00.000Z",
+			"frozenBy": null,
+			"order": null,
+			"gradedAt": null,
+			"population": 0,
+			"lines": []
+		},
+		{
+			"week": 14,
+			"status": "upcoming",
+			"frozenAt": "2026-12-11T01:15:00.000Z",
+			"frozenBy": null,
+			"order": null,
+			"gradedAt": null,
+			"population": 0,
+			"lines": []
+		},
+		{
+			"week": 15,
+			"status": "upcoming",
+			"frozenAt": "2026-12-18T01:15:00.000Z",
+			"frozenBy": null,
+			"order": null,
+			"gradedAt": null,
+			"population": 0,
+			"lines": []
+		},
+		{
+			"week": 16,
+			"status": "upcoming",
+			"frozenAt": "2026-12-25T01:15:00.000Z",
+			"frozenBy": null,
+			"order": null,
+			"gradedAt": null,
+			"population": 0,
+			"lines": []
+		},
+		{
+			"week": 17,
+			"status": "upcoming",
+			"frozenAt": "2027-01-01T01:15:00.000Z",
+			"frozenBy": null,
+			"order": null,
+			"gradedAt": null,
+			"population": 0,
+			"lines": []
+		},
+		{
+			"week": 18,
+			"status": "upcoming",
+			"frozenAt": "2027-01-10T18:00:00.000Z",
+			"frozenBy": null,
+			"order": null,
+			"gradedAt": null,
+			"population": 0,
+			"lines": []
+		}
+	],
+	"toDate": [
+		{
+			"position": "All",
+			"ours": {
+				"graded": 214,
+				"agreement": 0.49,
+				"placesOff": 43.3,
+				"starters": 289,
+				"startersOf": 504
+			},
+			"adp": {
+				"graded": 214,
+				"agreement": 0.38,
+				"placesOff": 49.1,
+				"starters": 296,
+				"startersOf": 504
+			},
+			"published": null,
+			"oursOnPublished": null
+		},
+		{
+			"position": "QB",
+			"ours": {
+				"graded": 33,
+				"agreement": 0.27,
+				"placesOff": 8.6,
+				"starters": 35,
+				"startersOf": 72
+			},
+			"adp": {
+				"graded": 33,
+				"agreement": 0.27,
+				"placesOff": 8.5,
+				"starters": 39,
+				"startersOf": 72
+			},
+			"published": null,
+			"oursOnPublished": null
+		},
+		{
+			"position": "RB",
+			"ours": {
+				"graded": 58,
+				"agreement": 0.54,
+				"placesOff": 11.1,
+				"starters": 86,
+				"startersOf": 144
+			},
+			"adp": {
+				"graded": 58,
+				"agreement": 0.48,
+				"placesOff": 11.5,
+				"starters": 87,
+				"startersOf": 144
+			},
+			"published": null,
+			"oursOnPublished": null
+		},
+		{
+			"position": "WR",
+			"ours": {
+				"graded": 86,
+				"agreement": 0.42,
+				"placesOff": 17.4,
+				"starters": 130,
+				"startersOf": 216
+			},
+			"adp": {
+				"graded": 86,
+				"agreement": 0.36,
+				"placesOff": 18.3,
+				"starters": 133,
+				"startersOf": 216
+			},
+			"published": null,
+			"oursOnPublished": null
+		},
+		{
+			"position": "TE",
+			"ours": {
+				"graded": 37,
+				"agreement": 0.26,
+				"placesOff": 7.6,
+				"starters": 38,
+				"startersOf": 72
+			},
+			"adp": {
+				"graded": 37,
+				"agreement": 0.19,
+				"placesOff": 7.9,
+				"starters": 37,
+				"startersOf": 72
+			},
+			"published": null,
+			"oursOnPublished": null
+		}
+	]
+}

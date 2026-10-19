@@ -9,9 +9,14 @@ export const FIXTURE_WEEK_CLOCK = '2026-10-17T17:00:00.000Z';
  * game still to be played (Lane 66w's honest empty state). */
 export const FIXTURE_UNREAD_CLOCK = '2026-10-13T17:00:00.000Z';
 
-/** Sunday Oct 18 2026, 2:00 pm Central (Lane 80): the noon games under way (kicked off, no final),
- * London's and Thursday's final by the hourly status (data/game-status.json), the late games ahead. */
-export const FIXTURE_SUNDAY_CLOCK = '2026-10-18T19:00:00.000Z';
+/** The week's Sunday stand-in read (sunday.ts): 1:52 pm Central, the noon games in their fourth
+ * quarter, the late games still to kick off. */
+export const FIXTURE_SUNDAY_READ = '2026-10-18T18:52:00.000Z';
+
+/** The browser's clock for a shot of that Sunday (Lane 79): four minutes after its read, as the
+ * stand-in API's reads are four minutes old. Lane 80's Sunday too: the noon games kicked off with no
+ * final, London's and Thursday's final by the hourly status (data/game-status.json). */
+export const FIXTURE_SUNDAY_CLOCK = '2026-10-18T18:56:00.000Z';
 
 /** Monday Oct 19 2026, 11:00 am Central (Lane 80): every Sunday game final by the hourly status, their
  * stats not in yet, Monday night's ahead. */
