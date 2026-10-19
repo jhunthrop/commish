@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import {
 		RECORD_BOX,
 		RECORD_SOURCES,
@@ -22,7 +23,13 @@
 	const HEIGHT = 230;
 	const PAD = { left: 44, right: 72, top: 14, bottom: 28 };
 	/** The drawing is sized to its column (Lane 82), so a phone's labels print at their own size. */
+	let figure = $state<HTMLElement | null>(null);
 	let measured = $state(0);
+	/** Read on mount and on a resize, with no size observer in the page's first script. */
+	const measure = (): void => {
+		measured = figure?.clientWidth ?? 0;
+	};
+	onMount(measure);
 	const width = $derived(measured > 0 ? Math.min(WIDE, measured) : WIDE);
 	const drawnSources = $derived(
 		RECORD_SOURCES.filter((source) => (series[source]?.length ?? 0) > 0)
@@ -66,7 +73,9 @@
 	});
 </script>
 
-<figure class="chart" bind:clientWidth={measured}>
+<svelte:window onresize={measure} />
+
+<figure class="chart" bind:this={figure}>
 	<figcaption>{RECORD_BOX.chart}</figcaption>
 	<svg viewBox="0 0 {width} {HEIGHT}" role="img" aria-label={RECORD_BOX.chart}>
 		{#each ticks as tick (tick.value)}
