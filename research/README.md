@@ -269,14 +269,14 @@ total counts each tested table per pass and each prerequisite table once, at its
 | nflverse-universe | rerun | players 24,853 | 0 |
 | nflverse-universe | prior | players 58 | 0 |
 | nflverse-universe | later | players 24,853 | 0 |
-| nflverse-season-2024 | first | players 24,853 (setup); player_week_observations 151,240; player_week_teams 7,551; team_week_observations 1,056 | 0 |
-| nflverse-season-2024 | rerun | players 24,853 (setup); player_week_observations 151,240; player_week_teams 7,551; team_week_observations 1,056 | 0 |
-| nflverse-season-2024 | prior | players 58 (setup); player_week_observations 898; player_week_teams 44; team_week_observations 5 | 0 |
-| nflverse-season-2024 | later | players 24,853 (setup); player_week_observations 151,590; player_week_teams 7,551; team_week_observations 1,056 | 0 |
+| nflverse-season-2024 | first | players 24,853 (setup); player_week_observations 151,240; player_week_teams 7,551; team_week_observations 1,600 | 0 |
+| nflverse-season-2024 | rerun | players 24,853 (setup); player_week_observations 151,240; player_week_teams 7,551; team_week_observations 1,600 | 0 |
+| nflverse-season-2024 | prior | players 58 (setup); player_week_observations 898; player_week_teams 44; team_week_observations 549 | 0 |
+| nflverse-season-2024 | later | players 24,853 (setup); player_week_observations 151,590; player_week_teams 7,551; team_week_observations 1,600 | 0 |
 | nflverse-season-2012 | first | players 24,853 (setup); player_week_observations 10,696; player_week_teams 764 | 0 |
 | nflverse-season-2012 | rerun | players 24,853 (setup); player_week_observations 10,696; player_week_teams 764 | 0 |
-| nflverse-season-2025 | first | players 24,853 (setup); player_week_observations 1,954; player_week_teams 977; team_week_observations 132 | 0 |
-| nflverse-season-2025 | rerun | players 24,853 (setup); player_week_observations 1,954; player_week_teams 977; team_week_observations 132 | 0 |
+| nflverse-season-2025 | first | players 24,853 (setup); player_week_observations 1,954; player_week_teams 977; team_week_observations 676 | 0 |
+| nflverse-season-2025 | rerun | players 24,853 (setup); player_week_observations 1,954; player_week_teams 977; team_week_observations 676 | 0 |
 | nflverse-schedule | first | team_week_observations 20,272 | 0 |
 | nflverse-schedule | rerun | team_week_observations 20,272 | 0 |
 | nflverse-game-results | first | team_week_observations 1,788 | 0 |
