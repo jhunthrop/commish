@@ -10,6 +10,7 @@ from research.capsules.page_figures import (
     page_tenth_text,
     projection_tenth,
 )
+from research.capsules.pull_figures import PullFigure, figure_matches_value, renderings_of
 
 
 def test_a_figure_prints_to_the_tenth_by_the_sites_one_rule() -> None:
@@ -30,6 +31,15 @@ def test_the_games_expected_score_is_in_half_points_the_opponents_from_the_total
     # Allen's game: his club 29.3 of a 53.6 total, which the card prints "29.5 to 24".
     assert expected_score(29.3, 53.6) == (29.5, 24.0)
     assert expected_score(32.5, 52.5) == (32.5, 20.0)
+
+
+def test_a_pull_figure_is_the_tenth_the_page_prints_on_a_tie() -> None:
+    """The board row prints 9.45 as 9.5 (the run's tenth), so the gate and the writer count "9.5", never
+    toFixed's "9.4"."""
+    assert renderings_of(9.45) == ["9.5"]
+    assert renderings_of(26.45) == ["26.5", "26"]
+    assert figure_matches_value(PullFigure("9.5", "projected points", 9.45, ""))
+    assert not figure_matches_value(PullFigure("9.4", "projected points", 9.45, ""))
 
 
 _SHEET = "Week by week: week 3 of 2026, played, 17.5 points. week 4 of 2026, played, 18.5 points. Time to throw: 2.85 seconds."
