@@ -175,33 +175,10 @@ func NewSeason(d Data, rules Rules, week int, now time.Time) *Season {
 	return s
 }
 
-// playedFromLines is the season's games under the one rule every screen
-// reads (the ruling on the sweep's X3): a club's game is final once the
-// store holds its result or a line from either side of it, as the run's
-// game log counts a week played by its line. The weekly stats are
-// published only after a game ends, so a line never comes from a game in
-// progress; the result can land a pass later. A new slice: the read's own
-// is left as it was.
-func playedFromLines(games []boards.TeamWeek, lines []boards.StatLine) []boards.TeamWeek {
-	lined := map[teamWeek]bool{}
-	for _, l := range lines {
-		if l.Team != "" {
-			lined[teamWeek{l.Week, l.Team}] = true
-		}
-	}
-	out := make([]boards.TeamWeek, len(games))
-	for i, g := range games {
-		g.Final = g.Final || lined[teamWeek{g.Week, g.Team}] || lined[teamWeek{g.Week, g.Opponent}]
-		out[i] = g
-	}
-	return out
-}
-
 // gameStateAt is a game's state at now, the one rule every screen reads
-// (Lane 80): final once the store holds its result or a line from either
-// side (playedFromLines), kicked off from its kickoff until then, upcoming
-// before. A kicked-off game stays so until the final lands, which the weekly
-// stats bring the morning after a Sunday or Monday game.
+// (Lane 80): final once the store's club_week_finals view holds either
+// club's result, hourly status final or line (boards.Schedule), kicked off
+// from its kickoff until then, upcoming before.
 func gameStateAt(g boards.TeamWeek, now time.Time) apitypes.GameState {
 	switch {
 	case g.Final:

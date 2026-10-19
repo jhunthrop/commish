@@ -81,7 +81,7 @@ func (c *Cache) Data(ctx context.Context, season int) (Data, error) {
 	if err != nil {
 		return Data{}, err
 	}
-	return Data{Lines: lines, Games: playedFromLines(games, lines), Designations: designations, GameFacts: gameFacts}, nil
+	return Data{Lines: lines, Games: games, Designations: designations, GameFacts: gameFacts}, nil
 }
 
 // Projection is the week's published projection, kept for CaptureTTL:

@@ -72,6 +72,7 @@ func weekFactsSchema(t *testing.T, pool *pgxpool.Pool, schema string) {
 		}
 	}
 	t.Cleanup(func() { _, _ = pool.Exec(context.Background(), `drop schema if exists `+schema+` cascade`) })
+	createFinalsView(t, pool, schema)
 }
 
 func TestWeekFactReads(t *testing.T) {
@@ -131,12 +132,13 @@ func TestWeekFactReads(t *testing.T) {
 	if bills.Opponent != "LAR" || bills.Home || !bills.Final || !bills.Kickoff.Equal(time.Date(2026, 9, 13, 20, 25, 0, 0, time.UTC)) {
 		t.Fatalf("Buffalo's week 1 %+v (the schedule's 4:25 Eastern, no kickoff observation of its own)", bills)
 	}
-	// The hourly capture's status (Lane 80): a final is final the hour after; a game under way is not.
+	// The one rule's view (Lane 80): Buffalo final by its line and the hourly status.
 	if buf := byKey["2|BUF"]; !buf.Final {
-		t.Fatalf("Buffalo's week 2 %+v: the hourly status says final", buf)
+		t.Fatalf("Buffalo's week 2 %+v: final by its line and the hourly status", buf)
 	}
-	if mia := byKey["2|MIA"]; mia.Final || mia.Opponent != "BUF" || !mia.Kickoff.Equal(time.Date(2026, 9, 20, 4, 0, 0, 0, time.UTC)) {
-		t.Fatalf("Miami's week 2 %+v: TBD reads as the start of the day", mia)
+	// Either club's final is the game's: Miami's own status says under way, Buffalo's says final.
+	if mia := byKey["2|MIA"]; !mia.Final || mia.Opponent != "BUF" || !mia.Kickoff.Equal(time.Date(2026, 9, 20, 4, 0, 0, 0, time.UTC)) {
+		t.Fatalf("Miami's week 2 %+v: TBD reads as the start of the day, final by its opponent", mia)
 	}
 
 	d, err := src.Designations(ctx)
