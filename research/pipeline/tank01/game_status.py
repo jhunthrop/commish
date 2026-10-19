@@ -4,9 +4,10 @@ The weekly pass brings a game's result with the week's stats on Tuesday or Wedne
 screens could only say a game had kicked off. The hourly capture now asks Tank01's week of games
 (`getNFLGamesForWeek`, whose `gameStatus` says Scheduled, live or Final) once a pass, and only while
 a game of the current week that kicked off has no final in the store: a game day and the night after
-it, never a quiet day. There is no lookback window (Lane 84): a game the passes missed, after a
-deploy, a lapse or an expired login, is still asked about at the next pass until its final is held. Each answer is kept verbatim in `capture_snapshots` (append-only, every
-call its own row, so the calls an hour are counted from the store) and read into the
+it, never a quiet day. A game the passes missed, after a deploy, a lapse or an expired login, is still
+asked about at the next pass (Lane 84), until its final is held or GIVE_UP_AFTER has passed since its
+kickoff. Each answer is kept verbatim in `capture_snapshots` (append-only, every call its own row, so
+the calls an hour are counted from the store) and read into the
 `tank01_game_status` team-week source, one `game_status` observation per club stamped at the pass:
 0 scheduled, 1 under way, 2 final. The feed carries no score, so none is written; the final score
 comes with the weekly stats as before.
@@ -16,8 +17,8 @@ HOURLY_CAP in any hour: a pass that finds the cap reached or the budget spent as
 so, and the count and the call are taken under an advisory lock. With the season's game days and a
 game's few hours to its final, that is about 20 calls a week, and with the 9:30 am Eastern games
 abroad and the late-season Saturdays some 390 a regular season, inside the purchased quota. A game
-the feed never calls final (a postponement) is asked about once a pass until its weekly result is
-held or the next week kicks off, some 18 calls a day at most, still under the cap.
+that never gets a final (a cancellation, or a missed weekly result) is asked about once a pass, some
+18 calls a day, until the next week kicks off or GIVE_UP_AFTER has passed, so never into the offseason.
 
 A FINAL IS HELD by the one rule, the `club_week_finals` view (revision 0014): the weekly result, a
 Tank01 final, or a line with the club, which the API's week facts and the run's states read too."""
@@ -45,6 +46,9 @@ STATUS_METRIC: Final = "game_status"
 STATUS_VALUES: Final[dict[GameStatus, float]] = {"scheduled": 0.0, "in_progress": 1.0, "final": 2.0}
 FINAL_VALUE: Final = STATUS_VALUES["final"]
 HOURLY_CAP: Final = 2
+# A game with no final this long after its kickoff stops being asked about (Lane 84 review): past the
+# weekly stats of Tuesday or Wednesday evening, its final will not come from the hourly status.
+GIVE_UP_AFTER: Final = timedelta(days=4)
 _HOUR: Final = timedelta(hours=1)
 # The status pass's advisory lock (pg_advisory_xact_lock), released with its transaction.
 _LOCK_KEY: Final = 80_0001
@@ -77,14 +81,14 @@ def finals_held(conn: Connection, season: int, now: datetime) -> frozenset[tuple
 def pending_week(kickoffs: Sequence[TeamKickoff], held: frozenset[tuple[str, int]], now: datetime) -> int | None:
     """The current week (the latest with a club-game kicked off by `now`) while any of its kicked-off
     club-games has no final held (the status and the result are written for both sides); None when
-    none waits, and the pass asks nothing. No lookback (Lane 84): a game the passes missed, after a
-    deploy or a lapse, is asked about until its final is held. An earlier week's gap is left to its
-    weekly stats."""
+    none waits, and the pass asks nothing. A game the passes missed, after a deploy or a lapse, is
+    asked about until its final is held (Lane 84), and given up on GIVE_UP_AFTER past its kickoff.
+    An earlier week's gap is left to its weekly stats."""
     kicked = [k for k in kickoffs if k.at <= now]
     if not kicked:
         return None
     week = max(k.week for k in kicked)
-    waiting = any((k.team, week) not in held for k in kicked if k.week == week)
+    waiting = any((k.team, week) not in held and now - k.at <= GIVE_UP_AFTER for k in kicked if k.week == week)
     return week if waiting else None
 
 

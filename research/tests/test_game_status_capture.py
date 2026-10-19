@@ -21,6 +21,7 @@ from research.pipeline.tank01 import game_status
 from research.pipeline.tank01.client import Paths, Tank01Client
 from research.pipeline.tank01.game_status import (
     FINAL_VALUE,
+    GIVE_UP_AFTER,
     HOURLY_CAP,
     STATUS_SOURCE,
     capture_game_status,
@@ -68,6 +69,15 @@ def test_a_game_the_passes_missed_is_still_asked_about() -> None:
     assert pending_week(KICKOFFS, held, SUNDAY + timedelta(hours=30)) == WEEK
     # Every game of the week final: a quiet Tuesday asks nothing.
     assert pending_week(KICKOFFS, held | {("MIA", WEEK), ("BUF", WEEK)}, SUNDAY + timedelta(hours=30)) is None
+    # Thursday's game with no final held by Saturday: the pass is due.
+    assert pending_week(KICKOFFS, frozenset(), SUNDAY - timedelta(hours=20)) == WEEK
+
+
+def test_a_game_with_no_final_is_given_up_on_past_its_stats() -> None:
+    # A cancelled game, or the season's last week with no next kickoff: past GIVE_UP_AFTER it asks nothing.
+    assert pending_week(KICKOFFS, frozenset(), SUNDAY + GIVE_UP_AFTER + timedelta(minutes=1)) is None
+    assert pending_week(KICKOFFS, frozenset(), SUNDAY + timedelta(days=5)) is None
+    assert pending_week(KICKOFFS, frozenset(), SUNDAY + timedelta(hours=30)) == WEEK
 
 
 def test_only_the_current_week_is_asked_about() -> None:
