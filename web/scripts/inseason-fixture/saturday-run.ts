@@ -13,6 +13,7 @@
 // then build with PUBLIC_RUN_ID=2026-10-17T17-ros PUBLIC_RUN_BASE_URL=.runs and start the fixture API
 // with FIXTURE_RUN_ID=2026-10-17T17-ros.
 import { cp, readFile, readdir, writeFile } from 'node:fs/promises';
+import { restFromWords } from '../../src/lib/run/rest-from.ts';
 import { FIXTURE_WEEK_CLOCK } from './clock.ts';
 
 const SOURCE_ID = '2026-10-21T12-ros';
@@ -110,7 +111,7 @@ manifest.formats = (manifest.formats as Json[]).map((f) => ({
 	basis: (f.basis as string[]).map((line) =>
 		line.replace(
 			/from week \d+, refreshed October \d+/,
-			"from week 6's games left, refreshed October 17"
+			`${restFromWords(FIRST_WEEK, true)}, refreshed October 17`
 		)
 	),
 	rosFromWeek: FIRST_WEEK,

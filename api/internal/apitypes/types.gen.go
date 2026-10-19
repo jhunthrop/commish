@@ -3186,7 +3186,7 @@ type OrderRow struct {
 	// Rank his place in our order for this view: at a position his position rank (by his rest-of-season total, which orders the same as points over replacement there), across every position his place by points over replacement
 	Rank int `json:"rank"`
 
-	// RestOfSeasonPoints the order's key, one decimal: his rest-of-season points over his club's games left at the read's clock (not yet kicked off) through week 17, byes out (Lane 86, as the player read's rest_of_season_points); null on the preseason order and without a projection
+	// RestOfSeasonPoints the order's key, one decimal: his rest-of-season points over his club's games left at the read's clock (not yet kicked off) through week 17, byes out (Lane 86, the player read's rest_of_season figure for the order's format); null on the preseason order and without a projection
 	RestOfSeasonPoints *float64 `json:"rest_of_season_points"`
 
 	// Roster whose roster in the league holds him, null without a league
@@ -3345,7 +3345,7 @@ type PlayerWeek struct {
 	// RestFromWeek the week his rest of season starts from: his club's first game still to play at the read's clock (not yet kicked off, through week 17); null off the rest-of-season order, without a projection or with no game left. Absent from a read older than the field
 	RestFromWeek *int `json:"rest_from_week,omitempty"`
 
-	// RestOfSeason his rest of season at the read's clock in every format the run carries (twelve teams: PPR, half PPR and standard on the standard lineup, PPR on the superflex lineup), each from that format's board re-valued as the order is (LiveBoard: the run's points a game times his club's games still to play now, so a game kicked off since the run is no longer counted); empty off the rest-of-season order and without a projection. Absent from a read older than the field
+	// RestOfSeason his rest of season at the read's clock in every format the run carries (twelve teams: PPR, half PPR and standard on the standard lineup, PPR on the superflex lineup), each from that format's board re-valued as the order is (LiveBoard: the run's points a game times his club's games still to play now, so a game kicked off since the run is no longer counted); absent off the rest-of-season order, without a projection and from a read older than the field
 	RestOfSeason *[]RestOfSeasonFigure `json:"rest_of_season,omitempty"`
 
 	// Tier the players the read was asked for (?tier=, ?tier_next=, ?tier_format=) at the read's clock in that format, as the page's tier box lists them; absent when not asked or off the rest-of-season order

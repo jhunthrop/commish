@@ -63,8 +63,6 @@ export function orderAtClock(order: OrderAdvice, now: number): OrderAdvice {
 }
 
 /** One club's games in the run's schedule.json. */
-
-/** One club's games in the run's schedule.json. */
 export interface RunSlate {
 	abbr: string;
 	games: { week: number; opponent: string | null; kickoff: string | null }[];

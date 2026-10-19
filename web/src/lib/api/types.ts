@@ -3068,7 +3068,7 @@ export interface components {
 			projection_previous_read_at: string | null;
 			/** @description what the league screens would do with him; null on the read with no league */
 			verb: components['schemas']['PlayerVerb'] | null;
-			/** @description his rest of season at the read's clock in every format the run carries (twelve teams: PPR, half PPR and standard on the standard lineup, PPR on the superflex lineup), each from that format's board re-valued as the order is (LiveBoard: the run's points a game times his club's games still to play now, so a game kicked off since the run is no longer counted); empty off the rest-of-season order and without a projection. Absent from a read older than the field */
+			/** @description his rest of season at the read's clock in every format the run carries (twelve teams: PPR, half PPR and standard on the standard lineup, PPR on the superflex lineup), each from that format's board re-valued as the order is (LiveBoard: the run's points a game times his club's games still to play now, so a game kicked off since the run is no longer counted); absent off the rest-of-season order, without a projection and from a read older than the field */
 			rest_of_season?: components['schemas']['RestOfSeasonFigure'][] | null;
 			/** @description the players the read was asked for (?tier=, ?tier_next=, ?tier_format=) at the read's clock in that format, as the page's tier box lists them; absent when not asked or off the rest-of-season order */
 			tier?: components['schemas']['RestOfSeasonTier'] | null;
@@ -3475,7 +3475,7 @@ export interface components {
 			rank: number;
 			/**
 			 * Format: double
-			 * @description the order's key, one decimal: his rest-of-season points over his club's games left at the read's clock (not yet kicked off) through week 17, byes out (Lane 86, as the player read's rest_of_season_points); null on the preseason order and without a projection
+			 * @description the order's key, one decimal: his rest-of-season points over his club's games left at the read's clock (not yet kicked off) through week 17, byes out (Lane 86, the player read's rest_of_season figure for the order's format); null on the preseason order and without a projection
 			 */
 			rest_of_season_points: number | null;
 			/**
