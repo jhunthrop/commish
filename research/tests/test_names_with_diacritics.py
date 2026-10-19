@@ -10,6 +10,7 @@ import pytest
 
 from research.capsules.grounding import is_name_grounded, proper_name_phrases
 from research.capsules.names import fold_name
+from research.capsules.repetition import opener_family
 from research.capsules.rule_notes import note_of
 from research.capsules.voice_rules import mask_names
 from research.capsules.week.sheet import DepthPlace, WeekSheet
@@ -86,3 +87,8 @@ def test_masking_reads_the_name_without_its_accent() -> None:
 
 def test_start_advice_reads_the_name_without_its_accent() -> None:
     assert start_advice_in("Start Estime this week.", "Audric Estimé") == "Start Estime"
+
+
+def test_the_opener_family_reads_his_accented_name_as_his() -> None:
+    assert opener_family("Estimé takes the early downs here.", SHEET_NAME, 4) == "_ takes the early"
+    assert opener_family("Estime takes the early downs here.", SHEET_NAME, 4) == "_ takes the early"
