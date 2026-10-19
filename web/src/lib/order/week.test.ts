@@ -288,3 +288,20 @@ void test("the tab's figure heads are the site's one table (Lane 66s): Avg from 
 		new RegExp(`\\b(${FIGURE.projected}|${FIGURE.perGame}|${FIGURE.week})\\b`)
 	);
 });
+
+void test('a lagging read (the API upcoming, the clock past kickoff) sits under Kicked off with the Final sentence (H-A)', () => {
+	const advice = visitor(fixture.read.K);
+	const lagging: WeekOrderAdvice = {
+		...advice,
+		rows: advice.rows.map((r) =>
+			r.section === 'to_play'
+				? { ...r, line: { ...r.line, facts: { ...r.line.facts, game_state: 'upcoming' as const } } }
+				: r
+		)
+	};
+	const late = Date.parse('2026-10-20T01:00:00.000Z');
+	const drawn = views(lagging, late).filter((v) => v.box.game !== 'bye');
+	assert.ok(drawn.length > 0);
+	assert.ok(drawn.every((v) => v.section === 'kicked_off'));
+	assert.ok(text(weekBasis(lagging, VISITOR, ZONE, late)).includes(KICKED_OFF_PART));
+});
