@@ -35,6 +35,8 @@
 
 	/** The lobby is still drafting or filling: it has a pool to search and a seat to leave. */
 	const open = $derived(lobby !== null && !lobby.complete && !lobby.abandoned && error === null);
+	/** The server closed the lobby (a final state): the bar passes no parts. */
+	const closed = $derived(lobby?.abandoned === true);
 
 	async function loadCard(state: LobbyState): Promise<void> {
 		if (!state.drafting || state.complete || cardFor === state.pickNumber) return;
@@ -122,17 +124,23 @@
 	<title>Mock lobby · Commish</title>
 </svelte:head>
 
-<Shell title="Mock draft" active="mock">
-	{#snippet search()}
-		{#if open}<Search
-				placeholder="Search the pool"
-				label="Search the pool"
-				bind:value={query}
-			/>{/if}
-	{/snippet}
-	{#snippet tail()}
-		{#if open && !leaving}<Quiet onclick={() => (leaving = true)}>Leave</Quiet>{/if}
-	{/snippet}
+{#snippet poolSearch()}
+	{#if open}<Search placeholder="Search the pool" label="Search the pool" bind:value={query} />{/if}
+{/snippet}
+
+{#snippet leaveAction()}
+	{#if open && !leaving}<Quiet onclick={() => (leaving = true)}>Leave</Quiet>{/if}
+{/snippet}
+
+<!-- A closed lobby has no pool to search and no seat to leave, so it passes neither and its bar is
+     the one row. The bar shrinks only when the server says so, with the page under it replaced by
+     the closed notice, never while the lobby loads. -->
+<Shell
+	title="Mock draft"
+	active="mock"
+	search={closed ? undefined : poolSearch}
+	tail={closed ? undefined : leaveAction}
+>
 	{#if error}
 		<div class="notice">
 			<RoomNotice {error} subject="lobby" returnTo={page.url.pathname} />

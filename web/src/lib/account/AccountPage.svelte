@@ -187,12 +187,8 @@
 	<meta name="robots" content="noindex" />
 </svelte:head>
 
+<!-- No bar parts: the bottom bar's Mock draft is the way to a mock, so the bar is its one row. -->
 <Shell title="Account">
-	{#snippet tail()}
-		{#if view?.kind === 'signed-in'}
-			<Quiet href={sectionHref('mock')}>Start a mock draft</Quiet>
-		{/if}
-	{/snippet}
 	<main class="account" aria-busy={view === null}>
 		{#if view === null}
 			<!-- The shell is drawn; the account arrives in a moment and takes this place. -->
