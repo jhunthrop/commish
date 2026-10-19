@@ -3273,6 +3273,8 @@ export interface components {
 		WaiverDrop: {
 			/** @description the dropped player's host id, a line in the answer's roster */
 			host_id: string;
+			/** @description the lineup the Lineup screen sets this week starts him; the panel marks him, and the row's own drop is one only when the lineup stays full with the add in it (Lane 66u) */
+			starts_this_week: boolean;
 			/**
 			 * Format: double
 			 * @description points over replacement a week to the lineup over the rest of the season, one decimal

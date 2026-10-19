@@ -18,19 +18,20 @@ func TestGainAndRestOfSeasonSaidOnce(t *testing.T) {
 			"Its drop is the one you lose least by."; got != want {
 		t.Errorf("waivers basis %q, want %q", got, want)
 	}
-	for _, s := range []string{TradesBasis(RestOfSeason, 12), TradeCheckBasis(RestOfSeason, 12)} {
-		if !strings.Contains(s, "Gain is the change in a lineup's points over replacement a week, points above what a free pickup "+
-			"at each position gives you: the rest of the season on our rest-of-season order, averaged over its 12 weeks") {
-			t.Errorf("trade basis %q does not say what Gain is", s)
-		}
-		guard(t, s)
+	if s := TradesBasis(RestOfSeason, 12); !strings.Contains(s, "Gain is the change in a lineup's points over replacement a week, "+
+		"points above what a free pickup at each position gives you: the rest of the season on our rest-of-season order, averaged over its 12 weeks") {
+		t.Errorf("trade basis %q does not say what Gain is", s)
 	}
+	guard(t, TradesBasis(RestOfSeason, 12))
+	guard(t, TradeCheckBasis(RestOfSeason))
 	f := restFixture(t)
 	a := newFixtureAdvisor(t, f, nil)
 	waivers, _ := a.Waivers("", "")
 	trades, _ := a.Trades("")
-	for name, basis := range map[string]string{"waivers": waivers.Basis + " " + waivers.SeasonBasis, "trades": trades.Basis,
-		"check": trades.CheckBasis} {
+	// The builder opens under the Trades basis, so the two together say
+	// each once (review 66u, finding 4).
+	for name, basis := range map[string]string{"waivers": waivers.Basis + " " + waivers.SeasonBasis,
+		"trades with the builder open": trades.Basis + " " + trades.CheckBasis} {
 		if n := strings.Count(basis, RestOfSeasonBasis(7)); n != 1 {
 			t.Errorf("%s says what Rest of season is %d times: %q", name, n, basis)
 		}

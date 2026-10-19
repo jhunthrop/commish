@@ -336,9 +336,13 @@ func WaiverSeasonBasis(b OrderBasis, weeks int) string {
 const OnlyCloseCalls = "Every trade we found with this team is a close call for them."
 
 // TradeCheckBasis is the trade builder's: the finder's line for a trade
-// the member built, which either lineup may gain or lose by.
-func TradeCheckBasis(b OrderBasis, weeks int) string {
-	return fmt.Sprintf("What each lineup gains or loses on %s. The other team decides. %s", numberWords(b), porWords(b, weeks))
+// the member built, which either lineup may gain or lose by. The builder
+// opens on the Trades screen, whose basis says what Gain and Rest of
+// season are, so this line points there and says them no second time
+// (review 66u, finding 4).
+func TradeCheckBasis(b OrderBasis) string {
+	return fmt.Sprintf("What each lineup gains or loses on %s. The other team decides. Gain and Rest of season are as the Trades basis says.",
+		numberWords(b))
 }
 
 // TradesBasis is the trade finder's (§6.3): which trades it lists, on the

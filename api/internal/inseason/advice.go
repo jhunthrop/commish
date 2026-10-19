@@ -590,7 +590,8 @@ func waiverRow(w *Writer, week *pickupWeek, mine []person, add person, move Waiv
 	}
 	for _, d := range move.Drops {
 		weekGain, _, _ := week.with(add.cand, d.At)
-		row.Drops = append(row.Drops, apitypes.WaiverDrop{HostId: mine[d.At].cand.ID, Gain: roundTenth(d.Gain), WeekGain: weekGain})
+		row.Drops = append(row.Drops, apitypes.WaiverDrop{HostId: mine[d.At].cand.ID, Gain: roundTenth(d.Gain), WeekGain: weekGain,
+			StartsThisWeek: d.StartsThisWeek})
 	}
 	row.Pickup = !move.NoDrop && isPickup(row)
 	if day, ok := clears[add.cand.ID]; ok {
@@ -648,7 +649,7 @@ func (a *advisor) Trades(focus string) (apitypes.TradeAdvice, bool) {
 		out.Teams = append(out.Teams, row)
 	}
 	out.Basis = withPerGame(a.Board, TradesBasis(a.basis, a.weeks), shown...)
-	out.CheckBasis = withPerGame(a.Board, TradeCheckBasis(a.basis, a.weeks), shown...)
+	out.CheckBasis = TradeCheckBasis(a.basis)
 	return out, true
 }
 

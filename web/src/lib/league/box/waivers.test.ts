@@ -92,8 +92,8 @@ const row = (add: PlayerLine, over: Partial<WaiverRow> = {}): WaiverRow => ({
 		open_spot: false
 	},
 	drops: [
-		{ host_id: lemon.player.host_id, gain: 1.2, week_gain: 6.7 },
-		{ host_id: vidal.player.host_id, gain: 0.6, week_gain: 6.7 }
+		{ host_id: lemon.player.host_id, gain: 1.2, week_gain: 6.7, starts_this_week: false },
+		{ host_id: vidal.player.host_id, gain: 0.6, week_gain: 6.7, starts_this_week: true }
 	],
 	clears: null,
 	sentence: '',
@@ -112,7 +112,7 @@ const chiefs = row(line('Chiefs D/ST', 'DEF', 9.6, 7), {
 		gain: 2.7,
 		open_spot: false
 	},
-	drops: [{ host_id: saints.player.host_id, gain: 0.3, week_gain: 2.7 }]
+	drops: [{ host_id: saints.player.host_id, gain: 0.3, week_gain: 2.7, starts_this_week: true }]
 });
 const mevis = row(line('Harrison Mevis', 'K', 6.7, 7.6), {
 	gain: -0.3,
@@ -224,6 +224,10 @@ void test("the drop panel lists the roster's players he could replace, the advic
 		['Makai Lemon', 'Kimani Vidal']
 	);
 	assert.equal(sameWeekGain(drops), 6.7);
+	// Every player he could replace is listed, this week's starters marked with the shared status chip
+	// (review 66u, finding 1).
+	assert.equal(drops[0]?.starter, null);
+	assert.deepEqual(drops[1]?.starter, { rank: null, mark: 'Starter', sits: false, line: null });
 	assert.equal(
 		dropLead(6.7),
 		'+6.7 Proj this week with any of them. The one you lose least by comes first.'

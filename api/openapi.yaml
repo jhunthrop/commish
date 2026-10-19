@@ -3939,9 +3939,14 @@ components:
     WaiverDrop:
       type: object
       description: one player of the member's an add could replace, with the lineup's gains after the swap
-      required: [host_id, gain, week_gain]
+      required: [host_id, gain, week_gain, starts_this_week]
       properties:
         host_id: { type: string, description: "the dropped player's host id, a line in the answer's roster" }
+        starts_this_week:
+          type: boolean
+          description: >-
+            the lineup the Lineup screen sets this week starts him; the panel marks him, and the row's own drop is one
+            only when the lineup stays full with the add in it (Lane 66u)
         gain: { type: number, format: double, description: "points over replacement a week to the lineup over the rest of the season, one decimal" }
         week_gain: { type: number, format: double, description: "this week's Proj to the lineup the advice sets, one decimal" }
     WaiverRow:

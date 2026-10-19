@@ -255,10 +255,15 @@ func (w *Writer) Waiver(add Line, drop *Line, move Waiver) string {
 }
 
 // TradeDrop is a trade's sentence when its drop starts this week (Lane
-// 66u): the spot he starts in, and the player the trade brings in who
-// takes it.
-func (w *Writer) TradeDrop(drop, by Line, slot string) string {
-	return fmt.Sprintf("%s starts at %s for you this week, and %s takes that spot after the trade.", drop.short(), slot, by.short())
+// 66u): the spot he starts in, and the player the trade brings in with
+// the slot he actually takes, the lineup kept full; a chain of moves
+// fills the rest.
+func (w *Writer) TradeDrop(drop, by Line, slot, bySlot string) string {
+	if bySlot == slot {
+		return fmt.Sprintf("%s starts at %s for you this week, and %s takes that spot after the trade.", drop.short(), slot, by.short())
+	}
+	return fmt.Sprintf("%s starts at %s for you this week. After the trade %s starts at %s and your lineup stays full.",
+		drop.short(), slot, by.short(), bySlot)
 }
 
 // dropWords names the drop, or says an open spot needs none.

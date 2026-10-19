@@ -36,10 +36,12 @@ type Waiver struct {
 }
 
 // Drop is one player a candidate could replace (an index into the
-// squad) and the lineup's gain after the swap, as Waiver.Gain.
+// squad), the lineup's gain after the swap, as Waiver.Gain, and whether
+// this week's lineup starts him (the panel marks him; Lane 66u).
 type Drop struct {
-	At   int
-	Gain float64
+	At             int
+	Gain           float64
+	StartsThisWeek bool
 }
 
 // Waivers is §5.2's gain for every pool candidate, a week's over the
@@ -84,22 +86,20 @@ type waiverSearch struct {
 }
 
 // bestDrop is the move for one candidate: no drop when a spot is open,
-// else the allowed drop whose loss costs least.
+// else the allowed drop whose loss costs least. As the trade finder's
+// (Lane 66u), the move drops a bench player before one this week's lineup
+// starts, and a starter only when the lineup stays full with the add in
+// it; the panel keeps every allowed drop, starters marked.
 func (w *waiverSearch) bestDrop(a int, c *Candidate) Waiver {
 	if w.squad.Open {
 		after := w.f.swap(w.mine, nil, c)
 		strength, _ := w.f.strength(after)
 		return Waiver{Add: a, Drop: -1, Gain: strength - w.base, Starts: w.f.started(len(after) - 1)}
 	}
-	best := Waiver{Add: a, Drop: -1, NoDrop: true}
+	bench, starter := Waiver{Add: a, Drop: -1, NoDrop: true}, Waiver{Add: a, Drop: -1, NoDrop: true}
 	var drops []Drop
 	for d, p := range w.mine {
 		if !w.drops.allowed(d, c, w.counts) {
-			continue
-		}
-		// A player this week's lineup starts goes only for an add who
-		// takes his spot this week (Lane 66u, the trade finder's rule).
-		if w.drops.startsThisWeek(d) && w.drops.takesHisSpot(d, nil, []Candidate{*c}) < 0 {
 			continue
 		}
 		after := w.f.swap(w.mine, []int{d}, c)
@@ -110,10 +110,22 @@ func (w *waiverSearch) bestDrop(a int, c *Candidate) Waiver {
 			continue
 		}
 		gain := strength - w.base
-		drops = append(drops, Drop{At: d, Gain: gain})
-		if best.NoDrop || gain > best.Gain || (gain == best.Gain && across(w.mine[best.Drop], p, false)) {
-			best = Waiver{Add: a, Drop: d, Gain: gain, Starts: starts}
+		weekStarter := w.drops.startsThisWeek(d)
+		drops = append(drops, Drop{At: d, Gain: gain, StartsThisWeek: weekStarter})
+		pick := &bench
+		if weekStarter {
+			if w.drops.takesHisSpot(d, nil, []Candidate{*c}).by < 0 {
+				continue
+			}
+			pick = &starter
 		}
+		if pick.NoDrop || gain > pick.Gain || (gain == pick.Gain && across(w.mine[pick.Drop], p, false)) {
+			*pick = Waiver{Add: a, Drop: d, Gain: gain, Starts: starts}
+		}
+	}
+	best := bench
+	if best.NoDrop {
+		best = starter
 	}
 	best.Drops = w.ordered(drops, best.Drop)
 	return best

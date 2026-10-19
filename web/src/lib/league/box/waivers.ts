@@ -8,6 +8,7 @@ import { memberZone } from '#lib/format/clock.ts';
 import { lastName } from '#lib/format/draft.ts';
 import { fixed, signed } from '#lib/format/number.ts';
 import type { LeagueHost } from '../api.ts';
+import type { StatusView } from '#lib/run/status-view.ts';
 import type { PlayerLine, WaiverAdvice, WaiverRow } from '../inseason/api.ts';
 import { addKey, claimsAdd } from '../inseason/move.ts';
 import { LINES } from '../inseason/words.ts';
@@ -88,8 +89,18 @@ export interface DropRow {
 	rest: number | null;
 	gain: number;
 	weekGain: number;
+	/** The shared status chip when this week's lineup starts him (the API's mark, Lane 66u), else null. */
+	starter: StatusView | null;
 	line: PlayerLine;
 }
+
+/** The drop panel's mark on a player this week's lineup starts, in the shared status chip. */
+export const STARTER_STATUS: StatusView = {
+	rank: null,
+	mark: WAIVERS.starter,
+	sits: false,
+	line: null
+};
 
 const WEEKDAY = new Intl.DateTimeFormat('en-US', { weekday: 'short', timeZone: 'UTC' });
 
@@ -235,6 +246,7 @@ export function dropRows(
 				rest: line.rest_of_season_per_game,
 				gain: drop.gain,
 				weekGain: drop.week_gain,
+				starter: drop.starts_this_week ? STARTER_STATUS : null,
 				line
 			}
 		];

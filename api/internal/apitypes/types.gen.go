@@ -4045,6 +4045,9 @@ type WaiverDrop struct {
 	// HostId the dropped player's host id, a line in the answer's roster
 	HostId string `json:"host_id"`
 
+	// StartsThisWeek the lineup the Lineup screen sets this week starts him; the panel marks him, and the row's own drop is one only when the lineup stays full with the add in it (Lane 66u)
+	StartsThisWeek bool `json:"starts_this_week"`
+
 	// WeekGain this week's Proj to the lineup the advice sets, one decimal
 	WeekGain float64 `json:"week_gain"`
 }
