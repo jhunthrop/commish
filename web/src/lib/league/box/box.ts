@@ -454,11 +454,11 @@ export function factsReadLine(
 	return `The ${BOX.game} cell shows each club's expected points, his club first, then the kickoff weather, read ${weekdayTime(oldest, zone)} ${zoneWord(zone)}.`;
 }
 
-/** The oldest read of any game still to be played, null when no row holds one: the Waivers basis
- * says it in its short line. */
-export function factsReadAt(lines: readonly PlayerLine[]): string | null {
+/** The oldest read of any game still to be played at `now`, null when no row holds one: the Waivers
+ * basis says it in its short line. */
+export function factsReadAt(lines: readonly PlayerLine[], now: number = Date.now()): string | null {
 	const reads = lines.flatMap(({ facts }) =>
-		facts.bye || !toBePlayed({ played: facts.played, kickoff: facts.kickoff })
+		facts.bye || !toBePlayed({ played: facts.played, kickoff: facts.kickoff }, now)
 			? []
 			: [facts.game_total?.read_at, facts.weather?.read_at].filter(
 					(at): at is string => at !== undefined
@@ -501,9 +501,10 @@ export const EVIDENCE_SHORT = `${BOX.oppRank} is points allowed to his position,
  * the player card's). */
 export function factsReadShort(
 	lines: readonly PlayerLine[],
-	zone: string = memberZone()
+	zone: string = memberZone(),
+	now: number = Date.now()
 ): string | null {
-	const read = factsReadAt(lines);
+	const read = factsReadAt(lines, now);
 	return read === null
 		? null
 		: `The ${BOX.game} cell's expected points and weather were read ${weekdayTime(read, zone)} ${zoneWord(zone)}.`;
