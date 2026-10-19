@@ -276,6 +276,7 @@ COMMANDS: Final = MappingProxyType({
     "tank01-adp": Command("the provider's ADP onto provider_players", lambda c, i: tank01.ingest_adp(c, tank01_provider(i), FixedBudget(TANK01_RUN_BUDGET))),
     "headshots": Command("the provider's headshot URLs onto provider_players", lambda c, i: tank01.backfill_headshots(c, tank01_provider(i))),
     "crosswalk": Command("the provider roster against the universe", lambda c, i: crosswalk.build_crosswalk(c, i.now)),
+    "provider-names": Command("each crossed provider name as the universe spells it, its diacritics kept (the Lane 78 backfill)", lambda c, i: crosswalk.respell_provider_names(c).line()),
     "host-ids": Command("the fantasy hosts' player ids onto the universe", lambda c, i: host_ids.ingest_host_ids(c, i.fetcher)),
     "capture-harvest": Command("the capture harvest's five feeds", _harvest),
     "adp-snapshot": Command("the nightly three-format ADP capture", lambda c, i: boards.ingest_adp_snapshot(c, i.fetcher, i.now)),

@@ -4,17 +4,26 @@ The engine keys on nflverse's gsis id, the product on the stats provider's id (E
 join is an ID join on `espn_id`, never a name join; a name comparison is computed only as an
 audit signal. A team defense is placed on its synthetic universe row by team code. Nobody is
 dropped: an unplaced player gets a row saying why.
+
+A NAME AS HE SPELLS IT (Lane 78): the provider drops diacritics nflverse keeps ("Audric Estime" for
+"Audric Estimé"), and `provider_players.name` is the name the board, the page, the API and the sheet
+print. Where a crossed provider name differs from the universe's only by those diacritics, the
+provider row takes the universe's spelling (`respell_provider_names`): the crosswalk build and the
+roster upsert both call it, and the `provider-names` command runs it alone as the backfill.
 """
 
+import logging
 import re
 import unicodedata
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Final
 
-from sqlalchemy import Connection, select
+from sqlalchemy import Connection, select, update
 from sqlalchemy.dialects.postgresql import insert
 
+from research.capsules.names import strip_accents
 from research.db.schema import PLAYER_CROSSWALK, PLAYERS, PROVIDER_PLAYERS
 from research.errors import CoherenceError
 from research.pipeline.nflverse.team_codes import (
@@ -23,6 +32,8 @@ from research.pipeline.nflverse.team_codes import (
     team_defense_universe_ids,
 )
 from research.pipeline.observations import INSERT_CHUNK_ROWS
+
+LOG: Final = logging.getLogger(__name__)
 
 
 class CrosswalkMethod:
@@ -233,10 +244,53 @@ def seed_team_defense_universe(conn: Connection) -> int:
     return len(conn.execute(statement).all())
 
 
+def universe_spelling(provider_name: str, universe_name: str) -> str | None:
+    """The universe's spelling when it is the provider's name with the diacritics the provider dropped,
+    else None: a suffix, punctuation or case difference is not a diacritic, and an accent the provider
+    keeps is never taken away."""
+    if universe_name == provider_name or strip_accents(provider_name) != provider_name:
+        return None
+    return universe_name if strip_accents(universe_name) == provider_name else None
+
+
+@dataclass(frozen=True)
+class RespellReport:
+    crossed: int
+    # Each provider name changed, as (stored, now): the log names every row the pass touched.
+    respelled: tuple[tuple[str, str], ...]
+
+    def line(self) -> str:
+        changed = "; ".join(f"{was} as {now}" for was, now in self.respelled)
+        detail = f" ({changed})" if changed else ""
+        return f"{len(self.respelled)} of {self.crossed} crossed provider names respelled{detail}"
+
+
+def respell_provider_names(conn: Connection) -> RespellReport:
+    """Every provider player the crosswalk placed on a person by his ESPN id takes the universe's
+    spelling where `universe_spelling` gives one. Idempotent: a second pass changes nothing."""
+    crossed = conn.execute(
+        select(PROVIDER_PLAYERS.c.id, PROVIDER_PLAYERS.c.name, PLAYERS.c.name.label("universe_name"))
+        .join(PLAYER_CROSSWALK, PLAYER_CROSSWALK.c.provider_player_id == PROVIDER_PLAYERS.c.id)
+        .join(PLAYERS, PLAYERS.c.id == PLAYER_CROSSWALK.c.player_id)
+        .where(PLAYER_CROSSWALK.c.method == CrosswalkMethod.ESPN_ID)
+        .order_by(PROVIDER_PLAYERS.c.id)
+    ).all()
+    respelled: list[tuple[str, str]] = []
+    for row in crossed:
+        spelled = universe_spelling(row.name, row.universe_name)
+        if spelled is None:
+            continue
+        conn.execute(update(PROVIDER_PLAYERS).where(PROVIDER_PLAYERS.c.id == row.id).values(name=spelled))
+        respelled.append((row.name, spelled))
+    return RespellReport(crossed=len(crossed), respelled=tuple(respelled))
+
+
 def build_crosswalk(conn: Connection, resolved_at: datetime) -> CrosswalkResolution:
-    """`build-crosswalk.ts` after the universe refresh: seed the defenses, resolve, record."""
+    """`build-crosswalk.ts` after the universe refresh: seed the defenses, resolve, record, then each
+    crossed provider name as the universe spells it (`respell_provider_names`)."""
     seed_team_defense_universe(conn)
     inputs = crosswalk_inputs(conn)
     resolution = resolve_crosswalk(inputs.providers, inputs.universe, inputs.team_defenses)
     record_crosswalk(conn, crosswalk_rows(resolution, resolved_at))
+    LOG.info("crosswalk: %s", respell_provider_names(conn).line())
     return resolution

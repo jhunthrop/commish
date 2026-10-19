@@ -13,8 +13,10 @@ prep site.
 """
 
 import json
+import logging
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
+from typing import Final
 
 from sqlalchemy import Connection, delete, text, update
 from sqlalchemy.dialects.postgresql import insert
@@ -23,9 +25,11 @@ from research.db.schema import PROVIDER_GAMES, PROVIDER_PLAYERS, PROVIDER_STAT_L
 from research.db.upsert import excluded_set
 from research.pipeline.budget import RequestBudget, UnmeteredBudget, reserve_or_raise
 from research.pipeline.checkpoint import Checkpoint, no_checkpoint
+from research.pipeline.crosswalk import respell_provider_names
 from research.pipeline.tank01.mapping import Player, StatLine, deduped_by_player_id
 from research.pipeline.tank01.provider import LIST_ADP_REQUEST_COST, LIST_PLAYERS_REQUEST_COST, Tank01Provider
 
+LOG: Final = logging.getLogger(__name__)
 _SEED_BATCH = 500
 
 
@@ -99,6 +103,8 @@ def ingest_roster_and_lines(
     players = provider.list_players()
     retire_other_seasons(conn, provider.season)
     _upsert_roster(conn, players)
+    # The provider's spelling was just written back; a crossed player keeps his own (Lane 78).
+    LOG.info("tank01 roster: %s", respell_provider_names(conn).line())
     checkpoint()
     stat_count = 0
     for week in range(1, provider.last_week_of_season + 1):
