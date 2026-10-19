@@ -61,23 +61,52 @@ func TestReadInPlayWeekScoresLive(t *testing.T) {
 	}
 }
 
-// A decided week reads ESPN's final totalPoints.
+// A decided week reads ESPN's final totalPoints on both sides, and the
+// final wins over live points the read still carries (the Tuesday
+// before the period rolls, a stat correction).
 func TestReadDecidedWeekScoresFinal(t *testing.T) {
 	l := readBody(t, readFixture(t, fullFixture), 2019)
 	g := l.Games[0]
-	if g.Home != 3 || g.HomePoints != 84 || g.HomeUnread || g.Unread {
+	if g.Home != 3 || g.Away != 9 || g.HomePoints != 84 || g.Points != 90 || g.HomeUnread || g.Unread {
 		t.Fatalf("a decided game: %+v", g)
+	}
+	const live = `"winner":"UNDECIDED","home":{"teamId":9,"totalPoints":0.0,"totalPointsLive":68.08},"away":{"teamId":3,"totalPoints":0.0,"totalPointsLive":76.8}`
+	in := string(readFixture(t, inPlayFixture))
+	if !strings.Contains(in, live) {
+		t.Fatal("the fixture's game 9 v 3 moved")
+	}
+	decided := strings.Replace(in, live,
+		`"winner":"AWAY","home":{"teamId":9,"totalPoints":70.1,"totalPointsLive":68.08},"away":{"teamId":3,"totalPoints":79.2,"totalPointsLive":76.8}`, 1)
+	if g := gameOf(t, readBody(t, []byte(decided), 2026), 9); g.HomePoints != 70.1 || g.Points != 79.2 || g.HomeUnread || g.Unread {
+		t.Fatalf("a decided game carrying live points: %+v", g)
 	}
 }
 
-// An undecided game whose read carries no live points is unread, never
-// a 0.0 a member would take for the score.
+// noLive is the in-play read with ESPN's live points gone.
+func noLive(t *testing.T) string {
+	t.Helper()
+	return strings.ReplaceAll(string(readFixture(t, inPlayFixture)), `"totalPointsLive"`, `"elsewhere"`)
+}
+
+// An undecided game whose starters have kicked off (lineupLocked) and
+// whose read carries no live points is unread, never a 0.0 a member
+// would take for the score.
 func TestReadUndecidedWithoutLiveIsUnread(t *testing.T) {
-	body := strings.ReplaceAll(string(readFixture(t, inPlayFixture)), `"totalPointsLive"`, `"elsewhere"`)
-	l := readBody(t, []byte(body), 2026)
+	l := readBody(t, []byte(noLive(t)), 2026)
 	for _, g := range l.Games {
 		if !g.HomeUnread || !g.Unread {
 			t.Fatalf("an undecided game without live points read as scored: %+v", g)
+		}
+	}
+}
+
+// Before any starter kicks off (Tuesday to Thursday) a side with no live
+// points has scored 0.0, read, not a read that failed.
+func TestReadBeforeKickoffWithoutLiveIsZero(t *testing.T) {
+	body := strings.ReplaceAll(noLive(t), `"lineupLocked":true`, `"lineupLocked":false`)
+	for _, g := range readBody(t, []byte(body), 2026).Games {
+		if g.HomeUnread || g.Unread || g.HomePoints != 0 || g.Points != 0 {
+			t.Fatalf("a game before kickoff: %+v", g)
 		}
 	}
 }

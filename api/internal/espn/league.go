@@ -221,14 +221,14 @@ type Player struct {
 func (p Player) Droppable() bool { return p.droppable == nil || *p.droppable }
 
 // Game is one matchup in the current matchup period, each side's points
-// as ESPN scores them now: totalPointsLive while ESPN carries it (the
-// period in play), else totalPoints (the decided matchup's final).
+// as ESPN scores them now: totalPoints once ESPN decides the matchup
+// (the final), else totalPointsLive (the period in play).
 type Game struct {
 	Home, Away         int
 	HomePoints, Points float64
-	// HomeUnread and Unread say ESPN gave no score for the side: an
-	// undecided matchup whose read carries no live points, whose 0.0
-	// totalPoints is not a score.
+	// HomeUnread and Unread say ESPN gave no score for a side under way:
+	// an undecided matchup, a starter kicked off, and no live points, so
+	// its 0.0 totalPoints is not a score.
 	HomeUnread, Unread bool
 }
 
@@ -246,12 +246,32 @@ type wireSide struct {
 }
 
 // points is the side's score as ESPN has it now, and whether ESPN gave
-// one: the live points when carried, the final once decided.
-func (s wireSide) points(winner string) (float64, bool) {
-	if s.TotalPointsLive != nil {
+// one: the final once ESPN decides the matchup, else the live points
+// when carried, else 0.0 for a side none of whose starters has kicked
+// off (kicked is any starter lineupLocked). A side under way with no
+// score sent is unread.
+func (s wireSide) points(winner string, kicked bool) (float64, bool) {
+	switch {
+	case winner != "" && winner != undecided:
+		return score(s.TotalPoints), true
+	case s.TotalPointsLive != nil:
 		return score(*s.TotalPointsLive), true
 	}
-	return score(s.TotalPoints), winner != "" && winner != undecided
+	return 0, !kicked
+}
+
+// kickedOff is the teams with a starter whose game has started: ESPN
+// locks his lineup slot (lineupLocked).
+func kickedOff(teams []Team) map[int]bool {
+	out := map[int]bool{}
+	for _, t := range teams {
+		for _, p := range t.Roster {
+			if p.Locked && p.Slot != SlotBench && p.Slot != SlotReserve {
+				out[t.ID] = true
+			}
+		}
+	}
+	return out
 }
 
 type wirePlayer struct {
@@ -482,12 +502,13 @@ func checkFull(w wireFull) (FullLeague, error) {
 		}
 		l.Teams = append(l.Teams, tm)
 	}
+	kicked := kickedOff(l.Teams)
 	for _, g := range w.Schedule {
 		if g.MatchupPeriodID != l.MatchupPeriod || g.Away == nil {
 			continue
 		}
-		home, homeRead := g.Home.points(g.Winner)
-		away, awayRead := g.Away.points(g.Winner)
+		home, homeRead := g.Home.points(g.Winner, kicked[g.Home.TeamID])
+		away, awayRead := g.Away.points(g.Winner, kicked[g.Away.TeamID])
 		l.Games = append(l.Games, Game{Home: g.Home.TeamID, Away: g.Away.TeamID, HomePoints: home, Points: away, HomeUnread: !homeRead, Unread: !awayRead})
 	}
 	return l, nil
