@@ -374,13 +374,17 @@ func (c *Client) Read(ctx context.Context, id string, season int, cookies *Cooki
 	}
 	q := url.Values{"view": {"mRoster", "mSettings", "mMatchup", "mTeam", "mDraftDetail", "mMatchupScore", "mScoreboard"}}
 	path := fmt.Sprintf("%s/apis/v3/games/ffl/seasons/%d/segments/0/leagues/%s?%s", c.Base, season, id, q.Encode())
-	body, err := c.get(ctx, path, cookies, maxLeagueBody)
+	var wire wireFull
+	err := c.fetch(ctx, path, cookies, "", func(body io.Reader) error {
+		// Decoded as it streams, never held whole: a body past the limit
+		// is cut short and fails to decode.
+		if err := json.NewDecoder(io.LimitReader(body, maxLeagueBody)).Decode(&wire); err != nil {
+			return fmt.Errorf("%w: %w", ErrMalformed, err)
+		}
+		return nil
+	})
 	if err != nil {
 		return FullLeague{}, err
-	}
-	var wire wireFull
-	if err := json.Unmarshal(body, &wire); err != nil {
-		return FullLeague{}, fmt.Errorf("%w: %w", ErrMalformed, err)
 	}
 	return checkFull(wire)
 }
@@ -411,16 +415,36 @@ func (c *Client) get(ctx context.Context, path string, cookies *Cookies, limit i
 // getFiltered is get with ESPN's X-Fantasy-Filter header when filter is
 // set: the players read narrows by it.
 func (c *Client) getFiltered(ctx context.Context, path string, cookies *Cookies, limit int64, filter string) ([]byte, error) {
+	var body []byte
+	err := c.fetch(ctx, path, cookies, filter, func(r io.Reader) error {
+		read, err := io.ReadAll(io.LimitReader(r, limit+1))
+		if err != nil {
+			return fmt.Errorf("%w: body: %w", ErrUnavailable, err)
+		}
+		if int64(len(read)) > limit {
+			return fmt.Errorf("%w: over %d bytes", ErrMalformed, limit)
+		}
+		body = read
+		return nil
+	})
+	return body, err
+}
+
+// fetch reads one address with the cookies when given and the filter
+// when set, handing an answered body to use while the read is open. A
+// refusal with cookies is ErrSignedOut, without them ErrPrivate. Its
+// errors name a status, never a cookie.
+func (c *Client) fetch(ctx context.Context, path string, cookies *Cookies, filter string, use func(io.Reader) error) error {
 	if c.Pace != nil {
 		if err := c.Pace.Wait(ctx); err != nil {
-			return nil, fmt.Errorf("%w: %w", ErrUnavailable, err)
+			return fmt.Errorf("%w: %w", ErrUnavailable, err)
 		}
 	}
 	ctx, cancel := context.WithTimeout(ctx, leagueTimeout)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, path, nil)
 	if err != nil {
-		return nil, fmt.Errorf("espn: request: %w", err)
+		return fmt.Errorf("espn: request: %w", err)
 	}
 	req.Header.Set("User-Agent", UserAgent)
 	req.Header.Set("Accept", "application/json")
@@ -433,29 +457,22 @@ func (c *Client) getFiltered(ctx context.Context, path string, cookies *Cookies,
 	resp, err := c.HTTP.Do(req)
 	if err != nil {
 		if ctx.Err() != nil {
-			return nil, fmt.Errorf("%w: %w", ErrUnavailable, ctx.Err())
+			return fmt.Errorf("%w: %w", ErrUnavailable, ctx.Err())
 		}
-		return nil, fmt.Errorf("%w: unreachable", ErrUnavailable)
+		return fmt.Errorf("%w: unreachable", ErrUnavailable)
 	}
 	defer func() { _ = resp.Body.Close() }()
 	switch {
 	case (resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden) && cookies != nil:
-		return nil, ErrSignedOut
+		return ErrSignedOut
 	case resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden:
-		return nil, ErrPrivate
+		return ErrPrivate
 	case resp.StatusCode == http.StatusNotFound:
-		return nil, ErrNotFound
+		return ErrNotFound
 	case resp.StatusCode != http.StatusOK:
-		return nil, fmt.Errorf("%w: status %d", ErrUnavailable, resp.StatusCode)
+		return fmt.Errorf("%w: status %d", ErrUnavailable, resp.StatusCode)
 	}
-	body, err := io.ReadAll(io.LimitReader(resp.Body, limit+1))
-	if err != nil {
-		return nil, fmt.Errorf("%w: body: %w", ErrUnavailable, err)
-	}
-	if int64(len(body)) > limit {
-		return nil, fmt.Errorf("%w: over %d bytes", ErrMalformed, limit)
-	}
-	return body, nil
+	return use(resp.Body)
 }
 
 func checkFull(w wireFull) (FullLeague, error) {

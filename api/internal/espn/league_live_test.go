@@ -2,6 +2,7 @@ package espn
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -108,6 +109,18 @@ func TestReadBeforeKickoffWithoutLiveIsZero(t *testing.T) {
 		if g.HomeUnread || g.Unread || g.HomePoints != 0 || g.Points != 0 {
 			t.Fatalf("a game before kickoff: %+v", g)
 		}
+	}
+}
+
+// The whole read decodes as it streams behind its limit: a body past it
+// is malformed, never held whole.
+func TestReadOverLimitIsMalformed(t *testing.T) {
+	big := `{"id":1,"pad":"` + strings.Repeat("x", maxLeagueBody) + `","teams":[{}]}`
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte(big)) }))
+	t.Cleanup(srv.Close)
+	_, err := (&Client{HTTP: srv.Client(), Base: srv.URL}).Read(context.Background(), "48153503", 2026, nil)
+	if !errors.Is(err, ErrMalformed) {
+		t.Fatalf("an over-limit read: %v", err)
 	}
 }
 
