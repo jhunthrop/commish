@@ -1,0 +1,115 @@
+"""Lane 75, nightly-rrl84 and nightly-869c4: Devin Neal's draft fell to its facts block with
+`The name "Audric Estim" does not trace to any supplied fact.` The sheet printed "Audric Estimé"; the
+name reader stopped at the first letter outside ASCII and traced the stub. The ruling: a name traces on
+NFKD-normalised, accent-stripped, case-folded text, whole name; a truncated name is still refused, and
+its violation then names the full name the sheet carries, so the fallback line shows the cause."""
+
+from dataclasses import replace
+
+import pytest
+
+from research.capsules.grounding import is_name_grounded, proper_name_phrases
+from research.capsules.names import fold_name
+from research.capsules.repetition import opener_family
+from research.capsules.rule_notes import note_of
+from research.capsules.spans import name_words, runs_of
+from research.capsules.voice_rules import mask_names
+from research.capsules.week.sheet import DepthPlace, WeekSheet
+from research.capsules.week.start_advice import start_advice_in
+from research.capsules.week.validate import validate_week_read
+from research.tests.week_read_fixtures import starter
+
+SHEET_NAME = "Audric Estimé"
+LEDGER = ("Devin Neal", "Devin", "Neal", SHEET_NAME, "Audric", "Estimé")
+TRUNCATED = 'The name "Audric Estim" does not trace to any supplied fact. The sheet carries "Audric Estimé".'
+
+
+def neal() -> WeekSheet:
+    """Devin Neal's week, Audric Estimé listed with him on the chart."""
+    return replace(
+        starter(),
+        player_id="00-0040000",
+        name="Devin Neal",
+        position="RB",
+        team="NO",
+        depth=DepthPlace(1.0, ((SHEET_NAME, 2.0),)),
+    )
+
+
+def test_fold_name_strips_accents_and_case() -> None:
+    assert fold_name("Audric Estimé") == fold_name("audric estime") == "audric estime"
+    # A decomposed accent (an e and a combining acute) folds like the precomposed one.
+    assert fold_name("Estimé") == "estime"
+
+
+def test_the_name_reader_keeps_the_accent() -> None:
+    assert proper_name_phrases("Audric Estimé takes the early downs.") == ["Audric Estimé"]
+    assert proper_name_phrases("Behind him sits Élan Ñúñez now.") == ["Élan Ñúñez"]
+
+
+@pytest.mark.parametrize("written", ["Audric Estimé", "Audric Estime", "AUDRIC ESTIMÉ"])
+def test_the_whole_name_traces_with_or_without_its_accent(written: str) -> None:
+    assert is_name_grounded(written, LEDGER)
+
+
+def test_a_truncated_name_is_still_refused() -> None:
+    assert not is_name_grounded("Audric Estim", LEDGER)
+
+
+def _name_violations(text: str) -> list[str]:
+    result = validate_week_read(text, neal())
+    return [v for v in result.violations if v.startswith("The name ")]
+
+
+@pytest.mark.parametrize("written", ["Audric Estimé", "Audric Estime"])
+def test_the_week_read_traces_the_teammate(written: str) -> None:
+    assert _name_violations(f"Devin Neal shares the backfield with {written} in week 6 of 2026.") == []
+
+
+def test_the_truncated_teammate_names_what_the_sheet_carries() -> None:
+    text = "Devin Neal shares the backfield with Audric Estim in week 6 of 2026."
+    assert _name_violations(text) == [TRUNCATED]
+
+
+def test_an_untraced_name_with_no_near_name_says_nothing_more() -> None:
+    text = "Devin Neal shares the backfield with Kendre Miller in week 6 of 2026."
+    assert _name_violations(text) == ['The name "Kendre Miller" does not trace to any supplied fact.']
+
+
+def test_the_rule_note_reads_the_named_violation() -> None:
+    body = "Devin Neal shares the backfield with Audric Estim in week 6 of 2026."
+    assert note_of(TRUNCATED, body).rule == 'an untraced name, "Audric Estim"'
+
+
+def test_masking_reads_the_name_without_its_accent() -> None:
+    assert mask_names("Estime will Bet on it.", ["Estimé"]) == "Him will Bet on it."
+    assert mask_names("Estimé will Bet on it.", ["Estimé"]) == "Him will Bet on it."
+
+
+def test_start_advice_reads_the_name_without_its_accent() -> None:
+    assert start_advice_in("Start Estime this week.", "Audric Estimé") == "Start Estime"
+
+
+def test_the_opener_family_reads_his_accented_name_as_his() -> None:
+    assert opener_family("Estimé takes the early downs here.", SHEET_NAME, 4) == "_ takes the early"
+    assert opener_family("Estime takes the early downs here.", SHEET_NAME, 4) == "_ takes the early"
+
+
+def test_the_opener_family_reads_an_accented_titlecase_word_as_a_name() -> None:
+    assert opener_family("We like Élan Ñúñez here.", None, 4) == "we like _ _"
+
+
+def test_a_lowercase_accented_word_is_no_name() -> None:
+    assert proper_name_phrases("He runs with élan and a café crowd behind Devin Neal.") == ["Devin Neal"]
+
+
+def test_an_accented_sentence_start_is_read_like_any_other() -> None:
+    assert proper_name_phrases("Él es bueno. São Paulo.") == ["São Paulo"]
+
+
+@pytest.mark.parametrize("written", ["Estimé", "Estime"])
+def test_the_span_runs_break_on_the_name_with_or_without_its_accent(written: str) -> None:
+    text = f"the backfield split stays the same with {written} taking the early downs and the goal line work"
+    runs = runs_of(text, name_words([SHEET_NAME]))
+    assert runs, "the words either side of the name still make runs"
+    assert all("estim" not in word for run in runs for word in run)
