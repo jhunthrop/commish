@@ -514,6 +514,8 @@ void test('copy guard: no card word uses a betting or trading word, the word hos
 		live.verb?.note ?? '',
 		CARD.whyTitle,
 		CARD.writtenFrom,
+		CARD.startHim,
+		CARD.openLineup,
 		unreadBasis(false, 'Wk 6'),
 		unreadBasis(true, 'Wk 6')
 	];

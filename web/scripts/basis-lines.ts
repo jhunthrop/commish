@@ -3,6 +3,7 @@
 // held to five at a desk and eight on a phone. The sweep's measurements (sweep-2026-10-19.md) are the
 // before each screen's count is printed beside.
 import type { Page } from 'playwright';
+import { BOX } from '../src/lib/league/box/box.ts';
 
 /** The widths the budget is measured at, and the most lines it allows at each. */
 export const BASIS_BUDGET: Readonly<Record<number, number>> = { 1440: 5, 390: 8 };
@@ -69,12 +70,22 @@ export function basisReport(
 	};
 }
 
+/** The weather a Game cell draws: a forecast's degrees or wind, or a venue's words from the one
+ * source a cell prints them from (box.ts BOX). */
+export const WEATHER_FIGURE = new RegExp(
+	[
+		String.raw`\d+°`,
+		String.raw`\d+ mph\b`,
+		...[BOX.indoors, BOX.outdoors, BOX.roofOpen, BOX.abroad]
+	].join('|')
+);
+
 /** A figure a row draws and the words of the sentence that says what it is (review H2). */
 const FIGURE_SENTENCES: readonly { figure: RegExp; sentence: string; what: string }[] = [
 	{ figure: /\bOpp \d+(st|nd|rd|th)\b/, sentence: 'Opp rank is', what: 'Opp rank' },
 	{ figure: /\b\d+(\.5)? to \d+(\.5)?\b/, sentence: 'expected points', what: 'the expected score' },
 	{ figure: /\bA game \d+\.\d\b/, sentence: 'A game is', what: 'A game' },
-	{ figure: /\d+°|\d+ mph\b|\bRoof TBD\b/, sentence: 'weather', what: 'the weather' }
+	{ figure: WEATHER_FIGURE, sentence: 'weather', what: 'the weather' }
 ];
 
 /** Every figure the page's rows draw where it is shot has its sentence in the basis drawn there: a

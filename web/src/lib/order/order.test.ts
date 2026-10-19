@@ -237,7 +237,12 @@ void test("the Monday after Sunday's games: Kicked off in the Game cell, and the
 	assert.ok(
 		!basisText(orderBasis(advice([before]), null, ZONE, kickoff - 1)).includes(KICKED_OFF_PART)
 	);
-	// A lagging read (the API still upcoming, the clock past kickoff) reads kicked off (H-A).
+	// A lagging read (the API still upcoming, the clock past kickoff) reads kicked off (H-A): its Game
+	// cell and its sentence.
+	assert.deepEqual(orderView(before, ZONE, true, monday).box.game, {
+		where: 'at ATL',
+		when: 'Kicked off'
+	});
 	assert.ok(basisText(orderBasis(advice([before]), null, ZONE, monday)).includes(KICKED_OFF_PART));
 });
 

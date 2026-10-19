@@ -210,7 +210,7 @@ export function verbOf(
 		case 'start':
 			return {
 				kind: verb.kind,
-				label: 'Start him',
+				label: CARD.startHim,
 				href: screenHref('start', player),
 				external: false,
 				note: null
@@ -218,7 +218,7 @@ export function verbOf(
 		case 'lineup':
 			return {
 				kind: verb.kind,
-				label: 'Open your lineup',
+				label: CARD.openLineup,
 				href: screenHref('start', player),
 				external: false,
 				note: null

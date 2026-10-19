@@ -28,7 +28,7 @@ import { chromium, type BrowserContext, type Page } from 'playwright';
 import { KICKED_OFF_PART } from '../src/lib/league/box/basis.ts';
 import { STRENGTH_HEADS } from '../src/lib/run/strength-words.ts';
 import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
-import { BASIS_BUDGET, basisLines, figureSentenceFaults } from './basis-lines.ts';
+import { BASIS_BUDGET, WEATHER_FIGURE, basisLines, figureSentenceFaults } from './basis-lines.ts';
 import { copyFault, watchData } from './copy-scan.ts';
 import { FIXTURE_IDS } from './inseason-fixture/ids.ts';
 import { EMPTY_FIGURE } from '../src/lib/format/empty.ts';
@@ -351,7 +351,7 @@ async function drawsFacts(page: Page): Promise<boolean> {
 		.evaluateAll((trs) =>
 			trs.filter((tr) => tr.getClientRects().length > 0).map((tr) => (tr as HTMLElement).innerText)
 		);
-	return rows.some((r) => /\b\d+(\.5)? to \d+(\.5)?\b|\d+°|Indoors|Roof TBD/.test(r));
+	return rows.some((r) => /\b\d+(\.5)? to \d+(\.5)?\b/.test(r) || WEATHER_FIGURE.test(r));
 }
 
 /** Waivers after the Sunday (review H3): a row whose game is past its kickoff draws no week gain in
