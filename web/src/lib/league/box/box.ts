@@ -269,10 +269,11 @@ export function boxRow(
 	line: PlayerLine,
 	slot: string,
 	zone: string = memberZone(),
-	ranked = true
+	ranked = true,
+	now: number = Date.now()
 ): BoxRow {
 	const { facts, player } = line;
-	const ahead = !facts.bye && toBePlayed({ played: facts.played, kickoff: facts.kickoff });
+	const ahead = !facts.bye && toBePlayed({ played: facts.played, kickoff: facts.kickoff }, now);
 	return {
 		key: player.host_id,
 		boardId: player.board_id,
@@ -447,9 +448,10 @@ export function projBasis(
  * any game still to be played, null when no row holds one. */
 export function factsReadLine(
 	lines: readonly PlayerLine[],
-	zone: string = memberZone()
+	zone: string = memberZone(),
+	now: number = Date.now()
 ): string | null {
-	const oldest = factsReadAt(lines);
+	const oldest = factsReadAt(lines, now);
 	if (oldest === null) return null;
 	return `The ${BOX.game} cell shows each club's expected points, his club first, then the kickoff weather, read ${weekdayTime(oldest, zone)} ${zoneWord(zone)}.`;
 }

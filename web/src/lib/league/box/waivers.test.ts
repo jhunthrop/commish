@@ -32,6 +32,12 @@ import {
 } from './waivers.ts';
 
 const ZONE = 'America/Chicago';
+/** When the game facts were read, and the clock every basis here is drawn at: the read's own time,
+ * before the fixture's kickoff. Never the real clock. */
+const FACTS_READ = '2026-10-17T02:00:00.000Z';
+const NOW = Date.parse(FACTS_READ);
+/** The facts-read sentence the basis ends on while a game on screen is still to be played. */
+const FACTS_SENTENCE = "The Game cell's expected points and weather were read Fri 9:00 pm Central.";
 
 const facts = (over: Partial<WeekFacts> = {}): WeekFacts => ({
 	week: 6,
@@ -75,7 +81,9 @@ const line = (
 
 const lemon = line('Makai Lemon', 'WR', 6.9, 6.2);
 const vidal = line('Kimani Vidal', 'RB', 2.8, 6.4);
-const saints = line('Saints D/ST', 'DEF', 6.9, 6.1);
+const saints = line('Saints D/ST', 'DEF', 6.9, 6.1, {
+	game_total: { points: 42.5, team_points: 20, read_at: FACTS_READ }
+});
 
 const row = (add: PlayerLine, over: Partial<WaiverRow> = {}): WaiverRow => ({
 	add,
@@ -268,8 +276,10 @@ void test('copy guard: every Waivers line is fantasy words, with no dash, semico
 		copiedWords('espn', 'Gainwell', true).said,
 		copiedWords('espn', 'Gainwell', false).said,
 		countWords(poolRows(advice, ZONE), 'espn'),
-		...waiverBasis(BASIS, [gainwell.add, saints], ZONE)
+		...waiverBasis(BASIS, [gainwell.add, saints], ZONE, NOW)
 	];
+	// The guard reads the facts-read sentence too.
+	assert.ok(lines.some((said) => said.endsWith(FACTS_SENTENCE)));
 	const forbidden =
 		/\b(odds|line|spread|favou?red|underdog|bet|market|buy|sell|price|host|tip)\b|—|–|;/i;
 	for (const said of lines) assert.doesNotMatch(said, forbidden, said);
@@ -307,7 +317,7 @@ const BASIS = {
 };
 
 void test('the basis is five short lines, the pickup rule first, Beats and Open spot each in a clause', () => {
-	const lines = waiverBasis(BASIS, [gainwell.add, saints], ZONE);
+	const lines = waiverBasis(BASIS, [gainwell.add, saints], ZONE, NOW);
 	assert.equal(lines.length, 5);
 	assert.equal(lines[0], BASIS.basis);
 	assert.equal(
@@ -320,5 +330,14 @@ void test('the basis is five short lines, the pickup rule first, Beats and Open 
 	);
 	assert.equal(lines[3], BASIS.season_basis);
 	assert.match(lines[4] ?? '', /^Opp rank is points allowed/);
+	assert.ok(lines[4]?.endsWith(` ${FACTS_SENTENCE}`), lines[4]);
+	// Once the game has kicked off, the read is no longer said.
+	const later = waiverBasis(
+		BASIS,
+		[gainwell.add, saints],
+		ZONE,
+		Date.parse(saints.facts.kickoff ?? '')
+	);
+	assert.ok(!(later[4] ?? '').includes('were read'), later[4]);
 	for (const said of lines) assert.ok(said.length <= 215, said);
 });
