@@ -451,6 +451,8 @@ for (const screen of SCREENS) {
 		}
 		await page.screenshot({ path: new URL(`${name}.png`, out).pathname, fullPage: true });
 		if (screen.name === 'record') {
+			// The table alone, the bars that ride over it hidden for its element shot.
+			await page.addStyleTag({ content: 'nav.rail, header.top { display: none !important; }' });
 			await page
 				.locator(screen.table)
 				.screenshot({ path: new URL(`record-table-${theme}-${String(width)}.png`, out).pathname });

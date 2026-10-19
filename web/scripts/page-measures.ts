@@ -39,11 +39,20 @@ export async function pageMeasures(page: Page): Promise<PageMeasures> {
 		const style = top ? getComputedStyle(top) : null;
 		const barRows =
 			style?.display === 'grid' ? style.gridTemplateRows.split(' ').filter(Boolean).length : 0;
-		const first = top
-			? [...top.children]
-					.filter(drawn)
-					.sort((a, b) => a.getBoundingClientRect().left - b.getBoundingClientRect().left)[0]
-			: undefined;
+		// The first part in reading order: the leftmost of the parts the top row's middle runs through
+		// (a part's negative margins put its box's top above its row's).
+		const parts = top ? [...top.children].filter(drawn) : [];
+		const highest = Math.min(...parts.map((p) => p.getBoundingClientRect().top));
+		const lead = parts.find((p) => p.getBoundingClientRect().top === highest);
+		const middle = lead
+			? (lead.getBoundingClientRect().top + lead.getBoundingClientRect().bottom) / 2
+			: 0;
+		const first = parts
+			.filter((p) => {
+				const r = p.getBoundingClientRect();
+				return r.top <= middle && r.bottom >= middle;
+			})
+			.sort((a, b) => a.getBoundingClientRect().left - b.getBoundingClientRect().left)[0];
 		const leads: 'mark' | 'switch' | 'other' = first?.classList.contains('home')
 			? 'mark'
 			: first?.classList.contains('league')
