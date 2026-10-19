@@ -89,11 +89,11 @@ def pending_week(kickoffs: Sequence[TeamKickoff], held: frozenset[tuple[str, int
 
 
 def calls_this_hour(conn: Connection, now: datetime) -> int:
-    """The status calls stored in the hour up to `now`: every call is its own snapshot."""
+    """The status calls stored from an hour before `now` on: every call is its own snapshot. No upper
+    bound (re-review finding 2): a pass that waited on the lock with an earlier `now` still counts the
+    call the pass holding it just stored."""
     table = CAPTURE_SNAPSHOTS
-    query = select(func.count()).where(
-        table.c.source == SNAPSHOT_SOURCE, table.c.captured_at > now - _HOUR, table.c.captured_at <= now
-    )
+    query = select(func.count()).where(table.c.source == SNAPSHOT_SOURCE, table.c.captured_at > now - _HOUR)
     return int(conn.execute(query).scalar_one())
 
 

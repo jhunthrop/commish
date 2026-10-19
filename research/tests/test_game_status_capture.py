@@ -118,6 +118,8 @@ def test_one_call_a_pass_kept_and_read_under_the_hourly_cap() -> None:
                 select(CAPTURE_CHECKS.c.checked_at).where(CAPTURE_CHECKS.c.source == game_status.SNAPSHOT_SOURCE)
             ).scalar_one()
             assert checked == at
+            # A pass that waited on the lock with an earlier clock still counts this call (re-review 2).
+            assert game_status.calls_this_hour(conn, at - timedelta(minutes=30)) == 1
             # MIA's final is held now, so the next hour asks nothing.
             assert capture_game_status(conn, tank01, 2026, at + timedelta(hours=1), BUDGET).requests == 0
             finals = conn.execute(
