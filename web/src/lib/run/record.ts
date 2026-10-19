@@ -174,14 +174,6 @@ export type RecordSource = (typeof RECORD_SOURCES)[number];
 export const RECORD_FIGURES = ['agreement', 'placesOff', 'starters'] as const;
 export type RecordFigure = (typeof RECORD_FIGURES)[number];
 
-/** The columns a row that is not graded spans with its status, at each width. At a desk: Players,
- * every figure for each order drawn, and Status. Below 1180px the table draws one figure at a time and
- * hides Players and Status, so the row spans only the shown figure's orders: a status spanning a
- * hidden track would keep it alive as an empty strip at the table's right (Lane 87). */
-export function recordStatusSpans(sourceCount: number): { desk: number; narrow: number } {
-	return { desk: 1 + RECORD_FIGURES.length * sourceCount + 1, narrow: sourceCount };
-}
-
 /** The record box score's words, in one place for the copy guard. */
 export const RECORD_BOX = {
 	week: 'Week',
@@ -194,6 +186,43 @@ export const RECORD_BOX = {
 	none: EMPTY_FIGURE,
 	chart: 'Order matched by week'
 } as const;
+
+/** A fixed column of the week table, beside the lead Week column and the figures: its head, its
+ * class, and whether it is drawn below 1180px, where the table shows one figure at a time. The
+ * table draws its heads from these lists and the status spans count them, so a column added here is
+ * spanned at once. A column not drawn narrow is hidden there by its class (the page's styles). */
+export interface RecordColumn {
+	head: string;
+	cls: string;
+	narrow: boolean;
+}
+
+/** The fixed columns between Week and the figures. */
+export const RECORD_BEFORE: readonly RecordColumn[] = [
+	{ head: RECORD_BOX.players, cls: 'n plc', narrow: false }
+];
+
+/** The fixed columns after the figures. */
+export const RECORD_AFTER: readonly RecordColumn[] = [
+	{ head: RECORD_BOX.status, cls: 'st', narrow: false }
+];
+
+const drawnAt = (columns: readonly RecordColumn[], narrow: boolean): number =>
+	columns.filter((column) => !narrow || column.narrow).length;
+
+/** The columns a row that is not graded spans with its status, after its Week cell, at each width:
+ * at a desk every fixed column and every figure for each order drawn; below 1180px the fixed columns
+ * drawn there and the shown figure's orders. A status spanning a hidden track would keep it alive as
+ * an empty strip at the table's right (Lane 87). */
+export function recordStatusSpans(sourceCount: number): { desk: number; narrow: number } {
+	return {
+		desk:
+			drawnAt(RECORD_BEFORE, false) +
+			RECORD_FIGURES.length * sourceCount +
+			drawnAt(RECORD_AFTER, false),
+		narrow: drawnAt(RECORD_BEFORE, true) + sourceCount + drawnAt(RECORD_AFTER, true)
+	};
+}
 
 /** One order's score in a line, null where the line has none (the published projection before its
  * first graded week). */

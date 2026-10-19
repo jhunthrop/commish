@@ -3,6 +3,8 @@
 	import { siteContext } from '#lib/context/context.svelte.ts';
 	import ContextNote from '#lib/context/ContextNote.svelte';
 	import {
+		RECORD_AFTER,
+		RECORD_BEFORE,
 		RECORD_BOX,
 		RECORD_FIGURES,
 		allLine,
@@ -157,21 +159,25 @@
 		<table class="weeks show-{figure}" aria-label="Our record week by week">
 			<thead>
 				<tr class="grp">
-					<th colspan="2"></th>
+					<th colspan={1 + RECORD_BEFORE.length}></th>
 					{#each RECORD_FIGURES as f (f)}
 						<th class="g {f}" colspan={sources.length} scope="colgroup">{FIGURE_HEADS[f]}</th>
 					{/each}
-					<th></th>
+					{#if RECORD_AFTER.length > 0}<th colspan={RECORD_AFTER.length}></th>{/if}
 				</tr>
 				<tr class="cols">
 					<th scope="col">{RECORD_BOX.week}</th>
-					<th class="n plc" scope="col">{RECORD_BOX.players}</th>
+					{#each RECORD_BEFORE as column (column.head)}
+						<th class={column.cls} scope="col">{column.head}</th>
+					{/each}
 					{#each RECORD_FIGURES as f (f)}
 						{#each sources as source (source)}
 							<th class="n m {f} {source}" scope="col">{SOURCE_HEADS[source]}</th>
 						{/each}
 					{/each}
-					<th class="st" scope="col">{RECORD_BOX.status}</th>
+					{#each RECORD_AFTER as column (column.head)}
+						<th class={column.cls} scope="col">{column.head}</th>
+					{/each}
 				</tr>
 			</thead>
 			<tbody>
