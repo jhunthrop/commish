@@ -24,9 +24,6 @@
 		/** The API's line on how the rows are ranked, above them; null where the screen says it in its
 		 * own basis block under the rows (the Trades table, Lane 66g). */
 		basis: string | null;
-		/** The rest of the API's basis, under the rows: the league the figures are for and the rules
-		 * points so far leave out; null as basis is. */
-		basisNote: string | null;
 		/** When set, the verb is a button that does this (opens the move's confirmation) rather than
 		 * the host's page. */
 		onverb?: (() => void) | null;
@@ -59,7 +56,6 @@
 		href,
 		hostNote = null,
 		basis,
-		basisNote,
 		onverb = null,
 		controls,
 		expanded,
@@ -114,7 +110,6 @@
 {@render move?.()}
 {#if basis !== null}<Basis {basis} />{/if}
 {@render children()}
-{#if basisNote !== null}<p class="foot">{basisNote}</p>{/if}
 {#if !asideForMove && (verb !== null || (verbFoot !== undefined && footSays) || hostNote !== null)}
 	<div class="pin" {@attach hostTab(href)}>
 		{@render action(true)}
@@ -169,13 +164,6 @@
 		color: var(--ink-2);
 		font-size: var(--t-sm);
 		text-align: right;
-	}
-
-	.foot {
-		margin: 0;
-		max-width: 90ch;
-		font-size: var(--t-sm);
-		color: var(--ink-3);
 	}
 
 	.pin {

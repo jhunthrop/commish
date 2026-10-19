@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { memberZone } from '#lib/format/clock.ts';
+	import BasisBlock from '#lib/ui/BasisBlock.svelte';
 	import { onMount } from 'svelte';
 	import { askedPlayer } from '../box/asked.ts';
 	import Chip from '#lib/ui/Chip.svelte';
@@ -56,6 +58,8 @@
 		check: (trade: TradeCheckInput) => Promise<TradeCheck>;
 		/** Puts the offer on the clipboard. */
 		copy?: (text: string) => Promise<void>;
+		/** The league's Settings at the scoring rules our stats lack. */
+		rulesHref: string;
 	}
 
 	let {
@@ -64,13 +68,14 @@
 		me,
 		narrow,
 		check,
-		copy = (text) => navigator.clipboard.writeText(text)
+		copy = (text) => navigator.clipboard.writeText(text),
+		rulesHref
 	}: Props = $props();
 
 	/** The builder's id, for the verbs that open it. */
 	const BUILDER_ID = 'trade-builder';
-	/** The space before the basis's link, an expression so the template's own breaks add none. */
-	const SPACE = ' ';
+	/** The basis's id, which the builder's "What the figures are" links to. */
+	const BASIS_ID = 'trades-basis';
 
 	/** The trade the builder opened with, and a count that makes it again for each opening; null
 	 * while it is closed. */
@@ -140,7 +145,19 @@
 		...advice.roster,
 		...advice.teams.flatMap((t) => [...t.roster, ...t.trades.flatMap((r) => [...r.give, ...r.get])])
 	]);
-	const basisLines = $derived(tradeBasis(advice, host, lines));
+	/** A trade opened in the finder: its players' columns are on the screen. */
+	let anyOpen = $state(false);
+	/** One paragraph, the zone named in the page's head (Lane 66t). */
+	const basis = $derived(
+		tradeBasis(
+			shown,
+			host,
+			lines,
+			anyOpen || building !== null,
+			{ rules: rulesHref, record: links.record() },
+			{ zone: memberZone(), zoned: false }
+		)
+	);
 	const everyCount = $derived(advice.teams.reduce((n, t) => n + t.trades.length, 0));
 	const bestCount = $derived(advice.teams.filter((t) => t.trades.length > 0).length);
 
@@ -197,7 +214,6 @@
 	verb={null}
 	href={shown.host_trades_url}
 	basis={null}
-	basisNote={null}
 	panelVerb={building !== null}
 >
 	{#snippet summary()}
@@ -224,6 +240,7 @@
 					moves={advice.moves}
 					start={building.picks}
 					basis={advice.check_basis}
+					basisHref="#{BASIS_ID}"
 					href={advice.host_trades_url}
 					hostNote={advice.host_note}
 					{check}
@@ -267,15 +284,10 @@
 			propose={proposeRow}
 			build={buildFrom}
 			builderId={BUILDER_ID}
+			bind:anyOpen
 		/>
 	</div>
-	<div class="basis">
-		{#each basisLines as said, i (i)}
-			<p class:first={i === 0}>
-				{said}{#if i === 0}{SPACE}<a href={links.record()}>{LINES.orderRecord}</a>{/if}
-			</p>
-		{/each}
-	</div>
+	<BasisBlock parts={basis} id={BASIS_ID} />
 </Screen>
 
 <style>
@@ -301,32 +313,4 @@
 		font-weight: 600;
 	}
 
-	.basis {
-		display: flex;
-		flex-direction: column;
-		gap: 2px;
-		max-width: 100ch;
-	}
-
-	.basis p {
-		margin: 0;
-		font-size: var(--t-sm);
-		line-height: 1.45;
-		color: var(--ink-3);
-	}
-
-	.basis .first {
-		color: var(--ink-2);
-	}
-
-	.basis a {
-		color: var(--accent-text);
-		white-space: nowrap;
-	}
-
-	@media (max-width: 760px) {
-		.basis p {
-			font-size: var(--t-xs);
-		}
-	}
 </style>

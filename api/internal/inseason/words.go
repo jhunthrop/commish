@@ -317,10 +317,10 @@ func WaiverSeasonBasis(b OrderBasis, weeks int) string {
 const OnlyCloseCalls = "Every trade we found with this team is a close call for them."
 
 // TradeCheckBasis is the trade builder's own line, under its scoreboard:
-// what to pick and what the scoreboard is. The Trades screen's basis says
-// what the figures are, so the builder says them no second time (Lane
-// 66u, 66t).
-const TradeCheckBasis = "Pick one or two of yours and one or two of theirs. The scoreboard is each lineup before and after."
+// what the scoreboard is (its own sentence says what to pick). The Trades
+// screen's basis says what the figures are, so the builder says them no
+// second time (Lane 66u, 66t).
+const TradeCheckBasis = "The scoreboard is each lineup before and after the trade."
 
 // TradesBasis is the trade finder's (§6.3): which trades it lists, yours
 // first, who decides, and what a Gain is.

@@ -19,15 +19,26 @@ import type {
 	TradeTeam
 } from '../inseason/api.ts';
 import { tradeKey } from '../inseason/state.ts';
-import { verbWords } from '../inseason/words.ts';
+import { LINES, verbWords } from '../inseason/words.ts';
 import { hostWords } from '../names.ts';
-import { BOX, EVIDENCE_BASIS, factsReadLine, projBasis, ptsBasis } from './box.ts';
+import {
+	OPP_PART,
+	projPart,
+	ptsPart,
+	said,
+	uncountedParts,
+	type BasisPart,
+	type Clock
+} from './basis.ts';
+import { BOX } from './box.ts';
 import { SEASON, TRADE_GAIN } from './season.ts';
 
 /** Every word the trade table prints that is not a player's or a team's, for the copy guard. */
 export const TRADES = {
 	/** The second of the finder's two ruled-off groups; the first is gainHead's. */
 	weekHead: `This week, ${BOX.proj}`,
+	/** The week's group as the basis names it. */
+	weekShort: 'This week',
 	you: 'You',
 	them: 'Them',
 	/** The head over each side's gain, in the finder and on the builder's scoreboard: the same on the
@@ -46,7 +57,7 @@ export const TRADES = {
 	sideGive: 'Give',
 	sideGet: 'Get',
 	sideDrop: 'Drop',
-	restOfSeason: SEASON.restOfSeason,
+	perGame: SEASON.perGame,
 	why: 'Why this trade',
 	fromThis: 'Build from this',
 	youHaveRoom: 'You have room',
@@ -58,7 +69,7 @@ export const TRADES = {
 	copied: 'Copied.',
 	copyFailed: 'This browser would not copy it.',
 	proposeItOn: 'Propose it on',
-	aWeekForYou: 'a week for you',
+	aWeekForYou: `${SEASON.gain} a week for you`,
 	forThem: 'for them',
 	weekWord: 'Week',
 	/** The builder's scoreboard. */
@@ -346,27 +357,55 @@ export function fromWords(team: string, mine: boolean): string {
 	return mine ? `From ${team}, you` : `From ${team}`;
 }
 
-/** The trade screen's basis, said once under the rows in five lines at most (Lane 66g): which trades
- * are listed and what their figures are (the API's own line), the Proj and the week's change, the
- * evidence columns and Pts, the room and the Game cell's read, then the league the figures are for. */
+/** What the finder's two desk columns are: the week's change and Room. */
+const WEEK_ROOM = `${TRADES.weekShort} is each lineup's ${BOX.proj} with the trade less without it, set as Lineup sets it. ${TRADES.room} is who a roster drops to take two for one.`;
+
+/** The trade screen's basis, one paragraph under the rows (Lane 66t): who decides and what Gain is
+ * (the API's), Proj, and at a desk the week's change and Room, then How the order has done. With a
+ * trade opened or the builder open, its players' columns too: the figure a game, Opp rank, Pts at a
+ * desk and the rules Avg and Last leave out. Each said once; the builder's own line points here. */
 export function tradeBasis(
 	advice: Pick<
 		TradeAdvice,
-		'basis' | 'basis_note' | 'projection_read_at' | 'projection_scoring' | 'player_points'
+		| 'basis'
+		| 'per_game_basis'
+		| 'basis_note'
+		| 'basis_note_link'
+		| 'projection_read_at'
+		| 'projection_scoring'
+		| 'player_points'
 	>,
 	host: LeagueHost,
 	lines: readonly PlayerLine[],
-	zone: string = memberZone()
-): string[] {
-	const defense = lines.some((l) => l.player.position === 'DEF');
-	const week = `${projBasis(advice.projection_read_at, advice.projection_scoring, defense, zone)} ${TRADES.weekHead} is the sum of each lineup's ${BOX.proj} with the trade less without it, each lineup set as the Lineup screen sets it.`;
-	const facts = factsReadLine(lines, zone);
-	const room = `${TRADES.room} says who a roster drops to take two for one.${facts === null ? '' : ` ${facts}`}`;
+	opened: boolean,
+	hrefs: { rules: string; record: string },
+	clock: Clock
+): BasisPart[] {
+	const defense = opened && lines.some((l) => l.player.position === 'DEF');
+	const proj = said(
+		projPart(
+			{
+				readAt: advice.projection_read_at,
+				scoring: advice.projection_scoring,
+				defense,
+				league: true
+			},
+			clock
+		)
+	);
+	const players = opened
+		? [
+				...said(OPP_PART),
+				...said(ptsPart(advice.player_points, host), false),
+				...uncountedParts(advice, hrefs.rules)
+			]
+		: [];
 	return [
-		advice.basis,
-		week,
-		`${EVIDENCE_BASIS} ${ptsBasis(advice.player_points, host)}`,
-		room,
-		advice.basis_note
+		...said(advice.basis),
+		...(opened ? said(advice.per_game_basis) : []),
+		...proj,
+		...players,
+		...said(WEEK_ROOM, false),
+		{ text: LINES.orderRecord, phone: true, href: hrefs.record }
 	];
 }

@@ -57,7 +57,7 @@
 			<th class="n ev first" scope="col">{BOX.opp}</th>
 			<th class="n ev" scope="col">{BOX.avg}</th>
 			<th class="n ev" scope="col">{BOX.last}</th>
-			<th class="n season" scope="col">{TRADES.restOfSeason}</th>
+			<th class="n season" scope="col">{TRADES.perGame}</th>
 		</tr>
 	</thead>
 	<tbody>

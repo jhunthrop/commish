@@ -18,7 +18,6 @@
 		TRADES,
 		type CopiedTrade
 	} from '../box/trades.ts';
-	import Basis from './Basis.svelte';
 	import type {
 		PlayerLine,
 		TradeCheck,
@@ -62,8 +61,10 @@
 		moves: TradeMoves;
 		/** The picks it opens with: a finder row's trade, or a team alone. */
 		start: Picks;
-		/** The builder's honesty line, from the finder's answer, until the first check says it. */
+		/** The builder's own line, from the finder's answer, until the first check says it. */
 		basis: string;
+		/** The page's basis, which says what the figures are: "What the figures are" links to it. */
+		basisHref: string;
 		/** The platform's trade page and the API's note when it has none. */
 		href: string;
 		hostNote: string | null;
@@ -82,6 +83,7 @@
 		moves,
 		start,
 		basis,
+		basisHref,
 		href,
 		hostNote,
 		check,
@@ -253,7 +255,10 @@
 				{/if}
 				{#if close}<ToneChip tone="even">{CLOSE_FOR_THEM}</ToneChip>{/if}
 			</div>
-			<Basis basis={answer?.basis ?? basis} />
+			<p class="own" data-basis="builder">
+				{answer?.basis ?? basis}
+				<a href={basisHref}>{BUILDER_LINES.figures}</a>
+			</p>
 			<div class="boxes">
 				<TradeBox
 					team={me.name}
@@ -339,6 +344,19 @@
 	.quiet {
 		color: var(--ink-2);
 		font-weight: 400;
+	}
+
+	/* The builder's own line: what the scoreboard is, then the way to what its figures are. */
+	.own {
+		margin: 0;
+		font-size: var(--t-sm);
+		line-height: 1.45;
+		color: var(--ink-3);
+	}
+
+	.own a {
+		color: var(--accent-text);
+		white-space: nowrap;
 	}
 
 	/* While the next answer is read, the last one stays, quieter. */

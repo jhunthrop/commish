@@ -35,7 +35,7 @@ export function waiverSeasonBasis(weeks: number): string {
 
 /** The builder's own line in the API's words (words.go TradeCheckBasis). */
 export const CHECK_BASIS =
-	'Pick one or two of yours and one or two of theirs. The scoreboard is each lineup before and after.';
+	'The scoreboard is each lineup before and after the trade.';
 
 /** The Lineup's advice rule (words.go LineupBasis). */
 export const LINEUP_BASIS =

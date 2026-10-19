@@ -1,7 +1,7 @@
 /** The Waivers screen as a pickup table (Lane 66f): the Lineup table turned outward. A strip names
  * the pickups worth making as cards (the add, the drop, this week's Proj gain and the rest of the
  * season's), each with the platform's verb; the table lists the players free to add in the Lineup's
- * columns, then the two only we give (Rest of season, and Beats: the member's player he tops with the
+ * columns, then the two only we give (A game, and Beats: the member's player he tops with the
  * gain); an add opens the players he could replace in the same columns, the advice's drop first.
  * Pure, tested in waivers.test.ts. */
 import { memberZone } from '#lib/format/clock.ts';
@@ -14,22 +14,23 @@ import { addKey, claimsAdd } from '../inseason/move.ts';
 import { LINES } from '../inseason/words.ts';
 import { hostWords } from '../names.ts';
 import {
-	BOX,
-	boxNumber,
-	boxRow,
-	EVIDENCE_SHORT,
-	factsReadShort,
-	positionWord,
-	projShort,
-	type BoxRow
-} from './box.ts';
+	deltaPart,
+	gamePart,
+	OPP_PART,
+	projPart,
+	said,
+	uncountedParts,
+	type BasisPart,
+	type Clock
+} from './basis.ts';
+import { BOX, boxNumber, boxRow, positionWord, type BoxRow } from './box.ts';
 import { SEASON, WAIVER_GAIN } from './season.ts';
 
 /** Every word the Waivers strip, table and drop panel print, in one place for the copy guard. */
 export const WAIVERS = {
 	close: 'Close',
 	beats: 'Beats',
-	rest: SEASON.restOfSeason,
+	rest: SEASON.perGame,
 	starter: 'Starter',
 	bench: 'Bench',
 	find: 'Find a player',
@@ -393,34 +394,37 @@ export function countWords(
 	return `${String(n)} free ${n === 1 ? 'agent' : 'agents'} we rank on ${hostWords(host)}, ${String(beating)} ${beating === 1 ? 'beats' : 'beat'} a player of yours`;
 }
 
-/** The Beats column's basis, said once. */
-export const BEATS_BASIS = `${WAIVERS.beats} is your player at his position with the lowest ${BOX.proj} he tops, starters first. ${WAIVERS.openSpot} is a starting spot no player of yours can play this week.`;
-
-/** The Waivers basis (review 66f M5): five short lines at most, the pickup rule first, then the
- * projection, Beats and Open spot, Rest of season and the gain a week, and the evidence with the
- * Game cell's read. The league's shape and the rules points so far leave out are the foot note. */
+/** The Waivers basis, one paragraph (Lane 66t): the pickup rule, Gain and the figure a game (the API's
+ * words), Proj, its change at a desk, the Game cell's read, Opp rank, and the rules Avg and Last leave
+ * out with the link to them. Beats and Open spot say themselves in their cells. */
 export function waiverBasis(
 	advice: Pick<
 		WaiverAdvice,
 		| 'basis'
 		| 'season_basis'
+		| 'basis_note'
+		| 'basis_note_link'
 		| 'projection_read_at'
 		| 'projection_previous_read_at'
 		| 'projection_scoring'
 	>,
 	lines: readonly PlayerLine[],
-	zone: string = memberZone(),
-	now: number = Date.now()
-): string[] {
+	rulesHref: string,
+	clock: Clock,
+	now: number
+): BasisPart[] {
 	const defense = lines.some((l) => l.player.position === 'DEF');
-	const proj = projShort(
-		advice.projection_read_at,
-		advice.projection_previous_read_at,
-		advice.projection_scoring,
-		defense,
-		zone
+	const proj = projPart(
+		{ readAt: advice.projection_read_at, scoring: advice.projection_scoring, defense, league: true },
+		clock
 	);
-	const read = factsReadShort(lines, zone, now);
-	const evidence = `${EVIDENCE_SHORT}${read === null ? '' : ` ${read}`}`;
-	return [advice.basis, proj, BEATS_BASIS, advice.season_basis, evidence].filter((l) => l !== '');
+	return [
+		...said(advice.basis),
+		...said(advice.season_basis),
+		...said(proj),
+		...said(deltaPart(advice.projection_previous_read_at, clock), false),
+		...said(gamePart(lines, clock, now, 'read')),
+		...said(OPP_PART),
+		...uncountedParts(advice, rulesHref)
+	];
 }

@@ -54,9 +54,23 @@
 		build: (row: FinderRow) => (() => void) | null;
 		/** The builder's id, which Build from this opens. */
 		builderId: string;
+		/** Whether any trade is open, its players drawn: the page's basis then says their columns. */
+		anyOpen?: boolean;
 	}
 
-	let { rows, sort, onsort, me, href, verb, reason, propose, build, builderId }: Props = $props();
+	let {
+		rows,
+		sort,
+		onsort,
+		me,
+		href,
+		verb,
+		reason,
+		propose,
+		build,
+		builderId,
+		anyOpen = $bindable(false)
+	}: Props = $props();
 
 	const COLUMNS = 9;
 	const zone = memberZone();
@@ -66,6 +80,7 @@
 	function toggle(key: string): void {
 		if (opened.has(key)) opened.delete(key);
 		else opened.add(key);
+		anyOpen = opened.size > 0;
 	}
 
 	async function press(entry: FinderRow): Promise<void> {
@@ -231,7 +246,7 @@
 									<th class="n ev first" scope="col">{BOX.oppRank}</th>
 									<th class="n ev" scope="col">{BOX.avg}</th>
 									<th class="n ev" scope="col">{BOX.last}</th>
-									<th class="n season" scope="col">{TRADES.restOfSeason}</th>
+									<th class="n season" scope="col">{TRADES.perGame}</th>
 								</tr>
 							</thead>
 							<tbody>

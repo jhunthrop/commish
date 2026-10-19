@@ -1,7 +1,7 @@
 {
 	"week": 6,
 	"basis": "Each team's best trade both lineups gain by, yours first. The other team decides. Gain is the change in a lineup's points over replacement, a week, averaged over the 12 weeks left on our rest-of-season order.",
-	"check_basis": "Pick one or two of yours and one or two of theirs. The scoreboard is each lineup before and after.",
+	"check_basis": "The scoreboard is each lineup before and after the trade.",
 	"basis_note": "Avg and Last leave out five of your scoring rules our stats lack.",
 	"order_basis": "rest_of_season",
 	"refreshed": "2026-10-14T19:05:37.917Z",

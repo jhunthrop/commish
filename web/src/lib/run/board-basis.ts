@@ -13,6 +13,8 @@ export interface BasisPart {
 	phone: boolean;
 	/** The Gap's sentence, which a screen whose rows carry no gap leaves out (Compare's pair). */
 	topic?: 'gap';
+	/** A part drawn as a link: the page its words open (the league's rules, our record). */
+	href?: string;
 }
 
 export interface BasisFacts {

@@ -3,6 +3,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { bannedPattern } from '#lib/format/copy-guard.ts';
+import { basisText } from './basis.ts';
 import type { PlayerLine, TradeAdvice, TradeCheck, TradeRow, TradeTeam } from '../inseason/api.ts';
 import {
 	bugFigures,
@@ -214,6 +215,7 @@ const check = (
 	week: 6,
 	basis: '',
 	basis_note: '',
+	basis_note_link: '',
 	order_basis: 'rest_of_season',
 	refreshed: '2026-10-14T19:05:37.917Z',
 	read_at: '2026-10-15T19:05:37.917Z',
@@ -295,29 +297,70 @@ void test("the builder's box lists by position, each by this week's Proj, injure
 
 const advice: Pick<
 	TradeAdvice,
-	'basis' | 'basis_note' | 'projection_read_at' | 'projection_scoring' | 'player_points'
+	| 'basis'
+	| 'per_game_basis'
+	| 'basis_note'
+	| 'basis_note_link'
+	| 'projection_read_at'
+	| 'projection_scoring'
+	| 'player_points'
 > = {
 	basis:
-		"Trades where both lineups gain on our rest-of-season order. Each team's best trade, yours first, among those they gain at least 0.5 a week from, then the close calls for them. The other team decides.",
-	basis_note: 'Points over replacement are for a 12-team league.',
+		"Each team's best trade both lineups gain by, yours first. The other team decides. Gain is the change in a lineup's points over replacement, a week, averaged over the 12 weeks left on our rest-of-season order.",
+	per_game_basis: 'A game is his rest-of-season points over the games his club has left.',
+	basis_note: 'Avg and Last leave out five of your scoring rules our stats lack.',
+	basis_note_link: 'Which five',
 	projection_read_at: '2026-10-17T02:00:00.000Z',
 	projection_scoring: { format: 'ppr', league_own: false },
 	player_points: true
 };
+const TRADE_CLOCK = { zone: 'America/Chicago', zoned: false };
+const TRADE_LINKS = { rules: '/league/1#uncounted', record: '/record' };
+const PROJ_SAID =
+	"Proj is this week's published projection, PPR nearest your rules, read Fri 9:00 pm.";
+const WEEK_ROOM =
+	"This week is each lineup's Proj with the trade less without it, set as Lineup sets it. Room is who a roster drops to take two for one.";
 
-void test('the basis is five lines at most, the first saying which trades are listed', () => {
-	const lines = tradeBasis(advice, 'sleeper', [line('Cam Skattebo')], 'America/Chicago');
-	assert.ok(lines.length <= 5, String(lines.length));
-	assert.match(
-		lines[0] ?? '',
-		/^Trades where both lineups gain on our rest-of-season order\. .*then the close calls for them\. The other team decides\./
+void test('closed, the basis names the finder columns only: who decides, Gain, Proj, this week and Room (Lane 66t)', () => {
+	const parts = tradeBasis(
+		advice,
+		'sleeper',
+		[line('Cam Skattebo')],
+		false,
+		TRADE_LINKS,
+		TRADE_CLOCK
 	);
-	assert.match(
-		lines[1] ?? '',
-		/This week, Proj is the sum of each lineup's Proj with the trade less without it/
+	assert.equal(
+		basisText(parts),
+		`${advice.basis} ${PROJ_SAID} ${WEEK_ROOM} How the order has done`
 	);
-	assert.match(lines[2] ?? '', /Opp rank is where/);
-	assert.match(lines[3] ?? '', /^Room says who a roster drops/);
+	assert.deepEqual(
+		parts.filter((p) => !p.phone).map((p) => p.text),
+		[WEEK_ROOM]
+	);
+});
+
+void test("a trade opened or the builder open adds the players' columns, each once", () => {
+	const parts = tradeBasis(
+		advice,
+		'sleeper',
+		[line('Cam Skattebo'), line('Chiefs D/ST', 'DEF')],
+		true,
+		TRADE_LINKS,
+		TRADE_CLOCK
+	);
+	assert.equal(
+		basisText(parts),
+		`${advice.basis} ${advice.per_game_basis} Proj is this week's published projection, PPR nearest your rules, defenses on its default scoring, read Fri 9:00 pm. Opp rank is points allowed to his position, 1st the fewest. Pts are Sleeper's, as your league scores them. ${advice.basis_note} Which five. ${WEEK_ROOM} How the order has done`
+	);
+	assert.deepEqual(
+		parts.filter((p) => p.href !== undefined).map((p) => p.href),
+		['/league/1#uncounted', '/record']
+	);
+	assert.deepEqual(
+		parts.filter((p) => !p.phone).map((p) => p.text),
+		["Pts are Sleeper's, as your league scores them.", WEEK_ROOM]
+	);
 });
 
 /** The brief's words a fantasy screen never prints, a dash between clauses, a semicolon, and the
@@ -339,7 +382,7 @@ void test('copy guard: every word the trade table prints is fantasy words, the p
 		copied.page,
 		room.yours,
 		room.theirs,
-		...tradeBasis(advice, 'sleeper', [line('Cam Skattebo')], 'America/Chicago')
+		basisText(tradeBasis(advice, 'sleeper', [line('Cam Skattebo')], true, TRADE_LINKS, TRADE_CLOCK))
 	];
 	for (const text of said) {
 		assert.doesNotMatch(text, NEVER, text);

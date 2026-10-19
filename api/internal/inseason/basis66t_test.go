@@ -28,7 +28,7 @@ func TestTradesBasisSaysWhoDecidesAndGainOnce(t *testing.T) {
 }
 
 func TestBuilderLinePointsAtThePage(t *testing.T) {
-	if TradeCheckBasis != "Pick one or two of yours and one or two of theirs. The scoreboard is each lineup before and after." {
+	if TradeCheckBasis != "The scoreboard is each lineup before and after the trade." {
 		t.Errorf("%q", TradeCheckBasis)
 	}
 }

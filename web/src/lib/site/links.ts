@@ -13,6 +13,10 @@ import {
 /** The attach page's search parameter naming the way in it starts from: `?host=ffpc`. */
 export const LEAGUE_HOST_PARAM = 'host';
 
+/** The anchor of a league's Settings list of the scoring rules our stats lack (Lane 66t): the league
+ * page opens on Settings at it. */
+export const UNCOUNTED_ANCHOR = 'uncounted';
+
 /** The hosts whose leagues are followed from the member's own list, the attach page's other ways in. */
 export const MEMBER_WAYS = ['ffpc', 'yahoo', 'espn'] as const;
 export type MemberWay = (typeof MEMBER_WAYS)[number];
@@ -65,6 +69,8 @@ export const links = {
 			? resolve(LEAGUE_START)
 			: `${resolve(LEAGUE_START)}?${new URLSearchParams({ [LEAGUE_HOST_PARAM]: host }).toString()}`,
 	league: (id: string): string => resolve('/league/[id]', { id }),
+	/** The league's Settings at the scoring rules our stats lack. */
+	leagueRules: (id: string): string => `${resolve('/league/[id]', { id })}#${UNCOUNTED_ANCHOR}`,
 	/** A new mock with a saved league's settings filled in, so drafting it is one tap. */
 	mockLeague: (savedId: string): string =>
 		`${sectionHref('mock')}?${new URLSearchParams({ league: savedId }).toString()}`,

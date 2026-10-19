@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { memberZone } from '#lib/format/clock.ts';
+	import BasisBlock from '#lib/ui/BasisBlock.svelte';
 	import Chip from '#lib/ui/Chip.svelte';
 	import ChipGroup from '#lib/ui/ChipGroup.svelte';
 	import Icon from '#lib/ui/Icon.svelte';
@@ -82,6 +84,8 @@
 		copy?: (text: string) => Promise<void>;
 		/** Opens the platform's page in a new tab. */
 		openPage?: (href: string) => void;
+		/** The league's Settings at the scoring rules our stats lack. */
+		rulesHref: string;
 	}
 
 	let {
@@ -92,7 +96,8 @@
 		make,
 		reread,
 		copy = (text) => navigator.clipboard.writeText(text),
-		openPage = (href) => void window.open(href, '_blank', 'noopener')
+		openPage = (href) => void window.open(href, '_blank', 'noopener'),
+		rulesHref
 	}: Props = $props();
 
 	const MOVE_ID = 'claim-move';
@@ -289,8 +294,11 @@
 
 	/** The pair the drop panel's verb acts on: the open add with the drop chosen. */
 	const pair = $derived(openRow ? withDrop(openRow.source, drop) : null);
-	/** The basis, five short lines at most, the pickup rule first (review 66f M5). */
-	const basis = $derived(waiverBasis(shown, lines));
+	/** The basis, one paragraph within five lines at a desk and eight on a phone (Lane 66t). The page
+	 * names the zone in its head. */
+	const basis = $derived(
+		waiverBasis(shown, lines, rulesHref, { zone: memberZone(), zoned: false }, Date.now())
+	);
 </script>
 
 {#snippet why()}
@@ -339,7 +347,6 @@
 	verb={card ? verbWords(card.source) : null}
 	href={shown.host_waivers_url}
 	basis={null}
-	basisNote={shown.basis_note === '' ? null : shown.basis_note}
 	deskVerb={false}
 	onverb={card ? () => act(card.source) : null}
 	controls={onHost ? MOVE_ID : undefined}
@@ -410,9 +417,7 @@
 			empty={WAIVERS.noneFound}
 		/>
 	</div>
-	<div class="basis">
-		{#each basis as line, i (i)}<p class:first={i === 0}>{line}</p>{/each}
-	</div>
+	<BasisBlock parts={basis} />
 </Screen>
 
 <style>
@@ -479,25 +484,6 @@
 		align-items: center;
 		gap: var(--s-3);
 		text-align: right;
-	}
-
-	.basis {
-		display: flex;
-		flex-direction: column;
-		gap: 2px;
-	}
-
-	/* Each line is one short sentence pair, the table's width: five lines at a desk (review 66f M5). */
-	.basis p {
-		margin: 0;
-		font-size: var(--t-sm);
-		line-height: 1.45;
-		color: var(--ink-3);
-	}
-
-	.basis .first {
-		color: var(--ink-2);
-		font-weight: 500;
 	}
 
 	@media (max-width: 760px) {

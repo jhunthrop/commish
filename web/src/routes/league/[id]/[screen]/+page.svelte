@@ -15,6 +15,7 @@
 	import type { AdviceHead } from '#lib/league/inseason/api.ts';
 	import { ASKED_PARAM } from '#lib/league/box/asked.ts';
 	import { sectionHref } from '#lib/ui/nav.ts';
+	import { links } from '#lib/site/links.ts';
 	import { siteContext } from '#lib/context/context.svelte.ts';
 	import { standingWords } from '#lib/league/model.ts';
 	import EmptyState from '#lib/ui/EmptyState.svelte';
@@ -57,6 +58,7 @@
 					plan={(move: HostMoveInput) => inSeasonApi.planMove(id, move)}
 					make={(move: HostMoveInput, confirm: string) => inSeasonApi.makeMove(id, move, confirm)}
 					{reread}
+					rulesHref={links.leagueRules(id)}
 				/>
 			{/snippet}
 		</InSeasonPage>
@@ -77,6 +79,7 @@
 					plan={(move: HostMoveInput) => inSeasonApi.planMove(id, move)}
 					make={(move: HostMoveInput, confirm: string) => inSeasonApi.makeMove(id, move, confirm)}
 					{reread}
+					rulesHref={links.leagueRules(id)}
 				/>
 			{/snippet}
 		</InSeasonPage>
@@ -96,6 +99,7 @@
 					me={{ name: league?.team_name ?? '', aside: league ? standingWords(league) : '' }}
 					narrow={(player: string) => inSeasonApi.trades(id, player)}
 					check={(trade: TradeCheckInput) => inSeasonApi.checkTrade(id, trade)}
+					rulesHref={links.leagueRules(id)}
 				/>
 			{/snippet}
 		</InSeasonPage>
