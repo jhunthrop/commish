@@ -25,7 +25,7 @@
 	const sum = $derived(pickupSum(figures, cards.length));
 </script>
 
-<div class="strip">
+<div class="strip" data-strip="waivers">
 	<div class="head">
 		<span class="wk">Week {week}</span>
 		<span class="title" class:quiet={cards.length === 0}>{pickupsTitle(cards.length)}</span>

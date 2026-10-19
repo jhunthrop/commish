@@ -5,7 +5,7 @@
 	import ChipGroup from '#lib/ui/ChipGroup.svelte';
 	import Icon from '#lib/ui/Icon.svelte';
 	import ProblemLine from '#lib/ui/ProblemLine.svelte';
-	import Quiet from '#lib/ui/Quiet.svelte';
+	import StripAction from '#lib/ui/StripAction.svelte';
 	import Verb from '#lib/ui/Verb.svelte';
 	import type { LeagueHost } from '../api.ts';
 	import { positionWord } from '../box/box.ts';
@@ -316,11 +316,7 @@
 {/snippet}
 
 {#snippet cardVerb(c: PickupCard, on: boolean)}
-	{#if on}
-		<Verb size="sm" onclick={() => act(c.source)}>{verbWords(c.source)}</Verb>
-	{:else}
-		<Quiet size="sm" onclick={() => act(c.source)}>{verbWords(c.source)}</Quiet>
-	{/if}
+	<StripAction lead={on} size="sm" onclick={() => act(c.source)}>{verbWords(c.source)}</StripAction>
 {/snippet}
 
 {#snippet go()}
