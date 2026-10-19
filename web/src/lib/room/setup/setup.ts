@@ -134,6 +134,20 @@ export function setupCells(lobby: Pick<LobbyFilling, 'clock_seconds'> | undefine
 	];
 }
 
+/** A lobby card's count: the drafters in the room filling now (the API's `filling`), said as people
+ * in, never as a score against the seats ("0 of 12"); the card's title already says the teams. */
+export interface LobbyFill {
+	words: string;
+	/** No one has joined yet: the card says so quietly, in words, not as a figure. */
+	empty: boolean;
+}
+
+export function lobbyFillWords(filling: number): LobbyFill {
+	return filling > 0
+		? { words: `${String(filling)} in`, empty: false }
+		: { words: 'No one in yet', empty: true };
+}
+
 /** "12 teams, PPR" for a lobby format. */
 export function lobbyTitle(
 	teams: number,

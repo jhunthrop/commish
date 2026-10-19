@@ -35,6 +35,7 @@ import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
 import { basisLines, basisReport } from './basis-lines.ts';
 import { copyFault, watchData } from './copy-scan.ts';
 import { installFixtureApiClock, requireFixtureClock } from './inseason-fixture/clock.ts';
+import { pageFaults, pageLine, pageMeasures } from './page-measures.ts';
 
 const web = process.argv[2] ?? 'http://localhost:4196';
 /** The fixture API the site was built against, on the fixture week's clock (FIXTURE_CLOCK=
@@ -126,6 +127,7 @@ await mkdir(out, { recursive: true });
 await writeFile(new URL('README.md', out), CAPTION);
 const browser = await chromium.launch();
 const faults: string[] = [];
+const pageLines: string[] = [];
 
 async function context(theme: string, width: number, signedIn: boolean): Promise<BrowserContext> {
 	const ctx = await browser.newContext({
@@ -428,7 +430,15 @@ for (const screen of SCREENS) {
 				? await recordFaults(page, width)
 				: await orderFaults(page, screen, width))
 		);
-		if (screen.name === 'record') faults.push(...(await variantFaults(page, width)));
+		if (screen.name === 'record') {
+			faults.push(...(await variantFaults(page, width)));
+			// Lane 87: every drawn row of the week table ends at its right edge, at every width.
+			const measured = await pageMeasures(page);
+			pageLines.push(pageLine(`record ${String(width)}`, measured));
+			faults.push(
+				...pageFaults(measured, width <= PHONE_MAX, 3).map((f) => `record ${String(width)}: ${f}`)
+			);
+		}
 		await ctx.close();
 	}
 	for (const [theme, width] of SHOTS) {
@@ -440,10 +450,18 @@ for (const screen of SCREENS) {
 			await page.screenshot({ path: new URL(`${name}-first-screen.png`, out).pathname });
 		}
 		await page.screenshot({ path: new URL(`${name}.png`, out).pathname, fullPage: true });
+		if (screen.name === 'record') {
+			// The table alone, the bars that ride over it hidden for its element shot.
+			await page.addStyleTag({ content: 'nav.rail, header.top { display: none !important; }' });
+			await page
+				.locator(screen.table)
+				.screenshot({ path: new URL(`record-table-${theme}-${String(width)}.png`, out).pathname });
+		}
 		await ctx.close();
 	}
 }
 await browser.close();
+for (const line of pageLines) process.stdout.write(`${line}\n`);
 for (const fault of faults) process.stdout.write(`FAULT ${fault}\n`);
 process.stdout.write(`${String(faults.length)} faults\n`);
 process.exit(faults.length === 0 ? 0 : 1);
