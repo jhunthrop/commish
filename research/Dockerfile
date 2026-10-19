@@ -1,7 +1,7 @@
-# research/Dockerfile. The build context is research/, with web/ as the named context `web` (the run
-# contract the nightly's schema gate reads):
-#   docker build --build-context web=web --build-arg VERSION=$(git rev-parse --short=8 HEAD) \
-#     -f research/Dockerfile -t commish-research:local research
+# research/Dockerfile. The build context is research/, with web/ and api/ as the named contexts `web`
+# and `api` (the run contract the nightly's schema gate reads, and the API's words file it imports):
+#   docker build --build-context web=web --build-context api=api \
+#     --build-arg VERSION=$(git rev-parse --short=8 HEAD) -f research/Dockerfile -t commish-research:local research
 #
 # One image, three modules, each run with `python -m`:
 #   research.advisor                    the advisor service (the default CMD), POST /advise on $PORT
@@ -15,8 +15,13 @@
 # THE WEB'S RUN CONTRACT (the nightly's `schema` gate, `nightly/schema_gate.py`): the web's own
 # schema and reader, copied from the repository, with zod and aws4fetch at the versions the web's lock
 # pins, under node. A run the web build would refuse never moves a pointer.
+# The stage mirrors the repository's layout, /contract/web beside /contract/api, so the reader's
+# relative imports resolve as they do in the tree (`src/lib/format/figure-words.ts` reads
+# `../../../../api/internal/figurewords/words.json`). Every runtime import of the reader is one of the
+# copies below: web/src/lib/run/image-closure.test.ts walks the closure against these COPY lines and
+# pins, so an import the image lacks fails the web's tests, not the image job (Lane 76).
 FROM node:24-slim AS web-contract
-WORKDIR /contract
+WORKDIR /contract/web
 COPY --from=web package-lock.json /tmp/web-lock.json
 RUN node -e 'const lock = require("/tmp/web-lock.json").packages; \
   const pin = (name) => lock["node_modules/" + name].version; \
@@ -25,7 +30,9 @@ RUN node -e 'const lock = require("/tmp/web-lock.json").packages; \
   require("fs").writeFileSync("package.json", JSON.stringify(manifest, null, 2));' \
   && npm install --omit=dev --no-audit --no-fund --ignore-scripts
 COPY --from=web src/lib/run ./src/lib/run
+COPY --from=web src/lib/format ./src/lib/format
 COPY --from=web src/lib/types/player.ts ./src/lib/types/player.ts
+COPY --from=api internal/figurewords/words.json ../api/internal/figurewords/words.json
 # The build's own reader, which the gate drives so that its cross-file checks are the web's, not a copy.
 COPY --from=web src/lib/server/run.ts ./src/lib/server/run.ts
 
@@ -43,11 +50,11 @@ ARG VERSION=dev
 # The model version every board and freeze records (`research.model.arithmetic.model_version`):
 # there is no git in the image, so the commit comes in at build time.
 ENV RESEARCH_MODEL_COMMIT=${VERSION} PATH=/app/.venv/bin:$PATH PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 \
-    WEB_CONTRACT_DIR=/app/web-contract
+    WEB_CONTRACT_DIR=/app/contract/web
 RUN apt-get update && apt-get install -y --no-install-recommends libstdc++6 && rm -rf /var/lib/apt/lists/* \
   && useradd --system --uid 10001 --no-create-home research
 COPY --from=web-contract /usr/local/bin/node /usr/local/bin/node
-COPY --from=web-contract /contract /app/web-contract
+COPY --from=web-contract /contract /app/contract
 COPY --from=build /app /app
 WORKDIR /app/research
 USER 10001

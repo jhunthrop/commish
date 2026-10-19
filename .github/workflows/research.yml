@@ -15,6 +15,8 @@ on:
       - "web/src/lib/run/**"
       - "web/src/lib/server/run.ts"
       - "web/src/lib/types/player.ts"
+      - "web/src/lib/format/**"
+      - "api/internal/figurewords/words.json"
       - "web/package-lock.json"
       - "research-ts/**"
       - "drizzle/**"
@@ -34,6 +36,8 @@ on:
       - "web/src/lib/run/**"
       - "web/src/lib/server/run.ts"
       - "web/src/lib/types/player.ts"
+      - "web/src/lib/format/**"
+      - "api/internal/figurewords/words.json"
       - "web/package-lock.json"
       - "research-ts/**"
       - "drizzle/**"
@@ -160,8 +164,11 @@ jobs:
         with:
           context: research
           file: research/Dockerfile
-          # The web's run contract, which the nightly's schema gate runs (research/nightly/schema_gate.py).
-          build-contexts: web=web
+          # The web's run contract, which the nightly's schema gate runs (research/nightly/schema_gate.py),
+          # and the API's words file its format modules import (research/Dockerfile, the web-contract stage).
+          build-contexts: |
+            web=web
+            api=api
           build-args: VERSION=${{ github.sha }}
           load: true
           tags: ${{ env.IMAGE }}
