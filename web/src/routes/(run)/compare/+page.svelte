@@ -12,6 +12,7 @@
 	import { links } from '#lib/site/links.ts';
 	import { SAME_PLAYER, verdict as callBetween } from '#lib/site/verdict.ts';
 	import { compareRows, type Side } from '#lib/site/compare-rows.ts';
+	import { firstStep } from '#lib/site/compare-words.ts';
 	import { EMPTY_FIGURE } from '#lib/format/empty.ts';
 	import { fetchPlayer, type PlayerData } from '#lib/site/player-data.ts';
 	import { SEARCH_INDEX_URL, searchable, type SearchablePlayer } from '#lib/site/search.ts';
@@ -153,7 +154,9 @@
 	<main class="compare">
 		<PageHead
 			title="Compare"
-			lead={failed ? 'The players are not loading. Try again in a moment.' : undefined}
+			lead={failed
+				? 'The players are not loading. Try again in a moment.'
+				: (firstStep(both.length) ?? undefined)}
 		/>
 		<ContextNote note={note?.text ?? null} link={note?.link ?? null} />
 
