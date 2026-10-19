@@ -158,7 +158,11 @@
 	let Order = $state<typeof OrderScreenComponent | null>(null);
 	let Week = $state<typeof WeekScreenComponent | null>(null);
 	/** The week's head and basis, once its read lands. */
-	let weekSaid = $state<{ heading: string; basis: BasisPart[] } | null>(null);
+	interface WeekSaid {
+		heading: string;
+		basis: BasisPart[];
+	}
+	let weekSaid = $state<WeekSaid | null>(null);
 	onMount(() => {
 		if (weekPosition !== null) {
 			void import('#lib/order/WeekScreen.svelte').then((module) => {
@@ -247,7 +251,7 @@
 					<Week
 						position={weekPosition}
 						league={orderLeague}
-						onread={(said) => {
+						onread={(said: WeekSaid) => {
 							weekSaid = said;
 						}}
 					/>

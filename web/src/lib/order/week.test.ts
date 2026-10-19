@@ -136,10 +136,7 @@ void test("a member's defenses' basis: its default scoring, the league's own poi
 	);
 	assert.match(said, /We have no defense model of our own/);
 	assert.match(said, /Opp rank is its opponent's points allowed to defenses this season/);
-	assert.match(
-		said,
-		/its points a game and in its last game, in this league's scoring\./
-	);
+	assert.match(said, /its points a game and in its last game, in this league's scoring\./);
 	assert.match(said, /the defense's club first/);
 	assert.match(said, /Roster is ESPN's, read /);
 	assert.doesNotMatch(said, /host/i);

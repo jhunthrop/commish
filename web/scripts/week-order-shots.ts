@@ -59,12 +59,48 @@ interface Screen {
 }
 
 const SCREENS: readonly Screen[] = [
-	{ name: 'k-visitor', path: '/board/ppr-12/k', member: false, heading: 'Week 6 kickers', state: 'week' },
-	{ name: 'k-member', path: '/board/ppr-12/k', member: true, heading: 'Week 6 kickers', state: 'week' },
-	{ name: 'dst-visitor', path: '/board/ppr-12/dst', member: false, heading: 'Week 6 defenses', state: 'week' },
-	{ name: 'dst-member', path: '/board/ppr-12/dst', member: true, heading: 'Week 6 defenses', state: 'week' },
-	{ name: 'k-visitor-empty', path: '/board/ppr-12/k', member: false, heading: 'Week 6 kickers', state: 'empty' },
-	{ name: 'dst-member-empty', path: '/board/ppr-12/dst', member: true, heading: 'Week 6 defenses', state: 'empty' }
+	{
+		name: 'k-visitor',
+		path: '/board/ppr-12/k',
+		member: false,
+		heading: 'Week 6 kickers',
+		state: 'week'
+	},
+	{
+		name: 'k-member',
+		path: '/board/ppr-12/k',
+		member: true,
+		heading: 'Week 6 kickers',
+		state: 'week'
+	},
+	{
+		name: 'dst-visitor',
+		path: '/board/ppr-12/dst',
+		member: false,
+		heading: 'Week 6 defenses',
+		state: 'week'
+	},
+	{
+		name: 'dst-member',
+		path: '/board/ppr-12/dst',
+		member: true,
+		heading: 'Week 6 defenses',
+		state: 'week'
+	},
+	{
+		name: 'k-visitor-empty',
+		path: '/board/ppr-12/k',
+		member: false,
+		heading: 'Week 6 kickers',
+		state: 'empty'
+	},
+	{
+		name: 'dst-member-empty',
+		path: '/board/ppr-12/dst',
+		member: true,
+		heading: 'Week 6 defenses',
+		state: 'empty'
+	}
 ];
 
 const CLOCKS = { week: FIXTURE_WEEK_CLOCK, empty: FIXTURE_UNREAD_CLOCK } as const;
@@ -121,7 +157,10 @@ async function context(theme: string, width: number, screen: Screen): Promise<Br
 }
 
 /** The page open with its week read, and every image it fetched. */
-async function open(page: Page, screen: Screen): Promise<{ images: string[]; bytes: () => number }> {
+async function open(
+	page: Page,
+	screen: Screen
+): Promise<{ images: string[]; bytes: () => number }> {
 	const images: string[] = [];
 	let bytes = 0;
 	page.on('response', (response) => {
@@ -142,7 +181,12 @@ async function open(page: Page, screen: Screen): Promise<{ images: string[]; byt
 	return { images, bytes: () => bytes };
 }
 
-async function check(page: Page, screen: Screen, width: number, images: string[]): Promise<string[]> {
+async function check(
+	page: Page,
+	screen: Screen,
+	width: number,
+	images: string[]
+): Promise<string[]> {
 	const seen = await page.evaluate(() => {
 		const text = (el: Element): string => el.textContent.trim();
 		const visible = (el: Element): boolean => (el as HTMLElement).offsetParent !== null;
@@ -206,8 +250,7 @@ async function check(page: Page, screen: Screen, width: number, images: string[]
 	} else if (seen.adds.length > 0) {
 		said.push(`${at}: an add without a league`);
 	}
-	if (seen.heads.includes('Opp rank') === false && width >= 1100)
-		said.push(`${at}: no Opp rank head`);
+	if (!seen.heads.includes('Opp rank') && width >= 1100) said.push(`${at}: no Opp rank head`);
 	for (const url of images) {
 		if (url.includes('espncdn')) said.push(`${at}: an image from the image host: ${url}`);
 	}
