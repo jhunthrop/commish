@@ -9,6 +9,7 @@ import pytest
 from research.errors import ConfigurationError
 from research.model.ros.live import (
     FIRST_MODEL_WEEK,
+    ClubSlates,
     PlayerWeeks,
     WeekFacts,
     Window,
@@ -22,7 +23,7 @@ from research.model.ros.scratch import check_target_url
 from research.model.ros.ship import first_difference
 from research.nightly.build.player_season import SCORING
 from research.nightly.build.ros import RosBasis, carried
-from research.nightly.build.season import format_json, month_day
+from research.nightly.build.season import format_json, month_day, read_week_templates
 from research.nightly.config import RUN_FORMATS
 from research.nightly.reads.record import method
 
@@ -92,11 +93,19 @@ def test_the_players_input_stops_at_the_lines_and_ranks_from_the_window() -> Non
     }
     who = PlayerWeeks("p", "WR", "KC", {1: "KC", 2: "BUF"}, weeks)
     schedule = {"KC": [1, 2, 3, 4, 5, 6, 7], "BUF": [1, 2, 3, 5, 6, 8, 9, 17, 18]}
-    player = player_to_date(who, Window(7, 5), schedule, stale_prior(None, _SERVED, 17.0), SCORING)
+    player = player_to_date(
+        who, Window(7, 5), ClubSlates(schedule, schedule), stale_prior(None, _SERVED, 17.0), SCORING
+    )
     assert player.club_weeks == (1, 2, 3, 5)  # his latest club is Buffalo
     assert [g.week for g in player.played] == [1, 2]
     assert player.remaining_weeks == (8, 9, 17)  # Buffalo plays weeks 8, 9 and 17 from week 7
     assert player.streak == 2
+    # Lane 86: Buffalo's week 8 game kicked off, so his rest of season is weeks 9 and 17.
+    played_eight = {**schedule, "BUF": [9, 17, 18]}
+    later = player_to_date(
+        who, Window(7, 5), ClubSlates(schedule, played_eight), stale_prior(None, _SERVED, 17.0), SCORING
+    )
+    assert later.remaining_weeks == (9, 17)
 
 
 def test_the_in_season_basis_names_the_rest_of_the_season_and_the_refresh() -> None:
@@ -109,8 +118,14 @@ def test_the_in_season_basis_names_the_rest_of_the_season_and_the_refresh() -> N
         "tiers drawn within each position",
     ]
     assert (shown["rosFromWeek"], shown["rosThroughWeek"], shown["refreshedAt"]) == (7, 6, "2026-10-21T03:30:00.000Z")
+    assert shown["rosFromWeekPartial"] is False
+    # Lane 86: while a game of the first week is played, the words say it counts that week's games left.
+    partly = format_json(RUN_FORMATS[0], 2026, RosBasis(6, 5, rest.refreshed_at, partial=True))
+    assert partly["basis"][0] == "PPR, rest of the 2026 season from week 6's games left, refreshed October 20"
+    assert (partly["rosFromWeek"], partly["rosFromWeekPartial"]) == (6, True)
     preseason = format_json(RUN_FORMATS[0], 2026)
     assert "rosFromWeek" not in preseason
+    assert "rosFromWeekPartial" not in preseason
     assert preseason["basis"][:2] == ["PPR, full 2026 season", "projected before the season's first kickoff"]
 
 
@@ -132,3 +147,18 @@ def test_the_one_shot_guard_refuses_dev_and_the_parity_database(url: str) -> Non
 def test_the_one_shot_guard_admits_an_explicit_other_store() -> None:
     check_target_url("postgres://u:p@localhost:6543/commish")  # a proxy on another port
     check_target_url("postgres://commish:commish@localhost:5433/lane18_live")
+
+
+def test_the_week_templates_are_checked_when_read() -> None:
+    """Re-review N3: the words table's week templates are read once, when the module loads, and a
+    template missing or without exactly one week slot fails then, never at a format's words."""
+    assert read_week_templates(
+        '{"restFrom": "from week {week}", "restFromPartial": "from week {week}\'s games left"}'
+    ) == {
+        "restFrom": "from week {week}",
+        "restFromPartial": "from week {week}'s games left",
+    }
+    for broken in ('{"restFrom": "from week {week}"}', '{"restFrom": "from week", "restFromPartial": "{week}"}',
+                   '{"restFrom": "{week} {week}", "restFromPartial": "{week}"}'):  # fmt: skip
+        with pytest.raises(ValueError, match="week template"):
+            read_week_templates(broken)

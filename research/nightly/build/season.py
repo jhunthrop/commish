@@ -1,5 +1,7 @@
 """ADP, THE RECORD, THE CLUBS AND THE SCHEDULE, in the web's run format (`web/src/lib/run/schema.ts`)."""
 
+import json
+import os
 from collections.abc import Mapping, Sequence
 from datetime import datetime
 from typing import Any, Final, Protocol
@@ -11,6 +13,7 @@ from research.nightly.reads import record as record_read
 from research.nightly.reads import schedule as schedule_read
 from research.nightly.reads.adp import AdpCapture
 from research.nightly.register_log import FrozenBy
+from research.web_contract import figure_words_path
 
 Json = dict[str, Any]
 # A rank correlation is at most one in magnitude; a float sum can land an ulp past it.
@@ -164,6 +167,38 @@ def schedule_json(
     }
 
 
+# The placeholder the words table's week templates carry.
+WEEK_SLOT: Final = "{week}"
+
+
+_WEEK_TEMPLATES: Final = ("restFrom", "restFromPartial")
+
+
+def read_week_templates(text: str) -> dict[str, str]:
+    """The words table's week templates, each checked for exactly one week slot (re-review N3, as the
+    API's figurewords.Parse checks them)."""
+    table = json.loads(text)
+    out: dict[str, str] = {}
+    for key in _WEEK_TEMPLATES:
+        template = table.get(key)
+        if not isinstance(template, str) or template.count(WEEK_SLOT) != 1:
+            raise ValueError(f"the words table's {key} week template needs exactly one {WEEK_SLOT}: {template!r}")
+        out[key] = template
+    return out
+
+
+# Read once, when the module loads: a broken table fails the run at its start, never at a format's words.
+_WEEK_WORDS: Final = read_week_templates(figure_words_path(os.environ).read_text())
+
+
+def rest_from_words(rest: "RestOfSeason") -> str:
+    """The week the rest of season counts from, said once (Lane 86), from the site's one words table
+    (api/internal/figurewords/words.json, the API's restFromWords and the web's): "from week 7", or
+    while a game of it is played "from week 6's games left"."""
+    template = _WEEK_WORDS["restFromPartial" if rest.partial else "restFrom"]
+    return template.replace(WEEK_SLOT, str(rest.from_week))
+
+
 def format_json(run_format: RunFormat, season: int, rest: "RestOfSeason | None" = None) -> Json:
     """A format as the manifest lists it, with the basis its board's lead prints, phrase by phrase. In
     season (`rest`), the rest-of-season window and the refresh, as additive fields and in the basis."""
@@ -171,7 +206,7 @@ def format_json(run_format: RunFormat, season: int, rest: "RestOfSeason | None" 
         [f"{run_format.scoring_words}, full {season} season", "projected before the season's first kickoff"]
         if rest is None
         else [
-            f"{run_format.scoring_words}, rest of the {season} season from week {rest.from_week}, "
+            f"{run_format.scoring_words}, rest of the {season} season {rest_from_words(rest)}, "
             f"refreshed {month_day(rest.refreshed_at)}"
         ]
     )
@@ -187,7 +222,13 @@ def format_json(run_format: RunFormat, season: int, rest: "RestOfSeason | None" 
         "marketOrder": run_format.adp.source,
     }
     if rest is not None:
-        out |= {"rosFromWeek": rest.from_week, "rosThroughWeek": rest.through, "refreshedAt": iso(rest.refreshed_at)}
+        out |= {
+            "rosFromWeek": rest.from_week,
+            # A game of the first week is played at the run: the board counts that week's games left.
+            "rosFromWeekPartial": rest.partial,
+            "rosThroughWeek": rest.through,
+            "refreshedAt": iso(rest.refreshed_at),
+        }
     return out
 
 
@@ -198,6 +239,8 @@ class RestOfSeason(Protocol):
     def through(self) -> int: ...
     @property
     def refreshed_at(self) -> datetime: ...
+    @property
+    def partial(self) -> bool: ...
 
 
 _MONTHS: Final = (

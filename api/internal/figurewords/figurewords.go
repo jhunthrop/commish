@@ -8,6 +8,7 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"strings"
 )
 
 //go:embed words.json
@@ -26,7 +27,16 @@ type Words struct {
 	Avg string `json:"avg"`
 	// Week heads this week's projection beside the season's ("Wk 6").
 	Week string `json:"week"`
+	// RestFrom is the week a rest of season starts from, "{week}" its
+	// number: "from week 7".
+	RestFrom string `json:"restFrom"`
+	// RestFromPartial is the same while a game of that week has kicked
+	// off (Lane 86): "from week 6's games left".
+	RestFromPartial string `json:"restFromPartial"`
 }
+
+// WeekSlot is the placeholder RestFrom and RestFromPartial carry.
+const WeekSlot = "{week}"
 
 // Parse reads a table, failing on an unknown key or an empty word.
 func Parse(b []byte) (Words, error) {
@@ -34,9 +44,15 @@ func Parse(b []byte) (Words, error) {
 	if err := json.Unmarshal(b, &w); err != nil {
 		return Words{}, fmt.Errorf("figurewords: %w", err)
 	}
-	for name, word := range map[string]string{"projected": w.Projected, "points": w.Points, "perGame": w.PerGame, "avg": w.Avg, "week": w.Week} {
+	for name, word := range map[string]string{"projected": w.Projected, "points": w.Points, "perGame": w.PerGame, "avg": w.Avg, "week": w.Week,
+		"restFrom": w.RestFrom, "restFromPartial": w.RestFromPartial} {
 		if word == "" {
 			return Words{}, fmt.Errorf("figurewords: no word for %s", name)
+		}
+	}
+	for name, template := range map[string]string{"restFrom": w.RestFrom, "restFromPartial": w.RestFromPartial} {
+		if !strings.Contains(template, WeekSlot) {
+			return Words{}, fmt.Errorf("figurewords: %s has no %s", name, WeekSlot)
 		}
 	}
 	return w, nil

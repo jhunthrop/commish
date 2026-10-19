@@ -13,6 +13,7 @@
 	import { CARD, unreadBasis, type CardTile } from '#lib/player/card.ts';
 	import type { CardLeague, LiveCard, RestParts } from '#lib/player/week-words.ts';
 	import { shownWeekRead } from '#lib/player/week-read.ts';
+	import { cliffAt, lineFiguresAt, matesAt } from '#lib/player/live-figures.ts';
 	import PlayerCard from '#lib/player/PlayerCard.svelte';
 	import type PlayerCompare from '#lib/player/PlayerCompare.svelte';
 	import Credit from '#lib/site/Credit.svelte';
@@ -96,7 +97,16 @@
 		try {
 			const module = await import('#lib/player/live.ts');
 			const player = { id: page.id, name: page.name, team: page.team, position: page.position };
-			const week = await module.readWeek(player, at);
+			const tierFormat = apiFormatOf(lead.format);
+			const ask =
+				tierFormat === null || page.tier.mates.length === 0
+					? null
+					: {
+							ids: page.tier.mates.map((mate) => mate.id),
+							next: page.tier.cliff?.nextId ?? null,
+							format: tierFormat
+						};
+			const week = await module.readWeek(player, at, ask);
 			if (mine !== asked) return;
 			live = module.liveCard({
 				week,
@@ -106,6 +116,7 @@
 				opponents: page.card.opponents,
 				games: page.card.games,
 				rest,
+				tier: { label: scoring, season, single: page.tier.mates.length === 1 },
 				screenHref: module.screenHrefFor(at),
 				// The page's clock: the card is drawn at the moment its week is read.
 				now: Date.now()
@@ -156,10 +167,11 @@
 			label: scoring,
 			preseason:
 				page.rest === null ? page.numbers.projected : (page.rest.preseason?.points ?? null),
+			// The read's rest of season once it answers in the lead's scoring (Lane 86), the run's before.
 			rest:
-				lead.rest === null || lead.format.rosFromWeek === undefined
+				lead.rest === null || lead.restParts === null
 					? null
-					: { points: n.projected, fromWeek: lead.format.rosFromWeek }
+					: (live?.rest ?? { points: n.projected, from: lead.restParts.from })
 		})
 	);
 	/** His status words as built, said again on the member's clock once the page is live. */
@@ -188,9 +200,23 @@
 	const statusNote = $derived(statusWords?.note ?? null);
 	/** On a season-long list: no tier and no gap frame the rank his figure would earn. */
 	const heldOut = $derived(page.status?.status.seasonLong === true);
+	/** The tier box and the every-format table on one clock (live-figures.ts, re-review N1): the run's
+	 * figures until the read answers, then the read's alone. */
 	const mates = $derived(
-		page.tier.mates.map((mate) => ({ ...mate, href: links.player(mate.slug) }))
+		matesAt(page.tier.mates, live?.tier ?? null).map((mate) => ({
+			...mate,
+			href: links.player(mate.slug)
+		}))
 	);
+	const tierCliff = $derived(cliffAt(page.tier.cliff, live?.tier ?? null));
+	const lineFigures = (
+		line: (typeof page.lines)[number]
+	): { points: number | null; vor: number | null } =>
+		lineFiguresAt(
+			{ points: line.numbers.projected, vor: line.numbers.vor },
+			apiFormatOf(line.format),
+			live?.formats ?? null
+		);
 	/** The week tile's head as drawn ("Wk 6"), which the unread basis names. */
 	const weekTileHead = $derived(tiles.find((tile) => tile.key === 'proj')?.label ?? CARD.proj);
 	/** Every number's basis, once: the week's, the rest of season's, the season's. */
@@ -340,9 +366,9 @@
 							group={POSITION_NAMES[page.position]}
 							{mates}
 							currentId={page.id}
-							cliff={page.tier.cliff}
+							cliff={tierCliff}
 							unit={page.format.unit}
-							basis={page.tierBasis}
+							basis={live?.tier?.basis ?? page.tierBasis}
 						/>
 					{/if}
 				</div>
@@ -357,17 +383,18 @@
 					columns={[
 						{ label: 'Format' },
 						{ label: 'Our rank', align: 'end' },
-						{ label: page.pointsHead, align: 'end' },
+						{ label: live?.formats?.head ?? page.pointsHead, align: 'end' },
 						{ label: 'Over replacement', align: 'end' },
 						{ label: 'Tier', align: 'end' }
 					]}
 				>
 					{#each page.lines as line (line.format.id)}
+						{@const figures = lineFigures(line)}
 						<tr>
 							<td><a href={links.board(line.format.id, page.position)}>{line.tableLabel}</a></td>
 							<td class="num">{listed?.rank ?? line.numbers.ourRank}</td>
-							<td class="num">{fixed(line.numbers.projected)}</td>
-							<td class="num">{signed(line.numbers.vor)}</td>
+							<td class="num">{figures.points === null ? EMPTY_FIGURE : fixed(figures.points)}</td>
+							<td class="num">{figures.vor === null ? EMPTY_FIGURE : signed(figures.vor)}</td>
 							<td class="num">{listed?.rank ?? line.numbers.tier}</td>
 						</tr>
 					{/each}

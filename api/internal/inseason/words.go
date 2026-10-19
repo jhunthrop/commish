@@ -401,13 +401,31 @@ func OrderLeague(own bool, s apitypes.LeagueSettings, format apitypes.Projection
 	return fmt.Sprintf("a %d-team %s league", s.Teams, formatNames[format])
 }
 
+// RestFrom is the week a rest-of-season order starts from, and whether a
+// game of it has kicked off (RestNow.Partial): then the order counts that
+// week's games left.
+type RestFrom struct {
+	Week    int
+	Partial bool
+}
+
+// restFromWords is the week the order counts from, said once: "from week
+// 7", or while a game of it is played "from week 6's games left".
+func restFromWords(r RestFrom) string {
+	template := figurewords.Table.RestFrom
+	if r.Partial {
+		template = figurewords.Table.RestFromPartial
+	}
+	return strings.ReplaceAll(template, figurewords.WeekSlot, strconv.Itoa(r.Week))
+}
+
 // OrderScreenBasis is the Rest of season and Players screens' line
-// (Lane 66j, 66t): what the order ranks by and the league its points over
-// replacement are for, said once.
-func OrderScreenBasis(b OrderBasis, fromWeek int, league string) string {
-	if b != RestOfSeason || fromWeek < 1 {
+// (Lane 66j, 66t): what the order ranks by, from which week's games
+// (Lane 86), and the league its points over replacement are for, said once.
+func OrderScreenBasis(b OrderBasis, from RestFrom, league string) string {
+	if b != RestOfSeason || from.Week < 1 {
 		return fmt.Sprintf("Our preseason order: All ranks by Over repl., his season less a free pickup's in %s.", league)
 	}
-	return fmt.Sprintf("Our rest-of-season order from week %d. A position ranks by %s through week %d, byes out, "+
-		"All by Over repl., his points less a free pickup's in %s.", fromWeek, figurewords.Table.Projected, LastWeek, league)
+	return fmt.Sprintf("Our rest-of-season order %s. A position ranks by %s through week %d, byes out, "+
+		"All by Over repl., his points less a free pickup's in %s.", restFromWords(from), figurewords.Table.Projected, LastWeek, league)
 }

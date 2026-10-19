@@ -3,6 +3,7 @@
 import { carriesGap } from '#lib/format/gap.ts';
 import { poolCount } from '#lib/format/pool-words.ts';
 import { adpDrafts } from '#lib/run/adp-drafts.ts';
+import { boardRestFrom } from '#lib/run/rest-from.ts';
 import { boardBasis, type BasisPart } from '#lib/run/board-basis.ts';
 import { withStatuses } from '#lib/run/board-status.ts';
 import { rangeScale } from '#lib/run/derive.ts';
@@ -19,6 +20,9 @@ const TOP_ROWS = 10;
 
 export interface FrontPage extends BoardStatuses {
 	format: Format;
+	/** The week the board's rest of season counts from, in the run's words; null on a full-season
+	 * board (Lane 86, review H2). */
+	restFrom: string | null;
 	/** Each with his season figures once the season is underway. */
 	rows: BoardRowView[];
 	/** The strip's basis, said once under its head (Lane 66n). */
@@ -58,6 +62,7 @@ export async function frontPage(now: number): Promise<FrontPage> {
 	const showsGap = rowFraming(format).compare && carriesGap(rows);
 	return {
 		format,
+		restFrom: boardRestFrom(format),
 		rows,
 		basis: boardBasis({
 			format,

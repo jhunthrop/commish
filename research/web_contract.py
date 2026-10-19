@@ -18,3 +18,9 @@ _REPOSITORY_WEB: Final = Path(__file__).resolve().parents[1] / "web"
 def contract_dir(environ: dict[str, str] | os._Environ[str]) -> Path:
     configured = environ.get(CONTRACT_DIR_VARIABLE, "").strip()
     return Path(configured) if configured else _REPOSITORY_WEB
+
+
+def figure_words_path(environ: dict[str, str] | os._Environ[str]) -> Path:
+    """The site's one words table (api/internal/figurewords/words.json), beside the web's contract as
+    the image's web-contract stage lays it out and as the repository holds it."""
+    return contract_dir(environ).parent / "api" / "internal" / "figurewords" / "words.json"

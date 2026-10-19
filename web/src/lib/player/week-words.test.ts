@@ -25,7 +25,13 @@ const PLAYER = { id: '4426515', name: 'Puka Nacua', team: 'LAR', position: 'WR' 
 const LEAGUE = { id: 'league-1', host: 'sleeper' as const };
 const href: ScreenHref = (screen, query) =>
 	`/league/league-1/${screen}?${new URLSearchParams(query).toString()}`;
-const REST = { fromWeek: 6, rank: 'WR1 in our order', scoring: 'ppr' as const, label: 'PPR' };
+const REST = {
+	from: 'from week 6',
+	rank: 'WR1 in our order',
+	scoring: 'ppr' as const,
+	label: 'PPR',
+	board: 'ppr' as const
+};
 
 const facts = (over: Partial<WeekFacts> = {}): WeekFacts => ({
 	week: 6,
@@ -155,6 +161,128 @@ void test("the rest tile stays in one scoring: the read's figure a game only whe
 	);
 	assert.equal(tile(half.tiles, 'rest').caption, 'from week 6, WR1 in our order, in PPR scoring');
 	assert.equal(tile(half.tiles, 'rest').value, '182.2');
+});
+
+/** The read's rest of season in every run format, Sunday evening: his game is played, so 167.5 from
+ * week 7 in PPR (review H3). */
+const RUN_FORMATS_LIVE = [
+	{ format: 'ppr', points: 167.5, points_over_replacement: 88.2 },
+	{ format: 'half_ppr', points: 150.1, points_over_replacement: 80.4 },
+	{ format: 'standard', points: 132.7, points_over_replacement: 71.9 },
+	{ format: 'superflex', points: 167.5, points_over_replacement: 60.3 }
+] as const;
+const LIVE_TIER: NonNullable<PlayerWeek['tier']> = {
+	format: 'ppr',
+	mates: [
+		{ board_id: 'ja-marr-chase', points: 171.0 },
+		{ board_id: PLAYER.id, points: 167.5 }
+	],
+	drop: 9.4,
+	from_week: 6,
+	partial: true
+};
+const TIER_ASK = { label: 'PPR', season: 2026, single: false };
+
+void test("on Sunday evening the read's rest of season replaces the run's: his game is played, so he counts from week 7 (Lane 86)", () => {
+	const live = card(
+		week(
+			{ rest_of_season: [...RUN_FORMATS_LIVE], rest_from_week: 7 },
+			{ rest_of_season_per_game: 16.8 }
+		)
+	);
+	assert.equal(tile(live.tiles, 'rest').value, '167.5');
+	assert.equal(tile(live.tiles, 'rest').caption, 'from week 7, 16.8 a game, WR1 in our order');
+	assert.deepEqual(live.rest, { points: 167.5, from: 'from week 7' });
+	// A read older than the fields keeps the run's figure and the run's week.
+	const older = card(week());
+	assert.equal(older.rest, null);
+	assert.equal(tile(older.tiles, 'rest').caption, 'from week 6, WR1 in our order');
+});
+
+void test("review H1: in another scoring the tile's week follows the figure it prints", () => {
+	// A half-PPR league's read carries the PPR figure at its clock: the tile prints it with its week.
+	const half = card(
+		week(
+			{
+				projection_scoring: { format: 'half_ppr', league_own: true },
+				rest_of_season: [...RUN_FORMATS_LIVE],
+				rest_from_week: 7
+			},
+			{ rest_of_season_per_game: 15 }
+		),
+		LEAGUE
+	);
+	assert.equal(tile(half.tiles, 'rest').value, '167.5');
+	assert.equal(tile(half.tiles, 'rest').caption, 'from week 7, WR1 in our order, in PPR scoring');
+	// A read with no figure for the tile's format leaves the run's figure under the run's week.
+	const without = card(
+		week(
+			{
+				projection_scoring: { format: 'half_ppr', league_own: true },
+				rest_of_season: [RUN_FORMATS_LIVE[1]],
+				rest_from_week: 7
+			},
+			{ rest_of_season_per_game: 15 }
+		),
+		LEAGUE
+	);
+	assert.equal(tile(without.tiles, 'rest').value, '182.2');
+	assert.equal(
+		tile(without.tiles, 'rest').caption,
+		'from week 6, WR1 in our order, in PPR scoring'
+	);
+	assert.equal(without.rest, null);
+});
+
+void test('review H3: the tile, the read, the every-format table and the tier box take one figure after a kickoff', () => {
+	const live = liveCard({
+		week: week({ rest_of_season: [...RUN_FORMATS_LIVE], rest_from_week: 7, tier: LIVE_TIER }),
+		player: PLAYER,
+		league: null,
+		tiles: BUILT,
+		opponents: { 5: 'vs BUF' },
+		games: 3,
+		rest: REST,
+		tier: TIER_ASK,
+		screenHref: href,
+		zone: ZONE,
+		now: NOW
+	});
+	const figure = '167.5';
+	assert.equal(tile(live.tiles, 'rest').value, figure);
+	assert.ok(live.rest && live.formats && live.tier);
+	assert.equal(live.rest.points.toFixed(1), figure);
+	assert.equal(live.formats.figures.ppr?.points.toFixed(1), figure);
+	assert.equal(live.tier.points[PLAYER.id]?.toFixed(1), figure);
+	// Each names the week it counts from.
+	assert.equal(live.formats.head, 'Rest of season from week 7');
+	assert.equal(live.formats.figures.superflex?.vor, 60.3);
+	assert.equal(live.tier.drop, 9.4);
+	assert.equal(
+		live.tier.basis,
+		"Projected PPR points for the rest of 2026 from week 6's games left"
+	);
+	// Review M3: with only him in the box, the basis words his own week, as his tile does.
+	const alone = liveCard({
+		week: week({
+			rest_of_season: [...RUN_FORMATS_LIVE],
+			rest_from_week: 7,
+			tier: { ...LIVE_TIER, mates: LIVE_TIER.mates.slice(1) }
+		}),
+		player: PLAYER,
+		league: null,
+		tiles: BUILT,
+		opponents: {},
+		games: 3,
+		rest: REST,
+		tier: { ...TIER_ASK, single: true },
+		screenHref: href,
+		zone: ZONE,
+		now: NOW
+	});
+	assert.equal(alone.tier?.basis, 'Projected PPR points for the rest of 2026 from week 7');
+	assert.equal(card(week()).formats, null);
+	assert.equal(card(week()).tier, null);
 });
 
 void test("the API's tenths print as given: formatting only, never rounded again (Lane 66k)", () => {

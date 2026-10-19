@@ -170,6 +170,9 @@ type Board struct {
 	RankedFor string
 	byID      map[string]int
 	teams     int
+	// slots is the league's starting slots the board was valued for, so a
+	// rescaled board (Rescaled) is valued for the same league.
+	slots []draft.SlotConfig
 }
 
 // For values raw under a league of teams starting slots.
@@ -184,12 +187,36 @@ func For(raw *Raw, teams int, slots []draft.SlotConfig) (Board, error) {
 		// preseason board. Every source sets its own.
 		order = OrderPreseason
 	}
-	b := Board{Raw: raw, Order: order, Refreshed: raw.AsOf, FromWeek: raw.FromWeek, Values: values, byID: make(map[string]int, len(raw.Players)), teams: teams}
+	b := Board{Raw: raw, Order: order, Refreshed: raw.AsOf, FromWeek: raw.FromWeek, Values: values, byID: make(map[string]int, len(raw.Players)), teams: teams, slots: slots}
 	for i, p := range raw.Players {
 		b.byID[p.ID] = i
 	}
 	b.PositionRanks = positionRanks(raw.Players, values)
 	return b, nil
+}
+
+// Rescaled is the board with each player's points given by points (a
+// player it does not name keeps his), valued again for the same league:
+// a new Raw and a new Board, the receiver untouched. Order, Refreshed,
+// FromWeek and RankedFor are the receiver's.
+func (b Board) Rescaled(points map[string]float64) (Board, error) {
+	if b.Raw == nil {
+		return Board{}, fmt.Errorf("boards: no board to rescale")
+	}
+	raw := *b.Raw
+	raw.Players = make([]Player, len(b.Raw.Players))
+	for i, p := range b.Raw.Players {
+		if v, ok := points[p.ID]; ok && p.Points != nil {
+			p.Points = &v
+		}
+		raw.Players[i] = p
+	}
+	out, err := For(&raw, b.teams, b.slots)
+	if err != nil {
+		return Board{}, err
+	}
+	out.Order, out.Refreshed, out.FromWeek, out.RankedFor = b.Order, b.Refreshed, b.FromWeek, b.RankedFor
+	return out, nil
 }
 
 // Player is one player by id.

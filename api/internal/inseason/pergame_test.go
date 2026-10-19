@@ -41,16 +41,26 @@ func restSchedule() []boards.TeamWeek {
 	return append(games, game(6, "BUF", "NYJ", kickoff.AddDate(0, 0, 35), true)...)
 }
 
-// A club's games left are its games from the order's first week through
-// the last week it covers: a bye is no game, nor a week past it.
+// leftFrom is each club's games left from week first before
+// the season's first kickoff.
+func leftFrom(first int) map[string]int {
+	return counts(weeksToPlay(restSchedule(), first, time.Date(2026, 9, 1, 12, 0, 0, 0, east)))
+}
+
+// A club's games left are its games still to play from the order's first
+// week through the last week it covers: a bye is no game, nor a week past
+// it, nor a game already final.
 func TestGamesLeft(t *testing.T) {
-	left := GamesLeft(restSchedule(), 7)
+	left := leftFrom(7)
 	// Weeks 7 to 17 less the bye in week 9.
 	if left["MIA"] != 10 || left["NE"] != 10 || left["BUF"] != 0 {
 		t.Fatalf("games left %v", left)
 	}
-	if left := GamesLeft(restSchedule(), 18); left["MIA"] != 0 {
+	if left := leftFrom(18); left["MIA"] != 0 {
 		t.Fatalf("past the last week %v", left)
+	}
+	if final := leftFrom(1); final["BUF"] != 0 || final["MIA"] != 10 {
+		t.Fatalf("a final game is no game left %v", final)
 	}
 }
 
@@ -58,13 +68,13 @@ func TestGamesLeft(t *testing.T) {
 // club has left, to one decimal, and absent wherever it cannot be said.
 func TestRestOfSeasonPerGame(t *testing.T) {
 	b := restBoard(t, 7)
-	left := GamesLeft(restSchedule(), b.FromWeek)
+	left := leftFrom(b.FromWeek)
 	rb, _ := b.Player("rb")
 	if got := RestOfSeasonPerGame(b, rb, left); got == nil || *got != 11 {
 		t.Fatalf("per game %v, want 11", got)
 	}
 	// An inexact figure rounds to a tenth: 110 over three games is 36.7.
-	three := GamesLeft(restSchedule(), 15)
+	three := leftFrom(15)
 	if three["MIA"] != 3 {
 		t.Fatalf("weeks 15 to 17: %d games", three["MIA"])
 	}
@@ -79,7 +89,7 @@ func TestRestOfSeasonPerGame(t *testing.T) {
 	if got := RestOfSeasonPerGame(b, fa, left); got != nil {
 		t.Fatalf("a player with no club has %v", *got)
 	}
-	if got := RestOfSeasonPerGame(b, rb, GamesLeft(restSchedule(), 18)); got != nil {
+	if got := RestOfSeasonPerGame(b, rb, leftFrom(18)); got != nil {
 		t.Fatalf("a club with no games left has %v", *got)
 	}
 	unsaid := restBoard(t, 0)

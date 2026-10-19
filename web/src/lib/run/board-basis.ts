@@ -5,6 +5,7 @@
  * words a page prints. */
 import { monthDayLabel } from '#lib/format/date.ts';
 import { FIGURE } from '#lib/format/figure-words.ts';
+import { restFromWords } from './rest-from.ts';
 import type { FiguresReach } from './rest-words.ts';
 import { throughClause } from './through-words.ts';
 import type { Format } from './schema.ts';
@@ -20,7 +21,7 @@ export interface BasisPart {
 }
 
 export interface BasisFacts {
-	format: Pick<Format, 'label' | 'teams' | 'rosFromWeek' | 'refreshedAt'>;
+	format: Pick<Format, 'label' | 'teams' | 'rosFromWeek' | 'rosFromWeekPartial' | 'refreshedAt'>;
 	season: number;
 	/** Our order first (the board, a club, the front door) or the drafters' (ADP). */
 	order: 'board' | 'adp';
@@ -47,7 +48,7 @@ function ourBoard(facts: BasisFacts): string {
 	const { format, season } = facts;
 	const league = `for ${String(format.teams)} teams`;
 	if (format.rosFromWeek !== undefined && format.refreshedAt !== undefined) {
-		return `Our ${format.label} board, the rest of the ${String(season)} season from week ${String(format.rosFromWeek)}, by points over replacement ${league}, refreshed ${monthDayLabel(format.refreshedAt)}.`;
+		return `Our ${format.label} board, the rest of the ${String(season)} season ${restFromWords(format.rosFromWeek, format.rosFromWeekPartial === true)}, by points over replacement ${league}, refreshed ${monthDayLabel(format.refreshedAt)}.`;
 	}
 	return `Our ${format.label} board, by points over replacement ${league}.`;
 }

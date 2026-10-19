@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { EMPTY_FIGURE } from '#lib/format/empty.ts';
 	import { fixed, plural } from '#lib/format/number.ts';
 	import type { PlayerRef } from '#lib/types/player.ts';
 	import PlayerLine from './PlayerLine.svelte';
@@ -7,7 +8,8 @@
 
 	interface Mate extends PlayerRef {
 		href: string;
-		projected: number;
+		/** Null once a read has answered without his figure: the empty figure, never another clock's. */
+		projected: number | null;
 	}
 
 	interface Props {
@@ -17,7 +19,7 @@
 		mates: readonly Mate[];
 		/** The player the page is about, marked in the list. */
 		currentId: string;
-		cliff: TierCliff | null;
+		cliff: (Omit<TierCliff, 'drop'> & { drop: number | null }) | null;
 		/** What the points are in: "PPR pts". */
 		unit: string;
 		/** The basis of the numbers in the list, printed at its foot: "Projected PPR points, 2026". */
@@ -28,7 +30,7 @@
 
 	const drop = $derived(
 		cliff
-			? `${plural(mates.length, 'player')}, then ${fixed(cliff.drop)} ${unit} down to tier ${String(cliff.nextTier)}`
+			? `${plural(mates.length, 'player')}, then ${cliff.drop === null ? EMPTY_FIGURE : fixed(cliff.drop)} ${unit} down to tier ${String(cliff.nextTier)}`
 			: `${plural(mates.length, 'player')}, the last tier`
 	);
 </script>
@@ -50,7 +52,10 @@
 					href={mate.href}
 					current={mate.id === currentId}
 				>
-					{#snippet trailing()}<Figure value={fixed(mate.projected)} size="sm" />{/snippet}
+					{#snippet trailing()}<Figure
+							value={mate.projected === null ? EMPTY_FIGURE : fixed(mate.projected)}
+							size="sm"
+						/>{/snippet}
 				</PlayerLine>
 			</li>
 		{/each}

@@ -21,4 +21,7 @@ export interface TierCliff {
 	/** Projected points from the last player in this tier to the first in the next. */
 	drop: number;
 	nextTier: number;
+	/** The next tier's first player, the end of the drop (the player read's tier_next, Lane 86); absent
+	 * where no board row stands behind it (a mock). */
+	nextId?: string;
 }

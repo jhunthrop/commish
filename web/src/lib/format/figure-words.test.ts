@@ -12,8 +12,15 @@ void test('the words are the one table the API embeds, every head named', () => 
 		points: 'Points',
 		perGame: 'A game',
 		avg: 'Avg',
-		week: 'Wk'
+		week: 'Wk',
+		restFrom: 'from week {week}',
+		restFromPartial: "from week {week}'s games left"
 	});
+});
+
+void test('each week template holds exactly one week slot (re-review N3)', () => {
+	for (const template of [FIGURE.restFrom, FIGURE.restFromPartial])
+		assert.equal(template.split('{week}').length, 2, template);
 });
 
 void test('the projected total is headed Projected on the board rows, the order and the card', () => {

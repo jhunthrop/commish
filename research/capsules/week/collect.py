@@ -43,10 +43,9 @@ from research.capsules.week.sheet import (
 from research.capsules.week.store import StoredWeekRead
 from research.model.domain import Position
 from research.nightly.build.player_season import SeasonContext, season_block, season_context
-from research.nightly.build.ros import pending_weeks
 from research.nightly.config import PAGE_FORMAT
 from research.nightly.designations import read_statuses, status_word
-from research.nightly.reads.schedule import Game
+from research.nightly.reads.schedule import Game, weeks_left_at
 from research.pipeline.nflverse.team_codes import product_team_code
 from research.pipeline.nws.grid import PRECIPITATION_KINDS
 from research.season import REGULAR_SEASON_WEEKS
@@ -354,7 +353,7 @@ def read_week_facts(conn: Connection, season: int, subjects: Sequence[Subject], 
         identity = subject.facts.identity
         players.setdefault(identity.id, (identity.position, identity.team))
     context = season_context(conn, season, list(players), as_of)
-    pending = pending_weeks(context.games, as_of)
+    pending = weeks_left_at(conn, season, context.games, as_of)
     the_board_week = board_week(conn, season, as_of, pending)
     if not pending or the_board_week is None:
         return None

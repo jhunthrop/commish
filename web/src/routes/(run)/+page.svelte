@@ -65,12 +65,16 @@
 	/** The words follow the season the rail shows: in season the followed league is the verb. Both
 	 * sets are in the HTML and the root's rail shows one (Phased.svelte), so the hero is right on the
 	 * first frame; the document's title follows the rail once the script runs. */
+	/** What the board covers, its week in the run's words (built on the server). */
+	const cover = $derived({
+		...format,
+		season: data.run.season,
+		...(page.restFrom === null ? {} : { restFrom: page.restFrom })
+	});
 	const wordsOf = (set: WordSet): FrontWords =>
-		frontWords(RAIL_OF_WORD_SET[set], { ...format, season: data.run.season }, leagueId !== null);
+		frontWords(RAIL_OF_WORD_SET[set], cover, leagueId !== null);
 	const rail = shownRail(() => data.siteRail);
-	const documentTitle = $derived(
-		frontWords(rail(), { ...format, season: data.run.season }, leagueId !== null).title
-	);
+	const documentTitle = $derived(frontWords(rail(), cover, leagueId !== null).title);
 
 	/** In season with a followed league, the week leads the page in place of the board's hero (Lane
 	 * 66k). Its band is loaded once it is wanted, so a visitor's front door carries none of it. */

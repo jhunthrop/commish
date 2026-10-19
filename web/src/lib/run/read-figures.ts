@@ -18,8 +18,9 @@ export interface ReadBasis {
 	label: string;
 	/** His preseason projection for the full season, null for a player the preseason board did not rank. */
 	preseason: number | null;
-	/** Once the run ranks the rest of the season: his points for it and the first week it counts. */
-	rest: { points: number; fromWeek: number } | null;
+	/** Once the run ranks the rest of the season: his points for it and the week it starts from, as
+	 * run/rest-from.ts words it ("from week 7"). */
+	rest: { points: number; from: string } | null;
 }
 
 export const PRESEASON_PROJECTION = 'Preseason projection';
@@ -56,7 +57,7 @@ export function readFigures(pulls: readonly PullFigure[], basis: ReadBasis): Rea
 	const lead: ReadFigure = {
 		label: REST_OF_SEASON,
 		figure: fixed(rest.points),
-		caption: `${basis.label} points from week ${String(rest.fromWeek)}`
+		caption: `${basis.label} points ${rest.from}`
 	};
 	const projection = pulls.find(isProjection);
 	const last: ReadFigure[] = projection ? [{ ...projection, label: PRESEASON_PROJECTION }] : [];

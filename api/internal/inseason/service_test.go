@@ -85,7 +85,7 @@ func serve(t *testing.T, s *Service, path string) (int, envelope) {
 
 func fixtureService(t *testing.T, l League, data Data, holds *fakeHolds) *Service {
 	t.Helper()
-	return &Service{Leagues: fakeLeagues{l}, Facts: fakeFacts{data: data}, Holds: holds, Now: func() time.Time { return fixtureNow },
+	return &Service{Leagues: fakeLeagues{l}, Facts: fakeFacts{data: data}, Holds: holds, Now: func() time.Time { return fixtureNow }, Boards: &askingBoards{board: l.Board},
 		Log: slog.New(slog.NewTextHandler(io.Discard, nil))}
 }
 

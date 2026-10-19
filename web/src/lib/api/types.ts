@@ -518,7 +518,14 @@ export interface paths {
 	};
 	'/leagues/attached/{id}/players/{player}': {
 		parameters: {
-			query?: never;
+			query?: {
+				/** @description board ids, comma separated, at most 24, whose rest-of-season points the read gives in tier_format (the page's tier box) */
+				tier?: components['parameters']['TierMates'];
+				/** @description the next tier's first board id, whose points the tier's drop is measured to */
+				tier_next?: components['parameters']['TierNext'];
+				/** @description the format the tier is in, PPR when absent */
+				tier_format?: components['parameters']['TierFormat'];
+			};
 			header?: never;
 			path: {
 				/** @description the attached league's id (AttachedLeague.id) */
@@ -3015,7 +3022,7 @@ export interface components {
 			points_over_replacement: number | null;
 			/**
 			 * Format: double
-			 * @description his rest-of-season points a game, one decimal: the published board's rest-of-season points over the games his club has left from the board's first week through week 17, byes out, as the basis says; null on the preseason number, on a run that does not say its first week, without a projection or with no games left. A player who is out keeps it: it assumes he plays
+			 * @description his rest-of-season points a game, one decimal: the published board's rest-of-season points over the games his club had still to play at the run (the games not yet kicked off, from the board's first week through week 17, byes out; the same as his rest-of-season points now over his club's games left now), as the basis says; null on the preseason number, on a run that does not say its first week, without a projection or with no games left. A player who is out keeps it: it assumes he plays
 			 */
 			rest_of_season_per_game: number | null;
 			/**
@@ -3061,6 +3068,46 @@ export interface components {
 			projection_previous_read_at: string | null;
 			/** @description what the league screens would do with him; null on the read with no league */
 			verb: components['schemas']['PlayerVerb'] | null;
+			/** @description his rest of season at the read's clock in every format the run carries (twelve teams: PPR, half PPR and standard on the standard lineup, PPR on the superflex lineup), each from that format's board re-valued as the order is (LiveBoard: the run's points a game times his club's games still to play now, so a game kicked off since the run is no longer counted); absent off the rest-of-season order, without a projection and from a read older than the field */
+			rest_of_season?: components['schemas']['RestOfSeasonFigure'][] | null;
+			/** @description the players the read was asked for (?tier=, ?tier_next=, ?tier_format=) at the read's clock in that format, as the page's tier box lists them; absent when not asked or off the rest-of-season order */
+			tier?: components['schemas']['RestOfSeasonTier'] | null;
+			/** @description the week his rest of season starts from: his club's first game still to play at the read's clock (not yet kicked off, through week 17); null off the rest-of-season order, without a projection or with no game left. Absent from a read older than the field */
+			rest_from_week?: number | null;
+		};
+		RestOfSeasonFigure: {
+			format: components['schemas']['BoardFormat'];
+			/**
+			 * Format: double
+			 * @description his rest-of-season points in this format at the read's clock, one decimal
+			 */
+			points: number;
+			/**
+			 * Format: double
+			 * @description those points less a free pickup's for a twelve-team league of this format, one decimal; null at a position the league starts nobody at
+			 */
+			points_over_replacement: number | null;
+		};
+		TierMate: {
+			board_id: string;
+			/**
+			 * Format: double
+			 * @description his rest-of-season points at the read's clock, one decimal; null when the board has no projection for him
+			 */
+			points: number | null;
+		};
+		RestOfSeasonTier: {
+			format: components['schemas']['BoardFormat'];
+			mates: components['schemas']['TierMate'][];
+			/**
+			 * Format: double
+			 * @description the last asked player's points less tier_next's, one decimal; null without tier_next or either figure
+			 */
+			drop: number | null;
+			/** @description the earliest week with a game still to play at the read's clock, the week the board's figures count from */
+			from_week: number | null;
+			/** @description a game of from_week has kicked off, so the board counts that week's games left */
+			partial: boolean;
 		};
 		PlayerVerb: {
 			/**
@@ -3403,7 +3450,7 @@ export interface components {
 			 * @description when the order was made
 			 */
 			refreshed: string;
-			/** @description the first week the rest-of-season order covers, null on the preseason order */
+			/** @description the first week the rest-of-season order covers at the read's clock: the earliest with a game still to play (Lane 86; a club whose game of it kicked off counts from its next week), null on the preseason order */
 			from_week: number | null;
 			/**
 			 * Format: date-time
@@ -3434,7 +3481,7 @@ export interface components {
 			rank: number;
 			/**
 			 * Format: double
-			 * @description the order's key, one decimal: his rest-of-season points over the games his club has left from the order's first week through week 17, byes out; null on the preseason order and without a projection
+			 * @description the order's key, one decimal: his rest-of-season points over his club's games left at the read's clock (not yet kicked off) through week 17, byes out (Lane 86, the player read's rest_of_season figure for the order's format); null on the preseason order and without a projection
 			 */
 			rest_of_season_points: number | null;
 			/**
@@ -4353,6 +4400,12 @@ export interface components {
 		};
 	};
 	parameters: {
+		/** @description board ids, comma separated, at most 24, whose rest-of-season points the read gives in tier_format (the page's tier box) */
+		TierMates: string;
+		/** @description the next tier's first board id, whose points the tier's drop is measured to */
+		TierNext: string;
+		/** @description the format the tier is in, PPR when absent */
+		TierFormat: components['schemas']['BoardFormat'];
 		/** @description the kickers' tab (K) or the defenses' (DEF) */
 		WeekOrderPosition: 'K' | 'DEF';
 		ID: string;
@@ -4977,7 +5030,14 @@ export interface operations {
 	};
 	leaguePlayerWeek: {
 		parameters: {
-			query?: never;
+			query?: {
+				/** @description board ids, comma separated, at most 24, whose rest-of-season points the read gives in tier_format (the page's tier box) */
+				tier?: components['parameters']['TierMates'];
+				/** @description the next tier's first board id, whose points the tier's drop is measured to */
+				tier_next?: components['parameters']['TierNext'];
+				/** @description the format the tier is in, PPR when absent */
+				tier_format?: components['parameters']['TierFormat'];
+			};
 			header?: never;
 			path: {
 				/** @description the attached league's id (AttachedLeague.id) */
@@ -5738,7 +5798,14 @@ export interface operations {
 	};
 	playerWeek: {
 		parameters: {
-			query?: never;
+			query?: {
+				/** @description board ids, comma separated, at most 24, whose rest-of-season points the read gives in tier_format (the page's tier box) */
+				tier?: components['parameters']['TierMates'];
+				/** @description the next tier's first board id, whose points the tier's drop is measured to */
+				tier_next?: components['parameters']['TierNext'];
+				/** @description the format the tier is in, PPR when absent */
+				tier_format?: components['parameters']['TierFormat'];
+			};
 			header?: never;
 			path: {
 				/** @description his board id, as his page names him */

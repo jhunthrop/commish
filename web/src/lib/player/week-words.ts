@@ -6,6 +6,13 @@ import { memberZone, weekdayTime } from '#lib/format/clock.ts';
 import { lineState, pastKickoff, toPlay } from '../league/box/kickoff.ts';
 import { weekHead } from '#lib/format/figure-words.ts';
 import {
+	playerRestWords,
+	restFromWords,
+	restOfSeasonHead,
+	tierBasisWords
+} from '#lib/run/rest-from.ts';
+import type { BoardFormat } from '#lib/sheet/model.ts';
+import {
 	avgLastPart,
 	deltaPart,
 	gamePart,
@@ -90,6 +97,60 @@ export interface LiveCard {
 	basis: string[];
 	/** The week's projection as the card prints it, which the week-ahead read is held to (Lane 66v). */
 	projection: CardProjection;
+	/** His rest of season at the read's clock (Lane 86), which the page's figures beside the read take;
+	 * null where the run's stand. */
+	rest: LiveRest | null;
+	/** The every-format table's figures at the read's clock, null where the run's stand. */
+	formats: LiveFormats | null;
+	/** The tier box's figures at the read's clock, null where the run's stand. */
+	tier: LiveTier | null;
+}
+
+/** His rest-of-season points at the read's clock and the week they start from, as words. */
+export interface LiveRest {
+	points: number;
+	from: string;
+}
+
+/** The every-format table at the read's clock: its points head and each format's figures. */
+export interface LiveFormats {
+	head: string;
+	figures: Partial<Record<BoardFormat, { points: number; vor: number | null }>>;
+}
+
+/** The tier box at the read's clock: each listed player's points, the drop and the basis. */
+export interface LiveTier {
+	points: Readonly<Record<string, number | null>>;
+	drop: number | null;
+	basis: string;
+}
+
+/** What the tier box needs to word its basis. */
+export interface TierAsk {
+	label: string;
+	season: number;
+	/** Only he is in the box: the basis words his own week (review M3). */
+	single: boolean;
+}
+
+function formatsOf(week: PlayerWeek, now: LiveRest | null): LiveFormats | null {
+	if (now === null || week.rest_of_season == null) return null;
+	const figures = Object.fromEntries(
+		week.rest_of_season.map((f) => [f.format, { points: f.points, vor: f.points_over_replacement }])
+	);
+	return { head: restOfSeasonHead(now.from), figures };
+}
+
+function tierOf(week: PlayerWeek, now: LiveRest | null, ask: TierAsk | null): LiveTier | null {
+	const tier = week.tier;
+	if (now === null || ask === null || tier == null) return null;
+	const board =
+		tier.from_week === null ? playerRestWords(null) : restFromWords(tier.from_week, tier.partial);
+	return {
+		points: Object.fromEntries(tier.mates.map((m) => [m.board_id, m.points])),
+		drop: tier.drop,
+		basis: tierBasisWords(ask.label, ask.season, ask.single ? now.from : board)
+	};
 }
 
 const SCORING_WORDS: Readonly<Record<Schemas['ProjectionScoring']['format'], string>> = {
@@ -288,18 +349,33 @@ function deltaTile(week: PlayerWeek, zone: string, now: number): CardTile {
 	};
 }
 
+/** His rest of season at the read's clock in the tile's format (Lane 86, review H3): the read's figure
+ * for that format and the week it starts from, his club's next game. Null on a preseason board and on
+ * a read that carries no figure for it: the run's figure and its week stand together. */
+function restNow(week: PlayerWeek, rest: RestParts | null): LiveRest | null {
+	const figure = week.rest_of_season?.find((f) => f.format === rest?.board);
+	if (figure === undefined) return null;
+	return { points: figure.points, from: playerRestWords(week.rest_from_week ?? null) };
+}
+
 /** Rest of season with his figure a game from the API's read (the league rows' one source), only
  * when the read is in the tile's own scoring: a league in another scoring leaves it out and the
- * caption names the tile's (review N2). The tile as built on a preseason board. */
+ * caption names the tile's (review N2). In that scoring the read's points replace the run's, and in
+ * any its week: a game kicked off since the run is no longer counted (Lane 86). The tile as built on a
+ * preseason board. */
 function restTile(week: PlayerWeek, rest: RestParts | null, fallback: CardTile): CardTile {
 	if (rest === null) return fallback;
 	const same = week.projection_scoring.format === rest.scoring;
+	const now = restNow(week, rest);
 	const perGame = week.line.rest_of_season_per_game;
 	const game = same && perGame !== null ? `, ${printTenth(perGame)} a game` : '';
 	const scoring = same ? '' : `, in ${rest.label} scoring`;
+	// The week follows the figure the tile prints (review H1).
+	const from = now === null ? rest.from : now.from;
 	return {
 		...fallback,
-		caption: `from week ${String(rest.fromWeek)}${game}, ${rest.rank}${scoring}`
+		...(now === null ? {} : { value: printTenth(now.points) }),
+		caption: `${from}${game}, ${rest.rank}${scoring}`
 	};
 }
 
@@ -383,6 +459,8 @@ export interface LiveInput {
 	/** Rest of season's first week and his rank at his position in our order, null before the run
 	 * ranks the rest of the season. */
 	rest: RestParts | null;
+	/** The tier box the read was asked for, null when the page shows none. */
+	tier?: TierAsk | null;
 	screenHref: ScreenHref;
 	zone?: string;
 	/** The time the card is drawn at, in ms: a game kicked off by then says no facts read. */
@@ -398,10 +476,12 @@ export function liveCard({
 	opponents,
 	games,
 	rest,
+	tier = null,
 	screenHref,
 	zone = memberZone(),
 	now
 }: LiveInput): LiveCard {
+	const restAtClock = restNow(week, rest);
 	const fallback = (key: CardTile['key']): CardTile => {
 		const found = tiles.find((tile) => tile.key === key);
 		if (!found) throw new Error(`The card has no ${key} tile.`);
@@ -428,6 +508,9 @@ export function liveCard({
 		next,
 		verb,
 		basis: liveBasis(week, verb !== null, zone, now),
+		rest: restAtClock,
+		formats: formatsOf(week, restAtClock),
+		tier: tierOf(week, restAtClock, tier),
 		projection: {
 			week: week.week,
 			scoring: week.projection_scoring.format,

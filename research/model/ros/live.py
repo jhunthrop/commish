@@ -180,17 +180,32 @@ class PlayerWeeks:
     weeks: Mapping[int, WeekFacts]
 
 
+@dataclass(frozen=True, slots=True)
+class ClubSlates:
+    """Each club's scheduled weeks, and its weeks whose game is still to play at the run (Lane 86)."""
+
+    weeks: Mapping[str, Sequence[int]]
+    to_play: Mapping[str, Sequence[int]]
+
+
+def club_at(who: PlayerWeeks, window: Window) -> str:
+    """His club at the window: the season store's latest through `through`, else the served board's."""
+    known = [week for week in who.clubs if week <= window.through]
+    return who.clubs[max(known)] if known else who.club
+
+
 def player_to_date(
     who: PlayerWeeks,
     window: Window,
-    schedule: Mapping[str, Sequence[int]],
+    slates: ClubSlates,
     stale: StaleEntry | None,
     rules: Mapping[str, ScoringRules],
 ) -> PlayerToDate:
-    """The model's input at the window: games through `through`, his club's games from `from_week`."""
-    known = [week for week in who.clubs if week <= window.through]
-    club = who.clubs[max(known)] if known else who.club
-    weeks = schedule.get(club, ())
+    """The model's input at the window: games through `through`, and his club's games still to play
+    from `from_week` (`slates.to_play`, each club's weeks whose game has not kicked off, Lane 86): a game of
+    the window's first week his club has already played is no game left."""
+    club = club_at(who, window)
+    weeks = slates.weeks.get(club, ())
     played = []
     for week in sorted(w for w in who.weeks if w <= window.through):
         game = game_played(week, who.weeks[week], who.position, rules)
@@ -201,6 +216,6 @@ def player_to_date(
         who.position,
         tuple(sorted(w for w in weeks if w <= window.through)),
         tuple(played),
-        tuple(sorted(w for w in weeks if window.from_week <= w <= LAST_FANTASY_WEEK)),
+        tuple(sorted(w for w in slates.to_play.get(club, ()) if window.from_week <= w <= LAST_FANTASY_WEEK)),
         stale,
     )

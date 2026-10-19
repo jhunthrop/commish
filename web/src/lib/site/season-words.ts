@@ -31,6 +31,10 @@ export interface BoardCover {
 	season: number;
 	/** The first week a rest-of-season board ranks, absent on a board of the full season. */
 	rosFromWeek?: number;
+	/** The week the rest of season counts from as the run says it, built on the server
+	 * (run/rest-from.ts boardRestFrom: "from week 6's games left"), so no words module rides in the
+	 * shell. Absent on a board of the full season. */
+	restFrom?: string;
 }
 
 export interface FrontWords {
@@ -59,9 +63,9 @@ export function frontWords(rail: RailKey, board: BoardCover, following: boolean)
 		};
 	}
 	const heading =
-		board.rosFromWeek === undefined
+		board.restFrom === undefined
 			? `Our ${season} board, for your league`
-			: `Our board for the rest of the ${season} season from week ${String(board.rosFromWeek)}, for your league`;
+			: `Our board for the rest of the ${season} season ${board.restFrom}, for your league`;
 	return { title: 'In season', heading, verb: leagueVerb(following), quiet: ['mock'] };
 }
 
