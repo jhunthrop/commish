@@ -80,6 +80,11 @@ const STATUS_PARTS =
  * screens after theirs (Lane 66j): kept out of the shared chunk by name, so loading the order's
  * screens never hoists it onto every page. */
 const WEEK_PARTS = /[\\/]src[\\/]lib[\\/]run[\\/]board-status\./;
+/** The counts' pool words (format/pool-words.ts, the sweep's M4): the order's hits, the sheet's start
+ * and the room's pool name their pools with them, and no shell part does (the front door's count is
+ * worded at build). Kept out of the shared chunk by name, so the room naming its pool never hoists them
+ * onto every page. */
+const POOL_WORDS = /[\\/]src[\\/]lib[\\/]format[\\/]pool-words\./;
 /** A component joins the shared chunk once this many routes use it. Fewer, and every page would
  * carry code only a couple of pages run. */
 const SHARED_BY_ROUTES = 4;
@@ -133,6 +138,7 @@ export default defineConfig({
 								!LIVE_STATUS.test(id) &&
 								!FIGURE_WORDS.test(id) &&
 								!WEEK_PARTS.test(id) &&
+								!POOL_WORDS.test(id) &&
 								!LEAGUE_PAGE_PARTS.test(id),
 							minShareCount: SHARED_BY_ROUTES,
 							priority: 1

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { poolCount } from '#lib/format/pool-words.ts';
+	import { boardPoolCount } from '#lib/format/pool-words.ts';
 	import Label from '#lib/ui/Label.svelte';
 	import Panel from '#lib/ui/Panel.svelte';
 	import Place from '#lib/ui/Place.svelte';
@@ -34,10 +34,10 @@
 
 	const first = $derived(board?.slice(0, PREVIEWED) ?? []);
 	/** The board the sheet starts from, every row of it: the run's ranked players, then its kickers and
-	 * defenses in draft order, a build-time count of the run's board file. Its pool named, so it never
-	 * reads against the search's ranked count or the empty sheet's 0 players. */
+	 * defenses in draft order, a build-time count of the run's board file. Its pool named, kickers and
+	 * defenses said, so it never reads against the front door's ranked count (the sweep's M4). */
 	const sheetCount = $derived(
-		board !== null && board.length > PREVIEWED ? poolCount(board.length, 'board') : null
+		board !== null && board.length > PREVIEWED ? boardPoolCount(board) : null
 	);
 </script>
 

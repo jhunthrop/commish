@@ -2774,6 +2774,14 @@ components:
         adp: { type: number, format: double, nullable: true, description: where drafters take him, null with no source }
         points: { type: number, format: double, nullable: true, description: projected season points, null for kickers and defenses }
         vor: { type: number, format: double, nullable: true, description: points over replacement for this league, null when it has none }
+        gap:
+          type: number
+          format: double
+          nullable: true
+          description: >-
+            drafters' ADP less his place on our board (the pool's order by points over replacement), the ADP the column
+            prints less the place, a tenth: plus when drafters take him later than we rank him; null with no ADP or no
+            place (a kicker, a defense). Absent from a server older than the column
         position_rank: { type: integer }
         bye: { type: integer, nullable: true }
         status:

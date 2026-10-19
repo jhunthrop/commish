@@ -30,6 +30,13 @@
 		padding-bottom: var(--s-7);
 	}
 
+	/* Where the pool carries a Gap, the call card's grid takes the pool's Gap track too, so every figure
+	   sits over the pool's column for it (review 81 finding 2). */
+	.content:has(:global([data-pool-gap])) {
+		--gap-track: 76px;
+		--gap-display: block;
+	}
+
 	.content {
 		min-width: 0;
 		display: flex;

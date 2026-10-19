@@ -62,10 +62,15 @@ void test('the group pass is the total for the teams chosen and the price a team
 	assert.deepEqual(said(groupFacts(null, 12)), [['12 teams', 'Not open yet']]);
 });
 
-void test('where the live draft works is cells: the host it works with, how, and the ones not followed yet', () => {
-	assert.deepEqual(said(hostCells()), [
-		['Today', 'Sleeper'],
+void test("where it works says the draft apart from the league, from the one platforms module (the sweep's C13)", () => {
+	assert.deepEqual(said(hostCells({ ffpc: true, yahoo: true, espn: true })), [
+		['Live draft', 'Sleeper'],
 		['How', 'Draft link'],
-		['Not yet', 'ESPN, Yahoo']
+		['Leagues', 'Sleeper, MyFantasyLeague, FFPC, Yahoo, ESPN']
+	]);
+	// A switched platform shut here is never named, so the pass reads as /account and /league/new do.
+	assert.deepEqual(said(hostCells({ ffpc: false, yahoo: false, espn: true })).at(-1), [
+		'Leagues',
+		'Sleeper, MyFantasyLeague, ESPN'
 	]);
 });

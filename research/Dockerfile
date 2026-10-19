@@ -20,6 +20,8 @@
 # `../../../../api/internal/figurewords/words.json`). Every runtime import of the reader is one of the
 # copies below: web/src/lib/run/image-closure.test.ts walks the closure against these COPY lines and
 # pins, so an import the image lacks fails the web's tests, not the image job (Lane 76).
+# The writer reads the site's one banned list from the same copy (src/lib/format/banned-words.json,
+# research/capsules/site_words.py through research/web_contract.py).
 FROM node:24-slim AS web-contract
 WORKDIR /contract/web
 COPY --from=web package-lock.json /tmp/web-lock.json

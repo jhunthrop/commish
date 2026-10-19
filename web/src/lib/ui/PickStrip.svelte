@@ -38,7 +38,7 @@
 						ringed={pick.ring === 'accent'}
 						marked={pick.ring === 'ink'}
 					/>
-					<b>{lastName(pick.player.name)}</b>
+					<b data-name>{lastName(pick.player.name)}</b>
 					{#each pick.lines as line, i (i)}<span>{line}</span>{/each}
 				</li>
 			{/each}

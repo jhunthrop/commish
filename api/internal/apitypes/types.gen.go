@@ -1724,8 +1724,11 @@ type BoardFormat string
 // BoardPlayer one player of the board a room drafts from
 type BoardPlayer struct {
 	// Adp where drafters take him
-	Adp      *float64 `json:"adp"`
-	Bye      *int     `json:"bye"`
+	Adp *float64 `json:"adp"`
+	Bye *int     `json:"bye"`
+
+	// Gap drafters' ADP less his place on our board (the pool's order by points over replacement), the ADP the column prints less the place, a tenth: plus when drafters take him later than we rank him; null with no ADP or no place (a kicker, a defense). Absent from a server older than the column
+	Gap      *float64 `json:"gap,omitempty"`
 	Headshot string   `json:"headshot"`
 	Id       string   `json:"id"`
 	Name     string   `json:"name"`
