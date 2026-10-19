@@ -258,3 +258,8 @@ void test('on a phone the stats sentence takes the room of the Game cell words a
 	// The paragraph as a desk reads it says the Game cell once.
 	assert.equal(basisText(parts).match(/Game /g)?.length, 1);
 });
+
+void test('the Final sentence says what holds, never a promise of within the hour (Lane 84)', () => {
+	assert.equal(KICKED_OFF_PART, 'Final lands the hour after a game ends, its stats by Wednesday.');
+	assert.equal(bannedPattern().test(KICKED_OFF_PART), false);
+});
