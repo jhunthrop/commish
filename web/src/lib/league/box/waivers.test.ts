@@ -334,7 +334,7 @@ void test('the basis is one paragraph, the pickup rule first, each column it dra
 	);
 	assert.deepEqual(
 		parts.filter((p) => !p.phone).map((p) => p.text),
-		['Δ Proj is its change since Thu 9:00 pm.', FACTS_SENTENCE]
+		[WAIVERS.dropRule, 'Δ Proj is its change since Thu 9:00 pm.', FACTS_SENTENCE]
 	);
 	assert.equal(parts.at(-1)?.href, RULES);
 	// Beats and Open spot say themselves in their cells, so the basis says nothing of them.

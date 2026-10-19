@@ -521,7 +521,9 @@ export function waiverBasis(
 				? seasonOrderWords(advice.week)
 				: advice.basis
 		),
-		...said(WAIVERS.dropRule),
+		// At a desk only: the phone's eight lines cannot hold it (review L-C); the drop panel says
+		// the same in its lead.
+		...said(WAIVERS.dropRule, false),
 		...said(advice.season_basis),
 		...said(proj),
 		...said(deltaPart(advice.projection_previous_read_at, clock), false),
