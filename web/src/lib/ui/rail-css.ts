@@ -7,7 +7,7 @@
  * on the first frame. The same mechanism shows a page's words: a page that follows the season draws
  * both sets (Phased.svelte) and the root's rail turns one on, so the words change with the rail
  * and never after the page's script runs. */
-import { LEAGUE_ATTR } from '#lib/context/boot.ts';
+import { LEAGUE_ATTR, LEAGUE_PENDING_ATTR } from '#lib/context/boot.ts';
 import { DEFAULT_RAIL, RAIL_KEYS, railInSeason, wordSetOf, type RailKey } from './nav.ts';
 import { RAIL_WITHOUT_LEAGUE, railOfKey, type RailEntry } from './rail-order.ts';
 
@@ -26,7 +26,8 @@ function roots(key: string): string[] {
 
 /** A root that names a league selected, and one that names none (the context's data-league). */
 const WITH_LEAGUE = `[${LEAGUE_ATTR}]`;
-const WITHOUT_LEAGUE = `:not([${LEAGUE_ATTR}])`;
+const PENDING = `[${LEAGUE_PENDING_ATTR}]`;
+const WITHOUT_LEAGUE = `:not([${LEAGUE_ATTR}]):not(${PENDING})`;
 
 /** Each rail a root can show and the items it shows: a season rail shows its league's pages only
  * with a league selected, and the rail without a league otherwise (Lane 83). */
@@ -34,10 +35,27 @@ function railsShown(key: RailKey): [string[], readonly RailEntry[]][] {
 	if (!railInSeason(key)) return [[roots(key), railOfKey(key)]];
 	const withLeague = roots(key).map((root) => `${root}${WITH_LEAGUE}`);
 	const withoutLeague = roots(key).map((root) => `${root}${WITHOUT_LEAGUE}`);
+	const pending = roots(key).map((root) => `${root}${PENDING}`);
 	return [
 		[withLeague, railOfKey(key)],
-		[withoutLeague, RAIL_WITHOUT_LEAGUE]
+		[withoutLeague, RAIL_WITHOUT_LEAGUE],
+		[pending, railOfKey(key)]
 	];
+}
+
+/** Before the context says whether a league is selected, a season rail draws the league's rail with
+ * every slot the rail without a league draws differently kept blank, its room held, so nothing
+ * wrong is drawn and nothing moves when the context answers (Lane 83 review 1). */
+function pendingCss(): string {
+	const same = new Set(RAIL_WITHOUT_LEAGUE.map((entry, i) => `${String(i)}:${entry.key}`));
+	const blank = RAIL_KEYS.filter(railInSeason).flatMap((key) =>
+		railOfKey(key)
+			.filter((entry, i) => !same.has(`${String(i)}:${entry.key}`))
+			.flatMap((entry) =>
+				roots(key).map((root) => `${root}${PENDING} .rail .item[data-k=${entry.key}]`)
+			)
+	);
+	return blank.length === 0 ? '' : `${blank.join(',')}{visibility:hidden}`;
 }
 
 export function railCss(): string {
@@ -55,7 +73,7 @@ export function railCss(): string {
 		}
 	}
 	const phone = `@media (max-width:${String(PHONE_MAX_PX)}px){${wideOnly.join(',')}{display:none}}`;
-	return `${HIDDEN}${shown.join(',')}{display:flex}${wordsCss()}${phone}`;
+	return `${HIDDEN}${shown.join(',')}{display:flex}${pendingCss()}${wordsCss()}${phone}`;
 }
 
 /** The words each rail shows: a wrapper that adds no box of its own (`contents`), so the words sit

@@ -53,7 +53,7 @@ for (const key of RAIL_KEYS) {
 
 for (const key of RAIL_KEYS.filter(railInSeason)) {
 	void test(`the ${key} rail with no league selected draws no league tabs (Lane 83)`, () => {
-		const root = `:root[data-rail=${key}]:not([data-league])`;
+		const root = `:root[data-rail=${key}]:not([data-league]):not([data-league-pending])`;
 		const labels = (keys: string[]): string[] =>
 			keys.map((k) => RAIL_ITEMS.find((item) => item.key === k)?.label ?? k);
 		const five = ['League', 'Rest of season', 'Players', 'Mock draft', 'Our record'];
@@ -63,6 +63,22 @@ for (const key of RAIL_KEYS.filter(railInSeason)) {
 			shown(root, false),
 			RAIL_WITHOUT_LEAGUE.map((entry) => entry.key)
 		);
+	});
+}
+
+for (const key of RAIL_KEYS.filter(railInSeason)) {
+	void test(`the ${key} rail before the context answers draws only League, the other slots held blank`, () => {
+		const root = `:root[data-rail=${key}][data-league-pending]`;
+		const rail = railOfKey(key).map((entry) => entry.key);
+		// The league's rail holds the slots, so nothing moves when the context answers.
+		assert.deepEqual(shown(root, false), rail);
+		const blank = css
+			.split('}')
+			.filter((rule) => rule.includes('{visibility:hidden'))
+			.flatMap((rule) => (rule.split('{')[0] ?? '').split(','));
+		const drawn = rail.filter((item) => !blank.includes(selector(root, item)));
+		// League is the one slot both rails draw alike: every other is blank until /me answers.
+		assert.deepEqual(drawn, ['league']);
 	});
 }
 

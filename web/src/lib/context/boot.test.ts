@@ -5,6 +5,7 @@ import { test } from 'node:test';
 import {
 	CONTEXT_KEY,
 	LEAGUE_ATTR,
+	LEAGUE_PENDING_ATTR,
 	LINES_KEY,
 	ACCOUNT_RAIL_KEY,
 	RAIL_ATTR,
@@ -109,4 +110,26 @@ void test("a session copy's rail that is not a rail key leaves the build's", () 
 	const local = new Store();
 	local.setItem(ACCOUNT_RAIL_KEY, 'bogus');
 	assert.equal(boot('in_season', { cookie, local }).attrs.get(RAIL_ATTR), 'in_season');
+});
+
+void test('the first page after a sign-in marks the league pending until the context answers', () => {
+	const cookie = `commish_csrf=${TOKEN}`;
+	// A session with nothing kept: whether a league is selected is not known before /me (Lane 83).
+	const first = boot('in_season', { cookie });
+	assert.equal(first.attrs.get(LEAGUE_PENDING_ATTR), '');
+	assert.equal(first.attrs.has(LEAGUE_ATTR), false);
+	// Signed out, no league is ever selected: nothing is pending.
+	assert.equal(boot('in_season').attrs.has(LEAGUE_PENDING_ATTR), false);
+	// The lines kept say a league; this session's copy or the account's kept rail say what it was.
+	const local = new Store();
+	local.setItem(LINES_KEY, '1');
+	assert.equal(boot('in_season', { cookie, local }).attrs.has(LEAGUE_PENDING_ATTR), false);
+	const kept = { session: TOKEN, rail: 'in_season' };
+	assert.equal(boot('in_season', { cookie, kept }).attrs.has(LEAGUE_PENDING_ATTR), false);
+	const account = new Store();
+	account.setItem(ACCOUNT_RAIL_KEY, 'in_season');
+	assert.equal(boot('in_season', { cookie, local: account }).attrs.has(LEAGUE_PENDING_ATTR), false);
+	// Another session's copy says nothing of this one.
+	const other = { session: 'csrf-0', rail: 'in_season' };
+	assert.equal(boot('in_season', { cookie, kept: other }).attrs.get(LEAGUE_PENDING_ATTR), '');
 });
