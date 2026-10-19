@@ -3497,6 +3497,10 @@ components:
         bye: { type: boolean }
         designation: { allOf: [{ $ref: "#/components/schemas/InjuryDesignation" }], nullable: true }
         played: { type: boolean, description: his game this week is final }
+        game_state:
+          allOf: [{ $ref: "#/components/schemas/GameState" }]
+          nullable: true
+          description: his game this week by the read's clock, null on his bye or when his club is unknown
         points_this_week:
           type: number
           format: double
@@ -3511,6 +3515,12 @@ components:
         spread: { allOf: [{ $ref: "#/components/schemas/GameSpread" }], nullable: true }
         roof: { allOf: [{ $ref: "#/components/schemas/GameRoof" }], nullable: true }
         weather: { allOf: [{ $ref: "#/components/schemas/KickoffWeather" }], nullable: true }
+    GameState:
+      type: string
+      enum: [upcoming, kicked_off, final]
+      description: >-
+        a game's state, one rule for every screen: upcoming before its kickoff, kicked_off from its kickoff until its
+        final is in, final once the store holds its result or a stat line from either side
     GameTotal:
       type: object
       description: >-
@@ -3571,6 +3581,7 @@ components:
         home: { type: boolean }
         kickoff: { type: string, format: date-time }
         played: { type: boolean, description: the game is final }
+        game_state: { allOf: [{ $ref: "#/components/schemas/GameState" }], nullable: true, description: "the game by the read's clock" }
         game_total: { allOf: [{ $ref: "#/components/schemas/GameTotal" }], nullable: true }
         spread: { allOf: [{ $ref: "#/components/schemas/GameSpread" }], nullable: true }
         roof: { allOf: [{ $ref: "#/components/schemas/GameRoof" }], nullable: true }

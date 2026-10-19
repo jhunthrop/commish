@@ -4,7 +4,8 @@
 import { dayLabel } from '#lib/format/date.ts';
 import { FIGURE, weekHead } from '#lib/format/figure-words.ts';
 import { fixed, plural } from '#lib/format/number.ts';
-import { countedWeek, type GameLogRow, type PlayerSeason } from '#lib/run/season.ts';
+import { countedWeek } from '#lib/run/reach.ts';
+import type { GameLogRow, PlayerSeason } from '#lib/run/season.ts';
 import { apiFormatOf } from '#lib/run/format-ids.ts';
 import { positionRankShown } from '#lib/run/held-places.ts';
 import type { Capsule, Format, PlayerFormat, PlayerStatus } from '#lib/run/schema.ts';

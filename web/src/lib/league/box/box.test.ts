@@ -142,6 +142,26 @@ void test('the game cell: the opponent and kickoff, Final once played, the bye',
 	assert.equal(gameOf(facts({ opponent: null }), ZONE), null);
 });
 
+void test("a game kicked off with no final says so, by the API's state (Lane 80)", () => {
+	const monday = facts({ kickoff: SUNDAY_NOON, game_state: 'kicked_off' });
+	assert.deepEqual(gameOf(monday, ZONE), { where: 'at ATL', when: 'Kicked off' });
+	assert.deepEqual(gameOf(facts({ game_state: 'final', played: true }), ZONE), {
+		where: 'at ATL',
+		when: 'Final'
+	});
+	// No expected score and no weather once kicked off, whatever the browser's clock says.
+	const row = boxRow(
+		line({}, { kickoff: SUNDAY_NOON, game_state: 'kicked_off' }),
+		'QB',
+		ZONE,
+		true,
+		NOW
+	);
+	assert.equal(row.expected, null);
+	assert.equal(row.weather, null);
+	assert.deepEqual(row.game, { where: 'at ATL', when: 'Kicked off' });
+});
+
 void test("a status is Lane 63's pill: the week's word, a season-long list's word in his rank", () => {
 	const asOf = '2026-10-16T21:00:00.000Z';
 	assert.deepEqual(statusOf({ status: 'questionable', as_of: asOf }, false), {

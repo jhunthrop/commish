@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/jhunthrop/commish/api/internal/apitypes"
+	"github.com/jhunthrop/commish/api/internal/boards"
 	"github.com/jhunthrop/commish/api/internal/leaguesync"
 )
 
@@ -81,22 +82,27 @@ func TestScoreboardGameState(t *testing.T) {
 		k := time.Date(2026, 10, 18, h, 0, 0, 0, time.UTC)
 		return &k
 	}
+	// A starter's facts as the wire carries them: his kickoff and its state at now (gameStateAt).
+	game := func(h int, final bool) apitypes.WeekFacts {
+		state := gameStateAt(boards.TeamWeek{Kickoff: *at(h), Final: final}, now)
+		return apitypes.WeekFacts{Kickoff: at(h), Played: final, GameState: &state}
+	}
 	cases := []struct {
 		name  string
 		facts []apitypes.WeekFacts
 		want  apitypes.ScoreboardGameState
 		next  *time.Time
 	}{
-		{"before kickoff", []apitypes.WeekFacts{{Kickoff: at(20)}, {Kickoff: at(21)}, {Bye: true}}, apitypes.ScoreboardGameStateUpcoming, at(20)},
-		{"one kicked off", []apitypes.WeekFacts{{Kickoff: at(17)}, {Kickoff: at(21)}}, apitypes.ScoreboardGameStatePlaying, at(21)},
-		{"one final, none to come", []apitypes.WeekFacts{{Kickoff: at(13), Played: true}, {Kickoff: at(17)}}, apitypes.ScoreboardGameStatePlaying, nil},
-		{"every one final", []apitypes.WeekFacts{{Kickoff: at(13), Played: true}, {Kickoff: at(17), Played: true}, {Bye: true}}, apitypes.ScoreboardGameStateFinal, nil},
+		{"before kickoff", []apitypes.WeekFacts{game(20, false), game(21, false), {Bye: true}}, apitypes.ScoreboardGameStateUpcoming, at(20)},
+		{"one kicked off", []apitypes.WeekFacts{game(17, false), game(21, false)}, apitypes.ScoreboardGameStatePlaying, at(21)},
+		{"one final, none to come", []apitypes.WeekFacts{game(13, true), game(17, false)}, apitypes.ScoreboardGameStatePlaying, nil},
+		{"every one final", []apitypes.WeekFacts{game(13, true), game(17, true), {Bye: true}}, apitypes.ScoreboardGameStateFinal, nil},
 		{"nobody plays", []apitypes.WeekFacts{{Bye: true}}, apitypes.ScoreboardGameStateUpcoming, nil},
 	}
 	for _, c := range cases {
 		var k kickoffs
 		for _, f := range c.facts {
-			k.add(f, now)
+			k.add(f)
 		}
 		if k.state() != c.want {
 			t.Errorf("%s: %s, want %s", c.name, k.state(), c.want)

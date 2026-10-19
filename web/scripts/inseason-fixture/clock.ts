@@ -17,8 +17,16 @@ export const FIXTURE_UNREAD_CLOCK = '2026-10-13T17:00:00.000Z';
 export const FIXTURE_SUNDAY_READ = '2026-10-18T18:52:00.000Z';
 
 /** The browser's clock for a shot of that Sunday (Lane 79): four minutes after its read, as the
- * stand-in API's reads are four minutes old. */
+ * stand-in API's reads are four minutes old. Lane 80's Sunday too: the noon games kicked off with no
+ * final, London's and Thursday's final by the hourly status (data/game-status.json). */
 export const FIXTURE_SUNDAY_CLOCK = '2026-10-18T18:56:00.000Z';
+
+/** Monday Oct 19 2026, 11:00 am Central (Lane 80): every Sunday game final by the hourly status, their
+ * stats not in yet, Monday night's ahead. */
+export const FIXTURE_MONDAY_CLOCK = '2026-10-19T16:00:00.000Z';
+
+/** Tuesday Oct 20 2026, noon Central (Lane 80): every week 6 game final, Monday night's included. */
+export const FIXTURE_TUESDAY_CLOCK = '2026-10-20T17:00:00.000Z';
 
 /** The environment variable the fixture API reads its clock from. */
 export const FIXTURE_CLOCK_VARIABLE = 'FIXTURE_CLOCK';

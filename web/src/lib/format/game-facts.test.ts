@@ -7,6 +7,7 @@ import {
 	type GameConditions,
 	figuresWords,
 	gameFactsLine,
+	gameStateOf,
 	readWords,
 	toBePlayed,
 	weatherWords
@@ -121,6 +122,24 @@ void test('the facts are said only until kickoff', () => {
 	assert.ok(!toBePlayed({ played: false, kickoff: KICKOFF }, Date.parse(KICKOFF)));
 	assert.ok(!toBePlayed({ played: true, kickoff: KICKOFF }, before));
 	assert.ok(toBePlayed({ played: false, kickoff: null }, before));
+});
+
+void test("a game's state is the API's (Lane 80), never derived from the clock (review finding 5)", () => {
+	const before = Date.parse(KICKOFF) - 60_000;
+	assert.equal(
+		gameStateOf({ game_state: 'kicked_off', played: false, kickoff: KICKOFF }),
+		'kicked_off'
+	);
+	assert.equal(
+		gameStateOf({ game_state: 'upcoming', played: false, kickoff: KICKOFF }),
+		'upcoming'
+	);
+	assert.equal(gameStateOf({ game_state: 'final', played: true, kickoff: KICKOFF }), 'final');
+	// A read with no state has none, whatever its kickoff and the clock.
+	assert.equal(gameStateOf({ played: true, kickoff: KICKOFF }), null);
+	assert.equal(gameStateOf({ game_state: null, played: false, kickoff: KICKOFF }), null);
+	// The API's state decides what is still to be played, whatever the browser's clock says.
+	assert.ok(!toBePlayed({ game_state: 'kicked_off', played: false, kickoff: KICKOFF }, before));
 });
 
 /** Words the game facts never use: the lines are an input and a fact, named only as what his club is

@@ -2,7 +2,15 @@
 	import { EMPTY_FIGURE } from '#lib/format/empty.ts';
 	import WeatherGlyph from '#lib/league/box/WeatherGlyph.svelte';
 	import Label from './Label.svelte';
-	import type { AheadRow, LogHead, LogNext, LogRow, PriorRow, SeasonLine } from './game-log.ts';
+	import {
+		stillToPlay,
+		type AheadRow,
+		type LogHead,
+		type LogNext,
+		type LogRow,
+		type PriorRow,
+		type SeasonLine
+	} from './game-log.ts';
 
 	/** A player's season as a box score (Lane 66h): every week so far with its opponent, the
 	 * projection we showed, his points and his line, the week ahead in the accent with this week's
@@ -55,6 +63,8 @@
 
 	/** The earlier seasons start collapsed, as the box's mock had them. */
 	let opened = $state(false);
+	/** The run's weeks still to play, the read's week shown once in the accent row (Lane 80). */
+	const toPlay = $derived(stillToPlay(ahead, next));
 </script>
 
 {#if line}
@@ -166,11 +176,11 @@
 	<p class="none">{none}</p>
 {/if}
 
-{#if ahead.length > 0}
+{#if toPlay.length > 0}
 	<section class="ahead" aria-label="Still to play">
 		<h3><Label>Still to play</Label></h3>
 		<ol>
-			{#each ahead as week (week.week)}
+			{#each toPlay as week (week.week)}
 				<li class:bye={week.bye}>
 					<span class="aw">Wk {week.week}</span>
 					<span class="ao">{week.opponent}</span>

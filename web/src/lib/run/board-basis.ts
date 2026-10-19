@@ -6,6 +6,7 @@
 import { monthDayLabel } from '#lib/format/date.ts';
 import { FIGURE } from '#lib/format/figure-words.ts';
 import type { FiguresReach } from './rest-words.ts';
+import { throughClause } from './through-words.ts';
 import type { Format } from './schema.ts';
 
 /** One sentence of the basis. A sentence about columns the phone does not draw is not said there. */
@@ -54,8 +55,7 @@ function ourBoard(facts: BasisFacts): string {
 /** "GP and Avg are this season's, through week 5.", naming the scoring when it is another's. */
 function seasonColumns(format: Pick<Format, 'label'>, reach: FiguresReach): string {
 	const scoring = reach.scoring === format.label ? '' : `, scored in ${reach.scoring}`;
-	const through = reach.through === 0 ? '' : `, through week ${String(reach.through)}`;
-	return `GP and ${FIGURE.avg} are this season's${scoring}${through}.`;
+	return `GP and ${FIGURE.avg} are this season's${scoring}${throughClause(reach)}.`;
 }
 
 export function boardBasis(facts: BasisFacts): BasisPart[] {

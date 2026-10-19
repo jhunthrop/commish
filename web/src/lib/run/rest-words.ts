@@ -2,22 +2,22 @@
 import { monthDayLabel } from '#lib/format/date.ts';
 import { FIGURE } from '#lib/format/figure-words.ts';
 import type { Format } from './schema.ts';
+import { throughClause } from './through-words.ts';
 
 /** How far this season's figures reach, and the scoring they are in. */
 export interface FiguresReach {
 	/** That format as a chip prints it: "PPR". */
 	scoring: string;
-	/** The week the newest counted game belongs to, 0 before week 1's (run/season.ts
-	 * newestCountedWeek): a Thursday player's GP is never past it. */
-	through: number;
+	/** "through week 5 and week 6's Thursday game" (run/reach.ts reachWords), empty before week 1's:
+	 * never a week a Sunday player's GP does not reach. */
+	through: string;
 }
 
 /** "Games and Avg are this season's, through week 5.", with ", scored in PPR" before the
  * week on a board of another scoring. */
 export function figuresLine(format: Format, reach: FiguresReach): string {
 	const scoring = reach.scoring === format.label ? '' : `, scored in ${reach.scoring}`;
-	const through = reach.through === 0 ? '' : `, through week ${String(reach.through)}`;
-	return `Games and ${FIGURE.avg} are this season's${scoring}${through}.`;
+	return `Games and ${FIGURE.avg} are this season's${scoring}${throughClause(reach)}.`;
 }
 
 /** Once the run ranks the rest of the season: "Ranked by points over replacement for the rest of the

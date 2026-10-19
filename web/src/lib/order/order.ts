@@ -8,6 +8,7 @@ import { memberZone, weekdayTime, zoneWord } from '#lib/format/clock.ts';
 import type { LeagueHost } from '#lib/league/api.ts';
 import {
 	gamePart,
+	kickedOffPart,
 	OPP_PART,
 	projPart,
 	said,
@@ -159,6 +160,8 @@ export function orderBasis(
 		...said(OPP_PART),
 		...(league === null ? [] : uncountedParts(advice, league.rulesHref)),
 		...said(gamePart(lines, clock, now, 'read'), false),
+		// Said on the phone too: the board has the room (review finding 6); K/DST keeps it to a desk.
+		...said(kickedOffPart(lines)),
 		...(league !== null && advice.read_at !== null
 			? said(rosterBasis(league.host, advice.read_at, zone), false)
 			: [])

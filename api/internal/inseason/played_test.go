@@ -10,9 +10,10 @@ import (
 	"github.com/jhunthrop/commish/api/internal/scoring"
 )
 
-// thursdayReads is week 6 with Thursday's game (SEA at DEN) in the store's
-// lines but its result not yet posted, and Sunday's game (BUF at MIA)
-// still to play: the sweep's X3, as the store stood on 2026-10-18.
+// thursdayReads is week 6 with Thursday's game (SEA at DEN) final by its
+// lines before its result is posted (the club_week_finals view, which
+// boards.Schedule reads), and Sunday's game (BUF at MIA) still to play:
+// the sweep's X3, as the store stood on 2026-10-18.
 type thursdayReads struct{ countingReads }
 
 var (
@@ -31,8 +32,8 @@ func (*thursdayReads) Schedule(context.Context, int) ([]boards.TeamWeek, error) 
 	return []boards.TeamWeek{
 		{Week: 5, Team: "SEA", Opponent: "ARI", Home: true, Kickoff: thursdayKickoff.AddDate(0, 0, -4), Final: true},
 		{Week: 5, Team: "ARI", Opponent: "SEA", Kickoff: thursdayKickoff.AddDate(0, 0, -4), Final: true},
-		{Week: 6, Team: "SEA", Opponent: "DEN", Kickoff: thursdayKickoff},
-		{Week: 6, Team: "DEN", Opponent: "SEA", Home: true, Kickoff: thursdayKickoff},
+		{Week: 6, Team: "SEA", Opponent: "DEN", Kickoff: thursdayKickoff, Final: true},
+		{Week: 6, Team: "DEN", Opponent: "SEA", Home: true, Kickoff: thursdayKickoff, Final: true},
 		{Week: 6, Team: "BUF", Opponent: "MIA", Kickoff: sundayKickoff},
 		{Week: 6, Team: "MIA", Opponent: "BUF", Home: true, Kickoff: sundayKickoff},
 	}, nil
@@ -65,16 +66,5 @@ func TestAGameWithLinesIsPlayedBeforeItsResultIsPosted(t *testing.T) {
 	f := NewSeason(d, RulesOf(scoring.PresetRules(pprPreset)), 6, now).For(Player{BoardID: "jsn", Team: "SEA", Position: draft.WR})
 	if !f.Played || len(f.LastGames) != 2 || f.LastGames[0].Week != 6 {
 		t.Fatalf("Thursday's game: %s", f)
-	}
-}
-
-// The rule makes a new schedule and leaves the read's own untouched.
-func TestPlayedFromLinesLeavesTheReadAsItWas(t *testing.T) {
-	reads := &thursdayReads{}
-	games, _ := reads.Schedule(context.Background(), 2026)
-	lines, _ := reads.StatLines(context.Background(), 2026)
-	out := playedFromLines(games, lines)
-	if games[2].Final || !out[2].Final {
-		t.Fatalf("read %v, ruled %v", games[2], out[2])
 	}
 }

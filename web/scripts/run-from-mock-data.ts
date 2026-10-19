@@ -71,7 +71,7 @@ import { POSITIONS, type Position } from '../src/lib/types/player.ts';
 import { bucketUrl, credentialsFromToken } from './r2.ts';
 import { dropBetween, gapOf, tenth } from './tenth.ts';
 import { checkRunSeasons } from '../src/lib/run/season-checks.ts';
-import { priorSeasonBlocks, seasonBlocks } from './standin-season.ts';
+import { GAME_LENGTH_MS, priorSeasonBlocks, seasonBlocks } from './standin-season.ts';
 import type { PlayerSeason, PriorSeason } from '../src/lib/run/season.ts';
 
 const RUN_ID = '2026-10-12T00-standin';
@@ -471,10 +471,27 @@ function clubList(codes: readonly string[], games: readonly GameRow[]): Club[] {
 	});
 }
 
+/** A game's state at the stand-in's clock (the nightly's rule, Lane 80), its final estimated as the
+ * stand-in's season block estimates it: GAME_LENGTH_MS after its kickoff. */
+function stateAt(kickoff: Date, now: Date): NonNullable<Game['state']> {
+	if (kickoff.getTime() + GAME_LENGTH_MS <= now.getTime()) return 'final';
+	return kickoff.getTime() <= now.getTime() ? 'kicked_off' : 'upcoming';
+}
+
+const mean = (values: readonly number[]): number =>
+	values.reduce((sum, v) => sum + v, 0) / values.length;
+
+/** Each club's place by its mean, 1 the highest, ties by club code. */
+function ranksOf(means: ReadonlyMap<string, number>): Map<string, number> {
+	const order = [...means].sort(([a, x], [b, y]) => y - x || a.localeCompare(b));
+	return new Map(order.map(([abbr], i) => [abbr, i + 1] as const));
+}
+
 function scheduleFrom(
 	codes: readonly string[],
 	games: readonly GameRow[],
-	winTotals: WinTotals
+	winTotals: WinTotals,
+	now: Date
 ): Schedule {
 	const value = (club: string): number => {
 		const total = winTotals.byClub.get(club);
@@ -483,31 +500,48 @@ function scheduleFrom(
 	};
 	const unranked = codes.map((abbr) => {
 		const slate: Game[] = games.flatMap((game): Game[] => {
-			const kickoff = kickoffOf(game).toISOString();
+			const at = kickoffOf(game);
+			const where = { week: game.week, kickoff: at.toISOString(), state: stateAt(at, now) };
 			if (game.home_nfl_team === abbr)
-				return [{ week: game.week, opponent: game.away_nfl_team, home: true, kickoff }];
+				return [{ ...where, opponent: game.away_nfl_team, home: true }];
 			if (game.away_nfl_team === abbr)
-				return [{ week: game.week, opponent: game.home_nfl_team, home: false, kickoff }];
+				return [{ ...where, opponent: game.home_nfl_team, home: false }];
 			return [];
 		});
-		const values = slate.map((game) => value(game.opponent));
 		// Ranked on the unrounded mean, written to the tenth every screen prints (the nightly's rule, X9).
-		const mean = values.reduce((sum, v) => sum + v, 0) / values.length;
-		return { abbr, games: slate, mean };
+		const left = slate.filter((game) => game.state === 'upcoming');
+		return {
+			abbr,
+			games: slate,
+			mean: mean(slate.map((game) => value(game.opponent))),
+			rest: left.length === 0 ? null : mean(left.map((game) => value(game.opponent)))
+		};
 	});
 	const ordered = [...unranked].sort((a, b) => b.mean - a.mean || a.abbr.localeCompare(b.abbr));
+	const restRanks = ranksOf(
+		new Map(unranked.flatMap(({ abbr, rest }) => (rest === null ? [] : [[abbr, rest] as const])))
+	);
 	return {
 		season: SEASON,
 		opponentValues: Object.fromEntries(codes.map((abbr) => [abbr, value(abbr)])),
 		opponentBasis: 'Published season win total',
 		unit: "opponents' average win total",
-		slates: unranked.map(({ abbr, games: slate, mean }) => ({
+		slates: unranked.map(({ abbr, games: slate, mean: strength, rest }) => ({
 			abbr,
 			games: slate,
-			strength: tenth(mean),
+			strength: tenth(strength),
 			rank: ordered.findIndex((other) => other.abbr === abbr) + 1,
 			method: "the average of its opponents' published season win totals",
-			window: winTotals.window
+			window: winTotals.window,
+			rest:
+				rest === null
+					? null
+					: {
+							strength: tenth(rest),
+							rank: restRanks.get(abbr) ?? 0,
+							method:
+								"the average of its remaining opponents' published season win totals, one per game still to play"
+						}
 		}))
 	};
 }
@@ -701,7 +735,7 @@ async function main(): Promise<void> {
 		if (codes.length !== CLUB_COUNT)
 			throw new Error(`The board names ${String(codes.length)} clubs.`);
 		const clubs = clubList(codes, games);
-		const schedule = scheduleFrom(codes, games, winTotals);
+		const schedule = scheduleFrom(codes, games, winTotals, now);
 		const seasonInputs = {
 			season: SEASON,
 			format: FORMAT.id,

@@ -137,6 +137,11 @@ void test("copy guard: no composed line doubles a word, the run's own phrases in
 		window: { from: '2026-09-07T12:00:00.000Z', to: '2026-09-07T12:00:00.000Z' },
 		rank: 32
 	};
+	const view = {
+		...slate,
+		kind: 'preseason' as const,
+		strength: 9.3
+	};
 	const graded: RecordWeek = {
 		week: 1,
 		status: 'graded',
@@ -182,14 +187,19 @@ void test("copy guard: no composed line doubles a word, the run's own phrases in
 	const te = league({ scoring: 'te_premium' });
 	const held: Held = { me: 1, teams: { 1: 'Nacua Matata', 2: 'Gmoneyman' }, by: { a: 1, b: 2 } };
 	const lines = [
-		scheduleLead(slate, { count: 9, atLeast: '10.5' }, 5),
-		clubsLead('PPR', slate),
+		scheduleLead(view, { count: 9, atLeast: '10.5' }, { complete: 5, partial: null }),
+		scheduleLead(
+			{ ...view, kind: 'rest' },
+			{ count: 9, atLeast: '10.5' },
+			{ complete: 5, partial: { week: 6, days: ['Thursday'], games: 1 } }
+		),
+		clubsLead('PPR', view),
 		winsBasis('Expected wins, set before the season'),
 		hardestFigure(10, 32).caption,
 		hardestWords(1, 32),
 		hardestWords(32, 32),
-		playedWords(1),
-		playedWords(5),
+		playedWords({ complete: 1, partial: null }),
+		playedWords({ complete: 5, partial: { week: 6, days: [], games: 0 } }),
 		contextNote(te, 'ppr', false)?.text,
 		contextNote(te, 'ppr', true)?.link?.words,
 		contextNote({ ...te, settings_league_id: 'x' }, 'ppr', true)?.link?.words,
@@ -199,8 +209,8 @@ void test("copy guard: no composed line doubles a word, the run's own phrases in
 		leagueLine(te),
 		recordHeadline(record).caption,
 		...weekLines(record.weeks).map((line) => `${line.lead} ${line.text}`),
-		leagueBasis('PPR', 5, 'te_premium', scoresSentence),
-		leagueBasis('Half PPR', 0, 'half_ppr', scoresSentence),
+		leagueBasis('PPR', 'through week 5', 'te_premium', scoresSentence),
+		leagueBasis('Half PPR', '', 'half_ppr', scoresSentence),
 		heldMark(held, 'a')?.words,
 		heldMark(held, 'free')?.words,
 		holderWords(held, 'b')

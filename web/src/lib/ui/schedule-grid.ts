@@ -8,6 +8,8 @@ export interface ScheduleCell {
 	value: string;
 	/** One of the strongest opponents, by the population the page states. */
 	hard: boolean;
+	/** The game is in at the run (Lane 80): set back, so what is left reads first. */
+	played: boolean;
 }
 
 export interface ScheduleRow {
@@ -18,9 +20,9 @@ export interface ScheduleRow {
 	/** The face that leads the row, named under the club: the club's top player on our board, or
 	 * null for a club with none. */
 	face: { src: string; name: string } | null;
-	/** 1 is the hardest slate. */
-	rank: number;
-	/** The strength, formatted: "9.26". */
-	strength: string;
+	/** 1 is the hardest slate by the strength shown, null with none to show. */
+	rank: number | null;
+	/** The strength shown, formatted: "9.3", null with none. */
+	strength: string | null;
 	cells: ScheduleCell[];
 }

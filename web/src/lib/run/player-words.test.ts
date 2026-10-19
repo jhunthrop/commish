@@ -44,7 +44,7 @@ const BARE: PlayerFormat = {
 	tier: 2
 };
 const NUMBERS: PlayerFormat = { ...BARE, preseasonRank: 20, preseasonPoints: 250 };
-const REACH = { scoring: 'PPR', through: 6 };
+const REACH = { scoring: 'PPR', through: 'through week 6' };
 
 void test('in season his preseason rank and points sit beside the rest of the season', () => {
 	const rest = restFigures(REST, NUMBERS, REACH, 2026);

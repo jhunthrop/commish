@@ -78,3 +78,10 @@ export interface AheadRow {
 	/** His kickoff's day, "Sun Oct 18", empty on his bye. */
 	day: string;
 }
+
+/** The weeks still to play as the log lists them (Lane 80): the run's, built with the page, until
+ * the API's week is read; that week then shows once, in the accent row with the API's state, never
+ * beside the run's. */
+export function stillToPlay(ahead: readonly AheadRow[], next: LogNext | null): readonly AheadRow[] {
+	return next === null ? ahead : ahead.filter((row) => row.week !== next.week);
+}

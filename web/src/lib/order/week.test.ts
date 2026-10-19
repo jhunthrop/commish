@@ -5,8 +5,10 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { bannedPattern } from '#lib/format/copy-guard.ts';
 import { FIGURE } from '#lib/format/figure-words.ts';
+import { KICKED_OFF_PART } from '#lib/league/box/basis.ts';
 import { BOX } from '#lib/league/box/box.ts';
 import type { WeekOrderAdvice } from './api.ts';
+import { stamped } from '../../../scripts/inseason-fixture/game-state.ts';
 import { weekOrderPath } from './path.ts';
 import {
 	foldedEvidence,
@@ -48,7 +50,11 @@ const withNote = (
 	K: { ...tabs.K, ...RULES_NOTE },
 	DEF: { ...tabs.DEF, ...RULES_NOTE }
 });
-const fixture = { read: withNote(stored.read), unread: withNote(stored.unread) };
+// The fixture API's answers as it serves them: every game stamped with the API's state at its clock.
+const fixture = {
+	read: withNote(stamped(stored.read, SATURDAY) as typeof stored.read),
+	unread: withNote(stamped(stored.unread, TUESDAY) as typeof stored.unread)
+};
 const visitor = (a: WeekOrderAdvice): WeekOrderAdvice => ({
 	...a,
 	read_at: null,
@@ -127,6 +133,36 @@ void test('a week whose games have kicked off but are not all final says so', ()
 	assert.deepEqual(heads, ['Kicked off', 'Bye in week 6']);
 });
 
+void test("the Monday after: the API's kicked-off rows say Kicked off, and the basis when Final lands (Lane 80)", () => {
+	const monday = Date.parse('2026-10-19T11:00:00.000Z');
+	const advice = visitor(fixture.read.K);
+	const kicked: WeekOrderAdvice = {
+		...advice,
+		rows: advice.rows.map((r) =>
+			r.section === 'to_play'
+				? {
+						...r,
+						section: 'kicked_off' as const,
+						line: { ...r.line, facts: { ...r.line.facts, game_state: 'kicked_off' as const } }
+					}
+				: r
+		)
+	};
+	const view = views(kicked, monday).find(
+		(v) => v.section === 'kicked_off' && v.box.game !== 'bye'
+	);
+	const game = view?.box.game;
+	assert.ok(game !== undefined && game !== null && game !== 'bye');
+	assert.equal(game.when, BOX.kickedOff);
+	const said = weekBasis(kicked, VISITOR, ZONE, monday);
+	assert.ok(
+		said.some((p) => p.text === KICKED_OFF_PART && !p.phone),
+		text(said)
+	);
+	// Saturday: Thursday's games are final, their kickers' stats not in yet, so the basis says they follow.
+	assert.ok(text(weekBasis(advice, VISITOR, ZONE, SATURDAY)).includes(KICKED_OFF_PART));
+});
+
 void test('the projection is in once a row has a Proj, and not before', () => {
 	assert.equal(landed(fixture.read.K), true);
 	assert.equal(landed(fixture.unread.K), false);
@@ -145,7 +181,8 @@ void test("a visitor's kickers' basis: the order with the model we lack, Opp ran
 		"Kickers are in order of Proj, this week's published projection in PPR scoring, read Fri 9:00 pm Central, as we have no kicker model of our own. " +
 			'Opp rank is points allowed to kickers this season, 1st the fewest. ' +
 			'Avg and Last are his points a game and last game, in PPR. ' +
-			"Game is each club's expected points, his first, and the kickoff weather, read Fri 4:01 pm Central."
+			"Game is each club's expected points, his first, and the kickoff weather, read Fri 4:01 pm Central. " +
+			KICKED_OFF_PART
 	);
 });
 
@@ -153,7 +190,7 @@ void test("a member's defenses' basis: its default scoring, the league's own poi
 	const basis = weekBasis(fixture.read.DEF, ESPN, ZONE, SATURDAY);
 	assert.deepEqual(
 		basis.map((p) => p.phone),
-		[true, true, true, true, false]
+		[true, true, true, true, false, false]
 	);
 	const said = text(basis);
 	assert.match(

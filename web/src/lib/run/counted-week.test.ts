@@ -2,7 +2,8 @@
 // belongs to, so a basis's "through week N" and a Thursday player's GP agree. Run with `npm test`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { countedWeek, newestCountedWeek, type GameLogRow } from './season.ts';
+import { countedWeek, newestCountedWeek } from './reach.ts';
+import type { GameLogRow } from './season.ts';
 
 const row = (week: number, status: GameLogRow['status']): Pick<GameLogRow, 'week' | 'status'> => ({
 	week,

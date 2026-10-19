@@ -41,6 +41,7 @@ import { SUNDAY, sundayOf } from './sunday.ts';
 import { inSeason, noWeek } from './member-week.ts';
 import { inTenths } from './tenths.ts';
 import { FIXTURE_CLOCK_VARIABLE, fixtureClock } from './clock.ts';
+import { stamped } from './game-state.ts';
 import {
 	espnDefenseId,
 	weekOrderAnswer,
@@ -279,7 +280,8 @@ function send(
 	res.end(
 		JSON.stringify({
 			ok,
-			data: ok ? body : null,
+			// Every game stamped with the API's state at the fixture's clock (Lane 80).
+			data: ok ? stamped(body, now()) : null,
 			error: ok ? null : { code, message: String(body) }
 		})
 	);

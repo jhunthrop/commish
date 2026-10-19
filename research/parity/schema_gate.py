@@ -54,6 +54,10 @@ where n.nspname = %s
 
 INDEXES_SQL = "select tablename, indexname, indexdef from pg_indexes where schemaname = %s"
 
+# The views (revision 0014): each one's definition as Postgres keeps it, so the migration's and the
+# declaration's must match word for word.
+VIEWS_SQL = "select viewname, definition from pg_views where schemaname = %s"
+
 LEGACY_COLUMNS_SQL = """
 select table_name, column_name from information_schema.columns where table_schema = %s
 """
@@ -71,6 +75,8 @@ def catalog(url: str, schema: str = RESEARCH_SCHEMA) -> frozenset[str]:
             facts.add(f"constraint {table}.{name} {definition}")
         for table, name, definition in conn.execute(INDEXES_SQL, (schema,)):
             facts.add(f"index {table}.{name} {definition}")
+        for name, definition in conn.execute(VIEWS_SQL, (schema,)):
+            facts.add(f"view {name} {' '.join(str(definition).split())}")
     return frozenset(facts)
 
 

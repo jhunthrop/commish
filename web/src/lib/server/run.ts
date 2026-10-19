@@ -29,7 +29,7 @@ import {
 } from '#lib/run/schema.ts';
 import { splitBoard, splitIndex, unindexedMarketRow, type RunIndex } from '#lib/run/market.ts';
 import { checkRunSeasons } from '#lib/run/season-checks.ts';
-import { newestCountedWeek } from '#lib/run/season.ts';
+import { countedReach, finalsReach, reachWords, type Reach } from '#lib/run/reach.ts';
 import { openRun, type RunReader } from '#lib/run/source.ts';
 import type { RunStamp } from '#lib/run/stamp.ts';
 import { searchPlaceholder } from '#lib/format/pool-words.ts';
@@ -168,10 +168,10 @@ export interface SeasonReach {
 	format: string;
 	/** That format as a chip prints it: "PPR". */
 	scoring: string;
-	/** The week the newest counted game belongs to (run/season.ts newestCountedWeek, the sweep's X3):
-	 * what a basis's "through week N" says, so a Thursday player's GP and the basis agree. */
-	through: number;
-	/** The last week whose games are all in, 0 before week 1's: the weeks a schedule fades. */
+	/** What a basis's "through week" says (run/reach.ts, Lane 80): "through week 5 and week 6's
+	 * Thursday game", never a week a Sunday player's GP does not reach; empty before week 1's. */
+	through: string;
+	/** The last complete week, its through week (the run's season blocks). */
 	complete: number;
 }
 
@@ -180,24 +180,30 @@ export function seasonReach(): Promise<SeasonReach> {
 		const entries = await index();
 		const [first] = entries;
 		if (!first) throw new Error('The run indexes no players.');
-		const seasons = (await Promise.all(entries.map((entry) => player(entry.id)))).map(
-			(loaded) => loaded.season
-		);
+		const [players, slate] = await Promise.all([
+			Promise.all(entries.map((entry) => player(entry.id))),
+			schedule()
+		]);
 		const { season } = await player(first.id);
 		const { label } = await formatById(season.format);
+		// Counted games only (review finding 1): his club's game, by his log, never a status final alone.
+		const counted = players.map((loaded) => ({ ...loaded.season, team: loaded.team }));
+		const reach = countedReach(counted, slate.slates, season.through);
 		return {
 			format: season.format,
 			scoring: label,
-			through: newestCountedWeek(seasons),
+			through: reachWords(reach),
 			complete: season.through
 		};
 	});
 }
 
-/** The last week whose games are all in, 0 before the season's first kickoff: the weeks a
- * schedule sets back as played. */
-export async function playedThrough(): Promise<number> {
-	return (await seasonUnderway()) ? (await seasonReach()).complete : 0;
+/** The games a schedule sets back as played (run/reach.ts finalsReach): the complete week and the
+ * next week's games final by the run's states; none before the season's first kickoff. */
+export async function playedReach(): Promise<Reach> {
+	if (!(await seasonUnderway())) return { complete: 0, partial: null };
+	const [{ complete }, slate] = await Promise.all([seasonReach(), schedule()]);
+	return finalsReach(slate.slates, complete);
 }
 
 export function adp(): Promise<Adp> {

@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { bannedPattern } from '#lib/format/copy-guard.ts';
+import { KICKED_OFF_PART } from '../league/box/basis.ts';
 import type { WeekFacts } from '../league/inseason/api.ts';
 import { CARD, NONE, printTenth, unreadBasis, type CardTile } from './card.ts';
 import {
@@ -226,6 +227,51 @@ void test('the week ahead is the box row and the cell under his name', () => {
 	assert.equal(tile(bye.tiles, 'proj').caption, 'Bye this week');
 });
 
+void test('the Monday after his Sunday game: kicked off, no expected score, weather or change (Lane 80)', () => {
+	const monday = card(week({}, { facts: facts({ game_state: 'kicked_off' }) }));
+	assert.deepEqual(monday.cell, {
+		where: 'vs ARI',
+		when: 'Kicked off',
+		expected: null,
+		weather: null
+	});
+	const { next } = monday;
+	assert.ok(next);
+	assert.equal(next.when, 'Kicked off');
+	assert.equal(next.expected, null);
+	assert.equal(next.weather, null);
+	assert.deepEqual(tile(monday.tiles, 'delta'), {
+		key: 'delta',
+		label: CARD.delta,
+		value: NONE,
+		caption: CARD.kickedOff,
+		tone: 'quiet'
+	});
+	assert.equal(monday.basis[1]?.endsWith(KICKED_OFF_PART), true, monday.basis[1]);
+	const final = card(week({}, { facts: facts({ game_state: 'final', played: true }) }));
+	const { cell } = final;
+	assert.ok(cell);
+	assert.equal(cell.when, 'Final');
+	assert.equal(tile(final.tiles, 'delta').caption, CARD.gameFinal);
+	assert.equal(cell.expected, null);
+	// Final the hour after, his stats not in yet: the basis says they follow.
+	assert.ok((final.basis[1] ?? '').includes(KICKED_OFF_PART));
+	// His week's stats in: nothing more to say.
+	const counted = card(
+		week(
+			{},
+			{
+				facts: facts({
+					game_state: 'final',
+					played: true,
+					last_games: [{ week: 6, points: 21 }]
+				})
+			}
+		)
+	);
+	assert.ok(!(counted.basis[1] ?? '').includes(KICKED_OFF_PART));
+});
+
 void test("the card's head is the API's week, the bye said in it, so one card shows one week (the sweep M6)", () => {
 	assert.deepEqual(card(week()).head, { week: 6, opponent: 'vs ARI' });
 	const away = card(week({ week: 7 }, { facts: facts({ week: 7, opponent: 'NYJ', home: false }) }));
@@ -274,6 +320,7 @@ void test("the game facts' read is said only while his game is still to be playe
 	const after = card(week(), null, kickoff).basis[1] ?? '';
 	assert.match(before, /weather were read Fri 9:00 pm Central\.$/);
 	assert.ok(!after.includes('were read'), after);
+	// A read with no state (review finding 5) says no state: the evidence line ends there.
 	assert.match(after, /PPR scoring\.$/);
 });
 

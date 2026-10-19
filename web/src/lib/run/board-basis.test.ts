@@ -11,7 +11,7 @@ const PRESEASON: BasisFacts = {
 	order: 'board',
 	adpBasis: ['PPR drafts, Sep 9'],
 	gap: true,
-	reach: { scoring: 'PPR', through: 5 }
+	reach: { scoring: 'PPR', through: 'through week 5' }
 };
 
 const text = (facts: BasisFacts, phone = false): string =>

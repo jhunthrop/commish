@@ -7,13 +7,14 @@ import { fixed, plural } from '#lib/format/number.ts';
 /** Tenths in a point, the box's printed precision. */
 const TENTHS = 10;
 import {
-	countedWeek,
 	POINTS_PER_GAME_DECIMALS,
 	type GameLogRow,
 	type PlayerSeason,
 	type PriorSeason
 } from '#lib/run/season.ts';
-import type { Format } from '#lib/run/schema.ts';
+import { countedWeek } from '#lib/run/reach.ts';
+import type { Format, Game } from '#lib/run/schema.ts';
+import { GAME_STATE_WORDS } from '#lib/format/game-facts.ts';
 import { STAT_COLUMNS, captionFor, type StatColumn } from '#lib/run/stat-columns.ts';
 import type { Position } from '#lib/types/player.ts';
 import type { AheadRow, LogHead, LogRow, PriorRow, SeasonLine } from '#lib/ui/game-log.ts';
@@ -35,8 +36,9 @@ export interface SeasonView {
 	prior: PriorRow[];
 }
 
-/** His kickoff in a week, from the run's schedule, or null on his bye. */
-export type KickoffOf = (week: number) => string | null;
+/** His club's game in a week, from the run's schedule: its kickoff and its state at the run (Lane 80),
+ * null on a run from before the field; null on his bye. */
+export type KickoffOf = (week: number) => { kickoff: string; state: Game['state'] | null } | null;
 
 function opponentWords(row: GameLogRow): string {
 	if (row.opponent === null) return 'Bye';
@@ -57,17 +59,26 @@ function logRow(row: GameLogRow, columns: readonly StatColumn[]): LogRow {
 	};
 }
 
+/** A week still to play's day: "Kicked off" or "Final" by the run's state where his stats are not in
+ * yet (Lane 80), else its kickoff's day. */
+function dayWords(game: NonNullable<ReturnType<KickoffOf>>): string {
+	const { state } = game;
+	return state === 'kicked_off' || state === 'final'
+		? GAME_STATE_WORDS[state]
+		: weekdayLabel(game.kickoff);
+}
+
 function aheadRow(row: GameLogRow, kickoffOf: KickoffOf): AheadRow {
 	const bye = row.opponent === null;
-	const kickoff = bye ? null : kickoffOf(row.week);
+	const game = bye ? null : kickoffOf(row.week);
 	// The run's reader holds every week still to play to a kickoff (season-checks.ts).
-	if (!bye && kickoff === null)
+	if (!bye && game === null)
 		throw new Error(`Week ${String(row.week)} against ${String(row.opponent)} has no kickoff.`);
 	return {
 		week: row.week,
 		opponent: opponentWords(row),
 		bye,
-		day: kickoff === null ? '' : weekdayLabel(kickoff)
+		day: game === null ? '' : dayWords(game)
 	};
 }
 

@@ -3,8 +3,16 @@
  * prints; live.ts reads the answer and builds the links. */
 import type { components } from '#lib/api/types.ts';
 import { memberZone, weekdayTime } from '#lib/format/clock.ts';
+import { gameStateOf, toBePlayed } from '#lib/format/game-facts.ts';
 import { weekHead } from '#lib/format/figure-words.ts';
-import { avgLastPart, deltaPart, gamePart, OPP_PART, projPart } from '#lib/league/box/basis.ts';
+import {
+	avgLastPart,
+	deltaPart,
+	gamePart,
+	kickedOffPart,
+	OPP_PART,
+	projPart
+} from '#lib/league/box/basis.ts';
 import {
 	BOX,
 	deltaWord,
@@ -255,12 +263,17 @@ function deltaCaption(week: PlayerWeek, zone: string): string {
 		: `since ${weekdayTime(read, zone)}`;
 }
 
-function deltaTile(week: PlayerWeek, zone: string): CardTile {
+function deltaTile(week: PlayerWeek, zone: string, now: number): CardTile {
+	const ahead = toBePlayed(week.line.facts, now) || week.line.facts.bye;
 	return {
 		key: 'delta',
 		label: CARD.delta,
-		value: deltaWord(week.line.projection_delta),
-		caption: deltaCaption(week, zone),
+		value: ahead ? deltaWord(week.line.projection_delta) : NONE,
+		caption: ahead
+			? deltaCaption(week, zone)
+			: gameStateOf(week.line.facts) === 'final'
+				? CARD.gameFinal
+				: CARD.kickedOff,
 		tone: 'quiet'
 	};
 }
@@ -304,7 +317,7 @@ export function liveBasis(week: PlayerWeek, league: boolean, zone: string, now: 
 		? 'your scoring'
 		: `${SCORING_WORDS[week.projection_scoring.format]} scoring`;
 	const evidence = `${OPP_PART} ${avgLastPart(scoring)}`;
-	const facts = gamePart([week.line], clock, now, 'next');
+	const facts = gamePart([week.line], clock, now, 'next') ?? kickedOffPart([week.line]);
 	return [proj, facts === null ? evidence : `${evidence} ${facts}`];
 }
 
@@ -315,14 +328,23 @@ function headOf(week: PlayerWeek, zone: string): CardHead {
 	return { week: week.week, opponent };
 }
 
-function nextOf(week: PlayerWeek, zone: string): { cell: NextCell | null; next: LogNext | null } {
-	const game = gameOf(week.line.facts, zone);
+/** His week's game under his name and as the log's accent row: the expected score and the weather
+ * only while it is still to be played (Lane 80), "Kicked off" or "Final" in place of the kickoff
+ * after. */
+function nextOf(
+	week: PlayerWeek,
+	zone: string,
+	now: number
+): { cell: NextCell | null; next: LogNext | null } {
+	const { facts } = week.line;
+	const game = gameOf(facts, zone);
 	if (game === null || game === 'bye') return { cell: null, next: null };
+	const ahead = toBePlayed(facts, now);
 	const cell: NextCell = {
 		where: game.where,
 		when: game.when,
-		expected: expectedWords(week.line.facts),
-		weather: weatherCell(week.line.facts)
+		expected: ahead ? expectedWords(facts) : null,
+		weather: ahead ? weatherCell(facts) : null
 	};
 	const proj = week.line.week_projection;
 	return {
@@ -381,9 +403,9 @@ export function liveCard({
 		oppTile(week, player.position),
 		avgTile(week, games, fallback('avg')),
 		lastTile(week, opponents, fallback('last')),
-		deltaTile(week, zone)
+		deltaTile(week, zone, now)
 	].reduce<CardTile[]>((all, tile) => withTile(all, tile), [...tiles]);
-	const { cell, next } = nextOf(week, zone);
+	const { cell, next } = nextOf(week, zone, now);
 	const verb =
 		league !== null && week.verb !== null ? verbOf(week.verb, league, player, screenHref) : null;
 	return {

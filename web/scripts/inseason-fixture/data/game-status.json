@@ -1,0 +1,201 @@
+{
+	"source": "tank01_game_status",
+	"rows": [
+		{
+			"week": 6,
+			"team": "DEN",
+			"kickoff": "2026-10-16T00:15:00.000Z",
+			"status": "final",
+			"as_of": "2026-10-16T06:00:00.000Z"
+		},
+		{
+			"week": 6,
+			"team": "SEA",
+			"kickoff": "2026-10-16T00:15:00.000Z",
+			"status": "final",
+			"as_of": "2026-10-16T06:00:00.000Z"
+		},
+		{
+			"week": 6,
+			"team": "HOU",
+			"kickoff": "2026-10-18T13:30:00.000Z",
+			"status": "final",
+			"as_of": "2026-10-18T18:00:00.000Z"
+		},
+		{
+			"week": 6,
+			"team": "JAX",
+			"kickoff": "2026-10-18T13:30:00.000Z",
+			"status": "final",
+			"as_of": "2026-10-18T18:00:00.000Z"
+		},
+		{
+			"week": 6,
+			"team": "ATL",
+			"kickoff": "2026-10-18T17:00:00.000Z",
+			"status": "final",
+			"as_of": "2026-10-18T21:00:00.000Z"
+		},
+		{
+			"week": 6,
+			"team": "BAL",
+			"kickoff": "2026-10-18T17:00:00.000Z",
+			"status": "final",
+			"as_of": "2026-10-18T21:00:00.000Z"
+		},
+		{
+			"week": 6,
+			"team": "CAR",
+			"kickoff": "2026-10-18T17:00:00.000Z",
+			"status": "final",
+			"as_of": "2026-10-18T21:00:00.000Z"
+		},
+		{
+			"week": 6,
+			"team": "CHI",
+			"kickoff": "2026-10-18T17:00:00.000Z",
+			"status": "final",
+			"as_of": "2026-10-18T21:00:00.000Z"
+		},
+		{
+			"week": 6,
+			"team": "CLE",
+			"kickoff": "2026-10-18T17:00:00.000Z",
+			"status": "final",
+			"as_of": "2026-10-18T21:00:00.000Z"
+		},
+		{
+			"week": 6,
+			"team": "IND",
+			"kickoff": "2026-10-18T17:00:00.000Z",
+			"status": "final",
+			"as_of": "2026-10-18T21:00:00.000Z"
+		},
+		{
+			"week": 6,
+			"team": "NE",
+			"kickoff": "2026-10-18T17:00:00.000Z",
+			"status": "final",
+			"as_of": "2026-10-18T21:00:00.000Z"
+		},
+		{
+			"week": 6,
+			"team": "NO",
+			"kickoff": "2026-10-18T17:00:00.000Z",
+			"status": "final",
+			"as_of": "2026-10-18T21:00:00.000Z"
+		},
+		{
+			"week": 6,
+			"team": "NYG",
+			"kickoff": "2026-10-18T17:00:00.000Z",
+			"status": "final",
+			"as_of": "2026-10-18T21:00:00.000Z"
+		},
+		{
+			"week": 6,
+			"team": "NYJ",
+			"kickoff": "2026-10-18T17:00:00.000Z",
+			"status": "final",
+			"as_of": "2026-10-18T21:00:00.000Z"
+		},
+		{
+			"week": 6,
+			"team": "PHI",
+			"kickoff": "2026-10-18T17:00:00.000Z",
+			"status": "final",
+			"as_of": "2026-10-18T21:00:00.000Z"
+		},
+		{
+			"week": 6,
+			"team": "PIT",
+			"kickoff": "2026-10-18T17:00:00.000Z",
+			"status": "final",
+			"as_of": "2026-10-18T21:00:00.000Z"
+		},
+		{
+			"week": 6,
+			"team": "TB",
+			"kickoff": "2026-10-18T17:00:00.000Z",
+			"status": "final",
+			"as_of": "2026-10-18T21:00:00.000Z"
+		},
+		{
+			"week": 6,
+			"team": "TEN",
+			"kickoff": "2026-10-18T17:00:00.000Z",
+			"status": "final",
+			"as_of": "2026-10-18T21:00:00.000Z"
+		},
+		{
+			"week": 6,
+			"team": "ARI",
+			"kickoff": "2026-10-18T20:05:00.000Z",
+			"status": "final",
+			"as_of": "2026-10-19T00:00:00.000Z"
+		},
+		{
+			"week": 6,
+			"team": "BUF",
+			"kickoff": "2026-10-18T20:25:00.000Z",
+			"status": "final",
+			"as_of": "2026-10-19T00:00:00.000Z"
+		},
+		{
+			"week": 6,
+			"team": "KC",
+			"kickoff": "2026-10-18T20:25:00.000Z",
+			"status": "final",
+			"as_of": "2026-10-19T00:00:00.000Z"
+		},
+		{
+			"week": 6,
+			"team": "LAC",
+			"kickoff": "2026-10-18T20:25:00.000Z",
+			"status": "final",
+			"as_of": "2026-10-19T00:00:00.000Z"
+		},
+		{
+			"week": 6,
+			"team": "LAR",
+			"kickoff": "2026-10-18T20:05:00.000Z",
+			"status": "final",
+			"as_of": "2026-10-19T00:00:00.000Z"
+		},
+		{
+			"week": 6,
+			"team": "LV",
+			"kickoff": "2026-10-18T20:25:00.000Z",
+			"status": "final",
+			"as_of": "2026-10-19T00:00:00.000Z"
+		},
+		{
+			"week": 6,
+			"team": "DAL",
+			"kickoff": "2026-10-19T00:20:00.000Z",
+			"status": "final",
+			"as_of": "2026-10-19T06:00:00.000Z"
+		},
+		{
+			"week": 6,
+			"team": "GB",
+			"kickoff": "2026-10-19T00:20:00.000Z",
+			"status": "final",
+			"as_of": "2026-10-19T06:00:00.000Z"
+		},
+		{
+			"week": 6,
+			"team": "SF",
+			"kickoff": "2026-10-20T00:15:00.000Z",
+			"status": "final",
+			"as_of": "2026-10-20T06:00:00.000Z"
+		},
+		{
+			"week": 6,
+			"team": "WSH",
+			"kickoff": "2026-10-20T00:15:00.000Z",
+			"status": "final",
+			"as_of": "2026-10-20T06:00:00.000Z"
+		}
+	]
+}

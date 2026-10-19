@@ -7,30 +7,30 @@ import { leagueBasis as basisOf } from './model.ts';
 
 const leagueBasis = (
 	scoring: string,
-	through: number,
+	through: string,
 	like: Parameters<typeof scoresSentence>[0]
 ): string => basisOf(scoring, through, like, scoresSentence);
 
 void test('a TE premium league on the PPR figures says the figures once and the league in plain words', () => {
 	assert.equal(
-		leagueBasis('PPR', 5, 'te_premium'),
+		leagueBasis('PPR', 'through week 5', 'te_premium'),
 		"PPR. This season's games and Avg through week 5, beside our preseason projection and points over replacement. Your league gives tight ends extra points per catch."
 	);
 });
 
 void test('a league scoring like the figures says nothing more', () => {
 	assert.equal(
-		leagueBasis('PPR', 5, 'ppr'),
+		leagueBasis('PPR', 'through week 5', 'ppr'),
 		"PPR. This season's games and Avg through week 5, beside our preseason projection and points over replacement."
 	);
 	assert.equal(
-		leagueBasis('Half PPR', 0, 'half_ppr'),
+		leagueBasis('Half PPR', '', 'half_ppr'),
 		"Half PPR. This season's games and Avg, beside our preseason projection and points over replacement."
 	);
 });
 
 void test('the line never names a lineup shape or promises exact rules', () => {
-	const line = leagueBasis('PPR', 5, 'standard');
+	const line = leagueBasis('PPR', 'through week 5', 'standard');
 	assert.match(line, /Your league scores standard\.$/);
 	assert.doesNotMatch(line, /superflex|Draft Pass|exact rules/i);
 });

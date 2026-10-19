@@ -49,11 +49,34 @@ export function figuresWords(c: GameConditions): string | null {
 	return `Expected to score ${team} and to ${spread.side} by ${halves(spread.points)}, ${points} points in the game.`;
 }
 
-/** Whether the game is still to be played: not final and not yet kicked off. */
-export function toBePlayed(
-	game: { played: boolean; kickoff: string | null },
-	now: number
-): boolean {
+export type GameState = Schemas['GameState'];
+
+/** A game past its kickoff in a word, the one source every screen prints (Lane 80): its kickoff day
+ * or time stands while it is upcoming. */
+export const GAME_STATE_WORDS = {
+	kicked_off: 'Kicked off',
+	final: 'Final'
+} as const satisfies Record<Exclude<GameState, 'upcoming'>, string>;
+
+/** A game as the API sends it: its state (Lane 80), absent on a read from before the field, beside
+ * the final flag and the kickoff. */
+export interface StatedGame {
+	game_state?: GameState | null;
+	played: boolean;
+	kickoff: string | null;
+}
+
+/** A game's state, one rule for every screen: the API's (its clock and its finals, gameStateAt in
+ * inseason/facts.go), never derived here (review finding 5): a read without it has no state. */
+export function gameStateOf(game: StatedGame): GameState | null {
+	return game.game_state ?? null;
+}
+
+/** Whether the game is still to be played: upcoming by its state; on a read with no state, the rule
+ * before it, not final and not yet kicked off at `now`. */
+export function toBePlayed(game: StatedGame, now: number): boolean {
+	const state = gameStateOf(game);
+	if (state !== null) return state === 'upcoming';
 	return !game.played && (game.kickoff === null || Date.parse(game.kickoff) > now);
 }
 

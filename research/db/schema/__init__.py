@@ -13,6 +13,7 @@ Every table lives in the `research` Postgres schema and is defined once here, by
     published     published_boards, the published run's board rows (revision 0006)
     venues        stadiums and nws_grid_points, the game's place and its forecast grid (revision 0010)
     game_history  nflverse_pbp_plays, nflverse_depth_chart_weeks, game_weather (revision 0009)
+    views         club_week_finals, the one "final held" rule (revision 0014, Lane 80)
 
 `alembic/versions/0001_research_schema.py` creates exactly this, and the schema gate checks the
 two agree. What changed from the legacy `public` tables, and why, is in the README; the column
@@ -58,11 +59,13 @@ from research.db.schema.provider import (
 )
 from research.db.schema.published import PUBLISHED_BOARDS
 from research.db.schema.venues import NWS_GRID_POINTS, STADIUMS
+from research.db.schema.views import CLUB_WEEK_FINALS
 
 __all__ = [
     "ADP_SNAPSHOTS",
     "CAPTURE_CHECKS",
     "CAPTURE_SNAPSHOTS",
+    "CLUB_WEEK_FINALS",
     "COACHES",
     "CUSTOM_BOARDS",
     "GAME_WEATHER",

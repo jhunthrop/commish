@@ -43,11 +43,10 @@ func StatMetrics() []string {
 // Read caps: a whole season is about 600 lined players a week for 18
 // weeks and 272 games.
 const (
-	maxStatLines     = 20000
-	maxTeamWeeks     = 1200
-	scheduleSource   = "nflverse_kickoff"
-	kickoffMetric    = "kickoff_instant"
-	gameResultMetric = "game_result"
+	maxStatLines   = 20000
+	maxTeamWeeks   = 1200
+	scheduleSource = "nflverse_kickoff"
+	kickoffMetric  = "kickoff_instant"
 )
 
 // nflverseTeams folds nflverse's spellings onto the provider's codes the
@@ -147,8 +146,8 @@ type TeamWeek struct {
 
 // Schedule is the season's games, each from both clubs' sides: the
 // provider's schedule for the pairing, the research store's team-week
-// observations for the kickoff instant and the final flag (the freeze
-// and game-log steps' reads).
+// observations for the kickoff instant, and the final from the one
+// final-held rule, the club_week_finals view (Lane 80), either club's.
 func (s *PGSource) Schedule(ctx context.Context, season int) ([]TeamWeek, error) {
 	games, err := s.games(ctx, season)
 	if err != nil {
@@ -164,7 +163,8 @@ func (s *PGSource) Schedule(ctx context.Context, season int) ([]TeamWeek, error)
 		if at, ok := kickoffs[key]; ok {
 			g.Kickoff = at
 		}
-		g.Final = finals[key]
+		// Either club's final is the game's (the view holds each club's own).
+		g.Final = finals[key] || finals[teamWeekKey(g.Week, g.Opponent)]
 		out = append(out, g)
 	}
 	return out, nil
@@ -210,37 +210,63 @@ func (s *PGSource) games(ctx context.Context, season int) ([]TeamWeek, error) {
 }
 
 // teamWeekFacts is each club-week's kickoff instant (the observation's
-// stamp) and whether its result is stored.
+// stamp) and whether it is final by club_week_finals (research revision
+// 0014, research/db/schema/club_week_finals.sql): the weekly result, the
+// hourly capture's status saying final, or a line with the club, the rule
+// the research store's readers share.
 func (s *PGSource) teamWeekFacts(ctx context.Context, season int) (map[string]time.Time, map[string]bool, error) {
-	rows, err := s.Pool.Query(ctx, `select week, team, metric, max(as_of) from `+s.table("team_week_observations")+`
-		where season = $1 and source = $2 and metric = any($3) group by week, team, metric
-		order by week, team collate "C", metric limit $4`, season, scheduleSource, []string{kickoffMetric, gameResultMetric}, 2*maxTeamWeeks+1)
+	kickoffs, err := s.kickoffs(ctx, season)
 	if err != nil {
-		return nil, nil, fmt.Errorf("boards: read team weeks %d: %w", season, err)
+		return nil, nil, err
+	}
+	rows, err := s.Pool.Query(ctx, `select week, team from `+s.table("club_week_finals")+`
+		where season = $1 order by week, team collate "C" limit $2`, season, maxTeamWeeks+1)
+	if err != nil {
+		return nil, nil, fmt.Errorf("boards: read finals %d: %w", season, err)
 	}
 	defer rows.Close()
-	kickoffs, finals := map[string]time.Time{}, map[string]bool{}
-	n := 0
+	finals := map[string]bool{}
 	for rows.Next() {
 		var week int
-		var team, metric string
-		var at time.Time
-		if err := rows.Scan(&week, &team, &metric, &at); err != nil {
-			return nil, nil, fmt.Errorf("boards: scan team weeks %d: %w", season, err)
+		var team string
+		if err := rows.Scan(&week, &team); err != nil {
+			return nil, nil, fmt.Errorf("boards: scan finals %d: %w", season, err)
 		}
-		n++
-		key := teamWeekKey(week, ProductTeam(team))
-		if metric == kickoffMetric {
-			kickoffs[key] = at.UTC()
-		} else {
-			finals[key] = true
-		}
+		finals[teamWeekKey(week, ProductTeam(team))] = true
 	}
 	if err := rows.Err(); err != nil {
-		return nil, nil, fmt.Errorf("boards: read team weeks %d: %w", season, err)
+		return nil, nil, fmt.Errorf("boards: read finals %d: %w", season, err)
 	}
-	if n > 2*maxTeamWeeks {
-		return nil, nil, fmt.Errorf("boards: over %d team-week facts for %d", 2*maxTeamWeeks, season)
+	if len(finals) > maxTeamWeeks {
+		return nil, nil, fmt.Errorf("boards: over %d finals for %d", maxTeamWeeks, season)
 	}
 	return kickoffs, finals, nil
+}
+
+// kickoffs is each club-week's newest kickoff observation's stamp.
+func (s *PGSource) kickoffs(ctx context.Context, season int) (map[string]time.Time, error) {
+	rows, err := s.Pool.Query(ctx, `select week, team, max(as_of) from `+s.table("team_week_observations")+`
+		where season = $1 and source = $2 and metric = $3 group by week, team
+		order by week, team collate "C" limit $4`, season, scheduleSource, kickoffMetric, maxTeamWeeks+1)
+	if err != nil {
+		return nil, fmt.Errorf("boards: read kickoffs %d: %w", season, err)
+	}
+	defer rows.Close()
+	out := map[string]time.Time{}
+	for rows.Next() {
+		var week int
+		var team string
+		var at time.Time
+		if err := rows.Scan(&week, &team, &at); err != nil {
+			return nil, fmt.Errorf("boards: scan kickoffs %d: %w", season, err)
+		}
+		out[teamWeekKey(week, ProductTeam(team))] = at.UTC()
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("boards: read kickoffs %d: %w", season, err)
+	}
+	if len(out) > maxTeamWeeks {
+		return nil, fmt.Errorf("boards: over %d kickoffs for %d", maxTeamWeeks, season)
+	}
+	return out, nil
 }

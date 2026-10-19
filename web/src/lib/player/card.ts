@@ -82,6 +82,9 @@ export const CARD = {
 	noEarlierRead: 'No earlier read this week',
 	noProjToCompare: 'No projection to compare',
 	notInEarlier: 'Not in the earlier read',
+	/** The change's caption once his game has kicked off (Lane 80): the projection no longer moves. */
+	kickedOff: 'His game has kicked off',
+	gameFinal: 'His game is final',
 	notRanked: 'not ranked yet',
 	/** The game log's collapsed earlier seasons (review M8). */
 	earlierSeasons: 'Earlier seasons',

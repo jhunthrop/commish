@@ -93,7 +93,7 @@ void test("the head reaches his newest game in the records, Thursday's before Su
 		log: [...[1, 2, 3, 4, 5, 6].map((week) => played(week, 27.5)), upcoming]
 	};
 	assert.equal(
-		seasonView(season, 'WR', [FORMAT], () => KICKOFF).aside,
+		seasonView(season, 'WR', [FORMAT], () => ({ kickoff: KICKOFF, state: null })).aside,
 		'2026, PPR, through week 6'
 	);
 	const sunday: PlayerSeason = {
@@ -102,7 +102,45 @@ void test("the head reaches his newest game in the records, Thursday's before Su
 		log: [...season.log.slice(0, 5), { ...upcoming, week: 6 }, upcoming]
 	};
 	assert.equal(
-		seasonView(sunday, 'WR', [FORMAT], () => KICKOFF).aside,
+		seasonView(sunday, 'WR', [FORMAT], () => ({ kickoff: KICKOFF, state: null })).aside,
 		'2026, PPR, through week 5'
+	);
+});
+
+void test("the weeks still to play name a game kicked off or final by the run's state, else its day (Lane 80)", () => {
+	const upcoming = (week: number): GameLogRow => ({
+		...played(week, 0),
+		points: null,
+		status: 'upcoming'
+	});
+	const season: PlayerSeason = {
+		season: 2026,
+		format: 'ppr-12',
+		weeks: 8,
+		through: 5,
+		games: 5,
+		pointsPerGame: 27.5,
+		totals: { ...EMPTY, snapShare: null, points: 137.5 },
+		log: [
+			...[1, 2, 3, 4, 5].map((week) => played(week, 27.5)),
+			upcoming(6),
+			upcoming(7),
+			upcoming(8)
+		]
+	};
+	const states = { 6: 'kicked_off', 7: 'final', 8: 'upcoming' } as const;
+	const view = seasonView(season, 'WR', [FORMAT], (week) => ({
+		kickoff: KICKOFF,
+		state: states[week as keyof typeof states]
+	}));
+	assert.deepEqual(
+		view.ahead.map((row) => row.day),
+		['Kicked off', 'Final', 'Sun Oct 25']
+	);
+	// A run from before the field: the day, as before.
+	const before = seasonView(season, 'WR', [FORMAT], () => ({ kickoff: KICKOFF, state: null }));
+	assert.deepEqual(
+		before.ahead.map((row) => row.day),
+		['Sun Oct 25', 'Sun Oct 25', 'Sun Oct 25']
 	);
 });

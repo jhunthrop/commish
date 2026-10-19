@@ -18,7 +18,13 @@ import {
 } from '#lib/format/designation.ts';
 import type { StatusView } from '#lib/run/status-view.ts';
 import { POSITIONS, type Position } from '#lib/types/player.ts';
-import { halves, toBePlayed, PRECIPITATION_NAMED_FROM } from '#lib/format/game-facts.ts';
+import {
+	GAME_STATE_WORDS,
+	gameStateOf,
+	halves,
+	toBePlayed,
+	PRECIPITATION_NAMED_FROM
+} from '#lib/format/game-facts.ts';
 import { fixed, ordinal, signed } from '#lib/format/number.ts';
 import { clubMark } from '#lib/ui/club-mark.ts';
 import type { LeaguePlayer } from '../api.ts';
@@ -61,7 +67,9 @@ export const BOX = {
 	bench: 'Bench',
 	reserve: 'Injured reserve',
 	bye: 'Bye',
-	final: 'Final',
+	final: GAME_STATE_WORDS.final,
+	/** A game past its kickoff whose final is not in yet (Lane 80). */
+	kickedOff: GAME_STATE_WORDS.kicked_off,
 	/** A number not held yet: before kickoff, or with no projection. */
 	none: EMPTY_FIGURE,
 	you: 'You',
@@ -247,13 +255,17 @@ export function weatherCell(facts: Pick<WeekFacts, 'roof' | 'weather'>): Weather
 	return roof === null ? null : { glyph: 'outdoors', words: BOX.outdoors };
 }
 
-/** His game's first line: the opponent with "at" or "vs", then the kickoff on the member's clock, or
- * "Final" once played; "bye" on a bye week; null when we hold no game. */
-export function gameOf(facts: WeekFacts, zone: string = memberZone()): BoxGame | 'bye' | null {
+/** His game's first line: the opponent with "at" or "vs", then by the game's state the kickoff on
+ * the member's clock, "Kicked off" or "Final" by the API's state; "bye" on a bye week; null when we hold
+ * no game. */
+export function gameOf(facts: WeekFacts, zone: string): BoxGame | 'bye' | null {
 	if (facts.bye) return 'bye';
 	if (facts.opponent === null) return null;
 	const where = `${facts.home === false ? 'at' : 'vs'} ${facts.opponent}`;
-	if (facts.played) return { where, when: BOX.final };
+	const state = gameStateOf(facts);
+	// A read with no state (review finding 5) says only what it holds: Final when played, else the kickoff.
+	if (state === 'final' || (state === null && facts.played)) return { where, when: BOX.final };
+	if (state === 'kicked_off') return { where, when: BOX.kickedOff };
 	return { where, when: facts.kickoff === null ? '' : weekdayTime(facts.kickoff, zone) };
 }
 
@@ -275,7 +287,7 @@ export function boxRow(
 	now: number
 ): BoxRow {
 	const { facts, player } = line;
-	const ahead = !facts.bye && toBePlayed({ played: facts.played, kickoff: facts.kickoff }, now);
+	const ahead = !facts.bye && toBePlayed(facts, now);
 	return {
 		key: player.host_id,
 		boardId: player.board_id,
@@ -429,7 +441,7 @@ export const FORMAT_WORDS: Readonly<Record<ProjectionScoring['format'], string>>
  * basis says it in its short line. */
 export function factsReadAt(lines: readonly PlayerLine[], now: number): string | null {
 	const reads = lines.flatMap(({ facts }) =>
-		facts.bye || !toBePlayed({ played: facts.played, kickoff: facts.kickoff }, now)
+		facts.bye || !toBePlayed(facts, now)
 			? []
 			: [facts.game_total?.read_at, facts.weather?.read_at].filter(
 					(at): at is string => at !== undefined

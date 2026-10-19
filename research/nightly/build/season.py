@@ -120,8 +120,17 @@ def clubs_json(clubs: Sequence[schedule_read.Club]) -> list[Json]:
     return [{"abbr": c.abbr, "city": c.city, "nickname": c.nickname, "bye": c.bye} for c in clubs]
 
 
+def _rest_json(rest: schedule_read.Rest | None) -> Json | None:
+    if rest is None:
+        return None
+    return {"strength": tenth(rest.strength), "rank": rest.rank, "method": schedule_read.REST_METHOD}
+
+
 def schedule_json(
-    season: int, slates: Sequence[schedule_read.Slate], values: Mapping[str, schedule_read.OpponentValue]
+    season: int,
+    slates: Sequence[schedule_read.Slate],
+    values: Mapping[str, schedule_read.OpponentValue],
+    states: Mapping[schedule_read.ClubWeek, schedule_read.GameState],
 ) -> Json:
     return {
         "season": season,
@@ -132,7 +141,14 @@ def schedule_json(
             {
                 "abbr": slate.club,
                 "games": [
-                    {"week": g.week, "opponent": g.opponent, "home": g.home, "kickoff": iso(g.kickoff)}
+                    {
+                        "week": g.week,
+                        "opponent": g.opponent,
+                        "home": g.home,
+                        "kickoff": iso(g.kickoff),
+                        # At the run's instant (Lane 80), the one rule the API's gameStateAt keeps.
+                        "state": states[(slate.club, g.week)],
+                    }
                     for g in slate.games
                 ],
                 # The tenth every screen prints, rounded once here; the rank is the unrounded mean's (X9).
@@ -140,6 +156,8 @@ def schedule_json(
                 "rank": slate.rank,
                 "method": schedule_read.METHOD,
                 "window": window(*slate.window),
+                # The games still to play (Lane 80), null with none left.
+                "rest": _rest_json(slate.rest),
             }
             for slate in slates
         ],

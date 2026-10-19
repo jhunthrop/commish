@@ -13,13 +13,18 @@ club. The publisher is provenance (the manifest's sources block); no screen name
 KICKOFF. A game's kickoff is the fixture's own date and Eastern time ("8:20p"), as the slate and the
 player card's game log read the same rows. A kickoff the league has not set yet ("TBD") counts from
 the start of its day in Eastern time, the earliest it can be, as the web's stand-in counts it.
+
+STATE (Lane 80). At the run's instant a game is final once the store holds its result (the hourly
+game status or the weekly result) or a line from either side (Lane 66s's rule, the API's
+gameStateAt), kicked off from its kickoff until then, and upcoming before. REST OF SEASON is a slate's games still upcoming: their opponents' mean, ranked the
+same way among the clubs with a game left.
 """
 
 import re
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, time
-from typing import Final
+from typing import Final, Literal
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import Connection, text
@@ -28,6 +33,7 @@ from research.capsules.facts.team_names import NFL_TEAM_NAMES
 from research.errors import ResearchError
 from research.model.backtest import sum_left
 from research.pipeline.nflverse.team_codes import NFL_TEAM_ABBREVIATIONS, product_team_code
+from research.pipeline.tank01.game_status import finals_held
 from research.season import REGULAR_SEASON_WEEKS
 
 WIN_TOTAL_SOURCE: Final = "vegas_win_totals"
@@ -41,6 +47,12 @@ _HALF_DAY: Final = 12
 METHOD: Final = (
     "the average of each club's opponents' expected wins for the season, one per game, set before the first kickoff"
 )
+REST_METHOD: Final = (
+    "the average of each club's remaining opponents' expected wins, one per game still to play, "
+    "set before the first kickoff"
+)
+GameState = Literal["upcoming", "kicked_off", "final"]
+ClubWeek = tuple[str, int]
 
 
 class ScheduleError(ResearchError):
@@ -62,12 +74,22 @@ class OpponentValue:
 
 
 @dataclass(frozen=True, slots=True)
+class Rest:
+    """A slate's games still to play: their opponents' mean and its rank, 1 the hardest."""
+
+    strength: float
+    rank: int
+
+
+@dataclass(frozen=True, slots=True)
 class Slate:
     club: str
     games: tuple[Game, ...]
     strength: float
     rank: int
     window: tuple[datetime, datetime]
+    # None with no game left to play.
+    rest: Rest | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -141,17 +163,64 @@ def opponent_values(conn: Connection, season: int, first_kickoff: datetime) -> d
     return values
 
 
-def slates(games: Mapping[str, list[Game]], values: Mapping[str, OpponentValue]) -> list[Slate]:
-    """Every club's slate with its strength and rank (1 the hardest, ties by club code)."""
-    measured = []
+def finals_at(conn: Connection, season: int, as_of: datetime) -> frozenset[ClubWeek]:
+    """The club-weeks the store holds a final for at `as_of`, each from its own side: the hourly
+    capture's game status (Lane 80, `pipeline/tank01/game_status.py`, the one read the API's
+    gameStateAt shares), the weekly result, or a line."""
+    return frozenset((product_team_code(team), week) for team, week in finals_held(conn, season, as_of))
+
+
+def game_states(
+    games: Mapping[str, Sequence[Game]], finals: frozenset[ClubWeek], as_of: datetime
+) -> dict[ClubWeek, GameState]:
+    """Every club-week's game state at `as_of`: final once either side's result or line is held."""
+    states: dict[ClubWeek, GameState] = {}
+    for club, slate in games.items():
+        for game in slate:
+            if (club, game.week) in finals or (game.opponent, game.week) in finals:
+                states[(club, game.week)] = "final"
+            else:
+                states[(club, game.week)] = "kicked_off" if game.kickoff <= as_of else "upcoming"
+    return states
+
+
+def _ranks(means: Mapping[str, float]) -> dict[str, int]:
+    """1 the hardest (the highest mean), ties by club code."""
+    order = sorted(means, key=lambda club: (-means[club], club))
+    return {club: index + 1 for index, club in enumerate(order)}
+
+
+def _mean(values: Sequence[float]) -> float:
+    return sum_left(list(values)) / len(values)
+
+
+def slates(
+    games: Mapping[str, list[Game]], values: Mapping[str, OpponentValue], states: Mapping[ClubWeek, GameState]
+) -> list[Slate]:
+    """Every club's slate with its strength and rank (1 the hardest, ties by club code), and its rest of
+    season: the games still upcoming, ranked among the clubs with one left."""
+    strengths: dict[str, float] = {}
+    rests: dict[str, float] = {}
+    windows: dict[str, tuple[datetime, datetime]] = {}
     for club in NFL_TEAM_ABBREVIATIONS:
         slate = games[club]
         if not slate:
             raise ScheduleError(f"{club} has no games on the slate.")
         opponents = [values[game.opponent] for game in slate]
-        strength = sum_left([o.value for o in opponents]) / len(opponents)
-        window = (min(o.published for o in opponents), max(o.published for o in opponents))
-        measured.append((club, tuple(slate), strength, window))
-    order = sorted(measured, key=lambda m: (-m[2], m[0]))
-    rank = {club: index + 1 for index, (club, _, _, _) in enumerate(order)}
-    return [Slate(club, slate, strength, rank[club], window) for club, slate, strength, window in measured]
+        strengths[club] = _mean([o.value for o in opponents])
+        windows[club] = (min(o.published for o in opponents), max(o.published for o in opponents))
+        left = [values[g.opponent].value for g in slate if states[(club, g.week)] == "upcoming"]
+        if left:
+            rests[club] = _mean(left)
+    rank, rest_rank = _ranks(strengths), _ranks(rests)
+    return [
+        Slate(
+            club,
+            tuple(games[club]),
+            strengths[club],
+            rank[club],
+            windows[club],
+            Rest(rests[club], rest_rank[club]) if club in rests else None,
+        )
+        for club in NFL_TEAM_ABBREVIATIONS
+    ]

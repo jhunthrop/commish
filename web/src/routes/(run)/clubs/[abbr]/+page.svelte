@@ -4,13 +4,6 @@
 	import { heldOut } from '#lib/run/board-status.ts';
 	import { liveStatusClock, sayBoard, type LiveStatus } from '#lib/run/live-status.ts';
 	import { rowFraming } from '#lib/run/row-framing.ts';
-	import {
-		CLUB_FIGURE_CAPTION,
-		hardestFigure,
-		playedWords,
-		readWords,
-		strengthFigure
-	} from '#lib/run/strength-words.ts';
 	import SiteShell from '#lib/site/SiteShell.svelte';
 	import { links } from '#lib/site/links.ts';
 	import BasisLine from '#lib/ui/BasisLine.svelte';
@@ -34,7 +27,6 @@
 	const club = $derived(page.club);
 	const name = $derived(`${club.city} ${club.nickname}`);
 	const names = $derived(new Map(page.clubs.map((other) => [other.abbr, other])));
-	const hardest = $derived(hardestFigure(page.slate.rank, page.clubs.length));
 	/** Every row shares the club's bye, said once in the hero, so the rows carry no Bye column. */
 	const columns = $derived(
 		boardColumns({
@@ -86,23 +78,25 @@
 		<HeroCard title={name}>
 			{#snippet meta()}<Label>{club.abbr} · bye week {club.bye ?? 'not set'}</Label>{/snippet}
 			{#snippet aside()}
-				<div class="figures">
-					<Figure
-						value={strengthFigure(page.slate.strength)}
-						size="xl"
-						align="end"
-						phoneAlign="start"
-						caption={CLUB_FIGURE_CAPTION}
-						note={readWords(page.slate)}
-					/>
-					<Figure
-						value={hardest.figure}
-						size="lg"
-						align="end"
-						phoneAlign="start"
-						caption={hardest.caption}
-					/>
-				</div>
+				{#if page.hero}
+					<div class="figures">
+						<Figure
+							value={page.hero.value}
+							size="xl"
+							align="end"
+							phoneAlign="start"
+							caption={page.hero.caption}
+							note={page.hero.note}
+						/>
+						<Figure
+							value={page.hero.hardest.figure}
+							size="lg"
+							align="end"
+							phoneAlign="start"
+							caption={page.hero.hardest.caption}
+						/>
+					</div>
+				{/if}
 			{/snippet}
 		</HeroCard>
 		<BasisLine parts={page.basis} tail={words?.capture ?? null} />
@@ -149,9 +143,7 @@
 
 		<section aria-label="Schedule">
 			<Table
-				caption={page.played === 0
-					? `${String(page.schedule.season)} schedule`
-					: `${String(page.schedule.season)} schedule, ${playedWords(page.played)}`}
+				caption={page.scheduleCaption}
 				showCaption
 				columns={[
 					{ label: 'Week' },
@@ -161,7 +153,7 @@
 			>
 				{#each page.games as game (game.week)}
 					{@const opponent = names.get(game.opponent)}
-					<tr class:played={game.week <= page.played}>
+					<tr class:played={game.played}>
 						<td>Week {game.week}</td>
 						<td>
 							{game.home ? 'vs' : 'at'}

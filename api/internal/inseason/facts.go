@@ -5,6 +5,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/jhunthrop/commish/api/internal/apitypes"
 	"github.com/jhunthrop/commish/api/internal/boards"
 	"github.com/jhunthrop/commish/api/internal/draft"
 )
@@ -68,8 +69,10 @@ type Facts struct {
 	Kickoff     *time.Time
 	Bye         bool
 	Designation *Designation
-	// Played is his game this week being final; Locked his game having
-	// kicked off by the run's clock.
+	// State is his game this week by the read's clock (gameStateAt), empty
+	// without a game. Played is it being final; Locked it having kicked off
+	// or being final.
+	State  apitypes.GameState
 	Played bool
 	Locked bool
 	// LastGames is up to three completed games, newest first.
@@ -143,6 +146,9 @@ func NewSeason(d Data, rules Rules, week int, now time.Time) *Season {
 	sums := map[teamPosition]float64{}
 	lined := map[draft.Position]bool{}
 	faced := map[teamPosition]map[int]bool{}
+	// linedWeeks is each club-week with a counted line: a game whose stats
+	// have landed.
+	linedWeeks := map[teamWeek]bool{}
 	s.carried = map[string]bool{}
 	for _, l := range d.Lines {
 		g, known := s.games[teamWeek{l.Week, l.Team}]
@@ -151,6 +157,9 @@ func NewSeason(d Data, rules Rules, week int, now time.Time) *Season {
 			continue
 		}
 		pts := rules.Points(l.Metrics, position)
+		if known {
+			linedWeeks[teamWeek{l.Week, l.Team}] = true
+		}
 		s.points[l.PlayerID] = append(s.points[l.PlayerID], GamePoints{Week: l.Week, Points: pts})
 		lined[position] = true
 		for m := range l.Metrics {
@@ -168,30 +177,22 @@ func NewSeason(d Data, rules Rules, week int, now time.Time) *Season {
 	for id := range s.points {
 		sort.Slice(s.points[id], func(i, j int) bool { return s.points[id][i].Week < s.points[id][j].Week })
 	}
-	s.allowed = rankAllowed(sums, finalGames(d.Games), faced, lined)
+	s.allowed = rankAllowed(sums, linedGames(d.Games, linedWeeks), faced, lined)
 	return s
 }
 
-// playedFromLines is the season's games under the one rule every screen
-// reads (the ruling on the sweep's X3): a club's game is final once the
-// store holds its result or a line from either side of it, as the run's
-// game log counts a week played by its line. The weekly stats are
-// published only after a game ends, so a line never comes from a game in
-// progress; the result can land a pass later. A new slice: the read's own
-// is left as it was.
-func playedFromLines(games []boards.TeamWeek, lines []boards.StatLine) []boards.TeamWeek {
-	lined := map[teamWeek]bool{}
-	for _, l := range lines {
-		if l.Team != "" {
-			lined[teamWeek{l.Week, l.Team}] = true
-		}
+// gameStateAt is a game's state at now, the one rule every screen reads
+// (Lane 80): final once the store's club_week_finals view holds either
+// club's result, hourly status final or line (boards.Schedule), kicked off
+// from its kickoff until then, upcoming before.
+func gameStateAt(g boards.TeamWeek, now time.Time) apitypes.GameState {
+	switch {
+	case g.Final:
+		return apitypes.GameStateFinal
+	case !now.Before(g.Kickoff):
+		return apitypes.GameStateKickedOff
 	}
-	out := make([]boards.TeamWeek, len(games))
-	for i, g := range games {
-		g.Final = g.Final || lined[teamWeek{g.Week, g.Team}] || lined[teamWeek{g.Week, g.Opponent}]
-		out[i] = g
-	}
-	return out
+	return apitypes.GameStateUpcoming
 }
 
 // Carries reports whether any line counted this season carries the
@@ -219,11 +220,14 @@ func isResult(l boards.StatLine) bool {
 	return false
 }
 
-// finalGames is each club's count of final games.
-func finalGames(games []boards.TeamWeek) map[string]int {
+// linedGames is each club's count of final games whose stats have landed:
+// a counted line from either side that week (Lane 80 re-review finding 1).
+// A game final by the hourly status alone has no points behind it until
+// the weekly stats come, so it is no game in a points-allowed denominator.
+func linedGames(games []boards.TeamWeek, linedWeeks map[teamWeek]bool) map[string]int {
 	out := map[string]int{}
 	for _, g := range games {
-		if g.Final {
+		if g.Final && (linedWeeks[teamWeek{g.Week, g.Team}] || linedWeeks[teamWeek{g.Week, g.Opponent}]) {
 			out[g.Team]++
 		}
 	}
@@ -237,7 +241,7 @@ func finalGames(games []boards.TeamWeek) map[string]int {
 // club (a week the kicking source has not written is no game), and a club
 // with none is not ranked. A defense's games are counted the same way, its
 // lines coming from the same source; every other position's are the
-// club's final games.
+// club's final games with their stats in (linedGames).
 func rankAllowed(sums map[teamPosition]float64, games map[string]int, faced map[teamPosition]map[int]bool,
 	lined map[draft.Position]bool) map[teamPosition]Allowed {
 	out := map[teamPosition]Allowed{}
@@ -288,8 +292,10 @@ func (s *Season) For(p Player) Facts {
 	if p.Team != "" {
 		if g, ok := s.games[teamWeek{s.week, p.Team}]; ok {
 			home, kickoff := g.Home, g.Kickoff
-			f.Opponent, f.Home, f.Kickoff, f.Played = g.Opponent, &home, &kickoff, g.Final
-			f.Locked = g.Final || !s.now.Before(g.Kickoff)
+			f.Opponent, f.Home, f.Kickoff = g.Opponent, &home, &kickoff
+			f.State = gameStateAt(g, s.now)
+			f.Played = f.State == apitypes.GameStateFinal
+			f.Locked = f.State != apitypes.GameStateUpcoming
 			f.Game = figuresAt(s.gameFacts[boards.ClubWeek{Week: s.week, Team: p.Team}], s.now, g.Kickoff)
 			if a, ok := s.allowed[teamPosition{g.Opponent, p.Position}]; ok {
 				f.Allowed = &a
@@ -329,5 +335,6 @@ func (s *Season) designation(p Player) *Designation {
 
 // String names the facts for a test's failure.
 func (f Facts) String() string {
-	return fmt.Sprintf("week %d opp %q bye %v played %v locked %v games %v", f.Week, f.Opponent, f.Bye, f.Played, f.Locked, f.LastGames)
+	return fmt.Sprintf("week %d opp %q bye %v state %q played %v locked %v games %v", f.Week, f.Opponent, f.Bye, f.State,
+		f.Played, f.Locked, f.LastGames)
 }
