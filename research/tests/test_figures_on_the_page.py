@@ -4,14 +4,20 @@ the card's figures, and a draft quoting another is refused by the figure guard, 
 nightly's fallback line says why."""
 
 from dataclasses import replace
-from datetime import timedelta
+from datetime import date, timedelta
 
 import httpx
 
 from research.capsules.gateway import GatewayClient
 from research.capsules.page_figures import FIGURE_OFF_PAGE
 from research.capsules.validate import Grounding, validate_prose
-from research.capsules.week.collect import expected_from_read, figures_at, last_games, published_projection
+from research.capsules.week.collect import (
+    expected_from_read,
+    figures_at,
+    last_games,
+    last_read_of,
+    published_projection,
+)
 from research.capsules.week.prompt import answer_json
 from research.capsules.week.render import render_week_sheet
 from research.capsules.week.sheet import (
@@ -24,6 +30,7 @@ from research.capsules.week.sheet import (
     WeekSheet,
     points_text,
 )
+from research.capsules.week.store import StoredWeekRead
 from research.capsules.week.validate import validate_week_read
 from research.capsules.week.write import WeekReadResult, write_week_read
 from research.nightly.week_reads import WeekReadSpend
@@ -172,6 +179,18 @@ def test_the_game_figures_are_the_read_the_card_shows() -> None:
     partial = (FIGURES, {"implied_team_total": 29.3, "game_total": 53.6})
     assert figures_at(partial, table, FIGURES, KICKOFF) == table
     assert figures_at(None, None, FIGURES, KICKOFF) is None
+
+
+def test_the_last_reads_projection_is_the_cards_tenth_as_the_comparison_reads_it() -> None:
+    """The review's finding 8: a row kept before the card's tenth was stored (26.449) prints 26.5 in "at our
+    last read", the figure the run and the web compare, never the plain tenth's 26.4."""
+    row = StoredWeekRead(
+        "00-0034857", 2026, 6, "llm", "A read.", "m/x", FIGURES, FIGURES, {}, 26.449, None, "first", "start",
+        date(2026, 10, 16), 1,
+    )  # fmt: skip
+    last = last_read_of(row)
+    assert last is not None and last.projection_points == 26.5  # noqa: PLR2004 - the cents, then the tenth
+    assert last_read_of(None) is None
 
 
 def test_the_sheet_prints_a_tie_as_the_page_does() -> None:

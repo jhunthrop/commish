@@ -410,8 +410,13 @@ def _depth(subject: Subject) -> DepthPlace | None:
     return DepthPlace(chart.slot, tuple((n.name, n.slot) for n in chart.around_him), released)
 
 
-def _last_read(stored: StoredWeekRead | None) -> LastRead | None:
-    return None if stored is None else LastRead(stored.written_at, stored.projection_points, stored.status)
+def last_read_of(stored: StoredWeekRead | None) -> LastRead | None:
+    """The read before this one, its projection as the card's tenth (a row kept before the tenth was stored
+    reads as the figure the run and the web compare, `cadence.projection_moved`)."""
+    if stored is None:
+        return None
+    points = None if stored.projection_points is None else projection_tenth(stored.projection_points)
+    return LastRead(stored.written_at, points, stored.status)
 
 
 def week_sheet(
@@ -460,7 +465,7 @@ def week_sheet(
         played=tuple(row["week"] for row in log if row["status"] == "played"),
         missed=tuple(row["week"] for row in log if row["status"] == "inactive"),
         board=facts.boards.get(identity.id),
-        last_read=_last_read(stored.get((subject.universe_id, cw.week))),
+        last_read=last_read_of(stored.get((subject.universe_id, cw.week))),
         lines_at=facts.lines_at,
     )
 
