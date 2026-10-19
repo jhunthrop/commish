@@ -30,7 +30,7 @@ def _compare(provider: dict[str, object], python: dict[str, object]) -> _Collect
 
 
 def test_the_row_comparison_clears_the_declared_difference_and_fails_any_other() -> None:
-    oracle = {"id": "4569682", "name": "Audric Estime", "team": "DEN"}
+    oracle: dict[str, object] = {"id": "4569682", "name": "Audric Estime", "team": "DEN"}
     both = _compare(oracle, {**oracle, "name": "Audric Estimé", "team": "KC"})
     assert both.departed == {_SPELLING}
     assert both.differing == ["('4569682',) team: ts='DEN' py='KC'"]
