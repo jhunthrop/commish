@@ -392,8 +392,14 @@ void test('copy guard: every League page word is fantasy words, with no dash or 
 		standingsBasis('sleeper', TERMS),
 		standingsBasis('espn', { waivers: 'order', waiver_budget: null }),
 		standingsBasis('mfl', { waivers: null, waiver_budget: null }),
-		teamBasis('sleeper', '2026-10-17T02:00:00.000Z', { format: 'ppr', league_own: false }, ZONE),
-		teamBasis('espn', null, { format: 'half_ppr', league_own: true }, ZONE),
+		teamBasis(
+			'sleeper',
+			'2026-10-17T02:00:00.000Z',
+			{ format: 'ppr', league_own: false },
+			true,
+			ZONE
+		),
+		teamBasis('espn', null, { format: 'half_ppr', league_own: true }, false, ZONE),
 		extraWords('sleeper'),
 		scoringLead(42, 'sleeper'),
 		settingsLink('espn'),
@@ -413,7 +419,19 @@ void test('copy guard: every League page word is fantasy words, with no dash or 
 		"Standings follow Sleeper's record, then points for. PF and PA are points for and against, Streak the current run, FAAB the budget left of $1,000."
 	);
 	assert.equal(
-		teamBasis('sleeper', '2026-10-17T02:00:00.000Z', { format: 'ppr', league_own: false }, ZONE),
+		teamBasis(
+			'sleeper',
+			'2026-10-17T02:00:00.000Z',
+			{ format: 'ppr', league_own: false },
+			false,
+			ZONE
+		),
 		"A team's Proj adds its starters' published projections in PPR, the closest match to this league's rules, read Fri 9:00 pm Central. Pts are Sleeper's so far."
+	);
+	// Ruling (b) of Lane 79: where the lineup's rows carry points, its Team adds them, said in the
+	// same sentence.
+	assert.equal(
+		teamBasis('espn', null, { format: 'ppr', league_own: true }, true, ZONE),
+		"A team's Proj adds its starters' published projections in PPR, this league's own, not in yet for this week. Pts are ESPN's so far, and your lineup's Team adds its rows."
 	);
 });

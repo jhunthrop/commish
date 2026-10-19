@@ -27,16 +27,10 @@
 
 	const matchup = $derived(sync.matchup);
 
-	/** Whether any starter on a side has a point. A host that gives each team's total but no player's
-	 * (FFPC, until its scoreboard is read) keeps every starter's points blank. */
-	function playersScored(s: MatchupSide): boolean {
-		return s.starters.some((p) => p.points !== 0);
-	}
-
 	/** A side has started once its total is not 0 or a starter has a point: before that its zeros
 	 * would read as duds, so its points stay blank. */
 	function hasStarted(s: MatchupSide): boolean {
-		return s.points !== 0 || playersScored(s);
+		return s.points !== 0 || s.starters.some((p) => (p.points ?? 0) !== 0);
 	}
 
 	/** In an all-play week a read score is shown even at 0: the host's own total, read, is the fact. */
@@ -47,7 +41,6 @@
 	function boxOf(s: MatchupSide): SideBox {
 		const answered = box?.sides.find((b) => b.roster_id === s.roster_id) ?? null;
 		return sideBox(s, answered, {
-			scored: playersScored(s),
 			hostTotal: showsTotal(s) ? s.points : null,
 			landed: box?.projection_read_at != null,
 			week: matchup?.week ?? sync.week
@@ -114,6 +107,7 @@
 		</div>
 		<BoxBasis
 			byPlayer={mine.byPlayer}
+			teamTotal={mine.teamTotal}
 			host={sync.host}
 			projection={box ? { readAt: box.projection_read_at, scoring: box.projection_scoring } : null}
 			{lines}

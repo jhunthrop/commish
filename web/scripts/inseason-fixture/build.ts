@@ -828,6 +828,9 @@ function sync(): LeagueSync {
 		roster_id: m.roster_id,
 		points: m.points,
 		points_read: true,
+		// Sleeper gives each player's points, and its score is theirs added (Lane 79 ruling a).
+		player_points: true,
+		team_total: false,
 		starters: m.starters.map((id, i) => ({
 			player: leaguePlayer(id, m.roster_id),
 			points: m.starters_points[i] ?? 0

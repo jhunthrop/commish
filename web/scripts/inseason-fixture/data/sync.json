@@ -411,6 +411,8 @@
 			"roster_id": 1,
 			"points": 0,
 			"points_read": true,
+			"player_points": true,
+			"team_total": false,
 			"starters": [
 				{
 					"player": {
@@ -528,6 +530,8 @@
 			"roster_id": 7,
 			"points": 0,
 			"points_read": true,
+			"player_points": true,
+			"team_total": false,
 			"starters": [
 				{
 					"player": {
