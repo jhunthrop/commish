@@ -238,8 +238,9 @@ func TestOrderSaysWhatItsRankSortsOnAndCarriesBothKeys(t *testing.T) {
 	if rb.RankBy != apitypes.OrderAdviceRankByRestOfSeasonPoints {
 		t.Fatalf("RB ranks by %s", rb.RankBy)
 	}
-	if !strings.Contains(all.BasisNote, "Points over replacement are for a 12-team league") {
-		t.Fatalf("the note names no league shape: %q", all.BasisNote)
+	// The league shape is said once, in the basis (Lane 66q); the note is the rules points so far leave out.
+	if !strings.Contains(all.Basis, "less a free pickup's, for 12 teams with 1 QB") || strings.Contains(all.BasisNote, "12-team") {
+		t.Fatalf("the basis %q and note %q name the league shape other than once", all.Basis, all.BasisNote)
 	}
 }
 

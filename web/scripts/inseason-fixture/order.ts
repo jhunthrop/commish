@@ -142,12 +142,22 @@ const ranked = [...lines.values()]
 	});
 const lineup = await read<components['schemas']['LineupAdvice']>('lineup');
 const waivers = await read<components['schemas']['WaiverAdvice']>('waivers');
+/** The Waivers note split as the order says it: the league shape, and the rules left out. */
+const SHAPE_SENTENCE = /^Points over replacement are for (.+?)\.(?: |$)/;
+const SHAPE = SHAPE_SENTENCE.exec(waivers.basis_note)?.[1] ?? '';
+if (SHAPE === '') throw new Error('The Waivers note names no league shape.');
+const NOTE = waivers.basis_note.replace(SHAPE_SENTENCE, '');
+/** The shape in the order's few words (words.go teamsWords): "12 teams with 1 QB, ... and two flex". */
+const TEAMS = SHAPE.replace(/^a (\d+)-team league/, '$1 teams').replace(
+	/two flex spots$/,
+	'two flex'
+);
 const out: OrderAdvice = {
 	week: WEEK,
-	basis: `Our rest-of-season order from week ${String(WEEK)}: Points is what he scores through week ${String(LAST_WEEK)}, byes out, A game the same a game. A position ranks by Points, All by Over repl., his points less a free pickup's.`,
-	// The league the points over replacement are for and the rules its season points leave out, as
-	// the API says them (BasisNote): the Waivers answer's note.
-	basis_note: waivers.basis_note,
+	// The league the points over replacement are for, said once in the basis, and the rules its season
+	// points leave out as the note, as the API says them (OrderScreenBasis, LineupNote; Lane 66q).
+	basis: `Our rest-of-season order from week ${String(WEEK)}: Points through week ${String(LAST_WEEK)}, byes out. Positions rank by Points, All by Over repl., his points less a free pickup's, for ${TEAMS}.`,
+	basis_note: NOTE,
 	rank_by: 'points_over_replacement',
 	moves: waivers.moves,
 	order_basis: 'rest_of_season',

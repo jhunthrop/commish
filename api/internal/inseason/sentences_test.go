@@ -203,8 +203,8 @@ func TestBasisNamesTheRulesLeftOut(t *testing.T) {
 	rules.PointsPerFieldGoalMissed, rules.PointsPerReturnTouchdown, rules.PointsPerDefensiveFumbleRecovery = 0, 0, 0
 	settings := apitypes.LeagueSettings{Teams: 12, Lineup: apitypes.LineupStandard, Scoring: apitypes.Scoring{Custom: &rules},
 		Roster: apitypes.RosterCounts{Qb: 1, Rb: 2, Wr: 3, Te: 1, K: 1, Dst: 1}}
-	want := "Points so far leave out your league's points for two-point conversions, safeties, a defense's points allowed " +
-		"and a defense's yards allowed: the stats we hold do not carry them."
+	want := "Points so far leave out two-point conversions, safeties, a defense's points allowed " +
+		"and a defense's yards allowed, which our stats lack."
 	if got := BasisNote(settings, nil); !strings.HasSuffix(got, want) {
 		t.Fatalf("%q", got)
 	}
@@ -215,13 +215,13 @@ func TestBasisNamesTheRulesLeftOut(t *testing.T) {
 		t.Fatalf("every rule carried: %q", got)
 	}
 	rules.PointsPerFieldGoal50Plus = 5
-	want = "Points so far leave out your league's points for field goals of 40 yards or more: the stats we hold do not carry them."
+	want = "Points so far leave out field goals of 40 yards or more, which our stats lack."
 	if got := BasisNote(settings, carried); !strings.HasSuffix(got, want) {
 		t.Fatalf("longer field goals: %q", got)
 	}
 	settings.Roster.K, settings.Roster.Dst = 0, 0
 	rules.PointsPerSafety = 0
-	want = "Points so far leave out your league's points for two-point conversions: the stats we hold do not carry them."
+	want = "Points so far leave out two-point conversions, which our stats lack."
 	if got := BasisNote(settings, nil); !strings.HasSuffix(got, want) {
 		t.Fatalf("no kicker or defense spot: %q", got)
 	}
@@ -231,7 +231,7 @@ func TestBasisNamesTheRulesLeftOut(t *testing.T) {
 	} // A defense's return touchdowns are on its lines; a player's kick and
 	// punt returns are what the basis names.
 	rules.PointsPerReturnTouchdown = 6
-	want = "Points so far leave out your league's points for a player's kick and punt return touchdowns: the stats we hold do not carry them."
+	want = "Points so far leave out a player's kick and punt return touchdowns, which our stats lack."
 	if got := BasisNote(settings, func(m string) bool { return m == "return_touchdowns" }); !strings.HasSuffix(got, want) {
 		t.Fatalf("return touchdowns: %q", got)
 	}
@@ -255,5 +255,23 @@ func TestSentenceGrammarAndBothDoubtful(t *testing.T) {
 		&Line{Name: "Tank Bigsby", Position: draft.RB, Rank: 31, Facts: doubtful})
 	if got != "Tank Bigsby is doubtful as of Thursday 4:10 pm and White is not." {
 		t.Fatalf("%q", got)
+	}
+}
+
+// The order screen's basis (Lane 66q) says what the order ranks by, its two
+// figures and the league its points over replacement are for in one line,
+// so the screen's basis fits eight phone lines; its note is the rules points
+// so far leave out, the league shape said once.
+func TestOrderScreenBasisNamesTheLeagueOnce(t *testing.T) {
+	settings := apitypes.LeagueSettings{Teams: 12, Lineup: apitypes.LineupTwoFlex,
+		Roster: apitypes.RosterCounts{Qb: 1, Rb: 2, Wr: 3, Te: 1}}
+	want := "Our rest-of-season order from week 6: Points through week 17, byes out. Positions rank by Points, " +
+		"All by Over repl., his points less a free pickup's, for 12 teams with 1 QB, 2 RB, 3 WR, 1 TE and two flex."
+	if got := OrderScreenBasis(RestOfSeason, 6, settings); got != want {
+		t.Fatalf("%q", got)
+	}
+	if got := OrderScreenBasis(Preseason, 0, settings); !strings.HasPrefix(got, "Our preseason order: All ranks by Over repl.") ||
+		!strings.Contains(got, "for 12 teams with") {
+		t.Fatalf("preseason %q", got)
 	}
 }

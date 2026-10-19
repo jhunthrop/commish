@@ -281,7 +281,7 @@ func uncountedWords(s apitypes.LeagueSettings, carried func(string) bool) string
 	if len(named) > 1 {
 		list = strings.Join(named[:len(named)-1], ", ") + " and " + named[len(named)-1]
 	}
-	return "Points so far leave out your league's points for " + list + ": the stats we hold do not carry them."
+	return "Points so far leave out " + list + ", which our stats lack."
 }
 
 // BasisNote is the rest of every page's basis, said once under the rows:
@@ -349,12 +349,28 @@ func TradesBasis(b OrderBasis, weeks int) string {
 }
 
 // OrderScreenBasis is the Rest of season and Players screens' line
-// (Lane 66j): what the order ranks by and what its two figures are.
-func OrderScreenBasis(b OrderBasis, fromWeek int) string {
+// (Lane 66j): what the order ranks by, what its two figures are and the
+// league its points over replacement are for, said once (Lane 66q: the
+// screen's note is then the rules points so far leave out, LineupNote, so
+// the whole basis fits eight phone lines).
+func OrderScreenBasis(b OrderBasis, fromWeek int, s apitypes.LeagueSettings) string {
 	if b != RestOfSeason || fromWeek < 1 {
-		return "Our preseason order: All ranks by Over repl., his season less a free pickup's at his position."
+		return fmt.Sprintf("Our preseason order: All ranks by Over repl., his season less a free pickup's, for %s.", teamsWords(s))
 	}
-	return fmt.Sprintf("Our rest-of-season order from week %d: Points is what he scores through week %d, byes out, A game the same "+
-		"a game. A position ranks by Points, All by Over repl., his points less a free pickup's.",
-		fromWeek, LastWeek)
+	return fmt.Sprintf("Our rest-of-season order from week %d: Points through week %d, byes out. Positions rank by Points, "+
+		"All by Over repl., his points less a free pickup's, for %s.", fromWeek, LastWeek, teamsWords(s))
+}
+
+// teamsWords is shapeWords in the order screen's few words: "12 teams
+// with 1 QB, 2 RB, 3 WR, 1 TE and two flex".
+func teamsWords(s apitypes.LeagueSettings) string {
+	flex := "a flex"
+	switch s.Lineup {
+	case apitypes.LineupTwoFlex:
+		flex = "two flex"
+	case apitypes.LineupSuperflex:
+		flex = "a flex and a superflex"
+	}
+	r := s.Roster
+	return fmt.Sprintf("%d teams with %d QB, %d RB, %d WR, %d TE and %s", s.Teams, r.Qb, r.Rb, r.Wr, r.Te, flex)
 }
