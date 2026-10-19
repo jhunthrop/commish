@@ -102,3 +102,19 @@ void test('a line reads by the same head: the API state, a lagging upcoming kick
 		}
 	);
 });
+
+void test('still to play by the one rule: the API state, the clock past a lagging upcoming (H-A)', () => {
+	const kickoff = SUNDAY_NOON;
+	const before = Date.parse(kickoff) - 60_000;
+	// A kicked-off state wins whatever the browser clock says.
+	assert.equal(
+		toPlay({ bye: false, game_state: 'kicked_off', played: false, kickoff }, before),
+		false
+	);
+	// A read with no state: played is final, else the clock decides.
+	assert.equal(toPlay({ bye: false, played: true, kickoff }, before), false);
+	assert.equal(toPlay({ bye: false, played: false, kickoff }, before), true);
+	assert.equal(toPlay({ bye: false, played: false, kickoff }, Date.parse(kickoff)), false);
+	// No game held is nothing to play.
+	assert.equal(toPlay({ bye: false, played: false, kickoff: null }, before), false);
+});

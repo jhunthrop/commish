@@ -125,8 +125,9 @@ void test('a week whose games have kicked off but are not all final says so', ()
 			? { ...r, section: 'kicked_off' as const, line: { ...r.line, facts: { ...r.line.facts } } }
 			: r
 	);
+	// Monday night, every game of the week past its kickoff and none final (the one rule, H-A).
 	const heads = weekSections(
-		sunday.map((r) => weekView(r, ZONE, Date.parse('2026-10-18T18:00:00.000Z'))),
+		sunday.map((r) => weekView(r, ZONE, Date.parse('2026-10-20T01:00:00.000Z'))),
 		6,
 		ZONE
 	).map((s) => s.head);

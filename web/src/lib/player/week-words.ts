@@ -3,13 +3,13 @@
  * prints; live.ts reads the answer and builds the links. */
 import type { components } from '#lib/api/types.ts';
 import { memberZone, weekdayTime } from '#lib/format/clock.ts';
-import { gameStateOf, toBePlayed } from '#lib/format/game-facts.ts';
+import { lineState, pastKickoff, toPlay } from '../league/box/kickoff.ts';
 import { weekHead } from '#lib/format/figure-words.ts';
 import {
 	avgLastPart,
 	deltaPart,
 	gamePart,
-	kickedOffPart,
+	kickedOffPartAt,
 	OPP_PART,
 	projPart
 } from '#lib/league/box/basis.ts';
@@ -123,6 +123,16 @@ export type ScreenHref = (
 	screen: 'start' | 'waivers' | 'trades',
 	query: Readonly<Record<string, string>>
 ) => string;
+
+/** The card's verb with no move on a locked row (Lane 85 fix round 2, M-D): Start him once his game
+ * has kicked off at the page's clock becomes the way to the lineup, as every league screen holds it. */
+export function heldVerb(
+	verb: NonNullable<PlayerWeek['verb']>,
+	facts: PlayerWeek['line']['facts'],
+	now: number
+): NonNullable<PlayerWeek['verb']> {
+	return verb.kind === 'start' && pastKickoff(facts, now) ? { ...verb, kind: 'lineup' } : verb;
+}
 
 /** The verb the league's screens give him, the platform named. */
 export function verbOf(
@@ -264,14 +274,14 @@ function deltaCaption(week: PlayerWeek, zone: string): string {
 }
 
 function deltaTile(week: PlayerWeek, zone: string, now: number): CardTile {
-	const ahead = toBePlayed(week.line.facts, now) || week.line.facts.bye;
+	const ahead = toPlay(week.line.facts, now) || week.line.facts.bye;
 	return {
 		key: 'delta',
 		label: CARD.delta,
 		value: ahead ? deltaWord(week.line.projection_delta) : NONE,
 		caption: ahead
 			? deltaCaption(week, zone)
-			: gameStateOf(week.line.facts) === 'final'
+			: lineState(week.line.facts, now) === 'final'
 				? CARD.gameFinal
 				: CARD.kickedOff,
 		tone: 'quiet'
@@ -317,7 +327,7 @@ export function liveBasis(week: PlayerWeek, league: boolean, zone: string, now: 
 		? 'your scoring'
 		: `${SCORING_WORDS[week.projection_scoring.format]} scoring`;
 	const evidence = `${OPP_PART} ${avgLastPart(scoring)}`;
-	const facts = gamePart([week.line], clock, now, 'next') ?? kickedOffPart([week.line]);
+	const facts = gamePart([week.line], clock, now, 'next') ?? kickedOffPartAt([week.line], now);
 	return [proj, facts === null ? evidence : `${evidence} ${facts}`];
 }
 
@@ -339,7 +349,7 @@ function nextOf(
 	const { facts } = week.line;
 	const game = gameOf(facts, zone, now);
 	if (game === null || game === 'bye') return { cell: null, next: null };
-	const ahead = toBePlayed(facts, now);
+	const ahead = toPlay(facts, now);
 	const cell: NextCell = {
 		where: game.where,
 		when: game.when,
@@ -407,7 +417,9 @@ export function liveCard({
 	].reduce<CardTile[]>((all, tile) => withTile(all, tile), [...tiles]);
 	const { cell, next } = nextOf(week, zone, now);
 	const verb =
-		league !== null && week.verb !== null ? verbOf(week.verb, league, player, screenHref) : null;
+		league !== null && week.verb !== null
+			? verbOf(heldVerb(week.verb, week.line.facts, now), league, player, screenHref)
+			: null;
 	return {
 		week: week.week,
 		head: headOf(week, zone, now),

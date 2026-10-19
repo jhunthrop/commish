@@ -233,7 +233,12 @@ void test("the Monday after Sunday's games: Kicked off in the Game cell, and the
 	const before = row('B', {
 		line: line('B', 'RB', { facts: { ...facts, game_state: 'upcoming' } })
 	});
-	assert.ok(!basisText(orderBasis(advice([before]), null, ZONE, monday)).includes(KICKED_OFF_PART));
+	const kickoff = Date.parse(facts.kickoff ?? '');
+	assert.ok(
+		!basisText(orderBasis(advice([before]), null, ZONE, kickoff - 1)).includes(KICKED_OFF_PART)
+	);
+	// A lagging read (the API still upcoming, the clock past kickoff) reads kicked off (H-A).
+	assert.ok(basisText(orderBasis(advice([before]), null, ZONE, monday)).includes(KICKED_OFF_PART));
 });
 
 void test('the path asks the league route with a league and the public one without', () => {

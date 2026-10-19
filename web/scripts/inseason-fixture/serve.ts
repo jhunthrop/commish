@@ -914,7 +914,18 @@ async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> 
 		send(req, res, HTTP.ok, orderAt(url.searchParams, true));
 		return;
 	}
-	const recorded = { sync, lineup, waivers, trades, matchup: matchupBox, games: gameWeek, sheets };
+	// The player's week restated at the fixture's clock (Lane 85 fix round 2, M-D): after the Sunday
+	// his verb comes from the Lineup as the engine advises it then, never Saturday's changes.
+	const week = afterSunday() ? sleeperAfter() : null;
+	const recorded = {
+		sync: week?.sync ?? sync,
+		lineup: week?.lineup ?? lineup,
+		waivers,
+		trades,
+		matchup: week?.matchup ?? matchupBox,
+		games: gameWeek,
+		sheets
+	};
 	const publicPlayer = PUBLIC_PLAYER.exec(url.pathname);
 	if (publicPlayer) {
 		// His club and position are our board's, as the API's (the built site's run here).
