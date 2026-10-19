@@ -24,8 +24,9 @@ import { copyFault, watchData } from './copy-scan.ts';
 const THEMES = ['light', 'dark'] as const;
 const WIDTHS = [1440, 390] as const;
 const VIEWPORT_HEIGHT = 900;
-/** The room's basis blocks: the pool's and the call card's sentences, and any [data-basis]. */
-const ROOM_BASIS = 'main .basis, main [data-basis]';
+/** The room's basis blocks: the pool's and the report's sentence (p.basis; a value cell's span.basis
+ * is its own label, not a basis), and any [data-basis]. */
+const ROOM_BASIS = 'main p.basis, main [data-basis]';
 const OUT_DIR = new URL('../screenshots/', import.meta.url);
 /** The lobby fills for 90 seconds, then the room drafts this long before the shot. */
 const FILL_WAIT_MS = 92_000;
