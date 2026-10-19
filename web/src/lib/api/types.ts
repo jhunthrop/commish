@@ -2888,6 +2888,8 @@ export interface components {
 			designation: components['schemas']['InjuryDesignation'] | null;
 			/** @description his game this week is final */
 			played: boolean;
+			/** @description his game this week by the read's clock, null on his bye or when his club is unknown */
+			game_state?: components['schemas']['GameState'] | null;
 			/**
 			 * Format: double
 			 * @description the host's score for him so far, from the matchup, when he starts there and his game has kicked off, to the tenth
@@ -2901,6 +2903,11 @@ export interface components {
 			roof: components['schemas']['GameRoof'] | null;
 			weather: components['schemas']['KickoffWeather'] | null;
 		};
+		/**
+		 * @description a game's state, one rule for every screen: upcoming before its kickoff, kicked_off from its kickoff until its final is in, final once the store holds its result or a stat line from either side
+		 * @enum {string}
+		 */
+		GameState: 'upcoming' | 'kicked_off' | 'final';
 		/** @description the game's expected score, the consensus of the hourly capture's newest read before kickoff; a read more than six hours before kickoff (or before now) gives way to the game table's newest weekly read, with its own read time */
 		GameTotal: {
 			/**
@@ -2977,6 +2984,8 @@ export interface components {
 			kickoff: string;
 			/** @description the game is final */
 			played: boolean;
+			/** @description the game by the read's clock */
+			game_state?: components['schemas']['GameState'] | null;
 			game_total: components['schemas']['GameTotal'] | null;
 			spread: components['schemas']['GameSpread'] | null;
 			roof: components['schemas']['GameRoof'] | null;

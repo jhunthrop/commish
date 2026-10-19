@@ -126,8 +126,10 @@ func gameWeek(d Data, season, week int, now time.Time) apitypes.GameWeek {
 			continue
 		}
 		c := conditionsOf(figuresAt(d.GameFacts[boards.ClubWeek{Week: week, Team: g.Team}], now, g.Kickoff))
+		state := gameStateAt(g, now)
 		out.Games = append(out.Games, apitypes.ClubGame{Team: g.Team, Opponent: g.Opponent, Home: g.Home,
-			Kickoff: g.Kickoff, Played: g.Final, GameTotal: c.total, Spread: c.spread, Roof: c.roof, Weather: c.weather})
+			Kickoff: g.Kickoff, Played: g.Final, GameState: &state, GameTotal: c.total, Spread: c.spread, Roof: c.roof,
+			Weather: c.weather})
 	}
 	sort.Slice(out.Games, func(i, j int) bool {
 		a, b := out.Games[i], out.Games[j]

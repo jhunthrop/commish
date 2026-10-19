@@ -59,15 +59,19 @@ type kickoffs struct {
 	next                 *time.Time
 }
 
-func (k *kickoffs) add(f apitypes.WeekFacts, now time.Time) {
-	if f.Bye || f.Kickoff == nil {
+// add counts one starter's game by its state (gameStateAt, carried on his
+// facts), so the bug and his row never disagree on a kickoff.
+func (k *kickoffs) add(f apitypes.WeekFacts) {
+	if f.Bye || f.Kickoff == nil || f.GameState == nil {
 		return
 	}
 	k.games++
-	if f.Played {
+	switch *f.GameState {
+	case apitypes.GameStateFinal:
 		k.final++
-	}
-	if f.Played || !f.Kickoff.After(now) {
+		k.kicked++
+		return
+	case apitypes.GameStateKickedOff:
 		k.kicked++
 		return
 	}
@@ -98,8 +102,8 @@ func (a *advisor) scoreboardGame(sides []*leaguesync.Side) apitypes.ScoreboardGa
 		projected := false
 		for _, id := range s.Starters {
 			line := a.build(id, a.Player(id), s).line
-			own.add(line.Facts, a.now)
-			game.add(line.Facts, a.now)
+			own.add(line.Facts)
+			game.add(line.Facts)
 			if line.WeekProjection != nil {
 				proj += roundTenth(*line.WeekProjection)
 				projected = true

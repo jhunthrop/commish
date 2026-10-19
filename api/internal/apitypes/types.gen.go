@@ -363,6 +363,27 @@ func (e GameSpreadSide) Valid() bool {
 	}
 }
 
+// Defines values for GameState.
+const (
+	GameStateFinal     GameState = "final"
+	GameStateKickedOff GameState = "kicked_off"
+	GameStateUpcoming  GameState = "upcoming"
+)
+
+// Valid indicates whether the value is a known member of the GameState enum.
+func (e GameState) Valid() bool {
+	switch e {
+	case GameStateFinal:
+		return true
+	case GameStateKickedOff:
+		return true
+	case GameStateUpcoming:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for GroupPassStatus.
 const (
 	GroupPassStatusActive   GroupPassStatus = "active"
@@ -1793,6 +1814,8 @@ type CheckoutRequest struct {
 
 // ClubGame one club's game in the week, from its side
 type ClubGame struct {
+	// GameState the game by the read's clock
+	GameState *GameState `json:"game_state,omitempty"`
 	GameTotal *GameTotal `json:"game_total"`
 	Home      bool       `json:"home"`
 	Kickoff   time.Time  `json:"kickoff"`
@@ -2130,6 +2153,9 @@ type GameSpread struct {
 
 // GameSpreadSide whether this club is expected to win or lose
 type GameSpreadSide string
+
+// GameState a game's state, one rule for every screen: upcoming before its kickoff, kicked_off from its kickoff until its final is in, final once the store holds its result or a stat line from either side
+type GameState string
 
 // GameTotal the game's expected score, the consensus of the hourly capture's newest read before kickoff; a read more than six hours before kickoff (or before now) gives way to the game table's newest weekly read, with its own read time
 type GameTotal struct {
@@ -4214,9 +4240,12 @@ type WeekFacts struct {
 	AllowedToPosition *PointsAllowed     `json:"allowed_to_position"`
 	Bye               bool               `json:"bye"`
 	Designation       *InjuryDesignation `json:"designation"`
-	GameTotal         *GameTotal         `json:"game_total"`
-	Home              *bool              `json:"home"`
-	Kickoff           *time.Time         `json:"kickoff"`
+
+	// GameState his game this week by the read's clock, null on his bye or when his club is unknown
+	GameState *GameState `json:"game_state,omitempty"`
+	GameTotal *GameTotal `json:"game_total"`
+	Home      *bool      `json:"home"`
+	Kickoff   *time.Time `json:"kickoff"`
 
 	// LastGames up to three completed games under the league's scoring, newest first
 	LastGames []GamePoints `json:"last_games"`

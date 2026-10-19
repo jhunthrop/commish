@@ -5,6 +5,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/jhunthrop/commish/api/internal/apitypes"
 	"github.com/jhunthrop/commish/api/internal/boards"
 	"github.com/jhunthrop/commish/api/internal/draft"
 )
@@ -68,8 +69,10 @@ type Facts struct {
 	Kickoff     *time.Time
 	Bye         bool
 	Designation *Designation
-	// Played is his game this week being final; Locked his game having
-	// kicked off by the run's clock.
+	// State is his game this week by the read's clock (gameStateAt), empty
+	// without a game. Played is it being final; Locked it having kicked off
+	// or being final.
+	State  apitypes.GameState
 	Played bool
 	Locked bool
 	// LastGames is up to three completed games, newest first.
@@ -194,6 +197,21 @@ func playedFromLines(games []boards.TeamWeek, lines []boards.StatLine) []boards.
 	return out
 }
 
+// gameStateAt is a game's state at now, the one rule every screen reads
+// (Lane 80): final once the store holds its result or a line from either
+// side (playedFromLines), kicked off from its kickoff until then, upcoming
+// before. A kicked-off game stays so until the final lands, which the weekly
+// stats bring the morning after a Sunday or Monday game.
+func gameStateAt(g boards.TeamWeek, now time.Time) apitypes.GameState {
+	switch {
+	case g.Final:
+		return apitypes.GameStateFinal
+	case !now.Before(g.Kickoff):
+		return apitypes.GameStateKickedOff
+	}
+	return apitypes.GameStateUpcoming
+}
+
 // Carries reports whether any line counted this season carries the
 // metric: a rule whose metric none carries scores nothing in points so far.
 func (s *Season) Carries(metric string) bool { return s.carried[metric] }
@@ -288,8 +306,10 @@ func (s *Season) For(p Player) Facts {
 	if p.Team != "" {
 		if g, ok := s.games[teamWeek{s.week, p.Team}]; ok {
 			home, kickoff := g.Home, g.Kickoff
-			f.Opponent, f.Home, f.Kickoff, f.Played = g.Opponent, &home, &kickoff, g.Final
-			f.Locked = g.Final || !s.now.Before(g.Kickoff)
+			f.Opponent, f.Home, f.Kickoff = g.Opponent, &home, &kickoff
+			f.State = gameStateAt(g, s.now)
+			f.Played = f.State == apitypes.GameStateFinal
+			f.Locked = f.State != apitypes.GameStateUpcoming
 			f.Game = figuresAt(s.gameFacts[boards.ClubWeek{Week: s.week, Team: p.Team}], s.now, g.Kickoff)
 			if a, ok := s.allowed[teamPosition{g.Opponent, p.Position}]; ok {
 				f.Allowed = &a
@@ -329,5 +349,6 @@ func (s *Season) designation(p Player) *Designation {
 
 // String names the facts for a test's failure.
 func (f Facts) String() string {
-	return fmt.Sprintf("week %d opp %q bye %v played %v locked %v games %v", f.Week, f.Opponent, f.Bye, f.Played, f.Locked, f.LastGames)
+	return fmt.Sprintf("week %d opp %q bye %v state %q played %v locked %v games %v", f.Week, f.Opponent, f.Bye, f.State,
+		f.Played, f.Locked, f.LastGames)
 }

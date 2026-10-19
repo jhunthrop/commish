@@ -336,6 +336,10 @@ func wireFacts(f Facts, pointsThisWeek *float64) apitypes.WeekFacts {
 		opp := f.Opponent
 		out.Opponent = &opp
 	}
+	if f.State != "" {
+		state := f.State
+		out.GameState = &state
+	}
 	if d := f.Designation; d != nil {
 		out.Designation = &apitypes.InjuryDesignation{Status: apitypes.DesignationStatus(d.Status), AsOf: d.AsOf, Since: d.Since}
 	}
