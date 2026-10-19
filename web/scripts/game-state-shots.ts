@@ -325,7 +325,7 @@ async function checkWaivers(page: Page, at: string): Promise<void> {
 	// In season order every Beats cell draws the season Gain, the key it is sorted by (review M-A);
 	// a row past its kickoff never draws a bare week figure.
 	for (const r of final)
-		if (r.gain !== EMPTY_FIGURE && !r.gain.endsWith(` ${SEASON.gain}`))
+		if (r.gain !== EMPTY_FIGURE && !(r.gain ?? '').endsWith(` ${SEASON.gain}`))
 			fault(at, `a row past its kickoff draws a week gain ${r.gain}`);
 	const basis = (await page.locator('main [data-basis]').allInnerTexts()).join(' ');
 	if (!basis.includes(seasonOrderWords(6)))
