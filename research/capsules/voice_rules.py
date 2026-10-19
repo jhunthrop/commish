@@ -25,6 +25,7 @@ from types import MappingProxyType
 from typing import Final
 
 from research.capsules.config import CAPSULE_CONFIG
+from research.capsules.names import name_pattern
 from research.capsules.sentences import phrase_pattern
 
 EM_DASH: Final = chr(0x2014)
@@ -370,9 +371,10 @@ def _normalise_apostrophes(text: str) -> str:
 
 def mask_names(text: str, names: Sequence[str]) -> str:
     """`text` with every proper name in `names` (a capitalised ledger entry) masked, so a player
-    called Price or Bet never reads as a banned word. Matched whole and case-sensitively."""
+    called Price or Bet never reads as a banned word. Matched whole and case-sensitively, each accent
+    written or not (`names.name_pattern`)."""
     for name in sorted((n for n in names if n[:1].isupper()), key=len, reverse=True):
-        text = re.sub(rf"(?<![A-Za-z]){re.escape(name)}(?![A-Za-z])", "Him", text)
+        text = re.sub(rf"(?<![^\W\d_]){name_pattern(name)}(?![^\W\d_])", "Him", text)
     return text
 
 

@@ -26,6 +26,7 @@ from research.capsules.grounding import (
     prompt_numbers,
     proper_name_phrases,
     round_half_up,
+    sheet_name_begun,
 )
 from research.capsules.multiples import multiple_violations
 from research.capsules.own_rate import own_points_per_game, own_rate_violations
@@ -295,11 +296,19 @@ def _grounding_violations(text: str, source: Grounding) -> list[str]:
         if raw not in named and not is_derived_from_ledger(value, ledger) and not is_loose_reading_of(value, printed)
     ]
     violations += [
-        f'The name "{phrase}" does not trace to any supplied fact.'
+        untraced_name_violation(phrase, source.name_ledger)
         for phrase in proper_name_phrases(text)
         if not is_name_grounded(phrase, source.name_ledger)
     ]
     return violations
+
+
+def untraced_name_violation(phrase: str, ledger: Sequence[str]) -> str:
+    """A name no fact holds; a cut-off start of a sheet's name says the name the sheet carries (Lane 75),
+    so the correction and the fallback line show the cause."""
+    violation = f'The name "{phrase}" does not trace to any supplied fact.'
+    carried = sheet_name_begun(phrase, ledger)
+    return violation if carried is None else f'{violation} The sheet carries "{carried}".'
 
 
 def _validate(
