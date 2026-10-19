@@ -1,8 +1,8 @@
 /** How far the season's figures reach, as every screen's "through week" says it (Lane 80, the sweep's
- * M2 and Y2): the last week whose games are all in, then the next week's games the run already holds
- * final, named by their day ("week 6's Thursday game"), so a basis over a Sunday player's GP never
- * claims his week 6. The days come from the schedule's game states (schedule.json); a run from before
- * them says "part of week 6" once any player's counted game is past the complete week. */
+ * M2 and Y2): the last week whose games are all in, then the next week's games named by their day
+ * ("week 6's Thursday game"). The bases count only games some player's counts hold (countedReach), so
+ * a basis over a Sunday player's GP never claims his week 6, even once his game is final by the
+ * hourly status; the schedule sets back every game final by its state (finalsReach). */
 import { weekdayWord } from '#lib/format/date.ts';
 import type { Game, Slate } from './schema.ts';
 import type { GameLogRow, PlayerSeason } from './season.ts';
@@ -40,33 +40,61 @@ type SlateGames = Pick<Slate, 'abbr'> & {
 	games: readonly Pick<Game, 'week' | 'opponent' | 'kickoff' | 'state'>[];
 };
 
-/** The final games of a week, each once (both clubs' sides are one game), in kickoff order. */
-function finalGames(slates: readonly SlateGames[], week: number): string[] {
-	const kickoffs = new Map<string, string>();
-	for (const slate of slates) {
-		for (const game of slate.games) {
-			if (game.week !== week || game.state !== 'final') continue;
-			kickoffs.set([slate.abbr, game.opponent].sort().join('-'), game.kickoff);
-		}
-	}
-	return [...kickoffs.values()].sort((a, b) => Date.parse(a) - Date.parse(b));
+/** Each game of a week once (both clubs' sides are one game), keyed by its two clubs. */
+function gameKey(club: string, opponent: string): string {
+	return [club, opponent].sort().join('-');
 }
 
-export function reachOf(
-	seasons: readonly CountedSeason[],
+/** A partial week from its games' kickoffs: their days in kickoff order and how many. */
+function partialOf(week: number, kickoffs: readonly string[]): NonNullable<Reach['partial']> {
+	const ordered = [...kickoffs].sort((a, b) => Date.parse(a) - Date.parse(b));
+	return { week, days: [...new Set(ordered.map(weekdayWord))], games: ordered.length };
+}
+
+/** What the bases' "through week" says (review finding 1): the complete week, then the next week's
+ * games a player's counts hold (a played or inactive row in his log, his club's game by the
+ * schedule), never a game final by status alone with no line behind it. A counted club the schedule
+ * does not place says "part of the week". */
+export function countedReach(
+	seasons: readonly (CountedSeason & { team: string })[],
 	slates: readonly SlateGames[],
 	complete: number
 ): Reach {
-	const week = complete + 1;
-	const finals = finalGames(slates, week);
-	if (finals.length > 0) {
-		const days = [...new Set(finals.map(weekdayWord))];
-		return { complete, partial: { week, days, games: finals.length } };
-	}
 	const newest = newestCountedWeek(seasons);
-	return newest > complete
-		? { complete, partial: { week: newest, days: [], games: 0 } }
-		: { complete, partial: null };
+	if (newest <= complete) return { complete, partial: null };
+	const clubs = new Set(
+		seasons
+			.filter((s) =>
+				s.log.some((r) => r.week === newest && (r.status === 'played' || r.status === 'inactive'))
+			)
+			.map((s) => s.team)
+	);
+	const kickoffs = new Map<string, string>();
+	let placed = true;
+	for (const club of clubs) {
+		const game = slates.find((s) => s.abbr === club)?.games.find((g) => g.week === newest);
+		if (game === undefined) placed = false;
+		else kickoffs.set(gameKey(club, game.opponent), game.kickoff);
+	}
+	return placed
+		? { complete, partial: partialOf(newest, [...kickoffs.values()]) }
+		: { complete, partial: { week: newest, days: [], games: 0 } };
+}
+
+/** What the schedule sets back (the run's game states): the complete week, then the next week's
+ * games final by their state, a status final included. */
+export function finalsReach(slates: readonly SlateGames[], complete: number): Reach {
+	const week = complete + 1;
+	const kickoffs = new Map<string, string>();
+	for (const slate of slates) {
+		for (const game of slate.games) {
+			if (game.week === week && game.state === 'final')
+				kickoffs.set(gameKey(slate.abbr, game.opponent), game.kickoff);
+		}
+	}
+	return kickoffs.size === 0
+		? { complete, partial: null }
+		: { complete, partial: partialOf(week, [...kickoffs.values()]) };
 }
 
 const joinAnd = (words: readonly string[]): string =>

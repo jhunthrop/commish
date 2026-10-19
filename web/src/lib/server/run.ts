@@ -29,7 +29,7 @@ import {
 } from '#lib/run/schema.ts';
 import { splitBoard, splitIndex, unindexedMarketRow, type RunIndex } from '#lib/run/market.ts';
 import { checkRunSeasons } from '#lib/run/season-checks.ts';
-import { reachOf, reachWords, type Reach } from '#lib/run/reach.ts';
+import { countedReach, finalsReach, reachWords, type Reach } from '#lib/run/reach.ts';
 import { openRun, type RunReader } from '#lib/run/source.ts';
 import type { RunStamp } from '#lib/run/stamp.ts';
 import { searchPlaceholder } from '#lib/format/pool-words.ts';
@@ -171,8 +171,8 @@ export interface SeasonReach {
 	/** What a basis's "through week" says (run/reach.ts, Lane 80): "through week 5 and week 6's
 	 * Thursday game", never a week a Sunday player's GP does not reach; empty before week 1's. */
 	through: string;
-	/** The last complete week and the next week's games already in. */
-	reach: Reach;
+	/** The last complete week, its through week (the run's season blocks). */
+	complete: number;
 }
 
 export function seasonReach(): Promise<SeasonReach> {
@@ -186,18 +186,24 @@ export function seasonReach(): Promise<SeasonReach> {
 		]);
 		const { season } = await player(first.id);
 		const { label } = await formatById(season.format);
-		const reach = reachOf(
-			players.map((loaded) => loaded.season),
-			slate.slates,
-			season.through
-		);
-		return { format: season.format, scoring: label, through: reachWords(reach), reach };
+		// Counted games only (review finding 1): his club's game, by his log, never a status final alone.
+		const counted = players.map((loaded) => ({ ...loaded.season, team: loaded.team }));
+		const reach = countedReach(counted, slate.slates, season.through);
+		return {
+			format: season.format,
+			scoring: label,
+			through: reachWords(reach),
+			complete: season.through
+		};
 	});
 }
 
-/** The games a schedule sets back as played (run/reach.ts): none before the season's first kickoff. */
+/** The games a schedule sets back as played (run/reach.ts finalsReach): the complete week and the
+ * next week's games final by the run's states; none before the season's first kickoff. */
 export async function playedReach(): Promise<Reach> {
-	return (await seasonUnderway()) ? (await seasonReach()).reach : { complete: 0, partial: null };
+	if (!(await seasonUnderway())) return { complete: 0, partial: null };
+	const [{ complete }, slate] = await Promise.all([seasonReach(), schedule()]);
+	return finalsReach(slate.slates, complete);
 }
 
 export function adp(): Promise<Adp> {
