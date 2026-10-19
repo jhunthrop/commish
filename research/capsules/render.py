@@ -52,8 +52,8 @@ def _adp_line(facts: PlayerFacts) -> str:
     by_adp = "" if facts.market.position_adp is None else f", {facts.market.position_adp} by ADP"
     if facts.season is not None:
         # In season the ADP is history, printed as history and with no pick word (the floor refuses one).
-        return f"ADP{before} {js_string(adp)} (where drafters took him{by_adp})."
-    return f"ADP {js_string(adp)} (drafters take him around pick {whole(adp)}{by_adp})."
+        return f"ADP{before} {page_tenth_text(adp)} (where drafters took him{by_adp})."
+    return f"ADP {page_tenth_text(adp)} (drafters take him around pick {whole(adp)}{by_adp})."
 
 
 def _board_line(facts: PlayerFacts) -> str:
@@ -207,7 +207,7 @@ def _trend_line(facts: PlayerFacts) -> str | None:
     noun = "yards per target" if facts.identity.position in ("WR", "TE") else "yards per touch"
     sentences = [
         _trend_sentence("His points per game", trend.points_per_game, page_tenth_text),
-        _trend_sentence(f"His {noun}", trend.yards_per_opportunity, js_string),
+        _trend_sentence(f"His {noun}", trend.yards_per_opportunity, page_tenth_text),
         _trend_sentence("His target share", trend.target_share, _percent),
     ]
     written = [sentence for sentence in sentences if sentence is not None]

@@ -6,8 +6,8 @@ from types import SimpleNamespace
 from typing import TYPE_CHECKING, cast
 
 from research.capsules.facts.model import RankedStat, SeasonSoFar, SeasonTotals, SeasonWeek
-from research.capsules.render import _story_line, _trend_line
-from research.capsules.render_depth import _prior_seasons, _volatility
+from research.capsules.render import _adp_line, _story_line, _trend_line
+from research.capsules.render_depth import _market_movement, _prior_seasons, _volatility
 from research.capsules.render_season import season_section
 
 if TYPE_CHECKING:
@@ -64,3 +64,21 @@ def test_his_worst_week_and_prior_seasons_print_to_the_tenth() -> None:
     depth = SimpleNamespace(prior_seasons=(prior,))
     seasons = _prior_seasons(_facts(depth=depth, identity=SimpleNamespace(position="QB"))) or ""
     assert "301.4 points over 17 games" in seasons
+
+
+def test_yards_per_opportunity_and_the_adp_print_as_the_page_prints_them() -> None:
+    """The review's finding 7: a rate and the ADP to the tenth, never the stat line's raw float."""
+    metric = SimpleNamespace(
+        material=True, delta=-2.33, prior_value=10.437, prior_season=2024, recent_value=8.104, recent_season=2025
+    )
+    trend = SimpleNamespace(points_per_game=None, yards_per_opportunity=metric, target_share=None)
+    line = _trend_line(_facts(trend=trend, identity=SimpleNamespace(position="WR")))
+    assert line == "His yards per target fell from 10.4 in 2024 to 8.1 in 2025."
+    market = SimpleNamespace(adp=24.25, position_adp="WR9")
+    told = _adp_line(_facts(market=market, season=None))
+    assert told == "ADP 24.3 (drafters take him around pick 24, WR9 by ADP)."
+    moved = SimpleNamespace(
+        picks=-3.17, earlier_adp=21.08, latest_adp=24.25, earlier_at="2026-08-01", latest_at="2026-09-01"
+    )
+    told = _market_movement(cast("Depth", SimpleNamespace(market_movement=moved)), in_season=True) or ""
+    assert told == "ADP moved down 3.2 picks before the season, from 21.1 to 24.3."

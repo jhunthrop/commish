@@ -281,9 +281,12 @@ def _market_movement(depth: Depth, in_season: bool) -> str | None:
         return None
     window = "before the season" if in_season else f"between {m.earlier_at} and {m.latest_at}"
     if m.picks == 0:
-        return f"ADP held at {js_string(m.latest_adp)} {window}."
+        return f"ADP held at {page_tenth_text(m.latest_adp)} {window}."
     direction = "up" if m.picks > 0 else "down"
-    return f"ADP moved {direction} {js_string(abs(m.picks))} picks {window}, from {js_string(m.earlier_adp)} to {js_string(m.latest_adp)}."
+    return (
+        f"ADP moved {direction} {page_tenth_text(abs(m.picks))} picks {window}, from "
+        f"{page_tenth_text(m.earlier_adp)} to {page_tenth_text(m.latest_adp)}."
+    )
 
 
 def _volatility(depth: Depth) -> str | None:
