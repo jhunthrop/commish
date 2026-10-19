@@ -69,3 +69,21 @@ func TestESPNPhase(t *testing.T) {
 	wantPhase(t, "pre-draft, the day of", PhaseOf(facts, time.Date(2026, 8, 30, 12, 0, 0, 0, time.UTC)), apitypes.LeaguePhaseDraftDay,
 		"ESPN has the draft starting within a day.", 14)
 }
+
+// Lane 74: the week in play reaches the snapshot as ESPN's live points,
+// and a side ESPN gave no score for is unread, never a 0.0.
+func TestESPNSnapshotScoresTheWeekInPlay(t *testing.T) {
+	snap := espnSnapshot(espnRead(t, "league-inplay-2026-week6.json", 2026, nil), phaseNow)
+	if snap.Week != 6 || len(snap.Matchups) != 12 {
+		t.Fatalf("week %d, %d sides", snap.Week, len(snap.Matchups))
+	}
+	if s := snap.Matchups[0]; s.RosterID != 9 || s.Points != 68.08 || s.PointsUnread {
+		t.Fatalf("team 9: %+v", s)
+	}
+	unlive := strings.NewReplacer(`"totalPointsLive"`, `"elsewhere"`)
+	for _, s := range espnSnapshot(espnRead(t, "league-inplay-2026-week6.json", 2026, unlive), phaseNow).Matchups {
+		if !s.PointsUnread {
+			t.Fatalf("a side with no live points read as scored: %+v", s)
+		}
+	}
+}
