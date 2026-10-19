@@ -6,7 +6,8 @@ import type { Format } from './schema.ts';
 export interface FiguresReach {
 	/** That format as a chip prints it: "PPR". */
 	scoring: string;
-	/** The last week whose games are all in, 0 before week 1's. */
+	/** The week the newest counted game belongs to, 0 before week 1's (run/season.ts
+	 * newestCountedWeek): a Thursday player's GP is never past it. */
 	through: number;
 }
 

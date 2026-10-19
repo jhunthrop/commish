@@ -29,6 +29,7 @@ import {
 } from '#lib/run/schema.ts';
 import { splitBoard, splitIndex, unindexedMarketRow, type RunIndex } from '#lib/run/market.ts';
 import { checkRunSeasons } from '#lib/run/season-checks.ts';
+import { newestCountedWeek } from '#lib/run/season.ts';
 import { openRun, type RunReader } from '#lib/run/source.ts';
 import type { RunStamp } from '#lib/run/stamp.ts';
 import { searchPlaceholder } from '#lib/format/pool-words.ts';
@@ -160,31 +161,43 @@ export async function player(id: string): Promise<Player> {
 	return readPlayer(id);
 }
 
-/** What every player's season figures are: the format they are scored in and the last week whose
- * games they reach, which every season block in the run shares (season-checks.ts holds them to it). */
+/** What every player's season figures are: the format they are scored in, which every season block
+ * in the run shares (season-checks.ts holds them to it), and how far they reach. */
 export interface SeasonReach {
 	/** The format id the figures are scored in. */
 	format: string;
 	/** That format as a chip prints it: "PPR". */
 	scoring: string;
-	/** The last week whose games are all in, 0 before week 1's. */
+	/** The week the newest counted game belongs to (run/season.ts newestCountedWeek, the sweep's X3):
+	 * what a basis's "through week N" says, so a Thursday player's GP and the basis agree. */
 	through: number;
+	/** The last week whose games are all in, 0 before week 1's: the weeks a schedule fades. */
+	complete: number;
 }
 
 export function seasonReach(): Promise<SeasonReach> {
 	return once('season:reach', async () => {
-		const [first] = await index();
+		const entries = await index();
+		const [first] = entries;
 		if (!first) throw new Error('The run indexes no players.');
+		const seasons = (await Promise.all(entries.map((entry) => player(entry.id)))).map(
+			(loaded) => loaded.season
+		);
 		const { season } = await player(first.id);
 		const { label } = await formatById(season.format);
-		return { format: season.format, scoring: label, through: season.through };
+		return {
+			format: season.format,
+			scoring: label,
+			through: newestCountedWeek(seasons),
+			complete: season.through
+		};
 	});
 }
 
 /** The last week whose games are all in, 0 before the season's first kickoff: the weeks a
  * schedule sets back as played. */
 export async function playedThrough(): Promise<number> {
-	return (await seasonUnderway()) ? (await seasonReach()).through : 0;
+	return (await seasonUnderway()) ? (await seasonReach()).complete : 0;
 }
 
 export function adp(): Promise<Adp> {
