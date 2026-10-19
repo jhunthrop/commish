@@ -146,6 +146,9 @@ func NewSeason(d Data, rules Rules, week int, now time.Time) *Season {
 	sums := map[teamPosition]float64{}
 	lined := map[draft.Position]bool{}
 	faced := map[teamPosition]map[int]bool{}
+	// linedWeeks is each club-week with a counted line: a game whose stats
+	// have landed.
+	linedWeeks := map[teamWeek]bool{}
 	s.carried = map[string]bool{}
 	for _, l := range d.Lines {
 		g, known := s.games[teamWeek{l.Week, l.Team}]
@@ -154,6 +157,9 @@ func NewSeason(d Data, rules Rules, week int, now time.Time) *Season {
 			continue
 		}
 		pts := rules.Points(l.Metrics, position)
+		if known {
+			linedWeeks[teamWeek{l.Week, l.Team}] = true
+		}
 		s.points[l.PlayerID] = append(s.points[l.PlayerID], GamePoints{Week: l.Week, Points: pts})
 		lined[position] = true
 		for m := range l.Metrics {
@@ -171,7 +177,7 @@ func NewSeason(d Data, rules Rules, week int, now time.Time) *Season {
 	for id := range s.points {
 		sort.Slice(s.points[id], func(i, j int) bool { return s.points[id][i].Week < s.points[id][j].Week })
 	}
-	s.allowed = rankAllowed(sums, finalGames(d.Games), faced, lined)
+	s.allowed = rankAllowed(sums, linedGames(d.Games, linedWeeks), faced, lined)
 	return s
 }
 
@@ -214,11 +220,14 @@ func isResult(l boards.StatLine) bool {
 	return false
 }
 
-// finalGames is each club's count of final games.
-func finalGames(games []boards.TeamWeek) map[string]int {
+// linedGames is each club's count of final games whose stats have landed:
+// a counted line from either side that week (Lane 80 re-review finding 1).
+// A game final by the hourly status alone has no points behind it until
+// the weekly stats come, so it is no game in a points-allowed denominator.
+func linedGames(games []boards.TeamWeek, linedWeeks map[teamWeek]bool) map[string]int {
 	out := map[string]int{}
 	for _, g := range games {
-		if g.Final {
+		if g.Final && (linedWeeks[teamWeek{g.Week, g.Team}] || linedWeeks[teamWeek{g.Week, g.Opponent}]) {
 			out[g.Team]++
 		}
 	}
@@ -232,7 +241,7 @@ func finalGames(games []boards.TeamWeek) map[string]int {
 // club (a week the kicking source has not written is no game), and a club
 // with none is not ranked. A defense's games are counted the same way, its
 // lines coming from the same source; every other position's are the
-// club's final games.
+// club's final games with their stats in (linedGames).
 func rankAllowed(sums map[teamPosition]float64, games map[string]int, faced map[teamPosition]map[int]bool,
 	lined map[draft.Position]bool) map[teamPosition]Allowed {
 	out := map[teamPosition]Allowed{}
