@@ -1,6 +1,7 @@
 package inseason
 
 import (
+	"context"
 	"fmt"
 	"regexp"
 	"sort"
@@ -71,26 +72,31 @@ func (a *advisor) found() map[int][]Trade {
 		return a.finds()
 	}
 	if a.foundHere == nil {
-		a.foundHere = a.findAll()
+		a.foundHere, _ = a.findAll(context.Background())
 	}
 	return a.foundHere
 }
 
 // findAll is the search found keeps: the drafter's squad against every
-// other team's. Empty when the drafter's team is not in the read.
-func (a *advisor) findAll() map[int][]Trade {
+// other team's. Empty when the drafter's team is not in the read. ctx
+// stops the search between teams (rereview 66u W3): a stopped search
+// answers ctx's error and nothing to keep.
+func (a *advisor) findAll(ctx context.Context) (map[int][]Trade, error) {
 	out := map[int][]Trade{}
 	team, ok := a.Snap.TeamByRoster(a.Me)
 	if !ok {
-		return out
+		return out, nil
 	}
 	squad := a.squad(team, a.active(team), true)
 	for _, t := range a.Snap.Teams {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 		if t.RosterID != a.Me {
 			out[t.RosterID] = AllTrades(a.config, a.weeks, squad, a.squad(t, a.active(t), false))
 		}
 	}
-	return out
+	return out, nil
 }
 
 // newAdvisor reads the league's roster shape and scoring from the saved

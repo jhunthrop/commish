@@ -29,14 +29,20 @@ const (
 	RefreshFloor   = 10 * time.Second
 	ReadTimeout    = 30 * time.Second
 	// idleAfter drops a league no viewer has asked about in this long.
-	idleAfter = 30 * time.Minute
+	idleAfter = ViewWindow
 )
 
+// ViewWindow is how long a league counts as viewed after its last view:
+// the poller keeps reading it that long, and the trade search warms for
+// the accounts that viewed it inside it (Lane 66u).
+const ViewWindow = 30 * time.Minute
+
 // SnapshotStore keeps the last good read per host league. PutSnapshot
-// keeps nothing for a league no account has linked.
+// keeps nothing for a league no account has linked, and says whether it
+// stored the read.
 type SnapshotStore interface {
 	LastSnapshot(ctx context.Context, ref Ref) (Snapshot, bool, error)
-	PutSnapshot(ctx context.Context, snap Snapshot) error
+	PutSnapshot(ctx context.Context, snap Snapshot) (bool, error)
 }
 
 // Read is a snapshot and how stale it is (poll.Read's rule). Failed is a
@@ -56,9 +62,10 @@ type Poller struct {
 	Store SnapshotStore
 	Now   func() time.Time
 	Log   *slog.Logger
-	// Landed, when set, is told of every good read once it is stored (the
-	// trade search warms on it, Lane 66u); a failed read tells it nothing,
-	// so the work done for the read before stands. It runs on the storing
+	// Landed, when set, is told of every good read the store wrote (the
+	// trade search warms on it, Lane 66u); a failed read, or one the store
+	// kept nothing of (a league no one has attached), tells it nothing, so
+	// the work done for the read before stands. It runs on the storing
 	// goroutine and must return at once.
 	Landed func(Snapshot)
 
@@ -128,11 +135,14 @@ func signedOut(err error) bool {
 func (p *Poller) Keep(snap Snapshot) {
 	ctx, cancel := context.WithTimeout(context.Background(), ReadTimeout)
 	defer cancel()
-	if err := p.Store.PutSnapshot(ctx, snap); err != nil {
+	stored, err := p.Store.PutSnapshot(ctx, snap)
+	if err != nil {
 		p.Log.Warn("leaguesync: keep snapshot", "league", snap.Ref.Key(), "err", err)
 		return
 	}
-	p.landed(snap)
+	if stored {
+		p.landed(snap)
+	}
 }
 
 // landed tells Landed of a stored read, if anyone listens.
@@ -167,10 +177,13 @@ func (s snapshots) Keep(ctx context.Context, key string, snap Snapshot, at time.
 	if ref, ok := refOfKey(key); ok {
 		snap.Ref.As = ref.As
 	}
-	if err := s.store.PutSnapshot(ctx, snap); err != nil {
+	stored, err := s.store.PutSnapshot(ctx, snap)
+	if err != nil {
 		return err
 	}
-	s.landed(snap)
+	if stored {
+		s.landed(snap)
+	}
 	return nil
 }
 

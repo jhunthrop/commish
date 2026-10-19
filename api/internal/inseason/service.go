@@ -23,6 +23,7 @@ import (
 	"github.com/jhunthrop/commish/api/internal/draft"
 	"github.com/jhunthrop/commish/api/internal/httpx"
 	"github.com/jhunthrop/commish/api/internal/leaguesync"
+	"sync/atomic"
 )
 
 // limitPerMinute is the sync routes' read limit, per account: a page
@@ -72,9 +73,18 @@ type Service struct {
 	// Boards values our board for the reads with no league: the public player read and the public
 	// order (PublicSettings).
 	Boards BoardSource
-	// finds keeps the trade finder's trades per league read (targets.go),
-	// for /trades and the order's targets alike (Lane 66u N3).
+	// Context is main's: shutdown stops every trade search and warm run
+	// (rereview 66u W3); nil is context.Background.
+	Context context.Context
+	// finds keeps each pair's latest trade search (targets.go), for
+	// /trades, the order's targets and a landed read's warm run alike.
 	finds readCache[map[int][]Trade]
+	// searches counts the trade searches run, the cache's misses.
+	searches atomic.Int64
+	// viewers is who viewed each league lately: the warm run's accounts.
+	viewers viewerSet
+	// warms is the landed reads waiting for a warm worker.
+	warms warmQueue
 	// Season is the season GET /games/week reads, the board's.
 	Season int
 	Now    func() time.Time
@@ -126,7 +136,9 @@ func (s *Service) advisorFor(w http.ResponseWriter, r *http.Request) (*advisor, 
 		httpx.WriteError(w, r, http.StatusConflict, httpx.CodeConflict, leaguesync.NoGamesWords, nil)
 		return nil, false
 	}
-	a, err := s.leagueAdvisor(r.Context(), l, auth.AccountID(r))
+	account := auth.AccountID(r)
+	s.viewers.saw(l.Snap.Ref, account, s.Now())
+	a, err := s.leagueAdvisor(r.Context(), l, account, s.base())
 	if err != nil {
 		httpx.WriteInternal(w, r, s.Log, "inseason: advisor", err)
 		return nil, false
@@ -135,9 +147,11 @@ func (s *Service) advisorFor(w http.ResponseWriter, r *http.Request) (*advisor, 
 }
 
 // leagueAdvisor is the account's league with its facts, the week's
-// projection, its holds and the league read's kept trade search: what a
-// request reads, and what a landed read warms (warm.go).
-func (s *Service) leagueAdvisor(ctx context.Context, l League, account uuid.UUID) (*advisor, error) {
+// projection, its holds and the pair's kept trade search: what a request
+// reads, and what a landed read warms (warm.go). search is the context a
+// search it starts runs on: the service's for a request (requests share
+// it), the warm run's for a warm.
+func (s *Service) leagueAdvisor(ctx context.Context, l League, account uuid.UUID, search context.Context) (*advisor, error) {
 	data, err := s.Facts.Data(ctx, seasonOf(l))
 	if err != nil {
 		return nil, fmt.Errorf("facts: %w", err)
@@ -150,7 +164,7 @@ func (s *Service) leagueAdvisor(ctx context.Context, l League, account uuid.UUID
 	if err != nil {
 		return nil, err
 	}
-	a.finds = s.findsFor(a, account.String())
+	a.finds = s.findsFor(a, account.String(), search)
 	return a, nil
 }
 

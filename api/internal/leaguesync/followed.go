@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jhunthrop/commish/api/internal/apitypes"
 	"github.com/jhunthrop/commish/api/internal/boards"
 	"github.com/jhunthrop/commish/api/internal/httpx"
@@ -65,17 +66,28 @@ func (s *Service) Follow(w http.ResponseWriter, r *http.Request) (Followed, bool
 	return f, true
 }
 
-// FollowedAt is every live link's league for a read that just landed,
-// each followed as its route would follow it (the shared read, the saved
-// league, the board), for work a landed read starts (Lane 66u: the trade
-// search). A link whose follow fails is logged and left out.
-func (s *Service) FollowedAt(ctx context.Context, ref Ref) ([]Followed, error) {
+// FollowedAt is the league of each of accounts' live links for a read
+// that just landed, each followed as its route would follow it (the shared
+// read, the saved league, the board), for work a landed read starts (Lane
+// 66u: the trade search, for the accounts that viewed the league). A link
+// whose follow fails is logged and left out.
+func (s *Service) FollowedAt(ctx context.Context, ref Ref, accounts []uuid.UUID) ([]Followed, error) {
+	if len(accounts) == 0 {
+		return nil, nil
+	}
 	links, err := s.Links.LinksOf(ctx, ref)
 	if err != nil {
 		return nil, err
 	}
-	out := make([]Followed, 0, len(links))
+	want := make(map[uuid.UUID]bool, len(accounts))
+	for _, a := range accounts {
+		want[a] = true
+	}
+	out := make([]Followed, 0, len(accounts))
 	for _, link := range links {
+		if !want[link.AccountID] {
+			continue
+		}
 		f, err := s.follow(ctx, link)
 		if err != nil {
 			s.Log.Warn("leaguesync: follow a landed read", "league", ref.Key(), "err", err)

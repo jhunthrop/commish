@@ -39,14 +39,14 @@ func (m *memorySnapshots) LastSnapshot(_ context.Context, ref Ref) (Snapshot, bo
 	return s, ok, nil
 }
 
-func (m *memorySnapshots) PutSnapshot(_ context.Context, s Snapshot) error {
+func (m *memorySnapshots) PutSnapshot(_ context.Context, s Snapshot) (bool, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.snaps == nil {
 		m.snaps = map[string]Snapshot{}
 	}
 	m.snaps[s.Ref.Key()] = s
-	return nil
+	return true, nil
 }
 
 type fakeClock struct {
@@ -301,5 +301,39 @@ func TestPollerTellsLandedOfEachGoodRead(t *testing.T) {
 	defer mu.Unlock()
 	if len(landed) != 2 || !landed[1].After(landed[0]) {
 		t.Fatalf("the next good read landed %v", landed)
+	}
+}
+
+// keepStore answers PutSnapshot as told.
+type keepStore struct {
+	memorySnapshots
+	stored bool
+	err    error
+}
+
+func (k *keepStore) PutSnapshot(context.Context, Snapshot) (bool, error) { return k.stored, k.err }
+
+// The attach path's Keep announces a read only when the store wrote it: a
+// league no one has attached, or a store that fails, announces nothing
+// (rereview 66u W5, W6).
+func TestKeepAnnouncesOnlyAStoredRead(t *testing.T) {
+	for _, c := range []struct {
+		name   string
+		store  *keepStore
+		landed int
+	}{
+		{"stored", &keepStore{stored: true}, 1},
+		{"nothing stored", &keepStore{}, 0},
+		{"the store failed", &keepStore{err: errors.New("down")}, 0},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			p := &Poller{Store: c.store, Log: quietLog()}
+			heard := 0
+			p.Landed = func(Snapshot) { heard++ }
+			p.Keep(Snapshot{Ref: testRef})
+			if heard != c.landed {
+				t.Fatalf("announced %d times, want %d", heard, c.landed)
+			}
+		})
 	}
 }

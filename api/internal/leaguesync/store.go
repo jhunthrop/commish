@@ -286,23 +286,23 @@ const maxLinksPerLeague = 64
 
 // PutSnapshot keeps a good read, replacing the one before, and only for a
 // league some account has attached: a league read for a preview leaves
-// nothing behind.
-func (s *Store) PutSnapshot(ctx context.Context, snap Snapshot) error {
+// nothing behind. stored says whether a row was written.
+func (s *Store) PutSnapshot(ctx context.Context, snap Snapshot) (stored bool, err error) {
 	raw, err := json.Marshal(snap)
 	if err != nil {
-		return fmt.Errorf("leaguesync: encode snapshot: %w", err)
+		return false, fmt.Errorf("leaguesync: encode snapshot: %w", err)
 	}
 	ref := snap.Ref
-	_, err = s.Pool.Exec(ctx, `insert into app.league_snapshots (host, host_league_id, host_season, read_as, snapshot, read_at)
+	tag, err := s.Pool.Exec(ctx, `insert into app.league_snapshots (host, host_league_id, host_season, read_as, snapshot, read_at)
 		select $1, $2, $3, $4, $5, $6
 		where exists (select 1 from app.league_links where host = $1 and host_league_id = $2 and host_season = $3
 			and `+linkedAs+`)
 		on conflict (host, host_league_id, host_season, read_as) do update set snapshot = excluded.snapshot, read_at = excluded.read_at`,
 		ref.Host, ref.LeagueID, ref.Season, ref.As, raw, snap.ReadAt)
 	if err != nil {
-		return fmt.Errorf("leaguesync: keep snapshot %s: %w", ref.Key(), err)
+		return false, fmt.Errorf("leaguesync: keep snapshot %s: %w", ref.Key(), err)
 	}
-	return nil
+	return tag.RowsAffected() > 0, nil
 }
 
 // HostPlayers is a host's kept directory and when it was read.

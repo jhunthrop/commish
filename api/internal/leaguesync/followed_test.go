@@ -93,15 +93,15 @@ func TestFollowIsTheAccountsOwnLeague(t *testing.T) {
 	}
 }
 
-// A read that lands is followed for every account with the league
-// attached, as each one's route follows it, and for no one else
-// (FollowedAt, the trade search's warm run; Lane 66u).
+// A read that lands is followed for each account asked for that has the
+// league attached, as each one's route follows it, and for no one else
+// (FollowedAt, the trade search's warm run for the league's viewers; Lane
+// 66u).
 func TestALandedReadIsFollowedForEveryAccount(t *testing.T) {
 	pool := dbtest.Pool(t)
 	ctx := context.Background()
 	accounts := &auth.Store{Pool: pool}
 	alice, bob := newAccount(t, accounts, "landed_alice"), newAccount(t, accounts, "landed_bob")
-	newAccount(t, accounts, "landed_carol")
 	svc := replayService(pool)
 	league := "https://sleeper.com/leagues/" + ReplaySleeperLeague + "/team"
 	for _, account := range []uuid.UUID{alice, bob} {
@@ -109,7 +109,9 @@ func TestALandedReadIsFollowedForEveryAccount(t *testing.T) {
 			t.Fatalf("attach: %d", status)
 		}
 	}
-	got, err := svc.FollowedAt(ctx, replayRef(t, svc, alice))
+	dave := newAccount(t, accounts, "landed_dave")
+	ref := replayRef(t, svc, alice)
+	got, err := svc.FollowedAt(ctx, ref, []uuid.UUID{alice, bob, dave})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -122,6 +124,11 @@ func TestALandedReadIsFollowedForEveryAccount(t *testing.T) {
 	}
 	if len(got) != 2 || !seen[alice] || !seen[bob] {
 		t.Fatalf("followed for %v, want alice and bob", seen)
+	}
+	// Only the accounts asked for: bob did not view the league.
+	only, err := svc.FollowedAt(ctx, ref, []uuid.UUID{alice})
+	if err != nil || len(only) != 1 || only[0].Link.AccountID != alice {
+		t.Fatalf("followed for alice alone: %v %d", err, len(only))
 	}
 }
 
