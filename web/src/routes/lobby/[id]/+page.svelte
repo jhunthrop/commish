@@ -35,8 +35,10 @@
 
 	/** The lobby is still drafting or filling: it has a pool to search and a seat to leave. */
 	const open = $derived(lobby !== null && !lobby.complete && !lobby.abandoned && error === null);
-	/** The server closed the lobby (a final state): the bar passes no parts. */
-	const closed = $derived(lobby?.abandoned === true);
+	/** The lobby no longer takes people: closed unattended, drafted to the end, or answered with an
+	 * error. Each is a final state the server reports, so the bar passes no parts only then, never
+	 * while the lobby loads. */
+	const closed = $derived(error !== null || lobby?.complete === true || lobby?.abandoned === true);
 
 	async function loadCard(state: LobbyState): Promise<void> {
 		if (!state.drafting || state.complete || cardFor === state.pickNumber) return;

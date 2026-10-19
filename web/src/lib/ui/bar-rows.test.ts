@@ -41,4 +41,9 @@ void test('a closed lobby passes no search and no Leave', () => {
 	const lobby = source('../../routes/lobby/[id]/+page.svelte');
 	assert.match(lobby, /search=\{closed \? undefined : /);
 	assert.match(lobby, /tail=\{closed \? undefined : /);
+	// Closed is every final state: abandoned, finished, or an error answer.
+	assert.match(
+		lobby,
+		/const closed = \$derived\(\s*error !== null \|\| lobby\?\.complete === true \|\| lobby\?\.abandoned === true\s*\)/
+	);
 });
