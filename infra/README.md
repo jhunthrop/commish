@@ -15,7 +15,7 @@ The prep site runs on three providers, provisioned on 2026-10-12 (spec §2, `doc
 - APIs: Cloud Run, Artifact Registry, IAM, IAM Credentials, STS, Secret Manager, Cloud Scheduler, Resource Manager, Logging, Monitoring, Cloud SQL Admin.
 - Artifact Registry: `us-east1-docker.pkg.dev/trycommish/commish` (Docker). Images: `api` (one image, two Cloud Run services `api` and `room`), `research` (the Cloud Run Job `nightly` and the service `advisor`).
 - Service accounts:
-  - `deployer@trycommish.iam.gserviceaccount.com`: GitHub Actions. Roles `run.admin`, `artifactregistry.writer`, `run.jobsExecutorWithOverrides`, and `iam.serviceAccountUser` on the runtime accounts (`boards-runtime` from Lane 8 part A).
+  - `deployer@trycommish.iam.gserviceaccount.com`: GitHub Actions. Roles `run.admin`, `artifactregistry.writer`, `run.jobsExecutorWithOverrides`, `logging.viewer` (granted 2026-10-19 so `ops.yml` can print a job execution's log lines; before that the step failed with PERMISSION_DENIED), and `iam.serviceAccountUser` on the runtime accounts (`boards-runtime` from Lane 8 part A).
   - `api-runtime@trycommish.iam.gserviceaccount.com`: the `api` and `room` services.
   - `research-runtime@trycommish.iam.gserviceaccount.com`: the `nightly`, `nightly-publish`, `inseason` and `inseason-capture` jobs, and the caller of the research schedule.
   - `advisor-runtime@trycommish.iam.gserviceaccount.com`: the `advisor` service, no roles; `deployer` has `iam.serviceAccountUser` on it. The service runs with ingress all behind IAM; `api-runtime` holds `run.invoker` on it and the Go rooms call it with a Google identity token (`ADVISOR_URL` repository variable; unset means the engine's own odds).

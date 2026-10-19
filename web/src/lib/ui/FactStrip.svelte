@@ -79,9 +79,22 @@
 		color: var(--accent-text);
 	}
 
+	/* On a phone the strip wraps: each cell grows to fill its row, so a row never stops short with a
+	   rule standing in the open (Lane 87). The rules are each cell's left and top, pulled 1px out under
+	   the strip's clip, so a rule stands only between two cells, whatever wraps. */
 	@media (max-width: 760px) {
-		.facts div {
+		.facts {
+			overflow: hidden;
+		}
+
+		.facts div,
+		.facts div:last-child {
+			flex: 1 1 auto;
 			padding: var(--s-2) var(--s-3);
+			border-right: 0;
+			border-left: 1px solid var(--line);
+			border-top: 1px solid var(--line);
+			margin: -1px 0 0 -1px;
 		}
 
 		dd {

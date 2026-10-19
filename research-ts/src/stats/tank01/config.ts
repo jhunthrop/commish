@@ -85,9 +85,12 @@ export const TANK01_CONFIG = {
    */
   gameStatuses: {
     scheduled: ["scheduled", "not started", "pre-game"],
+    /** Prefixes: "Final/OT" and "Final OT" read final too (Lane 89, 2026-10-19). */
     final: ["completed", "final"],
     in_progress: ["live - in progress", "in progress", "halftime"],
   },
+  /** Upstream's `gameStatusCode`, read before the words (Lane 89, 2026-10-19). */
+  gameStatusCodes: { "0": "scheduled", "1": "in_progress", "2": "final" },
   envVars: {
     apiKey: "TANK01_API_KEY",
     season: "TANK01_SEASON",

@@ -45,6 +45,7 @@ import {
 } from './inseason-fixture/clock.ts';
 import { BUILDER_LINE, basisLines, basisReport, figureSentenceFaults } from './basis-lines.ts';
 import { chromeFaults, chromeLine, chromeMeasures } from './chrome-measures.ts';
+import { pageFaults, pageLine, pageMeasures } from './page-measures.ts';
 import { UNCOUNTED_ANCHOR } from '../src/lib/league/uncounted.ts';
 import { FIXTURE_IDS } from './inseason-fixture/ids.ts';
 import { PER_GAME_BASIS, WAIVERS_BASIS } from './inseason-fixture/week.ts';
@@ -369,6 +370,11 @@ for (const { name, path, ready: text } of PAGES) {
 				const at = `${name} ${theme} ${String(width)}`;
 				if (theme === 'dark') chromeLines.push(chromeLine(at, chrome));
 				for (const fault of chromeFaults(chrome, width === PHONE.width))
+					missing.push(`${at} ${fault}`);
+				// A league's page passes the bar no parts: the one row led by the mark (Lane 87).
+				const measured = await pageMeasures(page);
+				if (theme === 'dark') chromeLines.push(pageLine(at, measured));
+				for (const fault of pageFaults(measured, width === PHONE.width, 1))
 					missing.push(`${at} ${fault}`);
 			}
 			if (PER_GAME_SCREENS.has(name)) {
@@ -1606,6 +1612,10 @@ for (const theme of THEMES) {
 			missing.push(`${at}: the rail is ${String(chrome.rail)}, a league ${String(chrome.league)}`);
 		if (chrome.railLabels.join('|') !== labels.join('|'))
 			missing.push(`${at}: the rail draws ${chrome.railLabels.join(', ')}`);
+		const measured = await pageMeasures(page);
+		if (theme === 'dark') chromeLines.push(pageLine(at, measured));
+		for (const fault of pageFaults(measured, width === PHONE.width, 1))
+			missing.push(`${at} ${fault}`);
 		await page.screenshot({ path: file(`no-league-mock-${theme}-${String(width)}`) });
 		await ctx.close();
 	}

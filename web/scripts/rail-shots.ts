@@ -19,6 +19,7 @@ import {
 	PHASE_COOKIE,
 	type FixturePhase
 } from './inseason-fixture/phases.ts';
+import { pageFaults, pageLine, pageMeasures } from './page-measures.ts';
 
 const THEMES = ['light', 'dark'] as const;
 const WIDTHS = [1440, 390, 360] as const;
@@ -276,7 +277,78 @@ for (const theme of THEMES) {
 	await ctx.close();
 }
 
+/** The pages that pass the bar no parts (Lane 87): at 390 each draws the one 57 px row led by the
+ * mark, with no band under it, signed out and signed in. */
+const NO_PARTS = [
+	{ name: 'mock-new', path: '/mock/new' },
+	{ name: 'pass', path: '/pass' },
+	{ name: 'account', path: '/account' },
+	{ name: 'claim', path: '/claim/no-such-code' },
+	{ name: 'companion-new', path: '/companion/new' },
+	{ name: 'league-new', path: '/league/new' },
+	{ name: 'notfound', path: '/no-such-page' },
+	// A lobby link the API answers with an error takes no one (Lane 87 review M1).
+	{ name: 'lobby-error', path: '/lobby/no-such-lobby' }
+] as const;
+const pageLines: string[] = [];
+/** A beat for a page's first answer to draw before it is measured. */
+const SETTLE_MS = 500;
+
+for (const theme of THEMES) {
+	for (const signedIn of [false, true]) {
+		for (const { name, path } of NO_PARTS) {
+			const who = signedIn ? 'in' : 'out';
+			const where = `${name} ${who} ${theme} 390`;
+			const cookies = signedIn ? [SIGNED_IN, { name: PHASE_COOKIE, value: 'in_season' }] : [];
+			const ctx = await context(theme, 390, cookies);
+			const page = await ctx.newPage();
+			await page.goto(`${web}${path}`, { waitUntil: 'networkidle' });
+			await page.evaluate(() => document.fonts.ready);
+			await page.waitForTimeout(SETTLE_MS);
+			const measured = await pageMeasures(page);
+			if (theme === 'dark') pageLines.push(pageLine(where, measured));
+			for (const fault of pageFaults(measured, true, 1)) failures.push(`${where}: ${fault}`);
+			await page.screenshot({ path: file(`${name}-${who}-${theme}-390`) });
+			await ctx.close();
+		}
+	}
+}
+
+/** Before /me answers (data-league-pending) the one-row bar is the height it is after. */
+for (const theme of THEMES) {
+	const where = `mock-new pending ${theme} 390`;
+	const ctx = await context(theme, 390, [SIGNED_IN, { name: PHASE_COOKIE, value: 'in_season' }]);
+	await ctx.route('**/me', async (route) => {
+		await new Promise((done) => setTimeout(done, ME_HELD_MS));
+		await route.continue();
+	});
+	const page = await ctx.newPage();
+	await page.goto(`${web}/mock/new`, { waitUntil: 'domcontentloaded' });
+	await page.waitForSelector('header.top', { state: 'attached' });
+	await page.evaluate(() => document.fonts.ready);
+	const pending = await page.evaluate(() =>
+		document.documentElement.hasAttribute('data-league-pending')
+	);
+	const before = await pageMeasures(page);
+	await page.screenshot({ path: file(`mock-new-pending-${theme}-390`) });
+	await page.waitForFunction(() => !document.documentElement.hasAttribute('data-league-pending'));
+	await page.waitForLoadState('networkidle');
+	const after = await pageMeasures(page);
+	if (theme === 'dark') {
+		pageLines.push(pageLine(`${where} (pending ${String(pending)})`, before));
+		pageLines.push(pageLine(`${where} answered`, after));
+	}
+	if (!pending) failures.push(`${where}: the root is not pending before /me answers`);
+	if (Math.abs(before.barHeight - after.barHeight) > 0.5)
+		failures.push(
+			`${where}: the bar is ${before.barHeight.toFixed(1)}px pending, ${after.barHeight.toFixed(1)}px after`
+		);
+	for (const fault of pageFaults(before, true, 1)) failures.push(`${where}: ${fault}`);
+	await ctx.close();
+}
+
 await browser.close();
+for (const line of pageLines) process.stdout.write(`${line}\n`);
 process.stdout.write(`shots in ${out.pathname}\n`);
 if (failures.length > 0) throw new Error(`Rails:\n${failures.join('\n')}`);
 process.stdout.write(

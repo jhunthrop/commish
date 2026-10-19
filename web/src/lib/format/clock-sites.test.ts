@@ -97,6 +97,10 @@ const ALLOWED: Readonly<Record<string, Site>> = {
 		reads: 3,
 		why: "the fixture API's clock, run on from FIXTURE_CLOCK"
 	},
+	'scripts/espn-window-check.ts': {
+		reads: 1,
+		why: "the stand-in Disney session's times, set against the live widget's clock"
+	},
 	'scripts/room-shots.ts': { reads: 2, why: 'a wait deadline, nothing drawn' },
 	'scripts/week-order-shots.ts': { reads: 2, why: 'a wait deadline, nothing drawn' },
 	'scripts/run-from-mock-data.ts': {

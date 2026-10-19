@@ -17,8 +17,9 @@ from research.pipeline.nflverse.team_codes import DEFENSE_PLAYER_ID_PREFIX
 GameStatus = Literal["scheduled", "in_progress", "final"]
 
 SCORED_POSITIONS: Final = ("QB", "RB", "WR", "TE", "K")
-_FINAL_STATUSES = ("completed", "final")
+_FINAL_STATUS_PREFIXES = ("completed", "final")
 _SCHEDULED_STATUSES = ("scheduled", "not started", "pre-game")
+_STATUS_BY_CODE: Final[dict[str, GameStatus]] = {"0": "scheduled", "1": "in_progress", "2": "final"}
 WEEKS_FIRST: Final = 1
 WEEKS_LAST: Final = 18
 SEASON_TYPE: Final = "reg"
@@ -145,9 +146,16 @@ def map_adp_list(body: object, listed_player_ids: frozenset[str]) -> list[AdpEnt
     return list(entries.values())
 
 
-def _game_status(raw: object) -> GameStatus:
-    value = text(raw).lower()
-    if value in _FINAL_STATUSES:
+def _game_status(record: Mapping[str, object]) -> GameStatus:
+    """The code Tank01 documents (0 scheduled, 1 in progress, 2 final) wins; the words are the fallback.
+
+    Words match by prefix so an overtime final ("Final/OT") reads final.
+    """
+    by_code = _STATUS_BY_CODE.get(text(record.get("gameStatusCode")))
+    if by_code is not None:
+        return by_code
+    value = text(record.get("gameStatus")).lower()
+    if value.startswith(_FINAL_STATUS_PREFIXES):
         return "final"
     if value in _SCHEDULED_STATUSES:
         return "scheduled"
@@ -169,7 +177,7 @@ def map_games(body: object, week: int) -> list[GameSummary]:
             GameSummary(
                 game_id=game_id,
                 week=week,
-                status=_game_status(record.get("gameStatus")),
+                status=_game_status(record),
                 home_nfl_team=home,
                 away_nfl_team=away,
                 game_date=text(record.get("gameDate")),
