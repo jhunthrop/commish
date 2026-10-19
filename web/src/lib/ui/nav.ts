@@ -134,6 +134,8 @@ export const RAIL_ITEMS: readonly RailItem[] = [
 	screenItem('matchup', 'Matchup', 'matchup'),
 	screenItem('waivers', 'Waivers', 'waivers'),
 	screenItem('trades', 'Trades', 'trades'),
+	// The season's rail with no league selected puts the board after League (rail-order.ts, Lane 83).
+	{ ...BOARD, key: 'rest_first', label: 'Rest of season' },
 	{ ...ADVISOR, key: 'advisor_first' },
 	BOARD,
 	{

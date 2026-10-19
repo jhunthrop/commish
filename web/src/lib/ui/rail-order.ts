@@ -34,12 +34,27 @@ function itemNamed(key: string): RailItem {
 	return item;
 }
 
+function entries(keys: readonly string[]): readonly RailEntry[] {
+	return keys.map((key, i) => ({ ...itemNamed(key), wideOnly: i >= PHONE_RAIL_ITEMS }));
+}
+
 /** The rail for a phase: the phone's five first, the wide rail's own after them. */
 export function railFor(phase: LeaguePhase, waiversOpen: boolean): readonly RailEntry[] {
 	const closed = phase === 'playoffs' && !waiversOpen;
-	const keys = RAIL_ORDER[phase].filter((key) => !(closed && key === 'waivers'));
-	return keys.map((key, i) => ({ ...itemNamed(key), wideOnly: i >= PHONE_RAIL_ITEMS }));
+	return entries(RAIL_ORDER[phase].filter((key) => !(closed && key === 'waivers')));
 }
+
+/** The season's rail with no league selected (signed out, or none followed; Lane 83, amending spec
+ * 2026-10-16 §2): League, the follow page's one door, then the season's own pages and the mock room,
+ * all on the phone's five. Lineup, Matchup, Waivers and Trades could only lead to the follow page,
+ * so they are not drawn. The rail styles show it on a season rail whose root names no league. */
+export const RAIL_WITHOUT_LEAGUE: readonly RailEntry[] = entries([
+	'league',
+	'rest_first',
+	'players',
+	'mock',
+	'record'
+]);
 
 /** A rail key's items. */
 export function railOfKey(key: RailKey): readonly RailEntry[] {

@@ -23,6 +23,7 @@ import {
 	ACCOUNT_RAIL_KEY,
 	CONTEXT_KEY,
 	LEAGUE_ATTR,
+	LEAGUE_PENDING_ATTR,
 	LINES_KEY,
 	RAIL_ATTR,
 	SITE_RAIL_KEY
@@ -253,6 +254,8 @@ class SiteContext {
 		} catch {
 			// Storage can be off or full: the context still holds for this page.
 		}
+		// The context has answered: the rail is the league's, or the rail without one.
+		document.documentElement.removeAttribute(LEAGUE_PENDING_ATTR);
 		if (lines === 0) document.documentElement.removeAttribute(LEAGUE_ATTR);
 		else document.documentElement.setAttribute(LEAGUE_ATTR, String(lines));
 		document.documentElement.setAttribute(RAIL_ATTR, this.rail);

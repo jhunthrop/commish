@@ -174,7 +174,7 @@
 	{:else}
 		<main class="league">
 			<header class="lead">
-				<div class="title"><DisplayTitle size="page">{name}</DisplayTitle></div>
+				<div class="title"><DisplayTitle size="page" wrap>{name}</DisplayTitle></div>
 				<p class="sub">
 					<span class="standing">{standing}</span>
 					{#if advice}
@@ -274,17 +274,9 @@
 			padding: var(--s-3) var(--s-4) var(--s-5);
 		}
 
-		/* One line for the league's name on a phone, so the decision and the first row stay in view. */
 		/* The standing is the league page's: here the stamps say what the screen was read from. */
 		.standing {
 			display: none;
-		}
-
-		.title :global(h2) {
-			display: block;
-			overflow: hidden;
-			white-space: nowrap;
-			text-overflow: ellipsis;
 		}
 
 		.pad {

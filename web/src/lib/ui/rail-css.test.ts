@@ -2,8 +2,8 @@
 // along the bottom (spec 2026-10-16 §2). Run with `npm test`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { RAIL_ITEMS, RAIL_KEYS, WORD_SETS, wordSetOf } from './nav.ts';
-import { railOfKey } from './rail-order.ts';
+import { RAIL_ITEMS, RAIL_KEYS, WORD_SETS, railInSeason, wordSetOf, type RailKey } from './nav.ts';
+import { RAIL_WITHOUT_LEAGUE, railOfKey } from './rail-order.ts';
 import { PHONE_MAX_PX, railCss } from './rail-css.ts';
 
 const css = railCss();
@@ -32,10 +32,14 @@ void test('every item is hidden until a rail shows it', () => {
 	assert.ok(css.startsWith('.rail .item[data-k]{display:none}'));
 });
 
+/** A rail's root as the styles name it: a season rail's with a league selected. */
+const rootOf = (key: RailKey): string =>
+	railInSeason(key) ? `:root[data-rail=${key}][data-league]` : `:root[data-rail=${key}]`;
+
 for (const key of RAIL_KEYS) {
 	void test(`the ${key} rail shows its items in its order, the phone its five`, () => {
 		const rail = railOfKey(key);
-		const root = `:root[data-rail=${key}]`;
+		const root = rootOf(key);
 		assert.deepEqual(
 			shown(root, false),
 			rail.map((entry) => entry.key)
@@ -44,6 +48,37 @@ for (const key of RAIL_KEYS) {
 			shown(root, true),
 			rail.filter((entry) => !entry.wideOnly).map((entry) => entry.key)
 		);
+	});
+}
+
+for (const key of RAIL_KEYS.filter(railInSeason)) {
+	void test(`the ${key} rail with no league selected draws no league tabs (Lane 83)`, () => {
+		const root = `:root[data-rail=${key}]:not([data-league]):not([data-league-pending])`;
+		const labels = (keys: string[]): string[] =>
+			keys.map((k) => RAIL_ITEMS.find((item) => item.key === k)?.label ?? k);
+		const five = ['League', 'Rest of season', 'Players', 'Mock draft', 'Our record'];
+		assert.deepEqual(labels(shown(root, false)), five);
+		assert.deepEqual(labels(shown(root, true)), five);
+		assert.deepEqual(
+			shown(root, false),
+			RAIL_WITHOUT_LEAGUE.map((entry) => entry.key)
+		);
+	});
+}
+
+for (const key of RAIL_KEYS.filter(railInSeason)) {
+	void test(`the ${key} rail before the context answers draws only League, the other slots held blank`, () => {
+		const root = `:root[data-rail=${key}][data-league-pending]`;
+		const rail = railOfKey(key).map((entry) => entry.key);
+		// The league's rail holds the slots, so nothing moves when the context answers.
+		assert.deepEqual(shown(root, false), rail);
+		const blank = css
+			.split('}')
+			.filter((rule) => rule.includes('{visibility:hidden'))
+			.flatMap((rule) => (rule.split('{')[0] ?? '').split(','));
+		const drawn = rail.filter((item) => !blank.includes(selector(root, item)));
+		// League is the one slot both rails draw alike: every other is blank until /me answers.
+		assert.deepEqual(drawn, ['league']);
 	});
 }
 

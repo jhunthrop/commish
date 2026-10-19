@@ -19,6 +19,12 @@ export const LINES_KEY = 'commish-league-lines';
  * The line's room comes from it (ContextNote). */
 export const LEAGUE_ATTR = 'data-league';
 
+/** The root's attribute on a session's first page, before /me says whether a league is selected:
+ * nothing kept says it (no lines, no session copy, no account rail). The rail styles hold the
+ * season rail's changing slots blank under it, so neither rail is drawn and then swapped (Lane 83
+ * review 1); the context removes it once it answers. */
+export const LEAGUE_PENDING_ATTR = 'data-league-pending';
+
 /** The rail the account's context shows, in localStorage so a new tab or a restarted browser
  * paints it before /me answers: a phase word (nav.ts RAIL_KEYS), never the league. Read by the boot
  * only with a session, and cleared at sign-out. */
@@ -44,9 +50,9 @@ export function contextBootScript(buildRail: RailKey | null): string {
 		SITE_RAIL_KEY
 	)},b);else b=l.getItem(${json(SITE_RAIL_KEY)});var m=document.cookie.match(${json(
 		`(?:^|; )${SESSION_CSRF_COOKIE}=([^;]*)`
-	)}),r=b;if(m){var n=l.getItem(${json(LINES_KEY)});if(n==='1'||n==='2'||n==='3')d.setAttribute(${json(
+	)}),r=b;if(m){var n=l.getItem(${json(LINES_KEY)}),h=n==='1'||n==='2'||n==='3';if(h)d.setAttribute(${json(
 		LEAGUE_ATTR
 	)},n);var c=JSON.parse(sessionStorage.getItem(${json(CONTEXT_KEY)})||'null'),a=c&&c.session===m[1]?c.rail:l.getItem(${json(
 		ACCOUNT_RAIL_KEY
-	)});if(k.indexOf(a)>=0)r=a;}if(k.indexOf(r)>=0)d.setAttribute(${json(RAIL_ATTR)},r);}catch(e){}})();`;
+	)});if(!h&&a==null)d.setAttribute(${json(LEAGUE_PENDING_ATTR)},'');if(k.indexOf(a)>=0)r=a;}if(k.indexOf(r)>=0)d.setAttribute(${json(RAIL_ATTR)},r);}catch(e){}})();`;
 }

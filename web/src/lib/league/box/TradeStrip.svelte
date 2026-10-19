@@ -1,5 +1,5 @@
 <script lang="ts">
-	import Verb from '#lib/ui/Verb.svelte';
+	import StripAction from '#lib/ui/StripAction.svelte';
 	import type { LeagueHost } from '../api.ts';
 	import type { TradeMoves } from '../inseason/api.ts';
 	import { hostTab } from '../inseason/attach.ts';
@@ -20,7 +20,8 @@
 	/** The Trades screen's decision as a strip (Lane 66g): the week, how many trades are worth
 	 * proposing, and each as a card naming the other team, both sides, both gains over the rest of
 	 * the season and the drop, with its one verb: Propose on the platform where it takes a proposal
-	 * from here, else Open the platform's trades, which copies the offer and opens its page. */
+	 * from here, else Open the platform's trades, which copies the offer and opens its page. The first
+	 * card, the best trade, draws the verb solid and the rest quiet, so the strip spends one orange. */
 	interface Props {
 		week: number;
 		rows: readonly FinderRow[];
@@ -43,14 +44,14 @@
 	}
 </script>
 
-<div class="strip">
+<div class="strip" data-strip="trades">
 	<div class="head">
 		<span class="wk">{TRADES.weekWord} {week}</span>
 		<span class="title">{worthTitle(rows.length)}</span>
 		{#if moves.reason}<span class="why">{moves.reason}</span>{/if}
 	</div>
 	<ul class="cards">
-		{#each rows as entry (entry.key)}
+		{#each rows as entry, index (entry.key)}
 			{@const room = roomWords(entry.row)}
 			{@const line = said[entry.key]}
 			{@const week = weekLine(entry.row)}
@@ -71,11 +72,12 @@
 				{#if entry.row.drop}<span class="drop">{room.yours}</span>{/if}
 				{#if entry.row.drop_reason}<span class="drop">{entry.row.drop_reason}</span>{/if}
 				<span class="act" {@attach hostTab(href)}>
-					<Verb
+					<StripAction
+						lead={index === 0}
 						size="sm"
 						href={href === '' ? undefined : href}
 						disabled={href === ''}
-						onclick={() => void press(entry)}>{verb}</Verb
+						onclick={() => void press(entry)}>{verb}</StripAction
 					>
 				</span>
 				{#if line}<span class="said"><TradeCopied {line} {href} /></span>{/if}

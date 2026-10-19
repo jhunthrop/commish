@@ -43,7 +43,8 @@
 	/** A followed league's own pages, the follow page (/league/new) not among them. */
 	const LEAGUE_PAGE = /^\/league\/(?!new(?:\/|$))[^/]+/;
 	/** On a league's pages the phone bar leads with the site mark, the way home (Lane 66t): the bottom
-	 * bar keeps its five, so the mark takes no tab. */
+	 * bar keeps its five, so the mark takes no tab. A league's page passes no stamp, verb or search,
+	 * so its phone bar is that one row (Lane 83). */
 	const homeMark = $derived(LEAGUE_PAGE.test(page.url.pathname));
 </script>
 
@@ -340,13 +341,17 @@
 			grid-area: league;
 		}
 
-		/* The mark leads the first row, where the desk rail puts it, the account still its last cell. */
+		/* The mark leads the one row, where the desk rail puts it, the account still its last cell. A
+		   league's page has no stamp, verb or search, so the bar is that row: no empty verb-height row
+		   under the switch (Lane 83). It is fixed by the page's kind, so it never grows as data loads. */
 		.top.homed {
-			grid-template-columns: 44px auto minmax(0, 1fr) auto;
-			grid-template-areas:
-				'home league league account'
-				'stamp stamp tail tail'
-				'find find find find';
+			grid-template-columns: 44px minmax(0, 1fr) auto;
+			grid-template-rows: auto;
+			grid-template-areas: 'home league account';
+		}
+
+		.top.homed .tail {
+			display: none;
 		}
 
 		.home {

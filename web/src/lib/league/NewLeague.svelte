@@ -48,7 +48,7 @@
 	import { FLAGS } from '#lib/site/flags.ts';
 	import OneLeagueFree from './OneLeagueFree.svelte';
 	import { FOLLOW_FOR } from './phase-words.ts';
-	import { SCREEN_PARAM } from '#lib/ui/nav.ts';
+	import { LEAGUE_HOME, SCREEN_PARAM } from '#lib/ui/nav.ts';
 	import { leagueScreenOf, screenSection } from '#lib/ui/rail-league.ts';
 
 	/** Attach a league: paste its link, say which team is yours (a tap on it, or a Sleeper username),
@@ -226,7 +226,7 @@
 	<title>Follow your league · Commish</title>
 </svelte:head>
 
-<Shell title="League" active={forScreen === null ? null : screenSection(forScreen)}>
+<Shell title="League" active={screenSection(forScreen ?? LEAGUE_HOME)}>
 	<main class="new">
 		{#if view === 'loading'}
 			<div class="reserve"></div>

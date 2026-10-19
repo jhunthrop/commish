@@ -311,8 +311,9 @@
 			width: 46px;
 		}
 
+		/* Wide enough for the Team row's 101.6 at its size with the cell's padding (Lane 83). */
 		.cols .num {
-			width: 44px;
+			width: 58px;
 		}
 
 		/* Wide enough for a total such as 101.6 beside its Proj, with a gap between them (Lane 79 fix 9). */
@@ -332,8 +333,11 @@
 			font-size: var(--t-xl);
 		}
 
+		/* The board's own divider between the Team row's two figures, so 101.6 and -- read as two
+		   columns (Lane 83). */
 		.totals .pts {
 			padding-left: var(--s-2);
+			border-left: 1px solid var(--scoreboard-line);
 			font-size: var(--t-md);
 		}
 	}

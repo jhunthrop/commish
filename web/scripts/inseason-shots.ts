@@ -44,6 +44,7 @@ import {
 	requireFixtureClock
 } from './inseason-fixture/clock.ts';
 import { BUILDER_LINE, basisLines, basisReport } from './basis-lines.ts';
+import { chromeFaults, chromeLine, chromeMeasures } from './chrome-measures.ts';
 import { UNCOUNTED_ANCHOR } from '../src/lib/league/uncounted.ts';
 import { FIXTURE_IDS } from './inseason-fixture/ids.ts';
 import { PER_GAME_BASIS, WAIVERS_BASIS } from './inseason-fixture/week.ts';
@@ -336,6 +337,8 @@ const basisCounts: string[] = [];
 const rows = new Map<string, number>();
 const under: string[] = [];
 const firstRows = new Map<string, string>();
+/** The phone chrome's measures (Lane 83), each page's line for the report. */
+const chromeLines: string[] = [];
 for (const { name, path, ready: text } of PAGES) {
 	for (const theme of THEMES) {
 		for (const width of WIDTHS) {
@@ -361,6 +364,13 @@ for (const { name, path, ready: text } of PAGES) {
 				);
 			}
 			rows.set(`${name} ${String(width)}`, wide.tallest);
+			if (SHOT_WIDTHS.has(width)) {
+				const chrome = await chromeMeasures(page);
+				const at = `${name} ${theme} ${String(width)}`;
+				if (theme === 'dark') chromeLines.push(chromeLine(at, chrome));
+				for (const fault of chromeFaults(chrome, width === PHONE.width))
+					missing.push(`${at} ${fault}`);
+			}
 			if (PER_GAME_SCREENS.has(name)) {
 				const said = await page.evaluate(() => ({
 					basis: document.querySelector('main p.basis')?.textContent ?? '',
@@ -1527,7 +1537,58 @@ for (const theme of THEMES) {
 	await ctx.close();
 }
 
+/** A league name long enough for three lines at 390 (the first-timer's note, Lane 83): it draws two,
+ * cut on the second, on every league page. The fixture's answers carry it in place of the
+ * recorded name. */
+const RECORDED_NAME = 'S.U.C.K. - Severely Underrated Carolina Keepers';
+const LONG_NAME = `${RECORDED_NAME} of the Piedmont and the Lowcountry Dynasty Association`;
+for (const width of SHOT_WIDTHS) {
+	const ctx = await context('dark', width);
+	await ctx.route(`${API_ORIGIN}/**`, async (route) => {
+		const response = await route.fetch();
+		const body = (await response.text()).replaceAll(RECORDED_NAME, LONG_NAME);
+		await route.fulfill({ response, body });
+	});
+	const page = await ctx.newPage();
+	for (const { name, path, ready: text } of PAGES) {
+		await page.goto(`${web}${path}`, { waitUntil: 'networkidle' });
+		await ready(page, text);
+		const chrome = await chromeMeasures(page);
+		const at = `${name} long name dark ${String(width)}`;
+		chromeLines.push(chromeLine(at, chrome));
+		for (const fault of chromeFaults(chrome, width === PHONE.width, width === PHONE.width))
+			missing.push(`${at} ${fault}`);
+		if (width === PHONE.width)
+			await page.screenshot({ path: file(`${name}-long-name-first-dark-390`) });
+	}
+	await ctx.close();
+}
+
+/** In season with no league (Lane 83): signed out, the season's rail with no league selected draws
+ * League first and none of the four screens, on the phone's five and at a desk. */
+const NO_LEAGUE_LABELS = ['League', 'Rest of season', 'Players', 'Mock draft', 'Our record'];
+for (const theme of THEMES) {
+	for (const width of SHOT_WIDTHS) {
+		const ctx = await context(theme, width);
+		await ctx.clearCookies();
+		const page = await ctx.newPage();
+		await page.goto(`${web}/mock/new`, { waitUntil: 'networkidle' });
+		await page.evaluate(() => document.fonts.ready);
+		const chrome = await chromeMeasures(page);
+		const at = `no league ${theme} ${String(width)}`;
+		if (theme === 'dark') chromeLines.push(chromeLine(at, chrome));
+		const labels = width === PHONE.width ? NO_LEAGUE_LABELS : [...NO_LEAGUE_LABELS, 'Account'];
+		if (chrome.rail !== 'in_season' || chrome.league)
+			missing.push(`${at}: the rail is ${String(chrome.rail)}, a league ${String(chrome.league)}`);
+		if (chrome.railLabels.join('|') !== labels.join('|'))
+			missing.push(`${at}: the rail draws ${chrome.railLabels.join(', ')}`);
+		await page.screenshot({ path: file(`no-league-mock-${theme}-${String(width)}`) });
+		await ctx.close();
+	}
+}
+
 for (const said of basisCounts) process.stdout.write(`${said}\n`);
+for (const said of chromeLines) process.stdout.write(`${said}\n`);
 process.stdout.write(`${STANDIN_CAPTION}\n`);
 
 await browser.close();
