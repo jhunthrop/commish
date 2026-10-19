@@ -25,6 +25,7 @@ from types import MappingProxyType
 from typing import Final
 
 from research.capsules.config import CAPSULE_CONFIG
+from research.capsules.facts.team_names import NFL_TEAM_NAMES
 from research.capsules.names import name_pattern
 from research.capsules.sentences import phrase_pattern
 from research.capsules.site_words import SITE_PATTERN, SITE_SHOWN
@@ -152,7 +153,9 @@ BETTING_PATTERNS: Final = (
     named_rule("a win total", r"\bwin totals?\b", shown=("win total",)),
     named_rule("a prop", r"\bprops?\b", shown=("prop",)),
     named_rule("a spread", r"\bpoint spread\b|\bthe spread\b", shown=("the spread", "point spread")),
-    named_rule("Vegas as a bettor", r"(?<!las )\bvegas\b", shown=("Vegas",)),
+    # The club's city is masked before any rule reads the text (`CLUB_SPELLINGS`), so "Las Vegas" is a
+    # name and every other "Vegas" the bettor's.
+    named_rule("Vegas as a bettor", r"\bvegas\b", shown=("Vegas",)),
     named_rule(
         "a bet",
         r"\bbet(?:s|ting|tor|tors)?\b|\bwagers?\b|\bparlays?\b|\bmoneylines?\b|\bvig\b",
@@ -349,6 +352,10 @@ def banned_term_pattern(term: str) -> re.Pattern[str]:
     return re.compile(re.escape(term), re.IGNORECASE)
 
 
+# The banned vocabulary as the validator refuses it (`validate.banned_term_in`): a site word it already
+# refuses is not refused twice (review 81 finding 5: "His price is high." took two corrections).
+_VOCABULARY_PATTERNS: Final = tuple(banned_term_pattern(term) for term in BANNED_VOCABULARY)
+
 _SET_PHRASE_PATTERNS: Final = tuple(named_rule(phrase, rf"\b{re.escape(phrase)}\b") for phrase in SET_PHRASES)
 
 
@@ -379,11 +386,20 @@ def _normalise_apostrophes(text: str) -> str:
     return text.translate(_APOSTROPHES)
 
 
+# Every club's city and nickname, alone and together (`facts.team_names`): names the writer may always
+# use, masked as ledger names are, the way the site skips a club's city and nickname as data (review 81
+# finding 9: "the Las Vegas Raiders" is a club, never the bettor's Vegas).
+CLUB_SPELLINGS: Final = tuple(
+    dict.fromkeys(form for city, nickname in NFL_TEAM_NAMES.values() for form in (f"{city} {nickname}", city, nickname))
+)
+
+
 def mask_names(text: str, names: Sequence[str]) -> str:
-    """`text` with every proper name in `names` (a capitalised ledger entry) masked, so a player
-    called Price or Bet never reads as a banned word. Matched whole and case-sensitively, each accent
-    written or not (`names.name_pattern`)."""
-    for name in sorted((n for n in names if n[:1].isupper()), key=len, reverse=True):
+    """`text` with every proper name in `names` (a capitalised ledger entry) and every club spelling
+    masked, so a player called Price or Bet, or the Las Vegas Raiders, never reads as a banned word.
+    Matched whole and case-sensitively, each accent written or not (`names.name_pattern`)."""
+    every = dict.fromkeys((*names, *CLUB_SPELLINGS))
+    for name in sorted((n for n in every if n[:1].isupper()), key=len, reverse=True):
         text = re.sub(rf"(?<![^\W\d_]){name_pattern(name)}(?![^\W\d_])", "Him", text)
     return text
 
@@ -409,12 +425,16 @@ def voice_rule_hits(text: str, names: Sequence[str]) -> list[VoiceRuleHit]:
 
 def _site_hit(normalised: str, hits: Sequence[VoiceRuleHit]) -> VoiceRuleHit | None:
     """The first word or mark of the site's list that no earlier rule has named, so one word is
-    refused once; the marks the copy rules name on their own are theirs."""
+    refused once: a voice rule's hit, a banned term the validator refuses on its own (the trading
+    words), and the marks the copy rules name are theirs."""
     named = {hit.found.lower() for hit in hits}
     for match in SITE_WORDS.pattern.finditer(normalised):
         found = match.group(0)
-        if found.lower() not in named and found not in _MARKS_RULED:
-            return VoiceRuleHit(f"site word ({SITE_WORDS.name})", found)
+        if found.lower() in named or found in _MARKS_RULED:
+            continue
+        if any(pattern.fullmatch(found) for pattern in _VOCABULARY_PATTERNS):
+            continue
+        return VoiceRuleHit(f"site word ({SITE_WORDS.name})", found)
     return None
 
 

@@ -12,7 +12,7 @@ from research.capsules.corrections import soft_correction_for
 from research.capsules.prompt import IN_SEASON_RULES, NEVER_ON_THE_PAGE, PRESEASON_RULES
 from research.capsules.season_voice import SeasonClock
 from research.capsules.site_words import list_file
-from research.capsules.validate import COST_WORDS, cites_tension
+from research.capsules.validate import COST_WORDS, banned_term_in, cites_tension
 from research.capsules.voice_rules import (
     ALL_TIME_TERMS,
     ASIDE_PATTERNS,
@@ -122,7 +122,7 @@ def test_the_writer_reads_the_sites_one_list_file() -> None:
         for word in raw[group].values():
             assert word in SITE_WORDS.shown, word
             hits = (*voice_rule_hits(f"We {word} him.", ()), *writer_only_hits(f"We {word} him.", ()))
-            assert any(hit.found == word for hit in hits), word
+            assert any(hit.found == word for hit in hits) or banned_term_in(f"We {word} him.") is not None, word
     assert raw["line"]["shown"] in SITE_WORDS.shown
     for mark in raw["marks"]:
         assert SITE_WORDS.pattern.search(f"a {mark} b"), mark
@@ -152,3 +152,28 @@ def test_the_fields_own_lines_and_a_word_already_refused_are_not_refused_twice()
     assert writer_only_hits("The odds say he scores.", ()) == []
     # A name in the ledger is masked first: Jadarian Price is never the trading word.
     assert writer_only_hits("Jadarian Price runs hard.", ["Jadarian Price"]) == []
+
+
+@pytest.mark.parametrize("text", ["His price is high.", "The market loves him.", "Buy him now."])
+def test_a_trading_word_on_both_lists_is_refused_once(text: str) -> None:
+    """Review 81 finding 5: the validator's banned term refuses it, the site list does not again."""
+    assert banned_term_in(text) is not None
+    assert not any(hit.rule.startswith("site word") for hit in writer_only_hits(text, ()))
+    assert [hit.found for hit in writer_only_hits("His stock and his price rose.", ())] == ["stock"]
+
+
+def test_a_clubs_city_is_a_name_and_every_other_vegas_the_bettors() -> None:
+    """Review 81 finding 9: the club spellings are masked as ledger names, on both lists."""
+    clean = "He scored twice against the Las Vegas Raiders, and Las Vegas had no answer."
+    assert voice_rule_hits(clean, ()) == []
+    assert writer_only_hits(clean, ()) == []
+    assert [hit.found for hit in voice_rule_hits("Vegas likes him this week.", ())] == ["Vegas"]
+
+
+def test_the_lists_own_examples_the_writer_catches_and_spares_as_the_site_does() -> None:
+    """Review 81 finding 6: the file's examples tie this pattern to the site's (copy-guard.test.ts)."""
+    examples = json.loads(list_file().read_text(encoding="utf-8"))["examples"]
+    for text in examples["caught"]:
+        assert SITE_WORDS.pattern.search(text), text
+    for text in examples["spared"]:
+        assert not SITE_WORDS.pattern.search(text), text
