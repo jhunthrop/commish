@@ -294,7 +294,10 @@ void test("a widget that never opens Disney's form ends the window as a sign-in 
 	const [stall, ...more] = r.timers;
 	assert.ok(stall, 'the window set one wait');
 	assert.equal(more.length, 0);
-	assert.ok(stall.ms >= 15_000 && stall.ms <= 60_000, `a wait a person would sit through: ${stall.ms}`);
+	assert.ok(
+		stall.ms >= 15_000 && stall.ms <= 60_000,
+		`a wait a person would sit through: ${stall.ms}`
+	);
 	stall.run();
 	const handed = handedOver(r);
 	assert.deepEqual(handed.message, { kind: MESSAGE_KIND, outcome: 'failed', seen: [] });

@@ -41,9 +41,12 @@ export interface PopupWidget {
 /** The parts of a window the script uses, so a test can run it. */
 export interface PopupWindow {
 	opener: { closed: boolean; postMessage: (message: unknown, targetOrigin: string) => void } | null;
-	location: { origin: string };
+	location: { origin: string; hostname: string };
 	close: () => void;
+	setTimeout: (handler: () => void, ms: number) => unknown;
+	localStorage: { removeItem: (key: string) => void };
 	document: {
+		cookie: string;
 		getElementById: (id: string) => {
 			textContent: string | null;
 			addEventListener: (event: string, handler: () => void) => void;
@@ -71,9 +74,17 @@ export interface PopupSetup {
 }
 
 /** The window's script. Served on any origin but the sign-in origin (the same build also serves the
- * site), it loads nothing: Disney's script never runs where our cookies are. A guest Disney already
- * has signed in is read through the widget; one whose session the widget keeps is signed out and
- * shown the form once, so the handoff happens on the login. */
+ * site), it loads nothing: Disney's script never runs where our cookies are.
+ *
+ * On the sign-in origin it first forgets the session Disney's widget stored there on an earlier
+ * sign-in. Disney's guest service refuses this origin (its CORS preflight answers 403), so a stored
+ * session the widget wants to refresh or re-read sends a request that can never answer, and the
+ * widget's init then never settles: the window sat at its first line (Lane 88). Forgotten, the
+ * widget starts signed out and opens Disney's form, and the sign-in hands over through the login,
+ * which runs inside Disney's own frame. A guest Disney still reports signed in is read through the
+ * widget; one whose session the widget keeps is signed out and shown the form once. A form that is
+ * not up within STALL_MS ends the window as a sign-in that did not open, so the account page offers
+ * the pasted values instead of a window that waits forever. */
 export function popupMain(win: PopupWindow, setup: PopupSetup): void {
 	const ONEID_SCRIPT = 'https://cdn.registerdisney.go.com/v4/OneID.js';
 	const ESPN_CLIENT_ID = 'ESPN-ONESITE.WEB-PROD';
@@ -81,8 +92,18 @@ export function popupMain(win: PopupWindow, setup: PopupSetup): void {
 	const KIND = 'commish-espn';
 	const MAX_REASON = 120;
 	const FORM_UP = 'Sign in on the form above. Closing this window goes back.';
+	/** How long Disney's form has to come up before the window gives up on it. */
+	const STALL_MS = 30_000;
+	/** Disney's session as its widget keeps it on this origin: the cookies its own sign-out expires
+	 * (responder.js, guest.logout), set on the host's dotted domain, and the guest it caches. */
+	const STORED_COOKIES = ['ab2', 'idn', 'rt', 'token', 'ts']
+		.map((name) => `${ESPN_CLIENT_ID}.${name}`)
+		.concat(`${ESPN_CLIENT_ID}-ac`);
+	const STORED_GUEST = `${ESPN_CLIENT_ID}.guest`;
+	const EXPIRED = '=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/';
 	const seen: string[] = [];
 	let done = false;
+	let formUp = false;
 
 	const post = (message: Record<string, unknown>): void => {
 		const opener = win.opener;
@@ -132,11 +153,25 @@ export function popupMain(win: PopupWindow, setup: PopupSetup): void {
 		return;
 	}
 
+	/** Expires Disney's stored session by name, never reading a cookie. */
+	const forgetStoredSession = (): void => {
+		for (const name of STORED_COOKIES) {
+			win.document.cookie = `${name}${EXPIRED}`;
+			win.document.cookie = `${name}${EXPIRED}; domain=.${win.location.hostname}`;
+		}
+		try {
+			win.localStorage.removeItem(STORED_GUEST);
+		} catch {
+			// Storage the browser refuses holds no guest to forget.
+		}
+	};
+
 	const begin = (widget: PopupWidget): void => {
 		const readGuest = (): Promise<unknown> =>
 			widget.getGuest(true, { forceRefresh: true }).catch(() => null);
 		const launch = (words: string): Promise<void> =>
 			widget.launchLogin().then(() => {
+				formUp = true;
 				say(words);
 			});
 		/** A guest already signed in: handed over when the widget yields both values, else signed
@@ -176,6 +211,7 @@ export function popupMain(win: PopupWindow, setup: PopupSetup): void {
 			});
 	};
 
+	forgetStoredSession();
 	const script = win.document.createElement('script');
 	script.src = ONEID_SCRIPT;
 	script.onerror = () => {
@@ -190,6 +226,9 @@ export function popupMain(win: PopupWindow, setup: PopupSetup): void {
 		begin(oneId.get({ clientId: ESPN_CLIENT_ID, responderPage: win.location.origin + RESPONDER }));
 	};
 	win.document.head.appendChild(script);
+	win.setTimeout(() => {
+		if (!formUp) send({ outcome: 'failed' });
+	}, STALL_MS);
 }
 
 /** The script the window loads: popupMain's source, run with its window and its setup written out
