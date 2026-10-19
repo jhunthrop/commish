@@ -415,7 +415,12 @@ export function waiverBasis(
 ): BasisPart[] {
 	const defense = lines.some((l) => l.player.position === 'DEF');
 	const proj = projPart(
-		{ readAt: advice.projection_read_at, scoring: advice.projection_scoring, defense, league: true },
+		{
+			readAt: advice.projection_read_at,
+			scoring: advice.projection_scoring,
+			defense,
+			league: true
+		},
 		clock
 	);
 	return [

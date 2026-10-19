@@ -4,7 +4,6 @@
  * Proj, the room each roster has), sortable, a row opening its players in the box score's columns;
  * the builder's two box scores under a scoreboard of each side's totals before and after. Pure,
  * tested in trades.test.ts, so every word the screen prints is here. */
-import { memberZone } from '#lib/format/clock.ts';
 import { lastName } from '#lib/format/draft.ts';
 import { listWords } from '#lib/format/list.ts';
 import { fixed, MINUS, signed } from '#lib/format/number.ts';

@@ -54,8 +54,8 @@
 		build: (row: FinderRow) => (() => void) | null;
 		/** The builder's id, which Build from this opens. */
 		builderId: string;
-		/** Whether any trade is open, its players drawn: the page's basis then says their columns. */
-		anyOpen?: boolean;
+		/** Told whether any trade is open, its players drawn: the page's basis then says their columns. */
+		onopen?: (anyOpen: boolean) => void;
 	}
 
 	let {
@@ -69,7 +69,7 @@
 		propose,
 		build,
 		builderId,
-		anyOpen = $bindable(false)
+		onopen = () => undefined
 	}: Props = $props();
 
 	const COLUMNS = 9;
@@ -80,7 +80,7 @@
 	function toggle(key: string): void {
 		if (opened.has(key)) opened.delete(key);
 		else opened.add(key);
-		anyOpen = opened.size > 0;
+		onopen(opened.size > 0);
 	}
 
 	async function press(entry: FinderRow): Promise<void> {

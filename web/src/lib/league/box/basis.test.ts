@@ -90,6 +90,9 @@ void test('Pts names the platform, and the team total alone where it gives none 
 		ptsPart(false, 'espn'),
 		"Pts are your team's points from ESPN, which gives none by player."
 	);
+	for (const host of ['espn', 'yahoo', 'ffpc', 'mfl'] as const) {
+		assert.doesNotMatch(ptsPart(false, host), /\bhost\b/i);
+	}
 });
 
 void test('the uncounted rules are the API sentence, then its link to the Settings list', () => {

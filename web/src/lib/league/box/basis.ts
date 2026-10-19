@@ -31,6 +31,8 @@ export interface ProjFacts {
 	defense: boolean;
 	/** The rows are a league's, so the scoring is said against its rules. */
 	league: boolean;
+	/** The column's head: Proj on a box score, Wk 6 where the season's Projected sits beside it. */
+	head?: string;
 }
 
 /** "Proj is this week's published projection, PPR nearest your rules, read Fri 9:00 pm." */
@@ -43,7 +45,7 @@ export function projPart(proj: ProjFacts, clock: Clock): string {
 			: `, ${format} nearest your rules`;
 	const defenses = proj.defense ? ', defenses on its default scoring' : '';
 	const when = proj.readAt === null ? 'not in yet' : `read ${stamp(proj.readAt, clock)}`;
-	return `${BOX.proj} is this week's published projection${whose}${defenses}, ${when}.`;
+	return `${proj.head ?? BOX.proj} is this week's published projection${whose}${defenses}, ${when}.`;
 }
 
 /** "Δ Proj is its change since Thu 9:00 pm.", null without a read before. */

@@ -284,7 +284,7 @@
 			propose={proposeRow}
 			build={buildFrom}
 			builderId={BUILDER_ID}
-			bind:anyOpen
+			onopen={(open: boolean) => (anyOpen = open)}
 		/>
 	</div>
 	<BasisBlock parts={basis} id={BASIS_ID} />
@@ -312,5 +312,4 @@
 		font-size: var(--t-lg);
 		font-weight: 600;
 	}
-
 </style>

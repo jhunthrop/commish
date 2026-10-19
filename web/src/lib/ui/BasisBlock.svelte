@@ -17,8 +17,9 @@
 	<div class="basis" data-basis {id}>
 		<p>
 			{#each parts as part, i (i)}<span class:desk={!part.phone}
-					>{i > 0 ? ' ' : ''}{#if part.href}<a href={part.href}>{part.text}</a
-						>{i < parts.length - 1 ? '.' : ''}{:else}{part.text}{/if}</span
+					>{i > 0 ? ' ' : ''}{#if part.href}<a href={part.href}>{part.text}</a>{i < parts.length - 1
+							? '.'
+							: ''}{:else}{part.text}{/if}</span
 				>{/each}
 		</p>
 	</div>

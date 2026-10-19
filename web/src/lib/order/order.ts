@@ -7,16 +7,16 @@
 import { memberZone, weekdayTime, zoneWord } from '#lib/format/clock.ts';
 import type { LeagueHost } from '#lib/league/api.ts';
 import {
-	boxRow,
-	EVIDENCE_SHORT,
-	evidenceShort,
-	factsReadLine,
-	projShort,
-	type BoxRow
-} from '#lib/league/box/box.ts';
+	gamePart,
+	OPP_PART,
+	projPart,
+	said,
+	uncountedParts,
+	type BasisPart
+} from '#lib/league/box/basis.ts';
+import { boxRow, type BoxRow } from '#lib/league/box/box.ts';
 import { addVerbWords } from '#lib/league/box/waivers.ts';
 import { hostWords } from '#lib/league/names.ts';
-import type { BasisPart } from '#lib/run/board-basis.ts';
 import { askedQuery } from '#lib/league/box/asked.ts';
 import type { OrderAdvice, OrderPosition, OrderRow, RosterMark } from './api.ts';
 import { weekHead } from '#lib/format/figure-words.ts';
@@ -124,50 +124,43 @@ export function moveHref(
 	return `${screenHref(screen, league)}?${new URLSearchParams(query).toString()}`;
 }
 
-/** The order's evidence columns' basis, said once, in the scoring the rows are in. */
-export function evidenceBasis(league: boolean): string {
-	return league ? EVIDENCE_SHORT : evidenceShort('in PPR');
-}
-
 /** Whose rosters the marks are, named once with the member's platform. */
 export function rosterBasis(host: LeagueHost, readAt: string, zone: string = memberZone()): string {
 	return `${ORDER.roster} is ${hostWords(host)}'s, read ${weekdayTime(readAt, zone)} ${zoneWord(zone)}.`;
 }
 
-/** The screen's basis, every number named once, held to five rendered lines at a desk and eight on a
- * phone (Lane 66q): the order, its figures and the league its points over replacement are for, the
- * rules its season points leave out, the projection, the evidence, the Game cell's read and, in a
- * league, whose the rosters are. The phone draws no Game and no Roster column, so it is not told about
- * them (board-basis.ts's rule). */
+/** The screen's basis, one paragraph, held to five rendered lines at a desk and eight on a phone
+ * (Lane 66q, 66t): the order, the league its points over replacement are for and the figure a game
+ * (the API's), this week's projection under its Wk head, Opp rank, in a league the rules Avg and Last
+ * leave out with the link to them, then at a desk the Game cell's read and whose the rosters are. The
+ * page names no zone elsewhere, so each time says it. */
 export function orderBasis(
 	advice: OrderAdvice,
-	league: { host: LeagueHost } | null,
-	zone: string = memberZone()
+	league: { host: LeagueHost; rulesHref: string } | null,
+	zone: string = memberZone(),
+	now: number = Date.now()
 ): BasisPart[] {
+	const clock = { zone, zoned: true };
 	const lines = advice.rows.map((row) => row.line);
 	// The order carries no defense (Lane 66m), so the projection's defense words never apply.
-	const proj = projShort(
-		advice.projection_read_at,
-		null,
-		advice.projection_scoring,
-		false,
-		zone,
-		league !== null,
-		weekHead(advice.week)
+	const proj = projPart(
+		{
+			readAt: advice.projection_read_at,
+			scoring: advice.projection_scoring,
+			defense: false,
+			league: league !== null,
+			head: weekHead(advice.week)
+		},
+		clock
 	);
-	const said: (BasisPart | null)[] = [
-		part(advice.basis, true),
-		part(advice.basis_note, true),
-		part(proj, true),
-		part(evidenceBasis(league !== null), true),
-		part(factsReadLine(lines, zone), false),
-		league !== null && advice.read_at !== null
-			? part(rosterBasis(league.host, advice.read_at, zone), false)
-			: null
+	return [
+		...said(advice.basis),
+		...said(proj),
+		...said(OPP_PART),
+		...(league === null ? [] : uncountedParts(advice, league.rulesHref)),
+		...said(gamePart(lines, clock, now, 'read'), false),
+		...(league !== null && advice.read_at !== null
+			? said(rosterBasis(league.host, advice.read_at, zone), false)
+			: [])
 	];
-	return said.filter((p): p is BasisPart => p !== null);
-}
-
-function part(text: string | null | undefined, phone: boolean): BasisPart | null {
-	return text === null || text === undefined || text === '' ? null : { text, phone };
 }
