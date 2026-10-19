@@ -20,6 +20,7 @@
 import { mkdir } from 'node:fs/promises';
 import { chromium, type BrowserContext, type Page } from 'playwright';
 import { KICKED_OFF_PART } from '../src/lib/league/box/basis.ts';
+import { CARD } from '../src/lib/player/card.ts';
 import { STRENGTH_HEADS } from '../src/lib/run/strength-words.ts';
 import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
 import { BASIS_BUDGET, basisLines } from './basis-lines.ts';
@@ -241,10 +242,22 @@ async function checkCard(page: Page, week: CardWeek, at: string): Promise<void> 
 async function checkOneRest(page: Page, at: string): Promise<void> {
 	const text = async (selector: string): Promise<string> =>
 		(await page.locator(selector).first().innerText()).trim();
+	// The one rule for whether the page has a rest of season to hold to one figure: the card's tile
+	// head. A run of the full season (the stand-in) heads it Projected and draws no rest-of-season
+	// figure anywhere; any other head is held to the check.
+	const heads = (await page.locator('.tiles .tile .lb').allTextContents()).map((head) =>
+		head.trim()
+	);
+	if (heads.includes(CARD.projected) && !heads.includes(CARD.rest)) {
+		process.stdout.write(
+			`${at}: four-figure check skipped: the run ranks the full season (the card's tile reads "${CARD.projected}"), so the page draws no rest-of-season figure\n`
+		);
+		return;
+	}
 	// A page whose read is not written yet has no lead figure beside it.
 	const read = (await page.locator('.pulls b').count()) > 0 ? { read: await text('.pulls b') } : {};
 	const figures = {
-		tile: await text('.tiles .tile:has(.lb:text-is("Rest of season")) .fig'),
+		tile: await text(`.tiles .tile:has(.lb:text-is("${CARD.rest}")) .fig`),
 		...read,
 		table: await text('section[aria-label="Every format"] tbody tr:first-child td:nth-child(3)'),
 		tier: await text('.mates .line.current .end')
