@@ -7,6 +7,7 @@ ranked among the clubs with a game left, the unrounded mean's order; a club with
 
 from datetime import UTC, datetime, timedelta
 
+from research.nightly.build import ros
 from research.nightly.build.season import schedule_json
 from research.nightly.reads.schedule import (
     Game,
@@ -14,6 +15,7 @@ from research.nightly.reads.schedule import (
     first_week_to_play,
     game_states,
     slates,
+    weeks_left,
     weeks_to_play,
 )
 from research.pipeline.nflverse.team_codes import NFL_TEAM_ABBREVIATIONS
@@ -106,3 +108,14 @@ def test_a_clubs_rest_of_season_starts_at_its_first_game_still_to_play() -> None
     assert weeks_to_play(states, "MIA") == ()
     assert [first_week_to_play(states, club) for club in ("BUF", "TB", "SEA", "MIA")] == [7, 6, 7, None]
     assert weeks_to_play(states, "KC") == ()  # a club the slate does not hold
+
+
+def test_the_run_holds_one_still_to_play_read() -> None:
+    """Review L1: the weeks still to play are the game state's alone. A game the store holds a final for
+    before its kickoff (a result entered early, a moved game) is not still to play, though its kickoff is
+    ahead; the kickoff-only read this replaced is gone from the run."""
+    later = MONDAY_RUN + timedelta(days=1)
+    games = {**_slate("TB", Game(6, "DET", False, later)), **_slate("DET", Game(6, "TB", True, later))}
+    assert weeks_left(game_states(games, frozenset(), MONDAY_RUN)) == [6]
+    assert weeks_left(game_states(games, frozenset({("TB", 6)}), MONDAY_RUN)) == []
+    assert not hasattr(ros, "pending_weeks")

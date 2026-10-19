@@ -190,6 +190,17 @@ def weeks_to_play(states: Mapping[ClubWeek, GameState], club: str) -> tuple[int,
     return tuple(sorted(week for (team, week), state in states.items() if team == club and state == "upcoming"))
 
 
+def weeks_left(states: Mapping[ClubWeek, GameState]) -> list[int]:
+    """The weeks with a game still upcoming by the game state: the run's one "still to play" read (the
+    rest-of-season window, the board week, the capsules' week), never the kickoff alone."""
+    return sorted({week for (_, week), state in states.items() if state == "upcoming"})
+
+
+def weeks_left_at(conn: Connection, season: int, games: Mapping[str, Sequence[Game]], as_of: datetime) -> list[int]:
+    """`weeks_left` at `as_of` with the finals the store holds then."""
+    return weeks_left(game_states(games, finals_at(conn, season, as_of), as_of))
+
+
 def first_week_to_play(states: Mapping[ClubWeek, GameState], club: str) -> int | None:
     """The week a club's rest of season starts from: its first game still upcoming, None with none left.
     The one rule the run's rest-of-season figures and their words read (the API's restFromWeek)."""

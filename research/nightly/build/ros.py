@@ -37,7 +37,7 @@ from research.model.ros.raw_line import RawLine
 from research.nightly.build.player_season import SCORING, SeasonContext
 from research.nightly.config import PAGE_FORMAT
 from research.nightly.reads.board import BoardEntry, FormatBoard, StoredRow, board_entries
-from research.nightly.reads.schedule import ClubWeek, Game, GameState, first_week_to_play, weeks_to_play
+from research.nightly.reads.schedule import ClubWeek, GameState, first_week_to_play, weeks_left, weeks_to_play
 
 MODEL_NAME: Final = "commish_ros_v3"
 
@@ -87,16 +87,6 @@ class RosResult:
     status: str
     # The format ids whose board ranks the rest of the season tonight.
     in_season: frozenset[str] = frozenset()
-
-
-def pending_weeks(games: Mapping[str, Sequence[Game]], instant: datetime) -> list[int]:
-    """The weeks with a game still to kick off at `instant`."""
-    return sorted({g.week for slate in games.values() for g in slate if g.kickoff > instant})
-
-
-def weeks_left(states: Mapping[ClubWeek, GameState]) -> list[int]:
-    """The weeks with a game still to play by the run's game state: the window's first is the earliest."""
-    return sorted({week for (_, week), state in states.items() if state == "upcoming"})
 
 
 def _served_projected(boards: Sequence[FormatBoard]) -> dict[str, dict[str, float]]:
