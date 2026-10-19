@@ -235,7 +235,7 @@ void test("the drop panel lists the roster's players he could replace, the advic
 	assert.equal(dropLead(null), 'The one you lose least by comes first.');
 	assert.equal(sameWeekGain([{ weekGain: 1 }, { weekGain: 2 }]), null);
 	assert.equal(dropTitle('Kenny Gainwell'), 'Drop one for Kenny Gainwell');
-	const chosen = withDrop(gainwell, drops[1] ?? null);
+	const chosen = withDrop(gainwell, drops.at(1) ?? null);
 	assert.equal(chosen.drop?.player.name, 'Kimani Vidal');
 	assert.equal(chosen.gain, 0.6);
 	assert.equal(withDrop(gainwell, null), gainwell);
