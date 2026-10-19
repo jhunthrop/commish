@@ -1,7 +1,7 @@
 // Serves the built site the way production does, for Lighthouse and screenshots: the prerendered
-// pages and assets as compressed static files with clean URLs (Workers static assets), and the one
-// request-time route, the headshot images, answered by the same upstream the Worker uses. A page is
-// measured with its faces coming from our origin, as they do in production.
+// pages and assets as compressed static files with clean URLs (Workers static assets), and the
+// request-time image routes, the headshots and the club marks, answered by the same upstream the
+// Worker uses. A page is measured with its faces coming from our origin, as they do in production.
 // Usage: npm run preview:static   (port 4173, or PORT)
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import compression from 'compression';
@@ -12,7 +12,8 @@ import {
 	HEADSHOT_ROUTE,
 	isHeadshotLeague
 } from '../src/lib/ui/headshot.ts';
-import { upstreamHeadshotUrl } from '../src/lib/ui/headshot-provider.ts';
+import { upstreamClubMarkUrl, upstreamHeadshotUrl } from '../src/lib/ui/headshot-provider.ts';
+import { clubMarkPath } from '../src/lib/ui/club-mark.ts';
 
 const PORT = Number(process.env.PORT ?? 4173);
 const ROOT = new URL('../.svelte-kit/cloudflare/', import.meta.url).pathname;
@@ -29,7 +30,12 @@ async function headshot(res: ServerResponse, match: RegExpExecArray): Promise<vo
 		res.writeHead(404).end();
 		return;
 	}
-	const upstream = await fetch(upstreamHeadshotUrl(league, id, width));
+	await image(res, upstreamHeadshotUrl(league, id, width));
+}
+
+/** An image from the provider, answered as the Worker answers it. */
+async function image(res: ServerResponse, url: string): Promise<void> {
+	const upstream = await fetch(url);
 	if (!upstream.ok) {
 		res.writeHead(upstream.status === 404 ? 404 : 502).end();
 		return;
@@ -46,6 +52,13 @@ function serve(req: IncomingMessage, res: ServerResponse): void {
 	const match = HEADSHOT_PATH.exec(path);
 	if (match) {
 		headshot(res, match).catch(() => res.writeHead(502).end());
+		return;
+	}
+	const mark = clubMarkPath(path);
+	if (mark) {
+		image(res, upstreamClubMarkUrl(mark.league, mark.club, mark.width)).catch(() =>
+			res.writeHead(502).end()
+		);
 		return;
 	}
 	compress(req, res, () => {
