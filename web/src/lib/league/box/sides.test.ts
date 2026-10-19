@@ -58,15 +58,23 @@ const texans = line('Texans D/ST', 'DEF', 'HOU', 7);
 const bench = line('Jordan Addison', 'WR', 'MIN', null, { bye: true, opponent: null });
 
 /** A side before kickoff with the week's projection in. */
-const NOT_STARTED = { scored: false, hostTotal: null, landed: true, week: 6 };
+const NOT_STARTED = { hostTotal: null, landed: true, week: 6 };
 
 void test("a side's box is the API's rows in their slots, its projection summed", () => {
-	const side: MatchupSide = { roster_id: 1, points: 0, points_read: true, starters: [] };
+	const side: MatchupSide = {
+		roster_id: 1,
+		points: 0,
+		points_read: true,
+		player_points: true,
+		team_total: false,
+		starters: []
+	};
 	const box = sideBox(
 		side,
 		{
 			roster_id: 1,
 			player_points: true,
+			team_total: false,
 			starters: [
 				{ slot: 'WR', line: collins },
 				{ slot: 'DEF', line: texans }
@@ -91,13 +99,30 @@ void test("without the API's rows a side is the read's starters with their point
 		roster_id: 7,
 		points: 31.4,
 		points_read: true,
+		player_points: true,
+		team_total: false,
 		starters: [{ player: collins.player, points: 18.2 }]
 	};
-	const box = sideBox(side, null, { ...NOT_STARTED, scored: true, hostTotal: 31.4 }, ZONE);
+	const box = sideBox(side, null, { ...NOT_STARTED, hostTotal: 31.4 }, ZONE);
 	assert.equal(box.starters[0]?.row.pts, 18.2);
 	assert.equal(box.starters.at(0)?.row.slot, 'WR');
 	assert.equal(box.totals.proj, null);
 	assert.equal(box.totals.pts, 18.2);
+	// The API's rule decides, never a guess from the figures (Lane 79 fix 7): a platform total alone
+	// leaves the rows blank and its total in Totals; a starter the read left out stays blank.
+	const total = sideBox(
+		{
+			...side,
+			player_points: false,
+			team_total: true,
+			starters: [{ player: collins.player, points: null }]
+		},
+		null,
+		{ ...NOT_STARTED, hostTotal: 31.4 },
+		ZONE
+	);
+	assert.equal(total.starters[0]?.row.pts, null);
+	assert.equal(total.totals.pts, 31.4);
 });
 
 void test('the bug names the first kickoff, then the next once one has started', () => {
@@ -175,6 +200,8 @@ void test("the fixture's bye rows show no projection and its totals leave them o
 			roster_id: side.roster_id,
 			points: 0,
 			points_read: true,
+			player_points: side.player_points,
+			team_total: false,
 			starters: []
 		};
 		const drawn = sideBox(read, side, NOT_STARTED, ZONE);
@@ -193,25 +220,36 @@ void test("the fixture's bye rows show no projection and its totals leave them o
 
 /** The same team after kickoff on both screens, as a host shapes it: the host's total for the team,
  * and each starter's points only where the host gives them (Sleeper, MFL). */
-function bothScreens(byPlayer: boolean): { matchup: SideBox; lineup: LineupBox } {
+function bothScreens(
+	byPlayer: boolean,
+	teamTotal = !byPlayer
+): { matchup: SideBox; lineup: LineupBox } {
 	const kicked = { kickoff: '2026-10-18T13:30:00.000Z', played: true };
 	const pts = (v: number) => (byPlayer ? v : null);
 	const qb = line('Caleb Williams', 'QB', 'CHI', 17.8, { ...kicked, points_this_week: pts(21.4) });
 	const wr = line('Nico Collins', 'WR', 'HOU', 15.2, { ...kicked, points_this_week: pts(12.0) });
 	const hostTotal = 87.4;
-	const read: MatchupSide = { roster_id: 1, points: hostTotal, points_read: true, starters: [] };
+	const read: MatchupSide = {
+		roster_id: 1,
+		points: hostTotal,
+		points_read: true,
+		player_points: byPlayer,
+		team_total: teamTotal,
+		starters: []
+	};
 	const matchup = sideBox(
 		read,
 		{
 			roster_id: 1,
 			player_points: byPlayer,
+			team_total: teamTotal,
 			starters: [
 				{ slot: 'QB', line: qb },
 				{ slot: 'WR', line: wr }
 			],
 			bench: []
 		},
-		{ scored: byPlayer, hostTotal, landed: true, week: 6 },
+		{ hostTotal, landed: true, week: 6 },
 		ZONE
 	);
 	const unchanged = (s: LineupSlot['slot'], l: PlayerLine) => ({
@@ -249,24 +287,40 @@ void test("a host that gives no player's points: rows say --, both screens' Tota
 	assert.equal(boxNumber(matchup.totals.pts), '87.4');
 	assert.equal(boxNumber(lineup.totals.pts), '87.4');
 	assert.equal(matchup.byPlayer, false);
-	assert.equal(ptsPart(matchup.byPlayer, 'espn'), "Pts are ESPN's team points, none by player.");
+	assert.equal(
+		ptsPart(matchup.byPlayer, 'yahoo', 'platform'),
+		"Pts are Yahoo's team points, none by player."
+	);
 });
 
-void test("a host that gives each player's points: both screens' Totals add the printed rows", () => {
-	const { matchup, lineup } = bothScreens(true);
+void test("Sleeper and MFL, points by player alone: the Matchup's Totals and score add the printed rows, the Lineup's too", () => {
+	const { matchup, lineup } = bothScreens(true, false);
 	assert.deepEqual(
 		matchup.starters.map((s) => boxNumber(s.row.pts)),
 		['21.4', '12.0']
 	);
 	assert.equal(boxNumber(matchup.totals.pts), '33.4');
 	assert.equal(boxNumber(lineup.totals.pts), '33.4');
-	assert.equal(ptsPart(matchup.byPlayer, 'espn'), "Pts are ESPN's points by player so far.");
+	assert.equal(
+		ptsPart(matchup.byPlayer, 'sleeper', 'rows'),
+		"Pts are Sleeper's points by player so far, and Team adds the rows."
+	);
 });
 
-void test("the score bug's points are the platform's total, never the rows' sum, whichever it gives (Lane 79)", () => {
-	for (const byPlayer of [true, false]) {
-		const { matchup } = bothScreens(byPlayer);
-		assert.equal(boxNumber(matchup.score), '87.4');
-	}
-	assert.notEqual(boxNumber(bothScreens(true).matchup.totals.pts), '87.4');
+void test("ESPN, points by player and its own total: the Matchup's Totals is ESPN's score, the bug's figure, and the Lineup's Team adds its rows (rulings a and b)", () => {
+	const { matchup, lineup } = bothScreens(true, true);
+	assert.deepEqual(
+		matchup.starters.map((s) => boxNumber(s.row.pts)),
+		['21.4', '12.0']
+	);
+	assert.equal(boxNumber(matchup.totals.pts), '87.4');
+	assert.equal(boxNumber(lineup.totals.pts), '33.4');
+	assert.equal(
+		ptsPart(matchup.byPlayer, 'espn', 'platform'),
+		"Pts are ESPN's points by player so far, each to a tenth, and Team is ESPN's score."
+	);
+	assert.equal(
+		ptsPart(true, 'espn', 'rows'),
+		"Pts are ESPN's points by player so far, and Team adds the rows."
+	);
 });

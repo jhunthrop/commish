@@ -85,11 +85,19 @@ void test('the change, the Game cell and Opp rank each in one sentence', () => {
 });
 
 void test('Pts says whether the platform gives each player his points or each team its total, the platform named', () => {
-	assert.equal(ptsPart(true, 'espn'), "Pts are ESPN's points by player so far.");
-	assert.equal(ptsPart(true, 'sleeper'), "Pts are Sleeper's points by player so far.");
-	assert.equal(ptsPart(false, 'yahoo'), "Pts are Yahoo's team points, none by player.");
+	assert.equal(
+		ptsPart(true, 'espn', 'platform'),
+		"Pts are ESPN's points by player so far, each to a tenth, and Team is ESPN's score."
+	);
+	assert.equal(
+		ptsPart(true, 'sleeper', 'rows'),
+		"Pts are Sleeper's points by player so far, and Team adds the rows."
+	);
+	assert.equal(ptsPart(false, 'yahoo', 'platform'), "Pts are Yahoo's team points, none by player.");
 	for (const host of ['sleeper', 'espn', 'yahoo', 'ffpc', 'mfl'] as const) {
-		for (const byPlayer of [true, false]) assert.doesNotMatch(ptsPart(byPlayer, host), /\bhost\b/i);
+		for (const byPlayer of [true, false])
+			for (const team of ['rows', 'platform'] as const)
+				assert.doesNotMatch(ptsPart(byPlayer, host, team), /\bhost\b/i);
 	}
 });
 
@@ -124,8 +132,9 @@ void test('copy guard: every basis part is fantasy words, with no dash or semico
 		deltaPart(BEFORE, CENTRAL) ?? '',
 		gamePart([line()], CENTRAL, NOW, 'full') ?? '',
 		OPP_PART,
-		ptsPart(false, 'espn'),
-		ptsPart(true, 'espn')
+		ptsPart(false, 'espn', 'platform'),
+		ptsPart(true, 'espn', 'platform'),
+		ptsPart(true, 'espn', 'rows')
 	];
 	for (const text of said) {
 		assert.doesNotMatch(text, banned, text);
@@ -139,6 +148,7 @@ void test("the Lineup's key says Proj, its change at a desk, Game, Opp rank, Pts
 			projection: { readAt: READ, scoring: CLOSEST },
 			lines: [line()],
 			byPlayer: true,
+			teamTotal: false,
 			host: 'sleeper',
 			lineup: {
 				previousReadAt: BEFORE,
@@ -154,7 +164,7 @@ void test("the Lineup's key says Proj, its change at a desk, Game, Opp rank, Pts
 	);
 	assert.equal(
 		basisText(parts),
-		"Proj is this week's published projection, PPR nearest your rules, read Fri 9:00 pm. Δ Proj is its change since Thu 9:00 pm. Game is each club's expected points, his first, and weather, read Fri 4:01 pm. Opp rank is points allowed to his position, 1st fewest. Pts are Sleeper's points by player so far. Avg and Last miss five of your rules our stats lack. Which five"
+		"Proj is this week's published projection, PPR nearest your rules, read Fri 9:00 pm. Δ Proj is its change since Thu 9:00 pm. Game is each club's expected points, his first, and weather, read Fri 4:01 pm. Opp rank is points allowed to his position, 1st fewest. Pts are Sleeper's points by player so far, and Team adds the rows. Avg and Last miss five of your rules our stats lack. Which five"
 	);
 	assert.deepEqual(
 		parts.filter((p) => !p.phone).map((p) => p.text),
@@ -168,6 +178,7 @@ void test('the Matchup key says Proj, Pts and Game, the columns it draws', () =>
 			projection: { readAt: READ, scoring: CLOSEST },
 			lines: [line()],
 			byPlayer: false,
+			teamTotal: true,
 			host: 'espn',
 			lineup: null
 		},

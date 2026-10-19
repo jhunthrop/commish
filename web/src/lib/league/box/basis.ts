@@ -79,12 +79,19 @@ export function avgLastPart(scoring: string): string {
 	return `${BOX.avg} and ${BOX.last} are his points a game and last game, ${scoring}.`;
 }
 
-/** The Pts column, by the API's per-platform rule (player_points, Lane 79): the platform's points by
- * player so far where it sends each player's, else its team points with none by player. */
-export function ptsPart(byPlayer: boolean, host: LeagueHost): string {
-	return byPlayer
-		? `${BOX.pts} are ${hostWords(host)}'s points by player so far.`
-		: `${BOX.pts} are ${hostWords(host)}'s team points, none by player.`;
+/** What a screen's Team row prints: the rows it shows added, or the platform's own total (the Matchup
+ * on a platform that sends one, ruling (a) of Lane 79). */
+export type TeamFigure = 'rows' | 'platform';
+
+/** The Pts column and the Team row in one sentence, by the API's per-platform rule (player_points,
+ * team_total, Lane 79): the platform's points by player so far and what Team is, else its team points
+ * with none by player (Team is then that total). */
+export function ptsPart(byPlayer: boolean, host: LeagueHost, team: TeamFigure): string {
+	const platform = hostWords(host);
+	if (!byPlayer) return `${BOX.pts} are ${platform}'s team points, none by player.`;
+	return team === 'platform'
+		? `${BOX.pts} are ${platform}'s points by player so far, each to a tenth, and Team is ${platform}'s score.`
+		: `${BOX.pts} are ${platform}'s points by player so far, and Team adds the rows.`;
 }
 
 /** The API's count of the rules our stats lack, then its link to the league's Settings, which lists
@@ -117,6 +124,8 @@ export interface BoxBasisFacts {
 	projection: { readAt: string | null; scoring: ProjectionScoring } | null;
 	lines: readonly PlayerLine[];
 	byPlayer: boolean;
+	/** The platform sends the side's own total, which the Matchup's Team row prints (team_total). */
+	teamTotal: boolean;
 	host: LeagueHost;
 	/** The Lineup's: the read the change counts from, the API's count of the rules our stats lack,
 	 * and its link; null on the Matchup, which draws no evidence columns. */
@@ -135,9 +144,11 @@ export function boxBasisParts(facts: BoxBasisFacts, clock: Clock, now: number): 
 	const proj = facts.projection
 		? said(projPart({ ...facts.projection, defense, league: true }, clock))
 		: [];
-	const pts = said(ptsPart(facts.byPlayer, facts.host));
-	const game = said(gamePart(facts.lines, clock, now, 'full'));
 	const { lineup } = facts;
+	// The Lineup's Team adds the lineup's rows; the Matchup's is the platform's total where it sends one.
+	const team = lineup === null && facts.teamTotal ? 'platform' : 'rows';
+	const pts = said(ptsPart(facts.byPlayer, facts.host, team));
+	const game = said(gamePart(facts.lines, clock, now, 'full'));
 	if (lineup === null) return [...proj, ...pts, ...game];
 	return [
 		...proj,

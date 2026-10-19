@@ -2818,14 +2818,18 @@ export interface components {
 			player: components['schemas']['LeaguePlayer'];
 			/**
 			 * Format: double
-			 * @description his points so far this week
+			 * @description his points so far this week; null where the side's player_points is false or the platform's read left him out (an ESPN starter kicked off and missing from its period roster)
 			 */
-			points: number;
+			points: number | null;
 		};
 		MatchupSide: {
 			roster_id: number;
 			/** Format: double */
 			points: number;
+			/** @description as MatchupBoxSide's: the platform gives each player's points */
+			player_points: boolean;
+			/** @description as MatchupBoxSide's: the platform sends the side's own total */
+			team_total: boolean;
 			/** @description the host's score for this side was read; false when it could not be (an FFPC all-play week whose scoring page did not answer), and points is then 0 and says nothing */
 			points_read: boolean;
 			starters: components['schemas']['MatchupStarter'][];
@@ -3134,6 +3138,8 @@ export interface components {
 			roster_id: number;
 			/** @description the host gives each player's points for this side; false where it gives the side's total alone */
 			player_points: boolean;
+			/** @description the platform sends the side's own total (ESPN, Yahoo, FFPC), so the score and the Totals row print it; false where it sends each player's points alone (Sleeper, MFL), so both print the rows' sum */
+			team_total: boolean;
 			/** @description the host's starters in the league's slot order (QB, RB, WR, TE, the flex spots, K, DEF); an empty spot is left out, and a starter no slot takes ends the list in his position's slot. Empty where the host shows us no lineup for the side (FFPC's opponents) */
 			starters: components['schemas']['BoxStarter'][];
 			/** @description the side's other active players, by our order (injured reserve and taxi spots left out) */

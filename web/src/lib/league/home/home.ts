@@ -595,9 +595,12 @@ export function teamBasis(
 	host: LeagueHost,
 	readAt: string | null,
 	scoring: ProjectionScoring,
+	/** The lineup's rows carry each player's points (player_points), so its Team adds them. */
+	byPlayer: boolean,
 	zone: string = memberZone()
 ): string {
 	const platform = hostWords(host);
+	const team = byPlayer ? ", and your lineup's Team adds its rows" : '';
 	const format =
 		scoring.format === 'half_ppr' ? 'half-PPR' : scoring.format === 'ppr' ? 'PPR' : 'standard';
 	const whose = scoring.league_own
@@ -607,5 +610,5 @@ export function teamBasis(
 		readAt === null
 			? 'not in yet for this week'
 			: `read ${weekdayTime(readAt, zone)} ${zoneWord(zone)}`;
-	return `A team's ${BOX.proj} adds its starters' published projections in ${format}, ${whose}, ${when}. ${BOX.pts} are ${platform}'s so far.`;
+	return `A team's ${BOX.proj} adds its starters' published projections in ${format}, ${whose}, ${when}. ${BOX.pts} are ${platform}'s so far${team}.`;
 }
