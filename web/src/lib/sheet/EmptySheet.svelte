@@ -34,9 +34,10 @@
 
 	const first = $derived(board?.slice(0, PREVIEWED) ?? []);
 	/** The board the sheet starts from, every row of it: the run's ranked players, then its kickers and
-	 * defenses in draft order. Its pool named, so it never reads against the search's ranked count. */
+	 * defenses in draft order, a build-time count of the run's board file. Its pool named, so it never
+	 * reads against the search's ranked count or the empty sheet's 0 players. */
 	const sheetCount = $derived(
-		board !== null && board.length > PREVIEWED ? poolCount(board.length, 'sheet') : null
+		board !== null && board.length > PREVIEWED ? poolCount(board.length, 'board') : null
 	);
 </script>
 

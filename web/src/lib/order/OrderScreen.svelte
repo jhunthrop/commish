@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount, untrack } from 'svelte';
-	import { poolCount } from '#lib/format/pool-words.ts';
+	import { hitsWords } from '#lib/format/pool-words.ts';
 	import { ApiError } from '#lib/api/client.ts';
 	import type { LeagueHost } from '#lib/league/api.ts';
 	import { positionWord } from '#lib/league/box/box.ts';
@@ -71,6 +71,10 @@
 	);
 	const basis = $derived(
 		advice === null ? [] : orderBasis(advice, mode === 'rest' && league !== null ? league : null)
+	);
+	/** A search, a position or a roster filter: the hits are matches, no longer the pool. */
+	const filtered = $derived(
+		q.trim().length >= MIN_SEARCH || position !== null || roster !== 'everyone'
 	);
 	const more = $derived(advice !== null && advice.total > advice.rows.length && limit < MAX_ROWS);
 	const tableLeague = $derived(
@@ -156,7 +160,7 @@
 				value={q}
 				oninput={(event) => search(event.currentTarget.value)}
 			/>
-			{#if advice}<span class="hits">{poolCount(advice.total, 'rosters')}</span>{/if}
+			{#if advice}<span class="hits">{hitsWords(advice.total, filtered)}</span>{/if}
 		</label>
 	{/if}
 	<div class="filters">
