@@ -1,6 +1,7 @@
 // The Lineup screen's table, strip and verb words (Lane 66e): run with `npm test`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { FIXTURE_WEEK_CLOCK } from '../../../../scripts/inseason-fixture/clock.ts';
 import { bannedPattern } from '#lib/format/copy-guard.ts';
 import type { LineupSlot, PlayerLine, WeekFacts } from '../inseason/api.ts';
 import { boxRow } from './box.ts';
@@ -18,6 +19,8 @@ import {
 } from './lineup.ts';
 
 const ZONE = 'America/Chicago';
+/** The fixture week's clock, Saturday noon Central: every Sunday game is still to be played. */
+const NOW = Date.parse(FIXTURE_WEEK_CLOCK);
 const READ = '2026-10-17T02:00:00.000Z';
 
 const facts = (over: Partial<WeekFacts> = {}): WeekFacts => ({
@@ -91,7 +94,7 @@ const advice = {
 };
 
 void test('the swap opens to one evidence line built from its columns', () => {
-	const box = lineupBox(advice, ZONE);
+	const box = lineupBox(advice, ZONE, NOW);
 	assert.equal(
 		box.starters[0]?.why,
 		"18.5 Proj against Stroud's 16.8, Questionable, at ATL, 24th, among the easiest for quarterbacks."
@@ -106,22 +109,22 @@ void test('a starter a designation sits is named first, a lowercase word in the 
 	});
 	const into = line('Dalton Kincaid', 'TE', 9.4);
 	assert.equal(
-		whyLine(boxRow(into, 'TE', ZONE, false), boxRow(out, 'Sit', ZONE, false), 'TE'),
+		whyLine(boxRow(into, 'TE', ZONE, false, NOW), boxRow(out, 'Sit', ZONE, false, NOW), 'TE'),
 		'Pitts is listed doubtful. Kincaid is the next TE with a Proj, 9.4.'
 	);
 	assert.equal(
-		whyLine(boxRow(into, 'TE', ZONE, false), null, 'TE'),
+		whyLine(boxRow(into, 'TE', ZONE, false, NOW), null, 'TE'),
 		'Your TE spot is empty, so Kincaid starts.'
 	);
 	const noProj = line('Dalton Kincaid', 'TE', null);
 	assert.equal(
-		whyLine(boxRow(noProj, 'TE', ZONE, false), boxRow(out, 'Sit', ZONE, false), 'TE'),
+		whyLine(boxRow(noProj, 'TE', ZONE, false, NOW), boxRow(out, 'Sit', ZONE, false, NOW), 'TE'),
 		'Pitts is listed doubtful. Kincaid is next in our order, with no Proj this week.'
 	);
 });
 
 void test('moves are marked: in on the lineup, Sit on the bench, the reserve apart', () => {
-	const box = lineupBox(advice, ZONE);
+	const box = lineupBox(advice, ZONE, NOW);
 	assert.deepEqual(
 		box.starters.map((s) => s.move),
 		['in', null, 'in']
@@ -148,7 +151,7 @@ void test('moves are marked: in on the lineup, Sit on the bench, the reserve apa
 });
 
 void test('the gain compares the advice with the lineup as the platform has it set now', () => {
-	const box = lineupBox(advice, ZONE);
+	const box = lineupBox(advice, ZONE, NOW);
 	assert.equal(box.totals.proj, 34.1);
 	// Stroud 16.8, Irving 12.8, Gibbs on bye with none.
 	assert.equal(box.asSet, 29.6);
@@ -161,14 +164,17 @@ void test('the gain compares the advice with the lineup as the platform has it s
 	assert.equal(changesTitle(box.swaps.length), 'Two changes');
 	assert.equal(changesTitle(1), 'One change');
 	assert.equal(changesTitle(0), 'Your lineup is set');
-	const set = lineupBox({ ...advice, slots: [slot('RB', irving, irving, false)] }, ZONE);
+	const set = lineupBox({ ...advice, slots: [slot('RB', irving, irving, false)] }, ZONE, NOW);
 	assert.deepEqual(stripSum(set), { figure: '12.8', words: 'Proj as set', gain: null });
-	assert.equal(stripSum(lineupBox({ ...advice, projection_read_at: null, slots: [] }, ZONE)), null);
+	assert.equal(
+		stripSum(lineupBox({ ...advice, projection_read_at: null, slots: [] }, ZONE, NOW)),
+		null
+	);
 });
 
 void test('the copy verb puts the lineup on the clipboard and says to set it on the platform page', () => {
 	assert.equal(
-		lineupText(lineupBox(advice, ZONE), 6),
+		lineupText(lineupBox(advice, ZONE, NOW), 6),
 		'Week 6 lineup\nQB Caleb Williams\nRB Bucky Irving\nRB Kimani Vidal'
 	);
 	assert.deepEqual(copiedLine('sleeper', true), {
@@ -190,21 +196,25 @@ void test("the opponent's rank says its direction, one rule for both ends", () =
 	const hard = line('Jaxson Dart', 'QB', 20.6, { opponent: 'NO', home: true }, 3);
 	const rodgers = line('Aaron Rodgers', 'QB', 15.8);
 	assert.equal(
-		whyLine(boxRow(hard, 'QB', ZONE, false), boxRow(rodgers, 'Sit', ZONE, false), 'QB'),
+		whyLine(boxRow(hard, 'QB', ZONE, false, NOW), boxRow(rodgers, 'Sit', ZONE, false, NOW), 'QB'),
 		"20.6 Proj against Rodgers's 15.8, vs NO, 3rd toughest against quarterbacks."
 	);
 	const defense = line('Saints D/ST', 'DEF', 6.9, { opponent: 'NYG' });
 	const vikings = line('Vikings D/ST', 'DEF', 5.1);
 	assert.equal(
-		whyLine(boxRow(defense, 'D/ST', ZONE, false), boxRow(vikings, 'Sit', ZONE, false), 'D/ST'),
+		whyLine(
+			boxRow(defense, 'D/ST', ZONE, false, NOW),
+			boxRow(vikings, 'Sit', ZONE, false, NOW),
+			'D/ST'
+		),
 		"6.9 Proj against Vikings's 5.1, at NYG.",
 		'a defense has no rank, so the line says nothing of one'
 	);
 	const pup = line('Kyle Pitts Sr.', 'TE', 11.4, { designation: { status: 'pup', as_of: READ } });
 	assert.match(
 		whyLine(
-			boxRow(line('Dalton Kincaid', 'TE', 9.4), 'TE', ZONE, false),
-			boxRow(pup, 'Sit', ZONE, false),
+			boxRow(line('Dalton Kincaid', 'TE', 9.4), 'TE', ZONE, false, NOW),
+			boxRow(pup, 'Sit', ZONE, false, NOW),
 			'TE'
 		),
 		/^Pitts is on a season-long list, PUP\. /
@@ -214,7 +224,7 @@ void test("the opponent's rank says its direction, one rule for both ends", () =
 void test('a spot no one who can play fills keeps his player, counts 0 and says so in the strip', () => {
 	const pitts = line('Kyle Pitts Sr.', 'TE', 11.4, { bye: true, opponent: null });
 	const idle: LineupSlot = { ...slot('TE', pitts, pitts, false), no_one_can_play: true };
-	const box = lineupBox({ ...advice, slots: [...advice.slots, idle] }, ZONE);
+	const box = lineupBox({ ...advice, slots: [...advice.slots, idle] }, ZONE, NOW);
 	assert.equal(box.starters.at(-1)?.idle, true);
 	assert.deepEqual(box.idle, ['TE: no one on your roster can play this week']);
 	assert.equal(idleWords('TE'), 'TE: no one on your roster can play this week');
@@ -227,7 +237,7 @@ void test('a spot no one who can play fills keeps his player, counts 0 and says 
 const BANNED = bannedPattern();
 
 void test('copy guard: every Lineup word is fantasy words, names the platform, no dash or semicolon', () => {
-	const box = lineupBox(advice, ZONE);
+	const box = lineupBox(advice, ZONE, NOW);
 	const said = [
 		...Object.values(LINEUP),
 		...box.starters.flatMap((s) => (s.why ? [s.why] : [])),
@@ -248,9 +258,18 @@ void test('copy guard: every Lineup word is fantasy words, names the platform, n
 });
 
 void test('a spot empty on the platform that no one can play is a row with no player and a chip (review N2)', () => {
-	const box = lineupBox({ ...advice, empty_slots: ['TE'] }, ZONE);
+	const box = lineupBox({ ...advice, empty_slots: ['TE'] }, ZONE, NOW);
 	assert.deepEqual(box.empty, ['TE']);
 	assert.deepEqual(box.idle, ['TE: no one on your roster can play this week']);
 	assert.equal(box.totals.proj, 34.1, 'the empty spot counts 0');
 	assert.equal(LINEUP.noOneHere, 'No one on your roster can play here this week');
+});
+
+void test('the lineup is drawn at the clock it is handed: past the kickoff it says no game facts (Lane 77)', () => {
+	const total = { game_total: { points: 49.5, team_points: 26.5, read_at: READ } };
+	const sunday = line('Caleb Williams', 'QB', 18.5, total);
+	const lined = { ...advice, slots: [slot('QB', sunday, sunday, false)], bench: [], reserve: [] };
+	assert.equal(lineupBox(lined, ZONE, NOW).starters[0]?.row.expected, '26.5 to 23');
+	const kicked = Date.parse('2026-10-18T17:00:00.000Z');
+	assert.equal(lineupBox(lined, ZONE, kicked).starters[0]?.row.expected, null);
 });

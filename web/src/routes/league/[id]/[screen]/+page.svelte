@@ -51,9 +51,10 @@
 			read={() => inSeasonApi.lineup(id)}
 			reserve={RESERVE_ROWS.start}
 		>
-			{#snippet children(advice, host, reread)}
+			{#snippet children(advice, host, now, reread)}
 				<StartScreen
 					{advice}
+					{now}
 					{host}
 					plan={(move: HostMoveInput) => inSeasonApi.planMove(id, move)}
 					make={(move: HostMoveInput, confirm: string) => inSeasonApi.makeMove(id, move, confirm)}
@@ -71,9 +72,10 @@
 			read={() => inSeasonApi.waivers(id, null, asked)}
 			reserve={RESERVE_ROWS.waivers}
 		>
-			{#snippet children(advice, host, reread)}
+			{#snippet children(advice, host, now, reread)}
 				<WaiverScreen
 					{advice}
+					{now}
 					{host}
 					narrow={(position: WaiverPosition) => inSeasonApi.waivers(id, position, asked)}
 					plan={(move: HostMoveInput) => inSeasonApi.planMove(id, move)}
@@ -92,9 +94,10 @@
 			read={() => inSeasonApi.trades(id)}
 			reserve={RESERVE_ROWS.trades}
 		>
-			{#snippet children(advice, host)}
+			{#snippet children(advice, host, now)}
 				<TradeScreen
 					{advice}
+					{now}
 					{host}
 					me={{ name: league?.team_name ?? '', aside: league ? standingWords(league) : '' }}
 					narrow={(player: string) => inSeasonApi.trades(id, player)}

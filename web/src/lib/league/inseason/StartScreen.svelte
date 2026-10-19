@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { LeagueHost } from '../api.ts';
 	import { onMount } from 'svelte';
+	import { memberZone } from '#lib/format/clock.ts';
 	import { lazySheet } from '#lib/site/lazy-sheet.svelte.ts';
 	import BoxBasis from '../box/BoxBasis.svelte';
 	import LineupStrip from '../box/LineupStrip.svelte';
@@ -49,6 +50,8 @@
 		copy?: (text: string) => Promise<void>;
 		/** The league's Settings at the scoring rules our stats lack. */
 		rulesHref: string;
+		/** The instant the answer was read, in ms: the page's clock the rows and the basis draw at. */
+		now: number;
 	}
 
 	let {
@@ -58,9 +61,10 @@
 		make,
 		reread,
 		copy = (text) => navigator.clipboard.writeText(text),
-		rulesHref
+		rulesHref,
+		now
 	}: Props = $props();
-	const box = $derived(lineupBox(advice));
+	const box = $derived(lineupBox(advice, memberZone(), now));
 	// Your sheet's tags mark your rows once the sheet is in (review L7).
 	onMount(() => void lazySheet.load());
 	/** Every line on the screen, for the game facts' read said once under the rows. */
@@ -179,6 +183,7 @@
 		projection={{ readAt: advice.projection_read_at, scoring: advice.projection_scoring }}
 		lineup={{ previousReadAt: advice.projection_previous_read_at, note: advice, rulesHref }}
 		lines={shown}
+		{now}
 	/>
 </Screen>
 

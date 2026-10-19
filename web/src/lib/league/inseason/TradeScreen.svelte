@@ -60,6 +60,8 @@
 		copy?: (text: string) => Promise<void>;
 		/** The league's Settings at the scoring rules our stats lack. */
 		rulesHref: string;
+		/** The instant the answer was read, in ms: the page's clock the rows and the basis draw at. */
+		now: number;
 	}
 
 	let {
@@ -69,7 +71,8 @@
 		narrow,
 		check,
 		copy = (text) => navigator.clipboard.writeText(text),
-		rulesHref
+		rulesHref,
+		now
 	}: Props = $props();
 
 	/** The builder's id, for the verbs that open it. */
@@ -156,7 +159,7 @@
 			building !== null ? 'builder' : anyOpen ? 'trade' : 'none',
 			{ rules: rulesHref, record: links.record() },
 			{ zone: memberZone(), zoned: false },
-			Date.now()
+			now
 		)
 	);
 	const everyCount = $derived(advice.teams.reduce((n, t) => n + t.trades.length, 0));
@@ -247,6 +250,7 @@
 					{check}
 					{propose}
 					onclose={() => (building = null)}
+					{now}
 				/>
 			{/key}
 		{/if}
@@ -286,6 +290,7 @@
 			build={buildFrom}
 			builderId={BUILDER_ID}
 			onopen={(open: boolean) => (anyOpen = open)}
+			{now}
 		/>
 	</div>
 	<BasisBlock parts={basis} id={BASIS_ID} />

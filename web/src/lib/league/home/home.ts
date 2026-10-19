@@ -169,10 +169,10 @@ export interface LineupSummary {
 
 /** The lineup as set from the Lineup's answer: each slot's player on the platform, in the league's
  * slots; every other active player is the bench, injured reserve counted apart. */
-export function lineupSummary(advice: LineupAdvice, zone: string = memberZone()): LineupSummary {
-	const box = lineupBox(advice, zone);
+export function lineupSummary(advice: LineupAdvice, zone: string, now: number): LineupSummary {
+	const box = lineupBox(advice, zone, now);
 	const starters = advice.slots.flatMap((slot): BoxStarter[] =>
-		slot.host ? [{ row: boxRow(slot.host, slotWord(slot.slot), zone, false) }] : []
+		slot.host ? [{ row: boxRow(slot.host, slotWord(slot.slot), zone, false, now) }] : []
 	);
 	const set = new Set(starters.map((s) => s.row.key));
 	const active = new Set([

@@ -31,12 +31,13 @@ export interface SideBox {
 
 /** What a side's box reads besides its rows: whether its starters have any points (the league read's
  * own sign, for a side without the API's rows), the host's total for it as the screen shows it,
- * whether the week's projection has landed, and the week. */
+ * whether the week's projection has landed, the week, and the instant the box is drawn at, in ms. */
 export interface SideRead {
 	scored: boolean;
 	hostTotal: number | null;
 	landed: boolean;
 	week: number;
+	now: number;
 }
 
 /** A side's box: the API's rows when it answered for the side, else the league read's starters with
@@ -49,11 +50,13 @@ export function sideBox(
 	zone: string = memberZone()
 ): SideBox {
 	if (box !== null) {
-		const starters = box.starters.map((s) => ({ row: boxRow(s.line, slotWord(s.slot), zone) }));
+		const starters = box.starters.map((s) => ({
+			row: boxRow(s.line, slotWord(s.slot), zone, true, read.now)
+		}));
 		const rows = starters.map((s) => s.row);
 		return {
 			starters,
-			bench: box.bench.map((line) => boxRow(line, '', zone)),
+			bench: box.bench.map((line) => boxRow(line, '', zone, true, read.now)),
 			totals: {
 				proj: projTotal(rows),
 				pts: totalsPts(rows, box.player_points, read.hostTotal),

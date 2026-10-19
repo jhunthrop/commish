@@ -185,7 +185,7 @@ void test('the strip names each pickup as a card: the move, both gains, the sum 
 });
 
 void test('the table tints only what the strip names: a starter he tops off the strip is not tinted', () => {
-	const rows = poolRows(advice, ZONE);
+	const rows = poolRows(advice, ZONE, NOW);
 	const tinted = rows.filter((r) => r.named).map((r) => r.row.name);
 	assert.deepEqual(tinted, ['Kenny Gainwell', 'Chiefs D/ST']);
 	const kicker = rows.find((r) => r.row.name === 'Harrison Mevis');
@@ -198,26 +198,26 @@ void test('the table tints only what the strip names: a starter he tops off the 
 });
 
 void test('the default sort is Beats: a starter topped first by the gain, then the bench, no one last', () => {
-	const rows = sortRows(poolRows(advice, ZONE), DEFAULT_SORT);
+	const rows = sortRows(poolRows(advice, ZONE, NOW), DEFAULT_SORT);
 	assert.deepEqual(
 		rows.map((r) => r.row.name),
 		['Kenny Gainwell', 'Chiefs D/ST', 'Harrison Mevis', 'Daniel Jones', 'Kaytron Allen']
 	);
-	const byProj = sortRows(poolRows(advice, ZONE), { key: 'proj', down: true });
+	const byProj = sortRows(poolRows(advice, ZONE, NOW), { key: 'proj', down: true });
 	assert.equal(byProj[0]?.row.name, 'Daniel Jones');
 	assert.equal(byProj.at(-1)?.row.name, 'Kaytron Allen');
-	const upProj = sortRows(poolRows(advice, ZONE), { key: 'proj', down: false });
+	const upProj = sortRows(poolRows(advice, ZONE, NOW), { key: 'proj', down: false });
 	// Not held stays last whichever way.
 	assert.equal(upProj.at(-1)?.row.name, 'Kaytron Allen');
 	assert.deepEqual(nextSort(DEFAULT_SORT, 'beats'), { key: 'beats', down: false });
 	assert.deepEqual(nextSort(DEFAULT_SORT, 'name'), { key: 'name', down: false });
 	assert.deepEqual(nextSort(DEFAULT_SORT, 'rest'), { key: 'rest', down: true });
-	const byName = sortRows(poolRows(advice, ZONE), { key: 'name', down: false });
+	const byName = sortRows(poolRows(advice, ZONE, NOW), { key: 'name', down: false });
 	assert.equal(byName[0]?.row.name, 'Chiefs D/ST');
 });
 
 void test('the search keeps the names that hold it, any case', () => {
-	const rows = poolRows(advice, ZONE);
+	const rows = poolRows(advice, ZONE, NOW);
 	assert.deepEqual(
 		findRows(rows, 'gAIN').map((r) => r.row.name),
 		['Kenny Gainwell']
@@ -227,7 +227,7 @@ void test('the search keeps the names that hold it, any case', () => {
 });
 
 void test("the drop panel lists the roster's players he could replace, the advice's drop first", () => {
-	const drops = dropRows(gainwell, [vidal, lemon, saints], ZONE);
+	const drops = dropRows(gainwell, [vidal, lemon, saints], ZONE, NOW);
 	assert.deepEqual(
 		drops.map((d) => d.row.name),
 		['Makai Lemon', 'Kimani Vidal']
@@ -258,7 +258,7 @@ void test("the verbs name the member's platform, and the copy says where he goes
 		page: "ESPN's waiver page"
 	});
 	assert.equal(copiedWords('sleeper', 'Gainwell', false).page, "Sleeper's waiver page");
-	const rows = poolRows(advice, ZONE);
+	const rows = poolRows(advice, ZONE, NOW);
 	assert.equal(countWords(rows, 'espn'), '5 free agents we rank on ESPN, 4 beat a player of yours');
 	assert.equal(
 		countWords(rows.slice(3, 4), 'sleeper'),
@@ -279,7 +279,7 @@ void test('copy guard: every Waivers line is fantasy words, with no dash, semico
 		addOnWords('yahoo'),
 		copiedWords('espn', 'Gainwell', true).said,
 		copiedWords('espn', 'Gainwell', false).said,
-		countWords(poolRows(advice, ZONE), 'espn'),
+		countWords(poolRows(advice, ZONE, NOW), 'espn'),
 		basisText(waiverBasis(BASIS, [gainwell.add, saints], RULES, CLOCK, NOW))
 	];
 	// The guard reads the facts-read sentence too.
@@ -293,11 +293,11 @@ void test('Beats prints the open spot only when the API says it: an empty Beats 
 		beats: { host_id: '', name: '', starter: true, gain: 4.8, open_spot: true },
 		week_gain: 4.8
 	});
-	const [only] = poolRows({ rows: [taylor], pickups: [taylor] }, ZONE);
+	const [only] = poolRows({ rows: [taylor], pickups: [taylor] }, ZONE, NOW);
 	assert.deepEqual(only?.beats, { name: 'Open spot', starter: true, gain: 4.8 });
 	// A flex start that tops no one at his own position is no open spot.
 	const flex = row(line('Theo Johnson', 'WR', 10.8), { beats: null, starts: true, week_gain: 0.3 });
-	assert.equal(poolRows({ rows: [flex], pickups: [] }, ZONE)[0]?.beats, null);
+	assert.equal(poolRows({ rows: [flex], pickups: [] }, ZONE, NOW)[0]?.beats, null);
 });
 
 void test('a card says a last name in full when another player on screen shares it', () => {

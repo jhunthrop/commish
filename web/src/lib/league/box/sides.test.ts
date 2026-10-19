@@ -1,6 +1,7 @@
 // The Matchup and Lineup boxes' rows and totals (Lane 66d): run with `npm test`.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { FIXTURE_WEEK_CLOCK } from '../../../../scripts/inseason-fixture/clock.ts';
 import { inTenths } from '../../../../scripts/inseason-fixture/tenths.ts';
 import { test } from 'node:test';
 import type { MatchupSide } from '../api.ts';
@@ -58,7 +59,9 @@ const texans = line('Texans D/ST', 'DEF', 'HOU', 7);
 const bench = line('Jordan Addison', 'WR', 'MIN', null, { bye: true, opponent: null });
 
 /** A side before kickoff with the week's projection in. */
-const NOT_STARTED = { scored: false, hostTotal: null, landed: true, week: 6 };
+/** The fixture week's clock, Saturday noon Central: every Sunday game is still to be played. */
+const NOW = Date.parse(FIXTURE_WEEK_CLOCK);
+const NOT_STARTED = { scored: false, hostTotal: null, landed: true, week: 6, now: NOW };
 
 void test("a side's box is the API's rows in their slots, its projection summed", () => {
 	const side: MatchupSide = { roster_id: 1, points: 0, points_read: true, starters: [] };
@@ -144,7 +147,8 @@ void test('a lineup swap moves ours in and the platform starter it sits out to t
 			projection_read_at: '2026-10-17T02:00:00.000Z',
 			week: 6
 		},
-		ZONE
+		ZONE,
+		NOW
 	);
 	assert.equal(box.starters[0]?.move, null);
 	assert.equal(box.starters[1]?.move, 'in');
@@ -211,7 +215,7 @@ function bothScreens(byPlayer: boolean): { matchup: SideBox; lineup: LineupBox }
 			],
 			bench: []
 		},
-		{ scored: byPlayer, hostTotal, landed: true, week: 6 },
+		{ scored: byPlayer, hostTotal, landed: true, week: 6, now: NOW },
 		ZONE
 	);
 	const unchanged = (s: LineupSlot['slot'], l: PlayerLine) => ({
@@ -233,7 +237,8 @@ function bothScreens(byPlayer: boolean): { matchup: SideBox; lineup: LineupBox }
 			projection_read_at: '2026-10-17T02:00:00.000Z',
 			week: 6
 		},
-		ZONE
+		ZONE,
+		NOW
 	);
 	return { matchup, lineup };
 }
