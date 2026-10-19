@@ -73,13 +73,13 @@
 			week={matchup.week}
 			mine={{
 				name: teamName(sync, matchup.mine.roster_id),
-				pts: mine.totals.pts,
+				pts: mine.score,
 				proj: mine.totals.proj
 			}}
 			opponent={matchup.opponent && theirs
 				? {
 						name: teamName(sync, matchup.opponent.roster_id),
-						pts: theirs.totals.pts,
+						pts: theirs.score,
 						proj: theirs.totals.proj
 					}
 				: null}

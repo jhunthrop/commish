@@ -260,5 +260,13 @@ void test("a host that gives each player's points: both screens' Totals add the 
 	);
 	assert.equal(boxNumber(matchup.totals.pts), '33.4');
 	assert.equal(boxNumber(lineup.totals.pts), '33.4');
-	assert.equal(ptsPart(matchup.byPlayer, 'sleeper'), null);
+	assert.equal(ptsPart(matchup.byPlayer, 'espn'), "Pts are ESPN's points by player so far.");
+});
+
+void test("the score bug's points are the platform's total, never the rows' sum, whichever it gives (Lane 79)", () => {
+	for (const byPlayer of [true, false]) {
+		const { matchup } = bothScreens(byPlayer);
+		assert.equal(boxNumber(matchup.score), '87.4');
+	}
+	assert.notEqual(boxNumber(bothScreens(true).matchup.totals.pts), '87.4');
 });

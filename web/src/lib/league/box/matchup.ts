@@ -27,6 +27,8 @@ export interface SideBox {
 	lines: PlayerLine[];
 	/** The host gives each player's points for the side. */
 	byPlayer: boolean;
+	/** The side's score as the bug prints it: the platform's own total, never the rows' sum (Lane 79). */
+	score: number | null;
 }
 
 /** What a side's box reads besides its rows: whether its starters have any points (the league read's
@@ -41,7 +43,7 @@ export interface SideRead {
 
 /** A side's box: the API's rows when it answered for the side, else the league read's starters with
  * their points so far when the host gives them. Totals' Pts follow totalsPts, the one rule both
- * screens share. */
+ * screens share; the bug's score is the platform's total. */
 export function sideBox(
 	side: MatchupSide,
 	box: MatchupBoxSide | null,
@@ -60,7 +62,8 @@ export function sideBox(
 				note: totalsNote(rows, read.landed, read.week)
 			},
 			lines: [...box.starters.map((s) => s.line), ...box.bench],
-			byPlayer: box.player_points
+			byPlayer: box.player_points,
+			score: read.hostTotal
 		};
 	}
 	const starters = side.starters.map((s) => ({
@@ -72,7 +75,8 @@ export function sideBox(
 		bench: [],
 		totals: { proj: null, pts: totalsPts(rows, read.scored, read.hostTotal), note: null },
 		lines: [],
-		byPlayer: read.scored
+		byPlayer: read.scored,
+		score: read.hostTotal
 	};
 }
 

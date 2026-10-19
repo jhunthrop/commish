@@ -79,10 +79,12 @@ export function avgLastPart(scoring: string): string {
 	return `${BOX.avg} and ${BOX.last} are his points a game and last game, ${scoring}.`;
 }
 
-/** The Pts column where it needs a sentence: a platform that gives each team's total alone; a
- * platform's own points by player say themselves, so nothing is said of them (Lane 66t). */
-export function ptsPart(byPlayer: boolean, host: LeagueHost): string | null {
-	return byPlayer ? null : `${BOX.pts} are ${hostWords(host)}'s team points, none by player.`;
+/** The Pts column, by the API's per-platform rule (player_points, Lane 79): the platform's points by
+ * player so far where it sends each player's, else its team points with none by player. */
+export function ptsPart(byPlayer: boolean, host: LeagueHost): string {
+	return byPlayer
+		? `${BOX.pts} are ${hostWords(host)}'s points by player so far.`
+		: `${BOX.pts} are ${hostWords(host)}'s team points, none by player.`;
 }
 
 /** The API's count of the rules our stats lack, then its link to the league's Settings, which lists
