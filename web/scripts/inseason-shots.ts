@@ -30,7 +30,9 @@
 // phone's first row is under the pin, or a figure or its sentence is missing.
 //
 //   node scripts/inseason-shots.ts [web origin] [out dir, from scripts/]
-// with the site built against PUBLIC_API_URL=http://localhost:8799 and the fixture API running there.
+// with the site built against PUBLIC_API_URL=http://localhost:8799 and the fixture API running there
+// on the fixture week's clock (FIXTURE_CLOCK=2026-10-17T17:00:00.000Z); API_ORIGIN names another
+// port. The script stops before its first shot when the API's clock is not that week's.
 import { mkdir } from 'node:fs/promises';
 import { chromium, type BrowserContext, type Page } from 'playwright';
 import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
@@ -61,6 +63,17 @@ const PAGES = [
 ] as const;
 /** The Trades screen's verb on every platform today: the offer copied, the trade page opened. */
 const TRADE_VERB = 'Open Sleeper trades';
+
+/** The fixture API the site was built against: it must run on the browser's clock, the fixture
+ * week's, or every read stamp disagrees with the screens. */
+const API_ORIGIN = new URL(process.env.API_ORIGIN ?? 'http://localhost:8799').origin;
+const fixtureClock = await (
+	await fetch(`${API_ORIGIN}/fixture/clock`)
+).json<{ data: { clock: string | null } | null }>();
+if (fixtureClock.data?.clock !== FIXTURE_WEEK_CLOCK)
+	throw new Error(
+		`The fixture API at ${API_ORIGIN} runs on ${fixtureClock.data?.clock ?? 'the real clock'}: start it with FIXTURE_CLOCK=${FIXTURE_WEEK_CLOCK}.`
+	);
 
 await mkdir(out, { recursive: true });
 const browser = await chromium.launch();
