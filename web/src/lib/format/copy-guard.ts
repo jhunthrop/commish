@@ -20,9 +20,11 @@ const BETTING_ONLY = [
 	'sportsbooks?',
 	'moneyline'
 ];
-/** "Line" as the betting word: the field's own lines (the goal line, the offensive and defensive
- * line, the line of scrimmage) are football and stay in the writer's prose (Lane 66x). */
-const FIELD_LINE_SPARED = '(?<!(?:goal|offensive|defensive) )lines?(?! of scrimmage)';
+/** "Line" as the betting word: the field's own lines (the goal line or goal-line, the offensive and
+ * defensive line, the O-line and D-line, the line of scrimmage) are football and stay in the writer's
+ * prose (coordinator ruling beside R3); "the line" stays caught. */
+const FIELD_LINE_SPARED =
+	'(?<!(?:goal|offensive|defensive)[ -])(?<!\\b[OD]-)lines?(?! of scrimmage)';
 /** The betting register's words that are plain words in code too. */
 const BETTING_SHARED = [FIELD_LINE_SPARED, 'spreads?', 'totals?', 'books?', 'props?'];
 const TRADING = [
@@ -62,31 +64,44 @@ export function bannedIn(text: string, own?: RegExp): string | null {
 	return bannedPattern(own).exec(text)?.[0] ?? null;
 }
 
-/** A string that ends a sentence is copy (a basis, a writer's line), never data. */
-const SENTENCE_END = /[.!?]$/u;
-/** The most words a name carries ("Keeper? I Hardly Know Her"): a longer string is a phrase, copy. */
-const NAME_WORDS = 5;
+/** The fields the API's answers (api/types.ts) and the run's files (run/schema.ts) carry names in: a
+ * player's, a club's city and nickname, a league's, a team's and its owner's. Only their strings are
+ * data; every other string an answer carries (a headline, a label, a caption, a basis) is copy. */
+const NAME_FIELDS: ReadonlySet<string> = new Set([
+	'name',
+	'first_name',
+	'last_name',
+	'city',
+	'nickname',
+	'team_name',
+	'league_name',
+	'board_name',
+	'owner',
+	'username',
+	'host_name',
+	'host_username',
+	'by_name',
+	'placed_by_name',
+	'seat_names'
+]);
 
-/** Whether a string the page was handed reads as copy: a sentence, or a phrase longer than a name. */
-function readsAsCopy(text: string): boolean {
-	return SENTENCE_END.test(text) || text.split(/\s+/u).length > NAME_WORDS;
-}
-
-/** The strings a page was handed as data, from any JSON the API or the run answered: every string
- * value, nested at any depth, that is not copy. Player, club and team names and row data are the
- * API's own words, so a page's scan skips them (ruling R3); a sentence or a phrase the API or the run
- * wrote is copy and is always scanned. */
-export function dataStrings(value: unknown): Set<string> {
+/** The strings a page was handed as data, from any JSON the API or the run answered: the values of
+ * its name fields, at any depth (ruling R3, decided by the field, never by a string's shape). Player,
+ * club and team names are the API's own words, so a page's scan skips them, while every other string
+ * in the answer is copy and is always scanned. */
+export function dataStrings(value: unknown, named = false): Set<string> {
 	if (typeof value === 'string') {
 		const text = value.trim();
-		return new Set(text === '' || readsAsCopy(text) ? [] : [text]);
+		return new Set(named && text !== '' ? [text] : []);
 	}
-	const children = Array.isArray(value)
-		? (value as unknown[])
-		: value !== null && typeof value === 'object'
-			? Object.values(value)
-			: [];
-	return new Set(children.flatMap((child) => [...dataStrings(child)]));
+	if (Array.isArray(value))
+		return new Set((value as unknown[]).flatMap((child) => [...dataStrings(child, named)]));
+	if (value === null || typeof value !== 'object') return new Set();
+	return new Set(
+		Object.entries(value).flatMap(([field, child]) => [
+			...dataStrings(child, NAME_FIELDS.has(field))
+		])
+	);
 }
 
 /** The first banned word or mark in a page's copy, the data it was handed skipped (ruling R3): a

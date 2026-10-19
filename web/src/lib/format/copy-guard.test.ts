@@ -56,25 +56,50 @@ void test('bannedIn names the first banned word or mark, a guard composing its o
 	assert.equal(bannedIn('his value rises', /\bvalue\b/i), 'value');
 });
 
-void test('the guard scans copy, not data: a name the page was handed is skipped, a sentence never (ruling R3)', () => {
-	const data = dataStrings({
-		players: [{ name: 'Jadarian Price', team: 'Las Vegas Raiders' }],
-		heads: ['Totals'],
-		basis: 'Our board reads the spreads.'
-	});
-	assert.ok(data.has('Jadarian Price'));
-	assert.ok(data.has('Las Vegas Raiders'));
-	// A sentence the API wrote is copy, so it is never data.
-	assert.ok(!data.has('Our board reads the spreads.'));
-	// A run's phrase is copy too, stop or none: more words than a name carries.
-	const phrase = "the average of its opponents' published season win totals";
-	assert.ok(!dataStrings({ method: phrase }).has(phrase));
-	assert.ok(dataStrings({ team: 'Keeper? I Hardly Know Her' }).has('Keeper? I Hardly Know Her'));
-	assert.equal(bannedInCopy('Jadarian Price, RB, Las Vegas Raiders. Proj 12.4', data), null);
-	// A data string that is only a banned word excuses nothing: "Totals" as a head is still caught.
-	assert.equal(bannedInCopy('Totals 104.2', data), 'Totals');
+/** An API answer as a page is handed it: names under their name fields, copy under every other. */
+const ANSWER = {
+	headline: 'Connect your host',
+	chips: [{ label: 'Buy low now' }, { label: 'Sell high' }],
+	caption: 'Bet on him',
+	note: 'Fade the line',
+	players: [
+		{ name: 'Jadarian Price', first_name: 'Jadarian', last_name: 'Price' },
+		{ name: 'Marvin Price Jr.' }
+	],
+	clubs: [{ city: 'Las Vegas', nickname: 'Raiders', name: 'Las Vegas Raiders' }],
+	teams: [{ team_name: 'Odds Are We Lose Again Tonight!' }]
+};
+
+void test('the guard scans copy, not data: only the name fields are data, by field not by shape (ruling R3)', () => {
+	const data = dataStrings(ANSWER);
+	for (const name of [
+		'Jadarian Price',
+		'Marvin Price Jr.',
+		'Las Vegas Raiders',
+		'Odds Are We Lose Again Tonight!'
+	])
+		assert.ok(data.has(name), name);
+	// Short copy an answer carries under any other field is never data, whatever its shape.
+	for (const [said, word] of [
+		['Connect your host', 'host'],
+		['Buy low now', 'Buy'],
+		['Sell high', 'Sell'],
+		['Bet on him', 'Bet'],
+		['Fade the line', 'line']
+	] as const) {
+		assert.ok(!data.has(said), said);
+		assert.equal(bannedInCopy(said, data), word, said);
+	}
+	assert.equal(
+		bannedInCopy(
+			'Jadarian Price, RB, Las Vegas Raiders. Marvin Price Jr. Odds Are We Lose Again Tonight! Proj 12.4',
+			data
+		),
+		null
+	);
+	// A name field that is only a banned word excuses nothing: "Price" alone is still caught.
 	assert.equal(bannedInCopy('Price is a reach here', data), 'Price');
-	assert.equal(bannedInCopy('Our board reads the spreads.', data), 'spreads');
+	assert.equal(bannedInCopy('Totals 104.2', data), 'Totals');
 	assert.equal(bannedInCopy('Jadarian Price; Proj 12.4', data), ';');
 	assert.equal(bannedInCopy('his value rises', data, /\bvalue\b/i), 'value');
 });
@@ -82,18 +107,27 @@ void test('the guard scans copy, not data: a name the page was handed is skipped
 void test("the field's own lines are football, not a betting line: goal line, offensive line, line of scrimmage", () => {
 	for (const said of [
 		'not close to the goal line',
+		'a goal-line back',
 		'behind a weak offensive line',
 		'the defensive line',
+		'the O-line held',
 		'past the line of scrimmage'
 	])
 		assert.equal(bannedIn(said), null, said);
-	for (const said of ['the line moved', 'his stat lines', 'a betting line'])
+	for (const said of ['the line moved', 'The line', 'his stat lines', 'a betting line'])
 		assert.notEqual(bannedIn(said), null, said);
 });
 
-void test('data strings come from any JSON, nested in arrays and objects, numbers and keys left out', () => {
+void test('data strings come from name fields at any depth, numbers and other fields left out', () => {
 	assert.deepEqual(
-		[...dataStrings([{ a: 'Las Vegas Raiders', n: 3, nested: [['Ja Price']] }, null, 'Done.'])],
+		[
+			...dataStrings([
+				{ name: 'Las Vegas Raiders', n: 3, nested: [[{ team_name: 'Ja Price' }]] },
+				null,
+				'Done.',
+				{ title: 'Sell now' }
+			])
+		],
 		['Las Vegas Raiders', 'Ja Price']
 	);
 });
