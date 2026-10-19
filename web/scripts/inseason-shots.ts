@@ -35,6 +35,7 @@ import { mkdir } from 'node:fs/promises';
 import { chromium, type BrowserContext, type Page } from 'playwright';
 import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
 import { copyFault, watchData } from './copy-scan.ts';
+import { FIXTURE_WEEK_CLOCK } from './inseason-fixture/clock.ts';
 import { FIXTURE_IDS } from './inseason-fixture/ids.ts';
 
 const THEMES = ['light', 'dark'] as const;
@@ -70,6 +71,9 @@ async function context(theme: string, width: number): Promise<BrowserContext> {
 		colorScheme: theme as 'light'
 	});
 	watchData(ctx);
+	// The fixture week's clock, never the day the script runs (start the fixture API with
+	// FIXTURE_CLOCK at the same instant): past its Sunday every game reads as played.
+	await ctx.clock.install({ time: new Date(FIXTURE_WEEK_CLOCK) });
 	await ctx.addCookies([{ ...SIGNED_IN, domain: 'localhost', path: '/' }]);
 	await ctx.addInitScript(
 		([key, value]: readonly [string, string]) => localStorage.setItem(key, value),
