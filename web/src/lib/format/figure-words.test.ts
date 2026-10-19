@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { BOX } from '#lib/league/box/box.ts';
 import { ORDER } from '#lib/order/words.ts';
@@ -7,12 +6,14 @@ import { CARD, unreadBasis } from '#lib/player/card.ts';
 import { COLUMN_HEADS } from '#lib/ui/board-columns.ts';
 import { FIGURE, weekHead } from './figure-words.ts';
 
-const TABLE = JSON.parse(
-	readFileSync(new URL('./figure-words.json', import.meta.url), 'utf8')
-) as Record<string, string>;
-
-void test('the words are the shared table the API reads', () => {
-	assert.deepEqual({ ...FIGURE }, TABLE);
+void test('the words are the one table the API embeds, every head named', () => {
+	assert.deepEqual(FIGURE, {
+		projected: 'Projected',
+		points: 'Points',
+		perGame: 'A game',
+		avg: 'Avg',
+		week: 'Wk'
+	});
 });
 
 void test('the projected total is headed Projected on the board rows, the order and the card', () => {

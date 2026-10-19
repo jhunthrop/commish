@@ -68,10 +68,12 @@ const PILL_PARTS = /[\\/]src[\\/]lib[\\/]ui[\\/](StatusPill|StatusChip)\./;
  * neither the shared chunk nor a page's group carries it for the others. */
 const LIVE_STATUS = /[\\/]src[\\/]lib[\\/]run[\\/]live-status\./;
 /** The site's one word per figure (format/figure-words.ts, the sweep's X1 and X2): the board row's
- * heads, the order's, the box score's and the player card's read it, and no shell part does. It rides
+ * heads, the order's, the box score's and the player card's read it (with its table, the API's
+ * words.json), and no shell part does. It rides
  * in the pill's group, which every page that draws those heads already loads, so neither the shared
  * chunk nor a page's own group carries it for the others. */
-const FIGURE_WORDS = /[\\/]src[\\/]lib[\\/]format[\\/]figure-words\./;
+const FIGURE_WORDS =
+	/[\\/]src[\\/]lib[\\/]format[\\/]figure-words\.|[\\/]api[\\/]internal[\\/]figurewords[\\/]words\.json/;
 const STATUS_PARTS =
 	/[\\/]src[\\/]lib[\\/](format[\\/]designation\.|run[\\/](status-view|held-places|tiers)\.)/;
 /** The board's status rule (Lane 63), which the board page draws on its first paint and the order's

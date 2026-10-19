@@ -10,6 +10,7 @@ import (
 	"github.com/jhunthrop/commish/api/internal/apitypes"
 	"github.com/jhunthrop/commish/api/internal/boards"
 	"github.com/jhunthrop/commish/api/internal/draft"
+	"github.com/jhunthrop/commish/api/internal/figurewords"
 	"github.com/jhunthrop/commish/api/internal/scoring"
 	"github.com/jhunthrop/commish/api/internal/season"
 )
@@ -358,12 +359,6 @@ func TradesBasis(b OrderBasis, weeks int) string {
 		"then the close calls for them. The other team decides. %s", numberWords(b), CloseCall, porWords(b, weeks))
 }
 
-// HeadProjected is the head the web draws over a projection's total, the
-// rest of the season's in season: the site's one word for it
-// (web/src/lib/format/figure-words.json, the ruling on the sweep's X2), so
-// the order's basis names its total as its column is headed.
-const HeadProjected = "Projected"
-
 // OrderScreenBasis is the Rest of season and Players screens' line
 // (Lane 66j): what the order ranks by, what its two figures are and the
 // league its points over replacement are for, said once (Lane 66q: the
@@ -374,7 +369,7 @@ func OrderScreenBasis(b OrderBasis, fromWeek int, s apitypes.LeagueSettings) str
 		return fmt.Sprintf("Our preseason order: All ranks by Over repl., his season less a free pickup's, for %s.", teamsWords(s))
 	}
 	return fmt.Sprintf("Our rest-of-season order from week %d. A position ranks by %s through week %d, byes out, "+
-		"All by Over repl., his points less a free pickup's, for %s.", fromWeek, HeadProjected, LastWeek, teamsWords(s))
+		"All by Over repl., his points less a free pickup's, for %s.", fromWeek, figurewords.Table.Projected, LastWeek, teamsWords(s))
 }
 
 // teamsWords is shapeWords in the order screen's few words: "12 teams
