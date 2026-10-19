@@ -9,6 +9,7 @@ import {
 	boxBasisParts,
 	deltaPart,
 	gamePart,
+	KICKED_OFF_PART,
 	OPP_PART,
 	projPart,
 	ptsPart,
@@ -189,4 +190,9 @@ void test('the Matchup key says Proj, Pts and Game, the columns it draws', () =>
 		basisText(parts),
 		"Proj is this week's published projection, PPR nearest your rules, read Fri 9:00 pm. Pts are ESPN's team points, none by player. Game is each club's expected points, his first, and weather, read Fri 4:01 pm."
 	);
+});
+
+void test('the Final sentence says what holds, never a promise of within the hour (Lane 84)', () => {
+	assert.equal(KICKED_OFF_PART, 'Final lands the hour after a game ends, its stats by Wednesday.');
+	assert.equal(bannedPattern().test(KICKED_OFF_PART), false);
 });

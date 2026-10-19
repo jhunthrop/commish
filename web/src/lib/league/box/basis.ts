@@ -76,9 +76,11 @@ export function gamePart(
 export const OPP_PART = `${BOX.oppRank} is points allowed to his position, 1st fewest.`;
 
 /** When a game's final and its stats land (Lane 80), short enough for a phone's basis: the hourly
- * capture reads the game's status, so it turns Final within the hour after it ends; its stats, and so
- * Avg and Last, come with the weekly pass on Tuesday or by Wednesday evening (research JOBS.md). */
-export const KICKED_OFF_PART = `${BOX.final} lands within the hour after a game, its stats by Wednesday.`;
+ * capture reads the game's status while any game of the week waits on its final, so it turns Final at
+ * the pass after it ends, however many passes were missed (Lane 84: no promise of "within the hour");
+ * its stats, and so Avg and Last, come with the weekly pass on Tuesday or by Wednesday evening
+ * (research JOBS.md). */
+export const KICKED_OFF_PART = `${BOX.final} lands the hour after a game ends, its stats by Wednesday.`;
 
 /** KICKED_OFF_PART where a row's game has kicked off with no final yet, or is final with the week's
  * stats not in his games yet; else null. */
