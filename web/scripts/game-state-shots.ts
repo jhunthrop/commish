@@ -216,13 +216,9 @@ async function checkPage(page: Page, screen: Screen, width: number, at: string):
 	await checkRows(page, screen, at);
 	const card = CARDS[screen.name];
 	if (card !== undefined) await checkCard(page, card, at);
-	// Sunday's rows wait on their finals, Monday's on their stats: the basis says when each lands.
-	if (
-		day !== 'tuesday' &&
-		screen.rows !== null &&
-		width === 1440 &&
-		!text.includes(KICKED_OFF_PART)
-	)
+	// Sunday's rows wait on their finals, Monday's on their stats: the basis says when each lands, at a
+	// desk and on a phone (review finding 6).
+	if (day !== 'tuesday' && screen.rows !== null && !text.includes(KICKED_OFF_PART))
 		fault(at, 'the basis does not say when Final and the stats land');
 	if (/through week 6(?! and)/.test(text) && day !== 'tuesday')
 		fault(at, 'a basis claims week 6 over Sunday players');

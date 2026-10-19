@@ -228,7 +228,7 @@ void test("the Monday after Sunday's games: Kicked off in the Game cell, and the
 	const said = orderBasis(advice([kicked]), null, ZONE, monday);
 	const part = said.find((p) => p.text === KICKED_OFF_PART);
 	assert.ok(part, basisText(said));
-	assert.equal(part.phone, false);
+	assert.equal(part.phone, true);
 	// Before kickoff, or with every game final, the sentence is not said.
 	const before = row('B', {
 		line: line('B', 'RB', { facts: { ...facts, game_state: 'upcoming' } })
