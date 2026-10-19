@@ -219,6 +219,21 @@ def test_a_club_whose_week_kicked_off_counts_from_its_next_week_while_the_board_
             assert row.projected < prior.projected
 
 
+def test_a_club_with_no_game_left_writes_no_start_week() -> None:
+    """Review M2: on the Sunday evening of week 17, the last week the model ranks, KC's game is played
+    and MIA's is Monday night's. The board is in season from week 17's games left; a KC row has no game
+    left, so it starts from no week and expects no game."""
+    sunday_evening = KICKOFF + timedelta(weeks=16, hours=3)
+    result = ros_boards(_boards(), _context(16), sunday_evening, _states(sunday_evening), SETUP)
+    assert result.basis is not None
+    assert (result.basis.from_week, result.basis.partial) == (17, True)
+    for board in result.boards:
+        for entry in board.entries:
+            assert entry.row.team == "KC"
+            assert entry.row.from_week is None
+            assert entry.row.expected_games == 0
+
+
 def test_a_preseason_row_says_no_start_week() -> None:
     boards = _boards()
     result = ros_boards(
