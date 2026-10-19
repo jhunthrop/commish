@@ -31,6 +31,9 @@ export interface ChromeMeasures {
 	league: boolean;
 	/** The bottom bar's (or at a desk the rail's) drawn labels, in order. */
 	railLabels: string[];
+	/** The phone evidence lines a label is parted from its figure on (Lane 83 review 2): each label
+	 * and figure pair drawn on more than one line, or a line ending on a label word or a lone "-". */
+	evidenceSplits: string[];
 }
 
 export async function chromeMeasures(page: Page): Promise<ChromeMeasures> {
@@ -98,6 +101,30 @@ export async function chromeMeasures(page: Page): Promise<ChromeMeasures> {
 		};
 		const proj = textBox(document.querySelector('main table.lineup tr.totals td.proj'));
 		const pts = textBox(document.querySelector('main table.lineup tr.totals td.pts'));
+		const splits: string[] = [];
+		for (const line of document.querySelectorAll<HTMLElement>('main .phone-ev')) {
+			if (!drawn(line)) continue;
+			// Each text box's line, by its middle: the words that end each drawn line.
+			const ends = new Map<number, string>();
+			const walker = document.createTreeWalker(line, NodeFilter.SHOW_TEXT);
+			for (let n = walker.nextNode(); n !== null; n = walker.nextNode()) {
+				const text = n.textContent ?? '';
+				for (let i = 0; i < text.length; i += 1) {
+					const range = document.createRange();
+					range.setStart(n, i);
+					range.setEnd(n, i + 1);
+					const r = range.getBoundingClientRect();
+					if (r.width === 0) continue;
+					const mid = Math.round((r.top + r.height / 2) / 4);
+					ends.set(mid, (ends.get(mid) ?? '') + text.charAt(i));
+				}
+			}
+			const lines = [...ends.entries()].sort((a, b) => a[0] - b[0]).map(([, t]) => t.trim());
+			const last = lines.slice(0, -1);
+			for (const t of last) {
+				if (/(Opp|Avg|Last|season)$/.test(t) || /(^|\s)-$/.test(t)) splits.push(lines.join(' / '));
+			}
+		}
 		const labels = [...document.querySelectorAll<HTMLElement>('nav.rail a.item')]
 			.filter(drawn)
 			.map((a) => a.innerText.trim());
@@ -109,7 +136,8 @@ export async function chromeMeasures(page: Page): Promise<ChromeMeasures> {
 			totalsGap: proj && pts ? pts.left - proj.right : null,
 			rail: document.documentElement.getAttribute('data-rail'),
 			league: document.documentElement.hasAttribute('data-league'),
-			railLabels: labels
+			railLabels: labels,
+			evidenceSplits: splits
 		};
 	});
 }
@@ -141,6 +169,7 @@ export function chromeFaults(m: ChromeMeasures, phone: boolean, long = false): s
 		if (long && (m.name.lines !== NAME_LINES_MAX || m.name.natural <= NAME_LINES_MAX))
 			faults.push(`the long name draws ${String(m.name.lines)} of ${String(m.name.natural)}`);
 	}
+	for (const split of m.evidenceSplits) faults.push(`an evidence line parts a label: ${split}`);
 	if (phone && m.totalsGap !== null && m.totalsGap < TOTALS_GAP_MIN_PX)
 		faults.push(`the Team row's figures ${m.totalsGap.toFixed(1)}px apart`);
 	return faults;

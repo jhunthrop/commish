@@ -85,18 +85,25 @@
 	/** The phone's evidence line's own words and separator, so the template adds no space. */
 	const oppLead = `${BOX.opp} `;
 	const SEPARATOR = ', ';
-	/** "Avg 15.2, Last 0.8": the phone's evidence after the opponent's rank. */
-	const seasonWords = $derived(
-		`${BOX.avg} ${boxNumber(row.evidence.avg)}, ${BOX.last} ${boxNumber(row.evidence.last)}${phoneMore === null ? '' : `${SEPARATOR}${phoneMore}`}`
-	);
+	/** "Avg 15.2", "Last 0.8": the phone's evidence after the opponent's rank, each label with its
+	 * figure, so a line breaks only at a separator and never between "Last" and its figure or inside
+	 * "--" (Lane 83 review 2). */
+	const seasonPairs = $derived([
+		`${BOX.avg} ${boxNumber(row.evidence.avg)}`,
+		`${BOX.last} ${boxNumber(row.evidence.last)}`,
+		...(phoneMore === null ? [] : [phoneMore])
+	]);
 </script>
 
 {#snippet seasonLine()}
 	<!-- The separators are expressions, so the template's own line breaks add no space (review L7). -->
 	<span class="phone-ev"
-		>{#if rank !== null}{oppLead}<span class="rk {easeOf(rank, row.evidence.oppOf)}"
-				>{oppRankWord(rank)}</span
-			>{SEPARATOR}{/if}{seasonWords}</span
+		>{#if rank !== null}<span class="pair"
+				>{oppLead}<span class="rk {easeOf(rank, row.evidence.oppOf)}">{oppRankWord(rank)}</span
+				></span
+			>{SEPARATOR}{/if}{#each seasonPairs as pair, i (i)}{#if i > 0}{SEPARATOR}{/if}<span
+				class="pair">{pair}</span
+			>{/each}</span
 	>
 {/snippet}
 
@@ -492,6 +499,11 @@
 			font-size: var(--t-xs);
 			color: var(--ink-3);
 			font-variant-numeric: tabular-nums;
+		}
+
+		/* A label and its figure never part across lines. */
+		.phone-ev .pair {
+			white-space: nowrap;
 		}
 
 		.phone-ev .rk {
