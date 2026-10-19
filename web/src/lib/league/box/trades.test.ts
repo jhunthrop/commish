@@ -12,6 +12,8 @@ import {
 	finderRows,
 	fromWords,
 	gainWord,
+	heldCheck,
+	heldTrades,
 	offerText,
 	phoneWith,
 	proposeVerb,
@@ -412,4 +414,45 @@ void test('copy guard: every word the trade table prints is fantasy words, the p
 	for (const text of said) {
 		assert.doesNotMatch(text, NEVER, text);
 	}
+});
+
+void test('a trade moving a player whose game has kicked off draws no change this week (Lane 85)', () => {
+	const NOW = Date.parse('2026-10-20T17:00:00.000Z');
+	const played = (l: PlayerLine): PlayerLine => ({
+		...l,
+		facts: { ...l.facts, kickoff: '2026-10-18T17:00:00.000Z', played: true, game_state: 'final' }
+	});
+	const ahead = (l: PlayerLine): PlayerLine => ({
+		...l,
+		facts: { ...l.facts, kickoff: '2026-10-25T17:00:00.000Z', game_state: 'upcoming' }
+	});
+	const open = row(4.6, 0.5, { give: [ahead(line('Aaron Rodgers', 'QB'))], get: [], drop: null });
+	const done = row(4.6, 0.5, { get: [played(line('Cam Skattebo'))] });
+	const answer = {
+		teams: [team(7, 'thatmattkelley', [open]), team(8, 'Max_Jensen10', [done])]
+	};
+	const held = heldTrades(answer, NOW);
+	assert.deepEqual(
+		held.teams.map((t) => t.trades.map((r) => [r.my_proj_change, r.their_proj_change])),
+		[[[7.3, 2.5]], [[null, null]]]
+	);
+	// The trade itself stays: for next week, its Gain unchanged.
+	const heldDone = held.teams[1]?.trades[0];
+	assert.ok(heldDone);
+	assert.equal(heldDone.my_gain, 4.6);
+	assert.equal(weekLine(heldDone), null);
+	assert.equal(weekWord(heldDone.my_proj_change), '--');
+	// Nothing locked: the answer as it came.
+	const quiet = { teams: [team(7, 'thatmattkelley', [open])] };
+	assert.equal(heldTrades(quiet, NOW), quiet);
+	// The builder's check: no week figure before or after.
+	const checked = heldCheck({ ...check(), trade: done }, NOW);
+	assert.equal(checked.trade.my_proj_change, null);
+	assert.deepEqual(
+		[checked.totals.yours.proj_before, checked.totals.theirs.proj_after],
+		[null, null]
+	);
+	assert.equal(checked.totals.yours.season_after, 35.8);
+	const fine = { ...check(), trade: open };
+	assert.equal(heldCheck(fine, NOW), fine);
 });

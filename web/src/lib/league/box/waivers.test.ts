@@ -370,9 +370,11 @@ void test('a pickup whose game is final keeps its card but says no Proj this wee
 	const cards = pickupCards(tuesday, NOW);
 	// The add is still allowed (it is for next week): the card stays, its week figure goes.
 	assert.deepEqual(cards.map(moveWords), ['Add Gainwell, drop Lemon', 'Add Chiefs, drop Saints']);
-	assert.equal(cards[0]?.weekGain, null);
-	assert.equal(cardGains(cards[0] ?? { weekGain: null, gain: 0 }), '+1.2 Gain a week');
-	assert.equal(cards[1]?.weekGain, 2.7);
+	const [first, second] = cards;
+	assert.ok(first && second);
+	assert.equal(first.weekGain, null);
+	assert.equal(cardGains(first), '+1.2 Gain a week');
+	assert.equal(second.weekGain, 2.7);
 	// The lineup's Proj with every card made is a week figure too: none once one card has none.
 	assert.equal(pickupSum(tuesday, cards), null);
 	// His row says Final.

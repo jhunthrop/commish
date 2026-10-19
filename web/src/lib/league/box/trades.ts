@@ -31,6 +31,7 @@ import {
 	type Clock
 } from './basis.ts';
 import { BOX } from './box.ts';
+import { locked } from './lineup.ts';
 import { SEASON, TRADE_GAIN } from './season.ts';
 
 /** Every word the trade table prints that is not a player's or a team's, for the copy guard. */
@@ -161,6 +162,44 @@ export function weekLine(
 ): string | null {
 	if (row.my_proj_change === null || row.their_proj_change === null) return null;
 	return `${weekWord(row.my_proj_change)} ${TRADES.projForYou}, ${weekWord(row.their_proj_change)} ${TRADES.forThem}`;
+}
+
+/** Whether a trade still counts this week: every player it moves (both sides and the drop) has his
+ * game still to be played by the API's state. */
+function countsThisWeek(row: Pick<TradeRow, 'give' | 'get' | 'drop'>, now: number): boolean {
+	const moved = [...row.give, ...row.get, ...(row.drop ? [row.drop] : [])];
+	return !moved.some((l) => locked(l, now));
+}
+
+/** A trade with no change this week once a player it moves has kicked off or is final (Lane 85): the
+ * platform locks him, so the trade counts from next week. Its Gain stands. */
+function heldRow(row: TradeRow, now: number): TradeRow {
+	return countsThisWeek(row, now) ? row : { ...row, my_proj_change: null, their_proj_change: null };
+}
+
+/** The answer with every trade's week change held as heldRow says; the answer as it came when none
+ * is. */
+export function heldTrades<T extends { teams: readonly TradeTeam[] }>(advice: T, now: number): T {
+	if (advice.teams.every((t) => t.trades.every((r) => countsThisWeek(r, now)))) return advice;
+	return {
+		...advice,
+		teams: advice.teams.map((t) => ({ ...t, trades: t.trades.map((r) => heldRow(r, now)) }))
+	};
+}
+
+/** The builder's check held the same way: no change and no lineup Proj before or after this week. */
+export function heldCheck(check: TradeCheck, now: number): TradeCheck {
+	if (countsThisWeek(check.trade, now)) return check;
+	const side = (s: TradeSideTotals): TradeSideTotals => ({
+		...s,
+		proj_before: null,
+		proj_after: null
+	});
+	return {
+		...check,
+		trade: heldRow(check.trade, now),
+		totals: { yours: side(check.totals.yours), theirs: side(check.totals.theirs) }
+	};
 }
 
 /** A side by last names: "Skattebo and Strong". */
