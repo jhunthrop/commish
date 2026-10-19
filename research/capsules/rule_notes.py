@@ -58,7 +58,9 @@ _NAMED_SENTENCE: Final = re.compile(r'the sentence "(?P<s>.+?)"(?=\.\s+[A-Z]|\.$
 _QUOTED: Final = re.compile(r'"(?P<q>[^"]+)"')
 _BAND: Final = re.compile(r"^Word count \d+ is outside the required (?P<low>\d+)-(?P<high>\d+) word band\.$")
 _COMPETITOR: Final = re.compile(r'^The text names a competitor product \("(?P<name>[^"]+)"\)')
-_UNTRACED: Final = re.compile(r'^The (?P<kind>number|name) "(?P<q>[^"]+)" does not trace to any supplied fact\.$')
+_UNTRACED: Final = re.compile(
+    r'^The (?P<kind>number|name) "(?P<q>[^"]+)" does not trace to any supplied fact\.(?: The sheet carries "[^"]+"\.)?$'
+)
 _RANK_BASIS: Final = re.compile(r'^The text states a rank, "(?P<q>[^"]+)", without who it ranks among\.')
 _SHARE_BASE: Final = re.compile(r"^The (?:text hangs the share|share \"[^\"]+\" (?:names no base|borrows the base))")
 
