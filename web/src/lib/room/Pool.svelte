@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { adpFigure } from '#lib/format/draft.ts';
 	import { carriesGap } from '#lib/format/gap.ts';
+	import { GAP_WORDS } from '#lib/run/board-basis.ts';
 	import { poolCount } from '#lib/format/pool-words.ts';
 	import Chip from '#lib/ui/Chip.svelte';
 	import ChipGroup from '#lib/ui/ChipGroup.svelte';
@@ -110,7 +111,10 @@
 			</ChipGroup>
 		</div>
 	</div>
-	<p class="basis">{basis}</p>
+	<!-- The Gap's sentence is drawn with its column, at a desk only (the phone hides ADP and Gap). -->
+	<p class="basis">
+		{basis}{#if gapShown}<span class="desk"> {GAP_WORDS}</span>{/if}
+	</p>
 	<div class="cols" aria-hidden="true">
 		<span></span>
 		<Label>Player</Label>
@@ -266,6 +270,7 @@
 
 		.cols > .adp,
 		.cols > .gapc,
+		.desk,
 		.acts-head,
 		.wide {
 			display: none;

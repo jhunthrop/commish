@@ -76,9 +76,11 @@ void test("the pool row and the call card print the Gap in the board row's one f
 	assert.match(readFileSync(new URL('./Pool.svelte', import.meta.url), 'utf8'), /carriesGap\(/u);
 });
 
-void test("the pool's basis says the Gap once in the board's sentence, only where it is carried", () => {
+void test("the Gap's sentence is drawn with its column, at a desk only, never in the basis string a phone reads (rereview 1)", () => {
 	const carried = boardOf(board([player('a', { gap: 11.4 })]), 12);
-	const none = boardOf(board([player('a', {})]), 12);
-	assert.equal(poolBasis(carried, null, 12).split(GAP_WORDS).length - 1, 1);
-	assert.ok(!poolBasis(none, null, 12).includes(GAP_WORDS));
+	assert.ok(!poolBasis(carried, null, 12).includes(GAP_WORDS));
+	const pool = readFileSync(new URL('./Pool.svelte', import.meta.url), 'utf8');
+	assert.match(pool, /\{#if gapShown\}<span class="desk"> \{GAP_WORDS\}<\/span>\{\/if\}/u);
+	// The phone rule that hides the ADP and Gap columns hides the sentence with them.
+	assert.match(pool, /\.cols > \.gapc,\s*\.desk,/u);
 });

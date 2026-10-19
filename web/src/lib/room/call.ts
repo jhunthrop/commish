@@ -3,8 +3,6 @@
  * Read off the card the API recorded for the turn. */
 import { pickLabel } from '#lib/format/draft.ts';
 import type { Position } from '#lib/types/player.ts';
-import { carriesGap } from '#lib/format/gap.ts';
-import { GAP_WORDS } from '#lib/run/board-basis.ts';
 import type { CallRow } from '#lib/types/room.ts';
 import type { RoomCard } from './api.ts';
 import type { Board, RoomPlayer } from './model.ts';
@@ -32,9 +30,7 @@ export function poolBasis(
 	teams: number,
 	callMissing = false
 ): string {
-	// The Gap said once, in the board's one sentence, only where the pool carries it.
-	const gap = carriesGap(board.players) ? `${GAP_WORDS} ` : '';
-	return `${board.basis} ${gap}${stillThereBasis(card, teams, callMissing)}`;
+	return `${board.basis} ${stillThereBasis(card, teams, callMissing)}`;
 }
 
 function stillThereBasis(card: RoomCard | null, teams: number, callMissing: boolean): string {
