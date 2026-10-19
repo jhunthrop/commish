@@ -19,6 +19,7 @@ import { hostWords } from '#lib/league/names.ts';
 import type { BasisPart } from '#lib/run/board-basis.ts';
 import { askedQuery } from '#lib/league/box/asked.ts';
 import type { OrderAdvice, OrderPosition, OrderRow, RosterMark } from './api.ts';
+import { weekHead } from '#lib/format/figure-words.ts';
 import { ORDER } from './words.ts';
 
 export { ORDER };
@@ -33,8 +34,8 @@ export type RosterView = 'everyone' | 'free' | 'yours';
 /** The figure columns of a view: the key first and big, then the others (review 66j H2). */
 export type FigureKey = 'por' | 'total' | 'perGame';
 
-/** The view's figure columns from what its rank sorts on: across positions Over repl., Points and A
- * game; at a position Points and A game. */
+/** The view's figure columns from what its rank sorts on: across positions Over repl., Projected and
+ * A game; at a position Projected and A game. */
 export function figureColumns(rankBy: OrderAdvice['rank_by']): readonly FigureKey[] {
 	return rankBy === 'points_over_replacement' ? ['por', 'total', 'perGame'] : ['total', 'perGame'];
 }
@@ -151,7 +152,8 @@ export function orderBasis(
 		advice.projection_scoring,
 		false,
 		zone,
-		league !== null
+		league !== null,
+		weekHead(advice.week)
 	);
 	const said: (BasisPart | null)[] = [
 		part(advice.basis, true),

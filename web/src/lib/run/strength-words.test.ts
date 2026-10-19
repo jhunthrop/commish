@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { test } from 'node:test';
 import { BANNED_WORDS } from '#lib/format/copy-guard.ts';
-import { clubsLead, scheduleLead, winsBasis } from './strength-words.ts';
+import { clubsLead, scheduleLead, strengthFigure, winsBasis } from './strength-words.ts';
 
 const FIXTURE = new URL('../../../../research/nightly/contract/fixture/runs/', import.meta.url);
 
@@ -44,4 +44,9 @@ void test("the pages print the run's words as given", () => {
 	const lead = scheduleLead(slate, { count: 9, atLeast: '10.5' }, 5);
 	assert.ok(lead.startsWith(`Strength is ${slate.method}, read Sep 7.`), lead);
 	for (const line of [lead, clubsLead('PPR', slate)]) assert.doesNotMatch(line, BANNED_WORDS, line);
+});
+
+void test("a slate's strength prints one tenth like every other figure (the sweep's X9)", () => {
+	assert.equal(strengthFigure(9.3), '9.3');
+	assert.equal(strengthFigure(10), '10.0');
 });

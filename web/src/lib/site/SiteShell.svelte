@@ -26,6 +26,6 @@
 </svelte:head>
 
 <Shell title={heading ?? title} {stamp} {tail}>
-	{#snippet search()}<PlayerSearch players={run.players} />{/snippet}
+	{#snippet search()}<PlayerSearch placeholder={run.search} />{/snippet}
 	{@render children()}
 </Shell>

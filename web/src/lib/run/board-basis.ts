@@ -4,6 +4,7 @@
  * it; the run's injury capture follows it, said on the member's clock. Pure, so the tests read the
  * words a page prints. */
 import { monthDayLabel } from '#lib/format/date.ts';
+import { FIGURE } from '#lib/format/figure-words.ts';
 import type { FiguresReach } from './rest-words.ts';
 import type { Format } from './schema.ts';
 
@@ -27,7 +28,7 @@ export interface BasisFacts {
 	/** The rows show the drafters' gap to our rank: the board compares the two (row-framing.ts) and
 	 * the run carries the figure on one of the screen's rows (format/gap.ts carriesGap). */
 	gap: boolean;
-	/** How far this season's GP and A game reach, null before the first kickoff. */
+	/** How far this season's GP and Avg reach, null before the first kickoff. */
 	reach: FiguresReach | null;
 	/** ADP's count of ranked players the drafts do not take yet. */
 	noAdp?: number;
@@ -48,11 +49,11 @@ function ourBoard(facts: BasisFacts): string {
 	return `Our ${format.label} board, by points over replacement ${league}.`;
 }
 
-/** "GP and A game are this season's, through week 5.", naming the scoring when it is another's. */
+/** "GP and Avg are this season's, through week 5.", naming the scoring when it is another's. */
 function seasonColumns(format: Pick<Format, 'label'>, reach: FiguresReach): string {
 	const scoring = reach.scoring === format.label ? '' : `, scored in ${reach.scoring}`;
 	const through = reach.through === 0 ? '' : `, through week ${String(reach.through)}`;
-	return `GP and A game are this season's${scoring}${through}.`;
+	return `GP and ${FIGURE.avg} are this season's${scoring}${through}.`;
 }
 
 export function boardBasis(facts: BasisFacts): BasisPart[] {

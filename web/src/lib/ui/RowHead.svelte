@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { BoardColumns, ColumnKey } from './board-columns.ts';
+	import { COLUMN_HEADS, type BoardColumns, type ColumnKey } from './board-columns.ts';
 	import { isSortKey, type Sort, type SortKey } from './board-sort.ts';
 
 	/** The column heads over a run of Rows, on the same grid: each figure's unit said once, here, never
@@ -13,32 +13,12 @@
 
 	let { columns, sort, onsort }: Props = $props();
 
-	/** Each head's words: in full, and on the phone where the column is narrower. */
-	const HEADS: Readonly<Record<ColumnKey, { text: string; short?: string; title?: string }>> = {
-		rank: { text: 'Rk', title: 'Our rank' },
-		adpLead: { text: 'ADP' },
-		face: { text: '' },
-		player: { text: 'Player' },
-		tier: { text: 'Tier' },
-		bye: { text: 'Bye' },
-		proj: { text: 'Projected' },
-		vor: { text: 'Over repl', title: 'Over replacement' },
-		order: { text: 'Draft order' },
-		range: { text: 'Floor to ceiling' },
-		adp: { text: 'ADP' },
-		ourRank: { text: 'Rk', title: 'Our rank' },
-		gap: { text: 'Gap', title: "Gap, drafters' ADP less our rank" },
-		gp: { text: 'GP', title: 'Games played' },
-		agame: { text: 'A game' },
-		action: { text: '' }
-	};
-
 	const LEFT: ReadonlySet<ColumnKey> = new Set(['player', 'range']);
 </script>
 
 <div class="head">
 	{#each columns.keys as key (key)}
-		{@const head = HEADS[key]}
+		{@const head = COLUMN_HEADS[key]}
 		{@const sorts = onsort !== undefined && isSortKey(key)}
 		<span
 			class="h {columns.cells[key]}"

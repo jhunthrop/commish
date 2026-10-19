@@ -3,6 +3,7 @@
  * front door's top ten and the system page all draw their rows through it, so a row and its head
  * never drift. A column with no width in a band is hidden there: the table's style picks the band's
  * grid (BoardTable sets it once per table), and each cell carries the classes that hide it. */
+import { FIGURE } from '#lib/format/figure-words.ts';
 
 /** Every column a board row can carry, in the order a row prints them. */
 export const COLUMN_KEYS = [
@@ -20,10 +21,39 @@ export const COLUMN_KEYS = [
 	'ourRank',
 	'gap',
 	'gp',
-	'agame',
+	'avg',
 	'action'
 ] as const;
 export type ColumnKey = (typeof COLUMN_KEYS)[number];
+
+/** A column head's words: in full, on the phone where the column is narrower, and the title that
+ * says an abbreviation in full. */
+export interface ColumnHead {
+	text: string;
+	short?: string;
+	title?: string;
+}
+
+/** Each column's head, said once over the rows (RowHead), each figure's unit never in the rows (Lane
+ * 66n). The figures' heads are the site's one word for each (format/figure-words.ts). */
+export const COLUMN_HEADS: Readonly<Record<ColumnKey, ColumnHead>> = {
+	rank: { text: 'Rk', title: 'Our rank' },
+	adpLead: { text: 'ADP' },
+	face: { text: '' },
+	player: { text: 'Player' },
+	tier: { text: 'Tier' },
+	bye: { text: 'Bye' },
+	proj: { text: FIGURE.projected },
+	vor: { text: 'Over repl', title: 'Over replacement' },
+	order: { text: 'Draft order' },
+	range: { text: 'Floor to ceiling' },
+	adp: { text: 'ADP' },
+	ourRank: { text: 'Rk', title: 'Our rank' },
+	gap: { text: 'Gap', title: "Gap, drafters' ADP less our rank" },
+	gp: { text: 'GP', title: 'Games played' },
+	avg: { text: FIGURE.avg, title: 'Points a game this season' },
+	action: { text: '' }
+};
 
 /** The page's width bands: a desk (1440 and up), a laptop or an iPad in landscape (961 to 1439), an
  * iPad in portrait (761 to 960) and the phone. */
@@ -59,7 +89,7 @@ const WIDTHS: Readonly<Record<ColumnKey, Widths>> = {
 	ourRank: { desk: 40, lap: 36, tab: 36, phone: null },
 	gap: { desk: 50, lap: 48, tab: 48, phone: 44 },
 	gp: { desk: 28, lap: null, tab: null, phone: null },
-	agame: { desk: 50, lap: 48, tab: null, phone: null },
+	avg: { desk: 50, lap: 48, tab: null, phone: null },
 	action: { desk: 60, lap: 36, tab: null, phone: null }
 };
 
@@ -113,7 +143,7 @@ function viewKeys(view: ColumnView): ColumnKey[] {
 		ourRank: view.order === 'adp',
 		gap: view.gap,
 		gp: view.season,
-		agame: view.season,
+		avg: view.season,
 		action: view.action
 	};
 	return COLUMN_KEYS.filter((key) => wanted[key]);

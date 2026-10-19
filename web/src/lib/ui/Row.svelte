@@ -180,8 +180,8 @@
 	{#if cell.gp}<span class="n quiet {cell.gp}" class:absent={season === undefined}
 			>{season?.games ?? EMPTY_FIGURE}</span
 		>{/if}
-	{#if cell.agame}<span
-			class="n {cell.agame}"
+	{#if cell.avg}<span
+			class="n {cell.avg}"
 			class:absent={season === undefined || season.pointsPerGame === null}
 			>{season === undefined || season.pointsPerGame === null
 				? EMPTY_FIGURE
