@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { chanceShort } from '#lib/format/draft.ts';
-	import { fixed, signed } from '#lib/format/number.ts';
+	import { adpFigure, chanceShort } from '#lib/format/draft.ts';
+	import { signed } from '#lib/format/number.ts';
 	import { isMarketPosition } from '#lib/run/market.ts';
 	import type { CallAction, CallRow } from '#lib/types/room.ts';
 	import Face from './Face.svelte';
@@ -89,7 +89,7 @@
 				<span class="n"
 					>{chanceHead === null || row.chance === null ? '' : chanceShort(row.chance)}</span
 				>
-				<span class="n adp">{row.adp === null ? '' : fixed(row.adp)}</span>
+				<span class="n adp">{adpFigure(row.adp)}</span>
 				<span class="go"
 					>{#if i === 0}{@render verb()}{/if}</span
 				>

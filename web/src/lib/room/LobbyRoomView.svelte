@@ -165,7 +165,6 @@
 			{chanceLabel}
 			chanceShown={card !== null}
 			basis={poolBasis(board, card, teams)}
-			pickNumber={lobby.pickNumber}
 			callId={call?.player.id ?? null}
 			{selectedId}
 			queue={new Set(queue)}

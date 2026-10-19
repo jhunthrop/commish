@@ -19,7 +19,7 @@
 		chanceLabel: string;
 		/** What the Still there cell says with no chance to show. */
 		chanceMissing: string;
-		/** Where drafters take him against the pick on the clock, in words. */
+		/** His ADP as the call card and the board's row print it (format/draft.ts adpFigure). */
 		adp: string;
 		/** Our call's row, washed in the accent. */
 		isCall: boolean;
@@ -148,10 +148,13 @@
 		color: var(--ink-3);
 	}
 
+	/* A figure, as the call card's ADP above it prints: the board row's numerals. */
 	.adp {
 		text-align: right;
-		font-size: var(--t-xs);
-		line-height: 1.25;
+		font-family: var(--font-num);
+		font-variant-numeric: tabular-nums;
+		font-weight: 600;
+		white-space: nowrap;
 		color: var(--ink-2);
 	}
 

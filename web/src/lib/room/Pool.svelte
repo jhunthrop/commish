@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { adpWords } from '#lib/format/draft.ts';
+	import { adpFigure } from '#lib/format/draft.ts';
 	import { poolCount } from '#lib/format/pool-words.ts';
 	import Chip from '#lib/ui/Chip.svelte';
 	import ChipGroup from '#lib/ui/ChipGroup.svelte';
@@ -26,8 +26,6 @@
 		chanceShown: boolean;
 		/** Whose points rank the pool and where the chances come from. */
 		basis: string;
-		/** The pick the ADP sentence is read against. */
-		pickNumber: number;
 		callId: string | null;
 		selectedId: string | null;
 		queue: ReadonlySet<string>;
@@ -55,7 +53,6 @@
 		chanceHead = 'Still there',
 		chanceShown,
 		basis,
-		pickNumber,
 		callId,
 		selectedId,
 		queue,
@@ -121,7 +118,7 @@
 			chance={chanceShown ? (chance[player.id] ?? null) : undefined}
 			{chanceLabel}
 			{chanceMissing}
-			adp={adpWords(player.adp, pickNumber)}
+			adp={adpFigure(player.adp)}
 			isCall={player.id === callId}
 			selected={player.id === selectedId}
 			queued={queue.has(player.id)}

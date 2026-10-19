@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { adpFigure } from '#lib/format/draft.ts';
 	import { EMPTY_FIGURE } from '#lib/format/empty.ts';
 	import { gapText, gapTone } from '#lib/format/gap.ts';
 	import { fixed, signed } from '#lib/format/number.ts';
@@ -105,7 +106,7 @@
 <div class="row" class:mine={held?.kind === 'mine'}>
 	{#if cell.rank}<span class="n rk {cell.rank}">{rankShown}</span>{/if}
 	{#if cell.adpLead}<span class="n {cell.adpLead}" class:absent={player.adp === null}
-			>{player.adp === null ? EMPTY_FIGURE : fixed(player.adp)}</span
+			>{adpFigure(player.adp)}</span
 		>{/if}
 	<span class="face {cell.face}"
 		><Face
@@ -166,7 +167,7 @@
 				/>{:else}<span class="n absent">{EMPTY_FIGURE}</span>{/if}</span
 		>{/if}
 	{#if cell.adp}<span class="n {cell.adp}" class:absent={player.adp === null}
-			>{player.adp === null ? EMPTY_FIGURE : fixed(player.adp)}</span
+			>{adpFigure(player.adp)}</span
 		>{/if}
 	{#if cell.ourRank}<span class="n quiet {cell.ourRank}" class:absent={ranked === null}
 			>{ranked ? rankShown : EMPTY_FIGURE}</span

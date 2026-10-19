@@ -305,7 +305,6 @@
 			chanceShown={!readonly}
 			basis={readonly ? board.basis : poolBasis(board, card, teams, noCall)}
 			chanceGone={noCall}
-			pickNumber={room.pick_number}
 			callId={call?.player.id ?? null}
 			{selectedId}
 			queue={new Set(queue)}
