@@ -6,12 +6,17 @@
 // what it shows, no betting word, and that nothing scrolls sideways. Against the built site served static and the
 // fixture API (scripts/inseason-fixture/serve.ts), whose /games/week answers the recorded week.
 //
+//   FIXTURE_CLOCK=2026-10-17T17:00:00.000Z PORT=8799 node scripts/inseason-fixture/serve.ts
 //   node scripts/game-facts-shots.ts [web origin] [out dir]
-// The player card's Game cell is player-card-shots.ts's (Lane 66h).
-// with the site built against PUBLIC_API_URL pointing at the fixture API.
+// with the site built against PUBLIC_API_URL pointing at the fixture API. One clock (review 66q
+// finding 2): the browser runs on the fixture week's (clock.ts FIXTURE_WEEK_CLOCK) and the fixture API
+// must be started on it too, so its read stamps and the score bug's next kickoff agree with the boxes;
+// the Matchup shot asserts they do. The Lineup and Matchup shots also assert the boxes' sums row reads
+// "Team" and are taken full page. The player card's Game cell is player-card-shots.ts's (Lane 66h).
 import { mkdir } from 'node:fs/promises';
 import { chromium, type BrowserContext, type Page } from 'playwright';
 import { bannedPattern } from '../src/lib/format/copy-guard.ts';
+import { BOX } from '../src/lib/league/box/box.ts';
 import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
 import { FIXTURE_WEEK_CLOCK } from './inseason-fixture/clock.ts';
 import { FIXTURE_IDS } from './inseason-fixture/ids.ts';
@@ -125,6 +130,66 @@ async function boxFacts(
 	});
 }
 
+/** The days of a fixture week in kickoff order, Thursday first. */
+const WEEK_DAYS = ['Thu', 'Fri', 'Sat', 'Sun', 'Mon', 'Tue', 'Wed'];
+const WHEN = /^(\w{3}) (\d{1,2}):(\d{2}) ([ap]m)/u;
+const HALF_DAY = 12;
+const DAY_MINUTES = 24 * 60;
+const HOUR_MINUTES = 60;
+
+/** A kickoff's "Sun 12:00 pm" as minutes into the fixture's week, null for words that are not one. */
+function weekMinutes(when: string): number | null {
+	const [, day = '', hour = '', minute = '', half = ''] = WHEN.exec(when) ?? [];
+	const index = WEEK_DAYS.indexOf(day);
+	if (index < 0) return null;
+	const hours = (Number(hour) % HALF_DAY) + (half === 'pm' ? HALF_DAY : 0);
+	return index * DAY_MINUTES + hours * HOUR_MINUTES + Number(minute);
+}
+
+/** The fixture week's clock as minutes into its week, on the shots' Central clock: a row kicking off
+ * before it is played, the bug never names it. */
+const CLOCK_MINUTES = weekMinutes(
+	new Intl.DateTimeFormat('en-US', {
+		timeZone: ZONE,
+		weekday: 'short',
+		hour: 'numeric',
+		minute: '2-digit'
+	})
+		.format(new Date(FIXTURE_WEEK_CLOCK))
+		.replace(',', '')
+		.toLowerCase()
+		.replace(/^\w/u, (c) => c.toUpperCase())
+);
+
+/** Every box's sums row reads "Team" (Lane 66q: never "Totals", a betting word on the site's list). */
+async function sumsFaults(page: Page, where: string): Promise<void> {
+	const labels = await page
+		.locator('main tr.totals .tl')
+		.evaluateAll((els) => els.map((el) => el.textContent.trim()));
+	check(labels.length > 0, `${where}: no sums row`);
+	for (const label of labels)
+		check(label === BOX.totals, `${where}: the sums row reads "${label}"`);
+}
+
+/** The score bug's next kickoff is the earliest kickoff still to come among the boxes' rows: the API's
+ * read and the browser run on one clock (review 66q finding 2). */
+async function bugFaults(page: Page, where: string): Promise<void> {
+	const bug = (await page.locator('main .bug .mid span').first().textContent()) ?? '';
+	const rows = await page
+		.locator('main table.box .opp > span')
+		.evaluateAll((els) => els.map((el) => el.textContent.trim()));
+	const ahead = rows.flatMap((when) => {
+		const at = weekMinutes(when);
+		return at === null || CLOCK_MINUTES === null || at <= CLOCK_MINUTES ? [] : [at];
+	});
+	const said = weekMinutes(bug);
+	check(said !== null, `${where}: the bug names no kickoff ("${bug}")`);
+	check(
+		ahead.length > 0 && said === Math.min(...ahead),
+		`${where}: the bug's next kickoff "${bug}" is not the boxes' earliest still to come`
+	);
+}
+
 for (const { name, path, ready, phone } of PAGES) {
 	for (const theme of THEMES) {
 		for (const width of WIDTHS) {
@@ -156,8 +221,11 @@ for (const { name, path, ready, phone } of PAGES) {
 						() => document.documentElement.scrollWidth > document.documentElement.clientWidth
 					);
 					check(!sideways, `${where}: scrolls sideways`);
+					if (name === 'start' || name === 'matchup') await sumsFaults(page, where);
+					if (name === 'matchup') await bugFaults(page, where);
 					await page.screenshot({
-						path: new URL(`${name}-${theme}-${String(width)}.png`, out).pathname
+						path: new URL(`${name}-${theme}-${String(width)}.png`, out).pathname,
+						fullPage: name === 'start' || name === 'matchup'
 					});
 					process.stdout.write(
 						`${where}: ${cells.expected[0] ?? 'none'} | ${cells.weather[0] ?? 'none'}\n`

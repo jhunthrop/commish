@@ -38,8 +38,12 @@ import { FIXTURE_SEASON, askedPhase, phaseAccount, phaseLeagues, phaseSync } fro
 import { ESPN_STAND_IN_NAME, espnSync } from './espn-sync.ts';
 import { inSeason, noWeek } from './member-week.ts';
 import { inTenths } from './tenths.ts';
+import { FIXTURE_CLOCK_VARIABLE, fixtureClock } from './clock.ts';
 
 const PORT = Number(process.env.PORT ?? 8799);
+/** The fixture's clock: the real one, or the shots' week clock (FIXTURE_CLOCK=2026-10-17T17:00:00.000Z,
+ * clock.ts FIXTURE_WEEK_CLOCK), so every read stamp agrees with the browser's. */
+const now = fixtureClock(process.env[FIXTURE_CLOCK_VARIABLE]);
 const DATA = new URL('./data/', import.meta.url);
 const {
 	league: LEAGUE,
@@ -138,7 +142,7 @@ const contextBase = {
  * then the ESPN stand-ins in season under their own name and platform, so the switch on an ESPN
  * screen names the league it shows. */
 const leaguesNow = (): components['schemas']['ContextLeague'][] => {
-	const phased = phaseLeagues(contextBase, Date.now());
+	const phased = phaseLeagues(contextBase, now());
 	const inSeason = phased.find((league) => league.id === LEAGUE);
 	const espn = inSeason
 		? [...ESPN_MOVES.keys()].map((espnId) => ({
@@ -168,15 +172,15 @@ const account: components['schemas']['Account'] = {
 	created_at: '2026-09-01T12:00:00.000Z'
 };
 
-const readAt = (): string => new Date(Date.now() - READ_MINUTES_AGO * MINUTE_MS).toISOString();
+const readAt = (): string => new Date(now() - READ_MINUTES_AGO * MINUTE_MS).toISOString();
 
 /** The API's sentence for an FFPC read FFPC signed out of (leaguesync HostProblemWords). */
 const FFPC_AGAIN = 'FFPC signed you out. Sign in to FFPC again to keep reading your league.';
 
 /** GET /me/week: every league the front door shows, the Sleeper league first. */
 function memberWeek(): components['schemas']['MemberWeek'] {
-	const now = Date.now();
 	const at = readAt();
+	const when = now();
 	const base = {
 		name: sync.name,
 		host: sync.host,
@@ -185,7 +189,7 @@ function memberWeek(): components['schemas']['MemberWeek'] {
 	};
 	return {
 		leagues: [
-			inSeason(LEAGUE, { sync, lineup, waivers, scoreboard, readAt: at }, now),
+			inSeason(LEAGUE, { sync, lineup, waivers, scoreboard, readAt: at }, when),
 			inSeason(
 				ESPN_DONE,
 				{
@@ -195,7 +199,7 @@ function memberWeek(): components['schemas']['MemberWeek'] {
 					scoreboard: scoreboardLive,
 					readAt: at
 				},
-				now
+				when
 			),
 			noWeek(
 				NO_TEAM,
@@ -222,7 +226,7 @@ const HOSTS: components['schemas']['HostConnections'] = {
 			status: 'connected',
 			proven: true,
 			connected_at: '2026-10-03T14:00:00.000Z',
-			last_read_at: new Date(Date.now() - HOURS_AGO_2).toISOString(),
+			last_read_at: new Date(now() - HOURS_AGO_2).toISOString(),
 			consent_version: 3,
 			writes_on: true,
 			writes_reason: null
@@ -529,7 +533,7 @@ function claimAnswer(
 			status: 'ready',
 			sentence,
 			confirm: 'fixture-token',
-			expires_at: new Date(Date.now() + HOLD_MS).toISOString(),
+			expires_at: new Date(now() + HOLD_MS).toISOString(),
 			host_url: ESPN_LEAGUE_URL,
 			bid: bids ? { amount, ...CLAIM_BUDGET, left_known: true } : null
 		};
@@ -555,7 +559,7 @@ function moveAnswer(id: string, plan: boolean, body: unknown): HostMovePlan | Ho
 			status: 'ready',
 			sentence: planSentence(),
 			confirm: 'fixture-token',
-			expires_at: new Date(Date.now() + HOLD_MS).toISOString(),
+			expires_at: new Date(now() + HOLD_MS).toISOString(),
 			host_url: ESPN_LINEUP_URL,
 			bid: null
 		};
