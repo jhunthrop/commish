@@ -2,44 +2,50 @@
  * (member-facing copy names the platform, never "host"), whole words, any case. One list for every
  * guard that reads the site's copy (Lane 66n re-review N5, re-review 2 F1, Lane 66q): every test and
  * shots script that guards copy reads it here. A guard with words of its own composes this list with
- * them (bannedIn), never a second list. */
+ * them (bannedIn), never a second list. The list itself is banned-words.json, which the research
+ * writer reads too (research/capsules/site_words.py, the sweep's C7 and Y6), so prose that passes the
+ * writer passes the site. */
+import LIST from './banned-words.json' with { type: 'json' };
 
-/** The betting register's words that no code says: a source file may say "line" or "total" in its
- * code, never "odds". */
-const BETTING_ONLY = [
-	'favou?red',
-	'favou?rites?',
-	'underdogs?',
-	'odds',
-	'over\\/under',
-	'bets?',
-	'betting',
-	'wagers?',
-	'parlays?',
-	'vegas',
-	'sportsbooks?',
-	'moneyline'
-];
+/** The one list's shape: each word a pattern fragment keyed to the word as a reader sees it, the
+ * betting line with the field's own lines it spares, and the marks. */
+export interface BannedList {
+	bettingOnly: Readonly<Record<string, string>>;
+	bettingShared: Readonly<Record<string, string>>;
+	line: {
+		word: string;
+		shown: string;
+		sparedAfter: readonly string[];
+		sparedSide: readonly string[];
+		sparedBefore: readonly string[];
+	};
+	trading: Readonly<Record<string, string>>;
+	platform: Readonly<Record<string, string>>;
+	marks: readonly string[];
+}
+
+/** The list the site and the writer both read. */
+export const BANNED_LIST: Readonly<BannedList> = LIST;
+
 /** "Line" as the betting word: the field's own lines (the goal line or goal-line, the offensive and
  * defensive line, the O-line and D-line, the line of scrimmage) are football and stay in the writer's
- * prose (coordinator ruling beside R3); "the line" stays caught. */
-const FIELD_LINE_SPARED =
-	'(?<!(?:goal|offensive|defensive)[ -])(?<!\\b[OD]-)lines?(?! of scrimmage)';
+ * prose (coordinator ruling beside R3); "the line" stays caught. One lookaround a spared word, built
+ * as the writer builds it. */
+function fieldLine({ word, sparedAfter, sparedSide, sparedBefore }: BannedList['line']): string {
+	const after = sparedAfter.map((spared) => `(?<!${spared}[ -])`).join('');
+	const side = sparedSide.map((spared) => `(?<!\\b${spared}-)`).join('');
+	const before = sparedBefore.map((spared) => `(?! ${spared})`).join('');
+	return `${after}${side}${word}${before}`;
+}
+
+const fragments = (words: Readonly<Record<string, string>>): string[] => Object.keys(words);
+/** The betting register's words that no code says: a source file may say "line" or "total" in its
+ * code, never "odds". */
+const BETTING_ONLY = fragments(BANNED_LIST.bettingOnly);
 /** The betting register's words that are plain words in code too. */
-const BETTING_SHARED = [FIELD_LINE_SPARED, 'spreads?', 'totals?', 'books?', 'props?'];
-const TRADING = [
-	'markets?',
-	'prices?',
-	'priced',
-	'buy',
-	'buys',
-	'buying',
-	'sell',
-	'sells',
-	'selling',
-	'stock'
-];
-const PLATFORM = ['hosts?'];
+const BETTING_SHARED = [fieldLine(BANNED_LIST.line), ...fragments(BANNED_LIST.bettingShared)];
+const TRADING = fragments(BANNED_LIST.trading);
+const PLATFORM = fragments(BANNED_LIST.platform);
 
 const whole = (words: readonly string[]): RegExp => new RegExp(`\\b(${words.join('|')})\\b`, 'iu');
 
@@ -49,8 +55,11 @@ export const BANNED_WORDS = whole([...BETTING_ONLY, ...BETTING_SHARED, ...TRADIN
  * without the words code says too. */
 export const BETTING_WORDS = whole(BETTING_ONLY);
 
+/** A mark inside a character class, escaped where the class would read it as syntax. */
+const classMark = (mark: string): string => mark.replace(/[\\\]^-]/gu, '\\$&');
+
 /** The punctuation the site's copy never uses: the em dash, the en dash and the semicolon. */
-export const BANNED_MARKS = /[—–;]/u;
+export const BANNED_MARKS = new RegExp(`[${BANNED_LIST.marks.map(classMark).join('')}]`, 'u');
 
 /** The list's words and marks as one pattern, with a guard's words of its own (a screen that also
  * never says "stock") composed with them: what a guard matches its copy against. */

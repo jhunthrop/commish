@@ -4,6 +4,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
+	BANNED_LIST,
 	BANNED_MARKS,
 	BANNED_WORDS,
 	BETTING_WORDS,
@@ -20,6 +21,21 @@ void test('the list holds the betting, trading and platform words, whole words i
 	assert.match('a — b', BANNED_MARKS);
 	assert.match('a; b', BANNED_MARKS);
 	assert.match('a – b', BANNED_MARKS);
+});
+
+void test("the guard reads the one list file the writer reads too, every word it shows caught (the sweep's C7)", () => {
+	const shown = [
+		...Object.values(BANNED_LIST.bettingOnly),
+		...Object.values(BANNED_LIST.bettingShared),
+		BANNED_LIST.line.shown,
+		...Object.values(BANNED_LIST.trading),
+		...Object.values(BANNED_LIST.platform)
+	];
+	for (const word of shown) assert.equal(bannedIn(`We ${word} him.`), word, word);
+	for (const mark of BANNED_LIST.marks) assert.equal(bannedIn(`a ${mark} b`), mark, mark);
+	assert.equal(bannedIn('15 total touchdowns'), 'total');
+	assert.equal(bannedIn('holding this line'), 'line');
+	assert.equal(bannedIn('behind the offensive line, inside the goal line, on the O-line'), null);
 });
 
 void test("the trading inflections and the betting register's other words are on the one list (review 66q 1)", () => {

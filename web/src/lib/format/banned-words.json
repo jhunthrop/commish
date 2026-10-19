@@ -1,0 +1,46 @@
+{
+	"about": "The words and marks the site never prints, one list read by the site's copy guard (web/src/lib/format/copy-guard.ts) and the research writer (research/capsules/site_words.py), so prose that passes the writer passes the site. Each word is a regular expression fragment matched whole and in any case, keyed to the word as a reader sees it. bettingOnly: the betting words no code says. bettingShared: the betting words that are plain words in code too. line: the betting line, with the field's own lines spared (the goal line, the offensive and defensive line, the O-line and D-line, the line of scrimmage). trading: the trading register. platform: the platform is named, never host. marks: the em dash, the en dash and the semicolon.",
+	"bettingOnly": {
+		"favou?red": "favored",
+		"favou?rites?": "favorite",
+		"underdogs?": "underdog",
+		"odds": "odds",
+		"over\\/under": "over/under",
+		"bets?": "bet",
+		"betting": "betting",
+		"wagers?": "wager",
+		"parlays?": "parlay",
+		"vegas": "Vegas",
+		"sportsbooks?": "sportsbook",
+		"moneyline": "moneyline"
+	},
+	"bettingShared": {
+		"spreads?": "spread",
+		"totals?": "total",
+		"books?": "book",
+		"props?": "prop"
+	},
+	"line": {
+		"word": "lines?",
+		"shown": "line",
+		"sparedAfter": ["goal", "offensive", "defensive"],
+		"sparedSide": ["O", "D"],
+		"sparedBefore": ["of scrimmage"]
+	},
+	"trading": {
+		"markets?": "market",
+		"prices?": "price",
+		"priced": "priced",
+		"buy": "buy",
+		"buys": "buys",
+		"buying": "buying",
+		"sell": "sell",
+		"sells": "sells",
+		"selling": "selling",
+		"stock": "stock"
+	},
+	"platform": {
+		"hosts?": "host"
+	},
+	"marks": ["—", "–", ";"]
+}
