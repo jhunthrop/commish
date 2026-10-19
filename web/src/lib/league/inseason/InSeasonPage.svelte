@@ -44,8 +44,9 @@
 		read: () => Promise<T>;
 		/** How many rows to hold while the answer is read, so nothing moves when it lands. */
 		reserve: number;
-		/** The screen, from its answer, the league's host, and a way to read the answer again. */
-		children: Snippet<[T, LeagueHost, () => void]>;
+		/** The screen, from its answer, the league's host, the instant the answer was read, in
+		 * ms (the page's one clock, which the screen draws at), and a way to read the answer again. */
+		children: Snippet<[T, LeagueHost, number, () => void]>;
 	}
 
 	let { id, screen, title, stamp, read, reserve, children }: Props = $props();
@@ -202,7 +203,7 @@
 				{#if problem}
 					<Panel edge="loss" padding="sm"><ProblemLine>{problem}</ProblemLine></Panel>
 				{/if}
-				{@render children(advice, head.host, () => void readAnswer())}
+				{@render children(advice, head.host, now.getTime(), () => void readAnswer())}
 			{:else}
 				<div class="reserve" aria-busy="true" aria-label={LINES.reading}>
 					<div class="call"></div>

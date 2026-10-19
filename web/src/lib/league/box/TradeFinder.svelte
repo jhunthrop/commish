@@ -56,6 +56,8 @@
 		builderId: string;
 		/** Told whether any trade is open, its players drawn: the page's basis then says their columns. */
 		onopen?: (anyOpen: boolean) => void;
+		/** The instant the answer was read, in ms: the page's clock the rows draw at. */
+		now: number;
 	}
 
 	let {
@@ -69,6 +71,7 @@
 		propose,
 		build,
 		builderId,
+		now,
 		onopen = () => undefined
 	}: Props = $props();
 
@@ -111,7 +114,7 @@
 	<tr class="grp"><th colspan={COLUMNS} scope="rowgroup">{label}</th></tr>
 	{#each side as entry (entry.line.player.host_id)}
 		<BoxLine
-			row={boxRow(entry.line, entry.side, zone, false)}
+			row={boxRow(entry.line, entry.side, zone, false, now)}
 			move={entry.move}
 			evidence
 			season

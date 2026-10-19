@@ -129,13 +129,13 @@ function standingWords(standing: WeekLeague['standing']): string {
 }
 
 /** The starters who play first, by name, with their game: "Meyers plays first, vs HOU". */
-function firstOf(lines: readonly PlayerLine[], zone: string): FrontLeague['first'] {
+function firstOf(lines: readonly PlayerLine[], zone: string, now: Date): FrontLeague['first'] {
 	const lead = lines[0];
 	if (lead === undefined) return null;
-	const rows = lines.map((line) => boxRow(line, '', zone, false));
+	const rows = lines.map((line) => boxRow(line, '', zone, false, now.getTime()));
 	const names = rows.map((r) => shortName(r.name));
 	const who = names.length === 1 ? `${names.join('')} plays` : `${names.join(' and ')} play`;
-	const game = gameOf(lead.facts, zone);
+	const game = gameOf(lead.facts, zone, now.getTime());
 	const where = game !== null && game !== 'bye' ? `, ${game.where}` : '';
 	return { rows, words: `${who} first${where}` };
 }
@@ -174,10 +174,11 @@ function chipScreen(chip: RosterChip): 'start' | 'waivers' {
 export function chipsOf(
 	league: WeekLeague,
 	href: ScreenHref,
-	zone: string = memberZone()
+	zone: string,
+	now: Date
 ): FrontChip[] {
 	return league.chips.map((chip) => {
-		const row = boxRow(chip.line, '', zone, false);
+		const row = boxRow(chip.line, '', zone, false, now.getTime());
 		const screen = chipScreen(chip);
 		return {
 			key: `${chip.kind}-${chip.line.player.host_id}`,
@@ -236,9 +237,9 @@ export function frontLeague(
 			bug === null || me === undefined
 				? null
 				: (bugsOf({ games: [bug.game] }, { teams: bug.teams, me }, zone)[0] ?? null),
-		first: bug === null ? null : firstOf(bug.first, zone),
+		first: bug === null ? null : firstOf(bug.first, zone, now),
 		nudge: nudgeOf(league, href),
-		chips: chipsOf(league, href, zone),
+		chips: chipsOf(league, href, zone, now),
 		phase:
 			league.week === 0 && league.problem === null
 				? phaseWord({ phase: league.phase, draft_at: null }, now, zone)

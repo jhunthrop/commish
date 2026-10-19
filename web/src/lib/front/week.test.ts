@@ -219,7 +219,7 @@ void test('the strip words the API summary: count, figures and the swaps by shor
 });
 
 void test('each chip names the fact and opens the screen that acts on it', () => {
-	const chips = chipsOf(SUCK, href, ZONE);
+	const chips = chipsOf(SUCK, href, ZONE, NOW);
 	assert.deepEqual(
 		chips.map((c) => [c.label, c.row.name, c.line, c.go, c.href]),
 		[
@@ -246,7 +246,7 @@ void test('each chip names the fact and opens the screen that acts on it', () =>
 			]
 		]
 	);
-	const starterBye = chipsOf({ ...SUCK, chips: [{ ...BYE, idle: false }] }, href, ZONE);
+	const starterBye = chipsOf({ ...SUCK, chips: [{ ...BYE, idle: false }] }, href, ZONE, NOW);
 	assert.deepEqual(
 		starterBye.map((c) => [c.line, c.go]),
 		[['TE, DET, a starter on bye', 'Lineup']]

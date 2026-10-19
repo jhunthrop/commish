@@ -69,14 +69,14 @@ export interface StatedGame {
 /** A game's state, one rule for every screen: the API's (its clock and its finals, gameStateAt in
  * inseason/facts.go). A read from before the API sent it falls back to its final flag and kickoff at
  * `now`, the rule the field replaced. */
-export function gameStateOf(game: StatedGame, now: number = Date.now()): GameState {
+export function gameStateOf(game: StatedGame, now: number): GameState {
 	if (game.game_state != null) return game.game_state;
 	if (game.played) return 'final';
 	return game.kickoff !== null && Date.parse(game.kickoff) <= now ? 'kicked_off' : 'upcoming';
 }
 
 /** Whether the game is still to be played: upcoming by its state. */
-export function toBePlayed(game: StatedGame, now: number = Date.now()): boolean {
+export function toBePlayed(game: StatedGame, now: number): boolean {
 	return gameStateOf(game, now) === 'upcoming';
 }
 

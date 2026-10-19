@@ -20,6 +20,7 @@ import { chromium, type Browser, type BrowserContext, type Page } from 'playwrig
 import { copyFault, watchData } from './copy-scan.ts';
 import { ORDER } from '../src/lib/order/words.ts';
 import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
+import { installFixtureApiClock, requireFixtureClock } from './inseason-fixture/clock.ts';
 
 const THEMES = ['dark', 'light'] as const;
 /** Shot widths, and the widths only checked for a sideways scroll. */
@@ -61,6 +62,10 @@ const SHOTS: readonly Shot[] = [
 ];
 
 const web = process.argv[2] ?? 'http://localhost:4173';
+/** The fixture API the site was built against, on the fixture week's clock (FIXTURE_CLOCK=
+ * 2026-10-17T17:00:00.000Z): the browser runs at its instant, never the day the script runs. */
+const API_ORIGIN = new URL(process.env.API_ORIGIN ?? 'http://localhost:8799').origin;
+await requireFixtureClock(API_ORIGIN);
 /** The dev server (npm run dev), where the dev-only system page draws the tier band. */
 const DEV_ORIGIN = process.env.DEV_ORIGIN;
 const NOT_FOUND = 404;
@@ -264,6 +269,7 @@ async function contextFor(
 		javaScriptEnabled: script
 	});
 	watchData(context);
+	await installFixtureApiClock(context, API_ORIGIN);
 	await context.addInitScript(
 		([key, value]: readonly [string, string]) => localStorage.setItem(key, value),
 		[THEME_STORAGE_KEY, theme] as const

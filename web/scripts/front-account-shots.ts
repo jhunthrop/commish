@@ -14,11 +14,14 @@
 // fault. Prints the stand-ins each shot carries.
 //
 //   node scripts/front-account-shots.ts [web origin] [out dir, from scripts/]
-// with the site built against PUBLIC_API_URL set to the fixture API's origin.
+// with the site built against PUBLIC_API_URL set to the fixture API's origin, the API started with
+// FIXTURE_CLOCK=2026-10-17T17:00:00.000Z: the browser runs on the fixture week's clock too (Lane 77),
+// so every "Last read ... ago" is said against the week, never the day the script runs.
 import { mkdir } from 'node:fs/promises';
 import { chromium, type BrowserContext, type Page } from 'playwright';
 import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
 import { copyFault, watchData } from './copy-scan.ts';
+import { installFixtureApiClock, requireFixtureClock } from './inseason-fixture/clock.ts';
 
 const THEMES = ['dark', 'light'] as const;
 const WIDTHS = [1440, 1024, 800, 768, 390] as const;
@@ -37,6 +40,7 @@ const PIN_IN_PLACE = '.nudge .pinned{position:static!important;box-shadow:none!i
  * a front door load makes is counted, and the only one allowed is GET /me/week, once. */
 const SHELL_READS = new Set(['/me', '/season']);
 const API_ORIGIN = new URL(process.env.API_ORIGIN ?? 'http://localhost:8866').origin;
+await requireFixtureClock(API_ORIGIN);
 
 /** What each shot carries that is not the record's, named so no one reads it as real. */
 const STAND_INS: Readonly<Record<string, string>> = {
@@ -60,6 +64,8 @@ async function context(theme: string, width: number, height: number): Promise<Br
 		deviceScaleFactor: width < 500 ? 2 : 1
 	});
 	watchData(ctx);
+	// The API's own instant, so its reads are minutes old to the browser too.
+	await installFixtureApiClock(ctx, API_ORIGIN);
 	await ctx.addCookies([{ ...SIGNED_IN, domain: 'localhost', path: '/' }]);
 	await ctx.addInitScript(
 		([key, value]: readonly [string, string]) => localStorage.setItem(key, value),

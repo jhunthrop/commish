@@ -58,11 +58,7 @@ export interface WeekView {
 }
 
 /** One row's view: a defense is named "Titans D/ST" beside its club mark. */
-export function weekView(
-	row: WeekOrderRow,
-	zone: string = memberZone(),
-	now: number = Date.now()
-): WeekView {
+export function weekView(row: WeekOrderRow, zone: string, now: number): WeekView {
 	const { player } = row.line;
 	const box = boxRow(row.line, '', zone, false, now);
 	const key = player.board_id ?? player.host_id;
@@ -218,8 +214,8 @@ function gameSentence(advice: WeekOrderAdvice, zone: string, now: number): strin
 export function weekBasis(
 	advice: WeekOrderAdvice,
 	reader: WeekReader,
-	zone: string = memberZone(),
-	now: number = Date.now()
+	zone: string,
+	now: number
 ): BasisPart[] {
 	const { many, whose } = WEEK_NOUNS[advice.position];
 	const { league } = reader;

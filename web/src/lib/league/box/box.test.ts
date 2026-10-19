@@ -134,12 +134,12 @@ void test('the game cell: the opponent and kickoff, Final once played, the bye',
 		where: 'at ATL',
 		when: 'Sun 12:00 pm'
 	});
-	assert.deepEqual(gameOf(facts({ home: true, played: true }), ZONE), {
+	assert.deepEqual(gameOf(facts({ home: true, played: true }), ZONE, NOW), {
 		where: 'vs ATL',
 		when: 'Final'
 	});
-	assert.equal(gameOf(facts({ bye: true }), ZONE), 'bye');
-	assert.equal(gameOf(facts({ opponent: null }), ZONE), null);
+	assert.equal(gameOf(facts({ bye: true }), ZONE, NOW), 'bye');
+	assert.equal(gameOf(facts({ opponent: null }), ZONE, NOW), null);
 });
 
 void test("a game kicked off with no final says so, by the API's state (Lane 80)", () => {
@@ -194,7 +194,7 @@ void test("a status is Lane 63's pill: the week's word, a season-long list's wor
 	});
 	assert.deepEqual(statusOf(null, true), { rank: 'IR', mark: 'IR', sits: true, line: null });
 	assert.equal(statusOf(null, false), null);
-	assert.deepEqual(boxRow(line(), 'QB', ZONE).pill, { position: 'QB', rank: 7 });
+	assert.deepEqual(boxRow(line(), 'QB', ZONE, true, NOW).pill, { position: 'QB', rank: 7 });
 });
 
 void test('a row carries the projection, not the points a game, and no facts once kicked off', () => {
@@ -222,7 +222,10 @@ void test("a defense's face is its club's mark, said in words", () => {
 			player: player({ name: 'Texans D/ST', position: 'DEF', team: 'HOU', board_id: null }),
 			headshot: null
 		}),
-		slotWord('DEF')
+		slotWord('DEF'),
+		ZONE,
+		true,
+		NOW
 	);
 	assert.deepEqual(defense.face, {
 		src: '/img/clubs/nfl/hou/64',
@@ -289,7 +292,7 @@ void test('the evidence columns print as the Lineup draws them', () => {
 	assert.equal(deltaWord(-1.2), '−1.2');
 	assert.equal(deltaWord(10.4), '+10.4');
 	assert.equal(deltaWord(null), '--');
-	const row = boxRow(line(), 'QB', ZONE, false);
+	const row = boxRow(line(), 'QB', ZONE, false, NOW);
 	assert.deepEqual(row.evidence, {
 		oppRank: 24,
 		oppOf: null,
@@ -299,7 +302,7 @@ void test('the evidence columns print as the Lineup draws them', () => {
 		season: 17.8
 	});
 	assert.equal(row.pill?.rank, null, 'the Lineup leaves the rest-of-season rank out');
-	assert.equal(boxRow(line(), 'QB', ZONE).pill?.rank, 7, 'the Matchup keeps it');
+	assert.equal(boxRow(line(), 'QB', ZONE, true, NOW).pill?.rank, 7, 'the Matchup keeps it');
 });
 
 /** The site's copy guard. */

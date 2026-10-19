@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { ApiError } from '#lib/api/client.ts';
+	import { memberZone } from '#lib/format/clock.ts';
 	import type { LeagueHost } from '#lib/league/api.ts';
 	import type { BasisPart } from '#lib/run/board-basis.ts';
 	import Chip from '#lib/ui/Chip.svelte';
@@ -45,10 +46,12 @@
 	let { position, league = null, boardScoring, onread }: Props = $props();
 
 	let advice = $state<WeekOrderAdvice | null>(null);
+	/** The instant the answer is drawn at, in ms, set with the answer (the screen's one clock). */
+	let now = $state(0);
 	let problem = $state<string | null>(null);
 	let roster = $state<RosterView>('everyone');
 
-	const views = $derived(advice?.rows.map((row) => weekView(row)) ?? []);
+	const views = $derived(advice?.rows.map((row) => weekView(row, memberZone(), now)) ?? []);
 	const shown = $derived(views.filter(weekRosterFilter(roster)));
 	const sections = $derived(advice === null ? [] : weekSections(shown, advice.week));
 	const status = $derived(advice === null ? null : weekStatus(advice));
@@ -64,13 +67,14 @@
 			.read(asked.league, asked.position)
 			.then((answer) => {
 				if (gone) return;
+				now = Date.now();
 				advice = answer;
 				problem = null;
 				const reader = { league, boardScoring };
 				onread?.({
 					key: weekReadKey(asked.position, asked.league),
 					heading: weekHeading(answer.position, answer.week),
-					basis: weekBasis(answer, reader),
+					basis: weekBasis(answer, reader, memberZone(), now),
 					rules: rulesLeftOut(answer, reader, leagueSettingsHref)
 				});
 			})

@@ -88,7 +88,7 @@ function playerOf(
 export async function loadBoard(
 	format: BoardFormat,
 	byes: Readonly<Record<string, number>>,
-	now: number = Date.now()
+	now: number
 ): Promise<LeagueBoard> {
 	const own = await fetchBoard(format);
 	const run = own ?? (await fetchBoard(FALLBACK));

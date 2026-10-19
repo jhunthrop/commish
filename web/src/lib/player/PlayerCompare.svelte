@@ -95,7 +95,9 @@
 				opponents: {},
 				games: player.season.games,
 				rest: null,
-				screenHref: screenHrefFor(league)
+				screenHref: screenHrefFor(league),
+				// The page's clock: the card is drawn at the moment its week is read.
+				now: Date.now()
 			});
 			other = {
 				id: player.id,

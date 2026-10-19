@@ -257,11 +257,7 @@ export function weatherCell(facts: Pick<WeekFacts, 'roof' | 'weather'>): Weather
 
 /** His game's first line: the opponent with "at" or "vs", then by the game's state the kickoff on
  * the member's clock, "Kicked off" or "Final"; "bye" on a bye week; null when we hold no game. */
-export function gameOf(
-	facts: WeekFacts,
-	zone: string = memberZone(),
-	now: number = Date.now()
-): BoxGame | 'bye' | null {
+export function gameOf(facts: WeekFacts, zone: string, now: number): BoxGame | 'bye' | null {
 	if (facts.bye) return 'bye';
 	if (facts.opponent === null) return null;
 	const where = `${facts.home === false ? 'at' : 'vs'} ${facts.opponent}`;
@@ -288,9 +284,9 @@ function faceOf(player: LeaguePlayer, headshot: string | null): BoxRow['face'] {
 export function boxRow(
 	line: PlayerLine,
 	slot: string,
-	zone: string = memberZone(),
-	ranked = true,
-	now: number = Date.now()
+	zone: string,
+	ranked: boolean,
+	now: number
 ): BoxRow {
 	const { facts, player } = line;
 	const ahead = !facts.bye && toBePlayed(facts, now);
@@ -445,7 +441,7 @@ export const FORMAT_WORDS: Readonly<Record<ProjectionScoring['format'], string>>
 
 /** The oldest read of any game still to be played at `now`, null when no row holds one: the Waivers
  * basis says it in its short line. */
-export function factsReadAt(lines: readonly PlayerLine[], now: number = Date.now()): string | null {
+export function factsReadAt(lines: readonly PlayerLine[], now: number): string | null {
 	const reads = lines.flatMap(({ facts }) =>
 		facts.bye || !toBePlayed(facts, now)
 			? []

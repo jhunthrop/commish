@@ -1,3 +1,4 @@
+import { buildInstant } from '#lib/server/build-clock.ts';
 import { stamp } from '#lib/server/run.ts';
 import { buildSiteRail } from '#lib/server/site-rail.ts';
 import type { LayoutServerLoad } from './$types';
@@ -9,5 +10,5 @@ export const prerender = true;
  * words from until the context says otherwise (site/shown-rail.svelte.ts). */
 export const load: LayoutServerLoad = async () => ({
 	run: await stamp(),
-	siteRail: await buildSiteRail()
+	siteRail: await buildSiteRail(new Date(buildInstant()))
 });
