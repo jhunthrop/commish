@@ -4,6 +4,7 @@
 import { dayLabel } from '#lib/format/date.ts';
 import { FIGURE, weekHead } from '#lib/format/figure-words.ts';
 import { fixed, plural } from '#lib/format/number.ts';
+import { countedWeek } from '#lib/run/reach.ts';
 import type { GameLogRow, PlayerSeason } from '#lib/run/season.ts';
 import { apiFormatOf } from '#lib/run/format-ids.ts';
 import { positionRankShown } from '#lib/run/held-places.ts';
@@ -13,6 +14,7 @@ import {
 	CARD,
 	NONE,
 	restRankWords,
+	type CardHead,
 	type CardTile,
 	type RestParts,
 	type TileScoring
@@ -21,8 +23,9 @@ import {
 export interface CardBuild {
 	/** The tiles but rest of season, which each format line carries. */
 	tiles: CardTile[];
-	/** The week ahead with its opponent, null when the season has none left. */
-	next: { week: number; opponent: string } | null;
+	/** The week ahead with its opponent, or "Bye" when it is his bye, null when the season has none
+	 * left. */
+	next: CardHead | null;
 	/** Each played week's opponent, "vs BUF", for Last's caption once the week is read. */
 	opponents: Record<number, string>;
 	/** "Written Oct 13, from his facts through last season", null when the run does not say. */
@@ -111,8 +114,21 @@ function lastPlayed(season: PlayerSeason): GameLogRow | null {
 	return season.log.findLast((row) => row.status === 'played' && row.points !== null) ?? null;
 }
 
+/** The week ahead: the first week past his counted one that is a game to play or his bye, so a bye
+ * week heads the card as the bye, never the game after it (the sweep's M6). */
+function weekAhead(season: PlayerSeason): GameLogRow | null {
+	const counted = countedWeek(season);
+	return (
+		season.log.find(
+			(row) =>
+				row.week > counted &&
+				(row.status === 'bye' || (row.status === 'upcoming' && row.opponent !== null))
+		) ?? null
+	);
+}
+
 export function cardBuild(season: PlayerSeason, capsule: Capsule | null): CardBuild {
-	const upcoming = season.log.find((row) => row.status === 'upcoming' && row.opponent !== null);
+	const upcoming = weekAhead(season);
 	const last = lastPlayed(season);
 	const opponents = Object.fromEntries(
 		season.log.filter((row) => row.status === 'played').map((row) => [row.week, opponentWords(row)])

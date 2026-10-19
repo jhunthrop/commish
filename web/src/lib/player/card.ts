@@ -19,6 +19,13 @@ export interface CardTile {
 	tone: TileTone;
 }
 
+/** The card's head: the week the card shows and his opponent in it ("at NYJ"), or "Bye" in his bye
+ * week, so the head and the week tile always name one week. */
+export interface CardHead {
+	week: number;
+	opponent: string;
+}
+
 /** A number not held. */
 export const NONE = EMPTY_FIGURE;
 

@@ -1,5 +1,5 @@
 /** The pass page's words: what each feature does in a drafter's terms, a figure in dollars with
- * its basis, and which hosts the live draft works with today. Pure, so the page, the account page
+ * its basis, and how a live draft is followed (the platforms are league/hosts.ts's). Pure, so the page, the account page
  * and the claim page say a product the same way. */
 import { dateLabel } from '#lib/format/date.ts';
 import { listWords } from '#lib/format/list.ts';
@@ -100,21 +100,7 @@ export function passEnds(catalog: Pick<PlanCatalog, 'pass_ends_at'>): string {
 	return dateLabel(catalog.pass_ends_at);
 }
 
-/** A host's live draft by the host's own name: ready is today. */
-export interface Host {
-	name: string;
-	ready: boolean;
-}
-
-/** Which hosts the live draft works with today, by the host's own name (spec §2.7). Only what is
- * built is said: the other hosts are named as not followed yet, with no date. */
-export const HOSTS: readonly Host[] = [
-	{ name: 'Sleeper', ready: true },
-	{ name: 'ESPN', ready: false },
-	{ name: 'Yahoo', ready: false }
-];
-
-/** How a ready platform's draft is followed: by its link, with no sign-in to the platform. */
+/** How a live draft is followed: by its link, with no sign-in to the platform. */
 export const FOLLOW_HOW = 'Draft link';
 
 /** What is free, said plainly: the pass never gates any of it. */

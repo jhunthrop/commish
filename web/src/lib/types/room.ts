@@ -42,6 +42,8 @@ export interface CallRow {
 	player: PlayerRef;
 	vor: number | null;
 	adp: number | null;
+	/** The pool's Gap, as the pool row prints it; absent where the caller has none. */
+	gap?: number | null;
 	chance: number | null;
 }
 

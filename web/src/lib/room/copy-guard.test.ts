@@ -127,3 +127,17 @@ void test('the call card is our top three as rows, its chance column headed stil
 	assert.equal(draftWords('RB'), 'Draft him');
 	assert.equal(draftWords('DST', 'Queue'), 'Queue them');
 });
+
+void test("every surname the room draws is marked as his name, never inside a sentence, so the shots' guard ties it to the handed data (the sweep's C8)", () => {
+	const drawing = [...SOURCES, 'lib/ui/PickStrip.svelte'].filter((file) =>
+		readFileSync(join(SRC, file), 'utf8').includes('lastName(')
+	);
+	const calls = drawing.flatMap((file) =>
+		(readFileSync(join(SRC, file), 'utf8').match(/[^\n]*lastName\([^\n]*/gu) ?? [])
+			.filter((line) => !/import|export function lastName/u.test(line))
+			.map((line) => ({ file, line: line.trim() }))
+	);
+	assert.ok(calls.length >= 3, `found ${String(calls.length)} surnames drawn`);
+	for (const { file, line } of calls)
+		assert.match(line, /data-name>\{lastName\(/u, `${file}: ${line}`);
+});

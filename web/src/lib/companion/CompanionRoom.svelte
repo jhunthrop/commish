@@ -161,7 +161,6 @@
 			chanceHead={card?.conditional ? 'Reaches' : 'Still there'}
 			chanceShown={call !== null}
 			basis={call ? poolBasis(board, card, teams) : c.basis}
-			pickNumber={now}
 			callId={call?.player.id ?? null}
 			selectedId={call?.player.id ?? null}
 			queue={new Set()}

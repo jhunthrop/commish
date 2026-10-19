@@ -4,6 +4,8 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { hasEvery, hasFeature } from '#lib/account/features.ts';
+	import { hostsApi, openHostsOf } from '#lib/hosts/api.ts';
+	import { SWITCHED_SHUT, type OpenHosts } from '#lib/league/hosts.ts';
 	import { links } from '#lib/site/links.ts';
 	import Chip from '#lib/ui/Chip.svelte';
 	import ChipGroup from '#lib/ui/ChipGroup.svelte';
@@ -38,8 +40,9 @@
 	import FactStrip from '#lib/ui/FactStrip.svelte';
 
 	/** The pass page: the Draft Pass, the Membership and the Group Draft Pass with what each unlocks,
-	 * read from the API (the prices from Stripe, the features from the table Can reads), which hosts
-	 * the live draft works with today, and what is free whatever you have. Signed out, a verb signs
+	 * read from the API (the prices from Stripe, the features from the table Can reads), which
+	 * platforms a live draft is read from and a league is followed from, and what is free whatever you
+	 * have. Signed out, a verb signs
 	 * in first and comes back here to go on to checkout. */
 
 	let catalog = $state<PlanCatalog | null>(null);
@@ -50,6 +53,9 @@
 	let league = $state('');
 	let busy = $state(false);
 	let problem = $state<string | null>(null);
+	/** The switched platforms open here, as /account and /league/new read them: shut until read, so a
+	 * platform switched off is never promised. */
+	let openHosts = $state<OpenHosts>(SWITCHED_SHUT);
 	/** Back from a checkout closed without paying. Read in the browser: the shell is prerendered. */
 	let canceled = $state(false);
 
@@ -101,6 +107,10 @@
 				if (intent && resume && me && plans.checkout_open) void begin(intent);
 			})
 			.catch(() => (unreachable = true));
+		void hostsApi
+			.connections()
+			.then((hosts) => (openHosts = openHostsOf(hosts)))
+			.catch(() => (openHosts = SWITCHED_SHUT));
 	});
 </script>
 
@@ -143,9 +153,13 @@
 					featured
 				>
 					{#snippet more()}
-						<section aria-label="Where your draft is">
-							<PanelHead title="Where your draft is" />
-							<FactStrip label="Where the live draft works" cells={hostCells()} dense />
+						<section aria-label="Where it works">
+							<PanelHead title="Where it works" />
+							<FactStrip
+								label="Where the live draft and your league work"
+								cells={hostCells(openHosts)}
+								dense
+							/>
 						</section>
 					{/snippet}
 					{#snippet action()}

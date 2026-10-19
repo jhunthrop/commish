@@ -28,7 +28,15 @@ import { AGAINST } from '#lib/league/box/lineup.ts';
 import type { LeagueHost } from '#lib/league/api.ts';
 import { hostWords } from '#lib/league/names.ts';
 import type { LogNext } from '#lib/ui/game-log.ts';
-import { CARD, NONE, printTenth, withTile, type CardTile, type RestParts } from './card.ts';
+import {
+	CARD,
+	NONE,
+	printTenth,
+	withTile,
+	type CardHead,
+	type CardTile,
+	type RestParts
+} from './card.ts';
 import type { CardProjection } from './week-read.ts';
 
 /** Tenths in a point, the precision the API prints. */
@@ -72,6 +80,9 @@ export interface CardVerb {
 
 export interface LiveCard {
 	week: number;
+	/** The head the read gives the card: the API's week and its game or bye, the empty figure when
+	 * the API names no game that week, so the head never shows the build's week over the read's. */
+	head: CardHead;
 	tiles: CardTile[];
 	cell: NextCell | null;
 	next: LogNext | null;
@@ -310,6 +321,13 @@ export function liveBasis(week: PlayerWeek, league: boolean, zone: string, now: 
 	return [proj, facts === null ? evidence : `${evidence} ${facts}`];
 }
 
+/** The card's head from the read: its week, and the game or the bye in it. */
+function headOf(week: PlayerWeek, zone: string): CardHead {
+	const game = gameOf(week.line.facts, zone);
+	const opponent = game === null ? NONE : game === 'bye' ? BOX.bye : game.where;
+	return { week: week.week, opponent };
+}
+
 /** His week's game under his name and as the log's accent row: the expected score and the weather
  * only while it is still to be played (Lane 80), "Kicked off" or "Final" in place of the kickoff
  * after. */
@@ -392,6 +410,7 @@ export function liveCard({
 		league !== null && week.verb !== null ? verbOf(week.verb, league, player, screenHref) : null;
 	return {
 		week: week.week,
+		head: headOf(week, zone),
 		tiles: updated,
 		cell,
 		next,

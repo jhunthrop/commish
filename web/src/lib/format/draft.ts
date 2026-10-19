@@ -1,4 +1,6 @@
 /** Words and labels for picks, chance and ADP. Every screen that names a pick or a chance uses these. */
+import { EMPTY_FIGURE } from './empty.ts';
+import { fixed } from './number.ts';
 
 export const DEFAULT_TEAMS = 12;
 const NAME_SUFFIXES = new Set(['Jr.', 'Sr.', 'II', 'III', 'IV', 'V']);
@@ -51,12 +53,11 @@ export function chanceWords(chance: number): string {
 	return chanceShort(chance).replace('<', 'under ').replace('>', 'over ');
 }
 
-/** Where drafters take him against a pick, in words: "drafters take him 1 earlier". */
-export function adpWords(adp: number | null, pick: number): string {
-	if (adp === null) return 'no ADP yet';
-	const gap = Math.round(adp - pick);
-	if (gap === 0) return 'drafters take him here';
-	return `drafters take him ${Math.abs(gap)} ${gap > 0 ? 'later' : 'earlier'}`;
+/** His ADP as every row prints it (the sweep's C19, Y8: the room's pool row, its call card and the
+ * board's row): the API's or the run's tenth as given, the empty figure with none. Never a sentence
+ * set against the pick on the clock. */
+export function adpFigure(adp: number | null): string {
+	return adp === null ? EMPTY_FIGURE : fixed(adp);
 }
 
 const SECONDS_PER_MINUTE = 60;
