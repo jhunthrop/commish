@@ -38,6 +38,23 @@ void test("the season's total is the sum of the points the rows print, so the bo
 	assert.equal(view.line?.total, '30.0');
 });
 
+void test('a season with no games played says he has no stats, never stat lines', () => {
+	const season: PlayerSeason = {
+		season: 2026,
+		format: 'ppr-12',
+		weeks: 18,
+		through: 6,
+		games: 0,
+		pointsPerGame: null,
+		totals: { ...EMPTY, snapShare: null, points: null },
+		log: []
+	};
+	assert.equal(
+		seasonView(season, 'WR', [FORMAT], () => null).none,
+		'He has no 2026 stats through week 6.'
+	);
+});
+
 void test('his earlier seasons are rows in the same columns, newest first, worded like the season line', () => {
 	const season: PlayerSeason = {
 		season: 2026,

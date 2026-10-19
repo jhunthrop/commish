@@ -90,7 +90,7 @@ anything else.
 `lighthouserc.json` carries the spec's budgets at the mobile profile (150 ms round trip, 1.6 Mbps,
 4x CPU), applied throttling, nine runs, asserted on the median. Chrome's paint holding used to land a run's first paint at 0.67 s, 1.66 s or 2.67 s on some machines whatever the page (see Running Lighthouse locally), which on 2026-10-13 failed a seven-run median on noise. Both configs now turn it off, so the runs agree. Nine runs stay as margin, and the 1.2 s budget is unchanged. Prerendered pages are measured from `npm run preview:static` (`scripts/serve-built.ts`), a compressing static server over the build that also answers the headshot route, because in production they are Workers static assets with no Worker in the path. Prerendered pages: LCP 1.2 s, script
 transfer 60 KB as the target and 72 KB as the deploy gate (the Svelte and SvelteKit client runtime is a 47 KB floor before any page code; a page over 60 is a review finding, over 72 fails the deploy). User pages (sheet, mock, lobby, report, account, pass): LCP 2.0 s, script 180 KB.
-CLS 0.05 everywhere. Collected: the board, a player page and the record. The system page is a noindex documentation page, not a nightly page, and is not held to the nightly budget.
+CLS 0.05 everywhere. Collected: the board, a player page and the record. The system page is a dev-only documentation page (`npm run dev`), never built or served, so it carries no budget.
 `.github/workflows/web.yml` runs check, lint, the timed build (budget four minutes), Lighthouse and
 the deploy to the workers.dev preview, on a push to main touching `web/` and on `nightly-run`.
 The workers.dev address is also where Disney's ESPN sign-in runs (`src/lib/site/origins.ts`), so it
@@ -114,7 +114,7 @@ dark again under `:root[data-theme="dark"]`. Change a token there first, then he
 
 The primitives in `src/lib/ui/` port the mock's `build/shell.py` and `build/roomparts.py`, one
 component per file with typed props. Every color is a token, and no page styles a primitive from the
-outside. The system page at `/system` renders each of them with the mock's real 2026 PPR rows from
+outside. The system page at `/system`, on the dev server only (a build answers 404 there), renders each of them with the mock's real 2026 PPR rows from
 `src/fixtures/mock-2026-ppr.ts`, the only fixture in the app.
 
 ## Fonts

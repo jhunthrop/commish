@@ -244,7 +244,6 @@ void test('copy guard: every Lineup word is fantasy words, names the platform, n
 	for (const text of said) {
 		assert.doesNotMatch(text, /\bpaste\b/i, text);
 		assert.doesNotMatch(text, BANNED, text);
-		assert.doesNotMatch(text, /[–—;]/, text);
 	}
 });
 

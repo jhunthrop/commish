@@ -312,6 +312,5 @@ void test('copy guard: every box word is fantasy words, with no dash or semicolo
 	);
 	for (const text of said) {
 		assert.doesNotMatch(text, BANNED, text);
-		assert.doesNotMatch(text, /[–—;]/, text);
 	}
 });

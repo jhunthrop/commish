@@ -2,6 +2,7 @@
  * where our board has him. */
 import { carriesGap } from '#lib/format/gap.ts';
 import { adpDrafts } from '#lib/run/adp-drafts.ts';
+import { carriesRange } from '#lib/run/derive.ts';
 import { boardBasis, type BasisPart } from '#lib/run/board-basis.ts';
 import { rowFraming } from '#lib/run/row-framing.ts';
 import type {
@@ -39,6 +40,9 @@ export interface AdpPage extends BoardStatuses {
 		status?: PlayerStatus;
 		season?: IndexSeason;
 	})[];
+	/** The ranked rows carry a range (preseason), so the page draws Floor to ceiling; in season none
+	 * does and the column is not drawn (Lane 66x). */
+	range: boolean;
 	/** The page's basis, said once under the title (Lane 66n). */
 	basis: BasisPart[];
 	/** The season is underway: the ranked rows carry this season's GP and A game. */
@@ -87,6 +91,7 @@ export async function adpPage(formatId: string): Promise<AdpPage> {
 		formats,
 		sources,
 		rows,
+		range: carriesRange(ranked),
 		basis: boardBasis({
 			format,
 			season: run.season,

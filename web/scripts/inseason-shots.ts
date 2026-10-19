@@ -8,15 +8,15 @@
 // basis line says what they are (Lane 64). On the Trades table (Lane 66g) it asserts the strip's cards
 // and their verb, the finder's heads (the phone's naming the unit), every gain and week cell signed,
 // an opened trade's box-score heads, the basis in five lines at most opening on which trades are
-// listed, the copy verb's confirm naming Sleeper's trade page, and that nothing says "host"; the
+// listed, the copy verb's confirm naming Sleeper's trade page, and that its copy passes the one guard; the
 // builder's two boxes, its scoreboard's figures before and after once answered, and its answer naming
 // its players with their points a game. On the Lineup and Matchup screens, box
 // scores (Lane 66d), it asserts the column heads, every row's projection and points as one decimal or
 // --, the projection's basis said once, no points a game on a row, no name cut and a defense drawn
 // with its club's mark. On the Lineup table (Lane 66e) it asserts the evidence heads and cells,
 // each swap's chip, arrow and evidence line, the bench arrow reading Sit, the copy verb with the
-// platform's own line under it, and that no sentence on the Lineup or Matchup says "host" (the
-// member's platform is named). On the Waivers table (Lane 66f) it asserts the heads, every Proj and Rest of
+// platform's own line under it, and that the copy on every screen passes the one guard, "host" among
+// its words, with the names and rows the API handed it skipped (copy-scan.ts). On the Waivers table (Lane 66f) it asserts the heads, every Proj and Rest of
 // season cell, the tint on the strip's pickups alone, the count of the free agents we rank with the
 // platform named, the basis at five rendered lines at most at 1440 with the pickup rule first and
 // Beats and Open spot said, the drop panel and the copy verb's confirm. On the League page (Lane 66i),
@@ -30,10 +30,14 @@
 // phone's first row is under the pin, or a figure or its sentence is missing.
 //
 //   node scripts/inseason-shots.ts [web origin] [out dir, from scripts/]
-// with the site built against PUBLIC_API_URL=http://localhost:8799 and the fixture API running there.
+// with the site built against PUBLIC_API_URL=http://localhost:8799 and the fixture API running there
+// on the fixture week's clock (FIXTURE_CLOCK=2026-10-17T17:00:00.000Z); API_ORIGIN names another
+// port. The script stops before its first shot when the API's clock is not that week's.
 import { mkdir } from 'node:fs/promises';
 import { chromium, type BrowserContext, type Page } from 'playwright';
 import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
+import { copyFault, watchData } from './copy-scan.ts';
+import { FIXTURE_WEEK_CLOCK } from './inseason-fixture/clock.ts';
 import { FIXTURE_IDS } from './inseason-fixture/ids.ts';
 
 const THEMES = ['light', 'dark'] as const;
@@ -60,6 +64,17 @@ const PAGES = [
 /** The Trades screen's verb on every platform today: the offer copied, the trade page opened. */
 const TRADE_VERB = 'Open Sleeper trades';
 
+/** The fixture API the site was built against: it must run on the browser's clock, the fixture
+ * week's, or every read stamp disagrees with the screens. */
+const API_ORIGIN = new URL(process.env.API_ORIGIN ?? 'http://localhost:8799').origin;
+const fixtureClock = await (
+	await fetch(`${API_ORIGIN}/fixture/clock`)
+).json<{ data: { clock: string | null } | null }>();
+if (fixtureClock.data?.clock !== FIXTURE_WEEK_CLOCK)
+	throw new Error(
+		`The fixture API at ${API_ORIGIN} runs on ${fixtureClock.data?.clock ?? 'the real clock'}: start it with FIXTURE_CLOCK=${FIXTURE_WEEK_CLOCK}.`
+	);
+
 await mkdir(out, { recursive: true });
 const browser = await chromium.launch();
 
@@ -68,6 +83,10 @@ async function context(theme: string, width: number): Promise<BrowserContext> {
 		viewport: { width, height: VIEWPORT_HEIGHT },
 		colorScheme: theme as 'light'
 	});
+	watchData(ctx);
+	// The fixture week's clock, never the day the script runs (start the fixture API with
+	// FIXTURE_CLOCK at the same instant): past its Sunday every game reads as played.
+	await ctx.clock.install({ time: new Date(FIXTURE_WEEK_CLOCK) });
 	await ctx.addCookies([{ ...SIGNED_IN, domain: 'localhost', path: '/' }]);
 	await ctx.addInitScript(
 		([key, value]: readonly [string, string]) => localStorage.setItem(key, value),
@@ -286,7 +305,7 @@ async function tradeFaults(page: Page, width: number): Promise<string[]> {
 	if (!PER_GAME_BASIS.test(all)) faults.push('basis says no points a game');
 	const proj = (all.match(PROJ_BASIS) ?? []).length;
 	if (proj !== 1) faults.push(`projection basis said ${String(proj)} times`);
-	for (const word of await hostWordsSaid(page)) faults.push(`says host: ${word}`);
+	for (const word of await bannedSaid(page)) faults.push(`says ${word}`);
 	return faults;
 }
 const missing: string[] = [];
@@ -350,7 +369,7 @@ for (const { name, path, ready: text } of PAGES) {
 						? ['Slot', 'Player', 'Proj', 'Pts']
 						: ['Slot', 'Player', 'Game', 'Proj', 'Pts'];
 				const heads = name === 'start' ? lineupHeads : boxHeads;
-				for (const word of await hostWordsSaid(page)) missing.push(`${at} says host: ${word}`);
+				for (const word of await bannedSaid(page)) missing.push(`${at} says ${word}`);
 				if (name === 'start') {
 					for (const fault of await lineupFaults(page)) missing.push(`${at} ${fault}`);
 				}
@@ -645,14 +664,12 @@ for (const theme of THEMES) {
 	}
 }
 
-/** Every sentence a member reads on a screen, checked for the word "host": the member's platform is
- * named instead (Lane 66e, founder 2026-10-17). */
-async function hostWordsSaid(page: Page): Promise<string[]> {
-	return page.evaluate(() =>
-		[...document.querySelectorAll('main p, main td, main th, main li, main button, main a')]
-			.map((el) => (el as HTMLElement).innerText)
-			.filter((text) => /\bhosts?\b/i.test(text))
-	);
+/** Every word a member reads on a screen against the site's one copy guard, "host" among its words
+ * (the member's platform is named instead, Lane 66e), with the names and rows the API handed the
+ * page skipped (ruling R3): the banned word found, or none. */
+async function bannedSaid(page: Page): Promise<string[]> {
+	const fault = await copyFault(page);
+	return fault === null ? [] : [fault];
 }
 
 /** What is wrong with the Waivers table at a width, as sentences; none when it holds. */
@@ -701,7 +718,7 @@ async function waiverFaults(page: Page, width: number): Promise<string[]> {
 	if (!seen.basis.some((line) => /Beats is .*Open spot is /.test(line)))
 		faults.push('basis says no word of Beats and Open spot');
 	if (!seen.basis[0]?.startsWith(PICKUP_RULE)) faults.push(`basis first ${seen.basis[0] ?? ''}`);
-	for (const word of await hostWordsSaid(page)) faults.push(`says host: ${word}`);
+	for (const word of await bannedSaid(page)) faults.push(`says ${word}`);
 	return faults;
 }
 
@@ -1171,7 +1188,7 @@ for (const theme of THEMES) {
 			await ready(page, 'Every game this week, yours first.');
 			const at = `${lp.name} ${theme} ${String(width)}`;
 			for (const fault of await leagueFaults(page, lp, width)) missing.push(`${at} ${fault}`);
-			for (const word of await hostWordsSaid(page)) missing.push(`${at} says host: ${word}`);
+			for (const word of await bannedSaid(page)) missing.push(`${at} says ${word}`);
 			if (await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth))
 				scrolls.push(at);
 			await page.screenshot({ path: file(`${lp.name}-${theme}-${String(width)}`), fullPage: true });
@@ -1198,8 +1215,7 @@ for (const theme of THEMES) {
 			await page.keyboard.press('ArrowRight');
 			await ready(page, `rules as ${lp.platform} states them`);
 			for (const fault of await settingsFaults(page, lp)) missing.push(`${at} ${fault}`);
-			for (const word of await hostWordsSaid(page))
-				missing.push(`${at} settings say host: ${word}`);
+			for (const word of await bannedSaid(page)) missing.push(`${at} settings say ${word}`);
 			if (await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth))
 				scrolls.push(`${at} settings`);
 			await page.screenshot({
