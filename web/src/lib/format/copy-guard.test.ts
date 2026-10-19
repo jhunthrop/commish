@@ -10,7 +10,8 @@ import {
 	BETTING_WORDS,
 	bannedIn,
 	bannedInCopy,
-	dataStrings
+	dataStrings,
+	frameData
 } from './copy-guard.ts';
 
 void test('the list holds the betting, trading and platform words, whole words in any case', () => {
@@ -146,4 +147,16 @@ void test('data strings come from name fields at any depth, numbers and other fi
 		],
 		['Las Vegas Raiders', 'Ja Price']
 	);
+});
+
+void test("the room's socket frames are data by their fields, as an answer is (the sweep's C8)", () => {
+	const frame = JSON.stringify({
+		type: 'update',
+		state: { picks: [{ by_name: 'helperA', player: { name: 'Jadarian Price', position: 'RB' } }] }
+	});
+	const data = frameData(frame);
+	assert.deepEqual([...data].sort(), ['Jadarian Price', 'helperA']);
+	assert.equal(bannedInCopy('Jadarian Price, RB, taken by helperA', data), null);
+	assert.equal(bannedInCopy('Price drops', data), 'Price');
+	assert.equal(frameData('not json').size, 0);
 });

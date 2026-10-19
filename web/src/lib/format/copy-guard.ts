@@ -113,6 +113,18 @@ export function dataStrings(value: unknown, named = false): Set<string> {
 	);
 }
 
+/** A socket frame's data (the room's, the sweep's C8): a JSON frame read by its fields as an answer
+ * is, any other frame none. */
+export function frameData(frame: string): Set<string> {
+	let parsed: unknown;
+	try {
+		parsed = JSON.parse(frame);
+	} catch {
+		return new Set();
+	}
+	return dataStrings(parsed);
+}
+
 /** The first banned word or mark in a page's copy, the data it was handed skipped (ruling R3): a
  * name like "Las Vegas Raiders" or "Jadarian Price" is taken out before the scan, while a data
  * string that is only a banned word ("Totals") excuses nothing, so a head the web prints is still

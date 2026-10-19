@@ -2,13 +2,15 @@
 // (src/lib/format/copy-guard.ts), with the data the page was handed skipped. The data is the API's
 // and the run's own names (their name fields, copy-guard.ts NAME_FIELDS), read from every JSON
 // answer the browser context received and from the prerendered page's own data file, never an
-// allow-list of names. Every other string an answer carries is copy and is scanned.
+// allow-list of names. The room's socket frames are answers too (the sweep's C8): a drafter's name
+// or a player's that arrives on the socket is data by its field, as an HTTP answer's is. Every other
+// string an answer carries is copy and is scanned.
 //
 //   const ctx = await browser.newContext(...); watchData(ctx);
 //   ... const fault = await copyFault(page); // null when the copy is clean
 import { unflatten } from 'devalue';
 import type { BrowserContext, Page, Response } from 'playwright';
-import { bannedInCopy, dataStrings } from '../src/lib/format/copy-guard.ts';
+import { bannedInCopy, dataStrings, frameData } from '../src/lib/format/copy-guard.ts';
 
 const JSON_TYPE = /\bjson\b/u;
 
@@ -25,13 +27,20 @@ async function answerStrings(response: Response): Promise<Set<string>> {
 	}
 }
 
-/** Starts collecting the data a context's pages are handed: every JSON answer, from any origin.
- * Call it before the first page opens. */
+/** Starts collecting the data a context's pages are handed: every JSON answer, from any origin, and
+ * every frame a page's sockets receive. Call it before the first page opens. */
 export function watchData(ctx: BrowserContext): void {
 	const answers: Promise<Set<string>>[] = [];
 	watched.set(ctx, answers);
 	ctx.on('response', (response) => {
 		answers.push(answerStrings(response));
+	});
+	ctx.on('page', (page) => {
+		page.on('websocket', (socket) => {
+			socket.on('framereceived', ({ payload }) => {
+				answers.push(Promise.resolve(typeof payload === 'string' ? frameData(payload) : new Set()));
+			});
+		});
 	});
 }
 
