@@ -3142,7 +3142,7 @@ export interface components {
 			/** @description one sentence under the verb when we cannot open the host's page ("Make this change on Yahoo. We cannot open that page for you yet."), null when the url opens it */
 			host_note: string | null;
 			moves: components['schemas']['LineupMoves'];
-			/** @description the sentence once every starter's game this week is final ("Every starter's game is final, so week 6 is in the books."): no change is left to make, so the screen says it in place of the changes and the verb; null while any starter's game is still to come or under way, or absent from an older answer */
+			/** @description the sentence once every starter's game this week is final ("Every starter's game is final, so week 6 is over."): no change is left to make, so the screen says it in place of the changes and the verb; null while any starter's game is still to come or under way, or absent from an older answer */
 			week_done?: string | null;
 		};
 		BoxStarter: {

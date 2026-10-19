@@ -19,7 +19,7 @@ func starterAt(state apitypes.GameState, bye bool) apitypes.LineupSlot {
 	return apitypes.LineupSlot{Ours: apitypes.PlayerLine{Facts: facts}}
 }
 
-// The week is in the books once every starter's game is final (Lane 85):
+// The week is over once every starter's game is final (Lane 85):
 // one sentence from the API, a bye starter aside, none while any starter's
 // game is still to come or under way, none with no starter who has a game.
 func TestWeekDoneOnceEveryStartersGameIsFinal(t *testing.T) {
@@ -30,9 +30,9 @@ func TestWeekDoneOnceEveryStartersGameIsFinal(t *testing.T) {
 		want  string
 	}{
 		{"every game final", []apitypes.LineupSlot{starterAt(final, false), starterAt(final, false)},
-			"Every starter's game is final, so week 6 is in the books."},
+			"Every starter's game is final, so week 6 is over."},
 		{"a bye starter aside", []apitypes.LineupSlot{starterAt(final, false), starterAt("", true)},
-			"Every starter's game is final, so week 6 is in the books."},
+			"Every starter's game is final, so week 6 is over."},
 		{"one kicked off", []apitypes.LineupSlot{starterAt(final, false), starterAt(kicked, false)}, ""},
 		{"one still to come", []apitypes.LineupSlot{starterAt(final, false), starterAt(upcoming, false)}, ""},
 		{"only byes", []apitypes.LineupSlot{starterAt("", true)}, ""},

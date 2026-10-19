@@ -337,7 +337,7 @@ func LineupBasis(b OrderBasis) string {
 // week is final (Lane 85): nothing is left to change, so it stands where
 // the changes and the verb would.
 func WeekDoneWords(week int) string {
-	return fmt.Sprintf("Every starter's game is final, so week %d is in the books.", week)
+	return fmt.Sprintf("Every starter's game is final, so week %d is over.", week)
 }
 
 // WaiversBasis is the waiver page's pickup rule (§5.3, Lane 66f): the

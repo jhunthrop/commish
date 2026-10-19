@@ -332,8 +332,10 @@ void test('no move is drawn on a row whose game has kicked off or is final (Lane
 	assert.equal(heldLineup(untouched, NOW), untouched);
 });
 
-void test('the week in the books takes the strip: no sum, the API sentence', () => {
-	const done = "Every starter's game is final, so week 6 is in the books.";
+void test('the finished week takes the strip: no sum, the API sentence', () => {
+	const done = "Every starter's game is final, so week 6 is over.";
+	// The API's sentence (words.go WeekDoneWords) passes the one copy guard.
+	assert.doesNotMatch(done, BANNED, done);
 	const box = lineupBox(advice, ZONE, NOW);
 	assert.equal(stripSum(box, done), null);
 	assert.notEqual(stripSum(box, null), null);

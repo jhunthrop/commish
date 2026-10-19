@@ -2800,7 +2800,7 @@ type LineupAdvice struct {
 	UncountedRules []string `json:"uncounted_rules"`
 	Week           int      `json:"week"`
 
-	// WeekDone the sentence once every starter's game this week is final ("Every starter's game is final, so week 6 is in the books."): no change is left to make, so the screen says it in place of the changes and the verb; null while any starter's game is still to come or under way, or absent from an older answer
+	// WeekDone the sentence once every starter's game this week is final ("Every starter's game is final, so week 6 is over."): no change is left to make, so the screen says it in place of the changes and the verb; null while any starter's game is still to come or under way, or absent from an older answer
 	WeekDone *string `json:"week_done,omitempty"`
 }
 

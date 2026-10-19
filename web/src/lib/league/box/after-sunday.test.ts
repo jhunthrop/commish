@@ -73,13 +73,13 @@ void test('on Monday no game reads a kickoff already past as next, and no move i
 	assert.equal(monday.lineup.team_points, mine?.points);
 });
 
-void test('on Tuesday every game is final, the lineup is set and the week is in the books', () => {
+void test('on Tuesday every game is final, the lineup is set and the week is over', () => {
 	const tuesday = at(FIXTURE_TUESDAY_CLOCK);
 	assert.ok(tuesday.scoreboard.games.every((g) => g.state === 'final' && g.next_kickoff === null));
 	assert.equal(tuesday.lineup.set, true);
 	assert.ok(tuesday.lineup.slots.every((s) => !s.changed));
 	assert.equal(
 		tuesday.lineup.week_done,
-		"Every starter's game is final, so week 6 is in the books."
+		"Every starter's game is final, so week 6 is over."
 	);
 });

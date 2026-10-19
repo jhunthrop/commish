@@ -7,7 +7,7 @@
 //     scoreboard-live.json by the same rules;
 //   - after the Sunday (afterSundayOf, on the Monday and Tuesday clocks): each game final by the API's
 //     rule at the fixture's clock (game-state.ts stateAt), the Lineup advised as the engine would with
-//     every kicked-off player locked, the scoreboard restated, and the week in the books once every
+//     every kicked-off player locked, the scoreboard restated, and the finished week once every
 //     starter's game is final.
 import type { LeagueSync, MatchupSide } from '../../src/lib/league/api.ts';
 import type {
@@ -70,7 +70,7 @@ function lineAt(line: PlayerLine, moment: Moment): PlayerLine {
 function weekDone(lineup: LineupAdvice, moment: Moment): string | null {
 	const games = lineup.slots.filter(({ ours }) => !ours.facts.bye && ours.facts.kickoff !== null);
 	if (games.length === 0 || !games.every(({ ours }) => moment.final(ours))) return null;
-	return `Every starter's game is final, so week ${String(lineup.week)} is in the books.`;
+	return `Every starter's game is final, so week ${String(lineup.week)} is over.`;
 }
 
 /** The Lineup at the moment: the roster advised again as the engine would then (advise.ts, engine.go

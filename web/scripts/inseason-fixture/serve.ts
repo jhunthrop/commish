@@ -207,7 +207,7 @@ function scoreboardNow(): Scoreboard {
 
 /** From the Monday clock on (Lane 80's FIXTURE_MONDAY_CLOCK and FIXTURE_TUESDAY_CLOCK), every league
  * read is the week after its Sunday at the fixture's clock (sunday.ts afterSundayOf): the Lineup as
- * the engine would advise it then, the points so far, the scoreboard restated, the week in the books
+ * the engine would advise it then, the points so far, the scoreboard restated, the finished week
  * once every starter's game is final (Lane 85). */
 const AFTER_SUNDAY = Date.parse(FIXTURE_MONDAY_CLOCK);
 const afterSunday = (): boolean => now() >= AFTER_SUNDAY;

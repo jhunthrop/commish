@@ -22,7 +22,8 @@
 		<span class="wk">Week {week}</span>
 		<span class="title">{changesTitle(box.swaps.length, done)}</span>
 	</div>
-	{#if box.swaps.length > 0 || box.idle.length > 0}
+	<!-- A finished week has nothing left to fill or change: no chip (Lane 85). -->
+	{#if done === null && (box.swaps.length > 0 || box.idle.length > 0)}
 		<ul class="swaps">
 			<!-- The spots no one can play first, so a phone shows them before the swaps (review N4). -->
 			{#each box.idle as said (said)}

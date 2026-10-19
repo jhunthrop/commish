@@ -466,7 +466,7 @@ void test('copy guard: every League page word is fantasy words, with no dash or 
 	);
 });
 
-void test('the lineup card draws no change on a played week and says it is in the books', () => {
+void test('the lineup card draws no change on a played week and says it is over', () => {
 	const recorded = JSON.parse(
 		readFileSync(
 			new URL('../../../../scripts/inseason-fixture/data/lineup.json', import.meta.url),
@@ -480,7 +480,7 @@ void test('the lineup card draws no change on a played week and says it is in th
 	const saturday = lineupSummary(recorded, ZONE, SATURDAY);
 	assert.ok(saturday.box.swaps.length > 0);
 	assert.equal(saturday.done, null);
-	const done = "Every starter's game is final, so week 6 is in the books.";
+	const done = "Every starter's game is final, so week 6 is over.";
 	const tuesday = lineupSummary(
 		{
 			...recorded,

@@ -91,7 +91,7 @@ export function shortName(name: string): string {
 const NUMBER_WORDS = ['No', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
 
 /** "Three changes", "One change", "12 changes", or "Your lineup is set"; "Final" once the API says
- * the week is in the books (its week_done sentence, said beside it). */
+ * the week is over (its week_done sentence, said beside it). */
 export function changesTitle(n: number, done: string | null = null): string {
 	if (done !== null) return BOX.final;
 	if (n === 0) return LINEUP.set;
@@ -111,7 +111,7 @@ export function stripSum(
 	box: Pick<LineupBox, 'totals' | 'asSet' | 'gain' | 'swaps'>,
 	done: string | null = null
 ): StripSum | null {
-	// A week in the books has no Proj left to add: the API's sentence stands in the sum's place.
+	// A finished week has no Proj left to add: the API's sentence stands in the sum's place.
 	if (box.totals.proj === null || done !== null) return null;
 	const figure = boxNumber(box.totals.proj);
 	if (box.swaps.length === 0) return { figure, words: `${BOX.proj} as set`, gain: null };

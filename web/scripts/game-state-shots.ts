@@ -10,6 +10,12 @@
 // Sunday, Final after), the schedule and the clubs (Rest of season strength, never the
 // preseason's). SET=standin (the site built from the stand-in run): Jaxson Dart's card, whose live week
 // replaces the run's week still to play, so his week 6 shows one state.
+// SET=standin on Monday and Tuesday also shoots the fixture league's screens (Lane 85): the League
+// page's score bugs never say "Next kickoff" for a game past its kickoff (Final or Kicked off, a time
+// only for Monday night's still to come), the Lineup offers no move on a player whose game has kicked
+// off and on Tuesday says the week is over with no verb, Waivers and Trades draw no "Proj
+// this week" on Tuesday, the Matchup's bug says Final on Tuesday, and each basis says when the stats
+// land.
 // Every screen: the basis says when Final and the stats land while a row waits on either, never claims
 // a week a Sunday player's GP does not reach, and stays within five rendered lines at 1440 and eight
 // at 390 (basis-lines.ts); the copy passes the one guard (copy-scan.ts); nothing scrolls sideways.
@@ -24,6 +30,7 @@ import { STRENGTH_HEADS } from '../src/lib/run/strength-words.ts';
 import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
 import { BASIS_BUDGET, basisLines } from './basis-lines.ts';
 import { copyFault, watchData } from './copy-scan.ts';
+import { FIXTURE_IDS } from './inseason-fixture/ids.ts';
 import {
 	FIXTURE_MONDAY_CLOCK,
 	FIXTURE_SUNDAY_CLOCK,
@@ -237,6 +244,117 @@ async function checkPage(page: Page, screen: Screen, width: number, at: string):
 	const copy = await copyFault(page);
 	if (copy !== null) fault(at, copy);
 	process.stdout.write(`${at}: basis ${String(lines)} lines\n`);
+}
+
+/** The fixture league's screens after its Sunday (Lane 85). */
+interface LeagueScreen {
+	name: string;
+	path: string;
+	ready: string;
+	check: (page: Page, at: string) => Promise<void>;
+}
+const LEAGUE = `/league/${FIXTURE_IDS.league}`;
+/** The Lineup's players whose games are still to come on Monday: Monday night's. */
+const MONDAY_NIGHT_MOVES = ['Kirk'];
+const WEEK_DONE = "Every starter's game is final, so week 6 is over.";
+
+async function checkBugs(page: Page, at: string): Promise<void> {
+	const bugs = await page.locator('main .bug').evaluateAll((els) =>
+		els.map((el) => ({
+			head: el.querySelector('.st')?.textContent.trim() ?? '',
+			words: el.querySelector('.sw')?.textContent.trim() ?? ''
+		}))
+	);
+	if (bugs.length === 0) fault(at, 'no score bug');
+	for (const bug of bugs) {
+		const past = bug.head === KICKED_OFF || bug.head === FINAL;
+		if (day === 'tuesday' && bug.head !== FINAL) fault(at, `a bug reads ${bug.head} on Tuesday`);
+		// Only Monday night's kickoff is still to come on Monday.
+		if (!past && !(day === 'monday' && bug.head.startsWith('Mon ')))
+			fault(at, `a bug reads "${bug.head} ${bug.words}", a kickoff already past`);
+	}
+}
+
+async function checkLineup(page: Page, at: string): Promise<void> {
+	const chips = await page.locator('main .swaps li:not(.idle)').allInnerTexts();
+	const moved = chips.filter((c) => !MONDAY_NIGHT_MOVES.some((name) => c.includes(name)));
+	if (moved.length > 0)
+		fault(at, `a move on a player whose game has kicked off: ${moved.join(', ')}`);
+	const text = await page.locator('main').innerText();
+	const verb = await page.getByText('Copy the lineup').filter({ visible: true }).count();
+	if (day === 'tuesday') {
+		if ((await page.locator('main .swaps li').count()) > 0)
+			fault(at, 'a change or an empty spot named on a finished week');
+		if (!text.includes(WEEK_DONE)) fault(at, 'the finished week is not said');
+		if (verb > 0) fault(at, 'a verb on a finished week');
+	} else if (text.includes(WEEK_DONE)) fault(at, 'the week is said over on Monday');
+}
+
+async function checkNoWeekFigure(page: Page, at: string, words: string): Promise<void> {
+	const text = await page.locator('main').innerText();
+	if (day === 'tuesday' && text.includes(words)) fault(at, `"${words}" on a finished week`);
+}
+
+async function checkMatchup(page: Page, at: string): Promise<void> {
+	const mid = ((await page.locator('main .bug .mid').textContent()) ?? '').replace(/\s+/g, ' ');
+	if (day === 'tuesday' && !mid.includes(FINAL)) fault(at, `the Matchup's bug reads "${mid}"`);
+	if (mid.includes('kickoff') && !(day === 'monday' && mid.includes('Mon ')))
+		fault(at, `the Matchup's bug reads "${mid}", a kickoff already past`);
+}
+
+const LEAGUE_SCREENS: readonly LeagueScreen[] = [
+	{ name: 'league', path: LEAGUE, ready: 'Every game this week, yours first.', check: checkBugs },
+	{ name: 'lineup', path: `${LEAGUE}/start`, ready: 'Week 6', check: checkLineup },
+	{ name: 'matchup', path: `${LEAGUE}/matchup`, ready: 'Week 6', check: checkMatchup },
+	{
+		name: 'waivers',
+		path: `${LEAGUE}/waivers`,
+		ready: 'Open Sleeper waivers',
+		check: (page, at) => checkNoWeekFigure(page, at, 'Proj this week')
+	},
+	{
+		name: 'trades',
+		path: `${LEAGUE}/trades`,
+		ready: 'worth proposing',
+		check: (page, at) => checkNoWeekFigure(page, at, 'Proj for you this week')
+	}
+];
+
+for (const screen of set === 'standin' && day !== 'sunday' ? LEAGUE_SCREENS : []) {
+	for (const [theme, width] of SHOTS) {
+		const ctx = await context(theme, width, true);
+		const page = await ctx.newPage();
+		const at = `${day} ${screen.name} ${theme} ${String(width)}`;
+		try {
+			await page.goto(`${web}${screen.path}`);
+			await ready(page, screen.ready);
+			await screen.check(page, at);
+			// Every row waits on its stats on Monday and Tuesday: each box screen's basis says when they
+			// land (the League page's basis is its standings').
+			if (
+				screen.name !== 'league' &&
+				!(await page.locator('main').innerText()).includes(KICKED_OFF_PART)
+			)
+				fault(at, 'the basis does not say when Final and the stats land');
+			const lines = await basisLines(page);
+			const budget = BASIS_BUDGET[width];
+			if (budget !== undefined && lines > budget)
+				fault(at, `basis ${String(lines)} lines, over ${String(budget)}`);
+			if (await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth))
+				fault(at, 'scrolls sideways');
+			const copy = await copyFault(page);
+			if (copy !== null) fault(at, copy);
+			process.stdout.write(`${at}: basis ${String(lines)} lines\n`);
+			const name = `${screen.name}-${theme}-${String(width)}`;
+			await page.screenshot({ path: new URL(`${name}-top.png`, out).pathname });
+			if (theme === 'dark')
+				await page.screenshot({ path: new URL(`${name}.png`, out).pathname, fullPage: true });
+		} catch (error) {
+			fault(at, error instanceof Error ? error.message : String(error));
+		} finally {
+			await ctx.close();
+		}
+	}
 }
 
 for (const screen of SCREENS.filter((s) => s.set === set)) {
