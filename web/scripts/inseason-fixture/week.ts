@@ -41,8 +41,7 @@ export const LINEUP_BASIS =
 	'We start the highest Proj at each slot after designations and byes, our order breaking ties.';
 
 /** The Waivers pickup rule (words.go WaiversBasis). */
-export const WAIVERS_BASIS =
-	'A pickup starts this week on Proj and keeps Gain at zero or better.';
+export const WAIVERS_BASIS = 'A pickup starts this week on Proj and keeps Gain at zero or better.';
 
 const COUNT_WORDS = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'];
 
