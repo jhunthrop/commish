@@ -9,6 +9,8 @@ import {
 	boxBasisParts,
 	deltaPart,
 	gamePart,
+	KICKED_OFF_PART,
+	kickedOffPart,
 	OPP_PART,
 	projPart,
 	ptsPart,
@@ -189,4 +191,38 @@ void test('the Matchup key says Proj, Pts and Game, the columns it draws', () =>
 		basisText(parts),
 		"Proj is this week's published projection, PPR nearest your rules, read Fri 9:00 pm. Pts are ESPN's team points, none by player. Game is each club's expected points, his first, and weather, read Fri 4:01 pm."
 	);
+});
+
+void test('the Lineup and the Matchup say when Final and the stats land while a row waits (Lane 85)', () => {
+	const waiting = line({ kickoff: '2026-10-18T17:00:00.000Z', played: true, game_state: 'final' });
+	const box = (lineup: boolean): string =>
+		basisText(
+			boxBasisParts(
+				{
+					projection: { readAt: READ, scoring: CLOSEST },
+					lines: [waiting],
+					byPlayer: true,
+					teamTotal: false,
+					host: 'sleeper',
+					lineup: lineup
+						? {
+								previousReadAt: null,
+								note: { basis_note: '', basis_note_link: '' },
+								rulesHref: '/league/1#uncounted'
+							}
+						: null
+				},
+				CENTRAL,
+				Date.parse('2026-10-19T16:00:00.000Z')
+			)
+		);
+	for (const text of [box(true), box(false)]) assert.ok(text.includes(KICKED_OFF_PART), text);
+	// Once his week's stats are in, nothing waits and the sentence goes.
+	const counted = line({
+		kickoff: '2026-10-18T17:00:00.000Z',
+		played: true,
+		game_state: 'final',
+		last_games: [{ week: 6, points: 12.4 }]
+	});
+	assert.equal(kickedOffPart([counted]), null);
 });

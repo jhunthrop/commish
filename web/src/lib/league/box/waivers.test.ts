@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { bannedPattern } from '#lib/format/copy-guard.ts';
 import type { PlayerLine, WaiverRow, WeekFacts } from '../inseason/api.ts';
-import { basisText } from './basis.ts';
+import { basisText, KICKED_OFF_PART } from './basis.ts';
 import {
 	cardGains,
 	cardName,
@@ -395,4 +395,14 @@ void test('a pickup whose game is final keeps its card but says no Proj this wee
 	);
 	assert.equal(sameWeekGain(drops), null);
 	assert.equal(withDrop(gainwell, drops[0] ?? null).week_gain, gainwell.week_gain);
+});
+
+void test('the basis says when Final and the stats land while a row waits on them (Lane 85)', () => {
+	const final = {
+		...gainwell.add,
+		facts: { ...gainwell.add.facts, played: true, game_state: 'final' as const }
+	};
+	const text = basisText(waiverBasis(BASIS, [final, saints], RULES, CLOCK, NOW));
+	assert.ok(text.includes(KICKED_OFF_PART), text);
+	assert.ok(!basisText(waiverBasis(BASIS, [saints], RULES, CLOCK, NOW)).includes(KICKED_OFF_PART));
 });

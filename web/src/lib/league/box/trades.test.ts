@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { bannedPattern } from '#lib/format/copy-guard.ts';
-import { basisText } from './basis.ts';
+import { basisText, KICKED_OFF_PART } from './basis.ts';
 import type { PlayerLine, TradeAdvice, TradeCheck, TradeRow, TradeTeam } from '../inseason/api.ts';
 import {
 	bugFigures,
@@ -455,4 +455,21 @@ void test('a trade moving a player whose game has kicked off draws no change thi
 	assert.equal(checked.totals.yours.season_after, 35.8);
 	const fine = { ...check(), trade: open };
 	assert.equal(heldCheck(fine, NOW), fine);
+});
+
+void test('the basis says when Final and the stats land while a row waits on them (Lane 85)', () => {
+	const played = line('Cam Skattebo');
+	const final = {
+		...played,
+		facts: {
+			...played.facts,
+			kickoff: '2026-10-18T17:00:00.000Z',
+			played: true,
+			game_state: 'final' as const
+		}
+	};
+	const text = basisText(
+		tradeBasis(advice, 'sleeper', [final], 'none', TRADE_LINKS, TRADE_CLOCK, NOW_66T)
+	);
+	assert.ok(text.includes(KICKED_OFF_PART), text);
 });

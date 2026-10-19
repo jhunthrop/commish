@@ -9,7 +9,10 @@ const SATURDAY = Date.parse('2026-10-17T17:00:00.000Z');
 const MONDAY = Date.parse('2026-10-19T16:00:00.000Z');
 
 void test('the API says final: Final, and no kickoff is next', () => {
-	assert.deepEqual(gameHead({ state: 'final', next: null }, MONDAY), { state: 'final', next: null });
+	assert.deepEqual(gameHead({ state: 'final', next: null }, MONDAY), {
+		state: 'final',
+		next: null
+	});
 	assert.deepEqual(gameHead({ state: 'final', next: SUNDAY_NOON }, SATURDAY), {
 		state: 'final',
 		next: null

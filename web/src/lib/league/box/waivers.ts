@@ -15,6 +15,7 @@ import { hostWords } from '../names.ts';
 import {
 	deltaPart,
 	gamePart,
+	kickedOffPart,
 	OPP_PART,
 	projPart,
 	said,
@@ -459,6 +460,7 @@ export function waiverBasis(
 		...said(proj),
 		...said(deltaPart(advice.projection_previous_read_at, clock), false),
 		...said(gamePart(lines, clock, now, 'read')),
+		...said(kickedOffPart(lines)),
 		...said(OPP_PART),
 		...uncountedParts(advice, rulesHref)
 	];

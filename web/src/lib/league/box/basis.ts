@@ -168,7 +168,11 @@ export function boxBasisParts(facts: BoxBasisFacts, clock: Clock, now: number): 
 	// The Lineup's Team adds the lineup's rows; the Matchup's is the platform's total where it sends one.
 	const team = lineup === null && facts.teamTotal ? 'platform' : 'rows';
 	const pts = said(ptsPart(facts.byPlayer, facts.host, team));
-	const game = said(gamePart(facts.lines, clock, now, 'full'));
+	// When a row's Final and its stats land, said while one waits on either (Lane 85).
+	const game = [
+		...said(gamePart(facts.lines, clock, now, 'full')),
+		...said(kickedOffPart(facts.lines))
+	];
 	if (lineup === null) return [...proj, ...pts, ...game];
 	return [
 		...proj,

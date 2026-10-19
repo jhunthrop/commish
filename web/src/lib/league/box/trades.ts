@@ -22,6 +22,7 @@ import { LINES, verbWords } from '../inseason/words.ts';
 import { hostWords } from '../names.ts';
 import {
 	gamePart,
+	kickedOffPart,
 	OPP_PART,
 	projPart,
 	ptsPart,
@@ -449,6 +450,7 @@ export function tradeBasis(
 		...said(advice.basis),
 		...(opened === 'none' ? [] : said(advice.per_game_basis)),
 		...proj,
+		...said(kickedOffPart(lines)),
 		...players,
 		...said(WEEK_ROOM, false),
 		{ text: LINES.orderRecord, phone: true, href: hrefs.record }
