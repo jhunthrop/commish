@@ -105,17 +105,14 @@ function standsOf(
 	return side.points > other.points ? 'ahead' : 'behind';
 }
 
-/** The state's words at the bug's head: the starters still to play only on the API's own count of a
- * game under way, never on a read that lags the clock. */
+/** The state's words at the bug's head: the API's count of the starters still to play while its game
+ * is under way (to_play, words.go ToPlayWords, a bye starter left out), never one made here. */
 function bugHead(game: ScoreboardGame, head: GameHead, zone: string): Pick<Bug, 'head' | 'words'> {
 	if (head.state === 'final') return { head: KICKOFF.final, words: '' };
 	if (head.state === 'kicked_off') {
-		const toPlay = game.sides.reduce((n, s) => n + s.starters - s.played, 0);
-		const starters = game.sides.reduce((n, s) => n + s.starters, 0);
 		return {
 			head: KICKOFF.kickedOff,
-			words:
-				game.state === 'playing' ? `${String(toPlay)} of ${String(starters)} starters to play` : ''
+			words: game.state === 'playing' ? (game.to_play ?? '') : ''
 		};
 	}
 	return {

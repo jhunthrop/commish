@@ -118,5 +118,17 @@ func (a *advisor) scoreboardGame(sides []*leaguesync.Side) apitypes.ScoreboardGa
 		out.Sides = append(out.Sides, side)
 	}
 	out.State, out.NextKickoff = game.state(), game.next
+	out.ToPlay = game.toPlay()
 	return out
+}
+
+// toPlay is the bug's count while the game is under way: of the
+// starters with a game this week, those still to play (a bye starter is
+// neither, review M3); nil before kickoff and once every game is final.
+func (k kickoffs) toPlay() *string {
+	if k.state() != apitypes.ScoreboardGameStatePlaying {
+		return nil
+	}
+	words := ToPlayWords(k.games-k.kicked, k.games)
+	return &words
 }

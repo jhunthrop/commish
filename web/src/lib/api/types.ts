@@ -3198,6 +3198,8 @@ export interface components {
 			 * @description the earliest kickoff still to come among both sides' starters, null when none is
 			 */
 			next_kickoff: string | null;
+			/** @description while the game is playing, how many of both sides' starters with a game this week are still to play ("5 of 18 starters to play"): a starter on bye, or with no game held, is neither to play nor played and leaves the count; null otherwise, or absent from an older answer */
+			to_play?: string | null;
 			/** @description two sides, the drafter's first when the game is theirs; one for a team with no opponent */
 			sides: components['schemas']['ScoreboardSide'][];
 		};

@@ -133,6 +133,8 @@ const board = (state: Scoreboard['games'][number]['state']): Scoreboard => ({
 		{
 			state,
 			next_kickoff: state === 'final' ? null : '2026-10-18T20:25:00.000Z',
+			// The API's count (words.go ToPlayWords), a bye starter left out of it.
+			to_play: state === 'playing' ? '12 of 18 starters to play' : null,
 			sides: [side(1, 62.1, 87), side(2, 71.4, null)]
 		}
 	]
@@ -170,7 +172,7 @@ void test('once a game has started the side ahead is bright and the side behind 
 	const [playing] = bugsOf(board('playing'), SYNC, SATURDAY, ZONE);
 	assert.ok(playing);
 	assert.equal(playing.head, KICKOFF.kickedOff);
-	assert.equal(playing.words, '12 of 20 starters to play');
+	assert.equal(playing.words, '12 of 18 starters to play');
 	const [final] = bugsOf(board('final'), SYNC, SATURDAY, ZONE);
 	assert.equal(final?.head, HOME.final);
 	const level = board('playing');
@@ -213,7 +215,7 @@ void test('a kickoff before the page clock is never the next: the bug reads Kick
 	const [playing] = bugsOf(board('playing'), SYNC, MONDAY, ZONE);
 	assert.ok(playing);
 	assert.equal(playing.head, KICKOFF.kickedOff);
-	assert.equal(playing.words, '12 of 20 starters to play');
+	assert.equal(playing.words, '12 of 18 starters to play');
 	assert.equal(bugsOf(board('final'), SYNC, MONDAY, ZONE)[0]?.head, KICKOFF.final);
 });
 

@@ -159,7 +159,13 @@ export function scoreboardAt(recorded: Recorded, moment: Moment, readAt: string)
 			};
 		});
 		const game = kicks(all, moment);
-		return { state: stateOf(game), next_kickoff: game.next, sides };
+		const state = stateOf(game);
+		// The API's count (scoreboard.go toPlay): starters with a game, a bye starter left out.
+		const toPlay =
+			state === 'playing'
+				? `${String(game.games - game.kicked)} of ${String(game.games)} starters to play`
+				: null;
+		return { state, next_kickoff: game.next, to_play: toPlay, sides };
 	});
 	return {
 		week: recorded.week,

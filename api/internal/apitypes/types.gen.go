@@ -3681,6 +3681,9 @@ type ScoreboardGame struct {
 
 	// State upcoming before any starter's game kicks off, final once every starter's game is over, playing between
 	State ScoreboardGameState `json:"state"`
+
+	// ToPlay while the game is playing, how many of both sides' starters with a game this week are still to play ("5 of 18 starters to play"): a starter on bye, or with no game held, is neither to play nor played and leaves the count; null otherwise, or absent from an older answer
+	ToPlay *string `json:"to_play,omitempty"`
 }
 
 // ScoreboardGameState upcoming before any starter's game kicks off, final once every starter's game is over, playing between
