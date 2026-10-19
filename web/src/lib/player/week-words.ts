@@ -23,6 +23,7 @@ import type { LeagueHost } from '#lib/league/api.ts';
 import { hostWords } from '#lib/league/names.ts';
 import type { LogNext } from '#lib/ui/game-log.ts';
 import { CARD, NONE, printTenth, withTile, type CardTile, type RestParts } from './card.ts';
+import type { CardProjection } from './week-read.ts';
 
 /** Tenths in a point, the precision the API prints. */
 const TENTHS = 10;
@@ -70,6 +71,8 @@ export interface LiveCard {
 	next: LogNext | null;
 	verb: CardVerb | null;
 	basis: string[];
+	/** The week's projection as the card prints it, which the week-ahead read is held to (Lane 66v). */
+	projection: CardProjection;
 }
 
 const SCORING_WORDS: Readonly<Record<Schemas['ProjectionScoring']['format'], string>> = {
@@ -367,7 +370,12 @@ export function liveCard({
 		cell,
 		next,
 		verb,
-		basis: liveBasis(week, verb !== null, zone, now)
+		basis: liveBasis(week, verb !== null, zone, now),
+		projection: {
+			week: week.week,
+			scoring: week.projection_scoring.format,
+			points: week.line.week_projection
+		}
 	};
 }
 

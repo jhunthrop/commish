@@ -14,6 +14,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Final
 
+from research.capsules.page_figures import page_tenth
 from research.capsules.prose_checks import unfinished_ending
 from research.capsules.season_voice import SeasonClock, names_missed_weeks, time_frame_hits
 from research.capsules.sentences import split_sentences
@@ -76,8 +77,9 @@ def facts_page_numbers(facts: "PlayerFacts") -> tuple[PageNumber, ...]:
 
 
 def renderings_of(value: float) -> list[str]:
-    """How a page number may be printed: to the tenth, and from ten up to the whole point."""
-    tenth = js_to_fixed(value, 1)
+    """How a page number may be printed: to the tenth the page prints (the site's one rule, `page_figures`),
+    and from ten up to the whole point."""
+    tenth = js_to_fixed(page_tenth(value), 1)
     return [tenth, js_string(js_round(value))] if abs(value) >= _WHOLE_NUMBER_FLOOR else [tenth]
 
 
@@ -108,6 +110,8 @@ def pull_figures_of(
 def figure_matches_value(figure: PullFigure) -> bool:
     """`figureMatchesValue`: the text is the value at the precision it prints."""
     decimals = len(figure.text.split(".")[1]) if "." in figure.text else 0
+    if decimals == 1:
+        return js_number(figure.text) == page_tenth(figure.value)
     return js_number(figure.text) == js_number(js_to_fixed(figure.value, decimals))
 
 

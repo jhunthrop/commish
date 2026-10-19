@@ -209,7 +209,9 @@ export const playerFormatSchema = boardRowSchema.omit({
 /** The week-ahead read (Lane 72): the week it is for; its text, null when his status changed since it
  * was written (the read is withheld and the caption says when the new one is due); its caption
  * ("Written Fri 9:00 pm Central, for week 6"); the status it was written against; the writer's call,
- * null when withheld; when it was written and the newest stamp of the facts it was written from. */
+ * null when withheld; when it was written and the newest stamp of the facts it was written from. Lane
+ * 66v: the published projection it quotes, in PPR as the card prints it (null when it had none), and the
+ * words the page shows once the card's live read prints another; both absent on a run from before. */
 export const weekReadSchema = z.object({
 	week: z.number().int().min(1),
 	body: phrase.nullable(),
@@ -217,7 +219,9 @@ export const weekReadSchema = z.object({
 	status: z.string().nullable(),
 	call: z.enum(['start', 'sit', 'hold', 'none']).nullable(),
 	writtenAt: isoTime,
-	factsAt: isoTime.nullable()
+	factsAt: isoTime.nullable(),
+	projection: z.number().nullable().optional(),
+	movedCaption: phrase.optional()
 });
 
 export type WeekRead = z.infer<typeof weekReadSchema>;

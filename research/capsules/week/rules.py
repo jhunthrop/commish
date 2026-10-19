@@ -26,6 +26,7 @@ from collections.abc import Sequence
 from typing import Final
 
 from research.capsules.facts.team_names import NFL_TEAM_NAMES
+from research.capsules.page_figures import page_tenth
 from research.capsules.sentences import split_sentences
 from research.capsules.voice_rules import named_rule
 from research.capsules.week.sheet import WeekSheet, points_text
@@ -160,7 +161,7 @@ def _published_figures(sheet: WeekSheet) -> set[float]:
     last = sheet.last_read
     values = [p.points, p.previous_points, sheet.projection_change, sheet.change_since_last_read]
     values.append(None if last is None else last.projection_points)
-    return {round(abs(v), 1) for v in values if v is not None}
+    return {page_tenth(abs(v)) for v in values if v is not None}
 
 
 def _projection_violations(sentences: Sequence[str], sheet: WeekSheet) -> list[str]:
@@ -182,10 +183,10 @@ def _projection_violations(sentences: Sequence[str], sheet: WeekSheet) -> list[s
             for s in sentences
             if _NAMES_PROJECTION.search(s)
         ]
-    figure, value = points_text(projection.points), round(projection.points, 1)
+    figure, value = points_text(projection.points), page_tenth(projection.points)
     allowed = _published_figures(sheet)
     for s in sentences:
-        stated = {round(v, 1) for _, v, _, _ in figures_of(s, sheet.season)}
+        stated = {page_tenth(v) for _, v, _, _ in figures_of(s, sheet.season)}
         if _NAMES_PROJECTION.search(s) and value not in stated:
             out.append(
                 _sentence_violation(

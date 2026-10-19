@@ -9,6 +9,7 @@ the writer never has to guess which year a week belongs to.
 from typing import TYPE_CHECKING, Final
 
 from research.capsules.facts.model import InjuryClean, InjuryDesignated, SeasonSoFar, SeasonWeek
+from research.capsules.page_figures import page_tenth_text
 from research.capsules.render_words import (
     AS_THE_PAGE_PRINTS,
     IN_OUR_RECORDS,
@@ -67,7 +68,7 @@ def _week_line(week: SeasonWeek, season: int) -> str:
         return f"{named}, his club's bye"
     if week.status == "inactive":
         return f"{named}, did not play"
-    points = "points not recorded" if week.points is None else f"{js_string(week.points)} points"
+    points = "points not recorded" if week.points is None else f"{page_tenth_text(week.points)} points"
     return f"{named}, played, {points}"
 
 

@@ -14,7 +14,7 @@ existed. Idempotent (a re-run writes nothing new), no register trail, each feed'
 `capture-harvest` also takes, in a kickoff slot's window, the slot week's Tank01 projection, the
 anytime-touchdown market (the weekly round 4's two benchmarks, `pipeline/kickoff_slots.py`) and the
 season's dated depth charts again. Last, after the status capture, the hourly week-ahead reads pass
-(Lane 72, `nightly/week_reads.py`): the reads whose status or published projection the hour moved,
+(Lane 72, `nightly/week_reads.py`): the reads whose status the hour moved (a projection move is the nightly's),
 under the hourly dollar budget; advisory, its own line, never the job's verdict.
 
 Exit status 1 when any step failed (or the capture was refused), 0 otherwise. Provider keys come

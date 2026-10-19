@@ -41,6 +41,7 @@ from research.capsules.narrative import (
     voice_rewritable,
     with_rewritten_slot,
 )
+from research.capsules.page_figures import fallback_violation
 from research.capsules.prompt import (
     NO_WORN_PHRASES,
     FreshDraft,
@@ -267,7 +268,8 @@ def _settle(
             return ReadResult(read.text, "llm", read.usage, None, read.attempts), read.calls
         prior = _next_correction(read)
         if prior is None or read.calls >= budget:
-            first = _NOT_WRITTEN if read.result is None or not read.result.violations else read.result.violations[0]
+            failed = None if read.result is None else read.result.violations
+            first = _NOT_WRITTEN if not failed else fallback_violation(failed)
             return _facts_block(facts, read, Fallback("failed_validation", first)), read.calls
         try:
             answer = ask(
