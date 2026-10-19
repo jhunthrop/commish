@@ -93,6 +93,49 @@ func TestFollowIsTheAccountsOwnLeague(t *testing.T) {
 	}
 }
 
+// A read that lands is followed for every account with the league
+// attached, as each one's route follows it, and for no one else
+// (FollowedAt, the trade search's warm run; Lane 66u).
+func TestALandedReadIsFollowedForEveryAccount(t *testing.T) {
+	pool := dbtest.Pool(t)
+	ctx := context.Background()
+	accounts := &auth.Store{Pool: pool}
+	alice, bob := newAccount(t, accounts, "landed_alice"), newAccount(t, accounts, "landed_bob")
+	newAccount(t, accounts, "landed_carol")
+	svc := replayService(pool)
+	league := "https://sleeper.com/leagues/" + ReplaySleeperLeague + "/team"
+	for _, account := range []uuid.UUID{alice, bob} {
+		if status, _, _ := attachAs(t, svc, account, league); status != http.StatusCreated {
+			t.Fatalf("attach: %d", status)
+		}
+	}
+	got, err := svc.FollowedAt(ctx, replayRef(t, svc, alice))
+	if err != nil {
+		t.Fatal(err)
+	}
+	seen := map[uuid.UUID]bool{}
+	for _, f := range got {
+		seen[f.Link.AccountID] = true
+		if f.Snap.Ref.LeagueID != ReplaySleeperLeague || f.Saved == nil {
+			t.Fatalf("a landed follow: league %s saved %v", f.Snap.Ref.LeagueID, f.Saved)
+		}
+	}
+	if len(got) != 2 || !seen[alice] || !seen[bob] {
+		t.Fatalf("followed for %v, want alice and bob", seen)
+	}
+}
+
+// replayRef is how the account's attached replay league is read, from its
+// link.
+func replayRef(t *testing.T, svc *Service, account uuid.UUID) Ref {
+	t.Helper()
+	all, err := svc.Links.Attached(context.Background(), account)
+	if err != nil || len(all) == 0 {
+		t.Fatalf("attached: %v %d", err, len(all))
+	}
+	return all[0].Ref
+}
+
 // A saved league's kicking and defense rules are its host's: a league
 // saved with the standard ones (00025's fill for a league attached before
 // them) takes the host's on its next read, the Sleeper league's shutout at
