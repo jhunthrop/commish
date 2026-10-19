@@ -45,7 +45,7 @@
 	import GroupPasses from './GroupPasses.svelte';
 	import { hostsApi, espnOpen, ffpcOpen, yahooOpen } from '#lib/hosts/api.ts';
 	import { SWITCHED_SHUT, type OpenHosts } from '#lib/league/hosts.ts';
-	import { CONNECT, connectPlatforms, keeps, memberHosts, signedOutTitle } from './keeps.ts';
+	import { CONNECT, keeps, memberHosts, signedOutTitle } from './keeps.ts';
 	import { accountLinks } from './links.ts';
 	import { hasFeature } from './features.ts';
 	import { boughtMembership, displayName, mockLine, planWords, sheetLine } from './words.ts';
@@ -216,7 +216,7 @@
 			</section>
 			{#if memberHosts(openHosts).length > 0}
 				<section aria-label={CONNECT.label}>
-					<PanelHead title={CONNECT.head} aside={connectPlatforms(openHosts)} level={2} />
+					<PanelHead title={CONNECT.head} level={2} />
 					<ActionRows label={CONNECT.label}>
 						{#each memberHosts(openHosts) as host (host.lead)}
 							<ActionRow lead={host.lead} text={host.text}>
