@@ -21,6 +21,8 @@ import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
 import { basisLines, basisReport } from './basis-lines.ts';
 import { copyFault, watchData } from './copy-scan.ts';
 import { chromeLine, chromeMeasures } from './chrome-measures.ts';
+import { pageFaults, pageLine, pageMeasures } from './page-measures.ts';
+import type { BarRows } from '../src/lib/ui/bar-rows.ts';
 
 const THEMES = ['light', 'dark'] as const;
 const WIDTHS = [1440, 390] as const;
@@ -150,6 +152,9 @@ interface ShotOptions {
 	after?: string;
 	/** How long the page's own text may take: a lobby state that comes with the draft's pace. */
 	timeout?: number;
+	/** The phone bar's rows the page's parts give (bar-rows.ts, Lane 87): one for a page that passes
+	 * none, two for a stamp or a verb, three for a search. */
+	rows: BarRows;
 }
 
 const faults: string[] = [];
@@ -173,6 +178,7 @@ const NO_LEAGUE_LABELS = ['League', 'Rest of season', 'Players', 'Mock draft', '
 const LEAGUE_SCREENS = ['Lineup', 'Matchup', 'Waivers', 'Trades'];
 const SEASON_RAILS = /^(in_season|playoffs)/;
 const chromeLines: string[] = [];
+const pageLines: string[] = [];
 
 /** The rail a room draws, held to the rail without a league when the root names a season and no
  * league. */
@@ -191,7 +197,7 @@ async function shoot(
 	name: string,
 	path: string | (() => Promise<string>),
 	ready: string,
-	{ who = me, before, act, after, timeout = 20_000 }: ShotOptions = {}
+	{ who = me, before, act, after, timeout = 20_000, rows }: ShotOptions
 ): Promise<void> {
 	for (const theme of THEMES) {
 		for (const width of WIDTHS) {
@@ -213,6 +219,11 @@ async function shoot(
 			await page.evaluate(() => document.fonts.ready);
 			await checkShot(name, page, width);
 			await railCheck(page, `${name} ${theme} ${String(width)}`, width);
+			const where = `${name} ${theme} ${String(width)}`;
+			const measured = await pageMeasures(page);
+			pageLines.push(pageLine(where, measured));
+			for (const fault of pageFaults(measured, width === 390, rows))
+				faults.push(`${where}: ${fault}`);
 			const file = new URL(`${name}-${theme}-${width}.png`, OUT_DIR);
 			await page.screenshot({ path: file.pathname, fullPage: true });
 			await ctx.close();
@@ -285,8 +296,8 @@ async function waitForStatus(roomId: string, status: string): Promise<void> {
 }
 
 try {
-	await shoot('mock-new', '/mock/new', 'Start against bots');
-	await shoot('mock-new-signed-out', '/mock/new', 'Sign in to keep it', { who: null });
+	await shoot('mock-new', '/mock/new', 'Start against bots', { rows: 1 });
+	await shoot('mock-new-signed-out', '/mock/new', 'Sign in to keep it', { who: null, rows: 1 });
 	await shoot('mock-new-refused', '/mock/new', 'Start against bots', {
 		who: null,
 		before: (ctx) =>
@@ -298,11 +309,12 @@ try {
 				})
 			),
 		act: (page) => page.getByRole('button', { name: 'Start against bots' }).click(),
-		after: 'Mocks start on trycommish.app'
+		after: 'Mocks start on trycommish.app',
+		rows: 1
 	});
 
 	const first = await newMock(2026);
-	await shoot('mock-first-turn', `/mock/${first.id}`, 'went before your first pick');
+	await shoot('mock-first-turn', `/mock/${first.id}`, 'went before your first pick', { rows: 3 });
 	// Each undo shot takes back a pick of its own, so each opens a fresh mock with one pick made.
 	await shoot(
 		'mock-undo',
@@ -313,26 +325,27 @@ try {
 			return `/mock/${room.id}`;
 		},
 		'Our call at',
-		{ act: (page) => page.keyboard.press('u'), after: 'Back to ' }
+		{ act: (page) => page.keyboard.press('u'), after: 'Back to ', rows: 3 }
 	);
 
 	const created = await newMock(2026);
 	await call<Room>(me, 'POST', `/mocks/${created.id}/autopick?to_round=4`);
-	await shoot('mock-room', `/mock/${created.id}`, 'Our call at');
+	await shoot('mock-room', `/mock/${created.id}`, 'Our call at', { rows: 3 });
 	// The same draft as a friend opens its link, signed out in a fresh browser.
 	const midway = await call<Room>(me, 'GET', `/mocks/${created.id}`);
 	await shoot('mock-shared', `/mock/share/${midway.share_code}`, 'Run this draft from slot', {
-		who: null
+		who: null,
+		rows: 3
 	});
 	await call<Room>(me, 'POST', `/mocks/${created.id}/finish`);
-	await shoot('mock-report', `/mock/${created.id}/report`, 'The field');
+	await shoot('mock-report', `/mock/${created.id}/report`, 'The field', { rows: 2 });
 	// The call at your last pick, after Pick for me through round 14: no next turn, so the card has no
 	// chance column (Lane 66o review L9).
 	const last = await newMock(2026);
 	await call<Room>(me, 'POST', `/mocks/${last.id}/autopick?to_round=14`);
-	await shoot('mock-last-pick', `/mock/${last.id}`, 'Our call at');
+	await shoot('mock-last-pick', `/mock/${last.id}`, 'Our call at', { rows: 3 });
 	const sunk = await sunkMock();
-	await shoot('mock-report-low', `/mock/${sunk}/report`, 'Leader');
+	await shoot('mock-report-low', `/mock/${sunk}/report`, 'Leader', { rows: 2 });
 
 	// A lobby joined and left unattended: nobody is here when it fills, so it closes, and opening it
 	// after the fill window shows the closed state with the verb to join another.
@@ -344,21 +357,23 @@ try {
 	// Every drafter holds the lobby open in a tab, as a person waiting in it does: a seat with no
 	// socket at the fill deadline is not counted as there.
 	const present = await Promise.all([me, ...helpers].map((who) => keepOpen(lobby, who)));
-	await shoot('lobby-filling', `/lobby/${lobby}`, 'The draft starts when');
+	await shoot('lobby-filling', `/lobby/${lobby}`, 'The draft starts when', { rows: 3 });
 	await new Promise((done) => setTimeout(done, FILL_WAIT_MS));
-	await shoot('lobby-abandoned', `/lobby/${lonely.room_id}`, 'Join another lobby');
+	await shoot('lobby-abandoned', `/lobby/${lonely.room_id}`, 'Join another lobby', { rows: 1 });
 	// The helpers step away once the room starts, so their queues draft at a bot's pace.
 	for (const helper of helpers) await call<null>(helper, 'POST', `/lobbies/${lobby}/leave`);
 	await Promise.all(present.slice(1).map((ctx) => ctx.close()));
 	await new Promise((done) => setTimeout(done, DRAFT_WAIT_MS));
-	await shoot('lobby-room', `/lobby/${lobby}`, 'just taken, newest first');
+	await shoot('lobby-room', `/lobby/${lobby}`, 'just taken, newest first', { rows: 3 });
 	// Off your turn the call waits on the board: "If the board holds to", headed Reaches (review L9).
 	await shoot('lobby-reaches', `/lobby/${lobby}`, 'If the board holds to', {
-		timeout: LOBBY_TURN_WAIT_MS
+		timeout: LOBBY_TURN_WAIT_MS,
+		rows: 3
 	});
 	await shoot('lobby-leave', `/lobby/${lobby}`, 'just taken, newest first', {
 		act: (page) => page.getByRole('button', { name: 'Leave', exact: true }).click(),
-		after: 'Leave? Your queue drafts your seat'
+		after: 'Leave? Your queue drafts your seat',
+		rows: 3
 	});
 	// Then I leave too: every seat drafts at a stand-in's pace, and setup offers the way back.
 	await present[0]?.close();
@@ -368,14 +383,18 @@ try {
 			LEFT_LOBBY_KEY,
 			lobby
 		] as const);
-	await shoot('mock-new-left', '/mock/new', 'Return to the lobby', { before: remembered });
+	await shoot('mock-new-left', '/mock/new', 'Return to the lobby', { before: remembered, rows: 1 });
 	await waitForStatus(lobby, 'complete');
-	await shoot('mock-new-left-done', '/mock/new', 'Read the report', { before: remembered });
-	await shoot('lobby-report', `/lobby/${lobby}/report`, 'The field');
+	await shoot('mock-new-left-done', '/mock/new', 'Read the report', {
+		before: remembered,
+		rows: 1
+	});
+	await shoot('lobby-report', `/lobby/${lobby}/report`, 'The field', { rows: 1 });
 } finally {
 	await browser.close();
 }
 for (const line of chromeLines) process.stdout.write(`${line}\n`);
+for (const line of pageLines) process.stdout.write(`${line}\n`);
 if (faults.length > 0) {
 	process.stderr.write(`${faults.join('\n')}\n`);
 	process.exit(1);
