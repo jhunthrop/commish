@@ -71,11 +71,22 @@ export async function chromeMeasures(page: Page): Promise<ChromeMeasures> {
 		let name: { lines: number; natural: number; cut: boolean } | null = null;
 		if (title) {
 			const lineHeight = parseFloat(getComputedStyle(title).lineHeight);
-			name = {
-				lines: Math.round(title.clientHeight / lineHeight),
-				natural: Math.round(title.scrollHeight / lineHeight),
-				cut: title.scrollHeight > title.clientHeight + 1
-			};
+			// The same words at the same width with no clamp: the lines they would run to.
+			const uncut = title.cloneNode(true) as HTMLElement;
+			Object.assign(uncut.style, {
+				position: 'absolute',
+				visibility: 'hidden',
+				display: 'block',
+				webkitLineClamp: 'none',
+				lineClamp: 'none',
+				// The drawn width, rounded up: a title sized to its words would wrap at a pixel less.
+				width: `${String(Math.ceil(title.getBoundingClientRect().width))}px`
+			});
+			title.after(uncut);
+			const natural = Math.round(uncut.clientHeight / lineHeight);
+			uncut.remove();
+			const lines = Math.round(title.clientHeight / lineHeight);
+			name = { lines, natural, cut: natural > lines };
 		}
 		const textBox = (cell: Element | null): DOMRect | null => {
 			if (!cell) return null;
