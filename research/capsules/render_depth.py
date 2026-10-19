@@ -9,6 +9,7 @@ from collections.abc import Sequence
 from typing import TYPE_CHECKING, Final
 
 from research.capsules.facts.depth_model import Depth, Fixture, GamesMissed
+from research.capsules.page_figures import page_tenth_text
 from research.capsules.render_words import percent, ranked_clause, week_of, whole
 from research.model.jsmath import js_to_fixed
 from research.pipeline.jscompat import js_string
@@ -292,7 +293,7 @@ def _volatility(depth: Depth) -> str | None:
     weeks = "week" if v.weeks_played == 1 else "weeks"
     return (
         f"He cleared {js_string(v.threshold)} points in {v.weeks_above_threshold} of his {v.weeks_played} played {weeks} in "
-        f"{v.season}, and his worst was {js_string(v.worst_week.points)} in {week_of(v.worst_week.week, v.season)}."
+        f"{v.season}, and his worst was {page_tenth_text(v.worst_week.points)} in {week_of(v.worst_week.week, v.season)}."
     )
 
 
@@ -301,7 +302,7 @@ def _prior_seasons(facts: "PlayerFacts") -> str | None:
     if not seasons:
         return None
     clauses = [
-        f"{s.season}, {js_string(s.points)} points over {s.games_played} games, {position}{s.position_rank} among {s.qualifier_count}"
+        f"{s.season}, {page_tenth_text(s.points)} points over {s.games_played} games, {position}{s.position_rank} among {s.qualifier_count}"
         for s in seasons
     ]
     return f"Season by season: {'. '.join(clauses)}."

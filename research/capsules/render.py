@@ -20,6 +20,7 @@ from research.capsules.facts.model import (
     ShareEvidence,
     TrendMetric,
 )
+from research.capsules.page_figures import page_tenth_text
 from research.capsules.render_depth import render_depth_section
 from research.capsules.render_season import bye_line, injury_line, season_section, today_line
 from research.capsules.render_usage import season_usage_section
@@ -73,7 +74,7 @@ def _board_line(facts: PlayerFacts) -> str:
     parts = [f"{number} {ranges}{rank_text}", _adp_line(facts)]
     if m.market_anchor_points is not None:
         parts.append(
-            f"Past seasons of {position}s drafted around his ADP: about {js_string(m.market_anchor_points)} points, "
+            f"Past seasons of {position}s drafted around his ADP: about {page_tenth_text(m.market_anchor_points)} points, "
             f"{POOLED_IN}. Our number is {signed(m.market_anchor_delta or 0.0)} points from that."
         )
     if m.players_left_in_tier is not None and m.drop_to_next_tier is not None:
@@ -166,7 +167,7 @@ def _story_line(facts: PlayerFacts) -> str | None:
     sentences = [
         f"Last season ({story.season}): {ranked_clause(position, 'total points', story.points_rank, whole)}.",
         f"Over {story.games_played} {games}, averaging {js_to_fixed(story.points_per_game, 1)} points a game.",
-        f"His best week was {week_of(story.best_week.week, story.season)} with {js_string(story.best_week.points)} points.",
+        f"His best week was {week_of(story.best_week.week, story.season)} with {page_tenth_text(story.best_week.points)} points.",
         f"He scored above the position's own weekly median in {story.weeks_above_median} of those {story.games_played} {games}.",
     ]
     if story.touches_rank is not None:
@@ -205,7 +206,7 @@ def _trend_line(facts: PlayerFacts) -> str | None:
         return None
     noun = "yards per target" if facts.identity.position in ("WR", "TE") else "yards per touch"
     sentences = [
-        _trend_sentence("His points per game", trend.points_per_game, js_string),
+        _trend_sentence("His points per game", trend.points_per_game, page_tenth_text),
         _trend_sentence(f"His {noun}", trend.yards_per_opportunity, js_string),
         _trend_sentence("His target share", trend.target_share, _percent),
     ]
