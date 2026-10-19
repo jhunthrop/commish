@@ -45,6 +45,16 @@ export function rankAgreement(record: RunRecord): string {
 	return record.statistic.agreement;
 }
 
+/** A rate (order matched) prints the run's two decimals, the one figure not to a tenth (ruling R2),
+ * and the basis says so once in these words. */
+const RATE_PLACES = 2;
+export const RATE_PLACES_WORDS = 'Rates print to two decimals.';
+
+/** The agreement's basis, said once: its name, the run's scale, and its two decimals. */
+export function agreementBasis(record: RunRecord): string {
+	return `${capitalized(rankAgreement(record))}: ${record.scale} ${RATE_PLACES_WORDS}`;
+}
+
 /** Graded: our rank agreement with the finish over every graded week, its scale, the span and the
  * players it counts, and ADP's beside it. Not yet: how many of the frozen weeks are graded. */
 export function recordHeadline(record: RunRecord): RecordHeadline {
@@ -53,10 +63,11 @@ export function recordHeadline(record: RunRecord): RecordHeadline {
 	const agreement = overall?.ours.agreement;
 	if (overall && agreement !== null && agreement !== undefined && graded.length > 0) {
 		const adp = overall.adp.agreement;
-		const adpPart = adp === null ? '' : `. ADP ${printPlaces(adp, 2)} on the same players`;
+		const adpPart =
+			adp === null ? '' : `. ADP ${printPlaces(adp, RATE_PLACES)} on the same players`;
 		return {
-			value: printPlaces(agreement, 2),
-			caption: `${capitalized(rankAgreement(record))}, ours over ${weekSpan(graded)} and ${plural(overall.ours.graded, 'player')}${adpPart}. ${record.scale}`,
+			value: printPlaces(agreement, RATE_PLACES),
+			caption: `${capitalized(rankAgreement(record))}, ours over ${weekSpan(graded)} and ${plural(overall.ours.graded, 'player')}${adpPart}. ${record.scale} ${RATE_PLACES_WORDS}`,
 			graded: true
 		};
 	}
@@ -194,7 +205,7 @@ export function printPlaces(value: number, places: number): string {
 export function figureWords(score: Score | null, figure: RecordFigure): string {
 	if (score === null) return RECORD_BOX.none;
 	if (figure === 'agreement')
-		return score.agreement === null ? 'Too few' : printPlaces(score.agreement, 2);
+		return score.agreement === null ? 'Too few' : printPlaces(score.agreement, RATE_PLACES);
 	if (figure === 'placesOff')
 		return score.placesOff === null ? RECORD_BOX.none : printPlaces(score.placesOff, 1);
 	return score.startersOf === 0
