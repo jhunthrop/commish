@@ -55,11 +55,11 @@ export function shortName(name: string): string {
 
 /** Whom an add beats, as the Beats cell prints it. */
 export interface BeatsCell {
-	name: string;
-	starter: boolean;
+	/** The member's player he tops, or the open spot he fills; null where he tops no one, the season
+	 * Gain order's cell drawing its figure alone (review M-I). */
+	who: { name: string; starter: boolean } | null;
 	/** The week gain, or the season Gain while the pickups go in that order (unit 'season', review
-	 * M-A: the sorted column draws its own key); null once his or the beaten player's game has kicked
-	 * off in week order (review H3), the cell drawing EMPTY_FIGURE and the Game cell Final. */
+	 * M-A: the sorted column draws its own key, on every row). */
 	gain: number | null;
 	unit: 'week' | 'season';
 }
@@ -126,20 +126,20 @@ export function clearsWords(day: string | null): string | null {
 }
 
 /** Whom an add beats, as the API says it: his player, or the open spot he fills (a starting spot no
- * one of the member's can play this week), and by how much this week. While the API orders the
- * pickups by the season Gain (a pickup's game has kicked off, every week figure withheld: its one
- * pickup rule, Lane 85 fix round 3) the cell draws the row's season Gain, the key the column sorts by.
- * Nothing is inferred or re-ordered here (review 66f M3). */
-function beatsOf(source: WaiverRow): BeatsCell | null {
+ * one of the member's can play this week), and by how much this week. In the API's season Gain order
+ * (its one pickup rule, Lane 85) every row's cell draws its season Gain, the key the column sorts by,
+ * whomever he tops or none (review M-I). Nothing is inferred or re-ordered here (review 66f M3). */
+function beatsOf(source: WaiverRow, order: WaiverAdvice['pickup_order']): BeatsCell | null {
 	const { beats } = source;
-	if (beats === null) return null;
-	const withheld = beats.gain === null;
-	return {
-		name: beats.open_spot ? WAIVERS.openSpot : shortName(beats.name),
-		starter: beats.starter,
-		gain: withheld ? source.gain : beats.gain,
-		unit: withheld ? 'season' : 'week'
-	};
+	const who =
+		beats === null
+			? null
+			: {
+					name: beats.open_spot ? WAIVERS.openSpot : shortName(beats.name),
+					starter: beats.starter
+				};
+	if (order === 'season_gain') return { who, gain: source.gain, unit: 'season' };
+	return beats === null ? null : { who, gain: beats.gain, unit: 'week' };
 }
 
 /** The Beats cell's figure: "+6.7" this week, "+0.3 Gain" in season order. */
@@ -159,7 +159,7 @@ function beatsOrder(
 	const gain = beats?.gain ?? null;
 	if (gain === null) return null;
 	// A starter topped (or an open spot filled) outranks any bench gain.
-	return (beats?.starter === true ? STARTER_RANK : 0) + gain;
+	return (beats?.who?.starter === true ? STARTER_RANK : 0) + gain;
 }
 
 /** The table's rows from the answer: every add, whom he beats, the strip's tint on the ones it names. */
@@ -171,7 +171,7 @@ export function poolRows(
 	const named = new Set(advice.pickups.map(addKey));
 	return advice.rows.map((source) => {
 		const key = addKey(source);
-		const beats = beatsOf(source);
+		const beats = beatsOf(source, advice.pickup_order);
 		return {
 			key,
 			row: { ...boxRow(source.add, '', zone, false, now), key },

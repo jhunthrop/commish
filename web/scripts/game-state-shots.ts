@@ -32,7 +32,6 @@ import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
 import { BASIS_BUDGET, WEATHER_FIGURE, basisLines, figureSentenceFaults } from './basis-lines.ts';
 import { copyFault, watchData } from './copy-scan.ts';
 import { FIXTURE_IDS } from './inseason-fixture/ids.ts';
-import { EMPTY_FIGURE } from '../src/lib/format/empty.ts';
 import { seasonOrderWords } from './inseason-fixture/waivers-at.ts';
 import { SEASON } from '../src/lib/league/box/season.ts';
 import { BOX } from '../src/lib/league/box/box.ts';
@@ -369,10 +368,10 @@ async function drawsFacts(page: Page): Promise<boolean> {
 	return rows.some((r) => /\b\d+(\.5)? to \d+(\.5)?\b/.test(r) || WEATHER_FIGURE.test(r));
 }
 
-/** Waivers after the Sunday (Lane 85 fix round 4): once any row is past its kickoff (every row on
- * Tuesday) the page is in the API's season Gain order: no Beats cell on any row draws a week figure
- * (the empty figure, or the season Gain the order sorts by), the strip's pick is the table's top row,
- * and the basis names the order. */
+/** Waivers after the Sunday (Lane 85 fix rounds 4 and 5): once any row is past its kickoff (every row
+ * on Tuesday) the page is in the API's season Gain order: every row's Beats draws its season Gain, the
+ * key the order sorts by, never a week figure, and ends left of the Add button; the strip's pick is the
+ * table's top row, and the basis names the order. */
 async function checkWaivers(page: Page, at: string): Promise<void> {
 	await checkNoWeekFigure(page, at, 'Proj this week');
 	const rows = await page.locator('main table tbody tr').evaluateAll((trs) =>
@@ -382,7 +381,10 @@ async function checkWaivers(page: Page, at: string): Promise<void> {
 				text: (tr as HTMLElement).innerText,
 				name: tr.querySelector<HTMLElement>('.nm')?.innerText.trim() ?? '',
 				named: tr.classList.contains('moved-in'),
-				gain: tr.querySelector('.beats .gain')?.textContent.trim() ?? null
+				gain: tr.querySelector('.beats .gain')?.textContent.trim() ?? null,
+				// The Beats text's right edge and the Add button's left (review M-J).
+				beatsRight: tr.querySelector('.beats .bt')?.getBoundingClientRect().right ?? null,
+				addLeft: tr.querySelector('.act .add')?.getBoundingClientRect().left ?? null
 			}))
 	);
 	const locked = rows.filter((r) => /\b(Final|Kicked off)\b/.test(r.text));
@@ -393,9 +395,13 @@ async function checkWaivers(page: Page, at: string): Promise<void> {
 		fault(at, 'no row past its kickoff');
 		return;
 	}
-	for (const r of rows)
-		if (r.gain !== null && r.gain !== EMPTY_FIGURE && !r.gain.endsWith(` ${SEASON.gain}`))
-			fault(at, `${r.name} draws a week gain ${r.gain} in Beats`);
+	// In the season Gain order every row's Beats draws its season Gain, the key it is sorted by (M-I).
+	for (const r of rows) {
+		if (!r.gain?.endsWith(` ${SEASON.gain}`))
+			fault(at, `${r.name} draws ${r.gain ?? 'no figure'} in Beats, not its season Gain`);
+		if (r.beatsRight !== null && r.addLeft !== null && r.beatsRight > r.addLeft)
+			fault(at, `${r.name}'s Beats runs under the Add button`);
+	}
 	const top = rows[0];
 	const moves = await page.locator('main [data-strip="waivers"] .pickup .move').allInnerTexts();
 	if (

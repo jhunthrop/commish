@@ -196,8 +196,8 @@ void test('the table tints only what the strip names: a starter he tops off the 
 	const kicker = rows.find((r) => r.row.name === 'Harrison Mevis');
 	assert.equal(kicker?.named, false);
 	assert.ok(kicker.beats);
-	assert.equal(kicker.beats.starter, true);
-	assert.equal(rows.find((r) => r.row.name === 'Daniel Jones')?.beats?.name, 'Stroud');
+	assert.equal(kicker.beats.who?.starter, true);
+	assert.equal(rows.find((r) => r.row.name === 'Daniel Jones')?.beats?.who?.name, 'Stroud');
 	assert.equal(rows.find((r) => r.row.name === 'Kaytron Allen')?.clears, 'Clears Wed');
 	assert.equal(rows[0]?.rest, 11.8);
 });
@@ -299,7 +299,11 @@ void test('Beats prints the open spot only when the API says it: an empty Beats 
 		week_gain: 4.8
 	});
 	const [only] = poolRows({ pickup_order: 'week', rows: [taylor], pickups: [taylor] }, ZONE, NOW);
-	assert.deepEqual(only?.beats, { name: 'Open spot', starter: true, gain: 4.8, unit: 'week' });
+	assert.deepEqual(only?.beats, {
+		who: { name: 'Open spot', starter: true },
+		gain: 4.8,
+		unit: 'week'
+	});
 	// A flex start that tops no one at his own position is no open spot.
 	const flex = row(line('Theo Johnson', 'WR', 10.8), { beats: null, starts: true, week_gain: 0.3 });
 	assert.equal(
@@ -409,7 +413,7 @@ void test('in the API season order the web prints it: the season Gain in Beats, 
 	const pool = poolRows(tuesday, ZONE, NOW);
 	const top = pool[0];
 	assert.ok(top?.beats);
-	assert.deepEqual(top.beats, { name: 'Vidal', starter: true, gain: 1.2, unit: 'season' });
+	assert.deepEqual(top.beats, { who: { name: 'Vidal', starter: true }, gain: 1.2, unit: 'season' });
 	assert.equal(beatsWord(top.beats), '+1.2 Gain');
 	assert.equal(beatsWord({ gain: 6.7, unit: 'week' }), '+6.7');
 	assert.deepEqual(
@@ -438,15 +442,10 @@ void test('in the API season order the web prints it: the season Gain in Beats, 
 });
 
 void test('the web never re-orders the strip: the cards are the API pickups in its order (M-E guard)', () => {
-	// The API sent Chiefs first though Gainwell has the higher season Gain: the web keeps its order.
+	// The API's week strip sent Chiefs first: the web keeps its order.
 	const cards = pickupCards({ ...advice, pickups: [chiefs, gainwell] });
 	assert.deepEqual(
 		cards.map((c) => c.add),
-		['Chiefs', 'Gainwell']
-	);
-	const season = [seasonOrder(chiefs), seasonOrder(gainwell)];
-	assert.deepEqual(
-		pickupCards({ ...advice, rows: season, pickups: season }).map((c) => c.add),
 		['Chiefs', 'Gainwell']
 	);
 	// Under the week's rule the drop's reason follows the pickup sentence, at a desk.
@@ -474,7 +473,15 @@ void test('in season order the table prints the API rows in its order, the strip
 	);
 	assert.equal(printed[0]?.key, pickupCards(answer)[0]?.key);
 	assert.equal(printed[0]?.named, true);
-	assert.ok(printed.every((r) => r.source.week_gain === null && r.beats?.unit !== 'week'));
+	assert.ok(printed.every((r) => r.source.week_gain === null));
+	// The sorted column draws its own key on every row, one tops no one or is on a bye (review M-I).
+	assert.deepEqual(
+		printed.map((r) => (r.beats === null ? null : beatsWord(r.beats))),
+		['+2.1 Gain', '+1.5 Gain', '+1.2 Gain', '+0.3 Gain', '−0.3 Gain']
+	);
+	const first = printed[0];
+	assert.ok(first.beats);
+	assert.equal(first.beats.who, null);
 	// The week order keeps the Beats sort: a starter topped first.
 	const week = sortRows(poolRows(advice, ZONE, NOW), DEFAULT_SORT);
 	assert.equal(week[0]?.row.name, 'Kenny Gainwell');
