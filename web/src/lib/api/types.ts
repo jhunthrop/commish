@@ -3421,8 +3421,8 @@ export interface components {
 			week: number;
 			/** @enum {string} */
 			position: 'K' | 'DEF';
-			/** @description the rules the league scores that the season's points (Avg and Last) leave out, empty when none */
-			basis_note: string;
+			/** @description how many of the league's scoring rules the season's points (Avg and Last) leave out, our stats lacking them; the basis says the count once and links to the league's Settings, never a list (Lane 66w) */
+			uncounted_rules: number;
 			/**
 			 * Format: date-time
 			 * @description when the league was read from its platform, null without a league

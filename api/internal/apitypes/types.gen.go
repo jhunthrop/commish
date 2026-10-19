@@ -4266,9 +4266,6 @@ type WeekLineup struct {
 
 // WeekOrderAdvice defines model for WeekOrderAdvice.
 type WeekOrderAdvice struct {
-	// BasisNote the rules the league scores that the season's points (Avg and Last) leave out, empty when none
-	BasisNote string `json:"basis_note"`
-
 	// Moves the claim's moves on the league's platform, the Waivers screen's verb rule for an add; null without a league
 	Moves    *WaiverMoves            `json:"moves"`
 	Position WeekOrderAdvicePosition `json:"position"`
@@ -4284,6 +4281,9 @@ type WeekOrderAdvice struct {
 
 	// Rows one a club (a kicker is the club's one the projection names, else the one who kicked for it last): first the games still to play by Proj, ties by Avg, then those kicked off, then the clubs on bye
 	Rows []WeekOrderRow `json:"rows"`
+
+	// UncountedRules how many of the league's scoring rules the season's points (Avg and Last) leave out, our stats lacking them; the basis says the count once and links to the league's Settings, never a list (Lane 66w)
+	UncountedRules int `json:"uncounted_rules"`
 
 	// Week the week the rows' Game cell and Proj are for
 	Week int `json:"week"`

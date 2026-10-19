@@ -40,6 +40,8 @@ type weekRow struct {
 	boardID string
 	p       person
 	section apitypes.WeekOrderRowSection
+	// adp is the drafts' price on him, nil when they do not price him.
+	adp *float64
 }
 
 // sectionOf is where a row's game puts it: still to play, kicked off by
@@ -59,7 +61,7 @@ func sectionOf(f Facts) apitypes.WeekOrderRowSection {
 // league of their own.
 func (a *advisor) WeekOrder(position draft.Position, marks bool) apitypes.WeekOrderAdvice {
 	out := apitypes.WeekOrderAdvice{Week: a.Snap.Week, Position: apitypes.WeekOrderAdvicePosition(position),
-		BasisNote: LineupNote(a.settings, a.season.Carries), ProjectionReadAt: a.projectionReadAt(),
+		UncountedRules: len(uncountedRules(a.settings, a.season.Carries)), ProjectionReadAt: a.projectionReadAt(),
 		ProjectionScoring: projectionScoring(a.settings, a.preset), Rows: []apitypes.WeekOrderRow{}}
 	var hosts map[string]string
 	if marks {
@@ -100,7 +102,7 @@ func (a *advisor) clubRows(position draft.Position, hosts map[string]string) []w
 		if !ok {
 			clubs = append(clubs, p.Team)
 		}
-		if !ok || clubPick(r.p.line, held.p.line) {
+		if !ok || a.clubPick(r, held) {
 			byClub[p.Team] = r
 		}
 	}
@@ -113,21 +115,37 @@ func (a *advisor) clubRows(position draft.Position, hosts map[string]string) []w
 
 func (a *advisor) weekRowOf(p boards.Player, hosts map[string]string) weekRow {
 	person := a.boardPerson(p, hosts)
-	return weekRow{boardID: p.ID, p: person, section: sectionOf(person.words.Facts)}
+	return weekRow{boardID: p.ID, p: person, section: sectionOf(person.words.Facts), adp: p.ADP}
 }
 
-// clubPick reports whether line stands for its club over held: the one
-// the week's projection names (the higher Proj if both), else the one
-// who played for it last. A club fields one kicker; a stale kicker the
-// directory still lists on it is never the club's.
-func clubPick(line, held apitypes.PlayerLine) bool {
-	if (line.WeekProjection != nil) != (held.WeekProjection != nil) {
-		return line.WeekProjection != nil
+// clubPick reports whether x stands for its club over y: the one the
+// week's projection names (the higher Proj if both), else the one who
+// played for it last. Before either (week 1, before its projection), the
+// one a roster in the league holds, else the one the drafts price lower.
+// A club fields one kicker; a stale kicker the directory still lists on it
+// is never the club's.
+func (a *advisor) clubPick(x, y weekRow) bool {
+	lx, ly := x.p.line, y.p.line
+	if decided, better := higher(lx.WeekProjection, ly.WeekProjection); decided {
+		return better
 	}
-	if line.WeekProjection != nil && *line.WeekProjection != *held.WeekProjection {
-		return *line.WeekProjection > *held.WeekProjection
+	if wx, wy := lastWeek(lx), lastWeek(ly); wx != wy {
+		return wx > wy
 	}
-	return lastWeek(line) > lastWeek(held)
+	_, hx := a.HeldBy[x.boardID]
+	_, hy := a.HeldBy[y.boardID]
+	if hx != hy {
+		return hx
+	}
+	return lowerADP(x.adp, y.adp)
+}
+
+// lowerADP is whether x's ADP is priced and before y's (or y has none).
+func lowerADP(x, y *float64) bool {
+	if x == nil || y == nil {
+		return x != nil
+	}
+	return *x < *y
 }
 
 // lastWeek is the week of his newest counted game, 0 with none.

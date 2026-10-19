@@ -278,12 +278,7 @@ func (c countable) counted(carried func(string) bool) bool {
 // uncountedWords says which of the league's rules points so far leave
 // out, "" when the league scores none of them or every one is counted.
 func uncountedWords(s apitypes.LeagueSettings, carried func(string) bool) string {
-	var named []string
-	for _, c := range countables(rulesOf(s.Scoring)) {
-		if c.points != 0 && c.starts(s) && !c.counted(carried) {
-			named = append(named, c.words)
-		}
-	}
+	named := uncountedRules(s, carried)
 	if len(named) == 0 {
 		return ""
 	}
@@ -292,6 +287,19 @@ func uncountedWords(s apitypes.LeagueSettings, carried func(string) bool) string
 		list = strings.Join(named[:len(named)-1], ", ") + " and " + named[len(named)-1]
 	}
 	return "Points so far leave out " + list + ", which our stats lack."
+}
+
+// uncountedRules is the league's rules points so far leave out, in
+// words: each one the league scores at a spot it starts and no line this
+// season carries.
+func uncountedRules(s apitypes.LeagueSettings, carried func(string) bool) []string {
+	var named []string
+	for _, c := range countables(rulesOf(s.Scoring)) {
+		if c.points != 0 && c.starts(s) && !c.counted(carried) {
+			named = append(named, c.words)
+		}
+	}
+	return named
 }
 
 // BasisNote is the rest of every page's basis, said once under the rows:

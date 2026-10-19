@@ -4114,13 +4114,15 @@ components:
             otherwise (and always for the drafter's own players)
     WeekOrderAdvice:
       type: object
-      required: [week, position, basis_note, read_at, projection_read_at, projection_scoring, moves, rows]
+      required: [week, position, uncounted_rules, read_at, projection_read_at, projection_scoring, moves, rows]
       properties:
         week: { type: integer, description: the week the rows' Game cell and Proj are for }
         position: { type: string, enum: [K, DEF] }
-        basis_note:
-          type: string
-          description: the rules the league scores that the season's points (Avg and Last) leave out, empty when none
+        uncounted_rules:
+          type: integer
+          description: >-
+            how many of the league's scoring rules the season's points (Avg and Last) leave out, our stats lacking
+            them; the basis says the count once and links to the league's Settings, never a list (Lane 66w)
         read_at:
           type: string
           format: date-time

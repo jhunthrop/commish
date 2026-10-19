@@ -166,6 +166,61 @@ func TestWeekOrderListsTheClubsOneKicker(t *testing.T) {
 	}
 }
 
+// The rules the season's points leave out are a count (Lane 66w review
+// finding 2): the basis says how many and links to the league's Settings,
+// never a list that grows with the league.
+func TestWeekOrderCountsTheRulesLeftOut(t *testing.T) {
+	f := newWeekOrderFixture(t)
+	rules := *f.league.Saved.Scoring.Custom
+	rules.PointsPerFieldGoal50Plus = 5
+	saved := *f.league.Saved
+	saved.Scoring = apitypes.Scoring{Custom: &rules}
+	f.league.Saved = &saved
+	out := f.advisor(t, f.projection, fixtureNow).WeekOrder(draft.K, true)
+	want := len(uncountedRules(saved, func(string) bool { return false }))
+	if want < 2 || out.UncountedRules != want {
+		t.Fatalf("%d rules left out, want %d", out.UncountedRules, want)
+	}
+}
+
+// Week 1 before its projection (Lane 66w review finding 7): no Proj and no
+// counted game, so the club's kicker is the one a roster in the league
+// holds, else the one the drafts price; never the board's first listing.
+func TestWeekOrderBeforeAnyGameListsTheClubsCurrentKicker(t *testing.T) {
+	f := newWeekOrderFixture(t)
+	adp := 140.5
+	for i := range f.raw.Players {
+		if f.raw.Players[i].ID == f.kicker.ID {
+			f.raw.Players[i].ADP = &adp
+		}
+	}
+	config, err := mock.SlotConfig(*f.league.Saved)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if f.league.Board, err = boards.For(f.raw, f.league.Saved.Teams, config); err != nil {
+		t.Fatal(err)
+	}
+	clubOf := func(out apitypes.WeekOrderAdvice) string {
+		for _, row := range out.Rows {
+			if row.Line.Player.Team == f.kicker.Team {
+				return *row.Line.Player.BoardId
+			}
+		}
+		return ""
+	}
+	none := boards.WeekProjection{Week: 6}
+	if got := clubOf(f.advisor(t, none, fixtureNow).WeekOrder(draft.K, false)); got != f.kicker.ID {
+		t.Fatalf("the priced kicker does not stand for his club: %s", got)
+	}
+	// A roster in the league holding the other one decides it for the league's tab.
+	delete(f.league.HeldBy, f.kicker.ID)
+	f.league.HeldBy[f.stale.ID] = 2
+	if got := clubOf(f.advisor(t, none, fixtureNow).WeekOrder(draft.K, true)); got != f.stale.ID {
+		t.Fatalf("the rostered kicker does not stand for his club: %s", got)
+	}
+}
+
 func TestWeekOrderWithoutAProjectionIsInOrderOfAvg(t *testing.T) {
 	f := newWeekOrderFixture(t)
 	for i, club := range fixtureTeams()[:8] {
