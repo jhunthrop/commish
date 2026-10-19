@@ -144,15 +144,72 @@ func TestTakesHisSpotFollowsTheChain(t *testing.T) {
 			if !r.startsThisWeek(d) || SlotLabel(slots, r.spotOf(d)) != tc.spot {
 				t.Fatalf("%s starts at slot %d this week, want %s", tc.drop, r.spotOf(d), tc.spot)
 			}
-			got := r.takesHisSpot(d, nil, []Candidate{tc.in})
+			// The path the searches run: the drop offered to recommend alone.
+			got, ok := r.recommend([]dropOption{{at: d, spot: noSpot}}, nil, []Candidate{tc.in})
 			if tc.want == "" {
-				if got.by >= 0 {
-					t.Fatalf("kept with %s at %s", tc.in.ID, SlotLabel(slots, got.slot))
+				if ok {
+					t.Fatalf("kept with %s at %s", tc.in.ID, SlotLabel(slots, got.spot.slot))
 				}
 				return
 			}
-			if got.by != 0 || SlotLabel(slots, got.slot) != tc.want {
-				t.Fatalf("%+v, want x at %s", got, tc.want)
+			if !ok || got.at != d || got.spot.by != 0 || SlotLabel(slots, got.spot.slot) != tc.want {
+				t.Fatalf("%+v (%v), want x at %s", got, ok, tc.want)
+			}
+		})
+	}
+}
+
+// valued is weekPlayer with his rest-of-season value, the last tie-break.
+func valued(id string, p draft.Position, proj, value float64) Candidate {
+	return withProj(player(id, p, 50, value), proj)
+}
+
+// Each of recommend's tie-breaks decides a case alone (rereview 66u N1):
+// between drops whose gains print alike, the higher Proj this week's
+// lineup keeps, then a bench player before a starter, then the player our
+// order values least. Every case adds a quarterback who starts at QB.
+func TestRecommendBreaksTiesInOrder(t *testing.T) {
+	config := twelveTeamPPR(t)
+	roster := func(qValue, w4Value, q2Value float64) []Candidate {
+		return []Candidate{valued("q", draft.QB, 20, qValue), valued("a", draft.RB, 18, 10), valued("b", draft.RB, 12, 10),
+			valued("c", draft.RB, 10, 10), valued("w1", draft.WR, 15, 10), valued("w2", draft.WR, 14, 10), valued("w3", draft.WR, 13, 10),
+			valued("t", draft.TE, 9, 10), valued("w4", draft.WR, 2, w4Value), valued("q2", draft.QB, 1, q2Value),
+			valued("k", draft.K, 8, 0), valued("df", draft.DEF, 7, 0)}
+	}
+	in := []Candidate{weekPlayer("x", draft.QB, 30)}
+	cases := []struct {
+		name   string
+		roster []Candidate
+		offer  []string
+		want   string
+	}{
+		// Both still start once x does; dropping w3 brings w4 (2) into WR3
+		// for 13, dropping c brings him into the flex for 10: c keeps more.
+		// Our order alone would drop w3 (c is ahead on the id).
+		{"the higher Proj kept", roster(10, 10, 10), []string{"w3", "c"}, "c"},
+		// q is benched by x and his place is taken; w4 sits either way: both
+		// keep the same Proj. Our order alone would drop q, valued least.
+		{"a bench player before a starter", roster(1, 10, 10), []string{"q", "w4"}, "w4"},
+		// Two bench players, alike in all but value.
+		{"the player our order values least", roster(10, 5, 1), []string{"w4", "q2"}, "q2"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			r := newDropRule(config, Squad{Players: tc.roster}, nil)
+			options := make([]dropOption, len(tc.offer))
+			for i, id := range tc.offer {
+				options[i] = dropOption{at: indexOf(tc.roster, id), gain: 1.23, spot: noSpot}
+			}
+			got, ok := r.recommend(options, nil, in)
+			if !ok || tc.roster[got.at].ID != tc.want {
+				t.Fatalf("recommends %v (%v), want %s", got, ok, tc.want)
+			}
+			// The order the options come in decides nothing.
+			for i, j := 0, len(options)-1; i < j; i, j = i+1, j-1 {
+				options[i], options[j] = options[j], options[i]
+			}
+			if again, _ := r.recommend(options, nil, in); again.at != got.at {
+				t.Fatalf("reversed, recommends %s", tc.roster[again.at].ID)
 			}
 		})
 	}

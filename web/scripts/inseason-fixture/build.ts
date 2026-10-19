@@ -30,7 +30,13 @@ import { fileURLToPath } from 'node:url';
 import { format as prettierFormat, resolveConfig } from 'prettier';
 import { listWords } from '../../src/lib/format/list.ts';
 import { FIXTURE_IDS } from './ids.ts';
-import { CHECK_BASIS } from './week.ts';
+import {
+	basisTail as basisTailOf,
+	CHECK_BASIS,
+	LAST_FANTASY_WEEK,
+	tradesBasis,
+	weeksCovered as weeksCoveredFrom
+} from './week.ts';
 import { leagueFields } from './league-fields.ts';
 import { shapeSentence } from './league-shape.ts';
 import type { LeaguePlayer, LeagueSync, MatchupSide } from '../../src/lib/league/api.ts';
@@ -62,7 +68,6 @@ const WAIVER_ROWS_UNDER_RULE = 8;
 const TRADES_PER_TEAM = 4;
 const CLOSE_FOR_THEM = 0.5;
 /** The last week the rest-of-season order covers (the API's LastWeek). */
-const LAST_FANTASY_WEEK = 17;
 /** A gain or a points over replacement figure on the wire: one decimal. */
 const TENTH = 10;
 /** The last games a change's reason names. */
@@ -192,11 +197,10 @@ if (!format?.rosFromWeek || !format.refreshedAt) {
 const refreshed = format.refreshedAt;
 const week = state.week;
 /** The weeks the rest-of-season order covers from the league's week: a week's figure is over them. */
-const weeksCovered = Math.max(1, LAST_FANTASY_WEEK - week + 1);
+const weeksCovered = weeksCoveredFrom(week);
 
-/** What every basis ends with, in the API's words (words.go porWords): what Gain is
- * and what a week's figure is, then what Rest of season is (pergame.go RestOfSeasonBasis). */
-const basisTail = `Gain is the change in a lineup's points over replacement a week, points above what a free pickup at each position gives you: the rest of the season on our rest-of-season order, averaged over its ${String(weeksCovered)} weeks, not a projection of any one week. Rest of season is his points a game on our rest-of-season projection from week ${String(format.rosFromWeek)}, byes out.`;
+const rosFromWeek = format.rosFromWeek;
+const basisTail = basisTailOf(weeksCovered, rosFromWeek);
 
 /** The rest of the basis, under the rows, in the API's words (words.go BasisNote): the league's
  * shape and the league's rules the stat lines leave out. */
@@ -794,9 +798,7 @@ function trades(): TradeAdvice {
 					: null
 		}));
 	return {
-		...head(
-			`Trades where both lineups gain on our rest-of-season order. Each team's best trade, yours first, among those they gain at least 0.5 a week from, then the close calls for them. The other team decides. ${basisTail}`
-		),
+		...head(tradesBasis(weeksCovered, rosFromWeek)),
 		check_basis: CHECK_BASIS,
 		teams,
 		roster: rosterByPosition(myLines),

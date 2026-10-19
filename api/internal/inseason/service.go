@@ -68,8 +68,9 @@ type Service struct {
 	// Boards values our board for the reads with no league: the public player read and the public
 	// order (PublicSettings).
 	Boards BoardSource
-	// targets keeps the trade finder's targets per league read (order.go).
-	targets targetCache
+	// finds keeps the trade finder's trades per league read (targets.go),
+	// for /trades and the order's targets alike (Lane 66u N3).
+	finds readCache[map[int][]Trade]
 	// Season is the season GET /games/week reads, the board's.
 	Season int
 	Now    func() time.Time
@@ -137,6 +138,7 @@ func (s *Service) advisorFor(w http.ResponseWriter, r *http.Request) (*advisor, 
 		httpx.WriteInternal(w, r, s.Log, "inseason: advisor", err)
 		return nil, false
 	}
+	a.finds = s.findsFor(a, auth.AccountID(r).String())
 	return a, true
 }
 

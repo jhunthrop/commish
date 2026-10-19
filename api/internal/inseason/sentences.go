@@ -236,7 +236,7 @@ func (w *Writer) Waiver(add Line, drop *Line, move Waiver) string {
 	number := numberWords(w.Basis)
 	switch {
 	case move.NoDrop:
-		return fmt.Sprintf("%s would start for you, but every player he could replace is held or starts.", add.Name)
+		return fmt.Sprintf("%s would start for you, but no player he could replace leaves your lineup full this week.", add.Name)
 	case positive(move.Gain) && !move.Starts:
 		gain := fmt.Sprintf("%s does not start for you this week, and your lineup still gains %s points over replacement a week with him on %s.",
 			add.Name, points(move.Gain), number)

@@ -60,18 +60,12 @@ type takenSpot struct{ by, slot int }
 // noSpot is a move that does not take his place.
 var noSpot = takenSpot{by: -1, slot: -1}
 
-// takesHisSpot is whether dropping roster[d], once out are gone and in
-// taken in, keeps this week's lineup full (every slot it filled before
-// is filled after, the chain of moves the fill makes included) and starts
-// a player of in: that player and the slot he actually takes, the one in
-// d's own slot first; noSpot when either fails.
-func (r dropRule) takesHisSpot(d int, out []int, in []Candidate) takenSpot {
-	roster := Swapped(r.squad.Players, withOne(out, d), in)
-	return r.spotIn(weekOf(r.config, roster, r.squad.Starters), d, len(roster)-len(in), len(in))
-}
-
-// spotIn is takesHisSpot read from the week's lineup after the move, the
-// players taken in at first through first+n-1 of its roster.
+// spotIn is whether dropping roster[d] for a move keeps this week's
+// lineup full (every slot it filled before is filled after, the chain of
+// moves the fill makes included) and starts a player taken in, read from
+// the week's lineup after the move, those players at first through
+// first+n-1 of its roster: that player and the slot he actually takes, the
+// one in d's own slot first; noSpot when either fails.
 func (r dropRule) spotIn(after weekLineup, d, first, n int) takenSpot {
 	for i, idle := range r.week.idle {
 		if !idle && i < len(after.idle) && after.idle[i] {

@@ -198,6 +198,71 @@ func league(n int) []Squad {
 	return out
 }
 
+// bigLeague is n rosters of 24, a deep bench league, every player with a
+// week's Proj so this week's lineup decides the drops (Lane 66u N3).
+func bigLeague(n int) []Squad {
+	positions := []draft.Position{draft.QB, draft.RB, draft.RB, draft.WR, draft.WR, draft.WR, draft.TE, draft.RB,
+		draft.K, draft.DEF, draft.QB, draft.RB, draft.WR, draft.TE, draft.WR, draft.RB, draft.WR, draft.RB, draft.WR,
+		draft.QB, draft.TE, draft.RB, draft.WR, draft.WR}
+	out := make([]Squad, n)
+	for team := range out {
+		players := make([]Candidate, len(positions))
+		for i, p := range positions {
+			value := float64((team*37+i*53)%150) + 1
+			proj := float64((team*13+i*29)%25) + 1
+			players[i] = withProj(player(fmt.Sprintf("t%d-%d", team, i), p, 1+(team*7+i*11)%60, value), proj)
+		}
+		out[team] = Squad{Players: players}
+	}
+	return out
+}
+
+// BenchmarkTradesReadTwentyFour is one league read's search, run once and
+// kept (Service.finds): the member's 24 against the other eleven's.
+func BenchmarkTradesReadTwentyFour(b *testing.B) {
+	config := twelveTeamPPR(b)
+	teams := bigLeague(12)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		for _, other := range teams[1:] {
+			AllTrades(config, SeasonGames, teams[0], other)
+		}
+	}
+}
+
+// BenchmarkTradesRequestTwentyFour is a /trades request once the read's
+// search is kept: each team's best ten narrowed from it.
+func BenchmarkTradesRequestTwentyFour(b *testing.B) {
+	config := twelveTeamPPR(b)
+	teams := bigLeague(12)
+	found := make([][]Trade, len(teams))
+	for i, other := range teams[1:] {
+		found[i+1] = AllTrades(config, SeasonGames, teams[0], other)
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		for t, other := range teams[1:] {
+			Narrow(found[t+1], teams[0], other, "", TradesPerTeam)
+		}
+	}
+}
+
+// Narrow over one search is the answer Trades gives with the same focus
+// and limit (Lane 66u N3: the kept search serves every request).
+func TestNarrowIsTheSearchWithItsFocus(t *testing.T) {
+	config := twelveTeamPPR(t)
+	mine, theirs := Squad{Players: deepAtBack()}, Squad{Players: deepAtReceiver()}
+	all := AllTrades(config, SeasonGames, mine, theirs)
+	for _, focus := range []string{"", "t-wr5", "m-rb3"} {
+		for _, limit := range []int{1, TradesPerTeam, 1000} {
+			want := Trades(config, SeasonGames, mine, theirs, focus, limit)
+			if got := Narrow(all, mine, theirs, focus, limit); fmt.Sprint(got) != fmt.Sprint(want) {
+				t.Fatalf("focus %q limit %d: %d trades, Trades %d", focus, limit, len(got), len(want))
+			}
+		}
+	}
+}
+
 // BenchmarkTradesFifteenAgainstFifteen is one team's search: 15 against
 // 15, every one-for-one and two-for-one pair both ways.
 func BenchmarkTradesFifteenAgainstFifteen(b *testing.B) {

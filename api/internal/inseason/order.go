@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"unicode/utf8"
 
 	"github.com/jhunthrop/commish/api/internal/apitypes"
@@ -164,7 +165,7 @@ func (a *advisor) tradeTargets() map[string]bool {
 			continue
 		}
 		theirs := a.active(t)
-		for _, tr := range Trades(a.config, a.weeks, squad, a.squad(t, theirs, false), "", targetsPerTeam) {
+		for _, tr := range Narrow(a.found()[t.RosterID], squad, a.squad(t, theirs, false), "", targetsPerTeam) {
 			for _, i := range tr.Get {
 				if id := theirs[i].line.Player.BoardId; id != nil {
 					out[*id] = true
@@ -243,6 +244,18 @@ func rankBy(position draft.Position) apitypes.OrderAdviceRankBy {
 // league read (review 66j M10); nil for a reader with no league.
 type Targets func() map[string]bool
 
+// onceTargets is the advisor's targets, worked out at most once per
+// request and only when a row asks; the search under them is the league
+// read's, kept across requests (advisor.found).
+func onceTargets(a *advisor) Targets {
+	var once sync.Once
+	var got map[string]bool
+	return func() map[string]bool {
+		once.Do(func() { got = a.tradeTargets() })
+		return got
+	}
+}
+
 // Order is one view of our order (spec §7, Lane 66j). targets, set in a
 // league, gives the rows the league's rosters and moves; nil for the reader
 // with no league of their own. The finder runs only when a shown row is on
@@ -310,7 +323,7 @@ func (s *Service) leagueOrder(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	out := a.Order(q, s.targetsFor(a, auth.AccountID(r).String()))
+	out := a.Order(q, onceTargets(a))
 	moves := CopyOnlyClaims(a.Snap.Ref.Host)
 	if s.Moves != nil {
 		claim, err := s.Moves.ClaimMove(r.Context(), auth.AccountID(r), a.Snap.Ref.Host)

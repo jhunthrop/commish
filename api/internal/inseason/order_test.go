@@ -272,19 +272,27 @@ func TestTheFinderRunsOncePerLeagueRead(t *testing.T) {
 	s := fixtureService(t, f.league, f.data, &fakeHolds{})
 	a := newFixtureAdvisor(t, f, nil)
 	runs := 0
-	find := func() map[string]bool { runs++; return a.tradeTargets() }
+	find := func() map[int][]Trade { runs++; return a.findAll() }
 	key := readKey(a, "acct")
 	for range 3 {
-		s.targets.get(key, find)
+		s.finds.get(key, find)
 	}
 	if runs != 1 {
 		t.Fatalf("the finder ran %d times for one read", runs)
 	}
 	moved := *a
 	moved.Snap.ReadAt = moved.Snap.ReadAt.Add(time.Minute)
-	s.targets.get(readKey(&moved, "acct"), find)
+	s.finds.get(readKey(&moved, "acct"), find)
 	if runs != 2 {
 		t.Fatalf("a new league read ran the finder %d times", runs)
+	}
+	// The drop follows this week's lineup, so a new projection read is a
+	// new search too (Lane 66u N3).
+	projected := *a
+	projected.projection.ReadAt = projected.projection.ReadAt.Add(time.Minute)
+	s.finds.get(readKey(&projected, "acct"), find)
+	if runs != 3 {
+		t.Fatalf("a new projection read ran the finder %d times", runs)
 	}
 	// A view with no row on another roster never runs it.
 	asked := 0

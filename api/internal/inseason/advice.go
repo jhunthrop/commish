@@ -56,6 +56,41 @@ type advisor struct {
 	projection boards.WeekProjection
 	preset     apitypes.ScoringPreset
 	now        time.Time
+	// finds is the league read's trades with each team, searched once per
+	// read across requests (Service.findsFor); nil searches for this
+	// advisor alone, once (found).
+	finds     func() map[int][]Trade
+	foundHere map[int][]Trade
+}
+
+// found is every trade the finder keeps with each other team, by roster
+// id, in orderTrades' order: the Trades screen and the order's targets
+// both read it (Lane 66u N3).
+func (a *advisor) found() map[int][]Trade {
+	if a.finds != nil {
+		return a.finds()
+	}
+	if a.foundHere == nil {
+		a.foundHere = a.findAll()
+	}
+	return a.foundHere
+}
+
+// findAll is the search found keeps: the drafter's squad against every
+// other team's. Empty when the drafter's team is not in the read.
+func (a *advisor) findAll() map[int][]Trade {
+	out := map[int][]Trade{}
+	team, ok := a.Snap.TeamByRoster(a.Me)
+	if !ok {
+		return out
+	}
+	squad := a.squad(team, a.active(team), true)
+	for _, t := range a.Snap.Teams {
+		if t.RosterID != a.Me {
+			out[t.RosterID] = AllTrades(a.config, a.weeks, squad, a.squad(t, a.active(t), false))
+		}
+	}
+	return out
 }
 
 // newAdvisor reads the league's roster shape and scoring from the saved
@@ -642,7 +677,7 @@ func (a *advisor) Trades(focus string) (apitypes.TradeAdvice, bool) {
 		row := apitypes.TradeTeam{RosterId: t.RosterID, Name: t.Name, Owner: t.Owner,
 			Record: apitypes.TradeRecord{Wins: t.Wins, Losses: t.Losses, Ties: t.Ties}, Roster: rosterLines(theirs), Trades: []apitypes.TradeRow{}}
 		close := 0
-		for _, tr := range Trades(a.config, a.weeks, squad, a.squad(t, theirs, false), focus, TradesPerTeam) {
+		for _, tr := range Narrow(a.found()[t.RosterID], squad, a.squad(t, theirs, false), focus, TradesPerTeam) {
 			row.Trades = append(row.Trades, a.tradeRow(mine, theirs, tr, a.tradeWeek(team, t, mine, theirs, tr)))
 			if tr.CloseForThem() {
 				close++

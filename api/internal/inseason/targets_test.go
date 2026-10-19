@@ -13,7 +13,7 @@ const findWait = 2 * time.Second
 // TestTheFinderRunsOutsideTheCacheLock is review 66j N4: one league read's
 // finder never holds up another's, and the lock guards the map only.
 func TestTheFinderRunsOutsideTheCacheLock(t *testing.T) {
-	var c targetCache
+	var c readCache[map[string]bool]
 	started, release := make(chan struct{}), make(chan struct{})
 	go c.get("slow", func() map[string]bool {
 		close(started)
@@ -37,7 +37,7 @@ func TestTheFinderRunsOutsideTheCacheLock(t *testing.T) {
 // TestConcurrentAsksOfOneReadRunTheFinderOnce: the same read asked at once
 // runs the finder once and every caller gets its answer.
 func TestConcurrentAsksOfOneReadRunTheFinderOnce(t *testing.T) {
-	var c targetCache
+	var c readCache[map[string]bool]
 	var runs atomic.Int32
 	release := make(chan struct{})
 	find := func() map[string]bool {

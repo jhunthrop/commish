@@ -3911,7 +3911,7 @@ type TradeRow struct {
 	// CloseForThem their gain is under 0.5 a week
 	CloseForThem bool `json:"close_for_them"`
 
-	// Drop who the drafter drops to make room when the trade brings in more players than it sends and the roster has no open spot (the player it costs least to lose, never held, never a starter after the trade, and never one of this week's lineup as the Lineup screen sets it while a bench player may go, Lane 66u); the gain is after him; null otherwise
+	// Drop who the drafter drops to make room when the trade brings in more players than it sends and the roster has no open spot: never held, never one whose loss leaves a rest-of-season slot empty; among the drops that keep this week's lineup as the Lineup screen sets it full (a bench player, or a starter whose place a player the trade brings in takes), the largest rest-of-season gain, ties to the higher Proj kept, then a bench player, then the player our order values least (Lane 66u); the gain is after him; null otherwise
 	Drop *PlayerLine `json:"drop"`
 
 	// DropReason the trade's sentence when its drop starts this week: the spot he starts in and the player the trade brings in who takes it (Lane 66u); null for a bench drop or none

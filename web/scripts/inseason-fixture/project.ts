@@ -45,13 +45,14 @@ import {
 	accepts,
 	better,
 	CHECK_BASIS,
-	TRADES_BASIS,
+	tradesBasis,
 	lineupProj,
 	printedProj,
 	seasonStarters,
 	tenth,
 	tierOf,
-	weekSlots
+	weekSlots,
+	weeksCovered
 } from './week.ts';
 
 const DATA = new URL('./data/', import.meta.url);
@@ -693,11 +694,15 @@ const STARTER_DROP_STANDIN = {
 	holds: ['Jaxson Dart', 'Ladd McConkey', 'Travis Etienne']
 } as const;
 
-/** Each trade's drop against this week's lineup, as the API picks it (inseason drops.go, Lane 66u):
- * the bench player it costs least to lose, never one the rest-of-season lineup starts after the
- * trade, never held, never the only defense; a player the Lineup starts only when no bench player
- * may go and the trade keeps this week's lineup full with a player it brings in starting, the trade
- * then naming the slot that player takes; a trade with no one to drop is not listed. */
+/** Each trade's drop against this week's lineup, a stand-in simplification of the API's rule (inseason
+ * drops.go recommend, Lane 66u). The API takes the largest rest-of-season gain among the drops that
+ * keep this week's lineup full, then the higher Proj kept, a bench player before a starter, then the
+ * player our order values least. Here the candidates are only the players the rest-of-season lineup
+ * does not start after the trade, never held, never the only defense; those all share the trade's
+ * gain, and dropping a bench player keeps the most Proj, so the rule reduces to: the cheapest bench
+ * player, else the cheapest starter whose place a player brought in takes with the lineup kept full,
+ * the trade then naming the slot that player takes. The Proj kept is not compared among starters the
+ * lineup still starts. A trade with no one to drop is not listed. */
 function followLineup(finder: TradeAdvice): TradeAdvice {
 	const id = (l: PlayerLine): string => l.player.host_id;
 	const roster = [...stampedLineup.slots.map((s) => s.ours), ...stampedLineup.bench];
@@ -825,10 +830,9 @@ function withWeek(finder: TradeAdvice): TradeAdvice {
 						: swapOnly(row.get, row.give)
 			}))
 		})),
-		// The finder's first sentence as the API now says it (words.go TradesBasis).
-		// The finder's basis as the API now says it (words.go TradesBasis and porWords, pergame.go
-		// RestOfSeasonBasis), stamped whole so a rerun on an older answer says it the same way.
-		basis: TRADES_BASIS,
+		// The finder's basis in the API's words, stamped whole from the one copy (week.ts tradesBasis) so a
+		// rerun on an older answer says it the same way.
+		basis: tradesBasis(weeksCovered(finder.week), finder.week),
 		check_basis: CHECK_BASIS,
 		moves: {
 			propose: 'unavailable',
