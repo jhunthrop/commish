@@ -22,6 +22,7 @@ from research.capsules.week.sheet import (
 )
 from research.capsules.week.validate import validate_week_read
 from research.capsules.week.write import WeekReadResult
+from research.nightly.week_reads import WeekReadSpend
 from research.tests.week_read_fixtures import BOARD, CAPTURED, FIGURES, KICKOFF, starter
 
 
@@ -91,12 +92,16 @@ def test_every_figure_of_the_sweeps_prose_is_refused() -> None:
 
 
 def test_the_nightlys_fallback_reason_names_the_guard() -> None:
-    """A week read that never passes falls to its facts block with its first violation as the reason."""
+    """A week read that never passes falls to its facts block with its first violation as the reason, and
+    the pass's line names the page and that reason."""
     draft = GOOD.replace("26.4 points", "26.6 points")
     first = validate_week_read(draft, allen(), call="start").violations[0]
     assert first.startswith(FIGURE_OFF_PAGE)
-    fallback = WeekReadResult("", "facts", None, None, None, 4, (), f"failed validation: {first}").fallback
-    assert fallback is not None and FIGURE_OFF_PAGE in fallback
+    spend = WeekReadSpend()
+    spend.add(WeekReadResult("Week: 6 of 2026", "facts", None, None, None, 4, (), f"failed validation: {first}"))
+    spend.fell_to_facts("Josh Allen", f"failed validation: {first}")
+    assert f"1 fell to their facts blocks: Josh Allen: failed validation: {FIGURE_OFF_PAGE}" in spend.line()
+    assert "fell to their facts blocks" not in WeekReadSpend().line()
 
 
 def _season_grounding(sheet: str) -> Grounding:
