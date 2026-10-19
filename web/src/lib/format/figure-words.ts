@@ -18,6 +18,10 @@ export interface FigureWords {
 	perGame: string;
 	avg: string;
 	week: string;
+	/** "from week {week}": the week a rest of season starts from (run/rest-from.ts). */
+	restFrom: string;
+	/** "from week {week}'s games left": the same while a game of that week has kicked off. */
+	restFromPartial: string;
 }
 
 export const FIGURE: Readonly<FigureWords> = TABLE;

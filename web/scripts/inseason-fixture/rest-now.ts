@@ -3,8 +3,9 @@
  * player whose club's week 6 game is no longer upcoming at the clock, or whose club is on bye, counts
  * from week 7, his total his points a game times the games still to play; the order starts at the
  * earliest week with a game left and, while a game of it has kicked off, says it counts that week's
- * games still to play. The words are the API's (words.go restFromWords, OrderScreenBasis). */
+ * games still to play. The words are the site's one table's (figurewords/words.json, run/rest-from.ts). */
 import type { components } from '../../src/lib/api/types.ts';
+import { restFromWords } from '../../src/lib/run/rest-from.ts';
 import { stateAt } from './game-state.ts';
 import { roundTenth } from './tenths.ts';
 
@@ -36,11 +37,6 @@ export function restOfRow(
 	if (points === null || perGame === null || !played || row.line.facts.bye)
 		return { points, fromWeek };
 	return { points: roundTenth(points - perGame), fromWeek };
-}
-
-/** "from week 7", or "from week 6's games left" (words.go restFromWords). */
-function restFromWords(week: number, partial: boolean): string {
-	return partial ? `from week ${String(week)}'s games left` : `from week ${String(week)}`;
 }
 
 /** The order at `now`: each row's total over his club's games left, the order's first week

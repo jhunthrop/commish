@@ -1,5 +1,8 @@
 """ADP, THE RECORD, THE CLUBS AND THE SCHEDULE, in the web's run format (`web/src/lib/run/schema.ts`)."""
 
+import functools
+import json
+import os
 from collections.abc import Mapping, Sequence
 from datetime import datetime
 from typing import Any, Final, Protocol
@@ -11,6 +14,7 @@ from research.nightly.reads import record as record_read
 from research.nightly.reads import schedule as schedule_read
 from research.nightly.reads.adp import AdpCapture
 from research.nightly.register_log import FrozenBy
+from research.web_contract import figure_words_path
 
 Json = dict[str, Any]
 # A rank correlation is at most one in magnitude; a float sum can land an ulp past it.
@@ -164,12 +168,22 @@ def schedule_json(
     }
 
 
+# The placeholder the words table's week templates carry.
+WEEK_SLOT: Final = "{week}"
+
+
+@functools.cache
+def _figure_words() -> dict[str, str]:
+    words: dict[str, str] = json.loads(figure_words_path(os.environ).read_text())
+    return words
+
+
 def rest_from_words(rest: "RestOfSeason") -> str:
-    """The week the rest of season counts from, said once (Lane 86, the API's restFromWords): "from week
-    7", or while a game of it is played "from week 6's games left"."""
-    if rest.partial:
-        return f"from week {rest.from_week}'s games left"
-    return f"from week {rest.from_week}"
+    """The week the rest of season counts from, said once (Lane 86), from the site's one words table
+    (api/internal/figurewords/words.json, the API's restFromWords and the web's): "from week 7", or
+    while a game of it is played "from week 6's games left"."""
+    template = _figure_words()["restFromPartial" if rest.partial else "restFrom"]
+    return template.replace(WEEK_SLOT, str(rest.from_week))
 
 
 def format_json(run_format: RunFormat, season: int, rest: "RestOfSeason | None" = None) -> Json:

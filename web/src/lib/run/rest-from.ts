@@ -1,11 +1,15 @@
 /** The week a rest of season counts from, said once on every screen built from the run (Lane 86, the
  * API's restFromWords and the nightly's rest_from_words). The run says each figure's week; this only
  * words it. */
+import { FIGURE } from '#lib/format/figure-words.ts';
 import type { BoardRow, Format } from './schema.ts';
+
+/** The placeholder the words table's week templates carry. */
+const WEEK_SLOT = '{week}';
 
 /** "from week 7", or while a game of that week is played "from week 6's games left". */
 export function restFromWords(week: number, partial: boolean): string {
-	return partial ? `from week ${String(week)}'s games left` : `from week ${String(week)}`;
+	return (partial ? FIGURE.restFromPartial : FIGURE.restFrom).replace(WEEK_SLOT, String(week));
 }
 
 /** A player's own week: "from week 7", or "with no game left" (his club's first game still to play is one

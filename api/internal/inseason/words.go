@@ -386,10 +386,11 @@ type RestFrom struct {
 // restFromWords is the week the order counts from, said once: "from week
 // 7", or while a game of it is played "from week 6's games left".
 func restFromWords(r RestFrom) string {
+	template := figurewords.Table.RestFrom
 	if r.Partial {
-		return fmt.Sprintf("from week %d's games left", r.Week)
+		template = figurewords.Table.RestFromPartial
 	}
-	return fmt.Sprintf("from week %d", r.Week)
+	return strings.ReplaceAll(template, figurewords.WeekSlot, strconv.Itoa(r.Week))
 }
 
 // OrderScreenBasis is the Rest of season and Players screens' line
