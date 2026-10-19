@@ -56,7 +56,9 @@ export function shortName(name: string): string {
 export interface BeatsCell {
 	name: string;
 	starter: boolean;
-	gain: number;
+	/** The week gain, null once his or the beaten player's game has kicked off (review H3): the cell
+	 * draws EMPTY_FIGURE then, the row's Game cell saying Final or Kicked off. */
+	gain: number | null;
 }
 
 /** One player free to add, as the table draws him. */
@@ -70,6 +72,9 @@ export interface PoolRow {
 	named: boolean;
 	/** "Clears Wed": the day a claim on him clears, where the platform says it; else null. */
 	clears: string | null;
+	/** The Beats sort's figure: a starter topped first, then the week gain, or the season Gain while
+	 * the pickups go in that order (seasonOrdered); null with no one beaten. */
+	order: number | null;
 	source: WaiverRow;
 }
 
@@ -116,34 +121,73 @@ export function clearsWords(day: string | null): string | null {
 	return Number.isNaN(at.getTime()) ? null : `${WAIVERS.clears} ${WEEKDAY.format(at)}`;
 }
 
+/** The member's player an add beats, by his host id, null for an open spot or one not on the roster. */
+function beatenLine(source: WaiverRow, roster: readonly PlayerLine[]): PlayerLine | null {
+	const id = source.beats?.host_id;
+	return id === undefined ? null : (roster.find((l) => l.player.host_id === id) ?? null);
+}
+
+/** Whether a row's week figures still count: the add's, the drop's and the beaten player's games all
+ * still to be played at the page's clock (kickoff.ts, the score bug's rule). */
+function weekCounts(source: WaiverRow, roster: readonly PlayerLine[], now: number): boolean {
+	return [source.add, source.drop, beatenLine(source, roster)].every(
+		(l) => l === null || !locked(l, now)
+	);
+}
+
+/** The pickups go in season Gain order once a pickup's week figure is withheld (review H3): the API
+ * orders them by this week's Proj, which no longer counts for a game kicked off; the basis says so
+ * (seasonOrderWords). */
+export function seasonOrdered(
+	advice: Pick<WaiverAdvice, 'pickups'> & Partial<Pick<WaiverAdvice, 'roster'>>,
+	now: number
+): boolean {
+	return advice.pickups.some((p) => !weekCounts(p, advice.roster ?? [], now));
+}
+
+/** The basis's first sentence while the pickups go in season Gain order. */
+export function seasonOrderWords(week: number): string {
+	return `Pickups go in ${SEASON.gain} order once their week ${String(week)} games kick off.`;
+}
+
 /** Whom an add beats, as the API says it: his player, or the open spot he fills (a starting spot no
- * one of the member's can play this week). Nothing is inferred here (review 66f M3). */
-function beatsOf(source: WaiverRow): BeatsCell | null {
+ * one of the member's can play this week), the week gain withheld once a game has kicked off. Nothing
+ * is inferred here (review 66f M3). */
+function beatsOf(source: WaiverRow, counts: boolean): BeatsCell | null {
 	const { beats } = source;
 	if (beats === null) return null;
 	return {
 		name: beats.open_spot ? WAIVERS.openSpot : shortName(beats.name),
 		starter: beats.starter,
-		gain: beats.gain
+		gain: counts ? beats.gain : null
 	};
 }
 
 /** The table's rows from the answer: every add, whom he beats, the strip's tint on the ones it names. */
 export function poolRows(
-	advice: Pick<WaiverAdvice, 'rows' | 'pickups'>,
+	advice: Pick<WaiverAdvice, 'rows' | 'pickups'> & Partial<Pick<WaiverAdvice, 'roster'>>,
 	zone: string,
 	now: number
 ): PoolRow[] {
 	const named = new Set(advice.pickups.map(addKey));
+	const roster = advice.roster ?? [];
+	const season = seasonOrdered(advice, now);
 	return advice.rows.map((source) => {
 		const key = addKey(source);
+		const beats = beatsOf(source, weekCounts(source, roster, now));
+		const figure = season ? source.gain : beats?.gain;
 		return {
 			key,
 			row: { ...boxRow(source.add, '', zone, false, now), key },
 			rest: source.add.rest_of_season_per_game,
-			beats: beatsOf(source),
+			beats,
 			named: named.has(key),
 			clears: clearsWords(source.clears),
+			// A starter topped (or an open spot filled) outranks any bench gain.
+			order:
+				beats === null || figure === null || figure === undefined
+					? null
+					: (beats.starter ? STARTER_RANK : 0) + figure,
 			source
 		};
 	});
@@ -176,13 +220,17 @@ function weekGainOf(
 	return locked(add, now) || (drop !== null && locked(drop, now)) ? null : gain;
 }
 
-/** The strip's cards in the API's order: each one's week gain is his over the cards before him. */
+/** The strip's cards in the API's order (each one's week gain is his over the cards before him), or in
+ * season Gain order once the week figure is withheld (seasonOrdered). */
 export function pickupCards(
 	advice: Pick<WaiverAdvice, 'rows' | 'pickups' | 'roster'>,
 	now: number
 ): PickupCard[] {
 	const names = namesOnScreen(advice);
-	return advice.pickups.map((source) => ({
+	const ordered = seasonOrdered(advice, now)
+		? [...advice.pickups].sort((a, b) => b.gain - a.gain)
+		: advice.pickups;
+	return ordered.map((source) => ({
 		key: addKey(source),
 		slot: positionWord(source.add.player.position),
 		add: cardName(source.add.player.name, names),
@@ -349,9 +397,7 @@ function valueOf(r: PoolRow, key: SortKey): number | string | null {
 		case 'rest':
 			return r.rest;
 		case 'beats':
-			// A starter topped (or an open spot filled) outranks any bench gain.
-			if (r.beats === null) return null;
-			return (r.beats.starter ? STARTER_RANK : 0) + r.beats.gain;
+			return r.order;
 	}
 }
 
@@ -438,7 +484,8 @@ export function waiverBasis(
 		| 'projection_read_at'
 		| 'projection_previous_read_at'
 		| 'projection_scoring'
-	>,
+	> &
+		Partial<Pick<WaiverAdvice, 'pickups' | 'roster' | 'week'>>,
 	lines: readonly PlayerLine[],
 	rulesHref: string,
 	clock: Clock,
@@ -457,7 +504,13 @@ export function waiverBasis(
 		clock
 	);
 	return [
-		...said(advice.basis),
+		// The order's rule: the API's week rule, or the season Gain once the week figure is withheld.
+		...said(
+			advice.week !== undefined &&
+				seasonOrdered({ pickups: advice.pickups ?? [], roster: advice.roster ?? [] }, now)
+				? seasonOrderWords(advice.week)
+				: advice.basis
+		),
 		...said(advice.season_basis),
 		...said(proj),
 		...said(deltaPart(advice.projection_previous_read_at, clock), false),

@@ -120,7 +120,9 @@
 									><b>{entry.beats.name}</b><span
 										>{entry.beats.starter ? WAIVERS.starter : WAIVERS.bench}</span
 									></span
-								><span class="gain">{gainWord(entry.beats.gain)}</span></span
+								><span class="gain"
+									>{entry.beats.gain === null ? BOX.none : gainWord(entry.beats.gain)}</span
+								></span
 							>
 						{:else}<span class="none">{entry.row.game === 'bye' ? BOX.bye : BOX.none}</span>{/if}
 					</td>

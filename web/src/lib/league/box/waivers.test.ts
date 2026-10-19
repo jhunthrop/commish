@@ -29,7 +29,8 @@ import {
 	stripDecision,
 	WAIVERS,
 	waiverBasis,
-	withDrop
+	withDrop,
+	seasonOrderWords
 } from './waivers.ts';
 
 const ZONE = 'America/Chicago';
@@ -405,4 +406,60 @@ void test('the basis says when Final and the stats land while a row waits on the
 	const text = basisText(waiverBasis(BASIS, [final, saints], RULES, CLOCK, NOW));
 	assert.ok(text.includes(KICKED_OFF_PART), text);
 	assert.ok(!basisText(waiverBasis(BASIS, [saints], RULES, CLOCK, NOW)).includes(KICKED_OFF_PART));
+});
+
+void test('a Final row keeps no week figure in Beats, and the pickups go in season Gain order (review H3)', () => {
+	const final = (r: WaiverRow): WaiverRow => ({
+		...r,
+		add: { ...r.add, facts: { ...r.add.facts, played: true, game_state: 'final' } }
+	});
+	const rows = [final(jones), final(gainwell), final(mevis), final(allen), final(chiefs)];
+	// The API's order is this week's: Gainwell then Chiefs by their week gains.
+	const tuesday = { ...advice, rows, pickups: [final(chiefs), final(gainwell)] };
+	const pool = poolRows(tuesday, ZONE, NOW);
+	const gainwellRow = pool.find((r) => r.row.name === 'Kenny Gainwell');
+	assert.ok(gainwellRow?.beats);
+	assert.equal(gainwellRow.beats.gain, null);
+	assert.deepEqual(gainwellRow.row.game, { where: 'vs PIT', when: 'Final' });
+	// The default sort reads the season Gain once the week figure is withheld: Gainwell (1.2) over
+	// Chiefs (0.3) over Mevis (-0.3), the starters topped first as before.
+	assert.deepEqual(
+		sortRows(pool, DEFAULT_SORT).map((r) => r.row.name),
+		['Kenny Gainwell', 'Chiefs D/ST', 'Harrison Mevis', 'Daniel Jones', 'Kaytron Allen']
+	);
+	// The strip's cards too: the API sent Chiefs first by the week, the season Gain puts Gainwell first.
+	assert.deepEqual(
+		pickupCards(tuesday, NOW).map((c) => c.add),
+		['Gainwell', 'Chiefs']
+	);
+	// The basis names the column that ordered them, never the week's rule.
+	const text = basisText(
+		waiverBasis(
+			{ ...BASIS, week: 6, pickups: tuesday.pickups, roster: tuesday.roster },
+			rows.map((r) => r.add),
+			RULES,
+			CLOCK,
+			NOW
+		)
+	);
+	assert.ok(text.startsWith(seasonOrderWords(6)), text);
+	assert.ok(!text.includes(BASIS.basis), text);
+	assert.equal(seasonOrderWords(6), 'Pickups go in Gain order once their week 6 games kick off.');
+	assert.doesNotMatch(seasonOrderWords(6), bannedPattern());
+	// While every week figure is still drawn, the API's order and rule stand.
+	assert.deepEqual(
+		pickupCards({ ...advice, pickups: [chiefs, gainwell] }, NOW).map((c) => c.add),
+		['Chiefs', 'Gainwell']
+	);
+	assert.ok(
+		basisText(
+			waiverBasis(
+				{ ...BASIS, week: 6, pickups: advice.pickups, roster: advice.roster },
+				[gainwell.add],
+				RULES,
+				CLOCK,
+				NOW
+			)
+		).startsWith(BASIS.basis)
+	);
 });
