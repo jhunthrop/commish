@@ -3,16 +3,24 @@
 // league the rows carry no roster, no move and no read (api week_order.go); in an ESPN stand-in league
 // each row is named by ESPN's id (a defense by its D/ST id, api hostIDOfAdd) and the claim is open.
 import type { components } from '../../src/lib/api/types.ts';
+import { uncountedCount } from './week.ts';
 
 type WeekOrderAdvice = components['schemas']['WeekOrderAdvice'];
 type WaiverMoves = components['schemas']['WaiverMoves'];
 type Position = WeekOrderAdvice['position'];
 
+/** A tab's answer as week-order.ts writes it: the rules sentence is the reader's, set here. */
+type StoredAdvice = Omit<WeekOrderAdvice, 'basis_note' | 'basis_note_link'>;
+
 /** The week's two states, as week-order.ts writes them. */
 export interface WeekOrderStates {
-	read: Readonly<Record<Position, WeekOrderAdvice>>;
-	unread: Readonly<Record<Position, WeekOrderAdvice>>;
+	read: Readonly<Record<Position, StoredAdvice>>;
+	unread: Readonly<Record<Position, StoredAdvice>>;
 }
+
+/** The recorded league's rules each tab's Avg and Last miss (api week_order.go uncountedRulesAt): the
+ * two kicking ones, the two defense ones. */
+const UNCOUNTED_RULES: Readonly<Record<Position, number>> = { K: 2, DEF: 2 };
 
 /** ESPN's proTeamId by our club code (api espn proTeams): a D/ST's id is -(16000 + it). */
 const ESPN_PRO_TEAMS: Readonly<Record<string, number>> = {
@@ -86,10 +94,12 @@ export function weekOrderAnswer(
 ): WeekOrderAdvice {
 	const readAt = states.read[position].projection_read_at;
 	const week = readAt !== null && now >= Date.parse(readAt) ? states.read : states.unread;
-	const answer = week[position];
+	const answer = { ...week[position], ...uncountedCount(UNCOUNTED_RULES[position]) };
 	if (league === null) {
 		return {
 			...answer,
+			// A reader with no league: the board's scoring, no Settings to open (week_order.go).
+			...uncountedCount(UNCOUNTED_RULES[position], 'the PPR', false),
 			read_at: null,
 			moves: null,
 			rows: answer.rows.map((row) => ({ ...row, roster: null, move: null }))

@@ -263,9 +263,15 @@ func onceTargets(a *advisor) Targets {
 func (a *advisor) Order(q orderQuery, targets Targets) apitypes.OrderAdvice {
 	marks := targets != nil
 	h := a.header()
-	out := apitypes.OrderAdvice{Week: h.week, Basis: OrderScreenBasis(a.basis, a.Board.FromWeek, a.settings), OrderBasis: h.basis,
-		Refreshed: h.refreshed, ProjectionReadAt: a.projectionReadAt(), ProjectionScoring: projectionScoring(a.settings, a.preset),
-		BasisNote: LineupNote(a.settings, a.season.Carries), RankBy: rankBy(q.position), Rows: []apitypes.OrderRow{}}
+	scoring := projectionScoring(a.settings, a.preset)
+	un := UncountedOf(a.settings, a.season.Carries)
+	if !marks {
+		// "Your scoring rules" are the member's: a reader with no league has none.
+		un = Uncounted{}
+	}
+	out := apitypes.OrderAdvice{Week: h.week, Basis: OrderScreenBasis(a.basis, a.Board.FromWeek, OrderLeague(marks, a.settings, scoring.Format)), OrderBasis: h.basis,
+		Refreshed: h.refreshed, ProjectionReadAt: a.projectionReadAt(), ProjectionScoring: scoring,
+		BasisNote: un.Note, BasisNoteLink: un.Link, RankBy: rankBy(q.position), Rows: []apitypes.OrderRow{}}
 	if carriesPerGame(a.Board) {
 		from := a.Board.FromWeek
 		out.FromWeek = &from
@@ -286,6 +292,12 @@ func (a *advisor) Order(q orderQuery, targets Targets) apitypes.OrderAdvice {
 			continue
 		}
 		out.Rows = append(out.Rows, a.orderRow(p, ranks[i], hosts, targets))
+	}
+	for _, r := range out.Rows {
+		if r.Line.RestOfSeasonPerGame != nil {
+			out.Basis += " " + PerGameBasis()
+			break
+		}
 	}
 	return out
 }

@@ -28,8 +28,8 @@
 	import { inSeasonApi, type LineupAdvice, type Scoreboard } from './inseason/api.ts';
 	import { siteContext } from '#lib/context/context.svelte.ts';
 	import { sectionHref } from '#lib/ui/nav.ts';
-	import { factsReadLine } from './box/box.ts';
-	import { weekdayTime } from '#lib/format/clock.ts';
+	import { gamePart } from './box/basis.ts';
+	import { memberZone, weekdayTime } from '#lib/format/clock.ts';
 	import { BENCH_ANCHOR } from './box/lineup.ts';
 	import RosterPanel from './RosterPanel.svelte';
 	import ScoreBoard from './home/ScoreBoard.svelte';
@@ -271,7 +271,15 @@
 					scoreboard
 						? teamBasis(sync.host, scoreboard.projection_read_at, scoreboard.projection_scoring)
 						: null,
-					advice ? factsReadLine(advice.slots.flatMap((s) => (s.host ? [s.host] : []))) : null,
+					// The season panel names the zone once, so the read's time does not repeat it.
+					advice
+						? gamePart(
+								advice.slots.flatMap((s) => (s.host ? [s.host] : [])),
+								{ zone: memberZone(), zoned: false },
+								Date.now(),
+								'full'
+							)
+						: null,
 					sync.moves_read ? null : movesBasis(sync.host)
 				].filter((line): line is string => line !== null)
 			: []
@@ -405,7 +413,12 @@
 			{/if}
 			<div class="panel" id="league-panel" role="tabpanel" aria-labelledby="league-tab-{view}">
 				{#if view === 'settings'}
-					<LeagueSettings terms={sync.terms} host={sync.host} teams={sync.teams.length} />
+					<LeagueSettings
+						terms={sync.terms}
+						host={sync.host}
+						teams={sync.teams.length}
+						uncounted={advice?.uncounted_rules ?? []}
+					/>
 				{:else if playing}
 					{#if bugs.length > 0 && scoreboard}
 						<ScoreBoard

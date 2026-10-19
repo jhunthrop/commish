@@ -4,17 +4,14 @@
 import type { components } from '#lib/api/types.ts';
 import { memberZone, weekdayTime } from '#lib/format/clock.ts';
 import { weekHead } from '#lib/format/figure-words.ts';
+import { avgLastPart, deltaPart, gamePart, OPP_PART, projPart } from '#lib/league/box/basis.ts';
 import {
 	BOX,
-	EVIDENCE_SHORT,
-	evidenceShort,
 	deltaWord,
 	easeOf,
 	expectedWords,
-	factsReadShort,
 	gameOf,
 	oppRankWord,
-	projShort,
 	weatherCell,
 	type WeatherCell
 } from '#lib/league/box/box.ts';
@@ -281,17 +278,27 @@ export function liveBasis(
 	zone: string,
 	now: number = Date.now()
 ): string[] {
-	const proj = projShort(
-		week.projection_read_at,
-		week.projection_previous_read_at,
-		week.projection_scoring,
-		false,
-		zone,
-		league
-	);
-	const scoring = `${SCORING_WORDS[week.projection_scoring.format]} scoring`;
-	const evidence = league ? EVIDENCE_SHORT : evidenceShort(scoring);
-	const facts = factsReadShort([week.line], zone, now);
+	// The card's page names no zone elsewhere, so each time says it (basis.ts, the one source).
+	const clock = { zone, zoned: true };
+	const proj = [
+		projPart(
+			{
+				readAt: week.projection_read_at,
+				scoring: week.projection_scoring,
+				defense: false,
+				league
+			},
+			clock
+		),
+		deltaPart(week.projection_previous_read_at, clock)
+	]
+		.filter((said) => said !== null)
+		.join(' ');
+	const scoring = league
+		? 'your scoring'
+		: `${SCORING_WORDS[week.projection_scoring.format]} scoring`;
+	const evidence = `${OPP_PART} ${avgLastPart(scoring)}`;
+	const facts = gamePart([week.line], clock, now, 'next');
 	return [proj, facts === null ? evidence : `${evidence} ${facts}`];
 }
 

@@ -239,7 +239,7 @@ func TestOrderSaysWhatItsRankSortsOnAndCarriesBothKeys(t *testing.T) {
 		t.Fatalf("RB ranks by %s", rb.RankBy)
 	}
 	// The league shape is said once, in the basis (Lane 66q); the note is the rules points so far leave out.
-	if !strings.Contains(all.Basis, "less a free pickup's, for 12 teams with 1 QB") || strings.Contains(all.BasisNote, "12-team") {
+	if !strings.Contains(all.Basis, "less a free pickup's in a 12-team PPR league.") || strings.Contains(all.BasisNote, "12-team") {
 		t.Fatalf("the basis %q and note %q name the league shape other than once", all.Basis, all.BasisNote)
 	}
 }

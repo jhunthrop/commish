@@ -76,8 +76,9 @@ const check = (
 	fills: Partial<TradeCheck['fills']> = {}
 ): TradeCheck => ({
 	week: 6,
-	basis: 'What each lineup gains or loses with this trade on our rest-of-season order.',
+	basis: 'The scoreboard is each lineup before and after the trade.',
 	basis_note: '',
+	basis_note_link: '',
 	order_basis: 'rest_of_season',
 	refreshed: '2026-10-14T19:05:37.917Z',
 	read_at: '2026-10-15T19:05:37.917Z',

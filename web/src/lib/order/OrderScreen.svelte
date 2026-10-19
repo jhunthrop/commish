@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { leagueSettingsHref } from '#lib/league/rules-link.ts';
+	import BasisBlock from '#lib/ui/BasisBlock.svelte';
 	import { onMount, untrack } from 'svelte';
 	import { hitsWords } from '#lib/format/pool-words.ts';
 	import { ApiError } from '#lib/api/client.ts';
@@ -70,7 +72,14 @@
 		advice?.rows.map((row) => orderView(row, undefined, position === null)) ?? []
 	);
 	const basis = $derived(
-		advice === null ? [] : orderBasis(advice, mode === 'rest' && league !== null ? league : null)
+		advice === null
+			? []
+			: orderBasis(
+					advice,
+					mode === 'rest' && league !== null
+						? { host: league.host, rulesHref: leagueSettingsHref(league.id) }
+						: null
+				)
 	);
 	/** A search, a position or a roster filter: the hits are matches, no longer the pool. */
 	const filtered = $derived(
@@ -221,16 +230,8 @@
 		<button type="button" class="more" onclick={showMore}>{ORDER.moreRows}</button>
 	{/if}
 
-	{#if basis.length > 0}
-		<!-- One paragraph; a sentence about a column the phone does not draw is not said there. -->
-		<div class="basis" data-basis>
-			<p>
-				{#each basis as part, i (i)}<span class:desk={!part.phone}
-						>{i > 0 ? ` ${part.text}` : part.text}</span
-					>{/each}
-			</p>
-		</div>
-	{/if}
+	<!-- One paragraph; a sentence about a column the phone does not draw is not said there. -->
+	<BasisBlock parts={basis} />
 </div>
 
 <style>
@@ -348,20 +349,6 @@
 		cursor: pointer;
 	}
 
-	.basis {
-		display: flex;
-		flex-direction: column;
-		gap: 2px;
-		max-width: none;
-	}
-
-	.basis p {
-		margin: 0;
-		font-size: var(--t-sm);
-		line-height: 1.45;
-		color: var(--ink-3);
-	}
-
 	.vh {
 		position: absolute;
 		width: 1px;
@@ -386,14 +373,6 @@
 		.search {
 			flex: 1;
 			min-width: 0;
-		}
-
-		.basis p {
-			font-size: var(--t-xs);
-		}
-
-		.basis .desk {
-			display: none;
 		}
 	}
 </style>

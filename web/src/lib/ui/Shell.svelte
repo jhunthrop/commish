@@ -40,7 +40,16 @@
 	// names no format) opens in the context's format by itself (follow.svelte.ts).
 	onMount(() => void siteContext.load());
 	const leagueId = $derived(siteContext.league?.id ?? null);
+	/** A followed league's own pages, the follow page (/league/new) not among them. */
+	const LEAGUE_PAGE = /^\/league\/(?!new(?:\/|$))[^/]+/;
+	/** On a league's pages the phone bar leads with the site mark, the way home (Lane 66t): the bottom
+	 * bar keeps its five, so the mark takes no tab. */
+	const homeMark = $derived(LEAGUE_PAGE.test(page.url.pathname));
 </script>
+
+{#snippet siteMark(cls: string)}
+	<a class={cls} href={HOME_HREF} aria-label="Commish"><b>C</b></a>
+{/snippet}
 
 {#snippet railLink(item: RailItem, foot: boolean)}
 	<a
@@ -62,7 +71,7 @@
 	     the boot script before the first paint and by the context after. So a prerendered page never
 	     paints the wrong rail and then swaps it. -->
 	<nav class="rail" aria-label="Sections" style="--phone-items: {PHONE_RAIL_ITEMS}">
-		<a class="mark" href={HOME_HREF} aria-label="Commish"><b>C</b></a>
+		{@render siteMark('mark')}
 		{#each RAIL_ITEMS as item (item.key)}
 			{@render railLink(item, false)}
 		{/each}
@@ -70,7 +79,8 @@
 		{@render railLink(RAIL_FOOT, true)}
 	</nav>
 	<div class="main">
-		<header class="top">
+		<header class="top" class:homed={homeMark}>
+			{#if homeMark}{@render siteMark('home')}{/if}
 			<h1>
 				{#if typeof title === 'string'}{title}{:else}{@render title()}{/if}
 			</h1>
@@ -122,7 +132,8 @@
 		text-decoration: none;
 	}
 
-	.mark b {
+	.mark b,
+	.home b {
 		font-family: var(--font-num);
 		font-weight: 800;
 		font-size: 30px;
@@ -157,6 +168,15 @@
 
 	.spacer {
 		flex: 1;
+	}
+
+	/* The site mark in the phone bar on a league's pages; the rail draws it at a desk. */
+	.home {
+		display: none;
+		place-items: center;
+		width: 44px;
+		height: 44px;
+		text-decoration: none;
 	}
 
 	/* The account's way in on the phone, where the rail's foot is not drawn. */
@@ -318,6 +338,26 @@
 
 		.league {
 			grid-area: league;
+		}
+
+		/* The mark leads the first row, where the desk rail puts it, the account still its last cell. */
+		.top.homed {
+			grid-template-columns: 44px auto minmax(0, 1fr) auto;
+			grid-template-areas:
+				'home league league account'
+				'stamp stamp tail tail'
+				'find find find find';
+		}
+
+		.home {
+			grid-area: home;
+			display: grid;
+			margin: -10px 0 -10px -10px;
+		}
+
+		.home b {
+			font-size: 24px;
+			border-bottom-width: 3px;
 		}
 
 		h1 {

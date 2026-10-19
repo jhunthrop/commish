@@ -66,7 +66,7 @@ export function weekNote(status: PlayerStatus['status']): string {
 
 /** The record's method words beside the capture's: the frozen boards it grades never moved anyone. */
 export const HELD_OUT_METHOD =
-	"The board puts a player on a season-long list below the available players at his position. The record grades each week's board as it froze, before that move.";
+	'A player moved to a season-long list is graded where the board froze.';
 
 /** The clock a page is built on: the NFL's, until the member's own is known in the browser. */
 export const BUILT_ZONE = 'America/New_York';

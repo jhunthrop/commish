@@ -136,42 +136,6 @@ func numberWords(b OrderBasis) string {
 	return "our preseason number"
 }
 
-// shapeWords names the league a points over replacement is for: "a
-// 12-team league with 1 QB, 2 RB, 3 WR, 1 TE and a flex".
-func shapeWords(s apitypes.LeagueSettings) string {
-	return fmt.Sprintf("a %d-team league with %s", s.Teams, startersWords(s, true))
-}
-
-// startersWords is a league's starting spots: "1 QB, 2 RB, 3 WR, 1 TE and two
-// flex spots", or "... and two flex" in the order screen's few words
-// (flexSpots false).
-func startersWords(s apitypes.LeagueSettings, flexSpots bool) string {
-	flex := "a flex"
-	switch s.Lineup {
-	case apitypes.LineupTwoFlex:
-		flex = "two flex"
-		if flexSpots {
-			flex += " spots"
-		}
-	case apitypes.LineupSuperflex:
-		flex = "a flex and a superflex"
-	}
-	r := s.Roster
-	return fmt.Sprintf("%d QB, %d RB, %d WR, %d TE and %s", r.Qb, r.Rb, r.Wr, r.Te, flex)
-}
-
-// porWords is what a trade's Gain is (the head Trades prints, Lane 66u)
-// and what "a week" is, so a week's figure never reads as a week's
-// projection.
-func porWords(b OrderBasis, weeks int) string {
-	span := "the season on our preseason number"
-	if b == RestOfSeason {
-		span = "the rest of the season on our rest-of-season order"
-	}
-	return fmt.Sprintf("Gain is the change in a lineup's points over replacement a week, points above what a free pickup at "+
-		"each position gives you: %s, averaged over its %s, not a projection of any one week.", span, weekCount(weeks))
-}
-
 // slotNames is a slot type as a lineup row labels it (the web's
 // slotLabels).
 var slotNames = map[draft.SlotType]string{draft.SlotFlex: "Flex", draft.SlotSuperflex: "Superflex"}
@@ -277,18 +241,45 @@ func (c countable) counted(carried func(string) bool) bool {
 	return false
 }
 
-// uncountedWords says which of the league's rules points so far leave
-// out, "" when the league scores none of them or every one is counted.
-func uncountedWords(s apitypes.LeagueSettings, carried func(string) bool) string {
-	named := uncountedRules(s, carried)
-	if len(named) == 0 {
-		return ""
+// countWords is a small count in words, "four", digits from ten on.
+func countWords(n int) string {
+	words := []string{"no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"}
+	if n >= 0 && n < len(words) {
+		return words[n]
 	}
-	list := named[0]
-	if len(named) > 1 {
-		list = strings.Join(named[:len(named)-1], ", ") + " and " + named[len(named)-1]
+	return strconv.Itoa(n)
+}
+
+// Uncounted is the league's rules a season's lines carry no metric for,
+// so Avg and Last leave them out (Lane 66t): Note counts them for a
+// screen's basis, Link is the words of its link to the league's Settings,
+// where Rules lists them. Note and Link are empty, Rules too, when the
+// league scores none of them or every one is counted.
+type Uncounted struct {
+	Note  string
+	Link  string
+	Rules []string
+}
+
+// UncountedOf is the league's uncounted rules. carried says whether any
+// line this season carries a metric (Season.Carries); nil carries none.
+func UncountedOf(s apitypes.LeagueSettings, carried func(string) bool) Uncounted {
+	return uncountedOf(uncountedRules(s, carried), "your", true)
+}
+
+// uncountedOf counts rules in the one sentence every basis prints, whose
+// rules they are ("your", or a reader's stand-in "the PPR"), and the
+// link's words where there is a Settings to open (linked).
+func uncountedOf(rules []string, whose string, linked bool) Uncounted {
+	if len(rules) == 0 {
+		return Uncounted{Rules: []string{}}
 	}
-	return "Points so far leave out " + list + ", which our stats lack."
+	n := countWords(len(rules))
+	out := Uncounted{Note: fmt.Sprintf("Avg and Last miss %s of %s rules our stats lack.", n, whose), Rules: rules}
+	if linked {
+		out.Link = "Which " + n
+	}
+	return out
 }
 
 // uncountedRules is the league's rules points so far leave out, in
@@ -320,90 +311,77 @@ func uncountedRulesAt(s apitypes.LeagueSettings, carried func(string) bool, posi
 	return uncountedWhere(s, carried, func(at spot) bool { return ok && at == want })
 }
 
-// BasisNote is the rest of every page's basis, said once under the rows:
-// the league the points over replacement are for, and the league's rules
-// points so far leave out. carried says whether any line this season
-// carries a metric (Season.Carries).
-func BasisNote(s apitypes.LeagueSettings, carried func(string) bool) string {
-	shape := "Points over replacement are for " + shapeWords(s) + "."
-	if u := uncountedWords(s, carried); u != "" {
-		return shape + " " + u
+// gainWords is what a Gain is, said once on a screen (Lane 66t): whose
+// lineup, a week, averaged over the weeks the order covers.
+func gainWords(whose string, b OrderBasis, weeks int) string {
+	over := fmt.Sprintf("the %s left on our order", weekCount(weeks))
+	if b != RestOfSeason {
+		over = fmt.Sprintf("the season's %s on our preseason number", weekCount(weeks))
 	}
-	return shape
+	return fmt.Sprintf("Gain is the change in %s points over replacement, a week, over %s.", whose, over)
 }
 
-// LineupBasis is the start and sit page's honesty line (§4.4), the
-// advice rule the coordinator ruled (Lane 66e): the page never argues with
-// its own numbers, so the lineup starts the highest Proj the rows show,
-// and our order only breaks ties and stands in where a row has none.
+// LineupBasis is the start and sit page's advice rule (§4.4, Lane 66e),
+// over its rows: the lineup starts the highest Proj the rows show, after
+// the week's designations and byes, and our order breaks ties (it stands
+// in too where a row has none, which the Totals note counts).
 func LineupBasis(b OrderBasis) string {
-	order := "Our preseason number"
-	if b == RestOfSeason {
-		order = "Our rest-of-season order"
+	order := "our order"
+	if b != RestOfSeason {
+		order = "our preseason number"
 	}
-	return fmt.Sprintf("We start the highest Proj at each slot, after this week's designations and byes. "+
-		"A player who cannot play this week never starts. %s breaks ties and stands in where a player has no Proj.", order)
+	return fmt.Sprintf("We start the highest Proj at each slot after designations and byes, %s breaking ties.", order)
 }
 
-// LineupNote is the start and sit page's note under its rows: the league's
-// rules its points so far leave out, empty when they leave out none.
-func LineupNote(s apitypes.LeagueSettings, carried func(string) bool) string {
-	return uncountedWords(s, carried)
-}
-
-// WaiversBasis is the waiver page's first basis line (§5.3), the pickup
-// rule the strip follows (Lane 66f): the week on the Proj the screen
-// shows, as the Lineup screen's advice, and the rest of the season on our
-// number.
-func WaiversBasis(b OrderBasis) string {
-	return fmt.Sprintf("A pickup starts for you this week on the Proj shown and its Gain is not below zero on %s. "+
-		"Its drop is the one you lose least by.", numberWords(b))
-}
+// WaiversBasis is the waiver page's pickup rule (§5.3, Lane 66f): the
+// week on the Proj the screen shows, the rest of the season on its Gain.
+const WaiversBasis = "A pickup starts this week on Proj and keeps your Gain at zero or better. Its drop costs least."
 
 // WaiverSeasonBasis is what a waiver Gain is, the head the card and the
 // drop panel print (Lane 66u).
 func WaiverSeasonBasis(b OrderBasis, weeks int) string {
-	return fmt.Sprintf("Gain is the change in your lineup's points over replacement a week on %s, averaged over its %s.", numberWords(b), weekCount(weeks))
+	return gainWords("your lineup's", b, weeks)
 }
 
 // OnlyCloseCalls is a team's line when every trade found with it is a
 // close call for them.
 const OnlyCloseCalls = "Every trade we found with this team is a close call for them."
 
-// TradeCheckBasis is the trade builder's: the finder's line for a trade
-// the member built, which either lineup may gain or lose by. The builder
-// opens on the Trades screen, whose basis says what Gain and Rest of
-// season are, so this line points there and says them no second time
-// (review 66u, finding 4).
-func TradeCheckBasis(b OrderBasis) string {
-	return fmt.Sprintf("What each lineup gains or loses on %s. The other team decides. Gain and Rest of season are as the Trades basis says.",
-		numberWords(b))
+// TradeCheckBasis is the trade builder's own line, under its scoreboard:
+// what the scoreboard is (its own sentence says what to pick). The Trades
+// screen's basis says what the figures are, so the builder says them no
+// second time (Lane 66u, 66t).
+const TradeCheckBasis = "The scoreboard is each lineup before and after the trade."
+
+// TradesBasis is the trade finder's (§6.3): which trades it lists, yours
+// first, who decides, and what a Gain is.
+func TradesBasis(b OrderBasis, weeks int) string {
+	return "Each team's best trade both lineups gain by, yours first. The other team decides. " + gainWords("a lineup's", b, weeks)
 }
 
-// TradesBasis is the trade finder's (§6.3): which trades it lists, on the
-// board's own order, and the order it lists each team's in (orderTrades):
-// those the other team gains at least CloseCall a week from first, best
-// for you first, then the close calls for them.
-func TradesBasis(b OrderBasis, weeks int) string {
-	return fmt.Sprintf("Trades where both lineups gain on %s. Each team's best trade, yours first, among those they gain at least %.1f a week from, "+
-		"then the close calls for them. The other team decides. %s", numberWords(b), CloseCall, porWords(b, weeks))
+// formatNames is a scoring preset as a sentence names a league.
+var formatNames = map[apitypes.ProjectionScoringFormat]string{
+	apitypes.ProjectionScoringFormatPpr:      "PPR",
+	apitypes.ProjectionScoringFormatHalfPpr:  "half-PPR",
+	apitypes.ProjectionScoringFormatStandard: "standard",
+}
+
+// OrderLeague is the league the order screen's points over replacement
+// are for: the member's own, or a stand-in for the reader with none.
+func OrderLeague(own bool, s apitypes.LeagueSettings, format apitypes.ProjectionScoringFormat) string {
+	if own {
+		return "your league"
+	}
+	return fmt.Sprintf("a %d-team %s league", s.Teams, formatNames[format])
 }
 
 // OrderScreenBasis is the Rest of season and Players screens' line
-// (Lane 66j): what the order ranks by, what its two figures are and the
-// league its points over replacement are for, said once (Lane 66q: the
-// screen's note is then the rules points so far leave out, LineupNote, so
-// the whole basis fits eight phone lines).
-func OrderScreenBasis(b OrderBasis, fromWeek int, s apitypes.LeagueSettings) string {
+// (Lane 66j, 66t): what the order ranks by and the league its points over
+// replacement are for, said once.
+func OrderScreenBasis(b OrderBasis, fromWeek int, league string) string {
 	if b != RestOfSeason || fromWeek < 1 {
-		return fmt.Sprintf("Our preseason order: All ranks by Over repl., his season less a free pickup's, for %s.", teamsWords(s))
+		return fmt.Sprintf("Our preseason order: All ranks by Over repl., his season less a free pickup's in %s.", league)
 	}
 	return fmt.Sprintf("Our rest-of-season order from week %d. A position ranks by %s through week %d, byes out, "+
-		"All by Over repl., his points less a free pickup's, for %s.", fromWeek, figurewords.Table.Projected, LastWeek, teamsWords(s))
-}
-
-// teamsWords is shapeWords in the order screen's few words: "12 teams
-// with 1 QB, 2 RB, 3 WR, 1 TE and two flex".
-func teamsWords(s apitypes.LeagueSettings) string {
-	return fmt.Sprintf("%d teams with %s", s.Teams, startersWords(s, false))
+		"All by Over repl., his points less a free pickup's in %s.", fromWeek, figurewords.Table.Projected, LastWeek, league)
 }

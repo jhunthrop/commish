@@ -60,9 +60,17 @@ func sectionOf(f Facts) apitypes.WeekOrderRowSection {
 // rows the league's rosters and the add; false for the reader with no
 // league of their own.
 func (a *advisor) WeekOrder(position draft.Position, marks bool) apitypes.WeekOrderAdvice {
+	scoring := projectionScoring(a.settings, a.preset)
+	// The tab's own rules (Lane 66w), said in the one sentence (Lane 66t): a reader with no league is
+	// told the board's scoring and has no Settings to open.
+	whose := "your"
+	if !marks {
+		whose = "the " + formatNames[scoring.Format]
+	}
+	un := uncountedOf(uncountedRulesAt(a.settings, a.season.Carries, position), whose, marks)
 	out := apitypes.WeekOrderAdvice{Week: a.Snap.Week, Position: apitypes.WeekOrderAdvicePosition(position),
-		UncountedRules: len(uncountedRulesAt(a.settings, a.season.Carries, position)), ProjectionReadAt: a.projectionReadAt(),
-		ProjectionScoring: projectionScoring(a.settings, a.preset), Rows: []apitypes.WeekOrderRow{}}
+		BasisNote: un.Note, BasisNoteLink: un.Link, ProjectionReadAt: a.projectionReadAt(),
+		ProjectionScoring: scoring, Rows: []apitypes.WeekOrderRow{}}
 	var hosts map[string]string
 	if marks {
 		readAt := a.Snap.ReadAt

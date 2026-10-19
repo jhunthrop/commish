@@ -28,12 +28,27 @@ const ZONE = 'America/Chicago';
 /** Saturday noon Central of week 6, and the Tuesday before (scripts/inseason-fixture/clock.ts). */
 const SATURDAY = Date.parse('2026-10-17T17:00:00.000Z');
 const TUESDAY = Date.parse('2026-10-13T17:00:00.000Z');
-const fixture = JSON.parse(
+/** The stored week, each tab with the API's rules sentence for a member (two rules each). */
+const stored = JSON.parse(
 	readFileSync(
 		new URL('../../../scripts/inseason-fixture/data/week-order.json', import.meta.url),
 		'utf8'
 	)
-) as Record<'read' | 'unread', Record<'K' | 'DEF', WeekOrderAdvice>>;
+) as Record<
+	'read' | 'unread',
+	Record<'K' | 'DEF', Omit<WeekOrderAdvice, 'basis_note' | 'basis_note_link'>>
+>;
+const RULES_NOTE = {
+	basis_note: 'Avg and Last miss two of your rules our stats lack.',
+	basis_note_link: 'Which two'
+};
+const withNote = (
+	tabs: Record<'K' | 'DEF', Omit<WeekOrderAdvice, 'basis_note' | 'basis_note_link'>>
+): Record<'K' | 'DEF', WeekOrderAdvice> => ({
+	K: { ...tabs.K, ...RULES_NOTE },
+	DEF: { ...tabs.DEF, ...RULES_NOTE }
+});
+const fixture = { read: withNote(stored.read), unread: withNote(stored.unread) };
 const visitor = (a: WeekOrderAdvice): WeekOrderAdvice => ({
 	...a,
 	read_at: null,
@@ -42,7 +57,7 @@ const visitor = (a: WeekOrderAdvice): WeekOrderAdvice => ({
 });
 const ESPN = { league: { id: 'office', host: 'espn' as const }, boardScoring: 'PPR' };
 const VISITOR = { league: null, boardScoring: 'PPR' };
-const settingsHref = (id: string): string => `/league/${id}?view=settings`;
+const settingsHref = (id: string): string => `/league/${id}?view=settings#uncounted`;
 const text = (parts: readonly { text: string }[]): string => parts.map((p) => p.text).join(' ');
 const views = (a: WeekOrderAdvice, now: number): WeekView[] =>
 	a.rows.map((r) => weekView(r, ZONE, now));
@@ -176,14 +191,16 @@ void test("a visitor's basis names the board's own scoring", () => {
 
 void test('the rules Avg and Last leave out are a count with the way to Settings, never a list', () => {
 	assert.deepEqual(rulesLeftOut(fixture.read.K, ESPN, settingsHref), {
-		text: 'Avg and Last leave out two of your scoring rules our stats lack.',
-		link: { words: 'Which two', href: '/league/office?view=settings' }
+		text: 'Avg and Last miss two of your rules our stats lack.',
+		link: { words: 'Which two', href: '/league/office?view=settings#uncounted' }
 	});
-	assert.deepEqual(rulesLeftOut({ uncounted_rules: 1 }, VISITOR, settingsHref), {
-		text: 'Avg and Last leave out one of the PPR scoring rules our stats lack.',
-		link: null
-	});
-	assert.equal(rulesLeftOut({ uncounted_rules: 0 }, ESPN, settingsHref), null);
+	// The API's sentence, printed as it comes; a reader with no league has no Settings to open.
+	const visitorNote = 'Avg and Last miss one of the PPR rules our stats lack.';
+	assert.deepEqual(
+		rulesLeftOut({ basis_note: visitorNote, basis_note_link: '' }, VISITOR, settingsHref),
+		{ text: visitorNote, link: null }
+	);
+	assert.equal(rulesLeftOut({ basis_note: '', basis_note_link: '' }, ESPN, settingsHref), null);
 });
 
 void test('the roster chips filter the rows the API sent, the adds where the API set them', () => {

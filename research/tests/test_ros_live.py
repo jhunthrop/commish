@@ -81,7 +81,7 @@ def test_the_one_shot_fit_still_refuses_any_number_off_the_judged_record() -> No
 
 
 def test_the_record_says_it_grades_the_preseason_board() -> None:
-    assert METHOD.startswith("Graded against our preseason board: ")
+    assert METHOD.startswith("Each week our preseason board froze ")
 
 
 def test_the_players_input_stops_at_the_lines_and_ranks_from_the_window() -> None:

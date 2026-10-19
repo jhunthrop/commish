@@ -8,18 +8,13 @@ import {
 	BOX,
 	boxNumber,
 	boxRow,
-	deltaBasis,
 	deltaWord,
 	easeOf,
-	EVIDENCE_BASIS,
 	oppRankWord,
 	expectedWords,
-	factsReadLine,
 	gameOf,
 	hostRow,
 	positionWord,
-	projBasis,
-	ptsBasis,
 	totalsNote,
 	totalsPts,
 	projTotal,
@@ -258,46 +253,6 @@ void test('totals sum what is held, and a number not held prints as --', () => {
 	assert.equal(boxNumber(null), '--');
 });
 
-const OWN = { format: 'ppr', league_own: true } as const;
-const CLOSEST = { format: 'half_ppr', league_own: false } as const;
-
-void test("the Proj line names the scoring, whose it is, the read, and the defenses' scoring when one shows", () => {
-	assert.equal(
-		projBasis(READ, OWN, false, ZONE),
-		"Proj is this week's published projection in PPR scoring, this league's own, read Fri 9:00 pm Central. Our own weekly model replaces it when it passes its test."
-	);
-	assert.equal(
-		projBasis(READ, CLOSEST, true, ZONE),
-		"Proj is this week's published projection in half-PPR scoring, the closest match to this league's rules, read Fri 9:00 pm Central. Defenses are on its default defense scoring. Our own weekly model replaces it when it passes its test."
-	);
-	assert.match(
-		projBasis(null, OWN, false, ZONE),
-		/in PPR scoring, this league's own, not in yet for this week\./
-	);
-});
-
-void test("the Pts line names the member's platform where it gives no player's points", () => {
-	assert.equal(
-		ptsBasis(true, 'sleeper'),
-		"Pts are this week's points as your league scores them, -- until his game kicks off."
-	);
-	assert.equal(
-		ptsBasis(false, 'espn'),
-		"Pts are this league's team points from ESPN, which gives no points by player."
-	);
-	assert.equal(
-		ptsBasis(false, 'yahoo'),
-		"Pts are this league's team points from Yahoo, which gives no points by player."
-	);
-	assert.equal(
-		ptsBasis(false, 'ffpc'),
-		"Pts are this league's team points from FFPC, which gives no points by player."
-	);
-	for (const host of ['espn', 'yahoo', 'ffpc', 'sleeper', 'mfl'] as const) {
-		assert.doesNotMatch(ptsBasis(false, host), /\bhost\b/i);
-	}
-});
-
 void test('the evidence columns print as the Lineup draws them', () => {
 	assert.equal(oppRankWord(24), '24th');
 	assert.equal(oppRankWord(1), '1st');
@@ -325,24 +280,6 @@ void test('the evidence columns print as the Lineup draws them', () => {
 	});
 	assert.equal(row.pill?.rank, null, 'the Lineup leaves the rest-of-season rank out');
 	assert.equal(boxRow(line(), 'QB', ZONE).pill?.rank, 7, 'the Matchup keeps it');
-	assert.equal(
-		deltaBasis('2026-10-16T02:00:00.000Z', ZONE),
-		'Δ Proj is its change since the read before, Thu 9:00 pm Central.'
-	);
-	assert.equal(deltaBasis(null, ZONE), null);
-});
-
-void test("the screen's basis lines say the Game cell's figures and the facts' read once", () => {
-	const older = '2026-10-16T20:00:00.000Z';
-	assert.equal(
-		factsReadLine(
-			[line(), line({}, { game_total: { points: 40, team_points: 20, read_at: older } })],
-			ZONE,
-			NOW
-		),
-		"The Game cell shows each club's expected points, his club first, then the kickoff weather, read Fri 3:00 pm Central."
-	);
-	assert.equal(factsReadLine([line({}, { bye: true })], ZONE, NOW), null);
 });
 
 /** The site's copy guard. */
@@ -351,20 +288,9 @@ const BANNED = bannedPattern();
 void test('copy guard: every box word is fantasy words, with no dash or semicolon', () => {
 	const said = [
 		...Object.values(BOX),
-		ptsBasis(true, 'espn'),
-		ptsBasis(false, 'espn'),
-		EVIDENCE_BASIS,
-		deltaBasis(READ, ZONE) ?? '',
-		projBasis(READ, OWN, true, ZONE),
-		projBasis(null, CLOSEST, false, ZONE),
 		totalsNote([{ proj: null, game: null }], true, 6) ?? '',
-		totalsNote([], false, 6) ?? '',
-		factsReadLine([line()], ZONE, NOW) ?? ''
+		totalsNote([], false, 6) ?? ''
 	];
-	assert.ok(
-		said.at(-1)?.startsWith("The Game cell shows each club's expected points"),
-		said.at(-1)
-	);
 	for (const text of said) {
 		assert.doesNotMatch(text, BANNED, text);
 	}

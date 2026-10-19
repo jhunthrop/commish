@@ -6,11 +6,6 @@ import { LEAGUE_HOME, type LeaguePage } from '#lib/ui/nav.ts';
 /** The query that opens a league's page on its Settings view, the scoring rules' reference. */
 export const SETTINGS_VIEW = { name: 'view', value: 'settings' } as const;
 
-/** A league's Settings, its scoring rules (Lane 66w: the rules our stats lack link here). */
-export function leagueSettingsHref(id: string): string {
-	return `${tabHref(LEAGUE_HOME, id)}?${SETTINGS_VIEW.name}=${SETTINGS_VIEW.value}`;
-}
-
 /** A league's page. */
 export function tabHref(page: LeaguePage, id: string): string {
 	return page === LEAGUE_HOME

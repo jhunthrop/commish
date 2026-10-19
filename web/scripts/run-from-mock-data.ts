@@ -584,8 +584,9 @@ async function recordFrom(
 		statistic: { agreement: 'order matched', placesOff: 'places off', starters: 'starters right' },
 		scale: "1.0 is a perfect match of the week's finishing order, 0 is none.",
 		startersBasis: null,
+		// The run's words (research/nightly/reads/record.py METHOD).
 		method:
-			'Each week our PPR board is frozen before the first kickoff and graded after the games against how its players finished, with ADP graded the same way on the same players.',
+			'Each week our preseason board froze before the first kickoff and was graded on how its players scored, ADP and Published on the same players.',
 		publishedFromWeek: null,
 		honest: null,
 		weeks: seasonWeeks(frozen, games, now),

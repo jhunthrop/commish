@@ -32,8 +32,10 @@ const SIGNED_IN = { name: 'commish_csrf', value: 'fixture' };
 const EXPECTED = /^\d+(\.5)? to \d+(\.5)?$/;
 const CELL_WEATHER =
 	/^(\d+°, \d+ mph(, \d+% (rain|snow|ice))?|Indoors|Roof TBD|Abroad, no forecast|Outdoors)$/;
+/** The Game cell's read in a basis (league/box/basis.ts gamePart): the in-season page names its zone
+ * once in its head, so the time stands alone. */
 const FACTS_READ =
-	/The Game cell(?: shows each club's expected points, his club first, then the kickoff weather, read|'s expected points and weather were read) \w{3} \d{1,2}:\d{2} [ap]m Central\./g;
+	/Game (?:is each club's expected points, his first, and weather, read|was read) \w{3} \d{1,2}:\d{2} [ap]m\./g;
 /** The site's copy guard (the round 4 lock's L5 words are on its list). */
 const BETTING = bannedPattern();
 

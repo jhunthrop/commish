@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { bannedPattern } from '#lib/format/copy-guard.ts';
 import type { PlayerLine, WaiverRow, WeekFacts } from '../inseason/api.ts';
+import { basisText } from './basis.ts';
 import {
-	BEATS_BASIS,
 	cardGains,
 	cardName,
 	clearsWords,
@@ -38,7 +38,7 @@ const ZONE = 'America/Chicago';
 const FACTS_READ = '2026-10-17T02:00:00.000Z';
 const NOW = Date.parse(FACTS_READ);
 /** The facts-read sentence the basis ends on while a game on screen is still to be played. */
-const FACTS_SENTENCE = "The Game cell's expected points and weather were read Fri 9:00 pm Central.";
+const FACTS_SENTENCE = 'Game was read Fri 9:00 pm.';
 
 const facts = (over: Partial<WeekFacts> = {}): WeekFacts => ({
 	week: 6,
@@ -272,7 +272,6 @@ void test('copy guard: every Waivers line is fantasy words, with no dash, semico
 	const cards = pickupCards(advice);
 	const lines = [
 		...Object.values(WAIVERS),
-		BEATS_BASIS,
 		stripDecision(cards),
 		...cards.map(cardGains),
 		dropLead(6.7),
@@ -281,10 +280,10 @@ void test('copy guard: every Waivers line is fantasy words, with no dash, semico
 		copiedWords('espn', 'Gainwell', true).said,
 		copiedWords('espn', 'Gainwell', false).said,
 		countWords(poolRows(advice, ZONE), 'espn'),
-		...waiverBasis(BASIS, [gainwell.add, saints], ZONE, NOW)
+		basisText(waiverBasis(BASIS, [gainwell.add, saints], RULES, CLOCK, NOW))
 	];
 	// The guard reads the facts-read sentence too.
-	assert.ok(lines.some((said) => said.endsWith(FACTS_SENTENCE)));
+	assert.ok(lines.some((said) => said.includes(FACTS_SENTENCE)));
 	const forbidden = bannedPattern(/\btips?\b/);
 	for (const said of lines) assert.doesNotMatch(said, forbidden, said);
 });
@@ -312,36 +311,38 @@ void test('a card says a last name in full when another player on screen shares 
 
 const BASIS = {
 	basis:
-		'A pickup starts for you this week on the Proj shown and its Gain is not below zero on our rest-of-season order. Its drop is the one you lose least by.',
+		'A pickup starts this week on Proj and keeps your Gain at zero or better. Its drop costs least.',
 	season_basis:
-		"Rest of season is his points a game on our rest-of-season projection from week 6, byes out. Gain is the change in your lineup's points over replacement a week on our rest-of-season order, averaged over its 12 weeks.",
+		"Gain is the change in your lineup's points over replacement, a week, over the 12 weeks left on our order. A game is that order's points a game.",
+	basis_note: 'Avg and Last miss five of your rules our stats lack.',
+	basis_note_link: 'Which five',
 	projection_read_at: '2026-10-17T02:00:00.000Z',
 	projection_previous_read_at: '2026-10-16T02:00:00.000Z',
 	projection_scoring: { format: 'ppr' as const, league_own: false }
 };
+const RULES = '/league/1#uncounted';
+const CLOCK = { zone: ZONE, zoned: false };
 
-void test('the basis is five short lines, the pickup rule first, Beats and Open spot each in a clause', () => {
-	const lines = waiverBasis(BASIS, [gainwell.add, saints], ZONE, NOW);
-	assert.equal(lines.length, 5);
-	assert.equal(lines[0], BASIS.basis);
+void test('the basis is one paragraph, the pickup rule first, each column it draws said once (Lane 66t)', () => {
+	const parts = waiverBasis(BASIS, [gainwell.add, saints], RULES, CLOCK, NOW);
 	assert.equal(
-		lines[1],
-		"Proj is this week's published projection in PPR scoring, the closest to this league's rules, read Fri 9:00 pm Central, defenses on its default scoring. Δ Proj is its change since Thu 9:00 pm."
+		basisText(parts),
+		`${BASIS.basis} ${BASIS.season_basis} Proj is this week's published projection, PPR nearest your rules, defenses on default scoring, read Fri 9:00 pm. Δ Proj is its change since Thu 9:00 pm. ${FACTS_SENTENCE} Opp rank is points allowed to his position, 1st fewest. ${BASIS.basis_note} Which five`
 	);
-	assert.match(
-		lines[2] ?? '',
-		/^Beats is your player .* Open spot is a starting spot no player of yours can play this week\.$/
+	assert.deepEqual(
+		parts.filter((p) => !p.phone).map((p) => p.text),
+		['Δ Proj is its change since Thu 9:00 pm.']
 	);
-	assert.equal(lines[3], BASIS.season_basis);
-	assert.match(lines[4] ?? '', /^Opp rank is points allowed/);
-	assert.ok(lines[4]?.endsWith(` ${FACTS_SENTENCE}`), lines[4]);
+	assert.equal(parts.at(-1)?.href, RULES);
+	// Beats and Open spot say themselves in their cells, so the basis says nothing of them.
+	assert.doesNotMatch(basisText(parts), /Beats|Open spot/);
 	// Once the game has kicked off, the read is no longer said.
 	const later = waiverBasis(
 		BASIS,
 		[gainwell.add, saints],
-		ZONE,
+		RULES,
+		CLOCK,
 		Date.parse(saints.facts.kickoff ?? '')
 	);
-	assert.ok(!(later[4] ?? '').includes('were read'), later[4]);
-	for (const said of lines) assert.ok(said.length <= 215, said);
+	assert.ok(!basisText(later).includes('was read'), basisText(later));
 });

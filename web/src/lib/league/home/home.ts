@@ -44,7 +44,11 @@ export const HOME = {
 	yardsAllowed: "A defense's yards allowed",
 	nextKickoff: 'Next kickoff',
 	playing: 'In play',
-	final: 'Final'
+	final: 'Final',
+	/** The Settings card listing the scoring rules our stats lack (Lane 66t), which the in-season bases
+	 * count and link to. */
+	uncounted: 'Not in Avg and Last',
+	uncountedLine: "Our stats lack these rules of yours, so a player's Avg and Last leave them out."
 } as const;
 
 // ---- the scoreboard

@@ -140,6 +140,8 @@ export function pickPrompt(picks: Picks): string {
 export const BUILDER_LINES = {
 	/** The quiet verb over the finder's rows that opens the builder, and the panel's name. */
 	open: 'Build a trade',
+	/** The builder's link to the page's basis, which says what its figures are (Lane 66t). */
+	figures: 'What the figures are',
 	team: 'Trade with',
 	give: 'You give',
 	get: 'You get',

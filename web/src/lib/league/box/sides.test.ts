@@ -5,7 +5,8 @@ import { inTenths } from '../../../../scripts/inseason-fixture/tenths.ts';
 import { test } from 'node:test';
 import type { MatchupSide } from '../api.ts';
 import type { LineupSlot, MatchupBox, PlayerLine, WeekFacts } from '../inseason/api.ts';
-import { boxNumber, ptsBasis } from './box.ts';
+import { ptsPart } from './basis.ts';
+import { boxNumber } from './box.ts';
 import { lineupBox, type LineupBox } from './lineup.ts';
 import { nextKickoff, sideBox, type SideBox } from './matchup.ts';
 
@@ -248,10 +249,7 @@ void test("a host that gives no player's points: rows say --, both screens' Tota
 	assert.equal(boxNumber(matchup.totals.pts), '87.4');
 	assert.equal(boxNumber(lineup.totals.pts), '87.4');
 	assert.equal(matchup.byPlayer, false);
-	assert.equal(
-		ptsBasis(matchup.byPlayer, 'espn'),
-		"Pts are this league's team points from ESPN, which gives no points by player."
-	);
+	assert.equal(ptsPart(matchup.byPlayer, 'espn'), "Pts are ESPN's team points, none by player.");
 });
 
 void test("a host that gives each player's points: both screens' Totals add the printed rows", () => {
@@ -262,5 +260,5 @@ void test("a host that gives each player's points: both screens' Totals add the 
 	);
 	assert.equal(boxNumber(matchup.totals.pts), '33.4');
 	assert.equal(boxNumber(lineup.totals.pts), '33.4');
-	assert.match(ptsBasis(matchup.byPlayer, 'sleeper'), /as your league scores them/);
+	assert.equal(ptsPart(matchup.byPlayer, 'sleeper'), null);
 });

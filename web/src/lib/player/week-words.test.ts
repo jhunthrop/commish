@@ -233,11 +233,11 @@ void test('with no league the basis names PPR and no league, and there is no ver
 	assert.equal(verb, null);
 	assert.equal(
 		basis[0],
-		"Proj is this week's published projection in PPR scoring, read Fri 9:00 pm Central. Δ Proj is its change since Thu 9:00 pm."
+		"Proj is this week's published projection in PPR, read Fri 9:00 pm Central. Δ Proj is its change since Thu 9:00 pm Central."
 	);
 	assert.match(
 		basis[1] ?? '',
-		/PPR scoring\. The Game cell's expected points and weather were read Fri 9:00 pm Central\.$/
+		/PPR scoring\. His next game's expected points and weather were read Fri 9:00 pm Central\.$/
 	);
 	assert.equal(basis.length, 2);
 	assert.ok(basis.every((line) => !line.includes('league') && !line.includes('your')));
@@ -284,7 +284,7 @@ void test("with a league the verb is the league screens', the platform named", (
 		week({ verb: { kind: 'start', holder: null, host_url: null, note: null } }),
 		LEAGUE
 	);
-	assert.match(basis[0] ?? '', /the closest to this league's rules/);
+	assert.match(basis[0] ?? '', /, PPR nearest your rules, /);
 	assert.match(basis[1] ?? '', /your scoring/);
 });
 

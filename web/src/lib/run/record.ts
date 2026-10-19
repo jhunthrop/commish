@@ -46,12 +46,13 @@ export function rankAgreement(record: RunRecord): string {
 }
 
 /** A rate (order matched) prints the run's two decimals, the one figure not to a tenth (ruling R2),
- * and the basis says so once in these words. */
+ * said once with the run's scale (scaleWords). */
 const RATE_PLACES = 2;
 export const RATE_PLACES_WORDS = 'Rates print to two decimals.';
 
-/** The agreement's basis, said once: its name, the run's scale, and its two decimals. */
-export function agreementBasis(record: RunRecord): string {
+/** The rank agreement's scale and its two decimals, said once on a page that prints the figure: the
+ * graded record's line under its tiles (Lane 66t), named by its head. */
+export function scaleWords(record: RunRecord): string {
 	return `${capitalized(rankAgreement(record))}: ${record.scale} ${RATE_PLACES_WORDS}`;
 }
 
@@ -231,9 +232,9 @@ export function publishedBeside(
 export function publishedWords(record: RunRecord): string {
 	const from =
 		record.publishedFromWeek === null
-			? `graded from the first week our register keeps it, ${RECORD_BOX.none} until then`
-			: `graded from week ${String(record.publishedFromWeek)} on the same players under the fill rule, ${RECORD_BOX.none} before`;
-	return `Published is one provider's weekly projection, read before each kickoff, ${from}.`;
+			? `${RECORD_BOX.none} until our register first keeps it`
+			: `graded from week ${String(record.publishedFromWeek)}, ${RECORD_BOX.none} before`;
+	return `Published is one provider's weekly projection, ${from}.`;
 }
 
 /** The order a week graded, in the record's words (review 66j M7). */

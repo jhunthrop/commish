@@ -1,7 +1,8 @@
 {
 	"week": 6,
-	"basis": "Our rest-of-season order from week 6. A position ranks by Projected through week 17, byes out, All by Over repl., his points less a free pickup's, for 12 teams with 1 QB, 2 RB, 3 WR, 1 TE and two flex.",
-	"basis_note": "Points so far leave out two-point conversions, missed field goals, missed extra points, fumble recoveries and safeties, which our stats lack.",
+	"basis": "Our rest-of-season order from week 6. A position ranks by Projected through week 17, byes out, All by Over repl., his points less a free pickup's in your league. A game is that order's points a game.",
+	"basis_note": "Avg and Last miss five of your rules our stats lack.",
+	"basis_note_link": "Which five",
 	"rank_by": "points_over_replacement",
 	"moves": {
 		"claim": "unavailable",

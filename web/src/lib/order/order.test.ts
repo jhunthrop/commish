@@ -5,10 +5,10 @@ import { bannedPattern } from '#lib/format/copy-guard.ts';
 import type { PlayerLine, WeekFacts } from '../league/inseason/api.ts';
 import type { OrderAdvice, OrderRow } from './api.ts';
 import { orderPath } from './path.ts';
+import { basisText } from '#lib/league/box/basis.ts';
 import {
 	FIGURE_HEADS,
 	ORDER,
-	evidenceBasis,
 	figureColumns,
 	moveHref,
 	moveWords,
@@ -76,14 +76,14 @@ const row = (name: string, over: Partial<OrderRow> = {}): OrderRow => ({
 const advice = (rows: OrderRow[], over: Partial<OrderAdvice> = {}): OrderAdvice => ({
 	week: 6,
 	basis: 'Our rest-of-season order from week 7.',
-	basis_note:
-		'Points over replacement are for a 12-team league with 1 QB, 2 RB, 3 WR, 1 TE and a flex.',
+	basis_note: '',
+	basis_note_link: '',
 	order_basis: 'rest_of_season',
 	refreshed: READ,
 	from_week: 7,
 	read_at: null,
 	projection_read_at: READ,
-	projection_scoring: { format: 'ppr', league_own: true },
+	projection_scoring: { format: 'ppr', league_own: false },
 	rank_by: 'rest_of_season_points',
 	moves: null,
 	total: rows.length,
@@ -176,36 +176,38 @@ void test("the add verb is the Waivers screen's own rule: claims open and the pl
 	assert.equal(moveWords(trade, open, 'espn'), 'Trade for him');
 });
 
-void test('the basis names the league shape and says every number once, the platform named', () => {
-	const words = (parts: readonly { text: string }[]): string => parts.map((p) => p.text).join(' ');
-	const signedOut = words(orderBasis(advice([row('A')]), null, ZONE));
+void test('the basis says each column once: the order, Wk 6, Opp rank, the rules our stats lack, then Game and Roster at a desk (Lane 66t)', () => {
+	const LEAGUE = { host: 'sleeper' as const, rulesHref: '/league/1#uncounted' };
+	const signedOut = basisText(orderBasis(advice([row('A')], { basis_note: '' }), null, ZONE));
 	assert.ok(signedOut.startsWith('Our rest-of-season order from week 7.'));
-	assert.match(signedOut, /Points over replacement are for a 12-team league/);
 	// The order holds the week's projection beside the season's, so its head names the API's week.
-	assert.match(signedOut, /Wk 6 is this week's published projection in PPR scoring, read /);
-	assert.doesNotMatch(signedOut, /Proj is/);
-	// Signed out there is no league whose rules the projection is matched to.
-	assert.doesNotMatch(signedOut, /this league's rules/);
-	assert.doesNotMatch(signedOut, /Roster is/);
-	const parts = orderBasis(advice([row('A')], { read_at: READ }), { host: 'sleeper' }, ZONE);
-	const inLeague = words(parts);
+	assert.match(
+		signedOut,
+		/Wk 6 is this week's published projection in PPR, read Fri 9:00 pm Central\./
+	);
+	assert.doesNotMatch(signedOut, /Proj is|your rules|Roster is|leave out/);
+	const parts = orderBasis(
+		advice([row('A')], {
+			read_at: READ,
+			basis_note: 'Avg and Last miss five of your rules our stats lack.',
+			basis_note_link: 'Which five'
+		}),
+		LEAGUE,
+		ZONE
+	);
+	const inLeague = basisText(parts);
+	assert.match(inLeague, /, PPR nearest your rules, read /);
+	assert.match(inLeague, /Opp rank is points allowed to his position, 1st fewest\./);
+	assert.match(inLeague, /Avg and Last miss five of your rules our stats lack\. Which five\./);
 	assert.match(inLeague, /Roster is Sleeper's, read /);
-	assert.match(inLeague, /the closest to this league's rules|this league's own/);
-	assert.match(evidenceBasis(true), /, your scoring\.$/);
+	assert.equal(parts.find((p) => p.href !== undefined)?.href, LEAGUE.rulesHref);
+	const phone = parts.filter((p) => p.phone).map((p) => p.text);
+	assert.ok(phone.every((t) => !t.startsWith('Roster is') && !t.startsWith('Game ')));
+	assert.ok(parts.some((p) => !p.phone && p.text.startsWith('Roster is')));
 	assert.match(rosterBasis('espn', READ, ZONE), /^Roster is ESPN's, read /);
 	for (const said of [inLeague, ...Object.values(ORDER), ...Object.values(FIGURE_HEADS)]) {
 		assert.doesNotMatch(said, bannedPattern(), said);
 	}
-});
-
-void test('the phone is not told about the columns it does not draw: the Game cell and the Roster column', () => {
-	const parts = orderBasis(advice([row('A')], { read_at: READ }), { host: 'sleeper' }, ZONE);
-	const phone = parts.filter((p) => p.phone).map((p) => p.text);
-	assert.ok(phone.some((t) => t.startsWith('Our rest-of-season order')));
-	assert.ok(phone.some((t) => t.startsWith('Wk 6 is')));
-	assert.ok(phone.some((t) => t.startsWith('Opp rank is')));
-	assert.ok(phone.every((t) => !t.startsWith('Roster is') && !t.startsWith('The Game cell')));
-	assert.ok(parts.some((p) => !p.phone && p.text.startsWith('Roster is')));
 });
 
 void test('the path asks the league route with a league and the public one without', () => {

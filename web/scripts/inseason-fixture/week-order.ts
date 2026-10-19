@@ -22,7 +22,11 @@ import type { components } from '../../src/lib/api/types.ts';
 import { FIXTURE_UNREAD_CLOCK, FIXTURE_WEEK_CLOCK } from './clock.ts';
 import { roundTenth } from './tenths.ts';
 
-type WeekOrderAdvice = components['schemas']['WeekOrderAdvice'];
+/** A tab's answer as stored: the rules sentence is the reader's, set when served (week-order-serve.ts). */
+type WeekOrderAdvice = Omit<
+	components['schemas']['WeekOrderAdvice'],
+	'basis_note' | 'basis_note_link'
+>;
 type WeekOrderRow = components['schemas']['WeekOrderRow'];
 type PlayerLine = components['schemas']['PlayerLine'];
 type ClubGame = components['schemas']['ClubGame'];
@@ -63,7 +67,6 @@ const HELD_EVERY = 3;
 /** The recorded league's rules our stats lack at each tab's position (its five left out: two-point
  * conversions, missed field goals and extra points, fumble recoveries and safeties), the API's
  * per-position count (words.go uncountedRulesAt), so the basis is measured with its rules sentence. */
-const UNCOUNTED_RULES: Readonly<Record<Position, number>> = { K: 2, DEF: 2 };
 const gameOf = new Map(games.games.map((g) => [g.team, g] as const));
 const clubs = [...new Set(directory.map((row) => row.team))].sort();
 
@@ -214,7 +217,6 @@ function advice(position: Position, at: number, landed: boolean): WeekOrderAdvic
 	return {
 		week: WEEK,
 		position,
-		uncounted_rules: UNCOUNTED_RULES[position],
 		read_at: lineup.read_at,
 		projection_read_at: landed ? lineup.projection_read_at : null,
 		projection_scoring: lineup.projection_scoring,

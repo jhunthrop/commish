@@ -47,6 +47,8 @@
 		reread: () => void;
 		/** Puts the lineup on the clipboard. */
 		copy?: (text: string) => Promise<void>;
+		/** The league's Settings at the scoring rules our stats lack. */
+		rulesHref: string;
 	}
 
 	let {
@@ -55,7 +57,8 @@
 		plan,
 		make,
 		reread,
-		copy = (text) => navigator.clipboard.writeText(text)
+		copy = (text) => navigator.clipboard.writeText(text),
+		rulesHref
 	}: Props = $props();
 	const box = $derived(lineupBox(advice));
 	// Your sheet's tags mark your rows once the sheet is in (review L7).
@@ -126,7 +129,6 @@
 	{footSays}
 	href={advice.host_lineup_url}
 	basis={advice.basis}
-	basisNote={advice.basis_note}
 	onverb={onHost ? () => void open() : () => void copyLineup()}
 	controls={onHost ? MOVE_ID : undefined}
 	expanded={onHost ? step.kind !== 'closed' : undefined}
@@ -175,7 +177,7 @@
 		byPlayer={advice.player_points}
 		{host}
 		projection={{ readAt: advice.projection_read_at, scoring: advice.projection_scoring }}
-		evidence={{ previousReadAt: advice.projection_previous_read_at }}
+		lineup={{ previousReadAt: advice.projection_previous_read_at, note: advice, rulesHref }}
 		lines={shown}
 	/>
 </Screen>

@@ -451,7 +451,8 @@ func (a *advisor) Lineup() (apitypes.LineupAdvice, bool) {
 	h := a.header()
 	// The rows end on the week's projection (Lane 66d), so the basis says
 	// nothing of points a game; the page says the projection's read itself.
-	out := apitypes.LineupAdvice{Week: h.week, Basis: LineupBasis(a.basis), BasisNote: LineupNote(a.settings, a.season.Carries), OrderBasis: h.basis, Refreshed: h.refreshed,
+	un := UncountedOf(a.settings, a.season.Carries)
+	out := apitypes.LineupAdvice{Week: h.week, Basis: LineupBasis(a.basis), BasisNote: un.Note, BasisNoteLink: un.Link, UncountedRules: un.Rules, OrderBasis: h.basis, Refreshed: h.refreshed,
 		ReadAt: h.readAt, ProjectionReadAt: a.projectionReadAt(), ProjectionPreviousReadAt: a.projectionPreviousReadAt(), ProjectionScoring: projectionScoring(a.settings, a.preset), PlayerPoints: givesPlayerPoints(mySide), TeamPoints: teamPoints(mySide, people), Set: true, Slots: []apitypes.LineupSlot{}, EmptySlots: []apitypes.LineupAdviceEmptySlots{}, Bench: []apitypes.PlayerLine{}, Reserve: a.reserve(team, mySide),
 		Moves: CopyOnlyMoves(a.Snap.Ref.Host),
 	}
@@ -591,8 +592,9 @@ func (a *advisor) Waivers(position draft.Position, asked string) (apitypes.Waive
 	}
 	mine, pool := run.mine, run.pool
 	h := a.header()
-	out := apitypes.WaiverAdvice{Week: h.week, Basis: WaiversBasis(a.basis), SeasonBasis: withRestOfSeason(a.Board, WaiverSeasonBasis(a.basis, a.weeks), mine, pool),
-		BasisNote: BasisNote(a.settings, a.season.Carries), OrderBasis: h.basis, Refreshed: h.refreshed, ReadAt: h.readAt,
+	un := UncountedOf(a.settings, a.season.Carries)
+	out := apitypes.WaiverAdvice{Week: h.week, Basis: WaiversBasis, SeasonBasis: withPerGame(a.Board, WaiverSeasonBasis(a.basis, a.weeks), mine, pool),
+		BasisNote: un.Note, BasisNoteLink: un.Link, OrderBasis: h.basis, Refreshed: h.refreshed, ReadAt: h.readAt,
 		ProjectionReadAt: a.projectionReadAt(), ProjectionPreviousReadAt: a.projectionPreviousReadAt(), ProjectionScoring: projectionScoring(a.settings, a.preset),
 		Pickups: []apitypes.WaiverRow{}, Rows: []apitypes.WaiverRow{}, Roster: lines(mine, indexes(len(mine))), Moves: CopyOnlyClaims(a.Snap.Ref.Host)}
 	out.HostWaiversUrl, out.HostNote = a.host(WaiversPage)
@@ -683,7 +685,8 @@ func (a *advisor) Trades(focus string) (apitypes.TradeAdvice, bool) {
 	mine := a.active(team)
 	squad := a.squad(team, mine, true)
 	h := a.header()
-	out := apitypes.TradeAdvice{Week: h.week, BasisNote: BasisNote(a.settings, a.season.Carries), OrderBasis: h.basis, Refreshed: h.refreshed,
+	un := UncountedOf(a.settings, a.season.Carries)
+	out := apitypes.TradeAdvice{Week: h.week, BasisNote: un.Note, BasisNoteLink: un.Link, OrderBasis: h.basis, Refreshed: h.refreshed,
 		ReadAt: h.readAt, Teams: []apitypes.TradeTeam{}, Roster: rosterLines(mine), Moves: TradeMoves(a.Snap.Ref.Host),
 		ProjectionReadAt: a.projectionReadAt(), ProjectionScoring: projectionScoring(a.settings, a.preset), PlayerPoints: givesPlayerPoints(a.side(a.Me))}
 	out.HostTradesUrl, out.HostNote = a.host(TradesPage)
@@ -710,8 +713,9 @@ func (a *advisor) Trades(focus string) (apitypes.TradeAdvice, bool) {
 		}
 		out.Teams = append(out.Teams, row)
 	}
-	out.Basis = withPerGame(a.Board, TradesBasis(a.basis, a.weeks), shown...)
-	out.CheckBasis = TradeCheckBasis(a.basis)
+	out.Basis = TradesBasis(a.basis, a.weeks)
+	out.PerGameBasis = perGameSaid(a.Board, shown...)
+	out.CheckBasis = TradeCheckBasis
 	return out, true
 }
 

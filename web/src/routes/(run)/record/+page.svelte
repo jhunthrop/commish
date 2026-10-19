@@ -1,4 +1,5 @@
 <script lang="ts">
+	import BasisBlock from '#lib/ui/BasisBlock.svelte';
 	import { onMount } from 'svelte';
 	import { siteContext } from '#lib/context/context.svelte.ts';
 	import ContextNote from '#lib/context/ContextNote.svelte';
@@ -7,7 +8,6 @@
 		RECORD_BOX,
 		RECORD_FIGURES,
 		RECORD_SOURCES,
-		agreementBasis,
 		allLine,
 		chartSeries,
 		figureWords,
@@ -16,6 +16,7 @@
 		ORDER_WORDS,
 		publishedWords,
 		recordHeadline,
+		scaleWords,
 		scoreOf,
 		weekLines,
 		type RecordFigure
@@ -97,6 +98,11 @@
 					now: clock.now
 				});
 	});
+	const basis = $derived(
+		[record.method, statusWords, record.startersBasis, publishedWords(record)].flatMap((text) =>
+			text === null || text === '' ? [] : [{ text, phone: true }]
+		)
+	);
 
 	const COLUMNS = 2 + RECORD_FIGURES.length * RECORD_SOURCES.length + 1;
 </script>
@@ -146,6 +152,7 @@
 						</div>
 					{/each}
 				</div>
+				<p class="scale">{scaleWords(record)}</p>
 				{#if record.honest}<p class="honest">{record.honest}</p>{/if}
 			</section>
 		{:else}
@@ -233,14 +240,8 @@
 			<RecordChart {series} weeks={record.weeks.length} />
 		{/if}
 
-		<div class="basis" data-basis>
-			<p>{record.method} {statusWords ?? ''}</p>
-			<p>
-				{agreementBasis(record)}
-				{record.startersBasis ?? ''}
-			</p>
-			<p>{publishedWords(record)}</p>
-		</div>
+		<!-- One paragraph; the bug says the scale and the two decimals once (Lane 66t). -->
+		<BasisBlock parts={basis} />
 	</main>
 </SiteShell>
 
@@ -326,6 +327,15 @@
 
 	.vals span {
 		font-size: var(--t-sm);
+		color: var(--ink-2);
+	}
+
+	/* The scale under the tiles, the bug's whole width. */
+	.scale {
+		grid-column: 1 / -1;
+		margin: 0;
+		font-size: var(--t-sm);
+		line-height: 1.45;
 		color: var(--ink-2);
 	}
 
@@ -523,24 +533,6 @@
 		color: var(--scoreboard-num);
 	}
 
-	.basis {
-		display: flex;
-		flex-direction: column;
-		gap: 2px;
-		max-width: 1180px;
-	}
-
-	.basis p {
-		margin: 0;
-		font-size: var(--t-sm);
-		line-height: 1.45;
-		color: var(--ink-3);
-	}
-
-	.basis p:first-child {
-		color: var(--ink-2);
-	}
-
 	@media (max-width: 1180px) {
 		.bug {
 			grid-template-columns: auto minmax(0, 1fr);
@@ -618,10 +610,6 @@
 
 		.quiet td.wide {
 			white-space: normal;
-		}
-
-		.basis p {
-			font-size: var(--t-xs);
 		}
 	}
 </style>
