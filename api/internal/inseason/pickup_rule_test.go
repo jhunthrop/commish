@@ -8,6 +8,7 @@ import (
 	"github.com/jhunthrop/commish/api/internal/apitypes"
 	"github.com/jhunthrop/commish/api/internal/boards"
 	"github.com/jhunthrop/commish/api/internal/draft"
+	"github.com/jhunthrop/commish/api/internal/mock"
 )
 
 // The read's clocks of week 6 (Lane 85 fix round 4): the fixture's games
@@ -21,6 +22,10 @@ var (
 // thursdayClubs are the clubs of the Thursday game the Monday read has
 // past its kickoff: four free agents of the fixture play for them.
 var thursdayClubs = map[string]bool{"HOU": true, "IND": true}
+
+// deepClubs are two clubs no one else plays for, a Thursday game of their
+// own for a player deep in the pool (Lane 85 fix round 5).
+var deepClubs = map[string]bool{"ZZA": true, "ZZB": true}
 
 // everyoneProjected is a week projection for every player: the rostered
 // at 8, the free agents from 5 to 17, so some top a starter.
@@ -38,7 +43,11 @@ func everyoneProjected(f fixture) boards.WeekProjection {
 
 // rescheduled is week 6 with the Thursday clubs' game on Thursday night,
 // final, and every other game on Monday night.
-func rescheduled(data Data) Data {
+func rescheduled(data Data) Data { return rescheduledFor(data, thursdayClubs) }
+
+// rescheduledFor is week 6 with the clubs' game on Thursday night, final,
+// and every other game on Monday night.
+func rescheduledFor(data Data, thursdayClubs map[string]bool) Data {
 	thursday := time.Date(2026, 10, 15, 20, 15, 0, 0, east)
 	monday := time.Date(2026, 10, 19, 20, 15, 0, 0, east)
 	games := slices.Clone(data.Games)
@@ -94,16 +103,24 @@ func withOpenSpot(f fixture) fixture {
 // front door's strip (Pickups), which must be the same.
 func pickupPage(t *testing.T, f fixture, now time.Time, position draft.Position) apitypes.WaiverAdvice {
 	t.Helper()
+	return pickupPageFor(t, f, now, position, "")
+}
+
+// pickupPageFor is the waiver page at now for a position and a player a
+// link asked for (?player=), and the front door's strip when it reads the
+// page whole.
+func pickupPageFor(t *testing.T, f fixture, now time.Time, position draft.Position, asked string) apitypes.WaiverAdvice {
+	t.Helper()
 	f.league.Snap.ReadAt = now.Add(-time.Minute)
 	a, err := newAdvisor(f.league, f.data, everyoneProjected(f), nil, now)
 	if err != nil {
 		t.Fatal(err)
 	}
-	out, ok := a.Waivers(position, "")
+	out, ok := a.Waivers(position, asked)
 	if !ok {
 		t.Fatal("no waiver page")
 	}
-	if position == "" {
+	if position == "" && asked == "" {
 		strip, _ := a.Pickups()
 		if len(strip) != len(out.Pickups) || (len(strip) > 0 && strip[0].Add.Player.HostId != out.Pickups[0].Add.Player.HostId) {
 			t.Fatalf("the front door's strip %v is not the page's %v", names(strip), names(out.Pickups))
@@ -252,4 +269,89 @@ func TestANarrowedPageInheritsTheSeasonOrder(t *testing.T) {
 		}
 	}
 	assertSeasonOrder(t, out)
+}
+
+// deepPlayer is a free agent at position whom the full page's rows leave
+// out on Saturday, by board id.
+func deepPlayer(t *testing.T, f fixture, position draft.Position) string {
+	t.Helper()
+	shown := map[string]bool{}
+	for _, r := range pickupPage(t, f, saturdayNoon, "").Rows {
+		shown[*r.Add.Player.BoardId] = true
+	}
+	for _, r := range pickupPage(t, f, saturdayNoon, position).Rows {
+		if id := *r.Add.Player.BoardId; !shown[id] {
+			return id
+		}
+	}
+	t.Fatalf("every %s on the narrowed page is on the full page", position)
+	return ""
+}
+
+// withDeepThursday is the league with a deep WR moved to a club of his
+// own whose game was Thursday night, final, and every other game on
+// Monday night: on Monday he is the only row past his kickoff, and only a
+// page that shows him holds him.
+func withDeepThursday(t *testing.T) (fixture, string) {
+	t.Helper()
+	f := newFixtureOf(t, 120)
+	id := deepPlayer(t, f, draft.WR)
+	for i, p := range f.raw.Players {
+		if p.ID == id {
+			f.raw.Players[i].Team = "ZZA"
+		}
+	}
+	settings := fixtureSettings()
+	config, err := mock.SlotConfig(settings)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if f.league.Board, err = boards.For(f.raw, settings.Teams, config); err != nil {
+		t.Fatal(err)
+	}
+	thursday := time.Date(2026, 10, 15, 20, 15, 0, 0, east)
+	f.data.Games = append(slices.Clone(f.data.Games), game(6, "ZZA", "ZZB", thursday, true)...)
+	f.data = rescheduledFor(f.data, deepClubs)
+	return f, id
+}
+
+// A locked row only a narrowed or focused answer holds still puts that
+// answer in the season order (review L-L, L-M), while the full page and the
+// front door's chip, which never hold him, stay in the week's.
+func TestARowOnlyTheAnswerHoldsDecidesItsOrder(t *testing.T) {
+	f, deep := withDeepThursday(t)
+	full := pickupPage(t, f, mondayNoon, "")
+	if full.PickupOrder != apitypes.WaiverAdvicePickupOrderWeek {
+		t.Fatalf("the full page is in %q: the case needs it in the week order", full.PickupOrder)
+	}
+	for _, r := range full.Rows {
+		if *r.Add.Player.BoardId == deep {
+			t.Fatal("the deep player is on the full page")
+		}
+	}
+	narrowed := pickupPage(t, f, mondayNoon, draft.WR)
+	held := false
+	for _, r := range narrowed.Rows {
+		held = held || *r.Add.Player.BoardId == deep
+	}
+	if !held {
+		t.Fatal("the narrowed page does not hold the deep player")
+	}
+	assertSeasonOrder(t, narrowed)
+	assertSeasonOrder(t, pickupPageFor(t, f, mondayNoon, "", deep))
+}
+
+// A page focused on a player (?player=) agrees with the front door's chip
+// when the full page is in the season order: the same order, the same pick.
+func TestTheFocusedPageAgreesWithTheChip(t *testing.T) {
+	f := newFixtureOf(t, 120)
+	deep := deepPlayer(t, f, draft.WR)
+	f.data = rescheduled(f.data)
+	full := pickupPage(t, f, mondayNoon, "")
+	assertSeasonOrder(t, full)
+	focused := pickupPageFor(t, f, mondayNoon, "", deep)
+	assertSeasonOrder(t, focused)
+	if focused.Pickups[0].Add.Player.HostId != full.Pickups[0].Add.Player.HostId {
+		t.Fatalf("the focused page picks %s, the chip %s", focused.Pickups[0].Add.Player.Name, full.Pickups[0].Add.Player.Name)
+	}
 }

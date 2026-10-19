@@ -612,7 +612,7 @@ func (a *advisor) Pickups() ([]apitypes.WaiverRow, bool) {
 // Waivers is the waiver page (§5). asked, a board id or "", is a player a
 // link named (?player=): his row is kept past the page's cut, so the order's
 // add for a free player deep in the pool lands on him (review 66j N2). The
-// page's pickup order is decided once from the full page's rows (pageOrder).
+// page's pickup order is decided over the full page's rows and its own (pageOrder).
 func (a *advisor) Waivers(position draft.Position, asked string) (apitypes.WaiverAdvice, bool) {
 	run, ok := a.waiverRun(position)
 	if !ok {
@@ -621,7 +621,7 @@ func (a *advisor) Waivers(position draft.Position, asked string) (apitypes.Waive
 	shown := pageMoves(run.moves, run.pool, asked, MaxWaiverRows)
 	// The strip is chosen from every add we rank, before the rows' cut.
 	strip, proj := run.stripMoves()
-	order, ok := a.pageOrder(position, asked, run.orderOf(shown, strip))
+	order, ok := a.pageOrder(run, position, asked, run.orderOf(shown, strip))
 	if !ok {
 		return apitypes.WaiverAdvice{}, false
 	}
@@ -645,20 +645,25 @@ func (a *advisor) Waivers(position draft.Position, asked string) (apitypes.Waive
 	return out, true
 }
 
-// pageOrder is the page's pickup order: own, the full page's, for a page
-// read whole; a page narrowed to one position carries the full page's
-// (review M-G), so its rows and the strip printed beside them never mix
-// the two rules.
-func (a *advisor) pageOrder(position draft.Position, asked string, own apitypes.WaiverAdvicePickupOrder) (apitypes.WaiverAdvicePickupOrder, bool) {
-	if position == "" {
+// pageOrder is an answer's pickup order over the union of the full
+// page's rows (read whole, no player asked) and the answer's own (review
+// L-L, L-M): a page narrowed to one position or focused on a player takes
+// the season order whenever the full page does (M-G), so the front door's
+// chip and the page agree, and also when a row only it holds is past its
+// kickoff, so no answer mixes withheld rows with live ones.
+func (a *advisor) pageOrder(run waiverRun, position draft.Position, asked string, own apitypes.WaiverAdvicePickupOrder) (apitypes.WaiverAdvicePickupOrder, bool) {
+	if own == seasonOrder || (position == "" && asked == "") {
 		return own, true
 	}
-	full, ok := a.waiverRun("")
-	if !ok {
-		return "", false
+	full := run
+	if position != "" {
+		var ok bool
+		if full, ok = a.waiverRun(""); !ok {
+			return "", false
+		}
 	}
 	strip, _ := full.stripMoves()
-	return full.orderOf(pageMoves(full.moves, full.pool, asked, MaxWaiverRows), strip), true
+	return full.orderOf(pageMoves(full.moves, full.pool, "", MaxWaiverRows), strip), true
 }
 
 // waiverPage is the waiver page's frame with no row yet, in the week order.

@@ -47,6 +47,12 @@ type fixture struct {
 // spread over teams so each roster mixes strong and weak players.
 func newFixture(t testing.TB) fixture {
 	t.Helper()
+	return newFixtureOf(t, 60)
+}
+
+// newFixtureOf is the league with extras free agents in the pool.
+func newFixtureOf(t testing.TB, extras int) fixture {
+	t.Helper()
 	settings := fixtureSettings()
 	config, err := mock.SlotConfig(settings)
 	if err != nil {
@@ -82,7 +88,7 @@ func newFixture(t testing.TB) fixture {
 		}
 		teams = append(teams, team)
 	}
-	for i := 0; i < 60; i++ {
+	for i := 0; i < extras; i++ {
 		add([]draft.Position{draft.RB, draft.WR, draft.QB, draft.TE, draft.WR}[i%5])
 	}
 	board, err := boards.For(raw, settings.Teams, config)

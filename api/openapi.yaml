@@ -4360,10 +4360,11 @@ components:
           type: string
           enum: [week, season_gain]
           description: >-
-            the order the page's rows and strip are in, decided once from the full page's rows by each row's game state
-            (gameStateAt): week (the strip by this week's Proj gain, the rows as the search ranks them) while no row's add
-            or drop has kicked off; season_gain once any has (the rows by the season Gain, every week figure null, the
-            strip the first row worth making); a page narrowed to one position carries the full page's
+            the order the page's rows and strip are in, decided over the full page's rows and the answer's own by each
+            row's game state (gameStateAt): week (the strip by this week's Proj gain, the rows as the search ranks them)
+            while no row's add or drop has kicked off; season_gain once any has (the rows by the season Gain, every week
+            figure null, the strip the first row worth making); a page narrowed to one position or focused on a player
+            takes season_gain whenever the full page does
         lineup_proj:
           type: number
           format: double
