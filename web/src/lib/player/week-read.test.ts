@@ -40,6 +40,13 @@ void test('the read stands as built until the card reads in PPR for its week', (
 	assert.deepEqual(shownWeekRead(older, ppr(20)), built);
 });
 
+void test('a read the run withheld for his status keeps its due time when the card also moved', () => {
+	const status =
+		'His status changed since this read was written. A new read is due by Sat 9:00 am Central.';
+	const withheld = { ...READ, body: null, caption: status };
+	assert.deepEqual(shownWeekRead(withheld, ppr(25.1)), { body: null, caption: status });
+});
+
 void test('a read the run already withheld stays withheld', () => {
 	const withheld = { ...READ, body: null, caption: MOVED };
 	assert.deepEqual(shownWeekRead(withheld, ppr(26.4)), { body: null, caption: MOVED });

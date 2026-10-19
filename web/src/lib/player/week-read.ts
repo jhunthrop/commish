@@ -22,6 +22,8 @@ export interface ShownRead {
 /** The read as the page shows it beside the card's live projection (null until the card has read). */
 export function shownWeekRead(read: WeekRead, card: CardProjection | null): ShownRead {
 	const built = { body: read.body, caption: read.caption };
+	// A read the run already withheld keeps the run's caption (a status change says when the new one is due).
+	if (read.body === null) return built;
 	if (card?.scoring !== 'ppr' || card.week !== read.week) return built;
 	if (read.projection === undefined || read.movedCaption === undefined) return built;
 	return card.points === read.projection ? built : { body: null, caption: read.movedCaption };
