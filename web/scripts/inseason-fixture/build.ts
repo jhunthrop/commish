@@ -192,9 +192,9 @@ const week = state.week;
 /** The weeks the rest-of-season order covers from the league's week: a week's figure is over them. */
 const weeksCovered = Math.max(1, LAST_FANTASY_WEEK - week + 1);
 
-/** What every basis ends with, in the API's words (words.go porWords): what points over
- * replacement are and what a week's figure is. */
-const basisTail = `Points over replacement, and every gain in them, are points above what a free pickup at his position gives you, a week: the rest of the season on our rest-of-season order, averaged over its ${String(weeksCovered)} weeks, not a projection of any one week. Points a game are our rest-of-season projection from week ${String(format.rosFromWeek)} over the games his club has left, byes out.`;
+/** What every basis ends with, in the API's words (words.go porWords): what Gain is
+ * and what a week's figure is, then what Rest of season is (pergame.go RestOfSeasonBasis). */
+const basisTail = `Gain is the change in a lineup's points over replacement a week, points above what a free pickup at each position gives you: the rest of the season on our rest-of-season order, averaged over its ${String(weeksCovered)} weeks, not a projection of any one week. Rest of season is his points a game on our rest-of-season projection from week ${String(format.rosFromWeek)}, byes out.`;
 
 /** The rest of the basis, under the rows, in the API's words (words.go BasisNote): the league's
  * shape and the league's rules the stat lines leave out. */

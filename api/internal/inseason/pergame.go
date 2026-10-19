@@ -37,12 +37,6 @@ func RestOfSeasonPerGame(b boards.Board, p boards.Player, left map[string]int) *
 	return &v
 }
 
-// PerGameBasis is the sentence a page's basis gains when its rows carry
-// the figure.
-func PerGameBasis(fromWeek int) string {
-	return fmt.Sprintf("Points a game are our rest-of-season projection from week %d over the games his club has left, byes out.", fromWeek)
-}
-
 // carriesPerGame is whether the board's rows carry the figure: a
 // rest-of-season order that says its first week.
 func carriesPerGame(b boards.Board) bool {
@@ -56,11 +50,12 @@ func withPerGame(b boards.Board, basis string, people ...[]person) string {
 	if !perGameShown(b, people...) {
 		return basis
 	}
-	return basis + " " + PerGameBasis(b.FromWeek)
+	return basis + " " + RestOfSeasonBasis(b.FromWeek)
 }
 
-// RestOfSeasonBasis is the Waivers screen's sentence for the figure, which
-// it heads "Rest of season" (Lane 66f).
+// RestOfSeasonBasis is the sentence for the figure, which Trades and
+// Waivers both head "Rest of season" (Lane 66f, 66u): one unit, said in
+// one way.
 func RestOfSeasonBasis(fromWeek int) string {
 	return fmt.Sprintf("Rest of season is his points a game on our rest-of-season projection from week %d, byes out.", fromWeek)
 }

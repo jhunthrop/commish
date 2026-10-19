@@ -93,14 +93,6 @@ func TestRestOfSeasonPerGame(t *testing.T) {
 	}
 }
 
-func TestPerGameBasis(t *testing.T) {
-	want := "Points a game are our rest-of-season projection from week 7 over the games his club has left, byes out."
-	if got := PerGameBasis(7); got != want {
-		t.Fatalf("%q", got)
-	}
-	guard(t, PerGameBasis(7))
-}
-
 // restFixture is the fixture league on a rest-of-season order from week
 // 7, its clubs playing every week through 17.
 func restFixture(t *testing.T) fixture {
@@ -143,7 +135,7 @@ func TestEveryScreenCarriesTheFigure(t *testing.T) {
 	lineup, _ := a.Lineup()
 	waivers, _ := a.Waivers("", "")
 	trades, _ := a.Trades("")
-	sentence := PerGameBasis(7)
+	sentence := RestOfSeasonBasis(7)
 	for _, basis := range []string{trades.Basis, trades.CheckBasis} {
 		if !strings.HasSuffix(basis, " "+sentence) {
 			t.Errorf("basis %q does not end on %q", basis, sentence)

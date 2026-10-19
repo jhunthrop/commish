@@ -196,7 +196,7 @@ async function boxFacts(page: Page): Promise<{
 	});
 }
 const PER_GAME_BASIS =
-	/Points a game are our rest-of-season projection from week \d+ over the games his club has left, byes out\./;
+	/Rest of season is his points a game on our rest-of-season projection from week \d+, byes out\./;
 const PER_GAME = /\d+\.\d a game/;
 /** The Trades table's heads (Lane 66g): at a desk, below the room's width, and on a phone, where the
  * gain heads name their unit. The open column's own words are read by a screen reader. */
@@ -212,7 +212,7 @@ const TRADE_HEADS = [
 	'Room'
 ];
 const TRADE_HEADS_NARROW = TRADE_HEADS.slice(0, -1);
-const TRADE_HEADS_PHONE = ['Why this trade', 'You give', 'You, a week', 'Them, a week'];
+const TRADE_HEADS_PHONE = ['Why this trade', 'You give', 'Your gain', 'Their gain'];
 const ROOM_FOLDS_AT = 1180;
 /** Below it a trade folds as on a phone. */
 const TRADES_FOLD_AT = 900;

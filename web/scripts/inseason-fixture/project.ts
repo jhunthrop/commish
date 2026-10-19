@@ -529,9 +529,9 @@ function pickupTable(advice: WaiverAdvice): WaiverAdvice {
 	return {
 		...advice,
 		basis:
-			'A pickup starts for you this week on the Proj shown and does not lower your rest of season on our rest-of-season order. Its drop is the one you lose least by.',
+			'A pickup starts for you this week on the Proj shown and its Gain is not below zero on our rest-of-season order. Its drop is the one you lose least by.',
 		season_basis:
-			"Rest of season is his points a game on our rest-of-season projection from week 6, byes out. A gain a week is your lineup's points over replacement on our rest-of-season order, averaged over its 12 weeks.",
+			"Rest of season is his points a game on our rest-of-season projection from week 6, byes out. Gain is the change in your lineup's points over replacement a week on our rest-of-season order, averaged over its 12 weeks.",
 		rows,
 		pickups,
 		roster,
@@ -679,7 +679,12 @@ function followLineup(finder: TradeAdvice): TradeAdvice {
 		for (const drop of may) {
 			const slot = spotOf.get(id(drop));
 			if (slot === undefined) continue;
-			const starts = new Set(weekStarters(after.filter((l) => l !== drop), SLOTS).map(id));
+			const starts = new Set(
+				weekStarters(
+					after.filter((l) => l !== drop),
+					SLOTS
+				).map(id)
+			);
 			const by = row.get.find((l) => starts.has(id(l)) && accepts(slot, l.player.position));
 			if (by) {
 				const reason = `${lastName(drop.player.name)} starts at ${slot} for you this week, and ${lastName(by.player.name)} takes that spot after the trade.`;
