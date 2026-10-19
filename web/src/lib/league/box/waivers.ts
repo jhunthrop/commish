@@ -23,6 +23,7 @@ import {
 	type Clock
 } from './basis.ts';
 import { BOX, boxNumber, boxRow, positionWord, type BoxRow } from './box.ts';
+import { locked } from './lineup.ts';
 import { SEASON, WAIVER_GAIN } from './season.ts';
 
 /** Every word the Waivers strip, table and drop panel print, in one place for the copy guard. */
@@ -77,7 +78,9 @@ export interface PickupCard {
 	slot: string;
 	add: string;
 	drop: string | null;
-	weekGain: number;
+	/** This week's Proj gain, null once the add's or the drop's game has kicked off: the move is for
+	 * next week then (Lane 85). */
+	weekGain: number | null;
 	gain: number;
 	source: WaiverRow;
 }
@@ -88,7 +91,8 @@ export interface DropRow {
 	row: BoxRow;
 	rest: number | null;
 	gain: number;
-	weekGain: number;
+	/** This week's Proj gain, null once his or the add's game has kicked off (Lane 85). */
+	weekGain: number | null;
 	/** The shared status chip when this week's lineup starts him (the API's mark, Lane 66u), else null. */
 	starter: StatusView | null;
 	line: PlayerLine;
@@ -159,9 +163,22 @@ export function namesOnScreen(advice: Pick<WaiverAdvice, 'rows' | 'pickups' | 'r
 		.concat(advice.roster.map((l) => l.player.name));
 }
 
+/** A week gain the screen may draw: the API's while both players' games are still to be played at
+ * `now`, none once either has kicked off or is final (Lane 85). The add or the drop stays allowed;
+ * it counts from next week. */
+function weekGainOf(
+	gain: number,
+	add: PlayerLine,
+	drop: PlayerLine | null,
+	now: number
+): number | null {
+	return locked(add, now) || (drop !== null && locked(drop, now)) ? null : gain;
+}
+
 /** The strip's cards in the API's order: each one's week gain is his over the cards before him. */
 export function pickupCards(
-	advice: Pick<WaiverAdvice, 'rows' | 'pickups' | 'roster'>
+	advice: Pick<WaiverAdvice, 'rows' | 'pickups' | 'roster'>,
+	now: number
 ): PickupCard[] {
 	const names = namesOnScreen(advice);
 	return advice.pickups.map((source) => ({
@@ -169,7 +186,7 @@ export function pickupCards(
 		slot: positionWord(source.add.player.position),
 		add: cardName(source.add.player.name, names),
 		drop: source.drop ? cardName(source.drop.player.name, names) : null,
-		weekGain: source.week_gain,
+		weekGain: weekGainOf(source.week_gain, source.add, source.drop, now),
 		gain: source.gain,
 		source
 	}));
@@ -202,9 +219,12 @@ export function gainWord(gain: number): string {
 	return shown === 0 ? fixed(0, 1) : signed(shown, 1);
 }
 
-/** "+6.7 Proj this week, +1.2 Gain a week". */
+/** "+6.7 Proj this week, +1.2 Gain a week", the Gain alone once the week figure is gone. */
 export function cardGains(card: Pick<PickupCard, 'weekGain' | 'gain'>): string {
-	return `${gainWord(card.weekGain)} ${WAIVERS.thisWeek}, ${gainWord(card.gain)} ${WAIVERS.gain}`;
+	const season = `${gainWord(card.gain)} ${WAIVERS.gain}`;
+	return card.weekGain === null
+		? season
+		: `${gainWord(card.weekGain)} ${WAIVERS.thisWeek}, ${season}`;
 }
 
 /** The strip's sum, every figure the API's (review 66f H1): "96.4" (the lineup's Proj with every
@@ -217,11 +237,14 @@ export interface PickupSum {
 
 export function pickupSum(
 	advice: Pick<WaiverAdvice, 'lineup_proj' | 'pickups_proj'>,
-	cards: number
+	cards: readonly Pick<PickupCard, 'weekGain'>[]
 ): PickupSum | null {
 	const { lineup_proj: without, pickups_proj: withAll } = advice;
-	if (without === null || withAll === null || cards === 0) return null;
-	const withWord = cards === 1 ? 'him' : cards === 2 ? 'both' : 'all three';
+	if (without === null || withAll === null || cards.length === 0) return null;
+	// The sum is this week's: none once any card's week figure is gone (Lane 85).
+	if (cards.some((c) => c.weekGain === null)) return null;
+	const n = cards.length;
+	const withWord = n === 1 ? 'him' : n === 2 ? 'both' : 'all three';
 	return {
 		figure: boxNumber(withAll),
 		words: `${BOX.proj} with ${withWord}, ${boxNumber(without)} without`,
@@ -247,7 +270,7 @@ export function dropRows(
 				row: boxRow(line, '', zone, false, now),
 				rest: line.rest_of_season_per_game,
 				gain: drop.gain,
-				weekGain: drop.week_gain,
+				weekGain: weekGainOf(drop.week_gain, source.add, line, now),
 				starter: drop.starts_this_week ? STARTER_STATUS : null,
 				line
 			}
@@ -258,6 +281,7 @@ export function dropRows(
 /** The week's gain said once over the drops when every drop gives the same: "+6.7"; else null and
  * each row says its own. */
 export function sameWeekGain(drops: readonly Pick<DropRow, 'weekGain'>[]): number | null {
+	// A drop with no week figure: none said over them, each row says its own (or none).
 	const first = drops[0];
 	if (first === undefined) return null;
 	return drops.every((d) => d.weekGain === first.weekGain) ? first.weekGain : null;
@@ -279,7 +303,12 @@ export function dropLead(weekGain: number | null): string {
 /** The row an add's claim names with the drop the member chose. */
 export function withDrop(source: WaiverRow, drop: DropRow | null): WaiverRow {
 	if (drop === null) return source;
-	return { ...source, drop: drop.line, gain: drop.gain, week_gain: drop.weekGain };
+	return {
+		...source,
+		drop: drop.line,
+		gain: drop.gain,
+		week_gain: drop.weekGain ?? source.week_gain
+	};
 }
 
 /** The table's sortable columns. */

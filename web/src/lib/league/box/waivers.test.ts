@@ -158,7 +158,7 @@ const advice = {
 };
 
 void test('the strip names each pickup as a card: the move, both gains, the sum on the Lineup', () => {
-	const cards = pickupCards(advice);
+	const cards = pickupCards(advice, NOW);
 	assert.deepEqual(cards.map(moveWords), ['Add Gainwell, drop Lemon', 'Add Chiefs, drop Saints']);
 	assert.equal(
 		cardGains(cards[0] ?? { weekGain: 0, gain: 0 }),
@@ -168,14 +168,14 @@ void test('the strip names each pickup as a card: the move, both gains, the sum 
 	assert.equal(pickupsTitle(2), 'Two pickups');
 	assert.equal(pickupsTitle(1), 'One pickup');
 	assert.equal(pickupsTitle(0), WAIVERS.noPickup);
-	assert.deepEqual(pickupSum(advice, cards.length), {
+	assert.deepEqual(pickupSum(advice, cards), {
 		figure: '96.1',
 		words: 'Proj with both, 87.0 without',
 		gain: '+9.1'
 	});
-	assert.equal(pickupSum(advice, 1)?.words, 'Proj with him, 87.0 without');
-	assert.equal(pickupSum({ lineup_proj: null, pickups_proj: null }, 2), null);
-	assert.equal(pickupSum(advice, 0), null);
+	assert.equal(pickupSum(advice, cards.slice(0, 1))?.words, 'Proj with him, 87.0 without');
+	assert.equal(pickupSum({ lineup_proj: null, pickups_proj: null }, cards), null);
+	assert.equal(pickupSum(advice, []), null);
 	assert.equal(
 		stripDecision(cards),
 		'Two pickups. Add Gainwell, drop Lemon. Add Chiefs, drop Saints.'
@@ -269,7 +269,7 @@ void test("the verbs name the member's platform, and the copy says where he goes
 });
 
 void test('copy guard: every Waivers line is fantasy words, with no dash, semicolon or the word host', () => {
-	const cards = pickupCards(advice);
+	const cards = pickupCards(advice, NOW);
 	const lines = [
 		...Object.values(WAIVERS),
 		stripDecision(cards),
@@ -304,7 +304,7 @@ void test('a card says a last name in full when another player on screen shares 
 	const roschon = line('Roschon Johnson', 'RB', 0.6);
 	const taylor = row(line('Mason Taylor', 'TE', 4.77), { drop: roschon });
 	const theo = row(line('Theo Johnson', 'TE', 4.1));
-	const [card] = pickupCards({ rows: [taylor, theo], pickups: [taylor], roster: [roschon] });
+	const [card] = pickupCards({ rows: [taylor, theo], pickups: [taylor], roster: [roschon] }, NOW);
 	assert.equal(card ? moveWords(card) : '', 'Add Taylor, drop Roschon Johnson');
 	assert.equal(cardName('Roschon Johnson', ['Roschon Johnson']), 'Johnson');
 });
@@ -355,4 +355,42 @@ void test('a narrowed read draws at its own instant: past his kickoff his game f
 	const narrowedAt = Date.parse('2026-10-18T17:30:00.000Z');
 	assert.equal(poolRows(pool, ZONE, NOW)[0]?.row.expected, '23 to 21.5');
 	assert.equal(poolRows(pool, ZONE, narrowedAt)[0]?.row.expected, null);
+});
+
+void test('a pickup whose game is final keeps its card but says no Proj this week (Lane 85)', () => {
+	const played = (row: WaiverRow): WaiverRow => ({
+		...row,
+		add: { ...row.add, facts: { ...row.add.facts, played: true, game_state: 'final' } }
+	});
+	const tuesday = {
+		...advice,
+		rows: [played(gainwell), chiefs],
+		pickups: [played(gainwell), chiefs]
+	};
+	const cards = pickupCards(tuesday, NOW);
+	// The add is still allowed (it is for next week): the card stays, its week figure goes.
+	assert.deepEqual(cards.map(moveWords), ['Add Gainwell, drop Lemon', 'Add Chiefs, drop Saints']);
+	assert.equal(cards[0]?.weekGain, null);
+	assert.equal(cardGains(cards[0] ?? { weekGain: null, gain: 0 }), '+1.2 Gain a week');
+	assert.equal(cards[1]?.weekGain, 2.7);
+	// The lineup's Proj with every card made is a week figure too: none once one card has none.
+	assert.equal(pickupSum(tuesday, cards), null);
+	// His row says Final.
+	const row = poolRows(tuesday, ZONE, NOW).find((r) => r.row.name === 'Kenny Gainwell');
+	assert.deepEqual(row?.row.game, { where: 'vs PIT', when: 'Final' });
+	// A drop whose game is final: the pair has no week figure either.
+	const lemonPlayed = {
+		...lemon,
+		facts: { ...lemon.facts, played: true, game_state: 'final' as const }
+	};
+	const drops = dropRows(gainwell, [vidal, lemonPlayed, saints], ZONE, NOW);
+	assert.deepEqual(
+		drops.map((d) => [d.row.name, d.weekGain]),
+		[
+			['Makai Lemon', null],
+			['Kimani Vidal', 6.7]
+		]
+	);
+	assert.equal(sameWeekGain(drops), null);
+	assert.equal(withDrop(gainwell, drops[0] ?? null).week_gain, gainwell.week_gain);
 });

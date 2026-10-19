@@ -171,7 +171,8 @@
 								>{#if drop.starter}<span class="dmark"><StatusChip status={drop.starter} /></span
 									>{/if}<span class="dgain" class:up={drop.gain > 0} class:down={drop.gain < 0}
 									>{gainWord(drop.gain)}</span
-								>{#if week === null}<span class="dweek">{gainWord(drop.weekGain)} {BOX.proj}</span
+								>{#if week === null && drop.weekGain !== null}<span class="dweek"
+										>{gainWord(drop.weekGain)} {BOX.proj}</span
 									>{/if}</td
 							>
 							<td class="act"

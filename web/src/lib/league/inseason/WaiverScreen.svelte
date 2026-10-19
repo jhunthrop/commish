@@ -145,7 +145,7 @@
 	);
 	const pool = $derived(poolRows({ rows: shown.rows, pickups: advice.pickups }, memberZone(), now));
 	const rows = $derived(findRows(sortRows(pool, sort), query));
-	const cards = $derived(pickupCards(advice));
+	const cards = $derived(pickupCards(advice, pageNow));
 	const card = $derived(cards.find((c) => c.key === chosenCard) ?? cards[0] ?? null);
 	const openRow = $derived(pool.find((r) => r.key === open) ?? null);
 	const drops = $derived(openRow ? dropRows(openRow.source, shown.roster, memberZone(), now) : []);
