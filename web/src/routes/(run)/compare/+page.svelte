@@ -11,8 +11,8 @@
 	import { lazySheet } from '#lib/site/lazy-sheet.svelte.ts';
 	import { links } from '#lib/site/links.ts';
 	import { SAME_PLAYER, verdict as callBetween } from '#lib/site/verdict.ts';
-	import { compareRows, type Side } from '#lib/site/compare-rows.ts';
-	import { firstStep } from '#lib/site/compare-words.ts';
+	import { compareRows, sideRange, type Side } from '#lib/site/compare-rows.ts';
+	import { COMPARE_FAILED, firstStep } from '#lib/site/compare-words.ts';
 	import { EMPTY_FIGURE } from '#lib/format/empty.ts';
 	import { fetchPlayer, type PlayerData } from '#lib/site/player-data.ts';
 	import { SEARCH_INDEX_URL, searchable, type SearchablePlayer } from '#lib/site/search.ts';
@@ -77,14 +77,17 @@
 		verdict?.kind === 'call' ? ([verdict.leader.side, verdict.other.side] as const) : null
 	);
 	const rows = $derived(pair ? compareRows(pair[0], pair[1], data.season, data.underway) : []);
-	const scale = $derived(
-		pair
-			? {
-					lo: Math.min(...pair.map((side) => side.numbers.floor ?? 0)),
-					hi: Math.max(...pair.map((side) => side.numbers.ceiling ?? 0))
-				}
-			: undefined
-	);
+	/** Each side's range where the run carries one, and the scale the carried ranges share. */
+	const ranges = $derived(pair ? pair.map(sideRange) : []);
+	const scale = $derived.by(() => {
+		const carried = ranges.filter((range) => range !== null);
+		return carried.length === 0
+			? undefined
+			: {
+					lo: Math.min(...carried.map((range) => range.floor)),
+					hi: Math.max(...carried.map((range) => range.ceiling))
+				};
+	});
 
 	function syncUrl(): void {
 		void goto(links.compare(chosen.a?.slug, chosen.b?.slug), { replace: true, shallow: true });
@@ -154,9 +157,7 @@
 	<main class="compare">
 		<PageHead
 			title="Compare"
-			lead={failed
-				? 'The players are not loading. Try again in a moment.'
-				: (firstStep(both.length) ?? undefined)}
+			lead={failed ? COMPARE_FAILED : (firstStep(both.length) ?? undefined)}
 		/>
 		<ContextNote note={note?.text ?? null} link={note?.link ?? null} />
 
@@ -223,23 +224,21 @@
 						<tr data-row={row.label}>
 							<th scope="row">{row.label}</th>
 							{#each row.cells as cell, i (i)}
+								{@const range = row.range ? ranges[i] : null}
 								<td
 									class:win={cell.wins === true}
 									class:lose={cell.wins === false}
 									class:gain={cell.tone === 'gain'}
 									class:loss={cell.tone === 'loss'}
 								>
-									{#if row.range && scale}
-										{@const numbers = pair[i]?.numbers}
-										{#if numbers?.floor != null && numbers.median !== null && numbers.ceiling !== null}
-											<RangeBar
-												floor={numbers.floor}
-												median={numbers.median}
-												ceiling={numbers.ceiling}
-												{scale}
-												form="inline"
-											/>
-										{/if}
+									{#if range && scale}
+										<RangeBar
+											floor={range.floor}
+											median={range.median}
+											ceiling={range.ceiling}
+											{scale}
+											form="inline"
+										/>
 									{:else}
 										<span class:none={cell.text === EMPTY_FIGURE}>{cell.text}</span>
 									{/if}

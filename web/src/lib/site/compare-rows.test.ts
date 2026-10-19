@@ -146,3 +146,24 @@ void test('a run without the Gap draws no Gap row, and a pair with one gap print
 		]
 	);
 });
+
+const unranged = (side: Side): Side => ({
+	...side,
+	numbers: { ...side.numbers, floor: null, median: null, ceiling: null }
+});
+
+void test('Floor to ceiling is drawn only where a side carries a range, the empty mark on the other', () => {
+	const none = compareRows(unranged(NACUA), unranged(CHASE), 2026, true);
+	assert.ok(!none.some((row) => row.label === 'Floor to ceiling'));
+	const one = byLabel(compareRows(NACUA, unranged(CHASE), 2026, true), 'Floor to ceiling');
+	assert.equal(one.range, true);
+	assert.deepEqual(
+		one.cells.map((cell) => cell.text),
+		['', '--']
+	);
+	const both = byLabel(compareRows(NACUA, CHASE, 2026, true), 'Floor to ceiling');
+	assert.deepEqual(
+		both.cells.map((cell) => cell.text),
+		['', '']
+	);
+});
