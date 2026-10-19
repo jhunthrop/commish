@@ -153,8 +153,8 @@
 					featured
 				>
 					{#snippet more()}
-						<section aria-label="Where your draft is">
-							<PanelHead title="Where your draft is" />
+						<section aria-label="Where it works">
+							<PanelHead title="Where it works" />
 							<FactStrip
 								label="Where the live draft and your league work"
 								cells={hostCells(openHosts)}

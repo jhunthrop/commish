@@ -22,13 +22,15 @@ const SHOTS = [
 	{ width: 1440, height: 900, scale: 1 },
 	{ width: 390, height: 844, scale: 2 }
 ] as const;
-/** Each page's budget in KB at 1440 and at 390. The sweep measured /adp at 451 and 928 and the club
- * page at 549 and 702 on live; the club page's excess was one college face at its 305 KB full file.
- * /adp's faces already come at their drawn size, about 11 KB each at 2x, so its phone budget holds
- * today's figure: under it needs the faces transcoded at the edge (the lane's report). */
+/** Each page's budget in KB at 1440 and at 390: the local stand-in build's figure (Lane 81: /adp 410
+ * and 609, the club page 183 and 266) with about a tenth over it, so a regression fails here. Live,
+ * on the run of Oct 19, the sweep measured /adp at 441 and 914 and the club page at 537 and 685; the
+ * club page's excess was one college face at its 305 KB full file. /adp's faces already come at their
+ * drawn size, about 11 KB each at 2x: under its live phone figure needs the faces transcoded at the
+ * edge (the lane's report). */
 const PAGES = [
-	{ name: 'adp', path: '/adp', ready: 'ADP', budget: { 1440: 460, 390: 940 } },
-	{ name: 'club', path: '/clubs/kc', ready: 'Kansas City', budget: { 1440: 300, 390: 420 } }
+	{ name: 'adp', path: '/adp', ready: 'ADP', budget: { 1440: 450, 390: 670 } },
+	{ name: 'club', path: '/clubs/kc', ready: 'Kansas City', budget: { 1440: 205, 390: 295 } }
 ] as const;
 /** The most one face may weigh: a face at its drawn size at 2x is about 11 KB, the full file 300. */
 const FACE_MOST_KB = 24;
