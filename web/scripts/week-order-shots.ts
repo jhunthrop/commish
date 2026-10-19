@@ -233,7 +233,7 @@ async function check(
 			rows: table?.querySelectorAll('tbody tr:not(.sec)').length ?? 0,
 			mine: table?.querySelectorAll('tbody tr.mine').length ?? 0,
 			status: document.querySelector('main .status')?.textContent.trim() ?? '',
-			rules: basis?.textContent.match(/leave out (\w+) of [^.]+\./)?.[0] ?? '',
+			rules: basis?.textContent.match(/miss (\w+) of [^.]+\./)?.[0] ?? '',
 			rulesLink: basis?.querySelector('a')?.getAttribute('href') ?? '',
 			glued: /[a-z]\.[A-Z]/.test(basis?.textContent ?? ''),
 			host: [...document.querySelectorAll('main p, main td, main th, main a, main button')]
@@ -271,7 +271,8 @@ async function check(
 	if (seen.rules !== `miss two of ${whose} rules our stats lack.`)
 		said.push(`${at}: the rules left out read "${seen.rules}"`);
 	if (seen.glued) said.push(`${at}: two basis sentences run together`);
-	if (screen.member !== seen.rulesLink.endsWith('?view=settings'))
+	// Settings at the list of the rules (tabs.ts leagueSettingsHref, Lane 66t).
+	if (screen.member !== /\?view=settings#\w+$/.test(seen.rulesLink))
 		said.push(`${at}: the rules link is "${seen.rulesLink}"`);
 	if (screen.member) {
 		if (width > ROSTER_FROM && !seen.heads.includes('Roster')) said.push(`${at}: no Roster head`);
