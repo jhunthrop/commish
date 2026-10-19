@@ -3,7 +3,6 @@
  * injured reserve; a decision strip above it naming each swap, each spot no one who can play fills,
  * and the Proj the swaps add over the lineup as the platform has it set now; one evidence line per
  * swap built from the row's own columns. Pure, tested in lineup.test.ts. */
-import { memberZone } from '#lib/format/clock.ts';
 import { lastName } from '#lib/format/draft.ts';
 import { designationWord } from '#lib/format/designation.ts';
 import { fixed } from '#lib/format/number.ts';
@@ -211,19 +210,20 @@ export function lineupBox(
 		| 'projection_read_at'
 		| 'week'
 	>,
-	zone: string = memberZone()
+	zone: string,
+	now: number
 ): LineupBox {
 	const sat = satIds(advice.slots);
 	const placed = advice.slots.map((slot): Placed => ({
 		slot,
-		row: boxRow(slot.ours, slotWord(slot.slot), zone, false)
+		row: boxRow(slot.ours, slotWord(slot.slot), zone, false, now)
 	}));
 	const ours = placed.map((p) => p.row);
 	const counted = placed.flatMap((p) => (p.slot.no_one_can_play ? [] : [p.row]));
 	const satRows = new Map(
 		advice.slots.flatMap((slot) =>
 			slot.changed && slot.host
-				? [[slot.host.player.host_id, boxRow(slot.host, LINEUP.sit, zone, false)] as const]
+				? [[slot.host.player.host_id, boxRow(slot.host, LINEUP.sit, zone, false, now)] as const]
 				: []
 		)
 	);
@@ -236,7 +236,7 @@ export function lineupBox(
 	const bench = advice.bench.map((line): LineupRow => {
 		const out = sat.has(line.player.host_id);
 		return {
-			row: boxRow(line, out ? LINEUP.sit : '', zone, false),
+			row: boxRow(line, out ? LINEUP.sit : '', zone, false, now),
 			move: out ? 'out' : null,
 			why: null,
 			idle: false
@@ -259,7 +259,7 @@ export function lineupBox(
 	return {
 		starters,
 		bench,
-		reserve: advice.reserve.map((line) => boxRow(line, '', zone, false)),
+		reserve: advice.reserve.map((line) => boxRow(line, '', zone, false, now)),
 		swaps,
 		idle: [
 			...placed.flatMap((p) => (p.slot.no_one_can_play ? [p.row.slot] : [])),

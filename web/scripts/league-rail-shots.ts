@@ -16,6 +16,7 @@ import { RAIL_FOOT, railHref, type RailKey } from '../src/lib/ui/nav.ts';
 import { railOfKey } from '../src/lib/ui/rail-order.ts';
 import { FIXTURE_IDS } from './inseason-fixture/ids.ts';
 import { PHASE_COOKIE, type FixturePhase } from './inseason-fixture/phases.ts';
+import { installFixtureApiClock, requireFixtureClock } from './inseason-fixture/clock.ts';
 
 const THEMES = ['dark', 'light'] as const;
 const WIDTHS = [1440, 390] as const;
@@ -26,6 +27,10 @@ const READY_TIMEOUT_MS = 30_000;
 const SIGNED_IN = { name: 'commish_csrf', value: 'fixture' };
 
 const web = process.argv[2] ?? 'http://localhost:4196';
+/** The fixture API the site was built against, on the fixture week's clock (FIXTURE_CLOCK=
+ * 2026-10-17T17:00:00.000Z): the browser runs at its instant, never the day the script runs. */
+const API_ORIGIN = new URL(process.env.API_ORIGIN ?? 'http://localhost:8799').origin;
+await requireFixtureClock(API_ORIGIN);
 const out = new URL(process.argv[3] ?? '../screenshots/league-rail/', import.meta.url);
 const id = FIXTURE_IDS.league;
 
@@ -56,6 +61,7 @@ async function context(theme: string, width: number, phase: FixturePhase): Promi
 		colorScheme: theme as 'light',
 		deviceScaleFactor: phone ? 2 : 1
 	});
+	await installFixtureApiClock(ctx, API_ORIGIN);
 	const cookies = [SIGNED_IN, { name: PHASE_COOKIE, value: phase }];
 	await ctx.addCookies(cookies.map((cookie) => ({ ...cookie, domain: 'localhost', path: '/' })));
 	await ctx.addInitScript(

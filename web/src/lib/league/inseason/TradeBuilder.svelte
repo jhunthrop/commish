@@ -72,6 +72,8 @@
 		/** Copies the trade's offer, answering the line under the verb. */
 		propose: (team: TradeTeam, row: Pick<TradeRow, 'give' | 'get'>) => Promise<CopiedTrade>;
 		onclose: () => void;
+		/** The instant the answer was read, in ms: the page's clock the rows draw at. */
+		now: number;
 	}
 
 	let {
@@ -88,7 +90,8 @@
 		hostNote,
 		check,
 		propose,
-		onclose
+		onclose,
+		now
 	}: Props = $props();
 
 	// The panel is made again for each trade it opens with ({#key} in the screen).
@@ -267,6 +270,7 @@
 					holds={holdsWords('give')}
 					lines={roster}
 					pickOf={tickOf('give')}
+					{now}
 				/>
 				{#if team}
 					<TradeBox
@@ -275,6 +279,7 @@
 						holds={holdsWords('get')}
 						lines={team.roster}
 						pickOf={tickOf('get')}
+						{now}
 					/>
 				{/if}
 			</div>

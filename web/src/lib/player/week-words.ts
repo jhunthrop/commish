@@ -272,12 +272,7 @@ function restTile(week: PlayerWeek, rest: RestParts | null, fallback: CardTile):
 /** The basis lines the week's read says, once each and short (the Waivers forms): the projection's
  * with its change's, then the evidence columns' scoring with the game facts' read while his game is
  * still to be played at `now`. A "--" says why on its own tile. */
-export function liveBasis(
-	week: PlayerWeek,
-	league: boolean,
-	zone: string,
-	now: number = Date.now()
-): string[] {
+export function liveBasis(week: PlayerWeek, league: boolean, zone: string, now: number): string[] {
 	// The card's page names no zone elsewhere, so each time says it (basis.ts, the one source).
 	const clock = { zone, zoned: true };
 	const proj = [
@@ -341,7 +336,7 @@ export interface LiveInput {
 	screenHref: ScreenHref;
 	zone?: string;
 	/** The time the card is drawn at, in ms: a game kicked off by then says no facts read. */
-	now?: number;
+	now: number;
 }
 
 /** The card once the week is read. */
@@ -355,7 +350,7 @@ export function liveCard({
 	rest,
 	screenHref,
 	zone = memberZone(),
-	now = Date.now()
+	now
 }: LiveInput): LiveCard {
 	const fallback = (key: CardTile['key']): CardTile => {
 		const found = tiles.find((tile) => tile.key === key);

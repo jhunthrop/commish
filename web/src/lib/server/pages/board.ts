@@ -76,7 +76,11 @@ export interface BoardPage {
 export type BoardRoute =
 	{ kind: 'board'; page: BoardPage } | { kind: 'absent'; page: AbsentFormatPage };
 
-export async function boardPage(formatId: string, segment: string | null): Promise<BoardPage> {
+export async function boardPage(
+	formatId: string,
+	segment: string | null,
+	now: number
+): Promise<BoardPage> {
 	const position = segment === null ? null : positionFromSegment(segment);
 	if (segment !== null && position === null) error(NOT_FOUND, 'No such position.');
 	const format = await formatForRoute(formatId, (id) => links.board(id, position));
@@ -127,15 +131,15 @@ export async function boardPage(formatId: string, segment: string | null): Promi
 		range,
 		boardSize: loaded.rows.length,
 		framing: rowFraming(format),
-		...boardStatuses([...rows, ...market], capture, format)
+		...boardStatuses([...rows, ...market], capture, format, now)
 	};
 }
 
 /** /board/<format>: the All view of a format the run carries, or the page for one it lacks. */
-export async function boardRoute(formatId: string): Promise<BoardRoute> {
+export async function boardRoute(formatId: string, now: number): Promise<BoardRoute> {
 	const route = await formatRoute(formatId, (id) => links.board(id));
 	return route.kind === 'run'
-		? { kind: 'board', page: await boardPage(route.format.id, null) }
+		? { kind: 'board', page: await boardPage(route.format.id, null, now) }
 		: { kind: 'absent', page: await absentFormatPage(route.format) };
 }
 

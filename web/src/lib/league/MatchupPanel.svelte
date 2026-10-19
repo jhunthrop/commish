@@ -43,7 +43,8 @@
 		return sideBox(s, answered, {
 			hostTotal: showsTotal(s) ? s.points : null,
 			landed: box?.projection_read_at != null,
-			week: matchup?.week ?? sync.week
+			week: matchup?.week ?? sync.week,
+			now: now.getTime()
 		});
 	}
 
@@ -112,6 +113,7 @@
 			projection={box ? { readAt: box.projection_read_at, scoring: box.projection_scoring } : null}
 			{lines}
 			lineup={null}
+			now={now.getTime()}
 		/>
 	</div>
 {:else}

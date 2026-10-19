@@ -30,6 +30,7 @@ import { copyFault, watchData } from './copy-scan.ts';
 import { EMPTY_FIGURE } from '../src/lib/format/empty.ts';
 import { FIGURE } from '../src/lib/format/figure-words.ts';
 import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
+import { installFixtureApiClock, requireFixtureClock } from './inseason-fixture/clock.ts';
 
 const THEMES = ['dark', 'light'] as const;
 const PHONE_WIDTH = 390;
@@ -53,6 +54,10 @@ const WEEK_READ = /Written \w{3} \d{1,2}:\d{2} [ap]m Central, for week \d+/;
 const WITHHELD = 'His status changed since this read was written. A new read is due by';
 
 const web = process.argv[2] ?? 'http://localhost:4173';
+/** The fixture API the site was built against, on the fixture week's clock (FIXTURE_CLOCK=
+ * 2026-10-17T17:00:00.000Z): the browser runs at its instant, never the day the script runs. */
+const API_ORIGIN = new URL(process.env.API_ORIGIN ?? 'http://localhost:8799').origin;
+await requireFixtureClock(API_ORIGIN);
 const out = new URL(process.argv[3] ?? '../screenshots/player-card/', import.meta.url);
 
 type WeekReadState = 'shown' | 'withheld' | 'none';
@@ -140,6 +145,7 @@ async function context(theme: string, width: number, shot: Shot): Promise<Browse
 		timezoneId: ZONE
 	});
 	watchData(ctx);
+	await installFixtureApiClock(ctx, API_ORIGIN);
 	const cookies = [
 		...(shot.signedIn ? [SIGNED_IN] : []),
 		...(shot.espn === true ? [ESPN_LEAGUE] : [])

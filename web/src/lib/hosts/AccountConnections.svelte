@@ -33,6 +33,9 @@
 	 * that dropped the connection has its way back in as the solid verb; one not connected opens its
 	 * connect form under the table. Every state is GET /hosts; it reads its own answer. */
 	let hosts = $state<HostConnections | null>(null);
+	/** The table's clock: the instant of the latest read, set with each answer (after a connect or a
+	 * disconnect too), so every last read is said against the moment it was read. */
+	let readAt = $state<Date | null>(null);
 	let failed = $state(false);
 	let busy = $state(false);
 	let problem = $state<string | null>(null);
@@ -49,6 +52,7 @@
 		hostsApi
 			.connections()
 			.then((answer) => {
+				readAt = new Date();
 				hosts = answer;
 				failed = false;
 			})
@@ -57,7 +61,7 @@
 
 	onMount(load);
 
-	const rows = $derived(hosts ? platformRows(hosts, new Date()) : []);
+	const rows = $derived(hosts && readAt ? platformRows(hosts, readAt) : []);
 
 	/** What disconnecting deleted, said once it went through. */
 	const GONE: Readonly<Record<ConnectedHost, string>> = {

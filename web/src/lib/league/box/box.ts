@@ -270,9 +270,9 @@ function faceOf(player: LeaguePlayer, headshot: string | null): BoxRow['face'] {
 export function boxRow(
 	line: PlayerLine,
 	slot: string,
-	zone: string = memberZone(),
-	ranked = true,
-	now: number = Date.now()
+	zone: string,
+	ranked: boolean,
+	now: number
 ): BoxRow {
 	const { facts, player } = line;
 	const ahead = !facts.bye && toBePlayed({ played: facts.played, kickoff: facts.kickoff }, now);
@@ -427,7 +427,7 @@ export const FORMAT_WORDS: Readonly<Record<ProjectionScoring['format'], string>>
 
 /** The oldest read of any game still to be played at `now`, null when no row holds one: the Waivers
  * basis says it in its short line. */
-export function factsReadAt(lines: readonly PlayerLine[], now: number = Date.now()): string | null {
+export function factsReadAt(lines: readonly PlayerLine[], now: number): string | null {
 	const reads = lines.flatMap(({ facts }) =>
 		facts.bye || !toBePlayed({ played: facts.played, kickoff: facts.kickoff }, now)
 			? []

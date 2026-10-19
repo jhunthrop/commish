@@ -24,6 +24,9 @@
 	 * few seconds after, to take that back. It reads its own list, so the account page's other reads
 	 * never wait on it. A detached league keeps its saved settings either way. */
 	let leagues = $state<AttachedLeague[] | null>(null);
+	/** The list's clock: the instant it was read, set with the list, so each last read is said against
+	 * it. No row draws before the list lands. */
+	let now = $state(new Date(0));
 	let failed = $state(false);
 	let busy = $state<string | null>(null);
 	let problem = $state<string | null>(null);
@@ -38,8 +41,6 @@
 
 	/** How long a detached league stays on the list with its undo. */
 	const UNDO_MS = 10_000;
-	/** The clock the rows' last reads are said against: the page's, when it was drawn. */
-	const now = new Date();
 
 	onMount(() => {
 		// Read in the browser only: the account page's shell is prerendered.
@@ -47,6 +48,7 @@
 		leagueApi
 			.attached()
 			.then((list) => {
+				now = new Date();
 				leagues = list;
 			})
 			.catch(() => (failed = true));
