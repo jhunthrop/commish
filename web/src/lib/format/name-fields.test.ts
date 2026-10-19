@@ -10,9 +10,9 @@ import { test } from 'node:test';
 import * as run from '#lib/run/schema.ts';
 import { NAME_FIELDS } from './copy-guard.ts';
 
-/** A field named as a name: `name` and `*_name(s)`, a city, a nickname, an owner, a username, and
- * `*_by`, the person a thing is by. Only its string-typed fields hold one. */
-const NAMED = /^(?:.*_)?(?:names?|nickname|city|owner|username)$|^[a-z]+_by$/;
+/** A field named as a name: `name` and `*_name(s)`, a city, a nickname, an owner, a username, a
+ * handle, a holder, an email, and `*_by`, the person a thing is by. Only its string-typed fields hold one. */
+const NAMED = /^(?:.*_)?(?:names?|nickname|city|owner|username|handle|holder|email)$|^[a-z]+_by$/;
 
 /** One property of the generated contract: `key?: type;` on its own line. */
 const PROPERTY = /^\s*(?:readonly\s+)?'?([a-z][a-z0-9_]*)'?\??:\s*([^;{]+);$/gm;
