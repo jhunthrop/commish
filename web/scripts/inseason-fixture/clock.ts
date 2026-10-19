@@ -5,6 +5,10 @@
  * and every read stamp agree whatever day the script runs (review 66q finding 2). */
 export const FIXTURE_WEEK_CLOCK = '2026-10-17T17:00:00.000Z';
 
+/** Tuesday Oct 13 2026, noon Central: week 6 before its projection and its game facts are read, every
+ * game still to be played (Lane 66w's honest empty state). */
+export const FIXTURE_UNREAD_CLOCK = '2026-10-13T17:00:00.000Z';
+
 /** The environment variable the fixture API reads its clock from. */
 export const FIXTURE_CLOCK_VARIABLE = 'FIXTURE_CLOCK';
 

@@ -39,6 +39,12 @@ import { ESPN_STAND_IN_NAME, espnSync } from './espn-sync.ts';
 import { inSeason, noWeek } from './member-week.ts';
 import { inTenths } from './tenths.ts';
 import { FIXTURE_CLOCK_VARIABLE, fixtureClock } from './clock.ts';
+import {
+	espnDefenseId,
+	weekOrderAnswer,
+	weekPosition,
+	type WeekOrderStates
+} from './week-order-serve.ts';
 
 const PORT = Number(process.env.PORT ?? 8799);
 /** The fixture's clock: the real one, or the shots' week clock (FIXTURE_CLOCK=2026-10-17T17:00:00.000Z,
@@ -105,18 +111,29 @@ async function load<T>(name: string): Promise<T> {
 
 /** Lane 72's recorded week sheets, the player card's line for those players (player-week.ts). */
 const { players: sheets } = await load<{ players: Record<string, Sheet> }>('week-sheets');
-const [sync, lineup, waivers, trades, gameWeek, matchupBox, scoreboard, scoreboardLive, order] =
-	await Promise.all([
-		load<LeagueSync>('sync'),
-		load<LineupAdvice>('lineup'),
-		load<WaiverAdvice>('waivers'),
-		load<TradeAdvice>('trades'),
-		load<GameWeek>('games'),
-		load<MatchupBox>('matchup'),
-		load<Scoreboard>('scoreboard'),
-		load<Scoreboard>('scoreboard-live'),
-		load<OrderAdvice>('order')
-	]);
+const [
+	sync,
+	lineup,
+	waivers,
+	trades,
+	gameWeek,
+	matchupBox,
+	scoreboard,
+	scoreboardLive,
+	order,
+	weekOrders
+] = await Promise.all([
+	load<LeagueSync>('sync'),
+	load<LineupAdvice>('lineup'),
+	load<WaiverAdvice>('waivers'),
+	load<TradeAdvice>('trades'),
+	load<GameWeek>('games'),
+	load<MatchupBox>('matchup'),
+	load<Scoreboard>('scoreboard'),
+	load<Scoreboard>('scoreboard-live'),
+	load<OrderAdvice>('order'),
+	load<WeekOrderStates>('week-order')
+]);
 
 const myTeam = sync.teams.find((t) => t.roster_id === sync.me);
 const contextBase = {
@@ -469,9 +486,6 @@ const HOST_ID = /^-?[0-9]{1,12}$/;
 /** The API's words for a claim whose add it cannot name (hostmoves claimFormWords). */
 const CLAIM_FORM_WORDS = 'Send the claim from the waivers screen.';
 
-/** ESPN's D/ST ids, -(16000 + its proTeamId) (api espn DefenseID), for the fixture's pool defense. */
-const ESPN_DEFENSE_IDS: Readonly<Record<string, string>> = { KC: '-16012' };
-
 /** The ESPN league's waivers, as the API answers an ESPN league: each add named by his board id
  * (ESPN's own), a defense by its D/ST id (api hostIDOfAdd), the claim open, the verb ESPN's league
  * page. */
@@ -481,7 +495,7 @@ function espnWaivers(position: string | null): WaiverAdvice {
 		const board = row.add.player.board_id ?? '';
 		const hostId =
 			row.add.player.position === 'DEF'
-				? (ESPN_DEFENSE_IDS[row.add.player.team] ?? '')
+				? espnDefenseId(row.add.player.team)
 				: HOST_ID.test(board)
 					? board
 					: '';
@@ -500,13 +514,12 @@ function espnWaivers(position: string | null): WaiverAdvice {
 function nameOf(hostId: string | null): string {
 	const lines = waivers.rows.flatMap((row) => (row.drop ? [row.add, row.drop] : [row.add]));
 	// An ESPN add is named by his board id or his D/ST id (espnWaivers), a roster player by his host id.
-	const defense = Object.entries(ESPN_DEFENSE_IDS).find(([, id]) => id === hostId)?.[0];
 	return (
 		lines.find(
 			(line) =>
 				line.player.host_id === hostId ||
 				line.player.board_id === hostId ||
-				(defense !== undefined && line.player.position === 'DEF' && line.player.team === defense)
+				(line.player.position === 'DEF' && espnDefenseId(line.player.team) === hostId)
 		)?.player.name ?? ''
 	);
 }
@@ -589,6 +602,9 @@ async function bodyOf(req: IncomingMessage): Promise<unknown> {
 }
 const SYNC = /^\/leagues\/attached\/([^/]+)\/(sync|refresh)$/;
 const LEAGUE_ORDER = /^\/leagues\/attached\/([^/]+)\/order$/;
+/** The kickers' and defenses' week (Lane 66w), in a league and with none. */
+const LEAGUE_WEEK_ORDER = /^\/leagues\/attached\/([^/]+)\/order\/week$/;
+const WEEK_POSITION_WORDS = 'Pick a position: K or DEF';
 const DEFAULT_ORDER_ROWS = 100;
 const MIN_SEARCH = 2;
 
@@ -763,6 +779,19 @@ async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> 
 	}
 	if (url.pathname === '/order') {
 		send(req, res, HTTP.ok, orderAt(url.searchParams, false));
+		return;
+	}
+	const leagueWeek = LEAGUE_WEEK_ORDER.exec(url.pathname);
+	if (url.pathname === '/order/week' || leagueWeek) {
+		const position = weekPosition(url.searchParams);
+		if (position === null) {
+			send(req, res, HTTP.badRequest, WEEK_POSITION_WORDS, 'invalid');
+			return;
+		}
+		const id = leagueWeek?.[1] ?? null;
+		const league =
+			id === null ? null : { espn: ESPN_MOVES.has(id), moves: waivers.moves, readAt: readAt() };
+		send(req, res, HTTP.ok, weekOrderAnswer(weekOrders, position, league, now()));
 		return;
 	}
 	if (LEAGUE_ORDER.test(url.pathname)) {
