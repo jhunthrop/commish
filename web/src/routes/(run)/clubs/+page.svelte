@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { fixed, plural } from '#lib/format/number.ts';
-	import { clubsLead, hardestWords } from '#lib/run/strength-words.ts';
+	import { plural } from '#lib/format/number.ts';
+	import { clubsLead, hardestWords, strengthFigure } from '#lib/run/strength-words.ts';
 	import SiteShell from '#lib/site/SiteShell.svelte';
 	import { links } from '#lib/site/links.ts';
 	import Figure from '#lib/ui/Figure.svelte';
@@ -28,7 +28,7 @@
 						meta="{club.abbr} · bye week {club.bye ?? 'not set'}"
 					>
 						<Figure
-							value={fixed(club.slate.strength, 2)}
+							value={strengthFigure(club.slate.strength)}
 							size="md"
 							caption="{page.unit}, {hardestWords(club.slate.rank, page.clubs.length)}"
 						/>

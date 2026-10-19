@@ -5,6 +5,7 @@ from datetime import datetime
 from typing import Any, Final, Protocol
 
 from research.model.instants import js_iso
+from research.nightly.build.tenth import tenth
 from research.nightly.config import PAGE_FORMAT, TEAMS, RunFormat
 from research.nightly.reads import record as record_read
 from research.nightly.reads import schedule as schedule_read
@@ -134,7 +135,8 @@ def schedule_json(
                     {"week": g.week, "opponent": g.opponent, "home": g.home, "kickoff": iso(g.kickoff)}
                     for g in slate.games
                 ],
-                "strength": slate.strength,
+                # The tenth every screen prints, rounded once here; the rank is the unrounded mean's (X9).
+                "strength": tenth(slate.strength),
                 "rank": slate.rank,
                 "method": schedule_read.METHOD,
                 "window": window(*slate.window),

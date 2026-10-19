@@ -8,7 +8,8 @@
 		CLUB_FIGURE_CAPTION,
 		hardestFigure,
 		playedWords,
-		readWords
+		readWords,
+		strengthFigure
 	} from '#lib/run/strength-words.ts';
 	import SiteShell from '#lib/site/SiteShell.svelte';
 	import { links } from '#lib/site/links.ts';
@@ -87,7 +88,7 @@
 			{#snippet aside()}
 				<div class="figures">
 					<Figure
-						value={fixed(page.slate.strength, 2)}
+						value={strengthFigure(page.slate.strength)}
 						size="xl"
 						align="end"
 						phoneAlign="start"
