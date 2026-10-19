@@ -1,8 +1,16 @@
 // The record box score's words (Lane 66j fix round 1): run with `npm test`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { bannedPattern } from '#lib/format/copy-guard.ts';
 import {
+	HELD_OUT_METHOD,
 	RATE_PLACES_WORDS,
+	chartSeries,
+	chartTicks,
+	publishedDrawn,
+	recordBasis,
+	recordLead,
+	recordSources,
 	scaleWords,
 	figureWords,
 	gradedOrders,
@@ -11,7 +19,7 @@ import {
 	publishedWords,
 	recordHeadline
 } from './record.ts';
-import type { RecordWeek, RunRecord } from './schema.ts';
+import type { RecordLine, RecordWeek, RunRecord } from './schema.ts';
 
 const week = (n: number, order: RecordWeek['order'], status: RecordWeek['status']): RecordWeek => ({
 	week: n,
@@ -38,14 +46,88 @@ const record = (over: Partial<RunRecord>): RunRecord => ({
 	...over
 });
 
-void test('the published columns say from which week they count, as the register says', () => {
-	assert.match(
-		publishedWords(record({})),
-		/^Published is one provider's weekly projection, -- until our register first keeps it\.$/
+const SCORE = { graded: 10, agreement: 0.5, placesOff: 43, starters: 50, startersOf: 84 };
+const line = (published: boolean): RecordLine => ({
+	position: 'All',
+	ours: SCORE,
+	adp: { ...SCORE, agreement: 0.41 },
+	published: published ? { ...SCORE, agreement: 0.55 } : null,
+	oursOnPublished: published ? SCORE : null
+});
+const gradedWeek = (n: number, published: boolean): RecordWeek => ({
+	...week(n, 'preseason', 'graded'),
+	lines: [line(published)]
+});
+/** Six graded weeks with Published kept from week 7 and not yet graded: live's shape (Lane 82). */
+const beforePublished = record({
+	publishedFromWeek: 7,
+	weeks: [1, 2, 3, 4, 5, 6].map((n) => gradedWeek(n, false)),
+	toDate: [line(false)]
+});
+const withPublished = record({
+	publishedFromWeek: 7,
+	weeks: [...beforePublished.weeks, gradedWeek(7, true)],
+	toDate: [line(true)]
+});
+
+void test('Published is drawn only once a graded week carries it (the honest empty state)', () => {
+	assert.equal(publishedDrawn(record({})), false);
+	assert.equal(publishedDrawn(beforePublished), false);
+	assert.equal(publishedDrawn(withPublished), true);
+	assert.deepEqual(recordSources(beforePublished), ['ours', 'adp']);
+	assert.deepEqual(recordSources(withPublished), ['ours', 'adp', 'published']);
+	assert.deepEqual(Object.keys(chartSeries(beforePublished, 'All')), ['ours', 'adp']);
+	assert.equal(chartSeries(withPublished, 'All').published?.length, 1);
+});
+
+void test('the lead names only the orders drawn', () => {
+	assert.equal(
+		recordLead(beforePublished, 'PPR'),
+		'How the order we froze each week called its games, beside ADP, graded in PPR'
 	);
-	assert.match(
-		publishedWords(record({ publishedFromWeek: 7 })),
-		/^Published is one provider's weekly projection, graded from week 7, -- before\.$/
+	assert.equal(
+		recordLead(withPublished, 'PPR'),
+		'How the order we froze each week called its games, beside ADP and a published projection, graded in PPR'
+	);
+});
+
+void test('Published says when it starts until it is drawn, from publishedFromWeek', () => {
+	assert.equal(
+		publishedWords(beforePublished),
+		"Published, one provider's weekly projection, starts with week 7."
+	);
+	assert.equal(
+		publishedWords(record({})),
+		"Published, one provider's weekly projection, starts once our register keeps it."
+	);
+	assert.equal(
+		publishedWords(withPublished),
+		"Published is one provider's weekly projection, from week 7."
+	);
+});
+
+void test('the basis is the run method, the season-long rule, the starters and Published, no capture', () => {
+	const run = { ...beforePublished, startersBasis: 'Starters right counts the top 12 QBs.' };
+	assert.deepEqual(recordBasis(run), [
+		run.method,
+		HELD_OUT_METHOD,
+		'Starters right counts the top 12 QBs.',
+		"Published, one provider's weekly projection, starts with week 7."
+	]);
+	assert.equal(recordBasis(record({})).length, 3, 'no starters sentence before a grade');
+	assert.match(HELD_OUT_METHOD, /graded where the board froze\.$/u);
+	for (const sentence of [...recordBasis(beforePublished), ...recordBasis(withPublished)])
+		assert.doesNotMatch(sentence, bannedPattern());
+});
+
+void test('the chart axis prints as the rates print, 0.00 to 1.00, and reaches a week below zero', () => {
+	assert.deepEqual(
+		chartTicks([0.49, 0.38]).map((t) => t.label),
+		['0.00', '0.25', '0.50', '0.75', '1.00']
+	);
+	assert.deepEqual(
+		chartTicks([-0.09, 0.2]).map((t) => t.label),
+		['-0.25', '0.00', '0.25', '0.50', '0.75', '1.00']
 	);
 });
 

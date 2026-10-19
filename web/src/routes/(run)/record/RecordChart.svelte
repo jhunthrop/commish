@@ -1,28 +1,37 @@
 <script lang="ts">
-	import { RECORD_BOX, RECORD_SOURCES, type RecordSource } from '#lib/run/record.ts';
+	import {
+		RECORD_BOX,
+		RECORD_SOURCES,
+		chartTicks,
+		type ChartSeries,
+		type RecordSource
+	} from '#lib/run/record.ts';
 
-	/** Order matched by week (Lane 66j): one line per order over the season's weeks, the graded weeks
-	 * drawn, each line named at its end. The table above holds every figure; this draws them. */
+	/** Order matched by week (Lane 66j): one line per order drawn over the season's weeks, the graded
+	 * weeks drawn, each line named at its end. The table above holds every figure; this draws them. */
 	interface Props {
-		series: Record<RecordSource, { week: number; value: number }[]>;
+		series: ChartSeries;
 		/** The season's last week, the axis's end. */
 		weeks: number;
 	}
 
 	let { series, weeks }: Props = $props();
 
-	const WIDTH = 860;
+	/** The drawing's width before the page has laid out, and its widest: a wide screen's column. */
+	const WIDE = 860;
 	const HEIGHT = 230;
-	const PAD = { left: 40, right: 104, top: 14, bottom: 28 };
-	/** The axis runs from 0 (or the lowest week below it) to 0.8 (or the highest week above it), in
-	 * steps of 0.2, so no week is drawn clamped (review 66j L12). */
-	const STEP = 0.2;
-	const values = $derived(RECORD_SOURCES.flatMap((source) => series[source].map((p) => p.value)));
-	const BOTTOM = $derived(Math.floor(Math.min(0, ...values) / STEP) * STEP);
-	const TOP = $derived(Math.ceil(Math.max(0.8, ...values) / STEP) * STEP);
-	const TICKS = $derived(
-		Array.from({ length: Math.round((TOP - BOTTOM) / STEP) + 1 }, (_, i) => BOTTOM + i * STEP)
+	const PAD = { left: 44, right: 72, top: 14, bottom: 28 };
+	/** The drawing is sized to its column (Lane 82), so a phone's labels print at their own size. */
+	let measured = $state(0);
+	const width = $derived(measured > 0 ? Math.min(WIDE, measured) : WIDE);
+	const drawnSources = $derived(
+		RECORD_SOURCES.filter((source) => (series[source]?.length ?? 0) > 0)
 	);
+	const ticks = $derived(
+		chartTicks(drawnSources.flatMap((source) => (series[source] ?? []).map((p) => p.value)))
+	);
+	const bottom = $derived(ticks.at(0)?.value ?? 0);
+	const top = $derived(ticks.at(-1)?.value ?? 1);
 	/** How far apart two line names stand where their lines end close together. */
 	const LABEL_GAP = 15;
 	const NAMES: Record<RecordSource, string> = {
@@ -32,13 +41,13 @@
 	};
 
 	const x = (week: number): number =>
-		PAD.left + ((week - 1) * (WIDTH - PAD.left - PAD.right)) / Math.max(1, weeks - 1);
+		PAD.left + ((week - 1) * (width - PAD.left - PAD.right)) / Math.max(1, weeks - 1);
 	const y = (value: number): number =>
-		PAD.top + (1 - (value - BOTTOM) / (TOP - BOTTOM)) * (HEIGHT - PAD.top - PAD.bottom);
+		PAD.top + (1 - (value - bottom) / (top - bottom)) * (HEIGHT - PAD.top - PAD.bottom);
 
 	const drawn = $derived.by(() => {
-		const ends = RECORD_SOURCES.filter((source) => series[source].length > 0)
-			.map((source) => ({ source, points: series[source] }))
+		const ends = drawnSources
+			.map((source) => ({ source, points: series[source] ?? [] }))
 			.sort((a, b) => y(a.points.at(-1)?.value ?? 0) - y(b.points.at(-1)?.value ?? 0));
 		const placed: number[] = [];
 		return ends.map(({ source, points }) => {
@@ -57,12 +66,19 @@
 	});
 </script>
 
-<figure class="chart">
+<figure class="chart" bind:clientWidth={measured}>
 	<figcaption>{RECORD_BOX.chart}</figcaption>
-	<svg viewBox="0 0 {WIDTH} {HEIGHT}" role="img" aria-label={RECORD_BOX.chart}>
-		{#each TICKS as tick (tick)}
-			<line class="grid" x1={PAD.left} x2={WIDTH - PAD.right} y1={y(tick)} y2={y(tick)} />
-			<text class="axis" x={PAD.left - 8} y={y(tick) + 4} text-anchor="end">{tick.toFixed(1)}</text>
+	<svg viewBox="0 0 {width} {HEIGHT}" role="img" aria-label={RECORD_BOX.chart}>
+		{#each ticks as tick (tick.value)}
+			<line
+				class="grid"
+				x1={PAD.left}
+				x2={width - PAD.right}
+				y1={y(tick.value)}
+				y2={y(tick.value)}
+			/>
+			<text class="axis" x={PAD.left - 8} y={y(tick.value) + 4} text-anchor="end">{tick.label}</text
+			>
 		{/each}
 		{#each Array.from({ length: weeks }, (_, i) => i + 1) as week (week)}
 			<text class="axis" x={x(week)} y={HEIGHT - 8} text-anchor="middle">{week}</text>
@@ -151,18 +167,5 @@
 	.published circle,
 	.published text {
 		fill: var(--ink);
-	}
-
-	/* On a phone the chart keeps its drawing at a readable size, at least 200 px tall, and scrolls
-	   inside its own box (the coordinator's ruling 3). */
-	@media (max-width: 760px) {
-		.chart {
-			overflow-x: auto;
-		}
-
-		svg {
-			width: 780px;
-			max-width: none;
-		}
 	}
 </style>

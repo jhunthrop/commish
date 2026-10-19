@@ -47,7 +47,7 @@ export function rankAgreement(record: RunRecord): string {
 
 /** A rate (order matched) prints the run's two decimals, the one figure not to a tenth (ruling R2),
  * said once with the run's scale (scaleWords). */
-const RATE_PLACES = 2;
+export const RATE_PLACES = 2;
 export const RATE_PLACES_WORDS = 'Rates print to two decimals.';
 
 /** The rank agreement's scale and its two decimals, said once on a page that prints the figure: the
@@ -228,13 +228,46 @@ export function publishedBeside(
 	};
 }
 
-/** The published projection's columns' basis: from which week it counts, as the register says. */
+/** Whether the record draws the published projection: once a graded week carries it, so the season to
+ * date does (Lane 82, the honest empty state: no column, no figure, no line before). The nightly names
+ * Published in its method by the same rule (research/nightly/reads/record.py method). */
+export function publishedDrawn(record: RunRecord): boolean {
+	return record.toDate.some((line) => line.published !== null);
+}
+
+/** The orders the record draws, ours first: Published only once drawn. */
+export function recordSources(record: RunRecord): readonly RecordSource[] {
+	return publishedDrawn(record) ? RECORD_SOURCES : RECORD_SOURCES.filter((s) => s !== 'published');
+}
+
+/** The page's lead, naming only the orders drawn. */
+export function recordLead(record: RunRecord, scoring: string): string {
+	const beside = publishedDrawn(record) ? 'ADP and a published projection' : 'ADP';
+	return `How the order we froze each week called its games, beside ${beside}, graded in ${scoring}`;
+}
+
+/** The published projection's basis from the week the register first keeps it: when it starts until a
+ * graded week carries it, and from which week it counts once drawn. */
 export function publishedWords(record: RunRecord): string {
-	const from =
-		record.publishedFromWeek === null
-			? `${RECORD_BOX.none} until our register first keeps it`
-			: `graded from week ${String(record.publishedFromWeek)}, ${RECORD_BOX.none} before`;
-	return `Published is one provider's weekly projection, ${from}.`;
+	const from = record.publishedFromWeek;
+	if (from !== null && publishedDrawn(record))
+		return `Published is one provider's weekly projection, from week ${String(from)}.`;
+	return from === null
+		? "Published, one provider's weekly projection, starts once our register keeps it."
+		: `Published, one provider's weekly projection, starts with week ${String(from)}.`;
+}
+
+/** A frozen board grades a player moved to a season-long list where it froze (the record's held-out
+ * rule): no figure on the record reads the hourly capture, so its read time is not said here. */
+export const HELD_OUT_METHOD =
+	'A player moved to a season-long list is graded where the board froze.';
+
+/** The record's basis, one paragraph's sentences: the run's method, the season-long rule, what the
+ * starters figure counts (once a week is graded) and Published's start. */
+export function recordBasis(record: RunRecord): string[] {
+	return [record.method, HELD_OUT_METHOD, record.startersBasis, publishedWords(record)].filter(
+		(text): text is string => text !== null && text !== ''
+	);
 }
 
 /** The order a week graded, in the record's words (review 66j M7). */
@@ -252,23 +285,44 @@ export function gradedOrders(record: RunRecord): string {
 		.join(', then ');
 }
 
-/** The chart's three series: each graded week's order matched for one position, in week order. */
-export function chartSeries(
-	record: RunRecord,
-	position: RecordLine['position']
-): Record<RecordSource, { week: number; value: number }[]> {
-	const out: Record<RecordSource, { week: number; value: number }[]> = {
-		ours: [],
-		adp: [],
-		published: []
-	};
-	for (const week of record.weeks) {
-		if (week.status !== 'graded') continue;
-		const line = week.lines.find((l) => l.position === position);
-		for (const source of RECORD_SOURCES) {
-			const value = scoreOf(line, source)?.agreement;
-			if (value !== null && value !== undefined) out[source].push({ week: week.week, value });
-		}
-	}
-	return out;
+/** A point of the chart: a graded week's order matched. */
+export interface ChartPoint {
+	week: number;
+	value: number;
+}
+
+/** One line per order drawn. */
+export type ChartSeries = Partial<Record<RecordSource, ChartPoint[]>>;
+
+/** The chart's series: each graded week's order matched for one position, in week order, for the
+ * orders the record draws. */
+export function chartSeries(record: RunRecord, position: RecordLine['position']): ChartSeries {
+	const sources = recordSources(record);
+	const graded = record.weeks.filter((week) => week.status === 'graded');
+	return Object.fromEntries(
+		sources.map((source) => [
+			source,
+			graded.flatMap((week) => {
+				const value = scoreOf(
+					week.lines.find((l) => l.position === position),
+					source
+				)?.agreement;
+				return value === null || value === undefined ? [] : [{ week: week.week, value }];
+			})
+		])
+	);
+}
+
+/** The chart's axis steps, a quarter apart. */
+const AXIS_STEP = 0.25;
+
+/** The chart's axis: 0.00 to 1.00 printed as the rates print, reaching a quarter lower for a week
+ * below zero, so no week is drawn clamped (review 66j L12). */
+export function chartTicks(values: readonly number[]): { value: number; label: string }[] {
+	const bottom = Math.floor(Math.min(0, ...values) / AXIS_STEP);
+	const top = Math.ceil(Math.max(1, ...values) / AXIS_STEP);
+	return Array.from({ length: top - bottom + 1 }, (_, i) => {
+		const value = (bottom + i) * AXIS_STEP;
+		return { value, label: printPlaces(value, RATE_PLACES) };
+	});
 }
