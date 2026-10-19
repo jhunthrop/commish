@@ -42,7 +42,7 @@ import { inSeason, noWeek } from './member-week.ts';
 import { inTenths } from './tenths.ts';
 import { FIXTURE_CLOCK_VARIABLE, fixtureClock } from './clock.ts';
 import { stamped } from './game-state.ts';
-import { orderAtClock, playerRest } from './rest-now.ts';
+import { orderAtClock, playerRest, runRest, type RunRow, type RunSlate } from './rest-now.ts';
 import {
 	espnDefenseId,
 	weekOrderAnswer,
@@ -437,11 +437,20 @@ const LEAGUE_PLAYER = /^\/leagues\/attached\/([^/]+)\/players\/([^/]+)$/;
 /** Each player's club and position from the built site's run (web/.runs, npm run standin), so the
  * league read places a player no recorded screen carries, as the API's board does. */
 const RUNS = new URL('../../.runs/runs/', import.meta.url);
+/** The run: the stand-in's latest, or FIXTURE_RUN_ID's (the Saturday run, saturday-run.ts). */
+const RUN_ID = await (async (): Promise<string | null> => {
+	const named = process.env.FIXTURE_RUN_ID;
+	if (named !== undefined && named !== '') return named;
+	try {
+		return (JSON.parse(await readFile(new URL('latest.json', RUNS), 'utf8')) as { runId: string })
+			.runId;
+	} catch {
+		return null;
+	}
+})();
 const runIndex = await (async (): Promise<Map<string, { team: string; position: string }>> => {
 	try {
-		const { runId } = JSON.parse(await readFile(new URL('latest.json', RUNS), 'utf8')) as {
-			runId: string;
-		};
+		const runId = RUN_ID ?? '';
 		const entries = JSON.parse(await readFile(new URL(`${runId}/index.json`, RUNS), 'utf8')) as {
 			id: string;
 			team: string;
@@ -452,6 +461,46 @@ const runIndex = await (async (): Promise<Map<string, { team: string; position: 
 		return new Map();
 	}
 })();
+/** The run's in-season rows and schedule, for the player read's rest of season (Lane 86): none on
+ * a preseason run. */
+const runRead = await (async (): Promise<{
+	rows: Map<string, RunRow>;
+	run: { fromWeek: number; at: number; slates: RunSlate[] };
+} | null> => {
+	try {
+		const dir = new URL(`${RUN_ID ?? ''}/`, RUNS);
+		const manifest = JSON.parse(await readFile(new URL('manifest.json', dir), 'utf8')) as {
+			formats: { id: string; rosFromWeek?: number; refreshedAt?: string }[];
+		};
+		const lead = manifest.formats[0];
+		if (lead?.rosFromWeek === undefined || lead.refreshedAt === undefined) return null;
+		const board = JSON.parse(await readFile(new URL(`boards/${lead.id}.json`, dir), 'utf8')) as {
+			rows: { id: string; team: string; projected: number | null }[];
+		};
+		const schedule = JSON.parse(await readFile(new URL('schedule.json', dir), 'utf8')) as {
+			slates: RunSlate[];
+		};
+		const rows = new Map(
+			board.rows.flatMap((r): [string, RunRow][] =>
+				r.projected === null ? [] : [[r.id, { team: r.team, projected: r.projected }]]
+			)
+		);
+		return {
+			rows,
+			run: { fromWeek: lead.rosFromWeek, at: Date.parse(lead.refreshedAt), slates: schedule.slates }
+		};
+	} catch {
+		return null;
+	}
+})();
+
+/** The player read's rest of season at the clock: his order row's, else the run's. */
+function restAtClock(id: string): ReturnType<typeof playerRest> {
+	const fromOrder = playerRest(order.rows, id, now());
+	if (fromOrder.rest_of_season_points !== undefined) return fromOrder;
+	const row = runRead?.rows.get(id);
+	return row === undefined || runRead === null ? {} : runRest(row, runRead.run, now());
+}
 const PUBLIC_PLAYER = /^\/players\/([^/]+)\/week$/;
 const MOVES = /^\/leagues\/attached\/([^/]+)\/moves(\/plan)?$/;
 
@@ -663,7 +712,7 @@ const MIN_SEARCH = 2;
  * position in order.json's order; a search's letters in the name or club;
  * the limit. Without a league the rows carry no roster and no move, and no read. */
 function orderAt(params: URLSearchParams, league: boolean): OrderAdvice {
-	// Each total over his club's games still to play at the clock (Lane 86, rest-now.ts).
+	// Each total over his club's games left at the clock (Lane 86, rest-now.ts).
 	const live = orderAtClock(order, now());
 	const position = params.get('position');
 	const q = (params.get('q') ?? '').trim().toLowerCase();
@@ -885,7 +934,7 @@ async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> 
 		const id = publicPlayer[1] ?? '';
 		const week = playerWeek(recorded, id, runIndex.get(id) ?? null, false);
 		if (week === null) send(req, res, HTTP.notFound, 'Nothing here by that id', 'not_found');
-		else send(req, res, HTTP.ok, { ...week, ...playerRest(order.rows, id, now()) });
+		else send(req, res, HTTP.ok, { ...week, ...restAtClock(id) });
 		return;
 	}
 	const leaguePlayer = LEAGUE_PLAYER.exec(url.pathname);
@@ -903,7 +952,7 @@ async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> 
 			ESPN_MOVES.has(leaguePlayer[1] ?? '')
 		);
 		if (week === null) send(req, res, HTTP.notFound, 'Nothing here by that id', 'not_found');
-		else send(req, res, HTTP.ok, { ...week, ...playerRest(order.rows, id, now()) });
+		else send(req, res, HTTP.ok, { ...week, ...restAtClock(id) });
 		return;
 	}
 	const inSeason = IN_SEASON.exec(url.pathname);

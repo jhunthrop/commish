@@ -38,12 +38,12 @@ export function restOfRow(
 	return { points: roundTenth(points - perGame), fromWeek };
 }
 
-/** "from week 7", or "from week 6's games still to play" (words.go restFromWords). */
+/** "from week 7", or "from week 6's games left" (words.go restFromWords). */
 function restFromWords(week: number, partial: boolean): string {
-	return partial ? `from week ${String(week)}'s games still to play` : `from week ${String(week)}`;
+	return partial ? `from week ${String(week)}'s games left` : `from week ${String(week)}`;
 }
 
-/** The order at `now`: each row's total over his club's games still to play, the order's first week
+/** The order at `now`: each row's total over his club's games left, the order's first week
  * and its line said as the API says them. */
 export function orderAtClock(order: OrderAdvice, now: number): OrderAdvice {
 	const rows = order.rows.map((row) => ({
@@ -58,6 +58,55 @@ export function orderAtClock(order: OrderAdvice, now: number): OrderAdvice {
 		`Our rest-of-season order ${restFromWords(fromWeek, partial)}.`
 	);
 	return { ...order, basis, from_week: fromWeek, rows };
+}
+
+/** One club's games in the run's schedule.json. */
+export interface RunSlate {
+	abbr: string;
+	games: { week: number; opponent: string | null; kickoff: string | null }[];
+}
+
+/** The run's in-season row for a player: his points and his club. */
+export interface RunRow {
+	team: string;
+	projected: number;
+}
+
+const LAST_WEEK = 17;
+
+/** A club's weeks from `from` through week 17 whose game is upcoming at `at` by the API's rule. */
+function weeksToPlay(slate: RunSlate, from: number, at: number): number[] {
+	return slate.games
+		.filter(
+			(g) =>
+				g.week >= from &&
+				g.week <= LAST_WEEK &&
+				g.kickoff !== null &&
+				stateAt(
+					{ played: false, kickoff: g.kickoff, team: slate.abbr, opponent: g.opponent },
+					at
+				) === 'upcoming'
+		)
+		.map((g) => g.week);
+}
+
+/** The player read's rest of season from the run the site was built from, as the API's RestAt and
+ * LiveBoard take it: the run's points a game (over his club's games still to play at the run) times
+ * his club's games still to play at `now`, and his club's first of them. */
+export function runRest(
+	row: RunRow,
+	run: { fromWeek: number; at: number; slates: readonly RunSlate[] },
+	now: number
+): { rest_of_season_points?: number; rest_from_week?: number } {
+	const slate = run.slates.find((s) => s.abbr === row.team);
+	if (slate === undefined) return {};
+	const atRun = weeksToPlay(slate, run.fromWeek, run.at).length;
+	const left = weeksToPlay(slate, run.fromWeek, now);
+	if (atRun === 0) return {};
+	const points = roundTenth((row.projected * left.length) / atRun);
+	return left[0] === undefined
+		? { rest_of_season_points: points }
+		: { rest_of_season_points: points, rest_from_week: left[0] };
 }
 
 /** The player read's rest of season at `now` (rest_of_season_points, rest_from_week): his order
