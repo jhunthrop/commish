@@ -16,7 +16,7 @@ func TestRowFiguresLeaveAsTheTenth(t *testing.T) {
 		t.Fatalf("avg %v last %v, want 9.5 and 1.2", orNone(avg), orNone(last))
 	}
 	side := &leaguesync.Side{Starters: []string{"h1"}, PlayerPoints: map[string]float64{"h1": 10.35}}
-	if got := thisWeek(side, "h1", Facts{Locked: true}); got == nil || *got != 10.4 {
+	if got := thisWeek(leaguesync.HostSleeper, side, "h1", Facts{Locked: true}); got == nil || *got != 10.4 {
 		t.Fatalf("points this week %v, want 10.4", orNone(got))
 	}
 	facts := wireFacts(Facts{LastGames: []GamePoints{{Week: 5, Points: 0.25}}}, nil)

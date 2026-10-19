@@ -65,13 +65,19 @@ func (p players) roster(t Team) []apitypes.RosterSpot {
 	return out
 }
 
-func (p players) side(s Side) apitypes.MatchupSide {
+func (p players) side(host string, s Side) apitypes.MatchupSide {
 	// The host's cents, rounded once by the site's rule to the tenth the
 	// Matchup screen prints (Lane 66k rereview N1).
 	out := apitypes.MatchupSide{RosterId: s.RosterID, Points: tenth.Round(round2(s.Points)), PointsRead: !s.PointsUnread,
+		PlayerPoints: GivesPlayerPoints(host, &s), TeamTotal: SendsTeamTotal(host),
 		Starters: make([]apitypes.MatchupStarter, 0, len(s.Starters))}
 	for _, id := range s.Starters {
-		out.Starters = append(out.Starters, apitypes.MatchupStarter{Player: p.player(id), Points: tenth.Round(round2(s.PlayerPoints[id]))})
+		st := apitypes.MatchupStarter{Player: p.player(id)}
+		if v, ok := StarterPoints(host, &s, id); ok {
+			pts := tenth.Round(round2(v))
+			st.Points = &pts
+		}
+		out.Starters = append(out.Starters, st)
 	}
 	return out
 }
@@ -91,13 +97,13 @@ func (p players) matchup(snap Snapshot, roster int) *apitypes.LeagueMatchup {
 	if mine == nil {
 		return nil
 	}
-	out := &apitypes.LeagueMatchup{Week: snap.Week, Mine: p.side(*mine)}
+	out := &apitypes.LeagueMatchup{Week: snap.Week, Mine: p.side(snap.Ref.Host, *mine)}
 	if mine.Game == 0 {
 		return out
 	}
 	for _, s := range snap.Matchups {
 		if s.Game == mine.Game && s.RosterID != roster {
-			opp := p.side(s)
+			opp := p.side(snap.Ref.Host, s)
 			out.Opponent = &opp
 			break
 		}

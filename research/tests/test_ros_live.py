@@ -24,7 +24,7 @@ from research.nightly.build.player_season import SCORING
 from research.nightly.build.ros import RosBasis, carried
 from research.nightly.build.season import format_json, month_day
 from research.nightly.config import RUN_FORMATS
-from research.nightly.reads.record import METHOD
+from research.nightly.reads.record import method
 
 _SERVED = {"ppr": 200.0, "half": 170.0, "std": 140.0}
 
@@ -81,7 +81,7 @@ def test_the_one_shot_fit_still_refuses_any_number_off_the_judged_record() -> No
 
 
 def test_the_record_says_it_grades_the_preseason_board() -> None:
-    assert METHOD.startswith("Each week our preseason board froze ")
+    assert method(()).startswith("Each week our preseason board froze ")
 
 
 def test_the_players_input_stops_at_the_lines_and_ranks_from_the_window() -> None:

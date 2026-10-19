@@ -27,22 +27,33 @@ export interface SideBox {
 	lines: PlayerLine[];
 	/** The host gives each player's points for the side. */
 	byPlayer: boolean;
+	/** The platform sends the side's own total: the bug and the Totals row print it. */
+	teamTotal: boolean;
 }
 
-/** What a side's box reads besides its rows: whether its starters have any points (the league read's
- * own sign, for a side without the API's rows), the host's total for it as the screen shows it,
- * whether the week's projection has landed, the week, and the instant the box is drawn at, in ms. */
+/** What a side's box reads besides its rows: the host's total for it as the screen shows it, whether
+ * the week's projection has landed, the week, and the instant the box is drawn at, in ms. */
 export interface SideRead {
-	scored: boolean;
 	hostTotal: number | null;
 	landed: boolean;
 	week: number;
 	now: number;
 }
 
+/** A side's score, the one figure the score bug and the Matchup's Totals row both print (ruling (a),
+ * Lane 79): the platform's own total where it sends one or gives no player's points, else the printed
+ * rows added (Sleeper, MFL). */
+export function sideScore(
+	rows: readonly Pick<BoxRow, 'pts'>[],
+	side: { player_points: boolean; team_total: boolean },
+	hostTotal: number | null
+): number | null {
+	return totalsPts(rows, side.player_points && !side.team_total, hostTotal);
+}
+
 /** A side's box: the API's rows when it answered for the side, else the league read's starters with
- * their points so far when the host gives them. Totals' Pts follow totalsPts, the one rule both
- * screens share. */
+ * their points so far when the host gives them. Totals' Pts is the side's score (sideScore), the bug's
+ * figure too. */
 export function sideBox(
 	side: MatchupSide,
 	box: MatchupBoxSide | null,
@@ -59,23 +70,25 @@ export function sideBox(
 			bench: box.bench.map((line) => boxRow(line, '', zone, true, read.now)),
 			totals: {
 				proj: projTotal(rows),
-				pts: totalsPts(rows, box.player_points, read.hostTotal),
+				pts: sideScore(rows, box, read.hostTotal),
 				note: totalsNote(rows, read.landed, read.week)
 			},
 			lines: [...box.starters.map((s) => s.line), ...box.bench],
-			byPlayer: box.player_points
+			byPlayer: box.player_points,
+			teamTotal: box.team_total
 		};
 	}
 	const starters = side.starters.map((s) => ({
-		row: hostRow(s.player, positionWord(s.player.position), read.scored ? s.points : null)
+		row: hostRow(s.player, positionWord(s.player.position), side.player_points ? s.points : null)
 	}));
 	const rows = starters.map((s) => s.row);
 	return {
 		starters,
 		bench: [],
-		totals: { proj: null, pts: totalsPts(rows, read.scored, read.hostTotal), note: null },
+		totals: { proj: null, pts: sideScore(rows, side, read.hostTotal), note: null },
 		lines: [],
-		byPlayer: read.scored
+		byPlayer: side.player_points,
+		teamTotal: side.team_total
 	};
 }
 

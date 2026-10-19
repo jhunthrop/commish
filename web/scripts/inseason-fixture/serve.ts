@@ -35,7 +35,9 @@ import { FIXTURE_IDS } from './ids.ts';
 import { playerWeek, type Sheet } from './player-week.ts';
 import { lineupProj, seasonStrength } from './week.ts';
 import { FIXTURE_SEASON, askedPhase, phaseAccount, phaseLeagues, phaseSync } from './phases.ts';
-import { ESPN_STAND_IN_NAME, espnSync } from './espn-sync.ts';
+import { ESPN_STAND_IN_NAME, espnMatchup, espnSync } from './espn-sync.ts';
+import { yahooStandIn } from './yahoo.ts';
+import { SUNDAY, sundayOf } from './sunday.ts';
 import { inSeason, noWeek } from './member-week.ts';
 import { inTenths } from './tenths.ts';
 import { FIXTURE_CLOCK_VARIABLE, fixtureClock } from './clock.ts';
@@ -474,27 +476,56 @@ function planSentence(): string {
 	return `Start ${joined}, on ESPN now.`;
 }
 
-/** A line as ESPN gives it: no player's points, only the team's (inseason thisWeek). */
-const noPlayerPoints = (line: PlayerLine): PlayerLine => ({
-	...line,
-	facts: { ...line.facts, points_this_week: null }
-});
-
-/** The ESPN league's lineup: the move open, the verb ESPN's lineup page, and ESPN's team total in
- * place of each player's points (Lane 66t: its Pts sentence must fit the phone's basis too). */
+/** The ESPN league's lineup: the move open and the verb ESPN's lineup page. ESPN gives each player's
+ * points for the week (Lane 79), so the lines keep the recorded league's. */
 function espnLineup(): LineupAdvice {
 	return {
 		...lineup,
-		player_points: false,
-		slots: lineup.slots.map((s) => ({
-			...s,
-			ours: noPlayerPoints(s.ours),
-			host: s.host === null ? null : noPlayerPoints(s.host)
-		})),
-		bench: lineup.bench.map(noPlayerPoints),
 		host_lineup_url: ESPN_LINEUP_URL,
 		moves: { lineup: 'available', note: null, takes_writes: true, writes_on: true, reason: null }
 	};
+}
+
+/** The leagues on their Sunday afternoon (sunday.ts), for a browser that asks for the Sunday with
+ * the fixture_week cookie: points by player where the platform gives them, totals the platform's,
+ * the Lineup advised with the kicked-off players locked, read at the Sunday. */
+const sleeperOnSunday = sundayOf({ sync, lineup, matchup: matchupBox, scoreboardLive });
+const espnOnSunday = sundayOf({
+	sync: espnSync(sync),
+	lineup: espnLineup(),
+	matchup: espnMatchup(matchupBox),
+	scoreboardLive
+});
+const SUNDAY_WEEK = /(?:^|; )fixture_week=sunday(?:;|$)/;
+/** The recorded league as a Yahoo league's (yahoo.ts), for a browser that asks with the
+ * fixture_platform cookie: team totals alone, so its Pts sentence keeps a shot, on the week's
+ * Saturday or its Sunday. */
+const yahooWeek = yahooStandIn({ sync, lineup, matchup: matchupBox });
+const yahooOnSunday = yahooStandIn(sleeperOnSunday);
+const YAHOO_PLATFORM = /(?:^|; )fixture_platform=yahoo(?:;|$)/;
+/** The request asks for the recorded league as Yahoo's. */
+const yahooAsked = (req: IncomingMessage, id: string): boolean =>
+	id === LEAGUE && YAHOO_PLATFORM.test(req.headers.cookie ?? '');
+
+/** A stand-in's answers and when they were read. */
+interface StandIn {
+	sync: LeagueSync;
+	lineup: LineupAdvice;
+	matchup: MatchupBox;
+	scoreboard: Scoreboard;
+	readAt: string;
+}
+
+/** The stand-in a request asks for by its cookies, null for the recorded answers: an ESPN league or
+ * the recorded league on the Sunday, the recorded league as Yahoo's on either day. */
+function standInAsked(req: IncomingMessage, id: string): StandIn | null {
+	const sunday = SUNDAY_WEEK.test(req.headers.cookie ?? '');
+	const live = { scoreboard: scoreboardLive, readAt: SUNDAY };
+	if (yahooAsked(req, id))
+		return sunday ? { ...yahooOnSunday, ...live } : { ...yahooWeek, scoreboard, readAt: readAt() };
+	if (!sunday) return null;
+	if (ESPN_MOVES.has(id)) return { ...espnOnSunday, ...live };
+	return id === LEAGUE ? { ...sleeperOnSunday, ...live } : null;
 }
 
 /** The shape of a host id the claim route takes (api hostmoves checkClaim). */
@@ -691,12 +722,20 @@ async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> 
 		const espn = /(?:^|; )fixture_league=espn(?:;|$)/.test(req.headers.cookie ?? '')
 			? { ...contextLeague, id: ESPN_DONE, host: 'espn' as const }
 			: null;
-		send(
-			req,
-			res,
-			HTTP.ok,
-			espn ? { ...answer, league: espn } : picked ? { ...answer, league: picked } : answer
-		);
+		const chosenAnswer = espn
+			? { ...answer, league: espn }
+			: picked
+				? { ...answer, league: picked }
+				: answer;
+		// The recorded league as Yahoo's (yahoo.ts): the account names it on its platform too.
+		const yahoo = yahooAsked(req, LEAGUE);
+		const onPlatform = <T extends { id: string; host: string }>(league: T): T =>
+			yahoo && league.id === LEAGUE ? { ...league, host: 'yahoo' } : league;
+		send(req, res, HTTP.ok, {
+			...chosenAnswer,
+			league: chosenAnswer.league === null ? null : onPlatform(chosenAnswer.league),
+			leagues: chosenAnswer.leagues.map(onPlatform)
+		});
 		return;
 	}
 	// The fixture's own clock, for a shots script to check before it shoots (Lane 66x): the instant
@@ -756,7 +795,7 @@ async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> 
 				const league = phased.get(id) ?? { ...contextLeague, name: sync.name };
 				return {
 					id,
-					host: ESPN_MOVES.has(id) ? 'espn' : sync.host,
+					host: ESPN_MOVES.has(id) ? 'espn' : yahooAsked(req, id) ? 'yahoo' : sync.host,
 					host_league_id: sync.host_league_id,
 					season: sync.season,
 					name: league.name,
@@ -778,6 +817,15 @@ async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> 
 	const synced = SYNC.exec(url.pathname);
 	if (synced) {
 		const asked = synced[1] ?? '';
+		const standIn = standInAsked(req, asked);
+		if (standIn) {
+			send(req, res, HTTP.ok, {
+				...phaseSync(standIn.sync, asked),
+				id: asked,
+				read_at: standIn.readAt
+			});
+			return;
+		}
 		send(req, res, HTTP.ok, {
 			...phaseSync(ESPN_MOVES.has(asked) ? espnSync(sync) : sync, asked),
 			id: synced[1],
@@ -865,9 +913,14 @@ async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> 
 			return;
 		}
 		if (id === SLOW) await new Promise((resolve) => setTimeout(resolve, HOLD_MS));
+		const standIn = standInAsked(req, id ?? '');
+		if (standIn && (route === 'lineup' || route === 'matchup' || route === 'scoreboard')) {
+			send(req, res, HTTP.ok, { ...standIn[route], read_at: standIn.readAt });
+			return;
+		}
 		const bodies = {
 			lineup: ESPN_MOVES.has(id ?? '') ? espnLineup() : lineup,
-			matchup: matchupBox,
+			matchup: ESPN_MOVES.has(id ?? '') ? espnMatchup(matchupBox) : matchupBox,
 			// The ESPN leagues show the week on its Sunday afternoon, a stand-in (league.ts): the
 			// points are made up so the board's played states can be drawn.
 			scoreboard: ESPN_MOVES.has(id ?? '') ? scoreboardLive : scoreboard,

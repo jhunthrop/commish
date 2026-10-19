@@ -402,7 +402,7 @@ export function tradeBasis(
 					...said(OPP_PART),
 					// The opened rows' Game cell draws its figures at a desk only.
 					...said(gamePart(lines, clock, now, 'read'), false),
-					...said(ptsPart(advice.player_points, host), false),
+					...said(ptsPart(advice.player_points, host, 'rows'), false),
 					...uncountedParts(advice, hrefs.rules)
 				]
 			: [];

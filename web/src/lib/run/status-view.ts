@@ -64,10 +64,6 @@ export function weekNote(status: PlayerStatus['status']): string {
 	return `${designationWord(status)} on the latest report, which does not move his place on our board.`;
 }
 
-/** The record's method words beside the capture's: the frozen boards it grades never moved anyone. */
-export const HELD_OUT_METHOD =
-	'A player moved to a season-long list is graded where the board froze.';
-
 /** The clock a page is built on: the NFL's, until the member's own is known in the browser. */
 export const BUILT_ZONE = 'America/New_York';
 
@@ -107,9 +103,4 @@ export function playerStatusWords(status: PlayerStatus, saying: Saying): PlayerS
 	const view = statusView(status, saying);
 	const capture = captureLine(saying.capture, saying.now, saying.zone);
 	return { view, note: `${view.line ?? weekNote(status.status)} ${capture}` };
-}
-
-/** The record's method words beside the capture's read. */
-export function recordStatusWords(saying: Saying): string {
-	return `${captureLine(saying.capture, saying.now, saying.zone)} ${HELD_OUT_METHOD}`;
 }
