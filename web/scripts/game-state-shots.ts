@@ -429,6 +429,64 @@ for (const screen of SCREENS.filter((s) => s.set === set)) {
 		}
 	}
 }
+/** A lagging read (Lane 85 fix round 2, H-A): on Sunday the API's kicked-off games are rewritten to
+ * upcoming on the wire, so only the page's clock is past their kickoffs. The one rule (lineState)
+ * still reads them kicked off: the board's rows say Kicked off and the basis says when Final and the
+ * stats land. The week tab's sections are held by the same rule in its unit test (order/week.test.ts),
+ * the stand-in run carrying no kickers' board to shoot. */
+const LAGGING: readonly {
+	set: 'contract' | 'standin';
+	name: string;
+	path: string;
+	ready: string;
+	section: boolean;
+}[] = [
+	{
+		set: 'contract',
+		name: 'board-rb',
+		path: '/board/ppr-12/rb',
+		ready: 'Our rest-of-season order',
+		section: false
+	}
+];
+for (const lag of day === 'sunday' ? LAGGING.filter((l) => l.set === set) : []) {
+	const ctx = await context('dark', 1440, true);
+	await ctx.route(`${API_ORIGIN}/**`, async (route) => {
+		const response = await route.fetch();
+		const body = (await response.text())
+			.replaceAll('"game_state":"kicked_off"', '"game_state":"upcoming"')
+			.replaceAll('"section":"kicked_off"', '"section":"to_play"');
+		await route.fulfill({ response, body });
+	});
+	const page = await ctx.newPage();
+	const at = `${day} lagging ${lag.name}`;
+	try {
+		await page.goto(`${web}${lag.path}`);
+		await ready(page, lag.ready);
+		const rows = await page.locator('main table tbody tr').allInnerTexts();
+		if (!rows.some((t) => t.includes(KICKED_OFF)))
+			fault(at, 'no row reads Kicked off on a lagging read');
+		if (lag.section) {
+			const misplaced = await page
+				.locator('main tbody.to_play tr')
+				.filter({ hasText: KICKED_OFF })
+				.count();
+			if (misplaced > 0)
+				fault(at, `${String(misplaced)} kicked-off rows under the to-play section`);
+		}
+		if (!(await page.locator('main').innerText()).includes(KICKED_OFF_PART))
+			fault(at, 'the basis does not say when Final and the stats land');
+		await page.screenshot({
+			path: new URL(`lagging-${lag.name}-dark-1440.png`, out).pathname,
+			fullPage: true
+		});
+		process.stdout.write(`${at}: holds\n`);
+	} catch (error) {
+		fault(at, error instanceof Error ? error.message : String(error));
+	} finally {
+		await ctx.close();
+	}
+}
 await browser.close();
 if (faults.length > 0) {
 	process.stderr.write(`${faults.join('\n')}\n`);
