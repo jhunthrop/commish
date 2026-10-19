@@ -53,12 +53,19 @@ export async function requireFixtureClock(
 		);
 }
 
-/** Puts a shots script's browser on `clock`, never the day the script runs. A script whose words say
- * how long ago a read was passes the API's own instant now (fixtureApiClock), so the browser and the
- * API agree however long the API has run. */
+/** Puts a shots script's browser on `clock`, never the day the script runs. */
 export async function installFixtureClock(
 	ctx: Pick<BrowserContext, 'clock'>,
 	clock: string = FIXTURE_WEEK_CLOCK
 ): Promise<void> {
 	await ctx.clock.install({ time: new Date(clock) });
+}
+
+/** Puts a shots script's browser at the fixture API's own instant now, so every read stamp the API
+ * makes is as old to the page as it is to the API, however long the API has run (Lane 77). */
+export async function installFixtureApiClock(
+	ctx: Pick<BrowserContext, 'clock'>,
+	origin: string
+): Promise<void> {
+	await installFixtureClock(ctx, (await fixtureApiClock(origin)).now);
 }

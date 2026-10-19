@@ -20,8 +20,13 @@ import { FIGURE } from '../src/lib/format/figure-words.ts';
 import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
 import { basisLines, basisReport } from './basis-lines.ts';
 import { copyFault, watchData } from './copy-scan.ts';
+import { installFixtureApiClock, requireFixtureClock } from './inseason-fixture/clock.ts';
 
 const web = process.argv[2] ?? 'http://localhost:4196';
+/** The fixture API the site was built against, on the fixture week's clock (FIXTURE_CLOCK=
+ * 2026-10-17T17:00:00.000Z): the browser runs at its instant, never the day the script runs. */
+const API_ORIGIN = new URL(process.env.API_ORIGIN ?? 'http://localhost:8799').origin;
+await requireFixtureClock(API_ORIGIN);
 const out = new URL(process.argv[3] ?? '../screenshots/order/', import.meta.url);
 const WIDTHS = [1440, 1024, 800, 768, 390] as const;
 const SHOTS: readonly (readonly ['dark' | 'light', number])[] = [
@@ -104,6 +109,7 @@ async function context(theme: string, width: number, signedIn: boolean): Promise
 		deviceScaleFactor: width <= PHONE_MAX ? 2 : 1
 	});
 	watchData(ctx);
+	await installFixtureApiClock(ctx, API_ORIGIN);
 	if (signedIn) await ctx.addCookies([{ ...SIGNED_IN, domain: 'localhost', path: '/' }]);
 	await ctx.addInitScript(
 		([key, value]: readonly [string, string]) => localStorage.setItem(key, value),
