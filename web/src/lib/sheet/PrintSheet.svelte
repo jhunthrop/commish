@@ -2,10 +2,12 @@
 	import { onMount, tick } from 'svelte';
 	import { resolve } from '$app/paths';
 	import { plural } from '#lib/format/number.ts';
+	import EmptyState from '#lib/ui/EmptyState.svelte';
 	import Quiet from '#lib/ui/Quiet.svelte';
 	import Verb from '#lib/ui/Verb.svelte';
 	import { POSITIONS } from '#lib/types/player.ts';
 	import { FORMAT_LABELS } from './format.ts';
+	import { PRINT_WORDS } from './print-words.ts';
 	import { ranksOf } from './model.ts';
 	import { sheetStore as store } from './store.svelte.ts';
 	import { tagLabel } from './tags.ts';
@@ -77,11 +79,17 @@
 </svelte:head>
 
 <div class="bar">
-	<Quiet href={resolve('/sheet')}>Back to your sheet</Quiet>
-	<Verb onclick={() => window.print()} disabled={pages.length === 0}>Print</Verb>
+	<Quiet href={resolve('/sheet')}>{PRINT_WORDS.back}</Quiet>
+	{#if pages.length > 0}<Verb onclick={() => window.print()}>{PRINT_WORDS.print}</Verb>{/if}
 </div>
 
 <main class="paper" bind:this={paper}>
+	<!-- An empty sheet says so in one sentence, the bar's link the way back, and no Print verb. -->
+	{#if store.loaded && pages.length === 0}
+		<div class="empty">
+			<EmptyState title={PRINT_WORDS.emptyTitle} line={PRINT_WORDS.emptyLine} />
+		</div>
+	{/if}
 	{#each pages as page (page.position)}
 		{@const heads = filled.get(page.position) ?? 0}
 		<section class="page">
@@ -136,6 +144,12 @@
 		padding: var(--s-3) var(--s-5);
 		background: var(--shell);
 		border-bottom: 1px solid var(--shell-line);
+	}
+
+	.empty {
+		width: min(100%, 8.5in);
+		background: var(--surface);
+		border-radius: var(--r-md);
 	}
 
 	.paper {

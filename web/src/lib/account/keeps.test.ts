@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { bannedPattern } from '#lib/format/copy-guard.ts';
 import { leagueHostsLine } from '#lib/league/hosts.ts';
-import { keeps, leaguesKeptText, memberHosts, signedOutTitle } from './keeps.ts';
+import { CONNECT, keeps, leaguesKeptText, memberHosts, signedOutTitle } from './keeps.ts';
 
 const ALL_OPEN = { ffpc: true, yahoo: true, espn: true };
 const ALL_SHUT = { ffpc: false, yahoo: false, espn: false };
@@ -55,7 +55,17 @@ void test('the copy has no em-dash, no semicolon, no doubled word and no trading
 	for (const line of [...words(ALL_OPEN), ...words(ALL_SHUT)]) {
 		assert.doesNotMatch(line, bannedPattern(), line);
 		assert.doesNotMatch(line, /\b([a-z]+)\s+\1\b/i, line);
+		// Ruling R1: a platform is named as a place to connect, never set against us.
+		assert.doesNotMatch(line, /\b(than|unlike|versus|vs)\b/i, line);
 	}
+});
+
+void test('the connect section is headed by the league, never "host", under the line naming the platforms', () => {
+	assert.equal(CONNECT.head, 'Connect your league');
+	// The platforms are named once, in the leagues line the section follows.
+	assert.ok(leaguesLine(ALL_OPEN).includes('Sleeper, MyFantasyLeague, FFPC, Yahoo or ESPN'));
+	for (const said of [CONNECT.head, CONNECT.label])
+		assert.doesNotMatch(said, bannedPattern(), said);
 });
 
 void test('in season the signed-out page leads with your leagues, before the draft with your prep', () => {

@@ -66,6 +66,10 @@ const MEMBER_HOSTS: readonly (MemberHost & { host: 'yahoo' | 'espn' })[] = [
 	}
 ];
 
+/** The signed-out page's connect section, said by the league and its platforms, never "host"
+ * (ruling R1: FFPC is named here as a place to connect, never in comparative copy). */
+export const CONNECT = { head: 'Connect your league', label: 'Platforms to connect' } as const;
+
 /** The hosts read as the member that are open here. */
 export function memberHosts(open: OpenHosts): readonly MemberHost[] {
 	return MEMBER_HOSTS.filter((h) => open[h.host]).map(({ lead, text, verb }) => ({

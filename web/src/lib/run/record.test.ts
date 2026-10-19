@@ -2,11 +2,14 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
+	RATE_PLACES_WORDS,
+	agreementBasis,
 	figureWords,
 	gradedOrders,
 	printPlaces,
 	publishedBeside,
-	publishedWords
+	publishedWords,
+	recordHeadline
 } from './record.ts';
 import type { RecordWeek, RunRecord } from './schema.ts';
 
@@ -58,6 +61,33 @@ void test('the bug names the orders the graded weeks graded', () => {
 		gradedOrders(record({ weeks: both })),
 		'Our preseason order, then our rest-of-season order'
 	);
+});
+
+void test('a rate in [0, 1] prints two decimals as given, and the basis says so once (ruling R2)', () => {
+	const score = { graded: 10, agreement: 0.48, placesOff: 43, starters: 50, startersOf: 84 };
+	const graded = record({
+		weeks: [week(1, 'preseason', 'graded')],
+		toDate: [
+			{
+				position: 'All',
+				ours: score,
+				adp: { ...score, agreement: 0.37 },
+				published: null,
+				oursOnPublished: null
+			}
+		]
+	});
+	const basis = agreementBasis(graded);
+	assert.equal(
+		basis,
+		"Order matched: 1.0 is a perfect match of the week's finishing order, 0 is none. Rates print to two decimals."
+	);
+	const headline = recordHeadline(graded);
+	assert.equal(headline.value, '0.48');
+	assert.ok(headline.caption.includes('ADP 0.37 on the same players'), headline.caption);
+	assert.ok(headline.caption.endsWith(RATE_PLACES_WORDS), headline.caption);
+	assert.equal(headline.caption.split(RATE_PLACES_WORDS).length, 2, 'said once');
+	assert.equal(printPlaces(0.483, 2), '0.483', 'never rounded again');
 });
 
 void test('a figure prints as the run gives it', () => {

@@ -5,6 +5,7 @@ import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
+import { BANNED_MARKS } from '#lib/format/copy-guard.ts';
 import { CREDIT, CREDIT_LICENCE_HREF, creditSentence } from './credit.ts';
 
 const WEB = fileURLToPath(new URL('../../../', import.meta.url));
@@ -42,7 +43,7 @@ void test('the credit names no other feed and breaks no copy rule', () => {
 	]) {
 		assert.ok(!sentence.includes(other), other);
 	}
-	assert.ok(!/[—–;]/.test(sentence));
+	assert.doesNotMatch(sentence, BANNED_MARKS);
 });
 
 void test('the player page prints the credit once, and no other file does', () => {

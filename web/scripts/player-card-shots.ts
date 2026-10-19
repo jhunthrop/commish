@@ -7,9 +7,10 @@
 //   the six tiles, each "--" with its reason on the tile, Opp rank's direction in words, the shared
 //   status pill, the verb and Compare, the week read's caption (or its withheld caption alone), the
 //   season read's stamp, the week ahead's row, the earlier seasons collapsed, the basis in at most five
-//   rendered lines at 1440 and eight at 390, no betting or trading word, no "host", no dash or
-//   semicolon in the card's words, nothing scrolling sideways, and on a phone the pinned verb clearing
-//   the first tiles.
+//   rendered lines at 1440 and eight at 390, the page's copy passing the one guard (betting and
+//   trading words, "host", a dash or a semicolon; the names the run and the API handed it skipped,
+//   copy-scan.ts), nothing scrolling sideways, and on a phone the pinned verb clearing the first
+//   tiles.
 // The Rest of season tile shows on a run that ranks the rest of the season: set ROS_FROM_WEEK to its
 // first week (the site built from the nightly's contract fixture run, research/nightly/contract/
 // fixture, PUBLIC_RUN_ID=2026-10-21T12-ros) and one signed-out page is shot with the tile held to
@@ -25,7 +26,7 @@
 // with the site built against PUBLIC_API_URL pointing at the fixture API.
 import { mkdir } from 'node:fs/promises';
 import { chromium, type BrowserContext, type Page } from 'playwright';
-import { bannedPattern } from '../src/lib/format/copy-guard.ts';
+import { copyFault, watchData } from './copy-scan.ts';
 import { EMPTY_FIGURE } from '../src/lib/format/empty.ts';
 import { FIGURE } from '../src/lib/format/figure-words.ts';
 import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
@@ -38,8 +39,8 @@ const ZONE = 'America/Chicago';
 const READY_TIMEOUT_MS = 30_000;
 const SIGNED_IN = { name: 'commish_csrf', value: 'fixture' };
 const ESPN_LEAGUE = { name: 'fixture_league', value: 'espn' };
-/** The site's copy guard, with the card's own word: "tip" (no tips, the copy rules). */
-const BANNED = bannedPattern(/\btips?\b/);
+/** The card's own word beside the site's copy guard: "tip" (no tips, the copy rules). */
+const OWN_WORDS = /\btips?\b/;
 const NONE = EMPTY_FIGURE;
 const PROJECTED = 'Projected';
 const REST = 'Rest of season';
@@ -138,6 +139,7 @@ async function context(theme: string, width: number, shot: Shot): Promise<Browse
 		colorScheme: theme as 'light',
 		timezoneId: ZONE
 	});
+	watchData(ctx);
 	const cookies = [
 		...(shot.signedIn ? [SIGNED_IN] : []),
 		...(shot.espn === true ? [ESPN_LEAGUE] : [])
@@ -160,8 +162,6 @@ interface Card {
 	captions: Record<string, string>;
 	pill: string;
 	verbs: string[];
-	text: string;
-	cardText: string;
 	readText: string;
 	basis: string[];
 	basisLines: number;
@@ -198,8 +198,6 @@ async function read(page: Page): Promise<Card> {
 			verbs: [...document.querySelectorAll('main .card .act a, main .card .act button')].map((el) =>
 				(el as HTMLElement).innerText.trim()
 			),
-			text: document.body.innerText,
-			cardText: document.querySelector<HTMLElement>('main .card')?.innerText ?? '',
 			readText: document.querySelector<HTMLElement>('main .read')?.innerText ?? '',
 			basis: basis.map((p) => p.innerText),
 			basisLines: lines,
@@ -281,10 +279,6 @@ function checkCard(card: Card, shot: Shot, where: string, width: number): void {
 		check(/earlier seasons/i.test(card.earlier) && !card.earlierOpen, `${where}: earlier seasons`);
 	const most = BASIS_LINES[width] ?? 0;
 	check(card.basisLines <= most, `${where}: the basis runs ${String(card.basisLines)} lines`);
-	for (const said of [card.cardText, ...card.basis]) {
-		check(!BANNED.test(said), `${where}: a banned word in "${said.slice(0, 80)}"`);
-	}
-	check(!/\bhost\b/i.test(card.text), `${where}: says host`);
 	check(!card.sideways, `${where}: scrolls sideways`);
 	if (width === PHONE_WIDTH && card.pinTop !== null && card.tilesBottom !== null)
 		check(card.pinTop > card.tilesBottom, `${where}: the pinned verb covers the first tiles`);
@@ -321,6 +315,8 @@ for (const shot of ROS ? ROS_SHOTS : SHOTS) {
 				if (shot.compare !== undefined) await openCompare(page, shot.compare);
 				const card = await read(page);
 				checkCard(card, shot, where, width);
+				const banned = await copyFault(page, OWN_WORDS, 'body');
+				check(banned === null, `${where}: says ${banned ?? ''}`);
 				if (width === PHONE_WIDTH) {
 					await page.screenshot({ path: file('-first-screen') });
 					// The full page in one image: the pinned bars set in the flow, as the page reads.

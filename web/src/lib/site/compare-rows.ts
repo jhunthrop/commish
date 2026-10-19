@@ -35,6 +35,13 @@ export interface CompareRow {
 /** Which is better: 'up' a higher figure, 'down' a lower one, null no better at all. */
 type Better = 'up' | 'down' | null;
 
+/** A side's floor, median and ceiling when the run carries all three, null otherwise: what the page
+ * draws a range bar from and sets the pair's scale by. */
+export function sideRange(side: Side): { floor: number; median: number; ceiling: number } | null {
+	const { floor, median, ceiling } = side.numbers;
+	return floor === null || median === null || ceiling === null ? null : { floor, median, ceiling };
+}
+
 function heldRank(side: Side): string | null {
 	const status = side.player.status;
 	return status?.seasonLong === true ? rankWord(status.status) : null;
@@ -96,6 +103,22 @@ export function compareRows(
 	const gapRow: CompareRow[] = carriesGap(gaps.map((value) => ({ gap: value })))
 		? [{ label: 'Gap', cells: [gapCell(gaps[0]), gapCell(gaps[1])] }]
 		: [];
+	/** The Floor to ceiling row, only when one of the pair carries a range (in season neither does):
+	 * the page draws a bar for a side that has one and the empty mark for a side that has none. */
+	const ranged = pairOf((side) => sideRange(side) !== null);
+	const rangeRow: CompareRow[] =
+		ranged[0] || ranged[1]
+			? [
+					{
+						label: 'Floor to ceiling',
+						cells: [
+							{ text: ranged[0] ? '' : EMPTY_FIGURE, wins: null },
+							{ text: ranged[1] ? '' : EMPTY_FIGURE, wins: null }
+						],
+						range: true
+					}
+				]
+			: [];
 	const rows: CompareRow[] = [
 		rankRow(
 			'Our rank',
@@ -123,14 +146,7 @@ export function compareRows(
 			(v) => signed(v, 1),
 			'up'
 		),
-		{
-			label: 'Floor to ceiling',
-			cells: [
-				{ text: '', wins: null },
-				{ text: '', wins: null }
-			],
-			range: true
-		},
+		...rangeRow,
 		figures(
 			'ADP',
 			pairOf((side) => side.numbers.adp),
