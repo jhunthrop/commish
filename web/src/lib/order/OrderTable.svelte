@@ -5,7 +5,9 @@
 	import BoxGame from '#lib/league/box/BoxGame.svelte';
 	import BoxPlayer from '#lib/league/box/BoxPlayer.svelte';
 	import { tabHref } from '#lib/league/inseason/tabs.ts';
-	import Icon from '#lib/ui/Icon.svelte';
+	import MoveLink from '#lib/ui/MoveLink.svelte';
+	import OppRank from '#lib/ui/OppRank.svelte';
+	import RosterChip from '#lib/ui/RosterChip.svelte';
 	import type { OrderAdvice } from './api.ts';
 	import {
 		FIGURE_HEADS,
@@ -55,8 +57,8 @@
 	}
 </script>
 
-{#snippet mark(row: OrderView)}
-	{#if row.roster}<span class="own {row.roster.kind}">{row.roster.words}</span>{/if}
+{#snippet mark(row: OrderView, size: 'md' | 'fold')}
+	{#if row.roster}<RosterChip kind={row.roster.kind} words={row.roster.words} {size} />{/if}
 {/snippet}
 
 <table class="order" class:marked aria-label={label}>
@@ -93,11 +95,11 @@
 				<td class="n rank">{row.rank}</td>
 				<td class="player">
 					<BoxPlayer row={row.box} tags={tagsOf(row.box.boardId)}>
-						{#snippet after()}<span class="ph-mark">{@render mark(row)}</span>{/snippet}
+						{#snippet after()}<span class="ph-mark">{@render mark(row, 'fold')}</span>{/snippet}
 						<span class="ph-ev">{folded(row)}</span>
 					</BoxPlayer>
 				</td>
-				{#if marked}<td class="roster">{@render mark(row)}</td>{/if}
+				{#if marked}<td class="roster">{@render mark(row, 'md')}</td>{/if}
 				<td class="game"><BoxGame row={row.box} /></td>
 				<td class="n proj">{boxNumber(row.box.proj)}</td>
 				{#each figures as f, i (f)}
@@ -106,27 +108,20 @@
 				<td class="n ev first">{boxNumber(row.box.evidence.avg)}</td>
 				<td class="n ev">{boxNumber(row.box.evidence.last)}</td>
 				<td class="n ev opp"
-					>{#if rank !== null}<span class="rk {easeOf(rank, row.box.evidence.oppOf)}"
-							>{oppRankWord(rank)}</span
-						>{:else}<span class="none">{BOX.none}</span>{/if}</td
+					><OppRank
+						text={oppRankWord(rank)}
+						ease={rank === null ? null : easeOf(rank, row.box.evidence.oppOf)}
+					/></td
 				>
 				{#if marked || end}
 					<td class="act">
 						{#if league !== null && href !== null && row.move}
-							{@const said = moveWords(row, league.moves, league.host)}
-							<a class="verb {row.move}" {href} aria-label="{said}, {row.box.name}"
-								>{#if row.move === 'add'}<Icon name="plus" size={14} />{:else}<svg
-										width="14"
-										height="14"
-										viewBox="0 0 24 24"
-										fill="none"
-										stroke="currentColor"
-										stroke-width="2"
-										stroke-linecap="round"
-										stroke-linejoin="round"
-										aria-hidden="true"><path d="M4 8h14l-3-3M20 16H6l3 3" /></svg
-									>{/if}<span>{said}</span></a
-							>
+							<MoveLink
+								{href}
+								move={row.move}
+								said={moveWords(row, league.moves, league.host)}
+								name={row.box.name}
+							/>
 						{:else if end}{@render end(row)}{/if}
 					</td>
 				{/if}
@@ -297,89 +292,9 @@
 		white-space: nowrap;
 	}
 
-	.own {
-		display: inline-flex;
-		align-items: center;
-		max-width: 100%;
-		height: 22px;
-		padding: 0 var(--s-2);
-		border-radius: var(--r-pill);
-		font-size: var(--t-xs);
-		font-weight: 700;
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
-	}
-
-	.own.yours {
-		background: var(--accent);
-		color: var(--accent-ink);
-	}
-
-	.own.free {
-		background: var(--gain-bg);
-		color: var(--gain-ink);
-	}
-
-	.own.team {
-		display: inline;
-		padding: 0;
-		font-size: var(--t-sm);
-		font-weight: 500;
-		color: var(--ink-3);
-	}
-
-	.rk {
-		display: inline-flex;
-		align-items: center;
-		justify-content: flex-end;
-		min-width: 40px;
-		height: 22px;
-		padding: 0 6px;
-		border-radius: var(--r-sm);
-	}
-
-	.rk.easy {
-		background: var(--gain-bg);
-		color: var(--gain-ink);
-	}
-
-	.rk.hard {
-		background: var(--loss-bg);
-		color: var(--loss-ink);
-	}
-
-	.none {
-		color: var(--ink-3);
-	}
-
 	.act {
 		text-align: right;
 		white-space: nowrap;
-	}
-
-	.verb {
-		display: inline-flex;
-		align-items: center;
-		gap: 4px;
-		height: 30px;
-		padding: 0 var(--s-3) 0 var(--s-2);
-		border: 1px solid var(--line-strong);
-		border-radius: var(--r-md);
-		font-size: var(--t-xs);
-		font-weight: 600;
-		color: var(--ink);
-		text-decoration: none;
-	}
-
-	/* Trade for him stays in the quietest ink (the coordinator's ruling 3). */
-	.verb.trade {
-		border-color: transparent;
-		color: var(--ink-3);
-	}
-
-	.verb:hover {
-		border-color: var(--ink-3);
 	}
 
 	.ph-mark,
@@ -426,23 +341,9 @@
 			max-width: 132px;
 		}
 
-		/* The verb keeps its glyph and its spoken words, its printed words giving their width away. */
+		/* The verb keeps its glyph (MoveLink), its printed words giving their width away. */
 		.cols .act {
 			width: 40px;
-		}
-
-		.verb {
-			width: 32px;
-			padding: 0;
-			justify-content: center;
-		}
-
-		.verb span {
-			display: none;
-		}
-
-		.verb.trade {
-			border-color: var(--line);
 		}
 	}
 
@@ -491,36 +392,6 @@
 
 		td.key {
 			font-size: var(--t-md);
-		}
-
-		/* The roster mark on his club line, one line, a long team name cut (ruling 3). */
-		.ph-mark .own {
-			height: 18px;
-			padding: 0 6px;
-			font-size: 10px;
-		}
-
-		.ph-mark .own.team {
-			display: block;
-			padding: 0;
-			overflow: hidden;
-			text-overflow: ellipsis;
-			white-space: nowrap;
-			font-size: var(--t-xs);
-		}
-
-		.verb {
-			width: 32px;
-			padding: 0;
-			justify-content: center;
-		}
-
-		.verb span {
-			display: none;
-		}
-
-		.verb.trade {
-			border-color: var(--line);
 		}
 	}
 </style>
