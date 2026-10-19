@@ -11,7 +11,7 @@ void test('the heads come from one module', () => {
 	assert.equal(SEASON.restOfSeason, 'Rest of season');
 	assert.equal(TRADES.restOfSeason, SEASON.restOfSeason);
 	assert.equal(WAIVERS.rest, SEASON.restOfSeason);
-	assert.equal(TRADE_GAIN, 'Gain, over replacement a week');
+	assert.equal(TRADE_GAIN, 'Gain, over repl. a week');
 	assert.equal(WAIVER_GAIN, 'Gain a week');
 	assert.equal(WAIVERS.gain, WAIVER_GAIN);
 	assert.equal(TRADES.gainHead, TRADE_GAIN);
