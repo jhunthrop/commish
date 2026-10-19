@@ -1,7 +1,7 @@
-/** What every nightly page derives from a board, in one place: tiers and their drops, the range
- * scale rows share, the positions a board carries, the URL segment of a position. */
+/** What every nightly page derives from a board, in one place: the range scale rows share, the
+ * positions a board carries, the URL segment of a position. A position's tiers are run/tiers.ts. */
 import { POSITIONS, type Position, type RangeScale } from '#lib/types/player.ts';
-import type { GroupName, TierCliff } from '#lib/ui/tier.ts';
+import type { GroupName } from '#lib/ui/tier.ts';
 import type { BoardRow } from './schema.ts';
 
 /** A range scale starts at the floor rounded down to this many points. */
@@ -36,41 +36,6 @@ export function rowsAt<R extends BoardRow>(rows: readonly R[], position: Positio
 	return rows
 		.filter((row) => row.position === position)
 		.sort((a, b) => a.positionRank - b.positionRank);
-}
-
-export interface TierGroup<R extends BoardRow = BoardRow> {
-	tier: number;
-	rows: R[];
-	cliff: TierCliff | null;
-}
-
-/** A position's tiers in order, each with its players and the drop in projected points from its
- * last player to the next tier's first. The last tier has no drop. */
-export function tierGroups<R extends BoardRow>(
-	rows: readonly R[],
-	position: Position
-): TierGroup<R>[] {
-	const groups: TierGroup<R>[] = [];
-	for (const row of rowsAt(rows, position)) {
-		const last = groups.at(-1);
-		if (last?.tier === row.tier) last.rows.push(row);
-		else groups.push({ tier: row.tier, rows: [row], cliff: null });
-	}
-	return groups.map((group, i) => {
-		const next = groups[i + 1];
-		const end = group.rows.at(-1);
-		const start = next?.rows[0];
-		return next && end && start
-			? { ...group, cliff: { drop: end.projected - start.projected, nextTier: next.tier } }
-			: group;
-	});
-}
-
-/** The tier group a player sits in. */
-export function tierOf(rows: readonly BoardRow[], player: BoardRow): TierGroup {
-	const group = tierGroups(rows, player.position).find((g) => g.tier === player.tier);
-	if (!group) throw new Error(`${player.name} is in no tier of his position.`);
-	return group;
 }
 
 /** The scale every range bar in one view shares, so spans compare across rows. In season the rows

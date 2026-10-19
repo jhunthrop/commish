@@ -6,9 +6,17 @@
  * printed as it comes. */
 import { memberZone, weekdayTime, zoneWord } from '#lib/format/clock.ts';
 import type { LeagueHost } from '#lib/league/api.ts';
-import { BOX, boxRow, factsReadLine, projBasis, type BoxRow } from '#lib/league/box/box.ts';
+import {
+	boxRow,
+	EVIDENCE_SHORT,
+	evidenceShort,
+	factsReadLine,
+	projShort,
+	type BoxRow
+} from '#lib/league/box/box.ts';
 import { addVerbWords } from '#lib/league/box/waivers.ts';
 import { hostWords } from '#lib/league/names.ts';
+import type { BasisPart } from '#lib/run/board-basis.ts';
 import { askedQuery } from '#lib/league/box/asked.ts';
 import type { OrderAdvice, OrderPosition, OrderRow, RosterMark } from './api.ts';
 import { ORDER } from './words.ts';
@@ -117,8 +125,7 @@ export function moveHref(
 
 /** The order's evidence columns' basis, said once, in the scoring the rows are in. */
 export function evidenceBasis(league: boolean): string {
-	const scoring = league ? "in this league's scoring" : 'in PPR';
-	return `${BOX.oppRank} is points allowed to his position, 1st the fewest. ${BOX.avg} and ${BOX.last} are a game this season and his last, ${scoring}.`;
+	return league ? EVIDENCE_SHORT : evidenceShort('in PPR');
 }
 
 /** Whose rosters the marks are, named once with the member's platform. */
@@ -126,26 +133,39 @@ export function rosterBasis(host: LeagueHost, readAt: string, zone: string = mem
 	return `${ORDER.roster} is ${hostWords(host)}'s, read ${weekdayTime(readAt, zone)} ${zoneWord(zone)}.`;
 }
 
-/** The screen's basis, every number named once, in one paragraph held to five rendered lines at a
- * desk: the order and its figures, the league the points over replacement are for and what its season
- * points leave out, the projection with the evidence, the Game cell's read and, in a league, whose the
- * rosters are. */
+/** The screen's basis, every number named once, held to five rendered lines at a desk and eight on a
+ * phone (Lane 66q): the order, its figures and the league its points over replacement are for, the
+ * rules its season points leave out, the projection, the evidence, the Game cell's read and, in a
+ * league, whose the rosters are. The phone draws no Game and no Roster column, so it is not told about
+ * them (board-basis.ts's rule). */
 export function orderBasis(
 	advice: OrderAdvice,
 	league: { host: LeagueHost } | null,
 	zone: string = memberZone()
-): string {
+): BasisPart[] {
 	const lines = advice.rows.map((row) => row.line);
-	const said = [
-		advice.basis,
-		advice.basis_note,
-		// The order carries no defense (Lane 66m), so the projection's defense words never apply.
-		projBasis(advice.projection_read_at, advice.projection_scoring, false, zone),
-		evidenceBasis(league !== null),
-		factsReadLine(lines, zone),
+	// The order carries no defense (Lane 66m), so the projection's defense words never apply.
+	const proj = projShort(
+		advice.projection_read_at,
+		null,
+		advice.projection_scoring,
+		false,
+		zone,
+		league !== null
+	);
+	const said: (BasisPart | null)[] = [
+		part(advice.basis, true),
+		part(advice.basis_note, true),
+		part(proj, true),
+		part(evidenceBasis(league !== null), true),
+		part(factsReadLine(lines, zone), false),
 		league !== null && advice.read_at !== null
-			? rosterBasis(league.host, advice.read_at, zone)
+			? part(rosterBasis(league.host, advice.read_at, zone), false)
 			: null
 	];
-	return said.filter((words): words is string => words !== null && words !== '').join(' ');
+	return said.filter((p): p is BasisPart => p !== null);
+}
+
+function part(text: string | null | undefined, phone: boolean): BasisPart | null {
+	return text === null || text === undefined || text === '' ? null : { text, phone };
 }

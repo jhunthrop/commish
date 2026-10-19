@@ -92,6 +92,7 @@ function directoryOf(
 		rank: row.ourRank,
 		positionRank: row.positionRank,
 		adp: row.adp,
+		gap: row.gap,
 		held: heldWord(row)
 	};
 }

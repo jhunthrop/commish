@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { PRESEASON_FRAMING } from '#lib/run/row-framing.ts';
-	import { DEFAULT_TEAMS, draftersGap, pickLabel } from '#lib/format/draft.ts';
+	import { DEFAULT_TEAMS, pickLabel } from '#lib/format/draft.ts';
 	import { fixed, plural } from '#lib/format/number.ts';
 	import ActionBar from '#lib/ui/ActionBar.svelte';
 	import CallPanel from '#lib/ui/CallPanel.svelte';
@@ -188,7 +188,7 @@
 					about="Where drafters take him against our rank, in words. Green when later, rose when earlier."
 				>
 					{#snippet show()}
-						<GapChip gap={draftersGap(row.adp, row.ourRank)} />
+						<GapChip adp={row.adp} gap={row.gap} />
 						{#if row.adp !== null}<Label>ADP {fixed(row.adp)}</Label>{/if}
 					{/snippet}
 				</Part>
@@ -249,7 +249,7 @@
 					team={row.team}
 					headshot={row.headshot}
 					place={SHEET_PLACE}
-					board={{ rank: row.ourRank, positionRank: row.positionRank, adp: row.adp }}
+					board={{ rank: row.ourRank, positionRank: row.positionRank, adp: row.adp, gap: row.gap }}
 					tags={[
 						{ label: 'Target', tone: 'you' },
 						{ label: 'Value', tone: 'you' }

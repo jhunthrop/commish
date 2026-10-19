@@ -2,6 +2,7 @@
 // the basis, each word from the API's answer alone. Run with `npm test`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { bannedPattern } from '#lib/format/copy-guard.ts';
 import type { components } from '#lib/api/types.ts';
 import {
 	FRONT,
@@ -324,6 +325,6 @@ void test('the copy guard: no em-dash, semicolon, platform word or betting word 
 		view.nudge?.asSet ?? ''
 	];
 	for (const s of said) {
-		assert.doesNotMatch(s, /[—;]|\bhosts?\b|\b(bet|odds|price|market|buy|sell)\b/i, s);
+		assert.doesNotMatch(s, bannedPattern(), s);
 	}
 });

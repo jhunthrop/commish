@@ -2,6 +2,7 @@
 // what the read will be built from. Run with `npm test`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { bannedPattern } from '#lib/format/copy-guard.ts';
 import type { PlayerFormat } from './schema.ts';
 import { UNWRITTEN_READ, unwrittenLines, type UnwrittenInput } from './unwritten-words.ts';
 
@@ -68,8 +69,7 @@ void test('in season the range and the games are the rest of the season, and no 
 void test('the copy has no em-dash, no semicolon and no trading words', () => {
 	for (const line of unwrittenLines(INPUT)) {
 		for (const words of [line.lead, line.text, line.figure, UNWRITTEN_READ]) {
-			assert.doesNotMatch(words, /[—–;]/, words);
-			assert.doesNotMatch(words, /\b(market|price|buy|sell|value)\b/i, words);
+			assert.doesNotMatch(words, bannedPattern(/\bvalue\b/), words);
 		}
 	}
 });

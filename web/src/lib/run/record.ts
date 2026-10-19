@@ -1,5 +1,6 @@
 /** The record in the words a page prints: its one big number and each week as a person says it.
  * The record page and the front door both read these, so the headline is said one way. */
+import { EMPTY_FIGURE } from '#lib/format/empty.ts';
 import { dayLabel, weekdayLabel } from '#lib/format/date.ts';
 import { plural } from '#lib/format/number.ts';
 import type { RecordLine, RecordWeek, RunRecord, Score } from './schema.ts';
@@ -170,7 +171,7 @@ export const RECORD_BOX = {
 	adp: 'ADP',
 	published: 'Published',
 	toDate: 'To date',
-	none: '--',
+	none: EMPTY_FIGURE,
 	chart: 'Order matched by week'
 } as const;
 

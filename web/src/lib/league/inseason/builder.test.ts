@@ -1,6 +1,7 @@
 // The trade builder's behaviour and words: run with `npm test`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { bannedPattern } from '#lib/format/copy-guard.ts';
 import type { PlayerLine, TradeCheck, TradeRow, TradeTeam } from './api.ts';
 import {
 	BUILDER_LINES,
@@ -266,11 +267,6 @@ void test('copy guard: the builder says no trading words, dashes or semicolons',
 		checkWords(check({}, { yours: false, yours_open: 'Flex' }))
 	];
 	for (const text of said) {
-		assert.doesNotMatch(
-			text,
-			/\b(market|prices?|buy|sell|value|win|wins|lose a trade|fair|grade)\b/i,
-			text
-		);
-		assert.doesNotMatch(text, /[–—;]/, text);
+		assert.doesNotMatch(text, bannedPattern(/\b(value|win|wins|lose a trade|fair|grade)\b/), text);
 	}
 });

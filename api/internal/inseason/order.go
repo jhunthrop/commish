@@ -250,9 +250,9 @@ type Targets func() map[string]bool
 func (a *advisor) Order(q orderQuery, targets Targets) apitypes.OrderAdvice {
 	marks := targets != nil
 	h := a.header()
-	out := apitypes.OrderAdvice{Week: h.week, Basis: OrderScreenBasis(a.basis, a.Board.FromWeek), OrderBasis: h.basis,
+	out := apitypes.OrderAdvice{Week: h.week, Basis: OrderScreenBasis(a.basis, a.Board.FromWeek, a.settings), OrderBasis: h.basis,
 		Refreshed: h.refreshed, ProjectionReadAt: a.projectionReadAt(), ProjectionScoring: projectionScoring(a.settings, a.preset),
-		BasisNote: BasisNote(a.settings, a.season.Carries), RankBy: rankBy(q.position), Rows: []apitypes.OrderRow{}}
+		BasisNote: LineupNote(a.settings, a.season.Carries), RankBy: rankBy(q.position), Rows: []apitypes.OrderRow{}}
 	if carriesPerGame(a.Board) {
 		from := a.Board.FromWeek
 		out.FromWeek = &from

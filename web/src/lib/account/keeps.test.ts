@@ -2,6 +2,7 @@
 // hosts, the copy guard. Run with `npm test`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { bannedPattern } from '#lib/format/copy-guard.ts';
 import { leagueHostsLine } from '#lib/league/hosts.ts';
 import { keeps, leaguesKeptText, memberHosts, signedOutTitle } from './keeps.ts';
 
@@ -52,9 +53,8 @@ void test('connecting ESPN is for any ESPN league and says what the session is k
 
 void test('the copy has no em-dash, no semicolon, no doubled word and no trading words', () => {
 	for (const line of [...words(ALL_OPEN), ...words(ALL_SHUT)]) {
-		assert.doesNotMatch(line, /[—;]/, line);
+		assert.doesNotMatch(line, bannedPattern(), line);
 		assert.doesNotMatch(line, /\b([a-z]+)\s+\1\b/i, line);
-		assert.doesNotMatch(line, /\b(market|price|buy|sell)\b/i, line);
 	}
 });
 

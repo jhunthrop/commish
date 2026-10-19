@@ -122,9 +122,40 @@ def gap_of(adp: float | None, our_rank: int) -> float | None:
     return None if adp is None else tenth(tenth(adp) - our_rank)
 
 
-def numbers_of(entry: BoardEntry, adp: float | None) -> Json:
+def drop_between(last: float, first: float) -> float:
+    """A tier's drop (Lane 66q): its last player's projection less the next tier's first, each rounded
+    to the tenth the board shows, the difference cleaned back to its tenth. The web prints it as given."""
+    return tenth(tenth(last) - tenth(first))
+
+
+def tier_drops(entries: Sequence[BoardEntry]) -> dict[str, float | None]:
+    """Each player's tier's drop to the next tier at his position, by player id: the drop from the
+    tier's last player (by position rank) to the next tier's first, across every tier the board draws,
+    the replacement line included. None in a position's last tier. The tier band, the tier list and the
+    jump list print it (`tierDrop`)."""
+    by_position: dict[str, list[BoardEntry]] = {}
+    for entry in entries:
+        by_position.setdefault(entry.row.position, []).append(entry)
+    out: dict[str, float | None] = {}
+    for pool in by_position.values():
+        ranked = sorted(pool, key=lambda e: e.position_rank)
+        first_of: dict[int, BoardEntry] = {}
+        last_of: dict[int, BoardEntry] = {}
+        for entry in ranked:
+            first_of.setdefault(entry.tier, entry)
+            last_of[entry.tier] = entry
+        for entry in ranked:
+            following = first_of.get(entry.tier + 1)
+            out[entry.row.player_id] = (
+                None if following is None else drop_between(last_of[entry.tier].row.projected, following.row.projected)
+            )
+    return out
+
+
+def numbers_of(entry: BoardEntry, adp: float | None, tier_drop: float | None) -> Json:
     """A board row without the identity: the page's numbers for one format (`playerFormatSchema`),
-    each figure rounded once to a tenth here, the web printing it as given (Lane 66n)."""
+    each figure rounded once to a tenth here, the web printing it as given (Lane 66n), with his
+    tier's drop to the next (`tier_drops`)."""
     row = entry.row
     numbers: Json = {
         "positionRank": entry.position_rank,
@@ -132,6 +163,7 @@ def numbers_of(entry: BoardEntry, adp: float | None) -> Json:
         "vorRound": math.ceil(entry.our_rank / TEAMS),
         "adp": tenth_or_none(adp),
         "gap": gap_of(adp, entry.our_rank),
+        "tierDrop": tier_drop,
         "projected": tenth(row.projected),
         "vor": tenth(entry.value_over_replacement),
         "expectedGames": tenth(row.expected_games),
@@ -164,7 +196,7 @@ def _who(who: Identity) -> Json:
 
 
 # A kicker's or a defense's projected figures: none (the ruling ships no projection and no tier).
-_UNPROJECTED: Final = ("projected", "vor", "expectedGames", "floor", "median", "ceiling", "tier")
+_UNPROJECTED: Final = ("projected", "vor", "expectedGames", "floor", "median", "ceiling", "tier", "tierDrop")
 
 
 def market_row(who: Identity, entry: MarketEntry, our_rank: int, adp: float | None) -> Json:
@@ -184,7 +216,11 @@ def board_json(
     board: FormatBoard, slugs: Mapping[str, Identity], adp: Mapping[str, float], market: Sequence[MarketEntry] = ()
 ) -> Json:
     """The ranked rows in the served order, then the kickers and defenses in draft order, numbered on."""
-    rows = [{**_who(slugs[e.row.player_id]), **numbers_of(e, adp.get(e.row.player_id))} for e in board.entries]
+    drops = tier_drops(board.entries)
+    rows = [
+        {**_who(slugs[e.row.player_id]), **numbers_of(e, adp.get(e.row.player_id), drops[e.row.player_id])}
+        for e in board.entries
+    ]
     ranked = len(rows)
     for entry in market:
         who = slugs[entry.player.player_id]
@@ -286,6 +322,8 @@ class PageInputs:
     formats: Mapping[str, RunFormat]
     season: SeasonContext
     week: ServedWeek
+    # Format id to player id to his tier's drop (`tier_drops`).
+    tier_drops: Mapping[str, Mapping[str, float | None]]
 
 
 def page_inputs(
@@ -297,7 +335,8 @@ def page_inputs(
 ) -> PageInputs:
     entries = {board.format.id: {entry.row.player_id: entry for entry in board.entries} for board in boards}
     formats = {board.format.id: board.format for board in boards}
-    return PageInputs(entries, adp_by_format, capsules, formats, season, week)
+    drops = {board.format.id: tier_drops(board.entries) for board in boards}
+    return PageInputs(entries, adp_by_format, capsules, formats, season, week, drops)
 
 
 def player_json(who: Identity, inputs: PageInputs) -> Json:
@@ -316,7 +355,9 @@ def player_json(who: Identity, inputs: PageInputs) -> Json:
             row = entry.row
             season = season_block(who.id, row.team, inputs.formats[PAGE_FORMAT.id], row.position, inputs.season)
             prior = prior_seasons(who.id, inputs.formats[PAGE_FORMAT.id], row.position, inputs.season)
-        formats[format_id] = numbers_of(entry, inputs.adp_by_format[format_id].get(who.id))
+        formats[format_id] = numbers_of(
+            entry, inputs.adp_by_format[format_id].get(who.id), inputs.tier_drops[format_id][who.id]
+        )
         universe_id = entry.row.universe_id
         if format_id == PAGE_FORMAT.id:
             page_entry = entry

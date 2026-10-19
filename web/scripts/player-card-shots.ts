@@ -25,6 +25,8 @@
 // with the site built against PUBLIC_API_URL pointing at the fixture API.
 import { mkdir } from 'node:fs/promises';
 import { chromium, type BrowserContext, type Page } from 'playwright';
+import { bannedPattern } from '../src/lib/format/copy-guard.ts';
+import { EMPTY_FIGURE } from '../src/lib/format/empty.ts';
 import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
 
 const THEMES = ['dark', 'light'] as const;
@@ -35,9 +37,9 @@ const ZONE = 'America/Chicago';
 const READY_TIMEOUT_MS = 30_000;
 const SIGNED_IN = { name: 'commish_csrf', value: 'fixture' };
 const ESPN_LEAGUE = { name: 'fixture_league', value: 'espn' };
-const BANNED =
-	/\b(favou?red|underdogs?|odds|spreads?|bets?|betting|market|buy|sell|price|host|tips?)\b|—|;/i;
-const NONE = '--';
+/** The site's copy guard, with the card's own word: "tip" (no tips, the copy rules). */
+const BANNED = bannedPattern(/\btips?\b/);
+const NONE = EMPTY_FIGURE;
 const PROJECTED = 'Projected';
 const REST = 'Rest of season';
 const DIRECTION = /, (among the easiest for|among the toughest for|in the middle for) \w/;

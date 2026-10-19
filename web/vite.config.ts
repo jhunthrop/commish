@@ -60,14 +60,15 @@ const LEAGUE_PAGE_PARTS =
 const PILL_PARTS = /[\\/]src[\\/]lib[\\/]ui[\\/](StatusPill|StatusChip)\./;
 /** A player's injury status in words on the member's clock (Lane 63): the designation's words, which
  * the league's screens import and the board, player and record pages load after their first paint.
- * The held places' pill rank joins them now the player card draws the status pill (Lane 66h). Kept out
- * of the shared chunk by name, as the league's parts are. */
+ * The held places' pill rank joins them now the player card draws the status pill (Lane 66h), and the
+ * tiers the held places draw without a held player (run/tiers.ts, Lane 66q). Kept out of the shared
+ * chunk by name, as the league's parts are. */
 /** The live clock the board, player and record pages call to say their status words again on the
  * member's clock: a few lines with no import but the words' own lazy one, in a file of its own, so
  * neither the shared chunk nor a page's group carries it for the others. */
 const LIVE_STATUS = /[\\/]src[\\/]lib[\\/]run[\\/]live-status\./;
 const STATUS_PARTS =
-	/[\\/]src[\\/]lib[\\/](format[\\/]designation\.|run[\\/](status-view|held-places)\.)/;
+	/[\\/]src[\\/]lib[\\/](format[\\/]designation\.|run[\\/](status-view|held-places|tiers)\.)/;
 /** The board's status rule (Lane 63), which the board page draws on its first paint and the order's
  * screens after theirs (Lane 66j): kept out of the shared chunk by name, so loading the order's
  * screens never hoists it onto every page. */

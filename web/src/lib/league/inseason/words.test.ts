@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { memberZone, weekdayTime, zoneLine } from '#lib/format/clock.ts';
 import { readFileSync } from 'node:fs';
+import { bannedPattern } from '#lib/format/copy-guard.ts';
 import { isScreen } from './screens.ts';
 import {
 	MOVE_LINES,
@@ -309,12 +310,10 @@ void test('the refreshed stamp names the order and its day', () => {
 	);
 });
 
-/** The words a fantasy screen never uses: the trading register (founder ruling 2026-09-07), "odds" (Lane 66m) and
- * verdict theatre (spec §2). Matched whole, with their plain inflections. */
-const BANNED =
-	/\b(market|prices?|priced|buy|buys|buying|sell|sells|selling|stock|assets?|value|values|valued|smash|robbery|fleece|fleeced|odds)\b/i;
-/** A dash between clauses (em or en), a semicolon, or a doubled word ("the the"). */
-const DASH = /[–—]/;
+/** The site's copy guard, with the in-season screens' own words: assets and values (founder ruling
+ * 2026-09-07) and verdict theatre (spec §2). */
+const BANNED = bannedPattern(/\b(assets?|value|values|valued|smash|robbery|fleece|fleeced)\b/);
+/** A doubled word ("the the"). */
 const DOUBLED_WORD = /\b([a-z]+)\s+\1\b/i;
 
 void test('copy guard: every in-season line is fantasy words, with no dash, semicolon, doubled word or tip', () => {
@@ -398,12 +397,11 @@ void test('copy guard: every in-season line is fantasy words, with no dash, semi
 	for (const text of lines) {
 		assert.ok(text, 'every composed line is said');
 		assert.doesNotMatch(text, BANNED, text);
-		assert.doesNotMatch(text, DASH, text);
-		assert.doesNotMatch(text, /;/, text);
 		assert.doesNotMatch(text, DOUBLED_WORD, text);
 	}
 	assert.match('a steal at his price', BANNED);
-	assert.match('a clause — another', DASH);
+	assert.match('a clause — another', BANNED);
+	assert.match('a clause – another', BANNED);
 });
 
 /** Every basis and sentence in an answer, however deep. */
@@ -429,8 +427,6 @@ void test("copy guard: the API's honesty lines and row sentences, as the fixture
 		assert.ok(said.length > 0, name);
 		for (const text of said) {
 			assert.doesNotMatch(text, BANNED, text);
-			assert.doesNotMatch(text, DASH, text);
-			assert.doesNotMatch(text, /;/, text);
 			assert.doesNotMatch(text, DOUBLED_WORD, text);
 		}
 	}

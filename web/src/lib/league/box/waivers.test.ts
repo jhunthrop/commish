@@ -1,6 +1,7 @@
 // The Waivers screen's table, strip and drop panel words (Lane 66f): run with `npm test`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { bannedPattern } from '#lib/format/copy-guard.ts';
 import type { PlayerLine, WaiverRow, WeekFacts } from '../inseason/api.ts';
 import {
 	BEATS_BASIS,
@@ -284,8 +285,7 @@ void test('copy guard: every Waivers line is fantasy words, with no dash, semico
 	];
 	// The guard reads the facts-read sentence too.
 	assert.ok(lines.some((said) => said.endsWith(FACTS_SENTENCE)));
-	const forbidden =
-		/\b(odds|line|spread|favou?red|underdog|bet|market|buy|sell|price|host|tip)\b|—|–|;/i;
+	const forbidden = bannedPattern(/\btips?\b/);
 	for (const said of lines) assert.doesNotMatch(said, forbidden, said);
 });
 

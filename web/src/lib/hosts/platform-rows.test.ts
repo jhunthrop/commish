@@ -2,6 +2,7 @@
 // fixed fact. Run with `npm test`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { bannedPattern } from '#lib/format/copy-guard.ts';
 import type { components } from '#lib/api/types.ts';
 import {
 	PLATFORMS,
@@ -105,5 +106,5 @@ void test('a read never made says so', () => {
 void test('the copy guard: no em-dash, semicolon or platform word in the table', () => {
 	const rows = platformRows({ enabled: ['yahoo'], connections: [] }, NOW);
 	const said = [...Object.values(PLATFORM_WORDS), ...rows.flatMap((r) => [r.state, r.line])];
-	for (const s of said) assert.doesNotMatch(s, /[—;]|\bhosts?\b/i, s);
+	for (const s of said) assert.doesNotMatch(s, bannedPattern(), s);
 });

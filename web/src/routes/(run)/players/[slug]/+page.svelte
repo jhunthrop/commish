@@ -1,10 +1,10 @@
 <script lang="ts">
+	import { EMPTY_FIGURE } from '#lib/format/empty.ts';
 	import { onMount } from 'svelte';
 	import { siteContext } from '#lib/context/context.svelte.ts';
 	import ContextNote from '#lib/context/ContextNote.svelte';
 	import { contextLine } from '#lib/context/context-format.ts';
 	import { apiFormatOf } from '#lib/run/format-ids.ts';
-	import { draftersGap } from '#lib/format/draft.ts';
 	import { fixed, signed } from '#lib/format/number.ts';
 	import { POSITION_NAMES } from '#lib/run/derive.ts';
 	import { readFigures } from '#lib/run/read-figures.ts';
@@ -45,7 +45,6 @@
 	const season = $derived(data.run.season);
 	const unit = $derived(lead.format.unit);
 	const scoring = $derived(lead.format.label);
-	const gap = $derived(draftersGap(n.adp, n.ourRank));
 	const figures = $derived(apiFormatOf(lead.format));
 	/** The league's line. */
 	const note = $derived(siteContext.notes?.lineFor(figures, 'These figures are') ?? null);
@@ -207,7 +206,7 @@
 			heads={page.season.heads}
 			projHead={{ short: CARD.proj, full: "the week's projection" }}
 			pointsHead={page.season.pointsHead}
-			pastProj="--"
+			pastProj={EMPTY_FIGURE}
 			line={page.season.line}
 			rows={page.season.rows}
 			next={live?.next ?? null}
@@ -277,7 +276,7 @@
 				<Fact label={lead.words.draftersLabel}>
 					{#snippet value()}
 						<Figure value={lead.words.draftersFigure} />
-						{#if !lead.rest && !heldOut}<GapChip {gap} />{/if}
+						{#if !lead.rest && !heldOut}<GapChip adp={n.adp} gap={n.gap} />{/if}
 					{/snippet}
 					{lead.words.drafters}
 				</Fact>

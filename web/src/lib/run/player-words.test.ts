@@ -3,6 +3,7 @@
 // compare caption. Run with `npm test`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { bannedPattern } from '#lib/format/copy-guard.ts';
 import {
 	draftersWords,
 	HELD_TIER_WORDS,
@@ -33,6 +34,7 @@ const BARE: PlayerFormat = {
 	ourRank: 12,
 	vorRound: 1,
 	adp: 15,
+	gap: 3,
 	projected: 140,
 	vor: 40,
 	expectedGames: 9.5,
@@ -80,7 +82,18 @@ void test('in season the drafters sentence gives the ADP alone, as a fact of the
 	);
 	assert.match(
 		draftersWords(NUMBERS, ['PPR drafts, Sep 9'], false),
-		/^We have him at pick 12, so drafters take him 3 picks later\./
+		/^We have him at pick 12, so drafters take him 3.0 picks later\./
+	);
+});
+
+void test("the drafters sentence reads the run's gap as given, and names none where the run wrote none", () => {
+	assert.equal(
+		draftersWords({ ...NUMBERS, adp: 5.5, ourRank: 10, gap: -4.5 }, ['PPR drafts'], false),
+		'We have him at pick 10, so drafters take him 4.5 picks earlier. ADP 5.5 from PPR drafts.'
+	);
+	assert.equal(
+		draftersWords({ ...NUMBERS, gap: undefined }, ['PPR drafts'], false),
+		'We have him at pick 12. ADP 15.0 from PPR drafts.'
 	);
 });
 
@@ -185,11 +198,13 @@ void test('a player on a season-long list is never given a rank as if he plays (
 		'If he plays, among the 618 on our board. He sits below the available players.'
 	);
 	for (const line of [words.caption, words.value, preseason.value, preseason.drafters]) {
-		assert.doesNotMatch(line, /rank \d|Round \d|pick \d|picks|[—;]/u, line);
+		assert.doesNotMatch(line, /rank \d|Round \d|pick \d|picks/u, line);
+		assert.doesNotMatch(line, bannedPattern(), line);
 	}
 });
 
 void test('a held player is placed in no tier: his aside says why (Lane 63, N1)', () => {
 	assert.match(HELD_TIER_WORDS, /^No tier while he is on a season-long list\./u);
-	assert.doesNotMatch(HELD_TIER_WORDS, /Tier \d|rank \d|[—;]/u);
+	assert.doesNotMatch(HELD_TIER_WORDS, /Tier \d|rank \d/u);
+	assert.doesNotMatch(HELD_TIER_WORDS, bannedPattern());
 });

@@ -1,6 +1,7 @@
 // A designation's words on every screen (Lane 63): run with `npm test`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { bannedPattern } from '#lib/format/copy-guard.ts';
 import { DESIGNATION_STATUSES } from '#lib/run/schema.ts';
 import { monthDay, zoneWord } from './clock.ts';
 import {
@@ -114,5 +115,5 @@ void test('no line carries an em-dash or a semicolon', () => {
 		captureLine({ readAt: LISTED, checkedAt: CHECKED }, SOON, CENTRAL),
 		captureLine({ readAt: LISTED, checkedAt: null }, SOON + CAPTURE_BEHIND_MS, CENTRAL)
 	];
-	for (const line of lines) assert.doesNotMatch(line, /[—;]/u, line);
+	for (const line of lines) assert.doesNotMatch(line, bannedPattern(), line);
 });

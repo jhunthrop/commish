@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { draftersGap } from '#lib/format/draft.ts';
+	import { EMPTY_FIGURE } from '#lib/format/empty.ts';
 	import { fixed, signed } from '#lib/format/number.ts';
 	import { scoringBasis } from '#lib/run/catalog.ts';
 	import { POSITION_NAMES } from '#lib/run/derive.ts';
@@ -147,7 +147,7 @@
 		<Fact label="Where drafters take him">
 			{#snippet value()}
 				<Figure value={n.adp === null ? 'No ADP' : `Pick ${fixed(n.adp, 0)}`} />
-				<GapChip gap={draftersGap(n.adp, n.ourRank)} />
+				<GapChip adp={n.adp} gap={n.gap} />
 			{/snippet}
 			We have him at pick {n.ourRank}.
 		</Fact>
@@ -210,7 +210,7 @@
 			basis="Projected {page.format.label} points, {run.season}"
 		/>
 		<Panel>
-			<PanelHead title="Tiers" aside="Drop to next" />
+			<PanelHead title="Tiers" aside={page.tier.cliff ? 'Drop to next' : undefined} />
 			<TierJump
 				{group}
 				tiers={[
@@ -251,7 +251,7 @@
 		>
 			{#each nightly.rows as row (row.id)}
 				<tr>
-					<td class="num">{row.adp === null ? 'None' : fixed(row.adp)}</td>
+					<td class="num">{row.adp === null ? EMPTY_FIGURE : fixed(row.adp)}</td>
 					<td>
 						<PlayerLine
 							name={row.name}
@@ -263,7 +263,7 @@
 						/>
 					</td>
 					<td class="num wide">{row.ourRank}</td>
-					<td><GapChip gap={draftersGap(row.adp, row.ourRank)} /></td>
+					<td><GapChip adp={row.adp} gap={row.gap} /></td>
 				</tr>
 			{/each}
 		</Table>

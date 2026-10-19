@@ -3,7 +3,8 @@
 	import { siteContext } from '#lib/context/context.svelte.ts';
 	import ContextNote from '#lib/context/ContextNote.svelte';
 	import { followFormat } from '#lib/context/follow.svelte.ts';
-	import { POSITION_NAMES, tierGroups } from '#lib/run/derive.ts';
+	import { POSITION_NAMES } from '#lib/run/derive.ts';
+	import { tierGroups } from '#lib/run/tiers.ts';
 	import type { BoardPage } from '#lib/server/pages/board.ts';
 	import { lazySheet } from './lazy-sheet.svelte.ts';
 	import RowSheetMark from './RowSheetMark.svelte';
@@ -126,12 +127,7 @@
 	const ours = $derived(sort.key === 'rank' && !sort.turned);
 	const banded = $derived(page.position !== null && ours);
 	const groups = $derived(
-		page.position === null
-			? []
-			: tierGroups(
-					page.rows.filter((row) => !heldOut(row)),
-					page.position
-				)
+		page.position === null ? [] : tierGroups(page.rows, page.position, heldOut)
 	);
 	const heldRows = $derived(page.position === null ? [] : page.rows.filter(heldOut).filter(shown));
 	const visible = $derived(
@@ -319,7 +315,11 @@
 	<aside class="side" id={SIDE_ID} aria-label="Your board">
 		{#if page.position !== null && !marketView && !inSeason}
 			<Panel>
-				<PanelHead title="Tiers" aside="Drop to next" />
+				<!-- A run older than the tier drop draws no drop, so the head names none. -->
+				<PanelHead
+					title="Tiers"
+					aside={groups.some((g) => g.cliff !== null) ? 'Drop to next' : undefined}
+				/>
 				<TierJump
 					{group}
 					tiers={groups.map((tierGroup) => ({
