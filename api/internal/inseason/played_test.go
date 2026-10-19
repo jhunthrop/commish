@@ -20,14 +20,14 @@ var (
 	sundayKickoff   = time.Date(2026, 10, 18, 17, 0, 0, 0, time.UTC)
 )
 
-func (thursdayReads) StatLines(context.Context, int) ([]boards.StatLine, error) {
+func (*thursdayReads) StatLines(context.Context, int) ([]boards.StatLine, error) {
 	return []boards.StatLine{
 		{PlayerID: "jsn", Position: "WR", Week: 5, Team: "SEA", Metrics: map[string]float64{"receptions": 8, "receiving_yards": 148}},
 		{PlayerID: "jsn", Position: "WR", Week: 6, Team: "SEA", Metrics: map[string]float64{"receptions": 12, "receiving_yards": 134}},
 	}, nil
 }
 
-func (thursdayReads) Schedule(context.Context, int) ([]boards.TeamWeek, error) {
+func (*thursdayReads) Schedule(context.Context, int) ([]boards.TeamWeek, error) {
 	return []boards.TeamWeek{
 		{Week: 5, Team: "SEA", Opponent: "ARI", Home: true, Kickoff: thursdayKickoff.AddDate(0, 0, -4), Final: true},
 		{Week: 5, Team: "ARI", Opponent: "SEA", Kickoff: thursdayKickoff.AddDate(0, 0, -4), Final: true},
@@ -70,8 +70,9 @@ func TestAGameWithLinesIsPlayedBeforeItsResultIsPosted(t *testing.T) {
 
 // The rule makes a new schedule and leaves the read's own untouched.
 func TestPlayedFromLinesLeavesTheReadAsItWas(t *testing.T) {
-	games, _ := thursdayReads{}.Schedule(context.Background(), 2026)
-	lines, _ := thursdayReads{}.StatLines(context.Background(), 2026)
+	reads := &thursdayReads{}
+	games, _ := reads.Schedule(context.Background(), 2026)
+	lines, _ := reads.StatLines(context.Background(), 2026)
 	out := playedFromLines(games, lines)
 	if games[2].Final || !out[2].Final {
 		t.Fatalf("read %v, ruled %v", games[2], out[2])

@@ -165,7 +165,8 @@ export function formatTable(lines: readonly { format: Format; rest: RestFigures 
 } {
 	const from = (format: Format): string => `rest of season from week ${String(format.rosFromWeek)}`;
 	const rest = lines.filter((line) => line.rest !== null);
-	if (rest.length === 0) return { head: FIGURE.projected, labels: lines.map((l) => l.format.label) };
+	if (rest.length === 0)
+		return { head: FIGURE.projected, labels: lines.map((l) => l.format.label) };
 	const [first] = rest;
 	if (first && rest.length === lines.length) {
 		const head = from(first.format);
