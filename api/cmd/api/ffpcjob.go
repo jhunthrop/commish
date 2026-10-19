@@ -48,7 +48,7 @@ func runFFPCRefresh(ctx context.Context, log *slog.Logger, cfg config.API, pool 
 			log.Warn("ffpc refresh: league", "league", ref.Key(), "err", err)
 			continue
 		}
-		if err := store.PutSnapshot(ctx, snap); err != nil {
+		if _, err := store.PutSnapshot(ctx, snap); err != nil {
 			return err
 		}
 		read++

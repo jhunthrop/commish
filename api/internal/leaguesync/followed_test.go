@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -91,6 +92,84 @@ func TestFollowIsTheAccountsOwnLeague(t *testing.T) {
 	if ok || code != http.StatusBadGateway || env.Error == nil || env.Error.Code != "unavailable" {
 		t.Fatalf("an unreadable host: ok %v %d %+v", ok, code, env.Error)
 	}
+}
+
+// A read that lands is followed for each account asked for that has the
+// league attached, as each one's route follows it, and for no one else
+// (FollowedAt, the trade search's warm run for the league's viewers; Lane
+// 66u).
+func TestALandedReadIsFollowedForEveryAccount(t *testing.T) {
+	pool := dbtest.Pool(t)
+	ctx := context.Background()
+	accounts := &auth.Store{Pool: pool}
+	alice, bob := newAccount(t, accounts, "landed_alice"), newAccount(t, accounts, "landed_bob")
+	svc := replayService(pool)
+	league := "https://sleeper.com/leagues/" + ReplaySleeperLeague + "/team"
+	for _, account := range []uuid.UUID{alice, bob} {
+		if status, _, _ := attachAs(t, svc, account, league); status != http.StatusCreated {
+			t.Fatalf("attach: %d", status)
+		}
+	}
+	dave := newAccount(t, accounts, "landed_dave")
+	ref := replayRef(t, svc, alice)
+	got, err := svc.FollowedAt(ctx, ref, []uuid.UUID{alice, bob, dave})
+	if err != nil {
+		t.Fatal(err)
+	}
+	seen := map[uuid.UUID]bool{}
+	for _, f := range got {
+		seen[f.Link.AccountID] = true
+		if f.Snap.Ref.LeagueID != ReplaySleeperLeague || f.Saved == nil {
+			t.Fatalf("a landed follow: league %s saved %v", f.Snap.Ref.LeagueID, f.Saved)
+		}
+	}
+	if len(got) != 2 || !seen[alice] || !seen[bob] {
+		t.Fatalf("followed for %v, want alice and bob", seen)
+	}
+	// Only the accounts asked for: bob did not view the league.
+	only, err := svc.FollowedAt(ctx, ref, []uuid.UUID{alice})
+	if err != nil || len(only) != 1 || only[0].Link.AccountID != alice {
+		t.Fatalf("followed for alice alone: %v %d", err, len(only))
+	}
+}
+
+// PutSnapshot says whether it wrote a row: nothing for a league no one has
+// attached, a write for the first read and for each one after (rereview
+// 66u F4, the flag Landed hears by).
+func TestPutSnapshotSaysWhetherItStored(t *testing.T) {
+	pool := dbtest.Pool(t)
+	ctx := context.Background()
+	store := &Store{Pool: pool}
+	unlinked := Snapshot{Ref: Ref{Host: HostSleeper, LeagueID: "999999999999", Season: 2026}, ReadAt: time.Now()}
+	if stored, err := store.PutSnapshot(ctx, unlinked); err != nil || stored {
+		t.Fatalf("an unattached league: stored %v, %v", stored, err)
+	}
+	alice := newAccount(t, &auth.Store{Pool: pool}, "stored_alice")
+	svc := replayService(pool)
+	if status, _, _ := attachAs(t, svc, alice, "https://sleeper.com/leagues/"+ReplaySleeperLeague+"/team"); status != http.StatusCreated {
+		t.Fatalf("attach: %d", status)
+	}
+	if _, err := pool.Exec(ctx, `delete from app.league_snapshots`); err != nil {
+		t.Fatal(err)
+	}
+	snap := Snapshot{Ref: replayRef(t, svc, alice), Name: "League", ReadAt: time.Now()}
+	for _, step := range []string{"the first read", "the next read"} {
+		if stored, err := store.PutSnapshot(ctx, snap); err != nil || !stored {
+			t.Fatalf("%s: stored %v, %v", step, stored, err)
+		}
+		snap.ReadAt = snap.ReadAt.Add(time.Minute)
+	}
+}
+
+// replayRef is how the account's attached replay league is read, from its
+// link.
+func replayRef(t *testing.T, svc *Service, account uuid.UUID) Ref {
+	t.Helper()
+	all, err := svc.Links.Attached(context.Background(), account)
+	if err != nil || len(all) == 0 {
+		t.Fatalf("attached: %v %d", err, len(all))
+	}
+	return all[0].Ref
 }
 
 // A saved league's kicking and defense rules are its host's: a league

@@ -272,19 +272,49 @@ func TestTheFinderRunsOncePerLeagueRead(t *testing.T) {
 	s := fixtureService(t, f.league, f.data, &fakeHolds{})
 	a := newFixtureAdvisor(t, f, nil)
 	runs := 0
-	find := func() map[string]bool { runs++; return a.tradeTargets() }
-	key := readKey(a, "acct")
+	find := func() (map[int][]Trade, error) { runs++; return a.findAll(context.Background()) }
+	get := func(b *advisor, account string) {
+		t.Helper()
+		if _, err := s.finds.get(pairKey(b, account), contentKey(b), find); err != nil {
+			t.Fatal(err)
+		}
+	}
 	for range 3 {
-		s.targets.get(key, find)
+		get(a, "acct")
 	}
 	if runs != 1 {
 		t.Fatalf("the finder ran %d times for one read", runs)
 	}
+	// A new read whose rosters, holds, projection and order are unchanged
+	// keeps the search (rereview 66u W1): the read time alone changes nothing.
 	moved := *a
 	moved.Snap.ReadAt = moved.Snap.ReadAt.Add(time.Minute)
-	s.targets.get(readKey(&moved, "acct"), find)
-	if runs != 2 {
-		t.Fatalf("a new league read ran the finder %d times", runs)
+	get(&moved, "acct")
+	if runs != 1 {
+		t.Fatalf("an unchanged read ran the finder again (%d runs)", runs)
+	}
+	// The drop follows this week's lineup, so a new projection read is a
+	// new search (Lane 66u N3), and it replaces the pair's last.
+	projected := *a
+	projected.projection.ReadAt = projected.projection.ReadAt.Add(time.Minute)
+	get(&projected, "acct")
+	if runs != 2 || len(s.finds.pairs) != 1 {
+		t.Fatalf("a new projection read: %d runs, %d pairs kept", runs, len(s.finds.pairs))
+	}
+	// Another account is another pair (rereview 66u W6).
+	get(&projected, "other")
+	if runs != 3 || len(s.finds.pairs) != 2 {
+		t.Fatalf("another account: %d runs, %d pairs kept", runs, len(s.finds.pairs))
+	}
+	// A changed hold is changed content.
+	held := projected
+	held.held = map[string]bool{"p001": true}
+	if contentKey(&held) == contentKey(&projected) {
+		t.Fatal("a hold leaves the content unchanged")
+	}
+	get(&held, "other")
+	if runs != 4 {
+		t.Fatalf("a changed hold ran the finder %d times in all", runs)
 	}
 	// A view with no row on another roster never runs it.
 	asked := 0

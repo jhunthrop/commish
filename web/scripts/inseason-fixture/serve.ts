@@ -353,6 +353,7 @@ function tradeCheck(input: TradeCheckInput): TradeCheck | string {
 		give: gives,
 		get: gets,
 		drop: null,
+		drop_reason: null,
 		my_gain: swing,
 		their_gain: -swing,
 		close_for_them: -swing < CLOSE_CALL,

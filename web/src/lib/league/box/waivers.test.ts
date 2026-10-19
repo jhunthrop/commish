@@ -101,8 +101,8 @@ const row = (add: PlayerLine, over: Partial<WaiverRow> = {}): WaiverRow => ({
 		open_spot: false
 	},
 	drops: [
-		{ host_id: lemon.player.host_id, gain: 1.2, week_gain: 6.7 },
-		{ host_id: vidal.player.host_id, gain: 0.6, week_gain: 6.7 }
+		{ host_id: lemon.player.host_id, gain: 1.2, week_gain: 6.7, starts_this_week: false },
+		{ host_id: vidal.player.host_id, gain: 0.6, week_gain: 6.7, starts_this_week: true }
 	],
 	clears: null,
 	sentence: '',
@@ -121,7 +121,7 @@ const chiefs = row(line('Chiefs D/ST', 'DEF', 9.6, 7), {
 		gain: 2.7,
 		open_spot: false
 	},
-	drops: [{ host_id: saints.player.host_id, gain: 0.3, week_gain: 2.7 }]
+	drops: [{ host_id: saints.player.host_id, gain: 0.3, week_gain: 2.7, starts_this_week: true }]
 });
 const mevis = row(line('Harrison Mevis', 'K', 6.7, 7.6), {
 	gain: -0.3,
@@ -162,7 +162,7 @@ void test('the strip names each pickup as a card: the move, both gains, the sum 
 	assert.deepEqual(cards.map(moveWords), ['Add Gainwell, drop Lemon', 'Add Chiefs, drop Saints']);
 	assert.equal(
 		cardGains(cards[0] ?? { weekGain: 0, gain: 0 }),
-		'+6.7 Proj this week, +1.2 a week rest of season'
+		'+6.7 Proj this week, +1.2 Gain a week'
 	);
 	assert.equal(cards[1]?.slot, 'D/ST');
 	assert.equal(pickupsTitle(2), 'Two pickups');
@@ -233,6 +233,10 @@ void test("the drop panel lists the roster's players he could replace, the advic
 		['Makai Lemon', 'Kimani Vidal']
 	);
 	assert.equal(sameWeekGain(drops), 6.7);
+	// Every player he could replace is listed, this week's starters marked with the shared status chip
+	// (review 66u, finding 1).
+	assert.equal(drops[0]?.starter, null);
+	assert.deepEqual(drops[1]?.starter, { rank: null, mark: 'Starter', sits: false, line: null });
 	assert.equal(
 		dropLead(6.7),
 		'+6.7 Proj this week with any of them. The one you lose least by comes first.'
@@ -240,7 +244,7 @@ void test("the drop panel lists the roster's players he could replace, the advic
 	assert.equal(dropLead(null), 'The one you lose least by comes first.');
 	assert.equal(sameWeekGain([{ weekGain: 1 }, { weekGain: 2 }]), null);
 	assert.equal(dropTitle('Kenny Gainwell'), 'Drop one for Kenny Gainwell');
-	const chosen = withDrop(gainwell, drops[1] ?? null);
+	const chosen = withDrop(gainwell, drops.at(1) ?? null);
 	assert.equal(chosen.drop?.player.name, 'Kimani Vidal');
 	assert.equal(chosen.gain, 0.6);
 	assert.equal(withDrop(gainwell, null), gainwell);
@@ -308,9 +312,9 @@ void test('a card says a last name in full when another player on screen shares 
 
 const BASIS = {
 	basis:
-		'A pickup starts for you this week on the Proj shown and does not lower your rest of season on our rest-of-season order. Its drop is the one you lose least by.',
+		'A pickup starts for you this week on the Proj shown and its Gain is not below zero on our rest-of-season order. Its drop is the one you lose least by.',
 	season_basis:
-		"Rest of season is his points a game on our rest-of-season projection from week 6, byes out. A gain a week is your lineup's points over replacement on our rest-of-season order, averaged over its 12 weeks.",
+		"Rest of season is his points a game on our rest-of-season projection from week 6, byes out. Gain is the change in your lineup's points over replacement a week on our rest-of-season order, averaged over its 12 weeks.",
 	projection_read_at: '2026-10-17T02:00:00.000Z',
 	projection_previous_read_at: '2026-10-16T02:00:00.000Z',
 	projection_scoring: { format: 'ppr' as const, league_own: false }

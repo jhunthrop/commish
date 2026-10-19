@@ -14,8 +14,8 @@ import {
 	offerText,
 	phoneWith,
 	proposeVerb,
+	roomWords,
 	rosterOrder,
-	seasonHead,
 	shortSide,
 	sideRows,
 	weekLine,
@@ -70,6 +70,7 @@ const row = (mine: number, theirs: number, over: Partial<TradeRow> = {}): TradeR
 	give: [line('Aaron Rodgers', 'QB')],
 	get: [line('Cam Skattebo'), line('Pierre Strong')],
 	drop: line('Jaxson Dart', 'QB'),
+	drop_reason: null,
 	my_gain: mine,
 	their_gain: theirs,
 	close_for_them: theirs < 0.5,
@@ -148,7 +149,18 @@ void test('a trade reads by last names, its gains and week signed, its room by n
 	assert.equal(toneOf(-5.6), 'loss');
 	assert.equal(toneOf(0.01), 'even');
 	assert.equal(phoneWith({ name: 'Max_Jensen10' }, best), 'with Max_Jensen10, you drop Dart');
-	assert.equal(phoneWith({ name: 'Muttdogs' }, { drop: null }), 'with Muttdogs');
+	assert.equal(phoneWith({ name: 'Muttdogs' }, { drop: null, drop_reason: null }), 'with Muttdogs');
+	// A drop this week's lineup starts says so wherever the drop is named, the opened trade carrying
+	// the API's whole sentence (review 66u finding 3).
+	const reason =
+		'Williams starts at WR3 for you this week, and Tucker takes that spot after the trade.';
+	const starter = { drop: line('Antonio Williams', 'WR'), drop_reason: reason };
+	assert.equal(roomWords(starter).yours, 'You drop Williams, a starter');
+	assert.equal(
+		phoneWith({ name: 'Bower Rangers' }, starter),
+		'with Bower Rangers, you drop Williams, a starter'
+	);
+	assert.equal(roomWords(best).yours, 'You drop Dart');
 	assert.equal(fromWords('McConkey Kong Country', true), 'From McConkey Kong Country, you');
 	assert.equal(fromWords('Max_Jensen10', false), 'From Max_Jensen10');
 });
@@ -296,8 +308,6 @@ const advice: Pick<
 void test('the basis is five lines at most, the first saying which trades are listed', () => {
 	const lines = tradeBasis(advice, 'sleeper', [line('Cam Skattebo')], 'America/Chicago');
 	assert.ok(lines.length <= 5, String(lines.length));
-	assert.equal(seasonHead('rest_of_season'), 'Rest of season, a week');
-	assert.equal(seasonHead('preseason'), 'Preseason number, a week');
 	assert.match(
 		lines[0] ?? '',
 		/^Trades where both lineups gain on our rest-of-season order\. .*then the close calls for them\. The other team decides\./
@@ -319,8 +329,6 @@ void test('copy guard: every word the trade table prints is fantasy words, the p
 	const room = checkRoom(check({}, line('Jaxson Dart', 'QB')));
 	const said: string[] = [
 		...Object.values(TRADES),
-		seasonHead('rest_of_season'),
-		seasonHead('preseason'),
 		worthTitle(2),
 		worthTitle(1),
 		phoneWith({ name: 'Max_Jensen10' }, row(5.7, 0.7)),
