@@ -1,10 +1,11 @@
 /** The fixture API's game states (Lane 80): every answer's games stamped with the state the API's
  * gameStateAt (api/internal/inseason/facts.go) gives them at the fixture's clock, so a shots script on
  * the Monday or the Tuesday clock draws what the API would. A game is final once the stored answer
- * says played, or, for a game kicked off before the finals land, from FIXTURE_FINALS_AT on (the
- * weekly pass that brings the week's stats, clock.ts). A kicker's or a defense's row moves to the
- * kicked-off section with its game, as the API's sectionOf does. */
-import { FIXTURE_FINALS_AT } from './clock.ts';
+ * says played, Thursday's from the fixture week's own instant on (FIXTURE_WEEK_CLOCK), and any game
+ * kicked off before the finals land from FIXTURE_FINALS_AT on (the weekly pass that brings the
+ * week's stats, clock.ts). A kicker's or a defense's row moves to the kicked-off section with its
+ * game, as the API's sectionOf does. */
+import { FIXTURE_FINALS_AT, FIXTURE_WEEK_CLOCK } from './clock.ts';
 
 type State = 'upcoming' | 'kicked_off' | 'final';
 
@@ -16,6 +17,12 @@ interface Game {
 }
 
 const FINALS = Date.parse(FIXTURE_FINALS_AT);
+/** The fixture week's own instant: week 6's Thursday game is in by it (clock.ts). */
+const THURSDAY_IN = Date.parse(FIXTURE_WEEK_CLOCK);
+
+/** A game kicked off before `landed` is final once `now` reaches it. */
+const inBy = (kickoff: number, landed: number, now: number): boolean =>
+	kickoff < landed && now >= landed;
 
 function isGame(value: Record<string, unknown>): value is Record<string, unknown> & Game {
 	return typeof value.played === 'boolean' && 'kickoff' in value;
@@ -25,7 +32,7 @@ function isGame(value: Record<string, unknown>): value is Record<string, unknown
 export function stateAt(game: Game, now: number): State | null {
 	if (game.bye === true || game.kickoff === null) return null;
 	const kickoff = Date.parse(game.kickoff);
-	if (game.played || (kickoff < FINALS && now >= FINALS)) return 'final';
+	if (game.played || inBy(kickoff, THURSDAY_IN, now) || inBy(kickoff, FINALS, now)) return 'final';
 	return now >= kickoff ? 'kicked_off' : 'upcoming';
 }
 
