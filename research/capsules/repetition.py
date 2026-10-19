@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from typing import Final
 
 from research.capsules.config import CAPSULE_CONFIG, Repetition
+from research.capsules.names import fold_name
 from research.capsules.narrative import sentences_of, sentences_verbatim
 from research.model.decide.slots import id_key
 
@@ -67,7 +68,6 @@ def stock_sentences(
     return sorted(findings, key=lambda f: (-len(f.player_ids), id_key(f.key)))
 
 
-_TITLECASE: Final = re.compile(r"^[A-Z][a-z]")
 _USAGE_CUES: Final = (
     re.compile(r"\bsnap share\b|\bof (?:the|his team's) snaps\b", re.IGNORECASE),
     re.compile(r"\btarget share\b|\bof (?:the|his team's) targets\b", re.IGNORECASE),
@@ -77,15 +77,25 @@ _RANK_CUE: Final = re.compile(r"\b(?:QB|RB|WR|TE)\d{1,2}\b|\bamong \d+\b", re.IG
 _RANK_CUES_FOR_A_TOUR: Final = 3
 
 
+def _is_titlecase(word: str) -> bool:
+    """A capital then a small letter, in any script ("Élan" as much as "Evan")."""
+    return len(word) > 1 and word[0].isupper() and word[1].islower()
+
+
 def _bare(token: str) -> str:
-    return re.sub(r"^[^a-z0-9']+|[^a-z0-9']+$", "", token, flags=re.IGNORECASE).lower()
+    """A token as a word for comparison: folded (`names.fold_name`), its edge punctuation stripped."""
+    return re.sub(r"^[^a-z0-9']+|[^a-z0-9']+$", "", fold_name(token))
+
+
+def _name_words(name: str | None) -> set[str]:
+    return {_bare(w) for w in (name or "").split() if _bare(w)}
 
 
 def opener_family(text: str, name: str | None, words: int = CAPSULE_CONFIG.repetition.opener_words) -> str:
     """`openerFamily`: the first words, his name and any other name as `_`, a number as `#`."""
     tokens = text.split()[:words]
-    names = {w for w in (name or "").lower().split() if w}
-    titled = [_TITLECASE.match(t.lstrip("\"'(")) is not None for t in tokens]
+    names = _name_words(name)
+    titled = [_is_titlecase(t.lstrip("\"'(")) for t in tokens]
     first_is_name = len(tokens) > 1 and titled[1] and _bare(tokens[1]) not in names
     family = []
     for index, token in enumerate(tokens):
@@ -100,7 +110,7 @@ def opener_family(text: str, name: str | None, words: int = CAPSULE_CONFIG.repet
 
 
 def _opener_example(text: str, name: str | None, words: int) -> str:
-    names = {w for w in (name or "").lower().split() if w}
+    names = _name_words(name)
     joined = " ".join("[name]" if _bare(t) in names else t for t in text.split()[:words])
     return re.sub(r"(\[name\]\s+)+\[name\]", "[name]", joined)
 
