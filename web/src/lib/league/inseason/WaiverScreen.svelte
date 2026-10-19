@@ -143,7 +143,13 @@
 	const positions = $derived(
 		POSITIONS.filter((p) => advice.rows.some((r) => r.add.player.position === p))
 	);
-	const pool = $derived(poolRows({ rows: shown.rows, pickups: advice.pickups }, memberZone(), now));
+	const pool = $derived(
+		poolRows(
+			{ rows: shown.rows, pickups: advice.pickups, pickup_order: shown.pickup_order },
+			memberZone(),
+			now
+		)
+	);
 	const rows = $derived(findRows(sortRows(pool, sort), query));
 	const cards = $derived(pickupCards(advice));
 	const card = $derived(cards.find((c) => c.key === chosenCard) ?? cards[0] ?? null);

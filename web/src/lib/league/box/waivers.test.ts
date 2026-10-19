@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { bannedPattern } from '#lib/format/copy-guard.ts';
 import type { PlayerLine, WaiverRow, WeekFacts } from '../inseason/api.ts';
+import { addKey } from '../inseason/move.ts';
 import { basisText, KICKED_OFF_PART } from './basis.ts';
 import {
 	cardGains,
@@ -152,6 +153,7 @@ const allen = row(line('Kaytron Allen', 'RB', null, 9.6, { bye: true, opponent: 
 	clears: '2026-10-21'
 });
 const advice = {
+	pickup_order: 'week' as const,
 	rows: [jones, gainwell, mevis, allen, chiefs],
 	pickups: [gainwell, chiefs],
 	roster: [lemon, vidal, saints],
@@ -296,11 +298,14 @@ void test('Beats prints the open spot only when the API says it: an empty Beats 
 		beats: { host_id: '', name: '', starter: true, gain: 4.8, open_spot: true },
 		week_gain: 4.8
 	});
-	const [only] = poolRows({ rows: [taylor], pickups: [taylor] }, ZONE, NOW);
+	const [only] = poolRows({ pickup_order: 'week', rows: [taylor], pickups: [taylor] }, ZONE, NOW);
 	assert.deepEqual(only?.beats, { name: 'Open spot', starter: true, gain: 4.8, unit: 'week' });
 	// A flex start that tops no one at his own position is no open spot.
 	const flex = row(line('Theo Johnson', 'WR', 10.8), { beats: null, starts: true, week_gain: 0.3 });
-	assert.equal(poolRows({ rows: [flex], pickups: [] }, ZONE, NOW)[0]?.beats, null);
+	assert.equal(
+		poolRows({ pickup_order: 'week', rows: [flex], pickups: [] }, ZONE, NOW)[0]?.beats,
+		null
+	);
 });
 
 void test('a card says a last name in full when another player on screen shares it', () => {
@@ -359,7 +364,11 @@ void test('a narrowed read draws at its own instant: past his kickoff his game f
 	// The page read the pool Friday evening; the member narrowed to his position 30 minutes after his
 	// kickoff. At the page's clock his expected score would stand; at the narrowed read's it is gone.
 	const total = { game_total: { points: 44.5, team_points: 23, read_at: FACTS_READ } };
-	const pool = { rows: [row(line('Mason Taylor', 'TE', 4.77, 5.3, total))], pickups: [] };
+	const pool = {
+		pickup_order: 'week' as const,
+		rows: [row(line('Mason Taylor', 'TE', 4.77, 5.3, total))],
+		pickups: []
+	};
 	const narrowedAt = Date.parse('2026-10-18T17:30:00.000Z');
 	assert.equal(poolRows(pool, ZONE, NOW)[0]?.row.expected, '23 to 21.5');
 	assert.equal(poolRows(pool, ZONE, narrowedAt)[0]?.row.expected, null);
@@ -375,8 +384,8 @@ void test('the basis says when Final and the stats land while a row waits on the
 	assert.ok(!basisText(waiverBasis(BASIS, [saints], RULES, CLOCK, NOW)).includes(KICKED_OFF_PART));
 });
 
-/** The API's answer once a pickup's game has kicked off (inseason season_order.go, Lane 85 fix round
- * 3): the rows by the season Gain, the strip its first, every week figure withheld. */
+/** A row as the API sends it in the season Gain order (inseason season_order.go, Lane 85 fix round
+ * 4): his game final, every week figure withheld, as the engine gives a Final add (no week gain). */
 const seasonOrder = (r: WaiverRow): WaiverRow => ({
 	...r,
 	add: { ...r.add, facts: { ...r.add.facts, played: true, game_state: 'final' } },
@@ -387,8 +396,16 @@ const seasonOrder = (r: WaiverRow): WaiverRow => ({
 const SEASON_WORDS = 'Pickups go in Gain order once their week 6 games kick off.';
 
 void test('in the API season order the web prints it: the season Gain in Beats, no week figure (M-E)', () => {
-	const rows = [gainwell, chiefs, mevis, jones, allen].map(seasonOrder);
-	const tuesday = { ...advice, rows, pickups: [rows[0] ?? gainwell] };
+	// The API's order: by the season Gain.
+	const rows = [gainwell, chiefs, mevis, { ...jones, gain: -0.5 }, { ...allen, gain: -0.8 }].map(
+		seasonOrder
+	);
+	const tuesday = {
+		...advice,
+		pickup_order: 'season_gain' as const,
+		rows,
+		pickups: [rows[0] ?? gainwell]
+	};
 	const pool = poolRows(tuesday, ZONE, NOW);
 	const top = pool[0];
 	assert.ok(top?.beats);
@@ -437,4 +454,28 @@ void test('the web never re-orders the strip: the cards are the API pickups in i
 	assert.ok(week.some((p) => p.text === WAIVERS.dropRule && !p.phone));
 	const none = waiverBasis({ ...BASIS, pickups: [] }, [gainwell.add], RULES, CLOCK, NOW);
 	assert.ok(!none.some((p) => p.text === WAIVERS.dropRule));
+});
+
+void test('in season order the table prints the API rows in its order, the strip its top row (M-H guard)', () => {
+	// The API's season Gain order: a row topping no one first, a bench player topped above a starter.
+	const rows = [
+		{ ...allen, gain: 2.1 },
+		{ ...jones, gain: 1.5 },
+		{ ...gainwell, gain: 1.2 },
+		{ ...chiefs, gain: 0.3 },
+		{ ...mevis, gain: -0.3 }
+	].map(seasonOrder);
+	const top = rows[0] ?? allen;
+	const answer = { ...advice, pickup_order: 'season_gain' as const, rows, pickups: [top] };
+	const printed = sortRows(poolRows(answer, ZONE, NOW), DEFAULT_SORT);
+	assert.deepEqual(
+		printed.map((r) => r.key),
+		rows.map(addKey)
+	);
+	assert.equal(printed[0]?.key, pickupCards(answer)[0]?.key);
+	assert.equal(printed[0]?.named, true);
+	assert.ok(printed.every((r) => r.source.week_gain === null && r.beats?.unit !== 'week'));
+	// The week order keeps the Beats sort: a starter topped first.
+	const week = sortRows(poolRows(advice, ZONE, NOW), DEFAULT_SORT);
+	assert.equal(week[0]?.row.name, 'Kenny Gainwell');
 });
