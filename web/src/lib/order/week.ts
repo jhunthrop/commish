@@ -226,13 +226,7 @@ export function weekBasis(
 		part(`${BOX.avg} and ${BOX.last} are ${whose} points a game and last game, ${scoring}.`, true),
 		part(gameSentence(advice, zone, now), true),
 		// The section head says Kicked off on the phone too; when Final lands is said at a desk.
-		part(
-			kickedOffPart(
-				advice.rows.map((row) => row.line),
-				now
-			),
-			false
-		),
+		part(kickedOffPart(advice.rows.map((row) => row.line)), false),
 		league !== null && advice.read_at !== null
 			? part(rosterBasis(league.host, advice.read_at, zone), false)
 			: null

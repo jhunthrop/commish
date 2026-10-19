@@ -130,22 +130,22 @@ void test('the weather is a glyph and two or three words, the venue first', () =
 });
 
 void test('the game cell: the opponent and kickoff, Final once played, the bye', () => {
-	assert.deepEqual(gameOf(facts({ kickoff: SUNDAY_NOON }), ZONE, NOW), {
+	assert.deepEqual(gameOf(facts({ kickoff: SUNDAY_NOON }), ZONE), {
 		where: 'at ATL',
 		when: 'Sun 12:00 pm'
 	});
-	assert.deepEqual(gameOf(facts({ home: true, played: true }), ZONE, NOW), {
+	assert.deepEqual(gameOf(facts({ home: true, played: true }), ZONE), {
 		where: 'vs ATL',
 		when: 'Final'
 	});
-	assert.equal(gameOf(facts({ bye: true }), ZONE, NOW), 'bye');
-	assert.equal(gameOf(facts({ opponent: null }), ZONE, NOW), null);
+	assert.equal(gameOf(facts({ bye: true }), ZONE), 'bye');
+	assert.equal(gameOf(facts({ opponent: null }), ZONE), null);
 });
 
 void test("a game kicked off with no final says so, by the API's state (Lane 80)", () => {
 	const monday = facts({ kickoff: SUNDAY_NOON, game_state: 'kicked_off' });
-	assert.deepEqual(gameOf(monday, ZONE, NOW), { where: 'at ATL', when: 'Kicked off' });
-	assert.deepEqual(gameOf(facts({ game_state: 'final', played: true }), ZONE, NOW), {
+	assert.deepEqual(gameOf(monday, ZONE), { where: 'at ATL', when: 'Kicked off' });
+	assert.deepEqual(gameOf(facts({ game_state: 'final', played: true }), ZONE), {
 		where: 'at ATL',
 		when: 'Final'
 	});

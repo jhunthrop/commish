@@ -82,10 +82,10 @@ export const KICKED_OFF_PART = `${BOX.kickedOff} turns ${BOX.final} within the h
 
 /** KICKED_OFF_PART where a row's game has kicked off with no final yet, or is final with the week's
  * stats not in his games yet; else null. */
-export function kickedOffPart(lines: readonly PlayerLine[], now: number): string | null {
+export function kickedOffPart(lines: readonly PlayerLine[]): string | null {
 	const waiting = lines.some(({ facts }) => {
 		if (facts.bye) return false;
-		const state = gameStateOf(facts, now);
+		const state = gameStateOf(facts);
 		return (
 			state === 'kicked_off' ||
 			(state === 'final' && !facts.last_games.some((game) => game.week === facts.week))

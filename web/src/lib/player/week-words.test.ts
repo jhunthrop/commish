@@ -295,8 +295,8 @@ void test("the game facts' read is said only while his game is still to be playe
 	const after = card(week(), null, kickoff).basis[1] ?? '';
 	assert.match(before, /weather were read Fri 9:00 pm Central\.$/);
 	assert.ok(!after.includes('were read'), after);
-	// Kicked off with no final: when the final lands takes the read's place (Lane 80).
-	assert.ok(after.endsWith(`PPR scoring. ${KICKED_OFF_PART}`), after);
+	// A read with no state (review finding 5) says no state: the evidence line ends there.
+	assert.match(after, /PPR scoring\.$/);
 });
 
 void test("with a league the verb is the league screens', the platform named", () => {

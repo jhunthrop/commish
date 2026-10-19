@@ -256,19 +256,17 @@ export function weatherCell(facts: Pick<WeekFacts, 'roof' | 'weather'>): Weather
 }
 
 /** His game's first line: the opponent with "at" or "vs", then by the game's state the kickoff on
- * the member's clock, "Kicked off" or "Final"; "bye" on a bye week; null when we hold no game. */
-export function gameOf(facts: WeekFacts, zone: string, now: number): BoxGame | 'bye' | null {
+ * the member's clock, "Kicked off" or "Final" by the API's state; "bye" on a bye week; null when we hold
+ * no game. */
+export function gameOf(facts: WeekFacts, zone: string): BoxGame | 'bye' | null {
 	if (facts.bye) return 'bye';
 	if (facts.opponent === null) return null;
 	const where = `${facts.home === false ? 'at' : 'vs'} ${facts.opponent}`;
-	switch (gameStateOf(facts, now)) {
-		case 'final':
-			return { where, when: BOX.final };
-		case 'kicked_off':
-			return { where, when: BOX.kickedOff };
-		case 'upcoming':
-			return { where, when: facts.kickoff === null ? '' : weekdayTime(facts.kickoff, zone) };
-	}
+	const state = gameStateOf(facts);
+	// A read with no state (review finding 5) says only what it holds: Final when played, else the kickoff.
+	if (state === 'final' || (state === null && facts.played)) return { where, when: BOX.final };
+	if (state === 'kicked_off') return { where, when: BOX.kickedOff };
+	return { where, when: facts.kickoff === null ? '' : weekdayTime(facts.kickoff, zone) };
 }
 
 /** A player's face: his headshot, or a defense's club mark with the club in its words. */
@@ -302,7 +300,7 @@ export function boxRow(
 		position: positionWord(player.position),
 		pill: pillOf(player.position, ranked ? line.position_rank : null),
 		status: statusOf(facts.designation, player.injured_reserve, zone),
-		game: gameOf(facts, zone, now),
+		game: gameOf(facts, zone),
 		expected: ahead ? expectedWords(facts) : null,
 		weather: ahead ? weatherCell(facts) : null,
 		proj: line.week_projection,

@@ -135,7 +135,7 @@ function firstOf(lines: readonly PlayerLine[], zone: string, now: Date): FrontLe
 	const rows = lines.map((line) => boxRow(line, '', zone, false, now.getTime()));
 	const names = rows.map((r) => shortName(r.name));
 	const who = names.length === 1 ? `${names.join('')} plays` : `${names.join(' and ')} play`;
-	const game = gameOf(lead.facts, zone, now.getTime());
+	const game = gameOf(lead.facts, zone);
 	const where = game !== null && game !== 'bye' ? `, ${game.where}` : '';
 	return { rows, words: `${who} first${where}` };
 }

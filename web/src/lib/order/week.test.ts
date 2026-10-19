@@ -8,6 +8,7 @@ import { FIGURE } from '#lib/format/figure-words.ts';
 import { KICKED_OFF_PART } from '#lib/league/box/basis.ts';
 import { BOX } from '#lib/league/box/box.ts';
 import type { WeekOrderAdvice } from './api.ts';
+import { stamped } from '../../../scripts/inseason-fixture/game-state.ts';
 import { weekOrderPath } from './path.ts';
 import {
 	foldedEvidence,
@@ -49,7 +50,11 @@ const withNote = (
 	K: { ...tabs.K, ...RULES_NOTE },
 	DEF: { ...tabs.DEF, ...RULES_NOTE }
 });
-const fixture = { read: withNote(stored.read), unread: withNote(stored.unread) };
+// The fixture API's answers as it serves them: every game stamped with the API's state at its clock.
+const fixture = {
+	read: withNote(stamped(stored.read, SATURDAY) as typeof stored.read),
+	unread: withNote(stamped(stored.unread, TUESDAY) as typeof stored.unread)
+};
 const visitor = (a: WeekOrderAdvice): WeekOrderAdvice => ({
 	...a,
 	read_at: null,

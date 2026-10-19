@@ -160,7 +160,8 @@ export function orderBasis(
 		...said(OPP_PART),
 		...(league === null ? [] : uncountedParts(advice, league.rulesHref)),
 		...said(gamePart(lines, clock, now, 'read'), false),
-		...said(kickedOffPart(lines, now), false),
+		// Said on the phone too: the board has the room (review finding 6); K/DST keeps it to a desk.
+		...said(kickedOffPart(lines)),
 		...(league !== null && advice.read_at !== null
 			? said(rosterBasis(league.host, advice.read_at, zone), false)
 			: [])

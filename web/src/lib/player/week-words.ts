@@ -260,7 +260,7 @@ function deltaTile(week: PlayerWeek, zone: string, now: number): CardTile {
 		value: ahead ? deltaWord(week.line.projection_delta) : NONE,
 		caption: ahead
 			? deltaCaption(week, zone)
-			: gameStateOf(week.line.facts, now) === 'final'
+			: gameStateOf(week.line.facts) === 'final'
 				? CARD.gameFinal
 				: CARD.kickedOff,
 		tone: 'quiet'
@@ -306,7 +306,7 @@ export function liveBasis(week: PlayerWeek, league: boolean, zone: string, now: 
 		? 'your scoring'
 		: `${SCORING_WORDS[week.projection_scoring.format]} scoring`;
 	const evidence = `${OPP_PART} ${avgLastPart(scoring)}`;
-	const facts = gamePart([week.line], clock, now, 'next') ?? kickedOffPart([week.line], now);
+	const facts = gamePart([week.line], clock, now, 'next') ?? kickedOffPart([week.line]);
 	return [proj, facts === null ? evidence : `${evidence} ${facts}`];
 }
 
@@ -319,7 +319,7 @@ function nextOf(
 	now: number
 ): { cell: NextCell | null; next: LogNext | null } {
 	const { facts } = week.line;
-	const game = gameOf(facts, zone, now);
+	const game = gameOf(facts, zone);
 	if (game === null || game === 'bye') return { cell: null, next: null };
 	const ahead = toBePlayed(facts, now);
 	const cell: NextCell = {
