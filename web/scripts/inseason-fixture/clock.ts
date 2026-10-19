@@ -24,12 +24,20 @@ export function fixtureClock(at: string | undefined, started: number = Date.now(
 	return () => from + (Date.now() - started);
 }
 
-/** The clock the fixture API at `origin` says it runs on (its /fixture/clock), null on the real one. */
-export async function fixtureApiClock(origin: string): Promise<string | null> {
+/** What the fixture API at `origin` says of its clock (its /fixture/clock): the instant FIXTURE_CLOCK
+ * started it at, null on the real clock, and the instant it reads now. */
+export interface FixtureApiClock {
+	clock: string | null;
+	now: string;
+}
+
+export async function fixtureApiClock(origin: string): Promise<FixtureApiClock> {
 	const said = await (
 		await fetch(`${origin}/fixture/clock`)
-	).json<{ data: { clock: string | null } | null }>();
-	return said.data?.clock ?? null;
+	).json<{ data: FixtureApiClock | null }>();
+	if (said.data === null)
+		throw new Error(`The fixture API at ${origin} said nothing of its clock.`);
+	return said.data;
 }
 
 /** Stops a shots script whose fixture API is not on `clock`: the browser runs on it, so every read
@@ -38,14 +46,16 @@ export async function requireFixtureClock(
 	origin: string,
 	clock: string = FIXTURE_WEEK_CLOCK
 ): Promise<void> {
-	const running = await fixtureApiClock(origin);
+	const running = (await fixtureApiClock(origin)).clock;
 	if (running !== clock)
 		throw new Error(
 			`The fixture API at ${origin} runs on ${running ?? 'the real clock'}: start it with ${FIXTURE_CLOCK_VARIABLE}=${clock}.`
 		);
 }
 
-/** Puts a shots script's browser on `clock`, never the day the script runs. */
+/** Puts a shots script's browser on `clock`, never the day the script runs. A script whose words say
+ * how long ago a read was passes the API's own instant now (fixtureApiClock), so the browser and the
+ * API agree however long the API has run. */
 export async function installFixtureClock(
 	ctx: Pick<BrowserContext, 'clock'>,
 	clock: string = FIXTURE_WEEK_CLOCK

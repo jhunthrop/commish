@@ -21,7 +21,11 @@ import { mkdir } from 'node:fs/promises';
 import { chromium, type BrowserContext, type Page } from 'playwright';
 import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
 import { copyFault, watchData } from './copy-scan.ts';
-import { installFixtureClock, requireFixtureClock } from './inseason-fixture/clock.ts';
+import {
+	fixtureApiClock,
+	installFixtureClock,
+	requireFixtureClock
+} from './inseason-fixture/clock.ts';
 
 const THEMES = ['dark', 'light'] as const;
 const WIDTHS = [1440, 1024, 800, 768, 390] as const;
@@ -64,7 +68,8 @@ async function context(theme: string, width: number, height: number): Promise<Br
 		deviceScaleFactor: width < 500 ? 2 : 1
 	});
 	watchData(ctx);
-	await installFixtureClock(ctx);
+	// The API's own instant, so its reads are minutes old to the browser too.
+	await installFixtureClock(ctx, (await fixtureApiClock(API_ORIGIN)).now);
 	await ctx.addCookies([{ ...SIGNED_IN, domain: 'localhost', path: '/' }]);
 	await ctx.addInitScript(
 		([key, value]: readonly [string, string]) => localStorage.setItem(key, value),
