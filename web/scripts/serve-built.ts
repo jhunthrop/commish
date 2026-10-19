@@ -13,7 +13,7 @@ import {
 	isHeadshotLeague
 } from '../src/lib/ui/headshot.ts';
 import { upstreamClubMarkUrl, upstreamHeadshotUrl } from '../src/lib/ui/headshot-provider.ts';
-import { clubMarkPath } from '../src/lib/ui/club-mark.ts';
+import { clubMarkPath } from '../src/lib/server/image-route.ts';
 
 const PORT = Number(process.env.PORT ?? 4173);
 const ROOT = new URL('../.svelte-kit/cloudflare/', import.meta.url).pathname;
