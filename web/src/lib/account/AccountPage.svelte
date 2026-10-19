@@ -56,6 +56,9 @@
 	const api = accountApi(apiClient(PUBLIC_API_URL), () => navigator.onLine);
 
 	let view = $state<AccountState | null>(null);
+	/** The room's clock: the connections' and the leagues' last reads are said against it, the
+	 * moment the page was drawn. */
+	const drawnAt = new Date();
 	/** The API's sentence for an action that failed, shown beside the action. */
 	let problem = $state<string | null>(null);
 	let busy = $state(false);
@@ -256,8 +259,8 @@
 
 			<div class="grid">
 				<div class="lists">
-					<AccountConnections />
-					<AccountLeagues features={account.features} />
+					<AccountConnections now={drawnAt} />
+					<AccountLeagues features={account.features} now={drawnAt} />
 					{#if groupPasses.length > 0}
 						<GroupPasses
 							passes={groupPasses}

@@ -32,6 +32,13 @@
 	 * why not, its last read, and its one verb. Disconnect deletes what we keep at once; a platform
 	 * that dropped the connection has its way back in as the solid verb; one not connected opens its
 	 * connect form under the table. Every state is GET /hosts; it reads its own answer. */
+	interface Props {
+		/** The account room's clock the rows' last reads are said against. */
+		now: Date;
+	}
+
+	let { now }: Props = $props();
+
 	let hosts = $state<HostConnections | null>(null);
 	let failed = $state(false);
 	let busy = $state(false);
@@ -57,7 +64,7 @@
 
 	onMount(load);
 
-	const rows = $derived(hosts ? platformRows(hosts, new Date()) : []);
+	const rows = $derived(hosts ? platformRows(hosts, now) : []);
 
 	/** What disconnecting deleted, said once it went through. */
 	const GONE: Readonly<Record<ConnectedHost, string>> = {

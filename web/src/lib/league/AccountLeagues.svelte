@@ -16,9 +16,11 @@
 	interface Props {
 		/** What the account may use (/me, Can): many_leagues follows more than one league. */
 		features: readonly Feature[];
+		/** The account room's clock the rows' last reads are said against. */
+		now: Date;
 	}
 
-	let { features }: Props = $props();
+	let { features, now }: Props = $props();
 
 	/** The account's leagues on other hosts, each with a quiet way to stop following it and, for a
 	 * few seconds after, to take that back. It reads its own list, so the account page's other reads
@@ -38,8 +40,6 @@
 
 	/** How long a detached league stays on the list with its undo. */
 	const UNDO_MS = 10_000;
-	/** The clock the rows' last reads are said against: the page's, when it was drawn. */
-	const now = new Date();
 
 	onMount(() => {
 		// Read in the browser only: the account page's shell is prerendered.
