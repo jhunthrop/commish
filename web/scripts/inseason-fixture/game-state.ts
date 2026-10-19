@@ -1,11 +1,11 @@
 /** The fixture API's game states (Lane 80): every answer's games stamped with the state the API's
- * gameStateAt (api/internal/inseason/facts.go) gives them at the fixture's clock, so a shots script on
- * the Monday or the Tuesday clock draws what the API would. A game is final once the stored answer
- * says played, Thursday's from the fixture week's own instant on (FIXTURE_WEEK_CLOCK), and any game
- * kicked off before the finals land from FIXTURE_FINALS_AT on (the weekly pass that brings the
- * week's stats, clock.ts). A kicker's or a defense's row moves to the kicked-off section with its
- * game, as the API's sectionOf does. */
-import { FIXTURE_FINALS_AT, FIXTURE_WEEK_CLOCK } from './clock.ts';
+ * gameStateAt (api/internal/inseason/facts.go) gives them at the fixture's clock. A game is final
+ * once the stored answer says played, or once the hourly capture's game status for either club says
+ * final at or before the clock: data/game-status.json stands in for the `tank01_game_status` rows the
+ * capture writes (research/pipeline/tank01/game_status.py), each club final at the first capture pass
+ * three and a half hours after its kickoff. A kicker's or a defense's row moves to the kicked-off
+ * section with its game, as the API's sectionOf does. */
+import { readFileSync } from 'node:fs';
 
 type State = 'upcoming' | 'kicked_off' | 'final';
 
@@ -13,27 +13,42 @@ interface Game {
 	played: boolean;
 	kickoff: string | null;
 	bye?: boolean;
+	team?: string;
+	opponent?: string | null;
 	game_state?: State | null;
 }
 
-const FINALS = Date.parse(FIXTURE_FINALS_AT);
-/** The fixture week's own instant: week 6's Thursday game is in by it (clock.ts). */
-const THURSDAY_IN = Date.parse(FIXTURE_WEEK_CLOCK);
+interface StatusRow {
+	team: string;
+	kickoff: string;
+	status: 'final';
+	as_of: string;
+}
 
-/** A game kicked off before `landed` is final once `now` reaches it. */
-const inBy = (kickoff: number, landed: number, now: number): boolean =>
-	kickoff < landed && now >= landed;
+const STATUSES = (
+	JSON.parse(readFileSync(new URL('./data/game-status.json', import.meta.url), 'utf8')) as {
+		rows: StatusRow[];
+	}
+).rows;
+
+/** When the capture first held a final for a club's game at that kickoff, null before. */
+function finalAt(team: string | null | undefined, kickoff: string): number | null {
+	const row = STATUSES.find((r) => r.team === team && r.kickoff === kickoff);
+	return row === undefined ? null : Date.parse(row.as_of);
+}
 
 function isGame(value: Record<string, unknown>): value is Record<string, unknown> & Game {
 	return typeof value.played === 'boolean' && 'kickoff' in value;
 }
 
-/** The API's rule at `now`, the finals landing at FIXTURE_FINALS_AT. */
+/** The API's rule at `now`: final by the stored answer or the capture's status for either club. */
 export function stateAt(game: Game, now: number): State | null {
 	if (game.bye === true || game.kickoff === null) return null;
-	const kickoff = Date.parse(game.kickoff);
-	if (game.played || inBy(kickoff, THURSDAY_IN, now) || inBy(kickoff, FINALS, now)) return 'final';
-	return now >= kickoff ? 'kicked_off' : 'upcoming';
+	const final = [finalAt(game.team, game.kickoff), finalAt(game.opponent, game.kickoff)].some(
+		(at) => at !== null && at <= now
+	);
+	if (game.played || final) return 'final';
+	return now >= Date.parse(game.kickoff) ? 'kicked_off' : 'upcoming';
 }
 
 function sectionOf(facts: Game, now: number): 'to_play' | 'kicked_off' | 'bye' {

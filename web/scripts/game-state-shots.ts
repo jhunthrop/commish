@@ -1,20 +1,22 @@
-// Screenshots of a game's three states on the day after (Lane 80): the board's RB tab signed in,
-// /players, Josh Allen's page, the schedule and the clubs, dark and light at 1440 and dark at 390, on
-// the fixture's Monday clock (week 6's Sunday games kicked off, Thursday's final) or its Tuesday clock
-// (the finals in). The fixture API must run on the same clock (FIXTURE_CLOCK), and stamps every game
-// with the API's state at it (inseason-fixture/game-state.ts). Each screen asserts:
-//   Monday: the API's rows say Kicked off and never carry an expected score or the weather after
-//   kickoff, the basis says when Final lands, and no row says Kicked off on Tuesday;
-//   the bases never claim a week a Sunday player's GP does not reach ("through week 6" alone);
-//   the schedule and clubs head their strength Rest of season strength, never the preseason's;
-//   every basis within five rendered lines at 1440 and eight at 390 (basis-lines.ts), the copy
-//   passing the one guard (copy-scan.ts), nothing scrolling sideways.
-// The prerendered pages read the contract run (2026-10-21T12-ros), the same on both clocks, whose schedule carries its own
-// states at its instant: weeks 1 to 5 and Thursday's week 6 game final, the rest of week 6 kicked off.
+// Screenshots of a game's three states through week 6's Sunday and after (Lane 80), dark and light at
+// 1440 and dark at 390, on one of the fixture's clocks (inseason-fixture/clock.ts):
+//   sunday   the noon games under way: Kicked off, no expected score or weather on those rows;
+//   monday   every Sunday game final by the hourly status, its stats not in yet;
+//   tuesday  every week 6 game final.
+// The fixture API must run on the same clock (FIXTURE_CLOCK); it stamps every game with the API's state
+// at it, the finals from the hourly status rows (inseason-fixture/game-state.ts).
+// SET=contract (the site built from the contract run, 2026-10-21T12-ros): the board's RB tab signed in,
+// /players, Josh Allen's card (his live week replaces the run's week still to play: still to play on
+// Sunday, Final after), the schedule and the clubs (Rest of season strength, never the
+// preseason's). SET=standin (the site built from the stand-in run): Jaxson Dart's card, whose live week
+// replaces the run's week still to play, so his week 6 shows one state.
+// Every screen: the basis says when Final and the stats land while a row waits on either, never claims
+// a week a Sunday player's GP does not reach, and stays within five rendered lines at 1440 and eight
+// at 390 (basis-lines.ts); the copy passes the one guard (copy-scan.ts); nothing scrolls sideways.
 // Exits non-zero on any fault.
 //
-//   CLOCK=monday|tuesday node scripts/game-state-shots.ts [web origin] [out dir, from scripts/]
-// with the site built from the contract run against PUBLIC_API_URL at the fixture API.
+//   CLOCK=sunday|monday|tuesday SET=contract|standin node scripts/game-state-shots.ts [web origin] [out dir]
+// with the site built against PUBLIC_API_URL at the fixture API.
 import { mkdir } from 'node:fs/promises';
 import { chromium, type BrowserContext, type Page } from 'playwright';
 import { KICKED_OFF_PART } from '../src/lib/league/box/basis.ts';
@@ -22,11 +24,21 @@ import { STRENGTH_HEADS } from '../src/lib/run/strength-words.ts';
 import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
 import { BASIS_BUDGET, basisLines } from './basis-lines.ts';
 import { copyFault, watchData } from './copy-scan.ts';
-import { FIXTURE_MONDAY_CLOCK, FIXTURE_TUESDAY_CLOCK } from './inseason-fixture/clock.ts';
+import {
+	FIXTURE_MONDAY_CLOCK,
+	FIXTURE_SUNDAY_CLOCK,
+	FIXTURE_TUESDAY_CLOCK
+} from './inseason-fixture/clock.ts';
 
-const CLOCKS = { monday: FIXTURE_MONDAY_CLOCK, tuesday: FIXTURE_TUESDAY_CLOCK } as const;
-const day = (process.env.CLOCK ?? 'monday') as keyof typeof CLOCKS;
+const CLOCKS = {
+	sunday: FIXTURE_SUNDAY_CLOCK,
+	monday: FIXTURE_MONDAY_CLOCK,
+	tuesday: FIXTURE_TUESDAY_CLOCK
+} as const;
+type Day = keyof typeof CLOCKS;
+const day = (process.env.CLOCK ?? 'sunday') as Day;
 const clock = CLOCKS[day];
+const set = process.env.SET === 'standin' ? 'standin' : 'contract';
 const web = process.argv[2] ?? 'http://localhost:4196';
 const out = new URL(process.argv[3] ?? `../screenshots/game-state/${day}/`, import.meta.url);
 const SHOTS: readonly (readonly ['dark' | 'light', number])[] = [
@@ -38,12 +50,23 @@ const VIEWPORT_HEIGHT = 900;
 const READY_TIMEOUT_MS = 30_000;
 const SIGNED_IN = { name: 'commish_csrf', value: 'fixture' };
 const KICKED_OFF = 'Kicked off';
+const FINAL = 'Final';
 /** Words a game past its kickoff never carries: its expected score and its weather. */
 const AFTER_KICKOFF = /Roof TBD|\d+(\.5)? to \d+(\.5)?\b/;
+/** The state a card's week 6 game shows on each clock, null while it is still to play: Jaxson Dart's
+ * NYG at NO kicks off Sunday at noon Eastern, Josh Allen's BUF at LV at 3:25 pm. */
+type CardWeek = Readonly<Record<Day, string | null>>;
+const DART_WEEK: CardWeek = { sunday: KICKED_OFF, monday: FINAL, tuesday: FINAL };
+const ALLEN_WEEK: CardWeek = { sunday: null, monday: FINAL, tuesday: FINAL };
+const CARDS: Readonly<Record<string, CardWeek>> = {
+	'jaxson-dart': DART_WEEK,
+	'josh-allen': ALLEN_WEEK
+};
 
 interface Screen {
 	name: string;
 	path: string;
+	set: 'contract' | 'standin';
 	signedIn: boolean;
 	ready: string;
 	/** The API's rows: their Game cells read the state. */
@@ -56,6 +79,7 @@ const SCREENS: readonly Screen[] = [
 	{
 		name: 'board-rb',
 		path: '/board/ppr-12/rb',
+		set: 'contract',
 		signedIn: true,
 		ready: 'Our rest-of-season order',
 		rows: 'table.order tbody tr',
@@ -64,6 +88,7 @@ const SCREENS: readonly Screen[] = [
 	{
 		name: 'players',
 		path: '/players',
+		set: 'contract',
 		signedIn: false,
 		ready: 'Find a player',
 		rows: 'table.order tbody tr',
@@ -72,6 +97,7 @@ const SCREENS: readonly Screen[] = [
 	{
 		name: 'josh-allen',
 		path: '/players/josh-allen',
+		set: 'contract',
 		signedIn: false,
 		ready: 'Josh Allen',
 		rows: null,
@@ -80,12 +106,30 @@ const SCREENS: readonly Screen[] = [
 	{
 		name: 'schedule',
 		path: '/schedule',
+		set: 'contract',
 		signedIn: false,
 		ready: 'schedule strength',
 		rows: null,
 		strength: true
 	},
-	{ name: 'clubs', path: '/clubs', signedIn: false, ready: 'Clubs', rows: null, strength: true }
+	{
+		name: 'clubs',
+		path: '/clubs',
+		set: 'contract',
+		signedIn: false,
+		ready: 'Clubs',
+		rows: null,
+		strength: true
+	},
+	{
+		name: 'jaxson-dart',
+		path: '/players/jaxson-dart',
+		set: 'standin',
+		signedIn: true,
+		ready: 'Still to play',
+		rows: null,
+		strength: false
+	}
 ];
 
 const API_ORIGIN = new URL(process.env.API_ORIGIN ?? 'http://localhost:8799').origin;
@@ -131,34 +175,56 @@ async function ready(page: Page, text: string): Promise<void> {
 	await page.waitForLoadState('networkidle');
 }
 
-/** The API's rows: Kicked off on Monday, never on Tuesday, and no expected score or weather on a
- * row whose game is past its kickoff. */
+/** The API's rows: Kicked off only while a game is under way (Sunday), none on Monday or Tuesday,
+ * and no expected score or weather on a row whose game is past its kickoff. */
 async function checkRows(page: Page, screen: Screen, at: string): Promise<void> {
 	if (screen.rows === null) return;
 	const rows = await page.locator(screen.rows).allInnerTexts();
 	if (rows.length === 0) fault(at, 'no rows');
 	const kicked = rows.filter((text) => text.includes(KICKED_OFF));
-	if (day === 'monday' && kicked.length === 0) fault(at, 'no row says Kicked off on Monday');
-	if (day === 'tuesday' && kicked.length > 0)
-		fault(at, `${String(kicked.length)} rows say Kicked off on Tuesday`);
-	for (const text of kicked) {
+	const final = rows.filter((text) => text.includes(FINAL));
+	if (day === 'sunday' && kicked.length === 0) fault(at, 'no row says Kicked off on Sunday');
+	if (day !== 'sunday' && kicked.length > 0)
+		fault(at, `${String(kicked.length)} rows say Kicked off on ${day}`);
+	if (day !== 'sunday' && final.length === 0) fault(at, `no row says Final on ${day}`);
+	for (const text of [...kicked, ...final]) {
 		if (AFTER_KICKOFF.test(text))
-			fault(at, `a kicked-off row carries its expected score or weather: ${text}`);
+			fault(at, `a played row carries its expected score or weather: ${text}`);
 	}
+}
+
+/** A card: his live week in the accent row with the clock's state (the API's, which takes the run's
+ * place), no expected score once played, and week 6 shown once. */
+async function checkCard(page: Page, week: CardWeek, at: string): Promise<void> {
+	const accent = await page.locator('tr.next').innerText();
+	const state = week[day];
+	if (state === null) {
+		if (accent.includes(KICKED_OFF) || accent.includes(FINAL))
+			fault(at, `his week 6 is still to play but reads "${accent}"`);
+	} else {
+		if (!accent.includes(state)) fault(at, `his week 6 reads "${accent}", not ${state}`);
+		if (AFTER_KICKOFF.test(accent))
+			fault(at, `his played week carries its expected score: ${accent}`);
+	}
+	const ahead = await page.locator('section.ahead li').allInnerTexts();
+	if (ahead.some((text) => /^Wk 6\b/.test(text.trim())))
+		fault(at, 'week 6 shows twice, in the accent row and still to play');
 }
 
 async function checkPage(page: Page, screen: Screen, width: number, at: string): Promise<void> {
 	const text = await page.locator('main').innerText();
 	await checkRows(page, screen, at);
-	if (screen.name === 'josh-allen') {
-		// His weeks still to play are the run's: the contract run's week 6 is kicked off whatever the
-		// clock (its finals come with the next nightly), and the fixture holds no live week for him.
-		if (!text.includes(KICKED_OFF)) fault(at, `his week 6 does not say ${KICKED_OFF}`);
-		if (text.includes('Roof TBD')) fault(at, 'his played game keeps Roof TBD');
-	}
-	if (day === 'monday' && screen.rows !== null && width === 1440 && !text.includes(KICKED_OFF_PART))
-		fault(at, 'the basis does not say when Final lands');
-	if (/through week 6(?! and)/.test(text) && day === 'monday')
+	const card = CARDS[screen.name];
+	if (card !== undefined) await checkCard(page, card, at);
+	// Sunday's rows wait on their finals, Monday's on their stats: the basis says when each lands.
+	if (
+		day !== 'tuesday' &&
+		screen.rows !== null &&
+		width === 1440 &&
+		!text.includes(KICKED_OFF_PART)
+	)
+		fault(at, 'the basis does not say when Final and the stats land');
+	if (/through week 6(?! and)/.test(text) && day !== 'tuesday')
 		fault(at, 'a basis claims week 6 over Sunday players');
 	if (screen.strength) {
 		if (!text.includes(STRENGTH_HEADS.rest)) fault(at, `no ${STRENGTH_HEADS.rest}`);
@@ -177,7 +243,7 @@ async function checkPage(page: Page, screen: Screen, width: number, at: string):
 	process.stdout.write(`${at}: basis ${String(lines)} lines\n`);
 }
 
-for (const screen of SCREENS) {
+for (const screen of SCREENS.filter((s) => s.set === set)) {
 	for (const [theme, width] of SHOTS) {
 		const ctx = await context(theme, width, screen.signedIn);
 		const page = await ctx.newPage();
@@ -185,6 +251,8 @@ for (const screen of SCREENS) {
 		try {
 			await page.goto(`${web}${screen.path}`);
 			await ready(page, screen.ready);
+			if (CARDS[screen.name] !== undefined)
+				await page.locator('tr.next').waitFor({ timeout: READY_TIMEOUT_MS });
 			await checkPage(page, screen, width, at);
 			const name = `${screen.name}-${theme}-${String(width)}`;
 			await page.screenshot({ path: new URL(`${name}-top.png`, out).pathname });
@@ -202,4 +270,4 @@ if (faults.length > 0) {
 	process.stderr.write(`${faults.join('\n')}\n`);
 	process.exit(1);
 }
-process.stdout.write(`${day}: every screen holds\n`);
+process.stdout.write(`${day} ${set}: every screen holds\n`);

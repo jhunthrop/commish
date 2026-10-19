@@ -9,16 +9,16 @@ export const FIXTURE_WEEK_CLOCK = '2026-10-17T17:00:00.000Z';
  * game still to be played (Lane 66w's honest empty state). */
 export const FIXTURE_UNREAD_CLOCK = '2026-10-13T17:00:00.000Z';
 
-/** Monday Oct 19 2026, 11:00 am Central (Lane 80): every week 6 Sunday game has kicked off and none
- * has its final, Thursday's is final. */
+/** Sunday Oct 18 2026, 2:00 pm Central (Lane 80): the noon games under way (kicked off, no final),
+ * London's and Thursday's final by the hourly status (data/game-status.json), the late games ahead. */
+export const FIXTURE_SUNDAY_CLOCK = '2026-10-18T19:00:00.000Z';
+
+/** Monday Oct 19 2026, 11:00 am Central (Lane 80): every Sunday game final by the hourly status, their
+ * stats not in yet, Monday night's ahead. */
 export const FIXTURE_MONDAY_CLOCK = '2026-10-19T16:00:00.000Z';
 
-/** Tuesday Oct 20 2026, noon Central (Lane 80): the weekly pass has brought week 6's finals in. */
+/** Tuesday Oct 20 2026, noon Central (Lane 80): every week 6 game final, Monday night's included. */
 export const FIXTURE_TUESDAY_CLOCK = '2026-10-20T17:00:00.000Z';
-
-/** When week 6's finals land in the fixture: the Tuesday 08:00 Eastern weekly pass that brings the
- * week's stats (research JOBS.md, `inseason`). A game kicked off before it is final from then on. */
-export const FIXTURE_FINALS_AT = '2026-10-20T12:00:00.000Z';
 
 /** The environment variable the fixture API reads its clock from. */
 export const FIXTURE_CLOCK_VARIABLE = 'FIXTURE_CLOCK';
