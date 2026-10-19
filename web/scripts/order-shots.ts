@@ -13,10 +13,14 @@
 //
 //   node scripts/order-shots.ts [web origin] [out dir, from scripts/]
 // with the site built on a rest-of-season run against PUBLIC_API_URL=http://localhost:8799 and the
-// fixture API running there.
+// fixture API running there, and the build's run inputs set (PUBLIC_RUN_ID, PUBLIC_RUN_BASE_URL), from
+// which the record's scale sentence is read.
 import { mkdir, writeFile } from 'node:fs/promises';
 import { chromium, type BrowserContext, type Page } from 'playwright';
 import { FIGURE } from '../src/lib/format/figure-words.ts';
+import { runConfigFrom } from '../src/lib/run/config.ts';
+import { RUN_PATHS, recordSchema } from '../src/lib/run/schema.ts';
+import { openRun } from '../src/lib/run/source.ts';
 import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
 import { basisLines, basisReport } from './basis-lines.ts';
 import { copyFault, watchData } from './copy-scan.ts';
@@ -39,8 +43,11 @@ const SETTLE_MS = 300;
 const FOLDS_AT = 1100;
 const BASIS_WIDTH = 1440;
 const CHART_MIN_HEIGHT = 200;
-/** The run's scale (research/nightly/reads/record.py SCALE), as the contract run carries it. */
-const RECORD_SCALE = "1.0 is a perfect match of the week's finishing order, 0 is none.";
+/** The record's scale sentence as the run the site was built from carries it (research/nightly/
+ * reads/record.py SCALE), read from the run with the build's own inputs, never a copy typed here. */
+const RECORD_SCALE = (
+	await (await openRun(runConfigFrom(process.env))).read(RUN_PATHS.record, recordSchema)
+).scale;
 /** Below this width the roster mark folds onto the club line. */
 const ROSTER_FOLDS_AT = 900;
 /** Trade for him on fewer rows than this share (the coordinator's ruling 3). */
