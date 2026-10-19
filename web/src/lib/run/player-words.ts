@@ -2,7 +2,7 @@
 import { gapPicks } from '#lib/format/gap-picks.ts';
 import { FIGURE } from '#lib/format/figure-words.ts';
 import { fixed } from '#lib/format/number.ts';
-import { playerRestFrom, playerRestWords } from './rest-from.ts';
+import { playerRestFrom, playerRestWords, restOfSeasonHead } from './rest-from.ts';
 import { restLead, type FiguresReach } from './rest-words.ts';
 import type { Format, PlayerFormat } from './schema.ts';
 
@@ -172,20 +172,21 @@ export function formatTable(
 } {
 	// His own first week still to play at the run (Lane 86), the same in every format.
 	const from = (line: (typeof lines)[number]): string =>
-		`rest of season ${playerRestWords(playerRestFrom(line.format, line.numbers))}`;
+		restOfSeasonHead(playerRestWords(playerRestFrom(line.format, line.numbers)));
 	const rest = lines.filter((line) => line.rest !== null);
 	if (rest.length === 0)
 		return { head: FIGURE.projected, labels: lines.map((l) => l.format.label) };
 	const [first] = rest;
 	if (first && rest.length === lines.length) {
-		const head = from(first);
 		return {
-			head: head.charAt(0).toUpperCase() + head.slice(1),
+			head: from(first),
 			labels: lines.map((l) => l.format.label)
 		};
 	}
 	return {
 		head: FIGURE.projected,
-		labels: lines.map((l) => (l.rest === null ? l.format.label : `${l.format.label}, ${from(l)}`))
+		labels: lines.map((l) =>
+			l.rest === null ? l.format.label : `${l.format.label}, ${from(l).toLowerCase()}`
+		)
 	};
 }

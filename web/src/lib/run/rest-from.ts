@@ -18,6 +18,16 @@ export function playerRestWords(week: number | null): string {
 	return week === null ? 'with no game left' : restFromWords(week, false);
 }
 
+/** The every-format table's points head: "Rest of season from week 7". */
+export function restOfSeasonHead(from: string): string {
+	return `Rest of season ${from}`;
+}
+
+/** The tier box's basis in season: "Projected PPR points for the rest of 2026 from week 8". */
+export function tierBasisWords(label: string, season: number, from: string): string {
+	return `Projected ${label} points for the rest of ${String(season)} ${from}`;
+}
+
 /** The board's words: its first week, and whether a game of it was played at the run. Null on a
  * preseason board. */
 export function boardRestFrom(

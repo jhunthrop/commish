@@ -4,7 +4,7 @@
 import { windowLabel } from '#lib/format/date.ts';
 import { withStatuses } from '#lib/run/board-status.ts';
 import { availableTierOf } from '#lib/run/held-places.ts';
-import { boardRestFrom } from '#lib/run/rest-from.ts';
+import { boardRestFrom, tierBasisWords } from '#lib/run/rest-from.ts';
 import type {
 	AdpSource,
 	Capsule,
@@ -192,6 +192,19 @@ async function mates(
 	};
 }
 
+/** The tier box's basis: preseason the season's; in season the board's week, or with only him in the
+ * box his own, as his tile words the same figure (review M3). */
+function tierBasisOf(
+	lead: { format: Format; restParts: RestParts | null },
+	mates: number,
+	season: number
+): string {
+	const board = boardRestFrom(lead.format);
+	if (board === null) return `Projected ${lead.format.label} points, ${String(season)}`;
+	const from = mates === 1 && lead.restParts !== null ? lead.restParts.from : board;
+	return tierBasisWords(lead.format.label, season, from);
+}
+
 /** His club's city and nickname. */
 function clubNameOf(list: readonly Club[], team: string): string {
 	const club = list.find((candidate) => candidate.abbr === team);
@@ -237,6 +250,7 @@ export async function playerPage(slug: string, now: number): Promise<PlayerPage>
 	);
 	const [lead] = lines;
 	if (!lead) throw new Error(`${loaded.name} has a page but no format ranks him.`);
+	const tier = await mates(lead.format, entry, capture);
 	const status =
 		capture && listed
 			? {
@@ -255,12 +269,9 @@ export async function playerPage(slug: string, now: number): Promise<PlayerPage>
 		format: lead.format,
 		numbers: lead.numbers,
 		lines,
-		tier: await mates(lead.format, entry, capture),
+		tier,
 		pointsHead: formatTable(lines).head,
-		tierBasis:
-			lead.format.rosFromWeek === undefined
-				? `Projected ${lead.format.label} points, ${String(run.season)}`
-				: `Projected ${lead.format.label} points for the rest of ${String(run.season)} ${boardRestFrom(lead.format) ?? ''}`,
+		tierBasis: tierBasisOf(lead, tier.mates.length, run.season),
 		words: lead.words,
 		rest: lead.rest,
 		adpSources: lead.adpSources,

@@ -12,7 +12,9 @@ void test('the words are the one table the API embeds, every head named', () => 
 		points: 'Points',
 		perGame: 'A game',
 		avg: 'Avg',
-		week: 'Wk'
+		week: 'Wk',
+		restFrom: 'from week {week}',
+		restFromPartial: "from week {week}'s games left"
 	});
 });
 

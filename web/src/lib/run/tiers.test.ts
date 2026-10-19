@@ -41,7 +41,7 @@ void test("each tier's drop is the run's, as given, and the last tier has none",
 	const groups = tierGroups(BOARD, 'WR');
 	assert.deepEqual(
 		groups.map((g) => g.cliff),
-		[{ drop: 16.8, nextTier: 2 }, { drop: 4.5, nextTier: 3 }, null]
+		[{ drop: 16.8, nextTier: 2, nextId: 'c' }, { drop: 4.5, nextTier: 3, nextId: 'd' }, null]
 	);
 });
 
@@ -62,7 +62,7 @@ void test("a held player at a tier's edge leaves that drop unsaid, the others st
 	);
 	assert.deepEqual(
 		groups.map((g) => g.cliff),
-		[null, { drop: 4.5, nextTier: 3 }, null]
+		[null, { drop: 4.5, nextTier: 3, nextId: 'd' }, null]
 	);
 });
 

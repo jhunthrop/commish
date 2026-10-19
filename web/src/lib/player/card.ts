@@ -3,6 +3,7 @@
  * Last before the week is read), and the week's read (live.ts) words what the API holds. */
 import { EMPTY_FIGURE } from '#lib/format/empty.ts';
 import { FIGURE } from '#lib/format/figure-words.ts';
+import type { BoardFormat } from '#lib/sheet/model.ts';
 
 /** A tile's tone: the accent for this week's projection, the ease of his opponent, quiet for the
  * change. */
@@ -46,6 +47,9 @@ export interface RestParts {
 	rank: string;
 	scoring: TileScoring;
 	label: string;
+	/** The format the read's rest_of_season figures name for the tile's (the API's BoardFormat), null
+	 * for a run format the API does not value. */
+	board: BoardFormat | null;
 }
 
 /** His rank at his position in words: the number in our order, or Lane 63's word for a player on a

@@ -94,7 +94,8 @@ void test("the rest tile's parts carry its first week, its rank words and its sc
 		from: 'from week 6',
 		rank: 'WR1 in our order',
 		scoring: 'ppr',
-		label: 'PPR'
+		label: 'PPR',
+		board: 'ppr'
 	});
 	assert.equal(restParts(PRESEASON, NUMBERS, 'WR', undefined), null);
 	// Lane 86: his club's game of the board's first week was played at the run, so his own week leads.

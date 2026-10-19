@@ -97,6 +97,7 @@ export function restParts(
 	if (format.rosFromWeek === undefined) return null;
 	return {
 		from: playerRestWords(playerRestFrom(format, numbers)),
+		board: apiFormatOf(format),
 		rank: rankIn(numbers, position, status),
 		scoring: scoringOf(format),
 		label: format.label

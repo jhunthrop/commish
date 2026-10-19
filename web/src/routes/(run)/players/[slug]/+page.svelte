@@ -96,7 +96,16 @@
 		try {
 			const module = await import('#lib/player/live.ts');
 			const player = { id: page.id, name: page.name, team: page.team, position: page.position };
-			const week = await module.readWeek(player, at);
+			const tierFormat = apiFormatOf(lead.format);
+			const ask =
+				tierFormat === null || page.tier.mates.length === 0
+					? null
+					: {
+							ids: page.tier.mates.map((mate) => mate.id),
+							next: page.tier.cliff?.nextId ?? null,
+							format: tierFormat
+						};
+			const week = await module.readWeek(player, at, ask);
 			if (mine !== asked) return;
 			live = module.liveCard({
 				week,
@@ -106,6 +115,7 @@
 				opponents: page.card.opponents,
 				games: page.card.games,
 				rest,
+				tier: { label: scoring, season, single: page.tier.mates.length === 1 },
 				screenHref: module.screenHrefFor(at),
 				// The page's clock: the card is drawn at the moment its week is read.
 				now: Date.now()
@@ -189,9 +199,28 @@
 	const statusNote = $derived(statusWords?.note ?? null);
 	/** On a season-long list: no tier and no gap frame the rank his figure would earn. */
 	const heldOut = $derived(page.status?.status.seasonLong === true);
+	/** The tier box: each player's figure at the read's clock once it answers (Lane 86), the run's
+	 * before. */
 	const mates = $derived(
-		page.tier.mates.map((mate) => ({ ...mate, href: links.player(mate.slug) }))
+		page.tier.mates.map((mate) => ({
+			...mate,
+			projected: live?.tier?.points[mate.id] ?? mate.projected,
+			href: links.player(mate.slug)
+		}))
 	);
+	const tierCliff = $derived(
+		page.tier.cliff && live?.tier?.drop != null
+			? { ...page.tier.cliff, drop: live.tier.drop }
+			: page.tier.cliff
+	);
+	/** The every-format table's figures for a line: the read's at its clock, the run's before. */
+	const lineFigures = (
+		line: (typeof page.lines)[number]
+	): { points: number; vor: number | null } => {
+		const format = apiFormatOf(line.format);
+		const read = format === null ? undefined : live?.formats?.figures[format];
+		return read ?? { points: line.numbers.projected, vor: line.numbers.vor };
+	};
 	/** The week tile's head as drawn ("Wk 6"), which the unread basis names. */
 	const weekTileHead = $derived(tiles.find((tile) => tile.key === 'proj')?.label ?? CARD.proj);
 	/** Every number's basis, once: the week's, the rest of season's, the season's. */
@@ -341,9 +370,9 @@
 							group={POSITION_NAMES[page.position]}
 							{mates}
 							currentId={page.id}
-							cliff={page.tier.cliff}
+							cliff={tierCliff}
 							unit={page.format.unit}
-							basis={page.tierBasis}
+							basis={live?.tier?.basis ?? page.tierBasis}
 						/>
 					{/if}
 				</div>
@@ -358,17 +387,18 @@
 					columns={[
 						{ label: 'Format' },
 						{ label: 'Our rank', align: 'end' },
-						{ label: page.pointsHead, align: 'end' },
+						{ label: live?.formats?.head ?? page.pointsHead, align: 'end' },
 						{ label: 'Over replacement', align: 'end' },
 						{ label: 'Tier', align: 'end' }
 					]}
 				>
 					{#each page.lines as line (line.format.id)}
+						{@const figures = lineFigures(line)}
 						<tr>
 							<td><a href={links.board(line.format.id, page.position)}>{line.tableLabel}</a></td>
 							<td class="num">{listed?.rank ?? line.numbers.ourRank}</td>
-							<td class="num">{fixed(line.numbers.projected)}</td>
-							<td class="num">{signed(line.numbers.vor)}</td>
+							<td class="num">{fixed(figures.points)}</td>
+							<td class="num">{figures.vor === null ? EMPTY_FIGURE : signed(figures.vor)}</td>
 							<td class="num">{listed?.rank ?? line.numbers.tier}</td>
 						</tr>
 					{/each}
