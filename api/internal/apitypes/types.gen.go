@@ -1479,6 +1479,60 @@ func (e WaiverMovesClaim) Valid() bool {
 	}
 }
 
+// Defines values for WeekOrderAdvicePosition.
+const (
+	WeekOrderAdvicePositionDEF WeekOrderAdvicePosition = "DEF"
+	WeekOrderAdvicePositionK   WeekOrderAdvicePosition = "K"
+)
+
+// Valid indicates whether the value is a known member of the WeekOrderAdvicePosition enum.
+func (e WeekOrderAdvicePosition) Valid() bool {
+	switch e {
+	case WeekOrderAdvicePositionDEF:
+		return true
+	case WeekOrderAdvicePositionK:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for WeekOrderRowMove.
+const (
+	WeekOrderRowMoveAdd WeekOrderRowMove = "add"
+)
+
+// Valid indicates whether the value is a known member of the WeekOrderRowMove enum.
+func (e WeekOrderRowMove) Valid() bool {
+	switch e {
+	case WeekOrderRowMoveAdd:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for WeekOrderRowSection.
+const (
+	WeekOrderRowSectionBye       WeekOrderRowSection = "bye"
+	WeekOrderRowSectionKickedOff WeekOrderRowSection = "kicked_off"
+	WeekOrderRowSectionToPlay    WeekOrderRowSection = "to_play"
+)
+
+// Valid indicates whether the value is a known member of the WeekOrderRowSection enum.
+func (e WeekOrderRowSection) Valid() bool {
+	switch e {
+	case WeekOrderRowSectionBye:
+		return true
+	case WeekOrderRowSectionKickedOff:
+		return true
+	case WeekOrderRowSectionToPlay:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for WeekSwapSlot.
 const (
 	WeekSwapSlotDEF       WeekSwapSlot = "DEF"
@@ -1509,6 +1563,24 @@ func (e WeekSwapSlot) Valid() bool {
 	case WeekSwapSlotTE:
 		return true
 	case WeekSwapSlotWR:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for WeekOrderPosition.
+const (
+	WeekOrderPositionDEF WeekOrderPosition = "DEF"
+	WeekOrderPositionK   WeekOrderPosition = "K"
+)
+
+// Valid indicates whether the value is a known member of the WeekOrderPosition enum.
+func (e WeekOrderPosition) Valid() bool {
+	switch e {
+	case WeekOrderPositionDEF:
+		return true
+	case WeekOrderPositionK:
 		return true
 	default:
 		return false
@@ -4198,6 +4270,54 @@ type WeekLineup struct {
 	Swaps []WeekSwap `json:"swaps"`
 }
 
+// WeekOrderAdvice defines model for WeekOrderAdvice.
+type WeekOrderAdvice struct {
+	// Moves the claim's moves on the league's platform, the Waivers screen's verb rule for an add; null without a league
+	Moves    *WaiverMoves            `json:"moves"`
+	Position WeekOrderAdvicePosition `json:"position"`
+
+	// ProjectionReadAt when the week's published projection was read, null when none is stored
+	ProjectionReadAt *time.Time `json:"projection_read_at"`
+
+	// ProjectionScoring the scoring the rows' week_projection is read in: the published projection's column the league scores most like, and whether that is the league's own scoring or the closest of the three to rules of its own (a tight end premium reads PPR and is never its own). A team defense's figure is the published default in every format
+	ProjectionScoring ProjectionScoring `json:"projection_scoring"`
+
+	// ReadAt when the league was read from its platform, null without a league
+	ReadAt *time.Time `json:"read_at"`
+
+	// Rows one a club (a kicker is the club's one the projection names, else the one who kicked for it last): first the games still to play by Proj, ties by Avg, then those kicked off, then the clubs on bye
+	Rows []WeekOrderRow `json:"rows"`
+
+	// UncountedRules how many of the league's scoring rules at the tab's position (kicking rules for K, defense rules for DEF) the season's points (Avg and Last) leave out, our stats lacking them; the basis says the count once and links to the league's Settings, never a list (Lane 66w)
+	UncountedRules int `json:"uncounted_rules"`
+
+	// Week the week the rows' Game cell and Proj are for
+	Week int `json:"week"`
+}
+
+// WeekOrderAdvicePosition defines model for WeekOrderAdvice.Position.
+type WeekOrderAdvicePosition string
+
+// WeekOrderRow defines model for WeekOrderRow.
+type WeekOrderRow struct {
+	Line PlayerLine `json:"line"`
+
+	// Move add on the first five free rows still to play at a position the league starts, null otherwise
+	Move *WeekOrderRowMove `json:"move"`
+
+	// Roster whose roster in the league holds him, null without a league
+	Roster *RosterMark `json:"roster"`
+
+	// Section his game still to play, kicked off (or final) by the read's clock, or his club on bye
+	Section WeekOrderRowSection `json:"section"`
+}
+
+// WeekOrderRowMove add on the first five free rows still to play at a position the league starts, null otherwise
+type WeekOrderRowMove string
+
+// WeekOrderRowSection his game still to play, kicked off (or final) by the read's clock, or his club on bye
+type WeekOrderRowSection string
+
 // WeekSwap defines model for WeekSwap.
 type WeekSwap struct {
 	In LeaguePlayer `json:"in"`
@@ -4230,6 +4350,9 @@ type PerPage = int
 
 // ShareCode defines model for ShareCode.
 type ShareCode = string
+
+// WeekOrderPosition defines model for WeekOrderPosition.
+type WeekOrderPosition string
 
 // AccountResponse defines model for AccountResponse.
 type AccountResponse struct {
@@ -4480,6 +4603,15 @@ type WaiverAdviceResponse struct {
 	RequestId string       `json:"request_id"`
 }
 
+// WeekOrderAdviceResponse defines model for WeekOrderAdviceResponse.
+type WeekOrderAdviceResponse struct {
+	Data      WeekOrderAdvice `json:"data"`
+	Error     *ErrorBody      `json:"error"`
+	Meta      *PageMeta       `json:"meta,omitempty"`
+	Ok        bool            `json:"ok"`
+	RequestId string          `json:"request_id"`
+}
+
 // CallbackParams defines parameters for Callback.
 type CallbackParams struct {
 	Code  string `form:"code" json:"code"`
@@ -4549,6 +4681,12 @@ type LeagueOrderParams struct {
 	Roster *string `form:"roster,omitempty" json:"roster,omitempty"`
 }
 
+// LeagueWeekOrderParams defines parameters for LeagueWeekOrder.
+type LeagueWeekOrderParams struct {
+	// Position the kickers' tab (K) or the defenses' (DEF)
+	Position WeekOrderPosition `form:"position" json:"position"`
+}
+
 // LeagueTradesParams defines parameters for LeagueTrades.
 type LeagueTradesParams struct {
 	// Player a board id; only trades holding this player, on either side
@@ -4585,6 +4723,12 @@ type OrderParams struct {
 
 	// Limit at most this many rows, 100 without it
 	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// WeekOrderParams defines parameters for WeekOrder.
+type WeekOrderParams struct {
+	// Position the kickers' tab (K) or the defenses' (DEF)
+	Position WeekOrderPosition `form:"position" json:"position"`
 }
 
 // ListSheetsParams defines parameters for ListSheets.

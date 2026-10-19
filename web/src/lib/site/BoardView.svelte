@@ -32,7 +32,11 @@
 	import { liveStatusClock, sayBoard, type LiveStatus } from '#lib/run/live-status.ts';
 	import { links, tierAnchor } from './links.ts';
 	import type OrderScreenComponent from '#lib/order/OrderScreen.svelte';
-	import { ORDER } from '#lib/order/words.ts';
+	import type WeekScreenComponent from '#lib/order/WeekScreen.svelte';
+	import { weekPositionOf, weekReadKey } from '#lib/order/week-head.ts';
+	import { ORDER, WEEK } from '#lib/order/words.ts';
+	import type { BasisPart } from '#lib/run/board-basis.ts';
+	import type { RulesLeftOut } from '#lib/order/week.ts';
 
 	interface Props {
 		page: BoardPage;
@@ -149,20 +153,48 @@
 	 * first line, so nothing a member reads before the script runs contradicts the order after it
 	 * (review 66n finding 3, the coordinator's revised ruling): the run's rows, whose Projected is the
 	 * season's, show only while the run says the season has not started. The kickers' and defenses'
-	 * views keep the run's draft order: the order carries no K or DEF rows. */
+	 * views are the week's (Lane 66w): we rank neither for the rest of the season, so in season their
+	 * tabs read the week's rows, the head and basis said once the read lands. */
 	const inSeason = $derived(page.underway && !marketView);
+	const weekPosition = $derived(page.underway ? weekPositionOf(page.position) : null);
 	let Order = $state<typeof OrderScreenComponent | null>(null);
-	onMount(() => {
-		if (!page.underway) return;
-		void import('#lib/order/OrderScreen.svelte').then((module) => {
-			Order = module.default;
-		});
+	let Week = $state<typeof WeekScreenComponent | null>(null);
+	/** Each screen's code is asked for once, when a tab first needs it (the position chips move
+	 * between tabs on this one page, review 66w finding 1). */
+	let asked = { week: false, order: false };
+	$effect(() => {
+		if (weekPosition !== null && !asked.week) {
+			asked = { ...asked, week: true };
+			void import('#lib/order/WeekScreen.svelte').then((module) => {
+				Week = module.default;
+			});
+		}
+		if (inSeason && !asked.order) {
+			asked = { ...asked, order: true };
+			void import('#lib/order/OrderScreen.svelte').then((module) => {
+				Order = module.default;
+			});
+		}
 	});
 	const orderLeague = $derived(
 		siteContext.league === null
 			? null
 			: { id: siteContext.league.id, host: siteContext.league.host }
 	);
+	/** The tab a week read belongs to: its position and the league it was read for. */
+	const weekKey = $derived(weekReadKey(weekPosition, orderLeague?.id ?? null));
+	/** The week's head, basis and the rules our stats lack, once its read lands, kept with the tab it
+	 * was read for: another tab never shows them, so a tab change never leaves a stale head. */
+	interface WeekSaid {
+		key: string;
+		heading: string;
+		basis: BasisPart[];
+		rules: RulesLeftOut | null;
+	}
+	let weekSaid = $state<WeekSaid | null>(null);
+	/** The space before the rules' link. */
+	const GAP = ' ';
+	const said = $derived(weekPosition !== null && weekSaid?.key === weekKey ? weekSaid : null);
 </script>
 
 {#snippet row(player: BoardRowView, i: number)}
@@ -183,7 +215,7 @@
 	</Row>
 {/snippet}
 
-<main class="board" class:ordered={inSeason}>
+<main class="board" class:ordered={inSeason || weekPosition !== null}>
 	<!-- The league's line sits by the switch, not under the caption: atop the side column on a desk,
 	     first under the bar elsewhere. -->
 	<div class="league-line">
@@ -191,13 +223,22 @@
 	</div>
 	<div class="content">
 		<div class="lead">
-			<PageHead title={heading}>
+			<PageHead title={said?.heading ?? heading}>
 				{#snippet actions()}
 					<Quiet href={links.adp(page.format.id)} size="sm">ADP</Quiet>
 					<Quiet href={links.schedule()} size="sm">Schedule strength</Quiet>
 				{/snippet}
 			</PageHead>
-			{#if marketView}
+			{#if weekPosition !== null}
+				{#if said}
+					{@const rules = said.rules}
+					<BasisLine parts={said.basis}>
+						{#snippet after()}{#if rules}{rules.text}{#if rules.link}{GAP}<a href={rules.link.href}
+										>{rules.link.words}</a
+									>{/if}{/if}{/snippet}
+					</BasisLine>
+				{/if}
+			{:else if marketView}
 				<BasisLine parts={[{ text: page.marketBasis ?? '', phone: true }]} tail={capture} />
 			{:else if !inSeason}
 				<BasisLine parts={page.basis} tail={capture} />
@@ -227,7 +268,30 @@
 			</span>
 		</div>
 
-		{#if inSeason}
+		{#if weekPosition !== null}
+			{#if Week}
+				{#key weekKey}
+					<Week
+						position={weekPosition}
+						league={orderLeague}
+						boardScoring={page.format.label}
+						onread={(read: WeekSaid) => {
+							weekSaid = read;
+						}}
+					/>
+				{/key}
+			{:else}
+				<p class="reading reading-live" aria-live="polite">{WEEK.reading}</p>
+				<noscript
+					><style>
+						.reading-live {
+							display: none;
+						}
+					</style>
+					<p class="reading">{WEEK.needsScript}</p></noscript
+				>
+			{/if}
+		{:else if inSeason}
 			{#if Order}
 				{#key orderLeague?.id}
 					<Order

@@ -4,9 +4,13 @@
 import { PUBLIC_API_URL } from '$app/env/public';
 import { apiClient } from '#lib/api/client.ts';
 import type { components, operations } from '#lib/api/types.ts';
-import { orderPath, type OrderQuery } from './path.ts';
+import { orderPath, weekOrderPath, type OrderQuery } from './path.ts';
+import type { WeekPosition } from './week-head.ts';
 
 export type OrderAdvice = components['schemas']['OrderAdvice'];
+/** The kickers' and defenses' week (Lane 66w). */
+export type WeekOrderAdvice = components['schemas']['WeekOrderAdvice'];
+export type WeekOrderRow = components['schemas']['WeekOrderRow'];
 export type OrderRow = components['schemas']['OrderRow'];
 export type RosterMark = components['schemas']['RosterMark'];
 /** A position the order narrows to. */
@@ -19,4 +23,9 @@ const client = apiClient(PUBLIC_API_URL);
 export const orderApi = {
 	read: (league: string | null, query: OrderQuery) =>
 		client.call<OrderAdvice>(orderPath(league, query))
+};
+
+export const weekOrderApi = {
+	read: (league: string | null, position: WeekPosition) =>
+		client.call<WeekOrderAdvice>(weekOrderPath(league, position))
 };

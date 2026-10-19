@@ -280,12 +280,7 @@ func (c countable) counted(carried func(string) bool) bool {
 // uncountedWords says which of the league's rules points so far leave
 // out, "" when the league scores none of them or every one is counted.
 func uncountedWords(s apitypes.LeagueSettings, carried func(string) bool) string {
-	var named []string
-	for _, c := range countables(rulesOf(s.Scoring)) {
-		if c.points != 0 && c.starts(s) && !c.counted(carried) {
-			named = append(named, c.words)
-		}
-	}
+	named := uncountedRules(s, carried)
 	if len(named) == 0 {
 		return ""
 	}
@@ -294,6 +289,35 @@ func uncountedWords(s apitypes.LeagueSettings, carried func(string) bool) string
 		list = strings.Join(named[:len(named)-1], ", ") + " and " + named[len(named)-1]
 	}
 	return "Points so far leave out " + list + ", which our stats lack."
+}
+
+// uncountedRules is the league's rules points so far leave out, in
+// words: each one the league scores at a spot it starts and no line this
+// season carries.
+func uncountedRules(s apitypes.LeagueSettings, carried func(string) bool) []string {
+	return uncountedWhere(s, carried, func(spot) bool { return true })
+}
+
+// uncountedWhere is the rules left out at the spots keep admits.
+func uncountedWhere(s apitypes.LeagueSettings, carried func(string) bool, keep func(spot) bool) []string {
+	var named []string
+	for _, c := range countables(rulesOf(s.Scoring)) {
+		if keep(c.spot) && c.points != 0 && c.starts(s) && !c.counted(carried) {
+			named = append(named, c.words)
+		}
+	}
+	return named
+}
+
+// tabSpots is the spot each week tab's rows score at (Lane 66w rereview
+// N2): a kicker's Avg and Last leave out only kicking rules, a defense's
+// only defense rules.
+var tabSpots = map[draft.Position]spot{draft.K: kickerSpot, draft.DEF: defenseSpot}
+
+// uncountedRulesAt is uncountedRules for one week tab's position.
+func uncountedRulesAt(s apitypes.LeagueSettings, carried func(string) bool, position draft.Position) []string {
+	want, ok := tabSpots[position]
+	return uncountedWhere(s, carried, func(at spot) bool { return ok && at == want })
 }
 
 // BasisNote is the rest of every page's basis, said once under the rows:

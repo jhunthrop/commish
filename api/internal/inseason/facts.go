@@ -13,10 +13,17 @@ import (
 const lastGamesShown = 3
 
 // allowedPositions are the positions a defense's points allowed are
-// ranked at.
+// ranked at: a defense's own too (Lane 66w), the points a club lets the
+// defense across from it score.
 func allowedPositions() []draft.Position {
-	return []draft.Position{draft.QB, draft.RB, draft.WR, draft.TE, draft.K}
+	return []draft.Position{draft.QB, draft.RB, draft.WR, draft.TE, draft.K, draft.DEF}
 }
+
+// kickingSourcePositions are the positions whose results come from the
+// kicking source alone (Lane 70a's nflverse_kdef_week), which lags and
+// skips: a club's games against one are only the weeks a counted line
+// played it.
+var kickingSourcePositions = map[draft.Position]bool{draft.K: true, draft.DEF: true}
 
 // Data is the season's facts as the reads answer them.
 type Data struct {
@@ -228,8 +235,9 @@ func finalGames(games []boards.TeamWeek) map[string]int {
 // with no counted line is not ranked, so no rank is read from zeros. A
 // kicker's games are only those with a counted kicker line against the
 // club (a week the kicking source has not written is no game), and a club
-// with none is not ranked; every other position's are the club's final
-// games.
+// with none is not ranked. A defense's games are counted the same way, its
+// lines coming from the same source; every other position's are the
+// club's final games.
 func rankAllowed(sums map[teamPosition]float64, games map[string]int, faced map[teamPosition]map[int]bool,
 	lined map[draft.Position]bool) map[teamPosition]Allowed {
 	out := map[teamPosition]Allowed{}
@@ -249,7 +257,7 @@ func rankAllowed(sums map[teamPosition]float64, games map[string]int, faced map[
 		rows := make([]row, 0, len(teams))
 		for _, team := range teams {
 			n := games[team]
-			if position == draft.K {
+			if kickingSourcePositions[position] {
 				n = len(faced[teamPosition{team, position}])
 			}
 			if n > 0 {

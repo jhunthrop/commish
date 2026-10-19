@@ -28,3 +28,10 @@ export const ORDER = {
 	/** The board's in-season page without script, its one line: the order is read in the browser. */
 	needsScript: 'Our rest-of-season order needs JavaScript.'
 } as const;
+
+/** The kickers' and defenses' week (Lane 66w): the words the board prints before its tab loads,
+ * for the copy guard. Its head is week-head.ts's, the rest of the tab's words week.ts's. */
+export const WEEK = {
+	reading: "Reading this week's rows",
+	needsScript: "This week's rows need JavaScript."
+} as const;

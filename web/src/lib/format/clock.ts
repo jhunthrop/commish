@@ -32,6 +32,19 @@ export function weekdayTime(iso: string, zone: string = memberZone()): string {
 	return `${part('weekday')} ${part('hour')}:${part('minute')} ${part('dayPeriod').toLowerCase()}`;
 }
 
+/** The long weekday format for a zone, made once per zone. */
+const weekdayNameFormats = new Map<string, Intl.DateTimeFormat>();
+
+/** "Thursday": an instant's weekday on the member's clock, as a heading names it. */
+export function weekdayName(iso: string, zone: string = memberZone()): string {
+	let made = weekdayNameFormats.get(zone);
+	if (!made) {
+		made = new Intl.DateTimeFormat('en-US', { weekday: 'long', timeZone: zone });
+		weekdayNameFormats.set(zone, made);
+	}
+	return made.format(new Date(iso));
+}
+
 /** The zone's own name, "Central Time", as the browser names it. */
 export function zoneName(zone: string = memberZone()): string {
 	const named = new Intl.DateTimeFormat('en-US', { timeZone: zone, timeZoneName: 'longGeneric' })

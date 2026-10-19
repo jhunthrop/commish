@@ -450,6 +450,29 @@ export interface paths {
 		patch?: never;
 		trace?: never;
 	};
+	'/leagues/attached/{id}/order/week': {
+		parameters: {
+			query: {
+				/** @description the kickers' tab (K) or the defenses' (DEF) */
+				position: components['parameters']['WeekOrderPosition'];
+			};
+			header?: never;
+			path: {
+				/** @description the attached league's id (AttachedLeague.id) */
+				id: string;
+			};
+			cookie?: never;
+		};
+		/** The kickers' or defenses' tab in season for the drafter's league (Lane 66w): every club's kicker or defense with its week, in the order of the week's published projection, in the league's scoring, whose roster holds it and an add on the first five free rows still to play. We have no kicker or defense model, so there is no rest-of-season order for these positions. We submit nothing. */
+		get: operations['leagueWeekOrder'];
+		put?: never;
+		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
 	'/leagues/attached/{id}/trades': {
 		parameters: {
 			query?: {
@@ -1064,6 +1087,26 @@ export interface paths {
 		};
 		/** Our rest-of-season order for a 12-team PPR league with no league of the reader's own, every QB, RB, WR and TE our board places with his week: the Rest of season and Players screens signed out. Rows carry no roster and no move. */
 		get: operations['order'];
+		put?: never;
+		post?: never;
+		delete?: never;
+		options?: never;
+		head?: never;
+		patch?: never;
+		trace?: never;
+	};
+	'/order/week': {
+		parameters: {
+			query: {
+				/** @description the kickers' tab (K) or the defenses' (DEF) */
+				position: components['parameters']['WeekOrderPosition'];
+			};
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		/** The kickers' or defenses' tab in season with no league of the reader's own (Lane 66w): every club's kicker or defense with its week, in the order of the week's published projection, in PPR. Rows carry no roster and no move. */
+		get: operations['weekOrder'];
 		put?: never;
 		post?: never;
 		delete?: never;
@@ -3375,6 +3418,44 @@ export interface components {
 			 */
 			move: 'add' | 'trade' | null;
 		};
+		WeekOrderAdvice: {
+			/** @description the week the rows' Game cell and Proj are for */
+			week: number;
+			/** @enum {string} */
+			position: 'K' | 'DEF';
+			/** @description how many of the league's scoring rules at the tab's position (kicking rules for K, defense rules for DEF) the season's points (Avg and Last) leave out, our stats lacking them; the basis says the count once and links to the league's Settings, never a list (Lane 66w) */
+			uncounted_rules: number;
+			/**
+			 * Format: date-time
+			 * @description when the league was read from its platform, null without a league
+			 */
+			read_at: string | null;
+			/**
+			 * Format: date-time
+			 * @description when the week's published projection was read, null when none is stored
+			 */
+			projection_read_at: string | null;
+			projection_scoring: components['schemas']['ProjectionScoring'];
+			/** @description the claim's moves on the league's platform, the Waivers screen's verb rule for an add; null without a league */
+			moves: components['schemas']['WaiverMoves'] | null;
+			/** @description one a club (a kicker is the club's one the projection names, else the one who kicked for it last): first the games still to play by Proj, ties by Avg, then those kicked off, then the clubs on bye */
+			rows: components['schemas']['WeekOrderRow'][];
+		};
+		WeekOrderRow: {
+			line: components['schemas']['PlayerLine'];
+			/**
+			 * @description his game still to play, kicked off (or final) by the read's clock, or his club on bye
+			 * @enum {string}
+			 */
+			section: 'to_play' | 'kicked_off' | 'bye';
+			/** @description whose roster in the league holds him, null without a league */
+			roster: components['schemas']['RosterMark'] | null;
+			/**
+			 * @description add on the first five free rows still to play at a position the league starts, null otherwise
+			 * @enum {string|null}
+			 */
+			move: 'add' | null;
+		};
 		RosterMark: {
 			/** @enum {string} */
 			kind: 'yours' | 'free' | 'team';
@@ -4136,6 +4217,15 @@ export interface components {
 				};
 			};
 		};
+		/** @description every club's kicker or defense with its week, in the order of the week's projection */
+		WeekOrderAdviceResponse: {
+			headers: Record<string, unknown>;
+			content: {
+				'application/json': components['schemas']['Envelope'] & {
+					data?: components['schemas']['WeekOrderAdvice'];
+				};
+			};
+		};
 		/** @description the waiver pool ranked by the gain to the drafter's lineup */
 		WaiverAdviceResponse: {
 			headers: Record<string, unknown>;
@@ -4219,6 +4309,8 @@ export interface components {
 		};
 	};
 	parameters: {
+		/** @description the kickers' tab (K) or the defenses' (DEF) */
+		WeekOrderPosition: 'K' | 'DEF';
 		ID: string;
 		ClaimCode: string;
 		Page: number;
@@ -4764,6 +4856,29 @@ export interface operations {
 			422: components['responses']['ErrorResponse'];
 			502: components['responses']['ErrorResponse'];
 			503: components['responses']['ErrorResponse'];
+		};
+	};
+	leagueWeekOrder: {
+		parameters: {
+			query: {
+				/** @description the kickers' tab (K) or the defenses' (DEF) */
+				position: components['parameters']['WeekOrderPosition'];
+			};
+			header?: never;
+			path: {
+				/** @description the attached league's id (AttachedLeague.id) */
+				id: string;
+			};
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			200: components['responses']['WeekOrderAdviceResponse'];
+			400: components['responses']['ErrorResponse'];
+			404: components['responses']['ErrorResponse'];
+			409: components['responses']['ErrorResponse'];
+			422: components['responses']['ErrorResponse'];
+			502: components['responses']['ErrorResponse'];
 		};
 	};
 	leagueTrades: {
@@ -5542,6 +5657,22 @@ export interface operations {
 		requestBody?: never;
 		responses: {
 			200: components['responses']['OrderAdviceResponse'];
+			400: components['responses']['ErrorResponse'];
+		};
+	};
+	weekOrder: {
+		parameters: {
+			query: {
+				/** @description the kickers' tab (K) or the defenses' (DEF) */
+				position: components['parameters']['WeekOrderPosition'];
+			};
+			header?: never;
+			path?: never;
+			cookie?: never;
+		};
+		requestBody?: never;
+		responses: {
+			200: components['responses']['WeekOrderAdviceResponse'];
 			400: components['responses']['ErrorResponse'];
 		};
 	};

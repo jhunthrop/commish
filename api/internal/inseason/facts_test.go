@@ -251,3 +251,36 @@ func TestKickerAndDefenseResults(t *testing.T) {
 		t.Fatal("carried metrics")
 	}
 }
+
+// sacking is a defense's line from the kicking source: its sacks alone,
+// a point each in standard scoring.
+func sacking(club string, week int, sacks float64) boards.StatLine {
+	return boards.StatLine{PlayerID: "DST-" + club, Position: "DEF", Week: week, Team: club, Metrics: map[string]float64{"sacks": sacks}}
+}
+
+// Points allowed to defenses rank like a kicker's (Lane 66w): a club's
+// games are only those a counted defense line played against it, 1st the
+// fewest, and a club no counted defense played is not ranked. Miami's
+// defense scored 4 against Buffalo in week 1, New England's 2 against it
+// in week 2, the Jets' 1 against New England in week 1.
+func TestPointsAllowedToDefensesRank(t *testing.T) {
+	saturday := time.Date(2026, 9, 26, 12, 0, 0, 0, east)
+	data := Data{Games: fixtureGames(), Lines: []boards.StatLine{sacking("MIA", 1, 4), sacking("NE", 2, 2), sacking("NYJ", 1, 1)}}
+	s := NewSeason(data, RulesOf(scoring.Standard()), 3, saturday)
+	want := map[string]Allowed{"NE": {1, 1, 2, draft.DEF}, "BUF": {3, 2, 2, draft.DEF}}
+	for club, a := range want {
+		if got := s.allowed[teamPosition{club, draft.DEF}]; got != a {
+			t.Errorf("%s: %+v, want %+v", club, got, a)
+		}
+	}
+	for _, club := range []string{"MIA", "NYJ"} {
+		if a, ok := s.allowed[teamPosition{club, draft.DEF}]; ok {
+			t.Errorf("%s ranked against defenses no counted defense played: %+v", club, a)
+		}
+	}
+	// Week 3: Miami at home to New England, whose rank its row carries.
+	d := s.For(Player{BoardID: "DST-MIA", Team: "MIA", Position: draft.DEF})
+	if d.Allowed == nil || *d.Allowed != want["NE"] {
+		t.Fatalf("Miami's defense against New England: %+v", d.Allowed)
+	}
+}

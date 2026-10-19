@@ -152,7 +152,7 @@ void test('a position lists its players in draft order, a defense with its club 
 	);
 	const [buffalo] = marketAt(board.market, 'DST');
 	assert.ok(buffalo);
-	assert.equal(marketFace(buffalo), 'https://a.espncdn.com/i/teamlogos/nfl/500/buf.png');
+	assert.equal(marketFace(buffalo), '/img/clubs/nfl/buf/64');
 	const [first] = marketAt(board.market, 'K');
 	assert.ok(first);
 	assert.equal(marketFace(first), first.headshot);
