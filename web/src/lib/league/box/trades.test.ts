@@ -368,7 +368,7 @@ void test("a trade opened or the builder open adds the players' columns, each on
 	);
 	assert.equal(
 		basisText(parts),
-		`${advice.basis} ${advice.per_game_basis} Proj is this week's published projection, PPR nearest your rules, defenses on default scoring, read Fri 9:00 pm. Opp rank is points allowed to his position, 1st fewest. Pts are Sleeper's points by player so far, and Team adds the rows. ${advice.basis_note} Which five. ${WEEK_ROOM} How the order has done`
+		`${advice.basis} ${advice.per_game_basis} Proj is this week's published projection, PPR nearest your rules, defenses on default scoring, read Fri 9:00 pm. Opp rank is points allowed to his position, 1st fewest. Pts are Sleeper's points so far, Team adds the rows. ${advice.basis_note} Which five. ${WEEK_ROOM} How the order has done`
 	);
 	assert.deepEqual(
 		parts.filter((p) => p.href !== undefined).map((p) => p.href),
@@ -379,7 +379,7 @@ void test("a trade opened or the builder open adds the players' columns, each on
 		[
 			// The builder's phone rows draw no Opp rank (review H2).
 			'Opp rank is points allowed to his position, 1st fewest.',
-			"Pts are Sleeper's points by player so far, and Team adds the rows.",
+			"Pts are Sleeper's points so far, Team adds the rows.",
 			WEEK_ROOM
 		]
 	);

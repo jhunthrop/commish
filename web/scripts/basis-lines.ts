@@ -73,7 +73,8 @@ export function basisReport(
 const FIGURE_SENTENCES: readonly { figure: RegExp; sentence: string; what: string }[] = [
 	{ figure: /\bOpp \d+(st|nd|rd|th)\b/, sentence: 'Opp rank is', what: 'Opp rank' },
 	{ figure: /\b\d+(\.5)? to \d+(\.5)?\b/, sentence: 'expected points', what: 'the expected score' },
-	{ figure: /\bA game \d+\.\d\b/, sentence: 'A game is', what: 'A game' }
+	{ figure: /\bA game \d+\.\d\b/, sentence: 'A game is', what: 'A game' },
+	{ figure: /\d+°|\d+ mph\b|\bRoof TBD\b/, sentence: 'weather', what: 'the weather' }
 ];
 
 /** Every figure the page's rows draw where it is shot has its sentence in the basis drawn there: a

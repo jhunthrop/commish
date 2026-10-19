@@ -93,7 +93,7 @@ void test('Pts says whether the platform gives each player his points or each te
 	);
 	assert.equal(
 		ptsPart(true, 'sleeper', 'rows'),
-		"Pts are Sleeper's points by player so far, and Team adds the rows."
+		"Pts are Sleeper's points so far, Team adds the rows."
 	);
 	assert.equal(ptsPart(false, 'yahoo', 'platform'), "Pts are Yahoo's team points, none by player.");
 	for (const host of ['sleeper', 'espn', 'yahoo', 'ffpc', 'mfl'] as const) {
@@ -166,15 +166,11 @@ void test("the Lineup's key says Proj, its change at a desk, Game, Opp rank, Pts
 	);
 	assert.equal(
 		basisText(parts),
-		"Proj is this week's published projection, PPR nearest your rules, read Fri 9:00 pm. Δ Proj is its change since Thu 9:00 pm. Game is each club's expected points, his first, and weather, read Fri 4:01 pm. Opp rank is points allowed to his position, 1st fewest. Pts are Sleeper's points by player so far, and Team adds the rows. Avg and Last miss five of your rules our stats lack. Which five"
+		"Proj is this week's published projection, PPR nearest your rules, read Fri 9:00 pm. Δ Proj is its change since Thu 9:00 pm. Game is each club's expected points, his first, and weather, read Fri 4:01 pm. Opp rank is points allowed to his position, 1st fewest. Pts are Sleeper's points so far, Team adds the rows. Avg and Last miss five of your rules our stats lack. Which five"
 	);
 	assert.deepEqual(
 		parts.filter((p) => !p.phone).map((p) => p.text),
-		[
-			'Δ Proj is its change since Thu 9:00 pm.',
-			// The phone's Lineup rows draw no expected score or weather (review H2).
-			"Game is each club's expected points, his first, and weather, read Fri 4:01 pm."
-		]
+		['Δ Proj is its change since Thu 9:00 pm.']
 	);
 });
 
@@ -231,30 +227,36 @@ void test('the Lineup and the Matchup say when Final and the stats land while a 
 	assert.equal(kickedOffPartAt([counted], Date.parse('2026-10-19T16:00:00.000Z')), null);
 });
 
-void test('on a phone every figure drawn keeps its sentence beside the stats sentence (review H2)', () => {
+void test('the Lineup phone keeps its fact cells; the Final sentence waits for the desk while they show', () => {
 	const waiting = line({ kickoff: '2026-10-18T17:00:00.000Z', played: true, game_state: 'final' });
-	const parts = boxBasisParts(
-		{
-			projection: { readAt: READ, scoring: CLOSEST },
-			lines: [waiting, line()],
-			byPlayer: true,
-			teamTotal: false,
-			host: 'sleeper',
-			lineup: {
-				previousReadAt: null,
-				note: { basis_note: '', basis_note_link: '' },
-				rulesHref: '/league/1#uncounted'
-			}
-		},
-		CENTRAL,
-		NOW
-	);
-	const phone = parts.filter((p) => p.phone).map((p) => p.text);
-	assert.ok(phone.includes(KICKED_OFF_PART));
+	const lineup = {
+		previousReadAt: null,
+		note: { basis_note: '', basis_note_link: '' },
+		rulesHref: '/league/1#uncounted'
+	};
+	const at = (lines: PlayerLine[]) =>
+		boxBasisParts(
+			{
+				projection: { readAt: READ, scoring: CLOSEST },
+				lines,
+				byPlayer: true,
+				teamTotal: false,
+				host: 'sleeper',
+				lineup
+			},
+			CENTRAL,
+			NOW
+		);
+	// A row still to play draws its expected score: its sentence on the phone, the Final one at a desk.
+	const sunday = at([waiting, line()]);
+	const phone = sunday.filter((p) => p.phone).map((p) => p.text);
 	assert.ok(phone.includes(OPP_PART));
-	// The phone draws Opp rank, so its sentence stays; it draws no expected score or weather on the
-	// Lineup (BoxLine phoneFacts), so the Game sentence is the desk's alone.
-	assert.ok(!phone.some((t) => t.startsWith("Game is each club's expected points")));
+	assert.ok(phone.some((t) => t.startsWith("Game is each club's expected points")));
+	assert.ok(!phone.includes(KICKED_OFF_PART));
+	assert.ok(sunday.some((p) => p.text === KICKED_OFF_PART && !p.phone));
+	// No row draws them (every game kicked off): the Final sentence is said on the phone too.
+	const tuesday = at([waiting]);
+	assert.ok(tuesday.some((p) => p.text === KICKED_OFF_PART && p.phone));
 });
 
 void test('the Final sentence says what holds, never a promise of within the hour (Lane 84)', () => {

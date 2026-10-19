@@ -326,7 +326,7 @@ void test("Sleeper and MFL, points by player alone: the Matchup's Totals and sco
 	assert.equal(boxNumber(lineup.totals.pts), '33.4');
 	assert.equal(
 		ptsPart(matchup.byPlayer, 'sleeper', 'rows'),
-		"Pts are Sleeper's points by player so far, and Team adds the rows."
+		"Pts are Sleeper's points so far, Team adds the rows."
 	);
 });
 
@@ -342,8 +342,5 @@ void test("ESPN, points by player and its own total: the Matchup's Totals is ESP
 		ptsPart(matchup.byPlayer, 'espn', 'platform'),
 		"Pts are ESPN's points by player so far, each to a tenth, and Team is ESPN's score."
 	);
-	assert.equal(
-		ptsPart(true, 'espn', 'rows'),
-		"Pts are ESPN's points by player so far, and Team adds the rows."
-	);
+	assert.equal(ptsPart(true, 'espn', 'rows'), "Pts are ESPN's points so far, Team adds the rows.");
 });

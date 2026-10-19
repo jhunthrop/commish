@@ -297,6 +297,16 @@ async function checkNoWeekFigure(page: Page, at: string, words: string): Promise
 	if (day === 'tuesday' && text.includes(words)) fault(at, `"${words}" on a finished week`);
 }
 
+/** Whether a visible row draws an expected score ("29 to 21.5") or weather. */
+async function drawsFacts(page: Page): Promise<boolean> {
+	const rows = await page
+		.locator('main table tbody tr')
+		.evaluateAll((trs) =>
+			trs.filter((tr) => tr.getClientRects().length > 0).map((tr) => (tr as HTMLElement).innerText)
+		);
+	return rows.some((r) => /\b\d+(\.5)? to \d+(\.5)?\b|\d+°|Indoors|Roof TBD/.test(r));
+}
+
 /** Waivers after the Sunday (review H3): a row whose game is past its kickoff draws no week gain in
  * Beats, and the basis names the season Gain as the pickups' order. */
 async function checkWaivers(page: Page, at: string): Promise<void> {
@@ -356,9 +366,19 @@ for (const screen of set === 'standin' && day !== 'sunday' ? LEAGUE_SCREENS : []
 			// land (the League page's basis is its standings').
 			if (
 				screen.name !== 'league' &&
-				!(await page.locator('main').innerText()).includes(KICKED_OFF_PART)
+				!(await page.locator('main').innerText()).includes(KICKED_OFF_PART) &&
+				// The Lineup phone keeps the fact cells while a row still draws them, the Final sentence
+				// then the desk's alone (Lane 85 fix round 2 ruling); on Tuesday none does.
+				!(screen.name === 'lineup' && width === 390 && (await drawsFacts(page)))
 			)
 				fault(at, 'the basis does not say when Final and the stats land');
+			if (
+				screen.name === 'lineup' &&
+				width === 390 &&
+				day === 'tuesday' &&
+				(await drawsFacts(page))
+			)
+				fault(at, 'a Tuesday row draws an expected score or weather');
 			const lines = await basisLines(page);
 			const budget = BASIS_BUDGET[width];
 			if (budget !== undefined && lines > budget)

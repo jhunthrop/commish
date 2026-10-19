@@ -58,14 +58,14 @@ const VIEWPORT_HEIGHT = 900;
 const PHONE = { width: 390, height: 844 } as const;
 const READY_TIMEOUT_MS = 30_000;
 /** ESPN's Pts sentence now that it gives each player's points (Lane 79, basis.ts ptsPart). */
-const ESPN_PTS = "Pts are ESPN's points by player so far, and Team adds the rows.";
+const ESPN_PTS = "Pts are ESPN's points so far, Team adds the rows.";
 /** ESPN's Matchup, whose Team is ESPN's own score (ruling (a)). */
 const ESPN_MATCHUP_PTS =
 	"Pts are ESPN's points by player so far, each to a tenth, and Team is ESPN's score.";
 /** The team-totals sentence (Lane 79 fix 6). */
 const YAHOO_PTS = "Pts are Yahoo's team points, none by player.";
 /** Sleeper's Matchup, whose Team adds the rows (ruling (a)). */
-const SLEEPER_MATCHUP_PTS = "Pts are Sleeper's points by player so far, and Team adds the rows.";
+const SLEEPER_MATCHUP_PTS = "Pts are Sleeper's points so far, Team adds the rows.";
 /** The drafter's four starters under way on the Sunday, their points added (13.4, 8.1, 9.4, 8.2). */
 const SLEEPER_SUNDAY_SUM = '39.1';
 /** The Sunday's changes the engine would make: Kirk (Monday night) for Chase on bye at Flex. Dart,
