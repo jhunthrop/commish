@@ -6,7 +6,7 @@ import { fixed, ordinal, plural } from '#lib/format/number.ts';
 import type { components } from '#lib/api/types.ts';
 import type { LeagueHost, LeagueMove, LeagueSync, LeagueTeam, LeagueTerms } from '../api.ts';
 import { BOX, boxRow, slotWord, totalsPts, type BoxStarter, type BoxTotals } from '../box/box.ts';
-import { lineupBox, type LineupBox } from '../box/lineup.ts';
+import { heldLineup, lineupBox, type LineupBox } from '../box/lineup.ts';
 import type { LineupAdvice, ProjectionScoring, Scoreboard } from '../inseason/api.ts';
 import { hostWords } from '../names.ts';
 import { gameHead, KICKOFF, type GameHead } from '../box/kickoff.ts';
@@ -175,12 +175,15 @@ export interface LineupSummary {
 	starters: BoxStarter[];
 	totals: BoxTotals;
 	benchWords: string;
+	/** The API's sentence once every starter's game is final (week_done), null before. */
+	done: string | null;
 }
 
 /** The lineup as set from the Lineup's answer: each slot's player on the platform, in the league's
  * slots; every other active player is the bench, injured reserve counted apart. */
 export function lineupSummary(advice: LineupAdvice, zone: string, now: number): LineupSummary {
-	const box = lineupBox(advice, zone, now);
+	// No change is drawn on a row whose game has kicked off or is final (Lane 85).
+	const box = lineupBox(heldLineup(advice, now), zone, now);
 	const starters = advice.slots.flatMap((slot): BoxStarter[] =>
 		slot.host ? [{ row: boxRow(slot.host, slotWord(slot.slot), zone, false, now) }] : []
 	);
@@ -201,7 +204,8 @@ export function lineupSummary(advice: LineupAdvice, zone: string, now: number): 
 			pts: totalsPts(rows, advice.player_points, advice.team_points),
 			note: null
 		},
-		benchWords
+		benchWords,
+		done: advice.week_done ?? null
 	};
 }
 

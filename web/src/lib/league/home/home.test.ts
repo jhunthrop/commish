@@ -1,14 +1,16 @@
 // The League page's words (Lane 66i): the scoreboard's bugs, the standings' columns and order, the
 // moves feed, the settings and the basis, with the copy guard over every one. Run with `npm test`.
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { bannedPattern } from '#lib/format/copy-guard.ts';
 import type { LeagueMove, LeagueTeam, LeagueTerms } from '../api.ts';
-import type { Scoreboard } from '../inseason/api.ts';
+import type { LineupAdvice, PlayerLine, Scoreboard } from '../inseason/api.ts';
 import { KICKOFF } from '../box/kickoff.ts';
 import {
 	HOME,
 	bugsOf,
+	lineupSummary,
 	extraWords,
 	feedRows,
 	playoffRule,
@@ -462,4 +464,38 @@ void test('copy guard: every League page word is fantasy words, with no dash or 
 		teamBasis('espn', null, { format: 'ppr', league_own: true }, true, ZONE),
 		"A team's Proj adds its starters' published projections in PPR, this league's own, not in yet for this week. Pts are ESPN's so far, and your lineup's Team adds its rows."
 	);
+});
+
+void test('the lineup card draws no change on a played week and says it is in the books', () => {
+	const recorded = JSON.parse(
+		readFileSync(
+			new URL('../../../../scripts/inseason-fixture/data/lineup.json', import.meta.url),
+			'utf8'
+		)
+	) as LineupAdvice;
+	const final = (l: PlayerLine): PlayerLine => ({
+		...l,
+		facts: { ...l.facts, played: true, game_state: l.facts.bye ? null : 'final' }
+	});
+	const saturday = lineupSummary(recorded, ZONE, SATURDAY);
+	assert.ok(saturday.box.swaps.length > 0);
+	assert.equal(saturday.done, null);
+	const done = "Every starter's game is final, so week 6 is in the books.";
+	const tuesday = lineupSummary(
+		{
+			...recorded,
+			week_done: done,
+			slots: recorded.slots.map((s) => ({
+				...s,
+				ours: final(s.ours),
+				host: s.host && final(s.host)
+			})),
+			bench: recorded.bench.map(final)
+		},
+		ZONE,
+		MONDAY
+	);
+	assert.equal(tuesday.box.swaps.length, 0);
+	assert.ok(tuesday.box.starters.every((s) => s.move === null));
+	assert.equal(tuesday.done, done);
 });

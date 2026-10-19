@@ -9,6 +9,7 @@
 	import { sheetTags } from '../sheet-tags.ts';
 	import {
 		copiedLine,
+		heldLineup,
 		LINEUP,
 		lineupBox,
 		lineupPageWords,
@@ -55,7 +56,7 @@
 	}
 
 	let {
-		advice,
+		advice: answer,
 		host,
 		plan,
 		make,
@@ -64,6 +65,11 @@
 		rulesHref,
 		now
 	}: Props = $props();
+	/** The answer with no change on a row whose game has kicked off or is final (Lane 85): every word,
+	 * the verb and the move read it. */
+	const advice = $derived(heldLineup(answer, now));
+	/** The API's sentence once every starter's game is final: no change and no verb is left. */
+	const done = $derived(advice.week_done ?? null);
 	const box = $derived(lineupBox(advice, memberZone(), now));
 	// Your sheet's tags mark your rows once the sheet is in (review L7).
 	onMount(() => void lazySheet.load());
@@ -87,7 +93,9 @@
 	const verb = $derived(isSet ? null : onHost ? LINEUP.make : LINEUP.copy);
 	/** Whether the line under the verb says anything: a set lineup on a platform without our writes
 	 * says nothing, and a phone shows no empty bar for it (review N3). */
-	const footSays = $derived(isSet ? advice.moves.lineup === 'available' : !onHost);
+	const footSays = $derived(
+		done !== null ? false : isSet ? advice.moves.lineup === 'available' : !onHost
+	);
 
 	async function open(): Promise<void> {
 		const move = lineupMove(advice);
@@ -138,10 +146,10 @@
 	expanded={onHost ? step.kind !== 'closed' : undefined}
 >
 	{#snippet summary()}
-		<LineupStrip week={advice.week} {box} />
+		<LineupStrip week={advice.week} {box} {done} />
 	{/snippet}
 	{#snippet verbFoot()}
-		{#if isSet}
+		{#if done !== null}{:else if isSet}
 			{#if advice.moves.lineup === 'available'}<span class="verb-line">{setOnWords(host)}</span
 				>{/if}
 		{:else if !onHost}

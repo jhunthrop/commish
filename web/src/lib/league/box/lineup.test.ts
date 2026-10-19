@@ -15,7 +15,8 @@ import {
 	lineupBox,
 	lineupText,
 	stripSum,
-	whyLine
+	whyLine,
+	heldLineup
 } from './lineup.ts';
 
 const ZONE = 'America/Chicago';
@@ -272,4 +273,70 @@ void test('the lineup is drawn at the clock it is handed: past the kickoff it sa
 	assert.equal(lineupBox(lined, ZONE, NOW).starters[0]?.row.expected, '26.5 to 23');
 	const kicked = Date.parse('2026-10-18T17:00:00.000Z');
 	assert.equal(lineupBox(lined, ZONE, kicked).starters[0]?.row.expected, null);
+});
+
+void test('no move is drawn on a row whose game has kicked off or is final (Lane 85)', () => {
+	const kicked = { ...williams, facts: { ...williams.facts, game_state: 'kicked_off' as const } };
+	const monday = {
+		...advice,
+		set: false,
+		slots: [
+			slot('QB', kicked, stroud, true),
+			slot('RB', irving, irving, false),
+			slot('RB', vidal, gibbs, true)
+		]
+	};
+	const held = heldLineup(monday, NOW);
+	assert.deepEqual(
+		held.slots.map((s) => [s.slot, s.ours.player.name, s.changed]),
+		[
+			['QB', 'C.J. Stroud', false],
+			['RB', 'Bucky Irving', false],
+			['RB', 'Kimani Vidal', true]
+		]
+	);
+	assert.equal(held.slots[0]?.sentence, null);
+	// The advised starter goes back to the bench, the platform's starter stays where it has him.
+	assert.deepEqual(
+		held.bench.map((l) => l.player.name),
+		['Jahmyr Gibbs', 'Caleb Williams']
+	);
+	assert.equal(held.set, false);
+	const box = lineupBox(held, ZONE, NOW);
+	assert.deepEqual(
+		box.swaps.map((s) => s.in),
+		['Vidal']
+	);
+	assert.deepEqual(
+		box.starters.map((s) => s.move),
+		[null, null, 'in']
+	);
+	// A platform starter sat by a change whose game is final holds his spot too.
+	const final = (l: PlayerLine): PlayerLine => ({
+		...l,
+		facts: { ...l.facts, played: true, game_state: 'final' }
+	});
+	const tuesday = heldLineup(
+		{ ...advice, set: false, slots: [slot('QB', final(williams), final(stroud), true)] },
+		NOW
+	);
+	assert.equal(tuesday.set, true);
+	assert.equal(tuesday.slots[0]?.ours.player.name, 'C.J. Stroud');
+	assert.equal(lineupBox(tuesday, ZONE, NOW).swaps.length, 0);
+	// A change into an empty spot whose player has kicked off leaves the spot empty.
+	const empty = heldLineup({ ...advice, set: false, slots: [slot('QB', kicked, null, true)] }, NOW);
+	assert.deepEqual(empty.slots, []);
+	assert.deepEqual(empty.empty_slots, ['QB']);
+	// Nothing locked: the answer as it came.
+	const untouched = { ...advice, set: false };
+	assert.equal(heldLineup(untouched, NOW), untouched);
+});
+
+void test('the week in the books takes the strip: no sum, the API sentence', () => {
+	const done = "Every starter's game is final, so week 6 is in the books.";
+	const box = lineupBox(advice, ZONE, NOW);
+	assert.equal(stripSum(box, done), null);
+	assert.notEqual(stripSum(box, null), null);
+	assert.equal(changesTitle(0, done), 'Final');
+	assert.equal(changesTitle(0, null), LINEUP.set);
 });

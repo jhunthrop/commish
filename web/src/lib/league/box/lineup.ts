@@ -7,7 +7,8 @@ import { lastName } from '#lib/format/draft.ts';
 import { designationWord } from '#lib/format/designation.ts';
 import { fixed } from '#lib/format/number.ts';
 import type { LeagueHost } from '../api.ts';
-import type { LineupAdvice, LineupSlot } from '../inseason/api.ts';
+import type { LineupAdvice, LineupSlot, PlayerLine } from '../inseason/api.ts';
+import { toBePlayed } from '#lib/format/game-facts.ts';
 import { hostWords } from '../names.ts';
 import { satIds } from '../inseason/words.ts';
 import {
@@ -89,8 +90,10 @@ export function shortName(name: string): string {
 
 const NUMBER_WORDS = ['No', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
 
-/** "Three changes", "One change", "12 changes", or "Your lineup is set". */
-export function changesTitle(n: number): string {
+/** "Three changes", "One change", "12 changes", or "Your lineup is set"; "Final" once the API says
+ * the week is in the books (its week_done sentence, said beside it). */
+export function changesTitle(n: number, done: string | null = null): string {
+	if (done !== null) return BOX.final;
 	if (n === 0) return LINEUP.set;
 	const word = NUMBER_WORDS[n] ?? String(n);
 	return `${word} ${n === 1 ? 'change' : 'changes'}`;
@@ -105,9 +108,11 @@ export interface StripSum {
 }
 
 export function stripSum(
-	box: Pick<LineupBox, 'totals' | 'asSet' | 'gain' | 'swaps'>
+	box: Pick<LineupBox, 'totals' | 'asSet' | 'gain' | 'swaps'>,
+	done: string | null = null
 ): StripSum | null {
-	if (box.totals.proj === null) return null;
+	// A week in the books has no Proj left to add: the API's sentence stands in the sum's place.
+	if (box.totals.proj === null || done !== null) return null;
 	const figure = boxNumber(box.totals.proj);
 	if (box.swaps.length === 0) return { figure, words: `${BOX.proj} as set`, gain: null };
 	const set = box.asSet === null ? '' : `, ${boxNumber(box.asSet)} as set`;
@@ -177,6 +182,42 @@ export function whyLine(into: BoxRow, out: BoxRow | null, slot: string): string 
 /** The strip's line for a spot no one who can play fills. */
 export function idleWords(slot: string): string {
 	return `${slot}: ${LINEUP.noOneCanPlay}`;
+}
+
+/** A player whose game is past its kickoff by the API's state (Lane 80): the platform takes no move
+ * on him, so no screen draws one (Lane 85). A bye is no game. */
+export function locked(line: PlayerLine, now: number): boolean {
+	return !line.facts.bye && !toBePlayed(line.facts, now);
+}
+
+/** The advice with every change on a locked row undone (Lane 85): the API's engine already holds a
+ * kicked-off starter where the platform has him (engine.go Lineup), and the web refuses to draw a move
+ * mark on such a row whatever it is sent. The platform's starter keeps the spot (an empty one stays
+ * empty) and the advised starter goes back to the bench. The answer as it came when nothing is
+ * undone. */
+export function heldLineup<T extends Pick<LineupAdvice, 'slots' | 'bench' | 'empty_slots' | 'set'>>(
+	advice: T,
+	now: number
+): T {
+	const undone = advice.slots.filter(
+		(s) => s.changed && (locked(s.ours, now) || (s.host !== null && locked(s.host, now)))
+	);
+	if (undone.length === 0) return advice;
+	const kept = new Set(undone.flatMap((s) => (s.host ? [s.host.player.host_id] : [])));
+	const slots = advice.slots.flatMap((s): LineupSlot[] => {
+		if (!undone.includes(s)) return [s];
+		return s.host === null ? [] : [{ ...s, ours: s.host, changed: false, sentence: null }];
+	});
+	return {
+		...advice,
+		slots,
+		bench: [
+			...advice.bench.filter((l) => !kept.has(l.player.host_id)),
+			...undone.map((s) => s.ours)
+		],
+		empty_slots: [...advice.empty_slots, ...undone.flatMap((s) => (s.host ? [] : [s.slot]))],
+		set: slots.every((s) => !s.changed)
+	};
 }
 
 /** One starting spot: the platform's slot and our row for it. */
