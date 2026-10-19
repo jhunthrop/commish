@@ -5,6 +5,7 @@
 	import LeagueSwitch from '#lib/context/LeagueSwitch.svelte';
 	import RailIcon from './RailIcon.svelte';
 	import Stamp from './Stamp.svelte';
+	import { barRows } from './bar-rows.ts';
 	import {
 		HOME_HREF,
 		PHONE_RAIL_ITEMS,
@@ -40,12 +41,9 @@
 	// names no format) opens in the context's format by itself (follow.svelte.ts).
 	onMount(() => void siteContext.load());
 	const leagueId = $derived(siteContext.league?.id ?? null);
-	/** A followed league's own pages, the follow page (/league/new) not among them. */
-	const LEAGUE_PAGE = /^\/league\/(?!new(?:\/|$))[^/]+/;
-	/** On a league's pages the phone bar leads with the site mark, the way home (Lane 66t): the bottom
-	 * bar keeps its five, so the mark takes no tab. A league's page passes no stamp, verb or search,
-	 * so its phone bar is that one row (Lane 83). */
-	const homeMark = $derived(LEAGUE_PAGE.test(page.url.pathname));
+	/** The phone bar's rows from the parts this page passes (bar-rows.ts): with none, the one row led by
+	 * the site mark, the way home; the bottom bar keeps its five, so the mark takes no tab. */
+	const rows = $derived(barRows({ stamp, tail, search }));
 </script>
 
 {#snippet siteMark(cls: string)}
@@ -80,8 +78,8 @@
 		{@render railLink(RAIL_FOOT, true)}
 	</nav>
 	<div class="main">
-		<header class="top" class:homed={homeMark}>
-			{#if homeMark}{@render siteMark('home')}{/if}
+		<header class="top" data-rows={rows}>
+			{#if rows === 1}{@render siteMark('home')}{/if}
 			<h1>
 				{#if typeof title === 'string'}{title}{:else}{@render title()}{/if}
 			</h1>
@@ -171,7 +169,7 @@
 		flex: 1;
 	}
 
-	/* The site mark in the phone bar on a league's pages; the rail draws it at a desk. */
+	/* The site mark in the phone bar of a page with no bar parts; the rail draws it at a desk. */
 	.home {
 		display: none;
 		place-items: center;
@@ -319,39 +317,50 @@
 			border-top-color: var(--accent);
 		}
 
-		/* The phone bar is one grid on every page, so it never changes size between pages: the league
-		   switch, the bar's one menu, takes the whole first row with the account in its last cell; the
-		   run's date and the page's verb share the second, a verb's height whether or not the page has
-		   either; the search runs across the last. */
+		/* The phone bar draws a row for each part its page passes and no other (bar-rows.ts): the league
+		   switch, the bar's one menu, takes the first row with the account in its last cell; a stamp or a
+		   verb adds the second, a verb's height whether or not the page has drawn its verb yet; a search
+		   runs across the third. The rows come from the page's props, never its data, so the bar never
+		   grows as a page loads, and no row stands empty under the switch (Lane 87). */
 		.top {
 			display: grid;
 			grid-template-columns: auto minmax(0, 1fr) auto;
-			grid-template-rows: auto var(--verb-h) auto;
-			grid-template-areas:
-				'league league account'
-				'stamp tail tail'
-				'find find find';
 			align-items: center;
 			padding: var(--s-2) var(--s-4);
 			gap: var(--s-2);
 			min-height: 0;
 		}
 
-		.league {
-			grid-area: league;
+		.top[data-rows='3'] {
+			grid-template-rows: auto var(--verb-h) auto;
+			grid-template-areas:
+				'league league account'
+				'stamp tail tail'
+				'find find find';
 		}
 
-		/* The mark leads the one row, where the desk rail puts it, the account still its last cell. A
-		   league's page has no stamp, verb or search, so the bar is that row: no empty verb-height row
-		   under the switch (Lane 83). It is fixed by the page's kind, so it never grows as data loads. */
-		.top.homed {
+		.top[data-rows='2'] {
+			grid-template-rows: auto var(--verb-h);
+			grid-template-areas:
+				'league league account'
+				'stamp tail tail';
+		}
+
+		/* No parts: the mark leads the one row, where the desk rail puts it, the account still its last
+		   cell. The switch's cell is the bar's, so the switch's width never comes from the name or the
+		   pending state. */
+		.top[data-rows='1'] {
 			grid-template-columns: 44px minmax(0, 1fr) auto;
 			grid-template-rows: auto;
 			grid-template-areas: 'home league account';
 		}
 
-		.top.homed .tail {
+		.top[data-rows='1'] .tail {
 			display: none;
+		}
+
+		.league {
+			grid-area: league;
 		}
 
 		.home {

@@ -24,6 +24,7 @@
 	import RoomCall from './RoomCall.svelte';
 	import RoomLayout from './RoomLayout.svelte';
 	import SeatsStrip from './SeatsStrip.svelte';
+	import { lobbyFillWords } from './setup/setup.ts';
 	import Wall from './Wall.svelte';
 	import { presetWords } from './words.ts';
 
@@ -134,7 +135,7 @@
 	{#if !started}
 		<Panel>
 			<p class="wait">
-				<b>{people} of {teams} in.</b> The draft starts when {teams} are in, or in {clockLabel(
+				<b>{lobbyFillWords(people).words}.</b> The draft starts when {teams} are in, or in {clockLabel(
 					fillLeft
 				)}
 				with bots in the open seats.

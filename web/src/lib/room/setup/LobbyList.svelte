@@ -2,7 +2,7 @@
 	import Panel from '#lib/ui/Panel.svelte';
 	import Quiet from '#lib/ui/Quiet.svelte';
 	import type { LobbyFilling, LobbyFormat } from '../api.ts';
-	import { lobbyTitle } from './setup.ts';
+	import { lobbyFillWords, lobbyTitle } from './setup.ts';
 
 	interface Props {
 		lobbies: readonly LobbyFilling[];
@@ -22,11 +22,12 @@
 	<ul>
 		{#each lobbies as lobby (lobby.format)}
 			{#snippet body()}
+				{@const fill = lobbyFillWords(lobby.filling)}
 				<span class="what">
 					<b>{lobbyTitle(lobby.teams, lobby.scoring, lobby.lineup)}</b>
 					<span>{lobby.clock_seconds} s a pick</span>
 				</span>
-				<span class="fill">{lobby.filling} of {lobby.teams}</span>
+				<span class="fill" class:none={fill.empty}>{fill.words}</span>
 			{/snippet}
 			<li>
 				{#if joinable}
@@ -107,6 +108,16 @@
 		font-weight: 700;
 		font-size: var(--t-lg);
 		color: var(--ink-2);
+		text-align: right;
+		white-space: nowrap;
+	}
+
+	/* No one in yet: words, not a figure, quiet beside the card's Join. */
+	.fill.none {
+		font-family: var(--font-ui);
+		font-size: var(--t-sm);
+		font-weight: 500;
+		color: var(--ink-3);
 	}
 
 	.join {

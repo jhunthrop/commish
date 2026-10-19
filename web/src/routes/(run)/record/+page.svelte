@@ -3,6 +3,8 @@
 	import { siteContext } from '#lib/context/context.svelte.ts';
 	import ContextNote from '#lib/context/ContextNote.svelte';
 	import {
+		RECORD_AFTER,
+		RECORD_BEFORE,
 		RECORD_BOX,
 		RECORD_FIGURES,
 		allLine,
@@ -16,6 +18,7 @@
 		recordHeadline,
 		recordLead,
 		recordSources,
+		recordStatusSpans,
 		scaleWords,
 		scoreOf,
 		weekLines,
@@ -80,7 +83,7 @@
 	const showPublished = $derived(publishedDrawn(record));
 	const basis = $derived(recordBasis(record).map((text) => ({ text, phone: true })));
 
-	const columns = $derived(2 + RECORD_FIGURES.length * sources.length + 1);
+	const spans = $derived(recordStatusSpans(sources.length));
 </script>
 
 {#snippet cells(line: RecordLine | undefined)}
@@ -156,21 +159,25 @@
 		<table class="weeks show-{figure}" aria-label="Our record week by week">
 			<thead>
 				<tr class="grp">
-					<th colspan="2"></th>
+					<th colspan={1 + RECORD_BEFORE.length}></th>
 					{#each RECORD_FIGURES as f (f)}
 						<th class="g {f}" colspan={sources.length} scope="colgroup">{FIGURE_HEADS[f]}</th>
 					{/each}
-					<th></th>
+					{#if RECORD_AFTER.length > 0}<th colspan={RECORD_AFTER.length}></th>{/if}
 				</tr>
 				<tr class="cols">
 					<th scope="col">{RECORD_BOX.week}</th>
-					<th class="n plc" scope="col">{RECORD_BOX.players}</th>
+					{#each RECORD_BEFORE as column (column.head)}
+						<th class={column.cls} scope="col">{column.head}</th>
+					{/each}
 					{#each RECORD_FIGURES as f (f)}
 						{#each sources as source (source)}
 							<th class="n m {f} {source}" scope="col">{SOURCE_HEADS[source]}</th>
 						{/each}
 					{/each}
-					<th class="st" scope="col">{RECORD_BOX.status}</th>
+					{#each RECORD_AFTER as column (column.head)}
+						<th class={column.cls} scope="col">{column.head}</th>
+					{/each}
 				</tr>
 			</thead>
 			<tbody>
@@ -193,7 +200,10 @@
 										>{ORDER_WORDS[row.week.order]}</span
 									>{/if}</td
 							>
-							<td class="st wide" colspan={columns - 1}>{capitalized(row.text)}</td>
+							<!-- One status cell per width, each spanning the columns that width draws; the
+							     other is display: none, so the status is read once. -->
+							<td class="st wide desk" colspan={spans.desk}>{capitalized(row.text)}</td>
+							<td class="st wide narrow" colspan={spans.narrow}>{capitalized(row.text)}</td>
 						</tr>
 					{/if}
 				{/each}
@@ -202,7 +212,7 @@
 						<td class="wk">{RECORD_BOX.toDate}</td>
 						<td class="n plc">{toDate.ours.graded}</td>
 						{@render cells(toDate)}
-						<td></td>
+						<td class="st"></td>
 					</tr>
 				{/if}
 			</tbody>
@@ -521,6 +531,10 @@
 		}
 	}
 
+	td.wide.narrow {
+		display: none;
+	}
+
 	/* Below a wide screen one figure at a time: Week, Ours, ADP and Published. */
 	@media (max-width: 1180px) {
 		.figure-pick {
@@ -530,8 +544,12 @@
 		.grp,
 		.plc,
 		.st:not(.wide),
-		.cols .st {
+		td.wide.desk {
 			display: none;
+		}
+
+		td.wide.narrow {
+			display: table-cell;
 		}
 
 		.weeks:not(.show-agreement) .agreement,

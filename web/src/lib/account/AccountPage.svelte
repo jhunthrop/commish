@@ -187,12 +187,9 @@
 	<meta name="robots" content="noindex" />
 </svelte:head>
 
+<!-- No bar parts, so the phone bar is its one row (Lane 87). The page's way to a mock is its Next
+     draft row; the bottom bar carries Mock draft only on a rail without a league's screens. -->
 <Shell title="Account">
-	{#snippet tail()}
-		{#if view?.kind === 'signed-in'}
-			<Quiet href={sectionHref('mock')}>Start a mock draft</Quiet>
-		{/if}
-	{/snippet}
 	<main class="account" aria-busy={view === null}>
 		{#if view === null}
 			<!-- The shell is drawn; the account arrives in a moment and takes this place. -->

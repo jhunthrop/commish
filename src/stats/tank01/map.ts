@@ -147,7 +147,7 @@ export function mapGames(body: unknown, week: number): readonly GameSummary[] {
       {
         gameId,
         week,
-        status: mapGameStatus(record.gameStatus),
+        status: mapGameStatus(record),
         homeNflTeam: home,
         awayNflTeam: away,
         // The schedule half of the response (founder, 2026-08-30): kept in the source's own
@@ -159,9 +159,14 @@ export function mapGames(body: unknown, week: number): readonly GameSummary[] {
   });
 }
 
-function mapGameStatus(raw: unknown): GameStatus {
-  const value = str(raw).toLowerCase();
-  if ((TANK01_CONFIG.gameStatuses.final as readonly string[]).includes(value)) return "final";
+function mapGameStatus(record: Record<string, unknown>): GameStatus {
+  // Tank01's documented code wins (0 scheduled, 1 in progress, 2 final); the words are the
+  // fallback and match by prefix, so an overtime final ("Final/OT") reads final. The same rule as
+  // research/pipeline/tank01/mapping.py `_game_status` (Lane 89, 2026-10-19).
+  const byCode = TANK01_CONFIG.gameStatusCodes[str(record.gameStatusCode) as keyof typeof TANK01_CONFIG.gameStatusCodes];
+  if (byCode !== undefined) return byCode;
+  const value = str(record.gameStatus).toLowerCase();
+  if (TANK01_CONFIG.gameStatuses.final.some((prefix) => value.startsWith(prefix))) return "final";
   if ((TANK01_CONFIG.gameStatuses.scheduled as readonly string[]).includes(value)) return "scheduled";
   // Everything else, INCLUDING an absent or unrecognized value. See `GameStatus`.
   return "in_progress";

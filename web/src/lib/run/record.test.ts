@@ -1,5 +1,6 @@
 // The record box score's words (Lane 66j fix round 1): run with `npm test`.
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { bannedPattern } from '#lib/format/copy-guard.ts';
 import {
@@ -11,6 +12,10 @@ import {
 	recordBasis,
 	recordLead,
 	recordSources,
+	RECORD_AFTER,
+	RECORD_BEFORE,
+	RECORD_FIGURES,
+	recordStatusSpans,
 	scaleWords,
 	figureWords,
 	gradedOrders,
@@ -197,4 +202,35 @@ void test('the published figure to date stands beside ours over the weeks that g
 		ours: null
 	});
 	assert.deepEqual(publishedBeside(undefined, 'agreement'), { published: '--', ours: null });
+});
+
+void test('a row not graded spans the columns each width draws, so no track is left empty', () => {
+	// Desk: Players, the three figures for each order and Status. Narrow: the shown figure's orders.
+	assert.deepEqual(recordStatusSpans(2), { desk: 8, narrow: 2 });
+	assert.deepEqual(recordStatusSpans(3), { desk: 11, narrow: 3 });
+	const page = readFileSync(
+		new URL('../../routes/(run)/record/+page.svelte', import.meta.url),
+		'utf8'
+	);
+	assert.match(page, /class="st wide desk" colspan=\{spans\.desk\}/);
+	assert.match(page, /class="st wide narrow" colspan=\{spans\.narrow\}/);
+	assert.match(page, /<td class="st"><\/td>/, "the To date row's last cell hides with Status");
+});
+
+void test('the status spans come from the column lists the table draws, never a hand count', () => {
+	const drawn = (list: readonly { narrow: boolean }[], narrow: boolean): number =>
+		list.filter((c) => !narrow || c.narrow).length;
+	for (const n of [2, 3]) {
+		assert.deepEqual(recordStatusSpans(n), {
+			desk: drawn(RECORD_BEFORE, false) + RECORD_FIGURES.length * n + drawn(RECORD_AFTER, false),
+			narrow: drawn(RECORD_BEFORE, true) + n + drawn(RECORD_AFTER, true)
+		});
+	}
+	const page = readFileSync(
+		new URL('../../routes/(run)/record/+page.svelte', import.meta.url),
+		'utf8'
+	);
+	assert.match(page, /\{#each RECORD_BEFORE as column/);
+	assert.match(page, /\{#each RECORD_AFTER as column/);
+	assert.doesNotMatch(page, /colspan="2"/);
 });
