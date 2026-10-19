@@ -187,7 +187,8 @@
 	<meta name="robots" content="noindex" />
 </svelte:head>
 
-<!-- No bar parts: the bottom bar's Mock draft is the way to a mock, so the bar is its one row. -->
+<!-- No bar parts, so the phone bar is its one row (Lane 87). The page's way to a mock is its Next
+     draft row; the bottom bar carries Mock draft only on a rail without a league's screens. -->
 <Shell title="Account">
 	<main class="account" aria-busy={view === null}>
 		{#if view === null}
