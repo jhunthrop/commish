@@ -38,7 +38,9 @@ function summary(lineup: LineupAdvice): Schemas['WeekLineup'] {
 		projection,
 		as_set: set,
 		gain: projection === null || set === null ? null : tenth(projection - set),
-		swaps
+		swaps,
+		// The Lineup's own sentence once the week is over (inseason week.go lineupSummary).
+		week_done: lineup.week_done ?? null
 	};
 }
 

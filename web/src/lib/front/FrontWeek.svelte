@@ -112,7 +112,9 @@
 						<div class="n-head">
 							<span class="wk">Week {view.nudge.week}</span><b>{view.nudge.title}</b>
 						</div>
-						{#if view.nudge.sum}
+						{#if view.nudge.done !== null}
+							<div class="n-sum"><span>{view.nudge.done}</span></div>
+						{:else if view.nudge.sum}
 							<div class="n-sum">
 								{#if view.nudge.sum.gain}<b>{view.nudge.sum.gain}</b>{:else}<b
 										>{view.nudge.sum.figure}</b
@@ -138,7 +140,7 @@
 					{/if}
 					<div class="n-act">
 						<span class="as-set">{view.nudge.asSet}</span>
-						{#if view.nudge.solid}
+						{#if view.nudge.verb === null}{:else if view.nudge.solid}
 							<PinnedVerb><Verb href={view.nudge.href}>{view.nudge.verb}</Verb></PinnedVerb>
 						{:else}
 							<Quiet href={view.nudge.href} size="sm">{view.nudge.verb}</Quiet>

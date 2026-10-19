@@ -4338,6 +4338,9 @@ type WeekLineup struct {
 
 	// Swaps each change, in the league's slot order
 	Swaps []WeekSwap `json:"swaps"`
+
+	// WeekDone the Lineup's own week_done sentence (words.go WeekDoneWords) once every starter's game is final, which the front door says in place of the changes and the verb; null before, or absent from an older answer
+	WeekDone *string `json:"week_done,omitempty"`
 }
 
 // WeekOrderAdvice defines model for WeekOrderAdvice.

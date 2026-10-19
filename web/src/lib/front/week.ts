@@ -65,8 +65,11 @@ export interface FrontNudge {
 	title: string;
 	sum: StripSum | null;
 	swaps: Swap[];
-	/** Set your lineup with changes to make, else a quiet way to the Lineup. */
-	verb: string;
+	/** Set your lineup with changes to make, else a quiet way to the Lineup; none once the week is
+	 * over. */
+	verb: string | null;
+	/** The API's sentence once every starter's game is final (week_done), null before. */
+	done: string | null;
 	solid: boolean;
 	href: string;
 	/** "As set on Sleeper". */
@@ -115,8 +118,9 @@ function problemWords(league: WeekLeague, zone: string): string | null {
 function changesWords(league: WeekLeague): string | null {
 	const lineup = league.lineup;
 	if (lineup === null) return null;
-	const title = changesTitle(lineup.changes);
-	return lineup.changes > 0 && lineup.gain !== null && lineup.gain > 0
+	const done = lineup.week_done ?? null;
+	const title = changesTitle(lineup.changes, done);
+	return done === null && lineup.changes > 0 && lineup.gain !== null && lineup.gain > 0
 		? `${title}, +${fixed(lineup.gain, 1)}`
 		: title;
 }
@@ -203,17 +207,23 @@ export function nudgeOf(league: WeekLeague, href: ScreenHref): FrontNudge | null
 		out: s.out === null ? null : shortName(s.out.name)
 	}));
 	const changes = lineup.changes;
+	// The Lineup's own sentence once the week is over: Final, no sum and no verb, as its strip says.
+	const done = lineup.week_done ?? null;
 	return {
 		week: league.week,
-		title: changesTitle(changes),
-		sum: stripSum({
-			totals: { proj: lineup.projection, pts: null, note: null },
-			asSet: lineup.as_set,
-			gain: lineup.gain,
-			swaps
-		}),
-		swaps,
-		verb: changes > 0 ? FRONT.setYourLineup : FRONT.openLineup,
+		title: changesTitle(changes, done),
+		sum: stripSum(
+			{
+				totals: { proj: lineup.projection, pts: null, note: null },
+				asSet: lineup.as_set,
+				gain: lineup.gain,
+				swaps
+			},
+			done
+		),
+		swaps: done === null ? swaps : [],
+		verb: done !== null ? null : changes > 0 ? FRONT.setYourLineup : FRONT.openLineup,
+		done,
 		solid: changes > 0,
 		href: href('start', league.id),
 		asSet: `As set on ${hostWords(league.host)}`

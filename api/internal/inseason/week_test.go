@@ -272,3 +272,15 @@ func TestWeekRouteWithNothingWired(t *testing.T) {
 		t.Fatalf("%d %s", code, env.Data)
 	}
 }
+
+// The front door's nudge says the Lineup's own sentence once the week is
+// over (Lane 85 fix round, M1), none before.
+func TestLineupSummaryCarriesTheWeekDone(t *testing.T) {
+	done := WeekDoneWords(6)
+	if got := lineupSummary(apitypes.LineupAdvice{Slots: weekSlots(), WeekDone: &done}); got.WeekDone == nil || *got.WeekDone != done {
+		t.Fatalf("week done %v", got.WeekDone)
+	}
+	if got := lineupSummary(apitypes.LineupAdvice{Slots: weekSlots()}); got.WeekDone != nil {
+		t.Errorf("week done before the week is over: %q", *got.WeekDone)
+	}
+}
