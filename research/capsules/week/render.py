@@ -3,8 +3,9 @@
 One fact to a line, each with the read it came from ("as of Monday 9:03 pm Central"), so the writer and
 a reviewer see how old each fact is; the injury report is named by its day ("on Monday's report"). His
 place on our board names which order it is, and the words a read must say it in ("in our preseason
-order", "in our rest-of-season order"). Numbers print as the season sheet prints them (JavaScript's
-`String`), so a figure the read quotes traces to the sheet word for word (`capsules.grounding`).
+order", "in our rest-of-season order"). Every figure prints as the player card prints it (`page_figures`:
+the tenth, the game's expected points in half points), so a figure the read quotes is the page's, word for
+word, and the guard refuses any other (`capsules.page_figures.figure_violations`).
 """
 
 from datetime import datetime

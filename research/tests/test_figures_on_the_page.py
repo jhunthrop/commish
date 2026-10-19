@@ -4,9 +4,11 @@ the card's figures, and a draft quoting another is refused by the figure guard, 
 nightly's fallback line says why."""
 
 from dataclasses import replace
+from datetime import timedelta
 
 from research.capsules.page_figures import FIGURE_OFF_PAGE
 from research.capsules.validate import Grounding, validate_prose
+from research.capsules.week.collect import expected_from_read, figures_at, last_games, published_projection
 from research.capsules.week.render import render_week_sheet
 from research.capsules.week.sheet import (
     BoardPlace,
@@ -16,6 +18,7 @@ from research.capsules.week.sheet import (
     PublishedProjection,
     WeekGame,
     WeekSheet,
+    points_text,
 )
 from research.capsules.week.validate import validate_week_read
 from research.capsules.week.write import WeekReadResult
@@ -119,3 +122,34 @@ def test_the_season_read_refuses_a_figure_to_more_decimals_than_the_page_prints(
     assert len(off) == 1 and '"17.46"' in off[0] and "17.5" in off[0]
     ok = prose.replace("17.46", "17.5")
     assert _figure_violations(validate_prose(ok, _season_grounding(sheet), (5, 60)).violations) == []
+
+
+def test_the_week_facts_are_read_as_the_card_serves_them() -> None:
+    """The store's raw figures become the card's at collection: the projection's cents then tenth, the game in
+    half points with the opponent's from the total, a week's points to the tenth."""
+    at = FIGURES
+    assert expected_from_read((at, {"implied_team_total": 29.3, "game_total": 53.6})) == ExpectedScore(29.5, 24.0, at)
+    assert published_projection(26.449, at, 26.62, at) == PublishedProjection(26.5, at, 26.6, at)
+    block = {"log": [{"week": 3, "opponent": "MIA", "home": False, "points": 17.46, "status": "played"}]}
+    assert last_games(block) == (GameLine(3, "MIA", False, 17.5),)
+
+
+def test_the_game_figures_are_the_read_the_card_shows() -> None:
+    """The API's `figuresAt`: the hourly capture's read while it is at most six hours older than the
+    instant (the kickoff once it has passed), else the game table's weekly read; a read without all three
+    figures is none."""
+    capture = (FIGURES, {"implied_team_total": 29.3, "game_total": 53.6, "point_spread": -5.5})
+    table = (FIGURES - timedelta(days=2), {"implied_team_total": 28.0, "game_total": 52.0, "point_spread": -4.0})
+    assert figures_at(capture, table, FIGURES + timedelta(hours=6), KICKOFF) == capture
+    assert figures_at(capture, table, FIGURES + timedelta(hours=7), KICKOFF) == table
+    # Past the kickoff the instant is the kickoff, so a capture read near it stands.
+    assert figures_at(capture, table, FIGURES + timedelta(days=9), FIGURES + timedelta(hours=1)) == capture
+    partial = (FIGURES, {"implied_team_total": 29.3, "game_total": 53.6})
+    assert figures_at(partial, table, FIGURES, KICKOFF) == table
+    assert figures_at(None, None, FIGURES, KICKOFF) is None
+
+
+def test_the_sheet_prints_a_tie_as_the_page_does() -> None:
+    assert points_text(9.45) == "9.5"
+    moved = replace(allen(), projection=PublishedProjection(26.4, CAPTURED, 26.6, CAPTURED))
+    assert moved.projection_change == -0.2  # noqa: PLR2004 - the card's tenths, 26.4 less 26.6

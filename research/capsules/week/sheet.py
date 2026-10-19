@@ -19,9 +19,8 @@ from typing import Final
 from zoneinfo import ZoneInfo
 
 from research.capsules.facts.team_names import team_name_forms
+from research.capsules.page_figures import page_tenth, page_tenth_text
 from research.capsules.season_voice import SeasonClock
-from research.model.jsmath import js_to_fixed
-from research.pipeline.jscompat import js_number, js_string
 
 CENTRAL: Final = ZoneInfo("America/Chicago")
 # The week's number is the published projection until the served path flips this (the founder's ruling:
@@ -54,8 +53,8 @@ def central_day_and_time(instant: datetime, *, short: bool = False) -> str:
 
 
 def points_text(value: float) -> str:
-    """A figure in points as the sheet prints it, to the tenth (JavaScript's `String`)."""
-    return js_string(js_number(js_to_fixed(value, 1)))
+    """A figure in points as the page prints it, to the tenth by the site's one rule (`page_figures`)."""
+    return page_tenth_text(value)
 
 
 @dataclass(frozen=True, slots=True)
@@ -256,7 +255,7 @@ class WeekSheet:
 
 
 def _rounded(value: float) -> float:
-    return js_number(js_to_fixed(value, 1))
+    return page_tenth(value)
 
 
 def week_name_ledger(sheet: WeekSheet) -> tuple[str, ...]:
