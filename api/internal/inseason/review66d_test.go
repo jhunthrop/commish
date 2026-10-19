@@ -32,7 +32,10 @@ func TestPointsSoFarOnlyWhereTheHostGivesThem(t *testing.T) {
 		{"yahoo", &leaguesync.Side{Starters: []string{"p"}, PlayerPoints: map[string]float64{"p": 5}}, locked, nil, "a total alone, whatever the read holds"},
 		{"ffpc", &leaguesync.Side{Starters: []string{"p"}}, locked, nil, "no map at all"},
 		{"sleeper", &leaguesync.Side{Starters: []string{"p"}, PlayerPoints: map[string]float64{"p": 9}}, Facts{}, nil, "not kicked off"},
-		{"sleeper", &leaguesync.Side{Starters: []string{"q"}, PlayerPoints: map[string]float64{"p": 9}}, locked, nil, "not a starter"},
+		{"sleeper", &leaguesync.Side{Starters: []string{"q"}, PlayerPoints: map[string]float64{"p": 9}}, locked, ptr(9), "a bench player under way (Lane 79 fix 3)"},
+		{"espn", &leaguesync.Side{Starters: []string{"q"}, PlayerPoints: map[string]float64{"p": 4.46}}, Facts{Locked: true, Played: true}, ptr(4.5), "a bench player final"},
+		{"espn", &leaguesync.Side{Starters: []string{"p"}, PlayerPoints: map[string]float64{"q": 3}}, locked, nil, "kicked off and left out of ESPN's period roster"},
+		{"espn", &leaguesync.Side{Starters: []string{"q"}, PlayerPoints: map[string]float64{"p": 0}}, Facts{}, nil, "a bench player still to kick off"},
 	}
 	for _, c := range cases {
 		got := thisWeek(c.host, c.side, "p", c.facts)

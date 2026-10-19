@@ -307,27 +307,21 @@ func teamPoints(side *leaguesync.Side, people []person) *float64 {
 	return nil
 }
 
-// thisWeek is the host's points for a starter whose game has kicked off,
+// thisWeek is the host's points for any rostered player of the side whose
+// game is under way or final, bench and starters alike (Lane 79 fix 3),
 // nil where the host gives no player's points.
 func thisWeek(host string, side *leaguesync.Side, id string, f Facts) *float64 {
 	if !leaguesync.GivesPlayerPoints(host, side) || side.PointsUnread || !f.Locked {
 		return nil
 	}
-	for _, s := range side.Starters {
-		if s != id {
-			continue
-		}
-		// A host that gives each side's total and no player's (Yahoo, FFPC),
-		// or a player its read left out, leaves his points unknown, never 0
-		// (Lane 66d review H1).
-		got, ok := side.PlayerPoints[id]
-		if !ok {
-			return nil
-		}
-		pts := roundTenth(got)
-		return &pts
+	// A player the read left out (ESPN's period roster, kicked off) has
+	// points unknown, never 0 (Lane 66d review H1).
+	got, ok := side.PlayerPoints[id]
+	if !ok {
+		return nil
 	}
-	return nil
+	pts := roundTenth(got)
+	return &pts
 }
 
 func wireFacts(f Facts, pointsThisWeek *float64) apitypes.WeekFacts {
