@@ -249,10 +249,7 @@ void test("a host that gives no player's points: rows say --, both screens' Tota
 	assert.equal(boxNumber(matchup.totals.pts), '87.4');
 	assert.equal(boxNumber(lineup.totals.pts), '87.4');
 	assert.equal(matchup.byPlayer, false);
-	assert.equal(
-		ptsPart(matchup.byPlayer, 'espn'),
-		"Pts are your team's points from ESPN, which gives none by player."
-	);
+	assert.equal(ptsPart(matchup.byPlayer, 'espn'), "Pts are ESPN's team points, none by player.");
 });
 
 void test("a host that gives each player's points: both screens' Totals add the printed rows", () => {

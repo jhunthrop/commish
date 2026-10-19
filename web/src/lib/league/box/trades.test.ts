@@ -315,6 +315,8 @@ const advice: Pick<
 	player_points: true
 };
 const TRADE_CLOCK = { zone: 'America/Chicago', zoned: false };
+/** The fixture's projection read, before every game in the lines. */
+const NOW_66T = Date.parse('2026-10-17T02:00:00.000Z');
 const TRADE_LINKS = { rules: '/league/1#uncounted', record: '/record' };
 const PROJ_SAID =
 	"Proj is this week's published projection, PPR nearest your rules, read Fri 9:00 pm.";
@@ -328,7 +330,8 @@ void test('closed, the basis names the finder columns only: who decides, Gain, P
 		[line('Cam Skattebo')],
 		'none',
 		TRADE_LINKS,
-		TRADE_CLOCK
+		TRADE_CLOCK,
+		NOW_66T
 	);
 	assert.equal(
 		basisText(parts),
@@ -345,7 +348,8 @@ void test('closed, the basis names the finder columns only: who decides, Gain, P
 		[line('Cam Skattebo'), line('Chiefs D/ST', 'DEF')],
 		'trade',
 		TRADE_LINKS,
-		TRADE_CLOCK
+		TRADE_CLOCK,
+		NOW_66T
 	);
 	assert.doesNotMatch(basisText(opened), /defenses/);
 });
@@ -357,7 +361,8 @@ void test("a trade opened or the builder open adds the players' columns, each on
 		[line('Cam Skattebo'), line('Chiefs D/ST', 'DEF')],
 		'builder',
 		TRADE_LINKS,
-		TRADE_CLOCK
+		TRADE_CLOCK,
+		NOW_66T
 	);
 	assert.equal(
 		basisText(parts),
@@ -393,7 +398,15 @@ void test('copy guard: every word the trade table prints is fantasy words, the p
 		room.yours,
 		room.theirs,
 		basisText(
-			tradeBasis(advice, 'sleeper', [line('Cam Skattebo')], 'trade', TRADE_LINKS, TRADE_CLOCK)
+			tradeBasis(
+				advice,
+				'sleeper',
+				[line('Cam Skattebo')],
+				'trade',
+				TRADE_LINKS,
+				TRADE_CLOCK,
+				NOW_66T
+			)
 		)
 	];
 	for (const text of said) {

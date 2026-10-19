@@ -155,7 +155,8 @@
 			lines,
 			building !== null ? 'builder' : anyOpen ? 'trade' : 'none',
 			{ rules: rulesHref, record: links.record() },
-			{ zone: memberZone(), zoned: false }
+			{ zone: memberZone(), zoned: false },
+			Date.now()
 		)
 	);
 	const everyCount = $derived(advice.teams.reduce((n, t) => n + t.trades.length, 0));

@@ -6,7 +6,7 @@
  * prints is tested here. */
 import { EMPTY_FIGURE } from '#lib/format/empty.ts';
 import { FIGURE } from '#lib/format/figure-words.ts';
-import { memberZone, weekdayTime, zoneWord } from '#lib/format/clock.ts';
+import { memberZone, weekdayTime } from '#lib/format/clock.ts';
 import { defenseWords } from '#lib/format/clubs.ts';
 import { lastName } from '#lib/format/draft.ts';
 import {
@@ -425,18 +425,6 @@ export const FORMAT_WORDS: Readonly<Record<ProjectionScoring['format'], string>>
 	standard: 'standard'
 };
 
-/** The game facts' read, said once on a screen in place of a stamp on every row: the oldest read of
- * any game still to be played, null when no row holds one. */
-export function factsReadLine(
-	lines: readonly PlayerLine[],
-	zone: string = memberZone(),
-	now: number = Date.now()
-): string | null {
-	const oldest = factsReadAt(lines, now);
-	if (oldest === null) return null;
-	return `The ${BOX.game} cell shows each club's expected points, his club first, then the kickoff weather, read ${weekdayTime(oldest, zone)} ${zoneWord(zone)}.`;
-}
-
 /** The oldest read of any game still to be played at `now`, null when no row holds one: the Waivers
  * basis says it in its short line. */
 export function factsReadAt(lines: readonly PlayerLine[], now: number = Date.now()): string | null {
@@ -449,53 +437,4 @@ export function factsReadAt(lines: readonly PlayerLine[], now: number = Date.now
 	);
 	if (reads.length === 0) return null;
 	return reads.reduce((a, b) => (Date.parse(a) <= Date.parse(b) ? a : b));
-}
-
-/** The projection's basis in one short line (the Waivers basis, review 66f M5): its scoring, whose,
- * its read, defenses' scoring when one is on the screen, and its change since the read before. */
-export function projShort(
-	readAt: string | null,
-	previousReadAt: string | null,
-	scoring: ProjectionScoring,
-	defense: boolean,
-	zone: string = memberZone(),
-	league = true,
-	head: string = BOX.proj
-): string {
-	// With no league (a player page signed out) the scoring is named alone.
-	const whose = !league
-		? ''
-		: scoring.league_own
-			? ", this league's own"
-			: ", the closest to this league's rules";
-	const when =
-		readAt === null ? 'not in yet' : `read ${weekdayTime(readAt, zone)} ${zoneWord(zone)}`;
-	const defenses = defense ? ', defenses on default scoring' : '';
-	const delta =
-		previousReadAt === null
-			? ''
-			: ` ${BOX.delta} is its change since ${weekdayTime(previousReadAt, zone)}.`;
-	return `${head} is this week's published projection in ${FORMAT_WORDS[scoring.format]} scoring${whose}, ${when}${defenses}.${delta}`;
-}
-
-/** The evidence columns in one short sentence pair, in the scoring the rows are in: "your scoring"
- * in a league, "in PPR" without one (the Waivers basis, the order's, the player card's). */
-export function evidenceShort(scoring = 'your scoring'): string {
-	return `${BOX.oppRank} is points allowed to his position, 1st fewest. ${BOX.avg} and ${BOX.last} are his points a game and last game, ${scoring}.`;
-}
-
-/** The evidence columns' short pair in a league. */
-export const EVIDENCE_SHORT = evidenceShort();
-
-/** The game facts' read in one short sentence, null when no line holds one (the Waivers basis and
- * the player card's). */
-export function factsReadShort(
-	lines: readonly PlayerLine[],
-	zone: string = memberZone(),
-	now: number = Date.now()
-): string | null {
-	const read = factsReadAt(lines, now);
-	return read === null
-		? null
-		: `The ${BOX.game} cell's expected points and weather were read ${weekdayTime(read, zone)} ${zoneWord(zone)}.`;
 }

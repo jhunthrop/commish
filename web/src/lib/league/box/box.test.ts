@@ -12,7 +12,6 @@ import {
 	easeOf,
 	oppRankWord,
 	expectedWords,
-	factsReadLine,
 	gameOf,
 	hostRow,
 	positionWord,
@@ -283,19 +282,6 @@ void test('the evidence columns print as the Lineup draws them', () => {
 	assert.equal(boxRow(line(), 'QB', ZONE).pill?.rank, 7, 'the Matchup keeps it');
 });
 
-void test("the screen's basis lines say the Game cell's figures and the facts' read once", () => {
-	const older = '2026-10-16T20:00:00.000Z';
-	assert.equal(
-		factsReadLine(
-			[line(), line({}, { game_total: { points: 40, team_points: 20, read_at: older } })],
-			ZONE,
-			NOW
-		),
-		"The Game cell shows each club's expected points, his club first, then the kickoff weather, read Fri 3:00 pm Central."
-	);
-	assert.equal(factsReadLine([line({}, { bye: true })], ZONE, NOW), null);
-});
-
 /** The site's copy guard. */
 const BANNED = bannedPattern();
 
@@ -303,13 +289,8 @@ void test('copy guard: every box word is fantasy words, with no dash or semicolo
 	const said = [
 		...Object.values(BOX),
 		totalsNote([{ proj: null, game: null }], true, 6) ?? '',
-		totalsNote([], false, 6) ?? '',
-		factsReadLine([line()], ZONE, NOW) ?? ''
+		totalsNote([], false, 6) ?? ''
 	];
-	assert.ok(
-		said.at(-1)?.startsWith("The Game cell shows each club's expected points"),
-		said.at(-1)
-	);
 	for (const text of said) {
 		assert.doesNotMatch(text, BANNED, text);
 	}

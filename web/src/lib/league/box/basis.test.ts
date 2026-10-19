@@ -86,10 +86,7 @@ void test('the change, the Game cell and Opp rank each in one sentence', () => {
 
 void test('Pts is said only where the platform gives each team its total alone, the platform named', () => {
 	assert.equal(ptsPart(true, 'sleeper'), null);
-	assert.equal(
-		ptsPart(false, 'espn'),
-		"Pts are your team's points from ESPN, which gives none by player."
-	);
+	assert.equal(ptsPart(false, 'espn'), "Pts are ESPN's team points, none by player.");
 	for (const host of ['espn', 'yahoo', 'ffpc', 'mfl'] as const) {
 		assert.doesNotMatch(ptsPart(false, host) ?? '', /\bhost\b/i);
 	}
@@ -177,6 +174,6 @@ void test('the Matchup key says Proj, Pts and Game, the columns it draws', () =>
 	);
 	assert.equal(
 		basisText(parts),
-		"Proj is this week's published projection, PPR nearest your rules, read Fri 9:00 pm. Pts are your team's points from ESPN, which gives none by player. Game is each club's expected points, his first, and weather, read Fri 4:01 pm."
+		"Proj is this week's published projection, PPR nearest your rules, read Fri 9:00 pm. Pts are ESPN's team points, none by player. Game is each club's expected points, his first, and weather, read Fri 4:01 pm."
 	);
 });

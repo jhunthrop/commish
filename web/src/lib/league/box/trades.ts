@@ -21,6 +21,7 @@ import { tradeKey } from '../inseason/state.ts';
 import { LINES, verbWords } from '../inseason/words.ts';
 import { hostWords } from '../names.ts';
 import {
+	gamePart,
 	OPP_PART,
 	projPart,
 	ptsPart,
@@ -379,7 +380,8 @@ export function tradeBasis(
 	lines: readonly PlayerLine[],
 	opened: 'none' | 'trade' | 'builder',
 	hrefs: { rules: string; record: string },
-	clock: Clock
+	clock: Clock,
+	now: number
 ): BasisPart[] {
 	// The builder's boxes draw a defense; a trade never holds one (Lane 66g).
 	const defense = opened === 'builder' && lines.some((l) => l.player.position === 'DEF');
@@ -398,6 +400,8 @@ export function tradeBasis(
 		opened !== 'none'
 			? [
 					...said(OPP_PART),
+					// The opened rows' Game cell draws its figures at a desk only.
+					...said(gamePart(lines, clock, now, 'read'), false),
 					...said(ptsPart(advice.player_points, host), false),
 					...uncountedParts(advice, hrefs.rules)
 				]

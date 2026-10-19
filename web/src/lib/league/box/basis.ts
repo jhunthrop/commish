@@ -55,29 +55,34 @@ export function deltaPart(previousReadAt: string | null, clock: Clock): string |
 		: `${BOX.delta} is its change since ${stamp(previousReadAt, clock)}.`;
 }
 
-/** The Game cell said whole where the screen draws the expected points and weather in it, or its read
- * alone where the cell explains itself; null when no game still to be played holds a read. */
+/** The Game cell said whole where the screen draws the expected points and weather in it, its read
+ * alone where the cell explains itself, or his next game's on the player card; null when no game still to be played holds a read. */
 export function gamePart(
 	lines: readonly PlayerLine[],
 	clock: Clock,
 	now: number,
-	say: 'full' | 'read'
+	say: 'full' | 'read' | 'next'
 ): string | null {
 	const read = factsReadAt(lines, now);
 	if (read === null) return null;
+	const at = stamp(read, clock);
+	if (say === 'next') return `His next game's expected points and weather were read ${at}.`;
 	return say === 'full'
-		? `${BOX.game} is each club's expected points, his first, and weather, read ${stamp(read, clock)}.`
-		: `${BOX.game} was read ${stamp(read, clock)}.`;
+		? `${BOX.game} is each club's expected points, his first, and weather, read ${at}.`
+		: `${BOX.game} was read ${at}.`;
 }
 
 export const OPP_PART = `${BOX.oppRank} is points allowed to his position, 1st fewest.`;
 
+/** Avg and Last where a page says what they are (the player card): in the scoring the rows are in. */
+export function avgLastPart(scoring: string): string {
+	return `${BOX.avg} and ${BOX.last} are his points a game and last game, ${scoring}.`;
+}
+
 /** The Pts column where it needs a sentence: a platform that gives each team's total alone; a
  * platform's own points by player say themselves, so nothing is said of them (Lane 66t). */
 export function ptsPart(byPlayer: boolean, host: LeagueHost): string | null {
-	return byPlayer
-		? null
-		: `${BOX.pts} are your team's points from ${hostWords(host)}, which gives none by player.`;
+	return byPlayer ? null : `${BOX.pts} are ${hostWords(host)}'s team points, none by player.`;
 }
 
 /** The API's count of the rules our stats lack, then its link to the league's Settings, which lists

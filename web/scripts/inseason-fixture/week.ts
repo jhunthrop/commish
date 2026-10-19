@@ -38,7 +38,7 @@ export const CHECK_BASIS = 'The scoreboard is each lineup before and after the t
 
 /** The Lineup's advice rule (words.go LineupBasis). */
 export const LINEUP_BASIS =
-	'We start the highest Proj at each slot after designations and byes, our order breaking ties and standing in for a missing Proj.';
+	'We start the highest Proj at each slot after designations and byes, our order breaking ties.';
 
 /** The Waivers pickup rule (words.go WaiversBasis). */
 export const WAIVERS_BASIS =
@@ -46,17 +46,27 @@ export const WAIVERS_BASIS =
 
 const COUNT_WORDS = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'];
 
+/** The uncounted rules' sentence and link in the API's words (words.go uncountedOf): a count of
+ * whose rules, and the link's words where there is a Settings to open. */
+export function uncountedCount(
+	count: number,
+	whose = 'your',
+	linked = true
+): { basis_note: string; basis_note_link: string } {
+	if (count === 0) return { basis_note: '', basis_note_link: '' };
+	const n = COUNT_WORDS[count] ?? String(count);
+	return {
+		basis_note: `Avg and Last miss ${n} of ${whose} rules our stats lack.`,
+		basis_note_link: linked ? `Which ${n}` : ''
+	};
+}
+
 /** The league's uncounted rules in the API's words (words.go UncountedOf). */
 export function uncountedOf(rules: readonly string[]): {
 	basis_note: string;
 	basis_note_link: string;
 } {
-	if (rules.length === 0) return { basis_note: '', basis_note_link: '' };
-	const n = COUNT_WORDS[rules.length] ?? String(rules.length);
-	return {
-		basis_note: `Avg and Last miss ${n} of your rules our stats lack.`,
-		basis_note_link: `Which ${n}`
-	};
+	return uncountedCount(rules.length);
 }
 
 /** A figure to the tenth a page prints. */

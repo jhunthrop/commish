@@ -474,10 +474,24 @@ function planSentence(): string {
 	return `Start ${joined}, on ESPN now.`;
 }
 
-/** The ESPN league's lineup: the move open, the verb ESPN's lineup page. */
+/** A line as ESPN gives it: no player's points, only the team's (inseason thisWeek). */
+const noPlayerPoints = (line: PlayerLine): PlayerLine => ({
+	...line,
+	facts: { ...line.facts, points_this_week: null }
+});
+
+/** The ESPN league's lineup: the move open, the verb ESPN's lineup page, and ESPN's team total in
+ * place of each player's points (Lane 66t: its Pts sentence must fit the phone's basis too). */
 function espnLineup(): LineupAdvice {
 	return {
 		...lineup,
+		player_points: false,
+		slots: lineup.slots.map((s) => ({
+			...s,
+			ours: noPlayerPoints(s.ours),
+			host: s.host === null ? null : noPlayerPoints(s.host)
+		})),
+		bench: lineup.bench.map(noPlayerPoints),
 		host_lineup_url: ESPN_LINEUP_URL,
 		moves: { lineup: 'available', note: null, takes_writes: true, writes_on: true, reason: null }
 	};
