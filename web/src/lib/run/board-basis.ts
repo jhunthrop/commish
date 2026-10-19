@@ -5,7 +5,8 @@
  * words a page prints. */
 import { monthDayLabel } from '#lib/format/date.ts';
 import { FIGURE } from '#lib/format/figure-words.ts';
-import { throughClause, type FiguresReach } from './rest-words.ts';
+import type { FiguresReach } from './rest-words.ts';
+import { throughClause } from './through-words.ts';
 import type { Format } from './schema.ts';
 
 /** One sentence of the basis. A sentence about columns the phone does not draw is not said there. */

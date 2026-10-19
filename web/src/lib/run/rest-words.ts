@@ -2,6 +2,7 @@
 import { monthDayLabel } from '#lib/format/date.ts';
 import { FIGURE } from '#lib/format/figure-words.ts';
 import type { Format } from './schema.ts';
+import { throughClause } from './through-words.ts';
 
 /** How far this season's figures reach, and the scoring they are in. */
 export interface FiguresReach {
@@ -10,11 +11,6 @@ export interface FiguresReach {
 	/** "through week 5 and week 6's Thursday game" (run/reach.ts reachWords), empty before week 1's:
 	 * never a week a Sunday player's GP does not reach. */
 	through: string;
-}
-
-/** ", through week 5", or nothing before week 1's games: the one way every basis says the reach. */
-export function throughClause(reach: Pick<FiguresReach, 'through'>): string {
-	return reach.through === '' ? '' : `, ${reach.through}`;
 }
 
 /** "Games and Avg are this season's, through week 5.", with ", scored in PPR" before the
