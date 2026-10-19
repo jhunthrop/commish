@@ -259,6 +259,13 @@ provider, a large CSV narrowed by rows kept byte for byte with the filter stated
 
 **Ingests:** `parity: 31 ingest case(s) in 76 passes, 31 matching; 1382755 rows compared per case, 943239 deduplicated; 0 differences`
 
+The headline above is the 2026-10-12 full run and predates Lane 78. The three `nflverse-season-*` cases
+were re-run on 2026-10-19 (Lane 78) once the stats step wrote each season's game results with its lines,
+2012 now comparing team_week_observations too: 3 matching in 8 passes, 0 differences; their rows below are
+that run's, as are the `crosswalk` rows.
+The `crosswalk` case declares one departure (Lane 78, `parity.diff.Departure`): the build writes provider
+player 4569682 as nflverse spells him, "Audric Estimé", where the oracle keeps the provider's "Audric Estime".
+
 Rows compared per case add every table of every pass of every case, so a shared prerequisite (the
 25,000-person universe several cases land first) counts once per case and pass; the deduplicated
 total counts each tested table per pass and each prerequisite table once, at its largest.
@@ -269,14 +276,14 @@ total counts each tested table per pass and each prerequisite table once, at its
 | nflverse-universe | rerun | players 24,853 | 0 |
 | nflverse-universe | prior | players 58 | 0 |
 | nflverse-universe | later | players 24,853 | 0 |
-| nflverse-season-2024 | first | players 24,853 (setup); player_week_observations 151,240; player_week_teams 7,551; team_week_observations 1,056 | 0 |
-| nflverse-season-2024 | rerun | players 24,853 (setup); player_week_observations 151,240; player_week_teams 7,551; team_week_observations 1,056 | 0 |
-| nflverse-season-2024 | prior | players 58 (setup); player_week_observations 898; player_week_teams 44; team_week_observations 5 | 0 |
-| nflverse-season-2024 | later | players 24,853 (setup); player_week_observations 151,590; player_week_teams 7,551; team_week_observations 1,056 | 0 |
-| nflverse-season-2012 | first | players 24,853 (setup); player_week_observations 10,696; player_week_teams 764 | 0 |
-| nflverse-season-2012 | rerun | players 24,853 (setup); player_week_observations 10,696; player_week_teams 764 | 0 |
-| nflverse-season-2025 | first | players 24,853 (setup); player_week_observations 1,954; player_week_teams 977; team_week_observations 132 | 0 |
-| nflverse-season-2025 | rerun | players 24,853 (setup); player_week_observations 1,954; player_week_teams 977; team_week_observations 132 | 0 |
+| nflverse-season-2024 | first | players 24,853 (setup); player_week_observations 151,240; player_week_teams 7,551; team_week_observations 1,600 | 0 |
+| nflverse-season-2024 | rerun | players 24,853 (setup); player_week_observations 151,240; player_week_teams 7,551; team_week_observations 1,600 | 0 |
+| nflverse-season-2024 | prior | players 58 (setup); player_week_observations 898; player_week_teams 44; team_week_observations 549 | 0 |
+| nflverse-season-2024 | later | players 24,853 (setup); player_week_observations 151,590; player_week_teams 7,551; team_week_observations 1,600 | 0 |
+| nflverse-season-2012 | first | players 24,853 (setup); player_week_observations 10,696; player_week_teams 764; team_week_observations 512 | 0 |
+| nflverse-season-2012 | rerun | players 24,853 (setup); player_week_observations 10,696; player_week_teams 764; team_week_observations 512 | 0 |
+| nflverse-season-2025 | first | players 24,853 (setup); player_week_observations 1,954; player_week_teams 977; team_week_observations 676 | 0 |
+| nflverse-season-2025 | rerun | players 24,853 (setup); player_week_observations 1,954; player_week_teams 977; team_week_observations 676 | 0 |
 | nflverse-schedule | first | team_week_observations 20,272 | 0 |
 | nflverse-schedule | rerun | team_week_observations 20,272 | 0 |
 | nflverse-game-results | first | team_week_observations 1,788 | 0 |
@@ -315,8 +322,8 @@ total counts each tested table per pass and each prerequisite table once, at its
 | tank01-adp | rerun | provider_players 1,373 | 0 |
 | tank01-headshots | first | provider_players 1,373 | 0 |
 | tank01-headshots | rerun | provider_players 1,373 | 0 |
-| crosswalk | first | players 24,885 (setup); provider_players 1,373 (setup); player_crosswalk 1,373 | 0 |
-| crosswalk | rerun | players 24,885 (setup); provider_players 1,373 (setup); player_crosswalk 1,373 | 0 |
+| crosswalk | first | players 24,885 (setup); provider_players 1,373 (setup, 1 declared departure); player_crosswalk 1,373 | 0 |
+| crosswalk | rerun | players 24,885 (setup); provider_players 1,373 (setup, 1 declared departure); player_crosswalk 1,373 | 0 |
 | tank01-capture-all | first | capture_snapshots 11 | 0 |
 | tank01-capture-all | rerun | capture_snapshots 11 | 0 |
 | tank01-capture-harvest | first | capture_snapshots 5 | 0 |

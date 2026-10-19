@@ -94,9 +94,11 @@ async function universeWithDefenses(ctx: TsCaseContext): Promise<void> {
   await seedTeamDefenseUniverse(ctx.db);
 }
 
+/** The stats step's season: its lines, then its game results (`season_stats.py`, Lane 78). */
 function seasonCase(season: number): TsCase {
   return async ({ db }) => {
     await realIngestStats(db, season);
+    await ingestGameResults(db, [season]);
   };
 }
 

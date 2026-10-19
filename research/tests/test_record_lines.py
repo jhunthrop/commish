@@ -8,8 +8,10 @@ from dataclasses import dataclass
 from typing import Any, Final
 
 from research.nightly.reads.record import (
+    AGREEMENT_PLACES,
     ALL,
     LEAGUE_TEAMS,
+    SCALE,
     Week,
     filled_ranks,
     honest_line,
@@ -227,3 +229,11 @@ def test_published_starters_right_counts_only_the_players_it_listed() -> None:
     assert qb.published is not None
     assert qb.published.starters == top
     assert qb.published.starters_of == LEAGUE_TEAMS
+
+
+def test_the_scale_prints_its_ends_as_the_page_prints_the_rate() -> None:
+    """Ruling R2: order matched prints two decimals, so the sentence that says its scale names its ends
+    in that form, 1.00 and 0.00, never 1.0 and 0 (Lane 78)."""
+    ends = re.findall(r"-?\d+(?:\.\d+)?", SCALE)
+    assert ends == [f"{1:.{AGREEMENT_PLACES}f}", f"{0:.{AGREEMENT_PLACES}f}"], SCALE
+    assert SCALE == "1.00 is a perfect match of the week's finishing order, 0.00 is none."
