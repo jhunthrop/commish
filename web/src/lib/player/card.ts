@@ -2,6 +2,7 @@
  * The types and words both halves share: the build words what the run holds (rest of season, Avg and
  * Last before the week is read), and the week's read (live.ts) words what the API holds. */
 import { EMPTY_FIGURE } from '#lib/format/empty.ts';
+import { FIGURE } from '#lib/format/figure-words.ts';
 
 /** A tile's tone: the accent for this week's projection, the ease of his opponent, quiet for the
  * change. */
@@ -50,9 +51,9 @@ export function restRankWords(position: string, shown: number | string): string 
 export const CARD = {
 	proj: 'Proj',
 	rest: 'Rest of season',
-	projected: 'Projected',
+	projected: FIGURE.projected,
 	opp: 'Opp rank',
-	avg: 'Avg',
+	avg: FIGURE.avg,
 	last: 'Last',
 	delta: 'Δ Proj',
 	compare: 'Compare',

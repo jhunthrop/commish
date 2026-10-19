@@ -358,6 +358,12 @@ func TradesBasis(b OrderBasis, weeks int) string {
 		"then the close calls for them. The other team decides. %s", numberWords(b), CloseCall, porWords(b, weeks))
 }
 
+// HeadProjected is the head the web draws over a projection's total, the
+// rest of the season's in season: the site's one word for it
+// (web/src/lib/format/figure-words.json, the ruling on the sweep's X2), so
+// the order's basis names its total as its column is headed.
+const HeadProjected = "Projected"
+
 // OrderScreenBasis is the Rest of season and Players screens' line
 // (Lane 66j): what the order ranks by, what its two figures are and the
 // league its points over replacement are for, said once (Lane 66q: the
@@ -367,8 +373,8 @@ func OrderScreenBasis(b OrderBasis, fromWeek int, s apitypes.LeagueSettings) str
 	if b != RestOfSeason || fromWeek < 1 {
 		return fmt.Sprintf("Our preseason order: All ranks by Over repl., his season less a free pickup's, for %s.", teamsWords(s))
 	}
-	return fmt.Sprintf("Our rest-of-season order from week %d: Points through week %d, byes out. Positions rank by Points, "+
-		"All by Over repl., his points less a free pickup's, for %s.", fromWeek, LastWeek, teamsWords(s))
+	return fmt.Sprintf("Our rest-of-season order from week %d: %s through week %d, byes out. Positions rank by %s, "+
+		"All by Over repl., his points less a free pickup's, for %s.", fromWeek, HeadProjected, LastWeek, HeadProjected, teamsWords(s))
 }
 
 // teamsWords is shapeWords in the order screen's few words: "12 teams

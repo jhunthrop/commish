@@ -1,5 +1,6 @@
 /** The player page's sentences for each format line, built with the page: no script carries them. */
 import { gapPicks } from '#lib/format/gap-picks.ts';
+import { FIGURE } from '#lib/format/figure-words.ts';
 import { fixed } from '#lib/format/number.ts';
 import { restLead, type FiguresReach } from './rest-words.ts';
 import type { Format, PlayerFormat } from './schema.ts';
@@ -164,7 +165,7 @@ export function formatTable(lines: readonly { format: Format; rest: RestFigures 
 } {
 	const from = (format: Format): string => `rest of season from week ${String(format.rosFromWeek)}`;
 	const rest = lines.filter((line) => line.rest !== null);
-	if (rest.length === 0) return { head: 'Projected', labels: lines.map((l) => l.format.label) };
+	if (rest.length === 0) return { head: FIGURE.projected, labels: lines.map((l) => l.format.label) };
 	const [first] = rest;
 	if (first && rest.length === lines.length) {
 		const head = from(first.format);
@@ -174,7 +175,7 @@ export function formatTable(lines: readonly { format: Format; rest: RestFigures 
 		};
 	}
 	return {
-		head: 'Projected',
+		head: FIGURE.projected,
 		labels: lines.map((l) =>
 			l.rest === null ? l.format.label : `${l.format.label}, ${from(l.format)}`
 		)

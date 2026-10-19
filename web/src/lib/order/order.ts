@@ -33,8 +33,8 @@ export type RosterView = 'everyone' | 'free' | 'yours';
 /** The figure columns of a view: the key first and big, then the others (review 66j H2). */
 export type FigureKey = 'por' | 'total' | 'perGame';
 
-/** The view's figure columns from what its rank sorts on: across positions Over repl., Points and A
- * game; at a position Points and A game. */
+/** The view's figure columns from what its rank sorts on: across positions Over repl., Projected and
+ * A game; at a position Projected and A game. */
 export function figureColumns(rankBy: OrderAdvice['rank_by']): readonly FigureKey[] {
 	return rankBy === 'points_over_replacement' ? ['por', 'total', 'perGame'] : ['total', 'perGame'];
 }

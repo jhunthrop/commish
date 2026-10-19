@@ -108,7 +108,7 @@ void test('the big figure is the key the rank sorts on (review 66j H2)', () => {
 	assert.deepEqual(figureColumns('points_over_replacement'), ['por', 'total', 'perGame']);
 	assert.deepEqual(figureColumns('rest_of_season_points'), ['total', 'perGame']);
 	assert.equal(FIGURE_HEADS.por, 'Over repl.');
-	assert.equal(FIGURE_HEADS.total, 'Points');
+	assert.equal(FIGURE_HEADS.total, 'Projected');
 });
 
 void test('a roster mark reads Yours, Free or the holding team, never the platform word', () => {

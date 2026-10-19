@@ -265,7 +265,7 @@ func TestSentenceGrammarAndBothDoubtful(t *testing.T) {
 func TestOrderScreenBasisNamesTheLeagueOnce(t *testing.T) {
 	settings := apitypes.LeagueSettings{Teams: 12, Lineup: apitypes.LineupTwoFlex,
 		Roster: apitypes.RosterCounts{Qb: 1, Rb: 2, Wr: 3, Te: 1}}
-	want := "Our rest-of-season order from week 6: Points through week 17, byes out. Positions rank by Points, " +
+	want := "Our rest-of-season order from week 6: Projected through week 17, byes out. Positions rank by Projected, " +
 		"All by Over repl., his points less a free pickup's, for 12 teams with 1 QB, 2 RB, 3 WR, 1 TE and two flex."
 	if got := OrderScreenBasis(RestOfSeason, 6, settings); got != want {
 		t.Fatalf("%q", got)
