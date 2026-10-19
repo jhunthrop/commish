@@ -94,6 +94,29 @@ const advice = (rows: OrderRow[], over: Partial<OrderAdvice> = {}): OrderAdvice 
 const screenHref = (screen: 'waivers' | 'trades', league: string): string =>
 	`/league/${league}/${screen}`;
 
+void test("a Thursday game the API's facts count as played reads Final with its points as Last (the sweep's X3)", () => {
+	// SEA at DEN, Thursday of week 6, as the API answers once its lines are in (playedFromLines).
+	const thursday: WeekFacts = {
+		...facts,
+		opponent: 'DEN',
+		kickoff: '2026-10-16T00:15:00.000Z',
+		played: true,
+		last_games: [
+			{ week: 6, points: 25.4 },
+			{ week: 5, points: 22.8 }
+		]
+	};
+	const view = orderView(
+		row('Smith-Njigba', {
+			line: line('Smith-Njigba', 'WR', { facts: thursday, season_avg: 27.5, last_points: 25.4 })
+		}),
+		ZONE
+	);
+	assert.deepEqual(view.box.game, { where: 'at DEN', when: 'Final' });
+	assert.equal(view.box.evidence.avg, 27.5);
+	assert.equal(view.box.evidence.last, 25.4);
+});
+
 void test('a row prints the API figures as they come', () => {
 	const view = orderView(row('Swift'), ZONE);
 	assert.equal(view.key, 'b-Swift');
