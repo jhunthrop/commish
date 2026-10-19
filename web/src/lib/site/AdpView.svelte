@@ -45,7 +45,7 @@
 			order: 'adp',
 			tier: true,
 			bye: true,
-			range: true,
+			range: page.range,
 			gap: page.gap,
 			season: page.underway,
 			action: true

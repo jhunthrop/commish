@@ -1,7 +1,7 @@
 /** The clubs index, a club's page and the strength of schedule page, from clubs.json, schedule.json
  * and the default board. */
 import { error } from '@sveltejs/kit';
-import { rangeScale } from '#lib/run/derive.ts';
+import { carriesRange, rangeScale } from '#lib/run/derive.ts';
 import type {
 	BoardRow,
 	BoardRowView,
@@ -73,6 +73,7 @@ export interface ClubPage extends BoardStatuses {
 	rows: BoardRowView[];
 	/** The club's kickers, then its defense, in draft order, each with his status. */
 	market: MarketRowView[];
+	/** The rows' range scale, null where no row carries a range (in season): no Floor to ceiling. */
 	scale: RangeScale | null;
 	clubs: Club[];
 	/** The last week played, 0 before the first kickoff: the schedule sets those weeks back. */
@@ -187,7 +188,7 @@ export async function clubPage(abbr: string): Promise<ClubPage> {
 		schedule: { opponentBasis: loaded.opponentBasis, season: loaded.season },
 		rows: seasoned,
 		market,
-		scale: own.length > 0 ? rangeScale(own) : null,
+		scale: carriesRange(own) ? rangeScale(own) : null,
 		clubs: list,
 		played,
 		basis: [
