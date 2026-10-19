@@ -5,7 +5,7 @@ rounding rule, like every other figure a screen prints, so the schedule and club
 from datetime import UTC, datetime
 
 from research.nightly.build.season import schedule_json
-from research.nightly.reads.schedule import Game, OpponentValue, Slate, slates
+from research.nightly.reads.schedule import Game, OpponentValue, Slate, game_states, slates
 from research.pipeline.nflverse.team_codes import NFL_TEAM_ABBREVIATIONS
 
 READ = datetime(2026, 8, 1, tzinfo=UTC)
@@ -20,7 +20,7 @@ def _game(opponent: str) -> Game:
 
 def test_strength_is_written_to_a_tenth() -> None:
     slate = Slate("ARI", (_game("BUF"),), 9.264705882352942, 1, (READ, READ))
-    written = schedule_json(2026, [slate], {"BUF": OpponentValue(10.5, READ)})
+    written = schedule_json(2026, [slate], {"BUF": OpponentValue(10.5, READ)}, {("ARI", 1): "upcoming"})
     assert written["slates"][0]["strength"] == WRITTEN
 
 
@@ -35,8 +35,9 @@ def test_the_rank_is_the_unrounded_means_so_a_tie_on_the_tenth_keeps_its_order()
         "ARI": [_game("BUF")],
         "ATL": [_game("MIA")],
     }
-    measured = slates(games, values)
+    states = game_states(games, frozenset(), READ)
+    measured = slates(games, values, states)
     rank = {s.club: s.rank for s in measured}
     assert (rank["ATL"], rank["ARI"]) == (1, 2)
-    written = {s["abbr"]: s["strength"] for s in schedule_json(2026, measured, values)["slates"]}
+    written = {s["abbr"]: s["strength"] for s in schedule_json(2026, measured, values, states)["slates"]}
     assert (written["ATL"], written["ARI"]) == (WRITTEN, WRITTEN)

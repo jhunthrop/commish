@@ -89,7 +89,8 @@ def _schedule(conn: Connection, as_of: datetime) -> tuple[Json, list[Json], Json
     games = schedule_read.slates_by_club(conn, PRODUCT_SEASON)
     kickoff = first_kickoff_for(conn, PRODUCT_SEASON) or as_of
     values = schedule_read.opponent_values(conn, PRODUCT_SEASON, kickoff)
-    slates = schedule_read.slates(games, values)
+    states = schedule_read.game_states(games, schedule_read.finals_at(conn, PRODUCT_SEASON, as_of), as_of)
+    slates = schedule_read.slates(games, values, states)
     published = [value.published for value in values.values()]
     sources = (
         {"artifact": "schedule", "vendor": WIN_TOTALS_VENDOR, "feed": schedule_read.WIN_TOTAL_SOURCE,
@@ -97,7 +98,7 @@ def _schedule(conn: Connection, as_of: datetime) -> tuple[Json, list[Json], Json
         {"artifact": "clubs", "vendor": FIXTURES_VENDOR, "feed": "provider_games", "window": season.window(*_fixtures_window(conn))},
     )  # fmt: skip
     clubs = season.clubs_json(schedule_read.clubs_of(games))
-    return season.schedule_json(PRODUCT_SEASON, slates, values), clubs, sources[0], sources[1]
+    return season.schedule_json(PRODUCT_SEASON, slates, values, states), clubs, sources[0], sources[1]
 
 
 def _record(conn: Connection, as_of: datetime, frozen_by: FrozenBy) -> tuple[Json, Json | None]:
