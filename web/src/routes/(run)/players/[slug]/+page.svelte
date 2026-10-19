@@ -189,9 +189,11 @@
 	const mates = $derived(
 		page.tier.mates.map((mate) => ({ ...mate, href: links.player(mate.slug) }))
 	);
+	/** The week tile's head as drawn ("Wk 6"), which the unread basis names. */
+	const weekTileHead = $derived(tiles.find((tile) => tile.key === 'proj')?.label ?? CARD.proj);
 	/** Every number's basis, once: the week's, the rest of season's, the season's. */
 	const basis = $derived([
-		...(live === null ? [unreadBasis(failed)] : live.basis),
+		...(live === null ? [unreadBasis(failed, weekTileHead)] : live.basis),
 		page.season.basis
 	]);
 </script>

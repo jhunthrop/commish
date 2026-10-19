@@ -94,6 +94,29 @@ const advice = (rows: OrderRow[], over: Partial<OrderAdvice> = {}): OrderAdvice 
 const screenHref = (screen: 'waivers' | 'trades', league: string): string =>
 	`/league/${league}/${screen}`;
 
+void test("a Thursday game the API's facts count as played reads Final with its points as Last (the sweep's X3)", () => {
+	// SEA at DEN, Thursday of week 6, as the API answers once its lines are in (playedFromLines).
+	const thursday: WeekFacts = {
+		...facts,
+		opponent: 'DEN',
+		kickoff: '2026-10-16T00:15:00.000Z',
+		played: true,
+		last_games: [
+			{ week: 6, points: 25.4 },
+			{ week: 5, points: 22.8 }
+		]
+	};
+	const view = orderView(
+		row('Smith-Njigba', {
+			line: line('Smith-Njigba', 'WR', { facts: thursday, season_avg: 27.5, last_points: 25.4 })
+		}),
+		ZONE
+	);
+	assert.deepEqual(view.box.game, { where: 'at DEN', when: 'Final' });
+	assert.equal(view.box.evidence.avg, 27.5);
+	assert.equal(view.box.evidence.last, 25.4);
+});
+
 void test('a row prints the API figures as they come', () => {
 	const view = orderView(row('Swift'), ZONE);
 	assert.equal(view.key, 'b-Swift');
@@ -108,7 +131,7 @@ void test('the big figure is the key the rank sorts on (review 66j H2)', () => {
 	assert.deepEqual(figureColumns('points_over_replacement'), ['por', 'total', 'perGame']);
 	assert.deepEqual(figureColumns('rest_of_season_points'), ['total', 'perGame']);
 	assert.equal(FIGURE_HEADS.por, 'Over repl.');
-	assert.equal(FIGURE_HEADS.total, 'Points');
+	assert.equal(FIGURE_HEADS.total, 'Projected');
 });
 
 void test('a roster mark reads Yours, Free or the holding team, never the platform word', () => {
@@ -158,7 +181,9 @@ void test('the basis names the league shape and says every number once, the plat
 	const signedOut = words(orderBasis(advice([row('A')]), null, ZONE));
 	assert.ok(signedOut.startsWith('Our rest-of-season order from week 7.'));
 	assert.match(signedOut, /Points over replacement are for a 12-team league/);
-	assert.match(signedOut, /Proj is this week's published projection in PPR scoring, read /);
+	// The order holds the week's projection beside the season's, so its head names the API's week.
+	assert.match(signedOut, /Wk 6 is this week's published projection in PPR scoring, read /);
+	assert.doesNotMatch(signedOut, /Proj is/);
 	// Signed out there is no league whose rules the projection is matched to.
 	assert.doesNotMatch(signedOut, /this league's rules/);
 	assert.doesNotMatch(signedOut, /Roster is/);
@@ -177,7 +202,7 @@ void test('the phone is not told about the columns it does not draw: the Game ce
 	const parts = orderBasis(advice([row('A')], { read_at: READ }), { host: 'sleeper' }, ZONE);
 	const phone = parts.filter((p) => p.phone).map((p) => p.text);
 	assert.ok(phone.some((t) => t.startsWith('Our rest-of-season order')));
-	assert.ok(phone.some((t) => t.startsWith('Proj is')));
+	assert.ok(phone.some((t) => t.startsWith('Wk 6 is')));
 	assert.ok(phone.some((t) => t.startsWith('Opp rank is')));
 	assert.ok(phone.every((t) => !t.startsWith('Roster is') && !t.startsWith('The Game cell')));
 	assert.ok(parts.some((p) => !p.phone && p.text.startsWith('Roster is')));

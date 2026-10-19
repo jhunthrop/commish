@@ -10,6 +10,7 @@ import (
 	"github.com/jhunthrop/commish/api/internal/apitypes"
 	"github.com/jhunthrop/commish/api/internal/boards"
 	"github.com/jhunthrop/commish/api/internal/draft"
+	"github.com/jhunthrop/commish/api/internal/figurewords"
 	"github.com/jhunthrop/commish/api/internal/scoring"
 	"github.com/jhunthrop/commish/api/internal/season"
 )
@@ -373,8 +374,8 @@ func OrderScreenBasis(b OrderBasis, fromWeek int, s apitypes.LeagueSettings) str
 	if b != RestOfSeason || fromWeek < 1 {
 		return fmt.Sprintf("Our preseason order: All ranks by Over repl., his season less a free pickup's, for %s.", teamsWords(s))
 	}
-	return fmt.Sprintf("Our rest-of-season order from week %d: Points through week %d, byes out. Positions rank by Points, "+
-		"All by Over repl., his points less a free pickup's, for %s.", fromWeek, LastWeek, teamsWords(s))
+	return fmt.Sprintf("Our rest-of-season order from week %d. A position ranks by %s through week %d, byes out, "+
+		"All by Over repl., his points less a free pickup's, for %s.", fromWeek, figurewords.Table.Projected, LastWeek, teamsWords(s))
 }
 
 // teamsWords is shapeWords in the order screen's few words: "12 teams

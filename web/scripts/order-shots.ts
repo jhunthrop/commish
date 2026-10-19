@@ -5,9 +5,9 @@
 // record reads the run the site was built from. At 1440, 1024, 800, 768 and 390 it asserts the page
 // never scrolls sideways, and that the basis draws at most five rendered lines at 1440 and eight at 390
 // (measured, never counted in paragraphs; Lane 66q turned the phone's on). It also asserts the heads ("Our rest-of-season order" over #, Rest of season
-// over Points and A game), that every figure cell prints one decimal or --, that Trade for him sits on
+// over Projected and A game, the week projection headed "Wk 6"), that every figure cell prints one decimal or --, that Trade for him sits on
 // fewer than a third of the rows, that the copy passes the one guard ("host" among its words, the
-// names and rows the API and the run handed it skipped, copy-scan.ts), the record's Order matched head with the
+// names the API and the run handed it skipped, copy-scan.ts), the record's Order matched head with the
 // published projection's -- before its week, the honest sentence where the run carries one, and the
 // record's chart at least 200 px tall on a phone. Exits non-zero on any fault.
 //
@@ -16,6 +16,7 @@
 // fixture API running there.
 import { mkdir, writeFile } from 'node:fs/promises';
 import { chromium, type BrowserContext, type Page } from 'playwright';
+import { FIGURE } from '../src/lib/format/figure-words.ts';
 import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
 import { copyFault, watchData } from './copy-scan.ts';
 
@@ -44,6 +45,7 @@ const ROSTER_FOLDS_AT = 900;
 /** Trade for him on fewer rows than this share (the coordinator's ruling 3). */
 const MOST_TRADE_SHARE = 1 / 3;
 const SIGNED_IN = { name: 'commish_csrf', value: 'fixture' };
+const WEEK_HEAD = new RegExp(`^${FIGURE.week} \\d+$`);
 const FIGURE_CELL = /^([-−]?\d+(\.\d)?|\d+(st|nd|rd|th)|--)$/;
 
 const SCREENS = [
@@ -78,7 +80,7 @@ const CAPTION = `# Lane 66j shots
   the recorded Sleeper league's answers carry, real as served (rest-of-season points a game, the week's facts,
   Proj, Avg, Last, Opp rank, status), its rosters, the trade finder's best trade with each team and the Waivers
   answer's claim moves (Sleeper takes no claim from here, so the add verb reads "Open Sleeper waivers").
-  STAND-INS: the fixture holds 85 of the order's players; each Points figure is the points a game times his club's games
+  STAND-INS: the fixture holds 85 of the order's players; each Projected figure is the points a game times his club's games
   left and each Over repl. the points over replacement a week times 12, which the API reads from the board; a
   position's # is the fixture's own order of those totals among the players it holds; every Proj is the
   fixture's one projection snapshot, the week 1 published figure.
@@ -172,15 +174,18 @@ async function orderFaults(page: Page, screen: Screen, width: number): Promise<s
 		said.push(`${screen.name}: no order group over # (${seen.groups.join('|')})`);
 	if (width >= FOLDS_AT && !seen.groups.includes('Rest of season'))
 		said.push(`${screen.name}: no Rest of season group`);
-	for (const head of ['#', 'Player', 'Proj']) {
+	for (const head of ['#', 'Player']) {
 		if (!seen.heads.includes(head))
 			said.push(`${screen.name} at ${String(width)}: no ${head} head`);
 	}
-	if (!seen.heads.includes('Points') && !seen.heads.includes('Over repl.'))
+	// The week's projection beside the season's Projected is headed by the API's week ("Wk 6").
+	if (!seen.heads.some((head) => WEEK_HEAD.test(head)) || seen.heads.includes('Proj'))
+		said.push(`${screen.name} at ${String(width)}: no week head (${seen.heads.join('|')})`);
+	if (!seen.heads.includes(FIGURE.projected) && !seen.heads.includes('Over repl.'))
 		said.push(`${screen.name} at ${String(width)}: no key head`);
-	if (width >= FOLDS_AT && !seen.heads.includes('A game'))
-		said.push(`${screen.name}: no A game head`);
-	if (width < FOLDS_AT && !seen.folded.every((f) => f.includes('Avg')))
+	if (width >= FOLDS_AT && !seen.heads.includes(FIGURE.perGame))
+		said.push(`${screen.name}: no ${FIGURE.perGame} head`);
+	if (width < FOLDS_AT && !seen.folded.every((f) => f.includes(FIGURE.avg)))
 		said.push(`${screen.name} at ${String(width)}: the figures do not fold under the name`);
 	for (const cell of seen.cells) {
 		if (!FIGURE_CELL.test(cell)) said.push(`${screen.name}: cell "${cell}"`);

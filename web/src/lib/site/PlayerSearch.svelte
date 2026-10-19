@@ -5,11 +5,11 @@
 	import type { SearchSession } from './search-session.svelte.ts';
 
 	interface Props {
-		/** How many players the run has pages for, for the placeholder. */
-		players: number;
+		/** "Search 619 ranked players": the run's count of players with a page, in words. */
+		placeholder: string;
 	}
 
-	let { players: count }: Props = $props();
+	let { placeholder }: Props = $props();
 
 	const MENU_ID = 'player-search-menu';
 	let query = $state('');
@@ -49,7 +49,7 @@
 <div class="find" onfocusout={onFocusOut} onfocusin={onFocusIn}>
 	<Search
 		bind:value={query}
-		placeholder="Search {count} players"
+		{placeholder}
 		label="Search players"
 		onfirstfocus={() => void start()}
 		oninput={(value: string) => session?.typed(value)}

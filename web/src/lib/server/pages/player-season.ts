@@ -7,6 +7,7 @@ import { fixed, plural } from '#lib/format/number.ts';
 /** Tenths in a point, the box's printed precision. */
 const TENTHS = 10;
 import {
+	countedWeek,
 	POINTS_PER_GAME_DECIMALS,
 	type GameLogRow,
 	type PlayerSeason,
@@ -154,7 +155,9 @@ export function seasonView(
 	if (!format) throw new Error(`The season block is scored in ${season.format}, not on this run.`);
 	const columns = STAT_COLUMNS[position];
 	const [past, ahead] = splitLog(season.log);
-	const reach = season.through === 0 ? '' : `, through week ${String(season.through)}`;
+	// The head never says week 5 over a table that has his week 6 (the sweep's X3).
+	const through = countedWeek(season);
+	const reach = through === 0 ? '' : `, through week ${String(through)}`;
 	return {
 		season: season.season,
 		aside: `${String(season.season)}, ${format.label}${reach}`,

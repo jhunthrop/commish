@@ -24,7 +24,7 @@ import { carriesGap } from '#lib/format/gap.ts';
 import { adpDrafts } from '#lib/run/adp-drafts.ts';
 import { boardBasis, type BasisPart } from '#lib/run/board-basis.ts';
 import { rowFraming } from '#lib/run/row-framing.ts';
-import { winsBasis } from '#lib/run/strength-words.ts';
+import { strengthFigure, winsBasis } from '#lib/run/strength-words.ts';
 import { boardSeason } from '../board-season.ts';
 import {
 	adp,
@@ -242,7 +242,7 @@ export async function schedulePage(): Promise<SchedulePage> {
 				href: links.club(slate.abbr),
 				face: lead ? { src: lead.headshot, name: lead.name } : null,
 				rank: slate.rank,
-				strength: fixed(slate.strength, 2),
+				strength: strengthFigure(slate.strength),
 				cells: weeks.map((week) => {
 					const game = slate.games.find((candidate) => candidate.week === week);
 					if (!game) return { week, opponent: null, home: false, value: '', hard: false };

@@ -28,6 +28,7 @@ import { mkdir } from 'node:fs/promises';
 import { chromium, type BrowserContext, type Page } from 'playwright';
 import { copyFault, watchData } from './copy-scan.ts';
 import { EMPTY_FIGURE } from '../src/lib/format/empty.ts';
+import { FIGURE } from '../src/lib/format/figure-words.ts';
 import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
 
 const THEMES = ['dark', 'light'] as const;
@@ -223,11 +224,18 @@ async function openCompare(page: Page, name: string): Promise<void> {
 	await page.waitForLoadState('networkidle');
 }
 
+const WEEK_TILE = new RegExp(`^${FIGURE.week}( \\d+)?$`);
+
 /** The tiles, each "--" with its reason, and rest of season's label as the run covers it. */
 function checkTiles(card: Card, where: string): void {
 	const rest = ROS_FROM_WEEK === undefined ? PROJECTED : REST;
-	const want = ['Proj', rest, 'Opp rank', 'Avg', 'Last', 'Δ Proj'];
-	check(card.labels.join('|') === want.join('|'), `${where}: tiles ${card.labels.join(', ')}`);
+	// The week tile is headed by its week beside the season's Projected ("Wk 6", the ruling).
+	const [weekTile = '', ...others] = card.labels;
+	const want = [rest, 'Opp rank', 'Avg', 'Last', 'Δ Proj'];
+	check(
+		WEEK_TILE.test(weekTile) && others.join('|') === want.join('|'),
+		`${where}: tiles ${card.labels.join(', ')}`
+	);
 	if (ROS_FROM_WEEK !== undefined)
 		check(REST_CAPTION.test(card.captions[REST] ?? ''), `${where}: rest of season's caption`);
 	for (const label of card.labels) {
@@ -264,8 +272,8 @@ function checkCard(card: Card, shot: Shot, where: string, width: number): void {
 			/Written \w{3} \d{1,2}, from his facts through last season/.test(card.readText),
 			`${where}: the season read's stamp`
 		);
-	// A week on bye has no game ahead to draw, and the Proj tile says so.
-	if (card.captions.Proj !== 'Bye this week')
+	// A week on bye has no game ahead to draw, and the week tile says so.
+	if (card.captions[card.labels[0] ?? ''] !== 'Bye this week')
 		check(card.nextRow !== '', `${where}: no week ahead row in the game log`);
 	if (!ROS)
 		check(/earlier seasons/i.test(card.earlier) && !card.earlierOpen, `${where}: earlier seasons`);
@@ -319,7 +327,7 @@ for (const shot of ROS ? ROS_SHOTS : SHOTS) {
 				await page.screenshot({ path: file(''), fullPage: true });
 				if (shot.follow === true) await follow(page, shot, where, file('-waivers'));
 				process.stdout.write(
-					`${where}: ${card.values.Proj ?? ''} Proj (${card.captions.Proj ?? ''}), ${card.values['Opp rank'] ?? ''}, basis ${String(card.basisLines)} lines, ${card.verbs.join(' / ')}\n`
+					`${where}: ${card.values[card.labels[0] ?? ''] ?? ''} ${card.labels[0] ?? ''} (${card.captions[card.labels[0] ?? ''] ?? ''}), ${card.values['Opp rank'] ?? ''}, basis ${String(card.basisLines)} lines, ${card.verbs.join(' / ')}\n`
 				);
 			} catch (error: unknown) {
 				failures.push(`${where}: ${String(error)}`);

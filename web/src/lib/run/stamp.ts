@@ -1,6 +1,6 @@
 import { dayLabel } from '#lib/format/date.ts';
 
-/** What every nightly page prints about its run: which run, when, and how many players it covers. */
+/** What every nightly page prints about its run: which run, when, and the players its search finds. */
 export interface RunStamp {
 	runId: string;
 	/** When the run finished, ISO. */
@@ -8,7 +8,9 @@ export interface RunStamp {
 	season: number;
 	/** The stand-in built from the approved mocks' data, before the first real nightly run. */
 	standIn: boolean;
-	players: number;
+	/** The search's placeholder, its count of ranked players in words (format/pool-words.ts), built
+	 * with the page so the shell's script carries no count words. */
+	search: string;
 	/** Every format the run carries, by its run id ("ppr-12"), the default first. */
 	formats: string[];
 }

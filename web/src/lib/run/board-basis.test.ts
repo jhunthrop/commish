@@ -23,12 +23,12 @@ const text = (facts: BasisFacts, phone = false): string =>
 void test('the board says its order, its drafts, the gap and the season columns once', () => {
 	assert.equal(
 		text(PRESEASON),
-		"Our PPR board, by points over replacement for 12 teams. ADP from PPR drafts, Sep 9. Gap, drafters' ADP less our rank: green when they wait, rose when they reach. GP and A game are this season's, through week 5."
+		"Our PPR board, by points over replacement for 12 teams. ADP from PPR drafts, Sep 9. Gap, drafters' ADP less our rank: green when they wait, rose when they reach. GP and Avg are this season's, through week 5."
 	);
 });
 
 void test('the phone leaves out the season columns it does not draw', () => {
-	assert.doesNotMatch(text(PRESEASON, true), /GP and A game/);
+	assert.doesNotMatch(text(PRESEASON, true), /GP and Avg/);
 	assert.match(text(PRESEASON, true), /Gap, drafters/);
 });
 
