@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { plural } from '#lib/format/number.ts';
+	import { poolCount } from '#lib/format/pool-words.ts';
 	import Label from '#lib/ui/Label.svelte';
 	import Panel from '#lib/ui/Panel.svelte';
 	import Place from '#lib/ui/Place.svelte';
@@ -33,7 +33,11 @@
 	const PREVIEWED = 5;
 
 	const first = $derived(board?.slice(0, PREVIEWED) ?? []);
-	const rest = $derived(board ? board.length - first.length : 0);
+	/** The board the sheet starts from, every row of it: the run's ranked players, then its kickers and
+	 * defenses in draft order. Its pool named, so it never reads against the search's ranked count. */
+	const sheetCount = $derived(
+		board !== null && board.length > PREVIEWED ? poolCount(board.length, 'sheet') : null
+	);
 </script>
 
 <Panel as="section" label="Start your sheet">
@@ -62,7 +66,7 @@
 					</li>
 				{/each}
 			</ol>
-			{#if rest > 0}<Label>And {plural(rest, 'more player')}</Label>{/if}
+			{#if sheetCount !== null}<Label>All {sheetCount}</Label>{/if}
 		</div>
 		<div class="verbs">
 			<!-- With no board for this format, importing is the one thing left to do. -->

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount, untrack } from 'svelte';
-	import { plural } from '#lib/format/number.ts';
+	import { poolCount } from '#lib/format/pool-words.ts';
 	import { ApiError } from '#lib/api/client.ts';
 	import type { LeagueHost } from '#lib/league/api.ts';
 	import { positionWord } from '#lib/league/box/box.ts';
@@ -156,7 +156,7 @@
 				value={q}
 				oninput={(event) => search(event.currentTarget.value)}
 			/>
-			{#if advice}<span class="hits">{plural(advice.total, ORDER.player)}</span>{/if}
+			{#if advice}<span class="hits">{poolCount(advice.total, 'rosters')}</span>{/if}
 		</label>
 	{/if}
 	<div class="filters">

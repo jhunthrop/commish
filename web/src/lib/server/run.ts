@@ -31,6 +31,7 @@ import { splitBoard, splitIndex, unindexedMarketRow, type RunIndex } from '#lib/
 import { checkRunSeasons } from '#lib/run/season-checks.ts';
 import { openRun, type RunReader } from '#lib/run/source.ts';
 import type { RunStamp } from '#lib/run/stamp.ts';
+import { searchPlaceholder } from '#lib/format/pool-words.ts';
 import type { z } from 'zod';
 
 /** The R2 keys sign run reads during the build and nowhere else, so they are read from the build's
@@ -295,7 +296,7 @@ export async function stamp(): Promise<RunStamp> {
 		runAt: run.runAt,
 		season: run.season,
 		standIn: run.standIn,
-		players: run.players,
+		search: searchPlaceholder(run.players),
 		formats: run.formats.map((format) => format.id)
 	};
 }

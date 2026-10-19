@@ -21,7 +21,6 @@ export const ORDER = {
 	every: 'All',
 	everyone: 'Everyone',
 	search: 'Find a player or a club',
-	player: 'player',
 	moreRows: 'Show more',
 	none: 'No player in our order matches.',
 	unread: 'We could not read our order just now. Try again in a minute.',
