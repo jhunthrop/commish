@@ -20,6 +20,13 @@ export const WEEK_MANY: Readonly<Record<WeekPosition, string>> = { K: 'kickers',
 /** The words beside a position in the bar and the document's title: "K this week". */
 export const THIS_WEEK = 'this week';
 
+/** Which tab a week read belongs to: the position it was asked for and the league it was read in
+ * (Lane 66w rereview N1). The page keys the tab it shows and the read it holds the same way, so a read
+ * that lands after its tab was left is never shown under another. */
+export function weekReadKey(position: WeekPosition | null, league: string | null): string {
+	return `${position ?? ''} ${league ?? ''}`;
+}
+
 /** The tab's head: "Week 6 kickers" once the week is read, "This week's kickers" before. */
 export function weekHeading(position: WeekPosition, week: number | null): string {
 	const many = WEEK_MANY[position];

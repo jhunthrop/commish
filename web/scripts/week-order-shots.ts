@@ -39,6 +39,8 @@ const PHONE_HEIGHT = 844;
 const PHONE_MAX = 760;
 const READY_TIMEOUT_MS = 30_000;
 const FIXTURE_START_MS = 1500;
+/** A beat for a table to draw an answer that has arrived. */
+const SETTLE_MS = 300;
 /** The most rendered lines the basis may draw, by the widths it is measured at. */
 const MOST_BASIS_LINES: Readonly<Partial<Record<number, number>>> = { 1440: 5, 390: 8 };
 /** Above this width the Roster column is drawn. */
@@ -316,7 +318,42 @@ async function tabFaults(): Promise<string[]> {
 			said.push(`${at}: the week's basis stays`);
 	}
 	await page.screenshot({ path: new URL('tabs-back-to-rb-dark-1440.png', out).pathname });
+	said.push(...(await lateReadFaults(page)));
 	await ctx.close();
+	return said;
+}
+
+/** How long the kickers' read is held, past the defenses' read and the tab switch. */
+const LATE_READ_MS = 2500;
+
+/** A late kickers' read never lands on the defenses' tab (rereview N1): the K read is held, K then
+ * DST are clicked at once, and once both reads are in the tab still heads and explains defenses. */
+async function lateReadFaults(page: Page): Promise<string[]> {
+	const said: string[] = [];
+	await page.route(
+		(url) => url.pathname.endsWith('/order/week') && url.searchParams.get('position') === 'K',
+		async (route) => {
+			await new Promise((resolve) => setTimeout(resolve, LATE_READ_MS));
+			await route.continue().catch(() => undefined);
+		}
+	);
+	const late = page.waitForResponse((r) => r.url().includes('position=K'), {
+		timeout: READY_TIMEOUT_MS
+	});
+	await page.getByRole('link', { name: 'K', exact: true }).first().click();
+	await page.getByRole('link', { name: 'DST', exact: true }).first().click();
+	await page.waitForURL(/\/dst$/);
+	await page.locator('main table.week tbody tr').first().waitFor({ timeout: READY_TIMEOUT_MS });
+	await late;
+	await page.waitForTimeout(SETTLE_MS);
+	const seen = await page.evaluate(() => ({
+		head: document.querySelector('main .lead h2')?.textContent.trim() ?? '',
+		basis: document.querySelector('main .lead .basis')?.textContent ?? ''
+	}));
+	if (seen.head !== 'Week 6 defenses') said.push(`late K read: the DST tab heads "${seen.head}"`);
+	if (!seen.basis.startsWith('Defenses')) said.push('late K read: the DST tab explains kickers');
+	await page.screenshot({ path: new URL('tabs-late-kickers-read-dark-1440.png', out).pathname });
+	await page.unrouteAll({ behavior: 'ignoreErrors' });
 	return said;
 }
 

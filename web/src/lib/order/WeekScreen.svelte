@@ -21,7 +21,7 @@
 		WEEK_TAB
 	} from './week.ts';
 	import WeekTable from './WeekTable.svelte';
-	import { weekHeading, type WeekPosition } from './week-head.ts';
+	import { weekHeading, weekReadKey, type WeekPosition } from './week-head.ts';
 	import { WEEK } from './words.ts';
 
 	/** The kickers' or defenses' tab in season (Lane 66w), read from the API: for the selected league
@@ -32,8 +32,14 @@
 		league?: { id: string; host: LeagueHost } | null;
 		/** The board's scoring a visitor's rows are named in: "PPR", "Half PPR", "Standard". */
 		boardScoring: string;
-		/** The tab's head, basis and the rules our stats lack, once the week is read. */
-		onread?: (said: { heading: string; basis: BasisPart[]; rules: RulesLeftOut | null }) => void;
+		/** The tab's head, basis and the rules our stats lack once the week is read, keyed by the tab
+		 * it was asked for (weekReadKey), so the page never shows it under another. */
+		onread?: (said: {
+			key: string;
+			heading: string;
+			basis: BasisPart[];
+			rules: RulesLeftOut | null;
+		}) => void;
 	}
 
 	let { position, league = null, boardScoring, onread }: Props = $props();
@@ -51,21 +57,30 @@
 	);
 
 	onMount(() => {
+		// A read that lands after the tab was left (this screen destroyed) is dropped (rereview N1).
+		let gone = false;
+		const asked = { league: league?.id ?? null, position };
 		void weekOrderApi
-			.read(league?.id ?? null, position)
+			.read(asked.league, asked.position)
 			.then((answer) => {
+				if (gone) return;
 				advice = answer;
 				problem = null;
 				const reader = { league, boardScoring };
 				onread?.({
+					key: weekReadKey(asked.position, asked.league),
 					heading: weekHeading(answer.position, answer.week),
 					basis: weekBasis(answer, reader),
 					rules: rulesLeftOut(answer, reader, leagueSettingsHref)
 				});
 			})
 			.catch((error: unknown) => {
+				if (gone) return;
 				problem = error instanceof ApiError ? error.message : WEEK_TAB.unread;
 			});
+		return () => {
+			gone = true;
+		};
 	});
 </script>
 

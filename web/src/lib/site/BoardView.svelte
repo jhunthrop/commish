@@ -33,7 +33,7 @@
 	import { links, tierAnchor } from './links.ts';
 	import type OrderScreenComponent from '#lib/order/OrderScreen.svelte';
 	import type WeekScreenComponent from '#lib/order/WeekScreen.svelte';
-	import { weekPositionOf } from '#lib/order/week-head.ts';
+	import { weekPositionOf, weekReadKey } from '#lib/order/week-head.ts';
 	import { ORDER, WEEK } from '#lib/order/words.ts';
 	import type { BasisPart } from '#lib/run/board-basis.ts';
 	import type { RulesLeftOut } from '#lib/order/week.ts';
@@ -182,7 +182,7 @@
 			: { id: siteContext.league.id, host: siteContext.league.host }
 	);
 	/** The tab a week read belongs to: its position and the league it was read for. */
-	const weekKey = $derived(`${weekPosition ?? ''} ${orderLeague?.id ?? ''}`);
+	const weekKey = $derived(weekReadKey(weekPosition, orderLeague?.id ?? null));
 	/** The week's head, basis and the rules our stats lack, once its read lands, kept with the tab it
 	 * was read for: another tab never shows them, so a tab change never leaves a stale head. */
 	interface WeekSaid {
@@ -271,13 +271,12 @@
 		{#if weekPosition !== null}
 			{#if Week}
 				{#key weekKey}
-					{@const key = weekKey}
 					<Week
 						position={weekPosition}
 						league={orderLeague}
 						boardScoring={page.format.label}
-						onread={(read: Omit<WeekSaid, 'key'>) => {
-							weekSaid = { ...read, key };
+						onread={(read: WeekSaid) => {
+							weekSaid = read;
 						}}
 					/>
 				{/key}

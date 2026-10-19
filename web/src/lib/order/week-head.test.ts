@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { boardWords } from '#lib/site/season-words.ts';
 import type { RailKey } from '#lib/ui/nav.ts';
-import { weekBoardWords, weekHeading, weekPositionOf } from './week-head.ts';
+import { weekBoardWords, weekHeading, weekPositionOf, weekReadKey } from './week-head.ts';
 
 const REST = { season: 2026, rosFromWeek: 6, label: 'PPR' };
 const PRESEASON = { season: 2026, label: 'PPR' };
@@ -37,6 +37,13 @@ void test('every other tab, and the tabs out of season, keep the board words', (
 	);
 	assert.equal(words('pre_draft', PRESEASON, 'K').heading, '2026 Board');
 	assert.equal(words('offseason', PRESEASON, 'DST').bar, 'DST Board');
+});
+
+void test("a read's key is the tab it was asked for, so a late kickers' read never matches defenses", () => {
+	assert.equal(weekReadKey('K', 'office'), weekReadKey('K', 'office'));
+	assert.notEqual(weekReadKey('K', 'office'), weekReadKey('DEF', 'office'));
+	assert.notEqual(weekReadKey('K', 'office'), weekReadKey('K', null));
+	assert.notEqual(weekReadKey('K', null), weekReadKey(null, null));
 });
 
 void test('the head once the week is read, and the positions', () => {
