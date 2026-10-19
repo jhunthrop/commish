@@ -136,21 +136,36 @@ func BoardView(b boards.Board, keep map[string]bool) apitypes.RoomBoard {
 		Format: apitypes.RoomBoardFormat(b.Raw.Format), Season: b.Raw.Season, AsOf: b.Raw.AsOf, Basis: b.Basis(),
 		Players: make([]apitypes.BoardPlayer, 0, len(b.Raw.Players)),
 	}
+	ranks := boardRanks(b)
 	for _, p := range b.Raw.Players {
 		if keep != nil && !keep[p.ID] {
 			continue
 		}
-		out.Players = append(out.Players, PlayerView(b, p))
+		out.Players = append(out.Players, playerView(b, p, ranks))
 	}
 	return out
 }
 
-// PlayerView is one player on the wire.
-func PlayerView(b boards.Board, p boards.Player) apitypes.BoardPlayer {
+// poolGap is drafters' ADP less his place on our board (review 81 finding
+// 2), the pool's Gap: the ADP the column prints less the place, so the row
+// adds up. Nil with no ADP or no place.
+func poolGap(adp *float64, rank int, ranked bool) *float64 {
+	if adp == nil || !ranked {
+		return nil
+	}
+	gap := tenth.Round(*adp - float64(rank))
+	return &gap
+}
+
+// playerView is one player on the wire; ranks is each valued player's
+// place on our board (boardRanks).
+func playerView(b boards.Board, p boards.Player, ranks map[string]int) apitypes.BoardPlayer {
 	v := apitypes.BoardPlayer{
 		Id: p.ID, Name: p.Name, Position: apitypes.PlayerPosition(p.Position), Team: p.Team, Headshot: p.Headshot,
 		Adp: tenthp(p.ADP), Points: tenthp(p.Points), PositionRank: b.PositionRanks[p.ID],
 	}
+	rank, ranked := ranks[p.ID]
+	v.Gap = poolGap(v.Adp, rank, ranked)
 	if vor, ok := b.Values[p.ID]; ok {
 		r := tenth.Round(vor)
 		v.Vor = &r
