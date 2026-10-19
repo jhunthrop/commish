@@ -46,6 +46,7 @@ import {
 import { BUILDER_LINE, basisLines, basisReport } from './basis-lines.ts';
 import { chromeFaults, chromeLine, chromeMeasures } from './chrome-measures.ts';
 import { UNCOUNTED_ANCHOR } from '../src/lib/league/uncounted.ts';
+import { KICKED_OFF_PART } from '../src/lib/league/box/basis.ts';
 import { FIXTURE_IDS } from './inseason-fixture/ids.ts';
 import { PER_GAME_BASIS, WAIVERS_BASIS } from './inseason-fixture/week.ts';
 
@@ -1027,7 +1028,9 @@ async function lineupFaults(page: Page): Promise<string[]> {
 		faults.push(`the no one can play chips: ${seen.idleChips.join(', ')}`);
 	if (!seen.firstChipIdle) faults.push('the no one can play chip is not first');
 	if (seen.idleRows !== 1) faults.push(`${String(seen.idleRows)} rows marked no one can play`);
-	if ((seen.text.match(/Opp rank is points allowed to his position/g) ?? []).length !== 1)
+	// A phone leaves Opp rank to its cell while the stats sentence shows (basis.ts phoneRoom, Lane 85).
+	const oppSaid = !seen.wide && seen.text.includes(KICKED_OFF_PART) ? 0 : 1;
+	if ((seen.text.match(/Opp rank is points allowed to his position/g) ?? []).length !== oppSaid)
 		faults.push('the evidence basis not said once');
 	if (!/Δ Proj is its change since \w{3} \d+:\d\d [ap]m\./.test(seen.text) && seen.wide)
 		faults.push('the change basis');
@@ -1169,14 +1172,24 @@ async function tapSide(page: Page, side: 'give' | 'get', name: string): Promise<
 		.first()
 		.click();
 }
-/** The scoreboard's figures once answered: each a figure to the tenth. */
+/** The scoreboard's figures once answered: each a figure to the tenth, the week's (each side's Proj
+ * before and after, the first figure of the two) "--" exactly when a ticked player's game has kicked off
+ * or is final, the trade counting from next week (Lane 85). */
 async function bugFaults(page: Page): Promise<string[]> {
-	const figures = await page
-		.locator(`${builder} .bug .fig b, ${builder} .bug .fig i`)
+	const figures = (
+		await page.locator(`${builder} .bug .fig b, ${builder} .bug .fig i`).allInnerTexts()
+	).map((f) => f.trim());
+	const ticked = await page
+		.locator(`${builder} table.box tbody tr`)
+		.filter({ has: page.locator('button.tick.on') })
 		.allInnerTexts();
-	return figures.length === 8 && figures.every((f) => /^−?\d+\.\d$/.test(f.trim()))
-		? []
-		: [`scoreboard ${figures.join(' ')}`];
+	const past = ticked.some((row) => /\b(Final|Kicked off)\b/.test(row));
+	const tenth = (f: string): boolean => /^−?\d+\.\d$/.test(f);
+	// Each side draws Proj before and after, then the season's before and after.
+	const week = (i: number): boolean => i % 4 < 2;
+	const fine =
+		figures.length === 8 && figures.every((f, i) => (week(i) && past ? f === '--' : tenth(f)));
+	return fine ? [] : [`scoreboard ${figures.join(' ')}${past ? ' (a ticked game is past)' : ''}`];
 }
 const builderLines = new Map<string, string>();
 for (const theme of THEMES) {
@@ -1356,6 +1369,7 @@ async function leagueFaults(page: Page, lp: LeaguePage, width: number): Promise<
 		return {
 			bugs: bugs.length,
 			mineFirst: bugs[0]?.classList.contains('mine') ?? false,
+			bugHeads: bugs.map((b) => text(b.querySelector('.st'))),
 			stands: bugs.map((b) =>
 				[...b.querySelectorAll('.bt')].map((s) =>
 					s.classList.contains('ahead')
@@ -1397,7 +1411,11 @@ async function leagueFaults(page: Page, lp: LeaguePage, width: number): Promise<
 	const started = seen.stands.filter((s) => s.some((x) => x !== 'level'));
 	if (lp.live && started.length === 0)
 		faults.push('no bug draws the side ahead once its game started');
-	if (!lp.live && started.length > 0) faults.push('a bug before kickoff draws one side ahead');
+	// A bug before its first kickoff draws both sides alike; one kicked off (Thursday's games on the
+	// Saturday, Lane 85) may draw a side ahead.
+	const before = seen.stands.filter((_, i) => !/^(Kicked off|Final)$/.test(seen.bugHeads[i] ?? ''));
+	if (before.some((s) => s.some((x) => x !== 'level')))
+		faults.push('a bug before kickoff draws one side ahead');
 	if (lp.live && started.some((s) => !(s.includes('ahead') && s.includes('behind'))))
 		faults.push('a started bug without one side ahead and one behind');
 	const want =

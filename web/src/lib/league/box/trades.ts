@@ -425,6 +425,7 @@ export function tradeBasis(
 ): BasisPart[] {
 	// The builder's boxes draw a defense; a trade never holds one (Lane 66g).
 	const defense = opened === 'builder' && lines.some((l) => l.player.position === 'DEF');
+	const waiting = kickedOffPart(lines);
 	const proj = said(
 		projPart(
 			{
@@ -439,7 +440,8 @@ export function tradeBasis(
 	const players =
 		opened !== 'none'
 			? [
-					...said(OPP_PART),
+					// A phone leaves Opp rank to its cell while the stats sentence shows (phoneRoom).
+					...said(OPP_PART, waiting === null),
 					// The opened rows' Game cell draws its figures at a desk only.
 					...said(gamePart(lines, clock, now, 'read'), false),
 					...said(ptsPart(advice.player_points, host, 'rows'), false),
@@ -448,9 +450,10 @@ export function tradeBasis(
 			: [];
 	return [
 		...said(advice.basis),
-		...(opened === 'none' ? [] : said(advice.per_game_basis)),
+		// A phone leaves A game to its head while the stats sentence shows (phoneRoom, Lane 85).
+		...(opened === 'none' ? [] : said(advice.per_game_basis, waiting === null)),
 		...proj,
-		...said(kickedOffPart(lines)),
+		...said(waiting),
 		...players,
 		...said(WEEK_ROOM, false),
 		{ text: LINES.orderRecord, phone: true, href: hrefs.record }

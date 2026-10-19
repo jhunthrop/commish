@@ -226,3 +226,35 @@ void test('the Lineup and the Matchup say when Final and the stats land while a 
 	});
 	assert.equal(kickedOffPart([counted]), null);
 });
+
+void test('on a phone the stats sentence takes the room of the Game cell words and Opp rank (Lane 85)', () => {
+	const waiting = line({ kickoff: '2026-10-18T17:00:00.000Z', played: true, game_state: 'final' });
+	const parts = boxBasisParts(
+		{
+			projection: { readAt: READ, scoring: CLOSEST },
+			lines: [waiting, line()],
+			byPlayer: true,
+			teamTotal: false,
+			host: 'sleeper',
+			lineup: {
+				previousReadAt: null,
+				note: { basis_note: '', basis_note_link: '' },
+				rulesHref: '/league/1#uncounted'
+			}
+		},
+		CENTRAL,
+		NOW
+	);
+	const phone = parts.filter((p) => p.phone).map((p) => p.text);
+	const desk = parts.filter((p) => p.desk !== false).map((p) => p.text);
+	assert.ok(phone.includes(KICKED_OFF_PART));
+	assert.ok(phone.includes('Game was read Fri 4:01 pm.'));
+	assert.ok(!phone.includes(OPP_PART));
+	assert.ok(desk.includes(OPP_PART));
+	assert.ok(
+		desk.includes("Game is each club's expected points, his first, and weather, read Fri 4:01 pm.")
+	);
+	assert.ok(!desk.includes('Game was read Fri 4:01 pm.'));
+	// The paragraph as a desk reads it says the Game cell once.
+	assert.equal(basisText(parts).match(/Game /g)?.length, 1);
+});

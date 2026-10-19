@@ -16,7 +16,7 @@
 {#if parts.length > 0}
 	<div class="basis" data-basis {id}>
 		<p>
-			{#each parts as part, i (i)}<span class:desk={!part.phone}
+			{#each parts as part, i (i)}<span class:desk={!part.phone} class:phone={part.desk === false}
 					>{i > 0 ? ' ' : ''}{#if part.href}<a href={part.href}>{part.text}</a>{i < parts.length - 1
 							? '.'
 							: ''}{:else}{part.text}{/if}</span
@@ -40,6 +40,12 @@
 
 	a {
 		color: var(--accent-text);
+	}
+
+	@media (min-width: 761px) {
+		.phone {
+			display: none;
+		}
 	}
 
 	@media (max-width: 760px) {

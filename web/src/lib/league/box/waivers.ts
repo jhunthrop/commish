@@ -16,7 +16,7 @@ import {
 	deltaPart,
 	gamePart,
 	kickedOffPart,
-	OPP_PART,
+	phoneRoom,
 	projPart,
 	said,
 	uncountedParts,
@@ -445,6 +445,8 @@ export function waiverBasis(
 	now: number
 ): BasisPart[] {
 	const defense = lines.some((l) => l.player.position === 'DEF');
+	const read = gamePart(lines, clock, now, 'read');
+	const room = phoneRoom({ full: read, read }, kickedOffPart(lines));
 	const proj = projPart(
 		{
 			readAt: advice.projection_read_at,
@@ -459,9 +461,9 @@ export function waiverBasis(
 		...said(advice.season_basis),
 		...said(proj),
 		...said(deltaPart(advice.projection_previous_read_at, clock), false),
-		...said(gamePart(lines, clock, now, 'read')),
-		...said(kickedOffPart(lines)),
-		...said(OPP_PART),
+		...room.game,
+		...room.waiting,
+		...room.opp,
 		...uncountedParts(advice, rulesHref)
 	];
 }
