@@ -8,7 +8,7 @@ import { designationWord } from '#lib/format/designation.ts';
 import { fixed } from '#lib/format/number.ts';
 import type { LeagueHost } from '../api.ts';
 import type { LineupAdvice, LineupSlot, PlayerLine } from '../inseason/api.ts';
-import { toBePlayed } from '#lib/format/game-facts.ts';
+import { pastKickoff } from './kickoff.ts';
 import { hostWords } from '../names.ts';
 import { satIds } from '../inseason/words.ts';
 import {
@@ -187,7 +187,7 @@ export function idleWords(slot: string): string {
 /** A player whose game is past its kickoff by the API's state (Lane 80): the platform takes no move
  * on him, so no screen draws one (Lane 85). A bye is no game. */
 export function locked(line: PlayerLine, now: number): boolean {
-	return !line.facts.bye && !toBePlayed(line.facts, now);
+	return pastKickoff(line.facts, now);
 }
 
 /** The advice with every change on a locked row undone (Lane 85): the API's engine already holds a

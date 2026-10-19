@@ -2,8 +2,7 @@
  * league's read alone when there is none, its totals, and the score bug's middle (the next kickoff).
  * Pure functions, tested in matchup.test.ts. */
 import { memberZone, weekdayTime } from '#lib/format/clock.ts';
-import { gameStateOf, toBePlayed } from '#lib/format/game-facts.ts';
-import { gameHead, KICKOFF } from './kickoff.ts';
+import { gameHead, KICKOFF, linesRead } from './kickoff.ts';
 import type { MatchupSide } from '../api.ts';
 import type { MatchupBoxSide, PlayerLine } from '../inseason/api.ts';
 import {
@@ -108,22 +107,16 @@ export function nextKickoff(
 			: [{ at: facts.kickoff, club: player.team, facts }]
 	);
 	if (games.length === 0) return null;
-	const ahead = games
-		.filter((g) => toBePlayed(g.facts, now))
-		.sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
-	const final = games.every(({ facts }) => {
-		const state = gameStateOf(facts);
-		return state === 'final' || (state === null && facts.played);
-	});
+	// Each starter's game by the one rule at the page's clock, gathered once (kickoff.ts linesRead).
 	const head = gameHead(
-		{
-			state: final ? 'final' : ahead.length < games.length ? 'playing' : 'upcoming',
-			next: ahead[0]?.at ?? null
-		},
+		linesRead(
+			games.map((g) => g.facts),
+			now
+		),
 		now
 	);
 	if (head.state === 'final') return { head: KICKOFF.final, words: '' };
-	const next = ahead.find((g) => g.at === head.next);
+	const next = games.find((g) => g.at === head.next);
 	if (next === undefined)
 		return head.state === 'kicked_off' ? { head: KICKOFF.kickedOff, words: '' } : null;
 	const side = next.facts.home === false ? 'at' : 'vs';

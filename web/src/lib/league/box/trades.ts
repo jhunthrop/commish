@@ -22,7 +22,7 @@ import { LINES, verbWords } from '../inseason/words.ts';
 import { hostWords } from '../names.ts';
 import {
 	gamePart,
-	kickedOffPart,
+	kickedOffPartAt,
 	OPP_PART,
 	projPart,
 	ptsPart,
@@ -425,7 +425,7 @@ export function tradeBasis(
 ): BasisPart[] {
 	// The builder's boxes draw a defense; a trade never holds one (Lane 66g).
 	const defense = opened === 'builder' && lines.some((l) => l.player.position === 'DEF');
-	const waiting = kickedOffPart(lines);
+	const waiting = kickedOffPartAt(lines, now);
 	const proj = said(
 		projPart(
 			{

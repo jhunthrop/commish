@@ -499,3 +499,58 @@ void test('the lineup card draws no change on a played week and says it is over'
 	assert.ok(tuesday.box.starters.every((s) => s.move === null));
 	assert.equal(tuesday.done, done);
 });
+
+void test('a scoreboard past a kickoff and a lineup read that lags it agree: no move on him', () => {
+	const recorded = JSON.parse(
+		readFileSync(
+			new URL('../../../../scripts/inseason-fixture/data/lineup.json', import.meta.url),
+			'utf8'
+		)
+	) as LineupAdvice;
+	// The lineup was read at 11:59 Central, every row still upcoming by the API; the page's clock and
+	// the scoreboard read are at 12:01, the noon games under way.
+	const upcoming = (l: PlayerLine): PlayerLine => ({
+		...l,
+		facts: { ...l.facts, game_state: l.facts.bye ? null : 'upcoming' }
+	});
+	const lagging: LineupAdvice = {
+		...recorded,
+		slots: recorded.slots.map((s) => ({
+			...s,
+			ours: upcoming(s.ours),
+			host: s.host && upcoming(s.host)
+		})),
+		bench: recorded.bench.map(upcoming)
+	};
+	const noon = '2026-10-18T17:00:00.000Z';
+	const now = Date.parse(noon) + 60_000;
+	const noonMoves = recorded.slots.filter(
+		(s) => s.changed && (s.ours.facts.kickoff === noon || s.host?.facts.kickoff === noon)
+	);
+	assert.ok(noonMoves.length > 0, 'the fixture changes a noon player');
+	const card = lineupSummary(lagging, ZONE, now);
+	for (const s of noonMoves)
+		assert.ok(
+			!card.box.swaps.some((w) => w.key === s.ours.player.host_id),
+			`${s.ours.player.name} is moved after his kickoff`
+		);
+	const [bug] = bugsOf(
+		{
+			games: [
+				{
+					state: 'playing',
+					next_kickoff: '2026-10-18T20:05:00.000Z',
+					sides: [side(1, 9.2), side(2, 4.1)]
+				}
+			]
+		},
+		SYNC,
+		now,
+		ZONE
+	);
+	assert.equal(bug?.head, KICKOFF.kickedOff);
+	// One ms before the kickoff the same read still offers the change.
+	assert.ok(
+		lineupSummary(lagging, ZONE, Date.parse(noon) - 1).box.swaps.length >= noonMoves.length
+	);
+});

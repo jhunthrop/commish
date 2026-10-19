@@ -15,7 +15,7 @@ import { hostWords } from '../names.ts';
 import {
 	deltaPart,
 	gamePart,
-	kickedOffPart,
+	kickedOffPartAt,
 	phoneRoom,
 	projPart,
 	said,
@@ -446,7 +446,7 @@ export function waiverBasis(
 ): BasisPart[] {
 	const defense = lines.some((l) => l.player.position === 'DEF');
 	const read = gamePart(lines, clock, now, 'read');
-	const room = phoneRoom({ full: read, read }, kickedOffPart(lines));
+	const room = phoneRoom({ full: read, read }, kickedOffPartAt(lines, now));
 	const proj = projPart(
 		{
 			readAt: advice.projection_read_at,

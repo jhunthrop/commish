@@ -5,6 +5,7 @@
  * draw (BasisPart.phone). Pure, tested in basis.test.ts. */
 import { weekdayTime, zoneWord } from '#lib/format/clock.ts';
 import { gameStateOf } from '#lib/format/game-facts.ts';
+import { lineState } from './kickoff.ts';
 import type { BasisPart } from '#lib/run/board-basis.ts';
 import type { LeagueHost } from '../api.ts';
 import type { PlayerLine, ProjectionScoring } from '../inseason/api.ts';
@@ -83,11 +84,23 @@ export const OPP_PART = `${BOX.oppRank} is points allowed to his position, 1st f
 export const KICKED_OFF_PART = `${BOX.final} lands the hour after a game ends, its stats by Wednesday.`;
 
 /** KICKED_OFF_PART where a row's game has kicked off with no final yet, or is final with the week's
- * stats not in his games yet; else null. */
+ * stats not in his games yet, by the API's state (the boards and the player card); else null. */
 export function kickedOffPart(lines: readonly PlayerLine[]): string | null {
+	return waitingPart(lines, (facts) => (facts.bye ? null : gameStateOf(facts)));
+}
+
+/** The same on a league screen, each row by its state at the page's clock (kickoff.ts lineState), the
+ * rule its score bug and its Game cells read (Lane 85 fix round, H1). */
+export function kickedOffPartAt(lines: readonly PlayerLine[], now: number): string | null {
+	return waitingPart(lines, (facts) => lineState(facts, now));
+}
+
+function waitingPart(
+	lines: readonly PlayerLine[],
+	stateOf: (facts: PlayerLine['facts']) => string | null
+): string | null {
 	const waiting = lines.some(({ facts }) => {
-		if (facts.bye) return false;
-		const state = gameStateOf(facts);
+		const state = stateOf(facts);
 		return (
 			state === 'kicked_off' ||
 			(state === 'final' && !facts.last_games.some((game) => game.week === facts.week))
@@ -192,7 +205,7 @@ export function boxBasisParts(facts: BoxBasisFacts, clock: Clock, now: number): 
 	const team = lineup === null && facts.teamTotal ? 'platform' : 'rows';
 	const pts = said(ptsPart(facts.byPlayer, facts.host, team));
 	// When a row's Final and its stats land, said while one waits on either (Lane 85).
-	const waiting = kickedOffPart(facts.lines);
+	const waiting = kickedOffPartAt(facts.lines, now);
 	if (lineup === null)
 		return [...proj, ...pts, ...said(gamePart(facts.lines, clock, now, 'full')), ...said(waiting)];
 	const room = phoneRoom(

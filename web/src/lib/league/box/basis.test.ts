@@ -10,7 +10,7 @@ import {
 	deltaPart,
 	gamePart,
 	KICKED_OFF_PART,
-	kickedOffPart,
+	kickedOffPartAt,
 	OPP_PART,
 	projPart,
 	ptsPart,
@@ -224,7 +224,7 @@ void test('the Lineup and the Matchup say when Final and the stats land while a 
 		game_state: 'final',
 		last_games: [{ week: 6, points: 12.4 }]
 	});
-	assert.equal(kickedOffPart([counted]), null);
+	assert.equal(kickedOffPartAt([counted], Date.parse('2026-10-19T16:00:00.000Z')), null);
 });
 
 void test('on a phone the stats sentence takes the room of the Game cell words and Opp rank (Lane 85)', () => {

@@ -322,8 +322,8 @@ export function liveBasis(week: PlayerWeek, league: boolean, zone: string, now: 
 }
 
 /** The card's head from the read: its week, and the game or the bye in it. */
-function headOf(week: PlayerWeek, zone: string): CardHead {
-	const game = gameOf(week.line.facts, zone);
+function headOf(week: PlayerWeek, zone: string, now: number): CardHead {
+	const game = gameOf(week.line.facts, zone, now);
 	const opponent = game === null ? NONE : game === 'bye' ? BOX.bye : game.where;
 	return { week: week.week, opponent };
 }
@@ -337,7 +337,7 @@ function nextOf(
 	now: number
 ): { cell: NextCell | null; next: LogNext | null } {
 	const { facts } = week.line;
-	const game = gameOf(facts, zone);
+	const game = gameOf(facts, zone, now);
 	if (game === null || game === 'bye') return { cell: null, next: null };
 	const ahead = toBePlayed(facts, now);
 	const cell: NextCell = {
@@ -410,7 +410,7 @@ export function liveCard({
 		league !== null && week.verb !== null ? verbOf(week.verb, league, player, screenHref) : null;
 	return {
 		week: week.week,
-		head: headOf(week, zone),
+		head: headOf(week, zone, now),
 		tiles: updated,
 		cell,
 		next,
