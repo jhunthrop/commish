@@ -33,6 +33,7 @@ THURSDAY: Final = datetime(2026, 10, 16, 0, 15, tzinfo=UTC)
 NEXT_SUNDAY: Final = SUNDAY + timedelta(days=7)
 _DATABASE: Final = "parity_lane80_game_status"
 WEEK: Final = 6
+NEXT_WEEK: Final = WEEK + 1
 BUDGET: Final = FixedBudget(10)
 
 
@@ -45,7 +46,7 @@ KICKOFFS: Final = [
     _k(6, "DEN", THURSDAY),
     _k(6, "BUF", SUNDAY),
     _k(6, "MIA", SUNDAY),
-    _k(7, "BUF", NEXT_SUNDAY),
+    _k(NEXT_WEEK, "BUF", NEXT_SUNDAY),
 ]
 
 
@@ -72,9 +73,9 @@ def test_a_game_the_passes_missed_is_still_asked_about() -> None:
 def test_only_the_current_week_is_asked_about() -> None:
     held = frozenset({("SEA", 6), ("DEN", 6)})
     # Week 7 under way: the current week is 7; week 6's missing final comes with its weekly stats.
-    assert pending_week(KICKOFFS, held, NEXT_SUNDAY + timedelta(hours=1)) == 7
+    assert pending_week(KICKOFFS, held, NEXT_SUNDAY + timedelta(hours=1)) == NEXT_WEEK
     # Week 7 kicked off and final: nothing asked, week 6's gap included.
-    assert pending_week(KICKOFFS, held | {("BUF", 7)}, NEXT_SUNDAY + timedelta(hours=5)) is None
+    assert pending_week(KICKOFFS, held | {("BUF", NEXT_WEEK)}, NEXT_SUNDAY + timedelta(hours=5)) is None
 
 
 BODY: Final = [
@@ -115,7 +116,7 @@ def _seed(conn: Connection) -> None:
          "metric": ScheduleMetric.GAME_RESULT, "as_of": THURSDAY + timedelta(hours=4), "value": 1.0}
         for team in ("SEA", "DEN")
     ]  # fmt: skip
-    conn.execute(insert(TEAM_WEEK_OBSERVATIONS), rows + results)
+    conn.execute(insert(TEAM_WEEK_OBSERVATIONS), [*rows, *results])
 
 
 @pytest.mark.skipif("PARITY_DATABASE_URL" not in os.environ, reason="needs a Postgres for scratch databases")
