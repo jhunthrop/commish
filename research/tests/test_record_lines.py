@@ -129,9 +129,7 @@ def test_the_starters_basis_names_only_the_positions_graded() -> None:
     rows = _quarterbacks(ours_right=True, published=False)
     weeks = [Week(1, "graded", None, None, None, _QUARTERBACKS, week_lines(rows), "preseason")]
     said = starters_basis(to_date(weeks, {1: rows}))
-    assert said == (
-        "Starters right counts the week's top 12 QBs it also put there."
-    )
+    assert said == ("Starters right counts the week's top 12 QBs it also put there.")
     assert starters_basis(()) is None
 
 
