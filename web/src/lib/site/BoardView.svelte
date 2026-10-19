@@ -36,6 +36,7 @@
 	import { weekPositionOf } from '#lib/order/week-head.ts';
 	import { ORDER, WEEK } from '#lib/order/words.ts';
 	import type { BasisPart } from '#lib/run/board-basis.ts';
+	import type { RulesLeftOut } from '#lib/order/week.ts';
 
 	interface Props {
 		page: BoardPage;
@@ -158,18 +159,18 @@
 	const weekPosition = $derived(page.underway ? weekPositionOf(page.position) : null);
 	let Order = $state<typeof OrderScreenComponent | null>(null);
 	let Week = $state<typeof WeekScreenComponent | null>(null);
-	/** The week's head and basis, once its read lands. */
-	interface WeekSaid {
-		heading: string;
-		basis: BasisPart[];
-	}
-	let weekSaid = $state<WeekSaid | null>(null);
-	onMount(() => {
-		if (weekPosition !== null) {
+	/** Each screen's code is asked for once, when a tab first needs it (the position chips move
+	 * between tabs on this one page, review 66w finding 1). */
+	let asked = { week: false, order: false };
+	$effect(() => {
+		if (weekPosition !== null && !asked.week) {
+			asked = { ...asked, week: true };
 			void import('#lib/order/WeekScreen.svelte').then((module) => {
 				Week = module.default;
 			});
-		} else if (inSeason) {
+		}
+		if (inSeason && !asked.order) {
+			asked = { ...asked, order: true };
 			void import('#lib/order/OrderScreen.svelte').then((module) => {
 				Order = module.default;
 			});
@@ -180,6 +181,20 @@
 			? null
 			: { id: siteContext.league.id, host: siteContext.league.host }
 	);
+	/** The tab a week read belongs to: its position and the league it was read for. */
+	const weekKey = $derived(`${weekPosition ?? ''} ${orderLeague?.id ?? ''}`);
+	/** The week's head, basis and the rules our stats lack, once its read lands, kept with the tab it
+	 * was read for: another tab never shows them, so a tab change never leaves a stale head. */
+	interface WeekSaid {
+		key: string;
+		heading: string;
+		basis: BasisPart[];
+		rules: RulesLeftOut | null;
+	}
+	let weekSaid = $state<WeekSaid | null>(null);
+	/** The space before the rules' link. */
+	const GAP = ' ';
+	const said = $derived(weekPosition !== null && weekSaid?.key === weekKey ? weekSaid : null);
 </script>
 
 {#snippet row(player: BoardRowView, i: number)}
@@ -208,14 +223,21 @@
 	</div>
 	<div class="content">
 		<div class="lead">
-			<PageHead title={weekSaid?.heading ?? heading}>
+			<PageHead title={said?.heading ?? heading}>
 				{#snippet actions()}
 					<Quiet href={links.adp(page.format.id)} size="sm">ADP</Quiet>
 					<Quiet href={links.schedule()} size="sm">Schedule strength</Quiet>
 				{/snippet}
 			</PageHead>
 			{#if weekPosition !== null}
-				{#if weekSaid}<BasisLine parts={weekSaid.basis} />{/if}
+				{#if said}
+					{@const rules = said.rules}
+					<BasisLine parts={said.basis}>
+						{#snippet after()}{#if rules}{rules.text}{#if rules.link}{GAP}<a href={rules.link.href}
+										>{rules.link.words}</a
+									>{/if}{/if}{/snippet}
+					</BasisLine>
+				{/if}
 			{:else if marketView}
 				<BasisLine parts={[{ text: page.marketBasis ?? '', phone: true }]} tail={capture} />
 			{:else if !inSeason}
@@ -248,12 +270,14 @@
 
 		{#if weekPosition !== null}
 			{#if Week}
-				{#key `${weekPosition} ${orderLeague?.id ?? ''}`}
+				{#key weekKey}
+					{@const key = weekKey}
 					<Week
 						position={weekPosition}
 						league={orderLeague}
-						onread={(said: WeekSaid) => {
-							weekSaid = said;
+						boardScoring={page.format.label}
+						onread={(read: Omit<WeekSaid, 'key'>) => {
+							weekSaid = { ...read, key };
 						}}
 					/>
 				{/key}
