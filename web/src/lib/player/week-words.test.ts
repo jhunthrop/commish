@@ -242,7 +242,7 @@ void test("the card's head is the API's week, the bye said in it, so one card sh
 		)
 	);
 	assert.deepEqual(bye.head, { week: 6, opponent: 'Bye' });
-	assert.equal(tile(bye.tiles, 'proj').label, `Wk ${String(bye.head?.week)}`);
+	assert.equal(tile(bye.tiles, 'proj').label, 'Wk 6');
 });
 
 void test('with no league the basis names PPR and no league, and there is no verb', () => {
