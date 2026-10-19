@@ -362,7 +362,8 @@ const WEEK_ROOM = `${TRADES.weekShort} is each lineup's ${BOX.proj} with the tra
 /** The trade screen's basis, one paragraph under the rows (Lane 66t): who decides and what Gain is
  * (the API's), Proj, and at a desk the week's change and Room, then How the order has done. With a
  * trade opened or the builder open, its players' columns too: the figure a game, Opp rank, Pts at a
- * desk and the rules Avg and Last leave out. Each said once; the builder's own line points here. */
+ * desk where the platform gives team totals alone, and the rules Avg and Last leave out; a defense's
+ * scoring only with the builder's boxes, which draw one. Each said once; the builder's own line points here. */
 export function tradeBasis(
 	advice: Pick<
 		TradeAdvice,
@@ -376,11 +377,12 @@ export function tradeBasis(
 	>,
 	host: LeagueHost,
 	lines: readonly PlayerLine[],
-	opened: boolean,
+	opened: 'none' | 'trade' | 'builder',
 	hrefs: { rules: string; record: string },
 	clock: Clock
 ): BasisPart[] {
-	const defense = opened && lines.some((l) => l.player.position === 'DEF');
+	// The builder's boxes draw a defense; a trade never holds one (Lane 66g).
+	const defense = opened === 'builder' && lines.some((l) => l.player.position === 'DEF');
 	const proj = said(
 		projPart(
 			{
@@ -392,16 +394,17 @@ export function tradeBasis(
 			clock
 		)
 	);
-	const players = opened
-		? [
-				...said(OPP_PART),
-				...said(ptsPart(advice.player_points, host), false),
-				...uncountedParts(advice, hrefs.rules)
-			]
-		: [];
+	const players =
+		opened !== 'none'
+			? [
+					...said(OPP_PART),
+					...said(ptsPart(advice.player_points, host), false),
+					...uncountedParts(advice, hrefs.rules)
+				]
+			: [];
 	return [
 		...said(advice.basis),
-		...(opened ? said(advice.per_game_basis) : []),
+		...(opened === 'none' ? [] : said(advice.per_game_basis)),
 		...proj,
 		...players,
 		...said(WEEK_ROOM, false),

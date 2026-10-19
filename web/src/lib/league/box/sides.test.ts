@@ -263,5 +263,5 @@ void test("a host that gives each player's points: both screens' Totals add the 
 	);
 	assert.equal(boxNumber(matchup.totals.pts), '33.4');
 	assert.equal(boxNumber(lineup.totals.pts), '33.4');
-	assert.match(ptsPart(matchup.byPlayer, 'sleeper'), /as your league scores them/);
+	assert.equal(ptsPart(matchup.byPlayer, 'sleeper'), null);
 });

@@ -3666,7 +3666,7 @@ components:
           type: string
           description: >-
             the league's scoring rules Avg and Last leave out because our stats lack them, counted ("Avg and Last
-            leave out four of your scoring rules our stats lack."), empty when they leave out none
+            leave out four of your rules our stats lack."), empty when they leave out none
         basis_note_link:
           type: string
           description: the words of basis_note's link to the league's Settings, where the rules are listed ("Which four"); empty with no basis_note
@@ -4008,7 +4008,7 @@ components:
           type: string
           description: >-
             the league's scoring rules Avg and Last leave out because our stats lack them, counted ("Avg and Last
-            leave out four of your scoring rules our stats lack."), empty when they leave out none
+            leave out four of your rules our stats lack."), empty when they leave out none
         basis_note_link:
           type: string
           description: the words of basis_note's link to the league's Settings, where the rules are listed ("Which four"); empty with no basis_note
@@ -4107,7 +4107,7 @@ components:
           type: string
           description: >-
             the league's scoring rules Avg and Last leave out because our stats lack them, counted ("Avg and Last
-            leave out four of your scoring rules our stats lack."), empty when they leave out none
+            leave out four of your rules our stats lack."), empty when they leave out none
         basis_note_link:
           type: string
           description: the words of basis_note's link to the league's Settings, where the rules are listed ("Which four"); empty with no basis_note
@@ -4419,7 +4419,7 @@ components:
           type: string
           description: >-
             the league's scoring rules Avg and Last leave out because our stats lack them, counted ("Avg and Last
-            leave out four of your scoring rules our stats lack."), empty when they leave out none
+            leave out four of your rules our stats lack."), empty when they leave out none
         basis_note_link:
           type: string
           description: the words of basis_note's link to the league's Settings, where the rules are listed ("Which four"); empty with no basis_note
@@ -4526,7 +4526,7 @@ components:
           type: string
           description: >-
             the league's scoring rules Avg and Last leave out because our stats lack them, counted ("Avg and Last
-            leave out four of your scoring rules our stats lack."), empty when they leave out none
+            leave out four of your rules our stats lack."), empty when they leave out none
         basis_note_link:
           type: string
           description: the words of basis_note's link to the league's Settings, where the rules are listed ("Which four"); empty with no basis_note

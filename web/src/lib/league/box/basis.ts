@@ -43,7 +43,7 @@ export function projPart(proj: ProjFacts, clock: Clock): string {
 		: proj.scoring.league_own
 			? ' on your rules'
 			: `, ${format} nearest your rules`;
-	const defenses = proj.defense ? ', defenses on its default scoring' : '';
+	const defenses = proj.defense ? ', defenses on default scoring' : '';
 	const when = proj.readAt === null ? 'not in yet' : `read ${stamp(proj.readAt, clock)}`;
 	return `${proj.head ?? BOX.proj} is this week's published projection${whose}${defenses}, ${when}.`;
 }
@@ -66,16 +66,17 @@ export function gamePart(
 	const read = factsReadAt(lines, now);
 	if (read === null) return null;
 	return say === 'full'
-		? `${BOX.game} is each club's expected points, his first, and kickoff weather, read ${stamp(read, clock)}.`
+		? `${BOX.game} is each club's expected points, his first, and weather, read ${stamp(read, clock)}.`
 		: `${BOX.game} was read ${stamp(read, clock)}.`;
 }
 
-export const OPP_PART = `${BOX.oppRank} is points allowed to his position, 1st the fewest.`;
+export const OPP_PART = `${BOX.oppRank} is points allowed to his position, 1st fewest.`;
 
-/** The Pts column: the platform's points as the league scores them, or its team total alone. */
-export function ptsPart(byPlayer: boolean, host: LeagueHost): string {
+/** The Pts column where it needs a sentence: a platform that gives each team's total alone; a
+ * platform's own points by player say themselves, so nothing is said of them (Lane 66t). */
+export function ptsPart(byPlayer: boolean, host: LeagueHost): string | null {
 	return byPlayer
-		? `${BOX.pts} are ${hostWords(host)}'s, as your league scores them.`
+		? null
 		: `${BOX.pts} are your team's points from ${hostWords(host)}, which gives none by player.`;
 }
 

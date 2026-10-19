@@ -56,7 +56,7 @@ void test('Proj says its scoring, whose rules, defenses when one is drawn, and i
 	);
 	assert.equal(
 		projPart({ readAt: READ, scoring: CLOSEST, defense: true, league: true }, CENTRAL),
-		"Proj is this week's published projection, PPR nearest your rules, defenses on its default scoring, read Fri 9:00 pm."
+		"Proj is this week's published projection, PPR nearest your rules, defenses on default scoring, read Fri 9:00 pm."
 	);
 	assert.equal(
 		projPart({ readAt: READ, scoring: OWN, defense: false, league: true }, CENTRAL),
@@ -77,27 +77,27 @@ void test('the change, the Game cell and Opp rank each in one sentence', () => {
 	assert.equal(deltaPart(null, CENTRAL), null);
 	assert.equal(
 		gamePart([line()], CENTRAL, NOW, 'full'),
-		"Game is each club's expected points, his first, and kickoff weather, read Fri 4:01 pm."
+		"Game is each club's expected points, his first, and weather, read Fri 4:01 pm."
 	);
 	assert.equal(gamePart([line()], CENTRAL, NOW, 'read'), 'Game was read Fri 4:01 pm.');
 	assert.equal(gamePart([line({ bye: true })], CENTRAL, NOW, 'read'), null);
-	assert.equal(OPP_PART, 'Opp rank is points allowed to his position, 1st the fewest.');
+	assert.equal(OPP_PART, 'Opp rank is points allowed to his position, 1st fewest.');
 });
 
-void test('Pts names the platform, and the team total alone where it gives none by player', () => {
-	assert.equal(ptsPart(true, 'sleeper'), "Pts are Sleeper's, as your league scores them.");
+void test('Pts is said only where the platform gives each team its total alone, the platform named', () => {
+	assert.equal(ptsPart(true, 'sleeper'), null);
 	assert.equal(
 		ptsPart(false, 'espn'),
 		"Pts are your team's points from ESPN, which gives none by player."
 	);
 	for (const host of ['espn', 'yahoo', 'ffpc', 'mfl'] as const) {
-		assert.doesNotMatch(ptsPart(false, host), /\bhost\b/i);
+		assert.doesNotMatch(ptsPart(false, host) ?? '', /\bhost\b/i);
 	}
 });
 
 void test('the uncounted rules are the API sentence, then its link to the Settings list', () => {
 	const advice = {
-		basis_note: 'Avg and Last leave out five of your scoring rules our stats lack.',
+		basis_note: 'Avg and Last miss five of your rules our stats lack.',
 		basis_note_link: 'Which five'
 	};
 	assert.deepEqual(uncountedParts(advice, '/league/1#uncounted'), [
@@ -126,8 +126,7 @@ void test('copy guard: every basis part is fantasy words, with no dash or semico
 		deltaPart(BEFORE, CENTRAL) ?? '',
 		gamePart([line()], CENTRAL, NOW, 'full') ?? '',
 		OPP_PART,
-		ptsPart(false, 'espn'),
-		ptsPart(true, 'sleeper')
+		ptsPart(false, 'espn') ?? ''
 	];
 	for (const text of said) {
 		assert.doesNotMatch(text, banned, text);
@@ -135,7 +134,7 @@ void test('copy guard: every basis part is fantasy words, with no dash or semico
 	}
 });
 
-void test("the Lineup's key says Proj, its change at a desk, Game, Opp rank, Pts and the uncounted rules once", () => {
+void test("the Lineup's key says Proj, its change at a desk, Game, Opp rank and the uncounted rules once", () => {
 	const parts = boxBasisParts(
 		{
 			projection: { readAt: READ, scoring: CLOSEST },
@@ -145,7 +144,7 @@ void test("the Lineup's key says Proj, its change at a desk, Game, Opp rank, Pts
 			lineup: {
 				previousReadAt: BEFORE,
 				note: {
-					basis_note: 'Avg and Last leave out five of your scoring rules our stats lack.',
+					basis_note: 'Avg and Last miss five of your rules our stats lack.',
 					basis_note_link: 'Which five'
 				},
 				rulesHref: '/league/1#uncounted'
@@ -156,7 +155,7 @@ void test("the Lineup's key says Proj, its change at a desk, Game, Opp rank, Pts
 	);
 	assert.equal(
 		basisText(parts),
-		"Proj is this week's published projection, PPR nearest your rules, read Fri 9:00 pm. Δ Proj is its change since Thu 9:00 pm. Game is each club's expected points, his first, and kickoff weather, read Fri 4:01 pm. Opp rank is points allowed to his position, 1st the fewest. Pts are Sleeper's, as your league scores them. Avg and Last leave out five of your scoring rules our stats lack. Which five"
+		"Proj is this week's published projection, PPR nearest your rules, read Fri 9:00 pm. Δ Proj is its change since Thu 9:00 pm. Game is each club's expected points, his first, and weather, read Fri 4:01 pm. Opp rank is points allowed to his position, 1st fewest. Avg and Last miss five of your rules our stats lack. Which five"
 	);
 	assert.deepEqual(
 		parts.filter((p) => !p.phone).map((p) => p.text),
@@ -178,6 +177,6 @@ void test('the Matchup key says Proj, Pts and Game, the columns it draws', () =>
 	);
 	assert.equal(
 		basisText(parts),
-		"Proj is this week's published projection, PPR nearest your rules, read Fri 9:00 pm. Pts are your team's points from ESPN, which gives none by player. Game is each club's expected points, his first, and kickoff weather, read Fri 4:01 pm."
+		"Proj is this week's published projection, PPR nearest your rules, read Fri 9:00 pm. Pts are your team's points from ESPN, which gives none by player. Game is each club's expected points, his first, and weather, read Fri 4:01 pm."
 	);
 });

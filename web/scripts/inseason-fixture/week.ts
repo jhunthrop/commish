@@ -16,7 +16,7 @@ export const weeksCovered = (week: number): number => Math.max(1, LAST_FANTASY_W
 /** What a Gain is, in the API's words (words.go gainWords). */
 export function gainWords(whose: string, weeks: number): string {
 	const span = weeks === 1 ? 'one week' : `${String(weeks)} weeks`;
-	return `Gain is the change in ${whose} points over replacement, a week, averaged over the ${span} left on our rest-of-season order.`;
+	return `Gain is the change in ${whose} points over replacement, a week, over the ${span} left on our order.`;
 }
 
 /** The finder's basis in the API's words (words.go TradesBasis), the one copy build.ts and
@@ -26,7 +26,7 @@ export function tradesBasis(weeks: number): string {
 }
 
 /** The figure a game in the API's words (pergame.go PerGameBasis). */
-export const PER_GAME_BASIS = 'A game is his rest-of-season points over the games his club has left.';
+export const PER_GAME_BASIS = "A game is that order's points a game.";
 
 /** The Waivers screen's Gain then the figure a game (words.go WaiverSeasonBasis, withPerGame). */
 export function waiverSeasonBasis(weeks: number): string {
@@ -34,8 +34,7 @@ export function waiverSeasonBasis(weeks: number): string {
 }
 
 /** The builder's own line in the API's words (words.go TradeCheckBasis). */
-export const CHECK_BASIS =
-	'The scoreboard is each lineup before and after the trade.';
+export const CHECK_BASIS = 'The scoreboard is each lineup before and after the trade.';
 
 /** The Lineup's advice rule (words.go LineupBasis). */
 export const LINEUP_BASIS =
@@ -43,7 +42,7 @@ export const LINEUP_BASIS =
 
 /** The Waivers pickup rule (words.go WaiversBasis). */
 export const WAIVERS_BASIS =
-	'A pickup starts for you this week on Proj and keeps your Gain at zero or better. Its drop costs you least.';
+	'A pickup starts this week on Proj and keeps your Gain at zero or better. Its drop costs least.';
 
 const COUNT_WORDS = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'];
 
@@ -55,7 +54,7 @@ export function uncountedOf(rules: readonly string[]): {
 	if (rules.length === 0) return { basis_note: '', basis_note_link: '' };
 	const n = COUNT_WORDS[rules.length] ?? String(rules.length);
 	return {
-		basis_note: `Avg and Last leave out ${n} of your scoring rules our stats lack.`,
+		basis_note: `Avg and Last miss ${n} of your rules our stats lack.`,
 		basis_note_link: `Which ${n}`
 	};
 }

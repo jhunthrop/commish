@@ -306,9 +306,9 @@ const advice: Pick<
 	| 'player_points'
 > = {
 	basis:
-		"Each team's best trade both lineups gain by, yours first. The other team decides. Gain is the change in a lineup's points over replacement, a week, averaged over the 12 weeks left on our rest-of-season order.",
-	per_game_basis: 'A game is his rest-of-season points over the games his club has left.',
-	basis_note: 'Avg and Last leave out five of your scoring rules our stats lack.',
+		"Each team's best trade both lineups gain by, yours first. The other team decides. Gain is the change in a lineup's points over replacement, a week, over the 12 weeks left on our order.",
+	per_game_basis: "A game is that order's points a game.",
+	basis_note: 'Avg and Last miss five of your rules our stats lack.',
 	basis_note_link: 'Which five',
 	projection_read_at: '2026-10-17T02:00:00.000Z',
 	projection_scoring: { format: 'ppr', league_own: false },
@@ -326,7 +326,7 @@ void test('closed, the basis names the finder columns only: who decides, Gain, P
 		advice,
 		'sleeper',
 		[line('Cam Skattebo')],
-		false,
+		'none',
 		TRADE_LINKS,
 		TRADE_CLOCK
 	);
@@ -338,6 +338,16 @@ void test('closed, the basis names the finder columns only: who decides, Gain, P
 		parts.filter((p) => !p.phone).map((p) => p.text),
 		[WEEK_ROOM]
 	);
+	// A trade opened in the finder holds no defense, so its scoring is not said.
+	const opened = tradeBasis(
+		advice,
+		'sleeper',
+		[line('Cam Skattebo'), line('Chiefs D/ST', 'DEF')],
+		'trade',
+		TRADE_LINKS,
+		TRADE_CLOCK
+	);
+	assert.doesNotMatch(basisText(opened), /defenses/);
 });
 
 void test("a trade opened or the builder open adds the players' columns, each once", () => {
@@ -345,13 +355,13 @@ void test("a trade opened or the builder open adds the players' columns, each on
 		advice,
 		'sleeper',
 		[line('Cam Skattebo'), line('Chiefs D/ST', 'DEF')],
-		true,
+		'builder',
 		TRADE_LINKS,
 		TRADE_CLOCK
 	);
 	assert.equal(
 		basisText(parts),
-		`${advice.basis} ${advice.per_game_basis} Proj is this week's published projection, PPR nearest your rules, defenses on its default scoring, read Fri 9:00 pm. Opp rank is points allowed to his position, 1st the fewest. Pts are Sleeper's, as your league scores them. ${advice.basis_note} Which five. ${WEEK_ROOM} How the order has done`
+		`${advice.basis} ${advice.per_game_basis} Proj is this week's published projection, PPR nearest your rules, defenses on default scoring, read Fri 9:00 pm. Opp rank is points allowed to his position, 1st fewest. ${advice.basis_note} Which five. ${WEEK_ROOM} How the order has done`
 	);
 	assert.deepEqual(
 		parts.filter((p) => p.href !== undefined).map((p) => p.href),
@@ -359,7 +369,7 @@ void test("a trade opened or the builder open adds the players' columns, each on
 	);
 	assert.deepEqual(
 		parts.filter((p) => !p.phone).map((p) => p.text),
-		["Pts are Sleeper's, as your league scores them.", WEEK_ROOM]
+		[WEEK_ROOM]
 	);
 });
 
@@ -382,7 +392,9 @@ void test('copy guard: every word the trade table prints is fantasy words, the p
 		copied.page,
 		room.yours,
 		room.theirs,
-		basisText(tradeBasis(advice, 'sleeper', [line('Cam Skattebo')], true, TRADE_LINKS, TRADE_CLOCK))
+		basisText(
+			tradeBasis(advice, 'sleeper', [line('Cam Skattebo')], 'trade', TRADE_LINKS, TRADE_CLOCK)
+		)
 	];
 	for (const text of said) {
 		assert.doesNotMatch(text, NEVER, text);

@@ -153,7 +153,7 @@
 			shown,
 			host,
 			lines,
-			anyOpen || building !== null,
+			building !== null ? 'builder' : anyOpen ? 'trade' : 'none',
 			{ rules: rulesHref, record: links.record() },
 			{ zone: memberZone(), zoned: false }
 		)

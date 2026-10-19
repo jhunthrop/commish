@@ -1,7 +1,7 @@
 {
 	"week": 6,
-	"basis": "A pickup starts for you this week on Proj and keeps your Gain at zero or better. Its drop costs you least.",
-	"basis_note": "Avg and Last leave out five of your scoring rules our stats lack.",
+	"basis": "A pickup starts this week on Proj and keeps your Gain at zero or better. Its drop costs least.",
+	"basis_note": "Avg and Last miss five of your rules our stats lack.",
 	"order_basis": "rest_of_season",
 	"refreshed": "2026-10-14T19:05:37.917Z",
 	"read_at": "2026-10-14T19:05:38.329Z",
@@ -1952,7 +1952,7 @@
 		"writes_on": false,
 		"reason": "Sleeper does not take claims from here, so add him on its waiver page."
 	},
-	"season_basis": "Gain is the change in your lineup's points over replacement, a week, averaged over the 12 weeks left on our rest-of-season order. A game is his rest-of-season points over the games his club has left.",
+	"season_basis": "Gain is the change in your lineup's points over replacement, a week, over the 12 weeks left on our order. A game is that order's points a game.",
 	"pickups": [
 		{
 			"add": {

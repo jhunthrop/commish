@@ -470,7 +470,7 @@ export function projShort(
 			: ", the closest to this league's rules";
 	const when =
 		readAt === null ? 'not in yet' : `read ${weekdayTime(readAt, zone)} ${zoneWord(zone)}`;
-	const defenses = defense ? ', defenses on its default scoring' : '';
+	const defenses = defense ? ', defenses on default scoring' : '';
 	const delta =
 		previousReadAt === null
 			? ''
@@ -481,7 +481,7 @@ export function projShort(
 /** The evidence columns in one short sentence pair, in the scoring the rows are in: "your scoring"
  * in a league, "in PPR" without one (the Waivers basis, the order's, the player card's). */
 export function evidenceShort(scoring = 'your scoring'): string {
-	return `${BOX.oppRank} is points allowed to his position, 1st the fewest. ${BOX.avg} and ${BOX.last} are his points a game and last game, ${scoring}.`;
+	return `${BOX.oppRank} is points allowed to his position, 1st fewest. ${BOX.avg} and ${BOX.last} are his points a game and last game, ${scoring}.`;
 }
 
 /** The evidence columns' short pair in a league. */

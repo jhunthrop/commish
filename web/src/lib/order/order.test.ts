@@ -189,7 +189,7 @@ void test('the basis says each column once: the order, Wk 6, Opp rank, the rules
 	const parts = orderBasis(
 		advice([row('A')], {
 			read_at: READ,
-			basis_note: 'Avg and Last leave out five of your scoring rules our stats lack.',
+			basis_note: 'Avg and Last miss five of your rules our stats lack.',
 			basis_note_link: 'Which five'
 		}),
 		LEAGUE,
@@ -197,10 +197,10 @@ void test('the basis says each column once: the order, Wk 6, Opp rank, the rules
 	);
 	const inLeague = basisText(parts);
 	assert.match(inLeague, /, PPR nearest your rules, read /);
-	assert.match(inLeague, /Opp rank is points allowed to his position, 1st the fewest\./);
+	assert.match(inLeague, /Opp rank is points allowed to his position, 1st fewest\./);
 	assert.match(
 		inLeague,
-		/Avg and Last leave out five of your scoring rules our stats lack\. Which five\./
+		/Avg and Last miss five of your rules our stats lack\. Which five\./
 	);
 	assert.match(inLeague, /Roster is Sleeper's, read /);
 	assert.equal(parts.find((p) => p.href !== undefined)?.href, LEAGUE.rulesHref);
