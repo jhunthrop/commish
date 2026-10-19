@@ -68,7 +68,6 @@ def stock_sentences(
     return sorted(findings, key=lambda f: (-len(f.player_ids), id_key(f.key)))
 
 
-_TITLECASE: Final = re.compile(r"^[A-Z][a-z]")
 _USAGE_CUES: Final = (
     re.compile(r"\bsnap share\b|\bof (?:the|his team's) snaps\b", re.IGNORECASE),
     re.compile(r"\btarget share\b|\bof (?:the|his team's) targets\b", re.IGNORECASE),
@@ -76,6 +75,11 @@ _USAGE_CUES: Final = (
 )
 _RANK_CUE: Final = re.compile(r"\b(?:QB|RB|WR|TE)\d{1,2}\b|\bamong \d+\b", re.IGNORECASE)
 _RANK_CUES_FOR_A_TOUR: Final = 3
+
+
+def _is_titlecase(word: str) -> bool:
+    """A capital then a small letter, in any script ("Élan" as much as "Evan")."""
+    return len(word) > 1 and word[0].isupper() and word[1].islower()
 
 
 def _bare(token: str) -> str:
@@ -91,7 +95,7 @@ def opener_family(text: str, name: str | None, words: int = CAPSULE_CONFIG.repet
     """`openerFamily`: the first words, his name and any other name as `_`, a number as `#`."""
     tokens = text.split()[:words]
     names = _name_words(name)
-    titled = [_TITLECASE.match(t.lstrip("\"'(")) is not None for t in tokens]
+    titled = [_is_titlecase(t.lstrip("\"'(")) for t in tokens]
     first_is_name = len(tokens) > 1 and titled[1] and _bare(tokens[1]) not in names
     family = []
     for index, token in enumerate(tokens):

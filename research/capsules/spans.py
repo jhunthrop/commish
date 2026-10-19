@@ -26,6 +26,7 @@ from dataclasses import dataclass
 from typing import Final
 
 from research.capsules.facts.team_names import NFL_TEAM_NAMES
+from research.capsules.names import fold_name, strip_accents
 from research.capsules.sentences import phrase_pattern
 
 SPAN_WORDS: Final = 6
@@ -82,7 +83,9 @@ def club_name_words() -> frozenset[str]:
 
 def name_words(player_names: Iterable[str]) -> frozenset[str]:
     """The capitalised words that are names: every word of these player names, and of the clubs."""
-    words = {word for name in player_names for word in _TOKEN.findall(name)} | club_name_words()
+    # Folded (`names.fold_name`), so "Estime" in a read is the sheet's "Estimé" (Lane 75).
+    spelled = [word for name in player_names for word in _TOKEN.findall(strip_accents(name))]
+    words = {fold_name(word) for word in (*spelled, *club_name_words())}
     # A lone initial ("A" of A.J. Brown) would cut every sentence that opens on "A".
     return frozenset(word for word in words if len(word) > 1)
 
@@ -91,8 +94,9 @@ def runs_of(text: str, names: frozenset[str]) -> Runs:
     """The text's words, lower case, split into runs wherever a name or a dated week stands."""
     runs: list[tuple[str, ...]] = []
     run: list[str] = []
-    for token in _TOKEN.findall(_DATED_WEEK.sub(f" {_BREAK} ", text.replace(chr(0x2019), "'"))):
-        if token == _BREAK or (token[:1].isupper() and _POSSESSIVE.sub("", token) in names):
+    plain = strip_accents(text.replace(chr(0x2019), "'"))
+    for token in _TOKEN.findall(_DATED_WEEK.sub(f" {_BREAK} ", plain)):
+        if token == _BREAK or (token[:1].isupper() and fold_name(_POSSESSIVE.sub("", token)) in names):
             runs.append(tuple(run))
             run = []
             continue

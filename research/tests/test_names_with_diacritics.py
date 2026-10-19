@@ -12,6 +12,7 @@ from research.capsules.grounding import is_name_grounded, proper_name_phrases
 from research.capsules.names import fold_name
 from research.capsules.repetition import opener_family
 from research.capsules.rule_notes import note_of
+from research.capsules.spans import name_words, runs_of
 from research.capsules.voice_rules import mask_names
 from research.capsules.week.sheet import DepthPlace, WeekSheet
 from research.capsules.week.start_advice import start_advice_in
@@ -92,3 +93,23 @@ def test_start_advice_reads_the_name_without_its_accent() -> None:
 def test_the_opener_family_reads_his_accented_name_as_his() -> None:
     assert opener_family("Estimé takes the early downs here.", SHEET_NAME, 4) == "_ takes the early"
     assert opener_family("Estime takes the early downs here.", SHEET_NAME, 4) == "_ takes the early"
+
+
+def test_the_opener_family_reads_an_accented_titlecase_word_as_a_name() -> None:
+    assert opener_family("We like Élan Ñúñez here.", None, 4) == "we like _ _"
+
+
+def test_a_lowercase_accented_word_is_no_name() -> None:
+    assert proper_name_phrases("He runs with élan and a café crowd behind Devin Neal.") == ["Devin Neal"]
+
+
+def test_an_accented_sentence_start_is_read_like_any_other() -> None:
+    assert proper_name_phrases("Él es bueno. São Paulo.") == ["São Paulo"]
+
+
+@pytest.mark.parametrize("written", ["Estimé", "Estime"])
+def test_the_span_runs_break_on_the_name_with_or_without_its_accent(written: str) -> None:
+    text = f"the backfield split stays the same with {written} taking the early downs and the goal line work"
+    runs = runs_of(text, name_words([SHEET_NAME]))
+    assert runs, "the words either side of the name still make runs"
+    assert all("estim" not in word for run in runs for word in run)
