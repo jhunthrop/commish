@@ -20,7 +20,15 @@ import { AGAINST } from '#lib/league/box/lineup.ts';
 import type { LeagueHost } from '#lib/league/api.ts';
 import { hostWords } from '#lib/league/names.ts';
 import type { LogNext } from '#lib/ui/game-log.ts';
-import { CARD, NONE, printTenth, withTile, type CardTile, type RestParts } from './card.ts';
+import {
+	CARD,
+	NONE,
+	printTenth,
+	withTile,
+	type CardHead,
+	type CardTile,
+	type RestParts
+} from './card.ts';
 import type { CardProjection } from './week-read.ts';
 
 /** Tenths in a point, the precision the API prints. */
@@ -64,6 +72,9 @@ export interface CardVerb {
 
 export interface LiveCard {
 	week: number;
+	/** The head the read gives the card: the API's week and its game or bye, null when the API names
+	 * no game that week. */
+	head: CardHead | null;
 	tiles: CardTile[];
 	cell: NextCell | null;
 	next: LogNext | null;
@@ -302,6 +313,13 @@ export function liveBasis(
 	return [proj, facts === null ? evidence : `${evidence} ${facts}`];
 }
 
+/** The card's head from the read: its week, and the game or the bye in it. */
+function headOf(week: PlayerWeek, zone: string): CardHead | null {
+	const game = gameOf(week.line.facts, zone);
+	if (game === null) return null;
+	return { week: week.week, opponent: game === 'bye' ? BOX.bye : game.where };
+}
+
 function nextOf(week: PlayerWeek, zone: string): { cell: NextCell | null; next: LogNext | null } {
 	const game = gameOf(week.line.facts, zone);
 	if (game === null || game === 'bye') return { cell: null, next: null };
@@ -375,6 +393,7 @@ export function liveCard({
 		league !== null && week.verb !== null ? verbOf(week.verb, league, player, screenHref) : null;
 	return {
 		week: week.week,
+		head: headOf(week, zone),
 		tiles: updated,
 		cell,
 		next,

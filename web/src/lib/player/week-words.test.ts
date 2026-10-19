@@ -226,6 +226,25 @@ void test('the week ahead is the box row and the cell under his name', () => {
 	assert.equal(tile(bye.tiles, 'proj').caption, 'Bye this week');
 });
 
+void test("the card's head is the API's week, the bye said in it, so one card shows one week (the sweep M6)", () => {
+	assert.deepEqual(card(week()).head, { week: 6, opponent: 'vs ARI' });
+	const away = card(week({ week: 7 }, { facts: facts({ week: 7, opponent: 'NYJ', home: false }) }));
+	assert.deepEqual(away.head, { week: 7, opponent: 'at NYJ' });
+	assert.equal(tile(away.tiles, 'proj').label, 'Wk 7');
+	const bye = card(
+		week(
+			{},
+			{
+				opp_rank: null,
+				week_projection: null,
+				facts: facts({ bye: true, opponent: null, home: null, kickoff: null })
+			}
+		)
+	);
+	assert.deepEqual(bye.head, { week: 6, opponent: 'Bye' });
+	assert.equal(tile(bye.tiles, 'proj').label, `Wk ${String(bye.head?.week)}`);
+});
+
 void test('with no league the basis names PPR and no league, and there is no verb', () => {
 	const { verb, basis } = card(
 		week({ verb: { kind: 'trade', holder: 'Nacua Matata', host_url: null, note: null } })

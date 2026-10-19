@@ -240,7 +240,7 @@
 			positionRank={n.positionRank}
 			holder={rostered}
 			holdRoom={league !== null}
-			next={page.card.next}
+			next={live?.head ?? page.card.next}
 			cell={live?.cell ?? null}
 			verb={live?.verb ?? null}
 			{tiles}
