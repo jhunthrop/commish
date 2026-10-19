@@ -193,7 +193,11 @@
 				<td class="n w {toneOf(entry.row.their_proj_change)}" class:sorted={sort === 'weekTheirs'}
 					>{weekWord(entry.row.their_proj_change)}</td
 				>
-				<td class="room"><span>{room.yours}</span><span>{room.theirs}</span></td>
+				<td class="room"
+					><span class:wraps={entry.row.drop_reason !== null}>{room.yours}</span><span
+						>{room.theirs}</span
+					></td
+				>
 			</tr>
 			{#if open}
 				{@const sides = sideRows(entry.row)}
@@ -523,6 +527,11 @@
 	td.room span {
 		display: block;
 		white-space: nowrap;
+	}
+
+	/* A starter's drop says so, on a second line where the column is narrow (Lane 66u). */
+	td.room span.wraps {
+		white-space: normal;
 	}
 
 	td.room span + span {

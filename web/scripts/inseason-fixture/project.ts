@@ -503,7 +503,11 @@ function pickupTable(advice: WaiverAdvice): WaiverAdvice {
 		const drops = choices
 			.map((d) => ({
 				host_id: d.player.host_id,
-				gain: tenth(row.gain + por(row.drop) - por(d)),
+				// A player the rest-of-season lineup does not start costs it nothing, as in the API's
+				// strength; a starter's loss stands in as the swing in points over replacement.
+				gain: seasonStarts.has(d.player.host_id)
+					? tenth(row.gain + por(row.drop) - por(d))
+					: row.gain,
 				week_gain: week(row.add, d).gain,
 				starts_this_week: base.starts.has(d.player.host_id)
 			}))
