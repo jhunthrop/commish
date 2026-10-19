@@ -39,6 +39,7 @@ import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
 import { copyFault, watchData } from './copy-scan.ts';
 import { FIXTURE_WEEK_CLOCK } from './inseason-fixture/clock.ts';
 import { BUILDER_LINE, basisLines, basisReport } from './basis-lines.ts';
+import { UNCOUNTED_ANCHOR } from '../src/lib/league/uncounted.ts';
 import { FIXTURE_IDS } from './inseason-fixture/ids.ts';
 import { PER_GAME_BASIS, WAIVERS_BASIS } from './inseason-fixture/week.ts';
 
@@ -443,6 +444,68 @@ for (const { name, path, ready: text } of PAGES) {
 			await ctx.close();
 		}
 	}
+}
+
+/** The bases on a platform that gives team totals alone (ESPN, Lane 66t review 2): the Lineup says
+ * Pts once and still holds its budget; Waivers, which draws no Pts, holds it too. */
+for (const width of SHOT_WIDTHS) {
+	const ctx = await context('dark', width);
+	const page = await ctx.newPage();
+	for (const [screen, basisName] of [
+		['start', 'lineup ESPN'],
+		['waivers', 'waivers ESPN']
+	] as const) {
+		await page.goto(`${web}/league/${FIXTURE_IDS.espnDone}/${screen}`, {
+			waitUntil: 'networkidle'
+		});
+		await page.locator('main [data-basis]').first().waitFor({ timeout: READY_TIMEOUT_MS });
+		await page.evaluate(() => document.fonts.ready);
+		const report = basisReport(basisName, width, await basisLines(page));
+		if (report !== null) {
+			basisCounts.push(report.line);
+			if (report.fault !== null) missing.push(report.fault);
+		}
+		const said = (await page.locator('main').textContent()) ?? '';
+		const pts = said.split("Pts are ESPN's team points").length - 1;
+		if (screen === 'start' && pts !== 1)
+			missing.push(`${basisName} ${String(width)}: Pts said ${String(pts)} times`);
+		await page.screenshot({ path: file(`${screen}-espn-dark-${String(width)}`), fullPage: true });
+	}
+	await ctx.close();
+}
+
+/** "Which five" lands on the league's Settings with the rules our stats lack in view (Lane 66t review
+ * 4): from Waivers on a phone, the card under the top bar, five rules listed. */
+{
+	const ctx = await context('dark', PHONE.width);
+	const page = await ctx.newPage();
+	await page.setViewportSize(PHONE);
+	await page.goto(`${web}/league/${id}/waivers`, { waitUntil: 'networkidle' });
+	await ready(page, 'Open Sleeper waivers');
+	await page.locator('main [data-basis] a', { hasText: 'Which five' }).click();
+	const card = page.locator(`#${UNCOUNTED_ANCHOR}`);
+	await card.waitFor({ timeout: READY_TIMEOUT_MS });
+	await page.waitForTimeout(400);
+	const landed = await page.evaluate((anchor: string) => {
+		const box = document.getElementById(anchor)?.getBoundingClientRect();
+		const bar = document.querySelector('header.top')?.getBoundingClientRect();
+		return {
+			url: location.pathname + location.search + location.hash,
+			top: box?.top ?? -1,
+			bottom: box?.bottom ?? -1,
+			barBottom: bar?.bottom ?? 0,
+			rules: document.querySelectorAll(`#${anchor} li`).length
+		};
+	}, UNCOUNTED_ANCHOR);
+	if (
+		!landed.url.endsWith(`?view=settings#${UNCOUNTED_ANCHOR}`) ||
+		landed.top < landed.barBottom - 1 ||
+		landed.top > PHONE.height ||
+		landed.rules !== 5
+	)
+		missing.push(`Which five lands ${JSON.stringify(landed)}`);
+	await page.screenshot({ path: file('which-five-landed-dark-390') });
+	await ctx.close();
 }
 
 /** A marked add and a narrowed trade list, at both widths in the dark theme. */

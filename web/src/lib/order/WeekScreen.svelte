@@ -6,7 +6,7 @@
 	import Chip from '#lib/ui/Chip.svelte';
 	import ChipGroup from '#lib/ui/ChipGroup.svelte';
 	import StatusLine from '#lib/ui/StatusLine.svelte';
-	import { leagueSettingsHref } from '#lib/league/inseason/tabs.ts';
+	import { leagueSettingsHref } from '#lib/league/rules-link.ts';
 	import { weekOrderApi, type WeekOrderAdvice } from './api.ts';
 	import { ORDER, type RosterView } from './order.ts';
 	import {

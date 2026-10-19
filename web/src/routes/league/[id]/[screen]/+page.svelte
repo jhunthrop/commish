@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { leagueSettingsHref } from '#lib/league/inseason/tabs.ts';
+	import { leagueSettingsHref } from '#lib/league/rules-link.ts';
 	import { page } from '$app/state';
 	import {
 		inSeasonApi,

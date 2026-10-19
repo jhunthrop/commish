@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount, tick } from 'svelte';
+	import { onMount } from 'svelte';
 	import { HTTP_STATUS, hasStatus, isSignedOut } from '#lib/api/status.ts';
 	import { takeHeld } from '#lib/context/held.ts';
 	import { scoresSentence } from '#lib/context/note-words.ts';
@@ -24,12 +24,12 @@
 	import { followSwitch } from './follow-switch.svelte.ts';
 	import SeasonPanel from './SeasonPanel.svelte';
 	import { MOCK_VERB } from '#lib/ui/nav.ts';
-	import { SETTINGS_VIEW, tabHref, UNCOUNTED_ANCHOR } from './inseason/tabs.ts';
+	import { SETTINGS_VIEW, tabHref } from './inseason/tabs.ts';
 	import { inSeasonApi, type LineupAdvice, type Scoreboard } from './inseason/api.ts';
 	import { siteContext } from '#lib/context/context.svelte.ts';
 	import { sectionHref } from '#lib/ui/nav.ts';
-	import { factsReadLine } from './box/box.ts';
-	import { weekdayTime } from '#lib/format/clock.ts';
+	import { gamePart } from './box/basis.ts';
+	import { memberZone, weekdayTime } from '#lib/format/clock.ts';
 	import { BENCH_ANCHOR } from './box/lineup.ts';
 	import RosterPanel from './RosterPanel.svelte';
 	import ScoreBoard from './home/ScoreBoard.svelte';
@@ -241,22 +241,12 @@
 		}
 	}
 
-	/** Asked for the rules our stats lack: the card is drawn once the week's read lands, then shown. */
-	let toRules = false;
-	$effect(() => {
-		if (!toRules || view !== 'settings' || !advice) return;
-		toRules = false;
-		void tick().then(() => document.getElementById(UNCOUNTED_ANCHOR)?.scrollIntoView());
-	});
-
 	// A link to the league's scoring rules (the week tab's "Which two", Lane 66w) opens on Settings.
 	onMount(() => {
 		if (new URLSearchParams(window.location.search).get(SETTINGS_VIEW.name) === SETTINGS_VIEW.value)
 			view = 'settings';
 	});
 	onMount(() => {
-		// Asked for the rules our stats lack ("Which five"): shown once the week's read draws them.
-		toRules = view === 'settings' && window.location.hash === `#${UNCOUNTED_ANCHOR}`;
 		void lazySheet.load();
 		void read();
 		const timer = setInterval(() => void read(), POLL_MS);
@@ -281,7 +271,15 @@
 					scoreboard
 						? teamBasis(sync.host, scoreboard.projection_read_at, scoreboard.projection_scoring)
 						: null,
-					advice ? factsReadLine(advice.slots.flatMap((s) => (s.host ? [s.host] : []))) : null,
+					// The season panel names the zone once, so the read's time does not repeat it.
+					advice
+						? gamePart(
+								advice.slots.flatMap((s) => (s.host ? [s.host] : [])),
+								{ zone: memberZone(), zoned: false },
+								Date.now(),
+								'full'
+							)
+						: null,
 					sync.moves_read ? null : movesBasis(sync.host)
 				].filter((line): line is string => line !== null)
 			: []
