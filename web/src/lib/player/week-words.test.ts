@@ -252,6 +252,7 @@ void test('the Monday after his Sunday game: kicked off, no expected score, weat
 	const { cell } = final;
 	assert.ok(cell);
 	assert.equal(cell.when, 'Final');
+	assert.equal(tile(final.tiles, 'delta').caption, CARD.gameFinal);
 	assert.equal(cell.expected, null);
 	// Final the hour after, his stats not in yet: the basis says they follow.
 	assert.ok((final.basis[1] ?? '').includes(KICKED_OFF_PART));

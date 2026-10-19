@@ -3,7 +3,7 @@
  * prints; live.ts reads the answer and builds the links. */
 import type { components } from '#lib/api/types.ts';
 import { memberZone, weekdayTime } from '#lib/format/clock.ts';
-import { toBePlayed } from '#lib/format/game-facts.ts';
+import { gameStateOf, toBePlayed } from '#lib/format/game-facts.ts';
 import { weekHead } from '#lib/format/figure-words.ts';
 import {
 	avgLastPart,
@@ -258,7 +258,11 @@ function deltaTile(week: PlayerWeek, zone: string, now: number): CardTile {
 		key: 'delta',
 		label: CARD.delta,
 		value: ahead ? deltaWord(week.line.projection_delta) : NONE,
-		caption: ahead ? deltaCaption(week, zone) : CARD.kickedOff,
+		caption: ahead
+			? deltaCaption(week, zone)
+			: gameStateOf(week.line.facts, now) === 'final'
+				? CARD.gameFinal
+				: CARD.kickedOff,
 		tone: 'quiet'
 	};
 }
