@@ -1,7 +1,7 @@
 {
 	"week": 6,
-	"basis": "A pickup starts for you this week on the Proj shown and its Gain is not below zero on our rest-of-season order. Its drop is the one you lose least by.",
-	"basis_note": "Points over replacement are for a 12-team league with 1 QB, 2 RB, 3 WR, 1 TE and two flex spots. Points so far leave out two-point conversions, missed field goals, missed extra points, fumble recoveries and safeties, which our stats lack.",
+	"basis": "A pickup starts for you this week on Proj and keeps your Gain at zero or better. Its drop costs you least.",
+	"basis_note": "Avg and Last leave out five of your scoring rules our stats lack.",
 	"order_basis": "rest_of_season",
 	"refreshed": "2026-10-14T19:05:37.917Z",
 	"read_at": "2026-10-14T19:05:38.329Z",
@@ -1952,7 +1952,7 @@
 		"writes_on": false,
 		"reason": "Sleeper does not take claims from here, so add him on its waiver page."
 	},
-	"season_basis": "Rest of season is his points a game on our rest-of-season projection from week 6, byes out. Gain is the change in your lineup's points over replacement a week on our rest-of-season order, averaged over its 12 weeks.",
+	"season_basis": "Gain is the change in your lineup's points over replacement, a week, averaged over the 12 weeks left on our rest-of-season order. A game is his rest-of-season points over the games his club has left.",
 	"pickups": [
 		{
 			"add": {
@@ -3048,5 +3048,6 @@
 	"projection_read_at": "2026-10-17T02:00:00.000Z",
 	"projection_previous_read_at": "2026-10-16T02:00:00.000Z",
 	"projection_scoring": { "format": "ppr", "league_own": false },
-	"pickups_proj": 108.1
+	"pickups_proj": 108.1,
+	"basis_note_link": "Which five"
 }

@@ -28,17 +28,19 @@
 import { readFile, readdir, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { format as prettierFormat, resolveConfig } from 'prettier';
-import { listWords } from '../../src/lib/format/list.ts';
 import { FIXTURE_IDS } from './ids.ts';
 import {
-	basisTail as basisTailOf,
 	CHECK_BASIS,
 	LAST_FANTASY_WEEK,
+	LINEUP_BASIS,
+	PER_GAME_BASIS,
 	tradesBasis,
+	uncountedOf,
+	WAIVERS_BASIS,
+	waiverSeasonBasis,
 	weeksCovered as weeksCoveredFrom
 } from './week.ts';
 import { leagueFields } from './league-fields.ts';
-import { shapeSentence } from './league-shape.ts';
 import type { LeaguePlayer, LeagueSync, MatchupSide } from '../../src/lib/league/api.ts';
 import type {
 	AdviceHead,
@@ -199,30 +201,25 @@ const week = state.week;
 /** The weeks the rest-of-season order covers from the league's week: a week's figure is over them. */
 const weeksCovered = weeksCoveredFrom(week);
 
-const rosFromWeek = format.rosFromWeek;
-const basisTail = basisTailOf(weeksCovered, rosFromWeek);
 
-/** The rest of the basis, under the rows, in the API's words (words.go BasisNote): the league's
- * shape and the league's rules the stat lines leave out. */
-const basisNote = ((): string => {
+/** The league's rules the stat lines leave out (words.go UncountedOf), counted under the rows and
+ * listed on the league's Settings. */
+const uncountedRules = ((): string[] => {
 	const s = league.scoring_settings;
 	const scores = (...keys: string[]): boolean =>
 		Object.entries(s).some(
 			([k, v]) => v !== 0 && keys.some((key) => k === key || k.startsWith(`${key}_`))
 		);
-	const left = [
+	return [
 		scores('pass_2pt', 'rush_2pt', 'rec_2pt') ? 'two-point conversions' : null,
 		scores('fgmiss') ? 'missed field goals' : null,
 		scores('xpmiss') ? 'missed extra points' : null,
-		scores('kr_td', 'pr_td') ? 'return touchdowns' : null,
+		scores('kr_td', 'pr_td') ? "a player's kick and punt return touchdowns" : null,
 		scores('fum_rec') ? 'fumble recoveries' : null,
 		scores('safe') ? 'safeties' : null
 	].filter((w): w is string => w !== null);
-	const por = shapeSentence({ rosterPositions: league.roster_positions, teams: rosters.length });
-	return left.length === 0
-		? por
-		: `${por} Points so far leave out ${listWords(left)}, which our stats lack.`;
 })();
+const uncounted = uncountedOf(uncountedRules);
 
 /** "amon-ra st brown": a name as both sources can agree on it. */
 function key(name: string): string {
@@ -516,10 +513,8 @@ async function lineup(): Promise<LineupAdvice> {
 		// One bench player tagged Hold, as a member would on a sheet, so the screen draws a held row.
 		.map((l) => (l.player.name === HELD_ON_SHEET ? { ...l, held: true } : l));
 	return {
-		...head(
-			// project.ts words it as the API does now (Lane 66d).
-			`Ranked by our rest-of-season order and this week's designations. We do not project a week's points. ${basisTail}`
-		),
+		...head(LINEUP_BASIS),
+		uncounted_rules: uncountedRules,
 		projection_read_at: null,
 		projection_previous_read_at: null,
 		projection_scoring: { format: 'ppr', league_own: false },
@@ -581,7 +576,7 @@ function head(basis: string): AdviceHead {
 	return {
 		week,
 		basis,
-		basis_note: basisNote,
+		...uncounted,
 		order_basis: 'rest_of_season',
 		refreshed,
 		read_at: manifest.runAt
@@ -629,9 +624,7 @@ async function waivers(held: ReadonlySet<string>): Promise<WaiverAdvice> {
 	const gaining = rows.filter((r) => r.gain > 0).sort((a, b) => b.gain - a.gain);
 	const rest = rows.filter((r) => r.gain <= 0).slice(0, WAIVER_ROWS_UNDER_RULE);
 	return {
-		...head(
-			`Ranked by the gain to your lineup on our rest-of-season order. A drop is the player it costs you least to lose. ${basisTail}`
-		),
+		...head(WAIVERS_BASIS),
 		rows: [...gaining, ...rest],
 		host_waivers_url: `https://sleeper.com/leagues/${league.league_id}/players`,
 		host_note: null,
@@ -644,7 +637,7 @@ async function waivers(held: ReadonlySet<string>): Promise<WaiverAdvice> {
 			reason: 'Sleeper does not take claims from here, so add him on its waiver page.'
 		},
 		// Lane 66f: the pickup table's own fields, stamped by project.ts with the projection.
-		season_basis: '',
+		season_basis: waiverSeasonBasis(weeksCovered),
 		lineup_proj: null,
 		pickups_proj: null,
 		pickups: [],
@@ -798,7 +791,8 @@ function trades(): TradeAdvice {
 					: null
 		}));
 	return {
-		...head(tradesBasis(weeksCovered, rosFromWeek)),
+		...head(tradesBasis(weeksCovered)),
+		per_game_basis: PER_GAME_BASIS,
 		check_basis: CHECK_BASIS,
 		teams,
 		roster: rosterByPosition(myLines),

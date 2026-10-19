@@ -42,7 +42,7 @@ export type WaiverPosition = NonNullable<
 /** The head every answer carries: the week, the honesty line, the order and its stamps. */
 export type AdviceHead = Pick<
 	LineupAdvice,
-	'week' | 'basis' | 'basis_note' | 'order_basis' | 'refreshed' | 'read_at'
+	'week' | 'basis' | 'basis_note' | 'basis_note_link' | 'order_basis' | 'refreshed' | 'read_at'
 >;
 
 const client = apiClient(PUBLIC_API_URL);

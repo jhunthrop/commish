@@ -13,22 +13,52 @@ export const LAST_FANTASY_WEEK = 17;
 /** The weeks the rest-of-season order covers from a week: a week's figure is over them. */
 export const weeksCovered = (week: number): number => Math.max(1, LAST_FANTASY_WEEK - week + 1);
 
-/** What every basis ends with, in the API's words (words.go porWords, pergame.go
- * RestOfSeasonBasis): what Gain is and what a week's figure is, then what Rest of season is. */
-export function basisTail(weeks: number, fromWeek: number): string {
-	return `Gain is the change in a lineup's points over replacement a week, points above what a free pickup at each position gives you: the rest of the season on our rest-of-season order, averaged over its ${String(weeks)} weeks, not a projection of any one week. Rest of season is his points a game on our rest-of-season projection from week ${String(fromWeek)}, byes out.`;
+/** What a Gain is, in the API's words (words.go gainWords). */
+export function gainWords(whose: string, weeks: number): string {
+	const span = weeks === 1 ? 'one week' : `${String(weeks)} weeks`;
+	return `Gain is the change in ${whose} points over replacement, a week, averaged over the ${span} left on our rest-of-season order.`;
 }
 
 /** The finder's basis in the API's words (words.go TradesBasis), the one copy build.ts and
  * project.ts both write. */
-export function tradesBasis(weeks: number, fromWeek: number): string {
-	return `Trades where both lineups gain on our rest-of-season order. Each team's best trade, yours first, among those they gain at least 0.5 a week from, then the close calls for them. The other team decides. ${basisTail(weeks, fromWeek)}`;
+export function tradesBasis(weeks: number): string {
+	return `Each team's best trade both lineups gain by, yours first. The other team decides. ${gainWords("a lineup's", weeks)}`;
 }
 
-/** The builder's basis in the API's words (words.go TradeCheckBasis): it opens under the Trades basis,
- * which says what Gain and Rest of season are (review 66u finding 4). */
+/** The figure a game in the API's words (pergame.go PerGameBasis). */
+export const PER_GAME_BASIS = 'A game is his rest-of-season points over the games his club has left.';
+
+/** The Waivers screen's Gain then the figure a game (words.go WaiverSeasonBasis, withPerGame). */
+export function waiverSeasonBasis(weeks: number): string {
+	return `${gainWords("your lineup's", weeks)} ${PER_GAME_BASIS}`;
+}
+
+/** The builder's own line in the API's words (words.go TradeCheckBasis). */
 export const CHECK_BASIS =
-	'What each lineup gains or loses on our rest-of-season order. The other team decides. Gain and Rest of season are as the Trades basis says.';
+	'Pick one or two of yours and one or two of theirs. The scoreboard is each lineup before and after.';
+
+/** The Lineup's advice rule (words.go LineupBasis). */
+export const LINEUP_BASIS =
+	'We start the highest Proj at each slot after designations and byes, our order breaking ties and standing in for a missing Proj.';
+
+/** The Waivers pickup rule (words.go WaiversBasis). */
+export const WAIVERS_BASIS =
+	'A pickup starts for you this week on Proj and keeps your Gain at zero or better. Its drop costs you least.';
+
+const COUNT_WORDS = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'];
+
+/** The league's uncounted rules in the API's words (words.go UncountedOf). */
+export function uncountedOf(rules: readonly string[]): {
+	basis_note: string;
+	basis_note_link: string;
+} {
+	if (rules.length === 0) return { basis_note: '', basis_note_link: '' };
+	const n = COUNT_WORDS[rules.length] ?? String(rules.length);
+	return {
+		basis_note: `Avg and Last leave out ${n} of your scoring rules our stats lack.`,
+		basis_note_link: `Which ${n}`
+	};
+}
 
 /** A figure to the tenth a page prints. */
 export const tenth = (value: number): number => Math.round(value * TENTH) / TENTH;

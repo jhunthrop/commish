@@ -1,8 +1,8 @@
 {
 	"week": 6,
-	"basis": "Trades where both lineups gain on our rest-of-season order. Each team's best trade, yours first, among those they gain at least 0.5 a week from, then the close calls for them. The other team decides. Gain is the change in a lineup's points over replacement a week, points above what a free pickup at each position gives you: the rest of the season on our rest-of-season order, averaged over its 12 weeks, not a projection of any one week. Rest of season is his points a game on our rest-of-season projection from week 6, byes out.",
-	"check_basis": "What each lineup gains or loses on our rest-of-season order. The other team decides. Gain and Rest of season are as the Trades basis says.",
-	"basis_note": "Points over replacement are for a 12-team league with 1 QB, 2 RB, 3 WR, 1 TE and two flex spots. Points so far leave out two-point conversions, missed field goals, missed extra points, fumble recoveries and safeties, which our stats lack.",
+	"basis": "Each team's best trade both lineups gain by, yours first. The other team decides. Gain is the change in a lineup's points over replacement, a week, averaged over the 12 weeks left on our rest-of-season order.",
+	"check_basis": "Pick one or two of yours and one or two of theirs. The scoreboard is each lineup before and after.",
+	"basis_note": "Avg and Last leave out five of your scoring rules our stats lack.",
 	"order_basis": "rest_of_season",
 	"refreshed": "2026-10-14T19:05:37.917Z",
 	"read_at": "2026-10-14T19:05:38.329Z",
@@ -13851,5 +13851,7 @@
 	},
 	"projection_read_at": "2026-10-17T02:00:00.000Z",
 	"projection_scoring": { "format": "ppr", "league_own": false },
-	"player_points": true
+	"player_points": true,
+	"per_game_basis": "A game is his rest-of-season points over the games his club has left.",
+	"basis_note_link": "Which five"
 }

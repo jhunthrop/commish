@@ -45,6 +45,11 @@ import {
 	accepts,
 	better,
 	CHECK_BASIS,
+	LINEUP_BASIS,
+	PER_GAME_BASIS,
+	uncountedOf,
+	WAIVERS_BASIS,
+	waiverSeasonBasis,
 	tradesBasis,
 	lineupProj,
 	printedProj,
@@ -326,14 +331,6 @@ function advise(advice: LineupAdvice): LineupAdvice {
 	};
 }
 
-/** The lineup's basis as the API now words it (words.go LineupBasis, Lane 66e). */
-const LINEUP_BASIS =
-	"We start the highest Proj at each slot, after this week's designations and byes. A player who cannot play this week never starts. Our rest-of-season order breaks ties and stands in where a player has no Proj.";
-
-function lineupNote(note: string): string {
-	return note.replace(/^Points over replacement are for [^.]*\. ?/, '');
-}
-
 const stampedLineup: LineupAdvice = {
 	// A lineup.json from before Lane 66e has no reserve.
 	...advise(
@@ -353,7 +350,7 @@ const stampedLineup: LineupAdvice = {
 		writes_on: false,
 		reason: 'Sleeper does not take lineups from here, so copy the lineup there.'
 	},
-	basis_note: lineupNote(lineup.basis_note),
+	...uncountedOf(lineup.uncounted_rules),
 	projection_read_at: PROJECTION_READ_AT,
 	projection_scoring: PROJECTION_SCORING,
 	// Sleeper gives each player's points; no game has kicked off in the recorded week.
@@ -552,10 +549,9 @@ function pickupTable(advice: WaiverAdvice): WaiverAdvice {
 	}
 	return {
 		...advice,
-		basis:
-			'A pickup starts for you this week on the Proj shown and its Gain is not below zero on our rest-of-season order. Its drop is the one you lose least by.',
-		season_basis:
-			"Rest of season is his points a game on our rest-of-season projection from week 6, byes out. Gain is the change in your lineup's points over replacement a week on our rest-of-season order, averaged over its 12 weeks.",
+		basis: WAIVERS_BASIS,
+		season_basis: waiverSeasonBasis(weeksCovered(advice.week)),
+		...uncountedOf(lineup.uncounted_rules),
 		rows,
 		pickups,
 		roster,
@@ -832,7 +828,9 @@ function withWeek(finder: TradeAdvice): TradeAdvice {
 		})),
 		// The finder's basis in the API's words, stamped whole from the one copy (week.ts tradesBasis) so a
 		// rerun on an older answer says it the same way.
-		basis: tradesBasis(weeksCovered(finder.week), finder.week),
+		basis: tradesBasis(weeksCovered(finder.week)),
+		per_game_basis: PER_GAME_BASIS,
+		...uncountedOf(lineup.uncounted_rules),
 		check_basis: CHECK_BASIS,
 		moves: {
 			propose: 'unavailable',
