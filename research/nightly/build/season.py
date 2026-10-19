@@ -164,6 +164,14 @@ def schedule_json(
     }
 
 
+def rest_from_words(rest: "RestOfSeason") -> str:
+    """The week the rest of season counts from, said once (Lane 86, the API's restFromWords): "from week
+    7", or while a game of it is played "from week 6's games still to play"."""
+    if rest.partial:
+        return f"from week {rest.from_week}'s games still to play"
+    return f"from week {rest.from_week}"
+
+
 def format_json(run_format: RunFormat, season: int, rest: "RestOfSeason | None" = None) -> Json:
     """A format as the manifest lists it, with the basis its board's lead prints, phrase by phrase. In
     season (`rest`), the rest-of-season window and the refresh, as additive fields and in the basis."""
@@ -171,7 +179,7 @@ def format_json(run_format: RunFormat, season: int, rest: "RestOfSeason | None" 
         [f"{run_format.scoring_words}, full {season} season", "projected before the season's first kickoff"]
         if rest is None
         else [
-            f"{run_format.scoring_words}, rest of the {season} season from week {rest.from_week}, "
+            f"{run_format.scoring_words}, rest of the {season} season {rest_from_words(rest)}, "
             f"refreshed {month_day(rest.refreshed_at)}"
         ]
     )
@@ -187,7 +195,13 @@ def format_json(run_format: RunFormat, season: int, rest: "RestOfSeason | None" 
         "marketOrder": run_format.adp.source,
     }
     if rest is not None:
-        out |= {"rosFromWeek": rest.from_week, "rosThroughWeek": rest.through, "refreshedAt": iso(rest.refreshed_at)}
+        out |= {
+            "rosFromWeek": rest.from_week,
+            # A game of the first week is played at the run: the board counts that week's games still to play.
+            "rosFromWeekPartial": rest.partial,
+            "rosThroughWeek": rest.through,
+            "refreshedAt": iso(rest.refreshed_at),
+        }
     return out
 
 
@@ -198,6 +212,8 @@ class RestOfSeason(Protocol):
     def through(self) -> int: ...
     @property
     def refreshed_at(self) -> datetime: ...
+    @property
+    def partial(self) -> bool: ...
 
 
 _MONTHS: Final = (

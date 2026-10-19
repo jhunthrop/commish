@@ -104,7 +104,7 @@ def test_an_in_season_row_says_the_week_his_rest_of_season_starts_from() -> None
     """Lane 86: an in-season row carries his club's first week still to play (null with none left), and
     a preseason row carries no such field."""
     rows = [replace(_row("p1", 120.0, 0.0), from_week=7), _row("p2", 90.0, 0.0)]
-    entries = [replace(e, in_season=True) for e in board_entries(rows, PPR)]
+    entries = tuple(replace(e, in_season=True) for e in board_entries(rows, PPR))
     board = FormatBoard(PPR, StoredBoard(PPR.board_source, AS_OF, "research@test", None), entries)
     people = {p.id: p for p in identities([board])}
     written = {r["id"]: r for r in board_json(board, people, {})["rows"]}

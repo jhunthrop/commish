@@ -70,11 +70,14 @@ class RosSetup:
 @dataclass(frozen=True, slots=True)
 class RosBasis:
     """What the in-season boards rank: the rest of the season from `from_week`, lines through
-    `through`, refreshed at the run's instant."""
+    `through`, refreshed at the run's instant. `partial` is set while a game of `from_week` has kicked
+    off at the run (Lane 86): its clubs count from their next week, and the words say the board counts
+    that week's games still to play."""
 
     from_week: int
     through: int
     refreshed_at: datetime
+    partial: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -276,4 +279,5 @@ def ros_boards(
         f"{window.through}, model {MODEL_NAME}, {len(extra)} players off the preseason board ranked"
         + (f"; {kept}" if kept else "")
     )
-    return RosResult(out, RosBasis(window.from_week, window.through, instant), status, ranked)
+    partial = any(state != "upcoming" for (_, week), state in states.items() if week == window.from_week)
+    return RosResult(out, RosBasis(window.from_week, window.through, instant, partial), status, ranked)
