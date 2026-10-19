@@ -209,14 +209,18 @@ def _stored(sheet_week: int = 6, **changes: object) -> StoredWeekRead:
     return replace(row, **changes)  # type: ignore[arg-type]
 
 
-def test_the_cadence_writes_a_first_read_a_status_change_and_a_projection_move_past_a_point() -> None:
+def test_the_cadence_writes_a_first_read_a_status_change_and_a_projection_the_card_prints_otherwise() -> None:
+    """Lane 66v: a read quotes the card's projection, so any move of the printed tenth makes it due (Josh
+    Allen's read said 26.6 a day after his card moved to 26.4, under the old one-point threshold)."""
     sheet = questionable()
     assert due_reason(sheet, None, _NOW) == FIRST
     assert due_reason(sheet, _stored(sheet_week=5), _NOW) == FIRST
     assert due_reason(sheet, _stored(), _NOW) is None
     assert due_reason(replace(sheet, status=Status("out", REPORT)), _stored(), _NOW) == STATUS_CHANGED
-    assert due_reason(sheet, _stored(projection_points=16.3), _NOW) == PROJECTION_MOVED
-    assert due_reason(sheet, _stored(projection_points=16.2), _NOW) is None
+    assert due_reason(sheet, _stored(projection_points=15.4), _NOW) == PROJECTION_MOVED
+    assert due_reason(sheet, _stored(projection_points=15.1), _NOW) == PROJECTION_MOVED
+    # A row kept before the card's tenth was stored reads as the tenth it printed.
+    assert due_reason(sheet, _stored(projection_points=15.24), _NOW) is None
     assert due_reason(sheet, _stored(source="facts"), _NOW) == UNWRITTEN
 
 
