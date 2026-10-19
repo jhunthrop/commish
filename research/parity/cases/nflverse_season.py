@@ -120,10 +120,10 @@ CASES: tuple[Case, ...] = (
     ),
     Case(
         name="nflverse-season-2012",
-        summary="a season below the snap-count floor: stat lines and team edges dated from the schedule "
-        "(no line continuity: there are no snap counts to take it from)",
+        summary="a season below the snap-count floor: stat lines and team edges dated from the schedule, "
+        "and its game results (no line continuity: there are no snap counts to take it from)",
         fixture_sets=("nflverse-universe", "nflverse-schedule", "nflverse-season-2012"),
-        tables=SEASON_TABLES[:3],
+        tables=SEASON_TABLES,
         run_python=SeasonRunner(2012),
         now=NOW,
         recordings=(_season_recording(2012, None, TeamFilter(("team",))),),

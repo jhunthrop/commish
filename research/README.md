@@ -259,8 +259,10 @@ provider, a large CSV narrowed by rows kept byte for byte with the filter stated
 
 **Ingests:** `parity: 31 ingest case(s) in 76 passes, 31 matching; 1382755 rows compared per case, 943239 deduplicated; 0 differences`
 
-The three `nflverse-season-*` cases were re-run on 2026-10-19 (Lane 78) once the stats step wrote each
-season's game results with its lines: 3 matching in 8 passes, 0 differences; their rows below are that run's.
+The headline above is the 2026-10-12 full run and predates Lane 78. The three `nflverse-season-*` cases
+were re-run on 2026-10-19 (Lane 78) once the stats step wrote each season's game results with its lines,
+2012 now comparing team_week_observations too: 3 matching in 8 passes, 0 differences; their rows below are
+that run's, as are the `crosswalk` rows.
 The `crosswalk` case declares one departure (Lane 78, `parity.diff.Departure`): the build writes provider
 player 4569682 as nflverse spells him, "Audric Estimé", where the oracle keeps the provider's "Audric Estime".
 
@@ -278,8 +280,8 @@ total counts each tested table per pass and each prerequisite table once, at its
 | nflverse-season-2024 | rerun | players 24,853 (setup); player_week_observations 151,240; player_week_teams 7,551; team_week_observations 1,600 | 0 |
 | nflverse-season-2024 | prior | players 58 (setup); player_week_observations 898; player_week_teams 44; team_week_observations 549 | 0 |
 | nflverse-season-2024 | later | players 24,853 (setup); player_week_observations 151,590; player_week_teams 7,551; team_week_observations 1,600 | 0 |
-| nflverse-season-2012 | first | players 24,853 (setup); player_week_observations 10,696; player_week_teams 764 | 0 |
-| nflverse-season-2012 | rerun | players 24,853 (setup); player_week_observations 10,696; player_week_teams 764 | 0 |
+| nflverse-season-2012 | first | players 24,853 (setup); player_week_observations 10,696; player_week_teams 764; team_week_observations 512 | 0 |
+| nflverse-season-2012 | rerun | players 24,853 (setup); player_week_observations 10,696; player_week_teams 764; team_week_observations 512 | 0 |
 | nflverse-season-2025 | first | players 24,853 (setup); player_week_observations 1,954; player_week_teams 977; team_week_observations 676 | 0 |
 | nflverse-season-2025 | rerun | players 24,853 (setup); player_week_observations 1,954; player_week_teams 977; team_week_observations 676 | 0 |
 | nflverse-schedule | first | team_week_observations 20,272 | 0 |
