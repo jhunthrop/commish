@@ -198,10 +198,7 @@ void test('the basis says each column once: the order, Wk 6, Opp rank, the rules
 	const inLeague = basisText(parts);
 	assert.match(inLeague, /, PPR nearest your rules, read /);
 	assert.match(inLeague, /Opp rank is points allowed to his position, 1st fewest\./);
-	assert.match(
-		inLeague,
-		/Avg and Last miss five of your rules our stats lack\. Which five\./
-	);
+	assert.match(inLeague, /Avg and Last miss five of your rules our stats lack\. Which five\./);
 	assert.match(inLeague, /Roster is Sleeper's, read /);
 	assert.equal(parts.find((p) => p.href !== undefined)?.href, LEAGUE.rulesHref);
 	const phone = parts.filter((p) => p.phone).map((p) => p.text);

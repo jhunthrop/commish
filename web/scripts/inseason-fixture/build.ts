@@ -201,7 +201,6 @@ const week = state.week;
 /** The weeks the rest-of-season order covers from the league's week: a week's figure is over them. */
 const weeksCovered = weeksCoveredFrom(week);
 
-
 /** The league's rules the stat lines leave out (words.go UncountedOf), counted under the rows and
  * listed on the league's Settings. */
 const uncountedRules = ((): string[] => {

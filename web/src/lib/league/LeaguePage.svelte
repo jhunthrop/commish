@@ -4,7 +4,8 @@
 	import { takeHeld } from '#lib/context/held.ts';
 	import { scoresSentence } from '#lib/context/note-words.ts';
 	import { lazySheet } from '#lib/site/lazy-sheet.svelte.ts';
-	import { links, UNCOUNTED_ANCHOR } from '#lib/site/links.ts';
+	import { links } from '#lib/site/links.ts';
+	import { UNCOUNTED_ANCHOR } from './rules-link.ts';
 	import DisplayTitle from '#lib/ui/DisplayTitle.svelte';
 	import EmptyState from '#lib/ui/EmptyState.svelte';
 	import Panel from '#lib/ui/Panel.svelte';
