@@ -78,8 +78,9 @@
 	const many = $derived(hasFeature(siteContext.features, 'many_leagues'));
 	const last = $derived(menuLast(siteContext.leagues.length, many));
 	const league = $derived(siteContext.league);
-	/** Each league's phase beside its name, only when the account's leagues differ. */
-	const phases = $derived(phaseWords(siteContext.leagues));
+	/** Each league's phase beside its name, only when the account's leagues differ, said at the moment
+	 * the leagues are read (the menu's one clock). */
+	const phases = $derived(phaseWords(siteContext.leagues, new Date()));
 	/** The pressed format: the chosen format with no league, PPR before any choice. */
 	const noLeagueFormat = $derived(
 		league === null ? (siteContext.format ?? DEFAULT_CONTEXT_FORMAT) : null

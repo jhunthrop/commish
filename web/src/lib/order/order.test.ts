@@ -1,6 +1,7 @@
 // The Rest of season and Players screens' words and rows (Lane 66j and its fix round 1): run with `npm test`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { FIXTURE_WEEK_CLOCK } from '../../../scripts/inseason-fixture/clock.ts';
 import { bannedPattern } from '#lib/format/copy-guard.ts';
 import type { PlayerLine, WeekFacts } from '../league/inseason/api.ts';
 import type { OrderAdvice, OrderRow } from './api.ts';
@@ -21,6 +22,8 @@ import {
 
 const ZONE = 'America/Chicago';
 const READ = '2026-10-17T02:00:00.000Z';
+/** The fixture week's clock, Saturday noon Central: every Sunday game is still to be played. */
+const NOW = Date.parse(FIXTURE_WEEK_CLOCK);
 
 const facts: WeekFacts = {
 	week: 6,
@@ -110,7 +113,9 @@ void test("a Thursday game the API's facts count as played reads Final with its 
 		row('Smith-Njigba', {
 			line: line('Smith-Njigba', 'WR', { facts: thursday, season_avg: 27.5, last_points: 25.4 })
 		}),
-		ZONE
+		ZONE,
+		true,
+		NOW
 	);
 	assert.deepEqual(view.box.game, { where: 'at DEN', when: 'Final' });
 	assert.equal(view.box.evidence.avg, 27.5);
@@ -118,7 +123,7 @@ void test("a Thursday game the API's facts count as played reads Final with its 
 });
 
 void test('a row prints the API figures as they come', () => {
-	const view = orderView(row('Swift'), ZONE);
+	const view = orderView(row('Swift'), ZONE, true, NOW);
 	assert.equal(view.key, 'b-Swift');
 	assert.equal(view.box.key, 'b-Swift');
 	assert.equal(view.rank, 4);
@@ -143,13 +148,13 @@ void test('a roster mark reads Yours, Free or the holding team, never the platfo
 });
 
 void test('a verb lands on him through the link the player card builds (review 66j H6, N2)', () => {
-	const add = orderView(row('B', { move: 'add' }), ZONE);
-	const trade = orderView(row('C', { move: 'trade' }), ZONE);
+	const add = orderView(row('B', { move: 'add' }), ZONE, true, NOW);
+	const trade = orderView(row('C', { move: 'trade' }), ZONE, true, NOW);
 	// Waivers reads him by name and narrows to his position, as from the player card.
 	assert.equal(moveHref(add, 'L1', screenHref), '/league/L1/waivers?player=b-B&position=RB');
 	assert.equal(moveHref(trade, 'L1', screenHref), '/league/L1/trades?player=b-C');
 	assert.equal(moveHref(trade, null, screenHref), null);
-	assert.equal(moveHref(orderView(row('D'), ZONE), 'L1', screenHref), null);
+	assert.equal(moveHref(orderView(row('D'), ZONE, true, NOW), 'L1', screenHref), null);
 });
 
 void test("the add verb is the Waivers screen's own rule: claims open and the platform names him (review 66j N3)", () => {
@@ -164,10 +169,12 @@ void test("the add verb is the Waivers screen's own rule: claims open and the pl
 	const base = line('B', 'RB');
 	const named = orderView(
 		row('B', { move: 'add', line: { ...base, player: { ...base.player, host_id: '4262921' } } }),
-		ZONE
+		ZONE,
+		true,
+		NOW
 	);
-	const unnamed = orderView(row('E', { move: 'add' }), ZONE);
-	const trade = orderView(row('C', { move: 'trade' }), ZONE);
+	const unnamed = orderView(row('E', { move: 'add' }), ZONE, true, NOW);
+	const trade = orderView(row('C', { move: 'trade' }), ZONE, true, NOW);
 	assert.equal(moveWords(named, closed, 'sleeper'), 'Open Sleeper waivers');
 	assert.equal(moveWords(named, open, 'espn'), 'Add on ESPN');
 	// No ESPN id for him: Waivers keeps the platform's page, and so does the order.
@@ -178,7 +185,7 @@ void test("the add verb is the Waivers screen's own rule: claims open and the pl
 
 void test('the basis says each column once: the order, Wk 6, Opp rank, the rules our stats lack, then Game and Roster at a desk (Lane 66t)', () => {
 	const LEAGUE = { host: 'sleeper' as const, rulesHref: '/league/1#uncounted' };
-	const signedOut = basisText(orderBasis(advice([row('A')], { basis_note: '' }), null, ZONE));
+	const signedOut = basisText(orderBasis(advice([row('A')], { basis_note: '' }), null, ZONE, NOW));
 	assert.ok(signedOut.startsWith('Our rest-of-season order from week 7.'));
 	// The order holds the week's projection beside the season's, so its head names the API's week.
 	assert.match(
@@ -193,7 +200,8 @@ void test('the basis says each column once: the order, Wk 6, Opp rank, the rules
 			basis_note_link: 'Which five'
 		}),
 		LEAGUE,
-		ZONE
+		ZONE,
+		NOW
 	);
 	const inLeague = basisText(parts);
 	assert.match(inLeague, /, PPR nearest your rules, read /);

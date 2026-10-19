@@ -35,5 +35,5 @@ void test('the playoffs run to the end of Super Bowl day, five weeks on, then th
 });
 
 void test('a run with no kickoffs fails the build, naming why', () => {
-	assert.throws(() => siteSeason(new Date(), []), /no kickoffs/);
+	assert.throws(() => siteSeason(new Date('2026-10-17T17:00:00.000Z'), []), /no kickoffs/);
 });

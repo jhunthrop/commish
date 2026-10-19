@@ -5,12 +5,12 @@
 
 	/** What a box score's numbers are, said once under the boxes as one paragraph (Lane 66t): the
 	 * columns the screen draws, each once (basis.ts boxBasisParts). The in-season page names the zone
-	 * in its head, so no time here repeats it. */
-	type Props = BoxBasisFacts;
+	 * in its head, so no time here repeats it. now is the page's clock, in ms. */
+	type Props = BoxBasisFacts & { now: number };
 
-	let props: Props = $props();
+	let { now, ...facts }: Props = $props();
 
-	const parts = $derived(boxBasisParts(props, { zone: memberZone(), zoned: false }, Date.now()));
+	const parts = $derived(boxBasisParts(facts, { zone: memberZone(), zoned: false }, now));
 </script>
 
 <BasisBlock {parts} />

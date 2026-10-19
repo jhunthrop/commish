@@ -60,6 +60,8 @@
 		copy?: (text: string) => Promise<void>;
 		/** The league's Settings at the scoring rules our stats lack. */
 		rulesHref: string;
+		/** The instant the answer was read, in ms: the page's clock the rows and the basis draw at. */
+		now: number;
 	}
 
 	let {
@@ -69,7 +71,8 @@
 		narrow,
 		check,
 		copy = (text) => navigator.clipboard.writeText(text),
-		rulesHref
+		rulesHref,
+		now: pageNow
 	}: Props = $props();
 
 	/** The builder's id, for the verbs that open it. */
@@ -100,6 +103,10 @@
 	/** The player the trades are narrowed to, by board id; null for every trade. */
 	let player = $state<string | null>(null);
 	let narrowed = $state<TradeAdvice | null>(null);
+	/** When the narrowed answer was read, in ms: a narrowed read is a read of its own, so its rows
+	 * and basis draw at its instant, the page's clock otherwise (review 77 finding 1). */
+	let narrowedAt = $state<number | null>(null);
+	const now = $derived(narrowed !== null && narrowedAt !== null ? narrowedAt : pageNow);
 	let reading = $state(false);
 	let problem = $state<string | null>(null);
 	/** Every trade, or each team's best. */
@@ -156,7 +163,7 @@
 			building !== null ? 'builder' : anyOpen ? 'trade' : 'none',
 			{ rules: rulesHref, record: links.record() },
 			{ zone: memberZone(), zoned: false },
-			Date.now()
+			now
 		)
 	);
 	const everyCount = $derived(advice.teams.reduce((n, t) => n + t.trades.length, 0));
@@ -185,7 +192,10 @@
 		const outcome = await narrowing.choose(next?.startsWith('host:') ? null : next);
 		if (outcome.kind === 'overtaken') return;
 		reading = false;
-		if (outcome.kind === 'answer') narrowed = outcome.answer;
+		if (outcome.kind === 'answer') {
+			narrowedAt = Date.now();
+			narrowed = outcome.answer;
+		}
 		if (outcome.kind === 'failed') problem = outcome.sentence;
 	}
 
@@ -247,6 +257,7 @@
 					{check}
 					{propose}
 					onclose={() => (building = null)}
+					{now}
 				/>
 			{/key}
 		{/if}
@@ -286,6 +297,7 @@
 			build={buildFrom}
 			builderId={BUILDER_ID}
 			onopen={(open: boolean) => (anyOpen = open)}
+			{now}
 		/>
 	</div>
 	<BasisBlock parts={basis} id={BASIS_ID} />

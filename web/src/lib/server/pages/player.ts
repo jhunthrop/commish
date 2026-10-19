@@ -205,7 +205,7 @@ async function kickoffsOf(team: string): Promise<KickoffOf> {
 	return (week) => slate.games.find((game) => game.week === week)?.kickoff ?? null;
 }
 
-export async function playerPage(slug: string): Promise<PlayerPage> {
+export async function playerPage(slug: string, now: number): Promise<PlayerPage> {
 	const entry = await entryBySlug(slug);
 	const [loaded, run, sources, kickoffOf, underway, capture, clubList] = await Promise.all([
 		player(entry.id),
@@ -238,7 +238,7 @@ export async function playerPage(slug: string): Promise<PlayerPage> {
 			? {
 					status: listed,
 					capture: captureStamp(capture),
-					words: playerStatusWords(listed, builtSaying(capture, lead.format))
+					words: playerStatusWords(listed, builtSaying(capture, lead.format, now))
 				}
 			: null;
 	return {

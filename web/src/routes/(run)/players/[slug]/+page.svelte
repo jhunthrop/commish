@@ -106,7 +106,9 @@
 				opponents: page.card.opponents,
 				games: page.card.games,
 				rest,
-				screenHref: module.screenHrefFor(at)
+				screenHref: module.screenHrefFor(at),
+				// The page's clock: the card is drawn at the moment its week is read.
+				now: Date.now()
 			});
 			readFor = key;
 			failed = false;

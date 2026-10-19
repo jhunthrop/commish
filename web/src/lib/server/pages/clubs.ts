@@ -153,7 +153,7 @@ export async function clubEntries(): Promise<{ abbr: string }[]> {
 	return (await clubs()).map((club) => ({ abbr: club.abbr.toLowerCase() }));
 }
 
-export async function clubPage(abbr: string): Promise<ClubPage> {
+export async function clubPage(abbr: string, now: number): Promise<ClubPage> {
 	const format = await defaultFormat();
 	const [list, loaded, rows, played, capture, sources, run] = await Promise.all([
 		clubs(),
@@ -204,7 +204,7 @@ export async function clubPage(abbr: string): Promise<ClubPage> {
 		],
 		gap: showsGap,
 		underway: reach !== null,
-		...boardStatuses([...seasoned, ...market], capture, format)
+		...boardStatuses([...seasoned, ...market], capture, format, now)
 	};
 }
 

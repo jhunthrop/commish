@@ -739,9 +739,14 @@ async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> 
 		return;
 	}
 	// The fixture's own clock, for a shots script to check before it shoots (Lane 66x): the instant
-	// FIXTURE_CLOCK started it at, null on the real clock. No API route has this name.
+	// FIXTURE_CLOCK started it at, null on the real clock, and the instant it reads now, which a
+	// script starts its browser at so the two agree however long the API has run (Lane 77). No API
+	// route has this name.
 	if (url.pathname === '/fixture/clock') {
-		send(req, res, HTTP.ok, { clock: process.env[FIXTURE_CLOCK_VARIABLE] ?? null });
+		send(req, res, HTTP.ok, {
+			clock: process.env[FIXTURE_CLOCK_VARIABLE] ?? null,
+			now: new Date(now()).toISOString()
+		});
 		return;
 	}
 	// The week's games with their facts (Lane 66a), the recorded week whatever week is asked.

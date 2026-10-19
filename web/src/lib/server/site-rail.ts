@@ -8,7 +8,7 @@ import { schedule } from './run.ts';
 
 let rail: Promise<RailKey> | null = null;
 
-export function buildSiteRail(now: Date = new Date()): Promise<RailKey> {
+export function buildSiteRail(now: Date): Promise<RailKey> {
 	rail ??= schedule().then((slate) => {
 		const kickoffs = slate.slates.flatMap((club) => club.games.map((game) => game.kickoff));
 		return siteRailAt(now, kickoffs);

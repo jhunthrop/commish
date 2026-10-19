@@ -125,7 +125,9 @@
 	// The board is the run's own file, for the roster and the basis when no game is on: asked for on
 	// each league read once the phase is known not to be in play, loaded once for the format asked
 	// (board-once.ts). A failed load says so and is tried again with the next league read.
-	const boards = boardOnce((format) => loadBoard(format as LeagueSync['board_format'], byesNow));
+	const boards = boardOnce((format) =>
+		loadBoard(format as LeagueSync['board_format'], byesNow, now.getTime())
+	);
 	let byesNow: Readonly<Record<string, number>> = {};
 	$effect(() => {
 		if (playing || !sync) return;
@@ -189,7 +191,8 @@
 				(answer) => (advice = answer)
 			)
 		]);
-		const at = new Date().toISOString();
+		now = new Date();
+		const at = now.toISOString();
 		const [scored, lined] = read;
 		scoreRead = scored ? { at, stale: false } : { ...scoreRead, stale: true };
 		lineupRead = lined ? { at, stale: false } : { ...lineupRead, stale: true };
@@ -259,7 +262,7 @@
 	const platform = $derived(sync ? hostWords(sync.host) : '');
 	const bugs = $derived(sync && scoreboard ? bugsOf(scoreboard, sync) : []);
 	const rows = $derived(sync ? standingsRows(sync, projections(scoreboard)) : []);
-	const summary = $derived(advice ? lineupSummary(advice) : null);
+	const summary = $derived(advice ? lineupSummary(advice, memberZone(), now.getTime()) : null);
 	const moves = $derived(sync ? feedRows(sync) : []);
 	const lineupHref = $derived(tabHref('start', id));
 	/** What every number on the in-season page is, said once and at most five lines: the standings,
@@ -281,7 +284,7 @@
 						? gamePart(
 								advice.slots.flatMap((s) => (s.host ? [s.host] : [])),
 								{ zone: memberZone(), zoned: false },
-								Date.now(),
+								now.getTime(),
 								'full'
 							)
 						: null,

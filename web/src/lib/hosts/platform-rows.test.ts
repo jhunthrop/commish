@@ -108,3 +108,17 @@ void test('the copy guard: no em-dash, semicolon or platform word in the table',
 	const said = [...Object.values(PLATFORM_WORDS), ...rows.flatMap((r) => [r.state, r.line])];
 	for (const s of said) assert.doesNotMatch(s, bannedPattern(), s);
 });
+
+void test('a re-read after a disconnect draws at its own instant: a 30-minute-old read says so (review 77)', () => {
+	// The page opened at 10:00, ESPN was read at 10:30, FFPC was disconnected at 11:00 and the table
+	// read again. Said against the page's open the read would be "just now"; against the re-read it is
+	// its true age.
+	const opened = new Date('2026-10-17T15:00:00.000Z');
+	const reread = new Date('2026-10-17T16:00:00.000Z');
+	const hosts = {
+		enabled: ['espn' as const],
+		connections: [conn({ host: 'espn', last_read_at: '2026-10-17T15:30:00.000Z' })]
+	};
+	assert.equal(rowOf(platformRows(hosts, reread), 'espn').read, '30 minutes ago');
+	assert.equal(rowOf(platformRows(hosts, opened), 'espn').read, 'just now');
+});
