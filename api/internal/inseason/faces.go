@@ -3,10 +3,8 @@ package inseason
 import (
 	"regexp"
 	"strings"
-	"unicode"
 
-	"golang.org/x/text/unicode/norm"
-
+	"github.com/jhunthrop/commish/api/internal/accents"
 	"github.com/jhunthrop/commish/api/internal/boards"
 )
 
@@ -17,13 +15,7 @@ var notSlug = regexp.MustCompile(`[^a-z0-9]+`)
 // nightly/build/pages.py slug_of, the web's run-from-mock-data.ts):
 // accents dropped, lower case, words joined by hyphens.
 func slugOf(name string) string {
-	var plain strings.Builder
-	for _, r := range norm.NFD.String(name) {
-		if !unicode.Is(unicode.Mn, r) {
-			plain.WriteRune(r)
-		}
-	}
-	return strings.Trim(notSlug.ReplaceAllString(strings.ToLower(plain.String()), "-"), "-")
+	return strings.Trim(notSlug.ReplaceAllString(strings.ToLower(accents.Strip(name)), "-"), "-")
 }
 
 // pages names each board player's page by his slug where the name alone
