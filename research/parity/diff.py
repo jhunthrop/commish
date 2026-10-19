@@ -11,13 +11,15 @@ Rows are keyed by the table's natural key (a typed tuple, so `None` and `"None"`
 and compared column by column. Excluded, and only these: an identity `id` (a sequence draw, not a
 fact) and a bookkeeping timestamp the DATABASE fills with `now()` that neither implementation sets
 (`ingested_at` and its kin). A float column may carry a tolerance only where a `Tolerance` names it
-and says why; there are none.
+and says why; there are none. Where the Python port departs from the oracle on purpose, the case
+declares each departure (`Departure`: the key, the column, both values and why); a declared one that
+no longer appears fails the table, so the declaration cannot outlive the departure.
 """
 
 import json
 import math
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime
 from decimal import Decimal
 from typing import Final
@@ -43,6 +45,30 @@ class Tolerance:
 
 
 @dataclass(frozen=True)
+class Departure:
+    """One value the Python side writes differently from the oracle on purpose."""
+
+    key: Key
+    column: str
+    ts: Value
+    py: Value
+    why: str
+
+
+def declared(departures: Sequence[Departure], key: Key, column: str, ts: Value, py: Value) -> Departure | None:
+    """The declared departure this difference is, or None."""
+    return next((d for d in departures if (d.key, d.column, d.ts, d.py) == (key, column, ts, py)), None)
+
+
+def unmatched_departures(departures: Sequence[Departure], seen: set[Departure]) -> list[str]:
+    return [
+        f"{d.key!r} {d.column}: the declared departure (ts={d.ts!r} py={d.py!r}) did not appear"
+        for d in departures
+        if d not in seen
+    ]
+
+
+@dataclass(frozen=True)
 class TableSpec:
     """One table a case compares: its natural key, any stated tolerances, and whether it is the
     ingest under test or a prerequisite the case lands first (`setup`, counted once in the totals)."""
@@ -55,9 +81,13 @@ class TableSpec:
     # rows under one key (an event's props fetched twice): rows under a key compare as multisets.
     unique: bool = True
     setup: bool = False
+    departures: tuple[Departure, ...] = ()
 
     def as_setup(self) -> "TableSpec":
-        return TableSpec(self.table, self.key, self.tolerances, self.also_excluded, self.unique, setup=True)
+        return replace(self, setup=True)
+
+    def departing(self, *departures: Departure) -> "TableSpec":
+        return replace(self, departures=(*self.departures, *departures))
 
 
 @dataclass(frozen=True)
@@ -94,6 +124,7 @@ class _Collector:
     only_py: list[str] = field(default_factory=list)
     differing: list[str] = field(default_factory=list)
     duplicate_keys: list[str] = field(default_factory=list)
+    departed: set[Departure] = field(default_factory=set)
 
 
 def compared_columns(spec: TableSpec) -> list[str]:
@@ -158,12 +189,20 @@ def _ordered(rows: list[Row], columns: Sequence[str]) -> list[Row]:
     return sorted(rows, key=lambda row: repr([row[c] for c in columns]))
 
 
+@dataclass(frozen=True)
+class _Rules:
+    """What a table's spec allows a difference to be: a stated tolerance, or a declared departure."""
+
+    tolerances: Mapping[str, Tolerance]
+    departures: Sequence[Departure]
+
+
 def _compare_key(
     key: Key,
     rows: tuple[list[Row], list[Row]],
     *,
     columns: Sequence[str],
-    tolerances: Mapping[str, Tolerance],
+    rules: _Rules,
     out: _Collector,
 ) -> None:
     """One key's rows, TypeScript's then Python's, compared as multisets column by column."""
@@ -174,8 +213,13 @@ def _compare_key(
     for ts_row, py_row in zip(_ordered(ts_rows, columns), _ordered(py_rows, columns), strict=True):
         for column in columns:
             a, b = ts_row[column], py_row[column]
-            if not _equal(a, b, tolerances.get(column)):
-                out.differing.append(f"{key!r} {column}: ts={a!r} py={b!r}")
+            if _equal(a, b, rules.tolerances.get(column)):
+                continue
+            departure = declared(rules.departures, key, column, a, b)
+            if departure is not None:
+                out.departed.add(departure)
+                continue
+            out.differing.append(f"{key!r} {column}: ts={a!r} py={b!r}")
 
 
 def diff_table(ts_url: str, py_url: str, spec: TableSpec) -> TableDiff:
@@ -193,9 +237,10 @@ def diff_table(ts_url: str, py_url: str, spec: TableSpec) -> TableDiff:
         out.duplicate_keys.extend(f"py {k!r}" for k, v in py.items() if len(v) > 1)
     out.only_ts.extend(repr(k) for k in sorted(ts.keys() - py.keys(), key=repr))
     out.only_py.extend(repr(k) for k in sorted(py.keys() - ts.keys(), key=repr))
-    tolerances = {t.column: t for t in spec.tolerances}
+    rules = _Rules({t.column: t for t in spec.tolerances}, spec.departures)
     for key in sorted(ts.keys() & py.keys(), key=repr):
-        _compare_key(key, (ts[key], py[key]), columns=columns, tolerances=tolerances, out=out)
+        _compare_key(key, (ts[key], py[key]), columns=columns, rules=rules, out=out)
+    out.differing.extend(unmatched_departures(spec.departures, out.departed))
     return TableDiff(
         table=spec.table,
         setup=spec.setup,

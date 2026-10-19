@@ -36,7 +36,6 @@ ALL: Final = "All"
 # The coordinator's ruling of 2026-10-17 (Lane 66j): "Order matched" names the rank correlation, its
 # scale said once.
 STATISTIC: Final = {"agreement": "order matched", "placesOff": "places off", "starters": "starters right"}
-SCALE: Final = "1.0 is a perfect match of the week's finishing order, 0 is none."
 # A 12-team league's starters at each position, the week's top players the starters figure counts:
 # 12 QB, 24 RB, 36 WR, 12 TE, 12 K and 12 defenses, where the register grades the position.
 LEAGUE_TEAMS: Final = 12
@@ -45,6 +44,10 @@ _STARTER_WORDS: Final = {"QB": "QBs", "RB": "RBs", "WR": "WRs", "TE": "TEs", "K"
 # The places the record page prints each figure to.
 AGREEMENT_PLACES: Final = 2
 PLACES_OFF_PLACES: Final = 1
+# The agreement's scale, its ends in the form the page prints the rate (ruling R2, Lane 78): 1.00 and 0.00.
+SCALE: Final = (
+    f"{1:.{AGREEMENT_PLACES}f} is a perfect match of the week's finishing order, {0:.{AGREEMENT_PLACES}f} is none."
+)
 
 
 def printed(value: float | None, places: int) -> float | None:

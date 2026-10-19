@@ -503,3 +503,26 @@ func TestIDMatcherSurvivesAFailedRead(t *testing.T) {
 		t.Fatal("a failed refresh dropped the map in hand")
 	}
 }
+
+// A host that drops his accent still places him on a board that keeps it
+// (Lane 78): the folded name, the prefix and the Sleeper name fallback.
+func TestAnUnaccentedPickPlacesTheAccentedPlayer(t *testing.T) {
+	if FoldName("Audric Estimé") != FoldName("Audric Estime") {
+		t.Fatalf("FoldName keeps the accent: %q, %q", FoldName("Audric Estimé"), FoldName("Audric Estime"))
+	}
+	raw := &boards.Raw{Players: []boards.Player{{ID: "4569682", Name: "Audric Estimé", Position: draft.RB, Team: "DEN"}}}
+	pick := sleeper.Pick{PlayerID: "11597", Name: "Audric Estime", Position: "RB", Team: "DEN"}
+	if id, how, ok := (&NameMatcher{}).Match(raw, pick); !ok || id != "4569682" || how != MatchNormalized {
+		t.Fatalf("by name: %q %q %v", id, how, ok)
+	}
+	cut := sleeper.Pick{Name: "Audric Est", Position: "RB", Team: "DEN"}
+	if id, how, ok := (&NameMatcher{}).Match(raw, cut); !ok || id != "4569682" || how != MatchPrefix {
+		t.Fatalf("by prefix: %q %q %v", id, how, ok)
+	}
+	m := &IDMatcher{IDs: &scriptedIDs{answers: []map[string]string{{"1": "x"}}}, Teams: &NameMatcher{}, TTL: time.Hour,
+		Now: func() time.Time { return time.Date(2026, 10, 19, 12, 0, 0, 0, time.UTC) },
+		Log: slog.New(slog.NewTextHandler(io.Discard, nil))}
+	if id, how, ok := m.Match(raw, pick); !ok || id != "4569682" || how != MatchSleeperName {
+		t.Fatalf("by the Sleeper name fallback: %q %q %v", id, how, ok)
+	}
+}

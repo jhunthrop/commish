@@ -5,6 +5,7 @@ import (
 	"sync"
 	"unicode"
 
+	"github.com/jhunthrop/commish/api/internal/accents"
 	"github.com/jhunthrop/commish/api/internal/boards"
 	"github.com/jhunthrop/commish/api/internal/draft"
 	"github.com/jhunthrop/commish/api/internal/sleeper"
@@ -135,11 +136,12 @@ func suffixes() map[string]bool {
 	return map[string]bool{"jr": true, "sr": true, "ii": true, "iii": true, "iv": true, "v": true}
 }
 
-// FoldName is a name with case, punctuation and a trailing generational
-// suffix taken off: "D.J. Moore Jr." reads "dj moore".
+// FoldName is a name with its accents, case, punctuation and a trailing
+// generational suffix taken off: "D.J. Moore Jr." reads "dj moore", and
+// "Audric Estimé" reads as "Audric Estime" does (Lane 78).
 func FoldName(name string) string {
 	var b strings.Builder
-	for _, r := range strings.ToLower(name) {
+	for _, r := range strings.ToLower(accents.Strip(name)) {
 		switch {
 		case unicode.IsLetter(r) || unicode.IsDigit(r):
 			b.WriteRune(r)

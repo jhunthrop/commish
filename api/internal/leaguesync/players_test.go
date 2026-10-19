@@ -6,6 +6,9 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/jhunthrop/commish/api/internal/boards"
+	"github.com/jhunthrop/commish/api/internal/draft"
 )
 
 // dirHost answers its directory, or fails, and counts the reads.
@@ -53,5 +56,21 @@ func TestDirectoryNeverReadIsUnavailableAndRetried(t *testing.T) {
 	got, err := d.For(ctx, HostSleeper, 2026, nil)
 	if err != nil || got["96"].Name != "Aaron Rodgers" || host.reads.Load() != 2 {
 		t.Fatalf("a minute later: %v, %d reads", err, host.reads.Load())
+	}
+}
+
+// A platform that sends him without his accent, and no ESPN id, is placed
+// by name on a board that keeps it (Lane 78), with and without a position.
+func TestPlaceByNameReadsHisNameWithOrWithoutTheAccent(t *testing.T) {
+	raw := &boards.Raw{Players: []boards.Player{{ID: "4569682", Name: "Audric Estimé", Position: draft.RB, Team: "DEN"}}}
+	dir := map[string]HostPlayer{
+		"h1": {ID: "h1", Name: "Audric Estime", Position: "RB", Team: "DEN"},
+		"h2": {ID: "h2", Name: "Audric Estime"},
+	}
+	got := Place(raw, dir, []string{"h1", "h2"})
+	for _, id := range []string{"h1", "h2"} {
+		if pl := got[id]; pl.BoardID != "4569682" || pl.How != PlacedByName {
+			t.Fatalf("%s placed as %+v, want 4569682 by name", id, pl)
+		}
 	}
 }

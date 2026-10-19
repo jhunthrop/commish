@@ -1,4 +1,6 @@
-"""The universe and one-season cases: the season-week job's stats-ingest step, three shapes of season.
+"""The universe and one-season cases: the season-week job's stats-ingest step, three shapes of season:
+the season's lines, then its game results (`season_stats`, Lane 78), as the step and the `season`
+command write them.
 
 2024 is the ordinary shape (snap counts and weekly stats both published). 2012 sits below the
 snap-count asset floor (a header-only snap-count file, weekly stats published), so its stat lines
@@ -22,7 +24,8 @@ from research.parity.record import RecordSpec
 from research.pipeline.http import Fetcher
 from research.pipeline.nflverse.client import NflverseClient
 from research.pipeline.nflverse.config import Files, Releases
-from research.pipeline.nflverse.ingest import ingest_player_universe, ingest_season, schedule_week_as_of
+from research.pipeline.nflverse.ingest import ingest_player_universe, schedule_week_as_of
+from research.pipeline.nflverse.season_stats import ingest_season_and_results
 
 NOW = datetime(2026, 10, 12, 5, 0, tzinfo=UTC)
 
@@ -69,8 +72,8 @@ PRIOR = "nflverse-2026-08-27-slices"
 
 
 class SeasonRunner:
-    """`realIngestStats` (the season-week job's stats step): the universe, the schedule's week
-    stamps, then the season."""
+    """`realIngestStats` and `ingestGameResults` for the season (the season-week job's stats step): the
+    universe, the schedule's week stamps, then the season's lines and its results."""
 
     def __init__(self, season: int) -> None:
         self.season = season
@@ -81,7 +84,7 @@ class SeasonRunner:
         schedule_as_of = schedule_week_as_of(client, [self.season]).get(self.season)
         # The oracle's release tag, so both sides read the same recording (`player_week_release`),
         # and no completions, which the oracle never wrote.
-        ingest_season(
+        ingest_season_and_results(
             conn, client, universe, self.season, schedule_as_of, release=Releases.PLAYER_WEEK, completions=False
         )
         return ()
@@ -117,10 +120,10 @@ CASES: tuple[Case, ...] = (
     ),
     Case(
         name="nflverse-season-2012",
-        summary="a season below the snap-count floor: stat lines and team edges dated from the schedule "
-        "(no line continuity: there are no snap counts to take it from)",
+        summary="a season below the snap-count floor: stat lines and team edges dated from the schedule, "
+        "and its game results (no line continuity: there are no snap counts to take it from)",
         fixture_sets=("nflverse-universe", "nflverse-schedule", "nflverse-season-2012"),
-        tables=SEASON_TABLES[:3],
+        tables=SEASON_TABLES,
         run_python=SeasonRunner(2012),
         now=NOW,
         recordings=(_season_recording(2012, None, TeamFilter(("team",))),),

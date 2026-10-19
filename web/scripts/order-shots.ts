@@ -40,7 +40,7 @@ const FOLDS_AT = 1100;
 const BASIS_WIDTH = 1440;
 const CHART_MIN_HEIGHT = 200;
 /** The run's scale (research/nightly/reads/record.py SCALE), as the contract run carries it. */
-const RECORD_SCALE = "1.0 is a perfect match of the week's finishing order, 0 is none.";
+const RECORD_SCALE = "1.00 is a perfect match of the week's finishing order, 0.00 is none.";
 /** Below this width the roster mark folds onto the club line. */
 const ROSTER_FOLDS_AT = 900;
 /** Trade for him on fewer rows than this share (the coordinator's ruling 3). */
