@@ -35,7 +35,8 @@ import { FIXTURE_IDS } from './ids.ts';
 import { playerWeek, type Sheet } from './player-week.ts';
 import { lineupProj, seasonStrength } from './week.ts';
 import { FIXTURE_SEASON, askedPhase, phaseAccount, phaseLeagues, phaseSync } from './phases.ts';
-import { ESPN_STAND_IN_NAME, espnSync } from './espn-sync.ts';
+import { ESPN_STAND_IN_NAME, espnMatchup, espnSync } from './espn-sync.ts';
+import { yahooStandIn } from './yahoo.ts';
 import { SUNDAY, espnSunday } from './sunday.ts';
 import { inSeason, noWeek } from './member-week.ts';
 import { inTenths } from './tenths.ts';
@@ -497,6 +498,13 @@ const SUNDAY_WEEK = /(?:^|; )fixture_week=sunday(?:;|$)/;
 /** The request asks for an ESPN league's Sunday. */
 const espnSundayAsked = (req: IncomingMessage, id: string): boolean =>
 	ESPN_MOVES.has(id) && SUNDAY_WEEK.test(req.headers.cookie ?? '');
+/** The recorded league as a Yahoo league's (yahoo.ts), for a browser that asks with the
+ * fixture_platform cookie: team totals alone, so its Pts sentence keeps a shot. */
+const asYahoo = yahooStandIn({ sync, lineup, matchup: matchupBox });
+const YAHOO_PLATFORM = /(?:^|; )fixture_platform=yahoo(?:;|$)/;
+/** The request asks for the recorded league as Yahoo's. */
+const yahooAsked = (req: IncomingMessage, id: string): boolean =>
+	id === LEAGUE && YAHOO_PLATFORM.test(req.headers.cookie ?? '');
 
 /** The shape of a host id the claim route takes (api hostmoves checkClaim). */
 const HOST_ID = /^-?[0-9]{1,12}$/;
@@ -782,6 +790,10 @@ async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> 
 			});
 			return;
 		}
+		if (yahooAsked(req, asked)) {
+			send(req, res, HTTP.ok, { ...phaseSync(asYahoo.sync, asked), id: asked, read_at: readAt() });
+			return;
+		}
 		send(req, res, HTTP.ok, {
 			...phaseSync(ESPN_MOVES.has(asked) ? espnSync(sync) : sync, asked),
 			id: synced[1],
@@ -873,9 +885,13 @@ async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> 
 			send(req, res, HTTP.ok, { ...espnOnSunday[route], read_at: SUNDAY });
 			return;
 		}
+		if (yahooAsked(req, id ?? '') && (route === 'lineup' || route === 'matchup')) {
+			send(req, res, HTTP.ok, { ...asYahoo[route], read_at: readAt() });
+			return;
+		}
 		const bodies = {
 			lineup: ESPN_MOVES.has(id ?? '') ? espnLineup() : lineup,
-			matchup: matchupBox,
+			matchup: ESPN_MOVES.has(id ?? '') ? espnMatchup(matchupBox) : matchupBox,
 			// The ESPN leagues show the week on its Sunday afternoon, a stand-in (league.ts): the
 			// points are made up so the board's played states can be drawn.
 			scoreboard: ESPN_MOVES.has(id ?? '') ? scoreboardLive : scoreboard,

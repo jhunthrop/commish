@@ -653,8 +653,9 @@ function boxSide(
 	const starting = new Set(placed.map((s) => s.line.player.host_id));
 	return {
 		roster_id: rosterId,
-		// Sleeper gives each player's points.
+		// Sleeper gives each player's points, and its score is theirs added (Lane 79 ruling a).
 		player_points: true,
+		team_total: false,
 		starters: placed,
 		bench: roster.filter((line) => !starting.has(line.player.host_id))
 	};
