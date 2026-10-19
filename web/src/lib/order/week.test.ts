@@ -4,6 +4,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { bannedPattern } from '#lib/format/copy-guard.ts';
+import { FIGURE } from '#lib/format/figure-words.ts';
+import { BOX } from '#lib/league/box/box.ts';
 import type { WeekOrderAdvice } from './api.ts';
 import { weekOrderPath } from './path.ts';
 import {
@@ -219,4 +221,15 @@ void test('every word the tab prints passes the copy guard', () => {
 			assert.doesNotMatch(said, /[–—;]/, said);
 		}
 	}
+});
+
+void test("the tab's figure heads are the site's one table (Lane 66s): Avg from figure-words, Proj the one-week box's own", () => {
+	const said = text(weekBasis(fixture.read.K, ESPN, ZONE, SATURDAY));
+	assert.equal(BOX.avg, FIGURE.avg);
+	assert.ok(said.includes(`${FIGURE.avg} and ${BOX.last} are his points a game`), said);
+	assert.equal(weekStatus(fixture.unread.K)?.rest.endsWith(`in order of ${FIGURE.avg}.`), true);
+	assert.doesNotMatch(
+		said,
+		new RegExp(`\\b(${FIGURE.projected}|${FIGURE.perGame}|${FIGURE.week})\\b`)
+	);
 });
