@@ -8,7 +8,14 @@ ranked among the clubs with a game left, the unrounded mean's order; a club with
 from datetime import UTC, datetime, timedelta
 
 from research.nightly.build.season import schedule_json
-from research.nightly.reads.schedule import Game, OpponentValue, game_states, slates
+from research.nightly.reads.schedule import (
+    Game,
+    OpponentValue,
+    first_week_to_play,
+    game_states,
+    slates,
+    weeks_to_play,
+)
 from research.pipeline.nflverse.team_codes import NFL_TEAM_ABBREVIATIONS
 
 READ = datetime(2026, 8, 1, tzinfo=UTC)
@@ -80,3 +87,22 @@ def test_a_club_with_no_game_left_has_no_rest() -> None:
     assert written["MIA"]["rest"] is None
     # Ranked among the 31 with a game left.
     assert max(s["rest"]["rank"] for s in written.values() if s["rest"] is not None) == len(NFL_TEAM_ABBREVIATIONS) - 1
+
+
+def test_a_clubs_rest_of_season_starts_at_its_first_game_still_to_play() -> None:
+    """Lane 86: on the Monday, a club whose week 6 game kicked off starts at week 7; a club whose
+    week 6 game is Monday night's still starts at week 6; a club with none left has no start."""
+    monday_night = datetime(2026, 10, 20, 0, 15, tzinfo=UTC)
+    games = {
+        **_slate("BUF", Game(6, "MIA", False, SUNDAY), Game(7, "NE", True, NEXT_SUNDAY)),
+        **_slate("MIA", Game(6, "BUF", True, SUNDAY)),
+        **_slate("TB", Game(6, "DET", False, monday_night), Game(8, "NO", True, NEXT_SUNDAY + timedelta(days=7))),
+        **_slate("SEA", Game(6, "DEN", False, THURSDAY), Game(7, "ARI", True, NEXT_SUNDAY)),
+    }
+    states = game_states(games, frozenset({("SEA", 6)}), MONDAY_RUN)
+    assert weeks_to_play(states, "BUF") == (7,)
+    assert weeks_to_play(states, "TB") == (6, 8)
+    assert weeks_to_play(states, "SEA") == (7,)
+    assert weeks_to_play(states, "MIA") == ()
+    assert [first_week_to_play(states, club) for club in ("BUF", "TB", "SEA", "MIA")] == [7, 6, 7, None]
+    assert weeks_to_play(states, "KC") == ()  # a club the slate does not hold

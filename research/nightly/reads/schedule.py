@@ -184,6 +184,19 @@ def game_states(
     return states
 
 
+def weeks_to_play(states: Mapping[ClubWeek, GameState], club: str) -> tuple[int, ...]:
+    """The club's weeks whose game is still upcoming at the states' instant, in order (Lane 86): a game
+    kicked off or final is played, so a rest of season counts only these."""
+    return tuple(sorted(week for (team, week), state in states.items() if team == club and state == "upcoming"))
+
+
+def first_week_to_play(states: Mapping[ClubWeek, GameState], club: str) -> int | None:
+    """The week a club's rest of season starts from: its first game still upcoming, None with none left.
+    The one rule the run's rest-of-season figures and their words read (the API's restFromWeek)."""
+    weeks = weeks_to_play(states, club)
+    return weeks[0] if weeks else None
+
+
 def _ranks(means: Mapping[str, float]) -> dict[str, int]:
     """1 the hardest (the highest mean), ties by club code."""
     order = sorted(means, key=lambda club: (-means[club], club))

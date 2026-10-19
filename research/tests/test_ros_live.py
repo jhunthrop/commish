@@ -9,6 +9,7 @@ import pytest
 from research.errors import ConfigurationError
 from research.model.ros.live import (
     FIRST_MODEL_WEEK,
+    ClubSlates,
     PlayerWeeks,
     WeekFacts,
     Window,
@@ -92,11 +93,19 @@ def test_the_players_input_stops_at_the_lines_and_ranks_from_the_window() -> Non
     }
     who = PlayerWeeks("p", "WR", "KC", {1: "KC", 2: "BUF"}, weeks)
     schedule = {"KC": [1, 2, 3, 4, 5, 6, 7], "BUF": [1, 2, 3, 5, 6, 8, 9, 17, 18]}
-    player = player_to_date(who, Window(7, 5), schedule, stale_prior(None, _SERVED, 17.0), SCORING)
+    player = player_to_date(
+        who, Window(7, 5), ClubSlates(schedule, schedule), stale_prior(None, _SERVED, 17.0), SCORING
+    )
     assert player.club_weeks == (1, 2, 3, 5)  # his latest club is Buffalo
     assert [g.week for g in player.played] == [1, 2]
     assert player.remaining_weeks == (8, 9, 17)  # Buffalo plays weeks 8, 9 and 17 from week 7
     assert player.streak == 2
+    # Lane 86: Buffalo's week 8 game kicked off, so his rest of season is weeks 9 and 17.
+    played_eight = {**schedule, "BUF": [9, 17, 18]}
+    later = player_to_date(
+        who, Window(7, 5), ClubSlates(schedule, played_eight), stale_prior(None, _SERVED, 17.0), SCORING
+    )
+    assert later.remaining_weeks == (9, 17)
 
 
 def test_the_in_season_basis_names_the_rest_of_the_season_and_the_refresh() -> None:

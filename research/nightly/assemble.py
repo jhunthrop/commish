@@ -30,6 +30,7 @@ from research.nightly.reads import schedule as schedule_read
 from research.nightly.reads.adp import AdpCapture, adp_cutoff, latest_capture
 from research.nightly.reads.board import FormatBoard, format_board
 from research.nightly.reads.market import market_order, market_players
+from research.nightly.reads.schedule import ClubWeek, Game, GameState
 from research.nightly.register_log import FrozenBy
 from research.season import PRODUCT_SEASON
 
@@ -85,11 +86,17 @@ def _fixtures_window(conn: Connection) -> tuple[datetime, datetime]:
     return row[0], row[1]
 
 
-def _schedule(conn: Connection, as_of: datetime) -> tuple[Json, list[Json], Json, Json]:
-    games = schedule_read.slates_by_club(conn, PRODUCT_SEASON)
+def _states(conn: Connection, games: Mapping[str, Sequence[Game]], as_of: datetime) -> dict[ClubWeek, GameState]:
+    """Every game's state at the run's instant (Lane 80): the one the schedule, the clubs and the
+    rest-of-season boards read alike (Lane 86)."""
+    return schedule_read.game_states(games, schedule_read.finals_at(conn, PRODUCT_SEASON, as_of), as_of)
+
+
+def _schedule(
+    conn: Connection, as_of: datetime, games: Mapping[str, list[Game]], states: Mapping[ClubWeek, GameState]
+) -> tuple[Json, list[Json], Json, Json]:
     kickoff = first_kickoff_for(conn, PRODUCT_SEASON) or as_of
     values = schedule_read.opponent_values(conn, PRODUCT_SEASON, kickoff)
-    states = schedule_read.game_states(games, schedule_read.finals_at(conn, PRODUCT_SEASON, as_of), as_of)
     slates = schedule_read.slates(games, values, states)
     published = [value.published for value in values.values()]
     sources = (
@@ -179,7 +186,9 @@ def assemble(conn: Connection, as_of: datetime, frozen_by: FrozenBy, ros: RosSet
     extra = () if ros is None else tuple(p.provider_id for p in ros.season_players)
     on_boards = {e.row.player_id for b in boards for e in b.entries}
     context = season_context(conn, PRODUCT_SEASON, sorted({*on_boards, *extra}), as_of, prior=True)
-    rest = None if ros is None else ros_boards(boards, context, as_of, ros)
+    games = schedule_read.slates_by_club(conn, PRODUCT_SEASON)
+    states = _states(conn, games, as_of)
+    rest = None if ros is None else ros_boards(boards, context, as_of, states, ros)
     if rest is not None:
         boards = rest.boards
     # The pages and the search index in the order of the boards the run prints, then the kickers and
@@ -197,7 +206,7 @@ def assemble(conn: Connection, as_of: datetime, frozen_by: FrozenBy, ros: RosSet
     served = _served_week(conn, as_of, context, rest, ids)
     inputs = pages.page_inputs(boards, adp_by_format, capsules, context, served)
     players = [pages.player_json(who, inputs) for who in people]
-    schedule, clubs, schedule_source, clubs_source = _schedule(conn, as_of)
+    schedule, clubs, schedule_source, clubs_source = _schedule(conn, as_of, games, states)
     record, record_source = _record(conn, as_of, frozen_by)
     files: dict[str, Any] = {
         f"boards/{b.format.id}.json": pages.board_json(b, by_slug, adp_by_format[b.format.id], orders[b.format.id])

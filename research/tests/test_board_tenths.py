@@ -5,6 +5,7 @@ tests read. A small hand-built board, no store."""
 
 import json
 import math
+from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -97,3 +98,16 @@ def test_a_board_file_carries_each_rows_tier_drop() -> None:
     drops = tier_drops(board.entries)
     assert [row["tierDrop"] for row in written] == [drops[e.row.player_id] for e in board.entries]
     assert written[-1]["tierDrop"] is None
+
+
+def test_an_in_season_row_says_the_week_his_rest_of_season_starts_from() -> None:
+    """Lane 86: an in-season row carries his club's first week still to play (null with none left), and
+    a preseason row carries no such field."""
+    rows = [replace(_row("p1", 120.0, 0.0), from_week=7), _row("p2", 90.0, 0.0)]
+    entries = [replace(e, in_season=True) for e in board_entries(rows, PPR)]
+    board = FormatBoard(PPR, StoredBoard(PPR.board_source, AS_OF, "research@test", None), entries)
+    people = {p.id: p for p in identities([board])}
+    written = {r["id"]: r for r in board_json(board, people, {})["rows"]}
+    assert (written["p1"]["restFromWeek"], written["p2"]["restFromWeek"]) == (7, None)
+    preseason = FormatBoard(PPR, board.stored, board_entries(rows, PPR))
+    assert "restFromWeek" not in board_json(preseason, people, {})["rows"][0]
