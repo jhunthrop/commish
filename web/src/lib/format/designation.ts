@@ -107,7 +107,7 @@ export function stampWords(iso: string, zone: string = memberZone()): string {
 
 /** The capture in the few words a page of board rows has left in its five-line basis (Lane 66n):
  * "Status read Oct 16.", "as of" its last change with no check, and past
- * CAPTURE_BEHIND_MS how old it is. The player page and the record keep captureLine's fuller words. */
+ * CAPTURE_BEHIND_MS how old it is. The player page keeps captureLine's fuller words. */
 export function captureShort(
 	capture: CaptureStamp,
 	now: number,

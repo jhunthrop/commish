@@ -22,6 +22,7 @@ import type {
 	WaiverAdvice
 } from '../../src/lib/league/inseason/api.ts';
 import { leagueFields } from './league-fields.ts';
+import { SCORED_SHARE, SUNDAY, SUNDAY_FINAL_BY } from './sunday.ts';
 
 type ScoreboardGame = Scoreboard['games'][number];
 
@@ -30,10 +31,6 @@ const REPLAY = new URL('../../../api/internal/leaguesync/replay/sleeper/', impor
 const TENTH = 10;
 /** The recorded read: Wednesday afternoon of week 6, before any game. */
 const READ_AT = '2026-10-14T19:05:38.329Z';
-/** The Sunday stand-in: 1:52 pm Central, the noon games in their fourth quarter. */
-const SUNDAY = '2026-10-18T18:52:00.000Z';
-/** The share of a kicked-off starter's projection the Sunday stand-in counts as scored. */
-const SCORED_SHARE = 0.85;
 
 interface SleeperMatchup {
 	roster_id: number;
@@ -172,8 +169,6 @@ function scoreboardAt(now: number, finalBy: number, sunday: boolean): Scoreboard
 
 const recorded = Date.parse(READ_AT);
 const sunday = Date.parse(SUNDAY);
-/** On the Sunday stand-in the early games are over: every kickoff before noon Central is final. */
-const SUNDAY_FINAL_BY = Date.parse('2026-10-18T17:00:00.000Z') - 1;
 
 const style = await resolveConfig(fileURLToPath(DATA));
 const answers = {

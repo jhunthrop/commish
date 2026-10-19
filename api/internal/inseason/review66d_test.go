@@ -27,13 +27,18 @@ func TestPointsSoFarOnlyWhereTheHostGivesThem(t *testing.T) {
 		{"sleeper", &leaguesync.Side{Starters: []string{"p"}, PlayerPoints: map[string]float64{"p": 0}}, locked, ptr(0), "a read 0 is a 0"},
 		{"mfl", &leaguesync.Side{Starters: []string{"p"}, PlayerPoints: map[string]float64{"p": 7}}, locked, ptr(7), "the host's points"},
 		{"espn", &leaguesync.Side{Starters: []string{"p"}, PlayerPoints: map[string]float64{}}, locked, nil, "a total and no player's"},
+		{"espn", &leaguesync.Side{Starters: []string{"p"}, PlayerPoints: map[string]float64{"p": 8.74}}, locked, ptr(8.7), "ESPN's points by player (Lane 79)"},
 		{"yahoo", &leaguesync.Side{Starters: []string{"p"}, PlayerPoints: map[string]float64{}}, locked, nil, "a total and no player's"},
+		{"yahoo", &leaguesync.Side{Starters: []string{"p"}, PlayerPoints: map[string]float64{"p": 5}}, locked, nil, "a total alone, whatever the read holds"},
 		{"ffpc", &leaguesync.Side{Starters: []string{"p"}}, locked, nil, "no map at all"},
 		{"sleeper", &leaguesync.Side{Starters: []string{"p"}, PlayerPoints: map[string]float64{"p": 9}}, Facts{}, nil, "not kicked off"},
-		{"sleeper", &leaguesync.Side{Starters: []string{"q"}, PlayerPoints: map[string]float64{"p": 9}}, locked, nil, "not a starter"},
+		{"sleeper", &leaguesync.Side{Starters: []string{"q"}, PlayerPoints: map[string]float64{"p": 9}}, locked, ptr(9), "a bench player under way (Lane 79 fix 3)"},
+		{"espn", &leaguesync.Side{Starters: []string{"q"}, PlayerPoints: map[string]float64{"p": 4.46}}, Facts{Locked: true, Played: true}, ptr(4.5), "a bench player final"},
+		{"espn", &leaguesync.Side{Starters: []string{"p"}, PlayerPoints: map[string]float64{"q": 3}}, locked, nil, "kicked off and left out of ESPN's period roster"},
+		{"espn", &leaguesync.Side{Starters: []string{"q"}, PlayerPoints: map[string]float64{"p": 0}}, Facts{}, nil, "a bench player still to kick off"},
 	}
 	for _, c := range cases {
-		got := thisWeek(c.side, "p", c.facts)
+		got := thisWeek(c.host, c.side, "p", c.facts)
 		if (got == nil) != (c.want == nil) || (got != nil && *got != *c.want) {
 			t.Errorf("%s, %s: %v, want %v", c.host, c.reason, deref(got), deref(c.want))
 		}
@@ -109,9 +114,9 @@ func hostShaped(t *testing.T, byPlayer bool) fixture {
 	return f
 }
 
-// A host that gives each team's total alone (ESPN, Yahoo, FFPC) says so on
+// A host that gives each team's total alone (Yahoo, FFPC) says so on
 // both answers, and start and sit carries the team's total; one that gives
-// each player's (Sleeper, MFL) says that (review N1).
+// each player's (Sleeper, MFL, ESPN since Lane 79) says that (review N1).
 func TestTheAnswersSayWhetherTheHostGivesPlayersPoints(t *testing.T) {
 	for _, byPlayer := range []bool{false, true} {
 		f := hostShaped(t, byPlayer)

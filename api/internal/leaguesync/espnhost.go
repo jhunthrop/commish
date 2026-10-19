@@ -177,12 +177,13 @@ func espnSnapshot(l espn.FullLeague, now time.Time) Snapshot {
 	sort.Slice(snap.Teams, func(i, j int) bool { return snap.Teams[i].RosterID < snap.Teams[j].RosterID })
 	for i, g := range l.Games {
 		for _, side := range []struct {
-			id     int
-			points float64
-			unread bool
-		}{{g.Home, g.HomePoints, g.HomeUnread}, {g.Away, g.Points, g.Unread}} {
+			id      int
+			points  float64
+			unread  bool
+			players map[string]float64
+		}{{g.Home, g.HomePoints, g.HomeUnread, g.HomePlayerPoints}, {g.Away, g.Points, g.Unread, g.PlayerPoints}} {
 			snap.Matchups = append(snap.Matchups, Side{
-				RosterID: side.id, Game: i + 1, Points: round2(side.points), PointsUnread: side.unread, Starters: byID[side.id].Starters, PlayerPoints: map[string]float64{},
+				RosterID: side.id, Game: i + 1, Points: round2(side.points), PointsUnread: side.unread, Starters: byID[side.id].Starters, PlayerPoints: espnPlayerPoints(side.players),
 			})
 		}
 	}
@@ -191,6 +192,16 @@ func espnSnapshot(l espn.FullLeague, now time.Time) Snapshot {
 	snap.Shape = espnShape(l.LineupSlotCount, len(snap.Teams))
 	snap.Terms = espnTerms(l)
 	return snap
+}
+
+// espnPlayerPoints is a side's players' week points as the snapshot
+// keeps them, at two places as every host's; empty where ESPN sent none.
+func espnPlayerPoints(in map[string]float64) map[string]float64 {
+	out := make(map[string]float64, len(in))
+	for id, v := range in {
+		out[id] = round2(v)
+	}
+	return out
 }
 
 // espnStatus is the league's state in ESPN's own flags: the scoring

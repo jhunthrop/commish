@@ -108,7 +108,7 @@ def record_json(
         "statistic": dict(record_read.STATISTIC),
         "scale": record_read.SCALE,
         "startersBasis": record_read.starters_basis(to_date),
-        "method": record_read.METHOD,
+        "method": record_read.method(to_date),
         "publishedFromWeek": published_from,
         "honest": record_read.honest_line(to_date),
         "weeks": [_week(week, frozen_by, season) for week in weeks],

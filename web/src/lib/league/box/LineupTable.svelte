@@ -315,8 +315,9 @@
 			width: 44px;
 		}
 
+		/* Wide enough for a total such as 101.6 beside its Proj, with a gap between them (Lane 79 fix 9). */
 		.cols .num.pts {
-			width: 30px;
+			width: 40px;
 		}
 
 		.cols .op {
@@ -332,7 +333,8 @@
 		}
 
 		.totals .pts {
-			font-size: var(--t-lg);
+			padding-left: var(--s-2);
+			font-size: var(--t-md);
 		}
 	}
 

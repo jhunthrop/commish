@@ -1,13 +1,10 @@
 // A listed player's row, page and record words (Lane 63): run with `npm test`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { bannedPattern } from '#lib/format/copy-guard.ts';
 import {
 	BUILT_ZONE,
-	HELD_OUT_METHOD,
 	boardStatusWords,
 	playerStatusWords,
-	recordStatusWords,
 	statusView,
 	weekNote,
 	type Saying
@@ -48,12 +45,6 @@ void test('a week’s designation keeps his rank and its chip is the word, as th
 		weekNote('doubtful'),
 		'Doubtful on the latest report, which does not move his place on our board.'
 	);
-});
-
-void test('the record says the frozen boards it grades moved no one', () => {
-	assert.match(HELD_OUT_METHOD, /graded where the board froze\.$/u);
-	assert.doesNotMatch(HELD_OUT_METHOD, bannedPattern());
-	assert.equal(recordStatusWords(CENTRAL).endsWith(HELD_OUT_METHOD), true);
 });
 
 void test('a board and a page built on the Eastern clock and said again on the member’s', () => {

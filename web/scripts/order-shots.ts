@@ -9,17 +9,27 @@
 // fewer than a third of the rows, that the copy passes the one guard ("host" among its words, the
 // names the API and the run handed it skipped, copy-scan.ts), the record's Order matched head with the
 // published projection's -- before its week, the honest sentence where the run carries one, and the
-// record's chart at least 200 px tall on a phone. Exits non-zero on any fault.
+// record's chart at least 200 px tall on a phone. Our record is held to the run the site was built
+// from (Lane 82): its scale and the two decimals said once, the Published column, figure and line
+// drawn only once a graded week carries it, the basis the record's own sentences and no capture time,
+// the axis printed 0.00 to 1.00; and the basis once Published is drawn, and at its worst (kickers and
+// defenses graded too), measured in the page at 1440 and 390. Exits non-zero on any fault.
 //
 //   node scripts/order-shots.ts [web origin] [out dir, from scripts/]
 // with the site built on a rest-of-season run against PUBLIC_API_URL=http://localhost:8799 and the
-// fixture API running there, and the build's run inputs set (PUBLIC_RUN_ID, PUBLIC_RUN_BASE_URL), from
-// which the record's scale sentence is read.
+// fixture API running there, and PUBLIC_RUN_ID and PUBLIC_RUN_BASE_URL naming that run here too (the
+// record shots run, scripts/record-fixture/run.ts, is live's shape).
 import { mkdir, writeFile } from 'node:fs/promises';
 import { chromium, type BrowserContext, type Page } from 'playwright';
 import { FIGURE } from '../src/lib/format/figure-words.ts';
-import { runConfigFrom } from '../src/lib/run/config.ts';
-import { RUN_PATHS, recordSchema } from '../src/lib/run/schema.ts';
+import { locationFor, parseBaseUrl, parseRunId } from '../src/lib/run/config.ts';
+import {
+	RATE_PLACES_WORDS,
+	RECORD_BOX,
+	publishedDrawn,
+	recordBasis
+} from '../src/lib/run/record.ts';
+import { RUN_PATHS, recordSchema, type RunRecord } from '../src/lib/run/schema.ts';
 import { openRun } from '../src/lib/run/source.ts';
 import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
 import { basisLines, basisReport } from './basis-lines.ts';
@@ -43,11 +53,15 @@ const SETTLE_MS = 300;
 const FOLDS_AT = 1100;
 const BASIS_WIDTH = 1440;
 const CHART_MIN_HEIGHT = 200;
-/** The record's scale sentence as the run the site was built from carries it (research/nightly/
- * reads/record.py SCALE), read from the run with the build's own inputs, never a copy typed here. */
-const RECORD_SCALE = (
-	await (await openRun(runConfigFrom(process.env))).read(RUN_PATHS.record, recordSchema)
-).scale;
+/** The record the site was built from, read from its run: the page's words are held to it. */
+const RECORD: RunRecord = await (
+	await openRun({
+		runId: parseRunId(process.env.PUBLIC_RUN_ID),
+		location: locationFor(parseBaseUrl(process.env.PUBLIC_RUN_BASE_URL), process.env)
+	})
+).read(RUN_PATHS.record, recordSchema);
+/** The chart axis's ends, printed as the rates print. */
+const AXIS_ENDS = ['0.00', '1.00'] as const;
 /** Below this width the roster mark folds onto the club line. */
 const ROSTER_FOLDS_AT = 900;
 /** Trade for him on fewer rows than this share (the coordinator's ruling 3). */
@@ -94,9 +108,13 @@ const CAPTION = `# Lane 66j shots
   fixture's one projection snapshot, the week 1 published figure.
 - The Rest of season shot is the RB tab. Its tabs are All, QB and RB only because the run the site was built
   from (the contract fixture's 2026-10-21T12-ros run) carries boards for those two positions.
-- Our record reads that run (its record regenerated from dev's register, read only): weeks 1 and 2 are real
-  grades of our preseason order, weeks 3 to 5 the register's real misses, the published projection -- until the
-  register keeps it.
+- Our record reads the run the site was built from. On the record shots run (scripts/record-fixture/run.ts,
+  Lane 82) that is live's shape a week on: weeks 1 and 2 are real grades of our preseason order, weeks 3 to 6
+  are STAND-INS (live has weeks 3 to 5 missed and week 6 waiting on its stats), week 7 frozen and not played,
+  and the published projection kept from week 7 so not drawn yet. The run keeps the contract fixture's time,
+  Oct 21, so its header, the boards' refresh and week 7's freeze that morning agree. The basis lines "record published" and
+  "record worst" are the page's basis with the words the nightly writes once Published is graded, and with
+  kickers and defenses graded too, measured in the page.
 `;
 
 await mkdir(out, { recursive: true });
@@ -205,8 +223,12 @@ async function recordFaults(page: Page, width: number): Promise<string[]> {
 		const text = (el: Element): string => el.textContent.trim();
 		return {
 			heads: [...document.querySelectorAll('main table.weeks th')].map(text),
-			published: [...document.querySelectorAll('main table.weeks td.published')].map(text),
+			published: document.querySelectorAll('main table.weeks .published').length,
+			bug: document.querySelector('main .bug .tiles')?.textContent ?? '',
+			lines: [...document.querySelectorAll('main .chart g text')].map(text),
+			axis: [...document.querySelectorAll('main .chart text.axis')].map(text),
 			honest: document.querySelector('main .honest')?.textContent.trim() ?? '',
+			basis: document.querySelector('main [data-basis]')?.textContent.trim() ?? '',
 			chart: document.querySelector('main .chart svg')?.getBoundingClientRect().height ?? 0,
 			main: document.querySelector('main')?.textContent ?? ''
 		};
@@ -216,18 +238,65 @@ async function recordFaults(page: Page, width: number): Promise<string[]> {
 		said.push('record: no Order matched head');
 	if (seen.heads.some((h) => /rank corr|agreement/i.test(h)))
 		said.push('record: the old head is drawn');
-	if (seen.published.length > 0 && seen.published.some((cell) => cell !== '--'))
-		said.push(
-			`record: a published figure before the register holds it: ${seen.published.join(' ')}`
-		);
-	if (seen.honest === '') said.push('record: no honest sentence though ours trails');
+	// The honest empty state (Lane 82): no Published column, figure or line before a graded week has it.
+	const drawn = publishedDrawn(RECORD);
+	const shown = {
+		column: seen.published > 0,
+		figure: seen.bug.includes(RECORD_BOX.published),
+		line: seen.lines.includes(RECORD_BOX.published)
+	};
+	for (const [part, on] of Object.entries(shown)) {
+		if (on !== drawn) said.push(`record: Published ${part} ${on ? 'drawn' : 'missing'}`);
+	}
+	if (seen.honest === '' && RECORD.honest !== null) said.push('record: no honest sentence');
 	// The graded record says the run's scale and the two decimals once (Lane 66t review 1).
-	for (const once of [RECORD_SCALE, 'Rates print to two decimals.']) {
+	for (const once of [RECORD.scale, RATE_PLACES_WORDS]) {
 		const n = seen.main.split(once).length - 1;
 		if (n !== 1) said.push(`record: "${once}" said ${String(n)} times`);
 	}
+	const basis = recordBasis(RECORD).join(' ');
+	if (seen.basis !== basis) said.push(`record: the basis is not the record's: ${seen.basis}`);
+	if (/capture/i.test(seen.basis)) said.push('record: the basis says the capture');
+	if (seen.axis.at(0) !== undefined && !AXIS_ENDS.every((end) => seen.axis.includes(end)))
+		said.push(`record: the axis prints ${seen.axis.join(' ')}`);
 	if (width <= PHONE_MAX && seen.chart < CHART_MIN_HEIGHT)
 		said.push(`record: the chart is ${String(Math.round(seen.chart))} px tall on a phone`);
+	return said;
+}
+
+/** The record's basis in two states the run does not carry yet, measured in the page at a budget
+ * width: Published drawn (a graded week carries it), and the worst case, Published drawn with kickers
+ * and defenses graded too. Each is said as the nightly would (research/nightly/reads/record.py). */
+function recordVariants(): readonly (readonly [string, RunRecord])[] {
+	const published = RECORD.toDate.map((line) => ({ ...line, published: line.ours }));
+	const drawn: RunRecord = {
+		...RECORD,
+		toDate: published,
+		method: RECORD.method.replace('ADP on the same', 'ADP and Published on the same')
+	};
+	const worst: RunRecord = {
+		...drawn,
+		startersBasis:
+			"Starters right counts the week's top 12 QBs, 24 RBs, 36 WRs, 12 TEs, 12 kickers and 12 defenses it also put there."
+	};
+	return [
+		['record published', drawn],
+		['record worst', worst]
+	];
+}
+
+async function variantFaults(page: Page, width: number): Promise<string[]> {
+	const said: string[] = [];
+	for (const [name, variant] of recordVariants()) {
+		await page.evaluate((text: string) => {
+			const p = document.querySelector('main [data-basis] p');
+			if (p !== null) p.textContent = text;
+		}, recordBasis(variant).join(' '));
+		const report = basisReport(name, width, await basisLines(page));
+		if (report === null) continue;
+		process.stdout.write(`${report.line}\n`);
+		if (report.fault !== null) said.push(report.fault);
+	}
 	return said;
 }
 
@@ -353,6 +422,7 @@ for (const screen of SCREENS) {
 				? await recordFaults(page, width)
 				: await orderFaults(page, screen, width))
 		);
+		if (screen.name === 'record') faults.push(...(await variantFaults(page, width)));
 		await ctx.close();
 	}
 	for (const [theme, width] of SHOTS) {
