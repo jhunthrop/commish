@@ -347,7 +347,9 @@
 		</div>
 	{:else if failure === 'host-sign-in'}
 		<main class="league">
-			<DisplayTitle size="page">{savedName || `Your ${hostWords(savedHost)} league`}</DisplayTitle>
+			<DisplayTitle size="page" wrap
+				>{savedName || `Your ${hostWords(savedHost)} league`}</DisplayTitle
+			>
 			<p class="sub">
 				Read from {hostWords(savedHost)} as a member. {savedHost === 'ffpc'
 					? 'Sign in to FFPC'
@@ -375,7 +377,7 @@
 		<main class="league">
 			<header class="lead">
 				<div class="title">
-					<DisplayTitle size="page">{sync.name || `Your ${platform} league`}</DisplayTitle>
+					<DisplayTitle size="page" wrap>{sync.name || `Your ${platform} league`}</DisplayTitle>
 					<p class="sub">
 						{#if team}
 							{team.name}, {recordWords(team)}, {myPlace(sync)} of {sync.teams.length}.

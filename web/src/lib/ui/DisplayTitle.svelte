@@ -18,13 +18,15 @@
 		size?: Size;
 		/** A tracked label after the title on the same line: what the section counts. */
 		note?: string;
+		/** A name the member owns (a league's): it wraps, balanced, and is cut only past two lines. */
+		wrap?: boolean;
 		children: Snippet;
 	}
 
-	let { size = 'section', note, children }: Props = $props();
+	let { size = 'section', note, wrap = false, children }: Props = $props();
 </script>
 
-<svelte:element this={TAGS[size]} class="title {size}">
+<svelte:element this={TAGS[size]} class="title {size}" class:wrap>
 	{@render children()}
 	{#if note}<span>{note}</span>{/if}
 </svelte:element>
@@ -58,6 +60,17 @@
 
 	.section {
 		font-size: var(--t-xl);
+	}
+
+	/* Two lines at most, never cut mid-word on the first: the switch's menu carries the whole name. */
+	.wrap {
+		display: -webkit-box;
+		-webkit-box-orient: vertical;
+		-webkit-line-clamp: 2;
+		line-clamp: 2;
+		overflow: hidden;
+		text-wrap: balance;
+		overflow-wrap: anywhere;
 	}
 
 	span {
