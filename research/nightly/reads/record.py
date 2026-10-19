@@ -62,9 +62,8 @@ ORDER_OF_SOURCE: Final = {SERVED_SOURCE: "preseason"}
 # Graded against the preseason board in season too: freezing and grading the rest-of-season board is
 # a later lane's (the coordinator's ruling of 2026-10-14), so the line says which board it grades.
 METHOD: Final = (
-    "Graded against our preseason board: each week our preseason PPR board is frozen before the week's first "
-    "kickoff and graded after its games against how its players scored, with ADP graded the same way on the same "
-    "players."
+    "Each week our preseason board froze before the first kickoff and was graded on how its players scored, "
+    "ADP and Published on the same players."
 )
 
 
@@ -182,18 +181,15 @@ def week_lines(rows: Sequence[Mapping[str, Any]]) -> tuple[Line, ...]:
 
 
 def starters_basis(to_date_lines: Sequence[Line]) -> str | None:
-    """What the starters figure counts, from the positions the record graded (review 66j M8): "Starters
-    right counts the week's top 12 QBs, 24 RBs, 36 WRs and 12 TEs, a 12-team league's starters, that the
-    order also put there." None before any week is graded."""
+    """What the starters figure counts, from the positions the record graded (review 66j M8, Lane 66t):
+    "Starters right counts the week's top 12 QBs, 24 RBs, 36 WRs and 12 TEs it also put there." None
+    before any week is graded."""
     graded = {line.position for line in to_date_lines if line.position != ALL and line.ours.starters_of > 0}
     counts = [f"{n * LEAGUE_TEAMS} {_STARTER_WORDS[p]}" for p, n in STARTERS_A_TEAM.items() if p in graded]
     if not counts:
         return None
     listed = counts[0] if len(counts) == 1 else f"{', '.join(counts[:-1])} and {counts[-1]}"
-    return (
-        f"Starters right counts the week's top {listed}, a {LEAGUE_TEAMS}-team league's starters, that the order "
-        "also put there."
-    )
+    return f"Starters right counts the week's top {listed} it also put there."
 
 
 def _pooled(scores: Sequence[Score], players: int) -> Score:

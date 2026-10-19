@@ -51,7 +51,7 @@ void test('a week’s designation keeps his rank and its chip is the word, as th
 });
 
 void test('the record says the frozen boards it grades moved no one', () => {
-	assert.match(HELD_OUT_METHOD, /as it froze, before that move\.$/u);
+	assert.match(HELD_OUT_METHOD, /graded where the board froze\.$/u);
 	assert.doesNotMatch(HELD_OUT_METHOD, bannedPattern());
 	assert.equal(recordStatusWords(CENTRAL).endsWith(HELD_OUT_METHOD), true);
 });

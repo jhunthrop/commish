@@ -50,11 +50,6 @@ export function rankAgreement(record: RunRecord): string {
 const RATE_PLACES = 2;
 export const RATE_PLACES_WORDS = 'Rates print to two decimals.';
 
-/** The agreement's basis, said once: its name, the run's scale, and its two decimals. */
-export function agreementBasis(record: RunRecord): string {
-	return `${capitalized(rankAgreement(record))}: ${record.scale} ${RATE_PLACES_WORDS}`;
-}
-
 /** Graded: our rank agreement with the finish over every graded week, its scale, the span and the
  * players it counts, and ADP's beside it. Not yet: how many of the frozen weeks are graded. */
 export function recordHeadline(record: RunRecord): RecordHeadline {
@@ -231,9 +226,9 @@ export function publishedBeside(
 export function publishedWords(record: RunRecord): string {
 	const from =
 		record.publishedFromWeek === null
-			? `graded from the first week our register keeps it, ${RECORD_BOX.none} until then`
-			: `graded from week ${String(record.publishedFromWeek)} on the same players under the fill rule, ${RECORD_BOX.none} before`;
-	return `Published is one provider's weekly projection, read before each kickoff, ${from}.`;
+			? `${RECORD_BOX.none} until our register first keeps it`
+			: `graded from week ${String(record.publishedFromWeek)}, ${RECORD_BOX.none} before`;
+	return `Published is one provider's weekly projection, ${from}.`;
 }
 
 /** The order a week graded, in the record's words (review 66j M7). */

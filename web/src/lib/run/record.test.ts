@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
 	RATE_PLACES_WORDS,
-	agreementBasis,
 	figureWords,
 	gradedOrders,
 	printPlaces,
@@ -41,11 +40,11 @@ const record = (over: Partial<RunRecord>): RunRecord => ({
 void test('the published columns say from which week they count, as the register says', () => {
 	assert.match(
 		publishedWords(record({})),
-		/graded from the first week our register keeps it, -- until then\.$/
+		/^Published is one provider's weekly projection, -- until our register first keeps it\.$/
 	);
 	assert.match(
 		publishedWords(record({ publishedFromWeek: 7 })),
-		/graded from week 7 on the same players/
+		/^Published is one provider's weekly projection, graded from week 7, -- before\.$/
 	);
 });
 
@@ -63,7 +62,7 @@ void test('the bug names the orders the graded weeks graded', () => {
 	);
 });
 
-void test('a rate in [0, 1] prints two decimals as given, and the basis says so once (ruling R2)', () => {
+void test('a rate in [0, 1] prints two decimals as given, and the headline says so once with its scale (ruling R2, Lane 66t)', () => {
 	const score = { graded: 10, agreement: 0.48, placesOff: 43, starters: 50, startersOf: 84 };
 	const graded = record({
 		weeks: [week(1, 'preseason', 'graded')],
@@ -77,11 +76,6 @@ void test('a rate in [0, 1] prints two decimals as given, and the basis says so 
 			}
 		]
 	});
-	const basis = agreementBasis(graded);
-	assert.equal(
-		basis,
-		"Order matched: 1.0 is a perfect match of the week's finishing order, 0 is none. Rates print to two decimals."
-	);
 	const headline = recordHeadline(graded);
 	assert.equal(headline.value, '0.48');
 	assert.ok(headline.caption.includes('ADP 0.37 on the same players'), headline.caption);
