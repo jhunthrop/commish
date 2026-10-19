@@ -700,12 +700,20 @@ async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> 
 		const espn = /(?:^|; )fixture_league=espn(?:;|$)/.test(req.headers.cookie ?? '')
 			? { ...contextLeague, id: ESPN_DONE, host: 'espn' as const }
 			: null;
-		send(
-			req,
-			res,
-			HTTP.ok,
-			espn ? { ...answer, league: espn } : picked ? { ...answer, league: picked } : answer
-		);
+		const chosenAnswer = espn
+			? { ...answer, league: espn }
+			: picked
+				? { ...answer, league: picked }
+				: answer;
+		// The recorded league as Yahoo's (yahoo.ts): the account names it on its platform too.
+		const yahoo = yahooAsked(req, LEAGUE);
+		const onPlatform = <T extends { id: string; host: string }>(league: T): T =>
+			yahoo && league.id === LEAGUE ? { ...league, host: 'yahoo' } : league;
+		send(req, res, HTTP.ok, {
+			...chosenAnswer,
+			league: chosenAnswer.league === null ? null : onPlatform(chosenAnswer.league),
+			leagues: chosenAnswer.leagues.map(onPlatform)
+		});
 		return;
 	}
 	// The fixture's own clock, for a shots script to check before it shoots (Lane 66x): the instant
@@ -760,7 +768,7 @@ async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> 
 				const league = phased.get(id) ?? { ...contextLeague, name: sync.name };
 				return {
 					id,
-					host: ESPN_MOVES.has(id) ? 'espn' : sync.host,
+					host: ESPN_MOVES.has(id) ? 'espn' : yahooAsked(req, id) ? 'yahoo' : sync.host,
 					host_league_id: sync.host_league_id,
 					season: sync.season,
 					name: league.name,

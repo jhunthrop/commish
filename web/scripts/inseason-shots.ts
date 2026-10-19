@@ -394,6 +394,11 @@ for (const { name, path, ready: text } of PAGES) {
 						: ['Slot', 'Player', 'Game', 'Proj', 'Pts'];
 				const heads = name === 'start' ? lineupHeads : boxHeads;
 				for (const word of await bannedSaid(page)) missing.push(`${at} says ${word}`);
+				// Sleeper adds its players' points: the bug and Totals one figure, the rows' sum (ruling (a)).
+				if (name === 'matchup') {
+					const { bug, row } = await bugAgainstTotals(page);
+					if (bug !== row) missing.push(`${at} the bug reads ${bug}, its Totals ${row}`);
+				}
 				if (name === 'start') {
 					for (const fault of await lineupFaults(page)) missing.push(`${at} ${fault}`);
 				}
@@ -591,7 +596,7 @@ await platformPass(
 	// A change offered on a player whose game has kicked off would be refused: ESPN locks him.
 	const moved = await page.evaluate(() =>
 		[...document.querySelectorAll('main table.lineup tbody tr')]
-			.filter((tr) => tr.querySelector('.mark') !== null)
+			.filter((tr) => tr.querySelector('.mark.in, .mark.out') !== null)
 			.map((tr) => tr.textContent)
 	);
 	for (const row of moved)
