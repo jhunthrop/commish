@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { adpWords } from '#lib/format/draft.ts';
-	import { count } from '#lib/format/number.ts';
+	import { poolCount } from '#lib/format/pool-words.ts';
 	import Chip from '#lib/ui/Chip.svelte';
 	import ChipGroup from '#lib/ui/ChipGroup.svelte';
 	import DisplayTitle from '#lib/ui/DisplayTitle.svelte';
@@ -95,7 +95,7 @@
 <section class="pool" class:no-chance={!chanceShown} class:readonly aria-label="Pool">
 	<div class="head">
 		<DisplayTitle size="panel">Pool</DisplayTitle>
-		<Label>{count(left)} left, ranked by points over replacement</Label>
+		<Label>{poolCount(left, 'room')}, ranked by points over replacement</Label>
 		<div class="chips">
 			<ChipGroup label="Position">
 				{#each filters as f (f)}
