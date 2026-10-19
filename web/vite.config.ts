@@ -67,6 +67,11 @@ const PILL_PARTS = /[\\/]src[\\/]lib[\\/]ui[\\/](StatusPill|StatusChip)\./;
  * member's clock: a few lines with no import but the words' own lazy one, in a file of its own, so
  * neither the shared chunk nor a page's group carries it for the others. */
 const LIVE_STATUS = /[\\/]src[\\/]lib[\\/]run[\\/]live-status\./;
+/** The site's one word per figure (format/figure-words.ts, the sweep's X1 and X2): the board row's
+ * heads, the order's, the box score's and the player card's read it, and no shell part does. It rides
+ * in the pill's group, which every page that draws those heads already loads, so neither the shared
+ * chunk nor a page's own group carries it for the others. */
+const FIGURE_WORDS = /[\\/]src[\\/]lib[\\/]format[\\/]figure-words\./;
 const STATUS_PARTS =
 	/[\\/]src[\\/]lib[\\/](format[\\/]designation\.|run[\\/](status-view|held-places|tiers)\.)/;
 /** The board's status rule (Lane 63), which the board page draws on its first paint and the order's
@@ -124,12 +129,18 @@ export default defineConfig({
 								!FIGURE_PARTS.test(id) &&
 								!STATUS_PARTS.test(id) &&
 								!LIVE_STATUS.test(id) &&
+								!FIGURE_WORDS.test(id) &&
 								!WEEK_PARTS.test(id) &&
 								!LEAGUE_PAGE_PARTS.test(id),
 							minShareCount: SHARED_BY_ROUTES,
 							priority: 1
 						},
-						{ name: 'pill', test: PILL_PARTS, minShareCount: 2, priority: 1 },
+						{
+							name: 'pill',
+							test: (id: string) => PILL_PARTS.test(id) || FIGURE_WORDS.test(id),
+							minShareCount: 2,
+							priority: 1
+						},
 						{ name: 'rows', test: ROW_PARTS, minShareCount: 2, priority: 1 },
 						{ name: 'board', test: BOARD_PARTS, minShareCount: 2, priority: 1 },
 						{ name: 'player', test: PLAYER_PARTS, minShareCount: 2, priority: 1 },
