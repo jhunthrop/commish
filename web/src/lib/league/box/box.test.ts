@@ -40,6 +40,8 @@ void test("a name's short form keeps the surname whole: the first initial, then 
 const ZONE = 'America/Chicago';
 /** Friday 9:00 pm Central, before every game of the week. */
 const READ = '2026-10-17T02:00:00.000Z';
+/** The clock the facts-read lines are drawn at: the read's own time. Never the real clock. */
+const NOW = Date.parse(READ);
 const SUNDAY_NOON = '2026-10-18T17:00:00.000Z';
 
 const facts = (over: Partial<WeekFacts> = {}): WeekFacts => ({
@@ -181,15 +183,18 @@ void test("a status is Lane 63's pill: the week's word, a season-long list's wor
 });
 
 void test('a row carries the projection, not the points a game, and no facts once kicked off', () => {
-	const row = boxRow(line(), 'QB', ZONE);
+	const row = boxRow(line(), 'QB', ZONE, true, NOW);
 	assert.equal(row.proj, 19.44);
 	assert.equal(row.pts, null);
 	assert.equal(row.expected, '26.5 to 23');
 	assert.equal(row.face.mark, false);
 	assert.equal(row.position, 'QB');
 	const kicked = boxRow(
-		line({}, { kickoff: '2020-01-01T00:00:00.000Z', points_this_week: 12.3 }),
-		'QB'
+		line({}, { kickoff: '2026-10-17T01:59:00.000Z', points_this_week: 12.3 }),
+		'QB',
+		ZONE,
+		true,
+		NOW
 	);
 	assert.equal(kicked.expected, null);
 	assert.equal(kicked.weather, null);
@@ -332,11 +337,12 @@ void test("the screen's basis lines say the Game cell's figures and the facts' r
 	assert.equal(
 		factsReadLine(
 			[line(), line({}, { game_total: { points: 40, team_points: 20, read_at: older } })],
-			ZONE
+			ZONE,
+			NOW
 		),
 		"The Game cell shows each club's expected points, his club first, then the kickoff weather, read Fri 3:00 pm Central."
 	);
-	assert.equal(factsReadLine([line({}, { bye: true })], ZONE), null);
+	assert.equal(factsReadLine([line({}, { bye: true })], ZONE, NOW), null);
 });
 
 /** The site's copy guard. */
@@ -353,8 +359,12 @@ void test('copy guard: every box word is fantasy words, with no dash or semicolo
 		projBasis(null, CLOSEST, false, ZONE),
 		totalsNote([{ proj: null, game: null }], true, 6) ?? '',
 		totalsNote([], false, 6) ?? '',
-		factsReadLine([line()], ZONE) ?? ''
+		factsReadLine([line()], ZONE, NOW) ?? ''
 	];
+	assert.ok(
+		said.at(-1)?.startsWith("The Game cell shows each club's expected points"),
+		said.at(-1)
+	);
 	for (const text of said) {
 		assert.doesNotMatch(text, BANNED, text);
 		assert.doesNotMatch(text, /[–—;]/, text);

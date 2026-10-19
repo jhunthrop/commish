@@ -23,6 +23,7 @@ export type Section =
 	| 'advisor'
 	| 'record'
 	| 'account'
+	| 'league'
 	| 'lineup'
 	| 'matchup'
 	| 'waivers'
@@ -30,6 +31,10 @@ export type Section =
 
 /** A followed league's screen, as its route segment names it: /league/<id>/<screen>. */
 export type LeagueScreen = 'start' | 'matchup' | 'waivers' | 'trades';
+/** A followed league's own page (/league/<id>: standings, roster, moves, pool). */
+export const LEAGUE_HOME = 'league';
+/** A followed league's pages: its own page and its screens. */
+export type LeaguePage = typeof LEAGUE_HOME | LeagueScreen;
 
 export interface RailItem {
 	/** The item, one word: the shell marks its link with it, and the rail's styles place it. */
@@ -42,8 +47,8 @@ export interface RailItem {
 	icon: RailIconName;
 	/** The first path segments of every page the item lights, its own first. */
 	owns: readonly string[];
-	/** The league screen the item opens, for the selected league. */
-	screen?: LeagueScreen;
+	/** The league's page the item opens, for the selected league. */
+	screen?: LeaguePage;
 }
 
 export const HOME_HREF = '/';
@@ -77,6 +82,18 @@ function screenItem(key: Section & RailIconName, label: string, screen: LeagueSc
 	return { key, section: key, label, href, icon: key, owns: [], screen };
 }
 
+/** The selected league's own page, leading its screens; the follow page for a visitor with none. Its
+ * glyph is the standings' trophy, apart from the switch's flag. */
+const LEAGUE_ITEM: RailItem = {
+	key: 'league',
+	section: 'league',
+	label: 'League',
+	href: LEAGUE_START,
+	icon: 'standings',
+	owns: [],
+	screen: LEAGUE_HOME
+};
+
 const BOARD: RailItem = {
 	key: 'board',
 	section: 'board',
@@ -101,20 +118,21 @@ const ADVISOR: RailItem = {
 	icon: 'advisor',
 	owns: ['advisor', 'companion']
 };
-const WAIVERS = screenItem('waivers', 'Waivers', 'waivers');
 
 /** Every item any rail holds, in the one order the shell draws them: each phase's rail is a run of
  * this list read top to bottom, and the rail styles (rail-css.ts) show only its own items, so the
  * order a reader tabs through is the order they see, and the page carries one list and no phase
  * table. An item a phase places elsewhere is drawn twice under its own key (the advisor first on
- * draft day, the mock draft after the sheet then, waivers after the board in the playoffs). The
- * board is "Board" before the draft and "Rest of season" once the league plays (spec §2): the same
- * page. A page lights the item whose `owns` holds its first path segment (the board's companions,
- * ADP and schedule strength, light the board), a league's screen the item that opens it. */
+ * draft day, the mock draft after the sheet then). The board is "Board" before the draft and "Rest
+ * of season" once the league plays (spec §2): the same page. A page lights the item whose `owns`
+ * holds its first path segment (the board's companions, ADP and schedule strength, light the
+ * board), a league's page the item that opens it. The league's own page leads its screens: the rail
+ * is the one way between them (Lane 66r). */
 export const RAIL_ITEMS: readonly RailItem[] = [
+	LEAGUE_ITEM,
 	screenItem('lineup', 'Lineup', 'start'),
 	screenItem('matchup', 'Matchup', 'matchup'),
-	WAIVERS,
+	screenItem('waivers', 'Waivers', 'waivers'),
 	screenItem('trades', 'Trades', 'trades'),
 	{ ...ADVISOR, key: 'advisor_first' },
 	BOARD,
@@ -138,7 +156,6 @@ export const RAIL_ITEMS: readonly RailItem[] = [
 	{ ...MOCK, key: 'mock_late' },
 	ADVISOR,
 	{ ...BOARD, key: 'rest', label: 'Rest of season' },
-	{ ...WAIVERS, key: 'waivers_late' },
 	{
 		key: 'record',
 		section: 'record',
@@ -218,40 +235,22 @@ export const RAIL_OF_WORD_SET: Readonly<Record<WordSet, RailKey>> = {
 	season: 'in_season'
 };
 
-/** Where an item goes: a league's screen for the selected league, the follow page naming it with
- * none, every other item its own page. */
+/** Where an item goes: a league's page for the selected league, the follow page with none, every
+ * other item its own page. */
 export function railHref(item: RailItem, leagueId: string | null): string {
 	if (item.screen === undefined || leagueId === null) return item.href;
-	return `/league/${encodeURIComponent(leagueId)}/${item.screen}`;
+	const screen = item.screen === LEAGUE_HOME ? '' : `/${item.screen}`;
+	return `/league/${encodeURIComponent(leagueId)}${screen}`;
 }
 
 const EVERY_ITEM: readonly RailItem[] = [...RAIL_ITEMS, RAIL_FOOT];
 
-/** The section a path belongs to, or null for a page outside the sections (the front door, a
- * league's own page, the follow page, the system page): its first segment's owner, or under
- * /league/<id>/ the screen's item. */
+/** The section a path belongs to, or null for a page outside the sections (the front door, the
+ * system page): its first segment's owner. A league's pages (/league/...) name their item
+ * themselves (rail-league.ts screenSection), so none is read from the path. */
 export function sectionOf(pathname: string): Section | null {
-	const [first = '', , screen] = pathname.split('/').filter((segment) => segment !== '');
-	const item = EVERY_ITEM.find((candidate) =>
-		first === 'league'
-			? screen !== undefined && candidate.screen === screen
-			: candidate.owns.includes(first)
-	);
-	return item?.section ?? null;
-}
-
-/** The rail item a league's screen lights: Lineup for start, and the rest by their own names. */
-export function screenSection(screen: LeagueScreen): Section {
-	const item = EVERY_ITEM.find((candidate) => candidate.screen === screen);
-	if (!item) throw new Error(`No rail item opens the ${screen} screen.`);
-	return item.section;
-}
-
-/** The league screen a search parameter names (the follow page's ?screen=), null for any other. */
-export function leagueScreenOf(word: string | null): LeagueScreen | null {
-	return (
-		EVERY_ITEM.find((item) => item.screen !== undefined && item.screen === word)?.screen ?? null
-	);
+	const [first = ''] = pathname.split('/').filter((segment) => segment !== '');
+	return EVERY_ITEM.find((candidate) => candidate.owns.includes(first))?.section ?? null;
 }
 
 /** Every href the shell links to before a league is selected. The mock room's routes arrive with

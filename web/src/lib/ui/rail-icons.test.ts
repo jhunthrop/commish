@@ -19,7 +19,7 @@ void test('every rail item has its glyph in the sprite', () => {
 });
 
 void test('the in-season glyphs are drawn in the set', () => {
-	for (const name of ['lineup', 'matchup', 'waivers', 'trades'] as const) {
+	for (const name of ['standings', 'lineup', 'matchup', 'waivers', 'trades'] as const) {
 		assert.ok(RAIL_ICONS[name].length > 0);
 		assert.ok(sprite.includes(`id="rail-${name}"`));
 	}

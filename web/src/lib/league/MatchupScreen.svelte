@@ -5,7 +5,7 @@
 	import { ApiError, leagueApi, type LeagueSync } from './api.ts';
 	import { inSeasonApi, type MatchupBox } from './inseason/api.ts';
 	import InSeasonPage from './inseason/InSeasonPage.svelte';
-	import { TAB_LABELS } from './inseason/words.ts';
+	import { SCREEN_TITLES } from './inseason/words.ts';
 	import MatchupPanel from './MatchupPanel.svelte';
 
 	/** A followed league's Matchup screen (spec 2026-10-16 §3, Lane 66d): this week's game as a box
@@ -58,7 +58,7 @@
 <InSeasonPage
 	{id}
 	screen="matchup"
-	title={TAB_LABELS.matchup}
+	title={SCREEN_TITLES.matchup}
 	stamp={() => ''}
 	{read}
 	reserve={RESERVE_ROWS}

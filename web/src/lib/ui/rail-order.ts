@@ -1,6 +1,6 @@
 /** Each season phase's rail as a list (spec 2026-10-16 §2): the phone's five in order, then what the
  * wide rail adds. Apart from nav.ts, so the shell's script carries only the items: the server
- * builds the rail styles from this (rail-css.ts), and a league's pages read their tabs from it. */
+ * builds the rail styles from this (rail-css.ts), and a league's pages read their screens from it. */
 import {
 	PHONE_RAIL_ITEMS,
 	RAIL_ITEMS,
@@ -14,14 +14,17 @@ export interface RailEntry extends RailItem {
 	wideOnly: boolean;
 }
 
+/** The league's pages, in season and in the playoffs: the rail is the one way between them, so the
+ * phone's five are these (Lane 66r). */
+const LEAGUE_PAGES = ['league', 'lineup', 'matchup', 'waivers', 'trades'];
+
 /** Each phase's rail, top to bottom: the phone's five in order, then what the wide rail adds above
- * the Account foot (spec §2). Waivers return to the playoffs' wide rail only while the host runs
- * them (railFor). */
+ * the Account foot (spec §2). In the playoffs Waivers stay only while the host runs them (railFor). */
 const RAIL_ORDER: Readonly<Record<LeaguePhase, readonly string[]>> = {
 	pre_draft: ['board', 'players', 'mock', 'sheet', 'advisor', 'record'],
 	draft_day: ['advisor_first', 'board', 'players', 'sheet', 'mock_late', 'record'],
-	in_season: ['lineup', 'matchup', 'waivers', 'trades', 'players', 'rest', 'record'],
-	playoffs: ['lineup', 'matchup', 'trades', 'players', 'rest', 'waivers_late', 'record'],
+	in_season: [...LEAGUE_PAGES, 'players', 'rest', 'record'],
+	playoffs: [...LEAGUE_PAGES, 'players', 'rest', 'record'],
 	offseason: ['board', 'players', 'mock', 'sheet', 'advisor', 'record']
 };
 
@@ -33,7 +36,8 @@ function itemNamed(key: string): RailItem {
 
 /** The rail for a phase: the phone's five first, the wide rail's own after them. */
 export function railFor(phase: LeaguePhase, waiversOpen: boolean): readonly RailEntry[] {
-	const keys = RAIL_ORDER[phase].filter((key) => !(key === 'waivers_late' && !waiversOpen));
+	const closed = phase === 'playoffs' && !waiversOpen;
+	const keys = RAIL_ORDER[phase].filter((key) => !(closed && key === 'waivers'));
 	return keys.map((key, i) => ({ ...itemNamed(key), wideOnly: i >= PHONE_RAIL_ITEMS }));
 }
 
