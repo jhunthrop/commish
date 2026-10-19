@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { siteContext } from '#lib/context/context.svelte.ts';
-	import { poolCount } from '#lib/format/pool-words.ts';
 	import RowSheetMark from '#lib/site/RowSheetMark.svelte';
 	import SiteShell from '#lib/site/SiteShell.svelte';
 	import { lazySheet } from '#lib/site/lazy-sheet.svelte.ts';
@@ -153,7 +152,7 @@
 					</BoardTable>
 				</div>
 				<div class="more">
-					<Quiet href={links.board(format.id)}>All {poolCount(page.boardSize, 'board')}</Quiet>
+					<Quiet href={links.board(format.id)}>All {page.boardCount}</Quiet>
 					<Quiet href={links.adp(format.id)}>ADP</Quiet>
 				</div>
 			</section>

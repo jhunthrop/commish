@@ -22,7 +22,9 @@ export const PLATFORMS: Readonly<Record<LeagueHost, Platform>> = {
 	espn: { liveDraft: false, switched: true }
 };
 
-export const LEAGUE_HOSTS = Object.keys(PLATFORMS) as readonly LeagueHost[];
+/** The platforms in naming order, apart from their flags so a page that only lists them (the shell's
+ * league switch) carries no flags; the test holds the two to one order. */
+export const LEAGUE_HOSTS: readonly LeagueHost[] = ['sleeper', 'mfl', 'ffpc', 'yahoo', 'espn'];
 
 /** What following a league gives in season, in one sentence for a first-timer: the three in-season
  * screens, by what each decides. Said on the follow page and on the signed-out account page. */

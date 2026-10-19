@@ -1,6 +1,7 @@
 /** The front door: the top of the default board in the board's order, and the record's headline,
  * from the run. */
 import { carriesGap } from '#lib/format/gap.ts';
+import { poolCount } from '#lib/format/pool-words.ts';
 import { adpDrafts } from '#lib/run/adp-drafts.ts';
 import { boardBasis, type BasisPart } from '#lib/run/board-basis.ts';
 import { withStatuses } from '#lib/run/board-status.ts';
@@ -34,6 +35,8 @@ export interface FrontPage extends BoardStatuses {
 	framing: RowFraming;
 	/** How many players the whole board ranks. */
 	boardSize: number;
+	/** That count with its pool named, as the strip's link says it: "619 on our board". */
+	boardCount: string;
 	/** The record's one number and its caption, the only part of the record the front door prints. */
 	record: RecordHeadline & { season: number };
 }
@@ -70,6 +73,7 @@ export async function frontPage(): Promise<FrontPage> {
 		scale: rangeScale(rows),
 		framing: rowFraming(format),
 		boardSize: loaded.rows.length,
+		boardCount: poolCount(loaded.rows.length, 'board'),
 		record: { ...recordHeadline(kept), season: kept.season },
 		// The rows' statuses as the board's, drawn with the shared pill (review finding 7).
 		...boardStatuses(rows, capture, format)
