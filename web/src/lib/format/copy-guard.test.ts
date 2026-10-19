@@ -155,7 +155,7 @@ void test('data strings come from name fields at any depth, numbers and other fi
 void test("the room's socket frames are data by their fields, as an answer is (the sweep's C8)", () => {
 	const frame = JSON.stringify({
 		type: 'update',
-		state: { picks: [{ by_name: 'helperA', player: { name: 'Jadarian Price', position: 'RB' } }] }
+		state: { picks: [{ handle: 'helperA', player: { name: 'Jadarian Price', position: 'RB' } }] }
 	});
 	const data = frameData(frame);
 	assert.deepEqual([...data].sort(), ['Jadarian Price', 'helperA']);
