@@ -481,24 +481,20 @@ function pickupTable(advice: WaiverAdvice): WaiverAdvice {
 			stampedLineup.slots.map((s) => s.slot)
 		).map((l) => l.player.host_id)
 	);
+	// The drop panel hides nothing (coordinator's ruling, Lane 66u): every player the member could
+	// drop, this week's starters marked; the defense's second is droppable, as the API's position rule
+	// allows with two on the roster.
 	const panel = [
 		...bench,
-		...stampedLineup.slots
-			.map((s) => s.ours)
-			.filter(
-				(l) =>
-					!l.held &&
-					l.player.position !== DEFENSE &&
-					l.player.position !== KICKER &&
-					!seasonStarts.has(l.player.host_id)
-			)
+		...stampedLineup.slots.map((s) => s.ours).filter((l) => !l.held && !bench.includes(l))
 	];
 	const rows = pool.map((source): WaiverAdvice['rows'][number] => {
 		const row = source.add.player.position === DEFENSE ? source : { ...source, drop: cheapest };
 		const own = week(row.add, row.drop);
-		// A defense replaces the starting defense alone; a skill player any player the panel keeps (review
-		// 66u finding 1): the bench, and this week's starters the rest-of-season lineup does not start,
-		// each starter marked. The row's own drop stays the cheapest bench player.
+		// A defense replaces the starting defense alone; a skill player any player on the panel. The
+		// row's own drop is the API's rule on these figures: the largest rest-of-season gain among the
+		// drops that keep this week's lineup full, a bench player first and the cheapest when gains tie,
+		// so the cheapest bench player the rest-of-season lineup does not start.
 		const choices = source.add.player.position === DEFENSE ? (row.drop ? [row.drop] : []) : panel;
 		const drops = choices
 			.map((d) => ({

@@ -88,10 +88,11 @@ type Change struct {
 // stands is a side the finder may keep the trade for.
 func (c Change) stands() bool { return c.Fills && c.Room }
 
-// change is the side's change from losing out and taking in. The drop
-// is looked for only when the side takes in more than it gives with no
-// open spot and, unless always, only when it gains: a drop never raises
-// a lineup, so the finder refuses a trade with no gain as it is.
+// change is the side's change from losing out and taking in, its gain
+// after any drop. The drop is looked for only when the side takes in more
+// than it gives with no open spot and, unless always, only when it gains:
+// a drop never raises a lineup, so the finder refuses a trade with no gain
+// as it is.
 func (s tradeSide) change(f *filler, out []int, in []*Candidate, always bool) Change {
 	strength, filled := f.strength(f.swap(s.players, out, in...))
 	c := Change{Gain: strength - s.base, Drop: -1, DropFor: -1, DropSlot: -1, ForSlot: -1, Fills: filled >= s.filled, Open: -1, Room: true}
@@ -102,11 +103,14 @@ func (s tradeSide) change(f *filler, out []int, in []*Candidate, always bool) Ch
 	if len(in) <= len(out) || s.squad.Open || (!always && !positive(c.Gain)) {
 		return c
 	}
-	var taken takenSpot
-	c.Drop, taken = s.withDrop(f, out, in)
-	c.Room = c.Drop >= 0
-	if taken.by >= 0 {
-		c.DropFor, c.DropSlot, c.ForSlot = taken.by, s.drops.spotOf(c.Drop), taken.slot
+	drop, ok := s.withDrop(f, c.Gain, out, in)
+	c.Room = ok
+	if !ok {
+		return c
+	}
+	c.Drop, c.Gain = drop.at, drop.gain
+	if drop.spot.by >= 0 {
+		c.DropFor, c.DropSlot, c.ForSlot = drop.spot.by, s.drops.spotOf(drop.at), drop.spot.slot
 	}
 	return c
 }
@@ -122,52 +126,56 @@ func (s tradeSide) emptied(fill []int) int {
 	return -1
 }
 
-// withDrop is §5.2's drop for a roster a trade grows past its spots:
-// the player it costs least to lose, never one it gives, never a starter
-// after the trade, never one the drop rule keeps; -1 for nobody. A player
-// the fill does not start changes no slot, so every allowed drop leaves
-// the lineup strength as it is and the one to drop is the last of them on
-// our order. A player this week's lineup starts goes only when no bench
-// player may (Lane 66u), and only when the move keeps this week's lineup
-// full and starts one of in (takesHisSpot): who and where is the second
-// answer (noSpot for none).
-func (s tradeSide) withDrop(f *filler, out []int, in []*Candidate) (int, takenSpot) {
-	f.strength(f.swap(s.players, out, in...))
+// withDrop is §5.2's drop for a roster a trade grows past its spots
+// (coordinator's ruling, Lane 66u): never one it gives, never one the drop
+// rule keeps, never one whose loss leaves a rest-of-season slot empty;
+// among those that keep this week's lineup full (a bench player, or a
+// starter whose place a player taken in takes), the one with the largest
+// rest-of-season gain (recommend). False for nobody.
+//
+// A player the rest-of-season fill after the trade does not start changes
+// no slot, so his gain is the trade's as it is, the most any drop keeps;
+// the players it starts are reckoned one by one only when none of the
+// others keeps this week's lineup full.
+func (s tradeSide) withDrop(f *filler, gain float64, out []int, in []*Candidate) (dropOption, bool) {
 	counts := s.countsAfter(out, in)
-	bench, at := -1, 0
-	var starters []int
-	for d, p := range s.players {
-		if contains(out, d) {
-			continue
-		}
-		started := f.started(at)
-		at++
-		if started || !s.drops.allowed(d, in[0], counts) {
-			continue
-		}
-		if s.drops.startsThisWeek(d) {
-			starters = append(starters, d)
-			continue
-		}
-		if bench < 0 || across(s.players[bench], p, false) {
-			bench = d
-		}
-	}
-	if bench >= 0 || len(starters) == 0 {
-		return bench, noSpot
-	}
-	// The one it costs least to lose first.
-	sort.SliceStable(starters, func(i, j int) bool { return across(s.players[starters[j]], s.players[starters[i]], false) })
 	taken := make([]Candidate, len(in))
 	for k, c := range in {
 		taken[k] = *c
 	}
-	for _, d := range starters {
-		if spot := s.drops.takesHisSpot(d, out, taken); spot.by >= 0 {
-			return d, spot
+	f.strength(f.swap(s.players, out, in...))
+	var benched, started []int
+	at := 0
+	for d := range s.players {
+		if contains(out, d) {
+			continue
+		}
+		starts := f.started(at)
+		at++
+		if !s.drops.allowed(d, in[0], counts) {
+			continue
+		}
+		if starts {
+			started = append(started, d)
+		} else {
+			benched = append(benched, d)
 		}
 	}
-	return -1, noSpot
+	options := make([]dropOption, 0, len(benched))
+	for _, d := range benched {
+		options = append(options, dropOption{at: d, gain: gain, spot: noSpot})
+	}
+	if best, ok := s.drops.recommend(options, out, taken); ok {
+		return best, true
+	}
+	options = options[:0]
+	for _, d := range started {
+		strength, filled := f.strength(f.swap(s.players, withOne(out, d), in...))
+		if filled >= s.filled {
+			options = append(options, dropOption{at: d, gain: strength - s.base, spot: noSpot})
+		}
+	}
+	return s.drops.recommend(options, out, taken)
 }
 
 // countsAfter is the side's players a position after losing out and

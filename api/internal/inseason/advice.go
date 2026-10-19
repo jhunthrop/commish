@@ -600,6 +600,12 @@ func waiverRow(w *Writer, week *pickupWeek, mine []person, add person, move Waiv
 	// The sentence says he starts only when he starts this week.
 	move.Starts = row.Starts
 	row.Sentence = w.Waiver(add.words, drop, move)
+	// A drop this week's lineup starts says who starts in his place (Lane 66u).
+	if drop != nil && move.DropSlot >= 0 && move.ForSlot >= 0 {
+		slots := Slots(week.config)
+		row.Sentence = sentence(row.Sentence, w.StarterDrop(*drop, add.words, SlotLabel(slots, move.DropSlot),
+			SlotLabel(slots, move.ForSlot), AddMove))
+	}
 	return row
 }
 

@@ -67,11 +67,19 @@ func TestAStarterGoesOnlyForHisSpot(t *testing.T) {
 		if tr.Drop < 0 {
 			continue
 		}
-		if mine[tr.Drop].ID != "m-qb2" {
-			t.Fatalf("%s drops %s, a held or starting player", words, mine[tr.Drop].ID)
-		}
-		if tr.DropFor < 0 || tr.ForSlot < 0 || !slots[tr.ForSlot].accepts(theirs[tr.Get[tr.DropFor]].Position) {
-			t.Fatalf("%s drops this week's starting QB and names nobody who starts in his place", words)
+		switch mine[tr.Drop].ID {
+		case "m-qb2":
+			if tr.DropFor < 0 || tr.ForSlot < 0 || !slots[tr.ForSlot].accepts(theirs[tr.Get[tr.DropFor]].Position) {
+				t.Fatalf("%s drops this week's starting QB and names nobody who starts in his place", words)
+			}
+		case "m-qb":
+			// On the bench this week: the drop that keeps the lineup full
+			// when nobody brought in starts.
+			if tr.DropFor >= 0 {
+				t.Fatalf("%s names a spot for a bench drop", words)
+			}
+		default:
+			t.Fatalf("%s drops %s, a held player", words, mine[tr.Drop].ID)
 		}
 	}
 	tr, ok := seen["m-qb for t-qb+t-wr5"]
@@ -157,7 +165,18 @@ func TestWaiversMarkThisWeeksStarters(t *testing.T) {
 	config := twelveTeamPPR(t)
 	mine := dartRoster()
 	pool := []Candidate{withProj(player("x-wr", draft.WR, 5, 140), 15), withProj(player("x-qb", draft.QB, 2, 90), 30)}
+	players := 0
+	for _, c := range mine {
+		if skill(c.Position) {
+			players++
+		}
+	}
 	for _, w := range Waivers(config, SeasonGames, Squad{Players: mine}, pool) {
+		// Nothing hidden: every skill player is in the panel, the
+		// rest-of-season starters too (coordinator's ruling).
+		if len(w.Drops) != players {
+			t.Fatalf("%s: the panel lists %d of %d players", pool[w.Add].ID, len(w.Drops), players)
+		}
 		marked := false
 		for _, d := range w.Drops {
 			if mine[d.At].ID == "m-qb2" {
@@ -209,10 +228,45 @@ func TestTradeDropSentence(t *testing.T) {
 		{"QB", "QB", "Dart starts at QB for you this week, and Mahomes takes that spot after the trade."},
 		{"RB2", "Flex", "Dart starts at RB2 for you this week. After the trade Mahomes starts at Flex and your lineup stays full."},
 	} {
-		got := w.TradeDrop(Line{Name: "Jaxson Dart"}, Line{Name: "Patrick Mahomes"}, tc.slot, tc.bySlot)
+		got := w.StarterDrop(Line{Name: "Jaxson Dart"}, Line{Name: "Patrick Mahomes"}, tc.slot, tc.bySlot, TradeMove)
 		if got != tc.want {
 			t.Errorf("sentence %q, want %q", got, tc.want)
 		}
 		guard(t, got)
+	}
+}
+
+// The recommended drop is the largest rest-of-season gain among the drops
+// that keep this week's lineup full (coordinator's ruling, Lane 66u): with
+// every bench player but m-qb held, dropping m-qb, the rest-of-season QB,
+// costs the season, while dropping m-qb2, who starts at QB this week, costs
+// nothing once m-qb takes his spot; so the starter beats the bench player,
+// in the trade finder and on Waivers alike.
+func TestAStarterDropBeatsTheBestBenchDrop(t *testing.T) {
+	config := twelveTeamPPR(t)
+	mine := dartRoster()
+	held := map[string]bool{"m-rb4": true, "m-wr4": true, "m-te2": true, "m-rb5": true}
+	theirs := rosterWithProj(deepAtReceiver(), 6)
+	squad := Squad{Players: mine, Held: held}
+	// m-rb3 for t-wr4 and t-wr5, two receivers who start this week.
+	checked := Check(config, SeasonGames, squad, Squad{Players: theirs}, []int{3}, []int{6, 7})
+	if checked.Drop < 0 || mine[checked.Drop].ID == "m-qb" || checked.DropFor < 0 {
+		t.Fatalf("the trade drops %d (for %d), want a starter with a player who starts for him", checked.Drop, checked.DropFor)
+	}
+	f := newFiller(Slots(config), SeasonGames)
+	base, _ := f.strength(pointers(mine))
+	without := func(drop string) float64 {
+		after := Swapped(mine, []int{3, indexOf(mine, drop)}, []Candidate{theirs[6], theirs[7]})
+		s, _ := f.strength(pointers(after))
+		return s - base
+	}
+	if dropped := mine[checked.Drop].ID; !(without(dropped) > without("m-qb")) || !near(checked.MyGain, without(dropped)) {
+		t.Fatalf("gains: %s %v, m-qb %v, the trade's %v", dropped, without(dropped), without("m-qb"), checked.MyGain)
+	}
+	add := []Candidate{withProj(player("x-wr", draft.WR, 5, 140), 15)}
+	for _, w := range Waivers(config, SeasonGames, squad, add) {
+		if w.Drop < 0 || mine[w.Drop].ID == "m-qb" || w.DropSlot < 0 || w.ForSlot < 0 {
+			t.Fatalf("the waiver move drops %d (%d, %d), want a starter with his spot", w.Drop, w.DropSlot, w.ForSlot)
+		}
 	}
 }

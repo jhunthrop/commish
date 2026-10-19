@@ -254,16 +254,22 @@ func (w *Writer) Waiver(add Line, drop *Line, move Waiver) string {
 	return fmt.Sprintf("%s is not in our order and would not start for you.", add.Name)
 }
 
-// TradeDrop is a trade's sentence when its drop starts this week (Lane
-// 66u): the spot he starts in, and the player the trade brings in with
-// the slot he actually takes, the lineup kept full; a chain of moves
-// fills the rest.
-func (w *Writer) TradeDrop(drop, by Line, slot, bySlot string) string {
+// Moves a starter's drop is said for: the trade's, and the waiver add's.
+const (
+	TradeMove = "the trade"
+	AddMove   = "the add"
+)
+
+// StarterDrop is the sentence for a drop this week's lineup starts (Lane
+// 66u): the spot he starts in, and the player the move brings in with the
+// slot he actually takes, the lineup kept full; a chain of moves fills the
+// rest. move is TradeMove or AddMove.
+func (w *Writer) StarterDrop(drop, by Line, slot, bySlot, move string) string {
 	if bySlot == slot {
-		return fmt.Sprintf("%s starts at %s for you this week, and %s takes that spot after the trade.", drop.short(), slot, by.short())
+		return fmt.Sprintf("%s starts at %s for you this week, and %s takes that spot after %s.", drop.short(), slot, by.short(), move)
 	}
-	return fmt.Sprintf("%s starts at %s for you this week. After the trade %s starts at %s and your lineup stays full.",
-		drop.short(), slot, by.short(), bySlot)
+	return fmt.Sprintf("%s starts at %s for you this week. After %s %s starts at %s and your lineup stays full.",
+		drop.short(), slot, move, by.short(), bySlot)
 }
 
 // dropWords names the drop, or says an open spot needs none.

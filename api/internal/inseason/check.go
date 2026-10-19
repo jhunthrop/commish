@@ -252,8 +252,8 @@ func (a *advisor) tradeRow(mine, theirs []person, tr Trade, week tradeWeek) apit
 	}
 	if tr.Drop >= 0 && tr.DropFor >= 0 && tr.DropSlot >= 0 && tr.ForSlot >= 0 {
 		w := &Writer{Basis: a.basis, Now: a.now}
-		reason := w.TradeDrop(mine[tr.Drop].words, theirs[tr.Get[tr.DropFor]].words, SlotLabel(a.slots, tr.DropSlot),
-			SlotLabel(a.slots, tr.ForSlot))
+		reason := w.StarterDrop(mine[tr.Drop].words, theirs[tr.Get[tr.DropFor]].words, SlotLabel(a.slots, tr.DropSlot),
+			SlotLabel(a.slots, tr.ForSlot), TradeMove)
 		row.DropReason = &reason
 	}
 	return row
