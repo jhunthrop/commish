@@ -135,17 +135,18 @@ func TestEveryScreenCarriesTheFigure(t *testing.T) {
 	lineup, _ := a.Lineup()
 	waivers, _ := a.Waivers("", "")
 	trades, _ := a.Trades("")
-	sentence := RestOfSeasonBasis(7)
-	if !strings.HasSuffix(trades.Basis, " "+sentence) {
-		t.Errorf("basis %q does not end on %q", trades.Basis, sentence)
+	sentence := PerGameBasis()
+	// Trades says it only with a trade opened, apart from its basis (Lane 66t).
+	if trades.PerGameBasis != sentence || strings.Contains(trades.Basis, sentence) {
+		t.Errorf("per game %q, basis %q", trades.PerGameBasis, trades.Basis)
 	}
 	// The builder opens under the Trades basis, which says it (review 66u).
 	if strings.Contains(trades.CheckBasis, sentence) {
 		t.Errorf("the builder's basis %q says it again", trades.CheckBasis)
 	}
-	// Waivers heads the figure "Rest of season" and says so first (Lane 66f).
-	if !strings.HasPrefix(waivers.SeasonBasis, RestOfSeasonBasis(7)+" ") {
-		t.Errorf("season basis %q does not start on %q", waivers.SeasonBasis, RestOfSeasonBasis(7))
+	// Waivers says it after the Gain (Lane 66t).
+	if !strings.HasSuffix(waivers.SeasonBasis, " "+sentence) {
+		t.Errorf("season basis %q does not end on %q", waivers.SeasonBasis, sentence)
 	}
 	if strings.Contains(lineup.Basis, sentence) {
 		t.Errorf("the lineup basis %q speaks of points a game", lineup.Basis)

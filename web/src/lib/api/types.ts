@@ -3049,8 +3049,12 @@ export interface components {
 			projection_previous_read_at: string | null;
 			/** @description the honesty line: the lineup starts the highest week_projection at each slot after this week's designations and byes, the rest-of-season order breaking ties and standing in where a player has none */
 			basis: string;
-			/** @description the rest of the basis, said once under the rows: the league's rules points so far leave out, empty when they leave out none (the page says what Proj and Pts are itself) */
+			/** @description the league's scoring rules Avg and Last leave out because our stats lack them, counted ("Avg and Last leave out four of your scoring rules our stats lack."), empty when they leave out none */
 			basis_note: string;
+			/** @description the words of basis_note's link to the league's Settings, where the rules are listed ("Which four"); empty with no basis_note */
+			basis_note_link: string;
+			/** @description the rules basis_note counts, in words ("two-point conversions"), for the league's Settings to list; empty when it counts none */
+			uncounted_rules: string[];
 			order_basis: components['schemas']['OrderBasis'];
 			/**
 			 * Format: date-time
@@ -3320,8 +3324,10 @@ export interface components {
 			week: number;
 			/** @description what the order and its two figures are, said once under the rows */
 			basis: string;
-			/** @description the league the points over replacement are for (a 12-team PPR league for a reader with none of their own), and the rules it scores that the season's points (Avg and Last) leave out */
+			/** @description the league's scoring rules Avg and Last leave out because our stats lack them, counted ("Avg and Last leave out four of your scoring rules our stats lack."), empty when they leave out none */
 			basis_note: string;
+			/** @description the words of basis_note's link to the league's Settings, where the rules are listed ("Which four"); empty with no basis_note */
+			basis_note_link: string;
 			order_basis: components['schemas']['OrderBasis'];
 			/**
 			 * Format: date-time
@@ -3392,8 +3398,10 @@ export interface components {
 			basis: string;
 			/** @description what the Rest of season column and a gain over the rest of the season are, said once under the rows */
 			season_basis: string;
-			/** @description the rest of the basis, said once under the rows: the league the points over replacement are for and the league's rules points so far leave out */
+			/** @description the league's scoring rules Avg and Last leave out because our stats lack them, counted ("Avg and Last leave out four of your scoring rules our stats lack."), empty when they leave out none */
 			basis_note: string;
+			/** @description the words of basis_note's link to the league's Settings, where the rules are listed ("Which four"); empty with no basis_note */
+			basis_note_link: string;
 			order_basis: components['schemas']['OrderBasis'];
 			/** Format: date-time */
 			refreshed: string;
@@ -3600,13 +3608,18 @@ export interface components {
 		};
 		TradeAdvice: {
 			week: number;
-			/** @description the trade builder's honesty line, shown before its first answer (TradeCheck.basis says the same) */
+			/** @description the trade builder's own line under its scoreboard, shown before its first answer (TradeCheck.basis says the same) */
 			check_basis: string;
+			/** @description what the opened rows' points a game is, said only while a trade is opened or the builder is open; empty when no player shown carries the figure */
+			per_game_basis: string;
+			/** @description which trades are listed, who decides and what a Gain is */
+			basis: string;
 			/** @description every player on the drafter's active roster (injured reserve and taxi spots left out), by position then name: the picker's own players, a trade found or not */
 			roster: components['schemas']['PlayerLine'][];
-			basis: string;
-			/** @description the rest of the basis, said once under the rows: the league the points over replacement are for and the league's rules points so far leave out */
+			/** @description the league's scoring rules Avg and Last leave out because our stats lack them, counted ("Avg and Last leave out four of your scoring rules our stats lack."), empty when they leave out none */
 			basis_note: string;
+			/** @description the words of basis_note's link to the league's Settings, where the rules are listed ("Which four"); empty with no basis_note */
+			basis_note_link: string;
 			order_basis: components['schemas']['OrderBasis'];
 			/** Format: date-time */
 			refreshed: string;
@@ -3689,7 +3702,10 @@ export interface components {
 			week: number;
 			/** @description the honesty line beside the answer */
 			basis: string;
+			/** @description the league's scoring rules Avg and Last leave out because our stats lack them, counted ("Avg and Last leave out four of your scoring rules our stats lack."), empty when they leave out none */
 			basis_note: string;
+			/** @description the words of basis_note's link to the league's Settings, where the rules are listed ("Which four"); empty with no basis_note */
+			basis_note_link: string;
 			order_basis: components['schemas']['OrderBasis'];
 			/** Format: date-time */
 			refreshed: string;

@@ -1,10 +1,12 @@
 package inseason
 
 import (
-	"fmt"
-
 	"github.com/jhunthrop/commish/api/internal/boards"
 )
+
+// perGameWord heads the figure on every screen: the order's A game,
+// Trades' and Waivers' too.
+const perGameWord = "A game"
 
 // GamesLeft is each club's games from week first through LastWeek, the
 // weeks the rest-of-season order covers: a bye is no game.
@@ -43,30 +45,30 @@ func carriesPerGame(b boards.Board) bool {
 	return b.Order == boards.OrderRestOfSeason && b.FromWeek >= 1
 }
 
-// withPerGame is a page's basis with the figure's sentence when any of
-// the page's players carries it: a board that could carry it but whose
-// rows do not (no game read from its first week) says nothing about it.
+// perGameSaid is the figure's sentence when any of the page's players
+// carries it, "" else: a board that could carry it but whose rows do not
+// (no game read from its first week) says nothing about it.
+func perGameSaid(b boards.Board, people ...[]person) string {
+	if !perGameShown(b, people...) {
+		return ""
+	}
+	return PerGameBasis()
+}
+
+// withPerGame is a basis with the figure's sentence after it when any of
+// the page's players carries it.
 func withPerGame(b boards.Board, basis string, people ...[]person) string {
-	if !perGameShown(b, people...) {
-		return basis
+	if said := perGameSaid(b, people...); said != "" {
+		return basis + " " + said
 	}
-	return basis + " " + RestOfSeasonBasis(b.FromWeek)
+	return basis
 }
 
-// RestOfSeasonBasis is the sentence for the figure, which Trades and
-// Waivers both head "Rest of season" (Lane 66f, 66u): one unit, said in
-// one way.
-func RestOfSeasonBasis(fromWeek int) string {
-	return fmt.Sprintf("Rest of season is his points a game on our rest-of-season projection from week %d, byes out.", fromWeek)
-}
-
-// withRestOfSeason is the Waivers screen's season line: the figure's
-// sentence first when any of its players carries it, then basis.
-func withRestOfSeason(b boards.Board, basis string, people ...[]person) string {
-	if !perGameShown(b, people...) {
-		return basis
-	}
-	return RestOfSeasonBasis(b.FromWeek) + " " + basis
+// PerGameBasis is the sentence for the figure, headed by its one word on
+// every screen (the figure words' perGame, Lane 66s, 66t): one unit, said
+// in one way.
+func PerGameBasis() string {
+	return perGameWord + " is his rest-of-season points over the games his club has left."
 }
 
 // perGameShown is whether any of the page's players carries the figure.

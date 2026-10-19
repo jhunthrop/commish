@@ -81,18 +81,14 @@ func TestTheMembersDropLeavesTheWeekFigure(t *testing.T) {
 	}
 }
 
-// The finder's basis keeps the board's own words for what the gains are on,
-// and says the order its trades come in (review M2).
+// The finder's basis keeps the board's own words for what the gains are on
+// (review M2): the preseason number never names the rest of the season.
 func TestTradesBasisSaysItsOrder(t *testing.T) {
-	rest := TradesBasis(RestOfSeason, 12)
-	// The order said plainly (rereview N3).
-	if !strings.HasPrefix(rest, "Trades where both lineups gain on our rest-of-season order. Each team's best trade, yours first, ") ||
-		!strings.Contains(rest, "at least 0.5 a week") || !strings.Contains(rest, "then the close calls for them") {
+	if rest := TradesBasis(RestOfSeason, 12); !strings.Contains(rest, "on our rest-of-season order.") {
 		t.Fatalf("rest of season: %q", rest)
 	}
 	pre := TradesBasis(Preseason, 17)
-	if !strings.HasPrefix(pre, "Trades where both lineups gain on our preseason number. ") ||
-		strings.Contains(pre, "rest of the season") || strings.Contains(pre, "rest-of-season") {
+	if !strings.HasSuffix(pre, "on our preseason number.") || strings.Contains(pre, "rest of the season") || strings.Contains(pre, "rest-of-season") {
 		t.Fatalf("preseason: %q", pre)
 	}
 }
@@ -133,7 +129,7 @@ func TestTradeAnswersCarryTheWeekAndTheTotals(t *testing.T) {
 	if advice.ProjectionReadAt == nil || advice.ProjectionScoring.Format == "" {
 		t.Fatalf("the projection's read and scoring: %v %+v", advice.ProjectionReadAt, advice.ProjectionScoring)
 	}
-	if !strings.Contains(advice.Basis, "then the close calls for them") {
+	if !strings.Contains(advice.Basis, "The other team decides.") {
 		t.Fatalf("basis %q", advice.Basis)
 	}
 	checked := 0
