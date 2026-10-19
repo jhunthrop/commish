@@ -61,6 +61,7 @@ const row = (over: Partial<TradeRow> = {}): TradeRow => ({
 	give: [line('Kyren Williams')],
 	get: [line('Nico Collins', 'WR')],
 	drop: null,
+	drop_reason: null,
 	my_gain: 2.1,
 	their_gain: -0.8,
 	close_for_them: true,
@@ -109,6 +110,12 @@ void test('a roster with no one to drop says so before any gain, and one with ro
 	assert.match(
 		checkWords(check({ drop: line('Jaxson Dart', 'QB') })),
 		/You drop Jaxson Dart to make room\.$/
+	);
+	// A drop this week's lineup starts says who takes his spot, in the API's sentence (Lane 66u).
+	const reason = 'Dart starts at QB for you this week, and Mahomes takes that spot after the trade.';
+	assert.match(
+		checkWords(check({ drop: line('Jaxson Dart', 'QB'), drop_reason: reason })),
+		/You drop Jaxson Dart to make room\. Dart starts at QB for you this week, and Mahomes takes that spot after the trade\.$/
 	);
 });
 

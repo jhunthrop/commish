@@ -208,6 +208,7 @@
 					<td class="edge"></td>
 					<td colspan={COLUMNS - 1}>
 						{#if week}<p class="week-line">{week}</p>{/if}
+						{#if entry.row.drop_reason}<p class="drop-why">{entry.row.drop_reason}</p>{/if}
 						<table class="inner" aria-label={TRADES.why}>
 							<colgroup>
 								<col class="i-side" />
@@ -592,6 +593,13 @@
 		font-weight: 600;
 		color: var(--ink);
 		font-variant-numeric: tabular-nums;
+	}
+
+	/* The API's sentence when the drop starts this week: who takes his spot (Lane 66u). */
+	.drop-why {
+		margin: 0 0 var(--s-2);
+		font-size: var(--t-sm);
+		color: var(--ink-2);
 	}
 
 	/* The member's drop, said in the With cell once the Room column folds (review M3). */
