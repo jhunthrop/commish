@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/jhunthrop/commish/api/internal/apitypes"
 	"github.com/jhunthrop/commish/api/internal/boards"
@@ -155,5 +156,50 @@ func TestAKickerOrDefenseRowLinksNowhere(t *testing.T) {
 	}
 	if kickers == 0 {
 		t.Fatal("the fixture starts no kicker or defense")
+	}
+}
+
+// restRoutes is the fixture league on Saturday's rest-of-season run from
+// week 6, its board answering every run format, read on Sunday evening.
+func restRoutes(t *testing.T) (*Service, fixture) {
+	t.Helper()
+	f := restFixture(t)
+	f.league.Board.FromWeek, f.league.Board.Refreshed = 6, restRunInstant
+	s := fixtureService(t, f.league, f.data, &fakeHolds{})
+	s.Season, s.Boards = 2026, fakeBoards{board: f.league.Board}
+	s.Now = func() time.Time { return restSunday.Add(5 * time.Hour) }
+	return s, f
+}
+
+// Re-review N2: a tier in a format the run does not carry is refused in
+// the envelope on both routes.
+func TestBothPlayerReadsRefuseATierFormatTheRunDoesNotCarry(t *testing.T) {
+	s, f := restRoutes(t)
+	id := f.raw.Players[0].ID
+	for _, path := range []string{"/players/" + id + "/week?tier_format=dynasty", leaguePath + "players/" + id + "?tier_format=dynasty"} {
+		code, env := serve(t, s, path)
+		if code != http.StatusBadRequest || env.Ok || env.Error == nil {
+			t.Fatalf("%s: %d %+v", path, code, env.Error)
+		}
+	}
+}
+
+// Re-review N2: both routes answer his rest of season in the run's four
+// formats and the tier asked, its players in the order asked.
+func TestBothPlayerReadsCarryTheRestOfSeasonAndTheTier(t *testing.T) {
+	s, f := restRoutes(t)
+	id, mate := f.raw.Players[0].ID, f.raw.Players[1].ID
+	query := "tier=" + mate + "," + id + "&tier_next=" + f.raw.Players[2].ID
+	for _, path := range []string{"/players/" + id + "/week?" + query, leaguePath + "players/" + id + "?" + query} {
+		out := playerWeekOf(t, s, path)
+		if out.RestOfSeason == nil || len(*out.RestOfSeason) != len(RunFormats()) {
+			t.Fatalf("%s: rest of season %v", path, out.RestOfSeason)
+		}
+		if out.Tier == nil || len(out.Tier.Mates) != 2 || out.Tier.Mates[0].BoardId != mate || out.Tier.Mates[1].BoardId != id {
+			t.Fatalf("%s: tier %+v", path, out.Tier)
+		}
+		if out.RestFromWeek == nil || *out.RestFromWeek != 7 {
+			t.Fatalf("%s: from %v", path, out.RestFromWeek)
+		}
 	}
 }
