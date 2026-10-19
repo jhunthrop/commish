@@ -259,6 +259,9 @@ provider, a large CSV narrowed by rows kept byte for byte with the filter stated
 
 **Ingests:** `parity: 31 ingest case(s) in 76 passes, 31 matching; 1382755 rows compared per case, 943239 deduplicated; 0 differences`
 
+The three `nflverse-season-*` cases were re-run on 2026-10-19 (Lane 78) once the stats step wrote each
+season's game results with its lines: 3 matching in 8 passes, 0 differences; their rows below are that run's.
+
 Rows compared per case add every table of every pass of every case, so a shared prerequisite (the
 25,000-person universe several cases land first) counts once per case and pass; the deduplicated
 total counts each tested table per pass and each prerequisite table once, at its largest.
