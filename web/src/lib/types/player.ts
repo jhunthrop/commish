@@ -36,6 +36,8 @@ export interface BoardPlayer extends PlayerRef {
 	ceiling: number | null;
 	/** Tier within his position, 1 is the top. */
 	tier: number;
+	/** His tier's drop to the next as the run writes it, null in the last tier, absent on an older run. */
+	tierDrop?: number | null;
 }
 
 /** The scale a range bar is drawn against, shared by every row in one view. */

@@ -21,6 +21,7 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { format as prettierFormat, resolveConfig } from 'prettier';
 import type { components } from '../../src/lib/api/types.ts';
+import { recordedShape, shapeSentence, teamsWords } from './league-shape.ts';
 
 type PlayerLine = components['schemas']['PlayerLine'];
 type OrderAdvice = components['schemas']['OrderAdvice'];
@@ -142,12 +143,20 @@ const ranked = [...lines.values()]
 	});
 const lineup = await read<components['schemas']['LineupAdvice']>('lineup');
 const waivers = await read<components['schemas']['WaiverAdvice']>('waivers');
+/** The league's shape in the order's few words, from its own settings (league-shape.ts, words.go
+ * teamsWords), and the order's note: the Waivers note without its shape sentence (LineupNote). */
+const shape = await recordedShape();
+const TEAMS = teamsWords(shape);
+const SHAPE_SENTENCE = shapeSentence(shape);
+if (!waivers.basis_note.startsWith(SHAPE_SENTENCE))
+	throw new Error(`The Waivers note does not open with "${SHAPE_SENTENCE}".`);
+const NOTE = waivers.basis_note.slice(SHAPE_SENTENCE.length).trim();
 const out: OrderAdvice = {
 	week: WEEK,
-	basis: `Our rest-of-season order from week ${String(WEEK)}: Points is what he scores through week ${String(LAST_WEEK)}, byes out, A game the same a game. A position ranks by Points, All by Over repl., his points less a free pickup's.`,
-	// The league the points over replacement are for and the rules its season points leave out, as
-	// the API says them (BasisNote): the Waivers answer's note.
-	basis_note: waivers.basis_note,
+	// The league the points over replacement are for, said once in the basis, and the rules its season
+	// points leave out as the note, as the API says them (OrderScreenBasis, LineupNote; Lane 66q).
+	basis: `Our rest-of-season order from week ${String(WEEK)}: Points through week ${String(LAST_WEEK)}, byes out. Positions rank by Points, All by Over repl., his points less a free pickup's, for ${TEAMS}.`,
+	basis_note: NOTE,
 	rank_by: 'points_over_replacement',
 	moves: waivers.moves,
 	order_basis: 'rest_of_season',

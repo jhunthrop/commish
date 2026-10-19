@@ -1,6 +1,7 @@
 // The account page's words for a connected host: run with `npm test`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { bannedPattern } from '#lib/format/copy-guard.ts';
 import {
 	ESPN_CONSENT,
 	ESPN_CONSENT_VERSION,
@@ -62,14 +63,14 @@ void test('the ESPN session sentence says what it is kept for, the moves the mem
 	);
 	assert.match(ESPN_CONSENT, /when you ask, to make your moves/);
 	assert.equal(ESPN_CONSENT_VERSION, 3);
-	assert.doesNotMatch(ESPN_CONSENT, /;|—/);
+	assert.doesNotMatch(ESPN_CONSENT, bannedPattern());
 });
 
 void test('the MyFantasyLeague words say the password is never kept and name the lineup moves', () => {
 	assert.equal(MFL_CONSENT_VERSION, 1);
 	assert.match(MFL_CONSENT, /never keep it/);
 	assert.match(MFL_CONSENT, /set your lineup there when you confirm a move/);
-	assert.doesNotMatch(MFL_CONSENT, /;|—|\bhost\b/i);
+	assert.doesNotMatch(MFL_CONSENT, bannedPattern());
 	const c = {
 		host: 'mfl',
 		status: 'signed_out',

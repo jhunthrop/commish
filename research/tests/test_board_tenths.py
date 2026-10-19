@@ -8,10 +8,10 @@ import math
 from datetime import UTC, datetime
 from pathlib import Path
 
-from research.nightly.build.pages import board_json, gap_of, identities
+from research.nightly.build.pages import board_json, drop_between, gap_of, identities, tier_drops
 from research.nightly.build.tenth import tenth, tenth_or_none
 from research.nightly.config import RUN_FORMATS
-from research.nightly.reads.board import FormatBoard, StoredBoard, StoredRow, board_entries
+from research.nightly.reads.board import BoardEntry, FormatBoard, StoredBoard, StoredRow, board_entries
 
 PPR = RUN_FORMATS[0]
 AS_OF = datetime(2026, 9, 9, 2, tzinfo=UTC)
@@ -63,3 +63,37 @@ def test_a_board_file_carries_each_figure_as_a_tenth() -> None:
     for key in ("projected", "vor", "expectedGames", "floor", "median", "ceiling", "adp", "gap"):
         value = written[key]
         assert value == tenth(value), key
+
+
+_TIER_DROPS = Path(__file__).resolve().parents[2] / "web" / "src" / "lib" / "format" / "tier-drop-table.json"
+
+
+def test_a_tier_drop_is_the_difference_of_the_two_projections_as_shown() -> None:
+    """The table the stand-in's test reads too (Lane 66q): each end rounded to the tenth the board
+    shows, the difference cleaned back to its tenth."""
+    for case in json.loads(_TIER_DROPS.read_text()):
+        assert drop_between(case["last"], case["first"]) == case["drop"], case
+
+
+def _entry(pid: str, position_rank: int, tier: int, projected: float) -> BoardEntry:
+    return BoardEntry(_row(pid, projected, projected / 2), projected - 100, position_rank, tier, None, position_rank)
+
+
+def test_every_player_carries_his_tiers_drop_to_the_next_and_the_last_tier_none() -> None:
+    entries = [
+        _entry("d", 4, 3, 290.04),
+        _entry("a", 1, 1, 344.08),
+        _entry("c", 3, 2, 313.26),
+        _entry("b", 2, 1, 330.0),
+    ]
+    assert tier_drops(entries) == {"a": 16.7, "b": 16.7, "c": 23.3, "d": None}
+
+
+def test_a_board_file_carries_each_rows_tier_drop() -> None:
+    rows = [_row("p1", 344.08, 241.7), _row("p2", 180.0, 120.0)]
+    board = FormatBoard(PPR, StoredBoard(PPR.board_source, AS_OF, "research@test", None), board_entries(rows, PPR))
+    people = identities([board])
+    written = board_json(board, {p.id: p for p in people}, {})["rows"]
+    drops = tier_drops(board.entries)
+    assert [row["tierDrop"] for row in written] == [drops[e.row.player_id] for e in board.entries]
+    assert written[-1]["tierDrop"] is None

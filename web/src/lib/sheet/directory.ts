@@ -13,6 +13,9 @@ export interface DirectoryPlayer extends SheetPlayer {
 	positionRank: number;
 	/** Where drafters take him on average, or null when he is not in our ADP window. */
 	adp: number | null;
+	/** The run's Gap, drafters' ADP less our rank, as written (Lane 66q); absent on a run older than
+	 * the column, and for a player with no ADP. */
+	gap?: number | null;
 	/** The word his ranks show as when he is on a season-long list ("IR", Lane 63), else absent. */
 	held?: string | null;
 	/** A kicker or a defense (Lane 66m): his position rank is his place in the drafters' order and
@@ -30,6 +33,8 @@ export interface DirectoryEntry {
 	r: number;
 	pr: number;
 	a: number | null;
+	/** The run's Gap, present only where the run wrote one. */
+	g?: number;
 	/** The held word, present only for a player on a season-long list. */
 	w?: string;
 	/** Set, to 1, only for a kicker or a defense in draft order. */
@@ -58,6 +63,7 @@ export function toEntry(player: DirectoryPlayer): DirectoryEntry {
 		r: player.rank,
 		pr: player.positionRank,
 		a: player.adp,
+		...(player.gap === undefined || player.gap === null ? {} : { g: player.gap }),
 		...(player.held ? { w: player.held } : {}),
 		...(player.draftOrder ? { o: 1 as const } : {})
 	};
@@ -75,6 +81,7 @@ function fromEntry(entry: DirectoryEntry): DirectoryPlayer | null {
 		rank: entry.r,
 		positionRank: entry.pr,
 		adp: entry.a,
+		gap: entry.g ?? null,
 		held: entry.w ?? null,
 		draftOrder: entry.o === 1
 	};

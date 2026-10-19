@@ -4,6 +4,7 @@
  * expected score with his club's first and the kickoff weather in two or three words), this week's
  * projection and his points so far. Pure functions over the API's player lines, so every word a box
  * prints is tested here. */
+import { EMPTY_FIGURE } from '#lib/format/empty.ts';
 import { memberZone, weekdayTime, zoneWord } from '#lib/format/clock.ts';
 import { defenseWords } from '#lib/format/clubs.ts';
 import { lastName } from '#lib/format/draft.ts';
@@ -55,13 +56,14 @@ export const BOX = {
 	opp: 'Opp',
 	/** The button that opens a swap's evidence line, as a screen reader hears it. */
 	why: 'Why',
-	totals: 'Totals',
+	/** The starters' sums row: "Team", never "Totals", a betting word on the site's list (Lane 66q). */
+	totals: 'Team',
 	bench: 'Bench',
 	reserve: 'Injured reserve',
 	bye: 'Bye',
 	final: 'Final',
 	/** A number not held yet: before kickoff, or with no projection. */
-	none: '--',
+	none: EMPTY_FIGURE,
 	you: 'You',
 	opponent: 'Opponent',
 	noOpponent: 'No opponent this week',
@@ -496,8 +498,14 @@ export function projShort(
 	return `${BOX.proj} is this week's published projection in ${FORMAT_WORDS[scoring.format]} scoring${whose}, ${when}${defenses}.${delta}`;
 }
 
-/** The evidence columns in one short sentence pair (the Waivers basis). */
-export const EVIDENCE_SHORT = `${BOX.oppRank} is points allowed to his position, 1st the fewest. ${BOX.avg} and ${BOX.last} are his points a game and last game, your scoring.`;
+/** The evidence columns in one short sentence pair, in the scoring the rows are in: "your scoring"
+ * in a league, "in PPR" without one (the Waivers basis, the order's, the player card's). */
+export function evidenceShort(scoring = 'your scoring'): string {
+	return `${BOX.oppRank} is points allowed to his position, 1st the fewest. ${BOX.avg} and ${BOX.last} are his points a game and last game, ${scoring}.`;
+}
+
+/** The evidence columns' short pair in a league. */
+export const EVIDENCE_SHORT = evidenceShort();
 
 /** The game facts' read in one short sentence, null when no line holds one (the Waivers basis and
  * the player card's). */

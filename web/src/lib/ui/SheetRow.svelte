@@ -7,6 +7,8 @@
 		positionRank: number;
 		/** Where drafters take him on average, or null when he is not in our ADP window. */
 		adp: number | null;
+		/** The run's Gap, drafters' ADP less our rank (Lane 66q); absent on a run older than the column. */
+		gap?: number | null;
 		/** The word his ranks show as when he is on a season-long list ("IR", Lane 63). */
 		held?: string | null;
 		/** A kicker or a defense (Lane 66m): his position rank is his place in the drafters' order, and
@@ -164,6 +166,7 @@
 			{#if board?.draftOrder && compact}<span class="order-words">{draftOrderWords(board)}</span
 				>{:else if board && compact}<AdpCell
 					adp={board.adp}
+					gap={board.gap}
 					ourRank={board.rank}
 					figure={false}
 					compare={!board.held}
@@ -176,6 +179,7 @@
 		<span class="adp">
 			{#if board}<AdpCell
 					adp={board.adp}
+					gap={board.gap}
 					ourRank={board.rank}
 					compare={!board.held && !board.draftOrder}
 					rankWord={board.held ?? null}

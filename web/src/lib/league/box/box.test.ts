@@ -1,6 +1,7 @@
 // The box score's words (Lane 66d), and the copy guard over every one: run with `npm test`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { bannedPattern } from '#lib/format/copy-guard.ts';
 import type { LeaguePlayer } from '../api.ts';
 import type { PlayerLine, WeekFacts } from '../inseason/api.ts';
 import {
@@ -344,9 +345,8 @@ void test("the screen's basis lines say the Game cell's figures and the facts' r
 	assert.equal(factsReadLine([line({}, { bye: true })], ZONE, NOW), null);
 });
 
-/** The words a fantasy screen never uses: the trading and betting registers. */
-const BANNED =
-	/\b(market|prices?|buy|sell|stock|odds|lines?|spreads?|favou?red|underdog|bets?|betting|vegas)\b/i;
+/** The site's copy guard. */
+const BANNED = bannedPattern();
 
 void test('copy guard: every box word is fantasy words, with no dash or semicolon', () => {
 	const said = [

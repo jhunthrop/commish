@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { EMPTY_FIGURE } from '#lib/format/empty.ts';
 	import WeatherGlyph from '#lib/league/box/WeatherGlyph.svelte';
 	import Label from './Label.svelte';
 	import type { AheadRow, LogHead, LogNext, LogRow, PriorRow, SeasonLine } from './game-log.ts';
@@ -107,7 +108,7 @@
 							<th scope="row" class="pin wk">{next.week}</th>
 							<td class="pin opp">{next.opponent}<span class="note">{next.when}</span></td>
 							<td class="proj n">{next.proj}</td>
-							<td class="pts n dim">--</td>
+							<td class="pts n dim">{EMPTY_FIGURE}</td>
 							<td class="facts first" colspan={heads.length}>
 								{#if next.expected}<span class="exp">{next.expected}</span>{/if}
 								{#if next.weather}<span class="wx"

@@ -2,6 +2,7 @@
 // scoreboard and every word it prints. Run with `npm test`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { bannedPattern } from '#lib/format/copy-guard.ts';
 import type { PlayerLine, TradeAdvice, TradeCheck, TradeRow, TradeTeam } from '../inseason/api.ts';
 import {
 	bugFigures,
@@ -303,7 +304,7 @@ void test('the basis is five lines at most, the first saying which trades are li
 	);
 	assert.match(
 		lines[1] ?? '',
-		/This week, Proj is each lineup's Proj total with the trade less without it/
+		/This week, Proj is the sum of each lineup's Proj with the trade less without it/
 	);
 	assert.match(lines[2] ?? '', /Opp rank is where/);
 	assert.match(lines[3] ?? '', /^Room says who a roster drops/);
@@ -311,8 +312,7 @@ void test('the basis is five lines at most, the first saying which trades are li
 
 /** The brief's words a fantasy screen never prints, a dash between clauses, a semicolon, and the
  * platform called anything but its name. */
-const NEVER =
-	/\b(market|prices?|buy|buys|sell|sells|values?|odds|spread|favou?red|underdog|bets?|betting|line|host)\b/i;
+const NEVER = bannedPattern(/\bvalues?\b/);
 
 void test('copy guard: every word the trade table prints is fantasy words, the platform named', () => {
 	const copied = copiedTrade('sleeper', true);

@@ -122,6 +122,11 @@ export const boardRowSchema = z.object({
 	ceiling: points.nullable(),
 	/** Tier within his position, 1 is the top. */
 	tier: z.number().int().min(1),
+	/** His tier's drop to the next tier at his position (Lane 66q): the tier's last player's projected
+	 * points less the next tier's first, written by the run to a tenth; null in his position's last
+	 * tier. Absent on a run older than the column, which then prints no drop: the web never works it
+	 * out. */
+	tierDrop: points.nullable().optional(),
 	/** In season, where the preseason board ranked him, and its points for the full season; null
 	 * for a player with a line this season whom the preseason board did not rank. */
 	preseasonRank: z.number().int().min(1).nullable().optional(),
@@ -154,7 +159,8 @@ export const marketRowSchema = z.object({
 	floor: z.null(),
 	median: z.null(),
 	ceiling: z.null(),
-	tier: z.null()
+	tier: z.null(),
+	tierDrop: z.null().optional()
 });
 
 export const boardSchema = z.object({

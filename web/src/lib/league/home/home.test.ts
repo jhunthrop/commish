@@ -2,6 +2,7 @@
 // moves feed, the settings and the basis, with the copy guard over every one. Run with `npm test`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { bannedPattern } from '#lib/format/copy-guard.ts';
 import type { LeagueMove, LeagueTeam, LeagueTerms } from '../api.ts';
 import type { Scoreboard } from '../inseason/api.ts';
 import {
@@ -353,9 +354,8 @@ void test('the settings hold all 42 rules in the setup page’s groups and the t
 	);
 });
 
-/** The words a fantasy screen never uses: the trading and betting registers. */
-const BANNED =
-	/\b(market|prices?|buy|sell|stock|odds|lines?|spreads?|favou?red|underdog|bets?|betting|vegas|host)\b/i;
+/** The site's copy guard. */
+const BANNED = bannedPattern();
 
 void test('a rule the platform does not state prints no figure, and the count leaves it out', () => {
 	const view = scoringView(RULES, ['points_per_return_touchdown', 'points_per_safety']);

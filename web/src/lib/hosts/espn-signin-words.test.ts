@@ -2,6 +2,7 @@
 // plain words: run with `npm test`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { bannedPattern } from '#lib/format/copy-guard.ts';
 import { ALREADY_SIGNED_IN_LINE } from './espn-window.ts';
 import { problemOf, seenWords } from './espn-signin-words.ts';
 
@@ -50,6 +51,6 @@ void test('no word on the page or in the window uses an em-dash or a semicolon',
 		seenWords(['init-signed-in', 'init-signed-out', 'login', 'logout', 'error'])
 	];
 	for (const word of words) {
-		assert.ok(word !== null && !/[—;]/.test(word), word ?? '');
+		assert.ok(word !== null && !bannedPattern().test(word), word ?? '');
 	}
 });

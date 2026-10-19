@@ -69,7 +69,7 @@ import {
 } from '../src/lib/run/schema.ts';
 import { POSITIONS, type Position } from '../src/lib/types/player.ts';
 import { bucketUrl, credentialsFromToken } from './r2.ts';
-import { gapOf } from './tenth.ts';
+import { dropBetween, gapOf } from './tenth.ts';
 import { checkRunSeasons } from '../src/lib/run/season-checks.ts';
 import { priorSeasonBlocks, seasonBlocks } from './standin-season.ts';
 import type { PlayerSeason, PriorSeason } from '../src/lib/run/season.ts';
@@ -199,7 +199,7 @@ function boardRows(csv: readonly BoardCsv[], adpByGsis: ReadonlyMap<string, numb
 			num(b.value_over_replacement, 'vor') - num(a.value_over_replacement, 'vor') ||
 			num(a.rank, 'rank') - num(b.rank, 'rank')
 	);
-	return byValue.map((row, i) => {
+	const rows = byValue.map((row, i) => {
 		if (!isPosition(row.position)) throw new Error(`${row.name} plays ${row.position}.`);
 		const ourRank = i + 1;
 		const adp = adpByGsis.get(row.gsis) ?? null;
@@ -224,6 +224,26 @@ function boardRows(csv: readonly BoardCsv[], adpByGsis: ReadonlyMap<string, numb
 			ceiling: round(num(row.ceiling_points, `${row.name} ceiling`)),
 			tier: num(row.tier, `${row.name} tier`) + 1
 		};
+	});
+	return withTierDrops(rows);
+}
+
+/** Each row with his tier's drop to the next at his position, as the nightly writes it
+ * (research/nightly/build/pages.py tier_drops, scripts/tenth.ts dropBetween): the tier's last
+ * projection, by position rank, less the next tier's first; null in a position's last tier. */
+function withTierDrops(rows: readonly BoardRow[]): BoardRow[] {
+	const ends = new Map<string, { last: BoardRow; first: BoardRow }>();
+	const byRank = [...rows].sort((a, b) => a.positionRank - b.positionRank);
+	for (const row of byRank) {
+		const key = `${row.position} ${String(row.tier)}`;
+		const end = ends.get(key);
+		ends.set(key, { first: end?.first ?? row, last: row });
+	}
+	return rows.map((row) => {
+		const own = ends.get(`${row.position} ${String(row.tier)}`);
+		const next = ends.get(`${row.position} ${String(row.tier + 1)}`);
+		const tierDrop = own && next ? dropBetween(own.last.projected, next.first.projected) : null;
+		return { ...row, tierDrop };
 	});
 }
 

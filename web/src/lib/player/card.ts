@@ -1,6 +1,7 @@
 /** The player card (Lane 66h): the tiles under his name and the words every number's basis takes.
  * The types and words both halves share: the build words what the run holds (rest of season, Avg and
  * Last before the week is read), and the week's read (live.ts) words what the API holds. */
+import { EMPTY_FIGURE } from '#lib/format/empty.ts';
 
 /** A tile's tone: the accent for this week's projection, the ease of his opponent, quiet for the
  * change. */
@@ -18,7 +19,7 @@ export interface CardTile {
 }
 
 /** A number not held. */
-export const NONE = '--';
+export const NONE = EMPTY_FIGURE;
 
 /** An API figure printed as given, one rule with the box cells (league/box/box.ts). */
 export { printTenth } from '#lib/league/box/box.ts';

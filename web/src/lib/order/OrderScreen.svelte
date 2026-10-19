@@ -70,7 +70,7 @@
 		advice?.rows.map((row) => orderView(row, undefined, position === null)) ?? []
 	);
 	const basis = $derived(
-		advice === null ? '' : orderBasis(advice, mode === 'rest' && league !== null ? league : null)
+		advice === null ? [] : orderBasis(advice, mode === 'rest' && league !== null ? league : null)
 	);
 	const more = $derived(advice !== null && advice.total > advice.rows.length && limit < MAX_ROWS);
 	const tableLeague = $derived(
@@ -216,8 +216,15 @@
 		<button type="button" class="more" onclick={showMore}>{ORDER.moreRows}</button>
 	{/if}
 
-	{#if basis !== ''}
-		<div class="basis" data-basis><p>{basis}</p></div>
+	{#if basis.length > 0}
+		<!-- One paragraph; a sentence about a column the phone does not draw is not said there. -->
+		<div class="basis" data-basis>
+			<p>
+				{#each basis as part, i (i)}<span class:desk={!part.phone}
+						>{i > 0 ? ` ${part.text}` : part.text}</span
+					>{/each}
+			</p>
+		</div>
 	{/if}
 </div>
 
@@ -378,6 +385,10 @@
 
 		.basis p {
 			font-size: var(--t-xs);
+		}
+
+		.basis .desk {
+			display: none;
 		}
 	}
 </style>

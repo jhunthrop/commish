@@ -637,12 +637,12 @@ export const VALUE_PLAYERS: readonly BoardPlayer[] = [
 	byName('Marvin Harrison Jr.')
 ];
 
-/** WR tier 3 on the PPR board. */
+/** WR tier 3 on the PPR board, its drop to tier 4 as the run writes one, to a tenth (Lane 66q). */
 export const WR_TIER = {
 	tier: 3,
 	count: 9,
 	group: { one: 'WR', many: 'WRs' },
-	cliff: { drop: 16.819999999999993, nextTier: 4 } satisfies TierCliff
+	cliff: { drop: 16.8, nextTier: 4 } satisfies TierCliff
 };
 
 /** The solo room at pick 5.08 of a 12-team PPR mock, slot 8, seed 2026. */

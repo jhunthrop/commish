@@ -1,6 +1,7 @@
 // The Rest of season and Players screens' words and rows (Lane 66j and its fix round 1): run with `npm test`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { bannedPattern } from '#lib/format/copy-guard.ts';
 import type { PlayerLine, WeekFacts } from '../league/inseason/api.ts';
 import type { OrderAdvice, OrderRow } from './api.ts';
 import { orderPath } from './path.ts';
@@ -153,18 +154,33 @@ void test("the add verb is the Waivers screen's own rule: claims open and the pl
 });
 
 void test('the basis names the league shape and says every number once, the platform named', () => {
-	const signedOut = orderBasis(advice([row('A')]), null, ZONE);
+	const words = (parts: readonly { text: string }[]): string => parts.map((p) => p.text).join(' ');
+	const signedOut = words(orderBasis(advice([row('A')]), null, ZONE));
 	assert.ok(signedOut.startsWith('Our rest-of-season order from week 7.'));
 	assert.match(signedOut, /Points over replacement are for a 12-team league/);
-	assert.match(signedOut, /Proj is this week's published projection in PPR/);
+	assert.match(signedOut, /Proj is this week's published projection in PPR scoring, read /);
+	// Signed out there is no league whose rules the projection is matched to.
+	assert.doesNotMatch(signedOut, /this league's rules/);
 	assert.doesNotMatch(signedOut, /Roster is/);
-	const inLeague = orderBasis(advice([row('A')], { read_at: READ }), { host: 'sleeper' }, ZONE);
+	const parts = orderBasis(advice([row('A')], { read_at: READ }), { host: 'sleeper' }, ZONE);
+	const inLeague = words(parts);
 	assert.match(inLeague, /Roster is Sleeper's, read /);
-	assert.match(evidenceBasis(true), /in this league's scoring\.$/);
+	assert.match(inLeague, /the closest to this league's rules|this league's own/);
+	assert.match(evidenceBasis(true), /, your scoring\.$/);
 	assert.match(rosterBasis('espn', READ, ZONE), /^Roster is ESPN's, read /);
 	for (const said of [inLeague, ...Object.values(ORDER), ...Object.values(FIGURE_HEADS)]) {
-		assert.doesNotMatch(said, /\bhost\b|—|;|\b(odds|line|spread|bet|market|buy|sell|price)\b/i);
+		assert.doesNotMatch(said, bannedPattern(), said);
 	}
+});
+
+void test('the phone is not told about the columns it does not draw: the Game cell and the Roster column', () => {
+	const parts = orderBasis(advice([row('A')], { read_at: READ }), { host: 'sleeper' }, ZONE);
+	const phone = parts.filter((p) => p.phone).map((p) => p.text);
+	assert.ok(phone.some((t) => t.startsWith('Our rest-of-season order')));
+	assert.ok(phone.some((t) => t.startsWith('Proj is')));
+	assert.ok(phone.some((t) => t.startsWith('Opp rank is')));
+	assert.ok(phone.every((t) => !t.startsWith('Roster is') && !t.startsWith('The Game cell')));
+	assert.ok(parts.some((p) => !p.phone && p.text.startsWith('Roster is')));
 });
 
 void test('the path asks the league route with a league and the public one without', () => {

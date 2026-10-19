@@ -6,6 +6,7 @@ import { memberZone, weekdayTime } from '#lib/format/clock.ts';
 import {
 	BOX,
 	EVIDENCE_SHORT,
+	evidenceShort,
 	deltaWord,
 	easeOf,
 	expectedWords,
@@ -287,7 +288,7 @@ export function liveBasis(
 		league
 	);
 	const scoring = `${SCORING_WORDS[week.projection_scoring.format]} scoring`;
-	const evidence = league ? EVIDENCE_SHORT : EVIDENCE_SHORT.replace('your scoring', scoring);
+	const evidence = league ? EVIDENCE_SHORT : evidenceShort(scoring);
 	const facts = factsReadShort([week.line], zone, now);
 	return [proj, facts === null ? evidence : `${evidence} ${facts}`];
 }

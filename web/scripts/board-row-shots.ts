@@ -26,6 +26,8 @@ const CHECK_WIDTHS = [1024, 768] as const;
 const VIEWPORT_HEIGHT = 900;
 const PHONE_MAX = 760;
 const MAX_BASIS_LINES = 5;
+/** The in-season order's basis (Lane 66q): five lines at a desk, eight on a phone. */
+const MAX_ORDER_BASIS_LINES = { desk: 5, phone: 8 } as const;
 const MAX_SCHEDULE_DESK_LINES = 2;
 /** The board row's figure size at its largest (--t-row-num on a desk, 17px). */
 const ROW_FIGURE_MAX_PX = 17;
@@ -160,12 +162,17 @@ async function checkPage(page: Page, shot: Shot, tag: string, width: number): Pr
 		if (!words.includes('expected wins')) fail(tag, 'the lead names no expected wins');
 		return;
 	}
-	if (shot.kind !== 'order') {
-		const lines = await renderedLines(page, '.basis');
-		if (lines === null) fail(tag, 'no basis');
-		else if (lines > MAX_BASIS_LINES) fail(tag, `basis ${String(lines)} lines`);
-		process.stdout.write(`${tag} basis ${String(lines)} lines\n`);
-	}
+	// The in-season board is the order, whose basis is its own paragraph (Lane 66q turned its check on).
+	const lines = await renderedLines(page, shot.kind === 'order' ? 'main [data-basis] p' : '.basis');
+	const most =
+		shot.kind !== 'order'
+			? MAX_BASIS_LINES
+			: width > PHONE_MAX
+				? MAX_ORDER_BASIS_LINES.desk
+				: MAX_ORDER_BASIS_LINES.phone;
+	if (lines === null || lines === 0) fail(tag, 'no basis');
+	else if (lines > most) fail(tag, `basis ${String(lines)} lines`);
+	process.stdout.write(`${tag} basis ${String(lines)} lines\n`);
 	if (shot.kind === 'rows') await checkRows(page, tag);
 	if (shot.kind === 'compare') {
 		const call = await page.locator('.call-words').first().innerText();

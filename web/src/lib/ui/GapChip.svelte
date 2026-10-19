@@ -1,20 +1,19 @@
 <script lang="ts">
-	import { plural } from '#lib/format/number.ts';
+	import { gapChipWords, gapTone } from '#lib/format/gap-picks.ts';
 	import ToneChip from './ToneChip.svelte';
 
 	interface Props {
-		/** Drafters' ADP against our rank, in picks. Positive is later, a gain for you. Null is no ADP. */
-		gap: number | null;
+		/** His ADP, null when the drafts do not take him: the chip says "No ADP". */
+		adp: number | null;
+		/** The run's Gap, drafters' ADP less our rank, as written (Lane 66q). Absent on a run older than
+		 * the column, which draws no chip: the web never works it out. */
+		gap?: number | null;
 	}
 
-	let { gap }: Props = $props();
+	let { adp, gap }: Props = $props();
 
-	const tone = $derived(gap === null || gap === 0 ? 'even' : gap > 0 ? 'gain' : 'loss');
-	const text = $derived.by(() => {
-		if (gap === null) return 'No ADP';
-		if (gap === 0) return 'Same spot';
-		return `${plural(Math.abs(gap), 'pick')} ${gap > 0 ? 'later' : 'earlier'}`;
-	});
+	const text = $derived(gapChipWords({ adp, gap }));
+	const tone = $derived(gapTone(adp === null ? null : gap) ?? 'even');
 </script>
 
-<ToneChip {tone} size="md">{text}</ToneChip>
+{#if text !== null}<ToneChip {tone} size="md">{text}</ToneChip>{/if}

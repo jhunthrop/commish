@@ -1,6 +1,7 @@
 /** The Account room's Leagues attached table (Lane 66k): each league the member follows with its
  * team and platform, record and place, where it is in its season, and its last read, all from GET
  * /leagues/attached. Pure, tested in attached-rows.test.ts. */
+import { EMPTY_FIGURE } from '#lib/format/empty.ts';
 import { ordinal } from '#lib/format/number.ts';
 import { readWords } from '#lib/hosts/platform-rows.ts';
 import type { AttachedLeague } from './api.ts';
@@ -46,7 +47,7 @@ export function attachedRow(league: AttachedLeague, now: Date, zone?: string): A
 		id: league.id,
 		name: league.name,
 		team: [league.team_name, `on ${hostWords(league.host)}`].filter((p) => p !== '').join(', '),
-		record: s ? recordWords(s) : '--',
+		record: s ? recordWords(s) : EMPTY_FIGURE,
 		place: s ? `${ordinal(s.place)} of ${String(s.teams)}` : '',
 		season: seasonWords(league, now, zone),
 		read: readWords(league.last_read_at, now)

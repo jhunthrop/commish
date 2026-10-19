@@ -3,8 +3,8 @@
 // built site, dark and light at 1440 and dark at 390 (with its first screen). Rest of season is the
 // board in season, signed in with the recorded Sleeper league selected; Players is signed out; Our
 // record reads the run the site was built from. At 1440, 1024, 800, 768 and 390 it asserts the page
-// never scrolls sideways, and at 1440 that the basis draws at most five rendered lines (measured, never
-// counted in paragraphs). It also asserts the heads ("Our rest-of-season order" over #, Rest of season
+// never scrolls sideways, and that the basis draws at most five rendered lines at 1440 and eight at 390
+// (measured, never counted in paragraphs; Lane 66q turned the phone's on). It also asserts the heads ("Our rest-of-season order" over #, Rest of season
 // over Points and A game), that every figure cell prints one decimal or --, that Trade for him sits on
 // fewer than a third of the rows, that no word says "host", the record's Order matched head with the
 // published projection's -- before its week, the honest sentence where the run carries one, and the
@@ -34,7 +34,8 @@ const SETTLE_MS = 300;
 /** Below this width the figures after the key fold under the name and the group heads go. */
 const FOLDS_AT = 1100;
 const BASIS_WIDTH = 1440;
-const MOST_BASIS_LINES = 5;
+/** The most rendered lines the basis may draw, by the widths it is measured at. */
+const MOST_BASIS_LINES: Readonly<Partial<Record<number, number>>> = { 1440: 5, 390: 8 };
 const CHART_MIN_HEIGHT = 200;
 /** Below this width the roster mark folds onto the club line. */
 const ROSTER_FOLDS_AT = 900;
@@ -134,8 +135,16 @@ async function common(page: Page, screen: Screen, width: number): Promise<string
 	const said: string[] = [];
 	if (seen.over > 0)
 		said.push(`${screen.name} at ${String(width)} scrolls sideways by ${String(seen.over)}`);
-	if (width === BASIS_WIDTH && (seen.basisLines === 0 || seen.basisLines > MOST_BASIS_LINES))
-		said.push(`${screen.name}: basis draws ${String(seen.basisLines)} lines`);
+	// The record's basis is the run's words, held to the desk's five lines here; its phone lines are
+	// the record lane's (Lane 66q held the order's).
+	const most =
+		screen.name === 'record' && width !== BASIS_WIDTH ? undefined : MOST_BASIS_LINES[width];
+	if (most !== undefined && (seen.basisLines === 0 || seen.basisLines > most))
+		said.push(`${screen.name} at ${String(width)}: basis draws ${String(seen.basisLines)} lines`);
+	if (most !== undefined)
+		process.stdout.write(
+			`${screen.name} ${String(width)} basis ${String(seen.basisLines)} lines\n`
+		);
 	for (const word of seen.host) said.push(`${screen.name} says host: ${word}`);
 	return said;
 }
@@ -234,7 +243,7 @@ async function tapFaults(): Promise<string[]> {
 	const rest = SCREENS[0];
 	await open(page, rest);
 	const basis = (await page.locator('main [data-basis]').textContent()) ?? '';
-	if (!basis.includes('Points over replacement are for a 12-team league'))
+	if (!basis.includes("less a free pickup's, for 12 teams with"))
 		said.push('rest: the basis names no league shape');
 	const before = await tableState(page);
 	await page.getByRole('link', { name: 'QB', exact: true }).first().click();

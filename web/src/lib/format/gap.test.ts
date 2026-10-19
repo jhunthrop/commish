@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { EMPTY_FIGURE } from './empty.ts';
+import { gapChipWords, gapPicks } from './gap-picks.ts';
 import { carriesGap, gapText, gapTone } from './gap.ts';
 
 void test('the gap prints the run tenth as given, with a true minus, a plain zero and -- for none', () => {
@@ -43,4 +44,16 @@ void test('an older run without the column carries no gap on any row', () => {
 	) as { rows: { gap?: number | null }[] };
 	assert.ok(board.rows.length > 0);
 	assert.equal(carriesGap(board.rows), false);
+});
+
+void test("the chip says the run's gap in picks, never a figure the web works out", () => {
+	assert.equal(gapPicks(3.5), '3.5 picks later');
+	assert.equal(gapPicks(-1), '1.0 pick earlier');
+	assert.equal(gapPicks(-4.5), '4.5 picks earlier');
+	assert.equal(gapChipWords({ adp: 15.5, gap: 3.5 }), '3.5 picks later');
+	assert.equal(gapChipWords({ adp: 12, gap: 0 }), 'Same spot');
+	assert.equal(gapChipWords({ adp: null, gap: null }), 'No ADP');
+	// A run older than the column: no chip, never a gap the web subtracts.
+	assert.equal(gapChipWords({ adp: 15.5 }), null);
+	assert.equal(gapChipWords({ adp: 15.5, gap: null }), null);
 });

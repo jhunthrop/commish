@@ -1,6 +1,7 @@
 // The Lineup screen's table, strip and verb words (Lane 66e): run with `npm test`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { bannedPattern } from '#lib/format/copy-guard.ts';
 import type { LineupSlot, PlayerLine, WeekFacts } from '../inseason/api.ts';
 import { boxRow } from './box.ts';
 import {
@@ -222,8 +223,8 @@ void test('a spot no one who can play fills keeps his player, counts 0 and says 
 	assert.equal(box.gain, 4.5);
 });
 
-const BANNED =
-	/\b(market|prices?|buy|sell|stock|odds|lines?|spreads?|favou?red|underdog|bets?|betting|vegas|host)\b/i;
+/** The site's copy guard. */
+const BANNED = bannedPattern();
 
 void test('copy guard: every Lineup word is fantasy words, names the platform, no dash or semicolon', () => {
 	const box = lineupBox(advice, ZONE);
