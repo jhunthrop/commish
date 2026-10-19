@@ -506,6 +506,7 @@ paths:
         "409": { $ref: "#/components/responses/ErrorResponse" }
         "422": { $ref: "#/components/responses/ErrorResponse" }
         "502": { $ref: "#/components/responses/ErrorResponse" }
+        "503": { $ref: "#/components/responses/ErrorResponse" }
   /leagues/attached/{id}/trades:
     parameters:
       - name: id
@@ -533,6 +534,7 @@ paths:
         "409": { $ref: "#/components/responses/ErrorResponse" }
         "422": { $ref: "#/components/responses/ErrorResponse" }
         "502": { $ref: "#/components/responses/ErrorResponse" }
+        "503": { $ref: "#/components/responses/ErrorResponse" }
   /leagues/attached/{id}/trades/check:
     parameters:
       - name: id

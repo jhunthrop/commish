@@ -53,7 +53,13 @@ type viewerSet struct {
 	seen map[string]map[uuid.UUID]time.Time
 }
 
-// saw records an account's view of the league at now.
+// maxViewedLeagues bounds the leagues the viewer set holds; past it the
+// league viewed longest ago goes (rereview 66u F3).
+const maxViewedLeagues = 1024
+
+// saw records an account's view of the league at now, forgetting every
+// view older than the window and, past maxViewedLeagues, the league
+// viewed longest ago.
 func (v *viewerSet) saw(ref leaguesync.Ref, account uuid.UUID, now time.Time) {
 	v.mu.Lock()
 	defer v.mu.Unlock()
@@ -65,6 +71,27 @@ func (v *viewerSet) saw(ref leaguesync.Ref, account uuid.UUID, now time.Time) {
 		v.seen[key] = map[uuid.UUID]time.Time{}
 	}
 	v.seen[key][account] = now
+	oldest, oldestAt := "", now
+	for league, views := range v.seen {
+		newest := time.Time{}
+		for a, at := range views {
+			if now.Sub(at) > leaguesync.ViewWindow {
+				delete(views, a)
+			} else if at.After(newest) {
+				newest = at
+			}
+		}
+		if len(views) == 0 {
+			delete(v.seen, league)
+			continue
+		}
+		if newest.Before(oldestAt) {
+			oldest, oldestAt = league, newest
+		}
+	}
+	if len(v.seen) > maxViewedLeagues && oldest != "" {
+		delete(v.seen, oldest)
+	}
 }
 
 // recent is the accounts that viewed the league inside the window before
@@ -236,6 +263,9 @@ func (s *Service) Warm(ctx context.Context, ref leaguesync.Ref) {
 			s.Log.Warn("inseason: warm the trade search", "league", ref.Key(), "err", err)
 			continue
 		}
-		a.found()
+		if a.found(); a.searchErr != nil {
+			s.Log.Info("inseason: the trade search's warm run stopped", "league", ref.Key(), "err", a.searchErr)
+			return
+		}
 	}
 }

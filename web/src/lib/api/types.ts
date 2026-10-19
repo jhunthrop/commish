@@ -4763,6 +4763,7 @@ export interface operations {
 			409: components['responses']['ErrorResponse'];
 			422: components['responses']['ErrorResponse'];
 			502: components['responses']['ErrorResponse'];
+			503: components['responses']['ErrorResponse'];
 		};
 	};
 	leagueTrades: {
@@ -4786,6 +4787,7 @@ export interface operations {
 			409: components['responses']['ErrorResponse'];
 			422: components['responses']['ErrorResponse'];
 			502: components['responses']['ErrorResponse'];
+			503: components['responses']['ErrorResponse'];
 		};
 	};
 	checkLeagueTrade: {

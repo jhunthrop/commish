@@ -324,6 +324,9 @@ func (s *Service) leagueOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	out := a.Order(q, onceTargets(a))
+	if s.searchStopped(w, r, a) {
+		return
+	}
 	moves := CopyOnlyClaims(a.Snap.Ref.Host)
 	if s.Moves != nil {
 		claim, err := s.Moves.ClaimMove(r.Context(), auth.AccountID(r), a.Snap.Ref.Host)

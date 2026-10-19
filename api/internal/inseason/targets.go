@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"math"
 	"sort"
@@ -12,6 +13,9 @@ import (
 	"time"
 
 	"golang.org/x/sync/singleflight"
+
+	"github.com/jhunthrop/commish/api/internal/apitypes"
+	"github.com/jhunthrop/commish/api/internal/draft"
 )
 
 // maxPairs bounds the (account, league, roster) pairs a cache keeps; past
@@ -142,27 +146,49 @@ func contentKey(a *advisor) string {
 	sort.Strings(held)
 	put("held", held)
 	put("read", a.projection.ReadAt.UnixNano(), a.Board.Refreshed.UnixNano(), a.basis, a.weeks)
+	// The league's shape the search reads (rereview 66u F1): its slots and
+	// bench (AllTrades, Squad.Open) and the saved settings they come from.
+	shape, _ := json.Marshal(struct {
+		Config   []draft.SlotConfig
+		Settings apitypes.LeagueSettings
+	}{a.config, a.settings})
+	_, _ = h.Write(shape)
 	return hex.EncodeToString(h.Sum(nil))
 }
 
 // searchTimeout bounds one search; a request and a warm run share it.
 const searchTimeout = 30 * time.Second
 
+// timeout is the bound on one search: Service.SearchTimeout, or
+// searchTimeout when zero.
+func (s *Service) timeout() time.Duration {
+	if s.SearchTimeout > 0 {
+		return s.SearchTimeout
+	}
+	return searchTimeout
+}
+
 // findsFor is the pair's trades by the other team's roster id, searched
 // at most once per content and only when a page asks. The search runs on
-// search, bounded by searchTimeout: the service's own context for a
-// request (shutdown stops it; requests share the run, so never one
-// request's), the warm run's for a warm.
-func (s *Service) findsFor(a *advisor, account string, search context.Context) func() map[int][]Trade {
+// search, bounded by the search timeout: for a request, a context that
+// outlives the drain (the service's, never cancelled, rereview 66u F2;
+// requests share the run, so never one request's), for a warm the warm
+// run's. A search that stops answers its error, said once by whoever
+// asked.
+func (s *Service) findsFor(a *advisor, account string, search context.Context) func() (map[int][]Trade, error) {
 	var once sync.Once
 	var got map[int][]Trade
-	return func() map[int][]Trade {
+	var failed error
+	return func() (map[int][]Trade, error) {
 		once.Do(func() {
-			ctx, cancel := context.WithTimeout(search, searchTimeout)
+			ctx, cancel := context.WithTimeout(search, s.timeout())
 			defer cancel()
 			pair, content := pairKey(a, account), contentKey(a)
 			find := func() (map[int][]Trade, error) {
 				s.searches.Add(1)
+				if s.beforeSearch != nil {
+					s.beforeSearch()
+				}
 				return a.findAll(ctx)
 			}
 			found, err := s.finds.get(pair, content, find)
@@ -171,11 +197,10 @@ func (s *Service) findsFor(a *advisor, account string, search context.Context) f
 				found, err = s.finds.get(pair, content, find)
 			}
 			if err != nil {
-				s.Log.Warn("inseason: the trade search stopped", "league", a.Snap.Ref.Key(), "err", err)
-				found = nil
+				found, failed = nil, err
 			}
 			got = found
 		})
-		return got
+		return got, failed
 	}
 }

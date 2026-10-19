@@ -60,19 +60,34 @@ type advisor struct {
 	// finds is the league read's trades with each team, searched once per
 	// read across requests (Service.findsFor); nil searches for this
 	// advisor alone, once (found).
-	finds     func() map[int][]Trade
+	finds     func() (map[int][]Trade, error)
 	foundHere map[int][]Trade
+	// searchErr is a search that stopped (shutdown, its deadline): the
+	// routes answer it as ErrSearchStopped, never as no trades (rereview
+	// 66u F2).
+	searchErr error
 }
 
 // found is every trade the finder keeps with each other team, by roster
 // id, in orderTrades' order: the Trades screen and the order's targets
-// both read it (Lane 66u N3).
+// both read it (Lane 66u N3). A search that stopped answers nothing and
+// leaves its error in searchErr.
 func (a *advisor) found() map[int][]Trade {
 	if a.finds != nil {
-		return a.finds()
+		got, err := a.finds()
+		if err != nil {
+			a.searchErr = err
+		}
+		return got
 	}
 	if a.foundHere == nil {
-		a.foundHere, _ = a.findAll(context.Background())
+		// An advisor with no service (the package's own tests) searches on
+		// a context nothing cancels, so findAll cannot stop.
+		found, err := a.findAll(context.Background())
+		if err != nil {
+			a.searchErr = err
+		}
+		a.foundHere = found
 	}
 	return a.foundHere
 }

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -129,6 +130,34 @@ func TestALandedReadIsFollowedForEveryAccount(t *testing.T) {
 	only, err := svc.FollowedAt(ctx, ref, []uuid.UUID{alice})
 	if err != nil || len(only) != 1 || only[0].Link.AccountID != alice {
 		t.Fatalf("followed for alice alone: %v %d", err, len(only))
+	}
+}
+
+// PutSnapshot says whether it wrote a row: nothing for a league no one has
+// attached, a write for the first read and for each one after (rereview
+// 66u F4, the flag Landed hears by).
+func TestPutSnapshotSaysWhetherItStored(t *testing.T) {
+	pool := dbtest.Pool(t)
+	ctx := context.Background()
+	store := &Store{Pool: pool}
+	unlinked := Snapshot{Ref: Ref{Host: HostSleeper, LeagueID: "999999999999", Season: 2026}, ReadAt: time.Now()}
+	if stored, err := store.PutSnapshot(ctx, unlinked); err != nil || stored {
+		t.Fatalf("an unattached league: stored %v, %v", stored, err)
+	}
+	alice := newAccount(t, &auth.Store{Pool: pool}, "stored_alice")
+	svc := replayService(pool)
+	if status, _, _ := attachAs(t, svc, alice, "https://sleeper.com/leagues/"+ReplaySleeperLeague+"/team"); status != http.StatusCreated {
+		t.Fatalf("attach: %d", status)
+	}
+	if _, err := pool.Exec(ctx, `delete from app.league_snapshots`); err != nil {
+		t.Fatal(err)
+	}
+	snap := Snapshot{Ref: replayRef(t, svc, alice), Name: "League", ReadAt: time.Now()}
+	for _, step := range []string{"the first read", "the next read"} {
+		if stored, err := store.PutSnapshot(ctx, snap); err != nil || !stored {
+			t.Fatalf("%s: stored %v, %v", step, stored, err)
+		}
+		snap.ReadAt = snap.ReadAt.Add(time.Minute)
 	}
 }
 

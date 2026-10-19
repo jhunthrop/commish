@@ -79,8 +79,12 @@ type Service struct {
 	// finds keeps each pair's latest trade search (targets.go), for
 	// /trades, the order's targets and a landed read's warm run alike.
 	finds readCache[map[int][]Trade]
+	// SearchTimeout bounds one trade search, searchTimeout when zero.
+	SearchTimeout time.Duration
 	// searches counts the trade searches run, the cache's misses.
 	searches atomic.Int64
+	// beforeSearch, set by a test, runs as a search starts.
+	beforeSearch func()
 	// viewers is who viewed each league lately: the warm run's accounts.
 	viewers viewerSet
 	// warms is the landed reads waiting for a warm worker.
@@ -138,12 +142,28 @@ func (s *Service) advisorFor(w http.ResponseWriter, r *http.Request) (*advisor, 
 	}
 	account := auth.AccountID(r)
 	s.viewers.saw(l.Snap.Ref, account, s.Now())
-	a, err := s.leagueAdvisor(r.Context(), l, account, s.base())
+	a, err := s.leagueAdvisor(r.Context(), l, account, context.WithoutCancel(s.base()))
 	if err != nil {
 		httpx.WriteInternal(w, r, s.Log, "inseason: advisor", err)
 		return nil, false
 	}
 	return a, true
+}
+
+// SearchStoppedWords is the sentence a screen prints when the trade
+// search stopped before it finished (shutdown, its deadline): never an
+// empty table (rereview 66u F2).
+const SearchStoppedWords = "We could not finish the trade search just now. Try again in a moment."
+
+// searchStopped answers a request whose trade search stopped, 503 with
+// SearchStoppedWords, logging it once; false when the search finished.
+func (s *Service) searchStopped(w http.ResponseWriter, r *http.Request, a *advisor) bool {
+	if a.searchErr == nil {
+		return false
+	}
+	s.Log.Warn("inseason: the trade search stopped", "league", a.Snap.Ref.Key(), "err", a.searchErr)
+	httpx.WriteError(w, r, http.StatusServiceUnavailable, httpx.CodeUnavailable, SearchStoppedWords, nil)
+	return true
 }
 
 // leagueAdvisor is the account's league with its facts, the week's
@@ -272,6 +292,9 @@ func (s *Service) trades(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	out, ok := a.Trades(focus)
+	if s.searchStopped(w, r, a) {
+		return
+	}
 	s.answer(w, r, out, ok)
 }
 
