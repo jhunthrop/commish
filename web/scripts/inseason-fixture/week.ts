@@ -7,6 +7,11 @@ import type { LineupSlot, PlayerLine } from '../../src/lib/league/inseason/api.t
 
 const TENTH = 10;
 
+/** The finder's basis in the API's words (words.go TradesBasis with porWords, then pergame.go
+ * RestOfSeasonBasis), for the fixture's rest-of-season order from week 6 over its 12 weeks. */
+export const TRADES_BASIS =
+	"Trades where both lineups gain on our rest-of-season order. Each team's best trade, yours first, among those they gain at least 0.5 a week from, then the close calls for them. The other team decides. Gain is the change in a lineup's points over replacement a week, points above what a free pickup at each position gives you: the rest of the season on our rest-of-season order, averaged over its 12 weeks, not a projection of any one week. Rest of season is his points a game on our rest-of-season projection from week 6, byes out.";
+
 /** The builder's basis in the API's words (words.go TradeCheckBasis): it opens under the Trades basis,
  * which says what Gain and Rest of season are (review 66u finding 4). */
 export const CHECK_BASIS =

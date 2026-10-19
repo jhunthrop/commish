@@ -45,6 +45,7 @@ import {
 	accepts,
 	better,
 	CHECK_BASIS,
+	TRADES_BASIS,
 	lineupProj,
 	printedProj,
 	seasonStarters,
@@ -825,10 +826,9 @@ function withWeek(finder: TradeAdvice): TradeAdvice {
 			}))
 		})),
 		// The finder's first sentence as the API now says it (words.go TradesBasis).
-		basis: finder.basis.replace(
-			/^Trades where both lineups gain .*? The other team decides\./,
-			"Trades where both lineups gain on our rest-of-season order. Each team's best trade, yours first, among those they gain at least 0.5 a week from, then the close calls for them. The other team decides."
-		),
+		// The finder's basis as the API now says it (words.go TradesBasis and porWords, pergame.go
+		// RestOfSeasonBasis), stamped whole so a rerun on an older answer says it the same way.
+		basis: TRADES_BASIS,
 		check_basis: CHECK_BASIS,
 		moves: {
 			propose: 'unavailable',
