@@ -87,6 +87,17 @@ function basisWords(season: PlayerSeason, position: Position, format: Format): s
 	return parts.join(' ');
 }
 
+/** The week the head says his block reaches (the ruling on the sweep's X3): the run's through week,
+ * or his own later game already in the records, as Thursday's is before Sunday's are, so the head
+ * never says week 5 over a table that has his week 6. */
+function reachWeek(season: PlayerSeason): number {
+	return season.log.reduce(
+		(week, row) =>
+			row.status === 'played' || row.status === 'inactive' ? Math.max(week, row.week) : week,
+		season.through
+	);
+}
+
 function noneWords(season: PlayerSeason): string {
 	const { through } = season;
 	return through === 0
@@ -154,7 +165,8 @@ export function seasonView(
 	if (!format) throw new Error(`The season block is scored in ${season.format}, not on this run.`);
 	const columns = STAT_COLUMNS[position];
 	const [past, ahead] = splitLog(season.log);
-	const reach = season.through === 0 ? '' : `, through week ${String(season.through)}`;
+	const through = reachWeek(season);
+	const reach = through === 0 ? '' : `, through week ${String(through)}`;
 	return {
 		season: season.season,
 		aside: `${String(season.season)}, ${format.label}${reach}`,
