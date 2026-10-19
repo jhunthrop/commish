@@ -3,6 +3,7 @@
  * is the trust loop, so it is the verb, and the board is the rest of the season under the rail's
  * own word; before the draft and after the season the draft words stay. A heading names the rest of
  * the season only where the run's board ranks it. Pure, so every sentence is tested. */
+import { boardRestFrom } from '#lib/run/rest-from.ts';
 import { MOCK_VERB, RAIL_ITEMS, railInSeason, type RailKey } from '#lib/ui/nav.ts';
 
 /** A page's verbs, each by what it does: the page maps each to its link. */
@@ -31,6 +32,8 @@ export interface BoardCover {
 	season: number;
 	/** The first week a rest-of-season board ranks, absent on a board of the full season. */
 	rosFromWeek?: number;
+	/** Set while a game of that week had kicked off at the run (Lane 86). */
+	rosFromWeekPartial?: boolean;
 }
 
 export interface FrontWords {
@@ -58,10 +61,11 @@ export function frontWords(rail: RailKey, board: BoardCover, following: boolean)
 			quiet: [leagueVerb(following), 'sheet']
 		};
 	}
+	const from = boardRestFrom(board);
 	const heading =
-		board.rosFromWeek === undefined
+		from === null
 			? `Our ${season} board, for your league`
-			: `Our board for the rest of the ${season} season from week ${String(board.rosFromWeek)}, for your league`;
+			: `Our board for the rest of the ${season} season ${from}, for your league`;
 	return { title: 'In season', heading, verb: leagueVerb(following), quiet: ['mock'] };
 }
 

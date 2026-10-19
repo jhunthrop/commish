@@ -156,6 +156,32 @@ void test("the rest tile stays in one scoring: the read's figure a game only whe
 	assert.equal(tile(half.tiles, 'rest').value, '182.2');
 });
 
+void test("on Sunday evening the read's rest of season replaces the run's: his game is played, so he counts from week 7 (Lane 86)", () => {
+	const live = card(
+		week({ rest_of_season_points: 167.5, rest_from_week: 7 }, { rest_of_season_per_game: 16.8 })
+	);
+	assert.equal(tile(live.tiles, 'rest').value, '167.5');
+	assert.equal(tile(live.tiles, 'rest').caption, 'from week 7, 16.8 a game, WR1 in our order');
+	assert.deepEqual(live.rest, { points: 167.5, fromWeek: 7 });
+	// A league in another scoring keeps the tile's figure and says its week only.
+	const half = card(
+		week(
+			{
+				projection_scoring: { format: 'half_ppr', league_own: true },
+				rest_of_season_points: 150.1,
+				rest_from_week: 7
+			},
+			{ rest_of_season_per_game: 15 }
+		),
+		LEAGUE
+	);
+	assert.equal(tile(half.tiles, 'rest').value, '182.2');
+	assert.equal(tile(half.tiles, 'rest').caption, 'from week 7, WR1 in our order, in PPR scoring');
+	assert.equal(half.rest, null);
+	// A read older than the fields keeps the run's.
+	assert.equal(card(week()).rest, null);
+});
+
 void test("the API's tenths print as given: formatting only, never rounded again (Lane 66k)", () => {
 	assert.equal(printTenth(9.5), '9.5');
 	assert.equal(printTenth(23), '23.0');

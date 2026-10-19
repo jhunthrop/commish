@@ -67,6 +67,10 @@ export const formatSchema = z.object({
 	basis: z.array(phrase).min(1),
 	/** In season, once the board ranks the rest of the season: the first week it ranks. Absent preseason. */
 	rosFromWeek: z.number().int().min(1).optional(),
+	/** In season, set while a game of rosFromWeek had kicked off at the run (Lane 86): its clubs count
+	 * from their next week, and the words say the board counts that week's games still to play. Absent
+	 * preseason and on a run older than the field. */
+	rosFromWeekPartial: z.boolean().optional(),
 	/** In season, the last week whose games are in the season figures. */
 	rosThroughWeek: z.number().int().min(0).optional(),
 	/** In season, when the run refreshed the rest-of-season board. */
@@ -130,7 +134,11 @@ export const boardRowSchema = z.object({
 	/** In season, where the preseason board ranked him, and its points for the full season; null
 	 * for a player with a line this season whom the preseason board did not rank. */
 	preseasonRank: z.number().int().min(1).nullable().optional(),
-	preseasonPoints: points.nullable().optional()
+	preseasonPoints: points.nullable().optional(),
+	/** In season, the week his rest of season starts from: his club's first game still to play at the
+	 * run (Lane 86), null with none left. Absent preseason and on a run older than the field, where the
+	 * format's rosFromWeek stands. */
+	restFromWeek: z.number().int().min(1).nullable().optional()
 });
 
 /** A kicker or a defense on a board (the 2026-09-05 ruling): after the ranked rows, in the drafters'

@@ -5,6 +5,7 @@ import type { components } from '#lib/api/types.ts';
 import { memberZone, weekdayTime } from '#lib/format/clock.ts';
 import { gameStateOf, toBePlayed } from '#lib/format/game-facts.ts';
 import { weekHead } from '#lib/format/figure-words.ts';
+import { playerRestWords } from '#lib/run/rest-from.ts';
 import {
 	avgLastPart,
 	deltaPart,
@@ -90,6 +91,16 @@ export interface LiveCard {
 	basis: string[];
 	/** The week's projection as the card prints it, which the week-ahead read is held to (Lane 66v). */
 	projection: CardProjection;
+	/** His rest of season at the read's clock (Lane 86), which the page's figures beside the read take;
+	 * null where the run's stand. */
+	rest: LiveRest | null;
+}
+
+/** His rest-of-season points at the read's clock and the week they start from (null with no game
+ * left). */
+export interface LiveRest {
+	points: number;
+	fromWeek: number | null;
 }
 
 const SCORING_WORDS: Readonly<Record<Schemas['ProjectionScoring']['format'], string>> = {
@@ -278,18 +289,32 @@ function deltaTile(week: PlayerWeek, zone: string, now: number): CardTile {
 	};
 }
 
+/** His rest of season at the read's clock (Lane 86), when the read is in the tile's own scoring and
+ * says it: the points over his club's games still to play now and the week they start from. Null on a
+ * preseason board, in another scoring and on a read older than the fields: the run's stand. */
+function restNow(week: PlayerWeek, rest: RestParts | null): LiveRest | null {
+	const points = week.rest_of_season_points;
+	if (week.projection_scoring.format !== rest?.scoring || points == null) return null;
+	return { points, fromWeek: week.rest_from_week ?? null };
+}
+
 /** Rest of season with his figure a game from the API's read (the league rows' one source), only
  * when the read is in the tile's own scoring: a league in another scoring leaves it out and the
- * caption names the tile's (review N2). The tile as built on a preseason board. */
+ * caption names the tile's (review N2). In that scoring the read's points replace the run's, and in
+ * any its week: a game kicked off since the run is no longer counted (Lane 86). The tile as built on a
+ * preseason board. */
 function restTile(week: PlayerWeek, rest: RestParts | null, fallback: CardTile): CardTile {
 	if (rest === null) return fallback;
 	const same = week.projection_scoring.format === rest.scoring;
+	const now = restNow(week, rest);
 	const perGame = week.line.rest_of_season_per_game;
 	const game = same && perGame !== null ? `, ${printTenth(perGame)} a game` : '';
 	const scoring = same ? '' : `, in ${rest.label} scoring`;
+	const from = playerRestWords(week.rest_from_week ?? rest.fromWeek);
 	return {
 		...fallback,
-		caption: `from week ${String(rest.fromWeek)}${game}, ${rest.rank}${scoring}`
+		...(now === null ? {} : { value: printTenth(now.points) }),
+		caption: `${from}${game}, ${rest.rank}${scoring}`
 	};
 }
 
@@ -416,6 +441,7 @@ export function liveCard({
 		next,
 		verb,
 		basis: liveBasis(week, verb !== null, zone, now),
+		rest: restNow(week, rest),
 		projection: {
 			week: week.week,
 			scoring: week.projection_scoring.format,

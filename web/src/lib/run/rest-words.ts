@@ -2,6 +2,7 @@
 import { monthDayLabel } from '#lib/format/date.ts';
 import { FIGURE } from '#lib/format/figure-words.ts';
 import type { Format } from './schema.ts';
+import { boardRestFrom } from './rest-from.ts';
 import { throughClause } from './through-words.ts';
 
 /** How far this season's figures reach, and the scoring they are in. */
@@ -24,14 +25,16 @@ export function figuresLine(format: Format, reach: FiguresReach): string {
  * 2026 season from week 6, refreshed October 14. Games and points a game are this season's, through
  * week 5." The board gives no range in season, and the line names none. Null on a preseason board. */
 export function restLead(format: Format, reach: FiguresReach, season: number): string | null {
-	if (format.rosFromWeek === undefined || format.refreshedAt === undefined) return null;
-	const rest = `the rest of the ${String(season)} season from week ${String(format.rosFromWeek)}`;
+	const from = boardRestFrom(format);
+	if (from === null || format.refreshedAt === undefined) return null;
+	const rest = `the rest of the ${String(season)} season ${from}`;
 	return `Ranked by points over replacement for ${rest}, refreshed ${monthDayLabel(format.refreshedAt)}. ${figuresLine(format, reach)}`;
 }
 
 /** A rest-of-season figure's caption where no basis line sits beside it (/compare): "PPR points for
  * the rest of the 2026 season from week 7, refreshed October 21". Null on a preseason board. */
 export function restCaption(format: Format, season: number): string | null {
-	if (format.rosFromWeek === undefined || format.refreshedAt === undefined) return null;
-	return `${format.label} points for the rest of the ${String(season)} season from week ${String(format.rosFromWeek)}, refreshed ${monthDayLabel(format.refreshedAt)}`;
+	const from = boardRestFrom(format);
+	if (from === null || format.refreshedAt === undefined) return null;
+	return `${format.label} points for the rest of the ${String(season)} season ${from}, refreshed ${monthDayLabel(format.refreshedAt)}`;
 }

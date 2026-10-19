@@ -2,6 +2,7 @@
 import { gapPicks } from '#lib/format/gap-picks.ts';
 import { FIGURE } from '#lib/format/figure-words.ts';
 import { fixed } from '#lib/format/number.ts';
+import { playerRestFrom, playerRestWords } from './rest-from.ts';
 import { restLead, type FiguresReach } from './rest-words.ts';
 import type { Format, PlayerFormat } from './schema.ts';
 
@@ -159,17 +160,25 @@ export function restFigures(
 /** The every-format table's points heading and each line's label: "Rest of season from week 7" when
  * every line prints in-season points, "Projected" otherwise, and when the table mixes the two each
  * in-season line names its basis beside its format. */
-export function formatTable(lines: readonly { format: Format; rest: RestFigures | null }[]): {
+export function formatTable(
+	lines: readonly {
+		format: Format;
+		numbers: Pick<PlayerFormat, 'restFromWeek'>;
+		rest: RestFigures | null;
+	}[]
+): {
 	head: string;
 	labels: string[];
 } {
-	const from = (format: Format): string => `rest of season from week ${String(format.rosFromWeek)}`;
+	// His own first week still to play at the run (Lane 86), the same in every format.
+	const from = (line: (typeof lines)[number]): string =>
+		`rest of season ${playerRestWords(playerRestFrom(line.format, line.numbers))}`;
 	const rest = lines.filter((line) => line.rest !== null);
 	if (rest.length === 0)
 		return { head: FIGURE.projected, labels: lines.map((l) => l.format.label) };
 	const [first] = rest;
 	if (first && rest.length === lines.length) {
-		const head = from(first.format);
+		const head = from(first);
 		return {
 			head: head.charAt(0).toUpperCase() + head.slice(1),
 			labels: lines.map((l) => l.format.label)
@@ -177,8 +186,6 @@ export function formatTable(lines: readonly { format: Format; rest: RestFigures 
 	}
 	return {
 		head: FIGURE.projected,
-		labels: lines.map((l) =>
-			l.rest === null ? l.format.label : `${l.format.label}, ${from(l.format)}`
-		)
+		labels: lines.map((l) => (l.rest === null ? l.format.label : `${l.format.label}, ${from(l)}`))
 	};
 }

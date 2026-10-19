@@ -6,6 +6,7 @@
  * gap leaves (the tier panel carries the rest of the season's). Never more than three figures, the
  * read's one row. Pure, so the tests read what the page prints. */
 import { fixed } from '#lib/format/number.ts';
+import { playerRestWords } from './rest-from.ts';
 import type { PullFigure } from './schema.ts';
 
 /** A figure beside the read, with the word or two that names its basis where it has one. */
@@ -18,8 +19,9 @@ export interface ReadBasis {
 	label: string;
 	/** His preseason projection for the full season, null for a player the preseason board did not rank. */
 	preseason: number | null;
-	/** Once the run ranks the rest of the season: his points for it and the first week it counts. */
-	rest: { points: number; fromWeek: number } | null;
+	/** Once the run ranks the rest of the season: his points for it and the first week it counts (his
+	 * club's first game still to play, null with none left). */
+	rest: { points: number; fromWeek: number | null } | null;
 }
 
 export const PRESEASON_PROJECTION = 'Preseason projection';
@@ -56,7 +58,7 @@ export function readFigures(pulls: readonly PullFigure[], basis: ReadBasis): Rea
 	const lead: ReadFigure = {
 		label: REST_OF_SEASON,
 		figure: fixed(rest.points),
-		caption: `${basis.label} points from week ${String(rest.fromWeek)}`
+		caption: `${basis.label} points ${playerRestWords(rest.fromWeek)}`
 	};
 	const projection = pulls.find(isProjection);
 	const last: ReadFigure[] = projection ? [{ ...projection, label: PRESEASON_PROJECTION }] : [];

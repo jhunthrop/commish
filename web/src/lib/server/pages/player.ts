@@ -4,6 +4,7 @@
 import { windowLabel } from '#lib/format/date.ts';
 import { withStatuses } from '#lib/run/board-status.ts';
 import { availableTierOf } from '#lib/run/held-places.ts';
+import { boardRestFrom } from '#lib/run/rest-from.ts';
 import type {
 	AdpSource,
 	Capsule,
@@ -259,7 +260,7 @@ export async function playerPage(slug: string, now: number): Promise<PlayerPage>
 		tierBasis:
 			lead.format.rosFromWeek === undefined
 				? `Projected ${lead.format.label} points, ${String(run.season)}`
-				: `Projected ${lead.format.label} points for the rest of ${String(run.season)} from week ${String(lead.format.rosFromWeek)}`,
+				: `Projected ${lead.format.label} points for the rest of ${String(run.season)} ${boardRestFrom(lead.format) ?? ''}`,
 		words: lead.words,
 		rest: lead.rest,
 		adpSources: lead.adpSources,

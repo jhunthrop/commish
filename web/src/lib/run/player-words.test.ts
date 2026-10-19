@@ -102,27 +102,40 @@ void test('the every-format table names the in-season basis in its heading, or b
 	const half: Format = { ...REST, id: 'half-ppr-12', label: 'Half PPR' };
 	assert.deepEqual(
 		formatTable([
-			{ format: REST, rest },
-			{ format: half, rest }
+			{ format: REST, numbers: {}, rest },
+			{ format: half, numbers: {}, rest }
 		]),
 		{
 			head: 'Rest of season from week 7',
 			labels: ['PPR', 'Half PPR']
 		}
 	);
-	assert.deepEqual(formatTable([{ format: PPR, rest: null }]), {
+	assert.deepEqual(formatTable([{ format: PPR, numbers: {}, rest: null }]), {
 		head: 'Projected',
 		labels: ['PPR']
 	});
 	assert.deepEqual(
 		formatTable([
-			{ format: REST, rest },
-			{ format: { ...PPR, id: 'standard-12', label: 'Standard' }, rest: null }
+			{ format: REST, numbers: {}, rest },
+			{ format: { ...PPR, id: 'standard-12', label: 'Standard' }, numbers: {}, rest: null }
 		]),
 		{
 			head: 'Projected',
 			labels: ['PPR, rest of season from week 7', 'Standard']
 		}
+	);
+});
+
+void test("the every-format table heads his own week: his club's game of week 6 was played at the run (Lane 86)", () => {
+	const rest: RestFigures = { lead: 'x', preseason: null };
+	const partly: Format = { ...REST, rosFromWeek: 6, rosFromWeekPartial: true };
+	assert.equal(
+		formatTable([{ format: partly, numbers: { restFromWeek: 7 }, rest }]).head,
+		'Rest of season from week 7'
+	);
+	assert.equal(
+		formatTable([{ format: partly, numbers: { restFromWeek: null }, rest }]).head,
+		'Rest of season with no game left'
 	);
 });
 
