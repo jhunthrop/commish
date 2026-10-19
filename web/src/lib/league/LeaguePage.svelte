@@ -1,10 +1,10 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, tick } from 'svelte';
 	import { HTTP_STATUS, hasStatus, isSignedOut } from '#lib/api/status.ts';
 	import { takeHeld } from '#lib/context/held.ts';
 	import { scoresSentence } from '#lib/context/note-words.ts';
 	import { lazySheet } from '#lib/site/lazy-sheet.svelte.ts';
-	import { links } from '#lib/site/links.ts';
+	import { links, UNCOUNTED_ANCHOR } from '#lib/site/links.ts';
 	import DisplayTitle from '#lib/ui/DisplayTitle.svelte';
 	import EmptyState from '#lib/ui/EmptyState.svelte';
 	import Panel from '#lib/ui/Panel.svelte';
@@ -241,7 +241,20 @@
 		}
 	}
 
+	/** Asked for the rules our stats lack: the card is drawn once the week's read lands, then shown. */
+	let toRules = false;
+	$effect(() => {
+		if (!toRules || view !== 'settings' || !advice) return;
+		toRules = false;
+		void tick().then(() => document.getElementById(UNCOUNTED_ANCHOR)?.scrollIntoView());
+	});
+
 	onMount(() => {
+		// An in-season basis's "Which five" opens the league on Settings at the rules our stats lack.
+		if (window.location.hash === `#${UNCOUNTED_ANCHOR}`) {
+			view = 'settings';
+			toRules = true;
+		}
 		void lazySheet.load();
 		void read();
 		const timer = setInterval(() => void read(), POLL_MS);
@@ -400,7 +413,12 @@
 			{/if}
 			<div class="panel" id="league-panel" role="tabpanel" aria-labelledby="league-tab-{view}">
 				{#if view === 'settings'}
-					<LeagueSettings terms={sync.terms} host={sync.host} teams={sync.teams.length} />
+					<LeagueSettings
+						terms={sync.terms}
+						host={sync.host}
+						teams={sync.teams.length}
+						uncounted={advice?.uncounted_rules ?? []}
+					/>
 				{:else if playing}
 					{#if bugs.length > 0 && scoreboard}
 						<ScoreBoard
