@@ -3423,7 +3423,7 @@ export interface components {
 			week: number;
 			/** @enum {string} */
 			position: 'K' | 'DEF';
-			/** @description how many of the league's scoring rules the season's points (Avg and Last) leave out, our stats lacking them; the basis says the count once and links to the league's Settings, never a list (Lane 66w) */
+			/** @description how many of the league's scoring rules at the tab's position (kicking rules for K, defense rules for DEF) the season's points (Avg and Last) leave out, our stats lacking them; the basis says the count once and links to the league's Settings, never a list (Lane 66w) */
 			uncounted_rules: number;
 			/**
 			 * Format: date-time

@@ -295,13 +295,29 @@ func uncountedWords(s apitypes.LeagueSettings, carried func(string) bool) string
 // words: each one the league scores at a spot it starts and no line this
 // season carries.
 func uncountedRules(s apitypes.LeagueSettings, carried func(string) bool) []string {
+	return uncountedWhere(s, carried, func(spot) bool { return true })
+}
+
+// uncountedWhere is the rules left out at the spots keep admits.
+func uncountedWhere(s apitypes.LeagueSettings, carried func(string) bool, keep func(spot) bool) []string {
 	var named []string
 	for _, c := range countables(rulesOf(s.Scoring)) {
-		if c.points != 0 && c.starts(s) && !c.counted(carried) {
+		if keep(c.spot) && c.points != 0 && c.starts(s) && !c.counted(carried) {
 			named = append(named, c.words)
 		}
 	}
 	return named
+}
+
+// tabSpots is the spot each week tab's rows score at (Lane 66w rereview
+// N2): a kicker's Avg and Last leave out only kicking rules, a defense's
+// only defense rules.
+var tabSpots = map[draft.Position]spot{draft.K: kickerSpot, draft.DEF: defenseSpot}
+
+// uncountedRulesAt is uncountedRules for one week tab's position.
+func uncountedRulesAt(s apitypes.LeagueSettings, carried func(string) bool, position draft.Position) []string {
+	want, ok := tabSpots[position]
+	return uncountedWhere(s, carried, func(at spot) bool { return ok && at == want })
 }
 
 // BasisNote is the rest of every page's basis, said once under the rows:

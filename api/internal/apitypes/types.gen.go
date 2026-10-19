@@ -4288,7 +4288,7 @@ type WeekOrderAdvice struct {
 	// Rows one a club (a kicker is the club's one the projection names, else the one who kicked for it last): first the games still to play by Proj, ties by Avg, then those kicked off, then the clubs on bye
 	Rows []WeekOrderRow `json:"rows"`
 
-	// UncountedRules how many of the league's scoring rules the season's points (Avg and Last) leave out, our stats lacking them; the basis says the count once and links to the league's Settings, never a list (Lane 66w)
+	// UncountedRules how many of the league's scoring rules at the tab's position (kicking rules for K, defense rules for DEF) the season's points (Avg and Last) leave out, our stats lacking them; the basis says the count once and links to the league's Settings, never a list (Lane 66w)
 	UncountedRules int `json:"uncounted_rules"`
 
 	// Week the week the rows' Game cell and Proj are for

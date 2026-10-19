@@ -4128,8 +4128,9 @@ components:
         uncounted_rules:
           type: integer
           description: >-
-            how many of the league's scoring rules the season's points (Avg and Last) leave out, our stats lacking
-            them; the basis says the count once and links to the league's Settings, never a list (Lane 66w)
+            how many of the league's scoring rules at the tab's position (kicking rules for K, defense rules for DEF)
+            the season's points (Avg and Last) leave out, our stats lacking them; the basis says the count once and
+            links to the league's Settings, never a list (Lane 66w)
         read_at:
           type: string
           format: date-time

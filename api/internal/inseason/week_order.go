@@ -61,7 +61,7 @@ func sectionOf(f Facts) apitypes.WeekOrderRowSection {
 // league of their own.
 func (a *advisor) WeekOrder(position draft.Position, marks bool) apitypes.WeekOrderAdvice {
 	out := apitypes.WeekOrderAdvice{Week: a.Snap.Week, Position: apitypes.WeekOrderAdvicePosition(position),
-		UncountedRules: len(uncountedRules(a.settings, a.season.Carries)), ProjectionReadAt: a.projectionReadAt(),
+		UncountedRules: len(uncountedRulesAt(a.settings, a.season.Carries, position)), ProjectionReadAt: a.projectionReadAt(),
 		ProjectionScoring: projectionScoring(a.settings, a.preset), Rows: []apitypes.WeekOrderRow{}}
 	var hosts map[string]string
 	if marks {

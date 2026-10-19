@@ -3,6 +3,7 @@ package inseason
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/jhunthrop/commish/api/internal/boards"
 	"github.com/jhunthrop/commish/api/internal/draft"
 	"github.com/jhunthrop/commish/api/internal/mock"
+	"github.com/jhunthrop/commish/api/internal/scoring"
 )
 
 // weekOrderFixture is the fixture league with every club's defense on the
@@ -177,9 +179,46 @@ func TestWeekOrderCountsTheRulesLeftOut(t *testing.T) {
 	saved.Scoring = apitypes.Scoring{Custom: &rules}
 	f.league.Saved = &saved
 	out := f.advisor(t, f.projection, fixtureNow).WeekOrder(draft.K, true)
-	want := len(uncountedRules(saved, func(string) bool { return false }))
+	want := len(uncountedRulesAt(saved, func(string) bool { return false }, draft.K))
 	if want < 2 || out.UncountedRules != want {
 		t.Fatalf("%d rules left out, want %d", out.UncountedRules, want)
+	}
+}
+
+// The count is the tab's own (Lane 66w rereview N2): the recorded league
+// leaves out five rules, two-point conversions, missed field goals,
+// missed extra points, fumble recoveries and safeties; a kicker's Avg and
+// Last leave out the two kicking ones, a defense's the two defense ones.
+func TestWeekOrderCountsOnlyTheTabsRulesLeftOut(t *testing.T) {
+	rules := scoring.PresetRules(apitypes.ScoringPresetPpr)
+	rules.PointsPerTwoPointConversion, rules.PointsPerReturnTouchdown = 2, 0
+	rules.PointsPerFieldGoalMissed, rules.PointsPerExtraPointMissed = -1, -1
+	rules.PointsPerDefensiveFumbleRecovery, rules.PointsPerSafety = 2, 2
+	rules.PointsPerFieldGoal4049, rules.PointsPerFieldGoal50Plus = rules.PointsPerFieldGoal, rules.PointsPerFieldGoal
+	settings := fixtureSettings()
+	settings.Scoring = apitypes.Scoring{Custom: &rules}
+	carried := func(metric string) bool { return metric == metricPointsAllowed || metric == metricYardsAllowed }
+	if all := uncountedRules(settings, carried); len(all) != 5 {
+		t.Fatalf("the league leaves out %v", all)
+	}
+	want := map[draft.Position][]string{
+		draft.K:   {"missed field goals", "missed extra points"},
+		draft.DEF: {"fumble recoveries", "safeties"},
+	}
+	for position, named := range want {
+		got := uncountedRulesAt(settings, carried, position)
+		if strings.Join(got, "|") != strings.Join(named, "|") {
+			t.Errorf("%s: %v, want %v", position, got, named)
+		}
+	}
+	f := newWeekOrderFixture(t)
+	f.league.Saved = &settings
+	a := f.advisor(t, f.projection, fixtureNow)
+	a.season.carried = map[string]bool{metricPointsAllowed: true, metricYardsAllowed: true}
+	for position := range want {
+		if out := a.WeekOrder(position, true); out.UncountedRules != 2 {
+			t.Errorf("%s tab counts %d", position, out.UncountedRules)
+		}
 	}
 }
 
