@@ -87,9 +87,10 @@ def club_week(slate: Sequence[Game], current: int, as_of: datetime) -> ClubWeek 
     return None
 
 
-def _projections(
+def published_projections(
     conn: Connection, season: int, weeks: Sequence[int], as_of: datetime
 ) -> dict[tuple[str, int], PublishedProjection]:
+    """Each player's published projection for `weeks` by (board id, week), as the card serves it at `as_of`."""
     rows = conn.execute(
         text(
             "with snapshots as (select week, snapshot_id, max(captured_at) as captured_at, "
@@ -372,7 +373,7 @@ def read_week_facts(conn: Connection, season: int, subjects: Sequence[Subject], 
         blocks,
         {} if stamp is None else allowed_by_opponent(context, blocks, players, stamp),
         weeks,
-        _projections(conn, season, wanted, as_of),
+        published_projections(conn, season, wanted, as_of),
         _team_week_reads(conn, season, wanted, (LINES_SOURCE,), as_of),
         _team_week_reads(conn, season, wanted, (GAME_TABLE_SOURCE,), as_of),
         _team_week_reads(conn, season, wanted, (FORECAST_SOURCE,), as_of),
