@@ -7,6 +7,7 @@
 		RECORD_BOX,
 		RECORD_FIGURES,
 		RECORD_SOURCES,
+		agreementBasis,
 		allLine,
 		chartSeries,
 		figureWords,
@@ -235,7 +236,7 @@
 		<div class="basis" data-basis>
 			<p>{record.method} {statusWords ?? ''}</p>
 			<p>
-				{capitalized(record.statistic.agreement)}: {record.scale}
+				{agreementBasis(record)}
 				{record.startersBasis ?? ''}
 			</p>
 			<p>{publishedWords(record)}</p>

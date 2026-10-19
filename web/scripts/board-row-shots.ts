@@ -9,13 +9,15 @@
 //   no run row, so the page before the script and the order after it never disagree;
 // - the status chip is styled from the first paint, script off (review 66n finding 1);
 // - Compare's head cell makes the call;
-// - no rendered word is an em-dash, a semicolon or a betting or trading word, "totals" among them.
+// - the copy passes the one guard (no em-dash, semicolon, betting, trading or platform word, "totals"
+//   among them), the names and rows the run and the API handed the page skipped (copy-scan.ts);
+// - the Floor to ceiling column is drawn only where a row carries a range.
 // Exits non-zero on a miss. Against the built site served by serve-built.ts, built with
 // PUBLIC_API_URL at the fixture API (scripts/inseason-fixture/serve.ts) so the order reads:
 //   node scripts/board-row-shots.ts [web origin] [out dir]
 import { mkdir } from 'node:fs/promises';
 import { chromium, type Browser, type BrowserContext, type Page } from 'playwright';
-import { BANNED_MARKS, BANNED_WORDS } from '../src/lib/format/copy-guard.ts';
+import { copyFault, watchData } from './copy-scan.ts';
 import { ORDER } from '../src/lib/order/words.ts';
 import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
 
@@ -59,6 +61,9 @@ const SHOTS: readonly Shot[] = [
 ];
 
 const web = process.argv[2] ?? 'http://localhost:4173';
+/** The dev server (npm run dev), where the dev-only system page draws the tier band. */
+const DEV_ORIGIN = process.env.DEV_ORIGIN;
+const NOT_FOUND = 404;
 const out = new URL(process.argv[3] ?? '../screenshots/board-row/', import.meta.url);
 const failures: string[] = [];
 
@@ -77,17 +82,6 @@ async function renderedLines(page: Page, selector: string): Promise<number | nul
 			? Math.round(el.getBoundingClientRect().height / parseFloat(style.lineHeight))
 			: 0;
 	}, selector);
-}
-
-/** The page's own words: players' and clubs' names are theirs, not copy ("Jalen Price"). */
-async function pageWords(page: Page): Promise<string> {
-	return page.evaluate(() => {
-		const main = document.querySelector('main')?.cloneNode(true);
-		if (!(main instanceof HTMLElement)) return '';
-		for (const name of main.querySelectorAll('.name, .ph a, .picked b, .opp a, td a, th.club a'))
-			name.remove();
-		return main.innerText;
-	});
 }
 
 /** Every signed gap on the page in its tone: plus green, minus rose. */
@@ -152,9 +146,19 @@ async function checkRows(page: Page, tag: string): Promise<void> {
 }
 
 async function checkPage(page: Page, shot: Shot, tag: string, width: number): Promise<void> {
-	const words = await pageWords(page);
-	const banned = BANNED_WORDS.exec(words) ?? BANNED_MARKS.exec(words);
-	if (banned) fail(tag, `rendered "${banned[0]}"`);
+	const words = await page.locator('main').innerText();
+	// The one guard on the copy, the names and rows the run and the API handed the page skipped
+	// ("Jadarian Price", "Las Vegas Raiders" are theirs, not copy; ruling R3).
+	const banned = await copyFault(page);
+	if (banned !== null) fail(tag, `rendered "${banned}"`);
+	if (shot.kind === 'rows') {
+		// The Floor to ceiling column is drawn only where a row carries a range (Lane 66x).
+		const range = await page.evaluate(() => ({
+			head: document.querySelectorAll('main .head .c-range').length,
+			bars: document.querySelectorAll('main .c-range .inline').length
+		}));
+		if (range.head > 0 && range.bars === 0) fail(tag, 'Floor to ceiling heads a column no row has');
+	}
 	if (shot.kind === 'schedule') {
 		const lines = await renderedLines(page, 'main .head p');
 		if (lines === null || (width > PHONE_MAX && lines > MAX_SCHEDULE_DESK_LINES))
@@ -213,9 +217,18 @@ async function checkPrerendered(page: Page, shot: Shot, tag: string, file: strin
 }
 
 /** The tier band (TierStrip) as the system page draws it: one row tall, its drop at a figure's size
- * (review 66n finding 5). In season the board's position views are the order, so no board draws it. */
+ * (review 66n finding 5). In season the board's position views are the order, so no board draws it.
+ * The system page is dev-only (ruling R4): the built site answers 404 there, checked here, and the
+ * band is shot from the dev server at DEV_ORIGIN when one is given. */
 async function shootTierStrip(page: Page, tag: string, file: string): Promise<void> {
-	await page.goto(`${web}/system`, { waitUntil: 'networkidle' });
+	const built = await page.request.get(`${web}/system`);
+	if (built.status() !== NOT_FOUND)
+		fail(tag, `the built site serves /system (${String(built.status())})`);
+	if (DEV_ORIGIN === undefined) {
+		process.stdout.write(`${tag}: no DEV_ORIGIN, the tier band is not shot\n`);
+		return;
+	}
+	await page.goto(`${DEV_ORIGIN}/system`, { waitUntil: 'networkidle' });
 	const band = page.locator('.band').first();
 	if ((await band.count()) === 0) {
 		fail(tag, 'the system page draws no tier band');
@@ -250,6 +263,7 @@ async function contextFor(
 		deviceScaleFactor: width <= PHONE_MAX ? 2 : 1,
 		javaScriptEnabled: script
 	});
+	watchData(context);
 	await context.addInitScript(
 		([key, value]: readonly [string, string]) => localStorage.setItem(key, value),
 		[THEME_STORAGE_KEY, theme] as const

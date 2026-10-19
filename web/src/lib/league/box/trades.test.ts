@@ -343,6 +343,5 @@ void test('copy guard: every word the trade table prints is fantasy words, the p
 	];
 	for (const text of said) {
 		assert.doesNotMatch(text, NEVER, text);
-		assert.doesNotMatch(text, /[–—;]/, text);
 	}
 });
