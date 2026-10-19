@@ -11,6 +11,7 @@ skipped without it, and run by CI, which sets it.
 
 import argparse
 import os
+import unicodedata
 from dataclasses import replace
 from datetime import UTC, datetime
 from typing import cast
@@ -60,6 +61,14 @@ def test_the_universe_spelling_is_taken_only_for_the_diacritics_dropped(
     provided: str, universe: str, spelled: str | None
 ) -> None:
     assert universe_spelling(provided, universe) == spelled
+
+
+def test_the_spelling_is_written_precomposed() -> None:
+    """A decomposed accent (an e and a combining acute) is written as the one letter the core font
+    subsets draw (web/src/lib/ui/fonts/coverage.ts), never as a bare combining mark."""
+    spelled = universe_spelling(_ESTIME_AS_PROVIDED, unicodedata.normalize("NFD", _ESTIME))
+    assert spelled == _ESTIME
+    assert spelled is not None and unicodedata.is_normalized("NFC", spelled)
 
 
 def test_the_sheet_prints_his_name_with_its_accent_and_a_draft_naming_him_traces() -> None:

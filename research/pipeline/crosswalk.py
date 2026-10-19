@@ -247,10 +247,11 @@ def seed_team_defense_universe(conn: Connection) -> int:
 def universe_spelling(provider_name: str, universe_name: str) -> str | None:
     """The universe's spelling when it is the provider's name with the diacritics the provider dropped,
     else None: a suffix, punctuation or case difference is not a diacritic, and an accent the provider
-    keeps is never taken away."""
-    if universe_name == provider_name or strip_accents(provider_name) != provider_name:
+    keeps is never taken away. Written precomposed (NFC), the letters the site's fonts draw."""
+    spelled = unicodedata.normalize("NFC", universe_name)
+    if spelled == provider_name or strip_accents(provider_name) != provider_name:
         return None
-    return universe_name if strip_accents(universe_name) == provider_name else None
+    return spelled if strip_accents(spelled) == provider_name else None
 
 
 @dataclass(frozen=True)
