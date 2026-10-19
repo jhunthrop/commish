@@ -1,6 +1,7 @@
 package espn
 
 import (
+	"math"
 	"strings"
 	"testing"
 )
@@ -63,21 +64,50 @@ func TestReadMidWeekCarriesEachPlayersPoints(t *testing.T) {
 	}
 }
 
+// The final fixture is the same league read with the same views for the
+// decided scoring period 5 (scoringPeriodId=5, 2026-10-19 11:30Z), on
+// the same anonymised template, the rosters as ESPN gave them for that
+// period. ESPN's status still named period 6 in play, so the fixture
+// states 5 as the current matchup period, the one edit (Lane 79 fix 8).
+const finalFixture = "testdata/league-final-2026-week5.json"
+
 // Once ESPN decides the matchup, the team's points are its final and
-// each player's are still his appliedStatTotal for the period, the
-// final's own figures.
+// each player's are still his appliedStatTotal for the period, as ESPN
+// sends a decided period's roster: every side's starters add to its
+// final.
 func TestReadFinalCarriesEachPlayersPoints(t *testing.T) {
-	in := string(readFixture(t, midWeekFixture))
-	const live = `"matchupPeriodId":6,"winner":"UNDECIDED","home":{"teamId":9,"totalPoints":0.0,"totalPointsLive":77.08`
-	if !strings.Contains(in, live) {
-		t.Fatal("the fixture's game 9 v 3 moved")
+	l := readBody(t, readFixture(t, finalFixture), 2026)
+	if l.MatchupPeriod != 5 || len(l.Games) != 6 {
+		t.Fatalf("period %d, %d games", l.MatchupPeriod, len(l.Games))
 	}
-	final := strings.Replace(in, live, `"matchupPeriodId":6,"winner":"HOME","home":{"teamId":9,"totalPoints":91.3,"totalPointsLive":77.08`, 1)
-	final = strings.Replace(final, `"playerId":3117251,"lineupSlotId":2,"playerPoolEntry":{"appliedStatTotal":0.0,"lineupLocked":false}`,
-		`"playerId":3117251,"lineupSlotId":2,"playerPoolEntry":{"appliedStatTotal":14.22,"lineupLocked":true}`, 1)
-	g := gameOf(t, readBody(t, []byte(final), 2026), 9)
-	if g.HomePoints != 91.3 || g.HomePlayerPoints[mccaffrey] != 14.22 || g.HomePlayerPoints[walker] != 27.9 {
-		t.Fatalf("a decided game: %v, McCaffrey %v, Walker %v", g.HomePoints, g.HomePlayerPoints[mccaffrey], g.HomePlayerPoints[walker])
+	g := gameOf(t, l, 11)
+	if g.Home != 11 || g.Away != 9 || g.HomePoints != 88.6 || g.Points != 136.5 {
+		t.Fatalf("game 11 v 9: %+v", g)
+	}
+	if g.HomePlayerPoints["4429615"] != 14.6 || g.HomePlayerPoints["4040715"] != 13 {
+		t.Fatalf("team 11's players: %v", g.HomePlayerPoints)
+	}
+	for _, t2 := range l.Teams {
+		for _, gm := range l.Games {
+			for side, pts := range map[int]map[string]float64{gm.Home: gm.HomePlayerPoints, gm.Away: gm.PlayerPoints} {
+				if side != t2.ID {
+					continue
+				}
+				sum := 0.0
+				for _, p := range t2.Roster {
+					if p.Slot != SlotBench && p.Slot != SlotReserve {
+						sum += pts[p.ID]
+					}
+				}
+				want := gm.HomePoints
+				if side == gm.Away {
+					want = gm.Points
+				}
+				if math.Abs(sum-want) > 0.011 {
+					t.Fatalf("team %d's starters add to %v, ESPN's final %v", side, sum, want)
+				}
+			}
+		}
 	}
 }
 

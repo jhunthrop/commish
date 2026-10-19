@@ -42,6 +42,11 @@ func TestTheAnswersReadThePerPlatformRule(t *testing.T) {
 		if lineup.TeamPoints == nil || *lineup.TeamPoints != 87.4 {
 			t.Fatalf("%s: the team's points %v", c.host, lineup.TeamPoints)
 		}
+		// Ruling (a): the platform's own total is the score on ESPN, Yahoo
+		// and FFPC; Sleeper's is its players' points added.
+		if total := c.host != leaguesync.HostSleeper; box.Sides[0].TeamTotal != total || box.Sides[1].TeamTotal != total {
+			t.Fatalf("%s: team total %v %v", c.host, box.Sides[0].TeamTotal, box.Sides[1].TeamTotal)
+		}
 	}
 }
 

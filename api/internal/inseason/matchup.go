@@ -57,7 +57,7 @@ func (a *advisor) boxSide(t leaguesync.Team, side *leaguesync.Side) apitypes.Mat
 	if side != nil {
 		starters = side.Starters
 	}
-	out := apitypes.MatchupBoxSide{RosterId: t.RosterID, PlayerPoints: a.givesPlayerPoints(side), Starters: []apitypes.BoxStarter{}, Bench: []apitypes.PlayerLine{}}
+	out := apitypes.MatchupBoxSide{RosterId: t.RosterID, PlayerPoints: a.givesPlayerPoints(side), TeamTotal: leaguesync.SendsTeamTotal(a.Snap.Ref.Host), Starters: []apitypes.BoxStarter{}, Bench: []apitypes.PlayerLine{}}
 	starting := map[int]bool{}
 	for i, p := range hostSpots(a.config, a.slots, cands, byID, starters) {
 		if p < 0 {

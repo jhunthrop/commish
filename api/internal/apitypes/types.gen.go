@@ -2922,24 +2922,32 @@ type MatchupBoxSide struct {
 
 	// Starters the host's starters in the league's slot order (QB, RB, WR, TE, the flex spots, K, DEF); an empty spot is left out, and a starter no slot takes ends the list in his position's slot. Empty where the host shows us no lineup for the side (FFPC's opponents)
 	Starters []BoxStarter `json:"starters"`
+
+	// TeamTotal the platform sends the side's own total (ESPN, Yahoo, FFPC), so the score and the Totals row print it; false where it sends each player's points alone (Sleeper, MFL), so both print the rows' sum
+	TeamTotal bool `json:"team_total"`
 }
 
 // MatchupSide defines model for MatchupSide.
 type MatchupSide struct {
-	Points float64 `json:"points"`
+	// PlayerPoints as MatchupBoxSide's: the platform gives each player's points
+	PlayerPoints bool    `json:"player_points"`
+	Points       float64 `json:"points"`
 
 	// PointsRead the host's score for this side was read; false when it could not be (an FFPC all-play week whose scoring page did not answer), and points is then 0 and says nothing
 	PointsRead bool             `json:"points_read"`
 	RosterId   int              `json:"roster_id"`
 	Starters   []MatchupStarter `json:"starters"`
+
+	// TeamTotal as MatchupBoxSide's: the platform sends the side's own total
+	TeamTotal bool `json:"team_total"`
 }
 
 // MatchupStarter defines model for MatchupStarter.
 type MatchupStarter struct {
 	Player LeaguePlayer `json:"player"`
 
-	// Points his points so far this week
-	Points float64 `json:"points"`
+	// Points his points so far this week; null where the side's player_points is false or the platform's read left him out (an ESPN starter kicked off and missing from its period roster)
+	Points *float64 `json:"points"`
 }
 
 // MemberWeek defines model for MemberWeek.
