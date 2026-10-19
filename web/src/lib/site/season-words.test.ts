@@ -11,6 +11,7 @@ import {
 	railInSeason,
 	type RailKey
 } from '#lib/ui/nav.ts';
+import { BANNED_MARKS } from '#lib/format/copy-guard.ts';
 import { railOfKey } from '#lib/ui/rail-order.ts';
 import { PAGE_VERBS, boardWords, frontWords } from './season-words.ts';
 
@@ -19,9 +20,9 @@ const BEFORE_OR_AFTER: readonly RailKey[] = ['pre_draft', 'draft_day', 'offseaso
 const REST = { season: 2026, rosFromWeek: 6, label: 'PPR' };
 const PRESEASON = { season: 2026, label: 'PPR' };
 
-/** The copy rules: no em-dash or en-dash, no semicolon. */
+/** The copy rules: no em-dash or en-dash, no semicolon (the one guard's marks). */
 function clean(line: string): void {
-	assert.doesNotMatch(line, /[–—;]/, line);
+	assert.doesNotMatch(line, BANNED_MARKS, line);
 }
 
 void test('the season is the rails that hold the in-season screens', () => {

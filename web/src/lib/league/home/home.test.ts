@@ -407,7 +407,6 @@ void test('copy guard: every League page word is fantasy words, with no dash or 
 	];
 	for (const text of said) {
 		assert.doesNotMatch(text, BANNED, text);
-		assert.doesNotMatch(text, /[–—;]/, text);
 	}
 	assert.equal(
 		standingsBasis('sleeper', TERMS),
