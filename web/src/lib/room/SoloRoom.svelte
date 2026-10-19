@@ -276,7 +276,7 @@
 				<p>No call for this pick. Draft from the pool.</p>
 				{#if selectedId !== null && selectedName !== null}
 					<Verb key="Enter" disabled={busy} onclick={() => draft(selectedId)}
-						>Draft {lastName(selectedName)}</Verb
+						>Draft <span data-name>{lastName(selectedName)}</span></Verb
 					>
 				{/if}
 			</div>

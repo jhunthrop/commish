@@ -63,6 +63,10 @@ async function builtData(page: Page): Promise<Set<string>> {
 	return dataStrings(loads);
 }
 
+/** A name the page draws in a form no answer carries (the room's surnames, "Price" for Jadarian
+ * Price): the element is marked data-name, so it is data by its mark, as a name field is. */
+const DRAWN_NAME = '[data-name]';
+
 /** The first banned word or mark in the copy under a selector (main by default), the page's data
  * skipped; null when the copy is clean. A guard's own words are composed with the list. */
 export async function copyFault(
@@ -73,9 +77,18 @@ export async function copyFault(
 	const answers = watched.get(page.context());
 	if (answers === undefined) throw new Error('copyFault reads a context watchData never watched.');
 	const text = await page.evaluate(
-		(sel) =>
-			[...document.querySelectorAll(sel)].map((el) => (el as HTMLElement).innerText).join('\n'),
-		selector
+		([sel, drawn]) => {
+			// innerText leaves out what is not displayed, so the marked names are hidden for the read.
+			const hide = document.createElement('style');
+			hide.textContent = `${drawn}{display:none!important}`;
+			document.head.append(hide);
+			const read = [...document.querySelectorAll(sel)]
+				.map((el) => (el as HTMLElement).innerText)
+				.join('\n');
+			hide.remove();
+			return read;
+		},
+		[selector, DRAWN_NAME] as const
 	);
 	const handed = (await Promise.all(answers)).flatMap((set) => [...set]);
 	return bannedInCopy(text, new Set([...handed, ...(await builtData(page))]), own);

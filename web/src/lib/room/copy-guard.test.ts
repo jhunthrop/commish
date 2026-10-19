@@ -127,3 +127,16 @@ void test('the call card is our top three as rows, its chance column headed stil
 	assert.equal(draftWords('RB'), 'Draft him');
 	assert.equal(draftWords('DST', 'Queue'), 'Queue them');
 });
+
+void test("a player's surname the room draws is marked as his name, so the shots' guard reads it as data (the sweep's C8)", () => {
+	for (const file of [
+		'lib/room/Wall.svelte',
+		'lib/ui/PickStrip.svelte',
+		'lib/room/SoloRoom.svelte'
+	]) {
+		const source = readFileSync(join(SRC, file), 'utf8');
+		const drawn = source.match(/[^\n]*\{lastName\([^\n]*/gu) ?? [];
+		assert.ok(drawn.length > 0, file);
+		for (const line of drawn) assert.match(line, /data-name/u, `${file}: ${line.trim()}`);
+	}
+});
