@@ -50,6 +50,8 @@ export const TRADES = {
 	why: 'Why this trade',
 	fromThis: 'Build from this',
 	youHaveRoom: 'You have room',
+	/** After a folded row's drop this week's lineup starts: "You drop Williams, a starter". */
+	aStarter: 'a starter',
 	theyHaveRoom: 'They have room',
 	noOneToDrop: 'No one to drop',
 	hasRoom: 'Has room',
@@ -175,19 +177,32 @@ export function toneOf(value: number | null): 'gain' | 'loss' | 'even' {
 	return shown > 0 ? 'gain' : 'loss';
 }
 
+/** The drop by name where a row is folded: "Dart", "Williams, a starter" when this week's lineup
+ * starts him (the API's drop_reason, said whole in the opened trade and on the card; Lane 66u). */
+function dropName(row: Pick<TradeRow, 'drop' | 'drop_reason'>): string {
+	const name = row.drop ? lastName(row.drop.player.name) : '';
+	return row.drop_reason === null ? name : `${name}, ${TRADES.aStarter}`;
+}
+
 /** The room each roster has for a trade the finder lists: the member's drop by name, else room;
  * theirs always (the finder keeps only trades both rosters have room for, their drop theirs to
  * choose). */
-export function roomWords(row: Pick<TradeRow, 'drop'>): { yours: string; theirs: string } {
+export function roomWords(row: Pick<TradeRow, 'drop' | 'drop_reason'>): {
+	yours: string;
+	theirs: string;
+} {
 	return {
-		yours: row.drop ? `You drop ${lastName(row.drop.player.name)}` : TRADES.youHaveRoom,
+		yours: row.drop ? `You drop ${dropName(row)}` : TRADES.youHaveRoom,
 		theirs: TRADES.theyHaveRoom
 	};
 }
 
 /** A trade's second line on a phone: "with Max_Jensen10, you drop Dart". */
-export function phoneWith(team: Pick<TradeTeam, 'name'>, row: Pick<TradeRow, 'drop'>): string {
-	const drop = row.drop ? `, you drop ${lastName(row.drop.player.name)}` : '';
+export function phoneWith(
+	team: Pick<TradeTeam, 'name'>,
+	row: Pick<TradeRow, 'drop' | 'drop_reason'>
+): string {
+	const drop = row.drop ? `, you drop ${dropName(row)}` : '';
 	return `with ${team.name}${drop}`;
 }
 

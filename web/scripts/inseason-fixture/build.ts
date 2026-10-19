@@ -30,6 +30,7 @@ import { fileURLToPath } from 'node:url';
 import { format as prettierFormat, resolveConfig } from 'prettier';
 import { listWords } from '../../src/lib/format/list.ts';
 import { FIXTURE_IDS } from './ids.ts';
+import { CHECK_BASIS } from './week.ts';
 import { leagueFields } from './league-fields.ts';
 import type { LeaguePlayer, LeagueSync, MatchupSide } from '../../src/lib/league/api.ts';
 import type {
@@ -800,7 +801,7 @@ function trades(): TradeAdvice {
 		...head(
 			`Trades where both lineups gain on our rest-of-season order. Each team's best trade, yours first, among those they gain at least 0.5 a week from, then the close calls for them. The other team decides. ${basisTail}`
 		),
-		check_basis: `What each lineup gains or loses on our rest-of-season order. The other team decides. ${basisTail}`,
+		check_basis: CHECK_BASIS,
 		teams,
 		roster: rosterByPosition(myLines),
 		host_trades_url: `https://sleeper.com/leagues/${league.league_id}/team`,

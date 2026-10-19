@@ -236,14 +236,17 @@
 				"open_spot": false
 			},
 			"drops": [
-				{ "host_id": "10235", "gain": 1.8, "week_gain": 1.1 },
-				{ "host_id": "9753", "gain": 1.3, "week_gain": 1.1 },
-				{ "host_id": "9756", "gain": -1.1, "week_gain": 1.1 },
-				{ "host_id": "8210", "gain": -2.4, "week_gain": 1.1 },
-				{ "host_id": "96", "gain": -4.4, "week_gain": 1.1 },
-				{ "host_id": "MIN", "gain": -4.4, "week_gain": 1.1 },
-				{ "host_id": "4046", "gain": -7.1, "week_gain": 1.1 },
-				{ "host_id": "7564", "gain": -8.8, "week_gain": 1.1 }
+				{ "host_id": "10235", "gain": 1.8, "week_gain": 1.1, "starts_this_week": false },
+				{ "host_id": "12508", "gain": 3.9, "week_gain": -1.6, "starts_this_week": true },
+				{ "host_id": "9753", "gain": 1.3, "week_gain": 1.1, "starts_this_week": false },
+				{ "host_id": "9756", "gain": -1.1, "week_gain": 1.1, "starts_this_week": false },
+				{ "host_id": "11635", "gain": -1.1, "week_gain": -8.9, "starts_this_week": true },
+				{ "host_id": "7543", "gain": -1.8, "week_gain": -9.9, "starts_this_week": true },
+				{ "host_id": "8210", "gain": -2.4, "week_gain": 1.1, "starts_this_week": false },
+				{ "host_id": "96", "gain": -4.4, "week_gain": 1.1, "starts_this_week": false },
+				{ "host_id": "MIN", "gain": -4.4, "week_gain": 1.1, "starts_this_week": false },
+				{ "host_id": "4046", "gain": -7.1, "week_gain": 1.1, "starts_this_week": false },
+				{ "host_id": "7564", "gain": -8.8, "week_gain": 1.1, "starts_this_week": false }
 			],
 			"pickup": true,
 			"clears": null
@@ -347,14 +350,17 @@
 			"week_gain": 0,
 			"beats": null,
 			"drops": [
-				{ "host_id": "10235", "gain": 0.6, "week_gain": 0 },
-				{ "host_id": "9753", "gain": 0.1, "week_gain": 0 },
-				{ "host_id": "9756", "gain": -2.3, "week_gain": 0 },
-				{ "host_id": "8210", "gain": -3.6, "week_gain": 0 },
-				{ "host_id": "96", "gain": -5.6, "week_gain": 0 },
-				{ "host_id": "MIN", "gain": -5.6, "week_gain": 0 },
-				{ "host_id": "4046", "gain": -8.3, "week_gain": 0 },
-				{ "host_id": "7564", "gain": -10, "week_gain": 0 }
+				{ "host_id": "10235", "gain": 0.6, "week_gain": 0, "starts_this_week": false },
+				{ "host_id": "12508", "gain": 2.7, "week_gain": 0, "starts_this_week": true },
+				{ "host_id": "9753", "gain": 0.1, "week_gain": 0, "starts_this_week": false },
+				{ "host_id": "9756", "gain": -2.3, "week_gain": 0, "starts_this_week": false },
+				{ "host_id": "11635", "gain": -2.3, "week_gain": 0, "starts_this_week": true },
+				{ "host_id": "7543", "gain": -3, "week_gain": 0, "starts_this_week": true },
+				{ "host_id": "8210", "gain": -3.6, "week_gain": 0, "starts_this_week": false },
+				{ "host_id": "96", "gain": -5.6, "week_gain": 0, "starts_this_week": false },
+				{ "host_id": "MIN", "gain": -5.6, "week_gain": 0, "starts_this_week": false },
+				{ "host_id": "4046", "gain": -8.3, "week_gain": 0, "starts_this_week": false },
+				{ "host_id": "7564", "gain": -10, "week_gain": 0, "starts_this_week": false }
 			],
 			"pickup": false,
 			"clears": null
@@ -468,14 +474,17 @@
 			"week_gain": 2.4,
 			"beats": { "host_id": "", "name": "", "starter": true, "gain": 2.4, "open_spot": true },
 			"drops": [
-				{ "host_id": "10235", "gain": 0.6, "week_gain": 2.4 },
-				{ "host_id": "9753", "gain": 0.1, "week_gain": 2.4 },
-				{ "host_id": "9756", "gain": -2.3, "week_gain": 2.4 },
-				{ "host_id": "8210", "gain": -3.6, "week_gain": 2.4 },
-				{ "host_id": "96", "gain": -5.6, "week_gain": 2.4 },
-				{ "host_id": "MIN", "gain": -5.6, "week_gain": 2.4 },
-				{ "host_id": "4046", "gain": -8.3, "week_gain": 2.4 },
-				{ "host_id": "7564", "gain": -10, "week_gain": 2.4 }
+				{ "host_id": "10235", "gain": 0.6, "week_gain": 2.4, "starts_this_week": false },
+				{ "host_id": "12508", "gain": 2.7, "week_gain": -0.3, "starts_this_week": true },
+				{ "host_id": "9753", "gain": 0.1, "week_gain": 2.4, "starts_this_week": false },
+				{ "host_id": "9756", "gain": -2.3, "week_gain": 2.4, "starts_this_week": false },
+				{ "host_id": "11635", "gain": -2.3, "week_gain": -10.2, "starts_this_week": true },
+				{ "host_id": "7543", "gain": -3, "week_gain": -11.2, "starts_this_week": true },
+				{ "host_id": "8210", "gain": -3.6, "week_gain": 2.4, "starts_this_week": false },
+				{ "host_id": "96", "gain": -5.6, "week_gain": 2.4, "starts_this_week": false },
+				{ "host_id": "MIN", "gain": -5.6, "week_gain": 2.4, "starts_this_week": false },
+				{ "host_id": "4046", "gain": -8.3, "week_gain": 2.4, "starts_this_week": false },
+				{ "host_id": "7564", "gain": -10, "week_gain": 2.4, "starts_this_week": false }
 			],
 			"pickup": true,
 			"clears": null
@@ -595,14 +604,17 @@
 				"open_spot": false
 			},
 			"drops": [
-				{ "host_id": "10235", "gain": 0.5, "week_gain": 1.8 },
-				{ "host_id": "9753", "gain": 0, "week_gain": 1.8 },
-				{ "host_id": "9756", "gain": -2.4, "week_gain": 1.8 },
-				{ "host_id": "8210", "gain": -3.7, "week_gain": 1.8 },
-				{ "host_id": "96", "gain": -5.7, "week_gain": 1.8 },
-				{ "host_id": "MIN", "gain": -5.7, "week_gain": 1.8 },
-				{ "host_id": "4046", "gain": -8.4, "week_gain": 1.8 },
-				{ "host_id": "7564", "gain": -10.1, "week_gain": 1.8 }
+				{ "host_id": "10235", "gain": 0.5, "week_gain": 1.8, "starts_this_week": false },
+				{ "host_id": "12508", "gain": 2.6, "week_gain": -0.9, "starts_this_week": true },
+				{ "host_id": "9753", "gain": 0, "week_gain": 1.8, "starts_this_week": false },
+				{ "host_id": "9756", "gain": -2.4, "week_gain": 1.8, "starts_this_week": false },
+				{ "host_id": "11635", "gain": -2.4, "week_gain": -8.2, "starts_this_week": true },
+				{ "host_id": "7543", "gain": -3.1, "week_gain": -9.2, "starts_this_week": true },
+				{ "host_id": "8210", "gain": -3.7, "week_gain": 1.8, "starts_this_week": false },
+				{ "host_id": "96", "gain": -5.7, "week_gain": 1.8, "starts_this_week": false },
+				{ "host_id": "MIN", "gain": -5.7, "week_gain": 1.8, "starts_this_week": false },
+				{ "host_id": "4046", "gain": -8.4, "week_gain": 1.8, "starts_this_week": false },
+				{ "host_id": "7564", "gain": -10.1, "week_gain": 1.8, "starts_this_week": false }
 			],
 			"pickup": true,
 			"clears": null
@@ -710,14 +722,17 @@
 			"week_gain": 2.9,
 			"beats": { "host_id": "", "name": "", "starter": true, "gain": 2.9, "open_spot": true },
 			"drops": [
-				{ "host_id": "10235", "gain": 0.2, "week_gain": 2.9 },
-				{ "host_id": "9753", "gain": -0.3, "week_gain": 2.9 },
-				{ "host_id": "9756", "gain": -2.7, "week_gain": 2.9 },
-				{ "host_id": "8210", "gain": -4, "week_gain": 2.9 },
-				{ "host_id": "96", "gain": -6, "week_gain": 2.9 },
-				{ "host_id": "MIN", "gain": -6, "week_gain": 2.9 },
-				{ "host_id": "4046", "gain": -8.7, "week_gain": 2.9 },
-				{ "host_id": "7564", "gain": -10.4, "week_gain": 2.9 }
+				{ "host_id": "10235", "gain": 0.2, "week_gain": 2.9, "starts_this_week": false },
+				{ "host_id": "12508", "gain": 2.3, "week_gain": 0.2, "starts_this_week": true },
+				{ "host_id": "9753", "gain": -0.3, "week_gain": 2.9, "starts_this_week": false },
+				{ "host_id": "9756", "gain": -2.7, "week_gain": 2.9, "starts_this_week": false },
+				{ "host_id": "11635", "gain": -2.7, "week_gain": -9.7, "starts_this_week": true },
+				{ "host_id": "7543", "gain": -3.4, "week_gain": -10.7, "starts_this_week": true },
+				{ "host_id": "8210", "gain": -4, "week_gain": 2.9, "starts_this_week": false },
+				{ "host_id": "96", "gain": -6, "week_gain": 2.9, "starts_this_week": false },
+				{ "host_id": "MIN", "gain": -6, "week_gain": 2.9, "starts_this_week": false },
+				{ "host_id": "4046", "gain": -8.7, "week_gain": 2.9, "starts_this_week": false },
+				{ "host_id": "7564", "gain": -10.4, "week_gain": 2.9, "starts_this_week": false }
 			],
 			"pickup": true,
 			"clears": null
@@ -831,14 +846,17 @@
 			"week_gain": 0,
 			"beats": null,
 			"drops": [
-				{ "host_id": "10235", "gain": 0, "week_gain": 0 },
-				{ "host_id": "9753", "gain": -0.5, "week_gain": 0 },
-				{ "host_id": "9756", "gain": -2.9, "week_gain": 0 },
-				{ "host_id": "8210", "gain": -4.2, "week_gain": 0 },
-				{ "host_id": "96", "gain": -6.2, "week_gain": 0 },
-				{ "host_id": "MIN", "gain": -6.2, "week_gain": 0 },
-				{ "host_id": "4046", "gain": -8.9, "week_gain": 0 },
-				{ "host_id": "7564", "gain": -10.6, "week_gain": 0 }
+				{ "host_id": "10235", "gain": 0, "week_gain": 0, "starts_this_week": false },
+				{ "host_id": "12508", "gain": 2.1, "week_gain": 0, "starts_this_week": true },
+				{ "host_id": "9753", "gain": -0.5, "week_gain": 0, "starts_this_week": false },
+				{ "host_id": "9756", "gain": -2.9, "week_gain": 0, "starts_this_week": false },
+				{ "host_id": "11635", "gain": -2.9, "week_gain": 0, "starts_this_week": true },
+				{ "host_id": "7543", "gain": -3.6, "week_gain": 0, "starts_this_week": true },
+				{ "host_id": "8210", "gain": -4.2, "week_gain": 0, "starts_this_week": false },
+				{ "host_id": "96", "gain": -6.2, "week_gain": 0, "starts_this_week": false },
+				{ "host_id": "MIN", "gain": -6.2, "week_gain": 0, "starts_this_week": false },
+				{ "host_id": "4046", "gain": -8.9, "week_gain": 0, "starts_this_week": false },
+				{ "host_id": "7564", "gain": -10.6, "week_gain": 0, "starts_this_week": false }
 			],
 			"pickup": false,
 			"clears": null
@@ -952,14 +970,17 @@
 			"week_gain": 0,
 			"beats": null,
 			"drops": [
-				{ "host_id": "10235", "gain": 0, "week_gain": 0 },
-				{ "host_id": "9753", "gain": -0.5, "week_gain": 0 },
-				{ "host_id": "9756", "gain": -2.9, "week_gain": 0 },
-				{ "host_id": "8210", "gain": -4.2, "week_gain": 0 },
-				{ "host_id": "96", "gain": -6.2, "week_gain": 0 },
-				{ "host_id": "MIN", "gain": -6.2, "week_gain": 0 },
-				{ "host_id": "4046", "gain": -8.9, "week_gain": 0 },
-				{ "host_id": "7564", "gain": -10.6, "week_gain": 0 }
+				{ "host_id": "10235", "gain": 0, "week_gain": 0, "starts_this_week": false },
+				{ "host_id": "12508", "gain": 2.1, "week_gain": 0, "starts_this_week": true },
+				{ "host_id": "9753", "gain": -0.5, "week_gain": 0, "starts_this_week": false },
+				{ "host_id": "9756", "gain": -2.9, "week_gain": 0, "starts_this_week": false },
+				{ "host_id": "11635", "gain": -2.9, "week_gain": 0, "starts_this_week": true },
+				{ "host_id": "7543", "gain": -3.6, "week_gain": 0, "starts_this_week": true },
+				{ "host_id": "8210", "gain": -4.2, "week_gain": 0, "starts_this_week": false },
+				{ "host_id": "96", "gain": -6.2, "week_gain": 0, "starts_this_week": false },
+				{ "host_id": "MIN", "gain": -6.2, "week_gain": 0, "starts_this_week": false },
+				{ "host_id": "4046", "gain": -8.9, "week_gain": 0, "starts_this_week": false },
+				{ "host_id": "7564", "gain": -10.6, "week_gain": 0, "starts_this_week": false }
 			],
 			"pickup": false,
 			"clears": null
@@ -1079,14 +1100,17 @@
 				"open_spot": false
 			},
 			"drops": [
-				{ "host_id": "10235", "gain": 0, "week_gain": 0 },
-				{ "host_id": "9753", "gain": -0.5, "week_gain": 0 },
-				{ "host_id": "9756", "gain": -2.9, "week_gain": 0 },
-				{ "host_id": "8210", "gain": -4.2, "week_gain": 0 },
-				{ "host_id": "96", "gain": -6.2, "week_gain": 0 },
-				{ "host_id": "MIN", "gain": -6.2, "week_gain": 0 },
-				{ "host_id": "4046", "gain": -8.9, "week_gain": 0 },
-				{ "host_id": "7564", "gain": -10.6, "week_gain": 0 }
+				{ "host_id": "10235", "gain": 0, "week_gain": 0, "starts_this_week": false },
+				{ "host_id": "12508", "gain": 2.1, "week_gain": 0, "starts_this_week": true },
+				{ "host_id": "9753", "gain": -0.5, "week_gain": 0, "starts_this_week": false },
+				{ "host_id": "9756", "gain": -2.9, "week_gain": 0, "starts_this_week": false },
+				{ "host_id": "11635", "gain": -2.9, "week_gain": 0, "starts_this_week": true },
+				{ "host_id": "7543", "gain": -3.6, "week_gain": 0, "starts_this_week": true },
+				{ "host_id": "8210", "gain": -4.2, "week_gain": 0, "starts_this_week": false },
+				{ "host_id": "96", "gain": -6.2, "week_gain": 0, "starts_this_week": false },
+				{ "host_id": "MIN", "gain": -6.2, "week_gain": 0, "starts_this_week": false },
+				{ "host_id": "4046", "gain": -8.9, "week_gain": 0, "starts_this_week": false },
+				{ "host_id": "7564", "gain": -10.6, "week_gain": 0, "starts_this_week": false }
 			],
 			"pickup": false,
 			"clears": null
@@ -1206,14 +1230,17 @@
 				"open_spot": false
 			},
 			"drops": [
-				{ "host_id": "10235", "gain": 0, "week_gain": 2.1 },
-				{ "host_id": "9753", "gain": -0.5, "week_gain": 2.1 },
-				{ "host_id": "9756", "gain": -2.9, "week_gain": 2.1 },
-				{ "host_id": "8210", "gain": -4.2, "week_gain": 2.1 },
-				{ "host_id": "96", "gain": -6.2, "week_gain": 2.1 },
-				{ "host_id": "MIN", "gain": -6.2, "week_gain": 2.1 },
-				{ "host_id": "4046", "gain": -8.9, "week_gain": 2.1 },
-				{ "host_id": "7564", "gain": -10.6, "week_gain": 2.1 }
+				{ "host_id": "10235", "gain": 0, "week_gain": 2.1, "starts_this_week": false },
+				{ "host_id": "12508", "gain": 2.1, "week_gain": -0.6, "starts_this_week": true },
+				{ "host_id": "9753", "gain": -0.5, "week_gain": 2.1, "starts_this_week": false },
+				{ "host_id": "9756", "gain": -2.9, "week_gain": 2.1, "starts_this_week": false },
+				{ "host_id": "11635", "gain": -2.9, "week_gain": -7.9, "starts_this_week": true },
+				{ "host_id": "7543", "gain": -3.6, "week_gain": -8.9, "starts_this_week": true },
+				{ "host_id": "8210", "gain": -4.2, "week_gain": 2.1, "starts_this_week": false },
+				{ "host_id": "96", "gain": -6.2, "week_gain": 2.1, "starts_this_week": false },
+				{ "host_id": "MIN", "gain": -6.2, "week_gain": 2.1, "starts_this_week": false },
+				{ "host_id": "4046", "gain": -8.9, "week_gain": 2.1, "starts_this_week": false },
+				{ "host_id": "7564", "gain": -10.6, "week_gain": 2.1, "starts_this_week": false }
 			],
 			"pickup": true,
 			"clears": null
@@ -1327,14 +1354,17 @@
 			"week_gain": 4.4,
 			"beats": { "host_id": "", "name": "", "starter": true, "gain": 4.4, "open_spot": true },
 			"drops": [
-				{ "host_id": "10235", "gain": 0, "week_gain": 4.4 },
-				{ "host_id": "9753", "gain": -0.5, "week_gain": 4.4 },
-				{ "host_id": "9756", "gain": -2.9, "week_gain": 4.4 },
-				{ "host_id": "8210", "gain": -4.2, "week_gain": 4.4 },
-				{ "host_id": "96", "gain": -6.2, "week_gain": 4.4 },
-				{ "host_id": "MIN", "gain": -6.2, "week_gain": 4.4 },
-				{ "host_id": "4046", "gain": -8.9, "week_gain": 4.4 },
-				{ "host_id": "7564", "gain": -10.6, "week_gain": 4.4 }
+				{ "host_id": "10235", "gain": 0, "week_gain": 4.4, "starts_this_week": false },
+				{ "host_id": "12508", "gain": 2.1, "week_gain": 1.7, "starts_this_week": true },
+				{ "host_id": "9753", "gain": -0.5, "week_gain": 4.4, "starts_this_week": false },
+				{ "host_id": "9756", "gain": -2.9, "week_gain": 4.4, "starts_this_week": false },
+				{ "host_id": "11635", "gain": -2.9, "week_gain": -8.2, "starts_this_week": true },
+				{ "host_id": "7543", "gain": -3.6, "week_gain": -9.2, "starts_this_week": true },
+				{ "host_id": "8210", "gain": -4.2, "week_gain": 4.4, "starts_this_week": false },
+				{ "host_id": "96", "gain": -6.2, "week_gain": 4.4, "starts_this_week": false },
+				{ "host_id": "MIN", "gain": -6.2, "week_gain": 4.4, "starts_this_week": false },
+				{ "host_id": "4046", "gain": -8.9, "week_gain": 4.4, "starts_this_week": false },
+				{ "host_id": "7564", "gain": -10.6, "week_gain": 4.4, "starts_this_week": false }
 			],
 			"pickup": true,
 			"clears": null
@@ -1454,14 +1484,17 @@
 				"open_spot": false
 			},
 			"drops": [
-				{ "host_id": "10235", "gain": 0, "week_gain": 2.4 },
-				{ "host_id": "9753", "gain": -0.5, "week_gain": 2.4 },
-				{ "host_id": "9756", "gain": -2.9, "week_gain": 2.4 },
-				{ "host_id": "8210", "gain": -4.2, "week_gain": 2.4 },
-				{ "host_id": "96", "gain": -6.2, "week_gain": 2.4 },
-				{ "host_id": "MIN", "gain": -6.2, "week_gain": 2.4 },
-				{ "host_id": "4046", "gain": -8.9, "week_gain": 2.4 },
-				{ "host_id": "7564", "gain": -10.6, "week_gain": 2.4 }
+				{ "host_id": "10235", "gain": 0, "week_gain": 2.4, "starts_this_week": false },
+				{ "host_id": "12508", "gain": 2.1, "week_gain": -0.3, "starts_this_week": true },
+				{ "host_id": "9753", "gain": -0.5, "week_gain": 2.4, "starts_this_week": false },
+				{ "host_id": "9756", "gain": -2.9, "week_gain": 2.4, "starts_this_week": false },
+				{ "host_id": "11635", "gain": -2.9, "week_gain": -7.6, "starts_this_week": true },
+				{ "host_id": "7543", "gain": -3.6, "week_gain": -8.6, "starts_this_week": true },
+				{ "host_id": "8210", "gain": -4.2, "week_gain": 2.4, "starts_this_week": false },
+				{ "host_id": "96", "gain": -6.2, "week_gain": 2.4, "starts_this_week": false },
+				{ "host_id": "MIN", "gain": -6.2, "week_gain": 2.4, "starts_this_week": false },
+				{ "host_id": "4046", "gain": -8.9, "week_gain": 2.4, "starts_this_week": false },
+				{ "host_id": "7564", "gain": -10.6, "week_gain": 2.4, "starts_this_week": false }
 			],
 			"pickup": true,
 			"clears": null
@@ -1575,14 +1608,17 @@
 			"week_gain": 4.8,
 			"beats": { "host_id": "", "name": "", "starter": true, "gain": 4.8, "open_spot": true },
 			"drops": [
-				{ "host_id": "10235", "gain": 0, "week_gain": 4.8 },
-				{ "host_id": "9753", "gain": -0.5, "week_gain": 4.8 },
-				{ "host_id": "9756", "gain": -2.9, "week_gain": 4.8 },
-				{ "host_id": "8210", "gain": -4.2, "week_gain": 4.8 },
-				{ "host_id": "96", "gain": -6.2, "week_gain": 4.8 },
-				{ "host_id": "MIN", "gain": -6.2, "week_gain": 4.8 },
-				{ "host_id": "4046", "gain": -8.9, "week_gain": 4.8 },
-				{ "host_id": "7564", "gain": -10.6, "week_gain": 4.8 }
+				{ "host_id": "10235", "gain": 0, "week_gain": 4.8, "starts_this_week": false },
+				{ "host_id": "12508", "gain": 2.1, "week_gain": 2.1, "starts_this_week": true },
+				{ "host_id": "9753", "gain": -0.5, "week_gain": 4.8, "starts_this_week": false },
+				{ "host_id": "9756", "gain": -2.9, "week_gain": 4.8, "starts_this_week": false },
+				{ "host_id": "11635", "gain": -2.9, "week_gain": -7.8, "starts_this_week": true },
+				{ "host_id": "7543", "gain": -3.6, "week_gain": -8.8, "starts_this_week": true },
+				{ "host_id": "8210", "gain": -4.2, "week_gain": 4.8, "starts_this_week": false },
+				{ "host_id": "96", "gain": -6.2, "week_gain": 4.8, "starts_this_week": false },
+				{ "host_id": "MIN", "gain": -6.2, "week_gain": 4.8, "starts_this_week": false },
+				{ "host_id": "4046", "gain": -8.9, "week_gain": 4.8, "starts_this_week": false },
+				{ "host_id": "7564", "gain": -10.6, "week_gain": 4.8, "starts_this_week": false }
 			],
 			"pickup": true,
 			"clears": null
@@ -1696,14 +1732,17 @@
 			"week_gain": 4.1,
 			"beats": { "host_id": "", "name": "", "starter": true, "gain": 4.1, "open_spot": true },
 			"drops": [
-				{ "host_id": "10235", "gain": 0, "week_gain": 4.1 },
-				{ "host_id": "9753", "gain": -0.5, "week_gain": 4.1 },
-				{ "host_id": "9756", "gain": -2.9, "week_gain": 4.1 },
-				{ "host_id": "8210", "gain": -4.2, "week_gain": 4.1 },
-				{ "host_id": "96", "gain": -6.2, "week_gain": 4.1 },
-				{ "host_id": "MIN", "gain": -6.2, "week_gain": 4.1 },
-				{ "host_id": "4046", "gain": -8.9, "week_gain": 4.1 },
-				{ "host_id": "7564", "gain": -10.6, "week_gain": 4.1 }
+				{ "host_id": "10235", "gain": 0, "week_gain": 4.1, "starts_this_week": false },
+				{ "host_id": "12508", "gain": 2.1, "week_gain": 1.4, "starts_this_week": true },
+				{ "host_id": "9753", "gain": -0.5, "week_gain": 4.1, "starts_this_week": false },
+				{ "host_id": "9756", "gain": -2.9, "week_gain": 4.1, "starts_this_week": false },
+				{ "host_id": "11635", "gain": -2.9, "week_gain": -8.5, "starts_this_week": true },
+				{ "host_id": "7543", "gain": -3.6, "week_gain": -9.5, "starts_this_week": true },
+				{ "host_id": "8210", "gain": -4.2, "week_gain": 4.1, "starts_this_week": false },
+				{ "host_id": "96", "gain": -6.2, "week_gain": 4.1, "starts_this_week": false },
+				{ "host_id": "MIN", "gain": -6.2, "week_gain": 4.1, "starts_this_week": false },
+				{ "host_id": "4046", "gain": -8.9, "week_gain": 4.1, "starts_this_week": false },
+				{ "host_id": "7564", "gain": -10.6, "week_gain": 4.1, "starts_this_week": false }
 			],
 			"pickup": true,
 			"clears": null
@@ -1809,7 +1848,7 @@
 				"gain": 1.7,
 				"open_spot": false
 			},
-			"drops": [{ "host_id": "HOU", "gain": 0.3, "week_gain": 1.7 }],
+			"drops": [{ "host_id": "HOU", "gain": 0.3, "week_gain": 1.7, "starts_this_week": true }],
 			"clears": null
 		}
 	],
@@ -1933,14 +1972,17 @@
 			"week_gain": 4.8,
 			"beats": { "host_id": "", "name": "", "starter": true, "gain": 4.8, "open_spot": true },
 			"drops": [
-				{ "host_id": "10235", "gain": 0, "week_gain": 4.8 },
-				{ "host_id": "9753", "gain": -0.5, "week_gain": 4.8 },
-				{ "host_id": "9756", "gain": -2.9, "week_gain": 4.8 },
-				{ "host_id": "8210", "gain": -4.2, "week_gain": 4.8 },
-				{ "host_id": "96", "gain": -6.2, "week_gain": 4.8 },
-				{ "host_id": "MIN", "gain": -6.2, "week_gain": 4.8 },
-				{ "host_id": "4046", "gain": -8.9, "week_gain": 4.8 },
-				{ "host_id": "7564", "gain": -10.6, "week_gain": 4.8 }
+				{ "host_id": "10235", "gain": 0, "week_gain": 4.8, "starts_this_week": false },
+				{ "host_id": "12508", "gain": 2.1, "week_gain": 2.1, "starts_this_week": true },
+				{ "host_id": "9753", "gain": -0.5, "week_gain": 4.8, "starts_this_week": false },
+				{ "host_id": "9756", "gain": -2.9, "week_gain": 4.8, "starts_this_week": false },
+				{ "host_id": "11635", "gain": -2.9, "week_gain": -7.8, "starts_this_week": true },
+				{ "host_id": "7543", "gain": -3.6, "week_gain": -8.8, "starts_this_week": true },
+				{ "host_id": "8210", "gain": -4.2, "week_gain": 4.8, "starts_this_week": false },
+				{ "host_id": "96", "gain": -6.2, "week_gain": 4.8, "starts_this_week": false },
+				{ "host_id": "MIN", "gain": -6.2, "week_gain": 4.8, "starts_this_week": false },
+				{ "host_id": "4046", "gain": -8.9, "week_gain": 4.8, "starts_this_week": false },
+				{ "host_id": "7564", "gain": -10.6, "week_gain": 4.8, "starts_this_week": false }
 			],
 			"pickup": true,
 			"clears": null
@@ -2046,7 +2088,7 @@
 				"gain": 1.7,
 				"open_spot": false
 			},
-			"drops": [{ "host_id": "HOU", "gain": 0.3, "week_gain": 1.7 }],
+			"drops": [{ "host_id": "HOU", "gain": 0.3, "week_gain": 1.7, "starts_this_week": true }],
 			"clears": null
 		}
 	],

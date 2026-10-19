@@ -1,7 +1,7 @@
 {
 	"week": 6,
 	"basis": "Trades where both lineups gain on our rest-of-season order. Each team's best trade, yours first, among those they gain at least 0.5 a week from, then the close calls for them. The other team decides. Gain is the change in a lineup's points over replacement a week, points above what a free pickup at each position gives you: the rest of the season on our rest-of-season order, averaged over its 12 weeks, not a projection of any one week. Rest of season is his points a game on our rest-of-season projection from week 6, byes out.",
-	"check_basis": "What each lineup gains or loses on our rest-of-season order. The other team decides. Gain is the change in a lineup's points over replacement a week, points above what a free pickup at each position gives you: the rest of the season on our rest-of-season order, averaged over its 12 weeks, not a projection of any one week. Rest of season is his points a game on our rest-of-season projection from week 6, byes out.",
+	"check_basis": "What each lineup gains or loses on our rest-of-season order. The other team decides. Gain and Rest of season are as the Trades basis says.",
 	"basis_note": "Points over replacement are for a 12-team league with 1 QB, 2 RB, 3 WR, 1 TE and two flex spots. Points so far leave out your league's points for two-point conversions, missed field goals, missed extra points, fumble recoveries and safeties: the stats we hold do not carry them.",
 	"order_basis": "rest_of_season",
 	"refreshed": "2026-10-14T19:05:37.917Z",
@@ -4744,66 +4744,66 @@
 					],
 					"drop": {
 						"player": {
-							"host_id": "10235",
-							"board_id": "4426386",
-							"name": "Roschon Johnson",
-							"position": "RB",
-							"team": "CHI",
+							"host_id": "13301",
+							"board_id": "5081432",
+							"name": "Antonio Williams",
+							"position": "WR",
+							"team": "WAS",
 							"injured_reserve": false
 						},
-						"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/4426386.png",
-						"slug": "roschon-johnson",
-						"position_rank": 74,
-						"points_over_replacement": -6.2,
-						"rest_of_season_per_game": null,
+						"headshot": "https://a.espncdn.com/i/headshots/nfl/players/full/5081432.png",
+						"slug": "antonio-williams",
+						"position_rank": 60,
+						"points_over_replacement": -2.5,
+						"rest_of_season_per_game": 4.8,
 						"held": false,
 						"facts": {
 							"week": 6,
-							"opponent": "ATL",
+							"opponent": "SF",
 							"home": false,
-							"kickoff": "2026-10-18T17:00:00.000Z",
+							"kickoff": "2026-10-20T00:15:00.000Z",
 							"bye": false,
 							"designation": null,
 							"played": false,
 							"points_this_week": null,
 							"last_games": [
-								{ "week": 5, "points": 9 },
-								{ "week": 4, "points": 3.3 },
-								{ "week": 2, "points": 0 }
+								{ "week": 5, "points": 6.1 },
+								{ "week": 4, "points": 5.1 },
+								{ "week": 3, "points": 3.5 }
 							],
 							"allowed_to_position": {
-								"points_a_game": 29.4,
-								"rank": 1,
+								"points_a_game": 15,
+								"rank": 25,
 								"of": 32,
-								"position": "RB"
+								"position": "WR"
 							},
 							"game_total": {
-								"points": 49.5,
-								"team_points": 26.5,
+								"points": 50.5,
+								"team_points": 21.5,
 								"read_at": "2026-10-16T21:01:26.774Z"
 							},
-							"spread": { "side": "win", "points": 3, "read_at": "2026-10-16T21:01:26.774Z" },
-							"roof": { "kind": "retractable", "abroad": false },
+							"spread": { "side": "lose", "points": 7.5, "read_at": "2026-10-16T21:01:26.774Z" },
+							"roof": { "kind": "outdoors", "abroad": false },
 							"weather": {
-								"temperature_f": 59,
+								"temperature_f": 63,
 								"wind_mph": 12.7,
-								"precipitation_chance": 0,
+								"precipitation_chance": 2,
 								"precipitation_kind": "none",
 								"read_at": "2026-10-16T21:01:34.611Z"
 							}
 						},
-						"week_projection": 0.57,
-						"projection_delta": -0.4,
-						"opp_rank": 1,
-						"season_avg": 4.1,
-						"last_points": 9
+						"week_projection": 3.21,
+						"projection_delta": 0,
+						"opp_rank": 25,
+						"season_avg": 4.9,
+						"last_points": 6.1
 					},
 					"my_gain": 2.7,
 					"their_gain": 0.6,
 					"close_for_them": false,
-					"my_proj_change": -3.6,
+					"my_proj_change": -6.2,
 					"their_proj_change": 3.6,
-					"drop_reason": null
+					"drop_reason": "Williams starts at WR3 for you this week. After the trade Tucker starts at Flex 1 and your lineup stays full."
 				},
 				{
 					"give": [

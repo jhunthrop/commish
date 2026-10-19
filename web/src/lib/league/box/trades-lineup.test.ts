@@ -11,7 +11,7 @@ function load(name: string): unknown {
 	return JSON.parse(readFileSync(new URL(`${name}.json`, DATA), 'utf8'));
 }
 
-void test('no trade in the fixture drops a starter the Lineup screen sets', () => {
+void test('no trade in the fixture drops a starter the Lineup screen sets without saying who starts for him', () => {
 	const lineup = load('lineup') as LineupAdvice;
 	const trades = load('trades') as TradeAdvice;
 	const starters = new Set(
@@ -36,4 +36,12 @@ void test('no trade in the fixture drops a starter the Lineup screen sets', () =
 			);
 		}
 	}
+	// The one stand-in starter drop (project.ts STARTER_DROP_STANDIN) names its slot and the man who
+	// starts in his place, so a shot shows the sentence (review 66u finding 3).
+	const said = drops.filter((row) => row.drop_reason !== null);
+	assert.equal(said.length, 1, 'the fixture has no starter drop to show its sentence');
+	assert.equal(
+		said[0]?.drop_reason,
+		'Williams starts at WR3 for you this week. After the trade Tucker starts at Flex 1 and your lineup stays full.'
+	);
 });

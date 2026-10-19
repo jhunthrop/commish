@@ -7,6 +7,11 @@ import type { LineupSlot, PlayerLine } from '../../src/lib/league/inseason/api.t
 
 const TENTH = 10;
 
+/** The builder's basis in the API's words (words.go TradeCheckBasis): it opens under the Trades basis,
+ * which says what Gain and Rest of season are (review 66u finding 4). */
+export const CHECK_BASIS =
+	'What each lineup gains or loses on our rest-of-season order. The other team decides. Gain and Rest of season are as the Trades basis says.';
+
 /** A figure to the tenth a page prints. */
 export const tenth = (value: number): number => Math.round(value * TENTH) / TENTH;
 
@@ -49,15 +54,38 @@ function fill(
 	order: (a: PlayerLine, b: PlayerLine) => number,
 	may: (l: PlayerLine) => boolean
 ): PlayerLine[] {
+	return fillSlots(lines, slots, order, may).filter((l): l is PlayerLine => l !== null);
+}
+
+/** The same fill by slot: who each slot takes, in the slots' order, null where nobody is left. */
+function fillSlots(
+	lines: readonly PlayerLine[],
+	slots: readonly LineupSlot['slot'][],
+	order: (a: PlayerLine, b: PlayerLine) => number,
+	may: (l: PlayerLine) => boolean
+): (PlayerLine | null)[] {
 	const sorted = [...lines].filter(may).sort(order);
-	const chosen: PlayerLine[] = [];
-	const pick = (slot: LineupSlot['slot']): void => {
-		const best = sorted.find((l) => !chosen.includes(l) && accepts(slot, l.player.position));
-		if (best) chosen.push(best);
+	const out: (PlayerLine | null)[] = slots.map(() => null);
+	const pick = (at: number): void => {
+		const slot = slots[at];
+		const best = sorted.find(
+			(l) => !out.includes(l) && slot !== undefined && accepts(slot, l.player.position)
+		);
+		out[at] = best ?? null;
 	};
-	slots.filter((s) => s !== 'FLEX').forEach(pick);
-	slots.filter((s) => s === 'FLEX').forEach(pick);
-	return chosen;
+	const at = slots.map((_, i) => i);
+	at.filter((i) => slots[i] !== 'FLEX').forEach(pick);
+	at.filter((i) => slots[i] === 'FLEX').forEach(pick);
+	return out;
+}
+
+/** This week's lineup by slot (the Lineup's rule): who each slot starts, null where no one who can
+ * play is left. */
+export function weekSlots(
+	lines: readonly PlayerLine[],
+	slots: readonly LineupSlot['slot'][]
+): (PlayerLine | null)[] {
+	return fillSlots(lines, slots, better, (l) => tierOf(l) === 0);
 }
 
 /** This week's Proj total of the lineup the Lineup screen sets: only a player who can play starts,
