@@ -308,7 +308,7 @@ const advice: Pick<
 	| 'player_points'
 > = {
 	basis:
-		"Each team's best trade both lineups gain by, yours first. The other team decides. Gain is a lineup's change in points over replacement a week, over the 12 weeks left.",
+		"Each team's best trade both lineups gain by, yours first. The other team decides. Gain is a lineup's change in points over replacement a week, weeks 6 to 17.",
 	per_game_basis: "A game is our order's points a game.",
 	basis_note: 'Avg and Last miss five of your rules our stats lack.',
 	basis_note_link: 'Which five',

@@ -315,7 +315,7 @@ void test('a card says a last name in full when another player on screen shares 
 const BASIS = {
 	basis: 'A pickup starts this week on Proj and keeps Gain at zero or better.',
 	season_basis:
-		"Gain is your lineup's change in points over replacement a week, over the 12 weeks left. A game is our order's points a game.",
+		"Gain is your lineup's change in points over replacement a week, weeks 6 to 17. A game is our order's points a game.",
 	basis_note: 'Avg and Last miss five of your rules our stats lack.',
 	basis_note_link: 'Which five',
 	projection_read_at: '2026-10-17T02:00:00.000Z',

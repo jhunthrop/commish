@@ -48,7 +48,7 @@ func TestBasisSaysWhatAWeekIs(t *testing.T) {
 		}
 	}
 	for _, s := range []string{WaiverSeasonBasis(RestOfSeason, 11), WaiverSeasonBasis(Preseason, 17), TradesBasis(RestOfSeason, 1)} {
-		if !strings.Contains(s, "over replacement a week, over the") || strings.Contains(s, "12-team") {
+		if !strings.Contains(s, "over replacement a week, ") || strings.Contains(s, "12-team") {
 			t.Errorf("%q", s)
 		}
 	}
@@ -68,11 +68,11 @@ func TestTheRunsFirstWeekSetsTheDivisor(t *testing.T) {
 	line := out.Slots[0].Ours
 	season := f.league.Board.Values[boardID(line)]
 	w, _ := a.Waivers("", "")
-	if *line.PointsOverReplacement != roundTenth(season/10) || !strings.Contains(w.SeasonBasis, "the 10 weeks left") {
+	if *line.PointsOverReplacement != roundTenth(season/10) || !strings.Contains(w.SeasonBasis, "weeks 8 to 17") {
 		t.Fatalf("%v %q", *line.PointsOverReplacement, w.SeasonBasis)
 	}
 	f.league.Board.FromWeek = 0
-	if w, _ := newFixtureAdvisor(t, f, nil).Waivers("", ""); !strings.Contains(w.SeasonBasis, "the 11 weeks left") {
+	if w, _ := newFixtureAdvisor(t, f, nil).Waivers("", ""); !strings.Contains(w.SeasonBasis, "weeks 7 to 17") {
 		t.Fatalf("the league's week: %q", w.SeasonBasis)
 	}
 	// A preseason board's from week is never read.

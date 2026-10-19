@@ -14,7 +14,7 @@ import (
 
 func TestTradesBasisSaysWhoDecidesAndGainOnce(t *testing.T) {
 	want := "Each team's best trade both lineups gain by, yours first. The other team decides. " +
-		"Gain is a lineup's change in points over replacement a week, over the 12 weeks left."
+		"Gain is a lineup's change in points over replacement a week, weeks 6 to 17."
 	if got := TradesBasis(RestOfSeason, 12); got != want {
 		t.Errorf("rest of season:\n got %q\nwant %q", got, want)
 	}
@@ -23,7 +23,7 @@ func TestTradesBasisSaysWhoDecidesAndGainOnce(t *testing.T) {
 		t.Errorf("preseason: %q", got)
 	}
 	if got := TradesBasis(RestOfSeason, 1); got != "Each team's best trade both lineups gain by, yours first. The other team decides. "+
-		"Gain is a lineup's change in points over replacement a week, over the one week left." {
+		"Gain is a lineup's change in points over replacement a week, week 17." {
 		t.Errorf("one week: %q", got)
 	}
 }
@@ -44,7 +44,7 @@ func TestLineupAndWaiverRules(t *testing.T) {
 	if WaiversBasis != "A pickup starts this week on Proj and keeps Gain at zero or better." {
 		t.Errorf("%q", WaiversBasis)
 	}
-	if got := WaiverSeasonBasis(RestOfSeason, 12); got != "Gain is your lineup's change in points over replacement a week, over the 12 weeks left." {
+	if got := WaiverSeasonBasis(RestOfSeason, 12); got != "Gain is your lineup's change in points over replacement a week, weeks 6 to 17." {
 		t.Errorf("%q", got)
 	}
 }

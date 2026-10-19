@@ -1952,7 +1952,7 @@
 		"writes_on": false,
 		"reason": "Sleeper does not take claims from here, so add him on its waiver page."
 	},
-	"season_basis": "Gain is your lineup's change in points over replacement a week, over the 12 weeks left. A game is our order's points a game.",
+	"season_basis": "Gain is your lineup's change in points over replacement a week, weeks 6 to 17. A game is our order's points a game.",
 	"pickups": [
 		{
 			"add": {

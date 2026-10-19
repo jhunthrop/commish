@@ -312,13 +312,25 @@ func uncountedRulesAt(s apitypes.LeagueSettings, carried func(string) bool, posi
 }
 
 // gainWords is what a Gain is, said once on a screen (Lane 66t): whose
-// lineup, a week, averaged over the weeks the order covers.
+// lineup, a week, averaged over the weeks the order covers, named by
+// number from the run's first week to the last (Lane 85 fix round 2, M-C),
+// so the span stays true once a week is over and before the run rolls.
 func gainWords(whose string, b OrderBasis, weeks int) string {
-	over := fmt.Sprintf("the %s left", weekCount(weeks))
 	if b != RestOfSeason {
-		over = fmt.Sprintf("the season's %s on our preseason number", weekCount(weeks))
+		over := fmt.Sprintf("over the season's %s on our preseason number", weekCount(weeks))
+		return fmt.Sprintf("Gain is %s change in points over replacement a week, %s.", whose, over)
 	}
-	return fmt.Sprintf("Gain is %s change in points over replacement a week, over %s.", whose, over)
+	return fmt.Sprintf("Gain is %s change in points over replacement a week, %s.", whose, weekSpan(weeks))
+}
+
+// weekSpan is the weeks the order covers by number: "weeks 6 to 17",
+// "week 17".
+func weekSpan(weeks int) string {
+	from := LastWeek - max(1, weeks) + 1
+	if from == LastWeek {
+		return fmt.Sprintf("week %d", LastWeek)
+	}
+	return fmt.Sprintf("weeks %d to %d", from, LastWeek)
 }
 
 // LineupBasis is the start and sit page's advice rule (§4.4, Lane 66e),

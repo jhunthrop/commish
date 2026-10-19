@@ -15,8 +15,12 @@ export const weeksCovered = (week: number): number => Math.max(1, LAST_FANTASY_W
 
 /** What a Gain is, in the API's words (words.go gainWords). */
 export function gainWords(whose: string, weeks: number): string {
-	const span = weeks === 1 ? 'one week' : `${String(weeks)} weeks`;
-	return `Gain is ${whose} change in points over replacement a week, over the ${span} left.`;
+	const from = LAST_FANTASY_WEEK - Math.max(1, weeks) + 1;
+	const span =
+		from === LAST_FANTASY_WEEK
+			? `week ${String(LAST_FANTASY_WEEK)}`
+			: `weeks ${String(from)} to ${String(LAST_FANTASY_WEEK)}`;
+	return `Gain is ${whose} change in points over replacement a week, ${span}.`;
 }
 
 /** The finder's basis in the API's words (words.go TradesBasis), the one copy build.ts and
