@@ -145,6 +145,16 @@ jobs:
       PUSH: ${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main' }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        # The run reader's import closure held to the Dockerfile's COPY lines and pins
+        # (web/src/lib/run/image-closure.test.ts, which reads them with typescript): a COPY change that
+        # leaves an import behind fails here, before the image builds (Lane 76 review).
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with: { node-version: 24, cache: npm, cache-dependency-path: web/package-lock.json }
+      - name: The image's copy of the run reader holds its import closure
+        working-directory: web
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          node --test src/lib/run/image-closure.test.ts
       - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
       - id: auth
         if: env.PUSH == 'true'

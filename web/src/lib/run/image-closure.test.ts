@@ -251,3 +251,30 @@ void test('the final image keeps the contract stage whole, so its relative paths
 	});
 	assert.ok(whole, `the final stage copies ${root}, the root of ${STAGE}, whole`);
 });
+
+const WORKFLOW = join(REPOSITORY, '.github/workflows/research.yml');
+const THIS_TEST = relative(WEB_ROOT, import.meta.filename)
+	.split(sep)
+	.join(posix.sep);
+
+/** The lines of one job of a workflow, by its two-space key, up to the next job. */
+function jobLines(workflow: string, job: string): string[] {
+	const lines = workflow.split('\n');
+	const start = lines.indexOf(`  ${job}:`);
+	assert.notEqual(start, -1, `research.yml has an ${job} job`);
+	const rest = lines.slice(start + 1);
+	const end = rest.findIndex((line) => /^ {2}\S/.test(line));
+	return end === -1 ? rest : rest.slice(0, end);
+}
+
+void test("research.yml's image job runs this test before the image builds (Lane 77)", () => {
+	const image = jobLines(readFileSync(WORKFLOW, 'utf8'), 'image');
+	const runs = image.findIndex((line) => line.includes(`node --test ${THIS_TEST}`));
+	const builds = image.findIndex((line) => line.includes('docker/build-push-action'));
+	assert.notEqual(runs, -1, `the image job runs node --test ${THIS_TEST}`);
+	assert.ok(runs < builds, 'a COPY change is caught before the image builds');
+	assert.ok(
+		image.slice(0, runs).some((line) => line.includes('npm ci')),
+		'the web packages the test reads (typescript) are installed first'
+	);
+});
