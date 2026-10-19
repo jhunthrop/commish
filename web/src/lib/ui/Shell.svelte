@@ -40,10 +40,16 @@
 	// names no format) opens in the context's format by itself (follow.svelte.ts).
 	onMount(() => void siteContext.load());
 	const leagueId = $derived(siteContext.league?.id ?? null);
+	/** A followed league's own pages, the follow page (/league/new) not among them. */
+	const LEAGUE_PAGE = /^\/league\/(?!new(?:\/|$))[^/]+/;
 	/** On a league's pages the phone bar leads with the site mark, the way home (Lane 66t): the bottom
 	 * bar keeps its five, so the mark takes no tab. */
-	const homeMark = $derived(page.url.pathname.startsWith('/league/'));
+	const homeMark = $derived(LEAGUE_PAGE.test(page.url.pathname));
 </script>
+
+{#snippet siteMark(cls: string)}
+	<a class={cls} href={HOME_HREF} aria-label="Commish"><b>C</b></a>
+{/snippet}
 
 {#snippet railLink(item: RailItem, foot: boolean)}
 	<a
@@ -65,7 +71,7 @@
 	     the boot script before the first paint and by the context after. So a prerendered page never
 	     paints the wrong rail and then swaps it. -->
 	<nav class="rail" aria-label="Sections" style="--phone-items: {PHONE_RAIL_ITEMS}">
-		<a class="mark" href={HOME_HREF} aria-label="Commish"><b>C</b></a>
+		{@render siteMark('mark')}
 		{#each RAIL_ITEMS as item (item.key)}
 			{@render railLink(item, false)}
 		{/each}
@@ -74,7 +80,7 @@
 	</nav>
 	<div class="main">
 		<header class="top" class:homed={homeMark}>
-			{#if homeMark}<a class="home" href={HOME_HREF} aria-label="Commish"><b>C</b></a>{/if}
+			{#if homeMark}{@render siteMark('home')}{/if}
 			<h1>
 				{#if typeof title === 'string'}{title}{:else}{@render title()}{/if}
 			</h1>
