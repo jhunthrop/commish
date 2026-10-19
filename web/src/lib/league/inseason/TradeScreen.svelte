@@ -14,6 +14,7 @@
 	import {
 		copiedTrade,
 		finderRows,
+		heldTrades,
 		offerText,
 		proposeVerb,
 		sortRows,
@@ -65,7 +66,7 @@
 	}
 
 	let {
-		advice,
+		advice: answer,
 		host,
 		me,
 		narrow,
@@ -74,6 +75,9 @@
 		rulesHref,
 		now: pageNow
 	}: Props = $props();
+
+	/** No change this week on a trade moving a player whose game has kicked off (Lane 85). */
+	const advice = $derived(heldTrades(answer, pageNow));
 
 	/** The builder's id, for the verbs that open it. */
 	const BUILDER_ID = 'trade-builder';
@@ -128,7 +132,7 @@
 		[...players.yours, ...players.theirs].find((l) => pickKey(l) === player)?.player.name ?? ''
 	);
 
-	const shown = $derived(narrowed ?? advice);
+	const shown = $derived(narrowed === null ? advice : heldTrades(narrowed, now));
 	const holds = (row: TradeRow, id: string): boolean =>
 		[...row.give, ...row.get].some((line) => line.player.board_id === id);
 	/** The teams' trades shown: narrowed to a player's while his are read, his own once they are. */

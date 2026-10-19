@@ -1,13 +1,16 @@
 // The League page's words (Lane 66i): the scoreboard's bugs, the standings' columns and order, the
 // moves feed, the settings and the basis, with the copy guard over every one. Run with `npm test`.
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { bannedPattern } from '#lib/format/copy-guard.ts';
 import type { LeagueMove, LeagueTeam, LeagueTerms } from '../api.ts';
-import type { Scoreboard } from '../inseason/api.ts';
+import type { LineupAdvice, PlayerLine, Scoreboard } from '../inseason/api.ts';
+import { KICKOFF } from '../box/kickoff.ts';
 import {
 	HOME,
 	bugsOf,
+	lineupSummary,
 	extraWords,
 	feedRows,
 	playoffRule,
@@ -30,6 +33,10 @@ import {
 } from './home.ts';
 
 const ZONE = 'America/Chicago';
+/** The fixture's Saturday, before Sunday's games (clock.ts FIXTURE_WEEK_CLOCK). */
+const SATURDAY = Date.parse('2026-10-17T17:00:00.000Z');
+/** The Monday after, every Sunday kickoff past (FIXTURE_MONDAY_CLOCK). */
+const MONDAY = Date.parse('2026-10-19T16:00:00.000Z');
 
 const team = (id: number, over: Partial<LeagueTeam> = {}): LeagueTeam => ({
 	roster_id: id,
@@ -126,6 +133,8 @@ const board = (state: Scoreboard['games'][number]['state']): Scoreboard => ({
 		{
 			state,
 			next_kickoff: state === 'final' ? null : '2026-10-18T20:25:00.000Z',
+			// The API's count (words.go ToPlayWords), a bye starter left out of it.
+			to_play: state === 'playing' ? '12 of 18 starters to play' : null,
 			sides: [side(1, 62.1, 87), side(2, 71.4, null)]
 		}
 	]
@@ -134,7 +143,7 @@ const board = (state: Scoreboard['games'][number]['state']): Scoreboard => ({
 const SYNC = { teams: [team(1), team(2, { ties: 1, avatar: 'https://sleepercdn.com/x' })], me: 1 };
 
 void test('a bug before kickoff names the next kickoff and draws both sides alike', () => {
-	const [bug] = bugsOf(board('upcoming'), SYNC, ZONE);
+	const [bug] = bugsOf(board('upcoming'), SYNC, SATURDAY, ZONE);
 	assert.ok(bug);
 	assert.equal(bug.head, 'Sun 3:25 pm');
 	assert.equal(bug.words, HOME.nextKickoff);
@@ -150,7 +159,7 @@ void test('a bug before kickoff names the next kickoff and draws both sides alik
 
 void test('once a game has started the side ahead is bright and the side behind muted', () => {
 	for (const state of ['playing', 'final'] as const) {
-		const [bug] = bugsOf(board(state), SYNC, ZONE);
+		const [bug] = bugsOf(board(state), SYNC, SATURDAY, ZONE);
 		assert.ok(bug);
 		assert.deepEqual(
 			bug.sides.map((s) => [s.pts, s.stands]),
@@ -160,11 +169,11 @@ void test('once a game has started the side ahead is bright and the side behind 
 			]
 		);
 	}
-	const [playing] = bugsOf(board('playing'), SYNC, ZONE);
+	const [playing] = bugsOf(board('playing'), SYNC, SATURDAY, ZONE);
 	assert.ok(playing);
-	assert.equal(playing.head, HOME.playing);
-	assert.equal(playing.words, '12 of 20 starters to play');
-	const [final] = bugsOf(board('final'), SYNC, ZONE);
+	assert.equal(playing.head, KICKOFF.kickedOff);
+	assert.equal(playing.words, '12 of 18 starters to play');
+	const [final] = bugsOf(board('final'), SYNC, SATURDAY, ZONE);
 	assert.equal(final?.head, HOME.final);
 	const level = board('playing');
 	const game = level.games[0];
@@ -173,18 +182,41 @@ void test('once a game has started the side ahead is bright and the side behind 
 		s.points = 40;
 	});
 	assert.deepEqual(
-		bugsOf(level, SYNC, ZONE)[0]?.sides.map((s) => s.stands),
+		bugsOf(level, SYNC, SATURDAY, ZONE)[0]?.sides.map((s) => s.stands),
 		['level', 'level']
 	);
 	const unread = board('playing');
 	if (unread.games[0]?.sides[1]) unread.games[0].sides[1].points_read = false;
 	assert.deepEqual(
-		bugsOf(unread, SYNC, ZONE)[0]?.sides.map((s) => [s.pts, s.stands]),
+		bugsOf(unread, SYNC, SATURDAY, ZONE)[0]?.sides.map((s) => [s.pts, s.stands]),
 		[
 			['62.1', 'level'],
 			['--', 'level']
 		]
 	);
+});
+
+void test('a kickoff before the page clock is never the next: the bug reads Kicked off', () => {
+	// The Monday after: a read that still says upcoming with Sunday's kickoff next (a lagging read)
+	// never says "Next kickoff" for a game played (sweep 3 M2).
+	const [lagging] = bugsOf(board('upcoming'), SYNC, MONDAY, ZONE);
+	assert.ok(lagging);
+	assert.equal(lagging.head, KICKOFF.kickedOff);
+	assert.equal(lagging.words, '');
+	assert.equal(lagging.state, 'kicked_off');
+	assert.deepEqual(
+		lagging.sides.map((s) => [s.pts, s.stands]),
+		[
+			['62.1', 'behind'],
+			['71.4', 'ahead']
+		]
+	);
+	// Under way with its next kickoff past: Kicked off, the starters still to play counted.
+	const [playing] = bugsOf(board('playing'), SYNC, MONDAY, ZONE);
+	assert.ok(playing);
+	assert.equal(playing.head, KICKOFF.kickedOff);
+	assert.equal(playing.words, '12 of 18 starters to play');
+	assert.equal(bugsOf(board('final'), SYNC, MONDAY, ZONE)[0]?.head, KICKOFF.final);
 });
 
 void test('the standings carry each team’s projection and sort by a column, best first', () => {
@@ -409,7 +441,7 @@ void test('copy guard: every League page word is fantasy words, with no dash or 
 		...scoringView(RULES, []).groups.flatMap((g) => [g.label, ...g.rules.map((r) => r.label)]),
 		...termsView(TERMS, 12).map((t) => `${t.label} ${t.value}`),
 		playoffRule(TERMS, 12)?.words ?? '',
-		bugsOf(board('playing'), SYNC, ZONE)[0]?.words ?? ''
+		bugsOf(board('playing'), SYNC, SATURDAY, ZONE)[0]?.words ?? ''
 	];
 	for (const text of said) {
 		assert.doesNotMatch(text, BANNED, text);
@@ -433,5 +465,94 @@ void test('copy guard: every League page word is fantasy words, with no dash or 
 	assert.equal(
 		teamBasis('espn', null, { format: 'ppr', league_own: true }, true, ZONE),
 		"A team's Proj adds its starters' published projections in PPR, this league's own, not in yet for this week. Pts are ESPN's so far, and your lineup's Team adds its rows."
+	);
+});
+
+void test('the lineup card draws no change on a played week and says it is over', () => {
+	const recorded = JSON.parse(
+		readFileSync(
+			new URL('../../../../scripts/inseason-fixture/data/lineup.json', import.meta.url),
+			'utf8'
+		)
+	) as LineupAdvice;
+	const final = (l: PlayerLine): PlayerLine => ({
+		...l,
+		facts: { ...l.facts, played: true, game_state: l.facts.bye ? null : 'final' }
+	});
+	const saturday = lineupSummary(recorded, ZONE, SATURDAY);
+	assert.ok(saturday.box.swaps.length > 0);
+	assert.equal(saturday.done, null);
+	const done = "Every starter's game is final, so week 6 is over.";
+	const tuesday = lineupSummary(
+		{
+			...recorded,
+			week_done: done,
+			slots: recorded.slots.map((s) => ({
+				...s,
+				ours: final(s.ours),
+				host: s.host && final(s.host)
+			})),
+			bench: recorded.bench.map(final)
+		},
+		ZONE,
+		MONDAY
+	);
+	assert.equal(tuesday.box.swaps.length, 0);
+	assert.ok(tuesday.box.starters.every((s) => s.move === null));
+	assert.equal(tuesday.done, done);
+});
+
+void test('a scoreboard past a kickoff and a lineup read that lags it agree: no move on him', () => {
+	const recorded = JSON.parse(
+		readFileSync(
+			new URL('../../../../scripts/inseason-fixture/data/lineup.json', import.meta.url),
+			'utf8'
+		)
+	) as LineupAdvice;
+	// The lineup was read at 11:59 Central, every row still upcoming by the API; the page's clock and
+	// the scoreboard read are at 12:01, the noon games under way.
+	const upcoming = (l: PlayerLine): PlayerLine => ({
+		...l,
+		facts: { ...l.facts, game_state: l.facts.bye ? null : 'upcoming' }
+	});
+	const lagging: LineupAdvice = {
+		...recorded,
+		slots: recorded.slots.map((s) => ({
+			...s,
+			ours: upcoming(s.ours),
+			host: s.host && upcoming(s.host)
+		})),
+		bench: recorded.bench.map(upcoming)
+	};
+	const noon = '2026-10-18T17:00:00.000Z';
+	const now = Date.parse(noon) + 60_000;
+	const noonMoves = recorded.slots.filter(
+		(s) => s.changed && (s.ours.facts.kickoff === noon || s.host?.facts.kickoff === noon)
+	);
+	assert.ok(noonMoves.length > 0, 'the fixture changes a noon player');
+	const card = lineupSummary(lagging, ZONE, now);
+	for (const s of noonMoves)
+		assert.ok(
+			!card.box.swaps.some((w) => w.key === s.ours.player.host_id),
+			`${s.ours.player.name} is moved after his kickoff`
+		);
+	const [bug] = bugsOf(
+		{
+			games: [
+				{
+					state: 'playing',
+					next_kickoff: '2026-10-18T20:05:00.000Z',
+					sides: [side(1, 9.2), side(2, 4.1)]
+				}
+			]
+		},
+		SYNC,
+		now,
+		ZONE
+	);
+	assert.equal(bug?.head, KICKOFF.kickedOff);
+	// One ms before the kickoff the same read still offers the change.
+	assert.ok(
+		lineupSummary(lagging, ZONE, Date.parse(noon) - 1).box.swaps.length >= noonMoves.length
 	);
 });

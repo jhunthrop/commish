@@ -62,6 +62,10 @@ export function restRankWords(position: string, shown: number | string): string 
 
 /** The card's words that are not a player's, in one place for the copy guard. */
 export const CARD = {
+	/** The verbs the league's screens give him (week-words.ts verbOf): starting him, the way to the
+	 * lineup once his game is locked or he starts already (Lane 85 fix round 3, M-D). */
+	startHim: 'Start him',
+	openLineup: 'Open your lineup',
 	/** The game log's per-week projection column, a one-week box score's head. The card's own week
 	 * tile is headed by its week beside the season's Projected (format/figure-words.ts weekHead). */
 	proj: 'Proj',

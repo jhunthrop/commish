@@ -9,18 +9,21 @@
 	interface Props {
 		week: number;
 		box: LineupBox;
+		/** The API's sentence once every starter's game is final, said in the sum's place (Lane 85). */
+		done?: string | null;
 	}
 
-	let { week, box }: Props = $props();
-	const sum = $derived(stripSum(box));
+	let { week, box, done = null }: Props = $props();
+	const sum = $derived(stripSum(box, done));
 </script>
 
 <div class="strip">
 	<div class="head">
 		<span class="wk">Week {week}</span>
-		<span class="title">{changesTitle(box.swaps.length)}</span>
+		<span class="title">{changesTitle(box.swaps.length, done)}</span>
 	</div>
-	{#if box.swaps.length > 0 || box.idle.length > 0}
+	<!-- A finished week has nothing left to fill or change: no chip (Lane 85). -->
+	{#if done === null && (box.swaps.length > 0 || box.idle.length > 0)}
 		<ul class="swaps">
 			<!-- The spots no one can play first, so a phone shows them before the swaps (review N4). -->
 			{#each box.idle as said (said)}
@@ -37,7 +40,9 @@
 		</ul>
 	{/if}
 	<div class="sum">
-		{#if sum}<b class="figure">{sum.figure}</b><span class="words"
+		{#if done !== null}<span class="words done">{done}</span>{:else if sum}<b class="figure"
+				>{sum.figure}</b
+			><span class="words"
 				>{sum.words}{#if sum.gain}, <em>{sum.gain}</em>{/if}</span
 			>{/if}
 		<a class="past" href={links.record()}>{LINEUP.pastWeeks}</a>

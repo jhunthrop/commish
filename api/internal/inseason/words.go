@@ -312,13 +312,25 @@ func uncountedRulesAt(s apitypes.LeagueSettings, carried func(string) bool, posi
 }
 
 // gainWords is what a Gain is, said once on a screen (Lane 66t): whose
-// lineup, a week, averaged over the weeks the order covers.
+// lineup, a week, averaged over the weeks the order covers, named by
+// number from the run's first week to the last (Lane 85 fix round 2, M-C),
+// so the span stays true once a week is over and before the run rolls.
 func gainWords(whose string, b OrderBasis, weeks int) string {
-	over := fmt.Sprintf("the %s left on our order", weekCount(weeks))
 	if b != RestOfSeason {
-		over = fmt.Sprintf("the season's %s on our preseason number", weekCount(weeks))
+		over := fmt.Sprintf("over the season's %s on our preseason number", weekCount(weeks))
+		return fmt.Sprintf("Gain is %s change in points over replacement a week, %s.", whose, over)
 	}
-	return fmt.Sprintf("Gain is the change in %s points over replacement, a week, over %s.", whose, over)
+	return fmt.Sprintf("Gain is %s change in points over replacement a week, %s.", whose, weekSpan(weeks))
+}
+
+// weekSpan is the weeks the order covers by number: "weeks 6 to 17",
+// "week 17".
+func weekSpan(weeks int) string {
+	from := LastWeek - max(1, weeks) + 1
+	if from == LastWeek {
+		return fmt.Sprintf("week %d", LastWeek)
+	}
+	return fmt.Sprintf("weeks %d to %d", from, LastWeek)
 }
 
 // LineupBasis is the start and sit page's advice rule (§4.4, Lane 66e),
@@ -333,9 +345,29 @@ func LineupBasis(b OrderBasis) string {
 	return fmt.Sprintf("We start the highest Proj at each slot after designations and byes, %s breaking ties.", order)
 }
 
+// ToPlayWords is a score bug's count while its game is under way (Lane
+// 85 fix round, M3): the starters with a game this week still to play, of
+// all who have one. A starter on bye is neither.
+func ToPlayWords(toPlay, withGame int) string {
+	return fmt.Sprintf("%d of %d starters to play", toPlay, withGame)
+}
+
+// WeekDoneWords is the Lineup's sentence once every starter's game this
+// week is final (Lane 85): nothing is left to change, so it stands where
+// the changes and the verb would.
+func WeekDoneWords(week int) string {
+	return fmt.Sprintf("Every starter's game is final, so week %d is over.", week)
+}
+
 // WaiversBasis is the waiver page's pickup rule (§5.3, Lane 66f): the
 // week on the Proj the screen shows, the rest of the season on its Gain.
-const WaiversBasis = "A pickup starts this week on Proj and keeps your Gain at zero or better. Its drop costs least."
+const WaiversBasis = "A pickup starts this week on Proj and keeps Gain at zero or better."
+
+// SeasonOrderWords is the waiver page's rule once a pickup's game has
+// kicked off (Lane 85 fix round 3): the adds go by the season Gain.
+func SeasonOrderWords(week int) string {
+	return fmt.Sprintf("Pickups go in Gain order once their week %d games kick off.", week)
+}
 
 // WaiverSeasonBasis is what a waiver Gain is, the head the card and the
 // drop panel print (Lane 66u).

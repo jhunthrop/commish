@@ -128,7 +128,7 @@ func TestWaiverAdvice(t *testing.T) {
 	if out.LineupProj != nil {
 		sum := *out.LineupProj
 		for _, p := range out.Pickups {
-			sum = roundTenth(sum + p.WeekGain)
+			sum = roundTenth(sum + fv(p.WeekGain))
 		}
 		if sum != *out.PickupsProj {
 			t.Fatalf("the cards' gains reach %v, the set's Proj is %v", sum, *out.PickupsProj)
@@ -273,7 +273,7 @@ func TestOrderComesFromTheBoard(t *testing.T) {
 	at := time.Date(2026, 10, 21, 12, 0, 0, 0, time.UTC)
 	f.league.Board.Order, f.league.Board.Refreshed = boards.OrderRestOfSeason, at
 	out, _ := newFixtureAdvisor(t, f, nil).Trades("")
-	if out.OrderBasis != apitypes.OrderBasisRestOfSeason || !out.Refreshed.Equal(at) || !strings.Contains(out.Basis, "left on our order.") {
+	if out.OrderBasis != apitypes.OrderBasisRestOfSeason || !out.Refreshed.Equal(at) || !strings.Contains(out.Basis, " to 17.") {
 		t.Fatalf("basis %q refreshed %v: %q", out.OrderBasis, out.Refreshed, out.Basis)
 	}
 }

@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { bannedPattern } from '#lib/format/copy-guard.ts';
-import { basisText } from './basis.ts';
+import { basisText, KICKED_OFF_PART } from './basis.ts';
 import type { PlayerLine, TradeAdvice, TradeCheck, TradeRow, TradeTeam } from '../inseason/api.ts';
 import {
 	bugFigures,
@@ -12,6 +12,8 @@ import {
 	finderRows,
 	fromWords,
 	gainWord,
+	heldCheck,
+	heldTrades,
 	offerText,
 	phoneWith,
 	proposeVerb,
@@ -306,8 +308,8 @@ const advice: Pick<
 	| 'player_points'
 > = {
 	basis:
-		"Each team's best trade both lineups gain by, yours first. The other team decides. Gain is the change in a lineup's points over replacement, a week, over the 12 weeks left on our order.",
-	per_game_basis: "A game is that order's points a game.",
+		"Each team's best trade both lineups gain by, yours first. The other team decides. Gain is a lineup's change in points over replacement a week, weeks 6 to 17.",
+	per_game_basis: "A game is our order's points a game.",
 	basis_note: 'Avg and Last miss five of your rules our stats lack.',
 	basis_note_link: 'Which five',
 	projection_read_at: '2026-10-17T02:00:00.000Z',
@@ -366,7 +368,7 @@ void test("a trade opened or the builder open adds the players' columns, each on
 	);
 	assert.equal(
 		basisText(parts),
-		`${advice.basis} ${advice.per_game_basis} Proj is this week's published projection, PPR nearest your rules, defenses on default scoring, read Fri 9:00 pm. Opp rank is points allowed to his position, 1st fewest. Pts are Sleeper's points by player so far, and Team adds the rows. ${advice.basis_note} Which five. ${WEEK_ROOM} How the order has done`
+		`${advice.basis} ${advice.per_game_basis} Proj is this week's published projection, PPR nearest your rules, defenses on default scoring, read Fri 9:00 pm. Opp rank is points allowed to his position, 1st fewest. Pts are Sleeper's points so far, Team adds the rows. ${advice.basis_note} Which five. ${WEEK_ROOM} How the order has done`
 	);
 	assert.deepEqual(
 		parts.filter((p) => p.href !== undefined).map((p) => p.href),
@@ -374,7 +376,12 @@ void test("a trade opened or the builder open adds the players' columns, each on
 	);
 	assert.deepEqual(
 		parts.filter((p) => !p.phone).map((p) => p.text),
-		["Pts are Sleeper's points by player so far, and Team adds the rows.", WEEK_ROOM]
+		[
+			// The builder's phone rows draw no Opp rank (review H2).
+			'Opp rank is points allowed to his position, 1st fewest.',
+			"Pts are Sleeper's points so far, Team adds the rows.",
+			WEEK_ROOM
+		]
 	);
 });
 
@@ -412,4 +419,62 @@ void test('copy guard: every word the trade table prints is fantasy words, the p
 	for (const text of said) {
 		assert.doesNotMatch(text, NEVER, text);
 	}
+});
+
+void test('a trade moving a player whose game has kicked off draws no change this week (Lane 85)', () => {
+	const NOW = Date.parse('2026-10-20T17:00:00.000Z');
+	const played = (l: PlayerLine): PlayerLine => ({
+		...l,
+		facts: { ...l.facts, kickoff: '2026-10-18T17:00:00.000Z', played: true, game_state: 'final' }
+	});
+	const ahead = (l: PlayerLine): PlayerLine => ({
+		...l,
+		facts: { ...l.facts, kickoff: '2026-10-25T17:00:00.000Z', game_state: 'upcoming' }
+	});
+	const open = row(4.6, 0.5, { give: [ahead(line('Aaron Rodgers', 'QB'))], get: [], drop: null });
+	const done = row(4.6, 0.5, { get: [played(line('Cam Skattebo'))] });
+	const answer = {
+		teams: [team(7, 'thatmattkelley', [open]), team(8, 'Max_Jensen10', [done])]
+	};
+	const held = heldTrades(answer, NOW);
+	assert.deepEqual(
+		held.teams.map((t) => t.trades.map((r) => [r.my_proj_change, r.their_proj_change])),
+		[[[7.3, 2.5]], [[null, null]]]
+	);
+	// The trade itself stays: for next week, its Gain unchanged.
+	const heldDone = held.teams[1]?.trades[0];
+	assert.ok(heldDone);
+	assert.equal(heldDone.my_gain, 4.6);
+	assert.equal(weekLine(heldDone), null);
+	assert.equal(weekWord(heldDone.my_proj_change), '--');
+	// Nothing locked: the answer as it came.
+	const quiet = { teams: [team(7, 'thatmattkelley', [open])] };
+	assert.equal(heldTrades(quiet, NOW), quiet);
+	// The builder's check: no week figure before or after.
+	const checked = heldCheck({ ...check(), trade: done }, NOW);
+	assert.equal(checked.trade.my_proj_change, null);
+	assert.deepEqual(
+		[checked.totals.yours.proj_before, checked.totals.theirs.proj_after],
+		[null, null]
+	);
+	assert.equal(checked.totals.yours.season_after, 35.8);
+	const fine = { ...check(), trade: open };
+	assert.equal(heldCheck(fine, NOW), fine);
+});
+
+void test('the basis says when Final and the stats land while a row waits on them (Lane 85)', () => {
+	const played = line('Cam Skattebo');
+	const final = {
+		...played,
+		facts: {
+			...played.facts,
+			kickoff: '2026-10-18T17:00:00.000Z',
+			played: true,
+			game_state: 'final' as const
+		}
+	};
+	const text = basisText(
+		tradeBasis(advice, 'sleeper', [final], 'none', TRADE_LINKS, TRADE_CLOCK, NOW_66T)
+	);
+	assert.ok(text.includes(KICKED_OFF_PART), text);
 });

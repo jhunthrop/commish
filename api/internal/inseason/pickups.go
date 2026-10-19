@@ -111,8 +111,8 @@ func (w *pickupWeek) beats(add Candidate, mine []person) *apitypes.WaiverBeats {
 		}
 		if low >= 0 {
 			p := mine[low]
-			return &apitypes.WaiverBeats{HostId: p.cand.ID, Name: p.line.Player.Name, Starter: starter,
-				Gain: roundTenth(add.Proj - p.cand.Proj)}
+			gain := roundTenth(add.Proj - p.cand.Proj)
+			return &apitypes.WaiverBeats{HostId: p.cand.ID, Name: p.line.Player.Name, Starter: starter, Gain: &gain}
 		}
 	}
 	return nil
@@ -121,13 +121,13 @@ func (w *pickupWeek) beats(add Candidate, mine []person) *apitypes.WaiverBeats {
 // openSpot is Beats for an add who fills a starting spot no one of the
 // member's can play this week: no player named, the week's gain.
 func openSpot(weekGain float64) *apitypes.WaiverBeats {
-	return &apitypes.WaiverBeats{OpenSpot: true, Starter: true, Gain: weekGain}
+	return &apitypes.WaiverBeats{OpenSpot: true, Starter: true, Gain: &weekGain}
 }
 
 // isPickup is the strip's rule (Lane 66f): he starts this week, the
 // lineup's Proj rises, and the rest of the season does not fall.
 func isPickup(row apitypes.WaiverRow) bool {
-	return row.Starts && row.WeekGain > 0 && roundTenth(row.Gain) >= 0
+	return row.Starts && row.WeekGain != nil && *row.WeekGain > 0 && roundTenth(row.Gain) >= 0
 }
 
 // setCandidate is one add the strip may name: the add, his drop (a roster
@@ -211,44 +211,49 @@ func anyUsed(used map[string]bool, keys []string) bool {
 	return false
 }
 
-// strip is the Waivers strip's cards (review 66f H1, L8): every add we
-// rank that is a pickup on his own (he starts, the week rises, the rest of
-// the season does not fall), highest week gain first, chosen as a set; each
-// card's week_gain is his over the cards before him. Also the lineup's Proj
-// with every card made.
-func (a *advisor) strip(w *Writer, week *pickupWeek, mine, pool []person, moves []Waiver, clears map[string]openapi_types.Date) ([]apitypes.WaiverRow, float64) {
+// stripMoves is the Waivers strip's moves under the week's rule (review
+// 66f H1, L8): every add we rank that is a pickup on his own (he starts,
+// the week rises, the rest of the season does not fall), highest week gain
+// first, chosen as a set. Also the lineup's Proj with every one made.
+func (r waiverRun) stripMoves() ([]Waiver, float64) {
 	type ranked struct {
 		move Waiver
 		gain float64
 	}
 	var cands []ranked
-	for _, m := range moves {
+	for _, m := range r.moves {
 		if m.NoDrop || roundTenth(m.Gain) < 0 {
 			continue
 		}
-		if gain, starts, _ := week.with(pool[m.Add].cand, m.Drop); starts && gain > 0 {
+		if gain, starts, _ := r.week.with(r.pool[m.Add].cand, m.Drop); starts && gain > 0 {
 			cands = append(cands, ranked{move: m, gain: gain})
 		}
 	}
 	sort.SliceStable(cands, func(i, j int) bool { return cands[i].gain > cands[j].gain })
 	set := make([]setCandidate, len(cands))
 	for i, c := range cands {
-		add := pool[c.move.Add].cand
+		add := r.pool[c.move.Add].cand
 		var keys []string
-		if b := week.beats(add, mine); b != nil {
+		if b := r.week.beats(add, r.mine); b != nil {
 			keys = append(keys, b.HostId)
 		}
 		if c.move.Drop >= 0 {
-			keys = append(keys, mine[c.move.Drop].cand.ID)
+			keys = append(keys, r.mine[c.move.Drop].cand.ID)
 		}
 		set[i] = setCandidate{add: add, drop: c.move.Drop, keys: keys}
 	}
-	chosen := week.set(set)
-	moves = make([]Waiver, len(chosen.chosen))
+	chosen := r.week.set(set)
+	moves := make([]Waiver, len(chosen.chosen))
 	for k, i := range chosen.chosen {
 		moves[k] = cands[i].move
 	}
-	return cardRows(w, a.config, week.hostStarters, mine, pool, moves, clears), chosen.proj
+	return moves, chosen.proj
+}
+
+// strip is the strip's moves as its cards; each card's week_gain is his
+// over the cards before him.
+func (r waiverRun) strip(moves []Waiver) []apitypes.WaiverRow {
+	return cardRows(r.w, r.week.config, r.week.hostStarters, r.mine, r.pool, moves, r.clears)
 }
 
 // cardRows is the strip's cards as rows, each measured against the lineup

@@ -68,14 +68,14 @@ func TestLaterCardsAreMeasuredAfterTheEarlierOnes(t *testing.T) {
 		{Add: 1, Drop: wr5, Drops: []Drop{{At: wr5, Gain: 0.4}, {At: rb4, Gain: 0.2}}},
 	}
 	rows := cardRows(&Writer{Basis: RestOfSeason}, config, pprHost(), mine, pool, moves, nil)
-	if len(rows) != 2 || rows[0].WeekGain != 2.5 || rows[1].WeekGain != 0.5 {
+	if len(rows) != 2 || fv(rows[0].WeekGain) != 2.5 || fv(rows[1].WeekGain) != 0.5 {
 		t.Fatalf("gains %+v", rows)
 	}
 	second := rows[1]
-	if len(second.Drops) != 1 || second.Drops[0].HostId != "wr5" || second.Drops[0].WeekGain != 0.5 {
+	if len(second.Drops) != 1 || second.Drops[0].HostId != "wr5" || fv(second.Drops[0].WeekGain) != 0.5 {
 		t.Fatalf("the second card's drops %+v, want wr5 alone at +0.5 after the first card", second.Drops)
 	}
-	if second.Beats == nil || second.Beats.HostId != "wr3" || second.Beats.Gain != 0.5 {
+	if second.Beats == nil || second.Beats.HostId != "wr3" || fv(second.Beats.Gain) != 0.5 {
 		t.Fatalf("the second card's beats %+v", second.Beats)
 	}
 }
@@ -108,7 +108,7 @@ func TestTheStripOnTheRecordedLeague(t *testing.T) {
 	taken := map[string]bool{}
 	sum, noDrop := *out.LineupProj, 0
 	for i, p := range out.Pickups {
-		if !p.Pickup || !p.Starts || p.WeekGain <= 0 || roundTenth(p.Gain) < 0 {
+		if !p.Pickup || !p.Starts || fv(p.WeekGain) <= 0 || roundTenth(p.Gain) < 0 {
 			t.Fatalf("card %d is no pickup: %+v", i, p)
 		}
 		var keys []string
@@ -126,7 +126,7 @@ func TestTheStripOnTheRecordedLeague(t *testing.T) {
 			}
 			taken[k] = true
 		}
-		sum = roundTenth(sum + p.WeekGain)
+		sum = roundTenth(sum + fv(p.WeekGain))
 	}
 	if sum != *out.PickupsProj {
 		t.Fatalf("the cards reach %v, pickups_proj is %v", sum, *out.PickupsProj)

@@ -1482,6 +1482,24 @@ func (e TradeMovesPropose) Valid() bool {
 	}
 }
 
+// Defines values for WaiverAdvicePickupOrder.
+const (
+	WaiverAdvicePickupOrderSeasonGain WaiverAdvicePickupOrder = "season_gain"
+	WaiverAdvicePickupOrderWeek       WaiverAdvicePickupOrder = "week"
+)
+
+// Valid indicates whether the value is a known member of the WaiverAdvicePickupOrder enum.
+func (e WaiverAdvicePickupOrder) Valid() bool {
+	switch e {
+	case WaiverAdvicePickupOrderSeasonGain:
+		return true
+	case WaiverAdvicePickupOrderWeek:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for WaiverMovesClaim.
 const (
 	WaiverMovesClaimAvailable   WaiverMovesClaim = "available"
@@ -2799,6 +2817,9 @@ type LineupAdvice struct {
 	// UncountedRules the rules basis_note counts, in words ("two-point conversions"), for the league's Settings to list; empty when it counts none
 	UncountedRules []string `json:"uncounted_rules"`
 	Week           int      `json:"week"`
+
+	// WeekDone the sentence once every starter's game this week is final ("Every starter's game is final, so week 6 is over."): no change is left to make, so the screen says it in place of the changes and the verb; null while any starter's game is still to come or under way, or absent from an older answer
+	WeekDone *string `json:"week_done,omitempty"`
 }
 
 // LineupAdviceEmptySlots defines model for LineupAdvice.EmptySlots.
@@ -3712,6 +3733,9 @@ type ScoreboardGame struct {
 
 	// State upcoming before any starter's game kicks off, final once every starter's game is over, playing between
 	State ScoreboardGameState `json:"state"`
+
+	// ToPlay while the game is playing, how many of both sides' starters with a game this week are still to play ("5 of 18 starters to play"): a starter on bye, or with no game held, is neither to play nor played and leaves the count; null otherwise, or absent from an older answer
+	ToPlay *string `json:"to_play,omitempty"`
 }
 
 // ScoreboardGameState upcoming before any starter's game kicks off, final once every starter's game is over, playing between
@@ -4166,6 +4190,9 @@ type WaiverAdvice struct {
 	// OrderBasis which order ranks the players: our preseason board, or the rest-of-season order (from week 7, once the API reads it)
 	OrderBasis OrderBasis `json:"order_basis"`
 
+	// PickupOrder the order the page's rows and strip are in, decided over the full page's rows and the answer's own by each row's game state (gameStateAt): week (the strip by this week's Proj gain, the rows as the search ranks them) while no row's add or drop has kicked off; season_gain once any has (the rows by the season Gain, every week figure null, the strip the first row worth making); a page narrowed to one position or focused on a player takes season_gain whenever the full page does
+	PickupOrder WaiverAdvicePickupOrder `json:"pickup_order"`
+
 	// Pickups the pickups worth making, chosen as a set from every add we rank, at most 3: each measured against the lineup with the ones before it made, kept only while he still starts and raises the Proj, no two taking the same player of the member's (topped or dropped); each one's week_gain is his over the ones before (the strip's cards); empty when no pickup beats the roster
 	Pickups []WaiverRow `json:"pickups"`
 
@@ -4186,7 +4213,7 @@ type WaiverAdvice struct {
 	// Roster the member's active roster (injured reserve and taxi spots left out), the lines beats and drops name
 	Roster []PlayerLine `json:"roster"`
 
-	// Rows positive gains first by gain, then the rest by points over replacement, at most 60
+	// Rows positive gains first by gain, then the rest by points over replacement, at most 60; by the season Gain alone in the season_gain order
 	Rows []WaiverRow `json:"rows"`
 
 	// SeasonBasis what the Rest of season column and a gain over the rest of the season are, said once under the rows
@@ -4194,10 +4221,13 @@ type WaiverAdvice struct {
 	Week        int    `json:"week"`
 }
 
+// WaiverAdvicePickupOrder the order the page's rows and strip are in, decided over the full page's rows and the answer's own by each row's game state (gameStateAt): week (the strip by this week's Proj gain, the rows as the search ranks them) while no row's add or drop has kicked off; season_gain once any has (the rows by the season Gain, every week figure null, the strip the first row worth making); a page narrowed to one position or focused on a player takes season_gain whenever the full page does
+type WaiverAdvicePickupOrder string
+
 // WaiverBeats the member's player at his position with the lowest Proj he tops, the advised lineup's starters first, then the bench, never one who cannot play this week (Lane 66f's Beats column); or the open spot he fills, a starting spot no player of the member's can play this week
 type WaiverBeats struct {
-	// Gain his Proj less that player's, as the screen prints them (tenths)
-	Gain float64 `json:"gain"`
+	// Gain his Proj less that player's, as the screen prints them (tenths); null while the pickups go in season Gain order (a pickup's game has kicked off), when no week figure counts
+	Gain *float64 `json:"gain"`
 
 	// HostId the member's player's host id, a line in the answer's roster; empty for the open spot
 	HostId string `json:"host_id"`
@@ -4223,8 +4253,8 @@ type WaiverDrop struct {
 	// StartsThisWeek the lineup the Lineup screen sets this week starts him; the panel marks him, and the row's own drop is one only when the lineup stays full with the add in it (Lane 66u)
 	StartsThisWeek bool `json:"starts_this_week"`
 
-	// WeekGain this week's Proj to the lineup the advice sets, one decimal
-	WeekGain float64 `json:"week_gain"`
+	// WeekGain this week's Proj to the lineup the advice sets, one decimal; null in season Gain order
+	WeekGain *float64 `json:"week_gain"`
 }
 
 // WaiverMoves defines model for WaiverMoves.
@@ -4274,8 +4304,8 @@ type WaiverRow struct {
 	// Starts he starts this week in the lineup the advice sets with him in (the highest Proj after designations and byes)
 	Starts bool `json:"starts"`
 
-	// WeekGain this week's Proj of the lineup the advice sets (the Lineup screen's rule) with him in and the row's drop out, less the lineup's without him, one decimal; 0 when he would not start
-	WeekGain float64 `json:"week_gain"`
+	// WeekGain this week's Proj of the lineup the advice sets (the Lineup screen's rule) with him in and the row's drop out, less the lineup's without him, one decimal; 0 when he would not start. Null on every row once any pickup's add or drop has kicked off (gameStateAt): the pickups then go in season Gain order and no week figure counts
+	WeekGain *float64 `json:"week_gain"`
 }
 
 // WeekBug defines model for WeekBug.
@@ -4374,6 +4404,9 @@ type WeekLineup struct {
 
 	// Swaps each change, in the league's slot order
 	Swaps []WeekSwap `json:"swaps"`
+
+	// WeekDone the Lineup's own week_done sentence (words.go WeekDoneWords) once every starter's game is final, which the front door says in place of the changes and the verb; null before, or absent from an older answer
+	WeekDone *string `json:"week_done,omitempty"`
 }
 
 // WeekOrderAdvice defines model for WeekOrderAdvice.

@@ -138,7 +138,9 @@ func (s *Service) weekLeague(ctx context.Context, wl WeekLeague, held map[string
 	out.Lineup = &summary
 	var pickups []apitypes.WaiverRow
 	if wl.WaiversOpen {
-		// The strip's chosen set alone: no table of rows is built for it.
+		// The full waiver page's strip by its one pickup rule: Pickups builds the
+		// whole page (its rows and their sentences) to read it, a cost each front
+		// door read with waivers open pays (review L-J).
 		pickups, _ = a.Pickups()
 	}
 	out.Chips = rosterChips(lineup, pickups)
@@ -257,6 +259,8 @@ func lineupSummary(lineup apitypes.LineupAdvice) apitypes.WeekLineup {
 		set = append(set, asSet(slot))
 	}
 	out.Changes = len(out.Swaps)
+	// The Lineup's own sentence once the week is over, one source for both screens.
+	out.WeekDone = lineup.WeekDone
 	out.Projection, out.AsSet = printedSum(ours), printedSum(set)
 	if out.Projection != nil && out.AsSet != nil {
 		gain := roundTenth(*out.Projection - *out.AsSet)
@@ -278,8 +282,7 @@ func rosterChips(lineup apitypes.LineupAdvice, pickups []apitypes.WaiverRow) []a
 		out = append(out, apitypes.RosterChip{Kind: apitypes.RosterChipKindBye, Line: *line, Idle: true})
 	}
 	if len(pickups) > 0 {
-		gain := pickups[0].WeekGain
-		out = append(out, apitypes.RosterChip{Kind: apitypes.RosterChipKindPickup, Line: pickups[0].Add, Gain: &gain})
+		out = append(out, apitypes.RosterChip{Kind: apitypes.RosterChipKindPickup, Line: pickups[0].Add, Gain: pickups[0].WeekGain})
 	}
 	return out
 }

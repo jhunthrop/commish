@@ -1,6 +1,6 @@
 {
 	"week": 6,
-	"basis": "Each team's best trade both lineups gain by, yours first. The other team decides. Gain is the change in a lineup's points over replacement, a week, over the 12 weeks left on our order.",
+	"basis": "Each team's best trade both lineups gain by, yours first. The other team decides. Gain is a lineup's change in points over replacement a week, weeks 6 to 17.",
 	"check_basis": "The scoreboard is each lineup before and after the trade.",
 	"basis_note": "Avg and Last miss five of your rules our stats lack.",
 	"order_basis": "rest_of_season",
@@ -13852,6 +13852,6 @@
 	"projection_read_at": "2026-10-17T02:00:00.000Z",
 	"projection_scoring": { "format": "ppr", "league_own": false },
 	"player_points": true,
-	"per_game_basis": "A game is that order's points a game.",
+	"per_game_basis": "A game is our order's points a game.",
 	"basis_note_link": "Which five"
 }

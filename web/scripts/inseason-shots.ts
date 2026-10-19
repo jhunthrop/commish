@@ -43,7 +43,7 @@ import {
 	installFixtureClock,
 	requireFixtureClock
 } from './inseason-fixture/clock.ts';
-import { BUILDER_LINE, basisLines, basisReport } from './basis-lines.ts';
+import { BUILDER_LINE, basisLines, basisReport, figureSentenceFaults } from './basis-lines.ts';
 import { chromeFaults, chromeLine, chromeMeasures } from './chrome-measures.ts';
 import { pageFaults, pageLine, pageMeasures } from './page-measures.ts';
 import { UNCOUNTED_ANCHOR } from '../src/lib/league/uncounted.ts';
@@ -58,14 +58,14 @@ const VIEWPORT_HEIGHT = 900;
 const PHONE = { width: 390, height: 844 } as const;
 const READY_TIMEOUT_MS = 30_000;
 /** ESPN's Pts sentence now that it gives each player's points (Lane 79, basis.ts ptsPart). */
-const ESPN_PTS = "Pts are ESPN's points by player so far, and Team adds the rows.";
+const ESPN_PTS = "Pts are ESPN's points so far, Team adds the rows.";
 /** ESPN's Matchup, whose Team is ESPN's own score (ruling (a)). */
 const ESPN_MATCHUP_PTS =
 	"Pts are ESPN's points by player so far, each to a tenth, and Team is ESPN's score.";
 /** The team-totals sentence (Lane 79 fix 6). */
 const YAHOO_PTS = "Pts are Yahoo's team points, none by player.";
 /** Sleeper's Matchup, whose Team adds the rows (ruling (a)). */
-const SLEEPER_MATCHUP_PTS = "Pts are Sleeper's points by player so far, and Team adds the rows.";
+const SLEEPER_MATCHUP_PTS = "Pts are Sleeper's points so far, Team adds the rows.";
 /** The drafter's four starters under way on the Sunday, their points added (13.4, 8.1, 9.4, 8.2). */
 const SLEEPER_SUNDAY_SUM = '39.1';
 /** The Sunday's changes the engine would make: Kirk (Monday night) for Chase on bye at Flex. Dart,
@@ -267,7 +267,7 @@ const TRADES_FOLD_AT = 900;
 /** A gain or a week's change as its cell prints it. */
 const SIGNED = /^([+−]\d+\.\d|0\.0|--)$/;
 const TRADE_BASIS_FIRST =
-	"Each team's best trade both lineups gain by, yours first. The other team decides. Gain is the change in a lineup's points over replacement, a week,";
+	"Each team's best trade both lineups gain by, yours first. The other team decides. Gain is a lineup's change in points over replacement a week,";
 /** A trade's week in one line, from the API's two changes (review H2). */
 const WEEK_LINE = /[+−]?\d+\.\d Proj for you this week, [+−]?\d+\.\d for them/;
 
@@ -388,6 +388,9 @@ for (const { name, path, ready: text } of PAGES) {
 			}
 			const basisName = name === 'start' ? 'lineup' : name;
 			const report = basisReport(basisName, width, await basisLines(page));
+			if (name !== 'league')
+				for (const fault of await figureSentenceFaults(page))
+					missing.push(`${basisName} ${theme} ${String(width)} ${fault}`);
 			if (report !== null && name !== 'league') {
 				if (theme === 'dark') basisCounts.push(report.line);
 				if (report.fault !== null) missing.push(`${theme} ${report.fault}`);
@@ -505,6 +508,8 @@ for (const width of SHOT_WIDTHS) {
 		await page.locator('main [data-basis]').first().waitFor({ timeout: READY_TIMEOUT_MS });
 		await page.evaluate(() => document.fonts.ready);
 		const report = basisReport(basisName, width, await basisLines(page));
+		for (const fault of await figureSentenceFaults(page))
+			missing.push(`${basisName} ${String(width)} ${fault}`);
 		if (report !== null) {
 			basisCounts.push(report.line);
 			if (report.fault !== null) missing.push(report.fault);
@@ -558,6 +563,7 @@ async function platformPass(
 			await page.locator('main [data-basis]').first().waitFor({ timeout: READY_TIMEOUT_MS });
 			await page.evaluate(() => document.fonts.ready);
 			const report = basisReport(basisName, width, await basisLines(page));
+			for (const fault of await figureSentenceFaults(page)) missing.push(`${at} ${fault}`);
 			if (report !== null) {
 				basisCounts.push(report.line);
 				if (report.fault !== null) missing.push(report.fault);
@@ -787,6 +793,8 @@ for (const theme of THEMES) {
 		if (!openedBasis.includes(PER_GAME_BASIS) || !openedBasis.includes('Which five'))
 			missing.push(`trades opened ${theme} ${String(width)} basis ${openedBasis}`);
 		const openedReport = basisReport('trades opened', width, await basisLines(page));
+		for (const fault of await figureSentenceFaults(page))
+			missing.push(`trades opened ${theme} ${String(width)} ${fault}`);
 		if (openedReport !== null) {
 			if (theme === 'dark') basisCounts.push(openedReport.line);
 			if (openedReport.fault !== null) missing.push(`${theme} ${openedReport.fault}`);
@@ -1175,14 +1183,24 @@ async function tapSide(page: Page, side: 'give' | 'get', name: string): Promise<
 		.first()
 		.click();
 }
-/** The scoreboard's figures once answered: each a figure to the tenth. */
+/** The scoreboard's figures once answered: each a figure to the tenth, the week's (each side's Proj
+ * before and after, the first figure of the two) "--" exactly when a ticked player's game has kicked off
+ * or is final, the trade counting from next week (Lane 85). */
 async function bugFaults(page: Page): Promise<string[]> {
-	const figures = await page
-		.locator(`${builder} .bug .fig b, ${builder} .bug .fig i`)
+	const figures = (
+		await page.locator(`${builder} .bug .fig b, ${builder} .bug .fig i`).allInnerTexts()
+	).map((f) => f.trim());
+	const ticked = await page
+		.locator(`${builder} table.box tbody tr`)
+		.filter({ has: page.locator('button.tick.on') })
 		.allInnerTexts();
-	return figures.length === 8 && figures.every((f) => /^−?\d+\.\d$/.test(f.trim()))
-		? []
-		: [`scoreboard ${figures.join(' ')}`];
+	const past = ticked.some((row) => /\b(Final|Kicked off)\b/.test(row));
+	const tenth = (f: string): boolean => /^−?\d+\.\d$/.test(f);
+	// Each side draws Proj before and after, then the season's before and after.
+	const week = (i: number): boolean => i % 4 < 2;
+	const fine =
+		figures.length === 8 && figures.every((f, i) => (week(i) && past ? f === '--' : tenth(f)));
+	return fine ? [] : [`scoreboard ${figures.join(' ')}${past ? ' (a ticked game is past)' : ''}`];
 }
 const builderLines = new Map<string, string>();
 for (const theme of THEMES) {
@@ -1218,6 +1236,7 @@ for (const theme of THEMES) {
 		await shot('picked');
 		// The builder's own line, then the page's basis with its players' columns (Lane 66t).
 		const builderReport = basisReport('trades builder', width, await basisLines(page));
+		for (const fault of await figureSentenceFaults(page)) missing.push(`builder ${at} ${fault}`);
 		const ownLines = await basisLines(page, BUILDER_LINE);
 		const ownLine = (await page.locator(BUILDER_LINE).textContent()) ?? '';
 		if (builderReport !== null) {
@@ -1362,6 +1381,7 @@ async function leagueFaults(page: Page, lp: LeaguePage, width: number): Promise<
 		return {
 			bugs: bugs.length,
 			mineFirst: bugs[0]?.classList.contains('mine') ?? false,
+			bugHeads: bugs.map((b) => text(b.querySelector('.st'))),
 			stands: bugs.map((b) =>
 				[...b.querySelectorAll('.bt')].map((s) =>
 					s.classList.contains('ahead')
@@ -1403,7 +1423,11 @@ async function leagueFaults(page: Page, lp: LeaguePage, width: number): Promise<
 	const started = seen.stands.filter((s) => s.some((x) => x !== 'level'));
 	if (lp.live && started.length === 0)
 		faults.push('no bug draws the side ahead once its game started');
-	if (!lp.live && started.length > 0) faults.push('a bug before kickoff draws one side ahead');
+	// A bug before its first kickoff draws both sides alike; one kicked off (Thursday's games on the
+	// Saturday, Lane 85) may draw a side ahead.
+	const before = seen.stands.filter((_, i) => !/^(Kicked off|Final)$/.test(seen.bugHeads[i] ?? ''));
+	if (before.some((s) => s.some((x) => x !== 'level')))
+		faults.push('a bug before kickoff draws one side ahead');
 	if (lp.live && started.some((s) => !(s.includes('ahead') && s.includes('behind'))))
 		faults.push('a started bug without one side ahead and one behind');
 	const want =

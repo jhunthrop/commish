@@ -17,7 +17,8 @@ import {
 	positionWord,
 	type BoxRow
 } from '#lib/league/box/box.ts';
-import { kickedOffPart } from '#lib/league/box/basis.ts';
+import { kickedOffPartAt } from '#lib/league/box/basis.ts';
+import { lineState } from '#lib/league/box/kickoff.ts';
 import type { BasisPart } from '#lib/run/board-basis.ts';
 import type { WeekOrderAdvice, WeekOrderRow } from './api.ts';
 import { rosterBasis, rosterWords, type RosterView } from './order.ts';
@@ -69,7 +70,9 @@ export function weekView(row: WeekOrderRow, zone: string, now: number): WeekView
 		position: player.position,
 		hostId: player.host_id,
 		box: { ...box, key, name },
-		section: row.section,
+		// The section by the one game-state rule at the page's clock (kickoff.ts lineState), so a read
+		// that lags a kickoff sits under Kicked off with its Game cell (Lane 85 fix round 2, H-A).
+		section: sectionAt(row, now),
 		kickoff: row.line.facts.kickoff,
 		roster: row.roster === null ? null : { kind: row.roster.kind, words: rosterWords(row.roster) },
 		move: row.move
@@ -193,9 +196,18 @@ export function rulesLeftOut(
 	};
 }
 
+/** A row's section at the page's clock: a bye as the API says, else to play or kicked off by
+ * lineState; a row with no game held keeps the API's section. */
+export function sectionAt(row: WeekOrderRow, now: number): WeekOrderRow['section'] {
+	if (row.section === 'bye') return 'bye';
+	const state = lineState(row.line.facts, now);
+	if (state === null) return row.section;
+	return state === 'upcoming' ? 'to_play' : 'kicked_off';
+}
+
 /** The Game cell's sentence: its read, or that its figures come later; null with no game to play. */
 function gameSentence(advice: WeekOrderAdvice, zone: string, now: number): string | null {
-	if (!advice.rows.some((row) => row.section === 'to_play')) return null;
+	if (!advice.rows.some((row) => sectionAt(row, now) === 'to_play')) return null;
 	const read = factsReadAt(
 		advice.rows.map((row) => row.line),
 		now
@@ -226,7 +238,13 @@ export function weekBasis(
 		part(`${BOX.avg} and ${BOX.last} are ${whose} points a game and last game, ${scoring}.`, true),
 		part(gameSentence(advice, zone, now), true),
 		// The section head says Kicked off on the phone too; when Final lands is said at a desk.
-		part(kickedOffPart(advice.rows.map((row) => row.line)), false),
+		part(
+			kickedOffPartAt(
+				advice.rows.map((row) => row.line),
+				now
+			),
+			false
+		),
 		league !== null && advice.read_at !== null
 			? part(rosterBasis(league.host, advice.read_at, zone), false)
 			: null

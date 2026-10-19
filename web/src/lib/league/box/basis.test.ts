@@ -10,6 +10,7 @@ import {
 	deltaPart,
 	gamePart,
 	KICKED_OFF_PART,
+	kickedOffPartAt,
 	OPP_PART,
 	projPart,
 	ptsPart,
@@ -92,7 +93,7 @@ void test('Pts says whether the platform gives each player his points or each te
 	);
 	assert.equal(
 		ptsPart(true, 'sleeper', 'rows'),
-		"Pts are Sleeper's points by player so far, and Team adds the rows."
+		"Pts are Sleeper's points so far, Team adds the rows."
 	);
 	assert.equal(ptsPart(false, 'yahoo', 'platform'), "Pts are Yahoo's team points, none by player.");
 	for (const host of ['sleeper', 'espn', 'yahoo', 'ffpc', 'mfl'] as const) {
@@ -165,7 +166,7 @@ void test("the Lineup's key says Proj, its change at a desk, Game, Opp rank, Pts
 	);
 	assert.equal(
 		basisText(parts),
-		"Proj is this week's published projection, PPR nearest your rules, read Fri 9:00 pm. Δ Proj is its change since Thu 9:00 pm. Game is each club's expected points, his first, and weather, read Fri 4:01 pm. Opp rank is points allowed to his position, 1st fewest. Pts are Sleeper's points by player so far, and Team adds the rows. Avg and Last miss five of your rules our stats lack. Which five"
+		"Proj is this week's published projection, PPR nearest your rules, read Fri 9:00 pm. Δ Proj is its change since Thu 9:00 pm. Game is each club's expected points, his first, and weather, read Fri 4:01 pm. Opp rank is points allowed to his position, 1st fewest. Pts are Sleeper's points so far, Team adds the rows. Avg and Last miss five of your rules our stats lack. Which five"
 	);
 	assert.deepEqual(
 		parts.filter((p) => !p.phone).map((p) => p.text),
@@ -190,6 +191,72 @@ void test('the Matchup key says Proj, Pts and Game, the columns it draws', () =>
 		basisText(parts),
 		"Proj is this week's published projection, PPR nearest your rules, read Fri 9:00 pm. Pts are ESPN's team points, none by player. Game is each club's expected points, his first, and weather, read Fri 4:01 pm."
 	);
+});
+
+void test('the Lineup and the Matchup say when Final and the stats land while a row waits (Lane 85)', () => {
+	const waiting = line({ kickoff: '2026-10-18T17:00:00.000Z', played: true, game_state: 'final' });
+	const box = (lineup: boolean): string =>
+		basisText(
+			boxBasisParts(
+				{
+					projection: { readAt: READ, scoring: CLOSEST },
+					lines: [waiting],
+					byPlayer: true,
+					teamTotal: false,
+					host: 'sleeper',
+					lineup: lineup
+						? {
+								previousReadAt: null,
+								note: { basis_note: '', basis_note_link: '' },
+								rulesHref: '/league/1#uncounted'
+							}
+						: null
+				},
+				CENTRAL,
+				Date.parse('2026-10-19T16:00:00.000Z')
+			)
+		);
+	for (const text of [box(true), box(false)]) assert.ok(text.includes(KICKED_OFF_PART), text);
+	// Once his week's stats are in, nothing waits and the sentence goes.
+	const counted = line({
+		kickoff: '2026-10-18T17:00:00.000Z',
+		played: true,
+		game_state: 'final',
+		last_games: [{ week: 6, points: 12.4 }]
+	});
+	assert.equal(kickedOffPartAt([counted], Date.parse('2026-10-19T16:00:00.000Z')), null);
+});
+
+void test('the Lineup phone keeps its fact cells; the Final sentence waits for the desk while they show', () => {
+	const waiting = line({ kickoff: '2026-10-18T17:00:00.000Z', played: true, game_state: 'final' });
+	const lineup = {
+		previousReadAt: null,
+		note: { basis_note: '', basis_note_link: '' },
+		rulesHref: '/league/1#uncounted'
+	};
+	const at = (lines: PlayerLine[]) =>
+		boxBasisParts(
+			{
+				projection: { readAt: READ, scoring: CLOSEST },
+				lines,
+				byPlayer: true,
+				teamTotal: false,
+				host: 'sleeper',
+				lineup
+			},
+			CENTRAL,
+			NOW
+		);
+	// A row still to play draws its expected score: its sentence on the phone, the Final one at a desk.
+	const sunday = at([waiting, line()]);
+	const phone = sunday.filter((p) => p.phone).map((p) => p.text);
+	assert.ok(phone.includes(OPP_PART));
+	assert.ok(phone.some((t) => t.startsWith("Game is each club's expected points")));
+	assert.ok(!phone.includes(KICKED_OFF_PART));
+	assert.ok(sunday.some((p) => p.text === KICKED_OFF_PART && !p.phone));
+	// No row draws them (every game kicked off): the Final sentence is said on the phone too.
+	const tuesday = at([waiting]);
+	assert.ok(tuesday.some((p) => p.text === KICKED_OFF_PART && p.phone));
 });
 
 void test('the Final sentence says what holds, never a promise of within the hour (Lane 84)', () => {

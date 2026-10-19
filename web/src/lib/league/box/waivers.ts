@@ -15,6 +15,7 @@ import { hostWords } from '../names.ts';
 import {
 	deltaPart,
 	gamePart,
+	kickedOffPartAt,
 	OPP_PART,
 	projPart,
 	said,
@@ -42,6 +43,8 @@ export const WAIVERS = {
 	noPickup: 'No pickup beats your roster',
 	/** Beats for an add who fills a spot no one of the member's can play this week. */
 	openSpot: 'Open spot',
+	/** Why a card's drop is the one it names (review L-C). */
+	dropRule: 'Its drop costs least.',
 	clears: 'Clears'
 } as const;
 
@@ -52,9 +55,13 @@ export function shortName(name: string): string {
 
 /** Whom an add beats, as the Beats cell prints it. */
 export interface BeatsCell {
-	name: string;
-	starter: boolean;
-	gain: number;
+	/** The member's player he tops, or the open spot he fills; null where he tops no one, the season
+	 * Gain order's cell drawing its figure alone (review M-I). */
+	who: { name: string; starter: boolean } | null;
+	/** The week gain, or the season Gain while the pickups go in that order (unit 'season', review
+	 * M-A: the sorted column draws its own key, on every row). */
+	gain: number | null;
+	unit: 'week' | 'season';
 }
 
 /** One player free to add, as the table draws him. */
@@ -68,6 +75,10 @@ export interface PoolRow {
 	named: boolean;
 	/** "Clears Wed": the day a claim on him clears, where the platform says it; else null. */
 	clears: string | null;
+	/** The Beats sort's figure: in the week order a starter topped first, then the week gain, null with
+	 * no one beaten; in the API's season Gain order the row's season Gain, every row, so the default
+	 * sort keeps the API's order (review M-H). */
+	order: number | null;
 	source: WaiverRow;
 }
 
@@ -77,7 +88,9 @@ export interface PickupCard {
 	slot: string;
 	add: string;
 	drop: string | null;
-	weekGain: number;
+	/** This week's Proj gain, null once the add's or the drop's game has kicked off: the move is for
+	 * next week then (Lane 85). */
+	weekGain: number | null;
 	gain: number;
 	source: WaiverRow;
 }
@@ -88,7 +101,8 @@ export interface DropRow {
 	row: BoxRow;
 	rest: number | null;
 	gain: number;
-	weekGain: number;
+	/** This week's Proj gain, null once his or the add's game has kicked off (Lane 85). */
+	weekGain: number | null;
 	/** The shared status chip when this week's lineup starts him (the API's mark, Lane 66u), else null. */
 	starter: StatusView | null;
 	line: PlayerLine;
@@ -112,33 +126,60 @@ export function clearsWords(day: string | null): string | null {
 }
 
 /** Whom an add beats, as the API says it: his player, or the open spot he fills (a starting spot no
- * one of the member's can play this week). Nothing is inferred here (review 66f M3). */
-function beatsOf(source: WaiverRow): BeatsCell | null {
+ * one of the member's can play this week), and by how much this week. In the API's season Gain order
+ * (its one pickup rule, Lane 85) every row's cell draws its season Gain, the key the column sorts by,
+ * whomever he tops or none (review M-I). Nothing is inferred or re-ordered here (review 66f M3). */
+function beatsOf(source: WaiverRow, order: WaiverAdvice['pickup_order']): BeatsCell | null {
 	const { beats } = source;
-	if (beats === null) return null;
-	return {
-		name: beats.open_spot ? WAIVERS.openSpot : shortName(beats.name),
-		starter: beats.starter,
-		gain: beats.gain
-	};
+	const who =
+		beats === null
+			? null
+			: {
+					name: beats.open_spot ? WAIVERS.openSpot : shortName(beats.name),
+					starter: beats.starter
+				};
+	if (order === 'season_gain') return { who, gain: source.gain, unit: 'season' };
+	return beats === null ? null : { who, gain: beats.gain, unit: 'week' };
+}
+
+/** The Beats cell's figure: "+6.7" this week, "+0.3 Gain" in season order. */
+export function beatsWord(beats: Pick<BeatsCell, 'gain' | 'unit'>): string {
+	if (beats.gain === null) return BOX.none;
+	return beats.unit === 'season' ? `${gainWord(beats.gain)} ${SEASON.gain}` : gainWord(beats.gain);
+}
+
+/** The Beats sort's figure for a row (PoolRow.order). */
+function beatsOrder(
+	source: WaiverRow,
+	beats: BeatsCell | null,
+	order: WaiverAdvice['pickup_order']
+): number | null {
+	// The API's season Gain order is printed as sent: no starter first, no empty Beats last.
+	if (order === 'season_gain') return source.gain;
+	const gain = beats?.gain ?? null;
+	if (gain === null) return null;
+	// A starter topped (or an open spot filled) outranks any bench gain.
+	return (beats?.who?.starter === true ? STARTER_RANK : 0) + gain;
 }
 
 /** The table's rows from the answer: every add, whom he beats, the strip's tint on the ones it names. */
 export function poolRows(
-	advice: Pick<WaiverAdvice, 'rows' | 'pickups'>,
+	advice: Pick<WaiverAdvice, 'rows' | 'pickups' | 'pickup_order'>,
 	zone: string,
 	now: number
 ): PoolRow[] {
 	const named = new Set(advice.pickups.map(addKey));
 	return advice.rows.map((source) => {
 		const key = addKey(source);
+		const beats = beatsOf(source, advice.pickup_order);
 		return {
 			key,
 			row: { ...boxRow(source.add, '', zone, false, now), key },
 			rest: source.add.rest_of_season_per_game,
-			beats: beatsOf(source),
+			beats,
 			named: named.has(key),
 			clears: clearsWords(source.clears),
+			order: beatsOrder(source, beats, advice.pickup_order),
 			source
 		};
 	});
@@ -159,7 +200,8 @@ export function namesOnScreen(advice: Pick<WaiverAdvice, 'rows' | 'pickups' | 'r
 		.concat(advice.roster.map((l) => l.player.name));
 }
 
-/** The strip's cards in the API's order: each one's week gain is his over the cards before him. */
+/** The strip's cards in the API's order, each one's week gain his over the cards before him, or null
+ * where the API withholds it (its season Gain order). Never re-ordered here. */
 export function pickupCards(
 	advice: Pick<WaiverAdvice, 'rows' | 'pickups' | 'roster'>
 ): PickupCard[] {
@@ -202,9 +244,12 @@ export function gainWord(gain: number): string {
 	return shown === 0 ? fixed(0, 1) : signed(shown, 1);
 }
 
-/** "+6.7 Proj this week, +1.2 Gain a week". */
+/** "+6.7 Proj this week, +1.2 Gain a week", the Gain alone once the week figure is gone. */
 export function cardGains(card: Pick<PickupCard, 'weekGain' | 'gain'>): string {
-	return `${gainWord(card.weekGain)} ${WAIVERS.thisWeek}, ${gainWord(card.gain)} ${WAIVERS.gain}`;
+	const season = `${gainWord(card.gain)} ${WAIVERS.gain}`;
+	return card.weekGain === null
+		? season
+		: `${gainWord(card.weekGain)} ${WAIVERS.thisWeek}, ${season}`;
 }
 
 /** The strip's sum, every figure the API's (review 66f H1): "96.4" (the lineup's Proj with every
@@ -217,11 +262,14 @@ export interface PickupSum {
 
 export function pickupSum(
 	advice: Pick<WaiverAdvice, 'lineup_proj' | 'pickups_proj'>,
-	cards: number
+	cards: readonly Pick<PickupCard, 'weekGain'>[]
 ): PickupSum | null {
 	const { lineup_proj: without, pickups_proj: withAll } = advice;
-	if (without === null || withAll === null || cards === 0) return null;
-	const withWord = cards === 1 ? 'him' : cards === 2 ? 'both' : 'all three';
+	if (without === null || withAll === null || cards.length === 0) return null;
+	// The sum is this week's: none once any card's week figure is gone (Lane 85).
+	if (cards.some((c) => c.weekGain === null)) return null;
+	const n = cards.length;
+	const withWord = n === 1 ? 'him' : n === 2 ? 'both' : 'all three';
 	return {
 		figure: boxNumber(withAll),
 		words: `${BOX.proj} with ${withWord}, ${boxNumber(without)} without`,
@@ -258,6 +306,7 @@ export function dropRows(
 /** The week's gain said once over the drops when every drop gives the same: "+6.7"; else null and
  * each row says its own. */
 export function sameWeekGain(drops: readonly Pick<DropRow, 'weekGain'>[]): number | null {
+	// A drop with no week figure: none said over them, each row says its own (or none).
 	const first = drops[0];
 	if (first === undefined) return null;
 	return drops.every((d) => d.weekGain === first.weekGain) ? first.weekGain : null;
@@ -279,7 +328,12 @@ export function dropLead(weekGain: number | null): string {
 /** The row an add's claim names with the drop the member chose. */
 export function withDrop(source: WaiverRow, drop: DropRow | null): WaiverRow {
 	if (drop === null) return source;
-	return { ...source, drop: drop.line, gain: drop.gain, week_gain: drop.weekGain };
+	return {
+		...source,
+		drop: drop.line,
+		gain: drop.gain,
+		week_gain: drop.weekGain
+	};
 }
 
 /** The table's sortable columns. */
@@ -292,7 +346,8 @@ export interface Sort {
 	down: boolean;
 }
 
-/** The table's default: Beats, a starter he tops first, then by the gain. */
+/** The table's default: Beats, a starter he tops first, then by the gain; the API's own order in its
+ * season Gain order (beatsOrder). */
 export const DEFAULT_SORT: Sort = { key: 'beats', down: true };
 
 /** What a starter topped adds to the Beats sort, above any bench gain. */
@@ -319,9 +374,7 @@ function valueOf(r: PoolRow, key: SortKey): number | string | null {
 		case 'rest':
 			return r.rest;
 		case 'beats':
-			// A starter topped (or an open spot filled) outranks any bench gain.
-			if (r.beats === null) return null;
-			return (r.beats.starter ? STARTER_RANK : 0) + r.beats.gain;
+			return r.order;
 	}
 }
 
@@ -395,6 +448,12 @@ export function countWords(
 	return `${String(n)} free ${n === 1 ? 'agent' : 'agents'} we rank on ${hostWords(host)}, ${String(beating)} ${beating === 1 ? 'beats' : 'beat'} a player of yours`;
 }
 
+/** Whether the basis says why a card's drop is the one named: a card names one under the week's rule
+ * (the API's season order withholds its week figures, and its sentence says no drop). */
+function dropsSaid(pickups: readonly WaiverRow[]): boolean {
+	return pickups.some((p) => p.drop !== null && p.week_gain !== null);
+}
+
 /** The Waivers basis, one paragraph (Lane 66t): the pickup rule, Gain and the figure a game (the API's
  * words), Proj, its change at a desk, the Game cell's read, Opp rank, and the rules Avg and Last leave
  * out with the link to them. Beats and Open spot say themselves in their cells. */
@@ -408,7 +467,8 @@ export function waiverBasis(
 		| 'projection_read_at'
 		| 'projection_previous_read_at'
 		| 'projection_scoring'
-	>,
+	> &
+		Partial<Pick<WaiverAdvice, 'pickups'>>,
 	lines: readonly PlayerLine[],
 	rulesHref: string,
 	clock: Clock,
@@ -425,11 +485,17 @@ export function waiverBasis(
 		clock
 	);
 	return [
+		// The order's rule, the API's: the week's, or the season Gain once a pickup's game kicked off.
 		...said(advice.basis),
+		// Why a card's drop is the one it names, after the week's rule about a pickup and only where a
+		// card names one; at a desk only, the phone's eight lines cannot hold it (review L-C, L-G).
+		...said(dropsSaid(advice.pickups ?? []) ? WAIVERS.dropRule : null, false),
 		...said(advice.season_basis),
 		...said(proj),
 		...said(deltaPart(advice.projection_previous_read_at, clock), false),
-		...said(gamePart(lines, clock, now, 'read')),
+		// The phone's rows draw no expected score or weather (BoxLine phoneFacts): no read to say there.
+		...said(gamePart(lines, clock, now, 'full'), false),
+		...said(kickedOffPartAt(lines, now)),
 		...said(OPP_PART),
 		...uncountedParts(advice, rulesHref)
 	];

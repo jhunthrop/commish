@@ -14,6 +14,7 @@
 		bugFigures,
 		checkRoom,
 		gainWord,
+		heldCheck,
 		proposeVerb,
 		TRADES,
 		type CopiedTrade
@@ -145,7 +146,8 @@
 		const outcome = await asking.choose(input);
 		if (outcome.kind === 'overtaken') return;
 		reading = false;
-		if (outcome.kind === 'answer') answer = outcome.answer;
+		// No change this week on a trade moving a player whose game has kicked off (Lane 85).
+		if (outcome.kind === 'answer') answer = heldCheck(outcome.answer, now);
 		if (outcome.kind === 'failed') {
 			answer = null;
 			problem = outcome.sentence;

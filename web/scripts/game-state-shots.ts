@@ -10,6 +10,12 @@
 // Sunday, Final after), the schedule and the clubs (Rest of season strength, never the
 // preseason's). SET=standin (the site built from the stand-in run): Jaxson Dart's card, whose live week
 // replaces the run's week still to play, so his week 6 shows one state.
+// SET=standin on Monday and Tuesday also shoots the fixture league's screens (Lane 85): the League
+// page's score bugs never say "Next kickoff" for a game past its kickoff (Final or Kicked off, a time
+// only for Monday night's still to come), the Lineup offers no move on a player whose game has kicked
+// off and on Tuesday says the week is over with no verb, Waivers and Trades draw no "Proj
+// this week" on Tuesday, the Matchup's bug says Final on Tuesday, and each basis says when the stats
+// land.
 // Every screen: the basis says when Final and the stats land while a row waits on either, never claims
 // a week a Sunday player's GP does not reach, and stays within five rendered lines at 1440 and eight
 // at 390 (basis-lines.ts); the copy passes the one guard (copy-scan.ts); nothing scrolls sideways.
@@ -23,8 +29,13 @@ import { KICKED_OFF_PART } from '../src/lib/league/box/basis.ts';
 import { CARD } from '../src/lib/player/card.ts';
 import { STRENGTH_HEADS } from '../src/lib/run/strength-words.ts';
 import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
-import { BASIS_BUDGET, basisLines } from './basis-lines.ts';
+import { BASIS_BUDGET, WEATHER_FIGURE, basisLines, figureSentenceFaults } from './basis-lines.ts';
 import { copyFault, watchData } from './copy-scan.ts';
+import { FIXTURE_IDS } from './inseason-fixture/ids.ts';
+import { seasonOrderWords } from './inseason-fixture/waivers-at.ts';
+import { SEASON } from '../src/lib/league/box/season.ts';
+import { BOX } from '../src/lib/league/box/box.ts';
+import { shortName } from '../src/lib/league/box/waivers.ts';
 import {
 	FIXTURE_MONDAY_CLOCK,
 	FIXTURE_SUNDAY_CLOCK,
@@ -298,6 +309,188 @@ async function checkPage(page: Page, screen: Screen, width: number, at: string):
 	process.stdout.write(`${at}: basis ${String(lines)} lines\n`);
 }
 
+/** The fixture league's screens after its Sunday (Lane 85). */
+interface LeagueScreen {
+	name: string;
+	path: string;
+	ready: string;
+	check: (page: Page, at: string) => Promise<void>;
+}
+const LEAGUE = `/league/${FIXTURE_IDS.league}`;
+/** The Lineup's players whose games are still to come on Monday: Monday night's. */
+const MONDAY_NIGHT_MOVES = ['Kirk'];
+const WEEK_DONE = "Every starter's game is final, so week 6 is over.";
+
+async function checkBugs(page: Page, at: string): Promise<void> {
+	const bugs = await page.locator('main .bug').evaluateAll((els) =>
+		els.map((el) => ({
+			head: el.querySelector('.st')?.textContent.trim() ?? '',
+			words: el.querySelector('.sw')?.textContent.trim() ?? ''
+		}))
+	);
+	if (bugs.length === 0) fault(at, 'no score bug');
+	for (const bug of bugs) {
+		const past = bug.head === KICKED_OFF || bug.head === FINAL;
+		if (day === 'tuesday' && bug.head !== FINAL) fault(at, `a bug reads ${bug.head} on Tuesday`);
+		// Only Monday night's kickoff is still to come on Monday.
+		if (!past && !(day === 'monday' && bug.head.startsWith('Mon ')))
+			fault(at, `a bug reads "${bug.head} ${bug.words}", a kickoff already past`);
+	}
+}
+
+async function checkLineup(page: Page, at: string): Promise<void> {
+	const chips = await page.locator('main .swaps li:not(.idle)').allInnerTexts();
+	const moved = chips.filter((c) => !MONDAY_NIGHT_MOVES.some((name) => c.includes(name)));
+	if (moved.length > 0)
+		fault(at, `a move on a player whose game has kicked off: ${moved.join(', ')}`);
+	const text = await page.locator('main').innerText();
+	const verb = await page.getByText('Copy the lineup').filter({ visible: true }).count();
+	if (day === 'tuesday') {
+		if ((await page.locator('main .swaps li').count()) > 0)
+			fault(at, 'a change or an empty spot named on a finished week');
+		if (!text.includes(WEEK_DONE)) fault(at, 'the finished week is not said');
+		if (verb > 0) fault(at, 'a verb on a finished week');
+	} else if (text.includes(WEEK_DONE)) fault(at, 'the week is said over on Monday');
+}
+
+async function checkNoWeekFigure(page: Page, at: string, words: string): Promise<void> {
+	const text = await page.locator('main').innerText();
+	if (day === 'tuesday' && text.includes(words)) fault(at, `"${words}" on a finished week`);
+}
+
+/** Whether a visible row draws an expected score ("29 to 21.5") or weather. */
+async function drawsFacts(page: Page): Promise<boolean> {
+	const rows = await page
+		.locator('main table tbody tr')
+		.evaluateAll((trs) =>
+			trs.filter((tr) => tr.getClientRects().length > 0).map((tr) => (tr as HTMLElement).innerText)
+		);
+	return rows.some((r) => /\b\d+(\.5)? to \d+(\.5)?\b/.test(r) || WEATHER_FIGURE.test(r));
+}
+
+/** Waivers after the Sunday (Lane 85 fix rounds 4 and 5): once any row is past its kickoff (every row
+ * on Tuesday) the page is in the API's season Gain order: every row's Beats draws its season Gain, the
+ * key the order sorts by, never a week figure, and ends left of the Add button; the strip's pick is the
+ * table's top row, and the basis names the order. */
+async function checkWaivers(page: Page, at: string): Promise<void> {
+	await checkNoWeekFigure(page, at, 'Proj this week');
+	const rows = await page.locator('main table tbody tr').evaluateAll((trs) =>
+		trs
+			.filter((tr) => tr.getClientRects().length > 0 && tr.querySelector('.nm') !== null)
+			.map((tr) => ({
+				text: (tr as HTMLElement).innerText,
+				name: tr.querySelector<HTMLElement>('.nm')?.innerText.trim() ?? '',
+				named: tr.classList.contains('moved-in'),
+				gain: tr.querySelector('.beats .gain')?.textContent.trim() ?? null,
+				// The Beats text's right edge and the Add button's left (review M-J).
+				beatsRight: tr.querySelector('.beats .bt')?.getBoundingClientRect().right ?? null,
+				addLeft: tr.querySelector('.act .add')?.getBoundingClientRect().left ?? null
+			}))
+	);
+	const locked = rows.filter((r) => /\b(Final|Kicked off)\b/.test(r.text));
+	const toPlay = rows.filter((r) => !locked.includes(r) && !r.text.includes(BOX.bye));
+	if (day === 'tuesday' && toPlay.length > 0)
+		fault(at, `${String(toPlay.length)} rows still to play on a finished week`);
+	if (locked.length === 0) {
+		fault(at, 'no row past its kickoff');
+		return;
+	}
+	// In the season Gain order every row's Beats draws its season Gain, the key it is sorted by (M-I).
+	for (const r of rows) {
+		if (!r.gain?.endsWith(` ${SEASON.gain}`))
+			fault(at, `${r.name} draws ${r.gain ?? 'no figure'} in Beats, not its season Gain`);
+		if (r.beatsRight !== null && r.addLeft !== null && r.beatsRight > r.addLeft)
+			fault(at, `${r.name}'s Beats runs under the Add button`);
+	}
+	const top = rows[0];
+	const moves = await page.locator('main [data-strip="waivers"] .pickup .move').allInnerTexts();
+	if (
+		top === undefined ||
+		!top.named ||
+		moves.length !== 1 ||
+		!(moves[0] ?? '').includes(shortName(top.name))
+	)
+		fault(at, `the strip ${JSON.stringify(moves)} is not the top row ${top?.name ?? 'none'}`);
+	const basis = (await page.locator('main [data-basis]').allInnerTexts()).join(' ');
+	if (!basis.includes(seasonOrderWords(6)))
+		fault(at, 'the basis does not name the season Gain order');
+}
+
+async function checkMatchup(page: Page, at: string): Promise<void> {
+	const mid = ((await page.locator('main .bug .mid').textContent()) ?? '').replace(/\s+/g, ' ');
+	if (day === 'tuesday' && !mid.includes(FINAL)) fault(at, `the Matchup's bug reads "${mid}"`);
+	if (mid.includes('kickoff') && !(day === 'monday' && mid.includes('Mon ')))
+		fault(at, `the Matchup's bug reads "${mid}", a kickoff already past`);
+}
+
+const LEAGUE_SCREENS: readonly LeagueScreen[] = [
+	{ name: 'league', path: LEAGUE, ready: 'Every game this week, yours first.', check: checkBugs },
+	{ name: 'lineup', path: `${LEAGUE}/start`, ready: 'Week 6', check: checkLineup },
+	{ name: 'matchup', path: `${LEAGUE}/matchup`, ready: 'Week 6', check: checkMatchup },
+	{
+		name: 'waivers',
+		path: `${LEAGUE}/waivers`,
+		ready: 'Open Sleeper waivers',
+		check: checkWaivers
+	},
+	{
+		name: 'trades',
+		path: `${LEAGUE}/trades`,
+		ready: 'worth proposing',
+		check: (page, at) => checkNoWeekFigure(page, at, 'Proj for you this week')
+	}
+];
+
+for (const screen of set === 'standin' && day !== 'sunday' ? LEAGUE_SCREENS : []) {
+	for (const [theme, width] of SHOTS) {
+		const ctx = await context(theme, width, true);
+		const page = await ctx.newPage();
+		const at = `${day} ${screen.name} ${theme} ${String(width)}`;
+		try {
+			await page.goto(`${web}${screen.path}`);
+			await ready(page, screen.ready);
+			await screen.check(page, at);
+			// Every row waits on its stats on Monday and Tuesday: each box screen's basis says when they
+			// land (the League page's basis is its standings').
+			if (
+				screen.name !== 'league' &&
+				!(await page.locator('main').innerText()).includes(KICKED_OFF_PART) &&
+				// The Lineup phone keeps the fact cells while a row still draws them, the Final sentence
+				// then the desk's alone (Lane 85 fix round 2 ruling); on Tuesday none does.
+				!(screen.name === 'lineup' && width === 390 && (await drawsFacts(page)))
+			)
+				fault(at, 'the basis does not say when Final and the stats land');
+			if (
+				screen.name === 'lineup' &&
+				width === 390 &&
+				day === 'tuesday' &&
+				(await drawsFacts(page))
+			)
+				fault(at, 'a Tuesday row draws an expected score or weather');
+			const lines = await basisLines(page);
+			const budget = BASIS_BUDGET[width];
+			if (budget !== undefined && lines > budget)
+				fault(at, `basis ${String(lines)} lines, over ${String(budget)}`);
+			// Every figure drawn at this width keeps its sentence in the basis drawn here (review H2).
+			if (screen.name !== 'league')
+				for (const said of await figureSentenceFaults(page)) fault(at, said);
+			if (await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth))
+				fault(at, 'scrolls sideways');
+			const copy = await copyFault(page);
+			if (copy !== null) fault(at, copy);
+			process.stdout.write(`${at}: basis ${String(lines)} lines\n`);
+			const name = `${screen.name}-${theme}-${String(width)}`;
+			await page.screenshot({ path: new URL(`${name}-top.png`, out).pathname });
+			if (theme === 'dark')
+				await page.screenshot({ path: new URL(`${name}.png`, out).pathname, fullPage: true });
+		} catch (error) {
+			fault(at, error instanceof Error ? error.message : String(error));
+		} finally {
+			await ctx.close();
+		}
+	}
+}
+
 for (const screen of SCREENS.filter((s) => s.set === set)) {
 	for (const [theme, width] of SHOTS) {
 		const ctx = await context(theme, width, screen.signedIn);
@@ -318,6 +511,64 @@ for (const screen of SCREENS.filter((s) => s.set === set)) {
 		} finally {
 			await ctx.close();
 		}
+	}
+}
+/** A lagging read (Lane 85 fix round 2, H-A): on Sunday the API's kicked-off games are rewritten to
+ * upcoming on the wire, so only the page's clock is past their kickoffs. The one rule (lineState)
+ * still reads them kicked off: the board's rows say Kicked off and the basis says when Final and the
+ * stats land. The week tab's sections are held by the same rule in its unit test (order/week.test.ts),
+ * the stand-in run carrying no kickers' board to shoot. */
+const LAGGING: readonly {
+	set: 'contract' | 'standin';
+	name: string;
+	path: string;
+	ready: string;
+	section: boolean;
+}[] = [
+	{
+		set: 'contract',
+		name: 'board-rb',
+		path: '/board/ppr-12/rb',
+		ready: 'Our rest-of-season order',
+		section: false
+	}
+];
+for (const lag of day === 'sunday' ? LAGGING.filter((l) => l.set === set) : []) {
+	const ctx = await context('dark', 1440, true);
+	await ctx.route(`${API_ORIGIN}/**`, async (route) => {
+		const response = await route.fetch();
+		const body = (await response.text())
+			.replaceAll('"game_state":"kicked_off"', '"game_state":"upcoming"')
+			.replaceAll('"section":"kicked_off"', '"section":"to_play"');
+		await route.fulfill({ response, body });
+	});
+	const page = await ctx.newPage();
+	const at = `${day} lagging ${lag.name}`;
+	try {
+		await page.goto(`${web}${lag.path}`);
+		await ready(page, lag.ready);
+		const rows = await page.locator('main table tbody tr').allInnerTexts();
+		if (!rows.some((t) => t.includes(KICKED_OFF)))
+			fault(at, 'no row reads Kicked off on a lagging read');
+		if (lag.section) {
+			const misplaced = await page
+				.locator('main tbody.to_play tr')
+				.filter({ hasText: KICKED_OFF })
+				.count();
+			if (misplaced > 0)
+				fault(at, `${String(misplaced)} kicked-off rows under the to-play section`);
+		}
+		if (!(await page.locator('main').innerText()).includes(KICKED_OFF_PART))
+			fault(at, 'the basis does not say when Final and the stats land');
+		await page.screenshot({
+			path: new URL(`lagging-${lag.name}-dark-1440.png`, out).pathname,
+			fullPage: true
+		});
+		process.stdout.write(`${at}: holds\n`);
+	} catch (error) {
+		fault(at, error instanceof Error ? error.message : String(error));
+	} finally {
+		await ctx.close();
 	}
 }
 await browser.close();

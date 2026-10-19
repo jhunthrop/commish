@@ -25,7 +25,7 @@
 
 	let { team, platform, summary, lineupHref, benchHref, tagsOf, stamp = null }: Props = $props();
 
-	const sum = $derived(stripSum(summary.box));
+	const sum = $derived(stripSum(summary.box, summary.done));
 	const changes = $derived(summary.box.swaps.length);
 </script>
 
@@ -37,8 +37,8 @@
 	</div>
 	<div class="decide" class:set={changes === 0}>
 		<div class="what">
-			<b>{changesTitle(changes)}</b>
-			{#if sum}<span
+			<b>{changesTitle(changes, summary.done)}</b>
+			{#if summary.done !== null}<span>{summary.done}</span>{:else if sum}<span
 					>{sum.figure}
 					{sum.words}{#if sum.gain}, <em>{sum.gain}</em>{/if}</span
 				>{/if}

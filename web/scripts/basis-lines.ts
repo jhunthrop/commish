@@ -3,6 +3,7 @@
 // held to five at a desk and eight on a phone. The sweep's measurements (sweep-2026-10-19.md) are the
 // before each screen's count is printed beside.
 import type { Page } from 'playwright';
+import { BOX } from '../src/lib/league/box/box.ts';
 
 /** The widths the budget is measured at, and the most lines it allows at each. */
 export const BASIS_BUDGET: Readonly<Record<number, number>> = { 1440: 5, 390: 8 };
@@ -67,4 +68,41 @@ export function basisReport(
 				? `${screen} ${String(width)} basis draws ${String(lines)} lines, at most ${String(most)}`
 				: null
 	};
+}
+
+/** The weather a Game cell draws: a forecast's degrees or wind, or a venue's words from the one
+ * source a cell prints them from (box.ts BOX). */
+export const WEATHER_FIGURE = new RegExp(
+	[
+		String.raw`\d+°`,
+		String.raw`\d+ mph\b`,
+		...[BOX.indoors, BOX.outdoors, BOX.roofOpen, BOX.abroad]
+	].join('|')
+);
+
+/** A figure a row draws and the words of the sentence that says what it is (review H2). */
+const FIGURE_SENTENCES: readonly { figure: RegExp; sentence: string; what: string }[] = [
+	{ figure: /\bOpp \d+(st|nd|rd|th)\b/, sentence: 'Opp rank is', what: 'Opp rank' },
+	{ figure: /\b\d+(\.5)? to \d+(\.5)?\b/, sentence: 'expected points', what: 'the expected score' },
+	{ figure: /\bA game \d+\.\d\b/, sentence: 'A game is', what: 'A game' },
+	{ figure: WEATHER_FIGURE, sentence: 'weather', what: 'the weather' }
+];
+
+/** Every figure the page's rows draw where it is shot has its sentence in the basis drawn there: a
+ * phone basis may leave a sentence out only with its figure (review H2). */
+export async function figureSentenceFaults(page: Page): Promise<string[]> {
+	const { rows, basis } = await page.evaluate((selector: string) => {
+		const shown = (el: Element): boolean => el.getClientRects().length > 0;
+		const rows = [...document.querySelectorAll('main table tbody tr')]
+			.filter(shown)
+			.map((tr) => (tr as HTMLElement).innerText)
+			.join('\n');
+		const basis = [...document.querySelectorAll(selector)]
+			.map((el) => (el as HTMLElement).innerText)
+			.join(' ');
+		return { rows, basis };
+	}, PAGE_BASIS);
+	return FIGURE_SENTENCES.filter((f) => f.figure.test(rows) && !basis.includes(f.sentence)).map(
+		(f) => `draws ${f.what} with no sentence saying what it is`
+	);
 }

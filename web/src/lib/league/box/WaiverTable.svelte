@@ -8,6 +8,7 @@
 	import {
 		dropLead,
 		dropTitle,
+		beatsWord,
 		gainWord,
 		sameWeekGain,
 		WAIVERS,
@@ -103,6 +104,7 @@
 		{@const isOpen = open === entry.key}
 		<tbody>
 			<BoxLine
+				phoneFacts={false}
 				row={entry.row}
 				slotCell={false}
 				ptsCell={false}
@@ -113,14 +115,17 @@
 			>
 				{#snippet tail()}
 					{@render restCell(entry.rest)}
-					<td class="n beats" class:starter={entry.beats?.starter === true}>
+					<td class="n beats" class:starter={entry.beats?.who?.starter === true}>
 						{#if entry.beats}
 							<span class="bt"
-								><span class="who"
-									><b>{entry.beats.name}</b><span
-										>{entry.beats.starter ? WAIVERS.starter : WAIVERS.bench}</span
-									></span
-								><span class="gain">{gainWord(entry.beats.gain)}</span></span
+								>{#if entry.beats.who}<span class="who"
+										><b>{entry.beats.who.name}</b><span
+											>{entry.beats.who.starter ? WAIVERS.starter : WAIVERS.bench}</span
+										></span
+									>{:else if entry.row.game === 'bye'}<span class="none">{BOX.bye}</span>{/if}<span
+									class="gain"
+									class:held={entry.beats.gain === null}>{beatsWord(entry.beats)}</span
+								></span
 							>
 						{:else}<span class="none">{entry.row.game === 'bye' ? BOX.bye : BOX.none}</span>{/if}
 					</td>
@@ -157,6 +162,7 @@
 				{#each drops as drop, i (drop.key)}
 					{@const on = chosen === drop.key}
 					<BoxLine
+						phoneFacts={false}
 						row={drop.row}
 						slotCell={false}
 						ptsCell={false}
@@ -171,7 +177,8 @@
 								>{#if drop.starter}<span class="dmark"><StatusChip status={drop.starter} /></span
 									>{/if}<span class="dgain" class:up={drop.gain > 0} class:down={drop.gain < 0}
 									>{gainWord(drop.gain)}</span
-								>{#if week === null}<span class="dweek">{gainWord(drop.weekGain)} {BOX.proj}</span
+								>{#if week === null && drop.weekGain !== null}<span class="dweek"
+										>{gainWord(drop.weekGain)} {BOX.proj}</span
 									>{/if}</td
 							>
 							<td class="act"
@@ -369,6 +376,11 @@
 		color: var(--gain-ink);
 	}
 
+	/* A week gain withheld past kickoff is no gain: drawn as an empty figure, never in the gain ink. */
+	.starter .gain.held {
+		color: var(--ink-3);
+	}
+
 	.starter .who b {
 		color: var(--ink);
 	}
@@ -545,8 +557,11 @@
 			padding: 7px 4px;
 		}
 
+		/* The gain under whom he tops, so "+1.8 Gain" stays whole left of the Add button (review M-J). */
 		.bt {
-			gap: 4px;
+			flex-direction: column;
+			align-items: flex-end;
+			gap: 0;
 		}
 
 		.who b {

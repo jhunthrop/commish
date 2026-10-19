@@ -3879,6 +3879,13 @@ components:
             one sentence under the verb when we cannot open the host's page ("Make this change on Yahoo. We cannot
             open that page for you yet."), null when the url opens it
         moves: { $ref: "#/components/schemas/LineupMoves" }
+        week_done:
+          type: string
+          nullable: true
+          description: >-
+            the sentence once every starter's game this week is final ("Every starter's game is final, so week 6 is
+            over."): no change is left to make, so the screen says it in place of the changes and the verb;
+            null while any starter's game is still to come or under way, or absent from an older answer
     BoxStarter:
       type: object
       required: [slot, line]
@@ -3949,6 +3956,13 @@ components:
           format: date-time
           nullable: true
           description: the earliest kickoff still to come among both sides' starters, null when none is
+        to_play:
+          type: string
+          nullable: true
+          description: >-
+            while the game is playing, how many of both sides' starters with a game this week are still to play
+            ("5 of 18 starters to play"): a starter on bye, or with no game held, is neither to play nor played and
+            leaves the count; null otherwise, or absent from an older answer
         sides:
           type: array
           description: two sides, the drafter's first when the game is theirs; one for a team with no opponent
@@ -4057,6 +4071,12 @@ components:
           type: array
           description: each change, in the league's slot order
           items: { $ref: "#/components/schemas/WeekSwap" }
+        week_done:
+          type: string
+          nullable: true
+          description: >-
+            the Lineup's own week_done sentence (words.go WeekDoneWords) once every starter's game is final, which
+            the front door says in place of the changes and the verb; null before, or absent from an older answer
     WeekSwap:
       type: object
       required: [slot, in, out]
@@ -4121,7 +4141,13 @@ components:
         host_id: { type: string, description: "the member's player's host id, a line in the answer's roster; empty for the open spot" }
         name: { type: string, description: empty for the open spot }
         starter: { type: boolean, description: the player he tops starts in the lineup the advice sets this week }
-        gain: { type: number, format: double, description: "his Proj less that player's, as the screen prints them (tenths)" }
+        gain:
+          type: number
+          format: double
+          nullable: true
+          description: >-
+            his Proj less that player's, as the screen prints them (tenths); null while the pickups go in season Gain
+            order (a pickup's game has kicked off), when no week figure counts
     WaiverDrop:
       type: object
       description: one player of the member's an add could replace, with the lineup's gains after the swap
@@ -4134,7 +4160,11 @@ components:
             the lineup the Lineup screen sets this week starts him; the panel marks him, and the row's own drop is one
             only when the lineup stays full with the add in it (Lane 66u)
         gain: { type: number, format: double, description: "points over replacement a week to the lineup over the rest of the season, one decimal" }
-        week_gain: { type: number, format: double, description: "this week's Proj to the lineup the advice sets, one decimal" }
+        week_gain:
+          type: number
+          format: double
+          nullable: true
+          description: "this week's Proj to the lineup the advice sets, one decimal; null in season Gain order"
     WaiverRow:
       type: object
       required: [add, drop, gain, week_gain, starts, pickup, beats, drops, clears, sentence]
@@ -4148,9 +4178,11 @@ components:
         week_gain:
           type: number
           format: double
+          nullable: true
           description: >-
             this week's Proj of the lineup the advice sets (the Lineup screen's rule) with him in and the row's drop out,
-            less the lineup's without him, one decimal; 0 when he would not start
+            less the lineup's without him, one decimal; 0 when he would not start. Null on every row once any pickup's
+            add or drop has kicked off (gameStateAt): the pickups then go in season Gain order and no week figure counts
         starts: { type: boolean, description: "he starts this week in the lineup the advice sets with him in (the highest Proj after designations and byes)" }
         pickup:
           type: boolean
@@ -4321,9 +4353,18 @@ components:
         team: { type: string, nullable: true, description: the holding team's name when kind is team, else null }
     WaiverAdvice:
       type: object
-      required: [week, basis, season_basis, basis_note, basis_note_link, order_basis, refreshed, read_at, projection_read_at, projection_previous_read_at, projection_scoring, lineup_proj, pickups_proj, pickups, rows, roster, host_waivers_url, host_note, moves]
+      required: [week, basis, pickup_order, season_basis, basis_note, basis_note_link, order_basis, refreshed, read_at, projection_read_at, projection_previous_read_at, projection_scoring, lineup_proj, pickups_proj, pickups, rows, roster, host_waivers_url, host_note, moves]
       properties:
         week: { type: integer }
+        pickup_order:
+          type: string
+          enum: [week, season_gain]
+          description: >-
+            the order the page's rows and strip are in, decided over the full page's rows and the answer's own by each
+            row's game state (gameStateAt): week (the strip by this week's Proj gain, the rows as the search ranks them)
+            while no row's add or drop has kicked off; season_gain once any has (the rows by the season Gain, every week
+            figure null, the strip the first row worth making); a page narrowed to one position or focused on a player
+            takes season_gain whenever the full page does
         lineup_proj:
           type: number
           format: double
@@ -4374,7 +4415,7 @@ components:
           items: { $ref: "#/components/schemas/WaiverRow" }
         rows:
           type: array
-          description: positive gains first by gain, then the rest by points over replacement, at most 60
+          description: positive gains first by gain, then the rest by points over replacement, at most 60; by the season Gain alone in the season_gain order
           items: { $ref: "#/components/schemas/WaiverRow" }
         roster:
           type: array

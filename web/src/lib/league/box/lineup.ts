@@ -7,7 +7,8 @@ import { lastName } from '#lib/format/draft.ts';
 import { designationWord } from '#lib/format/designation.ts';
 import { fixed } from '#lib/format/number.ts';
 import type { LeagueHost } from '../api.ts';
-import type { LineupAdvice, LineupSlot } from '../inseason/api.ts';
+import type { LineupAdvice, LineupSlot, PlayerLine } from '../inseason/api.ts';
+import { pastKickoff } from './kickoff.ts';
 import { hostWords } from '../names.ts';
 import { satIds } from '../inseason/words.ts';
 import {
@@ -76,7 +77,8 @@ export const LINEUP = {
 	setItOn: 'Set it on',
 	copyFailed: 'This browser would not copy it.',
 	noOneCanPlay: 'no one on your roster can play this week',
-	noOneHere: 'No one on your roster can play here this week'
+	noOneHere: 'No one on your roster can play here this week',
+	heldEmpty: 'has kicked off, the spot stays empty'
 } as const;
 
 /** The Lineup's bench, as a link from another page opens it (the League page's bench count). */
@@ -89,8 +91,10 @@ export function shortName(name: string): string {
 
 const NUMBER_WORDS = ['No', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
 
-/** "Three changes", "One change", "12 changes", or "Your lineup is set". */
-export function changesTitle(n: number): string {
+/** "Three changes", "One change", "12 changes", or "Your lineup is set"; "Final" once the API says
+ * the week is over (its week_done sentence, said beside it). */
+export function changesTitle(n: number, done: string | null = null): string {
+	if (done !== null) return BOX.final;
 	if (n === 0) return LINEUP.set;
 	const word = NUMBER_WORDS[n] ?? String(n);
 	return `${word} ${n === 1 ? 'change' : 'changes'}`;
@@ -105,9 +109,11 @@ export interface StripSum {
 }
 
 export function stripSum(
-	box: Pick<LineupBox, 'totals' | 'asSet' | 'gain' | 'swaps'>
+	box: Pick<LineupBox, 'totals' | 'asSet' | 'gain' | 'swaps'>,
+	done: string | null = null
 ): StripSum | null {
-	if (box.totals.proj === null) return null;
+	// A finished week has no Proj left to add: the API's sentence stands in the sum's place.
+	if (box.totals.proj === null || done !== null) return null;
 	const figure = boxNumber(box.totals.proj);
 	if (box.swaps.length === 0) return { figure, words: `${BOX.proj} as set`, gain: null };
 	const set = box.asSet === null ? '' : `, ${boxNumber(box.asSet)} as set`;
@@ -179,6 +185,86 @@ export function idleWords(slot: string): string {
 	return `${slot}: ${LINEUP.noOneCanPlay}`;
 }
 
+/** A player whose game is past its kickoff by the API's state (Lane 80): the platform takes no move
+ * on him, so no screen draws one (Lane 85). A bye is no game. */
+export function locked(line: PlayerLine, now: number): boolean {
+	return pastKickoff(line.facts, now);
+}
+
+/** A spot the advice would fill that stays empty because its player has kicked off. */
+export interface HeldSpot {
+	slot: LineupSlot['slot'];
+	name: string;
+}
+
+/** The advice after heldLineup: the spots its undone changes leave empty, said apart from the spots no
+ * one can play (review L2). */
+export interface Held {
+	held_empty: HeldSpot[];
+}
+
+/** The advice with every change on a locked row undone (Lane 85): the API's engine already holds a
+ * kicked-off starter where the platform has him (engine.go Lineup), and the web refuses to draw a move
+ * mark on such a row whatever it is sent. The platform's starter keeps the spot, the advised starter
+ * goes back to the bench, each player placed once however the changes chain (review L1); a change
+ * into an empty spot leaves it empty, held_empty saying whose game kicked off. The answer as it came
+ * when nothing is undone. */
+export function heldLineup<T extends Pick<LineupAdvice, 'slots' | 'bench' | 'empty_slots' | 'set'>>(
+	advice: T,
+	now: number
+): T & Held {
+	const undone = undoneSlots(advice.slots, now);
+	if (undone.length === 0) return { ...advice, held_empty: [] };
+	const slots = advice.slots.flatMap((s): LineupSlot[] => {
+		if (!undone.includes(s)) return [s];
+		return s.host === null ? [] : [{ ...s, ours: s.host, changed: false, sentence: null }];
+	});
+	const placed = new Set(slots.map((s) => s.ours.player.host_id));
+	const seen = new Set<string>();
+	const bench = [...advice.bench, ...undone.map((s) => s.ours)].filter((l) => {
+		const id = l.player.host_id;
+		if (placed.has(id) || seen.has(id)) return false;
+		seen.add(id);
+		return true;
+	});
+	return {
+		...advice,
+		slots,
+		bench,
+		held_empty: undone.flatMap((s) =>
+			s.host === null ? [{ slot: s.slot, name: shortName(s.ours.player.name) }] : []
+		),
+		set: slots.every((s) => !s.changed)
+	};
+}
+
+/** The changes heldLineup undoes: each on a locked row, then each that moves a player an undone change
+ * hands back to his own spot, until none is left (review L-A: a partly locked chain places him once). */
+function undoneSlots(slots: readonly LineupSlot[], now: number): LineupSlot[] {
+	const undone = new Set(
+		slots.filter(
+			(s) => s.changed && (locked(s.ours, now) || (s.host !== null && locked(s.host, now)))
+		)
+	);
+	for (let grew = true; grew;) {
+		grew = false;
+		const returned = new Set([...undone].flatMap((s) => (s.host ? [s.host.player.host_id] : [])));
+		for (const s of slots) {
+			if (s.changed && !undone.has(s) && returned.has(s.ours.player.host_id)) {
+				undone.add(s);
+				grew = true;
+			}
+		}
+	}
+	return slots.filter((s) => undone.has(s));
+}
+
+/** The strip's line for a spot an undone change leaves empty: "QB: Dart has kicked off, the spot
+ * stays empty". */
+export function heldWords(spot: HeldSpot): string {
+	return `${slotWord(spot.slot)}: ${spot.name} ${LINEUP.heldEmpty}`;
+}
+
 /** One starting spot: the platform's slot and our row for it. */
 interface Placed {
 	slot: LineupSlot;
@@ -209,7 +295,8 @@ export function lineupBox(
 		| 'team_points'
 		| 'projection_read_at'
 		| 'week'
-	>,
+	> &
+		Partial<Held>,
 	zone: string,
 	now: number
 ): LineupBox {
@@ -262,10 +349,13 @@ export function lineupBox(
 		reserve: advice.reserve.map((line) => boxRow(line, '', zone, false, now)),
 		swaps,
 		idle: [
-			...placed.flatMap((p) => (p.slot.no_one_can_play ? [p.row.slot] : [])),
-			...advice.empty_slots.map(slotWord)
-		].map(idleWords),
-		empty: advice.empty_slots.map(slotWord),
+			...[
+				...placed.flatMap((p) => (p.slot.no_one_can_play ? [p.row.slot] : [])),
+				...advice.empty_slots.map(slotWord)
+			].map(idleWords),
+			...(advice.held_empty ?? []).map(heldWords)
+		],
+		empty: [...advice.empty_slots, ...(advice.held_empty ?? []).map((h) => h.slot)].map(slotWord),
 		totals: {
 			proj,
 			pts: totalsPts(ours, advice.player_points, advice.team_points),

@@ -3189,6 +3189,8 @@ export interface components {
 			/** @description one sentence under the verb when we cannot open the host's page ("Make this change on Yahoo. We cannot open that page for you yet."), null when the url opens it */
 			host_note: string | null;
 			moves: components['schemas']['LineupMoves'];
+			/** @description the sentence once every starter's game this week is final ("Every starter's game is final, so week 6 is over."): no change is left to make, so the screen says it in place of the changes and the verb; null while any starter's game is still to come or under way, or absent from an older answer */
+			week_done?: string | null;
 		};
 		BoxStarter: {
 			/** @enum {string} */
@@ -3243,6 +3245,8 @@ export interface components {
 			 * @description the earliest kickoff still to come among both sides' starters, null when none is
 			 */
 			next_kickoff: string | null;
+			/** @description while the game is playing, how many of both sides' starters with a game this week are still to play ("5 of 18 starters to play"): a starter on bye, or with no game held, is neither to play nor played and leaves the count; null otherwise, or absent from an older answer */
+			to_play?: string | null;
 			/** @description two sides, the drafter's first when the game is theirs; one for a team with no opponent */
 			sides: components['schemas']['ScoreboardSide'][];
 		};
@@ -3328,6 +3332,8 @@ export interface components {
 			gain: number | null;
 			/** @description each change, in the league's slot order */
 			swaps: components['schemas']['WeekSwap'][];
+			/** @description the Lineup's own week_done sentence (words.go WeekDoneWords) once every starter's game is final, which the front door says in place of the changes and the verb; null before, or absent from an older answer */
+			week_done?: string | null;
 		};
 		WeekSwap: {
 			/** @enum {string} */
@@ -3379,9 +3385,9 @@ export interface components {
 			starter: boolean;
 			/**
 			 * Format: double
-			 * @description his Proj less that player's, as the screen prints them (tenths)
+			 * @description his Proj less that player's, as the screen prints them (tenths); null while the pickups go in season Gain order (a pickup's game has kicked off), when no week figure counts
 			 */
-			gain: number;
+			gain: number | null;
 		};
 		/** @description one player of the member's an add could replace, with the lineup's gains after the swap */
 		WaiverDrop: {
@@ -3396,9 +3402,9 @@ export interface components {
 			gain: number;
 			/**
 			 * Format: double
-			 * @description this week's Proj to the lineup the advice sets, one decimal
+			 * @description this week's Proj to the lineup the advice sets, one decimal; null in season Gain order
 			 */
-			week_gain: number;
+			week_gain: number | null;
 		};
 		WaiverRow: {
 			add: components['schemas']['PlayerLine'];
@@ -3411,9 +3417,9 @@ export interface components {
 			gain: number;
 			/**
 			 * Format: double
-			 * @description this week's Proj of the lineup the advice sets (the Lineup screen's rule) with him in and the row's drop out, less the lineup's without him, one decimal; 0 when he would not start
+			 * @description this week's Proj of the lineup the advice sets (the Lineup screen's rule) with him in and the row's drop out, less the lineup's without him, one decimal; 0 when he would not start. Null on every row once any pickup's add or drop has kicked off (gameStateAt): the pickups then go in season Gain order and no week figure counts
 			 */
-			week_gain: number;
+			week_gain: number | null;
 			/** @description he starts this week in the lineup the advice sets with him in (the highest Proj after designations and byes) */
 			starts: boolean;
 			/** @description a pickup worth making: he starts this week, the lineup's Proj rises, and the gain over the rest of the season is not below 0 */
@@ -3540,6 +3546,11 @@ export interface components {
 		WaiverAdvice: {
 			week: number;
 			/**
+			 * @description the order the page's rows and strip are in, decided over the full page's rows and the answer's own by each row's game state (gameStateAt): week (the strip by this week's Proj gain, the rows as the search ranks them) while no row's add or drop has kicked off; season_gain once any has (the rows by the season Gain, every week figure null, the strip the first row worth making); a page narrowed to one position or focused on a player takes season_gain whenever the full page does
+			 * @enum {string}
+			 */
+			pickup_order: 'week' | 'season_gain';
+			/**
 			 * Format: double
 			 * @description this week's Proj of the lineup the advice sets with no add (the Lineup screen's Totals), one decimal, the base every week_gain counts from; null before the week's projection is read
 			 */
@@ -3575,7 +3586,7 @@ export interface components {
 			pickups_proj: number | null;
 			/** @description the pickups worth making, chosen as a set from every add we rank, at most 3: each measured against the lineup with the ones before it made, kept only while he still starts and raises the Proj, no two taking the same player of the member's (topped or dropped); each one's week_gain is his over the ones before (the strip's cards); empty when no pickup beats the roster */
 			pickups: components['schemas']['WaiverRow'][];
-			/** @description positive gains first by gain, then the rest by points over replacement, at most 60 */
+			/** @description positive gains first by gain, then the rest by points over replacement, at most 60; by the season Gain alone in the season_gain order */
 			rows: components['schemas']['WaiverRow'][];
 			/** @description the member's active roster (injured reserve and taxi spots left out), the lines beats and drops name */
 			roster: components['schemas']['PlayerLine'][];

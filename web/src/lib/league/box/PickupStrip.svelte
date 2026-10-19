@@ -22,7 +22,7 @@
 	}
 
 	let { week, cards, sum: figures, chosen, onchoose, verb, foot }: Props = $props();
-	const sum = $derived(pickupSum(figures, cards.length));
+	const sum = $derived(pickupSum(figures, cards));
 </script>
 
 <div class="strip" data-strip="waivers">

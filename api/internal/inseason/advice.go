@@ -498,7 +498,30 @@ func (a *advisor) Lineup() (apitypes.LineupAdvice, bool) {
 	for _, i := range bench {
 		out.Bench = append(out.Bench, people[i].line)
 	}
+	out.WeekDone = weekDone(out.Slots, out.Week)
 	return out, true
+}
+
+// weekDone is the week's sentence once every starter with a game has it
+// final by the one state (gameStateAt), a bye starter aside; nil while
+// any is still to come or under way, or with no starter who has a game.
+func weekDone(slots []apitypes.LineupSlot, week int) *string {
+	games := 0
+	for _, s := range slots {
+		f := s.Ours.Facts
+		if f.Bye || f.Kickoff == nil {
+			continue
+		}
+		if f.GameState == nil || *f.GameState != apitypes.GameStateFinal {
+			return nil
+		}
+		games++
+	}
+	if games == 0 {
+		return nil
+	}
+	words := WeekDoneWords(week)
+	return &words
 }
 
 // starts reports whether the league starts a position in any slot.
@@ -576,44 +599,84 @@ func (a *advisor) waiverRun(position draft.Position) (waiverRun, bool) {
 		w: &Writer{Basis: a.basis, Now: a.now}, moves: Waivers(a.config, a.weeks, squad, cands)}, true
 }
 
-// Pickups is the Waivers strip's chosen set alone, without the table's
-// rows: what the front door's pickup chip reads.
+// Pickups is the Waivers strip's chosen set alone: what the front door's
+// pickup chip reads, by the one pickup rule (the full page's own strip).
 func (a *advisor) Pickups() ([]apitypes.WaiverRow, bool) {
-	run, ok := a.waiverRun("")
+	out, ok := a.Waivers("", "")
 	if !ok {
 		return nil, false
 	}
-	rows, _ := a.strip(run.w, run.week, run.mine, run.pool, run.moves, run.clears)
-	return rows, true
+	return out.Pickups, true
 }
 
 // Waivers is the waiver page (§5). asked, a board id or "", is a player a
 // link named (?player=): his row is kept past the page's cut, so the order's
-// add for a free player deep in the pool lands on him (review 66j N2).
+// add for a free player deep in the pool lands on him (review 66j N2). The
+// page's pickup order is decided over the full page's rows and its own (pageOrder).
 func (a *advisor) Waivers(position draft.Position, asked string) (apitypes.WaiverAdvice, bool) {
 	run, ok := a.waiverRun(position)
 	if !ok {
 		return apitypes.WaiverAdvice{}, false
 	}
-	mine, pool := run.mine, run.pool
-	h := a.header()
-	un := UncountedOf(a.settings, a.season.Carries)
-	out := apitypes.WaiverAdvice{Week: h.week, Basis: WaiversBasis, SeasonBasis: withPerGame(a.Board, WaiverSeasonBasis(a.basis, a.weeks), mine, pool),
-		BasisNote: un.Note, BasisNoteLink: un.Link, OrderBasis: h.basis, Refreshed: h.refreshed, ReadAt: h.readAt,
-		ProjectionReadAt: a.projectionReadAt(), ProjectionPreviousReadAt: a.projectionPreviousReadAt(), ProjectionScoring: projectionScoring(a.settings, a.preset),
-		Pickups: []apitypes.WaiverRow{}, Rows: []apitypes.WaiverRow{}, Roster: lines(mine, indexes(len(mine))), Moves: CopyOnlyClaims(a.Snap.Ref.Host)}
-	out.HostWaiversUrl, out.HostNote = a.host(WaiversPage)
-	for _, move := range pageMoves(run.moves, pool, asked, MaxWaiverRows) {
-		out.Rows = append(out.Rows, waiverRow(run.w, run.week, mine, pool[move.Add], move, run.clears))
-	}
+	shown := pageMoves(run.moves, run.pool, asked, MaxWaiverRows)
 	// The strip is chosen from every add we rank, before the rows' cut.
-	var proj float64
-	out.Pickups, proj = a.strip(run.w, run.week, mine, pool, run.moves, run.clears)
+	strip, proj := run.stripMoves()
+	order, ok := a.pageOrder(run, position, asked, run.orderOf(shown, strip))
+	if !ok {
+		return apitypes.WaiverAdvice{}, false
+	}
+	out := a.waiverPage(run)
+	for _, move := range shown {
+		row := waiverRow(run.w, run.week, run.mine, run.pool[move.Add], move, run.clears)
+		// A row past its kickoff has no week figure, whichever the order (Lane 85 fix round 4).
+		if run.pastKickoff(move) {
+			row = withheldWeek(row)
+		}
+		out.Rows = append(out.Rows, row)
+	}
+	if order == seasonOrder {
+		return inSeasonOrder(out, shown), true
+	}
+	out.Pickups = run.strip(strip)
 	if out.ProjectionReadAt != nil {
 		base := run.week.base.proj
 		out.LineupProj, out.PickupsProj = &base, &proj
 	}
 	return out, true
+}
+
+// pageOrder is an answer's pickup order over the union of the full
+// page's rows (read whole, no player asked) and the answer's own (review
+// L-L, L-M): a page narrowed to one position or focused on a player takes
+// the season order whenever the full page does (M-G), so the front door's
+// chip and the page agree, and also when a row only it holds is past its
+// kickoff, so no answer mixes withheld rows with live ones.
+func (a *advisor) pageOrder(run waiverRun, position draft.Position, asked string, own apitypes.WaiverAdvicePickupOrder) (apitypes.WaiverAdvicePickupOrder, bool) {
+	if own == seasonOrder || (position == "" && asked == "") {
+		return own, true
+	}
+	full := run
+	if position != "" {
+		var ok bool
+		if full, ok = a.waiverRun(""); !ok {
+			return "", false
+		}
+	}
+	strip, _ := full.stripMoves()
+	return full.orderOf(pageMoves(full.moves, full.pool, "", MaxWaiverRows), strip), true
+}
+
+// waiverPage is the waiver page's frame with no row yet, in the week order.
+func (a *advisor) waiverPage(run waiverRun) apitypes.WaiverAdvice {
+	h := a.header()
+	un := UncountedOf(a.settings, a.season.Carries)
+	out := apitypes.WaiverAdvice{Week: h.week, Basis: WaiversBasis, PickupOrder: weekOrder,
+		SeasonBasis: withPerGame(a.Board, WaiverSeasonBasis(a.basis, a.weeks), run.mine, run.pool),
+		BasisNote:   un.Note, BasisNoteLink: un.Link, OrderBasis: h.basis, Refreshed: h.refreshed, ReadAt: h.readAt,
+		ProjectionReadAt: a.projectionReadAt(), ProjectionPreviousReadAt: a.projectionPreviousReadAt(), ProjectionScoring: projectionScoring(a.settings, a.preset),
+		Pickups: []apitypes.WaiverRow{}, Rows: []apitypes.WaiverRow{}, Roster: lines(run.mine, indexes(len(run.mine))), Moves: CopyOnlyClaims(a.Snap.Ref.Host)}
+	out.HostWaiversUrl, out.HostNote = a.host(WaiversPage)
+	return out
 }
 
 // pageMoves is the moves a page carries: the first cut, and past it only
@@ -641,9 +704,11 @@ func waiverRow(w *Writer, week *pickupWeek, mine []person, add person, move Waiv
 	row := apitypes.WaiverRow{Add: add.line, Gain: roundTenth(move.Gain), Beats: week.beats(add.cand, mine), Drops: []apitypes.WaiverDrop{}}
 	if !move.NoDrop {
 		var open bool
-		row.WeekGain, row.Starts, open = week.with(add.cand, move.Drop)
+		var weekGain float64
+		weekGain, row.Starts, open = week.with(add.cand, move.Drop)
+		row.WeekGain = &weekGain
 		if open {
-			row.Beats = openSpot(row.WeekGain)
+			row.Beats = openSpot(weekGain)
 		}
 	}
 	var drop *Line
@@ -653,7 +718,7 @@ func waiverRow(w *Writer, week *pickupWeek, mine []person, add person, move Waiv
 	}
 	for _, d := range move.Drops {
 		weekGain, _, _ := week.with(add.cand, d.At)
-		row.Drops = append(row.Drops, apitypes.WaiverDrop{HostId: mine[d.At].cand.ID, Gain: roundTenth(d.Gain), WeekGain: weekGain,
+		row.Drops = append(row.Drops, apitypes.WaiverDrop{HostId: mine[d.At].cand.ID, Gain: roundTenth(d.Gain), WeekGain: &weekGain,
 			StartsThisWeek: d.StartsThisWeek})
 	}
 	row.Pickup = !move.NoDrop && isPickup(row)

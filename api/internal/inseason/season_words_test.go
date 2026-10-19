@@ -24,7 +24,7 @@ func TestGainAndPerGameSaidOnce(t *testing.T) {
 		if n := strings.Count(basis, PerGameBasis()); n != 1 {
 			t.Errorf("%s says what a game is %d times: %q", name, n, basis)
 		}
-		if n := strings.Count(basis, "Gain is the change in "); n != 1 {
+		if n := strings.Count(basis, " change in points over replacement"); n != 1 {
 			t.Errorf("%s says what Gain is %d times: %q", name, n, basis)
 		}
 		if strings.Contains(basis, "Points a game are") || strings.Contains(basis, "Rest of season is") {

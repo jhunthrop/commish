@@ -114,6 +114,7 @@
 	<tr class="grp"><th colspan={COLUMNS} scope="rowgroup">{label}</th></tr>
 	{#each side as entry (entry.line.player.host_id)}
 		<BoxLine
+			phoneFacts={false}
 			row={boxRow(entry.line, entry.side, zone, false, now)}
 			move={entry.move}
 			evidence

@@ -57,6 +57,11 @@
 		/** The trade builder's tick (Lane 66g), first in the row. */
 		pick?: BoxPick | null;
 		/** A narrow phone cell prints his short form, "A. Rodgers", never a cut surname (rereview N2). */
+		/** The phone's game line draws the expected score and weather (BoxPlayer phoneFacts). */
+		phoneFacts?: boolean;
+		/** The phone's evidence line leads with Opp rank (false in the trade builder, whose phone basis
+		 * cannot hold its sentence: a figure drawn keeps its sentence, review H2). */
+		phoneOpp?: boolean;
 		shortOnPhone?: boolean;
 	}
 
@@ -78,7 +83,9 @@
 		season = false,
 		compact = false,
 		pick = null,
-		shortOnPhone = false
+		shortOnPhone = false,
+		phoneFacts = true,
+		phoneOpp = true
 	}: Props = $props();
 	const picked = $derived(pick?.state === 'on');
 	const rank = $derived(row.evidence.oppRank);
@@ -98,7 +105,7 @@
 {#snippet seasonLine()}
 	<!-- The separators are expressions, so the template's own line breaks add no space (review L7). -->
 	<span class="phone-ev"
-		>{#if rank !== null}<span class="pair"
+		>{#if rank !== null && phoneOpp}<span class="pair"
 				>{oppLead}<span class="rk {easeOf(rank, row.evidence.oppOf)}">{oppRankWord(rank)}</span
 				></span
 			>{SEPARATOR}{/if}{#each seasonPairs as pair, i (i)}{#if i > 0}{SEPARATOR}{/if}<span
@@ -147,7 +154,7 @@
 		>
 	{/if}
 	<td class="player">
-		<BoxPlayer {row} {tags} {shortOnPhone} {compact} {clears}
+		<BoxPlayer {row} {tags} {shortOnPhone} {compact} {clears} {phoneFacts}
 			>{#if evidence}{@render seasonLine()}{/if}</BoxPlayer
 		>
 	</td>

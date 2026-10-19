@@ -72,14 +72,6 @@ export function gameStateOf(game: StatedGame): GameState | null {
 	return game.game_state ?? null;
 }
 
-/** Whether the game is still to be played: upcoming by its state; on a read with no state, the rule
- * before it, not final and not yet kicked off at `now`. */
-export function toBePlayed(game: StatedGame, now: number): boolean {
-	const state = gameStateOf(game);
-	if (state !== null) return state === 'upcoming';
-	return !game.played && (game.kickoff === null || Date.parse(game.kickoff) > now);
-}
-
 /** Where the game is played, as the end of the weather sentence or alone. */
 function placeWords(c: GameConditions): string {
 	return c.roof?.kind === 'retractable' ? 'under a retractable roof' : 'outdoors';

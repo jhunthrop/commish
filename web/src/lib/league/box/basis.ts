@@ -4,12 +4,12 @@
  * game, the rules our stats lack) with these and hides the ones about columns its phone does not
  * draw (BasisPart.phone). Pure, tested in basis.test.ts. */
 import { weekdayTime, zoneWord } from '#lib/format/clock.ts';
-import { gameStateOf } from '#lib/format/game-facts.ts';
+import { lineState, toPlay } from './kickoff.ts';
 import type { BasisPart } from '#lib/run/board-basis.ts';
 import type { LeagueHost } from '../api.ts';
 import type { PlayerLine, ProjectionScoring } from '../inseason/api.ts';
 import { hostWords } from '../names.ts';
-import { BOX, FORMAT_WORDS, factsReadAt } from './box.ts';
+import { BOX, FORMAT_WORDS, expectedWords, factsReadAt, weatherCell } from './box.ts';
 
 export type { BasisPart };
 
@@ -83,11 +83,11 @@ export const OPP_PART = `${BOX.oppRank} is points allowed to his position, 1st f
 export const KICKED_OFF_PART = `${BOX.final} lands the hour after a game ends, its stats by Wednesday.`;
 
 /** KICKED_OFF_PART where a row's game has kicked off with no final yet, or is final with the week's
- * stats not in his games yet; else null. */
-export function kickedOffPart(lines: readonly PlayerLine[]): string | null {
+ * stats not in his games yet, each by the one game-state rule at the page's clock (kickoff.ts
+ * lineState), on every screen that asks; else null. */
+export function kickedOffPartAt(lines: readonly PlayerLine[], now: number): string | null {
 	const waiting = lines.some(({ facts }) => {
-		if (facts.bye) return false;
-		const state = gameStateOf(facts);
+		const state = lineState(facts, now);
 		return (
 			state === 'kicked_off' ||
 			(state === 'final' && !facts.last_games.some((game) => game.week === facts.week))
@@ -113,7 +113,7 @@ export function ptsPart(byPlayer: boolean, host: LeagueHost, team: TeamFigure): 
 	if (!byPlayer) return `${BOX.pts} are ${platform}'s team points, none by player.`;
 	return team === 'platform'
 		? `${BOX.pts} are ${platform}'s points by player so far, each to a tenth, and Team is ${platform}'s score.`
-		: `${BOX.pts} are ${platform}'s points by player so far, and Team adds the rows.`;
+		: `${BOX.pts} are ${platform}'s points so far, Team adds the rows.`;
 }
 
 /** The API's count of the rules our stats lack, then its link to the league's Settings, which lists
@@ -138,6 +138,14 @@ export function said(text: string | null, phone = true): BasisPart[] {
  * sentence (BasisBlock draws the same). */
 export function basisText(parts: readonly BasisPart[]): string {
 	return parts.map((p, i) => (p.href && i < parts.length - 1 ? `${p.text}.` : p.text)).join(' ');
+}
+
+/** Whether any row still to be played draws the Game cell's expected score or weather. */
+function drawsFacts(lines: readonly PlayerLine[], now: number): boolean {
+	return lines.some(
+		({ facts }) =>
+			toPlay(facts, now) && (expectedWords(facts) !== null || weatherCell(facts) !== null)
+	);
 }
 
 /** What a box score screen's key is told (BoxBasis): the projection, the lines drawn, the Pts
@@ -170,12 +178,18 @@ export function boxBasisParts(facts: BoxBasisFacts, clock: Clock, now: number): 
 	// The Lineup's Team adds the lineup's rows; the Matchup's is the platform's total where it sends one.
 	const team = lineup === null && facts.teamTotal ? 'platform' : 'rows';
 	const pts = said(ptsPart(facts.byPlayer, facts.host, team));
-	const game = said(gamePart(facts.lines, clock, now, 'full'));
-	if (lineup === null) return [...proj, ...pts, ...game];
+	// When a row's Final and its stats land, said while one waits on either (Lane 85).
+	const waiting = kickedOffPartAt(facts.lines, now);
+	if (lineup === null)
+		return [...proj, ...pts, ...said(gamePart(facts.lines, clock, now, 'full')), ...said(waiting)];
 	return [
 		...proj,
 		...said(deltaPart(lineup.previousReadAt, clock), false),
-		...game,
+		...said(gamePart(facts.lines, clock, now, 'full')),
+		// On the Lineup phone the expected score and weather are the decision's facts and keep their
+		// cells and sentence: the Final sentence is said at a desk while any row still draws them, and
+		// on the phone too once none does (Lane 85 fix round 2, the coordinator's ruling on brief item 4).
+		...said(waiting, !drawsFacts(facts.lines, now)),
 		...said(OPP_PART),
 		...pts,
 		...uncountedParts(lineup.note, lineup.rulesHref)

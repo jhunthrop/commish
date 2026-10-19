@@ -260,7 +260,7 @@
 	const dropped = $derived(sync ? droppedKinds(sync.scoring_dropped) : []);
 	const team = $derived(sync ? myTeam(sync) : undefined);
 	const platform = $derived(sync ? hostWords(sync.host) : '');
-	const bugs = $derived(sync && scoreboard ? bugsOf(scoreboard, sync) : []);
+	const bugs = $derived(sync && scoreboard ? bugsOf(scoreboard, sync, now.getTime()) : []);
 	const rows = $derived(sync ? standingsRows(sync, projections(scoreboard)) : []);
 	const summary = $derived(advice ? lineupSummary(advice, memberZone(), now.getTime()) : null);
 	const moves = $derived(sync ? feedRows(sync) : []);

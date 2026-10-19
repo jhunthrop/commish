@@ -10,6 +10,7 @@ import {
 	liveCard,
 	oppCaption,
 	verbOf,
+	heldVerb,
 	type PlayerWeek,
 	type ScreenHref
 } from './week-words.ts';
@@ -448,8 +449,18 @@ void test("the game facts' read is said only while his game is still to be playe
 	const after = card(week(), null, kickoff).basis[1] ?? '';
 	assert.match(before, /weather were read Fri 9:00 pm Central\.$/);
 	assert.ok(!after.includes('were read'), after);
-	// A read with no state (review finding 5) says no state: the evidence line ends there.
-	assert.match(after, /PPR scoring\.$/);
+	// At his kickoff the one rule reads his game kicked off (kickoff.ts lineState, Lane 85 fix round 2),
+	// so the card says when Final and the stats land, as the boards and the league screens do.
+	assert.ok(after.endsWith(KICKED_OFF_PART), after);
+});
+
+void test('the card draws no move on a locked row: Start him becomes the way to the lineup (M-D)', () => {
+	const kickoff = Date.parse(facts().kickoff ?? '');
+	const start = { kind: 'start' as const, holder: null, host_url: null, note: null };
+	assert.equal(heldVerb(start, facts(), kickoff - 1).kind, 'start');
+	assert.equal(heldVerb(start, facts(), kickoff).kind, 'lineup');
+	const trade = { ...start, kind: 'trade' as const };
+	assert.equal(heldVerb(trade, facts(), kickoff).kind, 'trade');
 });
 
 void test("with a league the verb is the league screens', the platform named", () => {
@@ -503,6 +514,8 @@ void test('copy guard: no card word uses a betting or trading word, the word hos
 		live.verb?.note ?? '',
 		CARD.whyTitle,
 		CARD.writtenFrom,
+		CARD.startHim,
+		CARD.openLineup,
 		unreadBasis(false, 'Wk 6'),
 		unreadBasis(true, 'Wk 6')
 	];

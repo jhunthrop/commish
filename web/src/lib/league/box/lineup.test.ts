@@ -15,7 +15,8 @@ import {
 	lineupBox,
 	lineupText,
 	stripSum,
-	whyLine
+	whyLine,
+	heldLineup
 } from './lineup.ts';
 
 const ZONE = 'America/Chicago';
@@ -272,4 +273,129 @@ void test('the lineup is drawn at the clock it is handed: past the kickoff it sa
 	assert.equal(lineupBox(lined, ZONE, NOW).starters[0]?.row.expected, '26.5 to 23');
 	const kicked = Date.parse('2026-10-18T17:00:00.000Z');
 	assert.equal(lineupBox(lined, ZONE, kicked).starters[0]?.row.expected, null);
+});
+
+void test('no move is drawn on a row whose game has kicked off or is final (Lane 85)', () => {
+	const kicked = { ...williams, facts: { ...williams.facts, game_state: 'kicked_off' as const } };
+	const monday = {
+		...advice,
+		set: false,
+		slots: [
+			slot('QB', kicked, stroud, true),
+			slot('RB', irving, irving, false),
+			slot('RB', vidal, gibbs, true)
+		]
+	};
+	const held = heldLineup(monday, NOW);
+	assert.deepEqual(
+		held.slots.map((s) => [s.slot, s.ours.player.name, s.changed]),
+		[
+			['QB', 'C.J. Stroud', false],
+			['RB', 'Bucky Irving', false],
+			['RB', 'Kimani Vidal', true]
+		]
+	);
+	assert.equal(held.slots[0]?.sentence, null);
+	// The advised starter goes back to the bench, the platform's starter stays where it has him.
+	assert.deepEqual(
+		held.bench.map((l) => l.player.name),
+		['Jahmyr Gibbs', 'Caleb Williams']
+	);
+	assert.equal(held.set, false);
+	const box = lineupBox(held, ZONE, NOW);
+	assert.deepEqual(
+		box.swaps.map((s) => s.in),
+		['Vidal']
+	);
+	assert.deepEqual(
+		box.starters.map((s) => s.move),
+		[null, null, 'in']
+	);
+	// A platform starter sat by a change whose game is final holds his spot too.
+	const final = (l: PlayerLine): PlayerLine => ({
+		...l,
+		facts: { ...l.facts, played: true, game_state: 'final' }
+	});
+	const tuesday = heldLineup(
+		{ ...advice, set: false, slots: [slot('QB', final(williams), final(stroud), true)] },
+		NOW
+	);
+	assert.equal(tuesday.set, true);
+	assert.equal(tuesday.slots[0]?.ours.player.name, 'C.J. Stroud');
+	assert.equal(lineupBox(tuesday, ZONE, NOW).swaps.length, 0);
+	// A change into an empty spot whose player has kicked off leaves the spot empty, and says so: never
+	// that no one could play there (review L2).
+	const empty = heldLineup({ ...advice, set: false, slots: [slot('QB', kicked, null, true)] }, NOW);
+	assert.deepEqual(empty.slots, []);
+	assert.deepEqual(empty.empty_slots, []);
+	assert.deepEqual(empty.held_empty, [{ slot: 'QB', name: 'Williams' }]);
+	const emptyBox = lineupBox(empty, ZONE, NOW);
+	assert.deepEqual(emptyBox.idle, ['QB: Williams has kicked off, the spot stays empty']);
+	assert.deepEqual(emptyBox.empty, ['QB']);
+	// A flex chain undone places each player once (review L1): Williams moved from QB to the
+	// superflex and Stroud into QB, both games kicked off.
+	const stroudKicked = { ...stroud, facts: { ...stroud.facts, game_state: 'kicked_off' as const } };
+	const chain = heldLineup(
+		{
+			...advice,
+			set: false,
+			slots: [slot('QB', stroudKicked, kicked, true), slot('SUPERFLEX', kicked, irving, true)],
+			bench: [irving]
+		},
+		NOW
+	);
+	const ids = [
+		...chain.slots.map((s) => s.ours.player.name),
+		...chain.bench.map((l) => l.player.name)
+	];
+	assert.deepEqual(ids.toSorted(), [...new Set(ids)].toSorted());
+	assert.deepEqual(
+		chain.slots.map((s) => s.ours.player.name),
+		['Caleb Williams', 'Bucky Irving']
+	);
+	assert.deepEqual(
+		chain.bench.map((l) => l.player.name),
+		['C.J. Stroud']
+	);
+	// Nothing locked: the answer as it came.
+	const untouched = { ...advice, set: false };
+	assert.deepEqual(heldLineup(untouched, NOW), { ...untouched, held_empty: [] });
+});
+
+void test('the finished week takes the strip: no sum, the API sentence', () => {
+	const done = "Every starter's game is final, so week 6 is over.";
+	// The API's sentence (words.go WeekDoneWords) passes the one copy guard.
+	assert.doesNotMatch(done, BANNED, done);
+	const box = lineupBox(advice, ZONE, NOW);
+	assert.equal(stripSum(box, done), null);
+	assert.notEqual(stripSum(box, null), null);
+	assert.equal(changesTitle(0, done), 'Final');
+	assert.equal(changesTitle(0, null), LINEUP.set);
+});
+
+void test('a partly locked chain places each player once (review L-A)', () => {
+	// QB: Williams in for Stroud, Williams kicked off, so undone; SFlex: Stroud in for Irving, still to
+	// play. Undoing QB hands Stroud back to QB, so the SFlex change goes too.
+	const kicked = { ...williams, facts: { ...williams.facts, game_state: 'kicked_off' as const } };
+	const held = heldLineup(
+		{
+			...advice,
+			set: false,
+			slots: [slot('QB', kicked, stroud, true), slot('SUPERFLEX', stroud, irving, true)],
+			bench: [kicked]
+		},
+		NOW
+	);
+	const placed = [
+		...held.slots.map((s) => s.ours.player.name),
+		...held.bench.map((l) => l.player.name)
+	];
+	assert.equal(placed.length, new Set(placed).size, placed.join(', '));
+	assert.deepEqual(
+		held.slots.map((s) => [s.slot, s.ours.player.name, s.changed]),
+		[
+			['QB', 'C.J. Stroud', false],
+			['SUPERFLEX', 'Bucky Irving', false]
+		]
+	);
 });

@@ -2,7 +2,7 @@
  * league's read alone when there is none, its totals, and the score bug's middle (the next kickoff).
  * Pure functions, tested in matchup.test.ts. */
 import { memberZone, weekdayTime } from '#lib/format/clock.ts';
-import { toBePlayed } from '#lib/format/game-facts.ts';
+import { gameHead, KICKOFF, linesRead } from './kickoff.ts';
 import type { MatchupSide } from '../api.ts';
 import type { MatchupBoxSide, PlayerLine } from '../inseason/api.ts';
 import {
@@ -92,8 +92,10 @@ export function sideBox(
 	};
 }
 
-/** The score bug's middle: the next kickoff among the matchup's starters, "First kickoff" before any
- * has started; null once every game has. */
+/** The score bug's middle by the one rule the League page's bugs read (kickoff.ts): "First kickoff"
+ * before any of the matchup's starters' games, "Next kickoff" once one has started with another still
+ * to come, then "Kicked off" and "Final" by the API's states; a kickoff before the page's clock is never
+ * next. Null when no starter has a game. */
 export function nextKickoff(
 	lines: readonly PlayerLine[],
 	now: number,
@@ -102,17 +104,24 @@ export function nextKickoff(
 	const games = lines.flatMap(({ facts, player }) =>
 		facts.bye || facts.kickoff === null || facts.opponent === null
 			? []
-			: [{ at: facts.kickoff, played: facts.played, club: player.team, facts }]
+			: [{ at: facts.kickoff, club: player.team, facts }]
 	);
-	const ahead = games
-		.filter((g) => toBePlayed({ played: g.played, kickoff: g.at }, now))
-		.sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
-	const next = ahead[0];
-	if (next === undefined) return null;
-	const started = ahead.length < games.length;
+	if (games.length === 0) return null;
+	// Each starter's game by the one rule at the page's clock, gathered once (kickoff.ts linesRead).
+	const head = gameHead(
+		linesRead(
+			games.map((g) => g.facts),
+			now
+		),
+		now
+	);
+	if (head.state === 'final') return { head: KICKOFF.final, words: '' };
+	const next = games.find((g) => g.at === head.next);
+	if (next === undefined)
+		return head.state === 'kicked_off' ? { head: KICKOFF.kickedOff, words: '' } : null;
 	const side = next.facts.home === false ? 'at' : 'vs';
 	return {
-		head: started ? 'Next kickoff' : 'First kickoff',
+		head: head.state === 'kicked_off' ? KICKOFF.next : KICKOFF.first,
 		words: `${weekdayTime(next.at, zone)}, ${next.club} ${side} ${next.facts.opponent ?? ''}`
 	};
 }

@@ -23,6 +23,10 @@
 		/** A narrow phone cell prints his short form, "A. Rodgers", never a cut surname (rereview N2). */
 		shortOnPhone?: boolean;
 		/** The trade builder's rows (Lane 66g): the game under the name at every width, without facts. */
+		/** The phone's folded game line draws the expected score and weather (false on the Lineup,
+		 * Waivers and Trades, whose phone basis cannot hold their sentence beside the stats sentence:
+		 * a figure drawn keeps its sentence, review H2). */
+		phoneFacts?: boolean;
 		compact?: boolean;
 		/** "Clears Wed" in the folded game, where the platform says it (Lane 66f). */
 		clears?: string | null;
@@ -37,6 +41,7 @@
 		tags = [],
 		shortOnPhone = false,
 		compact = false,
+		phoneFacts = true,
 		clears = null,
 		after,
 		children
@@ -81,7 +86,9 @@
 					/>{/each}</span
 			>
 		{/if}
-		<span class="phone-game" class:compact><BoxGame {row} facts={!compact} {clears} /></span>
+		<span class="phone-game" class:compact
+			><BoxGame {row} facts={!compact && phoneFacts} {clears} /></span
+		>
 		{@render children?.()}
 	</span>
 </span>

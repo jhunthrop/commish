@@ -403,7 +403,9 @@ function pickupTable(advice: WaiverAdvice): WaiverAdvice {
 	const pickups: WaiverAdvice['rows'] = [];
 	let on = roster;
 	let proj = base.proj;
-	for (const r of rows.filter((x) => x.pickup).sort((a, b) => b.week_gain - a.week_gain)) {
+	for (const r of rows
+		.filter((x) => x.pickup)
+		.sort((a, b) => (b.week_gain ?? 0) - (a.week_gain ?? 0))) {
 		if (pickups.length === MAX_PICKUPS) break;
 		const keys = [
 			...(r.beats && !r.beats.open_spot ? [r.beats.host_id] : []),
@@ -421,6 +423,7 @@ function pickupTable(advice: WaiverAdvice): WaiverAdvice {
 	return {
 		...advice,
 		basis: WAIVERS_BASIS,
+		pickup_order: 'week',
 		season_basis: waiverSeasonBasis(weeksCovered(advice.week)),
 		...uncountedOf(lineup.uncounted_rules),
 		rows,
