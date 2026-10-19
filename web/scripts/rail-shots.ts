@@ -146,6 +146,52 @@ for (const phase of FIXTURE_PHASES) {
 	}
 }
 
+/** How long the first page's /me is held, so its first frames are measured before it answers. */
+const ME_HELD_MS = 2_000;
+
+/** The first page after a sign-in (Lane 83 review 1): a session and nothing kept. Before /me answers
+ * the season rail draws League alone, its other slots blank; never the rail without a league and
+ * then the league's. After it answers, the league's rail. */
+for (const theme of THEMES) {
+	for (const width of [1440, 390] as const) {
+		const where = `first page after sign-in ${theme} ${String(width)}`;
+		const ctx = await context(theme, width, [
+			SIGNED_IN,
+			{ name: PHASE_COOKIE, value: 'in_season' }
+		]);
+		await ctx.route('**/me', async (route) => {
+			await new Promise((done) => setTimeout(done, ME_HELD_MS));
+			await route.continue();
+		});
+		const page = await ctx.newPage();
+		await page.goto(`${web}/board`, { waitUntil: 'domcontentloaded' });
+		await page.waitForSelector('nav.rail', { state: 'attached' });
+		const before = await page.evaluate(() =>
+			[...document.querySelectorAll<HTMLElement>('nav.rail .item')]
+				.filter((item) => item.getBoundingClientRect().width > 0)
+				.filter((item) => getComputedStyle(item).visibility !== 'hidden')
+				.map((item) => item.innerText.trim())
+		);
+		const pending = await page.evaluate(() =>
+			document.documentElement.hasAttribute('data-league-pending')
+		);
+		if (
+			!pending ||
+			JSON.stringify(before) !==
+				JSON.stringify(width > PHONE_MAX ? ['League', 'Account'] : ['League'])
+		)
+			failures.push(
+				`${where}: before /me the rail draws ${before.join(', ')} (pending ${String(pending)})`
+			);
+		await page.screenshot({ path: file(`rail-first-sign-in-pending-${theme}-${String(width)}`) });
+		await settle(page, 'in_season');
+		await page.waitForFunction(() => !document.documentElement.hasAttribute('data-league-pending'));
+		await check(page, where, 'in_season', width);
+		await page.screenshot({ path: file(`rail-first-sign-in-${theme}-${String(width)}`) });
+		await ctx.close();
+	}
+}
+
 /** Signed out in season: the rail without a league (Lane 83), League opening the follow page. */
 for (const theme of THEMES) {
 	for (const width of WIDTHS) {
@@ -205,34 +251,28 @@ for (const theme of THEMES) {
 	}
 }
 
-/** Signed out in season: Lineup opens the follow page naming the lineup, then Trades on that page
- * names the trades and lights Trades. */
+/** Signed out in season: the rail without a league draws no Lineup or Trades (Lane 83), and its
+ * League opens the follow page, lit there. */
 for (const theme of THEMES) {
 	const ctx = await context(theme, 390, []);
 	const page = await ctx.newPage();
 	await page.goto(`${web}/board`, { waitUntil: 'networkidle' });
-	const taps = [
-		{ label: 'Lineup', line: 'to see your lineup each week' },
-		{ label: 'Trades', line: 'to see the trades that help both teams' }
-	] as const;
-	for (const tap of taps) {
-		await page.locator('nav.rail .item', { hasText: tap.label }).filter({ visible: true }).click();
-		await page
-			.getByText(tap.line)
-			.filter({ visible: true })
-			.waitFor({ timeout: READY_TIMEOUT_MS })
-			.catch(() =>
-				failures.push(`follow ${tap.label} ${theme}: the page does not say "${tap.line}"`)
-			);
-		const lit = await page.evaluate(
-			() =>
-				[...document.querySelectorAll<HTMLElement>('nav.rail .item[aria-current="page"]')]
-					.filter((item) => item.getBoundingClientRect().width > 0)
-					.map((item) => item.innerText.trim())[0] ?? ''
-		);
-		if (lit !== tap.label) failures.push(`follow ${tap.label} ${theme}: ${lit} is lit`);
-		await page.screenshot({ path: file(`follow-tap-${tap.label.toLowerCase()}-${theme}-390`) });
-	}
+	const drawn = await shownLabels(page);
+	for (const gone of ['Lineup', 'Matchup', 'Waivers', 'Trades'])
+		if (drawn.includes(gone)) failures.push(`follow ${theme}: signed out the rail draws ${gone}`);
+	await page.locator('nav.rail .item', { hasText: 'League' }).filter({ visible: true }).click();
+	await page
+		.waitForURL('**/league/new', { timeout: READY_TIMEOUT_MS })
+		.catch(() => failures.push(`follow League ${theme}: League opens ${page.url()}`));
+	await page.waitForLoadState('networkidle');
+	const lit = await page.evaluate(
+		() =>
+			[...document.querySelectorAll<HTMLElement>('nav.rail .item[aria-current="page"]')]
+				.filter((item) => item.getBoundingClientRect().width > 0)
+				.map((item) => item.innerText.trim())[0] ?? ''
+	);
+	if (lit !== 'League') failures.push(`follow League ${theme}: ${lit || 'nothing'} is lit`);
+	await page.screenshot({ path: file(`follow-tap-league-${theme}-390`) });
 	await ctx.close();
 }
 
