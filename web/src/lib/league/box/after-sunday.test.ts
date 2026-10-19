@@ -66,7 +66,7 @@ void test('on Monday no game reads a kickoff already past as next, and no move i
 			assert.ok(!locked(s.host, now), `${s.host.player.name} moves out after his kickoff`);
 	}
 	// The web's own hold has nothing to undo: the engine already holds the locked rows.
-	assert.equal(heldLineup(monday.lineup, now), monday.lineup);
+	assert.deepEqual(heldLineup(monday.lineup, now), { ...monday.lineup, held_empty: [] });
 	assert.equal(monday.lineup.week_done, null);
 	// The bug and the lineup card print one figure for the drafter's side.
 	const mine = monday.scoreboard.games[0]?.sides.find((s) => s.roster_id === sync.me);

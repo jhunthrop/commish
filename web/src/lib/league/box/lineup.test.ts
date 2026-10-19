@@ -323,13 +323,43 @@ void test('no move is drawn on a row whose game has kicked off or is final (Lane
 	assert.equal(tuesday.set, true);
 	assert.equal(tuesday.slots[0]?.ours.player.name, 'C.J. Stroud');
 	assert.equal(lineupBox(tuesday, ZONE, NOW).swaps.length, 0);
-	// A change into an empty spot whose player has kicked off leaves the spot empty.
+	// A change into an empty spot whose player has kicked off leaves the spot empty, and says so: never
+	// that no one could play there (review L2).
 	const empty = heldLineup({ ...advice, set: false, slots: [slot('QB', kicked, null, true)] }, NOW);
 	assert.deepEqual(empty.slots, []);
-	assert.deepEqual(empty.empty_slots, ['QB']);
+	assert.deepEqual(empty.empty_slots, []);
+	assert.deepEqual(empty.held_empty, [{ slot: 'QB', name: 'Williams' }]);
+	const emptyBox = lineupBox(empty, ZONE, NOW);
+	assert.deepEqual(emptyBox.idle, ['QB: Williams has kicked off, the spot stays empty']);
+	assert.deepEqual(emptyBox.empty, ['QB']);
+	// A flex chain undone places each player once (review L1): Williams moved from QB to the
+	// superflex and Stroud into QB, both games kicked off.
+	const stroudKicked = { ...stroud, facts: { ...stroud.facts, game_state: 'kicked_off' as const } };
+	const chain = heldLineup(
+		{
+			...advice,
+			set: false,
+			slots: [slot('QB', stroudKicked, kicked, true), slot('SUPERFLEX', kicked, irving, true)],
+			bench: [irving]
+		},
+		NOW
+	);
+	const ids = [
+		...chain.slots.map((s) => s.ours.player.name),
+		...chain.bench.map((l) => l.player.name)
+	];
+	assert.deepEqual(ids.toSorted(), [...new Set(ids)].toSorted());
+	assert.deepEqual(
+		chain.slots.map((s) => s.ours.player.name),
+		['Caleb Williams', 'Bucky Irving']
+	);
+	assert.deepEqual(
+		chain.bench.map((l) => l.player.name),
+		['C.J. Stroud']
+	);
 	// Nothing locked: the answer as it came.
 	const untouched = { ...advice, set: false };
-	assert.equal(heldLineup(untouched, NOW), untouched);
+	assert.deepEqual(heldLineup(untouched, NOW), { ...untouched, held_empty: [] });
 });
 
 void test('the finished week takes the strip: no sum, the API sentence', () => {
