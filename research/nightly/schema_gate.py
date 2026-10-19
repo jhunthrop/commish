@@ -24,7 +24,10 @@ _SCRIPT: Final = Path(__file__).resolve().parent / "contract" / "run-contract.ts
 # The repository's web/ in a developer's tree (it needs `npm ci` there for node_modules).
 _REPOSITORY_WEB: Final = Path(__file__).resolve().parents[2] / "web"
 _TIMEOUT_SECONDS: Final = 600
-_REFUSED: Final = 1
+# The head of a failed reader's stderr the reason carries: node prints the failing source line, a caret,
+# then the error itself (`Error [ERR_MODULE_NOT_FOUND]: Cannot find module ...`), so five lines reach it.
+_STDERR_LINES: Final = 5
+_STDERR_CHARACTERS: Final = 600
 
 
 def contract_dir(environ: dict[str, str] | os._Environ[str]) -> Path:
@@ -60,9 +63,29 @@ def schema_gate(runs_root: Path, run_id: str, web_dir: Path) -> GateRecord:
         return gate_record(
             "schema", [f"schema_unchecked:timeout after {_TIMEOUT_SECONDS} s"], "the web's reader timed out"
         )
-    lines = [line for line in completed.stdout.splitlines() if line.strip()]
+    reasons, summary = reader_outcome(completed.returncode, completed.stdout, completed.stderr)
+    return gate_record("schema", reasons, summary)
+
+
+def reader_outcome(returncode: int, stdout: str, stderr: str) -> tuple[list[str], str]:
+    """The reader's refusals and its summary line; a reader that could not run is a reason of its own.
+
+    The reader prints a `schema:` line per refusal and one summary line. A run with no refusal line that
+    exited non-zero, or printed no summary at all, was never read (Lane 76: an image missing a module the
+    reader imports): the reason is the exit code and the head of stderr, where node names what failed.
+    """
+    lines = [line for line in stdout.splitlines() if line.strip()]
     reasons = [line for line in lines if line.startswith("schema:")]
     summary = next((line for line in reversed(lines) if not line.startswith("schema:")), "")
-    if completed.returncode != 0 and not reasons:
-        reasons = [f"schema_unchecked:exit {completed.returncode}: {completed.stderr.strip()[-400:]}"]
-    return gate_record("schema", reasons, summary or "the web's reader returned nothing")
+    if reasons or (returncode == 0 and summary):
+        return reasons, summary
+    head = _stderr_head(stderr) or "the web's reader printed no summary and no stderr"
+    unread = f"the web's reader did not read the run (exit {returncode})"
+    return [f"schema_unchecked:exit {returncode}: {head}"], summary or unread
+
+
+def _stderr_head(stderr: str) -> str:
+    """The first lines of stderr on one line: node's error line and the source line above it."""
+    lines = [line.strip() for line in stderr.splitlines() if line.strip()]
+    head = " | ".join(lines[:_STDERR_LINES])
+    return head if len(head) <= _STDERR_CHARACTERS else f"{head[: _STDERR_CHARACTERS - 1]}…"
