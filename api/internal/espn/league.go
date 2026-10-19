@@ -16,10 +16,11 @@ import (
 	"time"
 )
 
-// A whole league read (the rosters, settings, matchups and teams views)
-// is bigger than a settings read: a season's schedule rides with it.
+// A whole league read (the rosters, settings, matchups, teams and live
+// score views) is bigger than a settings read: a season's schedule rides
+// with it, 6.9 MB for a 12-team league in week 6 of 2026 (Lane 74).
 const (
-	maxLeagueBody = 8 << 20
+	maxLeagueBody = 16 << 20
 	maxTeams      = 32
 	maxRoster     = 60
 	maxSchedule   = 600
@@ -219,10 +220,38 @@ type Player struct {
 // ESPN says so.
 func (p Player) Droppable() bool { return p.droppable == nil || *p.droppable }
 
-// Game is one matchup in the current matchup period.
+// Game is one matchup in the current matchup period, each side's points
+// as ESPN scores them now: totalPointsLive while ESPN carries it (the
+// period in play), else totalPoints (the decided matchup's final).
 type Game struct {
 	Home, Away         int
 	HomePoints, Points float64
+	// HomeUnread and Unread say ESPN gave no score for the side: an
+	// undecided matchup whose read carries no live points, whose 0.0
+	// totalPoints is not a score.
+	HomeUnread, Unread bool
+}
+
+// undecided is ESPN's winner for a matchup not yet decided.
+const undecided = "UNDECIDED"
+
+// wireSide is one side of a scheduled matchup. totalPoints is ESPN's
+// final, 0.0 until the matchup is decided; totalPointsLive is the score
+// so far, carried by mMatchupScore and mScoreboard for the current
+// period alone.
+type wireSide struct {
+	TeamID          int      `json:"teamId"`
+	TotalPoints     float64  `json:"totalPoints"`
+	TotalPointsLive *float64 `json:"totalPointsLive"`
+}
+
+// points is the side's score as ESPN has it now, and whether ESPN gave
+// one: the live points when carried, the final once decided.
+func (s wireSide) points(winner string) (float64, bool) {
+	if s.TotalPointsLive != nil {
+		return score(*s.TotalPointsLive), true
+	}
+	return score(s.TotalPoints), winner != "" && winner != undecided
 }
 
 type wirePlayer struct {
@@ -308,25 +337,22 @@ type wireFull struct {
 		} `json:"roster"`
 	} `json:"teams"`
 	Schedule []struct {
-		MatchupPeriodID int `json:"matchupPeriodId"`
-		Home            struct {
-			TeamID      int     `json:"teamId"`
-			TotalPoints float64 `json:"totalPoints"`
-		} `json:"home"`
-		Away *struct {
-			TeamID      int     `json:"teamId"`
-			TotalPoints float64 `json:"totalPoints"`
-		} `json:"away"`
+		MatchupPeriodID int       `json:"matchupPeriodId"`
+		Winner          string    `json:"winner"`
+		Home            wireSide  `json:"home"`
+		Away            *wireSide `json:"away"`
 	} `json:"schedule"`
 }
 
 // Read is one whole read of a league for a season: rosters, settings,
-// the matchups and the teams. A nil cookies reads it as the public does.
+// the matchups with their live scores (mMatchupScore and mScoreboard
+// carry totalPointsLive for the period in play) and the teams. A nil
+// cookies reads it as the public does.
 func (c *Client) Read(ctx context.Context, id string, season int, cookies *Cookies) (FullLeague, error) {
 	if !leagueID.MatchString(id) || season < minSeason || season > maxSeason {
 		return FullLeague{}, ErrNotALink
 	}
-	q := url.Values{"view": {"mRoster", "mSettings", "mMatchup", "mTeam", "mDraftDetail"}}
+	q := url.Values{"view": {"mRoster", "mSettings", "mMatchup", "mTeam", "mDraftDetail", "mMatchupScore", "mScoreboard"}}
 	path := fmt.Sprintf("%s/apis/v3/games/ffl/seasons/%d/segments/0/leagues/%s?%s", c.Base, season, id, q.Encode())
 	body, err := c.get(ctx, path, cookies, maxLeagueBody)
 	if err != nil {
@@ -460,7 +486,9 @@ func checkFull(w wireFull) (FullLeague, error) {
 		if g.MatchupPeriodID != l.MatchupPeriod || g.Away == nil {
 			continue
 		}
-		l.Games = append(l.Games, Game{Home: g.Home.TeamID, Away: g.Away.TeamID, HomePoints: score(g.Home.TotalPoints), Points: score(g.Away.TotalPoints)})
+		home, homeRead := g.Home.points(g.Winner)
+		away, awayRead := g.Away.points(g.Winner)
+		l.Games = append(l.Games, Game{Home: g.Home.TeamID, Away: g.Away.TeamID, HomePoints: home, Points: away, HomeUnread: !homeRead, Unread: !awayRead})
 	}
 	return l, nil
 }
