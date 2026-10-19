@@ -46,9 +46,15 @@ export function rankAgreement(record: RunRecord): string {
 }
 
 /** A rate (order matched) prints the run's two decimals, the one figure not to a tenth (ruling R2),
- * and the basis says so once in these words. */
+ * said once with the run's scale (scaleWords). */
 const RATE_PLACES = 2;
 export const RATE_PLACES_WORDS = 'Rates print to two decimals.';
+
+/** The rank agreement's scale and its two decimals, said once on a page that prints the figure: the
+ * graded record's line under its tiles (Lane 66t), named by its head. */
+export function scaleWords(record: RunRecord): string {
+	return `${capitalized(rankAgreement(record))}: ${record.scale} ${RATE_PLACES_WORDS}`;
+}
 
 /** Graded: our rank agreement with the finish over every graded week, its scale, the span and the
  * players it counts, and ADP's beside it. Not yet: how many of the frozen weeks are graded. */

@@ -16,6 +16,7 @@
 		ORDER_WORDS,
 		publishedWords,
 		recordHeadline,
+		scaleWords,
 		scoreOf,
 		weekLines,
 		type RecordFigure
@@ -151,6 +152,7 @@
 						</div>
 					{/each}
 				</div>
+				<p class="scale">{scaleWords(record)}</p>
 				{#if record.honest}<p class="honest">{record.honest}</p>{/if}
 			</section>
 		{:else}
@@ -238,7 +240,7 @@
 			<RecordChart {series} weeks={record.weeks.length} />
 		{/if}
 
-		<!-- One paragraph; the headline says the scale and the two decimals (Lane 66t). -->
+		<!-- One paragraph; the bug says the scale and the two decimals once (Lane 66t). -->
 		<BasisBlock parts={basis} />
 	</main>
 </SiteShell>
@@ -325,6 +327,15 @@
 
 	.vals span {
 		font-size: var(--t-sm);
+		color: var(--ink-2);
+	}
+
+	/* The scale under the tiles, the bug's whole width. */
+	.scale {
+		grid-column: 1 / -1;
+		margin: 0;
+		font-size: var(--t-sm);
+		line-height: 1.45;
 		color: var(--ink-2);
 	}
 

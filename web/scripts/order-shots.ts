@@ -39,6 +39,8 @@ const SETTLE_MS = 300;
 const FOLDS_AT = 1100;
 const BASIS_WIDTH = 1440;
 const CHART_MIN_HEIGHT = 200;
+/** The run's scale (research/nightly/reads/record.py SCALE), as the contract run carries it. */
+const RECORD_SCALE = "1.0 is a perfect match of the week's finishing order, 0 is none.";
 /** Below this width the roster mark folds onto the club line. */
 const ROSTER_FOLDS_AT = 900;
 /** Trade for him on fewer rows than this share (the coordinator's ruling 3). */
@@ -198,7 +200,8 @@ async function recordFaults(page: Page, width: number): Promise<string[]> {
 			heads: [...document.querySelectorAll('main table.weeks th')].map(text),
 			published: [...document.querySelectorAll('main table.weeks td.published')].map(text),
 			honest: document.querySelector('main .honest')?.textContent.trim() ?? '',
-			chart: document.querySelector('main .chart svg')?.getBoundingClientRect().height ?? 0
+			chart: document.querySelector('main .chart svg')?.getBoundingClientRect().height ?? 0,
+			main: document.querySelector('main')?.textContent ?? ''
 		};
 	});
 	const said: string[] = [];
@@ -211,6 +214,11 @@ async function recordFaults(page: Page, width: number): Promise<string[]> {
 			`record: a published figure before the register holds it: ${seen.published.join(' ')}`
 		);
 	if (seen.honest === '') said.push('record: no honest sentence though ours trails');
+	// The graded record says the run's scale and the two decimals once (Lane 66t review 1).
+	for (const once of [RECORD_SCALE, 'Rates print to two decimals.']) {
+		const n = seen.main.split(once).length - 1;
+		if (n !== 1) said.push(`record: "${once}" said ${String(n)} times`);
+	}
 	if (width <= PHONE_MAX && seen.chart < CHART_MIN_HEIGHT)
 		said.push(`record: the chart is ${String(Math.round(seen.chart))} px tall on a phone`);
 	return said;

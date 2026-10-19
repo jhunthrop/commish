@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
 	RATE_PLACES_WORDS,
+	scaleWords,
 	figureWords,
 	gradedOrders,
 	printPlaces,
@@ -82,6 +83,11 @@ void test('a rate in [0, 1] prints two decimals as given, and the headline says 
 	assert.ok(headline.caption.endsWith(RATE_PLACES_WORDS), headline.caption);
 	assert.equal(headline.caption.split(RATE_PLACES_WORDS).length, 2, 'said once');
 	assert.equal(printPlaces(0.483, 2), '0.483', 'never rounded again');
+	// The graded page says the scale and the two decimals once, under the bug's tiles (Lane 66t).
+	assert.equal(
+		scaleWords(graded),
+		"Order matched: 1.0 is a perfect match of the week's finishing order, 0 is none. Rates print to two decimals."
+	);
 });
 
 void test('a figure prints as the run gives it', () => {
