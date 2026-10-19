@@ -23,6 +23,7 @@ from research.parity.cases.tables import (
     PROVIDER_PLAYERS,
     PROVIDER_STAT_LINES,
 )
+from research.parity.diff import Departure
 from research.parity.record import RecordSpec
 from research.pipeline.budget import UnmeteredBudget
 from research.pipeline.http import Fetcher
@@ -119,6 +120,12 @@ def _crosswalk(conn: Connection, ctx: RunContext) -> tuple[int, ...]:
     return (crosswalk_script(conn, ctx),)
 
 
+# Lane 78: the crosswalk build writes each crossed provider name as the universe spells it where the
+# provider dropped only its diacritics; the oracle keeps the provider's. The 2026 roster holds one.
+ESTIME_AS_HE_SPELLS_IT = Departure(
+    ("4569682",), "name", "Audric Estime", "Audric Estimé", "a name prints as he spells it (Lane 78)"
+)
+
 CASES: tuple[Case, ...] = (
     Case(
         name="tank01-roster-and-lines",
@@ -157,7 +164,7 @@ CASES: tuple[Case, ...] = (
         name="crosswalk",
         summary="build-crosswalk.ts run as is: the provider roster against the universe, defenses seeded",
         fixture_sets=("nflverse-universe", "tank01-2026"),
-        tables=(PLAYERS.as_setup(), PROVIDER_PLAYERS.as_setup(), PLAYER_CROSSWALK),
+        tables=(PLAYERS.as_setup(), PROVIDER_PLAYERS.as_setup().departing(ESTIME_AS_HE_SPELLS_IT), PLAYER_CROSSWALK),
         ts_scripts=(Script("research-ts/scripts/build-crosswalk.ts"),),
         run_python=_crosswalk,
         now=datetime(2026, 10, 12, 5, 0, tzinfo=UTC),

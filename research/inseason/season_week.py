@@ -49,7 +49,7 @@ from research.model.reads.teams import kickoff_instants_by_week
 from research.model.register.freeze import SERVED_SOURCE, take_freeze
 from research.model.register.grade import grade_week, latest_freeze_for
 from research.pipeline.http import Fetcher
-from research.pipeline.nflverse import ingest, ingest_schedule
+from research.pipeline.nflverse import ingest, season_stats
 from research.pipeline.nflverse.client import NflverseClient, NflverseError
 from research.pipeline.nflverse.context import ingest_opponent_defence_to_date
 from research.pipeline.nflverse.games import ingest_games
@@ -104,17 +104,16 @@ def _safely(name: str, body: Callable[[], StepResult], context: SeasonWeekContex
 
 
 def stats_ingest(context: SeasonWeekContext) -> StepResult:
-    """The universe, then the season's participation, stat lines and team edges, committed after each."""
+    """The universe, then the season's participation, stat lines, team edges and game results, the
+    lines and results committed together (`season_stats`, the `season` command's same unit)."""
     client = NflverseClient(context.fetcher)
     with context.engine.connect() as conn:
         universe = ingest.ingest_player_universe(conn, client)
         conn.commit()
         as_of = ingest.schedule_week_as_of(client, [context.season]).get(context.season)
-        report = ingest.ingest_season(conn, client, universe, context.season, as_of)
-        conn.commit()
-        # Each game's result once nflverse posts its score: the feed's own final flag, which the
-        # nightly's game log reads (a week with no line is inactive only once his club's game is final).
-        ingest_schedule.ingest_game_results(conn, client, [context.season])
+        # Each game's result rides with its lines: the feed's own final flag, which the nightly's game
+        # log reads (a week with no line is inactive only once his club's game is final).
+        report = season_stats.ingest_season_and_results(conn, client, universe, context.season, as_of)
         conn.commit()
     if report.player_week_unavailable:
         return StepResult(

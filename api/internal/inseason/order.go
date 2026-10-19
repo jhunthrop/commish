@@ -9,6 +9,7 @@ import (
 	"sync"
 	"unicode/utf8"
 
+	"github.com/jhunthrop/commish/api/internal/accents"
 	"github.com/jhunthrop/commish/api/internal/apitypes"
 	"github.com/jhunthrop/commish/api/internal/auth"
 	"github.com/jhunthrop/commish/api/internal/boards"
@@ -119,13 +120,14 @@ func (a *advisor) ranked(position draft.Position) ([]boards.Player, []int) {
 	return players, ranks
 }
 
-// matches is whether a search's letters are in his name or his club.
+// matches is whether a search's letters are in his name or his club,
+// accents aside: "estime" finds "Audric Estimé" (Lane 78).
 func matches(p boards.Player, q string) bool {
 	if q == "" {
 		return true
 	}
-	q = strings.ToLower(q)
-	return strings.Contains(strings.ToLower(p.Name), q) || strings.Contains(strings.ToLower(p.Team), q)
+	q = strings.ToLower(accents.Strip(q))
+	return strings.Contains(strings.ToLower(accents.Strip(p.Name)), q) || strings.Contains(strings.ToLower(p.Team), q)
 }
 
 // hostIDs is each rostered player's id on the league's platform, by board id.

@@ -348,7 +348,7 @@ export const recordSchema = z.object({
 	 * rank agreement as "order matched", the typical miss as "places off", the starters called right.
 	 * The page prints them as its column heads. */
 	statistic: z.object({ agreement: phrase, placesOff: phrase, starters: phrase }),
-	/** The agreement's scale, said once: "1.0 is a perfect match of the week's finishing order, 0 is none." */
+	/** The agreement's scale, said once: "1.00 is a perfect match of the week's finishing order, 0.00 is none." */
 	scale: phrase,
 	/** What the starters figure counts, from the positions graded, said once; null before a week is graded. */
 	startersBasis: phrase.nullable(),
