@@ -5,7 +5,9 @@
     uv run python -m research.inseason --task capture-harvest
 
 `capture-harvest` takes the hourly provider capture, then reads the hour's game figures from it into
-`tank01_lines` and the weather service's kickoff forecasts into `nws_forecast` (Lane 66a).
+`tank01_lines` and the weather service's kickoff forecasts into `nws_forecast` (Lane 66a). While a game
+that kicked off has no final, it asks Tank01's week of games once for their statuses (Lane 80,
+`pipeline/tank01/game_status.py`, at most two calls an hour), so a game is final the hour after it ends.
 
 `usage-backfill` runs the weekly pass's usage steps alone (play-by-play and the three charted feeds)
 for every week nflverse has published: the operator's one-shot for weeks played before the steps
@@ -63,6 +65,7 @@ from research.pipeline.nws.forecast import FORECAST_SOURCE, run_forecast_pass
 from research.pipeline.odds.touchdowns import run_td_snapshot
 from research.pipeline.tank01.capture import CaptureResult, run_capture_harvest
 from research.pipeline.tank01.client import API_KEY_ENV, DEFAULT_SEASON, SEASON_ENV, Tank01Client
+from research.pipeline.tank01.game_status import STATUS_SOURCE, capture_game_status
 from research.pipeline.tank01.lines import LINES_SOURCE, lines_after_harvest
 from research.pipeline.tank01.projections import parse_stored_projections
 
@@ -199,6 +202,7 @@ def _capture_harvest(now: datetime) -> bool:
         with engine.begin() as conn:
             result = run_capture_harvest(conn, Tank01Client(fetcher, key), now, season)
         facts_ok = _game_facts(engine, fetcher, result, now)
+        status_ok = _game_status(engine, Tank01Client(fetcher, key), now, season)
     finally:
         fetcher.close()
         engine.dispose()
@@ -215,7 +219,20 @@ def _capture_harvest(now: datetime) -> bool:
     market = _touchdown_market(now, season)
     charts = _slot_depth_charts(now, season)
     _week_reads(now)
-    return not failed and facts_ok and parsed and market and charts
+    return not failed and facts_ok and status_ok and parsed and market and charts
+
+
+def _game_status(engine: Engine, client: Tank01Client, now: datetime, season: int) -> bool:
+    """The games' statuses (Lane 80), in a transaction of their own so a refused read never rolls back
+    the capture: its line names its requests, and a refusal by the hourly cap is not a failure."""
+    try:
+        with engine.begin() as conn:
+            status = capture_game_status(conn, client, season, now)
+    except (ResearchError, httpx.HTTPError) as error:
+        _line(f"  {STATUS_SOURCE}: FAILED, {error}")
+        return False
+    _line(f"  {STATUS_SOURCE}: {status.line}")
+    return True
 
 
 def _week_reads(now: datetime) -> None:

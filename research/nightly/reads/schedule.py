@@ -14,9 +14,9 @@ KICKOFF. A game's kickoff is the fixture's own date and Eastern time ("8:20p"), 
 player card's game log read the same rows. A kickoff the league has not set yet ("TBD") counts from
 the start of its day in Eastern time, the earliest it can be, as the web's stand-in counts it.
 
-STATE (Lane 80). At the run's instant a game is final once the store holds its result or a line from
-either side (Lane 66s's rule, the API's gameStateAt), kicked off from its kickoff until then, and
-upcoming before. REST OF SEASON is a slate's games still upcoming: their opponents' mean, ranked the
+STATE (Lane 80). At the run's instant a game is final once the store holds its result (the hourly
+game status or the weekly result) or a line from either side (Lane 66s's rule, the API's
+gameStateAt), kicked off from its kickoff until then, and upcoming before. REST OF SEASON is a slate's games still upcoming: their opponents' mean, ranked the
 same way among the clubs with a game left.
 """
 
@@ -33,6 +33,7 @@ from research.capsules.facts.team_names import NFL_TEAM_NAMES
 from research.errors import ResearchError
 from research.model.backtest import sum_left
 from research.pipeline.nflverse.team_codes import NFL_TEAM_ABBREVIATIONS, product_team_code
+from research.pipeline.tank01.game_status import finals_held
 from research.season import REGULAR_SEASON_WEEKS
 
 WIN_TOTAL_SOURCE: Final = "vegas_win_totals"
@@ -163,16 +164,10 @@ def opponent_values(conn: Connection, season: int, first_kickoff: datetime) -> d
 
 
 def finals_at(conn: Connection, season: int, as_of: datetime) -> frozenset[ClubWeek]:
-    """The club-weeks the store holds a result or a line for at `as_of`, each from its own side."""
-    rows = conn.execute(
-        text(
-            "select distinct team, week from research.team_week_observations where season = :s "
-            "and metric = 'game_result' and as_of <= :as_of "
-            "union select distinct team, week from research.player_week_teams where season = :s and as_of <= :as_of"
-        ),
-        {"s": season, "as_of": as_of},
-    )
-    return frozenset((product_team_code(row.team), int(row.week)) for row in rows)
+    """The club-weeks the store holds a final for at `as_of`, each from its own side: the hourly
+    capture's game status (Lane 80, `pipeline/tank01/game_status.py`, the one read the API's
+    gameStateAt shares), the weekly result, or a line."""
+    return frozenset((product_team_code(team), week) for team, week in finals_held(conn, season, as_of))
 
 
 def game_states(
