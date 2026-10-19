@@ -213,9 +213,7 @@ export function heldLineup<T extends Pick<LineupAdvice, 'slots' | 'bench' | 'emp
 	advice: T,
 	now: number
 ): T & Held {
-	const undone = advice.slots.filter(
-		(s) => s.changed && (locked(s.ours, now) || (s.host !== null && locked(s.host, now)))
-	);
+	const undone = undoneSlots(advice.slots, now);
 	if (undone.length === 0) return { ...advice, held_empty: [] };
 	const slots = advice.slots.flatMap((s): LineupSlot[] => {
 		if (!undone.includes(s)) return [s];
@@ -238,6 +236,27 @@ export function heldLineup<T extends Pick<LineupAdvice, 'slots' | 'bench' | 'emp
 		),
 		set: slots.every((s) => !s.changed)
 	};
+}
+
+/** The changes heldLineup undoes: each on a locked row, then each that moves a player an undone change
+ * hands back to his own spot, until none is left (review L-A: a partly locked chain places him once). */
+function undoneSlots(slots: readonly LineupSlot[], now: number): LineupSlot[] {
+	const undone = new Set(
+		slots.filter(
+			(s) => s.changed && (locked(s.ours, now) || (s.host !== null && locked(s.host, now)))
+		)
+	);
+	for (let grew = true; grew;) {
+		grew = false;
+		const returned = new Set([...undone].flatMap((s) => (s.host ? [s.host.player.host_id] : [])));
+		for (const s of slots) {
+			if (s.changed && !undone.has(s) && returned.has(s.ours.player.host_id)) {
+				undone.add(s);
+				grew = true;
+			}
+		}
+	}
+	return slots.filter((s) => undone.has(s));
 }
 
 /** The strip's line for a spot an undone change leaves empty: "QB: Dart has kicked off, the spot

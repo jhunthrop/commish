@@ -372,3 +372,30 @@ void test('the finished week takes the strip: no sum, the API sentence', () => {
 	assert.equal(changesTitle(0, done), 'Final');
 	assert.equal(changesTitle(0, null), LINEUP.set);
 });
+
+void test('a partly locked chain places each player once (review L-A)', () => {
+	// QB: Williams in for Stroud, Williams kicked off, so undone; SFlex: Stroud in for Irving, still to
+	// play. Undoing QB hands Stroud back to QB, so the SFlex change goes too.
+	const kicked = { ...williams, facts: { ...williams.facts, game_state: 'kicked_off' as const } };
+	const held = heldLineup(
+		{
+			...advice,
+			set: false,
+			slots: [slot('QB', kicked, stroud, true), slot('SUPERFLEX', stroud, irving, true)],
+			bench: [kicked]
+		},
+		NOW
+	);
+	const placed = [
+		...held.slots.map((s) => s.ours.player.name),
+		...held.bench.map((l) => l.player.name)
+	];
+	assert.equal(placed.length, new Set(placed).size, placed.join(', '));
+	assert.deepEqual(
+		held.slots.map((s) => [s.slot, s.ours.player.name, s.changed]),
+		[
+			['QB', 'C.J. Stroud', false],
+			['SUPERFLEX', 'Bucky Irving', false]
+		]
+	);
+});
