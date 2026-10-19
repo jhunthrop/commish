@@ -128,15 +128,16 @@ void test('the call card is our top three as rows, its chance column headed stil
 	assert.equal(draftWords('DST', 'Queue'), 'Queue them');
 });
 
-void test("a player's surname the room draws is marked as his name, so the shots' guard reads it as data (the sweep's C8)", () => {
-	for (const file of [
-		'lib/room/Wall.svelte',
-		'lib/ui/PickStrip.svelte',
-		'lib/room/SoloRoom.svelte'
-	]) {
-		const source = readFileSync(join(SRC, file), 'utf8');
-		const drawn = source.match(/[^\n]*\{lastName\([^\n]*/gu) ?? [];
-		assert.ok(drawn.length > 0, file);
-		for (const line of drawn) assert.match(line, /data-name/u, `${file}: ${line.trim()}`);
-	}
+void test("every surname the room draws is marked as his name, never inside a sentence, so the shots' guard ties it to the handed data (the sweep's C8)", () => {
+	const drawing = [...SOURCES, 'lib/ui/PickStrip.svelte'].filter((file) =>
+		readFileSync(join(SRC, file), 'utf8').includes('lastName(')
+	);
+	const calls = drawing.flatMap((file) =>
+		(readFileSync(join(SRC, file), 'utf8').match(/[^\n]*lastName\([^\n]*/gu) ?? [])
+			.filter((line) => !/import|export function lastName/u.test(line))
+			.map((line) => ({ file, line: line.trim() }))
+	);
+	assert.ok(calls.length >= 3, `found ${String(calls.length)} surnames drawn`);
+	for (const { file, line } of calls)
+		assert.match(line, /data-name>\{lastName\(/u, `${file}: ${line}`);
 });
