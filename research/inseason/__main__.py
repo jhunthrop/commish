@@ -6,7 +6,7 @@
 
 `capture-harvest` takes the hourly provider capture, then reads the hour's game figures from it into
 `tank01_lines` and the weather service's kickoff forecasts into `nws_forecast` (Lane 66a). While a game
-that kicked off has no final, it asks Tank01's week of games once for their statuses (Lane 80,
+of the current week that kicked off has no final, however long ago (Lane 84), it asks Tank01's week of games once for their statuses (Lane 80,
 `pipeline/tank01/game_status.py`, at most two calls an hour), so a game is final the hour after it ends.
 
 `usage-backfill` runs the weekly pass's usage steps alone (play-by-play and the three charted feeds)

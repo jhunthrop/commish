@@ -3,8 +3,9 @@
 The weekly pass brings a game's result with the week's stats on Tuesday or Wednesday; until then the
 screens could only say a game had kicked off. The hourly capture now asks Tank01's week of games
 (`getNFLGamesForWeek`, whose `gameStatus` says Scheduled, live or Final) once a pass, and only while
-a game that kicked off within the last LOOKBACK has no final in the store: a game day and the night
-after it, never a quiet day. Each answer is kept verbatim in `capture_snapshots` (append-only, every
+a game of the current week that kicked off has no final in the store: a game day and the night after
+it, never a quiet day. There is no lookback window (Lane 84): a game the passes missed, after a
+deploy, a lapse or an expired login, is still asked about at the next pass until its final is held. Each answer is kept verbatim in `capture_snapshots` (append-only, every
 call its own row, so the calls an hour are counted from the store) and read into the
 `tank01_game_status` team-week source, one `game_status` observation per club stamped at the pass:
 0 scheduled, 1 under way, 2 final. The feed carries no score, so none is written; the final score
@@ -14,7 +15,9 @@ THE BUDGET. One request a pass, on what the harvest left of its request budget, 
 HOURLY_CAP in any hour: a pass that finds the cap reached or the budget spent asks nothing and says
 so, and the count and the call are taken under an advisory lock. With the season's game days and a
 game's few hours to its final, that is about 20 calls a week, and with the 9:30 am Eastern games
-abroad and the late-season Saturdays some 390 a regular season, inside the purchased quota.
+abroad and the late-season Saturdays some 390 a regular season, inside the purchased quota. A game
+the feed never calls final (a postponement) is asked about once a pass until its weekly result is
+held or the next week kicks off, some 18 calls a day at most, still under the cap.
 
 A FINAL IS HELD by the one rule, the `club_week_finals` view (revision 0014): the weekly result, a
 Tank01 final, or a line with the club, which the API's week facts and the run's states read too."""
@@ -41,9 +44,6 @@ STATUS_SOURCE: Final = "tank01_game_status"
 STATUS_METRIC: Final = "game_status"
 STATUS_VALUES: Final[dict[GameStatus, float]] = {"scheduled": 0.0, "in_progress": 1.0, "final": 2.0}
 FINAL_VALUE: Final = STATUS_VALUES["final"]
-# A game that kicked off this long ago and still has no final stops being asked about: its final
-# comes with the weekly stats. A game ends some three and a half hours after its kickoff.
-LOOKBACK: Final = timedelta(hours=12)
 HOURLY_CAP: Final = 2
 _HOUR: Final = timedelta(hours=1)
 # The status pass's advisory lock (pg_advisory_xact_lock), released with its transaction.
@@ -75,17 +75,17 @@ def finals_held(conn: Connection, season: int, now: datetime) -> frozenset[tuple
 
 
 def pending_week(kickoffs: Sequence[TeamKickoff], held: frozenset[tuple[str, int]], now: datetime) -> int | None:
-    """The week of the earliest club-game kicked off within LOOKBACK with no final held for it (the
-    status and the result are written for both sides); None when no game is waiting on its final,
-    and the pass asks nothing."""
-    by_week: dict[int, set[str]] = {}
-    for k in kickoffs:
-        if k.at <= now and now - k.at <= LOOKBACK:
-            by_week.setdefault(k.week, set()).add(k.team)
-    for week in sorted(by_week):
-        if any((team, week) not in held for team in by_week[week]):
-            return week
-    return None
+    """The current week (the latest with a club-game kicked off by `now`) while any of its kicked-off
+    club-games has no final held (the status and the result are written for both sides); None when
+    none waits, and the pass asks nothing. No lookback (Lane 84): a game the passes missed, after a
+    deploy or a lapse, is asked about until its final is held. An earlier week's gap is left to its
+    weekly stats."""
+    kicked = [k for k in kickoffs if k.at <= now]
+    if not kicked:
+        return None
+    week = max(k.week for k in kicked)
+    waiting = any((k.team, week) not in held for k in kicked if k.week == week)
+    return week if waiting else None
 
 
 def calls_this_hour(conn: Connection, now: datetime) -> int:

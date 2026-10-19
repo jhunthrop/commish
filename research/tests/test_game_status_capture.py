@@ -1,4 +1,4 @@
-"""The hourly game status (Lane 80): asked once a pass, only while a game that kicked off has no final,
+"""The hourly game status (Lane 80): asked once a pass, only while a game of the week that kicked off has no final,
 never past two calls an hour, each answer kept and read into one status a club stamped at the pass.
 
 The DB case needs PARITY_DATABASE_URL (a server where the harness may create `parity_*` databases)."""
@@ -22,7 +22,6 @@ from research.pipeline.tank01.client import Paths, Tank01Client
 from research.pipeline.tank01.game_status import (
     FINAL_VALUE,
     HOURLY_CAP,
-    LOOKBACK,
     STATUS_SOURCE,
     capture_game_status,
     pending_week,
@@ -50,9 +49,9 @@ KICKOFFS: Final = [
 ]
 
 
-def test_it_asks_only_while_a_kicked_off_game_waits_on_its_final() -> None:
+def test_it_asks_only_while_a_kicked_off_game_of_the_week_waits_on_its_final() -> None:
     held = frozenset({("SEA", 6), ("DEN", 6)})
-    # Saturday: nothing kicked off within the lookback (Thursday's is final anyway).
+    # Saturday: the week's only kicked-off game (Thursday's) is final.
     assert pending_week(KICKOFFS, held, SUNDAY - timedelta(hours=20)) is None
     # Before Sunday's kickoff: nothing waits.
     assert pending_week(KICKOFFS, held, SUNDAY - timedelta(minutes=1)) is None
@@ -60,8 +59,22 @@ def test_it_asks_only_while_a_kicked_off_game_waits_on_its_final() -> None:
     assert pending_week(KICKOFFS, held, SUNDAY + timedelta(hours=3)) == WEEK
     # Its final in (the status and the result write both sides): nothing more to ask.
     assert pending_week(KICKOFFS, held | {("MIA", WEEK), ("BUF", WEEK)}, SUNDAY + timedelta(hours=5)) is None
-    # Past the lookback the weekly stats bring it: a quiet Tuesday asks nothing.
-    assert pending_week(KICKOFFS, held, SUNDAY + LOOKBACK + timedelta(minutes=1)) is None
+
+
+def test_a_game_the_passes_missed_is_still_asked_about() -> None:
+    held = frozenset({("SEA", 6), ("DEN", 6)})
+    # Lane 84 (sweep Z1): kicked off 30 hours ago with no final held, as after a deploy or a lapse.
+    assert pending_week(KICKOFFS, held, SUNDAY + timedelta(hours=30)) == WEEK
+    # Every game of the week final: a quiet Tuesday asks nothing.
+    assert pending_week(KICKOFFS, held | {("MIA", WEEK), ("BUF", WEEK)}, SUNDAY + timedelta(hours=30)) is None
+
+
+def test_only_the_current_week_is_asked_about() -> None:
+    held = frozenset({("SEA", 6), ("DEN", 6)})
+    # Week 7 under way: the current week is 7; week 6's missing final comes with its weekly stats.
+    assert pending_week(KICKOFFS, held, NEXT_SUNDAY + timedelta(hours=1)) == 7
+    # Week 7 kicked off and final: nothing asked, week 6's gap included.
+    assert pending_week(KICKOFFS, held | {("BUF", 7)}, NEXT_SUNDAY + timedelta(hours=5)) is None
 
 
 BODY: Final = [
@@ -96,7 +109,13 @@ def _seed(conn: Connection) -> None:
          "metric": ScheduleMetric.KICKOFF_INSTANT, "as_of": k.at, "value": 1.0}
         for k in KICKOFFS
     ]  # fmt: skip
-    conn.execute(insert(TEAM_WEEK_OBSERVATIONS), rows)
+    # Thursday's game has its weekly result, so the quiet Saturday has nothing waiting on a final.
+    results = [
+        {"season": 2026, "week": WEEK, "team": team, "source": ScheduleSource.KICKOFF,
+         "metric": ScheduleMetric.GAME_RESULT, "as_of": THURSDAY + timedelta(hours=4), "value": 1.0}
+        for team in ("SEA", "DEN")
+    ]  # fmt: skip
+    conn.execute(insert(TEAM_WEEK_OBSERVATIONS), rows + results)
 
 
 @pytest.mark.skipif("PARITY_DATABASE_URL" not in os.environ, reason="needs a Postgres for scratch databases")
