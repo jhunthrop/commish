@@ -26,3 +26,38 @@ export const ORDER = {
 	/** The board's in-season page without script, its one line: the order is read in the browser. */
 	needsScript: 'Our rest-of-season order needs JavaScript.'
 } as const;
+
+/** The kickers' and defenses' week (Lane 66w): the API's position for each, and the board's tab. */
+export type WeekPosition = 'K' | 'DEF';
+
+/** The board's tab for the week's position: kickers on K, defenses on DST; null for any other. */
+export function weekPositionOf(boardPosition: string | null): WeekPosition | null {
+	if (boardPosition === 'K') return 'K';
+	if (boardPosition === 'DST') return 'DEF';
+	return null;
+}
+
+/** Each position's words: its rows in the plural, one of them, and whose a row's figures are. */
+export const WEEK_NOUNS: Readonly<
+	Record<WeekPosition, { many: string; one: string; whose: string; clubFirst: string }>
+> = {
+	K: { many: 'kickers', one: 'kicker', whose: 'his', clubFirst: 'his club first' },
+	DEF: { many: 'defenses', one: 'defense', whose: 'its', clubFirst: "the defense's club first" }
+};
+
+/** The tab's head: "Week 6 kickers" once the week is read, "This week's kickers" before. */
+export function weekHeading(position: WeekPosition, week: number | null): string {
+	const many = WEEK_NOUNS[position].many;
+	return week === null ? `This week's ${many}` : `Week ${String(week)} ${many}`;
+}
+
+/** Every other word the week's tab prints, for the copy guard. */
+export const WEEK = {
+	thisWeek: 'this week',
+	reading: "Reading this week's rows",
+	needsScript: "This week's rows need JavaScript.",
+	unread: 'We could not read this week just now. Try again in a minute.',
+	kickedOff: 'Kicked off',
+	played: 'Played',
+	byeIn: 'Bye in week'
+} as const;

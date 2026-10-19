@@ -32,7 +32,9 @@
 	import { liveStatusClock, sayBoard, type LiveStatus } from '#lib/run/live-status.ts';
 	import { links, tierAnchor } from './links.ts';
 	import type OrderScreenComponent from '#lib/order/OrderScreen.svelte';
-	import { ORDER } from '#lib/order/words.ts';
+	import type WeekScreenComponent from '#lib/order/WeekScreen.svelte';
+	import { ORDER, WEEK, weekPositionOf } from '#lib/order/words.ts';
+	import type { BasisPart } from '#lib/run/board-basis.ts';
 
 	interface Props {
 		page: BoardPage;
@@ -149,14 +151,24 @@
 	 * first line, so nothing a member reads before the script runs contradicts the order after it
 	 * (review 66n finding 3, the coordinator's revised ruling): the run's rows, whose Projected is the
 	 * season's, show only while the run says the season has not started. The kickers' and defenses'
-	 * views keep the run's draft order: the order carries no K or DEF rows. */
+	 * views are the week's (Lane 66w): we rank neither for the rest of the season, so in season their
+	 * tabs read the week's rows, the head and basis said once the read lands. */
 	const inSeason = $derived(page.underway && !marketView);
+	const weekPosition = $derived(page.underway ? weekPositionOf(page.position) : null);
 	let Order = $state<typeof OrderScreenComponent | null>(null);
+	let Week = $state<typeof WeekScreenComponent | null>(null);
+	/** The week's head and basis, once its read lands. */
+	let weekSaid = $state<{ heading: string; basis: BasisPart[] } | null>(null);
 	onMount(() => {
-		if (!page.underway) return;
-		void import('#lib/order/OrderScreen.svelte').then((module) => {
-			Order = module.default;
-		});
+		if (weekPosition !== null) {
+			void import('#lib/order/WeekScreen.svelte').then((module) => {
+				Week = module.default;
+			});
+		} else if (inSeason) {
+			void import('#lib/order/OrderScreen.svelte').then((module) => {
+				Order = module.default;
+			});
+		}
 	});
 	const orderLeague = $derived(
 		siteContext.league === null
@@ -183,7 +195,7 @@
 	</Row>
 {/snippet}
 
-<main class="board" class:ordered={inSeason}>
+<main class="board" class:ordered={inSeason || weekPosition !== null}>
 	<!-- The league's line sits by the switch, not under the caption: atop the side column on a desk,
 	     first under the bar elsewhere. -->
 	<div class="league-line">
@@ -191,13 +203,15 @@
 	</div>
 	<div class="content">
 		<div class="lead">
-			<PageHead title={heading}>
+			<PageHead title={weekSaid?.heading ?? heading}>
 				{#snippet actions()}
 					<Quiet href={links.adp(page.format.id)} size="sm">ADP</Quiet>
 					<Quiet href={links.schedule()} size="sm">Schedule strength</Quiet>
 				{/snippet}
 			</PageHead>
-			{#if marketView}
+			{#if weekPosition !== null}
+				{#if weekSaid}<BasisLine parts={weekSaid.basis} />{/if}
+			{:else if marketView}
 				<BasisLine parts={[{ text: page.marketBasis ?? '', phone: true }]} tail={capture} />
 			{:else if !inSeason}
 				<BasisLine parts={page.basis} tail={capture} />
@@ -227,7 +241,29 @@
 			</span>
 		</div>
 
-		{#if inSeason}
+		{#if weekPosition !== null}
+			{#if Week}
+				{#key `${weekPosition} ${orderLeague?.id ?? ''}`}
+					<Week
+						position={weekPosition}
+						league={orderLeague}
+						onread={(said) => {
+							weekSaid = said;
+						}}
+					/>
+				{/key}
+			{:else}
+				<p class="reading reading-live" aria-live="polite">{WEEK.reading}</p>
+				<noscript
+					><style>
+						.reading-live {
+							display: none;
+						}
+					</style>
+					<p class="reading">{WEEK.needsScript}</p></noscript
+				>
+			{/if}
+		{:else if inSeason}
 			{#if Order}
 				{#key orderLeague?.id}
 					<Order
