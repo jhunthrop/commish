@@ -5,7 +5,7 @@ import { bannedPattern } from '#lib/format/copy-guard.ts';
 import type { PlayerLine, WeekFacts } from '../league/inseason/api.ts';
 import type { OrderAdvice, OrderRow } from './api.ts';
 import { orderPath } from './path.ts';
-import { basisText } from '#lib/league/box/basis.ts';
+import { basisText, KICKED_OFF_PART } from '#lib/league/box/basis.ts';
 import {
 	FIGURE_HEADS,
 	ORDER,
@@ -208,6 +208,24 @@ void test('the basis says each column once: the order, Wk 6, Opp rank, the rules
 	for (const said of [inLeague, ...Object.values(ORDER), ...Object.values(FIGURE_HEADS)]) {
 		assert.doesNotMatch(said, bannedPattern(), said);
 	}
+});
+
+void test("the Monday after Sunday's games: Kicked off in the Game cell, and the basis says when Final lands (Lane 80)", () => {
+	const monday = Date.parse('2026-10-19T11:00:00.000Z');
+	const kicked = row('A', {
+		line: line('A', 'RB', { facts: { ...facts, game_state: 'kicked_off' } })
+	});
+	const view = orderView(kicked, ZONE);
+	assert.deepEqual(view.box.game, { where: 'at ATL', when: 'Kicked off' });
+	const said = orderBasis(advice([kicked]), null, ZONE, monday);
+	const part = said.find((p) => p.text === KICKED_OFF_PART);
+	assert.ok(part, basisText(said));
+	assert.equal(part.phone, false);
+	// Before kickoff, or with every game final, the sentence is not said.
+	const before = row('B', {
+		line: line('B', 'RB', { facts: { ...facts, game_state: 'upcoming' } })
+	});
+	assert.ok(!basisText(orderBasis(advice([before]), null, ZONE, monday)).includes(KICKED_OFF_PART));
 });
 
 void test('the path asks the league route with a league and the public one without', () => {

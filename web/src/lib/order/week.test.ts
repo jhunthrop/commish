@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { bannedPattern } from '#lib/format/copy-guard.ts';
 import { FIGURE } from '#lib/format/figure-words.ts';
+import { KICKED_OFF_PART } from '#lib/league/box/basis.ts';
 import { BOX } from '#lib/league/box/box.ts';
 import type { WeekOrderAdvice } from './api.ts';
 import { weekOrderPath } from './path.ts';
@@ -125,6 +126,35 @@ void test('a week whose games have kicked off but are not all final says so', ()
 		ZONE
 	).map((s) => s.head);
 	assert.deepEqual(heads, ['Kicked off', 'Bye in week 6']);
+});
+
+void test("the Monday after: the API's kicked-off rows say Kicked off, and the basis when Final lands (Lane 80)", () => {
+	const monday = Date.parse('2026-10-19T11:00:00.000Z');
+	const advice = visitor(fixture.read.K);
+	const kicked: WeekOrderAdvice = {
+		...advice,
+		rows: advice.rows.map((r) =>
+			r.section === 'to_play'
+				? {
+						...r,
+						section: 'kicked_off' as const,
+						line: { ...r.line, facts: { ...r.line.facts, game_state: 'kicked_off' as const } }
+					}
+				: r
+		)
+	};
+	const view = views(kicked, monday).find(
+		(v) => v.section === 'kicked_off' && v.box.game !== 'bye'
+	);
+	const game = view?.box.game;
+	assert.ok(game !== undefined && game !== null && game !== 'bye');
+	assert.equal(game.when, BOX.kickedOff);
+	const said = weekBasis(kicked, VISITOR, ZONE, monday);
+	assert.ok(
+		said.some((p) => p.text === KICKED_OFF_PART && !p.phone),
+		text(said)
+	);
+	assert.ok(!text(weekBasis(advice, VISITOR, ZONE, SATURDAY)).includes(KICKED_OFF_PART));
 });
 
 void test('the projection is in once a row has a Proj, and not before', () => {

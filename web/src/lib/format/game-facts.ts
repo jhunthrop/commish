@@ -49,12 +49,28 @@ export function figuresWords(c: GameConditions): string | null {
 	return `Expected to score ${team} and to ${spread.side} by ${halves(spread.points)}, ${points} points in the game.`;
 }
 
-/** Whether the game is still to be played: not final and not yet kicked off. */
-export function toBePlayed(
-	game: { played: boolean; kickoff: string | null },
-	now: number = Date.now()
-): boolean {
-	return !game.played && (game.kickoff === null || Date.parse(game.kickoff) > now);
+export type GameState = Schemas['GameState'];
+
+/** A game as the API sends it: its state (Lane 80), absent on a read from before the field, beside
+ * the final flag and the kickoff. */
+export interface StatedGame {
+	game_state?: GameState | null;
+	played: boolean;
+	kickoff: string | null;
+}
+
+/** A game's state, one rule for every screen: the API's (its clock and its finals, gameStateAt in
+ * inseason/facts.go). A read from before the API sent it falls back to its final flag and kickoff at
+ * `now`, the rule the field replaced. */
+export function gameStateOf(game: StatedGame, now: number = Date.now()): GameState {
+	if (game.game_state != null) return game.game_state;
+	if (game.played) return 'final';
+	return game.kickoff !== null && Date.parse(game.kickoff) <= now ? 'kicked_off' : 'upcoming';
+}
+
+/** Whether the game is still to be played: upcoming by its state. */
+export function toBePlayed(game: StatedGame, now: number = Date.now()): boolean {
+	return gameStateOf(game, now) === 'upcoming';
 }
 
 /** Where the game is played, as the end of the weather sentence or alone. */

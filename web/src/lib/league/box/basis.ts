@@ -4,6 +4,7 @@
  * game, the rules our stats lack) with these and hides the ones about columns its phone does not
  * draw (BasisPart.phone). Pure, tested in basis.test.ts. */
 import { weekdayTime, zoneWord } from '#lib/format/clock.ts';
+import { gameStateOf } from '#lib/format/game-facts.ts';
 import type { BasisPart } from '#lib/run/board-basis.ts';
 import type { LeagueHost } from '../api.ts';
 import type { PlayerLine, ProjectionScoring } from '../inseason/api.ts';
@@ -73,6 +74,17 @@ export function gamePart(
 }
 
 export const OPP_PART = `${BOX.oppRank} is points allowed to his position, 1st fewest.`;
+
+/** When a kicked-off game's final lands (Lane 80): the weekly stats bring it, on the weekly pass's
+ * Tuesday or Wednesday run (research JOBS.md, the inseason job), since the hourly capture reads no
+ * game status. */
+export const KICKED_OFF_PART = `${BOX.kickedOff} turns ${BOX.final} when the week's stats are in, Tuesday or Wednesday.`;
+
+/** KICKED_OFF_PART where a row's game has kicked off with no final yet, else null. */
+export function kickedOffPart(lines: readonly PlayerLine[], now: number): string | null {
+	const kicked = lines.some(({ facts }) => !facts.bye && gameStateOf(facts, now) === 'kicked_off');
+	return kicked ? KICKED_OFF_PART : null;
+}
 
 /** Avg and Last where a page says what they are (the player card): in the scoring the rows are in. */
 export function avgLastPart(scoring: string): string {

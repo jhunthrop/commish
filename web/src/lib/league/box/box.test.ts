@@ -130,7 +130,7 @@ void test('the weather is a glyph and two or three words, the venue first', () =
 });
 
 void test('the game cell: the opponent and kickoff, Final once played, the bye', () => {
-	assert.deepEqual(gameOf(facts({ kickoff: SUNDAY_NOON }), ZONE), {
+	assert.deepEqual(gameOf(facts({ kickoff: SUNDAY_NOON }), ZONE, NOW), {
 		where: 'at ATL',
 		when: 'Sun 12:00 pm'
 	});
@@ -140,6 +140,26 @@ void test('the game cell: the opponent and kickoff, Final once played, the bye',
 	});
 	assert.equal(gameOf(facts({ bye: true }), ZONE), 'bye');
 	assert.equal(gameOf(facts({ opponent: null }), ZONE), null);
+});
+
+void test("a game kicked off with no final says so, by the API's state (Lane 80)", () => {
+	const monday = facts({ kickoff: SUNDAY_NOON, game_state: 'kicked_off' });
+	assert.deepEqual(gameOf(monday, ZONE, NOW), { where: 'at ATL', when: 'Kicked off' });
+	assert.deepEqual(gameOf(facts({ game_state: 'final', played: true }), ZONE, NOW), {
+		where: 'at ATL',
+		when: 'Final'
+	});
+	// No expected score and no weather once kicked off, whatever the browser's clock says.
+	const row = boxRow(
+		line({}, { kickoff: SUNDAY_NOON, game_state: 'kicked_off' }),
+		'QB',
+		ZONE,
+		true,
+		NOW
+	);
+	assert.equal(row.expected, null);
+	assert.equal(row.weather, null);
+	assert.deepEqual(row.game, { where: 'at ATL', when: 'Kicked off' });
 });
 
 void test("a status is Lane 63's pill: the week's word, a season-long list's word in his rank", () => {

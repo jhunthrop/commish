@@ -17,6 +17,7 @@ import {
 	positionWord,
 	type BoxRow
 } from '#lib/league/box/box.ts';
+import { kickedOffPart } from '#lib/league/box/basis.ts';
 import type { BasisPart } from '#lib/run/board-basis.ts';
 import type { WeekOrderAdvice, WeekOrderRow } from './api.ts';
 import { rosterBasis, rosterWords, type RosterView } from './order.ts';
@@ -34,7 +35,7 @@ export const WEEK_NOUNS: Readonly<
 /** Every other word the tab prints, for the copy guard. */
 export const WEEK_TAB = {
 	unread: 'We could not read this week just now. Try again in a minute.',
-	kickedOff: 'Kicked off',
+	kickedOff: BOX.kickedOff,
 	played: 'Played',
 	byeIn: 'Bye in week',
 	/** The add column's head, as a screen reader hears it. */
@@ -228,6 +229,14 @@ export function weekBasis(
 		part(`${BOX.oppRank} is points allowed to ${many} this season, 1st the fewest.`, true),
 		part(`${BOX.avg} and ${BOX.last} are ${whose} points a game and last game, ${scoring}.`, true),
 		part(gameSentence(advice, zone, now), true),
+		// The section head says Kicked off on the phone too; when Final lands is said at a desk.
+		part(
+			kickedOffPart(
+				advice.rows.map((row) => row.line),
+				now
+			),
+			false
+		),
 		league !== null && advice.read_at !== null
 			? part(rosterBasis(league.host, advice.read_at, zone), false)
 			: null
