@@ -3015,7 +3015,7 @@ export interface components {
 			points_over_replacement: number | null;
 			/**
 			 * Format: double
-			 * @description his rest-of-season points a game, one decimal: the published board's rest-of-season points over the games his club had still to play at the run (the games not yet kicked off, from the board's first week through week 17, byes out; the same as his rest-of-season points now over his club's games still to play now), as the basis says; null on the preseason number, on a run that does not say its first week, without a projection or with no games left. A player who is out keeps it: it assumes he plays
+			 * @description his rest-of-season points a game, one decimal: the published board's rest-of-season points over the games his club had still to play at the run (the games not yet kicked off, from the board's first week through week 17, byes out; the same as his rest-of-season points now over his club's games left now), as the basis says; null on the preseason number, on a run that does not say its first week, without a projection or with no games left. A player who is out keeps it: it assumes he plays
 			 */
 			rest_of_season_per_game: number | null;
 			/**
@@ -3063,7 +3063,7 @@ export interface components {
 			verb: components['schemas']['PlayerVerb'] | null;
 			/**
 			 * Format: double
-			 * @description his rest-of-season points now, one decimal, in projection_scoring's format: the published board's over the games his club had still to play at the run, taken down to his club's games still to play at the read's clock (Lane 86, the run's points a game times them, so a game kicked off since the run is no longer counted); null on the preseason order, on a run that does not say its first week and without a projection. Absent from a read older than the field
+			 * @description his rest-of-season points now, one decimal, in projection_scoring's format: the published board's over the games his club had still to play at the run, taken down to his club's games left at the read's clock (Lane 86, the run's points a game times them, so a game kicked off since the run is no longer counted); null on the preseason order, on a run that does not say its first week and without a projection. Absent from a read older than the field
 			 */
 			rest_of_season_points?: number | null;
 			/** @description the week his rest of season starts from: his club's first game still to play at the read's clock (not yet kicked off, through week 17); null with rest_of_season_points null or with no game left. Absent from a read older than the field */
@@ -3435,7 +3435,7 @@ export interface components {
 			rank: number;
 			/**
 			 * Format: double
-			 * @description the order's key, one decimal: his rest-of-season points over his club's games still to play at the read's clock (not yet kicked off) through week 17, byes out (Lane 86, as the player read's rest_of_season_points); null on the preseason order and without a projection
+			 * @description the order's key, one decimal: his rest-of-season points over his club's games left at the read's clock (not yet kicked off) through week 17, byes out (Lane 86, as the player read's rest_of_season_points); null on the preseason order and without a projection
 			 */
 			rest_of_season_points: number | null;
 			/**

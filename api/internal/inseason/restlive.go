@@ -9,7 +9,7 @@ import (
 )
 
 // The rest of season at the read's clock (Lane 86, the sweep's Z3). A
-// rest of season counts a club's games still to play by the one game
+// rest of season counts a club's games left by the one game
 // state (gameStateAt): once a club's game kicks off it is no game left,
 // so its players start from the club's next week while the board starts
 // from the first week with any game left. The nightly writes its points
@@ -20,7 +20,7 @@ import (
 
 // RestNow is the rest of season at a read's clock.
 type RestNow struct {
-	// Left is each club's games still to play at the read's clock, and Run
+	// Left is each club's games left at the read's clock, and Run
 	// each club's at the run's instant, both from the run's first week
 	// through LastWeek.
 	Left, Run map[string]int

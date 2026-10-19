@@ -68,7 +68,7 @@ export const formatSchema = z.object({
 	/** In season, once the board ranks the rest of the season: the first week it ranks. Absent preseason. */
 	rosFromWeek: z.number().int().min(1).optional(),
 	/** In season, set while a game of rosFromWeek had kicked off at the run (Lane 86): its clubs count
-	 * from their next week, and the words say the board counts that week's games still to play. Absent
+	 * from their next week, and the words say the board counts that week's games left. Absent
 	 * preseason and on a run older than the field. */
 	rosFromWeekPartial: z.boolean().optional(),
 	/** In season, the last week whose games are in the season figures. */
@@ -438,7 +438,7 @@ export const gameSchema = z.object({
 	state: z.enum(['upcoming', 'kicked_off', 'final']).optional()
 });
 
-/** A slate's games still to play at the run's instant (Lane 80): their strength to a tenth, its rank
+/** A slate's games left at the run's instant (Lane 80): their strength to a tenth, its rank
  * among the clubs with a game left (1 the hardest), and how it is measured. */
 export const restSlateSchema = z.object({
 	strength: points,

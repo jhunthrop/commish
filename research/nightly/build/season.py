@@ -166,9 +166,9 @@ def schedule_json(
 
 def rest_from_words(rest: "RestOfSeason") -> str:
     """The week the rest of season counts from, said once (Lane 86, the API's restFromWords): "from week
-    7", or while a game of it is played "from week 6's games still to play"."""
+    7", or while a game of it is played "from week 6's games left"."""
     if rest.partial:
-        return f"from week {rest.from_week}'s games still to play"
+        return f"from week {rest.from_week}'s games left"
     return f"from week {rest.from_week}"
 
 
@@ -197,7 +197,7 @@ def format_json(run_format: RunFormat, season: int, rest: "RestOfSeason | None" 
     if rest is not None:
         out |= {
             "rosFromWeek": rest.from_week,
-            # A game of the first week is played at the run: the board counts that week's games still to play.
+            # A game of the first week is played at the run: the board counts that week's games left.
             "rosFromWeekPartial": rest.partial,
             "rosThroughWeek": rest.through,
             "refreshedAt": iso(rest.refreshed_at),

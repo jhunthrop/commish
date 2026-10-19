@@ -377,17 +377,17 @@ func OrderLeague(own bool, s apitypes.LeagueSettings, format apitypes.Projection
 
 // RestFrom is the week a rest-of-season order starts from, and whether a
 // game of it has kicked off (RestNow.Partial): then the order counts that
-// week's games still to play.
+// week's games left.
 type RestFrom struct {
 	Week    int
 	Partial bool
 }
 
 // restFromWords is the week the order counts from, said once: "from week
-// 7", or while a game of it is played "from week 6's games still to play".
+// 7", or while a game of it is played "from week 6's games left".
 func restFromWords(r RestFrom) string {
 	if r.Partial {
-		return fmt.Sprintf("from week %d's games still to play", r.Week)
+		return fmt.Sprintf("from week %d's games left", r.Week)
 	}
 	return fmt.Sprintf("from week %d", r.Week)
 }

@@ -208,7 +208,7 @@ def test_a_club_whose_week_kicked_off_counts_from_its_next_week_while_the_board_
     after = ros_boards(_boards(), _context(LINES_THROUGH), sunday_evening, _states(sunday_evening), SETUP)
     assert before.basis is not None and after.basis is not None
     assert (before.basis.from_week, after.basis.from_week) == (FIRST_MODEL_WEEK, FIRST_MODEL_WEEK)
-    # A game of week 6 is played: the board's words say it counts that week's games still to play.
+    # A game of week 6 is played: the board's words say it counts that week's games left.
     assert (before.basis.partial, after.basis.partial) == (False, True)
     for board_before, board_after in zip(before.boards, after.boards, strict=True):
         was = {e.row.player_id: e.row for e in board_before.entries}

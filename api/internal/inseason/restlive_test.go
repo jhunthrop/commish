@@ -122,7 +122,7 @@ func TestTheOrderLineSaysWhichWeeksItCounts(t *testing.T) {
 		t.Fatalf("whole week %q", whole)
 	}
 	part := OrderScreenBasis(RestOfSeason, RestFrom{Week: 6, Partial: true}, league)
-	if !strings.HasPrefix(part, "Our rest-of-season order from week 6's games still to play. ") {
+	if !strings.HasPrefix(part, "Our rest-of-season order from week 6's games left. ") {
 		t.Fatalf("partly played week %q", part)
 	}
 }

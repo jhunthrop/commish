@@ -294,7 +294,7 @@ function fromOf(week: PlayerWeek, rest: RestParts): string {
 }
 
 /** His rest of season at the read's clock (Lane 86), when the read is in the tile's own scoring and
- * says it: the points over his club's games still to play now and the week they start from. Null on a
+ * says it: the points over his club's games left now and the week they start from. Null on a
  * preseason board, in another scoring and on a read older than the fields: the run's stand. */
 function restNow(week: PlayerWeek, rest: RestParts | null): LiveRest | null {
 	const points = week.rest_of_season_points;

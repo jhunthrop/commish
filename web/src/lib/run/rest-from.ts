@@ -3,9 +3,9 @@
  * words it. */
 import type { BoardRow, Format } from './schema.ts';
 
-/** "from week 7", or while a game of that week is played "from week 6's games still to play". */
+/** "from week 7", or while a game of that week is played "from week 6's games left". */
 export function restFromWords(week: number, partial: boolean): string {
-	return partial ? `from week ${String(week)}'s games still to play` : `from week ${String(week)}`;
+	return partial ? `from week ${String(week)}'s games left` : `from week ${String(week)}`;
 }
 
 /** A player's own week: "from week 7", or "with no game left" (his club's first game still to play is one

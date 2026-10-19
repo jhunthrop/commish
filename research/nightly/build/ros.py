@@ -11,7 +11,7 @@ reason; a format the raw line does not carry stays preseason alone, and the reas
 The window starts at the first week with a game still to play at the run's instant, by the run's one
 game state (`schedule.game_states`, the stored schedule and the finals held), never the clock alone; the
 lines run through the last week whose games are all in the records (`SeasonContext.through`). Each
-player's rest of season is his club's games still to play (Lane 86): once his club's game of the
+player's rest of season is his club's games left (Lane 86): once his club's game of the
 window's first week has kicked off it is no game left, and his row says the week he starts from.
 """
 
@@ -72,7 +72,7 @@ class RosBasis:
     """What the in-season boards rank: the rest of the season from `from_week`, lines through
     `through`, refreshed at the run's instant. `partial` is set while a game of `from_week` has kicked
     off at the run (Lane 86): its clubs count from their next week, and the words say the board counts
-    that week's games still to play."""
+    that week's games left."""
 
     from_week: int
     through: int
@@ -162,7 +162,7 @@ def _projections(
     ready: Ready,
 ) -> dict[str, RestFigures]:
     """Rest-of-season points by scoring, expected games and the week they start from, for the page
-    board's players and the ones with a line it does not rank: each over his club's games still to play."""
+    board's players and the ones with a line it does not rank: each over his club's games left."""
     page = next(b for b in boards if b.format.id == PAGE_FORMAT.id)
     served = _served_projected(boards)
     slates = ClubSlates(

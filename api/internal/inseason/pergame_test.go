@@ -41,7 +41,7 @@ func restSchedule() []boards.TeamWeek {
 	return append(games, game(6, "BUF", "NYJ", kickoff.AddDate(0, 0, 35), true)...)
 }
 
-// leftFrom is each club's games still to play from week first before
+// leftFrom is each club's games left from week first before
 // the season's first kickoff.
 func leftFrom(first int) map[string]int {
 	return counts(weeksToPlay(restSchedule(), first, time.Date(2026, 9, 1, 12, 0, 0, 0, east)))

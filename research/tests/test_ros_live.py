@@ -121,7 +121,7 @@ def test_the_in_season_basis_names_the_rest_of_the_season_and_the_refresh() -> N
     assert shown["rosFromWeekPartial"] is False
     # Lane 86: while a game of the first week is played, the words say it counts that week's games left.
     partly = format_json(RUN_FORMATS[0], 2026, RosBasis(6, 5, rest.refreshed_at, partial=True))
-    assert partly["basis"][0] == "PPR, rest of the 2026 season from week 6's games still to play, refreshed October 20"
+    assert partly["basis"][0] == "PPR, rest of the 2026 season from week 6's games left, refreshed October 20"
     assert (partly["rosFromWeek"], partly["rosFromWeekPartial"]) == (6, True)
     preseason = format_json(RUN_FORMATS[0], 2026)
     assert "rosFromWeek" not in preseason

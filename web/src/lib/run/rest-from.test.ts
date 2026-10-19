@@ -1,5 +1,5 @@
 // The week a rest of season counts from, said once (Lane 86, the sweep's Z3): the board's first week,
-// and while a game of it is played that it counts that week's games still to play; a player's own first
+// and while a game of it is played that it counts that week's games left; a player's own first
 // game still to play. Run with `npm test`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
@@ -7,13 +7,13 @@ import { boardRestFrom, playerRestFrom, playerRestWords, restFromWords } from '.
 
 void test('a whole week is "from week 7", a partly played one counts its games still to play', () => {
 	assert.equal(restFromWords(7, false), 'from week 7');
-	assert.equal(restFromWords(6, true), "from week 6's games still to play");
+	assert.equal(restFromWords(6, true), "from week 6's games left");
 });
 
 void test("the board's words read the run's first week and whether a game of it is played", () => {
 	assert.equal(
 		boardRestFrom({ rosFromWeek: 6, rosFromWeekPartial: true }),
-		"from week 6's games still to play"
+		"from week 6's games left"
 	);
 	assert.equal(boardRestFrom({ rosFromWeek: 7, rosFromWeekPartial: false }), 'from week 7');
 	// A run older than the field says the week alone.
