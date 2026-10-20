@@ -37,4 +37,3 @@ func TestProjectedFinalAddsTheRestOfAStarterInPlay(t *testing.T) {
 		}
 	}
 }
-
