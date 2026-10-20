@@ -190,7 +190,7 @@ void test('a player on a season-long list is never given a rank as if he plays (
 	const words = lineWords({ format: REST, numbers: NUMBERS, rest }, SOURCES, 618, held);
 	assert.equal(
 		words.caption,
-		'PPR points for the rest of 2026 if he plays, below the available players'
+		'PPR points for the rest of 2026 through week 17 if he plays, below the available players'
 	);
 	assert.equal(
 		words.value,

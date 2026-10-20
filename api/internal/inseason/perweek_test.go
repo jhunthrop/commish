@@ -22,7 +22,7 @@ func TestWeeksCovered(t *testing.T) {
 		{RestOfSeason, 0, 17},
 	}
 	for _, c := range cases {
-		if got := WeeksCovered(c.basis, c.week); got != c.want {
+		if got := WeeksCovered(c.basis, c.week, StandardHorizon); got != c.want {
 			t.Errorf("%s week %d: %d weeks, want %d", c.basis, c.week, got, c.want)
 		}
 	}
@@ -47,7 +47,7 @@ func TestBasisSaysWhatAWeekIs(t *testing.T) {
 			t.Errorf("the lineup's rows show no points over replacement: %q", s)
 		}
 	}
-	for _, s := range []string{WaiverSeasonBasis(RestOfSeason, 11), WaiverSeasonBasis(Preseason, 17), TradesBasis(RestOfSeason, 1)} {
+	for _, s := range []string{WaiverSeasonBasis(RestOfSeason, 11, StandardHorizon), WaiverSeasonBasis(Preseason, 17, StandardHorizon), TradesBasis(RestOfSeason, 1, StandardHorizon)} {
 		if !strings.Contains(s, "over replacement a week, ") || strings.Contains(s, "12-team") {
 			t.Errorf("%q", s)
 		}

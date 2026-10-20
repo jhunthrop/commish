@@ -188,6 +188,40 @@ func TestPublishedBoardCarriesItsFromWeek(t *testing.T) {
 	}
 }
 
+// Each row's points for one more club game (game_points, revision 0015,
+// Lane 96) reach the board: nil on a table before the column and on a
+// preseason read, the run's figure once written.
+func TestPublishedBoardCarriesItsGamePoints(t *testing.T) {
+	pool, src := publishedFixture(t, true)
+	publishRun(t, pool, "2026-10-21T12", "rest_of_season", "ppr,p1,242.5,null", "ppr,p2,195.3,null")
+	if raw := load(t, src, PPR); raw.Players[0].GamePoints != nil {
+		t.Fatalf("a table before the column: %v", *raw.Players[0].GamePoints)
+	}
+	ctx := context.Background()
+	if _, err := pool.Exec(ctx, "alter table "+publishedSchema+".published_boards add column game_points double precision"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, "update "+publishedSchema+".published_boards set game_points = 20.5 where player_id = 'p1'"); err != nil {
+		t.Fatal(err)
+	}
+	raw := load(t, src, PPR)
+	found := map[string]*float64{}
+	for _, p := range raw.Players {
+		found[p.ID] = p.GamePoints
+	}
+	if found["p1"] == nil || *found["p1"] != 20.5 || found["p2"] != nil {
+		t.Fatalf("game points %v and %v", found["p1"], found["p2"])
+	}
+	if _, err := pool.Exec(ctx, "delete from "+publishedSchema+".published_boards"); err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range load(t, src, PPR).Players {
+		if p.GamePoints != nil {
+			t.Fatalf("preseason %s: %v", p.ID, *p.GamePoints)
+		}
+	}
+}
+
 // Before week 7 the published run is the preseason board: its rows keep
 // their range, and the basis is the preseason sentence.
 func TestPublishedPreseasonRunKeepsItsRange(t *testing.T) {

@@ -116,10 +116,20 @@ class Allowed:
 
 @dataclass(frozen=True, slots=True)
 class Status:
-    """His designation on the newest injury report (the contract's word, None for none) and its capture."""
+    """His designation on the newest injury report (the contract's word, None for none), its capture (when
+    the list last changed) and the capture job's last check of that list (None when the store records
+    none)."""
 
     status: str | None
     captured_at: datetime | None
+    checked_at: datetime | None = None
+
+    def seen_at(self, written_at: datetime) -> datetime | None:
+        """The newest instant the list is known to have stood, at or before the write: its last check when
+        that came by then, else its capture."""
+        if self.checked_at is not None and self.captured_at is not None and self.checked_at <= written_at:
+            return max(self.captured_at, self.checked_at)
+        return self.captured_at
 
 
 @dataclass(frozen=True, slots=True)
