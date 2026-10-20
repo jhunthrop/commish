@@ -7,6 +7,7 @@
 import { memberZone, weekdayTime, zoneWord } from '#lib/format/clock.ts';
 import type { LeagueHost } from '#lib/league/api.ts';
 import {
+	anyKicked,
 	gamePart,
 	kickedOffPartAt,
 	OPP_PART,
@@ -15,7 +16,8 @@ import {
 	uncountedParts,
 	type BasisPart
 } from '#lib/league/box/basis.ts';
-import { boxRow, type BoxRow } from '#lib/league/box/box.ts';
+import { BOX, boxRow, type BoxRow } from '#lib/league/box/box.ts';
+import { lineState } from '#lib/league/box/kickoff.ts';
 import { addVerbWords } from '#lib/league/box/waivers.ts';
 import { hostWords } from '#lib/league/names.ts';
 import { askedQuery } from '#lib/league/box/asked.ts';
@@ -55,6 +57,8 @@ export interface OrderView {
 	position: string;
 	hostId: string;
 	box: BoxRow;
+	/** The week column (Lane 92, B36): his Pts once his game is final, his Proj before (weekFigure). */
+	week: number | null;
 	rank: number;
 	figures: Readonly<Record<FigureKey, number | null>>;
 	/** Whose roster holds him in words, with its kind for the chip; null without a league. */
@@ -80,6 +84,7 @@ export function orderView(row: OrderRow, zone: string, pillRank: boolean, now: n
 		position: row.line.player.position,
 		hostId: row.line.player.host_id,
 		box: { ...box, key },
+		week: weekFigure(row.line, now),
 		rank: row.rank,
 		figures: {
 			por: row.points_over_replacement,
@@ -89,6 +94,22 @@ export function orderView(row: OrderRow, zone: string, pillRank: boolean, now: n
 		roster: row.roster === null ? null : { kind: row.roster.kind, words: rosterWords(row.roster) },
 		move: row.move
 	};
+}
+
+/** His week column (Lane 92, B36): once his game is final his points, the platform's where his roster
+ * gives them, else our stats' once they land; before it his Proj (as of kickoff once it has kicked
+ * off). Null for a final game with no points held yet, never his Proj beside a played game. */
+export function weekFigure(line: OrderRow['line'], now: number): number | null {
+	const { facts } = line;
+	if (lineState(facts, now) !== 'final') return line.week_projection;
+	if (facts.points_this_week !== null) return facts.points_this_week;
+	return facts.last_games.find((g) => g.week === facts.week)?.points ?? null;
+}
+
+/** The week column's key, said once (Lane 92, B36, B50): Pts once final, "--" until they land, Proj
+ * before. */
+export function weekColumnPart(week: number): string {
+	return `${weekHead(week)} is ${BOX.pts} once final, ${BOX.none} until his stats land, ${BOX.proj} before.`;
 }
 
 /** The roster filter a chip asks the API for (review 66j H5): null for everyone. */
@@ -143,19 +164,21 @@ export function orderBasis(
 ): BasisPart[] {
 	const clock = { zone, zoned: true };
 	const lines = advice.rows.map((row) => row.line);
-	// The order carries no defense (Lane 66m), so the projection's defense words never apply.
+	// The order carries no defense (Lane 66m), so the projection's defense words never apply. The week
+	// column is keyed first, then what its Proj is (Lane 92: no week column is called Proj).
 	const proj = projPart(
 		{
 			readAt: advice.projection_read_at,
 			scoring: advice.projection_scoring,
 			defense: false,
 			league: league !== null,
-			head: weekHead(advice.week)
+			kicked: anyKicked(lines, now)
 		},
 		clock
 	);
 	return [
 		...said(advice.basis),
+		...said(weekColumnPart(advice.week)),
 		...said(proj),
 		...said(OPP_PART),
 		...(league === null ? [] : uncountedParts(advice, league.rulesHref)),

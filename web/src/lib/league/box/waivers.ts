@@ -13,6 +13,7 @@ import { addKey, claimsAdd } from '../inseason/move.ts';
 import { LINES } from '../inseason/words.ts';
 import { hostWords } from '../names.ts';
 import {
+	anyKicked,
 	deltaPart,
 	gamePart,
 	kickedOffPartAt,
@@ -494,7 +495,9 @@ export function waiverBasis(
 						readAt: advice.projection_read_at,
 						scoring: advice.projection_scoring,
 						defense,
-						league: true
+						league: true,
+						// A row past kickoff keeps its Proj as of kickoff (Lane 92, B27).
+						kicked: anyKicked(lines, now)
 					},
 					clock
 				);

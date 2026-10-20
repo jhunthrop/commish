@@ -194,6 +194,7 @@
 		projection={{ readAt: advice.projection_read_at, scoring: advice.projection_scoring }}
 		lineup={{ previousReadAt: advice.projection_previous_read_at, note: advice, rulesHref }}
 		lines={shown}
+		noFinal={box.totals.live && box.totals.final === null}
 		{now}
 	/>
 </Screen>

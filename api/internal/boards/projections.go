@@ -69,6 +69,29 @@ type WeekProjection struct {
 	// Previous is the week's snapshot before this one (Lane 66e: a row's
 	// change since the read before), nil with none.
 	Previous *WeekProjection
+	// Earlier is every snapshot of the week before this one, newest first
+	// (Earlier[0] is Previous), each with its own Previous: the one a game
+	// past its kickoff reads (AsOf, Lane 92).
+	Earlier []WeekProjection
+}
+
+// AsOf is the week's projection as it stood at an instant (Lane 92, B27):
+// the newest snapshot captured at or before it, with the snapshot before
+// it as its Previous. A game past its kickoff keeps its projection as of
+// kickoff, so its row never moves after the game has started. With none
+// captured by then (a week whose first capture came after the kickoff) it
+// holds no row: a snapshot from after the kickoff is never called as of
+// kickoff (fix round 1, L3).
+func (w WeekProjection) AsOf(at time.Time) WeekProjection {
+	if !w.ReadAt.After(at) {
+		return w
+	}
+	for _, e := range w.Earlier {
+		if !e.ReadAt.After(at) {
+			return e
+		}
+	}
+	return emptyProjection(w.Week)
 }
 
 // Player is a player's points: a team defense's by his club, anyone
@@ -101,22 +124,23 @@ func (s *PGSource) WeekProjection(ctx context.Context, season, week int) (WeekPr
 	}
 	rows, err := s.Pool.Query(ctx, `with newest as (
   select snapshot_id, max(captured_at) as captured_at from `+s.table("tank01_projection_rows")+`
-  where season = $1 and week = $2 group by snapshot_id order by max(captured_at) desc, snapshot_id desc limit 2
+  where season = $1 and week = $2 group by snapshot_id order by max(captured_at) desc, snapshot_id desc limit $5
 )
 select r.provider_player_id, r.position, r.team, r.ppr_points, r.half_points, r.standard_points, n.captured_at, r.snapshot_id
 from `+s.table("tank01_projection_rows")+` r join newest n on n.snapshot_id = r.snapshot_id
 left join `+s.table("provider_players")+` pp on pp.id = r.provider_player_id
 where r.position = any($3) or pp.id is not null
 order by n.captured_at desc, r.snapshot_id desc, r.provider_player_id collate "C" limit $4`, season, week,
-		[]string{DefensePosition, KickerPosition}, snapshotsRead*maxProjectionRows+1)
+		[]string{DefensePosition, KickerPosition}, snapshotsRead*maxProjectionRows+1, snapshotsRead)
 	if err != nil {
 		return out, fmt.Errorf("boards: read week %d projection: %w", week, err)
 	}
 	defer rows.Close()
 	n := 0
-	newest := int64(-1)
-	before := emptyProjection(week)
-	kickers, beforeKickers := map[string]int{}, map[string]int{}
+	// Every snapshot of the week, newest first, with its kickers by club.
+	var snaps []WeekProjection
+	var kickers []map[string]int
+	current := int64(-1)
 	for rows.Next() {
 		var id, position, team string
 		var p ProjectedPoints
@@ -126,14 +150,13 @@ order by n.captured_at desc, r.snapshot_id desc, r.provider_player_id collate "C
 			return out, fmt.Errorf("boards: scan week %d projection: %w", week, err)
 		}
 		n++
-		if newest < 0 {
-			newest = snapshot
+		if len(snaps) == 0 || snapshot != current {
+			current = snapshot
+			snaps = append(snaps, emptyProjection(week))
+			kickers = append(kickers, map[string]int{})
 		}
-		if snapshot == newest {
-			out.add(id, position, team, p, at, kickers)
-		} else {
-			before.add(id, position, team, p, at, beforeKickers)
-		}
+		last := len(snaps) - 1
+		snaps[last].add(id, position, team, p, at, kickers[last])
 	}
 	if err := rows.Err(); err != nil {
 		return out, fmt.Errorf("boards: read week %d projection: %w", week, err)
@@ -141,16 +164,30 @@ order by n.captured_at desc, r.snapshot_id desc, r.provider_player_id collate "C
 	if n > snapshotsRead*maxProjectionRows {
 		return out, fmt.Errorf("boards: over %d projection rows for week %d", snapshotsRead*maxProjectionRows, week)
 	}
-	out.dropSharedKickers(kickers)
-	if !before.ReadAt.IsZero() {
-		before.dropSharedKickers(beforeKickers)
-		out.Previous = &before
+	if len(snaps) == 0 {
+		return out, nil
 	}
-	return out, nil
+	return chained(snaps, kickers), nil
 }
 
-// snapshotsRead is the newest snapshot and the one before it.
-const snapshotsRead = 2
+// chained is the snapshots, newest first, each with the one before it as
+// its Previous, the newest with every earlier one as Earlier.
+func chained(snaps []WeekProjection, kickers []map[string]int) WeekProjection {
+	for i := range snaps {
+		snaps[i].dropSharedKickers(kickers[i])
+	}
+	for i := len(snaps) - 2; i >= 0; i-- {
+		before := snaps[i+1]
+		snaps[i].Previous = &before
+	}
+	out := snaps[0]
+	out.Earlier = snaps[1:]
+	return out
+}
+
+// snapshotsRead bounds the week's snapshots read: the harvest captures
+// one per kickoff slot (four to six a week), with room for retakes.
+const snapshotsRead = 16
 
 func emptyProjection(week int) WeekProjection {
 	return WeekProjection{Week: week, Players: map[string]ProjectedPoints{}, Defenses: map[string]ProjectedPoints{},

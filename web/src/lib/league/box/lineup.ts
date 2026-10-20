@@ -302,6 +302,7 @@ export function lineupBox(
 		| 'projection_read_at'
 		| 'week'
 	> &
+		Partial<Pick<LineupAdvice, 'projected_final'>> &
 		Partial<Held>,
 	zone: string,
 	now: number
@@ -365,6 +366,8 @@ export function lineupBox(
 		totals: {
 			proj,
 			pts: totalsPts(ours, advice.player_points, advice.team_points),
+			final: advice.projected_final ?? null,
+			live: placed.some((p) => pastKickoff((p.slot.host ?? p.slot.ours).facts, now)),
 			note: totalsNote(counted, advice.projection_read_at !== null, advice.week)
 		},
 		asSet,

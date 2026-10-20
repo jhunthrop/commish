@@ -19,10 +19,36 @@ func (a *advisor) Matchup() (apitypes.MatchupBox, bool) {
 	out := apitypes.MatchupBox{Week: a.Snap.Week, ReadAt: a.Snap.ReadAt, ProjectionReadAt: a.projectionReadAt(),
 		ProjectionScoring: projectionScoring(a.settings, a.preset),
 		Sides:             []apitypes.MatchupBoxSide{a.boxSide(team, a.side(a.Me))}}
+	sides := []*leaguesync.Side{a.side(a.Me)}
 	if opp := a.opponent(); opp != nil {
 		if t, ok := a.Snap.TeamByRoster(opp.RosterID); ok {
 			out.Sides = append(out.Sides, a.boxSide(t, opp))
+			sides = append(sides, opp)
 		}
+	}
+	// Each side's projected final once the game has kicked off, by the
+	// score bug's rule over the same starters.
+	starters := make([][]apitypes.PlayerLine, len(out.Sides))
+	var all []apitypes.PlayerLine
+	for i, side := range out.Sides {
+		for _, s := range side.Starters {
+			starters[i] = append(starters[i], s.Line)
+		}
+		all = append(all, starters[i]...)
+	}
+	started := anyStarted(all)
+	var game kickoffs
+	own := make([]kickoffs, len(out.Sides))
+	for i := range out.Sides {
+		for _, l := range starters[i] {
+			own[i].add(l.Facts)
+			game.add(l.Facts)
+		}
+	}
+	for i := range out.Sides {
+		out.Sides[i].ProjectedFinal = projectedFinal(sidePoints(sides[i]), starters[i], started)
+		// Each side's count by the score bug's rule (fix round 1, MEDIUM-3).
+		out.Sides[i].ToPlay = own[i].toPlay(game.state())
 	}
 	return out, true
 }

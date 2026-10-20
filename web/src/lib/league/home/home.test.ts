@@ -8,10 +8,13 @@ import type { LeagueMove, LeagueTeam, LeagueTerms } from '../api.ts';
 import type { LineupAdvice, PlayerLine, Scoreboard } from '../inseason/api.ts';
 import { WEEK_DONE } from '../../../../scripts/inseason-fixture/sunday.ts';
 import { KICKOFF } from '../box/kickoff.ts';
+import { BOX } from '../box/box.ts';
 import { changesTitle } from '../box/lineup.ts';
 import {
 	HOME,
 	bugsOf,
+	projectedFinalOf,
+	readCell,
 	lineupSummary,
 	extraWords,
 	feedRows,
@@ -136,9 +139,17 @@ const board = (state: Scoreboard['games'][number]['state']): Scoreboard => ({
 		{
 			state,
 			next_kickoff: state === 'final' ? null : '2026-10-18T20:25:00.000Z',
-			// The API's count (words.go ToPlayWords), a bye starter left out of it.
-			to_play: state === 'playing' ? '12 of 18 starters to play' : null,
-			sides: [side(1, 62.1, 87), side(2, 71.4, null)]
+			// The API's pooled count (words.go ToPlayWords), which the bug no longer prints.
+			to_play: state === 'playing' ? '3 to play' : null,
+			sides: [
+				// Each side's own count and projected final (Lane 92), only while under way.
+				{
+					...side(1, 62.1, 87),
+					to_play: state === 'playing' ? '2 playing' : null,
+					projected_final: state === 'upcoming' ? null : 70.4
+				},
+				{ ...side(2, 71.4, null), to_play: state === 'playing' ? '3 to play' : null }
+			]
 		}
 	]
 });
@@ -150,11 +161,13 @@ void test('a bug before kickoff names the next kickoff and draws both sides alik
 	assert.ok(bug);
 	assert.equal(bug.head, 'Sun 3:25 pm');
 	assert.equal(bug.words, HOME.nextKickoff);
+	// Before the first kickoff the Proj is the big figure (Lane 92, B22), nothing small beside it.
+	assert.deepEqual(bug.columns, { small: '', big: 'Proj' });
 	assert.deepEqual(
-		bug.sides.map((s) => [s.name, s.record, s.proj, s.pts, s.stands, s.me]),
+		bug.sides.map((s) => [s.name, s.record, s.small, s.big, s.toPlay, s.stands, s.me]),
 		[
-			['Team 1', '3-2', '87.0', '--', 'level', true],
-			['Team 2', '3-2-1', '--', '--', 'level', false]
+			['Team 1', '3-2', '', '87.0', '', 'level', true],
+			['Team 2', '3-2-1', '', '--', '', 'level', false]
 		]
 	);
 	assert.ok(bug.mine);
@@ -165,17 +178,28 @@ void test('once a game has started the side ahead is bright and the side behind 
 		const [bug] = bugsOf(board(state), SYNC, SATURDAY, ZONE);
 		assert.ok(bug);
 		assert.deepEqual(
-			bug.sides.map((s) => [s.pts, s.stands]),
+			bug.sides.map((s) => [s.big, s.stands]),
 			[
 				['62.1', 'behind'],
 				['71.4', 'ahead']
 			]
 		);
+		// From the first kickoff the Pts are big, the projected final small (its Proj with none).
+		assert.deepEqual(bug.columns, { small: BOX.projFinal, big: BOX.pts });
+		assert.deepEqual(
+			bug.sides.map((s) => s.small),
+			['70.4', '--']
+		);
 	}
 	const [playing] = bugsOf(board('playing'), SYNC, SATURDAY, ZONE);
 	assert.ok(playing);
 	assert.equal(playing.head, KICKOFF.kickedOff);
-	assert.equal(playing.words, '12 of 18 starters to play');
+	// Each side says where its starters stand (B02), never a pooled zero.
+	assert.deepEqual(
+		playing.sides.map((s) => s.toPlay),
+		['2 playing', '3 to play']
+	);
+	assert.equal(playing.words, '');
 	const [final] = bugsOf(board('final'), SYNC, SATURDAY, ZONE);
 	assert.equal(final?.head, HOME.final);
 	const level = board('playing');
@@ -191,7 +215,7 @@ void test('once a game has started the side ahead is bright and the side behind 
 	const unread = board('playing');
 	if (unread.games[0]?.sides[1]) unread.games[0].sides[1].points_read = false;
 	assert.deepEqual(
-		bugsOf(unread, SYNC, SATURDAY, ZONE)[0]?.sides.map((s) => [s.pts, s.stands]),
+		bugsOf(unread, SYNC, SATURDAY, ZONE)[0]?.sides.map((s) => [s.big, s.stands]),
 		[
 			['62.1', 'level'],
 			['--', 'level']
@@ -208,18 +232,43 @@ void test('a kickoff before the page clock is never the next: the bug reads Kick
 	assert.equal(lagging.words, '');
 	assert.equal(lagging.state, 'kicked_off');
 	assert.deepEqual(
-		lagging.sides.map((s) => [s.pts, s.stands]),
+		lagging.sides.map((s) => [s.big, s.stands]),
 		[
 			['62.1', 'behind'],
 			['71.4', 'ahead']
 		]
 	);
-	// Under way with its next kickoff past: Kicked off, the starters still to play counted.
+	// Under way with its next kickoff past: Kicked off, each side's starters counted.
 	const [playing] = bugsOf(board('playing'), SYNC, MONDAY, ZONE);
 	assert.ok(playing);
 	assert.equal(playing.head, KICKOFF.kickedOff);
-	assert.equal(playing.words, '12 of 18 starters to play');
+	assert.equal(playing.sides[1]?.toPlay, '3 to play');
 	assert.equal(bugsOf(board('final'), SYNC, MONDAY, ZONE)[0]?.head, KICKOFF.final);
+});
+
+void test('a live bug says its read beside the score, short, and nothing before or after', () => {
+	// Lane 92, B06: "ESPN 1 min ago" as a cell, from the league's read at the page's clock.
+	const read = { host: 'espn' as const, readAt: '2026-10-18T18:52:00.000Z' };
+	const at = (minutes: number) => Date.parse(read.readAt) + minutes * 60_000;
+	assert.equal(bugsOf(board('playing'), SYNC, at(0.5), ZONE, read)[0]?.words, 'ESPN just now');
+	assert.equal(bugsOf(board('playing'), SYNC, at(1), ZONE, read)[0]?.words, 'ESPN 1 min ago');
+	assert.equal(bugsOf(board('playing'), SYNC, at(8), ZONE, read)[0]?.words, 'ESPN 8 min ago');
+	assert.equal(readCell(read, at(125)), 'ESPN 2 hr ago');
+	assert.equal(bugsOf(board('final'), SYNC, at(1), ZONE, read)[0]?.words, '');
+	assert.equal(bugsOf(board('upcoming'), SYNC, SATURDAY, ZONE, read)[0]?.words, HOME.nextKickoff);
+});
+
+void test('the standings Proj is a team’s projected final once its week has started', () => {
+	const live = projections(board('playing'), SATURDAY);
+	assert.equal(live.get(1), 70.4);
+	assert.equal(live.get(2), null);
+	assert.equal(projections(board('upcoming'), SATURDAY).get(1), 87);
+	// A read that lags the page's clock (upcoming, its kickoff past) reads as the bug does, kicked off,
+	// never the pre-game Proj (round 2, gameHead at the page's clock).
+	assert.equal(projections(board('upcoming'), MONDAY).get(1), null);
+	assert.equal(projectedFinalOf(board('playing'), 1), 70.4);
+	assert.equal(projectedFinalOf(board('upcoming'), 1), null);
+	assert.equal(projectedFinalOf(null, 1), null);
 });
 
 void test('the standings carry each team’s projection and sort by a column, best first', () => {
@@ -230,10 +279,15 @@ void test('the standings carry each team’s projection and sort by a column, be
 	];
 	const rows = standingsRows(
 		{ teams, me: 3 },
-		projections({
-			...board('upcoming'),
-			games: [{ state: 'upcoming', next_kickoff: null, sides: [side(1, 0, 101), side(3, 0, 120)] }]
-		})
+		projections(
+			{
+				...board('upcoming'),
+				games: [
+					{ state: 'upcoming', next_kickoff: null, sides: [side(1, 0, 101), side(3, 0, 120)] }
+				]
+			},
+			SATURDAY
+		)
 	);
 	assert.deepEqual(
 		rows.map((r) => [r.rank, r.me, r.proj]),

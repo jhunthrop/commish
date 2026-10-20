@@ -12,6 +12,7 @@ import { apiFormatOf } from '../../src/lib/run/format-ids.ts';
 import { restFromWords } from '../../src/lib/run/rest-from.ts';
 import type { BoardFormat } from '../../src/lib/sheet/model.ts';
 import { stateAt } from './game-state.ts';
+import { SCORED_SHARE } from './scoreboard-at.ts';
 import { roundTenth } from './tenths.ts';
 
 type OrderAdvice = components['schemas']['OrderAdvice'];
@@ -28,6 +29,17 @@ function weekPlayed(line: PlayerLine, now: number): boolean {
 	const facts = line.facts as unknown as { bye?: boolean; kickoff: string | null; played: boolean };
 	if (facts.bye === true) return true;
 	return stateAt({ ...facts, team: line.player.team }, now) !== 'upcoming';
+}
+
+/** His line with his roster's points so far once his game has kicked off (Lane 92, the API's
+ * boardPerson reads his roster's side): the stand-in's scored share of his projection (sunday.ts), for
+ * a rostered player in a league's order alone; a free agent has none from the platform. */
+function withRosterPoints(row: OrderRow, now: number): PlayerLine {
+	const { line } = row;
+	if (row.roster === null || row.roster.kind === 'free' || !weekPlayed(line, now)) return line;
+	if (line.facts.bye || line.week_projection === null) return line;
+	const points = roundTenth(line.week_projection * SCORED_SHARE);
+	return { ...line, facts: { ...line.facts, points_this_week: points } };
 }
 
 /** His rest of season at `now` from his order row: the week it starts from and his total over the
@@ -50,6 +62,7 @@ export function restOfRow(
 export function orderAtClock(order: OrderAdvice, now: number): OrderAdvice {
 	const rows = order.rows.map((row) => ({
 		...row,
+		line: withRosterPoints(row, now),
 		rest_of_season_points: restOfRow(row, now).points
 	}));
 	const played = order.rows.map((row) => weekPlayed(row.line, now));

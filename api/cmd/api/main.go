@@ -187,6 +187,9 @@ func build(ctx context.Context, cfg config.API, pool *pgxpool.Pool, obs httpx.Ob
 	}
 	// The trade search warms as each league read lands (Lane 66u).
 	leagueSync.Poller.Landed = inSeason.OnLanded
+	// While a game is under way every screen waits for a read under the
+	// minute old (Lane 92): the schedule's one live window.
+	leagueSync.Poller.Live = facts.Live
 
 	routes := slices.Concat(
 		server.Health(pool, version),

@@ -3039,12 +3039,12 @@ export interface components {
 			rest_of_season_per_game: number | null;
 			/**
 			 * Format: double
-			 * @description his points this week on the week's published projection, to the tenth (the site's one rounding, half away from zero), in the format the league's scoring is most like (PPR, half PPR or standard); a team defense's by its club, a kicker our board does not place (no board id) by his club's one kicker, never a teammate's for a kicker the snapshot left out. The newest snapshot stored for the league's week (projection_read_at says when). Null when his club has no game that week (a bye), whatever the snapshot holds, and when the snapshot has no row for him or none is stored. Our own weekly model replaces it when it passes its test
+			 * @description his points this week on the week's published projection, to the tenth (the site's one rounding, half away from zero), in the format the league's scoring is most like (PPR, half PPR or standard); a team defense's by its club, a kicker our board does not place (no board id) by his club's one kicker, never a teammate's for a kicker the snapshot left out. The newest snapshot stored for the league's week (projection_read_at says when) while his game is still to come; once it has kicked off, the newest captured at or before his kickoff (null when none was), so a game under way or final keeps its projection as of kickoff. Null when his club has no game that week (a bye), whatever the snapshot holds, and when the snapshot has no row for him or none is stored. Our own weekly model replaces it when it passes its test
 			 */
 			week_projection: number | null;
 			/**
 			 * Format: double
-			 * @description week_projection's change since the week's snapshot before the newest, to the tenth, in the same format; null without a row for him in both snapshots or when week_projection is null
+			 * @description week_projection's change since the week's snapshot before the one it is read from (the newest, or once his game has kicked off the one as of kickoff), to the tenth, in the same format; null without a row for him in both snapshots or when week_projection is null
 			 */
 			projection_delta: number | null;
 			/** @description this week's opponent's rank in points allowed a game to his position this season under the league's scoring, 1 allowed the fewest (facts.allowed_to_position.rank, of its .of); null on a bye or before the season ranks it */
@@ -3156,6 +3156,11 @@ export interface components {
 			 * @description the host's points so far for the drafter's team this week, null before any of its starters has kicked off or when the host's score could not be read
 			 */
 			team_points: number | null;
+			/**
+			 * Format: double
+			 * @description the lineup's projected final by the score bug's one rule over the lineup as the platform holds it (the score bug's figure for the member): team_points plus the rest of the Proj of its starters in play and the Proj of its starters still to play, an out starter counting nothing; null while team_points is, while a starter still to play has no Proj, or absent from an older answer
+			 */
+			projected_final?: number | null;
 			projection_scoring: components['schemas']['ProjectionScoring'];
 			/**
 			 * Format: date-time
@@ -3217,6 +3222,13 @@ export interface components {
 			player_points: boolean;
 			/** @description the platform sends the side's own total (ESPN, Yahoo, FFPC), so the score and the Totals row print it; false where it sends each player's points alone (Sleeper, MFL), so both print the rows' sum */
 			team_total: boolean;
+			/** @description where the side's starters stand while the game is playing, by the score bug's rule (ScoreboardSide.to_play): "3 to play", "2 playing", never a zero; null otherwise, or absent from an older answer */
+			to_play?: string | null;
+			/**
+			 * Format: double
+			 * @description the side's projected final by the score bug's one rule (ScoreboardSide.projected_final): its score so far, the rest of the Proj of its starters in play and the Proj of its starters still to play; null before the game's first kickoff, with the score unread, while a starter still to play has no Proj, or absent from an older answer
+			 */
+			projected_final?: number | null;
 			/** @description the host's starters in the league's slot order (QB, RB, WR, TE, the flex spots, K, DEF); an empty spot is left out, and a starter no slot takes ends the list in his position's slot. Empty where the host shows us no lineup for the side (FFPC's opponents) */
 			starters: components['schemas']['BoxStarter'][];
 			/** @description the side's other active players, by our order (injured reserve and taxi spots left out) */
@@ -3252,6 +3264,13 @@ export interface components {
 			starters: number;
 			/** @description those starters whose game has kicked off */
 			played: number;
+			/** @description while the game is playing, where the side's starters stand, never a zero: "3 to play" while any starter with a game is still to come (an out starter whose game is still to come counts), "2 playing" once none is and some are in play; null once every starter is final, on bye or out of a game under way, before kickoff, or absent from an older answer */
+			to_play?: string | null;
+			/**
+			 * Format: double
+			 * @description the side's projected final once any starter of the game has kicked off: points (the platform's score so far), plus for each starter in play the rest of his week projection (max(0, Proj - his points so far), nothing where the platform gives no player's points), plus the week projection of each starter still to play, each as printed to the tenth, an out starter counting nothing; equal to points once every starter is final. Null before the game's first kickoff, with the score unread, while a starter still to play has no week projection, or absent from an older answer
+			 */
+			projected_final?: number | null;
 		};
 		ScoreboardGame: {
 			/**
@@ -3264,7 +3283,7 @@ export interface components {
 			 * @description the earliest kickoff still to come among both sides' starters, null when none is
 			 */
 			next_kickoff: string | null;
-			/** @description while the game is playing, how many of both sides' starters with a game this week are still to play ("5 of 18 starters to play"): a starter on bye, or with no game held, is neither to play nor played and leaves the count; null otherwise, or absent from an older answer */
+			/** @description while the game is playing, how many of both sides' starters with a game this week are still to play ("5 to play", or "2 playing" once none is still to come), never a zero; an out starter is done once his game has kicked off, a starter on bye or with no game held leaves the count; null otherwise, or absent from an older answer. Each side's own count is its to_play */
 			to_play?: string | null;
 			/** @description two sides, the drafter's first when the game is theirs; one for a team with no opponent */
 			sides: components['schemas']['ScoreboardSide'][];

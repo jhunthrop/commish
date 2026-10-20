@@ -1,7 +1,8 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
-	import { BOX, boxNumber, type BoxRow, type BoxStarter, type BoxTotals } from './box.ts';
+	import { BOX, type BoxRow, type BoxStarter, type BoxTotals } from './box.ts';
 	import BoxLine from './BoxLine.svelte';
+	import TeamFigures from './TeamFigures.svelte';
 	import TeamAvatar from './TeamAvatar.svelte';
 
 	/** One team's box score (Lane 66d): its name with its avatar over the columns (slot, player, game,
@@ -75,8 +76,7 @@
 				><span class="tl">{BOX.totals}</span>{#if totals.note}<span class="tsub">{totals.note}</span
 					>{/if}</td
 			>
-			<td class="n proj">{boxNumber(totals.proj)}</td>
-			<td class="n pts">{boxNumber(totals.pts)}</td>
+			<TeamFigures {totals} />
 		</tr>
 	</tbody>
 	{#if bench.length > 0 || noBench !== null}
@@ -206,18 +206,6 @@
 		letter-spacing: 0.06em;
 	}
 
-	.totals .proj {
-		font-size: var(--t-xl);
-		font-weight: 700;
-		color: var(--scoreboard-num);
-	}
-
-	.totals .pts {
-		font-size: var(--t-xl);
-		font-weight: 700;
-		color: var(--scoreboard-ink-2);
-	}
-
 	.bhead th {
 		height: 30px;
 		font-size: var(--t-xs);
@@ -244,11 +232,6 @@
 
 		.cols .n {
 			width: 50px;
-		}
-
-		.totals .proj,
-		.totals .pts {
-			font-size: var(--t-lg);
 		}
 	}
 </style>
