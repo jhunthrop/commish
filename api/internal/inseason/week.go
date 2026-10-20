@@ -136,12 +136,22 @@ func (s *Service) weekLeague(ctx context.Context, wl WeekLeague, held map[string
 	out.Bug = a.weekBug(lineup)
 	summary := lineupSummary(lineup)
 	out.Lineup = &summary
+	// The roster's facts are the action screens' (Lane 95): once the
+	// member's lineup has played its week, next week's.
+	acts := s.addressed(ctx, a)
+	chipsWeek := acts.week
+	out.ChipsWeek = &chipsWeek
+	if acts != a {
+		if lineup, ok = acts.Lineup(); !ok {
+			return problem(noTeamWords)
+		}
+	}
 	var pickups []apitypes.WaiverRow
 	if wl.WaiversOpen {
 		// The full waiver page's strip by its one pickup rule: Pickups builds the
 		// whole page (its rows and their sentences) to read it, a cost each front
 		// door read with waivers open pays (review L-J).
-		pickups, _ = a.Pickups()
+		pickups, _ = acts.Pickups()
 	}
 	out.Chips = rosterChips(lineup, pickups)
 	return out

@@ -130,17 +130,26 @@ type Season struct {
 	carried      map[string]bool
 	designations map[string]boards.Designation
 	gameFacts    map[boards.ClubWeek]boards.GameFact
+	// lastKickoff is each club's last kickoff before the week.
+	lastKickoff map[string]time.Time
+	// dropSpent is a Season for the week after the one the clock is in
+	// (Lane 95, WithoutSpent): a week's designation listed before his club's
+	// last game was about that game, so it is no fact of this week.
+	dropSpent bool
 }
 
 // NewSeason indexes the data for the league's rules, the week and now.
 func NewSeason(d Data, rules Rules, week int, now time.Time) *Season {
 	s := &Season{week: week, now: now, games: map[teamWeek]boards.TeamWeek{}, scheduled: map[string]bool{},
-		points: map[string][]GamePoints{}, designations: d.Designations, gameFacts: d.GameFacts}
+		points: map[string][]GamePoints{}, designations: d.Designations, gameFacts: d.GameFacts, lastKickoff: map[string]time.Time{}}
 	for _, g := range d.Games {
 		s.games[teamWeek{g.Week, g.Team}] = g
 		s.scheduled[g.Team] = true
 		if g.Week == week {
 			s.weekHasGames = true
+		}
+		if g.Week < week && g.Kickoff.After(s.lastKickoff[g.Team]) {
+			s.lastKickoff[g.Team] = g.Kickoff
 		}
 	}
 	sums := map[teamPosition]float64{}
@@ -319,10 +328,33 @@ func (s *Season) For(p Player) Facts {
 	return f
 }
 
+// WithoutSpent is the Season with every spent designation dropped: for the
+// week after the one whose games the member's lineup has played (Lane 95),
+// a week's designation (questionable, doubtful, out) counts only when the
+// provider listed it after his club's last kickoff before the week, so it is
+// about this week's game; a season-long one stands. A listing with no date
+// (Listed nil) is no newer than that game.
+func (s *Season) WithoutSpent() *Season {
+	out := *s
+	out.dropSpent = true
+	return &out
+}
+
+// spent reports whether a designation was about a game already played:
+// on a WithoutSpent Season, a week's designation listed no later than his
+// club's last kickoff before the week.
+func (s *Season) spent(d boards.Designation, team string) bool {
+	if !s.dropSpent || d.SeasonLong() {
+		return false
+	}
+	last, played := s.lastKickoff[team]
+	return played && (d.Listed == nil || !d.Listed.After(last))
+}
+
 // designation is the newest capture's designation for him, else the
 // host's IR mark at the read.
 func (s *Season) designation(p Player) *Designation {
-	if d, ok := s.designations[p.BoardID]; ok && p.BoardID != "" {
+	if d, ok := s.designations[p.BoardID]; ok && p.BoardID != "" && !s.spent(d, p.Team) {
 		if status := boards.StatusOf(d.Code); status != "" {
 			return &Designation{Status: status, AsOf: d.AsOf, Since: d.Since}
 		}

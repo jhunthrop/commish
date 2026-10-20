@@ -148,10 +148,15 @@ func TestWaiverDropsListEveryChoice(t *testing.T) {
 
 // The waiver answer carries the new fields on the recorded league: every
 // pickup is one by the rule, every drop is on the answer's roster, and
-// the copy line names the platform.
+// the copy line names the platform. The week's projection is read, so the
+// page is in the week order (Lane 95: with none read, the season Gain's).
 func TestWaiverAnswerCarriesTheTable(t *testing.T) {
 	f := newFixture(t)
-	out, ok := newFixtureAdvisor(t, f, nil).Waivers("", "")
+	a, err := newAdvisor(f.league, f.data, everyoneProjected(f), nil, fixtureNow)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, ok := a.Waivers("", "")
 	if !ok {
 		t.Fatal("no answer")
 	}

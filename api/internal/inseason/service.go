@@ -125,11 +125,29 @@ const (
 	noTeamWords   = "We could not find your team in this league's last read"
 )
 
-// advisorFor is the request's league with its facts, or an answer: a
-// league with no saved scoring answers 422 naming why, a league with no
-// current week 409 in the league page's words. A stale host read is no
-// error: read_at says how stale.
+// screenWeek is the week a screen's advisor reads (Lane 95).
+type screenWeek int
+
+const (
+	// leagueWeek is the platform's week: the Lineup, the Matchup and every
+	// screen about the week's games.
+	leagueWeek screenWeek = iota
+	// actionWeek is the first week the member can still act on
+	// (advisor.addressedWeek): Waivers and Trades.
+	actionWeek
+)
+
+// advisorFor is the request's league with its facts on the platform's
+// week (advisorAt).
 func (s *Service) advisorFor(w http.ResponseWriter, r *http.Request) (*advisor, bool) {
+	return s.advisorAt(w, r, leagueWeek)
+}
+
+// advisorAt is the request's league with its facts for the screen's week,
+// or an answer: a league with no saved scoring answers 422 naming why, a
+// league with no current week 409 in the league page's words. A stale host
+// read is no error: read_at says how stale.
+func (s *Service) advisorAt(w http.ResponseWriter, r *http.Request, at screenWeek) (*advisor, bool) {
 	l, ok := s.Leagues.Follow(w, r)
 	if !ok {
 		return nil, false
@@ -144,7 +162,7 @@ func (s *Service) advisorFor(w http.ResponseWriter, r *http.Request) (*advisor, 
 	}
 	account := auth.AccountID(r)
 	s.viewers.saw(l.Snap.Ref, account, s.Now())
-	a, err := s.leagueAdvisor(r.Context(), l, account, context.WithoutCancel(s.base()))
+	a, err := s.leagueAdvisor(r.Context(), l, account, context.WithoutCancel(s.base()), at)
 	if err != nil {
 		httpx.WriteInternal(w, r, s.Log, "inseason: advisor", err)
 		return nil, false
@@ -172,8 +190,10 @@ func (s *Service) searchStopped(w http.ResponseWriter, r *http.Request, a *advis
 // projection, its holds and the pair's kept trade search: what a request
 // reads, and what a landed read warms (warm.go). search is the context a
 // search it starts runs on: the service's for a request (requests share
-// it), the warm run's for a warm.
-func (s *Service) leagueAdvisor(ctx context.Context, l League, account uuid.UUID, search context.Context) (*advisor, error) {
+// it), the warm run's for a warm. at is the screen's week: on actionWeek
+// the advisor turns to the week after once the member's lineup has played
+// its week (Lane 95).
+func (s *Service) leagueAdvisor(ctx context.Context, l League, account uuid.UUID, search context.Context, at screenWeek) (*advisor, error) {
 	data, err := s.Facts.Data(ctx, seasonOf(l))
 	if err != nil {
 		return nil, fmt.Errorf("facts: %w", err)
@@ -186,8 +206,22 @@ func (s *Service) leagueAdvisor(ctx context.Context, l League, account uuid.UUID
 	if err != nil {
 		return nil, err
 	}
+	if at == actionWeek {
+		a = s.addressed(ctx, a)
+	}
 	a.finds = s.findsFor(a, account.String(), search)
 	return a, nil
+}
+
+// addressed is the advisor for the week an action screen addresses: a
+// itself on its own week, else a turned to the week after with that week's
+// published projection (Lane 95).
+func (s *Service) addressed(ctx context.Context, a *advisor) *advisor {
+	week := a.addressedWeek()
+	if week == a.week {
+		return a
+	}
+	return a.turnTo(week, s.projection(ctx, seasonOf(a.League), week))
 }
 
 // projection is the week's published projection. A read that fails is
@@ -254,7 +288,7 @@ func (s *Service) waivers(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteInvalid(w, r, map[string]string{fieldPlayer: playerWords})
 		return
 	}
-	a, ok := s.advisorFor(w, r)
+	a, ok := s.advisorAt(w, r, actionWeek)
 	if !ok {
 		return
 	}
@@ -282,7 +316,7 @@ func (s *Service) trades(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteInvalid(w, r, map[string]string{fieldPlayer: playerWords})
 		return
 	}
-	a, ok := s.advisorFor(w, r)
+	a, ok := s.advisorAt(w, r, actionWeek)
 	if !ok {
 		return
 	}
@@ -312,7 +346,7 @@ func (s *Service) checkTrade(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteInvalid(w, r, fields)
 		return
 	}
-	a, ok := s.advisorFor(w, r)
+	a, ok := s.advisorAt(w, r, actionWeek)
 	if !ok {
 		return
 	}

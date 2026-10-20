@@ -369,6 +369,13 @@ func SeasonOrderWords(week int) string {
 	return fmt.Sprintf("Pickups go in Gain order once their week %d games kick off.", week)
 }
 
+// UnprojectedOrderWords is the waiver page's rule while the week it
+// addresses has no published projection read (Lane 95): the adds go by the
+// season Gain until it is in.
+func UnprojectedOrderWords(week int) string {
+	return fmt.Sprintf("Pickups go in Gain order until week %d's published projection is in.", week)
+}
+
 // WaiverSeasonBasis is what a waiver Gain is, the head the card and the
 // drop panel print (Lane 66u).
 func WaiverSeasonBasis(b OrderBasis, weeks int) string {

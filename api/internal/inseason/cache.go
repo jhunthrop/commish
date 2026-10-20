@@ -18,7 +18,7 @@ type Reads interface {
 	StatLines(ctx context.Context, season int) ([]boards.StatLine, error)
 	Schedule(ctx context.Context, season int) ([]boards.TeamWeek, error)
 	Designations(ctx context.Context) (map[string]boards.Designation, error)
-	SeasonRuns(ctx context.Context, newest time.Time) (map[boards.RunKey]time.Time, error)
+	DesignationRuns(ctx context.Context, newest time.Time) (map[boards.RunKey]time.Time, error)
 	GameFacts(ctx context.Context, season int) (map[boards.ClubWeek]boards.GameFact, error)
 	WeekProjection(ctx context.Context, season, week int) (boards.WeekProjection, error)
 }
@@ -98,9 +98,9 @@ func (c *Cache) Designations(ctx context.Context) (map[string]boards.Designation
 	return cached(c, ctx, "designations", CaptureTTL, c.Reads.Designations)
 }
 
-// DatedDesignations is the same capture with each season-long
-// designation dated by its run (the board route's read,
-// solo.DesignationSource), the dating kept for CaptureTTL too. A dating
+// DatedDesignations is the same capture with each designation's run
+// start (Listed) and each season-long one dated by it (the board route's
+// read, solo.DesignationSource), the dating kept for CaptureTTL too. A dating
 // read that fails is logged and the designations answer undated, so a
 // row says "as of" rather than the board losing its statuses.
 func (c *Cache) DatedDesignations(ctx context.Context) (map[string]boards.Designation, error) {
@@ -109,12 +109,12 @@ func (c *Cache) DatedDesignations(ctx context.Context) (map[string]boards.Design
 		return designations, err
 	}
 	newest := boards.Newest(designations)
-	runs, err := cached(c, ctx, "season-runs/"+newest.Format(time.RFC3339Nano), CaptureTTL, func(ctx context.Context) (map[boards.RunKey]time.Time, error) {
-		return c.Reads.SeasonRuns(ctx, newest)
+	runs, err := cached(c, ctx, "designation-runs/"+newest.Format(time.RFC3339Nano), CaptureTTL, func(ctx context.Context) (map[boards.RunKey]time.Time, error) {
+		return c.Reads.DesignationRuns(ctx, newest)
 	})
 	if err != nil {
 		if c.Log != nil {
-			c.Log.Warn("inseason: the season-long runs were not read; the board answers its statuses undated", "err", err)
+			c.Log.Warn("inseason: the designation runs were not read; the statuses answer undated", "err", err)
 		}
 		return designations, nil
 	}

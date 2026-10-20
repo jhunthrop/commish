@@ -200,7 +200,7 @@ func TestDesignationSince(t *testing.T) {
 	if undated["p1"].Since != nil {
 		t.Fatal("the in-season screens' read dates a run")
 	}
-	runs, err := src.SeasonRuns(ctx, Newest(undated))
+	runs, err := src.DesignationRuns(ctx, Newest(undated))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -209,7 +209,13 @@ func TestDesignationSince(t *testing.T) {
 		v := time.Date(2026, 10, 13, hour, 0, 0, 0, time.UTC)
 		return &v
 	}
-	// p5's run reaches July's capture, outside the window: no date.
+	// Every status's run start is Listed, a week's out too (Lane 95); p5's
+	// run reaches July's capture, outside the window: no date.
+	for id, want := range map[string]*time.Time{"p1": at(11), "p2": at(11), "p3": at(12), "p4": at(14), "p5": nil} {
+		if got := d[id].Listed; (got == nil) != (want == nil) || (want != nil && !got.Equal(*want)) {
+			t.Errorf("%s listed %v, want %v", id, got, want)
+		}
+	}
 	for id, want := range map[string]*time.Time{"p1": at(11), "p2": at(11), "p3": at(12), "p4": nil, "p5": nil} {
 		got := d[id]
 		if got.Source != injuriesByDate || !got.AsOf.Equal(*at(14)) {
