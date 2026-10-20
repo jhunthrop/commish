@@ -341,6 +341,8 @@ void test('an injured reserve row draws no matchup: the bench one says why he is
 	assert.equal(bench.evidence.avg, drawn.evidence.avg);
 	assert.equal(bench.pts, 3);
 	assert.equal(reserveRow(drawn, 'slot').pts, null);
+	assert.equal(reserveRow(drawn, 'slot').proj, null);
+	assert.equal(bench.proj, drawn.proj);
 	assert.equal(reserveRow(drawn, null), drawn);
 	assert.equal(BOX.irBench, 'IR-eligible, taking a bench spot');
 	assert.doesNotMatch(BOX.irBench, bannedPattern());

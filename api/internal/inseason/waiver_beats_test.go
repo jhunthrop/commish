@@ -9,59 +9,51 @@ import (
 	"github.com/jhunthrop/commish/api/internal/draft"
 )
 
-// withRest is the people with their rest-of-season points a game.
-func withRest(people []person, rest map[string]float64) []person {
-	out := make([]person, len(people))
-	for i, p := range people {
-		if v, ok := rest[p.cand.ID]; ok {
-			p.line.RestOfSeasonPerGame = &v
-		}
-		out[i] = p
-	}
-	return out
-}
-
-func restPerson(c Candidate, rest float64) person {
-	return withRest(people([]Candidate{c}), map[string]float64{c.ID: rest})[0]
-}
-
-// Beats for a row the strip does not offer (Lane 98, B14): the weakest
-// player of the member's the advised lineup starts at a slot the add can
-// fill, by the rest of the season a game; never a bench player, nobody
-// when he tops no one, and a bye week never stands in for a name.
-func TestBeatsNamesTheWeakestStarterHeWouldDisplace(t *testing.T) {
-	roster := projRoster()
-	week := newPickupWeek(twelveTeamPPR(t), roster, pprHost())
-	mine := withRest(people(roster), map[string]float64{
-		"qb1": 20, "rb1": 16, "rb2": 13, "rb3": 9, "wr1": 17, "wr2": 14, "wr3": 10, "te1": 8, "k1": 8, "def1": 7,
-		"qb2": 15, "rb4": 3, "wr4": 5, "te2": 4, "wr5": 2,
-	})
+// Beats for a row the strip does not offer (Lane 98, B14, review H1):
+// the starter the add takes out of the rest-of-season lineup the Gain is
+// measured on, from the same fill; the drop himself when he started and
+// no one else leaves; nobody when the add does not start.
+func TestBeatsNamesWhomTheMoveTakesOutOfTheSeasonLineup(t *testing.T) {
+	squad := Squad{Players: pprRoster(), Held: map[string]bool{}}
 	cases := []struct {
 		name string
-		add  person
+		add  Candidate
 		want string
 	}{
-		{"a back over the flex back", restPerson(withProj(player("fa", draft.RB, 30, 10), 6), 11), "rb3"},
-		{"a receiver over the third receiver, not the flex", restPerson(withProj(player("fw", draft.WR, 30, 10), 6), 9.5), "rb3"},
-		{"a tight end over the starter", restPerson(withProj(player("ft", draft.TE, 30, 10), 6), 8.5), "te1"},
-		{"a back on bye still names whom he displaces", restPerson(withTier(player("fb", draft.RB, 30, 10), Out), 12), "rb3"},
-		{"below every starter he can replace: nobody, never the bench", restPerson(withProj(player("fa", draft.RB, 60, 1), 6), 3.5), ""},
-		{"an equal figure tops no one", restPerson(withProj(player("ft", draft.TE, 30, 10), 6), 8), ""},
-		{"no figure of his own", people([]Candidate{withProj(player("fa", draft.RB, 30, 10), 13)})[0], ""},
+		// rb2 (50) moves to the flex, rb3 (25) leaves.
+		{"a back over the flex back", player("fa", draft.RB, 10, 60), "rb3"},
+		// wr3 (30) moves to the flex, rb3 leaves: never the third receiver.
+		{"a receiver tops the flex back, not the third receiver", player("fw", draft.WR, 10, 40), "rb3"},
+		{"a defense with points over the starter's", player("fd", draft.DEF, 1, 3), "def1"},
+		{"below every starter he could replace: nobody", player("fa", draft.RB, 60, 3), ""},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := week.displaced(tc.add, mine)
+			got := Waivers(twelveTeamPPR(t), SeasonGames, squad, []Candidate{tc.add})[0]
 			if tc.want == "" {
-				if got != nil {
-					t.Fatalf("beats %+v, want no one", got)
+				if got.Replaces.Known || got.Replaces.Empty || positive(got.Gain) {
+					t.Fatalf("replaces %+v gain %v, want no one and no gain", got.Replaces, got.Gain)
 				}
 				return
 			}
-			if got == nil || got.HostId != tc.want || !got.Starter || got.OpenSpot {
-				t.Fatalf("beats %+v, want the starter %s", got, tc.want)
+			if !got.Replaces.Known || squad.Players[got.Replaces.At].ID != tc.want || !positive(got.Gain) {
+				t.Fatalf("replaces %+v (gain %v), want %s", got.Replaces, got.Gain, tc.want)
 			}
 		})
+	}
+}
+
+// Every row that gains names whom it beats, in the week order and the
+// season Gain order (review H1: a D/ST off the strip named no one).
+func TestEveryGainingRowNamesWhomItBeats(t *testing.T) {
+	f := newFixture(t)
+	for _, now := range []time.Time{saturdayNoon, tuesdayNoon} {
+		out := pickupPage(t, f, now, "")
+		for _, r := range out.Rows {
+			if roundTenth(r.Gain) > 0 && r.Beats == nil {
+				t.Errorf("%s: %s gains %v and names no one", now.Weekday(), r.Add.Player.Name, r.Gain)
+			}
+		}
 	}
 }
 

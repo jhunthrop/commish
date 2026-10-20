@@ -50,6 +50,8 @@ const SIGNED_IN = { name: 'commish_csrf', value: 'fixture' };
 const LEAGUE = `/league/${FIXTURE_IDS.league}`;
 /** The fixture case's players (waiver-beats.ts). */
 const DROP = 'Roschon Johnson';
+/** His Beats name: Theo Johnson is a row on the same screen (review M2). */
+const DROP_BEATS = 'R. Johnson';
 const UNLISTED = ["De'Von Achane", 'Tyquan Thornton'];
 const IR_SLOT = 'Tank Bigsby';
 
@@ -143,6 +145,8 @@ async function checkWaivers(page: Page, where: string, text: string): Promise<vo
 		if (!r.underDivider && /^[+−-]?0\.0/.test(r.gain) && !r.named)
 			fault(where, `${r.name} draws a loud ${r.gain}`);
 		if (r.who === BOX.bye) fault(where, `${r.name} draws Bye in Beats`);
+		// A row counts as beating a player of yours only when Beats names one (fix round 1, H1).
+		if (!r.underDivider && r.who === null) fault(where, `${r.name} gains and names no one`);
 	}
 	if (
 		!rows.some((r) => r.underDivider) ||
@@ -163,7 +167,7 @@ async function checkWaivers(page: Page, where: string, text: string): Promise<vo
 	}
 	if (!card.includes(`(${WAIVERS.irBench})`)) fault(where, `the card "${card}" does not say why`);
 	// The card's row names its drop in Beats (B14), Johnson by his last name.
-	if (!rows.some((r) => r.named && r.who === 'Johnson'))
+	if (!rows.some((r) => r.named && r.who === DROP_BEATS))
 		fault(where, `no tinted row names ${DROP} in Beats`);
 }
 
@@ -171,7 +175,7 @@ async function checkWaivers(page: Page, where: string, text: string): Promise<vo
 async function checkDropPanel(page: Page, where: string): Promise<void> {
 	await page
 		.locator('main table.pool tr.moved-in', {
-			has: page.locator('.beats .who', { hasText: 'Johnson' })
+			has: page.locator('.beats .who', { hasText: DROP_BEATS })
 		})
 		.locator('.act .add')
 		.first()
@@ -180,6 +184,18 @@ async function checkDropPanel(page: Page, where: string): Promise<void> {
 	await panel.first().waitFor({ timeout: READY_TIMEOUT_MS });
 	const said = await panel.first().innerText();
 	if (!said.includes(BOX.irBench)) fault(where, `the drop panel's ${DROP} row reads "${said}"`);
+}
+
+/** Every strip card within the strip at any width: the IR reason whole, never a hidden sideways
+ * scroll (fix round 1, H2). */
+async function checkStripFits(page: Page, where: string): Promise<void> {
+	const over = await page.locator('main [data-strip="waivers"]').evaluate((strip) => {
+		const edge = strip.getBoundingClientRect().right;
+		return Array.from(strip.querySelectorAll('.pickup, .pickup .move')).some(
+			(el) => el.getBoundingClientRect().right > edge + 1 || el.scrollWidth > el.clientWidth + 1
+		);
+	});
+	if (over) fault(where, 'a strip card runs past the strip');
 }
 
 async function checkLineup(page: Page, where: string): Promise<void> {
@@ -201,6 +217,7 @@ for (const [theme, width] of SHOTS) {
 	await open(page, `${LEAGUE}/waivers`, WAIVERS.noGain);
 	const text = await check(page, `waivers ${at}`);
 	await checkWaivers(page, `waivers ${at}`, text);
+	await checkStripFits(page, `waivers ${at}`);
 	await page.screenshot({ path: file('waivers'), fullPage: true });
 	await checkDropPanel(page, `waivers panel ${at}`);
 	await page.screenshot({ path: file('waivers-open'), fullPage: true });

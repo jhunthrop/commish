@@ -4348,7 +4348,7 @@ type WaiverAdvice struct {
 	// Roster the member's active roster (injured reserve and taxi spots left out), the lines beats and drops name
 	Roster []PlayerLine `json:"roster"`
 
-	// Rows positive gains first by gain, then the rest by points over replacement, at most 60; by the season Gain alone in the season_gain order; a free agent on a season-long list (injured reserve, PUP, NFI) or ruled out this week is not listed (no read gives his return), save the player a link asked for; a week's out carried over from a game already played is
+	// Rows positive gains first by gain, then the rest by points over replacement, at most 60; by the season Gain alone in the season_gain order; a free agent on a season-long list (injured reserve, PUP, NFI) or ruled out this week is not listed (no read gives his return), save the player a link asked for; a week's out carried over from a game already played is listed
 	Rows []WaiverRow `json:"rows"`
 
 	// SeasonBasis what the Rest of season column and a gain over the rest of the season are, said once under the rows
@@ -4361,7 +4361,7 @@ type WaiverAdvice struct {
 // WaiverAdvicePickupOrder the order the page's rows and strip are in, decided over the full page's rows and the answer's own by each row's game state (gameStateAt): week (the strip by this week's Proj gain, the rows as the search ranks them) while no row's add or drop has kicked off; season_gain once any has (the rows by the season Gain, every week figure null, the strip the first row worth making); a page narrowed to one position or focused on a player takes season_gain whenever the full page does; season_gain too while for_week's published projection is not read (Lane 95), there being no Proj to order the week by
 type WaiverAdvicePickupOrder string
 
-// WaiverBeats the Beats column (Lane 98): for the move the strip offers, the player that move drops (starter whether this week's lineup starts him, gain the move's week_gain); for any other row, the weakest player of the member's the advised lineup starts at a slot he can fill, by the rest of the season a game, whom he tops; or the open spot he fills, a starting spot no player of the member's can play this week
+// WaiverBeats the Beats column (Lane 98): for the move the strip offers, the player that move drops (starter whether this week's lineup starts him, gain the move's week_gain); for any other row, the player his move takes out of the rest-of-season lineup the row's gain is measured on (the same fill); or the open spot he fills, a slot that lineup leaves empty
 type WaiverBeats struct {
 	// Gain the offered move's week_gain, else his Proj less that player's where both have one, as the screen prints them (tenths); null while the pickups go in season Gain order (a pickup's game has kicked off), when no week figure counts
 	Gain *float64 `json:"gain"`
@@ -4372,7 +4372,7 @@ type WaiverBeats struct {
 	// Name empty for the open spot
 	Name string `json:"name"`
 
-	// OpenSpot he fills a starting spot no player of the member's can play this week (host_id and name empty, gain his week gain)
+	// OpenSpot he fills a slot the rest-of-season lineup leaves empty (host_id and name empty, gain null)
 	OpenSpot bool `json:"open_spot"`
 
 	// Starter the player named starts in the lineup the advice sets this week
@@ -4419,7 +4419,7 @@ type WaiverMovesClaim string
 type WaiverRow struct {
 	Add PlayerLine `json:"add"`
 
-	// Beats null when he tops no starter he could replace, or either has no rest-of-season figure, and his row is not the strip's
+	// Beats null when he starts in no one's place in the rest-of-season lineup and his row is not the strip's
 	Beats *WaiverBeats `json:"beats"`
 
 	// Clears the day a claim on him clears, from the platform (Yahoo's waiver wire); null when it does not say

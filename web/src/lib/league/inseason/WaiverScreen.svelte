@@ -147,7 +147,9 @@
 	const positions = $derived(
 		POSITIONS.filter((p) => advice.rows.some((r) => r.add.player.position === p))
 	);
-	const pool = $derived(poolRows({ rows: shown.rows, pickups: advice.pickups }, memberZone(), now));
+	const pool = $derived(
+		poolRows({ rows: shown.rows, pickups: advice.pickups, roster: shown.roster }, memberZone(), now)
+	);
 	/** The line under the column heads (Lane 98, B35). */
 	const heads = $derived(
 		headBasis(shown.projection_previous_read_at, weekProjected(shown), {

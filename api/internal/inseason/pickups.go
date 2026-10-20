@@ -15,22 +15,20 @@ const MaxPickups = 3
 // weekLineup is the lineup the advice sets this week (Lineup, the Lineup
 // screen's rule) from the roster: its Proj as the screen prints and sums
 // it, who starts by roster index, the slot each starter fills, and the
-// slots no one who can play fills, and each row's slot.
+// slots no one who can play fills.
 type weekLineup struct {
 	proj   float64
 	starts []bool
 	slotOf map[int]int
 	idle   []bool
-	slots  []Slot
 }
 
 // weekOf sets the week's lineup for roster with the host's starters, as
 // the Lineup screen does. A spot no one who can play fills counts 0.
 func weekOf(config []draft.SlotConfig, roster []Candidate, hostStarters []string) weekLineup {
 	rows := Lineup(config, roster, hostStarters)
-	out := weekLineup{starts: make([]bool, len(roster)), slotOf: map[int]int{}, idle: make([]bool, len(rows)), slots: make([]Slot, len(rows))}
+	out := weekLineup{starts: make([]bool, len(roster)), slotOf: map[int]int{}, idle: make([]bool, len(rows))}
 	for i, r := range rows {
-		out.slots[i] = r.Slot
 		if r.Ours < 0 || r.NoOneCanPlay {
 			out.idle[i] = true
 			continue
@@ -118,12 +116,6 @@ func (w *pickupWeek) beats(add Candidate, mine []person) *apitypes.WaiverBeats {
 		}
 	}
 	return nil
-}
-
-// openSpot is Beats for an add who fills a starting spot no one of the
-// member's can play this week: no player named, the week's gain.
-func openSpot(weekGain float64) *apitypes.WaiverBeats {
-	return &apitypes.WaiverBeats{OpenSpot: true, Starter: true, Gain: &weekGain}
 }
 
 // isPickup is the strip's rule (Lane 66f): he starts this week, the
@@ -304,6 +296,12 @@ func remap(m Waiver, from, to []person) Waiver {
 	out := m
 	out.Drop = at(m.Drop)
 	out.Drops = nil
+	out.Replaces = Replaced{Empty: m.Replaces.Empty}
+	if m.Replaces.Known {
+		if j := at(m.Replaces.At); j >= 0 {
+			out.Replaces = Replaced{At: j, Known: true}
+		}
+	}
 	for _, d := range m.Drops {
 		if j := at(d.At); j >= 0 {
 			out.Drops = append(out.Drops, Drop{At: j, Gain: d.Gain, StartsThisWeek: d.StartsThisWeek})

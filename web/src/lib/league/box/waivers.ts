@@ -25,7 +25,15 @@ import {
 	type BasisPart,
 	type Clock
 } from './basis.ts';
-import { BOX, boxNumber, boxRow, onReserve, positionWord, type BoxRow } from './box.ts';
+import {
+	BOX,
+	boxNumber,
+	boxRow,
+	initialName,
+	onReserve,
+	positionWord,
+	type BoxRow
+} from './box.ts';
 import { addressedWeek, arrivesPart } from './next-week.ts';
 import { SEASON, WAIVER_GAIN } from './season.ts';
 
@@ -61,7 +69,7 @@ export const HEAD_BASIS = {
 	avg: 'his season average',
 	/** "his Proj's change since Sunday 2 pm". */
 	delta: (since: string): string => `his ${BOX.proj}'s change since ${since}`,
-	beats: 'the player he would replace'
+	beats: 'the player he would replace in your rest-of-season lineup'
 } as const;
 
 /** A name's second mention: "Gainwell", a defense by its club ("Chiefs" from "Chiefs D/ST"). */
@@ -75,10 +83,14 @@ export interface BeatsCell {
 	 * would displace), or the open spot he fills; null where he beats nobody, and on a row that gains
 	 * nothing ("if he beats nobody, say nothing"). */
 	who: { name: string; starter: boolean } | null;
-	/** The season Gain, the column's key on every row in either order (review M-A). */
-	gain: number;
+	/** The season Gain, the column's key on every row in either order (review M-A); null on a row the
+	 * rule cannot judge (a Gain with no one named), which draws no Gain (fix round 1, H1). */
+	gain: number | null;
 	/** The row adds to the lineup: its Gain is drawn loud, the rest quiet (B13). */
 	gains: boolean;
+	/** The strip's move on its own row: the card's week Proj gain under the season Gain ("+4.8 Proj"),
+	 * so the row says why it is offered (review M1); null on any other row and in the season order. */
+	week: number | null;
 }
 
 /** One player free to add, as the table draws him. */
@@ -150,44 +162,74 @@ function positive(gain: number): boolean {
 	return Number(fixed(gain, 1)) > 0;
 }
 
-/** Whom an add beats, as the API names him (the offered move's drop, else the weakest starter he would
- * displace, or the open spot he fills), with the row's season Gain in either order: one key for the
- * column, never "Bye" in place of a name (B14). A row that gains nothing names no one. Nothing is
- * inferred or re-ordered here (review 66f M3). */
-function beatsOf(source: WaiverRow, gains: boolean): BeatsCell {
+/** A name in the Beats cell: the last name, or the first initial and the last name when another
+ * player on the screen shares it ("R. Johnson" beside a row for Theo Johnson, review M2). */
+export function beatsName(name: string, onScreen: readonly string[]): string {
+	return cardName(name, onScreen) === name
+		? initialName(name.replace(/\s+D\/ST$/, ''))
+		: shortName(name);
+}
+
+/** Whom an add beats, as the API names him (the offered move's drop, else the player his move takes
+ * out of the rest-of-season lineup, or the open slot he fills), with the row's season Gain in either
+ * order: one key for the column, never "Bye" in place of a name (B14). A row that gains nothing names
+ * no one; a Gain with no one named is no Gain the page can stand behind, so it draws none (fix round
+ * 1, H1). Nothing is inferred or re-ordered here (review 66f M3). */
+function beatsOf(
+	source: WaiverRow,
+	gains: boolean,
+	card: WaiverRow | undefined,
+	names: readonly string[]
+): BeatsCell {
 	const { beats } = source;
 	const who =
 		beats === null || !gains
 			? null
 			: {
-					name: beats.open_spot ? WAIVERS.openSpot : shortName(beats.name),
+					name: beats.open_spot ? WAIVERS.openSpot : beatsName(beats.name, names),
 					starter: beats.starter
 				};
-	return { who, gain: source.gain, gains };
+	const judged = beats !== null || !positive(source.gain);
+	return {
+		who,
+		gain: judged ? source.gain : null,
+		gains,
+		week: card?.week_gain ?? null
+	};
 }
 
 /** The Beats cell's figure: "+0.3 Gain" on a row that gains, the bare "0.0" on one that does not, so a
- * zero is never the loud cell (B13). */
+ * zero is never the loud cell (B13); "--" on a row the rule cannot judge. */
 export function beatsWord(beats: Pick<BeatsCell, 'gain' | 'gains'>): string {
+	if (beats.gain === null) return BOX.none;
 	return beats.gains ? `${gainWord(beats.gain)} ${SEASON.gain}` : gainWord(beats.gain);
 }
 
-/** The table's rows from the answer: every add, whom he beats, the strip's tint on the ones it names. */
+/** The card's week figure under its row's Gain: "+4.8 Proj" (review M1). */
+export function beatsWeekWord(week: number): string {
+	return `${gainWord(week)} ${BOX.proj}`;
+}
+
+/** The table's rows from the answer: every add, whom he beats, the strip's tint on the ones it names.
+ * A row counts as beating a player of yours only when Beats names one (fix round 1, H1), or when it is
+ * the strip's own move. */
 export function poolRows(
-	advice: Pick<WaiverAdvice, 'rows' | 'pickups'>,
+	advice: Pick<WaiverAdvice, 'rows' | 'pickups' | 'roster'>,
 	zone: string,
 	now: number
 ): PoolRow[] {
-	const named = new Set(advice.pickups.map(addKey));
+	const cards = new Map(advice.pickups.map((p) => [addKey(p), p]));
+	const names = namesOnScreen(advice);
 	return advice.rows.map((source) => {
 		const key = addKey(source);
-		const gains = positive(source.gain) || named.has(key);
+		const card = cards.get(key);
+		const gains = card !== undefined || (positive(source.gain) && source.beats !== null);
 		return {
 			key,
 			row: { ...boxRow(source.add, '', zone, false, now), key },
 			rest: source.add.rest_of_season_per_game,
-			beats: beatsOf(source, gains),
-			named: named.has(key),
+			beats: beatsOf(source, gains, card, names),
+			named: card !== undefined,
 			clears: clearsWords(source.clears),
 			order: source.gain,
 			gains,

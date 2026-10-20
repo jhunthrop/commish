@@ -247,17 +247,27 @@
 			text-align: right;
 		}
 
-		/* The cards scroll on one line; the chosen one's verb is pinned at the foot. */
+		/* The cards stack, each the strip's width, its move wrapping so the reason is whole: never a
+		   sideways scroll with the bar hidden (fix round 1, H2). The chosen one's verb is pinned at the
+		   foot. */
 		.pickups {
+			flex-direction: column;
 			flex-wrap: nowrap;
-			overflow-x: auto;
-			scrollbar-width: none;
 		}
 
 		.pickup {
 			flex: none;
-			max-width: none;
+			max-width: 100%;
 			padding-right: var(--s-3);
+		}
+
+		.pick,
+		.text {
+			min-width: 0;
+		}
+
+		.text {
+			white-space: normal;
 		}
 
 		.verb {

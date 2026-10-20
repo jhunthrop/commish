@@ -6,43 +6,20 @@ import "github.com/jhunthrop/commish/api/internal/apitypes"
 // B41). The strip's set rule still reads pickupWeek.beats for the roster
 // places a card takes; the cell names whom a row's move replaces.
 
-// restPerGame is a player's rest-of-season points a game, the A game
-// column: the figure the season Gain counts from.
-func restPerGame(p person) (float64, bool) {
-	if v := p.line.RestOfSeasonPerGame; v != nil {
-		return *v, true
+// replacedBeats is the Beats cell for an add the strip does not offer
+// (Lane 98, B14, review H1): the player his move takes out of the
+// rest-of-season lineup the Gain is measured on (Waiver.Replaces), or the
+// empty slot he fills there; nil when he starts in no one's place ("if he
+// beats nobody, say nothing"). Its gain is the Proj difference where both
+// have one.
+func replacedBeats(add person, mine []person, r Replaced) *apitypes.WaiverBeats {
+	if r.Empty {
+		return &apitypes.WaiverBeats{OpenSpot: true, Starter: true}
 	}
-	return 0, false
-}
-
-// displaced is the Beats cell for an add the strip does not offer: the
-// weakest player of the member's the advised lineup starts at a slot the
-// add can fill, by the rest of the season a game, whom the add tops; nil
-// when he tops no one there or either has no figure ("if he beats nobody,
-// say nothing"). His gain is the Proj difference where both have one.
-func (w *pickupWeek) displaced(add person, mine []person) *apitypes.WaiverBeats {
-	figure, ok := restPerGame(add)
-	if !ok {
+	if !r.Known || r.At < 0 || r.At >= len(mine) {
 		return nil
 	}
-	low, lowFigure := -1, 0.0
-	for i, p := range mine {
-		row, starts := w.base.slotOf[i]
-		if !starts || !w.base.starts[i] || !w.base.slots[row].accepts(add.cand.Position) {
-			continue
-		}
-		v, ok := restPerGame(p)
-		if !ok || roundTenth(v) >= roundTenth(figure) {
-			continue
-		}
-		if low < 0 || v < lowFigure {
-			low, lowFigure = i, v
-		}
-	}
-	if low < 0 {
-		return nil
-	}
-	p := mine[low]
+	p := mine[r.At]
 	out := &apitypes.WaiverBeats{HostId: p.cand.ID, Name: p.line.Player.Name, Starter: true}
 	if add.cand.HasProj && p.cand.HasProj {
 		gain := roundTenth(add.cand.Proj - p.cand.Proj)

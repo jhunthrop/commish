@@ -1,7 +1,8 @@
 // The Waivers rows' Beats and the adds the table lists, as the API answers them (Lane 98,
 // api/internal/inseason waiver_beats.go): the move the strip offers names the player it drops, every
-// other row the weakest player of the member's the lineup starts at a slot he can fill, by the rest
-// of the season a game, whom he tops; a free agent on a season-long list or ruled out (a week's out
+// other row the player his move takes out of the rest-of-season lineup the Gain is measured on (the
+// fixture's stand-in: the starter with the least points over replacement at a slot he can fill, whom
+// he tops, on a row that gains); a free agent on a season-long list or ruled out (a week's out
 // carried over from a game already played aside) is not listed. FIXTURE_IR_DROP=1 stamps the
 // fixture with the sense check's case (B34, B41): the strip's drop, Roschon Johnson, on injured
 // reserve on the bench, and two free agents the table no longer lists, De'Von Achane on injured
@@ -40,18 +41,19 @@ export function listedAdd(line: PlayerLine): boolean {
 	return d.status !== 'out' || d.carried_over === true;
 }
 
-/** The weakest starter he tops at a slot he can fill, by the rest of the season a game. */
-function displaced(add: PlayerLine, lineup: LineupAdvice, seasonOrder: boolean): Beats | null {
-	const figure = add.rest_of_season_per_game;
-	if (figure === null) return null;
+/** Whom his move takes out of the season lineup (waivers.go replaced), on the fixture's figures. */
+function displaced(row: WaiverRow, lineup: LineupAdvice, seasonOrder: boolean): Beats | null {
+	const { add } = row;
+	const figure = add.points_over_replacement;
+	if (figure === null || roundTenth(row.gain) <= 0) return null;
 	const below = lineup.slots
 		.filter((s) => (ACCEPTS[s.slot] ?? []).includes(add.player.position))
 		.map((s) => s.ours)
 		.filter((l) => {
-			const v = l.rest_of_season_per_game;
-			return v !== null && roundTenth(v) < roundTenth(figure);
+			const v = l.points_over_replacement;
+			return v !== null && v < figure;
 		})
-		.sort((a, b) => (a.rest_of_season_per_game ?? 0) - (b.rest_of_season_per_game ?? 0));
+		.sort((a, b) => (a.points_over_replacement ?? 0) - (b.points_over_replacement ?? 0));
 	const low = below[0];
 	if (low === undefined) return null;
 	const proj = add.week_projection;
@@ -85,8 +87,7 @@ export function restatedBeats(answer: WaiverAdvice, lineup: LineupAdvice): Waive
 	const cards = new Set(answer.pickups.map(addKey));
 	const restate = (row: WaiverRow): WaiverRow => {
 		if (cards.has(addKey(row))) return { ...row, beats: dropBeats(row) };
-		if (row.beats?.open_spot === true) return row;
-		return { ...row, beats: displaced(row.add, lineup, season) };
+		return { ...row, beats: displaced(row, lineup, season) };
 	};
 	return { ...answer, rows: answer.rows.map(restate), pickups: answer.pickups.map(restate) };
 }

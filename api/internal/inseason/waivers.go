@@ -36,6 +36,18 @@ type Waiver struct {
 	// the move's own drop first, then by gain (Lane 66f's drop panel).
 	// Empty when a roster spot is open or there is no move to make.
 	Drops []Drop
+	// Replaces is whom the move takes out of the rest-of-season lineup
+	// the Gain is measured on (Lane 98, B14): the Beats cell's player.
+	Replaces Replaced
+}
+
+// Replaced is the player a move takes out of the rest-of-season lineup:
+// At an index into the squad when Known, or Empty when the add fills a
+// slot the lineup left empty; neither when he starts no one's place.
+type Replaced struct {
+	At    int
+	Known bool
+	Empty bool
 }
 
 // Drop is one player a candidate could replace (an index into the
@@ -54,6 +66,10 @@ func Waivers(config []draft.SlotConfig, weeks int, squad Squad, pool []Candidate
 	w := waiverSearch{f: newFiller(Slots(config), weeks), squad: squad, mine: pointers(squad.Players),
 		drops: newDropRule(config, squad, squad.Held), counts: positionCounts(squad.Players)}
 	w.base, w.baseFilled = w.f.strength(w.mine)
+	w.baseStarts = make([]bool, len(w.mine))
+	for i := range w.mine {
+		w.baseStarts[i] = w.f.started(i)
+	}
 	out := make([]Waiver, 0, len(pool))
 	for a := range pool {
 		out = append(out, w.bestDrop(a, &pool[a]))
@@ -80,6 +96,8 @@ type waiverSearch struct {
 	mine       []*Candidate
 	base       float64
 	baseFilled int
+	// baseStarts is who the rest-of-season lineup starts, by squad index.
+	baseStarts []bool
 	drops      dropRule
 	counts     map[draft.Position]int
 }
@@ -93,7 +111,8 @@ func (w *waiverSearch) bestDrop(a int, c *Candidate) Waiver {
 	if w.squad.Open {
 		after := w.f.swap(w.mine, nil, c)
 		strength, _ := w.f.strength(after)
-		return Waiver{Add: a, Drop: -1, DropSlot: -1, ForSlot: -1, Gain: strength - w.base, Starts: w.f.started(len(after) - 1)}
+		return Waiver{Add: a, Drop: -1, DropSlot: -1, ForSlot: -1, Gain: strength - w.base, Starts: w.f.started(len(after) - 1),
+			Replaces: w.replaced(c, -1)}
 	}
 	in := []Candidate{*c}
 	var drops []Drop
@@ -119,9 +138,44 @@ func (w *waiverSearch) bestDrop(a int, c *Candidate) Waiver {
 		if o.spot.by >= 0 {
 			best.DropSlot, best.ForSlot = w.drops.spotOf(o.at), o.spot.slot
 		}
+		best.Replaces = w.replaced(c, o.at)
 	}
 	best.Drops = w.ordered(drops, best.Drop)
 	return best
+}
+
+// replaced is whom the add takes out of the rest-of-season lineup with
+// the squad player at drop gone (-1 for none), from the same fill the
+// Gain is measured on: the starter the after fill no longer starts (the
+// drop himself when he started and no one else leaves), or the empty
+// slot he fills; nothing when the add does not start.
+func (w *waiverSearch) replaced(c *Candidate, drop int) Replaced {
+	var out []int
+	if drop >= 0 {
+		out = []int{drop}
+	}
+	after := w.f.swap(w.mine, out, c)
+	_, filled := w.f.strength(after)
+	if !w.f.started(len(after) - 1) {
+		return Replaced{}
+	}
+	at := 0
+	for i := range w.mine {
+		if i == drop {
+			continue
+		}
+		if w.baseStarts[i] && !w.f.started(at) {
+			return Replaced{At: i, Known: true}
+		}
+		at++
+	}
+	if drop >= 0 && w.baseStarts[drop] {
+		return Replaced{At: drop, Known: true}
+	}
+	if filled > w.baseFilled {
+		return Replaced{Empty: true}
+	}
+	return Replaced{}
 }
 
 // ordered is the drops with the move's own first, then the highest gain,

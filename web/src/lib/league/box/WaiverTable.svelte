@@ -8,6 +8,7 @@
 	import {
 		dropLead,
 		dropTitle,
+		beatsWeekWord,
 		beatsWord,
 		gainGroups,
 		gainWord,
@@ -125,13 +126,18 @@
 		>
 			{#snippet tail()}
 				{@render restCell(entry.rest)}
-				<td class="n beats" class:loud={!quiet && entry.beats.gain > 0}>
+				<td class="n beats" class:loud={!quiet && (entry.beats.gain ?? 0) > 0}>
 					<span class="bt"
 						>{#if entry.beats.who}<span class="who"
 								><b>{entry.beats.who.name}</b><span
 									>{entry.beats.who.starter ? WAIVERS.starter : WAIVERS.bench}</span
 								></span
-							>{/if}<span class="gain" class:quiet>{beatsWord(entry.beats)}</span></span
+							>{/if}<span class="figs"
+							><span class="gain" class:quiet>{beatsWord(entry.beats)}</span
+							>{#if entry.beats.week !== null}<span class="bweek"
+									>{beatsWeekWord(entry.beats.week)}</span
+								>{/if}</span
+						></span
 					>
 				</td>
 				<td class="act"
@@ -567,6 +573,19 @@
 	.dmark {
 		margin-right: var(--s-2);
 		vertical-align: middle;
+	}
+
+	/* The strip's move on its row: its week figure under the season Gain (review M1). */
+	.figs {
+		display: inline-flex;
+		flex-direction: column;
+		align-items: flex-end;
+	}
+
+	.bweek {
+		font-family: var(--font-ui);
+		font-size: var(--t-xs);
+		color: var(--ink-3);
 	}
 
 	.dweek {

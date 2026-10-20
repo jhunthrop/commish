@@ -236,7 +236,8 @@ export function statusOf(
 }
 
 /** A row as an injured reserve row draws it (Lane 98, B34): no game, expected score or weather and no
- * Opp rank (his matchup is not his), and in the IR slot no points; null keeps the row whole. */
+ * Opp rank (his matchup is not his), and in the IR slot no points and no Proj, a figure he will not
+ * score (review L2); null keeps the row whole. */
 export function reserveRow(row: BoxRow, reserve: 'bench' | 'slot' | null): BoxRow {
 	if (reserve === null) return row;
 	return {
@@ -245,6 +246,7 @@ export function reserveRow(row: BoxRow, reserve: 'bench' | 'slot' | null): BoxRo
 		expected: null,
 		weather: null,
 		pts: reserve === 'slot' ? null : row.pts,
+		proj: reserve === 'slot' ? null : row.proj,
 		evidence: { ...row.evidence, oppRank: null, oppOf: null }
 	};
 }
