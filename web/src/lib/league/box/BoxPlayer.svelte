@@ -30,6 +30,8 @@
 		compact?: boolean;
 		/** "Clears Wed" in the folded game, where the platform says it (Lane 66f). */
 		clears?: string | null;
+		/** Said in place of the folded game (BoxGame's note). */
+		note?: string | null;
 		/** Drawn on the club line after the pill. */
 		after?: Snippet;
 		/** The screen's own line under the name, as the phone and narrow screens fold it. */
@@ -43,6 +45,7 @@
 		compact = false,
 		phoneFacts = true,
 		clears = null,
+		note = null,
 		after,
 		children
 	}: Props = $props();
@@ -87,7 +90,7 @@
 			>
 		{/if}
 		<span class="phone-game" class:compact
-			><BoxGame {row} facts={!compact && phoneFacts} {clears} /></span
+			><BoxGame {row} facts={!compact && phoneFacts} {clears} {note} /></span
 		>
 		{@render children?.()}
 	</span>

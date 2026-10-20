@@ -32,13 +32,14 @@ void test('a listing carried over from a played game says its date, never hidden
 		carried_over: true
 	};
 	assert.equal(carriedMark(out, ZONE), 'Out, listed Oct 12');
-	assert.equal(carriedMark({ ...out, listed: null }, ZONE), 'Out, as of Oct 19');
+	// An undated listing never takes the read's date, which would look fresh (Lane 98, B69).
+	assert.equal(carriedMark({ ...out, listed: null }, ZONE), 'Out, still listed');
 	assert.equal(carriedMark({ ...out, carried_over: undefined }, ZONE), null);
 	assert.equal(carriedMark(null, ZONE), null);
 	// Every row that draws a status draws it so.
 	assert.equal(statusOf(out, false, ZONE)?.mark, 'Out, listed Oct 12');
 	assert.equal(statusOf({ ...out, carried_over: undefined }, false, ZONE)?.mark, 'Out');
-	for (const said of [NEXT_WEEK.listed('Out', 'Oct 12'), NEXT_WEEK.asOf('Out', 'Oct 19')])
+	for (const said of [NEXT_WEEK.listed('Out', 'Oct 12'), NEXT_WEEK.stillListed('Out')])
 		assert.doesNotMatch(said, bannedPattern());
 });
 

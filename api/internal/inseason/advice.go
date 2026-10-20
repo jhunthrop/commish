@@ -813,6 +813,8 @@ func (a *advisor) Waivers(position draft.Position, asked string) (apitypes.Waive
 		return out, true
 	}
 	out.Pickups = run.strip(strip)
+	// A row the strip offers names its own drop in Beats (B14).
+	out.Rows = offered(out.Rows, out.Pickups)
 	if out.ProjectionReadAt != nil {
 		base := run.week.base.proj
 		out.LineupProj, out.PickupsProj = &base, &proj
@@ -855,13 +857,19 @@ func (a *advisor) waiverPage(run waiverRun) apitypes.WaiverAdvice {
 	return out
 }
 
-// pageMoves is the moves a page carries: the first cut, and past it only
-// the asked player's, in the search's order.
+// pageMoves is the moves a page carries: the first cut of the adds it
+// lists (listedAdd), and the asked player's wherever he falls, in the
+// search's order.
 func pageMoves(moves []Waiver, pool []person, asked string, cut int) []Waiver {
 	out := make([]Waiver, 0, min(len(moves), cut+1))
-	for i, move := range moves {
-		if i < cut || isAsked(pool[move.Add], asked) {
+	listed := 0
+	for _, move := range moves {
+		add := pool[move.Add]
+		if isAsked(add, asked) || (listed < cut && listedAdd(add)) {
 			out = append(out, move)
+		}
+		if listedAdd(add) {
+			listed++
 		}
 	}
 	return out
@@ -877,15 +885,11 @@ func isAsked(p person, asked string) bool {
 // open spot he fills), every drop he could take with its gains, and the
 // day a claim on him clears.
 func waiverRow(w *Writer, week *pickupWeek, mine []person, add person, move Waiver, clears map[string]openapi_types.Date) apitypes.WaiverRow {
-	row := apitypes.WaiverRow{Add: add.line, Gain: roundTenth(move.Gain), Beats: week.beats(add.cand, mine), Drops: []apitypes.WaiverDrop{}}
+	row := apitypes.WaiverRow{Add: add.line, Gain: roundTenth(move.Gain), Beats: replacedBeats(add, mine, move.Replaces), Drops: []apitypes.WaiverDrop{}}
 	if !move.NoDrop {
-		var open bool
 		var weekGain float64
-		weekGain, row.Starts, open = week.with(add.cand, move.Drop)
+		weekGain, row.Starts, _ = week.with(add.cand, move.Drop)
 		row.WeekGain = &weekGain
-		if open {
-			row.Beats = openSpot(weekGain)
-		}
 	}
 	var drop *Line
 	if move.Drop >= 0 {

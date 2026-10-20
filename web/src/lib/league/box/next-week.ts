@@ -23,8 +23,9 @@ export const NEXT_WEEK = {
 		`Week ${String(week)} projections expected ${day}.`,
 	/** "Out, listed Oct 12": a listing carried over from a game already played. */
 	listed: (word: string, day: string): string => `${word}, listed ${day}`,
-	/** "Out, as of Oct 19": one the provider still lists with no date of its own. */
-	asOf: (word: string, day: string): string => `${word}, as of ${day}`
+	/** "Out, still listed": one the provider still lists with no date of its own, never dated by the
+	 * read, which would look fresh (Lane 98, B69). */
+	stillListed: (word: string): string => `${word}, still listed`
 } as const;
 
 /** The week the page addresses: the API's for_week, else the platform's week. */
@@ -56,7 +57,7 @@ export function arrivesPart(
 }
 
 /** A week's designation as a turned page draws it once it is carried over from a game already
- * played (the API's carried_over): "Out, listed Oct 12", or "Out, as of Oct 19" when the provider's
+ * played (the API's carried_over): "Out, listed Oct 12", or "Out, still listed" when the provider's
  * listing has no date; null for any other, which keeps its plain word. Never hidden (the
  * coordinator's ruling). */
 export function carriedMark(designation: InjuryDesignation | null, zone: string): string | null {
@@ -64,6 +65,6 @@ export function carriedMark(designation: InjuryDesignation | null, zone: string)
 	const word = designationWord(designation.status);
 	const listed = designation.listed ?? null;
 	return listed === null
-		? NEXT_WEEK.asOf(word, shortDay(designation.as_of, zone))
+		? NEXT_WEEK.stillListed(word)
 		: NEXT_WEEK.listed(word, shortDay(listed, zone));
 }

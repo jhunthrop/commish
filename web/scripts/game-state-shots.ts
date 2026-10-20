@@ -382,6 +382,8 @@ async function checkWaivers(page: Page, at: string): Promise<void> {
 				name: tr.querySelector<HTMLElement>('.nm')?.innerText.trim() ?? '',
 				named: tr.classList.contains('moved-in'),
 				gain: tr.querySelector('.beats .gain')?.textContent.trim() ?? null,
+				// A row with no gain over the roster draws its figure bare and quiet (Lane 98, B13).
+				quiet: tr.querySelector('.beats .gain.quiet') !== null,
 				// The Beats text's right edge and the Add button's left (review M-J).
 				beatsRight: tr.querySelector('.beats .bt')?.getBoundingClientRect().right ?? null,
 				addLeft: tr.querySelector('.act .add')?.getBoundingClientRect().left ?? null
@@ -395,10 +397,13 @@ async function checkWaivers(page: Page, at: string): Promise<void> {
 		fault(at, 'no row past its kickoff');
 		return;
 	}
-	// In the season Gain order every row's Beats draws its season Gain, the key it is sorted by (M-I).
+	// In the season Gain order every row's Beats draws its season Gain, the key it is sorted by (M-I),
+	// bare and quiet on a row with no gain (Lane 98, B13).
 	for (const r of rows) {
-		if (!r.gain?.endsWith(` ${SEASON.gain}`))
+		if (!r.quiet && !r.gain?.endsWith(` ${SEASON.gain}`))
 			fault(at, `${r.name} draws ${r.gain ?? 'no figure'} in Beats, not its season Gain`);
+		if (r.quiet && r.gain?.endsWith(` ${SEASON.gain}`))
+			fault(at, `${r.name} draws a loud ${r.gain} under the divider`);
 		if (r.beatsRight !== null && r.addLeft !== null && r.beatsRight > r.addLeft)
 			fault(at, `${r.name}'s Beats runs under the Add button`);
 	}

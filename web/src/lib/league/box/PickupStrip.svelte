@@ -1,7 +1,14 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import type { WaiverAdvice } from '../inseason/api.ts';
-	import { cardGains, moveWords, pickupsTitle, pickupSum, type PickupCard } from './waivers.ts';
+	import {
+		cardGains,
+		dropWhyWords,
+		moveWords,
+		pickupsTitle,
+		pickupSum,
+		type PickupCard
+	} from './waivers.ts';
 
 	/** The Waivers decision as a strip (Lane 66f): the board week, the count of pickups worth making
 	 * and what they add to the lineup the advice sets, then a card for each (his slot, the move, this
@@ -43,9 +50,11 @@
 					<button type="button" class="pick" aria-pressed={on} onclick={() => onchoose(card)}>
 						<span class="slot">{card.slot}</span>
 						<span class="text"
-							><span class="move"><b>{moveWords(card)}</b></span><span class="gains"
-								>{cardGains(card)}</span
-							></span
+							><span class="move"
+								><b>{moveWords(card)}</b>{#if card.dropWhy}<span class="why"
+										>{dropWhyWords(card.dropWhy)}</span
+									>{/if}</span
+							><span class="gains">{cardGains(card)}</span></span
 						>
 					</button>
 					<span class="verb">{@render verb(card, on)}</span>
@@ -189,6 +198,13 @@
 		color: var(--ink);
 	}
 
+	/* Why the drop is the one named (B34), quieter than the move. */
+	.move .why {
+		margin-left: 0.3em;
+		font-size: var(--t-sm);
+		color: var(--ink-2);
+	}
+
 	.gains {
 		font-size: var(--t-xs);
 		color: var(--ink-3);
@@ -231,17 +247,27 @@
 			text-align: right;
 		}
 
-		/* The cards scroll on one line; the chosen one's verb is pinned at the foot. */
+		/* The cards stack, each the strip's width, its move wrapping so the reason is whole: never a
+		   sideways scroll with the bar hidden (fix round 1, H2). The chosen one's verb is pinned at the
+		   foot. */
 		.pickups {
+			flex-direction: column;
 			flex-wrap: nowrap;
-			overflow-x: auto;
-			scrollbar-width: none;
 		}
 
 		.pickup {
 			flex: none;
-			max-width: none;
+			max-width: 100%;
 			padding-right: var(--s-3);
+		}
+
+		.pick,
+		.text {
+			min-width: 0;
+		}
+
+		.text {
+			white-space: normal;
 		}
 
 		.verb {
