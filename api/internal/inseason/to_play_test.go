@@ -7,33 +7,95 @@ import (
 	"github.com/jhunthrop/commish/api/internal/apitypes"
 )
 
-// A score bug under way counts only starters with a game this week (Lane
-// 85 fix round, M3): a bye starter is neither to play nor played and
-// leaves the count.
-func TestToPlayCountsOnlyStartersWithAGame(t *testing.T) {
-	kickoff := time.Date(2026, 10, 18, 17, 0, 0, 0, time.UTC)
-	at := func(state apitypes.GameState) apitypes.WeekFacts {
-		s, k := state, kickoff
-		return apitypes.WeekFacts{GameState: &s, Kickoff: &k}
+var toPlayKickoff = time.Date(2026, 10, 18, 17, 0, 0, 0, time.UTC)
+
+// startedAt is a starter's facts in a game of that state, with a
+// designation when status is set.
+func startedAt(state apitypes.GameState, status apitypes.DesignationStatus) apitypes.WeekFacts {
+	s, k := state, toPlayKickoff
+	f := apitypes.WeekFacts{GameState: &s, Kickoff: &k}
+	if status != "" {
+		f.Designation = &apitypes.InjuryDesignation{Status: status, AsOf: toPlayKickoff}
 	}
-	var game kickoffs
-	for _, f := range []apitypes.WeekFacts{at(apitypes.GameStateFinal), at(apitypes.GameStateKickedOff),
-		at(apitypes.GameStateUpcoming), {Bye: true}, {}} {
-		game.add(f)
+	return f
+}
+
+// countOf is the kickoffs of these starters.
+func countOf(facts ...apitypes.WeekFacts) kickoffs {
+	var k kickoffs
+	for _, f := range facts {
+		k.add(f)
 	}
-	if got := game.toPlay(); got == nil || *got != "1 of 3 starters to play" {
-		t.Fatalf("to play %v", got)
+	return k
+}
+
+// A score bug under way never prints a zero (Lane 92, B02): the starters
+// still to come while any is, else those in play; a bye starter, or one
+// with no game held, leaves the count.
+func TestToPlayNeverPrintsAZero(t *testing.T) {
+	final, live, ahead := apitypes.GameStateFinal, apitypes.GameStateKickedOff, apitypes.GameStateUpcoming
+	cases := []struct {
+		name  string
+		facts []apitypes.WeekFacts
+		state apitypes.ScoreboardGameState
+		want  string
+	}{
+		{"one still to come", []apitypes.WeekFacts{startedAt(final, ""), startedAt(live, ""), startedAt(ahead, ""), {Bye: true}, {}},
+			apitypes.ScoreboardGameStatePlaying, "1 to play"},
+		{"none to come, two in play", []apitypes.WeekFacts{startedAt(final, ""), startedAt(live, ""), startedAt(live, "")},
+			apitypes.ScoreboardGameStatePlaying, "2 playing"},
+		{"every starter final", []apitypes.WeekFacts{startedAt(final, ""), {Bye: true}},
+			apitypes.ScoreboardGameStateFinal, ""},
+		{"before kickoff", []apitypes.WeekFacts{startedAt(ahead, ""), {Bye: true}},
+			apitypes.ScoreboardGameStateUpcoming, ""},
 	}
-	var before kickoffs
-	before.add(at(apitypes.GameStateUpcoming))
-	before.add(apitypes.WeekFacts{Bye: true})
-	if got := before.toPlay(); got != nil {
-		t.Errorf("before kickoff %q", *got)
+	for _, c := range cases {
+		k := countOf(c.facts...)
+		if got := k.state(); got != c.state {
+			t.Errorf("%s: state %s, want %s", c.name, got, c.state)
+		}
+		got := k.toPlay(k.state())
+		switch {
+		case c.want == "" && got != nil:
+			t.Errorf("%s: %q, want none", c.name, *got)
+		case c.want != "" && (got == nil || *got != c.want):
+			t.Errorf("%s: %v, want %q", c.name, got, c.want)
+		}
 	}
-	var over kickoffs
-	over.add(at(apitypes.GameStateFinal))
-	over.add(apitypes.WeekFacts{Bye: true})
-	if got := over.toPlay(); got != nil {
-		t.Errorf("once final %q", *got)
+}
+
+// A side whose every starter is final, on bye or out reads final (Lane
+// 92, B02, the FFPC card): an out starter in a game under way or to come
+// is done, a questionable one still plays.
+func TestToPlayOutStarterIsDone(t *testing.T) {
+	final, live, ahead := apitypes.GameStateFinal, apitypes.GameStateKickedOff, apitypes.GameStateUpcoming
+	done := countOf(startedAt(final, ""), startedAt(live, apitypes.DesignationStatusOut),
+		startedAt(ahead, apitypes.DesignationStatusInjuredReserve), apitypes.WeekFacts{Bye: true})
+	if got := done.state(); got != apitypes.ScoreboardGameStateFinal {
+		t.Errorf("final, out and bye read %s, want final", got)
+	}
+	if got := done.toPlay(done.state()); got != nil {
+		t.Errorf("a final card counts %q", *got)
+	}
+	playing := countOf(startedAt(final, ""), startedAt(live, apitypes.DesignationStatusQuestionable))
+	if got := playing.toPlay(playing.state()); got == nil || *got != "1 playing" {
+		t.Errorf("a questionable starter in play reads %v, want 1 playing", got)
+	}
+	// Before any kickoff an out starter leaves the card upcoming.
+	before := countOf(startedAt(ahead, apitypes.DesignationStatusOut), startedAt(ahead, ""))
+	if got := before.state(); got != apitypes.ScoreboardGameStateUpcoming {
+		t.Errorf("before kickoff %s", got)
+	}
+}
+
+// The words themselves, by the one table.
+func TestToPlayWords(t *testing.T) {
+	for _, c := range []struct {
+		toPlay, playing int
+		want            string
+	}{{3, 2, "3 to play"}, {0, 2, "2 playing"}, {0, 0, ""}, {1, 0, "1 to play"}} {
+		if got := ToPlayWords(c.toPlay, c.playing); got != c.want {
+			t.Errorf("ToPlayWords(%d, %d) = %q, want %q", c.toPlay, c.playing, got, c.want)
+		}
 	}
 }

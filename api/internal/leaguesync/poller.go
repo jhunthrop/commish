@@ -68,6 +68,11 @@ type Poller struct {
 	// the work done for the read before stands. It runs on the storing
 	// goroutine and must return at once.
 	Landed func(Snapshot)
+	// Live reports a game of the season under way (Lane 92, B06): then a
+	// read older than MinUpstreamGap waits for the fresh one rather than
+	// answer the last read while one goes upstream behind it, so no screen
+	// shows a live score staler than the minute. Nil is never live.
+	Live func(ctx context.Context, season int) bool
 
 	once  sync.Once
 	inner *poll.Poller[Snapshot]
@@ -89,9 +94,15 @@ func (p *Poller) Upstream() int64 { return p.shared().Upstream() }
 // of it costs the host nothing new.
 func (p *Poller) Holds(ref Ref) bool { return p.shared().Holds(ref.Key()) }
 
-// Read is the league as of at most MinUpstreamGap ago.
+// Read is the league as of at most MinUpstreamGap ago: past the minute
+// the last read, with one going upstream behind it, except while a game
+// is live, when the view waits for that read (Live).
 func (p *Poller) Read(ctx context.Context, ref Ref) (Read, error) {
-	return p.read(ctx, ref, MinUpstreamGap, poll.Revalidate)
+	mode := poll.Revalidate
+	if p.Live != nil && p.Live(ctx, ref.Season) {
+		mode = poll.Wait
+	}
+	return p.read(ctx, ref, MinUpstreamGap, mode)
 }
 
 // Refresh is the league read again now, waiting for the host, unless a

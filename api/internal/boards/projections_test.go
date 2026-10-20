@@ -11,7 +11,7 @@ import (
 	"github.com/jhunthrop/commish/api/internal/db/dbtest"
 )
 
-// projectionSchema builds the two tables the read joins: two snapshots of
+// projectionSchema builds the two tables the read joins: three snapshots of
 // week 6 and one of week 7, a fullback outside our universe, a kicker as
 // the provider files him ("PK") and a defense by its club in the
 // provider's spelling.
@@ -26,6 +26,7 @@ func projectionSchema(t *testing.T, pool *pgxpool.Pool, schema string) {
 		`create table ` + schema + `.tank01_projection_rows (snapshot_id bigint, provider_player_id text, captured_at timestamptz,
 			season int, week int, position text, team text, ppr_points float8, half_points float8, standard_points float8)`,
 		`insert into ` + schema + `.tank01_projection_rows values
+			(9, '4431611', '2026-10-14 13:00:00+00', 2026, 6, 'QB', 'CHI', 17.0, 17.0, 17.0),
 			(10, '4431611', '2026-10-15 13:00:00+00', 2026, 6, 'QB', 'CHI', 18.0, 18.0, 18.0),
 			(11, '4431611', '2026-10-17 01:00:00+00', 2026, 6, 'QB', 'CHI', 19.44, 19.44, 19.44),
 			(11, '2971573', '2026-10-17 01:00:00+00', 2026, 6, 'PK', 'HOU', 8.1, 8.1, 8.1),
@@ -97,6 +98,18 @@ func TestWeekProjectionReadsTheNewestSnapshot(t *testing.T) {
 	if _, ok := p.Delta("2971573", "K", "HOU", apitypes.ScoringPresetPpr); ok {
 		t.Fatal("a kicker the snapshot before lacks has no change")
 	}
+	// Every earlier snapshot is read too, newest first, each with its own
+	// before (Lane 92): a game past its kickoff reads the one as of kickoff.
+	if len(p.Earlier) != 2 || p.Earlier[0].ReadAt != p.Previous.ReadAt || p.Earlier[1].Players["4431611"].PPR != 17 {
+		t.Fatalf("the earlier snapshots %+v", p.Earlier)
+	}
+	kickoff := p.AsOf(time.Date(2026, 10, 16, 17, 0, 0, 0, time.UTC))
+	if kickoff.Players["4431611"].PPR != 18 || kickoff.Previous == nil || kickoff.Previous.Players["4431611"].PPR != 17 {
+		t.Fatalf("as of a kickoff between the two older snapshots: %+v", kickoff)
+	}
+	if d, ok := kickoff.Delta("4431611", "QB", "CHI", apitypes.ScoringPresetPpr); !ok || d != 1 {
+		t.Fatalf("the change as of kickoff %v %v, want 1.0 since the snapshot before it", d, ok)
+	}
 	only, err := src.WeekProjection(context.Background(), 2026, 7)
 	if err != nil || only.Previous != nil || only.Players["4431611"].PPR != 25 {
 		t.Fatalf("a week with one snapshot has none before: %+v %v", only, err)
@@ -139,5 +152,40 @@ func TestProjectedPointsForEachPreset(t *testing.T) {
 		if got := p.For(preset); got != want {
 			t.Errorf("%s: %v", preset, got)
 		}
+	}
+}
+
+// AsOf is the newest snapshot at or before the instant (Lane 92, B27), the
+// newest itself when it was captured by then, the earliest held when every
+// one came after.
+func TestWeekProjectionAsOfAKickoff(t *testing.T) {
+	at := func(day int) time.Time { return time.Date(2026, 10, day, 12, 0, 0, 0, time.UTC) }
+	snap := func(day int, ppr float64) WeekProjection {
+		w := emptyProjection(6)
+		w.ReadAt = at(day)
+		w.Players["p"] = ProjectedPoints{PPR: ppr}
+		return w
+	}
+	w := chained([]WeekProjection{snap(18, 3), snap(16, 2), snap(14, 1)}, []map[string]int{{}, {}, {}})
+	for _, c := range []struct {
+		name string
+		at   time.Time
+		want float64
+	}{
+		{"after the newest", at(19), 3},
+		{"at the newest", at(18), 3},
+		{"between", at(17), 2},
+		{"at the earliest", at(14), 1},
+		{"before every snapshot", at(13), 1},
+	} {
+		if got := w.AsOf(c.at).Players["p"].PPR; got != c.want {
+			t.Errorf("%s: %v, want %v", c.name, got, c.want)
+		}
+	}
+	if prev := w.AsOf(at(17)).Previous; prev == nil || prev.Players["p"].PPR != 1 {
+		t.Errorf("the snapshot before the one as of kickoff: %+v", prev)
+	}
+	if one := snap(18, 3); one.AsOf(at(13)).Players["p"].PPR != 3 {
+		t.Error("a week of one snapshot reads it at any instant")
 	}
 }

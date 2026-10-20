@@ -198,8 +198,9 @@ func (a *advisor) build(id string, lp apitypes.LeaguePlayer, side *leaguesync.Si
 	// A club with no game this week (a bye) has no projection, whatever a
 	// snapshot says.
 	if facts.Opponent != "" {
-		line.WeekProjection = a.weekProjection(boardID, position, team)
-		line.ProjectionDelta = a.projectionDelta(boardID, position, team)
+		projection := projectionAsOf(a.projection, facts)
+		line.WeekProjection = weekProjectionOf(projection, a.preset, boardID, position, team)
+		line.ProjectionDelta = projectionDeltaOf(projection, a.preset, boardID, position, team)
 	}
 	if line.WeekProjection != nil {
 		// The advice ranks by the tenth the screen prints (Lane 66e).
@@ -226,21 +227,32 @@ func (a *advisor) build(id string, lp apitypes.LeaguePlayer, side *leaguesync.Si
 	return person{cand: c, line: line, words: words}
 }
 
-// weekProjection is his points on the week's published projection in
-// the league's format, to the tenth a screen prints, nil without a row.
-func (a *advisor) weekProjection(boardID string, position draft.Position, team string) *float64 {
-	p, ok := a.projection.Player(boardID, string(position), team)
+// projectionAsOf is the week's projection a player's row reads (Lane 92,
+// B27): the newest while his game is still to come, the one as of his
+// kickoff once it has kicked off, so a game under way or final keeps the
+// Proj it started with.
+func projectionAsOf(p boards.WeekProjection, f Facts) boards.WeekProjection {
+	if !f.Locked || f.Kickoff == nil {
+		return p
+	}
+	return p.AsOf(*f.Kickoff)
+}
+
+// weekProjectionOf is his points on the projection in the preset's
+// format, to the tenth a screen prints, nil without a row.
+func weekProjectionOf(p boards.WeekProjection, preset apitypes.ScoringPreset, boardID string, position draft.Position, team string) *float64 {
+	got, ok := p.Player(boardID, string(position), team)
 	if !ok {
 		return nil
 	}
-	v := roundTenth(p.For(a.preset))
+	v := roundTenth(got.For(preset))
 	return &v
 }
 
-// projectionDelta is his projection's change since the snapshot before,
-// to the tenth a screen prints, nil without a row in both.
-func (a *advisor) projectionDelta(boardID string, position draft.Position, team string) *float64 {
-	d, ok := a.projection.Delta(boardID, string(position), team, a.preset)
+// projectionDeltaOf is his projection's change since the snapshot before
+// the one read, to the tenth a screen prints, nil without a row in both.
+func projectionDeltaOf(p boards.WeekProjection, preset apitypes.ScoringPreset, boardID string, position draft.Position, team string) *float64 {
+	d, ok := p.Delta(boardID, string(position), team, preset)
 	if !ok {
 		return nil
 	}
@@ -499,7 +511,20 @@ func (a *advisor) Lineup() (apitypes.LineupAdvice, bool) {
 		out.Bench = append(out.Bench, people[i].line)
 	}
 	out.WeekDone = weekDone(out.Slots, out.Week)
+	out.ProjectedFinal = projectedFinal(out.TeamPoints, advisedStarters(out.Slots))
 	return out, true
+}
+
+// advisedStarters is the starters the advice sets, a spot no one can play
+// left out: the lineup its projected final counts (Lane 92).
+func advisedStarters(slots []apitypes.LineupSlot) []apitypes.PlayerLine {
+	out := make([]apitypes.PlayerLine, 0, len(slots))
+	for _, s := range slots {
+		if !s.NoOneCanPlay {
+			out = append(out, s.Ours)
+		}
+	}
+	return out
 }
 
 // weekDone is the week's sentence once every starter with a game has it

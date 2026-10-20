@@ -62,6 +62,8 @@ func publicLine(d Data, projection boards.WeekProjection, b boards.Board, rest R
 		line.PositionRank = &rank
 	}
 	if facts.Opponent != "" {
+		// As of his kickoff once his game has kicked off (Lane 92, B27).
+		projection := projectionAsOf(projection, facts)
 		if p, ok := projection.Player(boardID, string(position), team); ok {
 			// The tenth the card prints, rounded once here (Lane 66k rereview N1).
 			v := roundTenth(roundCents(p.For(pprPreset)))

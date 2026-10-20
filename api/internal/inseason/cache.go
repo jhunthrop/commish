@@ -9,6 +9,7 @@ import (
 
 	"golang.org/x/sync/singleflight"
 
+	"github.com/jhunthrop/commish/api/internal/apitypes"
 	"github.com/jhunthrop/commish/api/internal/boards"
 )
 
@@ -82,6 +83,39 @@ func (c *Cache) Data(ctx context.Context, season int) (Data, error) {
 		return Data{}, err
 	}
 	return Data{Lines: lines, Games: games, Designations: designations, GameFacts: gameFacts}, nil
+}
+
+// LiveSpan bounds a live window: a game kicked off longer ago than this
+// with no final held (a final the hourly status missed) is no longer
+// live, so the window never stays open for days.
+const LiveSpan = 6 * time.Hour
+
+// Live reports whether a game of the season is under way at the cache's
+// clock (Lane 92, B06): kicked off by the one game state (gameStateAt),
+// no final held, inside LiveSpan. The league reads wait for a fresh read
+// inside it. A failed schedule read is logged and answers not live, so
+// the reads keep their usual pace.
+func (c *Cache) Live(ctx context.Context, season int) bool {
+	games, err := cached(c, ctx, fmt.Sprintf("games/%d", season), SeasonTTL, func(ctx context.Context) ([]boards.TeamWeek, error) {
+		return c.Reads.Schedule(ctx, season)
+	})
+	if err != nil {
+		if c.Log != nil {
+			c.Log.Warn("inseason: the schedule was not read; the league reads answer at their usual pace", "err", err)
+		}
+		return false
+	}
+	return liveAt(games, c.Now())
+}
+
+// liveAt reports a game kicked off at now with no final, inside LiveSpan.
+func liveAt(games []boards.TeamWeek, now time.Time) bool {
+	for _, g := range games {
+		if gameStateAt(g, now) == apitypes.GameStateKickedOff && now.Sub(g.Kickoff) < LiveSpan {
+			return true
+		}
+	}
+	return false
 }
 
 // Projection is the week's published projection, kept for CaptureTTL:

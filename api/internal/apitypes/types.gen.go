@@ -2787,6 +2787,9 @@ type LineupAdvice struct {
 	// PlayerPoints the host gives each player's points (Sleeper, MFL, ESPN); false where it gives each team's total alone (Yahoo, FFPC) or its read carried no player's, so a player's points_this_week stay null and the team's total is team_points
 	PlayerPoints bool `json:"player_points"`
 
+	// ProjectedFinal the lineup's projected final by the score bug's one rule: team_points plus the Proj of the starters the advice sets who are still to play, an out starter counting nothing; null while team_points is, or absent from an older answer
+	ProjectedFinal *float64 `json:"projected_final,omitempty"`
+
 	// ProjectionPreviousReadAt when the snapshot before it was captured, the read projection_delta counts from; null with none
 	ProjectionPreviousReadAt *time.Time `json:"projection_previous_read_at"`
 
@@ -2968,7 +2971,10 @@ type MatchupBoxSide struct {
 
 	// PlayerPoints the host gives each player's points for this side; false where it gives the side's total alone
 	PlayerPoints bool `json:"player_points"`
-	RosterId     int  `json:"roster_id"`
+
+	// ProjectedFinal the side's projected final by the score bug's one rule (ScoreboardSide.projected_final): its score so far plus the Proj of its starters still to play; null before any of them has kicked off, with the score unread, or absent from an older answer
+	ProjectedFinal *float64 `json:"projected_final,omitempty"`
+	RosterId       int      `json:"roster_id"`
 
 	// Starters the host's starters in the league's slot order (QB, RB, WR, TE, the flex spots, K, DEF); an empty spot is left out, and a starter no slot takes ends the list in his position's slot. Empty where the host shows us no lineup for the side (FFPC's opponents)
 	Starters []BoxStarter `json:"starters"`
@@ -3734,7 +3740,7 @@ type ScoreboardGame struct {
 	// State upcoming before any starter's game kicks off, final once every starter's game is over, playing between
 	State ScoreboardGameState `json:"state"`
 
-	// ToPlay while the game is playing, how many of both sides' starters with a game this week are still to play ("5 of 18 starters to play"): a starter on bye, or with no game held, is neither to play nor played and leaves the count; null otherwise, or absent from an older answer
+	// ToPlay while the game is playing, how many of both sides' starters with a game this week are still to play ("5 to play", or "2 playing" once none is still to come), never a zero; an out starter is done, a starter on bye or with no game held leaves the count; null otherwise, or absent from an older answer. Each side's own count is its to_play
 	ToPlay *string `json:"to_play,omitempty"`
 }
 
@@ -3752,12 +3758,18 @@ type ScoreboardSide struct {
 	// PointsRead false when the host's score could not be read; points then says nothing
 	PointsRead bool `json:"points_read"`
 
+	// ProjectedFinal the side's projected final once any of its starters has kicked off: points (the platform's score so far) plus the week projection, as printed to the tenth, of each starter still to play, an out starter counting nothing; equal to points once every starter is final. Null before kickoff, with the score unread, or absent from an older answer
+	ProjectedFinal *float64 `json:"projected_final,omitempty"`
+
 	// Projection the side's starters' week projections summed, each as printed to the tenth, a starter with none counting nothing; null when no starter has one
 	Projection *float64 `json:"projection"`
 	RosterId   int      `json:"roster_id"`
 
 	// Starters the starters the host lists for the side
 	Starters int `json:"starters"`
+
+	// ToPlay while the game is playing, where the side's starters stand, never a zero: "3 to play" while any starter with a game is still to come, "2 playing" once none is and some are in play; null once every starter is final, out (a designation that keeps him out) or on bye, before kickoff, or absent from an older answer
+	ToPlay *string `json:"to_play,omitempty"`
 }
 
 // Scoring exactly one of preset and custom. custom needs the custom_scoring feature.

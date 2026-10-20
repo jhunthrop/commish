@@ -84,5 +84,10 @@ func (a *advisor) boxSide(t leaguesync.Team, side *leaguesync.Side) apitypes.Mat
 	for _, i := range bench {
 		out.Bench = append(out.Bench, people[i].line)
 	}
+	lines := make([]apitypes.PlayerLine, len(out.Starters))
+	for i, s := range out.Starters {
+		lines[i] = s.Line
+	}
+	out.ProjectedFinal = projectedFinal(sidePoints(side), lines)
 	return out
 }
