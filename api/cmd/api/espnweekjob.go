@@ -13,9 +13,9 @@ import (
 	"github.com/jhunthrop/commish/api/internal/leaguerecord"
 )
 
-// runESPNWeekReads reads every attached ESPN league once for the NFL week
-// at the run's clock (Lane 93): ESPN's projection for each rostered player
-// in the league's scoring, and his points for the week before. Cloud
+// runESPNWeekReads reads every attached ESPN league of the board's season twice
+// (Lane 93): the NFL week at the run's clock, ESPN's projection for each rostered player
+// in the league's scoring, and the week before for its own period, its rosters and points. Cloud
 // Scheduler runs it Thursday 13:30 Eastern, half an hour before the
 // register's Thursday pass sets the week's order, and Wednesday 19:00
 // Eastern, after the Wednesday pass grades the week before (infra/README.md
@@ -45,10 +45,10 @@ func runESPNWeekReads(ctx context.Context, log *slog.Logger, cfg config.API, poo
 		return nil
 	}
 	reader := leaguerecord.ESPNWeeks{Member: e.member, Public: e.client, Log: log}
-	got, err := leaguerecord.Capture(ctx, &leaguerecord.Store{Pool: pool}, reader, week, now, log)
+	got, err := leaguerecord.Capture(ctx, &leaguerecord.Store{Pool: pool}, reader, cfg.Board.Season, leaguerecord.Periods(week), now, log)
 	if err != nil {
 		return fmt.Errorf("espn week reads: %w", err)
 	}
-	log.Info("espn week reads", "week", week, "leagues", got.Leagues, "read", got.Read, "failed", got.Failed, "rows", got.Rows)
+	log.Info("espn week reads", "week", week, "leagues", got.Leagues, "read", got.Read, "skipped", got.Skipped, "failed", got.Failed, "rows", got.Rows)
 	return nil
 }

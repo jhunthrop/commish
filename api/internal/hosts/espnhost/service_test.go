@@ -97,9 +97,9 @@ func (f *fakeESPN) Read(_ context.Context, id string, _ int, c *espn.Cookies) (e
 	return espn.FullLeague{ID: id}, nil
 }
 
-func (f *fakeESPN) ReadWeek(_ context.Context, _ string, season, period int, c *espn.Cookies) (espn.WeekRead, error) {
+func (f *fakeESPN) ReadWeek(_ context.Context, id string, season, period int, c *espn.Cookies) (espn.WeekRead, error) {
 	f.weeks++
-	if c == nil || c.S2 != goodS2 || f.refuseWeeks {
+	if c == nil || c.S2 != goodS2 || f.refuseWeeks || !f.listed(id) {
 		return espn.WeekRead{}, espn.ErrSignedOut
 	}
 	return espn.WeekRead{Season: season, Period: period}, nil
@@ -527,5 +527,19 @@ func TestReadWeekUsesTheKeptCookies(t *testing.T) {
 	r.client.refuseWeeks = true
 	if _, err := r.member.ReadWeek(context.Background(), r.me, agbo, 2026, 7); !errors.Is(err, ErrReconnect) || !r.store.signedOut {
 		t.Fatalf("refused cookies: %v, signed out %v", err, r.store.signedOut)
+	}
+}
+
+// A week read of a league the member is not in (left, or removed) is that
+// league's refusal: the connection is kept, as ReadLeague keeps it (Lane 93
+// review H1).
+func TestReadWeekNotTheirsKeepsTheConnection(t *testing.T) {
+	r := setup(t)
+	call(t, r.s.connect, r.me, goodPair)
+	if _, err := r.member.ReadWeek(context.Background(), r.me, "999", 2026, 7); !errors.Is(err, espn.ErrPrivate) || r.store.signedOut {
+		t.Fatalf("a league not theirs: %v, signed out %v", err, r.store.signedOut)
+	}
+	if _, err := r.member.ReadWeek(context.Background(), r.me, agbo, 2026, 7); err != nil {
+		t.Fatalf("their league: %v", err)
 	}
 }

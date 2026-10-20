@@ -3,13 +3,16 @@ package leaguerecord
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
+	"reflect"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
 
+	"github.com/jhunthrop/commish/api/internal/boards"
 	"github.com/jhunthrop/commish/api/internal/db/dbtest"
 	"github.com/jhunthrop/commish/api/internal/espn"
 	"github.com/jhunthrop/commish/api/internal/leaguesync"
@@ -38,7 +41,7 @@ func (w *fakeWeeks) ReadWeek(_ context.Context, ref leaguesync.Ref, period int) 
 	if (ref.LeagueID == "1" && ref.As == w.member) || ref.LeagueID == "2" {
 		return week7(), nil
 	}
-	return espn.WeekRead{}, errors.New("private")
+	return espn.WeekRead{}, fmt.Errorf("%w: not a league of this member", espn.ErrPrivate)
 }
 
 // Every attached ESPN league is read once, as a connected member who
@@ -63,11 +66,11 @@ func TestCaptureKeepsEveryAttachedESPNLeaguesRead(t *testing.T) {
 	if _, err := pool.Exec(ctx, `insert into app.league_links (account_id, host, host_league_id, host_season, roster_id, read_as_member, detached_at)
 		values ($2, 'espn', '1', 2026, 4, false, null), ($1, 'espn', '1', 2026, 3, true, null),
 		       ($2, 'espn', '2', 2026, 1, false, null), ($2, 'espn', '3', 2026, 1, true, null),
-		       ($2, 'espn', '4', 2026, 1, false, now()), ($1, 'sleeper', '5', 0, 1, false, null)`, member, other); err != nil {
+		       ($2, 'espn', '4', 2026, 1, false, now()), ($1, 'sleeper', '5', 0, 1, false, null), ($1, 'espn', '6', 2025, 1, true, null)`, member, other); err != nil {
 		t.Fatal(err)
 	}
 	store := &Store{Pool: pool}
-	refs, err := store.Leagues(ctx)
+	refs, err := store.Leagues(ctx, 2026)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -76,11 +79,11 @@ func TestCaptureKeepsEveryAttachedESPNLeaguesRead(t *testing.T) {
 	}
 	at := time.Date(2026, 10, 22, 17, 30, 0, 0, time.UTC)
 	reader := &fakeWeeks{member: member}
-	got, err := Capture(ctx, store, reader, 7, at, quiet)
+	got, err := Capture(ctx, store, reader, 2026, []int{7}, at, quiet)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got != (Captured{Leagues: 3, Read: 2, Failed: 1, Rows: 4}) {
+	if got != (Captured{Leagues: 3, Read: 2, Skipped: 1, Rows: 4}) {
 		t.Fatalf("captured %+v", got)
 	}
 	rows, err := store.Reads(ctx, "1", 2026)
@@ -120,4 +123,56 @@ func (publicWeeks) ReadWeek(_ context.Context, _ string, _, period int, cookies 
 		return espn.WeekRead{}, errors.New("a public read sends no cookies")
 	}
 	return espn.WeekRead{Season: 2026, Period: period}, nil
+}
+
+type fakeOrders struct{ orders []boards.SetOrder }
+
+func (f fakeOrders) SetOrders(context.Context, int) ([]boards.SetOrder, error) { return f.orders, nil }
+
+// The roster as one read of period 7 carries it, with or without points.
+func rosterRead(points bool) espn.WeekRead {
+	team := espn.WeekTeam{ID: 3}
+	for _, r := range roster {
+		p := espn.PeriodPoints{Projected: f(r.projected)}
+		if points {
+			p.Actual = f(r.actual)
+		}
+		team.Players = append(team.Players, espn.WeekPlayer{ID: r.id, Position: r.position, Team: r.team, Status: r.status,
+			Points: map[int]espn.PeriodPoints{7: p}})
+	}
+	return espn.WeekRead{Season: 2026, Period: 7, ScoringPeriod: 7, Teams: []espn.WeekTeam{team}}
+}
+
+// Review L3: the service end to end, through the store: an ESPN league's
+// team graded from the kept reads and the set orders; another platform's
+// league, or no team of the member's, has no week.
+func TestServiceGradesAnESPNLeagueFromItsKeptReads(t *testing.T) {
+	pool := dbtest.Pool(t)
+	ctx := context.Background()
+	store := &Store{Pool: pool}
+	for _, put := range []struct {
+		at     time.Time
+		points bool
+	}{{readAt, false}, {after, true}} {
+		if _, err := store.Put(ctx, "1", rosterRead(put.points), put.at); err != nil {
+			t.Fatal(err)
+		}
+	}
+	svc := &Service{Store: store, Orders: fakeOrders{[]boards.SetOrder{order(&gradedAt)}}}
+	snap := leaguesync.Snapshot{Ref: leaguesync.Ref{Host: leaguesync.HostESPN, LeagueID: "1", Season: 2026}, Shape: espnShape}
+	got, err := svc.Weeks(ctx, snap, 3, byes)
+	want := []Week{{Week: 7, Benchmark: BenchmarkESPN, Ours: 97, Theirs: 70, Margin: 27}}
+	if err != nil || !reflect.DeepEqual(got, want) {
+		t.Fatalf("%+v %v", got, err)
+	}
+	sleeper := snap
+	sleeper.Ref.Host = leaguesync.HostSleeper
+	for _, tc := range []struct {
+		snap leaguesync.Snapshot
+		me   int
+	}{{sleeper, 3}, {snap, 0}} {
+		if got, err := svc.Weeks(ctx, tc.snap, tc.me, byes); err != nil || got != nil {
+			t.Errorf("%s team %d: %+v %v", tc.snap.Ref.Host, tc.me, got, err)
+		}
+	}
 }

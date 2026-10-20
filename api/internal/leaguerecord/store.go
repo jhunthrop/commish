@@ -18,16 +18,17 @@ type Store struct {
 	Pool *pgxpool.Pool
 }
 
-// Leagues is every attached ESPN league once, each read as a member who
+// Leagues is every attached ESPN league of the season once (Lane 93 review
+// M2: a league attached for another season is not read), each read as a member who
 // attached it to be read as themselves and is connected, else as the
 // public reads it.
-func (s *Store) Leagues(ctx context.Context) ([]leaguesync.Ref, error) {
+func (s *Store) Leagues(ctx context.Context, season int) ([]leaguesync.Ref, error) {
 	rows, err := s.Pool.Query(ctx, `select distinct on (l.host_league_id, l.host_season) l.host_league_id, l.host_season,
 	  case when l.read_as_member and c.account_id is not null then l.account_id end
 	from app.league_links l
 	left join app.host_connections c on c.account_id = l.account_id and c.host = l.host and c.status = 'connected'
-	where l.host = 'espn' and l.detached_at is null
-	order by l.host_league_id, l.host_season, (l.read_as_member and c.account_id is not null) desc, l.attached_at`)
+	where l.host = 'espn' and l.detached_at is null and l.host_season = $1
+	order by l.host_league_id, l.host_season, (l.read_as_member and c.account_id is not null) desc, l.attached_at`, season)
 	if err != nil {
 		return nil, fmt.Errorf("leaguerecord: espn leagues: %w", err)
 	}

@@ -9,6 +9,7 @@ package leaguerecord
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"time"
@@ -57,33 +58,55 @@ func (e ESPNWeeks) ReadWeek(ctx context.Context, ref leaguesync.Ref, period int)
 	return e.Public.ReadWeek(ctx, ref.LeagueID, ref.Season, period, nil)
 }
 
-// Captured is one capture pass's count.
+// Captured is one capture pass's count: reads kept, reads skipped as
+// private to every reader (a league its reading member left), reads that
+// failed.
 type Captured struct {
-	Leagues, Read, Failed, Rows int
+	Leagues, Read, Skipped, Failed, Rows int
 }
 
-// Capture reads every attached ESPN league once for the period and keeps
-// each read whole, at now. A league that fails is counted and logged and
-// the pass goes on; a store that fails ends it.
-func Capture(ctx context.Context, store *Store, reader WeekReader, period int, now time.Time, log *slog.Logger) (Captured, error) {
-	refs, err := store.Leagues(ctx)
+// Periods is what a pass reads at the NFL week it runs in (Lane 93 review
+// H2): the week itself, before its games, and the week before it, read
+// again for its own period, so that week's points come with its rosters as
+// they stood then, a starter dropped since included. Week 1 has none before.
+func Periods(week int) []int {
+	if week <= 1 {
+		return []int{week}
+	}
+	return []int{week - 1, week}
+}
+
+// Capture reads every attached ESPN league of the season once for each
+// period and keeps each read whole, at now. A league private to every
+// reader is skipped and said so; a read that fails is counted and logged
+// and the pass goes on; a store that fails ends it.
+func Capture(ctx context.Context, store *Store, reader WeekReader, season int, periods []int, now time.Time, log *slog.Logger) (Captured, error) {
+	refs, err := store.Leagues(ctx, season)
 	if err != nil {
 		return Captured{}, err
 	}
 	out := Captured{Leagues: len(refs)}
 	for _, ref := range refs {
-		w, err := reader.ReadWeek(ctx, ref, period)
-		if err != nil {
-			out.Failed++
-			log.Warn("leaguerecord: espn week read", "league", ref.Shared().Key(), "period", period, "err", err)
-			continue
+		for _, period := range periods {
+			w, err := reader.ReadWeek(ctx, ref, period)
+			switch {
+			case errors.Is(err, espn.ErrPrivate):
+				out.Skipped++
+				log.Info("leaguerecord: espn week read skipped, the league is private and its reader is not in it",
+					"league", ref.Shared().Key(), "period", period)
+				continue
+			case err != nil:
+				out.Failed++
+				log.Warn("leaguerecord: espn week read", "league", ref.Shared().Key(), "period", period, "err", err)
+				continue
+			}
+			n, err := store.Put(ctx, ref.LeagueID, w, now)
+			if err != nil {
+				return out, fmt.Errorf("leaguerecord: keep %s: %w", ref.Shared().Key(), err)
+			}
+			out.Read++
+			out.Rows += n
 		}
-		n, err := store.Put(ctx, ref.LeagueID, w, now)
-		if err != nil {
-			return out, fmt.Errorf("leaguerecord: keep %s: %w", ref.Shared().Key(), err)
-		}
-		out.Read++
-		out.Rows += n
 	}
 	return out, nil
 }

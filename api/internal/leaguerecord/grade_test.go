@@ -50,7 +50,7 @@ func reads() []Row {
 		base := Row{Week: 7, PlayerID: r.id, TeamID: 3, Position: r.position, ProTeam: r.team, Status: r.status}
 		before, later := base, base
 		before.ReadAt, before.ReadPeriod, before.Projected = readAt, 7, f(r.projected)
-		later.ReadAt, later.ReadPeriod, later.Projected, later.Actual = after, 8, f(r.projected), f(r.actual)
+		later.ReadAt, later.ReadPeriod, later.Projected, later.Actual = after, 7, f(r.projected), f(r.actual)
 		rows = append(rows, before, later)
 	}
 	other := Row{Week: 7, ReadAt: readAt, ReadPeriod: 7, PlayerID: "z", TeamID: 4, Position: posQB, ProTeam: "BAL", Status: "ACTIVE", Projected: f(40)}
@@ -123,5 +123,40 @@ func TestLineupFillsEachSlotOnceAndTheFlexFromWhatIsLeft(t *testing.T) {
 	}
 	if Slots(espnShape) != 7 {
 		t.Errorf("slots %d", Slots(espnShape))
+	}
+}
+
+// Review H2: our RB c (25 points) was cut after the week. A later read of
+// week 8, whose rosters no longer hold him, is not where week 7's points
+// come from: the week 7 read taken after the grading still carries him, so
+// both lineups score as before.
+func TestGradeKeepsThePointsOfAStarterDroppedAfterTheWeek(t *testing.T) {
+	rows := reads()
+	cut := after.Add(20 * time.Hour)
+	for _, r := range roster {
+		if r.id == "c" {
+			continue
+		}
+		rows = append(rows, Row{Week: 7, ReadAt: cut, ReadPeriod: 8, PlayerID: r.id, TeamID: 3, Position: r.position,
+			ProTeam: r.team, Status: r.status, Actual: f(r.actual)})
+	}
+	got := Grade([]boards.SetOrder{order(&gradedAt)}, rows, 3, espnShape, byes)
+	if len(got) != 1 || got[0].Ours != 97 || got[0].Theirs != 70 {
+		t.Fatalf("got %+v", got)
+	}
+}
+
+// A starter the week's own read after the grading does not carry is never
+// counted as none: the week is not graded rather than drawn wrong.
+func TestGradeSkipsAWeekWhoseReadLacksAStarter(t *testing.T) {
+	var rows []Row
+	for _, r := range reads() {
+		if r.PlayerID == "c" && r.ReadAt.Equal(after) {
+			continue
+		}
+		rows = append(rows, r)
+	}
+	if got := Grade([]boards.SetOrder{order(&gradedAt)}, rows, 3, espnShape, byes); got != nil {
+		t.Fatalf("drew %+v with a starter's points missing", got)
 	}
 }

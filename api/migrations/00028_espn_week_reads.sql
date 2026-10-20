@@ -7,6 +7,9 @@
 -- names the team and slot he held at the read. Append-only: each read is
 -- its own read_at, never an update. The league record grades our order's
 -- lineup against ESPN's projected lineup from them (internal/leaguerecord).
+-- Retention: a season's rows are kept through the season after it (the
+-- record compares like with like a year on), then deleted by hand with the
+-- season's other league reads; nothing here ties a row to an account.
 create table app.espn_week_reads (
   league_id   text not null check (league_id ~ '^[0-9]{1,12}$'),
   season      int not null check (season between 2000 and 2100),

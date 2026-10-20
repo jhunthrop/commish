@@ -41,27 +41,42 @@ type Week struct {
 func Grade(orders []boards.SetOrder, rows []Row, team int, shape leaguesync.Shape, byes map[string]int) []Week {
 	var out []Week
 	for _, order := range orders {
-		if order.GradedAt == nil {
-			continue
+		if wk, ok := weekOf(order, rows, team, shape, byes); ok {
+			out = append(out, wk)
 		}
-		roster, projected, ok := rosterAt(rows, order.Week, team, order.SetAt)
-		if !ok {
-			continue
-		}
-		actual, ok := pointsAfter(rows, order.Week, *order.GradedAt)
-		if !ok {
-			continue
-		}
-		cands := candidates(roster, order.Week, byes)
-		benchmark, stance := benchmarkFor(cands, projected, order.Published)
-		if stance == nil {
-			continue
-		}
-		ours := tenth.Round(Scored(Lineup(cands, shape, ByRank(order.Rank)), actual))
-		theirs := tenth.Round(Scored(Lineup(cands, shape, stance), actual))
-		out = append(out, Week{Week: order.Week, Benchmark: benchmark, Ours: ours, Theirs: theirs, Margin: tenth.Round(ours - theirs)})
 	}
 	return out
+}
+
+// weekOf grades one set order, false where the week cannot be graded yet
+// or honestly: no roster read before the order was set, no read of the
+// week's own period after its grading, no benchmark, or a starter of
+// either lineup the points read does not carry (he would count as none).
+func weekOf(order boards.SetOrder, rows []Row, team int, shape leaguesync.Shape, byes map[string]int) (Week, bool) {
+	if order.GradedAt == nil {
+		return Week{}, false
+	}
+	roster, projected, ok := rosterAt(rows, order.Week, team, order.SetAt)
+	if !ok {
+		return Week{}, false
+	}
+	actual, carried, ok := pointsAfter(rows, order.Week, *order.GradedAt)
+	if !ok {
+		return Week{}, false
+	}
+	cands := candidates(roster, order.Week, byes)
+	benchmark, stance := benchmarkFor(cands, projected, order.Published)
+	if stance == nil {
+		return Week{}, false
+	}
+	ourPicks, theirPicks := Lineup(cands, shape, ByRank(order.Rank)), Lineup(cands, shape, stance)
+	for _, id := range append(append([]string(nil), ourPicks...), theirPicks...) {
+		if !carried[id] {
+			return Week{}, false
+		}
+	}
+	ours, theirs := tenth.Round(Scored(ourPicks, actual)), tenth.Round(Scored(theirPicks, actual))
+	return Week{Week: order.Week, Benchmark: benchmark, Ours: ours, Theirs: theirs, Margin: tenth.Round(ours - theirs)}, true
 }
 
 // rosterAt is the team's rows on the newest read of the week asked for
@@ -90,25 +105,32 @@ func rosterAt(rows []Row, week, team int, setAt time.Time) ([]Row, map[string]fl
 	return roster, projected, len(roster) > 0
 }
 
-// pointsAfter is every player's points for the week on the newest read
-// taken after the register graded it; false with none yet.
-func pointsAfter(rows []Row, week int, gradedAt time.Time) (map[string]float64, bool) {
+// pointsAfter is every player's points for the week on the newest read of
+// the week's own period taken after the register graded it (Lane 93 review
+// H2): that read's rosters are the week's, so a starter dropped since still
+// carries what he scored. carried is every player on any roster of that
+// read; one with no points split there played no snap and scored none.
+// False with no such read yet.
+func pointsAfter(rows []Row, week int, gradedAt time.Time) (map[string]float64, map[string]bool, bool) {
 	var newest time.Time
 	for _, r := range rows {
-		if r.Week == week && r.Actual != nil && !r.ReadAt.Before(gradedAt) && r.ReadAt.After(newest) {
+		if r.Week == week && r.ReadPeriod == week && !r.ReadAt.Before(gradedAt) && r.ReadAt.After(newest) {
 			newest = r.ReadAt
 		}
 	}
 	if newest.IsZero() {
-		return nil, false
+		return nil, nil, false
 	}
-	out := map[string]float64{}
+	out, carried := map[string]float64{}, map[string]bool{}
 	for _, r := range rows {
-		if r.Week == week && r.ReadAt.Equal(newest) && r.Actual != nil {
-			out[r.PlayerID] = *r.Actual
+		if r.Week == week && r.ReadPeriod == week && r.ReadAt.Equal(newest) {
+			carried[r.PlayerID] = true
+			if r.Actual != nil {
+				out[r.PlayerID] = *r.Actual
+			}
 		}
 	}
-	return out, true
+	return out, carried, true
 }
 
 func candidates(roster []Row, week int, byes map[string]int) []Candidate {

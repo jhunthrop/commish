@@ -21,7 +21,7 @@ const (
 
 // maxWeekStats bounds one player's stat splits: a period read carries
 // the period, the one before it and the season's two.
-const maxWeekStats = 16
+const maxWeekStats = 32
 
 // WeekRead is a league's rosters for one scoring period with ESPN's own
 // points for each player (Lane 93): the period ESPN projects in the

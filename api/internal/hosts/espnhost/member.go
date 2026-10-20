@@ -180,13 +180,20 @@ func (m *Member) ReadLeague(ctx context.Context, accountID uuid.UUID, leagueID s
 
 // ReadWeek reads one scoring period's rosters of a league with the
 // member's cookies (Lane 93's capture of ESPN's projection), noting the
-// read or marking refused cookies for a reconnect as ReadLeague does.
+// read or marking refused cookies for a reconnect as ReadLeague does: ESPN
+// refuses a private league to working cookies of someone not in it as it
+// refuses cookies that stopped working, so a refusal for a league outside
+// the member's own list is that league's refusal (espn.ErrPrivate), and the
+// connection is kept (Lane 93 review H1).
 func (m *Member) ReadWeek(ctx context.Context, accountID uuid.UUID, leagueID string, season, period int) (espn.WeekRead, error) {
 	k, err := m.open(ctx, accountID)
 	if err != nil {
 		return espn.WeekRead{}, err
 	}
 	w, err := m.Client.ReadWeek(ctx, leagueID, season, period, &k.cookies)
+	if errors.Is(err, espn.ErrSignedOut) && !m.inList(ctx, k.cookies, leagueID, season) {
+		return espn.WeekRead{}, fmt.Errorf("%w: not a league of this member", espn.ErrPrivate)
+	}
 	if err := m.after(ctx, accountID, k, err); err != nil {
 		return espn.WeekRead{}, err
 	}
