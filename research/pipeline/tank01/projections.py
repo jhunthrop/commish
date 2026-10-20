@@ -32,7 +32,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
 from http import HTTPStatus
-from typing import Final
+from typing import Final, Literal
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import Connection, text
@@ -149,7 +149,8 @@ def parse_projection_snapshot(payload: object, snapshot: int, captured_at: datet
 # kept): parsing it again inserts only the rows it lacks.
 _UNPARSED: Final = text(
     f"select s.id, s.captured_at, s.payload from {CAPTURE_SNAPSHOTS.fullname} s "
-    "where s.source = :source and not (coalesce(s.payload -> 'playerProjections', '{}'::jsonb) = '{}'::jsonb "
+    "where s.source = :source and not (s.payload ->> 'week' is not null "
+    "and coalesce(jsonb_typeof(s.payload -> 'playerProjections'), '') = 'object' and s.payload -> 'playerProjections' = '{}'::jsonb "
     "and coalesce(s.payload -> 'teamDefenseProjections', '{}'::jsonb) = '{}'::jsonb) and (not exists "
     f"(select 1 from {TANK01_PROJECTION_ROWS.fullname} r where r.snapshot_id = s.id) "
     "or (jsonb_typeof(s.payload -> 'teamDefenseProjections') = 'object' "
@@ -281,13 +282,20 @@ def projection_week_due(conn: Connection, season: int, now: datetime) -> Project
     return ProjectionRead(daily.week, ahead=True)
 
 
-def projection_unpublished(answer: object) -> bool:
-    """Whether the provider's answer for a week ahead says it has not published that week yet: a 404 or
-    an `error` envelope (a `Tank01Error`), an empty body (`{}`, `[]`, `""`, null), or the week with no
-    player entries. Content the strict parser refuses is not this: it is stored and refused as any
-    snapshot is."""
+ProjectionAnswer = Literal["unpublished", "empty"]
+
+
+def projection_answer(answer: object) -> ProjectionAnswer | None:
+    """What the provider's answer for a week says before any parse, or None for a payload to store and
+    parse. "unpublished": a 404, an `error` envelope (a `Tank01Error`), or the week with its player map
+    present and empty, the provider's way of saying it has not published the week yet. "empty": a body
+    of nothing (`{}`, `[]`, `""`, null). A missing player map or any other shape is neither: it is
+    stored and the strict parser refuses it, the feed's drift made loud."""
     if isinstance(answer, Tank01Error):
-        return answer.kind == "upstream" and answer.status in (HTTPStatus.NOT_FOUND, HTTPStatus.OK)
+        published = not (answer.kind == "upstream" and answer.status in (HTTPStatus.NOT_FOUND, HTTPStatus.OK))
+        return None if published else "unpublished"
     if answer is None or (isinstance(answer, str | list | dict) and len(answer) == 0):
-        return True
-    return isinstance(answer, dict) and "week" in answer and answer.get("playerProjections") in (None, "", [], {})
+        return "empty"
+    if isinstance(answer, dict) and "week" in answer and "playerProjections" in answer:
+        return "unpublished" if answer["playerProjections"] in ("", [], {}) else None
+    return None

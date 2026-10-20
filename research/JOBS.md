@@ -35,13 +35,15 @@ kickoffs, never the calendar; its read is due from 06:00 Eastern on the day afte
 last kickoff (at most six days before its own first kickoff's day) until that first kickoff, on the
 first pass at or after 06:00 each day, and never in a pass that takes a slot's read. A read equal to
 the newest stored snapshot writes none and the earlier snapshot stands. A week the provider has not
-published yet (a 404, an `error` envelope, an empty body, or the week with no player entries) is
+published yet (a 404, an `error` envelope, or the week with its player map present and empty) is
 logged as `tank01_projections: unpublished, ... week N not published yet`, stores nothing, counts as
 no read and never fails the pass, so the next hour reads again; any other failed read is the pass's
-failure and is retried the next hour. A slot's read treats an unpublished week as a failure. A slot
-whose read matched the morning's snapshot (unchanged) counts as read and is not repeated. One
-provider request a day: three a week for a Thursday week (Tuesday, Wednesday, Thursday), at most
-seven for a week after a long gap, plus one a day for each hour the week is not yet published.
+failure and is retried the next hour. An empty body, a missing player map or any other shape is drift:
+stored, and refused by the parse (its FAILED line, exit 1). A slot's read treats an unpublished week
+and an empty body as failures, stores neither and reads again in its window. A slot whose read matched
+the morning's snapshot (unchanged) counts as read and is not repeated. One provider request a day:
+three a week for a Thursday week (Tuesday, Wednesday, Thursday), at most seven for a week after a long
+gap, plus one an hour, at most 17 a day, while unpublished.
 `depth-chart-check` is the round 4 stamp check (it writes nothing; its recorded run is the
 coordinator's).
 

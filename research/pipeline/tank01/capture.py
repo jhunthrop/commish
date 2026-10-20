@@ -27,12 +27,12 @@ from research.db.schema import CAPTURE_CHECKS, CAPTURE_SNAPSHOTS, PROVIDER_GAMES
 from research.pipeline.budget import FixedBudget, RequestBudget
 from research.pipeline.jscompat import js_iso, js_json_stringify, js_object_keys
 from research.pipeline.nflverse.team_codes import NFL_TEAM_ABBREVIATIONS
-from research.pipeline.tank01.client import Paths, Tank01Client
+from research.pipeline.tank01.client import Paths, Tank01Client, Tank01Error
 from research.pipeline.tank01.mapping import ADP_TYPE
 from research.pipeline.tank01.projections import (
     PROJECTIONS_SOURCE,
     ProjectionRead,
-    projection_unpublished,
+    projection_answer,
     projection_week_due,
 )
 from research.pipeline.tolerated import TOLERATED_FAILURES
@@ -69,10 +69,10 @@ class CaptureFeed:
     source: str
     cadence: Cadence
     requests: Callable[[CaptureContext], list[CaptureRequest]]
-    # For a feed whose answer may be "not published yet" (the week ahead's projection): why, given the
-    # answer (a body, or the provider's failure), else None. Such an answer is stored nowhere, counts
-    # as no read, and is never the pass's failure.
-    unpublished: Callable[[object], str | None] | None = None
+    # For a feed whose answer is judged before it is stored (the weekly projection): given the answer (a
+    # body, or the provider's failure), the outcome it is instead of a capture, with its reason, else
+    # None. Such an answer is stored nowhere and records no check, so it is never a read.
+    screen: Callable[[object], tuple[Status, str] | None] | None = None
 
 
 CAPTURE_FEEDS: tuple[CaptureFeed, ...] = (
@@ -226,8 +226,8 @@ def _capture_feed(
         with conn.begin_nested():
             bodies = [client.get(r.path, r.query) for r in requests]
             payload: object = bodies[0] if len(bodies) == 1 else bodies
-            if (note := _unpublished(feed, payload)) is not None:
-                return FeedOutcome(feed.source, "unpublished", len(requests), note)
+            if (screened := _screen(feed, payload)) is not None:
+                return FeedOutcome(feed.source, screened[0], len(requests), screened[1])
             digest = digest_of(payload)
             if digest == _latest_digest(conn, feed.source):
                 return FeedOutcome(feed.source, "unchanged", len(requests))
@@ -235,12 +235,34 @@ def _capture_feed(
             conn.execute(_INSERT, row)
             return FeedOutcome(feed.source, "captured", len(requests))
     except TOLERATED_FAILURES as error:
-        note = _unpublished(feed, error)
-        return FeedOutcome(feed.source, "failed" if note is None else "unpublished", len(requests), note or str(error))
+        screened = _screen(feed, error)
+        failed: tuple[Status, str] = ("failed", str(error))
+        status, reason = failed if screened is None else screened
+        return FeedOutcome(feed.source, status, len(requests), reason)
 
 
-def _unpublished(feed: CaptureFeed, answer: object) -> str | None:
-    return None if feed.unpublished is None else feed.unpublished(answer)
+def _screen(feed: CaptureFeed, answer: object) -> tuple[Status, str] | None:
+    return None if feed.screen is None else feed.screen(answer)
+
+
+def _projection_screen(read: ProjectionRead) -> Callable[[object], tuple[Status, str] | None]:
+    """The week ahead's not-yet-published answer is its own outcome, logged and retried the next hour,
+    never a failure. A slot's, two hours before kickoff, is a failure, and so is a slot's empty body;
+    neither is stored, so the slot reads again in its window. Every other answer (the week ahead's empty
+    body among them) is stored, and the parser refuses drift."""
+
+    def screen(answer: object) -> tuple[Status, str] | None:
+        kind = projection_answer(answer)
+        if kind is None:
+            return None
+        if read.ahead:
+            return ("unpublished", f"week {read.week} not published yet") if kind == "unpublished" else None
+        if isinstance(answer, Tank01Error):
+            return None
+        said = "no players" if kind == "unpublished" else "an empty body"
+        return "failed", f"week {read.week} answered {said} two hours before its kickoff"
+
+    return screen
 
 
 def capture_once(
@@ -288,12 +310,11 @@ def current_nfl_week(conn: Connection, season: int) -> int:
 def week_projection_feed(read: ProjectionRead) -> CaptureFeed:
     """The weekly projection of one week: a kickoff slot's own, or the week ahead's daily read, whose
     not-yet-published answer is logged and retried the next hour, never a failure (`projections`)."""
-    note = f"week {read.week} not published yet"
     return CaptureFeed(
         PROJECTIONS_SOURCE,
         "daily",
         lambda _c: [CaptureRequest(Paths.PROJECTIONS, {"week": str(read.week)})],
-        (lambda answer: note if projection_unpublished(answer) else None) if read.ahead else None,
+        _projection_screen(read),
     )
 
 

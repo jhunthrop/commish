@@ -32,7 +32,7 @@ from research.pipeline.kickoff_slots import LEAD, due_slot, kickoff_slots, slot_
 from research.pipeline.kickoffs import TeamKickoff, stored_kickoffs
 from research.pipeline.odds import touchdowns
 from research.pipeline.tank01 import projections
-from research.pipeline.tank01.capture import FeedOutcome, record_checks, run_capture_harvest
+from research.pipeline.tank01.capture import CaptureResult, FeedOutcome, record_checks, run_capture_harvest
 from research.pipeline.tank01.client import Paths, Tank01Client
 
 TESTDATA: Final = Path(__file__).resolve().parent / "testdata"
@@ -446,20 +446,31 @@ def test_a_changed_projection_is_kept_each_day_and_another_weeks_read_never_coun
     assert (parsed.snapshots, kept) == (3, 2)
 
 
-_NO_PLAYERS: Final = {"season": "2026", "week": "7", "playerProjections": {}}
+# "Not published yet" is the provider saying so: a 404, an `error` envelope, or the week with its player
+# map present and empty. An empty body, a missing player map or any other shape is drift: stored and refused.
 _UNPUBLISHED_ANSWERS: Final = [
     pytest.param((404, {"statusCode": 404}), id="404"),
     pytest.param((200, {"statusCode": 200, "error": "No projections for week 7"}), id="error-envelope"),
-    pytest.param((200, {"statusCode": 200, "body": {}}), id="empty-object"),
-    pytest.param((200, {"statusCode": 200, "body": []}), id="empty-list"),
-    pytest.param((200, {"statusCode": 200, "body": ""}), id="empty-string"),
-    pytest.param((200, {"statusCode": 200, "body": _NO_PLAYERS}), id="no-players"),
+    pytest.param((200, {"statusCode": 200, "body": {"season": "2026", "week": "7", "playerProjections": {}}}), id="empty-map"),
+    pytest.param((200, {"statusCode": 200, "body": {"season": "2026", "week": "7", "playerProjections": []}}), id="empty-list-map"),
+]  # fmt: skip
+_DRIFT_ANSWERS: Final = [
+    pytest.param({"season": "2026", "week": "7", "projections": {}}, id="missing-map"),
+    pytest.param({}, id="empty-object"),
+    pytest.param([], id="empty-list"),
+    pytest.param("", id="empty-string"),
 ]
+_EMPTY_BODIES: Final = [pytest.param({}, id="{}"), pytest.param([], id="[]"), pytest.param("", id='""')]
 
 
 def _count(conn: Connection, table: Any) -> int:
     query = select(func.count()).select_from(table).where(table.c.source == projections.PROJECTIONS_SOURCE)
     return int(conn.execute(query).scalar_one())
+
+
+def _outcome(result: CaptureResult) -> FeedOutcome:
+    (outcome,) = [f for f in result.feeds if f.source == projections.PROJECTIONS_SOURCE]
+    return outcome
 
 
 @pytest.mark.parametrize("answer", _UNPUBLISHED_ANSWERS)
@@ -476,34 +487,79 @@ def test_a_week_ahead_not_published_yet_is_no_failure_no_snapshot_and_no_read(
         next_hour = run_capture_harvest(conn, client, _eastern(20, 7), 2026)
         parsed = projections.parse_stored_projections(conn)
         conn.rollback()
-    (outcome,) = [f for f in tuesday.feeds if f.source == projections.PROJECTIONS_SOURCE]
-    assert (outcome.status, outcome.reason) == ("unpublished", "week 7 not published yet")
+    assert (_outcome(tuesday).status, _outcome(tuesday).reason) == ("unpublished", "week 7 not published yet")
     assert not [f for f in tuesday.feeds if f.status == "failed"]  # the pass's verdict: no failure
     assert (stored, checked) == (0, 0)
     assert fetcher.weeks == ["7", "7"]  # the next hour tries again
-    (published,) = [f for f in next_hour.feeds if f.source == projections.PROJECTIONS_SOURCE]
-    assert published.status == "captured"
+    assert _outcome(next_hour).status == "captured"
     assert (parsed.snapshots, parsed.refused) == (1, ())
 
 
-def test_a_published_week_ahead_is_stored_and_content_the_parser_refuses_is_an_error() -> None:
-    assert not projections.projection_unpublished(_projections())
-    broken = _projections()
-    assert isinstance(broken, dict)
-    broken["playerProjections"]["8439"]["team"] = ""
-    assert not projections.projection_unpublished(broken)
-    with pytest.raises(SchemaDriftError):
-        projections.parse_projection_snapshot(broken, 1, _at(20, 10))
+@pytest.mark.parametrize("body", _DRIFT_ANSWERS)
+def test_drift_on_the_daily_read_is_stored_and_refused(engine: Engine, body: object) -> None:
+    fetcher = Tank01Fetcher(answer=(200, {"statusCode": 200, "body": body}))
+    with engine.connect() as conn:
+        _clear_projection_reads(conn)
+        result = run_capture_harvest(conn, Tank01Client(fetcher, "key"), _eastern(20, 6), 2026)
+        stored = _count(conn, CAPTURE_SNAPSHOTS)
+        parsed = projections.parse_stored_projections(conn)
+        conn.rollback()
+    assert (_outcome(result).status, stored) == ("captured", 1)
+    assert len(parsed.refused) == 1 and "FAILED" in parsed.line()
 
 
-def test_a_slot_week_not_published_two_hours_before_kickoff_fails_loudly(engine: Engine) -> None:
-    fetcher = Tank01Fetcher(answer=(404, {"statusCode": 404}))
+def test_drift_on_the_slot_read_is_stored_and_refused(engine: Engine) -> None:
+    fetcher = Tank01Fetcher(answer=(200, {"statusCode": 200, "body": {"season": "2026", "week": "7"}}))
     with engine.connect() as conn:
         _clear_projection_reads(conn)
         result = run_capture_harvest(conn, Tank01Client(fetcher, "key"), _eastern(22, 19), 2026)
+        parsed = projections.parse_stored_projections(conn)
         conn.rollback()
-    (outcome,) = [f for f in result.feeds if f.source == projections.PROJECTIONS_SOURCE]
-    assert outcome.status == "failed"
+    assert _outcome(result).status == "captured"
+    assert len(parsed.refused) == 1 and "playerProjections" in parsed.refused[0]
+
+
+@pytest.mark.parametrize("body", _EMPTY_BODIES)
+def test_an_empty_answer_on_the_slot_read_fails_and_the_slot_is_read_again(engine: Engine, body: object) -> None:
+    fetcher = Tank01Fetcher(answer=(200, {"statusCode": 200, "body": body}))
+    client = Tank01Client(fetcher, "key")
+    with engine.connect() as conn:
+        _clear_projection_reads(conn)
+        first = run_capture_harvest(conn, client, _eastern(22, 19), 2026)
+        stored = _count(conn, CAPTURE_SNAPSHOTS)
+        fetcher.answer = None
+        again = run_capture_harvest(conn, client, _eastern(22, 20), 2026)
+        conn.rollback()
+    assert (_outcome(first).status, _outcome(first).reason) == (
+        "failed",
+        "week 7 answered an empty body two hours before its kickoff",
+    )
+    assert stored == 0
+    assert _outcome(again).status == "captured"  # never counted as the slot's read
+
+
+def test_a_slot_week_not_published_two_hours_before_kickoff_fails_loudly(engine: Engine) -> None:
+    for answer in [
+        (404, {"statusCode": 404}),
+        (200, {"statusCode": 200, "body": {"week": "7", "playerProjections": {}}}),
+    ]:
+        fetcher = Tank01Fetcher(answer=answer)
+        with engine.connect() as conn:
+            _clear_projection_reads(conn)
+            result = run_capture_harvest(conn, Tank01Client(fetcher, "key"), _eastern(22, 19), 2026)
+            stored = _count(conn, CAPTURE_SNAPSHOTS)
+            conn.rollback()
+        assert (_outcome(result).status, stored) == ("failed", 0)
+
+
+def test_a_published_week_is_stored_and_content_the_parser_refuses_is_an_error() -> None:
+    assert projections.projection_answer(_projections()) is None
+    broken = _projections()
+    assert isinstance(broken, dict)
+    broken["playerProjections"]["8439"]["team"] = ""
+    assert projections.projection_answer(broken) is None
+    with pytest.raises(SchemaDriftError):
+        projections.parse_projection_snapshot(broken, 1, _at(20, 10))
 
 
 def test_a_slot_read_unchanged_since_the_mornings_read_is_not_repeated(engine: Engine) -> None:
@@ -517,15 +573,17 @@ def test_a_slot_read_unchanged_since_the_mornings_read_is_not_repeated(engine: E
     assert fetcher.weeks == ["7", "7"]  # Thursday 06:00, then 19:00 (unchanged); 20:00 reads nothing
 
 
-def test_a_stored_payload_with_no_player_entries_is_never_reparsed(engine: Engine) -> None:
+def test_only_the_week_with_an_empty_player_map_is_never_reparsed(engine: Engine) -> None:
     insert_snapshot = text(
         f"insert into {CAPTURE_SNAPSHOTS.fullname} (source, captured_at, digest, payload) "
-        "values (:source, :at, 'empty', cast(:payload as jsonb))"
+        "values (:source, :at, :digest, cast(:payload as jsonb))"
     )
-    row = {"source": projections.PROJECTIONS_SOURCE, "at": _at(20, 10), "payload": json.dumps(_NO_PLAYERS)}
+    payloads = [{"season": "2026", "week": "7", "playerProjections": {}}, {"season": "2026", "week": "7"}, [], {}]
     with engine.connect() as conn:
         _clear_projection_reads(conn)
-        conn.execute(insert_snapshot, row)
+        for index, payload in enumerate(payloads):
+            row = {"source": projections.PROJECTIONS_SOURCE, "at": _at(20, 10), "digest": str(index)}
+            conn.execute(insert_snapshot, {**row, "payload": json.dumps(payload)})
         report = projections.parse_stored_projections(conn)
         conn.rollback()
-    assert (report.snapshots, report.rows, report.refused) == (0, 0, ())
+    assert (report.snapshots, report.rows, len(report.refused)) == (0, 0, 3)
