@@ -15,14 +15,14 @@ import (
 func TestTradesBasisSaysWhoDecidesAndGainOnce(t *testing.T) {
 	want := "Each team's best trade both lineups gain by, yours first. The other team decides. " +
 		"Gain is a lineup's change in points over replacement a week, weeks 6 to 17."
-	if got := TradesBasis(RestOfSeason, 12); got != want {
+	if got := TradesBasis(RestOfSeason, 12, StandardHorizon); got != want {
 		t.Errorf("rest of season:\n got %q\nwant %q", got, want)
 	}
-	if got := TradesBasis(Preseason, 17); got != "Each team's best trade both lineups gain by, yours first. The other team decides. "+
+	if got := TradesBasis(Preseason, 17, StandardHorizon); got != "Each team's best trade both lineups gain by, yours first. The other team decides. "+
 		"Gain is a lineup's change in points over replacement a week, over the season's 17 weeks on our preseason number." {
 		t.Errorf("preseason: %q", got)
 	}
-	if got := TradesBasis(RestOfSeason, 1); got != "Each team's best trade both lineups gain by, yours first. The other team decides. "+
+	if got := TradesBasis(RestOfSeason, 1, StandardHorizon); got != "Each team's best trade both lineups gain by, yours first. The other team decides. "+
 		"Gain is a lineup's change in points over replacement a week, week 17." {
 		t.Errorf("one week: %q", got)
 	}
@@ -44,7 +44,7 @@ func TestLineupAndWaiverRules(t *testing.T) {
 	if WaiversBasis != "A pickup starts this week on Proj and keeps Gain at zero or better." {
 		t.Errorf("%q", WaiversBasis)
 	}
-	if got := WaiverSeasonBasis(RestOfSeason, 12); got != "Gain is your lineup's change in points over replacement a week, weeks 6 to 17." {
+	if got := WaiverSeasonBasis(RestOfSeason, 12, StandardHorizon); got != "Gain is your lineup's change in points over replacement a week, weeks 6 to 17." {
 		t.Errorf("%q", got)
 	}
 }
@@ -75,14 +75,14 @@ func TestUncountedRulesAreCountedAndListed(t *testing.T) {
 func TestOrderScreenBasisNamesItsLeague(t *testing.T) {
 	want := "Our rest-of-season order from week 6. A position ranks by Projected through week 17, byes out, " +
 		"All by Over repl., his points less a free pickup's in your league."
-	if got := OrderScreenBasis(RestOfSeason, RestFrom{Week: 6}, OrderLeague(true, apitypes.LeagueSettings{}, apitypes.ProjectionScoringFormatPpr)); got != want {
+	if got := OrderScreenBasis(RestOfSeason, RestFrom{Week: 6}, OrderLeague(true, apitypes.LeagueSettings{}, apitypes.ProjectionScoringFormatPpr), StandardHorizon); got != want {
 		t.Errorf("\n got %q\nwant %q", got, want)
 	}
 	stand := OrderLeague(false, apitypes.LeagueSettings{Teams: 12}, apitypes.ProjectionScoringFormatPpr)
 	if stand != "a 12-team PPR league" {
 		t.Errorf("%q", stand)
 	}
-	if got := OrderScreenBasis(Preseason, RestFrom{}, stand); got != "Our preseason order: All ranks by Over repl., his season less a free pickup's in a 12-team PPR league." {
+	if got := OrderScreenBasis(Preseason, RestFrom{}, stand, StandardHorizon); got != "Our preseason order: All ranks by Over repl., his season less a free pickup's in a 12-team PPR league." {
 		t.Errorf("%q", got)
 	}
 }

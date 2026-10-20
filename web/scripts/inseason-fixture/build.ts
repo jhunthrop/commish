@@ -38,7 +38,8 @@ import {
 	uncountedOf,
 	WAIVERS_BASIS,
 	waiverSeasonBasis,
-	weeksCovered as weeksCoveredFrom
+	weeksCovered as weeksCoveredFrom,
+	STANDARD_HORIZON
 } from './week.ts';
 import { leagueFields } from './league-fields.ts';
 import type { LeaguePlayer, LeagueSync, MatchupSide } from '../../src/lib/league/api.ts';
@@ -199,7 +200,7 @@ if (!format?.rosFromWeek || !format.refreshedAt) {
 const refreshed = format.refreshedAt;
 const week = state.week;
 /** The weeks the rest-of-season order covers from the league's week: a week's figure is over them. */
-const weeksCovered = weeksCoveredFrom(week);
+const weeksCovered = weeksCoveredFrom(week, STANDARD_HORIZON);
 
 /** The league's rules the stat lines leave out (words.go UncountedOf), counted under the rows and
  * listed on the league's Settings. */
@@ -638,7 +639,7 @@ async function waivers(held: ReadonlySet<string>): Promise<WaiverAdvice> {
 			reason: 'Sleeper does not take claims from here, so add him on its waiver page.'
 		},
 		// Lane 66f: the pickup table's own fields, stamped by project.ts with the projection.
-		season_basis: waiverSeasonBasis(weeksCovered),
+		season_basis: waiverSeasonBasis(weeksCovered, STANDARD_HORIZON),
 		lineup_proj: null,
 		pickups_proj: null,
 		pickups: [],
@@ -792,7 +793,7 @@ function trades(): TradeAdvice {
 					: null
 		}));
 	return {
-		...head(tradesBasis(weeksCovered)),
+		...head(tradesBasis(weeksCovered, STANDARD_HORIZON)),
 		per_game_basis: PER_GAME_BASIS,
 		check_basis: CHECK_BASIS,
 		teams,

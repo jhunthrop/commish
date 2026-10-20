@@ -3049,7 +3049,7 @@ export interface components {
 			position_rank: number | null;
 			/**
 			 * Format: double
-			 * @description points over replacement a week for this league, one decimal: the order's averaged over the weeks it covers (the preseason number's season over 17, the rest-of-season order's over its own first week, the league's when the run does not say, through week 17), as the basis says; null without a projection
+			 * @description points over replacement a week for this league, one decimal: the order's averaged over the weeks it covers (the preseason number's season over 17, the rest-of-season order's over its own first week, the league's when the run does not say, through the league's last playoff week as its platform states it, week 17 when it states none), as the basis says; null without a projection
 			 */
 			points_over_replacement: number | null;
 			/**
@@ -3549,7 +3549,7 @@ export interface components {
 			rank: number;
 			/**
 			 * Format: double
-			 * @description the order's key, one decimal: his rest-of-season points over his club's games left at the read's clock (not yet kicked off) through week 17, byes out (Lane 86, the player read's rest_of_season figure for the order's format); null on the preseason order and without a projection
+			 * @description the order's key, one decimal: his rest-of-season points over his club's games left at the read's clock (not yet kicked off) through the league's last playoff week as its platform states it (Lane 96; week 17 when it states none and with no league), byes out (Lane 86, the player read's rest_of_season figure for the order's format); null on the preseason order and without a projection
 			 */
 			rest_of_season_points: number | null;
 			/**

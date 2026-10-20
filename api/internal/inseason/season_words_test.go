@@ -9,7 +9,7 @@ import (
 // 66t, sweep X6): each screen says what the figure is and what Gain is,
 // once, in the same words on Trades and Waivers.
 func TestGainAndPerGameSaidOnce(t *testing.T) {
-	guard(t, TradesBasis(RestOfSeason, 12))
+	guard(t, TradesBasis(RestOfSeason, 12, StandardHorizon))
 	guard(t, TradeCheckBasis)
 	guard(t, WaiversBasis)
 	guard(t, PerGameBasis())

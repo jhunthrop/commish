@@ -59,6 +59,9 @@
 		/** His injury status when the run's capture lists him (run/status-view.ts), drawn by the shared
 		 * pill: a season-long one shows as his rank and its chip ("IR since Sep 22"). */
 		status?: StatusView | null;
+		/** A row the run does not tier (one the front door builds from the API's line, Lane 96): its
+		 * tier cell prints the empty figure. */
+		untiered?: boolean;
 	}
 
 	let {
@@ -73,7 +76,8 @@
 		season,
 		held = null,
 		framing,
-		status = null
+		status = null,
+		untiered = false
 	}: Props = $props();
 
 	function inDraftOrder(row: BoardPlayer | DraftOrderPlayer): row is DraftOrderPlayer {
@@ -130,8 +134,8 @@
 		</span>
 	</span>
 	{#if cell.tier}<span class={cell.tier}
-			>{#if ranked && !heldOut}<TierChip tier={ranked.tier} bare />{:else}<span class="n absent"
-					>{EMPTY_FIGURE}</span
+			>{#if ranked && !heldOut && !untiered}<TierChip tier={ranked.tier} bare />{:else}<span
+					class="n absent">{EMPTY_FIGURE}</span
 				>{/if}</span
 		>{/if}
 	{#if cell.bye}<span class="n quiet {cell.bye}" class:absent={bye === null}

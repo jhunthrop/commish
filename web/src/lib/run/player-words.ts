@@ -62,6 +62,10 @@ const BELOW_THE_AVAILABLE = 'He sits below the available players.';
 export const HELD_TIER_WORDS =
 	'No tier while he is on a season-long list. Our figure assumes he plays, so he sits below every available player at his position.';
 
+/** The last week the run's rest-of-season points count (the API's LastWeek, the research
+ * LAST_FANTASY_WEEK), or the board's own first week once the season is past it. */
+const RUN_LAST_WEEK = 17;
+
 export function lineWords(
 	line: { format: Format; numbers: PlayerFormat; rest: RestFigures | null },
 	sources: readonly string[],
@@ -75,9 +79,11 @@ export function lineWords(
 	const rank = held
 		? ' if he plays, below the available players'
 		: `, our rank ${String(numbers.ourRank)}`;
+	// The run's figure stops at its last week (Lane 96 review M2): said, as a league's title week may run on.
+	const through = String(Math.max(RUN_LAST_WEEK, format.rosFromWeek ?? RUN_LAST_WEEK));
 	const caption =
 		rest !== null
-			? `${format.label} points for the rest of ${year}${rank}`
+			? `${format.label} points for the rest of ${year} through week ${through}${rank}`
 			: season.underway
 				? `${format.label} points in ${year}, projected preseason over ${games} games`
 				: `projected ${format.label} points in ${year}, over ${games} expected games`;

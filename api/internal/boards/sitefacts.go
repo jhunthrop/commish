@@ -38,7 +38,7 @@ func (s *PGSource) BoardWeek(ctx context.Context, seasonYear int) (int, bool, er
 	if err != nil || !published {
 		return 0, false, err
 	}
-	hasWeek, err := s.hasFromWeek(ctx)
+	hasWeek, err := s.hasColumn(ctx, "from_week")
 	if err != nil || !hasWeek {
 		return 0, false, err
 	}

@@ -40,6 +40,16 @@ _NAMES = [p["sheet"]["name"] for p in _RECORDED]
 # recording is the guard's case and no longer one the writer reproduces.
 _REFUSED: Final = "CeeDee Lamb"
 _STANDING = [name for name in _NAMES if name != _REFUSED]
+# Lane 96 (B16): every recorded read names "Tuesday's report", the day the list was read, where no game status
+# report had been issued for the week's game by the write (the sheet's list stood from Tuesday, Friday's report
+# was still to come). The report rule now refuses each recording, so the writer no longer reproduces any; the
+# rest of every guard is kept on the recording with the report named as the list it was.
+_STALE_REPORT: Final = "Tuesday's report"
+
+
+def _corrected(read: str) -> str:
+    """A recorded read with its report named as the list as of Tuesday, the one change the report rule asks."""
+    return read.replace(_STALE_REPORT, "the Tuesday-night list")
 
 
 class _Replay:
@@ -91,22 +101,24 @@ def test_the_fixture_is_a_starter_a_questionable_player_and_a_player_on_bye() ->
     assert any(s.bye and not s.can_play for s in sheets)
 
 
-@pytest.mark.parametrize("name", _STANDING)
-def test_the_writer_reproduces_the_recorded_read(name: str) -> None:
+@pytest.mark.parametrize("name", _NAMES)
+def test_the_writer_refuses_a_recorded_read_naming_a_report_not_yet_issued(name: str) -> None:
     sheet, player = _sheet(name)
-    gateway = _Replay(player["answers"])
+    assert _STALE_REPORT in player["read"]
+    assert "game status report on Friday" in render_week_sheet(sheet)
+    # Each refusal asks again, past the answers recorded when the first took: the recording, replayed over.
+    gateway = _Replay(player["answers"] * 4)
     result = write_week_read(sheet, gateway, tuple(player["avoid"]), frozenset(player["taken"]))  # type: ignore[arg-type]
-    assert result.source == "llm", result.attempts
-    assert result.text == player["read"]
-    assert result.calls == player["calls"]
-    assert result.call == _call(player) and result.call in CALLS
-    assert result.call != "start" or sheet.may_start
+    assert result.source == "facts"
+    refused = [v for attempt in result.attempts for v in attempt.violations]
+    assert any(f"names {_STALE_REPORT}, a report the facts do not name" in v for v in refused), refused
 
 
 @pytest.mark.parametrize("name", _STANDING)
 def test_the_recorded_read_keeps_every_guard(name: str) -> None:
     sheet, player = _sheet(name)
-    read = player["read"]
+    read = _corrected(player["read"])
+    assert _call(player) in CALLS and (_call(player) != "start" or sheet.may_start)
     # A read asked for a shorter version may run 10% over the cap (the season read's ruling).
     shorter = player["calls"] > 1
     assert validate_week_read(read, sheet, frozenset(player["taken"]), _call(player), asked_shorter=shorter).ok
@@ -132,7 +144,7 @@ def test_the_cards_figure_on_a_tie_is_the_published_projection_the_rules_ask_for
     """Lamb's 19.45 prints 19.5 on the card: the read saying 19.5 names the published projection with its
     figure, and passes every rule."""
     sheet, player = _sheet(_REFUSED)
-    read = player["read"].replace("19.4", "19.5")
+    read = _corrected(player["read"]).replace("19.4", "19.5")
     assert week_rule_violations(read, sheet, _call(player)) == []
     result = validate_week_read(read, sheet, frozenset(player["taken"]), _call(player), asked_shorter=True)
     assert result.ok, result.violations

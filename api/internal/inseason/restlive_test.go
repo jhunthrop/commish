@@ -65,7 +65,7 @@ func TestRestAtStartsEachClubAtItsFirstGameStillToPlay(t *testing.T) {
 		{"sunday evening", restSunday.Add(5 * time.Hour), restWeekSix(true, false), 7, 6, 6, 11, 12, true},
 		{"tuesday", restMonday.Add(14 * time.Hour), restWeekSix(true, true), 7, 7, 7, 11, 11, false},
 	} {
-		rest := RestAt(tc.games, 6, restRunInstant, tc.now)
+		rest := RestAt(tc.games, 6, restRunInstant, tc.now, StandardHorizon)
 		if rest.From("MIA") != tc.mia || rest.From("TB") != tc.tb || rest.FromWeek != tc.fromWeek || rest.Partial != tc.partial {
 			t.Fatalf("%s: MIA from %d, TB from %d, board from %d partial %v", tc.name, rest.From("MIA"), rest.From("TB"), rest.FromWeek, rest.Partial)
 		}
@@ -73,7 +73,7 @@ func TestRestAtStartsEachClubAtItsFirstGameStillToPlay(t *testing.T) {
 			t.Fatalf("%s: left %v at the run %v", tc.name, rest.Left, rest.Run)
 		}
 	}
-	if none := RestAt(restWeekSix(true, true), 6, restRunInstant, restSunday.AddDate(0, 0, 7*12)); none.FromWeek != 0 || none.From("MIA") != 0 {
+	if none := RestAt(restWeekSix(true, true), 6, restRunInstant, restSunday.AddDate(0, 0, 7*12), StandardHorizon); none.FromWeek != 0 || none.From("MIA") != 0 {
 		t.Fatalf("past week 17: from %d, MIA %d", none.FromWeek, none.From("MIA"))
 	}
 }
@@ -84,7 +84,7 @@ func TestRestAtStartsEachClubAtItsFirstGameStillToPlay(t *testing.T) {
 // figure a game unchanged, and the board revalued on it.
 func TestTheLiveBoardDropsTheGamesPlayedSinceTheRun(t *testing.T) {
 	b := restRunBoard(t)
-	rest := RestAt(restWeekSix(true, false), b.Raw.FromWeek, b.Refreshed, restSunday.Add(5*time.Hour))
+	rest := RestAt(restWeekSix(true, false), b.Raw.FromWeek, b.Refreshed, restSunday.Add(5*time.Hour), StandardHorizon)
 	live, err := LiveBoard(b, rest)
 	if err != nil {
 		t.Fatal(err)
@@ -167,11 +167,11 @@ func TestTheOrderAgreesRowByRowAfterTheRevalue(t *testing.T) {
 // week is played that it counts the games still to play.
 func TestTheOrderLineSaysWhichWeeksItCounts(t *testing.T) {
 	league := OrderLeague(true, apitypes.LeagueSettings{}, apitypes.ProjectionScoringFormatPpr)
-	whole := OrderScreenBasis(RestOfSeason, RestFrom{Week: 7}, league)
+	whole := OrderScreenBasis(RestOfSeason, RestFrom{Week: 7}, league, StandardHorizon)
 	if !strings.HasPrefix(whole, "Our rest-of-season order from week 7. ") {
 		t.Fatalf("whole week %q", whole)
 	}
-	part := OrderScreenBasis(RestOfSeason, RestFrom{Week: 6, Partial: true}, league)
+	part := OrderScreenBasis(RestOfSeason, RestFrom{Week: 6, Partial: true}, league, StandardHorizon)
 	if !strings.HasPrefix(part, "Our rest-of-season order from week 6's games left. ") {
 		t.Fatalf("partly played week %q", part)
 	}

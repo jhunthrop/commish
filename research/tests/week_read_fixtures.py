@@ -137,7 +137,7 @@ _NESTED: Final[Mapping[str, type]] = MappingProxyType(
 )
 _INSTANTS: Final = frozenset(
     {"kickoff", "written_at", "captured_at", "previous_captured_at", "read_at", "published_at", "scheduled_at"}
-    | {"roof_read_at", "released_at"}
+    | {"roof_read_at", "released_at", "checked_at"}
 )
 
 

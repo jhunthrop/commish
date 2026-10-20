@@ -58,7 +58,8 @@ import {
 	tenth,
 	tierOf,
 	weekSlots,
-	weeksCovered
+	weeksCovered,
+	STANDARD_HORIZON
 } from './week.ts';
 
 const DATA = new URL('./data/', import.meta.url);
@@ -424,7 +425,7 @@ function pickupTable(advice: WaiverAdvice): WaiverAdvice {
 		...advice,
 		basis: WAIVERS_BASIS,
 		pickup_order: 'week',
-		season_basis: waiverSeasonBasis(weeksCovered(advice.week)),
+		season_basis: waiverSeasonBasis(weeksCovered(advice.week, STANDARD_HORIZON), STANDARD_HORIZON),
 		...uncountedOf(lineup.uncounted_rules),
 		rows,
 		pickups,
@@ -703,7 +704,7 @@ function withWeek(finder: TradeAdvice): TradeAdvice {
 		})),
 		// The finder's basis in the API's words, stamped whole from the one copy (week.ts tradesBasis) so a
 		// rerun on an older answer says it the same way.
-		basis: tradesBasis(weeksCovered(finder.week)),
+		basis: tradesBasis(weeksCovered(finder.week, STANDARD_HORIZON), STANDARD_HORIZON),
 		per_game_basis: PER_GAME_BASIS,
 		...uncountedOf(lineup.uncounted_rules),
 		check_basis: CHECK_BASIS,

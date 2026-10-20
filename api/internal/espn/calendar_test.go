@@ -71,3 +71,25 @@ func TestCalendarBeforeTheDraft(t *testing.T) {
 		}
 	}
 }
+
+// The championship's length is the scoring periods of the matchup period
+// holding the final one (Lane 96, B25): the recorded league's final is
+// one week ("16": [16]); a final over weeks 16 and 17 is two.
+func TestFinalRoundWeeks(t *testing.T) {
+	if l := readLeagueFixture(t, "league-48153503-2019-full.json", 2019, nil); l.FinalRoundWeeks != 1 {
+		t.Fatalf("a one-week final read as %d weeks", l.FinalRoundWeeks)
+	}
+	two := readLeagueFixture(t, "league-48153503-2019-full.json", 2019, func(s string) string {
+		s = strings.Replace(s, "\"16\": [\n     16\n    ]", "\"16\": [\n     16,\n     17\n    ]", 1)
+		return strings.Replace(s, `"finalScoringPeriod": 16`, `"finalScoringPeriod": 17`, 1)
+	})
+	if two.FinalRoundWeeks != 2 || two.FinalScoringPeriod != 17 {
+		t.Fatalf("a two-week final read as %d weeks ending %d", two.FinalRoundWeeks, two.FinalScoringPeriod)
+	}
+	none := readLeagueFixture(t, "league-48153503-2019-full.json", 2019, func(s string) string {
+		return strings.Replace(s, `"finalScoringPeriod": 16`, `"finalScoringPeriod": 0`, 1)
+	})
+	if none.FinalRoundWeeks != 0 {
+		t.Fatalf("no final period read as a %d-week final", none.FinalRoundWeeks)
+	}
+}
