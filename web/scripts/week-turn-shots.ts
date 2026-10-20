@@ -107,7 +107,7 @@ for (const width of WIDTHS) {
 
 	await open(page, `/league/${FIXTURE_IDS.league}/trades`, WEEK);
 	const trades = await check(page, `trades ${w}`);
-	if (width > 500 && turned === trades.includes(TRADES.weekHead))
+	if (width > 500 && turned === trades.toLowerCase().includes(TRADES.weekHead.toLowerCase()))
 		fault(`trades ${w}`, `the week's Proj group ${turned ? 'is' : 'is not'} drawn`);
 	if (turned !== trades.includes(ARRIVES))
 		fault(`trades ${w}`, `the basis ${turned ? 'does not say' : 'says'} when week 7's arrives`);

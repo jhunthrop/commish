@@ -292,7 +292,11 @@ const turnedNow = (): boolean => lineupSpent(lineupNow(), now());
  * member's lineup has played week 6 (turn.ts). */
 const waiversNow = (): WaiverAdvice => {
 	const answer = waiversAtClock(waivers, now(), fromWeekNow());
-	return turnedNow() ? turnedWaivers(answer, now()) : answer;
+	// Turned, the week 7 rows are ordered from the stored answer (its moves to make intact), with
+	// the Gain sentence at the clock.
+	return turnedNow()
+		? turnedWaivers({ ...waivers, season_basis: answer.season_basis }, now())
+		: answer;
 };
 
 function waiversAt(position: string | null): WaiverAdvice {

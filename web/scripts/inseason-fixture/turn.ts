@@ -76,7 +76,7 @@ export function turnedLine(line: PlayerLine): PlayerLine {
 			roof: null,
 			weather: null,
 			designation:
-				designation && WEEK_STATUSES.has(designation.status) && designation.since === null
+				designation && WEEK_STATUSES.has(designation.status) && (designation.since ?? null) === null
 					? null
 					: designation
 		}
