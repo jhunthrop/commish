@@ -69,6 +69,7 @@
 			range,
 			gap: page.gap,
 			season: page.underway,
+			restOfSeason: page.format.rosFromWeek !== undefined,
 			action: true,
 			draftOrder: marketView
 		})

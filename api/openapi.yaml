@@ -429,6 +429,27 @@ paths:
         "409": { $ref: "#/components/responses/ErrorResponse" }
         "422": { $ref: "#/components/responses/ErrorResponse" }
         "502": { $ref: "#/components/responses/ErrorResponse" }
+  /leagues/attached/{id}/record:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: the attached league's id (AttachedLeague.id)
+        schema: { type: string, format: uuid }
+    get:
+      tags: [league-sync]
+      operationId: leagueRecord
+      summary: >-
+        Our record in the member's own league (Lane 93): the league's lineup, which the record page counts starters in,
+        and each week the register has graded whose roster ESPN was read for before our order was set, with the points
+        the lineup our set order picks from the member's roster scored against the points of the lineup ESPN's own
+        projection picks from the same roster (or, where that read carries no ESPN projection, the week's published
+        projection), both scored as the league scores. Reads the league as the sync route does.
+      security: [{ session: [] }]
+      responses:
+        "200": { $ref: "#/components/responses/LeagueRecordResponse" }
+        "404": { $ref: "#/components/responses/ErrorResponse" }
+        "502": { $ref: "#/components/responses/ErrorResponse" }
   /leagues/attached/{id}/waivers:
     parameters:
       - name: id
@@ -2051,6 +2072,14 @@ components:
             allOf:
               - $ref: "#/components/schemas/Envelope"
               - properties: { data: { $ref: "#/components/schemas/Scoreboard" } }
+    LeagueRecordResponse:
+      description: our record in the member's own league
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: "#/components/schemas/Envelope"
+              - properties: { data: { $ref: "#/components/schemas/LeagueRecord" } }
     MatchupBoxResponse:
       description: the week's matchup as a box score
       content:
@@ -4985,6 +5014,34 @@ components:
       properties:
         first: { type: integer }
         last: { type: integer }
+    LeagueRecord:
+      type: object
+      description: our record in the member's own league (Lane 93)
+      required: [host, teams, lineup, weeks]
+      properties:
+        host: { $ref: "#/components/schemas/LeagueHost" }
+        teams: { type: integer, description: "the league's teams, the count each starting slot is multiplied by" }
+        lineup: { $ref: "#/components/schemas/LeagueShape" }
+        weeks:
+          type: array
+          description: >-
+            the graded weeks, in week order; empty on a platform whose week reads are not kept (every platform but
+            ESPN) and before the first graded week whose roster was read before our order was set
+          items: { $ref: "#/components/schemas/LeagueRecordWeek" }
+    LeagueRecordWeek:
+      type: object
+      required: [week, benchmark, ours, theirs, margin]
+      properties:
+        week: { type: integer }
+        benchmark:
+          type: string
+          enum: [espn, published]
+          description: >-
+            the lineup ours is graded against: espn, the lineup ESPN's own projection picks; published, the lineup the
+            week's published projection picks, where the read carried no ESPN projection
+        ours: { type: number, format: double, description: "our picks' points, to the tenth, as the league scores" }
+        theirs: { type: number, format: double, description: "the benchmark lineup's points, to the tenth, as the league scores" }
+        margin: { type: number, format: double, description: "ours less theirs, to the tenth" }
     LeagueShape:
       type: object
       description: the league's starting lineup by our slots, and its bench

@@ -94,7 +94,25 @@ def _week(week: record_read.Week, frozen_by: FrozenBy, season: int) -> Json:
     }
     if week.status == "missed":
         out["note"] = record_read.MISSED_NOTE
+    # Lane 93, additive (the web parses a run without them): when the graded order was refreshed, when
+    # a frozen week grades, and a graded week's players for a league's own starters count.
+    if week.board_as_of is not None:
+        out["orderAsOf"] = iso(week.board_as_of)
+    if week.grades_from is not None:
+        out["gradesFrom"] = iso(week.grades_from)
+    if week.placed:
+        out["players"] = [_placed(player) for player in week.placed]
     return out
+
+
+def _placed(player: record_read.Placed) -> Json:
+    return {
+        "position": player.position,
+        "ours": player.ours,
+        "adp": player.adp,
+        "published": player.published,
+        "finish": player.finish,
+    }
 
 
 def record_json(

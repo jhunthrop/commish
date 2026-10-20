@@ -19,10 +19,12 @@ non-zero when any step failed.
 2. **props-snapshot**: the odds provider's player props for the coming fourteen days.
 3. **grade**: every frozen week not yet graded, whose games are complete (below), against the
    stats now held. Each grade row is stamped `implementation = 'python'`.
-4. **freeze**: the coming week, if no freeze holds it yet, strictly before its first kickoff. A week
-   already frozen is ok; a week whose first kickoff passed unfrozen is listed as MISSED (the record
-   marks it) but never fails the pass, since nothing can be done for it. The step fails only when
-   the coming week could not be frozen.
+4. **freeze**: the coming week, if no freeze holds it yet, strictly before its first kickoff, and
+   again on the final pass before that kickoff (`FINAL_FREEZE_BEFORE`, Lane 93), which supersedes
+   the early freeze so the week's order is set once, on the Thursday pass. A week already frozen is
+   ok; a week whose first kickoff passed unfrozen is listed as MISSED (the record marks it) but
+   never fails the pass, since nothing can be done for it. The step fails only when the coming week
+   could not be frozen.
 5. **scoreboard**: the running score, read fresh.
 
 ONE CHANGE FROM THE ORACLE, on purpose: a week is graded only once its last kickoff is
@@ -46,7 +48,7 @@ from research.inseason.scoreboard import scoreboard_lines
 from research.inseason.step_result import Status, StepResult
 from research.model.instants import js_iso, ms_instant
 from research.model.reads.teams import kickoff_instants_by_week
-from research.model.register.freeze import SERVED_SOURCE, take_freeze
+from research.model.register.freeze import SERVED_SOURCE, SHIPPED_SOURCE, take_freeze
 from research.model.register.grade import grade_week, latest_freeze_for
 from research.pipeline.http import Fetcher
 from research.pipeline.nflverse import ingest, season_stats
@@ -59,6 +61,12 @@ from research.pipeline.odds.ingest import run_odds_snapshot
 
 LOG: Final = logging.getLogger(__name__)
 GRADE_AFTER: Final = timedelta(hours=36)
+# The week's order is set on the last pass before its first kickoff (Lane 93, B37): the Thursday 14:00
+# Eastern pass, six hours before a Thursday night game, is the one inside this window. The first pass
+# after the previous week's first kickoff still freezes the week early, so a failed final pass leaves
+# a freeze standing rather than a missed week; the final pass supersedes it by a new freeze instant
+# (the register's rule: rows never update, the latest freeze before kickoff is the one graded).
+FINAL_FREEZE_BEFORE: Final = timedelta(hours=12)
 # A week still ungradeable this long after its last kickoff fails the pass: nflverse publishes within
 # two days, so a refusal past this is an outage an operator must see, not a wait.
 GRADE_OVERDUE: Final = timedelta(days=4)
@@ -252,6 +260,12 @@ def grade(context: SeasonWeekContext) -> StepResult:
     return StepResult("grade", status, f"{len(ungraded)} ungraded weeks, {count} graded", tuple(detail))
 
 
+def is_final_pass(kickoff: datetime, at: datetime) -> bool:
+    """Whether an instant is inside the week's final freeze window, `FINAL_FREEZE_BEFORE` before its
+    first kickoff (Lane 93, B37): the pass there sets the week's order, superseding an early freeze."""
+    return kickoff - FINAL_FREEZE_BEFORE <= at < kickoff
+
+
 def week_to_freeze(kickoffs: Mapping[int, datetime], now: datetime) -> tuple[int, datetime] | None:
     """`pickWeekToFreeze`: the smallest week whose first kickoff is still ahead."""
     upcoming = sorted((week, kickoff) for week, kickoff in kickoffs.items() if kickoff > now)
@@ -286,15 +300,18 @@ def _take_freeze(context: SeasonWeekContext, candidate: tuple[int, datetime] | N
     week, kickoff = candidate
     with context.engine.connect() as conn:
         existing = latest_freeze_for(conn, context.season, week)
-    if existing is not None:
+    final = is_final_pass(kickoff, context.now)
+    if existing is not None and (not final or is_final_pass(kickoff, existing)):
         return StepResult("freeze", "ok", f"week {week} already frozen at {js_iso(existing)}")
     with context.engine.begin() as conn:
         result = take_freeze(conn, context.season, week, context.now)
     context.on_freeze(week, result.frozen_at)
     served = sum(1 for row in result.rows if row["board_source"] == SERVED_SOURCE)
+    shipped = sum(1 for row in result.rows if row["board_source"] == SHIPPED_SOURCE)
+    superseded = "" if existing is None else f", superseding the early freeze at {js_iso(existing)}"
     summary = (
         f"froze week {week} at {js_iso(result.frozen_at)}, kickoff {js_iso(kickoff)}, {len(result.rows)} rows "
-        f"({served} on the served board), implementation python"
+        f"({served} on the served board, {shipped} on the order shipped){superseded}, implementation python"
     )
     return StepResult(
         "freeze", "ok", summary, tuple(f"{source}: {counts}" for source, counts in result.coverage.items())

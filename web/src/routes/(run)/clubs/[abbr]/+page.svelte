@@ -36,6 +36,7 @@
 			range: page.scale !== null,
 			gap: page.gap,
 			season: page.underway,
+			restOfSeason: page.format.rosFromWeek !== undefined,
 			action: false
 		})
 	);

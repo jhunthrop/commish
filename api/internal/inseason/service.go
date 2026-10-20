@@ -70,6 +70,9 @@ type Service struct {
 	Moves    Moves
 	// Weeks lists the account's leagues for GET /me/week, nil answers none.
 	Weeks Weeks
+	// Records grades the account's league for GET /leagues/attached/{id}/record (Lane
+	// 93); nil answers its lineup with no weeks.
+	Records Records
 	// Boards values our board for the reads with no league: the public player read and the public
 	// order (PublicSettings).
 	Boards BoardSource
@@ -102,6 +105,7 @@ func (s *Service) Routes() []httpx.Route {
 		{Method: http.MethodGet, Path: "/leagues/attached/{id}/lineup", Access: httpx.SignedIn, Limit: limit, Handler: s.lineup},
 		{Method: http.MethodGet, Path: "/leagues/attached/{id}/matchup", Access: httpx.SignedIn, Limit: limit, Handler: s.matchup},
 		{Method: http.MethodGet, Path: "/leagues/attached/{id}/scoreboard", Access: httpx.SignedIn, Limit: limit, Handler: s.scoreboard},
+		{Method: http.MethodGet, Path: "/leagues/attached/{id}/record", Access: httpx.SignedIn, Limit: limit, Handler: s.leagueRecord},
 		{Method: http.MethodGet, Path: "/leagues/attached/{id}/waivers", Access: httpx.SignedIn, Limit: limit, Handler: s.waivers},
 		{Method: http.MethodGet, Path: "/leagues/attached/{id}/trades", Access: httpx.SignedIn, Limit: limit, Handler: s.trades},
 		{Method: http.MethodPost, Path: "/leagues/attached/{id}/trades/check", Access: httpx.SignedIn, Limit: limit, Handler: s.checkTrade},

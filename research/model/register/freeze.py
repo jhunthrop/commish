@@ -7,6 +7,11 @@ have been shown. A freeze taken at or after the week's first kickoff is refused.
 writes carries `implementation = 'python'`; the TypeScript's rows are never touched. Every row also
 carries the `model_version` of the board it quotes; a board that names no model is refused, since a
 claim whose maker is unknown cannot be graded as anyone's.
+
+Lane 93 (ruling B18) adds the order the site actually ships: from the first in-season board, every
+screen shows the published run's rest-of-season order (`published_boards`), so the freeze also keeps
+that board as `SHIPPED_SOURCE`, beside the preseason board it always kept. It is not in the oracle,
+which knew no published board; a store with no in-season published board freezes exactly as before.
 """
 
 import json
@@ -27,6 +32,12 @@ from research.pipeline.odds.props import PROP_MARKETS
 SERVED_SOURCE: Final = "commish_board_v9_ppr_12"
 SHADOW_SOURCE: Final = "commish_board_v7_ppr_12"
 REGISTER_BOARD_SOURCES: Final = ((SERVED_SOURCE, "served"), (SHADOW_SOURCE, "shadow"))
+# The order every screen ships in season (Lane 93, ruling B18): the published run's PPR board as
+# `published_boards` holds it at the freeze, our rest-of-season order. The record grades it from the
+# first week a freeze keeps it (week 7); the preseason board stays frozen beside it as it always was.
+SHIPPED_SOURCE: Final = "commish_ros_shipped_ppr_12"
+SHIPPED_FORMAT: Final = "ppr"
+SHIPPED_ORDER_BASIS: Final = "rest_of_season"
 ADP_SOURCE: Final = "ffc_adp_ppr_12"
 ECR_SOURCE: Final = "fantasypros_ecr_ppr"
 IMPLEMENTATION: Final = "python"
@@ -131,6 +142,59 @@ def week_published_points(conn: Connection, season: int, week: int, as_of: datet
     return {str(row.player_id): float(row.ppr_points) for row in rows}
 
 
+_SHIPPED: Final = """
+select c.player_id, b.refreshed, b.points, b.rank, b.run_id from research.published_boards b
+join research.player_crosswalk c on c.provider_player_id = b.player_id
+where b.season = :s and b.format = :format and b.order_basis = :basis and b.points is not null
+  and b.published_at <= :a and c.player_id is not null
+"""
+
+
+@dataclass(frozen=True, slots=True)
+class ShippedEntry:
+    """One row of the order the site ships at the freeze, in the stored board's shape: his
+    rest-of-season points, his place in the order (which is its value order, points over
+    replacement), and the published run as the maker of the claim."""
+
+    player_id: str
+    source: str
+    as_of: datetime
+    projected_points: float
+    rank: int
+    value_rank: int
+    model_version: str
+
+
+def shipped_board(conn: Connection, season: int, as_of: datetime) -> list[ShippedEntry]:
+    """The order the site ships at `as_of` (Lane 93): the published run's PPR rest-of-season board,
+    published at or before the freeze, each row through the crosswalk to its research id. Empty before
+    the first in-season board (the preseason board is then the order shipped, frozen as the served
+    board) and for a row with no research id."""
+    params = {"s": season, "format": SHIPPED_FORMAT, "basis": SHIPPED_ORDER_BASIS, "a": as_of}
+    return [
+        ShippedEntry(
+            str(row.player_id),
+            SHIPPED_SOURCE,
+            ms_instant(row.refreshed),
+            float(row.points),
+            int(row.rank),
+            int(row.rank),
+            f"published run {row.run_id}",
+        )
+        for row in conn.execute(text(_SHIPPED), params)
+    ]
+
+
+def _coverage(rows: Sequence[Mapping[str, Any]]) -> dict[str, int]:
+    return {
+        "board": len(rows),
+        "adp": sum(1 for row in rows if row["adp"] is not None),
+        "ecr": sum(1 for row in rows if row["ecr"] is not None),
+        "props": sum(1 for row in rows if row["props_points"] is not None),
+        "published": sum(1 for row in rows if row["published_points"] is not None),
+    }
+
+
 def _stored_board(conn: Connection, season: int, source: str, as_of: datetime) -> list[Any]:
     generations = conn.execute(
         text(
@@ -203,14 +267,15 @@ def take_freeze(conn: Connection, season: int, week: int, now: datetime) -> Free
                 "empty_served_board",
                 f'The served board ("{SERVED_SOURCE}") holds no {season} rows at or before {js_iso(frozen_at)}, so there is no claim to freeze.',
             )
-        coverage[source] = {
-            "board": len(board_rows),
-            "adp": sum(1 for row in board_rows if row["adp"] is not None),
-            "ecr": sum(1 for row in board_rows if row["ecr"] is not None),
-            "props": sum(1 for row in board_rows if row["props_points"] is not None),
-            "published": sum(1 for row in board_rows if row["published_points"] is not None),
-        }
+        coverage[source] = _coverage(board_rows)
         rows.extend(board_rows)
+    shipped = [
+        _freeze_row(season, week, frozen_at, entry, adp, ecr, props, published)
+        for entry in shipped_board(conn, season, frozen_at)
+    ]
+    if shipped:
+        coverage[SHIPPED_SOURCE] = _coverage(shipped)
+    rows.extend(shipped)
     _record(conn, rows)
     return FreezeResult(season, week, frozen_at, kickoff, rows, coverage)
 

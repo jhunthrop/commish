@@ -117,10 +117,7 @@ func terms(snap Snapshot) apitypes.LeagueTerms {
 	t := snap.Terms
 	out := apitypes.LeagueTerms{
 		PlayoffTeams: positive(t.PlayoffTeams), WaiverBudget: positive(t.Budget),
-		Roster: apitypes.LeagueShape{
-			Qb: snap.Shape.QB, Rb: snap.Shape.RB, Wr: snap.Shape.WR, Te: snap.Shape.TE, Flex: snap.Shape.Flex,
-			SuperFlex: snap.Shape.SuperFlex, K: snap.Shape.K, Def: snap.Shape.DEF, Bench: snap.Shape.Bench,
-		},
+		Roster:       snap.Shape.API(),
 		ScoringExtra: scoringExtra(snap.Scoring), ScoringUnstated: unstated(snap.Scoring.Defaulted),
 		HostSettingsUrl: orNil(hostSettingsURL(snap.Ref)),
 	}

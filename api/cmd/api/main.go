@@ -27,6 +27,7 @@ import (
 	"github.com/jhunthrop/commish/api/internal/exports"
 	"github.com/jhunthrop/commish/api/internal/httpx"
 	"github.com/jhunthrop/commish/api/internal/inseason"
+	"github.com/jhunthrop/commish/api/internal/leaguerecord"
 	"github.com/jhunthrop/commish/api/internal/leagues"
 	"github.com/jhunthrop/commish/api/internal/leaguesync"
 	"github.com/jhunthrop/commish/api/internal/metrics"
@@ -184,6 +185,7 @@ func build(ctx context.Context, cfg config.API, pool *pgxpool.Pool, obs httpx.Ob
 		Leagues: inseason.SyncLeagues{Sync: leagueSync}, Weeks: inseason.SyncLeagues{Sync: leagueSync}, Facts: facts,
 		Holds: sheetStore, Moves: moves, Boards: draftBoards, Season: draftBoards.Schedule.Season, Now: now, Log: log,
 		Landings: inseason.SyncLeagues{Sync: leagueSync}, Context: ctx,
+		Records: &leaguerecord.Service{Store: &leaguerecord.Store{Pool: pool}, Orders: draftBoards.Schedule},
 	}
 	// The trade search warms as each league read lands (Lane 66u).
 	leagueSync.Poller.Landed = inSeason.OnLanded

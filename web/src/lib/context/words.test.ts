@@ -178,7 +178,7 @@ void test("copy guard: no composed line doubles a word, the run's own phrases in
 			"Each week our PPR board is frozen before the week's first kickoff and graded after its games.",
 		publishedFromWeek: 7,
 		honest: null,
-		weeks: [graded, missed(3, 'Our weekly freeze failed that week.'), upcoming],
+		weeks: [graded, missed(3, 'Our order was not set before kickoff that week.'), upcoming],
 		toDate: [
 			{
 				position: 'All' as const,
@@ -241,17 +241,17 @@ const missed = (week: number, note: string): RecordWeek => ({
 });
 
 void test('missed weeks share a line only while their reason agrees, and the line says why', () => {
-	const freeze = 'Our weekly freeze failed that week.';
+	const unset = 'Our order was not set before kickoff that week.';
 	const weeks = [
-		missed(3, freeze),
-		missed(4, freeze),
+		missed(3, unset),
+		missed(4, unset),
 		missed(5, 'Our nightly run failed that week.')
 	];
 	assert.deepEqual(
 		weekLines(weeks).map((line) => `${line.lead}, ${line.text}`),
 		[
-			'Weeks 3 to 4, not frozen because our weekly freeze failed, so not graded',
-			'Week 5, not frozen because our nightly run failed, so not graded'
+			'Weeks 3 to 4, our order was not set before kickoff, so they cannot be graded',
+			'Week 5, our nightly run failed, so it cannot be graded'
 		]
 	);
 });
@@ -271,7 +271,7 @@ void test('the account page goes on only to a path on this site', () => {
 	assert.equal(safeThen(null, origin), null);
 });
 
-void test('a frozen week says it is not played yet until its first kickoff, then waits on the stats', () => {
+void test('a set week says it is not played yet until its first kickoff, then grades when the stats land', () => {
 	const frozen: RecordWeek = {
 		week: 6,
 		status: 'frozen',
@@ -282,6 +282,6 @@ void test('a frozen week says it is not played yet until its first kickoff, then
 		population: 0,
 		lines: []
 	};
-	assert.equal(weekLines([frozen], [6])[0]?.text, 'frozen Oct 13, not played yet');
-	assert.equal(weekLines([frozen])[0]?.text, 'frozen Oct 13, waiting on the stats');
+	assert.equal(weekLines([frozen], [6])[0]?.text, 'set Tue Oct 13, not played yet');
+	assert.equal(weekLines([frozen])[0]?.text, 'set Tue Oct 13, grades when the stats land');
 });

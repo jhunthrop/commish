@@ -720,6 +720,24 @@ func (e LeaguePhase) Valid() bool {
 	}
 }
 
+// Defines values for LeagueRecordWeekBenchmark.
+const (
+	LeagueRecordWeekBenchmarkEspn      LeagueRecordWeekBenchmark = "espn"
+	LeagueRecordWeekBenchmarkPublished LeagueRecordWeekBenchmark = "published"
+)
+
+// Valid indicates whether the value is a known member of the LeagueRecordWeekBenchmark enum.
+func (e LeagueRecordWeekBenchmark) Valid() bool {
+	switch e {
+	case LeagueRecordWeekBenchmarkEspn:
+		return true
+	case LeagueRecordWeekBenchmarkPublished:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for LeagueTermsPlayoffSeeds.
 const (
 	LeagueTermsPlayoffSeedsPoints LeagueTermsPlayoffSeeds = "points"
@@ -2613,6 +2631,40 @@ type LeaguePlayer struct {
 	Position       string `json:"position"`
 	Team           string `json:"team"`
 }
+
+// LeagueRecord our record in the member's own league (Lane 93)
+type LeagueRecord struct {
+	// Host the host a league runs on, named as a mechanism
+	Host LeagueHost `json:"host"`
+
+	// Lineup the league's starting lineup by our slots, and its bench
+	Lineup LeagueShape `json:"lineup"`
+
+	// Teams the league's teams, the count each starting slot is multiplied by
+	Teams int `json:"teams"`
+
+	// Weeks the graded weeks, in week order; empty on a platform whose week reads are not kept (every platform but ESPN) and before the first graded week whose roster was read before our order was set
+	Weeks []LeagueRecordWeek `json:"weeks"`
+}
+
+// LeagueRecordWeek defines model for LeagueRecordWeek.
+type LeagueRecordWeek struct {
+	// Benchmark the lineup ours is graded against: espn, the lineup ESPN's own projection picks; published, the lineup the week's published projection picks, where the read carried no ESPN projection
+	Benchmark LeagueRecordWeekBenchmark `json:"benchmark"`
+
+	// Margin ours less theirs, to the tenth
+	Margin float64 `json:"margin"`
+
+	// Ours our picks' points, to the tenth, as the league scores
+	Ours float64 `json:"ours"`
+
+	// Theirs the benchmark lineup's points, to the tenth, as the league scores
+	Theirs float64 `json:"theirs"`
+	Week   int     `json:"week"`
+}
+
+// LeagueRecordWeekBenchmark the lineup ours is graded against: espn, the lineup ESPN's own projection picks; published, the lineup the week's published projection picks, where the read carried no ESPN projection
+type LeagueRecordWeekBenchmark string
 
 // LeagueSettings defines model for LeagueSettings.
 type LeagueSettings struct {
@@ -4684,6 +4736,16 @@ type HostMovesResponse struct {
 	Meta      *PageMeta  `json:"meta,omitempty"`
 	Ok        bool       `json:"ok"`
 	RequestId string     `json:"request_id"`
+}
+
+// LeagueRecordResponse defines model for LeagueRecordResponse.
+type LeagueRecordResponse struct {
+	// Data our record in the member's own league (Lane 93)
+	Data      LeagueRecord `json:"data"`
+	Error     *ErrorBody   `json:"error"`
+	Meta      *PageMeta    `json:"meta,omitempty"`
+	Ok        bool         `json:"ok"`
+	RequestId string       `json:"request_id"`
 }
 
 // LeagueResponse defines model for LeagueResponse.
