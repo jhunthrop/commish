@@ -1,6 +1,7 @@
 package ffpc
 
 import (
+	"regexp"
 	"strconv"
 	"strings"
 )
@@ -16,7 +17,17 @@ type Standing struct {
 	HasRecord     bool    `json:"has_record"`
 	PointsFor     float64 `json:"points_for"`
 	PointsAgainst float64 `json:"points_against"`
+	// HasAgainst says the page gave a points-against column.
+	HasAgainst bool `json:"has_against"`
+	// Streak is the page's current run, "W4" or "L2", empty where it gives none.
+	Streak string `json:"streak,omitempty"`
 }
+
+// streakCell is a run as the page prints it: a W, L or T and its length.
+var streakCell = regexp.MustCompile(`^[WLT][0-9]{1,2}$`)
+
+// labelAgainst is the standings page's points-against heading.
+const labelAgainst = "pts against"
 
 // columns maps a header row's labels to their cell index.
 func columns(header *node) map[string]int {
@@ -108,7 +119,11 @@ func standingRow(tr *node, col map[string]int, hasWins bool) (Standing, bool) {
 		st.Wins, st.Losses, st.Ties = cellInt(row, col, "w"), cellInt(row, col, "l"), cellInt(row, col, "t")
 	}
 	st.PointsFor = cellFloat(row, col, "points")
-	st.PointsAgainst = cellFloat(row, col, "pts against")
+	_, st.HasAgainst = col[labelAgainst]
+	st.PointsAgainst = cellFloat(row, col, labelAgainst)
+	if s, ok := cellText(row, col, "streak"); ok && streakCell.MatchString(strings.TrimSpace(s)) {
+		st.Streak = strings.TrimSpace(s)
+	}
 	return st, true
 }
 

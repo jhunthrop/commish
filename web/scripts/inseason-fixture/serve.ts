@@ -32,6 +32,7 @@ import { playerWeek, type Sheet } from './player-week.ts';
 import { FIXTURE_SEASON, askedPhase, phaseAccount, phaseLeagues, phaseSync } from './phases.ts';
 import { ESPN_STAND_IN_NAME, espnMatchup, espnSync } from './espn-sync.ts';
 import { yahooStandIn } from './yahoo.ts';
+import { ffpcStandIn } from './ffpc.ts';
 import { afterSundayOf, SUNDAY, sundayOf } from './sunday.ts';
 import { linesOf, recordedMatchups, scoreboardAt } from './scoreboard-at.ts';
 import { inSeason, noWeek } from './member-week.ts';
@@ -373,6 +374,15 @@ const YAHOO_PLATFORM = /(?:^|; )fixture_platform=yahoo(?:;|$)/;
 /** The request asks for the recorded league as Yahoo's. */
 const yahooAsked = (req: IncomingMessage, id: string): boolean =>
 	id === LEAGUE && YAHOO_PLATFORM.test(req.headers.cookie ?? '');
+/** The recorded league as an FFPC league's (ffpc.ts), by the same cookie: FFPC's seeding and its
+ * tight end premium beside the PPR column (Lane 94). */
+const ffpcWeek = ffpcStandIn({ sync, lineup, matchup: matchupBox });
+const FFPC_PLATFORM = /(?:^|; )fixture_platform=ffpc(?:;|$)/;
+const ffpcAsked = (req: IncomingMessage, id: string): boolean =>
+	id === LEAGUE && FFPC_PLATFORM.test(req.headers.cookie ?? '');
+/** The platform a request asks the recorded league on, its own when none. */
+const platformAsked = (req: IncomingMessage, id: string): 'yahoo' | 'ffpc' | null =>
+	yahooAsked(req, id) ? 'yahoo' : ffpcAsked(req, id) ? 'ffpc' : null;
 
 /** A stand-in's answers. */
 interface StandInWeek {
@@ -391,6 +401,12 @@ interface StandIn extends StandInWeek {
  * the recorded league on the Sunday, the recorded league as Yahoo's on either day. */
 function standInAsked(req: IncomingMessage, id: string): StandIn | null {
 	const sunday = SUNDAY_WEEK.test(req.headers.cookie ?? '');
+	// The FFPC stand-in reads on the week's Saturday alone (its shots, Lane 94).
+	if (ffpcAsked(req, id)) {
+		const board = scoreboardNow();
+		const scoring = ffpcWeek.lineup.projection_scoring;
+		return { ...ffpcWeek, scoreboard: { ...board, projection_scoring: scoring }, readAt: readAt() };
+	}
 	if (!sunday && afterSunday()) {
 		const at = readAt();
 		if (yahooAsked(req, id)) {
@@ -500,9 +516,9 @@ async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> 
 				? { ...answer, league: picked }
 				: answer;
 		// The recorded league as Yahoo's (yahoo.ts): the account names it on its platform too.
-		const yahoo = yahooAsked(req, LEAGUE);
+		const platform = platformAsked(req, LEAGUE);
 		const onPlatform = <T extends { id: string; host: string }>(league: T): T =>
-			yahoo && league.id === LEAGUE ? { ...league, host: 'yahoo' } : league;
+			platform !== null && league.id === LEAGUE ? { ...league, host: platform } : league;
 		send(req, res, HTTP.ok, {
 			...chosenAnswer,
 			league: chosenAnswer.league === null ? null : onPlatform(chosenAnswer.league),
@@ -548,7 +564,19 @@ async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> 
 	// The Account room's platforms (Lane 66k), every connection a stand-in: ESPN connected with
 	// lineups set from here, FFPC signed out, Yahoo and MyFantasyLeague open and not connected.
 	if (url.pathname === '/hosts') {
-		send(req, res, HTTP.ok, HOSTS);
+		// With the FFPC stand-in asked for, FFPC is signed in and ESPN's session kept unproven, the
+		// two states the one state word set says (Lane 94).
+		const signedIn = ffpcAsked(req, LEAGUE)
+			? {
+					...HOSTS,
+					connections: HOSTS.connections.map((c) =>
+						c.host === 'ffpc'
+							? { ...c, status: 'connected' as const, last_read_at: readAt() }
+							: { ...c, proven: false }
+					)
+				}
+			: HOSTS;
+		send(req, res, HTTP.ok, signedIn);
 		return;
 	}
 	if (url.pathname === '/devices') {
@@ -567,7 +595,7 @@ async function answer(req: IncomingMessage, res: ServerResponse): Promise<void> 
 				const league = phased.get(id) ?? { ...contextLeague, name: sync.name };
 				return {
 					id,
-					host: ESPN_MOVES.has(id) ? 'espn' : yahooAsked(req, id) ? 'yahoo' : sync.host,
+					host: ESPN_MOVES.has(id) ? 'espn' : (platformAsked(req, id) ?? sync.host),
 					host_league_id: sync.host_league_id,
 					season: sync.season,
 					name: league.name,

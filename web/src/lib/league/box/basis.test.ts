@@ -51,6 +51,33 @@ const facts = (over: Partial<WeekFacts> = {}): WeekFacts => ({
 const line = (over: Partial<WeekFacts> = {}): PlayerLine =>
 	({ facts: facts(over), player: { position: 'QB' } }) as unknown as PlayerLine;
 
+void test("FFPC's tight end premium is said beside PPR nearest its rules, never as the only difference (Lane 94, B26, fix round 1)", () => {
+	const ffpc = { ...CLOSEST, te_bonus: 0.5 };
+	const said = projPart(
+		{ readAt: READ, scoring: ffpc, defense: false, league: true, host: 'ffpc' },
+		CENTRAL
+	);
+	assert.equal(
+		said,
+		"Proj is this week's published projection, PPR shown, nearest FFPC's rules, read Fri 9:00 pm. FFPC adds 0.5 a catch for TEs."
+	);
+	assert.doesNotMatch(said, bannedPattern());
+	assert.equal(
+		projPart({ readAt: READ, scoring: ffpc, defense: false, league: true }, CENTRAL),
+		"Proj is this week's published projection, PPR shown, nearest your league's rules, read Fri 9:00 pm. Your league adds 0.5 a catch for TEs."
+	);
+	// A commissioner's rules are the league's, never the platform's (fix round 2): never "Sleeper adds".
+	const sleeper = projPart(
+		{ readAt: READ, scoring: ffpc, defense: false, league: true, host: 'sleeper' },
+		CENTRAL
+	);
+	assert.equal(
+		sleeper,
+		"Proj is this week's published projection, PPR shown, nearest your league's rules, read Fri 9:00 pm. Your league adds 0.5 a catch for TEs."
+	);
+	assert.doesNotMatch(sleeper, /Sleeper/);
+});
+
 void test('Proj says its scoring, whose rules, defenses when one is drawn, and its read, the zone said once on the page', () => {
 	assert.equal(
 		projPart({ readAt: READ, scoring: CLOSEST, defense: false, league: true }, CENTRAL),

@@ -13,10 +13,10 @@ const read = {
 	host_stale_seconds: 600
 };
 
-void test('a member read that lapsed asks the drafter to connect, with the last read', () => {
+void test('a member read that lapsed asks the drafter to sign in or connect, in the platform word, with the last read', () => {
 	assert.equal(
 		readLine(read, now),
-		'Connect FFPC to keep this league in sync. This is our last read, 10 minutes ago.'
+		'Sign in to FFPC to keep this league in sync. This is our last read, 10 minutes ago.'
 	);
 	assert.equal(
 		readLine({ ...read, host: 'yahoo' }, now),

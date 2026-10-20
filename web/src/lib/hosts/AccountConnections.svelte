@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
 	import { links } from '#lib/site/links.ts';
+	import type { AttachedList } from '#lib/league/attached-list.svelte.ts';
 	import ProblemLine from '#lib/ui/ProblemLine.svelte';
 	import Quiet from '#lib/ui/Quiet.svelte';
 	import Verb from '#lib/ui/Verb.svelte';
@@ -18,9 +19,10 @@
 		type HostConnected,
 		type HostConnections
 	} from './api.ts';
-	import { ESPN_CONSENT, MFL_CONSENT } from './connection-words.ts';
+	import { ESPN_CONSENT, MFL_CONSENT, againWords, keepReadingVerb } from './connection-words.ts';
 	import {
 		PLATFORM_WORDS,
+		leaguesByPlatform,
 		platformRows,
 		type Platform,
 		type PlatformRow
@@ -48,6 +50,19 @@
 	/** Yahoo's return to this page, said once. */
 	const returned = yahooOutcome(page.url.searchParams);
 
+	interface Props {
+		/** The account's leagues, read once by the Account room for this table and the Leagues
+		 * attached table both, so a Detach there moves a row's count here (Lane 94 fix round 2). */
+		list: AttachedList;
+	}
+
+	let { list }: Props = $props();
+
+	/** The account's still-followed leagues by platform, the Leagues attached table's own list; null
+	 * until it lands or when it could not be read, and each row then says only when it was connected
+	 * and its connection's own read. */
+	const leagues = $derived(list.live === null ? null : leaguesByPlatform(list.live));
+
 	function load(): void {
 		hostsApi
 			.connections()
@@ -61,7 +76,10 @@
 
 	onMount(load);
 
-	const rows = $derived(hosts && readAt ? platformRows(hosts, readAt) : []);
+	/** The rows' clock: the league list's, once it is read, so a row's last read and its leagues' in the
+	 * table under it are said against one instant; the connections' read before. */
+	const clock = $derived(list.live === null ? readAt : new Date(list.readAt));
+	const rows = $derived(hosts && clock ? platformRows(hosts, clock, leagues) : []);
 
 	/** What disconnecting deleted, said once it went through. */
 	const GONE: Readonly<Record<ConnectedHost, string>> = {
@@ -202,8 +220,8 @@
 			<div class="form">
 				<ESPNConnect
 					label={rows.find((r) => r.key === 'espn')?.verb?.kind === 'again'
-						? 'Connect ESPN again'
-						: 'Connect ESPN'}
+						? againWords('espn')
+						: keepReadingVerb('espn')}
 					onconnected={connected}
 				/>
 			</div>
@@ -211,15 +229,15 @@
 			<div class="form">
 				<MFLConnect
 					label={rows.find((r) => r.key === 'mfl')?.verb?.kind === 'again'
-						? 'Connect MyFantasyLeague again'
-						: 'Connect MyFantasyLeague'}
+						? againWords('mfl')
+						: keepReadingVerb('mfl')}
 					onconnected={() => connected()}
 				/>
 			</div>
 		{:else if form === 'ffpc'}
 			<div class="form"><FFPCSignIn onconnected={load} /></div>
 		{:else if form === 'yahoo'}
-			<div class="form"><YahooConnect label="Connect Yahoo again" /></div>
+			<div class="form"><YahooConnect label={againWords('yahoo')} /></div>
 		{/if}
 		{#if problem}<ProblemLine>{problem}</ProblemLine>{/if}
 		{#if keeps.length > 0}
@@ -260,36 +278,34 @@
 		max-width: 110ch;
 	}
 
+	/* The Platform column is its longest name, MyFantasyLeague, kept on one line; the others share the
+	 * table by proportion, the Connection column (no width of its own) taking what is left: fixed pixel
+	 * widths left it 40 px beside the account's rail at 1280 (Lane 94 review HIGH-1). Its line wraps
+	 * within it. */
 	.c-name {
-		width: 170px;
+		width: 9.5rem;
 	}
 
 	.c-wr {
-		width: 240px;
+		width: 18%;
+	}
+
+	.c-read {
+		width: 9%;
+	}
+
+	.c-act {
+		width: 25%;
 	}
 
 	.note-cell {
 		color: var(--ink-2);
 	}
 
-	/* A connection's dates and consent hold on one line at a desk. */
-	@media (min-width: 1181px) {
-		.keep {
-			white-space: nowrap;
-		}
-	}
-
-	.c-read {
-		width: 120px;
-	}
-
-	.c-act {
-		width: 180px;
-	}
-
 	.name {
 		font-weight: 600;
 		text-align: left;
+		white-space: nowrap;
 	}
 
 	.wcell {

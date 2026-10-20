@@ -2,11 +2,12 @@
 	import { fixed } from '#lib/format/number.ts';
 	import TeamAvatar from '../box/TeamAvatar.svelte';
 	import { BOX } from '../box/box.ts';
-	import type { LeagueTerms } from '../api.ts';
+	import type { LeagueHost, LeagueTerms } from '../api.ts';
 	import {
 		HOME,
 		playoffRule,
 		recordCell,
+		seedingWords,
 		sortStandings,
 		waiverCell,
 		waiverColumn,
@@ -22,11 +23,16 @@
 	interface Props {
 		rows: readonly StandingsRow[];
 		terms: LeagueTerms;
+		/** The league's platform, named where it seeds the playoffs its own way. */
+		host: LeagueHost;
 		/** Whether a projection column shows: the week has one. */
 		projected: boolean;
 	}
 
-	let { rows, terms, projected }: Props = $props();
+	let { rows, terms, host, projected }: Props = $props();
+
+	/** How the platform seeds its playoffs, said under the table where no cut can show it. */
+	const seeding = $derived(seedingWords(terms, host));
 
 	let sortBy = $state<StandingsKey>('rank');
 	const sorted = $derived(sortStandings(rows, sortBy, terms));
@@ -107,6 +113,7 @@
 			{/each}
 		</tbody>
 	</table>
+	{#if seeding}<p class="seeding">{seeding}</p>{/if}
 </section>
 
 <style>
@@ -286,6 +293,12 @@
 
 	tr.cut td {
 		border-bottom: 2px solid var(--accent);
+	}
+
+	.seeding {
+		margin: var(--s-2) 0 0;
+		font-size: var(--t-sm);
+		color: var(--ink-2);
 	}
 
 	tr.rule td {
