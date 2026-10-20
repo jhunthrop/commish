@@ -18,10 +18,34 @@ const (
 	WaiversOrder  = "order"
 )
 
+// How an order league's waiver order moves, as the contract
+// (LeagueTerms.waiver_order) spells it: rolling, a claim sends the team to
+// the back; inverse standings, the order resets each week worst first.
+const (
+	OrderRolling          = string(apitypes.WaiverOrderRolling)
+	OrderInverseStandings = string(apitypes.WaiverOrderInverseStandings)
+)
+
+// The rule a tie in the standings is broken by, as the contract
+// (LeagueTerms.tiebreak) spells it.
+const (
+	TiebreakHeadToHead     = string(apitypes.TiebreakHeadToHead)
+	TiebreakPointsFor      = string(apitypes.TiebreakPointsFor)
+	TiebreakPointsAgainst  = string(apitypes.TiebreakPointsAgainst)
+	TiebreakDivisionRecord = string(apitypes.TiebreakDivisionRecord)
+)
+
 // Terms is the host's word on a league's waivers and playoffs. A zero
 // field is one the host does not say.
 type Terms struct {
-	Waivers      string `json:"waivers,omitempty"`
+	Waivers string `json:"waivers,omitempty"`
+	// WaiverOrder is how an order league's order moves (OrderRolling or
+	// OrderInverseStandings); empty in a budget league or where the host
+	// does not say.
+	WaiverOrder string `json:"waiver_order,omitempty"`
+	// Tiebreak is the rule the host breaks a tie in the standings by
+	// (TiebreakHeadToHead and the like); empty where it does not say.
+	Tiebreak     string `json:"tiebreak,omitempty"`
 	Budget       int    `json:"budget,omitempty"`
 	PlayoffTeams int    `json:"playoff_teams,omitempty"`
 	// PlayoffFirst and PlayoffLast are the playoffs' first and last week.
@@ -66,8 +90,10 @@ func sleeperTerms(l sleeper.League) Terms {
 	switch l.WaiverType {
 	case sleeper.WaiverBudget:
 		t.Waivers, t.Budget = WaiversBudget, l.WaiverBudget
-	case sleeper.WaiverRolling, sleeper.WaiverReverse:
-		t.Waivers = WaiversOrder
+	case sleeper.WaiverRolling:
+		t.Waivers, t.WaiverOrder = WaiversOrder, OrderRolling
+	case sleeper.WaiverReverse:
+		t.Waivers, t.WaiverOrder = WaiversOrder, OrderInverseStandings
 	}
 	if l.PlayoffWeekStart > 0 && l.PlayoffTeams > 0 {
 		t.PlayoffLast = l.PlayoffWeekStart + sleeperPlayoffWeeks(playoffRounds(l.PlayoffTeams), l.PlayoffRoundType) - 1
@@ -115,14 +141,39 @@ func playoffRounds(teams int) int {
 }
 
 func espnTerms(l espn.FullLeague) Terms {
-	t := Terms{PlayoffTeams: l.PlayoffTeams, PlayoffFirst: l.PlayoffStartWeek, Waivers: WaiversOrder}
+	t := Terms{PlayoffTeams: l.PlayoffTeams, PlayoffFirst: l.PlayoffStartWeek, Waivers: WaiversOrder,
+		WaiverOrder: espnWaiverOrder(l.Acquisition.OrderReset), Tiebreak: espnTiebreaks[l.SeedingTiebreak]}
 	if l.Acquisition.Budget {
-		t.Waivers, t.Budget = WaiversBudget, l.Acquisition.Total
+		t.Waivers, t.Budget, t.WaiverOrder = WaiversBudget, l.Acquisition.Total, ""
 	}
 	if l.PlayoffStartWeek > 0 && l.FinalScoringPeriod >= l.PlayoffStartWeek {
 		t.PlayoffLast, t.FinalWeeks = l.FinalScoringPeriod, l.FinalRoundWeeks
 	}
 	return t
+}
+
+// espnWaiverOrder is ESPN's waiverOrderReset as the order's type: a reset
+// is the inverse of the standings each week, no reset is rolling; none
+// where the read carries none.
+func espnWaiverOrder(reset *bool) string {
+	switch {
+	case reset == nil:
+		return ""
+	case *reset:
+		return OrderInverseStandings
+	}
+	return OrderRolling
+}
+
+// espnTiebreaks is ESPN's playoffSeedingRule, the tie rule its standings
+// follow, by the values espn-api and ESPN-Fantasy-Football-API name
+// (H2H_RECORD, TOTAL_POINTS_SCORED, INTRA_DIVISION_RECORD,
+// TOTAL_POINTS_AGAINST); any other value (RAW_STAT, UNKNOWN) states none.
+var espnTiebreaks = map[string]string{
+	"H2H_RECORD":            TiebreakHeadToHead,
+	"TOTAL_POINTS_SCORED":   TiebreakPointsFor,
+	"TOTAL_POINTS_AGAINST":  TiebreakPointsAgainst,
+	"INTRA_DIVISION_RECORD": TiebreakDivisionRecord,
 }
 
 // terms is the league's settings as the league page shows them.
@@ -137,6 +188,14 @@ func terms(snap Snapshot) apitypes.LeagueTerms {
 	if t.Waivers != "" {
 		w := apitypes.LeagueTermsWaivers(t.Waivers)
 		out.Waivers = &w
+	}
+	if t.WaiverOrder != "" {
+		o := apitypes.WaiverOrder(t.WaiverOrder)
+		out.WaiverOrder = &o
+	}
+	if t.Tiebreak != "" {
+		b := apitypes.Tiebreak(t.Tiebreak)
+		out.Tiebreak = &b
 	}
 	if t.PlayoffFirst > 0 && t.PlayoffLast >= t.PlayoffFirst {
 		out.PlayoffWeeks = &apitypes.PlayoffWeeks{First: t.PlayoffFirst, Last: t.PlayoffLast}

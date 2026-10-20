@@ -149,6 +149,11 @@ type FullLeague struct {
 	FinalRoundWeeks int
 	// PlayoffTeams is scheduleSettings.playoffTeamCount, 0 when unset.
 	PlayoffTeams int
+	// SeedingTiebreak is scheduleSettings.playoffSeedingRule, the rule
+	// ESPN breaks a tie in the standings by (H2H_RECORD,
+	// TOTAL_POINTS_SCORED and the like; espn-api's playoff_seed_tie_rule),
+	// empty when the read carries none.
+	SeedingTiebreak string
 }
 
 // DraftState is ESPN's draftDetail: whether the league has drafted, and
@@ -176,6 +181,10 @@ type Acquisition struct {
 	// Closed is an acquisitionLimit of 0: the league takes no adds (-1 is
 	// no limit).
 	Closed bool
+	// OrderReset is waiverOrderReset: true resets the waiver order each
+	// week by inverse standings, false keeps it rolling (a claim sends the
+	// team to the back); nil when the read carries none.
+	OrderReset *bool
 }
 
 // Team is one team, its record, owners and roster.
@@ -363,6 +372,7 @@ type wireFull struct {
 			MatchupPeriodLength int              `json:"matchupPeriodLength"`
 			MatchupPeriods      map[string][]int `json:"matchupPeriods"`
 			PlayoffTeamCount    int              `json:"playoffTeamCount"`
+			PlayoffSeedingRule  string           `json:"playoffSeedingRule"`
 		} `json:"scheduleSettings"`
 		RosterSettings struct {
 			LineupSlotCounts map[string]int `json:"lineupSlotCounts"`
@@ -534,6 +544,7 @@ func checkFull(w wireFull) (FullLeague, error) {
 		Members: map[string]string{}, LineupSlotCount: map[int]int{}, Acquisition: acquisitionOf(w.Settings.AcquisitionSettings),
 		DraftAt: draftDate(w.Settings.DraftSettings.Date), PlayoffStartWeek: playoffStart(w), PlayoffTeams: playoffTeams(w.Settings.ScheduleSettings.PlayoffTeamCount),
 		FinalScoringPeriod: period(w.Status.FinalScoringPeriod), FinalRoundWeeks: finalRoundWeeks(w),
+		SeedingTiebreak: bounded64(text(w.Settings.ScheduleSettings.PlayoffSeedingRule)),
 	}
 	if d := w.DraftDetail; d != nil {
 		l.Draft = &DraftState{Drafted: d.Drafted, InProgress: d.InProgress}
