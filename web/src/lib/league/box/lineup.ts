@@ -72,7 +72,8 @@ export const LINEUP = {
 	copy: 'Copy the lineup',
 	set: 'Your lineup is set',
 	sit: 'Sit',
-	pastWeeks: 'Past weeks on Our record',
+	/** The strip's link to the order's record (Lane 99, B62): it says where it goes. */
+	pastWeeks: 'Past weeks of our order, on Our record',
 	copied: 'Copied.',
 	setItOn: 'Set it on',
 	copyFailed: 'This browser would not copy it.',
@@ -107,24 +108,47 @@ export function changesTitle(
 }
 
 /** The strip's sum, its figure drawn large: "87.0" then "Proj with them, 77.5 as set, +9.5", or
- * "Proj as set" with no change; null before the week's projection. */
+ * "Proj as set" with no change; null before the week's projection. asSet names whose lineup the as-set
+ * figure is (the Lineup's "as set on ESPN", lineupSum). */
 export interface StripSum {
 	figure: string;
 	words: string;
 	gain: string | null;
 }
 
+/** The lineup as the platform holds it, in the strip's words. */
+const AS_SET = 'as set';
+
 export function stripSum(
 	box: Pick<LineupBox, 'totals' | 'asSet' | 'gain' | 'swaps'>,
-	done: string | null = null
+	done: string | null = null,
+	asSet: string = AS_SET
 ): StripSum | null {
 	// Every starter played leaves no Proj to add: the API's sentence stands in the sum's place.
 	if (box.totals.proj === null || done !== null) return null;
 	const figure = boxNumber(box.totals.proj);
-	if (box.swaps.length === 0) return { figure, words: `${BOX.proj} as set`, gain: null };
-	const set = box.asSet === null ? '' : `, ${boxNumber(box.asSet)} as set`;
+	if (box.swaps.length === 0) return { figure, words: `${BOX.proj} ${asSet}`, gain: null };
+	const set = box.asSet === null ? '' : `, ${boxNumber(box.asSet)} ${asSet}`;
 	const gain = box.gain === null || box.gain <= 0 ? null : `+${fixed(box.gain, 1)}`;
 	return { figure, words: `${BOX.proj} with them${set}`, gain };
+}
+
+/** "as set on ESPN": whose lineup the Lineup strip's figure is (Lane 99, B11). */
+export function asSetWords(host: LeagueHost): string {
+	return `${AS_SET} on ${hostWords(host)}`;
+}
+
+/** The Lineup strip's figure (Lane 99, B11), the platform named: stripSum's with "as set on ESPN", or
+ * once every starter has played the lineup's points, "76.8" and "Pts as set on ESPN"; null with
+ * neither figure. */
+export function lineupSum(
+	box: Pick<LineupBox, 'totals' | 'asSet' | 'gain' | 'swaps'>,
+	host: LeagueHost,
+	done: string | null
+): StripSum | null {
+	if (done === null) return stripSum(box, null, asSetWords(host));
+	if (box.totals.pts === null) return null;
+	return { figure: boxNumber(box.totals.pts), words: `${BOX.pts} ${asSetWords(host)}`, gain: null };
 }
 
 /** The position an opponent's rank is against, in a sentence. A defense has no rank (the API ranks
@@ -310,14 +334,14 @@ export function lineupBox(
 	const sat = satIds(advice.slots);
 	const placed = advice.slots.map((slot): Placed => ({
 		slot,
-		row: boxRow(slot.ours, slotWord(slot.slot), zone, false, now)
+		row: boxRow(slot.ours, slotWord(slot.slot), zone, true, now)
 	}));
 	const ours = placed.map((p) => p.row);
 	const counted = placed.flatMap((p) => (p.slot.no_one_can_play ? [] : [p.row]));
 	const satRows = new Map(
 		advice.slots.flatMap((slot) =>
 			slot.changed && slot.host
-				? [[slot.host.player.host_id, boxRow(slot.host, LINEUP.sit, zone, false, now)] as const]
+				? [[slot.host.player.host_id, boxRow(slot.host, LINEUP.sit, zone, true, now)] as const]
 				: []
 		)
 	);
@@ -330,7 +354,7 @@ export function lineupBox(
 	const bench = advice.bench.map((line): LineupRow => {
 		const out = sat.has(line.player.host_id);
 		return {
-			row: boxRow(line, out ? LINEUP.sit : '', zone, false, now),
+			row: boxRow(line, out ? LINEUP.sit : '', zone, true, now),
 			move: out ? 'out' : null,
 			why: null,
 			idle: false
@@ -353,7 +377,7 @@ export function lineupBox(
 	return {
 		starters,
 		bench,
-		reserve: advice.reserve.map((line) => boxRow(line, '', zone, false, now)),
+		reserve: advice.reserve.map((line) => boxRow(line, '', zone, true, now)),
 		swaps,
 		idle: [
 			...[

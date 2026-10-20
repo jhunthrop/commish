@@ -5,7 +5,14 @@
 	import { sheetTags } from './sheet-tags.ts';
 	import { BOX } from './box/box.ts';
 	import { KICKOFF } from './box/kickoff.ts';
-	import { matchupStarted, nextKickoff, sideBox, type SideBox } from './box/matchup.ts';
+	import {
+		decidedHead,
+		matchupStarted,
+		nextKickoff,
+		sideBox,
+		standingLine,
+		type SideBox
+	} from './box/matchup.ts';
 	import { readCell } from './home/home.ts';
 	import type { LeagueHost, LeagueSync, MatchupSide } from './api.ts';
 	import type { MatchupBox } from './inseason/api.ts';
@@ -70,7 +77,10 @@
 	const mine = $derived(matchup ? boxOf(matchup.mine) : null);
 	const theirs = $derived(matchup?.opponent ? boxOf(matchup.opponent) : null);
 	const lines = $derived([...(mine?.lines ?? []), ...(theirs?.lines ?? [])]);
-	const kickoff = $derived(nextKickoff(lines, now.getTime()));
+	/** The bug's middle, "Decided" while the side behind has nobody left (the API's, Lane 99 B31). */
+	const kickoff = $derived(
+		decidedHead(nextKickoff(lines, now.getTime()), box?.decided === true, started)
+	);
 	/** The read beside the live score (Lane 92, B06), while the game is under way. */
 	const read = $derived(
 		started && kickoff?.head !== KICKOFF.final
@@ -112,6 +122,7 @@
 			{kickoff}
 			{started}
 			{read}
+			standing={standingLine(box, started)}
 		/>
 		{#if sync.week_all_play}
 			<p class="note">
@@ -123,6 +134,7 @@
 			<BoxTable
 				team={teamName(sync, matchup.mine.roster_id)}
 				mine
+				ranked
 				tagsOf={sheetTags}
 				starters={mine.starters}
 				bench={mine.bench}
@@ -134,6 +146,7 @@
 					starters={theirs.starters}
 					bench={theirs.bench}
 					totals={theirs.totals}
+					ranked
 					empty={sync.host === 'ffpc' ? hidden : null}
 				/>
 			{:else if !sync.week_all_play}

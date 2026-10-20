@@ -6,8 +6,8 @@
 	/** The matchup's score bug (Lane 66d): both teams with their avatars on the lit board, each with
 	 * its big figure and its small one under (Lane 92: before the first kickoff its Proj, from it its
 	 * Pts with its projected final under), the week, the game's state and the read beside the live
-	 * score between them. The drafter's side in the accent. A side we hold no opponent for is left
-	 * out. */
+	 * score between them, and under the two scores the API's line on where the member stands (Lane 99,
+	 * B31). The drafter's side in the accent. A side we hold no opponent for is left out. */
 	interface Side extends BugTotals {
 		name: string;
 	}
@@ -21,9 +21,12 @@
 		started: boolean;
 		/** "ESPN 1 min ago" beside a live score, null before kickoff and once final. */
 		read: string | null;
+		/** "Down 14.1 with nobody left, McCaffrey and Kittle playing for them", the API's, null before
+		 * kickoff or without one. */
+		standing?: string | null;
 	}
 
-	let { week, mine, opponent, kickoff, started, read }: Props = $props();
+	let { week, mine, opponent, kickoff, started, read, standing = null }: Props = $props();
 </script>
 
 {#snippet side(s: Side, me: boolean)}
@@ -50,6 +53,7 @@
 		{#if read}<span class="read">{read}</span>{/if}
 	</div>
 	{#if opponent}{@render side(opponent, false)}{/if}
+	{#if standing}<p class="standing">{standing}</p>{/if}
 </section>
 
 <style>
@@ -172,6 +176,18 @@
 		white-space: nowrap;
 	}
 
+	/* Where the member stands, across the board under the two scores (Lane 99, B31). */
+	.standing {
+		grid-column: 1 / -1;
+		margin: 0;
+		padding: var(--s-2) var(--s-4);
+		border-top: 1px solid var(--scoreboard-line);
+		text-align: center;
+		font-size: var(--t-md);
+		font-weight: 600;
+		font-variant-numeric: tabular-nums;
+	}
+
 	/* The read beside the live score: a cell, lit, not the grey line under the league's name. */
 	.mid .read {
 		color: var(--scoreboard-ink);
@@ -215,6 +231,11 @@
 
 		.avatar {
 			display: none;
+		}
+
+		.standing {
+			padding: 6px var(--s-3);
+			font-size: var(--t-sm);
 		}
 
 		.nm b {
