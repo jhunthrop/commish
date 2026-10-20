@@ -49,6 +49,8 @@ export const FRONT = {
 	topPickup: 'Top pickup',
 	/** The head of a live league's card that leads in place of the selected one's (B38). */
 	liveNow: 'Live now',
+	/** The live card's label after its head: "Office League, ESPN". */
+	liveLabel: (league: string, platform: string): string => `${league}, ${platform}`,
 	/** What the changes' figure is, said once in the basis (B39). */
 	gain: 'Gain is what the changes add.',
 	/** A pickup's figure while the roster facts are the league's week (B39). */
@@ -310,14 +312,15 @@ export function leadOf(leagues: readonly WeekLeague[], chosen: string | null): W
 	);
 }
 
-/** A league's game is live at the page's clock (B38): by the bug's one rule (gameHead), a starter of
- * either side has kicked off and not every starter's game is final. */
+/** A league's game is live (B38, fix round 1 HIGH-1): a starter of either side is in play right now,
+ * the API's per-side in_play, and the game not final by the bug's one rule (gameHead) at the page's
+ * clock. Between games (Thursday's final, Sunday's still to come) no side has one in play, so it is
+ * not live; an answer from before the field reads as none in play. */
 export function gameLive(league: Pick<WeekLeague, 'bug'>, now: Date): boolean {
 	const game = league.bug?.game;
 	if (game === undefined) return false;
-	return (
-		gameHead({ state: game.state, next: game.next_kickoff }, now.getTime()).state === 'kicked_off'
-	);
+	const head = gameHead({ state: game.state, next: game.next_kickoff }, now.getTime());
+	return head.state === 'kicked_off' && game.sides.some((side) => (side.in_play ?? 0) > 0);
 }
 
 /** The league whose live card leads the front door ahead of the lead one (B38): the first other

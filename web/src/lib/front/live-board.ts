@@ -29,7 +29,11 @@ export const STRIP_WORDS = {
 		`Over replacement: his projected points above the last starter at his position for ${String(teams)} teams.`,
 	/** Why a row built from the answer has no Tier or GP (B78). */
 	untiered: (label: string): string =>
-		`Tier and GP read "${EMPTY_FIGURE}" for a player outside the top ${String(STRIP_POOL)} of our ${label} board, where they come from.`,
+		`Tier and GP come from our ${label} board's top ${String(STRIP_POOL)}, so a player outside it reads "${EMPTY_FIGURE}".`,
+	/** The strip's head in a scoring: "The top of our half PPR board" (B78). */
+	head: (scoring: string): string => `The top of our ${scoring} board`,
+	/** The strip's head in the scoring nearest the league's rules. */
+	nearestHead: (scoring: string): string => `The top of our board, ${scoring} nearest your rules`,
 	/** Avg beside a projection in the nearest scoring (B78). */
 	leagueAvg: "Avg is in your league's own scoring."
 } as const;
@@ -95,9 +99,9 @@ const SCORING_WORDS: Readonly<Record<Scoring['format'], string>> = {
  * scoring its figures are in, "The top of our half PPR board" for a league that scores exactly so,
  * else as the board says it: "The top of our board, half PPR nearest your rules". */
 export function stripHead(runLabel: string, scoring: Scoring | null): string {
-	if (scoring === null) return `The top of our ${runLabel} board`;
-	if (scoring.league_own) return `The top of our ${SCORING_WORDS[scoring.format]} board`;
-	return `The top of our board, ${SCORING_WORDS[scoring.format]} nearest your rules`;
+	if (scoring === null) return STRIP_WORDS.head(runLabel);
+	const words = SCORING_WORDS[scoring.format];
+	return scoring.league_own ? STRIP_WORDS.head(words) : STRIP_WORDS.nearestHead(words);
 }
 
 /** The strip's footer, each sentence said once (B78): why Tier and GP read empty when a row is built

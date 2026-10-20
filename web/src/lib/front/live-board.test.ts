@@ -152,7 +152,7 @@ void test("a player the run's rows do not hold is drawn from the answer's own li
 	assert.equal(none?.[0]?.season, undefined);
 	// One footer sentence says why Tier and GP read empty, only when a built row is shown.
 	assert.deepEqual(stripFooter(rows, 'PPR', { format: 'ppr', league_own: true }), [
-		'Tier and GP read "--" for a player outside the top 40 of our PPR board, where they come from.'
+		'Tier and GP come from our PPR board\'s top 40, so a player outside it reads "--".'
 	]);
 	assert.deepEqual(stripFooter(rows.slice(1), 'PPR', { format: 'ppr', league_own: true }), []);
 	assert.deepEqual(

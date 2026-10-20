@@ -37,7 +37,7 @@ import { ffpcStandIn } from './ffpc.ts';
 import { afterSundayOf, SUNDAY, sundayOf } from './sunday.ts';
 import { linesOf, recordedMatchups, scoreboardAt } from './scoreboard-at.ts';
 import { inSeason, noWeek } from './member-week.ts';
-import { inTenths } from './tenths.ts';
+import { inTenths, roundTenth } from './tenths.ts';
 import { FIXTURE_CLOCK_VARIABLE, FIXTURE_MONDAY_CLOCK, fixtureClock } from './clock.ts';
 import { stamped, stateAt } from './game-state.ts';
 import {
@@ -276,8 +276,45 @@ function finalGame(
 					...side,
 					played: side.starters,
 					to_play: null,
+					in_play: 0,
 					projected_final: side.points
 				}))
+			}
+		}
+	};
+}
+
+/** The ESPN stand-in's opponent under FIXTURE_LEAD_FINAL (review LOW-5): its own name and score, so
+ * the live card and the selected league's never read as one game. A stand-in, named so. */
+const LIVE_RIVAL = { name: 'Office Rival (stand-in)', points: 12.4 };
+
+function ownOpponent(
+	league: components['schemas']['WeekLeague']
+): components['schemas']['WeekLeague'] {
+	const bug = league.bug;
+	const rival = bug?.game.sides[1];
+	if (bug === null || rival === undefined) return league;
+	return {
+		...league,
+		bug: {
+			...bug,
+			teams: bug.teams.map((team) =>
+				team.roster_id === rival.roster_id ? { ...team, name: LIVE_RIVAL.name } : team
+			),
+			game: {
+				...bug.game,
+				sides: bug.game.sides.map((side) =>
+					side.roster_id === rival.roster_id
+						? {
+								...side,
+								points: roundTenth(side.points + LIVE_RIVAL.points),
+								projected_final:
+									side.projected_final == null
+										? null
+										: roundTenth(side.projected_final + LIVE_RIVAL.points)
+							}
+						: side
+				)
 			}
 		}
 	};
@@ -317,7 +354,9 @@ function memberWeek(): components['schemas']['MemberWeek'] {
 					when
 				)
 			),
-			inSeason(ESPN_DONE, { ...espnWeek, waivers: espnWaivers(null), readAt: at }, when),
+			((espn) => (leadFinal ? ownOpponent(espn) : espn))(
+				inSeason(ESPN_DONE, { ...espnWeek, waivers: espnWaivers(null), readAt: at }, when)
+			),
 			noWeek(
 				NO_TEAM,
 				{ ...base, name: 'Main Event (FFPC stand-in)', host: 'ffpc', phase: 'in_season' },

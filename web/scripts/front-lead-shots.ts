@@ -3,11 +3,14 @@
 // (FIXTURE_LEAD_FINAL=1), the live league's card leading, headed Live now, the selected league in
 // full after it; signed in after opening the ESPN league's page, the switch still the Sleeper
 // league's and no PUT /me/league sent; and signed out, the board strip's heads, tiers and basis and
-// the header's "Updated" stamp. In both themes at 1280 and 390. Exits non-zero on any fault.
+// the header's "Updated" stamp, and at 1280 the system page's tier chips past the ramp's last step
+// (an in-season run draws no tier bands on /board, so the specimen is where tier 8 and 14 show). In both
+// themes at 1280 and 390. Exits non-zero on any fault.
 //
 //   node scripts/front-lead-shots.ts [web origin] [out dir]
 // with the site built with PUBLIC_API_URL naming the fixture API (API_ORIGIN, default
-// http://localhost:8799), started with FIXTURE_LEAD_FINAL=1 FIXTURE_CLOCK=2026-10-20T00:40:00.000Z.
+// http://localhost:8799), started with FIXTURE_LEAD_FINAL=1 FIXTURE_CLOCK=2026-10-20T00:40:00.000Z, and
+// SYSTEM_ORIGIN naming `npm run dev` for the system page's tier chips.
 import { mkdir } from 'node:fs/promises';
 import { chromium, type Page } from 'playwright';
 import { THEME_STORAGE_KEY } from '../src/lib/ui/theme.ts';
@@ -20,6 +23,8 @@ import { FIXTURE_IDS } from './inseason-fixture/ids.ts';
 
 const web = process.argv[2] ?? 'http://localhost:4196';
 const out = process.argv[3] ?? new URL('../screenshots/front-lead/', import.meta.url).pathname;
+/** The system page is dev-only (routes/system): SYSTEM_ORIGIN names a dev server, default the site's. */
+const systemOrigin = process.env.SYSTEM_ORIGIN ?? web;
 const API_ORIGIN = new URL(process.env.API_ORIGIN ?? 'http://localhost:8799').origin;
 await requireFixtureClock(API_ORIGIN, FIXTURE_LIVE_CLOCK);
 
@@ -36,6 +41,9 @@ const SWITCH_LABEL = 'S.U.C.K.';
 /** The ESPN stand-in's name, on its own page. */
 const ESPN_LEAGUE = 'Office League';
 const STAMP = 'Updated';
+/** The system page, whose tier chip specimen runs past the ramp's seven steps (tiers 8 and 14). */
+const SYSTEM = '/system';
+const TIER_CHIP_PART = 'The tier chip';
 const BANNED = [/\bRun of\b/i, /\bstrip\b/i, /as of the run/i];
 
 const faults: string[] = [];
@@ -101,12 +109,23 @@ for (const theme of THEMES) {
 					faults.push(`front-after-${tag}: the live league no longer leads`);
 				}
 				await page.waitForTimeout(SETTLE_MS);
-				if (!phone) {
-					const label = await page.locator('header, .bar').first().innerText();
-					if (!label.includes(SWITCH_LABEL)) faults.push(`front-after-${tag}: the switch changed`);
-				}
+				// The switch's label, in the top bar at every width (the phone's bar draws it too).
+				const label = await page.locator('header').first().innerText();
+				if (!label.includes(SWITCH_LABEL)) faults.push(`front-after-${tag}: the switch changed`);
 				if (puts.length > 0) faults.push(`${tag}: opening a league sent PUT /me/league`);
 				await page.screenshot({ path: `${out}/front-after-league-${tag}.png` });
+			}
+			if (!signedIn && !phone) {
+				// The tier chips past the ramp's last step (fix round 1, HIGH-2).
+				await page.goto(`${systemOrigin}${SYSTEM}`, { waitUntil: 'networkidle' });
+				const part = page.getByText(TIER_CHIP_PART, { exact: true }).first();
+				try {
+					await part.scrollIntoViewIfNeeded({ timeout: READY_TIMEOUT_MS });
+				} catch {
+					faults.push(`tiers-${tag}: no tier chip specimen`);
+				}
+				await page.waitForTimeout(SETTLE_MS);
+				await page.screenshot({ path: `${out}/tiers-${tag}.png` });
 			}
 			await ctx.close();
 		}

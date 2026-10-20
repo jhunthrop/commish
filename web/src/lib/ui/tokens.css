@@ -104,8 +104,8 @@
 	   its own two. The first three carry --bg text, the rest --ink, each pair 4.5:1 or better in both
 	   themes; the label carries the tier number, so the shade is never the only channel. */
 	--tier-1: var(--ink);
-	--tier-2: color-mix(in srgb, var(--ink) 82%, var(--bg));
-	--tier-3: color-mix(in srgb, var(--ink) 66%, var(--bg));
+	--tier-2: color-mix(in srgb, var(--ink) 76%, var(--bg));
+	--tier-3: color-mix(in srgb, var(--ink) 62%, var(--bg));
 	--tier-4: color-mix(in srgb, var(--ink) 38%, var(--bg));
 	--tier-5: color-mix(in srgb, var(--ink) 28%, var(--bg));
 	--tier-6: color-mix(in srgb, var(--ink) 20%, var(--bg));

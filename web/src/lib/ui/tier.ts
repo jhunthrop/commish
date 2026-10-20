@@ -1,13 +1,14 @@
-/** Seven steps of the one ink ramp (tokens.css, B47), tier 1 the full ink. A position with more
- * tiers than steps wraps, and the printed tier number keeps them apart. */
+/** Seven steps of the one ink ramp (tokens.css, B47), tier 1 the full ink. The ramp never wraps: a
+ * position's tiers past the last step share its lightest ink (fix round 1, HIGH-2), and the printed
+ * tier number keeps them apart. */
 export const TIER_HUES = 7;
 
-/** A tier's step on the ramp, 1 to TIER_HUES. */
+/** A tier's step on the ramp, 1 to TIER_HUES, the last for every tier past it. */
 function tierStep(tier: number): number {
 	if (!Number.isInteger(tier) || tier < 1) {
 		throw new RangeError(`A tier is a whole number from 1, got ${tier}.`);
 	}
-	return ((tier - 1) % TIER_HUES) + 1;
+	return Math.min(tier, TIER_HUES);
 }
 
 /** The custom property carrying a tier's shade, for a style:--tier binding. */

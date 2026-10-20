@@ -176,17 +176,36 @@ void test('the lead league is the chosen one, else the first with a week', () =>
 	assert.equal(leadOf([], null), null);
 });
 
-void test('a live league leads ahead of the chosen one only while the chosen one is not live (B38)', () => {
+void test('a live league leads ahead of the chosen one only while a starter of its is in play (B38)', () => {
 	// Monday 7:25 pm Central: the chosen league's week is final, another's game is under way.
 	const monday = new Date('2026-10-20T00:25:00.000Z');
 	const bug = SUCK.bug;
 	assert.ok(bug !== null);
-	const game = (state: 'upcoming' | 'playing' | 'final', next: string | null) => ({
+	/** The game in a state, with each side's starters in play now (the API's in_play); undefined
+	 * leaves the field out, as an older answer does. */
+	const game = (
+		state: 'upcoming' | 'playing' | 'final',
+		next: string | null,
+		inPlay: readonly (number | undefined)[]
+	) => ({
 		...bug,
-		game: { ...bug.game, state, next_kickoff: next }
+		game: {
+			...bug.game,
+			state,
+			next_kickoff: next,
+			sides: bug.game.sides.map((side, i) => {
+				const count = inPlay[i];
+				return count === undefined ? side : { ...side, in_play: count };
+			})
+		}
 	});
-	const chosen: WeekLeague = { ...SUCK, id: 'chosen', bug: game('final', null) };
-	const live: WeekLeague = { ...SUCK, id: 'espn', host: 'espn', bug: game('playing', null) };
+	const chosen: WeekLeague = { ...SUCK, id: 'chosen', bug: game('final', null, [0, 0]) };
+	const live: WeekLeague = {
+		...SUCK,
+		id: 'espn',
+		host: 'espn',
+		bug: game('playing', null, [0, 2])
+	};
 	const idle: WeekLeague = { ...SUCK, id: 'ffpc', bug: null };
 	const leagues = [idle, chosen, live];
 	const lead = leadOf(leagues, 'chosen');
@@ -198,15 +217,23 @@ void test('a live league leads ahead of the chosen one only while the chosen one
 	assert.equal(liveLeadOf(leagues, lead, monday)?.id, 'espn');
 	// The chosen league live too: it leads alone.
 	assert.equal(liveLeadOf(leagues, live, monday), null);
-	// Upcoming by the API, but its kickoff past at the page's clock: kicked off, by gameHead's rule.
-	const lagging: WeekLeague = {
+	// Friday between games: playing by the API (Thursday's starter final), Sunday's still to come,
+	// nobody in play. Never Live now (fix round 1, HIGH-1).
+	const friday = new Date('2026-10-16T15:00:00.000Z');
+	const gap: WeekLeague = {
 		...live,
-		bug: game('upcoming', '2026-10-20T00:15:00.000Z')
+		bug: game('playing', '2026-10-18T17:00:00.000Z', [0, 0])
 	};
-	assert.equal(liveLeadOf([chosen, lagging], chosen, monday)?.id, 'espn');
-	const before: WeekLeague = { ...live, bug: game('upcoming', '2026-10-20T01:15:00.000Z') };
-	assert.equal(liveLeadOf([chosen, before], chosen, monday), null);
-	assert.equal(liveLeadOf([chosen, { ...live, bug: game('final', null) }], chosen, monday), null);
+	assert.equal(gameLive(gap, friday), false);
+	assert.equal(liveLeadOf([chosen, gap], chosen, friday), null);
+	// An answer from before in_play reads as none in play.
+	const older: WeekLeague = { ...live, bug: game('playing', null, [undefined, undefined]) };
+	assert.equal(liveLeadOf([chosen, older], chosen, monday), null);
+	// Final at the page's clock, whatever the count: never live.
+	assert.equal(
+		liveLeadOf([chosen, { ...live, bug: game('final', null, [0, 2]) }], chosen, monday),
+		null
+	);
 	assert.equal(liveLeadOf([], null, monday), null);
 	assert.equal(FRONT.liveNow, 'Live now');
 });

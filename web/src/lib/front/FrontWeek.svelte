@@ -115,7 +115,7 @@
 					href={live.matchupHref}
 					size="lg"
 					flag={FRONT.liveNow}
-					label="{live.name}, {live.platform}"
+					label={FRONT.liveLabel(live.name, live.platform)}
 				>
 					{#snippet foot()}<span class="open">{FRONT.matchup}</span>{/snippet}
 				</BugCard>
