@@ -4,6 +4,7 @@
  * the run's figures, said with the run's time beside them. Pure, so the tests read every figure and
  * word the strip prints. */
 import { timeOfDay, zoneWord } from '#lib/format/clock.ts';
+import { EMPTY_FIGURE } from '#lib/format/empty.ts';
 import type { BasisPart } from '#lib/run/board-basis.ts';
 import type { BoardRowView } from '#lib/run/schema.ts';
 import type { components } from '#lib/api/types.ts';
@@ -19,12 +20,31 @@ export const STRIP_POOL = 40;
 /** The clock a prerendered page says the run's time on, before the page knows the reader's. */
 export const BUILD_ZONE = 'America/Chicago';
 
-/** "Projected and Over repl. as of the run, 8:50 am Central.": the run's figures with its time. */
+/** Every word the strip prints that is not a player's, a figure or the API's. */
+export const STRIP_WORDS = {
+	/** "Projected and Over replacement updated 8:50 am Central.": the run's figures with its time. */
+	updated: (at: string): string => `Projected and Over replacement updated ${at}.`,
+	/** What Over replacement counts, said once under the heads (B46). */
+	overReplacement: (teams: number): string =>
+		`Over replacement: his projected points above the last starter at his position for ${String(teams)} teams.`,
+	/** Why a row built from the answer has no Tier or GP (B78). */
+	untiered: (label: string): string =>
+		`Tier and GP read "${EMPTY_FIGURE}" for a player outside the top ${String(STRIP_POOL)} of our ${label} board, where they come from.`,
+	/** Avg beside a projection in the nearest scoring (B78). */
+	leagueAvg: "Avg is in your league's own scoring."
+} as const;
+
+/** "Projected and Over replacement updated 8:50 am Central.": the run's figures with its time. */
 export function runStampPart(refreshedAt: string, zone: string): BasisPart {
 	return {
-		text: `Projected and Over repl. as of the run, ${timeOfDay(refreshedAt, zone)} ${zoneWord(zone)}.`,
+		text: STRIP_WORDS.updated(`${timeOfDay(refreshedAt, zone)} ${zoneWord(zone)}`),
 		phone: true
 	};
+}
+
+/** What Over replacement counts, for the shape the figures are for (B46). */
+export function overReplacementPart(teams: number): BasisPart {
+	return { text: STRIP_WORDS.overReplacement(teams), phone: true };
 }
 
 /** The shape the live figures are for: "for 12 teams", or in a league "for 12 teams, your league's
@@ -71,19 +91,41 @@ const SCORING_WORDS: Readonly<Record<Scoring['format'], string>> = {
 	standard: 'standard'
 };
 
-/** The strip's head (review R1-M2): the run's "The top of our PPR board", the same on a live answer
- * in PPR the league scores exactly, and otherwise the scoring the figures are in, as the board says
- * it: "The top of our board, half PPR nearest your rules". */
+/** The strip's head (review R1-M2, B78): the run's "The top of our PPR board"; on a live answer the
+ * scoring its figures are in, "The top of our half PPR board" for a league that scores exactly so,
+ * else as the board says it: "The top of our board, half PPR nearest your rules". */
 export function stripHead(runLabel: string, scoring: Scoring | null): string {
-	if (scoring === null || (scoring.format === 'ppr' && scoring.league_own)) {
-		return `The top of our ${runLabel} board`;
-	}
+	if (scoring === null) return `The top of our ${runLabel} board`;
+	if (scoring.league_own) return `The top of our ${SCORING_WORDS[scoring.format]} board`;
 	return `The top of our board, ${SCORING_WORDS[scoring.format]} nearest your rules`;
 }
 
+/** The strip's footer, each sentence said once (B78): why Tier and GP read empty when a row is built
+ * from the answer, and that Avg is in the league's own scoring when the projection's is the nearest. */
+export function stripFooter(
+	rows: readonly StripRow[],
+	runLabel: string,
+	scoring: Scoring | null
+): string[] {
+	return [
+		...(rows.some((row) => row.untiered === true) ? [STRIP_WORDS.untiered(runLabel)] : []),
+		...(scoring !== null && !scoring.league_own ? [STRIP_WORDS.leagueAvg] : [])
+	];
+}
+
+/** His season as a strip row prints it: games null where the run does not hold him (B78). */
+export interface StripSeason {
+	games: number | null;
+	pointsPerGame: number | null;
+}
+
 /** A strip row: the run's row, or one built from the answer's own line, which the run's top rows do
- * not hold (a two-quarterback league's quarterbacks, review R1-M1): it has no run tier. */
-export type StripRow = BoardRowView & { untiered?: boolean };
+ * not hold (a two-quarterback league's quarterbacks, review R1-M1): it has no run tier and no run
+ * games, and its Avg is the answer's. */
+export type StripRow = Omit<BoardRowView, 'season'> & {
+	season?: StripSeason;
+	untiered?: boolean;
+};
 
 type OrderRow = OrderAdvice['rows'][number];
 
@@ -95,9 +137,9 @@ function liveSeason(run: BoardRowView, line: OrderRow['line']): BoardRowView['se
 	return { games: run.season.games, pointsPerGame: line.season_avg };
 }
 
-/** A row the run's top rows do not hold, from the answer's line: his name, club, face, page and the
- * answer's figures, no tier, no ADP and no season columns (they are the run's). Null without a board
- * id or a page to link. */
+/** A row the run's top rows do not hold, from the answer's line: his name, club, face, page, the
+ * answer's figures and his Avg (B78), no tier, no ADP and no games (they are the run's). Null without
+ * a board id or a page to link. */
 function builtRow(row: OrderRow, projected: number, vor: number, teams: number): StripRow | null {
 	const { player, slug, headshot, position_rank: positionRank } = row.line;
 	if (player.board_id === null || slug === null) return null;
@@ -121,6 +163,9 @@ function builtRow(row: OrderRow, projected: number, vor: number, teams: number):
 		median: null,
 		ceiling: null,
 		tier: 1,
+		...(row.line.season_avg === null
+			? {}
+			: { season: { games: null, pointsPerGame: row.line.season_avg } }),
 		untiered: true
 	};
 }

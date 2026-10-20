@@ -7,14 +7,14 @@ export interface AbsentWords {
 	line: string;
 }
 
-/** "Half PPR is not on this run" / "Stand-in run of Oct 13 ranks PPR only." */
+/** "Half PPR is not on our board yet" / "Our board ranks PPR only. Updated Oct 13." */
 export function absentWords(
 	format: string,
 	stamp: string,
 	carried: readonly string[]
 ): AbsentWords {
 	return {
-		title: `${format} is not on this run`,
-		line: `${stamp} ranks ${listWords(carried)} only.`
+		title: `${format} is not on our board yet`,
+		line: `Our board ranks ${listWords(carried)} only. ${stamp}.`
 	};
 }

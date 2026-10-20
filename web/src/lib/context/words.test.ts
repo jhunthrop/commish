@@ -88,7 +88,7 @@ void test('a TE premium league on the PPR board says it in plain words, and wher
 void test('a format the run does not carry says so and names what the page is in', () => {
 	assert.equal(
 		contextNote(league({ scoring: 'half_ppr', format: 'half_ppr' }), 'ppr', false)?.text,
-		'Your league scores half PPR. This run has no half PPR board, so this board is PPR.'
+		'Your league scores half PPR. We have no half PPR board yet, so this board is PPR.'
 	);
 });
 

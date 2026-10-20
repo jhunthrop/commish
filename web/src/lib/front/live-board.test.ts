@@ -13,8 +13,10 @@ import {
 	liveBasis,
 	liveLeadPart,
 	liveStrip,
+	overReplacementPart,
 	runStampPart,
 	shapeWords,
+	stripFooter,
 	stripHead
 } from './live-board.ts';
 
@@ -142,9 +144,17 @@ void test("a player the run's rows do not hold is drawn from the answer's own li
 		[first.id, first.slug, first.ourRank, first.projected, first.vor, first.untiered],
 		['allen', 'allen', 1, 280.4, 160.2, true]
 	);
-	// No run tier, ADP or season columns for him: they are the run's.
+	// No run tier, ADP or games for him: they are the run's. His Avg is the answer's (B78).
 	assert.equal(first.adp, null);
-	assert.equal(first.season, undefined);
+	assert.deepEqual(first.season, { games: null, pointsPerGame: 30.7 });
+	const unplayed = { ...qb, line: { ...qb.line, season_avg: null } };
+	const none = liveStrip(POOL, { ...ANSWER, rows: [unplayed, ...ANSWER.rows.slice(0, 3)] }, 12, 4);
+	assert.equal(none?.[0]?.season, undefined);
+	// One footer sentence says why Tier and GP read empty, only when a built row is shown.
+	assert.deepEqual(stripFooter(rows, 'PPR', { format: 'ppr', league_own: true }), [
+		'Tier and GP read "--" for a player outside the top 40 of our PPR board, where they come from.'
+	]);
+	assert.deepEqual(stripFooter(rows.slice(1), 'PPR', { format: 'ppr', league_own: true }), []);
 	assert.deepEqual(
 		rows.slice(1).map((r) => r.untiered),
 		[undefined, undefined, undefined]
@@ -171,6 +181,20 @@ void test("the live Avg is the answer's, in the league's scoring, beside the run
 void test("the strip's head names the scoring its figures are in (review R1-M2)", () => {
 	assert.equal(stripHead('PPR', null), 'The top of our PPR board');
 	assert.equal(stripHead('PPR', { format: 'ppr', league_own: true }), 'The top of our PPR board');
+	// A league that scores exactly half PPR or standard reads its own board's name (B78).
+	assert.equal(
+		stripHead('PPR', { format: 'half_ppr', league_own: true }),
+		'The top of our half PPR board'
+	);
+	assert.equal(
+		stripHead('PPR', { format: 'standard', league_own: true }),
+		'The top of our standard board'
+	);
+	// Avg is in the league's own scoring: the footer says so when the head names the nearest.
+	assert.deepEqual(stripFooter([], 'PPR', { format: 'half_ppr', league_own: false }), [
+		"Avg is in your league's own scoring."
+	]);
+	assert.deepEqual(stripFooter([], 'PPR', null), []);
 	assert.equal(
 		stripHead('PPR', { format: 'half_ppr', league_own: false }),
 		'The top of our board, half PPR nearest your rules'
@@ -201,9 +225,19 @@ void test('a figure the answer lacks, or a short answer, keeps the run strip', (
 
 void test("the signed-out strip says the run's time beside its figures", () => {
 	assert.deepEqual(runStampPart(RUN_AT, ZONE), {
-		text: 'Projected and Over repl. as of the run, 8:50 am Central.',
+		text: 'Projected and Over replacement updated 8:50 am Central.',
 		phone: true
 	});
+	// "Run" is never the page's word (B53).
+	assert.doesNotMatch(runStampPart(RUN_AT, ZONE).text, /\brun\b/i);
+});
+
+void test('the basis says once what Over replacement counts, for the shape (B46)', () => {
+	assert.equal(
+		overReplacementPart(12).text,
+		'Over replacement: his projected points above the last starter at his position for 12 teams.'
+	);
+	assert.match(overReplacementPart(10).text, /for 10 teams\.$/);
 });
 
 void test("the live strip's lead says its weeks, the shape and when it was read", () => {

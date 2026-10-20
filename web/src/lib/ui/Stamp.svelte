@@ -1,6 +1,6 @@
 <script lang="ts">
 	interface Props {
-		/** What the page's numbers are as of: "Run of Oct 12". */
+		/** What the page's numbers are as of: "Updated Oct 12". */
 		text: string;
 	}
 

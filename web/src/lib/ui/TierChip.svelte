@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { tierColor } from './tier.ts';
+	import { tierColor, tierInk } from './tier.ts';
 
 	interface Props {
 		/** Tier within the player's position, 1 is the top. */
@@ -13,7 +13,7 @@
 	let { tier, long = false, bare = false }: Props = $props();
 </script>
 
-<span class="tier-chip" class:long style:--tier={tierColor(tier)}
+<span class="tier-chip" class:long style:--tier={tierColor(tier)} style:--tier-ink={tierInk(tier)}
 	>{long ? `Tier ${String(tier)}` : bare ? String(tier) : `T${String(tier)}`}</span
 >
 

@@ -33,13 +33,14 @@
 					onclick={() => onsort(key)}
 					>{#if head.short}<span class="full">{head.text}</span><span class="short"
 							>{head.short}</span
-						>{:else}{head.text}{/if}</button
+						>{:else}{head.text}{/if}{#if head.note}<span class="note">{head.note}</span
+						>{/if}</button
 				>
 			{:else if head.text !== ''}
 				<span title={head.title}
 					>{#if head.short}<span class="full">{head.text}</span><span class="short"
 							>{head.short}</span
-						>{:else}{head.text}{/if}</span
+						>{:else}{head.text}{/if}{#if head.note}<span class="note">{head.note}</span>{/if}</span
 				>
 			{/if}
 		</span>
@@ -114,6 +115,14 @@
 
 	.short {
 		display: none;
+	}
+
+	/* What the head counts, under it in plain case: Tier's "by position". */
+	.note {
+		display: block;
+		font-weight: 500;
+		text-transform: none;
+		letter-spacing: 0;
 	}
 
 	@media (min-width: 961px) and (max-width: 1439px) {

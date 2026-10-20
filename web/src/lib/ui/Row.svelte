@@ -6,7 +6,6 @@
 	import type { Snippet } from 'svelte';
 	import type { ShownMark } from '#lib/context/held-words.ts';
 	import { HELD_FRAMING, framedVorCell, type RowFraming } from '#lib/run/row-framing.ts';
-	import type { IndexSeason } from '#lib/run/schema.ts';
 	import type { StatusView } from '#lib/run/status-view.ts';
 	import type { BoardPlayer, MarketPosition, RangeScale } from '#lib/types/player.ts';
 	import type { BoardColumns } from './board-columns.ts';
@@ -50,8 +49,9 @@
 		action?: Snippet;
 		/** Marks on his line from the member's own sheet (its tags), drawn once the sheet is in. */
 		marks?: Snippet;
-		/** His season so far, once the run is past the season's first kickoff: the GP and A game columns. */
-		season?: IndexSeason;
+		/** His season so far, once the run is past the season's first kickoff: the GP and A game columns.
+		 * Games are null on a row the run does not hold (the front door's, B78). */
+		season?: { games: number | null; pointsPerGame: number | null };
 		/** The league's mark, with the component that draws it (HeldMark): yours tints the row. */
 		held?: ShownMark | null;
 		/** How the row frames his rank against the drafts (run/row-framing.ts): the tint it keeps. */
@@ -182,7 +182,7 @@
 			class:gain={tone === 'gain'}
 			class:loss={tone === 'loss'}>{gapText(gap)}</span
 		>{/if}
-	{#if cell.gp}<span class="n quiet {cell.gp}" class:absent={season === undefined}
+	{#if cell.gp}<span class="n quiet {cell.gp}" class:absent={(season?.games ?? null) === null}
 			>{season?.games ?? EMPTY_FIGURE}</span
 		>{/if}
 	{#if cell.avg}<span
@@ -233,6 +233,12 @@
 		white-space: nowrap;
 	}
 
+	/* His projected points: the row's biggest figure (B46), the one its basis is about. */
+	.c-proj {
+		font-size: var(--t-row-name);
+		font-weight: 700;
+	}
+
 	.quiet,
 	.rk {
 		color: var(--ink-2);
@@ -260,11 +266,13 @@
 		align-items: center;
 		justify-content: flex-end;
 		min-width: 100%;
-		height: 32px;
+		height: 26px;
 		padding: 0 var(--s-2);
 		border-radius: var(--r-sm);
 		color: var(--heat-ink);
-		font-weight: 600;
+		/* A step under Projected, so the tint never reads as his points (B46). */
+		font-size: var(--t-sm);
+		font-weight: 500;
 	}
 
 	.heat-1 {
@@ -437,7 +445,7 @@
 		}
 
 		.tile {
-			height: 30px;
+			height: 26px;
 			padding: 0 6px;
 		}
 

@@ -29,8 +29,10 @@
 		liveBasis,
 		liveLeadPart,
 		liveStrip,
+		overReplacementPart,
 		runStampPart,
 		shapeWords,
+		stripFooter,
 		stripHead,
 		type StripRow
 	} from '#lib/front/live-board.ts';
@@ -85,7 +87,12 @@
 	const runStamp = $derived(
 		format.refreshedAt === undefined ? null : runStampPart(format.refreshedAt, zone)
 	);
-	let liveRead = $state<{ rows: StripRow[]; basis: BasisPart[]; head: string } | null>(null);
+	let liveRead = $state<{
+		rows: StripRow[];
+		basis: BasisPart[];
+		head: string;
+		footer: string[];
+	} | null>(null);
 	$effect(() => {
 		const league = siteContext.league;
 		if (!siteContext.signedIn || format.rosFromWeek === undefined) {
@@ -113,8 +120,9 @@
 						? null
 						: {
 								rows,
-								basis: liveBasis(page.basis, lead),
-								head: stripHead(format.label, answer.projection_scoring)
+								basis: [...liveBasis(page.basis, lead), overReplacementPart(teams)],
+								head: stripHead(format.label, answer.projection_scoring),
+								footer: stripFooter(rows, format.label, answer.projection_scoring)
 							};
 			})
 			.catch(() => {
@@ -127,8 +135,13 @@
 	const stripRows = $derived<StripRow[]>(liveRead?.rows ?? page.rows);
 	const stripTitle = $derived(liveRead?.head ?? stripHead(format.label, null));
 	const stripBasis = $derived(
-		liveRead?.basis ?? (runStamp === null ? page.basis : [...page.basis, runStamp])
+		liveRead?.basis ?? [
+			...page.basis,
+			...(runStamp === null ? [] : [runStamp]),
+			overReplacementPart(format.teams)
+		]
 	);
+	const stripNotes = $derived(liveRead?.footer ?? []);
 
 	/** A member who follows a league is sent back to the one selected in the shell; anyone
 	 * else to follow one. */
@@ -223,6 +236,11 @@
 						{/each}
 					</BoardTable>
 				</div>
+				{#if stripNotes.length > 0}
+					<div class="notes">
+						{#each stripNotes as note (note)}<p>{note}</p>{/each}
+					</div>
+				{/if}
 				<div class="more">
 					<Quiet href={links.board(format.id)}>All {page.boardCount}</Quiet>
 					<Quiet href={links.adp(format.id)}>ADP</Quiet>
@@ -278,6 +296,14 @@
 		display: flex;
 		flex-direction: column;
 		gap: var(--s-3);
+	}
+
+	/* The strip's footer: why a cell reads empty, which scoring Avg is in (B78). */
+	.notes p {
+		margin: 0;
+		font-size: var(--t-xs);
+		line-height: 1.45;
+		color: var(--ink-2);
 	}
 
 	.more {
