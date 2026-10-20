@@ -2,6 +2,7 @@
 // the basis, each word from the API's answer alone. Run with `npm test`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { WEEK_DONE } from '../../../scripts/inseason-fixture/sunday.ts';
 import { bannedPattern } from '#lib/format/copy-guard.ts';
 import type { components } from '#lib/api/types.ts';
 import {
@@ -12,6 +13,7 @@ import {
 	nudgeOf,
 	rosterAside,
 	readWords,
+	turnedWeek,
 	weekBasis,
 	type ScreenHref,
 	type WeekLeague
@@ -226,7 +228,7 @@ void test('each chip names the fact and opens the screen that acts on it', () =>
 			[
 				'Questionable',
 				'Rome Odunze',
-				'WR, CHI, a starter. Listed Fri 4:00 pm',
+				'WR, CHI, a starter. Read Fri 4:00 pm',
 				'Lineup',
 				'/league/suck/start'
 			],
@@ -250,6 +252,29 @@ void test('each chip names the fact and opens the screen that acts on it', () =>
 	assert.deepEqual(
 		starterBye.map((c) => [c.line, c.go]),
 		[['TE, DET, a starter on bye', 'Lineup']]
+	);
+});
+
+void test("once the lineup has played its week the chips are the next week's, and say so (Lane 95)", () => {
+	const turned = { ...SUCK, chips_week: 7 };
+	assert.equal(turnedWeek(turned), 7);
+	assert.equal(turnedWeek({ ...SUCK, chips_week: 6 }), null);
+	// An answer from before the field reads as the league's week.
+	assert.equal(turnedWeek(SUCK), null);
+	assert.equal(frontLeague(turned, href, NOW, ZONE).chipsWeek, 7);
+	assert.equal(rosterAside(2, 7), 'Two facts for week 7. Each opens the screen that acts on it.');
+	assert.match(
+		weekBasis(turned, false, ZONE)[1] ?? '',
+		/The roster facts are for week 7: a pickup goes by Gain/
+	);
+	assert.doesNotMatch(weekBasis(turned, false, ZONE)[1] ?? '', /he adds this week/);
+	assert.deepEqual(
+		chipsOf(turned, href, ZONE, NOW).map((c) => c.line),
+		[
+			'WR, CHI, a starter. Read Fri 4:00 pm',
+			'TE, DET. No TE of yours plays in week 7',
+			'WR, HOU. +1.8 Proj in week 7'
+		]
 	);
 });
 
@@ -317,9 +342,11 @@ void test('the roster head counts its chips, and each other league carries its c
 void test('the copy guard: no em-dash, semicolon, platform word or betting word in any line', () => {
 	const view = frontLeague(SUCK, href, NOW, ZONE);
 	const said = [
-		...Object.values(FRONT),
+		...Object.values(FRONT).filter((v) => typeof v === 'string'),
+		FRONT.turnedPickup(7),
 		...weekBasis(SUCK, true, ZONE),
 		rosterAside(2),
+		rosterAside(2, 7),
 		...view.chips.flatMap((c) => [c.label, c.line]),
 		view.first?.words ?? '',
 		view.nudge?.asSet ?? ''
@@ -330,8 +357,13 @@ void test('the copy guard: no em-dash, semicolon, platform word or betting word 
 });
 
 void test('a finished week on the front door reads Final with the API sentence and no verb (Lane 85)', () => {
-	const done = "Every starter's game is final, so week 6 is over.";
-	const view = frontLeague({ ...SUCK, lineup: { ...LINEUP, week_done: done } }, href, NOW, ZONE);
+	const done = WEEK_DONE;
+	const view = frontLeague(
+		{ ...SUCK, lineup: { ...LINEUP, week_done: done, week_done_state: 'final' } },
+		href,
+		NOW,
+		ZONE
+	);
 	assert.ok(view.nudge);
 	assert.equal(view.nudge.title, 'Final');
 	assert.equal(view.nudge.done, done);
@@ -340,4 +372,25 @@ void test('a finished week on the front door reads Final with the API sentence a
 	assert.deepEqual(view.nudge.swaps, []);
 	assert.equal(view.changes, 'Final');
 	assert.equal(frontLeague(SUCK, href, NOW, ZONE).nudge?.done, null);
+});
+
+void test('the front door says Locked, never Final, while the matchup still plays (Lane 91)', () => {
+	const locked = frontLeague(
+		{ ...SUCK, lineup: { ...LINEUP, week_done: WEEK_DONE, week_done_state: 'locked' } },
+		href,
+		NOW,
+		ZONE
+	);
+	assert.equal(locked.nudge?.title, 'Locked');
+	assert.equal(locked.nudge.done, WEEK_DONE);
+	assert.equal(locked.nudge.verb, null);
+	assert.equal(locked.changes, 'Locked');
+	// The previous API's answer, the sentence with no state, reads Final as it did.
+	const previous = frontLeague(
+		{ ...SUCK, lineup: { ...LINEUP, week_done: WEEK_DONE } },
+		href,
+		NOW,
+		ZONE
+	);
+	assert.equal(previous.nudge?.title, 'Final');
 });

@@ -43,6 +43,12 @@ type Designation struct {
 	// reaches the oldest capture read (we do not know when it began). The
 	// board route and the in-season screens both read it dated (Lane 66n).
 	Since *time.Time
+	// Listed is the first capture of his unbroken run under this status,
+	// any status (WithSince): when the provider listed him so, a week's
+	// designation too. Nil for a run that reaches the oldest capture read,
+	// or an undated read. The in-season screens tell by it whether a week's
+	// designation came before or after his club's last game (Lane 95).
+	Listed *time.Time
 }
 
 // Status is the designation in the contract's words, "" for a code we
@@ -268,14 +274,13 @@ type RunKey struct {
 	Status   string
 }
 
-// SeasonRuns is, for each player the by-date capture at newest lists
-// under a season-long status, the first capture of his unbroken run
-// under it, from the captures at or before newest in the window. A run
+// DesignationRuns is, for each player the by-date capture at newest lists
+// under any status, the first capture of his unbroken run under it, from the captures at or before newest in the window. A run
 // that reaches the window's oldest capture is left out (no date). A
 // capture whose list does not read, or that falls below the floor, is
 // skipped, never a break in a run.
-func (s *PGSource) SeasonRuns(ctx context.Context, newest time.Time) (map[RunKey]time.Time, error) {
-	codes, statuses := seasonLongCodes()
+func (s *PGSource) DesignationRuns(ctx context.Context, newest time.Time) (map[RunKey]time.Time, error) {
+	codes, statuses := runCodes()
 	query := `with listed_caps as (
   select payload, captured_at, (
     select count(distinct btrim(e->>'playerID')) from jsonb_array_elements(payload->'injList') as e
@@ -334,12 +339,23 @@ func Newest(designations map[string]Designation) time.Time {
 	return at
 }
 
-// WithSince is the designations with each season-long one dated by its
-// run; the map handed in is not changed.
+// WithSince is the designations with each one's run start as Listed, and
+// each season-long one dated by it as Since; the map handed in is not
+// changed.
 func WithSince(designations map[string]Designation, runs map[RunKey]time.Time) map[string]Designation {
 	out := make(map[string]Designation, len(designations))
 	for id, d := range designations {
-		if since, ok := runs[RunKey{id, d.Status()}]; ok && d.SeasonLong() {
+		since, ok := runs[RunKey{id, d.Status()}]
+		if !ok {
+			out[id] = d
+			continue
+		}
+		listed := since
+		d.Listed = &listed
+		// Since dates the statuses that are season-long by their code alone,
+		// as before the run read took every status: an out the note makes
+		// season-long began its run as a week's out, so its start is no since.
+		if d.SeasonLong() && SeasonLong(d.Status(), "") {
 			d.Since = &since
 		}
 		out[id] = d

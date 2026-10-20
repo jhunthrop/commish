@@ -2871,6 +2871,13 @@ export interface components {
 			 * @description when his unbroken run under a season-long status began, the first capture that lists it (boards.WithSince, the nightly's designations.json since); null for a week's designation, the host's own IR mark, or a run older than the captures read. The site's status chip says it ("IR since Sep 28") and keeps the read for the basis
 			 */
 			since?: string | null;
+			/**
+			 * Format: date-time
+			 * @description when the provider first listed him under this status, any status (the run's start); null when the read could not date it; absent from an older answer
+			 */
+			listed?: string | null;
+			/** @description on a page addressing the week after the platform's (Lane 95): a week's designation listed no later than his club's last game, or undated, so still listed but from before that game; the site says it with its listing date ("Out, listed Oct 12"); absent otherwise */
+			carried_over?: boolean;
 		};
 		GamePoints: {
 			week: number;
@@ -2924,6 +2931,11 @@ export interface components {
 		 * @enum {string}
 		 */
 		GameState: 'upcoming' | 'kicked_off' | 'final';
+		/**
+		 * @description the matchup's state once the member's starters have all played: final when the matchup's game is final by the one game-state rule (every starter on both sides final), or the member has no opponent this week; locked while any starter on either side still has a game to play, nothing left to set
+		 * @enum {string}
+		 */
+		WeekDoneState: 'locked' | 'final';
 		/** @description the game's expected score, the consensus of the hourly capture's newest read before kickoff; a read more than six hours before kickoff (or before now) gives way to the game table's newest weekly read, with its own read time */
 		GameTotal: {
 			/**
@@ -3189,8 +3201,10 @@ export interface components {
 			/** @description one sentence under the verb when we cannot open the host's page ("Make this change on Yahoo. We cannot open that page for you yet."), null when the url opens it */
 			host_note: string | null;
 			moves: components['schemas']['LineupMoves'];
-			/** @description the sentence once every starter's game this week is final ("Every starter's game is final, so week 6 is over."): no change is left to make, so the screen says it in place of the changes and the verb; null while any starter's game is still to come or under way, or absent from an older answer */
+			/** @description the sentence once every starter of the member's with a game this week has it final, a bye starter aside ("Every starter of yours has played, so nothing is left to set."): it says the lineup, never the week, and stands in place of the changes and the verb; null while any starter's game is still to come or under way, or absent from an older answer */
 			week_done?: string | null;
+			/** @description present whenever week_done is, null otherwise or absent from an older answer */
+			week_done_state?: components['schemas']['WeekDoneState'] | null;
 		};
 		BoxStarter: {
 			/** @enum {string} */
@@ -3284,6 +3298,8 @@ export interface components {
 			phase: components['schemas']['LeaguePhase'];
 			/** @description the league's current week, 0 when it has none or the read failed */
 			week: number;
+			/** @description the week the chips address (Lane 95, the action screens' week): week, or the week after once every starter of the member's with a game has kicked off or is final; absent from an older answer */
+			chips_week?: number;
 			/**
 			 * Format: date-time
 			 * @description the league's last host read
@@ -3332,8 +3348,10 @@ export interface components {
 			gain: number | null;
 			/** @description each change, in the league's slot order */
 			swaps: components['schemas']['WeekSwap'][];
-			/** @description the Lineup's own week_done sentence (words.go WeekDoneWords) once every starter's game is final, which the front door says in place of the changes and the verb; null before, or absent from an older answer */
+			/** @description the Lineup's own week_done sentence (words.go WeekDoneWords) once every starter of the member's has played, which the front door says in place of the changes and the verb; null before, or absent from an older answer */
 			week_done?: string | null;
+			/** @description the Lineup's own week_done_state, present whenever week_done is, null otherwise or absent from an older answer */
+			week_done_state?: components['schemas']['WeekDoneState'] | null;
 		};
 		WeekSwap: {
 			/** @enum {string} */
@@ -3544,9 +3562,17 @@ export interface components {
 			team: string | null;
 		};
 		WaiverAdvice: {
+			/** @description the platform's current week, the week a claim names */
 			week: number;
+			/** @description the week the page addresses (Lane 95): week, or the week after once every starter of the member's with a game has kicked off or is final; the rows' facts, Proj and pickups are that week's; absent from an older answer */
+			for_week?: number;
 			/**
-			 * @description the order the page's rows and strip are in, decided over the full page's rows and the answer's own by each row's game state (gameStateAt): week (the strip by this week's Proj gain, the rows as the search ranks them) while no row's add or drop has kicked off; season_gain once any has (the rows by the season Gain, every week figure null, the strip the first row worth making); a page narrowed to one position or focused on a player takes season_gain whenever the full page does
+			 * Format: date-time
+			 * @description when for_week's published projection is first captured (its first kickoff less the capture's lead), set only while none is read for it; null otherwise, absent from an older answer
+			 */
+			projection_arrives_at?: string | null;
+			/**
+			 * @description the order the page's rows and strip are in, decided over the full page's rows and the answer's own by each row's game state (gameStateAt): week (the strip by this week's Proj gain, the rows as the search ranks them) while no row's add or drop has kicked off; season_gain once any has (the rows by the season Gain, every week figure null, the strip the first row worth making); a page narrowed to one position or focused on a player takes season_gain whenever the full page does; season_gain too while for_week's published projection is not read (Lane 95), there being no Proj to order the week by
 			 * @enum {string}
 			 */
 			pickup_order: 'week' | 'season_gain';
@@ -3768,7 +3794,15 @@ export interface components {
 			answered_at: string | null;
 		};
 		TradeAdvice: {
+			/** @description the platform's current week */
 			week: number;
+			/** @description the week the page addresses (Lane 95): week, or the week after once every starter of the member's with a game has kicked off or is final; the rows' facts and Proj changes are that week's; absent from an older answer */
+			for_week?: number;
+			/**
+			 * Format: date-time
+			 * @description when for_week's published projection is first captured (its first kickoff less the capture's lead), set only while none is read for it; null otherwise, absent from an older answer
+			 */
+			projection_arrives_at?: string | null;
 			/** @description the trade builder's own line under its scoreboard, shown before its first answer (TradeCheck.basis says the same) */
 			check_basis: string;
 			/** @description what the opened rows' points a game is, said only while a trade is opened or the builder is open; empty when no player shown carries the figure */

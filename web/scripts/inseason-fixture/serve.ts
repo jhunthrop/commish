@@ -44,6 +44,7 @@ import { weekOrderAnswer, weekPosition, type WeekOrderStates } from './week-orde
 import { tradeChecker } from './trade-check.ts';
 import { tradesAtClock, waiversAtClock } from './waivers-at.ts';
 import { finalWords, titleWeekHorizon } from './week.ts';
+import { lineupSpent, TURNED_WEEK, turnedLineup, turnedTrades, turnedWaivers } from './turn.ts';
 
 const PORT = Number(process.env.PORT ?? 8799);
 /** The fixture's clock: the real one, or the shots' week clock (FIXTURE_CLOCK=2026-10-17T17:00:00.000Z,
@@ -228,7 +229,18 @@ function memberWeek(): components['schemas']['MemberWeek'] {
 	};
 	return {
 		leagues: [
-			inSeason(LEAGUE, { ...sleeperWeek, waivers: waiversNow(), readAt: at }, when),
+			inSeason(
+				LEAGUE,
+				{
+					...sleeperWeek,
+					waivers: waiversNow(),
+					readAt: at,
+					...(turnedNow()
+						? { turned: { week: TURNED_WEEK, lineup: turnedLineup(lineupNow()) } }
+						: {})
+				},
+				when
+			),
 			inSeason(ESPN_DONE, { ...espnWeek, waivers: espnWaivers(null), readAt: at }, when),
 			noWeek(
 				NO_TEAM,
@@ -298,8 +310,20 @@ function send(
 
 /** The order's first week at the fixture's clock (rest-now.ts, Lane 86): the Gain words count from it. */
 const fromWeekNow = (): number => orderAtClock(order, now()).from_week ?? ORDER_FROM_WEEK;
-/** The waiver answer as the API gives it at the fixture's clock (waivers-at.ts). */
-const waiversNow = (): WaiverAdvice => waiversAtClock(waivers, now(), fromWeekNow(), HORIZON);
+/** The member's lineup at the fixture's clock: the week after its Sunday once that has come. */
+const lineupNow = (): LineupAdvice => (afterSunday() ? sleeperAfter().lineup : lineup);
+/** Whether the action screens address week 7 at the fixture's clock (turn.ts, Lane 95). */
+const turnedNow = (): boolean => lineupSpent(lineupNow(), now());
+/** The waiver answer as the API gives it at the fixture's clock (waivers-at.ts), week 7's once the
+ * member's lineup has played week 6 (turn.ts). */
+const waiversNow = (): WaiverAdvice => {
+	const answer = waiversAtClock(waivers, now(), fromWeekNow(), HORIZON);
+	// Turned, the week 7 rows are ordered from the stored answer (its moves to make intact), with
+	// the Gain sentence at the clock.
+	return turnedNow()
+		? turnedWaivers({ ...waivers, season_basis: answer.season_basis }, now())
+		: answer;
+};
 
 function waiversAt(position: string | null): WaiverAdvice {
 	const answer = waiversNow();
@@ -311,7 +335,8 @@ function waiversAt(position: string | null): WaiverAdvice {
 
 /** The trades holding one player, by his board id, every team kept. */
 function tradesHolding(player: string | null): TradeAdvice {
-	const answer = tradesAtClock(trades, fromWeekNow(), HORIZON);
+	const atClock = tradesAtClock(trades, fromWeekNow(), HORIZON);
+	const answer = turnedNow() ? turnedTrades(atClock) : atClock;
 	if (player === null) return answer;
 	const holds = (side: { player: { board_id: string | null } }[]): boolean =>
 		side.some((line) => line.player.board_id === player);

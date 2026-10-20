@@ -49,7 +49,7 @@ function worthMaking(row: WaiverRow): boolean {
 
 /** The answer in the season Gain order: the rows by the season Gain, withheld, the strip their first
  * worth making. */
-function inSeasonOrder(waivers: WaiverAdvice, now: number): WaiverAdvice {
+export function inSeasonOrder(waivers: WaiverAdvice, now: number): WaiverAdvice {
 	const ordered = [...waivers.rows].sort((a, b) => b.gain - a.gain);
 	const first = ordered.findIndex(worthMaking);
 	const rows = ordered.map((r, i) => ({ ...withheld(r, now), pickup: i === first }));

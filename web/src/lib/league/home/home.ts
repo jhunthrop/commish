@@ -7,7 +7,12 @@ import type { components } from '#lib/api/types.ts';
 import type { LeagueHost, LeagueMove, LeagueSync, LeagueTeam, LeagueTerms } from '../api.ts';
 import { BOX, boxRow, slotWord, totalsPts, type BoxStarter, type BoxTotals } from '../box/box.ts';
 import { heldLineup, lineupBox, type LineupBox } from '../box/lineup.ts';
-import type { LineupAdvice, ProjectionScoring, Scoreboard } from '../inseason/api.ts';
+import type {
+	LineupAdvice,
+	ProjectionScoring,
+	Scoreboard,
+	WeekDoneState
+} from '../inseason/api.ts';
 import { hostWords } from '../names.ts';
 import { gameHead, KICKOFF, type GameHead } from '../box/kickoff.ts';
 
@@ -172,8 +177,11 @@ export interface LineupSummary {
 	starters: BoxStarter[];
 	totals: BoxTotals;
 	benchWords: string;
-	/** The API's sentence once every starter's game is final (week_done), null before. */
+	/** The API's sentence once every starter of the member's has played (week_done), null before. */
 	done: string | null;
+	/** Locked while the matchup still plays, final once it is (week_done_state); null before, or
+	 * from the previous API. */
+	doneState: WeekDoneState | null;
 }
 
 /** The lineup as set from the Lineup's answer: each slot's player on the platform, in the league's
@@ -202,7 +210,8 @@ export function lineupSummary(advice: LineupAdvice, zone: string, now: number): 
 			note: null
 		},
 		benchWords,
-		done: advice.week_done ?? null
+		done: advice.week_done ?? null,
+		doneState: advice.week_done_state ?? null
 	};
 }
 
