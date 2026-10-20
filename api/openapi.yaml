@@ -3771,6 +3771,31 @@ components:
             the week his rest of season starts from: his club's first game still to play at the read's clock (not yet
             kicked off, through week 17); null off the rest-of-season order, without a projection or with no game left. Absent from a read
             older than the field
+        after_bye:
+          allOf: [{ $ref: "#/components/schemas/PlayerAfterBye" }]
+          nullable: true
+          description: >-
+            on his bye in week (line.facts.bye), his club's next game in the same scoring as line (Lane 100, B30): the card's
+            Opp rank and Proj tiles read it, as no tile of the bye week holds a figure; null off a bye or with no game left,
+            absent from an older answer
+    PlayerAfterBye:
+      type: object
+      required: [week, line, projection_read_at, projection_arrives_at]
+      properties:
+        week: { type: integer, description: the week of his club's next game after the bye }
+        line: { $ref: "#/components/schemas/PlayerLine" }
+        projection_read_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: when that week's published projection was captured, null with none stored
+        projection_arrives_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: >-
+            when that week's published projection is first captured (its first kickoff less the capture's lead), set
+            only while none is read for it; null otherwise
     RestOfSeasonFigure:
       type: object
       required: [format, points, points_over_replacement]
@@ -4271,26 +4296,27 @@ components:
     WaiverBeats:
       type: object
       description: >-
-        the member's player at his position with the lowest Proj he tops, the advised lineup's starters first, then the
-        bench, never one who cannot play this week (Lane 66f's Beats column); or the open spot he fills, a starting spot
-        no player of the member's can play this week
+        the Beats column (Lane 98): for the move the strip offers, the player that move drops (starter whether this
+        week's lineup starts him, gain the move's week_gain); for any other row, the player his move takes out of the
+        rest-of-season lineup the row's gain is measured on (the same fill); or the open spot he fills, a slot that
+        lineup leaves empty
       required: [host_id, name, starter, gain, open_spot]
       properties:
         open_spot:
           type: boolean
           description: >-
-            he fills a starting spot no player of the member's can play this week (host_id and name empty, gain his week
-            gain)
+            he fills a slot the rest-of-season lineup leaves empty (host_id and name empty, gain null)
         host_id: { type: string, description: "the member's player's host id, a line in the answer's roster; empty for the open spot" }
         name: { type: string, description: empty for the open spot }
-        starter: { type: boolean, description: the player he tops starts in the lineup the advice sets this week }
+        starter: { type: boolean, description: the player named starts in the lineup the advice sets this week }
         gain:
           type: number
           format: double
           nullable: true
           description: >-
-            his Proj less that player's, as the screen prints them (tenths); null while the pickups go in season Gain
-            order (a pickup's game has kicked off), when no week figure counts
+            the offered move's week_gain, else his Proj less that player's where both have one, as the screen prints them
+            (tenths); null while the pickups go in season Gain order (a pickup's game has kicked off), when no week figure
+            counts
     WaiverDrop:
       type: object
       description: one player of the member's an add could replace, with the lineup's gains after the swap
@@ -4335,7 +4361,7 @@ components:
         beats:
           allOf: [{ $ref: "#/components/schemas/WaiverBeats" }]
           nullable: true
-          description: null when he tops no one of the member's at his position, has no Proj, or cannot play this week
+          description: null when he starts in no one's place in the rest-of-season lineup and his row is not the strip's
         drops:
           type: array
           description: every player he could replace, the row's drop first, then by gain; empty when a spot is open
@@ -4573,7 +4599,11 @@ components:
           items: { $ref: "#/components/schemas/WaiverRow" }
         rows:
           type: array
-          description: positive gains first by gain, then the rest by points over replacement, at most 60; by the season Gain alone in the season_gain order
+          description: >-
+            positive gains first by gain, then the rest by points over replacement, at most 60; by the season Gain alone in
+            the season_gain order; a free agent on a season-long list (injured reserve, PUP, NFI) or ruled out this week
+            is not listed (no read gives his return), save the player a link asked for; a week's out carried over from a
+            game already played is listed
           items: { $ref: "#/components/schemas/WaiverRow" }
         roster:
           type: array

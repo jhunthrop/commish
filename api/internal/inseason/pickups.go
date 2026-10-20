@@ -118,12 +118,6 @@ func (w *pickupWeek) beats(add Candidate, mine []person) *apitypes.WaiverBeats {
 	return nil
 }
 
-// openSpot is Beats for an add who fills a starting spot no one of the
-// member's can play this week: no player named, the week's gain.
-func openSpot(weekGain float64) *apitypes.WaiverBeats {
-	return &apitypes.WaiverBeats{OpenSpot: true, Starter: true, Gain: &weekGain}
-}
-
 // isPickup is the strip's rule (Lane 66f): he starts this week, the
 // lineup's Proj rises, and the rest of the season does not fall.
 func isPickup(row apitypes.WaiverRow) bool {
@@ -268,6 +262,8 @@ func cardRows(w *Writer, config []draft.SlotConfig, hostStarters []string, mine,
 		move := remap(m, mine, cum)
 		row := waiverRow(w, week, cum, pool[m.Add], move, clears)
 		row.Pickup = true
+		// The banner's move names the player it drops (B14).
+		row.Beats = dropBeats(row)
 		out = append(out, row)
 		cum = afterCard(cum, move.Drop, pool[m.Add])
 	}
@@ -300,6 +296,12 @@ func remap(m Waiver, from, to []person) Waiver {
 	out := m
 	out.Drop = at(m.Drop)
 	out.Drops = nil
+	out.Replaces = Replaced{Empty: m.Replaces.Empty}
+	if m.Replaces.Known {
+		if j := at(m.Replaces.At); j >= 0 {
+			out.Replaces = Replaced{At: j, Known: true}
+		}
+	}
 	for _, d := range m.Drops {
 		if j := at(d.At); j >= 0 {
 			out.Drops = append(out.Drops, Drop{At: j, Gain: d.Gain, StartsThisWeek: d.StartsThisWeek})

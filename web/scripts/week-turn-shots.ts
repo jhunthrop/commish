@@ -2,7 +2,7 @@
 // and the built site, dark at 1280 and 390, on one of two clocks (inseason-fixture/clock.ts):
 //   saturday      the fixture's week clock, week 6 still to play: Waivers and Trades say Week 6;
 //   monday-night  Monday 11:00 pm Central, every starter of the member's kicked off or final: the
-//                 front door's roster facts are for week 7, a carried-over listing said with its date, Waivers and
+//                 front door's roster facts are for week 7, a carried-over listing said as still listed, Waivers and
 //                 Trades say Week 7, Trades draws no "This week, Proj" group, and both bases say the
 //                 day week 7's published projection arrives.
 // Every page: nothing scrolls sideways, and the copy passes the one guard (copy-scan.ts). Exits
@@ -95,8 +95,9 @@ for (const width of WIDTHS) {
 	await open(page, '/', 'Your roster');
 	const front = await check(page, `front ${w}`);
 	if (front.includes('a starter. Listed')) fault(`front ${w}`, 'a roster fact says Listed');
-	if (turned && !front.toLowerCase().includes(', as of oct'))
-		fault(`front ${w}`, 'the carried-over listing is not said with its date');
+	// The fixture's listings are undated: "Out, still listed", never the read's date (Lane 98, B69).
+	if (turned && !front.toLowerCase().includes(', still listed'))
+		fault(`front ${w}`, 'the carried-over listing is not said as still listed');
 	if (turned !== front.includes('for week 7.'))
 		fault(`front ${w}`, `the roster head ${turned ? 'is not' : 'is'} for week 7`);
 	await page.screenshot({ path: new URL(`front-${w}.png`, out).pathname, fullPage: true });

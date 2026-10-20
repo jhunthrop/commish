@@ -85,3 +85,9 @@ export interface AheadRow {
 export function stillToPlay(ahead: readonly AheadRow[], next: LogNext | null): readonly AheadRow[] {
 	return next === null ? ahead : ahead.filter((row) => row.week !== next.week);
 }
+
+/** The projection column shows only once a week holds a figure in it (Lane 100, B30): the log draws
+ * no column that is empty in every row. `empty` is the figure a week without one prints. */
+export function projShown(pastProj: string, next: LogNext | null, empty: string): boolean {
+	return pastProj !== empty || (next !== null && next.proj !== empty);
+}

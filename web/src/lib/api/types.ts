@@ -3106,6 +3106,23 @@ export interface components {
 			tier?: components['schemas']['RestOfSeasonTier'] | null;
 			/** @description the week his rest of season starts from: his club's first game still to play at the read's clock (not yet kicked off, through week 17); null off the rest-of-season order, without a projection or with no game left. Absent from a read older than the field */
 			rest_from_week?: number | null;
+			/** @description on his bye in week (line.facts.bye), his club's next game in the same scoring as line (Lane 100, B30): the card's Opp rank and Proj tiles read it, as no tile of the bye week holds a figure; null off a bye or with no game left, absent from an older answer */
+			after_bye?: components['schemas']['PlayerAfterBye'] | null;
+		};
+		PlayerAfterBye: {
+			/** @description the week of his club's next game after the bye */
+			week: number;
+			line: components['schemas']['PlayerLine'];
+			/**
+			 * Format: date-time
+			 * @description when that week's published projection was captured, null with none stored
+			 */
+			projection_read_at: string | null;
+			/**
+			 * Format: date-time
+			 * @description when that week's published projection is first captured (its first kickoff less the capture's lead), set only while none is read for it; null otherwise
+			 */
+			projection_arrives_at: string | null;
 		};
 		RestOfSeasonFigure: {
 			format: components['schemas']['BoardFormat'];
@@ -3441,19 +3458,19 @@ export interface components {
 			/** @description while the game plays, the side behind has nobody left to score and the leader cannot fall back to it (no QB or D/ST of the leader's still to score, or a lead of 10 points or more): the bug says Decided in place of the game's state; present whenever standing is, absent from an older answer */
 			decided?: boolean | null;
 		};
-		/** @description the member's player at his position with the lowest Proj he tops, the advised lineup's starters first, then the bench, never one who cannot play this week (Lane 66f's Beats column); or the open spot he fills, a starting spot no player of the member's can play this week */
+		/** @description the Beats column (Lane 98): for the move the strip offers, the player that move drops (starter whether this week's lineup starts him, gain the move's week_gain); for any other row, the player his move takes out of the rest-of-season lineup the row's gain is measured on (the same fill); or the open spot he fills, a slot that lineup leaves empty */
 		WaiverBeats: {
-			/** @description he fills a starting spot no player of the member's can play this week (host_id and name empty, gain his week gain) */
+			/** @description he fills a slot the rest-of-season lineup leaves empty (host_id and name empty, gain null) */
 			open_spot: boolean;
 			/** @description the member's player's host id, a line in the answer's roster; empty for the open spot */
 			host_id: string;
 			/** @description empty for the open spot */
 			name: string;
-			/** @description the player he tops starts in the lineup the advice sets this week */
+			/** @description the player named starts in the lineup the advice sets this week */
 			starter: boolean;
 			/**
 			 * Format: double
-			 * @description his Proj less that player's, as the screen prints them (tenths); null while the pickups go in season Gain order (a pickup's game has kicked off), when no week figure counts
+			 * @description the offered move's week_gain, else his Proj less that player's where both have one, as the screen prints them (tenths); null while the pickups go in season Gain order (a pickup's game has kicked off), when no week figure counts
 			 */
 			gain: number | null;
 		};
@@ -3492,7 +3509,7 @@ export interface components {
 			starts: boolean;
 			/** @description a pickup worth making: he starts this week, the lineup's Proj rises, and the gain over the rest of the season is not below 0 */
 			pickup: boolean;
-			/** @description null when he tops no one of the member's at his position, has no Proj, or cannot play this week */
+			/** @description null when he starts in no one's place in the rest-of-season lineup and his row is not the strip's */
 			beats: components['schemas']['WaiverBeats'] | null;
 			/** @description every player he could replace, the row's drop first, then by gain; empty when a spot is open */
 			drops: components['schemas']['WaiverDrop'][];
@@ -3662,7 +3679,7 @@ export interface components {
 			pickups_proj: number | null;
 			/** @description the pickups worth making, chosen as a set from every add we rank, at most 3: each measured against the lineup with the ones before it made, kept only while he still starts and raises the Proj, no two taking the same player of the member's (topped or dropped); each one's week_gain is his over the ones before (the strip's cards); empty when no pickup beats the roster */
 			pickups: components['schemas']['WaiverRow'][];
-			/** @description positive gains first by gain, then the rest by points over replacement, at most 60; by the season Gain alone in the season_gain order */
+			/** @description positive gains first by gain, then the rest by points over replacement, at most 60; by the season Gain alone in the season_gain order; a free agent on a season-long list (injured reserve, PUP, NFI) or ruled out this week is not listed (no read gives his return), save the player a link asked for; a week's out carried over from a game already played is listed */
 			rows: components['schemas']['WaiverRow'][];
 			/** @description the member's active roster (injured reserve and taxi spots left out), the lines beats and drops name */
 			roster: components['schemas']['PlayerLine'][];

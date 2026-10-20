@@ -132,6 +132,7 @@ func (s *Service) playerWeek(w http.ResponseWriter, r *http.Request) {
 		ProjectionScoring: apitypes.ProjectionScoring{Format: apitypes.ProjectionScoringFormatPpr, LeagueOwn: false},
 		ProjectionReadAt:  read, ProjectionPreviousReadAt: previous}
 	fillRest(&out, lives, bp, tier)
+	out.AfterBye = s.publicAfterBye(ctx, out, data, board, rest, bp, now)
 	httpx.WriteOK(w, r, http.StatusOK, out)
 }
 
@@ -181,6 +182,7 @@ func (s *Service) leaguePlayerWeek(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteInternal(w, r, s.Log, "inseason: league player week rest of season", err)
 		return
 	}
+	out.AfterBye = s.leagueAfterBye(r.Context(), a, out, bp)
 	if out.Verb != nil && (out.Verb.Kind == apitypes.PlayerVerbKindWaivers || out.Verb.Kind == apitypes.PlayerVerbKindClaim) {
 		out.Verb = s.claimVerb(r, a, bp, *out.Verb)
 	}

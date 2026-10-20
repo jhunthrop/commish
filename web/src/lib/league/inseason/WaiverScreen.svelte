@@ -20,6 +20,7 @@
 		DEFAULT_SORT,
 		dropRows,
 		findRows,
+		headBasis,
 		moveWords,
 		namesOnScreen,
 		nextSort,
@@ -147,11 +148,14 @@
 		POSITIONS.filter((p) => advice.rows.some((r) => r.add.player.position === p))
 	);
 	const pool = $derived(
-		poolRows(
-			{ rows: shown.rows, pickups: advice.pickups, pickup_order: shown.pickup_order },
-			memberZone(),
-			now
-		)
+		poolRows({ rows: shown.rows, pickups: advice.pickups, roster: shown.roster }, memberZone(), now)
+	);
+	/** The line under the column heads (Lane 98, B35). */
+	const heads = $derived(
+		headBasis(shown.projection_previous_read_at, weekProjected(shown), {
+			zone: memberZone(),
+			zoned: false
+		})
 	);
 	const rows = $derived(findRows(sortRows(pool, sort), query));
 	const cards = $derived(pickupCards(advice));
@@ -429,6 +433,7 @@
 			projected={weekProjected(shown)}
 			label={LINES.waiverAdds}
 			{rows}
+			{heads}
 			{sort}
 			{onsort}
 			{open}

@@ -15,6 +15,8 @@ import {
 	CARD,
 	NONE,
 	restRankWords,
+	vsAvgReason,
+	type BasisTile,
 	type CardHead,
 	type CardTile,
 	type RestParts,
@@ -102,6 +104,48 @@ export function restParts(
 		scoring: scoringOf(format),
 		label: format.label
 	};
+}
+
+/** The in-season row under the tiles in a format (Lane 100, B17 and B51): his preseason figure for the
+ * full season and the pace a game the order starts from, as the run stores them, and his rest of season
+ * a game against his Avg, which the week's read fills. None preseason or for a player the preseason
+ * board did not rank. The reason beside vs Avg is said only with the stored pace it rests on. */
+export function basisTiles(
+	format: Format,
+	numbers: PlayerFormat,
+	year: number,
+	games: number
+): BasisTile[] {
+	const points = numbers.preseasonPoints ?? null;
+	if (format.rosFromWeek === undefined || points === null) return [];
+	const pace = numbers.preseasonPerGame ?? null;
+	return [
+		{
+			key: 'preseason',
+			label: CARD.preseason,
+			value: fixed(points),
+			caption: `${format.label} points for ${String(year)}, the full season`,
+			reason: null
+		},
+		...(pace === null
+			? []
+			: [
+					{
+						key: 'pace' as const,
+						label: CARD.preseasonPace,
+						value: fixed(pace),
+						caption: CARD.paceCaption,
+						reason: null
+					}
+				]),
+		{
+			key: 'vsAvg',
+			label: CARD.vsAvg,
+			value: NONE,
+			caption: CARD.vsAvgCaption,
+			reason: pace === null ? null : vsAvgReason(games)
+		}
+	];
 }
 
 /** The read's stamp: its day, and the facts it was written from. */

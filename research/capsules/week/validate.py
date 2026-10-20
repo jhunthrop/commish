@@ -19,13 +19,13 @@ from typing import Final
 
 from research.capsules.config import CAPSULE_CONFIG
 from research.capsules.narrative import normalize_sentence, sentences_verbatim
-from research.capsules.validate import Grounding, ValidationResult, overrun_cap, validate_prose
+from research.capsules.validate import Grounding, ValidationResult, validate_prose
 from research.capsules.week.render import render_week_sheet
 from research.capsules.week.rules import week_rule_violations
 from research.capsules.week.sheet import WeekSheet, week_name_ledger
 
-# The read's words: three to five short sentences, about 80 words, never more than 100 (the ruling on L5).
-WEEK_BAND: Final = (40, 100)
+# The read's words: one paragraph of three to five short sentences, never more than 80 (Lane 100, B44).
+WEEK_BAND: Final = (40, 80)
 SHARED_SENTENCE: Final = "The text carries a sentence shaped like one another page carries this week"
 _NAME: Final = re.compile(r"\b[A-Z][\w'\u2019.-]*")
 _NUMBER: Final = re.compile(r"\d+(?:[.,]\d+)*%?")
@@ -96,14 +96,10 @@ def validate_week_read(
     sheet: WeekSheet,
     taken: Set[str] = frozenset(),
     call: str | None = "none",
-    *,
-    asked_shorter: bool = False,
 ) -> ValidationResult:
     """One week read against its sheet, the week's rules given the writer's `call`, and the sentence shapes
-    other pages carry (`taken`). A read already asked for a shorter version may run the season writer's
-    10% over its cap (`overrun_cap`, the phase C ruling), as the season read may."""
-    band = (WEEK_BAND[0], overrun_cap(WEEK_BAND[1]) if asked_shorter else WEEK_BAND[1])
-    base = validate_prose(with_season(text, sheet.season), week_grounding(sheet), band)
+    other pages carry (`taken`). The cap is the cap (Lane 100, B44): no overrun for a read asked shorter."""
+    base = validate_prose(with_season(text, sheet.season), week_grounding(sheet), WEEK_BAND)
     violations = (
         *base.violations,
         *week_rule_violations(text, sheet, call),

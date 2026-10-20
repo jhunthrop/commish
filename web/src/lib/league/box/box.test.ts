@@ -22,7 +22,9 @@ import {
 	slotWord,
 	statusOf,
 	weatherCell,
-	initialName
+	initialName,
+	onReserve,
+	reserveRow
 } from './box.ts';
 
 void test("a name's short form keeps the surname whole: the first initial, then the last name (rereview N2)", () => {
@@ -323,4 +325,31 @@ void test('copy guard: every box word is fantasy words, with no dash or semicolo
 	for (const text of said) {
 		assert.doesNotMatch(text, BANNED, text);
 	}
+});
+
+void test('an injured reserve row draws no matchup: the bench one says why he is a drop, the slot no points (Lane 98, B34)', () => {
+	const ir = line({}, { designation: { status: 'injured_reserve', as_of: READ, since: null } });
+	assert.equal(onReserve(ir), true);
+	assert.equal(onReserve(line({ player: player({ injured_reserve: true }) })), true);
+	assert.equal(onReserve(line()), false);
+	const drawn = boxRow(
+		{ ...ir, facts: { ...ir.facts, points_this_week: 3 } },
+		'Bench',
+		ZONE,
+		false,
+		NOW
+	);
+	assert.equal(drawn.reserve, true);
+	const bench = reserveRow(drawn, 'bench');
+	assert.equal(bench.game, null);
+	assert.equal(bench.expected, null);
+	assert.equal(bench.evidence.oppRank, null);
+	assert.equal(bench.evidence.avg, drawn.evidence.avg);
+	assert.equal(bench.pts, 3);
+	assert.equal(reserveRow(drawn, 'slot').pts, null);
+	assert.equal(reserveRow(drawn, 'slot').proj, null);
+	assert.equal(bench.proj, drawn.proj);
+	assert.equal(reserveRow(drawn, null), drawn);
+	assert.equal(BOX.irBench, 'IR-eligible, taking a bench spot');
+	assert.doesNotMatch(BOX.irBench, bannedPattern());
 });

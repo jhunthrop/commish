@@ -8,7 +8,7 @@
 	import Verb from '#lib/ui/Verb.svelte';
 	import { clubMark } from '#lib/ui/club-mark.ts';
 	import type { Position } from '#lib/types/player.ts';
-	import { CARD, type CardHead, type CardTile } from './card.ts';
+	import { CARD, type BasisTile, type CardHead, type CardTile } from './card.ts';
 	import type { CardVerb, NextCell } from './week-words.ts';
 
 	/** The player card (Lane 66h): his face, name, club and position with his status, whose roster he
@@ -37,6 +37,10 @@
 		/** The league screens' verb, null with no league: the sheet's add stands in. */
 		verb: CardVerb | null;
 		tiles: readonly CardTile[];
+		/** In season, the row under the tiles (Lane 100): his preseason figures and vs Avg. */
+		basisTiles: readonly BasisTile[];
+		/** His lineup verb no longer fits the week (Lane 100, B64): Compare is the one verb. */
+		compareLeads: boolean;
 		/** Whether Compare is open, and its toggle. */
 		comparing: boolean;
 		oncompare: () => void;
@@ -58,6 +62,8 @@
 		cell,
 		verb,
 		tiles,
+		basisTiles,
+		compareLeads,
 		comparing,
 		oncompare,
 		sheet
@@ -97,16 +103,22 @@
 			</div>
 		{/if}
 		<div class="act">
-			{#if verb === null}
+			{#if compareLeads}
+				<Verb size="lg" fill expanded={comparing} controls="compare" onclick={oncompare}
+					>{CARD.compare}</Verb
+				>
+			{:else if verb === null}
 				{@render sheet()}
 			{:else if verb.external}
 				<Verb size="lg" fill onclick={() => openExternal(verb.href)}>{verb.label}</Verb>
 			{:else}
 				<Verb size="lg" fill href={verb.href}>{verb.label}</Verb>
 			{/if}
-			<Quiet size="md" fill expanded={comparing} controls="compare" onclick={oncompare}
-				>{CARD.compare}</Quiet
-			>
+			{#if !compareLeads}
+				<Quiet size="md" fill expanded={comparing} controls="compare" onclick={oncompare}
+					>{CARD.compare}</Quiet
+				>
+			{/if}
 			{#if verb?.note}<p class="note">{verb.note}</p>{/if}
 		</div>
 	</div>
@@ -119,6 +131,17 @@
 			</div>
 		{/each}
 	</div>
+	{#if basisTiles.length > 0}
+		<div class="tiles basis" style:--n={basisTiles.length}>
+			{#each basisTiles as tile (tile.key)}
+				<div class="tile">
+					<span class="lb">{tile.label}</span>
+					<span class="v"><span class="fig">{tile.value}</span></span>
+					<span class="cap">{tile.caption}</span>
+				</div>
+			{/each}
+		</div>
+	{/if}
 </section>
 
 <style>
@@ -273,6 +296,15 @@
 		border-left: 0;
 	}
 
+	/* The row the figures above start from, quieter than the week's. */
+	.basis {
+		background: var(--surface);
+	}
+
+	.basis .v {
+		font-size: var(--t-xl);
+	}
+
 	.lb {
 		font-size: var(--t-xs);
 		font-weight: 700;
@@ -418,6 +450,15 @@
 
 		.tile:nth-child(-n + 3) {
 			border-top: 0;
+		}
+
+		/* On a phone the row under the tiles keeps its three across, as the tiles above it do. */
+		.basis .tile {
+			border-top: 0;
+		}
+
+		.basis .tile:first-child {
+			border-left: 0;
 		}
 
 		.v {

@@ -135,6 +135,10 @@ export const boardRowSchema = z.object({
 	 * for a player with a line this season whom the preseason board did not rank. */
 	preseasonRank: z.number().int().min(1).nullable().optional(),
 	preseasonPoints: points.nullable().optional(),
+	/** In season, the preseason pace a game the rest-of-season model starts his figure from, in this
+	 * format's scoring (Lane 100): null for a player the preseason board did not rank, absent on a run
+	 * older than the field. */
+	preseasonPerGame: points.nullable().optional(),
 	/** In season, the week his rest of season starts from: his club's first game still to play at the
 	 * run (Lane 86), null with none left. Absent preseason and on a run older than the field, where the
 	 * format's rosFromWeek stands. */

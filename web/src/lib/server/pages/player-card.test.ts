@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import type { Format, PlayerFormat, PlayerStatus } from '#lib/run/schema.ts';
 import type { GameLogRow, PlayerSeason, StatLine } from '#lib/run/season.ts';
 import { STAT_FIELDS } from '#lib/run/season.ts';
-import { cardBuild, readStamp, restParts, restTile } from './player-card.ts';
+import { basisTiles, cardBuild, readStamp, restParts, restTile } from './player-card.ts';
 
 const EMPTY = Object.fromEntries(STAT_FIELDS.map((field) => [field, null])) as Omit<
 	StatLine,
@@ -162,4 +162,35 @@ void test("the read's stamp is its day and what it was written from", () => {
 		'Written Oct 13, from his facts through last season'
 	);
 	assert.equal(readStamp({ body: 'A read.', pulls: [] }), null);
+});
+
+void test('in season the row under the tiles is his preseason figures as stored and vs Avg (Lane 100, B17, B51)', () => {
+	const stored = { ...NUMBERS, preseasonPoints: 262.1, preseasonPerGame: 17.5 };
+	assert.deepEqual(
+		basisTiles(IN_SEASON, stored, 2026, 5).map((t) => [t.key, t.value, t.caption, t.reason]),
+		[
+			['preseason', '262.1', 'PPR points for 2026, the full season', null],
+			['pace', '17.5', 'a game, the pace our figure starts from', null],
+			[
+				'vsAvg',
+				'--',
+				'rest of season a game against his Avg',
+				'our figure weighs his 5 games against his preseason pace'
+			]
+		]
+	);
+	// With no stored pace there is no reason to give: the cell alone.
+	assert.deepEqual(
+		basisTiles(IN_SEASON, { ...stored, preseasonPerGame: undefined }, 2026, 5).map((t) => [
+			t.key,
+			t.reason
+		]),
+		[
+			['preseason', null],
+			['vsAvg', null]
+		]
+	);
+	// Preseason, or a player the preseason board did not rank: no row.
+	assert.deepEqual(basisTiles(PRESEASON, stored, 2026, 5), []);
+	assert.deepEqual(basisTiles(IN_SEASON, { ...stored, preseasonPoints: null }, 2026, 5), []);
 });

@@ -11,12 +11,16 @@
 		facts?: boolean;
 		/** "Clears Wed", after the kickoff in the first line, where the platform says it (Lane 66f). */
 		clears?: string | null;
+		/** Said in place of the game: why a bench player on injured reserve is a drop (Lane 98). */
+		note?: string | null;
 	}
 
-	let { row, facts = true, clears = null }: Props = $props();
+	let { row, facts = true, clears = null, note = null }: Props = $props();
 </script>
 
-{#if row.game === 'bye'}
+{#if note}
+	<span class="note">{note}</span>
+{:else if row.game === 'bye'}
 	<span class="bye">{BOX.bye}</span>{#if clears}<span class="clears">{clears}</span>{/if}
 {:else if row.game}
 	<span class="opp"
@@ -43,6 +47,11 @@
 
 	.opp b {
 		font-weight: 600;
+	}
+
+	.note {
+		color: var(--ink-2);
+		white-space: nowrap;
 	}
 
 	.opp span {

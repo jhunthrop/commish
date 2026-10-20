@@ -65,6 +65,9 @@ class StoredRow:
     from_week: int | None = None
     # In season, his points for one more club game after the counted ones (Lane 96); None preseason.
     game_points: float | None = None
+    # In season, the preseason pace a game the rest-of-season model starts him from in the board's
+    # scoring (Lane 100, `nightly.build.ros`); None preseason or for a player the preseason line lacks.
+    preseason_per_game: float | None = None
 
 
 @dataclass(frozen=True, slots=True)

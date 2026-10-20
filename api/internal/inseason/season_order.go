@@ -49,6 +49,10 @@ func inSeasonOrder(out apitypes.WaiverAdvice, moves []Waiver) apitypes.WaiverAdv
 			first = k
 		}
 		rows[k].Pickup = k == first
+		if k == first {
+			// The banner's move names the player it drops (B14).
+			rows[k].Beats = dropBeats(rows[k])
+		}
 	}
 	out.Rows, out.Pickups = rows, []apitypes.WaiverRow{}
 	if first >= 0 {

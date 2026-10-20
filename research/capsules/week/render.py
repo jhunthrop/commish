@@ -16,6 +16,7 @@ from research.capsules.facts.team_names import NFL_TEAM_NAMES
 from research.capsules.render_depth import slot_word
 from research.capsules.render_season import week_list
 from research.capsules.render_words import IN_OUR_RECORDS, ordinal, signed, week_of
+from research.capsules.week.cells import named_chance
 from research.capsules.week.report_day import report_words
 from research.capsules.week.sheet import (
     CANNOT_PLAY,
@@ -25,6 +26,7 @@ from research.capsules.week.sheet import (
     central_day_and_time,
     points_text,
 )
+from research.model.jsmath import js_round
 from research.pipeline.jscompat import js_string
 
 LAST_FANTASY_WEEK: Final = 17
@@ -85,17 +87,11 @@ def _projection_line(sheet: WeekSheet) -> str | None:
         f"scoring{_as_of(p.captured_at)}. It is a projection published for the week, not ours: call it the "
         "published projection, with that figure."
     ]
+    # The change is the card's Δ Proj cell; the figure before it is in no cell (Lane 100, B17).
     change = sheet.projection_change
     if change is not None and p.previous_points is not None:
         parts.append(
-            f"The published figure before it was {points_text(p.previous_points)} points{_as_of(p.previous_captured_at)}, "
-            f"a change of {signed(change)} points."
-        )
-    since = sheet.change_since_last_read
-    if since is not None and sheet.last_read is not None and sheet.last_read.projection_points is not None:
-        parts.append(
-            f"At our last read for this week it was {points_text(sheet.last_read.projection_points)} points, "
-            f"a change of {signed(since)} points since."
+            f"It moved {signed(change)} points since the published figure before it{_as_of(p.previous_captured_at)}."
         )
     return " ".join(parts)
 
@@ -117,12 +113,13 @@ def _weather_line(sheet: WeekSheet) -> str | None:
     roofed = None if w.roof is None else _ROOF_WORDS.get(w.roof)
     if roofed is not None:
         return f"Venue: {roofed}{_as_of(w.roof_read_at)}."
+    # Each figure as the weather cell prints it (`Math.round`), the chance only from the share it names one
+    # at (Lane 100 review M2, LOW-2).
+    chance = named_chance(w)
     parts = [
-        f"{js_string(round(w.temperature_f))} degrees" if w.temperature_f is not None else None,
-        f"wind {js_string(round(w.wind_mph))} mph" if w.wind_mph is not None else None,
-        f"a {js_string(round(w.precipitation_chance))}% chance of {w.precipitation_kind or 'rain'}"
-        if w.precipitation_chance is not None and w.precipitation_kind not in (None, "none")
-        else None,
+        f"{js_string(js_round(w.temperature_f))} degrees" if w.temperature_f is not None else None,
+        f"wind {js_string(js_round(w.wind_mph))} mph" if w.wind_mph is not None else None,
+        None if chance is None else f"a {js_string(chance)}% chance of {w.precipitation_kind or 'rain'}",
     ]
     said = [part for part in parts if part is not None]
     if not said:
@@ -135,10 +132,11 @@ def _allowed_line(sheet: WeekSheet) -> str | None:
     a, game = sheet.allowed, sheet.game
     if a is None or game is None or sheet.bye:
         return None
+    # The rank is the card's Opp rank cell; the points it allows a game are in no cell (Lane 100, B17).
     return (
-        f"{game.opponent} against {a.position}s in {sheet.season}: {ordinal(a.rank)} of {a.of}, allowing "
-        f"{points_text(a.points_a_game)} PPR points a game to {a.position}s through {week_of(a.through, sheet.season)} "
-        f"(1st allowed the fewest, {ordinal(a.of)} the most){_as_of(a.read_at)}."
+        f"{game.opponent} against {a.position}s in {sheet.season}: {ordinal(a.rank)} of {a.of} through "
+        f"{week_of(a.through, sheet.season)} (1st allowed the fewest PPR points a game, {ordinal(a.of)} the most)"
+        f"{_as_of(a.read_at)}."
     )
 
 
@@ -170,9 +168,8 @@ def _season_line(sheet: WeekSheet) -> str:
     rate = (
         ""
         if sheet.points_per_game is None
-        else f" This season: {points_text(sheet.points_per_game)} PPR points a game over {sheet.games_played} {games}"
-        + ("" if sheet.touchdowns is None else f", {js_string(sheet.touchdowns)} touchdowns")
-        + "."
+        # His touchdowns are in no one cell (Lane 100, B17): the log splits them by kind.
+        else f" This season: {points_text(sheet.points_per_game)} PPR points a game over {sheet.games_played} {games}."
     )
     missed = "" if not sheet.missed else f" He did not play {week_list(sheet.missed, sheet.season)}."
     return f"His last games, newest first{_as_of(sheet.lines_at)}: {reach}.{rate}{missed}"
@@ -182,7 +179,8 @@ def _board_line(sheet: WeekSheet) -> str | None:
     b = sheet.board
     if b is None:
         return None
-    place = f"{b.rank} overall, {sheet.position}{b.position_rank}"
+    # His overall rank is in no cell; his place at his position is the card's (Lane 100, B17).
+    place = f"{sheet.position}{b.position_rank}"
     say = f'Any sentence with this rank says it is "in {b.order_words}".'
     if b.rest_of_season and b.from_week is not None:
         points = "" if b.points is None else f"{points_text(b.points)} PPR points, "
@@ -236,17 +234,12 @@ def week_facts_lines(sheet: WeekSheet) -> tuple[tuple[str, str], ...]:
         lines.append(("Published projection", f"{points_text(sheet.projection.points)} points (PPR)"))
     if sheet.allowed is not None and not sheet.bye:
         a = sheet.allowed
-        lines.append(
-            (
-                f"Opponent against {a.position}s",
-                f"{ordinal(a.rank)} of {a.of}, {points_text(a.points_a_game)} points a game",
-            )
-        )
+        lines.append((f"Opponent against {a.position}s", f"{ordinal(a.rank)} of {a.of}"))
     if sheet.last_games:
         lines.append(("Last games", ", ".join(f"{points_text(g.points)} points" for g in sheet.last_games)))
     if sheet.board is not None:
         b = sheet.board
-        lines.append((f"In {b.order_words}", f"{b.rank} overall, {sheet.position}{b.position_rank}"))
+        lines.append((f"In {b.order_words}", f"{sheet.position}{b.position_rank}"))
     return tuple(lines)
 
 

@@ -34,6 +34,8 @@
 		/** His position chip is drawn in its own cell under the Our rank head (BoxLine rankCell, Lane 99
 		 * B24): the club line keeps his status alone. */
 		rankApart?: boolean;
+		/** Said in place of the folded game (BoxGame's note). */
+		note?: string | null;
 		/** Drawn on the club line after the pill. */
 		after?: Snippet;
 		/** The screen's own line under the name, as the phone and narrow screens fold it. */
@@ -48,6 +50,7 @@
 		phoneFacts = true,
 		clears = null,
 		rankApart = false,
+		note = null,
 		after,
 		children
 	}: Props = $props();
@@ -94,7 +97,7 @@
 			>
 		{/if}
 		<span class="phone-game" class:compact
-			><BoxGame {row} facts={!compact && phoneFacts} {clears} /></span
+			><BoxGame {row} facts={!compact && phoneFacts} {clears} {note} /></span
 		>
 		{@render children?.()}
 	</span>

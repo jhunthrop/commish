@@ -3,6 +3,7 @@
 	import WeatherGlyph from '#lib/league/box/WeatherGlyph.svelte';
 	import Label from './Label.svelte';
 	import {
+		projShown,
 		stillToPlay,
 		type AheadRow,
 		type LogHead,
@@ -65,6 +66,8 @@
 	let opened = $state(false);
 	/** The run's weeks still to play, the read's week shown once in the accent row (Lane 80). */
 	const toPlay = $derived(stillToPlay(ahead, next));
+	/** No column that is empty in every row (Lane 100, B30). */
+	const showProj = $derived(projShown(pastProj, next, EMPTY_FIGURE));
 </script>
 
 {#if line}
@@ -78,11 +81,13 @@
 					<tr>
 						<th scope="col" class="pin wk">Wk</th>
 						<th scope="col" class="pin opp">Opp</th>
-						<th scope="col" class="proj"
-							><span aria-hidden="true">{projHead.short}</span><span class="sr"
-								>{projHead.full}</span
-							></th
-						>
+						{#if showProj}
+							<th scope="col" class="proj"
+								><span aria-hidden="true">{projHead.short}</span><span class="sr"
+									>{projHead.full}</span
+								></th
+							>
+						{/if}
 						<th scope="col" class="pts"
 							><span aria-hidden="true">{pointsHead.short}</span><span class="sr"
 								>{pointsHead.full}</span
@@ -102,7 +107,7 @@
 							<td class="pin opp"
 								>{row.opponent}{#if row.note}<span class="note">{row.note}</span>{/if}</td
 							>
-							<td class="proj n dim">{row.tone === 'bye' ? '' : pastProj}</td>
+							{#if showProj}<td class="proj n dim">{row.tone === 'bye' ? '' : pastProj}</td>{/if}
 							<td class="pts n">{row.points ?? ''}</td>
 							{#if row.cells}
 								{#each row.cells as cell, i (i)}
@@ -117,7 +122,7 @@
 						<tr class="next">
 							<th scope="row" class="pin wk">{next.week}</th>
 							<td class="pin opp">{next.opponent}<span class="note">{next.when}</span></td>
-							<td class="proj n">{next.proj}</td>
+							{#if showProj}<td class="proj n">{next.proj}</td>{/if}
 							<td class="pts n dim">{EMPTY_FIGURE}</td>
 							<td class="facts first" colspan={heads.length}>
 								{#if next.expected}<span class="exp">{next.expected}</span>{/if}
@@ -131,7 +136,7 @@
 						<th scope="row" colspan="2" class="pin lead"
 							><b>{line.lead}</b><span>{line.sub}</span></th
 						>
-						<td class="proj"></td>
+						{#if showProj}<td class="proj"></td>{/if}
 						<td class="pts n">{line.total}</td>
 						{#each line.cells as cell, i (i)}
 							<td class="n" class:first={i === 0}>{cell.value}</td>
@@ -151,7 +156,7 @@
 									></span>{priorLabel}</button
 								></td
 							>
-							<td class="rest" colspan={heads.length + 2}></td>
+							<td class="rest" colspan={heads.length + (showProj ? 2 : 1)}></td>
 						</tr>
 					</tbody>
 					<tbody id="earlier-seasons" hidden={!opened}>
@@ -160,7 +165,7 @@
 								<th scope="row" colspan="2" class="pin lead"
 									><b>{season.season}</b><span>{season.sub}</span></th
 								>
-								<td class="proj"></td>
+								{#if showProj}<td class="proj"></td>{/if}
 								<td class="pts n">{season.total}</td>
 								{#each season.cells as cell, i (i)}
 									<td class="n" class:first={i === 0}>{cell}</td>

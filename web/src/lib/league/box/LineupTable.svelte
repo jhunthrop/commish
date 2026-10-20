@@ -119,6 +119,7 @@
 				evidence
 				rankCell
 				move={entry.move}
+				reserve={entry.row.reserve ? 'bench' : null}
 			/>
 		{:else}
 			<tr><td class="empty" colspan={COLUMNS}>{noBench}</td></tr>
@@ -128,7 +129,7 @@
 		<tbody>
 			<tr class="sect"><th colspan={COLUMNS} scope="rowgroup">{BOX.reserve}</th></tr>
 			{#each box.reserve as row (row.key)}
-				<BoxLine {row} tags={tagsOf(row.boardId)} bench evidence rankCell />
+				<BoxLine {row} tags={tagsOf(row.boardId)} bench evidence rankCell reserve="slot" />
 			{/each}
 		</tbody>
 	{/if}

@@ -21,7 +21,7 @@ export interface Clock {
 	zoned: boolean;
 }
 
-function stamp(at: string, clock: Clock): string {
+export function stamp(at: string, clock: Clock): string {
 	const time = weekdayTime(at, clock.zone);
 	return clock.zoned ? `${time} ${zoneWord(clock.zone)}` : time;
 }
