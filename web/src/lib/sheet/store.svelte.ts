@@ -68,8 +68,8 @@ export class SheetStore {
 	account = $state.raw<Account | null>(null);
 	sheets = $state.raw<readonly SheetSummary[]>([]);
 	status = $state<SyncStatus>('local');
-	/** When the account last answered a save, for the status line. */
-	savedAt = $state.raw<Date | null>(null);
+	/** The instant the account last answered a sync, the clock the status line's day is said on. */
+	answeredAt = $state.raw<Date | null>(null);
 	/** The API's sentence for the last save that failed. */
 	problem = $state<string | null>(null);
 	canUndo = $state(false);
@@ -80,6 +80,9 @@ export class SheetStore {
 	notices = $state.raw<readonly string[]>([]);
 
 	sheet = $derived(this.stored.sheet);
+	/** When the account's copy last changed (its updated_at), the sheet's one changed date: a
+	 * visit that writes nothing leaves it where it was (B52). */
+	changedAt = $derived(this.stored.sync?.updatedAt ?? null);
 	ids: ReadonlySet<string> = $derived(new SvelteSet(this.stored.sheet.rows.map((row) => row.id)));
 	signedIn = $derived(this.account !== null);
 
@@ -357,7 +360,7 @@ export class SheetStore {
 
 	#saved(): void {
 		this.status = 'saved';
-		this.savedAt = this.#deps.now();
+		this.answeredAt = this.#deps.now();
 	}
 
 	#schedule(): void {

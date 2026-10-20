@@ -102,6 +102,12 @@ export function planWords(account: Account): PlanWords {
 	return { title: 'Free', line: freeLine(), action: null };
 }
 
+/** Whether the account's draft prep recedes to one line (B52): from the season's first kickoff to
+ * its last game, the site season the API reads at its own clock (/me's season). */
+export function draftToolsRecede(season: Account['season']): boolean {
+	return season.phase === 'in_season';
+}
+
 /** "PPR · 42 players · changed Oct 12". */
 export function sheetLine(sheet: AccountSheet): string {
 	return `${FORMAT_LABELS[sheet.format]} · ${plural(sheet.row_count, 'player')} · changed ${dayLabel(sheet.updated_at)}`;

@@ -36,8 +36,8 @@ export const NEXT_DRAFT = 'Next draft';
 export const ADVISOR_VERB = 'Open the Advisor';
 /** The cheat sheet's way in beside it. */
 export const SHEET_LINK = 'Cheat sheet';
-/** The account page's Next draft rows in season, where the draft prep has left the rail: each
- * page by its rail word, a line, and its verb. */
+/** The account page's Next draft rows out of season: each page by its rail word, a line, and its
+ * verb. */
 export const NEXT_DRAFT_ROWS = [
 	{
 		lead: 'Mock draft',
@@ -50,6 +50,16 @@ export const NEXT_DRAFT_ROWS = [
 		verb: 'Open your sheet'
 	}
 ] as const;
+
+/** The account page's draft prep in season (B52): from the season's first kickoff to its last game
+ * the Next draft block recedes to this one line, each tool's words opening it. */
+export const DRAFT_TOOLS = {
+	label: 'Draft tools',
+	lead: 'Draft tools:',
+	mock: 'mock draft',
+	joint: ', ',
+	sheet: 'cheat sheet'
+} as const;
 
 const DAY_MS = 86_400_000;
 /** A draft this many days off is named by its weekday, further off by its date. */
