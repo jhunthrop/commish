@@ -8,6 +8,8 @@ import type { components, operations } from '#lib/api/types.ts';
 
 type Schemas = components['schemas'];
 export type LineupAdvice = Schemas['LineupAdvice'];
+/** The matchup once the member's starters have all played: locked while it still plays, final after. */
+export type WeekDoneState = Schemas['WeekDoneState'];
 export type LineupSlot = Schemas['LineupSlot'];
 export type MatchupBox = Schemas['MatchupBox'];
 export type MatchupBoxSide = Schemas['MatchupBoxSide'];

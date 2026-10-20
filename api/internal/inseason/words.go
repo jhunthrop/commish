@@ -352,11 +352,12 @@ func ToPlayWords(toPlay, withGame int) string {
 	return fmt.Sprintf("%d of %d starters to play", toPlay, withGame)
 }
 
-// WeekDoneWords is the Lineup's sentence once every starter's game this
-// week is final (Lane 85): nothing is left to change, so it stands where
-// the changes and the verb would.
-func WeekDoneWords(week int) string {
-	return fmt.Sprintf("Every starter's game is final, so week %d is over.", week)
+// WeekDoneWords is the Lineup's sentence once every starter of the
+// member's has played (Lane 85): nothing is left to set, so it stands
+// where the changes and the verb would. It says the lineup, never the
+// week (Lane 91): the score bug beside it says who is still to play.
+func WeekDoneWords() string {
+	return "Every starter of yours has played, so nothing is left to set."
 }
 
 // WaiversBasis is the waiver page's pickup rule (§5.3, Lane 66f): the

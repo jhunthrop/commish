@@ -7,9 +7,9 @@ import {
 	FIXTURE_MONDAY_CLOCK,
 	FIXTURE_TUESDAY_CLOCK
 } from '../../../../scripts/inseason-fixture/clock.ts';
-import { stamped } from '../../../../scripts/inseason-fixture/game-state.ts';
+import { lateFinals, stamped } from '../../../../scripts/inseason-fixture/game-state.ts';
 import { linesOf, recordedMatchups } from '../../../../scripts/inseason-fixture/scoreboard-at.ts';
-import { afterSundayOf } from '../../../../scripts/inseason-fixture/sunday.ts';
+import { afterSundayOf, WEEK_DONE } from '../../../../scripts/inseason-fixture/sunday.ts';
 import { inTenths } from '../../../../scripts/inseason-fixture/tenths.ts';
 import type { LeagueSync } from '../api.ts';
 import type {
@@ -19,8 +19,10 @@ import type {
 	TradeAdvice,
 	WaiverAdvice
 } from '../inseason/api.ts';
+import { lineupSummary } from '../home/home.ts';
+import { BOX } from './box.ts';
 import { gameHead } from './kickoff.ts';
-import { heldLineup, locked } from './lineup.ts';
+import { changesTitle, heldLineup, locked } from './lineup.ts';
 import { sideScore } from './matchup.ts';
 
 const data = (name: string): unknown =>
@@ -32,6 +34,7 @@ const data = (name: string): unknown =>
 			)
 		)
 	);
+const ZONE = 'America/Chicago';
 const sync = data('sync') as LeagueSync;
 const lineup = data('lineup') as LineupAdvice;
 const matchup = data('matchup') as MatchupBox;
@@ -80,12 +83,40 @@ void test('on Monday no game reads a kickoff already past as next, and no move i
 	assert.equal(monday.lineup.team_points, mine?.points);
 });
 
-void test('on Tuesday every game is final, the lineup is set and the week is over', () => {
+void test('on Tuesday every game is final, the lineup is set and the matchup is Final', () => {
 	const tuesday = at(FIXTURE_TUESDAY_CLOCK);
 	assert.ok(tuesday.scoreboard.games.every((g) => g.state === 'final' && g.next_kickoff === null));
 	assert.equal(tuesday.lineup.set, true);
 	assert.ok(tuesday.lineup.slots.every((s) => !s.changed));
-	assert.equal(tuesday.lineup.week_done, "Every starter's game is final, so week 6 is over.");
+	assert.equal(tuesday.lineup.week_done, WEEK_DONE);
+	assert.equal(tuesday.lineup.week_done_state, 'final');
+	const card = lineupSummary(tuesday.lineup, ZONE, Date.parse(FIXTURE_TUESDAY_CLOCK));
+	assert.equal(changesTitle(0, card.done, card.doneState), BOX.final);
+});
+
+void test("every starter of the member's final, the opponent's still playing: Locked, not Final (Lane 91)", () => {
+	// The capture has not held LV at BUF's final: the opponent's Cook still plays.
+	const late = lateFinals('LV,BUF');
+	const now = Date.parse(FIXTURE_TUESDAY_CLOCK);
+	const tuesday = stamped(
+		afterSundayOf({ sync, lineup, matchup }, week, now, FIXTURE_TUESDAY_CLOCK, late),
+		now,
+		late
+	) as ReturnType<typeof afterSundayOf>;
+	const mine = tuesday.scoreboard.games[0];
+	assert.equal(mine?.sides[0]?.roster_id, sync.me);
+	assert.equal(mine.state, 'playing');
+	assert.ok(
+		tuesday.lineup.slots.every((s) => s.ours.facts.bye || s.ours.facts.game_state === 'final')
+	);
+	assert.equal(tuesday.lineup.week_done, WEEK_DONE);
+	assert.equal(tuesday.lineup.week_done_state, 'locked');
+	const card = lineupSummary(tuesday.lineup, ZONE, now);
+	assert.equal(changesTitle(0, card.done, card.doneState), BOX.locked);
+	// Monday, a starter of the member's still to play: no sentence, no state.
+	const monday = at(FIXTURE_MONDAY_CLOCK);
+	assert.equal(monday.lineup.week_done, null);
+	assert.equal(monday.lineup.week_done_state ?? null, null);
 });
 
 void test('the scoreboard and the Matchup print one figure for each side, its rows added (review M2)', () => {

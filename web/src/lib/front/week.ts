@@ -65,10 +65,10 @@ export interface FrontNudge {
 	title: string;
 	sum: StripSum | null;
 	swaps: Swap[];
-	/** Set your lineup with changes to make, else a quiet way to the Lineup; none once the week is
-	 * over. */
+	/** Set your lineup with changes to make, else a quiet way to the Lineup; none once every starter
+	 * has played. */
 	verb: string | null;
-	/** The API's sentence once every starter's game is final (week_done), null before. */
+	/** The API's sentence once every starter of the member's has played (week_done), null before. */
 	done: string | null;
 	solid: boolean;
 	href: string;
@@ -119,7 +119,7 @@ function changesWords(league: WeekLeague): string | null {
 	const lineup = league.lineup;
 	if (lineup === null) return null;
 	const done = lineup.week_done ?? null;
-	const title = changesTitle(lineup.changes, done);
+	const title = changesTitle(lineup.changes, done, lineup.week_done_state ?? null);
 	return done === null && lineup.changes > 0 && lineup.gain !== null && lineup.gain > 0
 		? `${title}, +${fixed(lineup.gain, 1)}`
 		: title;
@@ -207,11 +207,12 @@ export function nudgeOf(league: WeekLeague, href: ScreenHref): FrontNudge | null
 		out: s.out === null ? null : shortName(s.out.name)
 	}));
 	const changes = lineup.changes;
-	// The Lineup's own sentence once the week is over: Final, no sum and no verb, as its strip says.
+	// The Lineup's own sentence once every starter has played: Locked or Final, no sum and no verb,
+	// as its strip says.
 	const done = lineup.week_done ?? null;
 	return {
 		week: league.week,
-		title: changesTitle(changes, done),
+		title: changesTitle(changes, done, lineup.week_done_state ?? null),
 		sum: stripSum(
 			{
 				totals: { proj: lineup.projection, pts: null, note: null },

@@ -2924,6 +2924,11 @@ export interface components {
 		 * @enum {string}
 		 */
 		GameState: 'upcoming' | 'kicked_off' | 'final';
+		/**
+		 * @description the matchup's state once the member's starters have all played: final when the matchup's game is final by the one game-state rule (every starter on both sides final), or the member has no opponent this week; locked while any starter on either side still has a game to play, nothing left to set
+		 * @enum {string}
+		 */
+		WeekDoneState: 'locked' | 'final';
 		/** @description the game's expected score, the consensus of the hourly capture's newest read before kickoff; a read more than six hours before kickoff (or before now) gives way to the game table's newest weekly read, with its own read time */
 		GameTotal: {
 			/**
@@ -3189,8 +3194,10 @@ export interface components {
 			/** @description one sentence under the verb when we cannot open the host's page ("Make this change on Yahoo. We cannot open that page for you yet."), null when the url opens it */
 			host_note: string | null;
 			moves: components['schemas']['LineupMoves'];
-			/** @description the sentence once every starter's game this week is final ("Every starter's game is final, so week 6 is over."): no change is left to make, so the screen says it in place of the changes and the verb; null while any starter's game is still to come or under way, or absent from an older answer */
+			/** @description the sentence once every starter of the member's with a game this week has it final, a bye starter aside ("Every starter of yours has played, so nothing is left to set."): it says the lineup, never the week, and stands in place of the changes and the verb; null while any starter's game is still to come or under way, or absent from an older answer */
 			week_done?: string | null;
+			/** @description present whenever week_done is, null otherwise or absent from an older answer */
+			week_done_state?: components['schemas']['WeekDoneState'] | null;
 		};
 		BoxStarter: {
 			/** @enum {string} */
@@ -3332,8 +3339,10 @@ export interface components {
 			gain: number | null;
 			/** @description each change, in the league's slot order */
 			swaps: components['schemas']['WeekSwap'][];
-			/** @description the Lineup's own week_done sentence (words.go WeekDoneWords) once every starter's game is final, which the front door says in place of the changes and the verb; null before, or absent from an older answer */
+			/** @description the Lineup's own week_done sentence (words.go WeekDoneWords) once every starter of the member's has played, which the front door says in place of the changes and the verb; null before, or absent from an older answer */
 			week_done?: string | null;
+			/** @description the Lineup's own week_done_state, present whenever week_done is, null otherwise or absent from an older answer */
+			week_done_state?: components['schemas']['WeekDoneState'] | null;
 		};
 		WeekSwap: {
 			/** @enum {string} */
