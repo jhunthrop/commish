@@ -2,8 +2,9 @@
 // every starter of the member's with a game has kicked off or is final at the clock (the Lineup's
 // slots, the one game state), Waivers, Trades and the front door's roster facts address week 7 while
 // the platform, the Lineup and the claim stay on week 6. Every row carries his week 7 game
-// (data/week7-games.json, the store's provider schedule) or his bye, his week 6 designation dropped
-// as spent (Season.WithoutSpent: the fixture's are all listed before his week 6 game), and no week
+// (data/week7-games.json, the store's provider schedule) or his bye, his week 6 designation kept
+// and marked carried over (Season.Turned: the fixture's are all undated listings from before his
+// week 6 game, never hidden), and no week
 // figure: week 7's published projection is first captured in its Thursday slot, two hours before
 // Chicago and New England kick off (advice.go projectionArrivesAt), so the pickups go by the season
 // Gain (words.go UnprojectedOrderWords) and the page says when it arrives.
@@ -37,7 +38,7 @@ export const WEEK7_PROJECTION_ARRIVES = new Date(
 	Math.min(...WEEK7.games.map((g) => Date.parse(g.kickoff))) - CAPTURE_LEAD_MS
 ).toISOString();
 
-/** The week's designations, which a game played spends; a season-long one stands. */
+/** The week's designations, carried over once a game is played; a season-long one never is. */
 const WEEK_STATUSES = new Set(['questionable', 'doubtful', 'out']);
 
 /** Whether the member's lineup has played its week at `now` (advice.go everyStarterPast at kicked
@@ -52,7 +53,7 @@ export function lineupSpent(lineup: LineupAdvice, now: number): boolean {
 	);
 }
 
-/** His line for week 7: its game or his bye, no week figure, a week's designation spent. */
+/** His line for week 7: its game or his bye, no week figure, a week's designation carried over. */
 export function turnedLine(line: PlayerLine): PlayerLine {
 	const game = WEEK7.games.find((g) => g.team === line.player.team);
 	const designation = line.facts.designation;
@@ -77,7 +78,7 @@ export function turnedLine(line: PlayerLine): PlayerLine {
 			weather: null,
 			designation:
 				designation && WEEK_STATUSES.has(designation.status) && (designation.since ?? null) === null
-					? null
+					? { ...designation, listed: designation.listed ?? null, carried_over: true }
 					: designation
 		}
 	};

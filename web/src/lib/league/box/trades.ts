@@ -33,7 +33,7 @@ import {
 } from './basis.ts';
 import { BOX } from './box.ts';
 import { locked } from './lineup.ts';
-import { addressedWeek, arrivesPart, weekProjected } from './next-week.ts';
+import { addressedWeek, arrivesPart, NEXT_WEEK, turnedPage, weekProjected } from './next-week.ts';
 import { SEASON, TRADE_GAIN } from './season.ts';
 
 /** Every word the trade table prints that is not a player's or a team's, for the copy guard. */
@@ -171,6 +171,13 @@ export function weekLine(
 function countsThisWeek(row: Pick<TradeRow, 'give' | 'get' | 'drop'>, now: number): boolean {
 	const moved = [...row.give, ...row.get, ...(row.drop ? [row.drop] : [])];
 	return !moved.some((l) => locked(l, now));
+}
+
+/** The finder's week group head: "This week, Proj", "Week 7, Proj" on a turned page (Lane 95). */
+export function weekHeadFor(advice: { week: number; for_week?: number }): string {
+	return turnedPage(advice)
+		? `${NEXT_WEEK.week(addressedWeek(advice))}, ${BOX.proj}`
+		: TRADES.weekHead;
 }
 
 /** A trade with no change this week once a player it moves has kicked off or is final (Lane 85): the

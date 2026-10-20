@@ -21,6 +21,7 @@
 		sortRows,
 		TRADES,
 		tradeBasis,
+		weekHeadFor,
 		worthProposing,
 		type CopiedTrade,
 		type FinderRow,
@@ -304,6 +305,7 @@
 			onopen={(open: boolean) => (anyOpen = open)}
 			{now}
 			weekShown={weekProjected(advice)}
+			weekHead={weekHeadFor(advice)}
 		/>
 	</div>
 	<BasisBlock parts={basis} id={BASIS_ID} />

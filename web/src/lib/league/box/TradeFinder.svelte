@@ -61,6 +61,8 @@
 		/** Whether the week's Proj group is drawn: not while the week the page addresses has no
 		 * published projection read, whose columns would be "--" in every row (Lane 95). */
 		weekShown?: boolean;
+		/** The week group's head (trades.ts weekHeadFor). */
+		weekHead?: string;
 	}
 
 	let {
@@ -76,6 +78,7 @@
 		builderId,
 		now,
 		weekShown = true,
+		weekHead = TRADES.weekHead,
 		onopen = () => undefined
 	}: Props = $props();
 
@@ -149,7 +152,7 @@
 		<tr class="groups">
 			<td colspan="4"></td>
 			<th colspan="2" scope="colgroup" class="gh first">{TRADES.gainHead}</th>
-			{#if weekShown}<th colspan="2" scope="colgroup" class="gh first">{TRADES.weekHead}</th>{/if}
+			{#if weekShown}<th colspan="2" scope="colgroup" class="gh first">{weekHead}</th>{/if}
 			<td></td>
 		</tr>
 		<tr class="cols">

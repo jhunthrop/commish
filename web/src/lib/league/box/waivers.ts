@@ -476,7 +476,8 @@ export function waiverBasis(
 	now: number
 ): BasisPart[] {
 	const defense = lines.some((l) => l.player.position === 'DEF');
-	// Before the week's projection is read, the day it arrives in its place (Lane 95).
+	// Before the week's projection is read the screen draws no Proj column and says the day it
+	// arrives over the table (WaiverScreen, Lane 95), so the basis says nothing of Proj.
 	const arrives =
 		advice.week === undefined
 			? null
@@ -486,16 +487,17 @@ export function waiverBasis(
 					clock.zone
 				);
 	const proj =
-		arrives ??
-		projPart(
-			{
-				readAt: advice.projection_read_at,
-				scoring: advice.projection_scoring,
-				defense,
-				league: true
-			},
-			clock
-		);
+		arrives !== null
+			? null
+			: projPart(
+					{
+						readAt: advice.projection_read_at,
+						scoring: advice.projection_scoring,
+						defense,
+						league: true
+					},
+					clock
+				);
 	return [
 		// The order's rule, the API's: the week's, or the season Gain once a pickup's game kicked off.
 		...said(advice.basis),

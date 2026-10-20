@@ -2,7 +2,7 @@
 // and the built site, dark at 1280 and 390, on one of two clocks (inseason-fixture/clock.ts):
 //   saturday      the fixture's week clock, week 6 still to play: Waivers and Trades say Week 6;
 //   monday-night  Monday 11:00 pm Central, every starter of the member's kicked off or final: the
-//                 front door's roster facts are for week 7 with no stamp saying "Listed", Waivers and
+//                 front door's roster facts are for week 7, a carried-over listing said with its date, Waivers and
 //                 Trades say Week 7, Trades draws no "This week, Proj" group, and both bases say the
 //                 day week 7's published projection arrives.
 // Every page: nothing scrolls sideways, and the copy passes the one guard (copy-scan.ts). Exits
@@ -39,7 +39,7 @@ const HEIGHTS = { 1280: 900, 390: 844 } as const;
 const READY_TIMEOUT_MS = 30_000;
 const SIGNED_IN = { name: 'commish_csrf', value: 'fixture' };
 const WEEK = turned ? 'Week 7' : 'Week 6';
-const ARRIVES = 'Week 7 projections arrive Thursday.';
+const ARRIVES = 'Week 7 projections expected Thursday.';
 
 await requireFixtureClock(API_ORIGIN, CLOCKS[day]);
 await mkdir(out, { recursive: true });
@@ -94,13 +94,17 @@ for (const width of WIDTHS) {
 
 	await open(page, '/', 'Your roster');
 	const front = await check(page, `front ${w}`);
-	if (front.includes('Listed ')) fault(`front ${w}`, 'a roster fact says Listed');
+	if (front.includes('a starter. Listed')) fault(`front ${w}`, 'a roster fact says Listed');
+	if (turned && !front.toLowerCase().includes(', as of oct'))
+		fault(`front ${w}`, 'the carried-over listing is not said with its date');
 	if (turned !== front.includes('for week 7.'))
 		fault(`front ${w}`, `the roster head ${turned ? 'is not' : 'is'} for week 7`);
 	await page.screenshot({ path: new URL(`front-${w}.png`, out).pathname, fullPage: true });
 
 	await open(page, `/league/${FIXTURE_IDS.league}/waivers`, WEEK);
 	const waivers = await check(page, `waivers ${w}`);
+	if (turned === waivers.toLowerCase().includes('δ proj') && width > 500)
+		fault(`waivers ${w}`, `the Proj columns ${turned ? 'are' : 'are not'} drawn`);
 	if (turned !== waivers.includes(ARRIVES))
 		fault(`waivers ${w}`, `the basis ${turned ? 'does not say' : 'says'} when week 7's arrives`);
 	await page.screenshot({ path: new URL(`waivers-${w}.png`, out).pathname, fullPage: true });

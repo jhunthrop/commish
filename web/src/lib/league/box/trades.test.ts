@@ -375,7 +375,7 @@ void test("before the week's projection is read: no week columns to say, the day
 	);
 	assert.equal(
 		basisText(parts),
-		`${advice.basis} Week 7 projections arrive Thursday. Room is who a roster drops to take two for one. How the order has done`
+		`${advice.basis} Week 7 projections expected Thursday. Room is who a roster drops to take two for one. How the order has done`
 	);
 });
 
