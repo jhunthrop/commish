@@ -27,12 +27,22 @@ from research.db.schema import (
 from research.db.url import sqlalchemy_url
 from research.errors import SchemaDriftError
 from research.parity import databases
+from research.pipeline.budget import UnmeteredBudget
 from research.pipeline.http import HttpResponse
 from research.pipeline.kickoff_slots import LEAD, due_slot, kickoff_slots, slot_name, slot_of
 from research.pipeline.kickoffs import TeamKickoff, stored_kickoffs
 from research.pipeline.odds import touchdowns
 from research.pipeline.tank01 import projections
-from research.pipeline.tank01.capture import CaptureResult, FeedOutcome, record_checks, run_capture_harvest
+from research.pipeline.tank01.capture import (
+    CAPTURE_FEEDS,
+    CaptureContext,
+    CapturePass,
+    CaptureResult,
+    FeedOutcome,
+    capture_once,
+    record_checks,
+    run_capture_harvest,
+)
 from research.pipeline.tank01.client import Paths, Tank01Client
 
 TESTDATA: Final = Path(__file__).resolve().parent / "testdata"
@@ -591,3 +601,54 @@ def test_only_the_week_with_an_empty_player_map_is_never_reparsed(engine: Engine
         report = projections.parse_stored_projections(conn)
         conn.rollback()
     assert (report.snapshots, report.rows, len(report.refused)) == (0, 0, 3)
+
+
+# The full-capture feed list (the operator's stats:capture pass, the parity case's path) screens its
+# projections entry as the daily read does (B73): a week not published yet is never stored, drift is.
+_FULL_LIST_PROJECTIONS: Final = [f for f in CAPTURE_FEEDS if f.source == projections.PROJECTIONS_SOURCE]
+
+
+def _full_list_pass(conn: Connection, fetcher: Tank01Fetcher) -> CaptureResult:
+    capture = CapturePass(_eastern(20, 6), 2026, 7, feeds=_FULL_LIST_PROJECTIONS)
+    return capture_once(conn, Tank01Client(fetcher, "key"), capture, UnmeteredBudget())
+
+
+@pytest.mark.parametrize("answer", _UNPUBLISHED_ANSWERS)
+def test_the_full_list_never_stores_a_week_not_published_yet(engine: Engine, answer: tuple[int, object]) -> None:
+    fetcher = Tank01Fetcher(answer=answer)
+    with engine.connect() as conn:
+        _clear_projection_reads(conn)
+        result = _full_list_pass(conn, fetcher)
+        stored, checked = _count(conn, CAPTURE_SNAPSHOTS), _count(conn, CAPTURE_CHECKS)
+        fetcher.answer = None  # published by the next pass: nothing earlier stands in its way
+        later = _full_list_pass(conn, fetcher)
+        parsed = projections.parse_stored_projections(conn)
+        conn.rollback()
+    assert (_outcome(result).status, _outcome(result).reason) == ("unpublished", "week 7 not published yet")
+    assert (stored, checked) == (0, 0)
+    assert _outcome(later).status == "captured"
+    assert (parsed.snapshots, parsed.refused) == (1, ())
+
+
+@pytest.mark.parametrize("body", _DRIFT_ANSWERS)
+def test_drift_on_the_full_list_is_stored_and_refused(engine: Engine, body: object) -> None:
+    fetcher = Tank01Fetcher(answer=(200, {"statusCode": 200, "body": body}))
+    with engine.connect() as conn:
+        _clear_projection_reads(conn)
+        result = _full_list_pass(conn, fetcher)
+        stored = _count(conn, CAPTURE_SNAPSHOTS)
+        parsed = projections.parse_stored_projections(conn)
+        conn.rollback()
+    assert (_outcome(result).status, stored) == ("captured", 1)
+    assert len(parsed.refused) == 1 and "FAILED" in parsed.line()
+
+
+def test_the_full_list_reads_and_screens_the_pass_week() -> None:
+    (feed,) = _FULL_LIST_PROJECTIONS
+    assert feed.screen is not None
+    context = CaptureContext(2026, 9, "20261030", ())
+    assert [r.query for r in feed.requests(context)] == [{"week": "9"}]
+    assert feed.screen(context, {"week": "9", "playerProjections": {}}) == ("unpublished", "week 9 not published yet")
+    assert feed.screen(context, {}) == ("unpublished", "week 9 not published yet")
+    assert feed.screen(context, _projections()) is None
+    assert feed.screen(context, {"week": "9"}) is None  # drift: stored, and the parser refuses it
