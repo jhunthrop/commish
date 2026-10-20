@@ -1,7 +1,7 @@
 /** The one basis line a page prints about the selected league: what its figures are against the
  * league's scoring. Its own module, so only the pages that print it carry it. */
 import { midSentence } from '#lib/format/sentence.ts';
-import { SCORING_WORDS } from '#lib/league/names.ts';
+import { SCORING_WORDS, nearestRules } from '#lib/league/names.ts';
 import { FORMAT_LABELS } from '#lib/sheet/format.ts';
 import type { BoardFormat, ContextLeague } from './words.ts';
 
@@ -59,7 +59,7 @@ export function scoresSentence(scoring: ContextLeague['scoring']): string {
 }
 
 /** The page's one line about the league, null with no league selected. The figures' scoring names
- * its basis against the league's: the same, plain PPR beside a TE premium league with where its
+ * its basis against the league's: the same, PPR nearest the rules of a TE premium league with where its
  * exact rules rank it, a format this run does not carry, or (a link that named another board the
  * run carries) simply what this board is. exactRules is the account's custom_scoring. */
 export function contextNote(
@@ -78,7 +78,11 @@ export function contextNote(
 		return plain(`${scores} This run has no ${figuresWords(league.format)} board, so ${lower}.`);
 	}
 	if (league.scoring === 'te_premium') {
-		return exactNote(league, exactRules, `${scores} ${subject} plain ${figuresWords(figures)}.`);
+		return exactNote(
+			league,
+			exactRules,
+			`${scores} ${subject} ${figuresWords(figures)}, ${nearestRules(league.host)}.`
+		);
 	}
 	return plain(
 		league.format === 'superflex'

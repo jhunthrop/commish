@@ -51,7 +51,7 @@ const facts = (over: Partial<WeekFacts> = {}): WeekFacts => ({
 const line = (over: Partial<WeekFacts> = {}): PlayerLine =>
 	({ facts: facts(over), player: { position: 'QB' } }) as unknown as PlayerLine;
 
-void test("FFPC's tight end premium is said beside the PPR column, never as PPR nearest its rules (Lane 94, B26)", () => {
+void test("FFPC's tight end premium is said beside PPR nearest its rules, never as the only difference (Lane 94, B26, fix round 1)", () => {
 	const ffpc = { ...CLOSEST, te_bonus: 0.5 };
 	const said = projPart(
 		{ readAt: READ, scoring: ffpc, defense: false, league: true, host: 'ffpc' },
@@ -59,13 +59,12 @@ void test("FFPC's tight end premium is said beside the PPR column, never as PPR 
 	);
 	assert.equal(
 		said,
-		"Proj is this week's published projection, PPR shown, FFPC adds 0.5 a catch for TEs, read Fri 9:00 pm."
+		"Proj is this week's published projection, PPR shown, nearest FFPC's rules, read Fri 9:00 pm. FFPC adds 0.5 a catch for TEs."
 	);
-	assert.doesNotMatch(said, /nearest/);
 	assert.doesNotMatch(said, bannedPattern());
 	assert.equal(
 		projPart({ readAt: READ, scoring: ffpc, defense: false, league: true }, CENTRAL),
-		"Proj is this week's published projection, PPR shown, your league adds 0.5 a catch for TEs, read Fri 9:00 pm."
+		"Proj is this week's published projection, PPR shown, nearest your rules, read Fri 9:00 pm. Your league adds 0.5 a catch for TEs."
 	);
 });
 

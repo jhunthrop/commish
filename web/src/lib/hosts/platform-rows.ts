@@ -75,8 +75,18 @@ const CONNECT_LINES: Readonly<Record<ConnectedHost, string>> = {
 
 const DAY_SECONDS = 86_400;
 
-/** How many of the member's leagues run on each platform, from the account's league list. */
-export type LeagueCounts = Readonly<Partial<Record<Platform, number>>>;
+/** The member's leagues on one platform, from the account's league list: how many, and the newest
+ * read of any of them, the one time the row says (Lane 94 fix round 1: the time the leagues table
+ * says for its leagues, never the connection's own). */
+export interface PlatformLeagues {
+	count: number;
+	readAt: string | null;
+}
+
+/** Each platform's leagues. */
+export type LeaguesByPlatform = Readonly<Partial<Record<Platform, PlatformLeagues>>>;
+
+const NO_LEAGUES: PlatformLeagues = { count: 0, readAt: null };
 
 /** What a connection reads: "1 league followed", "no league followed". */
 function leaguesWords(count: number): string {
@@ -92,19 +102,22 @@ export function readWords(at: string | null, now: Date): string {
 	return age < DAY_SECONDS ? agoWords(age) : dayLabel(at);
 }
 
-function connectedRow(c: HostConnection, now: Date, leagues: number): PlatformRow {
+/** A connected platform's row; leagues null when the account's list could not be read, so the row
+ * says only when it was connected and its connection's own last read. */
+function connectedRow(c: HostConnection, now: Date, leagues: PlatformLeagues | null): PlatformRow {
 	const dropped = c.status === 'signed_out';
+	const since = `Since ${dayLabel(c.connected_at)}`;
 	return {
 		key: c.host,
 		name: hostWords(c.host),
 		dot: dropped ? 'bad' : 'ok',
 		state: statusWords(c),
-		line: `Since ${dayLabel(c.connected_at)}, ${leaguesWords(leagues)}`,
+		line: leagues === null ? since : `${since}, ${leaguesWords(leagues.count)}`,
 		writes: c.writes_on
 			? { on: true, words: PLATFORM_WORDS.onWords }
 			: { on: false, words: c.writes_reason ?? PLATFORM_WORDS.never },
 		note: null,
-		read: readWords(c.last_read_at, now),
+		read: readWords(leagues === null ? c.last_read_at : leagues.readAt, now),
 		verb: dropped
 			? { kind: 'again', words: againWords(c.host) }
 			: { kind: 'disconnect', words: PLATFORM_WORDS.disconnect }
@@ -128,6 +141,7 @@ function unconnectedRow(host: ConnectedHost, open: boolean): PlatformRow {
 /** Sleeper's row: followed by league id with nothing to connect, "Followed" once a league is. */
 function sleeperRow(leagues: number): PlatformRow {
 	const followed = leagues > 0;
+	// Its note spans the Lineups and Last read cells, so the row says no read.
 	return {
 		key: 'sleeper',
 		name: hostWords('sleeper'),
@@ -146,19 +160,31 @@ function sleeperRow(leagues: number): PlatformRow {
 export function platformRows(
 	hosts: HostConnections,
 	now: Date,
-	leagues: LeagueCounts = {}
+	leagues: LeaguesByPlatform | null = {}
 ): PlatformRow[] {
 	return PLATFORMS.map((key) => {
-		const count = leagues[key] ?? 0;
-		if (key === 'sleeper') return sleeperRow(count);
+		const mine = leagues === null ? null : (leagues[key] ?? NO_LEAGUES);
+		if (key === 'sleeper') return sleeperRow(mine?.count ?? 0);
 		const c = hosts.connections.find((x) => x.host === key);
-		return c ? connectedRow(c, now, count) : unconnectedRow(key, hosts.enabled.includes(key));
+		return c ? connectedRow(c, now, mine) : unconnectedRow(key, hosts.enabled.includes(key));
 	});
 }
 
-/** The account's leagues counted by platform. */
-export function leagueCounts(leagues: readonly { host: Platform }[]): LeagueCounts {
-	const out: Partial<Record<Platform, number>> = {};
-	for (const l of leagues) out[l.host] = (out[l.host] ?? 0) + 1;
+/** The newer of two reads, either may be none. */
+function newer(a: string | null, b: string | null): string | null {
+	if (a === null) return b;
+	if (b === null) return a;
+	return Date.parse(b) > Date.parse(a) ? b : a;
+}
+
+/** The account's leagues by platform: each platform's count and newest read. */
+export function leaguesByPlatform(
+	leagues: readonly { host: Platform; last_read_at: string | null }[]
+): LeaguesByPlatform {
+	const out: Partial<Record<Platform, PlatformLeagues>> = {};
+	for (const l of leagues) {
+		const was = out[l.host] ?? NO_LEAGUES;
+		out[l.host] = { count: was.count + 1, readAt: newer(was.readAt, l.last_read_at) };
+	}
 	return out;
 }

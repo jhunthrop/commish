@@ -32,8 +32,6 @@ type Rules struct {
 	// PlayoffLastWeek is the league playoffs' last week from the same row
 	// ("League Playoffs Weeks 13-14"), 0 when the row gives no range.
 	PlayoffLastWeek int `json:"playoff_last_week,omitempty"`
-	// HeadToHead says the Format (Regular Season) row states H2H matchups.
-	HeadToHead bool `json:"head_to_head,omitempty"`
 	// Seeds is how the rules seed the league playoffs, seed by seed
 	// (SeedRecord or SeedPoints), from the "Seed 1) Team with best regular
 	// season Record" lines; none when the page states no seeding.
@@ -78,14 +76,6 @@ func seedsOf(cell string) []string {
 		}
 	}
 	return out
-}
-
-// headToHead reports a regular season line that states H2H matchups
-// ("H2H matchups" under "Format (Regular Season):"); the championship
-// round's "No H2H matchups, total points only" is another section.
-func headToHead(section, value string) bool {
-	v := strings.ToLower(value)
-	return strings.HasPrefix(section, "format (regular season)") && strings.Contains(v, "h2h") && !strings.Contains(v, "no h2h")
 }
 
 // playoffEnd reads the Duration row's last league playoff week.
@@ -155,19 +145,13 @@ func ParseRules(page []byte) (Rules, error) {
 	}
 	r := Rules{Scoring: map[string]float64{}}
 	found := false
-	// A row with no label continues the labelled row above it.
-	section := ""
 	for _, tr := range all(doc, tag("tr")) {
 		row := cells(tr)
 		if len(row) < 2 {
 			continue
 		}
-		label, value := strings.ToLower(text(row[0])), text(row[1])
-		if label != "" {
-			section = label
-		}
-		found = ruleRow(&r, label, value) || found
-		r.HeadToHead = r.HeadToHead || headToHead(section, value)
+		value := text(row[1])
+		found = ruleRow(&r, strings.ToLower(text(row[0])), value) || found
 		if seeds := seedsOf(value); len(seeds) > 0 && len(r.Seeds) == 0 {
 			r.Seeds = seeds
 		}

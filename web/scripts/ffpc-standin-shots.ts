@@ -2,7 +2,7 @@
 // fixture API (scripts/inseason-fixture/serve.ts) asked for its FFPC stand-in (ffpc.ts, the
 // fixture_platform=ffpc cookie) and the built site, light at 1280 and 390, on the fixture week's
 // clock. It asserts the standings say FFPC's seeding under the table and draw no cut by record, the
-// Lineup's basis says the PPR column with FFPC's tight end extra and never "nearest your rules", and
+// Lineup's basis says the PPR column nearest FFPC's rules with FFPC's tight end extra beside it, and
 // the Account room's platforms say one state word each, what each connection is connected to, and no
 // internal field. Exits non-zero on any fault.
 //
@@ -16,14 +16,18 @@ import { copyFault, watchData } from './copy-scan.ts';
 import { installFixtureApiClock, requireFixtureClock } from './inseason-fixture/clock.ts';
 import { FIXTURE_IDS } from './inseason-fixture/ids.ts';
 
-const WIDTHS = [1280, 390] as const;
+const WIDTHS = [1440, 1280, 390] as const;
+/** The Connection column's least width at a desk, where its line wraps within it (fix round 1). */
+const CONNECTION_MIN_PX = 200;
+const DESK = 900;
 const VIEWPORT_HEIGHT = 900;
 const READY_TIMEOUT_MS = 30_000;
 const SIGNED_IN = { name: 'commish_csrf', value: 'fixture' };
 const FFPC_PLATFORM = { name: 'fixture_platform', value: 'ffpc' };
 const SEEDING =
 	'FFPC seeds 4 for the playoffs, weeks 13 to 14: 1 and 3 on record, 2 and 4 on points.';
-const TE_WORDS = 'PPR shown, FFPC adds 0.5 a catch for TEs';
+const NEAREST_WORDS = "PPR shown, nearest FFPC's rules";
+const TE_WORDS = 'FFPC adds 0.5 a catch for TEs.';
 const STATES = ['Connected', 'Followed', 'Not connected', 'Not yet open', 'Signed in'] as const;
 
 const web = process.argv[2] ?? 'http://localhost:4196';
@@ -80,15 +84,15 @@ for (const width of WIDTHS) {
 	if (seeding?.trim() !== SEEDING) fault(`league ${String(width)}`, `seeding "${seeding ?? ''}"`);
 	if ((await home.locator('.standings tr.rule').count()) !== 0)
 		fault(`league ${String(width)}`, 'a cut by record under the standings');
-	if (!((await home.locator('main').textContent()) ?? '').includes('FFPC adds 0.5 a catch for TEs'))
-		fault(`league ${String(width)}`, 'no tight end extra in the basis');
+	const homeText = (await home.locator('main').textContent()) ?? '';
+	if (!homeText.includes(NEAREST_WORDS) || !homeText.includes(TE_WORDS))
+		fault(`league ${String(width)}`, 'no nearest rules and tight end extra in the basis');
 	await shoot(home, 'ffpc-league', width);
 
 	const start = await open(width, `${league}/start`, 'Copy the lineup');
 	const body = (await start.locator('main').textContent()) ?? '';
-	if (!body.includes(TE_WORDS)) fault(`lineup ${String(width)}`, 'no tight end extra beside PPR');
-	if (body.includes('nearest your rules'))
-		fault(`lineup ${String(width)}`, 'says nearest your rules');
+	if (!body.includes(NEAREST_WORDS) || !body.includes(TE_WORDS))
+		fault(`lineup ${String(width)}`, 'no nearest rules and tight end extra in the basis');
 	await shoot(start, 'ffpc-lineup', width);
 
 	const account = await open(width, '/account', 'Platforms');
@@ -107,6 +111,33 @@ for (const width of WIDTHS) {
 		fault(`account ${String(width)}`, `internal field in "${text}"`);
 	if (!lines.some((l) => l.includes('league followed') || l.includes('leagues followed')))
 		fault(`account ${String(width)}`, `no league count in ${lines.join(' | ')}`);
+	if (width > DESK) {
+		const head = await account.locator('.platforms thead th').nth(1).boundingBox();
+		if (head === null || head.width < CONNECTION_MIN_PX)
+			fault(`account ${String(width)}`, `Connection column ${String(head?.width ?? 0)} px`);
+		// Every row's verb sits whole inside the table.
+		const table = await account.locator('.platforms table').boundingBox();
+		for (const verb of await account
+			.locator('.platforms tbody .act a, .platforms tbody .act button')
+			.all()) {
+			const box = await verb.boundingBox();
+			if (table !== null && box !== null && box.x + box.width > table.x + table.width)
+				fault(
+					`account ${String(width)}`,
+					`verb "${(await verb.textContent()) ?? ''}" past the table`
+				);
+		}
+	}
+	// One time a row: the ESPN row's last read is its leagues' newest, as the leagues table says it.
+	const bare = (r: string | null): string => (r ?? '').replace('Last read', '').trim();
+	const espnRead = bare(
+		await account.locator('.platforms tbody tr').first().locator('.read').textContent()
+	);
+	const leagueReads = (await account.locator('#your-leagues tbody .read').allTextContents()).map(
+		bare
+	);
+	if (!leagueReads.includes(espnRead))
+		fault(`account ${String(width)}`, `ESPN read "${espnRead}" is no league's`);
 	await shoot(account, 'account-platforms', width);
 }
 await browser.close();

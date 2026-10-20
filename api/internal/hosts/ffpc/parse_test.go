@@ -245,9 +245,6 @@ func TestRulesAndScoring(t *testing.T) {
 	if r.PlayoffLastWeek != 14 {
 		t.Fatalf("the Duration row says League Playoffs Weeks 13-14, read the last as %d", r.PlayoffLastWeek)
 	}
-	if !r.HeadToHead {
-		t.Fatal("the Format (Regular Season) row says H2H matchups")
-	}
 	wantSeeds := []string{SeedRecord, SeedPoints, SeedRecord, SeedPoints}
 	if !slices.Equal(r.Seeds, wantSeeds) {
 		t.Fatalf("seeds %v, want %v", r.Seeds, wantSeeds)

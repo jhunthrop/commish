@@ -8,7 +8,7 @@ import { lineState, toPlay } from './kickoff.ts';
 import type { BasisPart } from '#lib/run/board-basis.ts';
 import type { LeagueHost } from '../api.ts';
 import type { PlayerLine, ProjectionScoring } from '../inseason/api.ts';
-import { hostWords } from '../names.ts';
+import { hostWords, nearestRules } from '../names.ts';
 import { BOX, FORMAT_WORDS, expectedWords, factsReadAt, weatherCell } from './box.ts';
 
 export type { BasisPart };
@@ -38,25 +38,35 @@ export interface ProjFacts {
 	host?: LeagueHost;
 }
 
-/** The figures' scoring against the league's: its own, the nearest column, or the column shown
- * with the tight end's extra a catch the league adds (Lane 94, B26: never "PPR" for FFPC's rules). */
+/** The tight end's extra a catch the league's rules add, its own sentence (Lane 94 fix round 1: said
+ * beside "nearest", never as the only difference): "FFPC adds 0.5 a catch for TEs.", null without
+ * one. */
+export function teBonusSentence(bonus: number | undefined, host?: LeagueHost): string | null {
+	if (bonus === undefined) return null;
+	const who = host === undefined ? 'Your league' : hostWords(host);
+	return `${who} adds ${String(bonus)} a catch for TEs.`;
+}
+
+/** The figures' scoring against the league's: its own, or the column shown nearest its rules
+ * (Lane 94 ruling: "PPR shown, nearest FFPC's rules" where the rules add a tight end's extra). */
 function whoseScoring(proj: ProjFacts, format: string): string {
 	if (!proj.league) return ` in ${format}`;
 	if (proj.scoring.league_own) return ' on your rules';
-	const bonus = proj.scoring.te_bonus;
-	if (bonus === undefined) return `, ${format} nearest your rules`;
-	const who = proj.host === undefined ? 'your league' : hostWords(proj.host);
-	return `, ${format} shown, ${who} adds ${String(bonus)} a catch for TEs`;
+	if (proj.scoring.te_bonus === undefined) return `, ${format} nearest your rules`;
+	return `, ${format} shown, ${nearestRules(proj.host)}`;
 }
 
 /** "Proj is this week's published projection, PPR nearest your rules, read Fri 9:00 pm.", or for
- * FFPC's rules "..., PPR shown, FFPC adds 0.5 a catch for TEs, read Mon 6:00 pm." */
+ * FFPC's rules "..., PPR shown, nearest FFPC's rules, read Mon 6:00 pm. FFPC adds 0.5 a catch for
+ * TEs." */
 export function projPart(proj: ProjFacts, clock: Clock): string {
 	const format = FORMAT_WORDS[proj.scoring.format];
 	const whose = whoseScoring(proj, format);
 	const defenses = proj.defense ? ', defenses on default scoring' : '';
 	const when = proj.readAt === null ? 'not in yet' : `read ${stamp(proj.readAt, clock)}`;
-	return `${proj.head ?? BOX.proj} is this week's published projection${whose}${defenses}, ${when}.`;
+	const bonus = proj.league ? teBonusSentence(proj.scoring.te_bonus, proj.host) : null;
+	const said = `${proj.head ?? BOX.proj} is this week's published projection${whose}${defenses}, ${when}.`;
+	return bonus === null ? said : `${said} ${bonus}`;
 }
 
 /** "Δ Proj is its change since Thu 9:00 pm.", null without a read before. */

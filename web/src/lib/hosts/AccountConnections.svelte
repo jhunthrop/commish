@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
 	import { links } from '#lib/site/links.ts';
-	import { siteContext } from '#lib/context/context.svelte.ts';
+	import { leagueApi } from '#lib/league/api.ts';
 	import ProblemLine from '#lib/ui/ProblemLine.svelte';
 	import Quiet from '#lib/ui/Quiet.svelte';
 	import Verb from '#lib/ui/Verb.svelte';
@@ -22,7 +22,8 @@
 	import { ESPN_CONSENT, MFL_CONSENT, againWords, keepReadingVerb } from './connection-words.ts';
 	import {
 		PLATFORM_WORDS,
-		leagueCounts,
+		leaguesByPlatform,
+		type LeaguesByPlatform,
 		platformRows,
 		type Platform,
 		type PlatformRow
@@ -50,12 +51,21 @@
 	/** Yahoo's return to this page, said once. */
 	const returned = yahooOutcome(page.url.searchParams);
 
+	/** The account's leagues by platform, from the list the Leagues attached table reads too, so a
+	 * row's count and last read are that table's; null when the list could not be read, and each row
+	 * then says only when it was connected and its connection's own read. */
+	let leagues = $state<LeaguesByPlatform | null>(null);
+
 	function load(): void {
-		hostsApi
-			.connections()
-			.then((answer) => {
+		const listed = leagueApi
+			.attached()
+			.then(leaguesByPlatform)
+			.catch(() => null);
+		Promise.all([hostsApi.connections(), listed])
+			.then(([answer, mine]) => {
 				readAt = new Date();
 				hosts = answer;
+				leagues = mine;
 				failed = false;
 			})
 			.catch(() => (failed = true));
@@ -63,9 +73,7 @@
 
 	onMount(load);
 
-	/** Each platform's leagues, from the shell's list, so a connection says what it is connected to. */
-	const counts = $derived(leagueCounts(siteContext.leagues));
-	const rows = $derived(hosts && readAt ? platformRows(hosts, readAt, counts) : []);
+	const rows = $derived(hosts && readAt ? platformRows(hosts, readAt, leagues) : []);
 
 	/** What disconnecting deleted, said once it went through. */
 	const GONE: Readonly<Record<ConnectedHost, string>> = {
@@ -264,31 +272,27 @@
 		max-width: 110ch;
 	}
 
+	/* The columns share the table by proportion, the Connection column (no width of its own) taking
+	 * what is left, about a third: fixed pixel widths left it 40 px beside the account's rail at 1280
+	 * (Lane 94 review HIGH-1). Its line wraps within it. */
 	.c-name {
-		width: 170px;
+		width: 14%;
 	}
 
 	.c-wr {
-		width: 240px;
+		width: 21%;
+	}
+
+	.c-read {
+		width: 11%;
+	}
+
+	.c-act {
+		width: 23%;
 	}
 
 	.note-cell {
 		color: var(--ink-2);
-	}
-
-	/* A connection's dates and consent hold on one line at a desk. */
-	@media (min-width: 1181px) {
-		.keep {
-			white-space: nowrap;
-		}
-	}
-
-	.c-read {
-		width: 120px;
-	}
-
-	.c-act {
-		width: 180px;
 	}
 
 	.name {

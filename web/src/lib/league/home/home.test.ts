@@ -311,7 +311,7 @@ void test("FFPC's seeding, on record and on points in turn, is said under the st
 			false,
 			ZONE
 		),
-		"A team's Proj adds its starters' published projections in PPR, FFPC adds 0.5 a catch for TEs, read Fri 9:00 pm Central. Pts are FFPC's so far."
+		"A team's Proj adds its starters' published projections, PPR shown, nearest FFPC's rules, read Fri 9:00 pm Central. FFPC adds 0.5 a catch for TEs. Pts are FFPC's so far."
 	);
 });
 

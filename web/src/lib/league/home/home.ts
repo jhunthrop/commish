@@ -8,8 +8,9 @@ import type { LeagueHost, LeagueMove, LeagueSync, LeagueTeam, LeagueTerms } from
 import { BOX, boxRow, slotWord, totalsPts, type BoxStarter, type BoxTotals } from '../box/box.ts';
 import { heldLineup, lineupBox, type LineupBox } from '../box/lineup.ts';
 import type { LineupAdvice, ProjectionScoring, Scoreboard } from '../inseason/api.ts';
-import { hostWords } from '../names.ts';
+import { hostWords, nearestRules } from '../names.ts';
 import { gameHead, KICKOFF, type GameHead } from '../box/kickoff.ts';
+import { teBonusSentence } from '../box/basis.ts';
 
 type ScoreboardGame = Scoreboard['games'][number];
 type ScoringRules = components['schemas']['ScoringRules'];
@@ -654,15 +655,16 @@ export function teamBasis(
 	const team = byPlayer ? ", and your lineup's Team adds its rows" : '';
 	const format =
 		scoring.format === 'half_ppr' ? 'half-PPR' : scoring.format === 'ppr' ? 'PPR' : 'standard';
-	const bonus = scoring.te_bonus;
+	const bonus = scoring.league_own ? null : teBonusSentence(scoring.te_bonus, host);
 	const whose = scoring.league_own
-		? "this league's own"
-		: bonus === undefined
-			? "the closest match to this league's rules"
-			: `${platform} adds ${String(bonus)} a catch for TEs`;
+		? ` in ${format}, this league's own`
+		: bonus === null
+			? ` in ${format}, the closest match to this league's rules`
+			: `, ${format} shown, ${nearestRules(host)}`;
 	const when =
 		readAt === null
 			? 'not in yet for this week'
 			: `read ${weekdayTime(readAt, zone)} ${zoneWord(zone)}`;
-	return `A team's ${BOX.proj} adds its starters' published projections in ${format}, ${whose}, ${when}. ${BOX.pts} are ${platform}'s so far${team}.`;
+	const extra = bonus === null ? '' : ` ${bonus}`;
+	return `A team's ${BOX.proj} adds its starters' published projections${whose}, ${when}.${extra} ${BOX.pts} are ${platform}'s so far${team}.`;
 }

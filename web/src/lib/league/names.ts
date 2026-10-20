@@ -19,6 +19,12 @@ export function hostWords(host: LeagueHost): string {
 	return HOST_WORDS[host];
 }
 
+/** Whose rules a page's figures are nearest: "nearest FFPC's rules", or "nearest your rules" with
+ * no platform named (Lane 94 fix round 1). */
+export function nearestRules(host?: LeagueHost): string {
+	return host === undefined ? 'nearest your rules' : `nearest ${hostWords(host)}'s rules`;
+}
+
 /** A followed league's own name, or its host's when the read has none yet. */
 export function followedName(league: { name: string; host: LeagueHost }): string {
 	return league.name !== '' ? league.name : `Your ${hostWords(league.host)} league`;

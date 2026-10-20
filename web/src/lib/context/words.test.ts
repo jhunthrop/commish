@@ -62,19 +62,19 @@ void test('a TE premium league on the PPR board says it in plain words, and wher
 	const te = league({ scoring: 'te_premium' });
 	assert.equal(
 		contextNote(te, 'ppr', false)?.text,
-		"Your league gives tight ends extra points per catch. This board is plain PPR. The Draft Pass ranks it by your league's exact rules."
+		"Your league gives tight ends extra points per catch. This board is PPR, nearest FFPC's rules. The Draft Pass ranks it by your league's exact rules."
 	);
 	assert.equal(
 		contextNote(te, 'ppr', false, 'These figures are')?.text,
-		"Your league gives tight ends extra points per catch. These figures are plain PPR. The Draft Pass ranks it by your league's exact rules."
+		"Your league gives tight ends extra points per catch. These figures are PPR, nearest FFPC's rules. The Draft Pass ranks it by your league's exact rules."
 	);
 	const saved = '3f0c1a52-0000-4000-8000-000000000009';
 	assert.deepEqual(contextNote({ ...te, settings_league_id: saved }, 'ppr', true), {
-		text: 'Your league gives tight ends extra points per catch. This board is plain PPR.',
+		text: "Your league gives tight ends extra points per catch. This board is PPR, nearest FFPC's rules.",
 		link: { words: "Your league's exact board is in its mock draft.", savedLeague: saved }
 	});
 	assert.deepEqual(contextNote(te, 'ppr', true), {
-		text: 'Your league gives tight ends extra points per catch. This board is plain PPR.',
+		text: "Your league gives tight ends extra points per catch. This board is PPR, nearest FFPC's rules.",
 		link: { words: "Set up your league's exact rules to rank by them.", savedLeague: null }
 	});
 	assert.equal(contextNote(te, 'ppr', false)?.link, null);
