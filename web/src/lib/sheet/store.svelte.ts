@@ -27,8 +27,8 @@ import {
 import { queueSeed } from './queue.ts';
 import { sheetsApi, type Account, type SheetSummary, type SheetsApi } from './remote.ts';
 import { EMPTY_STORED, SHELF_LIMIT, readStored, writeStored, type StoredSheet } from './storage.ts';
-import { awaitsAccount, unreachedStatus, type SyncStatus } from './status.ts';
-import { isOffline, keepEdits, push, reconcile, syncedFrom } from './sync.ts';
+import { awaitsAccount, reconcilingStatus, unreachedStatus, type SyncStatus } from './status.ts';
+import { isOffline, keepEdits, push, reconcile, syncedFrom, writesOnReconcile } from './sync.ts';
 import { moveTierStart, removeTierAt, startTierAt } from './tiers.ts';
 
 /** How long after the last edit a save goes out: a drag or a burst of typing is one save. */
@@ -392,7 +392,7 @@ export class SheetStore {
 	}
 
 	async #reconcileStep(): Promise<void> {
-		this.status = this.signedIn ? 'saving' : 'checking';
+		this.status = reconcilingStatus(this.status, this.signedIn, writesOnReconcile(this.stored));
 		const edits = this.#edits;
 		const started = this.stored.sheet;
 		const outcome = await reconcile(this.#deps.api, this.stored);

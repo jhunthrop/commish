@@ -6,6 +6,7 @@
  * (its time today, its day before), never the visit's (B52). An empty sheet has nothing to keep
  * safe, so it says nothing but a problem.
  */
+import { sameDay } from '#lib/format/clock.ts';
 import { dayLabel, localTimeLabel } from '#lib/format/date.ts';
 
 export type SyncStatus =
@@ -27,6 +28,18 @@ export function unreachedStatus(online: boolean, knowsAccount: boolean): SyncSta
 /** True while edits wait for the account to answer again, so the store keeps trying. */
 export function awaitsAccount(status: SyncStatus): boolean {
 	return status === 'offline' || status === 'unreachable';
+}
+
+/** What the status says while a reconcile is out: "Saving" only when it carries something to write
+ * (an edit or a shelved sheet), so a visit or a tab coming back never claims a save (B52, Lane 105
+ * fix round 1); signed in with nothing to write, the last word stands. */
+export function reconcilingStatus(
+	current: SyncStatus,
+	signedIn: boolean,
+	writes: boolean
+): SyncStatus {
+	if (!signedIn) return 'checking';
+	return writes ? 'saving' : current;
 }
 
 const STATUS_WORDS = {
@@ -57,7 +70,7 @@ export interface StatusFacts {
 /** "Saved to your account at 7:41 PM" for a change today, "... Oct 13" for one before. */
 function savedWords(changedAt: string | null, answeredAt: Date | null): string {
 	if (changedAt === null) return STATUS_WORDS.saved;
-	const today = answeredAt !== null && dayLabel(answeredAt.toISOString()) === dayLabel(changedAt);
+	const today = answeredAt !== null && sameDay(new Date(changedAt), answeredAt);
 	return today
 		? STATUS_WORDS.savedAt(localTimeLabel(new Date(changedAt)))
 		: STATUS_WORDS.savedOn(dayLabel(changedAt));

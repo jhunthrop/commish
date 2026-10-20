@@ -75,6 +75,12 @@ void test('a drop for a detach taken back leaves the league on the list', () => 
 	assert.deepEqual(ids(liveLeagues(undone)), ['espn-1', 'ffpc-1']);
 });
 
+void test('an undo after the drop brings nothing back and leaves no mark', () => {
+	const late = unmarkDetached(dropDetached(markDetached(read, 'espn-1'), 'espn-1'), 'espn-1');
+	assert.deepEqual(ids(late.leagues), ['ffpc-1']);
+	assert.deepEqual(late.detached, []);
+});
+
 void test('two detaches drop each on its own, and the steps never change the state they read', () => {
 	const both = markDetached(markDetached(read, 'espn-1'), 'ffpc-1');
 	assert.deepEqual(liveLeagues(both), []);

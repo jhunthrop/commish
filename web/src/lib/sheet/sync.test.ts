@@ -70,7 +70,8 @@ void test('a visit to an empty sheet on the account follows it and writes nothin
 	assert.deepEqual(first.stored.sync, { sheetId: 'mine', updatedAt: CHANGED });
 	const again = await reconcile(api, first.stored);
 	assert.deepEqual(writes, []);
-	if (again.kind === 'synced') assert.equal(again.stored.sync?.updatedAt, CHANGED);
+	assert.equal(again.kind, 'synced');
+	assert.equal(again.stored.sync?.updatedAt, CHANGED);
 });
 
 void test('a mark for a sheet deleted since is let go when nothing here is held', async () => {
@@ -78,10 +79,9 @@ void test('a mark for a sheet deleted since is let go when nothing here is held'
 	const stale: StoredSheet = { ...EMPTY_STORED, sync: { sheetId: 'gone', updatedAt: CHANGED } };
 	const outcome = await reconcile(api, stale);
 	assert.deepEqual(writes, []);
-	if (outcome.kind === 'synced') {
-		assert.equal(outcome.stored.sync, null);
-		assert.deepEqual(outcome.notices, []);
-	}
+	assert.equal(outcome.kind, 'synced');
+	assert.equal(outcome.stored.sync, null);
+	assert.deepEqual(outcome.notices, []);
 });
 
 void test('the first edit after such a visit creates the account sheet', async () => {
@@ -96,5 +96,6 @@ void test('the first edit after such a visit creates the account sheet', async (
 	assert.equal((await push(api, edited)).kind, 'reconcile');
 	const saved = await reconcile(api, edited);
 	assert.deepEqual(writes, ['create 1']);
-	if (saved.kind === 'synced') assert.equal(saved.stored.sync?.sheetId, 's1');
+	assert.equal(saved.kind, 'synced');
+	assert.equal(saved.stored.sync?.sheetId, 's1');
 });

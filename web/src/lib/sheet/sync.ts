@@ -83,6 +83,12 @@ export function syncedFrom(remote: RemoteSheet, stored: StoredSheet): StoredShee
 const holdsSomething = (stored: StoredSheet): boolean =>
 	stored.dirty || stored.sheet.rows.length > 0;
 
+/** Whether a reconcile of this copy may write to the account: an unsaved edit or a shelved sheet.
+ * Without one it only reads (write() skips a sheet the account already holds). */
+export function writesOnReconcile(stored: StoredSheet): boolean {
+	return stored.dirty || stored.shelf.length > 0;
+}
+
 interface Followed {
 	remote: RemoteSheet;
 	/** Made from this browser's copy just now, so the two already agree. */

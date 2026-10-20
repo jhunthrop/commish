@@ -2,7 +2,7 @@
 // changed date the account holds, never the visit's. Run with `npm test`.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { statusWords, type StatusFacts } from './status.ts';
+import { reconcilingStatus, statusWords, type StatusFacts } from './status.ts';
 
 /** Monday October 19, 2026, 7:41 pm Central: the founder's visit in the sense check. */
 const VISIT = new Date('2026-10-20T00:41:00.000Z');
@@ -52,4 +52,16 @@ void test('a sheet with players keeps its other states', () => {
 	assert.equal(statusWords({ ...saved, status: 'local' }), 'Saved in this browser');
 	assert.equal(statusWords({ ...saved, status: 'offline' }), 'Offline. Saved in this browser');
 	assert.equal(statusWords({ ...saved, status: 'failed' }), 'Not saved to your account');
+});
+
+void test('a reconcile says saving only when it carries something to write', () => {
+	assert.equal(reconcilingStatus('saved', true, false), 'saved');
+	assert.equal(reconcilingStatus('local', true, false), 'local');
+	assert.equal(reconcilingStatus('saved', true, true), 'saving');
+	assert.equal(reconcilingStatus('local', false, true), 'checking');
+});
+
+void test('a change on the same date a year before says its day, not a time', () => {
+	const words = statusWords({ ...saved, changedAt: '2025-10-20T00:40:30.000Z' });
+	assert.equal(words, 'Saved to your account Oct 19');
 });
