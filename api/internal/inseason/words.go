@@ -413,9 +413,43 @@ const OnlyCloseCalls = "Every trade we found with this team is a close call for 
 const TradeCheckBasis = "The scoreboard is each lineup before and after the trade."
 
 // TradesBasis is the trade finder's (§6.3): which trades it lists, yours
-// first, who decides, and what a Gain is.
+// first, who decides, and the keep rule (Lane 103, B43) in one sentence.
+// What a Gain is sits under the heads (TradeGainBasis); a span past the
+// run's last week says its rate here once.
 func TradesBasis(b OrderBasis, weeks int, h Horizon) string {
-	return "Each team's best trade both lineups gain by, yours first. The other team decides. " + gainWords("a lineup's", b, weeks, h)
+	listed := "Each team's best trade both lineups gain by, yours first. The other team decides. " + keptWords
+	if b != RestOfSeason {
+		return listed
+	}
+	return listed + h.rateWords(h.Last-max(1, weeks)+1)
+}
+
+// keptWords is Lane 103's rule (proposable) in one sentence.
+var keptWords = fmt.Sprintf("A player we rank first at his position goes only for %.1f a week or more, or to fill a spot.", KeepGain)
+
+// TradeGainBasis is the line under the finder's Gain head (Lane 103,
+// B42): whose points, and the weeks they are a week over, "points over
+// replacement in each lineup, weeks 7 to 17".
+func TradeGainBasis(b OrderBasis, weeks int, h Horizon) string {
+	if b != RestOfSeason {
+		return fmt.Sprintf("points over replacement in each lineup, over the season's %s on our preseason number", weekCount(weeks))
+	}
+	return "points over replacement in each lineup, " + weekSpan(weeks, h)
+}
+
+// TradeNeedWords is the need a trade fills (Lane 103, B43): the empty
+// spot by its label, and the player it sends out who sits on bye that
+// week when there is one ("Fills your empty WR2 while Gibbs sits on
+// bye."), else the week ("Fills your empty FLEX this week.", "... in week
+// 7." once the page has turned to it).
+func TradeNeedWords(slot string, onBye *Line, week int, turned bool) string {
+	switch {
+	case onBye != nil:
+		return fmt.Sprintf("Fills your empty %s while %s sits on bye.", slot, onBye.short())
+	case turned:
+		return fmt.Sprintf("Fills your empty %s in week %d.", slot, week)
+	}
+	return fmt.Sprintf("Fills your empty %s this week.", slot)
 }
 
 // formatNames is a scoring preset as a sentence names a league.

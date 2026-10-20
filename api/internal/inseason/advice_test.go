@@ -273,7 +273,7 @@ func TestOrderComesFromTheBoard(t *testing.T) {
 	at := time.Date(2026, 10, 21, 12, 0, 0, 0, time.UTC)
 	f.league.Board.Order, f.league.Board.Refreshed = boards.OrderRestOfSeason, at
 	out, _ := newFixtureAdvisor(t, f, nil).Trades("")
-	if out.OrderBasis != apitypes.OrderBasisRestOfSeason || !out.Refreshed.Equal(at) || !strings.Contains(out.Basis, " to 17.") {
-		t.Fatalf("basis %q refreshed %v: %q", out.OrderBasis, out.Refreshed, out.Basis)
+	if out.OrderBasis != apitypes.OrderBasisRestOfSeason || !out.Refreshed.Equal(at) || out.GainBasis == nil || !strings.HasSuffix(*out.GainBasis, " to 17") {
+		t.Fatalf("basis %q refreshed %v: %v", out.OrderBasis, out.Refreshed, out.GainBasis)
 	}
 }

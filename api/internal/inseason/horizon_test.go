@@ -103,7 +103,10 @@ func TestTheLeagueOrderValuesThroughItsTitleWeek(t *testing.T) {
 	if !ok {
 		t.Fatal("no trades answer")
 	}
-	if !strings.HasSuffix(trades.Basis, "weeks 7 to 18, the championship over weeks 17 and 18. Week 18 counts at each player's rate a game. Our model runs through week 17.") {
+	if !strings.HasSuffix(trades.Basis, "to fill a spot. Week 18 counts at each player's rate a game. Our model runs through week 17.") {
 		t.Fatalf("trades basis %q", trades.Basis)
+	}
+	if trades.GainBasis == nil || !strings.HasSuffix(*trades.GainBasis, "weeks 7 to 18, the championship over weeks 17 and 18") {
+		t.Fatalf("trades gain basis %v", trades.GainBasis)
 	}
 }

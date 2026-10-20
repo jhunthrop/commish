@@ -15,13 +15,20 @@ const TradesPerTeam = 10
 // the other side (§6.2).
 const CloseCall = 0.5
 
+// KeepGain is the least gain a week, as a page prints it, a trade that
+// sends out a player our order keeps must bring the member's lineup
+// (Lane 103, B43), unless it fills a need.
+const KeepGain = 1.0
+
 // Trade is one trade both lineups gain from: who the member gives and
 // gets (indexes into each squad), who the member drops to make room
 // (Drop, -1 for none) and each side's gain in points over replacement a
 // week, after any drop. A drop this week's lineup starts names his spot
 // (DropSlot, an index into Slots), the player of Get who starts with the
 // lineup kept full (DropFor, an index into Get) and the slot that player
-// takes (ForSlot); all -1 for a bench drop or none.
+// takes (ForSlot); all -1 for a bench drop or none. Need is the
+// starting spot of this week's lineup no one of the member's who can play
+// fills that the trade fills (an index into Slots, -1 for none).
 type Trade struct {
 	Give      []int
 	Get       []int
@@ -31,6 +38,7 @@ type Trade struct {
 	ForSlot   int
 	MyGain    float64
 	TheirGain float64
+	Need      int
 }
 
 // tradeSide is one squad as the search reads it: its players, its
@@ -212,18 +220,78 @@ func orderTrades(trades []Trade) {
 }
 
 // tradeSearch is the two sides of one team's trades, with the buffer the
-// players taken in are read into.
+// players taken in are read into and the member's lineup this week before
+// any trade (week, set on the first need asked).
 type tradeSearch struct {
 	f      *filler
+	config []draft.SlotConfig
 	me     tradeSide
 	them   tradeSide
 	buffer []*Candidate
+	week   *weekLineup
 }
 
 func newSearch(config []draft.SlotConfig, weeks int, mine, theirs Squad) *tradeSearch {
 	f := newFiller(Slots(config), weeks)
 	me := newSide(f, config, mine, true)
-	return &tradeSearch{f: f, me: me, them: newSide(f, config, theirs, false)}
+	return &tradeSearch{f: f, config: config, me: me, them: newSide(f, config, theirs, false)}
+}
+
+// need is the first starting spot of the member's lineup this week, set
+// as the Lineup screen sets it, that no one of his who can play fills
+// and that the trade fills: he gives give and drop (-1 for none) and gets
+// get. -1 for none, and -1 when the trade leaves empty a spot that was
+// filled, which fills no need.
+func (t *tradeSearch) need(give []int, drop int, get []int) int {
+	squad := t.me.squad
+	if t.week == nil {
+		base := weekOf(t.config, squad.Players, squad.Starters)
+		t.week = &base
+	}
+	out := give
+	if drop >= 0 {
+		out = append(append([]int(nil), give...), drop)
+	}
+	after := weekOf(t.config, Swapped(squad.Players, out, candidatesOf(t.them.squad.Players, get)), squad.Starters)
+	filled := -1
+	for i, idle := range t.week.idle {
+		switch {
+		case !idle && after.idle[i]:
+			return -1
+		case idle && !after.idle[i] && filled < 0:
+			filled = i
+		}
+	}
+	return filled
+}
+
+// candidatesOf is the players at the indexes, in a new slice.
+func candidatesOf(players []Candidate, at []int) []Candidate {
+	out := make([]Candidate, len(at))
+	for k, i := range at {
+		out[k] = players[i]
+	}
+	return out
+}
+
+// Kept is a player our order keeps: the top player at his position, as
+// the player page ranks him (Lane 103, B43).
+func Kept(c Candidate) bool { return c.Rank == 1 }
+
+// proposable is Lane 103's rule (B43): a trade that sends out a player
+// our order keeps is proposed only when it gains the member's lineup
+// KeepGain a week or more as the page prints it, or fills a need.
+// mine is the member's squad's players, give's indexes into it.
+func proposable(tr Trade, mine []Candidate) bool {
+	if roundTenth(tr.MyGain) >= KeepGain || tr.Need >= 0 {
+		return true
+	}
+	for _, g := range tr.Give {
+		if Kept(mine[g]) {
+			return false
+		}
+	}
+	return true
 }
 
 // mine and theirs are each side's change from the member giving give and
@@ -241,8 +309,8 @@ func (t *tradeSearch) theirs(give, get []int, always bool) Change {
 // Trades is §6.2's search between the member's squad and one other team's:
 // exact over every one-for-one and two-for-one pair both ways at the
 // skill positions, a trade kept when both lineups gain and both still
-// fill every slot. focus, when set, keeps only trades holding that
-// player (either side's id). The best limit trades in orderTrades' order.
+// fill every slot, and proposable (Lane 103). focus, when set, keeps
+// only trades holding that player (either side's id). The best limit trades in orderTrades' order.
 // Gains are a week's over the weeks the order covers.
 func Trades(config []draft.SlotConfig, weeks int, mine, theirs Squad, focus string, limit int) []Trade {
 	t := newSearch(config, weeks, mine, theirs)
@@ -260,7 +328,11 @@ func Trades(config []draft.SlotConfig, weeks int, mine, theirs Squad, focus stri
 		if !their.stands() || !positive(their.Gain) {
 			return
 		}
-		out = append(out, tradeOf(give, get, my, their))
+		tr := tradeOf(give, get, my, their)
+		tr.Need = t.need(give, tr.Drop, get)
+		if proposable(tr, mine.Players) {
+			out = append(out, tr)
+		}
 	}
 	for _, g := range me.tradeable {
 		for _, h := range them.tradeable {
@@ -315,7 +387,7 @@ func holdsFocus(mine, theirs []Candidate, give, get []int, focus string) bool {
 // tradeOf is the trade from each side's change: the member's drop and
 // both gains.
 func tradeOf(give, get []int, my, their Change) Trade {
-	return Trade{Give: give, Get: get, Drop: my.Drop, DropFor: my.DropFor, DropSlot: my.DropSlot, ForSlot: my.ForSlot, MyGain: my.Gain, TheirGain: their.Gain}
+	return Trade{Give: give, Get: get, Drop: my.Drop, DropFor: my.DropFor, DropSlot: my.DropSlot, ForSlot: my.ForSlot, MyGain: my.Gain, TheirGain: their.Gain, Need: -1}
 }
 
 // Checked is one trade the member built, on the finder's reckoning: its
@@ -337,8 +409,9 @@ type Checked struct {
 func Check(config []draft.SlotConfig, weeks int, mine, theirs Squad, give, get []int) Checked {
 	t := newSearch(config, weeks, mine, theirs)
 	my, their := t.mine(give, get, true), t.theirs(give, get, true)
-	return Checked{Trade: tradeOf(give, get, my, their), Mine: my, Theirs: their,
-		MineBase: t.me.base, TheirsBase: t.them.base}
+	tr := tradeOf(give, get, my, their)
+	tr.Need = t.need(give, tr.Drop, get)
+	return Checked{Trade: tr, Mine: my, Theirs: their, MineBase: t.me.base, TheirsBase: t.them.base}
 }
 
 // WeekProj is this week's Proj total of the lineup the Lineup screen sets

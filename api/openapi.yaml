@@ -4657,6 +4657,13 @@ components:
             this week's Proj total of the drafter's lineup with the trade less without it, each lineup set as the
             Lineup screen sets it (Lane 66g), one decimal; null when the week has no published projection read
         their_proj_change: { type: number, format: double, nullable: true, description: the same for theirs }
+        need:
+          type: string
+          nullable: true
+          description: >-
+            the trade's sentence when it fills a starting spot of the drafter's lineup for the week the page addresses
+            that no one of his who can play fills, leaving no other spot empty ("Fills your empty WR2 while Gibbs sits
+            on bye.", Lane 103); null for none, absent from an older answer
     TradeTeam:
       type: object
       required: [roster_id, name, owner, record, roster, trades, note]
@@ -4675,7 +4682,8 @@ components:
           type: array
           description: >-
             at most 10: the trades their lineup gains 0.5 a week or more from first, then the close calls for them,
-            each group best for the drafter first
+            each group best for the drafter first; a trade sending out the top player at his position in our order
+            only when it gains the drafter's lineup 1.0 a week or more or fills a need (Lane 103)
           items: { $ref: "#/components/schemas/TradeRow" }
         note:
           type: string
@@ -4856,7 +4864,14 @@ components:
             when no player shown carries the figure
         basis:
           type: string
-          description: which trades are listed, who decides and what a Gain is
+          description: >-
+            which trades are listed (a trade sending out the top player at his position in our order only when it
+            gains the drafter's lineup 1.0 a week or more or fills an empty spot, Lane 103) and who decides
+        gain_basis:
+          type: string
+          description: >-
+            the line under the finder's Gain head: whose points and the weeks a Gain is a week over ("points over
+            replacement in each lineup, weeks 7 to 17", Lane 103); absent from an older answer
         roster:
           type: array
           description: >-

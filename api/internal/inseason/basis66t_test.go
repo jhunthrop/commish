@@ -12,19 +12,23 @@ import (
 // Lane 66t: each in-season basis names only its own columns, says each
 // thing once and fits five lines at a desk and eight on a phone.
 
-func TestTradesBasisSaysWhoDecidesAndGainOnce(t *testing.T) {
+// Lane 103: the footer says who decides and the keep rule in one
+// sentence; what a Gain is sits under the heads (B42).
+func TestTradesBasisSaysWhoDecidesAndTheKeepRule(t *testing.T) {
 	want := "Each team's best trade both lineups gain by, yours first. The other team decides. " +
-		"Gain is a lineup's change in points over replacement a week, weeks 6 to 17."
-	if got := TradesBasis(RestOfSeason, 12, StandardHorizon); got != want {
-		t.Errorf("rest of season:\n got %q\nwant %q", got, want)
+		"A player we rank first at his position goes only for 1.0 a week or more, or to fill a spot."
+	for _, b := range []OrderBasis{RestOfSeason, Preseason} {
+		if got := TradesBasis(b, 12, StandardHorizon); got != want {
+			t.Errorf("%v:\n got %q\nwant %q", b, got, want)
+		}
 	}
-	if got := TradesBasis(Preseason, 17, StandardHorizon); got != "Each team's best trade both lineups gain by, yours first. The other team decides. "+
-		"Gain is a lineup's change in points over replacement a week, over the season's 17 weeks on our preseason number." {
+	for weeks, want := range map[int]string{12: "points over replacement in each lineup, weeks 6 to 17", 1: "points over replacement in each lineup, week 17"} {
+		if got := TradeGainBasis(RestOfSeason, weeks, StandardHorizon); got != want {
+			t.Errorf("%d weeks: %q", weeks, got)
+		}
+	}
+	if got := TradeGainBasis(Preseason, 17, StandardHorizon); got != "points over replacement in each lineup, over the season's 17 weeks on our preseason number" {
 		t.Errorf("preseason: %q", got)
-	}
-	if got := TradesBasis(RestOfSeason, 1, StandardHorizon); got != "Each team's best trade both lineups gain by, yours first. The other team decides. "+
-		"Gain is a lineup's change in points over replacement a week, week 17." {
-		t.Errorf("one week: %q", got)
 	}
 }
 

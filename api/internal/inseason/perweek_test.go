@@ -47,10 +47,14 @@ func TestBasisSaysWhatAWeekIs(t *testing.T) {
 			t.Errorf("the lineup's rows show no points over replacement: %q", s)
 		}
 	}
-	for _, s := range []string{WaiverSeasonBasis(RestOfSeason, 11, StandardHorizon), WaiverSeasonBasis(Preseason, 17, StandardHorizon), TradesBasis(RestOfSeason, 1, StandardHorizon)} {
+	for _, s := range []string{WaiverSeasonBasis(RestOfSeason, 11, StandardHorizon), WaiverSeasonBasis(Preseason, 17, StandardHorizon)} {
 		if !strings.Contains(s, "over replacement a week, ") || strings.Contains(s, "12-team") {
 			t.Errorf("%q", s)
 		}
+	}
+	// Trades heads its gains "Gain a week", the line under them names the weeks (Lane 103).
+	if s := TradeGainBasis(RestOfSeason, 1, StandardHorizon); !strings.HasPrefix(s, "points over replacement in each lineup, ") {
+		t.Errorf("%q", s)
 	}
 }
 
