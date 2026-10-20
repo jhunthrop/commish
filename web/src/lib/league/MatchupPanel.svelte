@@ -4,7 +4,9 @@
 	import BoxBasis from './box/BoxBasis.svelte';
 	import { sheetTags } from './sheet-tags.ts';
 	import { BOX } from './box/box.ts';
-	import { nextKickoff, sideBox, type SideBox } from './box/matchup.ts';
+	import { KICKOFF } from './box/kickoff.ts';
+	import { matchupStarted, nextKickoff, sideBox, type SideBox } from './box/matchup.ts';
+	import { readCell } from './home/home.ts';
 	import type { LeagueSync, MatchupSide } from './api.ts';
 	import type { MatchupBox } from './inseason/api.ts';
 	import { hostWords, matchupGap, scoreGap, scoreUnread, teamName } from './model.ts';
@@ -21,9 +23,11 @@
 		box: MatchupBox | null;
 		/** The clock the page's read line uses. */
 		now: Date;
+		/** The page's own clock in ms, ticking: the read beside the live score is aged by it. */
+		clock?: number;
 	}
 
-	let { sync, box, now }: Props = $props();
+	let { sync, box, now, clock = now.getTime() }: Props = $props();
 
 	const matchup = $derived(sync.matchup);
 
@@ -38,13 +42,22 @@
 		return !scoreUnread(s) && (hasStarted(s) || sync.week_all_play);
 	}
 
+	/** The game has kicked off by both sides' starters (Lane 92): the Pts are the big figures. */
+	const started = $derived(
+		matchupStarted(
+			(box?.sides ?? []).flatMap((s) => s.starters.map((st) => st.line)),
+			now.getTime()
+		)
+	);
+
 	function boxOf(s: MatchupSide): SideBox {
 		const answered = box?.sides.find((b) => b.roster_id === s.roster_id) ?? null;
 		return sideBox(s, answered, {
 			hostTotal: showsTotal(s) ? s.points : null,
 			landed: box?.projection_read_at != null,
 			week: matchup?.week ?? sync.week,
-			now: now.getTime()
+			now: now.getTime(),
+			started
 		});
 	}
 
@@ -52,6 +65,12 @@
 	const theirs = $derived(matchup?.opponent ? boxOf(matchup.opponent) : null);
 	const lines = $derived([...(mine?.lines ?? []), ...(theirs?.lines ?? [])]);
 	const kickoff = $derived(nextKickoff(lines, now.getTime()));
+	/** The read beside the live score (Lane 92, B06), while the game is under way. */
+	const read = $derived(
+		started && kickoff?.head !== KICKOFF.final
+			? readCell({ host: sync.host, readAt: sync.read_at }, clock)
+			: null
+	);
 	/** FFPC is read as one member, so the API keeps only the viewer's own starters. */
 	const hidden = $derived(`${hostWords(sync.host)} shows us your lineup only.`);
 </script>
@@ -68,16 +87,20 @@
 			mine={{
 				name: teamName(sync, matchup.mine.roster_id),
 				pts: mine.totals.pts,
-				proj: mine.totals.proj
+				proj: mine.totals.proj,
+				final: mine.totals.final
 			}}
 			opponent={matchup.opponent && theirs
 				? {
 						name: teamName(sync, matchup.opponent.roster_id),
 						pts: theirs.totals.pts,
-						proj: theirs.totals.proj
+						proj: theirs.totals.proj,
+						final: theirs.totals.final
 					}
 				: null}
 			{kickoff}
+			{started}
+			{read}
 		/>
 		{#if sync.week_all_play}
 			<p class="note">

@@ -4,7 +4,7 @@
  * game, the rules our stats lack) with these and hides the ones about columns its phone does not
  * draw (BasisPart.phone). Pure, tested in basis.test.ts. */
 import { weekdayTime, zoneWord } from '#lib/format/clock.ts';
-import { lineState, toPlay } from './kickoff.ts';
+import { lineState, pastKickoff, toPlay } from './kickoff.ts';
 import type { BasisPart } from '#lib/run/board-basis.ts';
 import type { LeagueHost } from '../api.ts';
 import type { PlayerLine, ProjectionScoring } from '../inseason/api.ts';
@@ -34,6 +34,19 @@ export interface ProjFacts {
 	league: boolean;
 	/** The column's head: Proj on a box score, Wk 6 where the season's Projected sits beside it. */
 	head?: string;
+	/** A row's game has kicked off, so the sentence says its Proj is as of kickoff (Lane 92, B27). */
+	kicked?: boolean;
+}
+
+/** What a game past kickoff keeps (Lane 92, B27), the end of the Proj sentence. */
+export const AS_OF_KICKOFF = 'as of kickoff for a game under way or final';
+
+/** What Proj final is (Lane 92, B22), said once where a game has kicked off. */
+export const PROJ_FINAL_PART = `${BOX.projFinal} adds the ${BOX.pts} so far and the ${BOX.proj} of the starters still to play.`;
+
+/** Any row's game past its kickoff at the page's clock, by the one rule (kickoff.ts). */
+export function anyKicked(lines: readonly PlayerLine[], now: number): boolean {
+	return lines.some(({ facts }) => pastKickoff(facts, now));
 }
 
 /** "Proj is this week's published projection, PPR nearest your rules, read Fri 9:00 pm." */
@@ -46,7 +59,8 @@ export function projPart(proj: ProjFacts, clock: Clock): string {
 			: `, ${format} nearest your rules`;
 	const defenses = proj.defense ? ', defenses on default scoring' : '';
 	const when = proj.readAt === null ? 'not in yet' : `read ${stamp(proj.readAt, clock)}`;
-	return `${proj.head ?? BOX.proj} is this week's published projection${whose}${defenses}, ${when}.`;
+	const kicked = proj.kicked === true ? `, ${AS_OF_KICKOFF}` : '';
+	return `${proj.head ?? BOX.proj} is this week's published projection${whose}${defenses}, ${when}${kicked}.`;
 }
 
 /** "Δ Proj is its change since Thu 9:00 pm.", null without a read before. */
@@ -171,9 +185,12 @@ export interface BoxBasisFacts {
  * Proj, Pts and the Game cell, the columns it draws. */
 export function boxBasisParts(facts: BoxBasisFacts, clock: Clock, now: number): BasisPart[] {
 	const defense = facts.lines.some((l) => l.player.position === 'DEF');
+	const kicked = anyKicked(facts.lines, now);
 	const proj = facts.projection
-		? said(projPart({ ...facts.projection, defense, league: true }, clock))
+		? said(projPart({ ...facts.projection, defense, league: true, kicked }, clock))
 		: [];
+	// What the Team row's small figure is once a game has kicked off (Lane 92, B22).
+	const final = kicked ? said(PROJ_FINAL_PART) : [];
 	const { lineup } = facts;
 	// The Lineup's Team adds the lineup's rows; the Matchup's is the platform's total where it sends one.
 	const team = lineup === null && facts.teamTotal ? 'platform' : 'rows';
@@ -181,9 +198,16 @@ export function boxBasisParts(facts: BoxBasisFacts, clock: Clock, now: number): 
 	// When a row's Final and its stats land, said while one waits on either (Lane 85).
 	const waiting = kickedOffPartAt(facts.lines, now);
 	if (lineup === null)
-		return [...proj, ...pts, ...said(gamePart(facts.lines, clock, now, 'full')), ...said(waiting)];
+		return [
+			...proj,
+			...final,
+			...pts,
+			...said(gamePart(facts.lines, clock, now, 'full')),
+			...said(waiting)
+		];
 	return [
 		...proj,
+		...final,
 		...said(deltaPart(lineup.previousReadAt, clock), false),
 		...said(gamePart(facts.lines, clock, now, 'full')),
 		// On the Lineup phone the expected score and weather are the decision's facts and keep their

@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { siteContext } from '#lib/context/context.svelte.ts';
 	import { lazySheet } from '#lib/site/lazy-sheet.svelte.ts';
-	import { ApiError, leagueApi, type LeagueSync } from './api.ts';
+	import { ApiError, leagueApi, type LeagueHost, type LeagueSync } from './api.ts';
 	import { inSeasonApi, type MatchupBox } from './inseason/api.ts';
 	import InSeasonPage from './inseason/InSeasonPage.svelte';
 	import { SCREEN_TITLES } from './inseason/words.ts';
@@ -63,8 +63,8 @@
 	{read}
 	reserve={RESERVE_ROWS}
 >
-	{#snippet children(week: Week)}
-		<MatchupPanel sync={week.sync} box={week.box} now={new Date(week.read_at)} />
+	{#snippet children(week: Week, _host: LeagueHost, clock: number)}
+		<MatchupPanel sync={week.sync} box={week.box} now={new Date(week.read_at)} {clock} />
 		{#if week.sync.matchup === null && basis !== ''}<p class="basis">{basis}</p>{/if}
 	{/snippet}
 </InSeasonPage>

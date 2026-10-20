@@ -10,6 +10,7 @@
 	import PinnedVerb from '#lib/league/box/PinnedVerb.svelte';
 	import type { BoxRow } from '#lib/league/box/box.ts';
 	import { tabHref } from '#lib/league/inseason/tabs.ts';
+	import { memberZone } from '#lib/format/clock.ts';
 	import { weekApi } from './api.ts';
 	import {
 		FRONT,
@@ -58,7 +59,11 @@
 			: []
 	);
 	const read_ = $derived(lead ? readWords(lead, now) : null);
-	const basis = $derived(lead && view?.bug ? weekBasis(lead, others.length > 0) : []);
+	const basis = $derived(
+		lead && view?.bug
+			? weekBasis(lead, others.length > 0, memberZone(), view.bug.state !== 'upcoming')
+			: []
+	);
 </script>
 
 {#snippet face(row: BoxRow, size: number)}

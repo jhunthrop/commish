@@ -40,6 +40,7 @@
 	import {
 		HOME,
 		bugsOf,
+		projectedFinalOf,
 		feedRows,
 		lineupSummary,
 		movesBasis,
@@ -260,9 +261,21 @@
 	const dropped = $derived(sync ? droppedKinds(sync.scoring_dropped) : []);
 	const team = $derived(sync ? myTeam(sync) : undefined);
 	const platform = $derived(sync ? hostWords(sync.host) : '');
-	const bugs = $derived(sync && scoreboard ? bugsOf(scoreboard, sync, now.getTime()) : []);
+	// The live score's read sits beside it as a cell (Lane 92, B06).
+	const bugs = $derived(
+		sync && scoreboard
+			? bugsOf(scoreboard, sync, now.getTime(), memberZone(), {
+					host: sync.host,
+					readAt: scoreboard.read_at
+				})
+			: []
+	);
 	const rows = $derived(sync ? standingsRows(sync, projections(scoreboard)) : []);
-	const summary = $derived(advice ? lineupSummary(advice, memberZone(), now.getTime()) : null);
+	const summary = $derived(
+		advice && sync
+			? lineupSummary(advice, memberZone(), now.getTime(), projectedFinalOf(scoreboard, sync.me))
+			: null
+	);
 	const moves = $derived(sync ? feedRows(sync) : []);
 	const lineupHref = $derived(tabHref('start', id));
 	/** What every number on the in-season page is, said once and at most five lines: the standings,
@@ -276,7 +289,9 @@
 								sync.host,
 								scoreboard.projection_read_at,
 								scoreboard.projection_scoring,
-								advice?.player_points ?? false
+								advice?.player_points ?? false,
+								memberZone(),
+								bugs.some((b) => b.state !== 'upcoming')
 							)
 						: null,
 					// The season panel names the zone once, so the read's time does not repeat it.

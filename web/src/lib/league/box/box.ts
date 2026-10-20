@@ -48,6 +48,9 @@ export const BOX = {
 	proj: 'Proj',
 	/** Points so far this week. */
 	pts: 'Pts',
+	/** Once a game has kicked off, a team's Pts so far and the Proj of its starters still to play
+	 * (Lane 92, the API's projected_final). */
+	projFinal: 'Proj final',
 	/** The Lineup's evidence columns (Lane 66e). */
 	oppRank: 'Opp rank',
 	avg: FIGURE.avg,
@@ -181,6 +184,9 @@ const NO_EVIDENCE: RowEvidence = {
 export interface BoxTotals {
 	proj: number | null;
 	pts: number | null;
+	/** The team's projected final once a starter has kicked off (the API's projected_final, Lane 92):
+	 * then Pts is the row's big figure and this the small one; null before, when Proj is the big one. */
+	final: number | null;
 	/** Beside Totals: before the week's projection lands, that it has not; once it has, how many
 	 * playing starters have a Proj when one lacks it. Null when there is nothing to say. */
 	note: string | null;

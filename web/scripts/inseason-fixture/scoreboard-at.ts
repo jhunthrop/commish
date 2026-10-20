@@ -84,24 +84,37 @@ export interface Moment {
 
 interface Kicks {
 	kicked: number;
-	final: number;
+	/** Final, or out (a designation that keeps him out) however his game stands (Lane 92). */
+	done: number;
+	inPlay: number;
+	toCome: number;
 	games: number;
 	next: string | null;
 }
 
+/** A designation that keeps him out this week (scoreboard.go sitsOut, the web's sitsHim). */
+export function sitsOut(line: PlayerLine): boolean {
+	const status = line.facts.designation?.status;
+	return status !== undefined && status !== 'questionable' && status !== 'doubtful';
+}
+
 function kicks(lines: readonly PlayerLine[], moment: Moment): Kicks {
-	const out: Kicks = { kicked: 0, final: 0, games: 0, next: null };
+	const out: Kicks = { kicked: 0, done: 0, inPlay: 0, toCome: 0, games: 0, next: null };
 	for (const line of lines) {
 		const { facts } = line;
 		if (facts.bye || facts.kickoff === null) continue;
 		out.games++;
 		const at = Date.parse(facts.kickoff);
 		const final = moment.final(line);
-		if (final) out.final++;
+		const sits = sitsOut(line);
 		if (final || at <= moment.now) {
 			out.kicked++;
+			if (final || sits) out.done++;
+			else out.inPlay++;
 			continue;
 		}
+		if (sits) out.done++;
+		else out.toCome++;
 		if (out.next === null || at < Date.parse(out.next)) out.next = facts.kickoff;
 	}
 	return out;
@@ -109,7 +122,37 @@ function kicks(lines: readonly PlayerLine[], moment: Moment): Kicks {
 
 function stateOf(k: Kicks): ScoreboardGame['state'] {
 	if (k.kicked === 0) return 'upcoming';
-	return k.final === k.games ? 'final' : 'playing';
+	return k.done === k.games ? 'final' : 'playing';
+}
+
+/** The count while the game is under way (words.go ToPlayWords), never a zero; null otherwise. */
+function toPlayOf(k: Kicks, state: ScoreboardGame['state']): string | null {
+	if (state !== 'playing') return null;
+	if (k.toCome > 0) return `${String(k.toCome)} to play`;
+	if (k.inPlay > 0) return `${String(k.inPlay)} playing`;
+	return null;
+}
+
+/** A side's projected final (projfinal.go projectedFinal): its points so far plus the Proj, as
+ * printed, of each starter still to play, an out starter counting nothing; null before any of them
+ * has kicked off or with no points. */
+export function projectedFinalOf(
+	points: number | null,
+	lines: readonly PlayerLine[],
+	now: number
+): number | null {
+	if (points === null) return null;
+	let started = false;
+	let sum = points;
+	for (const line of lines) {
+		if (line.facts.bye || line.facts.kickoff === null) continue;
+		if (kickedOffAt(line, now)) {
+			started = true;
+			continue;
+		}
+		if (!sitsOut(line) && line.week_projection !== null) sum += tenth(line.week_projection);
+	}
+	return started ? tenth(sum) : null;
 }
 
 /** Whether a line has kicked off at `now`: the stand-in's scored share counts from then. */
@@ -145,32 +188,36 @@ export function scoreboardAt(recorded: Recorded, moment: Moment, readAt: string)
 			all.push(...lines);
 			const projected = lines.filter((l) => l.week_projection !== null);
 			const scored = lines.filter((l) => kickedOffAt(l, moment.now) && l.week_projection !== null);
+			const points = moment.scored
+				? // Each starter's points to the tenth as his row prints them, then added: the one sum the
+					// Matchup's Team prints (sideScore, Lane 79).
+					roundTenth(
+						scored.reduce((n, l) => n + roundTenth((l.week_projection ?? 0) * SCORED_SHARE), 0)
+					)
+				: m.points;
 			return {
 				roster_id: m.roster_id,
-				points: moment.scored
-					? // Each starter's points to the tenth as his row prints them, then added: the one sum the
-						// Matchup's Team prints (sideScore, Lane 79).
-						roundTenth(
-							scored.reduce((n, l) => n + roundTenth((l.week_projection ?? 0) * SCORED_SHARE), 0)
-						)
-					: m.points,
+				points,
 				points_read: true,
 				projection:
 					projected.length === 0
 						? null
 						: tenth(projected.reduce((n, l) => n + tenth(l.week_projection ?? 0), 0)),
 				starters: m.starters.filter((id) => id !== '0').length,
-				played: kicks(lines, moment).kicked
+				played: kicks(lines, moment).kicked,
+				kicks: kicks(lines, moment),
+				projected_final: projectedFinalOf(points, lines, moment.now)
 			};
 		});
 		const game = kicks(all, moment);
 		const state = stateOf(game);
-		// The API's count (scoreboard.go toPlay): starters with a game, a bye starter left out.
-		const toPlay =
-			state === 'playing'
-				? `${String(game.games - game.kicked)} of ${String(game.games)} starters to play`
-				: null;
-		return { state, next_kickoff: game.next, to_play: toPlay, sides };
+		// The API's counts (scoreboard.go toPlay): the game's pooled, each side's own (Lane 92).
+		return {
+			state,
+			next_kickoff: game.next,
+			to_play: toPlayOf(game, state),
+			sides: sides.map(({ kicks: own, ...side }) => ({ ...side, to_play: toPlayOf(own, state) }))
+		};
 	});
 	return {
 		week: recorded.week,

@@ -1,14 +1,15 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import TeamAvatar from './TeamAvatar.svelte';
-	import { BOX } from './box.ts';
 	import type { Bug } from '../home/home.ts';
 
 	/** One score bug on the lit board (Lane 66i), the League page's and the front door's: the state at
-	 * its head (the next kickoff, in play, final), then each side with its avatar, record, projection
-	 * and points so far. Once a game has started the side ahead is bright and the side behind muted;
-	 * before kickoff both read alike. The drafter's game carries the orange rim. Large on the front
-	 * door, where it leads the page; a foot line may follow the sides. */
+	 * its head (the next kickoff, or in play with the read beside the live score, final), then each
+	 * side with its avatar, record, where its starters stand while under way, and its two figures:
+	 * before kickoff its Proj big, from the first kickoff its Pts big with its projected final small
+	 * (Lane 92). Once a game has started the side ahead is bright and the side behind muted; before
+	 * kickoff both read alike. The drafter's game carries the orange rim. Large on the front door,
+	 * where it leads the page; a foot line may follow the sides. */
 	interface Props {
 		bug: Bug;
 		href: string;
@@ -29,17 +30,18 @@
 			>{#if bug.state === 'kicked_off'}<span class="pulse" aria-hidden="true"
 				></span>{/if}{bug.head}</span
 		>
-		<span class="sw">{bug.words}</span>
-		<span class="n">{BOX.proj}</span>
-		<span class="n">{BOX.pts}</span>
+		<span class="sw" class:read={bug.state === 'kicked_off'}>{bug.words}</span>
+		<span class="n">{bug.columns.small}</span>
+		<span class="n">{bug.columns.big}</span>
 	</span>
 	{#each bug.sides as side (side.rosterId)}
 		<span class="bt {side.stands}" class:me={side.me}>
 			<TeamAvatar name={side.name} size={avatar} me={side.me} board src={side.avatar} />
 			<span class="nm">{side.name}</span>
+			<span class="tp">{side.toPlay}</span>
 			<span class="rec">{side.record}</span>
-			<span class="proj">{side.proj}</span>
-			<span class="pts">{side.pts}</span>
+			<span class="proj">{side.small}</span>
+			<span class="pts">{side.big}</span>
 		</span>
 	{/each}
 	{#if foot}<span class="ft">{@render foot()}</span>{/if}
@@ -84,7 +86,7 @@
 	.bh,
 	.bt {
 		display: grid;
-		grid-template-columns: 26px minmax(0, 1fr) auto 52px 60px;
+		grid-template-columns: 26px minmax(0, 1fr) auto auto 52px 60px;
 		align-items: center;
 		column-gap: var(--s-2);
 	}
@@ -123,6 +125,21 @@
 
 	.n {
 		text-align: right;
+		white-space: nowrap;
+	}
+
+	/* The read beside the live score is a cell: the platform and its age, never the grey line alone. */
+	.sw.read {
+		color: var(--scoreboard-ink);
+		font-variant-numeric: tabular-nums;
+	}
+
+	/* Where a side's starters stand while the game is under way: "2 playing", "3 to play". */
+	.tp {
+		font-size: var(--t-xs);
+		font-weight: 600;
+		color: var(--scoreboard-num);
+		white-space: nowrap;
 	}
 
 	.pulse {
@@ -210,7 +227,7 @@
 	}
 
 	.lg .bt {
-		grid-template-columns: 34px minmax(0, 1fr) auto 72px 84px;
+		grid-template-columns: 34px minmax(0, 1fr) auto auto 72px 84px;
 		min-height: 50px;
 	}
 
@@ -229,7 +246,7 @@
 	@media (max-width: 760px) {
 		.bh,
 		.bt {
-			grid-template-columns: 26px minmax(0, 1fr) auto 40px 48px;
+			grid-template-columns: 26px minmax(0, 1fr) auto auto 40px 48px;
 			column-gap: 6px;
 		}
 
@@ -251,7 +268,7 @@
 		}
 
 		.lg .bt {
-			grid-template-columns: 34px minmax(0, 1fr) auto 54px 62px;
+			grid-template-columns: 34px minmax(0, 1fr) auto auto 54px 62px;
 			min-height: 42px;
 		}
 

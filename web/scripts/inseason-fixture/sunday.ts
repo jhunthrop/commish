@@ -21,6 +21,7 @@ import { FIXTURE_SUNDAY_READ } from './clock.ts';
 import { stateAt } from './game-state.ts';
 import {
 	kickedOffAt,
+	projectedFinalOf,
 	scoreboardAt,
 	SCORED_SHARE,
 	type Recorded as RecordedWeek
@@ -137,20 +138,33 @@ function weekOf(
 					? null
 					: { ...week, mine: side(week.mine), opponent: week.opponent && side(week.opponent) }
 		},
-		lineup: {
-			...lineupAt(lineup, moment),
-			player_points: true,
-			team_points: total.get(sync.me) ?? null
-		},
+		lineup: lineupWithFinal(
+			{ ...lineupAt(lineup, moment), player_points: true, team_points: total.get(sync.me) ?? null },
+			moment
+		),
 		matchup: {
 			...matchup,
 			sides: matchup.sides.map((s) => ({
 				...s,
 				starters: s.starters.map((st) => ({ ...st, line: lineAt(st.line, moment) })),
-				bench: s.bench.map((l) => lineAt(l, moment))
+				bench: s.bench.map((l) => lineAt(l, moment)),
+				projected_final: projectedFinalOf(
+					total.get(s.roster_id) ?? null,
+					s.starters.map((st) => st.line),
+					moment.now
+				)
 			}))
 		}
 	};
+}
+
+/** The Lineup's projected final (advice.go): team_points plus the Proj of the starters the advice sets
+ * still to play, a spot no one can play left out. */
+function lineupWithFinal(lineup: LineupAdvice, moment: Moment): LineupAdvice {
+	const advised = lineup.slots.filter((s) => !s.no_one_can_play).map((s) => s.ours);
+	const final =
+		lineup.team_points === null ? null : projectedFinalOf(lineup.team_points, advised, moment.now);
+	return { ...lineup, projected_final: final };
 }
 
 const sundayMoment: Moment = { now: Date.parse(SUNDAY), final: sundayFinal };
