@@ -1,0 +1,278 @@
+"""A week feed that lags (Lane 101, B75): a game the week's answer still has scheduled or under way four hours
+past its kickoff is asked about on its own, its box score kept under its own source and read through the
+same mapper, at most two a pass on what the pass's budget leaves; a refused answer fails the line.
+
+The DB cases need PARITY_DATABASE_URL (a server where the harness may create `parity_*` databases)."""
+
+import gzip
+import json
+import os
+from collections.abc import Iterator, Mapping
+from datetime import UTC, datetime, timedelta
+from typing import Final, cast
+
+import pytest
+from sqlalchemy import Connection, Engine, func, insert, select
+
+from research.db.engine import make_engine
+from research.db.schema import CAPTURE_SNAPSHOTS, TEAM_WEEK_OBSERVATIONS
+from research.db.url import sqlalchemy_url
+from research.parity import databases
+from research.parity.replay import FIXTURES_ROOT
+from research.pipeline.budget import FixedBudget
+from research.pipeline.kickoffs import TeamKickoff
+from research.pipeline.nflverse.schedule import ScheduleMetric, ScheduleSource
+from research.pipeline.tank01.client import Paths, Tank01Client, Tank01Error
+from research.pipeline.tank01.game_status import (
+    BOX_SCORE_SOURCE,
+    FALLBACK_AFTER,
+    FALLBACK_CAP,
+    GIVE_UP_AFTER,
+    STATUS_SOURCE,
+    capture_game_status,
+    lagging_games,
+    to_ask,
+)
+from research.pipeline.tank01.mapping import GameSummary, map_box_score_game, map_games
+
+WEEK: Final = 6
+SEASON: Final = 2026
+SUNDAY_LATE: Final = datetime(2026, 10, 18, 17, 0, tzinfo=UTC)  # PIT@TB
+MONDAY_NIGHT: Final = datetime(2026, 10, 20, 0, 15, tzinfo=UTC)  # WSH@SF, 8:15 pm Eastern
+LATE_KICK: Final = datetime(2026, 10, 20, 3, 30, tzinfo=UTC)  # LAR@SEA, under four hours old at both passes
+PASS_AT: Final = datetime(2026, 10, 20, 6, 0, tzinfo=UTC)  # the 02:00 ET pass of B75
+WEEK_FEED_ONLY: Final = 1
+WEEK_AND_ONE_BOX_SCORE: Final = 2
+FINAL: Final = 2.0
+UNDER_WAY: Final = 1.0
+SCHEDULED: Final = 0.0
+WSH_SF: Final = "20261019_WSH@SF"
+
+
+def _k(team: str, at: datetime) -> TeamKickoff:
+    return TeamKickoff(SEASON, WEEK, team, at)
+
+
+KICKOFFS: Final = [
+    _k("PIT", SUNDAY_LATE),
+    _k("TB", SUNDAY_LATE),
+    _k("WAS", MONDAY_NIGHT),
+    _k("SF", MONDAY_NIGHT),
+    _k("LA", LATE_KICK),
+    _k("SEA", LATE_KICK),
+]
+
+WEEK_BODY: Final = [
+    {"gameID": "20261018_PIT@TB", "home": "TB", "away": "PIT", "gameStatus": "Final/OT", "gameStatusCode": "2"},
+    {"gameID": WSH_SF, "home": "SF", "away": "WSH", "gameStatus": "Scheduled", "gameStatusCode": "0"},
+    {"gameID": "20261019_LAR@SEA", "home": "SEA", "away": "LAR", "gameStatus": "Live", "gameStatusCode": "1"},
+]
+
+
+def _recorded_box_score() -> dict[str, object]:
+    """A box score recorded from the live provider (tank01-2026, week 1)."""
+    path = FIXTURES_ROOT / "tank01-2026" / "box_20260913_WSH_at_PHI.json.gz"
+    with gzip.open(path, "rt", encoding="utf-8") as handle:
+        body = json.load(handle)["body"]
+    assert isinstance(body, dict)
+    return body
+
+
+def _as_wsh_sf(fields: Mapping[str, object]) -> dict[str, object]:
+    """The recorded box score's shape, made the Monday night game's."""
+    return {**_recorded_box_score(), "gameID": WSH_SF, "home": "SF", "away": "WSH", **fields}
+
+
+def test_the_recorded_box_score_reads_its_game_and_status_through_the_mapper() -> None:
+    game = map_box_score_game(_recorded_box_score(), 1)
+    assert game is not None
+    assert (game.game_id, game.home_nfl_team, game.away_nfl_team, game.status) == (
+        "20260913_WSH@PHI",
+        "PHI",
+        "WSH",
+        "final",
+    )
+
+
+@pytest.mark.parametrize(
+    ("fields", "expected"),
+    [
+        ({"gameStatus": "Final/OT", "gameStatusCode": "2"}, "final"),
+        ({"gameStatus": "Completed", "gameStatusCode": ""}, "final"),
+        ({"gameStatus": "", "gameStatusCode": "2"}, "final"),
+        ({"gameStatus": "Halftime", "gameStatusCode": "1"}, "in_progress"),
+        ({"gameStatus": "Scheduled", "gameStatusCode": "0"}, "scheduled"),
+    ],
+)
+def test_a_box_score_status_reads_code_then_words(fields: dict[str, str], expected: str) -> None:
+    game = map_box_score_game(_as_wsh_sf(fields), WEEK)
+    assert game is not None and game.status == expected
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        [],
+        "Final",
+        None,
+        {"gameID": WSH_SF, "home": "SF", "away": "WSH"},
+        {"gameID": WSH_SF, "home": "SF", "away": "WSH", "gameStatus": " ", "gameStatusCode": ""},
+        {"home": "SF", "away": "WSH", "gameStatus": "Final", "gameStatusCode": "2"},
+        {"gameID": WSH_SF, "away": "WSH", "gameStatus": "Final", "gameStatusCode": "2"},
+    ],
+)
+def test_an_answer_that_is_not_one_game_with_a_status_is_refused(body: object) -> None:
+    assert map_box_score_game(body, WEEK) is None
+
+
+def _games(at_status: Mapping[str, str] | None = None) -> list[GameSummary]:
+    body = [{**g, **({} if at_status is None else {"gameStatusCode": at_status.get(str(g["gameID"]), g["gameStatusCode"])})}
+            for g in WEEK_BODY]  # fmt: skip
+    return map_games(body, WEEK)
+
+
+def test_only_a_game_four_hours_past_its_kickoff_still_open_in_the_feed_lags() -> None:
+    lagging = lagging_games(_games(), KICKOFFS, frozenset(), WEEK, PASS_AT)
+    # PIT@TB is final in the feed; LAR@SEA kicked off two and a half hours ago.
+    assert [g.game_id for g in lagging] == [WSH_SF]
+    # One minute short of four hours: not yet.
+    assert (
+        lagging_games(_games(), KICKOFFS, frozenset(), WEEK, MONDAY_NIGHT + FALLBACK_AFTER - timedelta(minutes=1)) == []
+    )
+    # Exactly four hours: asked.
+    assert len(lagging_games(_games(), KICKOFFS, frozenset(), WEEK, MONDAY_NIGHT + FALLBACK_AFTER)) == 1
+
+
+def test_a_held_final_a_missing_kickoff_or_a_given_up_game_never_lags() -> None:
+    assert lagging_games(_games(), KICKOFFS, frozenset({("SF", WEEK)}), WEEK, PASS_AT) == []
+    assert lagging_games(_games(), KICKOFFS, frozenset({("WAS", WEEK)}), WEEK, PASS_AT) == []
+    no_sf = [k for k in KICKOFFS if k.team != "SF"]
+    assert lagging_games(_games(), no_sf, frozenset(), WEEK, PASS_AT) == []
+    past = LATE_KICK + GIVE_UP_AFTER + timedelta(minutes=1)
+    assert lagging_games(_games(), KICKOFFS, frozenset(), WEEK, past) == []
+
+
+def test_the_longest_waiting_game_comes_first() -> None:
+    games = _games({"20261018_PIT@TB": "1"})
+    lagging = lagging_games(games, KICKOFFS, frozenset(), WEEK, PASS_AT + timedelta(hours=2))
+    assert [g.game_id for g in lagging] == ["20261018_PIT@TB", WSH_SF, "20261019_LAR@SEA"]
+
+
+def test_at_most_two_a_pass_and_never_past_the_budget() -> None:
+    lagging = lagging_games(_games({"20261018_PIT@TB": "1"}), KICKOFFS, frozenset(), WEEK, PASS_AT + timedelta(hours=2))
+    assert len(to_ask(lagging, FixedBudget(10))) == FALLBACK_CAP
+    assert [g.game_id for g in to_ask(lagging, FixedBudget(1))] == ["20261018_PIT@TB"]
+    assert to_ask(lagging, FixedBudget(0)) == []
+
+
+class _Client:
+    """A Tank01 client answering the week's games and each game's box score from a table."""
+
+    def __init__(self, box_scores: Mapping[str, object]) -> None:
+        self.box_scores = box_scores
+        self.calls: list[tuple[str, dict[str, str]]] = []
+
+    def get(self, path: str, query: dict[str, str] | None = None) -> object:
+        asked = dict(query or {})
+        self.calls.append((path, asked))
+        if path == Paths.GAMES_FOR_WEEK:
+            return WEEK_BODY
+        assert path == Paths.BOX_SCORE
+        answer = self.box_scores[asked["gameID"]]
+        if isinstance(answer, Exception):
+            raise answer
+        return answer
+
+
+def _seed(conn: Connection) -> None:
+    rows = [
+        {"season": SEASON, "week": k.week, "team": k.team, "source": ScheduleSource.KICKOFF,
+         "metric": ScheduleMetric.KICKOFF_INSTANT, "as_of": k.at, "value": 1.0}
+        for k in KICKOFFS
+    ]  # fmt: skip
+    conn.execute(insert(TEAM_WEEK_OBSERVATIONS), rows)
+
+
+def _statuses(conn: Connection, at: datetime) -> dict[str, float]:
+    t = TEAM_WEEK_OBSERVATIONS
+    query = select(t.c.team, t.c.value).where(t.c.source == STATUS_SOURCE, t.c.as_of == at)
+    return {str(r.team): float(r.value) for r in conn.execute(query)}
+
+
+def _kept(conn: Connection, source: str) -> int:
+    t = CAPTURE_SNAPSHOTS
+    return int(conn.execute(select(func.count()).where(t.c.source == source)).scalar_one())
+
+
+@pytest.fixture
+def engine(request: pytest.FixtureRequest) -> Iterator[Engine]:
+    if "PARITY_DATABASE_URL" not in os.environ:
+        pytest.skip("needs a Postgres for scratch databases")
+    name = f"parity_lane101_{request.node.name.split('[')[0][-30:]}"
+    built = make_engine(sqlalchemy_url(databases.build_with_alembic(name)))
+    try:
+        yield built
+    finally:
+        built.dispose()
+        databases.drop(name)
+
+
+def test_the_lagging_game_is_asked_about_kept_and_its_final_written(engine: Engine) -> None:
+    client = _Client({WSH_SF: _as_wsh_sf({"gameStatus": "Completed", "gameStatusCode": "2"})})
+    with engine.begin() as conn:
+        _seed(conn)
+        result = capture_game_status(conn, cast(Tank01Client, client), SEASON, PASS_AT, FixedBudget(5))
+        assert (result.requests, result.failed) == (WEEK_AND_ONE_BOX_SCORE, False)
+        assert result.line == f"week 6, 6 clubs read, 4 final, 2 requests; {WSH_SF} box score final"
+        assert client.calls[1] == (Paths.BOX_SCORE, {"gameID": WSH_SF})
+        assert _statuses(conn, PASS_AT) == {"TB": 2.0, "PIT": 2.0, "SF": 2.0, "WAS": 2.0, "SEA": 1.0, "LA": 1.0}
+        assert _kept(conn, BOX_SCORE_SOURCE) == 1
+        # The next hour the final is held: the week's feed still says Scheduled, and nothing more is asked.
+        later = capture_game_status(
+            conn, cast(Tank01Client, client), SEASON, PASS_AT + timedelta(hours=1), FixedBudget(5)
+        )
+        assert later.requests == WEEK_FEED_ONLY and len(client.calls) == WEEK_AND_ONE_BOX_SCORE + WEEK_FEED_ONLY
+        assert _kept(conn, BOX_SCORE_SOURCE) == 1
+
+
+def test_a_box_score_still_open_is_written_as_it_says(engine: Engine) -> None:
+    client = _Client({WSH_SF: _as_wsh_sf({"gameStatus": "Live - In Progress", "gameStatusCode": "1"})})
+    with engine.begin() as conn:
+        _seed(conn)
+        result = capture_game_status(conn, cast(Tank01Client, client), SEASON, PASS_AT, FixedBudget(5))
+        assert not result.failed and result.line.endswith(f"{WSH_SF} box score under way")
+        assert _statuses(conn, PASS_AT)["SF"] == UNDER_WAY
+
+
+def test_a_refused_answer_is_kept_and_fails_the_line(engine: Engine) -> None:
+    client = _Client({WSH_SF: {"gameID": WSH_SF, "home": "SF", "away": "WSH"}})
+    with engine.begin() as conn:
+        _seed(conn)
+        result = capture_game_status(conn, cast(Tank01Client, client), SEASON, PASS_AT, FixedBudget(5))
+        assert result.failed and f"FAILED, {WSH_SF} box score refused" in result.line
+        assert _kept(conn, BOX_SCORE_SOURCE) == 1
+        # The week's read stands for every game, the refused one at the week's status.
+        assert _statuses(conn, PASS_AT)["SF"] == SCHEDULED and _statuses(conn, PASS_AT)["TB"] == FINAL
+
+
+def test_a_provider_failure_keeps_nothing_and_fails_the_line(engine: Engine) -> None:
+    failure = Tank01Error("upstream", Paths.BOX_SCORE, "Tank01 returned HTTP 500 for /getNFLBoxScore.", 500)
+    client = _Client({WSH_SF: failure})
+    with engine.begin() as conn:
+        _seed(conn)
+        result = capture_game_status(conn, cast(Tank01Client, client), SEASON, PASS_AT, FixedBudget(5))
+        assert (
+            result.failed and result.requests == WEEK_AND_ONE_BOX_SCORE and f"FAILED, {WSH_SF} box score" in result.line
+        )
+        assert _kept(conn, BOX_SCORE_SOURCE) == 0
+        assert _statuses(conn, PASS_AT)["SF"] == SCHEDULED
+
+
+def test_a_spent_budget_asks_the_week_alone_and_says_so(engine: Engine) -> None:
+    client = _Client({})
+    with engine.begin() as conn:
+        _seed(conn)
+        result = capture_game_status(conn, cast(Tank01Client, client), SEASON, PASS_AT, FixedBudget(1))
+        assert (result.requests, result.failed) == (WEEK_FEED_ONLY, False)
+        assert result.line == "week 6, 6 clubs read, 2 final, 1 request; 1 lagging, not asked this pass"
+        assert [path for path, _ in client.calls] == [Paths.GAMES_FOR_WEEK]

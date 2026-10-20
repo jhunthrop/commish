@@ -8,7 +8,8 @@
 `tank01_lines` and the weather service's kickoff forecasts into `nws_forecast` (Lane 66a). While a game
 of the current week that kicked off has no final, up to four days past its kickoff (Lane 84), it asks
 Tank01's week of games once for their statuses (Lane 80, `pipeline/tank01/game_status.py`, at most two
-calls an hour), so a game is final the hour after it ends.
+calls an hour), and a game that answer still has open four hours past its kickoff by its own box score
+(Lane 101, at most two a pass), so a game is final the hour after it ends.
 
 `usage-backfill` runs the weekly pass's usage steps alone (play-by-play and the three charted feeds)
 for every week nflverse has published: the operator's one-shot for weeks played before the steps
@@ -230,7 +231,8 @@ def _capture_harvest(now: datetime) -> bool:
 
 def _game_status(engine: Engine, client: Tank01Client, now: datetime, season: int, budget: FixedBudget) -> bool:
     """The games' statuses (Lane 80), in a transaction of their own so a refused read never rolls back
-    the capture: its line names its requests, and a refusal by the hourly cap is not a failure."""
+    the capture: its line names its requests, and a refusal by the hourly cap is not a failure. A
+    lagging game's refused or failed box score (Lane 101) fails the line; the week's read stands."""
     try:
         with engine.begin() as conn:
             status = capture_game_status(conn, client, season, now, budget)
@@ -238,7 +240,7 @@ def _game_status(engine: Engine, client: Tank01Client, now: datetime, season: in
         _line(f"  {STATUS_SOURCE}: FAILED, {error}")
         return False
     _line(f"  {STATUS_SOURCE}: {status.line}")
-    return True
+    return not status.failed
 
 
 def _week_reads(now: datetime) -> None:
