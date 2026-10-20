@@ -124,7 +124,8 @@ export function basisTiles(
 			key: 'preseason',
 			label: CARD.preseason,
 			value: fixed(points),
-			caption: `${format.label} points for ${String(year)}, the full season`
+			caption: `${format.label} points for ${String(year)}, the full season`,
+			reason: null
 		},
 		...(pace === null
 			? []
@@ -133,14 +134,16 @@ export function basisTiles(
 						key: 'pace' as const,
 						label: CARD.preseasonPace,
 						value: fixed(pace),
-						caption: CARD.paceCaption
+						caption: CARD.paceCaption,
+						reason: null
 					}
 				]),
 		{
 			key: 'vsAvg',
 			label: CARD.vsAvg,
 			value: NONE,
-			caption: pace === null ? CARD.vsAvgCaption : `${CARD.vsAvgCaption}: ${vsAvgReason(games)}`
+			caption: CARD.vsAvgCaption,
+			reason: pace === null ? null : vsAvgReason(games)
 		}
 	];
 }

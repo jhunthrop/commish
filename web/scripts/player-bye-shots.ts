@@ -1,5 +1,5 @@
 // Screenshots of a player page on his bye (Lane 100) at 1280 and 390 in both themes, on the fixture
-// API's clock: Jahmyr Gibbs, whose Lions are off in week 6, signed out (the sheet's add) and signed in
+// API's clock: Jahmyr Gibbs, whose Lions are off in week 6, signed out (Compare leads) and signed in
 // with the verb his own roster's (Open your lineup while a week 6 game is still to kick off, Compare
 // leading once the week's last game has). Each asserts what it shows:
 //   Opp rank reads his week 7 game ("Wk 7 vs GB, ...") and the change tile his week 7 Proj or the day it
@@ -41,6 +41,7 @@ const out = new URL(process.argv[3] ?? '../screenshots/player-bye/', import.meta
 interface Seen {
 	tiles: Record<string, { value: string; caption: string }>;
 	basis: string[];
+	vsAvg: { value: string; caption: string };
 	projHead: boolean;
 	paragraphs: number;
 	stamps: string[];
@@ -64,6 +65,16 @@ async function seen(page: Page): Promise<Seen> {
 			basis: [...document.querySelectorAll('main .card .tiles.basis .lb')].map((el) =>
 				el.textContent.trim()
 			),
+			vsAvg: {
+				value:
+					document
+						.querySelector('main .card .tiles.basis .tile:last-child .v')
+						?.textContent.trim() ?? '',
+				caption:
+					document
+						.querySelector('main .card .tiles.basis .tile:last-child .cap')
+						?.textContent.trim() ?? ''
+			},
 			projHead: [...document.querySelectorAll('main .season thead th')].some((th) =>
 				th.classList.contains('proj')
 			),
@@ -96,6 +107,12 @@ function checkSeen(s: Seen, where: string, verb: string): void {
 		s.basis.join('|') === [CARD.preseason, CARD.preseasonPace, CARD.vsAvg].join('|'),
 		`${where}: the row under the tiles ${s.basis.join(', ')}`
 	);
+	const gap = s.vsAvg;
+	check(
+		/^[+\u2212]\d+\.\d$/.test(gap.value) &&
+			/^\d+\.\d a game from week \d+ against his \d+\.\d: /.test(gap.caption),
+		`${where}: vs Avg ${JSON.stringify(gap)}`
+	);
 	check(!s.projHead, `${where}: the game log draws a Proj column`);
 	check(s.paragraphs <= 1, `${where}: the read runs to ${String(s.paragraphs)} paragraphs`);
 	check(!s.stamps.some((st) => st.includes(CARD.writtenFrom)), `${where}: a season read's stamp`);
@@ -106,7 +123,8 @@ function checkSeen(s: Seen, where: string, verb: string): void {
 await mkdir(out, { recursive: true });
 const browser = await chromium.launch();
 for (const signedIn of [false, true]) {
-	const verb = signedIn ? VERB : 'Add to my sheet';
+	// Signed out in season Compare leads too (fix round 1, M3).
+	const verb = signedIn ? VERB : CARD.compare;
 	for (const theme of THEMES) {
 		for (const width of WIDTHS) {
 			const where = `${signedIn ? 'roster' : 'signed-out'} ${theme} ${String(width)}`;

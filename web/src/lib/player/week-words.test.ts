@@ -565,6 +565,8 @@ void test('on his bye the Opp rank and change tiles read his next game (Lane 100
 		['Wk 7 Proj', NONE, publishedOn('Thursday')]
 	);
 	assert.equal(tile(pending, 'proj').caption, CARD.byeWeek);
+	// Its capture time passed with none read: the tile's own words, never this week's (fix round 1, LOW-1).
+	assert.equal(tile(at(byeWeek(null, null)).tiles, 'delta').caption, CARD.nextProjNotIn);
 	const read = at(byeWeek(18.4, null)).tiles;
 	assert.deepEqual([tile(read, 'delta').value, tile(read, 'delta').caption], ['18.4', 'PPR']);
 	// A bye with no game read after it keeps the bye week's words.
@@ -605,19 +607,38 @@ void test("the lineup verb fits the moment: once the week's last game kicks off,
 	assert.match(past.basis[1] ?? '', /your scoring/);
 });
 
+void test('signed out in season Compare leads, and preseason the sheet add stays (fix round 1, M3)', () => {
+	assert.equal(card(week()).compareLeads, true);
+	const preseason = liveCard({
+		week: week(),
+		player: PLAYER,
+		league: null,
+		tiles: BUILT,
+		opponents: {},
+		games: 3,
+		rest: null,
+		screenHref: href,
+		zone: ZONE,
+		now: NOW
+	});
+	assert.equal(preseason.compareLeads, false);
+});
+
 void test('vs Avg is his rest of season a game less his Avg, from the two printed tenths (Lane 100, B51)', () => {
 	const built: BasisTile[] = [
 		{
 			key: 'preseason',
 			label: CARD.preseason,
 			value: '262.1',
-			caption: 'PPR points for 2026, the full season'
+			caption: 'PPR points for 2026, the full season',
+			reason: null
 		},
 		{
 			key: 'vsAvg',
 			label: CARD.vsAvg,
 			value: NONE,
-			caption: `${CARD.vsAvgCaption}: ${vsAvgReason(5)}`
+			caption: CARD.vsAvgCaption,
+			reason: vsAvgReason(5)
 		}
 	];
 	const at = (perGame: number | null, format: 'ppr' | 'half_ppr' = 'ppr') =>
@@ -641,8 +662,10 @@ void test('vs Avg is his rest of season a game less his Avg, from the two printe
 	assert.equal(filled.find((t) => t.key === 'vsAvg')?.value, '\u22128.7');
 	assert.equal(
 		filled.find((t) => t.key === 'vsAvg')?.caption,
-		'rest of season a game against his Avg: our figure weighs his 5 games against his preseason pace'
+		'22.0 a game from week 6 against his 30.7: our figure weighs his 5 games against his preseason pace'
 	);
+	// "--" stands with the plain caption: no reason beside a figure not drawn (fix round 1, M4).
+	assert.equal(at(null).find((t) => t.key === 'vsAvg')?.caption, CARD.vsAvgCaption);
 	assert.equal(filled.find((t) => t.key === 'preseason')?.value, '262.1');
 	assert.equal(at(null).find((t) => t.key === 'vsAvg')?.value, NONE);
 	// In another scoring than the tile's the figure a game is not the tile's: no gap is drawn.

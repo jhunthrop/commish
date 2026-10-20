@@ -167,14 +167,15 @@ void test("the read's stamp is its day and what it was written from", () => {
 void test('in season the row under the tiles is his preseason figures as stored and vs Avg (Lane 100, B17, B51)', () => {
 	const stored = { ...NUMBERS, preseasonPoints: 262.1, preseasonPerGame: 17.5 };
 	assert.deepEqual(
-		basisTiles(IN_SEASON, stored, 2026, 5).map((t) => [t.key, t.value, t.caption]),
+		basisTiles(IN_SEASON, stored, 2026, 5).map((t) => [t.key, t.value, t.caption, t.reason]),
 		[
-			['preseason', '262.1', 'PPR points for 2026, the full season'],
-			['pace', '17.5', 'a game, the pace our figure starts from'],
+			['preseason', '262.1', 'PPR points for 2026, the full season', null],
+			['pace', '17.5', 'a game, the pace our figure starts from', null],
 			[
 				'vsAvg',
 				'--',
-				'rest of season a game against his Avg: our figure weighs his 5 games against his preseason pace'
+				'rest of season a game against his Avg',
+				'our figure weighs his 5 games against his preseason pace'
 			]
 		]
 	);
@@ -182,11 +183,11 @@ void test('in season the row under the tiles is his preseason figures as stored 
 	assert.deepEqual(
 		basisTiles(IN_SEASON, { ...stored, preseasonPerGame: undefined }, 2026, 5).map((t) => [
 			t.key,
-			t.caption
+			t.reason
 		]),
 		[
-			['preseason', 'PPR points for 2026, the full season'],
-			['vsAvg', 'rest of season a game against his Avg']
+			['preseason', null],
+			['vsAvg', null]
 		]
 	);
 	// Preseason, or a player the preseason board did not rank: no row.

@@ -21,6 +21,9 @@ export interface BasisTile {
 	label: string;
 	value: string;
 	caption: string;
+	/** vs Avg's reason from the order's stored basis, said once its two figures are (Lane 100 fix round
+	 * 1, M4): never beside "--". Null without the stored pace, and on the other tiles. */
+	reason: string | null;
 }
 
 export interface CardTile {
@@ -104,6 +107,8 @@ export const CARD = {
 	vsAvg: 'vs Avg',
 	paceCaption: 'a game, the pace our figure starts from',
 	vsAvgCaption: 'rest of season a game against his Avg',
+	/** The Proj of the week after his bye once its capture time has passed with none read. */
+	nextProjNotIn: 'Not in yet',
 	/** A "--" says why on its tile (review M4). */
 	byeWeek: 'Bye this week',
 	projNotIn: "This week's projection is not in yet",
@@ -128,6 +133,18 @@ export const TILE_ORDER: readonly TileKey[] = ['proj', 'rest', 'opp', 'avg', 'la
  * preseason pace a game it starts from, weighed against the games he has played (Lane 100, B51). */
 export function vsAvgReason(games: number): string {
 	return `our figure weighs his ${plural(games, 'game')} against his preseason pace`;
+}
+
+/** vs Avg's caption once its two figures are read, both named as the card prints them (Lane 100 fix
+ * round 1, HIGH-1): "22.0 a game from week 7 against his 30.7", then the stored reason. */
+export function vsAvgCaption(
+	perGame: string,
+	from: string,
+	avg: string,
+	reason: string | null
+): string {
+	const figures = `${perGame} a game ${from} against his ${avg}`;
+	return reason === null ? figures : `${figures}: ${reason}`;
 }
 
 /** The Proj of the week after his bye while it is not in: the day it is first published. */

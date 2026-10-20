@@ -41,6 +41,7 @@ import {
 	NONE,
 	printTenth,
 	publishedOn,
+	vsAvgCaption,
 	withTile,
 	type BasisTile,
 	type CardHead,
@@ -326,7 +327,7 @@ function afterByeProjTile(
 ): CardTile {
 	const value = after.line.week_projection;
 	const arrives = after.projection_arrives_at;
-	const pending = arrives === null ? CARD.projNotIn : publishedOn(weekdayName(arrives, zone));
+	const pending = arrives === null ? CARD.nextProjNotIn : publishedOn(weekdayName(arrives, zone));
 	return {
 		key: 'delta',
 		label: `${weekHead(after.week)} ${CARD.proj}`,
@@ -555,10 +556,16 @@ export function verbFits(
 function vsAvgTile(week: PlayerWeek, rest: RestParts | null, built: BasisTile): BasisTile {
 	const perGame = week.line.rest_of_season_per_game;
 	const avg = week.line.season_avg;
-	const same = week.projection_scoring.format === rest?.scoring;
+	if (rest === null) return built;
+	const same = week.projection_scoring.format === rest.scoring;
 	if (!same || perGame === null || avg === null) return built;
 	const tenths = Math.round(perGame * TENTHS) - Math.round(avg * TENTHS);
-	return { ...built, value: signed(tenths / TENTHS) };
+	const from = restNow(week, rest)?.from ?? rest.from;
+	return {
+		...built,
+		value: signed(tenths / TENTHS),
+		caption: vsAvgCaption(printTenth(perGame), from, printTenth(avg), built.reason)
+	};
 }
 
 /** The card once the week is read. */
@@ -608,7 +615,9 @@ export function liveCard({
 		cell,
 		next,
 		verb,
-		compareLeads: held,
+		// Signed out in season no lineup or league verb fits either: Compare leads, not the sheet's add
+		// (Lane 100 fix round 1, M3).
+		compareLeads: held || (league === null && rest !== null),
 		basis: liveBasis(week, leagueVerb !== null, zone, now),
 		rest: restAtClock,
 		formats: formatsOf(week, restAtClock),
