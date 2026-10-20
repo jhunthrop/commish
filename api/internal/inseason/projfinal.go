@@ -9,32 +9,39 @@ import (
 // the score bug, the Matchup's sides and the Lineup: its points so far as
 // the platform scores them plus the week projection, as printed to the
 // tenth, of each starter still to play, a starter out counting nothing.
-// Nil before any of the starters has kicked off (the Proj is then the
-// figure) or with the score unread.
-func projectedFinal(points *float64, starters []apitypes.PlayerLine) *float64 {
-	if points == nil {
+// Nil before the game has kicked off (started: any starter of either side
+// past kickoff; the Proj is then the figure), with the score unread, or
+// while a starter still to play has no Proj (fix round 1, MEDIUM-4): a
+// figure that left him out would read low, so none is printed.
+func projectedFinal(points *float64, starters []apitypes.PlayerLine, started bool) *float64 {
+	if points == nil || !started {
 		return nil
 	}
-	started := false
 	sum := *points
 	for _, l := range starters {
 		f := l.Facts
-		if f.Bye || f.GameState == nil {
+		if f.Bye || f.GameState == nil || *f.GameState != apitypes.GameStateUpcoming || sitsOut(f) {
 			continue
 		}
-		if *f.GameState != apitypes.GameStateUpcoming {
-			started = true
-			continue
+		if l.WeekProjection == nil {
+			return nil
 		}
-		if !sitsOut(f) && l.WeekProjection != nil {
-			sum += roundTenth(*l.WeekProjection)
-		}
-	}
-	if !started {
-		return nil
+		sum += roundTenth(*l.WeekProjection)
 	}
 	total := roundTenth(sum)
 	return &total
+}
+
+// anyStarted reports a starter past kickoff among the lines, by the one
+// game state (gameStateAt, carried on his facts).
+func anyStarted(lines []apitypes.PlayerLine) bool {
+	for _, l := range lines {
+		f := l.Facts
+		if !f.Bye && f.GameState != nil && *f.GameState != apitypes.GameStateUpcoming {
+			return true
+		}
+	}
+	return false
 }
 
 // sidePoints is the platform's score so far for the side to the tenth,

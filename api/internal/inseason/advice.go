@@ -515,17 +515,19 @@ func (a *advisor) Lineup() (apitypes.LineupAdvice, bool) {
 		state := a.weekDoneState()
 		out.WeekDoneState = &state
 	}
-	out.ProjectedFinal = projectedFinal(out.TeamPoints, advisedStarters(out.Slots))
+	set := setStarters(out.Slots)
+	out.ProjectedFinal = projectedFinal(out.TeamPoints, set, anyStarted(set))
 	return out, true
 }
 
-// advisedStarters is the starters the advice sets, a spot no one can play
-// left out: the lineup its projected final counts (Lane 92).
-func advisedStarters(slots []apitypes.LineupSlot) []apitypes.PlayerLine {
+// setStarters is the lineup as the platform holds it, its points the
+// team's score: the starters the score bug's projected final counts (fix
+// round 1, MEDIUM-5), so the Lineup's figure is the bug's.
+func setStarters(slots []apitypes.LineupSlot) []apitypes.PlayerLine {
 	out := make([]apitypes.PlayerLine, 0, len(slots))
 	for _, s := range slots {
-		if !s.NoOneCanPlay {
-			out = append(out, s.Ours)
+		if line := asSet(s); line != nil {
+			out = append(out, *line)
 		}
 	}
 	return out

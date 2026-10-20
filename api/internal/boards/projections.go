@@ -76,12 +76,14 @@ type WeekProjection struct {
 }
 
 // AsOf is the week's projection as it stood at an instant (Lane 92, B27):
-// the newest snapshot captured at or before it, else the earliest held
-// (the closest after it), with the snapshot before it as its Previous. A
-// game past its kickoff keeps its projection as of kickoff, so its row
-// never moves after the game has started.
+// the newest snapshot captured at or before it, with the snapshot before
+// it as its Previous. A game past its kickoff keeps its projection as of
+// kickoff, so its row never moves after the game has started. With none
+// captured by then (a week whose first capture came after the kickoff) it
+// holds no row: a snapshot from after the kickoff is never called as of
+// kickoff (fix round 1, L3).
 func (w WeekProjection) AsOf(at time.Time) WeekProjection {
-	if !w.ReadAt.After(at) || len(w.Earlier) == 0 {
+	if !w.ReadAt.After(at) {
 		return w
 	}
 	for _, e := range w.Earlier {
@@ -89,7 +91,7 @@ func (w WeekProjection) AsOf(at time.Time) WeekProjection {
 			return e
 		}
 	}
-	return w.Earlier[len(w.Earlier)-1]
+	return emptyProjection(w.Week)
 }
 
 // Player is a player's points: a team defense's by his club, anyone

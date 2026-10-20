@@ -156,8 +156,8 @@ func TestProjectedPointsForEachPreset(t *testing.T) {
 }
 
 // AsOf is the newest snapshot at or before the instant (Lane 92, B27), the
-// newest itself when it was captured by then, the earliest held when every
-// one came after.
+// newest itself when it was captured by then, and no row when every one
+// came after (fix round 1, L3).
 func TestWeekProjectionAsOfAKickoff(t *testing.T) {
 	at := func(day int) time.Time { return time.Date(2026, 10, day, 12, 0, 0, 0, time.UTC) }
 	snap := func(day int, ppr float64) WeekProjection {
@@ -176,7 +176,7 @@ func TestWeekProjectionAsOfAKickoff(t *testing.T) {
 		{"at the newest", at(18), 3},
 		{"between", at(17), 2},
 		{"at the earliest", at(14), 1},
-		{"before every snapshot", at(13), 1},
+		{"before every snapshot", at(13), 0},
 	} {
 		if got := w.AsOf(c.at).Players["p"].PPR; got != c.want {
 			t.Errorf("%s: %v, want %v", c.name, got, c.want)
@@ -185,7 +185,10 @@ func TestWeekProjectionAsOfAKickoff(t *testing.T) {
 	if prev := w.AsOf(at(17)).Previous; prev == nil || prev.Players["p"].PPR != 1 {
 		t.Errorf("the snapshot before the one as of kickoff: %+v", prev)
 	}
-	if one := snap(18, 3); one.AsOf(at(13)).Players["p"].PPR != 3 {
-		t.Error("a week of one snapshot reads it at any instant")
+	if _, ok := snap(18, 3).AsOf(at(13)).Players["p"]; ok {
+		t.Error("a snapshot from after the kickoff was read as of kickoff")
+	}
+	if got := snap(18, 3).AsOf(at(19)).Players["p"].PPR; got != 3 {
+		t.Errorf("a week of one snapshot after it is %v, want 3", got)
 	}
 }

@@ -53,7 +53,7 @@ func (a *advisor) pairings() [][]*leaguesync.Side {
 }
 
 // kickoffs is one game's starters' kickoffs: how many have kicked off,
-// how many are done (final, or out of a game under way or to come), how
+// how many are done (final, or out of a game under way), how
 // many are in play and still to come, how many have a game, and the next
 // to come.
 type kickoffs struct {
@@ -63,8 +63,10 @@ type kickoffs struct {
 
 // add counts one starter's game by its state (gameStateAt, carried on his
 // facts), so the bug and his row never disagree on a kickoff. A starter
-// out (a designation that keeps him out) is done however his game stands:
-// he scores nothing more (Lane 92, B02).
+// out (a designation that keeps him out) is done once his game has kicked
+// off: he scores nothing more (Lane 92, B02). Before kickoff his game is
+// still to come, as the platform keeps the matchup in progress: he can
+// still be swapped out (fix round 1, HIGH-2).
 func (k *kickoffs) add(f apitypes.WeekFacts) {
 	if f.Bye || f.Kickoff == nil || f.GameState == nil {
 		return
@@ -85,11 +87,7 @@ func (k *kickoffs) add(f apitypes.WeekFacts) {
 		}
 		return
 	}
-	if out {
-		k.done++
-	} else {
-		k.toCome++
-	}
+	k.toCome++
 	if k.next == nil || f.Kickoff.Before(*k.next) {
 		at := *f.Kickoff
 		k.next = &at
@@ -140,17 +138,21 @@ func (a *advisor) scoreboardGame(sides []*leaguesync.Side) apitypes.ScoreboardGa
 	var game kickoffs
 	own := make([]kickoffs, len(sides))
 	out := apitypes.ScoreboardGame{Sides: make([]apitypes.ScoreboardSide, 0, len(sides))}
+	starters := make([][]apitypes.PlayerLine, len(sides))
 	for i, s := range sides {
-		lines := make([]apitypes.PlayerLine, 0, len(s.Starters))
 		for _, id := range s.Starters {
 			line := a.build(id, a.Player(id), s).line
 			own[i].add(line.Facts)
 			game.add(line.Facts)
-			lines = append(lines, line)
+			starters[i] = append(starters[i], line)
 		}
 		out.Sides = append(out.Sides, apitypes.ScoreboardSide{RosterId: s.RosterID, Points: roundTenth(s.Points),
-			PointsRead: !s.PointsUnread, Starters: len(s.Starters), Played: own[i].kicked, Projection: printedLines(lines),
-			ProjectedFinal: projectedFinal(sidePoints(s), lines)})
+			PointsRead: !s.PointsUnread, Starters: len(s.Starters), Played: own[i].kicked, Projection: printedLines(starters[i])})
+	}
+	// Each side's projected final once the game has kicked off, a side none
+	// of whose starters has yet included.
+	for i, s := range sides {
+		out.Sides[i].ProjectedFinal = projectedFinal(sidePoints(s), starters[i], game.kicked > 0)
 	}
 	out.State, out.NextKickoff = game.state(), game.next
 	// The pooled count stays for the web before Lane 92; each side says its own.

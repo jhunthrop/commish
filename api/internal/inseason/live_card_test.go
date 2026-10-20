@@ -83,6 +83,9 @@ func TestLiveCardCountsEachSideAndProjectsItsFinal(t *testing.T) {
 		if side.ProjectedFinal == nil || want == nil || *side.ProjectedFinal != *want {
 			t.Errorf("matchup side %d projected final %v, the bug's %v", side.RosterId, side.ProjectedFinal, want)
 		}
+		if a, b := side.ToPlay, game.Sides[i].ToPlay; (a == nil) != (b == nil) || (a != nil && *a != *b) {
+			t.Errorf("matchup side %d count %v, the bug's %v", side.RosterId, a, b)
+		}
 	}
 	lineup := lineupOf(t, s)
 	if lineup.ProjectedFinal == nil || *lineup.ProjectedFinal != 50 {

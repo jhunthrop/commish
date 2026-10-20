@@ -64,13 +64,22 @@ func TestToPlayNeverPrintsAZero(t *testing.T) {
 	}
 }
 
-// A side whose every starter is final, on bye or out reads final (Lane
-// 92, B02, the FFPC card): an out starter in a game under way or to come
-// is done, a questionable one still plays.
+// A side whose every starter is final, on bye or out of a game under way
+// reads final (Lane 92, B02, the FFPC card); a questionable one still
+// plays. An out starter whose game is still to come is still to play
+// (fix round 1, HIGH-2): he can be swapped, and the platform keeps the
+// matchup in progress.
 func TestToPlayOutStarterIsDone(t *testing.T) {
 	final, live, ahead := apitypes.GameStateFinal, apitypes.GameStateKickedOff, apitypes.GameStateUpcoming
+	waiting := countOf(startedAt(final, ""), startedAt(ahead, apitypes.DesignationStatusOut))
+	if got := waiting.state(); got != apitypes.ScoreboardGameStatePlaying {
+		t.Errorf("an out starter still to come reads %s, want playing", got)
+	}
+	if got := waiting.toPlay(waiting.state()); got == nil || *got != "1 to play" {
+		t.Errorf("an out starter still to come counts %v, want 1 to play", got)
+	}
 	done := countOf(startedAt(final, ""), startedAt(live, apitypes.DesignationStatusOut),
-		startedAt(ahead, apitypes.DesignationStatusInjuredReserve), apitypes.WeekFacts{Bye: true})
+		startedAt(live, apitypes.DesignationStatusInjuredReserve), apitypes.WeekFacts{Bye: true})
 	if got := done.state(); got != apitypes.ScoreboardGameStateFinal {
 		t.Errorf("final, out and bye read %s, want final", got)
 	}
