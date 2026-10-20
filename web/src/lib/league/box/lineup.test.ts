@@ -4,7 +4,8 @@ import { test } from 'node:test';
 import { FIXTURE_WEEK_CLOCK } from '../../../../scripts/inseason-fixture/clock.ts';
 import { bannedPattern } from '#lib/format/copy-guard.ts';
 import type { LineupSlot, PlayerLine, WeekFacts } from '../inseason/api.ts';
-import { boxRow } from './box.ts';
+import { WEEK_DONE } from '../../../../scripts/inseason-fixture/sunday.ts';
+import { BOX, boxRow } from './box.ts';
 import {
 	changesTitle,
 	copiedLine,
@@ -362,15 +363,25 @@ void test('no move is drawn on a row whose game has kicked off or is final (Lane
 	assert.deepEqual(heldLineup(untouched, NOW), { ...untouched, held_empty: [] });
 });
 
-void test('the finished week takes the strip: no sum, the API sentence', () => {
-	const done = "Every starter's game is final, so week 6 is over.";
+void test('every starter played takes the strip: no sum, the API sentence', () => {
+	const done = WEEK_DONE;
 	// The API's sentence (words.go WeekDoneWords) passes the one copy guard.
 	assert.doesNotMatch(done, BANNED, done);
 	const box = lineupBox(advice, ZONE, NOW);
 	assert.equal(stripSum(box, done), null);
 	assert.notEqual(stripSum(box, null), null);
-	assert.equal(changesTitle(0, done), 'Final');
 	assert.equal(changesTitle(0, null), LINEUP.set);
+});
+
+void test('Locked while the matchup still plays, Final once it is, Final from the previous API (Lane 91)', () => {
+	assert.equal(changesTitle(0, WEEK_DONE, 'locked'), BOX.locked);
+	assert.equal(changesTitle(0, WEEK_DONE, 'final'), BOX.final);
+	// An answer with the sentence and no state, from the API before Lane 91, says Final as it did.
+	assert.equal(changesTitle(0, WEEK_DONE, null), BOX.final);
+	assert.equal(changesTitle(0, WEEK_DONE), BOX.final);
+	// No sentence, no state word: the changes as before.
+	assert.equal(changesTitle(2, null, null), 'Two changes');
+	assert.equal(BOX.locked, 'Locked');
 });
 
 void test('a partly locked chain places each player once (review L-A)', () => {

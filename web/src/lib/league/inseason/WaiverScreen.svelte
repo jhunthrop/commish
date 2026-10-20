@@ -10,6 +10,7 @@
 	import type { LeagueHost } from '../api.ts';
 	import { positionWord } from '../box/box.ts';
 	import PickupStrip from '../box/PickupStrip.svelte';
+	import { addressedWeek, arrivesPart, weekProjected } from '../box/next-week.ts';
 	import WaiverTable from '../box/WaiverTable.svelte';
 	import {
 		addVerbWords,
@@ -140,6 +141,8 @@
 	let copied = $state<CopiedLine | null>(null);
 
 	const shown = $derived(narrowed ?? advice);
+	/** "Week 7 projections expected Thursday.", over the table while the week has no Proj (Lane 95). */
+	const arrives = $derived(arrivesPart(shown, addressedWeek(shown), memberZone()));
 	const positions = $derived(
 		POSITIONS.filter((p) => advice.rows.some((r) => r.add.player.position === p))
 	);
@@ -373,7 +376,7 @@
 >
 	{#snippet summary()}
 		<PickupStrip
-			week={advice.week}
+			week={addressedWeek(advice)}
 			{cards}
 			sum={advice}
 			chosen={card?.key ?? null}
@@ -420,8 +423,10 @@
 		<span class="count">{countWords(pool, host)}</span>
 	</div>
 	{#if problem}<ProblemLine>{problem}</ProblemLine>{/if}
+	{#if arrives}<p class="arrives">{arrives}</p>{/if}
 	<div class="rows" class:reading aria-busy={reading}>
 		<WaiverTable
+			projected={weekProjected(shown)}
 			label={LINES.waiverAdds}
 			{rows}
 			{sort}
@@ -472,6 +477,13 @@
 		font: inherit;
 		color: var(--ink);
 		outline: none;
+	}
+
+	/* Where the Proj columns would be, before the week's projection is read (Lane 95). */
+	.arrives {
+		margin: 0 0 var(--s-2);
+		font-size: var(--t-sm);
+		color: var(--ink-2);
 	}
 
 	.count {

@@ -352,21 +352,39 @@ func ToPlayWords(toPlay, withGame int) string {
 	return fmt.Sprintf("%d of %d starters to play", toPlay, withGame)
 }
 
-// WeekDoneWords is the Lineup's sentence once every starter's game this
-// week is final (Lane 85): nothing is left to change, so it stands where
-// the changes and the verb would.
-func WeekDoneWords(week int) string {
-	return fmt.Sprintf("Every starter's game is final, so week %d is over.", week)
+// WeekDoneWords is the Lineup's sentence once every starter of the
+// member's has played (Lane 85): nothing is left to set, so it stands
+// where the changes and the verb would. It says the lineup, never the
+// week (Lane 91): the score bug beside it says who is still to play.
+func WeekDoneWords() string {
+	return "Every starter of yours has played, so nothing is left to set."
 }
 
 // WaiversBasis is the waiver page's pickup rule (§5.3, Lane 66f): the
 // week on the Proj the screen shows, the rest of the season on its Gain.
 const WaiversBasis = "A pickup starts this week on Proj and keeps Gain at zero or better."
 
+// WaiversBasisFor is the pickup rule for the week the page addresses: this
+// week's, or once the page has turned to the week after (Lane 95) that
+// week's by number.
+func WaiversBasisFor(week int, turned bool) string {
+	if !turned {
+		return WaiversBasis
+	}
+	return fmt.Sprintf("A pickup starts in week %d on Proj and keeps Gain at zero or better.", week)
+}
+
 // SeasonOrderWords is the waiver page's rule once a pickup's game has
 // kicked off (Lane 85 fix round 3): the adds go by the season Gain.
 func SeasonOrderWords(week int) string {
 	return fmt.Sprintf("Pickups go in Gain order once their week %d games kick off.", week)
+}
+
+// UnprojectedOrderWords is the waiver page's rule while the week it
+// addresses has no published projection read (Lane 95): the adds go by the
+// season Gain until it is in.
+func UnprojectedOrderWords(week int) string {
+	return fmt.Sprintf("Pickups go in Gain order until week %d's published projection is in.", week)
 }
 
 // WaiverSeasonBasis is what a waiver Gain is, the head the card and the

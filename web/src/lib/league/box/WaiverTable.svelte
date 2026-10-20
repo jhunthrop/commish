@@ -38,14 +38,31 @@
 		go: Snippet;
 		/** Said in place of the rows when none is left (a search that finds no one). */
 		empty: string;
+		/** Whether Proj and Δ Proj are drawn: not until the week's published projection is read
+		 * (Lane 95), as Trades drops its week group. */
+		projected?: boolean;
 	}
 
-	let { label, rows, sort, onsort, open, ontoggle, drops, chosen, onchoose, go, empty }: Props =
-		$props();
+	let {
+		label,
+		rows,
+		sort,
+		onsort,
+		open,
+		ontoggle,
+		drops,
+		chosen,
+		onchoose,
+		go,
+		empty,
+		projected = true
+	}: Props = $props();
 
-	const COLUMNS = 10;
+	/** The week's two projection columns, left out while no projection is read. */
+	const PROJ_KEYS = new Set<SortKey>(['proj', 'delta']);
+	const COLUMNS = $derived(projected ? 10 : 8);
 	/** The panel's cells before its two last columns. */
-	const LEAD_COLUMNS = 8;
+	const LEAD_COLUMNS = $derived(projected ? 8 : 6);
 	const HEADS: readonly { key: SortKey; label: string; cls: string }[] = [
 		{ key: 'name', label: BOX.player, cls: 'player' },
 		{ key: 'game', label: BOX.game, cls: 'game' },
@@ -57,6 +74,7 @@
 		{ key: 'rest', label: WAIVERS.rest, cls: 'n rest' },
 		{ key: 'beats', label: WAIVERS.beats, cls: 'n beats' }
 	];
+	const shownHeads = $derived(HEADS.filter((head) => projected || !PROJ_KEYS.has(head.key)));
 	const week = $derived(sameWeekGain(drops));
 
 	/** The arrow keys move the drop chosen through the group, its focus with it (review 66f L11). */
@@ -84,7 +102,7 @@
 <table class="pool" aria-label={label}>
 	<thead>
 		<tr class="cols">
-			{#each HEADS as head (head.key)}
+			{#each shownHeads as head (head.key)}
 				<th class={head.cls} scope="col" aria-sort={ariaSort(head.key)}
 					><button
 						type="button"
@@ -112,6 +130,7 @@
 				marked={entry.named}
 				clears={entry.clears}
 				phoneMore="{WAIVERS.rest} {boxNumber(entry.rest)}"
+				projCells={projected}
 			>
 				{#snippet tail()}
 					{@render restCell(entry.rest)}
@@ -170,6 +189,7 @@
 						nested
 						marked={on}
 						phoneMore="{WAIVERS.rest} {boxNumber(drop.rest)}"
+						projCells={projected}
 					>
 						{#snippet tail()}
 							{@render restCell(drop.rest)}
