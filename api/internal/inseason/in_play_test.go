@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/jhunthrop/commish/api/internal/boards"
+	"github.com/jhunthrop/commish/api/internal/leaguesync"
 )
 
 // A starter in play adds the rest of his projection (round 2, L6): his
@@ -35,5 +36,22 @@ func TestProjectedFinalAddsTheRestOfAStarterInPlay(t *testing.T) {
 		if box := matchupOf(t, s); box.Sides[0].ProjectedFinal == nil || *box.Sides[0].ProjectedFinal != c.want {
 			t.Errorf("%s: the Matchup's %v, want the bug's %v", c.name, box.Sides[0].ProjectedFinal, c.want)
 		}
+	}
+}
+
+// On a platform that gives team points alone (Yahoo), the per-player
+// points never reach the rule: a starter in play adds nothing more, the
+// rule before round 2, however the read is filled.
+func TestProjectedFinalTeamPointsOnlyAddsNothingInPlay(t *testing.T) {
+	f, projection := liveFixture(t)
+	f.league.Snap.Ref.Host = leaguesync.HostYahoo
+	projection.Players["p001"] = boards.ProjectedPoints{PPR: 12, Half: 12, Standard: 12}
+	f.league.Snap.Matchups[0].PlayerPoints["h001"] = 5
+	s := liveService(t, f, projection)
+	if got := scoreboardOf(t, s).Games[0].Sides[0].ProjectedFinal; got == nil || *got != 50 {
+		t.Errorf("Yahoo, h001 in play below his Proj: projected final %v, want 50 (team points alone)", got)
+	}
+	if got := matchupOf(t, s).Sides[0].ProjectedFinal; got == nil || *got != 50 {
+		t.Errorf("Yahoo Matchup %v, want the bug's 50", got)
 	}
 }
