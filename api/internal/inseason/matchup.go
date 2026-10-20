@@ -50,6 +50,8 @@ func (a *advisor) Matchup() (apitypes.MatchupBox, bool) {
 		// Each side's count by the score bug's rule (fix round 1, MEDIUM-3).
 		out.Sides[i].ToPlay = own[i].toPlay(game.state())
 	}
+	// Where the member stands, under the bug's two scores (Lane 99, B31).
+	out.Standing, out.Decided = standingFields(standingOf(game.state(), sides, starters))
 	return out, true
 }
 

@@ -2878,8 +2878,11 @@ type LineupAdvice struct {
 	HostLineupUrl string `json:"host_lineup_url"`
 
 	// HostNote one sentence under the verb when we cannot open the host's page ("Make this change on Yahoo. We cannot open that page for you yet."), null when the url opens it
-	HostNote *string     `json:"host_note"`
-	Moves    LineupMoves `json:"moves"`
+	HostNote *string `json:"host_note"`
+
+	// Missed the miss line once the lineup as set on the platform has kicked off where it differs from our pick (the highest Proj at each slot after designations and byes, as of each kickoff, no player held): each such slot once both its players have kicked off, "DJ Moore, Out, scored 0.0 in your Flex while Josh Downs scored 8.7 on your bench.", the two that cost the most named and the rest counted (", and one more."), then once every starter of both lineups is final "Our lineup would have scored 85.5."; null where the two agree, before such a slot has kicked off, where the platform gives no player's points, or absent from an older answer
+	Missed *string     `json:"missed,omitempty"`
+	Moves  LineupMoves `json:"moves"`
 
 	// OrderBasis which order ranks the players: our preseason board, or the rest-of-season order (from week 7, once the API reads it)
 	OrderBasis OrderBasis `json:"order_basis"`
@@ -3053,6 +3056,9 @@ type MFLConnectInput struct {
 
 // MatchupBox defines model for MatchupBox.
 type MatchupBox struct {
+	// Decided while the game plays, the side behind has nobody left to score and the leader cannot fall back to it (no QB or D/ST of the leader's still to score, or a lead of 10 points or more): the bug says Decided in place of the game's state; present whenever standing is, absent from an older answer
+	Decided *bool `json:"decided,omitempty"`
+
 	// ProjectionReadAt when the week's published projection the rows' week_projection read was captured, null with none
 	ProjectionReadAt *time.Time `json:"projection_read_at"`
 
@@ -3064,7 +3070,10 @@ type MatchupBox struct {
 
 	// Sides the drafter's side first, then the opponent's when the week pairs them
 	Sides []MatchupBoxSide `json:"sides"`
-	Week  int              `json:"week"`
+
+	// Standing where the member stands, said under the score bug's two scores from their side: while the game plays the margin and who is left ("Up 3.2, 2 of yours and 1 of theirs to play", "Down 14.1 with nobody left, McCaffrey and Kittle playing for them"), once final the result ("Won by 6.4", "Lost by 30.4", "Tied"); null before the first kickoff, without an opponent, with either score unread, where the platform shows us no starters for a side, or absent from an older answer
+	Standing *string `json:"standing,omitempty"`
+	Week     int     `json:"week"`
 }
 
 // MatchupBoxSide defines model for MatchupBoxSide.

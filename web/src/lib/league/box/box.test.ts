@@ -243,14 +243,20 @@ void test("a defense's face is its club's mark, said in words", () => {
 	assert.equal(positionWord('K'), 'K');
 });
 
-void test("Totals' note: the projection not in yet, else the playing starters with a Proj when one lacks it", () => {
-	const game = { where: 'at ATL', when: 'Sun 12:00 pm' };
-	const held = { proj: 10, game };
-	const lacking = { proj: null, game };
-	const bye = { proj: null, game: 'bye' as const };
+void test("Totals' note: the projection not in yet, else the playing starters without a Proj by name (Lane 99, B49)", () => {
+	const game = { where: 'at LV', when: 'Final' };
+	const held = { proj: 10, game, name: 'Josh Downs', toCome: false };
+	const lacking = { proj: null, game, name: 'DJ Moore', toCome: false };
+	const bye = { proj: null, game: 'bye' as const, name: 'Jahmyr Gibbs', toCome: false };
 	assert.equal(totalsNote([held, lacking, bye], false, 6), 'No projection yet for week 6');
-	assert.equal(totalsNote([held, lacking, bye], true, 6), '1 of 2 starters with a Proj');
+	assert.equal(totalsNote([held, lacking, bye], true, 6), 'DJ Moore had no Proj');
 	assert.equal(totalsNote([held, bye], true, 6), null);
+	// Still to come he has none; two are named; past two they are counted.
+	const ahead = { ...lacking, toCome: true };
+	assert.equal(totalsNote([held, ahead], true, 6), 'DJ Moore has no Proj');
+	const other = { ...lacking, name: 'Kyle Pitts Sr.' };
+	assert.equal(totalsNote([lacking, other], true, 6), 'DJ Moore and Kyle Pitts Sr. had no Proj');
+	assert.equal(totalsNote([lacking, other, lacking], true, 6), '3 starters had no Proj');
 });
 
 void test('Totals add the tenths the column prints, so a reader adding the column gets the bar', () => {
@@ -313,7 +319,7 @@ const BANNED = bannedPattern();
 void test('copy guard: every box word is fantasy words, with no dash or semicolon', () => {
 	const said = [
 		...Object.values(BOX),
-		totalsNote([{ proj: null, game: null }], true, 6) ?? '',
+		totalsNote([{ proj: null, game: null, name: 'DJ Moore', toCome: false }], true, 6) ?? '',
 		totalsNote([], false, 6) ?? ''
 	];
 	for (const text of said) {

@@ -82,7 +82,9 @@ export const WEATHER_FIGURE = new RegExp(
 
 /** A figure a row draws and the words of the sentence that says what it is (review H2). */
 const FIGURE_SENTENCES: readonly { figure: RegExp; sentence: string; what: string }[] = [
-	{ figure: /\bOpp \d+(st|nd|rd|th)\b/, sentence: 'Opp rank is', what: 'Opp rank' },
+	// Said alone ("Opp rank is points allowed to his position") or with Our rank on the Lineup
+	// ("..., Opp rank the points allowed to it", Lane 99).
+	{ figure: /\bOpp \d+(st|nd|rd|th)\b/, sentence: 'points allowed to', what: 'Opp rank' },
 	{ figure: /\b\d+(\.5)? to \d+(\.5)?\b/, sentence: 'expected points', what: 'the expected score' },
 	{ figure: /\bA game \d+\.\d\b/, sentence: 'A game is', what: 'A game' },
 	{ figure: WEATHER_FIGURE, sentence: 'weather', what: 'the weather' }
