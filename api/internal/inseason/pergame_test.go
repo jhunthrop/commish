@@ -44,7 +44,7 @@ func restSchedule() []boards.TeamWeek {
 // leftFrom is each club's games left from week first before
 // the season's first kickoff.
 func leftFrom(first int) map[string]int {
-	return counts(weeksToPlay(restSchedule(), first, time.Date(2026, 9, 1, 12, 0, 0, 0, east)))
+	return counts(weeksToPlay(restSchedule(), first, LastWeek, time.Date(2026, 9, 1, 12, 0, 0, 0, east)))
 }
 
 // A club's games left are its games still to play from the order's first

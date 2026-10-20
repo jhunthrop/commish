@@ -6,19 +6,21 @@ import "github.com/jhunthrop/commish/api/internal/draft"
 // season's seventeen games.
 const SeasonGames = 17
 
-// LastWeek is the last week the rest-of-season order covers, the last
-// fantasy week (research.model.ros.outcomes' LAST_FANTASY_WEEK).
+// LastWeek is the last week the published run's rest-of-season points
+// cover, the last fantasy week (research.model.ros.outcomes'
+// LAST_FANTASY_WEEK), and the order's for a read with no league
+// (StandardHorizon).
 const LastWeek = 17
 
 // WeeksCovered is how many weeks the order's points over replacement
 // cover: the season's on the preseason number; on the rest-of-season
-// order, the first week it covers through the last, never fewer than one. A
-// league with no week reads as the whole season.
-func WeeksCovered(basis OrderBasis, week int) int {
+// order, the first week it covers through the horizon's last, never fewer
+// than one. A league with no week reads as the whole season.
+func WeeksCovered(basis OrderBasis, week int, h Horizon) int {
 	if basis != RestOfSeason || week < 1 {
 		return SeasonGames
 	}
-	return max(1, LastWeek-week+1)
+	return max(1, h.Last-week+1)
 }
 
 // PerWeek is the order's points over replacement a week: averaged over

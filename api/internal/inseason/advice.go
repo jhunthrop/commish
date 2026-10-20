@@ -46,9 +46,11 @@ type advisor struct {
 	season   *Season
 	held     map[string]bool
 	basis    OrderBasis
-	// weeks is how many weeks the order covers (WeeksCovered).
-	pages pages
-	weeks int
+	// weeks is how many weeks the order covers (WeeksCovered), through
+	// the league's horizon (HorizonOf, Lane 96).
+	pages   pages
+	weeks   int
+	horizon Horizon
 	// rest is the rest of season at the read's clock (Lane 86), whose
 	// board League.Board is; gamesLeft its clubs' games still to play, the
 	// divisor of a row's rest-of-season points a game.
@@ -138,11 +140,12 @@ func newAdvisor(l League, data Data, projection boards.WeekProjection, held map[
 		basis = Preseason
 	}
 	preset, _ := leaguesync.LeagueScoring(l.Saved, nil, false)
-	rest := RestAt(data.Games, l.Board.FromWeek, l.Board.Refreshed, now)
+	horizon := HorizonOf(l.Snap.Terms).Reaching(l.Board.FromWeek)
+	rest := RestAt(data.Games, l.Board.FromWeek, l.Board.Refreshed, now, horizon)
 	if l.Board, err = LiveBoard(l.Board, rest); err != nil {
 		return nil, fmt.Errorf("inseason: the board at the read's clock: %w", err)
 	}
-	return &advisor{rest: rest, League: l, settings: *l.Saved, config: config, slots: Slots(config), held: held, basis: basis, weeks: WeeksCovered(basis, firstWeek(l)), pages: newPages(l.Board.Raw), now: now,
+	return &advisor{rest: rest, League: l, settings: *l.Saved, config: config, slots: Slots(config), held: held, basis: basis, horizon: horizon, weeks: WeeksCovered(basis, firstWeek(l), horizon), pages: newPages(l.Board.Raw), now: now,
 		gamesLeft: rest.Left, projection: projection, preset: preset, week: l.Snap.Week, data: data,
 		season: NewSeason(data, RulesOf(rulesOf(l.Saved.Scoring)), l.Snap.Week, now)}, nil
 }
@@ -838,7 +841,7 @@ func (a *advisor) waiverPage(run waiverRun) apitypes.WaiverAdvice {
 	un := UncountedOf(a.settings, a.season.Carries)
 	forWeek := h.forWeek
 	out := apitypes.WaiverAdvice{Week: h.week, ForWeek: &forWeek, ProjectionArrivesAt: a.projectionArrivesAt(), Basis: WaiversBasisFor(a.week, a.week != a.Snap.Week), PickupOrder: weekOrder,
-		SeasonBasis: withPerGame(a.Board, WaiverSeasonBasis(a.basis, a.weeks), run.mine, run.pool),
+		SeasonBasis: withPerGame(a.Board, WaiverSeasonBasis(a.basis, a.weeks, a.horizon), run.mine, run.pool),
 		BasisNote:   un.Note, BasisNoteLink: un.Link, OrderBasis: h.basis, Refreshed: h.refreshed, ReadAt: h.readAt,
 		ProjectionReadAt: a.projectionReadAt(), ProjectionPreviousReadAt: a.projectionPreviousReadAt(), ProjectionScoring: projectionScoring(a.settings, a.preset),
 		Pickups: []apitypes.WaiverRow{}, Rows: []apitypes.WaiverRow{}, Roster: lines(run.mine, indexes(len(run.mine))), Moves: CopyOnlyClaims(a.Snap.Ref.Host)}
@@ -951,7 +954,7 @@ func (a *advisor) Trades(focus string) (apitypes.TradeAdvice, bool) {
 		}
 		out.Teams = append(out.Teams, row)
 	}
-	out.Basis = TradesBasis(a.basis, a.weeks)
+	out.Basis = TradesBasis(a.basis, a.weeks, a.horizon)
 	out.PerGameBasis = perGameSaid(a.Board, shown...)
 	out.CheckBasis = TradeCheckBasis
 	return out, true

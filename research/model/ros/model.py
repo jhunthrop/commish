@@ -199,18 +199,33 @@ def play_rate(availability: float, played: int, club_games: int, k: float) -> fl
     return (k * availability + played) / (k + club_games)
 
 
-def expected_games(player: PlayerToDate, priors: RosPriors) -> float:
-    if player.remaining <= 0:
-        return 0.0
+def _q(player: PlayerToDate, priors: RosPriors) -> float:
+    """His play rate a club game: his availability shrunk by the games he has played of his club's."""
     availability = (
         player.stale.availability if player.stale is not None else priors.offboard_availability[player.position]
     )
+    return play_rate(availability, len(player.played), len(player.club_weeks), priors.availability_k[player.position])
+
+
+def expected_games(player: PlayerToDate, priors: RosPriors) -> float:
+    if player.remaining <= 0:
+        return 0.0
     streak = player.streak
     if streak == 0:
-        q = play_rate(availability, len(player.played), len(player.club_weeks), priors.availability_k[player.position])
-        return q * player.remaining
+        return _q(player, priors) * player.remaining
     index = min(streak, STREAK_CAP) - 1
     return priors.return_next[index] + priors.return_later[index] * (player.remaining - 1)
+
+
+def next_game_expected(player: PlayerToDate, priors: RosPriors) -> float:
+    """The expected games of one more club game after his counted ones (Lane 96, week 18 at his rate): what
+    `expected_games` adds for it. His play rate, or coming back from a run of missed games the return
+    weight of his next game while none is counted, of a later one after."""
+    streak = player.streak
+    if streak == 0:
+        return _q(player, priors)
+    index = min(streak, STREAK_CAP) - 1
+    return priors.return_next[index] if player.remaining <= 0 else priors.return_later[index]
 
 
 @dataclass(frozen=True, slots=True)
@@ -220,17 +235,22 @@ class RosProjection:
     expected_games: float
     per_game: Mapping[str, float]
     projected: Mapping[str, float]
+    # One more club game after his counted ones, by scoring (Lane 96): a league whose title week is past
+    # the run's last week values that week at it (the API's LiveBoard).
+    game_points: Mapping[str, float]
 
 
 def project(player: PlayerToDate, priors: RosPriors) -> RosProjection:
     games = expected_games(player, priors)
     rates = {name: per_game(player, name, priors) for name in FORMATS}
+    after = next_game_expected(player, priors)
     return RosProjection(
         player.player_id,
         player.position,
         games,
         MappingProxyType(rates),
         MappingProxyType({name: rate * games for name, rate in rates.items()}),
+        MappingProxyType({name: rate * after for name, rate in rates.items()}),
     )
 
 

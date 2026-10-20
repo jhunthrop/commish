@@ -76,7 +76,7 @@ NUMBERS, TIME AND WORDS
 - Every figure carries its unit right after it: "32 points", "19.5 points", "25.9 PPR points a game", "28th of 32 against receivers", "61 degrees", "14 mph", "a 30% chance". Never a bare figure, never "32 to 19.5".
 - A rank against his position reads as the facts give it, 1st allowed the fewest, said the way a person would, never a code.
 - Name the season once, with the first week you name ("week 6 of 2026"), and every week after it without the year ("week 5", "week 7"). Never the year twice. "This week" is fine. Never a date or the name of a month. A week still to play is only looked ahead to.
-- The injury report is the one the facts name, by its day ("on Monday's report"), never "the latest".
+- The injury report is the one the facts name, by the day the facts give ("on Friday's report"), never "the latest" and never another day. Before a game's status report is out, say so as the facts do.
 - Name clubs by name as the facts give them beside the code ("the Cardinals", "Arizona"), never by their code ("ARI").
 - Fantasy football words, never a trading or a betting word. The game's expected points are an expected score and nothing more. Never a provider, a data source or a rival product by name. Never a tip and never "remember to".
 - Speak for the board as "we" when you need to, never "I", "me" or "my". The facts are yours alone: never mention a sheet.

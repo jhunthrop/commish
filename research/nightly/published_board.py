@@ -18,7 +18,8 @@ Every number is the run's own, so it names the run's basis: `rank` (`ourRank`), 
 `points` (`projected`), `points_over_replacement` (`vor`) and the range at twelve teams under the
 format's roster shape. `order_basis` is `rest_of_season` for a format the manifest gives the
 in-season window (`rosFromWeek`), else `preseason`, and `from_week` is that `rosFromWeek` (NULL before
-it), the first week the figures cover; `refreshed` is that format's `refreshedAt` in
+it), the first week the figures cover; `game_points` (revision 0015, Lane 96) is the row's `gamePoints`,
+his points for one more club game, NULL preseason; `refreshed` is that format's `refreshedAt` in
 season, and before it the stored board generation the run printed (the manifest's boards source
 for the format's stored board, whose window is the generation's stamp).
 
@@ -78,6 +79,8 @@ class PublishedRow:
     order_basis: str
     refreshed: datetime
     from_week: int | None
+    # One more club game at his rate (Lane 96), None preseason and on a run older than the field.
+    game_points: float | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -167,6 +170,7 @@ def _row(row: object, format_id: str, order_basis: str, refreshed: datetime, fro
         order_basis,
         refreshed,
         from_week,
+        _number(row, "gamePoints", where),
     )
 
 
@@ -261,6 +265,7 @@ def replace_published_board(conn: Connection, board: PublishedBoard, published_a
                     "refreshed": r.refreshed,
                     "published_at": published_at,
                     "from_week": r.from_week,
+                    "game_points": r.game_points,
                 }
                 for r in board.rows
             ],

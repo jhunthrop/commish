@@ -35,33 +35,39 @@ func (s *PGSource) preseasonCTEs(gate string) string {
 // for a schema the 0006 migration has not reached.
 func (s *PGSource) preseasonQuery(m marketRead) string {
 	return `with ` + s.preseasonCTEs("") + m.cte(s) + `
-select ` + m.columns() + `, (select as_of from latest), '` + string(OrderPreseason) + `'::text, ''::text, 0
+select ` + m.columns() + `, (select as_of from latest), '` + string(OrderPreseason) + `'::text, ''::text, 0, null::double precision
 from ` + s.table("provider_players") + ` pp left join proj board on board.player_id = pp.id` + m.join() + m.order()
 }
 
 // publishedQuery is the same roster with the published run's rows for
 // (season $1, format $3) when the season has any, else the stored board's
 // as preseasonQuery reads it: one statement, so a publish between two
-// reads never mixes the two boards. fromWeek is whether the table holds
-// from_week (research revision 0007); without it the run's first week
-// reads as 0.
-func (s *PGSource) publishedQuery(fromWeek bool, m marketRead) string {
-	week := "0"
-	if fromWeek {
+// reads never mixes the two boards. cols says which later columns the
+// table holds: without from_week (research revision 0007) the run's first
+// week reads as 0, without game_points (revision 0015, Lane 96) each
+// player's points for one more club game read as null.
+func (s *PGSource) publishedQuery(cols publishedColumns, m marketRead) string {
+	week, game := "0", "null::double precision"
+	if cols.fromWeek {
 		week = "from_week"
 	}
+	if cols.gamePoints {
+		game = "game_points"
+	}
 	return `with pub as (
-  select player_id, points, floor_points, median_points, ceiling_points, order_basis, refreshed, run_id, ` + week + ` as from_week
+  select player_id, points, floor_points, median_points, ceiling_points, order_basis, refreshed, run_id, ` + week + ` as from_week,
+    ` + game + ` as game_points
   from ` + s.table("published_boards") + ` where season = $1 and format = $3
 ), ` + s.preseasonCTEs(" and not exists (select 1 from pub)") + `, board as (
-  select player_id, points, floor_points, median_points, ceiling_points from pub
-  union all select player_id, points, floor_points, median_points, ceiling_points from proj
+  select player_id, points, floor_points, median_points, ceiling_points, game_points from pub
+  union all select player_id, points, floor_points, median_points, ceiling_points, null::double precision from proj
 )` + m.cte(s) + `
 select ` + m.columns() + `,
   coalesce((select max(refreshed) from pub), (select as_of from latest)),
   coalesce((select min(order_basis) from pub), '` + string(OrderPreseason) + `'),
   coalesce((select min(run_id) from pub), ''),
-  coalesce((select min(from_week) from pub), 0)
+  coalesce((select min(from_week) from pub), 0),
+  board.game_points
 from ` + s.table("provider_players") + ` pp left join board on board.player_id = pp.id` + m.join() + m.order()
 }
 
@@ -80,23 +86,33 @@ func (s *PGSource) boardRead(ctx context.Context, f Format) (string, []any, erro
 		args := []any{s.Season, s.sourceFor(f)}
 		return s.preseasonQuery(marketRead{on: market, first: len(args) + 1}), append(args, marketArgs...), nil
 	}
-	fromWeek, err := s.hasFromWeek(ctx)
+	fromWeek, err := s.hasColumn(ctx, "from_week")
+	if err != nil {
+		return "", nil, err
+	}
+	gamePoints, err := s.hasColumn(ctx, "game_points")
 	if err != nil {
 		return "", nil, err
 	}
 	args := []any{s.Season, s.sourceFor(f), string(f)}
-	return s.publishedQuery(fromWeek, marketRead{on: market, first: len(args) + 1}), append(args, marketArgs...), nil
+	return s.publishedQuery(publishedColumns{fromWeek: fromWeek, gamePoints: gamePoints}, marketRead{on: market, first: len(args) + 1}), append(args, marketArgs...), nil
 }
 
-// hasFromWeek is true when published_boards holds from_week (research
-// revision 0007): the api can deploy ahead of the migration, and then
-// reads the league's week as before.
-func (s *PGSource) hasFromWeek(ctx context.Context) (bool, error) {
+// publishedColumns is which of published_boards' later columns the table
+// holds.
+type publishedColumns struct {
+	fromWeek, gamePoints bool
+}
+
+// hasColumn is true when published_boards holds the column (from_week,
+// research revision 0007; game_points, revision 0015): the api can deploy
+// ahead of the migration, and then reads as before it.
+func (s *PGSource) hasColumn(ctx context.Context, column string) (bool, error) {
 	var ok bool
 	err := s.Pool.QueryRow(ctx, `select exists (select 1 from information_schema.columns
-  where table_schema = $1 and table_name = 'published_boards' and column_name = 'from_week')`, s.Schema).Scan(&ok)
+  where table_schema = $1 and table_name = 'published_boards' and column_name = $2)`, s.Schema, column).Scan(&ok)
 	if err != nil {
-		return false, fmt.Errorf("boards: look for published_boards.from_week: %w", err)
+		return false, fmt.Errorf("boards: look for published_boards.%s: %w", column, err)
 	}
 	return ok, nil
 }

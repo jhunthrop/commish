@@ -13,6 +13,7 @@ from research.model.ros.live import (
     PlayerWeeks,
     WeekFacts,
     Window,
+    counted_through,
     game_played,
     player_to_date,
     stale_prior,
@@ -35,7 +36,10 @@ def test_the_switch_reads_the_first_week_still_to_play() -> None:
     assert window_of([6, 7, 18], through=5) == Window(6, 5)
     assert window_of([7, 8], through=5) == Window(7, 5)  # week 6's lines not yet in: the window still starts at 7
     assert window_of([5, 6], through=4) == "week 5 is before the switch week (6)"
-    assert window_of([18], through=17) == "week 18 is past week 17, the last the model ranks"
+    # Lane 96 (review H1): week 18 is ranked once it is the week left, counted through itself.
+    assert window_of([18], through=17) == Window(18, 17)
+    assert counted_through(Window(18, 17)) == 18 and counted_through(Window(7, 6)) == 17
+    assert window_of([19], through=18) == "week 19 is past week 18, the regular season's last"
     assert window_of([], through=17) == "the season's schedule has no game left to play"
     assert window_of([6], through=0) == "the store holds no week of this season's lines"
 

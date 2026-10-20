@@ -96,6 +96,11 @@ type Player struct {
 	// Range is his season's floor, median and ceiling, nil with no
 	// projection.
 	Range *Range
+	// GamePoints is his points for one more club game after the run's
+	// counted weeks (published_boards.game_points, Lane 96): the week a
+	// league's title week runs past the run's last is valued at it. Nil
+	// preseason and on a run older than the column.
+	GamePoints *float64
 }
 
 // Range is a season's range of outcomes on the stored board.

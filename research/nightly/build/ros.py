@@ -50,6 +50,8 @@ class RestFigures:
     projected: Mapping[str, float]
     expected_games: float
     from_week: int | None
+    # One more club game after his counted ones, by scoring (Lane 96, the week 18 a league may value).
+    game_points: Mapping[str, float]
 
 
 Projections = Mapping[str, RestFigures]
@@ -182,7 +184,9 @@ def _projections(
         projection = project(player, ready.priors)
         club = club_at(who, ready.window)
         start = first_week_to_play(states, club) if player.remaining_weeks else None
-        found[row.universe_id] = RestFigures(projection.projected, projection.expected_games, start)
+        found[row.universe_id] = RestFigures(
+            projection.projected, projection.expected_games, start, projection.game_points
+        )
     return found  # fmt: skip
 
 
@@ -197,6 +201,7 @@ def _reranked(board: FormatBoard, extra: Sequence[StoredRow], found: Projections
             projected=found[row.universe_id].projected[board.format.scoring],
             expected_games=found[row.universe_id].expected_games,
             from_week=found[row.universe_id].from_week,
+            game_points=found[row.universe_id].game_points[board.format.scoring],
             floor=None,
             median=None,
             ceiling=None,

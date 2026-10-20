@@ -63,6 +63,8 @@ class StoredRow:
     # In season, the week his rest of season starts from: his club's first game still to play at the
     # run's instant (Lane 86, `schedule.first_week_to_play`); None preseason or with no game left.
     from_week: int | None = None
+    # In season, his points for one more club game after the counted ones (Lane 96); None preseason.
+    game_points: float | None = None
 
 
 @dataclass(frozen=True, slots=True)
