@@ -625,7 +625,10 @@
 		font-size: var(--t-sm);
 	}
 
-	@media (max-width: 1180px) {
+	/* The side folds under the lists below 1280, not at the site's 1180: the Platforms table needs a
+	 * 744 px column for its Connection column to keep 200 px beside whole names, verbs and one-line
+	 * last reads, and beside the 380 px side it had 119 px at 1181 (Lane 105 fix round 1). */
+	@media (max-width: 1279px) {
 		.grid {
 			grid-template-columns: minmax(0, 1fr);
 		}

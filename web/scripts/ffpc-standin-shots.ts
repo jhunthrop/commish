@@ -5,7 +5,8 @@
 // Lineup's basis says the PPR column nearest FFPC's rules with FFPC's tight end extra beside it, and
 // the Account room's platforms say one state word each, what each connection is connected to, and no
 // internal field, and each Last read ("4 minutes ago") on one line at a desk and two at most in a hand
-// (B71). Exits non-zero on any fault.
+// (B71), and the Connection column at 200 px or more at every desk width, 1200 among them. Exits
+// non-zero on any fault.
 //
 //   FIXTURE_CLOCK=2026-10-17T17:00:00.000Z PORT=8799 node scripts/inseason-fixture/serve.ts
 //   node scripts/ffpc-standin-shots.ts [web origin] [out dir]
@@ -17,7 +18,9 @@ import { copyFault, watchData } from './copy-scan.ts';
 import { installFixtureApiClock, requireFixtureClock } from './inseason-fixture/clock.ts';
 import { FIXTURE_IDS } from './inseason-fixture/ids.ts';
 
-const WIDTHS = [1440, 1280, 390] as const;
+/** 1200 is inside the band above the site's 1180 fold where the Account side once squeezed the
+ * Platforms table's Connection column to 119 px (Lane 105 fix round 1). */
+const WIDTHS = [1440, 1280, 1200, 390] as const;
 /** The Connection column's least width at a desk, where its line wraps within it (fix round 1). */
 const CONNECTION_MIN_PX = 200;
 const DESK = 900;
